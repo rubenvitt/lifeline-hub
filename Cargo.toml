@@ -15,6 +15,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 clap = { version = "4", features = ["derive", "env"] }
 anyhow = "1"
 argon2 = { version = "0.5", features = ["std"] }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 axum-extra = { version = "0.10", features = ["cookie"] }
 
 [dev-dependencies]
