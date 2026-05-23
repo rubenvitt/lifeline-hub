@@ -30,10 +30,37 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Wartet auf Ctrl+C für einen sauberen Shutdown.
+/// Wartet auf ein Shutdown-Signal (SIGINT/Ctrl+C oder SIGTERM) für einen sauberen Shutdown.
 async fn shutdown_signal() {
-    match tokio::signal::ctrl_c().await {
-        Ok(()) => tracing::info!("Shutdown-Signal empfangen, fahre herunter"),
-        Err(err) => tracing::warn!("Ctrl+C-Handler konnte nicht installiert werden: {err}"),
+    let ctrl_c = async {
+        if let Err(err) = tokio::signal::ctrl_c().await {
+            tracing::warn!("Ctrl+C-Handler konnte nicht installiert werden: {err}");
+            // Nicht zurückkehren — sonst würde der Server sofort herunterfahren.
+            std::future::pending::<()>().await;
+        }
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        use tokio::signal::unix::{signal, SignalKind};
+        match signal(SignalKind::terminate()) {
+            Ok(mut stream) => {
+                stream.recv().await;
+            }
+            Err(err) => {
+                tracing::warn!("SIGTERM-Handler konnte nicht installiert werden: {err}");
+                std::future::pending::<()>().await;
+            }
+        }
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
     }
+
+    tracing::info!("Shutdown-Signal empfangen, fahre herunter");
 }
