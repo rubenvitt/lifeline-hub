@@ -1,5 +1,30 @@
 use clap::Parser;
 
+/// Passwort-Wert, dessen `Debug`-Ausgabe maskiert ist, damit das Klartext-
+/// Passwort nicht versehentlich (z.B. via `{config:?}`) ins Log gelangt.
+#[derive(Clone)]
+pub struct GeheimesPasswort(pub String);
+
+impl std::str::FromStr for GeheimesPasswort {
+    type Err = std::convert::Infallible;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(GeheimesPasswort(s.to_string()))
+    }
+}
+
+impl std::fmt::Debug for GeheimesPasswort {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("\"***\"")
+    }
+}
+
+impl GeheimesPasswort {
+    /// Klartext-Passwort als &str.
+    pub fn als_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// Laufzeit-Konfiguration für den lifeline-hub-Server.
 #[derive(Parser, Debug, Clone)]
 #[command(version, about = "lifeline-hub Server")]
@@ -23,7 +48,7 @@ pub struct Config {
     /// Passwort des initialen Admin-Kontos. Fehlt es, wird beim ersten Start
     /// ein Zufalls-Passwort erzeugt und ins Log geschrieben.
     #[arg(long, env = "LIFELINE_ADMIN_PASSWORD")]
-    pub admin_password: Option<String>,
+    pub admin_password: Option<GeheimesPasswort>,
 }
 
 #[cfg(test)]
@@ -57,6 +82,17 @@ mod tests {
         assert!(config.admin_password.is_none());
 
         let config = Config::parse_from(["lifeline-hub", "--admin-password", "geheim123"]);
-        assert_eq!(config.admin_password.as_deref(), Some("geheim123"));
+        assert_eq!(
+            config.admin_password.as_ref().map(|p| p.als_str()),
+            Some("geheim123")
+        );
+    }
+
+    #[test]
+    fn admin_password_wird_im_debug_maskiert() {
+        let config = Config::parse_from(["lifeline-hub", "--admin-password", "geheim123"]);
+        let ausgabe = format!("{config:?}");
+        assert!(!ausgabe.contains("geheim123"), "Passwort darf nicht im Debug stehen");
+        assert!(ausgabe.contains("***"));
     }
 }

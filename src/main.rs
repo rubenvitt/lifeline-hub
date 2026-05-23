@@ -22,7 +22,7 @@ async fn main() -> anyhow::Result<()> {
         &pool,
         &config.org_name,
         &config.admin_user,
-        config.admin_password.as_deref(),
+        config.admin_password.as_ref().map(|p| p.als_str()),
     )
     .await?;
     if ergebnis.admin_angelegt {
