@@ -1,7 +1,7 @@
-import { Alert, App, Button, Space, Spin, Tag, Typography } from 'antd';
+import { Alert, App, Button, Popconfirm, Space, Spin, Tag, Typography } from 'antd';
 import { Link, useParams } from 'react-router-dom';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { ladeEinsatz } from '../api/einsaetze';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ladeEinsatz, schliesseEinsatzAb } from '../api/einsaetze';
 import { SEITENGROESSE, listeEtb, type EtbFilterWerte, type NeuerEintrag } from '../api/etb';
 import { ApiError } from '../api/client';
 import type { EtbEintragAnzeige } from '../api/types';
@@ -35,9 +35,21 @@ export default function EtbPage() {
 
   const eintraege = etbQuery.data?.pages.flat() ?? [];
 
+  const qc = useQueryClient();
   const { message } = App.useApp();
   const [berichtigungZu, setBerichtigungZu] = useState<EtbEintragAnzeige | null>(null);
   const { erfassen, ausstehend, abgelehnt } = useEtbErfassung(einsatzId);
+
+  const abschliessenMutation = useMutation({
+    mutationFn: () => schliesseEinsatzAb(einsatzId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['einsatz', einsatzId] });
+      qc.invalidateQueries({ queryKey: ['einsaetze'] });
+      message.success('Einsatz abgeschlossen');
+    },
+    onError: (e) =>
+      message.error(e instanceof ApiError ? e.message : 'Abschließen fehlgeschlagen'),
+  });
 
   async function erfassenMitMeldung(e: NeuerEintrag) {
     try {
@@ -60,6 +72,8 @@ export default function EtbPage() {
   }
   const einsatz = einsatzQuery.data;
 
+  const darfAbschliessen = einsatz.status === 'aktiv' && einsatz.meine_rolle === 'einsatzleitung';
+
   const darfSchreiben =
     einsatz.status === 'aktiv' &&
     (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
@@ -74,6 +88,19 @@ export default function EtbPage() {
           </Typography.Title>
           <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
         </Space>
+        {darfAbschliessen && (
+          <Popconfirm
+            title="Einsatz abschließen?"
+            description="Danach sind keine neuen Einträge oder Berichtigungen mehr möglich."
+            okText="Ja"
+            cancelText="Abbrechen"
+            onConfirm={() => abschliessenMutation.mutate()}
+          >
+            <Button danger loading={abschliessenMutation.isPending}>
+              Einsatz abschließen
+            </Button>
+          </Popconfirm>
+        )}
       </Space>
 
       {etbQuery.isError && (

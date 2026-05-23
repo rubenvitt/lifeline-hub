@@ -1,0 +1,50 @@
+import { http, HttpResponse } from 'msw';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it } from 'vitest';
+import { Route, Routes } from 'react-router-dom';
+import { server } from '../test/server';
+import { renderMitProviders } from '../test/utils';
+import { AuthProvider } from '../auth/AuthContext';
+import EtbPage from './EtbPage';
+
+const admin = {
+  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
+  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00',
+};
+function einsatz(status: string) {
+  return {
+    id: 7, bezeichnung: 'Hochwasser', stichwort: null, status,
+    begonnen_at: '2026-05-23 09:00:00', abgeschlossen_at: null, abgeschlossen_von: null,
+    meine_rolle: 'einsatzleitung',
+  };
+}
+
+describe('EtbPage – Abschließen', () => {
+  it('schließt einen aktiven Einsatz als Einsatzleitung ab', async () => {
+    let abgeschlossen = false;
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () =>
+        HttpResponse.json(einsatz(abgeschlossen ? 'abgeschlossen' : 'aktiv')),
+      ),
+      http.get('/api/einsaetze/7/etb', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/7/abschliessen', () => {
+        abgeschlossen = true;
+        return HttpResponse.json(einsatz('abgeschlossen'));
+      }),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/7/etb' },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Einsatz abschließen' }));
+    // Popconfirm bestätigen
+    await userEvent.click(await screen.findByRole('button', { name: 'Ja' }));
+    await waitFor(() => expect(screen.getByText('abgeschlossen')).toBeInTheDocument());
+  });
+});
