@@ -538,6 +538,46 @@ async fn stream_fuer_mitglied_liefert_event_stream() {
 }
 
 #[tokio::test]
+async fn stream_fuer_beobachter_ist_200() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let beob_id = benutzer_anlegen(&app, &admin, "beobi", "keine").await;
+
+    let zuweisung = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/einsaetze/{einsatz}/mitglieder/{beob_id}"))
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, admin.clone())
+                .body(Body::from(r#"{"einsatz_rolle":"beobachter"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(zuweisung.status(), StatusCode::OK);
+
+    let beob = login_cookie(&app, "beobi", "beobipw1").await;
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/einsaetze/{einsatz}/etb/stream"))
+                .header(header::COOKIE, beob)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "Beobachter muss den Stream abonnieren dürfen"
+    );
+}
+
+#[tokio::test]
 async fn stream_fuer_nicht_mitglied_ist_403() {
     let (app, _live) = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
