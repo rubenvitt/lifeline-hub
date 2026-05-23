@@ -141,15 +141,18 @@ pub async fn abfrage(
         .map(fts_query)
         // Falls die Eingabe nur Sonderzeichen war, ist die FTS-Query leer → kein Filter.
         .filter(|s| !s.is_empty());
+    // FTS-Tabelle NICHT aliasen: das MATCH-Prädikat muss die FTS-Tabelle beim
+    // Originalnamen ansprechen (`etb_eintrag_fts MATCH ?`). Eine Alias-Kurzform
+    // wie `f MATCH ?` lehnt SQLite mit "no such column: f" ab.
     if fts.is_some() {
-        qb.push(" JOIN etb_eintrag_fts f ON f.rowid = e.id");
+        qb.push(" JOIN etb_eintrag_fts ON etb_eintrag_fts.rowid = e.id");
     }
 
     qb.push(" WHERE e.einsatz_id = ");
     qb.push_bind(einsatz_id);
 
     if let Some(fts_q) = fts {
-        qb.push(" AND f MATCH ");
+        qb.push(" AND etb_eintrag_fts MATCH ");
         qb.push_bind(fts_q);
     }
 
@@ -420,5 +423,107 @@ mod tests {
         let mut f = filter();
         f.limit = 2;
         assert_eq!(abfrage(&pool, einsatz, &f).await.unwrap().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn suche_findet_eintrag_per_volltext() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        anlegen(&pool, einsatz, benutzer, daten("Deich bei km 12 instabil"))
+            .await
+            .unwrap();
+        anlegen(&pool, einsatz, benutzer, daten("Lagebesprechung 14 Uhr"))
+            .await
+            .unwrap();
+
+        let mut f = filter();
+        f.q = Some("Deich".into());
+        let treffer = abfrage(&pool, einsatz, &f).await.unwrap();
+        assert_eq!(treffer.len(), 1);
+        assert!(treffer[0].inhalt.contains("Deich"));
+    }
+
+    #[tokio::test]
+    async fn suche_kombiniert_mit_typ_filter() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        anlegen(&pool, einsatz, benutzer, daten("Hochwasser steigt")).await.unwrap();
+        let mut anordnung = daten("Hochwasser-Sperre einrichten");
+        anordnung.typ = "anordnung";
+        anlegen(&pool, einsatz, benutzer, anordnung).await.unwrap();
+
+        let mut f = filter();
+        f.q = Some("Hochwasser".into());
+        f.typ = Some("anordnung".into());
+        let treffer = abfrage(&pool, einsatz, &f).await.unwrap();
+        assert_eq!(treffer.len(), 1);
+        assert_eq!(treffer[0].typ, "anordnung");
+    }
+
+    #[tokio::test]
+    async fn suche_mit_sonderzeichen_wirft_keinen_fehler() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        anlegen(&pool, einsatz, benutzer, daten("Status: alles ruhig"))
+            .await
+            .unwrap();
+
+        // FTS5-Sonderzeichen dürfen keinen Syntaxfehler auslösen (Escaping greift).
+        let mut f = filter();
+        f.q = Some("Status: \"alles\" AND *".into());
+        let ergebnis = abfrage(&pool, einsatz, &f).await;
+        assert!(ergebnis.is_ok(), "Sonderzeichen müssen sicher behandelt werden");
+    }
+
+    #[tokio::test]
+    async fn suche_findet_in_von_feld() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let mut d = daten("Routinemeldung");
+        d.von = Some("Abschnitt Nord");
+        anlegen(&pool, einsatz, benutzer, d).await.unwrap();
+
+        let mut f = filter();
+        f.q = Some("Nord".into());
+        assert_eq!(abfrage(&pool, einsatz, &f).await.unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn abfrage_filtert_nach_bis_zeit() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let mut frueh = daten("frueh");
+        frueh.ereigniszeit = Some("2026-05-23 08:00:00");
+        anlegen(&pool, einsatz, benutzer, frueh).await.unwrap();
+        let mut spaet = daten("spaet");
+        spaet.ereigniszeit = Some("2026-05-23 18:00:00");
+        anlegen(&pool, einsatz, benutzer, spaet).await.unwrap();
+
+        let mut f = filter();
+        f.bis_zeit = Some("2026-05-23 12:00:00".into());
+        let liste = abfrage(&pool, einsatz, &f).await.unwrap();
+        assert_eq!(liste.len(), 1);
+        assert_eq!(liste[0].inhalt, "frueh");
+    }
+
+    #[tokio::test]
+    async fn abfrage_filtert_nach_erfasser() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let zweiter: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'Zweiter', 'zwei', 'h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        anlegen(&pool, einsatz, benutzer, daten("von leit")).await.unwrap();
+        anlegen(&pool, einsatz, zweiter, daten("von zwei")).await.unwrap();
+
+        let mut f = filter();
+        f.erfasser_id = Some(zweiter);
+        let liste = abfrage(&pool, einsatz, &f).await.unwrap();
+        assert_eq!(liste.len(), 1);
+        assert_eq!(liste[0].erfasser_id, zweiter);
     }
 }
