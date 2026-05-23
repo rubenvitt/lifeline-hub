@@ -1,1 +1,189 @@
-// Inhalt folgt in Task 5.
+use crate::app::AppState;
+use crate::auth::Benutzer;
+use crate::error::AppError;
+use argon2::password_hash::rand_core::{OsRng, RngCore};
+use axum::extract::FromRequestParts;
+use axum::http::request::Parts;
+use axum_extra::extract::cookie::CookieJar;
+use sqlx::SqlitePool;
+
+/// Name des Session-Cookies.
+pub const SESSION_COOKIE: &str = "lifeline_sid";
+
+/// Erzeugt einen neuen, kryptografisch zufälligen Session-Token (64 Hex-Zeichen).
+pub fn neuer_token() -> String {
+    let mut bytes = [0u8; 32];
+    OsRng.fill_bytes(&mut bytes);
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// Legt eine neue Session für den Benutzer an (TTL 7 Tage) und liefert den Token.
+pub async fn anlegen(pool: &SqlitePool, benutzer_id: i64) -> Result<String, AppError> {
+    let token = neuer_token();
+    sqlx::query(
+        "INSERT INTO session (token, benutzer_id, expires_at) \
+         VALUES (?, ?, datetime('now', '+7 days'))",
+    )
+    .bind(&token)
+    .bind(benutzer_id)
+    .execute(pool)
+    .await?;
+    Ok(token)
+}
+
+/// Löscht eine Session anhand ihres Tokens (idempotent).
+pub async fn loeschen(pool: &SqlitePool, token: &str) -> Result<(), AppError> {
+    sqlx::query("DELETE FROM session WHERE token = ?")
+        .bind(token)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// Löst eine gültige (nicht abgelaufene) Session zu einem aktiven Benutzer auf.
+async fn benutzer_aus_token(pool: &SqlitePool, token: &str) -> Result<Benutzer, AppError> {
+    let benutzer = sqlx::query_as::<_, Benutzer>(
+        "SELECT b.id, b.org_id, b.anzeigename, b.benutzername, b.passwort_hash, \
+                b.system_rolle, b.aktiv, b.erstellt_at \
+         FROM session s \
+         JOIN benutzer b ON b.id = s.benutzer_id \
+         WHERE s.token = ? AND s.expires_at > datetime('now') AND b.aktiv = 1",
+    )
+    .bind(token)
+    .fetch_optional(pool)
+    .await?;
+
+    benutzer.ok_or(AppError::Unauthorized)
+}
+
+/// Extractor: der aktuell angemeldete Benutzer (aus Session-Cookie).
+/// Liefert 401, wenn kein gültiger Session-Cookie vorliegt.
+pub struct CurrentUser(pub Benutzer);
+
+impl FromRequestParts<AppState> for CurrentUser {
+    type Rejection = AppError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let jar = CookieJar::from_request_parts(parts, state)
+            .await
+            .expect("CookieJar-Extractor ist infallible");
+        let token = jar
+            .get(SESSION_COOKIE)
+            .map(|c| c.value().to_string())
+            .ok_or(AppError::Unauthorized)?;
+
+        let benutzer = benutzer_aus_token(&state.pool, &token).await?;
+        Ok(CurrentUser(benutzer))
+    }
+}
+
+/// Extractor: der aktuell angemeldete Benutzer, der zusätzlich Admin sein muss.
+/// Liefert 401 ohne Session, 403 bei fehlender Admin-Rolle.
+pub struct AdminUser(pub Benutzer);
+
+impl FromRequestParts<AppState> for AdminUser {
+    type Rejection = AppError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let CurrentUser(benutzer) = CurrentUser::from_request_parts(parts, state).await?;
+        if benutzer.ist_admin() {
+            Ok(AdminUser(benutzer))
+        } else {
+            Err(AppError::Forbidden)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Legt eine Org + einen Benutzer an und liefert dessen id.
+    async fn benutzer_anlegen(pool: &SqlitePool, aktiv: i64) -> i64 {
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, aktiv) \
+             VALUES (1, 'Max', 'max', 'hash', ?)",
+        )
+        .bind(aktiv)
+        .execute(pool)
+        .await
+        .unwrap();
+        sqlx::query_scalar::<_, i64>("SELECT id FROM benutzer WHERE benutzername = 'max'")
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    #[test]
+    fn neuer_token_ist_64_hex_zeichen() {
+        let t = neuer_token();
+        assert_eq!(t.len(), 64);
+        assert!(t.chars().all(|c| c.is_ascii_hexdigit()));
+        assert_ne!(t, neuer_token(), "Tokens müssen sich unterscheiden");
+    }
+
+    #[tokio::test]
+    async fn anlegen_und_aufloesen_roundtrip() {
+        let pool = crate::db::test_pool().await;
+        let id = benutzer_anlegen(&pool, 1).await;
+
+        let token = anlegen(&pool, id).await.unwrap();
+        let benutzer = benutzer_aus_token(&pool, &token).await.unwrap();
+        assert_eq!(benutzer.id, id);
+        assert_eq!(benutzer.benutzername, "max");
+    }
+
+    #[tokio::test]
+    async fn unbekannter_token_ist_unauthorized() {
+        let pool = crate::db::test_pool().await;
+        benutzer_anlegen(&pool, 1).await;
+        let err = benutzer_aus_token(&pool, "gibtsnicht").await.unwrap_err();
+        assert!(matches!(err, AppError::Unauthorized));
+    }
+
+    #[tokio::test]
+    async fn abgelaufene_session_ist_unauthorized() {
+        let pool = crate::db::test_pool().await;
+        let id = benutzer_anlegen(&pool, 1).await;
+        // Session mit Ablauf in der Vergangenheit direkt einfügen.
+        sqlx::query(
+            "INSERT INTO session (token, benutzer_id, expires_at) \
+             VALUES ('alt', ?, datetime('now', '-1 day'))",
+        )
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let err = benutzer_aus_token(&pool, "alt").await.unwrap_err();
+        assert!(matches!(err, AppError::Unauthorized));
+    }
+
+    #[tokio::test]
+    async fn session_eines_inaktiven_benutzers_ist_unauthorized() {
+        let pool = crate::db::test_pool().await;
+        let id = benutzer_anlegen(&pool, 0).await; // inaktiv
+        let token = anlegen(&pool, id).await.unwrap();
+        let err = benutzer_aus_token(&pool, &token).await.unwrap_err();
+        assert!(matches!(err, AppError::Unauthorized));
+    }
+
+    #[tokio::test]
+    async fn loeschen_invalidiert_session() {
+        let pool = crate::db::test_pool().await;
+        let id = benutzer_anlegen(&pool, 1).await;
+        let token = anlegen(&pool, id).await.unwrap();
+        loeschen(&pool, &token).await.unwrap();
+        let err = benutzer_aus_token(&pool, &token).await.unwrap_err();
+        assert!(matches!(err, AppError::Unauthorized));
+    }
+}
