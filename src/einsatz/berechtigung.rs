@@ -16,6 +16,16 @@ pub fn fordere_einsatzleitung(rolle: Option<EinsatzRolle>) -> Result<(), AppErro
     }
 }
 
+/// Stellt sicher, dass der Benutzer im Einsatz schreibberechtigt ist
+/// (Einsatzleitung oder Führungspersonal). `Forbidden` bei Beobachter
+/// oder fehlender Mitgliedschaft.
+pub fn fordere_schreibrecht(rolle: Option<EinsatzRolle>) -> Result<(), AppError> {
+    match rolle {
+        Some(r) if r.darf_schreiben() => Ok(()),
+        _ => Err(AppError::Forbidden),
+    }
+}
+
 /// Stellt sicher, dass der Einsatz noch aktiv (beschreibbar) ist.
 /// `Conflict` (409) bei abgeschlossenem (read-only) Einsatz.
 pub fn fordere_aktiv(einsatz: &Einsatz) -> Result<(), AppError> {
@@ -67,6 +77,20 @@ mod tests {
         ));
         assert!(matches!(
             fordere_einsatzleitung(None).unwrap_err(),
+            AppError::Forbidden
+        ));
+    }
+
+    #[test]
+    fn fordere_schreibrecht_blockt_beobachter_und_fremde() {
+        assert!(fordere_schreibrecht(Some(EinsatzRolle::Einsatzleitung)).is_ok());
+        assert!(fordere_schreibrecht(Some(EinsatzRolle::Fuehrungspersonal)).is_ok());
+        assert!(matches!(
+            fordere_schreibrecht(Some(EinsatzRolle::Beobachter)).unwrap_err(),
+            AppError::Forbidden
+        ));
+        assert!(matches!(
+            fordere_schreibrecht(None).unwrap_err(),
             AppError::Forbidden
         ));
     }

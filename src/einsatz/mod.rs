@@ -48,6 +48,15 @@ impl EinsatzRolle {
     pub fn ist_einsatzleitung(&self) -> bool {
         matches!(self, EinsatzRolle::Einsatzleitung)
     }
+
+    /// Ob diese Rolle ETB-Einträge erfassen/berichtigen darf
+    /// (Einsatzleitung und Führungspersonal; Beobachter ist nur lesend).
+    pub fn darf_schreiben(&self) -> bool {
+        matches!(
+            self,
+            EinsatzRolle::Einsatzleitung | EinsatzRolle::Fuehrungspersonal
+        )
+    }
 }
 
 /// Interner Einsatz-Datensatz (alle Spalten der Tabelle `einsatz`).
@@ -134,6 +143,13 @@ mod tests {
         assert!(EinsatzRolle::Einsatzleitung.ist_einsatzleitung());
         assert!(!EinsatzRolle::Fuehrungspersonal.ist_einsatzleitung());
         assert!(!EinsatzRolle::Beobachter.ist_einsatzleitung());
+    }
+
+    #[test]
+    fn darf_schreiben_nur_leitung_und_fuehrung() {
+        assert!(EinsatzRolle::Einsatzleitung.darf_schreiben());
+        assert!(EinsatzRolle::Fuehrungspersonal.darf_schreiben());
+        assert!(!EinsatzRolle::Beobachter.darf_schreiben());
     }
 
     #[test]
