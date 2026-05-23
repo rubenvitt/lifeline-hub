@@ -1,7 +1,6 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::fordere_aktiv;
-use crate::einsatz::berechtigung::fordere_schreibrecht;
+use crate::einsatz::berechtigung::{fordere_aktiv, fordere_mitglied, fordere_schreibrecht};
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
 use crate::etb::{normalisiere_zeit, repo, EtbEintragAnzeige, EtbTyp, MeldeWeg};
@@ -160,7 +159,7 @@ pub async fn liste(
 ) -> Result<Json<Vec<EtbEintragAnzeige>>, AppError> {
     einsatz_repo::laden(&state.pool, einsatz_id).await?; // 404, wenn unbekannt
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    crate::einsatz::berechtigung::fordere_mitglied(rolle)?;
+    fordere_mitglied(rolle)?;
 
     // Typ validieren, falls gesetzt.
     if let Some(t) = &params.typ {

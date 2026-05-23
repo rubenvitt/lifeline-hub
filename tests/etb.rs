@@ -400,6 +400,45 @@ async fn liste_nur_fuer_mitglieder() {
 }
 
 #[tokio::test]
+async fn beobachter_darf_lesen() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"typ":"meldung","inhalt":"Test"}"#,
+    )
+    .await;
+    let beob_id = benutzer_anlegen(&app, &admin, "beobi", "keine").await;
+
+    let zuweisung = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/einsaetze/{einsatz}/mitglieder/{beob_id}"))
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, admin.clone())
+                .body(Body::from(r#"{"einsatz_rolle":"beobachter"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(zuweisung.status(), StatusCode::OK);
+
+    let beob = login_cookie(&app, "beobi", "beobipw1").await;
+    let (status, json) = etb_abrufen(&app, &beob, einsatz, "").await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "Beobachter muss das ETB lesen dürfen"
+    );
+    assert_eq!(json.as_array().unwrap().len(), 1);
+}
+
+#[tokio::test]
 async fn liste_volltextsuche_filtert() {
     let (app, _live) = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
