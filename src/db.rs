@@ -119,4 +119,93 @@ mod tests {
         .await;
         assert!(dup.is_err(), "doppelter benutzername muss abgelehnt werden");
     }
+
+    #[tokio::test]
+    async fn einsatz_migration_creates_tables_and_constraints() {
+        let pool = test_pool().await;
+
+        // org_rolle: Default ist 'keine'.
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'Leit', 'leit', 'h')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let org_rolle: String =
+            sqlx::query_scalar("SELECT org_rolle FROM benutzer WHERE benutzername = 'leit'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(org_rolle, "keine");
+
+        // org_rolle-CHECK lehnt ungültigen Wert ab.
+        let bad_org = sqlx::query("UPDATE benutzer SET org_rolle = 'chef' WHERE benutzername = 'leit'")
+            .execute(&pool)
+            .await;
+        assert!(bad_org.is_err(), "ungültige org_rolle muss abgelehnt werden");
+
+        // Einsatz anlegen: status-Default ist 'aktiv'.
+        let einsatz_id: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Sturmlage') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let status: String =
+            sqlx::query_scalar("SELECT status FROM einsatz WHERE id = ?")
+                .bind(einsatz_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(status, "aktiv");
+
+        // status-CHECK lehnt ungültigen Wert ab.
+        let bad_status = sqlx::query("UPDATE einsatz SET status = 'pausiert' WHERE id = ?")
+            .bind(einsatz_id)
+            .execute(&pool)
+            .await;
+        assert!(bad_status.is_err(), "ungültiger status muss abgelehnt werden");
+
+        // Mitgliedschaft anlegen + einsatz_rolle-CHECK.
+        let benutzer_id: i64 =
+            sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'leit'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
+             VALUES (?, ?, 'einsatzleitung')",
+        )
+        .bind(einsatz_id)
+        .bind(benutzer_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let bad_rolle = sqlx::query(
+            "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
+             VALUES (?, ?, 'haeuptling')",
+        )
+        .bind(einsatz_id)
+        .bind(benutzer_id)
+        .execute(&pool)
+        .await;
+        assert!(bad_rolle.is_err(), "ungültige einsatz_rolle muss abgelehnt werden");
+
+        // PK (einsatz_id, benutzer_id) verhindert Doppel-Mitgliedschaft.
+        let dup = sqlx::query(
+            "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
+             VALUES (?, ?, 'beobachter')",
+        )
+        .bind(einsatz_id)
+        .bind(benutzer_id)
+        .execute(&pool)
+        .await;
+        assert!(dup.is_err(), "doppelte Mitgliedschaft muss abgelehnt werden");
+    }
 }
