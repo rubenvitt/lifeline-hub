@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, type RenderOptions } from '@testing-library/react';
-import { ConfigProvider } from 'antd';
+import { App as AntApp, ConfigProvider } from 'antd';
 import { MemoryRouter } from 'react-router-dom';
 import type { ReactElement, ReactNode } from 'react';
 
@@ -27,7 +27,9 @@ export function renderMitProviders(ui: ReactElement, options: ProviderOptions = 
     return (
       <QueryClientProvider client={client}>
         <ConfigProvider>
-          <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
+          <AntApp>
+            <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
+          </AntApp>
         </ConfigProvider>
       </QueryClientProvider>
     );
