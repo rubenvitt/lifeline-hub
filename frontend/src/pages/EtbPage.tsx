@@ -1,11 +1,14 @@
-import { Alert, Button, Space, Spin, Tag, Typography } from 'antd';
+import { Alert, App, Button, Space, Spin, Tag, Typography } from 'antd';
 import { Link, useParams } from 'react-router-dom';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
-import { SEITENGROESSE, listeEtb, type EtbFilterWerte } from '../api/etb';
+import { SEITENGROESSE, erfasseEtb, listeEtb, type EtbFilterWerte, type NeuerEintrag } from '../api/etb';
+import { ApiError } from '../api/client';
+import type { EtbEintragAnzeige } from '../api/types';
 import { useState } from 'react';
 import EtbTabelle from '../etb/EtbTabelle';
 import EtbFilterleiste from '../etb/EtbFilterleiste';
+import Schnellerfassung from '../etb/Schnellerfassung';
 
 export default function EtbPage() {
   const { id } = useParams();
@@ -29,6 +32,24 @@ export default function EtbPage() {
 
   const eintraege = etbQuery.data?.pages.flat() ?? [];
 
+  const qc = useQueryClient();
+  const { message } = App.useApp();
+  const [berichtigungZu, setBerichtigungZu] = useState<EtbEintragAnzeige | null>(null);
+
+  const erfassungMutation = useMutation({
+    mutationFn: (e: NeuerEintrag) => erfasseEtb(einsatzId, e),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['etb', einsatzId] }),
+  });
+
+  async function erfassen(e: NeuerEintrag) {
+    try {
+      await erfassungMutation.mutateAsync(e);
+    } catch (err) {
+      message.error(err instanceof ApiError ? err.message : 'Senden fehlgeschlagen');
+      throw err;
+    }
+  }
+
   if (einsatzQuery.isLoading) {
     return (
       <div style={{ textAlign: 'center', paddingTop: 80 }}>
@@ -40,6 +61,10 @@ export default function EtbPage() {
     return <Alert type="error" message="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
+
+  const darfSchreiben =
+    einsatz.status === 'aktiv' &&
+    (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
 
   return (
     <div>
@@ -63,7 +88,10 @@ export default function EtbPage() {
       )}
 
       <EtbFilterleiste onChange={setFilter} />
-      <EtbTabelle eintraege={eintraege} />
+      <EtbTabelle
+        eintraege={eintraege}
+        onBerichtigen={darfSchreiben ? (e) => setBerichtigungZu(e) : undefined}
+      />
 
       {etbQuery.hasNextPage && (
         <div style={{ textAlign: 'center', marginTop: 12 }}>
@@ -71,6 +99,14 @@ export default function EtbPage() {
             Ältere laden
           </Button>
         </div>
+      )}
+
+      {darfSchreiben && (
+        <Schnellerfassung
+          erfassen={erfassen}
+          berichtigungZu={berichtigungZu}
+          onBerichtigungAbbrechen={() => setBerichtigungZu(null)}
+        />
       )}
     </div>
   );
