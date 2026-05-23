@@ -13,6 +13,14 @@ export default function EtbTabelle({ eintraege, onBerichtigen }: Props) {
   // Map id → lfd_nr, um Berichtigungs-Ziele auf ihre laufende Nummer aufzulösen (Task 8).
   const lfdNrVonId = new Map(eintraege.map((e) => [e.id, e.lfd_nr]));
 
+  // Map Original-id → lfd_nr der Berichtigung, für den Rückverweis am Originaleintrag.
+  const berichtigtDurch = new Map<number, number>();
+  for (const e of eintraege) {
+    if (e.typ === 'berichtigung' && e.berichtigt_eintrag_id != null) {
+      berichtigtDurch.set(e.berichtigt_eintrag_id, e.lfd_nr);
+    }
+  }
+
   const spalten: ColumnsType<EtbEintragAnzeige> = [
     { title: 'Nr.', dataIndex: 'lfd_nr', width: 64 },
     {
@@ -49,6 +57,9 @@ export default function EtbTabelle({ eintraege, onBerichtigen }: Props) {
         <span>
           {e.typ === 'berichtigung' && e.berichtigt_eintrag_id != null && (
             <Tag color="red">berichtigt #{lfdNrVonId.get(e.berichtigt_eintrag_id) ?? '?'}</Tag>
+          )}
+          {berichtigtDurch.has(e.id) && (
+            <Tag color="gold">berichtigt durch #{berichtigtDurch.get(e.id)}</Tag>
           )}
           {e.inhalt}
         </span>
