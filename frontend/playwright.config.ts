@@ -1,4 +1,15 @@
 import { defineConfig, devices } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+
+// .env.local (von `npm run setup`) laden, damit baseURL/Port mit dem Vite-Dev-Server übereinstimmen.
+try {
+  for (const zeile of readFileSync(new URL('./.env.local', import.meta.url), 'utf8').split('\n')) {
+    const m = zeile.match(/^([A-Z0-9_]+)=(.*)$/);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
+  }
+} catch {
+  // keine .env.local vorhanden → Defaults greifen
+}
 
 // Dev-Port wie in vite.config aus ENV (von `npm run setup` gesetzt), Default 5173.
 const frontendPort = process.env.FRONTEND_PORT || '5173';

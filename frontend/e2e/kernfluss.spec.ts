@@ -32,7 +32,7 @@ test('Login → Einsatz → Eintrag live in zweitem Client', async ({ browser })
   const name = `E2E Einsatz ${Date.now()}`;
   await a.getByRole('button', { name: 'Einsatz anlegen' }).click();
   await a.getByLabel('Bezeichnung').fill(name);
-  await a.getByRole('button', { name: 'Anlegen' }).click();
+  await a.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(a.getByText(name)).toBeVisible();
 
   await einsatzOeffnen(a, name);
