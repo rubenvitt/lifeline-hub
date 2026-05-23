@@ -18,6 +18,22 @@ async fn main() -> anyhow::Result<()> {
     let pool = db::connect(&config.db_path).await?;
     db::migrate(&pool).await?;
 
+    let ergebnis = lifeline_hub::auth::bootstrap::bootstrap_admin(
+        &pool,
+        &config.org_name,
+        &config.admin_user,
+        config.admin_password.as_deref(),
+    )
+    .await?;
+    if ergebnis.admin_angelegt {
+        tracing::info!("Admin-Konto '{}' angelegt", config.admin_user);
+        if let Some(pw) = &ergebnis.generiertes_passwort {
+            tracing::warn!(
+                "Initiales Admin-Passwort (bitte sicher notieren und nach Login ändern): {pw}"
+            );
+        }
+    }
+
     let app = build_router(AppState { pool });
 
     let listener = tokio::net::TcpListener::bind(&config.bind).await?;
