@@ -102,13 +102,18 @@ mod tests {
             .execute(pool)
             .await
             .unwrap();
-        let benutzer_id: i64 = sqlx::query_scalar(
-            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
-             VALUES (1, 'Leitung', 'leit', 'h') RETURNING id",
+        sqlx::query(
+            "INSERT OR IGNORE INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'Leitung', 'leit', 'h')",
         )
-        .fetch_one(pool)
+        .execute(pool)
         .await
         .unwrap();
+        let benutzer_id: i64 =
+            sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'leit'")
+                .fetch_one(pool)
+                .await
+                .unwrap();
         let einsatz_id: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
         )
@@ -175,7 +180,12 @@ mod tests {
         d.ereigniszeit = None;
 
         let e = anlegen(&pool, einsatz, benutzer, d).await.unwrap();
-        assert!(!e.ereigniszeit.is_empty(), "Server muss jetzt einsetzen");
+        // datetime('now') liefert das kanonische Format YYYY-MM-DD HH:MM:SS (19 Zeichen).
+        assert_eq!(
+            e.ereigniszeit.len(),
+            19,
+            "Server-Default muss kanonisches SQLite-Zeitformat sein"
+        );
     }
 
     #[tokio::test]
