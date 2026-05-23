@@ -36,6 +36,8 @@ impl LiveHub {
     /// Ohne Kanal/Abonnenten passiert nichts. Ein Kanal ohne Empfänger wird
     /// opportunistisch entfernt, damit der Hub nicht über abgeschlossene
     /// Einsätze hinweg leakt.
+    /// Nachrichten, die bei leerem Kanal gesendet werden, gehen verloren — neue
+    /// Abonnenten erhalten nach ihrem Connect nur nachfolgende Einträge (vgl. §6).
     pub fn publiziere(&self, einsatz_id: i64, nachricht: String) {
         // Häufiger Fall (Kanal existiert): nur Lese-Lock.
         let keine_empfaenger = {
@@ -49,6 +51,12 @@ impl LiveHub {
 
         if keine_empfaenger {
             let mut kanaele = self.kanaele.write().expect("LiveHub-Lock");
+            // Soundness-Invariante: abonniere() hält ebenfalls einen Write-Lock,
+            // während es den Kanal anlegt und subscribt. Daher kann zwischen dem
+            // Freigeben des Read-Locks oben und diesem Write-Lock kein Abonnent
+            // dazukommen — receiver_count() == 0 garantiert hier einen wirklich
+            // verwaisten Kanal. NICHT abonniere() auf einen Read-Lock-Fastpath
+            // optimieren, sonst greift diese Garantie nicht mehr.
             // Erneut prüfen: zwischen den Locks könnte ein neuer Abonnent dazugekommen sein.
             if let Some(sender) = kanaele.get(&einsatz_id) {
                 if sender.receiver_count() == 0 {
