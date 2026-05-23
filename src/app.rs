@@ -21,5 +21,9 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/benutzer", get(routes::benutzer::liste))
         .route("/api/benutzer", post(routes::benutzer::anlegen))
         .route("/api/benutzer/{id}/deaktivieren", post(routes::benutzer::deaktivieren))
+        .route("/api/einsaetze", get(routes::einsatz::liste))
+        .route("/api/einsaetze", post(routes::einsatz::anlegen))
+        .route("/api/einsaetze/{id}", get(routes::einsatz::detail))
+        .route("/api/einsaetze/{id}/abschliessen", post(routes::einsatz::abschliessen))
         .with_state(state)
 }
