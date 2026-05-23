@@ -55,6 +55,7 @@ export default function BenutzerPage() {
       <List
         loading={isLoading}
         bordered
+        rowKey="id"
         dataSource={benutzer}
         renderItem={(b: BenutzerAnzeige) => (
           <List.Item
@@ -94,7 +95,10 @@ export default function BenutzerPage() {
       <Modal
         title="Neuen Benutzer anlegen"
         open={offen}
-        onCancel={() => setOffen(false)}
+        onCancel={() => {
+          setOffen(false);
+          form.resetFields();
+        }}
         onOk={() => form.submit()}
         okText="Anlegen"
         confirmLoading={anlegen.isPending}
