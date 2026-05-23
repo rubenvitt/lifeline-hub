@@ -1,1 +1,138 @@
-// Inhalt folgt in Task 6.
+use crate::auth::{password, ROLLE_ADMIN};
+use crate::error::AppError;
+use argon2::password_hash::rand_core::{OsRng, RngCore};
+use sqlx::SqlitePool;
+
+/// Ergebnis des Bootstraps: ob ein Admin neu angelegt wurde und mit welchem
+/// Passwort (nur gesetzt, wenn der Bootstrap ein Zufalls-Passwort erzeugt hat).
+#[derive(Debug, Default)]
+pub struct BootstrapErgebnis {
+    pub admin_angelegt: bool,
+    /// Generiertes Zufalls-Passwort, falls keines vorgegeben war.
+    pub generiertes_passwort: Option<String>,
+}
+
+/// Erzeugt ein gut lesbares Zufalls-Passwort (Hex, 24 Zeichen).
+fn zufalls_passwort() -> String {
+    let mut bytes = [0u8; 12];
+    OsRng.fill_bytes(&mut bytes);
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// Legt beim ersten Start eine Organisation und ein Admin-Konto an,
+/// sofern noch kein Benutzer existiert. Idempotent: bei vorhandenen
+/// Benutzern passiert nichts.
+///
+/// `admin_passwort = None` → es wird ein Zufalls-Passwort erzeugt und im
+/// Ergebnis zurückgegeben (der Aufrufer loggt es).
+pub async fn bootstrap_admin(
+    pool: &SqlitePool,
+    org_name: &str,
+    admin_benutzername: &str,
+    admin_passwort: Option<&str>,
+) -> Result<BootstrapErgebnis, AppError> {
+    let anzahl: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM benutzer")
+        .fetch_one(pool)
+        .await?;
+    if anzahl > 0 {
+        return Ok(BootstrapErgebnis::default());
+    }
+
+    let (passwort, generiert) = match admin_passwort {
+        Some(p) => (p.to_string(), None),
+        None => {
+            let p = zufalls_passwort();
+            (p.clone(), Some(p))
+        }
+    };
+    let hash = password::hash(&passwort)?;
+
+    let mut tx = pool.begin().await?;
+    // Organisation anlegen (oder vorhandene id=1 nutzen, falls schon vorhanden).
+    let org_id: i64 = sqlx::query_scalar(
+        "INSERT INTO organisation (name) VALUES (?) RETURNING id",
+    )
+    .bind(org_name)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    sqlx::query(
+        "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle) \
+         VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(org_id)
+    .bind("Administrator")
+    .bind(admin_benutzername)
+    .bind(&hash)
+    .bind(ROLLE_ADMIN)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+
+    Ok(BootstrapErgebnis {
+        admin_angelegt: true,
+        generiertes_passwort: generiert,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::auth::password;
+
+    #[tokio::test]
+    async fn legt_org_und_admin_an_wenn_leer() {
+        let pool = crate::db::test_pool().await;
+        let erg = bootstrap_admin(&pool, "Meine Orga", "admin", Some("startpw12"))
+            .await
+            .unwrap();
+        assert!(erg.admin_angelegt);
+        assert!(erg.generiertes_passwort.is_none());
+
+        let (rolle, hash): (String, String) = sqlx::query_as(
+            "SELECT system_rolle, passwort_hash FROM benutzer WHERE benutzername = 'admin'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(rolle, "admin");
+        assert!(password::verifizieren("startpw12", &hash));
+
+        let org_name: String = sqlx::query_scalar("SELECT name FROM organisation LIMIT 1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(org_name, "Meine Orga");
+    }
+
+    #[tokio::test]
+    async fn generiert_passwort_wenn_keines_vorgegeben() {
+        let pool = crate::db::test_pool().await;
+        let erg = bootstrap_admin(&pool, "Orga", "admin", None).await.unwrap();
+        let pw = erg.generiertes_passwort.expect("Passwort muss generiert sein");
+
+        let hash: String =
+            sqlx::query_scalar("SELECT passwort_hash FROM benutzer WHERE benutzername = 'admin'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert!(password::verifizieren(&pw, &hash));
+    }
+
+    #[tokio::test]
+    async fn ist_idempotent_bei_vorhandenen_benutzern() {
+        let pool = crate::db::test_pool().await;
+        bootstrap_admin(&pool, "Orga", "admin", Some("pw")).await.unwrap();
+
+        let erg2 = bootstrap_admin(&pool, "Orga", "admin2", Some("pw2"))
+            .await
+            .unwrap();
+        assert!(!erg2.admin_angelegt, "zweiter Bootstrap darf nichts anlegen");
+
+        let anzahl: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM benutzer")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(anzahl, 1);
+    }
+}
