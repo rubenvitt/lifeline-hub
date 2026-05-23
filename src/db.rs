@@ -279,4 +279,49 @@ mod tests {
         .unwrap();
         assert_eq!(treffer, 1, "FTS5-Trigger muss den Eintrag indizieren");
     }
+
+    #[tokio::test]
+    async fn etb_fts_wird_bei_cascade_delete_bereinigt() {
+        let pool = test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'Leit', 'leit', 'h')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let einsatz_id: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
+             VALUES (?, 1, 'meldung', 'Sandsack-Nachschub', 1, '2026-05-23 10:00:00')",
+        )
+        .bind(einsatz_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Einsatz löschen → CASCADE entfernt den Eintrag; AFTER DELETE-Trigger bereinigt FTS.
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(einsatz_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let treffer: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM etb_eintrag_fts WHERE etb_eintrag_fts MATCH 'Sandsack'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(treffer, 0, "FTS-Index muss nach Cascade-Delete bereinigt sein");
+    }
 }
