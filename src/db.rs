@@ -208,4 +208,75 @@ mod tests {
         .await;
         assert!(dup.is_err(), "doppelte Mitgliedschaft muss abgelehnt werden");
     }
+
+    #[tokio::test]
+    async fn etb_migration_legt_tabelle_und_fts_an() {
+        let pool = test_pool().await;
+
+        // Org + Benutzer + Einsatz als Voraussetzung anlegen.
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'Leit', 'leit', 'h')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let einsatz_id: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        // Eintrag einfügen (ereigniszeit Pflicht, received_at Default).
+        sqlx::query(
+            "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
+             VALUES (?, 1, 'meldung', 'Deich bei km 12 instabil', 1, '2026-05-23 10:00:00')",
+        )
+        .bind(einsatz_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // received_at wurde per Default gesetzt.
+        let received: String =
+            sqlx::query_scalar("SELECT received_at FROM etb_eintrag WHERE lfd_nr = 1")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert!(!received.is_empty());
+
+        // typ-CHECK lehnt ungültigen Wert ab.
+        let bad_typ = sqlx::query(
+            "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
+             VALUES (?, 2, 'geschwafel', 'x', 1, '2026-05-23 10:00:00')",
+        )
+        .bind(einsatz_id)
+        .execute(&pool)
+        .await;
+        assert!(bad_typ.is_err(), "ungültiger typ muss abgelehnt werden");
+
+        // UNIQUE(einsatz_id, lfd_nr) verhindert doppelte lfd_nr.
+        let dup = sqlx::query(
+            "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
+             VALUES (?, 1, 'lage', 'y', 1, '2026-05-23 10:00:00')",
+        )
+        .bind(einsatz_id)
+        .execute(&pool)
+        .await;
+        assert!(dup.is_err(), "doppelte lfd_nr muss abgelehnt werden");
+
+        // FTS5-Trigger hat den Eintrag indiziert: Volltextsuche findet ihn.
+        let treffer: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM etb_eintrag_fts WHERE etb_eintrag_fts MATCH 'Deich'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(treffer, 1, "FTS5-Trigger muss den Eintrag indizieren");
+    }
 }
