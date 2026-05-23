@@ -1519,9 +1519,17 @@ pub async fn erfassen(
     )
     .await?;
 
-    // Live an alle SSE-Abonnenten dieses Einsatzes pushen.
-    if let Ok(json) = serde_json::to_string(&anzeige) {
-        state.live.publiziere(einsatz_id, json);
+    // Live an alle SSE-Abonnenten dieses Einsatzes pushen. Eine Serialisierung
+    // dieses Typs kann derzeit nicht fehlschlagen; sollte sie es künftig doch,
+    // wird der Eintrag (bereits persistiert) nicht stillschweigend verschluckt,
+    // sondern protokolliert.
+    match serde_json::to_string(&anzeige) {
+        Ok(json) => state.live.publiziere(einsatz_id, json),
+        Err(e) => tracing::error!(
+            eintrag_id = anzeige.id,
+            %e,
+            "ETB-Eintrag konnte nicht für Live-Publish serialisiert werden"
+        ),
     }
 
     Ok((StatusCode::CREATED, Json(anzeige)))
@@ -1678,7 +1686,7 @@ async fn einsatzleitung_erfasst_eintrag() {
     assert_eq!(json["lfd_nr"], 1);
     assert_eq!(json["typ"], "meldung");
     assert_eq!(json["inhalt"], "Deich instabil");
-    assert_eq!(json["erfasser_name"], "admin");
+    assert_eq!(json["erfasser_name"], "Administrator"); // bootstrap_admin setzt anzeigename
     assert!(!json["received_at"].as_str().unwrap().is_empty());
 }
 
@@ -1690,7 +1698,8 @@ async fn beobachter_darf_nicht_erfassen() {
     let erika_id = benutzer_anlegen(&app, &admin, "erika", "keine").await;
 
     // Erika als Beobachterin zuweisen.
-    app.clone()
+    let zuweisung = app
+        .clone()
         .oneshot(
             Request::builder()
                 .method("PUT")
@@ -1702,6 +1711,11 @@ async fn beobachter_darf_nicht_erfassen() {
         )
         .await
         .unwrap();
+    assert_eq!(
+        zuweisung.status(),
+        StatusCode::OK,
+        "Beobachter-Rolle muss gesetzt werden, sonst testet der Test den Nicht-Mitglied-Pfad"
+    );
 
     let erika = login_cookie(&app, "erika", "erikapw1").await;
     let (status, _) =
