@@ -33,4 +33,24 @@ describe('AppLayout', () => {
     expect(screen.getByRole('link', { name: 'Benutzer' })).toBeInTheDocument();
     expect(screen.getByText('Inhalt')).toBeInTheDocument();
   });
+
+  it('verbirgt Benutzer-Link und Admin-Tag für Nicht-Admins', async () => {
+    server.use(
+      http.get('/api/auth/me', () =>
+        HttpResponse.json({ ...admin, system_rolle: 'keiner', anzeigename: 'Eva' }),
+      ),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<div>Inhalt</div>} />
+          </Route>
+        </Routes>
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(screen.getByText('Eva')).toBeInTheDocument());
+    expect(screen.queryByRole('link', { name: 'Benutzer' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Admin')).not.toBeInTheDocument();
+  });
 });
