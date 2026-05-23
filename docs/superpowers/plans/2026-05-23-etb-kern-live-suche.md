@@ -898,15 +898,18 @@ pub async fn abfrage(
         .map(fts_query)
         // Falls die Eingabe nur Sonderzeichen war, ist die FTS-Query leer → kein Filter.
         .filter(|s| !s.is_empty());
+    // FTS-Tabelle NICHT aliasen: das MATCH-Prädikat muss die FTS-Tabelle beim
+    // Originalnamen ansprechen (`etb_eintrag_fts MATCH ?`). Eine Alias-Kurzform
+    // wie `f MATCH ?` lehnt SQLite mit „no such column: f" ab.
     if fts.is_some() {
-        qb.push(" JOIN etb_eintrag_fts f ON f.rowid = e.id");
+        qb.push(" JOIN etb_eintrag_fts ON etb_eintrag_fts.rowid = e.id");
     }
 
     qb.push(" WHERE e.einsatz_id = ");
     qb.push_bind(einsatz_id);
 
     if let Some(fts_q) = fts {
-        qb.push(" AND f MATCH ");
+        qb.push(" AND etb_eintrag_fts MATCH ");
         qb.push_bind(fts_q);
     }
 
