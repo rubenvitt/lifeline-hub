@@ -2051,7 +2051,10 @@ async fn beobachter_darf_lesen() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
     eintrag_erfassen(&app, &admin, einsatz, r#"{"typ":"meldung","inhalt":"Test"}"#).await;
-    let beob_id = benutzer_anlegen(&app, &admin, "beob", "keine").await;
+    // 'beobi' (nicht 'beob'): benutzer_anlegen leitet das Passwort als
+    // "{benutzername}pw1" ab; "beobpw1" wäre nur 7 Zeichen und scheitert an
+    // PASSWORT_MIN_LEN=8. "beobipw1" hat 8 Zeichen.
+    let beob_id = benutzer_anlegen(&app, &admin, "beobi", "keine").await;
 
     let zuweisung = app
         .clone()
@@ -2068,7 +2071,7 @@ async fn beobachter_darf_lesen() {
         .unwrap();
     assert_eq!(zuweisung.status(), StatusCode::OK);
 
-    let beob = login_cookie(&app, "beob", "beobpw1").await;
+    let beob = login_cookie(&app, "beobi", "beobipw1").await;
     let (status, json) = etb_abrufen(&app, &beob, einsatz, "").await;
     assert_eq!(status, StatusCode::OK, "Beobachter muss das ETB lesen dürfen");
     assert_eq!(json.as_array().unwrap().len(), 1);
