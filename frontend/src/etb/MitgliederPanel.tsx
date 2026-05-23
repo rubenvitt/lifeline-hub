@@ -102,7 +102,13 @@ export default function MitgliederPanel({ einsatzId, istAktiv, offen, onClose }:
             options={verfuegbar.map((b) => ({ value: b.id, label: b.anzeigename }))}
             optionFilterProp="label"
             onChange={(v) => setNeuerBenutzer(v)}
-            notFoundContent={benutzerQuery.isError ? 'Benutzerliste nur für Admins' : undefined}
+            notFoundContent={
+              benutzerQuery.error instanceof ApiError && benutzerQuery.error.status === 403
+                ? 'Benutzerliste nur für Admins'
+                : benutzerQuery.isError
+                  ? 'Benutzerliste nicht verfügbar'
+                  : undefined
+            }
           />
           <Select value={neueRolle} style={{ width: 170 }} options={ROLLEN} onChange={setNeueRolle} />
           <Button

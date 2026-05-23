@@ -49,4 +49,17 @@ describe('MitgliederPanel', () => {
     await userEvent.click(within(popup).getByRole('button', { name: 'Ja' }));
     await waitFor(() => expect(screen.queryByText('Eva Einsatz')).not.toBeInTheDocument());
   });
+
+  it('blendet Edit-Aktionen aus, wenn der Einsatz nicht aktiv ist', async () => {
+    server.use(
+      http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json([mitglied()])),
+      http.get('/api/benutzer', () => HttpResponse.json([])),
+    );
+    renderMitProviders(
+      <MitgliederPanel einsatzId={7} istAktiv={false} offen onClose={() => {}} />,
+    );
+    expect(await screen.findByText('Eva Einsatz')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Entfernen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Hinzufügen' })).not.toBeInTheDocument();
+  });
 });
