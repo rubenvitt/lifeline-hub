@@ -155,7 +155,8 @@ async fn beobachter_darf_nicht_erfassen() {
     let erika_id = benutzer_anlegen(&app, &admin, "erika", "keine").await;
 
     // Erika als Beobachterin zuweisen.
-    app.clone()
+    let zuweisung = app
+        .clone()
         .oneshot(
             Request::builder()
                 .method("PUT")
@@ -167,6 +168,11 @@ async fn beobachter_darf_nicht_erfassen() {
         )
         .await
         .unwrap();
+    assert_eq!(
+        zuweisung.status(),
+        StatusCode::OK,
+        "Beobachter-Rolle muss gesetzt werden, sonst testet der Test den Nicht-Mitglied-Pfad"
+    );
 
     let erika = login_cookie(&app, "erika", "erikapw1").await;
     let (status, _) =

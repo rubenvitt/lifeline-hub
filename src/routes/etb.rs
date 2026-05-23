@@ -115,9 +115,17 @@ pub async fn erfassen(
     )
     .await?;
 
-    // Live an alle SSE-Abonnenten dieses Einsatzes pushen.
-    if let Ok(json) = serde_json::to_string(&anzeige) {
-        state.live.publiziere(einsatz_id, json);
+    // Live an alle SSE-Abonnenten dieses Einsatzes pushen. Eine Serialisierung
+    // dieses Typs kann derzeit nicht fehlschlagen; sollte sie es künftig doch,
+    // wird der Eintrag (bereits persistiert) nicht stillschweigend verschluckt,
+    // sondern protokolliert.
+    match serde_json::to_string(&anzeige) {
+        Ok(json) => state.live.publiziere(einsatz_id, json),
+        Err(e) => tracing::error!(
+            eintrag_id = anzeige.id,
+            %e,
+            "ETB-Eintrag konnte nicht für Live-Publish serialisiert werden"
+        ),
     }
 
     Ok((StatusCode::CREATED, Json(anzeige)))
