@@ -1,3 +1,4 @@
+use crate::live::LiveHub;
 use crate::routes;
 use axum::{
     routing::{delete, get, post, put},
@@ -9,6 +10,7 @@ use sqlx::SqlitePool;
 #[derive(Clone)]
 pub struct AppState {
     pub pool: SqlitePool,
+    pub live: LiveHub,
 }
 
 /// Baut den Axum-Router mit allen Routen und dem geteilten Zustand.
@@ -43,5 +45,6 @@ pub fn build_router(state: AppState) -> Router {
             "/api/einsaetze/{id}/mitglieder/{benutzer_id}",
             delete(routes::einsatz::mitglied_entfernen),
         )
+        .route("/api/einsaetze/{id}/etb", post(routes::etb::erfassen))
         .with_state(state)
 }

@@ -3,6 +3,7 @@ use axum::http::{header, Request, StatusCode};
 use lifeline_hub::app::{build_router, AppState};
 use lifeline_hub::auth::bootstrap::bootstrap_admin;
 use lifeline_hub::db;
+use lifeline_hub::live::LiveHub;
 use tower::ServiceExt; // stellt `oneshot` bereit
 
 /// Baut Router + DB mit einem Bootstrap-Admin (admin / startpw12).
@@ -11,11 +12,18 @@ async fn setup() -> axum::Router {
     bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
         .await
         .unwrap();
-    build_router(AppState { pool })
+    build_router(AppState {
+        pool,
+        live: LiveHub::new(),
+    })
 }
 
 /// Sendet ein Login und gibt den `Set-Cookie`-Header-Wert zurück.
-async fn login(app: &axum::Router, benutzername: &str, passwort: &str) -> (StatusCode, Option<String>) {
+async fn login(
+    app: &axum::Router,
+    benutzername: &str,
+    passwort: &str,
+) -> (StatusCode, Option<String>) {
     let body = format!(r#"{{"benutzername":"{benutzername}","passwort":"{passwort}"}}"#);
     let resp = app
         .clone()
@@ -100,7 +108,10 @@ async fn me_mit_session_liefert_benutzer() {
     let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(json["benutzername"], "admin");
     assert_eq!(json["system_rolle"], "admin");
-    assert!(json.get("passwort_hash").is_none(), "Hash darf nicht ausgegeben werden");
+    assert!(
+        json.get("passwort_hash").is_none(),
+        "Hash darf nicht ausgegeben werden"
+    );
 }
 
 #[tokio::test]

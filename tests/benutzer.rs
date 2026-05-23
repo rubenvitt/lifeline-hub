@@ -3,6 +3,7 @@ use axum::http::{header, Request, StatusCode};
 use lifeline_hub::app::{build_router, AppState};
 use lifeline_hub::auth::bootstrap::bootstrap_admin;
 use lifeline_hub::db;
+use lifeline_hub::live::LiveHub;
 use tower::ServiceExt;
 
 async fn setup() -> axum::Router {
@@ -10,7 +11,10 @@ async fn setup() -> axum::Router {
     bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
         .await
         .unwrap();
-    build_router(AppState { pool })
+    build_router(AppState {
+        pool,
+        live: LiveHub::new(),
+    })
 }
 
 /// Loggt sich ein und liefert das `name=value`-Cookie-Paar.

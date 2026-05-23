@@ -2,6 +2,7 @@ use clap::Parser;
 use lifeline_hub::app::{build_router, AppState};
 use lifeline_hub::config::Config;
 use lifeline_hub::db;
+use lifeline_hub::live::LiveHub;
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -34,7 +35,10 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    let app = build_router(AppState { pool });
+    let app = build_router(AppState {
+        pool,
+        live: LiveHub::new(),
+    });
 
     let listener = tokio::net::TcpListener::bind(&config.bind).await?;
     tracing::info!("Server lauscht auf {}", config.bind);

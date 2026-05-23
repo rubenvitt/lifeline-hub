@@ -2,12 +2,16 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use lifeline_hub::app::{build_router, AppState};
 use lifeline_hub::db;
+use lifeline_hub::live::LiveHub;
 use tower::ServiceExt; // stellt `oneshot` bereit
 
 #[tokio::test]
 async fn health_endpoint_returns_ok() {
     let pool = db::test_pool().await;
-    let app = build_router(AppState { pool });
+    let app = build_router(AppState {
+        pool,
+        live: LiveHub::new(),
+    });
 
     let response = app
         .oneshot(
@@ -35,7 +39,10 @@ async fn health_endpoint_returns_ok() {
 async fn health_endpoint_reports_degraded_when_db_down() {
     let pool = db::test_pool().await;
     pool.close().await; // DB-Verbindung schließen → Query schlägt fehl
-    let app = build_router(AppState { pool });
+    let app = build_router(AppState {
+        pool,
+        live: LiveHub::new(),
+    });
 
     let response = app
         .oneshot(
