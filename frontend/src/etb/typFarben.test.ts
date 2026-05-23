@@ -21,4 +21,8 @@ describe('istNachgetragen', () => {
   it('true bei spürbarer Abweichung (>= 60 s)', () => {
     expect(istNachgetragen('2026-05-23 09:30:00', '2026-05-23 10:00:00')).toBe(true);
   });
+
+  it('true bei exakt 60 s (Schwellenwert inklusive)', () => {
+    expect(istNachgetragen('2026-05-23 10:00:00', '2026-05-23 10:01:00')).toBe(true);
+  });
 });

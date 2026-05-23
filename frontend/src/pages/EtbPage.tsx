@@ -52,6 +52,15 @@ export default function EtbPage() {
         </Space>
       </Space>
 
+      {etbQuery.isError && (
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message="ETB-Einträge konnten nicht geladen werden"
+        />
+      )}
+
       <EtbTabelle eintraege={eintraege} />
 
       {etbQuery.hasNextPage && (
