@@ -1,6 +1,6 @@
 use crate::routes;
 use axum::{
-    routing::{get, post},
+    routing::{delete, get, post, put},
     Router,
 };
 use sqlx::SqlitePool;
@@ -20,10 +20,28 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/auth/me", get(routes::auth::me))
         .route("/api/benutzer", get(routes::benutzer::liste))
         .route("/api/benutzer", post(routes::benutzer::anlegen))
-        .route("/api/benutzer/{id}/deaktivieren", post(routes::benutzer::deaktivieren))
+        .route(
+            "/api/benutzer/{id}/deaktivieren",
+            post(routes::benutzer::deaktivieren),
+        )
         .route("/api/einsaetze", get(routes::einsatz::liste))
         .route("/api/einsaetze", post(routes::einsatz::anlegen))
         .route("/api/einsaetze/{id}", get(routes::einsatz::detail))
-        .route("/api/einsaetze/{id}/abschliessen", post(routes::einsatz::abschliessen))
+        .route(
+            "/api/einsaetze/{id}/abschliessen",
+            post(routes::einsatz::abschliessen),
+        )
+        .route(
+            "/api/einsaetze/{id}/mitglieder",
+            get(routes::einsatz::mitglieder),
+        )
+        .route(
+            "/api/einsaetze/{id}/mitglieder/{benutzer_id}",
+            put(routes::einsatz::mitglied_setzen),
+        )
+        .route(
+            "/api/einsaetze/{id}/mitglieder/{benutzer_id}",
+            delete(routes::einsatz::mitglied_entfernen),
+        )
         .with_state(state)
 }
