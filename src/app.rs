@@ -47,5 +47,6 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/api/einsaetze/{id}/etb", post(routes::etb::erfassen))
         .route("/api/einsaetze/{id}/etb", get(routes::etb::liste))
+        .route("/api/einsaetze/{id}/etb/stream", get(routes::etb::stream))
         .with_state(state)
 }

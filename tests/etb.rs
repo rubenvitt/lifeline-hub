@@ -506,3 +506,90 @@ async fn liste_ungueltiger_typ_filter_ist_400() {
     let (status, _) = etb_abrufen(&app, &admin, einsatz, "typ=unsinn").await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
+
+#[tokio::test]
+async fn stream_fuer_mitglied_liefert_event_stream() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/einsaetze/{einsatz}/etb/stream"))
+                .header(header::COOKIE, admin)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let content_type = resp
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(
+        content_type.starts_with("text/event-stream"),
+        "SSE muss text/event-stream sein, war: {content_type}"
+    );
+    // Body bleibt offen (Live-Stream) — wir lesen ihn nicht und beenden den Test.
+}
+
+#[tokio::test]
+async fn stream_fuer_nicht_mitglied_ist_403() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    benutzer_anlegen(&app, &admin, "fremd", "keine").await;
+    let fremd = login_cookie(&app, "fremd", "fremdpw1").await;
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/einsaetze/{einsatz}/etb/stream"))
+                .header(header::COOKIE, fremd)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn stream_unbekannter_einsatz_ist_404() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/einsaetze/999/etb/stream")
+                .header(header::COOKIE, admin)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn stream_ohne_session_ist_401() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/einsaetze/{einsatz}/etb/stream"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+}

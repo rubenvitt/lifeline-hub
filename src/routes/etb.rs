@@ -6,8 +6,12 @@ use crate::error::AppError;
 use crate::etb::{normalisiere_zeit, repo, EtbEintragAnzeige, EtbTyp, MeldeWeg};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
+use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::Json;
 use serde::Deserialize;
+use std::convert::Infallible;
+use tokio_stream::wrappers::BroadcastStream;
+use tokio_stream::{Stream, StreamExt};
 
 #[derive(Debug, Deserialize)]
 pub struct NeuerEintrag {
@@ -202,4 +206,31 @@ pub async fn liste(
     };
 
     Ok(Json(repo::abfrage(&state.pool, einsatz_id, &filter).await?))
+}
+
+/// GET /api/einsaetze/{id}/etb/stream — Server-Sent-Events-Stream der neuen
+/// ETB-Einträge eines Einsatzes. Nur für Mitglieder (auch Beobachter dürfen
+/// lesen). Es werden nur **neue** Einträge gepusht — der Initial-Bestand wird
+/// per `GET …/etb` geladen. Bei Pufferüberlauf sendet der Server ein
+/// `lagged`-Event; der Client soll dann per GET resynchronisieren.
+pub async fn stream(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path(einsatz_id): Path<i64>,
+) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, AppError> {
+    einsatz_repo::laden(&state.pool, einsatz_id).await?; // 404, wenn unbekannt
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    crate::einsatz::berechtigung::fordere_mitglied(rolle)?;
+
+    let rx = state.live.abonniere(einsatz_id);
+    let stream = BroadcastStream::new(rx).map(|res| {
+        let event = match res {
+            Ok(json) => Event::default().event("etb").data(json),
+            // Empfänger ist hinterhergehinkt: Client zum Resync auffordern.
+            Err(_) => Event::default().event("lagged").data("resync"),
+        };
+        Ok::<Event, Infallible>(event)
+    });
+
+    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
 }
