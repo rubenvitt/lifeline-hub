@@ -65,4 +65,19 @@ describe('EinsaetzePage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
     await waitFor(() => expect(screen.getByText('Sturm Süd')).toBeInTheDocument());
   });
+
+  it('zeigt den Anlege-Button nicht für Nutzer ohne Recht', async () => {
+    const ohneRecht = { ...admin, system_rolle: 'keiner', org_rolle: 'keine' };
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(ohneRecht)),
+      http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <EinsaetzePage />
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(screen.getByText('Hochwasser Nord')).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: 'Einsatz anlegen' })).not.toBeInTheDocument();
+  });
 });

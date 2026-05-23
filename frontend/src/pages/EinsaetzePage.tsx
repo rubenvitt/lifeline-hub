@@ -28,8 +28,8 @@ export default function EinsaetzePage() {
     mutationFn: (werte: { bezeichnung: string; stichwort?: string }) =>
       legeEinsatzAn(werte.bezeichnung, werte.stichwort),
     onSuccess: () => {
-      setDialogOffen(false);
       form.resetFields();
+      setDialogOffen(false);
       qc.invalidateQueries({ queryKey: ['einsaetze'] });
     },
     onError: (e) =>
