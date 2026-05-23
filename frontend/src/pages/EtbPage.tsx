@@ -37,7 +37,7 @@ export default function EtbPage() {
 
   const { message } = App.useApp();
   const [berichtigungZu, setBerichtigungZu] = useState<EtbEintragAnzeige | null>(null);
-  const { erfassen, ausstehend } = useEtbErfassung(einsatzId);
+  const { erfassen, ausstehend, abgelehnt } = useEtbErfassung(einsatzId);
 
   async function erfassenMitMeldung(e: NeuerEintrag) {
     try {
@@ -86,6 +86,21 @@ export default function EtbPage() {
       )}
 
       <EtbFilterleiste onChange={setFilter} />
+      {abgelehnt.length > 0 && (
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={`${abgelehnt.length} gepufferte(r) Eintrag/Einträge wurde(n) vom Server abgelehnt und NICHT gespeichert`}
+          description={
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {abgelehnt.map((a, i) => (
+                <li key={i}>{a.eintrag.inhalt} — {a.grund}</li>
+              ))}
+            </ul>
+          }
+        />
+      )}
       {ausstehend.length > 0 && (
         <Alert
           type="info"

@@ -4,6 +4,11 @@ import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import { server } from './server';
 
+// Signalisiert React, dass wir in einer act-fähigen Umgebung testen — entfernt die
+// „not configured to support act(...)"-Warnung und deckt echte act-Verletzungen auf.
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
+  true;
+
 // antd verwendet window.matchMedia (responsive observer) — in jsdom nicht vorhanden.
 Object.defineProperty(window, 'matchMedia', {
   writable: true,

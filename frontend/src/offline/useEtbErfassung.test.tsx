@@ -56,4 +56,32 @@ describe('useEtbErfassung', () => {
     await expect(result.current.erfassen(eintrag)).rejects.toMatchObject({ status: 403 });
     expect(result.current.ausstehend).toHaveLength(0);
   });
+
+  it('verwirft beim Flush abgelehnte Einträge nicht still, sondern meldet sie', async () => {
+    server.use(http.post('/api/einsaetze/9/etb', () => HttpResponse.error()));
+
+    const { result } = renderHook(() => useEtbErfassung(9), { wrapper });
+
+    await act(async () => {
+      await result.current.erfassen(eintrag);
+    });
+    await waitFor(() => expect(result.current.ausstehend).toHaveLength(1));
+
+    server.use(
+      http.post('/api/einsaetze/9/etb', () =>
+        HttpResponse.json({ error: 'Keine Berechtigung' }, { status: 403 }),
+      ),
+    );
+
+    await act(async () => {
+      await result.current.flush();
+    });
+
+    await waitFor(() => expect(result.current.ausstehend).toHaveLength(0));
+    await waitFor(() => expect(result.current.abgelehnt).toHaveLength(1));
+    expect(result.current.abgelehnt[0]).toMatchObject({
+      eintrag: { inhalt: 'x' },
+      grund: 'Keine Berechtigung',
+    });
+  });
 });
