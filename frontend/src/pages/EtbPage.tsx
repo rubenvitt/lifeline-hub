@@ -8,6 +8,7 @@ import type { EtbEintragAnzeige } from '../api/types';
 import { useState } from 'react';
 import EtbTabelle from '../etb/EtbTabelle';
 import EtbFilterleiste from '../etb/EtbFilterleiste';
+import MitgliederPanel from '../etb/MitgliederPanel';
 import Schnellerfassung from '../etb/Schnellerfassung';
 import { useEtbStream } from '../etb/useEtbStream';
 import { useEtbErfassung } from '../offline/useEtbErfassung';
@@ -38,6 +39,7 @@ export default function EtbPage() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [berichtigungZu, setBerichtigungZu] = useState<EtbEintragAnzeige | null>(null);
+  const [mitgliederOffen, setMitgliederOffen] = useState(false);
   const { erfassen, ausstehend, abgelehnt } = useEtbErfassung(einsatzId);
 
   const abschliessenMutation = useMutation({
@@ -72,6 +74,7 @@ export default function EtbPage() {
   }
   const einsatz = einsatzQuery.data;
 
+  const istEinsatzleitung = einsatz.meine_rolle === 'einsatzleitung';
   const darfAbschliessen = einsatz.status === 'aktiv' && einsatz.meine_rolle === 'einsatzleitung';
 
   const darfSchreiben =
@@ -88,19 +91,24 @@ export default function EtbPage() {
           </Typography.Title>
           <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
         </Space>
-        {darfAbschliessen && (
-          <Popconfirm
-            title="Einsatz abschließen?"
-            description="Danach sind keine neuen Einträge oder Berichtigungen mehr möglich."
-            okText="Ja"
-            cancelText="Abbrechen"
-            onConfirm={() => abschliessenMutation.mutate()}
-          >
-            <Button danger loading={abschliessenMutation.isPending}>
-              Einsatz abschließen
-            </Button>
-          </Popconfirm>
-        )}
+        <Space>
+          {istEinsatzleitung && (
+            <Button onClick={() => setMitgliederOffen(true)}>Mitglieder</Button>
+          )}
+          {darfAbschliessen && (
+            <Popconfirm
+              title="Einsatz abschließen?"
+              description="Danach sind keine neuen Einträge oder Berichtigungen mehr möglich."
+              okText="Ja"
+              cancelText="Abbrechen"
+              onConfirm={() => abschliessenMutation.mutate()}
+            >
+              <Button danger loading={abschliessenMutation.isPending}>
+                Einsatz abschließen
+              </Button>
+            </Popconfirm>
+          )}
+        </Space>
       </Space>
 
       {etbQuery.isError && (
@@ -161,6 +169,14 @@ export default function EtbPage() {
           erfassen={erfassenMitMeldung}
           berichtigungZu={berichtigungZu}
           onBerichtigungAbbrechen={() => setBerichtigungZu(null)}
+        />
+      )}
+      {istEinsatzleitung && (
+        <MitgliederPanel
+          einsatzId={einsatzId}
+          istAktiv={einsatz.status === 'aktiv'}
+          offen={mitgliederOffen}
+          onClose={() => setMitgliederOffen(false)}
         />
       )}
     </div>
