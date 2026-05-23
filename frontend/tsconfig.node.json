@@ -1,4 +1,6 @@
 {
+  // Hinweis: typecheck nutzt 'tsc --noEmit' ohne -b. TS 5.9 verbietet composite+noEmit
+  // (TS6310 bei 'tsc -b --noEmit'); vite.config wird daher nicht separat typgeprüft.
   "compilerOptions": {
     "composite": true,
     "skipLibCheck": true,
