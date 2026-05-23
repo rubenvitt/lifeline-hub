@@ -123,7 +123,7 @@ pub async fn mitglied_setzen(
         .await?;
     match ziel_aktiv {
         None => return Err(AppError::NotFound),
-        Some(false) => return Err(AppError::Validation("Benutzer ist deaktiviert".into())),
+        Some(false) => return Err(AppError::Conflict("Benutzer ist deaktiviert".into())),
         Some(true) => {}
     }
 

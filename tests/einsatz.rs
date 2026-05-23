@@ -495,3 +495,31 @@ async fn abgeschlossener_einsatz_blockt_mitgliederaenderung() {
     let status = mitglied_setzen(&app, &admin, einsatz_id, erika_id, "beobachter").await;
     assert_eq!(status, StatusCode::CONFLICT);
 }
+
+#[tokio::test]
+async fn deaktivierten_benutzer_zuweisen_ist_409() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, json) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz_id = json["id"].as_i64().unwrap();
+    let erika_id = benutzer_anlegen(&app, &admin, "erika", "keine").await;
+
+    // Erika deaktivieren.
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/benutzer/{erika_id}/deaktivieren"))
+                .header(header::COOKIE, admin.clone())
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Deaktivierten Benutzer einem Einsatz zuweisen → 409.
+    let status = mitglied_setzen(&app, &admin, einsatz_id, erika_id, "beobachter").await;
+    assert_eq!(status, StatusCode::CONFLICT);
+}
