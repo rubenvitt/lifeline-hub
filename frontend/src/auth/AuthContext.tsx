@@ -18,15 +18,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [laedt, setLaedt] = useState(true);
 
   useEffect(() => {
+    let aktiv = true;
     authApi
       .me()
-      .then((b) => setBenutzer(b))
+      .then((b) => {
+        if (aktiv) setBenutzer(b);
+      })
       .catch((e) => {
+        if (!aktiv) return;
         // 401 = nicht angemeldet (erwartet); andere Fehler ebenfalls als „anonym" behandeln
         if (!(e instanceof ApiError)) console.error('Auth-Prüfung fehlgeschlagen', e);
         setBenutzer(null);
       })
-      .finally(() => setLaedt(false));
+      .finally(() => {
+        if (aktiv) setLaedt(false);
+      });
+    return () => {
+      aktiv = false;
+    };
   }, []);
 
   const login = useCallback(async (benutzername: string, passwort: string) => {
