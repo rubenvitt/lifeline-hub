@@ -1,3 +1,4 @@
+import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { renderMitProviders } from './test/utils';
 import { AuthProvider } from './auth/AuthContext';
@@ -8,12 +9,12 @@ import { server } from './test/server';
 describe('App', () => {
   it('rendert ohne Absturz und leitet zu /login um', async () => {
     server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
-    const { container } = renderMitProviders(
+    renderMitProviders(
       <AuthProvider>
         <App />
       </AuthProvider>,
       { route: '/' },
     );
-    expect(container).toBeDefined();
+    expect(await screen.findByRole('button', { name: 'Anmelden' })).toBeInTheDocument();
   });
 });
