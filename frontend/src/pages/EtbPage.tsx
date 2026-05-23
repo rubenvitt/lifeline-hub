@@ -5,11 +5,12 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { SEITENGROESSE, listeEtb, type EtbFilterWerte } from '../api/etb';
 import { useState } from 'react';
 import EtbTabelle from '../etb/EtbTabelle';
+import EtbFilterleiste from '../etb/EtbFilterleiste';
 
 export default function EtbPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const [filter] = useState<EtbFilterWerte>({});
+  const [filter, setFilter] = useState<EtbFilterWerte>({});
 
   const einsatzQuery = useQuery({
     queryKey: ['einsatz', einsatzId],
@@ -61,6 +62,7 @@ export default function EtbPage() {
         />
       )}
 
+      <EtbFilterleiste onChange={setFilter} />
       <EtbTabelle eintraege={eintraege} />
 
       {etbQuery.hasNextPage && (
