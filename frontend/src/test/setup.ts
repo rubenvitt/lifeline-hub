@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import 'fake-indexeddb/auto';
-import { afterAll, afterEach, beforeAll, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import { server } from './server';
 
@@ -29,3 +29,11 @@ afterAll(() => server.close());
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 dayjs.extend(utc);
+
+// jsdom kennt keine EventSource — No-op-Stub verhindert ReferenceError in EtbPage-Tests.
+// beforeEach stellt den Stub nach vi.unstubAllGlobals() (z. B. in useEtbStream-Tests) wieder her.
+beforeEach(() => {
+  if (typeof globalThis.EventSource === 'undefined') {
+    vi.stubGlobal('EventSource', class { addEventListener() {} close() {} });
+  }
+});

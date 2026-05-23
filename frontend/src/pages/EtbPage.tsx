@@ -9,10 +9,12 @@ import { useState } from 'react';
 import EtbTabelle from '../etb/EtbTabelle';
 import EtbFilterleiste from '../etb/EtbFilterleiste';
 import Schnellerfassung from '../etb/Schnellerfassung';
+import { useEtbStream } from '../etb/useEtbStream';
 
 export default function EtbPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  useEtbStream(einsatzId);
   const [filter, setFilter] = useState<EtbFilterWerte>({});
 
   const einsatzQuery = useQuery({
