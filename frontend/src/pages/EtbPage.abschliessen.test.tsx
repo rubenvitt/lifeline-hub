@@ -67,4 +67,26 @@ describe('EtbPage – Abschließen', () => {
     await screen.findByRole('heading', { name: 'Hochwasser' });
     expect(screen.queryByRole('button', { name: 'Einsatz abschließen' })).not.toBeInTheDocument();
   });
+
+  it('zeigt Beobachtern keine Schreib-/Verwaltungsaktionen (read-only)', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () =>
+        HttpResponse.json({ ...einsatz('aktiv'), meine_rolle: 'beobachter' }),
+      ),
+      http.get('/api/einsaetze/7/etb', () => HttpResponse.json([])),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/7/etb' },
+    );
+    await screen.findByRole('heading', { name: 'Hochwasser' });
+    expect(screen.queryByRole('button', { name: 'Erfassen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Einsatz abschließen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Mitglieder' })).not.toBeInTheDocument();
+  });
 });

@@ -1,9 +1,11 @@
 import { App, Button, Form, Input, List, Modal, Popconfirm, Select, Space, Tag, Typography } from 'antd';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Navigate } from 'react-router-dom';
 import type { BenutzerAnzeige } from '../api/types';
 import { ApiError } from '../api/client';
 import { deaktiviereBenutzer, legeBenutzerAn, listeBenutzer, type NeuerBenutzer } from '../api/benutzer';
+import { useAuth } from '../auth/AuthContext';
 
 const SYSTEM_ROLLEN = [
   { value: 'keiner', label: 'Benutzer' },
@@ -15,12 +17,13 @@ const ORG_ROLLEN = [
 ];
 
 export default function BenutzerPage() {
+  const { benutzer: angemeldeterBenutzer, laedt: authLaedt } = useAuth();
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [offen, setOffen] = useState(false);
   const [form] = Form.useForm<NeuerBenutzer>();
 
-  const { data: benutzer = [], isLoading } = useQuery({
+  const { data: benutzerListe = [], isLoading } = useQuery({
     queryKey: ['benutzer'],
     queryFn: listeBenutzer,
   });
@@ -41,6 +44,10 @@ export default function BenutzerPage() {
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
   });
 
+  if (!authLaedt && angemeldeterBenutzer?.system_rolle !== 'admin') {
+    return <Navigate to="/einsaetze" replace />;
+  }
+
   return (
     <div style={{ maxWidth: 800, margin: '0 auto' }}>
       <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -56,7 +63,7 @@ export default function BenutzerPage() {
         loading={isLoading}
         bordered
         rowKey="id"
-        dataSource={benutzer}
+        dataSource={benutzerListe}
         renderItem={(b: BenutzerAnzeige) => (
           <List.Item
             actions={
