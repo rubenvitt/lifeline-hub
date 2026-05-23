@@ -74,4 +74,49 @@ mod tests {
                 .unwrap();
         assert_eq!(value, "1");
     }
+
+    #[tokio::test]
+    async fn auth_migration_creates_tables_and_constraints() {
+        let pool = test_pool().await;
+
+        // Organisation + Benutzer anlegen funktioniert.
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Test-Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'Max Muster', 'max', 'hash')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Default-Rolle ist 'keiner', aktiv ist 1.
+        let (rolle, aktiv): (String, i64) =
+            sqlx::query_as("SELECT system_rolle, aktiv FROM benutzer WHERE benutzername = 'max'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(rolle, "keiner");
+        assert_eq!(aktiv, 1);
+
+        // CHECK-Constraint lehnt ungültige Rolle ab.
+        let bad_rolle = sqlx::query(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle) \
+             VALUES (1, 'X', 'x', 'h', 'superadmin')",
+        )
+        .execute(&pool)
+        .await;
+        assert!(bad_rolle.is_err(), "ungültige system_rolle muss abgelehnt werden");
+
+        // UNIQUE-Constraint lehnt doppelten Benutzernamen ab.
+        let dup = sqlx::query(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'Zweiter Max', 'max', 'h')",
+        )
+        .execute(&pool)
+        .await;
+        assert!(dup.is_err(), "doppelter benutzername muss abgelehnt werden");
+    }
 }
