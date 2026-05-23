@@ -5,7 +5,7 @@ use crate::einsatz::berechtigung::fordere_schreibrecht;
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
 use crate::etb::{normalisiere_zeit, repo, EtbEintragAnzeige, EtbTyp, MeldeWeg};
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -129,4 +129,78 @@ pub async fn erfassen(
     }
 
     Ok((StatusCode::CREATED, Json(anzeige)))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct EtbAbfrageParams {
+    /// Volltext-Suchbegriff.
+    pub q: Option<String>,
+    /// Eintragstyp-Filter.
+    pub typ: Option<String>,
+    /// Untere Grenze ereigniszeit (ISO-8601/SQLite-Format).
+    pub von: Option<String>,
+    /// Obere Grenze ereigniszeit.
+    pub bis: Option<String>,
+    /// Filter nach Erfasser.
+    pub erfasser_id: Option<i64>,
+    /// Cursor: nur Einträge mit lfd_nr < diesem Wert.
+    pub before_lfd_nr: Option<i64>,
+    /// Seitengröße (Default STANDARD_LIMIT, max MAX_LIMIT).
+    pub limit: Option<i64>,
+}
+
+/// GET /api/einsaetze/{id}/etb — ETB-Einträge eines Einsatzes (gefiltert,
+/// volltextdurchsucht, paginiert). Nur für Mitglieder (auch Beobachter).
+/// Sortierung: lfd_nr DESC (neueste zuerst); Cursor über before_lfd_nr.
+pub async fn liste(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path(einsatz_id): Path<i64>,
+    Query(params): Query<EtbAbfrageParams>,
+) -> Result<Json<Vec<EtbEintragAnzeige>>, AppError> {
+    einsatz_repo::laden(&state.pool, einsatz_id).await?; // 404, wenn unbekannt
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    crate::einsatz::berechtigung::fordere_mitglied(rolle)?;
+
+    // Typ validieren, falls gesetzt.
+    if let Some(t) = &params.typ {
+        if EtbTyp::parse(t).is_none() {
+            return Err(AppError::Validation(
+                "Ungültiger Eintragstyp im Filter".into(),
+            ));
+        }
+    }
+
+    // Zeitgrenzen normalisieren.
+    let von_zeit = match &params.von {
+        Some(s) => Some(normalisiere_zeit(s)?),
+        None => None,
+    };
+    let bis_zeit = match &params.bis {
+        Some(s) => Some(normalisiere_zeit(s)?),
+        None => None,
+    };
+
+    // q nur als Filter nutzen, wenn nach Trim nicht leer.
+    let q = params
+        .q
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+
+    let limit = params
+        .limit
+        .unwrap_or(repo::STANDARD_LIMIT)
+        .clamp(1, repo::MAX_LIMIT);
+
+    let filter = repo::EtbFilter {
+        q,
+        typ: params.typ,
+        von_zeit,
+        bis_zeit,
+        erfasser_id: params.erfasser_id,
+        before_lfd_nr: params.before_lfd_nr,
+        limit,
+    };
+
+    Ok(Json(repo::abfrage(&state.pool, einsatz_id, &filter).await?))
 }

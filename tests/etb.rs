@@ -126,6 +126,35 @@ async fn eintrag_erfassen(
     (status, json)
 }
 
+/// Ruft die ETB-Liste mit optionalem Query-String ab; liefert (Status, JSON).
+async fn etb_abrufen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz_id: i64,
+    query: &str,
+) -> (StatusCode, Value) {
+    let uri = if query.is_empty() {
+        format!("/api/einsaetze/{einsatz_id}/etb")
+    } else {
+        format!("/api/einsaetze/{einsatz_id}/etb?{query}")
+    };
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(uri)
+                .header(header::COOKIE, cookie.to_string())
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = resp.status();
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+    (status, json)
+}
+
 #[tokio::test]
 async fn einsatzleitung_erfasst_eintrag() {
     let (app, _live) = setup().await;
@@ -328,4 +357,113 @@ async fn erfasster_eintrag_wird_live_publiziert() {
         .expect("Broadcast-Kanal liefert Nachricht");
     let value: Value = serde_json::from_str(&json).unwrap();
     assert_eq!(value["inhalt"], "Live-Test");
+}
+
+#[tokio::test]
+async fn liste_zeigt_eintraege_neueste_zuerst() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"typ":"meldung","inhalt":"erster"}"#,
+    )
+    .await;
+    eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"typ":"meldung","inhalt":"zweiter"}"#,
+    )
+    .await;
+
+    let (status, json) = etb_abrufen(&app, &admin, einsatz, "").await;
+    assert_eq!(status, StatusCode::OK);
+    let liste = json.as_array().unwrap();
+    assert_eq!(liste.len(), 2);
+    assert_eq!(liste[0]["lfd_nr"], 2);
+    assert_eq!(liste[1]["lfd_nr"], 1);
+}
+
+#[tokio::test]
+async fn liste_nur_fuer_mitglieder() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    benutzer_anlegen(&app, &admin, "fremd", "keine").await;
+    let fremd = login_cookie(&app, "fremd", "fremdpw1").await;
+
+    let (status, _) = etb_abrufen(&app, &fremd, einsatz, "").await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn liste_volltextsuche_filtert() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"typ":"meldung","inhalt":"Deich bricht"}"#,
+    )
+    .await;
+    eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"typ":"meldung","inhalt":"Lage ruhig"}"#,
+    )
+    .await;
+
+    let (status, json) = etb_abrufen(&app, &admin, einsatz, "q=Deich").await;
+    assert_eq!(status, StatusCode::OK);
+    let liste = json.as_array().unwrap();
+    assert_eq!(liste.len(), 1);
+    assert!(liste[0]["inhalt"].as_str().unwrap().contains("Deich"));
+}
+
+#[tokio::test]
+async fn liste_typ_filter() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    eintrag_erfassen(&app, &admin, einsatz, r#"{"typ":"meldung","inhalt":"m"}"#).await;
+    eintrag_erfassen(&app, &admin, einsatz, r#"{"typ":"anordnung","inhalt":"a"}"#).await;
+
+    let (status, json) = etb_abrufen(&app, &admin, einsatz, "typ=anordnung").await;
+    assert_eq!(status, StatusCode::OK);
+    let liste = json.as_array().unwrap();
+    assert_eq!(liste.len(), 1);
+    assert_eq!(liste[0]["typ"], "anordnung");
+}
+
+#[tokio::test]
+async fn liste_cursor_pagination() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    for i in 1..=3 {
+        let body = format!(r#"{{"typ":"meldung","inhalt":"e{i}"}}"#);
+        eintrag_erfassen(&app, &admin, einsatz, &body).await;
+    }
+
+    let (_, seite1) = etb_abrufen(&app, &admin, einsatz, "limit=1").await;
+    assert_eq!(seite1[0]["lfd_nr"], 3);
+
+    let (_, seite2) = etb_abrufen(&app, &admin, einsatz, "limit=1&before_lfd_nr=3").await;
+    assert_eq!(seite2[0]["lfd_nr"], 2);
+}
+
+#[tokio::test]
+async fn liste_ungueltiger_typ_filter_ist_400() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+
+    let (status, _) = etb_abrufen(&app, &admin, einsatz, "typ=unsinn").await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
 }

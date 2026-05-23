@@ -46,5 +46,6 @@ pub fn build_router(state: AppState) -> Router {
             delete(routes::einsatz::mitglied_entfernen),
         )
         .route("/api/einsaetze/{id}/etb", post(routes::etb::erfassen))
+        .route("/api/einsaetze/{id}/etb", get(routes::etb::liste))
         .with_state(state)
 }
