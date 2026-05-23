@@ -13,6 +13,10 @@ export function useEtbStream(einsatzId: number): void {
     const resync = () => qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
     quelle.addEventListener('etb', resync);
     quelle.addEventListener('lagged', resync);
-    return () => quelle.close();
+    return () => {
+      quelle.removeEventListener('etb', resync);
+      quelle.removeEventListener('lagged', resync);
+      quelle.close();
+    };
   }, [einsatzId, qc]);
 }

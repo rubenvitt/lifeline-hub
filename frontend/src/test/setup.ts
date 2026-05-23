@@ -34,6 +34,6 @@ dayjs.extend(utc);
 // beforeEach stellt den Stub nach vi.unstubAllGlobals() (z. B. in useEtbStream-Tests) wieder her.
 beforeEach(() => {
   if (typeof globalThis.EventSource === 'undefined') {
-    vi.stubGlobal('EventSource', class { addEventListener() {} close() {} });
+    vi.stubGlobal('EventSource', class { addEventListener() {} removeEventListener() {} close() {} });
   }
 });

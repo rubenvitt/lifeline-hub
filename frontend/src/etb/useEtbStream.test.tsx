@@ -16,6 +16,9 @@ class FakeEventSource {
   addEventListener(typ: string, cb: (e: MessageEvent) => void) {
     (this.listeners[typ] ??= []).push(cb);
   }
+  removeEventListener(typ: string, cb: (e: MessageEvent) => void) {
+    this.listeners[typ] = (this.listeners[typ] ?? []).filter((l) => l !== cb);
+  }
   close() {
     this.closed = true;
   }
@@ -46,6 +49,19 @@ describe('useEtbStream', () => {
     await waitFor(() =>
       expect(spy).toHaveBeenCalledWith({ queryKey: ['etb', 7] }),
     );
+  });
+
+  it('invalidiert die ETB-Query auch bei einem lagged-Event', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={7} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit('lagged', 'resync');
+    await waitFor(() => expect(spy).toHaveBeenCalledWith({ queryKey: ['etb', 7] }));
   });
 
   it('schließt die Verbindung beim Unmount', () => {
