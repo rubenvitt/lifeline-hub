@@ -79,7 +79,10 @@ export default function EinsaetzePage() {
       <Modal
         title="Neuen Einsatz anlegen"
         open={dialogOffen}
-        onCancel={() => setDialogOffen(false)}
+        onCancel={() => {
+          setDialogOffen(false);
+          form.resetFields();
+        }}
         onOk={() => form.submit()}
         okText="Anlegen"
         confirmLoading={anlegen.isPending}

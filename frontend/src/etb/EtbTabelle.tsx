@@ -10,7 +10,7 @@ interface Props {
 }
 
 export default function EtbTabelle({ eintraege, onBerichtigen }: Props) {
-  // Map id → lfd_nr, um Berichtigungs-Ziele auf ihre laufende Nummer aufzulösen (Task 8).
+  // Map id → lfd_nr, um Berichtigungs-Ziele auf ihre laufende Nummer aufzulösen.
   const lfdNrVonId = new Map(eintraege.map((e) => [e.id, e.lfd_nr]));
 
   // Map Original-id → lfd_nr der Berichtigung, für den Rückverweis am Originaleintrag.

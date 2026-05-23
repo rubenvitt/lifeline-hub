@@ -3,6 +3,10 @@ import 'fake-indexeddb/auto';
 import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import { server } from './server';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+
+dayjs.extend(utc);
 
 // Signalisiert React, dass wir in einer act-fähigen Umgebung testen — entfernt die
 // „not configured to support act(...)"-Warnung und deckt echte act-Verletzungen auf.
@@ -30,10 +34,6 @@ afterEach(() => {
   server.resetHandlers();
 });
 afterAll(() => server.close());
-
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
-dayjs.extend(utc);
 
 // jsdom kennt keine EventSource — No-op-Stub verhindert ReferenceError in EtbPage-Tests.
 // beforeEach stellt den Stub nach vi.unstubAllGlobals() (z. B. in useEtbStream-Tests) wieder her.
