@@ -248,3 +248,52 @@ async fn deaktivierter_benutzer_kann_sich_nicht_mehr_anmelden() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
 }
+
+#[tokio::test]
+async fn admin_legt_fuehrungskraft_an_und_org_rolle_erscheint() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/benutzer")
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, admin_cookie)
+                .body(Body::from(
+                    r#"{"anzeigename":"Frieda Führung","benutzername":"frieda","passwort":"friedapw1","org_rolle":"fuehrungskraft"}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::CREATED);
+
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(json["org_rolle"], "fuehrungskraft");
+}
+
+#[tokio::test]
+async fn ungueltige_org_rolle_ist_400() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/benutzer")
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, admin_cookie)
+                .body(Body::from(
+                    r#"{"anzeigename":"X","benutzername":"x","passwort":"xpasswort1","org_rolle":"chef"}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}

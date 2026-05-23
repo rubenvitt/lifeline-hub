@@ -44,7 +44,7 @@ pub async fn loeschen(pool: &SqlitePool, token: &str) -> Result<(), AppError> {
 async fn benutzer_aus_token(pool: &SqlitePool, token: &str) -> Result<Benutzer, AppError> {
     let benutzer = sqlx::query_as::<_, Benutzer>(
         "SELECT b.id, b.org_id, b.anzeigename, b.benutzername, b.passwort_hash, \
-                b.system_rolle, b.aktiv, b.erstellt_at \
+                b.system_rolle, b.org_rolle, b.aktiv, b.erstellt_at \
          FROM session s \
          JOIN benutzer b ON b.id = s.benutzer_id \
          WHERE s.token = ? AND s.expires_at > datetime('now') AND b.aktiv = 1",

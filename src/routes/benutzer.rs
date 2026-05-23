@@ -1,6 +1,8 @@
 use crate::app::AppState;
 use crate::auth::session::AdminUser;
-use crate::auth::{password, BenutzerAnzeige, ROLLE_ADMIN, ROLLE_KEINER};
+use crate::auth::{
+    password, BenutzerAnzeige, ORG_ROLLE_FUEHRUNGSKRAFT, ORG_ROLLE_KEINE, ROLLE_ADMIN, ROLLE_KEINER,
+};
 use crate::error::AppError;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -17,6 +19,8 @@ pub struct NeuerBenutzer {
     pub passwort: String,
     /// 'admin' oder 'keiner'; fehlt das Feld, gilt 'keiner'.
     pub system_rolle: Option<String>,
+    /// 'fuehrungskraft' oder 'keine'; fehlt das Feld, gilt 'keine'.
+    pub org_rolle: Option<String>,
 }
 
 /// GET /api/benutzer — Liste aller Benutzer (ohne Passwort-Hashes). Admin-only.
@@ -25,7 +29,7 @@ pub async fn liste(
     _admin: AdminUser,
 ) -> Result<Json<Vec<BenutzerAnzeige>>, AppError> {
     let benutzer = sqlx::query_as::<_, BenutzerAnzeige>(
-        "SELECT id, anzeigename, benutzername, system_rolle, aktiv, erstellt_at \
+        "SELECT id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, erstellt_at \
          FROM benutzer ORDER BY id",
     )
     .fetch_all(&state.pool)
@@ -57,6 +61,13 @@ pub async fn anlegen(
         ));
     }
 
+    let org_rolle = req.org_rolle.as_deref().unwrap_or(ORG_ROLLE_KEINE);
+    if org_rolle != ORG_ROLLE_FUEHRUNGSKRAFT && org_rolle != ORG_ROLLE_KEINE {
+        return Err(AppError::Validation(
+            "org_rolle muss 'fuehrungskraft' oder 'keine' sein".into(),
+        ));
+    }
+
     let hash = password::hash(&req.passwort)?;
     // Single-Org in T1: alle Benutzer gehören zur (einzigen) Organisation.
     let org_id: i64 = sqlx::query_scalar("SELECT id FROM organisation ORDER BY id LIMIT 1")
@@ -65,14 +76,15 @@ pub async fn anlegen(
         .ok_or_else(|| AppError::Internal("Keine Organisation vorhanden".into()))?;
 
     let ergebnis = sqlx::query(
-        "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle) \
-         VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle) \
+         VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(org_id)
     .bind(req.anzeigename.trim())
     .bind(req.benutzername.trim())
     .bind(&hash)
     .bind(rolle)
+    .bind(org_rolle)
     .execute(&state.pool)
     .await;
 
@@ -84,7 +96,7 @@ pub async fn anlegen(
     let id = ergebnis?.last_insert_rowid();
 
     let angelegt = sqlx::query_as::<_, BenutzerAnzeige>(
-        "SELECT id, anzeigename, benutzername, system_rolle, aktiv, erstellt_at \
+        "SELECT id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, erstellt_at \
          FROM benutzer WHERE id = ?",
     )
     .bind(id)
@@ -102,7 +114,7 @@ pub async fn deaktivieren(
     Path(id): Path<i64>,
 ) -> Result<Json<BenutzerAnzeige>, AppError> {
     let ziel = sqlx::query_as::<_, crate::auth::Benutzer>(
-        "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, aktiv, erstellt_at \
+        "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, aktiv, erstellt_at \
          FROM benutzer WHERE id = ?",
     )
     .bind(id)
@@ -137,7 +149,7 @@ pub async fn deaktivieren(
     tx.commit().await?;
 
     let aktualisiert = sqlx::query_as::<_, BenutzerAnzeige>(
-        "SELECT id, anzeigename, benutzername, system_rolle, aktiv, erstellt_at \
+        "SELECT id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, erstellt_at \
          FROM benutzer WHERE id = ?",
     )
     .bind(id)

@@ -31,7 +31,7 @@ pub async fn login(
     Json(req): Json<LoginRequest>,
 ) -> Result<(CookieJar, Json<crate::auth::BenutzerAnzeige>), AppError> {
     let benutzer = sqlx::query_as::<_, crate::auth::Benutzer>(
-        "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, aktiv, erstellt_at \
+        "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, aktiv, erstellt_at \
          FROM benutzer WHERE benutzername = ? AND aktiv = 1",
     )
     .bind(&req.benutzername)
