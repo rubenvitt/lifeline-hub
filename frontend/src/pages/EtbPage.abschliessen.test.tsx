@@ -47,4 +47,24 @@ describe('EtbPage – Abschließen', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Ja' }));
     await waitFor(() => expect(screen.getByText('abgeschlossen')).toBeInTheDocument());
   });
+
+  it('zeigt den Abschließen-Button nicht für Nicht-Einsatzleitung', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () =>
+        HttpResponse.json({ ...einsatz('aktiv'), meine_rolle: 'fuehrungspersonal' }),
+      ),
+      http.get('/api/einsaetze/7/etb', () => HttpResponse.json([])),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/7/etb' },
+    );
+    await screen.findByRole('heading', { name: 'Hochwasser' });
+    expect(screen.queryByRole('button', { name: 'Einsatz abschließen' })).not.toBeInTheDocument();
+  });
 });
