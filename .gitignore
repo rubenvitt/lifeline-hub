@@ -1,0 +1,15 @@
+# Visual-Companion-Mockups (Brainstorming)
+.superpowers/
+
+# Rust
+/target/
+
+# Node / Frontend
+node_modules/
+dist/
+build/
+
+# OS / Editor
+.DS_Store
+*.local
+.env
