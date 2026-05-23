@@ -30,3 +30,29 @@ async fn health_endpoint_returns_ok() {
     assert_eq!(json["db"], true);
     assert_eq!(json["version"], env!("CARGO_PKG_VERSION"));
 }
+
+#[tokio::test]
+async fn health_endpoint_reports_degraded_when_db_down() {
+    let pool = db::test_pool().await;
+    pool.close().await; // DB-Verbindung schließen → Query schlägt fehl
+    let app = build_router(AppState { pool });
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/health")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(json["status"], "degraded");
+    assert_eq!(json["db"], false);
+}

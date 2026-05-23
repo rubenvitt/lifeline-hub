@@ -1,18 +1,31 @@
 use crate::app::AppState;
-use axum::{extract::State, Json};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
 use serde_json::{json, Value};
 
 /// Health-Check: prüft DB-Konnektivität und liefert Status + Version.
-pub async fn health(State(state): State<AppState>) -> Json<Value> {
-    let db_ok = sqlx::query_scalar::<_, i64>("SELECT 1")
+/// Liefert 200 bei gesunder DB, 503 wenn die DB nicht erreichbar ist.
+pub async fn health(State(state): State<AppState>) -> impl IntoResponse {
+    let db_ok = match sqlx::query_scalar::<_, i64>("SELECT 1")
         .fetch_one(&state.pool)
         .await
-        .map(|v| v == 1)
-        .unwrap_or(false);
+    {
+        Ok(v) => v == 1,
+        Err(err) => {
+            tracing::warn!("Health-Check: DB-Abfrage fehlgeschlagen: {err}");
+            false
+        }
+    };
 
-    Json(json!({
+    let status_code = if db_ok {
+        StatusCode::OK
+    } else {
+        StatusCode::SERVICE_UNAVAILABLE
+    };
+    let body: Json<Value> = Json(json!({
         "status": if db_ok { "ok" } else { "degraded" },
         "version": env!("CARGO_PKG_VERSION"),
         "db": db_ok,
-    }))
+    }));
+
+    (status_code, body)
 }
