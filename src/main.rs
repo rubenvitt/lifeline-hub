@@ -13,7 +13,7 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let config = Config::parse();
-    tracing::info!(?config, "Starte lifeline-hub");
+    tracing::info!(db_path = %config.db_path, bind = %config.bind, "Starte lifeline-hub");
 
     let pool = db::connect(&config.db_path).await?;
     db::migrate(&pool).await?;
@@ -32,8 +32,8 @@ async fn main() -> anyhow::Result<()> {
 
 /// Wartet auf Ctrl+C für einen sauberen Shutdown.
 async fn shutdown_signal() {
-    tokio::signal::ctrl_c()
-        .await
-        .expect("Ctrl+C-Handler installieren");
-    tracing::info!("Shutdown-Signal empfangen, fahre herunter");
+    match tokio::signal::ctrl_c().await {
+        Ok(()) => tracing::info!("Shutdown-Signal empfangen, fahre herunter"),
+        Err(err) => tracing::warn!("Ctrl+C-Handler konnte nicht installiert werden: {err}"),
+    }
 }
