@@ -29,4 +29,10 @@ mod tests {
         let config = Config::parse_from(["lifeline-hub", "--bind", "0.0.0.0:9000"]);
         assert_eq!(config.bind, "0.0.0.0:9000");
     }
+
+    #[test]
+    fn db_path_flag_overrides_default() {
+        let config = Config::parse_from(["lifeline-hub", "--db-path", "/tmp/test.db"]);
+        assert_eq!(config.db_path, "/tmp/test.db");
+    }
 }
