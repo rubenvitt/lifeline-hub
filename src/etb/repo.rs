@@ -1,6 +1,6 @@
 use super::EtbEintragAnzeige;
 use crate::error::AppError;
-use sqlx::SqlitePool;
+use sqlx::{QueryBuilder, Sqlite, SqlitePool};
 
 /// Eingabedaten für einen neuen ETB-Eintrag. Alle Werte sind bereits
 /// validiert und normalisiert (Zeitformat, Pflichtfelder) — das ist Aufgabe
@@ -89,6 +89,116 @@ pub async fn gehoert_zu_einsatz(
             .fetch_optional(pool)
             .await?;
     Ok(treffer.is_some())
+}
+
+/// Standard-Seitengröße der ETB-Abfrage.
+pub const STANDARD_LIMIT: i64 = 100;
+/// Maximale Seitengröße (Schutz vor Riesen-Responses).
+pub const MAX_LIMIT: i64 = 500;
+
+/// Filter- und Pagination-Parameter für die ETB-Abfrage.
+/// Alle Filter sind optional und werden mit UND verknüpft.
+#[derive(Debug, Default)]
+pub struct EtbFilter {
+    /// Volltextsuche (FTS5) über Inhalt/Von/An/Veranlassung. Wird in Task 6 ausgewertet.
+    pub q: Option<String>,
+    /// Eintragstyp-Filter (z.B. "meldung").
+    pub typ: Option<String>,
+    /// Untere Grenze `ereigniszeit >=` (normalisiert).
+    pub von_zeit: Option<String>,
+    /// Obere Grenze `ereigniszeit <=` (normalisiert).
+    pub bis_zeit: Option<String>,
+    /// Filter nach Erfasser.
+    pub erfasser_id: Option<i64>,
+    /// Cursor: nur Einträge mit `lfd_nr <` diesem Wert (für ältere Seiten).
+    pub before_lfd_nr: Option<i64>,
+    /// Seitengröße (vom Handler auf [1, MAX_LIMIT] geklemmt).
+    pub limit: i64,
+}
+
+/// Fragt Einträge eines Einsatzes ab. Sortierung: `lfd_nr DESC` (neueste zuerst),
+/// stabiler Cursor über `before_lfd_nr`. Die fachliche Anzeige-Sortierung nach
+/// `ereigniszeit` erfolgt clientseitig (beide Zeitstempel werden geliefert).
+pub async fn abfrage(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    filter: &EtbFilter,
+) -> Result<Vec<EtbEintragAnzeige>, AppError> {
+    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
+        "SELECT e.id, e.lfd_nr, e.typ, e.inhalt, e.von, e.an, e.meldeweg, e.veranlassung, \
+                e.erfasser_id, b.anzeigename AS erfasser_name, e.ereigniszeit, e.received_at, \
+                e.erfasst_lokal_at, e.berichtigt_eintrag_id \
+         FROM etb_eintrag e JOIN benutzer b ON b.id = e.erfasser_id",
+    );
+
+    // FTS-Join nur, wenn ein Volltext-Query gesetzt ist (Auswertung in Task 6).
+    // Der Join verbindet nur per rowid; das MATCH gehört in die WHERE-Klausel
+    // (FTS5 wertet MATCH nur als top-level AND-Term gegen die FTS-Tabelle aus).
+    let fts: Option<String> = filter
+        .q
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .map(fts_query)
+        // Falls die Eingabe nur Sonderzeichen war, ist die FTS-Query leer → kein Filter.
+        .filter(|s| !s.is_empty());
+    if fts.is_some() {
+        qb.push(" JOIN etb_eintrag_fts f ON f.rowid = e.id");
+    }
+
+    qb.push(" WHERE e.einsatz_id = ");
+    qb.push_bind(einsatz_id);
+
+    if let Some(fts_q) = fts {
+        qb.push(" AND f MATCH ");
+        qb.push_bind(fts_q);
+    }
+
+    if let Some(typ) = &filter.typ {
+        qb.push(" AND e.typ = ");
+        qb.push_bind(typ);
+    }
+    if let Some(v) = &filter.von_zeit {
+        qb.push(" AND e.ereigniszeit >= ");
+        qb.push_bind(v);
+    }
+    if let Some(b) = &filter.bis_zeit {
+        qb.push(" AND e.ereigniszeit <= ");
+        qb.push_bind(b);
+    }
+    if let Some(eid) = filter.erfasser_id {
+        qb.push(" AND e.erfasser_id = ");
+        qb.push_bind(eid);
+    }
+    if let Some(cursor) = filter.before_lfd_nr {
+        qb.push(" AND e.lfd_nr < ");
+        qb.push_bind(cursor);
+    }
+
+    qb.push(" ORDER BY e.lfd_nr DESC LIMIT ");
+    qb.push_bind(filter.limit);
+
+    qb.build_query_as::<EtbEintragAnzeige>()
+        .fetch_all(pool)
+        .await
+        .map_err(Into::into)
+}
+
+/// Wandelt eine Nutzereingabe in eine sichere FTS5-Query um: jedes Token wird
+/// als Phrase in Anführungszeichen gesetzt (interne `"` verdoppelt), Tokens mit
+/// Leerzeichen verbunden (FTS5 = implizites UND). Verhindert Syntaxfehler bei
+/// Sonderzeichen wie `:`, `*`, `AND`.
+///
+/// Tokens ohne alphanumerische Zeichen (z.B. `*`, `:`) werden verworfen: sie
+/// würden nach dem Quoten zu einer leeren Phrase, die FTS5 als Syntaxfehler
+/// ablehnt. Enthält die Eingabe nur solche Tokens, ist das Ergebnis ein leerer
+/// String (der Aufrufer behandelt leeres `q` als „kein Filter").
+fn fts_query(eingabe: &str) -> String {
+    eingabe
+        .split_whitespace()
+        .filter(|t| t.chars().any(|c| c.is_alphanumeric()))
+        .map(|t| format!("\"{}\"", t.replace('"', "\"\"")))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 #[cfg(test)]
@@ -222,5 +332,93 @@ mod tests {
         let pool = crate::db::test_pool().await;
         setup(&pool).await;
         assert!(matches!(laden(&pool, 999).await.unwrap_err(), AppError::NotFound));
+    }
+
+    fn filter() -> EtbFilter {
+        EtbFilter {
+            limit: STANDARD_LIMIT,
+            ..Default::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn abfrage_sortiert_neueste_zuerst() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        anlegen(&pool, einsatz, benutzer, daten("erst")).await.unwrap();
+        anlegen(&pool, einsatz, benutzer, daten("dann")).await.unwrap();
+
+        let liste = abfrage(&pool, einsatz, &filter()).await.unwrap();
+        assert_eq!(liste.len(), 2);
+        assert_eq!(liste[0].lfd_nr, 2, "neuester Eintrag zuerst");
+        assert_eq!(liste[1].lfd_nr, 1);
+    }
+
+    #[tokio::test]
+    async fn abfrage_filtert_nach_typ() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        anlegen(&pool, einsatz, benutzer, daten("eine meldung")).await.unwrap();
+        let mut anordnung = daten("eine anordnung");
+        anordnung.typ = "anordnung";
+        anlegen(&pool, einsatz, benutzer, anordnung).await.unwrap();
+
+        let mut f = filter();
+        f.typ = Some("anordnung".into());
+        let liste = abfrage(&pool, einsatz, &f).await.unwrap();
+        assert_eq!(liste.len(), 1);
+        assert_eq!(liste[0].typ, "anordnung");
+    }
+
+    #[tokio::test]
+    async fn abfrage_filtert_nach_zeitraum() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let mut frueh = daten("frueh");
+        frueh.ereigniszeit = Some("2026-05-23 08:00:00");
+        anlegen(&pool, einsatz, benutzer, frueh).await.unwrap();
+        let mut spaet = daten("spaet");
+        spaet.ereigniszeit = Some("2026-05-23 18:00:00");
+        anlegen(&pool, einsatz, benutzer, spaet).await.unwrap();
+
+        let mut f = filter();
+        f.von_zeit = Some("2026-05-23 12:00:00".into());
+        let liste = abfrage(&pool, einsatz, &f).await.unwrap();
+        assert_eq!(liste.len(), 1);
+        assert_eq!(liste[0].inhalt, "spaet");
+    }
+
+    #[tokio::test]
+    async fn abfrage_cursor_blaettert_zu_aelteren() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        for i in 1..=3 {
+            anlegen(&pool, einsatz, benutzer, daten(&format!("e{i}")))
+                .await
+                .unwrap();
+        }
+
+        let mut f = filter();
+        f.limit = 1;
+        let seite1 = abfrage(&pool, einsatz, &f).await.unwrap();
+        assert_eq!(seite1[0].lfd_nr, 3);
+
+        f.before_lfd_nr = Some(seite1[0].lfd_nr);
+        let seite2 = abfrage(&pool, einsatz, &f).await.unwrap();
+        assert_eq!(seite2[0].lfd_nr, 2);
+    }
+
+    #[tokio::test]
+    async fn abfrage_limit_begrenzt_anzahl() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        for i in 1..=5 {
+            anlegen(&pool, einsatz, benutzer, daten(&format!("e{i}")))
+                .await
+                .unwrap();
+        }
+        let mut f = filter();
+        f.limit = 2;
+        assert_eq!(abfrage(&pool, einsatz, &f).await.unwrap().len(), 2);
     }
 }
