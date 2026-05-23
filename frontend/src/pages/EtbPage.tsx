@@ -1,8 +1,8 @@
 import { Alert, App, Button, Space, Spin, Tag, Typography } from 'antd';
 import { Link, useParams } from 'react-router-dom';
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
-import { SEITENGROESSE, erfasseEtb, listeEtb, type EtbFilterWerte, type NeuerEintrag } from '../api/etb';
+import { SEITENGROESSE, listeEtb, type EtbFilterWerte, type NeuerEintrag } from '../api/etb';
 import { ApiError } from '../api/client';
 import type { EtbEintragAnzeige } from '../api/types';
 import { useState } from 'react';
@@ -10,6 +10,7 @@ import EtbTabelle from '../etb/EtbTabelle';
 import EtbFilterleiste from '../etb/EtbFilterleiste';
 import Schnellerfassung from '../etb/Schnellerfassung';
 import { useEtbStream } from '../etb/useEtbStream';
+import { useEtbErfassung } from '../offline/useEtbErfassung';
 
 export default function EtbPage() {
   const { id } = useParams();
@@ -34,18 +35,13 @@ export default function EtbPage() {
 
   const eintraege = etbQuery.data?.pages.flat() ?? [];
 
-  const qc = useQueryClient();
   const { message } = App.useApp();
   const [berichtigungZu, setBerichtigungZu] = useState<EtbEintragAnzeige | null>(null);
+  const { erfassen, ausstehend } = useEtbErfassung(einsatzId);
 
-  const erfassungMutation = useMutation({
-    mutationFn: (e: NeuerEintrag) => erfasseEtb(einsatzId, e),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['etb', einsatzId] }),
-  });
-
-  async function erfassen(e: NeuerEintrag) {
+  async function erfassenMitMeldung(e: NeuerEintrag) {
     try {
-      await erfassungMutation.mutateAsync(e);
+      await erfassen(e);
     } catch (err) {
       message.error(err instanceof ApiError ? err.message : 'Senden fehlgeschlagen');
       throw err;
@@ -90,6 +86,21 @@ export default function EtbPage() {
       )}
 
       <EtbFilterleiste onChange={setFilter} />
+      {ausstehend.length > 0 && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={`${ausstehend.length} Eintrag/Einträge werden gesendet, sobald wieder Verbindung besteht`}
+          description={
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {ausstehend.map((a) => (
+                <li key={a.id}>{a.eintrag.inhalt}</li>
+              ))}
+            </ul>
+          }
+        />
+      )}
       <EtbTabelle
         eintraege={eintraege}
         onBerichtigen={darfSchreiben ? (e) => setBerichtigungZu(e) : undefined}
@@ -105,7 +116,7 @@ export default function EtbPage() {
 
       {darfSchreiben && (
         <Schnellerfassung
-          erfassen={erfassen}
+          erfassen={erfassenMitMeldung}
           berichtigungZu={berichtigungZu}
           onBerichtigungAbbrechen={() => setBerichtigungZu(null)}
         />
