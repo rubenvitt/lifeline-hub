@@ -35,7 +35,7 @@ Jeder Plan ergibt für sich lauffähige, testbare Software und baut auf dem vori
 |---|---|---|
 | 1 | **Backend-Fundament** — Server-Skelett, Config (CLI/ENV), SQLite-Pool (WAL/FK), Migrationen, Router, `/api/health`, Graceful Shutdown (SIGINT/SIGTERM) | ✅ **DONE** — auf `main`, Commit `9440456` |
 | 2 | **Auth & Benutzer/Org** — lokale Konten, Argon2-Hashing, Login/Sessions (httpOnly-Cookie), Admin-Bootstrap, Benutzerverwaltung; `error`-Modul (`AppError` + `IntoResponse`) | ✅ **DONE** — auf `main`, Commit `bfa047f` |
-| 3 | **Einsatz & Rollen** — Einsatz-CRUD, Lebenszyklus (aktiv → abgeschlossen, read-only), Mitgliedschaften, Rollen (Admin/Einsatzleitung/Führungspersonal/Beobachter), Autorisierung | ⬜ |
+| 3 | **Einsatz & Rollen** — Einsatz-CRUD, Lebenszyklus (aktiv → abgeschlossen, read-only), Mitgliedschaften, Rollen (Admin/Einsatzleitung/Führungspersonal/Beobachter), Autorisierung | ✅ **DONE** — auf `main`, Commit `8d5cc46` |
 | 4 | **ETB-Kern + Live + Suche** — append-only Einträge, server-autoritative `lfd_nr`, Berichtigungen, Drei-Zeitstempel-Modell (`ereigniszeit`/`received_at`/`erfasst_lokal_at`), SSE-Live, FTS5-Suche/Filter | ⬜ |
 | 5 | **Frontend (React + Ant Design PWA)** — Login, Einsatzauswahl, ETB-Ansicht, Schnellerfassung, SSE-Client, Offline-Queue (IndexedDB) | ⬜ |
 | 6 | **Backup/Restore + Packaging** — Hot-Backup (USB) + Restore, Frontend-Embedding, Single-Binary-Build | ⬜ |
@@ -55,6 +55,7 @@ Jeder Plan ergibt für sich lauffähige, testbare Software und baut auf dem vori
 - Spec (T1): `docs/superpowers/specs/2026-05-23-fundament-etb-kern-design.md`
 - Plan 1 (DONE): `docs/superpowers/plans/2026-05-23-backend-fundament.md`
 - Plan 2 (DONE): `docs/superpowers/plans/2026-05-23-auth-benutzer-org.md`
+- Plan 3 (DONE): `docs/superpowers/plans/2026-05-23-einsatz-rollen.md`
 - Diese Roadmap: `docs/superpowers/PROGRESS.md`
 
 ## So startest du einen neuen Chat
@@ -63,4 +64,4 @@ Minimaler Einstieg, z.B.:
 
 > „Lies `docs/superpowers/PROGRESS.md` und die T1-Spec. Schreibe als Nächstes **Plan 2 (Auth & Benutzer/Org)** im writing-plans-Bite-Sized-TDD-Format und setze ihn anschließend subagent-getrieben um."
 
-Der aktuelle Code-Stand liegt auf `main` (`cargo test` = 41/41 grün, clippy sauber). **Nächster Schritt: Plan 3 (Einsatz & Rollen).** Nach jedem fertigen Plan diese Tabelle hier aktualisieren.
+Der aktuelle Code-Stand liegt auf `main` (`cargo test` = 81/81 grün, clippy sauber). **Nächster Schritt: Plan 4 (ETB-Kern + Live + Suche).** Nach jedem fertigen Plan diese Tabelle hier aktualisieren.
