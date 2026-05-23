@@ -16,6 +16,28 @@ pub async fn connect(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
         .await
 }
 
+/// Spielt alle eingebetteten Migrationen aus `./migrations` ein.
+pub async fn migrate(pool: &SqlitePool) -> Result<(), sqlx::migrate::MigrateError> {
+    sqlx::migrate!("./migrations").run(pool).await
+}
+
+/// In-Memory-Pool für Tests (eine Verbindung, damit dieselbe DB geteilt wird),
+/// inklusive eingespielter Migrationen.
+pub async fn test_pool() -> SqlitePool {
+    let options = SqliteConnectOptions::new()
+        .filename(":memory:")
+        .foreign_keys(true);
+
+    let pool = SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect_with(options)
+        .await
+        .expect("In-Memory-Pool");
+
+    migrate(&pool).await.expect("Migrationen einspielen");
+    pool
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -40,5 +62,16 @@ mod tests {
             .unwrap()
             .get(0);
         assert_eq!(foreign_keys, 1);
+    }
+
+    #[tokio::test]
+    async fn migrations_create_app_meta() {
+        let pool = test_pool().await;
+        let value: String =
+            sqlx::query_scalar("SELECT value FROM app_meta WHERE key = 'schema_initialized'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(value, "1");
     }
 }
