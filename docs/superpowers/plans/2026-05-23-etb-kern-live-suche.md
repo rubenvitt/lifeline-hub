@@ -91,6 +91,14 @@ CREATE TRIGGER etb_eintrag_fts_ai AFTER INSERT ON etb_eintrag BEGIN
     INSERT INTO etb_eintrag_fts (rowid, inhalt, von, an, veranlassung)
     VALUES (new.id, new.inhalt, new.von, new.an, new.veranlassung);
 END;
+
+-- Anwendungsseitig ist die Tabelle append-only; ein DELETE entsteht nur über
+-- ON DELETE CASCADE bei Einsatz-Löschung. Damit der FTS-Index dann nicht
+-- verwaist, hält dieser AFTER DELETE-Trigger ihn synchron (FTS5 'delete'-Kommando).
+CREATE TRIGGER etb_eintrag_fts_ad AFTER DELETE ON etb_eintrag BEGIN
+    INSERT INTO etb_eintrag_fts (etb_eintrag_fts, rowid, inhalt, von, an, veranlassung)
+    VALUES ('delete', old.id, old.inhalt, old.von, old.an, old.veranlassung);
+END;
 ```
 
 - [ ] **Step 2: Failing-Test schreiben**
