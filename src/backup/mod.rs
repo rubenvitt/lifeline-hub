@@ -1,3 +1,5 @@
+pub mod restore;
+
 use crate::error::AppError;
 use sqlx::SqlitePool;
 use std::path::Path;
