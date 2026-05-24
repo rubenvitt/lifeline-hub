@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 
 /// Passwort-Wert, dessen `Debug`-Ausgabe maskiert ist, damit das Klartext-
 /// Passwort nicht versehentlich (z.B. via `{config:?}`) ins Log gelangt.
@@ -49,6 +49,30 @@ pub struct Config {
     /// ein Zufalls-Passwort erzeugt und ins Log geschrieben.
     #[arg(long, env = "LIFELINE_ADMIN_PASSWORD")]
     pub admin_password: Option<GeheimesPasswort>,
+
+    /// Optionales Subkommando. Ohne Subkommando wird der Server gestartet.
+    #[command(subcommand)]
+    pub command: Option<Command>,
+}
+
+/// Subkommandos der lifeline-hub-Binary (neben dem Server-Standardlauf).
+#[derive(Subcommand, Debug, Clone)]
+pub enum Command {
+    /// Konsistente Sicherung der Datenbank erstellen (auch im laufenden Betrieb).
+    Backup {
+        /// Zielpfad der Sicherungsdatei (darf noch nicht existieren).
+        #[arg(long)]
+        out: String,
+    },
+    /// Sicherung zurückspielen — ersetzt die aktuelle Datenbank.
+    Restore {
+        /// Pfad zur Sicherungsdatei.
+        #[arg(long)]
+        from: String,
+        /// Ohne Rückfrage überschreiben.
+        #[arg(long)]
+        force: bool,
+    },
 }
 
 #[cfg(test)]
@@ -92,7 +116,47 @@ mod tests {
     fn admin_password_wird_im_debug_maskiert() {
         let config = Config::parse_from(["lifeline-hub", "--admin-password", "geheim123"]);
         let ausgabe = format!("{config:?}");
-        assert!(!ausgabe.contains("geheim123"), "Passwort darf nicht im Debug stehen");
+        assert!(
+            !ausgabe.contains("geheim123"),
+            "Passwort darf nicht im Debug stehen"
+        );
         assert!(ausgabe.contains("***"));
+    }
+
+    #[test]
+    fn ohne_subkommando_ist_kein_command() {
+        let config = Config::parse_from(["lifeline-hub"]);
+        assert!(config.command.is_none());
+    }
+
+    #[test]
+    fn backup_subkommando_wird_geparst() {
+        let config = Config::parse_from(["lifeline-hub", "backup", "--out", "/mnt/usb/b.sqlite"]);
+        match config.command {
+            Some(Command::Backup { out }) => assert_eq!(out, "/mnt/usb/b.sqlite"),
+            andere => panic!("erwartete Backup, fand {andere:?}"),
+        }
+    }
+
+    #[test]
+    fn restore_subkommando_mit_force_wird_geparst() {
+        let config =
+            Config::parse_from(["lifeline-hub", "restore", "--from", "/mnt/usb/b.sqlite", "--force"]);
+        match config.command {
+            Some(Command::Restore { from, force }) => {
+                assert_eq!(from, "/mnt/usb/b.sqlite");
+                assert!(force);
+            }
+            andere => panic!("erwartete Restore, fand {andere:?}"),
+        }
+    }
+
+    #[test]
+    fn server_flags_funktionieren_weiter_mit_subkommando() {
+        let config = Config::parse_from([
+            "lifeline-hub", "--db-path", "/tmp/x.db", "backup", "--out", "/tmp/b.sqlite",
+        ]);
+        assert_eq!(config.db_path, "/tmp/x.db");
+        assert!(matches!(config.command, Some(Command::Backup { .. })));
     }
 }
