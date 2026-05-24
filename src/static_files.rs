@@ -86,6 +86,15 @@ fn baue_antwort(pfad: &str, daten: Vec<u8>) -> Response {
 /// Nutzt den `Uri`-Extractor (ein Fallback hat kein gematchtes Routenmuster,
 /// daher funktioniert hier kein `Path`-Extractor).
 pub async fn serve(uri: Uri) -> Response {
+    // Unbekannte API-Routen dürfen NICHT auf das SPA-index.html zurückfallen —
+    // Clients erwarten dort JSON/404, kein HTML.
+    if uri.path().starts_with("/api/") {
+        return Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .header(header::CONTENT_TYPE, HeaderValue::from_static("application/json"))
+            .body(Body::from(r#"{"error":"Nicht gefunden"}"#))
+            .unwrap();
+    }
     statische_antwort(uri.path(), |p| Asset::get(p).map(|f| f.data.into_owned()))
 }
 
@@ -161,5 +170,17 @@ mod tests {
         let get = getter(vec![]);
         let resp = statische_antwort("/", get);
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn unbekannte_api_route_faellt_nicht_auf_html_zurueck() {
+        use axum::http::Uri;
+        let uri: Uri = "/api/gibtsnicht".parse().unwrap();
+        let resp = serve(uri).await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            resp.headers().get(header::CONTENT_TYPE).unwrap(),
+            "application/json"
+        );
     }
 }
