@@ -38,7 +38,7 @@ Jeder Plan ergibt für sich lauffähige, testbare Software und baut auf dem vori
 | 3 | **Einsatz & Rollen** — Einsatz-CRUD, Lebenszyklus (aktiv → abgeschlossen, read-only), Mitgliedschaften, Rollen (Admin/Einsatzleitung/Führungspersonal/Beobachter), Autorisierung | ✅ **DONE** — auf `main`, Commit `8d5cc46` |
 | 4 | **ETB-Kern + Live + Suche** — append-only Einträge, server-autoritative `lfd_nr`, Berichtigungen, Drei-Zeitstempel-Modell (`ereigniszeit`/`received_at`/`erfasst_lokal_at`), SSE-Live, FTS5-Suche/Filter | ✅ **DONE** — Branch `worktree-feat+einsatz-rollen`, 136 Tests grün (Merge nach `main` ausstehend) |
 | 5 | **Frontend (React + Ant Design PWA)** — Login, Einsatzauswahl, ETB-Ansicht, Schnellerfassung, SSE-Client, Offline-Queue (IndexedDB), Mitglieder-/Benutzerverwaltung | ✅ **DONE** — Branch `worktree-feat+einsatz-rollen`, Frontend unter `frontend/` |
-| 6 | **Backup/Restore + Packaging** — Hot-Backup (USB) + Restore, Frontend-Embedding, Single-Binary-Build | ⬜ |
+| 6 | **Backup/Restore + Packaging** — Hot-Backup (`GET /api/backup` + CLI), Restore (CLI + Doku), Frontend-Embedding (rust-embed), Single-Binary-Build | ✅ **DONE** — Branch `worktree-feat+einsatz-rollen` |
 
 **Bewusst später (nicht Teil von T1):** PDF-/Druck-Export (priorisiert für T1.1/T2), OIDC/SSO, MFA, Schnellbausteine, Server-Discovery (QR/mDNS).
 
@@ -58,6 +58,8 @@ Jeder Plan ergibt für sich lauffähige, testbare Software und baut auf dem vori
 - Plan 3 (DONE): `docs/superpowers/plans/2026-05-23-einsatz-rollen.md`
 - Plan 4 (DONE): `docs/superpowers/plans/2026-05-23-etb-kern-live-suche.md`
 - Plan 5 (DONE): `docs/superpowers/plans/2026-05-23-frontend-react-antd-pwa.md`
+- Plan 6 (DONE): `docs/superpowers/plans/2026-05-24-backup-restore-packaging.md`
+- Betriebsdoku: `docs/betrieb/packaging.md`, `docs/betrieb/backup-restore.md`
 - Diese Roadmap: `docs/superpowers/PROGRESS.md`
 
 ## So startest du einen neuen Chat
@@ -66,4 +68,4 @@ Minimaler Einstieg, z.B.:
 
 > „Lies `docs/superpowers/PROGRESS.md` und die T1-Spec. Schreibe als Nächstes **Plan 6 (Backup/Restore + Packaging)** im writing-plans-Bite-Sized-TDD-Format und setze ihn anschließend subagent-getrieben um."
 
-Der aktuelle Code-Stand: Pläne 1–3 auf `main`; Plan 4 (ETB-Kern + Live + Suche) und Plan 5 (Frontend React + Ant Design PWA) auf Branch `worktree-feat+einsatz-rollen`, Merge nach `main` ausstehend. Frontend: 40/40 Vitest-Tests grün, Build inkl. PWA-Artefakte erfolgreich. **Nächster Schritt: Plan 6 (Backup/Restore + Packaging, inkl. Frontend-Embedding in die Binary).** Nach jedem fertigen Plan diese Tabelle hier aktualisieren.
+Der aktuelle Code-Stand: Pläne 1–3 auf `main`; Pläne 4–6 auf Branch `worktree-feat+einsatz-rollen` (Merge nach `main` ausstehend). **Teilprojekt 1 ist damit funktional vollständig** (Server, Auth, Einsatz, ETB-Kern, Frontend, Backup/Restore, Single-Binary mit eingebettetem Frontend). Backend-Tests grün; `scripts/build-release.sh` erzeugt erfolgreich eine ~8,4 MB Single-Binary mit eingebettetem Frontend. **Nächster Schritt: Merge nach `main`, danach Spec + Pläne für Teilprojekt 2 (Fahrzeug-/Einsatzmittelverwaltung).** Nach jedem fertigen Plan diese Tabelle hier aktualisieren.
