@@ -8,6 +8,9 @@
 node_modules/
 dist/
 build/
+# Embed-Ordner muss für die Compile-Zeit existieren (rust-embed):
+!frontend/dist/
+!frontend/dist/.gitkeep
 
 # OS / Editor
 .DS_Store
