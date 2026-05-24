@@ -17,6 +17,7 @@ pub struct AppState {
 pub fn build_router(state: AppState) -> Router {
     Router::new()
         .route("/api/health", get(routes::health::health))
+        .route("/api/backup", get(routes::backup::download))
         .route("/api/auth/login", post(routes::auth::login))
         .route("/api/auth/logout", post(routes::auth::logout))
         .route("/api/auth/me", get(routes::auth::me))
