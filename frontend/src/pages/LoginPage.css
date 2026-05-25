@@ -1,0 +1,137 @@
+/* Login-Seite: Vollbild-Hintergrund mit atmosphärischem Lagebild + schwebende Glas-Card. */
+
+.login-seite {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow: hidden;
+  background-color: #0b0b0e;
+}
+
+/* Hintergrundbild + abdunkelnder Verlauf für ruhige Lesbarkeit der Card. */
+.login-seite::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+      to bottom,
+      rgba(11, 11, 14, 0.55),
+      rgba(11, 11, 14, 0.78)
+    ),
+    var(--login-bg);
+  background-size: cover;
+  background-position: center;
+  transform: scale(1.04);
+  animation: login-bg-ein 1.2s ease-out both;
+}
+
+@keyframes login-bg-ein {
+  from {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+.login-karte {
+  position: relative;
+  width: 380px;
+  max-width: 100%;
+  padding: 36px 32px;
+  border-radius: 14px;
+  background: rgba(22, 22, 27, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 24px 60px -12px rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(16px) saturate(120%);
+  -webkit-backdrop-filter: blur(16px) saturate(120%);
+  animation: login-karte-ein 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: 0.15s;
+}
+
+@keyframes login-karte-ein {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Markenbereich: Name + erklärender Untertitel, dezenter roter Akzent. */
+.login-marke {
+  margin-bottom: 28px;
+}
+
+.login-marke__akzent {
+  display: block;
+  width: 36px;
+  height: 3px;
+  margin-bottom: 16px;
+  border-radius: 2px;
+  background: var(--ant-color-primary, #a8071a);
+  box-shadow: 0 0 12px 0 rgba(168, 7, 26, 0.6);
+}
+
+.login-marke__name {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #f5f5f5;
+  line-height: 1.1;
+}
+
+.login-marke__untertitel {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Eingangsanimation für die Formularzeilen (gestaffelt). */
+.login-karte .ant-form-item,
+.login-karte .ant-btn {
+  animation: login-feld-ein 0.6s ease-out both;
+}
+
+.login-karte .ant-form-item:nth-of-type(1) {
+  animation-delay: 0.3s;
+}
+.login-karte .ant-form-item:nth-of-type(2) {
+  animation-delay: 0.38s;
+}
+.login-karte .login-absenden {
+  animation-delay: 0.46s;
+}
+
+@keyframes login-feld-ein {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-seite::before,
+  .login-karte,
+  .login-karte .ant-form-item,
+  .login-karte .ant-btn {
+    animation: none;
+  }
+}
