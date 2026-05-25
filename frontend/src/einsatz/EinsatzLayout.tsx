@@ -55,7 +55,7 @@ export default function EinsatzLayout() {
           <EinsatzSwitcher aktuellName={einsatz?.bezeichnung ?? 'Einsatz'} />
         )}
       </Header>
-      <Layout>
+      <Layout hasSider>
         <IconRail
           kategorien={kategorien}
           aktiveKategorie={offeneKategorie ?? aktiveKategorie}
