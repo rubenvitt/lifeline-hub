@@ -13,6 +13,7 @@ export interface BenutzerAnzeige {
 
 export type EinsatzStatus = 'aktiv' | 'abgeschlossen';
 export type EinsatzRolle = 'einsatzleitung' | 'fuehrungspersonal' | 'beobachter';
+export type Einsatzart = 'realeinsatz' | 'uebung' | 'sanitaetsdienst' | 'bereitstellung';
 
 export interface EinsatzAnzeige {
   id: number;
@@ -22,6 +23,17 @@ export interface EinsatzAnzeige {
   begonnen_at: string;
   abgeschlossen_at: string | null;
   abgeschlossen_von: number | null;
+  einsatzart: Einsatzart;
+  einsatznummer_intern: string | null;
+  /** Read-only technischer Anlage-Zeitpunkt (Audit-Spur). */
+  angelegt_at: string;
+  leitstellen_nr: string | null;
+  einsatzort: string | null;
+  einsatzort_lat: number | null;
+  einsatzort_lon: number | null;
+  meldende_stelle: string | null;
+  sachverhalt: string | null;
+  anzahl_betroffene_initial: number | null;
   /** Rolle des abfragenden Benutzers; null = kein Mitglied. */
   meine_rolle: EinsatzRolle | null;
 }
@@ -32,6 +44,12 @@ export interface MitgliedAnzeige {
   benutzername: string;
   einsatz_rolle: EinsatzRolle;
   zugewiesen_at: string;
+}
+
+/** Org-weiter Einsatzstichwort-Vorschlag für die Combobox. */
+export interface StichwortVorschlag {
+  id: number;
+  text: string;
 }
 
 /** 'system' wird vom Server automatisch erzeugt und ist nicht client-erfassbar. */
