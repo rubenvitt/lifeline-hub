@@ -42,7 +42,10 @@ function setup() {
 describe('EtbPage', () => {
   it('zeigt Einsatz-Bezeichnung und ETB-Einträge', async () => {
     setup();
-    await waitFor(() => expect(screen.getByText('Hochwasser Nord')).toBeInTheDocument());
+    // Bezeichnung erscheint als Überschrift (zusätzlich in der Breadcrumb-Zeile) → gezielt die Überschrift prüfen.
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Hochwasser Nord' })).toBeInTheDocument(),
+    );
     expect(await screen.findByText('Erste Meldung')).toBeInTheDocument();
   });
 });

@@ -1,4 +1,4 @@
-import { Alert, App, Button, Popconfirm, Space, Spin, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Spin, Tag, Typography } from 'antd';
 import { Link, useParams } from 'react-router-dom';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz, schliesseEinsatzAb } from '../api/einsaetze';
@@ -83,9 +83,17 @@ export default function EtbPage() {
 
   return (
     <div>
+      {/* Dezente Breadcrumb-Zeile als Rückweg: vom Content getrennt, kein versehentlicher
+          Kontextwechsel mitten im Tagebuch. Klick auf „Einsätze“ führt zur Liste zurück. */}
+      <Breadcrumb
+        style={{ marginBottom: 12 }}
+        items={[
+          { title: <Link to="/einsaetze">Einsätze</Link> },
+          { title: einsatz.bezeichnung },
+        ]}
+      />
       <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
         <Space>
-          <Link to="/einsaetze">← Einsätze</Link>
           <Typography.Title level={3} style={{ margin: 0 }}>
             {einsatz.bezeichnung}
           </Typography.Title>
