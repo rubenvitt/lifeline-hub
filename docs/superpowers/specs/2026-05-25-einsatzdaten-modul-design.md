@@ -29,9 +29,10 @@ Konsolidiert aus BOS-Doktrin (FwDV/DV 100, Einsatzstichwort-Systematik, Einsatzt
 3. **Schreibrecht (aktiver Einsatz):** Einsatzleitung **+** Führungspersonal **+** System-Admin. Beobachter nur lesend. **Abgeschlossener Einsatz = read-only** (bestehendes Muster `fordere_aktiv`).
 4. **Seiten-UX:** Lesemodus (antd `Descriptions`) + „Bearbeiten"-Button → Formular mit Speichern/Abbrechen. Ein atomares Speichern.
 5. **Stichwort-Vorschläge-Katalog:** gepflegt im globalen Stammdaten-Bereich (org-weit, nur Admins editierbar).
-6. **`begonnen_at` (Alarmzeit) editierbar** auf dieser Seite (echte Alarmzeit weicht oft vom Anlege-Zeitpunkt ab).
+6. **Alarmzeit mit Audit-Trennung:** `begonnen_at` (Alarmzeit) editierbar; zusätzlich `angelegt_at` als read-only technischer Anlage-Zeitpunkt (Original bleibt nachvollziehbar).
 7. **Koordinate** jetzt schon als zwei manuelle Zahlenfelder (Lat/Lon); Karten-Picker erst später im Lage-Modul.
-8. **Einsatznummer-Format** `JJJJ-NNN` (z. B. `2026-001`), fortlaufend je Organisation/Jahr.
+8. **Einsatznummer-Format** `JJJJ-NNN` (z. B. `2026-001`), fortlaufend je Organisation/Jahr, **je Organisation eindeutig** (Unique-Index; Dublette → 409).
+9. **Admin-Schreibrecht über ein eigenes Gate** der PATCH-Route (Schreibrecht ODER System-Admin); `fordere_schreibrecht`/ETB-Semantik bleibt unverändert.
 
 ## Scope-Abgrenzung
 
@@ -51,7 +52,8 @@ Neue Spalten auf `einsatz` (alle nullable außer `einsatzart`):
 | Spalte | Typ | Bedeutung |
 |---|---|---|
 | `einsatzart` | `TEXT NOT NULL DEFAULT 'realeinsatz'`, CHECK in (`realeinsatz`, `uebung`, `sanitaetsdienst`, `bereitstellung`) | Grobklasse des Einsatzes |
-| `einsatznummer_intern` | `TEXT` | Format `JJJJ-NNN`, beim Anlegen automatisch vorbelegt, danach editierbar |
+| `einsatznummer_intern` | `TEXT` | Format `JJJJ-NNN`, beim Anlegen automatisch vorbelegt, danach editierbar. **Je Organisation eindeutig** (s. u.) |
+| `angelegt_at` | `TEXT NOT NULL DEFAULT (datetime('now'))` | technischer Anlage-Zeitpunkt, **read-only** (Audit-Spur) |
 | `leitstellen_nr` | `TEXT` | externe/Leitstellen-Einsatznummer |
 | `einsatzort` | `TEXT` | Adresse (Freitext) |
 | `einsatzort_lat` | `REAL` | optionale Koordinate (manuelle Eingabe) |
@@ -60,7 +62,11 @@ Neue Spalten auf `einsatz` (alle nullable außer `einsatzart`):
 | `sachverhalt` | `TEXT` | Meldebild/Lagebeschreibung (mehrzeilig) |
 | `anzahl_betroffene_initial` | `INTEGER` | erste gemeldete Zahl Betroffener |
 
-Bestandsdaten: `einsatzart` erhält per DEFAULT `'realeinsatz'`; alle übrigen Spalten bleiben bei `NULL`. `einsatznummer_intern` für Bestands-Einsätze nicht rückwirkend vergeben (bleibt `NULL`, ist nachträglich editierbar).
+**Eindeutigkeit der Einsatznummer:** `CREATE UNIQUE INDEX ... ON einsatz(org_id, einsatznummer_intern)`. In SQLite gelten mehrere `NULL` als verschieden — Bestands-Einsätze ohne Nummer kollidieren also nicht. Eine manuell vergebene Dublette (oder eine Auto-Kollision) führt zu `Conflict` (409).
+
+**Alarmzeit vs. Anlage-Zeit:** `begonnen_at` (Bestandsspalte) ist die **editierbare Alarmzeit/Einsatzbeginn**; `angelegt_at` (neu) ist der **read-only** technische Anlage-Zeitpunkt als Audit-Spur. Korrektur der Alarmzeit überschreibt also nicht den Original-Anlagezeitpunkt.
+
+Bestandsdaten: `einsatzart` erhält per DEFAULT `'realeinsatz'`; `angelegt_at` wird für Bestands-Einsätze auf `begonnen_at` zurückgesetzt (nächste bekannte technische Zeit); alle übrigen neuen Spalten bleiben bei `NULL`. `einsatznummer_intern` für Bestands-Einsätze nicht rückwirkend vergeben (bleibt `NULL`, ist nachträglich editierbar).
 
 ### Migration `0006_stichwort_vorschlag.sql`
 
@@ -87,9 +93,11 @@ Seed einer Startliste je Organisation (z. B. `H1`, `H1Y`, `MANV`, `San-Dienst`, 
 
 Aktualisiert die editierbaren Kopffelder in einem Request.
 
-- **Gate:** `fordere_schreibrecht(rolle)` (Einsatzleitung **oder** Führungspersonal — bereits vorhanden) **+** `fordere_aktiv(einsatz)` (abgeschlossen → `Conflict` 409). System-Admin ohne Mitgliedschaft: über bestehende „höhere Berechtigung"-Logik analog zu Lesezugriff zulassen (Implementierungsdetail im Plan; Verhalten: Admin darf schreiben).
-- **Editierbare Felder:** `bezeichnung`, `stichwort`, `einsatzart`, `einsatznummer_intern`, `leitstellen_nr`, `einsatzort`, `einsatzort_lat`, `einsatzort_lon`, `meldende_stelle`, `sachverhalt`, `anzahl_betroffene_initial`, `begonnen_at`.
-- **Nicht editierbar hier:** `status`, `abgeschlossen_at`, `abgeschlossen_von` (Abschließen-Aktion), `org_id`, `id`.
+- **Gate (eigenes Gate dieser Route, ETB-Semantik bleibt unverändert):** Schreibrecht **oder** System-Admin — d. h. `fordere_schreibrecht(rolle)` (Einsatzleitung oder Führungspersonal) **ODER** `benutzer.system_rolle == admin` — **plus** `fordere_aktiv(einsatz)` (abgeschlossen → `Conflict` 409). Das bestehende `fordere_schreibrecht` (auch vom ETB genutzt) wird **nicht** verändert; die Admin-Erlaubnis sitzt lokal in dieser Route.
+- **Editierbare Felder:** `bezeichnung`, `stichwort`, `einsatzart`, `einsatznummer_intern`, `leitstellen_nr`, `einsatzort`, `einsatzort_lat`, `einsatzort_lon`, `meldende_stelle`, `sachverhalt`, `anzahl_betroffene_initial`, `begonnen_at` (Alarmzeit).
+- **Nicht editierbar hier:** `status`, `abgeschlossen_at`, `abgeschlossen_von` (Abschließen-Aktion), `angelegt_at` (Audit), `org_id`, `id`.
+- **Eindeutigkeit:** Verstoß gegen den Unique-Index auf `einsatznummer_intern` → `Conflict` (409) mit klarer Meldung.
+- **Update-Semantik:** Das Formular sendet bei jedem Speichern **alle** editierbaren Felder (Vollersatz der editierbaren Spalten); nicht-editierbare Spalten bleiben unberührt. Leere Optional-Strings → `NULL`. Kein partielles Patchen einzelner Felder — das passt zum Lesemodus-/Bearbeiten-Workflow (ein atomares Speichern).
 - **Validierung:** `bezeichnung` getrimmt nicht leer; `einsatzart` ∈ Enum; `anzahl_betroffene_initial` ≥ 0 oder `NULL`; `begonnen_at` parsebares Datum/Zeit im DB-Format; leere Optional-Strings → `NULL`.
 - **Antwort:** aktualisierte `EinsatzAnzeige` (wie `detail`).
 
@@ -113,8 +121,9 @@ Neues Routen-Modul `src/routes/stichwort.rs` + Registrierung in `src/routes/mod.
   ```tsx
   const MODUL_ELEMENTE = { etb: <EtbPage />, einsatzdaten: <EinsatzdatenPage /> };
   ```
+- In `frontend/src/einsatz/modulRegistry.ts` den Eintrag `einsatzdaten` von `status: 'geplant'` auf `status: 'fertig'` setzen (damit das Modul-Panel es als fertig markiert).
 - Lädt den Einsatz über `useQuery(['einsatz', einsatzId])` (geteilter Cache mit `EinsatzLayout`) und die Mitglieder über `ladeMitglieder` (für die read-only Einsatzleitungs-Anzeige).
-- **Lesemodus:** antd `Descriptions` mit allen Feldern; leere Felder als „—". Einsatzleitung aus Mitgliedern mit Rolle `einsatzleitung`. Status-Badge.
+- **Lesemodus:** antd `Descriptions` mit allen Feldern; leere Felder als „—". Einsatzleitung aus Mitgliedern mit Rolle `einsatzleitung`. Status-Badge. `begonnen_at` (Alarmzeit) und `angelegt_at` (Anlage-Zeit, read-only) beide ausgewiesen.
 - **Bearbeiten:** Button nur sichtbar, wenn `meine_rolle` schreibberechtigt (Leitung/Führung) **oder** System-Admin **und** Einsatz aktiv. Klick → antd `Form` mit den editierbaren Feldern, Speichern/Abbrechen.
   - Stichwort: `AutoComplete` (oder `Select` mit `showSearch`, freie Eingabe erlaubt), Optionen aus `GET /api/stichwort-vorschlaege`.
   - Einsatzart: `Select` mit den vier Werten (deutsche Labels).
@@ -137,10 +146,11 @@ Aus dem reinen Platzhalter wird eine Seite mit einem Abschnitt **„Einsatz-Stic
 ## Tests
 
 ### Backend
-- PATCH-Berechtigung: Einsatzleitung ✓, Führungspersonal ✓, System-Admin ✓, Beobachter → `Forbidden`, Nicht-Mitglied ohne höhere Berechtigung → `Forbidden`.
+- PATCH-Berechtigung: Einsatzleitung ✓, Führungspersonal ✓, System-Admin (auch ohne Mitgliedschaft) ✓, Beobachter → `Forbidden`, Nicht-Mitglied ohne Admin → `Forbidden`. ETB-Schreibrecht bleibt unverändert (Admin ohne Mitgliedschaft darf ETB **nicht** schreiben).
 - PATCH auf abgeschlossenen Einsatz → `Conflict` (409).
-- Validierung: leere `bezeichnung` → `Validation`; ungültige `einsatzart` → `Validation`; negative `anzahl_betroffene_initial` → `Validation`; leere Optionals werden `NULL`.
+- Validierung: leere `bezeichnung` → `Validation`; ungültige `einsatzart` → `Validation`; negative `anzahl_betroffene_initial` → `Validation`; leere Optionals werden `NULL`. `angelegt_at` bleibt durch PATCH unverändert.
 - Einsatznummer-Auto-Vergabe: erster Einsatz des Jahres → `JJJJ-001`, nächster → `JJJJ-002`; je Organisation getrennt.
+- Einsatznummer-Eindeutigkeit: PATCH auf eine in derselben Orga bereits vergebene Nummer → `Conflict` (409); mehrere `NULL` erlaubt.
 - Stichwort-Vorschläge: `GET` für alle, `POST`/`DELETE` nur Admin (sonst `Forbidden`), Duplikat → `Conflict`.
 
 ### Frontend
