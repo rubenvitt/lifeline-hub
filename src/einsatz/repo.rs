@@ -197,6 +197,69 @@ pub async fn abschliessen(
     laden(pool, einsatz_id).await
 }
 
+/// Editierbare Kopffelder für `aktualisiere_kopf`. Optional-Strings sind bereits
+/// vom Handler getrimmt; leere Werte werden als `None` übergeben (→ NULL).
+#[derive(Debug)]
+pub struct KopfDaten<'a> {
+    pub bezeichnung: &'a str,
+    pub stichwort: Option<&'a str>,
+    pub einsatzart: &'a str,
+    pub einsatznummer_intern: Option<&'a str>,
+    pub leitstellen_nr: Option<&'a str>,
+    pub einsatzort: Option<&'a str>,
+    pub einsatzort_lat: Option<f64>,
+    pub einsatzort_lon: Option<f64>,
+    pub meldende_stelle: Option<&'a str>,
+    pub sachverhalt: Option<&'a str>,
+    pub anzahl_betroffene_initial: Option<i64>,
+    /// Bereits ins DB-Format normalisierte Alarmzeit.
+    pub begonnen_at: &'a str,
+}
+
+/// Vollersatz der editierbaren Kopf-Spalten (ein atomares Speichern).
+/// Nicht-editierbare Spalten (status, abgeschlossen_*, angelegt_at, org_id, id)
+/// bleiben unberührt. Ein Verstoß gegen den Einsatznummer-Unique-Index ergibt
+/// `Conflict` (409).
+pub async fn aktualisiere_kopf(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    daten: KopfDaten<'_>,
+) -> Result<Einsatz, AppError> {
+    let ergebnis = sqlx::query(
+        "UPDATE einsatz SET \
+            bezeichnung = ?, stichwort = ?, einsatzart = ?, einsatznummer_intern = ?, \
+            leitstellen_nr = ?, einsatzort = ?, einsatzort_lat = ?, einsatzort_lon = ?, \
+            meldende_stelle = ?, sachverhalt = ?, anzahl_betroffene_initial = ?, begonnen_at = ? \
+         WHERE id = ?",
+    )
+    .bind(daten.bezeichnung)
+    .bind(daten.stichwort)
+    .bind(daten.einsatzart)
+    .bind(daten.einsatznummer_intern)
+    .bind(daten.leitstellen_nr)
+    .bind(daten.einsatzort)
+    .bind(daten.einsatzort_lat)
+    .bind(daten.einsatzort_lon)
+    .bind(daten.meldende_stelle)
+    .bind(daten.sachverhalt)
+    .bind(daten.anzahl_betroffene_initial)
+    .bind(daten.begonnen_at)
+    .bind(einsatz_id)
+    .execute(pool)
+    .await;
+
+    if let Err(sqlx::Error::Database(db_err)) = &ergebnis {
+        if db_err.is_unique_violation() {
+            return Err(AppError::Conflict(
+                "Einsatznummer ist in dieser Organisation bereits vergeben".into(),
+            ));
+        }
+    }
+    ergebnis?;
+
+    laden(pool, einsatz_id).await
+}
+
 /// Alle Mitglieder eines Einsatzes (mit Benutzer-Klartext), sortiert nach Zuweisung.
 pub async fn mitglieder(
     pool: &SqlitePool,
@@ -460,6 +523,75 @@ mod tests {
         // anlegen nutzt Org 1 (ORDER BY id LIMIT 1) → beginnt bei 001.
         let a = anlegen(&pool, "Lage", None, leit).await.unwrap();
         assert_eq!(a.einsatznummer_intern.as_deref(), Some(format!("{jahr}-001").as_str()));
+    }
+
+    #[tokio::test]
+    async fn aktualisiere_kopf_setzt_felder_und_leere_optionals_null() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = anlegen(&pool, "Alt", None, leit).await.unwrap();
+
+        let aktualisiert = aktualisiere_kopf(
+            &pool,
+            einsatz.id,
+            KopfDaten {
+                bezeichnung: "Neu",
+                stichwort: Some("H1"),
+                einsatzart: crate::einsatz::EINSATZART_UEBUNG,
+                einsatznummer_intern: einsatz.einsatznummer_intern.as_deref(),
+                leitstellen_nr: None,
+                einsatzort: Some("Hauptstraße 1"),
+                einsatzort_lat: Some(52.5),
+                einsatzort_lon: Some(13.4),
+                meldende_stelle: None,
+                sachverhalt: Some("Mehrzeiliges\nMeldebild"),
+                anzahl_betroffene_initial: Some(3),
+                begonnen_at: "2026-05-25 08:00:00",
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(aktualisiert.bezeichnung, "Neu");
+        assert_eq!(aktualisiert.einsatzart, "uebung");
+        assert_eq!(aktualisiert.einsatzort.as_deref(), Some("Hauptstraße 1"));
+        assert_eq!(aktualisiert.einsatzort_lat, Some(52.5));
+        assert_eq!(aktualisiert.anzahl_betroffene_initial, Some(3));
+        assert_eq!(aktualisiert.leitstellen_nr, None);
+        assert_eq!(aktualisiert.begonnen_at, "2026-05-25 08:00:00");
+        // angelegt_at bleibt unverändert (Audit-Spur).
+        assert_eq!(aktualisiert.angelegt_at, einsatz.angelegt_at);
+    }
+
+    #[tokio::test]
+    async fn aktualisiere_kopf_doppelte_nummer_ist_conflict() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let a = anlegen(&pool, "A", None, leit).await.unwrap();
+        let b = anlegen(&pool, "B", None, leit).await.unwrap();
+
+        // b auf a's Nummer setzen → Unique-Verstoß → Conflict.
+        let err = aktualisiere_kopf(
+            &pool,
+            b.id,
+            KopfDaten {
+                bezeichnung: "B",
+                stichwort: None,
+                einsatzart: crate::einsatz::EINSATZART_REALEINSATZ,
+                einsatznummer_intern: a.einsatznummer_intern.as_deref(),
+                leitstellen_nr: None,
+                einsatzort: None,
+                einsatzort_lat: None,
+                einsatzort_lon: None,
+                meldende_stelle: None,
+                sachverhalt: None,
+                anzahl_betroffene_initial: None,
+                begonnen_at: &b.begonnen_at,
+            },
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(err, AppError::Conflict(_)));
     }
 
     #[tokio::test]
