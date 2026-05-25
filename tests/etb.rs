@@ -400,6 +400,58 @@ async fn liste_nur_fuer_mitglieder() {
 }
 
 #[tokio::test]
+async fn admin_nicht_mitglied_darf_etb_lesen() {
+    // Höhere Berechtigung (System-Admin) darf das ETB jedes Einsatzes lesen,
+    // auch ohne Mitgliedschaft. Eine Führungskraft legt den Einsatz an.
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin, "frieda", "fuehrungskraft").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let einsatz = einsatz_anlegen(&app, &frieda, "Friedas Lage").await;
+    eintrag_erfassen(
+        &app,
+        &frieda,
+        einsatz,
+        r#"{"typ":"meldung","inhalt":"Test"}"#,
+    )
+    .await;
+
+    // admin ist KEIN Mitglied dieses Einsatzes, darf das ETB aber lesen.
+    let (status, json) = etb_abrufen(&app, &admin, einsatz, "").await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "Admin (höhere Berechtigung) muss fremdes ETB lesen dürfen"
+    );
+    assert_eq!(json.as_array().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn admin_nicht_mitglied_darf_stream_abonnieren() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin, "frieda", "fuehrungskraft").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let einsatz = einsatz_anlegen(&app, &frieda, "Friedas Lage").await;
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/einsaetze/{einsatz}/etb/stream"))
+                .header(header::COOKIE, admin)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "Admin (höhere Berechtigung) muss fremden Stream abonnieren dürfen"
+    );
+}
+
+#[tokio::test]
 async fn beobachter_darf_lesen() {
     let (app, _live) = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;

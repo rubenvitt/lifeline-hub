@@ -1,6 +1,6 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{fordere_aktiv, fordere_mitglied, fordere_schreibrecht};
+use crate::einsatz::berechtigung::{fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
 use crate::etb::{normalisiere_zeit, repo, EtbEintragAnzeige, EtbTyp, MeldeWeg};
@@ -161,9 +161,9 @@ pub async fn liste(
     Path(einsatz_id): Path<i64>,
     Query(params): Query<EtbAbfrageParams>,
 ) -> Result<Json<Vec<EtbEintragAnzeige>>, AppError> {
-    einsatz_repo::laden(&state.pool, einsatz_id).await?; // 404, wenn unbekannt
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?; // 404, wenn unbekannt
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_mitglied(rolle)?;
+    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
 
     // Typ validieren, falls gesetzt.
     if let Some(t) = &params.typ {
@@ -218,9 +218,9 @@ pub async fn stream(
     CurrentUser(benutzer): CurrentUser,
     Path(einsatz_id): Path<i64>,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, AppError> {
-    einsatz_repo::laden(&state.pool, einsatz_id).await?; // 404, wenn unbekannt
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?; // 404, wenn unbekannt
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_mitglied(rolle)?;
+    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
 
     let rx = state.live.abonniere(einsatz_id);
     let stream = BroadcastStream::new(rx).map(|res| {

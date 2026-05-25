@@ -1,4 +1,5 @@
 import { App, Button, Card, Empty, Form, Input, Modal, Space, Tag, Typography } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -27,29 +28,47 @@ export default function EinsaetzePage() {
   const anlegen = useMutation({
     mutationFn: (werte: { bezeichnung: string; stichwort?: string }) =>
       legeEinsatzAn(werte.bezeichnung, werte.stichwort),
-    onSuccess: () => {
+    onSuccess: (neuerEinsatz) => {
       form.resetFields();
       setDialogOffen(false);
       qc.invalidateQueries({ queryKey: ['einsaetze'] });
+      navigate(`/einsaetze/${neuerEinsatz.id}`);
     },
     onError: (e) =>
       message.error(e instanceof ApiError ? e.message : 'Einsatz konnte nicht angelegt werden'),
   });
 
+  const aktive = einsaetze.filter((e: EinsatzAnzeige) => e.status === 'aktiv');
+  const abgeschlossene = einsaetze.filter((e: EinsatzAnzeige) => e.status === 'abgeschlossen');
+
+  const renderKarte = (e: EinsatzAnzeige, klein = false) => (
+    <Card
+      key={e.id}
+      hoverable
+      size={klein ? 'small' : 'default'}
+      title={e.bezeichnung}
+      style={klein ? { opacity: 0.65 } : undefined}
+      onClick={() => navigate(`/einsaetze/${e.id}`)}
+    >
+      <Space direction="vertical">
+        <Space>
+          <Tag color={STATUS_FARBE[e.status]}>{e.status}</Tag>
+          {e.meine_rolle && <Tag>{e.meine_rolle}</Tag>}
+        </Space>
+        {e.stichwort && <Typography.Text type="secondary">{e.stichwort}</Typography.Text>}
+      </Space>
+    </Card>
+  );
+
+  const leer = aktive.length === 0 && abgeschlossene.length === 0;
+
   return (
     <div style={{ maxWidth: 960, margin: '0 auto' }}>
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Typography.Title level={3} style={{ margin: 0 }}>
-          Einsätze
-        </Typography.Title>
-        {darfAnlegen && (
-          <Button type="primary" onClick={() => setDialogOffen(true)}>
-            Einsatz anlegen
-          </Button>
-        )}
-      </Space>
+      <Typography.Title level={3} style={{ marginBottom: 16 }}>
+        Einsätze
+      </Typography.Title>
 
-      {einsaetze.length === 0 && !isLoading ? (
+      {leer && !darfAnlegen && !isLoading ? (
         <Empty description="Keine Einsätze" />
       ) : (
         <div
@@ -59,23 +78,34 @@ export default function EinsaetzePage() {
             gap: 16,
           }}
         >
-          {einsaetze.map((e: EinsatzAnzeige) => (
-            <Card
-              key={e.id}
-              hoverable
-              loading={isLoading}
-              title={e.bezeichnung}
-              onClick={() => navigate(`/einsaetze/${e.id}`)}
+          {darfAnlegen && (
+            <Button
+              type="dashed"
+              icon={<PlusOutlined aria-hidden />}
+              onClick={() => setDialogOffen(true)}
+              style={{ height: '100%', width: '100%', minHeight: 120 }}
             >
-              <Space direction="vertical">
-                <Space>
-                  <Tag color={STATUS_FARBE[e.status]}>{e.status}</Tag>
-                  {e.meine_rolle && <Tag>{e.meine_rolle}</Tag>}
-                </Space>
-                {e.stichwort && <Typography.Text type="secondary">{e.stichwort}</Typography.Text>}
-              </Space>
-            </Card>
-          ))}
+              Neuer Einsatz
+            </Button>
+          )}
+          {aktive.map((e: EinsatzAnzeige) => renderKarte(e))}
+        </div>
+      )}
+
+      {abgeschlossene.length > 0 && (
+        <div style={{ marginTop: 32 }}>
+          <Typography.Title level={5} type="secondary" style={{ marginBottom: 12 }}>
+            Abgeschlossen
+          </Typography.Title>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+              gap: 12,
+            }}
+          >
+            {abgeschlossene.map((e: EinsatzAnzeige) => renderKarte(e, true))}
+          </div>
         </div>
       )}
 

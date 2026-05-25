@@ -36,7 +36,22 @@ impl Benutzer {
     }
 
     /// Ob dieser Benutzer Einsätze anlegen darf: System-Admin ODER org-weite Führungskraft.
+    ///
+    /// Bewusst getrennt von [`Self::ist_hoehere_berechtigung`], auch wenn das Prädikat
+    /// heute identisch ist: „anlegen" und „erweiterter Lesezugriff" sind verschiedene
+    /// Konzepte. Würde der erweiterte Lesezugriff künftig auf weitere Rollen ausgedehnt,
+    /// soll das nicht automatisch das Anlegerecht aufweichen (und umgekehrt).
     pub fn darf_einsatz_anlegen(&self) -> bool {
+        self.ist_admin() || self.org_rolle == ORG_ROLLE_FUEHRUNGSKRAFT
+    }
+
+    /// Höhere Berechtigung mit erweitertem Einsatz-Zugriff: System-Admin oder
+    /// org-weite Führungskraft. Darf u.a. abgeschlossene Einsätze auch nach der
+    /// DSGVO-Schonfrist sowie fremde Einsätze lesen.
+    ///
+    /// Bewusst eigenständig (siehe [`Self::darf_einsatz_anlegen`]); keine Delegation,
+    /// damit sich die beiden Berechtigungsmengen unabhängig entwickeln können.
+    pub fn ist_hoehere_berechtigung(&self) -> bool {
         self.ist_admin() || self.org_rolle == ORG_ROLLE_FUEHRUNGSKRAFT
     }
 
@@ -97,5 +112,20 @@ mod tests {
     #[test]
     fn normaler_benutzer_darf_nicht_anlegen() {
         assert!(!benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE).darf_einsatz_anlegen());
+    }
+
+    #[test]
+    fn admin_ist_hoehere_berechtigung() {
+        assert!(benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE).ist_hoehere_berechtigung());
+    }
+
+    #[test]
+    fn fuehrungskraft_ist_hoehere_berechtigung() {
+        assert!(benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT).ist_hoehere_berechtigung());
+    }
+
+    #[test]
+    fn normaler_benutzer_ist_keine_hoehere_berechtigung() {
+        assert!(!benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE).ist_hoehere_berechtigung());
     }
 }

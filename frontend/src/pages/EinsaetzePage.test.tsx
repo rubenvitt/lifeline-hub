@@ -49,22 +49,26 @@ describe('EinsaetzePage', () => {
     expect(screen.getByText('einsatzleitung')).toBeInTheDocument();
   });
 
-  it('legt einen neuen Einsatz an und zeigt ihn danach in der Liste', async () => {
-    let angelegt = false;
+  it('öffnet den neuen Einsatz direkt nach dem Anlegen', async () => {
     server.use(
-      http.get('/api/einsaetze', () =>
-        HttpResponse.json(angelegt ? [einsatz({ bezeichnung: 'Sturm Süd' })] : []),
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze', () => HttpResponse.json([])),
+      http.post('/api/einsaetze', () =>
+        HttpResponse.json(einsatz({ bezeichnung: 'Sturm Süd' }), { status: 201 }),
       ),
-      http.post('/api/einsaetze', async () => {
-        angelegt = true;
-        return HttpResponse.json(einsatz({ bezeichnung: 'Sturm Süd' }), { status: 201 });
-      }),
     );
-    setup();
-    await userEvent.click(await screen.findByRole('button', { name: 'Einsatz anlegen' }));
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/" element={<EinsaetzePage />} />
+          <Route path="/einsaetze/:id" element={<div>Workspace-7</div>} />
+        </Routes>
+      </AuthProvider>,
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Neuer Einsatz' }));
     await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Sturm Süd');
     await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
-    await waitFor(() => expect(screen.getByText('Sturm Süd')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Workspace-7')).toBeInTheDocument());
   });
 
   it('zeigt den Anlege-Button nicht für Nutzer ohne Recht', async () => {
@@ -79,7 +83,27 @@ describe('EinsaetzePage', () => {
       </AuthProvider>,
     );
     await waitFor(() => expect(screen.getByText('Hochwasser Nord')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: 'Einsatz anlegen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Neuer Einsatz' })).not.toBeInTheDocument();
+  });
+
+  it('trennt aktive und abgeschlossene Einsätze in eigene Sektionen', async () => {
+    server.use(
+      http.get('/api/einsaetze', () =>
+        HttpResponse.json([
+          einsatz(),
+          einsatz({
+            id: 8,
+            bezeichnung: 'Sturmtief Abschluss',
+            status: 'abgeschlossen',
+            abgeschlossen_at: '2026-05-24 10:00:00',
+          }),
+        ]),
+      ),
+    );
+    setup();
+    await waitFor(() => expect(screen.getByText('Hochwasser Nord')).toBeInTheDocument());
+    expect(screen.getByText('Abgeschlossen')).toBeInTheDocument();
+    expect(screen.getByText('Sturmtief Abschluss')).toBeInTheDocument();
   });
 
   it('oeffnet beim Klick auf eine Kachel den Workspace unter /einsaetze/:id', async () => {
