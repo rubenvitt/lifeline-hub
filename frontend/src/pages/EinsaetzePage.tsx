@@ -1,4 +1,4 @@
-import { App, Button, Form, Input, List, Modal, Space, Tag, Typography } from 'antd';
+import { App, Button, Card, Empty, Form, Input, Modal, Space, Tag, Typography } from 'antd';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -37,7 +37,7 @@ export default function EinsaetzePage() {
   });
 
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto' }}>
+    <div style={{ maxWidth: 960, margin: '0 auto' }}>
       <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
         <Typography.Title level={3} style={{ margin: 0 }}>
           Einsätze
@@ -49,32 +49,35 @@ export default function EinsaetzePage() {
         )}
       </Space>
 
-      <List
-        loading={isLoading}
-        bordered
-        dataSource={einsaetze}
-        locale={{ emptyText: 'Keine Einsätze' }}
-        renderItem={(e: EinsatzAnzeige) => (
-          <List.Item
-            actions={[
-              <Button key="oeffnen" type="link" onClick={() => navigate(`/einsaetze/${e.id}/etb`)}>
-                Öffnen
-              </Button>,
-            ]}
-          >
-            <List.Item.Meta
+      {einsaetze.length === 0 && !isLoading ? (
+        <Empty description="Keine Einsätze" />
+      ) : (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+            gap: 16,
+          }}
+        >
+          {einsaetze.map((e: EinsatzAnzeige) => (
+            <Card
+              key={e.id}
+              hoverable
+              loading={isLoading}
               title={e.bezeichnung}
-              description={
+              onClick={() => navigate(`/einsaetze/${e.id}`)}
+            >
+              <Space direction="vertical">
                 <Space>
                   <Tag color={STATUS_FARBE[e.status]}>{e.status}</Tag>
-                  {e.stichwort && <span>{e.stichwort}</span>}
                   {e.meine_rolle && <Tag>{e.meine_rolle}</Tag>}
                 </Space>
-              }
-            />
-          </List.Item>
-        )}
-      />
+                {e.stichwort && <Typography.Text type="secondary">{e.stichwort}</Typography.Text>}
+              </Space>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <Modal
         title="Neuen Einsatz anlegen"

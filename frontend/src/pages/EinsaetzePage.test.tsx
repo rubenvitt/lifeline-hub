@@ -2,6 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
+import { Route, Routes } from 'react-router-dom';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
@@ -79,5 +80,22 @@ describe('EinsaetzePage', () => {
     );
     await waitFor(() => expect(screen.getByText('Hochwasser Nord')).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: 'Einsatz anlegen' })).not.toBeInTheDocument();
+  });
+
+  it('oeffnet beim Klick auf eine Kachel den Workspace unter /einsaetze/:id', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/" element={<EinsaetzePage />} />
+          <Route path="/einsaetze/:id" element={<div>Workspace-7</div>} />
+        </Routes>
+      </AuthProvider>,
+    );
+    await userEvent.click(await screen.findByText('Hochwasser Nord'));
+    await waitFor(() => expect(screen.getByText('Workspace-7')).toBeInTheDocument());
   });
 });
