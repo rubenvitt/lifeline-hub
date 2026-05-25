@@ -376,4 +376,32 @@ mod tests {
         .unwrap();
         assert_eq!(treffer, 0, "FTS-Index muss nach Cascade-Delete bereinigt sein");
     }
+
+    #[tokio::test]
+    async fn stichwort_vorschlag_migration_legt_tabelle_mit_unique_an() {
+        let pool = test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        sqlx::query("INSERT INTO einsatz_stichwort_vorschlag (org_id, text) VALUES (1, 'H1')")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        // UNIQUE(org_id, text): Dublette je Org abgelehnt.
+        let dup = sqlx::query("INSERT INTO einsatz_stichwort_vorschlag (org_id, text) VALUES (1, 'H1')")
+            .execute(&pool)
+            .await;
+        assert!(dup.is_err(), "doppeltes Stichwort je Org muss abgelehnt werden");
+
+        // sortier-Default ist 0.
+        let sortier: i64 =
+            sqlx::query_scalar("SELECT sortier FROM einsatz_stichwort_vorschlag WHERE text = 'H1'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(sortier, 0);
+    }
 }
