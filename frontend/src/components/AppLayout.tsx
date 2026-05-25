@@ -1,6 +1,7 @@
 import { Button, Layout, Space, Tag, Typography } from 'antd';
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import ThemeToggle from './ThemeToggle';
 import type { BenutzerAnzeige } from '../api/types';
 
 const { Header, Content } = Layout;
@@ -46,6 +47,7 @@ export default function AppLayout() {
         <GlobalLink to="/stammdaten" label="Stammdaten" gesperrt={!darfStammdaten(benutzer)} />
         <GlobalLink to="/benutzer" label="Benutzer" gesperrt={benutzer?.system_rolle !== 'admin'} />
         <Space style={{ marginLeft: 'auto' }}>
+          <ThemeToggle />
           <GlobalLink to="/profil" label="Profil" gesperrt={false} />
           <Typography.Text style={{ color: '#fff' }}>{benutzer?.anzeigename}</Typography.Text>
           {benutzer?.system_rolle === 'admin' && <Tag color="gold">Admin</Tag>}

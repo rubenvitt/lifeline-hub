@@ -5,6 +5,22 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>lifeline-hub</title>
+    <!-- Theme synchron vor dem React-Mount setzen, sonst blitzt beim Laden das
+         falsche Farbschema auf (FOUC). Logik gespiegelt aus ThemeModeProvider. -->
+    <script>
+      (function () {
+        try {
+          var m = localStorage.getItem('lifeline-hub.theme') || 'system';
+          var dunkel =
+            m === 'dark' || (m === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+          var theme = dunkel ? 'dark' : 'light';
+          document.documentElement.dataset.theme = theme;
+          document.documentElement.style.colorScheme = theme;
+        } catch (e) {
+          /* localStorage gesperrt o. Ä. – Provider setzt das Theme nach dem Mount. */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

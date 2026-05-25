@@ -8,6 +8,12 @@ body {
   padding: 0;
 }
 
+/* Berichtigte ETB-Zeile dezent rot hinterlegen – je Modus eine eigene Tönung,
+   damit der antd-Textkontrast in beiden Themes lesbar bleibt. */
 .etb-berichtigung > td {
   background-color: #fff1f0;
+}
+
+[data-theme='dark'] .etb-berichtigung > td {
+  background-color: #2a1215;
 }

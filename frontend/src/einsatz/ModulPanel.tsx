@@ -1,4 +1,4 @@
-import { Typography } from 'antd';
+import { theme, Typography } from 'antd';
 import { istModulGesperrt, type ModulEintrag } from './modulRegistry';
 import type { BenutzerAnzeige } from '../api/types';
 
@@ -11,9 +11,18 @@ interface Props {
 }
 
 /** Liste der Module einer Kategorie (Ebene 2). */
-export default function ModulPanel({ titel, module, benutzer, aktiverModulKey, onModulKlick }: Props) {
+export default function ModulPanel({
+  titel,
+  module,
+  benutzer,
+  aktiverModulKey,
+  onModulKlick,
+}: Props) {
+  const { token } = theme.useToken();
   return (
-    <div style={{ width: 220, padding: 12, borderRight: '1px solid #f0f0f0' }}>
+    <div
+      style={{ width: 220, padding: 12, borderRight: `1px solid ${token.colorBorderSecondary}` }}
+    >
       <Typography.Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
         {titel}
       </Typography.Text>
@@ -30,11 +39,17 @@ export default function ModulPanel({ titel, module, benutzer, aktiverModulKey, o
               title={gesperrt ? 'Keine Berechtigung' : undefined}
               onClick={() => !gesperrt && onModulKlick(m)}
               style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px',
-                border: 'none', borderRadius: 6, textAlign: 'left', width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '6px 8px',
+                border: 'none',
+                borderRadius: 6,
+                textAlign: 'left',
+                width: '100%',
                 cursor: gesperrt ? 'not-allowed' : 'pointer',
-                background: aktiv ? '#fff1f0' : 'transparent',
-                color: gesperrt ? 'rgba(0,0,0,0.25)' : aktiv ? '#a8071a' : 'inherit',
+                background: aktiv ? token.colorPrimaryBg : 'transparent',
+                color: gesperrt ? token.colorTextDisabled : aktiv ? token.colorPrimary : 'inherit',
               }}
             >
               <Icon size={18} />
