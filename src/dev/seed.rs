@@ -67,12 +67,21 @@ pub const SEED_BENUTZER: &[DevBenutzer] = &[
 /// reproduzierbar sein.
 const SEED_ORG_NAME: &str = "Entwicklung";
 
+/// Seed-Einsätze: (bezeichnung, stichwort, status). `bezeichnung` ist der
+/// natürliche Schlüssel für die Idempotenz.
+const SEED_EINSAETZE: &[(&str, &str, &str)] = &[
+    ("Übung Hochwasser", "THW-Übung", "aktiv"),
+    ("Verkehrsunfall B27", "VU/Person", "aktiv"),
+    ("Sturmtief Abschluss", "Unwetter", "abgeschlossen"),
+];
+
 /// Legt reproduzierbare Dev-Testdaten an. Idempotent: mehrfacher Aufruf
 /// erzeugt keine Duplikate. Wird in `main` VOR `bootstrap_admin` aufgerufen,
 /// daher legt diese Funktion die Organisation selbst an.
 pub async fn dev_seed(pool: &SqlitePool) -> Result<(), AppError> {
     let org_id = organisation_anlegen(pool).await?;
     benutzer_seeden(pool, org_id).await?;
+    einsaetze_seeden(pool, org_id).await?;
     Ok(())
 }
 
@@ -124,6 +133,29 @@ async fn benutzer_seeden(pool: &SqlitePool, org_id: i64) -> Result<(), AppError>
     Ok(())
 }
 
+/// Seedet die `SEED_EINSAETZE`. Idempotent: nur fehlende `bezeichnung`en anlegen.
+async fn einsaetze_seeden(pool: &SqlitePool, org_id: i64) -> Result<(), AppError> {
+    for &(bezeichnung, stichwort, status) in SEED_EINSAETZE {
+        let existiert: Option<i64> =
+            sqlx::query_scalar("SELECT 1 FROM einsatz WHERE bezeichnung = ? AND org_id = ?")
+                .bind(bezeichnung)
+                .bind(org_id)
+                .fetch_optional(pool)
+                .await?;
+        if existiert.is_some() {
+            continue;
+        }
+        sqlx::query("INSERT INTO einsatz (org_id, bezeichnung, stichwort, status) VALUES (?, ?, ?, ?)")
+            .bind(org_id)
+            .bind(bezeichnung)
+            .bind(stichwort)
+            .bind(status)
+            .execute(pool)
+            .await?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -143,6 +175,33 @@ mod tests {
             .find(|b| b.benutzername == "inaktiv")
             .unwrap();
         assert!(!inaktiv.aktiv);
+    }
+
+    #[tokio::test]
+    async fn einsatz_seeding_ist_idempotent() {
+        let pool = crate::db::test_pool().await;
+        dev_seed(&pool).await.unwrap();
+        dev_seed(&pool).await.unwrap();
+
+        let einsaetze: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(einsaetze, 3);
+
+        // Zwei aktive und ein abgeschlossener Einsatz sind enthalten.
+        let aktiv: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM einsatz WHERE status = 'aktiv'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(aktiv, 2);
+        let abgeschlossen: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM einsatz WHERE status = 'abgeschlossen'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(abgeschlossen, 1);
     }
 
     #[tokio::test]
