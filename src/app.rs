@@ -15,7 +15,7 @@ pub struct AppState {
 
 /// Baut den Axum-Router mit allen Routen und dem geteilten Zustand.
 pub fn build_router(state: AppState) -> Router {
-    Router::new()
+    let router = Router::new()
         .route("/api/health", get(routes::health::health))
         .route("/api/backup", get(routes::backup::download))
         .route("/api/auth/login", post(routes::auth::login))
@@ -48,7 +48,13 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/api/einsaetze/{id}/etb", post(routes::etb::erfassen))
         .route("/api/einsaetze/{id}/etb", get(routes::etb::liste))
-        .route("/api/einsaetze/{id}/etb/stream", get(routes::etb::stream))
+        .route("/api/einsaetze/{id}/etb/stream", get(routes::etb::stream));
+
+    // Dev-only: Endpoint existiert physisch nur mit Feature `dev-seeds`.
+    #[cfg(feature = "dev-seeds")]
+    let router = router.route("/api/dev/users", get(routes::dev::users));
+
+    router
         .fallback(crate::static_files::serve)
         .with_state(state)
 }

@@ -1,6 +1,8 @@
 pub mod auth;
 pub mod backup;
 pub mod benutzer;
+#[cfg(feature = "dev-seeds")]
+pub mod dev;
 pub mod einsatz;
 pub mod etb;
 pub mod health;
