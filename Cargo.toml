@@ -21,5 +21,10 @@ tokio-stream = { version = "0.1", features = ["sync"] }
 tempfile = "3"
 rust-embed = "8"
 
+[features]
+# Dev-only: aktiviert Seed-Testdaten und den /api/dev/users-Endpoint.
+# Niemals im Release-Build aktivieren (kein Default-Feature).
+dev-seeds = []
+
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
