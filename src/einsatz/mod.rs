@@ -15,6 +15,25 @@ pub const STATUS_AKTIV: &str = "aktiv";
 /// Status eines abgeschlossenen (read-only) Einsatzes.
 pub const STATUS_ABGESCHLOSSEN: &str = "abgeschlossen";
 
+/// Grobklasse eines Einsatzes (DB-Spalte `einsatzart`, CHECK-validiert).
+pub const EINSATZART_REALEINSATZ: &str = "realeinsatz";
+pub const EINSATZART_UEBUNG: &str = "uebung";
+pub const EINSATZART_SANITAETSDIENST: &str = "sanitaetsdienst";
+pub const EINSATZART_BEREITSTELLUNG: &str = "bereitstellung";
+
+/// Alle gültigen Einsatzarten (Reihenfolge = UI-Reihenfolge).
+pub const EINSATZARTEN: [&str; 4] = [
+    EINSATZART_REALEINSATZ,
+    EINSATZART_UEBUNG,
+    EINSATZART_SANITAETSDIENST,
+    EINSATZART_BEREITSTELLUNG,
+];
+
+/// Ob `s` eine gültige Einsatzart ist (für die Eingabe-Validierung).
+pub fn ist_gueltige_einsatzart(s: &str) -> bool {
+    EINSATZARTEN.contains(&s)
+}
+
 /// Rolle einer Person innerhalb eines konkreten Einsatzes.
 /// Wird als TEXT in der DB gespeichert und manuell konvertiert (kein sqlx-Enum-Decode).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -70,6 +89,16 @@ pub struct Einsatz {
     pub begonnen_at: String,
     pub abgeschlossen_at: Option<String>,
     pub abgeschlossen_von: Option<i64>,
+    pub einsatzart: String,
+    pub einsatznummer_intern: Option<String>,
+    pub angelegt_at: String,
+    pub leitstellen_nr: Option<String>,
+    pub einsatzort: Option<String>,
+    pub einsatzort_lat: Option<f64>,
+    pub einsatzort_lon: Option<f64>,
+    pub meldende_stelle: Option<String>,
+    pub sachverhalt: Option<String>,
+    pub anzahl_betroffene_initial: Option<i64>,
 }
 
 impl Einsatz {
@@ -89,6 +118,16 @@ impl Einsatz {
             begonnen_at: self.begonnen_at.clone(),
             abgeschlossen_at: self.abgeschlossen_at.clone(),
             abgeschlossen_von: self.abgeschlossen_von,
+            einsatzart: self.einsatzart.clone(),
+            einsatznummer_intern: self.einsatznummer_intern.clone(),
+            angelegt_at: self.angelegt_at.clone(),
+            leitstellen_nr: self.leitstellen_nr.clone(),
+            einsatzort: self.einsatzort.clone(),
+            einsatzort_lat: self.einsatzort_lat,
+            einsatzort_lon: self.einsatzort_lon,
+            meldende_stelle: self.meldende_stelle.clone(),
+            sachverhalt: self.sachverhalt.clone(),
+            anzahl_betroffene_initial: self.anzahl_betroffene_initial,
             meine_rolle,
         }
     }
@@ -105,6 +144,16 @@ pub struct EinsatzAnzeige {
     pub begonnen_at: String,
     pub abgeschlossen_at: Option<String>,
     pub abgeschlossen_von: Option<i64>,
+    pub einsatzart: String,
+    pub einsatznummer_intern: Option<String>,
+    pub angelegt_at: String,
+    pub leitstellen_nr: Option<String>,
+    pub einsatzort: Option<String>,
+    pub einsatzort_lat: Option<f64>,
+    pub einsatzort_lon: Option<f64>,
+    pub meldende_stelle: Option<String>,
+    pub sachverhalt: Option<String>,
+    pub anzahl_betroffene_initial: Option<i64>,
     pub meine_rolle: Option<String>,
 }
 
@@ -163,6 +212,16 @@ mod tests {
             begonnen_at: "2026-05-23".into(),
             abgeschlossen_at: None,
             abgeschlossen_von: None,
+            einsatzart: EINSATZART_REALEINSATZ.into(),
+            einsatznummer_intern: None,
+            angelegt_at: "2026-05-23".into(),
+            leitstellen_nr: None,
+            einsatzort: None,
+            einsatzort_lat: None,
+            einsatzort_lon: None,
+            meldende_stelle: None,
+            sachverhalt: None,
+            anzahl_betroffene_initial: None,
         };
         assert!(e.ist_aktiv());
         e.status = STATUS_ABGESCHLOSSEN.into();

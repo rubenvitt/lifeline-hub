@@ -1,8 +1,11 @@
+use super::berechtigung::darf_lesen;
 use super::{
     Einsatz, EinsatzAnzeige, EinsatzRolle, MitgliedAnzeige, EINSATZ_ROLLE_LEITUNG,
     STATUS_ABGESCHLOSSEN,
 };
+use crate::auth::Benutzer;
 use crate::error::AppError;
+use chrono::Utc;
 use sqlx::SqlitePool;
 
 /// Legt einen Einsatz an und macht den Ersteller in derselben Transaktion zur Einsatzleitung.
@@ -46,7 +49,9 @@ pub async fn anlegen(
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppError> {
     sqlx::query_as::<_, Einsatz>(
         "SELECT id, org_id, bezeichnung, stichwort, status, begonnen_at, \
-                abgeschlossen_at, abgeschlossen_von \
+                abgeschlossen_at, abgeschlossen_von, einsatzart, einsatznummer_intern, \
+                angelegt_at, leitstellen_nr, einsatzort, einsatzort_lat, einsatzort_lon, \
+                meldende_stelle, sachverhalt, anzahl_betroffene_initial \
          FROM einsatz WHERE id = ?",
     )
     .bind(einsatz_id)
@@ -72,10 +77,12 @@ pub async fn rolle_von(
     Ok(rolle.and_then(|s| EinsatzRolle::parse(&s)))
 }
 
-/// Alle Einsätze, annotiert mit der Rolle des angegebenen Benutzers (`meine_rolle`).
+/// Alle für den Benutzer lesbaren Einsätze, annotiert mit dessen Rolle
+/// (`meine_rolle`). Die DSGVO-Lese-Policy (`darf_lesen`) filtert Einsätze,
+/// die der Benutzer nicht sehen darf, vor der Rückgabe heraus.
 pub async fn liste_fuer(
     pool: &SqlitePool,
-    benutzer_id: i64,
+    benutzer: &Benutzer,
 ) -> Result<Vec<EinsatzAnzeige>, AppError> {
     #[derive(sqlx::FromRow)]
     struct Row {
@@ -86,23 +93,46 @@ pub async fn liste_fuer(
         begonnen_at: String,
         abgeschlossen_at: Option<String>,
         abgeschlossen_von: Option<i64>,
+        einsatzart: String,
+        einsatznummer_intern: Option<String>,
+        angelegt_at: String,
+        leitstellen_nr: Option<String>,
+        einsatzort: Option<String>,
+        einsatzort_lat: Option<f64>,
+        einsatzort_lon: Option<f64>,
+        meldende_stelle: Option<String>,
+        sachverhalt: Option<String>,
+        anzahl_betroffene_initial: Option<i64>,
         meine_rolle: Option<String>,
     }
 
     let rows = sqlx::query_as::<_, Row>(
         "SELECT e.id, e.bezeichnung, e.stichwort, e.status, e.begonnen_at, \
-                e.abgeschlossen_at, e.abgeschlossen_von, m.einsatz_rolle AS meine_rolle \
+                e.abgeschlossen_at, e.abgeschlossen_von, e.einsatzart, e.einsatznummer_intern, \
+                e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
+                e.meldende_stelle, e.sachverhalt, e.anzahl_betroffene_initial, \
+                m.einsatz_rolle AS meine_rolle \
          FROM einsatz e \
          LEFT JOIN einsatz_mitgliedschaft m \
                 ON m.einsatz_id = e.id AND m.benutzer_id = ? \
          ORDER BY e.begonnen_at DESC, e.id DESC",
     )
-    .bind(benutzer_id)
+    .bind(benutzer.id)
     .fetch_all(pool)
     .await?;
 
+    let jetzt = Utc::now();
     Ok(rows
         .into_iter()
+        .filter(|r| {
+            darf_lesen(
+                benutzer,
+                &r.status,
+                r.abgeschlossen_at.as_deref(),
+                r.meine_rolle.as_deref().and_then(EinsatzRolle::parse),
+                jetzt,
+            )
+        })
         .map(|r| EinsatzAnzeige {
             id: r.id,
             bezeichnung: r.bezeichnung,
@@ -111,6 +141,16 @@ pub async fn liste_fuer(
             begonnen_at: r.begonnen_at,
             abgeschlossen_at: r.abgeschlossen_at,
             abgeschlossen_von: r.abgeschlossen_von,
+            einsatzart: r.einsatzart,
+            einsatznummer_intern: r.einsatznummer_intern,
+            angelegt_at: r.angelegt_at,
+            leitstellen_nr: r.leitstellen_nr,
+            einsatzort: r.einsatzort,
+            einsatzort_lat: r.einsatzort_lat,
+            einsatzort_lon: r.einsatzort_lon,
+            meldende_stelle: r.meldende_stelle,
+            sachverhalt: r.sachverhalt,
+            anzahl_betroffene_initial: r.anzahl_betroffene_initial,
             meine_rolle: r.meine_rolle,
         })
         .collect())
@@ -328,6 +368,15 @@ mod tests {
         assert_eq!(zaehle_einsatzleitung(&pool, einsatz.id).await.unwrap(), 2);
     }
 
+    /// Lädt den vollständigen `Benutzer`-Datensatz per id (für die Lese-Policy).
+    async fn benutzer_laden(pool: &SqlitePool, id: i64) -> Benutzer {
+        sqlx::query_as::<_, Benutzer>("SELECT * FROM benutzer WHERE id = ?")
+            .bind(id)
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
     #[tokio::test]
     async fn liste_fuer_annotiert_meine_rolle() {
         let pool = crate::db::test_pool().await;
@@ -336,14 +385,38 @@ mod tests {
         let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
 
         // Ersteller sieht sich als Einsatzleitung.
-        let fuer_leit = liste_fuer(&pool, leit).await.unwrap();
+        let leit_benutzer = benutzer_laden(&pool, leit).await;
+        let fuer_leit = liste_fuer(&pool, &leit_benutzer).await.unwrap();
         assert_eq!(fuer_leit.len(), 1);
         assert_eq!(fuer_leit[0].id, einsatz.id);
         assert_eq!(fuer_leit[0].meine_rolle.as_deref(), Some(EINSATZ_ROLLE_LEITUNG));
 
-        // Nicht-Mitglied sieht den Einsatz, aber ohne Rolle.
-        let fuer_fremd = liste_fuer(&pool, fremd).await.unwrap();
-        assert_eq!(fuer_fremd.len(), 1);
-        assert_eq!(fuer_fremd[0].meine_rolle, None);
+        // Nicht-Mitglied ohne höhere Berechtigung sieht den Einsatz NICHT (DSGVO-Filter).
+        let fremd_benutzer = benutzer_laden(&pool, fremd).await;
+        let fuer_fremd = liste_fuer(&pool, &fremd_benutzer).await.unwrap();
+        assert!(fuer_fremd.is_empty());
+    }
+
+    #[tokio::test]
+    async fn liste_fuer_zeigt_admin_nicht_mitglied_fremden_einsatz() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let admin = benutzer_anlegen(&pool, "admin").await;
+        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+
+        // Admin zur höheren Berechtigung machen.
+        sqlx::query("UPDATE benutzer SET system_rolle = ? WHERE id = ?")
+            .bind(crate::auth::ROLLE_ADMIN)
+            .bind(admin)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        // Admin ist KEIN Mitglied, sieht den Einsatz aber trotzdem (ohne Rolle).
+        let admin_benutzer = benutzer_laden(&pool, admin).await;
+        let fuer_admin = liste_fuer(&pool, &admin_benutzer).await.unwrap();
+        assert_eq!(fuer_admin.len(), 1);
+        assert_eq!(fuer_admin[0].id, einsatz.id);
+        assert_eq!(fuer_admin[0].meine_rolle, None);
     }
 }
