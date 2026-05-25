@@ -1551,8 +1551,7 @@ describe('App-Routing', () => {
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     );
     renderApp('/einsaetze/7/stab');
-    await waitFor(() => expect(screen.getByText('Stab')).toBeInTheDocument());
-    expect(screen.getByText(/🚧/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/🚧 Stab/)).toBeInTheDocument());
   });
 });
 ```
