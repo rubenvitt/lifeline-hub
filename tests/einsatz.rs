@@ -4,19 +4,27 @@ use lifeline_hub::app::{build_router, AppState};
 use lifeline_hub::auth::bootstrap::bootstrap_admin;
 use lifeline_hub::db;
 use lifeline_hub::live::LiveHub;
-use serde_json::Value;
+use serde_json::{json, Value};
+use sqlx::SqlitePool;
 use tower::ServiceExt;
 
 /// Router + DB mit Bootstrap-Admin (admin / startpw12).
 async fn setup() -> axum::Router {
+    setup_with_pool().await.0
+}
+
+/// Wie `setup`, liefert zusätzlich den `SqlitePool`, damit Tests direkt am
+/// DB-Zustand manipulieren können (z.B. Einsätze künstlich altern lassen).
+async fn setup_with_pool() -> (axum::Router, SqlitePool) {
     let pool = db::test_pool().await;
     bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
         .await
         .unwrap();
-    build_router(AppState {
-        pool,
+    let router = build_router(AppState {
+        pool: pool.clone(),
         live: LiveHub::new(),
-    })
+    });
+    (router, pool)
 }
 
 /// Loggt sich ein und liefert das `name=value`-Cookie-Paar.
@@ -146,6 +154,35 @@ async fn liste_zeigt_einsatz_mit_meiner_rolle() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     einsatz_anlegen(&app, &admin, "Lage A").await;
 
+    // Admin (Einsatzleitung) sieht den Einsatz mit seiner Rolle.
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/einsaetze")
+                .header(header::COOKIE, admin.clone())
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json: Value = serde_json::from_slice(&bytes).unwrap();
+    let liste = json.as_array().unwrap();
+    assert_eq!(liste.len(), 1);
+    assert_eq!(liste[0]["bezeichnung"], "Lage A");
+    assert_eq!(liste[0]["meine_rolle"], "einsatzleitung");
+}
+
+#[tokio::test]
+async fn liste_blendet_einsatz_fuer_nicht_mitglied_aus() {
+    // DSGVO-Filter: ein normaler Nicht-Mitglied-Benutzer sieht fremde Einsätze
+    // nicht mehr in der Liste.
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    einsatz_anlegen(&app, &admin, "Lage A").await;
+
     benutzer_anlegen(&app, &admin, "erika", "keine").await;
     let erika = login_cookie(&app, "erika", "erikapw1").await;
 
@@ -162,10 +199,7 @@ async fn liste_zeigt_einsatz_mit_meiner_rolle() {
     assert_eq!(resp.status(), StatusCode::OK);
     let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
     let json: Value = serde_json::from_slice(&bytes).unwrap();
-    let liste = json.as_array().unwrap();
-    assert_eq!(liste.len(), 1);
-    assert_eq!(liste[0]["bezeichnung"], "Lage A");
-    assert!(liste[0]["meine_rolle"].is_null());
+    assert!(json.as_array().unwrap().is_empty());
 }
 
 #[tokio::test]
@@ -526,4 +560,365 @@ async fn deaktivierten_benutzer_zuweisen_ist_409() {
     // Deaktivierten Benutzer einem Einsatz zuweisen → 409.
     let status = mitglied_setzen(&app, &admin, einsatz_id, erika_id, "beobachter").await;
     assert_eq!(status, StatusCode::CONFLICT);
+}
+
+/// Ruft das Einsatz-Detail als Cookie-Inhaber ab; liefert den Status.
+async fn detail_status(app: &axum::Router, cookie: &str, einsatz_id: i64) -> StatusCode {
+    app.clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/einsaetze/{einsatz_id}"))
+                .header(header::COOKIE, cookie.to_string())
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap()
+        .status()
+}
+
+/// Liefert die Anzahl der Einsätze in der Liste des Cookie-Inhabers.
+async fn listen_groesse(app: &axum::Router, cookie: &str) -> usize {
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/einsaetze")
+                .header(header::COOKIE, cookie.to_string())
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json: Value = serde_json::from_slice(&bytes).unwrap();
+    json.as_array().unwrap().len()
+}
+
+#[tokio::test]
+async fn admin_nicht_mitglied_darf_fremden_einsatz_detail_lesen() {
+    // Höhere Berechtigung (System-Admin) darf jeden Einsatz lesen, auch ohne
+    // Mitgliedschaft. `meine_rolle` ist dann null.
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+
+    // Eine Führungskraft legt einen eigenen Einsatz an (admin ist dort kein Mitglied).
+    benutzer_anlegen(&app, &admin, "frieda", "fuehrungskraft").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let (_, json) = einsatz_anlegen(&app, &frieda, "Friedas Lage").await;
+    let einsatz_id = json["id"].as_i64().unwrap();
+
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/einsaetze/{einsatz_id}"))
+                .header(header::COOKIE, admin)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json: Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(json["bezeichnung"], "Friedas Lage");
+    assert!(json["meine_rolle"].is_null());
+}
+
+#[tokio::test]
+async fn abgeschlossener_einsatz_nach_frist_nur_fuer_einsatzleitung() {
+    // Abgeschlossener Einsatz, künstlich auf >24h gealtert:
+    // - Beobachter-Mitglied: 403 und nicht mehr in der Liste,
+    // - Einsatzleitung: 200.
+    let (app, pool) = setup_with_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, json) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let einsatz_id = json["id"].as_i64().unwrap();
+
+    // Beobachter zuweisen.
+    let beob_id = benutzer_anlegen(&app, &admin, "beobi", "keine").await;
+    assert_eq!(
+        mitglied_setzen(&app, &admin, einsatz_id, beob_id, "beobachter").await,
+        StatusCode::OK
+    );
+
+    // Einsatz abschließen.
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/einsaetze/{einsatz_id}/abschliessen"))
+                .header(header::COOKIE, admin.clone())
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Künstlich auf >24h altern (außerhalb der Schonfrist).
+    sqlx::query("UPDATE einsatz SET abgeschlossen_at = datetime('now','-25 hours') WHERE id = ?")
+        .bind(einsatz_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let beob = login_cookie(&app, "beobi", "beobipw1").await;
+
+    // Beobachter: Detail 403 und nicht mehr in der Liste.
+    assert_eq!(
+        detail_status(&app, &beob, einsatz_id).await,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(listen_groesse(&app, &beob).await, 0);
+
+    // Einsatzleitung (admin) darf den abgeschlossenen Einsatz weiterhin lesen.
+    assert_eq!(detail_status(&app, &admin, einsatz_id).await, StatusCode::OK);
+    assert_eq!(listen_groesse(&app, &admin).await, 1);
+}
+
+/// Vollständiger, gültiger Kopfdaten-Body; Tests überschreiben einzelne Keys.
+fn basis_kopf(bezeichnung: &str) -> Value {
+    json!({
+        "bezeichnung": bezeichnung,
+        "stichwort": null,
+        "einsatzart": "realeinsatz",
+        "einsatznummer_intern": null,
+        "leitstellen_nr": null,
+        "einsatzort": null,
+        "einsatzort_lat": null,
+        "einsatzort_lon": null,
+        "meldende_stelle": null,
+        "sachverhalt": null,
+        "anzahl_betroffene_initial": null,
+        "begonnen_at": "2026-05-25 08:00:00"
+    })
+}
+
+/// PATCH der Kopfdaten als Cookie-Inhaber; liefert (Status, JSON).
+async fn patch_kopf(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz_id: i64,
+    body: Value,
+) -> (StatusCode, Value) {
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("PATCH")
+                .uri(format!("/api/einsaetze/{einsatz_id}"))
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, cookie.to_string())
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = resp.status();
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+    (status, json)
+}
+
+#[tokio::test]
+async fn einsatzleitung_patcht_kopfdaten() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, json) = einsatz_anlegen(&app, &admin, "Alt").await;
+    let id = json["id"].as_i64().unwrap();
+
+    let mut body = basis_kopf("Neu");
+    body["einsatzart"] = json!("uebung");
+    body["einsatzort"] = json!("Hauptstraße 1");
+    body["anzahl_betroffene_initial"] = json!(5);
+
+    let (status, antwort) = patch_kopf(&app, &admin, id, body).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(antwort["bezeichnung"], "Neu");
+    assert_eq!(antwort["einsatzart"], "uebung");
+    assert_eq!(antwort["einsatzort"], "Hauptstraße 1");
+    assert_eq!(antwort["anzahl_betroffene_initial"], 5);
+}
+
+#[tokio::test]
+async fn admin_ohne_mitgliedschaft_darf_patchen_aber_kein_etb() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin, "frieda", "fuehrungskraft").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let (_, json) = einsatz_anlegen(&app, &frieda, "Friedas Lage").await;
+    let id = json["id"].as_i64().unwrap();
+
+    let (status, _) = patch_kopf(&app, &admin, id, basis_kopf("Vom Admin")).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/einsaetze/{id}/etb"))
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, admin)
+                .body(Body::from(r#"{"typ":"meldung","inhalt":"Test"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn beobachter_darf_kopf_nicht_patchen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, json) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = json["id"].as_i64().unwrap();
+    let erika_id = benutzer_anlegen(&app, &admin, "erika", "keine").await;
+    assert_eq!(
+        mitglied_setzen(&app, &admin, id, erika_id, "beobachter").await,
+        StatusCode::OK
+    );
+
+    let erika = login_cookie(&app, "erika", "erikapw1").await;
+    let (status, _) = patch_kopf(&app, &erika, id, basis_kopf("X")).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn nicht_mitglied_ohne_admin_darf_kopf_nicht_patchen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, json) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = json["id"].as_i64().unwrap();
+    benutzer_anlegen(&app, &admin, "erika", "keine").await;
+    let erika = login_cookie(&app, "erika", "erikapw1").await;
+
+    let (status, _) = patch_kopf(&app, &erika, id, basis_kopf("X")).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn patch_auf_abgeschlossenen_einsatz_ist_409() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, json) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = json["id"].as_i64().unwrap();
+
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/einsaetze/{id}/abschliessen"))
+                .header(header::COOKIE, admin.clone())
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let (status, _) = patch_kopf(&app, &admin, id, basis_kopf("X")).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn patch_leere_bezeichnung_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, json) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = json["id"].as_i64().unwrap();
+
+    let (status, _) = patch_kopf(&app, &admin, id, basis_kopf("   ")).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn patch_ungueltige_einsatzart_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, json) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = json["id"].as_i64().unwrap();
+
+    let mut body = basis_kopf("Lage");
+    body["einsatzart"] = json!("quatsch");
+    let (status, _) = patch_kopf(&app, &admin, id, body).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn patch_negative_anzahl_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, json) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = json["id"].as_i64().unwrap();
+
+    let mut body = basis_kopf("Lage");
+    body["anzahl_betroffene_initial"] = json!(-1);
+    let (status, _) = patch_kopf(&app, &admin, id, body).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn patch_leere_optionals_werden_null() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, json) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = json["id"].as_i64().unwrap();
+
+    let mut body = basis_kopf("Lage");
+    body["einsatzort"] = json!("   ");
+    let (status, antwort) = patch_kopf(&app, &admin, id, body).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(antwort["einsatzort"].is_null());
+}
+
+#[tokio::test]
+async fn patch_doppelte_einsatznummer_ist_409() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin, "frieda", "fuehrungskraft").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+
+    let (_, a) = einsatz_anlegen(&app, &frieda, "A").await;
+    let (_, b) = einsatz_anlegen(&app, &frieda, "B").await;
+    let nummer_a = a["einsatznummer_intern"].as_str().unwrap().to_string();
+    let id_b = b["id"].as_i64().unwrap();
+
+    let mut body = basis_kopf("B");
+    body["einsatznummer_intern"] = json!(nummer_a);
+    let (status, _) = patch_kopf(&app, &frieda, id_b, body).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn angelegt_at_bleibt_bei_patch_unveraendert() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, json) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = json["id"].as_i64().unwrap();
+    let angelegt_vorher = json["angelegt_at"].as_str().unwrap().to_string();
+
+    let mut body = basis_kopf("Lage");
+    body["begonnen_at"] = json!("2026-05-20 10:00:00");
+    let (status, antwort) = patch_kopf(&app, &admin, id, body).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(antwort["begonnen_at"], "2026-05-20 10:00:00");
+    assert_eq!(antwort["angelegt_at"], angelegt_vorher);
+}
+
+#[tokio::test]
+async fn anlegen_vergibt_einsatznummer_im_format() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, a) = einsatz_anlegen(&app, &admin, "A").await;
+    let (_, b) = einsatz_anlegen(&app, &admin, "B").await;
+    let nr_a = a["einsatznummer_intern"].as_str().unwrap();
+    let nr_b = b["einsatznummer_intern"].as_str().unwrap();
+    assert!(nr_a.ends_with("-001"), "erste Nummer endet auf -001: {nr_a}");
+    assert!(nr_b.ends_with("-002"), "zweite Nummer endet auf -002: {nr_b}");
 }

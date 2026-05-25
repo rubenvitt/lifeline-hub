@@ -1,7 +1,7 @@
 use crate::live::LiveHub;
 use crate::routes;
 use axum::{
-    routing::{delete, get, post, put},
+    routing::{delete, get, patch, post, put},
     Router,
 };
 use sqlx::SqlitePool;
@@ -30,6 +30,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/einsaetze", get(routes::einsatz::liste))
         .route("/api/einsaetze", post(routes::einsatz::anlegen))
         .route("/api/einsaetze/{id}", get(routes::einsatz::detail))
+        .route("/api/einsaetze/{id}", patch(routes::einsatz::aktualisieren))
         .route(
             "/api/einsaetze/{id}/abschliessen",
             post(routes::einsatz::abschliessen),
