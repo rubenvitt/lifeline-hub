@@ -1,7 +1,8 @@
-import { Alert, Button, Card, Form, Input, Typography } from 'antd';
-import { useState } from 'react';
+import { Alert, Button, Card, Form, Input, Space, Tag, Typography } from 'antd';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ApiError } from '../api/client';
+import { devBenutzerLaden, type DevBenutzer } from '../api/dev';
 import { useAuth } from '../auth/AuthContext';
 
 interface FormWerte {
@@ -13,10 +14,23 @@ export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [form] = Form.useForm<FormWerte>();
   const [fehler, setFehler] = useState<string | null>(null);
   const [laedt, setLaedt] = useState(false);
+  const [devBenutzer, setDevBenutzer] = useState<DevBenutzer[]>([]);
 
   const zielPfad = (location.state as { von?: string } | null)?.von ?? '/einsaetze';
+
+  // Nur im Dev-Build: verfügbare Seed-Benutzer laden. Der gesamte Block steht
+  // hinter `import.meta.env.DEV` und entfällt im Production-Build per DCE.
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      devBenutzerLaden()
+        .then(setDevBenutzer)
+        // Feature aus / Netzwerkfehler → still ignorieren, normales Login bleibt.
+        .catch(() => {});
+    }
+  }, []);
 
   async function absenden(werte: FormWerte) {
     setFehler(null);
@@ -36,7 +50,26 @@ export default function LoginPage() {
       <Card style={{ width: 360 }}>
         <Typography.Title level={3}>lifeline-hub</Typography.Title>
         {fehler && <Alert type="error" message={fehler} style={{ marginBottom: 16 }} showIcon />}
-        <Form layout="vertical" onFinish={absenden} disabled={laedt}>
+        {import.meta.env.DEV && devBenutzer.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <Typography.Text type="secondary">Dev-Schnellanmeldung</Typography.Text>
+            <Space wrap style={{ display: 'flex', marginTop: 8 }}>
+              {devBenutzer.map((b) => (
+                <Button
+                  key={b.benutzername}
+                  size="small"
+                  onClick={() =>
+                    form.setFieldsValue({ benutzername: b.benutzername, passwort: b.passwort })
+                  }
+                >
+                  {b.anzeigename}
+                  <Tag style={{ marginLeft: 4 }}>{b.rolle}</Tag>
+                </Button>
+              ))}
+            </Space>
+          </div>
+        )}
+        <Form form={form} layout="vertical" onFinish={absenden} disabled={laedt}>
           <Form.Item
             label="Benutzername"
             name="benutzername"

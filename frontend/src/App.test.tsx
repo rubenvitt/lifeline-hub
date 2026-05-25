@@ -9,6 +9,7 @@ import { server } from './test/server';
 describe('App', () => {
   it('rendert ohne Absturz und leitet zu /login um', async () => {
     server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+    server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
     renderMitProviders(
       <AuthProvider>
         <App />
