@@ -31,6 +31,17 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     let pool = db::connect(&config.db_path).await?;
     db::migrate(&pool).await?;
 
+    // Dev-only: reproduzierbare Testdaten seeden, BEVOR bootstrap_admin läuft.
+    // Danach existieren Benutzer → bootstrap_admin ist no-op (legt auch keine
+    // Organisation an; deshalb macht dev_seed das selbst).
+    #[cfg(feature = "dev-seeds")]
+    {
+        lifeline_hub::dev::seed::dev_seed(&pool).await?;
+        tracing::warn!(
+            "dev-seeds AKTIV: Testdaten geseedet, /api/dev/users verfügbar — NIEMALS in Production!"
+        );
+    }
+
     let ergebnis = lifeline_hub::auth::bootstrap::bootstrap_admin(
         &pool,
         &config.org_name,
