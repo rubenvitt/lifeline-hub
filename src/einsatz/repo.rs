@@ -22,12 +22,32 @@ pub async fn anlegen(
         .ok_or_else(|| AppError::Internal("Keine Organisation vorhanden".into()))?;
 
     let mut tx = pool.begin().await?;
+
+    // Einsatznummer JJJJ-NNN: NNN je Organisation + Jahr fortlaufend, 3-stellig.
+    // 'JJJJ-' ist 5 Zeichen lang → substr(..., 6) liefert den NNN-Teil.
+    // Race-frei: WAL serialisiert Writer; der Unique-Index sichert zusätzlich ab.
+    let jahr: String = sqlx::query_scalar("SELECT strftime('%Y','now')")
+        .fetch_one(&mut *tx)
+        .await?;
+    let praefix = format!("{jahr}-");
+    let max_nr: Option<i64> = sqlx::query_scalar(
+        "SELECT MAX(CAST(substr(einsatznummer_intern, 6) AS INTEGER)) \
+         FROM einsatz WHERE org_id = ? AND einsatznummer_intern LIKE ?",
+    )
+    .bind(org_id)
+    .bind(format!("{praefix}%"))
+    .fetch_one(&mut *tx)
+    .await?;
+    let einsatznummer = format!("{praefix}{:03}", max_nr.unwrap_or(0) + 1);
+
     let einsatz_id: i64 = sqlx::query_scalar(
-        "INSERT INTO einsatz (org_id, bezeichnung, stichwort) VALUES (?, ?, ?) RETURNING id",
+        "INSERT INTO einsatz (org_id, bezeichnung, stichwort, einsatznummer_intern, angelegt_at) \
+         VALUES (?, ?, ?, ?, datetime('now')) RETURNING id",
     )
     .bind(org_id)
     .bind(bezeichnung)
     .bind(stichwort)
+    .bind(&einsatznummer)
     .fetch_one(&mut *tx)
     .await?;
 
@@ -395,6 +415,51 @@ mod tests {
         let fremd_benutzer = benutzer_laden(&pool, fremd).await;
         let fuer_fremd = liste_fuer(&pool, &fremd_benutzer).await.unwrap();
         assert!(fuer_fremd.is_empty());
+    }
+
+    #[tokio::test]
+    async fn anlegen_vergibt_fortlaufende_einsatznummer() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+
+        let jahr: String = sqlx::query_scalar("SELECT strftime('%Y','now')")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+        let a = anlegen(&pool, "Lage A", None, leit).await.unwrap();
+        let b = anlegen(&pool, "Lage B", None, leit).await.unwrap();
+        assert_eq!(a.einsatznummer_intern.as_deref(), Some(format!("{jahr}-001").as_str()));
+        assert_eq!(b.einsatznummer_intern.as_deref(), Some(format!("{jahr}-002").as_str()));
+
+        // angelegt_at wurde gesetzt (nicht der '' Default).
+        assert!(!a.angelegt_at.is_empty());
+    }
+
+    #[tokio::test]
+    async fn anlegen_zaehlt_je_organisation_getrennt() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await; // legt Org id=1 an
+
+        let jahr: String = sqlx::query_scalar("SELECT strftime('%Y','now')")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+        // Zweite Organisation mit bereits hoher Nummer — darf Org 1 nicht beeinflussen.
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (2, 'Orga 2')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO einsatz (org_id, bezeichnung, einsatznummer_intern) VALUES (2, 'Fremd', ?)")
+            .bind(format!("{jahr}-009"))
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        // anlegen nutzt Org 1 (ORDER BY id LIMIT 1) → beginnt bei 001.
+        let a = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        assert_eq!(a.einsatznummer_intern.as_deref(), Some(format!("{jahr}-001").as_str()));
     }
 
     #[tokio::test]
