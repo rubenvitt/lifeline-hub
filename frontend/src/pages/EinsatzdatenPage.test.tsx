@@ -80,11 +80,17 @@ describe('EinsatzdatenPage', () => {
   });
 
   it('speichert via PATCH und invalidiert den Einsatz-Cache', async () => {
-    let patchBody: Record<string, unknown> | null = null;
+    // Den PATCH-Body direkt im Handler prüfen und den Aufruf über ein Boolean
+    // signalisieren — so umgehen wir die TS-Control-Flow-Eigenheit, dass eine
+    // in einer Closure zugewiesene Variable außerhalb nicht eng typisiert wird.
+    let patchAufgerufen = false;
     setup();
     server.use(
       http.patch('/api/einsaetze/7', async ({ request }) => {
-        patchBody = (await request.json()) as Record<string, unknown>;
+        const body = (await request.json()) as Record<string, unknown>;
+        expect(body.bezeichnung).toBe('Geändert');
+        expect(body.einsatzart).toBe('realeinsatz');
+        patchAufgerufen = true;
         return HttpResponse.json({ ...basisEinsatz, bezeichnung: 'Geändert' });
       }),
     );
@@ -97,9 +103,6 @@ describe('EinsatzdatenPage', () => {
     await user.type(bezeichnung, 'Geändert');
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
 
-    await waitFor(() => expect(patchBody).not.toBeNull());
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    expect(patchBody!.bezeichnung).toBe('Geändert');
-    expect(patchBody!.einsatzart).toBe('realeinsatz');
+    await waitFor(() => expect(patchAufgerufen).toBe(true));
   });
 });
