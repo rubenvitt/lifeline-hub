@@ -1,4 +1,4 @@
-import type { EinsatzAnzeige, EinsatzRolle, MitgliedAnzeige } from './types';
+import type { Einsatzart, EinsatzAnzeige, EinsatzRolle, MitgliedAnzeige } from './types';
 import { apiGet, apiSend } from './client';
 
 export function listeEinsaetze(): Promise<EinsatzAnzeige[]> {
@@ -33,4 +33,25 @@ export function setzeMitglied(
 
 export function entferneMitglied(id: number, benutzerId: number): Promise<MitgliedAnzeige[]> {
   return apiSend<MitgliedAnzeige[]>(`/api/einsaetze/${id}/mitglieder/${benutzerId}`, 'DELETE');
+}
+
+/** Editierbare Kopffelder (Vollersatz beim atomaren Speichern). */
+export interface KopfdatenUpdate {
+  bezeichnung: string;
+  stichwort: string | null;
+  einsatzart: Einsatzart;
+  einsatznummer_intern: string | null;
+  leitstellen_nr: string | null;
+  einsatzort: string | null;
+  einsatzort_lat: number | null;
+  einsatzort_lon: number | null;
+  meldende_stelle: string | null;
+  sachverhalt: string | null;
+  anzahl_betroffene_initial: number | null;
+  /** Alarmzeit im SQLite-Format 'YYYY-MM-DD HH:mm:ss'. */
+  begonnen_at: string;
+}
+
+export function aktualisiereEinsatz(id: number, felder: KopfdatenUpdate): Promise<EinsatzAnzeige> {
+  return apiSend<EinsatzAnzeige>(`/api/einsaetze/${id}`, 'PATCH', felder);
 }
