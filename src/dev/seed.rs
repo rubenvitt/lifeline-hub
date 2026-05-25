@@ -82,6 +82,7 @@ pub async fn dev_seed(pool: &SqlitePool) -> Result<(), AppError> {
     let org_id = organisation_anlegen(pool).await?;
     benutzer_seeden(pool, org_id).await?;
     einsaetze_seeden(pool, org_id).await?;
+    mitgliedschaften_seeden(pool).await?;
     Ok(())
 }
 
@@ -133,6 +134,16 @@ async fn benutzer_seeden(pool: &SqlitePool, org_id: i64) -> Result<(), AppError>
     Ok(())
 }
 
+/// Seed-Mitgliedschaften: (einsatz_bezeichnung, benutzername, einsatz_rolle).
+/// einsatz_rolle ∈ {einsatzleitung, fuehrungspersonal, beobachter}.
+const SEED_MITGLIEDSCHAFTEN: &[(&str, &str, &str)] = &[
+    ("Übung Hochwasser", "leitung", "einsatzleitung"),
+    ("Übung Hochwasser", "mitglied", "beobachter"),
+    ("Übung Hochwasser", "admin", "fuehrungspersonal"),
+    ("Verkehrsunfall B27", "leitung", "einsatzleitung"),
+    ("Verkehrsunfall B27", "mitglied", "fuehrungspersonal"),
+];
+
 /// Seedet die `SEED_EINSAETZE`. Idempotent: nur fehlende `bezeichnung`en anlegen.
 async fn einsaetze_seeden(pool: &SqlitePool, org_id: i64) -> Result<(), AppError> {
     for &(bezeichnung, stichwort, status) in SEED_EINSAETZE {
@@ -152,6 +163,36 @@ async fn einsaetze_seeden(pool: &SqlitePool, org_id: i64) -> Result<(), AppError
             .bind(status)
             .execute(pool)
             .await?;
+    }
+    Ok(())
+}
+
+/// Seedet die `SEED_MITGLIEDSCHAFTEN`. Idempotent über den Primärschlüssel
+/// `(einsatz_id, benutzer_id)` via `ON CONFLICT DO NOTHING`.
+async fn mitgliedschaften_seeden(pool: &SqlitePool) -> Result<(), AppError> {
+    for &(einsatz_bez, benutzername, rolle) in SEED_MITGLIEDSCHAFTEN {
+        let einsatz_id: Option<i64> =
+            sqlx::query_scalar("SELECT id FROM einsatz WHERE bezeichnung = ?")
+                .bind(einsatz_bez)
+                .fetch_optional(pool)
+                .await?;
+        let benutzer_id: Option<i64> =
+            sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = ?")
+                .bind(benutzername)
+                .fetch_optional(pool)
+                .await?;
+        let (Some(einsatz_id), Some(benutzer_id)) = (einsatz_id, benutzer_id) else {
+            continue;
+        };
+        sqlx::query(
+            "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
+             VALUES (?, ?, ?) ON CONFLICT DO NOTHING",
+        )
+        .bind(einsatz_id)
+        .bind(benutzer_id)
+        .bind(rolle)
+        .execute(pool)
+        .await?;
     }
     Ok(())
 }
@@ -202,6 +243,35 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(abgeschlossen, 1);
+    }
+
+    #[tokio::test]
+    async fn mitgliedschaft_seeding_ist_idempotent() {
+        let pool = crate::db::test_pool().await;
+        dev_seed(&pool).await.unwrap();
+        let n1: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_mitgliedschaft")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        dev_seed(&pool).await.unwrap();
+        let n2: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_mitgliedschaft")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(n1, n2, "zweiter Seed-Lauf darf keine Duplikate erzeugen");
+        assert!(n1 > 0, "es müssen Mitgliedschaften angelegt werden");
+
+        // 'leitung' ist Einsatzleitung in 'Übung Hochwasser'.
+        let rolle: String = sqlx::query_scalar(
+            "SELECT m.einsatz_rolle FROM einsatz_mitgliedschaft m \
+             JOIN einsatz e ON e.id = m.einsatz_id \
+             JOIN benutzer b ON b.id = m.benutzer_id \
+             WHERE e.bezeichnung = 'Übung Hochwasser' AND b.benutzername = 'leitung'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(rolle, "einsatzleitung");
     }
 
     #[tokio::test]
