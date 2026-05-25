@@ -8,49 +8,48 @@ import { AuthProvider } from '../auth/AuthContext';
 import AppLayout from './AppLayout';
 
 const admin = {
-  id: 1,
-  anzeigename: 'Chef',
-  benutzername: 'chef',
-  system_rolle: 'admin',
-  org_rolle: 'keine',
-  aktiv: true,
-  erstellt_at: '2026-05-23 10:00:00',
+  id: 1, anzeigename: 'Chef', benutzername: 'chef', system_rolle: 'admin',
+  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00',
 };
 
-describe('AppLayout', () => {
-  it('zeigt den Namen des angemeldeten Nutzers und den Admin-Link', async () => {
-    server.use(http.get('/api/auth/me', () => HttpResponse.json(admin)));
-    renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route element={<AppLayout />}>
-            <Route path="/" element={<div>Inhalt</div>} />
-          </Route>
-        </Routes>
-      </AuthProvider>,
-    );
+function setup(me: Record<string, unknown>) {
+  server.use(http.get('/api/auth/me', () => HttpResponse.json(me)));
+  return renderMitProviders(
+    <AuthProvider>
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<div>Inhalt</div>} />
+        </Route>
+      </Routes>
+    </AuthProvider>,
+  );
+}
+
+describe('AppLayout (globale Topbar)', () => {
+  it('Admin: Stammdaten und Benutzer sind Links, Profil sichtbar', async () => {
+    setup(admin);
     await waitFor(() => expect(screen.getByText('Chef')).toBeInTheDocument());
+    expect(screen.getByRole('link', { name: 'Stammdaten' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Benutzer' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Profil' })).toBeInTheDocument();
     expect(screen.getByText('Inhalt')).toBeInTheDocument();
   });
 
-  it('verbirgt Benutzer-Link und Admin-Tag für Nicht-Admins', async () => {
-    server.use(
-      http.get('/api/auth/me', () =>
-        HttpResponse.json({ ...admin, system_rolle: 'keiner', anzeigename: 'Eva' }),
-      ),
-    );
-    renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route element={<AppLayout />}>
-            <Route path="/" element={<div>Inhalt</div>} />
-          </Route>
-        </Routes>
-      </AuthProvider>,
-    );
+  it('Fuehrungskraft: Stammdaten frei, Benutzer gesperrt (🔒, kein Link)', async () => {
+    setup({ ...admin, system_rolle: 'keiner', org_rolle: 'fuehrungskraft', anzeigename: 'Eva' });
     await waitFor(() => expect(screen.getByText('Eva')).toBeInTheDocument());
+    expect(screen.getByRole('link', { name: 'Stammdaten' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Benutzer' })).not.toBeInTheDocument();
+    expect(screen.getByText('Benutzer 🔒')).toBeInTheDocument();
+  });
+
+  it('Sonstige: Stammdaten und Benutzer gesperrt, kein Admin-Tag', async () => {
+    setup({ ...admin, system_rolle: 'keiner', org_rolle: 'keine', anzeigename: 'Max' });
+    await waitFor(() => expect(screen.getByText('Max')).toBeInTheDocument());
+    expect(screen.queryByRole('link', { name: 'Stammdaten' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Benutzer' })).not.toBeInTheDocument();
+    expect(screen.getByText('Stammdaten 🔒')).toBeInTheDocument();
+    expect(screen.getByText('Benutzer 🔒')).toBeInTheDocument();
     expect(screen.queryByText('Admin')).not.toBeInTheDocument();
   });
 });
