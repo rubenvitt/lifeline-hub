@@ -315,14 +315,14 @@ import Platzhalter from './Platzhalter';
 describe('Platzhalter', () => {
   it('zeigt Titel, Bauarbeiter-Marker und Beschreibung', () => {
     renderMitProviders(<Platzhalter titel="Stab" beschreibung="Kommt später." />);
-    expect(screen.getByText('Stab')).toBeInTheDocument();
+    expect(screen.getByText(/Stab/)).toBeInTheDocument();
     expect(screen.getByText(/🚧/)).toBeInTheDocument();
     expect(screen.getByText('Kommt später.')).toBeInTheDocument();
   });
 
   it('funktioniert ohne Beschreibung', () => {
     renderMitProviders(<Platzhalter titel="Profil" />);
-    expect(screen.getByText('Profil')).toBeInTheDocument();
+    expect(screen.getByText(/Profil/)).toBeInTheDocument();
   });
 });
 ```
@@ -351,7 +351,7 @@ export default function Platzhalter({ titel, beschreibung }: Props) {
   return (
     <div style={{ textAlign: 'center', paddingTop: 64 }}>
       <Typography.Title level={3} style={{ marginBottom: 8 }}>
-        🚧 {titel}
+        {`🚧 ${titel}`}
       </Typography.Title>
       {beschreibung && (
         <Typography.Paragraph type="secondary" style={{ maxWidth: 480, margin: '0 auto' }}>
@@ -401,7 +401,8 @@ describe('ModulStub', () => {
   it('rendert Label und Beschreibung des Moduls mit WIP-Marker', () => {
     const stab = modulRegistry.find((m) => m.key === 'stab')!;
     renderMitProviders(<ModulStub modul={stab} />);
-    expect(screen.getByText('Stab')).toBeInTheDocument();
+    // Anker an den 🚧-Marker: stab.beschreibung beginnt selbst mit „Stab…", daher /🚧 Stab/.
+    expect(screen.getByText(/🚧 Stab/)).toBeInTheDocument();
     expect(screen.getByText(/🚧/)).toBeInTheDocument();
     expect(screen.getByText(stab.beschreibung!)).toBeInTheDocument();
   });
@@ -1109,12 +1110,12 @@ import ProfilPage from './ProfilPage';
 describe('Globale Platzhalter-Seiten', () => {
   it('Stammdaten zeigt Titel und Platzhalter', () => {
     renderMitProviders(<StammdatenPage />);
-    expect(screen.getByText('Stammdaten')).toBeInTheDocument();
+    expect(screen.getByText(/Stammdaten/)).toBeInTheDocument();
   });
 
   it('Profil zeigt Titel und Platzhalter', () => {
     renderMitProviders(<ProfilPage />);
-    expect(screen.getByText('Profil')).toBeInTheDocument();
+    expect(screen.getByText(/Profil/)).toBeInTheDocument();
   });
 });
 ```
