@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Layout, Spin } from 'antd';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -27,6 +27,11 @@ export default function EinsatzLayout() {
   const aktiveKategorie: KategorieKey | null = aktuellesModul?.kategorie ?? null;
 
   const [offeneKategorie, setOffeneKategorie] = useState<KategorieKey | null>(aktiveKategorie);
+
+  // Panel an die aktuelle Modul-Kategorie angleichen (auch nach Default-Redirect, der kein Remount auslöst).
+  useEffect(() => {
+    setOffeneKategorie(aktiveKategorie);
+  }, [aktiveKategorie]);
 
   const { data: einsatz, isLoading } = useQuery({
     queryKey: ['einsatz', einsatzId],

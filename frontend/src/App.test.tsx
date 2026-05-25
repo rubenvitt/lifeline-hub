@@ -44,6 +44,8 @@ describe('App-Routing', () => {
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: 'Hochwasser Nord' })).toBeInTheDocument(),
     );
+    // Panel öffnet sich auf dem Redirect-Pfad zur Kategorie des Ziel-Moduls (Erfassung).
+    expect(await screen.findByText('Erfassung')).toBeInTheDocument();
   });
 
   it('WIP-Modul-Route rendert den Stub', async () => {
