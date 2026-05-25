@@ -83,6 +83,7 @@ pub async fn dev_seed(pool: &SqlitePool) -> Result<(), AppError> {
     benutzer_seeden(pool, org_id).await?;
     einsaetze_seeden(pool, org_id).await?;
     mitgliedschaften_seeden(pool).await?;
+    etb_seeden(pool).await?;
     Ok(())
 }
 
@@ -167,6 +168,47 @@ async fn einsaetze_seeden(pool: &SqlitePool, org_id: i64) -> Result<(), AppError
     Ok(())
 }
 
+/// Seed-ETB-Einträge: (einsatz_bezeichnung, typ, inhalt, erfasser_benutzername,
+/// ereigniszeit). typ ∈ {meldung, anordnung, lage, ...}. Reihenfolge bestimmt
+/// die lfd_nr innerhalb eines Einsatzes (ab 1, lückenlos).
+const SEED_ETB: &[(&str, &str, &str, &str, &str)] = &[
+    (
+        "Übung Hochwasser",
+        "lage",
+        "Deich bei km 12 wird beobachtet, Pegel steigt langsam.",
+        "leitung",
+        "2026-05-25 08:00:00",
+    ),
+    (
+        "Übung Hochwasser",
+        "meldung",
+        "Sandsackfüllstelle am Bauhof eingerichtet.",
+        "mitglied",
+        "2026-05-25 08:15:00",
+    ),
+    (
+        "Übung Hochwasser",
+        "anordnung",
+        "Trupp 1 zur Deichsicherung an km 12 entsenden.",
+        "leitung",
+        "2026-05-25 08:20:00",
+    ),
+    (
+        "Verkehrsunfall B27",
+        "meldung",
+        "PKW gegen Baum, eine Person eingeklemmt.",
+        "leitung",
+        "2026-05-25 09:30:00",
+    ),
+    (
+        "Verkehrsunfall B27",
+        "lage",
+        "Rettungsdienst und Feuerwehr vor Ort, Bergung läuft.",
+        "mitglied",
+        "2026-05-25 09:35:00",
+    ),
+];
+
 /// Seedet die `SEED_MITGLIEDSCHAFTEN`. Idempotent über den Primärschlüssel
 /// `(einsatz_id, benutzer_id)` via `ON CONFLICT DO NOTHING`.
 async fn mitgliedschaften_seeden(pool: &SqlitePool) -> Result<(), AppError> {
@@ -193,6 +235,57 @@ async fn mitgliedschaften_seeden(pool: &SqlitePool) -> Result<(), AppError> {
         .bind(rolle)
         .execute(pool)
         .await?;
+    }
+    Ok(())
+}
+
+/// Seedet die `SEED_ETB`. Idempotent pro Einsatz: nur anlegen, wenn der
+/// Einsatz noch KEINE Einträge hat (so bleibt lfd_nr lückenlos ab 1).
+async fn etb_seeden(pool: &SqlitePool) -> Result<(), AppError> {
+    for &(einsatz_bez, _, _) in SEED_EINSAETZE {
+        let einsatz_id: Option<i64> =
+            sqlx::query_scalar("SELECT id FROM einsatz WHERE bezeichnung = ?")
+                .bind(einsatz_bez)
+                .fetch_optional(pool)
+                .await?;
+        let Some(einsatz_id) = einsatz_id else {
+            continue;
+        };
+
+        let vorhandene: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?")
+                .bind(einsatz_id)
+                .fetch_one(pool)
+                .await?;
+        if vorhandene > 0 {
+            continue;
+        }
+
+        let mut lfd_nr: i64 = 0;
+        for &(bez, typ, inhalt, erfasser, ereigniszeit) in SEED_ETB {
+            if bez != einsatz_bez {
+                continue;
+            }
+            let erfasser_id: i64 =
+                sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = ?")
+                    .bind(erfasser)
+                    .fetch_one(pool)
+                    .await?;
+            lfd_nr += 1;
+            sqlx::query(
+                "INSERT INTO etb_eintrag \
+                    (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
+                 VALUES (?, ?, ?, ?, ?, ?)",
+            )
+            .bind(einsatz_id)
+            .bind(lfd_nr)
+            .bind(typ)
+            .bind(inhalt)
+            .bind(erfasser_id)
+            .bind(ereigniszeit)
+            .execute(pool)
+            .await?;
+        }
     }
     Ok(())
 }
@@ -272,6 +365,35 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(rolle, "einsatzleitung");
+    }
+
+    #[tokio::test]
+    async fn etb_seeding_ist_idempotent_und_lfd_nr_lueckenlos() {
+        let pool = crate::db::test_pool().await;
+        dev_seed(&pool).await.unwrap();
+        let n1: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        dev_seed(&pool).await.unwrap();
+        let n2: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(n1, n2, "zweiter Seed-Lauf darf keine ETB-Duplikate erzeugen");
+        assert!(n1 > 0, "es müssen ETB-Einträge angelegt werden");
+
+        // lfd_nr lückenlos ab 1 pro Einsatz: COUNT == MAX(lfd_nr).
+        let gruppen: Vec<(i64, i64, i64)> = sqlx::query_as(
+            "SELECT einsatz_id, COUNT(*) AS anzahl, MAX(lfd_nr) AS maxnr \
+             FROM etb_eintrag GROUP BY einsatz_id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        for (einsatz_id, anzahl, maxnr) in gruppen {
+            assert_eq!(anzahl, maxnr, "lfd_nr in Einsatz {einsatz_id} nicht lückenlos");
+        }
     }
 
     #[tokio::test]
