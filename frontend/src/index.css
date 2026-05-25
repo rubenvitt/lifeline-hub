@@ -1,3 +1,13 @@
+/* Globaler Reset: ohne dies bleibt das Browser-Default `body { margin: 8px }`
+   stehen und zeigt den weißen Body-Hintergrund als Rahmen um jede Vollbild-
+   Seite – zusätzlich treibt es `min-height: 100vh` über den Viewport hinaus
+   und erzeugt äußere Scrollbars. */
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
 .etb-berichtigung > td {
   background-color: #fff1f0;
 }
