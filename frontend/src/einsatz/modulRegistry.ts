@@ -46,7 +46,7 @@ export const kategorien: Kategorie[] = [
 
 export const modulRegistry: ModulEintrag[] = [
   // Führung
-  { key: 'einsatzdaten', kategorie: 'fuehrung', label: 'Einsatzdaten', icon: TbFileDescription, route: 'einsatzdaten', status: 'geplant', beschreibung: 'Stammdaten des Einsatzes: Bezeichnung, Stichwort, Zeiten, Leitung.' },
+  { key: 'einsatzdaten', kategorie: 'fuehrung', label: 'Einsatzdaten', icon: TbFileDescription, route: 'einsatzdaten', status: 'fertig', beschreibung: 'Stammdaten des Einsatzes: Bezeichnung, Stichwort, Zeiten, Leitung.' },
   { key: 'einsatzabschnitte', kategorie: 'fuehrung', label: 'Einsatzabschnitte', icon: TbSitemap, route: 'einsatzabschnitte', status: 'geplant', beschreibung: 'Gliederung des Einsatzes in Abschnitte und Zuordnung von Einheiten.' },
   { key: 'stab', kategorie: 'fuehrung', label: 'Stab', icon: TbBuildingCommunity, route: 'stab', status: 'wip', beschreibung: 'Stabsarbeit (S1–S6). Wird später ausgearbeitet.' },
   // Kräfte & Mittel
