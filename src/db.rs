@@ -210,6 +210,58 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn einsatzdaten_migration_legt_spalten_und_unique_index_an() {
+        let pool = test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        // einsatzart-Default ist 'realeinsatz'. angelegt_at hat den konstanten
+        // Migrations-Default '' (der Backfill betrifft nur Bestandszeilen; neue
+        // Zeilen bekommen den Wert erst in repo::anlegen, Task 4).
+        let id: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, begonnen_at) \
+             VALUES (1, 'Lage', '2026-05-23 09:00:00') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let (art, angelegt): (String, String) =
+            sqlx::query_as("SELECT einsatzart, angelegt_at FROM einsatz WHERE id = ?")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(art, "realeinsatz");
+        assert_eq!(angelegt, "", "neue Zeile: angelegt_at = '' bis repo::anlegen es setzt");
+
+        // einsatzart-CHECK lehnt ungültigen Wert ab.
+        let bad = sqlx::query("UPDATE einsatz SET einsatzart = 'quatsch' WHERE id = ?")
+            .bind(id)
+            .execute(&pool)
+            .await;
+        assert!(bad.is_err(), "ungültige einsatzart muss abgelehnt werden");
+
+        // Mehrere NULL-Einsatznummern sind erlaubt (Bestand).
+        sqlx::query("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'A'), (1, 'B')")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        // Erste manuelle Nummer ok, Dublette in derselben Org → Unique-Verstoß.
+        sqlx::query("UPDATE einsatz SET einsatznummer_intern = '2026-001' WHERE id = ?")
+            .bind(id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let dup = sqlx::query("INSERT INTO einsatz (org_id, bezeichnung, einsatznummer_intern) VALUES (1, 'C', '2026-001')")
+            .execute(&pool)
+            .await;
+        assert!(dup.is_err(), "doppelte Einsatznummer je Org muss abgelehnt werden");
+    }
+
+    #[tokio::test]
     async fn etb_migration_legt_tabelle_und_fts_an() {
         let pool = test_pool().await;
 
@@ -323,5 +375,33 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(treffer, 0, "FTS-Index muss nach Cascade-Delete bereinigt sein");
+    }
+
+    #[tokio::test]
+    async fn stichwort_vorschlag_migration_legt_tabelle_mit_unique_an() {
+        let pool = test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        sqlx::query("INSERT INTO einsatz_stichwort_vorschlag (org_id, text) VALUES (1, 'H1')")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        // UNIQUE(org_id, text): Dublette je Org abgelehnt.
+        let dup = sqlx::query("INSERT INTO einsatz_stichwort_vorschlag (org_id, text) VALUES (1, 'H1')")
+            .execute(&pool)
+            .await;
+        assert!(dup.is_err(), "doppeltes Stichwort je Org muss abgelehnt werden");
+
+        // sortier-Default ist 0.
+        let sortier: i64 =
+            sqlx::query_scalar("SELECT sortier FROM einsatz_stichwort_vorschlag WHERE text = 'H1'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(sortier, 0);
     }
 }

@@ -8,6 +8,7 @@ import BenutzerPage from './pages/BenutzerPage';
 import StammdatenPage from './pages/StammdatenPage';
 import ProfilPage from './pages/ProfilPage';
 import EtbPage from './pages/EtbPage';
+import EinsatzdatenPage from './pages/EinsatzdatenPage';
 import EinsatzLayout from './einsatz/EinsatzLayout';
 import DefaultModulRedirect from './einsatz/DefaultModulRedirect';
 import ModulStub from './einsatz/ModulStub';
@@ -16,6 +17,7 @@ import { modulRegistry } from './einsatz/modulRegistry';
 /** Module mit echter Implementierung; alle übrigen rendern den ModulStub. */
 const MODUL_ELEMENTE: Record<string, ReactElement> = {
   etb: <EtbPage />,
+  einsatzdaten: <EinsatzdatenPage />,
 };
 
 export default function App() {

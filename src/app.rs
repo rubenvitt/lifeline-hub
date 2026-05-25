@@ -1,7 +1,7 @@
 use crate::live::LiveHub;
 use crate::routes;
 use axum::{
-    routing::{delete, get, post, put},
+    routing::{delete, get, patch, post, put},
     Router,
 };
 use sqlx::SqlitePool;
@@ -30,6 +30,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/einsaetze", get(routes::einsatz::liste))
         .route("/api/einsaetze", post(routes::einsatz::anlegen))
         .route("/api/einsaetze/{id}", get(routes::einsatz::detail))
+        .route("/api/einsaetze/{id}", patch(routes::einsatz::aktualisieren))
         .route(
             "/api/einsaetze/{id}/abschliessen",
             post(routes::einsatz::abschliessen),
@@ -48,7 +49,13 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/api/einsaetze/{id}/etb", post(routes::etb::erfassen))
         .route("/api/einsaetze/{id}/etb", get(routes::etb::liste))
-        .route("/api/einsaetze/{id}/etb/stream", get(routes::etb::stream));
+        .route("/api/einsaetze/{id}/etb/stream", get(routes::etb::stream))
+        .route("/api/stichwort-vorschlaege", get(routes::stichwort::liste))
+        .route("/api/stichwort-vorschlaege", post(routes::stichwort::anlegen))
+        .route(
+            "/api/stichwort-vorschlaege/{id}",
+            delete(routes::stichwort::loeschen),
+        );
 
     // Dev-only: Endpoint existiert physisch nur mit Feature `dev-seeds`.
     #[cfg(feature = "dev-seeds")]

@@ -1,8 +1,11 @@
+use super::berechtigung::darf_lesen;
 use super::{
     Einsatz, EinsatzAnzeige, EinsatzRolle, MitgliedAnzeige, EINSATZ_ROLLE_LEITUNG,
     STATUS_ABGESCHLOSSEN,
 };
+use crate::auth::Benutzer;
 use crate::error::AppError;
+use chrono::Utc;
 use sqlx::SqlitePool;
 
 /// Legt einen Einsatz an und macht den Ersteller in derselben Transaktion zur Einsatzleitung.
@@ -19,12 +22,32 @@ pub async fn anlegen(
         .ok_or_else(|| AppError::Internal("Keine Organisation vorhanden".into()))?;
 
     let mut tx = pool.begin().await?;
+
+    // Einsatznummer JJJJ-NNN: NNN je Organisation + Jahr fortlaufend, 3-stellig.
+    // 'JJJJ-' ist 5 Zeichen lang → substr(..., 6) liefert den NNN-Teil.
+    // Race-frei: WAL serialisiert Writer; der Unique-Index sichert zusätzlich ab.
+    let jahr: String = sqlx::query_scalar("SELECT strftime('%Y','now')")
+        .fetch_one(&mut *tx)
+        .await?;
+    let praefix = format!("{jahr}-");
+    let max_nr: Option<i64> = sqlx::query_scalar(
+        "SELECT MAX(CAST(substr(einsatznummer_intern, 6) AS INTEGER)) \
+         FROM einsatz WHERE org_id = ? AND einsatznummer_intern LIKE ?",
+    )
+    .bind(org_id)
+    .bind(format!("{praefix}%"))
+    .fetch_one(&mut *tx)
+    .await?;
+    let einsatznummer = format!("{praefix}{:03}", max_nr.unwrap_or(0) + 1);
+
     let einsatz_id: i64 = sqlx::query_scalar(
-        "INSERT INTO einsatz (org_id, bezeichnung, stichwort) VALUES (?, ?, ?) RETURNING id",
+        "INSERT INTO einsatz (org_id, bezeichnung, stichwort, einsatznummer_intern, angelegt_at) \
+         VALUES (?, ?, ?, ?, datetime('now')) RETURNING id",
     )
     .bind(org_id)
     .bind(bezeichnung)
     .bind(stichwort)
+    .bind(&einsatznummer)
     .fetch_one(&mut *tx)
     .await?;
 
@@ -46,7 +69,9 @@ pub async fn anlegen(
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppError> {
     sqlx::query_as::<_, Einsatz>(
         "SELECT id, org_id, bezeichnung, stichwort, status, begonnen_at, \
-                abgeschlossen_at, abgeschlossen_von \
+                abgeschlossen_at, abgeschlossen_von, einsatzart, einsatznummer_intern, \
+                angelegt_at, leitstellen_nr, einsatzort, einsatzort_lat, einsatzort_lon, \
+                meldende_stelle, sachverhalt, anzahl_betroffene_initial \
          FROM einsatz WHERE id = ?",
     )
     .bind(einsatz_id)
@@ -72,10 +97,12 @@ pub async fn rolle_von(
     Ok(rolle.and_then(|s| EinsatzRolle::parse(&s)))
 }
 
-/// Alle Einsätze, annotiert mit der Rolle des angegebenen Benutzers (`meine_rolle`).
+/// Alle für den Benutzer lesbaren Einsätze, annotiert mit dessen Rolle
+/// (`meine_rolle`). Die DSGVO-Lese-Policy (`darf_lesen`) filtert Einsätze,
+/// die der Benutzer nicht sehen darf, vor der Rückgabe heraus.
 pub async fn liste_fuer(
     pool: &SqlitePool,
-    benutzer_id: i64,
+    benutzer: &Benutzer,
 ) -> Result<Vec<EinsatzAnzeige>, AppError> {
     #[derive(sqlx::FromRow)]
     struct Row {
@@ -86,23 +113,46 @@ pub async fn liste_fuer(
         begonnen_at: String,
         abgeschlossen_at: Option<String>,
         abgeschlossen_von: Option<i64>,
+        einsatzart: String,
+        einsatznummer_intern: Option<String>,
+        angelegt_at: String,
+        leitstellen_nr: Option<String>,
+        einsatzort: Option<String>,
+        einsatzort_lat: Option<f64>,
+        einsatzort_lon: Option<f64>,
+        meldende_stelle: Option<String>,
+        sachverhalt: Option<String>,
+        anzahl_betroffene_initial: Option<i64>,
         meine_rolle: Option<String>,
     }
 
     let rows = sqlx::query_as::<_, Row>(
         "SELECT e.id, e.bezeichnung, e.stichwort, e.status, e.begonnen_at, \
-                e.abgeschlossen_at, e.abgeschlossen_von, m.einsatz_rolle AS meine_rolle \
+                e.abgeschlossen_at, e.abgeschlossen_von, e.einsatzart, e.einsatznummer_intern, \
+                e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
+                e.meldende_stelle, e.sachverhalt, e.anzahl_betroffene_initial, \
+                m.einsatz_rolle AS meine_rolle \
          FROM einsatz e \
          LEFT JOIN einsatz_mitgliedschaft m \
                 ON m.einsatz_id = e.id AND m.benutzer_id = ? \
          ORDER BY e.begonnen_at DESC, e.id DESC",
     )
-    .bind(benutzer_id)
+    .bind(benutzer.id)
     .fetch_all(pool)
     .await?;
 
+    let jetzt = Utc::now();
     Ok(rows
         .into_iter()
+        .filter(|r| {
+            darf_lesen(
+                benutzer,
+                &r.status,
+                r.abgeschlossen_at.as_deref(),
+                r.meine_rolle.as_deref().and_then(EinsatzRolle::parse),
+                jetzt,
+            )
+        })
         .map(|r| EinsatzAnzeige {
             id: r.id,
             bezeichnung: r.bezeichnung,
@@ -111,6 +161,16 @@ pub async fn liste_fuer(
             begonnen_at: r.begonnen_at,
             abgeschlossen_at: r.abgeschlossen_at,
             abgeschlossen_von: r.abgeschlossen_von,
+            einsatzart: r.einsatzart,
+            einsatznummer_intern: r.einsatznummer_intern,
+            angelegt_at: r.angelegt_at,
+            leitstellen_nr: r.leitstellen_nr,
+            einsatzort: r.einsatzort,
+            einsatzort_lat: r.einsatzort_lat,
+            einsatzort_lon: r.einsatzort_lon,
+            meldende_stelle: r.meldende_stelle,
+            sachverhalt: r.sachverhalt,
+            anzahl_betroffene_initial: r.anzahl_betroffene_initial,
             meine_rolle: r.meine_rolle,
         })
         .collect())
@@ -134,6 +194,69 @@ pub async fn abschliessen(
     .bind(einsatz_id)
     .execute(pool)
     .await?;
+    laden(pool, einsatz_id).await
+}
+
+/// Editierbare Kopffelder für `aktualisiere_kopf`. Optional-Strings sind bereits
+/// vom Handler getrimmt; leere Werte werden als `None` übergeben (→ NULL).
+#[derive(Debug)]
+pub struct KopfDaten<'a> {
+    pub bezeichnung: &'a str,
+    pub stichwort: Option<&'a str>,
+    pub einsatzart: &'a str,
+    pub einsatznummer_intern: Option<&'a str>,
+    pub leitstellen_nr: Option<&'a str>,
+    pub einsatzort: Option<&'a str>,
+    pub einsatzort_lat: Option<f64>,
+    pub einsatzort_lon: Option<f64>,
+    pub meldende_stelle: Option<&'a str>,
+    pub sachverhalt: Option<&'a str>,
+    pub anzahl_betroffene_initial: Option<i64>,
+    /// Bereits ins DB-Format normalisierte Alarmzeit.
+    pub begonnen_at: &'a str,
+}
+
+/// Vollersatz der editierbaren Kopf-Spalten (ein atomares Speichern).
+/// Nicht-editierbare Spalten (status, abgeschlossen_*, angelegt_at, org_id, id)
+/// bleiben unberührt. Ein Verstoß gegen den Einsatznummer-Unique-Index ergibt
+/// `Conflict` (409).
+pub async fn aktualisiere_kopf(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    daten: KopfDaten<'_>,
+) -> Result<Einsatz, AppError> {
+    let ergebnis = sqlx::query(
+        "UPDATE einsatz SET \
+            bezeichnung = ?, stichwort = ?, einsatzart = ?, einsatznummer_intern = ?, \
+            leitstellen_nr = ?, einsatzort = ?, einsatzort_lat = ?, einsatzort_lon = ?, \
+            meldende_stelle = ?, sachverhalt = ?, anzahl_betroffene_initial = ?, begonnen_at = ? \
+         WHERE id = ?",
+    )
+    .bind(daten.bezeichnung)
+    .bind(daten.stichwort)
+    .bind(daten.einsatzart)
+    .bind(daten.einsatznummer_intern)
+    .bind(daten.leitstellen_nr)
+    .bind(daten.einsatzort)
+    .bind(daten.einsatzort_lat)
+    .bind(daten.einsatzort_lon)
+    .bind(daten.meldende_stelle)
+    .bind(daten.sachverhalt)
+    .bind(daten.anzahl_betroffene_initial)
+    .bind(daten.begonnen_at)
+    .bind(einsatz_id)
+    .execute(pool)
+    .await;
+
+    if let Err(sqlx::Error::Database(db_err)) = &ergebnis {
+        if db_err.is_unique_violation() {
+            return Err(AppError::Conflict(
+                "Einsatznummer ist in dieser Organisation bereits vergeben".into(),
+            ));
+        }
+    }
+    ergebnis?;
+
     laden(pool, einsatz_id).await
 }
 
@@ -328,6 +451,15 @@ mod tests {
         assert_eq!(zaehle_einsatzleitung(&pool, einsatz.id).await.unwrap(), 2);
     }
 
+    /// Lädt den vollständigen `Benutzer`-Datensatz per id (für die Lese-Policy).
+    async fn benutzer_laden(pool: &SqlitePool, id: i64) -> Benutzer {
+        sqlx::query_as::<_, Benutzer>("SELECT * FROM benutzer WHERE id = ?")
+            .bind(id)
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
     #[tokio::test]
     async fn liste_fuer_annotiert_meine_rolle() {
         let pool = crate::db::test_pool().await;
@@ -336,14 +468,152 @@ mod tests {
         let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
 
         // Ersteller sieht sich als Einsatzleitung.
-        let fuer_leit = liste_fuer(&pool, leit).await.unwrap();
+        let leit_benutzer = benutzer_laden(&pool, leit).await;
+        let fuer_leit = liste_fuer(&pool, &leit_benutzer).await.unwrap();
         assert_eq!(fuer_leit.len(), 1);
         assert_eq!(fuer_leit[0].id, einsatz.id);
         assert_eq!(fuer_leit[0].meine_rolle.as_deref(), Some(EINSATZ_ROLLE_LEITUNG));
 
-        // Nicht-Mitglied sieht den Einsatz, aber ohne Rolle.
-        let fuer_fremd = liste_fuer(&pool, fremd).await.unwrap();
-        assert_eq!(fuer_fremd.len(), 1);
-        assert_eq!(fuer_fremd[0].meine_rolle, None);
+        // Nicht-Mitglied ohne höhere Berechtigung sieht den Einsatz NICHT (DSGVO-Filter).
+        let fremd_benutzer = benutzer_laden(&pool, fremd).await;
+        let fuer_fremd = liste_fuer(&pool, &fremd_benutzer).await.unwrap();
+        assert!(fuer_fremd.is_empty());
+    }
+
+    #[tokio::test]
+    async fn anlegen_vergibt_fortlaufende_einsatznummer() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+
+        let jahr: String = sqlx::query_scalar("SELECT strftime('%Y','now')")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+        let a = anlegen(&pool, "Lage A", None, leit).await.unwrap();
+        let b = anlegen(&pool, "Lage B", None, leit).await.unwrap();
+        assert_eq!(a.einsatznummer_intern.as_deref(), Some(format!("{jahr}-001").as_str()));
+        assert_eq!(b.einsatznummer_intern.as_deref(), Some(format!("{jahr}-002").as_str()));
+
+        // angelegt_at wurde gesetzt (nicht der '' Default).
+        assert!(!a.angelegt_at.is_empty());
+    }
+
+    #[tokio::test]
+    async fn anlegen_zaehlt_je_organisation_getrennt() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await; // legt Org id=1 an
+
+        let jahr: String = sqlx::query_scalar("SELECT strftime('%Y','now')")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+        // Zweite Organisation mit bereits hoher Nummer — darf Org 1 nicht beeinflussen.
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (2, 'Orga 2')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO einsatz (org_id, bezeichnung, einsatznummer_intern) VALUES (2, 'Fremd', ?)")
+            .bind(format!("{jahr}-009"))
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        // anlegen nutzt Org 1 (ORDER BY id LIMIT 1) → beginnt bei 001.
+        let a = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        assert_eq!(a.einsatznummer_intern.as_deref(), Some(format!("{jahr}-001").as_str()));
+    }
+
+    #[tokio::test]
+    async fn aktualisiere_kopf_setzt_felder_und_leere_optionals_null() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = anlegen(&pool, "Alt", None, leit).await.unwrap();
+
+        let aktualisiert = aktualisiere_kopf(
+            &pool,
+            einsatz.id,
+            KopfDaten {
+                bezeichnung: "Neu",
+                stichwort: Some("H1"),
+                einsatzart: crate::einsatz::EINSATZART_UEBUNG,
+                einsatznummer_intern: einsatz.einsatznummer_intern.as_deref(),
+                leitstellen_nr: None,
+                einsatzort: Some("Hauptstraße 1"),
+                einsatzort_lat: Some(52.5),
+                einsatzort_lon: Some(13.4),
+                meldende_stelle: None,
+                sachverhalt: Some("Mehrzeiliges\nMeldebild"),
+                anzahl_betroffene_initial: Some(3),
+                begonnen_at: "2026-05-25 08:00:00",
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(aktualisiert.bezeichnung, "Neu");
+        assert_eq!(aktualisiert.einsatzart, "uebung");
+        assert_eq!(aktualisiert.einsatzort.as_deref(), Some("Hauptstraße 1"));
+        assert_eq!(aktualisiert.einsatzort_lat, Some(52.5));
+        assert_eq!(aktualisiert.anzahl_betroffene_initial, Some(3));
+        assert_eq!(aktualisiert.leitstellen_nr, None);
+        assert_eq!(aktualisiert.begonnen_at, "2026-05-25 08:00:00");
+        // angelegt_at bleibt unverändert (Audit-Spur).
+        assert_eq!(aktualisiert.angelegt_at, einsatz.angelegt_at);
+    }
+
+    #[tokio::test]
+    async fn aktualisiere_kopf_doppelte_nummer_ist_conflict() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let a = anlegen(&pool, "A", None, leit).await.unwrap();
+        let b = anlegen(&pool, "B", None, leit).await.unwrap();
+
+        // b auf a's Nummer setzen → Unique-Verstoß → Conflict.
+        let err = aktualisiere_kopf(
+            &pool,
+            b.id,
+            KopfDaten {
+                bezeichnung: "B",
+                stichwort: None,
+                einsatzart: crate::einsatz::EINSATZART_REALEINSATZ,
+                einsatznummer_intern: a.einsatznummer_intern.as_deref(),
+                leitstellen_nr: None,
+                einsatzort: None,
+                einsatzort_lat: None,
+                einsatzort_lon: None,
+                meldende_stelle: None,
+                sachverhalt: None,
+                anzahl_betroffene_initial: None,
+                begonnen_at: &b.begonnen_at,
+            },
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(err, AppError::Conflict(_)));
+    }
+
+    #[tokio::test]
+    async fn liste_fuer_zeigt_admin_nicht_mitglied_fremden_einsatz() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let admin = benutzer_anlegen(&pool, "admin").await;
+        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+
+        // Admin zur höheren Berechtigung machen.
+        sqlx::query("UPDATE benutzer SET system_rolle = ? WHERE id = ?")
+            .bind(crate::auth::ROLLE_ADMIN)
+            .bind(admin)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        // Admin ist KEIN Mitglied, sieht den Einsatz aber trotzdem (ohne Rolle).
+        let admin_benutzer = benutzer_laden(&pool, admin).await;
+        let fuer_admin = liste_fuer(&pool, &admin_benutzer).await.unwrap();
+        assert_eq!(fuer_admin.len(), 1);
+        assert_eq!(fuer_admin[0].id, einsatz.id);
+        assert_eq!(fuer_admin[0].meine_rolle, None);
     }
 }
