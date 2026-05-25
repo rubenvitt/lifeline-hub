@@ -6,3 +6,4 @@ pub mod dev;
 pub mod einsatz;
 pub mod etb;
 pub mod health;
+pub mod stichwort;

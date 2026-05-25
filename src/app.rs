@@ -49,7 +49,13 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/api/einsaetze/{id}/etb", post(routes::etb::erfassen))
         .route("/api/einsaetze/{id}/etb", get(routes::etb::liste))
-        .route("/api/einsaetze/{id}/etb/stream", get(routes::etb::stream));
+        .route("/api/einsaetze/{id}/etb/stream", get(routes::etb::stream))
+        .route("/api/stichwort-vorschlaege", get(routes::stichwort::liste))
+        .route("/api/stichwort-vorschlaege", post(routes::stichwort::anlegen))
+        .route(
+            "/api/stichwort-vorschlaege/{id}",
+            delete(routes::stichwort::loeschen),
+        );
 
     // Dev-only: Endpoint existiert physisch nur mit Feature `dev-seeds`.
     #[cfg(feature = "dev-seeds")]
