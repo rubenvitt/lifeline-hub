@@ -88,6 +88,20 @@ pub fn fordere_schreibrecht(rolle: Option<EinsatzRolle>) -> Result<(), AppError>
     }
 }
 
+/// Gate der PATCH-Kopfdaten-Route: Einsatz-Schreibrecht (Einsatzleitung oder
+/// Führungspersonal) ODER System-Admin (`system_rolle == admin`). Bewusst
+/// lokal zu dieser Route — `fordere_schreibrecht` (ETB) bleibt unberührt, und
+/// die Admin-Erlaubnis gilt NICHT für org-weite Führungskräfte ohne Mitgliedschaft.
+pub fn fordere_schreibrecht_oder_admin(
+    benutzer: &Benutzer,
+    rolle: Option<EinsatzRolle>,
+) -> Result<(), AppError> {
+    if benutzer.ist_admin() {
+        return Ok(());
+    }
+    fordere_schreibrecht(rolle)
+}
+
 /// Stellt sicher, dass der Einsatz noch aktiv (beschreibbar) ist.
 /// `Conflict` (409) bei abgeschlossenem (read-only) Einsatz.
 pub fn fordere_aktiv(einsatz: &Einsatz) -> Result<(), AppError> {
@@ -283,6 +297,38 @@ mod tests {
         assert!(matches!(
             fordere_aktiv(&einsatz_mit_status(STATUS_ABGESCHLOSSEN)).unwrap_err(),
             AppError::Conflict(_)
+        ));
+    }
+
+    #[test]
+    fn schreibrecht_oder_admin_erlaubt_admin_ohne_rolle() {
+        let admin = benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE);
+        assert!(fordere_schreibrecht_oder_admin(&admin, None).is_ok());
+    }
+
+    #[test]
+    fn schreibrecht_oder_admin_erlaubt_schreibberechtigte_rollen() {
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        assert!(fordere_schreibrecht_oder_admin(&normal, Some(EinsatzRolle::Einsatzleitung)).is_ok());
+        assert!(fordere_schreibrecht_oder_admin(&normal, Some(EinsatzRolle::Fuehrungspersonal)).is_ok());
+    }
+
+    #[test]
+    fn schreibrecht_oder_admin_blockt_beobachter_und_fremde_ohne_admin() {
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        assert!(matches!(
+            fordere_schreibrecht_oder_admin(&normal, Some(EinsatzRolle::Beobachter)).unwrap_err(),
+            AppError::Forbidden
+        ));
+        assert!(matches!(
+            fordere_schreibrecht_oder_admin(&normal, None).unwrap_err(),
+            AppError::Forbidden
+        ));
+        // Org-Führungskraft ohne Mitgliedschaft ist KEIN System-Admin → blockiert.
+        let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
+        assert!(matches!(
+            fordere_schreibrecht_oder_admin(&fk, None).unwrap_err(),
+            AppError::Forbidden
         ));
     }
 }
