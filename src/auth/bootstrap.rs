@@ -3,6 +3,10 @@ use crate::error::AppError;
 use argon2::password_hash::rand_core::{OsRng, RngCore};
 use sqlx::SqlitePool;
 
+/// Start-Stichworte je neu angelegter Organisation (Reihenfolge = sortier).
+/// Combobox erlaubt unabhängig davon Freitext.
+const STICHWORT_STARTLISTE: [&str; 5] = ["H1", "H1Y", "MANV", "San-Dienst", "Übung"];
+
 /// Ergebnis des Bootstraps: ob ein Admin neu angelegt wurde und mit welchem
 /// Passwort (nur gesetzt, wenn der Bootstrap ein Zufalls-Passwort erzeugt hat).
 #[derive(Debug, Default)]
@@ -67,6 +71,18 @@ pub async fn bootstrap_admin(
     .bind(ROLLE_ADMIN)
     .execute(&mut *tx)
     .await?;
+
+    for (i, text) in STICHWORT_STARTLISTE.iter().enumerate() {
+        sqlx::query(
+            "INSERT INTO einsatz_stichwort_vorschlag (org_id, text, sortier) VALUES (?, ?, ?)",
+        )
+        .bind(org_id)
+        .bind(text)
+        .bind(i as i64)
+        .execute(&mut *tx)
+        .await?;
+    }
+
     tx.commit().await?;
 
     Ok(BootstrapErgebnis {
@@ -117,6 +133,25 @@ mod tests {
                 .await
                 .unwrap();
         assert!(password::verifizieren(&pw, &hash));
+    }
+
+    #[tokio::test]
+    async fn seedet_stichwort_startliste_fuer_neue_org() {
+        let pool = crate::db::test_pool().await;
+        bootstrap_admin(&pool, "Orga", "admin", Some("startpw12"))
+            .await
+            .unwrap();
+
+        let texte: Vec<String> = sqlx::query_scalar(
+            "SELECT text FROM einsatz_stichwort_vorschlag ORDER BY sortier, text",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+
+        assert!(texte.contains(&"H1".to_string()));
+        assert!(texte.contains(&"MANV".to_string()));
+        assert_eq!(texte.len(), 5, "fünf Start-Stichworte erwartet");
     }
 
     #[tokio::test]
