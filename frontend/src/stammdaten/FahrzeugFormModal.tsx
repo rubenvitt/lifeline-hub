@@ -68,10 +68,19 @@ export default function FahrzeugFormModal({
   const sf = Form.useWatch('staerke_fuehrer', form);
   const su = Form.useWatch('staerke_unterfuehrer', form);
   const sm = Form.useWatch('staerke_mannschaft', form);
-  const gesamt = sf != null && su != null && sm != null ? sf + su + sm : null;
+  // Sobald in einem Stärke-Feld etwas steht, zählen leere Felder als 0;
+  // nur wenn alle drei leer sind, gibt es keine Stärke ("—").
+  const staerkeBegonnen = sf != null || su != null || sm != null;
+  const gesamt = staerkeBegonnen ? (sf ?? 0) + (su ?? 0) + (sm ?? 0) : null;
 
   const mutation = useMutation({
     mutationFn: (werte: FormWerte) => {
+      // Teilweise ausgefüllte Stärke: ist mindestens ein Feld gesetzt, werden die
+      // leeren als 0 gesendet (→ vollständige Stärke); sonst keine Stärke (null).
+      const begonnen =
+        werte.staerke_fuehrer != null ||
+        werte.staerke_unterfuehrer != null ||
+        werte.staerke_mannschaft != null;
       const daten: FahrzeugEingabe = {
         funkrufname: werte.funkrufname.trim(),
         fahrzeugtyp: leerZuNull(werte.fahrzeugtyp),
@@ -82,9 +91,9 @@ export default function FahrzeugFormModal({
         fms_issi: leerZuNull(werte.fms_issi),
         sondersignal: werte.sondersignal ?? false,
         tragenkapazitaet: werte.tragenkapazitaet ?? null,
-        staerke_fuehrer: werte.staerke_fuehrer ?? null,
-        staerke_unterfuehrer: werte.staerke_unterfuehrer ?? null,
-        staerke_mannschaft: werte.staerke_mannschaft ?? null,
+        staerke_fuehrer: begonnen ? (werte.staerke_fuehrer ?? 0) : null,
+        staerke_unterfuehrer: begonnen ? (werte.staerke_unterfuehrer ?? 0) : null,
+        staerke_mannschaft: begonnen ? (werte.staerke_mannschaft ?? 0) : null,
         bemerkung: leerZuNull(werte.bemerkung),
       };
       return fahrzeug ? aktualisiereFahrzeug(fahrzeug.id, daten) : legeFahrzeugAn(daten);
