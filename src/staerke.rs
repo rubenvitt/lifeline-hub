@@ -55,6 +55,52 @@ impl Staerke {
     }
 }
 
+/// Taktische Stärke-Position einer einzelnen Person (genau einer von drei Töpfen).
+/// Wird als TEXT in der DB gespeichert (kein sqlx-Enum-Decode → manuell konvertiert).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum StaerkePosition {
+    Fuehrer,
+    Unterfuehrer,
+    Mannschaft,
+}
+
+impl StaerkePosition {
+    /// DB-/API-Stringrepräsentation.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            StaerkePosition::Fuehrer => "fuehrer",
+            StaerkePosition::Unterfuehrer => "unterfuehrer",
+            StaerkePosition::Mannschaft => "mannschaft",
+        }
+    }
+
+    /// Parst einen gespeicherten/übergebenen Positionsstring; `None` bei ungültigem Wert.
+    pub fn parse(s: &str) -> Option<StaerkePosition> {
+        match s {
+            "fuehrer" => Some(StaerkePosition::Fuehrer),
+            "unterfuehrer" => Some(StaerkePosition::Unterfuehrer),
+            "mannschaft" => Some(StaerkePosition::Mannschaft),
+            _ => None,
+        }
+    }
+}
+
+impl Staerke {
+    /// Aggregiert einzelne Positionen zu einer Stärke (zählt je Topf). Damit summiert
+    /// K&M‑3 die Einheiten-Stärke direkt aus den Dispositionszeilen, ohne neue Logik.
+    pub fn aus_positionen(positionen: impl Iterator<Item = StaerkePosition>) -> Staerke {
+        let (mut f, mut u, mut m) = (0u16, 0u16, 0u16);
+        for p in positionen {
+            match p {
+                StaerkePosition::Fuehrer => f += 1,
+                StaerkePosition::Unterfuehrer => u += 1,
+                StaerkePosition::Mannschaft => m += 1,
+            }
+        }
+        Staerke::neu(f, u, m)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -98,5 +144,26 @@ mod tests {
     #[test]
     fn aus_optionen_zu_gross_ist_fehler() {
         assert!(Staerke::aus_optionen(Some(0), Some(0), Some(70000)).is_err());
+    }
+
+    #[test]
+    fn staerke_position_roundtrip() {
+        for p in [StaerkePosition::Fuehrer, StaerkePosition::Unterfuehrer, StaerkePosition::Mannschaft] {
+            assert_eq!(StaerkePosition::parse(p.as_str()), Some(p));
+        }
+        assert_eq!(StaerkePosition::parse("chef"), None);
+    }
+
+    #[test]
+    fn aus_positionen_zaehlt_je_topf() {
+        use StaerkePosition::*;
+        let s = Staerke::aus_positionen([Fuehrer, Mannschaft, Mannschaft, Unterfuehrer, Mannschaft].into_iter());
+        assert_eq!(s, Staerke::neu(1, 1, 3));
+        assert_eq!(s.gesamt(), 5);
+    }
+
+    #[test]
+    fn aus_positionen_leer_ist_null() {
+        assert_eq!(Staerke::aus_positionen(std::iter::empty()), Staerke::neu(0, 0, 0));
     }
 }
