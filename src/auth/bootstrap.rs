@@ -1,5 +1,6 @@
 use crate::auth::{password, ROLLE_ADMIN};
 use crate::error::AppError;
+use crate::fahrzeug::STATUS_STARTLISTE;
 use argon2::password_hash::rand_core::{OsRng, RngCore};
 use sqlx::SqlitePool;
 
@@ -83,6 +84,20 @@ pub async fn bootstrap_admin(
         .await?;
     }
 
+    for (label, kategorie, fms_anker, sortier) in STATUS_STARTLISTE {
+        sqlx::query(
+            "INSERT INTO fahrzeug_status (org_id, label, kategorie, fms_anker, sortier) \
+             VALUES (?, ?, ?, ?, ?)",
+        )
+        .bind(org_id)
+        .bind(label)
+        .bind(kategorie)
+        .bind(fms_anker)
+        .bind(sortier)
+        .execute(&mut *tx)
+        .await?;
+    }
+
     tx.commit().await?;
 
     Ok(BootstrapErgebnis {
@@ -152,6 +167,32 @@ mod tests {
         assert!(texte.contains(&"H1".to_string()));
         assert!(texte.contains(&"MANV".to_string()));
         assert_eq!(texte.len(), 5, "fünf Start-Stichworte erwartet");
+    }
+
+    #[tokio::test]
+    async fn seedet_status_katalog_fuer_neue_org() {
+        let pool = crate::db::test_pool().await;
+        bootstrap_admin(&pool, "Orga", "admin", Some("startpw12"))
+            .await
+            .unwrap();
+
+        let labels: Vec<String> = sqlx::query_scalar(
+            "SELECT label FROM fahrzeug_status ORDER BY sortier",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(labels.len(), 8, "acht Default-Status erwartet");
+        assert_eq!(labels.first().map(String::as_str), Some("einsatzbereit"));
+
+        // 'disponiert' ist als 'gebunden' geseedet (Initial-Status der Disposition).
+        let kat: String = sqlx::query_scalar(
+            "SELECT kategorie FROM fahrzeug_status WHERE label = 'disponiert'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(kat, "gebunden");
     }
 
     #[tokio::test]

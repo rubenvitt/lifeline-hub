@@ -90,7 +90,6 @@ async fn anfrage(
 // ---------- Tests ----------
 
 #[tokio::test]
-#[ignore = "Seeding wird in Task 10 ergänzt — dann reaktivieren"]
 async fn bootstrap_seedet_status_katalog() {
     // bootstrap_admin seedet den Default-Katalog → GET liefert die 8 Stati.
     let app = setup().await;
@@ -148,7 +147,6 @@ async fn fms_anker_ausserhalb_ist_400() {
 }
 
 #[tokio::test]
-#[ignore = "setzt Seed aus Task 10 voraus"]
 async fn dublette_label_ist_409() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
