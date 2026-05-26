@@ -10,5 +10,6 @@ pub mod fahrzeug;
 pub mod fahrzeug_status;
 pub mod health;
 pub mod personal;
+pub mod personal_status;
 pub mod qualifikation;
 pub mod stichwort;
