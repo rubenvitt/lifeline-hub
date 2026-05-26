@@ -2,6 +2,7 @@ import { Tabs, Typography } from 'antd';
 import StichworteTab from '../stammdaten/StichworteTab';
 import FahrzeugeTab from '../stammdaten/FahrzeugeTab';
 import StatusKatalogTab from '../stammdaten/StatusKatalogTab';
+import QualifikationenTab from '../stammdaten/QualifikationenTab';
 
 export default function StammdatenPage() {
   return (
@@ -13,6 +14,7 @@ export default function StammdatenPage() {
           { key: 'stichworte', label: 'Einsatz-Stichworte', children: <StichworteTab /> },
           { key: 'fahrzeuge', label: 'Fahrzeuge', children: <FahrzeugeTab /> },
           { key: 'status', label: 'Fahrzeug-Status', children: <StatusKatalogTab /> },
+          { key: 'qualifikationen', label: 'Qualifikationen', children: <QualifikationenTab /> },
         ]}
       />
     </div>
