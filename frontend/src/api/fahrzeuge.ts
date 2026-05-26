@@ -1,4 +1,4 @@
-import type { Fahrzeug } from './types';
+import type { Fahrzeug, FahrzeugVorschlaege } from './types';
 import { apiGet, apiSend } from './client';
 
 /** Editierbare Stammfelder (Anlegen + Vollersatz-PATCH). */
@@ -23,8 +23,8 @@ export function listeFahrzeuge(nurImDienst = false): Promise<Fahrzeug[]> {
   return apiGet<Fahrzeug[]>(`/api/fahrzeuge${qs}`);
 }
 
-export function ladeFahrzeugTypen(): Promise<string[]> {
-  return apiGet<string[]>('/api/fahrzeug-typen');
+export function ladeFahrzeugVorschlaege(): Promise<FahrzeugVorschlaege> {
+  return apiGet<FahrzeugVorschlaege>('/api/fahrzeug-vorschlaege');
 }
 
 export function legeFahrzeugAn(daten: FahrzeugEingabe): Promise<Fahrzeug> {

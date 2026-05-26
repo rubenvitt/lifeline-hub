@@ -108,7 +108,7 @@ async fn admin_legt_vorschlag_an_und_alle_sehen_ihn() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     benutzer_anlegen(&app, &admin, "erika").await;
 
-    assert_eq!(post_vorschlag(&app, &admin, "Sonderlage").await, StatusCode::CREATED);
+    assert_eq!(post_vorschlag(&app, &admin, "Probealarm").await, StatusCode::CREATED);
 
     let erika = login_cookie(&app, "erika", "erikapw1").await;
     let (status, json) = liste_vorschlaege(&app, &erika).await;
@@ -119,7 +119,7 @@ async fn admin_legt_vorschlag_an_und_alle_sehen_ihn() {
         .iter()
         .map(|v| v["text"].as_str().unwrap())
         .collect();
-    assert!(texte.contains(&"Sonderlage"));
+    assert!(texte.contains(&"Probealarm"));
 }
 
 #[tokio::test]

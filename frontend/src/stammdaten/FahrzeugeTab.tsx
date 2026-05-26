@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
-import { ladeFahrzeugTypen, listeFahrzeuge, setzeDienststatus } from '../api/fahrzeuge';
+import { ladeFahrzeugVorschlaege, listeFahrzeuge, setzeDienststatus } from '../api/fahrzeuge';
 import type { Fahrzeug } from '../api/types';
 import FahrzeugFormModal from './FahrzeugFormModal';
 
@@ -22,7 +22,7 @@ export default function FahrzeugeTab() {
   const [bearbeite, setBearbeite] = useState<Fahrzeug | null>(null);
 
   const fahrzeugeQuery = useQuery({ queryKey: ['fahrzeuge', 'alle'], queryFn: () => listeFahrzeuge(false) });
-  const typenQuery = useQuery({ queryKey: ['fahrzeug-typen'], queryFn: ladeFahrzeugTypen });
+  const vorschlaegeQuery = useQuery({ queryKey: ['fahrzeug-vorschlaege'], queryFn: ladeFahrzeugVorschlaege });
 
   const dienststatusMutation = useMutation({
     mutationFn: (v: { id: number; inDienst: boolean }) => setzeDienststatus(v.id, v.inDienst),
@@ -89,7 +89,7 @@ export default function FahrzeugeTab() {
       <FahrzeugFormModal
         offen={modalOffen}
         fahrzeug={bearbeite}
-        typVorschlaege={typenQuery.data ?? []}
+        vorschlaege={vorschlaegeQuery.data ?? { fahrzeugtyp: [], traegerorganisation: [], standort: [] }}
         onClose={() => setModalOffen(false)}
       />
     </>
