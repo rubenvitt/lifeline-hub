@@ -8,6 +8,7 @@ pub mod dev;
 pub mod einsatz;
 pub mod error;
 pub mod etb;
+pub mod fahrzeug;
 pub mod live;
 pub mod routes;
 pub mod staerke;
