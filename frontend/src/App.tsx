@@ -10,6 +10,7 @@ import ProfilPage from './pages/ProfilPage';
 import EtbPage from './pages/EtbPage';
 import EinsatzdatenPage from './pages/EinsatzdatenPage';
 import FahrzeugePage from './pages/FahrzeugePage';
+import PersonalPage from './pages/PersonalPage';
 import EinsatzLayout from './einsatz/EinsatzLayout';
 import DefaultModulRedirect from './einsatz/DefaultModulRedirect';
 import ModulStub from './einsatz/ModulStub';
@@ -20,6 +21,7 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   etb: <EtbPage />,
   einsatzdaten: <EinsatzdatenPage />,
   fahrzeuge: <FahrzeugePage />,
+  personal: <PersonalPage />,
 };
 
 export default function App() {

@@ -76,4 +76,11 @@ describe('modulRegistry', () => {
     expect(fahrzeuge?.kategorie).toBe('kraefte');
     expect(modulRegistry.find((m) => m.key === 'abrollbehaelter')).toBeUndefined();
   });
+
+  it('personal ist fertig in der Kategorie kraefte', () => {
+    const personal = modulRegistry.find((m) => m.key === 'personal');
+    expect(personal?.status).toBe('fertig');
+    expect(personal?.kategorie).toBe('kraefte');
+    expect(personal?.route).toBe('personal');
+  });
 });
