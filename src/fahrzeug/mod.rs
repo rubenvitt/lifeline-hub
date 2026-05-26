@@ -5,14 +5,12 @@ pub mod status_repo;
 use crate::staerke::Staerke;
 use serde::Serialize;
 
-/// Dienststatus im Stamm: aktiv vs. außer Dienst (Soft-Delete).
-pub const DIENSTSTATUS_IN_DIENST: &str = "in_dienst";
-pub const DIENSTSTATUS_AUSSER_DIENST: &str = "ausser_dienst";
-
-/// Semantik-Kategorie eines Status-Katalog-Eintrags (feste App-Logik).
-pub const KATEGORIE_VERFUEGBAR: &str = "verfuegbar";
-pub const KATEGORIE_GEBUNDEN: &str = "gebunden";
-pub const KATEGORIE_NICHT_VERFUEGBAR: &str = "nicht_verfuegbar";
+// Geteilte Konstanten/Validierung leben jetzt neutral in `crate::katalog` und werden
+// hier re-exportiert, damit Bestandscode (crate::fahrzeug::KATEGORIE_*, super::*) gilt.
+pub use crate::katalog::{
+    ist_gueltige_kategorie, DIENSTSTATUS_AUSSER_DIENST, DIENSTSTATUS_IN_DIENST,
+    KATEGORIE_GEBUNDEN, KATEGORIE_NICHT_VERFUEGBAR, KATEGORIE_VERFUEGBAR,
+};
 
 /// Default-Status-Katalog je neu angelegter Organisation
 /// (label, kategorie, fms_anker, sortier). **Muss mit dem Seed in
@@ -30,11 +28,6 @@ pub const STATUS_STARTLISTE: [(&str, &str, i64, i64); 10] = [
     ("9 – Fremdanmeldung", KATEGORIE_GEBUNDEN, 9, 90),
     ("0 – Prio. Sprechwunsch", KATEGORIE_GEBUNDEN, 0, 100),
 ];
-
-/// Ob `s` eine gültige Status-Kategorie ist (Eingabe-Validierung).
-pub fn ist_gueltige_kategorie(s: &str) -> bool {
-    matches!(s, KATEGORIE_VERFUEGBAR | KATEGORIE_GEBUNDEN | KATEGORIE_NICHT_VERFUEGBAR)
-}
 
 /// Interner Fahrzeug-Datensatz (alle Spalten von `fahrzeug`).
 #[derive(Debug, Clone, sqlx::FromRow)]
