@@ -11,6 +11,7 @@ pub mod etb;
 pub mod fahrzeug;
 pub mod katalog;
 pub mod live;
+pub mod personal;
 pub mod routes;
 pub mod staerke;
 pub mod static_files;
