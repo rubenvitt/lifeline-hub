@@ -67,6 +67,16 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/api/fahrzeuge/{id}/in-dienst",
             post(routes::fahrzeug::in_dienst),
+        )
+        .route("/api/fahrzeug-status", get(routes::fahrzeug_status::liste))
+        .route("/api/fahrzeug-status", post(routes::fahrzeug_status::anlegen))
+        .route(
+            "/api/fahrzeug-status/{id}",
+            patch(routes::fahrzeug_status::aktualisieren),
+        )
+        .route(
+            "/api/fahrzeug-status/{id}/deaktivieren",
+            post(routes::fahrzeug_status::deaktivieren),
         );
 
     // Dev-only: Endpoint existiert physisch nur mit Feature `dev-seeds`.
