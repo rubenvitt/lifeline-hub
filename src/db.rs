@@ -500,4 +500,78 @@ mod tests {
             .await;
         assert!(dup.is_err(), "doppeltes label je Org muss abgelehnt werden");
     }
+
+    #[tokio::test]
+    async fn einsatz_fahrzeug_migration_constraints() {
+        let pool = test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let einsatz: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let fz: i64 = sqlx::query_scalar(
+            "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Florian 1') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        // Stamm-Disposition.
+        sqlx::query(
+            "INSERT INTO einsatz_fahrzeug (einsatz_id, fahrzeug_id, snap_funkrufname) \
+             VALUES (?, ?, 'Florian 1')",
+        )
+        .bind(einsatz)
+        .bind(fz)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // UNIQUE(einsatz_id, fahrzeug_id): dasselbe Stamm-Fahrzeug nicht doppelt.
+        let dup = sqlx::query(
+            "INSERT INTO einsatz_fahrzeug (einsatz_id, fahrzeug_id, snap_funkrufname) \
+             VALUES (?, ?, 'Florian 1')",
+        )
+        .bind(einsatz)
+        .bind(fz)
+        .execute(&pool)
+        .await;
+        assert!(dup.is_err(), "dasselbe Stamm-Fahrzeug doppelt im Einsatz muss abgelehnt werden");
+
+        // Mehrere Ad-hoc (fahrzeug_id NULL) erlaubt — NULL ist in SQLite-UNIQUE verschieden.
+        sqlx::query("INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, 'FW Extern 1')")
+            .bind(einsatz)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, 'FW Extern 2')")
+            .bind(einsatz)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let anzahl: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_fahrzeug WHERE einsatz_id = ?")
+                .bind(einsatz)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(anzahl, 3, "1 Stamm + 2 Ad-hoc");
+
+        // Einsatz löschen → CASCADE entfernt die Dispositionszeilen.
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(einsatz)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_fahrzeug")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(rest, 0, "CASCADE muss Dispositionszeilen entfernen");
+    }
 }
