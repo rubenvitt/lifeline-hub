@@ -1,6 +1,7 @@
 use crate::auth::{password, ROLLE_ADMIN};
 use crate::error::AppError;
 use crate::fahrzeug::STATUS_STARTLISTE;
+use crate::personal::{PERSONAL_STATUS_STARTLISTE, QUALIFIKATION_STARTLISTE};
 use argon2::password_hash::rand_core::{OsRng, RngCore};
 use sqlx::SqlitePool;
 
@@ -101,6 +102,27 @@ pub async fn bootstrap_admin(
         .await?;
     }
 
+    for (label, sortier) in QUALIFIKATION_STARTLISTE {
+        sqlx::query("INSERT INTO qualifikation (org_id, label, sortier) VALUES (?, ?, ?)")
+            .bind(org_id)
+            .bind(label)
+            .bind(sortier)
+            .execute(&mut *tx)
+            .await?;
+    }
+
+    for (label, kategorie, sortier) in PERSONAL_STATUS_STARTLISTE {
+        sqlx::query(
+            "INSERT INTO personal_status (org_id, label, kategorie, sortier) VALUES (?, ?, ?, ?)",
+        )
+        .bind(org_id)
+        .bind(label)
+        .bind(kategorie)
+        .bind(sortier)
+        .execute(&mut *tx)
+        .await?;
+    }
+
     tx.commit().await?;
 
     Ok(BootstrapErgebnis {
@@ -195,6 +217,33 @@ mod tests {
         .fetch_one(&pool)
         .await
         .unwrap();
+        assert_eq!(kat, "gebunden");
+    }
+
+    #[tokio::test]
+    async fn seedet_qualifikations_startliste_fuer_neue_org() {
+        let pool = crate::db::test_pool().await;
+        bootstrap_admin(&pool, "Orga", "admin", Some("startpw12")).await.unwrap();
+        let labels: Vec<String> = sqlx::query_scalar(
+            "SELECT label FROM qualifikation ORDER BY sortier",
+        ).fetch_all(&pool).await.unwrap();
+        assert_eq!(labels.len(), 9, "neun Default-Qualifikationen erwartet");
+        assert_eq!(labels.first().map(String::as_str), Some("Sanitäter"));
+        assert!(labels.contains(&"Notarzt".to_string()));
+    }
+
+    #[tokio::test]
+    async fn seedet_personal_status_startliste_fuer_neue_org() {
+        let pool = crate::db::test_pool().await;
+        bootstrap_admin(&pool, "Orga", "admin", Some("startpw12")).await.unwrap();
+        let labels: Vec<String> = sqlx::query_scalar(
+            "SELECT label FROM personal_status ORDER BY sortier",
+        ).fetch_all(&pool).await.unwrap();
+        assert_eq!(labels.len(), 6, "sechs Default-Personal-Status erwartet");
+        // 'alarmiert' ist als 'gebunden' geseedet (erster Initial-Status der Disposition).
+        let kat: String = sqlx::query_scalar(
+            "SELECT kategorie FROM personal_status WHERE label = 'alarmiert'",
+        ).fetch_one(&pool).await.unwrap();
         assert_eq!(kat, "gebunden");
     }
 
