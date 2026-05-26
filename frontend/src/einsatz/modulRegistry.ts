@@ -1,7 +1,7 @@
 import type { IconType } from 'react-icons';
 import {
   TbHierarchy, TbFileDescription, TbSitemap, TbUsers, TbBuildingCommunity,
-  TbUsersGroup, TbUser, TbTruck, TbBox, TbPackages,
+  TbUsersGroup, TbUser, TbTruck, TbPackages,
   TbClipboardText, TbFirstAidKit, TbPaw, TbHome,
   TbMap2, TbLayoutDashboard, TbReport, TbListDetails, TbAlertTriangle,
   TbMessage, TbMessageCircle, TbBell, TbClipboardList, TbInbox,
@@ -52,8 +52,7 @@ export const modulRegistry: ModulEintrag[] = [
   // Kräfte & Mittel
   { key: 'einheiten', kategorie: 'kraefte', label: 'Einheiten', icon: TbUsersGroup, route: 'einheiten', status: 'geplant', beschreibung: 'Taktische Einheiten: Führer, Mannschaft, Fahrzeug, Abschnittszuordnung.' },
   { key: 'personal', kategorie: 'kraefte', label: 'Personal', icon: TbUser, route: 'personal', status: 'geplant', beschreibung: 'Im Einsatz aktive Personen aus dem Stammdaten-Pool plus Ad-hoc-Kräfte.' },
-  { key: 'fahrzeuge', kategorie: 'kraefte', label: 'Fahrzeuge', icon: TbTruck, route: 'fahrzeuge', status: 'geplant', beschreibung: 'Disponierte Fahrzeuge des Einsatzes.' },
-  { key: 'abrollbehaelter', kategorie: 'kraefte', label: 'Abrollbehälter', icon: TbBox, route: 'abrollbehaelter', status: 'geplant', beschreibung: 'Abrollbehälter und deren Träger-Fahrzeuge.' },
+  { key: 'fahrzeuge', kategorie: 'kraefte', label: 'Fahrzeuge', icon: TbTruck, route: 'fahrzeuge', status: 'fertig', beschreibung: 'Disponierte Fahrzeuge des Einsatzes.' },
   { key: 'material', kategorie: 'kraefte', label: 'Material', icon: TbPackages, route: 'material', status: 'geplant', beschreibung: 'Material und Verbrauchsgüter im Einsatz.' },
   // Erfassung
   { key: 'etb', kategorie: 'erfassung', label: 'ETB', icon: TbClipboardText, route: 'etb', status: 'fertig', beschreibung: 'Einsatztagebuch.' },

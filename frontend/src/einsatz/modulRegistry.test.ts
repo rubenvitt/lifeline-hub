@@ -69,4 +69,11 @@ describe('modulRegistry', () => {
     );
     expect(redirectZiel(mitFertigemDashboard)).toBe('lage-dashboard');
   });
+
+  it('fahrzeuge ist fertig, abrollbehaelter ist entfernt', () => {
+    const fahrzeuge = modulRegistry.find((m) => m.key === 'fahrzeuge');
+    expect(fahrzeuge?.status).toBe('fertig');
+    expect(fahrzeuge?.kategorie).toBe('kraefte');
+    expect(modulRegistry.find((m) => m.key === 'abrollbehaelter')).toBeUndefined();
+  });
 });
