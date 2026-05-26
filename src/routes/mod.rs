@@ -5,5 +5,6 @@ pub mod benutzer;
 pub mod dev;
 pub mod einsatz;
 pub mod etb;
+pub mod fahrzeug;
 pub mod health;
 pub mod stichwort;
