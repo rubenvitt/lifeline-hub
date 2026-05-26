@@ -574,4 +574,129 @@ mod tests {
             .unwrap();
         assert_eq!(rest, 0, "CASCADE muss Dispositionszeilen entfernen");
     }
+
+    #[tokio::test]
+    async fn migration_0010_bis_0013_legen_personal_schema_an() {
+        let pool = test_pool().await;
+        // Tabellen existieren (leeres SELECT wirft nicht).
+        for tabelle in ["personal", "qualifikation", "personal_qualifikation", "personal_status", "einsatz_personal"] {
+            let sql = format!("SELECT COUNT(*) FROM {tabelle}");
+            let n: i64 = sqlx::query_scalar(&sql).fetch_one(&pool).await.unwrap();
+            assert_eq!(n, 0, "{tabelle} startet leer (keine Org auf test_pool)");
+        }
+    }
+
+    #[tokio::test]
+    async fn qualifikation_und_personal_status_schema_akzeptiert_einfuegungen() {
+        let pool = test_pool().await;
+        // Org NACH den Migrationen anlegen → Seed greift NICHT (CROSS JOIN lief auf leerer
+        // Org-Menge). Wir prüfen daher den Seed über bootstrap in Task 9; hier nur, dass
+        // ein manuell geseedeter Eintrag einfügbar ist (Schema/CHECK korrekt).
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')").execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO qualifikation (org_id, label, sortier) VALUES (1, 'Sanitäter', 10)")
+            .execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO personal_status (org_id, label, kategorie, sortier) VALUES (1, 'verfügbar', 'verfuegbar', 10)")
+            .execute(&pool).await.unwrap();
+        let q: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM qualifikation WHERE org_id = 1").fetch_one(&pool).await.unwrap();
+        let s: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM personal_status WHERE org_id = 1").fetch_one(&pool).await.unwrap();
+        assert_eq!((q, s), (1, 1));
+    }
+
+    #[tokio::test]
+    async fn personal_schema_constraints() {
+        let pool = test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        // Partieller Unique-Index idx_personal_personalnummer: gleiche Personalnummer
+        // je Org unter aktiven (in_dienst) Personen verboten.
+        let p1: i64 = sqlx::query_scalar(
+            "INSERT INTO personal (org_id, name, personalnummer) VALUES (1, 'Anna', 'P-100') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let dup = sqlx::query("INSERT INTO personal (org_id, name, personalnummer) VALUES (1, 'Bert', 'P-100')")
+            .execute(&pool)
+            .await;
+        assert!(dup.is_err(), "doppelte aktive Personalnummer je Org muss abgelehnt werden");
+
+        // Außer Dienst gestellt → Nummer wieder frei.
+        sqlx::query("UPDATE personal SET dienststatus = 'ausser_dienst' WHERE id = ?")
+            .bind(p1)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let wieder = sqlx::query("INSERT INTO personal (org_id, name, personalnummer) VALUES (1, 'Cara', 'P-100')")
+            .execute(&pool)
+            .await;
+        assert!(wieder.is_ok(), "Nummer einer außer Dienst gestellten Person muss frei sein");
+
+        // Einsatz als Voraussetzung für einsatz_personal.
+        let einsatz: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let person: i64 = sqlx::query_scalar(
+            "INSERT INTO personal (org_id, name) VALUES (1, 'Dora') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        // Stamm-Person disponieren.
+        sqlx::query(
+            "INSERT INTO einsatz_personal (einsatz_id, personal_id, snap_name) VALUES (?, ?, 'Dora')",
+        )
+        .bind(einsatz)
+        .bind(person)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // UNIQUE(einsatz_id, personal_id): dieselbe Stamm-Person nicht doppelt.
+        let dup = sqlx::query(
+            "INSERT INTO einsatz_personal (einsatz_id, personal_id, snap_name) VALUES (?, ?, 'Dora')",
+        )
+        .bind(einsatz)
+        .bind(person)
+        .execute(&pool)
+        .await;
+        assert!(dup.is_err(), "dieselbe Stamm-Person doppelt im Einsatz muss abgelehnt werden");
+
+        // Mehrere Ad-hoc (personal_id NULL) erlaubt — NULL ist in SQLite-UNIQUE verschieden.
+        sqlx::query("INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Extern 1')")
+            .bind(einsatz)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Extern 2')")
+            .bind(einsatz)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let anzahl: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_personal WHERE einsatz_id = ?")
+                .bind(einsatz)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(anzahl, 3, "1 Stamm + 2 Ad-hoc");
+
+        // Einsatz löschen → CASCADE entfernt die Dispositionszeilen.
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(einsatz)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_personal")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(rest, 0, "CASCADE muss Dispositionszeilen entfernen");
+    }
 }
