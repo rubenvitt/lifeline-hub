@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Layout, Spin } from 'antd';
+import { Layout, Space, Spin } from 'antd';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -11,6 +11,8 @@ import {
 import EinsatzSwitcher from './EinsatzSwitcher';
 import IconRail from './IconRail';
 import ModulPanel from './ModulPanel';
+import ThemeToggle from '../components/ThemeToggle';
+import BenutzerMenu from '../components/BenutzerMenu';
 
 const { Header, Content } = Layout;
 
@@ -54,6 +56,10 @@ export default function EinsatzLayout() {
         ) : (
           <EinsatzSwitcher aktuellName={einsatz?.bezeichnung ?? 'Einsatz'} />
         )}
+        <Space style={{ marginLeft: 'auto' }} size="middle">
+          <ThemeToggle />
+          <BenutzerMenu />
+        </Space>
       </Header>
       <Layout hasSider>
         <IconRail

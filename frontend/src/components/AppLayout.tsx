@@ -1,7 +1,8 @@
-import { Button, Layout, Space, Tag, Typography } from 'antd';
-import { Link, Outlet, useNavigate } from 'react-router-dom';
+import { Layout, Space, Typography } from 'antd';
+import { Link, Outlet } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import ThemeToggle from './ThemeToggle';
+import BenutzerMenu from './BenutzerMenu';
 import type { BenutzerAnzeige } from '../api/types';
 
 const { Header, Content } = Layout;
@@ -30,13 +31,7 @@ function darfStammdaten(b: BenutzerAnzeige | null): boolean {
 }
 
 export default function AppLayout() {
-  const { benutzer, logout } = useAuth();
-  const navigate = useNavigate();
-
-  async function abmelden() {
-    await logout();
-    navigate('/login', { replace: true });
-  }
+  const { benutzer } = useAuth();
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -46,14 +41,9 @@ export default function AppLayout() {
         </Link>
         <GlobalLink to="/stammdaten" label="Stammdaten" gesperrt={!darfStammdaten(benutzer)} />
         <GlobalLink to="/benutzer" label="Benutzer" gesperrt={benutzer?.system_rolle !== 'admin'} />
-        <Space style={{ marginLeft: 'auto' }}>
+        <Space style={{ marginLeft: 'auto' }} size="middle">
           <ThemeToggle />
-          <GlobalLink to="/profil" label="Profil" gesperrt={false} />
-          <Typography.Text style={{ color: '#fff' }}>{benutzer?.anzeigename}</Typography.Text>
-          {benutzer?.system_rolle === 'admin' && <Tag color="gold">Admin</Tag>}
-          <Button size="small" onClick={abmelden}>
-            Abmelden
-          </Button>
+          <BenutzerMenu />
         </Space>
       </Header>
       <Content style={{ padding: 24 }}>
