@@ -66,6 +66,10 @@ pub fn build_router(state: AppState) -> Router {
             "/api/einsaetze/{id}/fahrzeuge/{ef_id}",
             delete(routes::einsatz_fahrzeug::entfernen),
         )
+        .route("/api/einsaetze/{id}/personal", get(routes::einsatz_personal::liste))
+        .route("/api/einsaetze/{id}/personal", post(routes::einsatz_personal::disponieren))
+        .route("/api/einsaetze/{id}/personal/{ep_id}", patch(routes::einsatz_personal::aktualisieren))
+        .route("/api/einsaetze/{id}/personal/{ep_id}", delete(routes::einsatz_personal::entfernen))
         .route("/api/stichwort-vorschlaege", get(routes::stichwort::liste))
         .route("/api/stichwort-vorschlaege", post(routes::stichwort::anlegen))
         .route(

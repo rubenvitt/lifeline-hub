@@ -5,6 +5,7 @@ pub mod benutzer;
 pub mod dev;
 pub mod einsatz;
 pub mod einsatz_fahrzeug;
+pub mod einsatz_personal;
 pub mod etb;
 pub mod fahrzeug;
 pub mod fahrzeug_status;
