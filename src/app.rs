@@ -50,6 +50,22 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/einsaetze/{id}/etb", post(routes::etb::erfassen))
         .route("/api/einsaetze/{id}/etb", get(routes::etb::liste))
         .route("/api/einsaetze/{id}/etb/stream", get(routes::etb::stream))
+        .route(
+            "/api/einsaetze/{id}/fahrzeuge",
+            get(routes::einsatz_fahrzeug::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/fahrzeuge",
+            post(routes::einsatz_fahrzeug::disponieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/fahrzeuge/{ef_id}",
+            patch(routes::einsatz_fahrzeug::aktualisieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/fahrzeuge/{ef_id}",
+            delete(routes::einsatz_fahrzeug::entfernen),
+        )
         .route("/api/stichwort-vorschlaege", get(routes::stichwort::liste))
         .route("/api/stichwort-vorschlaege", post(routes::stichwort::anlegen))
         .route(
