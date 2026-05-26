@@ -10,5 +10,6 @@ pub mod error;
 pub mod etb;
 pub mod live;
 pub mod routes;
-pub mod stichwort;
+pub mod staerke;
 pub mod static_files;
+pub mod stichwort;
