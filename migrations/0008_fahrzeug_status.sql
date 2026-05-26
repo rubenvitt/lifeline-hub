@@ -22,12 +22,14 @@ INSERT INTO fahrzeug_status (org_id, label, kategorie, fms_anker, sortier)
 SELECT o.id, v.label, v.kategorie, v.fms_anker, v.sortier
 FROM organisation o
 CROSS JOIN (
-    SELECT 'einsatzbereit'  AS label, 'verfuegbar'       AS kategorie, 1 AS fms_anker, 10 AS sortier
-    UNION ALL SELECT 'disponiert',    'gebunden',         3, 20
-    UNION ALL SELECT 'anfahrt',       'gebunden',         3, 30
-    UNION ALL SELECT 'vor_ort',       'gebunden',         4, 40
-    UNION ALL SELECT 'transport',     'gebunden',         7, 50
-    UNION ALL SELECT 'am_ziel',       'gebunden',         8, 60
-    UNION ALL SELECT 'zurück',        'gebunden',         1, 70
-    UNION ALL SELECT 'außer Dienst',  'nicht_verfuegbar', 6, 80
+    SELECT '1 – Frei auf Funk'         AS label, 'verfuegbar'       AS kategorie, 1 AS fms_anker, 10 AS sortier
+    UNION ALL SELECT '2 – Frei auf Wache',        'verfuegbar',       2, 20
+    UNION ALL SELECT '3 – Auf Anfahrt',           'gebunden',         3, 30
+    UNION ALL SELECT '4 – Am Einsatzort',         'gebunden',         4, 40
+    UNION ALL SELECT '5 – Sprechwunsch',          'gebunden',         5, 50
+    UNION ALL SELECT '6 – Nicht einsatzbereit',   'nicht_verfuegbar', 6, 60
+    UNION ALL SELECT '7 – Gebunden (Transport)',  'gebunden',         7, 70
+    UNION ALL SELECT '8 – Bedingt einsatzbereit', 'gebunden',         8, 80
+    UNION ALL SELECT '9 – Fremdanmeldung',        'gebunden',         9, 90
+    UNION ALL SELECT '0 – Prio. Sprechwunsch',    'gebunden',         0, 100
 ) v;

@@ -91,15 +91,15 @@ async fn anfrage(
 
 #[tokio::test]
 async fn bootstrap_seedet_status_katalog() {
-    // bootstrap_admin seedet den Default-Katalog → GET liefert die 8 Stati.
+    // bootstrap_admin seedet den FMS-Default-Katalog → GET liefert die 10 Stati.
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (status, json) = anfrage(&app, "GET", "/api/fahrzeug-status", &admin, None).await;
     assert_eq!(status, StatusCode::OK);
     let labels: Vec<&str> = json.as_array().unwrap().iter().map(|s| s["label"].as_str().unwrap()).collect();
-    assert!(labels.contains(&"einsatzbereit"));
-    assert!(labels.contains(&"disponiert"));
-    assert_eq!(json.as_array().unwrap().len(), 8);
+    assert!(labels.contains(&"1 – Frei auf Funk"));
+    assert!(labels.contains(&"3 – Auf Anfahrt"));
+    assert_eq!(json.as_array().unwrap().len(), 10);
 }
 
 #[tokio::test]
@@ -150,10 +150,10 @@ async fn fms_anker_ausserhalb_ist_400() {
 async fn dublette_label_ist_409() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    // 'disponiert' existiert bereits aus dem Seed.
+    // '3 – Auf Anfahrt' existiert bereits aus dem Seed.
     let (status, _) = anfrage(
         &app, "POST", "/api/fahrzeug-status", &admin,
-        Some(r#"{"label":"disponiert","kategorie":"gebunden"}"#),
+        Some(r#"{"label":"3 – Auf Anfahrt","kategorie":"gebunden"}"#),
     ).await;
     assert_eq!(status, StatusCode::CONFLICT);
 }

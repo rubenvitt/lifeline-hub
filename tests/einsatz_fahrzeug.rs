@@ -227,11 +227,11 @@ async fn status_wechsel_und_entfernen_schreiben_etb() {
     let (_, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/fahrzeuge"), &admin, Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#))).await;
     let ef = json["id"].as_i64().unwrap();
 
-    // Anderen 'gebunden'-Status aus dem Seed holen ('vor_ort').
+    // Anderen 'gebunden'-Status aus dem Seed holen ('4 – Am Einsatzort').
     let (_, stati) = anfrage(&app, "GET", "/api/fahrzeug-status", &admin, None).await;
-    let vor_ort = stati.as_array().unwrap().iter().find(|s| s["label"] == "vor_ort").unwrap()["id"].as_i64().unwrap();
+    let am_einsatzort = stati.as_array().unwrap().iter().find(|s| s["label"] == "4 – Am Einsatzort").unwrap()["id"].as_i64().unwrap();
 
-    let (status, _) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"), &admin, Some(&format!(r#"{{"status_id":{vor_ort}}}"#))).await;
+    let (status, _) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"), &admin, Some(&format!(r#"{{"status_id":{am_einsatzort}}}"#))).await;
     assert_eq!(status, StatusCode::OK);
 
     let (status, _) = anfrage(&app, "DELETE", &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"), &admin, None).await;

@@ -6,7 +6,10 @@ use sqlx::SqlitePool;
 
 /// Start-Stichworte je neu angelegter Organisation (Reihenfolge = sortier).
 /// Combobox erlaubt unabhängig davon Freitext.
-const STICHWORT_STARTLISTE: [&str; 5] = ["H1", "H1Y", "MANV", "San-Dienst", "Übung"];
+const STICHWORT_STARTLISTE: [&str; 12] = [
+    "B2", "B2Y", "B3", "B3Y", "B4", "B4Y", "MANV", "MANV7", "MANV15", "MANV50", "Sonderlage",
+    "Übung",
+];
 
 /// Ergebnis des Bootstraps: ob ein Admin neu angelegt wurde und mit welchem
 /// Passwort (nur gesetzt, wenn der Bootstrap ein Zufalls-Passwort erzeugt hat).
@@ -164,9 +167,9 @@ mod tests {
         .await
         .unwrap();
 
-        assert!(texte.contains(&"H1".to_string()));
+        assert!(texte.contains(&"B2".to_string()));
         assert!(texte.contains(&"MANV".to_string()));
-        assert_eq!(texte.len(), 5, "fünf Start-Stichworte erwartet");
+        assert_eq!(texte.len(), 12, "zwölf Start-Stichworte erwartet");
     }
 
     #[tokio::test]
@@ -182,12 +185,12 @@ mod tests {
         .fetch_all(&pool)
         .await
         .unwrap();
-        assert_eq!(labels.len(), 8, "acht Default-Status erwartet");
-        assert_eq!(labels.first().map(String::as_str), Some("einsatzbereit"));
+        assert_eq!(labels.len(), 10, "zehn FMS-Default-Status erwartet");
+        assert_eq!(labels.first().map(String::as_str), Some("1 – Frei auf Funk"));
 
-        // 'disponiert' ist als 'gebunden' geseedet (Initial-Status der Disposition).
+        // '3 – Auf Anfahrt' ist als 'gebunden' geseedet (erster Initial-Status der Disposition).
         let kat: String = sqlx::query_scalar(
-            "SELECT kategorie FROM fahrzeug_status WHERE label = 'disponiert'",
+            "SELECT kategorie FROM fahrzeug_status WHERE label = '3 – Auf Anfahrt'",
         )
         .fetch_one(&pool)
         .await

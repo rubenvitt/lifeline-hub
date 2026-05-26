@@ -18,15 +18,17 @@ pub const KATEGORIE_NICHT_VERFUEGBAR: &str = "nicht_verfuegbar";
 /// (label, kategorie, fms_anker, sortier). **Muss mit dem Seed in
 /// `migrations/0008_fahrzeug_status.sql` übereinstimmen.** bootstrap_admin
 /// iteriert diese Liste für neue Orgs.
-pub const STATUS_STARTLISTE: [(&str, &str, i64, i64); 8] = [
-    ("einsatzbereit", KATEGORIE_VERFUEGBAR, 1, 10),
-    ("disponiert", KATEGORIE_GEBUNDEN, 3, 20),
-    ("anfahrt", KATEGORIE_GEBUNDEN, 3, 30),
-    ("vor_ort", KATEGORIE_GEBUNDEN, 4, 40),
-    ("transport", KATEGORIE_GEBUNDEN, 7, 50),
-    ("am_ziel", KATEGORIE_GEBUNDEN, 8, 60),
-    ("zurück", KATEGORIE_GEBUNDEN, 1, 70),
-    ("außer Dienst", KATEGORIE_NICHT_VERFUEGBAR, 6, 80),
+pub const STATUS_STARTLISTE: [(&str, &str, i64, i64); 10] = [
+    ("1 – Frei auf Funk", KATEGORIE_VERFUEGBAR, 1, 10),
+    ("2 – Frei auf Wache", KATEGORIE_VERFUEGBAR, 2, 20),
+    ("3 – Auf Anfahrt", KATEGORIE_GEBUNDEN, 3, 30),
+    ("4 – Am Einsatzort", KATEGORIE_GEBUNDEN, 4, 40),
+    ("5 – Sprechwunsch", KATEGORIE_GEBUNDEN, 5, 50),
+    ("6 – Nicht einsatzbereit", KATEGORIE_NICHT_VERFUEGBAR, 6, 60),
+    ("7 – Gebunden (Transport)", KATEGORIE_GEBUNDEN, 7, 70),
+    ("8 – Bedingt einsatzbereit", KATEGORIE_GEBUNDEN, 8, 80),
+    ("9 – Fremdanmeldung", KATEGORIE_GEBUNDEN, 9, 90),
+    ("0 – Prio. Sprechwunsch", KATEGORIE_GEBUNDEN, 0, 100),
 ];
 
 /// Ob `s` eine gültige Status-Kategorie ist (Eingabe-Validierung).
@@ -200,7 +202,7 @@ mod tests {
 
     #[test]
     fn startliste_deckt_alle_kategorien_ab() {
-        assert_eq!(STATUS_STARTLISTE.len(), 8);
+        assert_eq!(STATUS_STARTLISTE.len(), 10);
         assert!(STATUS_STARTLISTE.iter().all(|(_, k, _, _)| ist_gueltige_kategorie(k)));
     }
 }
