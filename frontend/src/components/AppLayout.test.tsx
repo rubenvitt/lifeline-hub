@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
 import { server } from '../test/server';
@@ -26,13 +27,16 @@ function setup(me: Record<string, unknown>) {
 }
 
 describe('AppLayout (globale Topbar)', () => {
-  it('Admin: Stammdaten und Benutzer sind Links, Profil sichtbar', async () => {
+  it('Admin: Stammdaten und Benutzer sind Links, Profil/Abmelden im Benutzermenü', async () => {
     setup(admin);
     await waitFor(() => expect(screen.getByText('Chef')).toBeInTheDocument());
     expect(screen.getByRole('link', { name: 'Stammdaten' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Benutzer' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Profil' })).toBeInTheDocument();
     expect(screen.getByText('Inhalt')).toBeInTheDocument();
+    // Profil und Abmelden liegen jetzt im Benutzermenü (Dropdown).
+    await userEvent.click(screen.getByRole('button', { name: 'Benutzermenü' }));
+    expect(await screen.findByText('Profil')).toBeInTheDocument();
+    expect(screen.getByText('Abmelden')).toBeInTheDocument();
   });
 
   it('Fuehrungskraft: Stammdaten frei, Benutzer gesperrt (🔒, kein Link)', async () => {
