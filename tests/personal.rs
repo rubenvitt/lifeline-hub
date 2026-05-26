@@ -155,7 +155,6 @@ async fn ausser_dienst_versteckt_aus_nur_im_dienst() {
 }
 
 #[tokio::test]
-#[ignore = "braucht GET /api/qualifikationen aus Task 11 — wird dort aktiviert"]
 async fn qualifikationen_werden_zugeordnet_und_aufgeloest() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;

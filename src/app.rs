@@ -99,7 +99,11 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/personal-vorschlaege", get(routes::personal::vorschlaege))
         .route("/api/personal/{id}", patch(routes::personal::aktualisieren))
         .route("/api/personal/{id}/ausser-dienst", post(routes::personal::ausser_dienst))
-        .route("/api/personal/{id}/in-dienst", post(routes::personal::in_dienst));
+        .route("/api/personal/{id}/in-dienst", post(routes::personal::in_dienst))
+        .route("/api/qualifikationen", get(routes::qualifikation::liste))
+        .route("/api/qualifikationen", post(routes::qualifikation::anlegen))
+        .route("/api/qualifikationen/{id}", patch(routes::qualifikation::aktualisieren))
+        .route("/api/qualifikationen/{id}/deaktivieren", post(routes::qualifikation::deaktivieren));
 
     // Dev-only: Endpoint existiert physisch nur mit Feature `dev-seeds`.
     #[cfg(feature = "dev-seeds")]
