@@ -136,3 +136,65 @@ export interface EinsatzFahrzeug {
   disponiert_at: string;
   disponiert_von: number | null;
 }
+
+export type StaerkePosition = 'fuehrer' | 'unterfuehrer' | 'mannschaft';
+
+/** Aufgelöste Qualifikation einer Person (inkl. deaktivierter Zuordnungen). */
+export interface QualifikationRef {
+  id: number;
+  label: string;
+}
+
+export interface Personal {
+  id: number;
+  benutzer_id: number | null;
+  name: string;
+  personalnummer: string | null;
+  traegerorganisation: string | null;
+  telefon: string | null;
+  staerke_position: StaerkePosition | null;
+  bemerkung: string | null;
+  dienststatus: Dienststatus;
+  angelegt_at: string;
+  qualifikationen: QualifikationRef[];
+}
+
+/** Bereits verwendete Trägerorganisationen (DISTINCT) für die Combobox. */
+export interface PersonalVorschlaege {
+  traegerorganisation: string[];
+}
+
+/** Qualifikations-Katalog-Eintrag. */
+export interface Qualifikation {
+  id: number;
+  label: string;
+  sortier: number;
+}
+
+/** Personal-Status-Katalog-Eintrag (wie FahrzeugStatus, ohne fms_anker). */
+export interface PersonalStatus {
+  id: number;
+  label: string;
+  kategorie: StatusKategorie;
+  farbe: string | null;
+  sortier: number;
+}
+
+/** Aufgelöste Dispositionszeile (Live/Snapshot serverseitig gewählt). */
+export interface EinsatzPersonal {
+  id: number;
+  einsatz_id: number;
+  personal_id: number | null;
+  ist_adhoc: boolean;
+  name: string;
+  funktion: string | null;
+  traegerorganisation: string | null;
+  staerke_position: StaerkePosition | null;
+  status_id: number | null;
+  status_label: string | null;
+  status_kategorie: StatusKategorie | null;
+  status_farbe: string | null;
+  bemerkung: string | null;
+  disponiert_at: string;
+  disponiert_von: number | null;
+}
