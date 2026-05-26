@@ -404,4 +404,53 @@ mod tests {
                 .unwrap();
         assert_eq!(sortier, 0);
     }
+
+    #[tokio::test]
+    async fn fahrzeug_migration_constraints() {
+        let pool = test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        // dienststatus-Default ist 'in_dienst'.
+        let id: i64 = sqlx::query_scalar(
+            "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Florian 1') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let (status, signal): (String, i64) =
+            sqlx::query_as("SELECT dienststatus, sondersignal FROM fahrzeug WHERE id = ?")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(status, "in_dienst");
+        assert_eq!(signal, 0);
+
+        // dienststatus-CHECK lehnt ungültigen Wert ab.
+        let bad = sqlx::query("UPDATE fahrzeug SET dienststatus = 'kaputt' WHERE id = ?")
+            .bind(id)
+            .execute(&pool)
+            .await;
+        assert!(bad.is_err(), "ungültiger dienststatus muss abgelehnt werden");
+
+        // Partieller Unique-Index: doppelter Funkrufname unter aktiven verboten.
+        let dup = sqlx::query("INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Florian 1')")
+            .execute(&pool)
+            .await;
+        assert!(dup.is_err(), "doppelter aktiver Funkrufname je Org muss abgelehnt werden");
+
+        // Außer Dienst gestellt → Name wieder frei.
+        sqlx::query("UPDATE fahrzeug SET dienststatus = 'ausser_dienst' WHERE id = ?")
+            .bind(id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let wieder = sqlx::query("INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Florian 1')")
+            .execute(&pool)
+            .await;
+        assert!(wieder.is_ok(), "Name eines außer Dienst gestellten Fahrzeugs muss frei sein");
+    }
 }
