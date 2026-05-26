@@ -59,7 +59,7 @@ wird einzeln durchgebrainstormt (eigener Zyklus Spec → Plan → Umsetzung).
 | # | Spec | Liefert | Abhängigkeit | Status |
 |---|---|---|---|---|
 | K&M‑1 | **Stammdaten & Disposition — am Beispiel Fahrzeuge** | Generische Mechanik + Fahrzeuge: Stamm-CRUD im globalen Stammdaten-Bereich, Disposition im Einsatz, Ad-hoc-externe Fahrzeuge | — (Unterbau) | 📝 Design abgestimmt → Plan als Nächstes |
-| K&M‑2 | **Personal** | Personal-Stamm + Disposition (reuse der Mechanik) | K&M‑1 | offen |
+| K&M‑2 | **Personal** | Personal-Stamm + Disposition (reuse der Mechanik) | K&M‑1 | 📝 Design abgestimmt → Plan als Nächstes |
 | K&M‑3 | **Einheiten (taktische Einheiten)** | Komponiert Personal + Fahrzeuge, Zuordnung zu Einsatzabschnitt | **K&M‑1 + K&M‑2 (Zwang)** | offen |
 | K&M‑4 | **Material** | Material-Stamm + Disposition | K&M‑1 | offen |
 
@@ -68,6 +68,7 @@ wird einzeln durchgebrainstormt (eigener Zyklus Spec → Plan → Umsetzung).
 **Dispositions-Modell (abgestimmt, gilt für alle K&M‑Module):** Referenz aus dem globalen Stamm-Pool + Einsatz-Zustand obendrauf (kein Voll-Snapshot, keine Stamm-Versionierung). Zwei Schutzmechanismen für die Nachvollziehbarkeit: (1) **kein Hard-Delete** im Stamm — Ressourcen werden nur „außer Dienst" gesetzt, damit alte Referenzen auflösbar bleiben; (2) **Identitäts-Schnappschuss** in der Dispositionszeile (z. B. Funkrufname/Kennzeichen zum Dispo-Zeitpunkt). Dispo-/Status-Ereignisse werden zusätzlich als **ETB-Einträge** mitgeschrieben (inkl. Ressourcen-Identität) — das ist die unveränderliche Historie.
 
 **Spec K&M‑1:** `docs/superpowers/specs/2026-05-26-kraefte-mittel-fahrzeuge-disposition-design.md`
+**Spec K&M‑2:** `docs/superpowers/specs/2026-05-26-kraefte-mittel-personal-disposition-design.md`
 
 ## Querschnittliche Folge-Idee — Daten-Retention abgeschlossener Einsätze (Backlog)
 
