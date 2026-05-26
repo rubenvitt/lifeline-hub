@@ -73,3 +73,59 @@ export interface EtbEintragAnzeige {
   erfasst_lokal_at: string | null;
   berichtigt_eintrag_id: number | null;
 }
+
+export type Dienststatus = 'in_dienst' | 'ausser_dienst';
+export type StatusKategorie = 'verfuegbar' | 'gebunden' | 'nicht_verfuegbar';
+
+/** Taktische Stärke (F/UF/M); Gesamt = Summe (Frontend berechnet bei Bedarf). */
+export interface Staerke {
+  fuehrer: number;
+  unterfuehrer: number;
+  mannschaft: number;
+}
+
+export interface Fahrzeug {
+  id: number;
+  funkrufname: string;
+  fahrzeugtyp: string | null;
+  traegerorganisation: string | null;
+  kennzeichen: string | null;
+  opta: string | null;
+  standort: string | null;
+  fms_issi: string | null;
+  sondersignal: boolean;
+  tragenkapazitaet: number | null;
+  staerke: Staerke | null;
+  bemerkung: string | null;
+  dienststatus: Dienststatus;
+  angelegt_at: string;
+}
+
+export interface FahrzeugStatus {
+  id: number;
+  label: string;
+  kategorie: StatusKategorie;
+  farbe: string | null;
+  fms_anker: number | null;
+  sortier: number;
+}
+
+/** Aufgelöste Dispositionszeile (Live/Snapshot serverseitig gewählt). */
+export interface EinsatzFahrzeug {
+  id: number;
+  einsatz_id: number;
+  fahrzeug_id: number | null;
+  ist_adhoc: boolean;
+  funkrufname: string;
+  kennzeichen: string | null;
+  fahrzeugtyp: string | null;
+  opta: string | null;
+  traegerorganisation: string | null;
+  status_id: number | null;
+  status_label: string | null;
+  status_kategorie: StatusKategorie | null;
+  status_farbe: string | null;
+  bemerkung: string | null;
+  disponiert_at: string;
+  disponiert_von: number | null;
+}

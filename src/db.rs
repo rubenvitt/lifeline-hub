@@ -404,4 +404,174 @@ mod tests {
                 .unwrap();
         assert_eq!(sortier, 0);
     }
+
+    #[tokio::test]
+    async fn fahrzeug_migration_constraints() {
+        let pool = test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        // dienststatus-Default ist 'in_dienst'.
+        let id: i64 = sqlx::query_scalar(
+            "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Florian 1') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let (status, signal): (String, i64) =
+            sqlx::query_as("SELECT dienststatus, sondersignal FROM fahrzeug WHERE id = ?")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(status, "in_dienst");
+        assert_eq!(signal, 0);
+
+        // dienststatus-CHECK lehnt ungültigen Wert ab.
+        let bad = sqlx::query("UPDATE fahrzeug SET dienststatus = 'kaputt' WHERE id = ?")
+            .bind(id)
+            .execute(&pool)
+            .await;
+        assert!(bad.is_err(), "ungültiger dienststatus muss abgelehnt werden");
+
+        // Partieller Unique-Index: doppelter Funkrufname unter aktiven verboten.
+        let dup = sqlx::query("INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Florian 1')")
+            .execute(&pool)
+            .await;
+        assert!(dup.is_err(), "doppelter aktiver Funkrufname je Org muss abgelehnt werden");
+
+        // Außer Dienst gestellt → Name wieder frei.
+        sqlx::query("UPDATE fahrzeug SET dienststatus = 'ausser_dienst' WHERE id = ?")
+            .bind(id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let wieder = sqlx::query("INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Florian 1')")
+            .execute(&pool)
+            .await;
+        assert!(wieder.is_ok(), "Name eines außer Dienst gestellten Fahrzeugs muss frei sein");
+    }
+
+    #[tokio::test]
+    async fn fahrzeug_status_migration_constraints_und_seed() {
+        let pool = test_pool().await;
+        // Org NACH der Migration anlegen → Migrations-Seed greift hier NICHT
+        // (das Seeding der neuen Org ist bootstrap_admins Aufgabe, separat getestet).
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        // kategorie-CHECK.
+        let bad_kat = sqlx::query(
+            "INSERT INTO fahrzeug_status (org_id, label, kategorie) VALUES (1, 'X', 'quatsch')",
+        )
+        .execute(&pool)
+        .await;
+        assert!(bad_kat.is_err(), "ungültige kategorie muss abgelehnt werden");
+
+        // fms_anker-CHECK (0..=9).
+        let bad_fms = sqlx::query(
+            "INSERT INTO fahrzeug_status (org_id, label, kategorie, fms_anker) VALUES (1, 'Y', 'gebunden', 12)",
+        )
+        .execute(&pool)
+        .await;
+        assert!(bad_fms.is_err(), "fms_anker außerhalb 0..=9 muss abgelehnt werden");
+
+        // aktiv-Default ist 1, sortier-Default 0.
+        sqlx::query("INSERT INTO fahrzeug_status (org_id, label, kategorie) VALUES (1, 'frei', 'verfuegbar')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let (aktiv, sortier): (i64, i64) = sqlx::query_as(
+            "SELECT aktiv, sortier FROM fahrzeug_status WHERE label = 'frei'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(aktiv, 1);
+        assert_eq!(sortier, 0);
+
+        // UNIQUE(org_id, label).
+        let dup = sqlx::query("INSERT INTO fahrzeug_status (org_id, label, kategorie) VALUES (1, 'frei', 'gebunden')")
+            .execute(&pool)
+            .await;
+        assert!(dup.is_err(), "doppeltes label je Org muss abgelehnt werden");
+    }
+
+    #[tokio::test]
+    async fn einsatz_fahrzeug_migration_constraints() {
+        let pool = test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let einsatz: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let fz: i64 = sqlx::query_scalar(
+            "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Florian 1') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        // Stamm-Disposition.
+        sqlx::query(
+            "INSERT INTO einsatz_fahrzeug (einsatz_id, fahrzeug_id, snap_funkrufname) \
+             VALUES (?, ?, 'Florian 1')",
+        )
+        .bind(einsatz)
+        .bind(fz)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // UNIQUE(einsatz_id, fahrzeug_id): dasselbe Stamm-Fahrzeug nicht doppelt.
+        let dup = sqlx::query(
+            "INSERT INTO einsatz_fahrzeug (einsatz_id, fahrzeug_id, snap_funkrufname) \
+             VALUES (?, ?, 'Florian 1')",
+        )
+        .bind(einsatz)
+        .bind(fz)
+        .execute(&pool)
+        .await;
+        assert!(dup.is_err(), "dasselbe Stamm-Fahrzeug doppelt im Einsatz muss abgelehnt werden");
+
+        // Mehrere Ad-hoc (fahrzeug_id NULL) erlaubt — NULL ist in SQLite-UNIQUE verschieden.
+        sqlx::query("INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, 'FW Extern 1')")
+            .bind(einsatz)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, 'FW Extern 2')")
+            .bind(einsatz)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let anzahl: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_fahrzeug WHERE einsatz_id = ?")
+                .bind(einsatz)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(anzahl, 3, "1 Stamm + 2 Ad-hoc");
+
+        // Einsatz löschen → CASCADE entfernt die Dispositionszeilen.
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(einsatz)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_fahrzeug")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(rest, 0, "CASCADE muss Dispositionszeilen entfernen");
+    }
 }

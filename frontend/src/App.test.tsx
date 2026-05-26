@@ -57,4 +57,20 @@ describe('App-Routing', () => {
     renderApp('/einsaetze/7/stab');
     await waitFor(() => expect(screen.getByText(/🚧 Stab/)).toBeInTheDocument());
   });
+
+  it('fahrzeuge-Route rendert die echte FahrzeugePage statt Stub', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/fahrzeug-status', () => HttpResponse.json([])),
+      http.get('/api/fahrzeuge', () => HttpResponse.json([])),
+    );
+    renderApp('/einsaetze/7/fahrzeuge');
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Fahrzeuge' })).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/🚧/)).not.toBeInTheDocument();
+  });
 });

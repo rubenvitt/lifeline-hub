@@ -9,6 +9,7 @@ import StammdatenPage from './pages/StammdatenPage';
 import ProfilPage from './pages/ProfilPage';
 import EtbPage from './pages/EtbPage';
 import EinsatzdatenPage from './pages/EinsatzdatenPage';
+import FahrzeugePage from './pages/FahrzeugePage';
 import EinsatzLayout from './einsatz/EinsatzLayout';
 import DefaultModulRedirect from './einsatz/DefaultModulRedirect';
 import ModulStub from './einsatz/ModulStub';
@@ -18,6 +19,7 @@ import { modulRegistry } from './einsatz/modulRegistry';
 const MODUL_ELEMENTE: Record<string, ReactElement> = {
   etb: <EtbPage />,
   einsatzdaten: <EinsatzdatenPage />,
+  fahrzeuge: <FahrzeugePage />,
 };
 
 export default function App() {

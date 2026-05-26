@@ -50,11 +50,49 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/einsaetze/{id}/etb", post(routes::etb::erfassen))
         .route("/api/einsaetze/{id}/etb", get(routes::etb::liste))
         .route("/api/einsaetze/{id}/etb/stream", get(routes::etb::stream))
+        .route(
+            "/api/einsaetze/{id}/fahrzeuge",
+            get(routes::einsatz_fahrzeug::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/fahrzeuge",
+            post(routes::einsatz_fahrzeug::disponieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/fahrzeuge/{ef_id}",
+            patch(routes::einsatz_fahrzeug::aktualisieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/fahrzeuge/{ef_id}",
+            delete(routes::einsatz_fahrzeug::entfernen),
+        )
         .route("/api/stichwort-vorschlaege", get(routes::stichwort::liste))
         .route("/api/stichwort-vorschlaege", post(routes::stichwort::anlegen))
         .route(
             "/api/stichwort-vorschlaege/{id}",
             delete(routes::stichwort::loeschen),
+        )
+        .route("/api/fahrzeuge", get(routes::fahrzeug::liste))
+        .route("/api/fahrzeuge", post(routes::fahrzeug::anlegen))
+        .route("/api/fahrzeug-typen", get(routes::fahrzeug::typen))
+        .route("/api/fahrzeuge/{id}", patch(routes::fahrzeug::aktualisieren))
+        .route(
+            "/api/fahrzeuge/{id}/ausser-dienst",
+            post(routes::fahrzeug::ausser_dienst),
+        )
+        .route(
+            "/api/fahrzeuge/{id}/in-dienst",
+            post(routes::fahrzeug::in_dienst),
+        )
+        .route("/api/fahrzeug-status", get(routes::fahrzeug_status::liste))
+        .route("/api/fahrzeug-status", post(routes::fahrzeug_status::anlegen))
+        .route(
+            "/api/fahrzeug-status/{id}",
+            patch(routes::fahrzeug_status::aktualisieren),
+        )
+        .route(
+            "/api/fahrzeug-status/{id}/deaktivieren",
+            post(routes::fahrzeug_status::deaktivieren),
         );
 
     // Dev-only: Endpoint existiert physisch nur mit Feature `dev-seeds`.

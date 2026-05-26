@@ -4,6 +4,9 @@ pub mod benutzer;
 #[cfg(feature = "dev-seeds")]
 pub mod dev;
 pub mod einsatz;
+pub mod einsatz_fahrzeug;
 pub mod etb;
+pub mod fahrzeug;
+pub mod fahrzeug_status;
 pub mod health;
 pub mod stichwort;

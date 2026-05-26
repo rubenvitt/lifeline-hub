@@ -1,0 +1,102 @@
+use serde::Serialize;
+
+/// Taktische Stärke (FwDV 3 / DV 100): Führer / Unterführer / Mannschaft.
+/// `gesamt` wird berechnet, nicht gespeichert. `u16`, damit auch ein Verband/Stab
+/// über 255 nicht anstößt. Wiederverwendbar für Personal/Einheiten (K&M‑2/3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct Staerke {
+    pub fuehrer: u16,
+    pub unterfuehrer: u16,
+    pub mannschaft: u16,
+}
+
+impl Staerke {
+    pub fn neu(fuehrer: u16, unterfuehrer: u16, mannschaft: u16) -> Self {
+        Staerke { fuehrer, unterfuehrer, mannschaft }
+    }
+
+    /// Gesamtstärke = Summe der drei Werte. `u32`, damit die Summe dreier `u16`
+    /// nie überläuft (sauber, auch wenn praktisch nie relevant).
+    pub fn gesamt(&self) -> u32 {
+        self.fuehrer as u32 + self.unterfuehrer as u32 + self.mannschaft as u32
+    }
+
+    /// 4-stellige Anzeige "F/UF/M/Gesamt", z. B. "1/3/18/22".
+    pub fn anzeige(&self) -> String {
+        format!("{}/{}/{}/{}", self.fuehrer, self.unterfuehrer, self.mannschaft, self.gesamt())
+    }
+
+    /// Baut eine optionale Stärke aus drei Eingabe-/DB-Optionen (i64, da SQLite
+    /// INTEGER). Regel: alle drei gesetzt **oder** alle drei `None`; Werte
+    /// 0..=u16::MAX. Bei Verstoß `Err` mit deutscher Validierungsmeldung — der
+    /// Aufrufer (Handler) mappt das auf `AppError::Validation`.
+    pub fn aus_optionen(
+        fuehrer: Option<i64>,
+        unterfuehrer: Option<i64>,
+        mannschaft: Option<i64>,
+    ) -> Result<Option<Staerke>, String> {
+        match (fuehrer, unterfuehrer, mannschaft) {
+            (None, None, None) => Ok(None),
+            (Some(f), Some(u), Some(m)) => {
+                for (name, wert) in [("Führer", f), ("Unterführer", u), ("Mannschaft", m)] {
+                    if wert < 0 {
+                        return Err(format!("Stärke ({name}) darf nicht negativ sein"));
+                    }
+                    if wert > u16::MAX as i64 {
+                        return Err(format!("Stärke ({name}) ist zu groß"));
+                    }
+                }
+                Ok(Some(Staerke::neu(f as u16, u as u16, m as u16)))
+            }
+            _ => Err(
+                "Stärke muss vollständig (Führer, Unterführer, Mannschaft) oder leer sein".into(),
+            ),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gesamt_summiert_die_drei_werte() {
+        assert_eq!(Staerke::neu(1, 3, 18).gesamt(), 22);
+        assert_eq!(Staerke::neu(0, 0, 2).gesamt(), 2);
+    }
+
+    #[test]
+    fn anzeige_ist_vierstellig() {
+        assert_eq!(Staerke::neu(1, 3, 18).anzeige(), "1/3/18/22");
+        assert_eq!(Staerke::neu(0, 1, 5).anzeige(), "0/1/5/6");
+    }
+
+    #[test]
+    fn aus_optionen_alle_none_ist_ok_none() {
+        assert_eq!(Staerke::aus_optionen(None, None, None).unwrap(), None);
+    }
+
+    #[test]
+    fn aus_optionen_alle_gesetzt_ist_ok_some() {
+        assert_eq!(
+            Staerke::aus_optionen(Some(1), Some(3), Some(18)).unwrap(),
+            Some(Staerke::neu(1, 3, 18))
+        );
+    }
+
+    #[test]
+    fn aus_optionen_teilweise_gesetzt_ist_fehler() {
+        assert!(Staerke::aus_optionen(Some(1), None, Some(2)).is_err());
+        assert!(Staerke::aus_optionen(None, Some(1), None).is_err());
+    }
+
+    #[test]
+    fn aus_optionen_negativ_ist_fehler() {
+        assert!(Staerke::aus_optionen(Some(-1), Some(0), Some(0)).is_err());
+    }
+
+    #[test]
+    fn aus_optionen_zu_gross_ist_fehler() {
+        assert!(Staerke::aus_optionen(Some(0), Some(0), Some(70000)).is_err());
+    }
+}
