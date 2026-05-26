@@ -31,17 +31,10 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     let pool = db::connect(&config.db_path).await?;
     db::migrate(&pool).await?;
 
-    // Dev-only: reproduzierbare Testdaten seeden, BEVOR bootstrap_admin läuft.
-    // Danach existieren Benutzer → bootstrap_admin ist no-op (legt auch keine
-    // Organisation an; deshalb macht dev_seed das selbst).
-    #[cfg(feature = "dev-seeds")]
-    {
-        lifeline_hub::dev::seed::dev_seed(&pool).await?;
-        tracing::warn!(
-            "dev-seeds AKTIV: Testdaten geseedet, /api/dev/users verfügbar — NIEMALS in Production!"
-        );
-    }
-
+    // bootstrap_admin läuft ZUERST: legt auf leerer DB Organisation, Admin-Konto und
+    // die Default-Kataloge (Fahrzeug-Status, Einsatzstichworte) an. Muss vor dev_seed
+    // laufen, damit die Kataloge auch im dev-seeds-Modus geseedet werden (sonst
+    // hätten bereits Benutzer existiert und bootstrap_admin wäre ein No-Op).
     let ergebnis = lifeline_hub::auth::bootstrap::bootstrap_admin(
         &pool,
         &config.org_name,
@@ -51,11 +44,25 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     .await?;
     if ergebnis.admin_angelegt {
         tracing::info!("Admin-Konto '{}' angelegt", config.admin_user);
+        // Im dev-seeds-Build setzt dev_seed das Admin-Passwort gleich auf das
+        // bekannte Dev-Passwort zurück → ein generiertes Passwort nicht bewerben.
+        #[cfg(not(feature = "dev-seeds"))]
         if let Some(pw) = &ergebnis.generiertes_passwort {
             tracing::warn!(
                 "Initiales Admin-Passwort (bitte sicher notieren und nach Login ändern): {pw}"
             );
         }
+    }
+
+    // Dev-only: reproduzierbare Testdaten seeden, NACH bootstrap_admin. dev_seed setzt
+    // die Seed-Benutzer (inkl. des von bootstrap angelegten Admins) per Upsert auf das
+    // bekannte Dev-Passwort, damit der /api/dev/users-Login-Picker funktioniert.
+    #[cfg(feature = "dev-seeds")]
+    {
+        lifeline_hub::dev::seed::dev_seed(&pool).await?;
+        tracing::warn!(
+            "dev-seeds AKTIV: Testdaten geseedet, /api/dev/users verfügbar — NIEMALS in Production!"
+        );
     }
 
     let app = build_router(AppState {

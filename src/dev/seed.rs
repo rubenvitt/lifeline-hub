@@ -76,8 +76,9 @@ const SEED_EINSAETZE: &[(&str, &str, &str)] = &[
 ];
 
 /// Legt reproduzierbare Dev-Testdaten an. Idempotent: mehrfacher Aufruf
-/// erzeugt keine Duplikate. Wird in `main` VOR `bootstrap_admin` aufgerufen,
-/// daher legt diese Funktion die Organisation selbst an.
+/// erzeugt keine Duplikate. Wird in `main` NACH `bootstrap_admin` aufgerufen und
+/// nutzt dessen Organisation (oder legt selbst eine an, falls keine existiert);
+/// die Seed-Benutzer werden per Upsert auf den bekannten Dev-Stand gesetzt.
 pub async fn dev_seed(pool: &SqlitePool) -> Result<(), AppError> {
     let org_id = organisation_anlegen(pool).await?;
     benutzer_seeden(pool, org_id).await?;
@@ -103,24 +104,24 @@ async fn organisation_anlegen(pool: &SqlitePool) -> Result<i64, AppError> {
     Ok(id)
 }
 
-/// Seedet die `SEED_BENUTZER`. Idempotent über den natürlichen Schlüssel
-/// `benutzername`: existiert der Benutzer bereits, wird übersprungen (und das
-/// teure Argon2-Hashing gar nicht erst ausgeführt).
+/// Seedet die `SEED_BENUTZER` per Upsert über den natürlichen Schlüssel
+/// `benutzername`. Existiert ein Konto bereits — insbesondere der von
+/// `bootstrap_admin` angelegte Admin (mit Zufalls-/Config-Passwort) —, werden
+/// seine Felder inkl. des auf das **Dev-Passwort** zurückgesetzten Hashes
+/// überschrieben. So sind die Dev-Konten reproduzierbar und der
+/// `/api/dev/users`-Login-Picker funktioniert auch nach `bootstrap_admin`.
+/// (Das Argon2-Hashing läuft dadurch bei jedem Start — im Dev-Build akzeptabel.)
 async fn benutzer_seeden(pool: &SqlitePool, org_id: i64) -> Result<(), AppError> {
     for b in SEED_BENUTZER {
-        let existiert: Option<i64> =
-            sqlx::query_scalar("SELECT 1 FROM benutzer WHERE benutzername = ?")
-                .bind(b.benutzername)
-                .fetch_optional(pool)
-                .await?;
-        if existiert.is_some() {
-            continue;
-        }
         let hash = password::hash(b.passwort)?;
         sqlx::query(
             "INSERT INTO benutzer \
                 (org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, aktiv) \
-             VALUES (?, ?, ?, ?, ?, ?, ?)",
+             VALUES (?, ?, ?, ?, ?, ?, ?) \
+             ON CONFLICT(benutzername) DO UPDATE SET \
+                org_id = excluded.org_id, anzeigename = excluded.anzeigename, \
+                passwort_hash = excluded.passwort_hash, system_rolle = excluded.system_rolle, \
+                org_rolle = excluded.org_rolle, aktiv = excluded.aktiv",
         )
         .bind(org_id)
         .bind(b.anzeigename)
@@ -309,6 +310,43 @@ mod tests {
             .find(|b| b.benutzername == "inaktiv")
             .unwrap();
         assert!(!inaktiv.aktiv);
+    }
+
+    #[tokio::test]
+    async fn dev_seed_nach_bootstrap_setzt_admin_passwort_zurueck() {
+        let pool = crate::db::test_pool().await;
+        // Reihenfolge wie in main: bootstrap_admin zuerst (Org + Admin + Kataloge,
+        // hier mit zufälligem Bootstrap-Passwort), dann dev_seed.
+        crate::auth::bootstrap::bootstrap_admin(&pool, "Org", "admin", Some("zufalls-bootstrap-pw"))
+            .await
+            .unwrap();
+        dev_seed(&pool).await.unwrap();
+
+        // bootstrap_admin hat den FMS-Default-Katalog geseedet (10 Hauptstatus).
+        let status: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM fahrzeug_status")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(status, 10, "Katalog wird trotz dev-seeds geseedet");
+
+        // dev_seed hat das Admin-Passwort auf das Dev-Passwort zurückgesetzt.
+        let hash: String =
+            sqlx::query_scalar("SELECT passwort_hash FROM benutzer WHERE benutzername = 'admin'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert!(password::verifizieren(SEED_PASSWORT, &hash), "Admin nutzt das Dev-Passwort");
+        assert!(
+            !password::verifizieren("zufalls-bootstrap-pw", &hash),
+            "altes Bootstrap-Passwort gilt nicht mehr"
+        );
+
+        // Genau die vier Dev-Benutzer — 'admin' wurde nicht dupliziert.
+        let anzahl: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM benutzer")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(anzahl, 4);
     }
 
     #[tokio::test]
