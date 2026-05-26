@@ -453,4 +453,51 @@ mod tests {
             .await;
         assert!(wieder.is_ok(), "Name eines außer Dienst gestellten Fahrzeugs muss frei sein");
     }
+
+    #[tokio::test]
+    async fn fahrzeug_status_migration_constraints_und_seed() {
+        let pool = test_pool().await;
+        // Org NACH der Migration anlegen → Migrations-Seed greift hier NICHT
+        // (das Seeding der neuen Org ist bootstrap_admins Aufgabe, separat getestet).
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        // kategorie-CHECK.
+        let bad_kat = sqlx::query(
+            "INSERT INTO fahrzeug_status (org_id, label, kategorie) VALUES (1, 'X', 'quatsch')",
+        )
+        .execute(&pool)
+        .await;
+        assert!(bad_kat.is_err(), "ungültige kategorie muss abgelehnt werden");
+
+        // fms_anker-CHECK (0..=9).
+        let bad_fms = sqlx::query(
+            "INSERT INTO fahrzeug_status (org_id, label, kategorie, fms_anker) VALUES (1, 'Y', 'gebunden', 12)",
+        )
+        .execute(&pool)
+        .await;
+        assert!(bad_fms.is_err(), "fms_anker außerhalb 0..=9 muss abgelehnt werden");
+
+        // aktiv-Default ist 1, sortier-Default 0.
+        sqlx::query("INSERT INTO fahrzeug_status (org_id, label, kategorie) VALUES (1, 'frei', 'verfuegbar')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let (aktiv, sortier): (i64, i64) = sqlx::query_as(
+            "SELECT aktiv, sortier FROM fahrzeug_status WHERE label = 'frei'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(aktiv, 1);
+        assert_eq!(sortier, 0);
+
+        // UNIQUE(org_id, label).
+        let dup = sqlx::query("INSERT INTO fahrzeug_status (org_id, label, kategorie) VALUES (1, 'frei', 'gebunden')")
+            .execute(&pool)
+            .await;
+        assert!(dup.is_err(), "doppeltes label je Org muss abgelehnt werden");
+    }
 }
