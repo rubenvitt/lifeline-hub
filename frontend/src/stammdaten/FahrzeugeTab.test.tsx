@@ -23,7 +23,9 @@ function render(benutzer: typeof admin) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
     http.get('/api/fahrzeuge', () => HttpResponse.json([fahrzeug])),
-    http.get('/api/fahrzeug-typen', () => HttpResponse.json(['LF 20'])),
+    http.get('/api/fahrzeug-vorschlaege', () =>
+      HttpResponse.json({ fahrzeugtyp: ['LF 20'], traegerorganisation: [], standort: [] }),
+    ),
   );
   return renderMitProviders(
     <AuthProvider>

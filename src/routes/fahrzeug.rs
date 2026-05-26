@@ -2,7 +2,7 @@ use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
 use crate::error::AppError;
 use crate::fahrzeug::repo::{self, FahrzeugDaten};
-use crate::fahrzeug::FahrzeugAnzeige;
+use crate::fahrzeug::{FahrzeugAnzeige, FahrzeugVorschlaege};
 use crate::staerke::Staerke;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -108,12 +108,13 @@ pub async fn liste(
     Ok(Json(fahrzeuge.iter().map(|f| f.anzeige()).collect()))
 }
 
-/// GET /api/fahrzeug-typen — abgeleitete AutoComplete-Vorschläge (eigene Org).
-pub async fn typen(
+/// GET /api/fahrzeug-vorschlaege — abgeleitete AutoComplete-Vorschläge (eigene Org)
+/// für Fahrzeugtyp, Trägerorganisation und Standort.
+pub async fn vorschlaege(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-) -> Result<Json<Vec<String>>, AppError> {
-    Ok(Json(repo::typ_vorschlaege(&state.pool, benutzer.org_id).await?))
+) -> Result<Json<FahrzeugVorschlaege>, AppError> {
+    Ok(Json(repo::vorschlaege(&state.pool, benutzer.org_id).await?))
 }
 
 /// POST /api/fahrzeuge — Admin. Dublette Funkrufname → Conflict.

@@ -74,7 +74,7 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/api/fahrzeuge", get(routes::fahrzeug::liste))
         .route("/api/fahrzeuge", post(routes::fahrzeug::anlegen))
-        .route("/api/fahrzeug-typen", get(routes::fahrzeug::typen))
+        .route("/api/fahrzeug-vorschlaege", get(routes::fahrzeug::vorschlaege))
         .route("/api/fahrzeuge/{id}", patch(routes::fahrzeug::aktualisieren))
         .route(
             "/api/fahrzeuge/{id}/ausser-dienst",

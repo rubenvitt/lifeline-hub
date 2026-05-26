@@ -101,6 +101,13 @@ export interface Fahrzeug {
   angelegt_at: string;
 }
 
+/** Bereits verwendete Werte je Stamm-Feld (DISTINCT) für die Comboboxen. */
+export interface FahrzeugVorschlaege {
+  fahrzeugtyp: string[];
+  traegerorganisation: string[];
+  standort: string[];
+}
+
 export interface FahrzeugStatus {
   id: number;
   label: string;

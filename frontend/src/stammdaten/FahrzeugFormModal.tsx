@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
 import { aktualisiereFahrzeug, legeFahrzeugAn, type FahrzeugEingabe } from '../api/fahrzeuge';
-import type { Fahrzeug } from '../api/types';
+import type { Fahrzeug, FahrzeugVorschlaege } from '../api/types';
 
 interface FormWerte {
   funkrufname: string;
@@ -29,12 +29,12 @@ function leerZuNull(w: string | undefined): string | null {
 export default function FahrzeugFormModal({
   offen,
   fahrzeug,
-  typVorschlaege,
+  vorschlaege,
   onClose,
 }: {
   offen: boolean;
   fahrzeug: Fahrzeug | null; // null = neu
-  typVorschlaege: string[];
+  vorschlaege: FahrzeugVorschlaege;
   onClose: () => void;
 }) {
   const [form] = Form.useForm<FormWerte>();
@@ -91,7 +91,7 @@ export default function FahrzeugFormModal({
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fahrzeuge'] });
-      qc.invalidateQueries({ queryKey: ['fahrzeug-typen'] });
+      qc.invalidateQueries({ queryKey: ['fahrzeug-vorschlaege'] });
       onClose();
     },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
@@ -117,7 +117,7 @@ export default function FahrzeugFormModal({
         </Form.Item>
         <Form.Item label="Fahrzeugtyp" name="fahrzeugtyp">
           <AutoComplete
-            options={typVorschlaege.map((t) => ({ value: t }))}
+            options={vorschlaege.fahrzeugtyp.map((t) => ({ value: t }))}
             allowClear
             placeholder="z. B. LF 20, RTW"
             filterOption={(input, option) =>
@@ -125,10 +125,28 @@ export default function FahrzeugFormModal({
             }
           />
         </Form.Item>
-        <Form.Item label="Trägerorganisation" name="traegerorganisation"><Input /></Form.Item>
+        <Form.Item label="Trägerorganisation" name="traegerorganisation">
+          <AutoComplete
+            options={vorschlaege.traegerorganisation.map((t) => ({ value: t }))}
+            allowClear
+            placeholder="z. B. Feuerwehr Musterstadt"
+            filterOption={(input, option) =>
+              (option?.value ?? '').toLowerCase().includes(input.toLowerCase())
+            }
+          />
+        </Form.Item>
         <Form.Item label="Kennzeichen" name="kennzeichen"><Input /></Form.Item>
         <Form.Item label="OPTA" name="opta"><Input /></Form.Item>
-        <Form.Item label="Standort" name="standort"><Input /></Form.Item>
+        <Form.Item label="Standort" name="standort">
+          <AutoComplete
+            options={vorschlaege.standort.map((t) => ({ value: t }))}
+            allowClear
+            placeholder="z. B. Wache Mitte"
+            filterOption={(input, option) =>
+              (option?.value ?? '').toLowerCase().includes(input.toLowerCase())
+            }
+          />
+        </Form.Item>
         <Form.Item label="FMS-ISSI" name="fms_issi"><Input /></Form.Item>
         <Form.Item label="Sonder-/Wegerecht" name="sondersignal" valuePropName="checked">
           <Switch />

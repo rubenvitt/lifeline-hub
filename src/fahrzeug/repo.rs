@@ -1,4 +1,4 @@
-use super::{Fahrzeug, DIENSTSTATUS_AUSSER_DIENST, DIENSTSTATUS_IN_DIENST};
+use super::{Fahrzeug, FahrzeugVorschlaege, DIENSTSTATUS_AUSSER_DIENST, DIENSTSTATUS_IN_DIENST};
 use crate::error::AppError;
 use crate::staerke::Staerke;
 use sqlx::SqlitePool;
@@ -76,17 +76,29 @@ pub async fn liste(
         .map_err(Into::into)
 }
 
-/// Abgeleitete Fahrzeugtyp-Vorschläge (DISTINCT, org-weit) für die AutoComplete.
-pub async fn typ_vorschlaege(pool: &SqlitePool, org_id: i64) -> Result<Vec<String>, AppError> {
-    sqlx::query_scalar::<_, String>(
-        "SELECT DISTINCT fahrzeugtyp FROM fahrzeug \
-         WHERE org_id = ? AND fahrzeugtyp IS NOT NULL AND fahrzeugtyp <> '' \
-         ORDER BY fahrzeugtyp",
-    )
+/// DISTINCT-Werte einer Spalte (org-weit, nicht-leer, sortiert) für die AutoComplete.
+/// `spalte` wird in die Query interpoliert und darf daher AUSSCHLIESSLICH mit
+/// festen Literalen aufgerufen werden (keine Nutzereingabe).
+async fn distinct_werte(pool: &SqlitePool, org_id: i64, spalte: &str) -> Result<Vec<String>, AppError> {
+    sqlx::query_scalar::<_, String>(&format!(
+        "SELECT DISTINCT {spalte} FROM fahrzeug \
+         WHERE org_id = ? AND {spalte} IS NOT NULL AND {spalte} <> '' \
+         ORDER BY {spalte}"
+    ))
     .bind(org_id)
     .fetch_all(pool)
     .await
     .map_err(Into::into)
+}
+
+/// Abgeleitete AutoComplete-Vorschläge (DISTINCT, org-weit) für die Stamm-Comboboxen:
+/// Fahrzeugtyp, Trägerorganisation und Standort — jeweils die bereits verwendeten Werte.
+pub async fn vorschlaege(pool: &SqlitePool, org_id: i64) -> Result<FahrzeugVorschlaege, AppError> {
+    Ok(FahrzeugVorschlaege {
+        fahrzeugtyp: distinct_werte(pool, org_id, "fahrzeugtyp").await?,
+        traegerorganisation: distinct_werte(pool, org_id, "traegerorganisation").await?,
+        standort: distinct_werte(pool, org_id, "standort").await?,
+    })
 }
 
 /// Legt ein Fahrzeug an. Dublette Funkrufname (unter aktiven) → `Conflict`.
@@ -306,18 +318,24 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn typ_vorschlaege_distinct() {
+    async fn vorschlaege_distinct_je_feld() {
         let pool = crate::db::test_pool().await;
         org(&pool, 1).await;
         anlegen(&pool, 1, daten("Florian 1")).await.unwrap(); // LF 20
         let mut rtw = daten("Rettung 1");
         rtw.fahrzeugtyp = Some("RTW");
+        rtw.traegerorganisation = Some("DRK");
+        rtw.standort = Some("Wache Mitte");
         anlegen(&pool, 1, rtw).await.unwrap();
         let mut lf2 = daten("Florian 2");
-        lf2.fahrzeugtyp = Some("LF 20");
+        lf2.fahrzeugtyp = Some("LF 20"); // Dublette Typ
+        lf2.traegerorganisation = Some("Feuerwehr");
+        lf2.standort = Some("Wache Mitte"); // Dublette Standort
         anlegen(&pool, 1, lf2).await.unwrap();
 
-        let typen = typ_vorschlaege(&pool, 1).await.unwrap();
-        assert_eq!(typen, vec!["LF 20".to_string(), "RTW".to_string()]);
+        let v = vorschlaege(&pool, 1).await.unwrap();
+        assert_eq!(v.fahrzeugtyp, vec!["LF 20".to_string(), "RTW".to_string()]);
+        assert_eq!(v.traegerorganisation, vec!["DRK".to_string(), "Feuerwehr".to_string()]);
+        assert_eq!(v.standort, vec!["Wache Mitte".to_string()], "DISTINCT je Feld");
     }
 }

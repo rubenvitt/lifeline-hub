@@ -105,6 +105,15 @@ pub struct FahrzeugAnzeige {
     pub angelegt_at: String,
 }
 
+/// Abgeleitete AutoComplete-Vorschläge für die Stamm-Felder (DISTINCT, org-weit).
+/// Speist die Comboboxen im Fahrzeug-Formular mit bereits verwendeten Werten.
+#[derive(Debug, Clone, Serialize)]
+pub struct FahrzeugVorschlaege {
+    pub fahrzeugtyp: Vec<String>,
+    pub traegerorganisation: Vec<String>,
+    pub standort: Vec<String>,
+}
+
 /// Status-Katalog-Eintrag (org-weit). `aktiv` wird nicht serialisiert
 /// (Listen-Endpunkt liefert ohnehin nur aktive).
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
