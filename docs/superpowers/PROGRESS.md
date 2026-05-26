@@ -15,17 +15,24 @@ Vollständige Details: `docs/superpowers/specs/2026-05-23-fundament-etb-kern-des
 - **Live:** SSE (Server→Client) + POST (Client→Server).
 - **Karte (später):** MapLibre GL. **Desktop/Mobile (später):** Tauri / Capacitor.
 
-## Gesamt-Zerlegung (4 Teilprojekte)
+## Gesamt-Zerlegung (Teilprojekte)
 
 ```
 FUNDAMENT (Server · Auth · Einsatz · Stammdaten · Live)
-  └─▶ ① ETB-Kern              ← Teilprojekt 1 (aktuell)
-       ├─▶ ② Fahrzeug-/Einsatzmittelverwaltung
+  └─▶ ① ETB-Kern                     ← Teilprojekt 1 (funktional fertig)
+       ├─▶ ② Kräfte & Mittel         ← Teilprojekt 2 (aktuell)
+       │      (Fahrzeuge · Personal · Einheiten · Material)
        ├─▶ ③ Patienten-/Betroffenenverwaltung (sensible Daten)
        └─▶ ④ Lagekarte (visualisiert ①–③)
 ```
 
 Jedes Teilprojekt bekommt einen eigenen Zyklus: Spec → Pläne → Umsetzung.
+
+> **Reframing (2026-05-25):** Das Navigations-Redesign hat die Module in Kategorien
+> gegliedert. Das alte T2 „Fahrzeug-/Einsatzmittelverwaltung" wird zur ganzen
+> Kategorie **„Kräfte & Mittel"** geweitet. **Abrollbehälter** ist bewusst
+> gestrichen (keine eigene Entity; bei Bedarf später wieder aufnehmbar — auch der
+> geplante `modulRegistry`-Eintrag entfällt dann).
 
 ## Teilprojekt 1 — Plan-Sequenz (6 Pläne)
 
@@ -41,6 +48,32 @@ Jeder Plan ergibt für sich lauffähige, testbare Software und baut auf dem vori
 | 6 | **Backup/Restore + Packaging** — Hot-Backup (`GET /api/backup` + CLI), Restore (CLI + Doku), Frontend-Embedding (rust-embed), Single-Binary-Build | ✅ **DONE** — Branch `worktree-feat+einsatz-rollen` |
 
 **Bewusst später (nicht Teil von T1):** PDF-/Druck-Export (priorisiert für T1.1/T2), OIDC/SSO, MFA, Schnellbausteine, Server-Discovery (QR/mDNS).
+
+## Teilprojekt 2 — „Kräfte & Mittel" — Spec-Sequenz
+
+Org-globaler Ressourcen-Stamm + **Disposition** in den Einsatz (Auswahl/Aktivierung
+aus dem Pool + Ad-hoc-externe Kräfte). K&M‑1 legt die generische Mechanik und zieht
+sie konkret für Fahrzeuge durch; K&M‑2/3/4 verwenden dieses Pattern wieder. Jede Spec
+wird einzeln durchgebrainstormt (eigener Zyklus Spec → Plan → Umsetzung).
+
+| # | Spec | Liefert | Abhängigkeit | Status |
+|---|---|---|---|---|
+| K&M‑1 | **Stammdaten & Disposition — am Beispiel Fahrzeuge** | Generische Mechanik + Fahrzeuge: Stamm-CRUD im globalen Stammdaten-Bereich, Disposition im Einsatz, Ad-hoc-externe Fahrzeuge | — (Unterbau) | 📝 Design abgestimmt → Plan als Nächstes |
+| K&M‑2 | **Personal** | Personal-Stamm + Disposition (reuse der Mechanik) | K&M‑1 | offen |
+| K&M‑3 | **Einheiten (taktische Einheiten)** | Komponiert Personal + Fahrzeuge, Zuordnung zu Einsatzabschnitt | **K&M‑1 + K&M‑2 (Zwang)** | offen |
+| K&M‑4 | **Material** | Material-Stamm + Disposition | K&M‑1 | offen |
+
+**Harte Reihenfolge:** Einheiten *muss* nach Personal **und** Fahrzeugen kommen — eine taktische Einheit bündelt Führer + Mannschaft + Fahrzeug, die vorher existieren müssen. Material hängt nur am Unterbau (K&M‑1).
+
+**Dispositions-Modell (abgestimmt, gilt für alle K&M‑Module):** Referenz aus dem globalen Stamm-Pool + Einsatz-Zustand obendrauf (kein Voll-Snapshot, keine Stamm-Versionierung). Zwei Schutzmechanismen für die Nachvollziehbarkeit: (1) **kein Hard-Delete** im Stamm — Ressourcen werden nur „außer Dienst" gesetzt, damit alte Referenzen auflösbar bleiben; (2) **Identitäts-Schnappschuss** in der Dispositionszeile (z. B. Funkrufname/Kennzeichen zum Dispo-Zeitpunkt). Dispo-/Status-Ereignisse werden zusätzlich als **ETB-Einträge** mitgeschrieben (inkl. Ressourcen-Identität) — das ist die unveränderliche Historie.
+
+**Spec K&M‑1:** `docs/superpowers/specs/2026-05-26-kraefte-mittel-fahrzeuge-disposition-design.md`
+
+## Querschnittliche Folge-Idee — Daten-Retention abgeschlossener Einsätze (Backlog)
+
+Idee (2026-05-25): Abgeschlossene Einsätze nach einer Frist (z. B. 24 h) auf das rechtlich/fachlich Nötige eindampfen — **ETB** (append-only) + **generierter PDF-Report** (selbsttragendes Rechtsdokument, inkl. Lagebild) — statt den vollen App-Zustand (Dispositionen, Listen, …) dauerhaft vorzuhalten. Spart Daten und umgeht die „welches Fahrzeug war das"-Frage, weil die Identität bereits in ETB/Report steht.
+
+**Abhängigkeit:** setzt den PDF-/Druck-Report voraus (bereits als „priorisiert für T1.1/T2" vermerkt) → eigene, spätere Querschnitts-Spec. **Implikation für K&M‑1:** Dispositions-/Status-Ereignisse als ETB-Einträge mitschreiben (inkl. Fahrzeug-Identität), damit ETB+Report nach dem Eindampfen selbsttragend bleiben.
 
 ## Arbeitsweise / Konventionen
 
