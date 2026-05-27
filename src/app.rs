@@ -92,6 +92,18 @@ pub fn build_router(state: AppState) -> Router {
             "/api/fahrzeuge/{id}/in-dienst",
             post(routes::fahrzeug::in_dienst),
         )
+        .route("/api/material", get(routes::material::liste))
+        .route("/api/material", post(routes::material::anlegen))
+        .route("/api/material-kategorien", get(routes::material::kategorien))
+        .route("/api/material/{id}", patch(routes::material::aktualisieren))
+        .route(
+            "/api/material/{id}/ausser-dienst",
+            post(routes::material::ausser_dienst),
+        )
+        .route(
+            "/api/material/{id}/in-dienst",
+            post(routes::material::in_dienst),
+        )
         .route("/api/fahrzeug-status", get(routes::fahrzeug_status::liste))
         .route("/api/fahrzeug-status", post(routes::fahrzeug_status::anlegen))
         .route(

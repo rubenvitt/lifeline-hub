@@ -12,6 +12,7 @@ pub mod einsatzabschnitt;
 pub mod etb;
 pub mod fahrzeug;
 pub mod fahrzeug_status;
+pub mod material;
 pub mod health;
 pub mod personal;
 pub mod personal_status;
