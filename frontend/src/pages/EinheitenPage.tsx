@@ -10,6 +10,7 @@ import { listeEinheitTypen } from '../api/einheitTypen';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
+import { gibMaterialFrei, listeEinsatzMaterial, ordneMaterialZu } from '../api/einsatzMaterial';
 import {
   aktualisiereEinheit, bildeEinheit, gibFahrzeugFrei, gibPersonalFrei, listeEinheiten,
   loeseEinheitAuf, ordneFahrzeugZu, ordnePersonalZu, type EinheitEingabe,
@@ -91,11 +92,13 @@ export default function EinheitenPage() {
   const abschnitteQuery = useQuery({ queryKey: ['abschnitte', einsatzId], queryFn: () => listeAbschnitte(einsatzId) });
   const personalQuery = useQuery({ queryKey: ['einsatz-personal', einsatzId], queryFn: () => listeEinsatzPersonal(einsatzId) });
   const fahrzeugeQuery = useQuery({ queryKey: ['einsatz-fahrzeuge', einsatzId], queryFn: () => listeEinsatzFahrzeuge(einsatzId) });
+  const materialQuery = useQuery({ queryKey: ['einsatz-material', einsatzId], queryFn: () => listeEinsatzMaterial(einsatzId) });
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: ['einheiten', einsatzId] });
     qc.invalidateQueries({ queryKey: ['einsatz-personal', einsatzId] });
     qc.invalidateQueries({ queryKey: ['einsatz-fahrzeuge', einsatzId] });
+    qc.invalidateQueries({ queryKey: ['einsatz-material', einsatzId] });
     qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
   }
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
@@ -148,6 +151,14 @@ export default function EinheitenPage() {
     mutationFn: (efId: number) => gibFahrzeugFrei(einsatzId, aktuell!.id, efId),
     onSuccess: invalidate, onError: fehler,
   });
+  const materialZu = useMutation({
+    mutationFn: (emId: number) => ordneMaterialZu(einsatzId, aktuell!.id, emId),
+    onSuccess: invalidate, onError: fehler,
+  });
+  const materialFrei = useMutation({
+    mutationFn: (emId: number) => gibMaterialFrei(einsatzId, aktuell!.id, emId),
+    onSuccess: invalidate, onError: fehler,
+  });
   const fuehrerSetzen = useMutation({
     // Baut den PATCH-Body bewusst aus dem Server-Stand (`aktuell`), nicht aus dem
     // Formular: ungespeicherte Kopf-Edits werden NICHT mitgesendet (Vollersatz-Vertrag).
@@ -184,6 +195,7 @@ export default function EinheitenPage() {
   // Frei-Pool: disponierte Kräfte ohne Einheit.
   const freiesPersonal = (personalQuery.data ?? []).filter((p) => p.einheit_id == null);
   const freieFahrzeuge = (fahrzeugeQuery.data ?? []).filter((f) => f.einheit_id == null);
+  const freiesMaterial = (materialQuery.data ?? []).filter((m) => m.einheit_id == null);
 
   if (einsatzQuery.isLoading) {
     return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
@@ -294,6 +306,20 @@ export default function EinheitenPage() {
                   optionFilterProp="label" notFoundContent="Keine freien Fahrzeuge"
                   options={freieFahrzeuge.map((f) => ({ value: f.id, label: f.funkrufname }))}
                   onSelect={(efId) => fahrzeugZu.mutate(Number(efId))} />
+              )}
+
+              <Typography.Title level={5} style={{ marginTop: 16 }}>Material</Typography.Title>
+              {aktuell.material_mitglieder.map((m) => (
+                <Space key={m.em_id} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{m.bezeichnung} ×{m.menge}</span>
+                  {darfSchreiben && <Button size="small" danger onClick={() => materialFrei.mutate(m.em_id)}>Entfernen</Button>}
+                </Space>
+              ))}
+              {darfSchreiben && (
+                <Select showSearch style={{ width: '100%', marginTop: 8 }} placeholder="Material zuordnen …" value={null}
+                  optionFilterProp="label" notFoundContent="Kein freies Material"
+                  options={freiesMaterial.map((m) => ({ value: m.id, label: `${m.bezeichnung} ×${m.menge}` }))}
+                  onSelect={(emId) => materialZu.mutate(Number(emId))} />
               )}
             </Form>
           )}

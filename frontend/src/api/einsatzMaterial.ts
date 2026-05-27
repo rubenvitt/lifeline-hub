@@ -36,10 +36,10 @@ export function entferneDisposition(einsatzId: number, emId: number): Promise<vo
   return apiSend<void>(`/api/einsaetze/${einsatzId}/material/${emId}`, 'DELETE');
 }
 
-export function ordneEinheitZu(einsatzId: number, eid: number, emId: number): Promise<void> {
+export function ordneMaterialZu(einsatzId: number, eid: number, emId: number): Promise<void> {
   return apiSend<void>(`/api/einsaetze/${einsatzId}/einheiten/${eid}/material/${emId}`, 'PUT');
 }
 
-export function gibEinheitFrei(einsatzId: number, eid: number, emId: number): Promise<void> {
+export function gibMaterialFrei(einsatzId: number, eid: number, emId: number): Promise<void> {
   return apiSend<void>(`/api/einsaetze/${einsatzId}/einheiten/${eid}/material/${emId}`, 'DELETE');
 }
