@@ -85,7 +85,7 @@ die generische Mechanik legte). Jede Spec wird einzeln durchgebrainstormt.
 
 | # | Spec | Liefert | Abhängigkeit | Status |
 |---|---|---|---|---|
-| E‑1 | **Personen-Fundament + Erfassung** | Personen-Entity, Status-Lebenszyklus (vermisst → betroffen → Patient SK I–IV → verstorben), Basis-Erfassung, ETB-Integration **+ sensible-Daten-Zugriffs-/Audit-/Retention-Modell** | — (Unterbau) | 🧠 Brainstorming |
+| E‑1 | **Personen-Fundament + Erfassung** | Personen-Entity, Status-Lebenszyklus (vermisst → betroffen → Patient SK I–IV → verstorben), Basis-Erfassung, ETB-Integration **+ sensible-Daten-Zugriffs-/Audit-/Retention-Modell** | — (Unterbau) | ✅ **DONE** — Plan `docs/superpowers/plans/2026-05-27-erfassung-personen-fundament.md`, PersonenPage + Tests, Modul aktiviert |
 | E‑2 | **Sichtung & medizinischer Verlauf** | Sichtungskategorien SK I–IV/tot, Verletzungs-/Befundnotiz, Transport/Verbleib (Krankenhaus), Vermisstenabgleich | E‑1 | geplant |
 | E‑3 | **Unfallhilfsstellen** | Örtlichkeits-/Struktur-Stamm (Patientenablage, Behandlungsplatz, Verletztensammelstelle); Personen-Zuordnung | E‑1 | geplant |
 | E‑4 | **Tiere** | Eigener Stamm + Status (eigene Spec — Tiere kommen vor) | E‑1-Foundation | geplant |

@@ -56,7 +56,7 @@ export const modulRegistry: ModulEintrag[] = [
   { key: 'material', kategorie: 'kraefte', label: 'Material', icon: TbPackages, route: 'material', status: 'fertig', beschreibung: 'Material und Verbrauchsgüter im Einsatz.' },
   // Erfassung
   { key: 'etb', kategorie: 'erfassung', label: 'ETB', icon: TbClipboardText, route: 'etb', status: 'fertig', beschreibung: 'Einsatztagebuch.' },
-  { key: 'personen', kategorie: 'erfassung', label: 'Personen', icon: TbUsers, route: 'personen', status: 'geplant', beschreibung: 'Ein Personenstamm mit Status-Lebenszyklus (vermisst → betroffen → Patient → verstorben).' },
+  { key: 'personen', kategorie: 'erfassung', label: 'Personen', icon: TbUsers, route: 'personen', status: 'fertig', beschreibung: 'Ein Personenstamm mit Status-Lebenszyklus (vermisst → betroffen → Patient → verstorben).' },
   { key: 'unfallhilfsstellen', kategorie: 'erfassung', label: 'Unfallhilfsstellen', icon: TbFirstAidKit, route: 'unfallhilfsstellen', status: 'geplant', beschreibung: 'Behandlungs-/Sammelstellen als Örtlichkeiten.' },
   { key: 'tiere', kategorie: 'erfassung', label: 'Tiere', icon: TbPaw, route: 'tiere', status: 'geplant', beschreibung: 'Betroffene Tiere, getrennt vom Personenstamm.' },
   { key: 'sachschaeden', kategorie: 'erfassung', label: 'Sachschäden', icon: TbHome, route: 'sachschaeden', status: 'wip', beschreibung: 'Erfassung von Sachschäden (optional). Wird später ausgearbeitet.' },
