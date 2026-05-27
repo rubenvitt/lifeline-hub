@@ -141,9 +141,9 @@ pub async fn aktualisieren(
 
     if vorher.fuehrer_id != body.fuehrer_id {
         let inhalt = match (&vorher.fuehrer_name, &final_anzeige.fuehrer_name) {
-            (None, Some(neu)) => format!("Einheit «{}»: Führer «{}» gesetzt", final_anzeige.name, neu),
-            (Some(alt), Some(neu)) => format!("Einheit «{}»: Führer «{}» → «{}»", final_anzeige.name, alt, neu),
-            (Some(alt), None) => format!("Einheit «{}»: Führer «{}» entfernt", final_anzeige.name, alt),
+            (None, Some(neu)) => format!("Einheit «{}»: Einheitsführer «{}» gesetzt", final_anzeige.name, neu),
+            (Some(alt), Some(neu)) => format!("Einheit «{}»: Einheitsführer «{}» → «{}»", final_anzeige.name, alt, neu),
+            (Some(alt), None) => format!("Einheit «{}»: Einheitsführer «{}» entfernt", final_anzeige.name, alt),
             (None, None) => String::new(),
         };
         if !inhalt.is_empty() {
