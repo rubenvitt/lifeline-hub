@@ -6,6 +6,7 @@ import PersonalTab from '../stammdaten/PersonalTab';
 import QualifikationenTab from '../stammdaten/QualifikationenTab';
 import PersonalStatusTab from '../stammdaten/PersonalStatusTab';
 import EinheitTypenTab from '../stammdaten/EinheitTypenTab';
+import MaterialTab from '../stammdaten/MaterialTab';
 
 export default function StammdatenPage() {
   return (
@@ -16,6 +17,7 @@ export default function StammdatenPage() {
         items={[
           { key: 'stichworte', label: 'Einsatz-Stichworte', children: <StichworteTab /> },
           { key: 'fahrzeuge', label: 'Fahrzeuge', children: <FahrzeugeTab /> },
+          { key: 'material', label: 'Material', children: <MaterialTab /> },
           { key: 'status', label: 'Fahrzeug-Status', children: <StatusKatalogTab /> },
           { key: 'personal', label: 'Personal', children: <PersonalTab /> },
           { key: 'qualifikationen', label: 'Qualifikationen', children: <QualifikationenTab /> },
