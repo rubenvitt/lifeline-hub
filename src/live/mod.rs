@@ -17,7 +17,8 @@ pub struct LiveNachricht {
 }
 
 /// Registry der Live-Kanäle: pro Einsatz ein Broadcast-Sender, über den
-/// neu erfasste ETB-Einträge (als JSON-String) an alle SSE-Abonnenten gehen.
+/// getaggte `LiveNachricht`-Einträge (Event-Tag wie `etb`/`person` plus
+/// serialisierte Daten) an alle SSE-Abonnenten gehen.
 ///
 /// Klonbar (teilt denselben inneren Zustand) — wird im `AppState` gehalten.
 #[derive(Clone, Default)]
@@ -51,12 +52,15 @@ impl LiveHub {
     /// Ohne Kanal/Abonnenten passiert nichts. Ein Kanal ohne Empfänger wird
     /// opportunistisch entfernt, damit der Hub nicht über abgeschlossene
     /// Einsätze hinweg leakt.
+    /// Nachrichten, die bei leerem Kanal gesendet werden, gehen verloren — neue
+    /// Abonnenten erhalten nach ihrem Connect nur nachfolgende Einträge (vgl. §6).
     pub fn publiziere_event(&self, einsatz_id: i64, event: &str, data: String) {
         let nachricht = LiveNachricht { event: event.to_string(), data };
         // Häufiger Fall (Kanal existiert): nur Lese-Lock.
         let keine_empfaenger = {
             let kanaele = self.kanaele.read().expect("LiveHub-Lock");
             match kanaele.get(&einsatz_id) {
+                // send() liefert Err, wenn kein Empfänger mehr lauscht.
                 Some(sender) => sender.send(nachricht).is_err(),
                 None => false,
             }
