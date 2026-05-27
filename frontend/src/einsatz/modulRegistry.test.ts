@@ -84,6 +84,13 @@ describe('modulRegistry', () => {
     expect(personal?.route).toBe('personal');
   });
 
+  it('material ist fertig in der Kategorie kraefte', () => {
+    const material = modulRegistry.find((m) => m.key === 'material');
+    expect(material?.status).toBe('fertig');
+    expect(material?.kategorie).toBe('kraefte');
+    expect(material?.route).toBe('material');
+  });
+
   it('einheiten und einsatzabschnitte sind fertig', () => {
     const einheiten = modulRegistry.find((m) => m.key === 'einheiten');
     const abschnitte = modulRegistry.find((m) => m.key === 'einsatzabschnitte');

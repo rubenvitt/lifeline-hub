@@ -53,7 +53,7 @@ export const modulRegistry: ModulEintrag[] = [
   { key: 'einheiten', kategorie: 'kraefte', label: 'Einheiten', icon: TbUsersGroup, route: 'einheiten', status: 'fertig', beschreibung: 'Taktische Einheiten: Führer, Mannschaft, Fahrzeug, Abschnittszuordnung.' },
   { key: 'personal', kategorie: 'kraefte', label: 'Personal', icon: TbUser, route: 'personal', status: 'fertig', beschreibung: 'Im Einsatz aktive Personen aus dem Stammdaten-Pool plus Ad-hoc-Kräfte.' },
   { key: 'fahrzeuge', kategorie: 'kraefte', label: 'Fahrzeuge', icon: TbTruck, route: 'fahrzeuge', status: 'fertig', beschreibung: 'Disponierte Fahrzeuge des Einsatzes.' },
-  { key: 'material', kategorie: 'kraefte', label: 'Material', icon: TbPackages, route: 'material', status: 'geplant', beschreibung: 'Material und Verbrauchsgüter im Einsatz.' },
+  { key: 'material', kategorie: 'kraefte', label: 'Material', icon: TbPackages, route: 'material', status: 'fertig', beschreibung: 'Material und Verbrauchsgüter im Einsatz.' },
   // Erfassung
   { key: 'etb', kategorie: 'erfassung', label: 'ETB', icon: TbClipboardText, route: 'etb', status: 'fertig', beschreibung: 'Einsatztagebuch.' },
   { key: 'personen', kategorie: 'erfassung', label: 'Personen', icon: TbUsers, route: 'personen', status: 'geplant', beschreibung: 'Ein Personenstamm mit Status-Lebenszyklus (vermisst → betroffen → Patient → verstorben).' },

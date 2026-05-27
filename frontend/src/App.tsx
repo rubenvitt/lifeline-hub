@@ -10,6 +10,7 @@ import ProfilPage from './pages/ProfilPage';
 import EtbPage from './pages/EtbPage';
 import EinsatzdatenPage from './pages/EinsatzdatenPage';
 import FahrzeugePage from './pages/FahrzeugePage';
+import MaterialPage from './pages/MaterialPage';
 import PersonalPage from './pages/PersonalPage';
 import EinheitenPage from './pages/EinheitenPage';
 import EinsatzabschnittePage from './pages/EinsatzabschnittePage';
@@ -23,6 +24,7 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   etb: <EtbPage />,
   einsatzdaten: <EinsatzdatenPage />,
   fahrzeuge: <FahrzeugePage />,
+  material: <MaterialPage />,
   personal: <PersonalPage />,
   einheiten: <EinheitenPage />,
   einsatzabschnitte: <EinsatzabschnittePage />,
