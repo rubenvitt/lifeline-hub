@@ -5,6 +5,7 @@ use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
 use crate::etb::{self, repo as etb_repo};
 use crate::person::{registrier_anzeige, repo, Geschlecht, PersonAnzeige, PersonStatus};
+use crate::person::audit_repo;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::sse::{Event, KeepAlive, Sse};
@@ -147,6 +148,73 @@ pub async fn anlegen(
     .await?;
     sse_person(&state, einsatz_id, person.id);
     Ok((StatusCode::CREATED, Json(person)))
+}
+
+/// GET /api/einsaetze/{id}/personen/{pid} — Detail. **Schreibt einen
+/// `detail`-Audit-Eintrag VOR der Response** (auch wenn der Client abbricht).
+pub async fn detail(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, person_id)): Path<(i64, i64)>,
+) -> Result<Json<PersonAnzeige>, AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+
+    // Existenz/Zugehörigkeit prüfen, BEVOR auditiert wird (kein Audit für 404).
+    let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
+    audit_repo::anlegen(&state.pool, einsatz_id, Some(person_id), benutzer.id, "detail").await?;
+    Ok(Json(person))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PatchBody {
+    pub name: Option<String>,
+    pub vorname: Option<String>,
+    pub geschlecht: Option<String>,
+    pub geburtsdatum: Option<String>,
+    pub alter_geschaetzt: Option<i64>,
+    pub herkunft_adresse: Option<String>,
+    pub antreff_ort: Option<String>,
+    pub melder_kontakt: Option<String>,
+    pub notiz: Option<String>,
+}
+
+/// PATCH /api/einsaetze/{id}/personen/{pid} — Identitäts-/Kontextfelder bearbeiten.
+/// Schreibberechtigt + aktiver Einsatz. Kein ETB-Eintrag (E‑1-Felder sind keine
+/// besondere Kategorie; aktueller Datensatz genügt).
+pub async fn aktualisieren(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, person_id)): Path<(i64, i64)>,
+    Json(body): Json<PatchBody>,
+) -> Result<Json<PersonAnzeige>, AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_schreibrecht(rolle)?;
+    fordere_aktiv(&einsatz)?;
+    pruefe_geschlecht(&body.geschlecht)?;
+
+    let name = trimme(body.name);
+    let vorname = trimme(body.vorname);
+    let geburtsdatum = trimme(body.geburtsdatum);
+    let herkunft = trimme(body.herkunft_adresse);
+    let antreff = trimme(body.antreff_ort);
+    let melder = trimme(body.melder_kontakt);
+    let notiz = trimme(body.notiz);
+
+    let person = repo::aktualisiere(
+        &state.pool, einsatz_id, person_id, benutzer.id,
+        repo::PatchDaten {
+            name: name.as_deref(), vorname: vorname.as_deref(),
+            geschlecht: body.geschlecht.as_deref(), geburtsdatum: geburtsdatum.as_deref(),
+            alter_geschaetzt: body.alter_geschaetzt, herkunft_adresse: herkunft.as_deref(),
+            antreff_ort: antreff.as_deref(), melder_kontakt: melder.as_deref(),
+            notiz: notiz.as_deref(),
+        },
+    ).await?;
+    sse_person(&state, einsatz_id, person.id);
+    Ok(Json(person))
 }
 
 /// GET /api/einsaetze/{id}/personen/stream — SSE-Stream des Einsatz-Kanals.

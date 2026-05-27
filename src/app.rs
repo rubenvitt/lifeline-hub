@@ -77,6 +77,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/einsaetze/{id}/personen", get(routes::einsatz_person::liste))
         .route("/api/einsaetze/{id}/personen", post(routes::einsatz_person::anlegen))
         .route("/api/einsaetze/{id}/personen/stream", get(routes::einsatz_person::stream))
+        .route("/api/einsaetze/{id}/personen/{pid}", get(routes::einsatz_person::detail))
+        .route("/api/einsaetze/{id}/personen/{pid}", patch(routes::einsatz_person::aktualisieren))
         .route("/api/einsaetze/{id}/abschnitte", get(routes::einsatzabschnitt::liste))
         .route("/api/einsaetze/{id}/abschnitte", post(routes::einsatzabschnitt::anlegen))
         .route("/api/einsaetze/{id}/abschnitte/{aid}", patch(routes::einsatzabschnitt::aktualisieren))

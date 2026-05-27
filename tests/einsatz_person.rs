@@ -113,7 +113,54 @@ async fn system_etb_inhalte(app: &axum::Router, cookie: &str, einsatz: i64) -> V
         .collect()
 }
 
+/// Legt eine Person an und liefert ihre id.
+async fn person_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, body: &str) -> i64 {
+    let (status, json) = anfrage(app, "POST", &format!("/api/einsaetze/{einsatz}/personen"), cookie, Some(body)).await;
+    assert_eq!(status, StatusCode::CREATED);
+    json["id"].as_i64().unwrap()
+}
+
 // ---------- Tests ----------
+
+#[tokio::test]
+async fn detail_liefert_person_mit_feldern() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{"name":"Test","antreff_ort":"Brücke"}"#).await;
+    let (status, json) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/personen/{p}"), &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["id"], p);
+    assert_eq!(json["name"], "Test");
+    assert_eq!(json["antreff_ort"], "Brücke");
+    assert_eq!(json["registrier_nr"], 1);
+}
+
+#[tokio::test]
+async fn patch_bearbeitet_felder() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{"name":"Alt"}"#).await;
+    let (status, json) = anfrage(
+        &app, "PATCH", &format!("/api/einsaetze/{e}/personen/{p}"), &admin,
+        Some(r#"{"name":"Neu","notiz":"verletzt"}"#),
+    ).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["name"], "Neu");
+    assert_eq!(json["notiz"], "verletzt");
+}
+
+#[tokio::test]
+async fn detail_fremder_einsatz_ist_404() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let (status, _) = anfrage(&app, "GET", &format!("/api/einsaetze/{anderer}/personen/{p}"), &admin, None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
 
 #[tokio::test]
 async fn anlegen_vergibt_registriernummer_und_status_erfasst() {
