@@ -83,4 +83,11 @@ describe('modulRegistry', () => {
     expect(personal?.kategorie).toBe('kraefte');
     expect(personal?.route).toBe('personal');
   });
+
+  it('einheiten und einsatzabschnitte sind fertig', () => {
+    const einheiten = modulRegistry.find((m) => m.key === 'einheiten');
+    const abschnitte = modulRegistry.find((m) => m.key === 'einsatzabschnitte');
+    expect(einheiten?.status).toBe('fertig');
+    expect(abschnitte?.status).toBe('fertig');
+  });
 });
