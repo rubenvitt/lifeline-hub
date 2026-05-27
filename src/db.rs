@@ -576,6 +576,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn einsatzabschnitt_migration_legt_tabelle_und_cascade_an() {
+        let pool = test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool).await.unwrap();
+        let einsatz: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        ).fetch_one(&pool).await.unwrap();
+
+        // Oberste Ebene + Unterabschnitt.
+        let oben: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, 'Nord') RETURNING id",
+        ).bind(einsatz).fetch_one(&pool).await.unwrap();
+        sqlx::query("INSERT INTO einsatzabschnitt (einsatz_id, ueber_abschnitt_id, name) VALUES (?, ?, 'Nord-1')")
+            .bind(einsatz).bind(oben).execute(&pool).await.unwrap();
+
+        // sortier-Default 0, angelegt_at gesetzt.
+        let (sortier, angelegt): (i64, String) = sqlx::query_as(
+            "SELECT sortier, angelegt_at FROM einsatzabschnitt WHERE name = 'Nord'",
+        ).fetch_one(&pool).await.unwrap();
+        assert_eq!(sortier, 0);
+        assert!(!angelegt.is_empty());
+
+        // CASCADE: Einsatz löschen entfernt die Abschnitte.
+        sqlx::query("DELETE FROM einsatz WHERE id = ?").bind(einsatz).execute(&pool).await.unwrap();
+        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatzabschnitt").fetch_one(&pool).await.unwrap();
+        assert_eq!(rest, 0, "CASCADE muss Abschnitte entfernen");
+    }
+
+    #[tokio::test]
     async fn migration_0010_bis_0013_legen_personal_schema_an() {
         let pool = test_pool().await;
         // Tabellen existieren (leeres SELECT wirft nicht).
