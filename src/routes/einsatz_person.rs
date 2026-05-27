@@ -242,6 +242,9 @@ pub async fn status_wechsel(
         return Err(AppError::Validation("Unbekannter Status".into()));
     }
     let vorher = repo::laden(&state.pool, einsatz_id, person_id).await?;
+    if vorher.storniert_at.is_some() {
+        return Err(AppError::Conflict("Stornierte Person kann nicht geändert werden".into()));
+    }
     if !darf_uebergehen(&vorher.status, &body.status) {
         return Err(AppError::UnprocessableEntity(format!(
             "Status-Übergang {} → {} ist nicht erlaubt",
@@ -274,6 +277,9 @@ pub async fn stornieren(
     fordere_aktiv(&einsatz)?;
 
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
+    if person.storniert_at.is_some() {
+        return Err(AppError::Conflict("Person ist bereits storniert".into()));
+    }
     repo::storniere(&state.pool, einsatz_id, person_id, benutzer.id).await?;
     etb_system(
         &state, einsatz_id, benutzer.id,
@@ -300,7 +306,14 @@ pub async fn audit(
 }
 
 /// Einfaches CSV-Feld-Quoting (RFC 4180): in Anführungszeichen, innere `"` verdoppelt.
+/// Entschärft zusätzlich Formel-Injektion (Excel/LibreOffice): Felder, die mit
+/// =,+,-,@,Tab oder CR beginnen, werden mit einem führenden Apostroph neutralisiert.
 fn csv_feld(s: &str) -> String {
+    let s = if s.starts_with(['=', '+', '-', '@', '\t', '\r']) {
+        format!("'{s}")
+    } else {
+        s.to_string()
+    };
     format!("\"{}\"", s.replace('"', "\"\""))
 }
 

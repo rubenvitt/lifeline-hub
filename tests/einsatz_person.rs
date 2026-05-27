@@ -399,6 +399,55 @@ async fn beobachter_liest_aber_schreibt_nicht() {
 }
 
 #[tokio::test]
+async fn status_wechsel_auf_stornierte_person_ist_409() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    let (status, _) = anfrage(&app, "DELETE", &format!("/api/einsaetze/{e}/personen/{p}"), &admin, None).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    // Status-Wechsel auf bereits stornierte Person → 409 Conflict, KEIN zusätzlicher ETB-Eintrag.
+    let vorher = system_etb_inhalte(&app, &admin, e).await.len();
+    let (status, _) = anfrage(
+        &app, "POST", &format!("/api/einsaetze/{e}/personen/{p}/status"), &admin,
+        Some(r#"{"status":"vermisst"}"#),
+    ).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(system_etb_inhalte(&app, &admin, e).await.len(), vorher, "kein ETB-Eintrag bei abgelehntem Wechsel");
+}
+
+#[tokio::test]
+async fn doppeltes_stornieren_ist_409() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    let (s1, _) = anfrage(&app, "DELETE", &format!("/api/einsaetze/{e}/personen/{p}"), &admin, None).await;
+    assert_eq!(s1, StatusCode::NO_CONTENT);
+    let (s2, _) = anfrage(&app, "DELETE", &format!("/api/einsaetze/{e}/personen/{p}"), &admin, None).await;
+    assert_eq!(s2, StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn export_entschaerft_formel_injektion() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    // Name mit Formel-Präfix:
+    person_anlegen(&app, &admin, e, r#"{"name":"=SUM(A1)"}"#).await;
+    let resp = app.clone().oneshot(
+        Request::builder().method("GET").uri(format!("/api/einsaetze/{e}/personen/export"))
+            .header(header::COOKIE, admin.clone()).body(Body::empty()).unwrap(),
+    ).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let csv = String::from_utf8(bytes.to_vec()).unwrap();
+    // Der Name darf NICHT roh als Formel erscheinen; er ist mit ' neutralisiert:
+    assert!(csv.contains("\"'=SUM(A1)\""), "Formel-Präfix muss mit Apostroph entschärft sein, CSV war:\n{csv}");
+    assert!(!csv.contains("\"=SUM(A1)\""), "roher Formel-Wert darf nicht im CSV stehen");
+}
+
+#[tokio::test]
 async fn export_schreibt_export_audit() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
