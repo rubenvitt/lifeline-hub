@@ -7,6 +7,7 @@ pub mod db;
 pub mod dev;
 pub mod einheit;
 pub mod einsatz;
+pub mod einsatzabschnitt;
 pub mod error;
 pub mod etb;
 pub mod fahrzeug;
