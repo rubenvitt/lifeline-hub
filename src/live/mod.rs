@@ -7,13 +7,22 @@ use tokio::sync::broadcast;
 /// `lagged`-Signal und resynct per GET (siehe SSE-Route).
 const KANAL_KAPAZITAET: usize = 256;
 
+/// Eine Live-Nachricht im Einsatz-Kanal: ein SSE-Event-Name plus serialisierte
+/// Daten. Clients abonnieren denselben Kanal und filtern per Event-Name
+/// (`etb`, `person`, …) — sensible Payload gehört NICHT in `data`.
+#[derive(Clone, Debug)]
+pub struct LiveNachricht {
+    pub event: String,
+    pub data: String,
+}
+
 /// Registry der Live-Kanäle: pro Einsatz ein Broadcast-Sender, über den
 /// neu erfasste ETB-Einträge (als JSON-String) an alle SSE-Abonnenten gehen.
 ///
 /// Klonbar (teilt denselben inneren Zustand) — wird im `AppState` gehalten.
 #[derive(Clone, Default)]
 pub struct LiveHub {
-    kanaele: Arc<RwLock<HashMap<i64, broadcast::Sender<String>>>>,
+    kanaele: Arc<RwLock<HashMap<i64, broadcast::Sender<LiveNachricht>>>>,
 }
 
 impl LiveHub {
@@ -24,7 +33,7 @@ impl LiveHub {
 
     /// Abonniert den Live-Kanal eines Einsatzes (legt ihn bei Bedarf an)
     /// und liefert einen Empfänger für neue Einträge.
-    pub fn abonniere(&self, einsatz_id: i64) -> broadcast::Receiver<String> {
+    pub fn abonniere(&self, einsatz_id: i64) -> broadcast::Receiver<LiveNachricht> {
         let mut kanaele = self.kanaele.write().expect("LiveHub-Lock");
         let sender = kanaele
             .entry(einsatz_id)
@@ -32,18 +41,22 @@ impl LiveHub {
         sender.subscribe()
     }
 
-    /// Sendet eine Nachricht an alle Abonnenten eines Einsatzes.
+    /// Sendet einen ETB-Eintrag (JSON) an alle Abonnenten. Bequemer Wrapper für
+    /// den häufigsten Fall — entspricht `publiziere_event(id, "etb", json)`.
+    pub fn publiziere(&self, einsatz_id: i64, json: String) {
+        self.publiziere_event(einsatz_id, "etb", json);
+    }
+
+    /// Sendet ein getaggtes Event an alle Abonnenten eines Einsatzes.
     /// Ohne Kanal/Abonnenten passiert nichts. Ein Kanal ohne Empfänger wird
     /// opportunistisch entfernt, damit der Hub nicht über abgeschlossene
     /// Einsätze hinweg leakt.
-    /// Nachrichten, die bei leerem Kanal gesendet werden, gehen verloren — neue
-    /// Abonnenten erhalten nach ihrem Connect nur nachfolgende Einträge (vgl. §6).
-    pub fn publiziere(&self, einsatz_id: i64, nachricht: String) {
+    pub fn publiziere_event(&self, einsatz_id: i64, event: &str, data: String) {
+        let nachricht = LiveNachricht { event: event.to_string(), data };
         // Häufiger Fall (Kanal existiert): nur Lese-Lock.
         let keine_empfaenger = {
             let kanaele = self.kanaele.read().expect("LiveHub-Lock");
             match kanaele.get(&einsatz_id) {
-                // send() liefert Err, wenn kein Empfänger mehr lauscht.
                 Some(sender) => sender.send(nachricht).is_err(),
                 None => false,
             }
@@ -57,7 +70,6 @@ impl LiveHub {
             // dazukommen — receiver_count() == 0 garantiert hier einen wirklich
             // verwaisten Kanal. NICHT abonniere() auf einen Read-Lock-Fastpath
             // optimieren, sonst greift diese Garantie nicht mehr.
-            // Erneut prüfen: zwischen den Locks könnte ein neuer Abonnent dazugekommen sein.
             if let Some(sender) = kanaele.get(&einsatz_id) {
                 if sender.receiver_count() == 0 {
                     kanaele.remove(&einsatz_id);
@@ -76,7 +88,7 @@ mod tests {
         let hub = LiveHub::new();
         let mut rx = hub.abonniere(1);
         hub.publiziere(1, "hallo".into());
-        assert_eq!(rx.recv().await.unwrap(), "hallo");
+        assert_eq!(rx.recv().await.unwrap().data, "hallo");
     }
 
     #[tokio::test]
@@ -86,7 +98,7 @@ mod tests {
         let mut rx2 = hub.abonniere(2);
         hub.publiziere(1, "fuer-eins".into());
 
-        assert_eq!(rx1.recv().await.unwrap(), "fuer-eins");
+        assert_eq!(rx1.recv().await.unwrap().data, "fuer-eins");
         // Einsatz 2 hat nichts bekommen.
         assert!(rx2.try_recv().is_err());
     }
@@ -114,7 +126,27 @@ mod tests {
         let mut a = hub.abonniere(1);
         let mut b = hub.abonniere(1);
         hub.publiziere(1, "broadcast".into());
-        assert_eq!(a.recv().await.unwrap(), "broadcast");
-        assert_eq!(b.recv().await.unwrap(), "broadcast");
+        assert_eq!(a.recv().await.unwrap().data, "broadcast");
+        assert_eq!(b.recv().await.unwrap().data, "broadcast");
+    }
+
+    #[tokio::test]
+    async fn publiziere_event_traegt_event_typ() {
+        let hub = LiveHub::new();
+        let mut rx = hub.abonniere(1);
+        hub.publiziere_event(1, "person", r#"{"einsatz_id":1,"person_id":5}"#.into());
+        let n = rx.recv().await.unwrap();
+        assert_eq!(n.event, "person");
+        assert_eq!(n.data, r#"{"einsatz_id":1,"person_id":5}"#);
+    }
+
+    #[tokio::test]
+    async fn publiziere_wrapt_als_etb_event() {
+        let hub = LiveHub::new();
+        let mut rx = hub.abonniere(1);
+        hub.publiziere(1, "hallo".into());
+        let n = rx.recv().await.unwrap();
+        assert_eq!(n.event, "etb");
+        assert_eq!(n.data, "hallo");
     }
 }

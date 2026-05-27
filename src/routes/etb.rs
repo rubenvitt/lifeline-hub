@@ -225,7 +225,7 @@ pub async fn stream(
     let rx = state.live.abonniere(einsatz_id);
     let stream = BroadcastStream::new(rx).map(|res| {
         let event = match res {
-            Ok(json) => Event::default().event("etb").data(json),
+            Ok(n) => Event::default().event(n.event).data(n.data),
             // Empfänger ist hinterhergehinkt: Client zum Resync auffordern.
             Err(_) => Event::default().event("lagged").data("resync"),
         };

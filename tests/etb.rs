@@ -351,11 +351,12 @@ async fn erfasster_eintrag_wird_live_publiziert() {
     .await;
     assert_eq!(status, StatusCode::CREATED);
 
-    let json = tokio::time::timeout(Duration::from_secs(1), rx.recv())
+    let nachricht = tokio::time::timeout(Duration::from_secs(1), rx.recv())
         .await
         .expect("Broadcast muss innerhalb 1s ankommen")
         .expect("Broadcast-Kanal liefert Nachricht");
-    let value: Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(nachricht.event, "etb");
+    let value: Value = serde_json::from_str(&nachricht.data).unwrap();
     assert_eq!(value["inhalt"], "Live-Test");
 }
 
