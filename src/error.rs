@@ -17,6 +17,9 @@ pub enum AppError {
     Validation(String),
     /// Konflikt mit dem aktuellen Zustand (409), z.B. doppelter Benutzername.
     Conflict(String),
+    /// Anfrage verstanden, aber der aktuelle Zustand verbietet sie (422),
+    /// z.B. ein nicht erlaubter Status-Übergang.
+    UnprocessableEntity(String),
     /// Datenbankfehler (500) — Details nur im Log, nicht in der Antwort.
     Database(sqlx::Error),
     /// Sonstiger interner Fehler (500).
@@ -31,6 +34,7 @@ impl std::fmt::Display for AppError {
             AppError::NotFound => write!(f, "Nicht gefunden"),
             AppError::Validation(m) => write!(f, "{m}"),
             AppError::Conflict(m) => write!(f, "{m}"),
+            AppError::UnprocessableEntity(m) => write!(f, "{m}"),
             AppError::Database(e) => write!(f, "Datenbankfehler: {e}"),
             AppError::Internal(m) => write!(f, "{m}"),
         }
@@ -54,6 +58,7 @@ impl AppError {
             AppError::NotFound => StatusCode::NOT_FOUND,
             AppError::Validation(_) => StatusCode::BAD_REQUEST,
             AppError::Conflict(_) => StatusCode::CONFLICT,
+            AppError::UnprocessableEntity(_) => StatusCode::UNPROCESSABLE_ENTITY,
             AppError::Database(_) | AppError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -115,6 +120,14 @@ mod tests {
         assert_eq!(
             AppError::Conflict("x".into()).status(),
             StatusCode::CONFLICT
+        );
+    }
+
+    #[test]
+    fn unprocessable_maps_to_422() {
+        assert_eq!(
+            AppError::UnprocessableEntity("Übergang nicht erlaubt".into()).status(),
+            StatusCode::UNPROCESSABLE_ENTITY
         );
     }
 }
