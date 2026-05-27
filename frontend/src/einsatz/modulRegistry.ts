@@ -47,10 +47,10 @@ export const kategorien: Kategorie[] = [
 export const modulRegistry: ModulEintrag[] = [
   // Führung
   { key: 'einsatzdaten', kategorie: 'fuehrung', label: 'Einsatzdaten', icon: TbFileDescription, route: 'einsatzdaten', status: 'fertig', beschreibung: 'Stammdaten des Einsatzes: Bezeichnung, Stichwort, Zeiten, Leitung.' },
-  { key: 'einsatzabschnitte', kategorie: 'fuehrung', label: 'Einsatzabschnitte', icon: TbSitemap, route: 'einsatzabschnitte', status: 'geplant', beschreibung: 'Gliederung des Einsatzes in Abschnitte und Zuordnung von Einheiten.' },
+  { key: 'einsatzabschnitte', kategorie: 'fuehrung', label: 'Einsatzabschnitte', icon: TbSitemap, route: 'einsatzabschnitte', status: 'fertig', beschreibung: 'Gliederung des Einsatzes in Abschnitte und Zuordnung von Einheiten.' },
   { key: 'stab', kategorie: 'fuehrung', label: 'Stab', icon: TbBuildingCommunity, route: 'stab', status: 'wip', beschreibung: 'Stabsarbeit (S1–S6). Wird später ausgearbeitet.' },
   // Kräfte & Mittel
-  { key: 'einheiten', kategorie: 'kraefte', label: 'Einheiten', icon: TbUsersGroup, route: 'einheiten', status: 'geplant', beschreibung: 'Taktische Einheiten: Führer, Mannschaft, Fahrzeug, Abschnittszuordnung.' },
+  { key: 'einheiten', kategorie: 'kraefte', label: 'Einheiten', icon: TbUsersGroup, route: 'einheiten', status: 'fertig', beschreibung: 'Taktische Einheiten: Führer, Mannschaft, Fahrzeug, Abschnittszuordnung.' },
   { key: 'personal', kategorie: 'kraefte', label: 'Personal', icon: TbUser, route: 'personal', status: 'fertig', beschreibung: 'Im Einsatz aktive Personen aus dem Stammdaten-Pool plus Ad-hoc-Kräfte.' },
   { key: 'fahrzeuge', kategorie: 'kraefte', label: 'Fahrzeuge', icon: TbTruck, route: 'fahrzeuge', status: 'fertig', beschreibung: 'Disponierte Fahrzeuge des Einsatzes.' },
   { key: 'material', kategorie: 'kraefte', label: 'Material', icon: TbPackages, route: 'material', status: 'geplant', beschreibung: 'Material und Verbrauchsgüter im Einsatz.' },

@@ -107,6 +107,8 @@ pub struct EinsatzPersonalAnzeige {
     pub einsatz_id: i64,
     /// `None` = Ad-hoc-externe Person (kein Stamm-Bezug).
     pub personal_id: Option<i64>,
+    /// Zugeordnete Einheit (K&M‑3); `None` = freie, nicht zugeordnete Kraft.
+    pub einheit_id: Option<i64>,
     pub ist_adhoc: bool,
     pub name: String,
     /// Qualifikationen/Funktion als flacher Text (Live recomposed oder Snapshot).

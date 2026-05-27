@@ -1,0 +1,304 @@
+use super::EinsatzabschnittAnzeige;
+use crate::error::AppError;
+use sqlx::SqlitePool;
+
+/// Editierbare Felder eines Abschnitts (bereits getrimmt/validiert durch den Handler,
+/// hier zusätzlich auf Einsatz-Zugehörigkeit von parent/leiter geprüft).
+#[derive(Debug)]
+pub struct AbschnittDaten<'a> {
+    pub name: &'a str,
+    pub ueber_abschnitt_id: Option<i64>,
+    pub leiter_id: Option<i64>,
+    pub bemerkung: Option<&'a str>,
+    pub sortier: i64,
+}
+
+const SELECT_AUFGELOEST: &str = "\
+    SELECT a.id, a.einsatz_id, a.ueber_abschnitt_id, a.name, a.leiter_id, \
+           p.snap_name AS leiter_name, a.bemerkung, a.sortier \
+    FROM einsatzabschnitt a \
+    LEFT JOIN einsatz_personal p ON p.id = a.leiter_id";
+
+#[derive(sqlx::FromRow)]
+struct Row {
+    id: i64,
+    einsatz_id: i64,
+    ueber_abschnitt_id: Option<i64>,
+    name: String,
+    leiter_id: Option<i64>,
+    leiter_name: Option<String>,
+    bemerkung: Option<String>,
+    sortier: i64,
+}
+
+fn zu_anzeige(row: Row) -> EinsatzabschnittAnzeige {
+    EinsatzabschnittAnzeige {
+        id: row.id,
+        einsatz_id: row.einsatz_id,
+        ueber_abschnitt_id: row.ueber_abschnitt_id,
+        name: row.name,
+        leiter_id: row.leiter_id,
+        leiter_name: row.leiter_name,
+        bemerkung: row.bemerkung,
+        sortier: row.sortier,
+    }
+}
+
+/// Alle Abschnitte eines Einsatzes (flach, aufgelöst), sortiert nach `sortier`, dann `id`.
+pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<EinsatzabschnittAnzeige>, AppError> {
+    let rows = sqlx::query_as::<_, Row>(&format!(
+        "{SELECT_AUFGELOEST} WHERE a.einsatz_id = ? ORDER BY a.sortier, a.id"
+    ))
+    .bind(einsatz_id)
+    .fetch_all(pool).await?;
+    Ok(rows.into_iter().map(zu_anzeige).collect())
+}
+
+/// Lädt einen Abschnitt (aufgelöst); `NotFound`, falls nicht zum Einsatz.
+pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<EinsatzabschnittAnzeige, AppError> {
+    sqlx::query_as::<_, Row>(&format!("{SELECT_AUFGELOEST} WHERE a.id = ? AND a.einsatz_id = ?"))
+        .bind(id).bind(einsatz_id)
+        .fetch_optional(pool).await?
+        .map(zu_anzeige)
+        .ok_or(AppError::NotFound)
+}
+
+/// Prüft, ob ein Abschnitt zum Einsatz gehört (für Parent-Validierung). `NotFound` sonst.
+async fn pruefe_parent(pool: &SqlitePool, einsatz_id: i64, parent_id: i64) -> Result<(), AppError> {
+    let treffer: Option<i64> = sqlx::query_scalar(
+        "SELECT 1 FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?",
+    ).bind(parent_id).bind(einsatz_id).fetch_optional(pool).await?;
+    treffer.map(|_| ()).ok_or(AppError::NotFound)
+}
+
+/// Prüft, ob `leiter_id` eine disponierte Person *desselben* Einsatzes ist.
+async fn pruefe_leiter(pool: &SqlitePool, einsatz_id: i64, leiter_id: i64) -> Result<(), AppError> {
+    let treffer: Option<i64> = sqlx::query_scalar(
+        "SELECT 1 FROM einsatz_personal WHERE id = ? AND einsatz_id = ?",
+    ).bind(leiter_id).bind(einsatz_id).fetch_optional(pool).await?;
+    treffer.map(|_| ()).ok_or_else(|| AppError::Validation(
+        "Abschnittsleiter muss eine disponierte Person des Einsatzes sein".into(),
+    ))
+}
+
+/// Ob `kandidat` ein Nachfahre von `start` ist (oder `kandidat == start`): verhindert
+/// Zyklen beim Setzen von `ueber_abschnitt_id = kandidat` für den Knoten `start`.
+/// Läuft von `kandidat` nach oben; trifft er auf `start`, läge ein Zyklus vor.
+async fn waere_zyklus(pool: &SqlitePool, start_id: i64, kandidat_parent: i64) -> Result<bool, AppError> {
+    let mut aktuell = Some(kandidat_parent);
+    // Begrenzung gegen korrupte Altdaten: Anzahl Knoten ist endlich.
+    let mut schritte = 0;
+    while let Some(id) = aktuell {
+        if id == start_id {
+            return Ok(true);
+        }
+        schritte += 1;
+        if schritte > 10_000 {
+            return Ok(true); // defensiv: bei Verdacht auf Zyklus abbrechen
+        }
+        aktuell = sqlx::query_scalar::<_, Option<i64>>(
+            "SELECT ueber_abschnitt_id FROM einsatzabschnitt WHERE id = ?",
+        ).bind(id).fetch_optional(pool).await?.flatten();
+    }
+    Ok(false)
+}
+
+/// Validiert parent (selber Einsatz, zyklenfrei) und leiter (disponierte Person).
+/// `self_id = None` beim Anlegen (kein Knoten zum Vergleichen).
+async fn validiere(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    self_id: Option<i64>,
+    daten: &AbschnittDaten<'_>,
+) -> Result<(), AppError> {
+    if let Some(parent) = daten.ueber_abschnitt_id {
+        pruefe_parent(pool, einsatz_id, parent).await?;
+        if let Some(sid) = self_id {
+            if waere_zyklus(pool, sid, parent).await? {
+                return Err(AppError::Validation(
+                    "Abschnitt darf nicht eigener Vorfahr werden".into(),
+                ));
+            }
+        }
+    }
+    if let Some(leiter) = daten.leiter_id {
+        pruefe_leiter(pool, einsatz_id, leiter).await?;
+    }
+    Ok(())
+}
+
+/// Legt einen Abschnitt an (nach Validierung). Liefert die aufgelöste Anzeige.
+pub async fn anlegen(pool: &SqlitePool, einsatz_id: i64, daten: AbschnittDaten<'_>) -> Result<EinsatzabschnittAnzeige, AppError> {
+    validiere(pool, einsatz_id, None, &daten).await?;
+    let id = sqlx::query_scalar::<_, i64>(
+        "INSERT INTO einsatzabschnitt (einsatz_id, ueber_abschnitt_id, name, leiter_id, bemerkung, sortier) \
+         VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
+    )
+    .bind(einsatz_id).bind(daten.ueber_abschnitt_id).bind(daten.name)
+    .bind(daten.leiter_id).bind(daten.bemerkung).bind(daten.sortier)
+    .fetch_one(pool).await?;
+    laden(pool, einsatz_id, id).await
+}
+
+/// Vollersatz der editierbaren Felder (Parent-Wechsel zyklenfrei). `NotFound`,
+/// falls der Abschnitt nicht zum Einsatz gehört.
+pub async fn aktualisiere(pool: &SqlitePool, einsatz_id: i64, id: i64, daten: AbschnittDaten<'_>) -> Result<EinsatzabschnittAnzeige, AppError> {
+    // Existenz im Einsatz sichern (auch für die self_id-Zyklenprüfung).
+    laden(pool, einsatz_id, id).await?;
+    validiere(pool, einsatz_id, Some(id), &daten).await?;
+    let resultat = sqlx::query(
+        "UPDATE einsatzabschnitt SET ueber_abschnitt_id = ?, name = ?, leiter_id = ?, \
+                bemerkung = ?, sortier = ? WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(daten.ueber_abschnitt_id).bind(daten.name).bind(daten.leiter_id)
+    .bind(daten.bemerkung).bind(daten.sortier).bind(id).bind(einsatz_id)
+    .execute(pool).await?;
+    if resultat.rows_affected() == 0 {
+        return Err(AppError::NotFound);
+    }
+    laden(pool, einsatz_id, id).await
+}
+
+/// Löst einen Abschnitt auf (Transaktion): Unter-Abschnitte auf den Parent des
+/// gelöschten hochziehen, zugeordnete Einheiten `abschnitt_id = NULL`, dann löschen.
+/// `NotFound`, falls nicht zum Einsatz.
+pub async fn loese_auf(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
+    // Parent des aufzulösenden Knotens ermitteln (und Einsatz-Zugehörigkeit sichern).
+    let parent: Option<i64> = sqlx::query_scalar(
+        "SELECT ueber_abschnitt_id FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?",
+    ).bind(id).bind(einsatz_id).fetch_optional(pool).await?.ok_or(AppError::NotFound)?;
+
+    let mut tx = pool.begin().await?;
+    sqlx::query("UPDATE einsatzabschnitt SET ueber_abschnitt_id = ? WHERE ueber_abschnitt_id = ? AND einsatz_id = ?")
+        .bind(parent).bind(id).bind(einsatz_id).execute(&mut *tx).await?;
+    sqlx::query("UPDATE einsatz_einheit SET abschnitt_id = NULL WHERE abschnitt_id = ? AND einsatz_id = ?")
+        .bind(id).bind(einsatz_id).execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?")
+        .bind(id).bind(einsatz_id).execute(&mut *tx).await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Org(1) + Einsatz; liefert einsatz_id.
+    async fn setup(pool: &SqlitePool) -> i64 {
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')").execute(pool).await.unwrap();
+        sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id")
+            .fetch_one(pool).await.unwrap()
+    }
+
+    fn daten<'a>(name: &'a str, parent: Option<i64>, leiter: Option<i64>) -> AbschnittDaten<'a> {
+        AbschnittDaten { name, ueber_abschnitt_id: parent, leiter_id: leiter, bemerkung: None, sortier: 0 }
+    }
+
+    #[tokio::test]
+    async fn anlegen_und_liste_mit_baum_und_leiter() {
+        let pool = crate::db::test_pool().await;
+        let einsatz = setup(&pool).await;
+        // Disponierte Person als Leiter.
+        let ep: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Abschnittsleiter Nord') RETURNING id",
+        ).bind(einsatz).fetch_one(&pool).await.unwrap();
+
+        let oben = anlegen(&pool, einsatz, daten("Nord", None, Some(ep))).await.unwrap();
+        anlegen(&pool, einsatz, daten("Nord-1", Some(oben.id), None)).await.unwrap();
+
+        let liste = liste(&pool, einsatz).await.unwrap();
+        assert_eq!(liste.len(), 2);
+        let nord = liste.iter().find(|a| a.name == "Nord").unwrap();
+        assert_eq!(nord.leiter_name.as_deref(), Some("Abschnittsleiter Nord"));
+        let unter = liste.iter().find(|a| a.name == "Nord-1").unwrap();
+        assert_eq!(unter.ueber_abschnitt_id, Some(oben.id));
+    }
+
+    #[tokio::test]
+    async fn parent_in_fremdem_einsatz_ist_notfound() {
+        let pool = crate::db::test_pool().await;
+        let einsatz = setup(&pool).await;
+        let fremd: i64 = sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Fremd') RETURNING id")
+            .fetch_one(&pool).await.unwrap();
+        let fremder_abschnitt = anlegen(&pool, fremd, daten("Fremd-Nord", None, None)).await.unwrap();
+        assert!(matches!(
+            anlegen(&pool, einsatz, daten("X", Some(fremder_abschnitt.id), None)).await.unwrap_err(),
+            AppError::NotFound
+        ));
+    }
+
+    #[tokio::test]
+    async fn leiter_aus_fremdem_einsatz_ist_validation() {
+        let pool = crate::db::test_pool().await;
+        let einsatz = setup(&pool).await;
+        let fremd: i64 = sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Fremd') RETURNING id")
+            .fetch_one(&pool).await.unwrap();
+        let fremder_ep: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Fremd') RETURNING id",
+        ).bind(fremd).fetch_one(&pool).await.unwrap();
+        assert!(matches!(
+            anlegen(&pool, einsatz, daten("Nord", None, Some(fremder_ep))).await.unwrap_err(),
+            AppError::Validation(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn zyklus_direkt_und_transitiv_ist_validation() {
+        let pool = crate::db::test_pool().await;
+        let einsatz = setup(&pool).await;
+        let a = anlegen(&pool, einsatz, daten("A", None, None)).await.unwrap();
+        let b = anlegen(&pool, einsatz, daten("B", Some(a.id), None)).await.unwrap();
+        let c = anlegen(&pool, einsatz, daten("C", Some(b.id), None)).await.unwrap();
+
+        // A unter sich selbst.
+        assert!(matches!(
+            aktualisiere(&pool, einsatz, a.id, daten("A", Some(a.id), None)).await.unwrap_err(),
+            AppError::Validation(_)
+        ));
+        // A unter C (C ist Nachfahre von A) → transitiver Zyklus.
+        assert!(matches!(
+            aktualisiere(&pool, einsatz, a.id, daten("A", Some(c.id), None)).await.unwrap_err(),
+            AppError::Validation(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn aufloesen_zieht_unterabschnitte_hoch_und_loest_einheit_zuordnung() {
+        let pool = crate::db::test_pool().await;
+        let einsatz = setup(&pool).await;
+        let oben = anlegen(&pool, einsatz, daten("Nord", None, None)).await.unwrap();
+        let mitte = anlegen(&pool, einsatz, daten("Nord-Mitte", Some(oben.id), None)).await.unwrap();
+        let unten = anlegen(&pool, einsatz, daten("Nord-Mitte-1", Some(mitte.id), None)).await.unwrap();
+
+        // Eine Einheit ist dem mittleren Abschnitt zugeordnet.
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, abschnitt_id, name) VALUES (?, ?, 'Zug') RETURNING id",
+        ).bind(einsatz).bind(mitte.id).fetch_one(&pool).await.unwrap();
+
+        loese_auf(&pool, einsatz, mitte.id).await.unwrap();
+
+        // 'unten' hängt jetzt direkt unter 'oben' (Parent des aufgelösten).
+        let liste = liste(&pool, einsatz).await.unwrap();
+        let unten_neu = liste.iter().find(|a| a.id == unten.id).unwrap();
+        assert_eq!(unten_neu.ueber_abschnitt_id, Some(oben.id));
+        // Der aufgelöste Abschnitt ist weg.
+        assert!(liste.iter().all(|a| a.id != mitte.id));
+        // Die Einheit ist nicht mehr zugeordnet.
+        let abschnitt_id: Option<i64> = sqlx::query_scalar(
+            "SELECT abschnitt_id FROM einsatz_einheit WHERE id = ?",
+        ).bind(einheit).fetch_one(&pool).await.unwrap();
+        assert_eq!(abschnitt_id, None);
+    }
+
+    #[tokio::test]
+    async fn aktualisiere_fremder_einsatz_ist_notfound() {
+        let pool = crate::db::test_pool().await;
+        let einsatz = setup(&pool).await;
+        let a = anlegen(&pool, einsatz, daten("A", None, None)).await.unwrap();
+        assert!(matches!(
+            aktualisiere(&pool, 999, a.id, daten("A", None, None)).await.unwrap_err(),
+            AppError::NotFound
+        ));
+        assert!(matches!(loese_auf(&pool, 999, a.id).await.unwrap_err(), AppError::NotFound));
+    }
+}

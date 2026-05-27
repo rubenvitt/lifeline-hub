@@ -5,7 +5,7 @@ use sqlx::SqlitePool;
 /// SELECT mit aufgelöster Live-Identität (LEFT JOIN fahrzeug) und Status (LEFT JOIN
 /// fahrzeug_status). Die Wahl Live vs. Snapshot trifft `zu_anzeige` mit `einsatz_aktiv`.
 const SELECT_AUFGELOEST: &str = "\
-    SELECT ef.id, ef.einsatz_id, ef.fahrzeug_id, ef.status_id, \
+    SELECT ef.id, ef.einsatz_id, ef.fahrzeug_id, ef.einheit_id, ef.status_id, \
            ef.snap_funkrufname, ef.snap_kennzeichen, ef.snap_fahrzeugtyp, ef.snap_opta, \
            ef.snap_traegerorganisation, ef.bemerkung, ef.disponiert_at, ef.disponiert_von, \
            f.funkrufname AS live_funkrufname, f.kennzeichen AS live_kennzeichen, \
@@ -21,6 +21,7 @@ struct Row {
     id: i64,
     einsatz_id: i64,
     fahrzeug_id: Option<i64>,
+    einheit_id: Option<i64>,
     status_id: Option<i64>,
     snap_funkrufname: String,
     snap_kennzeichen: Option<String>,
@@ -70,6 +71,7 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzFahrzeugAnzeige {
         id: row.id,
         einsatz_id: row.einsatz_id,
         fahrzeug_id: row.fahrzeug_id,
+        einheit_id: row.einheit_id,
         ist_adhoc: row.fahrzeug_id.is_none(),
         funkrufname,
         kennzeichen,

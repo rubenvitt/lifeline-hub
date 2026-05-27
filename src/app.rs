@@ -70,6 +70,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/einsaetze/{id}/personal", post(routes::einsatz_personal::disponieren))
         .route("/api/einsaetze/{id}/personal/{ep_id}", patch(routes::einsatz_personal::aktualisieren))
         .route("/api/einsaetze/{id}/personal/{ep_id}", delete(routes::einsatz_personal::entfernen))
+        .route("/api/einsaetze/{id}/abschnitte", get(routes::einsatzabschnitt::liste))
+        .route("/api/einsaetze/{id}/abschnitte", post(routes::einsatzabschnitt::anlegen))
+        .route("/api/einsaetze/{id}/abschnitte/{aid}", patch(routes::einsatzabschnitt::aktualisieren))
+        .route("/api/einsaetze/{id}/abschnitte/{aid}", delete(routes::einsatzabschnitt::aufloesen))
         .route("/api/stichwort-vorschlaege", get(routes::stichwort::liste))
         .route("/api/stichwort-vorschlaege", post(routes::stichwort::anlegen))
         .route(
@@ -111,7 +115,19 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/qualifikationen", get(routes::qualifikation::liste))
         .route("/api/qualifikationen", post(routes::qualifikation::anlegen))
         .route("/api/qualifikationen/{id}", patch(routes::qualifikation::aktualisieren))
-        .route("/api/qualifikationen/{id}/deaktivieren", post(routes::qualifikation::deaktivieren));
+        .route("/api/qualifikationen/{id}/deaktivieren", post(routes::qualifikation::deaktivieren))
+        .route("/api/einheit-typen", get(routes::einheit_typ::liste))
+        .route("/api/einheit-typen", post(routes::einheit_typ::anlegen))
+        .route("/api/einheit-typen/{id}", patch(routes::einheit_typ::aktualisieren))
+        .route("/api/einheit-typen/{id}/deaktivieren", post(routes::einheit_typ::deaktivieren))
+        .route("/api/einsaetze/{id}/einheiten", get(routes::einsatz_einheit::liste))
+        .route("/api/einsaetze/{id}/einheiten", post(routes::einsatz_einheit::bilden))
+        .route("/api/einsaetze/{id}/einheiten/{eid}", patch(routes::einsatz_einheit::aktualisieren))
+        .route("/api/einsaetze/{id}/einheiten/{eid}", delete(routes::einsatz_einheit::aufloesen))
+        .route("/api/einsaetze/{id}/einheiten/{eid}/personal/{ep_id}", put(routes::einsatz_einheit::personal_zuordnen))
+        .route("/api/einsaetze/{id}/einheiten/{eid}/personal/{ep_id}", delete(routes::einsatz_einheit::personal_freigeben))
+        .route("/api/einsaetze/{id}/einheiten/{eid}/fahrzeug/{ef_id}", put(routes::einsatz_einheit::fahrzeug_zuordnen))
+        .route("/api/einsaetze/{id}/einheiten/{eid}/fahrzeug/{ef_id}", delete(routes::einsatz_einheit::fahrzeug_freigeben));
 
     // Dev-only: Endpoint existiert physisch nur mit Feature `dev-seeds`.
     #[cfg(feature = "dev-seeds")]

@@ -130,6 +130,8 @@ pub struct EinsatzFahrzeugAnzeige {
     pub einsatz_id: i64,
     /// `None` = Ad-hoc-externes Fahrzeug (kein Stamm-Bezug).
     pub fahrzeug_id: Option<i64>,
+    /// Zugeordnete Einheit (K&M‑3); `None` = freie, nicht zugeordnete Kraft.
+    pub einheit_id: Option<i64>,
     pub ist_adhoc: bool,
     pub funkrufname: String,
     pub kennzeichen: Option<String>,

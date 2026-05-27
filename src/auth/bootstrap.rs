@@ -1,4 +1,5 @@
 use crate::auth::{password, ROLLE_ADMIN};
+use crate::einheit::EINHEIT_TYP_STARTLISTE;
 use crate::error::AppError;
 use crate::fahrzeug::STATUS_STARTLISTE;
 use crate::personal::{PERSONAL_STATUS_STARTLISTE, QUALIFIKATION_STARTLISTE};
@@ -118,6 +119,21 @@ pub async fn bootstrap_admin(
         .bind(org_id)
         .bind(label)
         .bind(kategorie)
+        .bind(sortier)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    for (label, f, u, m, sortier) in EINHEIT_TYP_STARTLISTE {
+        sqlx::query(
+            "INSERT INTO einheit_typ (org_id, label, soll_fuehrer, soll_unterfuehrer, soll_mannschaft, sortier) \
+             VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(org_id)
+        .bind(label)
+        .bind(f)
+        .bind(u)
+        .bind(m)
         .bind(sortier)
         .execute(&mut *tx)
         .await?;
@@ -245,6 +261,28 @@ mod tests {
             "SELECT kategorie FROM personal_status WHERE label = 'alarmiert'",
         ).fetch_one(&pool).await.unwrap();
         assert_eq!(kat, "gebunden");
+    }
+
+    #[tokio::test]
+    async fn seedet_einheit_typ_startliste_fuer_neue_org() {
+        let pool = crate::db::test_pool().await;
+        bootstrap_admin(&pool, "Orga", "admin", Some("startpw12")).await.unwrap();
+        let labels: Vec<String> = sqlx::query_scalar(
+            "SELECT label FROM einheit_typ ORDER BY sortier",
+        ).fetch_all(&pool).await.unwrap();
+        assert_eq!(labels.len(), 5, "fünf Default-Einheitstypen erwartet");
+        assert_eq!(labels.first().map(String::as_str), Some("Trupp"));
+        assert!(labels.contains(&"Zug".to_string()));
+
+        // Zug hat die Soll-Stärke 1/3/18; Sonstige hat keine.
+        let (zf, zu, zm): (Option<i64>, Option<i64>, Option<i64>) = sqlx::query_as(
+            "SELECT soll_fuehrer, soll_unterfuehrer, soll_mannschaft FROM einheit_typ WHERE label = 'Zug'",
+        ).fetch_one(&pool).await.unwrap();
+        assert_eq!((zf, zu, zm), (Some(1), Some(3), Some(18)));
+        let sonstige: (Option<i64>,) = sqlx::query_as(
+            "SELECT soll_fuehrer FROM einheit_typ WHERE label = 'Sonstige'",
+        ).fetch_one(&pool).await.unwrap();
+        assert_eq!(sonstige.0, None);
     }
 
     #[tokio::test]

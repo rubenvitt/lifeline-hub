@@ -576,6 +576,130 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn einsatzabschnitt_migration_legt_tabelle_und_cascade_an() {
+        let pool = test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool).await.unwrap();
+        let einsatz: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        ).fetch_one(&pool).await.unwrap();
+
+        // Oberste Ebene + Unterabschnitt.
+        let oben: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, 'Nord') RETURNING id",
+        ).bind(einsatz).fetch_one(&pool).await.unwrap();
+        sqlx::query("INSERT INTO einsatzabschnitt (einsatz_id, ueber_abschnitt_id, name) VALUES (?, ?, 'Nord-1')")
+            .bind(einsatz).bind(oben).execute(&pool).await.unwrap();
+
+        // sortier-Default 0, angelegt_at gesetzt.
+        let (sortier, angelegt): (i64, String) = sqlx::query_as(
+            "SELECT sortier, angelegt_at FROM einsatzabschnitt WHERE name = 'Nord'",
+        ).fetch_one(&pool).await.unwrap();
+        assert_eq!(sortier, 0);
+        assert!(!angelegt.is_empty());
+
+        // CASCADE: Einsatz löschen entfernt die Abschnitte.
+        sqlx::query("DELETE FROM einsatz WHERE id = ?").bind(einsatz).execute(&pool).await.unwrap();
+        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatzabschnitt").fetch_one(&pool).await.unwrap();
+        assert_eq!(rest, 0, "CASCADE muss Abschnitte entfernen");
+    }
+
+    #[tokio::test]
+    async fn einheit_typ_migration_constraints_und_nullable_soll() {
+        let pool = test_pool().await;
+        // Org NACH der Migration → Migrations-Seed greift NICHT (bootstrap seedet neue Orgs).
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool).await.unwrap();
+
+        // Soll vollständig.
+        sqlx::query("INSERT INTO einheit_typ (org_id, label, soll_fuehrer, soll_unterfuehrer, soll_mannschaft) VALUES (1, 'Zug', 1, 3, 18)")
+            .execute(&pool).await.unwrap();
+        // Soll komplett NULL (z. B. Sonstige).
+        sqlx::query("INSERT INTO einheit_typ (org_id, label) VALUES (1, 'Sonstige')")
+            .execute(&pool).await.unwrap();
+        let (aktiv, sortier): (i64, i64) = sqlx::query_as(
+            "SELECT aktiv, sortier FROM einheit_typ WHERE label = 'Sonstige'",
+        ).fetch_one(&pool).await.unwrap();
+        assert_eq!((aktiv, sortier), (1, 0), "aktiv-Default 1, sortier-Default 0");
+
+        // UNIQUE(org_id, label).
+        let dup = sqlx::query("INSERT INTO einheit_typ (org_id, label) VALUES (1, 'Zug')")
+            .execute(&pool).await;
+        assert!(dup.is_err(), "doppeltes label je Org muss abgelehnt werden");
+    }
+
+    #[tokio::test]
+    async fn einsatz_einheit_migration_referenzen_und_cascade() {
+        let pool = test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool).await.unwrap();
+        let einsatz: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        ).fetch_one(&pool).await.unwrap();
+        let typ: i64 = sqlx::query_scalar(
+            "INSERT INTO einheit_typ (org_id, label) VALUES (1, 'Zug') RETURNING id",
+        ).fetch_one(&pool).await.unwrap();
+        let abschnitt: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, 'Nord') RETURNING id",
+        ).bind(einsatz).fetch_one(&pool).await.unwrap();
+
+        // Einheit mit beiden Referenzen + Selbstreferenz (Unter-Einheit).
+        let zug: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, abschnitt_id, typ_id, name) VALUES (?, ?, ?, '1. Zug') RETURNING id",
+        ).bind(einsatz).bind(abschnitt).bind(typ).fetch_one(&pool).await.unwrap();
+        sqlx::query("INSERT INTO einsatz_einheit (einsatz_id, ueber_einheit_id, name) VALUES (?, ?, 'Gruppe Florian 1')")
+            .bind(einsatz).bind(zug).execute(&pool).await.unwrap();
+
+        let (sortier, angelegt): (i64, String) = sqlx::query_as(
+            "SELECT sortier, angelegt_at FROM einsatz_einheit WHERE name = '1. Zug'",
+        ).fetch_one(&pool).await.unwrap();
+        assert_eq!(sortier, 0);
+        assert!(!angelegt.is_empty());
+
+        // CASCADE über Einsatz.
+        sqlx::query("DELETE FROM einsatz WHERE id = ?").bind(einsatz).execute(&pool).await.unwrap();
+        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_einheit").fetch_one(&pool).await.unwrap();
+        assert_eq!(rest, 0, "CASCADE muss Einheiten entfernen");
+    }
+
+    #[tokio::test]
+    async fn einheit_mitgliedschaft_migration_fk_spalte_default_null() {
+        let pool = test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool).await.unwrap();
+        let einsatz: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        ).fetch_one(&pool).await.unwrap();
+
+        // Neue Dispozeile: einheit_id ist standardmäßig NULL (freie Kraft).
+        let ep: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Extern') RETURNING id",
+        ).bind(einsatz).fetch_one(&pool).await.unwrap();
+        let einheit_id: Option<i64> = sqlx::query_scalar(
+            "SELECT einheit_id FROM einsatz_personal WHERE id = ?",
+        ).bind(ep).fetch_one(&pool).await.unwrap();
+        assert_eq!(einheit_id, None);
+
+        // Zuordnen auf eine Einheit funktioniert.
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Trupp') RETURNING id",
+        ).bind(einsatz).fetch_one(&pool).await.unwrap();
+        sqlx::query("UPDATE einsatz_personal SET einheit_id = ? WHERE id = ?")
+            .bind(einheit).bind(ep).execute(&pool).await.unwrap();
+
+        // Auch an einsatz_fahrzeug existiert die Spalte.
+        let ef: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, 'Florian 1') RETURNING id",
+        ).bind(einsatz).fetch_one(&pool).await.unwrap();
+        sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = ? WHERE id = ?")
+            .bind(einheit).bind(ef).execute(&pool).await.unwrap();
+        let zuordnung: Option<i64> = sqlx::query_scalar(
+            "SELECT einheit_id FROM einsatz_fahrzeug WHERE id = ?",
+        ).bind(ef).fetch_one(&pool).await.unwrap();
+        assert_eq!(zuordnung, Some(einheit));
+    }
+
+    #[tokio::test]
     async fn migration_0010_bis_0013_legen_personal_schema_an() {
         let pool = test_pool().await;
         // Tabellen existieren (leeres SELECT wirft nicht).
