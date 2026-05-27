@@ -13,6 +13,7 @@ pub mod etb;
 pub mod fahrzeug;
 pub mod katalog;
 pub mod live;
+pub mod material;
 pub mod personal;
 pub mod routes;
 pub mod staerke;
