@@ -3,6 +3,7 @@ pub mod backup;
 pub mod benutzer;
 #[cfg(feature = "dev-seeds")]
 pub mod dev;
+pub mod einheit_typ;
 pub mod einsatz;
 pub mod einsatz_fahrzeug;
 pub mod einsatz_personal;
