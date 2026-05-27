@@ -70,6 +70,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/einsaetze/{id}/personal", post(routes::einsatz_personal::disponieren))
         .route("/api/einsaetze/{id}/personal/{ep_id}", patch(routes::einsatz_personal::aktualisieren))
         .route("/api/einsaetze/{id}/personal/{ep_id}", delete(routes::einsatz_personal::entfernen))
+        .route("/api/einsaetze/{id}/abschnitte", get(routes::einsatzabschnitt::liste))
+        .route("/api/einsaetze/{id}/abschnitte", post(routes::einsatzabschnitt::anlegen))
+        .route("/api/einsaetze/{id}/abschnitte/{aid}", patch(routes::einsatzabschnitt::aktualisieren))
+        .route("/api/einsaetze/{id}/abschnitte/{aid}", delete(routes::einsatzabschnitt::aufloesen))
         .route("/api/stichwort-vorschlaege", get(routes::stichwort::liste))
         .route("/api/stichwort-vorschlaege", post(routes::stichwort::anlegen))
         .route(
