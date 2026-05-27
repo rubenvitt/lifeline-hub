@@ -209,3 +209,53 @@ export interface EinsatzPersonal {
   disponiert_at: string;
   disponiert_von: number | null;
 }
+
+/** Aufgelöster Einsatzabschnitt (flach; Baum baut das FE über ueber_abschnitt_id). */
+export interface Einsatzabschnitt {
+  id: number;
+  einsatz_id: number;
+  ueber_abschnitt_id: number | null;
+  name: string;
+  leiter_id: number | null;
+  leiter_name: string | null;
+  bemerkung: string | null;
+  sortier: number;
+}
+
+/** Personal-Mitglied einer Einheit (leichtgewichtig). */
+export interface EinheitMitgliedPerson {
+  ep_id: number;
+  name: string;
+  funktion: string | null;
+  staerke_position: StaerkePosition | null;
+  ist_fuehrer: boolean;
+}
+
+/** Fahrzeug-Mitglied einer Einheit. */
+export interface EinheitMitgliedFahrzeug {
+  ef_id: number;
+  funkrufname: string;
+  fahrzeugtyp: string | null;
+}
+
+/** Aufgelöste Einheit inkl. Mitgliedern und Soll/Ist-Stärke. */
+export interface Einheit {
+  id: number;
+  einsatz_id: number;
+  abschnitt_id: number | null;
+  abschnitt_name: string | null;
+  ueber_einheit_id: number | null;
+  typ_id: number | null;
+  typ_label: string | null;
+  name: string;
+  fuehrer_id: number | null;
+  fuehrer_name: string | null;
+  bemerkung: string | null;
+  sortier: number;
+  /** null, wenn weder Override noch Typ eine Soll-Stärke liefern. */
+  soll: Staerke | null;
+  ist: Staerke;
+  ist_kumuliert: Staerke;
+  personal_mitglieder: EinheitMitgliedPerson[];
+  fahrzeug_mitglieder: EinheitMitgliedFahrzeug[];
+}
