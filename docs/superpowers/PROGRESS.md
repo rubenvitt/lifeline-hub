@@ -86,7 +86,7 @@ die generische Mechanik legte). Jede Spec wird einzeln durchgebrainstormt.
 | # | Spec | Liefert | Abhängigkeit | Status |
 |---|---|---|---|---|
 | E‑1 | **Personen-Fundament + Erfassung** | Personen-Entity, Status-Lebenszyklus (vermisst → betroffen → Patient SK I–IV → verstorben), Basis-Erfassung, ETB-Integration **+ sensible-Daten-Zugriffs-/Audit-/Retention-Modell** | — (Unterbau) | ✅ **DONE** — Plan `docs/superpowers/plans/2026-05-27-erfassung-personen-fundament.md`, PersonenPage + Tests, Modul aktiviert |
-| E‑2 | **Sichtung & medizinischer Verlauf** | Sichtungskategorien SK I–IV/tot, Verletzungs-/Befundnotiz, Transport/Verbleib (Krankenhaus), Vermisstenabgleich | E‑1 | geplant |
+| E‑2 | **Sichtung & medizinischer Verlauf** | Sichtungskategorien SK I–IV/tot/unverletzt (Verlauf + Cache), Befund-/Verlaufsnotiz (append-only), Transport/Verbleib (KH=Freitext), Vermisstenabgleich (Verdacht→bestätigt) | E‑1 | 📝 **Design abgestimmt** → Plan als Nächstes — Spec `docs/superpowers/specs/2026-05-27-erfassung-sichtung-medizinischer-verlauf-design.md` |
 | E‑3 | **Unfallhilfsstellen** | Örtlichkeits-/Struktur-Stamm (Patientenablage, Behandlungsplatz, Verletztensammelstelle); Personen-Zuordnung | E‑1 | geplant |
 | E‑4 | **Tiere** | Eigener Stamm + Status (eigene Spec — Tiere kommen vor) | E‑1-Foundation | geplant |
 | E‑5 | **Schäden** (allgemein) | Schadensobjekte/-stellen: Art, Ort, Ausmaß, Status (Sach-/Infrastruktur-/Umweltschäden); **kein** Karten-Rendering (→ T4), **keine** Gefahren-/Absperrzonen (→ Lage) | E‑1-Foundation | geplant |
