@@ -60,15 +60,17 @@ wird einzeln durchgebrainstormt (eigener Zyklus Spec → Plan → Umsetzung).
 |---|---|---|---|---|
 | K&M‑1 | **Stammdaten & Disposition — am Beispiel Fahrzeuge** | Generische Mechanik + Fahrzeuge: Stamm-CRUD im globalen Stammdaten-Bereich, Disposition im Einsatz, Ad-hoc-externe Fahrzeuge | — (Unterbau) | 📝 Design abgestimmt → Plan als Nächstes |
 | K&M‑2 | **Personal** | Personal-Stamm + Disposition (reuse der Mechanik) | K&M‑1 | 📝 Design abgestimmt → Plan als Nächstes |
-| K&M‑3 | **Einheiten (taktische Einheiten)** | Komponiert Personal + Fahrzeuge, Zuordnung zu Einsatzabschnitt | **K&M‑1 + K&M‑2 (Zwang)** | offen |
-| K&M‑4 | **Material** | Material-Stamm + Disposition | K&M‑1 | offen |
+| K&M‑3 | **Einheiten (taktische Einheiten)** | Komponiert Personal + Fahrzeuge, Zuordnung zu Einsatzabschnitt | **K&M‑1 + K&M‑2 (Zwang)** | ✅ im Code (Migr. `0014`–`0017`, `src/einheit/`) |
+| K&M‑4 | **Material** | Material-Stamm + Disposition + Material→Einheit-Zuordnung | K&M‑1 (+ K&M‑3 für Einheit-Zuordnung) | 📝 Design abgestimmt → Plan als Nächstes |
 
-**Harte Reihenfolge:** Einheiten *muss* nach Personal **und** Fahrzeugen kommen — eine taktische Einheit bündelt Führer + Mannschaft + Fahrzeug, die vorher existieren müssen. Material hängt nur am Unterbau (K&M‑1).
+**Harte Reihenfolge:** Einheiten *muss* nach Personal **und** Fahrzeugen kommen — eine taktische Einheit bündelt Führer + Mannschaft + Fahrzeug, die vorher existieren müssen. Material-Stamm + Disposition hängen nur am Unterbau (K&M‑1); die **Material→Einheit-Zuordnung** (K&M‑4-Scope, abgestimmt 2026-05-27) setzt zusätzlich K&M‑3 voraus — das ist bereits gebaut.
 
 **Dispositions-Modell (abgestimmt, gilt für alle K&M‑Module):** Referenz aus dem globalen Stamm-Pool + Einsatz-Zustand obendrauf (kein Voll-Snapshot, keine Stamm-Versionierung). Zwei Schutzmechanismen für die Nachvollziehbarkeit: (1) **kein Hard-Delete** im Stamm — Ressourcen werden nur „außer Dienst" gesetzt, damit alte Referenzen auflösbar bleiben; (2) **Identitäts-Schnappschuss** in der Dispositionszeile (z. B. Funkrufname/Kennzeichen zum Dispo-Zeitpunkt). Dispo-/Status-Ereignisse werden zusätzlich als **ETB-Einträge** mitgeschrieben (inkl. Ressourcen-Identität) — das ist die unveränderliche Historie.
 
 **Spec K&M‑1:** `docs/superpowers/specs/2026-05-26-kraefte-mittel-fahrzeuge-disposition-design.md`
 **Spec K&M‑2:** `docs/superpowers/specs/2026-05-26-kraefte-mittel-personal-disposition-design.md`
+**Spec K&M‑3:** `docs/superpowers/specs/2026-05-26-kraefte-mittel-einheiten-abschnitte-design.md`
+**Spec K&M‑4:** `docs/superpowers/specs/2026-05-27-kraefte-mittel-material-disposition-design.md`
 
 ## Querschnittliche Folge-Idee — Daten-Retention abgeschlossener Einsätze (Backlog)
 
