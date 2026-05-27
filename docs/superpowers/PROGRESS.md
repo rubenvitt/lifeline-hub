@@ -20,9 +20,10 @@ Vollständige Details: `docs/superpowers/specs/2026-05-23-fundament-etb-kern-des
 ```
 FUNDAMENT (Server · Auth · Einsatz · Stammdaten · Live)
   └─▶ ① ETB-Kern                     ← Teilprojekt 1 (funktional fertig)
-       ├─▶ ② Kräfte & Mittel         ← Teilprojekt 2 (aktuell)
+       ├─▶ ② Kräfte & Mittel         ← Teilprojekt 2 (Specs K&M‑1…4 vollständig)
        │      (Fahrzeuge · Personal · Einheiten · Material)
-       ├─▶ ③ Patienten-/Betroffenenverwaltung (sensible Daten)
+       ├─▶ ③ Erfassung               ← Teilprojekt 3 (aktuell)
+       │      (Personen/Betroffene · Unfallhilfsstellen · Tiere · Schäden — sensible Daten)
        └─▶ ④ Lagekarte (visualisiert ①–③)
 ```
 
@@ -71,6 +72,29 @@ wird einzeln durchgebrainstormt (eigener Zyklus Spec → Plan → Umsetzung).
 **Spec K&M‑2:** `docs/superpowers/specs/2026-05-26-kraefte-mittel-personal-disposition-design.md`
 **Spec K&M‑3:** `docs/superpowers/specs/2026-05-26-kraefte-mittel-einheiten-abschnitte-design.md`
 **Spec K&M‑4:** `docs/superpowers/specs/2026-05-27-kraefte-mittel-material-disposition-design.md`
+
+## Teilprojekt 3 — „Erfassung" — Spec-Sequenz
+
+Die Kategorie **Erfassung** (Navigations-Redesign) erfasst die im Einsatz betroffenen
+Subjekte/Objekte: Personen/Betroffene, Tiere, Schäden — plus **Unfallhilfsstellen** als
+deren örtliche Struktur. **Neu gegenüber T1/T2: sensible Personendaten** (medizinische
+Sichtung, DSGVO-besondere Kategorie, Lösch-/Aufbewahrungspflichten). Das K&M-Prinzip
+„alle Berechtigten lesen alles" trägt hier nicht — das **Zugriffs-/Audit-/Retention-Modell**
+wird in der ersten Spec (E‑1) gebaut und von E‑2…E‑5 wiederverwendet (analog wie K&M‑1
+die generische Mechanik legte). Jede Spec wird einzeln durchgebrainstormt.
+
+| # | Spec | Liefert | Abhängigkeit | Status |
+|---|---|---|---|---|
+| E‑1 | **Personen-Fundament + Erfassung** | Personen-Entity, Status-Lebenszyklus (vermisst → betroffen → Patient SK I–IV → verstorben), Basis-Erfassung, ETB-Integration **+ sensible-Daten-Zugriffs-/Audit-/Retention-Modell** | — (Unterbau) | 🧠 Brainstorming |
+| E‑2 | **Sichtung & medizinischer Verlauf** | Sichtungskategorien SK I–IV/tot, Verletzungs-/Befundnotiz, Transport/Verbleib (Krankenhaus), Vermisstenabgleich | E‑1 | geplant |
+| E‑3 | **Unfallhilfsstellen** | Örtlichkeits-/Struktur-Stamm (Patientenablage, Behandlungsplatz, Verletztensammelstelle); Personen-Zuordnung | E‑1 | geplant |
+| E‑4 | **Tiere** | Eigener Stamm + Status (eigene Spec — Tiere kommen vor) | E‑1-Foundation | geplant |
+| E‑5 | **Schäden** (allgemein) | Schadensobjekte/-stellen: Art, Ort, Ausmaß, Status (Sach-/Infrastruktur-/Umweltschäden); **kein** Karten-Rendering (→ T4), **keine** Gefahren-/Absperrzonen (→ Lage) | E‑1-Foundation | geplant |
+
+**Bindendes Personen-Konzept (aus Navigations-Spec):** Personen = EIN Stamm mit
+Status-Lebenszyklus; dieselbe physische Person wandert durch die Zustände (ein Modul
+mit gefilterten Sichten, kein Modul je Status). Unfallhilfsstellen (Örtlichkeit) und
+Tiere bleiben davon getrennt.
 
 ## Querschnittliche Folge-Idee — Daten-Retention abgeschlossener Einsätze (Backlog)
 
