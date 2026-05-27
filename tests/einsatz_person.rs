@@ -17,6 +17,15 @@ async fn setup() -> axum::Router {
     build_router(AppState { pool, live: LiveHub::new() })
 }
 
+/// Wie `setup`, liefert aber zusätzlich den Pool (für Direktquery-Verifikation).
+/// `SqlitePool` ist billig klonbar und teilt dieselbe In-Memory-DB.
+async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
+    let pool = db::test_pool().await;
+    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12")).await.unwrap();
+    let router = build_router(AppState { pool: pool.clone(), live: LiveHub::new() });
+    (router, pool)
+}
+
 async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) -> String {
     let body = format!(r#"{{"benutzername":"{benutzername}","passwort":"{passwort}"}}"#);
     let resp = app
@@ -334,7 +343,7 @@ async fn audit_einsicht_nur_fuer_einsatzleitung() {
 
 #[tokio::test]
 async fn export_schreibt_export_audit() {
-    let app = setup().await;
+    let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     person_anlegen(&app, &admin, e, r#"{"name":"Test"}"#).await;
@@ -346,4 +355,9 @@ async fn export_schreibt_export_audit() {
     assert_eq!(resp.status(), StatusCode::OK);
     let ct = resp.headers().get(header::CONTENT_TYPE).unwrap().to_str().unwrap().to_string();
     assert!(ct.starts_with("text/csv"), "Content-Type ist CSV, war: {ct}");
+    // Verifiziere: genau eine export-Audit-Zeile mit person_id IS NULL.
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM person_zugriff_audit WHERE einsatz_id = ? AND art = 'export' AND person_id IS NULL")
+        .bind(e).fetch_one(&pool).await.unwrap();
+    assert_eq!(count, 1, "Export muss genau einen export-Audit-Eintrag schreiben");
 }
