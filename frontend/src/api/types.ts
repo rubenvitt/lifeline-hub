@@ -305,3 +305,36 @@ export interface Einheit {
   fahrzeug_mitglieder: EinheitMitgliedFahrzeug[];
   material_mitglieder: EinheitMitgliedMaterial[];
 }
+
+export type PersonStatus = 'erfasst' | 'vermisst' | 'betroffen' | 'verstorben' | 'abgemeldet';
+export type Geschlecht = 'maennlich' | 'weiblich' | 'divers' | 'unbekannt';
+
+export interface Person {
+  id: number;
+  einsatz_id: number;
+  registrier_nr: number;
+  status: PersonStatus;
+  name: string | null;
+  vorname: string | null;
+  geschlecht: Geschlecht | null;
+  geburtsdatum: string | null;
+  alter_geschaetzt: number | null;
+  herkunft_adresse: string | null;
+  antreff_ort: string | null;
+  melder_kontakt: string | null;
+  notiz: string | null;
+  erfasst_at: string;
+  erfasst_von: number;
+  geaendert_at: string;
+  geaendert_von: number;
+  storniert_at: string | null;
+}
+
+export interface PersonZugriff {
+  id: number;
+  person_id: number | null;
+  benutzer_id: number;
+  benutzer_name: string;
+  art: 'detail' | 'export';
+  zugriff_at: string;
+}
