@@ -4,7 +4,7 @@ use crate::einsatz::berechtigung::{fordere_aktiv, fordere_lesezugriff, fordere_s
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
 use crate::etb::{self, repo as etb_repo};
-use crate::person::{registrier_anzeige, repo, Geschlecht, PersonAnzeige, PersonStatus};
+use crate::person::{darf_uebergehen, registrier_anzeige, repo, Geschlecht, PersonAnzeige, PersonStatus};
 use crate::person::audit_repo;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -215,6 +215,70 @@ pub async fn aktualisieren(
     ).await?;
     sse_person(&state, einsatz_id, person.id);
     Ok(Json(person))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct StatusBody {
+    pub status: String,
+}
+
+/// POST /api/einsaetze/{id}/personen/{pid}/status — validierter Status-Wechsel.
+/// Unbekannter Zielstatus → 400; nicht erlaubter Übergang → 422. Schreibt
+/// pseudonyme ETB-Spur + SSE.
+pub async fn status_wechsel(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, person_id)): Path<(i64, i64)>,
+    Json(body): Json<StatusBody>,
+) -> Result<Json<PersonAnzeige>, AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_schreibrecht(rolle)?;
+    fordere_aktiv(&einsatz)?;
+
+    if PersonStatus::parse(&body.status).is_none() {
+        return Err(AppError::Validation("Unbekannter Status".into()));
+    }
+    let vorher = repo::laden(&state.pool, einsatz_id, person_id).await?;
+    if !darf_uebergehen(&vorher.status, &body.status) {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Status-Übergang {} → {} ist nicht erlaubt",
+            vorher.status, body.status
+        )));
+    }
+    repo::setze_status(&state.pool, einsatz_id, person_id, &body.status, benutzer.id).await?;
+
+    etb_system(
+        &state, einsatz_id, benutzer.id,
+        &format!(
+            "Person {}: {} → {}",
+            registrier_anzeige(vorher.registrier_nr), vorher.status, body.status
+        ),
+    ).await?;
+    sse_person(&state, einsatz_id, person_id);
+    Ok(Json(repo::laden(&state.pool, einsatz_id, person_id).await?))
+}
+
+/// DELETE /api/einsaetze/{id}/personen/{pid} — Stornieren (Soft-Delete).
+/// Schreibberechtigt + aktiver Einsatz. Schreibt pseudonyme ETB-Spur + SSE.
+pub async fn stornieren(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, person_id)): Path<(i64, i64)>,
+) -> Result<StatusCode, AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_schreibrecht(rolle)?;
+    fordere_aktiv(&einsatz)?;
+
+    let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
+    repo::storniere(&state.pool, einsatz_id, person_id, benutzer.id).await?;
+    etb_system(
+        &state, einsatz_id, benutzer.id,
+        &format!("Person {} storniert", registrier_anzeige(person.registrier_nr)),
+    ).await?;
+    sse_person(&state, einsatz_id, person_id);
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// GET /api/einsaetze/{id}/personen/stream — SSE-Stream des Einsatz-Kanals.

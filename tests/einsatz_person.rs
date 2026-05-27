@@ -231,3 +231,60 @@ async fn beobachter_kann_nicht_anlegen() {
     let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/personen"), &beob, Some(r#"{}"#)).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 }
+
+#[tokio::test]
+async fn gueltiger_status_wechsel_schreibt_etb() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    let (status, json) = anfrage(
+        &app, "POST", &format!("/api/einsaetze/{e}/personen/{p}/status"), &admin,
+        Some(r#"{"status":"vermisst"}"#),
+    ).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["status"], "vermisst");
+    let inhalte = system_etb_inhalte(&app, &admin, e).await;
+    assert!(inhalte.iter().any(|i| i.contains("R-001") && i.contains("erfasst") && i.contains("vermisst")));
+}
+
+#[tokio::test]
+async fn ungueltiger_status_wechsel_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    // erfasst → erfasst ist kein gültiger Übergang.
+    let (status, _) = anfrage(
+        &app, "POST", &format!("/api/einsaetze/{e}/personen/{p}/status"), &admin,
+        Some(r#"{"status":"erfasst"}"#),
+    ).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn unbekannter_zielstatus_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    let (status, _) = anfrage(
+        &app, "POST", &format!("/api/einsaetze/{e}/personen/{p}/status"), &admin,
+        Some(r#"{"status":"quatsch"}"#),
+    ).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn stornieren_blendet_aus_liste_und_schreibt_etb() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    let (status, _) = anfrage(&app, "DELETE", &format!("/api/einsaetze/{e}/personen/{p}"), &admin, None).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let (_, liste) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/personen"), &admin, None).await;
+    assert_eq!(liste.as_array().unwrap().len(), 0);
+    let inhalte = system_etb_inhalte(&app, &admin, e).await;
+    assert!(inhalte.iter().any(|i| i.contains("R-001") && i.contains("storniert")));
+}
