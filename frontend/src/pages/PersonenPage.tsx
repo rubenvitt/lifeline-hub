@@ -1,9 +1,10 @@
-import { Alert, Breadcrumb, Space, Spin, Table, Tabs, Tag, Typography, type TableColumnsType } from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Input, InputNumber, Modal, Select, Space, Spin, Table, Tabs, Tag, Typography, type TableColumnsType } from 'antd';
 import { Link, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
-import { listePersonen, registrierAnzeige } from '../api/einsatzPerson';
+import { legePersonAn, listePersonen, registrierAnzeige, setzePersonStatus, type PersonEingabe } from '../api/einsatzPerson';
+import { ApiError } from '../api/client';
 import { usePersonenStream } from '../etb/usePersonenStream';
 import type { Person, PersonStatus } from '../api/types';
 
@@ -44,6 +45,27 @@ export default function PersonenPage() {
     queryFn: () => listePersonen(einsatzId),
   });
 
+  const qc = useQueryClient();
+  const { message } = App.useApp();
+  const [modus, setModus] = useState<null | 'schnell' | 'vermisst' | 'betroffen'>(null);
+  const [form] = Form.useForm<PersonEingabe>();
+
+  function invalidate() {
+    qc.invalidateQueries({ queryKey: ['einsatz-personen', einsatzId] });
+    qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
+  }
+  const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+
+  const anlegenMutation = useMutation({
+    mutationFn: async (v: { daten: PersonEingabe; folgeStatus?: 'vermisst' | 'betroffen' }) => {
+      const person = await legePersonAn(einsatzId, v.daten);
+      if (v.folgeStatus) await setzePersonStatus(einsatzId, person.id, v.folgeStatus);
+      return person;
+    },
+    onSuccess: () => { invalidate(); setModus(null); form.resetFields(); },
+    onError: fehler,
+  });
+
   if (einsatzQuery.isLoading) {
     return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
   }
@@ -51,6 +73,9 @@ export default function PersonenPage() {
     return <Alert type="error" message="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
+  const darfSchreiben =
+    einsatz.status === 'aktiv' &&
+    (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
 
   const alle = personenQuery.data ?? [];
   const personen = sicht === 'alle' ? alle : alle.filter((p) => p.status === sicht);
@@ -87,6 +112,13 @@ export default function PersonenPage() {
           <Typography.Title level={3} style={{ margin: 0 }}>Personen</Typography.Title>
           <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
         </Space>
+        {darfSchreiben && (
+          <Space>
+            <Button type="primary" onClick={() => setModus('schnell')}>Schnellerfassung</Button>
+            <Button onClick={() => setModus('vermisst')}>Vermisst melden</Button>
+            <Button onClick={() => setModus('betroffen')}>Betroffene/n erfassen</Button>
+          </Space>
+        )}
       </Space>
 
       <Tabs
@@ -94,6 +126,10 @@ export default function PersonenPage() {
         onChange={(k) => setSicht(k as Sicht)}
         items={SICHTEN.map((s) => ({ key: s.key, label: s.label }))}
       />
+
+      {!darfSchreiben && einsatz.status !== 'aktiv' && (
+        <Alert style={{ marginBottom: 12 }} type="info" showIcon message="Einsatz ist abgeschlossen — nur Ansicht." />
+      )}
 
       <Table
         rowKey="id"
@@ -103,6 +139,52 @@ export default function PersonenPage() {
         pagination={false}
         locale={{ emptyText: 'Keine Personen in dieser Sicht' }}
       />
+
+      <Modal
+        open={modus !== null}
+        title={modus === 'vermisst' ? 'Vermisst melden' : modus === 'betroffen' ? 'Betroffene/n erfassen' : 'Schnellerfassung'}
+        okText="Erfassen"
+        confirmLoading={anlegenMutation.isPending}
+        onOk={() => form.submit()}
+        onCancel={() => { setModus(null); form.resetFields(); }}
+        destroyOnClose
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={(daten) =>
+            anlegenMutation.mutate({
+              daten,
+              folgeStatus: modus === 'vermisst' ? 'vermisst' : modus === 'betroffen' ? 'betroffen' : undefined,
+            })
+          }
+        >
+          <Form.Item label="Geschlecht" name="geschlecht">
+            <Select
+              allowClear
+              placeholder="unbekannt"
+              options={[
+                { value: 'maennlich', label: 'männlich' },
+                { value: 'weiblich', label: 'weiblich' },
+                { value: 'divers', label: 'divers' },
+                { value: 'unbekannt', label: 'unbekannt' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item label="Geschätztes Alter (Jahre)" name="alter_geschaetzt">
+            <InputNumber min={0} max={120} style={{ width: 140 }} />
+          </Form.Item>
+          <Form.Item label="Antreffort" name="antreff_ort"><Input placeholder="z. B. Brücke, Sammelstelle" /></Form.Item>
+          <Form.Item label="Name" name="name"><Input /></Form.Item>
+          <Form.Item label="Vorname" name="vorname"><Input /></Form.Item>
+          {modus === 'vermisst' && (
+            <Form.Item label="Melder / Kontakt" name="melder_kontakt">
+              <Input placeholder="Angehöriger, Kontaktdaten" />
+            </Form.Item>
+          )}
+          <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }
