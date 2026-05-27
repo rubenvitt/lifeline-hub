@@ -1,11 +1,13 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
+use crate::einsatz::berechtigung::{fordere_aktiv, fordere_einsatzleitung, fordere_lesezugriff, fordere_schreibrecht};
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
 use crate::etb::{self, repo as etb_repo};
 use crate::person::{darf_uebergehen, registrier_anzeige, repo, Geschlecht, PersonAnzeige, PersonStatus};
 use crate::person::audit_repo;
+use crate::person::audit_repo::ZugriffAnzeige;
+use axum::response::{IntoResponse, Response};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::sse::{Event, KeepAlive, Sse};
@@ -279,6 +281,61 @@ pub async fn stornieren(
     ).await?;
     sse_person(&state, einsatz_id, person_id);
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// GET /api/einsaetze/{id}/personen/{pid}/audit — Lese-Audit der Person.
+/// Nur Einsatzleitung. Selbst NICHT auditiert (kein detail-Eintrag).
+pub async fn audit(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, person_id)): Path<(i64, i64)>,
+) -> Result<Json<Vec<ZugriffAnzeige>>, AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    fordere_einsatzleitung(rolle)?;
+    // Existenz der Person sicherstellen (404 statt leerer Liste bei Tippfehler).
+    repo::laden(&state.pool, einsatz_id, person_id).await?;
+    Ok(Json(audit_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?))
+}
+
+/// Einfaches CSV-Feld-Quoting (RFC 4180): in Anführungszeichen, innere `"` verdoppelt.
+fn csv_feld(s: &str) -> String {
+    format!("\"{}\"", s.replace('"', "\"\""))
+}
+
+/// GET /api/einsaetze/{id}/personen/export — CSV aller (nicht-stornierten)
+/// Personen. **Schreibt einen `export`-Audit-Eintrag** (person_id = NULL).
+pub async fn export(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path(einsatz_id): Path<i64>,
+) -> Result<Response, AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+
+    let personen = repo::liste(&state.pool, einsatz_id, None).await?;
+    audit_repo::anlegen(&state.pool, einsatz_id, None, benutzer.id, "export").await?;
+
+    let mut csv = String::from("registrier_nr;status;name;vorname;geschlecht;alter;antreff_ort\n");
+    for p in &personen {
+        let alter = p.alter_geschaetzt.map(|a| a.to_string()).unwrap_or_default();
+        csv.push_str(&format!(
+            "{};{};{};{};{};{};{}\n",
+            registrier_anzeige(p.registrier_nr),
+            csv_feld(&p.status),
+            csv_feld(p.name.as_deref().unwrap_or("")),
+            csv_feld(p.vorname.as_deref().unwrap_or("")),
+            csv_feld(p.geschlecht.as_deref().unwrap_or("")),
+            alter,
+            csv_feld(p.antreff_ort.as_deref().unwrap_or("")),
+        ));
+    }
+    Ok((
+        [(axum::http::header::CONTENT_TYPE, "text/csv; charset=utf-8")],
+        csv,
+    ).into_response())
 }
 
 /// GET /api/einsaetze/{id}/personen/stream — SSE-Stream des Einsatz-Kanals.

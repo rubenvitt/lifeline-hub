@@ -288,3 +288,62 @@ async fn stornieren_blendet_aus_liste_und_schreibt_etb() {
     let inhalte = system_etb_inhalte(&app, &admin, e).await;
     assert!(inhalte.iter().any(|i| i.contains("R-001") && i.contains("storniert")));
 }
+
+/// Zählt Audit-Einträge einer Person (über die Audit-Einsicht der Leitung).
+async fn audit_anzahl(app: &axum::Router, leit_cookie: &str, einsatz: i64, person: i64) -> usize {
+    let (status, json) = anfrage(app, "GET", &format!("/api/einsaetze/{einsatz}/personen/{person}/audit"), leit_cookie, None).await;
+    assert_eq!(status, StatusCode::OK);
+    json.as_array().unwrap().len()
+}
+
+#[tokio::test]
+async fn detail_oeffnen_schreibt_genau_einen_audit_liste_keinen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await; // admin = Einsatzleitung → darf Audit sehen
+    let p = person_anlegen(&app, &admin, e, r#"{"name":"Test"}"#).await;
+    // Liste schreibt keinen Audit:
+    anfrage(&app, "GET", &format!("/api/einsaetze/{e}/personen"), &admin, None).await;
+    assert_eq!(audit_anzahl(&app, &admin, e, p).await, 0);
+    // Eine Detail-Öffnung → genau ein Eintrag (die Audit-Einsicht selbst schreibt keinen):
+    let (status, _) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/personen/{p}"), &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(audit_anzahl(&app, &admin, e, p).await, 1);
+    // Zweite Öffnung → zwei Einträge:
+    anfrage(&app, "GET", &format!("/api/einsaetze/{e}/personen/{p}"), &admin, None).await;
+    assert_eq!(audit_anzahl(&app, &admin, e, p).await, 2);
+}
+
+#[tokio::test]
+async fn audit_einsicht_nur_fuer_einsatzleitung() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    // admin legt den Einsatz an → wird Einsatzleitung. Ein Führungs-User wird hinzugefügt.
+    let fueh_id = benutzer_anlegen(&app, &admin, "fuehrung", "keine").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    rolle_setzen(&app, &admin, e, fueh_id, "fuehrungspersonal").await;
+    let fueh = login_cookie(&app, "fuehrung", "fuehrungpw1").await;
+    let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    // Führungspersonal darf NICHT in die Audit-Einsicht:
+    let (status, _) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/personen/{p}/audit"), &fueh, None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    // Einsatzleitung (admin) darf:
+    let (status, _) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/personen/{p}/audit"), &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn export_schreibt_export_audit() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    person_anlegen(&app, &admin, e, r#"{"name":"Test"}"#).await;
+    // Export liefert CSV (text/csv), kein JSON — daher roher Request:
+    let resp = app.clone().oneshot(
+        Request::builder().method("GET").uri(format!("/api/einsaetze/{e}/personen/export"))
+            .header(header::COOKIE, admin.clone()).body(Body::empty()).unwrap(),
+    ).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let ct = resp.headers().get(header::CONTENT_TYPE).unwrap().to_str().unwrap().to_string();
+    assert!(ct.starts_with("text/csv"), "Content-Type ist CSV, war: {ct}");
+}
