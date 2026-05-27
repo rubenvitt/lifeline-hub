@@ -5,6 +5,7 @@ import StatusKatalogTab from '../stammdaten/StatusKatalogTab';
 import PersonalTab from '../stammdaten/PersonalTab';
 import QualifikationenTab from '../stammdaten/QualifikationenTab';
 import PersonalStatusTab from '../stammdaten/PersonalStatusTab';
+import EinheitTypenTab from '../stammdaten/EinheitTypenTab';
 
 export default function StammdatenPage() {
   return (
@@ -19,6 +20,7 @@ export default function StammdatenPage() {
           { key: 'personal', label: 'Personal', children: <PersonalTab /> },
           { key: 'qualifikationen', label: 'Qualifikationen', children: <QualifikationenTab /> },
           { key: 'personal-status', label: 'Personal-Status', children: <PersonalStatusTab /> },
+          { key: 'einheit-typen', label: 'Einheitstypen', children: <EinheitTypenTab /> },
         ]}
       />
     </div>

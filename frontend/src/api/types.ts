@@ -181,6 +181,15 @@ export interface PersonalStatus {
   sortier: number;
 }
 
+/** Einheitstyp-Katalog-Eintrag (org-weit) mit optionaler Standard-Soll-Stärke. */
+export interface EinheitTyp {
+  id: number;
+  label: string;
+  /** null, wenn der Typ keine Soll-Stärke definiert (z. B. „Sonstige"). */
+  soll: Staerke | null;
+  sortier: number;
+}
+
 /** Aufgelöste Dispositionszeile (Live/Snapshot serverseitig gewählt). */
 export interface EinsatzPersonal {
   id: number;
