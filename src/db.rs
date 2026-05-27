@@ -629,6 +629,40 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn einsatz_einheit_migration_referenzen_und_cascade() {
+        let pool = test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool).await.unwrap();
+        let einsatz: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        ).fetch_one(&pool).await.unwrap();
+        let typ: i64 = sqlx::query_scalar(
+            "INSERT INTO einheit_typ (org_id, label) VALUES (1, 'Zug') RETURNING id",
+        ).fetch_one(&pool).await.unwrap();
+        let abschnitt: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, 'Nord') RETURNING id",
+        ).bind(einsatz).fetch_one(&pool).await.unwrap();
+
+        // Einheit mit beiden Referenzen + Selbstreferenz (Unter-Einheit).
+        let zug: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, abschnitt_id, typ_id, name) VALUES (?, ?, ?, '1. Zug') RETURNING id",
+        ).bind(einsatz).bind(abschnitt).bind(typ).fetch_one(&pool).await.unwrap();
+        sqlx::query("INSERT INTO einsatz_einheit (einsatz_id, ueber_einheit_id, name) VALUES (?, ?, 'Gruppe Florian 1')")
+            .bind(einsatz).bind(zug).execute(&pool).await.unwrap();
+
+        let (sortier, angelegt): (i64, String) = sqlx::query_as(
+            "SELECT sortier, angelegt_at FROM einsatz_einheit WHERE name = '1. Zug'",
+        ).fetch_one(&pool).await.unwrap();
+        assert_eq!(sortier, 0);
+        assert!(!angelegt.is_empty());
+
+        // CASCADE über Einsatz.
+        sqlx::query("DELETE FROM einsatz WHERE id = ?").bind(einsatz).execute(&pool).await.unwrap();
+        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_einheit").fetch_one(&pool).await.unwrap();
+        assert_eq!(rest, 0, "CASCADE muss Einheiten entfernen");
+    }
+
+    #[tokio::test]
     async fn migration_0010_bis_0013_legen_personal_schema_an() {
         let pool = test_pool().await;
         // Tabellen existieren (leeres SELECT wirft nicht).
