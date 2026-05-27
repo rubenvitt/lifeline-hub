@@ -179,3 +179,27 @@ async fn beobachter_darf_nicht_bilden() {
     assert_eq!(anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/einheiten"), &erika_c, None).await.0, StatusCode::OK);
     assert_eq!(anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/einheiten"), &erika_c, Some(r#"{"name":"X"}"#)).await.0, StatusCode::FORBIDDEN);
 }
+
+#[tokio::test]
+async fn fremder_nutzer_ohne_mitgliedschaft_kann_einheiten_nicht_lesen_oder_bilden() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    // Nutzer ohne Mitgliedschaft und ohne höhere Berechtigung anlegen.
+    let _fremd = benutzer_anlegen(&app, &admin, "fremd", "keine").await;
+    let fremd_c = login_cookie(&app, "fremd", "fremdpw1").await;
+    // Kein Mitglied, keine höhere Berechtigung → Forbidden bzw. NotFound.
+    let status_get = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/einheiten"), &fremd_c, None).await.0;
+    assert!(matches!(status_get, StatusCode::FORBIDDEN | StatusCode::NOT_FOUND));
+    let status_post = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/einheiten"), &fremd_c, Some(r#"{"name":"X"}"#)).await.0;
+    assert!(matches!(status_post, StatusCode::FORBIDDEN | StatusCode::NOT_FOUND));
+}
+
+#[tokio::test]
+async fn bilden_auf_abgeschlossenem_einsatz_ist_409() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/abschliessen"), &admin, None).await;
+    assert_eq!(anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/einheiten"), &admin, Some(r#"{"name":"X"}"#)).await.0, StatusCode::CONFLICT);
+}
