@@ -138,6 +138,51 @@ export interface EinsatzFahrzeug {
   disponiert_von: number | null;
 }
 
+export type MaterialStatus =
+  | 'einsatzbereit'
+  | 'im_einsatz'
+  | 'defekt'
+  | 'verbraucht'
+  | 'desinfektion_noetig';
+
+export interface Material {
+  id: number;
+  bezeichnung: string;
+  kategorie: string | null;
+  bestandsnummer: string | null;
+  traegerorganisation: string | null;
+  standort: string | null;
+  bemerkung: string | null;
+  dienststatus: Dienststatus;
+  angelegt_at: string;
+}
+
+/** Aufgelöste Material-Dispositionszeile (Live/Snapshot serverseitig gewählt). */
+export interface EinsatzMaterial {
+  id: number;
+  einsatz_id: number;
+  material_id: number | null;
+  einheit_id: number | null;
+  ist_adhoc: boolean;
+  bezeichnung: string;
+  kategorie: string | null;
+  bestandsnummer: string | null;
+  traegerorganisation: string | null;
+  menge: number;
+  status: MaterialStatus;
+  bemerkung: string | null;
+  disponiert_at: string;
+  disponiert_von: number | null;
+}
+
+/** Material-Mitglied einer Einheit. */
+export interface EinheitMitgliedMaterial {
+  em_id: number;
+  bezeichnung: string;
+  menge: number;
+  status: MaterialStatus;
+}
+
 export type StaerkePosition = 'fuehrer' | 'unterfuehrer' | 'mannschaft';
 
 /** Aufgelöste Qualifikation einer Person (inkl. deaktivierter Zuordnungen). */
@@ -258,4 +303,5 @@ export interface Einheit {
   ist_kumuliert: Staerke;
   personal_mitglieder: EinheitMitgliedPerson[];
   fahrzeug_mitglieder: EinheitMitgliedFahrzeug[];
+  material_mitglieder: EinheitMitgliedMaterial[];
 }
