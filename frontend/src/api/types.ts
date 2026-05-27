@@ -122,6 +122,7 @@ export interface EinsatzFahrzeug {
   id: number;
   einsatz_id: number;
   fahrzeug_id: number | null;
+  einheit_id: number | null;
   ist_adhoc: boolean;
   funkrufname: string;
   kennzeichen: string | null;
@@ -185,6 +186,7 @@ export interface EinsatzPersonal {
   id: number;
   einsatz_id: number;
   personal_id: number | null;
+  einheit_id: number | null;
   ist_adhoc: boolean;
   name: string;
   funktion: string | null;

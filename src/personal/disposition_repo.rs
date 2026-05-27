@@ -8,7 +8,7 @@ use sqlx::SqlitePool;
 /// Subquery über aktive Qualifikationen — identisch zu `qualifikation_repo::funktion_text`)
 /// und Status (LEFT JOIN personal_status). Live vs. Snapshot wählt `zu_anzeige`.
 const SELECT_AUFGELOEST: &str = "\
-    SELECT ep.id, ep.einsatz_id, ep.personal_id, ep.status_id, \
+    SELECT ep.id, ep.einsatz_id, ep.personal_id, ep.einheit_id, ep.status_id, \
            ep.staerke_position AS ep_staerke_position, \
            ep.snap_name, ep.snap_funktion, ep.snap_traegerorganisation, \
            ep.bemerkung, ep.disponiert_at, ep.disponiert_von, \
@@ -30,6 +30,7 @@ struct Row {
     id: i64,
     einsatz_id: i64,
     personal_id: Option<i64>,
+    einheit_id: Option<i64>,
     status_id: Option<i64>,
     ep_staerke_position: Option<String>,
     snap_name: String,
@@ -70,6 +71,7 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzPersonalAnzeige {
         id: row.id,
         einsatz_id: row.einsatz_id,
         personal_id: row.personal_id,
+        einheit_id: row.einheit_id,
         ist_adhoc: row.personal_id.is_none(),
         name,
         funktion,
@@ -416,6 +418,25 @@ mod tests {
         assert_eq!(live, snap, "Live == Snapshot bei unverändertem Stamm");
         assert_eq!(live, helper, "Anzeige == funktion_text-Helper");
         assert_eq!(live.as_deref(), Some("Sanitäter, Gruppenführer"));
+    }
+
+    #[tokio::test]
+    async fn einheit_id_wird_in_anzeige_geliefert() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[]).await.unwrap();
+        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer).await.unwrap();
+
+        // Frisch disponiert → keiner Einheit zugeordnet.
+        assert_eq!(laden_anzeige(&pool, einsatz, ep, true).await.unwrap().einheit_id, None);
+
+        // Direkt einer Einheit zuordnen (Mitglied-Repo kommt später; hier roh).
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Trupp') RETURNING id",
+        ).bind(einsatz).fetch_one(&pool).await.unwrap();
+        sqlx::query("UPDATE einsatz_personal SET einheit_id = ? WHERE id = ?")
+            .bind(einheit).bind(ep).execute(&pool).await.unwrap();
+        assert_eq!(laden_anzeige(&pool, einsatz, ep, true).await.unwrap().einheit_id, Some(einheit));
     }
 
     #[tokio::test]
