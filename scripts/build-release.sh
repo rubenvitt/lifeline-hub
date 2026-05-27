@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 echo "==> 1/2 Frontend bauen (frontend/dist)"
-( cd frontend && npm ci && npm run build )
+( cd frontend && pnpm install --frozen-lockfile && pnpm run build )
 
 echo "==> 2/2 Backend im Release-Modus bauen (bettet frontend/dist ein)"
 cargo build --release

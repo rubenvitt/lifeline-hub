@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 
-// .env.local (von `npm run setup`) laden, damit baseURL/Port mit dem Vite-Dev-Server übereinstimmen.
+// .env.local (von `pnpm run setup`) laden, damit baseURL/Port mit dem Vite-Dev-Server übereinstimmen.
 try {
   for (const zeile of readFileSync(new URL('./.env.local', import.meta.url), 'utf8').split('\n')) {
     const m = zeile.match(/^([A-Z0-9_]+)=(.*)$/);
@@ -11,7 +11,7 @@ try {
   // keine .env.local vorhanden → Defaults greifen
 }
 
-// Dev-Port wie in vite.config aus ENV (von `npm run setup` gesetzt), Default 5173.
+// Dev-Port wie in vite.config aus ENV (von `pnpm run setup` gesetzt), Default 5173.
 const frontendPort = process.env.FRONTEND_PORT || '5173';
 const baseURL = process.env.FRONTEND_URL || `http://localhost:${frontendPort}`;
 
@@ -25,7 +25,7 @@ export default defineConfig({
   use: { baseURL, trace: 'on-first-retry' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: 'npm run dev',
+    command: 'pnpm run dev',
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,

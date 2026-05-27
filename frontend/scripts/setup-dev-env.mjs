@@ -25,7 +25,7 @@ const frontendPort = Number(process.env.FRONTEND_PORT) || (await freierPort());
 const backendUrl = `http://127.0.0.1:${backendPort}`;
 
 const inhalt =
-  `# Generiert von 'npm run setup' — pro Workspace dynamisch, NICHT committen.\n` +
+  `# Generiert von 'pnpm run setup' — pro Workspace dynamisch, NICHT committen.\n` +
   `FRONTEND_PORT=${frontendPort}\n` +
   `LIFELINE_BACKEND_URL=${backendUrl}\n`;
 

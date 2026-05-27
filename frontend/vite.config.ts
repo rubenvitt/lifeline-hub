@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // Dev-Server und Proxy-Ziel werden NICHT fest verdrahtet (Workspaces vergeben Ports
-// dynamisch). Quelle: .env.local (vom `npm run setup` geschrieben) + Shell-/CI-ENV,
+// dynamisch). Quelle: .env.local (vom `pnpm run setup` geschrieben) + Shell-/CI-ENV,
 // wobei process.env Vorrang hat. Defaults greifen für „einfach lokal".
 export default defineConfig(({ mode }) => {
   const env = { ...loadEnv(mode, process.cwd(), ''), ...process.env };
