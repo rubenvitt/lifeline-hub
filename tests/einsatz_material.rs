@@ -299,3 +299,59 @@ async fn patch_menge_unter_eins_ist_400() {
     let (status, _) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/material/{em}"), &admin, Some(r#"{"menge":0}"#)).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
+
+/// Bildet eine Einheit (Admin) und liefert ihre id.
+async fn einheit_bilden(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
+    let (status, json) = anfrage(app, "POST", &format!("/api/einsaetze/{einsatz}/einheiten"), cookie, Some(&format!(r#"{{"name":"{name}"}}"#))).await;
+    assert_eq!(status, StatusCode::CREATED);
+    json["id"].as_i64().unwrap()
+}
+
+#[tokio::test]
+async fn material_einheit_zuordnen_freigeben_und_aufloesen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let mat = material_anlegen(&app, &admin, "Wolldecke").await;
+    let (_, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/material"), &admin, Some(&format!(r#"{{"material_id":{mat},"menge":50}}"#))).await;
+    let em = json["id"].as_i64().unwrap();
+    let eid = einheit_bilden(&app, &admin, einsatz, "Trupp 1").await;
+
+    // Zuordnen.
+    assert_eq!(
+        anfrage(&app, "PUT", &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/{em}"), &admin, None).await.0,
+        StatusCode::NO_CONTENT
+    );
+    let (_, liste) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/material"), &admin, None).await;
+    assert_eq!(liste.as_array().unwrap()[0]["einheit_id"], eid);
+
+    // Material-Mitglied erscheint in der Einheit.
+    let (_, einheiten) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/einheiten"), &admin, None).await;
+    let einheit = einheiten.as_array().unwrap().iter().find(|e| e["id"] == eid).unwrap();
+    assert_eq!(einheit["material_mitglieder"].as_array().unwrap().len(), 1);
+
+    // Explizit freigeben (HTTP-Route material_freigeben).
+    assert_eq!(
+        anfrage(&app, "DELETE", &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/{em}"), &admin, None).await.0,
+        StatusCode::NO_CONTENT
+    );
+    let (_, liste_frei) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/material"), &admin, None).await;
+    assert!(liste_frei.as_array().unwrap()[0]["einheit_id"].is_null(), "Freigeben löst die Zuordnung");
+    // Wieder zuordnen, damit der anschließende Auflösen-Block weiterhin greift.
+    anfrage(&app, "PUT", &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/{em}"), &admin, None).await;
+
+    // Auflösen gibt Material frei.
+    assert_eq!(anfrage(&app, "DELETE", &format!("/api/einsaetze/{einsatz}/einheiten/{eid}"), &admin, None).await.0, StatusCode::NO_CONTENT);
+    let (_, liste2) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/material"), &admin, None).await;
+    assert!(liste2.as_array().unwrap()[0]["einheit_id"].is_null(), "Auflösen gibt Material frei");
+}
+
+#[tokio::test]
+async fn fremde_em_id_an_einheit_ist_404() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let eid = einheit_bilden(&app, &admin, einsatz, "Trupp 1").await;
+    let (status, _) = anfrage(&app, "PUT", &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/999999"), &admin, None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}

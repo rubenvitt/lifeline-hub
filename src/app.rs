@@ -143,7 +143,9 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/einsaetze/{id}/einheiten/{eid}/personal/{ep_id}", put(routes::einsatz_einheit::personal_zuordnen))
         .route("/api/einsaetze/{id}/einheiten/{eid}/personal/{ep_id}", delete(routes::einsatz_einheit::personal_freigeben))
         .route("/api/einsaetze/{id}/einheiten/{eid}/fahrzeug/{ef_id}", put(routes::einsatz_einheit::fahrzeug_zuordnen))
-        .route("/api/einsaetze/{id}/einheiten/{eid}/fahrzeug/{ef_id}", delete(routes::einsatz_einheit::fahrzeug_freigeben));
+        .route("/api/einsaetze/{id}/einheiten/{eid}/fahrzeug/{ef_id}", delete(routes::einsatz_einheit::fahrzeug_freigeben))
+        .route("/api/einsaetze/{id}/einheiten/{eid}/material/{em_id}", put(routes::einsatz_einheit::material_zuordnen))
+        .route("/api/einsaetze/{id}/einheiten/{eid}/material/{em_id}", delete(routes::einsatz_einheit::material_freigeben));
 
     // Dev-only: Endpoint existiert physisch nur mit Feature `dev-seeds`.
     #[cfg(feature = "dev-seeds")]

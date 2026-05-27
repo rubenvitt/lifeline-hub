@@ -49,6 +49,17 @@ pub struct EinheitMitgliedFahrzeug {
     pub fahrzeugtyp: Option<String>,
 }
 
+/// Material-Mitglied einer Einheit (leichtgewichtig).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct EinheitMitgliedMaterial {
+    /// `einsatz_material.id` der Dispozeile.
+    pub em_id: i64,
+    pub bezeichnung: String,
+    pub menge: i64,
+    /// Festes Status-Enum als String (z. B. "einsatzbereit").
+    pub status: String,
+}
+
 /// Aufgelöste Einheiten-Anzeige inkl. Typ/Abschnitt-Labels, Führer-Identität,
 /// Mitgliedern und berechneter Stärke. `soll` ist optional (Override → Typ-Default →
 /// `None`); `ist`/`ist_kumuliert` sind immer gesetzt.
@@ -71,6 +82,7 @@ pub struct EinheitAnzeige {
     pub ist_kumuliert: crate::staerke::Staerke,
     pub personal_mitglieder: Vec<EinheitMitgliedPerson>,
     pub fahrzeug_mitglieder: Vec<EinheitMitgliedFahrzeug>,
+    pub material_mitglieder: Vec<EinheitMitgliedMaterial>,
 }
 
 #[cfg(test)]

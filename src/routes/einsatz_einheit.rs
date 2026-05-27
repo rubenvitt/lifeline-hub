@@ -224,3 +224,29 @@ pub async fn fahrzeug_freigeben(
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: Fahrzeug «{}» freigegeben", einheit, fz)).await?;
     Ok(StatusCode::NO_CONTENT)
 }
+
+/// PUT .../einheiten/{eid}/material/{em_id} — Material zuordnen. ETB-Eintrag.
+pub async fn material_zuordnen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, eid, em_id)): Path<(i64, i64, i64)>,
+) -> Result<StatusCode, AppError> {
+    schreib_gate(&state, einsatz_id, benutzer.id).await?;
+    let einheit = einheit_name(&state, einsatz_id, eid).await?;
+    let (bez, menge) = mitglied_repo::ordne_material_zu(&state.pool, einsatz_id, eid, em_id).await?;
+    etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: Material «{}» (×{}) zugeordnet", einheit, bez, menge)).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// DELETE .../einheiten/{eid}/material/{em_id} — Material freigeben. ETB-Eintrag.
+pub async fn material_freigeben(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, eid, em_id)): Path<(i64, i64, i64)>,
+) -> Result<StatusCode, AppError> {
+    schreib_gate(&state, einsatz_id, benutzer.id).await?;
+    let einheit = einheit_name(&state, einsatz_id, eid).await?;
+    let (bez, menge) = mitglied_repo::gib_material_frei(&state.pool, einsatz_id, eid, em_id).await?;
+    etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: Material «{}» (×{}) freigegeben", einheit, bez, menge)).await?;
+    Ok(StatusCode::NO_CONTENT)
+}

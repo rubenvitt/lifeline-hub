@@ -64,6 +64,7 @@ async fn zu_anzeige(pool: &SqlitePool, row: Row) -> Result<EinheitAnzeige, AppEr
     let ist_kumuliert = ist_kumuliert(pool, row.einsatz_id, row.id).await?;
     let personal_mitglieder = mitglied_repo::personal_mitglieder(pool, row.id).await?;
     let fahrzeug_mitglieder = mitglied_repo::fahrzeug_mitglieder(pool, row.id).await?;
+    let material_mitglieder = mitglied_repo::material_mitglieder(pool, row.id).await?;
 
     Ok(EinheitAnzeige {
         id: row.id,
@@ -83,6 +84,7 @@ async fn zu_anzeige(pool: &SqlitePool, row: Row) -> Result<EinheitAnzeige, AppEr
         ist_kumuliert,
         personal_mitglieder,
         fahrzeug_mitglieder,
+        material_mitglieder,
     })
 }
 
@@ -259,7 +261,7 @@ pub async fn setze_fuehrer(pool: &SqlitePool, einsatz_id: i64, einheit_id: i64, 
 }
 
 /// Löst eine Einheit auf (Transaktion): alle Mitglieder freigeben (`einheit_id = NULL` an
-/// Personal + Fahrzeug), Unter-Einheiten auf den Parent hochziehen, dann löschen.
+/// Personal + Fahrzeug + Material), Unter-Einheiten auf den Parent hochziehen, dann löschen.
 /// `NotFound`, falls nicht zum Einsatz.
 pub async fn loese_auf(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
     let parent: Option<i64> = sqlx::query_scalar(
@@ -269,6 +271,7 @@ pub async fn loese_auf(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<()
     let mut tx = pool.begin().await?;
     sqlx::query("UPDATE einsatz_personal SET einheit_id = NULL WHERE einheit_id = ?").bind(id).execute(&mut *tx).await?;
     sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = NULL WHERE einheit_id = ?").bind(id).execute(&mut *tx).await?;
+    sqlx::query("UPDATE einsatz_material SET einheit_id = NULL WHERE einheit_id = ?").bind(id).execute(&mut *tx).await?;
     sqlx::query("UPDATE einsatz_einheit SET ueber_einheit_id = ? WHERE ueber_einheit_id = ? AND einsatz_id = ?")
         .bind(parent).bind(id).bind(einsatz_id).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?").bind(id).bind(einsatz_id).execute(&mut *tx).await?;
@@ -444,5 +447,20 @@ mod tests {
         assert_eq!(laden(&pool, einsatz, trupp.id).await.unwrap().ueber_einheit_id, Some(zug.id));
         // Gruppe ist weg.
         assert!(matches!(laden(&pool, einsatz, gruppe.id).await.unwrap_err(), AppError::NotFound));
+    }
+
+    #[tokio::test]
+    async fn aufloesen_gibt_material_frei() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, b) = setup(&pool).await;
+        let gruppe = anlegen(&pool, einsatz, 1, daten("Gruppe", None, None, None, None), b).await.unwrap();
+        let em: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_material (einsatz_id, einheit_id, snap_bezeichnung, menge) VALUES (?, ?, 'Wolldecke', 50) RETURNING id",
+        ).bind(einsatz).bind(gruppe.id).fetch_one(&pool).await.unwrap();
+
+        loese_auf(&pool, einsatz, gruppe.id).await.unwrap();
+        let einheit_id: Option<i64> = sqlx::query_scalar("SELECT einheit_id FROM einsatz_material WHERE id = ?")
+            .bind(em).fetch_one(&pool).await.unwrap();
+        assert_eq!(einheit_id, None, "Material muss beim Auflösen frei werden");
     }
 }

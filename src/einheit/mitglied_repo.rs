@@ -1,4 +1,4 @@
-use super::{EinheitMitgliedFahrzeug, EinheitMitgliedPerson};
+use super::{EinheitMitgliedFahrzeug, EinheitMitgliedMaterial, EinheitMitgliedPerson};
 use crate::error::AppError;
 use crate::staerke::{Staerke, StaerkePosition};
 use sqlx::SqlitePool;
@@ -69,6 +69,45 @@ pub async fn gib_fahrzeug_frei(pool: &SqlitePool, einsatz_id: i64, einheit_id: i
     sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = NULL WHERE id = ?")
         .bind(ef_id).execute(pool).await?;
     Ok(name)
+}
+
+/// Ordnet eine Material-Dispozeile einer Einheit zu (exklusiv; Material kann kein Führer
+/// sein). `NotFound` analog. Liefert (Bezeichnung, Menge) für den ETB-Text.
+pub async fn ordne_material_zu(pool: &SqlitePool, einsatz_id: i64, einheit_id: i64, em_id: i64) -> Result<(String, i64), AppError> {
+    pruefe_einheit(pool, einsatz_id, einheit_id).await?;
+    let row: Option<(String, i64)> = sqlx::query_as(
+        "SELECT snap_bezeichnung, menge FROM einsatz_material WHERE id = ? AND einsatz_id = ?",
+    ).bind(em_id).bind(einsatz_id).fetch_optional(pool).await?;
+    let row = row.ok_or(AppError::NotFound)?;
+    sqlx::query("UPDATE einsatz_material SET einheit_id = ? WHERE id = ? AND einsatz_id = ?")
+        .bind(einheit_id).bind(em_id).bind(einsatz_id).execute(pool).await?;
+    Ok(row)
+}
+
+/// Gibt eine Material-Dispozeile aus ihrer Einheit frei. `NotFound`, falls nicht zu dieser
+/// Einheit. Liefert (Bezeichnung, Menge).
+pub async fn gib_material_frei(pool: &SqlitePool, einsatz_id: i64, einheit_id: i64, em_id: i64) -> Result<(String, i64), AppError> {
+    let row: Option<(String, i64)> = sqlx::query_as(
+        "SELECT snap_bezeichnung, menge FROM einsatz_material WHERE id = ? AND einsatz_id = ? AND einheit_id = ?",
+    ).bind(em_id).bind(einsatz_id).bind(einheit_id).fetch_optional(pool).await?;
+    let row = row.ok_or(AppError::NotFound)?;
+    sqlx::query("UPDATE einsatz_material SET einheit_id = NULL WHERE id = ?")
+        .bind(em_id).execute(pool).await?;
+    Ok(row)
+}
+
+#[derive(sqlx::FromRow)]
+struct MaterialRow { em_id: i64, bezeichnung: String, menge: i64, status: String }
+
+/// Material-Mitglieder einer Einheit (Snapshot-Bezeichnung + Menge + Status).
+pub async fn material_mitglieder(pool: &SqlitePool, einheit_id: i64) -> Result<Vec<EinheitMitgliedMaterial>, AppError> {
+    let rows = sqlx::query_as::<_, MaterialRow>(
+        "SELECT id AS em_id, snap_bezeichnung AS bezeichnung, menge, status \
+         FROM einsatz_material WHERE einheit_id = ? ORDER BY id",
+    ).bind(einheit_id).fetch_all(pool).await?;
+    Ok(rows.into_iter().map(|r| EinheitMitgliedMaterial {
+        em_id: r.em_id, bezeichnung: r.bezeichnung, menge: r.menge, status: r.status,
+    }).collect())
 }
 
 #[derive(sqlx::FromRow)]
@@ -261,5 +300,29 @@ mod tests {
         assert_eq!(fahrzeug_mitglieder(&pool, a).await.unwrap().len(), 1);
         assert_eq!(gib_fahrzeug_frei(&pool, einsatz, a, ef).await.unwrap(), "Florian 1");
         assert!(fahrzeug_mitglieder(&pool, a).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn material_zuordnen_und_freigeben() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, a, b) = setup(&pool).await;
+        let em: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_material (einsatz_id, snap_bezeichnung, menge) VALUES (?, 'Wolldecke', 50) RETURNING id",
+        ).bind(einsatz).fetch_one(&pool).await.unwrap();
+
+        let (bez, menge) = ordne_material_zu(&pool, einsatz, a, em).await.unwrap();
+        assert_eq!((bez.as_str(), menge), ("Wolldecke", 50));
+        assert_eq!(material_mitglieder(&pool, a).await.unwrap().len(), 1);
+
+        // Exklusiv: erneutes Zuordnen zu B wechselt.
+        ordne_material_zu(&pool, einsatz, b, em).await.unwrap();
+        assert!(material_mitglieder(&pool, a).await.unwrap().is_empty());
+        assert_eq!(material_mitglieder(&pool, b).await.unwrap().len(), 1);
+
+        // Freigeben aus falscher Einheit (a) → NotFound.
+        assert!(matches!(gib_material_frei(&pool, einsatz, a, em).await.unwrap_err(), AppError::NotFound));
+        // Freigeben aus b.
+        gib_material_frei(&pool, einsatz, b, em).await.unwrap();
+        assert!(material_mitglieder(&pool, b).await.unwrap().is_empty());
     }
 }
