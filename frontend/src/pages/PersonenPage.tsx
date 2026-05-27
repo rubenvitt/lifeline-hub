@@ -1,12 +1,12 @@
-import { Alert, App, Breadcrumb, Button, Form, Input, InputNumber, Modal, Select, Space, Spin, Table, Tabs, Tag, Typography, type TableColumnsType } from 'antd';
+import { Alert, App, Breadcrumb, Button, Descriptions, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Spin, Table, Tabs, Tag, Typography, type TableColumnsType } from 'antd';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
-import { legePersonAn, listePersonen, registrierAnzeige, setzePersonStatus, type PersonEingabe } from '../api/einsatzPerson';
+import { aktualisierePerson, ladePerson, ladePersonAudit, legePersonAn, listePersonen, registrierAnzeige, setzePersonStatus, stornierePerson, type PersonEingabe } from '../api/einsatzPerson';
 import { ApiError } from '../api/client';
 import { usePersonenStream } from '../etb/usePersonenStream';
-import type { Person, PersonStatus } from '../api/types';
+import type { Person, PersonStatus, PersonZugriff } from '../api/types';
 
 const STATUS_META: Record<PersonStatus, { label: string; color: string }> = {
   erfasst: { label: 'erfasst', color: 'default' },
@@ -30,6 +30,17 @@ function alterAnzeige(p: Person): string {
   if (p.geburtsdatum) return p.geburtsdatum;
   if (p.alter_geschaetzt != null) return `~${p.alter_geschaetzt} J.`;
   return '—';
+}
+
+/** Erlaubte Folge-Status (Spiegel von darf_uebergehen im Backend). */
+function naechsteStatus(aktuell: PersonStatus): PersonStatus[] {
+  switch (aktuell) {
+    case 'erfasst': return ['vermisst', 'betroffen', 'verstorben', 'abgemeldet'];
+    case 'vermisst': return ['betroffen', 'verstorben', 'abgemeldet'];
+    case 'betroffen': return ['vermisst', 'verstorben', 'abgemeldet'];
+    case 'verstorben':
+    case 'abgemeldet': return ['erfasst', 'vermisst', 'betroffen'];
+  }
 }
 
 export default function PersonenPage() {
@@ -64,6 +75,38 @@ export default function PersonenPage() {
     },
     onSuccess: () => { invalidate(); setModus(null); form.resetFields(); },
     onError: fehler,
+  });
+
+  const [offenePersonId, setOffenePersonId] = useState<number | null>(null);
+  const [bearbeiten, setBearbeiten] = useState(false);
+  const [editForm] = Form.useForm<PersonEingabe>();
+
+  const detailQuery = useQuery({
+    queryKey: ['einsatz-person', einsatzId, offenePersonId],
+    queryFn: () => ladePerson(einsatzId, offenePersonId!),
+    enabled: offenePersonId != null,
+  });
+  const auditQuery = useQuery({
+    queryKey: ['einsatz-person-audit', einsatzId, offenePersonId],
+    queryFn: () => ladePersonAudit(einsatzId, offenePersonId!),
+    enabled: offenePersonId != null && einsatzQuery.data?.meine_rolle === 'einsatzleitung',
+  });
+
+  function invalidateDetail() {
+    invalidate();
+    qc.invalidateQueries({ queryKey: ['einsatz-person', einsatzId, offenePersonId] });
+  }
+  const statusMutation = useMutation({
+    mutationFn: (v: { personId: number; status: PersonStatus }) => setzePersonStatus(einsatzId, v.personId, v.status),
+    onSuccess: invalidateDetail, onError: fehler,
+  });
+  const editMutation = useMutation({
+    mutationFn: (daten: PersonEingabe) => aktualisierePerson(einsatzId, offenePersonId!, daten),
+    onSuccess: () => { invalidateDetail(); setBearbeiten(false); }, onError: fehler,
+  });
+  const stornoMutation = useMutation({
+    mutationFn: (personId: number) => stornierePerson(einsatzId, personId),
+    onSuccess: () => { invalidate(); setOffenePersonId(null); }, onError: fehler,
   });
 
   if (einsatzQuery.isLoading) {
@@ -138,6 +181,7 @@ export default function PersonenPage() {
         columns={spalten}
         pagination={false}
         locale={{ emptyText: 'Keine Personen in dieser Sicht' }}
+        onRow={(p) => ({ onClick: () => { setOffenePersonId(p.id); setBearbeiten(false); }, style: { cursor: 'pointer' } })}
       />
 
       <Modal
@@ -185,6 +229,101 @@ export default function PersonenPage() {
           <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
         </Form>
       </Modal>
+
+      <Drawer
+        open={offenePersonId != null}
+        width={520}
+        title={detailQuery.data ? `Person ${registrierAnzeige(detailQuery.data.registrier_nr)}` : 'Person'}
+        onClose={() => { setOffenePersonId(null); setBearbeiten(false); }}
+      >
+        {detailQuery.isLoading && <Spin />}
+        {detailQuery.data && (() => {
+          const p = detailQuery.data;
+          return (
+            <Space direction="vertical" style={{ width: '100%' }} size="large">
+              <Space>
+                <Tag color={STATUS_META[p.status].color}>{STATUS_META[p.status].label}</Tag>
+                {p.storniert_at && <Tag color="default">storniert</Tag>}
+              </Space>
+
+              {darfSchreiben && !p.storniert_at && (
+                <Space wrap>
+                  {naechsteStatus(p.status).map((s) => (
+                    <Button key={s} size="small"
+                      onClick={() => statusMutation.mutate({ personId: p.id, status: s })}>
+                      → {STATUS_META[s].label}
+                    </Button>
+                  ))}
+                </Space>
+              )}
+
+              {bearbeiten ? (
+                <Form form={editForm} layout="vertical" initialValues={p}
+                  onFinish={(daten) => editMutation.mutate(daten)}>
+                  <Form.Item label="Name" name="name"><Input /></Form.Item>
+                  <Form.Item label="Vorname" name="vorname"><Input /></Form.Item>
+                  <Form.Item label="Geschlecht" name="geschlecht">
+                    <Select allowClear options={[
+                      { value: 'maennlich', label: 'männlich' }, { value: 'weiblich', label: 'weiblich' },
+                      { value: 'divers', label: 'divers' }, { value: 'unbekannt', label: 'unbekannt' },
+                    ]} />
+                  </Form.Item>
+                  <Form.Item label="Geburtsdatum (YYYY-MM-DD)" name="geburtsdatum"><Input /></Form.Item>
+                  <Form.Item label="Geschätztes Alter" name="alter_geschaetzt"><InputNumber min={0} max={120} /></Form.Item>
+                  <Form.Item label="Herkunft / Adresse" name="herkunft_adresse"><Input /></Form.Item>
+                  <Form.Item label="Antreffort" name="antreff_ort"><Input /></Form.Item>
+                  <Form.Item label="Melder / Kontakt" name="melder_kontakt"><Input /></Form.Item>
+                  <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
+                  <Space>
+                    <Button type="primary" htmlType="submit" loading={editMutation.isPending}>Speichern</Button>
+                    <Button onClick={() => setBearbeiten(false)}>Abbrechen</Button>
+                  </Space>
+                </Form>
+              ) : (
+                <Descriptions column={1} size="small" bordered>
+                  <Descriptions.Item label="Name">{p.name ?? '—'}</Descriptions.Item>
+                  <Descriptions.Item label="Vorname">{p.vorname ?? '—'}</Descriptions.Item>
+                  <Descriptions.Item label="Geschlecht">{p.geschlecht ?? '—'}</Descriptions.Item>
+                  <Descriptions.Item label="Geburtsdatum">{p.geburtsdatum ?? '—'}</Descriptions.Item>
+                  <Descriptions.Item label="Alter (geschätzt)">{p.alter_geschaetzt ?? '—'}</Descriptions.Item>
+                  <Descriptions.Item label="Herkunft / Adresse">{p.herkunft_adresse ?? '—'}</Descriptions.Item>
+                  <Descriptions.Item label="Antreffort">{p.antreff_ort ?? '—'}</Descriptions.Item>
+                  <Descriptions.Item label="Melder / Kontakt">{p.melder_kontakt ?? '—'}</Descriptions.Item>
+                  <Descriptions.Item label="Notiz">{p.notiz ?? '—'}</Descriptions.Item>
+                </Descriptions>
+              )}
+
+              {darfSchreiben && !p.storniert_at && !bearbeiten && (
+                <Space>
+                  <Button onClick={() => { setBearbeiten(true); editForm.setFieldsValue(p); }}>Bearbeiten</Button>
+                  <Popconfirm title="Person stornieren (Soft-Delete)?" onConfirm={() => stornoMutation.mutate(p.id)}>
+                    <Button danger>Stornieren</Button>
+                  </Popconfirm>
+                </Space>
+              )}
+
+              {einsatz.meine_rolle === 'einsatzleitung' && (
+                <div>
+                  <Typography.Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
+                    Zugriffs-Audit
+                  </Typography.Text>
+                  <Table<PersonZugriff>
+                    rowKey="id" size="small" pagination={false}
+                    loading={auditQuery.isLoading}
+                    dataSource={auditQuery.data ?? []}
+                    columns={[
+                      { title: 'Wann', dataIndex: 'zugriff_at', key: 'zugriff_at' },
+                      { title: 'Wer', dataIndex: 'benutzer_name', key: 'benutzer_name' },
+                      { title: 'Art', dataIndex: 'art', key: 'art' },
+                    ]}
+                    locale={{ emptyText: 'Noch keine Zugriffe' }}
+                  />
+                </div>
+              )}
+            </Space>
+          );
+        })()}
+      </Drawer>
     </div>
   );
 }
