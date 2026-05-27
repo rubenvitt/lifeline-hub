@@ -1,3 +1,4 @@
+pub mod mitglied_repo;
 pub mod typ_repo;
 
 use crate::staerke::Staerke;
@@ -24,6 +25,51 @@ pub struct EinheitTyp {
     /// Standard-Soll-Stärke; `None`, wenn der Typ keine Soll-Stärke definiert.
     pub soll: Option<Staerke>,
     pub sortier: i64,
+}
+
+/// Personal-Mitglied einer Einheit (leichtgewichtig für die Einheiten-Anzeige).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct EinheitMitgliedPerson {
+    /// `einsatz_personal.id` der Dispozeile.
+    pub ep_id: i64,
+    pub name: String,
+    pub funktion: Option<String>,
+    pub staerke_position: Option<String>,
+    /// `true`, wenn diese Person als Führer der Einheit eingetragen ist.
+    pub ist_fuehrer: bool,
+}
+
+/// Fahrzeug-Mitglied einer Einheit (leichtgewichtig).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct EinheitMitgliedFahrzeug {
+    /// `einsatz_fahrzeug.id` der Dispozeile.
+    pub ef_id: i64,
+    pub funkrufname: String,
+    pub fahrzeugtyp: Option<String>,
+}
+
+/// Aufgelöste Einheiten-Anzeige inkl. Typ/Abschnitt-Labels, Führer-Identität,
+/// Mitgliedern und berechneter Stärke. `soll` ist optional (Override → Typ-Default →
+/// `None`); `ist`/`ist_kumuliert` sind immer gesetzt.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct EinheitAnzeige {
+    pub id: i64,
+    pub einsatz_id: i64,
+    pub abschnitt_id: Option<i64>,
+    pub abschnitt_name: Option<String>,
+    pub ueber_einheit_id: Option<i64>,
+    pub typ_id: Option<i64>,
+    pub typ_label: Option<String>,
+    pub name: String,
+    pub fuehrer_id: Option<i64>,
+    pub fuehrer_name: Option<String>,
+    pub bemerkung: Option<String>,
+    pub sortier: i64,
+    pub soll: Option<crate::staerke::Staerke>,
+    pub ist: crate::staerke::Staerke,
+    pub ist_kumuliert: crate::staerke::Staerke,
+    pub personal_mitglieder: Vec<EinheitMitgliedPerson>,
+    pub fahrzeug_mitglieder: Vec<EinheitMitgliedFahrzeug>,
 }
 
 #[cfg(test)]
