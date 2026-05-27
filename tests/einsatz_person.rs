@@ -342,6 +342,63 @@ async fn audit_einsicht_nur_fuer_einsatzleitung() {
 }
 
 #[tokio::test]
+async fn fremder_einsatz_anlegen_ist_403() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    // Ein Nicht-Mitglied (keine Einsatz-Rolle), kein System-Admin.
+    benutzer_anlegen(&app, &admin, "aussen", "keine").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let aussen = login_cookie(&app, "aussen", "aussenpw1").await;
+    // Lesen ohne Mitgliedschaft: 403 (darf_lesen = false).
+    let (status, _) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/personen"), &aussen, None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    // Schreiben ohne Mitgliedschaft: 403.
+    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/personen"), &aussen, Some(r#"{}"#)).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn abgeschlossener_einsatz_ist_readonly() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    // Einsatz abschließen:
+    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/abschliessen"), &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    // Lesen weiterhin erlaubt (in der Nachlauffrist):
+    let (status, _) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/personen"), &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    // Schreiben blockiert (409 Conflict via fordere_aktiv):
+    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/personen"), &admin, Some(r#"{}"#)).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/personen/{p}/status"), &admin, Some(r#"{"status":"vermisst"}"#)).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    let (status, _) = anfrage(&app, "DELETE", &format!("/api/einsaetze/{e}/personen/{p}"), &admin, None).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn beobachter_liest_aber_schreibt_nicht() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let beob_id = benutzer_anlegen(&app, &admin, "beob2", "keine").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    rolle_setzen(&app, &admin, e, beob_id, "beobachter").await;
+    let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    let beob = login_cookie(&app, "beob2", "beob2pw1").await;
+    // Lesen erlaubt:
+    let (status, _) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/personen"), &beob, None).await;
+    assert_eq!(status, StatusCode::OK);
+    // Detail lesen erlaubt (und auditiert):
+    let (status, _) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/personen/{p}"), &beob, None).await;
+    assert_eq!(status, StatusCode::OK);
+    // Status-Wechsel verboten:
+    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/personen/{p}/status"), &beob, Some(r#"{"status":"vermisst"}"#)).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
 async fn export_schreibt_export_audit() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
