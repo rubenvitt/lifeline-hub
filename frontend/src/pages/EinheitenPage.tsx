@@ -266,10 +266,10 @@ export default function EinheitenPage() {
               <Typography.Title level={5} style={{ marginTop: 16 }}>Personal</Typography.Title>
               {aktuell.personal_mitglieder.map((m) => (
                 <Space key={m.ep_id} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>{m.name}{m.staerke_position ? ` (${m.staerke_position})` : ''}{m.ist_fuehrer && <Tag color="gold" style={{ marginLeft: 4 }}>Führer</Tag>}</span>
+                  <span>{m.name}{m.staerke_position ? ` (${m.staerke_position})` : ''}{m.ist_fuehrer && <Tag color="gold" style={{ marginLeft: 4 }}>Einheitsführer</Tag>}</span>
                   {darfSchreiben && (
                     <Space>
-                      {!m.ist_fuehrer && <Button size="small" onClick={() => fuehrerSetzen.mutate(m.ep_id)}>Als Führer</Button>}
+                      {!m.ist_fuehrer && <Button size="small" onClick={() => fuehrerSetzen.mutate(m.ep_id)}>Als Einheitsführer</Button>}
                       <Button size="small" danger onClick={() => personalFrei.mutate(m.ep_id)}>Entfernen</Button>
                     </Space>
                   )}

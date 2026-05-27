@@ -243,7 +243,7 @@ pub async fn pruefe_fuehrer(pool: &SqlitePool, einsatz_id: i64, einheit_id: i64,
             "SELECT 1 FROM einsatz_personal WHERE id = ? AND einheit_id = ? AND einsatz_id = ?",
         ).bind(ep).bind(einheit_id).bind(einsatz_id).fetch_optional(pool).await?;
         if mitglied.is_none() {
-            return Err(AppError::Validation("Führer muss Mitglied dieser Einheit sein".into()));
+            return Err(AppError::Validation("Einheitsführer muss Mitglied dieser Einheit sein".into()));
         }
     }
     Ok(())
