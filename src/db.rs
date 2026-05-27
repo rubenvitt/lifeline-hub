@@ -605,6 +605,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn einheit_typ_migration_constraints_und_nullable_soll() {
+        let pool = test_pool().await;
+        // Org NACH der Migration → Migrations-Seed greift NICHT (bootstrap seedet neue Orgs).
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool).await.unwrap();
+
+        // Soll vollständig.
+        sqlx::query("INSERT INTO einheit_typ (org_id, label, soll_fuehrer, soll_unterfuehrer, soll_mannschaft) VALUES (1, 'Zug', 1, 3, 18)")
+            .execute(&pool).await.unwrap();
+        // Soll komplett NULL (z. B. Sonstige).
+        sqlx::query("INSERT INTO einheit_typ (org_id, label) VALUES (1, 'Sonstige')")
+            .execute(&pool).await.unwrap();
+        let (aktiv, sortier): (i64, i64) = sqlx::query_as(
+            "SELECT aktiv, sortier FROM einheit_typ WHERE label = 'Sonstige'",
+        ).fetch_one(&pool).await.unwrap();
+        assert_eq!((aktiv, sortier), (1, 0), "aktiv-Default 1, sortier-Default 0");
+
+        // UNIQUE(org_id, label).
+        let dup = sqlx::query("INSERT INTO einheit_typ (org_id, label) VALUES (1, 'Zug')")
+            .execute(&pool).await;
+        assert!(dup.is_err(), "doppeltes label je Org muss abgelehnt werden");
+    }
+
+    #[tokio::test]
     async fn migration_0010_bis_0013_legen_personal_schema_an() {
         let pool = test_pool().await;
         // Tabellen existieren (leeres SELECT wirft nicht).
