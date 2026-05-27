@@ -1,3 +1,4 @@
+pub mod repo;
 pub mod mitglied_repo;
 pub mod typ_repo;
 
