@@ -15,6 +15,7 @@ pub mod katalog;
 pub mod live;
 pub mod material;
 pub mod personal;
+pub mod person;
 pub mod routes;
 pub mod staerke;
 pub mod static_files;
