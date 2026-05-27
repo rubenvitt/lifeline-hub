@@ -6,6 +6,7 @@ pub mod dev;
 pub mod einheit_typ;
 pub mod einsatz;
 pub mod einsatz_fahrzeug;
+pub mod einsatz_material;
 pub mod einsatz_personal;
 pub mod einsatz_einheit;
 pub mod einsatzabschnitt;
