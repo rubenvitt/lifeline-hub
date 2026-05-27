@@ -25,3 +25,19 @@ pub struct EinheitTyp {
     pub soll: Option<Staerke>,
     pub sortier: i64,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn startliste_konsistent() {
+        assert_eq!(EINHEIT_TYP_STARTLISTE.len(), 5);
+        // Jeder Eintrag hat alle drei Soll-Werte gesetzt ODER alle drei leer.
+        for (_, f, u, m, _) in EINHEIT_TYP_STARTLISTE {
+            let alle = f.is_some() && u.is_some() && m.is_some();
+            let keiner = f.is_none() && u.is_none() && m.is_none();
+            assert!(alle || keiner, "Soll muss vollständig oder leer sein");
+        }
+    }
+}
