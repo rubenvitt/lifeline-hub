@@ -663,6 +663,43 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn einheit_mitgliedschaft_migration_fk_spalte_default_null() {
+        let pool = test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool).await.unwrap();
+        let einsatz: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        ).fetch_one(&pool).await.unwrap();
+
+        // Neue Dispozeile: einheit_id ist standardmäßig NULL (freie Kraft).
+        let ep: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Extern') RETURNING id",
+        ).bind(einsatz).fetch_one(&pool).await.unwrap();
+        let einheit_id: Option<i64> = sqlx::query_scalar(
+            "SELECT einheit_id FROM einsatz_personal WHERE id = ?",
+        ).bind(ep).fetch_one(&pool).await.unwrap();
+        assert_eq!(einheit_id, None);
+
+        // Zuordnen auf eine Einheit funktioniert.
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Trupp') RETURNING id",
+        ).bind(einsatz).fetch_one(&pool).await.unwrap();
+        sqlx::query("UPDATE einsatz_personal SET einheit_id = ? WHERE id = ?")
+            .bind(einheit).bind(ep).execute(&pool).await.unwrap();
+
+        // Auch an einsatz_fahrzeug existiert die Spalte.
+        let ef: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, 'Florian 1') RETURNING id",
+        ).bind(einsatz).fetch_one(&pool).await.unwrap();
+        sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = ? WHERE id = ?")
+            .bind(einheit).bind(ef).execute(&pool).await.unwrap();
+        let zuordnung: Option<i64> = sqlx::query_scalar(
+            "SELECT einheit_id FROM einsatz_fahrzeug WHERE id = ?",
+        ).bind(ef).fetch_one(&pool).await.unwrap();
+        assert_eq!(zuordnung, Some(einheit));
+    }
+
+    #[tokio::test]
     async fn migration_0010_bis_0013_legen_personal_schema_an() {
         let pool = test_pool().await;
         // Tabellen existieren (leeres SELECT wirft nicht).
