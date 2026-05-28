@@ -16,6 +16,7 @@ import EinheitenPage from './pages/EinheitenPage';
 import EinsatzabschnittePage from './pages/EinsatzabschnittePage';
 import PersonenPage from './pages/PersonenPage';
 import UnfallhilfsstellenPage from './pages/UnfallhilfsstellenPage';
+import UhsDetailPage from './pages/uhs/UhsDetailPage';
 import EinsatzLayout from './einsatz/EinsatzLayout';
 import DefaultModulRedirect from './einsatz/DefaultModulRedirect';
 import ModulStub from './einsatz/ModulStub';
@@ -56,6 +57,7 @@ export default function App() {
               element={MODUL_ELEMENTE[m.key] ?? <ModulStub modul={m} />}
             />
           ))}
+          <Route path="unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/einsaetze" replace />} />

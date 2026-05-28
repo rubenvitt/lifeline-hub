@@ -6,6 +6,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { server } from '../test/server';
 import UnfallhilfsstellenPage from './UnfallhilfsstellenPage';
+import UhsDetailPage from './uhs/UhsDetailPage';
 import { App as AntApp } from 'antd';
 
 class FakeEventSource {
@@ -35,6 +36,7 @@ function renderPage() {
         <MemoryRouter initialEntries={['/einsaetze/1/unfallhilfsstellen']}>
           <Routes>
             <Route path="/einsaetze/:id/unfallhilfsstellen" element={<UnfallhilfsstellenPage />} />
+            <Route path="/einsaetze/:id/unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />
           </Routes>
         </MemoryRouter>
       </AntApp>

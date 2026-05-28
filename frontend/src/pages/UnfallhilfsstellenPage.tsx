@@ -7,7 +7,6 @@ import { legeUhsAn, listeUhs, type UhsEingabe } from '../api/einsatzUhs';
 import { ApiError } from '../api/client';
 import { useUhsStream } from '../etb/useUhsStream';
 import type { Uhs, UhsStatus, UhsTyp } from '../api/types';
-import UhsDetailDrawer from './uhs/UhsDetailDrawer';
 
 const UHS_TYP_LABEL: Record<UhsTyp, string> = {
   patientenablage: 'Patientenablage',
@@ -38,7 +37,6 @@ export default function UnfallhilfsstellenPage() {
   const { message } = App.useApp();
   const [anlegen, setAnlegen] = useState(false);
   const [form] = Form.useForm<UhsEingabe>();
-  const [aktivId, setAktivId] = useState<number | null>(null);
 
   const ist_aktiv = einsatzQuery.data?.status === 'aktiv';
   const ist_beobachter = einsatzQuery.data?.meine_rolle === 'beobachter';
@@ -58,7 +56,7 @@ export default function UnfallhilfsstellenPage() {
 
   const spalten: TableColumnsType<Uhs> = [
     { title: 'Bezeichnung', dataIndex: 'bezeichnung', render: (b: string, u) =>
-        <Button type="link" onClick={() => setAktivId(u.id)}>{b}</Button> },
+        <Link to={`/einsaetze/${einsatzId}/unfallhilfsstellen/${u.id}`}>{b}</Link> },
     { title: 'Typ', dataIndex: 'typ', render: (t: UhsTyp) => UHS_TYP_LABEL[t] },
     { title: 'Status', dataIndex: 'status', render: (s: UhsStatus) => {
       const meta = STATUS_META[s];
@@ -117,15 +115,6 @@ export default function UnfallhilfsstellenPage() {
           <Button type="primary" htmlType="submit" loading={anlegenMut.isPending}>Anlegen</Button>
         </Form>
       </Drawer>
-
-      {aktivId != null && (
-        <UhsDetailDrawer
-          einsatzId={einsatzId}
-          uhsId={aktivId}
-          schreibgeschuetzt={schreibgeschuetzt}
-          onClose={() => setAktivId(null)}
-        />
-      )}
     </div>
   );
 }
