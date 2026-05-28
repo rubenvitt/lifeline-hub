@@ -6,7 +6,8 @@ const SELECT_ALLE: &str = "\
     SELECT id, einsatz_id, registrier_nr, status, name, vorname, geschlecht, \
            geburtsdatum, alter_geschaetzt, herkunft_adresse, antreff_ort, \
            melder_kontakt, notiz, erfasst_at, erfasst_von, geaendert_at, \
-           geaendert_von, storniert_at \
+           geaendert_von, storniert_at, \
+           aktuelle_sichtung, aktuelle_sichtung_at, aktueller_verbleib \
     FROM einsatz_person";
 
 /// Eingabedaten beim Anlegen. Strings bereits getrimmt (Handler-Aufgabe);
@@ -299,5 +300,16 @@ mod tests {
         let p = anlegen(&pool, e, b, leere_daten()).await.unwrap();
         let err = laden(&pool, 999, p.id).await.unwrap_err();
         assert!(matches!(err, crate::error::AppError::NotFound));
+    }
+
+    #[tokio::test]
+    async fn neue_person_hat_leeren_med_cache() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let p = anlegen(&pool, e, b, leere_daten()).await.unwrap();
+        let detail = laden(&pool, e, p.id).await.unwrap();
+        assert!(detail.aktuelle_sichtung.is_none(), "ungesichtet = NULL");
+        assert!(detail.aktuelle_sichtung_at.is_none());
+        assert!(detail.aktueller_verbleib.is_none(), "kein Verbleib = vor Ort");
     }
 }

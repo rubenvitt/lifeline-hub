@@ -119,6 +119,10 @@ pub struct PersonAnzeige {
     pub geaendert_at: String,
     pub geaendert_von: i64,
     pub storniert_at: Option<String>,
+    // E‑2: denormalisierter medizinischer Cache (NULL = ungesichtet / vor Ort).
+    pub aktuelle_sichtung: Option<String>,
+    pub aktuelle_sichtung_at: Option<String>,
+    pub aktueller_verbleib: Option<String>,
 }
 
 #[cfg(test)]
