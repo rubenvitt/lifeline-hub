@@ -75,7 +75,8 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, onVerfuegbarkeit, onS
       <Personenkarte person={belegtVon} />
       {!schreibgeschuetzt && (
         <Dropdown menu={menu} trigger={['click']}>
-          <Button size="small" type="text">…</Button>
+          {/* stopPropagation: sonst startet eine kleine Mausbewegung beim Klick aufs "…" einen Drag. */}
+          <Button size="small" type="text" onPointerDown={(e) => e.stopPropagation()}>…</Button>
         </Dropdown>
       )}
     </div>
@@ -166,25 +167,27 @@ export default function Grundriss({
 
   function onDragEnd(event: DragEndEvent) {
     const { active, over, delta } = event;
-    if (!over) return;
     const data = active.data.current as { kind: string; personId?: number; platzId?: number } | undefined;
-    const target = over.data.current as { kind: string; platzId?: number } | undefined;
-    if (!data || !target) return;
-    // Person-Drop:
+    if (!data) return;
+    // Platz-Verschiebung: braucht kein Drop-Target — Layout-Fläche ist keine Droppable.
+    // delta reicht; auf >= 0 clampen, damit die Karte nicht off-screen landen kann.
+    if (data.kind === 'platz' && data.platzId != null) {
+      const platz = uhs.plaetze.find((p) => p.id === data.platzId);
+      if (!platz) return;
+      const nx = Math.max(0, (platz.pos_x ?? 10) + delta.x);
+      const ny = Math.max(0, (platz.pos_y ?? 10) + delta.y);
+      if (nx === (platz.pos_x ?? 10) && ny === (platz.pos_y ?? 10)) return;
+      layoutMut.mutate({ pid: data.platzId, pos_x: nx, pos_y: ny });
+      return;
+    }
+    // Person-Drop: braucht ein Drop-Target (Platz oder Inbox).
     if (data.kind === 'person' && data.personId != null) {
+      const target = over?.data.current as { kind: string; platzId?: number } | undefined;
+      if (!target) return;
       if (target.kind === 'inbox') belegMut.mutate({ personId: data.personId, platzId: null });
       else if (target.kind === 'platz' && target.platzId != null) {
         belegMut.mutate({ personId: data.personId, platzId: target.platzId });
       }
-      return;
-    }
-    // Platz-Verschiebung (drag platz, drop irgendwo → neue Position):
-    if (data.kind === 'platz' && data.platzId != null) {
-      const platz = uhs.plaetze.find((p) => p.id === data.platzId);
-      if (!platz) return;
-      const nx = (platz.pos_x ?? 10) + delta.x;
-      const ny = (platz.pos_y ?? 10) + delta.y;
-      layoutMut.mutate({ pid: data.platzId, pos_x: nx, pos_y: ny });
     }
   }
 
