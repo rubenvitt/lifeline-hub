@@ -129,6 +129,68 @@ async fn person_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, body: &s
     json["id"].as_i64().unwrap()
 }
 
+// ---------- Cross-cutting: ETB-Leak + SSE-Payload ----------
+
+#[tokio::test]
+async fn etb_enthaelt_keine_identitaet_und_keinen_befundtext() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{"name":"Mustermann","vorname":"Max"}"#).await;
+    // Sichtung + Verbleib + Notiz
+    sichten(&app, &admin, e, p, r#"{"kategorie":"sk1","notiz":"GANZ_GEHEIME_KURZBEGRUENDUNG"}"#).await;
+    anfrage(&app, "POST", &format!("/api/einsaetze/{e}/personen/{p}/verbleib"), &admin,
+        Some(r#"{"art":"transport","ziel":"KH Mitte"}"#)).await;
+    anfrage(&app, "POST", &format!("/api/einsaetze/{e}/personen/{p}/notizen"), &admin,
+        Some(r#"{"text":"VERTRAULICHER_BEFUND_XYZ"}"#)).await;
+    let inhalte = system_etb_inhalte(&app, &admin, e).await;
+    for i in &inhalte {
+        assert!(!i.contains("Mustermann"), "ETB-Leak (name): {i}");
+        assert!(!i.contains("Max"), "ETB-Leak (vorname): {i}");
+        assert!(!i.contains("VERTRAULICHER_BEFUND_XYZ"), "ETB-Leak (befundtext): {i}");
+        assert!(!i.contains("GANZ_GEHEIME_KURZBEGRUENDUNG"), "ETB-Leak (sichtungsnotiz): {i}");
+    }
+    // Notiz darf KEINEN ETB-Eintrag erzeugt haben → kein Eintrag mit "Notiz" o.ä.
+    assert!(inhalte.iter().all(|i| !i.to_lowercase().contains("notiz")), "Notiz darf kein ETB schreiben: {inhalte:?}");
+}
+
+#[tokio::test]
+async fn sse_person_event_enthaelt_nur_ids_keinen_befundtext() {
+    let pool = lifeline_hub::db::test_pool().await;
+    lifeline_hub::auth::bootstrap::bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12")).await.unwrap();
+    let live = lifeline_hub::live::LiveHub::new();
+    let app = lifeline_hub::app::build_router(lifeline_hub::app::AppState { pool: pool.clone(), live: live.clone() });
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{"name":"Mustermann"}"#).await;
+    let mut rx = live.abonniere(e);
+
+    // Eine Notiz auslösen (enthält sensiblen Text → muss im SSE NICHT auftauchen)
+    anfrage(&app, "POST", &format!("/api/einsaetze/{e}/personen/{p}/notizen"), &admin,
+        Some(r#"{"text":"GEHEIM_XYZ_BEFUND"}"#)).await;
+
+    // Es gibt potenziell mehrere Events (etb für vorherige Anlegen-ETB-Einträge); wir
+    // suchen das nach der Notiz erwartete `person`-Event und prüfen seinen Payload.
+    let mut gefunden = false;
+    for _ in 0..10 {
+        match tokio::time::timeout(std::time::Duration::from_millis(100), rx.recv()).await {
+            Ok(Ok(n)) if n.event == "person" => {
+                assert!(!n.data.contains("GEHEIM_XYZ_BEFUND"), "SSE leakt Befundtext: {}", n.data);
+                assert!(!n.data.contains("Mustermann"), "SSE leakt Name: {}", n.data);
+                // Erwartetes Format: { einsatz_id, person_id }
+                let v: Value = serde_json::from_str(&n.data).unwrap();
+                assert!(v.get("einsatz_id").is_some() && v.get("person_id").is_some());
+                assert_eq!(v.as_object().unwrap().len(), 2, "person-SSE darf NUR einsatz_id+person_id enthalten");
+                gefunden = true;
+                break;
+            }
+            Ok(Ok(_)) => continue,    // andere Events ignorieren
+            Ok(Err(_)) | Err(_) => break,
+        }
+    }
+    assert!(gefunden, "Kein `person`-SSE-Event empfangen");
+}
+
 // ---------- Tests ----------
 
 #[tokio::test]
