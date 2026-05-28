@@ -328,6 +328,67 @@ export interface Person {
   geaendert_at: string;
   geaendert_von: number;
   storniert_at: string | null;
+  // E‑2: medizinischer Cache (null = ungesichtet / vor Ort)
+  aktuelle_sichtung: Sichtungskategorie | null;
+  aktuelle_sichtung_at: string | null;
+  aktueller_verbleib: string | null;
+}
+
+export type Sichtungskategorie = 'sk1' | 'sk2' | 'sk3' | 'sk4' | 'tot' | 'unverletzt';
+export type VerbleibArt = 'transport' | 'entlassung' | 'vor_ort' | 'verstorben';
+export type VerbleibStatus = 'angemeldet' | 'abtransportiert';
+export type AbgleichStatus = 'verdacht' | 'bestaetigt' | 'verworfen';
+
+export interface Sichtung {
+  id: number;
+  einsatz_id: number;
+  person_id: number;
+  kategorie: Sichtungskategorie;
+  notiz: string | null;
+  gesichtet_at: string;
+  gesichtet_von: number;
+}
+
+export interface Verlaufsnotiz {
+  id: number;
+  einsatz_id: number;
+  person_id: number;
+  text: string;
+  erfasst_at: string;
+  erfasst_von: number;
+}
+
+export interface Verbleib {
+  id: number;
+  einsatz_id: number;
+  person_id: number;
+  art: VerbleibArt;
+  transportmittel: string | null;
+  ziel: string | null;
+  status: VerbleibStatus | null;
+  notiz: string | null;
+  zeitpunkt_at: string;
+  erfasst_von: number;
+}
+
+export interface Abgleich {
+  id: number;
+  einsatz_id: number;
+  vermisst_person_id: number;
+  gefunden_person_id: number;
+  status: AbgleichStatus;
+  erstellt_at: string;
+  erstellt_von: number;
+  entschieden_at: string | null;
+  entschieden_von: number | null;
+}
+
+/** Detail-Antwort: alle Person-Felder PLUS die vier E‑2-Verlauf-Arrays. */
+export interface PersonDetail extends Person {
+  sichtungen: Sichtung[];
+  notizen: Verlaufsnotiz[];
+  verbleib: Verbleib[];
+  abgleiche: Abgleich[];
 }
 
 export interface PersonZugriff {

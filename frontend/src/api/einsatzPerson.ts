@@ -1,4 +1,8 @@
-import type { Person, PersonStatus, PersonZugriff } from './types';
+import type {
+  Person, PersonDetail, PersonStatus, PersonZugriff,
+  Sichtung, Sichtungskategorie, Verbleib, VerbleibArt, VerbleibStatus,
+  Verlaufsnotiz, Abgleich,
+} from './types';
 import { apiGet, apiSend } from './client';
 
 /** Felder, die beim Anlegen/Bearbeiten gesetzt werden können (alle optional). */
@@ -19,9 +23,10 @@ export function listePersonen(einsatzId: number, status?: PersonStatus): Promise
   return apiGet<Person[]>(`/api/einsaetze/${einsatzId}/personen${q}`);
 }
 
-export function ladePerson(einsatzId: number, personId: number): Promise<Person> {
-  // Schreibt serverseitig einen detail-Audit-Eintrag.
-  return apiGet<Person>(`/api/einsaetze/${einsatzId}/personen/${personId}`);
+export function ladePerson(einsatzId: number, personId: number): Promise<PersonDetail> {
+  // Schreibt serverseitig EINEN detail-Audit-Eintrag (E‑1-Mechanik, unverändert
+  // in E‑2 — der medizinische Verlauf ist Teil derselben Antwort).
+  return apiGet<PersonDetail>(`/api/einsaetze/${einsatzId}/personen/${personId}`);
 }
 
 export function legePersonAn(einsatzId: number, daten: PersonEingabe): Promise<Person> {
@@ -47,4 +52,60 @@ export function ladePersonAudit(einsatzId: number, personId: number): Promise<Pe
 /** Registriernummer-Anzeige wie im Backend (R-042). */
 export function registrierAnzeige(nr: number): string {
   return `R-${String(nr).padStart(3, '0')}`;
+}
+
+/** E‑2: Sichtung (Triage) erfassen. Hebt erfasst→betroffen serverseitig an. */
+export function erfasseSichtung(
+  einsatzId: number, personId: number,
+  kategorie: Sichtungskategorie, notiz?: string | null,
+): Promise<Sichtung> {
+  return apiSend<Sichtung>(
+    `/api/einsaetze/${einsatzId}/personen/${personId}/sichtung`,
+    'POST', { kategorie, notiz: notiz ?? null },
+  );
+}
+
+export interface VerbleibEingabe {
+  art: VerbleibArt;
+  transportmittel?: string | null;
+  ziel?: string | null;
+  status?: VerbleibStatus | null;
+  notiz?: string | null;
+}
+export function erfasseVerbleib(
+  einsatzId: number, personId: number, daten: VerbleibEingabe,
+): Promise<Verbleib> {
+  return apiSend<Verbleib>(
+    `/api/einsaetze/${einsatzId}/personen/${personId}/verbleib`, 'POST', daten,
+  );
+}
+
+/** E‑2: Befund-/Verlaufsnotiz (append-only, KEIN ETB-Eintrag). */
+export function legeNotizAn(
+  einsatzId: number, personId: number, text: string,
+): Promise<Verlaufsnotiz> {
+  return apiSend<Verlaufsnotiz>(
+    `/api/einsaetze/${einsatzId}/personen/${personId}/notizen`, 'POST', { text },
+  );
+}
+
+/** E‑2: Vermisstenabgleich vorschlagen (Verdacht). `vermisstPersonId` ist :pid. */
+export function schlageAbgleichVor(
+  einsatzId: number, vermisstPersonId: number, gefundenPersonId: number,
+): Promise<Abgleich> {
+  return apiSend<Abgleich>(
+    `/api/einsaetze/${einsatzId}/personen/${vermisstPersonId}/abgleich`,
+    'POST', { gefunden_person_id: gefundenPersonId },
+  );
+}
+
+/** E‑2: Abgleich entscheiden — nur Einsatzleitung. */
+export function entscheideAbgleich(
+  einsatzId: number, vermisstPersonId: number, abgleichId: number,
+  entscheidung: 'bestaetigt' | 'verworfen',
+): Promise<Abgleich> {
+  return apiSend<Abgleich>(
+    `/api/einsaetze/${einsatzId}/personen/${vermisstPersonId}/abgleich/${abgleichId}/entscheidung`,
+    'POST', { entscheidung },
+  );
 }
