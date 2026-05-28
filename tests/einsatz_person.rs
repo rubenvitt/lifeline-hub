@@ -448,6 +448,28 @@ async fn export_entschaerft_formel_injektion() {
 }
 
 #[tokio::test]
+async fn detail_enthaelt_medizinischen_verlauf_und_genau_einen_audit() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    let (status, json) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/personen/{p}"), &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    // E-2: vier Verlaufs-Arrays sind Teil der Detail-Antwort:
+    assert!(json["sichtungen"].is_array());
+    assert!(json["notizen"].is_array());
+    assert!(json["verbleib"].is_array());
+    assert!(json["abgleiche"].is_array());
+    // E-1-Felder bleiben top-level (serde flatten):
+    assert_eq!(json["registrier_nr"], 1);
+    // Cache-Felder sind initial null:
+    assert!(json["aktuelle_sichtung"].is_null());
+    assert!(json["aktueller_verbleib"].is_null());
+    // Genau EIN detail-Audit-Eintrag — auch mit angereicherter Antwort:
+    assert_eq!(audit_anzahl(&app, &admin, e, p).await, 1);
+}
+
+#[tokio::test]
 async fn export_schreibt_export_audit() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;

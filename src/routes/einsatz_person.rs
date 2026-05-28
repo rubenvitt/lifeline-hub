@@ -5,8 +5,13 @@ use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
 use crate::etb::{self, repo as etb_repo};
 use crate::person::{darf_uebergehen, registrier_anzeige, repo, Geschlecht, PersonAnzeige, PersonStatus};
-use crate::person::audit_repo;
+use crate::person::{abgleich_repo, audit_repo, sichtung_repo, verbleib_repo, verlaufsnotiz_repo};
+use crate::person::abgleich_repo::AbgleichAnzeige;
 use crate::person::audit_repo::ZugriffAnzeige;
+use crate::person::sichtung_repo::SichtungAnzeige;
+use crate::person::verbleib_repo::VerbleibAnzeige;
+use crate::person::verlaufsnotiz_repo::NotizAnzeige;
+use serde::Serialize;
 use axum::response::{IntoResponse, Response};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -16,6 +21,18 @@ use serde::Deserialize;
 use std::convert::Infallible;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::{Stream, StreamExt};
+
+/// Detail-Antwort: E‑1-Personenfelder (flatten) + E‑2-Verlauf-Arrays. Genau eine
+/// Antwort, genau ein `detail`-Audit (Spec-Annahme „Lesen / Lese-Audit").
+#[derive(Debug, Serialize)]
+pub struct PersonDetail {
+    #[serde(flatten)]
+    pub person: PersonAnzeige,
+    pub sichtungen: Vec<SichtungAnzeige>,
+    pub notizen: Vec<NotizAnzeige>,
+    pub verbleib: Vec<VerbleibAnzeige>,
+    pub abgleiche: Vec<AbgleichAnzeige>,
+}
 
 /// Schreibt einen pseudonymen System-ETB-Eintrag (nur Registriernummer + Status)
 /// und publiziert ihn als `etb`-SSE-Event.
@@ -152,21 +169,28 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(person)))
 }
 
-/// GET /api/einsaetze/{id}/personen/{pid} — Detail. **Schreibt einen
-/// `detail`-Audit-Eintrag VOR der Response** (auch wenn der Client abbricht).
+/// GET /api/einsaetze/{id}/personen/{pid} — Detail inkl. medizinischem Verlauf.
+/// **Schreibt EINEN `detail`-Audit-Eintrag VOR der Verlauf-Anreicherung**
+/// (auch wenn der Client abbricht). Die Verlauf-Listen sind eigene Reads ohne
+/// zusätzliches Audit — der eine Audit-Eintrag steht für die gesamte Öffnung.
 pub async fn detail(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, person_id)): Path<(i64, i64)>,
-) -> Result<Json<PersonAnzeige>, AppError> {
+) -> Result<Json<PersonDetail>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
 
-    // Existenz/Zugehörigkeit prüfen, BEVOR auditiert wird (kein Audit für 404).
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
     audit_repo::anlegen(&state.pool, einsatz_id, Some(person_id), benutzer.id, "detail").await?;
-    Ok(Json(person))
+
+    let sichtungen = sichtung_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
+    let notizen = verlaufsnotiz_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
+    let verbleib = verbleib_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
+    let abgleiche = abgleich_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
+
+    Ok(Json(PersonDetail { person, sichtungen, notizen, verbleib, abgleiche }))
 }
 
 #[derive(Debug, Deserialize)]
