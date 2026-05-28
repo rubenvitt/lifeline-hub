@@ -7,7 +7,8 @@ const SELECT_ALLE: &str = "\
            geburtsdatum, alter_geschaetzt, herkunft_adresse, antreff_ort, \
            melder_kontakt, notiz, erfasst_at, erfasst_von, geaendert_at, \
            geaendert_von, storniert_at, \
-           aktuelle_sichtung, aktuelle_sichtung_at, aktueller_verbleib \
+           aktuelle_sichtung, aktuelle_sichtung_at, aktueller_verbleib, \
+           aktuelle_uhs_id, aktueller_platz_id \
     FROM einsatz_person";
 
 /// Eingabedaten beim Anlegen. Strings bereits getrimmt (Handler-Aufgabe);

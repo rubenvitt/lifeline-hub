@@ -235,6 +235,9 @@ pub struct PersonAnzeige {
     pub aktuelle_sichtung: Option<String>,
     pub aktuelle_sichtung_at: Option<String>,
     pub aktueller_verbleib: Option<String>,
+    // E‑3: UHS-Cache (NULL = nicht in einer UHS / nicht auf einem Platz).
+    pub aktuelle_uhs_id: Option<i64>,
+    pub aktueller_platz_id: Option<i64>,
 }
 
 #[cfg(test)]
