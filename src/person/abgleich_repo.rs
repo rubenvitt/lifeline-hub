@@ -115,10 +115,11 @@ pub async fn liste_je_person(
 ) -> Result<Vec<AbgleichAnzeige>, AppError> {
     Ok(sqlx::query_as::<_, AbgleichAnzeige>(&format!(
         "{SELECT_ABGLEICH} WHERE einsatz_id = ? \
-         AND (vermisst_person_id = ?1 OR gefunden_person_id = ?1) \
+         AND (vermisst_person_id = ? OR gefunden_person_id = ?) \
          ORDER BY erstellt_at DESC, id DESC"
     ))
     .bind(einsatz_id)
+    .bind(person_id)
     .bind(person_id)
     .fetch_all(pool)
     .await?)
@@ -203,5 +204,23 @@ mod tests {
         let a = anlegen_verdacht(&pool, e, v, g, b).await.unwrap();
         entscheide(&pool, e, a.id, "verworfen", b).await.unwrap();
         assert_eq!(status(&pool, v).await, "vermisst", "verworfen ändert den Status nicht");
+    }
+
+    #[tokio::test]
+    async fn liste_je_person_filtert_korrekt_auch_bei_id_kollision() {
+        let pool = test_pool().await;
+        let (b, e, v, g, _) = setup(&pool).await;
+        anlegen_verdacht(&pool, e, v, g, b).await.unwrap();
+        // Eine vierte Person, die NICHT am Abgleich beteiligt ist.
+        let unbeteiligt: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, status, erfasst_von, geaendert_von) \
+             VALUES (?, 99, 'erfasst', ?, ?) RETURNING id")
+            .bind(e).bind(b).bind(b).fetch_one(&pool).await.unwrap();
+        // Unbeteiligte Person hat KEINEN Abgleich — Query muss leere Liste liefern.
+        assert_eq!(
+            liste_je_person(&pool, e, unbeteiligt).await.unwrap().len(),
+            0,
+            "person_id-Filter muss greifen (unbeteiligte Person hat keinen Abgleich)"
+        );
     }
 }
