@@ -2,6 +2,7 @@ use crate::app::AppState;
 use crate::auth::session::CurrentUser;
 use crate::einsatz::berechtigung::{fordere_aktiv, fordere_einsatzleitung, fordere_lesezugriff, fordere_schreibrecht};
 use crate::einsatz::repo as einsatz_repo;
+use crate::routes::einsatz_uhs;
 use crate::error::AppError;
 use crate::etb::{self, repo as etb_repo};
 use crate::person::{darf_uebergehen, registrier_anzeige, repo, Geschlecht, PersonAnzeige, PersonStatus, Sichtungskategorie, VerbleibArt};
@@ -277,6 +278,12 @@ pub async fn status_wechsel(
     }
     repo::setze_status(&state.pool, einsatz_id, person_id, &body.status, benutzer.id).await?;
 
+    // E‑3: bei verstorben/abgemeldet → UHS-Auto-Austritt (sequenziell, eigene ETB-Spur).
+    if matches!(body.status.as_str(), "verstorben" | "abgemeldet") {
+        let anlass = format!("durch Status-Wechsel zu {}", body.status);
+        einsatz_uhs::auto_austritt(&state, einsatz_id, person_id, &anlass, benutzer.id).await?;
+    }
+
     etb_system(
         &state, einsatz_id, benutzer.id,
         &format!(
@@ -305,6 +312,8 @@ pub async fn stornieren(
         return Err(AppError::Conflict("Person ist bereits storniert".into()));
     }
     repo::storniere(&state.pool, einsatz_id, person_id, benutzer.id).await?;
+    // E‑3: Storno → UHS-Auto-Austritt + Reservierungs-Cleanup (Repo schreibt nur ETB, wenn Austritt nötig).
+    einsatz_uhs::auto_austritt(&state, einsatz_id, person_id, "durch Storno der Person", benutzer.id).await?;
     etb_system(
         &state, einsatz_id, benutzer.id,
         &format!("Person {} storniert", registrier_anzeige(person.registrier_nr)),
@@ -498,6 +507,12 @@ pub async fn verbleib(
         benutzer.id,
     )
     .await?;
+
+    // E‑3: bei transport/entlassung → UHS-Auto-Austritt (eigene ETB-Spur).
+    if matches!(art, VerbleibArt::Transport | VerbleibArt::Entlassung) {
+        let anlass = format!("durch Verbleib {}", art.as_str());
+        einsatz_uhs::auto_austritt(&state, einsatz_id, person_id, &anlass, benutzer.id).await?;
+    }
 
     etb_system(
         &state,
