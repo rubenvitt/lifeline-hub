@@ -548,6 +548,56 @@ pub async fn notiz(
     Ok((StatusCode::CREATED, Json(notiz)))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct AbgleichBody {
+    pub gefunden_person_id: i64,
+}
+
+/// POST /api/einsaetze/{id}/personen/{pid}/abgleich — Verdachts-Link anlegen.
+/// `pid` = vermisste Person. Schreibberechtigt + aktiver Einsatz. KEIN ETB; SSE für beide Personen.
+pub async fn abgleich_anlegen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, person_id)): Path<(i64, i64)>,
+    Json(body): Json<AbgleichBody>,
+) -> Result<(StatusCode, Json<AbgleichAnzeige>), AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_schreibrecht(rolle)?;
+    fordere_aktiv(&einsatz)?;
+
+    if body.gefunden_person_id == person_id {
+        return Err(AppError::Validation(
+            "Vermisste und gefundene Person müssen verschieden sein".into(),
+        ));
+    }
+    let vermisst = repo::laden(&state.pool, einsatz_id, person_id).await?;
+    if vermisst.storniert_at.is_some() || vermisst.status != "vermisst" {
+        return Err(AppError::UnprocessableEntity(
+            "Abgleich nur ausgehend von einer vermissten Person".into(),
+        ));
+    }
+    // `repo::laden` schützt org-isoliert: NotFound (404), falls in fremdem Einsatz.
+    let gefunden = repo::laden(&state.pool, einsatz_id, body.gefunden_person_id).await?;
+    if gefunden.storniert_at.is_some() || !matches!(gefunden.status.as_str(), "betroffen" | "verstorben") {
+        return Err(AppError::UnprocessableEntity(
+            "Gefundene Person muss Status betroffen/verstorben haben".into(),
+        ));
+    }
+
+    let abgleich = abgleich_repo::anlegen_verdacht(
+        &state.pool,
+        einsatz_id,
+        person_id,
+        body.gefunden_person_id,
+        benutzer.id,
+    )
+    .await?;
+    sse_person(&state, einsatz_id, person_id);
+    sse_person(&state, einsatz_id, body.gefunden_person_id);
+    Ok((StatusCode::CREATED, Json(abgleich)))
+}
+
 /// GET /api/einsaetze/{id}/personen/stream — SSE-Stream des Einsatz-Kanals.
 /// Der Client filtert clientseitig auf `person`-Events. Nur Lesezugriff.
 pub async fn stream(

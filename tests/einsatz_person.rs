@@ -590,6 +590,52 @@ async fn notiz_mit_leerem_text_ist_400() {
     assert_eq!(s, StatusCode::BAD_REQUEST);
 }
 
+async fn status_setzen(app: &axum::Router, cookie: &str, einsatz: i64, person: i64, status: &str) {
+    let body = format!(r#"{{"status":"{status}"}}"#);
+    let (s, _) = anfrage(app, "POST", &format!("/api/einsaetze/{einsatz}/personen/{person}/status"), cookie, Some(&body)).await;
+    assert_eq!(s, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn abgleich_anlegen_verdacht_erlaubt_und_in_beiden_details_sichtbar() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let v = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    status_setzen(&app, &admin, e, v, "vermisst").await;
+    let g = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    status_setzen(&app, &admin, e, g, "betroffen").await;
+    let (s, j) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/personen/{v}/abgleich"), &admin,
+        Some(&format!(r#"{{"gefunden_person_id":{g}}}"#))).await;
+    assert_eq!(s, StatusCode::CREATED);
+    assert_eq!(j["status"], "verdacht");
+    // Sichtbar in beiden Detail-Antworten:
+    let (_, dv) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/personen/{v}"), &admin, None).await;
+    assert_eq!(dv["abgleiche"].as_array().unwrap().len(), 1);
+    let (_, dg) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/personen/{g}"), &admin, None).await;
+    assert_eq!(dg["abgleiche"].as_array().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn abgleich_falsche_status_kombination_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let v = person_anlegen(&app, &admin, e, r#"{}"#).await;          // erfasst, NICHT vermisst
+    let g = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    status_setzen(&app, &admin, e, g, "betroffen").await;
+    // pid-Person ist nicht vermisst → 422
+    let (s, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/personen/{v}/abgleich"), &admin,
+        Some(&format!(r#"{{"gefunden_person_id":{g}}}"#))).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    // Jetzt vermisst, aber gefunden ist erfasst → 422
+    status_setzen(&app, &admin, e, v, "vermisst").await;
+    let g2 = person_anlegen(&app, &admin, e, r#"{}"#).await;          // erfasst
+    let (s, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/personen/{v}/abgleich"), &admin,
+        Some(&format!(r#"{{"gefunden_person_id":{g2}}}"#))).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
 #[tokio::test]
 async fn export_schreibt_export_audit() {
     let (app, pool) = setup_mit_pool().await;
