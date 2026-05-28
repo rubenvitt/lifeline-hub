@@ -163,6 +163,8 @@ export interface EinsatzMaterial {
   einsatz_id: number;
   material_id: number | null;
   einheit_id: number | null;
+  /** E‑3: zugeordnete UHS (null = nicht verortet). */
+  uhs_id: number | null;
   ist_adhoc: boolean;
   bezeichnung: string;
   kategorie: string | null;
@@ -332,6 +334,9 @@ export interface Person {
   aktuelle_sichtung: Sichtungskategorie | null;
   aktuelle_sichtung_at: string | null;
   aktueller_verbleib: string | null;
+  // E‑3: UHS-Cache (null = nicht in UHS)
+  aktuelle_uhs_id: number | null;
+  aktueller_platz_id: number | null;
 }
 
 export type Sichtungskategorie = 'sk1' | 'sk2' | 'sk3' | 'sk4' | 'tot' | 'unverletzt';
@@ -398,4 +403,67 @@ export interface PersonZugriff {
   benutzer_name: string;
   art: 'detail' | 'export';
   zugriff_at: string;
+}
+
+// ============================== E‑3 Unfallhilfsstellen ==============================
+
+export type UhsTyp =
+  | 'patientenablage' | 'behandlungsplatz' | 'verletztensammelstelle'
+  | 'bereitstellungsraum' | 'sonstige';
+
+export type UhsStatus = 'geplant' | 'aktiv' | 'aufgeloest';
+
+export type PlatzTyp =
+  | 'wartebereich' | 'behandlungsplatz' | 'bett' | 'intensivplatz'
+  | 'trage' | 'transport_bereitstellung' | 'sonstige';
+
+export type Verfuegbarkeit = 'frei' | 'defekt' | 'aufbereitung' | 'gesperrt' | 'reserviert';
+
+export type BelegungsArt = 'eintritt' | 'wechsel' | 'austritt';
+
+export interface Uhs {
+  id: number;
+  einsatz_id: number;
+  abschnitt_id: number | null;
+  typ: UhsTyp;
+  bezeichnung: string;
+  standort: string | null;
+  notiz: string | null;
+  status: UhsStatus;
+  erfasst_at: string;
+  erfasst_von: number;
+  geaendert_at: string;
+  geaendert_von: number;
+  storniert_at: string | null;
+}
+
+export interface UhsPlatz {
+  id: number;
+  uhs_id: number;
+  typ: PlatzTyp;
+  bezeichnung: string;
+  pos_x: number | null;
+  pos_y: number | null;
+  verfuegbarkeit: Verfuegbarkeit;
+  reserviert_fuer_person_id: number | null;
+  storniert_at: string | null;
+}
+
+export interface UhsBelegung {
+  id: number;
+  einsatz_id: number;
+  person_id: number;
+  uhs_id: number;
+  platz_id: number | null;
+  art: BelegungsArt;
+  notiz: string | null;
+  zeitpunkt_at: string;
+  erfasst_von: number;
+}
+
+/** Detail-Antwort: UHS + Plätze + Belegungen + Material. */
+export interface UhsDetail extends Uhs {
+  plaetze: UhsPlatz[];
+  belegungen: UhsBelegung[];
+  material: EinsatzMaterial[];
 }

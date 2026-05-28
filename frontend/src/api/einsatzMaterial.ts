@@ -27,7 +27,7 @@ export function disponiereAdhoc(einsatzId: number, adhoc: MaterialAdhocEingabe, 
 export function aktualisiereDisposition(
   einsatzId: number,
   emId: number,
-  felder: { menge?: number; status?: MaterialStatus; bemerkung?: string },
+  felder: { menge?: number; status?: MaterialStatus; bemerkung?: string; uhs_id?: number | null },
 ): Promise<EinsatzMaterial> {
   return apiSend<EinsatzMaterial>(`/api/einsaetze/${einsatzId}/material/${emId}`, 'PATCH', felder);
 }
