@@ -130,6 +130,30 @@ describe('PersonenPage', () => {
     await vi.waitFor(() => expect(gerufen.kategorie).toBe('sk2'));
   });
 
+  it('Einsatzleitung kann einen Verdachts-Abgleich bestätigen', async () => {
+    const vermisst = { ...person, id: 20, status: 'vermisst' as const };
+    const gefunden = { ...person, id: 21, registrier_nr: 4, status: 'betroffen' as const };
+    const detail = { ...vermisst, aktuelle_sichtung: null, aktuelle_sichtung_at: null,
+      aktueller_verbleib: null, sichtungen: [], notizen: [], verbleib: [],
+      abgleiche: [{ id: 5, einsatz_id: 1, vermisst_person_id: 20, gefunden_person_id: 21,
+        status: 'verdacht', erstellt_at: '2026-05-27 10:00:00', erstellt_von: 1,
+        entschieden_at: null, entschieden_von: null }] } as PersonDetail;
+    let entscheidung: string | undefined;
+    server.use(
+      http.get('/api/einsaetze/1/personen/20', () => HttpResponse.json(detail)),
+      http.post('/api/einsaetze/1/personen/20/abgleich/5/entscheidung', async ({ request }) => {
+        entscheidung = ((await request.json()) as { entscheidung: string }).entscheidung;
+        return HttpResponse.json({ ...detail.abgleiche[0], status: 'bestaetigt' });
+      }),
+    );
+    render(einsatzAktiv, [vermisst, gefunden]);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Vermisst' }));
+    await userEvent.click((await screen.findAllByText('Mustermann, Max'))[0]);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Medizinischer Verlauf' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
+    await vi.waitFor(() => expect(entscheidung).toBe('bestaetigt'));
+  });
+
   it('zeigt bei Sichtung=tot den Hinweis „Status → verstorben"', async () => {
     const detail = { ...person, aktuelle_sichtung: 'tot', aktuelle_sichtung_at: '2026-05-27 10:00:00',
       aktueller_verbleib: null, sichtungen: [{ id: 1, einsatz_id: 1, person_id: 10, kategorie: 'tot',

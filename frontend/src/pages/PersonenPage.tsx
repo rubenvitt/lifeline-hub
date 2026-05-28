@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
-import { aktualisierePerson, erfasseSichtung, erfasseVerbleib, ladePerson, ladePersonAudit, legeNotizAn, legePersonAn, listePersonen, registrierAnzeige, setzePersonStatus, stornierePerson, type PersonEingabe } from '../api/einsatzPerson';
+import { aktualisierePerson, entscheideAbgleich, erfasseSichtung, erfasseVerbleib, ladePerson, ladePersonAudit, legeNotizAn, legePersonAn, listePersonen, registrierAnzeige, schlageAbgleichVor, setzePersonStatus, stornierePerson, type PersonEingabe } from '../api/einsatzPerson';
 import { ApiError } from '../api/client';
 import { usePersonenStream } from '../etb/usePersonenStream';
 import type { Person, PersonDetail, PersonStatus, PersonZugriff, Sichtungskategorie, Verbleib, VerbleibArt } from '../api/types';
@@ -171,6 +171,18 @@ export default function PersonenPage() {
     onError: fehler,
   });
 
+  const abgleichVorschlagMutation = useMutation({
+    mutationFn: (v: { vermisstId: number; gefundenId: number }) =>
+      schlageAbgleichVor(einsatzId, v.vermisstId, v.gefundenId),
+    onSuccess: () => { invalidateDetail(); message.success('Verdachts-Abgleich angelegt'); },
+    onError: fehler,
+  });
+  const abgleichEntscheidenMutation = useMutation({
+    mutationFn: (v: { vermisstId: number; abgleichId: number; entscheidung: 'bestaetigt' | 'verworfen' }) =>
+      entscheideAbgleich(einsatzId, v.vermisstId, v.abgleichId, v.entscheidung),
+    onSuccess: invalidateDetail, onError: fehler,
+  });
+
   if (einsatzQuery.isLoading) {
     return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
   }
@@ -212,6 +224,20 @@ export default function PersonenPage() {
     { title: 'Alter', key: 'alter', render: (_, p) => alterAnzeige(p) },
     { title: 'Antreffort', dataIndex: 'antreff_ort', key: 'antreff_ort', render: (t) => t ?? '—' },
   ];
+
+  const gefundene = alle.filter((p) => ['betroffen', 'verstorben'].includes(p.status) && !p.storniert_at);
+
+  const aktionsSpalte: TableColumnsType<Person> = darfSchreiben && sicht === 'vermisst' ? [{
+    title: 'Abgleich vorschlagen', key: 'abgleich', width: 220,
+    render: (_: unknown, v: Person) => (
+      <Select<number> placeholder="gefundene Person …" size="small" style={{ width: 200 }}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(gid) => abgleichVorschlagMutation.mutate({ vermisstId: v.id, gefundenId: gid })}
+        options={gefundene.map((g) => ({ value: g.id, label: `${registrierAnzeige(g.registrier_nr)} ${g.name ?? 'unbekannt'}` }))}
+        disabled={gefundene.length === 0}
+      />
+    ),
+  }] : [];
 
   function drawerInhalt(p: PersonDetail) {
     const eintraege: Array<{ key: string; at: string; node: React.ReactNode }> = [
@@ -372,6 +398,39 @@ export default function PersonenPage() {
                         ))}
                       </ul>}
                 </div>
+                {(p.abgleiche?.length ?? 0) > 0 && (
+                  <div>
+                    <Typography.Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
+                      Vermisstenabgleich
+                    </Typography.Text>
+                    <ul style={{ listStyle: 'none', paddingLeft: 0 }}>
+                      {p.abgleiche.map((a) => (
+                        <li key={a.id} style={{ padding: '4px 0' }}>
+                          <Tag color={a.status === 'bestaetigt' ? 'green' : a.status === 'verworfen' ? 'default' : 'gold'}>{a.status}</Tag>
+                          <Typography.Text>
+                            R-{String(a.vermisst_person_id === p.id ? a.gefunden_person_id : a.vermisst_person_id).padStart(3, '0')}
+                          </Typography.Text>
+                          {a.status === 'verdacht' && a.vermisst_person_id === p.id && (
+                            <Space style={{ marginLeft: 12 }}>
+                              <Button size="small" type="primary"
+                                disabled={einsatz.meine_rolle !== 'einsatzleitung'}
+                                onClick={() => abgleichEntscheidenMutation.mutate({
+                                  vermisstId: p.id, abgleichId: a.id, entscheidung: 'bestaetigt' })}>
+                                Bestätigen
+                              </Button>
+                              <Button size="small" danger
+                                disabled={einsatz.meine_rolle !== 'einsatzleitung'}
+                                onClick={() => abgleichEntscheidenMutation.mutate({
+                                  vermisstId: p.id, abgleichId: a.id, entscheidung: 'verworfen' })}>
+                                Verwerfen
+                              </Button>
+                            </Space>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </Space>
             ),
           },
@@ -430,7 +489,7 @@ export default function PersonenPage() {
         rowKey="id"
         loading={personenQuery.isLoading}
         dataSource={personen}
-        columns={spalten}
+        columns={[...spalten, ...aktionsSpalte]}
         pagination={false}
         locale={{ emptyText: 'Keine Personen in dieser Sicht' }}
         onRow={(p) => ({ onClick: () => { setOffenePersonId(p.id); setBearbeiten(false); }, style: { cursor: 'pointer' } })}
