@@ -6,7 +6,27 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { aktualisierePerson, ladePerson, ladePersonAudit, legePersonAn, listePersonen, registrierAnzeige, setzePersonStatus, stornierePerson, type PersonEingabe } from '../api/einsatzPerson';
 import { ApiError } from '../api/client';
 import { usePersonenStream } from '../etb/usePersonenStream';
-import type { Person, PersonStatus, PersonZugriff } from '../api/types';
+import type { Person, PersonStatus, PersonZugriff, Sichtungskategorie } from '../api/types';
+
+const SK_META: Record<Sichtungskategorie, { label: string; color: string }> = {
+  sk1: { label: 'SK I', color: 'red' },
+  sk2: { label: 'SK II', color: 'gold' },
+  sk3: { label: 'SK III', color: 'green' },
+  sk4: { label: 'SK IV', color: 'blue' },
+  tot: { label: 'tot', color: 'black' },
+  unverletzt: { label: 'unverletzt', color: 'default' },
+};
+
+/** Zählt je SK-Kategorie + Gruppen „ungesichtet" und „unverletzt" (Spec-Drei-Teilung). */
+function lagebildZaehlung(alle: Person[]): { sk: Record<Sichtungskategorie, number>; ungesichtet: number } {
+  const sk: Record<Sichtungskategorie, number> = { sk1: 0, sk2: 0, sk3: 0, sk4: 0, tot: 0, unverletzt: 0 };
+  let ungesichtet = 0;
+  for (const p of alle) {
+    if (p.aktuelle_sichtung) sk[p.aktuelle_sichtung]++;
+    else ungesichtet++;
+  }
+  return { sk, ungesichtet };
+}
 
 const STATUS_META: Record<PersonStatus, { label: string; color: string }> = {
   erfasst: { label: 'erfasst', color: 'default' },
@@ -133,6 +153,13 @@ export default function PersonenPage() {
       render: (_, p) => <Tag color={STATUS_META[p.status].color}>{STATUS_META[p.status].label}</Tag>,
     },
     {
+      title: 'SK', key: 'sk', width: 90,
+      render: (_, p) =>
+        p.aktuelle_sichtung
+          ? <Tag color={SK_META[p.aktuelle_sichtung].color}>{SK_META[p.aktuelle_sichtung].label}</Tag>
+          : <Typography.Text type="secondary">—</Typography.Text>,
+    },
+    {
       title: 'Name', key: 'name',
       render: (_, p) =>
         p.name || p.vorname
@@ -173,6 +200,22 @@ export default function PersonenPage() {
       {!darfSchreiben && einsatz.status !== 'aktiv' && (
         <Alert style={{ marginBottom: 12 }} type="info" showIcon message="Einsatz ist abgeschlossen — nur Ansicht." />
       )}
+
+      {(() => {
+        const z = lagebildZaehlung(alle);
+        const skTags = (Object.keys(z.sk) as Sichtungskategorie[])
+          .filter((k) => z.sk[k] > 0)
+          .map((k) => (
+            <Tag key={k} color={SK_META[k].color}>{SK_META[k].label}: {z.sk[k]}</Tag>
+          ));
+        return (
+          <Space wrap style={{ marginBottom: 12 }}>
+            <Typography.Text type="secondary">Lagebild:</Typography.Text>
+            {skTags.length > 0 ? skTags : <Typography.Text type="secondary">noch keine Sichtungen</Typography.Text>}
+            <Tag>ungesichtet: {z.ungesichtet}</Tag>
+          </Space>
+        );
+      })()}
 
       <Table
         rowKey="id"

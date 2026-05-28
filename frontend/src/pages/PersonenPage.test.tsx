@@ -93,4 +93,17 @@ describe('PersonenPage', () => {
     await userEvent.click(zelle);
     expect(await screen.findByText('Person R-001')).toBeInTheDocument();
   });
+
+  it('zeigt SK-Badge und Lagebild-Zählungen', async () => {
+    const gesichtet = { ...person, id: 12, registrier_nr: 3, status: 'betroffen' as const,
+      aktuelle_sichtung: 'sk2' as const, aktuelle_sichtung_at: '2026-05-27 09:30:00' };
+    render(einsatzAktiv, [person, unbekannt, gesichtet]);
+    // Liste-Sicht „Alle" wählen, dann nach SK-Tag suchen
+    await screen.findByText('R-001');
+    await userEvent.click(screen.getByRole('tab', { name: 'Alle' }));
+    expect(await screen.findByText('SK II')).toBeInTheDocument();
+    // Lagebild: „SK II: 1", „ungesichtet: 2" (person + unbekannt)
+    expect(screen.getByText(/SK II:\s*1/)).toBeInTheDocument();
+    expect(screen.getByText(/ungesichtet:\s*2/)).toBeInTheDocument();
+  });
 });
