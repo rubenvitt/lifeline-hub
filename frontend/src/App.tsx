@@ -15,6 +15,7 @@ import PersonalPage from './pages/PersonalPage';
 import EinheitenPage from './pages/EinheitenPage';
 import EinsatzabschnittePage from './pages/EinsatzabschnittePage';
 import PersonenPage from './pages/PersonenPage';
+import UnfallhilfsstellenPage from './pages/UnfallhilfsstellenPage';
 import EinsatzLayout from './einsatz/EinsatzLayout';
 import DefaultModulRedirect from './einsatz/DefaultModulRedirect';
 import ModulStub from './einsatz/ModulStub';
@@ -30,6 +31,7 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   einheiten: <EinheitenPage />,
   einsatzabschnitte: <EinsatzabschnittePage />,
   personen: <PersonenPage />,
+  unfallhilfsstellen: <UnfallhilfsstellenPage />,
 };
 
 export default function App() {
