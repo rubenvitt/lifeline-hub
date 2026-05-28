@@ -4,7 +4,7 @@ use crate::einsatz::berechtigung::{fordere_aktiv, fordere_einsatzleitung, forder
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
 use crate::etb::{self, repo as etb_repo};
-use crate::person::{darf_uebergehen, registrier_anzeige, repo, Geschlecht, PersonAnzeige, PersonStatus, Sichtungskategorie};
+use crate::person::{darf_uebergehen, registrier_anzeige, repo, Geschlecht, PersonAnzeige, PersonStatus, Sichtungskategorie, VerbleibArt};
 use crate::person::{abgleich_repo, audit_repo, sichtung_repo, verbleib_repo, verlaufsnotiz_repo};
 use crate::person::abgleich_repo::AbgleichAnzeige;
 use crate::person::audit_repo::ZugriffAnzeige;
@@ -441,6 +441,77 @@ pub async fn export(
         [(axum::http::header::CONTENT_TYPE, "text/csv; charset=utf-8")],
         csv,
     ).into_response())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct VerbleibBody {
+    pub art: String,
+    pub transportmittel: Option<String>,
+    pub ziel: Option<String>,
+    pub status: Option<String>,
+    pub notiz: Option<String>,
+}
+
+/// POST /api/einsaetze/{id}/personen/{pid}/verbleib — Verbleib-Ereignis erfassen.
+/// Schreibberechtigt + aktiv. Cache-Kurzform via `VerbleibArt::kurzform`. Pseudonyme ETB-Spur + SSE.
+pub async fn verbleib(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, person_id)): Path<(i64, i64)>,
+    Json(body): Json<VerbleibBody>,
+) -> Result<(StatusCode, Json<VerbleibAnzeige>), AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_schreibrecht(rolle)?;
+    fordere_aktiv(&einsatz)?;
+
+    let art = VerbleibArt::parse(&body.art)
+        .ok_or_else(|| AppError::Validation("Unbekannte Verbleib-Art".into()))?;
+    if let Some(s) = &body.status {
+        if !matches!(s.as_str(), "angemeldet" | "abtransportiert") {
+            return Err(AppError::Validation("Unbekannter Verbleib-Status".into()));
+        }
+    }
+    let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
+    if person.storniert_at.is_some() {
+        return Err(AppError::Conflict(
+            "Stornierte Person kann keinen Verbleib erhalten".into(),
+        ));
+    }
+    let transportmittel = trimme(body.transportmittel);
+    let ziel = trimme(body.ziel);
+    let notiz = trimme(body.notiz);
+    let kurzform = art.kurzform(ziel.as_deref());
+
+    let verbleib = verbleib_repo::erfassen(
+        &state.pool,
+        einsatz_id,
+        person_id,
+        verbleib_repo::VerbleibDaten {
+            art: art.as_str(),
+            transportmittel: transportmittel.as_deref(),
+            ziel: ziel.as_deref(),
+            status: body.status.as_deref(),
+            notiz: notiz.as_deref(),
+        },
+        &kurzform,
+        benutzer.id,
+    )
+    .await?;
+
+    etb_system(
+        &state,
+        einsatz_id,
+        benutzer.id,
+        &format!(
+            "Person {}: {}",
+            registrier_anzeige(person.registrier_nr),
+            art.etb_sachverhalt(ziel.as_deref())
+        ),
+    )
+    .await?;
+    sse_person(&state, einsatz_id, person_id);
+    Ok((StatusCode::CREATED, Json(verbleib)))
 }
 
 /// GET /api/einsaetze/{id}/personen/stream — SSE-Stream des Einsatz-Kanals.

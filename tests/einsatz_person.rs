@@ -474,6 +474,38 @@ async fn sichten(app: &axum::Router, cookie: &str, einsatz: i64, person: i64, bo
 }
 
 #[tokio::test]
+async fn verbleib_transport_setzt_cache_und_etb_mit_ziel() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    let (s, _) = anfrage(
+        &app, "POST", &format!("/api/einsaetze/{e}/personen/{p}/verbleib"), &admin,
+        Some(r#"{"art":"transport","transportmittel":"RTW 1","ziel":"KH Mitte","status":"abtransportiert"}"#),
+    ).await;
+    assert_eq!(s, StatusCode::CREATED);
+    let (_, detail) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/personen/{p}"), &admin, None).await;
+    assert_eq!(detail["aktueller_verbleib"], "Transport → KH Mitte");
+    assert_eq!(detail["verbleib"].as_array().unwrap().len(), 1);
+    let inhalte = system_etb_inhalte(&app, &admin, e).await;
+    assert!(inhalte.iter().any(|i| i.contains("R-001") && i.contains("abtransportiert → KH Mitte")));
+}
+
+#[tokio::test]
+async fn verbleib_ungueltige_art_ist_400_und_ungueltiger_status_auch() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    let (s, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/personen/{p}/verbleib"), &admin,
+        Some(r#"{"art":"teleportation"}"#)).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/personen/{p}/verbleib"), &admin,
+        Some(r#"{"art":"transport","status":"unterwegs"}"#)).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
 async fn sichtung_ist_append_only_cache_und_etb() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
