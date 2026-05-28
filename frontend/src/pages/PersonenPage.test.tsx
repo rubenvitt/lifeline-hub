@@ -7,6 +7,7 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
 import PersonenPage from './PersonenPage';
+import type { PersonDetail } from '../api/types';
 
 class FakeEventSource {
   url: string; closed = false;
@@ -105,5 +106,39 @@ describe('PersonenPage', () => {
     // Lagebild: „SK II: 1", „ungesichtet: 2" (person + unbekannt)
     expect(screen.getByText(/SK II:\s*1/)).toBeInTheDocument();
     expect(screen.getByText(/ungesichtet:\s*2/)).toBeInTheDocument();
+  });
+
+  it('Re-Sichten-Aktion ruft erfasseSichtung mit SK II und löst Refetch aus', async () => {
+    const detail = { ...person, aktuelle_sichtung: null, aktuelle_sichtung_at: null,
+      aktueller_verbleib: null, sichtungen: [], notizen: [], verbleib: [], abgleiche: [] } as PersonDetail;
+    let gerufen: { kategorie?: string } = {};
+    server.use(
+      http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(detail)),
+      http.post('/api/einsaetze/1/personen/10/sichtung', async ({ request }) => {
+        gerufen = await request.json() as { kategorie?: string };
+        return HttpResponse.json({ id: 1, einsatz_id: 1, person_id: 10, kategorie: 'sk2',
+          notiz: null, gesichtet_at: '2026-05-27 10:00:00', gesichtet_von: 1 }, { status: 201 });
+      }),
+    );
+    render(einsatzAktiv, [person]);
+    await userEvent.click((await screen.findAllByText('Mustermann, Max'))[0]);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Medizinischer Verlauf' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Re-Sichten' }));
+    await userEvent.click(await screen.findByRole('combobox', { name: /Kategorie/ }));
+    await userEvent.click(await screen.findByText('SK II'));
+    await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
+    await vi.waitFor(() => expect(gerufen.kategorie).toBe('sk2'));
+  });
+
+  it('zeigt bei Sichtung=tot den Hinweis „Status → verstorben"', async () => {
+    const detail = { ...person, aktuelle_sichtung: 'tot', aktuelle_sichtung_at: '2026-05-27 10:00:00',
+      aktueller_verbleib: null, sichtungen: [{ id: 1, einsatz_id: 1, person_id: 10, kategorie: 'tot',
+        notiz: null, gesichtet_at: '2026-05-27 10:00:00', gesichtet_von: 1 }],
+      notizen: [], verbleib: [], abgleiche: [] } as PersonDetail;
+    server.use(http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(detail)));
+    render(einsatzAktiv, [person]);
+    await userEvent.click((await screen.findAllByText('Mustermann, Max'))[0]);
+    await userEvent.click(await screen.findByRole('tab', { name: 'Medizinischer Verlauf' }));
+    expect(await screen.findByRole('button', { name: /Status → verstorben/ })).toBeInTheDocument();
   });
 });
