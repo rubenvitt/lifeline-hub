@@ -1,5 +1,9 @@
+pub mod abgleich_repo;
 pub mod audit_repo;
 pub mod repo;
+pub mod sichtung_repo;
+pub mod verbleib_repo;
+pub mod verlaufsnotiz_repo;
 
 use serde::Serialize;
 
