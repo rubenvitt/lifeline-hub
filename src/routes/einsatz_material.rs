@@ -135,11 +135,21 @@ pub async fn disponieren(
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
 
+fn deserialize_optional_field<'de, T, D>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    T: serde::Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    Option::<T>::deserialize(deserializer).map(Some)
+}
+
 #[derive(Debug, Deserialize)]
 pub struct DispoPatchBody {
     pub menge: Option<i64>,
     pub status: Option<String>,
     pub bemerkung: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub uhs_id: Option<Option<i64>>,
 }
 
 /// PATCH /api/einsaetze/{id}/material/{em_id} — Menge und/oder Status und/oder Bemerkung.
@@ -174,7 +184,7 @@ pub async fn aktualisieren(
     // Bemerkung: im Body gesetzt (auch "") → setzen (leer = löschen); absent/null →
     // unverändert (COALESCE). Daher NICHT über `trimme` zu None kollabieren lassen.
     let bemerkung = body.bemerkung.as_deref().map(str::trim);
-    disposition_repo::aktualisiere(&state.pool, einsatz_id, em_id, body.menge, status, bemerkung).await?;
+    disposition_repo::aktualisiere(&state.pool, einsatz_id, em_id, body.menge, status, bemerkung, body.uhs_id).await?;
     let nachher = disposition_repo::laden_anzeige(&state.pool, einsatz_id, em_id, true).await?;
 
     if vorher.menge != nachher.menge {

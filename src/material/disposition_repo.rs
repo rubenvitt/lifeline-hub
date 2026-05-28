@@ -5,7 +5,7 @@ use sqlx::SqlitePool;
 /// SELECT mit aufgelöster Live-Identität (LEFT JOIN material). Status ist ein festes
 /// Enum direkt auf der Zeile — kein Katalog-JOIN. Live vs. Snapshot trifft `zu_anzeige`.
 const SELECT_AUFGELOEST: &str = "\
-    SELECT em.id, em.einsatz_id, em.material_id, em.einheit_id, em.menge, em.status, \
+    SELECT em.id, em.einsatz_id, em.material_id, em.einheit_id, em.uhs_id, em.menge, em.status, \
            em.snap_bezeichnung, em.snap_kategorie, em.snap_bestandsnummer, \
            em.snap_traegerorganisation, em.bemerkung, em.disponiert_at, em.disponiert_von, \
            m.bezeichnung AS live_bezeichnung, m.kategorie AS live_kategorie, \
@@ -20,6 +20,7 @@ struct Row {
     einsatz_id: i64,
     material_id: Option<i64>,
     einheit_id: Option<i64>,
+    uhs_id: Option<i64>,
     menge: i64,
     status: String,
     snap_bezeichnung: String,
@@ -65,6 +66,7 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzMaterialAnzeige {
         einsatz_id: row.einsatz_id,
         material_id: row.material_id,
         einheit_id: row.einheit_id,
+        uhs_id: row.uhs_id,
         ist_adhoc: row.material_id.is_none(),
         bezeichnung,
         kategorie,
@@ -196,6 +198,8 @@ pub async fn disponiere_adhoc(
 }
 
 /// Aktualisiert Menge, Status und/oder Bemerkung (COALESCE: `None` = unverändert).
+/// `uhs_id`: `None` = unverändert; `Some(None)` = explizit auf NULL setzen;
+/// `Some(Some(id))` = neue UHS zuordnen.
 /// `status` muss bereits validiert sein (gültiges Enum). `NotFound`, falls die Zeile
 /// nicht zum Einsatz gehört.
 pub async fn aktualisiere(
@@ -205,16 +209,21 @@ pub async fn aktualisiere(
     menge: Option<i64>,
     status: Option<&str>,
     bemerkung: Option<&str>,
+    uhs_id: Option<Option<i64>>,
 ) -> Result<(), AppError> {
     let resultat = sqlx::query(
         "UPDATE einsatz_material \
-         SET menge = COALESCE(?, menge), status = COALESCE(?, status), \
-             bemerkung = COALESCE(?, bemerkung) \
-         WHERE id = ? AND einsatz_id = ?",
+         SET menge = COALESCE(?1, menge), \
+             status = COALESCE(?2, status), \
+             bemerkung = COALESCE(?3, bemerkung), \
+             uhs_id = CASE WHEN ?4 IS NULL THEN uhs_id ELSE ?5 END \
+         WHERE id = ?6 AND einsatz_id = ?7",
     )
     .bind(menge)
     .bind(status)
     .bind(bemerkung)
+    .bind(uhs_id.map(|_| 1_i64))      // sentinel: Some(_) → 1, None → NULL
+    .bind(uhs_id.and_then(|v| v))     // value: Some(Some(x)) → x, Some(None) → NULL
     .bind(em_id)
     .bind(einsatz_id)
     .execute(pool)
@@ -223,6 +232,24 @@ pub async fn aktualisiere(
         return Err(AppError::NotFound);
     }
     Ok(())
+}
+
+/// Disponiertes Material einer UHS (aufgelöst), sortiert nach Dispo-Zeit.
+/// Filtert nach einsatz_id UND uhs_id für Org-Isolation.
+pub async fn liste_je_uhs(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    uhs_id: i64,
+    einsatz_aktiv: bool,
+) -> Result<Vec<EinsatzMaterialAnzeige>, AppError> {
+    let rows = sqlx::query_as::<_, Row>(&format!(
+        "{SELECT_AUFGELOEST} WHERE em.einsatz_id = ? AND em.uhs_id = ? ORDER BY em.disponiert_at, em.id"
+    ))
+    .bind(einsatz_id)
+    .bind(uhs_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows.into_iter().map(|r| zu_anzeige(r, einsatz_aktiv)).collect())
 }
 
 /// Entfernt eine Dispositionszeile aus dem Einsatz (der Stamm bleibt). `NotFound`,
@@ -339,20 +366,45 @@ mod tests {
         let m = mat_repo::anlegen(&pool, 1, mat_daten("Wolldecke")).await.unwrap();
         let em = disponiere_stamm(&pool, einsatz, 1, m.id, 50, benutzer).await.unwrap();
 
-        aktualisiere(&pool, einsatz, em, Some(30), Some(MaterialStatus::Defekt.as_str()), Some("nass")).await.unwrap();
+        aktualisiere(&pool, einsatz, em, Some(30), Some(MaterialStatus::Defekt.as_str()), Some("nass"), None).await.unwrap();
         let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(a.menge, 30);
         assert_eq!(a.status, "defekt");
         assert_eq!(a.bemerkung.as_deref(), Some("nass"));
 
         // Nur Status ändern (menge/bemerkung None -> bleiben).
-        aktualisiere(&pool, einsatz, em, None, Some(MaterialStatus::Verbraucht.as_str()), None).await.unwrap();
+        aktualisiere(&pool, einsatz, em, None, Some(MaterialStatus::Verbraucht.as_str()), None, None).await.unwrap();
         let b = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(b.menge, 30, "Menge unveraendert");
         assert_eq!(b.status, "verbraucht");
 
         entferne(&pool, einsatz, em).await.unwrap();
         assert!(matches!(laden_anzeige(&pool, einsatz, em, true).await.unwrap_err(), AppError::NotFound));
+    }
+
+    #[tokio::test]
+    async fn aktualisiere_setzt_uhs_id_und_loese() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let m = mat_repo::anlegen(&pool, 1, mat_daten("Wolldecke")).await.unwrap();
+        let em = disponiere_stamm(&pool, einsatz, 1, m.id, 50, benutzer).await.unwrap();
+        let u: i64 = sqlx::query_scalar(
+            "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
+             VALUES (?, 'behandlungsplatz', 'BHP 50', ?, ?) RETURNING id")
+            .bind(einsatz).bind(benutzer).bind(benutzer).fetch_one(&pool).await.unwrap();
+        // Zuordnen:
+        aktualisiere(&pool, einsatz, em, None, None, None, Some(Some(u))).await.unwrap();
+        let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        assert_eq!(a.uhs_id, Some(u));
+        // Lösen (explizit NULL):
+        aktualisiere(&pool, einsatz, em, None, None, None, Some(None)).await.unwrap();
+        let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
+        assert!(a.uhs_id.is_none());
+        // liste_je_uhs:
+        aktualisiere(&pool, einsatz, em, None, None, None, Some(Some(u))).await.unwrap();
+        let liste = liste_je_uhs(&pool, einsatz, u, true).await.unwrap();
+        assert_eq!(liste.len(), 1);
+        assert_eq!(liste[0].id, em);
     }
 
     #[tokio::test]

@@ -100,6 +100,8 @@ pub struct EinsatzMaterialAnzeige {
     pub material_id: Option<i64>,
     /// Zugeordnete Einheit; `None` = freie, nicht zugeordnete Position.
     pub einheit_id: Option<i64>,
+    /// Zugeordnete Unfallhilfsstelle; `None` = nicht einer UHS zugeordnet.
+    pub uhs_id: Option<i64>,
     pub ist_adhoc: bool,
     pub bezeichnung: String,
     pub kategorie: Option<String>,
