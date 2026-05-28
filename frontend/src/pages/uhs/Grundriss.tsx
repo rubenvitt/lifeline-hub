@@ -192,7 +192,7 @@ export default function Grundriss({
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
       <Space align="start">
         <InboxContainer personen={inboxPersonen} schreibgeschuetzt={schreibgeschuetzt} />
-        <div style={{ position: 'relative', width: 520, height: 400, border: '1px dashed #d9d9d9', background: '#fafafa' }}>
+        <div style={{ position: 'relative', width: 1000, height: 600, border: '1px dashed #d9d9d9', background: '#fafafa' }}>
           {uhs.plaetze.map((p) => (
             <PlatzKarte
               key={p.id}
