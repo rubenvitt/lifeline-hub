@@ -596,6 +596,13 @@ async fn status_setzen(app: &axum::Router, cookie: &str, einsatz: i64, person: i
     assert_eq!(s, StatusCode::OK);
 }
 
+async fn abgleich_anlegen_helper(app: &axum::Router, cookie: &str, einsatz: i64, vermisst: i64, gefunden: i64) -> i64 {
+    let body = format!(r#"{{"gefunden_person_id":{gefunden}}}"#);
+    let (s, j) = anfrage(app, "POST", &format!("/api/einsaetze/{einsatz}/personen/{vermisst}/abgleich"), cookie, Some(&body)).await;
+    assert_eq!(s, StatusCode::CREATED);
+    j["id"].as_i64().unwrap()
+}
+
 #[tokio::test]
 async fn abgleich_anlegen_verdacht_erlaubt_und_in_beiden_details_sichtbar() {
     let app = setup().await;
@@ -655,4 +662,79 @@ async fn export_schreibt_export_audit() {
         "SELECT COUNT(*) FROM person_zugriff_audit WHERE einsatz_id = ? AND art = 'export' AND person_id IS NULL")
         .bind(e).fetch_one(&pool).await.unwrap();
     assert_eq!(count, 1, "Export muss genau einen export-Audit-Eintrag schreiben");
+}
+
+#[tokio::test]
+async fn entscheidung_bestaetigt_meldet_ab_und_schreibt_etb() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let v = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    status_setzen(&app, &admin, e, v, "vermisst").await;
+    let g = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    status_setzen(&app, &admin, e, g, "betroffen").await;
+    let aid = abgleich_anlegen_helper(&app, &admin, e, v, g).await;
+    let (s, j) = anfrage(&app, "POST",
+        &format!("/api/einsaetze/{e}/personen/{v}/abgleich/{aid}/entscheidung"), &admin,
+        Some(r#"{"entscheidung":"bestaetigt"}"#)).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(j["status"], "bestaetigt");
+    // Vermisstmeldung ist abgemeldet:
+    let (_, dv) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/personen/{v}"), &admin, None).await;
+    assert_eq!(dv["status"], "abgemeldet");
+    // ETB „Vermisstmeldung R-001 aufgeklärt — identisch mit R-002"
+    let inhalte = system_etb_inhalte(&app, &admin, e).await;
+    assert!(inhalte.iter().any(|i|
+        i.contains("Vermisstmeldung R-001") && i.contains("aufgeklärt") && i.contains("R-002")),
+        "ETB-Bestätigung fehlt oder unvollständig: {inhalte:?}");
+}
+
+#[tokio::test]
+async fn zweiter_bestaetigter_je_vermisstmeldung_ist_409() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let v = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    status_setzen(&app, &admin, e, v, "vermisst").await;
+    let g1 = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    status_setzen(&app, &admin, e, g1, "betroffen").await;
+    let g2 = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    status_setzen(&app, &admin, e, g2, "betroffen").await;
+    let a1 = abgleich_anlegen_helper(&app, &admin, e, v, g1).await;
+    let a2 = abgleich_anlegen_helper(&app, &admin, e, v, g2).await;
+    anfrage(&app, "POST", &format!("/api/einsaetze/{e}/personen/{v}/abgleich/{a1}/entscheidung"), &admin,
+        Some(r#"{"entscheidung":"bestaetigt"}"#)).await;
+    let (s, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/personen/{v}/abgleich/{a2}/entscheidung"), &admin,
+        Some(r#"{"entscheidung":"bestaetigt"}"#)).await;
+    // Achtung: nach dem ersten bestaetigt ist v=abgemeldet → der Status-Check des zweiten Aufrufs greift, BEVOR der Unique-Index feuert. Spec verlangt 409 für den Doppel-bestaetigt; der Unique-Index ist die Garantie, der Status-Check ist freundlicher: beides ist akzeptabel und konsistent.
+    assert_eq!(s, StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn entscheidung_nur_einsatzleitung_und_pid_invariante() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let fueh_id = benutzer_anlegen(&app, &admin, "fuehr2", "keine").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    rolle_setzen(&app, &admin, e, fueh_id, "fuehrungspersonal").await;
+    let v = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    status_setzen(&app, &admin, e, v, "vermisst").await;
+    let g = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    status_setzen(&app, &admin, e, g, "betroffen").await;
+    let aid = abgleich_anlegen_helper(&app, &admin, e, v, g).await;
+    // Führungspersonal (Schreibrecht, aber keine Leitung) → 403
+    let fueh = login_cookie(&app, "fuehr2", "fuehr2pw1").await;
+    let (s, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/personen/{v}/abgleich/{aid}/entscheidung"), &fueh,
+        Some(r#"{"entscheidung":"verworfen"}"#)).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    // pid-Invariante: Aufruf mit falscher pid → 404 (Abgleich gehört dort nicht hin)
+    let (s, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/personen/{g}/abgleich/{aid}/entscheidung"), &admin,
+        Some(r#"{"entscheidung":"verworfen"}"#)).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    // Verworfen lässt den Status unverändert:
+    let (s, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/personen/{v}/abgleich/{aid}/entscheidung"), &admin,
+        Some(r#"{"entscheidung":"verworfen"}"#)).await;
+    assert_eq!(s, StatusCode::OK);
+    let (_, dv) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/personen/{v}"), &admin, None).await;
+    assert_eq!(dv["status"], "vermisst", "verworfen ändert den Status nicht");
 }

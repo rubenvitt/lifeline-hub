@@ -598,6 +598,69 @@ pub async fn abgleich_anlegen(
     Ok((StatusCode::CREATED, Json(abgleich)))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct EntscheidungBody {
+    pub entscheidung: String,
+}
+
+/// POST /api/einsaetze/{id}/personen/{pid}/abgleich/{aid}/entscheidung — bestätigen
+/// oder verwerfen. **Nur Einsatzleitung** (Annahme 8). Routing-Invariante:
+/// `abgleich.vermisst_person_id == pid`, sonst `404`. Nur aus `verdacht` heraus
+/// (sonst `409`). Bei `bestaetigt`: Vermisstmeldung → `abgemeldet` + pseudonyme
+/// ETB-Spur. SSE für beide beteiligten Personen.
+pub async fn abgleich_entscheiden(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, person_id, abgleich_id)): Path<(i64, i64, i64)>,
+    Json(body): Json<EntscheidungBody>,
+) -> Result<Json<AbgleichAnzeige>, AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_einsatzleitung(rolle)?;
+    fordere_aktiv(&einsatz)?;
+
+    if !matches!(body.entscheidung.as_str(), "bestaetigt" | "verworfen") {
+        return Err(AppError::Validation(
+            "Entscheidung muss 'bestaetigt' oder 'verworfen' sein".into(),
+        ));
+    }
+    let abgleich = abgleich_repo::laden(&state.pool, einsatz_id, abgleich_id).await?;
+    if abgleich.vermisst_person_id != person_id {
+        // pid-Invariante verletzt: nicht der Pfad zu DIESEM Abgleich.
+        return Err(AppError::NotFound);
+    }
+    if abgleich.status != "verdacht" {
+        return Err(AppError::Conflict("Abgleich ist bereits entschieden".into()));
+    }
+    let entschieden = abgleich_repo::entscheide(
+        &state.pool,
+        einsatz_id,
+        abgleich_id,
+        &body.entscheidung,
+        benutzer.id,
+    )
+    .await?;
+
+    if body.entscheidung == "bestaetigt" {
+        let vermisst = repo::laden(&state.pool, einsatz_id, abgleich.vermisst_person_id).await?;
+        let gefunden = repo::laden(&state.pool, einsatz_id, abgleich.gefunden_person_id).await?;
+        etb_system(
+            &state,
+            einsatz_id,
+            benutzer.id,
+            &format!(
+                "Vermisstmeldung {} aufgeklärt — identisch mit {}",
+                registrier_anzeige(vermisst.registrier_nr),
+                registrier_anzeige(gefunden.registrier_nr)
+            ),
+        )
+        .await?;
+    }
+    sse_person(&state, einsatz_id, abgleich.vermisst_person_id);
+    sse_person(&state, einsatz_id, abgleich.gefunden_person_id);
+    Ok(Json(entschieden))
+}
+
 /// GET /api/einsaetze/{id}/personen/stream — SSE-Stream des Einsatz-Kanals.
 /// Der Client filtert clientseitig auf `person`-Events. Nur Lesezugriff.
 pub async fn stream(

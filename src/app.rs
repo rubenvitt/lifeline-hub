@@ -85,6 +85,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/einsaetze/{id}/personen/{pid}/verbleib", post(routes::einsatz_person::verbleib))
         .route("/api/einsaetze/{id}/personen/{pid}/notizen", post(routes::einsatz_person::notiz))
         .route("/api/einsaetze/{id}/personen/{pid}/abgleich", post(routes::einsatz_person::abgleich_anlegen))
+        .route("/api/einsaetze/{id}/personen/{pid}/abgleich/{aid}/entscheidung",
+               post(routes::einsatz_person::abgleich_entscheiden))
         .route("/api/einsaetze/{id}/personen/{pid}/audit", get(routes::einsatz_person::audit))
         .route("/api/einsaetze/{id}/personen/{pid}", delete(routes::einsatz_person::stornieren))
         .route("/api/einsaetze/{id}/abschnitte", get(routes::einsatzabschnitt::liste))
