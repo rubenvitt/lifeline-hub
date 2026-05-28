@@ -70,6 +70,114 @@ impl Geschlecht {
     }
 }
 
+/// Medizinische Sichtungskategorie (Triage). String = CHECK-Constraint in
+/// `migrations/0023_person_sichtung.sql`. **`Tot` ist ein medizinisches Urteil
+/// und ändert den Admin-`PersonStatus` NICHT** (Annahme 4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum Sichtungskategorie {
+    Sk1,
+    Sk2,
+    Sk3,
+    Sk4,
+    Tot,
+    Unverletzt,
+}
+
+impl Sichtungskategorie {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Sichtungskategorie::Sk1 => "sk1",
+            Sichtungskategorie::Sk2 => "sk2",
+            Sichtungskategorie::Sk3 => "sk3",
+            Sichtungskategorie::Sk4 => "sk4",
+            Sichtungskategorie::Tot => "tot",
+            Sichtungskategorie::Unverletzt => "unverletzt",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Sichtungskategorie> {
+        match s {
+            "sk1" => Some(Sichtungskategorie::Sk1),
+            "sk2" => Some(Sichtungskategorie::Sk2),
+            "sk3" => Some(Sichtungskategorie::Sk3),
+            "sk4" => Some(Sichtungskategorie::Sk4),
+            "tot" => Some(Sichtungskategorie::Tot),
+            "unverletzt" => Some(Sichtungskategorie::Unverletzt),
+            _ => None,
+        }
+    }
+
+    /// Pseudonyme ETB-Beschriftung (z. B. `SK II`, `tot`, `unverletzt`).
+    pub fn etb_label(&self) -> &'static str {
+        match self {
+            Sichtungskategorie::Sk1 => "SK I",
+            Sichtungskategorie::Sk2 => "SK II",
+            Sichtungskategorie::Sk3 => "SK III",
+            Sichtungskategorie::Sk4 => "SK IV",
+            Sichtungskategorie::Tot => "tot",
+            Sichtungskategorie::Unverletzt => "unverletzt",
+        }
+    }
+}
+
+/// Art eines Verbleib-Ereignisses. String = CHECK-Constraint in
+/// `migrations/0025_person_verbleib.sql`. `Verstorben` = Verbleib des Leichnams
+/// (NICHT der Admin-Status).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum VerbleibArt {
+    Transport,
+    Entlassung,
+    VorOrt,
+    Verstorben,
+}
+
+impl VerbleibArt {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            VerbleibArt::Transport => "transport",
+            VerbleibArt::Entlassung => "entlassung",
+            VerbleibArt::VorOrt => "vor_ort",
+            VerbleibArt::Verstorben => "verstorben",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<VerbleibArt> {
+        match s {
+            "transport" => Some(VerbleibArt::Transport),
+            "entlassung" => Some(VerbleibArt::Entlassung),
+            "vor_ort" => Some(VerbleibArt::VorOrt),
+            "verstorben" => Some(VerbleibArt::Verstorben),
+            _ => None,
+        }
+    }
+
+    /// Kurzform fürs Cache-Feld `aktueller_verbleib` (z. B. `Transport → KH Mitte`).
+    pub fn kurzform(&self, ziel: Option<&str>) -> String {
+        match self {
+            VerbleibArt::Transport => match ziel {
+                Some(z) => format!("Transport → {z}"),
+                None => "Transport".to_string(),
+            },
+            VerbleibArt::Entlassung => "entlassen".to_string(),
+            VerbleibArt::VorOrt => "vor Ort".to_string(),
+            VerbleibArt::Verstorben => "verstorben".to_string(),
+        }
+    }
+
+    /// Pseudonymer ETB-Sachverhalt (ohne Reg.-Nr.-Präfix; der Handler stellt es voran).
+    pub fn etb_sachverhalt(&self, ziel: Option<&str>) -> String {
+        match self {
+            VerbleibArt::Transport => match ziel {
+                Some(z) => format!("abtransportiert → {z}"),
+                None => "abtransportiert".to_string(),
+            },
+            VerbleibArt::Entlassung => "entlassen".to_string(),
+            VerbleibArt::VorOrt => "verbleibt vor Ort".to_string(),
+            VerbleibArt::Verstorben => "Verbleib des Leichnams".to_string(),
+        }
+    }
+}
+
 /// Ob ein Status-Übergang `von → nach` erlaubt ist. Unbekannte Werte und
 /// gleichbleibender Status sind nie erlaubt. Übergänge aus terminalen Zuständen
 /// (`verstorben`/`abgemeldet`) zurück in aktive sind erlaubt — als Korrektur
@@ -178,5 +286,24 @@ mod tests {
         assert_eq!(registrier_anzeige(42), "R-042");
         assert_eq!(registrier_anzeige(7), "R-007");
         assert_eq!(registrier_anzeige(1234), "R-1234");
+    }
+
+    #[test]
+    fn sichtungskategorie_roundtrip_und_label() {
+        for k in ["sk1", "sk2", "sk3", "sk4", "tot", "unverletzt"] {
+            assert_eq!(Sichtungskategorie::parse(k).unwrap().as_str(), k);
+        }
+        assert!(Sichtungskategorie::parse("sk5").is_none());
+        assert_eq!(Sichtungskategorie::parse("sk2").unwrap().etb_label(), "SK II");
+        assert_eq!(Sichtungskategorie::parse("tot").unwrap().etb_label(), "tot");
+        assert_eq!(Sichtungskategorie::parse("unverletzt").unwrap().etb_label(), "unverletzt");
+    }
+
+    #[test]
+    fn verbleib_art_roundtrip() {
+        for a in ["transport", "entlassung", "vor_ort", "verstorben"] {
+            assert_eq!(VerbleibArt::parse(a).unwrap().as_str(), a);
+        }
+        assert!(VerbleibArt::parse("teleportation").is_none());
     }
 }
