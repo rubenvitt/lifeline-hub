@@ -20,3 +20,4 @@ pub mod routes;
 pub mod staerke;
 pub mod static_files;
 pub mod stichwort;
+pub mod uhs;
