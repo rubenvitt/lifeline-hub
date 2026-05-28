@@ -514,6 +514,40 @@ pub async fn verbleib(
     Ok((StatusCode::CREATED, Json(verbleib)))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct NotizBody {
+    pub text: String,
+}
+
+/// POST /api/einsaetze/{id}/personen/{pid}/notizen — append-only Befundnotiz.
+/// Schreibberechtigt + aktiv. **KEIN ETB-Eintrag** (besondere Kategorie). SSE.
+pub async fn notiz(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, person_id)): Path<(i64, i64)>,
+    Json(body): Json<NotizBody>,
+) -> Result<(StatusCode, Json<NotizAnzeige>), AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_schreibrecht(rolle)?;
+    fordere_aktiv(&einsatz)?;
+
+    let text = body.text.trim();
+    if text.is_empty() {
+        return Err(AppError::Validation("Notiztext darf nicht leer sein".into()));
+    }
+    let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
+    if person.storniert_at.is_some() {
+        return Err(AppError::Conflict(
+            "Stornierte Person kann keine Notiz erhalten".into(),
+        ));
+    }
+    let notiz = verlaufsnotiz_repo::anlegen(&state.pool, einsatz_id, person_id, text, benutzer.id).await?;
+    // BEWUSST kein etb_system(): besondere Kategorie gehört NICHT in den ETB.
+    sse_person(&state, einsatz_id, person_id);
+    Ok((StatusCode::CREATED, Json(notiz)))
+}
+
 /// GET /api/einsaetze/{id}/personen/stream — SSE-Stream des Einsatz-Kanals.
 /// Der Client filtert clientseitig auf `person`-Events. Nur Lesezugriff.
 pub async fn stream(

@@ -561,6 +561,36 @@ async fn sichtung_bei_vermisst_ist_422_und_unbekannte_kategorie_ist_400() {
 }
 
 #[tokio::test]
+async fn notiz_erscheint_im_detail_und_erzeugt_keinen_etb() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    let vorher_etb = system_etb_inhalte(&app, &admin, e).await.len();
+    let (s, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/personen/{p}/notizen"), &admin,
+        Some(r#"{"text":"Platzwunde Stirn, stabil"}"#)).await;
+    assert_eq!(s, StatusCode::CREATED);
+    let (_, detail) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/personen/{p}"), &admin, None).await;
+    let notizen = detail["notizen"].as_array().unwrap();
+    assert_eq!(notizen.len(), 1);
+    assert_eq!(notizen[0]["text"], "Platzwunde Stirn, stabil");
+    // KEIN ETB-Eintrag (besondere Kategorie):
+    assert_eq!(system_etb_inhalte(&app, &admin, e).await.len(), vorher_etb,
+        "Befundnotiz darf KEINEN ETB-Eintrag erzeugen");
+}
+
+#[tokio::test]
+async fn notiz_mit_leerem_text_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    let (s, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/personen/{p}/notizen"), &admin,
+        Some(r#"{"text":"  "}"#)).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
 async fn export_schreibt_export_audit() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
