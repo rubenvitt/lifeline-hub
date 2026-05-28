@@ -16,8 +16,12 @@ use crate::uhs::{
 };
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
+use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::Json;
 use serde::{Deserialize, Serialize};
+use std::convert::Infallible;
+use tokio_stream::wrappers::BroadcastStream;
+use tokio_stream::{Stream, StreamExt};
 
 /// Detail-Antwort: UHS-Stamm + Plätze + aktuelle Belegungen + zugeordnetes Material.
 #[derive(Debug, Serialize)]
@@ -682,4 +686,26 @@ pub async fn auto_austritt(
     sse_uhs(state, einsatz_id, info.uhs_id);
     sse_person(state, einsatz_id, person_id);
     Ok(())
+}
+
+/// GET /api/einsaetze/{id}/uhs/stream — SSE-Stream. Nur Lesezugriff.
+/// Der Client filtert clientseitig auf `uhs`- und `person`-Events.
+pub async fn stream(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path(einsatz_id): Path<i64>,
+) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+
+    let rx = state.live.abonniere(einsatz_id);
+    let stream = BroadcastStream::new(rx).map(|res| {
+        let event = match res {
+            Ok(n) => Event::default().event(n.event).data(n.data),
+            Err(_) => Event::default().event("lagged").data("resync"),
+        };
+        Ok::<Event, Infallible>(event)
+    });
+    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
 }

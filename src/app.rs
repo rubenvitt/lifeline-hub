@@ -91,6 +91,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/einsaetze/{id}/personen/{pid}", delete(routes::einsatz_person::stornieren))
         .route("/api/einsaetze/{id}/uhs", get(routes::einsatz_uhs::liste))
         .route("/api/einsaetze/{id}/uhs", post(routes::einsatz_uhs::anlegen))
+        .route("/api/einsaetze/{id}/uhs/stream", get(routes::einsatz_uhs::stream))
         .route("/api/einsaetze/{id}/uhs/{uid}", get(routes::einsatz_uhs::detail))
         .route("/api/einsaetze/{id}/uhs/{uid}", patch(routes::einsatz_uhs::aktualisieren))
         .route("/api/einsaetze/{id}/uhs/{uid}/status", post(routes::einsatz_uhs::status_wechsel))
