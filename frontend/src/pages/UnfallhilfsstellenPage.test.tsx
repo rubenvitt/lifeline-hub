@@ -89,3 +89,30 @@ describe('UnfallhilfsstellenPage', () => {
     await waitFor(() => expect(body).toMatchObject({ bezeichnung: 'PA 1' }));
   });
 });
+
+describe('Grundriss DnD', () => {
+  it('öffnet Detail-Drawer und zeigt Tab „Grundriss"', async () => {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
+      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([
+        { id: 7, einsatz_id: 1, abschnitt_id: null, typ: 'behandlungsplatz',
+          bezeichnung: 'BHP 50', standort: null, notiz: null, status: 'aktiv',
+          erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1, storniert_at: null },
+      ])),
+      http.get('/api/einsaetze/1/uhs/7', () => HttpResponse.json({
+        id: 7, einsatz_id: 1, abschnitt_id: null, typ: 'behandlungsplatz',
+        bezeichnung: 'BHP 50', standort: null, notiz: null, status: 'aktiv',
+        erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1, storniert_at: null,
+        plaetze: [{ id: 1, uhs_id: 7, typ: 'bett', bezeichnung: 'Bett 3',
+                    pos_x: 100, pos_y: 50, verfuegbarkeit: 'frei',
+                    reserviert_fuer_person_id: null, storniert_at: null }],
+        belegungen: [], material: [],
+      })),
+      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByText('BHP 50'));
+    expect(await screen.findByRole('tab', { name: 'Grundriss' })).toBeInTheDocument();
+    expect(await screen.findByText('Bett 3')).toBeInTheDocument();
+  });
+});
