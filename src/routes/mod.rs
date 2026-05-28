@@ -10,6 +10,7 @@ pub mod einsatz_material;
 pub mod einsatz_person;
 pub mod einsatz_personal;
 pub mod einsatz_einheit;
+pub mod einsatz_uhs;
 pub mod einsatzabschnitt;
 pub mod etb;
 pub mod fahrzeug;
