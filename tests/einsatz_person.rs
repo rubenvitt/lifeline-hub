@@ -469,6 +469,65 @@ async fn detail_enthaelt_medizinischen_verlauf_und_genau_einen_audit() {
     assert_eq!(audit_anzahl(&app, &admin, e, p).await, 1);
 }
 
+async fn sichten(app: &axum::Router, cookie: &str, einsatz: i64, person: i64, body: &str) -> (StatusCode, Value) {
+    anfrage(app, "POST", &format!("/api/einsaetze/{einsatz}/personen/{person}/sichtung"), cookie, Some(body)).await
+}
+
+#[tokio::test]
+async fn sichtung_ist_append_only_cache_und_etb() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{"name":"Geheim","vorname":"Sehr"}"#).await;
+    // erfasst → Sichtung sk2: hebt Status auf betroffen + Cache + ETB
+    let (s, _) = sichten(&app, &admin, e, p, r#"{"kategorie":"sk2"}"#).await;
+    assert_eq!(s, StatusCode::CREATED);
+    let (s, _) = sichten(&app, &admin, e, p, r#"{"kategorie":"sk1","notiz":"verschlechtert"}"#).await;
+    assert_eq!(s, StatusCode::CREATED);
+    // Detail: zwei Sichtungen, neuester Cache + Person ist betroffen
+    let (_, detail) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/personen/{p}"), &admin, None).await;
+    assert_eq!(detail["status"], "betroffen", "Sichtung hebt erfasst → betroffen");
+    assert_eq!(detail["aktuelle_sichtung"], "sk1");
+    assert_eq!(detail["sichtungen"].as_array().unwrap().len(), 2);
+    // ETB: zwei Sichtungs-Einträge, kein Identitäts-Leak
+    let inhalte = system_etb_inhalte(&app, &admin, e).await;
+    let sichtung_etb: Vec<_> = inhalte.iter().filter(|i| i.contains("Sichtung")).collect();
+    assert_eq!(sichtung_etb.len(), 2);
+    assert!(sichtung_etb.iter().all(|i| i.contains("R-001")));
+    assert!(sichtung_etb.iter().any(|i| i.contains("SK II")));
+    assert!(sichtung_etb.iter().any(|i| i.contains("SK I")));
+    assert!(sichtung_etb.iter().all(|i| !i.contains("Geheim") && !i.contains("Sehr") && !i.contains("verschlechtert")));
+}
+
+#[tokio::test]
+async fn sichtung_tot_aendert_admin_status_nicht() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    // Vorab betroffen setzen (kein erfasst-Anheben verfälscht den Test)
+    anfrage(&app, "POST", &format!("/api/einsaetze/{e}/personen/{p}/status"), &admin, Some(r#"{"status":"betroffen"}"#)).await;
+    let (s, _) = sichten(&app, &admin, e, p, r#"{"kategorie":"tot"}"#).await;
+    assert_eq!(s, StatusCode::CREATED);
+    let (_, detail) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/personen/{p}"), &admin, None).await;
+    assert_eq!(detail["status"], "betroffen", "Sichtung tot ändert Admin-Status NICHT");
+    assert_eq!(detail["aktuelle_sichtung"], "tot");
+}
+
+#[tokio::test]
+async fn sichtung_bei_vermisst_ist_422_und_unbekannte_kategorie_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    anfrage(&app, "POST", &format!("/api/einsaetze/{e}/personen/{p}/status"), &admin, Some(r#"{"status":"vermisst"}"#)).await;
+    let (s, _) = sichten(&app, &admin, e, p, r#"{"kategorie":"sk2"}"#).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "vermisste Person ist nicht anwesend");
+    let p2 = person_anlegen(&app, &admin, e, r#"{}"#).await;
+    let (s, _) = sichten(&app, &admin, e, p2, r#"{"kategorie":"sk7"}"#).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "unbekannte Kategorie");
+}
+
 #[tokio::test]
 async fn export_schreibt_export_audit() {
     let (app, pool) = setup_mit_pool().await;

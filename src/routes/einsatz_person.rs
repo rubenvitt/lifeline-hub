@@ -4,7 +4,7 @@ use crate::einsatz::berechtigung::{fordere_aktiv, fordere_einsatzleitung, forder
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
 use crate::etb::{self, repo as etb_repo};
-use crate::person::{darf_uebergehen, registrier_anzeige, repo, Geschlecht, PersonAnzeige, PersonStatus};
+use crate::person::{darf_uebergehen, registrier_anzeige, repo, Geschlecht, PersonAnzeige, PersonStatus, Sichtungskategorie};
 use crate::person::{abgleich_repo, audit_repo, sichtung_repo, verbleib_repo, verlaufsnotiz_repo};
 use crate::person::abgleich_repo::AbgleichAnzeige;
 use crate::person::audit_repo::ZugriffAnzeige;
@@ -311,6 +311,74 @@ pub async fn stornieren(
     ).await?;
     sse_person(&state, einsatz_id, person_id);
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SichtungBody {
+    pub kategorie: String,
+    pub notiz: Option<String>,
+}
+
+/// POST /api/einsaetze/{id}/personen/{pid}/sichtung — Sichtung erfassen.
+/// Schreibberechtigt + aktiv. Hebt `erfasst→betroffen` (Annahme 5); bei
+/// `vermisst`/`abgemeldet` → 422; bei storniert → 409. Sichtung=`tot` ändert
+/// den Admin-Status NICHT (Annahme 4). Pseudonyme ETB-Spur + SSE.
+pub async fn sichten(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, person_id)): Path<(i64, i64)>,
+    Json(body): Json<SichtungBody>,
+) -> Result<(StatusCode, Json<SichtungAnzeige>), AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_schreibrecht(rolle)?;
+    fordere_aktiv(&einsatz)?;
+
+    let kategorie = Sichtungskategorie::parse(&body.kategorie)
+        .ok_or_else(|| AppError::Validation("Unbekannte Sichtungskategorie".into()))?;
+    let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
+    if person.storniert_at.is_some() {
+        return Err(AppError::Conflict(
+            "Stornierte Person kann nicht gesichtet werden".into(),
+        ));
+    }
+    // Anwesenheit: betroffen|verstorben ok; erfasst → anheben; sonst 422.
+    let hebe_auf_betroffen = match person.status.as_str() {
+        "betroffen" | "verstorben" => false,
+        "erfasst" => true,
+        _ => {
+            return Err(AppError::UnprocessableEntity(format!(
+                "Person ist nicht anwesend (Status {})",
+                person.status
+            )))
+        }
+    };
+    let notiz = trimme(body.notiz);
+
+    let sichtung = sichtung_repo::erfassen(
+        &state.pool,
+        einsatz_id,
+        person_id,
+        kategorie.as_str(),
+        notiz.as_deref(),
+        benutzer.id,
+        hebe_auf_betroffen,
+    )
+    .await?;
+
+    etb_system(
+        &state,
+        einsatz_id,
+        benutzer.id,
+        &format!(
+            "Person {}: Sichtung {}",
+            registrier_anzeige(person.registrier_nr),
+            kategorie.etb_label()
+        ),
+    )
+    .await?;
+    sse_person(&state, einsatz_id, person_id);
+    Ok((StatusCode::CREATED, Json(sichtung)))
 }
 
 /// GET /api/einsaetze/{id}/personen/{pid}/audit — Lese-Audit der Person.
