@@ -1,12 +1,14 @@
 import { Alert, App, Breadcrumb, Button, Descriptions, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Spin, Table, Tabs, Tag, Typography, type TableColumnsType } from 'antd';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { aktualisierePerson, entscheideAbgleich, erfasseSichtung, erfasseVerbleib, ladePerson, ladePersonAudit, legeNotizAn, legePersonAn, listePersonen, registrierAnzeige, schlageAbgleichVor, setzePersonStatus, stornierePerson, type PersonEingabe } from '../api/einsatzPerson';
 import { ApiError } from '../api/client';
 import { usePersonenStream } from '../etb/usePersonenStream';
-import type { Person, PersonDetail, PersonStatus, PersonZugriff, Sichtungskategorie, Verbleib, VerbleibArt } from '../api/types';
+import { useTiereStream } from '../etb/useTiereStream';
+import { listeTiere, tierRegistrierAnzeige } from '../api/einsatzTier';
+import type { Person, PersonDetail, PersonStatus, PersonZugriff, Sichtungskategorie, Verbleib, VerbleibArt, Tier, Spezies } from '../api/types';
 
 const SK_META: Record<Sichtungskategorie, { label: string; color: string }> = {
   sk1: { label: 'SK I', color: 'red' },
@@ -34,6 +36,11 @@ const STATUS_META: Record<PersonStatus, { label: string; color: string }> = {
   betroffen: { label: 'betroffen', color: 'blue' },
   verstorben: { label: 'verstorben', color: 'red' },
   abgemeldet: { label: 'abgemeldet', color: 'green' },
+};
+
+const TIER_SPEZIES_LABEL: Record<Spezies, string> = {
+  hund: 'Hund', katze: 'Katze', grosstier: 'Großtier', nutzgefluegel: 'Nutzgeflügel',
+  kleintier: 'Kleintier', wildtier: 'Wildtier', sonstige: 'Sonstige',
 };
 
 /** Sicht-Tabs: 'alle' = kein Filter; sonst Status-Filter. */
@@ -77,9 +84,11 @@ function kurzVerbleib(v: Verbleib): string {
 export default function PersonenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const navigate = useNavigate();
   const [sicht, setSicht] = useState<Sicht>('erfasst');
 
   usePersonenStream(einsatzId);
+  useTiereStream(einsatzId); // hält den „Zugeordnete Tiere"-Block live
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const personenQuery = useQuery({
@@ -115,6 +124,11 @@ export default function PersonenPage() {
   const detailQuery = useQuery({
     queryKey: ['einsatz-person', einsatzId, offenePersonId],
     queryFn: () => ladePerson(einsatzId, offenePersonId!),
+    enabled: offenePersonId != null,
+  });
+  const tiereDerPersonQuery = useQuery({
+    queryKey: ['einsatz-tiere', einsatzId, 'halter', offenePersonId],
+    queryFn: () => listeTiere(einsatzId, { halterPersonId: offenePersonId! }),
     enabled: offenePersonId != null,
   });
   const auditQuery = useQuery({
@@ -324,6 +338,29 @@ export default function PersonenPage() {
                     </Popconfirm>
                   </Space>
                 )}
+
+                <div>
+                  <Typography.Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
+                    Zugeordnete Tiere
+                  </Typography.Text>
+                  {(tiereDerPersonQuery.data?.length ?? 0) === 0 ? (
+                    <div><Typography.Text type="secondary">keine</Typography.Text></div>
+                  ) : (
+                    <Space wrap style={{ marginTop: 4 }}>
+                      {(tiereDerPersonQuery.data ?? []).map((t: Tier) => (
+                        <Tag
+                          key={t.id}
+                          color="cyan"
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => navigate(`/einsaetze/${einsatzId}/tiere`)}
+                        >
+                          {tierRegistrierAnzeige(t.registrier_nr)} {TIER_SPEZIES_LABEL[t.spezies] ?? t.spezies}
+                          {t.rufname ? ` „${t.rufname}"` : ''}
+                        </Tag>
+                      ))}
+                    </Space>
+                  )}
+                </div>
 
                 {einsatz.meine_rolle === 'einsatzleitung' && (
                   <div>

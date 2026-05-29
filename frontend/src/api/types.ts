@@ -467,3 +467,42 @@ export interface UhsDetail extends Uhs {
   belegungen: UhsBelegung[];
   material: EinsatzMaterial[];
 }
+
+// ============================== E‑4 Tiere ==============================
+
+export type TierStatus = 'aktiv' | 'vermisst' | 'abgeschlossen';
+export type Spezies =
+  | 'hund' | 'katze' | 'grosstier' | 'nutzgefluegel' | 'kleintier' | 'wildtier' | 'sonstige';
+export type TierGeschlecht = 'maennlich' | 'weiblich' | 'unbekannt';
+export type AbschlussGrund =
+  | 'uebergabe_halter' | 'uebergabe_tierarzt' | 'uebergabe_tierheim'
+  | 'verstorben' | 'freilauf' | 'sonstiges';
+
+export interface Tier {
+  id: number;
+  einsatz_id: number;
+  registrier_nr: number;
+  status: TierStatus;
+  spezies: Spezies;
+  rasse_beschreibung: string | null;
+  rufname: string | null;
+  geschlecht: TierGeschlecht | null;
+  alter_geschaetzt: number | null;
+  farbe_beschreibung: string | null;
+  kennzeichnung: string | null;
+  groesse_gewicht: string | null;
+  halter_person_id: number | null;
+  halter_kontakt: string | null;
+  antreff_ort: string | null;
+  notiz: string | null;
+  abschluss_grund: AbschlussGrund | null;
+  abschluss_ziel: string | null;
+  erfasst_at: string;
+  erfasst_von: number;
+  geaendert_at: string;
+  geaendert_von: number;
+  storniert_at: string | null;
+  // Read-only Join-Felder (Halter-Auflösung über einsatz_person):
+  halter_registrier_nr: number | null;
+  halter_storniert_at: string | null;
+}
