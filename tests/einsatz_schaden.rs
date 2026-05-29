@@ -434,3 +434,93 @@ async fn lifecycle_etb_je_event_ein_eintrag_ohne_leak() {
     assert!(schaden_eintraege.iter().any(|i| i.contains("abgeschlossen (behoben)")));
     assert!(schaden_eintraege.iter().any(|i| i.contains("S-001 storniert")));
 }
+
+// ---------- Tests: Rechte-Matrix + Org-Isolation + Read-only ----------
+
+#[tokio::test]
+async fn beobachter_kann_lesen_nicht_schreiben() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let beob_id = benutzer_anlegen(&app, &admin, "beobachter", "keine").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    rolle_setzen(&app, &admin, e, beob_id, "beobachter").await;
+    schaden_anlegen(&app, &admin, e, &gueltig()).await;
+    let beob = login_cookie(&app, "beobachter", "beobachterpw1").await;
+    let (s_get, _) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/schaeden"), &beob, None).await;
+    assert_eq!(s_get, StatusCode::OK);
+    let (s_post, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/schaeden"), &beob, Some(&gueltig())).await;
+    assert_eq!(s_post, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn fremder_einsatz_ohne_mitgliedschaft_ist_403() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin, "fremder", "keine").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let fremd = login_cookie(&app, "fremder", "fremderpw1").await;
+    let (s, _) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/schaeden"), &fremd, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn geschaedigt_aus_fremdem_einsatz_ist_404() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e1 = einsatz_anlegen(&app, &admin).await;
+    let e2 = einsatz_anlegen(&app, &admin).await;
+    let p_fremd = person_anlegen(&app, &admin, e2).await;
+    let mut body = gueltig();
+    body["geschaedigt_person_id"] = json!(p_fremd);
+    let (s, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e1}/schaeden"), &admin, Some(&body)).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "Geschädigt aus fremdem Einsatz → 404");
+}
+
+#[tokio::test]
+async fn abgeschlossener_einsatz_ist_read_only() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
+    anfrage(&app, "POST", &format!("/api/einsaetze/{e}/abschliessen"), &admin, Some(&json!({}))).await;
+    let (s_get, _) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/schaeden"), &admin, None).await;
+    assert_eq!(s_get, StatusCode::OK, "Lesen bleibt erlaubt (Nachlauffrist)");
+    let (s_post, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/schaeden"), &admin, Some(&gueltig())).await;
+    assert_eq!(s_post, StatusCode::CONFLICT, "Schreiben auf abgeschlossenem Einsatz → 409");
+    let (s_del, _) = anfrage(&app, "DELETE", &format!("/api/einsaetze/{e}/schaeden/{sid}"), &admin, None).await;
+    assert_eq!(s_del, StatusCode::CONFLICT);
+}
+
+/// PINNT das aktuelle Cross-Org-Verhalten von `darf_lesen` (mögliche Isolations-Lücke
+/// über `ist_hoehere_berechtigung`). Schlägt der LESE-Teil fehl, hat sich das Gate geändert —
+/// dann Sicherheitslage neu bewerten, NICHT den Test stumpf anpassen.
+/// bootstrap_admin ist nicht ein 2. Mal aufrufbar → zweite Org per rohem SQL; der
+/// bestehende System-Admin (org 1) hat selbst höhere Berechtigung und liest org-übergreifend.
+#[tokio::test]
+async fn hoehere_berechtigung_liest_fremde_org_pin_schreiben_403() {
+    let (app, pool) = setup_mit_pool().await; // "Test-Orga" (org 1) + System-Admin "admin"
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+
+    let org2: i64 = sqlx::query_scalar("INSERT INTO organisation (name) VALUES ('Fremd-Orga') RETURNING id")
+        .fetch_one(&pool).await.unwrap();
+    let u2: i64 = sqlx::query_scalar(
+        "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+         VALUES (?, 'F', 'fremduser', 'x') RETURNING id")
+        .bind(org2).fetch_one(&pool).await.unwrap();
+    let e2: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz (org_id, bezeichnung, status) VALUES (?, 'Fremd-Lage', 'aktiv') RETURNING id")
+        .bind(org2).fetch_one(&pool).await.unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_schaden (einsatz_id, registrier_nr, typ, ausmass, ort, erfasst_von, geaendert_von) \
+         VALUES (?, 1, 'sachschaden', 'gering', 'Fremdstr. 1', ?, ?)")
+        .bind(e2).bind(u2).bind(u2).execute(&pool).await.unwrap();
+
+    // LESEN: aktuelles Verhalten festhalten (erwartet: 200 wegen ist_hoehere_berechtigung-Bypass).
+    let (s_get, v) = anfrage(&app, "GET", &format!("/api/einsaetze/{e2}/schaeden"), &admin, None).await;
+    assert_eq!(s_get, StatusCode::OK, "PIN: höhere Berechtigung liest org-übergreifend (Lücke dokumentiert)");
+    assert_eq!(v.as_array().unwrap().len(), 1, "Schaden der fremden Org ist sichtbar");
+
+    // SCHREIBEN: muss IMMER 403 sein — Schreib-Gate kennt keinen Bypass (admin ist nicht Mitglied von e2).
+    let (s_post, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e2}/schaeden"), &admin, Some(&gueltig())).await;
+    assert_eq!(s_post, StatusCode::FORBIDDEN, "fremde Org schreiben → 403");
+}
