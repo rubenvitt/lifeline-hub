@@ -139,7 +139,7 @@ export default function TierePage() {
     (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
 
   const alle = tiereQuery.data ?? [];
-  const personen = alle
+  const tiere = alle
     .filter((t) => sicht === 'alle' || t.status === sicht)
     .filter((t) => !speziesFilter || t.spezies === speziesFilter);
 
@@ -269,9 +269,19 @@ export default function TierePage() {
             <Button onClick={() => {
               setBearbeiten(true);
               editForm.setFieldsValue({
-                ...t,
+                rufname: t.rufname,
+                rasse_beschreibung: t.rasse_beschreibung,
+                geschlecht: t.geschlecht,
+                alter_geschaetzt: t.alter_geschaetzt,
+                farbe_beschreibung: t.farbe_beschreibung,
+                kennzeichnung: t.kennzeichnung,
+                groesse_gewicht: t.groesse_gewicht,
+                antreff_ort: t.antreff_ort,
+                notiz: t.notiz,
+                halter_person_id: t.halter_person_id,
+                halter_kontakt: t.halter_kontakt,
                 halter_modus: t.halter_person_id != null ? 'fk' : t.halter_kontakt ? 'freitext' : 'keiner',
-              } as never);
+              });
             }}>Bearbeiten</Button>
             <Popconfirm title="Tier stornieren (Soft-Delete)?" onConfirm={() => stornoMutation.mutate(t.id)}>
               <Button danger>Stornieren</Button>
@@ -317,7 +327,7 @@ export default function TierePage() {
       <Table
         rowKey="id"
         loading={tiereQuery.isLoading}
-        dataSource={personen}
+        dataSource={tiere}
         columns={spalten}
         pagination={false}
         locale={{ emptyText: 'Keine Tiere in dieser Sicht' }}
