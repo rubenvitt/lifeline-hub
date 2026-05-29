@@ -390,8 +390,8 @@ async fn fremder_einsatz_detail_ist_404() {
 async fn fremder_einsatz_ohne_mitgliedschaft_ist_403() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let fremd_id = benutzer_anlegen(&app, &admin, "fremdnutzer", "keine").await;
-    let _ = fremd_id;
+    // Benutzer anlegen (Existenz reicht), aber NICHT dem Einsatz zuordnen.
+    benutzer_anlegen(&app, &admin, "fremdnutzer", "keine").await;
     let e = einsatz_anlegen(&app, &admin).await; // admin ist Leitung, fremdnutzer kein Mitglied
     let fremd = login_cookie(&app, "fremdnutzer", "fremdnutzerpw1").await;
     let (s, _) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/tiere"), &fremd, None).await;

@@ -8,7 +8,7 @@ import { ApiError } from '../api/client';
 import { usePersonenStream } from '../etb/usePersonenStream';
 import { useTiereStream } from '../etb/useTiereStream';
 import { listeTiere, tierRegistrierAnzeige } from '../api/einsatzTier';
-import type { Person, PersonDetail, PersonStatus, PersonZugriff, Sichtungskategorie, Verbleib, VerbleibArt, Tier } from '../api/types';
+import type { Person, PersonDetail, PersonStatus, PersonZugriff, Sichtungskategorie, Verbleib, VerbleibArt, Tier, Spezies } from '../api/types';
 
 const SK_META: Record<Sichtungskategorie, { label: string; color: string }> = {
   sk1: { label: 'SK I', color: 'red' },
@@ -38,7 +38,7 @@ const STATUS_META: Record<PersonStatus, { label: string; color: string }> = {
   abgemeldet: { label: 'abgemeldet', color: 'green' },
 };
 
-const TIER_SPEZIES_LABEL: Record<string, string> = {
+const TIER_SPEZIES_LABEL: Record<Spezies, string> = {
   hund: 'Hund', katze: 'Katze', grosstier: 'Großtier', nutzgefluegel: 'Nutzgeflügel',
   kleintier: 'Kleintier', wildtier: 'Wildtier', sonstige: 'Sonstige',
 };
