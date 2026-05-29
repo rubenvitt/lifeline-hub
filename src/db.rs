@@ -823,4 +823,71 @@ mod tests {
             .unwrap();
         assert_eq!(rest, 0, "CASCADE muss Dispositionszeilen entfernen");
     }
+
+    #[tokio::test]
+    async fn einsatz_tier_migration_legt_tabelle_und_constraints_an() {
+        let pool = test_pool().await;
+
+        // Setup: Org, Benutzer, Einsatz, eine Person (als Halter-FK-Ziel).
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool).await.unwrap();
+        sqlx::query(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'Leit', 'leit', 'h')",
+        ).execute(&pool).await.unwrap();
+        let einsatz_id: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        ).fetch_one(&pool).await.unwrap();
+        let person_id: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
+             VALUES (?, 1, 1, 1) RETURNING id",
+        ).bind(einsatz_id).fetch_one(&pool).await.unwrap();
+
+        // Gültiges Tier (Status-Default 'aktiv', spezies gesetzt).
+        let tier_id: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_tier (einsatz_id, registrier_nr, spezies, erfasst_von, geaendert_von) \
+             VALUES (?, 1, 'hund', 1, 1) RETURNING id",
+        ).bind(einsatz_id).fetch_one(&pool).await.unwrap();
+        let status: String = sqlx::query_scalar("SELECT status FROM einsatz_tier WHERE id = ?")
+            .bind(tier_id).fetch_one(&pool).await.unwrap();
+        assert_eq!(status, "aktiv", "Status-Default ist aktiv");
+
+        // spezies-CHECK lehnt ungültigen Wert ab.
+        let bad_spezies = sqlx::query(
+            "INSERT INTO einsatz_tier (einsatz_id, registrier_nr, spezies, erfasst_von, geaendert_von) \
+             VALUES (?, 2, 'dinosaurier', 1, 1)",
+        ).bind(einsatz_id).execute(&pool).await;
+        assert!(bad_spezies.is_err(), "ungültige spezies muss abgelehnt werden");
+
+        // status-CHECK lehnt ungültigen Wert ab.
+        let bad_status = sqlx::query("UPDATE einsatz_tier SET status = 'gestohlen' WHERE id = ?")
+            .bind(tier_id).execute(&pool).await;
+        assert!(bad_status.is_err(), "ungültiger status muss abgelehnt werden");
+
+        // Halter-XOR-CHECK: beide gesetzt → Insert-Fehler.
+        let bad_halter = sqlx::query(
+            "INSERT INTO einsatz_tier \
+                (einsatz_id, registrier_nr, spezies, halter_person_id, halter_kontakt, erfasst_von, geaendert_von) \
+             VALUES (?, 3, 'katze', ?, 'Frau Müller', 1, 1)",
+        ).bind(einsatz_id).bind(person_id).execute(&pool).await;
+        assert!(bad_halter.is_err(), "halter_person_id UND halter_kontakt gleichzeitig muss abgelehnt werden");
+
+        // Abschluss-CHECK: status='abgeschlossen' ohne abschluss_grund → Fehler.
+        let bad_abschluss = sqlx::query(
+            "UPDATE einsatz_tier SET status = 'abgeschlossen' WHERE id = ?",
+        ).bind(tier_id).execute(&pool).await;
+        assert!(bad_abschluss.is_err(), "abgeschlossen ohne abschluss_grund muss abgelehnt werden");
+
+        // Mit abschluss_grund erlaubt.
+        sqlx::query(
+            "UPDATE einsatz_tier SET status = 'abgeschlossen', abschluss_grund = 'uebergabe_tierarzt' WHERE id = ?",
+        ).bind(tier_id).execute(&pool).await.unwrap();
+
+        // UNIQUE (einsatz_id, registrier_nr): doppelte Nummer je Einsatz → Fehler.
+        let dup = sqlx::query(
+            "INSERT INTO einsatz_tier (einsatz_id, registrier_nr, spezies, erfasst_von, geaendert_von) \
+             VALUES (?, 1, 'hund', 1, 1)",
+        ).bind(einsatz_id).execute(&pool).await;
+        assert!(dup.is_err(), "doppelte registrier_nr je Einsatz muss abgelehnt werden");
+    }
 }
