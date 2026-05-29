@@ -8,6 +8,7 @@ pub mod einsatz;
 pub mod einsatz_fahrzeug;
 pub mod einsatz_material;
 pub mod einsatz_person;
+pub mod einsatz_schaden;
 pub mod einsatz_tier;
 pub mod einsatz_personal;
 pub mod einsatz_einheit;
