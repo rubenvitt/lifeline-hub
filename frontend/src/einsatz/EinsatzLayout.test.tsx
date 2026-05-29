@@ -35,6 +35,24 @@ function setup() {
   );
 }
 
+function setupRoute(route: string, childPath: string) {
+  server.use(
+    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
+    http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+  );
+  return renderMitProviders(
+    <AuthProvider>
+      <Routes>
+        <Route path="/einsaetze/:id" element={<EinsatzLayout />}>
+          <Route path={childPath} element={<div>Outlet-Inhalt</div>} />
+        </Route>
+      </Routes>
+    </AuthProvider>,
+    { route },
+  );
+}
+
 describe('EinsatzLayout', () => {
   it('zeigt Switcher mit Einsatznamen, Kategorie-Rail und Outlet-Inhalt', async () => {
     setup();
@@ -43,5 +61,12 @@ describe('EinsatzLayout', () => {
     );
     expect(screen.getByRole('navigation', { name: 'Kategorien' })).toBeInTheDocument();
     expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument();
+  });
+
+  it('hält das aktive Modul auf einer Sub-Route hervorgehoben (Panel bleibt offen)', async () => {
+    // Letztes Segment ist „liste"; das aktive Modul wird am Segment nach der
+    // Einsatz-ID erkannt — sonst klappt das Erfassung-Panel beim UHS-Redirect zu.
+    setupRoute('/einsaetze/7/unfallhilfsstellen/liste', 'unfallhilfsstellen/liste');
+    expect(await screen.findByRole('button', { name: 'Unfallhilfsstellen' })).toBeInTheDocument();
   });
 });
