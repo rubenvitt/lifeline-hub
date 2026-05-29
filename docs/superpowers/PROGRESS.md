@@ -89,7 +89,7 @@ die generische Mechanik legte). Jede Spec wird einzeln durchgebrainstormt.
 | E‑2 | **Sichtung & medizinischer Verlauf** | Sichtungskategorien SK I–IV/tot/unverletzt (Verlauf + Cache), Befund-/Verlaufsnotiz (append-only), Transport/Verbleib (KH=Freitext), Vermisstenabgleich (Verdacht→bestätigt) | E‑1 | ✅ **DONE** — Plan `docs/superpowers/plans/2026-05-27-erfassung-sichtung-medizinischer-verlauf.md` |
 | E‑3 | **Unfallhilfsstellen** | Örtlichkeits-/Struktur-Stamm (Patientenablage, Behandlungsplatz, Verletztensammelstelle); Personen-Zuordnung | E‑1 | ✅ **DONE** — Plan `docs/superpowers/plans/2026-05-28-erfassung-unfallhilfsstellen.md` |
 | E‑4 | **Tiere** | Eigener Stamm + Status (eigene Spec — Tiere kommen vor) | E‑1-Foundation | geplant |
-| E‑5 | **Schäden** (allgemein) | Schadensobjekte/-stellen: Art, Ort, Ausmaß, Status (Sach-/Infrastruktur-/Umweltschäden); **kein** Karten-Rendering (→ T4), **keine** Gefahren-/Absperrzonen (→ Lage) | E‑1-Foundation | geplant |
+| E‑5 | **Schäden** (allgemein) | Schadensobjekte/-stellen: Art, Ort, Ausmaß, Status (Sach-/Infrastruktur-/Umweltschäden); **kein** Karten-Rendering (→ T4), **keine** Gefahren-/Absperrzonen (→ Lage) | E‑1-Foundation | ✅ **DONE** — Plan `docs/superpowers/plans/2026-05-29-erfassung-schaeden.md`, SchaedenPage + Tests, Modul aktiviert, ETB-Leak-Tests grün |
 
 **Bindendes Personen-Konzept (aus Navigations-Spec):** Personen = EIN Stamm mit
 Status-Lebenszyklus; dieselbe physische Person wandert durch die Zustände (ein Modul
