@@ -82,12 +82,13 @@ describe('TierePage', () => {
     await userEvent.click(screen.getByRole('combobox'));
     // Tabellenzelle und Dropdown-Option tragen beide "Katze" → auf die Option im Dropdown zielen.
     const katzeOption = (await screen.findAllByText('Katze')).find((el) => el.closest('.ant-select-item-option'));
+    expect(katzeOption).toBeTruthy();
     await userEvent.click(katzeOption!);
     expect(await screen.findByText('Felix')).toBeInTheDocument();
     expect(screen.queryByText('Rex')).not.toBeInTheDocument();
   });
 
-  it('Einsatzleitung sieht Anlege-Buttons, Beobachter nicht', async () => {
+  it('Einsatzleitung sieht Anlege-Buttons', async () => {
     render(einsatzAktiv, []);
     await screen.findByRole('heading', { name: 'Tiere' });
     expect(screen.getByRole('button', { name: 'Schnellerfassung' })).toBeInTheDocument();
@@ -149,10 +150,11 @@ describe('TierePage', () => {
     await userEvent.click((await screen.findAllByText('Rex'))[0]);
     await userEvent.click(await screen.findByRole('button', { name: 'Abschließen' }));
     // Ohne Grund: Submit blockiert (Pflichtfeld) → kein Request.
-    // Drawer und Modal tragen beide role="dialog" → Modal ist das Nicht-Drawer-Dialog.
+    // antd Drawer trägt ebenfalls role="dialog"; Modal-Titel ist nicht als accessible name verdrahtet → über Klasse abgrenzen.
     const dialog = (await screen.findAllByRole('dialog')).find(
       (d) => !d.classList.contains('ant-drawer-content'),
     )!;
+    expect(dialog).toBeTruthy();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abschließen' })); // OK-Button im Modal
     expect(await screen.findByText('Grund ist Pflicht')).toBeInTheDocument();
     expect(body.status).toBeUndefined();
