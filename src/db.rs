@@ -890,4 +890,81 @@ mod tests {
         ).bind(einsatz_id).execute(&pool).await;
         assert!(dup.is_err(), "doppelte registrier_nr je Einsatz muss abgelehnt werden");
     }
+
+    // --- E-5 Schaden: Constraints ---
+
+    /// Legt Org, Benutzer, Einsatz per rohem SQL an und gibt (benutzer_id, einsatz_id) zurück.
+    /// Spalten gemäß Migrationen 0002/0003: benutzer.org_id, system_rolle ∈ {admin,keiner};
+    /// einsatz.org_id NOT NULL, KEIN erstellt_von.
+    async fn schaden_setup(pool: &sqlx::SqlitePool) -> (i64, i64) {
+        sqlx::query("INSERT INTO organisation (name) VALUES ('O')")
+            .execute(pool).await.unwrap();
+        let benutzer_id: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, \
+                system_rolle, org_rolle) \
+             VALUES (1, 'A', 'a', 'x', 'keiner', 'keine') RETURNING id")
+            .fetch_one(pool).await.unwrap();
+        let einsatz_id: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status) \
+             VALUES (1, 'L', 'aktiv') RETURNING id")
+            .fetch_one(pool).await.unwrap();
+        (benutzer_id, einsatz_id)
+    }
+
+    async fn schaden_insert_min(
+        pool: &sqlx::SqlitePool, einsatz_id: i64, benutzer_id: i64, extra_spalten: &str, extra_werte: &str,
+    ) -> Result<sqlx::sqlite::SqliteQueryResult, sqlx::Error> {
+        let sql = format!(
+            "INSERT INTO einsatz_schaden \
+                (einsatz_id, registrier_nr, typ, ausmass, ort, erfasst_von, geaendert_von{extra_spalten}) \
+             VALUES ({einsatz_id}, 1, 'sachschaden', 'gering', 'Hauptstr. 1', {benutzer_id}, {benutzer_id}{extra_werte})"
+        );
+        sqlx::query(&sql).execute(pool).await
+    }
+
+    #[tokio::test]
+    async fn schaden_minimal_insert_ok() {
+        let pool = test_pool().await;
+        let (b, e) = schaden_setup(&pool).await;
+        schaden_insert_min(&pool, e, b, "", "").await.expect("Minimal-Insert muss gehen");
+    }
+
+    #[tokio::test]
+    async fn schaden_geschaedigt_xor_check() {
+        let pool = test_pool().await;
+        let (b, e) = schaden_setup(&pool).await;
+        let p: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, status, erfasst_von, geaendert_von) \
+             VALUES (?, 1, 'betroffen', ?, ?) RETURNING id")
+            .bind(e).bind(b).bind(b).fetch_one(&pool).await.unwrap();
+        let res = schaden_insert_min(
+            &pool, e, b, ", geschaedigt_person_id, geschaedigt_kontakt",
+            &format!(", {p}, 'Herr Meier'")).await;
+        assert!(res.is_err(), "FK UND Freitext gleichzeitig muss vom CHECK abgelehnt werden");
+    }
+
+    #[tokio::test]
+    async fn schaden_status_uebergeben_braucht_adressat() {
+        let pool = test_pool().await;
+        let (b, e) = schaden_setup(&pool).await;
+        let res = schaden_insert_min(&pool, e, b, ", status", ", 'uebergeben'").await;
+        assert!(res.is_err(), "status='uebergeben' ohne uebergeben_an muss CHECK verletzen");
+    }
+
+    #[tokio::test]
+    async fn schaden_status_abgeschlossen_braucht_grund() {
+        let pool = test_pool().await;
+        let (b, e) = schaden_setup(&pool).await;
+        let res = schaden_insert_min(&pool, e, b, ", status", ", 'abgeschlossen'").await;
+        assert!(res.is_err(), "status='abgeschlossen' ohne abschluss_grund muss CHECK verletzen");
+    }
+
+    #[tokio::test]
+    async fn schaden_registrier_nr_unique_je_einsatz() {
+        let pool = test_pool().await;
+        let (b, e) = schaden_setup(&pool).await;
+        schaden_insert_min(&pool, e, b, "", "").await.unwrap();
+        let res = schaden_insert_min(&pool, e, b, "", "").await;
+        assert!(res.is_err(), "UNIQUE(einsatz_id, registrier_nr) muss greifen");
+    }
 }
