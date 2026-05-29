@@ -8,7 +8,9 @@ import { ApiError } from '../api/client';
 import { usePersonenStream } from '../etb/usePersonenStream';
 import { useTiereStream } from '../etb/useTiereStream';
 import { listeTiere, tierRegistrierAnzeige } from '../api/einsatzTier';
-import type { Person, PersonDetail, PersonStatus, PersonZugriff, Sichtungskategorie, Verbleib, VerbleibArt, Tier, Spezies } from '../api/types';
+import { useSchaedenStream } from '../etb/useSchaedenStream';
+import { listeSchaeden, schadenRegistrierAnzeige } from '../api/einsatzSchaden';
+import type { Person, PersonDetail, PersonStatus, PersonZugriff, Sichtungskategorie, Verbleib, VerbleibArt, Tier, Spezies, Schaden } from '../api/types';
 
 const SK_META: Record<Sichtungskategorie, { label: string; color: string }> = {
   sk1: { label: 'SK I', color: 'red' },
@@ -89,6 +91,7 @@ export default function PersonenPage() {
 
   usePersonenStream(einsatzId);
   useTiereStream(einsatzId); // hält den „Zugeordnete Tiere"-Block live
+  useSchaedenStream(einsatzId); // hält den „Als Geschädigte bei Schäden"-Block live
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const personenQuery = useQuery({
@@ -129,6 +132,11 @@ export default function PersonenPage() {
   const tiereDerPersonQuery = useQuery({
     queryKey: ['einsatz-tiere', einsatzId, 'halter', offenePersonId],
     queryFn: () => listeTiere(einsatzId, { halterPersonId: offenePersonId! }),
+    enabled: offenePersonId != null,
+  });
+  const schaedenDerPersonQuery = useQuery({
+    queryKey: ['einsatz-schaeden', einsatzId, 'geschaedigt', offenePersonId],
+    queryFn: () => listeSchaeden(einsatzId, { geschaedigtPersonId: offenePersonId!, inklStorniert: false }),
     enabled: offenePersonId != null,
   });
   const auditQuery = useQuery({
@@ -356,6 +364,28 @@ export default function PersonenPage() {
                         >
                           {tierRegistrierAnzeige(t.registrier_nr)} {TIER_SPEZIES_LABEL[t.spezies] ?? t.spezies}
                           {t.rufname ? ` „${t.rufname}"` : ''}
+                        </Tag>
+                      ))}
+                    </Space>
+                  )}
+                </div>
+
+                <div>
+                  <Typography.Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
+                    Als Geschädigte bei Schäden
+                  </Typography.Text>
+                  {(schaedenDerPersonQuery.data?.length ?? 0) === 0 ? (
+                    <div><Typography.Text type="secondary">keine</Typography.Text></div>
+                  ) : (
+                    <Space wrap style={{ marginTop: 4 }}>
+                      {(schaedenDerPersonQuery.data ?? []).map((sch: Schaden) => (
+                        <Tag
+                          key={sch.id}
+                          color="orange"
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => navigate(`/einsaetze/${einsatzId}/schaeden`)}
+                        >
+                          {schadenRegistrierAnzeige(sch.registrier_nr)} {sch.typ} ({sch.ausmass}) — {sch.status}
                         </Tag>
                       ))}
                     </Space>

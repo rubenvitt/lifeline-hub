@@ -48,6 +48,8 @@ function render(einsatzObj: typeof einsatzAktiv, personen: unknown[]) {
     // Default-Fallback für den „Zugeordnete Tiere"-Block (Cross-Modul-Fetch).
     // Jeder Test, der einen spezifischen Handler braucht, überschreibt ihn via server.use().
     http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
+    // Default-Fallback für den „Als Geschädigte bei Schäden"-Block (Cross-Modul-Fetch).
+    http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
   );
   return renderMitProviders(
     <AuthProvider>
