@@ -28,14 +28,14 @@ function einsatzAntwort(rolle: 'einsatzleitung' | 'beobachter' = 'einsatzleitung
   };
 }
 
-function renderPage() {
+function renderPage(route = '/einsaetze/1/unfallhilfsstellen/liste') {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
       <AntApp>
-        <MemoryRouter initialEntries={['/einsaetze/1/unfallhilfsstellen']}>
+        <MemoryRouter initialEntries={[route]}>
           <Routes>
-            <Route path="/einsaetze/:id/unfallhilfsstellen" element={<UnfallhilfsstellenPage />} />
+            <Route path="/einsaetze/:id/unfallhilfsstellen/liste" element={<UnfallhilfsstellenPage />} />
             <Route path="/einsaetze/:id/unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />
           </Routes>
         </MemoryRouter>
@@ -89,6 +89,28 @@ describe('UnfallhilfsstellenPage', () => {
     await userEvent.type(screen.getByPlaceholderText('z. B. BHP 50'), 'PA 1');
     await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
     await waitFor(() => expect(body).toMatchObject({ bezeichnung: 'PA 1' }));
+  });
+
+  it('„Zurück zur Liste" im Detail führt auf die Listen-Subroute', async () => {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
+      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([
+        { id: 7, einsatz_id: 1, abschnitt_id: null, typ: 'behandlungsplatz',
+          bezeichnung: 'BHP 50', standort: null, notiz: null, status: 'aktiv',
+          erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1, storniert_at: null },
+      ])),
+      http.get('/api/einsaetze/1/uhs/7', () => HttpResponse.json({
+        id: 7, einsatz_id: 1, abschnitt_id: null, typ: 'behandlungsplatz',
+        bezeichnung: 'BHP 50', standort: null, notiz: null, status: 'aktiv',
+        erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1, storniert_at: null,
+        plaetze: [], belegungen: [], material: [],
+      })),
+      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
+    );
+    renderPage('/einsaetze/1/unfallhilfsstellen/7');
+    await userEvent.click(await screen.findByRole('button', { name: 'Zurück zur Liste' }));
+    // Die Liste rendert ihren „Neu"-Button — Beleg, dass /liste (nicht die Basis) getroffen wurde.
+    expect(await screen.findByRole('button', { name: 'Neu' })).toBeInTheDocument();
   });
 });
 

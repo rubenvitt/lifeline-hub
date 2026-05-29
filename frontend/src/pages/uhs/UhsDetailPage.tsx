@@ -20,7 +20,7 @@ export default function UhsDetailPage() {
   const { id, uhsId: uhsIdParam } = useParams();
   const einsatzId = Number(id);
   const uhsId = Number(uhsIdParam);
-  const listenPfad = `/einsaetze/${einsatzId}/unfallhilfsstellen`;
+  const listenPfad = `/einsaetze/${einsatzId}/unfallhilfsstellen/liste`;
   useUhsStream(einsatzId);
 
   const qc = useQueryClient();
