@@ -274,13 +274,22 @@ pub async fn aktualisieren(
         return Err(AppError::Conflict("Storniertes Tier kann nicht geändert werden".into()));
     }
 
-    // Halter-Exklusivität: beide explizit-non-null gesetzt → 422.
-    let setzt_fk = matches!(body.halter_person_id, Some(Some(_)));
     let kontakt_norm = body
         .halter_kontakt
         .map(|opt| opt.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
-    let setzt_kontakt = matches!(kontakt_norm, Some(Some(_)));
-    if setzt_fk && setzt_kontakt {
+
+    // Effektiven Halter-Zustand NACH dem Patch bestimmen (XOR als zweite
+    // Verteidigungslinie zum DB-CHECK): ein Patch, der nur EIN Halter-Feld setzt,
+    // während das andere bereits belegt ist, würde sonst beide setzen → DB-CHECK → 500.
+    let effektiv_fk: Option<i64> = match body.halter_person_id {
+        Some(opt) => opt,                          // Some(Some(id)) = setzen, Some(None) = leeren
+        None => vorher.halter_person_id,           // unverändert
+    };
+    let effektiv_kontakt: Option<String> = match &kontakt_norm {
+        Some(opt) => opt.clone(),                  // Some(Some(s)) = setzen, Some(None) = leeren
+        None => vorher.halter_kontakt.clone(),     // unverändert
+    };
+    if effektiv_fk.is_some() && effektiv_kontakt.is_some() {
         return Err(AppError::UnprocessableEntity(
             "Halter-FK und Halter-Freitext schließen sich aus".into(),
         ));

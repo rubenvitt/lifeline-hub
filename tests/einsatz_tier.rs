@@ -247,6 +247,19 @@ async fn halter_beide_felder_ist_422() {
 }
 
 #[tokio::test]
+async fn patch_zweites_halter_feld_bei_bestehendem_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e).await;
+    // Tier mit Freitext-Halter; dann PATCH nur halter_person_id → beide würden gesetzt.
+    let t = tier_anlegen(&app, &admin, e, &json!({"spezies":"hund","halter_kontakt":"Frau Müller"})).await;
+    let (s, _) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{e}/tiere/{t}"), &admin,
+        Some(&json!({"halter_person_id": p}))).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "darf 422 sein, NICHT 500");
+}
+
+#[tokio::test]
 async fn halter_fk_auf_stornierte_person_bleibt_zulaessig() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
