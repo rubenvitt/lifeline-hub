@@ -1,1 +1,373 @@
-// folgt in Task 3
+use super::SchadenAnzeige;
+use crate::error::AppError;
+use sqlx::SqlitePool;
+
+const SELECT_ALLE: &str = "\
+    SELECT s.id, s.einsatz_id, s.registrier_nr, s.status, s.typ, s.ausmass, s.ort, \
+           s.beschreibung, s.geschaedigt_person_id, s.geschaedigt_kontakt, \
+           s.uebergeben_an, s.uebergeben_at, s.abschluss_grund, s.abschluss_at, \
+           s.erfasst_at, s.erfasst_von, s.geaendert_at, s.geaendert_von, \
+           s.storniert_at, s.storniert_von, \
+           gp.registrier_nr AS geschaedigt_registrier_nr, \
+           gp.storniert_at  AS geschaedigt_storniert_at \
+    FROM einsatz_schaden s \
+    LEFT JOIN einsatz_person gp ON gp.id = s.geschaedigt_person_id \
+                               AND gp.einsatz_id = s.einsatz_id";
+
+#[derive(Debug)]
+pub struct NeueDaten<'a> {
+    pub typ: &'a str,
+    pub ausmass: &'a str,
+    pub ort: &'a str,
+    pub beschreibung: Option<&'a str>,
+    pub geschaedigt_person_id: Option<i64>,
+    pub geschaedigt_kontakt: Option<&'a str>,
+}
+
+#[derive(Debug, Default)]
+pub struct PatchDaten<'a> {
+    pub typ: Option<&'a str>,
+    pub ausmass: Option<&'a str>,
+    pub ort: Option<&'a str>,
+    pub beschreibung: Option<&'a str>,
+    /// `Some(Some(id))` = setzen, `Some(None)` = auf NULL, `None` = unverändert.
+    pub geschaedigt_person_id: Option<Option<i64>>,
+    pub geschaedigt_kontakt: Option<Option<&'a str>>,
+    pub uebergeben_an: Option<Option<&'a str>>,
+    pub abschluss_grund: Option<Option<&'a str>>,
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn liste(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    status: Option<&str>,
+    typ: Option<&str>,
+    ausmass: Option<&str>,
+    geschaedigt_person_id: Option<i64>,
+    inkl_storniert: bool,
+) -> Result<Vec<SchadenAnzeige>, AppError> {
+    let storno_filter = if inkl_storniert { "" } else { " AND s.storniert_at IS NULL" };
+    let sql = format!(
+        "{SELECT_ALLE} WHERE s.einsatz_id = ?1{storno_filter} \
+         AND (?2 IS NULL OR s.status = ?2) \
+         AND (?3 IS NULL OR s.typ = ?3) \
+         AND (?4 IS NULL OR s.ausmass = ?4) \
+         AND (?5 IS NULL OR s.geschaedigt_person_id = ?5) \
+         ORDER BY s.registrier_nr DESC"
+    );
+    Ok(sqlx::query_as::<_, SchadenAnzeige>(&sql)
+        .bind(einsatz_id)
+        .bind(status)
+        .bind(typ)
+        .bind(ausmass)
+        .bind(geschaedigt_person_id)
+        .fetch_all(pool)
+        .await?)
+}
+
+pub async fn laden(pool: &SqlitePool, einsatz_id: i64, schaden_id: i64) -> Result<SchadenAnzeige, AppError> {
+    sqlx::query_as::<_, SchadenAnzeige>(&format!("{SELECT_ALLE} WHERE s.id = ? AND s.einsatz_id = ?"))
+        .bind(schaden_id)
+        .bind(einsatz_id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or(AppError::NotFound)
+}
+
+pub async fn anlegen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    erfasser_id: i64,
+    daten: NeueDaten<'_>,
+) -> Result<SchadenAnzeige, AppError> {
+    let id: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_schaden \
+            (einsatz_id, registrier_nr, status, typ, ausmass, ort, beschreibung, \
+             geschaedigt_person_id, geschaedigt_kontakt, erfasst_von, geaendert_von) \
+         SELECT ?1, COALESCE(MAX(registrier_nr), 0) + 1, 'offen', ?2, ?3, ?4, \
+                COALESCE(?5, ''), ?6, ?7, ?8, ?8 \
+         FROM einsatz_schaden WHERE einsatz_id = ?1 \
+         RETURNING id",
+    )
+    .bind(einsatz_id)
+    .bind(daten.typ)
+    .bind(daten.ausmass)
+    .bind(daten.ort)
+    .bind(daten.beschreibung)
+    .bind(daten.geschaedigt_person_id)
+    .bind(daten.geschaedigt_kontakt)
+    .bind(erfasser_id)
+    .fetch_one(pool)
+    .await?;
+
+    laden(pool, einsatz_id, id).await
+}
+
+pub async fn aktualisiere(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    schaden_id: i64,
+    geaendert_von: i64,
+    daten: PatchDaten<'_>,
+) -> Result<SchadenAnzeige, AppError> {
+    let betroffen = sqlx::query(
+        "UPDATE einsatz_schaden SET \
+            typ = COALESCE(?, typ), \
+            ausmass = COALESCE(?, ausmass), \
+            ort = COALESCE(?, ort), \
+            beschreibung = COALESCE(?, beschreibung), \
+            geschaedigt_person_id = CASE WHEN ? THEN ? ELSE geschaedigt_person_id END, \
+            geschaedigt_kontakt   = CASE WHEN ? THEN ? ELSE geschaedigt_kontakt END, \
+            uebergeben_an   = CASE WHEN ? THEN ? ELSE uebergeben_an END, \
+            abschluss_grund = CASE WHEN ? THEN ? ELSE abschluss_grund END, \
+            geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
+            geaendert_von = ? \
+         WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(daten.typ)
+    .bind(daten.ausmass)
+    .bind(daten.ort)
+    .bind(daten.beschreibung)
+    .bind(daten.geschaedigt_person_id.is_some())
+    .bind(daten.geschaedigt_person_id.flatten())
+    .bind(daten.geschaedigt_kontakt.is_some())
+    .bind(daten.geschaedigt_kontakt.flatten())
+    .bind(daten.uebergeben_an.is_some())
+    .bind(daten.uebergeben_an.flatten())
+    .bind(daten.abschluss_grund.is_some())
+    .bind(daten.abschluss_grund.flatten())
+    .bind(geaendert_von)
+    .bind(schaden_id)
+    .bind(einsatz_id)
+    .execute(pool)
+    .await?
+    .rows_affected();
+    if betroffen == 0 {
+        return Err(AppError::NotFound);
+    }
+    laden(pool, einsatz_id, schaden_id).await
+}
+
+pub async fn uebergebe(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    schaden_id: i64,
+    uebergeben_an: &str,
+    geaendert_von: i64,
+) -> Result<(), AppError> {
+    let betroffen = sqlx::query(
+        "UPDATE einsatz_schaden SET status = 'uebergeben', uebergeben_an = ?, \
+            uebergeben_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
+            geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), geaendert_von = ? \
+         WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(uebergeben_an)
+    .bind(geaendert_von)
+    .bind(schaden_id)
+    .bind(einsatz_id)
+    .execute(pool)
+    .await?
+    .rows_affected();
+    if betroffen == 0 {
+        return Err(AppError::NotFound);
+    }
+    Ok(())
+}
+
+pub async fn schliesse_ab(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    schaden_id: i64,
+    abschluss_grund: &str,
+    notiz: Option<&str>,
+    geaendert_von: i64,
+) -> Result<(), AppError> {
+    let betroffen = if let Some(notiz) = notiz {
+        sqlx::query(
+            "UPDATE einsatz_schaden SET status = 'abgeschlossen', abschluss_grund = ?, \
+                abschluss_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
+                beschreibung = beschreibung || (CASE WHEN beschreibung = '' THEN '' ELSE char(10) END) \
+                    || '[' || strftime('%Y-%m-%d %H:%M:%S','now') || '] ' || ?, \
+                geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), geaendert_von = ? \
+             WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(abschluss_grund)
+        .bind(notiz)
+        .bind(geaendert_von)
+        .bind(schaden_id)
+        .bind(einsatz_id)
+        .execute(pool)
+        .await?
+        .rows_affected()
+    } else {
+        sqlx::query(
+            "UPDATE einsatz_schaden SET status = 'abgeschlossen', abschluss_grund = ?, \
+                abschluss_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
+                geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), geaendert_von = ? \
+             WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(abschluss_grund)
+        .bind(geaendert_von)
+        .bind(schaden_id)
+        .bind(einsatz_id)
+        .execute(pool)
+        .await?
+        .rows_affected()
+    };
+    if betroffen == 0 {
+        return Err(AppError::NotFound);
+    }
+    Ok(())
+}
+
+pub async fn storniere(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    schaden_id: i64,
+    storniert_von: i64,
+) -> Result<(), AppError> {
+    let betroffen = sqlx::query(
+        "UPDATE einsatz_schaden SET storniert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
+            storniert_von = ?, geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), geaendert_von = ? \
+         WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(storniert_von)
+    .bind(storniert_von)
+    .bind(schaden_id)
+    .bind(einsatz_id)
+    .execute(pool)
+    .await?
+    .rows_affected();
+    if betroffen == 0 {
+        return Err(AppError::NotFound);
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::test_pool;
+
+    async fn setup(pool: &sqlx::SqlitePool) -> (i64, i64) {
+        // Spalten gemäß Migr. 0002/0003: benutzer.org_id, system_rolle ∈ {admin,keiner};
+        // einsatz.org_id NOT NULL, KEIN erstellt_von.
+        sqlx::query("INSERT INTO organisation (name) VALUES ('O')").execute(pool).await.unwrap();
+        let b: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, \
+                system_rolle, org_rolle) VALUES (1,'A','a','x','keiner','keine') RETURNING id")
+            .fetch_one(pool).await.unwrap();
+        let e: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status) VALUES (1,'L','aktiv') RETURNING id")
+            .fetch_one(pool).await.unwrap();
+        (b, e)
+    }
+
+    fn minimal<'a>() -> NeueDaten<'a> {
+        NeueDaten {
+            typ: "sachschaden",
+            ausmass: "gering",
+            ort: "Hauptstr. 1",
+            beschreibung: None,
+            geschaedigt_person_id: None,
+            geschaedigt_kontakt: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn anlegen_vergibt_fortlaufende_nr_und_status_offen() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let s1 = anlegen(&pool, e, b, minimal()).await.unwrap();
+        let s2 = anlegen(&pool, e, b, minimal()).await.unwrap();
+        assert_eq!(s1.registrier_nr, 1);
+        assert_eq!(s2.registrier_nr, 2);
+        assert_eq!(s1.status, "offen");
+    }
+
+    #[tokio::test]
+    async fn uebergebe_setzt_status_und_zeit() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let s = anlegen(&pool, e, b, minimal()).await.unwrap();
+        uebergebe(&pool, e, s.id, "Stadtwerke", b).await.unwrap();
+        let neu = laden(&pool, e, s.id).await.unwrap();
+        assert_eq!(neu.status, "uebergeben");
+        assert_eq!(neu.uebergeben_an.as_deref(), Some("Stadtwerke"));
+        assert!(neu.uebergeben_at.is_some());
+    }
+
+    #[tokio::test]
+    async fn schliesse_ab_haengt_notiz_an_beschreibung() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let s = anlegen(&pool, e, b, NeueDaten { beschreibung: Some("Erstbefund"), ..minimal() })
+            .await.unwrap();
+        schliesse_ab(&pool, e, s.id, "behoben", Some("vor Ort erledigt"), b).await.unwrap();
+        let neu = laden(&pool, e, s.id).await.unwrap();
+        assert_eq!(neu.status, "abgeschlossen");
+        assert_eq!(neu.abschluss_grund.as_deref(), Some("behoben"));
+        assert!(neu.abschluss_at.is_some());
+        assert!(neu.beschreibung.contains("Erstbefund"));
+        assert!(neu.beschreibung.contains("vor Ort erledigt"), "Notiz angehängt");
+    }
+
+    #[tokio::test]
+    async fn storniere_setzt_at_und_von() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let s = anlegen(&pool, e, b, minimal()).await.unwrap();
+        storniere(&pool, e, s.id, b).await.unwrap();
+        let neu = laden(&pool, e, s.id).await.unwrap();
+        assert!(neu.storniert_at.is_some());
+        assert_eq!(neu.storniert_von, Some(b));
+    }
+
+    #[tokio::test]
+    async fn liste_blendet_storniert_aus_default_und_zeigt_mit_flag() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let s = anlegen(&pool, e, b, minimal()).await.unwrap();
+        storniere(&pool, e, s.id, b).await.unwrap();
+        let ohne = liste(&pool, e, None, None, None, None, false).await.unwrap();
+        assert_eq!(ohne.len(), 0, "storniert nicht in Default-Liste");
+        let mit = liste(&pool, e, None, None, None, None, true).await.unwrap();
+        assert_eq!(mit.len(), 1, "mit inkl_storniert sichtbar");
+    }
+
+    #[tokio::test]
+    async fn liste_filtert_nach_status_typ_ausmass() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        anlegen(&pool, e, b, NeueDaten { typ: "umweltschaden", ausmass: "gross", ..minimal() }).await.unwrap();
+        anlegen(&pool, e, b, minimal()).await.unwrap();
+        let nur_umwelt = liste(&pool, e, None, Some("umweltschaden"), None, None, false).await.unwrap();
+        assert_eq!(nur_umwelt.len(), 1);
+        let nur_gross = liste(&pool, e, None, None, Some("gross"), None, false).await.unwrap();
+        assert_eq!(nur_gross.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn laden_fremder_einsatz_ist_notfound() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let s = anlegen(&pool, e, b, minimal()).await.unwrap();
+        let res = laden(&pool, 999, s.id).await;
+        assert!(matches!(res, Err(AppError::NotFound)));
+    }
+
+    #[tokio::test]
+    async fn aktualisiere_geschaedigt_toggle() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let s = anlegen(&pool, e, b, NeueDaten { geschaedigt_kontakt: Some("Herr Meier"), ..minimal() })
+            .await.unwrap();
+        aktualisiere(&pool, e, s.id, b, PatchDaten {
+            geschaedigt_kontakt: Some(None),
+            ..Default::default()
+        }).await.unwrap();
+        let neu = laden(&pool, e, s.id).await.unwrap();
+        assert!(neu.geschaedigt_kontakt.is_none());
+    }
+}
