@@ -16,6 +16,7 @@ import EinheitenPage from './pages/EinheitenPage';
 import EinsatzabschnittePage from './pages/EinsatzabschnittePage';
 import PersonenPage from './pages/PersonenPage';
 import UnfallhilfsstellenPage from './pages/UnfallhilfsstellenPage';
+import UnfallhilfsstellenDefault from './pages/UnfallhilfsstellenDefault';
 import UhsDetailPage from './pages/uhs/UhsDetailPage';
 import EinsatzLayout from './einsatz/EinsatzLayout';
 import DefaultModulRedirect from './einsatz/DefaultModulRedirect';
@@ -32,7 +33,7 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   einheiten: <EinheitenPage />,
   einsatzabschnitte: <EinsatzabschnittePage />,
   personen: <PersonenPage />,
-  unfallhilfsstellen: <UnfallhilfsstellenPage />,
+  unfallhilfsstellen: <UnfallhilfsstellenDefault />,
 };
 
 export default function App() {
@@ -57,6 +58,7 @@ export default function App() {
               element={MODUL_ELEMENTE[m.key] ?? <ModulStub modul={m} />}
             />
           ))}
+          <Route path="unfallhilfsstellen/liste" element={<UnfallhilfsstellenPage />} />
           <Route path="unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />
         </Route>
       </Route>
