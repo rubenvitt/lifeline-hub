@@ -622,3 +622,23 @@ async fn patch_geschaedigt_personal_auf_kontakt_effektivzustand_ist_422() {
         Some(&json!({"geschaedigt_personal_id": ep}))).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "Effektivzustand 2 Quellen → 422, NICHT 500");
 }
+
+#[tokio::test]
+async fn patch_geschaedigt_organisation_erzwingt_eigene_org() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
+    // Bewusst eine unsinnige/fremde Org-id senden — der Server muss sie ignorieren
+    // und IMMER die eigene Org des Einsatzes setzen.
+    let (s, _) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{e}/schaeden/{sid}"), &admin,
+        Some(&json!({"geschaedigt_organisation_id": 99999}))).await;
+    assert_eq!(s, StatusCode::OK, "PATCH mit bogus Org-id: erwartet 200");
+    let (s_get, v) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/schaeden/{sid}"), &admin, None).await;
+    assert_eq!(s_get, StatusCode::OK);
+    let zurueck = v["geschaedigt_organisation_id"].as_i64().unwrap();
+    assert_ne!(zurueck, 99999, "Client-Org-id darf NICHT übernommen werden");
+    assert!(v["geschaedigt_organisation_name"].is_string(), "Org-Name aufgelöst");
+    // Die eigene Org ist die bootstrap-Org (id 1).
+    assert_eq!(zurueck, 1, "abgeleitet aus einsatz.org_id");
+}

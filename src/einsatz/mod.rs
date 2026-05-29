@@ -137,8 +137,8 @@ impl Einsatz {
     }
 }
 
-/// Öffentliche Einsatz-Darstellung für API-Antworten (ohne `org_id`),
-/// inklusive der Rolle des abfragenden Benutzers.
+/// Öffentliche Einsatz-Darstellung für API-Antworten,
+/// inklusive Org-Angaben und der Rolle des abfragenden Benutzers.
 #[derive(Debug, Clone, Serialize)]
 pub struct EinsatzAnzeige {
     pub id: i64,
