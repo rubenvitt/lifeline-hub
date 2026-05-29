@@ -24,7 +24,10 @@ export default function EinsatzLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
-  const aktuellesSegment = pathname.split('/').filter(Boolean).pop();
+  // Modul-Segment ist der Pfad-Teil direkt nach der Einsatz-ID
+  // (…/einsaetze/:id/<route>/…) — nicht das letzte Segment, sonst verliert das
+  // Menü auf Sub-Routen (Detail, Liste) die Hervorhebung.
+  const aktuellesSegment = pathname.split('/').filter(Boolean)[2];
   const aktuellesModul = modulRegistry.find((m) => m.route === aktuellesSegment);
   const aktiveKategorie: KategorieKey | null = aktuellesModul?.kategorie ?? null;
 
