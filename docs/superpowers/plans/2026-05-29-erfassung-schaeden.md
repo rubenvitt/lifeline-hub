@@ -60,32 +60,23 @@ Dieses Modul kopiert das Tier-Pattern, **überschreibt** es aber an genau diesen
 
 ---
 
-## Task 0: Pre-Flight — Bestands-Schemata verifizieren (kein Commit)
+## Task 0: Pre-Flight — Bestands-Schemata verifizieren (kein Commit) — ✅ ERLEDIGT
 
 Mehrere Test-Helfer legen Org/Benutzer/Einsatz/Person per rohem SQL an, mit **angenommenen** Spalten. Weil die Tasks TDD-getrieben sind, würde eine falsche Spalte den „Test soll fehlschlagen"-Schritt mit `no such column: …` zum Fehlschlag bringen — was wie der erwartete Fail *aussieht*, sodass der spätere „grün"-Schritt verwirrend scheitert. Diese Annahmen einmal vorab klären.
 
-- [ ] **Step 1: Basis-Tabellen-Schemata lesen**
+**Ergebnisse (gegen Migrationen 0002/0003/0020 verifiziert) — die Helfer in Task 1/3/7 sind bereits darauf korrigiert:**
 
-Run: `rtk proxy cat migrations/0001*.sql migrations/0002*.sql migrations/0006*.sql migrations/0020_einsatz_person.sql`
-(bzw. die Migrationen, die `organisation`, `benutzer`, `einsatz`, `einsatz_person` definieren).
+- [x] **Step 1: Basis-Tabellen-Schemata** (Migr. `0002_auth.sql`, `0003_einsatz.sql`, `0020_einsatz_person.sql`)
+  - `organisation`: nur `name` Pflicht. ✅ wie angenommen.
+  - `benutzer`: Spalte heißt **`org_id`** (nicht `organisation_id`); `system_rolle ∈ {admin, keiner}` (**nicht** `benutzer`); `org_rolle ∈ {fuehrungskraft, keine}`. → Helfer auf `org_id` + `system_rolle='keiner'` korrigiert.
+  - `einsatz`: **`org_id` NOT NULL** Pflicht; **kein** `erstellt_von` (nur `abgeschlossen_von`). → Helfer auf `(org_id, bezeichnung, status)` korrigiert.
+  - `einsatz_person`: `(einsatz_id, registrier_nr, erfasst_von, geaendert_von)` Pflicht; `status ∈ {erfasst,vermisst,betroffen,verstorben,abgemeldet}` → `'betroffen'` gültig. ✅ wie angenommen.
 
-Festhalten und in den Helfern aus Task 1/3/5/6/7 abgleichen:
-- `organisation`: echte NOT-NULL-Pflichtspalten (Plan nutzt nur `name`).
-- `benutzer`: Pflichtspalten + erlaubte `system_rolle`/`org_rolle`-CHECK-Werte (Plan nutzt `organisation_id, anzeigename, benutzername, passwort_hash, system_rolle='benutzer', org_rolle='keine'`).
-- `einsatz`: Pflichtspalten (Plan nutzt `bezeichnung, status='aktiv', erstellt_von`).
-- `einsatz_person`: Pflichtspalten + erlaubte `status`-CHECK-Werte (Plan nutzt `einsatz_id, registrier_nr, status='betroffen', erfasst_von, geaendert_von`).
+- [x] **Step 2: `bootstrap_admin`-Idempotenz** (`src/auth/bootstrap.rs`)
+  - `bootstrap_admin` macht early-return bei `SELECT COUNT(*) FROM benutzer > 0` → ein **zweiter** Aufruf legt **nichts** an (Single-Org-Design). Der ursprüngliche Plan-Test hätte einen nicht-existenten User eingeloggt.
+  - → Cross-Org-Test in Task 7 baut die zweite Org per rohem SQL und nutzt den bestehenden System-Admin als höhere Berechtigung (kein zweiter Login). Bereits eingearbeitet.
 
-Falls Abweichungen: die `schaden_setup`/`setup`-Helfer und den `einsatz_person`-Insert in Task 1/3 entsprechend korrigieren, bevor diese Tasks umgesetzt werden.
-
-- [ ] **Step 2: `bootstrap_admin`-Idempotenz für Task 7 klären**
-
-Run: `rtk proxy rg -n "pub async fn bootstrap_admin" -A 40 src/auth/bootstrap.rs`
-
-Prüfen, ob ein **zweiter** Aufruf mit anderem Org-Namen (`bootstrap_admin(&pool, "Fremd-Orga", …)`) sauber durchläuft oder an einer nicht-org-scoped UNIQUE (z. B. globale FMS-/Status-Katalog-Seeds) scheitert.
-- Läuft er sauber → Task 7 bleibt wie geschrieben.
-- Scheitert er → in Task 7 die zweite Org + deren Benutzer per rohem SQL anlegen (Muster wie `schaden_setup`), statt `bootstrap_admin` ein zweites Mal aufzurufen.
-
-> Keine Datei-Änderung, kein Commit — reine Verifikation. Erkenntnisse fließen in Task 1/3/7 ein.
+> Reine Verifikation, kein Commit. Erkenntnisse sind in Task 1/3/7 eingeflossen.
 
 ---
 
@@ -105,18 +96,20 @@ In `src/db.rs`, im bestehenden `#[cfg(test)] mod tests { ... }`-Block am Dateien
 // --- E-5 Schaden: Constraints ---
 
 /// Legt Org, Benutzer, Einsatz per rohem SQL an und gibt (benutzer_id, einsatz_id) zurück.
+/// Spalten gemäß Migrationen 0002/0003 (Task 0 verifiziert): benutzer.org_id,
+/// system_rolle ∈ {admin,keiner}; einsatz.org_id NOT NULL, KEIN erstellt_von.
 async fn schaden_setup(pool: &sqlx::SqlitePool) -> (i64, i64) {
     sqlx::query("INSERT INTO organisation (name) VALUES ('O')")
         .execute(pool).await.unwrap();
     let benutzer_id: i64 = sqlx::query_scalar(
-        "INSERT INTO benutzer (organisation_id, anzeigename, benutzername, passwort_hash, \
+        "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, \
             system_rolle, org_rolle) \
-         VALUES (1, 'A', 'a', 'x', 'benutzer', 'keine') RETURNING id")
+         VALUES (1, 'A', 'a', 'x', 'keiner', 'keine') RETURNING id")
         .fetch_one(pool).await.unwrap();
     let einsatz_id: i64 = sqlx::query_scalar(
-        "INSERT INTO einsatz (bezeichnung, status, erstellt_von) \
-         VALUES ('L', 'aktiv', ?) RETURNING id")
-        .bind(benutzer_id).fetch_one(pool).await.unwrap();
+        "INSERT INTO einsatz (org_id, bezeichnung, status) \
+         VALUES (1, 'L', 'aktiv') RETURNING id")
+        .fetch_one(pool).await.unwrap();
     (benutzer_id, einsatz_id)
 }
 
@@ -567,14 +560,16 @@ mod tests {
     use crate::db::test_pool;
 
     async fn setup(pool: &sqlx::SqlitePool) -> (i64, i64) {
+        // Spalten gemäß Migr. 0002/0003 (Task 0): benutzer.org_id, system_rolle ∈ {admin,keiner};
+        // einsatz.org_id NOT NULL, KEIN erstellt_von.
         sqlx::query("INSERT INTO organisation (name) VALUES ('O')").execute(pool).await.unwrap();
         let b: i64 = sqlx::query_scalar(
-            "INSERT INTO benutzer (organisation_id, anzeigename, benutzername, passwort_hash, \
-                system_rolle, org_rolle) VALUES (1,'A','a','x','benutzer','keine') RETURNING id")
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, \
+                system_rolle, org_rolle) VALUES (1,'A','a','x','keiner','keine') RETURNING id")
             .fetch_one(pool).await.unwrap();
         let e: i64 = sqlx::query_scalar(
-            "INSERT INTO einsatz (bezeichnung, status, erstellt_von) VALUES ('L','aktiv',?) RETURNING id")
-            .bind(b).fetch_one(pool).await.unwrap();
+            "INSERT INTO einsatz (org_id, bezeichnung, status) VALUES (1,'L','aktiv') RETURNING id")
+            .fetch_one(pool).await.unwrap();
         (b, e)
     }
 
@@ -2063,29 +2058,48 @@ async fn abgeschlossener_einsatz_ist_read_only() {
 /// PINNT das aktuelle Cross-Org-Verhalten von `darf_lesen` (mögliche Isolations-Lücke
 /// über `ist_hoehere_berechtigung`). Schlägt der Test fehl, hat sich das Gate geändert —
 /// dann ist die Sicherheitslage neu zu bewerten, NICHT der Test stumpf anzupassen.
+///
+/// Hinweis (Task 0): `bootstrap_admin` ist NICHT ein zweites Mal aufrufbar (early-return
+/// bei `COUNT(benutzer)>0`). Daher wird die zweite Org per rohem SQL gebaut. Es wird KEIN
+/// zweiter Login gebraucht: Der bestehende System-Admin (org 1) hat selbst
+/// `ist_hoehere_berechtigung` und liest damit org-übergreifend; der Schreib-Pfad prüft
+/// `fordere_schreibrecht(rolle)` mit rolle=None (Nicht-Mitglied) → 403, ohne Bypass.
 #[tokio::test]
-async fn fremde_org_fuehrungskraft_lesen_pin_und_schreiben_403() {
-    let (app, pool) = setup_mit_pool().await; // "Test-Orga" (org 1) + admin
-    bootstrap_admin(&pool, "Fremd-Orga", "fremdadmin", Some("fremdpw12")).await.unwrap();
+async fn hoehere_berechtigung_liest_fremde_org_pin_schreiben_403() {
+    let (app, pool) = setup_mit_pool().await; // "Test-Orga" (org 1) + System-Admin "admin"
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let e = einsatz_anlegen(&app, &admin).await; // Einsatz in org 1
-    schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    let fremd = login_cookie(&app, "fremdadmin", "fremdpw12").await; // org 2, höhere Berechtigung
+
+    // Zweite Org + Benutzer + Einsatz + Schaden per rohem SQL (kein Login für den Fremd-User nötig;
+    // er dient nur als FK-Ziel für erfasst_von/geaendert_von).
+    let org2: i64 = sqlx::query_scalar("INSERT INTO organisation (name) VALUES ('Fremd-Orga') RETURNING id")
+        .fetch_one(&pool).await.unwrap();
+    let u2: i64 = sqlx::query_scalar(
+        "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+         VALUES (?, 'F', 'fremduser', 'x') RETURNING id")
+        .bind(org2).fetch_one(&pool).await.unwrap();
+    let e2: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz (org_id, bezeichnung, status) VALUES (?, 'Fremd-Lage', 'aktiv') RETURNING id")
+        .bind(org2).fetch_one(&pool).await.unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz_schaden (einsatz_id, registrier_nr, typ, ausmass, ort, erfasst_von, geaendert_von) \
+         VALUES (?, 1, 'sachschaden', 'gering', 'Fremdstr. 1', ?, ?)")
+        .bind(e2).bind(u2).bind(u2).execute(&pool).await.unwrap();
 
     // LESEN: aktuelles Verhalten festhalten (erwartet: 200 wegen ist_hoehere_berechtigung-Bypass).
-    let (s_get, _) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/schaeden"), &fremd, None).await;
-    assert_eq!(s_get, StatusCode::OK, "PIN: fremde Org mit höherer Berechtigung liest aktuell (Lücke dokumentiert)");
+    let (s_get, v) = anfrage(&app, "GET", &format!("/api/einsaetze/{e2}/schaeden"), &admin, None).await;
+    assert_eq!(s_get, StatusCode::OK, "PIN: höhere Berechtigung liest org-übergreifend (Lücke dokumentiert)");
+    assert_eq!(v.as_array().unwrap().len(), 1, "Schaden der fremden Org ist sichtbar");
 
-    // SCHREIBEN: muss IMMER 403 sein — Schreib-Gate kennt keinen Bypass.
-    let (s_post, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/schaeden"), &fremd, Some(&gueltig())).await;
-    assert_eq!(s_post, StatusCode::FORBIDDEN, "fremde Org darf nie schreiben");
+    // SCHREIBEN: muss IMMER 403 sein — Schreib-Gate kennt keinen Bypass (admin ist nicht Mitglied von e2).
+    let (s_post, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e2}/schaeden"), &admin, Some(&gueltig())).await;
+    assert_eq!(s_post, StatusCode::FORBIDDEN, "fremde Org schreiben → 403");
 }
 ```
 
 - [ ] **Step 2: Tests laufen lassen — anpassen falls Pin abweicht**
 
 Run: `rtk proxy cargo test --test einsatz_schaden`
-Expected: PASS. **Falls** `fremde_org_fuehrungskraft_lesen_pin_und_schreiben_403` beim LESEN nicht 200 liefert (z. B. 404/403), den `assert_eq!`-Wert auf den tatsächlich beobachteten Status setzen und den Kommentar entsprechend anpassen — der Test dokumentiert das Ist-Verhalten. Der Schreib-Assert (403) bleibt unverändert; scheitert er, liegt ein echter Sicherheitsbefund vor → stoppen und melden.
+Expected: PASS. **Falls** `hoehere_berechtigung_liest_fremde_org_pin_schreiben_403` beim LESEN nicht 200 liefert (z. B. 404/403), den `assert_eq!`-Wert auf den tatsächlich beobachteten Status setzen und den Kommentar entsprechend anpassen — der Test dokumentiert das Ist-Verhalten. Der Schreib-Assert (403) bleibt unverändert; scheitert er, liegt ein echter Sicherheitsbefund vor → stoppen und melden.
 
 - [ ] **Step 3: Commit**
 
