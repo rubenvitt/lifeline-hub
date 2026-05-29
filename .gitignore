@@ -21,3 +21,5 @@ build/
 *.db
 *.db-wal
 *.db-shm
+
+.claude/worktrees

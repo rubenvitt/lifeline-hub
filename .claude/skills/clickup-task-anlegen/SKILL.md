@@ -31,7 +31,29 @@ Sobald etwas auftaucht, das nicht jetzt erledigt wird, aber nicht verloren gehen
 - `name`: kurzer, konkreter Titel auf Deutsch; BOS-/Fachsprache statt generischer Dev-Begriffe
 - `markdown_description`: strukturiert (siehe unten) — **nicht** `description` verwenden
 - `priority`: nach Einschätzung — `urgent` / `high` / `normal` / `low`
+- `task_type`: passenden Typ setzen (siehe unten) — **nicht** `Bug`/`Story`/englische Namen raten
 - **Keine Tags** — der Space hat keine, `tags` würde fehlschlagen
+
+### Verfügbare Task-Typen
+
+Im Space existieren nur diese Typen (exakt so schreiben, sonst Fehler):
+
+| Typ              | Wofür                                              |
+|------------------|----------------------------------------------------|
+| `Fehler`         | Bug/Defekt (**nicht** `Bug`!)                      |
+| `Feature`        | Feature / Verbesserung                             |
+| `Benutzergeschich` | User Story (Wert truncated — exakt so übergeben) |
+| `Routine`        | wiederkehrende Aufgabe                             |
+| `Projekt`        | Projekt                                            |
+| `Initiative`     | übergeordnete Initiative                           |
+| `Ziel`           | Ziel                                               |
+| `milestone`      | Meilenstein                                        |
+| `meeting_note`   | Meeting-Notiz                                      |
+| `form_response`  | Formular-Antwort                                   |
+| `ai_skill`       | AI-Skill                                           |
+
+Im Normalfall: Bugs → `Fehler`, alles Funktionale → `Feature`. Wird kein Typ
+gesetzt, greift der Default-Typ.
 
 ### Aufbau der Beschreibung
 
