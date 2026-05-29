@@ -173,6 +173,8 @@ pub struct SchadenAnzeige {
     pub beschreibung: String,
     pub geschaedigt_person_id: Option<i64>,
     pub geschaedigt_kontakt: Option<String>,
+    pub geschaedigt_personal_id: Option<i64>,
+    pub geschaedigt_organisation_id: Option<i64>,
     pub uebergeben_an: Option<String>,
     pub uebergeben_at: Option<String>,
     pub abschluss_grund: Option<String>,
@@ -186,6 +188,9 @@ pub struct SchadenAnzeige {
     // Read-only Join-Felder (Geschädigt-Auflösung über einsatz_person):
     pub geschaedigt_registrier_nr: Option<i64>,
     pub geschaedigt_storniert_at: Option<String>,
+    // Read-only Join-Felder (Geschädigt-Auflösung über einsatz_personal / organisation):
+    pub geschaedigt_personal_name: Option<String>,      // einsatz_personal.snap_name
+    pub geschaedigt_organisation_name: Option<String>,  // organisation.name
 }
 
 #[cfg(test)]

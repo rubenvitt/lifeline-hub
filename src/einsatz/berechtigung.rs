@@ -124,6 +124,7 @@ mod tests {
         Einsatz {
             id: 1,
             org_id: 1,
+            org_name: "Orga".into(),
             bezeichnung: "Lage".into(),
             stichwort: None,
             status: status.into(),

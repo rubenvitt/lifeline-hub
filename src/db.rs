@@ -967,4 +967,74 @@ mod tests {
         let res = schaden_insert_min(&pool, e, b, "", "").await;
         assert!(res.is_err(), "UNIQUE(einsatz_id, registrier_nr) muss greifen");
     }
+
+    // --- E-5 Schaden: 4‑Wege-Geschädigt-Exklusivität (Migration 0033) ---
+
+    /// Legt eine Einsatzkraft (einsatz_personal, Ad-hoc) an und liefert deren id.
+    /// einsatz_id + snap_name sind NOT NULL; personal_id darf NULL sein (Ad-hoc extern).
+    async fn schaden_personal(pool: &sqlx::SqlitePool, einsatz_id: i64) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Einsatzkraft A') RETURNING id",
+        )
+        .bind(einsatz_id)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn schaden_geschaedigt_personal_einzeln_ok() {
+        let pool = test_pool().await;
+        let (b, e) = schaden_setup(&pool).await;
+        let ep = schaden_personal(&pool, e).await;
+        schaden_insert_min(&pool, e, b, ", geschaedigt_personal_id", &format!(", {ep}"))
+            .await
+            .expect("einzelne Einsatzkraft als Geschädigter muss gehen");
+    }
+
+    #[tokio::test]
+    async fn schaden_geschaedigt_organisation_einzeln_ok() {
+        let pool = test_pool().await;
+        let (b, e) = schaden_setup(&pool).await;
+        // organisation id 1 wird in schaden_setup angelegt.
+        schaden_insert_min(&pool, e, b, ", geschaedigt_organisation_id", ", 1")
+            .await
+            .expect("einzelne eigene Organisation als Geschädigter muss gehen");
+    }
+
+    #[tokio::test]
+    async fn schaden_geschaedigt_person_und_personal_check() {
+        let pool = test_pool().await;
+        let (b, e) = schaden_setup(&pool).await;
+        let p: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, status, erfasst_von, geaendert_von) \
+             VALUES (?, 1, 'betroffen', ?, ?) RETURNING id")
+            .bind(e).bind(b).bind(b).fetch_one(&pool).await.unwrap();
+        let ep = schaden_personal(&pool, e).await;
+        let res = schaden_insert_min(
+            &pool, e, b, ", geschaedigt_person_id, geschaedigt_personal_id",
+            &format!(", {p}, {ep}")).await;
+        assert!(res.is_err(), "Person UND Einsatzkraft gleichzeitig muss vom CHECK abgelehnt werden");
+    }
+
+    #[tokio::test]
+    async fn schaden_geschaedigt_personal_und_organisation_check() {
+        let pool = test_pool().await;
+        let (b, e) = schaden_setup(&pool).await;
+        let ep = schaden_personal(&pool, e).await;
+        let res = schaden_insert_min(
+            &pool, e, b, ", geschaedigt_personal_id, geschaedigt_organisation_id",
+            &format!(", {ep}, 1")).await;
+        assert!(res.is_err(), "Einsatzkraft UND Organisation gleichzeitig muss vom CHECK abgelehnt werden");
+    }
+
+    #[tokio::test]
+    async fn schaden_geschaedigt_organisation_und_kontakt_check() {
+        let pool = test_pool().await;
+        let (b, e) = schaden_setup(&pool).await;
+        let res = schaden_insert_min(
+            &pool, e, b, ", geschaedigt_organisation_id, geschaedigt_kontakt",
+            ", 1, 'Stadtwerke'").await;
+        assert!(res.is_err(), "Organisation UND Freitext gleichzeitig muss vom CHECK abgelehnt werden");
+    }
 }

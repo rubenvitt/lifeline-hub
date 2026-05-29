@@ -120,6 +120,20 @@ async fn schaden_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, body: &
     v["id"].as_i64().unwrap()
 }
 
+/// Disponiert eine Ad-hoc-Einsatzkraft in den Einsatz und liefert deren einsatz_personal-id.
+async fn personal_disponieren(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
+    let (s, v) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        cookie,
+        Some(&json!({ "adhoc": { "name": name } })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "personal_disponieren: {v:?}");
+    v["id"].as_i64().unwrap()
+}
+
 /// ETB-Einträge mit typ='system' als Vec der Inhalte.
 async fn system_etb_inhalte(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<String> {
     let (_, json) = anfrage(app, "GET", &format!("/api/einsaetze/{einsatz}/etb"), cookie, None).await;
@@ -523,4 +537,88 @@ async fn hoehere_berechtigung_liest_fremde_org_pin_schreiben_403() {
     // SCHREIBEN: muss IMMER 403 sein — Schreib-Gate kennt keinen Bypass (admin ist nicht Mitglied von e2).
     let (s_post, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e2}/schaeden"), &admin, Some(&gueltig())).await;
     assert_eq!(s_post, StatusCode::FORBIDDEN, "fremde Org schreiben → 403");
+}
+
+// ---------- Tests: 4‑Wege-Geschädigter (Einsatzkraft / eigene Org / extern) ----------
+
+#[tokio::test]
+async fn anlegen_mit_geschaedigt_einsatzkraft_ist_201_mit_name() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let ep = personal_disponieren(&app, &admin, e, "Einsatzkraft Alpha").await;
+    let mut body = gueltig();
+    body["geschaedigt_personal_id"] = json!(ep);
+    let (s, v) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/schaeden"), &admin, Some(&body)).await;
+    assert_eq!(s, StatusCode::CREATED, "Einsatzkraft als Geschädigter: {v:?}");
+    assert_eq!(v["geschaedigt_personal_id"], json!(ep));
+    assert_eq!(v["geschaedigt_personal_name"], json!("Einsatzkraft Alpha"));
+}
+
+#[tokio::test]
+async fn anlegen_mit_geschaedigt_einsatzkraft_aus_fremdem_einsatz_ist_404() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e1 = einsatz_anlegen(&app, &admin).await;
+    let e2 = einsatz_anlegen(&app, &admin).await;
+    let ep_fremd = personal_disponieren(&app, &admin, e2, "Fremde Kraft").await;
+    let mut body = gueltig();
+    body["geschaedigt_personal_id"] = json!(ep_fremd);
+    let (s, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e1}/schaeden"), &admin, Some(&body)).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "Einsatzkraft aus fremdem Einsatz → 404");
+}
+
+#[tokio::test]
+async fn anlegen_mit_geschaedigt_organisation_erzwingt_eigene_org() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    // Bewusst eine unsinnige/fremde Org-id senden — der Server muss sie ignorieren
+    // und IMMER die eigene Org des Einsatzes setzen.
+    let mut body = gueltig();
+    body["geschaedigt_organisation_id"] = json!(99999);
+    let (s, v) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/schaeden"), &admin, Some(&body)).await;
+    assert_eq!(s, StatusCode::CREATED, "eigene Org als Geschädigter: {v:?}");
+    let zurueck = v["geschaedigt_organisation_id"].as_i64().unwrap();
+    assert_ne!(zurueck, 99999, "Client-Org-id darf NICHT übernommen werden");
+    assert!(v["geschaedigt_organisation_name"].is_string(), "Org-Name aufgelöst");
+    // Die eigene Org ist die bootstrap-Org (id 1).
+    assert_eq!(zurueck, 1, "abgeleitet aus einsatz.org_id");
+}
+
+#[tokio::test]
+async fn anlegen_mit_zwei_geschaedigt_quellen_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let ep = personal_disponieren(&app, &admin, e, "Kraft").await;
+    // person + personal
+    let p = person_anlegen(&app, &admin, e).await;
+    let mut body = gueltig();
+    body["geschaedigt_person_id"] = json!(p);
+    body["geschaedigt_personal_id"] = json!(ep);
+    let (s1, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/schaeden"), &admin, Some(&body)).await;
+    assert_eq!(s1, StatusCode::UNPROCESSABLE_ENTITY, "Person + Einsatzkraft → 422");
+    // personal + organisation
+    let mut body2 = gueltig();
+    body2["geschaedigt_personal_id"] = json!(ep);
+    body2["geschaedigt_organisation_id"] = json!(1);
+    let (s2, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/schaeden"), &admin, Some(&body2)).await;
+    assert_eq!(s2, StatusCode::UNPROCESSABLE_ENTITY, "Einsatzkraft + Org → 422");
+}
+
+#[tokio::test]
+async fn patch_geschaedigt_personal_auf_kontakt_effektivzustand_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let ep = personal_disponieren(&app, &admin, e, "Kraft").await;
+    // Schaden mit Freitext-Kontakt anlegen ...
+    let mut body = gueltig();
+    body["geschaedigt_kontakt"] = json!("Stadtwerke");
+    let sid = schaden_anlegen(&app, &admin, e, &body).await;
+    // ... dann per PATCH eine Einsatzkraft setzen OHNE den Kontakt zu löschen → 422 (nicht 500).
+    let (s, _) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{e}/schaeden/{sid}"), &admin,
+        Some(&json!({"geschaedigt_personal_id": ep}))).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "Effektivzustand 2 Quellen → 422, NICHT 500");
 }

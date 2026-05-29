@@ -5,14 +5,20 @@ use sqlx::SqlitePool;
 const SELECT_ALLE: &str = "\
     SELECT s.id, s.einsatz_id, s.registrier_nr, s.status, s.typ, s.ausmass, s.ort, \
            s.beschreibung, s.geschaedigt_person_id, s.geschaedigt_kontakt, \
+           s.geschaedigt_personal_id, s.geschaedigt_organisation_id, \
            s.uebergeben_an, s.uebergeben_at, s.abschluss_grund, s.abschluss_at, \
            s.erfasst_at, s.erfasst_von, s.geaendert_at, s.geaendert_von, \
            s.storniert_at, s.storniert_von, \
            gp.registrier_nr AS geschaedigt_registrier_nr, \
-           gp.storniert_at  AS geschaedigt_storniert_at \
+           gp.storniert_at  AS geschaedigt_storniert_at, \
+           gpe.snap_name    AS geschaedigt_personal_name, \
+           go.name          AS geschaedigt_organisation_name \
     FROM einsatz_schaden s \
     LEFT JOIN einsatz_person gp ON gp.id = s.geschaedigt_person_id \
-                               AND gp.einsatz_id = s.einsatz_id";
+                               AND gp.einsatz_id = s.einsatz_id \
+    LEFT JOIN einsatz_personal gpe ON gpe.id = s.geschaedigt_personal_id \
+                                  AND gpe.einsatz_id = s.einsatz_id \
+    LEFT JOIN organisation     go  ON go.id  = s.geschaedigt_organisation_id";
 
 #[derive(Debug)]
 pub struct NeueDaten<'a> {
@@ -22,6 +28,8 @@ pub struct NeueDaten<'a> {
     pub beschreibung: Option<&'a str>,
     pub geschaedigt_person_id: Option<i64>,
     pub geschaedigt_kontakt: Option<&'a str>,
+    pub geschaedigt_personal_id: Option<i64>,
+    pub geschaedigt_organisation_id: Option<i64>,
 }
 
 #[derive(Debug, Default)]
@@ -33,6 +41,8 @@ pub struct PatchDaten<'a> {
     /// `Some(Some(id))` = setzen, `Some(None)` = auf NULL, `None` = unverändert.
     pub geschaedigt_person_id: Option<Option<i64>>,
     pub geschaedigt_kontakt: Option<Option<&'a str>>,
+    pub geschaedigt_personal_id: Option<Option<i64>>,
+    pub geschaedigt_organisation_id: Option<Option<i64>>,
     pub uebergeben_an: Option<Option<&'a str>>,
     pub abschluss_grund: Option<Option<&'a str>>,
 }
@@ -84,9 +94,10 @@ pub async fn anlegen(
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO einsatz_schaden \
             (einsatz_id, registrier_nr, status, typ, ausmass, ort, beschreibung, \
-             geschaedigt_person_id, geschaedigt_kontakt, erfasst_von, geaendert_von) \
+             geschaedigt_person_id, geschaedigt_kontakt, geschaedigt_personal_id, \
+             geschaedigt_organisation_id, erfasst_von, geaendert_von) \
          SELECT ?1, COALESCE(MAX(registrier_nr), 0) + 1, 'offen', ?2, ?3, ?4, \
-                COALESCE(?5, ''), ?6, ?7, ?8, ?8 \
+                COALESCE(?5, ''), ?6, ?7, ?9, ?10, ?8, ?8 \
          FROM einsatz_schaden WHERE einsatz_id = ?1 \
          RETURNING id",
     )
@@ -98,6 +109,8 @@ pub async fn anlegen(
     .bind(daten.geschaedigt_person_id)
     .bind(daten.geschaedigt_kontakt)
     .bind(erfasser_id)
+    .bind(daten.geschaedigt_personal_id)
+    .bind(daten.geschaedigt_organisation_id)
     .fetch_one(pool)
     .await?;
 
@@ -119,6 +132,8 @@ pub async fn aktualisiere(
             beschreibung = COALESCE(?, beschreibung), \
             geschaedigt_person_id = CASE WHEN ? THEN ? ELSE geschaedigt_person_id END, \
             geschaedigt_kontakt   = CASE WHEN ? THEN ? ELSE geschaedigt_kontakt END, \
+            geschaedigt_personal_id = CASE WHEN ? THEN ? ELSE geschaedigt_personal_id END, \
+            geschaedigt_organisation_id = CASE WHEN ? THEN ? ELSE geschaedigt_organisation_id END, \
             uebergeben_an   = CASE WHEN ? THEN ? ELSE uebergeben_an END, \
             abschluss_grund = CASE WHEN ? THEN ? ELSE abschluss_grund END, \
             geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
@@ -133,6 +148,10 @@ pub async fn aktualisiere(
     .bind(daten.geschaedigt_person_id.flatten())
     .bind(daten.geschaedigt_kontakt.is_some())
     .bind(daten.geschaedigt_kontakt.flatten())
+    .bind(daten.geschaedigt_personal_id.is_some())
+    .bind(daten.geschaedigt_personal_id.flatten())
+    .bind(daten.geschaedigt_organisation_id.is_some())
+    .bind(daten.geschaedigt_organisation_id.flatten())
     .bind(daten.uebergeben_an.is_some())
     .bind(daten.uebergeben_an.flatten())
     .bind(daten.abschluss_grund.is_some())
@@ -245,6 +264,22 @@ pub async fn storniere(
     Ok(())
 }
 
+/// Prüft, ob eine Einsatzkraft (einsatz_personal) zu diesem Einsatz gehört
+/// (Org-Isolation der Geschädigt-FK). Liefert `false` für fremde/unbekannte ids.
+pub async fn personal_im_einsatz(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    ep_id: i64,
+) -> Result<bool, AppError> {
+    let vorhanden: Option<i64> =
+        sqlx::query_scalar("SELECT 1 FROM einsatz_personal WHERE id = ? AND einsatz_id = ?")
+            .bind(ep_id)
+            .bind(einsatz_id)
+            .fetch_optional(pool)
+            .await?;
+    Ok(vorhanden.is_some())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -272,6 +307,8 @@ mod tests {
             beschreibung: None,
             geschaedigt_person_id: None,
             geschaedigt_kontakt: None,
+            geschaedigt_personal_id: None,
+            geschaedigt_organisation_id: None,
         }
     }
 
@@ -369,5 +406,66 @@ mod tests {
         }).await.unwrap();
         let neu = laden(&pool, e, s.id).await.unwrap();
         assert!(neu.geschaedigt_kontakt.is_none());
+    }
+
+    #[tokio::test]
+    async fn anlegen_mit_geschaedigt_personal_zeigt_snap_name() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let ep: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Einsatzkraft A') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let s = anlegen(&pool, e, b, NeueDaten { geschaedigt_personal_id: Some(ep), ..minimal() })
+            .await
+            .unwrap();
+        assert_eq!(s.geschaedigt_personal_id, Some(ep));
+        assert_eq!(s.geschaedigt_personal_name.as_deref(), Some("Einsatzkraft A"));
+        assert!(s.geschaedigt_organisation_name.is_none());
+    }
+
+    #[tokio::test]
+    async fn aktualisiere_setzt_geschaedigt_personal_und_loescht_kontakt() {
+        // Deckt die neuen CASE-Toggles + Bind-Reihenfolge in `aktualisiere` ab:
+        // von Freitext-Kontakt auf eine Einsatzkraft umstellen (Kontakt → NULL).
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let ep: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Kraft B') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let s = anlegen(&pool, e, b, NeueDaten { geschaedigt_kontakt: Some("Stadtwerke"), ..minimal() })
+            .await
+            .unwrap();
+        aktualisiere(&pool, e, s.id, b, PatchDaten {
+            geschaedigt_kontakt: Some(None),
+            geschaedigt_personal_id: Some(Some(ep)),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+        let neu = laden(&pool, e, s.id).await.unwrap();
+        assert!(neu.geschaedigt_kontakt.is_none());
+        assert_eq!(neu.geschaedigt_personal_id, Some(ep));
+        assert_eq!(neu.geschaedigt_personal_name.as_deref(), Some("Kraft B"));
+    }
+
+    #[tokio::test]
+    async fn anlegen_mit_geschaedigt_organisation_zeigt_org_name() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        // setup legt organisation id 1 namens 'O' an.
+        let s = anlegen(&pool, e, b, NeueDaten { geschaedigt_organisation_id: Some(1), ..minimal() })
+            .await
+            .unwrap();
+        assert_eq!(s.geschaedigt_organisation_id, Some(1));
+        assert_eq!(s.geschaedigt_organisation_name.as_deref(), Some("O"));
+        assert!(s.geschaedigt_personal_name.is_none());
     }
 }

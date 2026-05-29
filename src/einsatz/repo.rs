@@ -68,11 +68,14 @@ pub async fn anlegen(
 /// Lädt einen Einsatz; `AppError::NotFound`, wenn er nicht existiert.
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppError> {
     sqlx::query_as::<_, Einsatz>(
-        "SELECT id, org_id, bezeichnung, stichwort, status, begonnen_at, \
-                abgeschlossen_at, abgeschlossen_von, einsatzart, einsatznummer_intern, \
-                angelegt_at, leitstellen_nr, einsatzort, einsatzort_lat, einsatzort_lon, \
-                meldende_stelle, sachverhalt, anzahl_betroffene_initial \
-         FROM einsatz WHERE id = ?",
+        "SELECT e.id, e.org_id, e.bezeichnung, e.stichwort, e.status, e.begonnen_at, \
+                e.abgeschlossen_at, e.abgeschlossen_von, e.einsatzart, e.einsatznummer_intern, \
+                e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
+                e.meldende_stelle, e.sachverhalt, e.anzahl_betroffene_initial, \
+                o.name AS org_name \
+         FROM einsatz e \
+         LEFT JOIN organisation o ON o.id = e.org_id \
+         WHERE e.id = ?",
     )
     .bind(einsatz_id)
     .fetch_optional(pool)
@@ -107,6 +110,8 @@ pub async fn liste_fuer(
     #[derive(sqlx::FromRow)]
     struct Row {
         id: i64,
+        org_id: i64,
+        org_name: String,
         bezeichnung: String,
         stichwort: Option<String>,
         status: String,
@@ -127,12 +132,13 @@ pub async fn liste_fuer(
     }
 
     let rows = sqlx::query_as::<_, Row>(
-        "SELECT e.id, e.bezeichnung, e.stichwort, e.status, e.begonnen_at, \
+        "SELECT e.id, e.org_id, o.name AS org_name, e.bezeichnung, e.stichwort, e.status, e.begonnen_at, \
                 e.abgeschlossen_at, e.abgeschlossen_von, e.einsatzart, e.einsatznummer_intern, \
                 e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
                 e.meldende_stelle, e.sachverhalt, e.anzahl_betroffene_initial, \
                 m.einsatz_rolle AS meine_rolle \
          FROM einsatz e \
+         LEFT JOIN organisation o ON o.id = e.org_id \
          LEFT JOIN einsatz_mitgliedschaft m \
                 ON m.einsatz_id = e.id AND m.benutzer_id = ? \
          ORDER BY e.begonnen_at DESC, e.id DESC",
@@ -155,6 +161,8 @@ pub async fn liste_fuer(
         })
         .map(|r| EinsatzAnzeige {
             id: r.id,
+            org_id: r.org_id,
+            org_name: r.org_name,
             bezeichnung: r.bezeichnung,
             stichwort: r.stichwort,
             status: r.status,

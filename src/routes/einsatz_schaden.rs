@@ -123,6 +123,8 @@ pub struct AnlegenBody {
     pub beschreibung: Option<String>,
     pub geschaedigt_person_id: Option<i64>,
     pub geschaedigt_kontakt: Option<String>,
+    pub geschaedigt_personal_id: Option<i64>,
+    pub geschaedigt_organisation_id: Option<i64>,
 }
 
 pub async fn anlegen(
@@ -156,13 +158,31 @@ pub async fn anlegen(
         None => return Err(AppError::UnprocessableEntity("Ort ist Pflicht".into())),
     };
     let kontakt = trimme(body.geschaedigt_kontakt.clone());
-    if body.geschaedigt_person_id.is_some() && kontakt.is_some() {
+
+    // Eigene Organisation: id wird IMMER serverseitig aus einsatz.org_id abgeleitet,
+    // der vom Client gesendete Wert wird ignoriert (nie vertrauen).
+    let org_gesetzt = body.geschaedigt_organisation_id.is_some();
+    let geschaedigt_org_id = if org_gesetzt { Some(einsatz.org_id) } else { None };
+
+    // 4‑Wege-Exklusivität: höchstens eine Geschädigt-Quelle.
+    let anzahl_quellen = body.geschaedigt_person_id.is_some() as u8
+        + body.geschaedigt_personal_id.is_some() as u8
+        + org_gesetzt as u8
+        + kontakt.is_some() as u8;
+    if anzahl_quellen > 1 {
         return Err(AppError::UnprocessableEntity(
-            "Geschädigt-FK und Geschädigt-Freitext schließen sich aus".into(),
+            "Höchstens eine Geschädigt-Quelle erlaubt".into(),
         ));
     }
+
+    // Org-Isolation der FKs (404 bei fremder/unbekannter Person bzw. Einsatzkraft).
     if let Some(pid) = body.geschaedigt_person_id {
-        person_repo::laden(&state.pool, einsatz_id, pid).await?; // 404 bei fremder/unbekannter Person
+        person_repo::laden(&state.pool, einsatz_id, pid).await?;
+    }
+    if let Some(ep_id) = body.geschaedigt_personal_id {
+        if !schaden_repo::personal_im_einsatz(&state.pool, einsatz_id, ep_id).await? {
+            return Err(AppError::NotFound);
+        }
     }
     let beschreibung = trimme(body.beschreibung.clone());
 
@@ -177,6 +197,8 @@ pub async fn anlegen(
             beschreibung: beschreibung.as_deref(),
             geschaedigt_person_id: body.geschaedigt_person_id,
             geschaedigt_kontakt: kontakt.as_deref(),
+            geschaedigt_personal_id: body.geschaedigt_personal_id,
+            geschaedigt_organisation_id: geschaedigt_org_id,
         },
     )
     .await?;
@@ -218,6 +240,10 @@ pub struct PatchBody {
     pub geschaedigt_person_id: Option<Option<i64>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub geschaedigt_kontakt: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub geschaedigt_personal_id: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub geschaedigt_organisation_id: Option<Option<i64>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub uebergeben_an: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
@@ -269,18 +295,36 @@ pub async fn aktualisieren(
     let abschluss_grund_norm: Option<Option<String>> =
         body.abschluss_grund.map(|o| o.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
 
-    // Effektivzustand NACH dem Patch berechnen (drei Mehrspalten-CHECKs) → 422 statt 500.
-    let eff_fk: Option<i64> = match body.geschaedigt_person_id {
+    // Eigene Organisation: der vom Client gesendete id-Wert wird ignoriert. Die Tri-State
+    // wird auf die ABGELEITETE Org-id gemappt: Some(Some(_)) → Some(Some(einsatz.org_id)),
+    // Some(None) → Some(None) (löschen), None → None (unverändert).
+    let org_delta: Option<Option<i64>> =
+        body.geschaedigt_organisation_id.map(|opt| opt.map(|_| einsatz.org_id));
+
+    // Effektivzustand NACH dem Patch für ALLE VIER Quellen (4‑Wege-CHECK) → 422 statt 500.
+    let eff_person: Option<i64> = match body.geschaedigt_person_id {
         Some(opt) => opt,
         None => vorher.geschaedigt_person_id,
+    };
+    let eff_personal: Option<i64> = match body.geschaedigt_personal_id {
+        Some(opt) => opt,
+        None => vorher.geschaedigt_personal_id,
+    };
+    let eff_org: Option<i64> = match org_delta {
+        Some(opt) => opt,
+        None => vorher.geschaedigt_organisation_id,
     };
     let eff_kontakt: Option<String> = match &kontakt_norm {
         Some(opt) => opt.clone(),
         None => vorher.geschaedigt_kontakt.clone(),
     };
-    if eff_fk.is_some() && eff_kontakt.is_some() {
+    let anzahl_quellen = eff_person.is_some() as u8
+        + eff_personal.is_some() as u8
+        + eff_org.is_some() as u8
+        + eff_kontakt.is_some() as u8;
+    if anzahl_quellen > 1 {
         return Err(AppError::UnprocessableEntity(
-            "Geschädigt-FK und Geschädigt-Freitext schließen sich aus".into(),
+            "Höchstens eine Geschädigt-Quelle erlaubt".into(),
         ));
     }
     let eff_uebergeben_an: Option<String> = match &uebergeben_an_norm {
@@ -305,6 +349,11 @@ pub async fn aktualisieren(
     if let Some(Some(pid)) = body.geschaedigt_person_id {
         person_repo::laden(&state.pool, einsatz_id, pid).await?; // Org-Isolation → 404
     }
+    if let Some(Some(ep_id)) = body.geschaedigt_personal_id {
+        if !schaden_repo::personal_im_einsatz(&state.pool, einsatz_id, ep_id).await? {
+            return Err(AppError::NotFound); // Org-Isolation der Einsatzkraft → 404
+        }
+    }
 
     let schaden = schaden_repo::aktualisiere(
         &state.pool,
@@ -318,6 +367,8 @@ pub async fn aktualisieren(
             beschreibung: beschreibung_norm.as_deref(),
             geschaedigt_person_id: body.geschaedigt_person_id,
             geschaedigt_kontakt: kontakt_norm.as_ref().map(|o| o.as_deref()),
+            geschaedigt_personal_id: body.geschaedigt_personal_id,
+            geschaedigt_organisation_id: org_delta,
             uebergeben_an: uebergeben_an_norm.as_ref().map(|o| o.as_deref()),
             abschluss_grund: abschluss_grund_norm.as_ref().map(|o| o.as_deref()),
         },

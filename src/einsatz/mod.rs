@@ -99,6 +99,8 @@ pub struct Einsatz {
     pub meldende_stelle: Option<String>,
     pub sachverhalt: Option<String>,
     pub anzahl_betroffene_initial: Option<i64>,
+    /// Read-only Join-Feld (organisation.name der eigenen Org); via `laden` befüllt.
+    pub org_name: String,
 }
 
 impl Einsatz {
@@ -112,6 +114,8 @@ impl Einsatz {
     pub fn anzeige(&self, meine_rolle: Option<String>) -> EinsatzAnzeige {
         EinsatzAnzeige {
             id: self.id,
+            org_id: self.org_id,
+            org_name: self.org_name.clone(),
             bezeichnung: self.bezeichnung.clone(),
             stichwort: self.stichwort.clone(),
             status: self.status.clone(),
@@ -138,6 +142,8 @@ impl Einsatz {
 #[derive(Debug, Clone, Serialize)]
 pub struct EinsatzAnzeige {
     pub id: i64,
+    pub org_id: i64,
+    pub org_name: String,
     pub bezeichnung: String,
     pub stichwort: Option<String>,
     pub status: String,
@@ -206,6 +212,7 @@ mod tests {
         let mut e = Einsatz {
             id: 1,
             org_id: 1,
+            org_name: "Orga".into(),
             bezeichnung: "Lage".into(),
             stichwort: None,
             status: STATUS_AKTIV.into(),
