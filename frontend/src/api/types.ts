@@ -468,6 +468,46 @@ export interface UhsDetail extends Uhs {
   material: EinsatzMaterial[];
 }
 
+// ============================== E‑5 Schäden ==============================
+
+export type SchadenStatus = 'offen' | 'uebergeben' | 'abgeschlossen';
+export type SchadenTyp =
+  | 'sachschaden'
+  | 'verkehrshindernis'
+  | 'infrastruktur'
+  | 'umweltschaden'
+  | 'tierkadaver'
+  | 'sonstige';
+export type Ausmass = 'gering' | 'mittel' | 'gross' | 'katastrophal';
+// Hinweis: AbschlussGrund ist bereits für Tier belegt (andere Werte) → hier SchadenAbschlussGrund
+export type SchadenAbschlussGrund = 'behoben' | 'kein_handlungsbedarf' | 'abgewiesen';
+
+export interface Schaden {
+  id: number;
+  einsatz_id: number;
+  registrier_nr: number;
+  status: SchadenStatus;
+  typ: SchadenTyp;
+  ausmass: Ausmass;
+  ort: string;
+  beschreibung: string;
+  geschaedigt_person_id: number | null;
+  geschaedigt_kontakt: string | null;
+  uebergeben_an: string | null;
+  uebergeben_at: string | null;
+  abschluss_grund: SchadenAbschlussGrund | null;
+  abschluss_at: string | null;
+  erfasst_at: string;
+  erfasst_von: number;
+  geaendert_at: string;
+  geaendert_von: number;
+  storniert_at: string | null;
+  storniert_von: number | null;
+  // Read-only Join-Felder (Geschädigt-Auflösung über einsatz_person):
+  geschaedigt_registrier_nr: number | null;
+  geschaedigt_storniert_at: string | null;
+}
+
 // ============================== E‑4 Tiere ==============================
 
 export type TierStatus = 'aktiv' | 'vermisst' | 'abgeschlossen';
