@@ -45,6 +45,9 @@ function render(einsatzObj: typeof einsatzAktiv, personen: unknown[]) {
     http.get('/api/auth/me', () => HttpResponse.json(admin)),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/personen', () => HttpResponse.json(personen)),
+    // Default-Fallback für den „Zugeordnete Tiere"-Block (Cross-Modul-Fetch).
+    // Jeder Test, der einen spezifischen Handler braucht, überschreibt ihn via server.use().
+    http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
   );
   return renderMitProviders(
     <AuthProvider>
@@ -167,5 +170,39 @@ describe('PersonenPage', () => {
     await userEvent.click((await screen.findAllByText('Mustermann, Max'))[0]);
     await userEvent.click(await screen.findByRole('tab', { name: 'Medizinischer Verlauf' }));
     expect(await screen.findByRole('button', { name: /Status → verstorben/ })).toBeInTheDocument();
+  });
+
+  it('zeigt den „Zugeordnete Tiere"-Block im Personen-Drawer', async () => {
+    const detail = { ...person, aktuelle_sichtung: null, aktuelle_sichtung_at: null,
+      aktueller_verbleib: null, aktuelle_uhs_id: null, aktueller_platz_id: null,
+      sichtungen: [], notizen: [], verbleib: [], abgleiche: [] } as PersonDetail;
+    server.use(
+      http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(detail)),
+    );
+    render(einsatzAktiv, [person]);
+    // Tiere-Handler nach render() einsetzen, damit er Vorrang gegenüber dem
+    // Default-Fallback aus render() hat (MSW-Prepend-Semantik).
+    server.use(
+      http.get('/api/einsaetze/1/tiere', ({ request }) => {
+        const url = new URL(request.url);
+        // Nur der Cross-Modul-Fetch trägt halter_person_id.
+        if (url.searchParams.get('halter_person_id') === '10') {
+          return HttpResponse.json([{
+            id: 30, einsatz_id: 1, registrier_nr: 7, status: 'aktiv', spezies: 'hund',
+            rasse_beschreibung: null, rufname: 'Rex', geschlecht: null, alter_geschaetzt: null,
+            farbe_beschreibung: null, kennzeichnung: null, groesse_gewicht: null,
+            halter_person_id: 10, halter_kontakt: null, antreff_ort: null, notiz: null,
+            abschluss_grund: null, abschluss_ziel: null, erfasst_at: '2026-05-27 09:00:00',
+            erfasst_von: 1, geaendert_at: '2026-05-27 09:00:00', geaendert_von: 1,
+            storniert_at: null, halter_registrier_nr: 1, halter_storniert_at: null,
+          }]);
+        }
+        return HttpResponse.json([]);
+      }),
+    );
+    await userEvent.click((await screen.findAllByText('Mustermann, Max'))[0]);
+    expect(await screen.findByText(/Zugeordnete Tiere/i)).toBeInTheDocument();
+    expect(await screen.findByText(/T-007/)).toBeInTheDocument();
+    expect(screen.getByText(/Rex/)).toBeInTheDocument();
   });
 });
