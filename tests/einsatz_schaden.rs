@@ -379,3 +379,58 @@ async fn liste_filtert_nach_status_typ_ausmass() {
     let (_, nur_gross) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/schaeden?ausmass=gross"), &admin, None).await;
     assert_eq!(nur_gross.as_array().unwrap().len(), 1);
 }
+
+// ---------- Tests: ETB-Leak ----------
+
+#[tokio::test]
+async fn anlegen_etb_nennt_ort_aber_nicht_geschaedigt_oder_beschreibung() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    schaden_anlegen(&app, &admin, e, &json!({
+        "typ":"umweltschaden","ausmass":"gross","ort":"Hauptstr. 17",
+        "beschreibung":"GEHEIM_BESCHREIBUNG","geschaedigt_kontakt":"Frau GEHEIM"
+    })).await;
+    let inhalte = system_etb_inhalte(&app, &admin, e).await;
+    assert_eq!(inhalte.len(), 1);
+    assert!(inhalte[0].contains("S-001"), "ETB nennt Registriernummer");
+    assert!(inhalte[0].contains("umweltschaden"), "ETB nennt Typ");
+    assert!(inhalte[0].contains("gross"), "ETB nennt Ausmaß");
+    assert!(inhalte[0].contains("Hauptstr. 17"), "ETB nennt den Ort (Lagebild)");
+    assert!(!inhalte[0].contains("GEHEIM"), "ETB-Leak: weder beschreibung noch geschaedigt_kontakt");
+}
+
+#[tokio::test]
+async fn lifecycle_etb_je_event_ein_eintrag_ohne_leak() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e).await; // FK-Geschädigter (R-001)
+    let sid = schaden_anlegen(&app, &admin, e, &json!({
+        "typ":"sachschaden","ausmass":"mittel","ort":"Wald hinter Müllers Hof",
+        "geschaedigt_person_id": p
+    })).await;
+    anfrage(&app, "POST", &format!("/api/einsaetze/{e}/schaeden/{sid}/uebergeben"), &admin,
+        Some(&json!({"uebergeben_an":"Bauhof"}))).await;
+    anfrage(&app, "POST", &format!("/api/einsaetze/{e}/schaeden/{sid}/abschliessen"), &admin,
+        Some(&json!({"abschluss_grund":"behoben","notiz":"GEHEIM_NOTIZ"}))).await;
+    anfrage(&app, "DELETE", &format!("/api/einsaetze/{e}/schaeden/{sid}"), &admin, None).await;
+
+    let inhalte = system_etb_inhalte(&app, &admin, e).await;
+    // NUR die Schaden-eigenen Einträge prüfen: Das Anlegen der Geschädigt-Person (E‑1)
+    // schreibt selbst einen system-ETB-Eintrag mit IHRER R-Nr — das ist kein Leak des
+    // Schadens. Auf S-001 filtern macht den Test robust.
+    let schaden_eintraege: Vec<&String> = inhalte.iter().filter(|i| i.contains("S-001")).collect();
+    assert_eq!(
+        schaden_eintraege.len(),
+        4,
+        "Schaden-Lifecycle: Anlegen + uebergeben + abschliessen + storno: {schaden_eintraege:?}"
+    );
+    for i in &schaden_eintraege {
+        assert!(!i.contains("GEHEIM_NOTIZ"), "Leak: Abschluss-Notiz im ETB: {i}");
+        assert!(!i.contains("R-001"), "Leak: Geschädigt-R-Nr im Schaden-ETB: {i}");
+    }
+    assert!(schaden_eintraege.iter().any(|i| i.contains("übergeben an Bauhof")));
+    assert!(schaden_eintraege.iter().any(|i| i.contains("abgeschlossen (behoben)")));
+    assert!(schaden_eintraege.iter().any(|i| i.contains("S-001 storniert")));
+}
