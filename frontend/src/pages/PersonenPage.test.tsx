@@ -207,4 +207,37 @@ describe('PersonenPage', () => {
     expect(await screen.findByText(/T-007/)).toBeInTheDocument();
     expect(screen.getByText(/Rex/)).toBeInTheDocument();
   });
+
+  it('zeigt den „Als Geschädigte bei Schäden"-Block im Personen-Drawer', async () => {
+    const detail = { ...person, aktuelle_sichtung: null, aktuelle_sichtung_at: null,
+      aktueller_verbleib: null, aktuelle_uhs_id: null, aktueller_platz_id: null,
+      sichtungen: [], notizen: [], verbleib: [], abgleiche: [] } as PersonDetail;
+    server.use(
+      http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(detail)),
+    );
+    render(einsatzAktiv, [person]);
+    // Schäden-Handler nach render() einsetzen, damit er Vorrang gegenüber dem
+    // Default-Fallback aus render() hat (MSW-Prepend-Semantik).
+    server.use(
+      http.get('/api/einsaetze/1/schaeden', ({ request }) => {
+        const url = new URL(request.url);
+        // Nur der Cross-Modul-Fetch trägt geschaedigt_person_id.
+        if (url.searchParams.get('geschaedigt_person_id') === '10') {
+          return HttpResponse.json([{
+            id: 7, einsatz_id: 1, registrier_nr: 3, status: 'offen', typ: 'umweltschaden',
+            ausmass: 'mittel', ort: 'Hauptstr. 1', beschreibung: '', geschaedigt_person_id: 10,
+            geschaedigt_kontakt: null, uebergeben_an: null, uebergeben_at: null,
+            abschluss_grund: null, abschluss_at: null, erfasst_at: '2026-05-29 10:00:00',
+            erfasst_von: 1, geaendert_at: '2026-05-29 10:00:00', geaendert_von: 1,
+            storniert_at: null, storniert_von: null, geschaedigt_registrier_nr: null,
+            geschaedigt_storniert_at: null,
+          }]);
+        }
+        return HttpResponse.json([]);
+      }),
+    );
+    await userEvent.click((await screen.findAllByText('Mustermann, Max'))[0]);
+    expect(await screen.findByText(/Als Geschädigte bei Schäden/i)).toBeInTheDocument();
+    expect(await screen.findByText((t) => t.includes('S-003'))).toBeInTheDocument();
+  });
 });
