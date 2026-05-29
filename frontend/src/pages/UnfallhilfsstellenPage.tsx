@@ -1,11 +1,11 @@
-import { Alert, App, Breadcrumb, Button, Drawer, Form, Input, Select, Space, Spin, Table, Tag, Typography, type TableColumnsType } from 'antd';
+import { Alert, Breadcrumb, Button, Space, Spin, Table, Tag, Typography, type TableColumnsType } from 'antd';
 import { Link, useParams } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
-import { legeUhsAn, listeUhs, type UhsEingabe } from '../api/einsatzUhs';
-import { ApiError } from '../api/client';
+import { listeUhs } from '../api/einsatzUhs';
 import { useUhsStream } from '../etb/useUhsStream';
+import UhsAnlegenDrawer from './uhs/UhsAnlegenDrawer';
 import type { Uhs, UhsStatus, UhsTyp } from '../api/types';
 
 const UHS_TYP_LABEL: Record<UhsTyp, string> = {
@@ -33,26 +33,11 @@ export default function UnfallhilfsstellenPage() {
     queryFn: () => listeUhs(einsatzId),
   });
 
-  const qc = useQueryClient();
-  const { message } = App.useApp();
   const [anlegen, setAnlegen] = useState(false);
-  const [form] = Form.useForm<UhsEingabe>();
 
   const ist_aktiv = einsatzQuery.data?.status === 'aktiv';
   const ist_beobachter = einsatzQuery.data?.meine_rolle === 'beobachter';
   const schreibgeschuetzt = !ist_aktiv || ist_beobachter;
-
-  function invalidate() {
-    qc.invalidateQueries({ queryKey: ['einsatz-uhs', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
-  }
-  const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
-
-  const anlegenMut = useMutation({
-    mutationFn: (daten: UhsEingabe) => legeUhsAn(einsatzId, daten),
-    onSuccess: () => { message.success('UHS angelegt'); invalidate(); setAnlegen(false); form.resetFields(); },
-    onError: fehler,
-  });
 
   const spalten: TableColumnsType<Uhs> = [
     { title: 'Bezeichnung', dataIndex: 'bezeichnung', render: (b: string, u) =>
@@ -87,34 +72,7 @@ export default function UnfallhilfsstellenPage() {
         pagination={false}
       />
 
-      <Drawer
-        title="Unfallhilfsstelle anlegen"
-        open={anlegen}
-        onClose={() => setAnlegen(false)}
-        width={420}
-        destroyOnClose
-      >
-        <Form<UhsEingabe>
-          form={form}
-          layout="vertical"
-          onFinish={(v) => anlegenMut.mutate(v)}
-          initialValues={{ typ: 'behandlungsplatz' }}
-        >
-          <Form.Item label="Typ" name="typ" rules={[{ required: true }]}>
-            <Select options={Object.entries(UHS_TYP_LABEL).map(([v, l]) => ({ value: v, label: l }))} />
-          </Form.Item>
-          <Form.Item label="Bezeichnung" name="bezeichnung" rules={[{ required: true, message: 'Bezeichnung erforderlich' }]}>
-            <Input placeholder="z. B. BHP 50" />
-          </Form.Item>
-          <Form.Item label="Standort (optional)" name="standort">
-            <Input placeholder="Adresse / Hinweis" />
-          </Form.Item>
-          <Form.Item label="Notiz (optional)" name="notiz">
-            <Input.TextArea rows={3} />
-          </Form.Item>
-          <Button type="primary" htmlType="submit" loading={anlegenMut.isPending}>Anlegen</Button>
-        </Form>
-      </Drawer>
+      <UhsAnlegenDrawer einsatzId={einsatzId} open={anlegen} onClose={() => setAnlegen(false)} />
     </div>
   );
 }

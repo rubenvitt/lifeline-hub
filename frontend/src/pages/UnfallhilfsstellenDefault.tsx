@@ -1,29 +1,15 @@
 import { Alert, Button, Empty, Spin } from 'antd';
-import { Link, Navigate, useParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { listeUhs } from '../api/einsatzUhs';
-import type { Uhs } from '../api/types';
-
-type Ziel =
-  | { art: 'detail'; uhsId: number }
-  | { art: 'liste' }
-  | { art: 'leer' };
-
-/** Entscheidet, wohin der Default-Einstieg führt. Bei mehreren aktiven UHS die
- *  alphabetisch erste nach Bezeichnung — deterministisch und stabil. */
-function bestimmeZiel(uhsListe: Uhs[]): Ziel {
-  if (uhsListe.length === 0) return { art: 'leer' };
-  const aktive = uhsListe.filter((u) => u.status === 'aktiv');
-  if (aktive.length === 0) return { art: 'liste' };
-  const ziel = [...aktive].sort((a, b) => a.bezeichnung.localeCompare(b.bezeichnung, 'de'))[0];
-  return { art: 'detail', uhsId: ziel.id };
-}
+import UhsAnlegenDrawer from './uhs/UhsAnlegenDrawer';
+import { liesLetzteUhs, waehleDefaultUhs } from './uhs/uhsAuswahl';
 
 /**
  * Index-Route /einsaetze/:id/unfallhilfsstellen.
- * Springt bei vorhandener aktiver UHS direkt ins Detail, zeigt sonst die Liste
- * bzw. einen Leerzustand.
+ * Springt direkt in die passende UHS (zuletzt ausgewählte → älteste aktive →
+ * zuletzt angelegte) oder zeigt bei 0 UHS einen Leerzustand mit Anlegen-Drawer.
  *
  * Bewusst KEIN useUhsStream: die Entscheidung wird einmalig aus dem ersten
  * geladenen Stand getroffen (siehe `entscheidung`-Ref). So reißt eine live
@@ -33,6 +19,7 @@ function bestimmeZiel(uhsListe: Uhs[]): Ziel {
 export default function UnfallhilfsstellenDefault() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const navigate = useNavigate();
   const basis = `/einsaetze/${einsatzId}/unfallhilfsstellen`;
 
   const uhsQuery = useQuery({
@@ -40,10 +27,12 @@ export default function UnfallhilfsstellenDefault() {
     queryFn: () => listeUhs(einsatzId),
   });
 
-  const entscheidung = useRef<Ziel | null>(null);
+  const entscheidung = useRef<{ uhsId: number | null } | null>(null);
   if (!entscheidung.current && uhsQuery.data) {
-    entscheidung.current = bestimmeZiel(uhsQuery.data);
+    entscheidung.current = { uhsId: waehleDefaultUhs(uhsQuery.data, liesLetzteUhs(einsatzId)) };
   }
+
+  const [anlegen, setAnlegen] = useState(false);
 
   if (!entscheidung.current) {
     if (uhsQuery.error) {
@@ -52,17 +41,20 @@ export default function UnfallhilfsstellenDefault() {
     return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
   }
 
-  const ziel = entscheidung.current;
-  if (ziel.art === 'detail') return <Navigate to={`${basis}/${ziel.uhsId}`} replace />;
-  if (ziel.art === 'liste') return <Navigate to={`${basis}/liste`} replace />;
+  const { uhsId } = entscheidung.current;
+  if (uhsId != null) return <Navigate to={`${basis}/${uhsId}`} replace />;
 
   return (
     <div style={{ padding: 16 }}>
       <Empty description="Noch keine Unfallhilfsstellen erfasst">
-        <Link to={`${basis}/liste`}>
-          <Button type="primary">Erste UHS anlegen</Button>
-        </Link>
+        <Button type="primary" onClick={() => setAnlegen(true)}>Erste UHS anlegen</Button>
       </Empty>
+      <UhsAnlegenDrawer
+        einsatzId={einsatzId}
+        open={anlegen}
+        onClose={() => setAnlegen(false)}
+        onAngelegt={(uhs) => navigate(`${basis}/${uhs.id}`)}
+      />
     </div>
   );
 }

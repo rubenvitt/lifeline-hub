@@ -1,11 +1,14 @@
-import { Alert, App, Breadcrumb, Button, Descriptions, Popconfirm, Space, Spin, Tabs, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Descriptions, Popconfirm, Space, Spin, Tabs, Tag } from 'antd';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { ladeUhs, setzeUhsStatus, storniereUhs } from '../../api/einsatzUhs';
 import { useUhsStream } from '../../etb/useUhsStream';
 import { ApiError } from '../../api/client';
 import type { UhsStatus } from '../../api/types';
+import UhsSwitcher from './UhsSwitcher';
+import { merkeLetzteUhs } from './uhsAuswahl';
 import Grundriss from './Grundriss';
 import MaterialTab from './MaterialTab';
 import BewegungenTab from './BewegungenTab';
@@ -31,6 +34,12 @@ export default function UhsDetailPage() {
     queryKey: ['einsatz-uhs-detail', einsatzId, uhsId],
     queryFn: () => ladeUhs(einsatzId, uhsId),
   });
+
+  // Diese UHS als „zuletzt ausgewählt" merken — der Default-Einstieg landet beim
+  // nächsten Mal wieder hier.
+  useEffect(() => {
+    if (detailQuery.isSuccess) merkeLetzteUhs(einsatzId, uhsId);
+  }, [einsatzId, uhsId, detailQuery.isSuccess]);
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: ['einsatz-uhs', einsatzId] });
@@ -76,7 +85,7 @@ export default function UhsDetailPage() {
       ]} />
       <Space style={{ width: '100%', justifyContent: 'space-between', marginTop: 12, marginBottom: 12 }}>
         <Space>
-          <Typography.Title level={4} style={{ margin: 0 }}>{uhs.bezeichnung}</Typography.Title>
+          <UhsSwitcher einsatzId={einsatzId} aktuelleUhs={uhs} />
           <Tag color={STATUS_LABEL[uhs.status].color}>{STATUS_LABEL[uhs.status].label}</Tag>
         </Space>
         <Space>
@@ -99,7 +108,6 @@ export default function UhsDetailPage() {
               <Button danger>Auflösen</Button>
             </Popconfirm>
           )}
-          <Link to={listenPfad}><Button>Zurück zur Liste</Button></Link>
         </Space>
       </Space>
       <Descriptions size="small" column={2} style={{ marginBottom: 12 }}>

@@ -7,6 +7,7 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../test/server';
 import UnfallhilfsstellenPage from './UnfallhilfsstellenPage';
 import UhsDetailPage from './uhs/UhsDetailPage';
+import { liesLetzteUhs } from './uhs/uhsAuswahl';
 import { App as AntApp } from 'antd';
 
 class FakeEventSource {
@@ -14,7 +15,7 @@ class FakeEventSource {
   constructor(url: string) { this.url = url; }
   addEventListener() {} removeEventListener() {} close() { this.closed = true; }
 }
-beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
+beforeEach(() => { vi.stubGlobal('EventSource', FakeEventSource); localStorage.clear(); });
 afterEach(() => vi.unstubAllGlobals());
 
 function einsatzAntwort(rolle: 'einsatzleitung' | 'beobachter' = 'einsatzleitung') {
@@ -90,28 +91,6 @@ describe('UnfallhilfsstellenPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
     await waitFor(() => expect(body).toMatchObject({ bezeichnung: 'PA 1' }));
   });
-
-  it('„Zurück zur Liste" im Detail führt auf die Listen-Subroute', async () => {
-    server.use(
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([
-        { id: 7, einsatz_id: 1, abschnitt_id: null, typ: 'behandlungsplatz',
-          bezeichnung: 'BHP 50', standort: null, notiz: null, status: 'aktiv',
-          erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1, storniert_at: null },
-      ])),
-      http.get('/api/einsaetze/1/uhs/7', () => HttpResponse.json({
-        id: 7, einsatz_id: 1, abschnitt_id: null, typ: 'behandlungsplatz',
-        bezeichnung: 'BHP 50', standort: null, notiz: null, status: 'aktiv',
-        erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1, storniert_at: null,
-        plaetze: [], belegungen: [], material: [],
-      })),
-      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
-    );
-    renderPage('/einsaetze/1/unfallhilfsstellen/7');
-    await userEvent.click(await screen.findByRole('button', { name: 'Zurück zur Liste' }));
-    // Die Liste rendert ihren „Neu"-Button — Beleg, dass /liste (nicht die Basis) getroffen wurde.
-    expect(await screen.findByRole('button', { name: 'Neu' })).toBeInTheDocument();
-  });
 });
 
 describe('Grundriss DnD', () => {
@@ -138,5 +117,28 @@ describe('Grundriss DnD', () => {
     await userEvent.click(await screen.findByText('BHP 50'));
     expect(await screen.findByRole('tab', { name: 'Grundriss' })).toBeInTheDocument();
     expect(await screen.findByText('Bett 3')).toBeInTheDocument();
+  });
+});
+
+describe('UhsDetailPage', () => {
+  it('merkt die geöffnete UHS als zuletzt ausgewählt', async () => {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
+      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([
+        { id: 7, einsatz_id: 1, abschnitt_id: null, typ: 'behandlungsplatz',
+          bezeichnung: 'BHP 50', standort: null, notiz: null, status: 'aktiv',
+          erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1, storniert_at: null },
+      ])),
+      http.get('/api/einsaetze/1/uhs/7', () => HttpResponse.json({
+        id: 7, einsatz_id: 1, abschnitt_id: null, typ: 'behandlungsplatz',
+        bezeichnung: 'BHP 50', standort: null, notiz: null, status: 'aktiv',
+        erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1, storniert_at: null,
+        plaetze: [], belegungen: [], material: [],
+      })),
+      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
+    );
+    renderPage('/einsaetze/1/unfallhilfsstellen/7');
+    await screen.findByRole('button', { name: /BHP 50/ });
+    await waitFor(() => expect(liesLetzteUhs(1)).toBe(7));
   });
 });
