@@ -16,6 +16,7 @@ import EinheitenPage from './pages/EinheitenPage';
 import EinsatzabschnittePage from './pages/EinsatzabschnittePage';
 import PersonenPage from './pages/PersonenPage';
 import TierePage from './pages/TierePage';
+import SchaedenPage from './pages/SchaedenPage';
 import UnfallhilfsstellenPage from './pages/UnfallhilfsstellenPage';
 import UnfallhilfsstellenDefault from './pages/UnfallhilfsstellenDefault';
 import UhsDetailPage from './pages/uhs/UhsDetailPage';
@@ -36,6 +37,7 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   personen: <PersonenPage />,
   unfallhilfsstellen: <UnfallhilfsstellenDefault />,
   tiere: <TierePage />,
+  schaeden: <SchaedenPage />,
 };
 
 export default function App() {

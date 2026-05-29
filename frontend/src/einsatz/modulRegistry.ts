@@ -59,7 +59,7 @@ export const modulRegistry: ModulEintrag[] = [
   { key: 'personen', kategorie: 'erfassung', label: 'Personen', icon: TbUsers, route: 'personen', status: 'fertig', beschreibung: 'Ein Personenstamm mit Status-Lebenszyklus (vermisst → betroffen → Patient → verstorben).' },
   { key: 'unfallhilfsstellen', kategorie: 'erfassung', label: 'Unfallhilfsstellen', icon: TbFirstAidKit, route: 'unfallhilfsstellen', status: 'fertig', beschreibung: 'Behandlungs-/Sammelstellen als Örtlichkeiten mit Plätzen, Belegung und Material.' },
   { key: 'tiere', kategorie: 'erfassung', label: 'Tiere', icon: TbPaw, route: 'tiere', status: 'fertig', beschreibung: 'Betroffene Tiere, getrennt vom Personenstamm.' },
-  { key: 'sachschaeden', kategorie: 'erfassung', label: 'Sachschäden', icon: TbHome, route: 'sachschaeden', status: 'wip', beschreibung: 'Erfassung von Sachschäden (optional). Wird später ausgearbeitet.' },
+  { key: 'schaeden', kategorie: 'erfassung', label: 'Schäden', icon: TbHome, route: 'schaeden', status: 'fertig', beschreibung: 'Sach-/Infrastruktur-/Umweltschäden mit Bearbeitungs-Workflow.' },
   // Lage
   { key: 'lage-dashboard', kategorie: 'lage', label: 'Dashboard', icon: TbLayoutDashboard, route: 'lage-dashboard', status: 'geplant', beschreibung: 'Verdichtete Lageübersicht des Einsatzes.' },
   { key: 'lagekarte', kategorie: 'lage', label: 'Lagekarte', icon: TbMap2, route: 'lagekarte', status: 'geplant', beschreibung: 'Taktische Karte mit Zeichen, Einheiten und Zonen.' },
