@@ -341,7 +341,7 @@ export default function TierePage() {
         confirmLoading={anlegenMutation.isPending}
         onOk={() => form.submit()}
         onCancel={() => { setModus(null); form.resetFields(); }}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical"
           initialValues={{ spezies: 'hund' }}
@@ -380,7 +380,7 @@ export default function TierePage() {
         confirmLoading={abschlussMutation.isPending}
         onOk={() => abschlussForm.submit()}
         onCancel={() => { setAbschlussOffen(false); abschlussForm.resetFields(); }}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={abschlussForm} layout="vertical" onFinish={abschlussMutation.mutate}>
           <Form.Item label="Abschlussgrund" name="abschluss_grund" rules={[{ required: true, message: 'Grund ist Pflicht' }]}>

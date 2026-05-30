@@ -395,7 +395,7 @@ export default function SchaedenPage() {
         onOk={() => erfassForm.submit()}
         okText="Anlegen"
         confirmLoading={anlegenMutation.isPending}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={erfassForm} layout="vertical" onFinish={onErfassen}>
           <Form.Item label="Typ" name="typ" rules={[{ required: true, message: 'Typ ist Pflicht' }]}>
@@ -534,7 +534,7 @@ export default function SchaedenPage() {
         onOk={() => uebergebForm.submit()}
         okText="Übergeben"
         confirmLoading={uebergebMutation.isPending}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={uebergebForm} layout="vertical" onFinish={(v) => uebergebMutation.mutate(v.uebergeben_an)}>
           <Form.Item
@@ -555,7 +555,7 @@ export default function SchaedenPage() {
         onOk={() => abschlussForm.submit()}
         okText="Abschließen"
         confirmLoading={abschlussMutation.isPending}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={abschlussForm} layout="vertical" onFinish={(v) => abschlussMutation.mutate(v)}>
           <Form.Item

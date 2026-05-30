@@ -112,7 +112,7 @@ export default function PersonalFormModal({
       confirmLoading={mutation.isPending}
       onOk={() => form.submit()}
       onCancel={onClose}
-      destroyOnClose
+      destroyOnHidden
     >
       <Form<FormWerte> form={form} layout="vertical" onFinish={(w) => mutation.mutate(w)}>
         <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true, message: 'Name darf nicht leer sein' }]}>

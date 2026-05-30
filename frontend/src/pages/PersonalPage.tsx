@@ -235,7 +235,7 @@ export default function PersonalPage() {
         confirmLoading={adhocMutation.isPending}
         onOk={() => form.submit()}
         onCancel={() => setAdhocOffen(false)}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form<AdhocEingabe> form={form} layout="vertical" onFinish={(w) => adhocMutation.mutate(w)}>
           <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}>

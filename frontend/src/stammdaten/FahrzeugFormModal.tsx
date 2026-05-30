@@ -114,7 +114,7 @@ export default function FahrzeugFormModal({
       confirmLoading={mutation.isPending}
       onOk={() => form.submit()}
       onCancel={onClose}
-      destroyOnClose
+      destroyOnHidden
     >
       <Form<FormWerte> form={form} layout="vertical" onFinish={(w) => mutation.mutate(w)}>
         <Form.Item

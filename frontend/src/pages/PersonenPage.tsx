@@ -569,7 +569,7 @@ export default function PersonenPage() {
         confirmLoading={anlegenMutation.isPending}
         onOk={() => form.submit()}
         onCancel={() => { setModus(null); form.resetFields(); }}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form
           form={form}
@@ -625,7 +625,7 @@ export default function PersonenPage() {
         confirmLoading={sichtungMutation.isPending}
         onOk={() => sichtungForm.submit()}
         onCancel={() => { setReSichtenOffen(false); sichtungForm.resetFields(); }}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={sichtungForm} layout="vertical" onFinish={sichtungMutation.mutate}>
           <Form.Item label="Kategorie" name="kategorie" rules={[{ required: true }]}>
@@ -644,7 +644,7 @@ export default function PersonenPage() {
         confirmLoading={verbleibMutation.isPending}
         onOk={() => verbleibForm.submit()}
         onCancel={() => { setVerbleibOffen(false); verbleibForm.resetFields(); }}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={verbleibForm} layout="vertical" onFinish={verbleibMutation.mutate}>
           <Form.Item label="Art" name="art" rules={[{ required: true }]}>

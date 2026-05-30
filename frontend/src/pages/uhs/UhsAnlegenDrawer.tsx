@@ -46,7 +46,7 @@ export default function UhsAnlegenDrawer({ einsatzId, open, onClose, onAngelegt 
       open={open}
       onClose={onClose}
       width={420}
-      destroyOnClose
+      destroyOnHidden
     >
       <Form<UhsEingabe>
         form={form}

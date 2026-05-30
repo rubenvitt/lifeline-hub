@@ -134,7 +134,7 @@ export default function StatusKatalogTab() {
         confirmLoading={speichern.isPending}
         onOk={() => form.submit()}
         onCancel={() => setModalOffen(false)}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form<FormWerte> form={form} layout="vertical" onFinish={(w) => speichern.mutate(w)}>
           <Form.Item label="Label" name="label" rules={[{ required: true, whitespace: true }]}>

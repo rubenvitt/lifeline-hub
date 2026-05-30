@@ -239,7 +239,7 @@ export default function MaterialPage() {
         confirmLoading={adhocMutation.isPending}
         onOk={() => form.submit()}
         onCancel={() => setAdhocOffen(false)}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" initialValues={{ menge: 1 }} onFinish={(w) => adhocMutation.mutate(w)}>
           <Form.Item label="Bezeichnung" name="bezeichnung" rules={[{ required: true, whitespace: true }]}>
