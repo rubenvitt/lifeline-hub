@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
 import type { ReactElement } from 'react';
 import RequireAuth from './routes/RequireAuth';
 import AppLayout from './components/AppLayout';
@@ -25,6 +26,8 @@ import DefaultModulRedirect from './einsatz/DefaultModulRedirect';
 import ModulStub from './einsatz/ModulStub';
 import { modulRegistry } from './einsatz/modulRegistry';
 
+const LagekartePage = lazy(() => import('./pages/LagekartePage'));
+
 /** Module mit echter Implementierung; alle übrigen rendern den ModulStub. */
 const MODUL_ELEMENTE: Record<string, ReactElement> = {
   etb: <EtbPage />,
@@ -38,6 +41,11 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   unfallhilfsstellen: <UnfallhilfsstellenDefault />,
   tiere: <TierePage />,
   schaeden: <SchaedenPage />,
+  lagekarte: (
+    <Suspense fallback={<div style={{ padding: 24 }}>Karte wird geladen…</div>}>
+      <LagekartePage />
+    </Suspense>
+  ),
 };
 
 export default function App() {
