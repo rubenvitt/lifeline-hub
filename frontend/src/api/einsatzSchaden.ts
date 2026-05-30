@@ -26,6 +26,8 @@ export interface SchadenPatch {
   geschaedigt_kontakt?: string | null;
   uebergeben_an?: string | null;
   abschluss_grund?: string | null;
+  lat?: number | null;
+  lon?: number | null;
 }
 
 export interface SchaedenFilter {

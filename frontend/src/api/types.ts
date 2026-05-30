@@ -432,6 +432,8 @@ export interface Uhs {
   bezeichnung: string;
   standort: string | null;
   notiz: string | null;
+  lat: number | null;
+  lon: number | null;
   status: UhsStatus;
   erfasst_at: string;
   erfasst_von: number;
@@ -493,6 +495,8 @@ export interface Schaden {
   typ: SchadenTyp;
   ausmass: Ausmass;
   ort: string;
+  lat: number | null;
+  lon: number | null;
   beschreibung: string;
   geschaedigt_person_id: number | null;
   geschaedigt_personal_id: number | null;
