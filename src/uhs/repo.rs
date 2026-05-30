@@ -26,6 +26,8 @@ pub struct PatchDaten<'a> {
     pub abschnitt_id: Option<Option<i64>>, // Some(None) = explizit auf NULL setzen
     pub standort: Option<Option<&'a str>>,
     pub notiz: Option<Option<&'a str>>,
+    pub lat: Option<Option<f64>>,
+    pub lon: Option<Option<f64>>,
 }
 
 /// UHS eines Einsatzes (ohne stornierte), optional gefiltert nach Status und/oder Abschnitt.
@@ -111,22 +113,23 @@ pub async fn aktualisiere(
              abschnitt_id = CASE WHEN ?2 IS NULL THEN abschnitt_id ELSE ?3 END, \
              standort = CASE WHEN ?4 IS NULL THEN standort ELSE ?5 END, \
              notiz = CASE WHEN ?6 IS NULL THEN notiz ELSE ?7 END, \
+             lat = CASE WHEN ?8 IS NULL THEN lat ELSE ?9 END, \
+             lon = CASE WHEN ?10 IS NULL THEN lon ELSE ?11 END, \
              geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
-             geaendert_von = ?8 \
-         WHERE id = ?9 AND einsatz_id = ?10",
+             geaendert_von = ?12 \
+         WHERE id = ?13 AND einsatz_id = ?14",
     )
-    // ?1 = bezeichnung (COALESCE: None = keep existing)
     .bind(daten.bezeichnung)
-    // ?2 = abschnitt_id sentinel (Some(_) → 1, None → NULL), ?3 = new value
     .bind(daten.abschnitt_id.map(|_| 1_i64))
     .bind(daten.abschnitt_id.and_then(|v| v))
-    // ?4 = standort sentinel, ?5 = new value
     .bind(daten.standort.map(|_| 1_i64))
     .bind(daten.standort.and_then(|v| v))
-    // ?6 = notiz sentinel, ?7 = new value
     .bind(daten.notiz.map(|_| 1_i64))
     .bind(daten.notiz.and_then(|v| v))
-    // ?8 = geaendert_von, ?9 = id, ?10 = einsatz_id
+    .bind(daten.lat.map(|_| 1_i64))
+    .bind(daten.lat.and_then(|v| v))
+    .bind(daten.lon.map(|_| 1_i64))
+    .bind(daten.lon.and_then(|v| v))
     .bind(geaendert_von)
     .bind(id)
     .bind(einsatz_id)

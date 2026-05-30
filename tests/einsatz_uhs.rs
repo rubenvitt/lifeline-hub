@@ -780,3 +780,110 @@ async fn abgeschlossener_einsatz_blockt_schreibrouten() {
         "fordere_aktiv blockt Schreibrouten auf abgeschlossenen Einsätzen"
     );
 }
+
+#[tokio::test]
+async fn verorten_setzt_lat_lon_und_liste_liefert_sie() {
+    let (app, _) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &cookie).await;
+    let (s, v) = json_request(
+        &app, "POST", &format!("/api/einsaetze/{einsatz}/uhs"), &cookie,
+        Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
+    ).await;
+    assert_eq!(s, StatusCode::CREATED);
+    let uhs_id = v["id"].as_i64().unwrap();
+
+    let (s, v) = json_request(
+        &app, "PATCH", &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"), &cookie,
+        Some(&json!({"lat": 50.1, "lon": 8.6})),
+    ).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(v["lat"].as_f64(), Some(50.1));
+    assert_eq!(v["lon"].as_f64(), Some(8.6));
+
+    let (s, liste) = json_request(
+        &app, "GET", &format!("/api/einsaetze/{einsatz}/uhs"), &cookie, None,
+    ).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(liste[0]["lat"].as_f64(), Some(50.1));
+}
+
+#[tokio::test]
+async fn verorten_loeschen_setzt_beide_auf_null() {
+    let (app, _) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &cookie).await;
+    let (_s, v) = json_request(
+        &app, "POST", &format!("/api/einsaetze/{einsatz}/uhs"), &cookie,
+        Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
+    ).await;
+    let uhs_id = v["id"].as_i64().unwrap();
+    let (s, _) = json_request(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"), &cookie,
+        Some(&json!({"lat": 50.1, "lon": 8.6}))).await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, v) = json_request(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"), &cookie,
+        Some(&json!({"lat": null, "lon": null}))).await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(v["lat"].is_null());
+    assert!(v["lon"].is_null());
+}
+
+#[tokio::test]
+async fn verorten_nur_lat_ist_422() {
+    let (app, _) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &cookie).await;
+    let (_s, v) = json_request(
+        &app, "POST", &format!("/api/einsaetze/{einsatz}/uhs"), &cookie,
+        Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
+    ).await;
+    let uhs_id = v["id"].as_i64().unwrap();
+    let (s, _) = json_request(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"), &cookie,
+        Some(&json!({"lat": 50.1}))).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "darf 422 sein, NICHT 500");
+}
+
+#[tokio::test]
+async fn verorten_nur_lon_ist_422() {
+    let (app, _) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &cookie).await;
+    let (_s, v) = json_request(
+        &app, "POST", &format!("/api/einsaetze/{einsatz}/uhs"), &cookie,
+        Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
+    ).await;
+    let uhs_id = v["id"].as_i64().unwrap();
+    let (s, _) = json_request(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"), &cookie,
+        Some(&json!({"lon": 8.6}))).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "darf 422 sein, NICHT 500");
+}
+
+#[tokio::test]
+async fn verorten_ausserhalb_range_ist_422() {
+    let (app, _) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &cookie).await;
+    let (_s, v) = json_request(
+        &app, "POST", &format!("/api/einsaetze/{einsatz}/uhs"), &cookie,
+        Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
+    ).await;
+    let uhs_id = v["id"].as_i64().unwrap();
+    let (s, _) = json_request(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"), &cookie,
+        Some(&json!({"lat": 99.0, "lon": 8.6}))).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn verorten_lon_ausserhalb_range_ist_422() {
+    let (app, _) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &cookie).await;
+    let (_s, v) = json_request(
+        &app, "POST", &format!("/api/einsaetze/{einsatz}/uhs"), &cookie,
+        Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
+    ).await;
+    let uhs_id = v["id"].as_i64().unwrap();
+    let (s, _) = json_request(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"), &cookie,
+        Some(&json!({"lat": 50.0, "lon": 200.0}))).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+}

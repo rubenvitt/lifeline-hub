@@ -208,6 +208,11 @@ pub struct PatchBody {
     pub standort: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub notiz: Option<Option<String>>,
+    /// lat/lon werden als Paar behandelt (Effektivzustand-Check im Handler). `Some(null)` = löschen.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub lat: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub lon: Option<Option<f64>>,
 }
 
 /// PATCH /api/einsaetze/{id}/uhs/{uid} — Stammfelder. KEIN ETB-Eintrag.
@@ -221,6 +226,26 @@ pub async fn aktualisieren(
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
     fordere_aktiv(&einsatz)?;
+
+    // lat/lon als Paar: Effektivzustand nach dem Patch prüfen (422 statt 500).
+    let vorher = uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?; // 404 falls fremd
+    let eff_lat = match body.lat { Some(opt) => opt, None => vorher.lat };
+    let eff_lon = match body.lon { Some(opt) => opt, None => vorher.lon };
+    if eff_lat.is_some() != eff_lon.is_some() {
+        return Err(AppError::UnprocessableEntity(
+            "lat und lon müssen gemeinsam gesetzt oder gemeinsam leer sein".into(),
+        ));
+    }
+    if let Some(la) = eff_lat {
+        if !(-90.0..=90.0).contains(&la) {
+            return Err(AppError::UnprocessableEntity("lat muss zwischen -90 und 90 liegen".into()));
+        }
+    }
+    if let Some(lo) = eff_lon {
+        if !(-180.0..=180.0).contains(&lo) {
+            return Err(AppError::UnprocessableEntity("lon muss zwischen -180 und 180 liegen".into()));
+        }
+    }
 
     let bezeichnung = body
         .bezeichnung
@@ -249,6 +274,8 @@ pub async fn aktualisieren(
             abschnitt_id: body.abschnitt_id,
             standort: standort.as_ref().map(|o| o.as_deref()),
             notiz: notiz.as_ref().map(|o| o.as_deref()),
+            lat: body.lat,
+            lon: body.lon,
         },
     )
     .await?;
