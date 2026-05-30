@@ -21,6 +21,7 @@ const basisEinsatz: EinsatzAnzeige = {
   leitstellen_nr: null, einsatzort: null, einsatzort_lat: null, einsatzort_lon: null,
   meldende_stelle: null, sachverhalt: null, anzahl_betroffene_initial: null,
   meine_rolle: 'einsatzleitung',
+  org_id: 1, org_name: 'DRK Musterstadt',
 };
 
 const mitglieder = [

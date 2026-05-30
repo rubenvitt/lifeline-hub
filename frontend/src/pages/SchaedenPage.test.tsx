@@ -17,27 +17,43 @@ beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
 
 const admin = { id: 1, anzeigename: 'Admin', system_rolle: 'admin', org_rolle: 'fuehrungskraft' };
-const einsatzAktiv = { id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung' };
-const einsatzBeobachter = { id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'beobachter' };
+const einsatzAktiv = {
+  id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung',
+  org_id: 5, org_name: 'DRK Musterstadt',
+};
+const einsatzBeobachter = {
+  id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'beobachter',
+  org_id: 5, org_name: 'DRK Musterstadt',
+};
+
+const einePerson = {
+  id: 42, einsatz_id: 1, registrier_nr: 7, status: 'betroffen', name: 'Meier', vorname: 'Anna',
+};
+const eineEinsatzkraft = { id: 99, einsatz_id: 1, name: 'Schulz', funktion: 'Sanitäter' };
 
 function basisSchaden(overrides: Record<string, unknown> = {}) {
   return {
     id: 10, einsatz_id: 1, registrier_nr: 1, status: 'offen', typ: 'sachschaden',
     ausmass: 'gering', ort: 'Hauptstr. 17', beschreibung: '',
-    geschaedigt_person_id: null, geschaedigt_kontakt: null,
+    geschaedigt_person_id: null, geschaedigt_personal_id: null, geschaedigt_organisation_id: null,
+    geschaedigt_kontakt: null,
     uebergeben_an: null, uebergeben_at: null, abschluss_grund: null, abschluss_at: null,
     erfasst_at: '2026-05-29 10:00:00', erfasst_von: 1, geaendert_at: '2026-05-29 10:00:00', geaendert_von: 1,
     storniert_at: null, storniert_von: null,
     geschaedigt_registrier_nr: null, geschaedigt_storniert_at: null,
+    geschaedigt_personal_name: null, geschaedigt_organisation_name: null,
     ...overrides,
   };
 }
 
-function render(einsatzObj: object, schaeden: object[]) {
+function render(einsatzObj: object, schaeden: object[], personen: object[] = [], personal: object[] = []) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(admin)),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json(schaeden)),
+    // Quellen der Geschädigt-Combobox (mounten beim Öffnen der Formulare):
+    http.get('/api/einsaetze/1/personen', () => HttpResponse.json(personen)),
+    http.get('/api/einsaetze/1/personal', () => HttpResponse.json(personal)),
   );
   return renderMitProviders(
     <AuthProvider>
@@ -112,6 +128,88 @@ describe('SchaedenPage', () => {
     await vi.waitFor(() => expect(body.typ).toBe('umweltschaden'));
     expect(body.ausmass).toBe('gross');
     expect(body.ort).toBe('Hauptstr. 17');
+  });
+
+  it('Schnellerfassung: Betroffene Person aus Combobox → geschaedigt_person_id', async () => {
+    let body: Record<string, unknown> = {};
+    server.use(
+      http.post('/api/einsaetze/1/schaeden', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(basisSchaden(), { status: 201 });
+      }),
+    );
+    render(einsatzAktiv, [], [einePerson], [eineEinsatzkraft]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    const dialog = await modalDialog();
+    await userEvent.click(within(dialog).getAllByRole('combobox')[0]); // Typ
+    await waehleOption('Sachschaden');
+    await userEvent.click(within(dialog).getAllByRole('combobox')[1]); // Ausmaß
+    await waehleOption('gering');
+    await userEvent.type(within(dialog).getByLabelText('Ort'), 'Hauptstr. 17');
+    // Geschädigt-Combobox (3.) öffnen und die betroffene Person wählen.
+    await userEvent.click(within(dialog).getAllByRole('combobox')[2]);
+    await waehleOption('R-007 · Anna Meier');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await vi.waitFor(() => expect(body.geschaedigt_person_id).toBe(42));
+    expect(body.geschaedigt_personal_id).toBeNull();
+    expect(body.geschaedigt_organisation_id).toBeNull();
+    expect(body.geschaedigt_kontakt).toBeNull();
+  });
+
+  it('Schnellerfassung: Einsatzkraft aus Combobox → geschaedigt_personal_id', async () => {
+    let body: Record<string, unknown> = {};
+    server.use(
+      http.post('/api/einsaetze/1/schaeden', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(basisSchaden(), { status: 201 });
+      }),
+    );
+    render(einsatzAktiv, [], [einePerson], [eineEinsatzkraft]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    const dialog = await modalDialog();
+    await userEvent.click(within(dialog).getAllByRole('combobox')[0]);
+    await waehleOption('Sachschaden');
+    await userEvent.click(within(dialog).getAllByRole('combobox')[1]);
+    await waehleOption('gering');
+    await userEvent.type(within(dialog).getByLabelText('Ort'), 'Hauptstr. 17');
+    await userEvent.click(within(dialog).getAllByRole('combobox')[2]);
+    await waehleOption('Schulz · Sanitäter');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await vi.waitFor(() => expect(body.geschaedigt_personal_id).toBe(99));
+    expect(body.geschaedigt_person_id).toBeNull();
+    expect(body.geschaedigt_kontakt).toBeNull();
+  });
+
+  it('Schnellerfassung: Freitext → externer Kontakt (geschaedigt_kontakt)', async () => {
+    let body: Record<string, unknown> = {};
+    server.use(
+      http.post('/api/einsaetze/1/schaeden', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(basisSchaden(), { status: 201 });
+      }),
+    );
+    render(einsatzAktiv, [], [einePerson], [eineEinsatzkraft]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Schnellerfassung' }));
+    const dialog = await modalDialog();
+    await userEvent.click(within(dialog).getAllByRole('combobox')[0]);
+    await waehleOption('Sachschaden');
+    await userEvent.click(within(dialog).getAllByRole('combobox')[1]);
+    await waehleOption('gering');
+    await userEvent.type(within(dialog).getByLabelText('Ort'), 'Hauptstr. 17');
+    // In die Geschädigt-Combobox tippen → synthetische „extern"-Option erscheint.
+    const geschaedigt = within(dialog).getAllByRole('combobox')[2];
+    await userEvent.click(geschaedigt);
+    await userEvent.type(geschaedigt, 'Familie Krause');
+    const externOption = (await screen.findAllByText(/Als externen Kontakt/)).find((el) =>
+      el.closest('.ant-select-item-option'),
+    );
+    expect(externOption).toBeTruthy();
+    await userEvent.click(externOption!);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await vi.waitFor(() => expect(body.geschaedigt_kontakt).toBe('Familie Krause'));
+    expect(body.geschaedigt_person_id).toBeNull();
+    expect(body.geschaedigt_personal_id).toBeNull();
+    expect(body.geschaedigt_organisation_id).toBeNull();
   });
 
   it('Übergeben-Modal erzwingt einen Adressaten und schickt ihn', async () => {

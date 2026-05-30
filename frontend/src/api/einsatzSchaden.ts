@@ -8,6 +8,8 @@ export interface SchadenEingabe {
   ort: string;
   beschreibung?: string | null;
   geschaedigt_person_id?: number | null;
+  geschaedigt_personal_id?: number | null;
+  geschaedigt_organisation_id?: number | null;
   geschaedigt_kontakt?: string | null;
 }
 
@@ -19,6 +21,8 @@ export interface SchadenPatch {
   ort?: string;
   beschreibung?: string;
   geschaedigt_person_id?: number | null;
+  geschaedigt_personal_id?: number | null;
+  geschaedigt_organisation_id?: number | null;
   geschaedigt_kontakt?: string | null;
   uebergeben_an?: string | null;
   abschluss_grund?: string | null;

@@ -8,10 +8,8 @@ import {
   Drawer,
   Form,
   Input,
-  InputNumber,
   Modal,
   Popconfirm,
-  Radio,
   Select,
   Space,
   Table,
@@ -42,6 +40,7 @@ import type {
   SchadenTyp,
 } from '../api/types';
 import { useSchaedenStream } from '../etb/useSchaedenStream';
+import GeschaedigtPicker, { type GeschaedigtWert } from './schaeden/GeschaedigtPicker';
 
 const STATUS_META: Record<SchadenStatus, { label: string; color: string }> = {
   offen: { label: 'offen', color: 'gold' },
@@ -84,20 +83,77 @@ const SICHTEN: { key: Sicht; label: string }[] = [
   { key: 'alle', label: 'Alle' },
 ];
 
+function pad3(nr: number): string {
+  return String(nr).padStart(3, '0');
+}
+
 function geschaedigtAnzeige(s: Schaden): React.ReactNode {
   if (s.geschaedigt_registrier_nr != null) {
-    const label = `R-${String(s.geschaedigt_registrier_nr).padStart(3, '0')}`;
+    const label = `R-${pad3(s.geschaedigt_registrier_nr)}`;
     return s.geschaedigt_storniert_at ? (
       <Typography.Text type="secondary">Geschädigt (storniert): {label}</Typography.Text>
     ) : (
       <Tag color="blue">{label}</Tag>
     );
   }
+  if (s.geschaedigt_personal_id != null) {
+    return <Tag color="geekblue">{s.geschaedigt_personal_name ?? 'Einsatzkraft'}</Tag>;
+  }
+  if (s.geschaedigt_organisation_id != null) {
+    return <Tag color="purple">{s.geschaedigt_organisation_name ?? 'Eigene Organisation'}</Tag>;
+  }
   if (s.geschaedigt_kontakt) return <Typography.Text>{s.geschaedigt_kontakt}</Typography.Text>;
   return <Typography.Text type="secondary">—</Typography.Text>;
 }
 
-type GeschaedigtModus = 'keiner' | 'fk' | 'freitext';
+/** Strukturierten Geschädigt-Wert aus einem geladenen Schaden ableiten (Edit-Seeding). */
+function geschaedigtAusSchaden(s: Schaden): GeschaedigtWert {
+  if (s.geschaedigt_person_id != null) {
+    return {
+      typ: 'person',
+      refId: s.geschaedigt_person_id,
+      label:
+        s.geschaedigt_registrier_nr != null ? `R-${pad3(s.geschaedigt_registrier_nr)}` : 'Betroffene Person',
+    };
+  }
+  if (s.geschaedigt_personal_id != null) {
+    return { typ: 'personal', refId: s.geschaedigt_personal_id, label: s.geschaedigt_personal_name ?? 'Einsatzkraft' };
+  }
+  if (s.geschaedigt_organisation_id != null) {
+    return { typ: 'organisation', label: s.geschaedigt_organisation_name ?? 'Eigene Organisation' };
+  }
+  if (s.geschaedigt_kontakt) return { typ: 'extern', kontakt: s.geschaedigt_kontakt };
+  return null;
+}
+
+/** GeschaedigtWert → die vier Backend-Felder (genau eines gesetzt). orgId für die eigene Org. */
+function geschaedigtFelder(
+  wert: GeschaedigtWert,
+  orgId: number,
+): {
+  geschaedigt_person_id: number | null;
+  geschaedigt_personal_id: number | null;
+  geschaedigt_organisation_id: number | null;
+  geschaedigt_kontakt: string | null;
+} {
+  const leer = {
+    geschaedigt_person_id: null,
+    geschaedigt_personal_id: null,
+    geschaedigt_organisation_id: null,
+    geschaedigt_kontakt: null,
+  };
+  if (wert == null) return leer;
+  switch (wert.typ) {
+    case 'person':
+      return { ...leer, geschaedigt_person_id: wert.refId };
+    case 'personal':
+      return { ...leer, geschaedigt_personal_id: wert.refId };
+    case 'organisation':
+      return { ...leer, geschaedigt_organisation_id: orgId };
+    case 'extern':
+      return { ...leer, geschaedigt_kontakt: wert.kontakt };
+  }
+}
 
 export default function SchaedenPage() {
   const { id } = useParams();
@@ -116,10 +172,14 @@ export default function SchaedenPage() {
   const [uebergebenOffen, setUebergebenOffen] = useState(false);
   const [abschlussOffen, setAbschlussOffen] = useState(false);
 
-  const [erfassForm] = Form.useForm<SchadenEingabe & { geschaedigt_modus?: GeschaedigtModus }>();
-  const [editForm] = Form.useForm<SchadenPatch & { geschaedigt_modus?: GeschaedigtModus }>();
+  const [erfassForm] = Form.useForm<SchadenEingabe>();
+  const [editForm] = Form.useForm<SchadenPatch>();
   const [uebergebForm] = Form.useForm<{ uebergeben_an: string }>();
   const [abschlussForm] = Form.useForm<{ abschluss_grund: string; notiz?: string }>();
+
+  // Geschädigt ist ein strukturierter Wert → lokaler State (kein Form.Item).
+  const [erfassGeschaedigt, setErfassGeschaedigt] = useState<GeschaedigtWert>(null);
+  const [editGeschaedigt, setEditGeschaedigt] = useState<GeschaedigtWert>(null);
 
   useSchaedenStream(einsatzId);
 
@@ -147,6 +207,7 @@ export default function SchaedenPage() {
       invalidate();
       setErfassenOffen(false);
       erfassForm.resetFields();
+      setErfassGeschaedigt(null);
     },
     onError: fehler,
   });
@@ -228,65 +289,30 @@ export default function SchaedenPage() {
     { title: 'Geschädigt', key: 'geschaedigt', render: (_, row) => geschaedigtAnzeige(row) },
   ];
 
-  function onErfassen(daten: SchadenEingabe & { geschaedigt_modus?: GeschaedigtModus }) {
-    const modus = daten.geschaedigt_modus ?? 'keiner';
+  const orgId = einsatz?.org_id ?? 0;
+
+  function onErfassen(daten: SchadenEingabe) {
     anlegenMutation.mutate({
       typ: daten.typ,
       ausmass: daten.ausmass,
       ort: daten.ort,
       beschreibung: daten.beschreibung ?? null,
-      geschaedigt_person_id: modus === 'fk' ? daten.geschaedigt_person_id ?? null : null,
-      geschaedigt_kontakt: modus === 'freitext' ? daten.geschaedigt_kontakt ?? null : null,
+      ...geschaedigtFelder(erfassGeschaedigt, orgId),
     });
   }
 
-  function onEdit(daten: SchadenPatch & { geschaedigt_modus?: GeschaedigtModus }) {
-    const modus = daten.geschaedigt_modus ?? 'keiner';
+  function onEdit(daten: SchadenPatch) {
     editMutation.mutate({
       typ: daten.typ,
       ausmass: daten.ausmass,
       ort: daten.ort,
       beschreibung: daten.beschreibung,
-      geschaedigt_person_id: modus === 'fk' ? daten.geschaedigt_person_id ?? null : null,
-      geschaedigt_kontakt: modus === 'freitext' ? daten.geschaedigt_kontakt ?? null : null,
+      // Patch ersetzt die Auswahl: immer alle vier Felder explizit senden.
+      ...geschaedigtFelder(editGeschaedigt, orgId),
     });
   }
 
   const s = detailQuery.data;
-
-  function geschaedigtFelder(form: typeof erfassForm | typeof editForm) {
-    return (
-      <>
-        <Form.Item label="Geschädigt" name="geschaedigt_modus">
-          <Radio.Group
-            options={[
-              { value: 'keiner', label: 'unbekannt/öffentlich' },
-              { value: 'fk', label: 'Person im Einsatz (R-Nr.)' },
-              { value: 'freitext', label: 'Freitext (extern)' },
-            ]}
-          />
-        </Form.Item>
-        <Form.Item noStyle shouldUpdate={(p, c) => p.geschaedigt_modus !== c.geschaedigt_modus}>
-          {() => {
-            const m = form.getFieldValue('geschaedigt_modus');
-            if (m === 'fk')
-              return (
-                <Form.Item label="Geschädigt-Person-ID" name="geschaedigt_person_id">
-                  <InputNumber min={1} style={{ width: 200 }} />
-                </Form.Item>
-              );
-            if (m === 'freitext')
-              return (
-                <Form.Item label="Geschädigt-Kontakt (Name, Tel.)" name="geschaedigt_kontakt">
-                  <Input />
-                </Form.Item>
-              );
-            return null;
-          }}
-        </Form.Item>
-      </>
-    );
-  }
 
   return (
     <div style={{ padding: 16 }}>
@@ -295,7 +321,14 @@ export default function SchaedenPage() {
           Schäden
         </Typography.Title>
         {darfSchreiben && (
-          <Button type="primary" onClick={() => setErfassenOffen(true)}>
+          <Button
+            type="primary"
+            onClick={() => {
+              setErfassGeschaedigt(null);
+              erfassForm.resetFields();
+              setErfassenOffen(true);
+            }}
+          >
             Schnellerfassung
           </Button>
         )}
@@ -357,7 +390,7 @@ export default function SchaedenPage() {
         confirmLoading={anlegenMutation.isPending}
         destroyOnClose
       >
-        <Form form={erfassForm} layout="vertical" onFinish={onErfassen} initialValues={{ geschaedigt_modus: 'keiner' }}>
+        <Form form={erfassForm} layout="vertical" onFinish={onErfassen}>
           <Form.Item label="Typ" name="typ" rules={[{ required: true, message: 'Typ ist Pflicht' }]}>
             <Select options={(Object.keys(TYP_LABEL) as SchadenTyp[]).map((t) => ({ value: t, label: TYP_LABEL[t] }))} />
           </Form.Item>
@@ -370,7 +403,15 @@ export default function SchaedenPage() {
           <Form.Item label="Beschreibung" name="beschreibung">
             <Input.TextArea rows={2} />
           </Form.Item>
-          {geschaedigtFelder(erfassForm)}
+          <Form.Item label="Geschädigt">
+            <GeschaedigtPicker
+              einsatzId={einsatzId}
+              orgId={einsatz?.org_id}
+              orgName={einsatz?.org_name ?? 'Eigene Organisation'}
+              value={erfassGeschaedigt}
+              onChange={setErfassGeschaedigt}
+            />
+          </Form.Item>
         </Form>
       </Modal>
 
@@ -429,10 +470,6 @@ export default function SchaedenPage() {
                   ausmass: s.ausmass,
                   ort: s.ort,
                   beschreibung: s.beschreibung,
-                  geschaedigt_modus:
-                    s.geschaedigt_person_id != null ? 'fk' : s.geschaedigt_kontakt ? 'freitext' : 'keiner',
-                  geschaedigt_person_id: s.geschaedigt_person_id ?? undefined,
-                  geschaedigt_kontakt: s.geschaedigt_kontakt ?? undefined,
                 }}
               >
                 <Form.Item label="Typ" name="typ">
@@ -447,7 +484,15 @@ export default function SchaedenPage() {
                 <Form.Item label="Beschreibung" name="beschreibung">
                   <Input.TextArea rows={2} />
                 </Form.Item>
-                {geschaedigtFelder(editForm)}
+                <Form.Item label="Geschädigt">
+                  <GeschaedigtPicker
+                    einsatzId={einsatzId}
+                    orgId={einsatz?.org_id}
+                    orgName={einsatz?.org_name ?? 'Eigene Organisation'}
+                    value={editGeschaedigt}
+                    onChange={setEditGeschaedigt}
+                  />
+                </Form.Item>
                 <Space>
                   <Button type="primary" htmlType="submit" loading={editMutation.isPending}>
                     Speichern
@@ -459,7 +504,14 @@ export default function SchaedenPage() {
 
             {darfSchreiben && !s.storniert_at && !bearbeiten && (
               <Space>
-                <Button onClick={() => setBearbeiten(true)}>Bearbeiten</Button>
+                <Button
+                  onClick={() => {
+                    setEditGeschaedigt(geschaedigtAusSchaden(s));
+                    setBearbeiten(true);
+                  }}
+                >
+                  Bearbeiten
+                </Button>
                 <Popconfirm title="Schaden stornieren?" onConfirm={() => stornoMutation.mutate()} okText="Stornieren">
                   <Button danger>Stornieren</Button>
                 </Popconfirm>

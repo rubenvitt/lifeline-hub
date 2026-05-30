@@ -36,6 +36,9 @@ export interface EinsatzAnzeige {
   anzahl_betroffene_initial: number | null;
   /** Rolle des abfragenden Benutzers; null = kein Mitglied. */
   meine_rolle: EinsatzRolle | null;
+  /** Eigene Organisation des Einsatzes (Träger). */
+  org_id: number;
+  org_name: string;
 }
 
 export interface MitgliedAnzeige {
@@ -492,6 +495,8 @@ export interface Schaden {
   ort: string;
   beschreibung: string;
   geschaedigt_person_id: number | null;
+  geschaedigt_personal_id: number | null;
+  geschaedigt_organisation_id: number | null;
   geschaedigt_kontakt: string | null;
   uebergeben_an: string | null;
   uebergeben_at: string | null;
@@ -503,9 +508,11 @@ export interface Schaden {
   geaendert_von: number;
   storniert_at: string | null;
   storniert_von: number | null;
-  // Read-only Join-Felder (Geschädigt-Auflösung über einsatz_person):
+  // Read-only Join-Felder (Geschädigt-Auflösung):
   geschaedigt_registrier_nr: number | null;
   geschaedigt_storniert_at: string | null;
+  geschaedigt_personal_name: string | null;
+  geschaedigt_organisation_name: string | null;
 }
 
 // ============================== E‑4 Tiere ==============================
