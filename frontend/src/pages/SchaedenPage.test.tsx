@@ -177,6 +177,7 @@ describe('SchaedenPage', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
     await vi.waitFor(() => expect(body.geschaedigt_personal_id).toBe(99));
     expect(body.geschaedigt_person_id).toBeNull();
+    expect(body.geschaedigt_organisation_id).toBeNull();
     expect(body.geschaedigt_kontakt).toBeNull();
   });
 

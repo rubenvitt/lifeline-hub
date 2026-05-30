@@ -406,7 +406,6 @@ export default function SchaedenPage() {
           <Form.Item label="Geschädigt">
             <GeschaedigtPicker
               einsatzId={einsatzId}
-              orgId={einsatz?.org_id}
               orgName={einsatz?.org_name ?? 'Eigene Organisation'}
               value={erfassGeschaedigt}
               onChange={setErfassGeschaedigt}
@@ -487,7 +486,6 @@ export default function SchaedenPage() {
                 <Form.Item label="Geschädigt">
                   <GeschaedigtPicker
                     einsatzId={einsatzId}
-                    orgId={einsatz?.org_id}
                     orgName={einsatz?.org_name ?? 'Eigene Organisation'}
                     value={editGeschaedigt}
                     onChange={setEditGeschaedigt}

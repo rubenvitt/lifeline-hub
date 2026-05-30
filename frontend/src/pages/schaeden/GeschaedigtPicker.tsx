@@ -36,8 +36,8 @@ function personLabel(registrierNr: number, name: string | null, vorname: string 
 
 interface Props {
   einsatzId: number;
-  /** Eigene Org-ID; vom Aufrufer beim Submit genutzt (Server clamped serverseitig). */
-  orgId?: number;
+  /** Anzeigename der eigenen Organisation (für die Org-Option). Die Org-ID wird vom
+   *  Aufrufer beim Submit gesetzt und serverseitig ohnehin auf die Einsatz-Org geklemmt. */
   orgName: string;
   value: GeschaedigtWert;
   onChange: (v: GeschaedigtWert) => void;
