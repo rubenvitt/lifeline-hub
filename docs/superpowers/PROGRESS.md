@@ -113,7 +113,7 @@ Online-Style-URL, beides konfigurierbar; Laufzeit-Bevorzugung online → PMTiles
 
 | # | Spec | Liefert | Abhängigkeit | Status |
 |---|---|---|---|---|
-| L‑1 | **Karten-Fundament** | MapLibre-GL-Karte (offline-fähig via PMTiles), Geo-Spalten auf UHS + Schäden, Verorten per Klick, Marker-Rendering + Live (SSE), Einsatzort-Karten-Picker | E‑3 (UHS) + E‑5 (Schäden) | 📝 Design abgestimmt → User-Review → Plan als Nächstes |
+| L‑1 | **Karten-Fundament** | MapLibre-GL-Karte (offline-fähig via PMTiles), Geo-Spalten auf UHS + Schäden, Verorten per Klick, Marker-Rendering + Live (SSE), Einsatzort-Karten-Picker | E‑3 (UHS) + E‑5 (Schäden) | ✅ **DONE** — Plan `docs/superpowers/plans/2026-05-30-lage-karten-fundament.md`, Branch `worktree-feat+lage-karten-fundament` (Migr. `0034`, `src/routes/karte.rs`, `LagekartePage` + `pages/lagekarte/`); subagent-getrieben umgesetzt |
 | L‑2 | **Taktische Gliederung** | Einheiten/Abschnitte (K&M‑3) als taktische Zeichen (DV 102); operativer Fahrzeug-/Kräfte-Standort (FMS) | L‑1 + K&M‑3 | geplant |
 | L‑3 | **Gefahren- & Absperrzonen** | Freies Zeichnen von Flächen/Linien, entitätsloser Annotations-Layer | L‑1 | geplant |
 | (L‑4) | **Live-Fahrzeugpositionen / Tracking** | nur falls machbar — Vorabklärung | L‑1 | ⏸ geparkt — ClickUp [86ca1nv2v](https://app.clickup.com/t/86ca1nv2v) (Machbarkeit prüfen) |
