@@ -88,13 +88,37 @@ die generische Mechanik legte). Jede Spec wird einzeln durchgebrainstormt.
 | E‑1 | **Personen-Fundament + Erfassung** | Personen-Entity, Status-Lebenszyklus (vermisst → betroffen → Patient SK I–IV → verstorben), Basis-Erfassung, ETB-Integration **+ sensible-Daten-Zugriffs-/Audit-/Retention-Modell** | — (Unterbau) | ✅ **DONE** — Plan `docs/superpowers/plans/2026-05-27-erfassung-personen-fundament.md`, PersonenPage + Tests, Modul aktiviert |
 | E‑2 | **Sichtung & medizinischer Verlauf** | Sichtungskategorien SK I–IV/tot/unverletzt (Verlauf + Cache), Befund-/Verlaufsnotiz (append-only), Transport/Verbleib (KH=Freitext), Vermisstenabgleich (Verdacht→bestätigt) | E‑1 | ✅ **DONE** — Plan `docs/superpowers/plans/2026-05-27-erfassung-sichtung-medizinischer-verlauf.md` |
 | E‑3 | **Unfallhilfsstellen** | Örtlichkeits-/Struktur-Stamm (Patientenablage, Behandlungsplatz, Verletztensammelstelle); Personen-Zuordnung | E‑1 | ✅ **DONE** — Plan `docs/superpowers/plans/2026-05-28-erfassung-unfallhilfsstellen.md` |
-| E‑4 | **Tiere** | Eigener Stamm + Status (eigene Spec — Tiere kommen vor) | E‑1-Foundation | geplant |
+| E‑4 | **Tiere** | Eigener Stamm + Status (eigene Spec — Tiere kommen vor) | E‑1-Foundation | ✅ **DONE** — Plan `docs/superpowers/plans/2026-05-29-erfassung-tiere.md`, `src/tier/` + TierePage, gemerged (`2ddb130`) |
 | E‑5 | **Schäden** (allgemein) | Schadensobjekte/-stellen: Art, Ort, Ausmaß, Status (Sach-/Infrastruktur-/Umweltschäden); **kein** Karten-Rendering (→ T4), **keine** Gefahren-/Absperrzonen (→ Lage) | E‑1-Foundation | ✅ **DONE** — Plan `docs/superpowers/plans/2026-05-29-erfassung-schaeden.md`, SchaedenPage + Tests, Modul aktiviert, ETB-Leak-Tests grün |
 
 **Bindendes Personen-Konzept (aus Navigations-Spec):** Personen = EIN Stamm mit
 Status-Lebenszyklus; dieselbe physische Person wandert durch die Zustände (ein Modul
 mit gefilterten Sichten, kein Modul je Status). Unfallhilfsstellen (Örtlichkeit) und
 Tiere bleiben davon getrennt.
+
+## Teilprojekt 4 — „Lage" — Spec-Sequenz
+
+Die Kategorie **Lagekarte** (Navigations-Redesign) **visualisiert** die in T1–T3
+erfassten Daten räumlich. Bisher liegt alles Ortsbezogene nur als Freitext vor
+(`uhs.standort`, `einsatz_schaden.ort`); nur der Einsatz hat echte Koordinaten. T4 ist
+selbst eine Sequenz (wie K&M und Erfassung): **L‑1** legt das Karten-/Geo-Fundament
+(Basemap offline-fähig, Koordinaten direkt am Objekt, Marker, Live), das **L‑2/L‑3**
+wiederverwenden. Jede Spec wird einzeln durchgebrainstormt.
+
+**Koordinaten-Modell (abgestimmt, gilt für die Lage-Sequenz):** Geo direkt am Objekt-
+Datensatz (entity-gekoppelt) — kein separater Overlay-/Marker-Layer (eine Wahrheit, keine
+Drift, Marker = echtes Objekt). Der freie, entitätslose Zeichen-/Annotations-Layer ist
+bewusst L‑3 vorbehalten. **Basemap:** offline-first PMTiles (lokaler Pfad) **+** optionale
+Online-Style-URL, beides konfigurierbar; Laufzeit-Bevorzugung online → PMTiles → Blind-Modus.
+
+| # | Spec | Liefert | Abhängigkeit | Status |
+|---|---|---|---|---|
+| L‑1 | **Karten-Fundament** | MapLibre-GL-Karte (offline-fähig via PMTiles), Geo-Spalten auf UHS + Schäden, Verorten per Klick, Marker-Rendering + Live (SSE), Einsatzort-Karten-Picker | E‑3 (UHS) + E‑5 (Schäden) | 📝 Design abgestimmt → User-Review → Plan als Nächstes |
+| L‑2 | **Taktische Gliederung** | Einheiten/Abschnitte (K&M‑3) als taktische Zeichen (DV 102); operativer Fahrzeug-/Kräfte-Standort (FMS) | L‑1 + K&M‑3 | geplant |
+| L‑3 | **Gefahren- & Absperrzonen** | Freies Zeichnen von Flächen/Linien, entitätsloser Annotations-Layer | L‑1 | geplant |
+| (L‑4) | **Live-Fahrzeugpositionen / Tracking** | nur falls machbar — Vorabklärung | L‑1 | ⏸ geparkt — ClickUp [86ca1nv2v](https://app.clickup.com/t/86ca1nv2v) (Machbarkeit prüfen) |
+
+**Spec L‑1:** `docs/superpowers/specs/2026-05-30-lage-karten-fundament-design.md`
 
 ## Querschnittliche Folge-Idee — Daten-Retention abgeschlossener Einsätze (Backlog)
 
