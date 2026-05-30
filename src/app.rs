@@ -1,10 +1,12 @@
+use crate::config::KarteConfig;
 use crate::live::LiveHub;
 use crate::routes;
 use axum::{
     routing::{delete, get, patch, post, put},
-    Router,
+    Extension, Router,
 };
 use sqlx::SqlitePool;
+use tower_http::services::ServeFile;
 
 /// Geteilter Anwendungszustand, der an alle Handler übergeben wird.
 #[derive(Clone)]
@@ -13,8 +15,14 @@ pub struct AppState {
     pub live: LiveHub,
 }
 
-/// Baut den Axum-Router mit allen Routen und dem geteilten Zustand.
+/// Baut den Router mit Default-Karte (keine Basemap konfiguriert → Blind-Modus).
+/// Bestehende Aufrufer und Tests bleiben unverändert.
 pub fn build_router(state: AppState) -> Router {
+    build_router_mit_karte(state, KarteConfig::default())
+}
+
+/// Baut den Axum-Router mit allen Routen, dem geteilten Zustand und der Basemap.
+pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
     let router = Router::new()
         .route("/api/health", get(routes::health::health))
         .route("/api/backup", get(routes::backup::download))
@@ -196,7 +204,17 @@ pub fn build_router(state: AppState) -> Router {
     #[cfg(feature = "dev-seeds")]
     let router = router.route("/api/dev/users", get(routes::dev::users));
 
+    let router = router.route("/api/karte/config", get(routes::karte::config));
+
+    // PMTiles-Tile-Service: nur mounten, wenn eine Datei konfiguriert ist.
+    // ServeFile (eine feste Datei, kein ServeDir) beherrscht HTTP-Range nativ.
+    let router = match &karte.pmtiles_path {
+        Some(pfad) => router.route_service("/api/karte/tiles.pmtiles", ServeFile::new(pfad)),
+        None => router.route("/api/karte/tiles.pmtiles", get(routes::karte::tiles_fehlt)),
+    };
+
     router
+        .layer(Extension(karte))
         .fallback(crate::static_files::serve)
         .with_state(state)
 }
