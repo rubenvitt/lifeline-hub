@@ -1,0 +1,82 @@
+use axum::body::Body;
+use axum::http::{Request, StatusCode};
+use lifeline_hub::app::{build_router, build_router_mit_karte, AppState};
+use lifeline_hub::config::KarteConfig;
+use lifeline_hub::live::LiveHub;
+use std::io::Write;
+use tower::ServiceExt; // oneshot
+
+async fn pool() -> sqlx::SqlitePool {
+    // db::test_pool() liefert einen bereits migrierten Test-Pool (wie alle tests/*.rs).
+    // Die Karte-Routen lesen die DB nicht — der Pool wird nur für AppState gebraucht.
+    lifeline_hub::db::test_pool().await
+}
+
+#[tokio::test]
+async fn tiles_route_liefert_range_aus() {
+    let pool = pool().await;
+    let mut datei = tempfile::NamedTempFile::new().unwrap();
+    datei.write_all(b"PMTILESDATA0123456789").unwrap();
+    let pfad = datei.path().to_string_lossy().to_string();
+
+    let app = build_router_mit_karte(
+        AppState { pool, live: LiveHub::new() },
+        KarteConfig { pmtiles_path: Some(pfad), online_style_url: None },
+    );
+
+    let req = Request::builder()
+        .uri("/api/karte/tiles.pmtiles")
+        .header("Range", "bytes=0-7")
+        .body(Body::empty())
+        .unwrap();
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::PARTIAL_CONTENT); // 206
+    let bytes = axum::body::to_bytes(res.into_body(), 1024).await.unwrap();
+    assert_eq!(&bytes[..], b"PMTILESD");
+}
+
+#[tokio::test]
+async fn tiles_route_404_ohne_konfigurierten_pfad() {
+    let pool = pool().await;
+    let app = build_router(AppState { pool, live: LiveHub::new() }); // Default-KarteConfig
+    let req = Request::builder()
+        .uri("/api/karte/tiles.pmtiles")
+        .body(Body::empty())
+        .unwrap();
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn config_endpoint_meldet_verfuegbarkeit() {
+    let pool = pool().await;
+    let app = build_router_mit_karte(
+        AppState { pool, live: LiveHub::new() },
+        KarteConfig {
+            pmtiles_path: Some("/irrelevant.pmtiles".into()),
+            online_style_url: Some("https://tiles.example/style.json".into()),
+        },
+    );
+    let req = Request::builder().uri("/api/karte/config").body(Body::empty()).unwrap();
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = axum::body::to_bytes(res.into_body(), 4096).await.unwrap();
+    let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(v["pmtiles_verfuegbar"].as_bool(), Some(true));
+    assert_eq!(v["pmtiles_url"].as_str(), Some("/api/karte/tiles.pmtiles"));
+    assert_eq!(v["online_style_url"].as_str(), Some("https://tiles.example/style.json"));
+}
+
+#[tokio::test]
+async fn config_endpoint_blind_modus_ohne_konfiguration() {
+    let pool = pool().await;
+    let app = build_router(AppState { pool, live: LiveHub::new() });
+    let req = Request::builder().uri("/api/karte/config").body(Body::empty()).unwrap();
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = axum::body::to_bytes(res.into_body(), 4096).await.unwrap();
+    let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(v["pmtiles_verfuegbar"].as_bool(), Some(false));
+    assert!(v["pmtiles_url"].is_null());
+    assert!(v["online_style_url"].is_null());
+}

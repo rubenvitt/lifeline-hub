@@ -209,6 +209,8 @@ pub struct UhsAnzeige {
     pub bezeichnung: String,
     pub standort: Option<String>,
     pub notiz: Option<String>,
+    pub lat: Option<f64>,
+    pub lon: Option<f64>,
     pub status: String,
     pub erfasst_at: String,
     pub erfasst_von: i64,

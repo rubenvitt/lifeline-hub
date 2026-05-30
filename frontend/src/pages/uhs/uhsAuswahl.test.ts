@@ -5,7 +5,7 @@ import type { Uhs, UhsStatus } from '../../api/types';
 function uhs(id: number, status: UhsStatus): Uhs {
   return {
     id, einsatz_id: 1, abschnitt_id: null, typ: 'behandlungsplatz',
-    bezeichnung: `UHS ${id}`, standort: null, notiz: null, status,
+    bezeichnung: `UHS ${id}`, standort: null, notiz: null, lat: null, lon: null, status,
     erfasst_at: 'x', erfasst_von: 1, geaendert_at: 'x', geaendert_von: 1, storniert_at: null,
   };
 }

@@ -25,6 +25,14 @@ impl GeheimesPasswort {
     }
 }
 
+/// Karten-/Basemap-Konfiguration, die zur Laufzeit an die Karte-Routen geht.
+/// `Default` (alles `None`) → kein Tile-Service, Frontend geht in den Blind-Modus.
+#[derive(Clone, Debug, Default)]
+pub struct KarteConfig {
+    pub pmtiles_path: Option<String>,
+    pub online_style_url: Option<String>,
+}
+
 /// Laufzeit-Konfiguration für den lifeline-hub-Server.
 #[derive(Parser, Debug, Clone)]
 #[command(version, about = "lifeline-hub Server")]
@@ -49,6 +57,15 @@ pub struct Config {
     /// ein Zufalls-Passwort erzeugt und ins Log geschrieben.
     #[arg(long, env = "LIFELINE_ADMIN_PASSWORD")]
     pub admin_password: Option<GeheimesPasswort>,
+
+    /// Pfad zur lokalen PMTiles-Basemap (Offline-Karte). Fehlt er, gibt es keinen
+    /// Offline-Tile-Service; das Frontend nutzt dann Online-URL oder Blind-Modus.
+    #[arg(long, env = "LIFELINE_PMTILES_PATH")]
+    pub pmtiles_path: Option<String>,
+
+    /// Online-Style-URL (MapLibre-Style-JSON), bevorzugt wenn das Netz erreichbar ist.
+    #[arg(long, env = "LIFELINE_KARTE_STYLE_URL")]
+    pub karte_online_style_url: Option<String>,
 
     /// Optionales Subkommando. Ohne Subkommando wird der Server gestartet.
     #[command(subcommand)]
@@ -158,5 +175,19 @@ mod tests {
         ]);
         assert_eq!(config.db_path, "/tmp/x.db");
         assert!(matches!(config.command, Some(Command::Backup { .. })));
+    }
+
+    #[test]
+    fn karte_flags_werden_geparst() {
+        let config = Config::parse_from([
+            "lifeline-hub",
+            "--pmtiles-path", "/data/de.pmtiles",
+            "--karte-online-style-url", "https://tiles.example/style.json",
+        ]);
+        assert_eq!(config.pmtiles_path.as_deref(), Some("/data/de.pmtiles"));
+        assert_eq!(
+            config.karte_online_style_url.as_deref(),
+            Some("https://tiles.example/style.json")
+        );
     }
 }

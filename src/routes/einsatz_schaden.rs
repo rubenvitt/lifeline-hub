@@ -248,6 +248,10 @@ pub struct PatchBody {
     pub uebergeben_an: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub abschluss_grund: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub lat: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub lon: Option<Option<f64>>,
 }
 
 pub async fn aktualisieren(
@@ -264,6 +268,25 @@ pub async fn aktualisieren(
     let vorher = schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?; // 404
     if vorher.storniert_at.is_some() {
         return Err(AppError::Conflict("Stornierter Schaden kann nicht geändert werden".into()));
+    }
+
+    // lat/lon als Paar: Effektivzustand nach dem Patch prüfen (422 statt 500).
+    let eff_lat = match body.lat { Some(opt) => opt, None => vorher.lat };
+    let eff_lon = match body.lon { Some(opt) => opt, None => vorher.lon };
+    if eff_lat.is_some() != eff_lon.is_some() {
+        return Err(AppError::UnprocessableEntity(
+            "lat und lon müssen gemeinsam gesetzt oder gemeinsam leer sein".into(),
+        ));
+    }
+    if let Some(la) = eff_lat {
+        if !(-90.0..=90.0).contains(&la) {
+            return Err(AppError::UnprocessableEntity("lat muss zwischen -90 und 90 liegen".into()));
+        }
+    }
+    if let Some(lo) = eff_lon {
+        if !(-180.0..=180.0).contains(&lo) {
+            return Err(AppError::UnprocessableEntity("lon muss zwischen -180 und 180 liegen".into()));
+        }
     }
 
     if let Some(t) = &body.typ {
@@ -371,6 +394,8 @@ pub async fn aktualisieren(
             geschaedigt_organisation_id: org_delta,
             uebergeben_an: uebergeben_an_norm.as_ref().map(|o| o.as_deref()),
             abschluss_grund: abschluss_grund_norm.as_ref().map(|o| o.as_deref()),
+            lat: body.lat,
+            lon: body.lon,
         },
     )
     .await?;

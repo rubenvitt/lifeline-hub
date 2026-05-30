@@ -36,6 +36,9 @@ export interface UhsPatch {
   abschnitt_id?: number | null;
   standort?: string | null;
   notiz?: string | null;
+  /** lat/lon werden gemeinsam gesendet (beide Zahl = setzen, beide null = löschen). */
+  lat?: number | null;
+  lon?: number | null;
 }
 
 export function aktualisiereUhs(einsatzId: number, uhsId: number, daten: UhsPatch): Promise<Uhs> {

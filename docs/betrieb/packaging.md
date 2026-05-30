@@ -35,6 +35,8 @@ Konfiguration per CLI-Flag oder ENV (Auszug):
 | `--org-name` | `LIFELINE_ORG_NAME` | `Meine Organisation` | Org-Name beim ersten Start |
 | `--admin-user` | `LIFELINE_ADMIN_USER` | `admin` | Initialer Admin (erster Start) |
 | `--admin-password` | `LIFELINE_ADMIN_PASSWORD` | *(generiert)* | Fehlt es, wird beim ersten Start ein Zufallspasswort ins Log geschrieben |
+| `--pmtiles-path` | `LIFELINE_PMTILES_PATH` | *(leer)* | Lokale PMTiles-Basemap (Offline-Karte), per HTTP-Range ausgeliefert |
+| `--karte-online-style-url` | `LIFELINE_KARTE_STYLE_URL` | *(leer)* | Online-MapLibre-Style-JSON-URL (bevorzugt, wenn Netz da ist) |
 
 > **Erstes Admin-Passwort:** Wurde kein `--admin-password` gesetzt, schreibt die
 > Binary beim ersten Start ein Zufallspasswort als Warnung ins Log. Mit systemd:
@@ -54,3 +56,27 @@ LAN ist HTTP zulässig.
 > **Hinweis:** Die Binary wird auf einem Entwickler-/Build-Rechner mit Node.js und
 > Rust gebaut und dann als fertige Datei auf den ELW-Rechner kopiert. Auf dem
 > ELW-Rechner selbst werden weder Node.js noch eine Internetverbindung benötigt.
+
+## Lagekarte / Basemap
+
+Die Lagekarte (Modul „Lagekarte") rendert mit MapLibre GL und ist offline-fähig. Zwei
+Konfigurationsquellen, beide optional:
+
+- **`--pmtiles-path` / `LIFELINE_PMTILES_PATH`** — Pfad zu einer lokalen **PMTiles**-Datei
+  (z. B. ein Protomaps-Build von [build.protomaps.com](https://build.protomaps.com),
+  DE-weit mehrere GB). Der Server liefert sie per **HTTP-Range** unter
+  `/api/karte/tiles.pmtiles` aus. Ideal für den ELW ohne Netz.
+- **`--karte-online-style-url` / `LIFELINE_KARTE_STYLE_URL`** — vollständige MapLibre-
+  **Style-JSON-URL** (online), z. B. ein gehosteter Vektor-Style.
+
+**Laufzeit-Bevorzugung im Frontend:** online (falls erreichbar) → Offline-PMTiles →
+**Blind-Modus** (neutrales Raster). Im Blind-Modus funktionieren Marker und das Verorten
+weiterhin — nur der Kartenhintergrund fehlt. Ein Umschalter in der Karten-Toolbar erlaubt
+die manuelle Wahl. Fehlt der PMTiles-Pfad, liefert `/api/karte/tiles.pmtiles` 404 und das
+Frontend nutzt automatisch Online bzw. Blind.
+
+**Schema-Hinweis (Offline-Vektor-Style):** Der gebündelte Offline-Style nimmt das
+**Protomaps-Schema** an (Source-Layer `earth`/`landuse`/`water`/`roads`/`buildings`) und
+rendert bewusst **ohne Beschriftung** — so werden keine Glyphs/Offline-Fonts benötigt.
+PMTiles-Dateien mit einem anderen Schema brauchen einen angepassten Offline-Style
+(`frontend/src/pages/lagekarte/basemapStil.ts`) oder die Online-Style-URL.

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   App,
@@ -158,6 +158,7 @@ function geschaedigtFelder(
 export default function SchaedenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const [searchParams] = useSearchParams();
   const { message } = App.useApp();
   const qc = useQueryClient();
 
@@ -193,6 +194,12 @@ export default function SchaedenPage() {
     queryFn: () => ladeSchaden(einsatzId, offenerSchadenId!),
     enabled: offenerSchadenId != null,
   });
+
+  useEffect(() => {
+    const ziel = searchParams.get('schaden');
+    const n = Number(ziel);
+    if (ziel && !Number.isNaN(n)) setOffenerSchadenId(n);
+  }, [searchParams]);
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: ['einsatz-schaeden', einsatzId] });

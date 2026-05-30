@@ -1,5 +1,5 @@
 use clap::Parser;
-use lifeline_hub::app::{build_router, AppState};
+use lifeline_hub::app::{build_router_mit_karte, AppState};
 use lifeline_hub::backup;
 use lifeline_hub::config::{Command, Config};
 use lifeline_hub::db;
@@ -65,10 +65,17 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         );
     }
 
-    let app = build_router(AppState {
-        pool,
-        live: LiveHub::new(),
-    });
+    let karte = lifeline_hub::config::KarteConfig {
+        pmtiles_path: config.pmtiles_path.clone(),
+        online_style_url: config.karte_online_style_url.clone(),
+    };
+    let app = build_router_mit_karte(
+        AppState {
+            pool,
+            live: LiveHub::new(),
+        },
+        karte,
+    );
 
     let listener = tokio::net::TcpListener::bind(&config.bind).await?;
     tracing::info!("Server lauscht auf {}", config.bind);
