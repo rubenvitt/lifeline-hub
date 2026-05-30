@@ -35,6 +35,7 @@ function basisSchaden(overrides: Record<string, unknown> = {}) {
   return {
     id: 10, einsatz_id: 1, registrier_nr: 1, status: 'offen', typ: 'sachschaden',
     ausmass: 'gering', ort: 'Hauptstr. 17', beschreibung: '',
+    lat: null, lon: null,
     geschaedigt_person_id: null, geschaedigt_personal_id: null, geschaedigt_organisation_id: null,
     geschaedigt_kontakt: null,
     uebergeben_an: null, uebergeben_at: null, abschluss_grund: null, abschluss_at: null,
@@ -254,5 +255,30 @@ describe('SchaedenPage', () => {
     await waehleOption('behoben');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abschließen' }));
     await vi.waitFor(() => expect(body.abschluss_grund).toBe('behoben'));
+  });
+
+  it('öffnet per ?schaden=-Query den Detail-Drawer', async () => {
+    const schaden5 = basisSchaden({
+      id: 5, registrier_nr: 7, ort: 'Gartenstr. 42',
+      beschreibung: 'Riss', ausmass: 'gross',
+    });
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([schaden5])),
+      http.get('/api/einsaetze/1/schaeden/5', () => HttpResponse.json(schaden5)),
+      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/schaeden" element={<SchaedenPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/1/schaeden?schaden=5' },
+    );
+    // Drawer-Titel enthält die S-Nummer und den Typ — erscheint nur im Drawer, nicht in der Tabelle.
+    expect(await screen.findByText('S-007 · Sachschaden')).toBeInTheDocument();
   });
 });
