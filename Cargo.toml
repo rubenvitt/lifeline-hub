@@ -20,6 +20,7 @@ axum-extra = { version = "0.10", features = ["cookie"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
 tempfile = "3"
 rust-embed = "8"
+tower-http = { version = "0.6", features = ["fs"] }
 
 [features]
 # Dev-only: aktiviert Seed-Testdaten und den /api/dev/users-Endpoint.
