@@ -1,4 +1,4 @@
-import { Badge, Button, Card, Empty, List, Radio, Space, Switch, Typography } from 'antd';
+import { Badge, Button, Card, Empty, List, Radio, Space, Switch, Tooltip, Typography } from 'antd';
 import type { KarteMarker, NichtVerortet } from './marker';
 import type { BasemapModus } from './basemapStil';
 
@@ -22,6 +22,8 @@ export interface SidebarProps {
   basemap: BasemapModus;
   onBasemapWechsel: (modus: BasemapModus) => void;
   onMarkerWaehlen: (schluessel: string) => void;
+  onlineVerfuegbar: boolean;
+  offlineVerfuegbar: boolean;
 }
 
 export default function Sidebar(props: SidebarProps) {
@@ -157,10 +159,23 @@ export default function Sidebar(props: SidebarProps) {
           optionType="button"
           size="small"
         >
-          <Radio.Button value="online">Online</Radio.Button>
-          <Radio.Button value="offline">Offline</Radio.Button>
+          <Tooltip title={props.onlineVerfuegbar ? '' : 'nicht konfiguriert'}>
+            <Radio.Button value="online" disabled={!props.onlineVerfuegbar}>
+              Online
+            </Radio.Button>
+          </Tooltip>
+          <Tooltip title={props.offlineVerfuegbar ? '' : 'nicht konfiguriert'}>
+            <Radio.Button value="offline" disabled={!props.offlineVerfuegbar}>
+              Offline
+            </Radio.Button>
+          </Tooltip>
           <Radio.Button value="blind">Blind</Radio.Button>
         </Radio.Group>
+        {props.basemap === 'blind' && (
+          <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0, fontSize: 12 }}>
+            Keine Basemap konfiguriert — Marker und Verorten funktionieren weiterhin.
+          </Typography.Paragraph>
+        )}
       </Card>
     </div>
   );

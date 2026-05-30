@@ -157,6 +157,8 @@ export default function LagekartePage() {
         basemap={basemap ?? 'blind'}
         onBasemapWechsel={setBasemap}
         onMarkerWaehlen={onMarkerWaehlen}
+        onlineVerfuegbar={!!configQuery.data?.online_style_url}
+        offlineVerfuegbar={!!configQuery.data?.pmtiles_verfuegbar}
       />
       <div style={{ flex: 1, position: 'relative' }}>
         <Kartenflaeche

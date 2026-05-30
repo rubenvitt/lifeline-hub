@@ -213,4 +213,49 @@ describe('LagekartePage', () => {
     // Marker bleiben im Blind-Modus sichtbar (Spec-Garantie):
     expect(screen.getByText('marker-schaden-9')).toBeInTheDocument();
   });
+
+  it('Basemap-Umschalter: ohne Config sind Online/Offline disabled, Blind aktiv', async () => {
+    // Default-Config: leer → defaultModus = blind, kein Modus außer Blind verfügbar.
+    basisHandler();
+    renderSeite();
+    await screen.findByText('marker-schaden-9');
+    expect((screen.getByRole('radio', { name: 'Online' }) as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByRole('radio', { name: 'Offline' }) as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByRole('radio', { name: 'Blind' }) as HTMLInputElement).disabled).toBe(false);
+    expect((screen.getByRole('radio', { name: 'Blind' }) as HTMLInputElement).checked).toBe(true);
+  });
+
+  it('Basemap-Umschalter: Blind-Modus zeigt erklärenden Hinweistext', async () => {
+    basisHandler();
+    renderSeite();
+    expect(await screen.findByText(/Keine Basemap konfiguriert/i)).toBeInTheDocument();
+  });
+
+  it('Basemap-Umschalter: bei verfügbarer Config sind passende Buttons aktiv und kein Blind-Hinweis', async () => {
+    basisHandler([], {
+      online_style_url: 'https://x/style.json',
+      pmtiles_verfuegbar: true,
+      pmtiles_url: '/api/karte/tiles.pmtiles',
+    });
+    renderSeite();
+    await screen.findByText('marker-schaden-9');
+    expect((screen.getByRole('radio', { name: 'Online' }) as HTMLInputElement).disabled).toBe(false);
+    expect((screen.getByRole('radio', { name: 'Offline' }) as HTMLInputElement).disabled).toBe(false);
+    // Default-Modus ist 'online' → kein Blind-Hinweis sichtbar.
+    expect(screen.queryByText(/Keine Basemap konfiguriert/i)).not.toBeInTheDocument();
+  });
+
+  it('Basemap-Umschalter: nur Offline konfiguriert → Online disabled, Offline aktiv', async () => {
+    basisHandler([], {
+      online_style_url: null,
+      pmtiles_verfuegbar: true,
+      pmtiles_url: '/api/karte/tiles.pmtiles',
+    });
+    renderSeite();
+    await screen.findByText('marker-schaden-9');
+    expect((screen.getByRole('radio', { name: 'Online' }) as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByRole('radio', { name: 'Offline' }) as HTMLInputElement).disabled).toBe(false);
+    // defaultModus springt auf 'offline'
+    expect((screen.getByRole('radio', { name: 'Offline' }) as HTMLInputElement).checked).toBe(true);
+  });
 });
