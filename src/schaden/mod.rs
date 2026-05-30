@@ -170,6 +170,8 @@ pub struct SchadenAnzeige {
     pub typ: String,
     pub ausmass: String,
     pub ort: String,
+    pub lat: Option<f64>,
+    pub lon: Option<f64>,
     pub beschreibung: String,
     pub geschaedigt_person_id: Option<i64>,
     pub geschaedigt_kontakt: Option<String>,

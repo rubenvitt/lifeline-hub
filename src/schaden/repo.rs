@@ -4,6 +4,7 @@ use sqlx::SqlitePool;
 
 const SELECT_ALLE: &str = "\
     SELECT s.id, s.einsatz_id, s.registrier_nr, s.status, s.typ, s.ausmass, s.ort, \
+           s.lat, s.lon, \
            s.beschreibung, s.geschaedigt_person_id, s.geschaedigt_kontakt, \
            s.geschaedigt_personal_id, s.geschaedigt_organisation_id, \
            s.uebergeben_an, s.uebergeben_at, s.abschluss_grund, s.abschluss_at, \
