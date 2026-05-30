@@ -642,3 +642,70 @@ async fn patch_geschaedigt_organisation_erzwingt_eigene_org() {
     // Die eigene Org ist die bootstrap-Org (id 1).
     assert_eq!(zurueck, 1, "abgeleitet aus einsatz.org_id");
 }
+
+// ---------- Tests: Verortung (lat/lon) ----------
+
+#[tokio::test]
+async fn schaden_verorten_setzt_lat_lon() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
+    let (s, v) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{e}/schaeden/{sid}"), &admin,
+        Some(&json!({"lat": 51.0, "lon": 7.0}))).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(v["lat"].as_f64(), Some(51.0));
+    assert_eq!(v["lon"].as_f64(), Some(7.0));
+}
+
+#[tokio::test]
+async fn schaden_verorten_nur_lon_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
+    let (s, _) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{e}/schaeden/{sid}"), &admin,
+        Some(&json!({"lon": 7.0}))).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "darf 422 sein, NICHT 500");
+}
+
+#[tokio::test]
+async fn schaden_verorten_nur_lat_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
+    let (s, _) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{e}/schaeden/{sid}"), &admin,
+        Some(&json!({"lat": 51.0}))).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "darf 422 sein, NICHT 500");
+}
+
+#[tokio::test]
+async fn schaden_verorten_ausserhalb_range_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
+    let (s, _) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{e}/schaeden/{sid}"), &admin,
+        Some(&json!({"lat": 99.0, "lon": 7.0}))).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    let (s, _) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{e}/schaeden/{sid}"), &admin,
+        Some(&json!({"lat": 51.0, "lon": 200.0}))).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn schaden_verorten_loeschen_setzt_null() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
+    let (s, _) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{e}/schaeden/{sid}"), &admin,
+        Some(&json!({"lat": 51.0, "lon": 7.0}))).await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, v) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{e}/schaeden/{sid}"), &admin,
+        Some(&json!({"lat": null, "lon": null}))).await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(v["lat"].is_null());
+    assert!(v["lon"].is_null());
+}

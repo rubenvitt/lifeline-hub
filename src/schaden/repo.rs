@@ -46,6 +46,8 @@ pub struct PatchDaten<'a> {
     pub geschaedigt_organisation_id: Option<Option<i64>>,
     pub uebergeben_an: Option<Option<&'a str>>,
     pub abschluss_grund: Option<Option<&'a str>>,
+    pub lat: Option<Option<f64>>,
+    pub lon: Option<Option<f64>>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -137,6 +139,8 @@ pub async fn aktualisiere(
             geschaedigt_organisation_id = CASE WHEN ? THEN ? ELSE geschaedigt_organisation_id END, \
             uebergeben_an   = CASE WHEN ? THEN ? ELSE uebergeben_an END, \
             abschluss_grund = CASE WHEN ? THEN ? ELSE abschluss_grund END, \
+            lat = CASE WHEN ? THEN ? ELSE lat END, \
+            lon = CASE WHEN ? THEN ? ELSE lon END, \
             geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
             geaendert_von = ? \
          WHERE id = ? AND einsatz_id = ?",
@@ -157,6 +161,10 @@ pub async fn aktualisiere(
     .bind(daten.uebergeben_an.flatten())
     .bind(daten.abschluss_grund.is_some())
     .bind(daten.abschluss_grund.flatten())
+    .bind(daten.lat.is_some())
+    .bind(daten.lat.flatten())
+    .bind(daten.lon.is_some())
+    .bind(daten.lon.flatten())
     .bind(geaendert_von)
     .bind(schaden_id)
     .bind(einsatz_id)
