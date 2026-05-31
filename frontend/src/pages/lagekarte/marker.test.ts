@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { baueMarker, baueTaktischeMarker } from './marker';
+import { baueMarker, baueTaktischeMarker, type TaktischeQuelle } from './marker';
 import type { EinsatzAnzeige, Schaden, Uhs } from '../../api/types';
 
 function uhs(partial: Partial<Uhs>): Uhs {
@@ -67,7 +67,7 @@ describe('baueTaktischeMarker', () => {
     const einheiten = [
       { id: 1, name: 'Zug 1', typ_label: 'Zug', lat: 50.1, lon: 8.6, tz_fachaufgabe: 'rettungswesen', tz_organisation: null },
       { id: 2, name: 'Gruppe 2', typ_label: 'Gruppe', lat: null, lon: null, tz_fachaufgabe: null, tz_organisation: null },
-    ] as any;
+    ] as unknown as TaktischeQuelle['einheiten'];
     const { verortet, nichtVerortet } = baueTaktischeMarker(
       { einheiten, fahrzeuge: [], fuehrungskraefte: [], orgDefault: 'hilfsorganisation' });
     expect(verortet.find((m) => m.schluessel === 'einheit-1')?.tz?.grundzeichen).toBe('taktische-formation');

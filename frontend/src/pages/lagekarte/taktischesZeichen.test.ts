@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { erzeugeTaktischesZeichen } from 'taktische-zeichen-react';
 import { baueTzProps, groesseAusLabel } from './taktischesZeichen';
 
 describe('taktischesZeichen', () => {
@@ -19,5 +20,14 @@ describe('taktischesZeichen', () => {
   });
   it('unbekanntes Größen-Label → keine Größe', () => {
     expect(groesseAusLabel('Sonstige')).toBeUndefined();
+  });
+  it('erzeugt valides SVG je Objekttyp', () => {
+    for (const objekttyp of ['einheit', 'fahrzeug', 'fuehrung', 'abschnitt'] as const) {
+      const svg = erzeugeTaktischesZeichen({
+        ...baueTzProps({ objekttyp, einheitTypLabel: 'Gruppe', orgDefault: 'hilfsorganisation' }),
+        skipFontRegistration: true,
+      }).svg.render();
+      expect(svg).toContain('<svg');
+    }
   });
 });
