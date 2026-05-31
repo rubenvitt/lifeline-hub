@@ -65,7 +65,9 @@ export default function Sidebar(props: SidebarProps) {
                             <Button
                               size="small"
                               type="primary"
-                              onClick={() => props.onPlatzierenStart({ typ: o.typ, id: o.id })}
+                              onClick={() =>
+                                props.onPlatzierenStart({ typ: o.typ as 'uhs' | 'schaden', id: o.id })
+                              }
                             >
                               Platzieren
                             </Button>

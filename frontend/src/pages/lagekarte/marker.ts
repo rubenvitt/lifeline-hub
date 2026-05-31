@@ -1,6 +1,8 @@
-import type { EinsatzAnzeige, Schaden, Uhs } from '../../api/types';
+import type { Einheit, EinsatzAnzeige, EinsatzFahrzeug, FuehrungskraftKarte, Schaden, Uhs } from '../../api/types';
+import { baueTzProps, type TzProps } from './taktischesZeichen';
 
-export type MarkerTyp = 'einsatzort' | 'uhs' | 'schaden';
+export type MarkerTyp =
+  | 'einsatzort' | 'uhs' | 'schaden' | 'einheit' | 'fahrzeug' | 'fuehrung' | 'abschnitt';
 
 export interface KarteMarker {
   /** Stabil & eindeutig über alle Typen: 'einsatzort' | 'uhs-<id>' | 'schaden-<id>'. */
@@ -12,10 +14,14 @@ export interface KarteMarker {
   lon: number;
   label: string;
   farbe: string;
+  /** Wenn gesetzt → DV-102-SVG (taktisches Zeichen) statt einfachem Kreis. */
+  tz?: TzProps;
+  /** FMS-Status-Ring, nur für Fahrzeuge. */
+  statusFarbe?: string | null;
 }
 
 export interface NichtVerortet {
-  typ: 'uhs' | 'schaden';
+  typ: 'uhs' | 'schaden' | 'einheit' | 'fahrzeug' | 'fuehrung' | 'abschnitt';
   id: number;
   label: string;
 }
@@ -86,5 +92,45 @@ export function baueMarker(
     }
   }
 
+  return { verortet, nichtVerortet };
+}
+
+export interface TaktischeQuelle {
+  einheiten: Einheit[];
+  fahrzeuge: EinsatzFahrzeug[];
+  fuehrungskraefte: FuehrungskraftKarte[];
+  orgDefault: string | null;
+}
+
+/** Leitet taktische Marker (Einheit/Fahrzeug/Führung) + Nicht-verortet-Liste ab. */
+export function baueTaktischeMarker(
+  q: TaktischeQuelle,
+): { verortet: KarteMarker[]; nichtVerortet: NichtVerortet[] } {
+  const verortet: KarteMarker[] = [];
+  const nichtVerortet: NichtVerortet[] = [];
+  const add = (
+    typ: 'einheit' | 'fahrzeug' | 'fuehrung', id: number, label: string,
+    lat: number | null, lon: number | null, tz: TzProps, statusFarbe?: string | null,
+  ) => {
+    if (lat != null && lon != null) {
+      verortet.push({ schluessel: `${typ}-${id}`, typ, id, lat, lon, label, farbe: '#555', tz, statusFarbe });
+    } else {
+      nichtVerortet.push({ typ, id, label });
+    }
+  };
+  for (const e of q.einheiten) {
+    add('einheit', e.id, e.name, e.lat, e.lon,
+      baueTzProps({ objekttyp: 'einheit', einheitTypLabel: e.typ_label, fachaufgabe: e.tz_fachaufgabe,
+        organisation: e.tz_organisation, orgDefault: q.orgDefault }));
+  }
+  for (const f of q.fahrzeuge) {
+    add('fahrzeug', f.id, f.funkrufname, f.lat, f.lon,
+      baueTzProps({ objekttyp: 'fahrzeug', fachaufgabe: f.tz_fachaufgabe, organisation: f.tz_organisation, orgDefault: q.orgDefault }),
+      f.status_farbe);
+  }
+  for (const p of q.fuehrungskraefte) {
+    add('fuehrung', p.id, p.name, p.lat, p.lon,
+      baueTzProps({ objekttyp: 'fuehrung', fachaufgabe: p.tz_fachaufgabe, organisation: p.tz_organisation, orgDefault: q.orgDefault }));
+  }
   return { verortet, nichtVerortet };
 }

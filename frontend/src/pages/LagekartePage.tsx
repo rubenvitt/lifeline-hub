@@ -76,7 +76,7 @@ export default function LagekartePage() {
     [einsatz, uhsQuery.data, schaedenQuery.data],
   );
 
-  const sichtbareMarker = verortet.filter((m) => layer[m.typ]);
+  const sichtbareMarker = verortet.filter((m) => layer[m.typ as keyof LayerSichtbar]);
   const aktiverMarker = verortet.find((m) => m.schluessel === auswahl) ?? null;
 
   const style = useMemo(
