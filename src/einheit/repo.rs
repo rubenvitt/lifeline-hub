@@ -33,6 +33,10 @@ struct Row {
     fuehrer_name: Option<String>,
     bemerkung: Option<String>,
     sortier: i64,
+    lat: Option<f64>,
+    lon: Option<f64>,
+    tz_fachaufgabe: Option<String>,
+    tz_organisation: Option<String>,
     soll_fuehrer: Option<i64>,
     soll_unterfuehrer: Option<i64>,
     soll_mannschaft: Option<i64>,
@@ -45,6 +49,7 @@ const SELECT_AUFGELOEST: &str = "\
     SELECT e.id, e.einsatz_id, e.abschnitt_id, ab.name AS abschnitt_name, \
            e.ueber_einheit_id, e.typ_id, t.label AS typ_label, e.name, \
            e.fuehrer_id, fp.snap_name AS fuehrer_name, e.bemerkung, e.sortier, \
+           e.lat, e.lon, e.tz_fachaufgabe, e.tz_organisation, \
            e.soll_fuehrer, e.soll_unterfuehrer, e.soll_mannschaft, \
            t.soll_fuehrer AS typ_soll_fuehrer, t.soll_unterfuehrer AS typ_soll_unterfuehrer, \
            t.soll_mannschaft AS typ_soll_mannschaft \
@@ -79,6 +84,10 @@ async fn zu_anzeige(pool: &SqlitePool, row: Row) -> Result<EinheitAnzeige, AppEr
         fuehrer_name: row.fuehrer_name,
         bemerkung: row.bemerkung,
         sortier: row.sortier,
+        lat: row.lat,
+        lon: row.lon,
+        tz_fachaufgabe: row.tz_fachaufgabe,
+        tz_organisation: row.tz_organisation,
         soll,
         ist,
         ist_kumuliert,
@@ -233,6 +242,42 @@ pub async fn aktualisiere(pool: &SqlitePool, einsatz_id: i64, org_id: i64, id: i
     laden(pool, einsatz_id, id).await
 }
 
+/// Reine Geo-/Symbol-Felder einer Einheit. `Some(None)` = auf NULL, `None` = unverändert.
+#[derive(Debug, Default)]
+pub struct PositionPatch<'a> {
+    pub lat: Option<Option<f64>>,
+    pub lon: Option<Option<f64>>,
+    pub tz_fachaufgabe: Option<Option<&'a str>>,
+    pub tz_organisation: Option<Option<&'a str>>,
+}
+
+/// Setzt/ändert/löscht Position + Symbol-Felder. KEIN ETB-Schreibpfad (Lage-Pflege).
+pub async fn aktualisiere_position(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    einheit_id: i64,
+    daten: PositionPatch<'_>,
+) -> Result<EinheitAnzeige, AppError> {
+    let betroffen = sqlx::query(
+        "UPDATE einsatz_einheit SET \
+            lat = CASE WHEN ? THEN ? ELSE lat END, \
+            lon = CASE WHEN ? THEN ? ELSE lon END, \
+            tz_fachaufgabe  = CASE WHEN ? THEN ? ELSE tz_fachaufgabe END, \
+            tz_organisation = CASE WHEN ? THEN ? ELSE tz_organisation END \
+         WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(daten.lat.is_some()).bind(daten.lat.flatten())
+    .bind(daten.lon.is_some()).bind(daten.lon.flatten())
+    .bind(daten.tz_fachaufgabe.is_some()).bind(daten.tz_fachaufgabe.flatten())
+    .bind(daten.tz_organisation.is_some()).bind(daten.tz_organisation.flatten())
+    .bind(einheit_id).bind(einsatz_id)
+    .execute(pool).await?.rows_affected();
+    if betroffen == 0 {
+        return Err(AppError::NotFound);
+    }
+    laden(pool, einsatz_id, einheit_id).await
+}
+
 /// Reine Validierung (kein Write): Einheit gehört zum Einsatz, und bei `Some(ep)` ist die
 /// Person Mitglied *dieser* Einheit. `NotFound`/`Validation`. Wird im Route-Handler **vor**
 /// jeglichem Write aufgerufen, damit ein ungültiger Führer kein Teil-Update hinterlässt.
@@ -304,6 +349,34 @@ mod tests {
     async fn ad_hoc_person(pool: &SqlitePool, einsatz: i64, name: &str, pos: &str) -> i64 {
         sqlx::query_scalar("INSERT INTO einsatz_personal (einsatz_id, snap_name, staerke_position) VALUES (?, ?, ?) RETURNING id")
             .bind(einsatz).bind(name).bind(pos).fetch_one(pool).await.unwrap()
+    }
+
+    /// Einsatz + Org + Benutzer + eine Einheit; liefert (einsatz_id, einheit_id).
+    async fn seed_einheit(pool: &SqlitePool) -> (i64, i64) {
+        let (einsatz, b) = setup(pool).await;
+        let e = anlegen(pool, einsatz, 1, daten("Trupp", None, None, None, None), b).await.unwrap();
+        (einsatz, e.id)
+    }
+
+    #[tokio::test]
+    async fn position_setzen_und_loeschen() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz_id, einheit_id) = seed_einheit(&pool).await;
+
+        let a = aktualisiere_position(&pool, einsatz_id, einheit_id, PositionPatch {
+            lat: Some(Some(50.1)), lon: Some(Some(8.6)),
+            tz_fachaufgabe: Some(Some("rettungswesen")), tz_organisation: None,
+        }).await.unwrap();
+        assert_eq!(a.lat, Some(50.1));
+        assert_eq!(a.lon, Some(8.6));
+        assert_eq!(a.tz_fachaufgabe.as_deref(), Some("rettungswesen"));
+
+        let b = aktualisiere_position(&pool, einsatz_id, einheit_id, PositionPatch {
+            lat: Some(None), lon: Some(None), tz_fachaufgabe: None, tz_organisation: None,
+        }).await.unwrap();
+        assert_eq!(b.lat, None);
+        assert_eq!(b.lon, None);
+        assert_eq!(b.tz_fachaufgabe.as_deref(), Some("rettungswesen")); // unverändert
     }
 
     #[tokio::test]
