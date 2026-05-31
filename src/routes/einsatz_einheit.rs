@@ -9,8 +9,43 @@ use crate::etb::{self, repo as etb_repo};
 use crate::staerke::Staerke;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
+use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::Json;
 use serde::Deserialize;
+use std::convert::Infallible;
+use tokio_stream::wrappers::BroadcastStream;
+use tokio_stream::{Stream, StreamExt};
+
+/// Liest ein optional-nullable Feld so, dass JSON-`null` zu `Some(None)` und
+/// fehlendes Feld zu `None` wird (Tri-State, wie in `routes::einsatz_uhs`).
+fn deserialize_optional_field<'de, T, D>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    T: serde::Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    Option::<T>::deserialize(deserializer).map(Some)
+}
+
+/// SSE-Notify (Lage-Karte): Einheit hat sich geändert. Frontend filtert per Event-Name.
+fn sse_einheit(state: &AppState, einsatz_id: i64, einheit_id: i64) {
+    let data = serde_json::json!({ "einsatz_id": einsatz_id, "einheit_id": einheit_id }).to_string();
+    state.live.publiziere_event(einsatz_id, "einheit", data);
+}
+
+/// SSE-Notify (Lage-Karte): betroffenes Fahrzeug aktualisieren (z.B. bei Zuordnung/Freigabe).
+/// Lokaler Spiegel von `routes::einsatz_fahrzeug::sse_fahrzeug` (gleiche Payload), um
+/// Cross-Modul-Sichtbarkeit zu vermeiden.
+fn sse_fahrzeug(state: &AppState, einsatz_id: i64, ef_id: i64) {
+    let data = serde_json::json!({ "einsatz_id": einsatz_id, "fahrzeug_id": ef_id }).to_string();
+    state.live.publiziere_event(einsatz_id, "fahrzeug", data);
+}
+
+/// SSE-Notify (Lage-Karte): betroffene Person aktualisieren (z.B. bei Zuordnung/Freigabe).
+/// Lokaler Spiegel von `routes::einsatz_personal::sse_personal` (Tag `person`, gleiche Payload).
+fn sse_personal(state: &AppState, einsatz_id: i64, ep_id: i64) {
+    let data = serde_json::json!({ "einsatz_id": einsatz_id, "person_id": ep_id }).to_string();
+    state.live.publiziere_event(einsatz_id, "person", data);
+}
 
 async fn etb_system(state: &AppState, einsatz_id: i64, benutzer_id: i64, inhalt: &str) -> Result<(), AppError> {
     let anzeige = etb_repo::anlegen(
@@ -98,6 +133,7 @@ pub async fn bilden(
         benutzer.id,
     ).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}» gebildet", anzeige.name)).await?;
+    sse_einheit(&state, einsatz_id, anzeige.id);
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
 
@@ -157,6 +193,7 @@ pub async fn aktualisieren(
         };
         etb_system(&state, einsatz_id, benutzer.id, &inhalt).await?;
     }
+    sse_einheit(&state, einsatz_id, eid);
     Ok(Json(final_anzeige))
 }
 
@@ -170,6 +207,7 @@ pub async fn aufloesen(
     let name = einheit_name(&state, einsatz_id, eid).await?;
     einheit_repo::loese_auf(&state.pool, einsatz_id, eid).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}» aufgelöst", name)).await?;
+    sse_einheit(&state, einsatz_id, eid);
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -183,6 +221,8 @@ pub async fn personal_zuordnen(
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let person = mitglied_repo::ordne_personal_zu(&state.pool, einsatz_id, eid, ep_id).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: «{}» zugeordnet", einheit, person)).await?;
+    sse_einheit(&state, einsatz_id, eid);
+    sse_personal(&state, einsatz_id, ep_id);
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -196,6 +236,8 @@ pub async fn personal_freigeben(
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let person = mitglied_repo::gib_personal_frei(&state.pool, einsatz_id, eid, ep_id).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: «{}» freigegeben", einheit, person)).await?;
+    sse_einheit(&state, einsatz_id, eid);
+    sse_personal(&state, einsatz_id, ep_id);
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -209,6 +251,8 @@ pub async fn fahrzeug_zuordnen(
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let fz = mitglied_repo::ordne_fahrzeug_zu(&state.pool, einsatz_id, eid, ef_id).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: Fahrzeug «{}» zugeordnet", einheit, fz)).await?;
+    sse_einheit(&state, einsatz_id, eid);
+    sse_fahrzeug(&state, einsatz_id, ef_id);
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -222,6 +266,8 @@ pub async fn fahrzeug_freigeben(
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let fz = mitglied_repo::gib_fahrzeug_frei(&state.pool, einsatz_id, eid, ef_id).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: Fahrzeug «{}» freigegeben", einheit, fz)).await?;
+    sse_einheit(&state, einsatz_id, eid);
+    sse_fahrzeug(&state, einsatz_id, ef_id);
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -235,6 +281,7 @@ pub async fn material_zuordnen(
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let (bez, menge) = mitglied_repo::ordne_material_zu(&state.pool, einsatz_id, eid, em_id).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: Material «{}» (×{}) zugeordnet", einheit, bez, menge)).await?;
+    sse_einheit(&state, einsatz_id, eid);
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -248,5 +295,87 @@ pub async fn material_freigeben(
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let (bez, menge) = mitglied_repo::gib_material_frei(&state.pool, einsatz_id, eid, em_id).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: Material «{}» (×{}) freigegeben", einheit, bez, menge)).await?;
+    sse_einheit(&state, einsatz_id, eid);
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PositionBody {
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub lat: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub lon: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub tz_fachaufgabe: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub tz_organisation: Option<Option<String>>,
+}
+
+/// PATCH /api/einsaetze/{id}/einheiten/{eid}/position — reine Lage-Pflege, KEIN ETB.
+pub async fn position(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, einheit_id)): Path<(i64, i64)>,
+    Json(body): Json<PositionBody>,
+) -> Result<Json<EinheitAnzeige>, AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_schreibrecht(rolle)?;
+    fordere_aktiv(&einsatz)?;
+
+    let vorher = einheit_repo::laden(&state.pool, einsatz_id, einheit_id).await?; // 404 falls fremd
+    let eff_lat = match body.lat { Some(o) => o, None => vorher.lat };
+    let eff_lon = match body.lon { Some(o) => o, None => vorher.lon };
+    if eff_lat.is_some() != eff_lon.is_some() {
+        return Err(AppError::UnprocessableEntity(
+            "lat und lon müssen gemeinsam gesetzt oder gemeinsam leer sein".into(),
+        ));
+    }
+    if let Some(la) = eff_lat {
+        if !(-90.0..=90.0).contains(&la) {
+            return Err(AppError::UnprocessableEntity("lat muss zwischen -90 und 90 liegen".into()));
+        }
+    }
+    if let Some(lo) = eff_lon {
+        if !(-180.0..=180.0).contains(&lo) {
+            return Err(AppError::UnprocessableEntity("lon muss zwischen -180 und 180 liegen".into()));
+        }
+    }
+
+    let nachher = einheit_repo::aktualisiere_position(
+        &state.pool,
+        einsatz_id,
+        einheit_id,
+        einheit_repo::PositionPatch {
+            lat: body.lat,
+            lon: body.lon,
+            tz_fachaufgabe: body.tz_fachaufgabe.as_ref().map(|o| o.as_deref()),
+            tz_organisation: body.tz_organisation.as_ref().map(|o| o.as_deref()),
+        },
+    )
+    .await?;
+    sse_einheit(&state, einsatz_id, einheit_id);
+    Ok(Json(nachher))
+}
+
+/// GET /api/einsaetze/{id}/einheiten/stream — SSE-Stream (ganzer Einsatz-Kanal).
+/// Nur Lesezugriff; das Frontend filtert per Event-Name (`einheit`).
+pub async fn stream(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path(einsatz_id): Path<i64>,
+) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+
+    let rx = state.live.abonniere(einsatz_id);
+    let stream = BroadcastStream::new(rx).map(|res| {
+        let event = match res {
+            Ok(n) => Event::default().event(n.event).data(n.data),
+            Err(_) => Event::default().event("lagged").data("resync"),
+        };
+        Ok::<Event, Infallible>(event)
+    });
+    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
 }

@@ -60,7 +60,7 @@ pub async fn bootstrap_admin(
     let mut tx = pool.begin().await?;
     // Organisation anlegen (oder vorhandene id=1 nutzen, falls schon vorhanden).
     let org_id: i64 = sqlx::query_scalar(
-        "INSERT INTO organisation (name) VALUES (?) RETURNING id",
+        "INSERT INTO organisation (name, tz_organisation) VALUES (?, 'hilfsorganisation') RETURNING id",
     )
     .bind(org_name)
     .fetch_one(&mut *tx)

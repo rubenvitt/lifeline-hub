@@ -124,6 +124,20 @@ pub struct EinsatzPersonalAnzeige {
     pub disponiert_von: Option<i64>,
 }
 
+/// Schlanke Karten-Sicht einer Führungskraft (Einheits- oder Abschnittsführung).
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct FuehrungskraftKarte {
+    pub id: i64,            // einsatz_personal.id
+    pub einsatz_id: i64,
+    pub name: String,
+    pub lat: Option<f64>,
+    pub lon: Option<f64>,
+    pub tz_fachaufgabe: Option<String>,
+    pub tz_organisation: Option<String>,
+    pub ist_einheitsfuehrer: bool,
+    pub ist_abschnittsleiter: bool,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

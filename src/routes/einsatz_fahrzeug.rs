@@ -9,8 +9,28 @@ use crate::fahrzeug::status_repo;
 use crate::fahrzeug::EinsatzFahrzeugAnzeige;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
+use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::Json;
 use serde::Deserialize;
+use std::convert::Infallible;
+use tokio_stream::wrappers::BroadcastStream;
+use tokio_stream::{Stream, StreamExt};
+
+/// Liest ein optional-nullable Feld so, dass JSON-`null` zu `Some(None)` und
+/// fehlendes Feld zu `None` wird (Tri-State, wie in `routes::einsatz_uhs`).
+fn deserialize_optional_field<'de, T, D>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    T: serde::Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    Option::<T>::deserialize(deserializer).map(Some)
+}
+
+/// SSE-Notify (Lage-Karte): Fahrzeug-Disposition hat sich geändert.
+fn sse_fahrzeug(state: &AppState, einsatz_id: i64, ef_id: i64) {
+    let data = serde_json::json!({ "einsatz_id": einsatz_id, "fahrzeug_id": ef_id }).to_string();
+    state.live.publiziere_event(einsatz_id, "fahrzeug", data);
+}
 
 /// Schreibt einen automatischen System-ETB-Eintrag für die handelnde Person und
 /// publiziert ihn live (wie `routes::etb::erfassen`). Bewusst sequentiell nach der
@@ -131,6 +151,7 @@ pub async fn disponieren(
         &format!("Fahrzeug «{}» disponiert", anzeige.funkrufname),
     )
     .await?;
+    sse_fahrzeug(&state, einsatz_id, ef_id);
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
 
@@ -180,6 +201,7 @@ pub async fn aktualisieren(
         )
         .await?;
     }
+    sse_fahrzeug(&state, einsatz_id, ef_id);
     Ok(Json(nachher))
 }
 
@@ -203,5 +225,96 @@ pub async fn entfernen(
         &format!("Fahrzeug «{}» aus dem Einsatz entfernt", anzeige.funkrufname),
     )
     .await?;
+    sse_fahrzeug(&state, einsatz_id, ef_id);
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PositionBody {
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub lat: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub lon: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub tz_fachaufgabe: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub tz_organisation: Option<Option<String>>,
+}
+
+/// PATCH /api/einsaetze/{id}/fahrzeuge/{ef_id}/position — reine Lage-Pflege, KEIN ETB.
+pub async fn position(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, ef_id)): Path<(i64, i64)>,
+    Json(body): Json<PositionBody>,
+) -> Result<Json<EinsatzFahrzeugAnzeige>, AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_schreibrecht(rolle)?;
+    fordere_aktiv(&einsatz)?;
+
+    // Effektivzustand für die Paar-Validierung: vorhandene lat/lon (404 falls fremd).
+    let vorher: (Option<f64>, Option<f64>) = sqlx::query_as(
+        "SELECT lat, lon FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    let eff_lat = match body.lat { Some(o) => o, None => vorher.0 };
+    let eff_lon = match body.lon { Some(o) => o, None => vorher.1 };
+    if eff_lat.is_some() != eff_lon.is_some() {
+        return Err(AppError::UnprocessableEntity(
+            "lat und lon müssen gemeinsam gesetzt oder gemeinsam leer sein".into(),
+        ));
+    }
+    if let Some(la) = eff_lat {
+        if !(-90.0..=90.0).contains(&la) {
+            return Err(AppError::UnprocessableEntity("lat muss zwischen -90 und 90 liegen".into()));
+        }
+    }
+    if let Some(lo) = eff_lon {
+        if !(-180.0..=180.0).contains(&lo) {
+            return Err(AppError::UnprocessableEntity("lon muss zwischen -180 und 180 liegen".into()));
+        }
+    }
+
+    let nachher = disposition_repo::aktualisiere_position(
+        &state.pool,
+        einsatz_id,
+        ef_id,
+        disposition_repo::PositionPatch {
+            lat: body.lat,
+            lon: body.lon,
+            tz_fachaufgabe: body.tz_fachaufgabe.as_ref().map(|o| o.as_deref()),
+            tz_organisation: body.tz_organisation.as_ref().map(|o| o.as_deref()),
+        },
+        einsatz.ist_aktiv(),
+    )
+    .await?;
+    sse_fahrzeug(&state, einsatz_id, ef_id);
+    Ok(Json(nachher))
+}
+
+/// GET /api/einsaetze/{id}/fahrzeuge/stream — SSE-Stream (ganzer Einsatz-Kanal).
+/// Nur Lesezugriff; das Frontend filtert per Event-Name (`fahrzeug`).
+pub async fn stream(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path(einsatz_id): Path<i64>,
+) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+
+    let rx = state.live.abonniere(einsatz_id);
+    let stream = BroadcastStream::new(rx).map(|res| {
+        let event = match res {
+            Ok(n) => Event::default().event(n.event).data(n.data),
+            Err(_) => Event::default().event("lagged").data("resync"),
+        };
+        Ok::<Event, Infallible>(event)
+    });
+    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
 }

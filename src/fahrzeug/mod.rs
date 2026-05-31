@@ -143,6 +143,10 @@ pub struct EinsatzFahrzeugAnzeige {
     pub status_kategorie: Option<String>,
     pub status_farbe: Option<String>,
     pub bemerkung: Option<String>,
+    pub lat: Option<f64>,
+    pub lon: Option<f64>,
+    pub tz_fachaufgabe: Option<String>,
+    pub tz_organisation: Option<String>,
     pub disponiert_at: String,
     pub disponiert_von: Option<i64>,
 }

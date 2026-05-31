@@ -14,5 +14,8 @@ pub struct EinsatzabschnittAnzeige {
     /// Name der disponierten Leiter-Person (aufgelöst), falls gesetzt.
     pub leiter_name: Option<String>,
     pub bemerkung: Option<String>,
+    pub flaeche_geojson: Option<String>,
+    pub tz_fachaufgabe: Option<String>,
+    pub tz_organisation: Option<String>,
     pub sortier: i64,
 }

@@ -47,6 +47,15 @@ importers:
       react-router-dom:
         specifier: ^6.26.2
         version: 6.30.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      taktische-zeichen-react:
+        specifier: ^0.10.0
+        version: 0.10.0(react@18.3.1)
+      terra-draw:
+        specifier: ^1.31.0
+        version: 1.31.0
+      terra-draw-maplibre-gl-adapter:
+        specifier: ^1.4.1
+        version: 1.4.1(maplibre-gl@5.24.0)(terra-draw@1.31.0)
     devDependencies:
       '@eslint/js':
         specifier: ^9.11.1
@@ -1577,6 +1586,9 @@ packages:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
     engines: {node: 18 || 20 || >=22}
 
+  base64-js@1.5.1:
+    resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
+
   baseline-browser-mapping@2.10.32:
     resolution: {integrity: sha512-wbPvpyjJPC0zdfdKXxqEL3Ea+bOMD/87X4lftiJkkaBiuG6ALQy1SLmEd7BSmVCuwCQsBrCamgBoLyfFDD1EPg==}
     engines: {node: '>=6.0.0'}
@@ -3079,6 +3091,14 @@ packages:
     resolution: {integrity: sha512-yEFYrVhod+hdNyx7g5Bnkkb0G6si8HJurOoOEgC8B/O0uXLHlaey/65KRv6cuWBNhBgHKAROVpc7QyYqE5gFng==}
     engines: {node: '>=20'}
 
+  taktische-zeichen-core@0.10.0:
+    resolution: {integrity: sha512-jo4jZmAuBbAsKJrDppHY1hSprnZGmC8f8fRI1GwpZ6fOKDXXEaxVrNWJDfvywnjYXwEfOsRl7obbLW/LT77J9g==}
+
+  taktische-zeichen-react@0.10.0:
+    resolution: {integrity: sha512-tVoFQ7fmpBEC7eRL93oc0itJ4uX/eCmCkobHqZlj2nChRrDz7k9O/jksmVlTnnsy0eHZ4gd1V72AP4C/QpAraA==}
+    peerDependencies:
+      react: '>= 17.0.0'
+
   temp-dir@2.0.0:
     resolution: {integrity: sha512-aoBAniQmmwtcKp/7BzsH8Cxzv8OL736p7v1ihGb5e9DJ9kTwGWHrQrVB5+lfVDzfGrdRzXch+ig7LHaY1JTOrg==}
     engines: {node: '>=8'}
@@ -3086,6 +3106,15 @@ packages:
   tempy@0.6.0:
     resolution: {integrity: sha512-G13vtMYPT/J8A4X2SjdtBTphZlrp1gKv6hZiOjw14RCWg6GbHuQBGtjlx75xLbYV/wEc0D7G5K4rxKP/cXk8Bw==}
     engines: {node: '>=10'}
+
+  terra-draw-maplibre-gl-adapter@1.4.1:
+    resolution: {integrity: sha512-qZ/bc9bVPnyt0keLVTofV8xiTPkdkbO6RzqrfNLe9zH/edW5PsjvJw97m1EksPZeXNJtFxsVbhi12cPaoNiWfg==}
+    peerDependencies:
+      maplibre-gl: '>=4'
+      terra-draw: ^1.0.0
+
+  terra-draw@1.31.0:
+    resolution: {integrity: sha512-4tNhOHL+Oj749Ih2dRvjq8L/JvutBo+tgj8alLs002YiGIgXc57XoiC+zfzRQn/r1+N2BqU18FgC9DQXJiZADw==}
 
   terser@5.48.0:
     resolution: {integrity: sha512-J/9An6vs9Us6wKRriSFXBWdRZapREHqFzdNUKk0pmu804EMR6dr6winwo7e5JDxN4xahxQsuysyYFwlwj4XN/Q==}
@@ -5107,6 +5136,8 @@ snapshots:
 
   balanced-match@4.0.4: {}
 
+  base64-js@1.5.1: {}
+
   baseline-browser-mapping@2.10.32: {}
 
   brace-expansion@1.1.14:
@@ -6817,6 +6848,15 @@ snapshots:
 
   tagged-tag@1.0.0: {}
 
+  taktische-zeichen-core@0.10.0:
+    dependencies:
+      base64-js: 1.5.1
+
+  taktische-zeichen-react@0.10.0(react@18.3.1):
+    dependencies:
+      react: 18.3.1
+      taktische-zeichen-core: 0.10.0
+
   temp-dir@2.0.0: {}
 
   tempy@0.6.0:
@@ -6825,6 +6865,13 @@ snapshots:
       temp-dir: 2.0.0
       type-fest: 0.16.0
       unique-string: 2.0.0
+
+  terra-draw-maplibre-gl-adapter@1.4.1(maplibre-gl@5.24.0)(terra-draw@1.31.0):
+    dependencies:
+      maplibre-gl: 5.24.0
+      terra-draw: 1.31.0
+
+  terra-draw@1.31.0: {}
 
   terser@5.48.0:
     dependencies:

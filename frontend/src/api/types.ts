@@ -139,6 +139,11 @@ export interface EinsatzFahrzeug {
   bemerkung: string | null;
   disponiert_at: string;
   disponiert_von: number | null;
+  // L‑2: taktische Verortung auf der Lagekarte.
+  lat: number | null;
+  lon: number | null;
+  tz_fachaufgabe: string | null;
+  tz_organisation: string | null;
 }
 
 export type MaterialStatus =
@@ -270,6 +275,10 @@ export interface Einsatzabschnitt {
   leiter_name: string | null;
   bemerkung: string | null;
   sortier: number;
+  // L‑2: taktische Fläche (GeoJSON-String) und Verortungs-Metadaten.
+  flaeche_geojson: string | null;
+  tz_fachaufgabe: string | null;
+  tz_organisation: string | null;
 }
 
 /** Personal-Mitglied einer Einheit (leichtgewichtig). */
@@ -309,6 +318,32 @@ export interface Einheit {
   personal_mitglieder: EinheitMitgliedPerson[];
   fahrzeug_mitglieder: EinheitMitgliedFahrzeug[];
   material_mitglieder: EinheitMitgliedMaterial[];
+  // L‑2: taktische Verortung auf der Lagekarte.
+  lat: number | null;
+  lon: number | null;
+  tz_fachaufgabe: string | null;
+  tz_organisation: string | null;
+}
+
+/** L‑2: Führungskraft-Marker für die Lagekarte (aus GET …/karte/fuehrungskraefte
+ *  bzw. Rückgabe von PATCH …/personal/{ep_id}/position). */
+export interface FuehrungskraftKarte {
+  id: number;
+  einsatz_id: number;
+  name: string;
+  lat: number | null;
+  lon: number | null;
+  tz_fachaufgabe: string | null;
+  tz_organisation: string | null;
+  ist_einheitsfuehrer: boolean;
+  ist_abschnittsleiter: boolean;
+}
+
+/** L‑2: Organisations-Stammdaten inkl. taktischer Default-Organisation. */
+export interface OrganisationInfo {
+  id: number;
+  name: string;
+  tz_organisation: string | null;
 }
 
 export type PersonStatus = 'erfasst' | 'vermisst' | 'betroffen' | 'verstorben' | 'abgemeldet';

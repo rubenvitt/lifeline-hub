@@ -1,5 +1,5 @@
 use super::qualifikation_repo;
-use super::{status_repo, EinsatzPersonalAnzeige};
+use super::{status_repo, EinsatzPersonalAnzeige, FuehrungskraftKarte};
 use crate::error::AppError;
 use crate::katalog::{DIENSTSTATUS_IN_DIENST, KATEGORIE_GEBUNDEN};
 use sqlx::SqlitePool;
@@ -257,6 +257,63 @@ pub async fn entferne(pool: &SqlitePool, einsatz_id: i64, ep_id: i64) -> Result<
     Ok(())
 }
 
+/// Dedizierter Lesepfad: nur Personen, die Einheitsführer (`einsatz_einheit.fuehrer_id`)
+/// ODER Abschnittsleiter (`einsatzabschnitt.leiter_id`) sind, mit ihrer Position. Bewusst
+/// getrennt vom allgemeinen `liste`-Pfad (der KEIN lat/lon liefert).
+pub async fn liste_fuehrungskraefte(
+    pool: &SqlitePool, einsatz_id: i64,
+) -> Result<Vec<FuehrungskraftKarte>, AppError> {
+    let rows = sqlx::query_as::<_, FuehrungskraftKarte>(
+        "SELECT ep.id, ep.einsatz_id, ep.snap_name AS name, \
+                ep.lat, ep.lon, ep.tz_fachaufgabe, ep.tz_organisation, \
+                EXISTS(SELECT 1 FROM einsatz_einheit e \
+                       WHERE e.einsatz_id = ep.einsatz_id AND e.fuehrer_id = ep.id) AS ist_einheitsfuehrer, \
+                EXISTS(SELECT 1 FROM einsatzabschnitt a \
+                       WHERE a.einsatz_id = ep.einsatz_id AND a.leiter_id = ep.id) AS ist_abschnittsleiter \
+         FROM einsatz_personal ep \
+         WHERE ep.einsatz_id = ?1 \
+           AND ( ep.id IN (SELECT fuehrer_id FROM einsatz_einheit WHERE einsatz_id = ?1 AND fuehrer_id IS NOT NULL) \
+              OR ep.id IN (SELECT leiter_id  FROM einsatzabschnitt WHERE einsatz_id = ?1 AND leiter_id  IS NOT NULL) ) \
+         ORDER BY ep.snap_name, ep.id",
+    ).bind(einsatz_id).fetch_all(pool).await?;
+    Ok(rows)
+}
+
+/// PATCH-Daten für die Führungskraft-Position. Drei-Zustands-Semantik je Feld:
+/// `None` = unverändert, `Some(None)` = explizit auf NULL, `Some(Some(x))` = setzen.
+#[derive(Debug, Default)]
+pub struct PositionPatch<'a> {
+    pub lat: Option<Option<f64>>,
+    pub lon: Option<Option<f64>>,
+    pub tz_fachaufgabe: Option<Option<&'a str>>,
+    pub tz_organisation: Option<Option<&'a str>>,
+}
+
+/// Aktualisiert lat/lon/tz_* einer Person des Einsatzes (Drei-Zustands-PATCH; siehe
+/// `PositionPatch`). `NotFound`, falls die Zeile nicht zum Einsatz gehört. Liefert die
+/// frische Karten-Sicht (setzt voraus, dass die Person eine Führungskraft ist).
+pub async fn aktualisiere_position(
+    pool: &SqlitePool, einsatz_id: i64, ep_id: i64, daten: PositionPatch<'_>,
+) -> Result<FuehrungskraftKarte, AppError> {
+    let betroffen = sqlx::query(
+        "UPDATE einsatz_personal SET \
+            lat = CASE WHEN ? THEN ? ELSE lat END, \
+            lon = CASE WHEN ? THEN ? ELSE lon END, \
+            tz_fachaufgabe  = CASE WHEN ? THEN ? ELSE tz_fachaufgabe END, \
+            tz_organisation = CASE WHEN ? THEN ? ELSE tz_organisation END \
+         WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(daten.lat.is_some()).bind(daten.lat.flatten())
+    .bind(daten.lon.is_some()).bind(daten.lon.flatten())
+    .bind(daten.tz_fachaufgabe.is_some()).bind(daten.tz_fachaufgabe.flatten())
+    .bind(daten.tz_organisation.is_some()).bind(daten.tz_organisation.flatten())
+    .bind(ep_id).bind(einsatz_id)
+    .execute(pool).await?.rows_affected();
+    if betroffen == 0 { return Err(AppError::NotFound); }
+    let liste = liste_fuehrungskraefte(pool, einsatz_id).await?;
+    liste.into_iter().find(|f| f.id == ep_id).ok_or(AppError::NotFound)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -286,6 +343,51 @@ mod tests {
             name, benutzer_id: None, personalnummer: None, traegerorganisation: Some("DRK"),
             telefon: None, staerke_position: Some("fuehrer"), bemerkung: None,
         }
+    }
+
+    /// Seed: Org/Benutzer/Einsatz + 3 `einsatz_personal` (roh, nur snap_name) und eine
+    /// `einsatz_einheit` mit `fuehrer_id = p1` sowie ein `einsatzabschnitt` mit
+    /// `leiter_id = p2`. #3 bleibt ohne Führungsrolle. Liefert (einsatz, p1, p2, p3).
+    async fn seed_personal_mit_fuehrung(pool: &SqlitePool) -> (i64, i64, i64, i64) {
+        let (_benutzer, einsatz) = setup(pool).await;
+        let mut ids = Vec::new();
+        for name in ["Anton Abel", "Berta Busch", "Cäsar Crom"] {
+            let id: i64 = sqlx::query_scalar(
+                "INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, ?) RETURNING id",
+            )
+            .bind(einsatz)
+            .bind(name)
+            .fetch_one(pool)
+            .await
+            .unwrap();
+            ids.push(id);
+        }
+        let (p1, p2, p3) = (ids[0], ids[1], ids[2]);
+        sqlx::query("INSERT INTO einsatz_einheit (einsatz_id, name, fuehrer_id) VALUES (?, 'Trupp', ?)")
+            .bind(einsatz).bind(p1).execute(pool).await.unwrap();
+        sqlx::query("INSERT INTO einsatzabschnitt (einsatz_id, name, leiter_id) VALUES (?, 'Abschnitt Nord', ?)")
+            .bind(einsatz).bind(p2).execute(pool).await.unwrap();
+        (einsatz, p1, p2, p3)
+    }
+
+    #[tokio::test]
+    async fn nur_fuehrungskraefte_und_position() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz_id, p1, p2, _p3) = seed_personal_mit_fuehrung(&pool).await;
+
+        let liste = liste_fuehrungskraefte(&pool, einsatz_id).await.unwrap();
+        let ids: Vec<i64> = liste.iter().map(|f| f.id).collect();
+        assert!(ids.contains(&p1) && ids.contains(&p2));
+        assert_eq!(liste.len(), 2); // #3 NICHT enthalten
+
+        aktualisiere_position(&pool, einsatz_id, p1, PositionPatch {
+            lat: Some(Some(50.1)), lon: Some(Some(8.6)),
+            tz_fachaufgabe: Some(Some("fuehrung")), tz_organisation: None,
+        }).await.unwrap();
+        let liste2 = liste_fuehrungskraefte(&pool, einsatz_id).await.unwrap();
+        let f1 = liste2.iter().find(|f| f.id == p1).unwrap();
+        assert_eq!(f1.lat, Some(50.1));
+        assert!(f1.ist_einheitsfuehrer);
     }
 
     #[tokio::test]

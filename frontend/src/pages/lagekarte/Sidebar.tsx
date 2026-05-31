@@ -1,4 +1,5 @@
-import { Badge, Button, Card, Empty, List, Radio, Space, Switch, Tooltip, Typography } from 'antd';
+import { Badge, Button, Card, Empty, InputNumber, List, Radio, Space, Switch, Tooltip, Typography } from 'antd';
+import { useState } from 'react';
 import type { KarteMarker, NichtVerortet } from './marker';
 import type { BasemapModus } from './basemapStil';
 
@@ -6,15 +7,33 @@ export interface LayerSichtbar {
   einsatzort: boolean;
   uhs: boolean;
   schaden: boolean;
+  einheit: boolean;
+  fahrzeug: boolean;
+  fuehrung: boolean;
+  abschnitt: boolean;
 }
+
+/** Platzierbare Punkt-Typen (Fläche/Abschnitt läuft über onAbschnittZeichnenStart). */
+export type PlatzierenPunktTyp = 'uhs' | 'schaden' | 'einheit' | 'fahrzeug' | 'fuehrung';
+
+const NICHT_VERORTET_LABEL: Record<NichtVerortet['typ'], string> = {
+  uhs: 'UHS',
+  schaden: 'Schaden',
+  einheit: 'Einheit',
+  fahrzeug: 'Fahrzeug',
+  fuehrung: 'Führung',
+  abschnitt: 'Abschnitt',
+};
 
 export interface SidebarProps {
   nichtVerortet: NichtVerortet[];
   verortet: KarteMarker[];
   darfSchreiben: boolean;
-  platzierungZiel: { typ: 'uhs' | 'schaden' | 'einsatzort'; id: number } | null;
-  onPlatzierenStart: (ziel: { typ: 'uhs' | 'schaden'; id: number }) => void;
+  platzierungZiel: { typ: PlatzierenPunktTyp | 'einsatzort'; id: number } | null;
+  onPlatzierenStart: (ziel: { typ: PlatzierenPunktTyp; id: number }) => void;
   onPlatzierenAbbrechen: () => void;
+  onAbschnittZeichnenStart: (id: number) => void;
+  onKoordinateEingeben: (lat: number, lon: number) => void;
   einsatzortVerortet: boolean;
   onEinsatzortPlatzieren: () => void;
   layer: LayerSichtbar;
@@ -28,6 +47,8 @@ export interface SidebarProps {
 
 export default function Sidebar(props: SidebarProps) {
   const { nichtVerortet, verortet, darfSchreiben, platzierungZiel } = props;
+  const [manuellLat, setManuellLat] = useState<number | null>(null);
+  const [manuellLon, setManuellLon] = useState<number | null>(null);
   const uhsVerortet = verortet.filter((m) => m.typ === 'uhs');
   const schadenVerortet = verortet.filter((m) => m.typ === 'schaden');
 
@@ -51,31 +72,38 @@ export default function Sidebar(props: SidebarProps) {
             dataSource={nichtVerortet}
             renderItem={(o) => {
               const aktiv = platzierungZiel?.typ === o.typ && platzierungZiel?.id === o.id;
+              let action: React.ReactNode = null;
+              if (darfSchreiben) {
+                if (o.typ === 'abschnitt') {
+                  action = (
+                    <Button size="small" type="primary" onClick={() => props.onAbschnittZeichnenStart(o.id)}>
+                      Fläche zeichnen
+                    </Button>
+                  );
+                } else if (aktiv) {
+                  action = (
+                    <Button size="small" onClick={props.onPlatzierenAbbrechen}>
+                      Abbrechen
+                    </Button>
+                  );
+                } else {
+                  // o.typ ist hier auf die Punkt-Typen verengt (abschnitt oben behandelt).
+                  const punktTyp = o.typ;
+                  action = (
+                    <Button
+                      size="small"
+                      type="primary"
+                      onClick={() => props.onPlatzierenStart({ typ: punktTyp, id: o.id })}
+                    >
+                      Platzieren
+                    </Button>
+                  );
+                }
+              }
               return (
-                <List.Item
-                  key={`${o.typ}-${o.id}`}
-                  actions={
-                    darfSchreiben
-                      ? [
-                          aktiv ? (
-                            <Button size="small" onClick={props.onPlatzierenAbbrechen}>
-                              Abbrechen
-                            </Button>
-                          ) : (
-                            <Button
-                              size="small"
-                              type="primary"
-                              onClick={() => props.onPlatzierenStart({ typ: o.typ, id: o.id })}
-                            >
-                              Platzieren
-                            </Button>
-                          ),
-                        ]
-                      : []
-                  }
-                >
+                <List.Item key={`${o.typ}-${o.id}`} actions={action ? [action] : []}>
                   <Typography.Text>
-                    {o.typ === 'uhs' ? 'UHS' : 'Schaden'}: {o.label}
+                    {NICHT_VERORTET_LABEL[o.typ]}: {o.label}
                   </Typography.Text>
                 </List.Item>
               );
@@ -89,6 +117,33 @@ export default function Sidebar(props: SidebarProps) {
           <Typography.Text type="secondary">
             Klick auf die Karte setzt die Koordinate. (Abbrechen beendet.)
           </Typography.Text>
+          <Space style={{ marginTop: 8 }} wrap>
+            <InputNumber
+              size="small"
+              placeholder="Lat"
+              aria-label="Breitengrad"
+              value={manuellLat}
+              onChange={(v) => setManuellLat(v)}
+              style={{ width: 90 }}
+            />
+            <InputNumber
+              size="small"
+              placeholder="Lon"
+              aria-label="Längengrad"
+              value={manuellLon}
+              onChange={(v) => setManuellLon(v)}
+              style={{ width: 90 }}
+            />
+            <Button
+              size="small"
+              disabled={manuellLat == null || manuellLon == null}
+              onClick={() => {
+                if (manuellLat != null && manuellLon != null) props.onKoordinateEingeben(manuellLat, manuellLon);
+              }}
+            >
+              Übernehmen
+            </Button>
+          </Space>
         </Card>
       )}
 
@@ -148,6 +203,18 @@ export default function Sidebar(props: SidebarProps) {
           </Space>
           <Space>
             <Switch checked={props.layer.schaden} onChange={(v) => props.onLayerToggle('schaden', v)} /> Schäden
+          </Space>
+          <Space>
+            <Switch checked={props.layer.einheit} onChange={(v) => props.onLayerToggle('einheit', v)} /> Einheiten
+          </Space>
+          <Space>
+            <Switch checked={props.layer.fahrzeug} onChange={(v) => props.onLayerToggle('fahrzeug', v)} /> Fahrzeuge
+          </Space>
+          <Space>
+            <Switch checked={props.layer.fuehrung} onChange={(v) => props.onLayerToggle('fuehrung', v)} /> Personal-Führung
+          </Space>
+          <Space>
+            <Switch checked={props.layer.abschnitt} onChange={(v) => props.onLayerToggle('abschnitt', v)} /> Abschnitte
           </Space>
         </Space>
       </Card>

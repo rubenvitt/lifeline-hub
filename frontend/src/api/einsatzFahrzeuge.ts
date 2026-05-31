@@ -1,5 +1,8 @@
 import type { EinsatzFahrzeug } from './types';
 import { apiGet, apiSend } from './client';
+import type { PositionPatch } from './einheiten';
+
+export type { PositionPatch } from './einheiten';
 
 export interface AdhocEingabe {
   funkrufname: string;
@@ -33,4 +36,9 @@ export function aktualisiereDisposition(
 
 export function entferneDisposition(einsatzId: number, efId: number): Promise<void> {
   return apiSend<void>(`/api/einsaetze/${einsatzId}/fahrzeuge/${efId}`, 'DELETE');
+}
+
+/** L‑2: Verortet ein Einsatzfahrzeug auf der Lagekarte. */
+export function verorteFahrzeug(einsatzId: number, efId: number, daten: PositionPatch): Promise<EinsatzFahrzeug> {
+  return apiSend<EinsatzFahrzeug>(`/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/position`, 'PATCH', daten);
 }

@@ -63,7 +63,7 @@ pub struct EinheitMitgliedMaterial {
 /// Aufgelöste Einheiten-Anzeige inkl. Typ/Abschnitt-Labels, Führer-Identität,
 /// Mitgliedern und berechneter Stärke. `soll` ist optional (Override → Typ-Default →
 /// `None`); `ist`/`ist_kumuliert` sind immer gesetzt.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct EinheitAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
@@ -77,6 +77,10 @@ pub struct EinheitAnzeige {
     pub fuehrer_name: Option<String>,
     pub bemerkung: Option<String>,
     pub sortier: i64,
+    pub lat: Option<f64>,
+    pub lon: Option<f64>,
+    pub tz_fachaufgabe: Option<String>,
+    pub tz_organisation: Option<String>,
     pub soll: Option<crate::staerke::Staerke>,
     pub ist: crate::staerke::Staerke,
     pub ist_kumuliert: crate::staerke::Staerke,

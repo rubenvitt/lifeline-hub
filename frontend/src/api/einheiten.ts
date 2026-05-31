@@ -18,6 +18,21 @@ export function listeEinheiten(einsatzId: number): Promise<Einheit[]> {
   return apiGet<Einheit[]>(`/api/einsaetze/${einsatzId}/einheiten`);
 }
 
+/** L‑2: Geo-Verortung eines taktischen Objekts. Felder werden nur gesendet, wenn
+ *  gesetzt; `null` löscht explizit. lat/lon gehören zusammen (beide Zahl = setzen,
+ *  beide null = löschen). */
+export interface PositionPatch {
+  lat?: number | null;
+  lon?: number | null;
+  tz_fachaufgabe?: string | null;
+  tz_organisation?: string | null;
+}
+
+/** L‑2: Verortet eine Einheit auf der Lagekarte. */
+export function verorteEinheit(einsatzId: number, einheitId: number, daten: PositionPatch): Promise<Einheit> {
+  return apiSend<Einheit>(`/api/einsaetze/${einsatzId}/einheiten/${einheitId}/position`, 'PATCH', daten);
+}
+
 export function bildeEinheit(einsatzId: number, daten: EinheitEingabe): Promise<Einheit> {
   return apiSend<Einheit>(`/api/einsaetze/${einsatzId}/einheiten`, 'POST', daten);
 }

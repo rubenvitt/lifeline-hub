@@ -7,14 +7,24 @@ import { aktualisiereEinsatz, ladeEinsatz, type KopfdatenUpdate } from '../api/e
 import { listeUhs, aktualisiereUhs } from '../api/einsatzUhs';
 import { listeSchaeden, aktualisiereSchaden } from '../api/einsatzSchaden';
 import { ladeKarteConfig } from '../api/karte';
+import { listeEinheiten, verorteEinheit } from '../api/einheiten';
+import { listeEinsatzFahrzeuge, verorteFahrzeug } from '../api/einsatzFahrzeuge';
+import { listeFuehrungskraefte, verortePerson } from '../api/einsatzPersonal';
+import { listeAbschnitte, zeichneAbschnitt } from '../api/einsatzabschnitte';
+import { ladeOrganisation } from '../api/organisation';
 import type { EinsatzAnzeige } from '../api/types';
 import { useUhsStream } from '../etb/useUhsStream';
 import { useSchaedenStream } from '../etb/useSchaedenStream';
+import { useEinheitenStream } from '../etb/useEinheitenStream';
+import { useFahrzeugeStream } from '../etb/useFahrzeugeStream';
+import { useAbschnitteStream } from '../etb/useAbschnitteStream';
 import { useThemeMode } from '../theme/ThemeModeProvider';
-import { baueMarker, type KarteMarker } from './lagekarte/marker';
+import { baueMarker, baueTaktischeMarker, type KarteMarker } from './lagekarte/marker';
+import { parsePolygon, polygonZentroid } from './lagekarte/geo';
+import { baueTzProps } from './lagekarte/taktischesZeichen';
 import { baueBasemapStyle, defaultModus, type BasemapModus } from './lagekarte/basemapStil';
 import Kartenflaeche from './lagekarte/Kartenflaeche';
-import Sidebar, { type LayerSichtbar } from './lagekarte/Sidebar';
+import Sidebar, { type LayerSichtbar, type PlatzierenPunktTyp } from './lagekarte/Sidebar';
 import Inspector from './lagekarte/Inspector';
 
 /** EinsatzAnzeige → KopfdatenUpdate (Vollersatz) mit überschriebener Koordinate. */
@@ -43,15 +53,21 @@ export default function LagekartePage() {
   const { effektiv } = useThemeMode();
 
   const [platzierungZiel, setPlatzierungZiel] =
-    useState<{ typ: 'uhs' | 'schaden' | 'einsatzort'; id: number } | null>(null);
+    useState<{ typ: PlatzierenPunktTyp | 'einsatzort'; id: number } | null>(null);
+  const [zeichneAbschnittId, setZeichneAbschnittId] = useState<number | null>(null);
   const [auswahl, setAuswahl] = useState<string | null>(null);
   const [basemap, setBasemap] = useState<BasemapModus | null>(null);
   const [flyToZiel, setFlyToZiel] = useState<{ lng: number; lat: number } | null>(null);
-  const [layer, setLayer] = useState<LayerSichtbar>({ einsatzort: true, uhs: true, schaden: true });
+  const [layer, setLayer] = useState<LayerSichtbar>({
+    einsatzort: true, uhs: true, schaden: true, einheit: true, fahrzeug: true, fuehrung: true, abschnitt: true,
+  });
 
   // SSE-Reuse: dieselben Query-Keys wie die Listenseiten → Marker live.
   useUhsStream(einsatzId);
   useSchaedenStream(einsatzId);
+  useEinheitenStream(einsatzId);
+  useFahrzeugeStream(einsatzId);
+  useAbschnitteStream(einsatzId);
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const uhsQuery = useQuery({ queryKey: ['einsatz-uhs', einsatzId], queryFn: () => listeUhs(einsatzId) });
@@ -59,6 +75,23 @@ export default function LagekartePage() {
     queryKey: ['einsatz-schaeden', einsatzId],
     queryFn: () => listeSchaeden(einsatzId),
   });
+  const einheitenQuery = useQuery({
+    queryKey: ['einsatz-einheiten', einsatzId],
+    queryFn: () => listeEinheiten(einsatzId),
+  });
+  const fahrzeugeQuery = useQuery({
+    queryKey: ['einsatz-fahrzeuge', einsatzId],
+    queryFn: () => listeEinsatzFahrzeuge(einsatzId),
+  });
+  const abschnitteQuery = useQuery({
+    queryKey: ['einsatz-abschnitte', einsatzId],
+    queryFn: () => listeAbschnitte(einsatzId),
+  });
+  const fkQuery = useQuery({
+    queryKey: ['einsatz-fuehrungskraefte', einsatzId],
+    queryFn: () => listeFuehrungskraefte(einsatzId),
+  });
+  const orgQuery = useQuery({ queryKey: ['organisation'], queryFn: ladeOrganisation });
   const configQuery = useQuery({ queryKey: ['karte-config'], queryFn: ladeKarteConfig });
 
   // Basemap-Default setzen, sobald Config da ist.
@@ -76,8 +109,71 @@ export default function LagekartePage() {
     [einsatz, uhsQuery.data, schaedenQuery.data],
   );
 
-  const sichtbareMarker = verortet.filter((m) => layer[m.typ]);
-  const aktiverMarker = verortet.find((m) => m.schluessel === auswahl) ?? null;
+  const orgDefault = orgQuery.data?.tz_organisation ?? null;
+
+  const taktisch = useMemo(
+    () =>
+      baueTaktischeMarker({
+        einheiten: einheitenQuery.data ?? [],
+        fahrzeuge: fahrzeugeQuery.data ?? [],
+        fuehrungskraefte: fkQuery.data ?? [],
+        orgDefault,
+      }),
+    [einheitenQuery.data, fahrzeugeQuery.data, fkQuery.data, orgDefault],
+  );
+
+  const flaechen = useMemo(
+    () =>
+      (abschnitteQuery.data ?? []).flatMap((a) => {
+        const poly = parsePolygon(a.flaeche_geojson);
+        if (!poly) return [];
+        const z = polygonZentroid(poly);
+        if (!z) return [];
+        const tz = baueTzProps({
+          objekttyp: 'abschnitt',
+          fachaufgabe: a.tz_fachaufgabe,
+          organisation: a.tz_organisation,
+          orgDefault,
+        });
+        return [
+          {
+            id: a.id,
+            label: a.name,
+            polygon: poly,
+            tzMarker: {
+              schluessel: `abschnitt-${a.id}`,
+              typ: 'abschnitt' as const,
+              id: a.id,
+              lon: z[0],
+              lat: z[1],
+              label: a.name,
+              farbe: '#722ed1',
+              tz,
+            } satisfies KarteMarker,
+          },
+        ];
+      }),
+    [abschnitteQuery.data, orgDefault],
+  );
+
+  const alleVerortet = useMemo(
+    () => [...verortet, ...taktisch.verortet, ...flaechen.map((f) => f.tzMarker)],
+    [verortet, taktisch.verortet, flaechen],
+  );
+
+  const nichtVerortetAlle = useMemo(
+    () => [
+      ...nichtVerortet,
+      ...taktisch.nichtVerortet,
+      ...(abschnitteQuery.data ?? [])
+        .filter((a) => !a.flaeche_geojson)
+        .map((a) => ({ typ: 'abschnitt' as const, id: a.id, label: a.name })),
+    ],
+    [nichtVerortet, taktisch.nichtVerortet, abschnitteQuery.data],
+  );
+
+  const sichtbareMarker = alleVerortet.filter((m) => layer[m.typ]);
+  const aktiverMarker = alleVerortet.find((m) => m.schluessel === auswahl) ?? null;
 
   const style = useMemo(
     () => baueBasemapStyle(basemap ?? 'blind', effektiv, configQuery.data),
@@ -94,7 +190,13 @@ export default function LagekartePage() {
         await aktualisiereUhs(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
       } else if (platzierungZiel.typ === 'schaden') {
         await aktualisiereSchaden(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
-      } else if (einsatz) {
+      } else if (platzierungZiel.typ === 'einheit') {
+        await verorteEinheit(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
+      } else if (platzierungZiel.typ === 'fahrzeug') {
+        await verorteFahrzeug(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
+      } else if (platzierungZiel.typ === 'fuehrung') {
+        await verortePerson(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
+      } else if (platzierungZiel.typ === 'einsatzort' && einsatz) {
         await aktualisiereEinsatz(einsatzId, kopfMitKoordinate(einsatz, p.lat, p.lon));
       }
     },
@@ -102,6 +204,9 @@ export default function LagekartePage() {
       qc.invalidateQueries({ queryKey: ['einsatz', einsatzId] });
       qc.invalidateQueries({ queryKey: ['einsatz-uhs', einsatzId] });
       qc.invalidateQueries({ queryKey: ['einsatz-schaeden', einsatzId] });
+      qc.invalidateQueries({ queryKey: ['einsatz-einheiten', einsatzId] });
+      qc.invalidateQueries({ queryKey: ['einsatz-fahrzeuge', einsatzId] });
+      qc.invalidateQueries({ queryKey: ['einsatz-fuehrungskraefte', einsatzId] });
       setPlatzierungZiel(null);
     },
     onError: fehler,
@@ -114,7 +219,7 @@ export default function LagekartePage() {
 
   function onMarkerWaehlen(schluessel: string) {
     setAuswahl(schluessel);
-    const m = verortet.find((x) => x.schluessel === schluessel);
+    const m = alleVerortet.find((x) => x.schluessel === schluessel);
     if (m) setFlyToZiel({ lng: m.lon, lat: m.lat });
   }
 
@@ -127,8 +232,40 @@ export default function LagekartePage() {
       aktualisiereSchaden(einsatzId, marker.id, { lat: null, lon: null })
         .then(() => qc.invalidateQueries({ queryKey: ['einsatz-schaeden', einsatzId] }))
         .catch(fehler);
+    } else if (marker.typ === 'einheit') {
+      verorteEinheit(einsatzId, marker.id, { lat: null, lon: null })
+        .then(() => qc.invalidateQueries({ queryKey: ['einsatz-einheiten', einsatzId] }))
+        .catch(fehler);
+    } else if (marker.typ === 'fahrzeug') {
+      verorteFahrzeug(einsatzId, marker.id, { lat: null, lon: null })
+        .then(() => qc.invalidateQueries({ queryKey: ['einsatz-fahrzeuge', einsatzId] }))
+        .catch(fehler);
+    } else if (marker.typ === 'fuehrung') {
+      verortePerson(einsatzId, marker.id, { lat: null, lon: null })
+        .then(() => qc.invalidateQueries({ queryKey: ['einsatz-fuehrungskraefte', einsatzId] }))
+        .catch(fehler);
+    } else if (marker.typ === 'abschnitt') {
+      zeichneAbschnitt(einsatzId, marker.id, { flaeche_geojson: null })
+        .then(() => qc.invalidateQueries({ queryKey: ['einsatz-abschnitte', einsatzId] }))
+        .catch(fehler);
     }
     setAuswahl(null);
+  }
+
+  function aendereSymbol(
+    marker: KarteMarker,
+    patch: { tz_fachaufgabe?: string | null; tz_organisation?: string | null },
+  ) {
+    const inval = (key: string) => qc.invalidateQueries({ queryKey: [key, einsatzId] });
+    if (marker.typ === 'einheit') {
+      verorteEinheit(einsatzId, marker.id, patch).then(() => inval('einsatz-einheiten')).catch(fehler);
+    } else if (marker.typ === 'fahrzeug') {
+      verorteFahrzeug(einsatzId, marker.id, patch).then(() => inval('einsatz-fahrzeuge')).catch(fehler);
+    } else if (marker.typ === 'fuehrung') {
+      verortePerson(einsatzId, marker.id, patch).then(() => inval('einsatz-fuehrungskraefte')).catch(fehler);
+    } else if (marker.typ === 'abschnitt') {
+      zeichneAbschnitt(einsatzId, marker.id, patch).then(() => inval('einsatz-abschnitte')).catch(fehler);
+    }
   }
 
   if (einsatzQuery.isLoading || configQuery.isLoading) {
@@ -138,8 +275,8 @@ export default function LagekartePage() {
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 120px)', position: 'relative' }}>
       <Sidebar
-        nichtVerortet={nichtVerortet}
-        verortet={verortet}
+        nichtVerortet={nichtVerortetAlle}
+        verortet={alleVerortet}
         darfSchreiben={!!darfSchreiben}
         platzierungZiel={platzierungZiel}
         onPlatzierenStart={(z) => {
@@ -147,6 +284,14 @@ export default function LagekartePage() {
           setAuswahl(null);
         }}
         onPlatzierenAbbrechen={() => setPlatzierungZiel(null)}
+        onAbschnittZeichnenStart={(id) => {
+          setZeichneAbschnittId(id);
+          setPlatzierungZiel(null);
+          setAuswahl(null);
+        }}
+        onKoordinateEingeben={(lat, lon) => {
+          if (platzierungZiel && darfSchreiben) verortenMutation.mutate({ lat, lon });
+        }}
         einsatzortVerortet={verortet.some((m) => m.typ === 'einsatzort')}
         onEinsatzortPlatzieren={() => {
           setPlatzierungZiel({ typ: 'einsatzort', id: 0 });
@@ -170,6 +315,15 @@ export default function LagekartePage() {
           onStyleFehler={() => {
             setBasemap((m) => (m === 'online' ? 'offline' : m === 'offline' ? 'blind' : 'blind'));
           }}
+          flaechen={layer.abschnitt ? flaechen.map((f) => ({ id: f.id, label: f.label, polygon: f.polygon })) : []}
+          zeichnen={zeichneAbschnittId != null}
+          onFlaecheGezeichnet={(poly) => {
+            zeichneAbschnitt(einsatzId, zeichneAbschnittId!, { flaeche_geojson: JSON.stringify(poly) })
+              .then(() => qc.invalidateQueries({ queryKey: ['einsatz-abschnitte', einsatzId] }))
+              .catch(fehler)
+              .finally(() => setZeichneAbschnittId(null));
+          }}
+          onFlaecheKlick={(fid) => setAuswahl(`abschnitt-${fid}`)}
         />
         {aktiverMarker && (
           <Inspector
@@ -178,6 +332,7 @@ export default function LagekartePage() {
             darfSchreiben={!!darfSchreiben}
             onSchliessen={() => setAuswahl(null)}
             onVerortungLoeschen={loescheVerortung}
+            onSymbolAendern={aendereSymbol}
           />
         )}
       </div>

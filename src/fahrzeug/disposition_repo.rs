@@ -7,7 +7,9 @@ use sqlx::SqlitePool;
 const SELECT_AUFGELOEST: &str = "\
     SELECT ef.id, ef.einsatz_id, ef.fahrzeug_id, ef.einheit_id, ef.status_id, \
            ef.snap_funkrufname, ef.snap_kennzeichen, ef.snap_fahrzeugtyp, ef.snap_opta, \
-           ef.snap_traegerorganisation, ef.bemerkung, ef.disponiert_at, ef.disponiert_von, \
+           ef.snap_traegerorganisation, ef.bemerkung, \
+           ef.lat, ef.lon, ef.tz_fachaufgabe, ef.tz_organisation, \
+           ef.disponiert_at, ef.disponiert_von, \
            f.funkrufname AS live_funkrufname, f.kennzeichen AS live_kennzeichen, \
            f.fahrzeugtyp AS live_fahrzeugtyp, f.opta AS live_opta, \
            f.traegerorganisation AS live_traegerorganisation, f.dienststatus AS live_dienststatus, \
@@ -29,6 +31,10 @@ struct Row {
     snap_opta: Option<String>,
     snap_traegerorganisation: Option<String>,
     bemerkung: Option<String>,
+    lat: Option<f64>,
+    lon: Option<f64>,
+    tz_fachaufgabe: Option<String>,
+    tz_organisation: Option<String>,
     disponiert_at: String,
     disponiert_von: Option<i64>,
     live_funkrufname: Option<String>,
@@ -83,6 +89,10 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzFahrzeugAnzeige {
         status_kategorie: row.status_kategorie,
         status_farbe: row.status_farbe,
         bemerkung: row.bemerkung,
+        lat: row.lat,
+        lon: row.lon,
+        tz_fachaufgabe: row.tz_fachaufgabe,
+        tz_organisation: row.tz_organisation,
         disponiert_at: row.disponiert_at,
         disponiert_von: row.disponiert_von,
     }
@@ -243,6 +253,52 @@ pub async fn aktualisiere(
     Ok(())
 }
 
+/// Reine Geo-/Symbol-Felder einer Disposition. `Some(None)` = auf NULL, `None` = unverändert.
+#[derive(Debug, Default)]
+pub struct PositionPatch<'a> {
+    pub lat: Option<Option<f64>>,
+    pub lon: Option<Option<f64>>,
+    pub tz_fachaufgabe: Option<Option<&'a str>>,
+    pub tz_organisation: Option<Option<&'a str>>,
+}
+
+/// Setzt/ändert/löscht Position + Symbol-Felder einer Dispositionszeile. Liefert die
+/// aufgelöste Anzeige (`einsatz_aktiv` steuert Live vs. Snapshot). `NotFound`, falls
+/// die Zeile nicht zum Einsatz gehört.
+pub async fn aktualisiere_position(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    ef_id: i64,
+    daten: PositionPatch<'_>,
+    einsatz_aktiv: bool,
+) -> Result<EinsatzFahrzeugAnzeige, AppError> {
+    let betroffen = sqlx::query(
+        "UPDATE einsatz_fahrzeug SET \
+            lat = CASE WHEN ? THEN ? ELSE lat END, \
+            lon = CASE WHEN ? THEN ? ELSE lon END, \
+            tz_fachaufgabe  = CASE WHEN ? THEN ? ELSE tz_fachaufgabe END, \
+            tz_organisation = CASE WHEN ? THEN ? ELSE tz_organisation END \
+         WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(daten.lat.is_some()).bind(daten.lat.flatten())
+    .bind(daten.lon.is_some()).bind(daten.lon.flatten())
+    .bind(daten.tz_fachaufgabe.is_some()).bind(daten.tz_fachaufgabe.flatten())
+    .bind(daten.tz_organisation.is_some()).bind(daten.tz_organisation.flatten())
+    .bind(ef_id).bind(einsatz_id)
+    .execute(pool).await?.rows_affected();
+    if betroffen == 0 {
+        return Err(AppError::NotFound);
+    }
+    let row = sqlx::query_as::<_, Row>(&format!(
+        "{SELECT_AUFGELOEST} WHERE ef.id = ? AND ef.einsatz_id = ?"
+    ))
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .fetch_one(pool)
+    .await?;
+    Ok(zu_anzeige(row, einsatz_aktiv))
+}
+
 /// Entfernt eine Dispositionszeile aus dem Einsatz (der Stamm bleibt). `NotFound`,
 /// falls nicht zum Einsatz gehörend.
 pub async fn entferne(pool: &SqlitePool, einsatz_id: i64, ef_id: i64) -> Result<(), AppError> {
@@ -287,6 +343,30 @@ mod tests {
             kennzeichen: Some("XX-AB 1"), opta: None, standort: None, fms_issi: None,
             sondersignal: false, tragenkapazitaet: None, staerke: None, bemerkung: None,
         }
+    }
+
+    /// Org + Einsatz + ein disponiertes Stamm-Fahrzeug; liefert (einsatz_id, ef_id).
+    async fn seed_fahrzeug(pool: &SqlitePool) -> (i64, i64) {
+        let (benutzer, einsatz) = setup(pool).await;
+        let fz = fz_repo::anlegen(pool, 1, fz_daten("Florian 1")).await.unwrap();
+        let ef = disponiere_stamm(pool, einsatz, 1, fz.id, benutzer).await.unwrap();
+        (einsatz, ef)
+    }
+
+    #[tokio::test]
+    async fn fahrzeug_position_partial_merge() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz_id, ef_id) = seed_fahrzeug(&pool).await;
+        aktualisiere_position(&pool, einsatz_id, ef_id, PositionPatch {
+            lat: Some(Some(50.0)), lon: Some(Some(8.0)),
+            tz_fachaufgabe: Some(Some("transport")), tz_organisation: Some(Some("feuerwehr")),
+        }, true).await.unwrap();
+        let a = aktualisiere_position(&pool, einsatz_id, ef_id, PositionPatch {
+            lat: None, lon: None, tz_fachaufgabe: Some(Some("logistik")), tz_organisation: None,
+        }, true).await.unwrap();
+        assert_eq!(a.lat, Some(50.0));
+        assert_eq!(a.tz_fachaufgabe.as_deref(), Some("logistik"));
+        assert_eq!(a.tz_organisation.as_deref(), Some("feuerwehr"));
     }
 
     #[tokio::test]

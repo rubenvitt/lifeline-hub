@@ -63,6 +63,14 @@ pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
             get(routes::einsatz_fahrzeug::liste),
         )
         .route(
+            "/api/einsaetze/{id}/fahrzeuge/stream",
+            get(routes::einsatz_fahrzeug::stream),
+        )
+        .route(
+            "/api/einsaetze/{id}/fahrzeuge/{ef_id}/position",
+            patch(routes::einsatz_fahrzeug::position),
+        )
+        .route(
             "/api/einsaetze/{id}/fahrzeuge",
             post(routes::einsatz_fahrzeug::disponieren),
         )
@@ -78,6 +86,8 @@ pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
         .route("/api/einsaetze/{id}/personal", post(routes::einsatz_personal::disponieren))
         .route("/api/einsaetze/{id}/personal/{ep_id}", patch(routes::einsatz_personal::aktualisieren))
         .route("/api/einsaetze/{id}/personal/{ep_id}", delete(routes::einsatz_personal::entfernen))
+        .route("/api/einsaetze/{id}/personal/{ep_id}/position", patch(routes::einsatz_personal::position))
+        .route("/api/einsaetze/{id}/karte/fuehrungskraefte", get(routes::einsatz_personal::karte_fuehrungskraefte))
         .route("/api/einsaetze/{id}/material", get(routes::einsatz_material::liste))
         .route("/api/einsaetze/{id}/material", post(routes::einsatz_material::disponieren))
         .route("/api/einsaetze/{id}/material/{em_id}", patch(routes::einsatz_material::aktualisieren))
@@ -129,8 +139,12 @@ pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
                post(routes::einsatz_uhs::belegung))
         .route("/api/einsaetze/{id}/abschnitte", get(routes::einsatzabschnitt::liste))
         .route("/api/einsaetze/{id}/abschnitte", post(routes::einsatzabschnitt::anlegen))
+        .route("/api/einsaetze/{id}/abschnitte/stream", get(routes::einsatzabschnitt::stream))
         .route("/api/einsaetze/{id}/abschnitte/{aid}", patch(routes::einsatzabschnitt::aktualisieren))
+        .route("/api/einsaetze/{id}/abschnitte/{aid}/flaeche", patch(routes::einsatzabschnitt::flaeche))
         .route("/api/einsaetze/{id}/abschnitte/{aid}", delete(routes::einsatzabschnitt::aufloesen))
+        .route("/api/organisation", get(routes::organisation::lesen))
+        .route("/api/organisation", patch(routes::organisation::aktualisieren))
         .route("/api/stichwort-vorschlaege", get(routes::stichwort::liste))
         .route("/api/stichwort-vorschlaege", post(routes::stichwort::anlegen))
         .route(
@@ -191,7 +205,9 @@ pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
         .route("/api/einheit-typen/{id}/deaktivieren", post(routes::einheit_typ::deaktivieren))
         .route("/api/einsaetze/{id}/einheiten", get(routes::einsatz_einheit::liste))
         .route("/api/einsaetze/{id}/einheiten", post(routes::einsatz_einheit::bilden))
+        .route("/api/einsaetze/{id}/einheiten/stream", get(routes::einsatz_einheit::stream))
         .route("/api/einsaetze/{id}/einheiten/{eid}", patch(routes::einsatz_einheit::aktualisieren))
+        .route("/api/einsaetze/{id}/einheiten/{eid}/position", patch(routes::einsatz_einheit::position))
         .route("/api/einsaetze/{id}/einheiten/{eid}", delete(routes::einsatz_einheit::aufloesen))
         .route("/api/einsaetze/{id}/einheiten/{eid}/personal/{ep_id}", put(routes::einsatz_einheit::personal_zuordnen))
         .route("/api/einsaetze/{id}/einheiten/{eid}/personal/{ep_id}", delete(routes::einsatz_einheit::personal_freigeben))
