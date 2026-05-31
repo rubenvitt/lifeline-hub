@@ -112,6 +112,9 @@ async fn verorten_erzeugt_keinen_etb() {
     let eid = einheit_bilden(&app, &admin, einsatz, "1. Zug").await; // Bilden DARF ETB erzeugen.
 
     let vorher = etb_anzahl(&app, &admin, einsatz).await;
+    // Positive Kontrolle: ohne diesen Assert wäre vorher=0=nachher fälschlich grün,
+    // falls das ETB-System komplett kaputt wäre.
+    assert!(vorher >= 1, "bilden muss mindestens einen ETB-Eintrag erzeugt haben — ETB-Baseline ist kaputt");
     let (s, _) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/position"), &admin,
         Some(r#"{"lat":52.5,"lon":13.4,"tz_fachaufgabe":"fuehrung"}"#)).await;
     assert_eq!(s, StatusCode::OK);
