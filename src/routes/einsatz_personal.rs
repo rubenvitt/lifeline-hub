@@ -6,12 +6,29 @@ use crate::error::AppError;
 use crate::etb::{self, repo as etb_repo};
 use crate::personal::disposition_repo::{self, AdhocDaten};
 use crate::personal::status_repo;
-use crate::personal::EinsatzPersonalAnzeige;
+use crate::personal::{EinsatzPersonalAnzeige, FuehrungskraftKarte};
 use crate::staerke::StaerkePosition;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
+
+/// Liest ein optional-nullable Feld so, dass JSON-`null` zu `Some(None)` und
+/// fehlendes Feld zu `None` wird (Tri-State, wie in `routes::einsatz_uhs`).
+fn deserialize_optional_field<'de, T, D>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    T: serde::Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    Option::<T>::deserialize(deserializer).map(Some)
+}
+
+/// SSE-Notify (Lage-Karte): Person-Disposition hat sich geändert. Nutzt das bestehende
+/// `person`-Event-Tag (kein neues `personal`-Tag, sonst bricht der Frontend-Filter).
+fn sse_personal(state: &AppState, einsatz_id: i64, ep_id: i64) {
+    let data = serde_json::json!({ "einsatz_id": einsatz_id, "person_id": ep_id }).to_string();
+    state.live.publiziere_event(einsatz_id, "person", data);
+}
 
 /// Schreibt einen automatischen System-ETB-Eintrag und publiziert ihn live
 /// (wie `routes::einsatz_fahrzeug::etb_system`).
@@ -233,4 +250,86 @@ pub async fn entfernen(
     )
     .await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PositionBody {
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub lat: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub lon: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub tz_fachaufgabe: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub tz_organisation: Option<Option<String>>,
+}
+
+/// PATCH /api/einsaetze/{id}/personal/{ep_id}/position — reine Lage-Pflege, KEIN ETB.
+/// Liefert die Karten-Sicht; Repo 404t Nicht-Führungskräfte (gewollt, Merge-Design).
+pub async fn position(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, ep_id)): Path<(i64, i64)>,
+    Json(body): Json<PositionBody>,
+) -> Result<Json<FuehrungskraftKarte>, AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_schreibrecht(rolle)?;
+    fordere_aktiv(&einsatz)?;
+
+    // Effektivzustand für die Paar-Validierung: vorhandene lat/lon (404 falls fremd).
+    let vorher: (Option<f64>, Option<f64>) = sqlx::query_as(
+        "SELECT lat, lon FROM einsatz_personal WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    let eff_lat = match body.lat { Some(o) => o, None => vorher.0 };
+    let eff_lon = match body.lon { Some(o) => o, None => vorher.1 };
+    if eff_lat.is_some() != eff_lon.is_some() {
+        return Err(AppError::UnprocessableEntity(
+            "lat und lon müssen gemeinsam gesetzt oder gemeinsam leer sein".into(),
+        ));
+    }
+    if let Some(la) = eff_lat {
+        if !(-90.0..=90.0).contains(&la) {
+            return Err(AppError::UnprocessableEntity("lat muss zwischen -90 und 90 liegen".into()));
+        }
+    }
+    if let Some(lo) = eff_lon {
+        if !(-180.0..=180.0).contains(&lo) {
+            return Err(AppError::UnprocessableEntity("lon muss zwischen -180 und 180 liegen".into()));
+        }
+    }
+
+    let nachher = disposition_repo::aktualisiere_position(
+        &state.pool,
+        einsatz_id,
+        ep_id,
+        disposition_repo::PositionPatch {
+            lat: body.lat,
+            lon: body.lon,
+            tz_fachaufgabe: body.tz_fachaufgabe.as_ref().map(|o| o.as_deref()),
+            tz_organisation: body.tz_organisation.as_ref().map(|o| o.as_deref()),
+        },
+    )
+    .await?;
+    sse_personal(&state, einsatz_id, ep_id);
+    Ok(Json(nachher))
+}
+
+/// GET /api/einsaetze/{id}/karte/fuehrungskraefte — nur Einheits-/Abschnittsführung.
+pub async fn karte_fuehrungskraefte(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path(einsatz_id): Path<i64>,
+) -> Result<Json<Vec<FuehrungskraftKarte>>, AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    Ok(Json(
+        disposition_repo::liste_fuehrungskraefte(&state.pool, einsatz_id).await?,
+    ))
 }
