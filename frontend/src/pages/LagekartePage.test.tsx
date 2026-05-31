@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
@@ -20,6 +20,25 @@ vi.mock('./lagekarte/Kartenflaeche', () => ({
       {(props.markers ?? []).map((m) => (
         <button key={m.schluessel} onClick={() => props.onMarkerKlick?.(m.schluessel)}>
           marker-{m.schluessel}
+        </button>
+      ))}
+      {/* Polygon-Zeichnen: nur im aktiven Zeichenmodus feuerbar (spiegelt den echten Flow). */}
+      {props.zeichnen && (
+        <button
+          onClick={() =>
+            props.onFlaecheGezeichnet?.({
+              type: 'Polygon',
+              coordinates: [[[8.6, 50.1], [8.7, 50.1], [8.7, 50.2], [8.6, 50.1]]],
+            })
+          }
+        >
+          flaeche-fertig
+        </button>
+      )}
+      {/* Klick auf eine gerenderte Abschnittsfläche → onFlaecheKlick. */}
+      {(props.flaechen ?? []).map((f) => (
+        <button key={f.id} onClick={() => props.onFlaecheKlick?.(f.id)}>
+          flaeche-{f.id}
         </button>
       ))}
     </div>
@@ -113,11 +132,61 @@ const SCHADEN_VERORTET = {
   geschaedigt_organisation_name: null,
 };
 
+// --- L‑2 taktische Mock-Objekte ---------------------------------------------
+// Nur die Felder, die der Code (baueTaktischeMarker/baueTzProps/flaechen) liest.
+// Bewusst NICHT als voller Typ annotiert: HttpResponse.json prüft nicht gegen den
+// Interface-Typ, und voll auszufüllen wäre nur Rauschen.
+
+const EINHEIT_NICHT_VERORTET = {
+  id: 2,
+  name: 'Zug 1',
+  typ_label: 'Zug',
+  lat: null as number | null,
+  lon: null as number | null,
+  tz_fachaufgabe: null,
+  tz_organisation: null,
+};
+
+const EINHEIT_VERORTET = {
+  id: 1,
+  name: 'Gruppe A',
+  typ_label: 'Gruppe',
+  lat: 50.1,
+  lon: 8.6,
+  tz_fachaufgabe: null,
+  tz_organisation: null,
+};
+
+const ABSCHNITT_OHNE_FLAECHE = {
+  id: 3,
+  name: 'EA Nord',
+  flaeche_geojson: null as string | null,
+  tz_fachaufgabe: null,
+  tz_organisation: null,
+};
+
+const FUEHRUNGSKRAFT_VERORTET = {
+  id: 7,
+  einsatz_id: 1,
+  name: 'Zugführer',
+  lat: 50.2,
+  lon: 8.5,
+  tz_fachaufgabe: null,
+  tz_organisation: null,
+  ist_einheitsfuehrer: true,
+  ist_abschnittsleiter: false,
+};
+
+const ORG_DRK = { id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' };
+
 function basisHandler(
   extra: ReturnType<typeof http.get>[] = [],
   config: KarteServerConfig = { online_style_url: null, pmtiles_verfuegbar: false, pmtiles_url: null },
 ) {
+  // extra ZUERST: MSW nimmt den ersten Treffer → Tests können einzelne GET-Defaults
+  // (z. B. /einheiten) gezielt überschreiben, ohne die übrigen Defaults anzufassen.
   server.use(
+    ...extra,
     http.get('/api/einsaetze/1', () => HttpResponse.json(EINSATZ)),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([UHS_NICHT_VERORTET])),
     http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([SCHADEN_VERORTET])),
@@ -127,7 +196,6 @@ function basisHandler(
     http.get('/api/einsaetze/1/karte/fuehrungskraefte', () => HttpResponse.json([])),
     http.get('/api/organisation', () => HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null })),
     http.get('/api/karte/config', () => HttpResponse.json(config)),
-    ...extra,
   );
 }
 
@@ -262,5 +330,85 @@ describe('LagekartePage', () => {
     expect((screen.getByRole('radio', { name: 'Offline' }) as HTMLInputElement).disabled).toBe(false);
     // defaultModus springt auf 'offline'
     expect((screen.getByRole('radio', { name: 'Offline' }) as HTMLInputElement).checked).toBe(true);
+  });
+
+  // --- L‑2: taktische Gliederung --------------------------------------------
+
+  it('zeigt die taktischen Layer-Toggles und ein nicht-verortetes taktisches Objekt in der Liste', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([EINHEIT_NICHT_VERORTET])),
+      http.get('/api/organisation', () => HttpResponse.json(ORG_DRK)),
+    ]);
+    renderSeite();
+    // Layer-Switch-Labels vorhanden (taktische Ebenen).
+    expect(await screen.findByText('Einheiten')).toBeInTheDocument();
+    expect(screen.getByText('Fahrzeuge')).toBeInTheDocument();
+    expect(screen.getByText('Personal-Führung')).toBeInTheDocument();
+    expect(screen.getByText('Abschnitte')).toBeInTheDocument();
+    // Nicht-verortete Einheit erscheint mit korrektem Label in der Nicht-verortet-Liste.
+    expect(await screen.findByText('Einheit: Zug 1')).toBeInTheDocument();
+  });
+
+  it('platziert eine Einheit: wählen → Karten-Klick → PATCH /position mit lat/lon', async () => {
+    let body: unknown = null;
+    basisHandler([
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([EINHEIT_NICHT_VERORTET])),
+      http.patch('/api/einsaetze/1/einheiten/2/position', async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({ ...EINHEIT_NICHT_VERORTET, lat: 50.1, lon: 8.6 });
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    // Mehrere "Platzieren"-Buttons (UHS BHP 50 + Einheit Zug 1) → über das List-Item
+    // der Einheit eindeutig treffen.
+    const item = (await screen.findByText('Einheit: Zug 1')).closest('.ant-list-item') as HTMLElement;
+    await user.click(within(item).getByRole('button', { name: 'Platzieren' }));
+    await user.click(await screen.findByText('karte-klick'));
+    await waitFor(() => expect(body).toMatchObject({ lat: 50.1, lon: 8.6 }));
+  });
+
+  it('zeichnet eine Abschnittsfläche: Fläche zeichnen → fertig → PATCH /flaeche mit Polygon-GeoJSON', async () => {
+    let body: { flaeche_geojson?: string } | null = null;
+    basisHandler([
+      http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([ABSCHNITT_OHNE_FLAECHE])),
+      http.patch('/api/einsaetze/1/abschnitte/3/flaeche', async ({ request }) => {
+        body = (await request.json()) as { flaeche_geojson?: string };
+        return HttpResponse.json({ ...ABSCHNITT_OHNE_FLAECHE, flaeche_geojson: body.flaeche_geojson });
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Fläche zeichnen' }));
+    // Der Stub blendet "flaeche-fertig" nur im aktiven Zeichenmodus ein.
+    await user.click(await screen.findByText('flaeche-fertig'));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(typeof body!.flaeche_geojson).toBe('string');
+    const poly = JSON.parse(body!.flaeche_geojson as string);
+    expect(poly.type).toBe('Polygon');
+    expect(Array.isArray(poly.coordinates)).toBe(true);
+  });
+
+  it('rendert verortete Führungskräfte als Personal-Zeichen (normales Personal wird nicht geladen)', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1/karte/fuehrungskraefte', () => HttpResponse.json([FUEHRUNGSKRAFT_VERORTET])),
+    ]);
+    renderSeite();
+    // Verortete Führungskraft erzeugt marker-fuehrung-7.
+    expect(await screen.findByText('marker-fuehrung-7')).toBeInTheDocument();
+    // Es gibt keine /personal-Query auf der Lagekarte → normales Personal taucht
+    // strukturell nicht als Marker auf. Stichprobe: kein generischer Personal-Marker.
+    expect(screen.queryByText(/^marker-personal-/)).not.toBeInTheDocument();
+  });
+
+  it('Marker-Klick auf eine verortete Einheit öffnet den Inspector mit Fach-Modul-Link', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([EINHEIT_VERORTET])),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByText('marker-einheit-1'));
+    const link = await screen.findByRole('link', { name: /Im Fach-Modul öffnen/ });
+    expect(link).toHaveAttribute('href', '/einsaetze/1/einheiten');
   });
 });
