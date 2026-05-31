@@ -19,6 +19,7 @@ pub mod fahrzeug;
 pub mod fahrzeug_status;
 pub mod material;
 pub mod health;
+pub mod organisation;
 pub mod karte;
 pub mod personal;
 pub mod personal_status;

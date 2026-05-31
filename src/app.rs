@@ -143,6 +143,8 @@ pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
         .route("/api/einsaetze/{id}/abschnitte/{aid}", patch(routes::einsatzabschnitt::aktualisieren))
         .route("/api/einsaetze/{id}/abschnitte/{aid}/flaeche", patch(routes::einsatzabschnitt::flaeche))
         .route("/api/einsaetze/{id}/abschnitte/{aid}", delete(routes::einsatzabschnitt::aufloesen))
+        .route("/api/organisation", get(routes::organisation::lesen))
+        .route("/api/organisation", patch(routes::organisation::aktualisieren))
         .route("/api/stichwort-vorschlaege", get(routes::stichwort::liste))
         .route("/api/stichwort-vorschlaege", post(routes::stichwort::anlegen))
         .route(
