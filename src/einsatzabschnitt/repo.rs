@@ -15,7 +15,8 @@ pub struct AbschnittDaten<'a> {
 
 const SELECT_AUFGELOEST: &str = "\
     SELECT a.id, a.einsatz_id, a.ueber_abschnitt_id, a.name, a.leiter_id, \
-           p.snap_name AS leiter_name, a.bemerkung, a.sortier \
+           p.snap_name AS leiter_name, a.bemerkung, \
+           a.flaeche_geojson, a.tz_fachaufgabe, a.tz_organisation, a.sortier \
     FROM einsatzabschnitt a \
     LEFT JOIN einsatz_personal p ON p.id = a.leiter_id";
 
@@ -28,6 +29,9 @@ struct Row {
     leiter_id: Option<i64>,
     leiter_name: Option<String>,
     bemerkung: Option<String>,
+    flaeche_geojson: Option<String>,
+    tz_fachaufgabe: Option<String>,
+    tz_organisation: Option<String>,
     sortier: i64,
 }
 
@@ -40,6 +44,9 @@ fn zu_anzeige(row: Row) -> EinsatzabschnittAnzeige {
         leiter_id: row.leiter_id,
         leiter_name: row.leiter_name,
         bemerkung: row.bemerkung,
+        flaeche_geojson: row.flaeche_geojson,
+        tz_fachaufgabe: row.tz_fachaufgabe,
+        tz_organisation: row.tz_organisation,
         sortier: row.sortier,
     }
 }
@@ -159,6 +166,39 @@ pub async fn aktualisiere(pool: &SqlitePool, einsatz_id: i64, id: i64, daten: Ab
     laden(pool, einsatz_id, id).await
 }
 
+/// Reine Fläche-/Symbol-Felder eines Abschnitts. `Some(None)` = auf NULL, `None` = unverändert.
+#[derive(Debug, Default)]
+pub struct FlaechePatch<'a> {
+    pub flaeche_geojson: Option<Option<&'a str>>,
+    pub tz_fachaufgabe: Option<Option<&'a str>>,
+    pub tz_organisation: Option<Option<&'a str>>,
+}
+
+/// Setzt/ändert/löscht Fläche (GeoJSON) + taktische Zeichen-Felder. KEIN ETB-Schreibpfad (Lage-Pflege).
+pub async fn aktualisiere_flaeche(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    aid: i64,
+    daten: FlaechePatch<'_>,
+) -> Result<EinsatzabschnittAnzeige, AppError> {
+    let betroffen = sqlx::query(
+        "UPDATE einsatzabschnitt SET \
+            flaeche_geojson = CASE WHEN ? THEN ? ELSE flaeche_geojson END, \
+            tz_fachaufgabe  = CASE WHEN ? THEN ? ELSE tz_fachaufgabe END, \
+            tz_organisation = CASE WHEN ? THEN ? ELSE tz_organisation END \
+         WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(daten.flaeche_geojson.is_some()).bind(daten.flaeche_geojson.flatten())
+    .bind(daten.tz_fachaufgabe.is_some()).bind(daten.tz_fachaufgabe.flatten())
+    .bind(daten.tz_organisation.is_some()).bind(daten.tz_organisation.flatten())
+    .bind(aid).bind(einsatz_id)
+    .execute(pool).await?.rows_affected();
+    if betroffen == 0 {
+        return Err(AppError::NotFound);
+    }
+    laden(pool, einsatz_id, aid).await
+}
+
 /// Löst einen Abschnitt auf (Transaktion): Unter-Abschnitte auf den Parent des
 /// gelöschten hochziehen, zugeordnete Einheiten `abschnitt_id = NULL`, dann löschen.
 /// `NotFound`, falls nicht zum Einsatz.
@@ -192,6 +232,29 @@ mod tests {
 
     fn daten<'a>(name: &'a str, parent: Option<i64>, leiter: Option<i64>) -> AbschnittDaten<'a> {
         AbschnittDaten { name, ueber_abschnitt_id: parent, leiter_id: leiter, bemerkung: None, sortier: 0 }
+    }
+
+    /// Org + Einsatz + ein Abschnitt; liefert (einsatz_id, abschnitt_id).
+    async fn seed_abschnitt(pool: &SqlitePool) -> (i64, i64) {
+        let einsatz = setup(pool).await;
+        let a = anlegen(pool, einsatz, daten("Nord", None, None)).await.unwrap();
+        (einsatz, a.id)
+    }
+
+    #[tokio::test]
+    async fn abschnitt_flaeche_setzen_und_loeschen() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz_id, aid) = seed_abschnitt(&pool).await;
+        let gj = r#"{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}"#;
+        let a = aktualisiere_flaeche(&pool, einsatz_id, aid, FlaechePatch {
+            flaeche_geojson: Some(Some(gj)), tz_fachaufgabe: Some(Some("fuehrung")), tz_organisation: None,
+        }).await.unwrap();
+        assert_eq!(a.flaeche_geojson.as_deref(), Some(gj));
+        let b = aktualisiere_flaeche(&pool, einsatz_id, aid, FlaechePatch {
+            flaeche_geojson: Some(None), tz_fachaufgabe: None, tz_organisation: None,
+        }).await.unwrap();
+        assert_eq!(b.flaeche_geojson, None);
+        assert_eq!(b.tz_fachaufgabe.as_deref(), Some("fuehrung")); // unverändert
     }
 
     #[tokio::test]
