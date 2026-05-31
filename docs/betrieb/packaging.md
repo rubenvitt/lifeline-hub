@@ -80,3 +80,18 @@ Frontend nutzt automatisch Online bzw. Blind.
 rendert bewusst **ohne Beschriftung** — so werden keine Glyphs/Offline-Fonts benötigt.
 PMTiles-Dateien mit einem anderen Schema brauchen einen angepassten Offline-Style
 (`frontend/src/pages/lagekarte/basemapStil.ts`) oder die Online-Style-URL.
+
+> **Wichtig — keine Secrets in der Style-URL:** Der Server spiegelt
+> `LIFELINE_KARTE_STYLE_URL` wörtlich an das Frontend zurück. Ein in der URL
+> eingebetteter API-Key (z. B. `https://tiles.example/style.json?key=GEHEIM`)
+> ist damit für **jeden eingeloggten Benutzer** im Klartext sichtbar — und bei
+> falscher Konfiguration unter Umständen abgreifbar. Wenn dein Style-Anbieter
+> einen Schlüssel verlangt, nimm einen Anbieter mit Referrer-/Domain-Schutz,
+> einen serverseitigen Tile-Proxy, oder bleibe bei der Offline-PMTiles-Variante.
+>
+> **Auth des Konfigurations-Endpoints:** `/api/karte/config` erfordert eine
+> gültige Session (siehe `src/routes/karte.rs`). Die rohen Tile-Daten unter
+> `/api/karte/tiles.pmtiles` werden hingegen bewusst ohne Auth ausgeliefert,
+> da MapLibre/PMTiles per HTTP-Range tausende Tile-Requests stellen und die
+> Daten reine Map-Geometrie ohne Personenbezug sind. Bei Betrieb auf
+> `0.0.0.0` (LAN) ist das die bewusst akzeptierte Grenze.

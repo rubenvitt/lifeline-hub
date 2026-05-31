@@ -1,3 +1,4 @@
+use crate::auth::session::CurrentUser;
 use crate::config::KarteConfig;
 use axum::http::StatusCode;
 use axum::{Extension, Json};
@@ -14,7 +15,17 @@ pub struct KarteConfigAntwort {
 }
 
 /// GET /api/karte/config — Basemap-Verfügbarkeit fürs Frontend.
-pub async fn config(Extension(karte): Extension<KarteConfig>) -> Json<KarteConfigAntwort> {
+///
+/// Auth: erfordert eine gültige Session. `online_style_url` wird wörtlich
+/// zurückgegeben; ein versehentlich eingebetteter API-Key in der Style-URL
+/// (siehe `LIFELINE_KARTE_STYLE_URL`) soll nicht an unauthentifizierte LAN-Clients
+/// gehen, wenn der Server auf `0.0.0.0` lauscht. Tile-Daten selbst bleiben
+/// bewusst offen, da die ServeFile-Schicht keinen Extractor durchschleift und
+/// die PMTiles ohnehin nur Map-Geometrie enthalten.
+pub async fn config(
+    _user: CurrentUser,
+    Extension(karte): Extension<KarteConfig>,
+) -> Json<KarteConfigAntwort> {
     let pmtiles_verfuegbar = karte.pmtiles_path.is_some();
     Json(KarteConfigAntwort {
         online_style_url: karte.online_style_url.clone(),

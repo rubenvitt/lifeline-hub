@@ -1,6 +1,7 @@
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::{header, Request, StatusCode};
 use lifeline_hub::app::{build_router, build_router_mit_karte, AppState};
+use lifeline_hub::auth::bootstrap::bootstrap_admin;
 use lifeline_hub::config::KarteConfig;
 use lifeline_hub::live::LiveHub;
 use std::io::Write;
@@ -10,6 +11,34 @@ async fn pool() -> sqlx::SqlitePool {
     // db::test_pool() liefert einen bereits migrierten Test-Pool (wie alle tests/*.rs).
     // Die Karte-Routen lesen die DB nicht — der Pool wird nur für AppState gebraucht.
     lifeline_hub::db::test_pool().await
+}
+
+/// Bootstrappt einen Admin im übergebenen Pool, loggt sich ein und liefert das
+/// `name=value`-Cookie-Paar für nachfolgende authentifizierte Requests.
+async fn login_cookie(app: &axum::Router) -> String {
+    let body = r#"{"benutzername":"admin","passwort":"startpw12"}"#;
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/auth/login")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(body))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK, "Login im Test muss klappen");
+    resp.headers()
+        .get(header::SET_COOKIE)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap()
+        .to_string()
 }
 
 #[tokio::test]
@@ -50,6 +79,7 @@ async fn tiles_route_404_ohne_konfigurierten_pfad() {
 #[tokio::test]
 async fn config_endpoint_meldet_verfuegbarkeit() {
     let pool = pool().await;
+    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12")).await.unwrap();
     let app = build_router_mit_karte(
         AppState { pool, live: LiveHub::new() },
         KarteConfig {
@@ -57,7 +87,12 @@ async fn config_endpoint_meldet_verfuegbarkeit() {
             online_style_url: Some("https://tiles.example/style.json".into()),
         },
     );
-    let req = Request::builder().uri("/api/karte/config").body(Body::empty()).unwrap();
+    let cookie = login_cookie(&app).await;
+    let req = Request::builder()
+        .uri("/api/karte/config")
+        .header(header::COOKIE, &cookie)
+        .body(Body::empty())
+        .unwrap();
     let res = app.oneshot(req).await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);
     let bytes = axum::body::to_bytes(res.into_body(), 4096).await.unwrap();
@@ -70,8 +105,14 @@ async fn config_endpoint_meldet_verfuegbarkeit() {
 #[tokio::test]
 async fn config_endpoint_blind_modus_ohne_konfiguration() {
     let pool = pool().await;
+    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12")).await.unwrap();
     let app = build_router(AppState { pool, live: LiveHub::new() });
-    let req = Request::builder().uri("/api/karte/config").body(Body::empty()).unwrap();
+    let cookie = login_cookie(&app).await;
+    let req = Request::builder()
+        .uri("/api/karte/config")
+        .header(header::COOKIE, &cookie)
+        .body(Body::empty())
+        .unwrap();
     let res = app.oneshot(req).await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);
     let bytes = axum::body::to_bytes(res.into_body(), 4096).await.unwrap();
@@ -79,4 +120,16 @@ async fn config_endpoint_blind_modus_ohne_konfiguration() {
     assert_eq!(v["pmtiles_verfuegbar"].as_bool(), Some(false));
     assert!(v["pmtiles_url"].is_null());
     assert!(v["online_style_url"].is_null());
+}
+
+#[tokio::test]
+async fn config_endpoint_401_ohne_session() {
+    let pool = pool().await;
+    let app = build_router(AppState { pool, live: LiveHub::new() });
+    let req = Request::builder()
+        .uri("/api/karte/config")
+        .body(Body::empty())
+        .unwrap();
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
 }
