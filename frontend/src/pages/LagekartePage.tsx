@@ -252,6 +252,22 @@ export default function LagekartePage() {
     setAuswahl(null);
   }
 
+  function aendereSymbol(
+    marker: KarteMarker,
+    patch: { tz_fachaufgabe?: string | null; tz_organisation?: string | null },
+  ) {
+    const inval = (key: string) => qc.invalidateQueries({ queryKey: [key, einsatzId] });
+    if (marker.typ === 'einheit') {
+      verorteEinheit(einsatzId, marker.id, patch).then(() => inval('einsatz-einheiten')).catch(fehler);
+    } else if (marker.typ === 'fahrzeug') {
+      verorteFahrzeug(einsatzId, marker.id, patch).then(() => inval('einsatz-fahrzeuge')).catch(fehler);
+    } else if (marker.typ === 'fuehrung') {
+      verortePerson(einsatzId, marker.id, patch).then(() => inval('einsatz-fuehrungskraefte')).catch(fehler);
+    } else if (marker.typ === 'abschnitt') {
+      zeichneAbschnitt(einsatzId, marker.id, patch).then(() => inval('einsatz-abschnitte')).catch(fehler);
+    }
+  }
+
   if (einsatzQuery.isLoading || configQuery.isLoading) {
     return <Spin style={{ marginTop: 64 }} />;
   }
@@ -316,6 +332,7 @@ export default function LagekartePage() {
             darfSchreiben={!!darfSchreiben}
             onSchliessen={() => setAuswahl(null)}
             onVerortungLoeschen={loescheVerortung}
+            onSymbolAendern={aendereSymbol}
           />
         )}
       </div>
