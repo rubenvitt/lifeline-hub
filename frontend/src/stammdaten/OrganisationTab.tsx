@@ -5,7 +5,7 @@ import { ApiError } from '../api/client';
 import { ladeOrganisation, setzeOrgDefault } from '../api/organisation';
 
 interface FormWerte {
-  tz_organisation: string | null;
+  tz_organisation: string;
 }
 
 const ORG_OPTIONEN = [
@@ -27,13 +27,13 @@ export default function OrganisationTab() {
   const orgQuery = useQuery({ queryKey: ['organisation'], queryFn: ladeOrganisation });
 
   useEffect(() => {
-    if (orgQuery.data) {
+    if (orgQuery.data?.tz_organisation) {
       form.setFieldsValue({ tz_organisation: orgQuery.data.tz_organisation });
     }
   }, [orgQuery.data, form]);
 
   const speichern = useMutation({
-    mutationFn: (werte: FormWerte) => setzeOrgDefault(werte.tz_organisation ?? ''),
+    mutationFn: (werte: FormWerte) => setzeOrgDefault(werte.tz_organisation),
     onSuccess: () => {
       message.success('DV-102-Organisation gespeichert');
       qc.invalidateQueries({ queryKey: ['organisation'] });
@@ -51,7 +51,6 @@ export default function OrganisationTab() {
           <Select
             options={ORG_OPTIONEN}
             placeholder="Organisation wählen"
-            allowClear
             loading={orgQuery.isLoading}
           />
         </Form.Item>
