@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import maplibregl, { type LngLatLike, type StyleSpecification } from 'maplibre-gl';
 import { Protocol } from 'pmtiles';
+import { erzeugeTaktischesZeichen } from 'taktische-zeichen-react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { KarteMarker } from './marker';
 
@@ -93,8 +94,24 @@ export default function Kartenflaeche({
     for (const m of markerObjekteRef.current) m.remove();
     markerObjekteRef.current = markers.map((mk) => {
       const el = document.createElement('div');
-      el.style.cssText = `width:18px;height:18px;border-radius:50%;border:2px solid #fff;cursor:pointer;background:${mk.farbe};box-shadow:0 0 3px rgba(0,0,0,.5)`;
       el.title = mk.label;
+      el.style.cursor = 'pointer';
+      if (mk.tz) {
+        // Per DOM-API bauen (kein innerHTML). dataUrl/statusFarbe stammen aus kontrollierten Enum-Werten.
+        const { dataUrl } = erzeugeTaktischesZeichen(mk.tz);
+        const wrap = document.createElement('div');
+        wrap.style.display = 'flex';
+        if (mk.statusFarbe) {
+          wrap.style.cssText += `border:3px solid ${mk.statusFarbe};border-radius:6px;padding:1px;background:rgba(255,255,255,.85);`;
+        }
+        const img = document.createElement('img');
+        img.src = dataUrl;
+        img.width = 34; img.height = 34; img.alt = '';
+        wrap.appendChild(img);
+        el.appendChild(wrap);
+      } else {
+        el.style.cssText += `width:18px;height:18px;border-radius:50%;border:2px solid #fff;background:${mk.farbe};box-shadow:0 0 3px rgba(0,0,0,.5)`;
+      }
       el.addEventListener('click', (ev) => {
         ev.stopPropagation(); // nicht als Karten-Klick werten
         onMarkerKlick?.(mk.schluessel);
