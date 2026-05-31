@@ -151,6 +151,7 @@ pub async fn disponieren(
         &format!("Fahrzeug «{}» disponiert", anzeige.funkrufname),
     )
     .await?;
+    sse_fahrzeug(&state, einsatz_id, ef_id);
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
 
@@ -200,6 +201,7 @@ pub async fn aktualisieren(
         )
         .await?;
     }
+    sse_fahrzeug(&state, einsatz_id, ef_id);
     Ok(Json(nachher))
 }
 
@@ -223,6 +225,7 @@ pub async fn entfernen(
         &format!("Fahrzeug «{}» aus dem Einsatz entfernt", anzeige.funkrufname),
     )
     .await?;
+    sse_fahrzeug(&state, einsatz_id, ef_id);
     Ok(StatusCode::NO_CONTENT)
 }
 

@@ -171,6 +171,7 @@ pub async fn disponieren(
         &format!("Person «{}» disponiert", person_bezeichnung(&anzeige)),
     )
     .await?;
+    sse_personal(&state, einsatz_id, ep_id);
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
 
@@ -226,6 +227,7 @@ pub async fn aktualisieren(
         )
         .await?;
     }
+    sse_personal(&state, einsatz_id, ep_id);
     Ok(Json(nachher))
 }
 
@@ -249,6 +251,7 @@ pub async fn entfernen(
         &format!("Person «{}» aus dem Einsatz entfernt", person_bezeichnung(&anzeige)),
     )
     .await?;
+    sse_personal(&state, einsatz_id, ep_id);
     Ok(StatusCode::NO_CONTENT)
 }
 

@@ -32,6 +32,21 @@ fn sse_einheit(state: &AppState, einsatz_id: i64, einheit_id: i64) {
     state.live.publiziere_event(einsatz_id, "einheit", data);
 }
 
+/// SSE-Notify (Lage-Karte): betroffenes Fahrzeug aktualisieren (z.B. bei Zuordnung/Freigabe).
+/// Lokaler Spiegel von `routes::einsatz_fahrzeug::sse_fahrzeug` (gleiche Payload), um
+/// Cross-Modul-Sichtbarkeit zu vermeiden.
+fn sse_fahrzeug(state: &AppState, einsatz_id: i64, ef_id: i64) {
+    let data = serde_json::json!({ "einsatz_id": einsatz_id, "fahrzeug_id": ef_id }).to_string();
+    state.live.publiziere_event(einsatz_id, "fahrzeug", data);
+}
+
+/// SSE-Notify (Lage-Karte): betroffene Person aktualisieren (z.B. bei Zuordnung/Freigabe).
+/// Lokaler Spiegel von `routes::einsatz_personal::sse_personal` (Tag `person`, gleiche Payload).
+fn sse_personal(state: &AppState, einsatz_id: i64, ep_id: i64) {
+    let data = serde_json::json!({ "einsatz_id": einsatz_id, "person_id": ep_id }).to_string();
+    state.live.publiziere_event(einsatz_id, "person", data);
+}
+
 async fn etb_system(state: &AppState, einsatz_id: i64, benutzer_id: i64, inhalt: &str) -> Result<(), AppError> {
     let anzeige = etb_repo::anlegen(
         &state.pool, einsatz_id, benutzer_id,
@@ -118,6 +133,7 @@ pub async fn bilden(
         benutzer.id,
     ).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}» gebildet", anzeige.name)).await?;
+    sse_einheit(&state, einsatz_id, anzeige.id);
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
 
@@ -177,6 +193,7 @@ pub async fn aktualisieren(
         };
         etb_system(&state, einsatz_id, benutzer.id, &inhalt).await?;
     }
+    sse_einheit(&state, einsatz_id, eid);
     Ok(Json(final_anzeige))
 }
 
@@ -190,6 +207,7 @@ pub async fn aufloesen(
     let name = einheit_name(&state, einsatz_id, eid).await?;
     einheit_repo::loese_auf(&state.pool, einsatz_id, eid).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}» aufgelöst", name)).await?;
+    sse_einheit(&state, einsatz_id, eid);
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -203,6 +221,8 @@ pub async fn personal_zuordnen(
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let person = mitglied_repo::ordne_personal_zu(&state.pool, einsatz_id, eid, ep_id).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: «{}» zugeordnet", einheit, person)).await?;
+    sse_einheit(&state, einsatz_id, eid);
+    sse_personal(&state, einsatz_id, ep_id);
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -216,6 +236,8 @@ pub async fn personal_freigeben(
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let person = mitglied_repo::gib_personal_frei(&state.pool, einsatz_id, eid, ep_id).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: «{}» freigegeben", einheit, person)).await?;
+    sse_einheit(&state, einsatz_id, eid);
+    sse_personal(&state, einsatz_id, ep_id);
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -229,6 +251,8 @@ pub async fn fahrzeug_zuordnen(
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let fz = mitglied_repo::ordne_fahrzeug_zu(&state.pool, einsatz_id, eid, ef_id).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: Fahrzeug «{}» zugeordnet", einheit, fz)).await?;
+    sse_einheit(&state, einsatz_id, eid);
+    sse_fahrzeug(&state, einsatz_id, ef_id);
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -242,6 +266,8 @@ pub async fn fahrzeug_freigeben(
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let fz = mitglied_repo::gib_fahrzeug_frei(&state.pool, einsatz_id, eid, ef_id).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: Fahrzeug «{}» freigegeben", einheit, fz)).await?;
+    sse_einheit(&state, einsatz_id, eid);
+    sse_fahrzeug(&state, einsatz_id, ef_id);
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -255,6 +281,7 @@ pub async fn material_zuordnen(
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let (bez, menge) = mitglied_repo::ordne_material_zu(&state.pool, einsatz_id, eid, em_id).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: Material «{}» (×{}) zugeordnet", einheit, bez, menge)).await?;
+    sse_einheit(&state, einsatz_id, eid);
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -268,6 +295,7 @@ pub async fn material_freigeben(
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let (bez, menge) = mitglied_repo::gib_material_frei(&state.pool, einsatz_id, eid, em_id).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: Material «{}» (×{}) freigegeben", einheit, bez, menge)).await?;
+    sse_einheit(&state, einsatz_id, eid);
     Ok(StatusCode::NO_CONTENT)
 }
 

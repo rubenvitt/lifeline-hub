@@ -98,6 +98,7 @@ pub async fn anlegen(
         },
     ).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Abschnitt «{}» angelegt", anzeige.name)).await?;
+    sse_abschnitt(&state, einsatz_id, anzeige.id);
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
 
@@ -126,6 +127,7 @@ pub async fn aktualisieren(
             leiter_id: body.leiter_id, bemerkung: bemerkung.as_deref(), sortier: body.sortier,
         },
     ).await?;
+    sse_abschnitt(&state, einsatz_id, aid);
     Ok(Json(anzeige))
 }
 
@@ -143,6 +145,7 @@ pub async fn aufloesen(
     let vorher = abschnitt_repo::laden(&state.pool, einsatz_id, aid).await?;
     abschnitt_repo::loese_auf(&state.pool, einsatz_id, aid).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Abschnitt «{}» aufgelöst", vorher.name)).await?;
+    sse_abschnitt(&state, einsatz_id, aid);
     Ok(StatusCode::NO_CONTENT)
 }
 
