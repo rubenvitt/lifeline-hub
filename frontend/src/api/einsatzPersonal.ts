@@ -1,5 +1,8 @@
-import type { EinsatzPersonal, StaerkePosition } from './types';
+import type { EinsatzPersonal, FuehrungskraftKarte, StaerkePosition } from './types';
 import { apiGet, apiSend } from './client';
+import type { PositionPatch } from './einheiten';
+
+export type { PositionPatch } from './einheiten';
 
 export interface AdhocEingabe {
   name: string;
@@ -37,4 +40,14 @@ export function aktualisiereDisposition(
 
 export function entferneDisposition(einsatzId: number, epId: number): Promise<void> {
   return apiSend<void>(`/api/einsaetze/${einsatzId}/personal/${epId}`, 'DELETE');
+}
+
+/** L‑2: Lädt die Führungskräfte-Marker für die Lagekarte. */
+export function listeFuehrungskraefte(einsatzId: number): Promise<FuehrungskraftKarte[]> {
+  return apiGet<FuehrungskraftKarte[]>(`/api/einsaetze/${einsatzId}/karte/fuehrungskraefte`);
+}
+
+/** L‑2: Verortet eine Führungskraft (Einsatzpersonal) auf der Lagekarte. */
+export function verortePerson(einsatzId: number, epId: number, daten: PositionPatch): Promise<FuehrungskraftKarte> {
+  return apiSend<FuehrungskraftKarte>(`/api/einsaetze/${einsatzId}/personal/${epId}/position`, 'PATCH', daten);
 }
