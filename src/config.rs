@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use serde::{Deserialize, Serialize};
 
 /// Passwort-Wert, dessen `Debug`-Ausgabe maskiert ist, damit das Klartext-
 /// Passwort nicht versehentlich (z.B. via `{config:?}`) ins Log gelangt.
@@ -25,12 +26,97 @@ impl GeheimesPasswort {
     }
 }
 
+/// Typ eines Online-Views: Vektor-Style-JSON (URL direkt an MapLibre) oder
+/// Raster-Tile-Template (`{z}/{y}/{x}`), das das Frontend in einen Raster-Style verpackt.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum OnlineStyleTyp {
+    #[default]
+    Vektor,
+    Raster,
+}
+
+/// Ein benannter Online-Basemap-View. `attribution` ist die config-autoritative
+/// Pflicht-Attribution, die das Frontend per `customAttribution` anzeigt.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct OnlineStyle {
+    pub name: String,
+    pub url: String,
+    #[serde(default)]
+    pub typ: OnlineStyleTyp,
+    #[serde(default)]
+    pub attribution: Option<String>,
+}
+
 /// Karten-/Basemap-Konfiguration, die zur Laufzeit an die Karte-Routen geht.
-/// `Default` (alles `None`) → kein Tile-Service, Frontend geht in den Blind-Modus.
+/// `Default` (leer/None) → kein Tile-Service, Frontend geht in den Blind-Modus.
+/// Die eingebaute Default-Shortlist wird NICHT hier, sondern erst beim Serverstart
+/// über `online_styles_aufloesen` injiziert (Tests mit `build_router` bleiben Blind).
 #[derive(Clone, Debug, Default)]
 pub struct KarteConfig {
     pub pmtiles_path: Option<String>,
-    pub online_style_url: Option<String>,
+    pub online_styles: Vec<OnlineStyle>,
+}
+
+/// Eingebaute, schlüsselfreie Default-Shortlist (alle ohne API-Key, MapLibre-GL-tauglich,
+/// behördlich/kommerziell nutzbar — Stand Recherche 30.05.2026).
+pub fn default_online_styles() -> Vec<OnlineStyle> {
+    vec![
+        OnlineStyle {
+            name: "OpenFreeMap Liberty".into(),
+            url: "https://tiles.openfreemap.org/styles/liberty".into(),
+            typ: OnlineStyleTyp::Vektor,
+            attribution: Some("© OpenMapTiles © OpenStreetMap-Mitwirkende".into()),
+        },
+        OnlineStyle {
+            name: "basemap.de Farbe".into(),
+            url: "https://sgx.geodatenzentrum.de/gdz_basemapde_vektor/styles/bm_web_col.json".into(),
+            typ: OnlineStyleTyp::Vektor,
+            attribution: Some("© GeoBasis-DE / BKG (2026) CC BY 4.0".into()),
+        },
+        OnlineStyle {
+            name: "basemap.de Grau".into(),
+            url: "https://sgx.geodatenzentrum.de/gdz_basemapde_vektor/styles/bm_web_gry.json".into(),
+            typ: OnlineStyleTyp::Vektor,
+            attribution: Some("© GeoBasis-DE / BKG (2026) CC BY 4.0".into()),
+        },
+        OnlineStyle {
+            name: "OpenFreeMap Dark".into(),
+            url: "https://tiles.openfreemap.org/styles/dark".into(),
+            typ: OnlineStyleTyp::Vektor,
+            attribution: Some("© OpenMapTiles © OpenStreetMap-Mitwirkende".into()),
+        },
+        OnlineStyle {
+            name: "TopPlusOpen (Topographie)".into(),
+            url: "https://sgx.geodatenzentrum.de/wmts_topplus_open/tile/1.0.0/web/default/WEBMERCATOR/{z}/{y}/{x}.png".into(),
+            typ: OnlineStyleTyp::Raster,
+            attribution: Some("© GeoBasis-DE / BKG (2026), TopPlusOpen".into()),
+        },
+    ]
+}
+
+/// Bestimmt die Online-Views beim Serverstart. Präzedenz:
+/// 1. `LIFELINE_KARTE_STYLES` (JSON-Liste) — bei Malformed JSON HARTER Fehler.
+/// 2. sonst altes `LIFELINE_KARTE_STYLE_URL` → Ein-Element-Vektor-View „Online".
+/// 3. sonst eingebaute Default-Shortlist.
+pub fn online_styles_aufloesen(
+    styles_json: Option<&str>,
+    single_url: Option<&str>,
+) -> anyhow::Result<Vec<OnlineStyle>> {
+    if let Some(json) = styles_json {
+        let liste: Vec<OnlineStyle> = serde_json::from_str(json)
+            .map_err(|e| anyhow::anyhow!("LIFELINE_KARTE_STYLES ist kein gültiges JSON: {e}"))?;
+        return Ok(liste);
+    }
+    if let Some(url) = single_url {
+        return Ok(vec![OnlineStyle {
+            name: "Online".into(),
+            url: url.into(),
+            typ: OnlineStyleTyp::Vektor,
+            attribution: None,
+        }]);
+    }
+    Ok(default_online_styles())
 }
 
 /// Laufzeit-Konfiguration für den lifeline-hub-Server.
@@ -66,6 +152,11 @@ pub struct Config {
     /// Online-Style-URL (MapLibre-Style-JSON), bevorzugt wenn das Netz erreichbar ist.
     #[arg(long, env = "LIFELINE_KARTE_STYLE_URL")]
     pub karte_online_style_url: Option<String>,
+
+    /// Mehrere Online-Views als JSON-Liste: `[{"name":..,"url":..,"typ":"vektor|raster","attribution":..}]`.
+    /// Hat Vorrang vor `--karte-online-style-url`. Fehlt beides, liefert der Server die Default-Shortlist.
+    #[arg(long, env = "LIFELINE_KARTE_STYLES")]
+    pub karte_styles: Option<String>,
 
     /// Optionales Subkommando. Ohne Subkommando wird der Server gestartet.
     #[command(subcommand)]
@@ -189,5 +280,63 @@ mod tests {
             config.karte_online_style_url.as_deref(),
             Some("https://tiles.example/style.json")
         );
+    }
+
+    #[test]
+    fn online_style_deserialisiert_mit_default_typ_vektor() {
+        let s: OnlineStyle =
+            serde_json::from_str(r#"{"name":"A","url":"https://x/s.json"}"#).unwrap();
+        assert_eq!(s.name, "A");
+        assert_eq!(s.url, "https://x/s.json");
+        assert_eq!(s.typ, OnlineStyleTyp::Vektor); // typ fehlt → Default
+        assert_eq!(s.attribution, None);
+    }
+
+    #[test]
+    fn online_style_deserialisiert_raster_mit_attribution() {
+        let s: OnlineStyle = serde_json::from_str(
+            r#"{"name":"Top","url":"https://x/{z}/{y}/{x}.png","typ":"raster","attribution":"© BKG"}"#,
+        )
+        .unwrap();
+        assert_eq!(s.typ, OnlineStyleTyp::Raster);
+        assert_eq!(s.attribution.as_deref(), Some("© BKG"));
+    }
+
+    #[test]
+    fn aufloesen_parst_json_liste() {
+        let json = r#"[{"name":"A","url":"https://a"},{"name":"B","url":"https://b","typ":"raster"}]"#;
+        let liste = online_styles_aufloesen(Some(json), None).unwrap();
+        assert_eq!(liste.len(), 2);
+        assert_eq!(liste[0].typ, OnlineStyleTyp::Vektor);
+        assert_eq!(liste[1].typ, OnlineStyleTyp::Raster);
+    }
+
+    #[test]
+    fn aufloesen_malformed_json_ist_fehler() {
+        let err = online_styles_aufloesen(Some("kein json"), None);
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn aufloesen_faellt_auf_single_url_zurueck() {
+        let liste = online_styles_aufloesen(None, Some("https://einzel/style.json")).unwrap();
+        assert_eq!(liste.len(), 1);
+        assert_eq!(liste[0].name, "Online");
+        assert_eq!(liste[0].url, "https://einzel/style.json");
+        assert_eq!(liste[0].typ, OnlineStyleTyp::Vektor);
+    }
+
+    #[test]
+    fn aufloesen_ohne_config_liefert_default_shortlist() {
+        let liste = online_styles_aufloesen(None, None).unwrap();
+        assert!(liste.len() >= 3, "Default-Shortlist sollte mehrere Views haben");
+        assert!(liste.iter().any(|s| s.typ == OnlineStyleTyp::Raster), "mind. ein Raster-View");
+    }
+
+    #[test]
+    fn default_karte_config_ist_leer_blind() {
+        let k = KarteConfig::default();
+        assert!(k.online_styles.is_empty());
+        assert!(k.pmtiles_path.is_none());
     }
 }

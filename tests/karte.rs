@@ -21,7 +21,7 @@ async fn tiles_route_liefert_range_aus() {
 
     let app = build_router_mit_karte(
         AppState { pool, live: LiveHub::new() },
-        KarteConfig { pmtiles_path: Some(pfad), online_style_url: None },
+        KarteConfig { pmtiles_path: Some(pfad), online_styles: vec![] },
     );
 
     let req = Request::builder()
@@ -54,7 +54,12 @@ async fn config_endpoint_meldet_verfuegbarkeit() {
         AppState { pool, live: LiveHub::new() },
         KarteConfig {
             pmtiles_path: Some("/irrelevant.pmtiles".into()),
-            online_style_url: Some("https://tiles.example/style.json".into()),
+            online_styles: vec![lifeline_hub::config::OnlineStyle {
+                name: "Online".into(),
+                url: "https://tiles.example/style.json".into(),
+                typ: lifeline_hub::config::OnlineStyleTyp::Vektor,
+                attribution: None,
+            }],
         },
     );
     let req = Request::builder().uri("/api/karte/config").body(Body::empty()).unwrap();
@@ -64,7 +69,8 @@ async fn config_endpoint_meldet_verfuegbarkeit() {
     let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(v["pmtiles_verfuegbar"].as_bool(), Some(true));
     assert_eq!(v["pmtiles_url"].as_str(), Some("/api/karte/tiles.pmtiles"));
-    assert_eq!(v["online_style_url"].as_str(), Some("https://tiles.example/style.json"));
+    assert_eq!(v["online_styles"][0]["url"].as_str(), Some("https://tiles.example/style.json"));
+    assert_eq!(v["online_styles"][0]["typ"].as_str(), Some("vektor"));
 }
 
 #[tokio::test]
@@ -78,5 +84,5 @@ async fn config_endpoint_blind_modus_ohne_konfiguration() {
     let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(v["pmtiles_verfuegbar"].as_bool(), Some(false));
     assert!(v["pmtiles_url"].is_null());
-    assert!(v["online_style_url"].is_null());
+    assert!(v["online_styles"].as_array().unwrap().is_empty());
 }
