@@ -5,7 +5,7 @@ import { erzeugeTaktischesZeichen } from 'taktische-zeichen-react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { KarteMarker } from './marker';
 import type { GeoJsonPolygon } from './geo';
-import { createAbschnittDraw, type AbschnittDraw } from './abschnittDraw';
+import { createZeichnung, type Zeichnung } from './zeichnen';
 
 // pmtiles-Protokoll genau einmal global registrieren.
 let pmtilesRegistriert = false;
@@ -95,7 +95,7 @@ export default function Kartenflaeche({
   // Aktuelle Flächendaten; nach setStyle ist die Source leer → re-Anlage liest hieraus.
   const flaechenDatenRef = useRef<FlaechenFeatureCollection>(baueFlaechenFc(flaechen));
   // Zeichen-Controller (terra-draw) über Renders hinweg.
-  const drawRef = useRef<AbschnittDraw | null>(null);
+  const drawRef = useRef<Zeichnung | null>(null);
   // onFlaecheGezeichnet stabil halten, damit eine neue Identität den Draw nicht mitten im Zeichnen neu aufsetzt.
   const onFlaecheGezeichnetRef = useRef(onFlaecheGezeichnet);
   onFlaecheGezeichnetRef.current = onFlaecheGezeichnet;
@@ -227,9 +227,11 @@ export default function Kartenflaeche({
     if (!map) return;
     if (zeichnen) {
       if (!drawRef.current) {
-        drawRef.current = createAbschnittDraw(map, (poly) => onFlaecheGezeichnetRef.current?.(poly));
+        drawRef.current = createZeichnung(map, (g) => {
+          if (g.type === 'Polygon') onFlaecheGezeichnetRef.current?.(g);
+        });
       }
-      drawRef.current.starten();
+      drawRef.current.starten('polygon');
     } else if (drawRef.current) {
       drawRef.current.stoppen();
     }
