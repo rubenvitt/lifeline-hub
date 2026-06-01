@@ -41,6 +41,26 @@ vi.mock('./lagekarte/Kartenflaeche', () => ({
           flaeche-{f.id}
         </button>
       ))}
+      {/* Zone zeichnen: feuert je nach Modus eine Linien- oder Polygon-Geometrie. */}
+      {props.zoneZeichnen && (
+        <button
+          onClick={() =>
+            props.onZoneGezeichnet?.(
+              props.zoneZeichnen === 'linie'
+                ? { type: 'LineString', coordinates: [[8.6, 50.1], [8.7, 50.2]] }
+                : { type: 'Polygon', coordinates: [[[8.6, 50.1], [8.7, 50.1], [8.7, 50.2], [8.6, 50.1]]] },
+            )
+          }
+        >
+          zone-fertig
+        </button>
+      )}
+      {/* Klick auf eine gerenderte Zone → onZoneKlick. */}
+      {(props.zonen ?? []).map((z) => (
+        <button key={z.id} onClick={() => props.onZoneKlick?.(z.id)}>
+          zone-{z.id}
+        </button>
+      ))}
     </div>
   ),
 }));
@@ -411,5 +431,81 @@ describe('LagekartePage', () => {
     await user.click(await screen.findByText('marker-einheit-1'));
     const link = await screen.findByRole('link', { name: /Im Fach-Modul öffnen/ });
     expect(link).toHaveAttribute('href', '/einsaetze/1/einheiten');
+  });
+
+  // --- L‑3: Gefahren- & Absperrzonen ----------------------------------------
+
+  it('zeichnet eine Polygon-Zone: Typ Gefahrengebiet → zeichnen → POST mit geometrie_typ Polygon', async () => {
+    let body: { typ?: string; geometrie_typ?: string; geometrie?: string } | null = null;
+    basisHandler([
+      http.post('/api/einsaetze/1/zonen', async ({ request }) => {
+        body = (await request.json()) as typeof body;
+        return HttpResponse.json({ id: 5, einsatz_id: 1, typ: body!.typ, geometrie_typ: body!.geometrie_typ, geometrie: body!.geometrie, label: null, farbe: null, notiz: null, erstellt_von: 1, erstellt_at: '', geaendert_at: '' });
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await screen.findByText('zone-fertig'));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body!.typ).toBe('gefahrengebiet');
+    expect(body!.geometrie_typ).toBe('Polygon');
+    expect(JSON.parse(body!.geometrie as string).type).toBe('Polygon');
+  });
+
+  it('zeichnet eine Linien-Zone: Absperrgrenze → zeichnen → POST mit geometrie_typ LineString', async () => {
+    let body: { typ?: string; geometrie_typ?: string } | null = null;
+    basisHandler([
+      http.post('/api/einsaetze/1/zonen', async ({ request }) => {
+        body = (await request.json()) as typeof body;
+        return HttpResponse.json({ id: 6, einsatz_id: 1, typ: 'absperrgrenze', geometrie_typ: 'LineString', geometrie: '{}', label: null, farbe: null, notiz: null, erstellt_von: 1, erstellt_at: '', geaendert_at: '' });
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Absperrgrenze zeichnen' }));
+    await user.click(await screen.findByText('zone-fertig'));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body!.typ).toBe('absperrgrenze');
+    expect(body!.geometrie_typ).toBe('LineString');
+  });
+
+  it('öffnet den Inspector per Klick und ändert das Label (PATCH)', async () => {
+    let patch: { label?: string } | null = null;
+    const ZONE_FREI = { id: 7, einsatz_id: 1, typ: 'freie_skizze', geometrie_typ: 'Polygon',
+      geometrie: '{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}',
+      label: 'Skizze', farbe: '#00ff00', notiz: null, erstellt_von: 1, erstellt_at: '', geaendert_at: '' };
+    basisHandler([
+      http.get('/api/einsaetze/1/zonen', () => HttpResponse.json([ZONE_FREI])),
+      http.patch('/api/einsaetze/1/zonen/7', async ({ request }) => {
+        patch = (await request.json()) as typeof patch;
+        return HttpResponse.json({ ...ZONE_FREI, label: patch!.label });
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByText('zone-7'));
+    const labelInput = await screen.findByLabelText('Label');
+    await user.clear(labelInput);
+    await user.type(labelInput, 'Neu');
+    await user.tab(); // onBlur löst PATCH aus
+    await waitFor(() => expect(patch).not.toBeNull());
+    expect(patch!.label).toBe('Neu');
+  });
+
+  it('hebt eine Zone auf (DELETE)', async () => {
+    let geloescht = false;
+    const ZONE_FREI = { id: 7, einsatz_id: 1, typ: 'freie_skizze', geometrie_typ: 'Polygon',
+      geometrie: '{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}',
+      label: 'Skizze', farbe: '#00ff00', notiz: null, erstellt_von: 1, erstellt_at: '', geaendert_at: '' };
+    basisHandler([
+      http.get('/api/einsaetze/1/zonen', () => HttpResponse.json([ZONE_FREI])),
+      http.delete('/api/einsaetze/1/zonen/7', () => { geloescht = true; return new HttpResponse(null, { status: 204 }); }),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByText('zone-7'));
+    await user.click(await screen.findByRole('button', { name: 'Zone aufheben' }));
+    await waitFor(() => expect(geloescht).toBe(true));
   });
 });
