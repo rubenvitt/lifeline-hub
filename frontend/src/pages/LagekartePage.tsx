@@ -22,7 +22,7 @@ import { useThemeMode } from '../theme/ThemeModeProvider';
 import { baueMarker, baueTaktischeMarker, type KarteMarker } from './lagekarte/marker';
 import { parsePolygon, polygonZentroid } from './lagekarte/geo';
 import { baueTzProps } from './lagekarte/taktischesZeichen';
-import { baueBasemapStyle, defaultModus, type BasemapModus } from './lagekarte/basemapStil';
+import { baueBasemapStyle, defaultModus, aktuelleAttribution, type BasemapModus } from './lagekarte/basemapStil';
 import Kartenflaeche from './lagekarte/Kartenflaeche';
 import Sidebar, { type LayerSichtbar, type PlatzierenPunktTyp } from './lagekarte/Sidebar';
 import Inspector from './lagekarte/Inspector';
@@ -57,6 +57,7 @@ export default function LagekartePage() {
   const [zeichneAbschnittId, setZeichneAbschnittId] = useState<number | null>(null);
   const [auswahl, setAuswahl] = useState<string | null>(null);
   const [basemap, setBasemap] = useState<BasemapModus | null>(null);
+  const [onlineStilName, setOnlineStilName] = useState<string | null>(null);
   const [flyToZiel, setFlyToZiel] = useState<{ lng: number; lat: number } | null>(null);
   const [layer, setLayer] = useState<LayerSichtbar>({
     einsatzort: true, uhs: true, schaden: true, einheit: true, fahrzeug: true, fuehrung: true, abschnitt: true,
@@ -94,10 +95,13 @@ export default function LagekartePage() {
   const orgQuery = useQuery({ queryKey: ['organisation'], queryFn: ladeOrganisation });
   const configQuery = useQuery({ queryKey: ['karte-config'], queryFn: ladeKarteConfig });
 
-  // Basemap-Default setzen, sobald Config da ist.
+  // Basemap-Default + Default-Online-View setzen, sobald Config da ist.
   useEffect(() => {
     if (basemap == null && configQuery.data) setBasemap(defaultModus(configQuery.data));
-  }, [basemap, configQuery.data]);
+    if (onlineStilName == null && configQuery.data?.online_styles.length) {
+      setOnlineStilName(configQuery.data.online_styles[0].name);
+    }
+  }, [basemap, onlineStilName, configQuery.data]);
 
   const einsatz = einsatzQuery.data;
   const darfSchreiben =
@@ -175,9 +179,19 @@ export default function LagekartePage() {
   const sichtbareMarker = alleVerortet.filter((m) => layer[m.typ]);
   const aktiverMarker = alleVerortet.find((m) => m.schluessel === auswahl) ?? null;
 
+  const onlineStil = useMemo(() => {
+    const liste = configQuery.data?.online_styles ?? [];
+    return liste.find((s) => s.name === onlineStilName) ?? liste[0];
+  }, [configQuery.data, onlineStilName]);
+
   const style = useMemo(
-    () => baueBasemapStyle(basemap ?? 'blind', effektiv, configQuery.data),
-    [basemap, effektiv, configQuery.data],
+    () => baueBasemapStyle(basemap ?? 'blind', effektiv, configQuery.data, onlineStil),
+    [basemap, effektiv, configQuery.data, onlineStil],
+  );
+
+  const attribution = useMemo(
+    () => aktuelleAttribution(basemap ?? 'blind', onlineStil),
+    [basemap, onlineStil],
   );
 
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
@@ -302,12 +316,16 @@ export default function LagekartePage() {
         basemap={basemap ?? 'blind'}
         onBasemapWechsel={setBasemap}
         onMarkerWaehlen={onMarkerWaehlen}
-        onlineVerfuegbar={!!configQuery.data?.online_style_url}
+        onlineVerfuegbar={(configQuery.data?.online_styles.length ?? 0) > 0}
         offlineVerfuegbar={!!configQuery.data?.pmtiles_verfuegbar}
+        onlineStyles={configQuery.data?.online_styles ?? []}
+        onlineStilName={onlineStilName}
+        onOnlineStilWechsel={setOnlineStilName}
       />
       <div style={{ flex: 1, position: 'relative' }}>
         <Kartenflaeche
           style={style}
+          attribution={attribution}
           markers={sichtbareMarker}
           onKarteKlick={onKarteKlick}
           onMarkerKlick={onMarkerWaehlen}

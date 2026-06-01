@@ -16,6 +16,7 @@ import LagekartePage from './LagekartePage';
 vi.mock('./lagekarte/Kartenflaeche', () => ({
   default: (props: Partial<KartenflaecheProps>) => (
     <div data-testid="kartenflaeche-stub">
+      <div data-testid="attribution">{props.attribution ?? ''}</div>
       <button onClick={() => props.onKarteKlick?.({ lng: 8.6, lat: 50.1 })}>karte-klick</button>
       {(props.markers ?? []).map((m) => (
         <button key={m.schluessel} onClick={() => props.onMarkerKlick?.(m.schluessel)}>
@@ -181,7 +182,7 @@ const ORG_DRK = { id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' };
 
 function basisHandler(
   extra: ReturnType<typeof http.get>[] = [],
-  config: KarteServerConfig = { online_style_url: null, pmtiles_verfuegbar: false, pmtiles_url: null },
+  config: KarteServerConfig = { online_styles: [], pmtiles_verfuegbar: false, pmtiles_url: null },
 ) {
   // extra ZUERST: MSW nimmt den ersten Treffer → Tests können einzelne GET-Defaults
   // (z. B. /einheiten) gezielt überschreiben, ohne die übrigen Defaults anzufassen.
@@ -267,7 +268,7 @@ describe('LagekartePage', () => {
 
   it('Basemap-Umschalter: von Online auf Blind wechseln, Marker bleiben sichtbar', async () => {
     basisHandler([], {
-      online_style_url: 'https://x/style.json',
+      online_styles: [{ name: 'Online', url: 'https://x/style.json', typ: 'vektor', attribution: '© X' }],
       pmtiles_verfuegbar: true,
       pmtiles_url: '/api/karte/tiles.pmtiles',
     });
@@ -306,7 +307,7 @@ describe('LagekartePage', () => {
 
   it('Basemap-Umschalter: bei verfügbarer Config sind passende Buttons aktiv und kein Blind-Hinweis', async () => {
     basisHandler([], {
-      online_style_url: 'https://x/style.json',
+      online_styles: [{ name: 'Online', url: 'https://x/style.json', typ: 'vektor', attribution: '© X' }],
       pmtiles_verfuegbar: true,
       pmtiles_url: '/api/karte/tiles.pmtiles',
     });
@@ -320,7 +321,7 @@ describe('LagekartePage', () => {
 
   it('Basemap-Umschalter: nur Offline konfiguriert → Online disabled, Offline aktiv', async () => {
     basisHandler([], {
-      online_style_url: null,
+      online_styles: [],
       pmtiles_verfuegbar: true,
       pmtiles_url: '/api/karte/tiles.pmtiles',
     });
@@ -410,5 +411,31 @@ describe('LagekartePage', () => {
     await user.click(await screen.findByText('marker-einheit-1'));
     const link = await screen.findByRole('link', { name: /Im Fach-Modul öffnen/ });
     expect(link).toHaveAttribute('href', '/einsaetze/1/einheiten');
+  });
+
+  it('Online-Sub-Switcher: zwischen zwei Views wechseln aktualisiert die Attribution', async () => {
+    basisHandler([], {
+      online_styles: [
+        { name: 'Liberty', url: 'https://x/liberty', typ: 'vektor', attribution: '© Liberty' },
+        { name: 'TopPlus', url: 'https://x/{z}/{y}/{x}.png', typ: 'raster', attribution: '© BKG' },
+      ],
+      pmtiles_verfuegbar: false,
+      pmtiles_url: null,
+    });
+    const user = userEvent.setup();
+    renderSeite();
+    await screen.findByText('marker-schaden-9');
+    // Default-View ist der erste (Liberty) → dessen Attribution liegt an.
+    expect(screen.getByTestId('attribution')).toHaveTextContent('© Liberty');
+    // Sub-Switcher (Select) öffnen und TopPlus wählen. Es gibt nur EINE Combobox auf der
+    // Seite (die InputNumber-Felder sind spinbutton) → Query ohne name ist eindeutig.
+    // Option über `.ant-select-item-option` abgrenzen (etabliertes Muster, da der Text
+    // auch im ausgewählten Selektor stehen kann).
+    await user.click(screen.getByRole('combobox'));
+    const option = (await screen.findAllByText('TopPlus')).find((el) =>
+      el.closest('.ant-select-item-option'),
+    );
+    await user.click(option!);
+    await waitFor(() => expect(screen.getByTestId('attribution')).toHaveTextContent('© BKG'));
   });
 });
