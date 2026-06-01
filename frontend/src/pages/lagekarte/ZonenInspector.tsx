@@ -53,9 +53,12 @@ export default function ZonenInspector({ zone, darfSchreiben, onSchliessen, onAe
           <Input
             aria-label="Farbe"
             type="color"
-            value={zone.farbe ?? '#1677ff'}
+            defaultValue={zone.farbe ?? '#1677ff'}
             disabled={!darfSchreiben}
-            onChange={(e) => onAendern({ farbe: e.target.value })}
+            onBlur={(e) => {
+              const v = e.target.value;
+              if (v !== (zone.farbe ?? '#1677ff')) onAendern({ farbe: v });
+            }}
           />
         )}
 

@@ -151,6 +151,23 @@ async fn patch_typ_oder_label_schreibt_etb_geaendert_notiz_und_farbe_nicht() {
 }
 
 #[tokio::test]
+async fn patch_typ_weg_von_freie_skizze_nullt_farbe() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    // Freie Skizze (Polygon) mit Farbe; gefahrengebiet ist ebenfalls Polygon → Typ-Wechsel zulässig.
+    let body = json!({"typ":"freie_skizze","geometrie_typ":"Polygon","geometrie":POLY,"farbe":"#00ff00"}).to_string();
+    let (_, z) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/zonen"), &admin, Some(&body)).await;
+    let zid = z["id"].as_i64().unwrap();
+    assert_eq!(z["farbe"], "#00ff00");
+
+    let (status, nach) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/zonen/{zid}"), &admin, Some(r#"{"typ":"gefahrengebiet"}"#)).await;
+    assert_eq!(status, StatusCode::OK, "{nach:?}");
+    assert_eq!(nach["typ"], "gefahrengebiet");
+    assert!(nach["farbe"].is_null(), "farbe muss beim Wechsel weg von freie_skizze genullt werden: {nach:?}");
+}
+
+#[tokio::test]
 async fn patch_typ_inkompatibel_zur_geometrie_ist_422() {
     let (app, _live) = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
