@@ -1,7 +1,8 @@
-import { Badge, Button, Card, Empty, InputNumber, List, Radio, Space, Switch, Tooltip, Typography } from 'antd';
+import { Badge, Button, Card, Empty, InputNumber, List, Radio, Select, Space, Switch, Tooltip, Typography } from 'antd';
 import { useState } from 'react';
 import type { KarteMarker, NichtVerortet } from './marker';
 import type { BasemapModus } from './basemapStil';
+import type { OnlineStyle } from '../../api/karte';
 
 export interface LayerSichtbar {
   einsatzort: boolean;
@@ -43,6 +44,9 @@ export interface SidebarProps {
   onMarkerWaehlen: (schluessel: string) => void;
   onlineVerfuegbar: boolean;
   offlineVerfuegbar: boolean;
+  onlineStyles: OnlineStyle[];
+  onlineStilName: string | null;
+  onOnlineStilWechsel: (name: string) => void;
 }
 
 export default function Sidebar(props: SidebarProps) {
@@ -238,6 +242,16 @@ export default function Sidebar(props: SidebarProps) {
           </Tooltip>
           <Radio.Button value="blind">Blind</Radio.Button>
         </Radio.Group>
+        {props.basemap === 'online' && props.onlineStyles.length > 1 && (
+          <Select
+            size="small"
+            aria-label="Online-Ansicht"
+            style={{ width: '100%', marginTop: 8 }}
+            value={props.onlineStilName ?? props.onlineStyles[0]?.name}
+            onChange={(name) => props.onOnlineStilWechsel(name)}
+            options={props.onlineStyles.map((s) => ({ label: s.name, value: s.name }))}
+          />
+        )}
         {props.basemap === 'blind' && (
           <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0, fontSize: 12 }}>
             Keine Basemap konfiguriert — Marker und Verorten funktionieren weiterhin.
