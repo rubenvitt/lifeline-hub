@@ -36,7 +36,8 @@ Konfiguration per CLI-Flag oder ENV (Auszug):
 | `--admin-user` | `LIFELINE_ADMIN_USER` | `admin` | Initialer Admin (erster Start) |
 | `--admin-password` | `LIFELINE_ADMIN_PASSWORD` | *(generiert)* | Fehlt es, wird beim ersten Start ein Zufallspasswort ins Log geschrieben |
 | `--pmtiles-path` | `LIFELINE_PMTILES_PATH` | *(leer)* | Lokale PMTiles-Basemap (Offline-Karte), per HTTP-Range ausgeliefert |
-| `--karte-online-style-url` | `LIFELINE_KARTE_STYLE_URL` | *(leer)* | Online-MapLibre-Style-JSON-URL (bevorzugt, wenn Netz da ist) |
+| `--karte-styles` | `LIFELINE_KARTE_STYLES` | *(Default-Shortlist)* | JSON-Liste benannter Online-Views: `[{"name","url","typ":"vektor\|raster","attribution"}]`. Hat Vorrang vor `--karte-online-style-url` |
+| `--karte-online-style-url` | `LIFELINE_KARTE_STYLE_URL` | *(leer)* | Online-MapLibre-Style-JSON-URL (Einzel-URL-Kurzform; ergibt einen Ein-Element-View „Online") |
 
 > **Erstes Admin-Passwort:** Wurde kein `--admin-password` gesetzt, schreibt die
 > Binary beim ersten Start ein Zufallspasswort als Warnung ins Log. Mit systemd:
@@ -66,13 +67,23 @@ Konfigurationsquellen, beide optional:
   (z. B. ein Protomaps-Build von [build.protomaps.com](https://build.protomaps.com),
   DE-weit mehrere GB). Der Server liefert sie per **HTTP-Range** unter
   `/api/karte/tiles.pmtiles` aus. Ideal für den ELW ohne Netz.
-- **`--karte-online-style-url` / `LIFELINE_KARTE_STYLE_URL`** — vollständige MapLibre-
-  **Style-JSON-URL** (online), z. B. ein gehosteter Vektor-Style.
+- **`--karte-styles` / `LIFELINE_KARTE_STYLES`** — mehrere Online-Views als JSON-Liste.
+  Jeder View: `name` (Anzeigename im Switcher), `url` (Vektor-Style-JSON-URL **oder**
+  Raster-Tile-Template mit `{z}/{y}/{x}`), `typ` (`vektor` Default | `raster`),
+  `attribution` (Pflicht-Attribution, wird je View angezeigt). Fehlt diese ENV **und**
+  `LIFELINE_KARTE_STYLE_URL`, liefert der Server eine eingebaute schlüsselfreie Shortlist
+  (OpenFreeMap, basemap.de, TopPlusOpen). Key-basierte Anbieter (MapTiler/Stadia) **nicht**
+  mit Secret hier hinterlegen — nur serverseitig/Domain-Restriction.
+- **`--karte-online-style-url` / `LIFELINE_KARTE_STYLE_URL`** — Einzel-URL-Kurzform für eine
+  vollständige MapLibre-**Style-JSON-URL** (online). Ergibt einen Ein-Element-View „Online";
+  wird ignoriert, sobald `LIFELINE_KARTE_STYLES` gesetzt ist.
 
 **Laufzeit-Bevorzugung im Frontend:** online (falls erreichbar) → Offline-PMTiles →
 **Blind-Modus** (neutrales Raster). Im Blind-Modus funktionieren Marker und das Verorten
-weiterhin — nur der Kartenhintergrund fehlt. Ein Umschalter in der Karten-Toolbar erlaubt
-die manuelle Wahl. Fehlt der PMTiles-Pfad, liefert `/api/karte/tiles.pmtiles` 404 und das
+weiterhin — nur der Kartenhintergrund fehlt. Ein Umschalter in der Sidebar erlaubt
+die manuelle Wahl; im Modus **Online** erscheint zusätzlich ein **Sub-Switcher**, mit dem
+zwischen den konfigurierten Online-Views umgeschaltet wird (Stil + Pflicht-Attribution
+wechseln dynamisch). Fehlt der PMTiles-Pfad, liefert `/api/karte/tiles.pmtiles` 404 und das
 Frontend nutzt automatisch Online bzw. Blind.
 
 **Schema-Hinweis (Offline-Vektor-Style):** Der gebündelte Offline-Style nimmt das
