@@ -193,6 +193,7 @@ function basisHandler(
     http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/zonen', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/karte/fuehrungskraefte', () => HttpResponse.json([])),
     http.get('/api/organisation', () => HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null })),
     http.get('/api/karte/config', () => HttpResponse.json(config)),
