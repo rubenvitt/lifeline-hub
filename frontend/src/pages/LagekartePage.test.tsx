@@ -65,11 +65,13 @@ vi.mock('./lagekarte/Kartenflaeche', () => ({
   ),
 }));
 
+const eventSourceUrls: string[] = [];
 class FakeEventSource {
   url: string;
   closed = false;
   constructor(url: string) {
     this.url = url;
+    eventSourceUrls.push(url);
   }
   addEventListener() {}
   removeEventListener() {}
@@ -77,7 +79,10 @@ class FakeEventSource {
     this.closed = true;
   }
 }
-beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
+beforeEach(() => {
+  eventSourceUrls.length = 0;
+  vi.stubGlobal('EventSource', FakeEventSource);
+});
 afterEach(() => vi.unstubAllGlobals());
 
 const EINSATZ = {
@@ -239,6 +244,18 @@ describe('LagekartePage', () => {
     // Badge-Knoten treffen, nicht eine zufällige "(1)"-Zähltext-Stelle.
     const badge = container.querySelector('.ant-badge-count');
     expect(badge).toHaveTextContent('1');
+  });
+
+  it('öffnet genau EINE SSE-Verbindung für den ganzen Einsatz (HTTP/1.1-6-Verbindungslimit)', async () => {
+    // Regression: zuvor öffnete die Seite 6 EventSources (uhs/schaeden/einheiten/
+    // fahrzeuge/abschnitte/zonen) → bei HTTP/1.1 sind alle 6 Origin-Verbindungen
+    // belegt, jeder weitere Request (z. B. ein Zonen-POST) hängt endlos.
+    basisHandler();
+    renderSeite();
+    expect(await screen.findByText('⚠ Nicht verortet')).toBeInTheDocument();
+    expect(eventSourceUrls).toHaveLength(1);
+    expect(eventSourceUrls[0]).toContain('/api/einsaetze/1/');
+    expect(eventSourceUrls[0]).toContain('/stream');
   });
 
   it('platziert ein Objekt: Objekt wählen → Karten-Klick → PATCH mit lat/lon', async () => {

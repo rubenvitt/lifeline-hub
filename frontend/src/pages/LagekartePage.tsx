@@ -14,12 +14,7 @@ import { listeAbschnitte, zeichneAbschnitt } from '../api/einsatzabschnitte';
 import { listeZonen, legeZoneAn, aktualisiereZone, loescheZone } from '../api/lagezonen';
 import { ladeOrganisation } from '../api/organisation';
 import type { EinsatzAnzeige, ZoneTyp } from '../api/types';
-import { useUhsStream } from '../etb/useUhsStream';
-import { useSchaedenStream } from '../etb/useSchaedenStream';
-import { useEinheitenStream } from '../etb/useEinheitenStream';
-import { useFahrzeugeStream } from '../etb/useFahrzeugeStream';
-import { useAbschnitteStream } from '../etb/useAbschnitteStream';
-import { useZonenStream } from '../etb/useZonenStream';
+import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import { baueMarker, baueTaktischeMarker, type KarteMarker } from './lagekarte/marker';
 import { parsePolygon, parseGeometry, polygonZentroid } from './lagekarte/geo';
@@ -70,13 +65,10 @@ export default function LagekartePage() {
     einsatzort: true, uhs: true, schaden: true, einheit: true, fahrzeug: true, fuehrung: true, abschnitt: true, zone: true,
   });
 
-  // SSE-Reuse: dieselben Query-Keys wie die Listenseiten → Marker live.
-  useUhsStream(einsatzId);
-  useSchaedenStream(einsatzId);
-  useEinheitenStream(einsatzId);
-  useFahrzeugeStream(einsatzId);
-  useAbschnitteStream(einsatzId);
-  useZonenStream(einsatzId);
+  // EINE SSE-Verbindung für alle Domänen (uhs/schaden/einheit/fahrzeug/abschnitt/zone/
+  // person). Pro Domäne eine eigene EventSource würde das HTTP/1.1-Limit (6/Origin)
+  // sprengen und nachfolgende Requests (z. B. Zonen-POST) endlos hängen lassen.
+  useEinsatzLiveStream(einsatzId);
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const uhsQuery = useQuery({ queryKey: ['einsatz-uhs', einsatzId], queryFn: () => listeUhs(einsatzId) });
