@@ -11,21 +11,26 @@ import { listeEinheiten, verorteEinheit } from '../api/einheiten';
 import { listeEinsatzFahrzeuge, verorteFahrzeug } from '../api/einsatzFahrzeuge';
 import { listeFuehrungskraefte, verortePerson } from '../api/einsatzPersonal';
 import { listeAbschnitte, zeichneAbschnitt } from '../api/einsatzabschnitte';
+import { listeZonen, legeZoneAn, aktualisiereZone, loescheZone } from '../api/lagezonen';
 import { ladeOrganisation } from '../api/organisation';
-import type { EinsatzAnzeige } from '../api/types';
+import type { EinsatzAnzeige, ZoneTyp } from '../api/types';
 import { useUhsStream } from '../etb/useUhsStream';
 import { useSchaedenStream } from '../etb/useSchaedenStream';
 import { useEinheitenStream } from '../etb/useEinheitenStream';
 import { useFahrzeugeStream } from '../etb/useFahrzeugeStream';
 import { useAbschnitteStream } from '../etb/useAbschnitteStream';
+import { useZonenStream } from '../etb/useZonenStream';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import { baueMarker, baueTaktischeMarker, type KarteMarker } from './lagekarte/marker';
-import { parsePolygon, polygonZentroid } from './lagekarte/geo';
+import { parsePolygon, parseGeometry, polygonZentroid } from './lagekarte/geo';
 import { baueTzProps } from './lagekarte/taktischesZeichen';
 import { baueBasemapStyle, defaultModus, type BasemapModus } from './lagekarte/basemapStil';
-import Kartenflaeche from './lagekarte/Kartenflaeche';
+import Kartenflaeche, { type ZoneFeature } from './lagekarte/Kartenflaeche';
 import Sidebar, { type LayerSichtbar, type PlatzierenPunktTyp } from './lagekarte/Sidebar';
 import Inspector from './lagekarte/Inspector';
+import ZonenInspector from './lagekarte/ZonenInspector';
+import { zoneStil } from './lagekarte/zonenStil';
+import type { ZeichenModus } from './lagekarte/zeichnen';
 
 /** EinsatzAnzeige → KopfdatenUpdate (Vollersatz) mit überschriebener Koordinate. */
 function kopfMitKoordinate(e: EinsatzAnzeige, lat: number | null, lon: number | null): KopfdatenUpdate {
@@ -55,11 +60,14 @@ export default function LagekartePage() {
   const [platzierungZiel, setPlatzierungZiel] =
     useState<{ typ: PlatzierenPunktTyp | 'einsatzort'; id: number } | null>(null);
   const [zeichneAbschnittId, setZeichneAbschnittId] = useState<number | null>(null);
+  const [zoneEntwurf, setZoneEntwurf] =
+    useState<{ typ: ZoneTyp; modus: ZeichenModus; farbe?: string } | null>(null);
+  const [zoneAuswahl, setZoneAuswahl] = useState<number | null>(null);
   const [auswahl, setAuswahl] = useState<string | null>(null);
   const [basemap, setBasemap] = useState<BasemapModus | null>(null);
   const [flyToZiel, setFlyToZiel] = useState<{ lng: number; lat: number } | null>(null);
   const [layer, setLayer] = useState<LayerSichtbar>({
-    einsatzort: true, uhs: true, schaden: true, einheit: true, fahrzeug: true, fuehrung: true, abschnitt: true,
+    einsatzort: true, uhs: true, schaden: true, einheit: true, fahrzeug: true, fuehrung: true, abschnitt: true, zone: true,
   });
 
   // SSE-Reuse: dieselben Query-Keys wie die Listenseiten → Marker live.
@@ -68,6 +76,7 @@ export default function LagekartePage() {
   useEinheitenStream(einsatzId);
   useFahrzeugeStream(einsatzId);
   useAbschnitteStream(einsatzId);
+  useZonenStream(einsatzId);
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const uhsQuery = useQuery({ queryKey: ['einsatz-uhs', einsatzId], queryFn: () => listeUhs(einsatzId) });
@@ -86,6 +95,10 @@ export default function LagekartePage() {
   const abschnitteQuery = useQuery({
     queryKey: ['einsatz-abschnitte', einsatzId],
     queryFn: () => listeAbschnitte(einsatzId),
+  });
+  const zonenQuery = useQuery({
+    queryKey: ['einsatz-zonen', einsatzId],
+    queryFn: () => listeZonen(einsatzId),
   });
   const fkQuery = useQuery({
     queryKey: ['einsatz-fuehrungskraefte', einsatzId],
@@ -156,6 +169,21 @@ export default function LagekartePage() {
     [abschnitteQuery.data, orgDefault],
   );
 
+  const zonenFeatures = useMemo<ZoneFeature[]>(
+    () =>
+      (layer.zone ? zonenQuery.data ?? [] : []).flatMap((z) => {
+        const g = parseGeometry(z.geometrie);
+        if (!g) return [];
+        return [{ id: z.id, geometrie: g, label: z.label, stil: zoneStil(z.typ, z.farbe) }];
+      }),
+    [zonenQuery.data, layer.zone],
+  );
+
+  const ausgewaehlteZone = useMemo(
+    () => (zonenQuery.data ?? []).find((z) => z.id === zoneAuswahl) ?? null,
+    [zonenQuery.data, zoneAuswahl],
+  );
+
   const alleVerortet = useMemo(
     () => [...verortet, ...taktisch.verortet, ...flaechen.map((f) => f.tzMarker)],
     [verortet, taktisch.verortet, flaechen],
@@ -219,6 +247,7 @@ export default function LagekartePage() {
 
   function onMarkerWaehlen(schluessel: string) {
     setAuswahl(schluessel);
+    setZoneAuswahl(null);
     const m = alleVerortet.find((x) => x.schluessel === schluessel);
     if (m) setFlyToZiel({ lng: m.lon, lat: m.lat });
   }
@@ -281,11 +310,20 @@ export default function LagekartePage() {
         platzierungZiel={platzierungZiel}
         onPlatzierenStart={(z) => {
           setPlatzierungZiel(z);
+          setZoneEntwurf(null);
           setAuswahl(null);
         }}
         onPlatzierenAbbrechen={() => setPlatzierungZiel(null)}
         onAbschnittZeichnenStart={(id) => {
           setZeichneAbschnittId(id);
+          setZoneEntwurf(null);
+          setPlatzierungZiel(null);
+          setAuswahl(null);
+        }}
+        onZoneZeichnenStart={(entwurf) => {
+          setZoneEntwurf(entwurf);
+          setZoneAuswahl(null);
+          setZeichneAbschnittId(null);
           setPlatzierungZiel(null);
           setAuswahl(null);
         }}
@@ -324,6 +362,24 @@ export default function LagekartePage() {
               .finally(() => setZeichneAbschnittId(null));
           }}
           onFlaecheKlick={(fid) => setAuswahl(`abschnitt-${fid}`)}
+          zonen={zonenFeatures}
+          zoneZeichnen={zoneEntwurf ? zoneEntwurf.modus : null}
+          onZoneKlick={(id) => {
+            setZoneAuswahl(id);
+            setAuswahl(null);
+          }}
+          onZoneGezeichnet={(g) => {
+            if (!zoneEntwurf) return;
+            legeZoneAn(einsatzId, {
+              typ: zoneEntwurf.typ,
+              geometrie_typ: g.type,
+              geometrie: JSON.stringify(g),
+              farbe: zoneEntwurf.typ === 'freie_skizze' ? zoneEntwurf.farbe ?? null : null,
+            })
+              .then(() => qc.invalidateQueries({ queryKey: ['einsatz-zonen', einsatzId] }))
+              .catch(fehler)
+              .finally(() => setZoneEntwurf(null));
+          }}
         />
         {aktiverMarker && (
           <Inspector
@@ -333,6 +389,26 @@ export default function LagekartePage() {
             onSchliessen={() => setAuswahl(null)}
             onVerortungLoeschen={loescheVerortung}
             onSymbolAendern={aendereSymbol}
+          />
+        )}
+        {ausgewaehlteZone && (
+          <ZonenInspector
+            zone={ausgewaehlteZone}
+            darfSchreiben={!!darfSchreiben}
+            onSchliessen={() => setZoneAuswahl(null)}
+            onAendern={(patch) =>
+              aktualisiereZone(einsatzId, ausgewaehlteZone.id, patch)
+                .then(() => qc.invalidateQueries({ queryKey: ['einsatz-zonen', einsatzId] }))
+                .catch(fehler)
+            }
+            onLoeschen={() =>
+              loescheZone(einsatzId, ausgewaehlteZone.id)
+                .then(() => {
+                  setZoneAuswahl(null);
+                  return qc.invalidateQueries({ queryKey: ['einsatz-zonen', einsatzId] });
+                })
+                .catch(fehler)
+            }
           />
         )}
       </div>

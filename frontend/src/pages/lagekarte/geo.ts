@@ -3,6 +3,13 @@ export interface GeoJsonPolygon {
   coordinates: number[][][];
 }
 
+export interface GeoJsonLineString {
+  type: 'LineString';
+  coordinates: number[][];
+}
+
+export type GeoJsonGeometry = GeoJsonPolygon | GeoJsonLineString;
+
 /** Flächengewichteter Zentroid des äußeren Rings; null bei leerem/degeneriertem Polygon. */
 export function polygonZentroid(poly: GeoJsonPolygon): [number, number] | null {
   const ring = poly.coordinates?.[0];
@@ -30,6 +37,19 @@ export function parsePolygon(geojson: string | null | undefined): GeoJsonPolygon
   try {
     const v = JSON.parse(geojson);
     return v?.type === 'Polygon' && Array.isArray(v.coordinates) ? (v as GeoJsonPolygon) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Liest eine Polygon- ODER LineString-Geometry aus einem GeoJSON-String; null sonst. */
+export function parseGeometry(geojson: string | null | undefined): GeoJsonGeometry | null {
+  if (!geojson) return null;
+  try {
+    const v = JSON.parse(geojson);
+    if (v?.type === 'Polygon' && Array.isArray(v.coordinates)) return v as GeoJsonPolygon;
+    if (v?.type === 'LineString' && Array.isArray(v.coordinates)) return v as GeoJsonLineString;
+    return null;
   } catch {
     return null;
   }

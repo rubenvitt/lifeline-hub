@@ -592,3 +592,26 @@ export interface Tier {
   halter_registrier_nr: number | null;
   halter_storniert_at: string | null;
 }
+
+// ============================== L-3 Gefahren- & Absperrzonen ==============================
+
+export type ZoneTyp =
+  | 'gefahrengebiet'
+  | 'absperrbereich'
+  | 'absperrgrenze'
+  | 'sperrgebiet'
+  | 'freie_skizze';
+
+export interface LageZone {
+  id: number;
+  einsatz_id: number;
+  typ: ZoneTyp;
+  geometrie_typ: 'Polygon' | 'LineString';
+  geometrie: string; // GeoJSON-Geometry als String
+  label: string | null;
+  farbe: string | null;
+  notiz: string | null;
+  erstellt_von: number;
+  erstellt_at: string;
+  geaendert_at: string;
+}

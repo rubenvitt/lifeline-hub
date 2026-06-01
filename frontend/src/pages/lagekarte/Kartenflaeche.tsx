@@ -4,8 +4,9 @@ import { Protocol } from 'pmtiles';
 import { erzeugeTaktischesZeichen } from 'taktische-zeichen-react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { KarteMarker } from './marker';
-import type { GeoJsonPolygon } from './geo';
-import { createAbschnittDraw, type AbschnittDraw } from './abschnittDraw';
+import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
+import { createZeichnung, type Zeichnung, type ZeichenModus } from './zeichnen';
+import type { ZoneStil } from './zonenStil';
 
 // pmtiles-Protokoll genau einmal global registrieren.
 let pmtilesRegistriert = false;
@@ -35,6 +36,21 @@ export interface KartenflaecheProps {
   onFlaecheGezeichnet?: (polygon: GeoJsonPolygon) => void;
   /** Klick auf eine Abschnittsfläche → Inspector. */
   onFlaecheKlick?: (id: number) => void;
+  /** Gefahren-/Absperrzonen (Flächen + Linien) mit aufgelöstem Stil. */
+  zonen?: ZoneFeature[];
+  /** Zonen-Zeichenmodus (Polygon/Linie) aktiv. */
+  zoneZeichnen?: ZeichenModus | null;
+  /** Callback nach abgeschlossenem Zeichnen einer Zone. */
+  onZoneGezeichnet?: (geometrie: GeoJsonGeometry) => void;
+  /** Klick auf eine Zone → Inspector. */
+  onZoneKlick?: (id: number) => void;
+}
+
+export interface ZoneFeature {
+  id: number;
+  geometrie: GeoJsonGeometry;
+  label: string | null;
+  stil: ZoneStil;
 }
 
 type FlaechenFeatureCollection = {
@@ -82,9 +98,79 @@ function baueFlaechenFc(flaechen: KartenflaecheProps['flaechen']): FlaechenFeatu
   };
 }
 
+type ZonenFeatureCollection = {
+  type: 'FeatureCollection';
+  features: Array<{
+    type: 'Feature';
+    id: number;
+    properties: {
+      id: number;
+      label: string;
+      fillColor: string;
+      fillOpacity: number;
+      lineColor: string;
+      lineWidth: number;
+    };
+    geometry: GeoJsonGeometry;
+  }>;
+};
+
+function baueZonenFc(zonen: ZoneFeature[] | undefined): ZonenFeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: (zonen ?? []).map((z) => ({
+      type: 'Feature',
+      id: z.id,
+      properties: {
+        id: z.id,
+        label: z.label ?? '',
+        fillColor: z.stil.fillColor,
+        fillOpacity: z.stil.fillOpacity,
+        lineColor: z.stil.lineColor,
+        lineWidth: z.stil.lineWidth,
+      },
+      geometry: z.geometrie,
+    })),
+  };
+}
+
+/** Idempotent: Source + fill/line/label-Layer für Zonen (datengetriebenes Paint; Style-Wechsel entfernt sie). */
+function sorgeFuerZonenLayer(map: maplibregl.Map, daten: ZonenFeatureCollection) {
+  if (!map.getSource('zonen')) {
+    map.addSource('zonen', { type: 'geojson', data: daten as never });
+  }
+  if (!map.getLayer('zonen-fill')) {
+    map.addLayer({
+      id: 'zonen-fill',
+      type: 'fill',
+      source: 'zonen',
+      filter: ['==', ['geometry-type'], 'Polygon'],
+      paint: { 'fill-color': ['get', 'fillColor'], 'fill-opacity': ['get', 'fillOpacity'] },
+    });
+  }
+  if (!map.getLayer('zonen-line')) {
+    map.addLayer({
+      id: 'zonen-line',
+      type: 'line',
+      source: 'zonen',
+      paint: { 'line-color': ['get', 'lineColor'], 'line-width': ['get', 'lineWidth'] },
+    });
+  }
+  if (!map.getLayer('zonen-label')) {
+    map.addLayer({
+      id: 'zonen-label',
+      type: 'symbol',
+      source: 'zonen',
+      layout: { 'text-field': ['get', 'label'], 'text-size': 12, 'symbol-placement': 'point' },
+      paint: { 'text-color': '#1f1f1f', 'text-halo-color': '#fff', 'text-halo-width': 1.5 },
+    });
+  }
+}
+
 export default function Kartenflaeche({
   style, markers, onKarteKlick, onMarkerKlick, flyToZiel, onStyleFehler,
   flaechen, zeichnen, onFlaecheGezeichnet, onFlaecheKlick,
+  zonen, zoneZeichnen, onZoneGezeichnet, onZoneKlick,
 }: KartenflaecheProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -94,11 +180,17 @@ export default function Kartenflaeche({
   const stilGeladenRef = useRef(false);
   // Aktuelle Flächendaten; nach setStyle ist die Source leer → re-Anlage liest hieraus.
   const flaechenDatenRef = useRef<FlaechenFeatureCollection>(baueFlaechenFc(flaechen));
+  // Aktuelle Zonendaten; analog flaechenDatenRef für die Re-Anlage nach setStyle.
+  const zonenDatenRef = useRef<ZonenFeatureCollection>(baueZonenFc(zonen));
   // Zeichen-Controller (terra-draw) über Renders hinweg.
-  const drawRef = useRef<AbschnittDraw | null>(null);
+  const drawRef = useRef<Zeichnung | null>(null);
+  // Eigener Zeichen-Controller für Zonen (Polygon ODER Linie).
+  const zoneDrawRef = useRef<Zeichnung | null>(null);
   // onFlaecheGezeichnet stabil halten, damit eine neue Identität den Draw nicht mitten im Zeichnen neu aufsetzt.
   const onFlaecheGezeichnetRef = useRef(onFlaecheGezeichnet);
   onFlaecheGezeichnetRef.current = onFlaecheGezeichnet;
+  const onZoneGezeichnetRef = useRef(onZoneGezeichnet);
+  onZoneGezeichnetRef.current = onZoneGezeichnet;
 
   // Karte einmalig erzeugen.
   useEffect(() => {
@@ -115,12 +207,14 @@ export default function Kartenflaeche({
     map.on('load', () => {
       stilGeladenRef.current = true;
       sorgeFuerAbschnittLayer(map, flaechenDatenRef.current);
+      sorgeFuerZonenLayer(map, zonenDatenRef.current);
     });
     // Nach setStyle (Basemap-/Theme-Wechsel) sind Source/Layer weg → idempotent re-anlegen
     // und die zuletzt bekannten Flächendaten wieder einspielen.
     map.on('styledata', () => {
       if (!map.isStyleLoaded()) return;
       sorgeFuerAbschnittLayer(map, flaechenDatenRef.current);
+      sorgeFuerZonenLayer(map, zonenDatenRef.current);
     });
     mapRef.current = map;
     return () => {
@@ -221,24 +315,69 @@ export default function Kartenflaeche({
     return () => { map.off('click', 'abschnitte-fill', handler); };
   }, [onFlaecheKlick]);
 
+  // Zonendaten in die Source spielen (und für setStyle-Re-Anlage merken).
+  useEffect(() => {
+    const fc = baueZonenFc(zonen);
+    zonenDatenRef.current = fc; // unbedingt: load/styledata-Handler lesen daraus
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    sorgeFuerZonenLayer(map, fc);
+    const src = map.getSource('zonen') as maplibregl.GeoJSONSource | undefined;
+    if (src) src.setData(fc as never);
+  }, [zonen]);
+
+  // Klick auf eine Zone (Fläche ODER Linie) → Inspector.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const handler = (e: maplibregl.MapLayerMouseEvent) => {
+      const id = e.features?.[0]?.properties?.id;
+      if (id != null) onZoneKlick?.(Number(id));
+    };
+    map.on('click', 'zonen-fill', handler);
+    map.on('click', 'zonen-line', handler);
+    return () => {
+      map.off('click', 'zonen-fill', handler);
+      map.off('click', 'zonen-line', handler);
+    };
+  }, [onZoneKlick]);
+
   // Zeichenmodus an-/abschalten; Controller-Lifecycle über drawRef.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     if (zeichnen) {
       if (!drawRef.current) {
-        drawRef.current = createAbschnittDraw(map, (poly) => onFlaecheGezeichnetRef.current?.(poly));
+        drawRef.current = createZeichnung(map, (g) => {
+          if (g.type === 'Polygon') onFlaecheGezeichnetRef.current?.(g);
+        });
       }
-      drawRef.current.starten();
+      drawRef.current.starten('polygon');
     } else if (drawRef.current) {
       drawRef.current.stoppen();
     }
   }, [zeichnen]);
 
+  // Zonen-Zeichenmodus (Polygon/Linie) an-/abschalten; eigener Controller-Lifecycle.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (zoneZeichnen) {
+      if (!zoneDrawRef.current) {
+        zoneDrawRef.current = createZeichnung(map, (g) => onZoneGezeichnetRef.current?.(g));
+      }
+      zoneDrawRef.current.starten(zoneZeichnen);
+    } else if (zoneDrawRef.current) {
+      zoneDrawRef.current.stoppen();
+    }
+  }, [zoneZeichnen]);
+
   // Controller bei Unmount sauber zerstören.
   useEffect(() => () => {
     drawRef.current?.zerstoeren();
     drawRef.current = null;
+    zoneDrawRef.current?.zerstoeren();
+    zoneDrawRef.current = null;
   }, []);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} data-testid="kartenflaeche" />;
