@@ -129,8 +129,11 @@ export default function Kartenflaeche({
     });
     mapRef.current = map;
     return () => {
-      map.remove();
+      map.remove(); // zerstört auch die AttributionControl
       mapRef.current = null;
+      // Ref nullen: sonst sieht der Attribution-Effekt nach StrictMode-Remount eine
+      // stale Control der entfernten Map und ruft removeControl auf bereits Zerstörtem.
+      attribControlRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
