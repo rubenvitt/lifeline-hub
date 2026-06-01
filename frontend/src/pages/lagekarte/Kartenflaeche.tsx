@@ -27,6 +27,8 @@ export interface KartenflaecheProps {
   flyToZiel?: { lng: number; lat: number } | null;
   /** Style-Ladefehler (online nicht erreichbar) → Page stuft ab. */
   onStyleFehler?: () => void;
+  /** Config-autoritative Pflicht-Attribution des aktiven Online-Views (null = keine). */
+  attribution?: string | null;
   /** Abschnittsflächen als Polygone rendern (Befehlsstellen-Marker laufen über `markers`). */
   flaechen?: { id: number; label: string; polygon: GeoJsonPolygon }[];
   /** Polygon-Zeichenmodus aktiv. */
@@ -83,7 +85,7 @@ function baueFlaechenFc(flaechen: KartenflaecheProps['flaechen']): FlaechenFeatu
 }
 
 export default function Kartenflaeche({
-  style, markers, onKarteKlick, onMarkerKlick, flyToZiel, onStyleFehler,
+  style, markers, onKarteKlick, onMarkerKlick, flyToZiel, onStyleFehler, attribution,
   flaechen, zeichnen, onFlaecheGezeichnet, onFlaecheKlick,
 }: KartenflaecheProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -92,6 +94,9 @@ export default function Kartenflaeche({
   // true, sobald der initiale Style geladen ist → danach gelten error-Events als
   // transient (einzelne Tiles), NICHT als Style-Ladefehler.
   const stilGeladenRef = useRef(false);
+  // Eigene AttributionControl (statt der eingebauten), damit customAttribution je View
+  // gesetzt werden kann. Wird bei Attribution-Wechsel entfernt und neu hinzugefügt.
+  const attribControlRef = useRef<maplibregl.AttributionControl | null>(null);
   // Aktuelle Flächendaten; nach setStyle ist die Source leer → re-Anlage liest hieraus.
   const flaechenDatenRef = useRef<FlaechenFeatureCollection>(baueFlaechenFc(flaechen));
   // Zeichen-Controller (terra-draw) über Renders hinweg.
@@ -109,7 +114,7 @@ export default function Kartenflaeche({
       style,
       center: [10.45, 51.16], // Mitte DE als neutraler Start
       zoom: 5,
-      attributionControl: { compact: true },
+      attributionControl: false,
     });
     map.addControl(new maplibregl.NavigationControl(), 'top-right');
     map.on('load', () => {
@@ -137,6 +142,23 @@ export default function Kartenflaeche({
     const map = mapRef.current;
     if (map) map.setStyle(style);
   }, [style]);
+
+  // AttributionControl je nach aktivem View neu setzen (config-autoritativ). MapLibre
+  // bietet keinen Setter für customAttribution → Control entfernen und neu anlegen.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (attribControlRef.current) {
+      map.removeControl(attribControlRef.current);
+      attribControlRef.current = null;
+    }
+    const ctrl = new maplibregl.AttributionControl({
+      compact: true,
+      customAttribution: attribution ?? '',
+    });
+    map.addControl(ctrl);
+    attribControlRef.current = ctrl;
+  }, [attribution]);
 
   // Klick-Handler verdrahten (onKarteKlick kann sich ändern → neu binden).
   useEffect(() => {
