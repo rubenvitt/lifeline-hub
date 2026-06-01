@@ -247,6 +247,7 @@ export default function LagekartePage() {
 
   function onMarkerWaehlen(schluessel: string) {
     setAuswahl(schluessel);
+    setZoneAuswahl(null);
     const m = alleVerortet.find((x) => x.schluessel === schluessel);
     if (m) setFlyToZiel({ lng: m.lon, lat: m.lat });
   }
@@ -309,11 +310,13 @@ export default function LagekartePage() {
         platzierungZiel={platzierungZiel}
         onPlatzierenStart={(z) => {
           setPlatzierungZiel(z);
+          setZoneEntwurf(null);
           setAuswahl(null);
         }}
         onPlatzierenAbbrechen={() => setPlatzierungZiel(null)}
         onAbschnittZeichnenStart={(id) => {
           setZeichneAbschnittId(id);
+          setZoneEntwurf(null);
           setPlatzierungZiel(null);
           setAuswahl(null);
         }}
