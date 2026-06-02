@@ -97,4 +97,12 @@ describe('modulRegistry', () => {
     expect(einheiten?.status).toBe('fertig');
     expect(abschnitte?.status).toBe('fertig');
   });
+
+  it('Lageberichte-Modul ist fertig (Kategorie lage, ohne Rollensperre)', () => {
+    const lb = modulRegistry.find((m) => m.key === 'lageberichte');
+    expect(lb).toBeDefined();
+    expect(lb?.status).toBe('fertig');
+    expect(lb?.kategorie).toBe('lage');
+    expect(lb?.benoetigteRolle).toBeUndefined();
+  });
 });

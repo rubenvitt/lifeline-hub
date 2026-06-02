@@ -18,6 +18,7 @@ import EinsatzabschnittePage from './pages/EinsatzabschnittePage';
 import PersonenPage from './pages/PersonenPage';
 import TierePage from './pages/TierePage';
 import SchaedenPage from './pages/SchaedenPage';
+import LageberichtePage from './pages/LageberichtePage';
 import UnfallhilfsstellenPage from './pages/UnfallhilfsstellenPage';
 import UnfallhilfsstellenDefault from './pages/UnfallhilfsstellenDefault';
 import UhsDetailPage from './pages/uhs/UhsDetailPage';
@@ -41,6 +42,7 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   unfallhilfsstellen: <UnfallhilfsstellenDefault />,
   tiere: <TierePage />,
   schaeden: <SchaedenPage />,
+  lageberichte: <LageberichtePage />,
   lagekarte: (
     <Suspense fallback={<div style={{ padding: 24 }}>Karte wird geladen…</div>}>
       <LagekartePage />

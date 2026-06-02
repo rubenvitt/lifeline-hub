@@ -63,7 +63,7 @@ export const modulRegistry: ModulEintrag[] = [
   // Lage
   { key: 'lage-dashboard', kategorie: 'lage', label: 'Dashboard', icon: TbLayoutDashboard, route: 'lage-dashboard', status: 'geplant', beschreibung: 'Verdichtete Lageübersicht des Einsatzes.' },
   { key: 'lagekarte', kategorie: 'lage', label: 'Lagekarte', icon: TbMap2, route: 'lagekarte', status: 'fertig', beschreibung: 'Karte der verortbaren Objekte: Einsatzort, Unfallhilfsstellen, Schäden — verorten per Klick.' },
-  { key: 'lageberichte', kategorie: 'lage', label: 'Lageberichte', icon: TbReport, route: 'lageberichte', status: 'geplant', beschreibung: 'Strukturierte Lageberichte.' },
+  { key: 'lageberichte', kategorie: 'lage', label: 'Lageberichte', icon: TbReport, route: 'lageberichte', status: 'fertig', beschreibung: 'Strukturierte Lageberichte.' },
   { key: 'kraefteuebersicht', kategorie: 'lage', label: 'Kräfteübersicht', icon: TbListDetails, route: 'kraefteuebersicht', status: 'geplant', beschreibung: 'Meldebild der eingesetzten Kräfte.' },
   { key: 'gefahrenzonen', kategorie: 'lage', label: 'Gefahren-/Absperrzonen', icon: TbAlertTriangle, route: 'gefahrenzonen', status: 'geplant', beschreibung: 'Gefahren- und Absperrbereiche.' },
   // Kommunikation
