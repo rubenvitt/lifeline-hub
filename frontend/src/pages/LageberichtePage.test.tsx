@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { Route, Routes } from 'react-router-dom';
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
 import LageberichtePage from './LageberichtePage';
+import LageberichtDetailPage from './LageberichtDetailPage';
 import type { EinsatzAnzeige, LageberichtAnzeige } from '../api/types';
 
 const admin = {
@@ -45,6 +47,64 @@ function setup(berichte: LageberichtAnzeige[] = [bericht]) {
     { route: '/einsaetze/7/lageberichte' },
   );
 }
+
+const lagebericht7Abschnitte: LageberichtAnzeige = {
+  ...bericht, id: 12, vorlage: 'lagebericht', titel: 'Lagevortrag',
+  abschnitte: [
+    { schluessel: 'auftrag', text: '' },
+    { schluessel: 'gefahren_schadenlage', text: '' },
+    { schluessel: 'eigene_lage', text: '' },
+    { schluessel: 'lageentwicklung', text: '' },
+    { schluessel: 'fuehrungsprobleme', text: '' },
+    { schluessel: 'antraege_vorschlaege', text: '' },
+    { schluessel: 'zusammenfassung', text: '' },
+  ],
+};
+
+function setupDetail(lb: LageberichtAnzeige) {
+  server.use(
+    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+    http.get(`/api/einsaetze/7/lageberichte/${lb.id}`, () => HttpResponse.json(lb)),
+  );
+  return renderMitProviders(
+    <AuthProvider>
+      <Routes>
+        <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
+      </Routes>
+    </AuthProvider>,
+    { route: `/einsaetze/7/lageberichte/${lb.id}` },
+  );
+}
+
+describe('LageberichtDetailPage', () => {
+  it('Entwurf-Editor zeigt ein Feld je Abschnitt der Vorlage', async () => {
+    setupDetail(lagebericht7Abschnitte);
+    expect(await screen.findByLabelText('Auftrag')).toBeInTheDocument();
+    expect(screen.getByLabelText('Zusammenfassung')).toBeInTheDocument();
+    expect(screen.getByLabelText('Gefahren-/Schadenlage')).toBeInTheDocument();
+  });
+
+  it('freigegebener Bericht ist read-only mit ETB-Link und Fortschreiben', async () => {
+    setupDetail({
+      ...lagebericht7Abschnitte, status: 'freigegeben', etb_eintrag_id: 99,
+      freigegeben_von_name: 'A', freigegeben_at: '2026-06-02 11:00:00',
+    });
+    expect(await screen.findByRole('button', { name: /Fortschreiben/i })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Auftrag')).not.toBeInTheDocument();
+  });
+
+  it('Freigeben öffnet einen Bestätigungsdialog', async () => {
+    setupDetail({ ...lagebericht7Abschnitte, abschnitte: [
+      { schluessel: 'auftrag', text: 'X' }, { schluessel: 'gefahren_schadenlage', text: '' },
+      { schluessel: 'eigene_lage', text: '' }, { schluessel: 'lageentwicklung', text: '' },
+      { schluessel: 'fuehrungsprobleme', text: '' }, { schluessel: 'antraege_vorschlaege', text: '' },
+      { schluessel: 'zusammenfassung', text: '' }] });
+    await screen.findByRole('button', { name: /Freigeben/i });
+    await userEvent.click(screen.getByRole('button', { name: /Freigeben/i }));
+    expect(await screen.findByText(/endgültig|unveränderlich|ETB/i)).toBeInTheDocument();
+  });
+});
 
 describe('LageberichtePage', () => {
   it('zeigt die Berichte des Einsatzes', async () => {

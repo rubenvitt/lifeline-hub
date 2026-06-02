@@ -19,6 +19,7 @@ import PersonenPage from './pages/PersonenPage';
 import TierePage from './pages/TierePage';
 import SchaedenPage from './pages/SchaedenPage';
 import LageberichtePage from './pages/LageberichtePage';
+import LageberichtDetailPage from './pages/LageberichtDetailPage';
 import UnfallhilfsstellenPage from './pages/UnfallhilfsstellenPage';
 import UnfallhilfsstellenDefault from './pages/UnfallhilfsstellenDefault';
 import UhsDetailPage from './pages/uhs/UhsDetailPage';
@@ -74,6 +75,7 @@ export default function App() {
           ))}
           <Route path="unfallhilfsstellen/liste" element={<UnfallhilfsstellenPage />} />
           <Route path="unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />
+          <Route path="lageberichte/:lbId" element={<LageberichtDetailPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/einsaetze" replace />} />
