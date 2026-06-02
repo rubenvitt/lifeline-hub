@@ -235,6 +235,19 @@ describe('PersonenPage', () => {
     expect(await screen.findByText(/Keine Patienten/)).toBeInTheDocument();
   });
 
+  it('Lagebild-Streifen zeigt „Patienten: N" (SK I–IV + tot)', async () => {
+    const sk2 = { ...person, id: 12, registrier_nr: 3, status: 'betroffen' as const,
+      aktuelle_sichtung: 'sk2' as const, aktuelle_sichtung_at: '2026-05-27 09:30:00' };
+    const tot = { ...person, id: 13, registrier_nr: 4, status: 'verstorben' as const,
+      aktuelle_sichtung: 'tot' as const, aktuelle_sichtung_at: '2026-05-27 09:40:00' };
+    const unverletzt = { ...person, id: 14, registrier_nr: 5, status: 'betroffen' as const,
+      aktuelle_sichtung: 'unverletzt' as const, aktuelle_sichtung_at: '2026-05-27 09:50:00' };
+    render(einsatzAktiv, [person, sk2, tot, unverletzt]);
+    await screen.findByText('R-001');
+    // Patienten = sk2 + tot = 2 (unverletzt + ungesichtet zählen nicht):
+    expect(await screen.findByText(/Patienten:\s*2/)).toBeInTheDocument();
+  });
+
   it('zeigt den „Als Geschädigte bei Schäden"-Block im Personen-Drawer', async () => {
     const detail = { ...person, aktuelle_sichtung: null, aktuelle_sichtung_at: null,
       aktueller_verbleib: null, aktuelle_uhs_id: null, aktueller_platz_id: null,

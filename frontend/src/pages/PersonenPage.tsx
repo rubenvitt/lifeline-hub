@@ -550,6 +550,7 @@ export default function PersonenPage() {
 
       {(() => {
         const z = lagebildZaehlung(alle);
+        const patientenAnzahl = z.sk.sk1 + z.sk.sk2 + z.sk.sk3 + z.sk.sk4 + z.sk.tot;
         const skTags = (Object.keys(z.sk) as Sichtungskategorie[])
           .filter((k) => z.sk[k] > 0)
           .map((k) => (
@@ -558,6 +559,7 @@ export default function PersonenPage() {
         return (
           <Space wrap style={{ marginBottom: 12 }}>
             <Typography.Text type="secondary">Lagebild:</Typography.Text>
+            <Tag color="geekblue">Patienten: {patientenAnzahl}</Tag>
             {skTags.length > 0 ? skTags : <Typography.Text type="secondary">noch keine Sichtungen</Typography.Text>}
             <Tag>ungesichtet: {z.ungesichtet}</Tag>
           </Space>
