@@ -15,6 +15,7 @@ pub mod einsatz_einheit;
 pub mod einsatz_uhs;
 pub mod einsatzabschnitt;
 pub mod etb;
+pub mod lagebericht;
 pub mod etb_baustein;
 pub mod fahrzeug;
 pub mod fahrzeug_status;
