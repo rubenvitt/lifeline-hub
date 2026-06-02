@@ -1,6 +1,6 @@
 use super::EtbEintragAnzeige;
 use crate::error::AppError;
-use sqlx::{QueryBuilder, Sqlite, SqlitePool};
+use sqlx::{QueryBuilder, Sqlite, SqliteConnection, SqlitePool};
 
 /// Eingabedaten für einen neuen ETB-Eintrag. Alle Werte sind bereits
 /// validiert und normalisiert (Zeitformat, Pflichtfelder) — das ist Aufgabe
@@ -19,19 +19,17 @@ pub struct EintragDaten<'a> {
     pub berichtigt_eintrag_id: Option<i64>,
 }
 
-/// Legt einen ETB-Eintrag an und liefert ihn als Anzeige zurück.
-///
-/// `lfd_nr` wird in **einem** atomaren Statement vergeben:
-/// `COALESCE(MAX(lfd_nr),0)+1` über alle Einträge desselben Einsatzes.
-/// SQLite serialisiert im WAL-Modus alle Writer, daher ist dieses einzelne
-/// Statement race-frei; `UNIQUE(einsatz_id, lfd_nr)` sichert zusätzlich ab.
-/// `received_at` wird per Spalten-Default `datetime('now')` gesetzt.
-pub async fn anlegen(
-    pool: &SqlitePool,
+/// Legt einen ETB-Eintrag auf einer beliebigen Connection/Transaktion an und
+/// liefert die neue `id`. Vergibt `lfd_nr` atomar (`COALESCE(MAX(lfd_nr),0)+1`
+/// über alle Einträge desselben Einsatzes); `received_at` per Spalten-Default.
+/// Für transaktionale Aufrufer (z. B. Lagebericht-Freigabe), die den Eintrag
+/// gemeinsam mit Folge-Updates committen wollen.
+pub async fn anlegen_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     erfasser_id: i64,
     daten: EintragDaten<'_>,
-) -> Result<EtbEintragAnzeige, AppError> {
+) -> Result<i64, AppError> {
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO etb_eintrag \
             (einsatz_id, lfd_nr, typ, inhalt, von, an, meldeweg, veranlassung, \
@@ -53,9 +51,24 @@ pub async fn anlegen(
     .bind(daten.erfasst_lokal_at)
     .bind(daten.berichtigt_eintrag_id)
     .bind(einsatz_id)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
+    Ok(id)
+}
 
+/// Legt einen ETB-Eintrag an und liefert ihn als Anzeige zurück.
+/// Dünner Wrapper um `anlegen_tx` auf einer frischen Pool-Connection.
+pub async fn anlegen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    erfasser_id: i64,
+    daten: EintragDaten<'_>,
+) -> Result<EtbEintragAnzeige, AppError> {
+    let id = {
+        let mut conn = pool.acquire().await?;
+        anlegen_tx(&mut *conn, einsatz_id, erfasser_id, daten).await?
+        // conn fällt hier aus dem Scope → PoolConnection::drop gibt die Verbindung zurück
+    };
     laden(pool, id).await
 }
 
@@ -65,7 +78,7 @@ pub async fn laden(pool: &SqlitePool, id: i64) -> Result<EtbEintragAnzeige, AppE
     sqlx::query_as::<_, EtbEintragAnzeige>(
         "SELECT e.id, e.lfd_nr, e.typ, e.inhalt, e.von, e.an, e.meldeweg, e.veranlassung, \
                 e.erfasser_id, b.anzeigename AS erfasser_name, e.ereigniszeit, e.received_at, \
-                e.erfasst_lokal_at, e.berichtigt_eintrag_id \
+                e.erfasst_lokal_at, e.berichtigt_eintrag_id, e.lagebericht_id \
          FROM etb_eintrag e JOIN benutzer b ON b.id = e.erfasser_id \
          WHERE e.id = ?",
     )
@@ -127,7 +140,7 @@ pub async fn abfrage(
     let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
         "SELECT e.id, e.lfd_nr, e.typ, e.inhalt, e.von, e.an, e.meldeweg, e.veranlassung, \
                 e.erfasser_id, b.anzeigename AS erfasser_name, e.ereigniszeit, e.received_at, \
-                e.erfasst_lokal_at, e.berichtigt_eintrag_id \
+                e.erfasst_lokal_at, e.berichtigt_eintrag_id, e.lagebericht_id \
          FROM etb_eintrag e JOIN benutzer b ON b.id = e.erfasser_id",
     );
 
@@ -525,5 +538,17 @@ mod tests {
         let liste = abfrage(&pool, einsatz, &f).await.unwrap();
         assert_eq!(liste.len(), 1);
         assert_eq!(liste[0].erfasser_id, zweiter);
+    }
+
+    #[tokio::test]
+    async fn anlegen_setzt_lagebericht_id_auf_none() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+
+        let a = anlegen(&pool, einsatz, benutzer, daten("Test"))
+            .await
+            .unwrap();
+
+        assert_eq!(a.lagebericht_id, None);
     }
 }

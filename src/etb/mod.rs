@@ -136,6 +136,9 @@ pub struct EtbEintragAnzeige {
     pub received_at: String,
     pub erfasst_lokal_at: Option<String>,
     pub berichtigt_eintrag_id: Option<i64>,
+    /// Gesetzt, wenn dieser Eintrag der Freigabe-Snapshot eines Lageberichts ist
+    /// (Timeline-Badge + Rückverlinkung). Sonst `None`.
+    pub lagebericht_id: Option<i64>,
 }
 
 #[cfg(test)]
