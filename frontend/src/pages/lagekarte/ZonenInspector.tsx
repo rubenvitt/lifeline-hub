@@ -24,6 +24,7 @@ export default function ZonenInspector({ zone, darfSchreiben, onSchliessen, onAe
       title={zone.label?.trim() ? zone.label : zoneTypLabel(zone.typ)}
       extra={<Button type="text" onClick={onSchliessen} aria-label="Schließen">×</Button>}
       size="small"
+      style={{ position: 'absolute', right: 12, top: 12, width: 280, maxHeight: 'calc(100% - 24px)', overflowY: 'auto', zIndex: 5 }}
     >
       <Space direction="vertical" style={{ width: '100%' }}>
         {darfSchreiben ? (
