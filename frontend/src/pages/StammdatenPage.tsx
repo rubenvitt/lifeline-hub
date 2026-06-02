@@ -8,6 +8,7 @@ import PersonalStatusTab from '../stammdaten/PersonalStatusTab';
 import EinheitTypenTab from '../stammdaten/EinheitTypenTab';
 import MaterialTab from '../stammdaten/MaterialTab';
 import OrganisationTab from '../stammdaten/OrganisationTab';
+import EtbBausteineTab from '../stammdaten/EtbBausteineTab';
 
 export default function StammdatenPage() {
   return (
@@ -23,6 +24,7 @@ export default function StammdatenPage() {
           { key: 'personal', label: 'Personal', children: <PersonalTab /> },
           { key: 'qualifikationen', label: 'Qualifikationen', children: <QualifikationenTab /> },
           { key: 'personal-status', label: 'Personal-Status', children: <PersonalStatusTab /> },
+          { key: 'etb-bausteine', label: 'ETB-Schnellbausteine', children: <EtbBausteineTab /> },
           { key: 'einheit-typen', label: 'Einheitstypen', children: <EinheitTypenTab /> },
           { key: 'organisation', label: 'Organisation', children: <OrganisationTab /> },
         ]}
