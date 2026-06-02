@@ -7,6 +7,7 @@ import type { KarteMarker } from './marker';
 import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
 import { createZeichnung, type Zeichnung, type ZeichenModus } from './zeichnen';
 import type { ZoneStil } from './zonenStil';
+import { wendeKartenDatenAn } from './kartenDaten';
 
 // pmtiles-Protokoll genau einmal global registrieren.
 let pmtilesRegistriert = false;
@@ -318,14 +319,17 @@ export default function Kartenflaeche({
   // Abschnittsflächen-Daten in die Source spielen (und für setStyle-Re-Anlage merken).
   useEffect(() => {
     const fc = baueFlaechenFc(flaechen);
-    flaechenDatenRef.current = fc; // unbedingt: load/styledata-Handler lesen daraus
+    flaechenDatenRef.current = fc; // unbedingt: load/styledata/idle-Handler lesen daraus
     const map = mapRef.current;
-    // Vor Style-Load würden addSource/addLayer werfen ("Style is not done loading");
-    // die initiale Anlage übernimmt der load-Handler aus flaechenDatenRef.
-    if (!map || !map.isStyleLoaded()) return;
-    sorgeFuerAbschnittLayer(map, fc); // legt Source/Layer an, falls noch nicht vorhanden
-    const src = map.getSource('abschnitte') as maplibregl.GeoJSONSource | undefined;
-    if (src) src.setData(fc as never);
+    if (!map) return;
+    // Style noch nicht geladen → Anwendung auf das nächste idle vertagen (sonst ginge
+    // eine frisch gezeichnete Fläche bis zum Reload verloren). Immer aus dem Ref lesen,
+    // damit ein vertagter Lauf die zuletzt bekannten Daten einspielt.
+    wendeKartenDatenAn(map, () => {
+      sorgeFuerAbschnittLayer(map, flaechenDatenRef.current);
+      const src = map.getSource('abschnitte') as maplibregl.GeoJSONSource | undefined;
+      if (src) src.setData(flaechenDatenRef.current as never);
+    });
   }, [flaechen]);
 
   // Klick auf eine Fläche → Inspector.
@@ -343,12 +347,18 @@ export default function Kartenflaeche({
   // Zonendaten in die Source spielen (und für setStyle-Re-Anlage merken).
   useEffect(() => {
     const fc = baueZonenFc(zonen);
-    zonenDatenRef.current = fc; // unbedingt: load/styledata-Handler lesen daraus
+    zonenDatenRef.current = fc; // unbedingt: load/styledata/idle-Handler lesen daraus
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
-    sorgeFuerZonenLayer(map, fc);
-    const src = map.getSource('zonen') as maplibregl.GeoJSONSource | undefined;
-    if (src) src.setData(fc as never);
+    if (!map) return;
+    // Style noch nicht geladen (z. B. während terra-draw seine Zeichen-Layer auf-/abbaut)
+    // → Anwendung auf das nächste idle vertagen, sonst bliebe die frisch gezeichnete Zone
+    // bis zum Reload unsichtbar. Immer aus dem Ref lesen → vertagter Lauf nutzt die
+    // aktuellsten Daten.
+    wendeKartenDatenAn(map, () => {
+      sorgeFuerZonenLayer(map, zonenDatenRef.current);
+      const src = map.getSource('zonen') as maplibregl.GeoJSONSource | undefined;
+      if (src) src.setData(zonenDatenRef.current as never);
+    });
   }, [zonen]);
 
   // Klick auf eine Zone (Fläche ODER Linie) → Inspector.
