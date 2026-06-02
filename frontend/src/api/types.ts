@@ -77,6 +77,16 @@ export interface EtbEintragAnzeige {
   berichtigt_eintrag_id: number | null;
 }
 
+export interface EtbBaustein {
+  id: number;
+  label: string;
+  typ: EtbTyp;
+  inhalt: string;
+  meldeweg: MeldeWeg | null;
+  veranlassung: string | null;
+  sortier: number;
+}
+
 export type Dienststatus = 'in_dienst' | 'ausser_dienst';
 export type StatusKategorie = 'verfuegbar' | 'gebunden' | 'nicht_verfuegbar';
 
