@@ -251,7 +251,11 @@ describe('PersonenPage', () => {
   it('Detail-Drawer zeigt das „Patient"-Tag bei gesichteter Person', async () => {
     const patient = { ...person, status: 'betroffen' as const,
       aktuelle_sichtung: 'sk1' as const, aktuelle_sichtung_at: '2026-05-27 10:00:00' };
-    const detail = { ...patient, sichtungen: [], notizen: [], verbleib: [], abgleiche: [] };
+    const detail = {
+      ...patient,
+      aktueller_verbleib: null, aktuelle_uhs_id: null, aktueller_platz_id: null,
+      sichtungen: [], notizen: [], verbleib: [], abgleiche: [],
+    } as PersonDetail;
     render(einsatzAktiv, [patient]);
     server.use(http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(detail)));
     await userEvent.click(await screen.findByRole('tab', { name: 'Alle' }));
