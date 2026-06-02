@@ -21,6 +21,15 @@ const SK_META: Record<Sichtungskategorie, { label: string; color: string }> = {
   unverletzt: { label: 'unverletzt', color: 'default' },
 };
 
+/** Patient = gesichtet mit behandlungsrelevanter Kategorie (SK I–IV oder tot);
+ *  unverletzt und ungesichtet zählen nicht (LFH-10, rein medizinische Achse). */
+function istPatient(p: Person): boolean {
+  return p.aktuelle_sichtung != null && p.aktuelle_sichtung !== 'unverletzt';
+}
+
+/** Triage-Reihenfolge der Patienten-Abschnitte (SK I zuerst, tot zuletzt). */
+const PATIENT_SK: Sichtungskategorie[] = ['sk1', 'sk2', 'sk3', 'sk4', 'tot'];
+
 /** Zählt je SK-Kategorie + Gruppen „ungesichtet" und „unverletzt" (Spec-Drei-Teilung). */
 function lagebildZaehlung(alle: Person[]): { sk: Record<Sichtungskategorie, number>; ungesichtet: number } {
   const sk: Record<Sichtungskategorie, number> = { sk1: 0, sk2: 0, sk3: 0, sk4: 0, tot: 0, unverletzt: 0 };
@@ -45,12 +54,13 @@ const TIER_SPEZIES_LABEL: Record<Spezies, string> = {
   kleintier: 'Kleintier', wildtier: 'Wildtier', sonstige: 'Sonstige',
 };
 
-/** Sicht-Tabs: 'alle' = kein Filter; sonst Status-Filter. */
-type Sicht = 'erfasst' | 'vermisst' | 'betroffen' | 'verstorben' | 'alle';
+/** Sicht-Tabs: 'alle' = kein Filter; 'patienten' = SK-Achse; sonst Status-Filter. */
+type Sicht = 'erfasst' | 'vermisst' | 'betroffen' | 'patienten' | 'verstorben' | 'alle';
 const SICHTEN: { key: Sicht; label: string }[] = [
   { key: 'erfasst', label: 'Neu' },
   { key: 'vermisst', label: 'Vermisst' },
   { key: 'betroffen', label: 'Betroffen' },
+  { key: 'patienten', label: 'Patienten' },
   { key: 'verstorben', label: 'Verstorben' },
   { key: 'alle', label: 'Alle' },
 ];
@@ -552,15 +562,44 @@ export default function PersonenPage() {
         );
       })()}
 
-      <Table
-        rowKey="id"
-        loading={personenQuery.isLoading}
-        dataSource={personen}
-        columns={[...spalten, ...aktionsSpalte]}
-        pagination={false}
-        locale={{ emptyText: 'Keine Personen in dieser Sicht' }}
-        onRow={(p) => ({ onClick: () => { setOffenePersonId(p.id); setBearbeiten(false); }, style: { cursor: 'pointer' } })}
-      />
+      {sicht === 'patienten' ? (
+        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+          {PATIENT_SK.map((sk) => {
+            const gruppe = alle.filter((p) => p.aktuelle_sichtung === sk);
+            if (gruppe.length === 0) return null;
+            return (
+              <div key={sk}>
+                <Typography.Title level={5} style={{ marginTop: 0 }}>
+                  <Tag color={SK_META[sk].color}>{SK_META[sk].label}</Tag>{' '}
+                  <Typography.Text type="secondary">
+                    {gruppe.length} {gruppe.length === 1 ? 'Patient' : 'Patienten'}
+                  </Typography.Text>
+                </Typography.Title>
+                <Table
+                  rowKey="id"
+                  dataSource={gruppe}
+                  columns={spalten}
+                  pagination={false}
+                  onRow={(p) => ({ onClick: () => { setOffenePersonId(p.id); setBearbeiten(false); }, style: { cursor: 'pointer' } })}
+                />
+              </div>
+            );
+          })}
+          {!alle.some(istPatient) && (
+            <Alert type="info" showIcon message="Keine Patienten in diesem Einsatz." />
+          )}
+        </Space>
+      ) : (
+        <Table
+          rowKey="id"
+          loading={personenQuery.isLoading}
+          dataSource={personen}
+          columns={[...spalten, ...aktionsSpalte]}
+          pagination={false}
+          locale={{ emptyText: 'Keine Personen in dieser Sicht' }}
+          onRow={(p) => ({ onClick: () => { setOffenePersonId(p.id); setBearbeiten(false); }, style: { cursor: 'pointer' } })}
+        />
+      )}
 
       <Modal
         open={modus !== null}
