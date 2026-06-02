@@ -21,6 +21,16 @@ const SK_META: Record<Sichtungskategorie, { label: string; color: string }> = {
   unverletzt: { label: 'unverletzt', color: 'default' },
 };
 
+/** Triage-Reihenfolge der Patienten-Abschnitte (SK I zuerst, tot zuletzt).
+ *  Single Source of Truth dafür, welche Sichtungen einen „Patienten" ausmachen. */
+const PATIENT_SK: Sichtungskategorie[] = ['sk1', 'sk2', 'sk3', 'sk4', 'tot'];
+
+/** Patient = gesichtet mit behandlungsrelevanter Kategorie (SK I–IV oder tot);
+ *  unverletzt und ungesichtet zählen nicht (LFH-10, rein medizinische Achse). */
+function istPatient(p: Person): boolean {
+  return p.aktuelle_sichtung != null && PATIENT_SK.includes(p.aktuelle_sichtung);
+}
+
 /** Zählt je SK-Kategorie + Gruppen „ungesichtet" und „unverletzt" (Spec-Drei-Teilung). */
 function lagebildZaehlung(alle: Person[]): { sk: Record<Sichtungskategorie, number>; ungesichtet: number } {
   const sk: Record<Sichtungskategorie, number> = { sk1: 0, sk2: 0, sk3: 0, sk4: 0, tot: 0, unverletzt: 0 };
@@ -45,12 +55,13 @@ const TIER_SPEZIES_LABEL: Record<Spezies, string> = {
   kleintier: 'Kleintier', wildtier: 'Wildtier', sonstige: 'Sonstige',
 };
 
-/** Sicht-Tabs: 'alle' = kein Filter; sonst Status-Filter. */
-type Sicht = 'erfasst' | 'vermisst' | 'betroffen' | 'verstorben' | 'alle';
+/** Sicht-Tabs: 'alle' = kein Filter; 'patienten' = SK-Achse; sonst Status-Filter. */
+type Sicht = 'erfasst' | 'vermisst' | 'betroffen' | 'patienten' | 'verstorben' | 'alle';
 const SICHTEN: { key: Sicht; label: string }[] = [
   { key: 'erfasst', label: 'Neu' },
   { key: 'vermisst', label: 'Vermisst' },
   { key: 'betroffen', label: 'Betroffen' },
+  { key: 'patienten', label: 'Patienten' },
   { key: 'verstorben', label: 'Verstorben' },
   { key: 'alle', label: 'Alle' },
 ];
@@ -217,7 +228,9 @@ export default function PersonenPage() {
     (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
 
   const alle = personenQuery.data ?? [];
-  const personen = sicht === 'alle' ? alle : alle.filter((p) => p.status === sicht);
+  const personen = (sicht === 'alle' || sicht === 'patienten')
+    ? alle
+    : alle.filter((p) => p.status === sicht);
 
   const spalten: TableColumnsType<Person> = [
     {
@@ -288,6 +301,7 @@ export default function PersonenPage() {
               <Space direction="vertical" style={{ width: '100%' }} size="large">
                 <Space>
                   <Tag color={STATUS_META[p.status].color}>{STATUS_META[p.status].label}</Tag>
+                  {istPatient(p) && <Tag color="geekblue">Patient</Tag>}
                   {p.storniert_at && <Tag color="default">storniert</Tag>}
                 </Space>
 
@@ -419,6 +433,7 @@ export default function PersonenPage() {
             children: (
               <Space direction="vertical" style={{ width: '100%' }} size="large">
                 <Space wrap>
+                  {istPatient(p) && <Tag color="geekblue">Patient</Tag>}
                   {p.aktuelle_sichtung
                     ? <Tag color={SK_META[p.aktuelle_sichtung].color}>SK: {SK_META[p.aktuelle_sichtung].label}</Tag>
                     : <Tag>ungesichtet</Tag>}
@@ -538,6 +553,7 @@ export default function PersonenPage() {
 
       {(() => {
         const z = lagebildZaehlung(alle);
+        const patientenAnzahl = PATIENT_SK.reduce((summe, k) => summe + z.sk[k], 0);
         const skTags = (Object.keys(z.sk) as Sichtungskategorie[])
           .filter((k) => z.sk[k] > 0)
           .map((k) => (
@@ -546,21 +562,53 @@ export default function PersonenPage() {
         return (
           <Space wrap style={{ marginBottom: 12 }}>
             <Typography.Text type="secondary">Lagebild:</Typography.Text>
+            <Tag color="geekblue">Patienten: {patientenAnzahl}</Tag>
             {skTags.length > 0 ? skTags : <Typography.Text type="secondary">noch keine Sichtungen</Typography.Text>}
             <Tag>ungesichtet: {z.ungesichtet}</Tag>
           </Space>
         );
       })()}
 
-      <Table
-        rowKey="id"
-        loading={personenQuery.isLoading}
-        dataSource={personen}
-        columns={[...spalten, ...aktionsSpalte]}
-        pagination={false}
-        locale={{ emptyText: 'Keine Personen in dieser Sicht' }}
-        onRow={(p) => ({ onClick: () => { setOffenePersonId(p.id); setBearbeiten(false); }, style: { cursor: 'pointer' } })}
-      />
+      {sicht === 'patienten' ? (
+        <Spin spinning={personenQuery.isLoading}>
+        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+          {PATIENT_SK.map((sk) => {
+            const gruppe = alle.filter((p) => p.aktuelle_sichtung === sk);
+            if (gruppe.length === 0) return null;
+            return (
+              <div key={sk}>
+                <Typography.Title level={5} style={{ marginTop: 0 }}>
+                  <Tag color={SK_META[sk].color}>{SK_META[sk].label}</Tag>{' '}
+                  <Typography.Text type="secondary">
+                    {gruppe.length} {gruppe.length === 1 ? 'Patient' : 'Patienten'}
+                  </Typography.Text>
+                </Typography.Title>
+                <Table
+                  rowKey="id"
+                  dataSource={gruppe}
+                  columns={spalten}
+                  pagination={false}
+                  onRow={(p) => ({ onClick: () => { setOffenePersonId(p.id); setBearbeiten(false); }, style: { cursor: 'pointer' } })}
+                />
+              </div>
+            );
+          })}
+          {!personenQuery.isLoading && !alle.some(istPatient) && (
+            <Alert type="info" showIcon message="Keine Patienten in diesem Einsatz." />
+          )}
+        </Space>
+        </Spin>
+      ) : (
+        <Table
+          rowKey="id"
+          loading={personenQuery.isLoading}
+          dataSource={personen}
+          columns={[...spalten, ...aktionsSpalte]}
+          pagination={false}
+          locale={{ emptyText: 'Keine Personen in dieser Sicht' }}
+          onRow={(p) => ({ onClick: () => { setOffenePersonId(p.id); setBearbeiten(false); }, style: { cursor: 'pointer' } })}
+        />
+      )}
 
       <Modal
         open={modus !== null}

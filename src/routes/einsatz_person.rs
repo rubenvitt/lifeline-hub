@@ -432,13 +432,14 @@ pub async fn export(
     let personen = repo::liste(&state.pool, einsatz_id, None).await?;
     audit_repo::anlegen(&state.pool, einsatz_id, None, benutzer.id, "export").await?;
 
-    let mut csv = String::from("registrier_nr;status;name;vorname;geschlecht;alter;antreff_ort\n");
+    let mut csv = String::from("registrier_nr;status;sichtung;name;vorname;geschlecht;alter;antreff_ort\n");
     for p in &personen {
         let alter = p.alter_geschaetzt.map(|a| a.to_string()).unwrap_or_default();
         csv.push_str(&format!(
-            "{};{};{};{};{};{};{}\n",
+            "{};{};{};{};{};{};{};{}\n",
             registrier_anzeige(p.registrier_nr),
             csv_feld(&p.status),
+            csv_feld(p.aktuelle_sichtung.as_deref().unwrap_or("")),
             csv_feld(p.name.as_deref().unwrap_or("")),
             csv_feld(p.vorname.as_deref().unwrap_or("")),
             csv_feld(p.geschlecht.as_deref().unwrap_or("")),

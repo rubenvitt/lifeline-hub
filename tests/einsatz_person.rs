@@ -510,6 +510,38 @@ async fn export_entschaerft_formel_injektion() {
 }
 
 #[tokio::test]
+async fn export_enthaelt_sichtung_spalte() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    // Eine gesichtete Person (SK I) und eine ungesichtete:
+    let p1 = person_anlegen(&app, &admin, e, r#"{"name":"Gesichtet"}"#).await;
+    sichten(&app, &admin, e, p1, r#"{"kategorie":"sk1"}"#).await;
+    person_anlegen(&app, &admin, e, r#"{"name":"Ungesichtet"}"#).await;
+
+    let resp = app.clone().oneshot(
+        Request::builder().method("GET").uri(format!("/api/einsaetze/{e}/personen/export"))
+            .header(header::COOKIE, admin.clone()).body(Body::empty()).unwrap(),
+    ).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let csv = String::from_utf8(bytes.to_vec()).unwrap();
+
+    // Header trägt `sichtung` an Position 3 (direkt nach `status`):
+    assert_eq!(
+        csv.lines().next().unwrap(),
+        "registrier_nr;status;sichtung;name;vorname;geschlecht;alter;antreff_ort"
+    );
+    // Gesichtete Person trägt den SK-Code in der sichtung-Spalte:
+    assert!(csv.contains(";\"sk1\";"), "gesichtete Person muss sk1 tragen, CSV:\n{csv}");
+    // Ungesichtete Person hat ein leeres sichtung-Feld:
+    assert!(
+        csv.lines().any(|z| z.contains("Ungesichtet") && z.contains(";\"\";\"Ungesichtet\"")),
+        "ungesichtete Person muss ein leeres sichtung-Feld haben, CSV:\n{csv}"
+    );
+}
+
+#[tokio::test]
 async fn detail_enthaelt_medizinischen_verlauf_und_genau_einen_audit() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
