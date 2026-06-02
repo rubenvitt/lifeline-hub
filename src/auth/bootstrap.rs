@@ -1,6 +1,7 @@
 use crate::auth::{password, ROLLE_ADMIN};
 use crate::einheit::EINHEIT_TYP_STARTLISTE;
 use crate::error::AppError;
+use crate::etb_baustein::ETB_BAUSTEIN_STARTLISTE;
 use crate::fahrzeug::STATUS_STARTLISTE;
 use crate::personal::{PERSONAL_STATUS_STARTLISTE, QUALIFIKATION_STARTLISTE};
 use argon2::password_hash::rand_core::{OsRng, RngCore};
@@ -134,6 +135,20 @@ pub async fn bootstrap_admin(
         .bind(f)
         .bind(u)
         .bind(m)
+        .bind(sortier)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    for (label, typ, inhalt, sortier) in ETB_BAUSTEIN_STARTLISTE {
+        sqlx::query(
+            "INSERT INTO etb_baustein (org_id, label, typ, inhalt, sortier) \
+             VALUES (?, ?, ?, ?, ?)",
+        )
+        .bind(org_id)
+        .bind(label)
+        .bind(typ)
+        .bind(inhalt)
         .bind(sortier)
         .execute(&mut *tx)
         .await?;
@@ -283,6 +298,21 @@ mod tests {
             "SELECT soll_fuehrer FROM einheit_typ WHERE label = 'Sonstige'",
         ).fetch_one(&pool).await.unwrap();
         assert_eq!(sonstige.0, None);
+    }
+
+    #[tokio::test]
+    async fn seedet_etb_baustein_startliste_fuer_neue_org() {
+        let pool = crate::db::test_pool().await;
+        bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
+            .await
+            .unwrap();
+        let labels: Vec<String> =
+            sqlx::query_scalar("SELECT label FROM etb_baustein ORDER BY sortier")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert_eq!(labels.len(), 5, "fünf Default-Bausteine erwartet");
+        assert_eq!(labels.first().map(String::as_str), Some("Lage unverändert"));
     }
 
     #[tokio::test]
