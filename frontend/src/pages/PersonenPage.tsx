@@ -227,7 +227,9 @@ export default function PersonenPage() {
     (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
 
   const alle = personenQuery.data ?? [];
-  const personen = sicht === 'alle' ? alle : alle.filter((p) => p.status === sicht);
+  const personen = (sicht === 'alle' || sicht === 'patienten')
+    ? alle
+    : alle.filter((p) => p.status === sicht);
 
   const spalten: TableColumnsType<Person> = [
     {
@@ -563,6 +565,7 @@ export default function PersonenPage() {
       })()}
 
       {sicht === 'patienten' ? (
+        <Spin spinning={personenQuery.isLoading}>
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
           {PATIENT_SK.map((sk) => {
             const gruppe = alle.filter((p) => p.aktuelle_sichtung === sk);
@@ -585,10 +588,11 @@ export default function PersonenPage() {
               </div>
             );
           })}
-          {!alle.some(istPatient) && (
+          {!personenQuery.isLoading && !alle.some(istPatient) && (
             <Alert type="info" showIcon message="Keine Patienten in diesem Einsatz." />
           )}
         </Space>
+        </Spin>
       ) : (
         <Table
           rowKey="id"
