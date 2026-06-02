@@ -1,0 +1,21 @@
+@media print {
+  /* Alles ausblenden, außer dem markierten Druckbereich. */
+  body * {
+    visibility: hidden;
+  }
+  .lagebericht-print-root,
+  .lagebericht-print-root * {
+    visibility: visible;
+  }
+  .lagebericht-print-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 0;
+  }
+  /* Interaktive Elemente nie drucken. */
+  .lagebericht-no-print {
+    display: none !important;
+  }
+}

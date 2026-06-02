@@ -94,6 +94,12 @@ describe('LageberichtDetailPage', () => {
     expect(screen.queryByLabelText('Auftrag')).not.toBeInTheDocument();
   });
 
+  it('rendert einen markierten Druckbereich', async () => {
+    const { container } = setupDetail(lagebericht7Abschnitte);
+    await screen.findAllByText('Lagevortrag');
+    expect(container.querySelector('.lagebericht-print-root')).not.toBeNull();
+  });
+
   it('Freigeben öffnet einen Bestätigungsdialog', async () => {
     setupDetail({ ...lagebericht7Abschnitte, abschnitte: [
       { schluessel: 'auftrag', text: 'X' }, { schluessel: 'gefahren_schadenlage', text: '' },

@@ -13,6 +13,7 @@ import {
 import type { LageberichtAbschnitt, LageberichtAnzeige } from '../api/types';
 import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
 import { vorlage } from '../lageberichte/vorlagen';
+import './lageberichtPrint.css';
 
 export default function LageberichtDetailPage() {
   const { id, lbId } = useParams();
@@ -112,8 +113,9 @@ export default function LageberichtDetailPage() {
     });
 
   return (
-    <div>
+    <div className="lagebericht-print-root">
       <Breadcrumb
+        className="lagebericht-no-print"
         style={{ marginBottom: 12 }}
         items={[
           { title: <Link to="/einsaetze">Einsätze</Link> },
@@ -122,7 +124,7 @@ export default function LageberichtDetailPage() {
           { title: bericht.titel },
         ]}
       />
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
+      <Space className="lagebericht-no-print" style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
         <Space>
           <Typography.Title level={3} style={{ margin: 0 }}>
             {bericht.titel}
