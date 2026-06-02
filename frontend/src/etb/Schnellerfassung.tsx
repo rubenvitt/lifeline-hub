@@ -1,6 +1,7 @@
 import { Alert, Button, Card, Collapse, DatePicker, Form, Input, Select, Space } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { NeuerEintrag } from '../api/etb';
 import type { EinsatzAnzeige, EtbBaustein, EtbEintragAnzeige, EtbTyp, MeldeWeg } from '../api/types';
 import { ERFASSBARE_TYPEN, TYP_LABEL } from './typFarben';
@@ -36,6 +37,8 @@ const MELDEWEG_OPTIONEN: { value: MeldeWeg; label: string }[] = [
 export default function Schnellerfassung({ erfassen, berichtigungZu, onBerichtigungAbbrechen, bausteine, einsatz }: Props) {
   const [form] = Form.useForm<FormWerte>();
   const [sendet, setSendet] = useState(false);
+  const navigate = useNavigate();
+  const aktTyp = Form.useWatch('typ', form);
 
   // Im Berichtigungsmodus fokussiert das Inhaltsfeld; bei Moduswechsel Felder zurücksetzen.
   useEffect(() => {
@@ -111,6 +114,18 @@ export default function Schnellerfassung({ erfassen, berichtigungZu, onBerichtig
             Erfassen
           </Button>
         </Space>
+
+        {!berichtigungZu && aktTyp === 'lage' && (
+          <Form.Item style={{ marginBottom: 8 }}>
+            <Button
+              type="link"
+              style={{ paddingLeft: 0 }}
+              onClick={() => navigate(`/einsaetze/${einsatz.id}/lageberichte`)}
+            >
+              Als strukturierten Lagebericht erfassen →
+            </Button>
+          </Form.Item>
+        )}
 
         <Collapse
           ghost

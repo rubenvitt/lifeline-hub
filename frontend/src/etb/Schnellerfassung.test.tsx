@@ -37,6 +37,24 @@ describe('Schnellerfassung', () => {
     expect(arg.berichtigt_eintrag_id).toBeUndefined();
   });
 
+  it('zeigt bei Typ „Lage" den Sprung in den strukturierten Lagebericht', async () => {
+    renderMitProviders(
+      <Schnellerfassung
+        erfassen={vi.fn<(e: NeuerEintrag) => Promise<void>>().mockResolvedValue()}
+        berichtigungZu={null}
+        onBerichtigungAbbrechen={vi.fn()}
+        bausteine={[]}
+        einsatz={{ id: 7, bezeichnung: 'Test', stichwort: null, leitstellen_nr: null, einsatzort: null } as unknown as EinsatzAnzeige}
+      />,
+    );
+    // Standardtyp ist 'meldung' → kein Button
+    expect(screen.queryByRole('button', { name: /strukturierten Lagebericht/i })).not.toBeInTheDocument();
+    // Typ auf 'Lage' umstellen
+    await userEvent.click(screen.getByRole('combobox'));
+    await userEvent.click(await screen.findByText('Lage'));
+    expect(await screen.findByRole('button', { name: /strukturierten Lagebericht/i })).toBeInTheDocument();
+  });
+
   it('sendet im Berichtigungsmodus typ=berichtigung mit berichtigt_eintrag_id', async () => {
     const erfassen = vi.fn<(e: NeuerEintrag) => Promise<void>>().mockResolvedValue();
     renderMitProviders(
