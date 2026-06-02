@@ -10,6 +10,7 @@ pub mod einsatz;
 pub mod einsatzabschnitt;
 pub mod error;
 pub mod etb;
+pub mod etb_baustein;
 pub mod fahrzeug;
 pub mod katalog;
 pub mod live;
