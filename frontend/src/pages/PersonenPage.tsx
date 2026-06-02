@@ -550,7 +550,7 @@ export default function PersonenPage() {
 
       {(() => {
         const z = lagebildZaehlung(alle);
-        const patientenAnzahl = z.sk.sk1 + z.sk.sk2 + z.sk.sk3 + z.sk.sk4 + z.sk.tot;
+        const patientenAnzahl = PATIENT_SK.reduce((summe, k) => summe + z.sk[k], 0);
         const skTags = (Object.keys(z.sk) as Sichtungskategorie[])
           .filter((k) => z.sk[k] > 0)
           .map((k) => (
