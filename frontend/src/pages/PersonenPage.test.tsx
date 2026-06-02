@@ -226,6 +226,9 @@ describe('PersonenPage', () => {
     // unverletzt (R-005) und ungesichtet (R-001) sind KEINE Patienten:
     expect(screen.queryByText('R-005')).not.toBeInTheDocument();
     expect(screen.queryByText('R-001')).not.toBeInTheDocument();
+    // Achsen-Überlappung: verstorben+tot erscheint AUCH im Verstorben-Tab:
+    await userEvent.click(screen.getByRole('tab', { name: 'Verstorben' }));
+    expect(await screen.findByText('R-004')).toBeInTheDocument();
   });
 
   it('Patienten-Tab zeigt einen Leer-Hinweis, wenn niemand gesichtet ist', async () => {
@@ -262,6 +265,23 @@ describe('PersonenPage', () => {
     await userEvent.click(await screen.findByText('R-001'));
     const tags = await screen.findAllByText('Patient');
     expect(tags.length).toBeGreaterThan(0);
+  });
+
+  it('Detail-Drawer zeigt KEIN „Patient"-Tag bei unverletzter Person', async () => {
+    const unverletztPerson = { ...person, status: 'betroffen' as const,
+      aktuelle_sichtung: 'unverletzt' as const, aktuelle_sichtung_at: '2026-05-27 10:00:00' };
+    const detail = {
+      ...unverletztPerson,
+      aktueller_verbleib: null, aktuelle_uhs_id: null, aktueller_platz_id: null,
+      sichtungen: [], notizen: [], verbleib: [], abgleiche: [],
+    } as PersonDetail;
+    render(einsatzAktiv, [unverletztPerson]);
+    server.use(http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(detail)));
+    await userEvent.click(await screen.findByRole('tab', { name: 'Alle' }));
+    await userEvent.click(await screen.findByText('R-001'));
+    // Drawer offen (Stammdaten sichtbar), aber kein Patient-Tag:
+    expect(await screen.findByText('Stammdaten')).toBeInTheDocument();
+    expect(screen.queryByText('Patient')).not.toBeInTheDocument();
   });
 
   it('zeigt den „Als Geschädigte bei Schäden"-Block im Personen-Drawer', async () => {

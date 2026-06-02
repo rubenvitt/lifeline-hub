@@ -21,14 +21,15 @@ const SK_META: Record<Sichtungskategorie, { label: string; color: string }> = {
   unverletzt: { label: 'unverletzt', color: 'default' },
 };
 
+/** Triage-Reihenfolge der Patienten-Abschnitte (SK I zuerst, tot zuletzt).
+ *  Single Source of Truth dafür, welche Sichtungen einen „Patienten" ausmachen. */
+const PATIENT_SK: Sichtungskategorie[] = ['sk1', 'sk2', 'sk3', 'sk4', 'tot'];
+
 /** Patient = gesichtet mit behandlungsrelevanter Kategorie (SK I–IV oder tot);
  *  unverletzt und ungesichtet zählen nicht (LFH-10, rein medizinische Achse). */
 function istPatient(p: Person): boolean {
-  return p.aktuelle_sichtung != null && p.aktuelle_sichtung !== 'unverletzt';
+  return p.aktuelle_sichtung != null && PATIENT_SK.includes(p.aktuelle_sichtung);
 }
-
-/** Triage-Reihenfolge der Patienten-Abschnitte (SK I zuerst, tot zuletzt). */
-const PATIENT_SK: Sichtungskategorie[] = ['sk1', 'sk2', 'sk3', 'sk4', 'tot'];
 
 /** Zählt je SK-Kategorie + Gruppen „ungesichtet" und „unverletzt" (Spec-Drei-Teilung). */
 function lagebildZaehlung(alle: Person[]): { sk: Record<Sichtungskategorie, number>; ungesichtet: number } {
