@@ -159,12 +159,12 @@ pub async fn aktualisiere(
             zeitstand  = CASE WHEN ? THEN ? ELSE zeitstand END, \
             abschnitte = CASE WHEN ? THEN ? ELSE abschnitte END, \
             aktualisiert_at = datetime('now') \
-         WHERE id = ? AND einsatz_id = ?",
+         WHERE id = ? AND einsatz_id = ? AND status = ?",
     )
     .bind(patch.titel.is_some()).bind(patch.titel)
     .bind(patch.zeitstand.is_some()).bind(patch.zeitstand)
     .bind(abschnitte_json.is_some()).bind(abschnitte_json.as_deref())
-    .bind(id).bind(einsatz_id)
+    .bind(id).bind(einsatz_id).bind(STATUS_ENTWURF)
     .execute(pool)
     .await?
     .rows_affected();
@@ -352,6 +352,24 @@ mod tests {
         }).await.unwrap();
         assert_eq!(upd.titel, "Neu");
         assert_eq!(upd.abschnitte, neu);
+    }
+
+    #[tokio::test]
+    async fn aktualisiere_nach_freigabe_ist_notfound() {
+        // DB-Guard (AND status='entwurf'): ein spätes PATCH darf einen bereits
+        // freigegebenen Bericht nicht überschreiben (Race-Absicherung).
+        let pool = crate::db::test_pool().await;
+        let (einsatz, ersteller) = setup(&pool).await;
+        let lb = anlegen(&pool, einsatz, "freitext", "X", "2026-06-02 10:00:00", ersteller).await.unwrap();
+        let gefuellt = vec![Abschnitt { schluessel: "text".into(), text: "Inhalt".into() }];
+        aktualisiere(&pool, einsatz, lb.id, LageberichtPatch { titel: None, zeitstand: None, abschnitte: Some(&gefuellt) }).await.unwrap();
+        freigeben(&pool, einsatz, lb.id, ersteller, "render", "2026-06-02 10:00:00").await.unwrap();
+
+        let nachtrag = vec![Abschnitt { schluessel: "text".into(), text: "Manipuliert".into() }];
+        let err = aktualisiere(&pool, einsatz, lb.id, LageberichtPatch {
+            titel: Some("Hack"), zeitstand: None, abschnitte: Some(&nachtrag),
+        }).await.unwrap_err();
+        assert!(matches!(err, crate::error::AppError::NotFound));
     }
 
     #[tokio::test]
