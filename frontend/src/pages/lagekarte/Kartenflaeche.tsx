@@ -6,8 +6,20 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import type { KarteMarker } from './marker';
 import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
 import { createZeichnung, type Zeichnung, type ZeichenModus } from './zeichnen';
-import type { ZoneStil } from './zonenStil';
 import { wendeKartenDatenAn } from './kartenDaten';
+import {
+  baueFlaechenFc,
+  baueZonenFc,
+  planeReAnlegenNachStyle,
+  sorgeFuerAbschnittLayer,
+  sorgeFuerZonenLayer,
+  type FlaechenFeatureCollection,
+  type ZonenFeatureCollection,
+  type ZoneFeature,
+} from './kartenLayer';
+
+// Re-Export: LagekartePage importiert ZoneFeature weiterhin aus Kartenflaeche.
+export type { ZoneFeature };
 
 // pmtiles-Protokoll genau einmal global registrieren.
 let pmtilesRegistriert = false;
@@ -49,127 +61,6 @@ export interface KartenflaecheProps {
   onZoneKlick?: (id: number) => void;
 }
 
-export interface ZoneFeature {
-  id: number;
-  geometrie: GeoJsonGeometry;
-  label: string | null;
-  stil: ZoneStil;
-}
-
-type FlaechenFeatureCollection = {
-  type: 'FeatureCollection';
-  features: {
-    type: 'Feature';
-    id: number;
-    properties: { id: number; label: string };
-    geometry: GeoJsonPolygon;
-  }[];
-};
-
-/** Idempotent: legt Source + fill/line-Layer für Abschnittsflächen an (Style-Wechsel entfernt sie). */
-function sorgeFuerAbschnittLayer(map: maplibregl.Map, daten: FlaechenFeatureCollection) {
-  if (!map.getSource('abschnitte')) {
-    map.addSource('abschnitte', { type: 'geojson', data: daten as never });
-  }
-  if (!map.getLayer('abschnitte-fill')) {
-    map.addLayer({
-      id: 'abschnitte-fill',
-      type: 'fill',
-      source: 'abschnitte',
-      paint: { 'fill-color': '#722ed1', 'fill-opacity': 0.15 },
-    });
-  }
-  if (!map.getLayer('abschnitte-line')) {
-    map.addLayer({
-      id: 'abschnitte-line',
-      type: 'line',
-      source: 'abschnitte',
-      paint: { 'line-color': '#722ed1', 'line-width': 2 },
-    });
-  }
-}
-
-function baueFlaechenFc(flaechen: KartenflaecheProps['flaechen']): FlaechenFeatureCollection {
-  return {
-    type: 'FeatureCollection',
-    features: (flaechen ?? []).map((f) => ({
-      type: 'Feature',
-      id: f.id,
-      properties: { id: f.id, label: f.label },
-      geometry: f.polygon,
-    })),
-  };
-}
-
-type ZonenFeatureCollection = {
-  type: 'FeatureCollection';
-  features: Array<{
-    type: 'Feature';
-    id: number;
-    properties: {
-      id: number;
-      label: string;
-      fillColor: string;
-      fillOpacity: number;
-      lineColor: string;
-      lineWidth: number;
-    };
-    geometry: GeoJsonGeometry;
-  }>;
-};
-
-function baueZonenFc(zonen: ZoneFeature[] | undefined): ZonenFeatureCollection {
-  return {
-    type: 'FeatureCollection',
-    features: (zonen ?? []).map((z) => ({
-      type: 'Feature',
-      id: z.id,
-      properties: {
-        id: z.id,
-        label: z.label ?? '',
-        fillColor: z.stil.fillColor,
-        fillOpacity: z.stil.fillOpacity,
-        lineColor: z.stil.lineColor,
-        lineWidth: z.stil.lineWidth,
-      },
-      geometry: z.geometrie,
-    })),
-  };
-}
-
-/** Idempotent: Source + fill/line/label-Layer für Zonen (datengetriebenes Paint; Style-Wechsel entfernt sie). */
-function sorgeFuerZonenLayer(map: maplibregl.Map, daten: ZonenFeatureCollection) {
-  if (!map.getSource('zonen')) {
-    map.addSource('zonen', { type: 'geojson', data: daten as never });
-  }
-  if (!map.getLayer('zonen-fill')) {
-    map.addLayer({
-      id: 'zonen-fill',
-      type: 'fill',
-      source: 'zonen',
-      filter: ['==', ['geometry-type'], 'Polygon'],
-      paint: { 'fill-color': ['get', 'fillColor'], 'fill-opacity': ['get', 'fillOpacity'] },
-    });
-  }
-  if (!map.getLayer('zonen-line')) {
-    map.addLayer({
-      id: 'zonen-line',
-      type: 'line',
-      source: 'zonen',
-      paint: { 'line-color': ['get', 'lineColor'], 'line-width': ['get', 'lineWidth'] },
-    });
-  }
-  if (!map.getLayer('zonen-label')) {
-    map.addLayer({
-      id: 'zonen-label',
-      type: 'symbol',
-      source: 'zonen',
-      layout: { 'text-field': ['get', 'label'], 'text-size': 12, 'symbol-placement': 'point' },
-      paint: { 'text-color': '#1f1f1f', 'text-halo-color': '#fff', 'text-halo-width': 1.5 },
-    });
-  }
-}
-
 export default function Kartenflaeche({
   style, markers, onKarteKlick, onMarkerKlick, flyToZiel, onStyleFehler, attribution,
   flaechen, zeichnen, onFlaecheGezeichnet, onFlaecheKlick,
@@ -188,6 +79,10 @@ export default function Kartenflaeche({
   const flaechenDatenRef = useRef<FlaechenFeatureCollection>(baueFlaechenFc(flaechen));
   // Aktuelle Zonendaten; analog flaechenDatenRef für die Re-Anlage nach setStyle.
   const zonenDatenRef = useRef<ZonenFeatureCollection>(baueZonenFc(zonen));
+  // Zuletzt angewandter Style. Der Konstruktor wendet den initialen Style an → der
+  // [style]-Effekt soll NUR auf echte Wechsel reagieren (sonst lädt diff:false beim
+  // Mount den Style unnötig komplett neu).
+  const angewandterStyleRef = useRef(style);
   // Zeichen-Controller (terra-draw) über Renders hinweg.
   const drawRef = useRef<Zeichnung | null>(null);
   // Eigener Zeichen-Controller für Zonen (Polygon ODER Linie).
@@ -215,13 +110,6 @@ export default function Kartenflaeche({
       sorgeFuerAbschnittLayer(map, flaechenDatenRef.current);
       sorgeFuerZonenLayer(map, zonenDatenRef.current);
     });
-    // Nach setStyle (Basemap-/Theme-Wechsel) sind Source/Layer weg → idempotent re-anlegen
-    // und die zuletzt bekannten Flächendaten wieder einspielen.
-    map.on('styledata', () => {
-      if (!map.isStyleLoaded()) return;
-      sorgeFuerAbschnittLayer(map, flaechenDatenRef.current);
-      sorgeFuerZonenLayer(map, zonenDatenRef.current);
-    });
     mapRef.current = map;
     return () => {
       map.remove(); // zerstört auch die AttributionControl
@@ -236,9 +124,21 @@ export default function Kartenflaeche({
   // Style wechseln (Basemap-Umschalter / Theme). Bewusst KEIN Reset von
   // stilGeladenRef: ein Style-Ladefehler nach manuellem Wechsel wird NICHT über
   // onStyleFehler gemeldet (Reset würde transiente Tile-Errors als Fehler werten).
+  //
+  // WICHTIG `diff: false`: per Default difft setStyle und ist bei URL-/Vektor-Styles
+  // ASYNCHRON (erst Fetch, dann Diff). In diesem Fenster liefert isStyleLoaded() noch
+  // den ALTEN Style als „geladen" → der render-Poll würde zu früh laufen (Sources noch
+  // da, No-Op), und der nachgelagerte Diff wischt unsere Layer weg → Zeichnungen
+  // verschwinden NUR bei Vektor-Basemaps. `diff: false` setzt synchron einen frischen,
+  // ungeladenen Style (isStyleLoaded() sofort false) → der Poll vertagt zuverlässig auf
+  // den ersten geladenen Frame und legt Abschnitte/Zonen neu an — für ALLE Style-Typen.
   useEffect(() => {
     const map = mapRef.current;
-    if (map) map.setStyle(style);
+    if (!map) return;
+    if (style === angewandterStyleRef.current) return; // Mount: Konstruktor hat ihn schon
+    angewandterStyleRef.current = style;
+    map.setStyle(style, { diff: false });
+    planeReAnlegenNachStyle(map, () => flaechenDatenRef.current, () => zonenDatenRef.current);
   }, [style]);
 
   // AttributionControl je nach aktivem View neu setzen (config-autoritativ). MapLibre
