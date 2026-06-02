@@ -12,6 +12,7 @@ pub mod error;
 pub mod etb;
 pub mod fahrzeug;
 pub mod katalog;
+pub mod lage_zone;
 pub mod live;
 pub mod material;
 pub mod personal;

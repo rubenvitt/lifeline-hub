@@ -3,6 +3,9 @@ import { useState } from 'react';
 import type { KarteMarker, NichtVerortet } from './marker';
 import type { BasemapModus } from './basemapStil';
 import type { OnlineStyle } from '../../api/karte';
+import type { ZoneTyp } from '../../api/types';
+import type { ZeichenModus } from './zeichnen';
+import { ZONE_TYPEN } from './zonenStil';
 
 export interface LayerSichtbar {
   einsatzort: boolean;
@@ -12,6 +15,7 @@ export interface LayerSichtbar {
   fahrzeug: boolean;
   fuehrung: boolean;
   abschnitt: boolean;
+  zone: boolean;
 }
 
 /** Platzierbare Punkt-Typen (Fläche/Abschnitt läuft über onAbschnittZeichnenStart). */
@@ -34,6 +38,7 @@ export interface SidebarProps {
   onPlatzierenStart: (ziel: { typ: PlatzierenPunktTyp; id: number }) => void;
   onPlatzierenAbbrechen: () => void;
   onAbschnittZeichnenStart: (id: number) => void;
+  onZoneZeichnenStart: (entwurf: { typ: ZoneTyp; modus: ZeichenModus; farbe?: string }) => void;
   onKoordinateEingeben: (lat: number, lon: number) => void;
   einsatzortVerortet: boolean;
   onEinsatzortPlatzieren: () => void;
@@ -220,8 +225,50 @@ export default function Sidebar(props: SidebarProps) {
           <Space>
             <Switch checked={props.layer.abschnitt} onChange={(v) => props.onLayerToggle('abschnitt', v)} /> Abschnitte
           </Space>
+          <Space>
+            <Switch checked={props.layer.zone} onChange={(v) => props.onLayerToggle('zone', v)} /> Zonen
+          </Space>
         </Space>
       </Card>
+
+      {darfSchreiben && (
+        <Card size="small" title="Zone zeichnen" style={{ marginBottom: 12 }}>
+          <Space direction="vertical" style={{ width: '100%' }}>
+            {ZONE_TYPEN.map((t) => {
+              if (t.geometrie === 'beides') {
+                return (
+                  <Space key={t.typ}>
+                    <Typography.Text>{t.label}</Typography.Text>
+                    <Button
+                      size="small"
+                      onClick={() => props.onZoneZeichnenStart({ typ: t.typ, modus: 'polygon', farbe: '#1677ff' })}
+                    >
+                      Fläche
+                    </Button>
+                    <Button
+                      size="small"
+                      onClick={() => props.onZoneZeichnenStart({ typ: t.typ, modus: 'linie', farbe: '#1677ff' })}
+                    >
+                      Linie
+                    </Button>
+                  </Space>
+                );
+              }
+              const modus: ZeichenModus = t.geometrie === 'LineString' ? 'linie' : 'polygon';
+              return (
+                <Button
+                  key={t.typ}
+                  size="small"
+                  block
+                  onClick={() => props.onZoneZeichnenStart({ typ: t.typ, modus })}
+                >
+                  {t.label} zeichnen
+                </Button>
+              );
+            })}
+          </Space>
+        </Card>
+      )}
 
       <Card size="small" title="Basemap">
         <Radio.Group
