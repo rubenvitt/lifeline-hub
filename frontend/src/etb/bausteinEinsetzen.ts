@@ -10,24 +10,35 @@ export interface BausteinFelder {
   veranlassung?: string;
 }
 
-/** Liefert für jeden Auto-Whitelist-Platzhalter den Wert, oder null wenn nicht auflösbar. */
+/** Metadaten eines vorkonfigurierten (automatisch befüllten) Platzhalters. */
+export interface AutoPlatzhalter {
+  /** Name innerhalb der geschweiften Klammern, z. B. `uhrzeit` für `{uhrzeit}`. */
+  name: string;
+  /** Kurzbeschreibung des automatisch eingesetzten Werts (für die Admin-UI). */
+  beschreibung: string;
+  /** Liefert den aktuellen Wert oder null/undefined, wenn er für den Einsatz fehlt. */
+  wert: (einsatz: EinsatzAnzeige) => string | null | undefined;
+}
+
+/**
+ * Vorkonfigurierte Platzhalter, die beim Einsetzen automatisch aus Datum/Uhrzeit
+ * bzw. dem Einsatz befüllt werden. Single Source of Truth für Engine UND Admin-UI.
+ */
+export const AUTO_PLATZHALTER: AutoPlatzhalter[] = [
+  { name: 'datum', beschreibung: 'Aktuelles Datum (TT.MM.JJJJ)', wert: () => dayjs().format('DD.MM.YYYY') },
+  { name: 'uhrzeit', beschreibung: 'Aktuelle Uhrzeit (HH:MM)', wert: () => dayjs().format('HH:mm') },
+  { name: 'einsatzort', beschreibung: 'Einsatzort', wert: (e) => e.einsatzort },
+  { name: 'stichwort', beschreibung: 'Stichwort', wert: (e) => e.stichwort },
+  { name: 'einsatz', beschreibung: 'Einsatzbezeichnung', wert: (e) => e.bezeichnung },
+  { name: 'einsatznr', beschreibung: 'Leitstellen-Nummer', wert: (e) => e.leitstellen_nr },
+];
+
+const AUTO_MAP = new Map(AUTO_PLATZHALTER.map((p) => [p.name, p.wert]));
+
+/** Liefert für jeden Auto-Whitelist-Platzhalter den Wert, oder undefined wenn kein Auto-Platzhalter. */
 function autoWert(name: string, einsatz: EinsatzAnzeige): string | null | undefined {
-  switch (name) {
-    case 'datum':
-      return dayjs().format('DD.MM.YYYY');
-    case 'uhrzeit':
-      return dayjs().format('HH:mm');
-    case 'einsatzort':
-      return einsatz.einsatzort;
-    case 'stichwort':
-      return einsatz.stichwort;
-    case 'einsatz':
-      return einsatz.bezeichnung;
-    case 'einsatznr':
-      return einsatz.leitstellen_nr;
-    default:
-      return undefined; // kein Auto-Platzhalter
-  }
+  const fn = AUTO_MAP.get(name);
+  return fn ? fn(einsatz) : undefined;
 }
 
 function istLeer(wert: string | null | undefined): boolean {

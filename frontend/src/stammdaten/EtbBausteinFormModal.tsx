@@ -1,10 +1,11 @@
-import { App, Form, Input, InputNumber, Modal, Select } from 'antd';
+import { App, Form, Input, InputNumber, Modal, Select, Typography } from 'antd';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
 import { aktualisiereBaustein, legeBausteinAn, type BausteinEingabe } from '../api/etbBaustein';
 import type { EtbBaustein, EtbTyp, MeldeWeg } from '../api/types';
 import { ERFASSBARE_TYPEN, TYP_LABEL } from '../etb/typFarben';
+import { AUTO_PLATZHALTER } from '../etb/bausteinEinsetzen';
 
 interface FormWerte {
   label: string;
@@ -97,6 +98,18 @@ export default function EtbBausteinFormModal({
           label="Inhalt (Platzhalter wie {einheit} erlaubt)"
           name="inhalt"
           rules={[{ required: true, whitespace: true }]}
+          extra={
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              Vorkonfigurierte Platzhalter werden beim Einsetzen automatisch befüllt:{' '}
+              {AUTO_PLATZHALTER.map((p) => (
+                <span key={p.name}>
+                  <code>{`{${p.name}}`}</code> ({p.beschreibung}){' '}
+                </span>
+              ))}
+              . Beliebige weitere Platzhalter wie <code>{'{einheit}'}</code> werden beim Einsetzen
+              abgefragt. Gilt auch für die Veranlassung.
+            </Typography.Text>
+          }
         >
           <Input.TextArea rows={2} placeholder="Vorlagentext mit {platzhalter}" />
         </Form.Item>
