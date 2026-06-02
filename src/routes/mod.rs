@@ -22,6 +22,7 @@ pub mod material;
 pub mod health;
 pub mod organisation;
 pub mod karte;
+pub mod lage_zone;
 pub mod personal;
 pub mod personal_status;
 pub mod qualifikation;

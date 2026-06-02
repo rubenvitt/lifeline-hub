@@ -58,11 +58,29 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
+// Web-Storage-Polyfill: jsdom liefert hier kein localStorage, und Node 26 stellt sein
+// experimentelles globales localStorage ohne `--localstorage-file` als undefined bereit
+// (→ überschattet jsdom). Guard: nur setzen, wenn nichts Brauchbares vorhanden ist.
+if (globalThis.localStorage == null) {
+  class InMemoryStorage implements Storage {
+    private map = new Map<string, string>();
+    get length() { return this.map.size; }
+    clear() { this.map.clear(); }
+    getItem(key: string) { return this.map.has(key) ? this.map.get(key)! : null; }
+    key(index: number) { return Array.from(this.map.keys())[index] ?? null; }
+    removeItem(key: string) { this.map.delete(key); }
+    setItem(key: string, value: string) { this.map.set(key, String(value)); }
+  }
+  const storage = new InMemoryStorage();
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage });
+  if (globalThis.window) Object.defineProperty(globalThis.window, 'localStorage', { configurable: true, value: storage });
+}
+
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
   cleanup();
   server.resetHandlers();
-  localStorage.clear();
+  localStorage.clear(); // Persistenz (z. B. gemerkte Basemap/UHS) nicht zwischen Tests lecken lassen
 });
 afterAll(() => server.close());
 

@@ -208,6 +208,82 @@ describe('PersonenPage', () => {
     expect(screen.getByText(/Rex/)).toBeInTheDocument();
   });
 
+  it('Patienten-Tab gruppiert SK I–IV + tot in Abschnitte, ohne unverletzt/ungesichtet', async () => {
+    const sk2 = { ...person, id: 12, registrier_nr: 3, status: 'betroffen' as const,
+      aktuelle_sichtung: 'sk2' as const, aktuelle_sichtung_at: '2026-05-27 09:30:00' };
+    const totVerstorben = { ...person, id: 13, registrier_nr: 4, status: 'verstorben' as const,
+      aktuelle_sichtung: 'tot' as const, aktuelle_sichtung_at: '2026-05-27 09:40:00' };
+    const unverletzt = { ...person, id: 14, registrier_nr: 5, status: 'betroffen' as const,
+      aktuelle_sichtung: 'unverletzt' as const, aktuelle_sichtung_at: '2026-05-27 09:50:00' };
+    render(einsatzAktiv, [person, sk2, totVerstorben, unverletzt]);
+    await screen.findByText('R-001'); // ungesichtete Person im „Neu"-Tab
+    await userEvent.click(screen.getByRole('tab', { name: 'Patienten' }));
+    // SK-II-Abschnitt + tot-Abschnitt: beide Patienten sichtbar:
+    expect(await screen.findByText('R-003')).toBeInTheDocument();
+    expect(screen.getByText('R-004')).toBeInTheDocument();
+    // Zwei Abschnitte mit je einem Patienten:
+    expect(screen.getAllByText('1 Patient')).toHaveLength(2);
+    // unverletzt (R-005) und ungesichtet (R-001) sind KEINE Patienten:
+    expect(screen.queryByText('R-005')).not.toBeInTheDocument();
+    expect(screen.queryByText('R-001')).not.toBeInTheDocument();
+    // Achsen-Überlappung: verstorben+tot erscheint AUCH im Verstorben-Tab:
+    await userEvent.click(screen.getByRole('tab', { name: 'Verstorben' }));
+    expect(await screen.findByText('R-004')).toBeInTheDocument();
+  });
+
+  it('Patienten-Tab zeigt einen Leer-Hinweis, wenn niemand gesichtet ist', async () => {
+    render(einsatzAktiv, [person, unbekannt]); // beide ungesichtet
+    await screen.findByText('R-001');
+    await userEvent.click(screen.getByRole('tab', { name: 'Patienten' }));
+    expect(await screen.findByText(/Keine Patienten/)).toBeInTheDocument();
+  });
+
+  it('Lagebild-Streifen zeigt „Patienten: N" (SK I–IV + tot)', async () => {
+    const sk2 = { ...person, id: 12, registrier_nr: 3, status: 'betroffen' as const,
+      aktuelle_sichtung: 'sk2' as const, aktuelle_sichtung_at: '2026-05-27 09:30:00' };
+    const tot = { ...person, id: 13, registrier_nr: 4, status: 'verstorben' as const,
+      aktuelle_sichtung: 'tot' as const, aktuelle_sichtung_at: '2026-05-27 09:40:00' };
+    const unverletzt = { ...person, id: 14, registrier_nr: 5, status: 'betroffen' as const,
+      aktuelle_sichtung: 'unverletzt' as const, aktuelle_sichtung_at: '2026-05-27 09:50:00' };
+    render(einsatzAktiv, [person, sk2, tot, unverletzt]);
+    await screen.findByText('R-001');
+    // Patienten = sk2 + tot = 2 (unverletzt + ungesichtet zählen nicht):
+    expect(await screen.findByText(/Patienten:\s*2/)).toBeInTheDocument();
+  });
+
+  it('Detail-Drawer zeigt das „Patient"-Tag bei gesichteter Person', async () => {
+    const patient = { ...person, status: 'betroffen' as const,
+      aktuelle_sichtung: 'sk1' as const, aktuelle_sichtung_at: '2026-05-27 10:00:00' };
+    const detail = {
+      ...patient,
+      aktueller_verbleib: null, aktuelle_uhs_id: null, aktueller_platz_id: null,
+      sichtungen: [], notizen: [], verbleib: [], abgleiche: [],
+    } as PersonDetail;
+    render(einsatzAktiv, [patient]);
+    server.use(http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(detail)));
+    await userEvent.click(await screen.findByRole('tab', { name: 'Alle' }));
+    await userEvent.click(await screen.findByText('R-001'));
+    const tags = await screen.findAllByText('Patient');
+    expect(tags.length).toBeGreaterThan(0);
+  });
+
+  it('Detail-Drawer zeigt KEIN „Patient"-Tag bei unverletzter Person', async () => {
+    const unverletztPerson = { ...person, status: 'betroffen' as const,
+      aktuelle_sichtung: 'unverletzt' as const, aktuelle_sichtung_at: '2026-05-27 10:00:00' };
+    const detail = {
+      ...unverletztPerson,
+      aktueller_verbleib: null, aktuelle_uhs_id: null, aktueller_platz_id: null,
+      sichtungen: [], notizen: [], verbleib: [], abgleiche: [],
+    } as PersonDetail;
+    render(einsatzAktiv, [unverletztPerson]);
+    server.use(http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(detail)));
+    await userEvent.click(await screen.findByRole('tab', { name: 'Alle' }));
+    await userEvent.click(await screen.findByText('R-001'));
+    // Drawer offen (Stammdaten sichtbar), aber kein Patient-Tag:
+    expect(await screen.findByText('Stammdaten')).toBeInTheDocument();
+    expect(screen.queryByText('Patient')).not.toBeInTheDocument();
+  });
+
   it('zeigt den „Als Geschädigte bei Schäden"-Block im Personen-Drawer', async () => {
     const detail = { ...person, aktuelle_sichtung: null, aktuelle_sichtung_at: null,
       aktueller_verbleib: null, aktuelle_uhs_id: null, aktueller_platz_id: null,

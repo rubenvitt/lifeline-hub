@@ -13,6 +13,7 @@ pub mod etb;
 pub mod etb_baustein;
 pub mod fahrzeug;
 pub mod katalog;
+pub mod lage_zone;
 pub mod live;
 pub mod material;
 pub mod personal;

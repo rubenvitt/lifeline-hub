@@ -16,6 +16,7 @@ import LagekartePage from './LagekartePage';
 vi.mock('./lagekarte/Kartenflaeche', () => ({
   default: (props: Partial<KartenflaecheProps>) => (
     <div data-testid="kartenflaeche-stub">
+      <div data-testid="attribution">{props.attribution ?? ''}</div>
       <button onClick={() => props.onKarteKlick?.({ lng: 8.6, lat: 50.1 })}>karte-klick</button>
       {(props.markers ?? []).map((m) => (
         <button key={m.schluessel} onClick={() => props.onMarkerKlick?.(m.schluessel)}>
@@ -41,15 +42,37 @@ vi.mock('./lagekarte/Kartenflaeche', () => ({
           flaeche-{f.id}
         </button>
       ))}
+      {/* Zone zeichnen: feuert je nach Modus eine Linien- oder Polygon-Geometrie. */}
+      {props.zoneZeichnen && (
+        <button
+          onClick={() =>
+            props.onZoneGezeichnet?.(
+              props.zoneZeichnen === 'linie'
+                ? { type: 'LineString', coordinates: [[8.6, 50.1], [8.7, 50.2]] }
+                : { type: 'Polygon', coordinates: [[[8.6, 50.1], [8.7, 50.1], [8.7, 50.2], [8.6, 50.1]]] },
+            )
+          }
+        >
+          zone-fertig
+        </button>
+      )}
+      {/* Klick auf eine gerenderte Zone → onZoneKlick. */}
+      {(props.zonen ?? []).map((z) => (
+        <button key={z.id} onClick={() => props.onZoneKlick?.(z.id)}>
+          zone-{z.id}
+        </button>
+      ))}
     </div>
   ),
 }));
 
+const eventSourceUrls: string[] = [];
 class FakeEventSource {
   url: string;
   closed = false;
   constructor(url: string) {
     this.url = url;
+    eventSourceUrls.push(url);
   }
   addEventListener() {}
   removeEventListener() {}
@@ -57,7 +80,10 @@ class FakeEventSource {
     this.closed = true;
   }
 }
-beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
+beforeEach(() => {
+  eventSourceUrls.length = 0;
+  vi.stubGlobal('EventSource', FakeEventSource);
+});
 afterEach(() => vi.unstubAllGlobals());
 
 const EINSATZ = {
@@ -181,7 +207,7 @@ const ORG_DRK = { id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' };
 
 function basisHandler(
   extra: ReturnType<typeof http.get>[] = [],
-  config: KarteServerConfig = { online_style_url: null, pmtiles_verfuegbar: false, pmtiles_url: null },
+  config: KarteServerConfig = { online_styles: [], pmtiles_verfuegbar: false, pmtiles_url: null },
 ) {
   // extra ZUERST: MSW nimmt den ersten Treffer → Tests können einzelne GET-Defaults
   // (z. B. /einheiten) gezielt überschreiben, ohne die übrigen Defaults anzufassen.
@@ -193,6 +219,7 @@ function basisHandler(
     http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/zonen', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/karte/fuehrungskraefte', () => HttpResponse.json([])),
     http.get('/api/organisation', () => HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null })),
     http.get('/api/karte/config', () => HttpResponse.json(config)),
@@ -218,6 +245,18 @@ describe('LagekartePage', () => {
     // Badge-Knoten treffen, nicht eine zufällige "(1)"-Zähltext-Stelle.
     const badge = container.querySelector('.ant-badge-count');
     expect(badge).toHaveTextContent('1');
+  });
+
+  it('öffnet genau EINE SSE-Verbindung für den ganzen Einsatz (HTTP/1.1-6-Verbindungslimit)', async () => {
+    // Regression: zuvor öffnete die Seite 6 EventSources (uhs/schaeden/einheiten/
+    // fahrzeuge/abschnitte/zonen) → bei HTTP/1.1 sind alle 6 Origin-Verbindungen
+    // belegt, jeder weitere Request (z. B. ein Zonen-POST) hängt endlos.
+    basisHandler();
+    renderSeite();
+    expect(await screen.findByText('⚠ Nicht verortet')).toBeInTheDocument();
+    expect(eventSourceUrls).toHaveLength(1);
+    expect(eventSourceUrls[0]).toContain('/api/einsaetze/1/');
+    expect(eventSourceUrls[0]).toContain('/stream');
   });
 
   it('platziert ein Objekt: Objekt wählen → Karten-Klick → PATCH mit lat/lon', async () => {
@@ -267,7 +306,7 @@ describe('LagekartePage', () => {
 
   it('Basemap-Umschalter: von Online auf Blind wechseln, Marker bleiben sichtbar', async () => {
     basisHandler([], {
-      online_style_url: 'https://x/style.json',
+      online_styles: [{ name: 'Online', url: 'https://x/style.json', typ: 'vektor', attribution: '© X' }],
       pmtiles_verfuegbar: true,
       pmtiles_url: '/api/karte/tiles.pmtiles',
     });
@@ -306,7 +345,7 @@ describe('LagekartePage', () => {
 
   it('Basemap-Umschalter: bei verfügbarer Config sind passende Buttons aktiv und kein Blind-Hinweis', async () => {
     basisHandler([], {
-      online_style_url: 'https://x/style.json',
+      online_styles: [{ name: 'Online', url: 'https://x/style.json', typ: 'vektor', attribution: '© X' }],
       pmtiles_verfuegbar: true,
       pmtiles_url: '/api/karte/tiles.pmtiles',
     });
@@ -320,7 +359,7 @@ describe('LagekartePage', () => {
 
   it('Basemap-Umschalter: nur Offline konfiguriert → Online disabled, Offline aktiv', async () => {
     basisHandler([], {
-      online_style_url: null,
+      online_styles: [],
       pmtiles_verfuegbar: true,
       pmtiles_url: '/api/karte/tiles.pmtiles',
     });
@@ -410,5 +449,107 @@ describe('LagekartePage', () => {
     await user.click(await screen.findByText('marker-einheit-1'));
     const link = await screen.findByRole('link', { name: /Im Fach-Modul öffnen/ });
     expect(link).toHaveAttribute('href', '/einsaetze/1/einheiten');
+  });
+
+  it('Online-Sub-Switcher: zwischen zwei Views wechseln aktualisiert die Attribution', async () => {
+    basisHandler([], {
+      online_styles: [
+        { name: 'Liberty', url: 'https://x/liberty', typ: 'vektor', attribution: '© Liberty' },
+        { name: 'TopPlus', url: 'https://x/{z}/{y}/{x}.png', typ: 'raster', attribution: '© BKG' },
+      ],
+      pmtiles_verfuegbar: false,
+      pmtiles_url: null,
+    });
+    const user = userEvent.setup();
+    renderSeite();
+    await screen.findByText('marker-schaden-9');
+    // Default-View ist der erste (Liberty) → dessen Attribution liegt an.
+    expect(screen.getByTestId('attribution')).toHaveTextContent('© Liberty');
+    // Sub-Switcher (Select) öffnen und TopPlus wählen. Es gibt nur EINE Combobox auf der
+    // Seite (die InputNumber-Felder sind spinbutton) → Query ohne name ist eindeutig.
+    // Option über `.ant-select-item-option` abgrenzen (etabliertes Muster, da der Text
+    // auch im ausgewählten Selektor stehen kann).
+    await user.click(screen.getByRole('combobox'));
+    const option = (await screen.findAllByText('TopPlus')).find((el) =>
+      el.closest('.ant-select-item-option'),
+    );
+    await user.click(option!);
+    await waitFor(() => expect(screen.getByTestId('attribution')).toHaveTextContent('© BKG'));
+  });
+
+  // --- L‑3: Gefahren- & Absperrzonen ----------------------------------------
+
+  it('zeichnet eine Polygon-Zone: Typ Gefahrengebiet → zeichnen → POST mit geometrie_typ Polygon', async () => {
+    let body: { typ?: string; geometrie_typ?: string; geometrie?: string } | null = null;
+    basisHandler([
+      http.post('/api/einsaetze/1/zonen', async ({ request }) => {
+        body = (await request.json()) as typeof body;
+        return HttpResponse.json({ id: 5, einsatz_id: 1, typ: body!.typ, geometrie_typ: body!.geometrie_typ, geometrie: body!.geometrie, label: null, farbe: null, notiz: null, erstellt_von: 1, erstellt_at: '', geaendert_at: '' });
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await screen.findByText('zone-fertig'));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body!.typ).toBe('gefahrengebiet');
+    expect(body!.geometrie_typ).toBe('Polygon');
+    expect(JSON.parse(body!.geometrie as string).type).toBe('Polygon');
+  });
+
+  it('zeichnet eine Linien-Zone: Absperrgrenze → zeichnen → POST mit geometrie_typ LineString', async () => {
+    let body: { typ?: string; geometrie_typ?: string } | null = null;
+    basisHandler([
+      http.post('/api/einsaetze/1/zonen', async ({ request }) => {
+        body = (await request.json()) as typeof body;
+        return HttpResponse.json({ id: 6, einsatz_id: 1, typ: 'absperrgrenze', geometrie_typ: 'LineString', geometrie: '{}', label: null, farbe: null, notiz: null, erstellt_von: 1, erstellt_at: '', geaendert_at: '' });
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Absperrgrenze zeichnen' }));
+    await user.click(await screen.findByText('zone-fertig'));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body!.typ).toBe('absperrgrenze');
+    expect(body!.geometrie_typ).toBe('LineString');
+  });
+
+  it('öffnet den Inspector per Klick und ändert das Label (PATCH)', async () => {
+    let patch: { label?: string } | null = null;
+    const ZONE_FREI = { id: 7, einsatz_id: 1, typ: 'freie_skizze', geometrie_typ: 'Polygon',
+      geometrie: '{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}',
+      label: 'Skizze', farbe: '#00ff00', notiz: null, erstellt_von: 1, erstellt_at: '', geaendert_at: '' };
+    basisHandler([
+      http.get('/api/einsaetze/1/zonen', () => HttpResponse.json([ZONE_FREI])),
+      http.patch('/api/einsaetze/1/zonen/7', async ({ request }) => {
+        patch = (await request.json()) as typeof patch;
+        return HttpResponse.json({ ...ZONE_FREI, label: patch!.label });
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByText('zone-7'));
+    const labelInput = await screen.findByLabelText('Label');
+    await user.clear(labelInput);
+    await user.type(labelInput, 'Neu');
+    await user.tab(); // onBlur löst PATCH aus
+    await waitFor(() => expect(patch).not.toBeNull());
+    expect(patch!.label).toBe('Neu');
+  });
+
+  it('hebt eine Zone auf (DELETE)', async () => {
+    let geloescht = false;
+    const ZONE_FREI = { id: 7, einsatz_id: 1, typ: 'freie_skizze', geometrie_typ: 'Polygon',
+      geometrie: '{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}',
+      label: 'Skizze', farbe: '#00ff00', notiz: null, erstellt_von: 1, erstellt_at: '', geaendert_at: '' };
+    basisHandler([
+      http.get('/api/einsaetze/1/zonen', () => HttpResponse.json([ZONE_FREI])),
+      http.delete('/api/einsaetze/1/zonen/7', () => { geloescht = true; return new HttpResponse(null, { status: 204 }); }),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByText('zone-7'));
+    await user.click(await screen.findByRole('button', { name: 'Zone aufheben' }));
+    await waitFor(() => expect(geloescht).toBe(true));
   });
 });

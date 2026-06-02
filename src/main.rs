@@ -67,7 +67,10 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
 
     let karte = lifeline_hub::config::KarteConfig {
         pmtiles_path: config.pmtiles_path.clone(),
-        online_style_url: config.karte_online_style_url.clone(),
+        online_styles: lifeline_hub::config::online_styles_aufloesen(
+            config.karte_styles.as_deref(),
+            config.karte_online_style_url.as_deref(),
+        )?,
     };
     let app = build_router_mit_karte(
         AppState {

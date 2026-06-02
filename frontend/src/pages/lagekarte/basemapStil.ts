@@ -1,5 +1,5 @@
 import type { StyleSpecification } from 'maplibre-gl';
-import type { KarteServerConfig } from '../../api/karte';
+import type { KarteServerConfig, OnlineStyle } from '../../api/karte';
 
 export type BasemapModus = 'online' | 'offline' | 'blind';
 export type KartenTheme = 'light' | 'dark';
@@ -52,21 +52,50 @@ export function offlineStyle(theme: KartenTheme, pmtilesUrl: string): StyleSpeci
 
 /** Default-Modus nach Verfügbarkeit: online → offline → blind. */
 export function defaultModus(config: KarteServerConfig | undefined): BasemapModus {
-  if (config?.online_style_url) return 'online';
+  if (config && config.online_styles.length > 0) return 'online';
   if (config?.pmtiles_verfuegbar) return 'offline';
   return 'blind';
 }
 
+/** Verpackt ein Raster-Tile-Template (`{z}/{y}/{x}`) in einen MapLibre-Raster-Style.
+ *  URL wird VERBATIM durchgereicht; Attribution läuft NICHT über die Source,
+ *  sondern config-autoritativ über `customAttribution` (siehe aktuelleAttribution). */
+function rasterStyle(stil: OnlineStyle): StyleSpecification {
+  return {
+    version: 8,
+    sources: {
+      raster: { type: 'raster', tiles: [stil.url], tileSize: 256 },
+    },
+    layers: [{ id: 'raster', type: 'raster', source: 'raster' }],
+  } as StyleSpecification;
+}
+
+/** Style für einen Online-View: Vektor → URL-String, Raster → verpackter Raster-Style. */
+export function baueOnlineStyle(stil: OnlineStyle): StyleSpecification | string {
+  if (stil.typ === 'raster') return rasterStyle(stil);
+  return stil.url;
+}
+
 /**
- * Wählt den Style passend zu Modus + Theme + Verfügbarkeit. 'online' liefert die
- * konfigurierte URL (String). Ist der gewünschte Modus nicht verfügbar → Blind-Style.
+ * Wählt den Style passend zu Modus + Theme + Verfügbarkeit. Im Online-Modus wird der
+ * übergebene View verwendet; fehlt er → Blind-Style. Offline → pmtiles-Style.
  */
 export function baueBasemapStyle(
   modus: BasemapModus,
   theme: KartenTheme,
   config: KarteServerConfig | undefined,
+  onlineStil: OnlineStyle | undefined,
 ): StyleSpecification | string {
-  if (modus === 'online' && config?.online_style_url) return config.online_style_url;
+  if (modus === 'online' && onlineStil) return baueOnlineStyle(onlineStil);
   if (modus === 'offline' && config?.pmtiles_url) return offlineStyle(theme, config.pmtiles_url);
   return blindStyle(theme);
+}
+
+/** Config-autoritative Pflicht-Attribution des aktiven Views (nur online). */
+export function aktuelleAttribution(
+  modus: BasemapModus,
+  onlineStil: OnlineStyle | undefined,
+): string | null {
+  if (modus === 'online' && onlineStil) return onlineStil.attribution;
+  return null;
 }
