@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { NeuerEintrag } from '../api/etb';
-import type { EtbEintragAnzeige } from '../api/types';
+import type { EinsatzAnzeige, EtbEintragAnzeige } from '../api/types';
 import { renderMitProviders } from '../test/utils';
 import Schnellerfassung from './Schnellerfassung';
 
@@ -19,7 +19,13 @@ describe('Schnellerfassung', () => {
   it('sendet typ=meldung mit Inhalt und erfasst_lokal_at', async () => {
     const erfassen = vi.fn<(e: NeuerEintrag) => Promise<void>>().mockResolvedValue();
     renderMitProviders(
-      <Schnellerfassung erfassen={erfassen} berichtigungZu={null} onBerichtigungAbbrechen={vi.fn()} />,
+      <Schnellerfassung
+        erfassen={erfassen}
+        berichtigungZu={null}
+        onBerichtigungAbbrechen={vi.fn()}
+        bausteine={[]}
+        einsatz={{ bezeichnung: 'Test', stichwort: null, leitstellen_nr: null, einsatzort: null } as unknown as EinsatzAnzeige}
+      />,
     );
     await userEvent.type(screen.getByPlaceholderText('Inhalt …'), 'Pumpe läuft');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
@@ -38,6 +44,8 @@ describe('Schnellerfassung', () => {
         erfassen={erfassen}
         berichtigungZu={original()}
         onBerichtigungAbbrechen={vi.fn()}
+        bausteine={[]}
+        einsatz={{ bezeichnung: 'Test', stichwort: null, leitstellen_nr: null, einsatzort: null } as unknown as EinsatzAnzeige}
       />,
     );
     expect(screen.getByText(/Berichtigung zu #5/)).toBeInTheDocument();

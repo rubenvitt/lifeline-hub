@@ -2,6 +2,7 @@ import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Spin, Tag, Typograph
 import { Link, useParams } from 'react-router-dom';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz, schliesseEinsatzAb } from '../api/einsaetze';
+import { listeBausteine } from '../api/etbBaustein';
 import { SEITENGROESSE, listeEtb, type EtbFilterWerte, type NeuerEintrag } from '../api/etb';
 import { ApiError } from '../api/client';
 import type { EtbEintragAnzeige } from '../api/types';
@@ -23,6 +24,8 @@ export default function EtbPage() {
     queryKey: ['einsatz', einsatzId],
     queryFn: () => ladeEinsatz(einsatzId),
   });
+
+  const bausteineQuery = useQuery({ queryKey: ['etb-bausteine'], queryFn: listeBausteine });
 
   const etbQuery = useInfiniteQuery({
     queryKey: ['etb', einsatzId, filter],
@@ -177,6 +180,8 @@ export default function EtbPage() {
           erfassen={erfassenMitMeldung}
           berichtigungZu={berichtigungZu}
           onBerichtigungAbbrechen={() => setBerichtigungZu(null)}
+          bausteine={bausteineQuery.data ?? []}
+          einsatz={einsatz}
         />
       )}
       {istEinsatzleitung && (

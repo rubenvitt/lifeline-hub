@@ -2,14 +2,17 @@ import { Alert, Button, Card, Collapse, DatePicker, Form, Input, Select, Space }
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import type { NeuerEintrag } from '../api/etb';
-import type { EtbEintragAnzeige, EtbTyp, MeldeWeg } from '../api/types';
+import type { EinsatzAnzeige, EtbBaustein, EtbEintragAnzeige, EtbTyp, MeldeWeg } from '../api/types';
 import { ERFASSBARE_TYPEN, TYP_LABEL } from './typFarben';
+import BausteinPicker from './BausteinPicker';
 
 interface Props {
   erfassen: (eintrag: NeuerEintrag) => Promise<void>;
   /** Gesetzt = Berichtigungsmodus für diesen Originaleintrag. */
   berichtigungZu: EtbEintragAnzeige | null;
   onBerichtigungAbbrechen: () => void;
+  bausteine: EtbBaustein[];
+  einsatz: EinsatzAnzeige;
 }
 
 interface FormWerte {
@@ -30,7 +33,7 @@ const MELDEWEG_OPTIONEN: { value: MeldeWeg; label: string }[] = [
   { value: 'sonstige', label: 'Sonstige' },
 ];
 
-export default function Schnellerfassung({ erfassen, berichtigungZu, onBerichtigungAbbrechen }: Props) {
+export default function Schnellerfassung({ erfassen, berichtigungZu, onBerichtigungAbbrechen, bausteine, einsatz }: Props) {
   const [form] = Form.useForm<FormWerte>();
   const [sendet, setSendet] = useState(false);
 
@@ -88,6 +91,9 @@ export default function Schnellerfassung({ erfassen, berichtigungZu, onBerichtig
         onFinish={absenden}
         disabled={sendet}
       >
+        {!berichtigungZu && bausteine.length > 0 && (
+          <BausteinPicker form={form} bausteine={bausteine} einsatz={einsatz} />
+        )}
         <Space align="start" style={{ width: '100%' }}>
           {!berichtigungZu && (
             <Form.Item name="typ" style={{ marginBottom: 8, minWidth: 150 }}>
