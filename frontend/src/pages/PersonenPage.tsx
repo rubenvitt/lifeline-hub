@@ -300,6 +300,7 @@ export default function PersonenPage() {
               <Space direction="vertical" style={{ width: '100%' }} size="large">
                 <Space>
                   <Tag color={STATUS_META[p.status].color}>{STATUS_META[p.status].label}</Tag>
+                  {istPatient(p) && <Tag color="geekblue">Patient</Tag>}
                   {p.storniert_at && <Tag color="default">storniert</Tag>}
                 </Space>
 
@@ -431,6 +432,7 @@ export default function PersonenPage() {
             children: (
               <Space direction="vertical" style={{ width: '100%' }} size="large">
                 <Space wrap>
+                  {istPatient(p) && <Tag color="geekblue">Patient</Tag>}
                   {p.aktuelle_sichtung
                     ? <Tag color={SK_META[p.aktuelle_sichtung].color}>SK: {SK_META[p.aktuelle_sichtung].label}</Tag>
                     : <Tag>ungesichtet</Tag>}
