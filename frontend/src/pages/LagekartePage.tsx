@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { App, Spin } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -19,7 +19,8 @@ import { useThemeMode } from '../theme/ThemeModeProvider';
 import { baueMarker, baueTaktischeMarker, type KarteMarker } from './lagekarte/marker';
 import { parsePolygon, parseGeometry, polygonZentroid } from './lagekarte/geo';
 import { baueTzProps } from './lagekarte/taktischesZeichen';
-import { baueBasemapStyle, defaultModus, aktuelleAttribution, type BasemapModus } from './lagekarte/basemapStil';
+import { baueBasemapStyle, aktuelleAttribution, type BasemapModus } from './lagekarte/basemapStil';
+import { waehleInitialeBasemap, liesLetzteBasemap, merkeLetzteBasemap } from './lagekarte/basemapAuswahl';
 import Kartenflaeche, { type ZoneFeature } from './lagekarte/Kartenflaeche';
 import Sidebar, { type LayerSichtbar, type PlatzierenPunktTyp } from './lagekarte/Sidebar';
 import Inspector from './lagekarte/Inspector';
@@ -100,13 +101,24 @@ export default function LagekartePage() {
   const orgQuery = useQuery({ queryKey: ['organisation'], queryFn: ladeOrganisation });
   const configQuery = useQuery({ queryKey: ['karte-config'], queryFn: ladeKarteConfig });
 
-  // Basemap-Default + Default-Online-View setzen, sobald Config da ist.
+  // Kartenwahl einmal aus der pro-Einsatz gemerkten Auswahl (localStorage) initialisieren,
+  // gegen die aktuelle Config validiert; sonst Verfügbarkeits-Default. Danach persistiert
+  // ein Effekt jede Änderung.
+  const basemapInitiiertRef = useRef(false);
   useEffect(() => {
-    if (basemap == null && configQuery.data) setBasemap(defaultModus(configQuery.data));
-    if (onlineStilName == null && configQuery.data?.online_styles.length) {
-      setOnlineStilName(configQuery.data.online_styles[0].name);
-    }
-  }, [basemap, onlineStilName, configQuery.data]);
+    if (basemapInitiiertRef.current || !configQuery.data) return;
+    basemapInitiiertRef.current = true;
+    const { modus, onlineView } = waehleInitialeBasemap(configQuery.data, liesLetzteBasemap(einsatzId));
+    setBasemap(modus);
+    setOnlineStilName(onlineView);
+  }, [configQuery.data, einsatzId]);
+
+  // Jede Änderung der Kartenwahl pro Einsatz merken (erst nach der Initialisierung,
+  // damit der gemerkte Wert nicht durch den transienten Default überschrieben wird).
+  useEffect(() => {
+    if (!basemapInitiiertRef.current || basemap == null) return;
+    merkeLetzteBasemap(einsatzId, { modus: basemap, onlineView: onlineStilName });
+  }, [basemap, onlineStilName, einsatzId]);
 
   const einsatz = einsatzQuery.data;
   const darfSchreiben =
