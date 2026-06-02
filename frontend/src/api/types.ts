@@ -625,3 +625,33 @@ export interface LageZone {
   erstellt_at: string;
   geaendert_at: string;
 }
+
+// ============================== LFH-48 Lageberichte ==============================
+
+export type LageberichtVorlageKey = 'lagebericht' | 'lagebeurteilung' | 'freitext';
+export type LageberichtStatus = 'entwurf' | 'freigegeben';
+
+export interface LageberichtAbschnitt {
+  schluessel: string;
+  text: string;
+}
+
+export interface LageberichtAnzeige {
+  id: number;
+  einsatz_id: number;
+  vorlage: LageberichtVorlageKey;
+  titel: string;
+  zeitstand: string;
+  status: LageberichtStatus;
+  abschnitte: LageberichtAbschnitt[];
+  version: number;
+  vorgaenger_id: number | null;
+  ersteller_id: number;
+  ersteller_name: string;
+  erstellt_at: string;
+  aktualisiert_at: string;
+  freigegeben_von_id: number | null;
+  freigegeben_von_name: string | null;
+  freigegeben_at: string | null;
+  etb_eintrag_id: number | null;
+}
