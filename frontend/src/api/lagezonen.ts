@@ -1,4 +1,4 @@
-import type { LageZone, ZoneTyp } from './types';
+import type { Gefahrentyp, LageZone, Schutzobjekt, ZoneTyp } from './types';
 import { apiGet, apiSend } from './client';
 
 export interface ZoneNeu {
@@ -8,6 +8,8 @@ export interface ZoneNeu {
   label?: string | null;
   farbe?: string | null;
   notiz?: string | null;
+  gefahrentyp?: Gefahrentyp | null;
+  schutzobjekt?: Schutzobjekt | null;
 }
 
 export interface ZonePatch {
@@ -15,6 +17,8 @@ export interface ZonePatch {
   label?: string | null;
   farbe?: string | null;
   notiz?: string | null;
+  gefahrentyp?: Gefahrentyp | null;
+  schutzobjekt?: Schutzobjekt | null;
 }
 
 export function listeZonen(einsatzId: number): Promise<LageZone[]> {

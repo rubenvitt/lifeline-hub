@@ -14,10 +14,11 @@ const einsatz = {
   sachverhalt: null, anzahl_betroffene_initial: null, meine_rolle: 'einsatzleitung',
 };
 
-function handlers(rolle = 'einsatzleitung', status = 'aktiv', matrix: unknown[] = []) {
+function handlers(rolle = 'einsatzleitung', status = 'aktiv', matrix: unknown[] = [], zonen: unknown[] = []) {
   return [
     http.get('/api/einsaetze/1', () => HttpResponse.json({ ...einsatz, meine_rolle: rolle, status })),
     http.get('/api/einsaetze/1/gefahrenmatrix', () => HttpResponse.json(matrix)),
+    http.get('/api/einsaetze/1/zonen', () => HttpResponse.json(zonen)),
   ];
 }
 
@@ -72,5 +73,18 @@ describe('GefahrenPage', () => {
     // antd Table → mehrere Elemente mit gleichem aria-label; [0] = erste echte Zeile.
     const zellen = await screen.findAllByLabelText('Warnstufe atemgifte × sachwerte');
     expect(zellen[0]).toHaveClass('ant-select-disabled');
+  });
+
+  it('zeigt die Anzahl verknüpfter Zonen als Badge', async () => {
+    const zone = {
+      id: 9, einsatz_id: 1, typ: 'gefahrengebiet', geometrie_typ: 'Polygon', geometrie: '{}',
+      label: null, farbe: null, notiz: null, gefahrentyp: 'brand', schutzobjekt: 'menschen',
+      erstellt_von: 1, erstellt_at: '', geaendert_at: '',
+    };
+    server.use(...handlers('einsatzleitung', 'aktiv', [], [zone]));
+    renderPage();
+    // Badge-Count „1" erscheint an der Zelle brand × menschen.
+    const badges = await screen.findAllByText('1');
+    expect(badges[0]).toBeInTheDocument();
   });
 });

@@ -1,11 +1,12 @@
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, App, Select, Spin, Table } from 'antd';
+import { Alert, App, Badge, Select, Spin, Table, Tooltip } from 'antd';
 import type { TableColumnsType } from 'antd';
 import type { GefahrBewertung, Gefahrentyp, Schutzobjekt, Warnstufe } from '../../api/types';
 import { ApiError } from '../../api/client';
 import { ladeGefahrenmatrix, setzeBewertung } from '../../api/gefahren';
 import { ladeEinsatz } from '../../api/einsaetze';
+import { listeZonen } from '../../api/lagezonen';
 import { useEinsatzLiveStream } from '../../etb/useEinsatzLiveStream';
 import {
   GEFAHRENTYPEN, SCHUTZOBJEKTE, WARNSTUFEN, kombinationGueltig, warnstufeFarbe,
@@ -26,6 +27,7 @@ export default function GefahrenPage() {
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const matrixQuery = useQuery({ queryKey: ['gefahrenmatrix', einsatzId], queryFn: () => ladeGefahrenmatrix(einsatzId) });
+  const zonenQuery = useQuery({ queryKey: ['einsatz-zonen', einsatzId], queryFn: () => listeZonen(einsatzId) });
 
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
   const setzen = useMutation({
@@ -56,6 +58,10 @@ export default function GefahrenPage() {
     return t?.warnstufe ?? 'keine';
   };
 
+  const zonen = zonenQuery.data ?? [];
+  const zonenAnzahl = (typ: Gefahrentyp, objekt: Schutzobjekt): number =>
+    zonen.filter((z) => z.gefahrentyp === typ && z.schutzobjekt === objekt).length;
+
   const spalten: TableColumnsType<ZeilenDaten> = [
     { title: 'Gefahr', dataIndex: 'label', key: 'label', fixed: 'left', width: 180 },
     ...SCHUTZOBJEKTE.map((obj) => ({
@@ -68,16 +74,21 @@ export default function GefahrenPage() {
       render: (_: unknown, zeile: ZeilenDaten) => {
         const gueltig = kombinationGueltig(zeile.typ, obj.wert);
         const aktuell = warnstufeVon(zeile.typ, obj.wert);
+        const anzahl = zonenAnzahl(zeile.typ, obj.wert);
         return (
-          <Select<Warnstufe>
-            aria-label={`Warnstufe ${zeile.typ} × ${obj.wert}`}
-            size="small"
-            style={{ width: 110 }}
-            value={aktuell}
-            disabled={!gueltig || !darfSchreiben || setzen.isPending}
-            options={WARNSTUFEN.map((w) => ({ value: w.wert, label: w.label }))}
-            onChange={(w) => setzen.mutate({ typ: zeile.typ, objekt: obj.wert, warnstufe: w })}
-          />
+          <Tooltip title={anzahl > 0 ? `${anzahl} verknüpfte Zone(n) auf der Lagekarte` : undefined}>
+            <Badge count={anzahl} size="small" offset={[-4, 2]}>
+              <Select<Warnstufe>
+                aria-label={`Warnstufe ${zeile.typ} × ${obj.wert}`}
+                size="small"
+                style={{ width: 110 }}
+                value={aktuell}
+                disabled={!gueltig || !darfSchreiben || setzen.isPending}
+                options={WARNSTUFEN.map((w) => ({ value: w.wert, label: w.label }))}
+                onChange={(w) => setzen.mutate({ typ: zeile.typ, objekt: obj.wert, warnstufe: w })}
+              />
+            </Badge>
+          </Tooltip>
         );
       },
     })),

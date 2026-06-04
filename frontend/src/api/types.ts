@@ -643,6 +643,8 @@ export interface LageZone {
   label: string | null;
   farbe: string | null;
   notiz: string | null;
+  gefahrentyp: Gefahrentyp | null;
+  schutzobjekt: Schutzobjekt | null;
   erstellt_von: number;
   erstellt_at: string;
   geaendert_at: string;

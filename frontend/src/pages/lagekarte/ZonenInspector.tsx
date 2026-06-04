@@ -1,5 +1,6 @@
 import { Button, Card, Input, Select, Space, Typography } from 'antd';
-import type { LageZone, ZoneTyp } from '../../api/types';
+import type { Gefahrentyp, LageZone, Schutzobjekt, ZoneTyp } from '../../api/types';
+import { GEFAHRENTYPEN, SCHUTZOBJEKTE, kombinationGueltig } from '../gefahren/gefahrenSchema';
 import { ZONE_TYPEN, zoneTypLabel } from './zonenStil';
 
 export interface ZonenInspectorProps {
@@ -7,7 +8,14 @@ export interface ZonenInspectorProps {
   darfSchreiben: boolean;
   onSchliessen: () => void;
   /** Partielles PATCH (nur geänderte Felder). */
-  onAendern: (patch: { typ?: ZoneTyp; label?: string | null; farbe?: string | null; notiz?: string | null }) => void;
+  onAendern: (patch: {
+    typ?: ZoneTyp;
+    label?: string | null;
+    farbe?: string | null;
+    notiz?: string | null;
+    gefahrentyp?: Gefahrentyp | null;
+    schutzobjekt?: Schutzobjekt | null;
+  }) => void;
   onLoeschen: () => void;
 }
 
@@ -61,6 +69,42 @@ export default function ZonenInspector({ zone, darfSchreiben, onSchliessen, onAe
               if (v !== (zone.farbe ?? '#1677ff')) onAendern({ farbe: v });
             }}
           />
+        )}
+
+        {zone.typ === 'gefahrengebiet' && (
+          <>
+            <Select<Gefahrentyp>
+              aria-label="Gefahrentyp"
+              allowClear
+              placeholder="Gefahrentyp"
+              style={{ width: '100%' }}
+              value={zone.gefahrentyp ?? undefined}
+              disabled={!darfSchreiben}
+              options={GEFAHRENTYPEN.map((g) => ({ value: g.wert, label: g.label }))}
+              onChange={(v) => {
+                // Beim Leeren beide Felder nullen (beide-oder-keine).
+                if (!v) onAendern({ gefahrentyp: null, schutzobjekt: null });
+                else onAendern({ gefahrentyp: v });
+              }}
+            />
+            <Select<Schutzobjekt>
+              aria-label="Schutzobjekt"
+              allowClear
+              placeholder="Schutzobjekt"
+              style={{ width: '100%' }}
+              value={zone.schutzobjekt ?? undefined}
+              disabled={!darfSchreiben || !zone.gefahrentyp}
+              options={SCHUTZOBJEKTE.map((o) => ({
+                value: o.wert,
+                label: o.label,
+                disabled: zone.gefahrentyp ? !kombinationGueltig(zone.gefahrentyp, o.wert) : true,
+              }))}
+              onChange={(v) => {
+                if (!v) onAendern({ gefahrentyp: null, schutzobjekt: null });
+                else onAendern({ schutzobjekt: v });
+              }}
+            />
+          </>
         )}
 
         <Input.TextArea
