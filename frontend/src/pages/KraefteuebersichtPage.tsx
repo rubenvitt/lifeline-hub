@@ -14,19 +14,15 @@ import {
   baueKraeftebild,
   filtereKraefte,
   rendereMeldebildMarkdown,
+  staerkeText,
   type FilterWerte,
   type MeldebildZeile,
   type Rohdaten,
-  type StaerkeSumme,
   type StatusVerteilung,
 } from '../kraefte/kraeftebild';
 import { legeLageberichtAn, aktualisiereLagebericht } from '../api/lageberichte';
 import type { MaterialStatus, StatusKategorie } from '../api/types';
 import './kraefteuebersichtPrint.css';
-
-export function staerkeText(s: StaerkeSumme): string {
-  return `${s.fuehrer}/${s.unterfuehrer}/${s.mannschaft}/${s.gesamt}`;
-}
 
 const KAT_FARBE: Record<StatusKategorie, string> = { verfuegbar: 'green', gebunden: 'gold', nicht_verfuegbar: 'red' };
 

@@ -48,8 +48,11 @@ it('verschachtelte Einheiten: keine Doppelzählung', () => {
 
 it('verschachtelte Abschnitte rollen hoch', () => {
   const bild = baueKraeftebild([ab(1), ab(2, 1)], [eh(10, 2)], [p(1, 10, 'mannschaft')], [], []);
+  // Kind-Abschnitt mit vorhandenem Eltern erscheint NUR unter dem Eltern, nicht als zweite Wurzel.
+  expect(bild.baum.map((z) => z.key)).toEqual(['ab-1']);
   const a1 = bild.baum.find((z) => z.key === 'ab-1')!;
   expect(a1.staerke.gesamt).toBe(1);
+  expect(a1.children!.map((z) => z.key)).toContain('ab-2');
 });
 
 it('Catch-all: Kräfte ohne Zuordnung erscheinen und zählen', () => {
@@ -73,6 +76,16 @@ it('verdichtet Fahrzeug-Status getrennt', () => {
   expect(bild.verdichtung.fahrzeugStatus.verfuegbar).toBe(1);
   expect(bild.verdichtung.fahrzeugStatus.gebunden).toBe(1);
   expect(bild.verdichtung.fahrzeugStatus.nicht_verfuegbar).toBe(1);
+});
+
+it('Waisen-Abschnitt (Eltern nicht in Eingabe) wird zur Wurzel promotet', () => {
+  // Filter auf Unter-Abschnitt 2 (ueber_abschnitt_id=1), aber Abschnitt 1 fehlt
+  // in der Eingabe. Ohne Promotion bliebe der Baum leer, während der Kopf zählt.
+  const bild = baueKraeftebild([ab(2, 1)], [eh(10, 2)], [p(1, 10, 'mannschaft')], [], []);
+  expect(bild.verdichtung.anzahlPersonal).toBe(1);
+  const a2 = bild.baum.find((z) => z.key === 'ab-2');
+  expect(a2).toBeDefined();
+  expect(a2!.staerke.gesamt).toBe(1);
 });
 
 const mat = (id: number, einheit_id: number | null, status: EinsatzMaterial['status'], menge = 1): EinsatzMaterial =>
