@@ -1,7 +1,7 @@
-import { Alert, Breadcrumb, Card, Input, Select, Space, Spin, Statistic, Table, Tag, Typography } from 'antd';
+import { Alert, Breadcrumb, Button, Card, Input, Select, Space, Spin, Statistic, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { Link, useParams } from 'react-router-dom';
-import { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
@@ -20,6 +20,7 @@ import {
   type StatusVerteilung,
 } from '../kraefte/kraeftebild';
 import type { MaterialStatus, StatusKategorie } from '../api/types';
+import './kraefteuebersichtPrint.css';
 
 export function staerkeText(s: StaerkeSumme): string {
   return `${s.fuehrer}/${s.unterfuehrer}/${s.mannschaft}/${s.gesamt}`;
@@ -83,12 +84,18 @@ const spalten: ColumnsType<MeldebildZeile> = [
   },
 ];
 
+function alleKeys(zeilen: MeldebildZeile[]): string[] {
+  return zeilen.flatMap((z) => [z.key, ...(z.children ? alleKeys(z.children) : [])]);
+}
+
 export default function KraefteuebersichtPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   useEinsatzLiveStream(einsatzId);
 
   const [filter, setFilter] = useState<FilterWerte>({ abschnittId: null, traeger: null, kategorie: null, suche: '' });
+  const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
+  const [printPending, setPrintPending] = useState(false);
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   // Query-Keys IDENTISCH zu den vom Live-Hook invalidierten Keys (Task 5 erweitert den Hook).
@@ -118,16 +125,33 @@ export default function KraefteuebersichtPage() {
     );
   }, [abschnitteQuery.data, einheitenQuery.data, personalQuery.data, fahrzeugeQuery.data, materialQuery.data, filter]);
 
+  // Erst nach committetem Aufklappen drucken (sonst kollabierte Zeilen bei großen Bäumen).
+  useEffect(() => {
+    if (printPending) {
+      window.print();
+      setPrintPending(false);
+    }
+  }, [printPending]);
+
+  // Tabelle bleibt nach dem Druck bewusst voll aufgeklappt (kein Restore in v1).
+  const handleDrucken = () => {
+    setExpandedKeys(alleKeys(bild.baum));
+    setPrintPending(true);
+  };
+
   if (einsatzQuery.isLoading) return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
   if (einsatzQuery.isError || !einsatzQuery.data) return <Alert type="error" message="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   const einsatz = einsatzQuery.data;
   const v = bild.verdichtung;
 
   return (
-    <div>
-      <Breadcrumb style={{ marginBottom: 12 }}
+    <div className="kraefte-print-root">
+      <Breadcrumb className="kraefte-no-print" style={{ marginBottom: 12 }}
         items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Kräfteübersicht' }]} />
-      <Typography.Title level={3} style={{ marginTop: 0 }}>Kräfteübersicht</Typography.Title>
+      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 4 }}>
+        <Typography.Title level={3} style={{ marginTop: 0 }}>Kräfteübersicht</Typography.Title>
+        <Button className="kraefte-no-print" onClick={handleDrucken}>Drucken / als PDF</Button>
+      </Space>
       <Card size="small" style={{ marginBottom: 16 }} styles={{ body: { overflowX: 'auto' } }}>
         {/* Monitoring-Kopf: nicht umbrechend, bei schmalem Viewport horizontal scrollbar. */}
         <Space size="large" align="start" style={{ flexWrap: 'nowrap' }}>
@@ -165,7 +189,7 @@ export default function KraefteuebersichtPage() {
           </Space>
         </Space>
       </Card>
-      <Card size="small" style={{ marginBottom: 12 }}>
+      <Card size="small" className="kraefte-no-print" style={{ marginBottom: 12 }}>
         <Space wrap>
           <Select
             placeholder="Abschnitt"
@@ -206,7 +230,12 @@ export default function KraefteuebersichtPage() {
       </Card>
       <Table<MeldebildZeile>
         size="small" columns={spalten} dataSource={bild.baum} pagination={false}
-        rowKey="key" expandable={{ defaultExpandAllRows: false, childrenColumnName: 'children' }}
+        rowKey="key"
+        expandable={{
+          expandedRowKeys: expandedKeys,
+          onExpandedRowsChange: (keys) => setExpandedKeys([...keys]),
+          childrenColumnName: 'children',
+        }}
         locale={{ emptyText: 'Keine Kräfte im Einsatz disponiert' }} />
     </div>
   );

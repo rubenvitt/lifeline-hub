@@ -63,6 +63,7 @@ const FAHRZEUG_F1 = {
 };
 
 beforeEach(() => {
+  vi.stubGlobal('print', vi.fn());
   vi.mocked(ladeEinsatz).mockResolvedValue(EINSATZ);
   vi.mocked(listeEinheiten).mockResolvedValue([]);
   vi.mocked(listeEinsatzPersonal).mockResolvedValue([]);
@@ -85,6 +86,11 @@ function setup() {
 }
 
 describe('KraefteuebersichtPage', () => {
+  it('zeigt einen Druck-Button', async () => {
+    setup();
+    expect(await screen.findByRole('button', { name: /Drucken/i })).toBeInTheDocument();
+  });
+
   it('zeigt Titel und die Gesamt-Personalstärke im Kopf', async () => {
     vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]);
     setup();

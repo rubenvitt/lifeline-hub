@@ -1,0 +1,6 @@
+@media print {
+  body * { visibility: hidden; }
+  .kraefte-print-root, .kraefte-print-root * { visibility: visible; }
+  .kraefte-print-root { position: absolute; left: 0; top: 0; width: 100%; padding: 0; }
+  .kraefte-no-print { display: none !important; }
+}
