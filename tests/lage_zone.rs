@@ -294,3 +294,44 @@ async fn patch_entfernt_zuordnung_ohne_matrixzelle_zu_loeschen() {
     assert_eq!(matrix.as_array().unwrap().len(), 1);
     assert_eq!(matrix[0]["warnstufe"], "hoch");
 }
+
+#[tokio::test]
+async fn patch_setzt_zuordnung_ueber_beide_felder() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    // gefahrengebiet-Zone OHNE Zuordnung anlegen.
+    let body = json!({"typ":"gefahrengebiet","geometrie_typ":"Polygon","geometrie":POLY}).to_string();
+    let (_, z) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/zonen"), &admin, Some(&body)).await;
+    let zid = z["id"].as_i64().unwrap();
+    assert!(z["gefahrentyp"].is_null());
+
+    // Zuordnung über BEIDE Felder gemeinsam setzen → 200.
+    let (status, z2) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/zonen/{zid}"), &admin,
+        Some(r#"{"gefahrentyp":"brand","schutzobjekt":"menschen"}"#)).await;
+    assert_eq!(status, StatusCode::OK, "{z2:?}");
+    assert_eq!(z2["gefahrentyp"], "brand");
+    assert_eq!(z2["schutzobjekt"], "menschen");
+    // Lazy-Create legt eine keine-Zelle an → Matrix-Liste bleibt leer (kein Phantom).
+    let (_, matrix) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/gefahrenmatrix"), &admin, None).await;
+    assert_eq!(matrix.as_array().unwrap().len(), 0);
+}
+
+#[tokio::test]
+async fn patch_typ_weg_von_gefahrengebiet_nullt_zuordnung() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    // gefahrengebiet-Zone MIT Zuordnung (Polygon; absperrbereich ist ebenfalls Polygon → Typ-Wechsel zulässig).
+    let body = json!({"typ":"gefahrengebiet","geometrie_typ":"Polygon","geometrie":POLY,"gefahrentyp":"brand","schutzobjekt":"menschen"}).to_string();
+    let (_, z) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/zonen"), &admin, Some(&body)).await;
+    let zid = z["id"].as_i64().unwrap();
+
+    // Typ wechseln weg von gefahrengebiet → 200 (NICHT 422), Zuordnung wird auto-genullt.
+    let (status, z2) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/zonen/{zid}"), &admin,
+        Some(r#"{"typ":"absperrbereich"}"#)).await;
+    assert_eq!(status, StatusCode::OK, "{z2:?}");
+    assert_eq!(z2["typ"], "absperrbereich");
+    assert!(z2["gefahrentyp"].is_null(), "gefahrentyp muss beim Verlassen von gefahrengebiet genullt werden: {z2:?}");
+    assert!(z2["schutzobjekt"].is_null(), "schutzobjekt muss beim Verlassen von gefahrengebiet genullt werden: {z2:?}");
+}

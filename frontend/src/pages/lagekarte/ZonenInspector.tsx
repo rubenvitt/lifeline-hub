@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Button, Card, Input, Select, Space, Typography } from 'antd';
 import type { Gefahrentyp, LageZone, Schutzobjekt, ZoneTyp } from '../../api/types';
 import { GEFAHRENTYPEN, SCHUTZOBJEKTE, kombinationGueltig } from '../gefahren/gefahrenSchema';
@@ -26,6 +27,13 @@ export default function ZonenInspector({ zone, darfSchreiben, onSchliessen, onAe
   const erlaubteTypen = ZONE_TYPEN.filter(
     (t) => t.geometrie === 'beides' || t.geometrie === zone.geometrie_typ,
   );
+
+  // Lokaler Entwurf für die Gefahren-Zuordnung: solange noch kein Schutzobjekt
+  // gespeichert ist, darf NICHT einzeln gePATCHt werden (Backend: beide-oder-keine).
+  // Erst wenn das Paar vollständig ist, wird genau ein PATCH mit BEIDEN Feldern gesendet.
+  const [entwurfGefahrentyp, setEntwurfGefahrentyp] = useState<Gefahrentyp | null>(zone.gefahrentyp);
+  useEffect(() => { setEntwurfGefahrentyp(zone.gefahrentyp); }, [zone.id, zone.gefahrentyp]);
+  const aktuellerGefahrentyp = zone.gefahrentyp ?? entwurfGefahrentyp;
 
   return (
     <Card
@@ -78,13 +86,20 @@ export default function ZonenInspector({ zone, darfSchreiben, onSchliessen, onAe
               allowClear
               placeholder="Gefahrentyp"
               style={{ width: '100%' }}
-              value={zone.gefahrentyp ?? undefined}
+              value={aktuellerGefahrentyp ?? undefined}
               disabled={!darfSchreiben}
               options={GEFAHRENTYPEN.map((g) => ({ value: g.wert, label: g.label }))}
               onChange={(v) => {
                 // Beim Leeren beide Felder nullen (beide-oder-keine).
-                if (!v) onAendern({ gefahrentyp: null, schutzobjekt: null });
-                else onAendern({ gefahrentyp: v });
+                if (!v) {
+                  setEntwurfGefahrentyp(null);
+                  onAendern({ gefahrentyp: null, schutzobjekt: null });
+                } else {
+                  setEntwurfGefahrentyp(v);
+                  // Bestehendes Paar: einzelnes Feld ist ok (das andere ist im Backend gesetzt).
+                  // Ohne gespeichertes schutzobjekt nur Entwurf halten, kein PATCH.
+                  if (zone.schutzobjekt) onAendern({ gefahrentyp: v, schutzobjekt: zone.schutzobjekt });
+                }
               }}
             />
             <Select<Schutzobjekt>
@@ -93,15 +108,20 @@ export default function ZonenInspector({ zone, darfSchreiben, onSchliessen, onAe
               placeholder="Schutzobjekt"
               style={{ width: '100%' }}
               value={zone.schutzobjekt ?? undefined}
-              disabled={!darfSchreiben || !zone.gefahrentyp}
+              disabled={!darfSchreiben || !aktuellerGefahrentyp}
               options={SCHUTZOBJEKTE.map((o) => ({
                 value: o.wert,
                 label: o.label,
-                disabled: zone.gefahrentyp ? !kombinationGueltig(zone.gefahrentyp, o.wert) : true,
+                disabled: aktuellerGefahrentyp ? !kombinationGueltig(aktuellerGefahrentyp, o.wert) : true,
               }))}
               onChange={(v) => {
-                if (!v) onAendern({ gefahrentyp: null, schutzobjekt: null });
-                else onAendern({ schutzobjekt: v });
+                if (!v) {
+                  onAendern({ gefahrentyp: null, schutzobjekt: null });
+                  setEntwurfGefahrentyp(null);
+                } else if (aktuellerGefahrentyp) {
+                  // Genau ein PATCH mit BEIDEN Feldern → etabliert die Zuordnung atomar.
+                  onAendern({ gefahrentyp: aktuellerGefahrentyp, schutzobjekt: v });
+                }
               }}
             />
           </>

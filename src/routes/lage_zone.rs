@@ -211,16 +211,25 @@ pub async fn aktualisieren(
         body.farbe.as_ref().map(|o| o.as_deref())
     };
 
+    // Gefahren-Normalisierung: nur gefahrengebiet darf Zuordnung tragen.
+    // Verlässt die Zone gefahrengebiet → Zuordnung nullen (wie farbe bei freie_skizze).
+    let (gefahrentyp_patch, schutzobjekt_patch): (Option<Option<&str>>, Option<Option<&str>>) =
+        if neuer_typ != "gefahrengebiet" {
+            (Some(None), Some(None))
+        } else {
+            (body.gefahrentyp.as_ref().map(|o| o.as_deref()),
+             body.schutzobjekt.as_ref().map(|o| o.as_deref()))
+        };
     // Effektive Zuordnung (Merge gegen Bestand; Memory patch-xor-effektivzustand).
-    let eff_gefahrentyp: Option<String> = match &body.gefahrentyp {
-        Some(opt) => opt.clone(),
-        None => vorher.gefahrentyp.clone(),
+    let eff_gefahrentyp: Option<&str> = match gefahrentyp_patch {
+        Some(o) => o,
+        None => vorher.gefahrentyp.as_deref(),
     };
-    let eff_schutzobjekt: Option<String> = match &body.schutzobjekt {
-        Some(opt) => opt.clone(),
-        None => vorher.schutzobjekt.clone(),
+    let eff_schutzobjekt: Option<&str> = match schutzobjekt_patch {
+        Some(o) => o,
+        None => vorher.schutzobjekt.as_deref(),
     };
-    if !lage_zone::gefahren_zuordnung_gueltig(&neuer_typ, eff_gefahrentyp.as_deref(), eff_schutzobjekt.as_deref()) {
+    if !lage_zone::gefahren_zuordnung_gueltig(&neuer_typ, eff_gefahrentyp, eff_schutzobjekt) {
         return Err(AppError::UnprocessableEntity(
             "Gefahren-Zuordnung nur an gefahrengebiet-Zonen, beide Felder gemeinsam und als gültige Kombination".into(),
         ));
@@ -231,8 +240,8 @@ pub async fn aktualisieren(
         label: body.label.as_ref().map(|o| o.as_deref().map(str::trim).filter(|s| !s.is_empty())),
         farbe: farbe_patch,
         notiz: body.notiz.as_ref().map(|o| o.as_deref().map(str::trim).filter(|s| !s.is_empty())),
-        gefahrentyp: body.gefahrentyp.as_ref().map(|o| o.as_deref()),
-        schutzobjekt: body.schutzobjekt.as_ref().map(|o| o.as_deref()),
+        gefahrentyp: gefahrentyp_patch,
+        schutzobjekt: schutzobjekt_patch,
     }).await?;
 
     // Sinntragende Änderung? typ oder label effektiv geändert.
