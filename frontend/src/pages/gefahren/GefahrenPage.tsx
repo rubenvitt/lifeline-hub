@@ -61,21 +61,23 @@ export default function GefahrenPage() {
     ...SCHUTZOBJEKTE.map((obj) => ({
       title: obj.label,
       key: obj.wert,
+      // Warnstufen-Farbe garantiert sichtbar: das ganze <td> färben (unabhängig von Select-Internals).
+      onCell: (zeile: ZeilenDaten) => ({
+        style: { backgroundColor: warnstufeFarbe(warnstufeVon(zeile.typ, obj.wert)), textAlign: 'center' as const },
+      }),
       render: (_: unknown, zeile: ZeilenDaten) => {
         const gueltig = kombinationGueltig(zeile.typ, obj.wert);
         const aktuell = warnstufeVon(zeile.typ, obj.wert);
         return (
-          <div style={{ backgroundColor: warnstufeFarbe(aktuell), borderRadius: 4, display: 'inline-block' }}>
-            <Select<Warnstufe>
-              aria-label={`Warnstufe ${zeile.typ} × ${obj.wert}`}
-              size="small"
-              style={{ width: 110 }}
-              value={aktuell}
-              disabled={!gueltig || !darfSchreiben || setzen.isPending}
-              options={WARNSTUFEN.map((w) => ({ value: w.wert, label: w.label }))}
-              onChange={(w) => setzen.mutate({ typ: zeile.typ, objekt: obj.wert, warnstufe: w })}
-            />
-          </div>
+          <Select<Warnstufe>
+            aria-label={`Warnstufe ${zeile.typ} × ${obj.wert}`}
+            size="small"
+            style={{ width: 110 }}
+            value={aktuell}
+            disabled={!gueltig || !darfSchreiben || setzen.isPending}
+            options={WARNSTUFEN.map((w) => ({ value: w.wert, label: w.label }))}
+            onChange={(w) => setzen.mutate({ typ: zeile.typ, objekt: obj.wert, warnstufe: w })}
+          />
         );
       },
     })),
