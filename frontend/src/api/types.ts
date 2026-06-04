@@ -605,6 +605,28 @@ export interface Tier {
 
 // ============================== L-3 Gefahren- & Absperrzonen ==============================
 
+export type Gefahrentyp =
+  | 'atemgifte' | 'angstreaktion' | 'ausbreitung' | 'atomare_strahlung' | 'chemische_stoffe'
+  | 'erkrankung_verletzung' | 'explosion' | 'elektrizitaet' | 'einsturz' | 'absturz' | 'brand'
+  | 'durchbruch' | 'ertrinken';
+
+export type Schutzobjekt = 'menschen' | 'tiere' | 'umwelt' | 'sachwerte' | 'einsatzkraefte';
+
+export type Warnstufe = 'keine' | 'niedrig' | 'mittel' | 'hoch' | 'akut';
+
+export interface GefahrBewertung {
+  id: number;
+  einsatz_id: number;
+  gefahrentyp: Gefahrentyp;
+  schutzobjekt: Schutzobjekt;
+  warnstufe: Warnstufe;
+  beschreibung: string | null;
+  gemeldet_von: string | null;
+  aktualisiert_von: number;
+  erstellt_at: string;
+  geaendert_at: string;
+}
+
 export type ZoneTyp =
   | 'gefahrengebiet'
   | 'absperrbereich'
