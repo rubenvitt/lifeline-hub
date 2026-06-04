@@ -244,9 +244,10 @@ pub async fn freigeben(
 }
 
 /// Legt aus einem **freigegebenen** Bericht eine neue Entwurfs-Version an
-/// (version+1, vorgaenger_id, gleiche Vorlage, **leeres Abschnitts-Skelett aus
-/// der Vorlage** — Spec §2 „Abschnitte aus der Vorlage vorbefüllt"; das ETB trägt
-/// den Verlauf ohnehin). `UnprocessableEntity`, wenn der Vorgänger nicht freigegeben ist.
+/// (version+1, vorgaenger_id, gleiche Vorlage, **Abschnitts-Inhalte des Vorgängers
+/// übernommen** als Ausgangspunkt — die Führungskraft bearbeitet nur die Deltas;
+/// das ETB trägt jede freigegebene Version als eigenen Snapshot). `UnprocessableEntity`,
+/// wenn der Vorgänger nicht freigegeben ist.
 pub async fn fortschreiben(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -260,9 +261,8 @@ pub async fn fortschreiben(
             "Nur freigegebene Berichte können fortgeschrieben werden".into(),
         ));
     }
-    let v = vorlage(&vorher.vorlage).ok_or(AppError::Internal("Vorlage verschwunden".into()))?;
     let abschnitte_json =
-        serde_json::to_string(&leere_abschnitte(v)).map_err(|e| AppError::Internal(e.to_string()))?;
+        serde_json::to_string(&vorher.abschnitte).map_err(|e| AppError::Internal(e.to_string()))?;
     let neu_id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO lagebericht \
             (einsatz_id, vorlage, titel, zeitstand, status, abschnitte, version, vorgaenger_id, ersteller_id) \
@@ -413,9 +413,9 @@ mod tests {
         assert_eq!(fort.vorgaenger_id, Some(lb.id));
         assert_eq!(fort.status, STATUS_ENTWURF);
         assert_eq!(fort.vorlage, "freitext");
-        // Leeres Schema aus der Vorlage (Spec §2), NICHT der Vorgänger-Inhalt.
-        assert_eq!(fort.abschnitte, super::leere_abschnitte(vorlage("freitext").unwrap()));
-        assert!(fort.abschnitte.iter().all(|a| a.text.is_empty()));
+        // Fortschreibung übernimmt die Inhalte des freigegebenen Vorgängers als
+        // Ausgangspunkt (nur Deltas bearbeiten); der ETB trägt jede Version separat.
+        assert_eq!(fort.abschnitte, gefuellt);
     }
 
     #[tokio::test]

@@ -137,6 +137,8 @@ async fn fortschreiben_erzeugt_version_2() {
     assert_eq!(fort["version"], 2);
     assert_eq!(fort["vorgaenger_id"], lid);
     assert_eq!(fort["status"], "entwurf");
+    // Fortschreibung übernimmt die Inhalte des freigegebenen Vorgängers als Ausgangspunkt.
+    assert_eq!(fort["abschnitte"][0]["text"], "A");
 }
 
 #[tokio::test]

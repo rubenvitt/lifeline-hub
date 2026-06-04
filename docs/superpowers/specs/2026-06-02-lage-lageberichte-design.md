@@ -132,8 +132,10 @@ Abfrage-Nutzen, nur Join-Aufwand.
      `etb_eintrag_id` setzen. Danach **immutable** (kein weiteres PATCH).
 - **Fortschreiben** (`POST …/{id}/fortschreiben`): nur aus einem freigegebenen Bericht. Legt
   eine neue `lagebericht`-Zeile an, `status='entwurf'`, `version = vorige+1`,
-  `vorgaenger_id = <id>`, Abschnitte aus der Vorlage vorbefüllt. Eigene Freigabe → eigener
-  ETB-Eintrag.
+  `vorgaenger_id = <id>`, **Abschnitts-Inhalte des freigegebenen Vorgängers übernommen**
+  als Ausgangspunkt (die Führungskraft bearbeitet nur die Deltas zur vorigen Lage; das
+  ETB trägt jede freigegebene Version als eigenen unveränderlichen Snapshot). Eigene
+  Freigabe → eigener ETB-Eintrag.
 
 Korrektur eines bereits freigegebenen Berichts läuft ausschließlich über Fortschreibung — es
 gibt kein In-Place-Edit und keinen separaten Berichtigungs-Typ (das ETB trägt den Verlauf
