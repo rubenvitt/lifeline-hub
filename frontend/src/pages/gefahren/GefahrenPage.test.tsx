@@ -44,7 +44,7 @@ describe('GefahrenPage', () => {
   });
 
   it('setzt eine Warnstufe und ruft die API (PUT)', async () => {
-    let put: { gefahrentyp: string; schutzobjekt: string; warnstufe: string } | null = null;
+    let put: Record<string, unknown> | null = null;
     server.use(
       ...handlers(),
       http.put('/api/einsaetze/1/gefahrenmatrix/bewertung', async ({ request }) => {
@@ -64,7 +64,10 @@ describe('GefahrenPage', () => {
     const combobox = zelle.querySelector('input[role="combobox"]') ?? zelle;
     await userEvent.click(combobox);
     await userEvent.click(await screen.findByText('Hoch'));
-    await waitFor(() => expect(put).toEqual({ gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'hoch' }));
+    // Voller Zell-Zustand: beschreibung/gemeldet_von bei unbewerteter Zelle null.
+    await waitFor(() => expect(put).toEqual({
+      gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'hoch', beschreibung: null, gemeldet_von: null,
+    }));
   });
 
   it('graut ungültige Kombinationen aus (sachwerte × atemgifte disabled)', async () => {
@@ -73,6 +76,56 @@ describe('GefahrenPage', () => {
     // antd Table → mehrere Elemente mit gleichem aria-label; [0] = erste echte Zeile.
     const zellen = await screen.findAllByLabelText('Warnstufe atemgifte × sachwerte');
     expect(zellen[0]).toHaveClass('ant-select-disabled');
+  });
+
+  it('editiert beschreibung über das Detail-Popover (voller Zell-Zustand)', async () => {
+    const matrix = [{
+      id: 5, einsatz_id: 1, gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'hoch',
+      beschreibung: 'X', gemeldet_von: null, aktualisiert_von: 1, erstellt_at: '', geaendert_at: '',
+    }];
+    let put: Record<string, unknown> | null = null;
+    server.use(
+      ...handlers('einsatzleitung', 'aktiv', matrix),
+      http.put('/api/einsaetze/1/gefahrenmatrix/bewertung', async ({ request }) => {
+        put = (await request.json()) as typeof put;
+        return HttpResponse.json({ ...matrix[0], ...put });
+      }),
+    );
+    renderPage();
+    const buttons = await screen.findAllByLabelText('Details brand × menschen');
+    await userEvent.click(buttons[0]);
+    const textarea = await screen.findByLabelText('Beschreibung');
+    await userEvent.clear(textarea);
+    await userEvent.type(textarea, 'Dachstuhl brennt');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(put).toEqual({
+      gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'hoch',
+      beschreibung: 'Dachstuhl brennt', gemeldet_von: null,
+    }));
+  });
+
+  it('Warnstufen-Änderung clobbert bestehende beschreibung nicht', async () => {
+    const matrix = [{
+      id: 5, einsatz_id: 1, gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'hoch',
+      beschreibung: 'Dachstuhl', gemeldet_von: 'KdoW', aktualisiert_von: 1, erstellt_at: '', geaendert_at: '',
+    }];
+    let put: Record<string, unknown> | null = null;
+    server.use(
+      ...handlers('einsatzleitung', 'aktiv', matrix),
+      http.put('/api/einsaetze/1/gefahrenmatrix/bewertung', async ({ request }) => {
+        put = (await request.json()) as typeof put;
+        return HttpResponse.json({ ...matrix[0], ...put });
+      }),
+    );
+    renderPage();
+    const zellen = await screen.findAllByLabelText('Warnstufe brand × menschen');
+    const combobox = zellen[0].querySelector('input[role="combobox"]') ?? zellen[0];
+    await userEvent.click(combobox);
+    await userEvent.click(await screen.findByText('Akut'));
+    await waitFor(() => expect(put).toEqual({
+      gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'akut',
+      beschreibung: 'Dachstuhl', gemeldet_von: 'KdoW',
+    }));
   });
 
   it('zeigt die Anzahl verknüpfter Zonen als Badge', async () => {

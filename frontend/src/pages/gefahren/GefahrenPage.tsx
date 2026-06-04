@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, App, Badge, Select, Spin, Table, Tooltip } from 'antd';
+import { Alert, App, Badge, Button, Input, Popover, Select, Space, Spin, Table, Tooltip } from 'antd';
+import { EditOutlined } from '@ant-design/icons';
 import type { TableColumnsType } from 'antd';
 import type { GefahrBewertung, Gefahrentyp, Schutzobjekt, Warnstufe } from '../../api/types';
+import type { BewertungEingabe } from '../../api/gefahren';
 import { ApiError } from '../../api/client';
 import { ladeGefahrenmatrix, setzeBewertung } from '../../api/gefahren';
 import { ladeEinsatz } from '../../api/einsaetze';
@@ -15,6 +18,66 @@ import {
 interface ZeilenDaten {
   typ: Gefahrentyp;
   label: string;
+}
+
+/** Popover-Formular für beschreibung/gemeldet_von einer bewerteten Zelle. */
+function DetailPopover({
+  zelle,
+  onSpeichern,
+  speichert,
+}: {
+  zelle: GefahrBewertung;
+  onSpeichern: (beschreibung: string | null, gemeldetVon: string | null) => void;
+  speichert: boolean;
+}) {
+  const [offen, setOffen] = useState(false);
+  const [beschreibung, setBeschreibung] = useState(zelle.beschreibung ?? '');
+  const [gemeldetVon, setGemeldetVon] = useState(zelle.gemeldet_von ?? '');
+
+  const oeffnen = (auf: boolean) => {
+    if (auf) {
+      // Beim Öffnen aus der aktuellen Zelle vorbelegen.
+      setBeschreibung(zelle.beschreibung ?? '');
+      setGemeldetVon(zelle.gemeldet_von ?? '');
+    }
+    setOffen(auf);
+  };
+
+  const speichern = () => {
+    onSpeichern(beschreibung.trim() || null, gemeldetVon.trim() || null);
+    setOffen(false);
+  };
+
+  return (
+    <Popover
+      trigger="click"
+      open={offen}
+      onOpenChange={oeffnen}
+      title="Details"
+      content={
+        <Space direction="vertical" style={{ width: 240 }}>
+          <Input.TextArea
+            aria-label="Beschreibung"
+            rows={2}
+            placeholder="Beschreibung"
+            value={beschreibung}
+            onChange={(e) => setBeschreibung(e.target.value)}
+          />
+          <Input
+            aria-label="Gemeldet von"
+            placeholder="Gemeldet von"
+            value={gemeldetVon}
+            onChange={(e) => setGemeldetVon(e.target.value)}
+          />
+          <Button type="primary" size="small" loading={speichert} onClick={speichern}>
+            Speichern
+          </Button>
+        </Space>
+      }
+    >
+      <Button aria-label={`Details ${zelle.gefahrentyp} × ${zelle.schutzobjekt}`} size="small" type="text" icon={<EditOutlined />} />
+    </Popover>
+  );
 }
 
 export default function GefahrenPage() {
@@ -30,9 +93,10 @@ export default function GefahrenPage() {
   const zonenQuery = useQuery({ queryKey: ['einsatz-zonen', einsatzId], queryFn: () => listeZonen(einsatzId) });
 
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+  // Sendet immer den vollen Zell-Zustand (warnstufe + beschreibung + gemeldet_von),
+  // damit eine Warnstufen-Änderung vorhandene beschreibung/gemeldet_von nicht clobbert.
   const setzen = useMutation({
-    mutationFn: (d: { typ: Gefahrentyp; objekt: Schutzobjekt; warnstufe: Warnstufe }) =>
-      setzeBewertung(einsatzId, { gefahrentyp: d.typ, schutzobjekt: d.objekt, warnstufe: d.warnstufe }),
+    mutationFn: (d: BewertungEingabe) => setzeBewertung(einsatzId, d),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['gefahrenmatrix', einsatzId] }); },
     onError: fehler,
   });
@@ -53,10 +117,10 @@ export default function GefahrenPage() {
 
   // Effektive Warnstufe je (typ, objekt) aus der (keine-gefilterten) Matrix.
   const matrix: GefahrBewertung[] = matrixQuery.data ?? [];
-  const warnstufeVon = (typ: Gefahrentyp, objekt: Schutzobjekt): Warnstufe => {
-    const t = matrix.find((m) => m.gefahrentyp === typ && m.schutzobjekt === objekt);
-    return t?.warnstufe ?? 'keine';
-  };
+  const zelleVon = (typ: Gefahrentyp, objekt: Schutzobjekt): GefahrBewertung | undefined =>
+    matrix.find((m) => m.gefahrentyp === typ && m.schutzobjekt === objekt);
+  const warnstufeVon = (typ: Gefahrentyp, objekt: Schutzobjekt): Warnstufe =>
+    zelleVon(typ, objekt)?.warnstufe ?? 'keine';
 
   const zonen = zonenQuery.data ?? [];
   const zonenAnzahl = (typ: Gefahrentyp, objekt: Schutzobjekt): number =>
@@ -73,22 +137,45 @@ export default function GefahrenPage() {
       }),
       render: (_: unknown, zeile: ZeilenDaten) => {
         const gueltig = kombinationGueltig(zeile.typ, obj.wert);
-        const aktuell = warnstufeVon(zeile.typ, obj.wert);
+        const zelle = zelleVon(zeile.typ, obj.wert);
+        const aktuell = zelle?.warnstufe ?? 'keine';
         const anzahl = zonenAnzahl(zeile.typ, obj.wert);
         return (
-          <Tooltip title={anzahl > 0 ? `${anzahl} verknüpfte Zone(n) auf der Lagekarte` : undefined}>
-            <Badge count={anzahl} size="small" offset={[-4, 2]}>
-              <Select<Warnstufe>
-                aria-label={`Warnstufe ${zeile.typ} × ${obj.wert}`}
-                size="small"
-                style={{ width: 110 }}
-                value={aktuell}
-                disabled={!gueltig || !darfSchreiben || setzen.isPending}
-                options={WARNSTUFEN.map((w) => ({ value: w.wert, label: w.label }))}
-                onChange={(w) => setzen.mutate({ typ: zeile.typ, objekt: obj.wert, warnstufe: w })}
+          <Space size={4} align="center">
+            <Tooltip title={anzahl > 0 ? `${anzahl} verknüpfte Zone(n) auf der Lagekarte` : undefined}>
+              <Badge count={anzahl} size="small" offset={[-4, 2]}>
+                <Select<Warnstufe>
+                  aria-label={`Warnstufe ${zeile.typ} × ${obj.wert}`}
+                  size="small"
+                  style={{ width: 110 }}
+                  value={aktuell}
+                  disabled={!gueltig || !darfSchreiben || setzen.isPending}
+                  options={WARNSTUFEN.map((w) => ({ value: w.wert, label: w.label }))}
+                  // Vollen Zell-Zustand senden → kein Clobber von beschreibung/gemeldet_von.
+                  onChange={(w) => setzen.mutate({
+                    gefahrentyp: zeile.typ,
+                    schutzobjekt: obj.wert,
+                    warnstufe: w,
+                    beschreibung: zelle?.beschreibung ?? null,
+                    gemeldet_von: zelle?.gemeldet_von ?? null,
+                  })}
+                />
+              </Badge>
+            </Tooltip>
+            {darfSchreiben && aktuell !== 'keine' && zelle && (
+              <DetailPopover
+                zelle={zelle}
+                speichert={setzen.isPending}
+                onSpeichern={(beschreibung, gemeldetVon) => setzen.mutate({
+                  gefahrentyp: zeile.typ,
+                  schutzobjekt: obj.wert,
+                  warnstufe: zelle.warnstufe,
+                  beschreibung,
+                  gemeldet_von: gemeldetVon,
+                })}
               />
-            </Badge>
-          </Tooltip>
+            )}
+          </Space>
         );
       },
     })),

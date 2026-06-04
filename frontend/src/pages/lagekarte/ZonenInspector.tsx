@@ -88,7 +88,12 @@ export default function ZonenInspector({ zone, darfSchreiben, onSchliessen, onAe
               style={{ width: '100%' }}
               value={aktuellerGefahrentyp ?? undefined}
               disabled={!darfSchreiben}
-              options={GEFAHRENTYPEN.map((g) => ({ value: g.wert, label: g.label }))}
+              options={GEFAHRENTYPEN.map((g) => ({
+                value: g.wert,
+                label: g.label,
+                // Gegen das gespeicherte Schutzobjekt symmetrisch sperren (vermeidet 422-Toast).
+                disabled: zone.schutzobjekt ? !kombinationGueltig(g.wert, zone.schutzobjekt) : false,
+              }))}
               onChange={(v) => {
                 // Beim Leeren beide Felder nullen (beide-oder-keine).
                 if (!v) {
