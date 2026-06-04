@@ -11,6 +11,8 @@ pub struct ZoneNeu<'a> {
     pub label: Option<&'a str>,
     pub farbe: Option<&'a str>,
     pub notiz: Option<&'a str>,
+    pub gefahrentyp: Option<&'a str>,
+    pub schutzobjekt: Option<&'a str>,
     pub erstellt_von: i64,
 }
 
@@ -22,11 +24,13 @@ pub struct ZonePatch<'a> {
     pub label: Option<Option<&'a str>>,
     pub farbe: Option<Option<&'a str>>,
     pub notiz: Option<Option<&'a str>>,
+    pub gefahrentyp: Option<Option<&'a str>>,
+    pub schutzobjekt: Option<Option<&'a str>>,
 }
 
 const SELECT_ALLE: &str = "\
     SELECT id, einsatz_id, typ, geometrie_typ, geometrie, label, farbe, notiz, \
-           erstellt_von, erstellt_at, geaendert_at \
+           gefahrentyp, schutzobjekt, erstellt_von, erstellt_at, geaendert_at \
     FROM lage_zone";
 
 #[derive(sqlx::FromRow)]
@@ -39,6 +43,8 @@ struct Row {
     label: Option<String>,
     farbe: Option<String>,
     notiz: Option<String>,
+    gefahrentyp: Option<String>,
+    schutzobjekt: Option<String>,
     erstellt_von: i64,
     erstellt_at: String,
     geaendert_at: String,
@@ -54,6 +60,8 @@ fn zu_anzeige(r: Row) -> LageZoneAnzeige {
         label: r.label,
         farbe: r.farbe,
         notiz: r.notiz,
+        gefahrentyp: r.gefahrentyp,
+        schutzobjekt: r.schutzobjekt,
         erstellt_von: r.erstellt_von,
         erstellt_at: r.erstellt_at,
         geaendert_at: r.geaendert_at,
@@ -83,12 +91,16 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<LageZo
 pub async fn anlegen(pool: &SqlitePool, einsatz_id: i64, daten: ZoneNeu<'_>) -> Result<LageZoneAnzeige, AppError> {
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO lage_zone \
-            (einsatz_id, typ, geometrie_typ, geometrie, label, farbe, notiz, erstellt_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            (einsatz_id, typ, geometrie_typ, geometrie, label, farbe, notiz, gefahrentyp, schutzobjekt, erstellt_von) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id).bind(daten.typ).bind(daten.geometrie_typ).bind(daten.geometrie)
-    .bind(daten.label).bind(daten.farbe).bind(daten.notiz).bind(daten.erstellt_von)
+    .bind(daten.label).bind(daten.farbe).bind(daten.notiz)
+    .bind(daten.gefahrentyp).bind(daten.schutzobjekt).bind(daten.erstellt_von)
     .fetch_one(pool).await?;
+    if let (Some(g), Some(o)) = (daten.gefahrentyp, daten.schutzobjekt) {
+        crate::gefahr::repo::lazy_create_zelle(pool, einsatz_id, g, o, daten.erstellt_von).await?;
+    }
     laden(pool, einsatz_id, id).await
 }
 
@@ -106,6 +118,8 @@ pub async fn aktualisiere(
             label = CASE WHEN ? THEN ? ELSE label END, \
             farbe = CASE WHEN ? THEN ? ELSE farbe END, \
             notiz = CASE WHEN ? THEN ? ELSE notiz END, \
+            gefahrentyp  = CASE WHEN ? THEN ? ELSE gefahrentyp END, \
+            schutzobjekt = CASE WHEN ? THEN ? ELSE schutzobjekt END, \
             geaendert_at = datetime('now') \
          WHERE id = ? AND einsatz_id = ?",
     )
@@ -113,12 +127,19 @@ pub async fn aktualisiere(
     .bind(daten.label.is_some()).bind(daten.label.flatten())
     .bind(daten.farbe.is_some()).bind(daten.farbe.flatten())
     .bind(daten.notiz.is_some()).bind(daten.notiz.flatten())
+    .bind(daten.gefahrentyp.is_some()).bind(daten.gefahrentyp.flatten())
+    .bind(daten.schutzobjekt.is_some()).bind(daten.schutzobjekt.flatten())
     .bind(id).bind(einsatz_id)
     .execute(pool).await?.rows_affected();
     if betroffen == 0 {
         return Err(AppError::NotFound);
     }
-    laden(pool, einsatz_id, id).await
+    // Beim Setzen einer Zuordnung die Matrix-Zelle sicherstellen (Lazy-Create).
+    let z = laden(pool, einsatz_id, id).await?;
+    if let (Some(g), Some(o)) = (z.gefahrentyp.as_deref(), z.schutzobjekt.as_deref()) {
+        crate::gefahr::repo::lazy_create_zelle(pool, einsatz_id, g, o, z.erstellt_von).await?;
+    }
+    Ok(z)
 }
 
 /// Hard-Delete. `NotFound`, falls nicht zum Einsatz.
@@ -159,7 +180,8 @@ mod tests {
         let (einsatz, von) = setup(&pool).await;
         let z = anlegen(&pool, einsatz, ZoneNeu {
             typ: "gefahrengebiet", geometrie_typ: "Polygon", geometrie: POLY,
-            label: Some("Chemie Halle 3"), farbe: None, notiz: None, erstellt_von: von,
+            label: Some("Chemie Halle 3"), farbe: None, notiz: None,
+            gefahrentyp: None, schutzobjekt: None, erstellt_von: von,
         }).await.unwrap();
         assert_eq!(z.typ, "gefahrengebiet");
         assert_eq!(z.geometrie_typ, "Polygon");
@@ -175,7 +197,8 @@ mod tests {
         let (einsatz, von) = setup(&pool).await;
         let z = anlegen(&pool, einsatz, ZoneNeu {
             typ: "freie_skizze", geometrie_typ: "LineString", geometrie: LINE,
-            label: None, farbe: Some("#00ff00"), notiz: None, erstellt_von: von,
+            label: None, farbe: Some("#00ff00"), notiz: None,
+            gefahrentyp: None, schutzobjekt: None, erstellt_von: von,
         }).await.unwrap();
         assert_eq!(z.farbe.as_deref(), Some("#00ff00"));
         assert_eq!(z.geometrie_typ, "LineString");
@@ -187,7 +210,8 @@ mod tests {
         let (einsatz, von) = setup(&pool).await;
         let z = anlegen(&pool, einsatz, ZoneNeu {
             typ: "gefahrengebiet", geometrie_typ: "Polygon", geometrie: POLY,
-            label: Some("A"), farbe: None, notiz: Some("Notiz bleibt"), erstellt_von: von,
+            label: Some("A"), farbe: None, notiz: Some("Notiz bleibt"),
+            gefahrentyp: None, schutzobjekt: None, erstellt_von: von,
         }).await.unwrap();
         // Nur label ändern; notiz NICHT mitsenden → bleibt erhalten.
         let n = aktualisiere(&pool, einsatz, z.id, ZonePatch {
@@ -203,7 +227,8 @@ mod tests {
         let (einsatz, von) = setup(&pool).await;
         let z = anlegen(&pool, einsatz, ZoneNeu {
             typ: "absperrgrenze", geometrie_typ: "LineString", geometrie: LINE,
-            label: None, farbe: None, notiz: None, erstellt_von: von,
+            label: None, farbe: None, notiz: None,
+            gefahrentyp: None, schutzobjekt: None, erstellt_von: von,
         }).await.unwrap();
         assert!(matches!(laden(&pool, 999, z.id).await.unwrap_err(), AppError::NotFound));
         loese_auf(&pool, einsatz, z.id).await.unwrap();
