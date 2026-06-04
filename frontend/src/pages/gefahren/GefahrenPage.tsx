@@ -6,6 +6,7 @@ import type { GefahrBewertung, Gefahrentyp, Schutzobjekt, Warnstufe } from '../.
 import { ApiError } from '../../api/client';
 import { ladeGefahrenmatrix, setzeBewertung } from '../../api/gefahren';
 import { ladeEinsatz } from '../../api/einsaetze';
+import { useEinsatzLiveStream } from '../../etb/useEinsatzLiveStream';
 import {
   GEFAHRENTYPEN, SCHUTZOBJEKTE, WARNSTUFEN, kombinationGueltig, warnstufeFarbe,
 } from './gefahrenSchema';
@@ -20,6 +21,8 @@ export default function GefahrenPage() {
   const einsatzId = Number(id);
   const qc = useQueryClient();
   const { message } = App.useApp();
+
+  useEinsatzLiveStream(einsatzId);
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const matrixQuery = useQuery({ queryKey: ['gefahrenmatrix', einsatzId], queryFn: () => ladeGefahrenmatrix(einsatzId) });
@@ -37,6 +40,9 @@ export default function GefahrenPage() {
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
     return <Alert type="error" message="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+  }
+  if (matrixQuery.isError) {
+    return <Alert type="error" message="Gefahrenmatrix konnte nicht geladen werden" showIcon />;
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben =
@@ -59,15 +65,17 @@ export default function GefahrenPage() {
         const gueltig = kombinationGueltig(zeile.typ, obj.wert);
         const aktuell = warnstufeVon(zeile.typ, obj.wert);
         return (
-          <Select<Warnstufe>
-            aria-label={`Warnstufe ${zeile.typ} × ${obj.wert}`}
-            size="small"
-            style={{ width: 110, backgroundColor: warnstufeFarbe(aktuell) }}
-            value={aktuell}
-            disabled={!gueltig || !darfSchreiben || setzen.isPending}
-            options={WARNSTUFEN.map((w) => ({ value: w.wert, label: w.label }))}
-            onChange={(w) => setzen.mutate({ typ: zeile.typ, objekt: obj.wert, warnstufe: w })}
-          />
+          <div style={{ backgroundColor: warnstufeFarbe(aktuell), borderRadius: 4, display: 'inline-block' }}>
+            <Select<Warnstufe>
+              aria-label={`Warnstufe ${zeile.typ} × ${obj.wert}`}
+              size="small"
+              style={{ width: 110 }}
+              value={aktuell}
+              disabled={!gueltig || !darfSchreiben || setzen.isPending}
+              options={WARNSTUFEN.map((w) => ({ value: w.wert, label: w.label }))}
+              onChange={(w) => setzen.mutate({ typ: zeile.typ, objekt: obj.wert, warnstufe: w })}
+            />
+          </div>
         );
       },
     })),
@@ -76,14 +84,24 @@ export default function GefahrenPage() {
   const zeilen: ZeilenDaten[] = GEFAHRENTYPEN.map((g) => ({ typ: g.wert, label: g.label }));
 
   return (
-    <Table<ZeilenDaten>
-      rowKey="typ"
-      columns={spalten}
-      dataSource={zeilen}
-      pagination={false}
-      size="small"
-      scroll={{ x: 'max-content' }}
-      loading={matrixQuery.isLoading}
-    />
+    <>
+      {!darfSchreiben && (
+        <Alert
+          type="info"
+          showIcon
+          message="Nur Lesezugriff – Bewertungen können nicht geändert werden."
+          style={{ marginBottom: 12 }}
+        />
+      )}
+      <Table<ZeilenDaten>
+        rowKey="typ"
+        columns={spalten}
+        dataSource={zeilen}
+        pagination={false}
+        size="small"
+        scroll={{ x: 'max-content' }}
+        loading={matrixQuery.isLoading}
+      />
+    </>
   );
 }

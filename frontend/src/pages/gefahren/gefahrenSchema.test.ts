@@ -28,5 +28,7 @@ describe('gefahrenSchema', () => {
     for (const w of WARNSTUFEN) {
       expect(typeof warnstufeFarbe(w.wert)).toBe('string');
     }
+    expect(warnstufeFarbe('keine')).toBe('transparent');
+    expect(warnstufeFarbe('akut')).toBe('#ff4d4f');
   });
 });
