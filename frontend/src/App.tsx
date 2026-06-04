@@ -29,6 +29,7 @@ import ModulStub from './einsatz/ModulStub';
 import { modulRegistry } from './einsatz/modulRegistry';
 
 const LagekartePage = lazy(() => import('./pages/LagekartePage'));
+const KraefteuebersichtPage = lazy(() => import('./pages/KraefteuebersichtPage'));
 
 /** Module mit echter Implementierung; alle übrigen rendern den ModulStub. */
 const MODUL_ELEMENTE: Record<string, ReactElement> = {
@@ -47,6 +48,11 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   lagekarte: (
     <Suspense fallback={<div style={{ padding: 24 }}>Karte wird geladen…</div>}>
       <LagekartePage />
+    </Suspense>
+  ),
+  kraefteuebersicht: (
+    <Suspense fallback={<div style={{ padding: 24 }}>Meldebild wird geladen…</div>}>
+      <KraefteuebersichtPage />
     </Suspense>
   ),
 };
