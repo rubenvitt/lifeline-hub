@@ -19,6 +19,7 @@ pub mod lagebericht;
 pub mod etb_baustein;
 pub mod fahrzeug;
 pub mod fahrzeug_status;
+pub mod gefahr;
 pub mod material;
 pub mod health;
 pub mod organisation;
