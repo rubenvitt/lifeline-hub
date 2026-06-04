@@ -1,5 +1,5 @@
 import { it, expect } from 'vitest';
-import { baueKraeftebild, filtereKraefte, OHNE_ABSCHNITT_KEY } from './kraeftebild';
+import { baueKraeftebild, filtereKraefte, rendereMeldebildMarkdown, OHNE_ABSCHNITT_KEY } from './kraeftebild';
 import type { Einheit, EinsatzPersonal, EinsatzFahrzeug, EinsatzMaterial, Einsatzabschnitt } from '../api/types';
 
 const ab = (id: number, ueber: number | null = null, name = `A${id}`): Einsatzabschnitt =>
@@ -120,6 +120,15 @@ it('Abschnitts-Filter grenzt Blätter ein und liefert nur den gewählten Abschni
   expect(ge.personal.map((x) => x.id)).toEqual([1]);
   const bild = baueKraeftebild(ge.abschnitte, ge.einheiten, ge.personal, ge.fahrzeuge, ge.material);
   expect(bild.baum.map((z) => z.key)).toEqual(['ab-1']);
+});
+
+it('rendert das Meldebild als Markdown mit Kopfzeile und Abschnitten', () => {
+  const bild = baueKraeftebild([ab(1)], [eh(10, 1)], [p(1, 10, 'fuehrer')], [], []);
+  const md = rendereMeldebildMarkdown(bild, 'Stand 12:00');
+  expect(md).toContain('# Kräftemeldebild');
+  expect(md).toContain('Stand 12:00');
+  expect(md).toContain('Gesamtstärke');
+  expect(md).toContain('A1');
 });
 
 it('Suche matcht über Name und Funkrufname', () => {

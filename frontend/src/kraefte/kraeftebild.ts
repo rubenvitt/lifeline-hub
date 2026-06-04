@@ -388,6 +388,94 @@ export function filtereKraefte(roh: Rohdaten, f: FilterWerte): Rohdaten {
   };
 }
 
+// ── Markdown-Renderer ─────────────────────────────────────────────────────────
+
+function formatStaerke(s: StaerkeSumme): string {
+  return `${s.fuehrer}/${s.unterfuehrer}/${s.mannschaft}/${s.gesamt}`;
+}
+
+function rendereMeldebildZeileMarkdown(zeile: MeldebildZeile, tiefe: number): string {
+  const zeilen: string[] = [];
+
+  if (zeile.art === 'abschnitt') {
+    // Abschnitte tragen keinen Einzug — die Tiefe steckt in der Heading-Hierarchie (## / ###).
+    const prefix = tiefe === 0 ? '##' : '###';
+    zeilen.push(`${prefix} ${zeile.bezeichnung}`);
+    zeilen.push(`Stärke (F/UF/M/Ges): ${formatStaerke(zeile.staerke)}`);
+  } else if (zeile.art === 'einheit') {
+    const einzug = '  '.repeat(Math.max(0, tiefe - 1));
+    const detail = zeile.detail ? ` (${zeile.detail})` : '';
+    zeilen.push(`${einzug}- **${zeile.bezeichnung}**${detail} — Stärke: ${formatStaerke(zeile.staerke)}`);
+  } else {
+    // mittel
+    const einzug = '  '.repeat(Math.max(0, tiefe - 1));
+    if (zeile.mittelArt === 'person') {
+      const detail = zeile.detail ? ` (${zeile.detail})` : '';
+      const status = zeile.statusLabel ?? zeile.statusKategorie ?? '';
+      zeilen.push(`${einzug}  - 👤 ${zeile.bezeichnung}${detail}${status ? ` [${status}]` : ''}`);
+    } else if (zeile.mittelArt === 'fahrzeug') {
+      const detail = zeile.detail ? ` (${zeile.detail})` : '';
+      const status = zeile.statusLabel ?? zeile.statusKategorie ?? '';
+      zeilen.push(`${einzug}  - 🚒 ${zeile.bezeichnung}${detail}${status ? ` [${status}]` : ''}`);
+    } else {
+      const menge = zeile.menge != null ? ` ×${zeile.menge}` : '';
+      const status = zeile.statusLabel ?? '';
+      zeilen.push(`${einzug}  - 📦 ${zeile.bezeichnung}${menge}${status ? ` [${status}]` : ''}`);
+    }
+  }
+
+  if (zeile.children) {
+    for (const kind of zeile.children) {
+      zeilen.push(rendereMeldebildZeileMarkdown(kind, tiefe + 1));
+    }
+  }
+
+  return zeilen.join('\n');
+}
+
+/**
+ * Rendert ein Kraeftebild als lesbares Markdown. Deterministisch — keine Date-Aufrufe.
+ * Der `stand`-String wird von außen übergeben.
+ */
+export function rendereMeldebildMarkdown(bild: Kraeftebild, stand: string): string {
+  const v = bild.verdichtung;
+  const zeilen: string[] = [];
+
+  zeilen.push('# Kräftemeldebild');
+  zeilen.push('');
+  zeilen.push(`**Stand:** ${stand}`);
+  zeilen.push('');
+
+  // Verdichtungsblock
+  zeilen.push('## Lagebild gesamt');
+  zeilen.push('');
+  zeilen.push(`**Gesamtstärke (F/UF/M/Ges):** ${formatStaerke(v.staerke)}`);
+  zeilen.push(`**Fahrzeuge:** ${v.anzahlFahrzeuge} gesamt (frei: ${v.fahrzeugStatus.verfuegbar}, gebunden: ${v.fahrzeugStatus.gebunden}, n.v.: ${v.fahrzeugStatus.nicht_verfuegbar})`);
+  zeilen.push(`**Material (Positionen):** ${v.anzahlMaterialPositionen}`);
+  if (v.anzahlMaterialPositionen > 0) {
+    const matTeile: string[] = [];
+    if (v.materialStatus.einsatzbereit > 0) matTeile.push(`einsatzbereit: ${v.materialStatus.einsatzbereit}`);
+    if (v.materialStatus.im_einsatz > 0) matTeile.push(`im Einsatz: ${v.materialStatus.im_einsatz}`);
+    if (v.materialStatus.defekt > 0) matTeile.push(`defekt: ${v.materialStatus.defekt}`);
+    if (v.materialStatus.verbraucht > 0) matTeile.push(`verbraucht: ${v.materialStatus.verbraucht}`);
+    if (v.materialStatus.desinfektion_noetig > 0) matTeile.push(`Desinfektion nötig: ${v.materialStatus.desinfektion_noetig}`);
+    if (matTeile.length > 0) zeilen.push(`  (${matTeile.join(', ')})`);
+  }
+  zeilen.push('');
+
+  // Baum
+  if (bild.baum.length > 0) {
+    zeilen.push('## Kräftegliederung');
+    zeilen.push('');
+    for (const zeile of bild.baum) {
+      zeilen.push(rendereMeldebildZeileMarkdown(zeile, 0));
+      zeilen.push('');
+    }
+  }
+
+  return zeilen.join('\n');
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export function baueKraeftebild(

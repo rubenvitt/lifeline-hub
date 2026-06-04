@@ -1,8 +1,8 @@
-import { Alert, Breadcrumb, Button, Card, Input, Select, Space, Spin, Statistic, Table, Tag, Typography } from 'antd';
+import { Alert, App as AntApp, Breadcrumb, Button, Card, Input, Select, Space, Spin, Statistic, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import React, { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
@@ -13,12 +13,14 @@ import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
 import {
   baueKraeftebild,
   filtereKraefte,
+  rendereMeldebildMarkdown,
   type FilterWerte,
   type MeldebildZeile,
   type Rohdaten,
   type StaerkeSumme,
   type StatusVerteilung,
 } from '../kraefte/kraeftebild';
+import { legeLageberichtAn, aktualisiereLagebericht } from '../api/lageberichte';
 import type { MaterialStatus, StatusKategorie } from '../api/types';
 import './kraefteuebersichtPrint.css';
 
@@ -92,6 +94,8 @@ export default function KraefteuebersichtPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   useEinsatzLiveStream(einsatzId);
+  const navigate = useNavigate();
+  const { message } = AntApp.useApp();
 
   const [filter, setFilter] = useState<FilterWerte>({ abschnittId: null, traeger: null, kategorie: null, suche: '' });
   const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
@@ -125,6 +129,20 @@ export default function KraefteuebersichtPage() {
     );
   }, [abschnitteQuery.data, einheitenQuery.data, personalQuery.data, fahrzeugeQuery.data, materialQuery.data, filter]);
 
+  const uebernehmen = useMutation({
+    mutationFn: async () => {
+      const stand = new Date().toLocaleString('de-DE');
+      const md = rendereMeldebildMarkdown(bild, stand);
+      const lb = await legeLageberichtAn(einsatzId, { vorlage: 'freitext', titel: `Kräftemeldebild ${stand}` });
+      // Hinweis: Schlägt der PATCH fehl, bleibt ein leerer Entwurf zurück (vom EL löschbar).
+      // Atomar wäre nur mit eigenem Backend-Endpoint — bewusst v1-Kompromiss.
+      await aktualisiereLagebericht(einsatzId, lb.id, { abschnitte: [{ schluessel: 'text', text: md }] });
+      return lb.id;
+    },
+    onSuccess: (lbId) => navigate(`/einsaetze/${einsatzId}/lageberichte/${lbId}`),
+    onError: () => message.error('Übernahme fehlgeschlagen'),
+  });
+
   // Erst nach committetem Aufklappen drucken (sonst kollabierte Zeilen bei großen Bäumen).
   useEffect(() => {
     if (printPending) {
@@ -143,6 +161,7 @@ export default function KraefteuebersichtPage() {
   if (einsatzQuery.isError || !einsatzQuery.data) return <Alert type="error" message="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   const einsatz = einsatzQuery.data;
   const v = bild.verdichtung;
+  const darfSchreiben = einsatz.status === 'aktiv' && (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
 
   return (
     <div className="kraefte-print-root">
@@ -150,7 +169,12 @@ export default function KraefteuebersichtPage() {
         items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Kräfteübersicht' }]} />
       <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 4 }}>
         <Typography.Title level={3} style={{ marginTop: 0 }}>Kräfteübersicht</Typography.Title>
-        <Button className="kraefte-no-print" onClick={handleDrucken}>Drucken / als PDF</Button>
+        <Space className="kraefte-no-print">
+          {darfSchreiben && (
+            <Button loading={uebernehmen.isPending} onClick={() => uebernehmen.mutate()}>In Lagebericht übernehmen</Button>
+          )}
+          <Button onClick={handleDrucken}>Drucken / als PDF</Button>
+        </Space>
       </Space>
       <Card size="small" style={{ marginBottom: 16 }} styles={{ body: { overflowX: 'auto' } }}>
         {/* Monitoring-Kopf: nicht umbrechend, bei schmalem Viewport horizontal scrollbar. */}

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within, fireEvent } from '@testing-library/react';
+import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { App as AntApp } from 'antd';
@@ -10,6 +10,7 @@ import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../api/einsatzMaterial';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
+import { legeLageberichtAn, aktualisiereLagebericht } from '../api/lageberichte';
 import type { EinsatzAnzeige } from '../api/types';
 
 vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn() }));
@@ -19,6 +20,11 @@ vi.mock('../api/einsatzFahrzeuge', () => ({ listeEinsatzFahrzeuge: vi.fn() }));
 vi.mock('../api/einsatzMaterial', () => ({ listeEinsatzMaterial: vi.fn() }));
 vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn() }));
 vi.mock('../etb/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: vi.fn() }));
+vi.mock('../api/lageberichte', () => ({
+  legeLageberichtAn: vi.fn(() => Promise.resolve({ id: 99 })),
+  aktualisiereLagebericht: vi.fn(() => Promise.resolve({})),
+}));
+vi.mock('react-router-dom', async (orig) => ({ ...(await orig()), useNavigate: () => vi.fn() }));
 
 // Nur die im Page genutzten Felder; Rest via Cast (Test-Fixture, kein echter Server-DTO).
 const EINSATZ = { id: 1, bezeichnung: 'Testeinsatz', status: 'aktiv', meine_rolle: 'einsatzleitung' } as EinsatzAnzeige;
@@ -126,5 +132,42 @@ describe('KraefteuebersichtPage', () => {
     setup();
     // Filter bar renders after einsatzQuery resolves past the Spin early-return
     expect(await screen.findByText('Trägerorganisation')).toBeInTheDocument();
+  });
+
+  it('zeigt "In Lagebericht übernehmen" nur für Führungspersonal im aktiven Einsatz', async () => {
+    // EINSATZ hat status:'aktiv' und meine_rolle:'einsatzleitung' → Button sichtbar
+    setup();
+    expect(await screen.findByRole('button', { name: /In Lagebericht übernehmen/i })).toBeInTheDocument();
+  });
+
+  it('versteckt "In Lagebericht übernehmen" für Beobachter', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue({ ...EINSATZ, meine_rolle: 'beobachter' } as EinsatzAnzeige);
+    setup();
+    // Wait for page to render past Spin
+    await screen.findByRole('button', { name: /Drucken/i });
+    expect(screen.queryByRole('button', { name: /In Lagebericht übernehmen/i })).toBeNull();
+  });
+
+  it('ruft legeLageberichtAn und aktualisiereLagebericht beim Klick auf Übernahme-Button auf', async () => {
+    setup();
+    const btn = await screen.findByRole('button', { name: /In Lagebericht übernehmen/i });
+    fireEvent.click(btn);
+    await waitFor(() =>
+      expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ vorlage: 'freitext' }),
+      ),
+    );
+    await waitFor(() =>
+      expect(vi.mocked(aktualisiereLagebericht)).toHaveBeenCalledWith(
+        1,
+        99,
+        expect.objectContaining({
+          abschnitte: expect.arrayContaining([
+            expect.objectContaining({ schluessel: 'text' }),
+          ]),
+        }),
+      ),
+    );
   });
 });
