@@ -26,6 +26,7 @@ import UnfallhilfsstellenDefault from './pages/UnfallhilfsstellenDefault';
 import UhsDetailPage from './pages/uhs/UhsDetailPage';
 import EinsatzLayout from './einsatz/EinsatzLayout';
 import DefaultModulRedirect from './einsatz/DefaultModulRedirect';
+import ModulRedirect from './einsatz/ModulRedirect';
 import ModulStub from './einsatz/ModulStub';
 import { modulRegistry } from './einsatz/modulRegistry';
 
@@ -78,7 +79,11 @@ export default function App() {
             <Route
               key={m.key}
               path={m.route}
-              element={MODUL_ELEMENTE[m.key] ?? <ModulStub modul={m} />}
+              element={
+                m.verweistAuf
+                  ? <ModulRedirect to={m.verweistAuf} />
+                  : MODUL_ELEMENTE[m.key] ?? <ModulStub modul={m} />
+              }
             />
           ))}
           <Route path="unfallhilfsstellen/liste" element={<UnfallhilfsstellenPage />} />

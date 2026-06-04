@@ -38,6 +38,19 @@ describe('ModulPanel', () => {
     expect(screen.getByText(/🔒/)).toBeInTheDocument();
   });
 
+  it('markiert ein Deep-Link-Modul mit Hinweis-Symbol', () => {
+    renderMitProviders(
+      <ModulPanel
+        titel="Lage"
+        module={[basis({ key: 'gefahrenzonen', label: 'Gefahren-/Absperrzonen', route: 'gefahrenzonen', status: 'fertig', verweistAuf: 'lagekarte' })]}
+        benutzer={ohne}
+        aktiverModulKey={null}
+        onModulKlick={() => {}}
+      />,
+    );
+    expect(screen.getByTitle('Öffnet in der Lagekarte')).toBeInTheDocument();
+  });
+
   it('meldet Klick auf ein freies Modul', async () => {
     const onKlick = vi.fn();
     renderMitProviders(

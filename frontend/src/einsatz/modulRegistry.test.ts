@@ -5,6 +5,7 @@ import {
   moduleNachKategorie,
   istModulGesperrt,
   redirectZiel,
+  modulZielRoute,
   type ModulEintrag,
 } from './modulRegistry';
 import type { BenutzerAnzeige } from '../api/types';
@@ -104,5 +105,23 @@ describe('modulRegistry', () => {
     expect(lb?.status).toBe('fertig');
     expect(lb?.kategorie).toBe('lage');
     expect(lb?.benoetigteRolle).toBeUndefined();
+  });
+
+  it('gefahrenzonen ist ein Deep-Link auf die Lagekarte (kein Platzhalter)', () => {
+    const gz = modulRegistry.find((m) => m.key === 'gefahrenzonen');
+    expect(gz).toBeDefined();
+    expect(gz?.kategorie).toBe('lage');
+    expect(gz?.verweistAuf).toBe('lagekarte');
+    // Die Funktion lebt in der Lagekarte → das Modul ist nicht mehr „geplant".
+    expect(gz?.status).toBe('fertig');
+  });
+
+  it('modulZielRoute: Deep-Link-Ziel hat Vorrang vor der eigenen Route', () => {
+    expect(modulZielRoute({ ...offen, route: 'gefahrenzonen', verweistAuf: 'lagekarte' }))
+      .toBe('lagekarte');
+  });
+
+  it('modulZielRoute: ohne Deep-Link die eigene Route', () => {
+    expect(modulZielRoute({ ...offen, route: 'etb' })).toBe('etb');
   });
 });

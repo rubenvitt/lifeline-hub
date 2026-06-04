@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { useAuth } from '../auth/AuthContext';
 import {
-  kategorien, modulRegistry, moduleNachKategorie,
+  kategorien, modulRegistry, moduleNachKategorie, modulZielRoute,
   type KategorieKey, type ModulEintrag,
 } from './modulRegistry';
 import EinsatzSwitcher from './EinsatzSwitcher';
@@ -48,7 +48,7 @@ export default function EinsatzLayout() {
   }
 
   function onModulKlick(modul: ModulEintrag) {
-    navigate(`/einsaetze/${einsatzId}/${modul.route}`);
+    navigate(`/einsaetze/${einsatzId}/${modulZielRoute(modul)}`);
   }
 
   return (

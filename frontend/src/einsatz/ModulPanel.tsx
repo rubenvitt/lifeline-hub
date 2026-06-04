@@ -55,6 +55,11 @@ export default function ModulPanel({
               <Icon size={18} />
               <span>{m.label}</span>
               {m.status === 'wip' && <span title="In Arbeit">🚧</span>}
+              {m.verweistAuf && (
+                <span title="Öffnet in der Lagekarte" aria-hidden style={{ marginLeft: 'auto' }}>
+                  ↗
+                </span>
+              )}
               {gesperrt && <span style={{ marginLeft: 'auto' }}>🔒</span>}
             </button>
           );
