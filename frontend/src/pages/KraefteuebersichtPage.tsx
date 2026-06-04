@@ -11,13 +11,26 @@ import { listeEinsatzMaterial } from '../api/einsatzMaterial';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
 import { baueKraeftebild, type MeldebildZeile, type StaerkeSumme, type StatusVerteilung } from '../kraefte/kraeftebild';
-import type { StatusKategorie } from '../api/types';
+import type { MaterialStatus, StatusKategorie } from '../api/types';
 
 export function staerkeText(s: StaerkeSumme): string {
   return `${s.fuehrer}/${s.unterfuehrer}/${s.mannschaft}/${s.gesamt}`;
 }
 
 const KAT_FARBE: Record<StatusKategorie, string> = { verfuegbar: 'green', gebunden: 'gold', nicht_verfuegbar: 'red' };
+
+const MAT_STATUS_ANZEIGE: Array<{ key: MaterialStatus; label: string; farbe?: string }> = [
+  { key: 'einsatzbereit', label: 'Mtl. einsatzbereit', farbe: '#52c41a' },
+  { key: 'im_einsatz', label: 'Mtl. im Einsatz', farbe: '#faad14' },
+  { key: 'defekt', label: 'Mtl. defekt', farbe: '#ff4d4f' },
+  { key: 'verbraucht', label: 'Mtl. verbraucht' },
+  { key: 'desinfektion_noetig', label: 'Mtl. Desinfektion', farbe: '#faad14' },
+];
+
+// Schlichter, umbruchsicherer Achsen-Trenner (Flex-Kind statt inline-block Divider).
+const achsenTrenner = (
+  <div style={{ width: 1, height: 48, background: '#d9d9d9', alignSelf: 'center', flex: 'none' }} />
+);
 
 function verteilungTags(v: StatusVerteilung | null) {
   if (!v) return null;
@@ -90,12 +103,41 @@ export default function KraefteuebersichtPage() {
       <Breadcrumb style={{ marginBottom: 12 }}
         items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Kräfteübersicht' }]} />
       <Typography.Title level={3} style={{ marginTop: 0 }}>Kräfteübersicht</Typography.Title>
-      <Card size="small" style={{ marginBottom: 16 }}>
-        <Space size="large" wrap>
-          <Statistic title="Gesamtstärke (F/UF/M/Ges)" value={staerkeText(v.staerke)} />
-          <Statistic title="Personal" value={v.anzahlPersonal} />
-          <Statistic title="Fahrzeuge" value={v.anzahlFahrzeuge} />
-          <Statistic title="Material" value={v.anzahlMaterialPositionen} />
+      <Card size="small" style={{ marginBottom: 16 }} styles={{ body: { overflowX: 'auto' } }}>
+        {/* Monitoring-Kopf: nicht umbrechend, bei schmalem Viewport horizontal scrollbar. */}
+        <Space size="large" align="start" style={{ flexWrap: 'nowrap' }}>
+          {/* Achse 1: Personalstärke */}
+          <Space size="large">
+            <Statistic title="Gesamtstärke (F/UF/M/Ges)" value={staerkeText(v.staerke)} />
+            <Statistic title="Personal" value={v.anzahlPersonal} />
+          </Space>
+
+          {achsenTrenner}
+
+          {/* Achse 2: Fahrzeug-Verfügbarkeit */}
+          <Space size="large">
+            <Statistic title="Fahrzeuge" value={v.anzahlFahrzeuge} />
+            <Statistic title="Fzg frei" value={v.fahrzeugStatus.verfuegbar} valueStyle={{ color: '#52c41a' }} />
+            <Statistic title="Fzg gebunden" value={v.fahrzeugStatus.gebunden} valueStyle={{ color: '#faad14' }} />
+            <Statistic title="Fzg n. einsatzbereit" value={v.fahrzeugStatus.nicht_verfuegbar} valueStyle={{ color: '#ff4d4f' }} />
+          </Space>
+
+          {achsenTrenner}
+
+          {/* Achse 3: Material */}
+          <Space size="large">
+            <Statistic title="Material (Pos.)" value={v.anzahlMaterialPositionen} />
+            {MAT_STATUS_ANZEIGE.map(({ key, label, farbe }) =>
+              v.materialStatus[key] > 0 ? (
+                <Statistic
+                  key={key}
+                  title={label}
+                  value={v.materialStatus[key]}
+                  valueStyle={farbe ? { color: farbe } : undefined}
+                />
+              ) : null,
+            )}
+          </Space>
         </Space>
       </Card>
       <Table<MeldebildZeile>

@@ -106,4 +106,13 @@ describe('KraefteuebersichtPage', () => {
     fireEvent.click(expandIcon!);
     expect(await screen.findByText('1. Zug')).toBeInTheDocument();
   });
+
+  it('zeigt Fahrzeug-Verfügbarkeits-Achse im Kopf', async () => {
+    vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([FAHRZEUG_F1]);
+    setup();
+    // Warten bis die Daten geladen sind
+    const titelEl = await screen.findByText('Fzg frei');
+    const statCard = titelEl.closest('.ant-statistic')!;
+    expect(await within(statCard as HTMLElement).findByText('1')).toBeInTheDocument();
+  });
 });

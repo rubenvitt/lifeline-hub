@@ -74,3 +74,15 @@ it('verdichtet Fahrzeug-Status getrennt', () => {
   expect(bild.verdichtung.fahrzeugStatus.gebunden).toBe(1);
   expect(bild.verdichtung.fahrzeugStatus.nicht_verfuegbar).toBe(1);
 });
+
+const mat = (id: number, einheit_id: number | null, status: EinsatzMaterial['status'], menge = 1): EinsatzMaterial =>
+  ({ id, einsatz_id: 1, material_id: null, einheit_id, uhs_id: null, ist_adhoc: false, bezeichnung: `M${id}`,
+     kategorie: null, bestandsnummer: null, traegerorganisation: null, menge, status, bemerkung: null,
+     disponiert_at: '', disponiert_von: null });
+
+it('verdichtet Material nach Status', () => {
+  const bild = baueKraeftebild([], [], [], [], [mat(1, null, 'einsatzbereit'), mat(2, null, 'defekt'), mat(3, null, 'einsatzbereit')]);
+  expect(bild.verdichtung.materialStatus.einsatzbereit).toBe(2);
+  expect(bild.verdichtung.materialStatus.defekt).toBe(1);
+  expect(bild.verdichtung.anzahlMaterialPositionen).toBe(3);
+});
