@@ -30,14 +30,20 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     const onEinheit = () => {
       inval('einsatz-einheiten');
       inval('einsatz-fuehrungskraefte');
+      // Mitglieder-Zuordnungen an Einheiten betreffen auch Personal- und Material-Listen.
+      inval('einsatz-personal');
+      inval('einsatz-fahrzeuge');
+      inval('einsatz-material');
     };
     const onAbschnitt = () => {
       inval('einsatz-abschnitte');
       inval('einsatz-fuehrungskraefte');
     };
-    // person berührt mehrere Sammlungen: Registrierung, Einheiten-/Abschnittsführung.
+    // person berührt mehrere Sammlungen: Registrierung, Einheiten-/Abschnittsführung,
+    // sowie disponiertes Personal im Meldebild.
     const onPerson = () => {
       inval('einsatz-personen');
+      inval('einsatz-personal');
       inval('einsatz-einheiten');
       inval('einsatz-abschnitte');
       inval('einsatz-fuehrungskraefte');
