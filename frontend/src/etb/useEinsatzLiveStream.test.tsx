@@ -68,4 +68,20 @@ describe('useEinsatzLiveStream', () => {
       expect(keys).toContain('einsatz-personal');
     });
   });
+
+  it('invalidiert gefahrenmatrix bei gefahr-Event', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={1} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit('gefahr');
+    await waitFor(() => {
+      const keys = spy.mock.calls.map((c) => (c[0] as { queryKey: string[] }).queryKey[0]);
+      expect(keys).toContain('gefahrenmatrix');
+    });
+  });
 });

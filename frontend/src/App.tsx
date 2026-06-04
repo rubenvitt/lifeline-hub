@@ -15,6 +15,7 @@ import MaterialPage from './pages/MaterialPage';
 import PersonalPage from './pages/PersonalPage';
 import EinheitenPage from './pages/EinheitenPage';
 import EinsatzabschnittePage from './pages/EinsatzabschnittePage';
+import GefahrenPage from './pages/gefahren/GefahrenPage';
 import PersonenPage from './pages/PersonenPage';
 import TierePage from './pages/TierePage';
 import SchaedenPage from './pages/SchaedenPage';
@@ -55,6 +56,7 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
       <KraefteuebersichtPage />
     </Suspense>
   ),
+  gefahrenzonen: <GefahrenPage />,
 };
 
 export default function App() {

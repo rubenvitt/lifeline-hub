@@ -27,6 +27,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     const onSchaden = () => inval('einsatz-schaeden');
     const onFahrzeug = () => inval('einsatz-fahrzeuge');
     const onZone = () => inval('einsatz-zonen');
+    const onGefahr = () => inval('gefahrenmatrix');
     const onEinheit = () => {
       inval('einsatz-einheiten');
       inval('einsatz-fuehrungskraefte');
@@ -58,6 +59,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       onSchaden();
       onFahrzeug();
       onZone();
+      onGefahr();
       onEinheit();
       onAbschnitt();
       onPerson();
@@ -68,6 +70,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     quelle.addEventListener('schaden', onSchaden);
     quelle.addEventListener('fahrzeug', onFahrzeug);
     quelle.addEventListener('lage_zone', onZone);
+    quelle.addEventListener('gefahr', onGefahr);
     quelle.addEventListener('einheit', onEinheit);
     quelle.addEventListener('abschnitt', onAbschnitt);
     quelle.addEventListener('person', onPerson);
@@ -78,6 +81,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       quelle.removeEventListener('schaden', onSchaden);
       quelle.removeEventListener('fahrzeug', onFahrzeug);
       quelle.removeEventListener('lage_zone', onZone);
+      quelle.removeEventListener('gefahr', onGefahr);
       quelle.removeEventListener('einheit', onEinheit);
       quelle.removeEventListener('abschnitt', onAbschnitt);
       quelle.removeEventListener('person', onPerson);
