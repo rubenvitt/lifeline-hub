@@ -58,4 +58,23 @@ describe('EtbTabelle', () => {
     expect(screen.getByText('berichtigt #1')).toBeInTheDocument();
     expect(screen.getByText('berichtigt durch #2')).toBeInTheDocument();
   });
+
+  it('rendert Markdown-Inhalt mit Fettschrift (kein Rohtext mit **)', () => {
+    const { container } = render(
+      <EtbTabelle eintraege={[eintrag({ inhalt: '**Lage** erkundet' })]} />,
+    );
+    // Nach der Markdown-Umwandlung muss ein <strong>-Element vorhanden sein.
+    expect(container.querySelector('strong')).toBeInTheDocument();
+    // Die rohen Sternchen dürfen NICHT als Plaintext erscheinen.
+    expect(screen.queryByText('**Lage** erkundet')).not.toBeInTheDocument();
+  });
+
+  it('rendert Markdown-Listen als Listenelemente (kein Rohtext mit #/-)', () => {
+    const { container } = render(
+      <EtbTabelle eintraege={[eintrag({ inhalt: '# Titel\n- a\n- b' })]} />,
+    );
+    // Liste aus zwei Einträgen muss als <li>-Elemente erscheinen.
+    const liElemente = container.querySelectorAll('li');
+    expect(liElemente.length).toBeGreaterThanOrEqual(2);
+  });
 });

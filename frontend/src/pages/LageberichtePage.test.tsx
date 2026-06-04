@@ -110,6 +110,32 @@ describe('LageberichtDetailPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /Freigeben/i }));
     expect(await screen.findByText(/endgültig|unveränderlich|ETB/i)).toBeInTheDocument();
   });
+
+  it('freigegebener Bericht rendert Markdown-Abschnittstext formatiert (Überschrift + Liste)', async () => {
+    // Einen Abschnitt mit Markdown, einen ohne Text (Fallback "—")
+    setupDetail({
+      ...lagebericht7Abschnitte,
+      status: 'freigegeben',
+      abschnitte: [
+        { schluessel: 'auftrag', text: '## Schwerpunkt\n- Punkt A' },
+        { schluessel: 'gefahren_schadenlage', text: '' },
+        { schluessel: 'eigene_lage', text: '' },
+        { schluessel: 'lageentwicklung', text: '' },
+        { schluessel: 'fuehrungsprobleme', text: '' },
+        { schluessel: 'antraege_vorschlaege', text: '' },
+        { schluessel: 'zusammenfassung', text: '' },
+      ],
+    });
+    // Markdown-Überschrift (h2) muss als Heading gerendert sein, nicht als Rohtext "## Schwerpunkt"
+    expect(await screen.findByRole('heading', { name: 'Schwerpunkt', level: 2 })).toBeInTheDocument();
+    // Listeneintrag muss als listitem erscheinen, nicht als Rohtext "- Punkt A"
+    expect(screen.getByText('Punkt A')).toBeInTheDocument();
+    // Leerer Abschnitt zeigt den Fallback "—"
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+    // Kein Rohtext mit Markdown-Zeichen
+    expect(screen.queryByText(/## Schwerpunkt/)).toBeNull();
+    expect(screen.queryByText(/- Punkt A/)).toBeNull();
+  });
 });
 
 describe('LageberichtePage', () => {

@@ -1,6 +1,7 @@
 import { Button, Space, Table, Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { EtbEintragAnzeige } from '../api/types';
+import Markdown from '../components/Markdown';
 import { TYP_FARBE, TYP_LABEL, istNachgetragen } from './typFarben';
 
 interface Props {
@@ -53,17 +54,25 @@ export default function EtbTabelle({ eintraege, onBerichtigen }: Props) {
     {
       title: 'Inhalt',
       dataIndex: 'inhalt',
-      render: (_, e) => (
-        <span>
-          {e.typ === 'berichtigung' && e.berichtigt_eintrag_id != null && (
-            <Tag color="red">berichtigt #{lfdNrVonId.get(e.berichtigt_eintrag_id) ?? '?'}</Tag>
-          )}
-          {berichtigtDurch.has(e.id) && (
-            <Tag color="gold">berichtigt durch #{berichtigtDurch.get(e.id)}</Tag>
-          )}
-          {e.inhalt}
-        </span>
-      ),
+      render: (_, e) => {
+        const istBerichtigung = e.typ === 'berichtigung' && e.berichtigt_eintrag_id != null;
+        const wurdeBerichtigt = berichtigtDurch.has(e.id);
+        return (
+          <div>
+            {(istBerichtigung || wurdeBerichtigt) && (
+              <div style={{ marginBottom: 4 }}>
+                {istBerichtigung && (
+                  <Tag color="red">berichtigt #{lfdNrVonId.get(e.berichtigt_eintrag_id!) ?? '?'}</Tag>
+                )}
+                {wurdeBerichtigt && (
+                  <Tag color="gold">berichtigt durch #{berichtigtDurch.get(e.id)}</Tag>
+                )}
+              </div>
+            )}
+            <Markdown variante="kompakt">{e.inhalt}</Markdown>
+          </div>
+        );
+      },
     },
     { title: 'Erfasser', dataIndex: 'erfasser_name', width: 120 },
   ];

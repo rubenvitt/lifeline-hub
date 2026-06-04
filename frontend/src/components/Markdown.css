@@ -1,0 +1,170 @@
+/* Gerendertes Markdown — geteilt von Lagebericht-Anzeige und ETB.
+   Farben erben (color: inherit) die antd-Textfarbe, damit Light/Dark ohne
+   eigene Token-Pflege lesbar bleiben. Nur strukturelle Akzente (Code-Hinter-
+   grund, Zitat-/Tabellen-Rahmen) bekommen einen theme-abhängigen Wert. */
+.markdown {
+  --md-akzent: #a8071a; /* antd colorPrimary */
+  --md-flaeche: rgba(0, 0, 0, 0.04);
+  --md-rahmen: rgba(0, 0, 0, 0.12);
+  color: inherit;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+[data-theme='dark'] .markdown {
+  /* Das dunkle Marken-Rot #a8071a verfehlt auf dunklem Grund den Kontrast;
+     im Dark-Mode ein aufgehelltes Rot (antd red-5) für lesbare Links/Akzente. */
+  --md-akzent: #ff4d4f;
+  --md-flaeche: rgba(255, 255, 255, 0.08);
+  --md-rahmen: rgba(255, 255, 255, 0.18);
+}
+
+/* Außenränder kollabieren lassen: der Container gibt den Abstand vor, nicht
+   das erste/letzte Markdown-Element. */
+.markdown > :first-child {
+  margin-top: 0;
+}
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown a {
+  color: var(--md-akzent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.markdown code {
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+  font-size: 0.875em;
+  background: var(--md-flaeche);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
+.markdown pre {
+  background: var(--md-flaeche);
+  border-radius: 6px;
+  padding: 12px 14px;
+  overflow-x: auto;
+}
+.markdown pre code {
+  background: none;
+  padding: 0;
+}
+
+.markdown blockquote {
+  margin: 0.75em 0;
+  padding: 2px 14px;
+  border-left: 3px solid var(--md-akzent);
+  color: inherit;
+  opacity: 0.85;
+}
+
+.markdown table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75em 0;
+}
+.markdown th,
+.markdown td {
+  border: 1px solid var(--md-rahmen);
+  padding: 6px 10px;
+  text-align: left;
+}
+.markdown th {
+  background: var(--md-flaeche);
+  font-weight: 600;
+}
+
+.markdown img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+
+.markdown hr {
+  border: none;
+  border-top: 1px solid var(--md-rahmen);
+  margin: 1.25em 0;
+}
+
+/* ---------- Variante „dokument": Lagebericht-Anzeige ---------- */
+.markdown--dokument {
+  line-height: 1.65;
+}
+.markdown--dokument h1,
+.markdown--dokument h2,
+.markdown--dokument h3,
+.markdown--dokument h4,
+.markdown--dokument h5,
+.markdown--dokument h6 {
+  line-height: 1.3;
+  font-weight: 600;
+  margin: 1.4em 0 0.5em;
+}
+.markdown--dokument h1 {
+  font-size: 1.5em;
+}
+.markdown--dokument h2 {
+  font-size: 1.3em;
+}
+.markdown--dokument h3 {
+  font-size: 1.15em;
+}
+.markdown--dokument h4,
+.markdown--dokument h5,
+.markdown--dokument h6 {
+  font-size: 1em;
+}
+.markdown--dokument p {
+  margin: 0.6em 0;
+}
+.markdown--dokument ul,
+.markdown--dokument ol {
+  margin: 0.6em 0;
+  padding-left: 1.5em;
+}
+.markdown--dokument li {
+  margin: 0.2em 0;
+}
+.markdown--dokument li > ul,
+.markdown--dokument li > ol {
+  margin: 0.2em 0;
+}
+
+/* ---------- Variante „kompakt": ETB-Tabellenzelle ----------
+   Blöcke bleiben Blöcke (Akzeptanzkriterium: Überschriften/Listen sichtbar),
+   aber Margins und Heading-Größen sind stark gedämpft, damit eine Zelle
+   nicht aufbläht. */
+.markdown--kompakt {
+  line-height: 1.45;
+}
+.markdown--kompakt p {
+  margin: 0.25em 0;
+}
+.markdown--kompakt h1,
+.markdown--kompakt h2,
+.markdown--kompakt h3,
+.markdown--kompakt h4,
+.markdown--kompakt h5,
+.markdown--kompakt h6 {
+  font-size: 1em;
+  font-weight: 600;
+  line-height: 1.35;
+  margin: 0.35em 0 0.15em;
+}
+.markdown--kompakt ul,
+.markdown--kompakt ol {
+  margin: 0.25em 0;
+  padding-left: 1.3em;
+}
+.markdown--kompakt li {
+  margin: 0.1em 0;
+}
+.markdown--kompakt blockquote {
+  margin: 0.35em 0;
+}
+.markdown--kompakt pre {
+  padding: 8px 10px;
+}

@@ -13,6 +13,7 @@ import {
 import type { LageberichtAbschnitt, LageberichtAnzeige } from '../api/types';
 import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
 import { vorlage } from '../lageberichte/vorlagen';
+import Markdown from '../components/Markdown';
 import './lageberichtPrint.css';
 
 export default function LageberichtDetailPage() {
@@ -180,9 +181,9 @@ export default function LageberichtDetailPage() {
             return (
               <section key={a.schluessel} style={{ marginBottom: 16 }}>
                 <Typography.Title level={5}>{a.label}</Typography.Title>
-                <Typography.Paragraph style={{ whiteSpace: 'pre-wrap' }}>
-                  {text.trim() || '—'}
-                </Typography.Paragraph>
+                {text.trim()
+                  ? <Markdown variante="dokument">{text}</Markdown>
+                  : <Typography.Paragraph>—</Typography.Paragraph>}
               </section>
             );
           })}

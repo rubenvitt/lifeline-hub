@@ -18,4 +18,37 @@
   .lagebericht-no-print {
     display: none !important;
   }
+
+  /* Markdown-Inhalte im Druckbereich */
+  .lagebericht-druck .markdown h1,
+  .lagebericht-druck .markdown h2,
+  .lagebericht-druck .markdown h3,
+  .lagebericht-druck .markdown h4,
+  .lagebericht-druck .markdown h5,
+  .lagebericht-druck .markdown h6 {
+    font-weight: 600;
+    margin: 0.75em 0 0.3em;
+    line-height: 1.3;
+    page-break-after: avoid;
+  }
+
+  .lagebericht-druck .markdown ul,
+  .lagebericht-druck .markdown ol {
+    padding-left: 1.5em;
+    margin: 0.4em 0;
+  }
+
+  /* Blöcke nicht über Seitenumbrüche zerreißen */
+  .lagebericht-druck .markdown ul,
+  .lagebericht-druck .markdown ol,
+  .lagebericht-druck .markdown p,
+  .lagebericht-druck .markdown blockquote {
+    page-break-inside: avoid;
+  }
+
+  /* Links im Druck nicht als grelle Farbe anzeigen */
+  .lagebericht-druck .markdown a {
+    color: inherit;
+    text-decoration: underline;
+  }
 }
