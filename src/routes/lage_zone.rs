@@ -79,6 +79,8 @@ pub struct ZoneBody {
     pub label: Option<String>,
     pub farbe: Option<String>,
     pub notiz: Option<String>,
+    pub gefahrentyp: Option<String>,
+    pub schutzobjekt: Option<String>,
 }
 
 /// Validiert typ/geometrie_typ/geometrie und gibt 422 bei Verstoß (statt DB-CHECK→500).
@@ -121,6 +123,13 @@ pub async fn anlegen(
     fordere_aktiv(&einsatz)?;
 
     let geometrie = validiere_neu(&body)?;
+
+    if !lage_zone::gefahren_zuordnung_gueltig(&body.typ, body.gefahrentyp.as_deref(), body.schutzobjekt.as_deref()) {
+        return Err(AppError::UnprocessableEntity(
+            "Gefahren-Zuordnung nur an gefahrengebiet-Zonen, beide Felder gemeinsam und als gültige Kombination".into(),
+        ));
+    }
+
     let label = trimme(body.label.clone());
     let notiz = trimme(body.notiz.clone());
     // farbe nur für freie_skizze; sonst ignorieren (Stil aus typ abgeleitet).
@@ -133,6 +142,8 @@ pub async fn anlegen(
         label: label.as_deref(),
         farbe: farbe.as_deref(),
         notiz: notiz.as_deref(),
+        gefahrentyp: body.gefahrentyp.as_deref(),
+        schutzobjekt: body.schutzobjekt.as_deref(),
         erstellt_von: benutzer.id,
     }).await?;
 
@@ -150,6 +161,10 @@ pub struct ZonePatchBody {
     pub farbe: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub notiz: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub gefahrentyp: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub schutzobjekt: Option<Option<String>>,
 }
 
 /// PATCH /api/einsaetze/{id}/zonen/{zid} — label/typ/farbe/notiz. Geometrie NICHT änderbar.
@@ -196,11 +211,28 @@ pub async fn aktualisieren(
         body.farbe.as_ref().map(|o| o.as_deref())
     };
 
+    // Effektive Zuordnung (Merge gegen Bestand; Memory patch-xor-effektivzustand).
+    let eff_gefahrentyp: Option<String> = match &body.gefahrentyp {
+        Some(opt) => opt.clone(),
+        None => vorher.gefahrentyp.clone(),
+    };
+    let eff_schutzobjekt: Option<String> = match &body.schutzobjekt {
+        Some(opt) => opt.clone(),
+        None => vorher.schutzobjekt.clone(),
+    };
+    if !lage_zone::gefahren_zuordnung_gueltig(&neuer_typ, eff_gefahrentyp.as_deref(), eff_schutzobjekt.as_deref()) {
+        return Err(AppError::UnprocessableEntity(
+            "Gefahren-Zuordnung nur an gefahrengebiet-Zonen, beide Felder gemeinsam und als gültige Kombination".into(),
+        ));
+    }
+
     let z = zone_repo::aktualisiere(&state.pool, einsatz_id, zid, ZonePatch {
         typ: body.typ.as_deref(),
         label: body.label.as_ref().map(|o| o.as_deref().map(str::trim).filter(|s| !s.is_empty())),
         farbe: farbe_patch,
         notiz: body.notiz.as_ref().map(|o| o.as_deref().map(str::trim).filter(|s| !s.is_empty())),
+        gefahrentyp: body.gefahrentyp.as_ref().map(|o| o.as_deref()),
+        schutzobjekt: body.schutzobjekt.as_ref().map(|o| o.as_deref()),
     }).await?;
 
     // Sinntragende Änderung? typ oder label effektiv geändert.

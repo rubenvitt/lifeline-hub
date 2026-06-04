@@ -236,3 +236,61 @@ async fn org_isolation_fremder_nutzer_kann_zonen_nicht_lesen_oder_schreiben() {
     let del = anfrage(&app, "DELETE", &format!("/api/einsaetze/{einsatz}/zonen/{zid}"), &fremd_c, None).await.0;
     assert!(matches!(del, StatusCode::FORBIDDEN | StatusCode::NOT_FOUND), "DELETE: {del}");
 }
+
+#[tokio::test]
+async fn gefahrengebiet_mit_zuordnung_macht_lazy_create() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let body = json!({"typ":"gefahrengebiet","geometrie_typ":"Polygon","geometrie":POLY,"gefahrentyp":"brand","schutzobjekt":"menschen"}).to_string();
+    let (status, z) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/zonen"), &admin, Some(&body)).await;
+    assert_eq!(status, StatusCode::CREATED, "{z:?}");
+    assert_eq!(z["gefahrentyp"], "brand");
+    assert_eq!(z["schutzobjekt"], "menschen");
+    // Lazy-Create legt eine keine-Zelle an → NICHT in der Matrix-Liste (kein Phantom),
+    // aber die Matrix bleibt leer (keine != gelistet).
+    let (_, matrix) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/gefahrenmatrix"), &admin, None).await;
+    assert_eq!(matrix.as_array().unwrap().len(), 0);
+}
+
+#[tokio::test]
+async fn zuordnung_an_nicht_gefahrengebiet_ist_422() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let body = json!({"typ":"absperrbereich","geometrie_typ":"Polygon","geometrie":POLY,"gefahrentyp":"brand","schutzobjekt":"menschen"}).to_string();
+    assert_eq!(anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/zonen"), &admin, Some(&body)).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn nur_eines_der_zuordnungsfelder_ist_422() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let body = json!({"typ":"gefahrengebiet","geometrie_typ":"Polygon","geometrie":POLY,"gefahrentyp":"brand"}).to_string();
+    assert_eq!(anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/zonen"), &admin, Some(&body)).await.0, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn patch_entfernt_zuordnung_ohne_matrixzelle_zu_loeschen() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    // Zelle aktiv setzen (warnstufe hoch) → Matrix hat 1 Eintrag.
+    anfrage(&app, "PUT", &format!("/api/einsaetze/{einsatz}/gefahrenmatrix/bewertung"), &admin,
+        Some(&json!({"gefahrentyp":"brand","schutzobjekt":"menschen","warnstufe":"hoch"}).to_string())).await;
+    let body = json!({"typ":"gefahrengebiet","geometrie_typ":"Polygon","geometrie":POLY,"gefahrentyp":"brand","schutzobjekt":"menschen"}).to_string();
+    let (_, z) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/zonen"), &admin, Some(&body)).await;
+    let zid = z["id"].as_i64().unwrap();
+
+    // Zuordnung entfernen (beide → null).
+    let (status, z2) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/zonen/{zid}"), &admin,
+        Some(r#"{"gefahrentyp":null,"schutzobjekt":null}"#)).await;
+    assert_eq!(status, StatusCode::OK, "{z2:?}");
+    assert!(z2["gefahrentyp"].is_null());
+    assert!(z2["schutzobjekt"].is_null());
+    // Matrix-Zelle bleibt unangetastet.
+    let (_, matrix) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/gefahrenmatrix"), &admin, None).await;
+    assert_eq!(matrix.as_array().unwrap().len(), 1);
+    assert_eq!(matrix[0]["warnstufe"], "hoch");
+}
