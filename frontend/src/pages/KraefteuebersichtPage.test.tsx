@@ -115,4 +115,10 @@ describe('KraefteuebersichtPage', () => {
     const statCard = titelEl.closest('.ant-statistic')!;
     expect(await within(statCard as HTMLElement).findByText('1')).toBeInTheDocument();
   });
+
+  it('zeigt Filterleiste mit Trägerorganisation-Select', async () => {
+    setup();
+    // Filter bar renders after einsatzQuery resolves past the Spin early-return
+    expect(await screen.findByText('Trägerorganisation')).toBeInTheDocument();
+  });
 });

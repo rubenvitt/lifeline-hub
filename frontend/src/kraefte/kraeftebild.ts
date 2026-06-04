@@ -348,6 +348,46 @@ function baueAbschnittZeile(
   return { zeile, gesammeltesSoll };
 }
 
+// ── Filter API ────────────────────────────────────────────────────────────────
+
+export interface Rohdaten {
+  abschnitte: Einsatzabschnitt[];
+  einheiten: Einheit[];
+  personal: EinsatzPersonal[];
+  fahrzeuge: EinsatzFahrzeug[];
+  material: EinsatzMaterial[];
+}
+
+export interface FilterWerte {
+  abschnittId: number | null;
+  traeger: string | null;
+  kategorie: StatusKategorie | null;
+  suche: string;
+}
+
+export function filtereKraefte(roh: Rohdaten, f: FilterWerte): Rohdaten {
+  const s = f.suche.trim().toLowerCase();
+  const treffer = (txt: (string | null)[]) => !s || txt.some((t) => t?.toLowerCase().includes(s));
+  // v1-Annahme: Untereinheiten tragen die `abschnitt_id` ihrer Elterneinheit. Sonst würden
+  // Kräfte einer Untereinheit ohne eigene `abschnitt_id` beim Abschnitts-Filter herausfallen
+  // (echtes Sub-Section-roll-in ist v2).
+  const einheitErlaubt = (e: Einheit) => f.abschnittId == null || e.abschnitt_id === f.abschnittId;
+  const erlaubteEinheiten = new Set(roh.einheiten.filter(einheitErlaubt).map((e) => e.id));
+  const abschnittOk = (einheit_id: number | null) =>
+    f.abschnittId == null || (einheit_id != null && erlaubteEinheiten.has(einheit_id));
+  const traegerOk = (traeger: string | null) => !f.traeger || traeger === f.traeger;
+  const passt = (einheit_id: number | null, traeger: string | null, kat: StatusKategorie | null, txt: (string | null)[]) =>
+    abschnittOk(einheit_id) && traegerOk(traeger) && (!f.kategorie || kat === f.kategorie) && treffer(txt);
+  return {
+    abschnitte: f.abschnittId == null ? roh.abschnitte : roh.abschnitte.filter((a) => a.id === f.abschnittId),
+    einheiten: roh.einheiten.filter(einheitErlaubt),
+    personal: roh.personal.filter((x) => passt(x.einheit_id, x.traegerorganisation, x.status_kategorie, [x.name, x.funktion])),
+    fahrzeuge: roh.fahrzeuge.filter((x) => passt(x.einheit_id, x.traegerorganisation, x.status_kategorie, [x.funkrufname, x.fahrzeugtyp])),
+    // Material hat keine `status_kategorie` (eigene Achse) → NICHT der Kategorie-Filterung unterwerfen.
+    material: roh.material.filter((x) => abschnittOk(x.einheit_id) && traegerOk(x.traegerorganisation) && treffer([x.bezeichnung])),
+  };
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export function baueKraeftebild(

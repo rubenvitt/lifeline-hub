@@ -1,7 +1,7 @@
-import { Alert, Breadcrumb, Card, Space, Spin, Statistic, Table, Tag, Typography } from 'antd';
+import { Alert, Breadcrumb, Card, Input, Select, Space, Spin, Statistic, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { Link, useParams } from 'react-router-dom';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
@@ -10,7 +10,15 @@ import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../api/einsatzMaterial';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
-import { baueKraeftebild, type MeldebildZeile, type StaerkeSumme, type StatusVerteilung } from '../kraefte/kraeftebild';
+import {
+  baueKraeftebild,
+  filtereKraefte,
+  type FilterWerte,
+  type MeldebildZeile,
+  type Rohdaten,
+  type StaerkeSumme,
+  type StatusVerteilung,
+} from '../kraefte/kraeftebild';
 import type { MaterialStatus, StatusKategorie } from '../api/types';
 
 export function staerkeText(s: StaerkeSumme): string {
@@ -80,6 +88,8 @@ export default function KraefteuebersichtPage() {
   const einsatzId = Number(id);
   useEinsatzLiveStream(einsatzId);
 
+  const [filter, setFilter] = useState<FilterWerte>({ abschnittId: null, traeger: null, kategorie: null, suche: '' });
+
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   // Query-Keys IDENTISCH zu den vom Live-Hook invalidierten Keys (Task 5 erweitert den Hook).
   const einheitenQuery = useQuery({ queryKey: ['einsatz-einheiten', einsatzId], queryFn: () => listeEinheiten(einsatzId) });
@@ -88,10 +98,25 @@ export default function KraefteuebersichtPage() {
   const materialQuery = useQuery({ queryKey: ['einsatz-material', einsatzId], queryFn: () => listeEinsatzMaterial(einsatzId) });
   const abschnitteQuery = useQuery({ queryKey: ['einsatz-abschnitte', einsatzId], queryFn: () => listeAbschnitte(einsatzId) });
 
-  const bild = useMemo(() => baueKraeftebild(
-    abschnitteQuery.data ?? [], einheitenQuery.data ?? [], personalQuery.data ?? [],
-    fahrzeugeQuery.data ?? [], materialQuery.data ?? [],
-  ), [abschnitteQuery.data, einheitenQuery.data, personalQuery.data, fahrzeugeQuery.data, materialQuery.data]);
+  const traeger = useMemo(() => [...new Set([
+    ...(personalQuery.data ?? []).map((x) => x.traegerorganisation),
+    ...(fahrzeugeQuery.data ?? []).map((x) => x.traegerorganisation),
+  ].filter((t): t is string => !!t))].sort(), [personalQuery.data, fahrzeugeQuery.data]);
+
+  const bild = useMemo(() => {
+    const roh: Rohdaten = {
+      abschnitte: abschnitteQuery.data ?? [],
+      einheiten: einheitenQuery.data ?? [],
+      personal: personalQuery.data ?? [],
+      fahrzeuge: fahrzeugeQuery.data ?? [],
+      material: materialQuery.data ?? [],
+    };
+    const gefiltert = filtereKraefte(roh, filter);
+    return baueKraeftebild(
+      gefiltert.abschnitte, gefiltert.einheiten, gefiltert.personal,
+      gefiltert.fahrzeuge, gefiltert.material,
+    );
+  }, [abschnitteQuery.data, einheitenQuery.data, personalQuery.data, fahrzeugeQuery.data, materialQuery.data, filter]);
 
   if (einsatzQuery.isLoading) return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
   if (einsatzQuery.isError || !einsatzQuery.data) return <Alert type="error" message="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
@@ -138,6 +163,45 @@ export default function KraefteuebersichtPage() {
               ) : null,
             )}
           </Space>
+        </Space>
+      </Card>
+      <Card size="small" style={{ marginBottom: 12 }}>
+        <Space wrap>
+          <Select
+            placeholder="Abschnitt"
+            allowClear
+            style={{ minWidth: 160 }}
+            value={filter.abschnittId ?? undefined}
+            options={(abschnitteQuery.data ?? []).map((a) => ({ value: a.id, label: a.name }))}
+            onChange={(v) => setFilter((f) => ({ ...f, abschnittId: v ?? null }))}
+          />
+          <Select
+            placeholder="Trägerorganisation"
+            allowClear
+            style={{ minWidth: 180 }}
+            value={filter.traeger ?? undefined}
+            options={traeger.map((t) => ({ value: t, label: t }))}
+            onChange={(v) => setFilter((f) => ({ ...f, traeger: v ?? null }))}
+          />
+          <Select
+            placeholder="Status"
+            allowClear
+            style={{ minWidth: 160 }}
+            value={filter.kategorie ?? undefined}
+            options={[
+              { value: 'verfuegbar' as const, label: 'verfügbar' },
+              { value: 'gebunden' as const, label: 'gebunden' },
+              { value: 'nicht_verfuegbar' as const, label: 'nicht verfügbar' },
+            ]}
+            onChange={(v) => setFilter((f) => ({ ...f, kategorie: v ?? null }))}
+          />
+          <Input.Search
+            placeholder="Suche..."
+            allowClear
+            style={{ width: 220 }}
+            value={filter.suche}
+            onChange={(e) => setFilter((f) => ({ ...f, suche: e.target.value }))}
+          />
         </Space>
       </Card>
       <Table<MeldebildZeile>

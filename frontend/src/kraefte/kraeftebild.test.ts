@@ -1,5 +1,5 @@
 import { it, expect } from 'vitest';
-import { baueKraeftebild, OHNE_ABSCHNITT_KEY } from './kraeftebild';
+import { baueKraeftebild, filtereKraefte, OHNE_ABSCHNITT_KEY } from './kraeftebild';
 import type { Einheit, EinsatzPersonal, EinsatzFahrzeug, EinsatzMaterial, Einsatzabschnitt } from '../api/types';
 
 const ab = (id: number, ueber: number | null = null, name = `A${id}`): Einsatzabschnitt =>
@@ -85,4 +85,55 @@ it('verdichtet Material nach Status', () => {
   expect(bild.verdichtung.materialStatus.einsatzbereit).toBe(2);
   expect(bild.verdichtung.materialStatus.defekt).toBe(1);
   expect(bild.verdichtung.anzahlMaterialPositionen).toBe(3);
+});
+
+it('filtert Personal nach Trägerorganisation und Summe zieht mit', () => {
+  const personal = [
+    { ...p(1, null, 'mannschaft'), traegerorganisation: 'THW' },
+    { ...p(2, null, 'mannschaft'), traegerorganisation: 'FW' },
+  ];
+  const ge = filtereKraefte({ abschnitte: [], einheiten: [], personal, fahrzeuge: [], material: [] },
+    { traeger: 'THW', abschnittId: null, kategorie: null, suche: '' });
+  const bild = baueKraeftebild(ge.abschnitte, ge.einheiten, ge.personal, ge.fahrzeuge, ge.material);
+  expect(bild.verdichtung.anzahlPersonal).toBe(1);
+});
+
+it('Status-Filter lässt Material unverändert (eigene Achse)', () => {
+  const personal = [p(1, null, 'mannschaft', 'verfuegbar'), p(2, null, 'mannschaft', 'gebunden')];
+  const material = [mat(1, null, 'einsatzbereit'), mat(2, null, 'defekt')];
+  const ge = filtereKraefte({ abschnitte: [], einheiten: [], personal, fahrzeuge: [], material },
+    { traeger: null, abschnittId: null, kategorie: 'verfuegbar', suche: '' });
+  // Personal wird nach Kategorie gefiltert …
+  expect(ge.personal).toHaveLength(1);
+  // … Material bleibt vollständig erhalten (keine status_kategorie).
+  expect(ge.material).toHaveLength(2);
+});
+
+it('Abschnitts-Filter grenzt Blätter ein und liefert nur den gewählten Abschnitt im Baum', () => {
+  const abschnitte = [ab(1), ab(2)];
+  const einheiten = [eh(10, 1), eh(20, 2)];
+  const personal = [p(1, 10, 'mannschaft'), p(2, 20, 'mannschaft')];
+  const ge = filtereKraefte({ abschnitte, einheiten, personal, fahrzeuge: [], material: [] },
+    { traeger: null, abschnittId: 1, kategorie: null, suche: '' });
+  expect(ge.abschnitte.map((a) => a.id)).toEqual([1]);
+  expect(ge.einheiten.map((e) => e.id)).toEqual([10]);
+  expect(ge.personal.map((x) => x.id)).toEqual([1]);
+  const bild = baueKraeftebild(ge.abschnitte, ge.einheiten, ge.personal, ge.fahrzeuge, ge.material);
+  expect(bild.baum.map((z) => z.key)).toEqual(['ab-1']);
+});
+
+it('Suche matcht über Name und Funkrufname', () => {
+  const personal = [
+    { ...p(1, null, 'mannschaft'), name: 'Müller' },
+    { ...p(2, null, 'mannschaft'), name: 'Schmidt' },
+  ];
+  const fahrzeuge = [fz(1, null), fz(2, null)]; // funkrufname F1 / F2
+  const nachName = filtereKraefte({ abschnitte: [], einheiten: [], personal, fahrzeuge, material: [] },
+    { traeger: null, abschnittId: null, kategorie: null, suche: 'müll' });
+  expect(nachName.personal.map((x) => x.name)).toEqual(['Müller']);
+  expect(nachName.fahrzeuge).toHaveLength(0);
+  const nachFunk = filtereKraefte({ abschnitte: [], einheiten: [], personal, fahrzeuge, material: [] },
+    { traeger: null, abschnittId: null, kategorie: null, suche: 'f2' });
+  expect(nachFunk.fahrzeuge.map((x) => x.funkrufname)).toEqual(['F2']);
+  expect(nachFunk.personal).toHaveLength(0);
 });
