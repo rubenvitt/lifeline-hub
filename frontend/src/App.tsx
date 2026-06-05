@@ -33,7 +33,12 @@ import { modulRegistry } from './einsatz/modulRegistry';
 const LagekartePage = lazy(() => import('./pages/LagekartePage'));
 const KraefteuebersichtPage = lazy(() => import('./pages/KraefteuebersichtPage'));
 
-/** Module mit echter Implementierung; alle übrigen rendern den ModulStub. */
+/**
+ * Module mit echter Implementierung; alle übrigen rendern den ModulStub.
+ * Gekeyt nach `ModulEintrag.key` (nicht nach `route`!) — bei `gefahrenzonen`
+ * weichen key (`gefahrenzonen`) und route (`gefahren`) ab; das Element muss
+ * unter dem key stehen, sonst greift der Stub-Fallback.
+ */
 const MODUL_ELEMENTE: Record<string, ReactElement> = {
   etb: <EtbPage />,
   einsatzdaten: <EinsatzdatenPage />,

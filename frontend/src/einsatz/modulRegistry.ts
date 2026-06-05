@@ -35,6 +35,8 @@ export interface ModulEintrag {
   /**
    * Deep-Link: Statt einer eigenen Seite leitet das Modul auf die `route` eines
    * anderen Moduls um (Eintrag bleibt zur Auffindbarkeit in der Navigation).
+   * Aktuell von keinem Eintrag genutzt — als generische Infrastruktur für
+   * künftige Module erhalten (vgl. LFH-74).
    */
   verweistAuf?: string;
 }
