@@ -14,6 +14,7 @@ import type { LageberichtAbschnitt, LageberichtAnzeige } from '../api/types';
 import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
 import { vorlage } from '../lageberichte/vorlagen';
 import Markdown from '../components/Markdown';
+import MarkdownEditor from '../components/MarkdownEditor';
 import './lageberichtPrint.css';
 
 export default function LageberichtDetailPage() {
@@ -170,7 +171,7 @@ export default function LageberichtDetailPage() {
           </Form.Item>
           {v?.abschnitte.map((a) => (
             <Form.Item key={a.schluessel} label={a.label} name={a.schluessel}>
-              <Input.TextArea rows={4} />
+              <MarkdownEditor layout="split" variante="dokument" rows={4} />
             </Form.Item>
           ))}
         </Form>

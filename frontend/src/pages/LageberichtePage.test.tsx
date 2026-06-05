@@ -111,6 +111,34 @@ describe('LageberichtDetailPage', () => {
     expect(await screen.findByText(/endgültig|unveränderlich|ETB/i)).toBeInTheDocument();
   });
 
+  it('Entwurf-Editor spiegelt Markdown live als Vorschau (layout=split)', async () => {
+    setupDetail({
+      ...lagebericht7Abschnitte,
+      abschnitte: [
+        { schluessel: 'auftrag', text: '' },
+        { schluessel: 'gefahren_schadenlage', text: '' },
+        { schluessel: 'eigene_lage', text: '' },
+        { schluessel: 'lageentwicklung', text: '' },
+        { schluessel: 'fuehrungsprobleme', text: '' },
+        { schluessel: 'antraege_vorschlaege', text: '' },
+        { schluessel: 'zusammenfassung', text: '' },
+      ],
+    });
+    // Warte auf das Formular
+    const auftragFeld = await screen.findByLabelText('Auftrag');
+    // Markdown-Text eintippen
+    await userEvent.type(auftragFeld, '## Schwerpunkt\n- Punkt A');
+    // Live-Vorschau muss die formatierte Überschrift zeigen (nicht den Rohtext)
+    expect(await screen.findByRole('heading', { name: 'Schwerpunkt', level: 2 })).toBeInTheDocument();
+    // Listeneintrag muss als listitem erscheinen
+    expect(screen.getByText('Punkt A')).toBeInTheDocument();
+    // "## Schwerpunkt" darf NICHT als sichtbarer Text (außerhalb der Textarea) erscheinen
+    const rohTexte = screen.queryAllByText(/## Schwerpunkt/);
+    for (const el of rohTexte) {
+      expect(el.tagName.toLowerCase()).toBe('textarea');
+    }
+  });
+
   it('freigegebener Bericht rendert Markdown-Abschnittstext formatiert (Überschrift + Liste)', async () => {
     // Einen Abschnitt mit Markdown, einen ohne Text (Fallback "—")
     setupDetail({

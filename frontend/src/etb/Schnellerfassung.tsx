@@ -6,6 +6,7 @@ import type { NeuerEintrag } from '../api/etb';
 import type { EinsatzAnzeige, EtbBaustein, EtbEintragAnzeige, EtbTyp, MeldeWeg } from '../api/types';
 import { ERFASSBARE_TYPEN, TYP_LABEL } from './typFarben';
 import BausteinPicker from './BausteinPicker';
+import MarkdownEditor from '../components/MarkdownEditor';
 
 interface Props {
   erfassen: (eintrag: NeuerEintrag) => Promise<void>;
@@ -97,22 +98,27 @@ export default function Schnellerfassung({ erfassen, berichtigungZu, onBerichtig
         {!berichtigungZu && bausteine.length > 0 && (
           <BausteinPicker form={form} bausteine={bausteine} einsatz={einsatz} />
         )}
-        <Space align="start" style={{ width: '100%' }}>
+        {/* Inhaltsfeld in voller Breite — der Schreiben/Vorschau-Tab-Umschalter des
+            MarkdownEditors ist höher als eine einzelne Zeile, daher eigene Zeile. */}
+        <Form.Item
+          name="inhalt"
+          style={{ marginBottom: 8 }}
+          rules={[{ required: true, message: 'Inhalt ist Pflicht' }]}
+        >
+          <MarkdownEditor layout="tabs" variante="kompakt" placeholder="Inhalt …" autoSize={{ minRows: 1, maxRows: 4 }} />
+        </Form.Item>
+        {/* Typ-Select + Erfassen-Button in einer kompakten Zeile darunter */}
+        <Space align="start" style={{ marginBottom: 0 }}>
           {!berichtigungZu && (
             <Form.Item name="typ" style={{ marginBottom: 8, minWidth: 150 }}>
               <Select options={TYP_OPTIONEN} />
             </Form.Item>
           )}
-          <Form.Item
-            name="inhalt"
-            style={{ flex: 1, marginBottom: 8, width: '100%' }}
-            rules={[{ required: true, message: 'Inhalt ist Pflicht' }]}
-          >
-            <Input.TextArea placeholder="Inhalt …" autoSize={{ minRows: 1, maxRows: 4 }} />
+          <Form.Item style={{ marginBottom: 8 }}>
+            <Button type="primary" htmlType="submit" loading={sendet}>
+              Erfassen
+            </Button>
           </Form.Item>
-          <Button type="primary" htmlType="submit" loading={sendet}>
-            Erfassen
-          </Button>
         </Space>
 
         {!berichtigungZu && aktTyp === 'lage' && (

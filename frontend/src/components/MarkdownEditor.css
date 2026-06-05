@@ -1,0 +1,55 @@
+/* Eingabe mit Live-Markdown-Vorschau. Farben/Akzente erbt die Vorschau aus
+   der geteilten .markdown-Komponente; hier nur das Editor-Layout. */
+.markdown-editor__vorschau {
+  --me-rahmen: rgba(0, 0, 0, 0.12);
+  --me-flaeche: rgba(0, 0, 0, 0.02);
+  border: 1px solid var(--me-rahmen);
+  border-radius: 6px;
+  padding: 8px 12px;
+  background: var(--me-flaeche);
+  overflow: auto;
+}
+
+[data-theme='dark'] .markdown-editor__vorschau {
+  --me-rahmen: rgba(255, 255, 255, 0.18);
+  --me-flaeche: rgba(255, 255, 255, 0.03);
+}
+
+.markdown-editor__label {
+  font-size: 0.75em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.55;
+  margin-bottom: 6px;
+}
+
+/* ---------- split: Eingabe links, Vorschau rechts ---------- */
+.markdown-editor--split {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+.markdown-editor--split .markdown-editor__eingabe {
+  flex: 1 1 50%;
+  min-width: 0;
+}
+.markdown-editor--split .markdown-editor__vorschau {
+  flex: 1 1 50%;
+  min-width: 0;
+}
+/* Eingabefeld füllt die gemeinsame Höhe, damit beide Spalten bündig sind. */
+.markdown-editor--split .markdown-editor__eingabe textarea {
+  height: 100%;
+}
+
+/* Auf schmalen Viewports/mobil untereinander statt nebeneinander. */
+@media (max-width: 640px) {
+  .markdown-editor--split {
+    flex-direction: column;
+  }
+}
+
+/* ---------- tabs: kompakter Schreiben/Vorschau-Umschalter ---------- */
+.markdown-editor--tabs .markdown-editor__vorschau {
+  min-height: 40px;
+}
