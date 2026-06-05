@@ -107,13 +107,15 @@ describe('modulRegistry', () => {
     expect(lb?.benoetigteRolle).toBeUndefined();
   });
 
-  it('gefahrenzonen ist ein Deep-Link auf die Lagekarte (kein Platzhalter)', () => {
+  it('gefahrenzonen ist eine eigene Seite (kein Deep-Link mehr)', () => {
     const gz = modulRegistry.find((m) => m.key === 'gefahrenzonen');
     expect(gz).toBeDefined();
     expect(gz?.kategorie).toBe('lage');
-    expect(gz?.verweistAuf).toBe('lagekarte');
-    // Die Funktion lebt in der Lagekarte → das Modul ist nicht mehr „geplant".
     expect(gz?.status).toBe('fertig');
+    // LFH-74: Der Gefahren-Button zeigt die Gefahrenmatrix selbst, nicht die Lagekarte.
+    expect(gz?.verweistAuf).toBeUndefined();
+    expect(gz?.route).toBe('gefahren');
+    expect(modulZielRoute(gz!)).toBe('gefahren');
   });
 
   it('modulZielRoute: Deep-Link-Ziel hat Vorrang vor der eigenen Route', () => {

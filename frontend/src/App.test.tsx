@@ -58,6 +58,19 @@ describe('App-Routing', () => {
     await waitFor(() => expect(screen.getByText(/🚧 Stab/)).toBeInTheDocument());
   });
 
+  it('gefahren-Route rendert die Gefahrenmatrix statt auf die Lagekarte umzuleiten', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/gefahrenmatrix', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/zonen', () => HttpResponse.json([])),
+    );
+    renderApp('/einsaetze/7/gefahren');
+    // Matrix-eigene Gefahrentyp-Zeile beweist: GefahrenPage rendert (kein Redirect, kein Stub).
+    expect((await screen.findAllByText('Brand'))[0]).toBeInTheDocument();
+  });
+
   it('fahrzeuge-Route rendert die echte FahrzeugePage statt Stub', async () => {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(admin)),

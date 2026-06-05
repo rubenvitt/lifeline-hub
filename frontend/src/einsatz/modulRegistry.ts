@@ -35,6 +35,8 @@ export interface ModulEintrag {
   /**
    * Deep-Link: Statt einer eigenen Seite leitet das Modul auf die `route` eines
    * anderen Moduls um (Eintrag bleibt zur Auffindbarkeit in der Navigation).
+   * Aktuell von keinem Eintrag genutzt — als generische Infrastruktur für
+   * künftige Module erhalten (vgl. LFH-74).
    */
   verweistAuf?: string;
 }
@@ -70,7 +72,7 @@ export const modulRegistry: ModulEintrag[] = [
   { key: 'lagekarte', kategorie: 'lage', label: 'Lagekarte', icon: TbMap2, route: 'lagekarte', status: 'fertig', beschreibung: 'Karte der verortbaren Objekte: Einsatzort, Unfallhilfsstellen, Schäden — verorten per Klick.' },
   { key: 'lageberichte', kategorie: 'lage', label: 'Lageberichte', icon: TbReport, route: 'lageberichte', status: 'fertig', beschreibung: 'Strukturierte Lageberichte.' },
   { key: 'kraefteuebersicht', kategorie: 'lage', label: 'Kräfteübersicht', icon: TbListDetails, route: 'kraefteuebersicht', status: 'fertig', beschreibung: 'Meldebild der eingesetzten Kräfte.' },
-  { key: 'gefahrenzonen', kategorie: 'lage', label: 'Gefahren', icon: TbAlertTriangle, route: 'gefahren', status: 'fertig', verweistAuf: 'lagekarte', beschreibung: 'Gefahrenmatrix (Gefahrentyp × Schutzobjekt → Warnstufe) und Verknüpfung der Gefahrengebiete.' },
+  { key: 'gefahrenzonen', kategorie: 'lage', label: 'Gefahren', icon: TbAlertTriangle, route: 'gefahren', status: 'fertig', beschreibung: 'Gefahrenmatrix (Gefahrentyp × Schutzobjekt → Warnstufe) und Verknüpfung der Gefahrengebiete.' },
   // Kommunikation
   { key: 'chat', kategorie: 'kommunikation', label: 'Chat', icon: TbMessageCircle, route: 'chat', status: 'geplant', beschreibung: 'Einsatzinterner Chat (pro Einsatz, nicht einsatzübergreifend).' },
   { key: 'erinnerungen', kategorie: 'kommunikation', label: 'Erinnerungen', icon: TbBell, route: 'erinnerungen', status: 'geplant', beschreibung: 'Terminierte Erinnerungen.' },
