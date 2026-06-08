@@ -85,7 +85,7 @@ export default function LageDashboardPage() {
     <div>
       <Breadcrumb
         style={{ marginBottom: 12 }}
-        items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: 'Lage-Dashboard' }]}
+        items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Lage-Dashboard' }]}
       />
       <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 8 }} align="center">
         <div>

@@ -2,6 +2,7 @@ import { Card, Empty, Space, Tag, Typography } from 'antd';
 import type { Sichtungskategorie } from '../../api/types';
 import { SK_META, STATUS_META } from '../../personen/personMeta';
 import type { BetroffeneVerdichtung } from './lageVerdichtung';
+import { aufTaste } from './klickbar';
 
 interface Props {
   betroffene: BetroffeneVerdichtung | null;
@@ -12,7 +13,7 @@ const SK_REIHENFOLGE: Sichtungskategorie[] = ['sk1', 'sk2', 'sk3', 'sk4', 'tot',
 
 export default function BetroffeneKachel({ betroffene, onNavigate }: Props) {
   return (
-    <Card size="small" title="Betroffene" hoverable onClick={() => onNavigate('personen')} style={{ height: '100%', cursor: 'pointer' }}>
+    <Card size="small" title="Betroffene" hoverable role="button" tabIndex={0} onClick={() => onNavigate('personen')} onKeyDown={aufTaste(() => onNavigate('personen'))} style={{ height: '100%', cursor: 'pointer' }}>
       {betroffene === null ? (
         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Daten nicht verfügbar" />
       ) : (

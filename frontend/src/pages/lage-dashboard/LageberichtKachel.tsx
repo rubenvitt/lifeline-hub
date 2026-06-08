@@ -1,5 +1,6 @@
 import { Card, Empty, Space, Tag, Typography } from 'antd';
 import type { LageberichtAnzeige } from '../../api/types';
+import { aufTaste } from './klickbar';
 
 interface Props {
   bericht: LageberichtAnzeige | null;
@@ -8,7 +9,7 @@ interface Props {
 
 export default function LageberichtKachel({ bericht, onNavigate }: Props) {
   return (
-    <Card size="small" title="Aktueller Lagebericht" hoverable onClick={() => onNavigate('lageberichte')} style={{ height: '100%', cursor: 'pointer' }}>
+    <Card size="small" title="Aktueller Lagebericht" hoverable role="button" tabIndex={0} onClick={() => onNavigate('lageberichte')} onKeyDown={aufTaste(() => onNavigate('lageberichte'))} style={{ height: '100%', cursor: 'pointer' }}>
       {bericht === null ? (
         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Noch kein Lagebericht" />
       ) : (

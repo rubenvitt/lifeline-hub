@@ -1,6 +1,7 @@
 import { Card, Empty, Space, Statistic, Tag, Typography } from 'antd';
 import type { Verdichtung } from '../../kraefte/kraeftebild';
 import { staerkeText } from '../../kraefte/kraeftebild';
+import { aufTaste } from './klickbar';
 
 interface Props {
   kraefte: Verdichtung | null;
@@ -11,7 +12,7 @@ interface Props {
 
 export default function KraefteKachel({ kraefte, einheiten, abschnitte, onNavigate }: Props) {
   return (
-    <Card size="small" title="Kräfte" hoverable onClick={() => onNavigate('kraefteuebersicht')} style={{ height: '100%', cursor: 'pointer' }}>
+    <Card size="small" title="Kräfte" hoverable role="button" tabIndex={0} onClick={() => onNavigate('kraefteuebersicht')} onKeyDown={aufTaste(() => onNavigate('kraefteuebersicht'))} style={{ height: '100%', cursor: 'pointer' }}>
       {kraefte === null ? (
         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Daten nicht verfügbar" />
       ) : (

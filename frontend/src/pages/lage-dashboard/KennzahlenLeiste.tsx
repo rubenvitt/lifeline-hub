@@ -2,6 +2,7 @@ import { Card, Space, Statistic } from 'antd';
 import type { Warnstufe } from '../../api/types';
 import type { Verdichtung } from '../../kraefte/kraeftebild';
 import { staerkeText } from '../../kraefte/kraeftebild';
+import { aufTaste } from './klickbar';
 
 /** Lesbare Textfarbe je Warnstufe (die Matrix nutzt Hintergrundfarben; hier Text). */
 const WARNSTUFE_TEXTFARBE: Record<Warnstufe, string | undefined> = {
@@ -31,7 +32,7 @@ function Kennzahl(props: {
       role="button"
       tabIndex={0}
       onClick={props.onClick}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') props.onClick(); }}
+      onKeyDown={aufTaste(props.onClick)}
       style={{ cursor: 'pointer' }}
     >
       <Statistic

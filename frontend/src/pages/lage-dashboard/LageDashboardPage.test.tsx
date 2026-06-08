@@ -77,7 +77,7 @@ describe('LageDashboardPage', () => {
       personen: [person('sk1'), person('sk1'), person('sk3'), person(null, 'vermisst')],
     });
     render();
-    expect(await screen.findByText('Hochwasser Musterstadt')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Hochwasser Musterstadt' })).toBeInTheDocument();
     expect(await screen.findByText('Patienten (SK I–IV)')).toBeInTheDocument();
     const patienten = screen.getByText('Patienten (SK I–IV)').closest('.ant-statistic');
     expect(patienten).toHaveTextContent('3');
@@ -86,7 +86,7 @@ describe('LageDashboardPage', () => {
   it('Leerzustand: null Daten → Dashboard rendert ohne Crash, Aufträge-Platzhalter sichtbar', async () => {
     mockEndpunkte({});
     render();
-    expect(await screen.findByText('Hochwasser Musterstadt')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Hochwasser Musterstadt' })).toBeInTheDocument();
     expect(screen.getByText(/Aufträge-Modul/i)).toBeInTheDocument();
   });
 
@@ -101,7 +101,7 @@ describe('LageDashboardPage', () => {
   it('Fehler-Resilienz: Gefahrenmatrix-Fehler → nur diese Kachel zeigt „—", Rest steht', async () => {
     mockEndpunkte({ personen: [person('sk1')], gefahrenStatus: 500 });
     render();
-    expect(await screen.findByText('Hochwasser Musterstadt')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Hochwasser Musterstadt' })).toBeInTheDocument();
     const patienten = screen.getByText('Patienten (SK I–IV)').closest('.ant-statistic');
     expect(patienten).toHaveTextContent('1');
     const warnstufe = screen.getByText('Höchste Warnstufe').closest('.ant-statistic');
