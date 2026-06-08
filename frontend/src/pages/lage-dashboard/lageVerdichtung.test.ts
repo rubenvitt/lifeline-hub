@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { GefahrBewertung, LageberichtAnzeige, Person } from '../../api/types';
+import type { GefahrBewertung, LageberichtAnzeige, Person, Schaden, Tier, Uhs } from '../../api/types';
 import { hoechsteWarnstufe, neuesterLagebericht, verdichteGefahren, verdichtePersonen } from './lageVerdichtung';
+import { verdichteSchaeden, verdichteTiere, verdichteUhs } from './lageVerdichtung';
 
 function person(p: Partial<Person>): Person {
   return {
@@ -109,5 +110,49 @@ describe('neuesterLagebericht', () => {
     const b = bericht({ id: 2, erstellt_at: '2026-06-08 14:30:00' });
     const c = bericht({ id: 3, erstellt_at: '2026-06-08 12:00:00' });
     expect(neuesterLagebericht([a, b, c])?.id).toBe(2);
+  });
+});
+
+describe('einfache Status-Zählungen', () => {
+  it('verdichteTiere zählt nach Status', () => {
+    const t = (status: Tier['status']): Tier => ({
+      id: 1, einsatz_id: 1, registrier_nr: 1, status, spezies: 'hund',
+      rasse_beschreibung: null, rufname: null, geschlecht: null, alter_geschaetzt: null,
+      farbe_beschreibung: null, kennzeichnung: null, groesse_gewicht: null,
+      halter_person_id: null, halter_kontakt: null, antreff_ort: null, notiz: null,
+      abschluss_grund: null, abschluss_ziel: null, erfasst_at: '2026-06-08 10:00:00',
+      erfasst_von: 1, geaendert_at: '2026-06-08 10:00:00', geaendert_von: 1,
+      storniert_at: null, halter_registrier_nr: null, halter_storniert_at: null,
+    });
+    expect(verdichteTiere([])).toEqual({ aktiv: 0, vermisst: 0, abgeschlossen: 0, gesamt: 0 });
+    expect(verdichteTiere([t('aktiv'), t('aktiv'), t('vermisst')]))
+      .toEqual({ aktiv: 2, vermisst: 1, abgeschlossen: 0, gesamt: 3 });
+  });
+
+  it('verdichteUhs zählt nach Status', () => {
+    const u = (status: Uhs['status']): Uhs => ({
+      id: 1, einsatz_id: 1, abschnitt_id: null, typ: 'behandlungsplatz',
+      bezeichnung: 'BHP', standort: null, notiz: null, lat: null, lon: null, status,
+      erfasst_at: '2026-06-08 10:00:00', erfasst_von: 1,
+      geaendert_at: '2026-06-08 10:00:00', geaendert_von: 1, storniert_at: null,
+    });
+    expect(verdichteUhs([])).toEqual({ geplant: 0, aktiv: 0, aufgeloest: 0, gesamt: 0 });
+    expect(verdichteUhs([u('aktiv'), u('aktiv'), u('geplant')]))
+      .toEqual({ geplant: 1, aktiv: 2, aufgeloest: 0, gesamt: 3 });
+  });
+
+  it('verdichteSchaeden zählt nach Status', () => {
+    const s = (status: Schaden['status']): Schaden => ({
+      id: 1, einsatz_id: 1, registrier_nr: 1, status, typ: 'sachschaden', ausmass: 'mittel',
+      ort: 'X', lat: null, lon: null, beschreibung: '', geschaedigt_person_id: null,
+      geschaedigt_personal_id: null, geschaedigt_organisation_id: null, geschaedigt_kontakt: null,
+      uebergeben_an: null, uebergeben_at: null, abschluss_grund: null, abschluss_at: null,
+      erfasst_at: '2026-06-08 10:00:00', erfasst_von: 1, geaendert_at: '2026-06-08 10:00:00',
+      geaendert_von: 1, storniert_at: null, storniert_von: null, geschaedigt_registrier_nr: null,
+      geschaedigt_storniert_at: null, geschaedigt_personal_name: null, geschaedigt_organisation_name: null,
+    });
+    expect(verdichteSchaeden([])).toEqual({ offen: 0, uebergeben: 0, abgeschlossen: 0, gesamt: 0 });
+    expect(verdichteSchaeden([s('offen'), s('offen'), s('abgeschlossen')]))
+      .toEqual({ offen: 2, uebergeben: 0, abgeschlossen: 1, gesamt: 3 });
   });
 });

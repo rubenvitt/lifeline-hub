@@ -1,4 +1,4 @@
-import type { GefahrBewertung, LageberichtAnzeige, Person, Warnstufe } from '../../api/types';
+import type { GefahrBewertung, LageberichtAnzeige, Person, Schaden, Tier, Uhs, Warnstufe } from '../../api/types';
 
 export interface SkVerteilung {
   sk1: number; sk2: number; sk3: number; sk4: number;
@@ -73,4 +73,25 @@ export function verdichtePersonen(personen: Person[]): BetroffeneVerdichtung {
 export function neuesterLagebericht(berichte: LageberichtAnzeige[]): LageberichtAnzeige | null {
   if (berichte.length === 0) return null;
   return berichte.reduce((neuester, b) => (b.erstellt_at > neuester.erstellt_at ? b : neuester));
+}
+
+export interface TierVerdichtung { aktiv: number; vermisst: number; abgeschlossen: number; gesamt: number; }
+export function verdichteTiere(tiere: Tier[]): TierVerdichtung {
+  const v: TierVerdichtung = { aktiv: 0, vermisst: 0, abgeschlossen: 0, gesamt: tiere.length };
+  for (const t of tiere) v[t.status] += 1;
+  return v;
+}
+
+export interface UhsVerdichtung { geplant: number; aktiv: number; aufgeloest: number; gesamt: number; }
+export function verdichteUhs(uhs: Uhs[]): UhsVerdichtung {
+  const v: UhsVerdichtung = { geplant: 0, aktiv: 0, aufgeloest: 0, gesamt: uhs.length };
+  for (const u of uhs) v[u.status] += 1;
+  return v;
+}
+
+export interface SchadenVerdichtung { offen: number; uebergeben: number; abgeschlossen: number; gesamt: number; }
+export function verdichteSchaeden(schaeden: Schaden[]): SchadenVerdichtung {
+  const v: SchadenVerdichtung = { offen: 0, uebergeben: 0, abgeschlossen: 0, gesamt: schaeden.length };
+  for (const s of schaeden) v[s.status] += 1;
+  return v;
 }
