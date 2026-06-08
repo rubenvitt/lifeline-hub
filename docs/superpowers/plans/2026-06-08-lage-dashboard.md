@@ -448,6 +448,11 @@ git commit -m "feat(fe): neuesterLagebericht für Lage-Dashboard (LFH-47)"
 
 ## Task 5: `verdichteTiere`, `verdichteUhs`, `verdichteSchaeden`
 
+> **Hinweis Tiere nicht live:** `useEinsatzLiveStream` kennt kein `tier`-Event und invalidiert
+> `einsatz-tiere` nicht (Backend-Lücke). Die Tiere-Kachel aktualisiert sich nur bei Mount/Refetch,
+> nicht in Echtzeit. Das ist bewusst nicht Teil dieses Tasks (bräuchte ein Backend-`tier`-Event).
+> Alle übrigen Kacheln sind live.
+
 **Files:**
 - Modify: `frontend/src/pages/lage-dashboard/lageVerdichtung.ts`
 - Modify: `frontend/src/pages/lage-dashboard/lageVerdichtung.test.ts`
@@ -1136,7 +1141,7 @@ export default function LageDashboardPage() {
 - [ ] **Step 10: Page-Test laufen lassen — muss bestehen**
 
 Run: `cd frontend && pnpm test -- src/pages/lage-dashboard/LageDashboardPage.test.tsx`
-Expected: PASS (4 tests). Falls die „Patienten"-Assertion am `.ant-statistic`-Container scheitert (verschachtelte Knoten), stattdessen `within(patienten!).getByText('3')` verwenden (`within` aus `@testing-library/react` importieren).
+Expected: PASS (4 tests). Der Fehler-Resilienz-Test braucht keinen Spezial-Client: `neuerQueryClient()` setzt bereits `retry: false` (`src/test/utils.tsx:11`), d. h. der 500er flippt `isError` sofort (kein Backoff). Falls die „Patienten"-Assertion am `.ant-statistic`-Container scheitert (verschachtelte Knoten), stattdessen `within(patienten!).getByText('3')` verwenden (`within` aus `@testing-library/react` importieren).
 
 - [ ] **Step 11: Commit**
 
