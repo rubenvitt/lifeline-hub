@@ -33,19 +33,18 @@ describe('App-Routing', () => {
     expect(await screen.findByRole('button', { name: 'Anmelden' })).toBeInTheDocument();
   });
 
-  it('Default-Route /einsaetze/:id landet (Fallback) im ETB', async () => {
+  it('Default-Route /einsaetze/:id landet im Lage-Dashboard', async () => {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(admin)),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/etb', () => HttpResponse.json([])),
     );
     renderApp('/einsaetze/7');
     await waitFor(() =>
       expect(screen.getByRole('heading', { name: 'Hochwasser Nord' })).toBeInTheDocument(),
     );
-    // Panel öffnet sich auf dem Redirect-Pfad zur Kategorie des Ziel-Moduls (Erfassung).
-    expect(await screen.findByText('Erfassung')).toBeInTheDocument();
+    // Panel öffnet sich auf dem Redirect-Pfad zur Kategorie des Ziel-Moduls (Lage).
+    expect(await screen.findByText('Lage')).toBeInTheDocument();
   });
 
   it('WIP-Modul-Route rendert den Stub', async () => {

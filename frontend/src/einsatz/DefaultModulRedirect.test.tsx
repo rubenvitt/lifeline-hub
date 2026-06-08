@@ -5,14 +5,14 @@ import { renderMitProviders } from '../test/utils';
 import DefaultModulRedirect from './DefaultModulRedirect';
 
 describe('DefaultModulRedirect', () => {
-  it('leitet ohne Modul auf das ETB-Fallback um', () => {
+  it('leitet ohne Modul auf das Lage-Dashboard um', () => {
     renderMitProviders(
       <Routes>
         <Route path="/einsaetze/:id" element={<DefaultModulRedirect />} />
-        <Route path="/einsaetze/:id/etb" element={<div>ETB-Inhalt</div>} />
+        <Route path="/einsaetze/:id/lage-dashboard" element={<div>Dashboard-Inhalt</div>} />
       </Routes>,
       { route: '/einsaetze/7' },
     );
-    expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument();
+    expect(screen.getByText('Dashboard-Inhalt')).toBeInTheDocument();
   });
 });
