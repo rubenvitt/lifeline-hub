@@ -60,15 +60,15 @@ describe('modulRegistry', () => {
     expect(istModulGesperrt(fkModul, ohne)).toBe(true);
   });
 
-  it('redirectZiel: Fallback ETB solange Dashboard nicht fertig', () => {
-    expect(redirectZiel(modulRegistry)).toBe('etb');
+  it('redirectZiel: Dashboard ist Default sobald fertig', () => {
+    expect(redirectZiel(modulRegistry)).toBe('lage-dashboard');
   });
 
-  it('redirectZiel: Dashboard sobald es fertig ist', () => {
-    const mitFertigemDashboard = modulRegistry.map((m) =>
-      m.key === 'lage-dashboard' ? { ...m, status: 'fertig' as const } : m,
+  it('redirectZiel: Fallback ETB solange Dashboard nicht fertig', () => {
+    const ohneFertigesDashboard = modulRegistry.map((m) =>
+      m.key === 'lage-dashboard' ? { ...m, status: 'geplant' as const } : m,
     );
-    expect(redirectZiel(mitFertigemDashboard)).toBe('lage-dashboard');
+    expect(redirectZiel(ohneFertigesDashboard)).toBe('etb');
   });
 
   it('fahrzeuge ist fertig, abrollbehaelter ist entfernt', () => {

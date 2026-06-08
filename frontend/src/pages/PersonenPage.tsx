@@ -11,15 +11,7 @@ import { listeTiere, tierRegistrierAnzeige } from '../api/einsatzTier';
 import { useSchaedenStream } from '../etb/useSchaedenStream';
 import { listeSchaeden, schadenRegistrierAnzeige } from '../api/einsatzSchaden';
 import type { Person, PersonDetail, PersonStatus, PersonZugriff, Sichtungskategorie, Verbleib, VerbleibArt, Tier, Spezies, Schaden } from '../api/types';
-
-const SK_META: Record<Sichtungskategorie, { label: string; color: string }> = {
-  sk1: { label: 'SK I', color: 'red' },
-  sk2: { label: 'SK II', color: 'gold' },
-  sk3: { label: 'SK III', color: 'green' },
-  sk4: { label: 'SK IV', color: 'blue' },
-  tot: { label: 'tot', color: 'black' },
-  unverletzt: { label: 'unverletzt', color: 'default' },
-};
+import { SK_META, STATUS_META } from '../personen/personMeta';
 
 /** Triage-Reihenfolge der Patienten-Abschnitte (SK I zuerst, tot zuletzt).
  *  Single Source of Truth dafür, welche Sichtungen einen „Patienten" ausmachen. */
@@ -41,14 +33,6 @@ function lagebildZaehlung(alle: Person[]): { sk: Record<Sichtungskategorie, numb
   }
   return { sk, ungesichtet };
 }
-
-const STATUS_META: Record<PersonStatus, { label: string; color: string }> = {
-  erfasst: { label: 'erfasst', color: 'default' },
-  vermisst: { label: 'vermisst', color: 'orange' },
-  betroffen: { label: 'betroffen', color: 'blue' },
-  verstorben: { label: 'verstorben', color: 'red' },
-  abgemeldet: { label: 'abgemeldet', color: 'green' },
-};
 
 const TIER_SPEZIES_LABEL: Record<Spezies, string> = {
   hund: 'Hund', katze: 'Katze', grosstier: 'Großtier', nutzgefluegel: 'Nutzgeflügel',
