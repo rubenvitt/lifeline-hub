@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { GefahrBewertung, Person } from '../../api/types';
-import { hoechsteWarnstufe, verdichteGefahren, verdichtePersonen } from './lageVerdichtung';
+import type { GefahrBewertung, LageberichtAnzeige, Person } from '../../api/types';
+import { hoechsteWarnstufe, neuesterLagebericht, verdichteGefahren, verdichtePersonen } from './lageVerdichtung';
 
 function person(p: Partial<Person>): Person {
   return {
@@ -86,5 +86,28 @@ describe('verdichteGefahren', () => {
   });
   it('leere Liste → keine / 0', () => {
     expect(verdichteGefahren([])).toEqual({ hoechste: 'keine', anzahlAktiv: 0 });
+  });
+});
+
+function bericht(p: Partial<LageberichtAnzeige>): LageberichtAnzeige {
+  return {
+    id: 1, einsatz_id: 1, vorlage: 'freitext', titel: 'Bericht', zeitstand: '2026-06-08 10:00:00',
+    status: 'entwurf', abschnitte: [], version: 1, vorgaenger_id: null,
+    ersteller_id: 1, ersteller_name: 'Müller', erstellt_at: '2026-06-08 10:00:00',
+    aktualisiert_at: '2026-06-08 10:00:00', freigegeben_von_id: null,
+    freigegeben_von_name: null, freigegeben_at: null, etb_eintrag_id: null,
+    ...p,
+  };
+}
+
+describe('neuesterLagebericht', () => {
+  it('leere Liste → null', () => {
+    expect(neuesterLagebericht([])).toBeNull();
+  });
+  it('liefert den Bericht mit dem jüngsten erstellt_at', () => {
+    const a = bericht({ id: 1, erstellt_at: '2026-06-08 10:00:00' });
+    const b = bericht({ id: 2, erstellt_at: '2026-06-08 14:30:00' });
+    const c = bericht({ id: 3, erstellt_at: '2026-06-08 12:00:00' });
+    expect(neuesterLagebericht([a, b, c])?.id).toBe(2);
   });
 });

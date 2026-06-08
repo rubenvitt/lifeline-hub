@@ -1,4 +1,4 @@
-import type { GefahrBewertung, Person, Warnstufe } from '../../api/types';
+import type { GefahrBewertung, LageberichtAnzeige, Person, Warnstufe } from '../../api/types';
 
 export interface SkVerteilung {
   sk1: number; sk2: number; sk3: number; sk4: number;
@@ -64,4 +64,13 @@ export function verdichtePersonen(personen: Person[]): BetroffeneVerdichtung {
     vermisst: status.vermisst,
     gesamt: personen.length,
   };
+}
+
+/**
+ * Jüngster Lagebericht nach `erstellt_at`. Das Format 'YYYY-MM-DD HH:MM:SS' ist
+ * lexikografisch sortierbar. Null bei leerer Liste.
+ */
+export function neuesterLagebericht(berichte: LageberichtAnzeige[]): LageberichtAnzeige | null {
+  if (berichte.length === 0) return null;
+  return berichte.reduce((neuester, b) => (b.erstellt_at > neuester.erstellt_at ? b : neuester));
 }
