@@ -1,4 +1,4 @@
-import type { Person } from '../../api/types';
+import type { GefahrBewertung, Person, Warnstufe } from '../../api/types';
 
 export interface SkVerteilung {
   sk1: number; sk2: number; sk3: number; sk4: number;
@@ -19,6 +19,32 @@ export interface BetroffeneVerdichtung {
   patienten: number;
   vermisst: number;
   gesamt: number;
+}
+
+const WARNSTUFE_RANG: Record<Warnstufe, number> = {
+  keine: 0, niedrig: 1, mittel: 2, hoch: 3, akut: 4,
+};
+
+/** Ordinales Maximum aller Warnstufen; 'keine' wenn leer. */
+export function hoechsteWarnstufe(bewertungen: GefahrBewertung[]): Warnstufe {
+  let max: Warnstufe = 'keine';
+  for (const b of bewertungen) {
+    if (WARNSTUFE_RANG[b.warnstufe] > WARNSTUFE_RANG[max]) max = b.warnstufe;
+  }
+  return max;
+}
+
+export interface GefahrVerdichtung {
+  hoechste: Warnstufe;
+  /** Anzahl Bewertungen mit Warnstufe !== 'keine'. */
+  anzahlAktiv: number;
+}
+
+export function verdichteGefahren(bewertungen: GefahrBewertung[]): GefahrVerdichtung {
+  return {
+    hoechste: hoechsteWarnstufe(bewertungen),
+    anzahlAktiv: bewertungen.filter((b) => b.warnstufe !== 'keine').length,
+  };
 }
 
 export function verdichtePersonen(personen: Person[]): BetroffeneVerdichtung {

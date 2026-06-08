@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Person } from '../../api/types';
-import { verdichtePersonen } from './lageVerdichtung';
+import type { GefahrBewertung, Person } from '../../api/types';
+import { hoechsteWarnstufe, verdichteGefahren, verdichtePersonen } from './lageVerdichtung';
 
 function person(p: Partial<Person>): Person {
   return {
@@ -54,5 +54,37 @@ describe('verdichtePersonen', () => {
     expect(v.status.betroffen).toBe(1);
     expect(v.status.verstorben).toBe(1);
     expect(v.vermisst).toBe(2);
+  });
+});
+
+function bewertung(warnstufe: GefahrBewertung['warnstufe']): GefahrBewertung {
+  return {
+    id: 1, einsatz_id: 1, gefahrentyp: 'atemgifte', schutzobjekt: 'menschen',
+    warnstufe, beschreibung: null, gemeldet_von: null, aktualisiert_von: 1,
+    erstellt_at: '2026-06-08 10:00:00', geaendert_at: '2026-06-08 10:00:00',
+  };
+}
+
+describe('hoechsteWarnstufe', () => {
+  it('leere Liste → keine', () => {
+    expect(hoechsteWarnstufe([])).toBe('keine');
+  });
+  it('liefert ordinales Maximum', () => {
+    expect(hoechsteWarnstufe([bewertung('niedrig'), bewertung('hoch'), bewertung('mittel')])).toBe('hoch');
+    expect(hoechsteWarnstufe([bewertung('akut'), bewertung('hoch')])).toBe('akut');
+  });
+  it('nur keine → keine', () => {
+    expect(hoechsteWarnstufe([bewertung('keine'), bewertung('keine')])).toBe('keine');
+  });
+});
+
+describe('verdichteGefahren', () => {
+  it('zählt aktive (warnstufe !== keine) und höchste', () => {
+    const v = verdichteGefahren([bewertung('keine'), bewertung('mittel'), bewertung('hoch')]);
+    expect(v.hoechste).toBe('hoch');
+    expect(v.anzahlAktiv).toBe(2);
+  });
+  it('leere Liste → keine / 0', () => {
+    expect(verdichteGefahren([])).toEqual({ hoechste: 'keine', anzahlAktiv: 0 });
   });
 });
