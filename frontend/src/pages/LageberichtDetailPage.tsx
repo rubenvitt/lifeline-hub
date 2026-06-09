@@ -171,7 +171,7 @@ export default function LageberichtDetailPage() {
           </Form.Item>
           {v?.abschnitte.map((a) => (
             <Form.Item key={a.schluessel} label={a.label} name={a.schluessel}>
-              <MarkdownEditor layout="split" variante="dokument" rows={4} />
+              <MarkdownEditor layout="split" variante="dokument" autoSize={{ minRows: 8 }} />
             </Form.Item>
           ))}
         </Form>
