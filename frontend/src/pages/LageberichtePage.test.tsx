@@ -85,6 +85,17 @@ describe('LageberichtDetailPage', () => {
     expect(screen.getByLabelText('Gefahren-/Schadenlage')).toBeInTheDocument();
   });
 
+  it('Entwurf-Editor stellt die Abschnitts-Felder mit autoSize statt fixer Mini-Höhe dar', async () => {
+    setupDetail(lagebericht7Abschnitte);
+    const feld = (await screen.findByLabelText('Auftrag')) as HTMLTextAreaElement;
+    // autoSize lässt das Feld mit dem Inhalt mitwachsen (kein fixer rows={4}-Kasten)
+    // und schaltet den browser-nativen Resize-Griff ab — kein zufälliger Mini-Griff (AK#2).
+    // autoSize löst in rc-textarea eine Resize-Messung aus, die overflowY:hidden setzt
+    // (nach Flush der Effects via findBy); ein fixer rows-Kasten hat kein Inline-Style.
+    expect(feld.style.overflowY).toBe('hidden');
+    expect(feld).not.toHaveAttribute('rows', '4');
+  });
+
   it('freigegebener Bericht ist read-only mit ETB-Link und Fortschreiben', async () => {
     setupDetail({
       ...lagebericht7Abschnitte, status: 'freigegeben', etb_eintrag_id: 99,
