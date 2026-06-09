@@ -1,4 +1,4 @@
-import type { ZoneTyp } from '../../api/types';
+import type { Warnstufe, ZoneTyp } from '../../api/types';
 
 export interface ZoneStil {
   fillColor: string;
@@ -45,4 +45,20 @@ export const ZONE_TYPEN: ZoneTypInfo[] = [
 /** Sprechendes Label eines Typs (für Inspector/Legende). */
 export function zoneTypLabel(typ: ZoneTyp): string {
   return ZONE_TYPEN.find((t) => t.typ === typ)?.label ?? typ;
+}
+
+/** Stil einer gefahrengebiet-Zone abgeleitet aus der höchsten Warnstufe ihres Gebiets. */
+const WARNSTUFE_KARTE: Record<Warnstufe, string> = {
+  // Bewusst Rot (= alte gefahrengebiet-Default-Farbe): ein noch unbewertetes Gefahren-
+  // gebiet wird vorsichtshalber als Gefahr dargestellt, nicht „ruhiger" als niedrig (Gold).
+  keine: '#cf1322',
+  niedrig: '#faad14',
+  mittel: '#fa8c16',
+  hoch: '#f5222d',
+  akut: '#a8071a',
+};
+
+export function gefahrengebietStil(warnstufe: Warnstufe): ZoneStil {
+  const c = WARNSTUFE_KARTE[warnstufe];
+  return { fillColor: c, fillOpacity: 0.25, lineColor: c, lineWidth: 2 };
 }

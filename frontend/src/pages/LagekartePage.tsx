@@ -12,8 +12,9 @@ import { listeEinsatzFahrzeuge, verorteFahrzeug } from '../api/einsatzFahrzeuge'
 import { listeFuehrungskraefte, verortePerson } from '../api/einsatzPersonal';
 import { listeAbschnitte, zeichneAbschnitt } from '../api/einsatzabschnitte';
 import { listeZonen, legeZoneAn, aktualisiereZone, loescheZone } from '../api/lagezonen';
+import { ladeGefahrengebiete } from '../api/gefahren';
 import { ladeOrganisation } from '../api/organisation';
-import type { EinsatzAnzeige, ZoneTyp } from '../api/types';
+import type { EinsatzAnzeige, Warnstufe, ZoneTyp } from '../api/types';
 import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import { baueMarker, baueTaktischeMarker, type KarteMarker } from './lagekarte/marker';
@@ -25,7 +26,8 @@ import Kartenflaeche, { type ZoneFeature } from './lagekarte/Kartenflaeche';
 import Sidebar, { type LayerSichtbar, type PlatzierenPunktTyp } from './lagekarte/Sidebar';
 import Inspector from './lagekarte/Inspector';
 import ZonenInspector from './lagekarte/ZonenInspector';
-import { zoneStil } from './lagekarte/zonenStil';
+import { zoneStil, gefahrengebietStil } from './lagekarte/zonenStil';
+import GefahrengebietMatrixDrawer from './lagekarte/GefahrengebietMatrixDrawer';
 import type { ZeichenModus } from './lagekarte/zeichnen';
 
 /** EinsatzAnzeige → KopfdatenUpdate (Vollersatz) mit überschriebener Koordinate. */
@@ -66,6 +68,7 @@ export default function LagekartePage() {
   const [layer, setLayer] = useState<LayerSichtbar>({
     einsatzort: true, uhs: true, schaden: true, einheit: true, fahrzeug: true, fuehrung: true, abschnitt: true, zone: true,
   });
+  const [matrixGebiet, setMatrixGebiet] = useState<number | null>(null);
 
   // EINE SSE-Verbindung für alle Domänen (uhs/schaden/einheit/fahrzeug/abschnitt/zone/
   // person). Pro Domäne eine eigene EventSource würde das HTTP/1.1-Limit (6/Origin)
@@ -94,6 +97,7 @@ export default function LagekartePage() {
     queryKey: ['einsatz-zonen', einsatzId],
     queryFn: () => listeZonen(einsatzId),
   });
+  const gebieteQuery = useQuery({ queryKey: ['gefahrengebiete', einsatzId], queryFn: () => ladeGefahrengebiete(einsatzId) });
   const fkQuery = useQuery({
     queryKey: ['einsatz-fuehrungskraefte', einsatzId],
     queryFn: () => listeFuehrungskraefte(einsatzId),
@@ -177,14 +181,24 @@ export default function LagekartePage() {
     [abschnitteQuery.data, orgDefault],
   );
 
+  const gebietWarnstufe = useMemo(() => {
+    const m = new Map<number, Warnstufe>();
+    (gebieteQuery.data ?? []).forEach((g) => m.set(g.id, g.hoechste_warnstufe));
+    return m;
+  }, [gebieteQuery.data]);
+
   const zonenFeatures = useMemo<ZoneFeature[]>(
     () =>
       (layer.zone ? zonenQuery.data ?? [] : []).flatMap((z) => {
         const g = parseGeometry(z.geometrie);
         if (!g) return [];
-        return [{ id: z.id, geometrie: g, label: z.label, stil: zoneStil(z.typ, z.farbe) }];
+        const stil =
+          z.typ === 'gefahrengebiet' && z.gefahrengebiet_id != null
+            ? gefahrengebietStil(gebietWarnstufe.get(z.gefahrengebiet_id) ?? 'keine')
+            : zoneStil(z.typ, z.farbe);
+        return [{ id: z.id, geometrie: g, label: z.label, stil }];
       }),
-    [zonenQuery.data, layer.zone],
+    [zonenQuery.data, layer.zone, gebietWarnstufe],
   );
 
   const ausgewaehlteZone = useMemo(
@@ -416,23 +430,35 @@ export default function LagekartePage() {
         {ausgewaehlteZone && (
           <ZonenInspector
             zone={ausgewaehlteZone}
+            gebiete={gebieteQuery.data ?? []}
             darfSchreiben={!!darfSchreiben}
             onSchliessen={() => setZoneAuswahl(null)}
             onAendern={(patch) =>
               aktualisiereZone(einsatzId, ausgewaehlteZone.id, patch)
-                .then(() => qc.invalidateQueries({ queryKey: ['einsatz-zonen', einsatzId] }))
+                .then(() => {
+                  qc.invalidateQueries({ queryKey: ['einsatz-zonen', einsatzId] });
+                  qc.invalidateQueries({ queryKey: ['gefahrengebiete', einsatzId] });
+                })
                 .catch(fehler)
             }
+            onMatrixOeffnen={(gid) => setMatrixGebiet(gid)}
             onLoeschen={() =>
               loescheZone(einsatzId, ausgewaehlteZone.id)
                 .then(() => {
                   setZoneAuswahl(null);
-                  return qc.invalidateQueries({ queryKey: ['einsatz-zonen', einsatzId] });
+                  qc.invalidateQueries({ queryKey: ['einsatz-zonen', einsatzId] });
+                  return qc.invalidateQueries({ queryKey: ['gefahrengebiete', einsatzId] });
                 })
                 .catch(fehler)
             }
           />
         )}
+        <GefahrengebietMatrixDrawer
+          einsatzId={einsatzId}
+          gefahrengebietId={matrixGebiet}
+          darfSchreiben={!!darfSchreiben}
+          onClose={() => setMatrixGebiet(null)}
+        />
       </div>
     </div>
   );

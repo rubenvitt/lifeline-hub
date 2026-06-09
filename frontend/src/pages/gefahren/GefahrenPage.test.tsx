@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
-import { renderMitProviders } from '../../test/utils';
+import { neuerQueryClient, renderMitProviders } from '../../test/utils';
 import GefahrenPage from './GefahrenPage';
 
 const einsatz = {
@@ -33,7 +33,8 @@ describe('GefahrenPage', () => {
   it('listet Gefahrengebiete und zeigt die Matrix des gewählten', async () => {
     server.use(...handlers());
     renderPage();
-    expect(await screen.findByText('Nord')).toBeInTheDocument();
+    // „Nord" erscheint in der Liste UND als editierbarer Titel → mehrere Treffer.
+    expect((await screen.findAllByText('Nord'))[0]).toBeInTheDocument();
     // Erstes Gebiet automatisch gewählt → Matrix sichtbar.
     expect(screen.getAllByText('Brand')[0]).toBeInTheDocument();
   });
@@ -42,6 +43,37 @@ describe('GefahrenPage', () => {
     server.use(...handlers([]));
     renderPage();
     expect(await screen.findByText(/keine Gefahrengebiete/i)).toBeInTheDocument();
+  });
+
+  it('korrigiert die Auswahl, wenn das gewählte Gebiet aus der Liste verschwindet', async () => {
+    const nord = { id: 7, einsatz_id: 1, label: 'Nord', zonen_ids: [9], hoechste_warnstufe: 'hoch' };
+    const sued = { id: 8, einsatz_id: 1, label: 'Süd', zonen_ids: [11], hoechste_warnstufe: 'mittel' };
+    let aktuelle: unknown[] = [nord];
+    let matrix8Angefragt = false;
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json(aktuelle)),
+      http.get('/api/einsaetze/1/gefahrengebiete/7/matrix', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/gefahrengebiete/8/matrix', () => {
+        matrix8Angefragt = true;
+        return HttpResponse.json([]);
+      }),
+    );
+    const client = neuerQueryClient();
+    renderMitProviders(
+      <Routes><Route path="/einsaetze/:id/gefahren" element={<GefahrenPage />} /></Routes>,
+      { route: '/einsaetze/1/gefahren', client },
+    );
+    // Gebiet 7 (Nord) ist gewählt, seine Matrix gerendert.
+    expect((await screen.findAllByText('Nord'))[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Brand')[0]).toBeInTheDocument();
+    // Refetch liefert nur noch Gebiet 8 (Süd) → Auswahl fällt auf das erste zurück.
+    aktuelle = [sued];
+    client.invalidateQueries({ queryKey: ['gefahrengebiete', 1] });
+    expect((await screen.findAllByText('Süd'))[0]).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Nord')).not.toBeInTheDocument());
+    // Matrix des neu gewählten Gebiets (8) wurde geladen.
+    await waitFor(() => expect(matrix8Angefragt).toBe(true));
   });
 
   it('setzt eine Warnstufe (PUT auf das gewählte Gebiet)', async () => {
@@ -58,7 +90,32 @@ describe('GefahrenPage', () => {
     const combobox = zellen[0].querySelector('input[role="combobox"]') ?? zellen[0];
     await userEvent.click(combobox);
     await userEvent.click(await screen.findByText('Hoch'));
-    await screen.findByText('Nord'); // settle
+    await screen.findAllByText('Nord'); // settle
     expect(put).toMatchObject({ gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'hoch' });
+  });
+
+  it('benennt das gewählte Gefahrengebiet um (PATCH)', async () => {
+    let patch: Record<string, unknown> | null = null;
+    server.use(
+      ...handlers(),
+      http.patch('/api/einsaetze/1/gefahrengebiete/7', async ({ request }) => {
+        patch = (await request.json()) as typeof patch;
+        return HttpResponse.json({ id: 7, einsatz_id: 1, label: (patch as { label: string }).label, zonen_ids: [9], hoechste_warnstufe: 'hoch' });
+      }),
+    );
+    renderPage();
+    // Editierbarer Titel des gewählten Gebiets „Nord" rendert ein Edit-Control.
+    await screen.findAllByText('Nord');
+    // antd Typography.editable rendert genau EIN Edit-Trigger-Button (aria-label „Edit").
+    const editBtn = screen.getByLabelText('Edit');
+    await userEvent.click(editBtn);
+    const input = await screen.findByRole('textbox');
+    await userEvent.clear(input);
+    await userEvent.type(input, 'Süd');
+    // Das Edit-Feld ist ein <textarea>; Enter fügt sonst nur einen Umbruch ein.
+    // Bestätigung robust über Enter-keyDown + Blur (löst editable.onChange aus).
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', keyCode: 13 });
+    fireEvent.blur(input);
+    await waitFor(() => expect(patch).toEqual({ label: 'Süd' }));
   });
 });

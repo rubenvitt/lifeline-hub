@@ -4,16 +4,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, App, Empty, List, Space, Spin, Tag, Typography } from 'antd';
 import type { BewertungEingabe } from '../../api/gefahren';
 import { ApiError } from '../../api/client';
-import { ladeGefahrengebiete, ladeMatrix, setzeBewertung } from '../../api/gefahren';
+import { benenneGefahrengebiet, gefahrengebietName, ladeGefahrengebiete, ladeMatrix, setzeBewertung } from '../../api/gefahren';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { useEinsatzLiveStream } from '../../etb/useEinsatzLiveStream';
 import { warnstufeFarbe } from './gefahrenSchema';
 import GefahrenMatrix from './GefahrenMatrix';
-import type { Warnstufe } from '../../api/types';
-
-function gebietName(label: string | null, id: number): string {
-  return label?.trim() ? label : `Gefahrengebiet #${id}`;
-}
 
 export default function GefahrenPage() {
   const { id } = useParams();
@@ -49,6 +44,11 @@ export default function GefahrenPage() {
     },
     onError: fehler,
   });
+  const umbenennen = useMutation({
+    mutationFn: (label: string) => benenneGefahrengebiet(einsatzId, gewaehlt as number, label),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['gefahrengebiete', einsatzId] }),
+    onError: fehler,
+  });
 
   if (einsatzQuery.isLoading) return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
   if (einsatzQuery.isError || !einsatzQuery.data) return <Alert type="error" message="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
@@ -56,9 +56,14 @@ export default function GefahrenPage() {
   const einsatz = einsatzQuery.data;
   const darfSchreiben = einsatz.status === 'aktiv' && (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
 
+  if (gebieteQuery.isLoading) return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
+  if (gebieteQuery.isError) return <Alert type="error" message="Gefahrengebiete konnten nicht geladen werden" showIcon />;
+
   if (gebiete.length === 0) {
     return <Empty description="Noch keine Gefahrengebiete – auf der Lagekarte ein Gefahrengebiet zeichnen." style={{ marginTop: 64 }} />;
   }
+
+  const aktuell = gebiete.find((g) => g.id === gewaehlt);
 
   return (
     <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
@@ -74,16 +79,25 @@ export default function GefahrenPage() {
             style={{ cursor: 'pointer', background: g.id === gewaehlt ? 'rgba(22,119,255,0.08)' : undefined }}
           >
             <Space>
-              <Tag color={g.hoechste_warnstufe === 'keine' ? undefined : warnstufeFarbe(g.hoechste_warnstufe as Warnstufe)}>
+              <Tag color={g.hoechste_warnstufe === 'keine' ? undefined : warnstufeFarbe(g.hoechste_warnstufe)}>
                 {g.hoechste_warnstufe}
               </Tag>
-              <span>{gebietName(g.label, g.id)}</span>
+              <span>{gefahrengebietName(g.label, g.id)}</span>
               <Typography.Text type="secondary">({g.zonen_ids.length})</Typography.Text>
             </Space>
           </List.Item>
         )}
       />
       <div style={{ flex: 1, minWidth: 0 }}>
+        {aktuell && (
+          <Typography.Title
+            level={5}
+            style={{ marginTop: 0 }}
+            editable={darfSchreiben ? { onChange: (v) => { const t = v.trim(); if (t !== (aktuell.label ?? '')) umbenennen.mutate(t); } } : false}
+          >
+            {gefahrengebietName(aktuell.label, aktuell.id)}
+          </Typography.Title>
+        )}
         {!darfSchreiben && (
           <Alert type="info" showIcon message="Nur Lesezugriff – Bewertungen können nicht geändert werden." style={{ marginBottom: 12 }} />
         )}

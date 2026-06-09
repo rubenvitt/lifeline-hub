@@ -24,3 +24,8 @@ export function setzeBewertung(einsatzId: number, gefahrengebietId: number, date
 export function benenneGefahrengebiet(einsatzId: number, gefahrengebietId: number, label: string | null): Promise<Gefahrengebiet> {
   return apiSend<Gefahrengebiet>(`/api/einsaetze/${einsatzId}/gefahrengebiete/${gefahrengebietId}`, 'PATCH', { label });
 }
+
+/** Anzeigename eines Gefahrengebiets: Label, sonst Fallback „Gefahrengebiet #<id>". */
+export function gefahrengebietName(label: string | null, id: number): string {
+  return label?.trim() ? label : `Gefahrengebiet #${id}`;
+}

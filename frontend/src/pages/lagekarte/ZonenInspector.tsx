@@ -1,39 +1,29 @@
-import { useEffect, useState } from 'react';
-import { Button, Card, Input, Select, Space, Typography } from 'antd';
-import type { Gefahrentyp, LageZone, Schutzobjekt, ZoneTyp } from '../../api/types';
-import { GEFAHRENTYPEN, SCHUTZOBJEKTE, kombinationGueltig } from '../gefahren/gefahrenSchema';
+import { Button, Card, Input, Popconfirm, Select, Space, Typography } from 'antd';
+import type { Gefahrengebiet, LageZone, ZoneTyp } from '../../api/types';
+import { gefahrengebietName } from '../../api/gefahren';
 import { ZONE_TYPEN, zoneTypLabel } from './zonenStil';
+
+/** Sentinel im Dropdown für „in neues Gefahrengebiet abspalten". */
+const NEU = -1;
 
 export interface ZonenInspectorProps {
   zone: LageZone;
+  gebiete: Gefahrengebiet[];
   darfSchreiben: boolean;
   onSchliessen: () => void;
   /** Partielles PATCH (nur geänderte Felder). */
-  onAendern: (patch: {
-    typ?: ZoneTyp;
-    label?: string | null;
-    farbe?: string | null;
-    notiz?: string | null;
-    gefahrentyp?: Gefahrentyp | null;
-    schutzobjekt?: Schutzobjekt | null;
-  }) => void;
+  onAendern: (patch: { typ?: ZoneTyp; label?: string | null; farbe?: string | null; notiz?: string | null; gefahrengebiet_id?: number | null }) => void;
+  onMatrixOeffnen: (gefahrengebietId: number) => void;
   onLoeschen: () => void;
 }
 
-/** Inspector für eine Zone: Typ/Label/Notiz/Farbe ändern (PATCH) + löschen (DELETE). */
-export default function ZonenInspector({ zone, darfSchreiben, onSchliessen, onAendern, onLoeschen }: ZonenInspectorProps) {
+export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchliessen, onAendern, onMatrixOeffnen, onLoeschen }: ZonenInspectorProps) {
   const istFreieSkizze = zone.typ === 'freie_skizze';
-  // Beim Typ-Wechsel sind nur Typen mit passender Geometrie zulässig (Geometrie ist fix).
-  const erlaubteTypen = ZONE_TYPEN.filter(
-    (t) => t.geometrie === 'beides' || t.geometrie === zone.geometrie_typ,
-  );
+  const erlaubteTypen = ZONE_TYPEN.filter((t) => t.geometrie === 'beides' || t.geometrie === zone.geometrie_typ);
+  const aktuellesGebiet = gebiete.find((g) => g.id === zone.gefahrengebiet_id) ?? null;
+  const aktuellHatWarnstufen = (aktuellesGebiet?.hoechste_warnstufe ?? 'keine') !== 'keine';
 
-  // Lokaler Entwurf für die Gefahren-Zuordnung: solange noch kein Schutzobjekt
-  // gespeichert ist, darf NICHT einzeln gePATCHt werden (Backend: beide-oder-keine).
-  // Erst wenn das Paar vollständig ist, wird genau ein PATCH mit BEIDEN Feldern gesendet.
-  const [entwurfGefahrentyp, setEntwurfGefahrentyp] = useState<Gefahrentyp | null>(zone.gefahrentyp);
-  useEffect(() => { setEntwurfGefahrentyp(zone.gefahrentyp); }, [zone.id, zone.gefahrentyp]);
-  const aktuellerGefahrentyp = zone.gefahrentyp ?? entwurfGefahrentyp;
+  const umhaengen = (ziel: number) => onAendern({ gefahrengebiet_id: ziel === NEU ? null : ziel });
 
   return (
     <Card
@@ -44,110 +34,54 @@ export default function ZonenInspector({ zone, darfSchreiben, onSchliessen, onAe
     >
       <Space direction="vertical" style={{ width: '100%' }}>
         {darfSchreiben ? (
-          <Select<ZoneTyp>
-            aria-label="Zonen-Typ"
-            value={zone.typ}
-            style={{ width: '100%' }}
+          <Select<ZoneTyp> aria-label="Zonen-Typ" value={zone.typ} style={{ width: '100%' }}
             options={erlaubteTypen.map((t) => ({ value: t.typ, label: t.label }))}
-            onChange={(v) => onAendern({ typ: v })}
-          />
+            onChange={(v) => onAendern({ typ: v })} />
         ) : (
           <Typography.Text>{zoneTypLabel(zone.typ)}</Typography.Text>
         )}
 
-        <Input
-          aria-label="Label"
-          placeholder="Bezeichnung"
-          defaultValue={zone.label ?? ''}
-          disabled={!darfSchreiben}
-          onBlur={(e) => {
-            const v = e.target.value.trim();
-            if (v !== (zone.label ?? '')) onAendern({ label: v || null });
-          }}
-        />
+        <Input aria-label="Label" placeholder="Bezeichnung" defaultValue={zone.label ?? ''} disabled={!darfSchreiben}
+          onBlur={(e) => { const v = e.target.value.trim(); if (v !== (zone.label ?? '')) onAendern({ label: v || null }); }} />
 
         {istFreieSkizze && (
-          <Input
-            aria-label="Farbe"
-            type="color"
-            defaultValue={zone.farbe ?? '#1677ff'}
-            disabled={!darfSchreiben}
-            onBlur={(e) => {
-              const v = e.target.value;
-              if (v !== (zone.farbe ?? '#1677ff')) onAendern({ farbe: v });
-            }}
-          />
+          <Input aria-label="Farbe" type="color" defaultValue={zone.farbe ?? '#1677ff'} disabled={!darfSchreiben}
+            onBlur={(e) => { const v = e.target.value; if (v !== (zone.farbe ?? '#1677ff')) onAendern({ farbe: v }); }} />
         )}
 
         {zone.typ === 'gefahrengebiet' && (
           <>
-            <Select<Gefahrentyp>
-              aria-label="Gefahrentyp"
-              allowClear
-              placeholder="Gefahrentyp"
+            <Typography.Text type="secondary">Gehört zu Gefahrengebiet</Typography.Text>
+            <Select<number>
+              aria-label="Gehört zu Gefahrengebiet"
               style={{ width: '100%' }}
-              value={aktuellerGefahrentyp ?? undefined}
+              value={zone.gefahrengebiet_id ?? undefined}
               disabled={!darfSchreiben}
-              options={GEFAHRENTYPEN.map((g) => ({
-                value: g.wert,
-                label: g.label,
-                // Gegen das gespeicherte Schutzobjekt symmetrisch sperren (vermeidet 422-Toast).
-                disabled: zone.schutzobjekt ? !kombinationGueltig(g.wert, zone.schutzobjekt) : false,
-              }))}
-              onChange={(v) => {
-                // Beim Leeren beide Felder nullen (beide-oder-keine).
-                if (!v) {
-                  setEntwurfGefahrentyp(null);
-                  onAendern({ gefahrentyp: null, schutzobjekt: null });
-                } else {
-                  setEntwurfGefahrentyp(v);
-                  // Bestehendes Paar: einzelnes Feld ist ok (das andere ist im Backend gesetzt).
-                  // Ohne gespeichertes schutzobjekt nur Entwurf halten, kein PATCH.
-                  if (zone.schutzobjekt) onAendern({ gefahrentyp: v, schutzobjekt: zone.schutzobjekt });
-                }
-              }}
+              options={[
+                ...gebiete.map((g) => ({ value: g.id, label: gefahrengebietName(g.label, g.id) })),
+                { value: NEU, label: '+ Neues Gefahrengebiet' },
+              ]}
+              onChange={(v) => umhaengen(v)}
             />
-            <Select<Schutzobjekt>
-              aria-label="Schutzobjekt"
-              allowClear
-              placeholder="Schutzobjekt"
-              style={{ width: '100%' }}
-              value={zone.schutzobjekt ?? undefined}
-              disabled={!darfSchreiben || !aktuellerGefahrentyp}
-              options={SCHUTZOBJEKTE.map((o) => ({
-                value: o.wert,
-                label: o.label,
-                disabled: aktuellerGefahrentyp ? !kombinationGueltig(aktuellerGefahrentyp, o.wert) : true,
-              }))}
-              onChange={(v) => {
-                if (!v) {
-                  onAendern({ gefahrentyp: null, schutzobjekt: null });
-                  setEntwurfGefahrentyp(null);
-                } else if (aktuellerGefahrentyp) {
-                  // Genau ein PATCH mit BEIDEN Feldern → etabliert die Zuordnung atomar.
-                  onAendern({ gefahrentyp: aktuellerGefahrentyp, schutzobjekt: v });
-                }
-              }}
-            />
+            {zone.gefahrengebiet_id != null && (
+              <Button block onClick={() => onMatrixOeffnen(zone.gefahrengebiet_id as number)}>
+                Gefahrenmatrix bearbeiten
+              </Button>
+            )}
           </>
         )}
 
-        <Input.TextArea
-          aria-label="Notiz"
-          placeholder="Notiz"
-          defaultValue={zone.notiz ?? ''}
-          disabled={!darfSchreiben}
-          rows={2}
-          onBlur={(e) => {
-            const v = e.target.value.trim();
-            if (v !== (zone.notiz ?? '')) onAendern({ notiz: v || null });
-          }}
-        />
+        <Input.TextArea aria-label="Notiz" placeholder="Notiz" defaultValue={zone.notiz ?? ''} disabled={!darfSchreiben} rows={2}
+          onBlur={(e) => { const v = e.target.value.trim(); if (v !== (zone.notiz ?? '')) onAendern({ notiz: v || null }); }} />
 
         {darfSchreiben && (
-          <Button danger onClick={onLoeschen}>
-            Zone aufheben
-          </Button>
+          aktuellHatWarnstufen ? (
+            <Popconfirm title="Zone aufheben?" description="Wird das Gefahrengebiet dadurch leer, geht seine Matrix verloren." okText="Aufheben" cancelText="Abbrechen" onConfirm={onLoeschen}>
+              <Button danger>Zone aufheben</Button>
+            </Popconfirm>
+          ) : (
+            <Button danger onClick={onLoeschen}>Zone aufheben</Button>
+          )
         )}
       </Space>
     </Card>
