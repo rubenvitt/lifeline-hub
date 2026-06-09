@@ -25,8 +25,7 @@ pub struct LageZoneAnzeige {
     pub label: Option<String>,
     pub farbe: Option<String>,
     pub notiz: Option<String>,
-    pub gefahrentyp: Option<String>,
-    pub schutzobjekt: Option<String>,
+    pub gefahrengebiet_id: Option<i64>,
     pub erstellt_von: i64,
     pub erstellt_at: String,
     pub geaendert_at: String,
@@ -41,27 +40,6 @@ pub fn typ_label(typ: &str) -> &'static str {
         "sperrgebiet" => "Sperrgebiet",
         "freie_skizze" => "Freie Skizze",
         _ => "Zone",
-    }
-}
-
-/// Prüft die optionale Gefahren-Zuordnung einer Zone:
-/// - nur `typ='gefahrengebiet'` darf eine Zuordnung tragen,
-/// - beide Felder gemeinsam gesetzt oder beide leer (kein Halb-Zustand),
-/// - gültige Enums + gültige Kombination (delegiert an `gefahr::kombination_gueltig`).
-pub fn gefahren_zuordnung_gueltig(
-    typ_der_zone: &str,
-    gefahrentyp: Option<&str>,
-    schutzobjekt: Option<&str>,
-) -> bool {
-    match (gefahrentyp, schutzobjekt) {
-        (None, None) => true,
-        (Some(g), Some(o)) => {
-            typ_der_zone == "gefahrengebiet"
-                && crate::gefahr::GEFAHRENTYPEN.contains(&g)
-                && crate::gefahr::SCHUTZOBJEKTE.contains(&o)
-                && crate::gefahr::kombination_gueltig(g, o)
-        }
-        _ => false, // genau eines gesetzt → ungültig
     }
 }
 
