@@ -62,8 +62,8 @@ describe('App-Routing', () => {
       http.get('/api/auth/me', () => HttpResponse.json(admin)),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/gefahrenmatrix', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/7/zonen', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/gefahrengebiete', () => HttpResponse.json([{ id: 1, einsatz_id: 7, label: 'Nord', zonen_ids: [], hoechste_warnstufe: 'keine' }])),
+      http.get('/api/einsaetze/7/gefahrengebiete/1/matrix', () => HttpResponse.json([])),
     );
     renderApp('/einsaetze/7/gefahren');
     // Matrix-eigene Gefahrentyp-Zeile beweist: GefahrenPage rendert (kein Redirect, kein Stub).

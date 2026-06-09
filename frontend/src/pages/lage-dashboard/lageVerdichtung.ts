@@ -1,4 +1,4 @@
-import type { GefahrBewertung, LageberichtAnzeige, Person, Schaden, Tier, Uhs, Warnstufe } from '../../api/types';
+import type { GefahrBewertung, Gefahrengebiet, LageberichtAnzeige, Person, Schaden, Tier, Uhs, Warnstufe } from '../../api/types';
 
 export interface SkVerteilung {
   sk1: number; sk2: number; sk3: number; sk4: number;
@@ -45,6 +45,23 @@ export function verdichteGefahren(bewertungen: GefahrBewertung[]): GefahrVerdich
     hoechste: hoechsteWarnstufe(bewertungen),
     anzahlAktiv: bewertungen.filter((b) => b.warnstufe !== 'keine').length,
   };
+}
+
+const WARNSTUFE_RANG_MAP: Record<Warnstufe, number> = {
+  keine: 0, niedrig: 1, mittel: 2, hoch: 3, akut: 4,
+};
+
+/** Gefahren-Verdichtung aus Gefahrengebiet-Übersicht (ohne Einzel-Matrix-Requests). */
+export function verdichteGefahrengebiete(gebiete: Gefahrengebiet[]): GefahrVerdichtung {
+  let max: Warnstufe = 'keine';
+  let anzahlAktiv = 0;
+  for (const g of gebiete) {
+    if (WARNSTUFE_RANG_MAP[g.hoechste_warnstufe] > WARNSTUFE_RANG_MAP[max]) {
+      max = g.hoechste_warnstufe;
+    }
+    if (g.hoechste_warnstufe !== 'keine') anzahlAktiv += 1;
+  }
+  return { hoechste: max, anzahlAktiv };
 }
 
 export function verdichtePersonen(personen: Person[]): BetroffeneVerdichtung {

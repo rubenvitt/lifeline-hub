@@ -49,7 +49,7 @@ function mockEndpunkte(d: Daten) {
     http.get('/api/einsaetze/1/uhs', () => json(d.uhs)),
     http.get('/api/einsaetze/1/schaeden', () => json(d.schaeden)),
     http.get('/api/einsaetze/1/tiere', () => json(d.tiere)),
-    http.get('/api/einsaetze/1/gefahrenmatrix', () =>
+    http.get('/api/einsaetze/1/gefahrengebiete', () =>
       d.gefahrenStatus ? new HttpResponse(null, { status: d.gefahrenStatus }) : json(d.gefahren)),
     http.get('/api/einsaetze/1/zonen', () => json(d.zonen)),
     http.get('/api/einsaetze/1/lageberichte', () => json(d.lageberichte)),
