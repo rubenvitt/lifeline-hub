@@ -1,4 +1,4 @@
-import { App, Breadcrumb, Button, Form, Input, Modal, Space, Spin, Tag, Typography } from 'antd';
+import { App, Breadcrumb, Button, Form, Input, Space, Spin, Tag, Typography } from 'antd';
 import { useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -21,7 +21,7 @@ export default function LageberichtDetailPage() {
   const { id, lbId } = useParams();
   const einsatzId = Number(id);
   const berichtId = Number(lbId);
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [form] = Form.useForm<Record<string, string>>();
@@ -52,15 +52,19 @@ export default function LageberichtDetailPage() {
   const fehler = (e: unknown) =>
     message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
+  // Persistiert die aktuellen Formularwerte als Entwurf (ohne Erfolgs-Toast) — von der
+  // „Entwurf speichern"-Mutation und vom Freigabe-Flow gemeinsam genutzt.
+  const speichern = (werte: Record<string, string>) => {
+    const v = vorlage(berichtQuery.data!.vorlage)!;
+    const abschnitte: LageberichtAbschnitt[] = v.abschnitte.map((a) => ({
+      schluessel: a.schluessel,
+      text: werte[a.schluessel] ?? '',
+    }));
+    return aktualisiereLagebericht(einsatzId, berichtId, { titel: werte.titel, abschnitte });
+  };
+
   const speichernMutation = useMutation({
-    mutationFn: (werte: Record<string, string>) => {
-      const v = vorlage(berichtQuery.data!.vorlage)!;
-      const abschnitte: LageberichtAbschnitt[] = v.abschnitte.map((a) => ({
-        schluessel: a.schluessel,
-        text: werte[a.schluessel] ?? '',
-      }));
-      return aktualisiereLagebericht(einsatzId, berichtId, { titel: werte.titel, abschnitte });
-    },
+    mutationFn: speichern,
     onSuccess: () => {
       invalidate();
       message.success('Entwurf gespeichert');
@@ -104,15 +108,34 @@ export default function LageberichtDetailPage() {
     einsatz.status === 'aktiv' &&
     (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
 
-  const freigabeBestaetigen = () =>
-    Modal.confirm({
+  const freigabeBestaetigen = async () => {
+    // Pflichtfelder VOR dem Dialog prüfen — sonst landet ein Titel-Fehler hinter dem Modal.
+    let werte: Record<string, string>;
+    try {
+      werte = await form.validateFields();
+    } catch {
+      return; // Validierungsfehler werden am Formular angezeigt.
+    }
+    modal.confirm({
       title: 'Lagebericht freigeben?',
       content:
         'Die Freigabe ist endgültig und unveränderlich: Der Bericht wird als ETB-Eintrag gesnapshottet. Korrekturen sind danach nur per Fortschreibung möglich.',
       okText: 'Freigeben',
       cancelText: 'Abbrechen',
-      onOk: () => freigebenMutation.mutateAsync(),
+      onOk: async () => {
+        // /freigeben validiert den persistierten DB-Stand, nicht den Editor-Inhalt:
+        // den aktuellen Inhalt erst speichern, sonst wird ein eben befüllter Entwurf
+        // fälschlich als „leer" abgelehnt (und ungespeicherte Edits gingen verloren).
+        try {
+          await speichern(werte);
+        } catch (e) {
+          fehler(e);
+          throw e; // Dialog offen lassen, Freigabe nicht auslösen.
+        }
+        await freigebenMutation.mutateAsync();
+      },
     });
+  };
 
   return (
     <div className="lagebericht-print-root">

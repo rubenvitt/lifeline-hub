@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { Route, Routes } from 'react-router-dom';
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
@@ -94,6 +94,59 @@ describe('LageberichtDetailPage', () => {
     // (nach Flush der Effects via findBy); ein fixer rows-Kasten hat kein Inline-Style.
     expect(feld.style.overflowY).toBe('hidden');
     expect(feld).not.toHaveAttribute('rows', '4');
+  });
+
+  it('Freigeben speichert den getippten Inhalt zuvor — ein eben befüllter Entwurf wird nicht als „leer" abgelehnt', async () => {
+    // Backend-Semantik nachgebildet: POST /freigeben nimmt KEINEN Body und validiert
+    // den PERSISTIERTEN Stand. Wer tippt und direkt freigibt (ohne „Entwurf speichern"),
+    // bekam bisher „Der Bericht ist leer", obwohl Text im Feld steht.
+    let persistierte = lagebericht7Abschnitte.abschnitte.map((a) => ({ ...a }));
+    let status = 'entwurf';
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/lageberichte/12', () =>
+        HttpResponse.json({ ...lagebericht7Abschnitte, abschnitte: persistierte, status }),
+      ),
+      http.patch('/api/einsaetze/7/lageberichte/12', async ({ request }) => {
+        const body = (await request.json()) as { abschnitte?: typeof persistierte };
+        if (body.abschnitte) persistierte = body.abschnitte;
+        return HttpResponse.json({ ...lagebericht7Abschnitte, abschnitte: persistierte, status });
+      }),
+      http.post('/api/einsaetze/7/lageberichte/12/freigeben', () => {
+        if (persistierte.every((a) => a.text.trim() === '')) {
+          return HttpResponse.json(
+            { error: 'Der Bericht ist leer und kann nicht freigegeben werden' },
+            { status: 422 },
+          );
+        }
+        status = 'freigegeben';
+        return HttpResponse.json({
+          ...lagebericht7Abschnitte,
+          abschnitte: persistierte,
+          status,
+          etb_eintrag_id: 99,
+        });
+      }),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/7/lageberichte/12' },
+    );
+
+    const auftrag = await screen.findByLabelText('Auftrag');
+    await userEvent.type(auftrag, 'Hochwasser steigt');
+    // Bewusst OHNE vorher „Entwurf speichern" zu klicken.
+    await userEvent.click(screen.getByRole('button', { name: /Freigeben/i }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: /Freigeben/i }));
+
+    // Erfolg: der getippte Inhalt wird persistiert und der Bericht freigegeben.
+    expect(await screen.findByText('Bericht freigegeben')).toBeInTheDocument();
   });
 
   it('freigegebener Bericht ist read-only mit ETB-Link und Fortschreiben', async () => {
