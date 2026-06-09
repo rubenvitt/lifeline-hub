@@ -26,8 +26,8 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     const onUhs = () => inval('einsatz-uhs');
     const onSchaden = () => inval('einsatz-schaeden');
     const onFahrzeug = () => inval('einsatz-fahrzeuge');
-    const onZone = () => inval('einsatz-zonen');
-    const onGefahr = () => inval('gefahrenmatrix');
+    const onZone = () => { inval('einsatz-zonen'); inval('gefahrengebiete'); };
+    const onGefahr = () => { inval('gefahrenmatrix'); inval('gefahrengebiete'); };
     const onEinheit = () => {
       inval('einsatz-einheiten');
       inval('einsatz-fuehrungskraefte');

@@ -616,7 +616,7 @@ export type Warnstufe = 'keine' | 'niedrig' | 'mittel' | 'hoch' | 'akut';
 
 export interface GefahrBewertung {
   id: number;
-  einsatz_id: number;
+  gefahrengebiet_id: number;
   gefahrentyp: Gefahrentyp;
   schutzobjekt: Schutzobjekt;
   warnstufe: Warnstufe;
@@ -625,6 +625,14 @@ export interface GefahrBewertung {
   aktualisiert_von: number;
   erstellt_at: string;
   geaendert_at: string;
+}
+
+export interface Gefahrengebiet {
+  id: number;
+  einsatz_id: number;
+  label: string | null;
+  zonen_ids: number[];
+  hoechste_warnstufe: Warnstufe;
 }
 
 export type ZoneTyp =
@@ -643,8 +651,7 @@ export interface LageZone {
   label: string | null;
   farbe: string | null;
   notiz: string | null;
-  gefahrentyp: Gefahrentyp | null;
-  schutzobjekt: Schutzobjekt | null;
+  gefahrengebiet_id: number | null;
   erstellt_von: number;
   erstellt_at: string;
   geaendert_at: string;

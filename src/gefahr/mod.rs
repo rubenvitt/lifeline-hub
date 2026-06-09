@@ -4,25 +4,33 @@ use serde::Serialize;
 
 /// 13 Gefahrentypen (verbatim aus bluelight-hub; lowercase-snake wie lage_zone.typ).
 pub const GEFAHRENTYPEN: [&str; 13] = [
-    "atemgifte", "angstreaktion", "ausbreitung", "atomare_strahlung", "chemische_stoffe",
-    "erkrankung_verletzung", "explosion", "elektrizitaet", "einsturz", "absturz", "brand",
-    "durchbruch", "ertrinken",
+    "atemgifte",
+    "angstreaktion",
+    "ausbreitung",
+    "atomare_strahlung",
+    "chemische_stoffe",
+    "erkrankung_verletzung",
+    "explosion",
+    "elektrizitaet",
+    "einsturz",
+    "absturz",
+    "brand",
+    "durchbruch",
+    "ertrinken",
 ];
 
 /// 5 Schutzobjekte.
-pub const SCHUTZOBJEKTE: [&str; 5] = [
-    "menschen", "tiere", "umwelt", "sachwerte", "einsatzkraefte",
-];
+pub const SCHUTZOBJEKTE: [&str; 5] = ["menschen", "tiere", "umwelt", "sachwerte", "einsatzkraefte"];
 
 /// 5 Warnstufen (`keine` = effektiv keine Bewertung).
 pub const WARNSTUFEN: [&str; 5] = ["keine", "niedrig", "mittel", "hoch", "akut"];
 
-/// Aufgelöste Matrix-Zelle (einsatz-skopiert). Die Liste enthält nur Zellen mit
+/// Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält nur Zellen mit
 /// `warnstufe != 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct GefahrBewertungAnzeige {
     pub id: i64,
-    pub einsatz_id: i64,
+    pub gefahrengebiet_id: i64,
     pub gefahrentyp: String,
     pub schutzobjekt: String,
     pub warnstufe: String,
@@ -33,14 +41,43 @@ pub struct GefahrBewertungAnzeige {
     pub geaendert_at: String,
 }
 
+/// Ein Gefahrengebiet (Gruppe aus 1..n gefahrengebiet-Zonen), trägt eine Matrix.
+/// `zonen_ids`: zugehörige lage_zone-IDs. `hoechste_warnstufe`: stärkste gesetzte
+/// Zelle der Matrix (Severity-Maximum), `keine` wenn nichts gesetzt.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct GefahrengebietAnzeige {
+    pub id: i64,
+    pub einsatz_id: i64,
+    pub label: Option<String>,
+    pub zonen_ids: Vec<i64>,
+    pub hoechste_warnstufe: String,
+}
+
+/// Severity-Rang einer Warnstufe (für „höchste Warnstufe je Gebiet"). Lexikalisches
+/// MAX wäre falsch (`akut` < `keine`), daher expliziter Rang.
+pub fn warnstufe_von_rang(rang: i64) -> &'static str {
+    match rang {
+        4 => "akut",
+        3 => "hoch",
+        2 => "mittel",
+        1 => "niedrig",
+        _ => "keine",
+    }
+}
+
 /// Ob `(typ, objekt)` eine fachlich gültige Kombination ist (verbatim aus BLH).
 /// Ungültig: sachwerte×{angstreaktion,atemgifte,erkrankung_verletzung,ertrinken},
 /// umwelt×{angstreaktion,erkrankung_verletzung,ertrinken}.
 pub fn kombination_gueltig(typ: &str, objekt: &str) -> bool {
     !matches!(
         (objekt, typ),
-        ("sachwerte", "angstreaktion" | "atemgifte" | "erkrankung_verletzung" | "ertrinken")
-            | ("umwelt", "angstreaktion" | "erkrankung_verletzung" | "ertrinken")
+        (
+            "sachwerte",
+            "angstreaktion" | "atemgifte" | "erkrankung_verletzung" | "ertrinken"
+        ) | (
+            "umwelt",
+            "angstreaktion" | "erkrankung_verletzung" | "ertrinken"
+        )
     )
 }
 

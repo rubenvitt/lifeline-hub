@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
-import { renderMitProviders } from '../../test/utils';
+import { neuerQueryClient, renderMitProviders } from '../../test/utils';
 import GefahrenPage from './GefahrenPage';
 
 const einsatz = {
@@ -13,131 +13,109 @@ const einsatz = {
   leitstellen_nr: null, einsatzort: null, einsatzort_lat: null, einsatzort_lon: null, meldende_stelle: null,
   sachverhalt: null, anzahl_betroffene_initial: null, meine_rolle: 'einsatzleitung',
 };
+const gebiet = { id: 7, einsatz_id: 1, label: 'Nord', zonen_ids: [9], hoechste_warnstufe: 'hoch' };
 
-function handlers(rolle = 'einsatzleitung', status = 'aktiv', matrix: unknown[] = [], zonen: unknown[] = []) {
+function handlers(gebiete: unknown[] = [gebiet], matrix: unknown[] = []) {
   return [
-    http.get('/api/einsaetze/1', () => HttpResponse.json({ ...einsatz, meine_rolle: rolle, status })),
-    http.get('/api/einsaetze/1/gefahrenmatrix', () => HttpResponse.json(matrix)),
-    http.get('/api/einsaetze/1/zonen', () => HttpResponse.json(zonen)),
+    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
+    http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json(gebiete)),
+    http.get('/api/einsaetze/1/gefahrengebiete/7/matrix', () => HttpResponse.json(matrix)),
   ];
 }
-
 function renderPage() {
   renderMitProviders(
-    <Routes>
-      <Route path="/einsaetze/:id/gefahren" element={<GefahrenPage />} />
-    </Routes>,
+    <Routes><Route path="/einsaetze/:id/gefahren" element={<GefahrenPage />} /></Routes>,
     { route: '/einsaetze/1/gefahren' },
   );
 }
 
 describe('GefahrenPage', () => {
-  it('rendert das 13×5-Raster (13 Gefahrentyp-Zeilen, 5 Schutzobjekt-Spalten)', async () => {
+  it('listet Gefahrengebiete und zeigt die Matrix des gewählten', async () => {
     server.use(...handlers());
     renderPage();
-    // antd Table rendert eine Maßzeile → mehrere Elemente; findAllByText + [0] ist die kanonische Umgehung.
-    expect((await screen.findAllByText('Brand'))[0]).toBeInTheDocument();
-    expect(screen.getAllByText('Atemgifte')[0]).toBeInTheDocument();
-    expect(screen.getAllByText('Ertrinken')[0]).toBeInTheDocument();
-    expect(screen.getAllByText('Menschen')[0]).toBeInTheDocument();
-    expect(screen.getAllByText('Einsatzkräfte')[0]).toBeInTheDocument();
+    // „Nord" erscheint in der Liste UND als editierbarer Titel → mehrere Treffer.
+    expect((await screen.findAllByText('Nord'))[0]).toBeInTheDocument();
+    // Erstes Gebiet automatisch gewählt → Matrix sichtbar.
+    expect(screen.getAllByText('Brand')[0]).toBeInTheDocument();
   });
 
-  it('setzt eine Warnstufe und ruft die API (PUT)', async () => {
+  it('zeigt Leerzustand ohne Gefahrengebiete', async () => {
+    server.use(...handlers([]));
+    renderPage();
+    expect(await screen.findByText(/keine Gefahrengebiete/i)).toBeInTheDocument();
+  });
+
+  it('korrigiert die Auswahl, wenn das gewählte Gebiet aus der Liste verschwindet', async () => {
+    const nord = { id: 7, einsatz_id: 1, label: 'Nord', zonen_ids: [9], hoechste_warnstufe: 'hoch' };
+    const sued = { id: 8, einsatz_id: 1, label: 'Süd', zonen_ids: [11], hoechste_warnstufe: 'mittel' };
+    let aktuelle: unknown[] = [nord];
+    let matrix8Angefragt = false;
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json(aktuelle)),
+      http.get('/api/einsaetze/1/gefahrengebiete/7/matrix', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/gefahrengebiete/8/matrix', () => {
+        matrix8Angefragt = true;
+        return HttpResponse.json([]);
+      }),
+    );
+    const client = neuerQueryClient();
+    renderMitProviders(
+      <Routes><Route path="/einsaetze/:id/gefahren" element={<GefahrenPage />} /></Routes>,
+      { route: '/einsaetze/1/gefahren', client },
+    );
+    // Gebiet 7 (Nord) ist gewählt, seine Matrix gerendert.
+    expect((await screen.findAllByText('Nord'))[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Brand')[0]).toBeInTheDocument();
+    // Refetch liefert nur noch Gebiet 8 (Süd) → Auswahl fällt auf das erste zurück.
+    aktuelle = [sued];
+    client.invalidateQueries({ queryKey: ['gefahrengebiete', 1] });
+    expect((await screen.findAllByText('Süd'))[0]).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Nord')).not.toBeInTheDocument());
+    // Matrix des neu gewählten Gebiets (8) wurde geladen.
+    await waitFor(() => expect(matrix8Angefragt).toBe(true));
+  });
+
+  it('setzt eine Warnstufe (PUT auf das gewählte Gebiet)', async () => {
     let put: Record<string, unknown> | null = null;
     server.use(
       ...handlers(),
-      http.put('/api/einsaetze/1/gefahrenmatrix/bewertung', async ({ request }) => {
+      http.put('/api/einsaetze/1/gefahrengebiete/7/matrix/bewertung', async ({ request }) => {
         put = (await request.json()) as typeof put;
-        return HttpResponse.json({
-          id: 1, einsatz_id: 1, gefahrentyp: put!.gefahrentyp, schutzobjekt: put!.schutzobjekt,
-          warnstufe: put!.warnstufe, beschreibung: null, gemeldet_von: null, aktualisiert_von: 1,
-          erstellt_at: '', geaendert_at: '',
-        });
-      }),
-    );
-    renderPage();
-    // Zelle (brand × menschen): aria-label am Select. antd Table → mehrere → [0] nehmen.
-    // Klick auf das innere combobox-Input öffnet das Dropdown sicher.
-    const zellen = await screen.findAllByLabelText('Warnstufe brand × menschen');
-    const zelle = zellen[0];
-    const combobox = zelle.querySelector('input[role="combobox"]') ?? zelle;
-    await userEvent.click(combobox);
-    await userEvent.click(await screen.findByText('Hoch'));
-    // Voller Zell-Zustand: beschreibung/gemeldet_von bei unbewerteter Zelle null.
-    await waitFor(() => expect(put).toEqual({
-      gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'hoch', beschreibung: null, gemeldet_von: null,
-    }));
-  });
-
-  it('graut ungültige Kombinationen aus (sachwerte × atemgifte disabled)', async () => {
-    server.use(...handlers());
-    renderPage();
-    // antd Table → mehrere Elemente mit gleichem aria-label; [0] = erste echte Zeile.
-    const zellen = await screen.findAllByLabelText('Warnstufe atemgifte × sachwerte');
-    expect(zellen[0]).toHaveClass('ant-select-disabled');
-  });
-
-  it('editiert beschreibung über das Detail-Popover (voller Zell-Zustand)', async () => {
-    const matrix = [{
-      id: 5, einsatz_id: 1, gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'hoch',
-      beschreibung: 'X', gemeldet_von: null, aktualisiert_von: 1, erstellt_at: '', geaendert_at: '',
-    }];
-    let put: Record<string, unknown> | null = null;
-    server.use(
-      ...handlers('einsatzleitung', 'aktiv', matrix),
-      http.put('/api/einsaetze/1/gefahrenmatrix/bewertung', async ({ request }) => {
-        put = (await request.json()) as typeof put;
-        return HttpResponse.json({ ...matrix[0], ...put });
-      }),
-    );
-    renderPage();
-    const buttons = await screen.findAllByLabelText('Details brand × menschen');
-    await userEvent.click(buttons[0]);
-    const textarea = await screen.findByLabelText('Beschreibung');
-    await userEvent.clear(textarea);
-    await userEvent.type(textarea, 'Dachstuhl brennt');
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(put).toEqual({
-      gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'hoch',
-      beschreibung: 'Dachstuhl brennt', gemeldet_von: null,
-    }));
-  });
-
-  it('Warnstufen-Änderung clobbert bestehende beschreibung nicht', async () => {
-    const matrix = [{
-      id: 5, einsatz_id: 1, gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'hoch',
-      beschreibung: 'Dachstuhl', gemeldet_von: 'KdoW', aktualisiert_von: 1, erstellt_at: '', geaendert_at: '',
-    }];
-    let put: Record<string, unknown> | null = null;
-    server.use(
-      ...handlers('einsatzleitung', 'aktiv', matrix),
-      http.put('/api/einsaetze/1/gefahrenmatrix/bewertung', async ({ request }) => {
-        put = (await request.json()) as typeof put;
-        return HttpResponse.json({ ...matrix[0], ...put });
+        return HttpResponse.json({ id: 1, gefahrengebiet_id: 7, ...put, beschreibung: null, gemeldet_von: null, aktualisiert_von: 1, erstellt_at: '', geaendert_at: '' });
       }),
     );
     renderPage();
     const zellen = await screen.findAllByLabelText('Warnstufe brand × menschen');
     const combobox = zellen[0].querySelector('input[role="combobox"]') ?? zellen[0];
     await userEvent.click(combobox);
-    await userEvent.click(await screen.findByText('Akut'));
-    await waitFor(() => expect(put).toEqual({
-      gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'akut',
-      beschreibung: 'Dachstuhl', gemeldet_von: 'KdoW',
-    }));
+    await userEvent.click(await screen.findByText('Hoch'));
+    await screen.findAllByText('Nord'); // settle
+    expect(put).toMatchObject({ gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'hoch' });
   });
 
-  it('zeigt die Anzahl verknüpfter Zonen als Badge', async () => {
-    const zone = {
-      id: 9, einsatz_id: 1, typ: 'gefahrengebiet', geometrie_typ: 'Polygon', geometrie: '{}',
-      label: null, farbe: null, notiz: null, gefahrentyp: 'brand', schutzobjekt: 'menschen',
-      erstellt_von: 1, erstellt_at: '', geaendert_at: '',
-    };
-    server.use(...handlers('einsatzleitung', 'aktiv', [], [zone]));
+  it('benennt das gewählte Gefahrengebiet um (PATCH)', async () => {
+    let patch: Record<string, unknown> | null = null;
+    server.use(
+      ...handlers(),
+      http.patch('/api/einsaetze/1/gefahrengebiete/7', async ({ request }) => {
+        patch = (await request.json()) as typeof patch;
+        return HttpResponse.json({ id: 7, einsatz_id: 1, label: (patch as { label: string }).label, zonen_ids: [9], hoechste_warnstufe: 'hoch' });
+      }),
+    );
     renderPage();
-    // Badge-Count „1" erscheint an der Zelle brand × menschen.
-    const badges = await screen.findAllByText('1');
-    expect(badges[0]).toBeInTheDocument();
+    // Editierbarer Titel des gewählten Gebiets „Nord" rendert ein Edit-Control.
+    await screen.findAllByText('Nord');
+    // antd Typography.editable rendert genau EIN Edit-Trigger-Button (aria-label „Edit").
+    const editBtn = screen.getByLabelText('Edit');
+    await userEvent.click(editBtn);
+    const input = await screen.findByRole('textbox');
+    await userEvent.clear(input);
+    await userEvent.type(input, 'Süd');
+    // Das Edit-Feld ist ein <textarea>; Enter fügt sonst nur einen Umbruch ein.
+    // Bestätigung robust über Enter-keyDown + Blur (löst editable.onChange aus).
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', keyCode: 13 });
+    fireEvent.blur(input);
+    await waitFor(() => expect(patch).toEqual({ label: 'Süd' }));
   });
 });

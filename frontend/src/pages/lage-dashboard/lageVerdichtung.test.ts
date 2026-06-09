@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { GefahrBewertung, LageberichtAnzeige, Person, Schaden, Tier, Uhs } from '../../api/types';
-import { hoechsteWarnstufe, neuesterLagebericht, verdichteGefahren, verdichtePersonen } from './lageVerdichtung';
+import type { Gefahrengebiet, LageberichtAnzeige, Person, Schaden, Tier, Uhs, Warnstufe } from '../../api/types';
+import { neuesterLagebericht, verdichteGefahrengebiete, verdichtePersonen } from './lageVerdichtung';
 import { verdichteSchaeden, verdichteTiere, verdichteUhs } from './lageVerdichtung';
 
 function person(p: Partial<Person>): Person {
@@ -58,35 +58,25 @@ describe('verdichtePersonen', () => {
   });
 });
 
-function bewertung(warnstufe: GefahrBewertung['warnstufe']): GefahrBewertung {
-  return {
-    id: 1, einsatz_id: 1, gefahrentyp: 'atemgifte', schutzobjekt: 'menschen',
-    warnstufe, beschreibung: null, gemeldet_von: null, aktualisiert_von: 1,
-    erstellt_at: '2026-06-08 10:00:00', geaendert_at: '2026-06-08 10:00:00',
-  };
+function gebiet(hoechste_warnstufe: Warnstufe): Gefahrengebiet {
+  return { id: 1, einsatz_id: 1, label: null, zonen_ids: [], hoechste_warnstufe };
 }
 
-describe('hoechsteWarnstufe', () => {
-  it('leere Liste → keine', () => {
-    expect(hoechsteWarnstufe([])).toBe('keine');
+describe('verdichteGefahrengebiete', () => {
+  it('leere Liste → keine / 0', () => {
+    expect(verdichteGefahrengebiete([])).toEqual({ hoechste: 'keine', anzahlAktiv: 0 });
   });
-  it('liefert ordinales Maximum', () => {
-    expect(hoechsteWarnstufe([bewertung('niedrig'), bewertung('hoch'), bewertung('mittel')])).toBe('hoch');
-    expect(hoechsteWarnstufe([bewertung('akut'), bewertung('hoch')])).toBe('akut');
-  });
-  it('nur keine → keine', () => {
-    expect(hoechsteWarnstufe([bewertung('keine'), bewertung('keine')])).toBe('keine');
-  });
-});
-
-describe('verdichteGefahren', () => {
-  it('zählt aktive (warnstufe !== keine) und höchste', () => {
-    const v = verdichteGefahren([bewertung('keine'), bewertung('mittel'), bewertung('hoch')]);
+  it('liefert höchste Warnstufe per Severity-Rang und zählt aktive Gebiete', () => {
+    const v = verdichteGefahrengebiete([gebiet('keine'), gebiet('mittel'), gebiet('hoch')]);
     expect(v.hoechste).toBe('hoch');
     expect(v.anzahlAktiv).toBe(2);
   });
-  it('leere Liste → keine / 0', () => {
-    expect(verdichteGefahren([])).toEqual({ hoechste: 'keine', anzahlAktiv: 0 });
+  it('akut schlägt hoch (ordinales Maximum, nicht lexikalisch)', () => {
+    expect(verdichteGefahrengebiete([gebiet('hoch'), gebiet('akut')]).hoechste).toBe('akut');
+  });
+  it('nur keine → keine / 0', () => {
+    expect(verdichteGefahrengebiete([gebiet('keine'), gebiet('keine')]))
+      .toEqual({ hoechste: 'keine', anzahlAktiv: 0 });
   });
 });
 

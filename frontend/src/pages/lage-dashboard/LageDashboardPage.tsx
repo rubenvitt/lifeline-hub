@@ -8,7 +8,7 @@ import { listePersonen } from '../../api/einsatzPerson';
 import { listeTiere } from '../../api/einsatzTier';
 import { listeUhs } from '../../api/einsatzUhs';
 import { listeSchaeden } from '../../api/einsatzSchaden';
-import { ladeGefahrenmatrix } from '../../api/gefahren';
+import { ladeGefahrengebiete } from '../../api/gefahren';
 import { listeZonen } from '../../api/lagezonen';
 import { listeLageberichte } from '../../api/lageberichte';
 import { listeEinheiten } from '../../api/einheiten';
@@ -19,7 +19,7 @@ import { listeAbschnitte } from '../../api/einsatzabschnitte';
 import { useEinsatzLiveStream } from '../../etb/useEinsatzLiveStream';
 import { baueKraeftebild } from '../../kraefte/kraeftebild';
 import {
-  neuesterLagebericht, verdichteGefahren, verdichtePersonen,
+  neuesterLagebericht, verdichteGefahrengebiete, verdichtePersonen,
   verdichteSchaeden, verdichteTiere, verdichteUhs,
 } from './lageVerdichtung';
 import KennzahlenLeiste from './KennzahlenLeiste';
@@ -44,7 +44,7 @@ export default function LageDashboardPage() {
   const tiereQuery = useQuery({ queryKey: ['einsatz-tiere', einsatzId], queryFn: () => listeTiere(einsatzId) });
   const uhsQuery = useQuery({ queryKey: ['einsatz-uhs', einsatzId], queryFn: () => listeUhs(einsatzId) });
   const schaedenQuery = useQuery({ queryKey: ['einsatz-schaeden', einsatzId], queryFn: () => listeSchaeden(einsatzId) });
-  const gefahrenQuery = useQuery({ queryKey: ['gefahrenmatrix', einsatzId], queryFn: () => ladeGefahrenmatrix(einsatzId) });
+  const gefahrenQuery = useQuery({ queryKey: ['gefahrengebiete', einsatzId], queryFn: () => ladeGefahrengebiete(einsatzId) });
   const zonenQuery = useQuery({ queryKey: ['einsatz-zonen', einsatzId], queryFn: () => listeZonen(einsatzId) });
   const lageberichteQuery = useQuery({ queryKey: ['einsatz-lageberichte', einsatzId], queryFn: () => listeLageberichte(einsatzId) });
   const einheitenQuery = useQuery({ queryKey: ['einsatz-einheiten', einsatzId], queryFn: () => listeEinheiten(einsatzId) });
@@ -67,7 +67,7 @@ export default function LageDashboardPage() {
   const tiere = tiereQuery.isError ? null : verdichteTiere(tiereQuery.data ?? []);
   const uhs = uhsQuery.isError ? null : verdichteUhs(uhsQuery.data ?? []);
   const schaeden = schaedenQuery.isError ? null : verdichteSchaeden(schaedenQuery.data ?? []);
-  const gefahren = gefahrenQuery.isError ? null : verdichteGefahren(gefahrenQuery.data ?? []);
+  const gefahren = gefahrenQuery.isError ? null : verdichteGefahrengebiete(gefahrenQuery.data ?? []);
   const zonen = zonenQuery.isError ? null : (zonenQuery.data ?? []).length;
   const bericht = lageberichteQuery.isError ? null : neuesterLagebericht(lageberichteQuery.data ?? []);
   const einheitenAnzahl = einheitenQuery.isError ? null : (einheitenQuery.data ?? []).length;

@@ -1,15 +1,13 @@
-import type { Gefahrentyp, LageZone, Schutzobjekt, ZoneTyp } from './types';
+import type { LageZone, ZoneTyp } from './types';
 import { apiGet, apiSend } from './client';
 
 export interface ZoneNeu {
   typ: ZoneTyp;
   geometrie_typ: 'Polygon' | 'LineString';
-  geometrie: string; // JSON.stringify der Geometry
+  geometrie: string;
   label?: string | null;
   farbe?: string | null;
   notiz?: string | null;
-  gefahrentyp?: Gefahrentyp | null;
-  schutzobjekt?: Schutzobjekt | null;
 }
 
 export interface ZonePatch {
@@ -17,8 +15,8 @@ export interface ZonePatch {
   label?: string | null;
   farbe?: string | null;
   notiz?: string | null;
-  gefahrentyp?: Gefahrentyp | null;
-  schutzobjekt?: Schutzobjekt | null;
+  /** Merge-Ziel (bestehende Gruppe) oder `null` = in neue eigene Gruppe abspalten. */
+  gefahrengebiet_id?: number | null;
 }
 
 export function listeZonen(einsatzId: number): Promise<LageZone[]> {

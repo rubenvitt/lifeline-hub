@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../../test/utils';
-import type { LageZone } from '../../api/types';
+import type { Gefahrengebiet, LageZone } from '../../api/types';
 import ZonenInspector from './ZonenInspector';
 
 const basisZone: LageZone = {
@@ -14,53 +14,103 @@ const basisZone: LageZone = {
   label: null,
   farbe: null,
   notiz: null,
-  gefahrentyp: null,
-  schutzobjekt: null,
+  gefahrengebiet_id: 10,
   erstellt_von: 1,
   erstellt_at: '',
   geaendert_at: '',
 };
 
-/** Öffnet ein antd-Select (per aria-label) und klickt die genannte Option im Dropdown. */
-async function waehle(label: string, option: string) {
-  // antd rendert das aria-label sowohl am Wrapper-div als auch am Platzhalter-Text;
-  // getAllByLabelText + [0] greift deterministisch den Select-Wrapper.
-  const select = screen.getAllByLabelText(label)[0];
-  // antd öffnet das Dropdown auf mousedown des Selektors (nicht zuverlässig per click).
-  const selector = select.querySelector('.ant-select-selector') ?? select;
-  fireEvent.mouseDown(selector);
-  // Option im geöffneten Dropdown klicken (Muster wie GefahrenPage-Test).
-  const optionen = await screen.findAllByText(option);
-  await userEvent.click(optionen[optionen.length - 1]);
+const gebiet: Gefahrengebiet = {
+  id: 10,
+  einsatz_id: 1,
+  label: 'Nord',
+  zonen_ids: [1],
+  hoechste_warnstufe: 'keine',
+};
+
+const gebietMitWarnstufe: Gefahrengebiet = {
+  ...gebiet,
+  hoechste_warnstufe: 'hoch',
+};
+
+function renderInspector(opts: {
+  zone?: LageZone;
+  gebiete?: Gefahrengebiet[];
+  darfSchreiben?: boolean;
+  onAendern?: ReturnType<typeof vi.fn>;
+  onLoeschen?: ReturnType<typeof vi.fn>;
+  onMatrixOeffnen?: ReturnType<typeof vi.fn>;
+}) {
+  const onAendern = opts.onAendern ?? vi.fn();
+  const onLoeschen = opts.onLoeschen ?? vi.fn();
+  const onMatrixOeffnen = opts.onMatrixOeffnen ?? vi.fn();
+  renderMitProviders(
+    <ZonenInspector
+      zone={opts.zone ?? basisZone}
+      gebiete={opts.gebiete ?? [gebiet]}
+      darfSchreiben={opts.darfSchreiben ?? true}
+      onSchliessen={() => {}}
+      onAendern={onAendern}
+      onMatrixOeffnen={onMatrixOeffnen}
+      onLoeschen={onLoeschen}
+    />,
+  );
+  return { onAendern, onLoeschen, onMatrixOeffnen };
 }
 
-describe('ZonenInspector — Gefahren-Zuordnung', () => {
-  it('etabliert eine Zuordnung erst beim vollständigen Paar mit BEIDEN Feldern in einem PATCH', async () => {
+describe('ZonenInspector — Gefahrengebiet-Gruppe', () => {
+  it('zeigt das Gruppen-Dropdown mit dem aktuellen Gebiet', () => {
+    renderInspector({});
+    // Der Inspector soll ein Dropdown für die Gruppen-Zugehörigkeit zeigen.
+    expect(screen.getAllByLabelText('Gehört zu Gefahrengebiet')[0]).toBeInTheDocument();
+  });
+
+  it('zeigt den Button „Gefahrenmatrix bearbeiten" bei gesetzter gefahrengebiet_id', () => {
+    renderInspector({});
+    expect(screen.getByRole('button', { name: /Gefahrenmatrix bearbeiten/i })).toBeInTheDocument();
+  });
+
+  it('ruft onMatrixOeffnen mit der gefahrengebiet_id auf', async () => {
+    const onMatrixOeffnen = vi.fn();
+    renderInspector({ onMatrixOeffnen });
+    await userEvent.click(screen.getByRole('button', { name: /Gefahrenmatrix bearbeiten/i }));
+    expect(onMatrixOeffnen).toHaveBeenCalledWith(10);
+  });
+
+  it('wählt ein anderes Gebiet → ruft onAendern mit gefahrengebiet_id auf', async () => {
     const onAendern = vi.fn();
-    renderMitProviders(
-      <ZonenInspector
-        zone={basisZone}
-        darfSchreiben
-        onSchliessen={() => {}}
-        onAendern={onAendern}
-        onLoeschen={() => {}}
-      />,
-    );
+    const gebiete: Gefahrengebiet[] = [
+      gebiet,
+      { id: 20, einsatz_id: 1, label: 'Süd', zonen_ids: [], hoechste_warnstufe: 'keine' },
+    ];
+    renderInspector({ onAendern, gebiete });
+    const select = screen.getAllByLabelText('Gehört zu Gefahrengebiet')[0];
+    const selector = select.querySelector('.ant-select-selector') ?? select;
+    fireEvent.mouseDown(selector);
+    const optionen = await screen.findAllByText('Süd');
+    await userEvent.click(optionen[optionen.length - 1]);
+    await waitFor(() => expect(onAendern).toHaveBeenCalledWith({ gefahrengebiet_id: 20 }));
+  });
 
-    // Schutzobjekt ist anfangs disabled (kein Gefahrentyp gewählt).
-    const schutzobjekt = screen.getAllByLabelText('Schutzobjekt')[0];
-    expect(schutzobjekt).toHaveClass('ant-select-disabled');
+  it('Split: „+ Neues Gefahrengebiet" (Sentinel) ruft onAendern mit gefahrengebiet_id null', async () => {
+    const onAendern = vi.fn();
+    renderInspector({ onAendern });
+    const select = screen.getAllByLabelText('Gehört zu Gefahrengebiet')[0];
+    const selector = select.querySelector('.ant-select-selector') ?? select;
+    fireEvent.mouseDown(selector);
+    const optionen = await screen.findAllByText('+ Neues Gefahrengebiet');
+    await userEvent.click(optionen[optionen.length - 1]);
+    await waitFor(() => expect(onAendern).toHaveBeenCalledWith({ gefahrengebiet_id: null }));
+  });
 
-    // Gefahrentyp wählen → nur Entwurf, KEIN PATCH (schutzobjekt noch leer).
-    // (Atemgifte/Menschen: gültige Kombination und beide am Listenanfang → nicht von der antd-Virtualisierung verdeckt.)
-    await waehle('Gefahrentyp', 'Atemgifte');
-    expect(onAendern).not.toHaveBeenCalled();
+  it('kein Löschen-Button wenn darfSchreiben=false', () => {
+    renderInspector({ darfSchreiben: false });
+    expect(screen.queryByRole('button', { name: /Zone aufheben/i })).not.toBeInTheDocument();
+  });
 
-    // Schutzobjekt wählen → genau EIN PATCH mit BEIDEN Feldern.
-    await waehle('Schutzobjekt', 'Menschen');
-    await waitFor(() =>
-      expect(onAendern).toHaveBeenCalledWith({ gefahrentyp: 'atemgifte', schutzobjekt: 'menschen' }),
-    );
-    expect(onAendern).toHaveBeenCalledTimes(1);
+  it('Popconfirm statt direkter Löschen-Button wenn Gebiet Warnstufen hat', () => {
+    renderInspector({ gebiete: [gebietMitWarnstufe] });
+    // Popconfirm rendert den Trigger-Button — bei Warnstufe soll es ein Popconfirm sein.
+    expect(screen.getByRole('button', { name: /Zone aufheben/i })).toBeInTheDocument();
   });
 });

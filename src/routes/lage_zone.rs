@@ -31,14 +31,29 @@ fn sse_zone(state: &AppState, einsatz_id: i64, zid: i64) {
 }
 
 /// Schreibt einen System-ETB-Eintrag und publiziert ihn live (Muster wie einsatzabschnitt).
-async fn etb_system(state: &AppState, einsatz_id: i64, benutzer_id: i64, inhalt: &str) -> Result<(), AppError> {
+async fn etb_system(
+    state: &AppState,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    inhalt: &str,
+) -> Result<(), AppError> {
     let anzeige = etb_repo::anlegen(
-        &state.pool, einsatz_id, benutzer_id,
+        &state.pool,
+        einsatz_id,
+        benutzer_id,
         etb_repo::EintragDaten {
-            typ: etb::TYP_SYSTEM, inhalt, von: None, an: None, meldeweg: None,
-            veranlassung: None, ereigniszeit: None, erfasst_lokal_at: None, berichtigt_eintrag_id: None,
+            typ: etb::TYP_SYSTEM,
+            inhalt,
+            von: None,
+            an: None,
+            meldeweg: None,
+            veranlassung: None,
+            ereigniszeit: None,
+            erfasst_lokal_at: None,
+            berichtigt_eintrag_id: None,
         },
-    ).await?;
+    )
+    .await?;
     if let Ok(json) = serde_json::to_string(&anzeige) {
         state.live.publiziere(einsatz_id, json);
     }
@@ -79,24 +94,27 @@ pub struct ZoneBody {
     pub label: Option<String>,
     pub farbe: Option<String>,
     pub notiz: Option<String>,
-    pub gefahrentyp: Option<String>,
-    pub schutzobjekt: Option<String>,
 }
 
 /// Validiert typ/geometrie_typ/geometrie und gibt 422 bei Verstoß (statt DB-CHECK→500).
 /// Liefert die zu speichernde Geometrie-String-Form zurück (= der validierte Eingabe-String).
 fn validiere_neu(body: &ZoneBody) -> Result<String, AppError> {
     if !lage_zone::TYPEN.contains(&body.typ.as_str()) {
-        return Err(AppError::UnprocessableEntity(format!("Unbekannter Zonen-Typ: {}", body.typ)));
+        return Err(AppError::UnprocessableEntity(format!(
+            "Unbekannter Zonen-Typ: {}",
+            body.typ
+        )));
     }
     if !lage_zone::GEOMETRIE_TYPEN.contains(&body.geometrie_typ.as_str()) {
         return Err(AppError::UnprocessableEntity(format!(
-            "Unbekannter Geometrie-Typ: {}", body.geometrie_typ
+            "Unbekannter Geometrie-Typ: {}",
+            body.geometrie_typ
         )));
     }
     if !lage_zone::geometrie_klasse_passt(&body.typ, &body.geometrie_typ) {
         return Err(AppError::UnprocessableEntity(format!(
-            "Typ {} ist mit Geometrie {} nicht zulässig", body.typ, body.geometrie_typ
+            "Typ {} ist mit Geometrie {} nicht zulässig",
+            body.typ, body.geometrie_typ
         )));
     }
     // geometrie muss gültiges JSON und vom angegebenen geometrie_typ sein.
@@ -124,30 +142,37 @@ pub async fn anlegen(
 
     let geometrie = validiere_neu(&body)?;
 
-    if !lage_zone::gefahren_zuordnung_gueltig(&body.typ, body.gefahrentyp.as_deref(), body.schutzobjekt.as_deref()) {
-        return Err(AppError::UnprocessableEntity(
-            "Gefahren-Zuordnung nur an gefahrengebiet-Zonen, beide Felder gemeinsam und als gültige Kombination".into(),
-        ));
-    }
-
     let label = trimme(body.label.clone());
     let notiz = trimme(body.notiz.clone());
     // farbe nur für freie_skizze; sonst ignorieren (Stil aus typ abgeleitet).
-    let farbe = if body.typ == "freie_skizze" { trimme(body.farbe.clone()) } else { None };
+    let farbe = if body.typ == "freie_skizze" {
+        trimme(body.farbe.clone())
+    } else {
+        None
+    };
 
-    let z = zone_repo::anlegen(&state.pool, einsatz_id, ZoneNeu {
-        typ: &body.typ,
-        geometrie_typ: &body.geometrie_typ,
-        geometrie: &geometrie,
-        label: label.as_deref(),
-        farbe: farbe.as_deref(),
-        notiz: notiz.as_deref(),
-        gefahrentyp: body.gefahrentyp.as_deref(),
-        schutzobjekt: body.schutzobjekt.as_deref(),
-        erstellt_von: benutzer.id,
-    }).await?;
+    let z = zone_repo::anlegen(
+        &state.pool,
+        einsatz_id,
+        ZoneNeu {
+            typ: &body.typ,
+            geometrie_typ: &body.geometrie_typ,
+            geometrie: &geometrie,
+            label: label.as_deref(),
+            farbe: farbe.as_deref(),
+            notiz: notiz.as_deref(),
+            erstellt_von: benutzer.id,
+        },
+    )
+    .await?;
 
-    etb_system(&state, einsatz_id, benutzer.id, &etb_text(&z.typ, z.label.as_deref(), "eingerichtet")).await?;
+    etb_system(
+        &state,
+        einsatz_id,
+        benutzer.id,
+        &etb_text(&z.typ, z.label.as_deref(), "eingerichtet"),
+    )
+    .await?;
     sse_zone(&state, einsatz_id, z.id);
     Ok((StatusCode::CREATED, Json(z)))
 }
@@ -162,9 +187,7 @@ pub struct ZonePatchBody {
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub notiz: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
-    pub gefahrentyp: Option<Option<String>>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
-    pub schutzobjekt: Option<Option<String>>,
+    pub gefahrengebiet_id: Option<Option<i64>>,
 }
 
 /// PATCH /api/einsaetze/{id}/zonen/{zid} — label/typ/farbe/notiz. Geometrie NICHT änderbar.
@@ -186,11 +209,14 @@ pub async fn aktualisieren(
     let neuer_typ = match &body.typ {
         Some(t) => {
             if !lage_zone::TYPEN.contains(&t.as_str()) {
-                return Err(AppError::UnprocessableEntity(format!("Unbekannter Zonen-Typ: {t}")));
+                return Err(AppError::UnprocessableEntity(format!(
+                    "Unbekannter Zonen-Typ: {t}"
+                )));
             }
             if !lage_zone::geometrie_klasse_passt(t, &vorher.geometrie_typ) {
                 return Err(AppError::UnprocessableEntity(format!(
-                    "Typ {t} ist mit der vorhandenen Geometrie ({}) nicht zulässig", vorher.geometrie_typ
+                    "Typ {t} ist mit der vorhandenen Geometrie ({}) nicht zulässig",
+                    vorher.geometrie_typ
                 )));
             }
             t.clone()
@@ -211,47 +237,69 @@ pub async fn aktualisieren(
         body.farbe.as_ref().map(|o| o.as_deref())
     };
 
-    // Gefahren-Normalisierung: nur gefahrengebiet darf Zuordnung tragen.
-    // Verlässt die Zone gefahrengebiet → Zuordnung nullen (wie farbe bei freie_skizze).
-    let (gefahrentyp_patch, schutzobjekt_patch): (Option<Option<&str>>, Option<Option<&str>>) =
-        if neuer_typ != "gefahrengebiet" {
-            (Some(None), Some(None))
-        } else {
-            (body.gefahrentyp.as_ref().map(|o| o.as_deref()),
-             body.schutzobjekt.as_ref().map(|o| o.as_deref()))
-        };
-    // Effektive Zuordnung (Merge gegen Bestand; Memory patch-xor-effektivzustand).
-    let eff_gefahrentyp: Option<&str> = match gefahrentyp_patch {
-        Some(o) => o,
-        None => vorher.gefahrentyp.as_deref(),
+    // Gruppen-Zuordnung: nur gefahrengebiet-Zonen; Merge-Ziel muss zum Einsatz gehören.
+    let gebiet_patch: Option<Option<i64>> = match &body.gefahrengebiet_id {
+        Some(Some(zielid)) => {
+            if neuer_typ != "gefahrengebiet" {
+                return Err(AppError::UnprocessableEntity(
+                    "Gefahrengebiet-Zuordnung nur an gefahrengebiet-Zonen".into(),
+                ));
+            }
+            crate::gefahr::repo::gebiet_laden(&state.pool, einsatz_id, *zielid).await?; // Ownership/NotFound
+            Some(Some(*zielid))
+        }
+        Some(None) => Some(None), // in neue eigene Gruppe abspalten
+        None => None,             // unverändert
     };
-    let eff_schutzobjekt: Option<&str> = match schutzobjekt_patch {
-        Some(o) => o,
-        None => vorher.schutzobjekt.as_deref(),
-    };
-    if !lage_zone::gefahren_zuordnung_gueltig(&neuer_typ, eff_gefahrentyp, eff_schutzobjekt) {
-        return Err(AppError::UnprocessableEntity(
-            "Gefahren-Zuordnung nur an gefahrengebiet-Zonen, beide Felder gemeinsam und als gültige Kombination".into(),
-        ));
-    }
 
-    let z = zone_repo::aktualisiere(&state.pool, einsatz_id, zid, ZonePatch {
-        typ: body.typ.as_deref(),
-        label: body.label.as_ref().map(|o| o.as_deref().map(str::trim).filter(|s| !s.is_empty())),
-        farbe: farbe_patch,
-        notiz: body.notiz.as_ref().map(|o| o.as_deref().map(str::trim).filter(|s| !s.is_empty())),
-        gefahrentyp: gefahrentyp_patch,
-        schutzobjekt: schutzobjekt_patch,
-    }).await?;
+    let z = zone_repo::aktualisiere(
+        &state.pool,
+        einsatz_id,
+        zid,
+        benutzer.id,
+        ZonePatch {
+            typ: body.typ.as_deref(),
+            label: body
+                .label
+                .as_ref()
+                .map(|o| o.as_deref().map(str::trim).filter(|s| !s.is_empty())),
+            farbe: farbe_patch,
+            notiz: body
+                .notiz
+                .as_ref()
+                .map(|o| o.as_deref().map(str::trim).filter(|s| !s.is_empty())),
+            gefahrengebiet_id: gebiet_patch,
+        },
+    )
+    .await?;
 
     // Sinntragende Änderung? typ oder label effektiv geändert.
     let typ_geaendert = neuer_typ != vorher.typ;
     let label_geaendert = neues_label != vorher.label;
     if typ_geaendert || label_geaendert {
-        etb_system(&state, einsatz_id, benutzer.id, &etb_text(&z.typ, z.label.as_deref(), "geändert")).await?;
+        etb_system(
+            &state,
+            einsatz_id,
+            benutzer.id,
+            &etb_text(&z.typ, z.label.as_deref(), "geändert"),
+        )
+        .await?;
     }
 
     sse_zone(&state, einsatz_id, zid);
+
+    // Merge/Split hat die Gebiete-Liste verändert → zusätzlich gefahr-Event (Design-Spec).
+    if gebiet_patch.is_some() {
+        if let Some(gid) = z.gefahrengebiet_id {
+            state.live.publiziere_event(
+                einsatz_id,
+                "gefahr",
+                serde_json::json!({ "einsatz_id": einsatz_id, "gefahrengebiet_id": gid })
+                    .to_string(),
+            );
+        }
+    }
+
     Ok(Json(z))
 }
 
@@ -268,7 +316,13 @@ pub async fn aufloesen(
 
     let vorher = zone_repo::laden(&state.pool, einsatz_id, zid).await?;
     zone_repo::loese_auf(&state.pool, einsatz_id, zid).await?;
-    etb_system(&state, einsatz_id, benutzer.id, &etb_text(&vorher.typ, vorher.label.as_deref(), "aufgehoben")).await?;
+    etb_system(
+        &state,
+        einsatz_id,
+        benutzer.id,
+        &etb_text(&vorher.typ, vorher.label.as_deref(), "aufgehoben"),
+    )
+    .await?;
     sse_zone(&state, einsatz_id, zid);
     Ok(StatusCode::NO_CONTENT)
 }
