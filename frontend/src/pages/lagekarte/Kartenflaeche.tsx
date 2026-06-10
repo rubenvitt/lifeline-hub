@@ -18,7 +18,13 @@ import {
   type ZoneFeature,
   type AktiveFachebene,
 } from './kartenLayer';
-import { sorgeFuerFachebeneLayer, setzeFachebeneDaten, entferneFachebeneLayer } from './fachebenenLayer';
+import {
+  sorgeFuerFachebeneLayer,
+  setzeFachebeneDaten,
+  entferneFachebeneLayer,
+  fachebeneClickLayerId,
+  baueFachebenePopupInhalt,
+} from './fachebenenLayer';
 import { KRITIS_MIN_ZOOM } from './fachebenen';
 
 // Re-Export: LagekartePage importiert ZoneFeature weiterhin aus Kartenflaeche.
@@ -66,13 +72,15 @@ export interface KartenflaecheProps {
   fachebenen?: AktiveFachebene[];
   /** Karten-Viewport (west,sued,ost,nord) nach Bewegung — für bbox-abhängige Ebenen. */
   onBboxAenderung?: (bbox: string) => void;
+  /** Aktuelles Zoom-Level nach Bewegung — z. B. um „näher heranzoomen"-Hinweise zu steuern. */
+  onZoomAenderung?: (zoom: number) => void;
 }
 
 export default function Kartenflaeche({
   style, markers, onKarteKlick, onMarkerKlick, flyToZiel, onStyleFehler, attribution,
   flaechen, zeichnen, onFlaecheGezeichnet, onFlaecheKlick,
   zonen, zoneZeichnen, onZoneGezeichnet, onZoneKlick,
-  fachebenen, onBboxAenderung,
+  fachebenen, onBboxAenderung, onZoomAenderung,
 }: KartenflaecheProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -314,35 +322,71 @@ export default function Kartenflaeche({
     });
   }, [fachebenen]);
 
-  // Viewport-bbox nach Kartenbewegung melden (für bbox-abhängige Ebenen wie KRITIS).
-  // Sendet sofort beim Aktivieren (Effekt-Setup) und dann nach jedem moveend (600ms-Debounce).
-  // Unter KRITIS_MIN_ZOOM wird keine bbox gemeldet — verhindert riesige Overpass-Anfragen.
+  // Viewport nach Kartenbewegung melden: Zoom (für „näher heranzoomen"-Hinweise) immer,
+  // bbox (für bbox-abhängige Ebenen wie KRITIS) nur ab KRITIS_MIN_ZOOM — verhindert riesige
+  // Overpass-Anfragen. Sendet sofort beim Wirksamwerden und dann nach jedem moveend (600ms-Debounce).
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !onBboxAenderung) return;
+    if (!map || (!onBboxAenderung && !onZoomAenderung)) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
-    const sendeBbox = () => {
-      if (map.getZoom() < KRITIS_MIN_ZOOM) return;
-      const b = map.getBounds();
-      onBboxAenderung(`${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`);
+    const verarbeite = () => {
+      const zoom = map.getZoom();
+      onZoomAenderung?.(zoom);
+      if (onBboxAenderung && zoom >= KRITIS_MIN_ZOOM) {
+        const b = map.getBounds();
+        onBboxAenderung(`${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`);
+      }
     };
 
     const melde = () => {
       if (timer) clearTimeout(timer);
-      timer = setTimeout(sendeBbox, 600);
+      timer = setTimeout(verarbeite, 600);
     };
 
-    // Einmalige Sofort-Emission beim Wirksamwerden (z. B. wenn KRITIS eingeschaltet wird
-    // während die Karte bereits auf ausreichendem Zoom-Level steht).
-    sendeBbox();
-
+    verarbeite(); // initial (z. B. wenn KRITIS aktiviert wird während Karte bereits passend gezoomt ist)
     map.on('moveend', melde);
     return () => {
       if (timer) clearTimeout(timer);
       map.off('moveend', melde);
     };
-  }, [onBboxAenderung]);
+  }, [onBboxAenderung, onZoomAenderung]);
+
+  // Klick auf ein Fachebenen-Objekt → Popup mit Details (read-only externe Daten).
+  // Handler je aktivem anklickbaren Layer; Cursor wird zur Hand. Re-Bind bei Ebenen-Wechsel.
+  const popupRef = useRef<maplibregl.Popup | null>(null);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const ids = (fachebenen ?? []).map((fe) => fachebeneClickLayerId(fe.def));
+
+    const klick = (e: maplibregl.MapLayerMouseEvent) => {
+      const feature = e.features?.[0];
+      if (!feature) return;
+      popupRef.current?.remove();
+      popupRef.current = new maplibregl.Popup({ closeButton: true, maxWidth: '260px' })
+        .setLngLat(e.lngLat)
+        .setDOMContent(baueFachebenePopupInhalt(feature.properties as Record<string, unknown>))
+        .addTo(map);
+    };
+    const enter = () => { map.getCanvas().style.cursor = 'pointer'; };
+    const leave = () => { map.getCanvas().style.cursor = ''; };
+
+    for (const id of ids) {
+      map.on('click', id, klick);
+      map.on('mouseenter', id, enter);
+      map.on('mouseleave', id, leave);
+    }
+    return () => {
+      for (const id of ids) {
+        map.off('click', id, klick);
+        map.off('mouseenter', id, enter);
+        map.off('mouseleave', id, leave);
+      }
+      popupRef.current?.remove();
+      popupRef.current = null;
+    };
+  }, [fachebenen]);
 
   // Zeichenmodus an-/abschalten; Controller-Lifecycle über drawRef.
   useEffect(() => {

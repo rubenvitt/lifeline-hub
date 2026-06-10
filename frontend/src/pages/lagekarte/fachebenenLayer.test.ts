@@ -1,5 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
-import { sorgeFuerFachebeneLayer, entferneFachebeneLayer, fachebeneSourceId } from './fachebenenLayer';
+import {
+  sorgeFuerFachebeneLayer,
+  entferneFachebeneLayer,
+  fachebeneSourceId,
+  fachebeneClickLayerId,
+  baueFachebenePopupInhalt,
+  kategorieLabel,
+} from './fachebenenLayer';
 import { FACHEBENEN } from './fachebenen';
 
 function fakeMap() {
@@ -43,5 +50,45 @@ describe('fachebenenLayer', () => {
     entferneFachebeneLayer(m as never, 'dwd');
     expect(m._sources.has(fachebeneSourceId('dwd'))).toBe(false);
     expect(m._layers.has('fachebene-dwd-fill')).toBe(false);
+  });
+});
+
+describe('fachebeneClickLayerId', () => {
+  it('Polygon-Ebene → fill-Layer, Punkt-Ebene → circle-Layer', () => {
+    expect(fachebeneClickLayerId(FACHEBENEN.dwd)).toBe('fachebene-dwd-fill');
+    expect(fachebeneClickLayerId(FACHEBENEN.pegelonline)).toBe('fachebene-pegelonline-circle');
+  });
+});
+
+describe('kategorieLabel', () => {
+  it('mappt bekannte Kategorien, Fallback auf Rohwert', () => {
+    expect(kategorieLabel('krankenhaus')).toBe('Krankenhaus');
+    expect(kategorieLabel('strom')).toBe('Umspannwerk');
+    expect(kategorieLabel('unbekannt')).toBe('unbekannt');
+  });
+});
+
+describe('baueFachebenePopupInhalt', () => {
+  it('zeigt Titel + Kategorie-Label (KRITIS)', () => {
+    const el = baueFachebenePopupInhalt({ titel: 'Uniklinik', kategorie: 'krankenhaus' });
+    expect(el.textContent).toContain('Uniklinik');
+    expect(el.textContent).toContain('Krankenhaus');
+  });
+  it('zeigt Wasserstand bei Pegel', () => {
+    const el = baueFachebenePopupInhalt({ titel: 'Pegel Köln', kategorie: 'pegel', wert: 320, einheit: 'cm' });
+    expect(el.textContent).toContain('320');
+    expect(el.textContent).toContain('cm');
+  });
+  it('zeigt Schwere bei NINA-Warnung', () => {
+    const el = baueFachebenePopupInhalt({ titel: 'Hochwasser', kategorie: 'warnung', schwere: 'Severe' });
+    expect(el.textContent).toContain('Severe');
+  });
+  it('fällt auf DWD-Properties zurück (HEADLINE) ohne titel', () => {
+    const el = baueFachebenePopupInhalt({ HEADLINE: 'Amtliche Unwetterwarnung' });
+    expect(el.textContent).toContain('Amtliche Unwetterwarnung');
+  });
+  it('robust gegen leere Properties', () => {
+    const el = baueFachebenePopupInhalt(null);
+    expect(el.textContent).toContain('Objekt');
   });
 });

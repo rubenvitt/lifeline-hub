@@ -57,6 +57,8 @@ export interface SidebarProps {
   onFachebeneToggle: (key: import('../../api/fachebenen').FachebeneQuelle, an: boolean) => void;
   /** Status je Fachebene für Ausgrau-/Offline-Hinweis. */
   fachebenenStatus: Partial<Record<import('../../api/fachebenen').FachebeneQuelle, import('../../api/fachebenen').FachebeneStatus>>;
+  /** KRITIS ist aktiv, aber die Karte ist zu weit herausgezoomt für eine Abfrage. */
+  kritisZoomZuKlein?: boolean;
 }
 
 export default function Sidebar(props: SidebarProps) {
@@ -241,23 +243,33 @@ export default function Sidebar(props: SidebarProps) {
           {fachebeneKeys().map((key) => {
             const def = FACHEBENEN[key];
             const status = props.fachebenenStatus[key];
+            const sichtbar = props.fachebenenSichtbar[key];
             const offline = status === 'offline';
+            const zoomHinweis = sichtbar && key === 'kritis' && props.kritisZoomZuKlein;
             return (
               <Space key={key} style={{ justifyContent: 'space-between', width: '100%' }}>
                 <Space>
                   <Switch
-                    checked={props.fachebenenSichtbar[key]}
+                    checked={sichtbar}
                     onChange={(v) => props.onFachebeneToggle(key, v)}
                   />
                   <span style={{ color: def.farbe }}>●</span> {def.label}
                 </Space>
-                {props.fachebenenSichtbar[key] && offline && (
-                  <Tooltip title="Quelle offline — Ebene wird leer angezeigt">
-                    <Typography.Text type="secondary" style={{ fontSize: 11 }}>offline</Typography.Text>
+                {zoomHinweis ? (
+                  <Tooltip title="KRITIS-Objekte werden erst ab einer näheren Zoomstufe geladen">
+                    <Typography.Text type="warning" style={{ fontSize: 11 }}>näher heranzoomen</Typography.Text>
                   </Tooltip>
-                )}
-                {props.fachebenenSichtbar[key] && status === 'leer' && (
-                  <Typography.Text type="secondary" style={{ fontSize: 11 }}>keine Daten</Typography.Text>
+                ) : (
+                  <>
+                    {sichtbar && offline && (
+                      <Tooltip title="Quelle offline — Ebene wird leer angezeigt">
+                        <Typography.Text type="secondary" style={{ fontSize: 11 }}>offline</Typography.Text>
+                      </Tooltip>
+                    )}
+                    {sichtbar && status === 'leer' && (
+                      <Typography.Text type="secondary" style={{ fontSize: 11 }}>keine Daten</Typography.Text>
+                    )}
+                  </>
                 )}
               </Space>
             );
