@@ -15,15 +15,17 @@ describe('MetaChip', () => {
     expect(onCommit).toHaveBeenCalledWith('von', 'ELW 1');
   });
 
-  it('geschlossen: zeigt Label+Wert, × ruft onRemove', async () => {
+  it('geschlossen: zeigt Label+Wert, × ruft onRemove (nicht onEdit)', async () => {
     const onRemove = vi.fn();
+    const onEdit = vi.fn();
     renderMitProviders(
-      <MetaChip feld="meldeweg" editing={false} wert="funk" onCommit={vi.fn()} onCancel={vi.fn()} onRemove={onRemove} onEdit={vi.fn()} />,
+      <MetaChip feld="meldeweg" editing={false} wert="funk" onCommit={vi.fn()} onCancel={vi.fn()} onRemove={onRemove} onEdit={onEdit} />,
     );
     expect(screen.getByText(/Meldeweg/)).toBeInTheDocument();
     expect(screen.getByText(/Funk/)).toBeInTheDocument();
     await userEvent.click(screen.getByLabelText('schließen'));
     expect(onRemove).toHaveBeenCalledWith('meldeweg');
+    expect(onEdit).not.toHaveBeenCalled();
   });
 
   it('Escape im Editor ruft onCancel', async () => {
