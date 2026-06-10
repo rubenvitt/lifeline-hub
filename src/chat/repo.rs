@@ -1,6 +1,6 @@
 use super::{ChatKanalAnzeige, ChatNachrichtAnzeige, DEFAULT_KANAL_NAME};
 use crate::error::AppError;
-use sqlx::{QueryBuilder, Sqlite, SqliteConnection, SqlitePool};
+use sqlx::{QueryBuilder, Sqlite, SqlitePool};
 
 /// Lädt alle Kanäle eines Einsatzes und stellt sicher, dass mindestens der
 /// Default-Kanal existiert (lazy-Anlage mit `default_ersteller_id` als Ersteller).
@@ -175,6 +175,42 @@ pub async fn gehoert_nachricht_zu_einsatz(
     Ok(treffer.is_some())
 }
 
+/// Liefert die Autor-ID einer Nachricht (`None`, wenn sie nicht existiert).
+/// Grundlage für die Autor-Prüfung bei Bearbeiten/Löschen.
+pub async fn autor_von(pool: &SqlitePool, nachricht_id: i64) -> Result<Option<i64>, AppError> {
+    sqlx::query_scalar("SELECT autor_id FROM chat_nachricht WHERE id = ?")
+        .bind(nachricht_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(Into::into)
+}
+
+/// Bearbeitet den Inhalt einer Nachricht und setzt `bearbeitet_at` auf jetzt.
+pub async fn bearbeiten(
+    pool: &SqlitePool,
+    nachricht_id: i64,
+    neuer_inhalt: &str,
+) -> Result<ChatNachrichtAnzeige, AppError> {
+    sqlx::query(
+        "UPDATE chat_nachricht SET inhalt = ?, bearbeitet_at = datetime('now') \
+         WHERE id = ? AND geloescht_at IS NULL",
+    )
+    .bind(neuer_inhalt)
+    .bind(nachricht_id)
+    .execute(pool)
+    .await?;
+    laden(pool, nachricht_id).await
+}
+
+/// Soft-löscht eine Nachricht (Tombstone via `geloescht_at`).
+pub async fn loeschen(pool: &SqlitePool, nachricht_id: i64) -> Result<(), AppError> {
+    sqlx::query("UPDATE chat_nachricht SET geloescht_at = datetime('now') WHERE id = ?")
+        .bind(nachricht_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -294,5 +330,42 @@ mod tests {
 
         assert!(gehoert_nachricht_zu_einsatz(&pool, m.id, einsatz).await.unwrap());
         assert!(!gehoert_nachricht_zu_einsatz(&pool, m.id, 999).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn autor_von_liefert_autor_id() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let kid = kanal(&pool, einsatz, benutzer).await;
+        let m = anlegen(&pool, einsatz, benutzer, NachrichtDaten { kanal_id: kid, inhalt: "x" }).await.unwrap();
+
+        assert_eq!(autor_von(&pool, m.id).await.unwrap(), Some(benutzer));
+        assert_eq!(autor_von(&pool, 999).await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn bearbeiten_setzt_inhalt_und_bearbeitet_at() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let kid = kanal(&pool, einsatz, benutzer).await;
+        let m = anlegen(&pool, einsatz, benutzer, NachrichtDaten { kanal_id: kid, inhalt: "alt" }).await.unwrap();
+        assert_eq!(m.bearbeitet_at, None);
+
+        let bearbeitet = bearbeiten(&pool, m.id, "neu").await.unwrap();
+        assert_eq!(bearbeitet.inhalt.as_deref(), Some("neu"));
+        assert!(bearbeitet.bearbeitet_at.is_some());
+    }
+
+    #[tokio::test]
+    async fn loeschen_setzt_tombstone() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let kid = kanal(&pool, einsatz, benutzer).await;
+        let m = anlegen(&pool, einsatz, benutzer, NachrichtDaten { kanal_id: kid, inhalt: "geheim" }).await.unwrap();
+
+        loeschen(&pool, m.id).await.unwrap();
+        let nachher = laden(&pool, m.id).await.unwrap();
+        assert!(nachher.geloescht_at.is_some());
+        assert_eq!(nachher.inhalt, None, "Inhalt gelöschter Nachrichten wird nicht ausgeliefert");
     }
 }
