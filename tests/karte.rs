@@ -20,7 +20,7 @@ async fn tiles_route_liefert_range_aus() {
     let pfad = datei.path().to_string_lossy().to_string();
 
     let app = build_router_mit_karte(
-        AppState { pool, live: LiveHub::new() },
+        AppState { pool, live: LiveHub::new(), fachebenen: lifeline_hub::karte::FachebenenState::neu() },
         KarteConfig { pmtiles_path: Some(pfad), online_styles: vec![] },
     );
 
@@ -38,7 +38,7 @@ async fn tiles_route_liefert_range_aus() {
 #[tokio::test]
 async fn tiles_route_404_ohne_konfigurierten_pfad() {
     let pool = pool().await;
-    let app = build_router(AppState { pool, live: LiveHub::new() }); // Default-KarteConfig
+    let app = build_router(AppState { pool, live: LiveHub::new(), fachebenen: lifeline_hub::karte::FachebenenState::neu() }); // Default-KarteConfig
     let req = Request::builder()
         .uri("/api/karte/tiles.pmtiles")
         .body(Body::empty())
@@ -51,7 +51,7 @@ async fn tiles_route_404_ohne_konfigurierten_pfad() {
 async fn config_endpoint_meldet_verfuegbarkeit() {
     let pool = pool().await;
     let app = build_router_mit_karte(
-        AppState { pool, live: LiveHub::new() },
+        AppState { pool, live: LiveHub::new(), fachebenen: lifeline_hub::karte::FachebenenState::neu() },
         KarteConfig {
             pmtiles_path: Some("/irrelevant.pmtiles".into()),
             online_styles: vec![lifeline_hub::config::OnlineStyle {
@@ -76,7 +76,7 @@ async fn config_endpoint_meldet_verfuegbarkeit() {
 #[tokio::test]
 async fn config_endpoint_blind_modus_ohne_konfiguration() {
     let pool = pool().await;
-    let app = build_router(AppState { pool, live: LiveHub::new() });
+    let app = build_router(AppState { pool, live: LiveHub::new(), fachebenen: lifeline_hub::karte::FachebenenState::neu() });
     let req = Request::builder().uri("/api/karte/config").body(Body::empty()).unwrap();
     let res = app.oneshot(req).await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);
@@ -85,4 +85,36 @@ async fn config_endpoint_blind_modus_ohne_konfiguration() {
     assert_eq!(v["pmtiles_verfuegbar"].as_bool(), Some(false));
     assert!(v["pmtiles_url"].is_null());
     assert!(v["online_styles"].as_array().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn fachebenen_unbekannte_quelle_ist_400() {
+    let pool = pool().await;
+    let app = build_router(AppState {
+        pool,
+        live: LiveHub::new(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+    });
+    let req = Request::builder()
+        .uri("/api/karte/fachebenen/gibtsnicht")
+        .body(Body::empty())
+        .unwrap();
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn fachebenen_kritis_ohne_bbox_ist_400() {
+    let pool = pool().await;
+    let app = build_router(AppState {
+        pool,
+        live: LiveHub::new(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+    });
+    let req = Request::builder()
+        .uri("/api/karte/fachebenen/kritis")
+        .body(Body::empty())
+        .unwrap();
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 }

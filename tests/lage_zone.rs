@@ -34,6 +34,7 @@ async fn setup() -> (axum::Router, LiveHub) {
     let router = build_router(AppState {
         pool,
         live: live.clone(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
     });
     (router, live)
 }
