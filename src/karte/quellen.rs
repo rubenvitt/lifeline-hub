@@ -6,7 +6,7 @@ use crate::karte::normalisierung::{
 };
 use crate::karte::typen::{leere_collection, Bbox, FachebeneAntwort};
 use crate::karte::FachebenenState;
-use futures::future::join_all;
+use futures::stream::{self, StreamExt};
 use std::time::Duration;
 
 const DWD_ATTRIB: &str = "Datenbasis: Deutscher Wetterdienst";
@@ -112,21 +112,25 @@ pub async fn fetch_nina(s: &FachebenenState) -> FachebeneAntwort {
                 .collect()
         })
         .unwrap_or_default();
-    let geo_futs = ids.iter().map(|id| {
-        let url = nina_geojson_url(id);
-        let id = id.clone();
-        async move {
-            match hole_json(s, &url).await {
-                Ok(v) => Some((id, v)),
-                Err(e) => {
-                    tracing::warn!("NINA-Geometrie-Fetch für {id} fehlgeschlagen: {e}");
-                    None
+    let geometrien: Vec<(String, serde_json::Value)> = stream::iter(ids)
+        .map(|id| {
+            let url = nina_geojson_url(&id);
+            async move {
+                match hole_json(s, &url).await {
+                    Ok(v) => Some((id, v)),
+                    Err(e) => {
+                        tracing::warn!("NINA-Geometrie-Fetch für {id} fehlgeschlagen: {e}");
+                        None
+                    }
                 }
             }
-        }
-    });
-    let geometrien: Vec<(String, serde_json::Value)> =
-        join_all(geo_futs).await.into_iter().flatten().collect();
+        })
+        .buffer_unordered(8)
+        .collect::<Vec<_>>()
+        .await
+        .into_iter()
+        .flatten()
+        .collect();
     let fc = kombiniere_nina(&map_data, &geometrien);
     let a = FachebeneAntwort::ok("nina", NINA_ATTRIB, None, fc);
     s.cache.setze("nina", a.clone());
