@@ -82,12 +82,20 @@ impl Bbox {
             .collect::<Result<_, _>>()
             .map_err(|_| "bbox muss vier Zahlen sein".to_string())?;
         match teile.as_slice() {
-            [west, sued, ost, nord] if west < ost && sued < nord => Ok(Bbox {
-                west: *west,
-                sued: *sued,
-                ost: *ost,
-                nord: *nord,
-            }),
+            [west, sued, ost, nord] if west < ost && sued < nord => {
+                if *sued < -90.0 || *nord > 90.0 || *west < -180.0 || *ost > 180.0 {
+                    return Err("bbox-Koordinaten außerhalb des gültigen Bereichs".to_string());
+                }
+                if (ost - west) > 1.0 || (nord - sued) > 1.0 {
+                    return Err("bbox zu groß — weiter hineinzoomen".to_string());
+                }
+                Ok(Bbox {
+                    west: *west,
+                    sued: *sued,
+                    ost: *ost,
+                    nord: *nord,
+                })
+            }
             _ => Err("bbox ungültig (west,sued,ost,nord)".to_string()),
         }
     }
@@ -119,6 +127,32 @@ mod bbox_tests {
     #[test]
     fn lehnt_unvollstaendig_ab() {
         assert!(Bbox::parse("1,2,3").is_err());
+    }
+    #[test]
+    fn lehnt_koordinaten_ausserhalb_range_ab() {
+        // Lon > 180
+        assert!(Bbox::parse("185.0,50.0,186.0,51.0").is_err());
+        // Lat > 90
+        assert!(Bbox::parse("6.0,91.0,7.0,92.0").is_err());
+        // Lat < -90
+        assert!(Bbox::parse("6.0,-91.0,7.0,-89.0").is_err());
+        // Lon < -180
+        assert!(Bbox::parse("-181.0,50.0,-179.0,51.0").is_err());
+    }
+    #[test]
+    fn lehnt_zu_grosse_bbox_ab() {
+        // Ganz Deutschland: west=5, sued=47, ost=15, nord=55 → Δlon=10, Δlat=8
+        assert!(Bbox::parse("5.0,47.0,15.0,55.0").is_err());
+        // Lon-Spanne > 1
+        assert!(Bbox::parse("6.0,50.0,7.5,50.9").is_err());
+        // Lat-Spanne > 1
+        assert!(Bbox::parse("6.0,50.0,6.9,51.5").is_err());
+    }
+    #[test]
+    fn akzeptiert_bbox_mit_genau_einem_grad_spanne() {
+        // Genau 1.0 Grad in jeder Richtung (nicht > 1.0) → Ok
+        let b = Bbox::parse("6.0,50.0,7.0,51.0").unwrap();
+        assert_eq!(b.west, 6.0);
     }
 }
 
