@@ -37,6 +37,78 @@ pub fn normalisiere_pegelonline(roh: &Value) -> Value {
     json!({ "type": "FeatureCollection", "features": features })
 }
 
+/// Kombiniert die NINA-`mapData`-Liste (Metadaten je `id`) mit den separat geladenen
+/// Einzel-Geometrien (`id` → GeoJSON-Value von `/warnings/{id}.geojson`) zu einer
+/// FeatureCollection. Jede Warnung kann mehrere Features (Polygone) tragen.
+pub fn kombiniere_nina(map_data: &Value, geometrien: &[(String, Value)]) -> Value {
+    use std::collections::HashMap;
+    let meta: HashMap<&str, &Value> = map_data
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|w| w.get("id").and_then(|i| i.as_str()).map(|id| (id, w)))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let mut features: Vec<Value> = Vec::new();
+    for (id, geo) in geometrien {
+        let info = meta.get(id.as_str());
+        let titel = info
+            .and_then(|w| w.get("i18nTitle"))
+            .and_then(|t| t.as_object())
+            .and_then(|o| o.values().next())
+            .and_then(|v| v.as_str())
+            .unwrap_or("Warnung");
+        let schwere = info
+            .and_then(|w| w.get("severity"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        if let Some(arr) = geo.get("features").and_then(|f| f.as_array()) {
+            for f in arr {
+                let geometry = f.get("geometry").cloned().unwrap_or(Value::Null);
+                if geometry.is_null() {
+                    continue;
+                }
+                features.push(json!({
+                    "type": "Feature",
+                    "geometry": geometry,
+                    "properties": { "titel": titel, "kategorie": "warnung", "schwere": schwere, "id": id }
+                }));
+            }
+        }
+    }
+    json!({ "type": "FeatureCollection", "features": features })
+}
+
+#[cfg(test)]
+mod nina_tests {
+    use super::*;
+
+    #[test]
+    fn kombiniert_meta_und_geometrie() {
+        let map_data = json!([
+            { "id": "abc", "severity": "Severe", "i18nTitle": { "de": "Hochwasser" } }
+        ]);
+        let geo = json!({ "type": "FeatureCollection", "features": [
+            { "type": "Feature", "geometry": { "type": "Polygon", "coordinates": [[[0,0],[1,0],[1,1],[0,0]]] } }
+        ]});
+        let fc = kombiniere_nina(&map_data, &[("abc".to_string(), geo)]);
+        let f = &fc["features"][0];
+        assert_eq!(f["properties"]["titel"], "Hochwasser");
+        assert_eq!(f["properties"]["schwere"], "Severe");
+        assert_eq!(f["geometry"]["type"], "Polygon");
+    }
+
+    #[test]
+    fn ueberspringt_features_ohne_geometrie() {
+        let map_data = json!([{ "id": "x" }]);
+        let geo = json!({ "type": "FeatureCollection", "features": [ { "type": "Feature", "geometry": null } ] });
+        let fc = kombiniere_nina(&map_data, &[("x".to_string(), geo)]);
+        assert_eq!(fc["features"].as_array().unwrap().len(), 0);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

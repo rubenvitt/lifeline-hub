@@ -1,7 +1,8 @@
 //! Fetch-Logik je Quelle. Wird in den Phasen 2–5 befüllt.
 
 use crate::error::AppError;
-use crate::karte::normalisierung::normalisiere_pegelonline;
+use crate::karte::normalisierung::{kombiniere_nina, normalisiere_pegelonline};
+use futures::future::join_all;
 use crate::karte::typen::{leere_collection, FachebeneAntwort};
 use crate::karte::FachebenenState;
 use std::time::Duration;
@@ -78,8 +79,53 @@ pub(crate) async fn hole_json(s: &FachebenenState, url: &str) -> Result<serde_js
     resp.json().await.map_err(|e| e.to_string())
 }
 
-pub async fn fetch_nina(_s: &FachebenenState) -> FachebeneAntwort {
-    FachebeneAntwort::offline("nina", "BBK / MoWaS")
+const NINA_ATTRIB: &str =
+    "Quelle: Bundesamt für Bevölkerungsschutz und Katastrophenhilfe (BBK) / MoWaS";
+const NINA_TTL: Duration = Duration::from_secs(90);
+const NINA_MAPDATA: &str = "https://warnung.bund.de/api31/mowas/mapData.json";
+fn nina_geojson_url(id: &str) -> String {
+    format!("https://warnung.bund.de/api31/warnings/{id}.geojson")
+}
+
+pub async fn fetch_nina(s: &FachebenenState) -> FachebeneAntwort {
+    if let Some(a) = s.cache.frisch("nina", NINA_TTL) {
+        return a;
+    }
+    let map_data = match hole_json(s, NINA_MAPDATA).await {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::warn!("NINA-mapData-Fetch fehlgeschlagen: {e}");
+            return s
+                .cache
+                .stale("nina")
+                .unwrap_or_else(|| FachebeneAntwort::offline("nina", NINA_ATTRIB));
+        }
+    };
+    // IDs einsammeln und Geometrien parallel laden (N+1, begrenzt auf die aktuellen Warnungen).
+    let ids: Vec<String> = map_data
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|w| w.get("id").and_then(|i| i.as_str()).map(String::from))
+                .collect()
+        })
+        .unwrap_or_default();
+    let geo_futs = ids.iter().map(|id| {
+        let url = nina_geojson_url(id);
+        let id = id.clone();
+        async move {
+            match hole_json(s, &url).await {
+                Ok(v) => Some((id, v)),
+                Err(_) => None,
+            }
+        }
+    });
+    let geometrien: Vec<(String, serde_json::Value)> =
+        join_all(geo_futs).await.into_iter().flatten().collect();
+    let fc = kombiniere_nina(&map_data, &geometrien);
+    let a = FachebeneAntwort::ok("nina", NINA_ATTRIB, None, fc);
+    s.cache.setze("nina", a.clone());
+    a
 }
 
 pub async fn fetch_kritis(_s: &FachebenenState, _bbox: &str) -> Result<FachebeneAntwort, AppError> {
