@@ -13,6 +13,7 @@ pub mod etb;
 pub mod etb_baustein;
 pub mod fahrzeug;
 pub mod gefahr;
+pub mod karte;
 pub mod katalog;
 pub mod lagebericht;
 pub mod lage_zone;
