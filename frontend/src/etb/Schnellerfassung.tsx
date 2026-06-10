@@ -1,73 +1,135 @@
-import { Alert, Button, Card, Collapse, DatePicker, Form, Input, Select, Space } from 'antd';
+import { Alert, Button, Card, Select, Space } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { NeuerEintrag } from '../api/etb';
 import type { EinsatzAnzeige, EtbBaustein, EtbEintragAnzeige, EtbTyp, MeldeWeg } from '../api/types';
 import { ERFASSBARE_TYPEN, TYP_LABEL } from './typFarben';
-import BausteinPicker from './BausteinPicker';
-import MarkdownEditor from '../components/MarkdownEditor';
+import type { BausteinFelder } from './bausteinEinsetzen';
+import MarkdownEditor, { type TextAreaRef } from '../components/MarkdownEditor';
+import MetaChip from './MetaChip';
+import SlashMenu, { type SlashMenuHandle } from './SlashMenu';
+import BausteinPlatzhalterModal from './BausteinPlatzhalterModal';
+import {
+  baueEintrag, erkenneSlashTrigger, METADATEN_FELDER,
+  type MetadatenWerte, type MetaFeld, type SlashEintrag,
+} from './schnellerfassungModell';
 
 interface Props {
   erfassen: (eintrag: NeuerEintrag) => Promise<void>;
-  /** Gesetzt = Berichtigungsmodus für diesen Originaleintrag. */
   berichtigungZu: EtbEintragAnzeige | null;
   onBerichtigungAbbrechen: () => void;
   bausteine: EtbBaustein[];
   einsatz: EinsatzAnzeige;
 }
 
-interface FormWerte {
-  typ: EtbTyp;
-  inhalt: string;
-  von?: string;
-  an?: string;
-  meldeweg?: MeldeWeg;
-  veranlassung?: string;
-  ereigniszeit?: dayjs.Dayjs;
-}
-
 const TYP_OPTIONEN = ERFASSBARE_TYPEN.map((t) => ({ value: t, label: TYP_LABEL[t] }));
-const MELDEWEG_OPTIONEN: { value: MeldeWeg; label: string }[] = [
-  { value: 'funk', label: 'Funk' },
-  { value: 'telefon', label: 'Telefon' },
-  { value: 'persoenlich', label: 'Persönlich' },
-  { value: 'sonstige', label: 'Sonstige' },
-];
 
 export default function Schnellerfassung({ erfassen, berichtigungZu, onBerichtigungAbbrechen, bausteine, einsatz }: Props) {
-  const [form] = Form.useForm<FormWerte>();
-  const [sendet, setSendet] = useState(false);
   const navigate = useNavigate();
-  const aktTyp = Form.useWatch('typ', form);
+  const textRef = useRef<TextAreaRef>(null);
+  const menuRef = useRef<SlashMenuHandle>(null);
 
-  // Im Berichtigungsmodus fokussiert das Inhaltsfeld; bei Moduswechsel Felder zurücksetzen.
+  const [inhalt, setInhalt] = useState('');
+  const [typ, setTyp] = useState<EtbTyp>('meldung');
+  const [metadaten, setMetadaten] = useState<MetadatenWerte>({});
+  const [editFeld, setEditFeld] = useState<MetaFeld | null>(null);
+  const [sendet, setSendet] = useState(false);
+
+  const [menuOffen, setMenuOffen] = useState(false);
+  const [menuFilter, setMenuFilter] = useState('');
+  const [triggerStart, setTriggerStart] = useState(-1);
+
+  const [bausteinOffen, setBausteinOffen] = useState<EtbBaustein | null>(null);
+
+  // Moduswechsel Berichtigung → alles leeren und fokussieren.
   useEffect(() => {
-    if (berichtigungZu) form.resetFields();
-  }, [berichtigungZu, form]);
+    setInhalt(''); setMetadaten({}); setEditFeld(null); setMenuOffen(false);
+    textRef.current?.focus();
+  }, [berichtigungZu]);
 
-  async function absenden(werte: FormWerte) {
+  const gesetzteFelder = METADATEN_FELDER.map((d) => d.feld).filter((f) => metadaten[f] != null);
+
+  function fokusInsFeld() {
+    requestAnimationFrame(() => textRef.current?.focus());
+  }
+
+  function aktualisiereTrigger(text: string, caret: number) {
+    const t = erkenneSlashTrigger(text, caret);
+    setMenuOffen(t.aktiv);
+    setMenuFilter(t.filter);
+    setTriggerStart(t.start);
+  }
+
+  function onInhaltChange(neu: string) {
+    setInhalt(neu);
+    // Caret-Position aus dem nativen textarea über die antd-Ref.
+    // Falls der Ref-Pfad nicht verfügbar ist (ältere antd-Version), Fallback auf Textende.
+    const caret = textRef.current?.resizableTextArea?.textArea?.selectionStart ?? neu.length;
+    aktualisiereTrigger(neu, caret);
+  }
+
+  function entferneTriggerText() {
+    if (triggerStart < 0) return;
+    const ta = textRef.current?.resizableTextArea?.textArea;
+    const caret = ta?.selectionStart ?? inhalt.length;
+    setInhalt(inhalt.slice(0, triggerStart) + inhalt.slice(caret));
+    setMenuOffen(false);
+  }
+
+  function waehleEintrag(e: SlashEintrag) {
+    entferneTriggerText();
+    if (e.art === 'feld') {
+      setEditFeld(e.key as MetaFeld);
+    } else {
+      const b = bausteine.find((x) => String(x.id) === e.key) ?? null;
+      setBausteinOffen(b);
+    }
+  }
+
+  function commitFeld(feld: MetaFeld, wert: string | dayjs.Dayjs | MeldeWeg) {
+    setMetadaten((m) => ({ ...m, [feld]: wert }));
+    setEditFeld(null);
+    fokusInsFeld();
+  }
+
+  function bausteinEinsetzen(felder: BausteinFelder) {
+    setInhalt(felder.inhalt);
+    setMetadaten((m) => ({
+      ...m,
+      ...(felder.meldeweg ? { meldeweg: felder.meldeweg } : {}),
+      ...(felder.veranlassung ? { veranlassung: felder.veranlassung } : {}),
+    }));
+    if (felder.typ) setTyp(felder.typ);
+    setBausteinOffen(null);
+    fokusInsFeld();
+  }
+
+  function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (menuOffen && menuRef.current?.handleKey(e.key)) {
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      void absenden();
+    }
+  }
+
+  async function absenden() {
+    if (sendet || inhalt.trim() === '') return;
     setSendet(true);
     try {
-      const jetztIso = new Date().toISOString();
-      const eintrag: NeuerEintrag = {
-        typ: berichtigungZu ? 'berichtigung' : werte.typ,
-        inhalt: werte.inhalt,
-        von: werte.von || undefined,
-        an: werte.an || undefined,
-        meldeweg: werte.meldeweg || undefined,
-        veranlassung: werte.veranlassung || undefined,
-        // ereigniszeit clientseitig setzen (Default jetzt), damit gepufferte Einträge
-        // ihre tatsächliche Ereigniszeit behalten (Spec §11).
-        ereigniszeit: werte.ereigniszeit
-          ? werte.ereigniszeit.utc().format('YYYY-MM-DD HH:mm:ss')
-          : jetztIso,
-        erfasst_lokal_at: jetztIso,
-        berichtigt_eintrag_id: berichtigungZu ? berichtigungZu.id : undefined,
-      };
+      const eintrag = baueEintrag({
+        inhalt, typ, metadaten,
+        berichtigungZuId: berichtigungZu ? berichtigungZu.id : undefined,
+        jetztIso: new Date().toISOString(),
+      });
       await erfassen(eintrag);
-      form.resetFields();
+      setInhalt(''); setMetadaten({}); setEditFeld(null); setMenuOffen(false);
       if (berichtigungZu) onBerichtigungAbbrechen();
+      fokusInsFeld();
     } finally {
       setSendet(false);
     }
@@ -77,91 +139,86 @@ export default function Schnellerfassung({ erfassen, berichtigungZu, onBerichtig
     <Card size="small" style={{ marginTop: 16 }}>
       {berichtigungZu && (
         <Alert
-          type="warning"
-          showIcon
-          style={{ marginBottom: 12 }}
+          type="warning" showIcon style={{ marginBottom: 12 }}
           message={`Berichtigung zu #${berichtigungZu.lfd_nr}`}
-          action={
-            <Button size="small" onClick={onBerichtigungAbbrechen}>
-              Abbrechen
-            </Button>
-          }
+          action={<Button size="small" onClick={onBerichtigungAbbrechen}>Abbrechen</Button>}
         />
       )}
-      <Form
-        form={form}
-        layout="vertical"
-        initialValues={{ typ: 'meldung' }}
-        onFinish={absenden}
-        disabled={sendet}
-      >
-        {!berichtigungZu && bausteine.length > 0 && (
-          <BausteinPicker form={form} bausteine={bausteine} einsatz={einsatz} />
-        )}
-        {/* Inhaltsfeld in voller Breite — der Schreiben/Vorschau-Tab-Umschalter des
-            MarkdownEditors ist höher als eine einzelne Zeile, daher eigene Zeile. */}
-        <Form.Item
-          name="inhalt"
-          style={{ marginBottom: 8 }}
-          rules={[{ required: true, message: 'Inhalt ist Pflicht' }]}
-        >
-          <MarkdownEditor layout="tabs" variante="kompakt" placeholder="Inhalt …" autoSize={{ minRows: 1, maxRows: 4 }} />
-        </Form.Item>
-        {/* Typ-Select + Erfassen-Button in einer kompakten Zeile darunter */}
-        <Space align="start" style={{ marginBottom: 0 }}>
-          {!berichtigungZu && (
-            <Form.Item name="typ" style={{ marginBottom: 8, minWidth: 150 }}>
-              <Select options={TYP_OPTIONEN} />
-            </Form.Item>
-          )}
-          <Form.Item style={{ marginBottom: 8 }}>
-            <Button type="primary" htmlType="submit" loading={sendet}>
-              Erfassen
-            </Button>
-          </Form.Item>
-        </Space>
 
-        {!berichtigungZu && aktTyp === 'lage' && (
-          <Form.Item style={{ marginBottom: 8 }}>
-            <Button
-              type="link"
-              style={{ paddingLeft: 0 }}
-              onClick={() => navigate(`/einsaetze/${einsatz.id}/lageberichte`)}
-            >
-              Als strukturierten Lagebericht erfassen →
-            </Button>
-          </Form.Item>
-        )}
-
-        <Collapse
-          ghost
-          items={[
-            {
-              key: 'optional',
-              label: 'Weitere Angaben',
-              children: (
-                <Space wrap>
-                  <Form.Item name="von" label="Von" style={{ marginBottom: 0 }}>
-                    <Input />
-                  </Form.Item>
-                  <Form.Item name="an" label="An" style={{ marginBottom: 0 }}>
-                    <Input />
-                  </Form.Item>
-                  <Form.Item name="meldeweg" label="Meldeweg" style={{ marginBottom: 0 }}>
-                    <Select allowClear style={{ width: 140 }} options={MELDEWEG_OPTIONEN} />
-                  </Form.Item>
-                  <Form.Item name="veranlassung" label="Veranlassung" style={{ marginBottom: 0 }}>
-                    <Input />
-                  </Form.Item>
-                  <Form.Item name="ereigniszeit" label="Ereigniszeit" style={{ marginBottom: 0 }}>
-                    <DatePicker showTime placeholder="abweichend …" />
-                  </Form.Item>
-                </Space>
-              ),
-            },
-          ]}
+      <div style={{ position: 'relative' }}>
+        <MarkdownEditor
+          ref={textRef}
+          layout="toggle"
+          variante="kompakt"
+          placeholder="Inhalt …  ( / für Felder & Bausteine )"
+          autoSize={{ minRows: 1, maxRows: 4 }}
+          value={inhalt}
+          onChange={onInhaltChange}
+          onKeyDown={onKeyDown}
         />
-      </Form>
+        <SlashMenu
+          ref={menuRef}
+          offen={menuOffen && !berichtigungZu}
+          filter={menuFilter}
+          bausteine={bausteine}
+          gesetzteFelder={gesetzteFelder}
+          onWahl={waehleEintrag}
+          onSchliessen={() => setMenuOffen(false)}
+        />
+      </div>
+
+      {/* Chip-Leiste */}
+      <Space wrap style={{ marginTop: 8 }}>
+        {gesetzteFelder.map((feld) => (
+          <MetaChip
+            key={`${feld}-${editFeld === feld ? 'edit' : 'view'}`}
+            feld={feld}
+            editing={editFeld === feld}
+            wert={metadaten[feld]}
+            onCommit={commitFeld}
+            onCancel={() => { setEditFeld(null); fokusInsFeld(); }}
+            onRemove={(f) => setMetadaten((m) => ({ ...m, [f]: undefined }))}
+            onEdit={(f) => setEditFeld(f)}
+          />
+        ))}
+        {editFeld != null && metadaten[editFeld] == null && (
+          <MetaChip
+            key={`${editFeld}-edit-new`}
+            feld={editFeld}
+            editing
+            wert={undefined}
+            onCommit={commitFeld}
+            onCancel={() => { setEditFeld(null); fokusInsFeld(); }}
+            onRemove={() => setEditFeld(null)}
+            onEdit={() => {}}
+          />
+        )}
+        {!berichtigungZu && (
+          <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={() => setMenuOffen((o) => !o)}>
+            Feld
+          </Button>
+        )}
+      </Space>
+
+      {/* Steuerzeile */}
+      <Space align="center" style={{ marginTop: 12, width: '100%' }}>
+        {!berichtigungZu && (
+          <Select value={typ} style={{ minWidth: 150 }} options={TYP_OPTIONEN} onChange={(v) => setTyp(v)} />
+        )}
+        <Button type="primary" loading={sendet} onClick={() => void absenden()}>Erfassen</Button>
+        {!berichtigungZu && typ === 'lage' && (
+          <Button type="link" style={{ paddingLeft: 0 }} onClick={() => navigate(`/einsaetze/${einsatz.id}/lageberichte`)}>
+            Als strukturierten Lagebericht erfassen →
+          </Button>
+        )}
+      </Space>
+
+      <BausteinPlatzhalterModal
+        baustein={bausteinOffen}
+        einsatz={einsatz}
+        onEinsetzen={bausteinEinsetzen}
+        onAbbrechenAll={() => setBausteinOffen(null)}
+      />
     </Card>
   );
 }
