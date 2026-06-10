@@ -1,12 +1,14 @@
 //! Fetch-Logik je Quelle. Wird in den Phasen 2–5 befüllt.
 
 use crate::error::AppError;
+use crate::karte::cache;
 use crate::karte::normalisierung::{
     kombiniere_nina, normalisiere_overpass, normalisiere_pegelonline,
 };
 use crate::karte::typen::{leere_collection, Bbox, FachebeneAntwort};
 use crate::karte::FachebenenState;
 use futures::stream::{self, StreamExt};
+use sqlx::SqlitePool;
 use std::time::Duration;
 
 const DWD_ATTRIB: &str = "Datenbasis: Deutscher Wetterdienst";
@@ -14,20 +16,20 @@ const DWD_TTL: Duration = Duration::from_secs(300);
 // Vereinigte Warngebiete (weniger Features, bundesweit), als GeoJSON.
 const DWD_URL: &str = "https://maps.dwd.de/geoserver/dwd/ows?service=WFS&version=2.0.0&request=GetFeature&typeName=dwd:Warnungen_Gemeinden_vereinigt&outputFormat=application/json&srsName=EPSG:4326";
 
-pub async fn fetch_dwd(s: &FachebenenState) -> FachebeneAntwort {
-    if let Some(a) = s.cache.frisch("dwd", DWD_TTL) {
+pub async fn fetch_dwd(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwort {
+    if let Some(a) = cache::frisch(pool, "dwd", DWD_TTL.as_secs() as i64).await {
         return a;
     }
     match hole_geojson(s, DWD_URL).await {
         Ok(fc) => {
             let a = FachebeneAntwort::ok("dwd", DWD_ATTRIB, None, fc);
-            s.cache.setze("dwd", a.clone());
+            cache::setze(pool, "dwd", &a).await;
             a
         }
         Err(e) => {
             tracing::warn!("DWD-Fetch fehlgeschlagen: {e}");
-            s.cache
-                .stale("dwd")
+            cache::stale(pool, "dwd")
+                .await
                 .unwrap_or_else(|| FachebeneAntwort::offline("dwd", DWD_ATTRIB))
         }
     }
@@ -52,21 +54,21 @@ const PEGEL_ATTRIB: &str = "PEGELONLINE / WSV";
 const PEGEL_TTL: Duration = Duration::from_secs(300);
 const PEGEL_URL: &str = "https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations.json?includeTimeseries=true&includeCurrentMeasurement=true";
 
-pub async fn fetch_pegelonline(s: &FachebenenState) -> FachebeneAntwort {
-    if let Some(a) = s.cache.frisch("pegelonline", PEGEL_TTL) {
+pub async fn fetch_pegelonline(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwort {
+    if let Some(a) = cache::frisch(pool, "pegelonline", PEGEL_TTL.as_secs() as i64).await {
         return a;
     }
     match hole_json(s, PEGEL_URL).await {
         Ok(roh) => {
             let fc = normalisiere_pegelonline(&roh);
             let a = FachebeneAntwort::ok("pegelonline", PEGEL_ATTRIB, None, fc);
-            s.cache.setze("pegelonline", a.clone());
+            cache::setze(pool, "pegelonline", &a).await;
             a
         }
         Err(e) => {
             tracing::warn!("PEGELONLINE-Fetch fehlgeschlagen: {e}");
-            s.cache
-                .stale("pegelonline")
+            cache::stale(pool, "pegelonline")
+                .await
                 .unwrap_or_else(|| FachebeneAntwort::offline("pegelonline", PEGEL_ATTRIB))
         }
     }
@@ -89,17 +91,16 @@ fn nina_geojson_url(id: &str) -> String {
     format!("https://warnung.bund.de/api31/warnings/{id}.geojson")
 }
 
-pub async fn fetch_nina(s: &FachebenenState) -> FachebeneAntwort {
-    if let Some(a) = s.cache.frisch("nina", NINA_TTL) {
+pub async fn fetch_nina(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwort {
+    if let Some(a) = cache::frisch(pool, "nina", NINA_TTL.as_secs() as i64).await {
         return a;
     }
     let map_data = match hole_json(s, NINA_MAPDATA).await {
         Ok(v) => v,
         Err(e) => {
             tracing::warn!("NINA-mapData-Fetch fehlgeschlagen: {e}");
-            return s
-                .cache
-                .stale("nina")
+            return cache::stale(pool, "nina")
+                .await
                 .unwrap_or_else(|| FachebeneAntwort::offline("nina", NINA_ATTRIB));
         }
     };
@@ -133,7 +134,7 @@ pub async fn fetch_nina(s: &FachebenenState) -> FachebeneAntwort {
         .collect();
     let fc = kombiniere_nina(&map_data, &geometrien);
     let a = FachebeneAntwort::ok("nina", NINA_ATTRIB, None, fc);
-    s.cache.setze("nina", a.clone());
+    cache::setze(pool, "nina", &a).await;
     a
 }
 
@@ -162,11 +163,12 @@ nwr[amenity=fire_station]({b});nwr[amenity=police]({b}););out center tags;",
 
 pub async fn fetch_kritis(
     s: &FachebenenState,
+    pool: &SqlitePool,
     bbox_roh: &str,
 ) -> Result<FachebeneAntwort, AppError> {
     let bbox = Bbox::parse(bbox_roh).map_err(AppError::Validation)?;
     let key = bbox.cache_key();
-    if let Some(a) = s.cache.frisch(&key, KRITIS_TTL) {
+    if let Some(a) = cache::frisch(pool, &key, KRITIS_TTL.as_secs() as i64).await {
         return Ok(a);
     }
     let query = overpass_query(&bbox.overpass());
@@ -191,7 +193,7 @@ pub async fn fetch_kritis(
                         None,
                         normalisiere_overpass(&roh),
                     );
-                    s.cache.setze(&key, a.clone());
+                    cache::setze(pool, &key, &a).await;
                     return Ok(a);
                 }
                 Err(e) => tracing::debug!("Overpass-JSON-Parse ({url}) fehlgeschlagen: {e}"),
@@ -202,8 +204,7 @@ pub async fn fetch_kritis(
     }
 
     tracing::warn!("Overpass nicht erreichbar (alle Endpunkte) — KRITIS aus Cache/leer");
-    Ok(s
-        .cache
-        .stale(&key)
+    Ok(cache::stale(pool, &key)
+        .await
         .unwrap_or_else(|| FachebeneAntwort::offline("kritis", KRITIS_ATTRIB)))
 }

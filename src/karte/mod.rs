@@ -7,15 +7,13 @@ pub mod normalisierung;
 pub mod quellen;
 pub mod typen;
 
-use cache::FachebenenCache;
-use std::sync::Arc;
 use std::time::Duration;
 
-/// Geteilter Zustand des Aggregators: ein wiederverwendeter HTTP-Client und der Cache.
+/// Geteilter Zustand des Aggregators: ein wiederverwendeter HTTP-Client.
+/// Der Cache liegt persistent in der DB (siehe `cache`) und nutzt den AppState-Pool.
 #[derive(Clone)]
 pub struct FachebenenState {
     pub client: reqwest::Client,
-    pub cache: Arc<FachebenenCache>,
 }
 
 impl FachebenenState {
@@ -25,10 +23,7 @@ impl FachebenenState {
             .user_agent("LifelineHub-Lagekarte/1.0 (+https://github.com/)")
             .build()
             .expect("reqwest-Client baubar");
-        FachebenenState {
-            client,
-            cache: Arc::new(FachebenenCache::neu()),
-        }
+        FachebenenState { client }
     }
 }
 
