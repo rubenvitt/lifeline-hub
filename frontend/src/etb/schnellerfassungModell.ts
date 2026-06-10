@@ -37,3 +37,28 @@ export const MELDEWEG_OPTIONEN: { value: MeldeWeg; label: string }[] = [
   { value: 'persoenlich', label: 'Persönlich' },
   { value: 'sonstige', label: 'Sonstige' },
 ];
+
+export interface SlashTrigger {
+  aktiv: boolean;
+  filter: string;
+  start: number;
+}
+
+const INAKTIV: SlashTrigger = { aktiv: false, filter: '', start: -1 };
+
+/**
+ * Sucht links vom Cursor ein '/' am Wortanfang. Bricht bei Whitespace ab
+ * (Whitespace zwischen '/' und Cursor schließt das Menü). '/' mitten im Wort
+ * (z.B. "2/9", Datums-/Pfadangaben) triggert nicht.
+ */
+export function erkenneSlashTrigger(text: string, caret: number): SlashTrigger {
+  for (let i = caret - 1; i >= 0; i--) {
+    const c = text[i];
+    if (c === '/') {
+      const wortanfang = i === 0 || /\s/.test(text[i - 1]);
+      return wortanfang ? { aktiv: true, filter: text.slice(i + 1, caret), start: i } : INAKTIV;
+    }
+    if (/\s/.test(c)) return INAKTIV;
+  }
+  return INAKTIV;
+}
