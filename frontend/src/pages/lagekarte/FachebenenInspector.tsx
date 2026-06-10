@@ -132,7 +132,9 @@ function PegelInhalt({ p }: { p: Record<string, unknown> }) {
 function KritisInhalt({ p }: { p: Record<string, unknown> }) {
   const kategorie = s(p.kategorie);
   const telefon = s(p.telefon);
-  const website = s(p.website);
+  const websiteRoh = s(p.website);
+  // Nur http(s) als Link zulassen (OSM-Tag ist untrusted → javascript:-URI wäre XSS).
+  const website = websiteRoh && /^https?:\/\//i.test(websiteRoh) ? websiteRoh : null;
   const notaufnahme = s(p.notaufnahme);
   return (
     <>
@@ -145,9 +147,13 @@ function KritisInhalt({ p }: { p: Record<string, unknown> }) {
             <a href={`tel:${telefon.replace(/\s/g, '')}`}>{telefon}</a>
           </Descriptions.Item>
         )}
-        {website && (
+        {websiteRoh && (
           <Descriptions.Item label="Web">
-            <a href={website} target="_blank" rel="noreferrer noopener">{website}</a>
+            {website ? (
+              <a href={website} target="_blank" rel="noreferrer noopener">{website}</a>
+            ) : (
+              websiteRoh
+            )}
           </Descriptions.Item>
         )}
         {notaufnahme && <Descriptions.Item label="Notaufnahme">{notaufnahme}</Descriptions.Item>}
