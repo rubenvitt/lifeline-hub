@@ -1,6 +1,9 @@
-import type dayjs from 'dayjs';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import type { EtbBaustein, EtbTyp, MeldeWeg } from '../api/types';
 import type { NeuerEintrag } from '../api/etb';
+
+dayjs.extend(utc);
 
 export type MetaFeld = 'ereigniszeit' | 'von' | 'an' | 'meldeweg' | 'veranlassung';
 
@@ -109,15 +112,13 @@ export interface EintragArgs {
 
 export function baueEintrag({ inhalt, typ, metadaten, berichtigungZuId, jetztIso }: EintragArgs): NeuerEintrag {
   return {
-    typ: berichtigungZuId ? 'berichtigung' : typ,
+    typ: berichtigungZuId != null ? 'berichtigung' : typ,
     inhalt,
     von: metadaten.von || undefined,
     an: metadaten.an || undefined,
     meldeweg: metadaten.meldeweg || undefined,
     veranlassung: metadaten.veranlassung || undefined,
-    ereigniszeit: metadaten.ereigniszeit
-      ? metadaten.ereigniszeit.utc().format('YYYY-MM-DD HH:mm:ss')
-      : jetztIso,
+    ereigniszeit: (metadaten.ereigniszeit ?? dayjs.utc(jetztIso)).utc().format('YYYY-MM-DD HH:mm:ss'),
     erfasst_lokal_at: jetztIso,
     berichtigt_eintrag_id: berichtigungZuId,
   };

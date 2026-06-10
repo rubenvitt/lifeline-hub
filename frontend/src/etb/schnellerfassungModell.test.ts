@@ -45,6 +45,10 @@ describe('erkenneSlashTrigger', () => {
     expect(erkenneSlashTrigger('/von bar', 8)).toEqual({ aktiv: false, filter: '', start: -1 });
   });
 
+  it('aktiv bei Caret mitten im Text direkt nach dem Filterwort (vor dem Space)', () => {
+    expect(erkenneSlashTrigger('/von bar', 4)).toEqual({ aktiv: true, filter: 'von', start: 0 });
+  });
+
   it('inaktiv ohne / links vom Cursor', () => {
     expect(erkenneSlashTrigger('Lage stabil', 11)).toEqual({ aktiv: false, filter: '', start: -1 });
   });
@@ -87,9 +91,9 @@ describe('filterSlashEintraege', () => {
 describe('baueEintrag', () => {
   const jetztIso = '2026-06-10T12:00:00.000Z';
 
-  it('Standardmeldung: typ + inhalt, ereigniszeit = jetzt, leere Metadaten weggelassen', () => {
+  it('Standardmeldung: typ + inhalt, ereigniszeit = jetzt (SQLite-UTC), leere Metadaten weggelassen', () => {
     const e = baueEintrag({ inhalt: 'Pumpe läuft', typ: 'meldung', metadaten: {}, jetztIso });
-    expect(e).toMatchObject({ typ: 'meldung', inhalt: 'Pumpe läuft', ereigniszeit: jetztIso });
+    expect(e).toMatchObject({ typ: 'meldung', inhalt: 'Pumpe läuft', ereigniszeit: '2026-06-10 12:00:00' });
     expect(e.erfasst_lokal_at).toBe(jetztIso);
     expect(e.von).toBeUndefined();
     expect(e.berichtigt_eintrag_id).toBeUndefined();
@@ -115,5 +119,11 @@ describe('baueEintrag', () => {
     const e = baueEintrag({ inhalt: 'Korrektur', typ: 'meldung', metadaten: {}, berichtigungZuId: 5, jetztIso });
     expect(e.typ).toBe('berichtigung');
     expect(e.berichtigt_eintrag_id).toBe(5);
+  });
+
+  it('leere Metadaten-Strings werden zu undefined', () => {
+    const e = baueEintrag({ inhalt: 'Pumpe läuft', typ: 'meldung', metadaten: { von: '', an: '' }, jetztIso });
+    expect(e.von).toBeUndefined();
+    expect(e.an).toBeUndefined();
   });
 });
