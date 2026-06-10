@@ -30,7 +30,7 @@ import { zoneStil, gefahrengebietStil } from './lagekarte/zonenStil';
 import GefahrengebietMatrixDrawer from './lagekarte/GefahrengebietMatrixDrawer';
 import type { ZeichenModus } from './lagekarte/zeichnen';
 import { ladeFachebene, type FachebeneQuelle, type FachebeneStatus } from '../api/fachebenen';
-import { FACHEBENEN, fachebeneKeys } from './lagekarte/fachebenen';
+import { FACHEBENEN, fachebeneKeys, KRITIS_MIN_ZOOM } from './lagekarte/fachebenen';
 import { liesFachebenenSichtbar, merkeFachebenenSichtbar, defaultFachebenenSichtbar, type FachebenenSichtbar } from './lagekarte/fachebenenAuswahl';
 import type { AktiveFachebene } from './lagekarte/kartenLayer';
 
@@ -113,6 +113,8 @@ export default function LagekartePage() {
   // Muss VOR den Fachebenen-Queries stehen, damit enabled korrekt ist.
   const [fachebenenSichtbar, setFachebenenSichtbar] = useState<FachebenenSichtbar>(defaultFachebenenSichtbar);
   const [kritisBbox, setKritisBbox] = useState<string | null>(null);
+  // Aktuelles Karten-Zoom-Level — steuert den „näher heranzoomen"-Hinweis für KRITIS.
+  const [kartenZoom, setKartenZoom] = useState<number | null>(null);
   const fachebenenInitRef = useRef(false);
   useEffect(() => {
     if (fachebenenInitRef.current) return;
@@ -452,6 +454,9 @@ export default function LagekartePage() {
         fachebenenSichtbar={fachebenenSichtbar}
         fachebenenStatus={fachebenenStatus}
         onFachebeneToggle={(k, an) => setFachebenenSichtbar((s) => ({ ...s, [k]: an }))}
+        kritisZoomZuKlein={
+          fachebenenSichtbar.kritis && kartenZoom != null && kartenZoom < KRITIS_MIN_ZOOM
+        }
       />
       <div style={{ flex: 1, position: 'relative' }}>
         <Kartenflaeche
@@ -493,6 +498,7 @@ export default function LagekartePage() {
           }}
           fachebenen={aktiveFachebenen}
           onBboxAenderung={fachebenenSichtbar.kritis ? setKritisBbox : undefined}
+          onZoomAenderung={setKartenZoom}
         />
         {aktiverMarker && (
           <Inspector
