@@ -18,24 +18,37 @@ describe('FachebenenInspector', () => {
         onSchliessen={() => {}}
       />,
     );
-    expect(screen.getByText('Amtliche Warnung vor Dauerregen')).toBeInTheDocument();
+    expect(screen.getByText('🌧️ Dauerregen')).toBeInTheDocument(); // Icon + Ereignis im Titel
+    expect(screen.getByText('Amtliche Warnung vor Dauerregen')).toBeInTheDocument(); // volle Headline im Body
     expect(screen.getByText('Mäßig')).toBeInTheDocument();
     expect(screen.getByText('Sofort')).toBeInTheDocument();
     expect(screen.getByText('Es tritt Dauerregen auf.')).toBeInTheDocument();
     expect(screen.getByText('Meiden Sie überflutete Bereiche.')).toBeInTheDocument();
   });
 
-  it('Pegel: Wasserstand mit Einheit, Zustand-Tag, Gewässer', () => {
+  it('Pegel: Wasserstand mit Einheit, Zustand-Tag (high→Hoch), Gewässer', () => {
     render(
       <FachebenenInspector
         quelle="pegelonline"
-        properties={{ titel: 'KÖLN', gewaesser: 'RHEIN', wert: 320, einheit: 'cm', zustand: 'hoch' }}
+        properties={{ titel: 'KÖLN', gewaesser: 'RHEIN', wert: 320, einheit: 'cm', zustand: 'high' }}
         onSchliessen={() => {}}
       />,
     );
     expect(screen.getByText(/320 cm/)).toBeInTheDocument();
     expect(screen.getByText('Hoch')).toBeInTheDocument();
     expect(screen.getByText('RHEIN')).toBeInTheDocument();
+  });
+
+  it('Pegel: Zustand "unknown" zeigt KEIN Tag (statt Rohwert)', () => {
+    render(
+      <FachebenenInspector
+        quelle="pegelonline"
+        properties={{ titel: 'X', wert: 100, einheit: 'cm', zustand: 'unknown' }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.queryByText('unknown')).toBeNull();
+    expect(screen.getByText(/100 cm/)).toBeInTheDocument();
   });
 
   it('KRITIS: Kategorie-Label, Adresse, klickbares Telefon', () => {
