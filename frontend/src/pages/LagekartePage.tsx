@@ -29,6 +29,10 @@ import ZonenInspector from './lagekarte/ZonenInspector';
 import { zoneStil, gefahrengebietStil } from './lagekarte/zonenStil';
 import GefahrengebietMatrixDrawer from './lagekarte/GefahrengebietMatrixDrawer';
 import type { ZeichenModus } from './lagekarte/zeichnen';
+import { ladeFachebene, type FachebeneQuelle, type FachebeneStatus } from '../api/fachebenen';
+import { FACHEBENEN, fachebeneKeys } from './lagekarte/fachebenen';
+import { liesFachebenenSichtbar, merkeFachebenenSichtbar, defaultFachebenenSichtbar, type FachebenenSichtbar } from './lagekarte/fachebenenAuswahl';
+import type { AktiveFachebene } from './lagekarte/kartenLayer';
 
 /** EinsatzAnzeige → KopfdatenUpdate (Vollersatz) mit überschriebener Koordinate. */
 function kopfMitKoordinate(e: EinsatzAnzeige, lat: number | null, lon: number | null): KopfdatenUpdate {
@@ -104,6 +108,40 @@ export default function LagekartePage() {
   });
   const orgQuery = useQuery({ queryKey: ['organisation'], queryFn: ladeOrganisation });
   const configQuery = useQuery({ queryKey: ['karte-config'], queryFn: ladeKarteConfig });
+
+  // Fachebenen-Sichtbarkeit: einmal aus localStorage laden (analog basemap-Persistenz).
+  // Muss VOR den Fachebenen-Queries stehen, damit enabled korrekt ist.
+  const [fachebenenSichtbar, setFachebenenSichtbar] = useState<FachebenenSichtbar>(defaultFachebenenSichtbar);
+  const [kritisBbox, setKritisBbox] = useState<string | null>(null);
+  const fachebenenInitRef = useRef(false);
+  useEffect(() => {
+    if (fachebenenInitRef.current) return;
+    fachebenenInitRef.current = true;
+    const gespeichert = liesFachebenenSichtbar(einsatzId);
+    if (gespeichert) setFachebenenSichtbar(gespeichert);
+  }, [einsatzId]);
+  useEffect(() => {
+    if (!fachebenenInitRef.current) return;
+    merkeFachebenenSichtbar(einsatzId, fachebenenSichtbar);
+  }, [fachebenenSichtbar, einsatzId]);
+
+  // Fachebenen-Queries (per Default disabled — alle Ebenen aus).
+  const ninaQuery = useQuery({
+    queryKey: ['fachebene', 'nina'], queryFn: () => ladeFachebene('nina'),
+    enabled: fachebenenSichtbar.nina, refetchInterval: FACHEBENEN.nina.pollMs,
+  });
+  const dwdQuery = useQuery({
+    queryKey: ['fachebene', 'dwd'], queryFn: () => ladeFachebene('dwd'),
+    enabled: fachebenenSichtbar.dwd, refetchInterval: FACHEBENEN.dwd.pollMs,
+  });
+  const pegelQuery = useQuery({
+    queryKey: ['fachebene', 'pegelonline'], queryFn: () => ladeFachebene('pegelonline'),
+    enabled: fachebenenSichtbar.pegelonline, refetchInterval: FACHEBENEN.pegelonline.pollMs,
+  });
+  const kritisQuery = useQuery({
+    queryKey: ['fachebene', 'kritis', kritisBbox], queryFn: () => ladeFachebene('kritis', kritisBbox!),
+    enabled: fachebenenSichtbar.kritis && !!kritisBbox,
+  });
 
   // Kartenwahl einmal aus der pro-Einsatz gemerkten Auswahl (localStorage) initialisieren,
   // gegen die aktuelle Config validiert; sonst Verfügbarkeits-Default. Danach persistiert
@@ -235,10 +273,44 @@ export default function LagekartePage() {
     [basemap, effektiv, configQuery.data, onlineStil],
   );
 
-  const attribution = useMemo(
-    () => aktuelleAttribution(basemap ?? 'blind', onlineStil),
-    [basemap, onlineStil],
+  const fachebenenQueries: Record<FachebeneQuelle, typeof ninaQuery> = {
+    nina: ninaQuery, dwd: dwdQuery, pegelonline: pegelQuery, kritis: kritisQuery,
+  };
+
+  const aktiveFachebenen = useMemo<AktiveFachebene[]>(
+    () => fachebeneKeys()
+      .filter((k) => fachebenenSichtbar[k])
+      .map((k) => {
+        const data = fachebenenQueries[k].data;
+        return { def: FACHEBENEN[k], daten: data?.features ?? { type: 'FeatureCollection' as const, features: [] } };
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [fachebenenSichtbar, ninaQuery.data, dwdQuery.data, pegelQuery.data, kritisQuery.data],
   );
+
+  const fachebenenStatus = useMemo<Partial<Record<FachebeneQuelle, FachebeneStatus>>>(() => {
+    const s: Partial<Record<FachebeneQuelle, FachebeneStatus>> = {};
+    for (const k of fachebeneKeys()) {
+      const q = fachebenenQueries[k];
+      if (!fachebenenSichtbar[k]) continue;
+      s[k] = q.isError ? 'offline' : q.data?.status;
+    }
+    return s;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fachebenenSichtbar, ninaQuery.status, dwdQuery.status, pegelQuery.status, kritisQuery.status, ninaQuery.data, dwdQuery.data, pegelQuery.data, kritisQuery.data]);
+
+  const fachebenenAttribution = useMemo(() => {
+    return fachebeneKeys()
+      .filter((k) => fachebenenSichtbar[k] && fachebenenQueries[k].data && fachebenenQueries[k].data!.status !== 'offline')
+      .map((k) => fachebenenQueries[k].data!.attribution)
+      .filter(Boolean) as string[];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fachebenenSichtbar, ninaQuery.data, dwdQuery.data, pegelQuery.data, kritisQuery.data]);
+
+  const attribution = useMemo(() => {
+    const teile = [aktuelleAttribution(basemap ?? 'blind', onlineStil), ...fachebenenAttribution].filter(Boolean) as string[];
+    return teile.length ? teile.join(' · ') : null;
+  }, [basemap, onlineStil, fachebenenAttribution]);
 
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
@@ -377,6 +449,9 @@ export default function LagekartePage() {
         onlineStyles={configQuery.data?.online_styles ?? []}
         onlineStilName={onlineStilName}
         onOnlineStilWechsel={setOnlineStilName}
+        fachebenenSichtbar={fachebenenSichtbar}
+        fachebenenStatus={fachebenenStatus}
+        onFachebeneToggle={(k, an) => setFachebenenSichtbar((s) => ({ ...s, [k]: an }))}
       />
       <div style={{ flex: 1, position: 'relative' }}>
         <Kartenflaeche
@@ -416,6 +491,8 @@ export default function LagekartePage() {
               .catch(fehler)
               .finally(() => setZoneEntwurf(null));
           }}
+          fachebenen={aktiveFachebenen}
+          onBboxAenderung={fachebenenSichtbar.kritis ? setKritisBbox : undefined}
         />
         {aktiverMarker && (
           <Inspector
