@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { Form } from 'antd';
+import { renderMitProviders } from '../test/utils';
 import MarkdownEditor from './MarkdownEditor';
 
 describe('MarkdownEditor', () => {
@@ -61,7 +62,7 @@ describe('MarkdownEditor', () => {
       );
     }
     const { container } = render(<Wrapper />);
-    // Externes setFieldsValue (wie BausteinPicker) muss in der Komponente ankommen.
+    // Extern gesetztes value (z.B. Baustein-Einsetzen via Form) muss in der Komponente ankommen.
     await userEvent.click(screen.getByText('baustein'));
     expect(screen.getByRole('textbox')).toHaveValue('**fett**');
     expect(container.querySelector('.markdown strong')).toHaveTextContent('fett');
@@ -75,5 +76,26 @@ describe('MarkdownEditor', () => {
     const { container } = render(<Wrapper />);
     await userEvent.type(screen.getByRole('textbox'), '# Titel');
     expect(container.querySelector('.markdown h1')).toHaveTextContent('Titel');
+  });
+});
+
+describe('MarkdownEditor – toggle-Variante', () => {
+  it('zeigt Eingabe; Vorschau-Toggle blendet formatierten Markdown ein', async () => {
+    function Wrap() {
+      return <MarkdownEditor layout="toggle" variante="kompakt" placeholder="Inhalt …" value="**fett**" onChange={() => {}} />;
+    }
+    const { container } = renderMitProviders(<Wrap />);
+    expect(container.querySelector('.markdown strong')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: /vorschau/i }));
+    expect(container.querySelector('.markdown strong')).toHaveTextContent('fett');
+  });
+
+  it('reicht onKeyDown durch', async () => {
+    const onKeyDown = vi.fn();
+    renderMitProviders(
+      <MarkdownEditor layout="toggle" placeholder="Inhalt …" value="" onChange={() => {}} onKeyDown={onKeyDown} />,
+    );
+    await userEvent.type(screen.getByPlaceholderText('Inhalt …'), '/');
+    expect(onKeyDown).toHaveBeenCalled();
   });
 });

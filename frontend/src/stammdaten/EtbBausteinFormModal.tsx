@@ -6,6 +6,7 @@ import { aktualisiereBaustein, legeBausteinAn, type BausteinEingabe } from '../a
 import type { EtbBaustein, EtbTyp, MeldeWeg } from '../api/types';
 import { ERFASSBARE_TYPEN, TYP_LABEL } from '../etb/typFarben';
 import { AUTO_PLATZHALTER } from '../etb/bausteinEinsetzen';
+import { MELDEWEG_OPTIONEN } from '../etb/schnellerfassungModell';
 
 interface FormWerte {
   label: string;
@@ -15,13 +16,6 @@ interface FormWerte {
   veranlassung?: string;
   sortier: number;
 }
-
-const MELDEWEG_OPTIONEN: { value: MeldeWeg; label: string }[] = [
-  { value: 'funk', label: 'Funk' },
-  { value: 'telefon', label: 'Telefon' },
-  { value: 'persoenlich', label: 'Persönlich' },
-  { value: 'sonstige', label: 'Sonstige' },
-];
 
 function leerZuNull(w: string | undefined): string | null {
   const t = w?.trim();
