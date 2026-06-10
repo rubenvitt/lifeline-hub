@@ -35,7 +35,12 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
     handleKey(key) {
       if (!offen) return false;
       if (key === 'Escape') { onSchliessen(); return true; }
-      if (flach.length === 0) return false;
+      if (flach.length === 0) {
+        // Enter bei leerem Menü ("Kein Treffer") konsumieren und schließen,
+        // damit der Container den Eintrag nicht versehentlich absendet.
+        if (key === 'Enter') { onSchliessen(); return true; }
+        return false;
+      }
       if (key === 'ArrowDown') { setAktiv((i) => (i + 1) % flach.length); return true; }
       if (key === 'ArrowUp') { setAktiv((i) => (i - 1 + flach.length) % flach.length); return true; }
       if (key === 'Enter') { const e = flach[aktiv]; if (!e) return false; onWahl(e); return true; }

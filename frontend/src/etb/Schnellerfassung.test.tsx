@@ -99,6 +99,24 @@ describe('Schnellerfassung', () => {
     expect(p.erfassen).not.toHaveBeenCalled();
   });
 
+  it('Enter bei offenem, leerem /-Menü sendet nicht', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Lage /xyzqfehlt');
+    await screen.findByText(/Kein Treffer/i);
+    await userEvent.keyboard('{Enter}');
+    expect(p.erfassen).not.toHaveBeenCalled();
+  });
+
+  it('+ Feld-Button öffnet das Felder-Menü und ein Feld ist wählbar', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.click(screen.getByRole('button', { name: /Feld/ }));
+    await userEvent.click(await screen.findByText('Ereigniszeit'));
+    // Chip im Edit-Zustand erscheint (Zeit-Editor)
+    expect(await screen.findByText(/Ereigniszeit/)).toBeInTheDocument();
+  });
+
   it('Berichtigungsmodus sendet typ=berichtigung + berichtigt_eintrag_id', async () => {
     const p = props({ berichtigungZu: original() });
     renderMitProviders(<Schnellerfassung {...p} />);

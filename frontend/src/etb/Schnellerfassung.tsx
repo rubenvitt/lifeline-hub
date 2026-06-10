@@ -195,7 +195,12 @@ export default function Schnellerfassung({ erfassen, berichtigungZu, onBerichtig
             onEdit={() => {}}
           />
         )}
-        <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={() => setMenuOffen((o) => !o)}>
+        <Button
+          size="small"
+          type="dashed"
+          icon={<PlusOutlined />}
+          onClick={() => { setMenuFilter(''); setTriggerStart(-1); setMenuOffen((o) => !o); }}
+        >
           Feld
         </Button>
       </Space>
