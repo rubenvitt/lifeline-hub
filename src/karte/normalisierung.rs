@@ -82,10 +82,12 @@ pub fn kombiniere_nina(map_data: &Value, geometrien: &[(String, Value)]) -> Valu
     let mut features: Vec<Value> = Vec::new();
     for (id, geo) in geometrien {
         let info = meta.get(id.as_str());
+        // WICHTIG: serde_json sortiert Objekt-Schlüssel alphabetisch (BTreeMap), d. h.
+        // `values().next()` lieferte "ar" (Arabisch) vor "de". Daher gezielt Deutsch wählen.
         let titel = info
             .and_then(|w| w.get("i18nTitle"))
             .and_then(|t| t.as_object())
-            .and_then(|o| o.values().next())
+            .and_then(|o| o.get("de").or_else(|| o.values().next()))
             .and_then(|v| v.as_str())
             .unwrap_or("Warnung")
             .to_string();
@@ -138,6 +140,19 @@ mod nina_tests {
         assert_eq!(f["properties"]["dringlichkeit"], "Immediate");
         assert_eq!(f["properties"]["beginn"], "2026-06-09T10:00:00+02:00");
         assert_eq!(f["geometry"]["type"], "Polygon");
+    }
+
+    #[test]
+    fn waehlt_deutschen_titel_trotz_alphabetischer_schluessel() {
+        // serde_json sortiert Keys alphabetisch → "ar" käme vor "de"; wir wollen Deutsch.
+        let map_data = json!([
+            { "id": "abc", "i18nTitle": { "ar": "تحذير", "de": "Stromausfall", "en": "Power outage" } }
+        ]);
+        let geo = json!({ "type": "FeatureCollection", "features": [
+            { "type": "Feature", "geometry": { "type": "Polygon", "coordinates": [[[0,0],[1,0],[1,1],[0,0]]] } }
+        ]});
+        let fc = kombiniere_nina(&map_data, &[("abc".to_string(), geo)]);
+        assert_eq!(fc["features"][0]["properties"]["titel"], "Stromausfall");
     }
 
     #[test]
