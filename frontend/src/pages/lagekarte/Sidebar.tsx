@@ -1,4 +1,4 @@
-import { Badge, Button, Card, Empty, InputNumber, List, Radio, Select, Space, Switch, Tooltip, Typography } from 'antd';
+import { Badge, Button, Card, Empty, InputNumber, List, Radio, Select, Space, Spin, Switch, Tooltip, Typography } from 'antd';
 import { useState } from 'react';
 import type { KarteMarker, NichtVerortet } from './marker';
 import type { BasemapModus } from './basemapStil';
@@ -59,6 +59,8 @@ export interface SidebarProps {
   fachebenenStatus: Partial<Record<import('../../api/fachebenen').FachebeneQuelle, import('../../api/fachebenen').FachebeneStatus>>;
   /** KRITIS ist aktiv, aber die Karte ist zu weit herausgezoomt für eine Abfrage. */
   kritisZoomZuKlein?: boolean;
+  /** Lade-Zustand je Fachebene (z. B. KRITIS/Overpass lädt länger → Spinner). */
+  fachebenenLaedt?: Partial<Record<import('../../api/fachebenen').FachebeneQuelle, boolean>>;
 }
 
 export default function Sidebar(props: SidebarProps) {
@@ -245,6 +247,7 @@ export default function Sidebar(props: SidebarProps) {
             const status = props.fachebenenStatus[key];
             const sichtbar = props.fachebenenSichtbar[key];
             const offline = status === 'offline';
+            const laedt = sichtbar && props.fachebenenLaedt?.[key];
             const zoomHinweis = sichtbar && key === 'kritis' && props.kritisZoomZuKlein;
             return (
               <Space key={key} style={{ justifyContent: 'space-between', width: '100%' }}>
@@ -255,7 +258,9 @@ export default function Sidebar(props: SidebarProps) {
                   />
                   <span style={{ color: def.farbe }}>●</span> {def.label}
                 </Space>
-                {zoomHinweis ? (
+                {laedt ? (
+                  <Spin size="small" />
+                ) : zoomHinweis ? (
                   <Tooltip title="KRITIS-Objekte werden erst ab einer näheren Zoomstufe geladen">
                     <Typography.Text type="warning" style={{ fontSize: 11 }}>näher heranzoomen</Typography.Text>
                   </Tooltip>
