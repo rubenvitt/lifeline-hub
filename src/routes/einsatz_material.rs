@@ -37,6 +37,14 @@ async fn etb_system(state: &AppState, einsatz_id: i64, benutzer_id: i64, inhalt:
     Ok(())
 }
 
+/// SSE-Notify (Lage-Karte/Meldebild): Material-Disposition hat sich geändert.
+/// Wird unbedingt nach jeder Mutation gesendet — auch bei reinen Bemerkungs-/
+/// UHS-Zuordnungs-Änderungen, die keinen ETB-Eintrag schreiben (LFH-66).
+fn sse_material(state: &AppState, einsatz_id: i64, em_id: i64) {
+    let data = serde_json::json!({ "einsatz_id": einsatz_id, "material_id": em_id }).to_string();
+    state.live.publiziere_event(einsatz_id, "material", data);
+}
+
 fn trimme(s: Option<String>) -> Option<String> {
     s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
 }
@@ -132,6 +140,7 @@ pub async fn disponieren(
         &format!("Material «{}» (×{}) disponiert", anzeige.bezeichnung, anzeige.menge),
     )
     .await?;
+    sse_material(&state, einsatz_id, em_id);
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
 
@@ -205,6 +214,7 @@ pub async fn aktualisieren(
         )
         .await?;
     }
+    sse_material(&state, einsatz_id, em_id);
     Ok(Json(nachher))
 }
 
@@ -228,5 +238,6 @@ pub async fn entfernen(
         &format!("Material «{}» aus dem Einsatz entfernt", anzeige.bezeichnung),
     )
     .await?;
+    sse_material(&state, einsatz_id, em_id);
     Ok(StatusCode::NO_CONTENT)
 }

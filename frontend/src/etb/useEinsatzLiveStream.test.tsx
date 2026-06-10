@@ -53,6 +53,22 @@ describe('useEinsatzLiveStream', () => {
     });
   });
 
+  it('invalidiert einsatz-material bei material-Event', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={1} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit('material');
+    await waitFor(() => {
+      const keys = spy.mock.calls.map((c) => (c[0] as { queryKey: string[] }).queryKey[0]);
+      expect(keys).toContain('einsatz-material');
+    });
+  });
+
   it('invalidiert einsatz-personal bei person-Event', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();

@@ -17,6 +17,21 @@ async fn setup() -> axum::Router {
     build_router(AppState { pool, live: LiveHub::new(), fachebenen: lifeline_hub::karte::FachebenenState::neu() })
 }
 
+/// Wie `setup`, behält aber ein Handle auf den `LiveHub`, um Live-Events zu abonnieren.
+async fn setup_mit_hub() -> (axum::Router, LiveHub) {
+    let pool = db::test_pool().await;
+    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
+        .await
+        .unwrap();
+    let live = LiveHub::new();
+    let router = build_router(AppState {
+        pool,
+        live: live.clone(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+    });
+    (router, live)
+}
+
 async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) -> String {
     let body = format!(r#"{{"benutzername":"{benutzername}","passwort":"{passwort}"}}"#);
     let resp = app
@@ -354,4 +369,29 @@ async fn fremde_em_id_an_einheit_ist_404() {
     let eid = einheit_bilden(&app, &admin, einsatz, "Trupp 1").await;
     let (status, _) = anfrage(&app, "PUT", &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/999999"), &admin, None).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+/// LFH-66: Jede Material-Mutation publiziert ein `material`-Live-Event — auch eine
+/// reine Bemerkungsänderung, die KEINEN ETB-Eintrag schreibt. Diskriminiert die
+/// Fehlplatzierung des Events hinter den ETB-Schreibbedingungen (menge/status).
+#[tokio::test]
+async fn reine_bemerkung_publiziert_material_event() {
+    let (app, live) = setup_mit_hub().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let mat = material_anlegen(&app, &admin, "Wolldecke").await;
+    let (_, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/material"), &admin, Some(&format!(r#"{{"material_id":{mat}}}"#))).await;
+    let em = json["id"].as_i64().unwrap();
+
+    // Erst NACH dem Disponieren abonnieren → isoliert das Event des folgenden PATCH.
+    let mut rx = live.abonniere(einsatz);
+    let (status, _) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/material/{em}"), &admin, Some(r#"{"bemerkung":"Lagerhalle 2"}"#)).await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Reine Bemerkung schreibt keinen ETB → das einzige Live-Event muss `material` sein.
+    let nachricht = rx.try_recv().expect("ein Live-Event nach der Material-Mutation erwartet");
+    assert_eq!(nachricht.event, "material");
+    let data: Value = serde_json::from_str(&nachricht.data).unwrap();
+    assert_eq!(data["einsatz_id"], einsatz);
+    assert_eq!(data["material_id"], em);
 }
