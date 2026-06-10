@@ -41,13 +41,13 @@ pub async fn fachebenen(
 ) -> Result<Json<crate::karte::typen::FachebeneAntwort>, AppError> {
     let bbox = params.get("bbox").map(|s| s.as_str());
     let antwort = match quelle.as_str() {
-        "dwd" => quellen::fetch_dwd(&state.fachebenen).await,
-        "pegelonline" => quellen::fetch_pegelonline(&state.fachebenen).await,
-        "nina" => quellen::fetch_nina(&state.fachebenen).await,
+        "dwd" => quellen::fetch_dwd(&state.fachebenen, &state.pool).await,
+        "pegelonline" => quellen::fetch_pegelonline(&state.fachebenen, &state.pool).await,
+        "nina" => quellen::fetch_nina(&state.fachebenen, &state.pool).await,
         "kritis" => {
             let bbox =
                 bbox.ok_or_else(|| AppError::Validation("bbox-Parameter erforderlich".into()))?;
-            quellen::fetch_kritis(&state.fachebenen, bbox).await?
+            quellen::fetch_kritis(&state.fachebenen, &state.pool, bbox).await?
         }
         _ => return Err(AppError::Validation(format!("Unbekannte Quelle: {quelle}"))),
     };

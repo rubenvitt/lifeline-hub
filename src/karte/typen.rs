@@ -1,10 +1,10 @@
 //! Antwort-Umschlag des Fachebenen-Aggregators und Hilfsbuilder.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 /// Status einer Fachebenen-Antwort.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum FachebeneStatus {
     /// Daten vorhanden (frisch oder aus gültigem Cache).
@@ -16,7 +16,7 @@ pub enum FachebeneStatus {
 }
 
 /// Einheitlicher Umschlag für jede Fachebene.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FachebeneAntwort {
     pub quelle: String,
     pub status: FachebeneStatus,
