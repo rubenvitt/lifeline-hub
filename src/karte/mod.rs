@@ -7,13 +7,17 @@ pub mod normalisierung;
 pub mod quellen;
 pub mod typen;
 
+use std::collections::HashSet;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-/// Geteilter Zustand des Aggregators: ein wiederverwendeter HTTP-Client.
-/// Der Cache liegt persistent in der DB (siehe `cache`) und nutzt den AppState-Pool.
+/// Geteilter Zustand des Aggregators. Der Cache liegt persistent in der DB (siehe `cache`)
+/// und nutzt den AppState-Pool. `inflight` verhindert mehrfache parallele Hintergrund-
+/// Refreshes desselben Schlüssels (Stale-while-revalidate).
 #[derive(Clone)]
 pub struct FachebenenState {
     pub client: reqwest::Client,
+    pub inflight: Arc<Mutex<HashSet<String>>>,
 }
 
 impl FachebenenState {
@@ -23,7 +27,10 @@ impl FachebenenState {
             .user_agent("LifelineHub-Lagekarte/1.0 (+https://github.com/)")
             .build()
             .expect("reqwest-Client baubar");
-        FachebenenState { client }
+        FachebenenState {
+            client,
+            inflight: Arc::new(Mutex::new(HashSet::new())),
+        }
     }
 }
 
