@@ -23,6 +23,22 @@ fn deserialisiere(json: &str) -> Option<FachebeneAntwort> {
     }
 }
 
+/// Liefert den Cache-Eintrag samt Alter in Sekunden (für Stale-while-revalidate), sonst None.
+pub async fn eintrag(pool: &SqlitePool, schluessel: &str) -> Option<(FachebeneAntwort, i64)> {
+    let row: Option<(String, i64)> = sqlx::query_as(
+        "SELECT antwort_json, unixepoch() - gespeichert_at \
+         FROM fachebenen_cache WHERE schluessel = ?",
+    )
+    .bind(schluessel)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or_else(|e| {
+        tracing::warn!("Fachebenen-Cache: Lesefehler (eintrag): {e}");
+        None
+    });
+    row.and_then(|(j, alter)| deserialisiere(&j).map(|a| (a, alter)))
+}
+
 /// Frischen Eintrag (jünger als `ttl_sekunden`) liefern, sonst None.
 pub async fn frisch(pool: &SqlitePool, schluessel: &str, ttl_sekunden: i64) -> Option<FachebeneAntwort> {
     let json: Option<String> = sqlx::query_scalar(
@@ -91,7 +107,7 @@ pub async fn setze(pool: &SqlitePool, schluessel: &str, antwort: &FachebeneAntwo
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::karte::typen::{leere_collection, FachebeneAntwort, FachebeneStatus};
+    use crate::karte::typen::{FachebeneAntwort, FachebeneStatus};
     use serde_json::json;
 
     fn antwort() -> FachebeneAntwort {
