@@ -34,6 +34,26 @@ function fmtZeit(v: string | null): string | null {
     : d.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+/** „DAUERREGEN" / „STARKES GEWITTER" → „Dauerregen" / „Starkes Gewitter". */
+function titelCase(v: string): string {
+  return v
+    .toLocaleLowerCase('de-DE')
+    .replace(/(^|\s|-)([\p{L}])/gu, (_, sep, ch) => sep + ch.toLocaleUpperCase('de-DE'));
+}
+
+/** Emoji-Icon zum Wetter-Ereignis (DWD EC_GROUP / EVENT). */
+function wetterIcon(group: string | null, event: string | null): string {
+  const t = `${group ?? ''} ${event ?? ''}`.toUpperCase();
+  if (/GEWITTER|THUNDER/.test(t)) return '⛈️';
+  if (/REGEN|RAIN/.test(t)) return '🌧️';
+  if (/STURM|ORKAN|WIND|BÖ/.test(t)) return '💨';
+  if (/SCHNEE|SNOW|GLATT|GLÄTTE|EIS|GLAZE|ICE|FROST|TAUWETTER|THAW/.test(t)) return '❄️';
+  if (/NEBEL|FOG/.test(t)) return '🌫️';
+  if (/HITZE|HEAT/.test(t)) return '🌡️';
+  if (/UV/.test(t)) return '☀️';
+  return '⚠️';
+}
+
 const SCHWERE: Record<string, { label: string; color: string }> = {
   Extreme: { label: 'Extrem', color: 'red' },
   Severe: { label: 'Schwer', color: 'volcano' },
@@ -49,16 +69,18 @@ const DRINGLICHKEIT: Record<string, string> = {
   Unknown: 'Unbekannt',
 };
 
+// PEGELONLINE stateMnwMhw ist englisch; nur die aussagekräftigen Werte als Tag zeigen
+// (unknown/commented/out-dated → kein Tag).
 const ZUSTAND: Record<string, { label: string; color: string }> = {
-  hoch: { label: 'Hoch', color: 'red' },
+  high: { label: 'Hoch', color: 'red' },
   normal: { label: 'Normal', color: 'green' },
-  niedrig: { label: 'Niedrig', color: 'gold' },
+  low: { label: 'Niedrig', color: 'gold' },
 };
 
 function WarnungInhalt({ p }: { p: Record<string, unknown> }) {
+  const headline = pick(p, 'HEADLINE', 'titel', 'headline');
   const schwere = pick(p, 'SEVERITY', 'schwere', 'severity');
   const sev = schwere ? SCHWERE[schwere] : undefined;
-  const ereignis = pick(p, 'EVENT', 'typ', 'event');
   const dring = pick(p, 'URGENCY', 'dringlichkeit', 'urgency');
   const von = fmtZeit(pick(p, 'ONSET', 'EFFECTIVE', 'beginn'));
   const bis = fmtZeit(pick(p, 'EXPIRES'));
@@ -68,13 +90,15 @@ function WarnungInhalt({ p }: { p: Record<string, unknown> }) {
 
   return (
     <>
+      {headline && (
+        <Typography.Paragraph strong style={{ marginBottom: 8 }}>{headline}</Typography.Paragraph>
+      )}
       {sev ? (
         <Tag color={sev.color} style={{ marginBottom: 8 }}>{sev.label}</Tag>
       ) : schwere ? (
         <Tag style={{ marginBottom: 8 }}>{schwere}</Tag>
       ) : null}
       <Descriptions column={1} size="small">
-        {ereignis && <Descriptions.Item label="Ereignis">{ereignis}</Descriptions.Item>}
         {dring && <Descriptions.Item label="Dringlichkeit">{DRINGLICHKEIT[dring] ?? dring}</Descriptions.Item>}
         {(von || bis) && (
           <Descriptions.Item label="Gültig">
@@ -111,7 +135,7 @@ function PegelInhalt({ p }: { p: Record<string, unknown> }) {
       {wert ? (
         <Typography.Title level={3} style={{ margin: '0 0 8px' }}>
           {wert}{einheit ? ` ${einheit}` : ''}{' '}
-          {zust ? <Tag color={zust.color}>{zust.label}</Tag> : zustand ? <Tag>{zustand}</Tag> : null}
+          {zust ? <Tag color={zust.color}>{zust.label}</Tag> : null}
         </Typography.Title>
       ) : (
         <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
@@ -166,8 +190,18 @@ function KritisInhalt({ p }: { p: Record<string, unknown> }) {
 export default function FachebenenInspector({ quelle, properties, onSchliessen }: FachebenenInspectorProps) {
   const p = properties;
   const istWarnung = quelle === 'nina' || quelle === 'dwd';
-  const titel =
-    pick(p, 'HEADLINE', 'titel', 'headline', 'EVENT', 'name') ?? FACHEBENEN[quelle].label;
+
+  let titel: string;
+  if (istWarnung) {
+    const event = pick(p, 'EVENT', 'event');
+    if (quelle === 'dwd') {
+      titel = `${wetterIcon(pick(p, 'EC_GROUP'), event)} ${event ? titelCase(event) : 'Wetterwarnung'}`;
+    } else {
+      titel = '⚠️ Amtliche Warnung';
+    }
+  } else {
+    titel = pick(p, 'titel', 'name') ?? FACHEBENEN[quelle].label;
+  }
 
   return (
     <Card
@@ -178,7 +212,10 @@ export default function FachebenenInspector({ quelle, properties, onSchliessen }
         position: 'absolute', right: 12, top: 12, width: 300, zIndex: 5,
         maxHeight: 'calc(100vh - 160px)', overflowY: 'auto',
       }}
-      styles={{ header: { borderLeft: `4px solid ${FACHEBENEN[quelle].farbe}` } }}
+      styles={{
+        header: { borderLeft: `4px solid ${FACHEBENEN[quelle].farbe}` },
+        title: { whiteSpace: 'normal' },
+      }}
     >
       {istWarnung ? (
         <WarnungInhalt p={p} />
