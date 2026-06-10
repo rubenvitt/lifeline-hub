@@ -1,5 +1,8 @@
 import type { FachebeneQuelle } from '../../api/fachebenen';
 
+/** Mindest-Zoom-Level für KRITIS-Abfragen (unter diesem Zoom keine bbox-Anfrage). */
+export const KRITIS_MIN_ZOOM = 11;
+
 export interface FachebeneDef {
   key: FachebeneQuelle;
   label: string;

@@ -19,6 +19,7 @@ import {
   type AktiveFachebene,
 } from './kartenLayer';
 import { sorgeFuerFachebeneLayer, setzeFachebeneDaten, entferneFachebeneLayer } from './fachebenenLayer';
+import { KRITIS_MIN_ZOOM } from './fachebenen';
 
 // Re-Export: LagekartePage importiert ZoneFeature weiterhin aus Kartenflaeche.
 export type { ZoneFeature };
@@ -314,17 +315,28 @@ export default function Kartenflaeche({
   }, [fachebenen]);
 
   // Viewport-bbox nach Kartenbewegung melden (für bbox-abhängige Ebenen wie KRITIS).
+  // Sendet sofort beim Aktivieren (Effekt-Setup) und dann nach jedem moveend (600ms-Debounce).
+  // Unter KRITIS_MIN_ZOOM wird keine bbox gemeldet — verhindert riesige Overpass-Anfragen.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !onBboxAenderung) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const sendeBbox = () => {
+      if (map.getZoom() < KRITIS_MIN_ZOOM) return;
+      const b = map.getBounds();
+      onBboxAenderung(`${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`);
+    };
+
     const melde = () => {
       if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        const b = map.getBounds();
-        onBboxAenderung(`${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`);
-      }, 600);
+      timer = setTimeout(sendeBbox, 600);
     };
+
+    // Einmalige Sofort-Emission beim Wirksamwerden (z. B. wenn KRITIS eingeschaltet wird
+    // während die Karte bereits auf ausreichendem Zoom-Level steht).
+    sendeBbox();
+
     map.on('moveend', melde);
     return () => {
       if (timer) clearTimeout(timer);
