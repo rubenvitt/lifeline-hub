@@ -205,7 +205,7 @@ mod overpass_tests {
 }
 
 #[cfg(test)]
-mod tests {
+mod pegelonline_tests {
     use super::*;
 
     #[test]

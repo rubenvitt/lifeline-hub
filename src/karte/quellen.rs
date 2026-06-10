@@ -118,7 +118,10 @@ pub async fn fetch_nina(s: &FachebenenState) -> FachebeneAntwort {
         async move {
             match hole_json(s, &url).await {
                 Ok(v) => Some((id, v)),
-                Err(_) => None,
+                Err(e) => {
+                    tracing::warn!("NINA-Geometrie-Fetch für {id} fehlgeschlagen: {e}");
+                    None
+                }
             }
         }
     });
@@ -155,14 +158,25 @@ pub async fn fetch_kritis(
         return Ok(a);
     }
     let query = overpass_query(&bbox.overpass());
-    let resp = s.client.post(OVERPASS_URL).body(query).send().await;
+    let resp = s
+        .client
+        .post(OVERPASS_URL)
+        .header("Content-Type", "text/plain")
+        .body(query)
+        .send()
+        .await;
     match resp {
         Ok(r) if r.status().is_success() => {
-            let roh: serde_json::Value = r
-                .json()
-                .await
-                .map_err(|e| e.to_string())
-                .unwrap_or(serde_json::Value::Null);
+            let roh: serde_json::Value = match r.json().await {
+                Ok(v) => v,
+                Err(e) => {
+                    tracing::warn!("Overpass-JSON-Parse fehlgeschlagen: {e}");
+                    return Ok(s
+                        .cache
+                        .stale(&key)
+                        .unwrap_or_else(|| FachebeneAntwort::offline("kritis", KRITIS_ATTRIB)));
+                }
+            };
             let fc = normalisiere_overpass(&roh);
             let a = FachebeneAntwort::ok("kritis", KRITIS_ATTRIB, None, fc);
             s.cache.setze(&key, a.clone());
