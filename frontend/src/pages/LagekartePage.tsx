@@ -305,6 +305,16 @@ export default function LagekartePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fachebenenSichtbar, ninaQuery.status, dwdQuery.status, pegelQuery.status, kritisQuery.status, ninaQuery.data, dwdQuery.data, pegelQuery.data, kritisQuery.data]);
 
+  const fachebenenLaedt = useMemo<Partial<Record<FachebeneQuelle, boolean>>>(() => {
+    const m: Partial<Record<FachebeneQuelle, boolean>> = {};
+    for (const k of fachebeneKeys()) {
+      if (!fachebenenSichtbar[k]) continue;
+      m[k] = fachebenenQueries[k].isFetching;
+    }
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fachebenenSichtbar, ninaQuery.isFetching, dwdQuery.isFetching, pegelQuery.isFetching, kritisQuery.isFetching]);
+
   const fachebenenAttribution = useMemo(() => {
     return fachebeneKeys()
       .filter((k) => fachebenenSichtbar[k] && fachebenenQueries[k].data && fachebenenQueries[k].data!.status !== 'offline')
@@ -462,6 +472,7 @@ export default function LagekartePage() {
         kritisZoomZuKlein={
           fachebenenSichtbar.kritis && kartenZoom != null && kartenZoom < KRITIS_MIN_ZOOM
         }
+        fachebenenLaedt={fachebenenLaedt}
       />
       <div style={{ flex: 1, position: 'relative' }}>
         <Kartenflaeche

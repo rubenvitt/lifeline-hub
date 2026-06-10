@@ -68,7 +68,6 @@ describe('FachebenenInspector', () => {
     rerender(
       <FachebenenInspector
         quelle="kritis"
-        // eslint-disable-next-line no-script-url
         properties={{ titel: 'A', website: 'javascript:alert(1)' }}
         onSchliessen={() => {}}
       />,
