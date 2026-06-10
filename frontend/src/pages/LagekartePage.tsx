@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { App, Spin } from 'antd';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
 import { aktualisiereEinsatz, ladeEinsatz, type KopfdatenUpdate } from '../api/einsaetze';
 import { listeUhs, aktualisiereUhs } from '../api/einsatzUhs';
@@ -31,7 +31,7 @@ import { zoneStil, gefahrengebietStil } from './lagekarte/zonenStil';
 import GefahrengebietMatrixDrawer from './lagekarte/GefahrengebietMatrixDrawer';
 import type { ZeichenModus } from './lagekarte/zeichnen';
 import { ladeFachebene, type FachebeneQuelle, type FachebeneStatus } from '../api/fachebenen';
-import { FACHEBENEN, fachebeneKeys, KRITIS_MIN_ZOOM } from './lagekarte/fachebenen';
+import { FACHEBENEN, fachebeneKeys, KRITIS_MIN_ZOOM, rasterBbox } from './lagekarte/fachebenen';
 import { liesFachebenenSichtbar, merkeFachebenenSichtbar, defaultFachebenenSichtbar, type FachebenenSichtbar } from './lagekarte/fachebenenAuswahl';
 import type { AktiveFachebene } from './lagekarte/kartenLayer';
 
@@ -147,6 +147,10 @@ export default function LagekartePage() {
   const kritisQuery = useQuery({
     queryKey: ['fachebene', 'kritis', kritisBbox], queryFn: () => ladeFachebene('kritis', kritisBbox!),
     enabled: fachebenenSichtbar.kritis && !!kritisBbox,
+    // Beim Wechsel der Raster-bbox die bisherigen KRITIS-Objekte sichtbar lassen (kein
+    // Leer-Blinken) und eine Weile als frisch behandeln → erneutes Ansehen ist sofort da.
+    placeholderData: keepPreviousData,
+    staleTime: 30 * 60_000,
   });
 
   // Kartenwahl einmal aus der pro-Einsatz gemerkten Auswahl (localStorage) initialisieren,
@@ -517,7 +521,7 @@ export default function LagekartePage() {
               .finally(() => setZoneEntwurf(null));
           }}
           fachebenen={aktiveFachebenen}
-          onBboxAenderung={fachebenenSichtbar.kritis ? setKritisBbox : undefined}
+          onBboxAenderung={fachebenenSichtbar.kritis ? (b) => setKritisBbox(rasterBbox(b)) : undefined}
           onZoomAenderung={setKartenZoom}
           onFachebeneKlick={(props, quelle) => {
             if (platzierungZiel) return; // im Platzier-Modus nicht den Detail-Panel öffnen
