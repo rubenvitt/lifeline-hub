@@ -52,6 +52,31 @@ describe('FachebenenInspector', () => {
     expect(screen.getByRole('link', { name: '0221-1' })).toHaveAttribute('href', 'tel:0221-1');
   });
 
+  it('KRITIS: http(s)-Website wird Link, javascript:-URI nur Klartext (kein href)', () => {
+    const { rerender } = render(
+      <FachebenenInspector
+        quelle="kritis"
+        properties={{ titel: 'A', website: 'https://example.org' }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByRole('link', { name: 'https://example.org' })).toHaveAttribute(
+      'href',
+      'https://example.org',
+    );
+
+    rerender(
+      <FachebenenInspector
+        quelle="kritis"
+        // eslint-disable-next-line no-script-url
+        properties={{ titel: 'A', website: 'javascript:alert(1)' }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(screen.getByText('javascript:alert(1)')).toBeInTheDocument();
+  });
+
   it('Schließen-Button ruft Callback', async () => {
     const onSchliessen = vi.fn();
     const { default: userEvent } = await import('@testing-library/user-event');
