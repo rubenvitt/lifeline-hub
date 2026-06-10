@@ -1,4 +1,6 @@
-import type { FachebeneQuelle } from '../../api/fachebenen';
+import type { FachebeneQuelle, FeatureCollection } from '../../api/fachebenen';
+
+type Feature = FeatureCollection['features'][number];
 
 /** Mindest-Zoom-Level für KRITIS-Abfragen (unter diesem Zoom keine bbox-Anfrage). */
 export const KRITIS_MIN_ZOOM = 10;
@@ -44,4 +46,28 @@ export function rasterBbox(bbox: string, grid = 0.05): string {
   const auf = (v: number) => Math.ceil(v / grid) * grid; // nach oben
   const r = (v: number) => Math.round(v * 1e6) / 1e6; // Fließkomma-Rauschen kappen
   return [r(ab(w)), r(ab(s)), r(auf(e)), r(auf(n))].join(',');
+}
+
+/**
+ * Mergt neue Features in `sammlung` (dedupliziert über die Koordinate), begrenzt auf `max`
+ * (älteste zuerst entfernt). So bleiben einmal geladene KRITIS-Objekte sichtbar, auch wenn
+ * man wegzoomt oder das Gebiet wechselt. Mutiert `sammlung`; true bei Änderung.
+ */
+export function mergeFeatures(sammlung: Map<string, Feature>, neue: Feature[], max: number): boolean {
+  let geaendert = false;
+  for (const f of neue) {
+    const key = JSON.stringify(f.geometry?.coordinates ?? null);
+    if (!sammlung.has(key)) {
+      sammlung.set(key, f);
+      geaendert = true;
+    }
+  }
+  if (geaendert) {
+    while (sammlung.size > max) {
+      const aeltester = sammlung.keys().next().value;
+      if (aeltester === undefined) break;
+      sammlung.delete(aeltester);
+    }
+  }
+  return geaendert;
 }

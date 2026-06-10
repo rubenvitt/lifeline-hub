@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { FACHEBENEN, fachebeneKeys, istBboxAbhaengig, KRITIS_MIN_ZOOM, rasterBbox } from './fachebenen';
+import { FACHEBENEN, fachebeneKeys, istBboxAbhaengig, KRITIS_MIN_ZOOM, rasterBbox, mergeFeatures } from './fachebenen';
+
+// Minimaler Feature-Builder für die Merge-Tests.
+const feat = (lon: number, lat: number) =>
+  ({ type: 'Feature' as const, geometry: { type: 'Point', coordinates: [lon, lat] }, properties: {} });
 
 describe('Fachebenen-Registry', () => {
   it('enthält die vier v1-Quellen', () => {
@@ -40,5 +44,27 @@ describe('rasterBbox', () => {
   });
   it('gibt ungültige Eingabe unverändert zurück', () => {
     expect(rasterBbox('kaputt')).toBe('kaputt');
+  });
+});
+
+describe('mergeFeatures', () => {
+  it('akkumuliert über mehrere Aufrufe und dedupliziert per Koordinate', () => {
+    const m = new Map();
+    expect(mergeFeatures(m, [feat(6.9, 50.9), feat(7.0, 51.0)], 100)).toBe(true);
+    // anderer Ausschnitt mit einem überlappenden Punkt → nur der neue kommt dazu
+    expect(mergeFeatures(m, [feat(7.0, 51.0), feat(8.0, 52.0)], 100)).toBe(true);
+    expect(m.size).toBe(3); // 6.9/7.0/8.0, der doppelte 7.0 nur einmal
+  });
+  it('meldet keine Änderung, wenn nichts Neues dazukommt', () => {
+    const m = new Map();
+    mergeFeatures(m, [feat(6.9, 50.9)], 100);
+    expect(mergeFeatures(m, [feat(6.9, 50.9)], 100)).toBe(false);
+  });
+  it('begrenzt die Größe (älteste zuerst raus)', () => {
+    const m = new Map();
+    mergeFeatures(m, [feat(1, 1), feat(2, 2), feat(3, 3)], 2);
+    expect(m.size).toBe(2);
+    expect(m.has(JSON.stringify([1, 1]))).toBe(false); // ältester entfernt
+    expect(m.has(JSON.stringify([3, 3]))).toBe(true);
   });
 });
