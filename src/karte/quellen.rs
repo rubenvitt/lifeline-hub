@@ -1,10 +1,12 @@
 //! Fetch-Logik je Quelle. Wird in den Phasen 2–5 befüllt.
 
 use crate::error::AppError;
-use crate::karte::normalisierung::{kombiniere_nina, normalisiere_overpass, normalisiere_pegelonline};
+use crate::karte::normalisierung::{
+    kombiniere_nina, normalisiere_overpass, normalisiere_pegelonline,
+};
 use crate::karte::typen::{leere_collection, Bbox, FachebeneAntwort};
-use futures::future::join_all;
 use crate::karte::FachebenenState;
+use futures::future::join_all;
 use std::time::Duration;
 
 const DWD_ATTRIB: &str = "Datenbasis: Deutscher Wetterdienst";
@@ -143,7 +145,10 @@ nwr[amenity=fire_station]({b});nwr[amenity=police]({b}););out center tags;",
     )
 }
 
-pub async fn fetch_kritis(s: &FachebenenState, bbox_roh: &str) -> Result<FachebeneAntwort, AppError> {
+pub async fn fetch_kritis(
+    s: &FachebenenState,
+    bbox_roh: &str,
+) -> Result<FachebeneAntwort, AppError> {
     let bbox = Bbox::parse(bbox_roh).map_err(AppError::Validation)?;
     let key = bbox.cache_key();
     if let Some(a) = s.cache.frisch(&key, KRITIS_TTL) {
