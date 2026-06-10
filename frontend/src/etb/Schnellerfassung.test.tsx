@@ -38,6 +38,19 @@ describe('TextAreaRef – Caret-Pfad', () => {
     );
     expect(ref.current?.resizableTextArea?.textArea).toBeInstanceOf(HTMLTextAreaElement);
   });
+
+  it('/ mitten im Text triggert mit korrektem Caret-Filter (beweist echten Caret-Read)', async () => {
+    // Test unterscheidet: korrekter Caret(4) → filter '' → alle Felder sichtbar.
+    // Kaputter Fallback (textLength=6) → filter 'cd' → kein Feld sichtbar.
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'ab cd');
+    // Caret zwischen "ab " und "cd" setzen, dann '/' tippen → "ab /cd", Caret=4
+    await userEvent.type(feld, '/', { initialSelectionStart: 3, initialSelectionEnd: 3 });
+    // Korrekter Caret(4) → filter '' → alle Felder. Kaputter Fallback(len=6) → filter 'cd' → kein Feld.
+    expect(await screen.findByText('Ereigniszeit')).toBeInTheDocument();
+  });
 });
 
 // ---------------------------------------------------------------------------
