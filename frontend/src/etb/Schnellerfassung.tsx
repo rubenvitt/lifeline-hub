@@ -111,7 +111,7 @@ export default function Schnellerfassung({ erfassen, berichtigungZu, onBerichtig
       e.preventDefault();
       return;
     }
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && editFeld == null) {
       e.preventDefault();
       void absenden();
     }
@@ -158,9 +158,11 @@ export default function Schnellerfassung({ erfassen, berichtigungZu, onBerichtig
         />
         <SlashMenu
           ref={menuRef}
-          offen={menuOffen && !berichtigungZu}
+          offen={menuOffen}
           filter={menuFilter}
-          bausteine={bausteine}
+          // Berichtigung: Felder-Erfassung bleibt verfügbar, nur die Bausteine-Sektion
+          // entfällt (leere Liste → SlashMenu rendert die Bausteine-Sektion nicht).
+          bausteine={berichtigungZu ? [] : bausteine}
           gesetzteFelder={gesetzteFelder}
           onWahl={waehleEintrag}
           onSchliessen={() => setMenuOffen(false)}
@@ -193,11 +195,9 @@ export default function Schnellerfassung({ erfassen, berichtigungZu, onBerichtig
             onEdit={() => {}}
           />
         )}
-        {!berichtigungZu && (
-          <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={() => setMenuOffen((o) => !o)}>
-            Feld
-          </Button>
-        )}
+        <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={() => setMenuOffen((o) => !o)}>
+          Feld
+        </Button>
       </Space>
 
       {/* Steuerzeile */}

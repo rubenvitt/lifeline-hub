@@ -108,6 +108,21 @@ describe('Schnellerfassung', () => {
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({ typ: 'berichtigung', berichtigt_eintrag_id: 5 });
   });
 
+  it('Berichtigungsmodus: Feld per / setzbar und mitgesendet, aber keine Bausteine im Menü', async () => {
+    const baustein: EtbBaustein = { id: 1, label: 'Lagemeldung', typ: 'meldung', inhalt: 'X', meldeweg: null, veranlassung: null, sortier: 0 };
+    const p = props({ berichtigungZu: original(), bausteine: [baustein] });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Korrektur /von');
+    // Bausteine dürfen NICHT erscheinen
+    expect(screen.queryByText('Lagemeldung')).toBeNull();
+    await userEvent.click(await screen.findByText('Von'));
+    await userEvent.type(await screen.findByLabelText('Von'), 'ELW 1{Enter}');
+    await userEvent.type(feld, '{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({ typ: 'berichtigung', berichtigt_eintrag_id: 5, von: 'ELW 1' });
+  });
+
   it('Baustein über / setzt den Inhalt', async () => {
     const baustein: EtbBaustein = { id: 1, label: 'Bereitstellung', typ: 'meldung', inhalt: 'Bereitstellungsraum bezogen', meldeweg: null, veranlassung: null, sortier: 0 };
     const p = props({ bausteine: [baustein] });
