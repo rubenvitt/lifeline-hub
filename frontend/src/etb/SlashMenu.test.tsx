@@ -1,10 +1,11 @@
 // src/etb/SlashMenu.test.tsx
-import { screen } from '@testing-library/react';
+import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { EtbBaustein } from '../api/types';
 import { renderMitProviders } from '../test/utils';
-import SlashMenu from './SlashMenu';
+import SlashMenu, { type SlashMenuHandle } from './SlashMenu';
 
 const bausteine: EtbBaustein[] = [
   { id: 1, label: 'Lagemeldung', typ: 'meldung', inhalt: '', meldeweg: null, veranlassung: null, sortier: 0 },
@@ -29,6 +30,21 @@ describe('SlashMenu', () => {
     );
     expect(screen.queryByText('Ereigniszeit')).toBeNull();
     expect(screen.getByText('Lagemeldung')).toBeInTheDocument();
+  });
+
+  it('Tastatur-Nav: ArrowDown + Enter wählt den zweiten Eintrag; Escape schließt', () => {
+    const onWahl = vi.fn();
+    const onSchliessen = vi.fn();
+    const ref = createRef<SlashMenuHandle>();
+    renderMitProviders(
+      <SlashMenu ref={ref} offen filter="" bausteine={bausteine} gesetzteFelder={[]} onWahl={onWahl} onSchliessen={onSchliessen} />,
+    );
+    // flach = [ereigniszeit, von, an, meldeweg, veranlassung, ...bausteine]
+    act(() => { ref.current!.handleKey('ArrowDown'); });
+    act(() => { ref.current!.handleKey('Enter'); });
+    expect(onWahl).toHaveBeenCalledWith(expect.objectContaining({ art: 'feld', key: 'von' }));
+    act(() => { expect(ref.current!.handleKey('Escape')).toBe(true); });
+    expect(onSchliessen).toHaveBeenCalled();
   });
 
   it('rendert nichts, wenn geschlossen', () => {

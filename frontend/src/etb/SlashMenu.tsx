@@ -33,11 +33,12 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
 
   useImperativeHandle(ref, () => ({
     handleKey(key) {
-      if (!offen || flach.length === 0) return false;
+      if (!offen) return false;
+      if (key === 'Escape') { onSchliessen(); return true; }
+      if (flach.length === 0) return false;
       if (key === 'ArrowDown') { setAktiv((i) => (i + 1) % flach.length); return true; }
       if (key === 'ArrowUp') { setAktiv((i) => (i - 1 + flach.length) % flach.length); return true; }
-      if (key === 'Enter') { onWahl(flach[aktiv]); return true; }
-      if (key === 'Escape') { onSchliessen(); return true; }
+      if (key === 'Enter') { const e = flach[aktiv]; if (!e) return false; onWahl(e); return true; }
       return false;
     },
   }), [offen, flach, aktiv, onWahl, onSchliessen]);
