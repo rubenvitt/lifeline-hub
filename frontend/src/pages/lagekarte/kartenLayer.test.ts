@@ -1,10 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
+  baueFlaechenFc,
   baueZonenFc,
   planeReAnlegenNachStyle,
   reAnlegenAlles,
   type ZoneFeature,
 } from './kartenLayer';
+import { FACHEBENEN } from './fachebenen';
 
 /**
  * Regressionsschutz für „alle Zeichnungen verschwinden beim Basemap-/Theme-Wechsel,
@@ -58,6 +60,15 @@ describe('reAnlegenAlles', () => {
     expect(addSource).toHaveBeenCalledWith('abschnitte', expect.anything());
     expect(addSource).toHaveBeenCalledWith('zonen', expect.anything());
     expect(setData).toHaveBeenCalledWith(zonen);
+  });
+
+  it('reAnlegenAlles legt aktive Fachebenen mit an', () => {
+    const { map } = fakeMap(() => true);
+    const aktive = [
+      { def: FACHEBENEN.dwd, daten: { type: 'FeatureCollection' as const, features: [] } },
+    ];
+    reAnlegenAlles(map, baueFlaechenFc([]), baueZonenFc([]), aktive as never);
+    expect(map.getLayer('fachebene-dwd-fill')).toBeTruthy();
   });
 });
 
