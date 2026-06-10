@@ -148,9 +148,11 @@ export default function LagekartePage() {
     queryKey: ['fachebene', 'kritis', kritisBbox], queryFn: () => ladeFachebene('kritis', kritisBbox!),
     enabled: fachebenenSichtbar.kritis && !!kritisBbox,
     // Beim Wechsel der Raster-bbox die bisherigen KRITIS-Objekte sichtbar lassen (kein
-    // Leer-Blinken) und eine Weile als frisch behandeln → erneutes Ansehen ist sofort da.
+    // Leer-Blinken). KRITIS ist quasi statisch → lange als frisch behandeln (6 h);
+    // serverseitig wird ohnehin 1 Tag gecacht.
     placeholderData: keepPreviousData,
-    staleTime: 30 * 60_000,
+    staleTime: 6 * 60 * 60_000,
+    gcTime: 6 * 60 * 60_000,
   });
 
   // Kartenwahl einmal aus der pro-Einsatz gemerkten Auswahl (localStorage) initialisieren,

@@ -138,7 +138,9 @@ pub async fn fetch_nina(s: &FachebenenState) -> FachebeneAntwort {
 }
 
 const KRITIS_ATTRIB: &str = "© OpenStreetMap-Beitragende (ODbL)";
-const KRITIS_TTL: Duration = Duration::from_secs(3600);
+/// KRITIS-Objekte (Krankenhäuser, Schulen, Umspannwerke …) sind quasi statisch →
+/// lange cachen (1 Tag). Entlastet Overpass deutlich.
+const KRITIS_TTL: Duration = Duration::from_secs(24 * 3600);
 /// Overpass braucht länger als das globale Client-Timeout (8 s) — interne `[timeout:25]`.
 const KRITIS_TIMEOUT: Duration = Duration::from_secs(30);
 /// Hauptinstanz ist oft überlastet (TimedOut) → Mirror als Fallback.
