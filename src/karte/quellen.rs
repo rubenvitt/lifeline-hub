@@ -50,7 +50,7 @@ async fn hole_geojson(s: &FachebenenState, url: &str) -> Result<serde_json::Valu
 
 const PEGEL_ATTRIB: &str = "PEGELONLINE / WSV";
 const PEGEL_TTL: Duration = Duration::from_secs(300);
-const PEGEL_URL: &str = "https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations.json?includeCurrentMeasurement=true";
+const PEGEL_URL: &str = "https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations.json?includeTimeseries=true&includeCurrentMeasurement=true";
 
 pub async fn fetch_pegelonline(s: &FachebenenState) -> FachebeneAntwort {
     if let Some(a) = s.cache.frisch("pegelonline", PEGEL_TTL) {
@@ -139,7 +139,13 @@ pub async fn fetch_nina(s: &FachebenenState) -> FachebeneAntwort {
 
 const KRITIS_ATTRIB: &str = "© OpenStreetMap-Beitragende (ODbL)";
 const KRITIS_TTL: Duration = Duration::from_secs(3600);
-const OVERPASS_URL: &str = "https://overpass-api.de/api/interpreter";
+/// Overpass braucht länger als das globale Client-Timeout (8 s) — interne `[timeout:25]`.
+const KRITIS_TIMEOUT: Duration = Duration::from_secs(30);
+/// Hauptinstanz ist oft überlastet (TimedOut) → Mirror als Fallback.
+const OVERPASS_URLS: [&str; 2] = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+];
 
 fn overpass_query(bbox_op: &str) -> String {
     format!(
@@ -162,35 +168,40 @@ pub async fn fetch_kritis(
         return Ok(a);
     }
     let query = overpass_query(&bbox.overpass());
-    let resp = s
-        .client
-        .post(OVERPASS_URL)
-        .header("Content-Type", "text/plain")
-        .body(query)
-        .send()
-        .await;
-    match resp {
-        Ok(r) if r.status().is_success() => {
-            let roh: serde_json::Value = match r.json().await {
-                Ok(v) => v,
-                Err(e) => {
-                    tracing::warn!("Overpass-JSON-Parse fehlgeschlagen: {e}");
-                    return Ok(s
-                        .cache
-                        .stale(&key)
-                        .unwrap_or_else(|| FachebeneAntwort::offline("kritis", KRITIS_ATTRIB)));
+
+    // Endpunkte der Reihe nach versuchen (eigenes, längeres Timeout). Einzelfehler nur auf
+    // debug-Ebene — erst wenn ALLE Endpunkte scheitern, eine warn-Meldung (weniger Log-Rauschen).
+    for url in OVERPASS_URLS {
+        let resp = s
+            .client
+            .post(url)
+            .timeout(KRITIS_TIMEOUT)
+            .header("Content-Type", "text/plain")
+            .body(query.clone())
+            .send()
+            .await;
+        match resp {
+            Ok(r) if r.status().is_success() => match r.json::<serde_json::Value>().await {
+                Ok(roh) => {
+                    let a = FachebeneAntwort::ok(
+                        "kritis",
+                        KRITIS_ATTRIB,
+                        None,
+                        normalisiere_overpass(&roh),
+                    );
+                    s.cache.setze(&key, a.clone());
+                    return Ok(a);
                 }
-            };
-            let fc = normalisiere_overpass(&roh);
-            let a = FachebeneAntwort::ok("kritis", KRITIS_ATTRIB, None, fc);
-            s.cache.setze(&key, a.clone());
-            Ok(a)
-        }
-        other => {
-            tracing::warn!("Overpass-Fetch fehlgeschlagen: {other:?}");
-            Ok(s.cache
-                .stale(&key)
-                .unwrap_or_else(|| FachebeneAntwort::offline("kritis", KRITIS_ATTRIB)))
+                Err(e) => tracing::debug!("Overpass-JSON-Parse ({url}) fehlgeschlagen: {e}"),
+            },
+            Ok(r) => tracing::debug!("Overpass ({url}) HTTP {}", r.status()),
+            Err(e) => tracing::debug!("Overpass-Fetch ({url}) fehlgeschlagen: {e}"),
         }
     }
+
+    tracing::warn!("Overpass nicht erreichbar (alle Endpunkte) — KRITIS aus Cache/leer");
+    Ok(s
+        .cache
+        .stale(&key)
+        .unwrap_or_else(|| FachebeneAntwort::offline("kritis", KRITIS_ATTRIB)))
 }

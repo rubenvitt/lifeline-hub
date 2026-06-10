@@ -4,7 +4,6 @@ import {
   entferneFachebeneLayer,
   fachebeneSourceId,
   fachebeneClickLayerId,
-  baueFachebenePopupInhalt,
   kategorieLabel,
 } from './fachebenenLayer';
 import { FACHEBENEN } from './fachebenen';
@@ -68,27 +67,3 @@ describe('kategorieLabel', () => {
   });
 });
 
-describe('baueFachebenePopupInhalt', () => {
-  it('zeigt Titel + Kategorie-Label (KRITIS)', () => {
-    const el = baueFachebenePopupInhalt({ titel: 'Uniklinik', kategorie: 'krankenhaus' });
-    expect(el.textContent).toContain('Uniklinik');
-    expect(el.textContent).toContain('Krankenhaus');
-  });
-  it('zeigt Wasserstand bei Pegel', () => {
-    const el = baueFachebenePopupInhalt({ titel: 'Pegel Köln', kategorie: 'pegel', wert: 320, einheit: 'cm' });
-    expect(el.textContent).toContain('320');
-    expect(el.textContent).toContain('cm');
-  });
-  it('zeigt Schwere bei NINA-Warnung', () => {
-    const el = baueFachebenePopupInhalt({ titel: 'Hochwasser', kategorie: 'warnung', schwere: 'Severe' });
-    expect(el.textContent).toContain('Severe');
-  });
-  it('fällt auf DWD-Properties zurück (HEADLINE) ohne titel', () => {
-    const el = baueFachebenePopupInhalt({ HEADLINE: 'Amtliche Unwetterwarnung' });
-    expect(el.textContent).toContain('Amtliche Unwetterwarnung');
-  });
-  it('robust gegen leere Properties', () => {
-    const el = baueFachebenePopupInhalt(null);
-    expect(el.textContent).toContain('Objekt');
-  });
-});

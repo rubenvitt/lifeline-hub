@@ -26,6 +26,7 @@ import Kartenflaeche, { type ZoneFeature } from './lagekarte/Kartenflaeche';
 import Sidebar, { type LayerSichtbar, type PlatzierenPunktTyp } from './lagekarte/Sidebar';
 import Inspector from './lagekarte/Inspector';
 import ZonenInspector from './lagekarte/ZonenInspector';
+import FachebenenInspector from './lagekarte/FachebenenInspector';
 import { zoneStil, gefahrengebietStil } from './lagekarte/zonenStil';
 import GefahrengebietMatrixDrawer from './lagekarte/GefahrengebietMatrixDrawer';
 import type { ZeichenModus } from './lagekarte/zeichnen';
@@ -73,6 +74,9 @@ export default function LagekartePage() {
     einsatzort: true, uhs: true, schaden: true, einheit: true, fahrzeug: true, fuehrung: true, abschnitt: true, zone: true,
   });
   const [matrixGebiet, setMatrixGebiet] = useState<number | null>(null);
+  // Angeklicktes Fachebenen-Objekt (externe Daten) → Detail-Panel.
+  const [fachebeneAuswahl, setFachebeneAuswahl] =
+    useState<{ quelle: FachebeneQuelle; properties: Record<string, unknown> } | null>(null);
 
   // EINE SSE-Verbindung für alle Domänen (uhs/schaden/einheit/fahrzeug/abschnitt/zone/
   // person). Pro Domäne eine eigene EventSource würde das HTTP/1.1-Limit (6/Origin)
@@ -354,6 +358,7 @@ export default function LagekartePage() {
   function onMarkerWaehlen(schluessel: string) {
     setAuswahl(schluessel);
     setZoneAuswahl(null);
+    setFachebeneAuswahl(null);
     const m = alleVerortet.find((x) => x.schluessel === schluessel);
     if (m) setFlyToZiel({ lng: m.lon, lat: m.lat });
   }
@@ -477,12 +482,16 @@ export default function LagekartePage() {
               .catch(fehler)
               .finally(() => setZeichneAbschnittId(null));
           }}
-          onFlaecheKlick={(fid) => setAuswahl(`abschnitt-${fid}`)}
+          onFlaecheKlick={(fid) => {
+            setAuswahl(`abschnitt-${fid}`);
+            setFachebeneAuswahl(null);
+          }}
           zonen={zonenFeatures}
           zoneZeichnen={zoneEntwurf ? zoneEntwurf.modus : null}
           onZoneKlick={(id) => {
             setZoneAuswahl(id);
             setAuswahl(null);
+            setFachebeneAuswahl(null);
           }}
           onZoneGezeichnet={(g) => {
             if (!zoneEntwurf) return;
@@ -499,6 +508,12 @@ export default function LagekartePage() {
           fachebenen={aktiveFachebenen}
           onBboxAenderung={fachebenenSichtbar.kritis ? setKritisBbox : undefined}
           onZoomAenderung={setKartenZoom}
+          onFachebeneKlick={(props, quelle) => {
+            if (platzierungZiel) return; // im Platzier-Modus nicht den Detail-Panel öffnen
+            setFachebeneAuswahl({ quelle, properties: props });
+            setAuswahl(null);
+            setZoneAuswahl(null);
+          }}
         />
         {aktiverMarker && (
           <Inspector
@@ -508,6 +523,13 @@ export default function LagekartePage() {
             onSchliessen={() => setAuswahl(null)}
             onVerortungLoeschen={loescheVerortung}
             onSymbolAendern={aendereSymbol}
+          />
+        )}
+        {fachebeneAuswahl && (
+          <FachebenenInspector
+            quelle={fachebeneAuswahl.quelle}
+            properties={fachebeneAuswahl.properties}
+            onSchliessen={() => setFachebeneAuswahl(null)}
           />
         )}
         {ausgewaehlteZone && (
