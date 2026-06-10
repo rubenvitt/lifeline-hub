@@ -23,9 +23,9 @@ import {
   setzeFachebeneDaten,
   entferneFachebeneLayer,
   fachebeneClickLayerId,
-  baueFachebenePopupInhalt,
 } from './fachebenenLayer';
 import { KRITIS_MIN_ZOOM } from './fachebenen';
+import type { FachebeneQuelle } from '../../api/fachebenen';
 
 // Re-Export: LagekartePage importiert ZoneFeature weiterhin aus Kartenflaeche.
 export type { ZoneFeature };
@@ -74,13 +74,15 @@ export interface KartenflaecheProps {
   onBboxAenderung?: (bbox: string) => void;
   /** Aktuelles Zoom-Level nach Bewegung — z. B. um „näher heranzoomen"-Hinweise zu steuern. */
   onZoomAenderung?: (zoom: number) => void;
+  /** Klick auf ein Fachebenen-Objekt → liefert dessen Properties + Quelle (für Detail-Panel). */
+  onFachebeneKlick?: (properties: Record<string, unknown>, quelle: FachebeneQuelle) => void;
 }
 
 export default function Kartenflaeche({
   style, markers, onKarteKlick, onMarkerKlick, flyToZiel, onStyleFehler, attribution,
   flaechen, zeichnen, onFlaecheGezeichnet, onFlaecheKlick,
   zonen, zoneZeichnen, onZoneGezeichnet, onZoneKlick,
-  fachebenen, onBboxAenderung, onZoomAenderung,
+  fachebenen, onBboxAenderung, onZoomAenderung, onFachebeneKlick,
 }: KartenflaecheProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -352,41 +354,33 @@ export default function Kartenflaeche({
     };
   }, [onBboxAenderung, onZoomAenderung]);
 
-  // Klick auf ein Fachebenen-Objekt → Popup mit Details (read-only externe Daten).
-  // Handler je aktivem anklickbaren Layer; Cursor wird zur Hand. Re-Bind bei Ebenen-Wechsel.
-  const popupRef = useRef<maplibregl.Popup | null>(null);
+  // Klick auf ein Fachebenen-Objekt → meldet Properties + Quelle nach oben (Detail-Panel).
+  // Handler je aktivem anklickbaren Layer (Closure über die Quelle); Cursor wird zur Hand.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const ids = (fachebenen ?? []).map((fe) => fachebeneClickLayerId(fe.def));
-
-    const klick = (e: maplibregl.MapLayerMouseEvent) => {
-      const feature = e.features?.[0];
-      if (!feature) return;
-      popupRef.current?.remove();
-      popupRef.current = new maplibregl.Popup({ closeButton: true, maxWidth: '260px' })
-        .setLngLat(e.lngLat)
-        .setDOMContent(baueFachebenePopupInhalt(feature.properties as Record<string, unknown>))
-        .addTo(map);
-    };
-    const enter = () => { map.getCanvas().style.cursor = 'pointer'; };
-    const leave = () => { map.getCanvas().style.cursor = ''; };
-
-    for (const id of ids) {
+    const binds = (fachebenen ?? []).map((fe) => {
+      const id = fachebeneClickLayerId(fe.def);
+      const quelle = fe.def.key;
+      const klick = (e: maplibregl.MapLayerMouseEvent) => {
+        const props = (e.features?.[0]?.properties ?? {}) as Record<string, unknown>;
+        onFachebeneKlick?.(props, quelle);
+      };
+      const enter = () => { map.getCanvas().style.cursor = 'pointer'; };
+      const leave = () => { map.getCanvas().style.cursor = ''; };
       map.on('click', id, klick);
       map.on('mouseenter', id, enter);
       map.on('mouseleave', id, leave);
-    }
+      return { id, klick, enter, leave };
+    });
     return () => {
-      for (const id of ids) {
-        map.off('click', id, klick);
-        map.off('mouseenter', id, enter);
-        map.off('mouseleave', id, leave);
+      for (const b of binds) {
+        map.off('click', b.id, b.klick);
+        map.off('mouseenter', b.id, b.enter);
+        map.off('mouseleave', b.id, b.leave);
       }
-      popupRef.current?.remove();
-      popupRef.current = null;
     };
-  }, [fachebenen]);
+  }, [fachebenen, onFachebeneKlick]);
 
   // Zeichenmodus an-/abschalten; Controller-Lifecycle über drawRef.
   useEffect(() => {
