@@ -62,7 +62,7 @@ describe('MarkdownEditor', () => {
       );
     }
     const { container } = render(<Wrapper />);
-    // Externes setFieldsValue (wie BausteinPicker) muss in der Komponente ankommen.
+    // Extern gesetztes value (z.B. Baustein-Einsetzen via Form) muss in der Komponente ankommen.
     await userEvent.click(screen.getByText('baustein'));
     expect(screen.getByRole('textbox')).toHaveValue('**fett**');
     expect(container.querySelector('.markdown strong')).toHaveTextContent('fett');

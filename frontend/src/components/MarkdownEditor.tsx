@@ -37,7 +37,7 @@ interface Props {
  *
  * Bewusst KEIN WYSIWYG: gespeichert wird exakt der getippte Markdown-String
  * (kein verlustbehafteter Roundtrip), und als controlled `value`/`onChange`-
- * Komponente bleibt sie mit antd Form (z.B. BausteinPicker via setFieldsValue)
+ * Komponente bleibt sie mit extern gesetztem `value` (z.B. Baustein-Einsetzen)
  * voll kompatibel. Die Vorschau nutzt die XSS-sichere `Markdown`-Komponente.
  */
 const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
