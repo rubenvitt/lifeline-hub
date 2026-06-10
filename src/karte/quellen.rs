@@ -1,9 +1,9 @@
 //! Fetch-Logik je Quelle. Wird in den Phasen 2–5 befüllt.
 
 use crate::error::AppError;
-use crate::karte::normalisierung::{kombiniere_nina, normalisiere_pegelonline};
+use crate::karte::normalisierung::{kombiniere_nina, normalisiere_overpass, normalisiere_pegelonline};
+use crate::karte::typen::{leere_collection, Bbox, FachebeneAntwort};
 use futures::future::join_all;
-use crate::karte::typen::{leere_collection, FachebeneAntwort};
 use crate::karte::FachebenenState;
 use std::time::Duration;
 
@@ -128,9 +128,46 @@ pub async fn fetch_nina(s: &FachebenenState) -> FachebeneAntwort {
     a
 }
 
-pub async fn fetch_kritis(_s: &FachebenenState, _bbox: &str) -> Result<FachebeneAntwort, AppError> {
-    Ok(FachebeneAntwort::offline(
-        "kritis",
-        "© OpenStreetMap-Beitragende",
-    ))
+const KRITIS_ATTRIB: &str = "© OpenStreetMap-Beitragende (ODbL)";
+const KRITIS_TTL: Duration = Duration::from_secs(3600);
+const OVERPASS_URL: &str = "https://overpass-api.de/api/interpreter";
+
+fn overpass_query(bbox_op: &str) -> String {
+    format!(
+        "[out:json][timeout:25];(\
+nwr[amenity=hospital]({b});nwr[amenity=clinic]({b});nwr[amenity=nursing_home]({b});\
+nwr[\"social_facility\"]({b});nwr[amenity=school]({b});nwr[amenity=kindergarten]({b});\
+nwr[man_made=water_works]({b});nwr[man_made=water_tower]({b});nwr[power=substation]({b});\
+nwr[amenity=fire_station]({b});nwr[amenity=police]({b}););out center tags;",
+        b = bbox_op
+    )
+}
+
+pub async fn fetch_kritis(s: &FachebenenState, bbox_roh: &str) -> Result<FachebeneAntwort, AppError> {
+    let bbox = Bbox::parse(bbox_roh).map_err(AppError::Validation)?;
+    let key = bbox.cache_key();
+    if let Some(a) = s.cache.frisch(&key, KRITIS_TTL) {
+        return Ok(a);
+    }
+    let query = overpass_query(&bbox.overpass());
+    let resp = s.client.post(OVERPASS_URL).body(query).send().await;
+    match resp {
+        Ok(r) if r.status().is_success() => {
+            let roh: serde_json::Value = r
+                .json()
+                .await
+                .map_err(|e| e.to_string())
+                .unwrap_or(serde_json::Value::Null);
+            let fc = normalisiere_overpass(&roh);
+            let a = FachebeneAntwort::ok("kritis", KRITIS_ATTRIB, None, fc);
+            s.cache.setze(&key, a.clone());
+            Ok(a)
+        }
+        other => {
+            tracing::warn!("Overpass-Fetch fehlgeschlagen: {other:?}");
+            Ok(s.cache
+                .stale(&key)
+                .unwrap_or_else(|| FachebeneAntwort::offline("kritis", KRITIS_ATTRIB)))
+        }
+    }
 }
