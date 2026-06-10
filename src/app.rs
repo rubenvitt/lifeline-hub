@@ -1,4 +1,5 @@
 use crate::config::KarteConfig;
+use crate::karte::FachebenenState;
 use crate::live::LiveHub;
 use crate::routes;
 use axum::{
@@ -13,6 +14,7 @@ use tower_http::services::ServeFile;
 pub struct AppState {
     pub pool: SqlitePool,
     pub live: LiveHub,
+    pub fachebenen: FachebenenState,
 }
 
 /// Baut den Router mit Default-Karte (keine Basemap konfiguriert → Blind-Modus).
@@ -240,6 +242,10 @@ pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
     let router = router.route("/api/dev/users", get(routes::dev::users));
 
     let router = router.route("/api/karte/config", get(routes::karte::config));
+    let router = router.route(
+        "/api/karte/fachebenen/{quelle}",
+        get(routes::karte::fachebenen),
+    );
 
     // PMTiles-Tile-Service: nur mounten, wenn eine Datei konfiguriert ist.
     // ServeFile (eine feste Datei, kein ServeDir) beherrscht HTTP-Range nativ.

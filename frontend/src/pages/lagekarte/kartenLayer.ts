@@ -2,6 +2,14 @@ import type { Map as MapLibreMap, GeoJSONSource } from 'maplibre-gl';
 import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
 import type { ZoneStil } from './zonenStil';
 import { wendeKartenDatenAn } from './kartenDaten';
+import { sorgeFuerFachebeneLayer, setzeFachebeneDaten } from './fachebenenLayer';
+import type { FachebeneDef } from './fachebenen';
+import type { FeatureCollection } from '../../api/fachebenen';
+
+export interface AktiveFachebene {
+  def: FachebeneDef;
+  daten: FeatureCollection;
+}
 
 /**
  * Zentrale (Re-)Anlage der entitätslosen Karten-Layer (Abschnittsflächen + Zonen).
@@ -140,11 +148,16 @@ export function reAnlegenAlles(
   map: MapLibreMap,
   flaechen: FlaechenFeatureCollection,
   zonen: ZonenFeatureCollection,
+  fachebenen: AktiveFachebene[] = [],
 ) {
   sorgeFuerAbschnittLayer(map, flaechen);
   (map.getSource('abschnitte') as GeoJSONSource | undefined)?.setData(flaechen as never);
   sorgeFuerZonenLayer(map, zonen);
   (map.getSource('zonen') as GeoJSONSource | undefined)?.setData(zonen as never);
+  for (const fe of fachebenen) {
+    sorgeFuerFachebeneLayer(map, fe.def, fe.daten);
+    setzeFachebeneDaten(map, fe.def.key, fe.daten);
+  }
 }
 
 /**
@@ -162,6 +175,7 @@ export function planeReAnlegenNachStyle(
   map: Pick<MapLibreMap, 'isStyleLoaded' | 'on' | 'off'> & MapLibreMap,
   getFlaechen: () => FlaechenFeatureCollection,
   getZonen: () => ZonenFeatureCollection,
+  getFachebenen: () => AktiveFachebene[] = () => [],
 ) {
-  wendeKartenDatenAn(map, () => reAnlegenAlles(map, getFlaechen(), getZonen()));
+  wendeKartenDatenAn(map, () => reAnlegenAlles(map, getFlaechen(), getZonen(), getFachebenen()));
 }

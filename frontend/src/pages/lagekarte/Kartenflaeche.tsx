@@ -16,7 +16,10 @@ import {
   type FlaechenFeatureCollection,
   type ZonenFeatureCollection,
   type ZoneFeature,
+  type AktiveFachebene,
 } from './kartenLayer';
+import { sorgeFuerFachebeneLayer, setzeFachebeneDaten, entferneFachebeneLayer } from './fachebenenLayer';
+import { KRITIS_MIN_ZOOM } from './fachebenen';
 
 // Re-Export: LagekartePage importiert ZoneFeature weiterhin aus Kartenflaeche.
 export type { ZoneFeature };
@@ -59,12 +62,17 @@ export interface KartenflaecheProps {
   onZoneGezeichnet?: (geometrie: GeoJsonGeometry) => void;
   /** Klick auf eine Zone → Inspector. */
   onZoneKlick?: (id: number) => void;
+  /** Aktive Fachebenen mit Daten (externe Overlays). */
+  fachebenen?: AktiveFachebene[];
+  /** Karten-Viewport (west,sued,ost,nord) nach Bewegung — für bbox-abhängige Ebenen. */
+  onBboxAenderung?: (bbox: string) => void;
 }
 
 export default function Kartenflaeche({
   style, markers, onKarteKlick, onMarkerKlick, flyToZiel, onStyleFehler, attribution,
   flaechen, zeichnen, onFlaecheGezeichnet, onFlaecheKlick,
   zonen, zoneZeichnen, onZoneGezeichnet, onZoneKlick,
+  fachebenen, onBboxAenderung,
 }: KartenflaecheProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -79,6 +87,9 @@ export default function Kartenflaeche({
   const flaechenDatenRef = useRef<FlaechenFeatureCollection>(baueFlaechenFc(flaechen));
   // Aktuelle Zonendaten; analog flaechenDatenRef für die Re-Anlage nach setStyle.
   const zonenDatenRef = useRef<ZonenFeatureCollection>(baueZonenFc(zonen));
+  // Aktuelle Fachebenen; nach setStyle re-angelegt.
+  const fachebenenRef = useRef<AktiveFachebene[]>(fachebenen ?? []);
+  fachebenenRef.current = fachebenen ?? [];
   // Zuletzt angewandter Style. Der Konstruktor wendet den initialen Style an → der
   // [style]-Effekt soll NUR auf echte Wechsel reagieren (sonst lädt diff:false beim
   // Mount den Style unnötig komplett neu).
@@ -109,6 +120,9 @@ export default function Kartenflaeche({
       stilGeladenRef.current = true;
       sorgeFuerAbschnittLayer(map, flaechenDatenRef.current);
       sorgeFuerZonenLayer(map, zonenDatenRef.current);
+      for (const fe of fachebenenRef.current) {
+        sorgeFuerFachebeneLayer(map, fe.def, fe.daten);
+      }
     });
     mapRef.current = map;
     return () => {
@@ -138,7 +152,7 @@ export default function Kartenflaeche({
     if (style === angewandterStyleRef.current) return; // Mount: Konstruktor hat ihn schon
     angewandterStyleRef.current = style;
     map.setStyle(style, { diff: false });
-    planeReAnlegenNachStyle(map, () => flaechenDatenRef.current, () => zonenDatenRef.current);
+    planeReAnlegenNachStyle(map, () => flaechenDatenRef.current, () => zonenDatenRef.current, () => fachebenenRef.current);
   }, [style]);
 
   // AttributionControl je nach aktivem View neu setzen (config-autoritativ). MapLibre
@@ -276,6 +290,59 @@ export default function Kartenflaeche({
       map.off('click', 'zonen-line', handler);
     };
   }, [onZoneKlick]);
+
+  // Aktive Fachebenen rendern: Source/Layer sicherstellen, Daten einspielen,
+  // inaktive entfernen. Vertagt über wendeKartenDatenAn (Style evtl. nicht geladen).
+  const vorherigeFachebenenRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const aktiv = fachebenen ?? [];
+    fachebenenRef.current = aktiv;
+    wendeKartenDatenAn(map, () => {
+      const aktivKeys = new Set(aktiv.map((f) => f.def.key));
+      // entfernte Ebenen abbauen
+      for (const key of vorherigeFachebenenRef.current) {
+        if (!aktivKeys.has(key as never)) entferneFachebeneLayer(map, key as never);
+      }
+      // aktive an-/nachlegen + Daten setzen
+      for (const fe of aktiv) {
+        sorgeFuerFachebeneLayer(map, fe.def, fe.daten);
+        setzeFachebeneDaten(map, fe.def.key, fe.daten);
+      }
+      vorherigeFachebenenRef.current = aktivKeys as Set<string>;
+    });
+  }, [fachebenen]);
+
+  // Viewport-bbox nach Kartenbewegung melden (für bbox-abhängige Ebenen wie KRITIS).
+  // Sendet sofort beim Aktivieren (Effekt-Setup) und dann nach jedem moveend (600ms-Debounce).
+  // Unter KRITIS_MIN_ZOOM wird keine bbox gemeldet — verhindert riesige Overpass-Anfragen.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !onBboxAenderung) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const sendeBbox = () => {
+      if (map.getZoom() < KRITIS_MIN_ZOOM) return;
+      const b = map.getBounds();
+      onBboxAenderung(`${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`);
+    };
+
+    const melde = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(sendeBbox, 600);
+    };
+
+    // Einmalige Sofort-Emission beim Wirksamwerden (z. B. wenn KRITIS eingeschaltet wird
+    // während die Karte bereits auf ausreichendem Zoom-Level steht).
+    sendeBbox();
+
+    map.on('moveend', melde);
+    return () => {
+      if (timer) clearTimeout(timer);
+      map.off('moveend', melde);
+    };
+  }, [onBboxAenderung]);
 
   // Zeichenmodus an-/abschalten; Controller-Lifecycle über drawRef.
   useEffect(() => {

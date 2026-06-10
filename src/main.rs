@@ -76,6 +76,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         AppState {
             pool,
             live: LiveHub::new(),
+            fachebenen: lifeline_hub::karte::FachebenenState::neu(),
         },
         karte,
     );

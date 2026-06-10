@@ -6,6 +6,7 @@ import type { OnlineStyle } from '../../api/karte';
 import type { ZoneTyp } from '../../api/types';
 import type { ZeichenModus } from './zeichnen';
 import { ZONE_TYPEN } from './zonenStil';
+import { FACHEBENEN, fachebeneKeys } from './fachebenen';
 
 export interface LayerSichtbar {
   einsatzort: boolean;
@@ -52,6 +53,10 @@ export interface SidebarProps {
   onlineStyles: OnlineStyle[];
   onlineStilName: string | null;
   onOnlineStilWechsel: (name: string) => void;
+  fachebenenSichtbar: import('./fachebenenAuswahl').FachebenenSichtbar;
+  onFachebeneToggle: (key: import('../../api/fachebenen').FachebeneQuelle, an: boolean) => void;
+  /** Status je Fachebene für Ausgrau-/Offline-Hinweis. */
+  fachebenenStatus: Partial<Record<import('../../api/fachebenen').FachebeneQuelle, import('../../api/fachebenen').FachebeneStatus>>;
 }
 
 export default function Sidebar(props: SidebarProps) {
@@ -228,6 +233,35 @@ export default function Sidebar(props: SidebarProps) {
           <Space>
             <Switch checked={props.layer.zone} onChange={(v) => props.onLayerToggle('zone', v)} /> Zonen
           </Space>
+        </Space>
+      </Card>
+
+      <Card size="small" title="Fachebenen (extern)" style={{ marginBottom: 12 }}>
+        <Space direction="vertical" style={{ width: '100%' }}>
+          {fachebeneKeys().map((key) => {
+            const def = FACHEBENEN[key];
+            const status = props.fachebenenStatus[key];
+            const offline = status === 'offline';
+            return (
+              <Space key={key} style={{ justifyContent: 'space-between', width: '100%' }}>
+                <Space>
+                  <Switch
+                    checked={props.fachebenenSichtbar[key]}
+                    onChange={(v) => props.onFachebeneToggle(key, v)}
+                  />
+                  <span style={{ color: def.farbe }}>●</span> {def.label}
+                </Space>
+                {props.fachebenenSichtbar[key] && offline && (
+                  <Tooltip title="Quelle offline — Ebene wird leer angezeigt">
+                    <Typography.Text type="secondary" style={{ fontSize: 11 }}>offline</Typography.Text>
+                  </Tooltip>
+                )}
+                {props.fachebenenSichtbar[key] && status === 'leer' && (
+                  <Typography.Text type="secondary" style={{ fontSize: 11 }}>keine Daten</Typography.Text>
+                )}
+              </Space>
+            );
+          })}
         </Space>
       </Card>
 

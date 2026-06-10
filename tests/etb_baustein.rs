@@ -14,7 +14,7 @@ async fn setup() -> axum::Router {
     bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
         .await
         .unwrap();
-    build_router(AppState { pool, live: LiveHub::new() })
+    build_router(AppState { pool, live: LiveHub::new(), fachebenen: lifeline_hub::karte::FachebenenState::neu() })
 }
 
 async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
@@ -22,7 +22,7 @@ async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
     bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
         .await
         .unwrap();
-    let app = build_router(AppState { pool: pool.clone(), live: LiveHub::new() });
+    let app = build_router(AppState { pool: pool.clone(), live: LiveHub::new(), fachebenen: lifeline_hub::karte::FachebenenState::neu() });
     (app, pool)
 }
 
