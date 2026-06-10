@@ -109,6 +109,101 @@ mod nina_tests {
     }
 }
 
+/// Overpass-JSON (`elements` mit `lat`/`lon` bei Nodes bzw. `center` bei Ways/Relations,
+/// dank `out center`) → GeoJSON-Points. `kategorie` wird aus den Tags abgeleitet.
+pub fn normalisiere_overpass(roh: &Value) -> Value {
+    let elemente = roh
+        .get("elements")
+        .and_then(|e| e.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let features: Vec<Value> = elemente
+        .iter()
+        .filter_map(|el| {
+            let (lon, lat) = if let (Some(lon), Some(lat)) = (
+                el.get("lon").and_then(|v| v.as_f64()),
+                el.get("lat").and_then(|v| v.as_f64()),
+            ) {
+                (lon, lat)
+            } else {
+                let c = el.get("center")?;
+                (c.get("lon")?.as_f64()?, c.get("lat")?.as_f64()?)
+            };
+            let tags = el.get("tags").and_then(|t| t.as_object());
+            let kategorie = kritis_kategorie(tags);
+            let titel = tags
+                .and_then(|t| t.get("name"))
+                .and_then(|v| v.as_str())
+                .unwrap_or_else(|| kategorie_label(&kategorie));
+            Some(json!({
+                "type": "Feature",
+                "geometry": { "type": "Point", "coordinates": [lon, lat] },
+                "properties": { "titel": titel, "kategorie": kategorie }
+            }))
+        })
+        .collect();
+    json!({ "type": "FeatureCollection", "features": features })
+}
+
+fn kritis_kategorie(tags: Option<&serde_json::Map<String, Value>>) -> String {
+    let g = |k: &str| tags.and_then(|t| t.get(k)).and_then(|v| v.as_str());
+    if g("amenity") == Some("hospital") || g("amenity") == Some("clinic") {
+        return "krankenhaus".into();
+    }
+    if g("amenity") == Some("nursing_home") || g("social_facility").is_some() {
+        return "pflege".into();
+    }
+    if g("amenity") == Some("school") || g("amenity") == Some("kindergarten") {
+        return "schule".into();
+    }
+    if g("man_made") == Some("water_works") || g("man_made") == Some("water_tower") {
+        return "wasser".into();
+    }
+    if g("power") == Some("substation") {
+        return "strom".into();
+    }
+    if g("amenity") == Some("fire_station") {
+        return "feuerwehr".into();
+    }
+    if g("amenity") == Some("police") {
+        return "polizei".into();
+    }
+    "kritis".into()
+}
+
+fn kategorie_label(k: &str) -> &'static str {
+    match k {
+        "krankenhaus" => "Krankenhaus",
+        "pflege" => "Pflegeeinrichtung",
+        "schule" => "Schule/Kita",
+        "wasser" => "Wasserversorgung",
+        "strom" => "Umspannwerk",
+        "feuerwehr" => "Feuerwehr",
+        "polizei" => "Polizei",
+        _ => "KRITIS-Objekt",
+    }
+}
+
+#[cfg(test)]
+mod overpass_tests {
+    use super::*;
+    #[test]
+    fn node_wird_punkt() {
+        let roh = json!({ "elements": [ { "type": "node", "lon": 6.9, "lat": 50.9, "tags": { "amenity": "hospital", "name": "Uniklinik" } } ] });
+        let fc = normalisiere_overpass(&roh);
+        assert_eq!(fc["features"][0]["properties"]["kategorie"], "krankenhaus");
+        assert_eq!(fc["features"][0]["properties"]["titel"], "Uniklinik");
+    }
+    #[test]
+    fn way_mit_center_wird_punkt() {
+        let roh = json!({ "elements": [ { "type": "way", "center": { "lon": 7.0, "lat": 51.0 }, "tags": { "power": "substation" } } ] });
+        let fc = normalisiere_overpass(&roh);
+        assert_eq!(fc["features"][0]["geometry"]["coordinates"][0], 7.0);
+        assert_eq!(fc["features"][0]["properties"]["kategorie"], "strom");
+        assert_eq!(fc["features"][0]["properties"]["titel"], "Umspannwerk");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

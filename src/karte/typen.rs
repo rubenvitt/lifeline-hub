@@ -64,6 +64,64 @@ impl FachebeneAntwort {
     }
 }
 
+/// Bounding-Box in WGS84, Reihenfolge wie vom Frontend: west,sued,ost,nord.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Bbox {
+    pub west: f64,
+    pub sued: f64,
+    pub ost: f64,
+    pub nord: f64,
+}
+
+impl Bbox {
+    /// Parst "west,sued,ost,nord". Fehler → Err(Meldung).
+    pub fn parse(s: &str) -> Result<Bbox, String> {
+        let teile: Vec<f64> = s
+            .split(',')
+            .map(|t| t.trim().parse::<f64>())
+            .collect::<Result<_, _>>()
+            .map_err(|_| "bbox muss vier Zahlen sein".to_string())?;
+        match teile.as_slice() {
+            [west, sued, ost, nord] if west < ost && sued < nord => Ok(Bbox {
+                west: *west,
+                sued: *sued,
+                ost: *ost,
+                nord: *nord,
+            }),
+            _ => Err("bbox ungültig (west,sued,ost,nord)".to_string()),
+        }
+    }
+    /// Overpass erwartet sued,west,nord,ost.
+    pub fn overpass(&self) -> String {
+        format!("{},{},{},{}", self.sued, self.west, self.nord, self.ost)
+    }
+    /// Cache-Schlüssel: auf 2 Nachkommastellen gerundet (≈1 km), reduziert Cache-Streuung.
+    pub fn cache_key(&self) -> String {
+        format!(
+            "kritis:{:.2},{:.2},{:.2},{:.2}",
+            self.west, self.sued, self.ost, self.nord
+        )
+    }
+}
+
+#[cfg(test)]
+mod bbox_tests {
+    use super::*;
+    #[test]
+    fn parst_gueltige_bbox() {
+        let b = Bbox::parse("6.0,50.0,7.0,51.0").unwrap();
+        assert_eq!(b.overpass(), "50,6,51,7");
+    }
+    #[test]
+    fn lehnt_vertauschte_grenzen_ab() {
+        assert!(Bbox::parse("7.0,50.0,6.0,51.0").is_err());
+    }
+    #[test]
+    fn lehnt_unvollstaendig_ab() {
+        assert!(Bbox::parse("1,2,3").is_err());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
