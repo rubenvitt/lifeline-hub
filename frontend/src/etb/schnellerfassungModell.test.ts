@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { erkenneSlashTrigger, METADATEN_FELDER, type MetaFeld } from './schnellerfassungModell';
+import type { EtbBaustein } from '../api/types';
+import { erkenneSlashTrigger, filterSlashEintraege, METADATEN_FELDER, type MetaFeld } from './schnellerfassungModell';
 
 describe('METADATEN_FELDER', () => {
   it('enthält genau die fünf Metadatenfelder in Anzeigereihenfolge', () => {
@@ -41,5 +42,35 @@ describe('erkenneSlashTrigger', () => {
 
   it('leerer Filter direkt nach /', () => {
     expect(erkenneSlashTrigger('Lage /', 6)).toEqual({ aktiv: true, filter: '', start: 5 });
+  });
+});
+
+function baustein(id: number, label: string): EtbBaustein {
+  return { id, label, typ: 'meldung', inhalt: '', meldeweg: null, veranlassung: null, sortier: id };
+}
+
+describe('filterSlashEintraege', () => {
+  const bausteine = [baustein(1, 'Lagemeldung'), baustein(2, 'Bereitstellung')];
+
+  it('ohne Filter: alle Felder + alle Bausteine', () => {
+    const r = filterSlashEintraege('', bausteine, []);
+    expect(r.felder.map((e) => e.key)).toEqual(['ereigniszeit', 'von', 'an', 'meldeweg', 'veranlassung']);
+    expect(r.bausteine.map((e) => e.label)).toEqual(['Lagemeldung', 'Bereitstellung']);
+  });
+
+  it('filtert Felder per Trigger-Stichwort (case-insensitive)', () => {
+    const r = filterSlashEintraege('ZEI', bausteine, []);
+    expect(r.felder.map((e) => e.key)).toEqual(['ereigniszeit']);
+    expect(r.bausteine).toEqual([]);
+  });
+
+  it('filtert Bausteine per Label-Teilstring', () => {
+    const r = filterSlashEintraege('lage', bausteine, []);
+    expect(r.bausteine.map((e) => e.label)).toEqual(['Lagemeldung']);
+  });
+
+  it('markiert bereits gesetzte Felder', () => {
+    const r = filterSlashEintraege('von', bausteine, ['von']);
+    expect(r.felder[0]).toMatchObject({ key: 'von', gesetzt: true });
   });
 });

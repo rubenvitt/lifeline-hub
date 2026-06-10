@@ -1,5 +1,5 @@
 import type dayjs from 'dayjs';
-import type { EtbTyp, MeldeWeg } from '../api/types';
+import type { EtbBaustein, EtbTyp, MeldeWeg } from '../api/types';
 
 export type MetaFeld = 'ereigniszeit' | 'von' | 'an' | 'meldeweg' | 'veranlassung';
 
@@ -61,4 +61,38 @@ export function erkenneSlashTrigger(text: string, caret: number): SlashTrigger {
     if (/\s/.test(c)) return INAKTIV;
   }
   return INAKTIV;
+}
+
+export interface SlashEintrag {
+  art: 'feld' | 'baustein';
+  key: string;
+  label: string;
+  gesetzt?: boolean;
+}
+
+export interface SlashTreffer {
+  felder: SlashEintrag[];
+  bausteine: SlashEintrag[];
+}
+
+export function filterSlashEintraege(
+  filter: string,
+  bausteine: EtbBaustein[],
+  gesetzteFelder: MetaFeld[],
+): SlashTreffer {
+  const f = filter.trim().toLowerCase();
+  const felder: SlashEintrag[] = METADATEN_FELDER.filter(
+    (def) => f === '' || def.trigger.some((t) => t.includes(f)) || def.label.toLowerCase().includes(f),
+  ).map((def) => ({
+    art: 'feld',
+    key: def.feld,
+    label: def.label,
+    gesetzt: gesetzteFelder.includes(def.feld),
+  }));
+
+  const treffer: SlashEintrag[] = bausteine
+    .filter((b) => f === '' || b.label.toLowerCase().includes(f))
+    .map((b) => ({ art: 'baustein', key: String(b.id), label: b.label }));
+
+  return { felder, bausteine: treffer };
 }
