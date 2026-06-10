@@ -47,6 +47,13 @@ fn sse_personal(state: &AppState, einsatz_id: i64, ep_id: i64) {
     state.live.publiziere_event(einsatz_id, "person", data);
 }
 
+/// SSE-Notify (Meldebild): betroffenes Material aktualisieren (z.B. bei Zuordnung/Freigabe).
+/// Lokaler Spiegel von `routes::einsatz_material::sse_material` (Tag `material`, gleiche Payload).
+fn sse_material(state: &AppState, einsatz_id: i64, em_id: i64) {
+    let data = serde_json::json!({ "einsatz_id": einsatz_id, "material_id": em_id }).to_string();
+    state.live.publiziere_event(einsatz_id, "material", data);
+}
+
 async fn etb_system(state: &AppState, einsatz_id: i64, benutzer_id: i64, inhalt: &str) -> Result<(), AppError> {
     let anzeige = etb_repo::anlegen(
         &state.pool, einsatz_id, benutzer_id,
@@ -282,6 +289,7 @@ pub async fn material_zuordnen(
     let (bez, menge) = mitglied_repo::ordne_material_zu(&state.pool, einsatz_id, eid, em_id).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: Material «{}» (×{}) zugeordnet", einheit, bez, menge)).await?;
     sse_einheit(&state, einsatz_id, eid);
+    sse_material(&state, einsatz_id, em_id);
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -296,6 +304,7 @@ pub async fn material_freigeben(
     let (bez, menge) = mitglied_repo::gib_material_frei(&state.pool, einsatz_id, eid, em_id).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: Material «{}» (×{}) freigegeben", einheit, bez, menge)).await?;
     sse_einheit(&state, einsatz_id, eid);
+    sse_material(&state, einsatz_id, em_id);
     Ok(StatusCode::NO_CONTENT)
 }
 

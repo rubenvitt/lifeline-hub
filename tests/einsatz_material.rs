@@ -395,3 +395,31 @@ async fn reine_bemerkung_publiziert_material_event() {
     assert_eq!(data["einsatz_id"], einsatz);
     assert_eq!(data["material_id"], em);
 }
+
+/// LFH-66: Auch das Zuordnen von Material an eine Einheit publiziert ein
+/// `material`-Live-Event (analog fahrzeug/personal in einsatz_einheit) — nicht nur
+/// als Beifang des `einheit`-Events.
+#[tokio::test]
+async fn material_an_einheit_zuordnen_publiziert_material_event() {
+    let (app, live) = setup_mit_hub().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let mat = material_anlegen(&app, &admin, "Wolldecke").await;
+    let (_, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/material"), &admin, Some(&format!(r#"{{"material_id":{mat}}}"#))).await;
+    let em = json["id"].as_i64().unwrap();
+    let eid = einheit_bilden(&app, &admin, einsatz, "Trupp 1").await;
+
+    // Erst NACH dem Aufbau abonnieren → isoliert die Events der Zuordnung.
+    let mut rx = live.abonniere(einsatz);
+    assert_eq!(
+        anfrage(&app, "PUT", &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/{em}"), &admin, None).await.0,
+        StatusCode::NO_CONTENT
+    );
+
+    // Unter den publizierten Events (einheit/etb/material) muss ein `material`-Event sein.
+    let mut events = Vec::new();
+    while let Ok(n) = rx.try_recv() {
+        events.push(n.event);
+    }
+    assert!(events.iter().any(|e| e == "material"), "erwartete ein material-Event, bekam: {events:?}");
+}
