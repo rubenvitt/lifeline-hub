@@ -1,9 +1,14 @@
-import { Input, Tabs, Typography } from 'antd';
-import { useState } from 'react';
+import { Button, Input, Tabs, Typography } from 'antd';
+import type { GetRef } from 'antd';
+import { EyeOutlined } from '@ant-design/icons';
+import { forwardRef, useState, type KeyboardEvent } from 'react';
 import Markdown from './Markdown';
 import './MarkdownEditor.css';
 
-type Layout = 'split' | 'tabs';
+/** Ref-Typ des inneren antd Input.TextArea (hat `resizableTextArea.textArea`). */
+export type TextAreaRef = GetRef<typeof Input.TextArea>;
+
+type Layout = 'split' | 'tabs' | 'toggle';
 type Variante = 'kompakt' | 'dokument';
 
 interface Props {
@@ -14,6 +19,7 @@ interface Props {
   /**
    * `split` (Default): Eingabe und Live-Vorschau nebeneinander (Lagebericht).
    * `tabs`: kompakter Schreiben/Vorschau-Umschalter (ETB-Schnellerfassung).
+   * `toggle`: schlankes Feld + dezenter Vorschau-Button (Command-Bar-Flow).
    */
   layout?: Layout;
   /** Darstellung der Vorschau — soll der späteren Anzeige entsprechen. */
@@ -23,11 +29,7 @@ interface Props {
   rows?: number;
   /** Von antd Form.Item gesetzt (für Label-Verknüpfung). */
   id?: string;
-}
-
-/** Dezenter Hinweis, solange noch nichts getippt wurde. */
-function LeereVorschau() {
-  return <Typography.Text type="secondary">Noch nichts zu zeigen.</Typography.Text>;
+  onKeyDown?: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
 }
 
 /**
@@ -38,34 +40,50 @@ function LeereVorschau() {
  * Komponente bleibt sie mit antd Form (z.B. BausteinPicker via setFieldsValue)
  * voll kompatibel. Die Vorschau nutzt die XSS-sichere `Markdown`-Komponente.
  */
-export default function MarkdownEditor({
-  value = '',
-  onChange,
-  layout = 'split',
-  variante = 'dokument',
-  placeholder,
-  autoSize,
-  rows,
-  id,
-}: Props) {
+const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
+  { value = '', onChange, layout = 'split', variante = 'dokument', placeholder, autoSize, rows, id, onKeyDown },
+  ref,
+) {
   const [aktiv, setAktiv] = useState<'schreiben' | 'vorschau'>('schreiben');
+  const [vorschauOffen, setVorschauOffen] = useState(false);
 
   const textfeld = (
     <Input.TextArea
+      ref={ref}
       id={id}
       value={value}
       placeholder={placeholder}
       autoSize={autoSize}
       rows={rows}
       onChange={(e) => onChange?.(e.target.value)}
+      onKeyDown={onKeyDown}
     />
   );
 
   const vorschau = value.trim() ? (
     <Markdown variante={variante}>{value}</Markdown>
   ) : (
-    <LeereVorschau />
+    <Typography.Text type="secondary">Noch nichts zu zeigen.</Typography.Text>
   );
+
+  if (layout === 'toggle') {
+    return (
+      <div className="markdown-editor markdown-editor--toggle">
+        {textfeld}
+        <div style={{ marginTop: 4 }}>
+          <Button
+            type="text"
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => setVorschauOffen((v) => !v)}
+          >
+            Vorschau
+          </Button>
+        </div>
+        {vorschauOffen && <div className="markdown-editor__vorschau">{vorschau}</div>}
+      </div>
+    );
+  }
 
   if (layout === 'tabs') {
     return (
@@ -100,4 +118,6 @@ export default function MarkdownEditor({
       </div>
     </div>
   );
-}
+});
+
+export default MarkdownEditor;
