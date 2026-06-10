@@ -1,6 +1,15 @@
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import { describe, expect, it } from 'vitest';
 import type { EtbBaustein } from '../api/types';
-import { erkenneSlashTrigger, filterSlashEintraege, METADATEN_FELDER, type MetaFeld } from './schnellerfassungModell';
+import {
+  baueEintrag,
+  erkenneSlashTrigger,
+  filterSlashEintraege,
+  METADATEN_FELDER,
+  type MetaFeld,
+} from './schnellerfassungModell';
+dayjs.extend(utc);
 
 describe('METADATEN_FELDER', () => {
   it('enthält genau die fünf Metadatenfelder in Anzeigereihenfolge', () => {
@@ -72,5 +81,39 @@ describe('filterSlashEintraege', () => {
   it('markiert bereits gesetzte Felder', () => {
     const r = filterSlashEintraege('von', bausteine, ['von']);
     expect(r.felder[0]).toMatchObject({ key: 'von', gesetzt: true });
+  });
+});
+
+describe('baueEintrag', () => {
+  const jetztIso = '2026-06-10T12:00:00.000Z';
+
+  it('Standardmeldung: typ + inhalt, ereigniszeit = jetzt, leere Metadaten weggelassen', () => {
+    const e = baueEintrag({ inhalt: 'Pumpe läuft', typ: 'meldung', metadaten: {}, jetztIso });
+    expect(e).toMatchObject({ typ: 'meldung', inhalt: 'Pumpe läuft', ereigniszeit: jetztIso });
+    expect(e.erfasst_lokal_at).toBe(jetztIso);
+    expect(e.von).toBeUndefined();
+    expect(e.berichtigt_eintrag_id).toBeUndefined();
+  });
+
+  it('übernimmt gesetzte Metadaten inkl. abweichender Ereigniszeit (SQLite-UTC-Format)', () => {
+    const e = baueEintrag({
+      inhalt: 'Lage',
+      typ: 'lage',
+      metadaten: {
+        von: 'ELW 1', an: 'Abschnitt 2', meldeweg: 'funk', veranlassung: 'RTW nachfordern',
+        ereigniszeit: dayjs.utc('2026-06-10 09:30:00'),
+      },
+      jetztIso,
+    });
+    expect(e).toMatchObject({
+      von: 'ELW 1', an: 'Abschnitt 2', meldeweg: 'funk', veranlassung: 'RTW nachfordern',
+      ereigniszeit: '2026-06-10 09:30:00',
+    });
+  });
+
+  it('Berichtigung: typ=berichtigung + berichtigt_eintrag_id', () => {
+    const e = baueEintrag({ inhalt: 'Korrektur', typ: 'meldung', metadaten: {}, berichtigungZuId: 5, jetztIso });
+    expect(e.typ).toBe('berichtigung');
+    expect(e.berichtigt_eintrag_id).toBe(5);
   });
 });

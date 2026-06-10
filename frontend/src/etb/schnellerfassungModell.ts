@@ -1,5 +1,6 @@
 import type dayjs from 'dayjs';
 import type { EtbBaustein, EtbTyp, MeldeWeg } from '../api/types';
+import type { NeuerEintrag } from '../api/etb';
 
 export type MetaFeld = 'ereigniszeit' | 'von' | 'an' | 'meldeweg' | 'veranlassung';
 
@@ -95,4 +96,29 @@ export function filterSlashEintraege(
     .map((b) => ({ art: 'baustein', key: String(b.id), label: b.label }));
 
   return { felder, bausteine: treffer };
+}
+
+export interface EintragArgs {
+  inhalt: string;
+  typ: EtbTyp;
+  metadaten: MetadatenWerte;
+  berichtigungZuId?: number;
+  /** ISO-Zeitstempel „jetzt" (vom Aufrufer übergeben — testbar). */
+  jetztIso: string;
+}
+
+export function baueEintrag({ inhalt, typ, metadaten, berichtigungZuId, jetztIso }: EintragArgs): NeuerEintrag {
+  return {
+    typ: berichtigungZuId ? 'berichtigung' : typ,
+    inhalt,
+    von: metadaten.von || undefined,
+    an: metadaten.an || undefined,
+    meldeweg: metadaten.meldeweg || undefined,
+    veranlassung: metadaten.veranlassung || undefined,
+    ereigniszeit: metadaten.ereigniszeit
+      ? metadaten.ereigniszeit.utc().format('YYYY-MM-DD HH:mm:ss')
+      : jetztIso,
+    erfasst_lokal_at: jetztIso,
+    berichtigt_eintrag_id: berichtigungZuId,
+  };
 }
