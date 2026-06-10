@@ -30,8 +30,8 @@ import FachebenenInspector from './lagekarte/FachebenenInspector';
 import { zoneStil, gefahrengebietStil } from './lagekarte/zonenStil';
 import GefahrengebietMatrixDrawer from './lagekarte/GefahrengebietMatrixDrawer';
 import type { ZeichenModus } from './lagekarte/zeichnen';
-import { ladeFachebene, type FachebeneQuelle, type FachebeneStatus } from '../api/fachebenen';
-import { FACHEBENEN, fachebeneKeys, KRITIS_MIN_ZOOM, rasterBbox } from './lagekarte/fachebenen';
+import { ladeFachebene, type FachebeneQuelle, type FachebeneStatus, type FeatureCollection } from '../api/fachebenen';
+import { FACHEBENEN, fachebeneKeys, KRITIS_MIN_ZOOM, rasterBbox, mergeFeatures } from './lagekarte/fachebenen';
 import { liesFachebenenSichtbar, merkeFachebenenSichtbar, defaultFachebenenSichtbar, type FachebenenSichtbar } from './lagekarte/fachebenenAuswahl';
 import type { AktiveFachebene } from './lagekarte/kartenLayer';
 
@@ -289,15 +289,31 @@ export default function LagekartePage() {
     nina: ninaQuery, dwd: dwdQuery, pegelonline: pegelQuery, kritis: kritisQuery,
   };
 
+  // KRITIS akkumulieren: einmal geladene Objekte bleiben sichtbar (auch beim Rauszoomen oder
+  // Wechsel des Gebiets), statt bei jedem Fetch ersetzt zu werden. Dedup über die Koordinate;
+  // Obergrenze gegen unbegrenztes Wachstum (älteste zuerst raus).
+  const KRITIS_MAX = 4000;
+  const kritisSammlungRef = useRef<Map<string, FeatureCollection['features'][number]>>(new Map());
+  const [kritisAkku, setKritisAkku] = useState<FeatureCollection>({ type: 'FeatureCollection', features: [] });
+  useEffect(() => {
+    const fc = kritisQuery.data?.features;
+    if (!fc) return;
+    if (mergeFeatures(kritisSammlungRef.current, fc.features, KRITIS_MAX)) {
+      setKritisAkku({ type: 'FeatureCollection', features: [...kritisSammlungRef.current.values()] });
+    }
+  }, [kritisQuery.data]);
+
+  const leereFc: FeatureCollection = { type: 'FeatureCollection', features: [] };
   const aktiveFachebenen = useMemo<AktiveFachebene[]>(
     () => fachebeneKeys()
       .filter((k) => fachebenenSichtbar[k])
       .map((k) => {
-        const data = fachebenenQueries[k].data;
-        return { def: FACHEBENEN[k], daten: data?.features ?? { type: 'FeatureCollection' as const, features: [] } };
+        // KRITIS aus der akkumulierten Sammlung; übrige Quellen direkt aus der Query.
+        const daten = k === 'kritis' ? kritisAkku : (fachebenenQueries[k].data?.features ?? leereFc);
+        return { def: FACHEBENEN[k], daten };
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [fachebenenSichtbar, ninaQuery.data, dwdQuery.data, pegelQuery.data, kritisQuery.data],
+    [fachebenenSichtbar, ninaQuery.data, dwdQuery.data, pegelQuery.data, kritisAkku],
   );
 
   const fachebenenStatus = useMemo<Partial<Record<FachebeneQuelle, FachebeneStatus>>>(() => {
