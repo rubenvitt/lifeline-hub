@@ -1,6 +1,7 @@
-import { Button, Card, Descriptions, Select, Space } from 'antd';
+import { Button, Descriptions, Select, Space, Tag } from 'antd';
 import { Link } from 'react-router-dom';
 import type { KarteMarker, MarkerTyp } from './marker';
+import KartenDetailCard from './KartenDetailCard';
 
 export interface InspectorProps {
   einsatzId: number;
@@ -61,14 +62,9 @@ export default function Inspector({
   const symbolAuswahl = darfSchreiben && onSymbolAendern && TAKTISCHE_TYPEN.includes(marker.typ);
 
   return (
-    <Card
-      size="small"
-      title={marker.label}
-      extra={<Button size="small" type="text" onClick={onSchliessen} aria-label="Schließen">×</Button>}
-      style={{ position: 'absolute', right: 12, top: 12, width: 280, zIndex: 5 }}
-    >
+    <KartenDetailCard titel={marker.label} akzentFarbe={marker.farbe} onSchliessen={onSchliessen}>
+      <Tag color={marker.farbe} style={{ marginBottom: 8 }}>{TYP_LABEL[marker.typ]}</Tag>
       <Descriptions column={1} size="small">
-        <Descriptions.Item label="Typ">{TYP_LABEL[marker.typ]}</Descriptions.Item>
         <Descriptions.Item label="Koordinate">
           {marker.lat.toFixed(5)}, {marker.lon.toFixed(5)}
         </Descriptions.Item>
@@ -109,6 +105,6 @@ export default function Inspector({
           </Button>
         )}
       </Space>
-    </Card>
+    </KartenDetailCard>
   );
 }

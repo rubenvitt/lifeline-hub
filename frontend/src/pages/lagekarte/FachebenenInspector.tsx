@@ -1,7 +1,8 @@
-import { Button, Card, Descriptions, Tag, Typography } from 'antd';
+import { Descriptions, Tag, Typography } from 'antd';
 import type { FachebeneQuelle } from '../../api/fachebenen';
 import { FACHEBENEN } from './fachebenen';
 import { kategorieLabel } from './fachebenenLayer';
+import KartenDetailCard from './KartenDetailCard';
 
 export interface FachebenenInspectorProps {
   quelle: FachebeneQuelle;
@@ -204,19 +205,7 @@ export default function FachebenenInspector({ quelle, properties, onSchliessen }
   }
 
   return (
-    <Card
-      size="small"
-      title={titel}
-      extra={<Button size="small" type="text" onClick={onSchliessen} aria-label="Schließen">×</Button>}
-      style={{
-        position: 'absolute', right: 12, top: 12, width: 300, zIndex: 5,
-        maxHeight: 'calc(100vh - 160px)', overflowY: 'auto',
-      }}
-      styles={{
-        header: { borderLeft: `4px solid ${FACHEBENEN[quelle].farbe}` },
-        title: { whiteSpace: 'normal' },
-      }}
-    >
+    <KartenDetailCard titel={titel} akzentFarbe={FACHEBENEN[quelle].farbe} onSchliessen={onSchliessen}>
       {istWarnung ? (
         <WarnungInhalt p={p} />
       ) : quelle === 'pegelonline' ? (
@@ -224,6 +213,6 @@ export default function FachebenenInspector({ quelle, properties, onSchliessen }
       ) : (
         <KritisInhalt p={p} />
       )}
-    </Card>
+    </KartenDetailCard>
   );
 }

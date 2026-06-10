@@ -1,7 +1,8 @@
-import { Button, Card, Input, Popconfirm, Select, Space, Typography } from 'antd';
+import { Button, Input, Popconfirm, Select, Space, Typography } from 'antd';
 import type { Gefahrengebiet, LageZone, ZoneTyp } from '../../api/types';
 import { gefahrengebietName } from '../../api/gefahren';
-import { ZONE_TYPEN, zoneTypLabel } from './zonenStil';
+import { ZONE_TYPEN, zoneTypLabel, zoneStil } from './zonenStil';
+import KartenDetailCard from './KartenDetailCard';
 
 /** Sentinel im Dropdown für „in neues Gefahrengebiet abspalten". */
 const NEU = -1;
@@ -26,11 +27,10 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
   const umhaengen = (ziel: number) => onAendern({ gefahrengebiet_id: ziel === NEU ? null : ziel });
 
   return (
-    <Card
-      title={zone.label?.trim() ? zone.label : zoneTypLabel(zone.typ)}
-      extra={<Button type="text" onClick={onSchliessen} aria-label="Schließen">×</Button>}
-      size="small"
-      style={{ position: 'absolute', right: 12, top: 12, width: 280, maxHeight: 'calc(100% - 24px)', overflowY: 'auto', zIndex: 5 }}
+    <KartenDetailCard
+      titel={zone.label?.trim() ? zone.label : zoneTypLabel(zone.typ)}
+      akzentFarbe={zoneStil(zone.typ, zone.farbe).lineColor}
+      onSchliessen={onSchliessen}
     >
       <Space direction="vertical" style={{ width: '100%' }}>
         {darfSchreiben ? (
@@ -84,6 +84,6 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
           )
         )}
       </Space>
-    </Card>
+    </KartenDetailCard>
   );
 }
