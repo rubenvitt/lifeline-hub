@@ -118,6 +118,59 @@ pub async fn status_setzen(
     laden(pool, id, jetzt).await
 }
 
+/// Eine fällige, offene Erinnerung, die ein Scheduler-Nudge braucht.
+/// `intervall_minuten` entscheidet einmalig vs. wiederkehrend in `tick_einmal`.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct FaelligeErinnerung {
+    pub id: i64,
+    pub einsatz_id: i64,
+    pub faellig_at: String,
+    pub intervall_minuten: Option<i64>,
+}
+
+/// Liefert offene Erinnerungen, die fällig sind (`faellig_at <= jetzt`) und für
+/// ihren aktuellen `faellig_at`-Slot noch nicht benachrichtigt wurden
+/// (`zuletzt_ausgeloest_at IS NULL OR zuletzt_ausgeloest_at < faellig_at`).
+/// Einsatzübergreifend — der Scheduler läuft global.
+pub async fn faellige_zum_ausloesen(
+    pool: &SqlitePool,
+    jetzt: &str,
+) -> Result<Vec<FaelligeErinnerung>, AppError> {
+    sqlx::query_as::<_, FaelligeErinnerung>(
+        "SELECT id, einsatz_id, faellig_at, intervall_minuten \
+         FROM erinnerung \
+         WHERE status = 'offen' AND faellig_at <= ?1 \
+           AND (zuletzt_ausgeloest_at IS NULL OR zuletzt_ausgeloest_at < faellig_at) \
+         ORDER BY faellig_at, id",
+    )
+    .bind(jetzt)
+    .fetch_all(pool)
+    .await
+    .map_err(Into::into)
+}
+
+/// Markiert eine Erinnerung als ausgelöst. Bei wiederkehrenden wird zugleich
+/// `faellig_at` auf `neues_faellig_at` (skip-forward) gesetzt; bei einmaligen
+/// bleibt `faellig_at` und nur `zuletzt_ausgeloest_at` wird gesetzt.
+pub async fn markiere_ausgeloest(
+    pool: &SqlitePool,
+    id: i64,
+    neues_faellig_at: Option<&str>,
+    jetzt: &str,
+) -> Result<(), AppError> {
+    match neues_faellig_at {
+        Some(neu) => {
+            sqlx::query("UPDATE erinnerung SET faellig_at = ?, zuletzt_ausgeloest_at = ? WHERE id = ?")
+                .bind(neu).bind(jetzt).bind(id).execute(pool).await?;
+        }
+        None => {
+            sqlx::query("UPDATE erinnerung SET zuletzt_ausgeloest_at = ? WHERE id = ?")
+                .bind(jetzt).bind(id).execute(pool).await?;
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
