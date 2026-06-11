@@ -211,6 +211,68 @@ pub async fn loeschen(pool: &SqlitePool, nachricht_id: i64) -> Result<(), AppErr
     Ok(())
 }
 
+/// Stuft eine Chat-Nachricht zu einem ETB-Eintrag herauf — transaktional nach dem
+/// Muster von `lagebericht::freigeben`: legt den ETB-Eintrag an und setzt den
+/// Rückverweis `chat_nachricht.etb_eintrag_id` im selben Commit. Der ETB-Eintrag
+/// ist ein Snapshot (Text + Ereigniszeit der Nachricht); spätere Bearbeitungen der
+/// Nachricht wirken nicht zurück. Doppel-Heraufstufung → `Conflict`.
+///
+/// `etb_typ`, `inhalt` und `ereigniszeit` sind bereits vom Handler validiert/normalisiert.
+/// Liefert die neue ETB-`id`.
+pub async fn heraufstufen_zu_etb(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    nachricht_id: i64,
+    heraufstufer_id: i64,
+    etb_typ: &str,
+    inhalt: &str,
+    ereigniszeit: &str,
+) -> Result<i64, AppError> {
+    let mut tx = pool.begin().await?;
+
+    // Guard: schon heraufgestuft oder gelöscht? (Sperrt Doppel-Heraufstufung.)
+    let zustand: Option<(Option<i64>, Option<String>)> = sqlx::query_as(
+        "SELECT etb_eintrag_id, geloescht_at FROM chat_nachricht WHERE id = ?",
+    )
+    .bind(nachricht_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    let (etb_vorhanden, geloescht) = zustand.ok_or(AppError::NotFound)?;
+    if etb_vorhanden.is_some() {
+        return Err(AppError::Conflict("Nachricht ist bereits heraufgestuft".into()));
+    }
+    if geloescht.is_some() {
+        return Err(AppError::Conflict("Gelöschte Nachricht kann nicht heraufgestuft werden".into()));
+    }
+
+    let etb_id = crate::etb::repo::anlegen_tx(
+        &mut *tx,
+        einsatz_id,
+        heraufstufer_id,
+        crate::etb::repo::EintragDaten {
+            typ: etb_typ,
+            inhalt,
+            von: None,
+            an: None,
+            meldeweg: None,
+            veranlassung: None,
+            ereigniszeit: Some(ereigniszeit),
+            erfasst_lokal_at: None,
+            berichtigt_eintrag_id: None,
+        },
+    )
+    .await?;
+
+    sqlx::query("UPDATE chat_nachricht SET etb_eintrag_id = ? WHERE id = ?")
+        .bind(etb_id)
+        .bind(nachricht_id)
+        .execute(&mut *tx)
+        .await?;
+
+    tx.commit().await?;
+    Ok(etb_id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -367,5 +429,39 @@ mod tests {
         let nachher = laden(&pool, m.id).await.unwrap();
         assert!(nachher.geloescht_at.is_some());
         assert_eq!(nachher.inhalt, None, "Inhalt gelöschter Nachrichten wird nicht ausgeliefert");
+    }
+
+    #[tokio::test]
+    async fn heraufstufen_legt_etb_an_und_setzt_rueckverweis() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let kid = kanal(&pool, einsatz, benutzer).await;
+        let m = anlegen(&pool, einsatz, benutzer, NachrichtDaten { kanal_id: kid, inhalt: "Deich instabil" }).await.unwrap();
+
+        let etb_id = heraufstufen_zu_etb(
+            &pool, einsatz, m.id, benutzer, "meldung", "Deich instabil", &m.erstellt_at,
+        ).await.unwrap();
+
+        // ETB-Eintrag existiert mit dem Text und der Ereigniszeit der Nachricht (Snapshot).
+        let etb = crate::etb::repo::laden(&pool, etb_id).await.unwrap();
+        assert_eq!(etb.typ, "meldung");
+        assert_eq!(etb.inhalt, "Deich instabil");
+        assert_eq!(etb.ereigniszeit, m.erstellt_at);
+
+        // Rückverweis an der Nachricht ist gesetzt.
+        let nachher = laden(&pool, m.id).await.unwrap();
+        assert_eq!(nachher.etb_eintrag_id, Some(etb_id));
+    }
+
+    #[tokio::test]
+    async fn heraufstufen_doppelt_ist_konflikt() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let kid = kanal(&pool, einsatz, benutzer).await;
+        let m = anlegen(&pool, einsatz, benutzer, NachrichtDaten { kanal_id: kid, inhalt: "x" }).await.unwrap();
+        heraufstufen_zu_etb(&pool, einsatz, m.id, benutzer, "meldung", "x", &m.erstellt_at).await.unwrap();
+
+        let zweimal = heraufstufen_zu_etb(&pool, einsatz, m.id, benutzer, "meldung", "x", &m.erstellt_at).await;
+        assert!(matches!(zweimal.unwrap_err(), AppError::Conflict(_)));
     }
 }
