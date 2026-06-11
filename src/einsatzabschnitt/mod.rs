@@ -17,5 +17,9 @@ pub struct EinsatzabschnittAnzeige {
     pub flaeche_geojson: Option<String>,
     pub tz_fachaufgabe: Option<String>,
     pub tz_organisation: Option<String>,
+    pub sprechgruppe_tmo: Option<String>,
+    pub sprechgruppe_dmo: Option<String>,
+    pub kommunikationsmittel: Option<String>,
+    pub erreichbarkeit: Option<String>,
     pub sortier: i64,
 }
