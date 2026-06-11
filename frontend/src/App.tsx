@@ -9,6 +9,7 @@ import BenutzerPage from './pages/BenutzerPage';
 import StammdatenPage from './pages/StammdatenPage';
 import ProfilPage from './pages/ProfilPage';
 import EtbPage from './pages/EtbPage';
+import ChatPage from './pages/ChatPage';
 import EinsatzdatenPage from './pages/EinsatzdatenPage';
 import FahrzeugePage from './pages/FahrzeugePage';
 import MaterialPage from './pages/MaterialPage';
@@ -43,6 +44,7 @@ const KraefteuebersichtPage = lazy(() => import('./pages/KraefteuebersichtPage')
 const MODUL_ELEMENTE: Record<string, ReactElement> = {
   'lage-dashboard': <LageDashboardPage />,
   etb: <EtbPage />,
+  chat: <ChatPage />,
   einsatzdaten: <EinsatzdatenPage />,
   fahrzeuge: <FahrzeugePage />,
   material: <MaterialPage />,
