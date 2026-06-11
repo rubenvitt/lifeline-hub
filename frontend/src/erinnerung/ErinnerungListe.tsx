@@ -35,6 +35,8 @@ export default function ErinnerungListe({ erinnerungen, darfSchreiben, onErledig
                 {e.ist_faellig && <Tag color="red">fällig</Tag>}
                 {e.intervall_minuten && <Tag>alle {e.intervall_minuten} Min</Tag>}
                 {e.quelle === 'auto_frist' && <Tag color="orange">automatisch</Tag>}
+                {e.vollzug_status === 'vollzogen' && <Tag color="success">Vollzogen</Tag>}
+                {e.quittiert_at && <Tag color="blue">Quittiert</Tag>}
               </Space>
             }
             description={
