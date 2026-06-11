@@ -449,6 +449,19 @@ mod tests {
         }
     }
 
+    /// Wie `daten`, aber mit frei wählbarer Priorität (für Sortier-Tests).
+    fn daten_prio<'a>(
+        text: &'a str,
+        prio: &'a str,
+        frist: Option<&'a str>,
+        empf: Vec<EmpfaengerEingabe>,
+    ) -> AuftragDaten<'a> {
+        AuftragDaten {
+            prioritaet: prio,
+            ..daten(text, frist, empf)
+        }
+    }
+
     #[tokio::test]
     async fn anlegen_speichert_auftrag_mit_empfaenger_und_default_vollzug() {
         let pool = crate::db::test_pool().await;
@@ -581,5 +594,39 @@ mod tests {
         let nach = laden(&pool, d.auftrag.id, "2026-06-11 12:01:00").await.unwrap();
         assert_eq!(nach.auftrag.bearbeitungsstatus, "abgenommen");
         assert_eq!(nach.auftrag.abgenommen_von_id, Some(b));
+    }
+
+    #[tokio::test]
+    async fn liste_sortiert_nach_prio_dann_frist() {
+        use super::super::{PRIO_DRINGEND, PRIO_NORMAL, PRIO_SOFORT};
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        // In gemischter Reihenfolge anlegen → erzwingt echtes ORDER BY (nicht Insert-Reihenfolge).
+        // Erwartete Sortierung: sofort, dringend, dann drei 'normal' nach frist_at
+        // (frühere Frist vor späterer, NULL-Frist zuletzt).
+        anlegen(&pool, e, b, daten_prio("normal-spaet", PRIO_NORMAL, Some("2026-06-11 12:00:00"), vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+        anlegen(&pool, e, b, daten_prio("normal-ohne", PRIO_NORMAL, None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+        anlegen(&pool, e, b, daten_prio("sofort", PRIO_SOFORT, None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+        anlegen(&pool, e, b, daten_prio("normal-frueh", PRIO_NORMAL, Some("2026-06-11 10:00:00"), vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+        anlegen(&pool, e, b, daten_prio("dringend", PRIO_DRINGEND, None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+
+        let liste = liste(&pool, e, None, None, "2026-06-11 09:30:00").await.unwrap();
+        let reihenfolge: Vec<&str> = liste.iter().map(|d| d.auftrag.auftrag_text.as_str()).collect();
+        assert_eq!(
+            reihenfolge,
+            vec!["sofort", "dringend", "normal-frueh", "normal-spaet", "normal-ohne"]
+        );
+    }
+
+    #[tokio::test]
+    async fn ueberfaellig_false_wenn_alle_quittiert() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let d = anlegen(&pool, e, b, daten("Frist", Some("2026-06-11 10:00:00"), vec![funktion("EA1")]), "2026-06-11 09:00:00").await.unwrap();
+        // Einzigen Empfänger quittieren → EXISTS(unquittiert) wird leer.
+        quittiere_empfaenger(&pool, d.empfaenger[0].id, b, "2026-06-11 09:30:00").await.unwrap();
+        // Laden NACH der Frist: nicht überfällig, weil alle quittiert.
+        let nach = laden(&pool, d.auftrag.id, "2026-06-11 10:30:00").await.unwrap();
+        assert!(!nach.auftrag.ist_ueberfaellig, "alle quittiert → nicht überfällig trotz überschrittener Frist");
     }
 }

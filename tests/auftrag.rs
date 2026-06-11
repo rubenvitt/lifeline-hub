@@ -69,6 +69,27 @@ async fn einsatz_anlegen(app: &axum::Router, cookie: &str) -> i64 {
     json["id"].as_i64().unwrap()
 }
 
+async fn benutzer_anlegen(app: &axum::Router, admin: &str, name: &str, org_rolle: &str) -> i64 {
+    let body = format!(
+        r#"{{"anzeigename":"{name}","benutzername":"{name}","passwort":"{name}pw1","org_rolle":"{org_rolle}"}}"#
+    );
+    let (status, json) = anfrage(app, "POST", "/api/benutzer", admin, Some(&body)).await;
+    assert_eq!(status, StatusCode::CREATED, "{json:?}");
+    json["id"].as_i64().unwrap()
+}
+
+async fn rolle_setzen(app: &axum::Router, leit: &str, einsatz: i64, benutzer_id: i64, rolle: &str) {
+    let (status, _) = anfrage(
+        app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/mitglieder/{benutzer_id}"),
+        leit,
+        Some(&format!(r#"{{"einsatz_rolle":"{rolle}"}}"#)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+}
+
 fn body_mit_funktion(text: &str, empf: &str) -> String {
     serde_json::json!({
         "auftrag_text": text,
@@ -196,4 +217,127 @@ async fn abnehmen_vor_vollzug_ist_422() {
     let aid = a["id"].as_i64().unwrap();
     let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege/{aid}/abnehmen"), &admin, None).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn beobachter_liest_aber_schreibt_nicht() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    // Vom Admin angelegter Auftrag (echte ids für Empfänger-/Quittier-/Abnahme-Routen).
+    let (_, a) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege"), &admin, Some(&body_mit_funktion("X", "EA1"))).await;
+    let aid = a["id"].as_i64().unwrap();
+    let empf = a["empfaenger"][0]["id"].as_i64().unwrap();
+
+    // Zweiter Benutzer mit Einsatz-Rolle 'beobachter'.
+    let erika = benutzer_anlegen(&app, &admin, "erika", "keine").await;
+    rolle_setzen(&app, &admin, e, erika, "beobachter").await;
+    let erika_c = login_cookie(&app, "erika", "erikapw1").await;
+
+    // GET listen ist erlaubt (Lesezugriff).
+    let (status, _) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/auftraege"), &erika_c, None).await;
+    assert_eq!(status, StatusCode::OK);
+
+    // POST anlegen → 403 (gültiger Body, damit der Schreibrecht-Guard greift, nicht der Json-Extractor).
+    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege"), &erika_c, Some(&body_mit_funktion("Y", "EA2"))).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+
+    // POST quittieren → 403.
+    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege/{aid}/empfaenger/{empf}/quittieren"), &erika_c, None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+
+    // POST vollzug → 403 (gültiger Body 'in_arbeit', damit der Guard greift).
+    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege/{aid}/vollzug"), &erika_c, Some(r#"{"status":"in_arbeit"}"#)).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+
+    // POST abnehmen → 403.
+    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege/{aid}/abnehmen"), &erika_c, None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn cross_einsatz_abnehmen_ist_404() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let a_einsatz = einsatz_anlegen(&app, &admin).await;
+    let b_einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, a) = anfrage(&app, "POST", &format!("/api/einsaetze/{a_einsatz}/auftraege"), &admin, Some(&body_mit_funktion("X", "EA1"))).await;
+    let aid_a = a["id"].as_i64().unwrap();
+    // Auftrag aus A unter Einsatz B abnehmen → 404 (Cross-Einsatz-Schutz).
+    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{b_einsatz}/auftraege/{aid_a}/abnehmen"), &admin, None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn status_filter_trennt_offen_und_vollzogen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (_, a1) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege"), &admin, Some(&body_mit_funktion("A", "EA1"))).await;
+    let aid1 = a1["id"].as_i64().unwrap();
+    anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege"), &admin, Some(&body_mit_funktion("B", "EA2"))).await;
+
+    // A auf vollzogen setzen.
+    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege/{aid1}/vollzug"), &admin, Some(r#"{"status":"vollzogen","vollzugsmeldung":"x"}"#)).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, json) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/auftraege?status=vollzogen"), &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    let vollzogen = json.as_array().unwrap();
+    assert_eq!(vollzogen.len(), 1);
+    assert_eq!(vollzogen[0]["auftrag_text"], "A");
+
+    let (status, json) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/auftraege?status=offen"), &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    let offen = json.as_array().unwrap();
+    assert_eq!(offen.len(), 1);
+    assert_eq!(offen[0]["auftrag_text"], "B");
+}
+
+#[tokio::test]
+async fn vollzug_in_arbeit_setzt_status() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (_, a) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege"), &admin, Some(&body_mit_funktion("X", "EA1"))).await;
+    let aid = a["id"].as_i64().unwrap();
+    let (status, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege/{aid}/vollzug"), &admin, Some(r#"{"status":"in_arbeit"}"#)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["bearbeitungsstatus"], "in_arbeit");
+}
+
+#[tokio::test]
+async fn vollzogen_ohne_meldung_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (_, a) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege"), &admin, Some(&body_mit_funktion("X", "EA1"))).await;
+    let aid = a["id"].as_i64().unwrap();
+    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege/{aid}/vollzug"), &admin, Some(r#"{"status":"vollzogen"}"#)).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn ungueltiger_vollzug_status_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (_, a) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege"), &admin, Some(&body_mit_funktion("X", "EA1"))).await;
+    let aid = a["id"].as_i64().unwrap();
+    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege/{aid}/vollzug"), &admin, Some(r#"{"status":"quatsch","vollzugsmeldung":"x"}"#)).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn abnehmen_nach_vollzug_ist_erfolgreich() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (_, a) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege"), &admin, Some(&body_mit_funktion("X", "EA1"))).await;
+    let aid = a["id"].as_i64().unwrap();
+    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege/{aid}/vollzug"), &admin, Some(r#"{"status":"vollzogen","vollzugsmeldung":"fertig"}"#)).await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege/{aid}/abnehmen"), &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["bearbeitungsstatus"], "abgenommen");
 }
