@@ -518,6 +518,30 @@ export interface UhsDetail extends Uhs {
   material: EinsatzMaterial[];
 }
 
+export interface ChatKanal {
+  id: number;
+  einsatz_id: number;
+  name: string;
+  beschreibung: string | null;
+  erstellt_von_id: number;
+  erstellt_at: string;
+  archiviert_at: string | null;
+}
+
+export interface ChatNachricht {
+  id: number;
+  einsatz_id: number;
+  kanal_id: number;
+  autor_id: number;
+  autor_name: string;
+  /** `null` = gelöscht (Tombstone) — der Text wird vom Server nicht ausgeliefert. */
+  inhalt: string | null;
+  erstellt_at: string;
+  bearbeitet_at: string | null;
+  geloescht_at: string | null;
+  etb_eintrag_id: number | null;
+}
+
 // ============================== E‑5 Schäden ==============================
 
 export type SchadenStatus = 'offen' | 'uebergeben' | 'abgeschlossen';

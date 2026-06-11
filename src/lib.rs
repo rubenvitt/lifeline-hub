@@ -1,6 +1,7 @@
 pub mod app;
 pub mod auth;
 pub mod backup;
+pub mod chat;
 pub mod config;
 pub mod db;
 #[cfg(feature = "dev-seeds")]

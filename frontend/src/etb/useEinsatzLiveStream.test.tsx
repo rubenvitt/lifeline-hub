@@ -100,4 +100,21 @@ describe('useEinsatzLiveStream', () => {
       expect(keys).toContain('gefahrenmatrix');
     });
   });
+
+  it('invalidiert einsatz-chat-kanaele und einsatz-chat-nachrichten bei chat-Event', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={42} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit('chat');
+    await waitFor(() => {
+      const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+      expect(calls).toContainEqual(['einsatz-chat-kanaele', 42]);
+      expect(calls).toContainEqual(['einsatz-chat-nachrichten', 42]);
+    });
+  });
 });

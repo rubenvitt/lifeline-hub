@@ -74,7 +74,7 @@ export const modulRegistry: ModulEintrag[] = [
   { key: 'kraefteuebersicht', kategorie: 'lage', label: 'Kräfteübersicht', icon: TbListDetails, route: 'kraefteuebersicht', status: 'fertig', beschreibung: 'Meldebild der eingesetzten Kräfte.' },
   { key: 'gefahrenzonen', kategorie: 'lage', label: 'Gefahren', icon: TbAlertTriangle, route: 'gefahren', status: 'fertig', beschreibung: 'Gefahrenmatrix (Gefahrentyp × Schutzobjekt → Warnstufe) und Verknüpfung der Gefahrengebiete.' },
   // Kommunikation
-  { key: 'chat', kategorie: 'kommunikation', label: 'Chat', icon: TbMessageCircle, route: 'chat', status: 'geplant', beschreibung: 'Einsatzinterner Chat (pro Einsatz, nicht einsatzübergreifend).' },
+  { key: 'chat', kategorie: 'kommunikation', label: 'Chat', icon: TbMessageCircle, route: 'chat', status: 'fertig', beschreibung: 'Einsatzinterner Chat (pro Einsatz, nicht einsatzübergreifend).' },
   { key: 'erinnerungen', kategorie: 'kommunikation', label: 'Erinnerungen', icon: TbBell, route: 'erinnerungen', status: 'geplant', beschreibung: 'Terminierte Erinnerungen.' },
   { key: 'auftraege', kategorie: 'kommunikation', label: 'Aufträge/Befehle', icon: TbClipboardList, route: 'auftraege', status: 'geplant', beschreibung: 'Aufträge und Befehle mit Quittierung.' },
   { key: 'meldungen', kategorie: 'kommunikation', label: 'Meldungen (eingehend)', icon: TbInbox, route: 'meldungen', status: 'geplant', beschreibung: 'Eingehende Meldungen zur Bearbeitung.' },

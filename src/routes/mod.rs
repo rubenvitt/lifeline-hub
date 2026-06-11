@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod backup;
 pub mod benutzer;
+pub mod chat;
 #[cfg(feature = "dev-seeds")]
 pub mod dev;
 pub mod einheit_typ;
