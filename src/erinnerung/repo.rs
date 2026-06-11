@@ -177,6 +177,7 @@ pub async fn markiere_ausgeloest(
 /// Dubletten; bei bereits vorhandener offener Auto-Erinnerung wird die
 /// bestehende zurückgeliefert. Für späteres Wiring durch das Aufträge-Modul
 /// (LFH-52); dort wird `bezug_typ='auftrag'` + Auftrags-ID übergeben.
+#[allow(clippy::too_many_arguments)]
 pub async fn anlegen_aus_frist(
     pool: &SqlitePool,
     einsatz_id: i64,

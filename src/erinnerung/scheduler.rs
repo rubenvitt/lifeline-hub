@@ -57,6 +57,18 @@ pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>
     ausgeloest
 }
 
+/// Startet den Hintergrund-Scheduler (nur im Produktivlauf aus `main.rs`).
+/// Dünner Wrapper um `tick_einmal`; die Logik selbst ist oben testbar.
+pub fn starte_scheduler(pool: SqlitePool, live: LiveHub) {
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(Duration::from_secs(TICK_SEKUNDEN));
+        loop {
+            ticker.tick().await;
+            tick_einmal(&pool, &live, Utc::now()).await;
+        }
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -145,16 +157,4 @@ mod tests {
         let nachricht = rx.recv().await.unwrap();
         assert_eq!(nachricht.event, "erinnerung");
     }
-}
-
-/// Startet den Hintergrund-Scheduler (nur im Produktivlauf aus `main.rs`).
-/// Dünner Wrapper um `tick_einmal`; die Logik selbst ist oben testbar.
-pub fn starte_scheduler(pool: SqlitePool, live: LiveHub) {
-    tokio::spawn(async move {
-        let mut ticker = tokio::time::interval(Duration::from_secs(TICK_SEKUNDEN));
-        loop {
-            ticker.tick().await;
-            tick_einmal(&pool, &live, Utc::now()).await;
-        }
-    });
 }
