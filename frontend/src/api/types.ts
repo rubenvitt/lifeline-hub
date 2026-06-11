@@ -710,3 +710,32 @@ export interface LageberichtAnzeige {
   freigegeben_at: string | null;
   etb_eintrag_id: number | null;
 }
+
+// ============================== LFH-51 Terminierte Erinnerungen ==============================
+
+export interface Erinnerung {
+  id: number;
+  einsatz_id: number;
+  titel: string;
+  beschreibung: string | null;
+  faellig_at: string;
+  intervall_minuten: number | null;
+  empfaenger_funktion: string | null;
+  bezug_typ: string | null;
+  bezug_id: number | null;
+  quelle: string;
+  status: 'offen' | 'erledigt' | 'quittiert';
+  erledigt_at: string | null;
+  erstellt_von_id: number;
+  erstellt_at: string;
+  ist_faellig: boolean;
+}
+
+export interface NeueErinnerung {
+  titel: string;
+  beschreibung?: string;
+  /** 'YYYY-MM-DD HH:MM' (UTC). */
+  faellig_at: string;
+  intervall_minuten?: number;
+  empfaenger_funktion?: string;
+}
