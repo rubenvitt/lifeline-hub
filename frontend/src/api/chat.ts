@@ -1,8 +1,6 @@
 import { apiGet, apiSend } from './client';
 import type { ChatKanal, ChatNachricht, EtbTyp } from './types';
 
-/** Seitengröße der Nachrichten-Abfrage (muss zum Server-STANDARD_LIMIT passen). */
-export const SEITENGROESSE_CHAT = 100;
 
 export function listeKanaele(einsatzId: number): Promise<ChatKanal[]> {
   return apiGet<ChatKanal[]>(`/api/einsaetze/${einsatzId}/chat/kanaele`);

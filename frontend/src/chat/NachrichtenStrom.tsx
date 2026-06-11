@@ -30,7 +30,7 @@ export default function NachrichtenStrom({
                     ...(darfSchreiben && !heraufgestuft
                       ? [<Button key="hoch" type="link" size="small" onClick={() => onHeraufstufen(n)}>Zu ETB</Button>]
                       : []),
-                    ...(eigene
+                    ...(eigene && darfSchreiben
                       ? [
                           <Button key="edit" type="link" size="small" onClick={() => onBearbeiten(n)}>Bearbeiten</Button>,
                           <Button key="del" type="link" size="small" danger onClick={() => onLoeschen(n)}>Löschen</Button>,

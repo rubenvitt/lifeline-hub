@@ -40,6 +40,15 @@ describe('NachrichtenStrom', () => {
     expect(screen.getByText(/heraufgestuft zu ETB/i)).toBeInTheDocument();
   });
 
+  it('blendet Bearbeiten/Löschen bei fehlendem Schreibrecht aus (eigene Nachricht)', () => {
+    renderMitProviders(
+      <NachrichtenStrom nachrichten={[nachricht({ autor_id: 1 })]} eigeneBenutzerId={1} darfSchreiben={false}
+        onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={vi.fn()} />,
+    );
+    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
+  });
+
   it('Aktionen nur an eigenen Nachrichten; Heraufstufen löst Callback aus', async () => {
     const onHeraufstufen = vi.fn();
     renderMitProviders(
