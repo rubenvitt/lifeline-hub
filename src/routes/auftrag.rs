@@ -290,3 +290,64 @@ pub async fn quittieren(
     sse(&state, einsatz_id);
     Ok(Json(d))
 }
+
+#[derive(Debug, Deserialize)]
+pub struct VollzugReq {
+    /// 'in_arbeit' | 'vollzogen'.
+    pub status: String,
+    pub vollzugsmeldung: Option<String>,
+}
+
+/// POST /api/einsaetze/{id}/auftraege/{aid}/vollzug — Bearbeitungsfortschritt (Achse 2).
+pub async fn vollzug(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, auftrag_id)): Path<(i64, i64)>,
+    Json(req): Json<VollzugReq>,
+) -> Result<Json<AuftragDetail>, AppError> {
+    let org_id = fordere_bearbeitbar(&state, &benutzer, einsatz_id, auftrag_id).await?;
+    let now = jetzt();
+    match req.status.as_str() {
+        "in_arbeit" => {
+            repo::setze_in_arbeit(&state.pool, org_id, einsatz_id, auftrag_id, benutzer.id, &now).await?;
+        }
+        "vollzogen" => {
+            let text = req
+                .vollzugsmeldung
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| AppError::Validation("Vollzugsmeldung darf nicht leer sein".into()))?;
+            let etb_id = repo::melde_vollzug(&state.pool, org_id, einsatz_id, auftrag_id, benutzer.id, text, &now).await?;
+            if let Ok(etb) = crate::etb::repo::laden(&state.pool, etb_id).await {
+                if let Ok(json) = serde_json::to_string(&etb) {
+                    state.live.publiziere(einsatz_id, json);
+                }
+            }
+        }
+        _ => return Err(AppError::Validation("Ungültiger Vollzug-Status".into())),
+    }
+    let d = repo::laden(&state.pool, auftrag_id, &now).await?;
+    sse(&state, einsatz_id);
+    Ok(Json(d))
+}
+
+/// POST /api/einsaetze/{id}/auftraege/{aid}/abnehmen — Führung nimmt Vollzug ab.
+pub async fn abnehmen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, auftrag_id)): Path<(i64, i64)>,
+) -> Result<Json<AuftragDetail>, AppError> {
+    fordere_bearbeitbar(&state, &benutzer, einsatz_id, auftrag_id).await?;
+    let now = jetzt();
+    let aktuell = repo::laden(&state.pool, auftrag_id, &now).await?;
+    if aktuell.auftrag.vollzug_status != "vollzogen" {
+        return Err(AppError::UnprocessableEntity(
+            "Nur vollzogene Aufträge können abgenommen werden".into(),
+        ));
+    }
+    repo::nimm_ab(&state.pool, auftrag_id, benutzer.id, &now).await?;
+    let d = repo::laden(&state.pool, auftrag_id, &now).await?;
+    sse(&state, einsatz_id);
+    Ok(Json(d))
+}

@@ -166,3 +166,34 @@ async fn quittieren_aendert_quittung_nicht_vollzug() {
     assert_eq!(json["vollzug_status"], "offen");
     assert_eq!(json["bearbeitungsstatus"], "offen");
 }
+
+#[tokio::test]
+async fn vollzug_melden_erzeugt_etb_meldung_und_setzt_status() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (_, a) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege"), &admin, Some(&body_mit_funktion("X", "EA1"))).await;
+    let aid = a["id"].as_i64().unwrap();
+
+    let body = r#"{"status":"vollzogen","vollzugsmeldung":"Deich gehalten"}"#;
+    let (status, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege/{aid}/vollzug"), &admin, Some(body)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["bearbeitungsstatus"], "vollzogen");
+    assert_eq!(json["vollzugsmeldung"], "Deich gehalten");
+
+    let (_, etb) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/etb"), &admin, None).await;
+    let typen: Vec<&str> = etb.as_array().unwrap().iter().filter_map(|x| x["typ"].as_str()).collect();
+    assert!(typen.contains(&"anordnung"));
+    assert!(typen.contains(&"meldung"));
+}
+
+#[tokio::test]
+async fn abnehmen_vor_vollzug_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (_, a) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege"), &admin, Some(&body_mit_funktion("X", "EA1"))).await;
+    let aid = a["id"].as_i64().unwrap();
+    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege/{aid}/abnehmen"), &admin, None).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
