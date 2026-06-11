@@ -129,6 +129,32 @@ describe('Schnellerfassung', () => {
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({ von: 'Florian 1' });
   });
 
+  it('bietet disponierte Funkrufnamen auch als Empfänger-Vorschlag (an)', async () => {
+    server.use(
+      http.get('/api/einsaetze/7/fahrzeuge', () =>
+        HttpResponse.json([{ id: 1, funkrufname: 'Florian 1', opta: null }]),
+      ),
+      http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
+    );
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Lage /an');
+    await userEvent.click(await screen.findByText('An'));
+    const chip = await screen.findByRole('combobox', { name: 'An' });
+    await userEvent.type(chip, 'Florian');
+    // Klick auf den Vorschlag committet sofort via AutoComplete onSelect → onCommit.
+    const vorschlag = await screen.findByText(
+      (_, el) => typeof el?.className === 'string'
+        && el.className.includes('ant-select-item-option-content')
+        && el.textContent === 'Florian 1',
+    );
+    await userEvent.click(vorschlag);
+    await userEvent.type(feld, '{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({ an: 'Florian 1' });
+  });
+
   it('Enter bei offenem Menü sendet nicht', async () => {
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);
