@@ -378,15 +378,18 @@ pub async fn melde_vollzug(
         .bind(etb_id)
         .execute(&mut *tx)
         .await?;
+    // Vollzug-Achse im SELBEN Commit wie ETB-Meldung + Rückmeldetext (atomar):
+    // ein Teilfehler rollt alles zurück, kein verwaister ETB-Eintrag.
+    krepo::setze_vollzug_tx(&mut tx, org_id, einsatz_id, OBJEKT_AUFTRAG, auftrag_id, VOLLZUG_VOLLZOGEN, von_id, jetzt).await?;
     tx.commit().await?;
-    // Vollzug-Achse außerhalb der tx (eigener Pool-Schreibpfad).
-    krepo::setze_vollzug(pool, org_id, einsatz_id, OBJEKT_AUFTRAG, auftrag_id, VOLLZUG_VOLLZOGEN, von_id, jetzt).await?;
     Ok(etb_id)
 }
 
 /// Abnahme durch die Führung (4. Stufe). Setzt abgenommen_at/_von_id am Auftrag.
+/// Idempotent (first-write-wins via `abgenommen_at IS NULL`) — eine bereits
+/// erfolgte Abnahme (Zeitstempel + verantwortliche Person) bleibt unveränderlich.
 pub async fn nimm_ab(pool: &SqlitePool, auftrag_id: i64, von_id: i64, jetzt: &str) -> Result<(), AppError> {
-    sqlx::query("UPDATE auftrag SET abgenommen_at = ?, abgenommen_von_id = ? WHERE id = ?")
+    sqlx::query("UPDATE auftrag SET abgenommen_at = ?, abgenommen_von_id = ? WHERE id = ? AND abgenommen_at IS NULL")
         .bind(jetzt)
         .bind(von_id)
         .bind(auftrag_id)
