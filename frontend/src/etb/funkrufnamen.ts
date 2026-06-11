@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeEinheiten } from '../api/einheiten';
 
@@ -17,12 +18,14 @@ export function useFunkrufnamen(einsatzId: number): string[] {
     queryFn: () => listeEinheiten(einsatzId),
   });
 
-  const namen = new Set<string>();
-  for (const f of fahrzeuge.data ?? []) {
-    namen.add(f.opta ? `${f.funkrufname} (${f.opta})` : f.funkrufname);
-  }
-  for (const e of einheiten.data ?? []) {
-    if (e.name) namen.add(e.name);
-  }
-  return [...namen].sort((a, b) => a.localeCompare(b, 'de'));
+  return useMemo(() => {
+    const namen = new Set<string>();
+    for (const f of fahrzeuge.data ?? []) {
+      namen.add(f.opta ? `${f.funkrufname} (${f.opta})` : f.funkrufname);
+    }
+    for (const e of einheiten.data ?? []) {
+      namen.add(e.name);
+    }
+    return [...namen].sort((a, b) => a.localeCompare(b, 'de'));
+  }, [fahrzeuge.data, einheiten.data]);
 }
