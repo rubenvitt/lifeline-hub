@@ -59,6 +59,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       inval('einsatz-chat-nachrichten');
     };
     const onErinnerung = () => inval('einsatz-erinnerungen');
+    const onAuftrag = () => inval('einsatz-auftraege');
     // Buffer-Overflow (verpasste Events) → konservativ alles refetchen.
     const onLag = () => {
       onUhs();
@@ -73,6 +74,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       onLagebericht();
       onChat();
       onErinnerung();
+      onAuftrag();
     };
 
     quelle.addEventListener('uhs', onUhs);
@@ -87,6 +89,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     quelle.addEventListener('lagebericht', onLagebericht);
     quelle.addEventListener('chat', onChat);
     quelle.addEventListener('erinnerung', onErinnerung);
+    quelle.addEventListener('auftrag', onAuftrag);
     quelle.addEventListener('lagged', onLag);
     return () => {
       quelle.removeEventListener('uhs', onUhs);
@@ -101,6 +104,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       quelle.removeEventListener('lagebericht', onLagebericht);
       quelle.removeEventListener('chat', onChat);
       quelle.removeEventListener('erinnerung', onErinnerung);
+      quelle.removeEventListener('auftrag', onAuftrag);
       quelle.removeEventListener('lagged', onLag);
       quelle.close();
     };

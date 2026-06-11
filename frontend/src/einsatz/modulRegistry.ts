@@ -76,7 +76,7 @@ export const modulRegistry: ModulEintrag[] = [
   // Kommunikation
   { key: 'chat', kategorie: 'kommunikation', label: 'Chat', icon: TbMessageCircle, route: 'chat', status: 'fertig', beschreibung: 'Einsatzinterner Chat (pro Einsatz, nicht einsatzübergreifend).' },
   { key: 'erinnerungen', kategorie: 'kommunikation', label: 'Erinnerungen', icon: TbBell, route: 'erinnerungen', status: 'fertig', beschreibung: 'Terminierte Erinnerungen.' },
-  { key: 'auftraege', kategorie: 'kommunikation', label: 'Aufträge/Befehle', icon: TbClipboardList, route: 'auftraege', status: 'geplant', beschreibung: 'Aufträge und Befehle mit Quittierung.' },
+  { key: 'auftraege', kategorie: 'kommunikation', label: 'Aufträge/Befehle', icon: TbClipboardList, route: 'auftraege', status: 'fertig', beschreibung: 'Aufträge und Befehle mit Quittierung.' },
   { key: 'meldungen', kategorie: 'kommunikation', label: 'Meldungen (eingehend)', icon: TbInbox, route: 'meldungen', status: 'geplant', beschreibung: 'Eingehende Meldungen zur Bearbeitung.' },
   // Einstellungen
   { key: 'einsatz-einstellungen', kategorie: 'einstellungen', label: 'Einstellungen', icon: TbSettings, route: 'einstellungen', status: 'geplant', beschreibung: 'Einsatzbezogene Einstellungen.' },
