@@ -6,6 +6,10 @@ export interface AbschnittEingabe {
   ueber_abschnitt_id?: number | null;
   leiter_id?: number | null;
   bemerkung?: string | null;
+  sprechgruppe_tmo?: string | null;
+  sprechgruppe_dmo?: string | null;
+  kommunikationsmittel?: string | null;
+  erreichbarkeit?: string | null;
   sortier?: number;
 }
 

@@ -4,7 +4,8 @@ import type { Einheit, EinsatzPersonal, EinsatzFahrzeug, EinsatzMaterial, Einsat
 
 const ab = (id: number, ueber: number | null = null, name = `A${id}`): Einsatzabschnitt =>
   ({ id, einsatz_id: 1, ueber_abschnitt_id: ueber, name, leiter_id: null, leiter_name: null,
-     bemerkung: null, sortier: id, flaeche_geojson: null, tz_fachaufgabe: null, tz_organisation: null });
+     bemerkung: null, sortier: id, flaeche_geojson: null, tz_fachaufgabe: null, tz_organisation: null,
+     sprechgruppe_tmo: null, sprechgruppe_dmo: null, kommunikationsmittel: null, erreichbarkeit: null });
 const eh = (id: number, abschnitt_id: number | null, ueber_einheit_id: number | null = null): Einheit =>
   ({ id, einsatz_id: 1, abschnitt_id, abschnitt_name: null, ueber_einheit_id, typ_id: null,
      typ_label: 'Gruppe', name: `E${id}`, fuehrer_id: null, fuehrer_name: null, bemerkung: null,

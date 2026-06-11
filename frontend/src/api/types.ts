@@ -289,6 +289,11 @@ export interface Einsatzabschnitt {
   flaeche_geojson: string | null;
   tz_fachaufgabe: string | null;
   tz_organisation: string | null;
+  // LFH-86: Funk-/Kommunikations-Stammdaten je Abschnitt (einsatz-scoped).
+  sprechgruppe_tmo: string | null;
+  sprechgruppe_dmo: string | null;
+  kommunikationsmittel: string | null;
+  erreichbarkeit: string | null;
 }
 
 /** Personal-Mitglied einer Einheit (leichtgewichtig). */
