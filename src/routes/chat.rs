@@ -5,7 +5,9 @@ use crate::chat::{ChatKanalAnzeige, ChatNachrichtAnzeige};
 use crate::einsatz::berechtigung::{fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
-use crate::etb::EtbTyp;
+// Vokabular modulübergreifend über das Kommunikations-Fundament referenziert
+// (LFH-84) statt direkt aus `etb` — Single Source of Truth bleibt `etb`.
+use crate::kommunikation::EtbTyp;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;

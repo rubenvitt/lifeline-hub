@@ -21,6 +21,7 @@ pub async fn quittiere(
 
 /// Setzt die Vollzugs-Achse (UPSERT je Objekt). Quittung bleibt unberührt.
 /// `vollzogen_at`/`_von` nur bei Zielstatus `vollzogen` gesetzt.
+#[allow(clippy::too_many_arguments)]
 pub async fn setze_vollzug(
     pool: &SqlitePool, org_id: i64, einsatz_id: i64,
     objekt_typ: &str, objekt_id: i64, status: &str, von_id: i64, jetzt: &str,
