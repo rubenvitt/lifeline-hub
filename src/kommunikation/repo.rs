@@ -169,4 +169,37 @@ mod tests {
             .bind(b).fetch_one(&pool).await.unwrap();
         assert_eq!(n, 1);
     }
+
+    #[tokio::test]
+    async fn vermerke_zustellung_haelt_ersten_zeitstempel() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        vermerke_zustellung(&pool, 1, e, OBJEKT_ERINNERUNG, 7, b, "2026-06-11 10:00:00").await.unwrap();
+        vermerke_zustellung(&pool, 1, e, OBJEKT_ERINNERUNG, 7, b, "2026-06-11 10:09:00").await.unwrap();
+        let row: (i64, Option<String>) = sqlx::query_as(
+            "SELECT COUNT(*), MIN(zugestellt_at) FROM kommunikation_zustellung WHERE objekt_id = 7 AND empfaenger_id = ?")
+            .bind(b).fetch_one(&pool).await.unwrap();
+        assert_eq!(row.0, 1, "eine Zeile je (Objekt, Empfänger)");
+        assert_eq!(row.1.as_deref(), Some("2026-06-11 10:00:00"), "erster Zeitstempel bleibt erhalten");
+    }
+
+    #[tokio::test]
+    async fn vollzug_in_arbeit_haelt_vollzogen_felder_leer_und_downgrade_loescht_sie() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        // in_arbeit: keine vollzogen-Felder
+        setze_vollzug(&pool, 1, e, OBJEKT_ERINNERUNG, 7, VOLLZUG_IN_ARBEIT, b, "2026-06-11 10:00:00").await.unwrap();
+        let s1 = lade_status(&pool, e, OBJEKT_ERINNERUNG, 7).await.unwrap().unwrap();
+        assert_eq!(s1.vollzug_status, VOLLZUG_IN_ARBEIT);
+        assert!(s1.vollzogen_at.is_none());
+        assert!(s1.vollzogen_von_id.is_none());
+        // vollzogen setzt sie
+        setze_vollzug(&pool, 1, e, OBJEKT_ERINNERUNG, 7, VOLLZUG_VOLLZOGEN, b, "2026-06-11 11:00:00").await.unwrap();
+        assert!(lade_status(&pool, e, OBJEKT_ERINNERUNG, 7).await.unwrap().unwrap().vollzogen_at.is_some());
+        // Downgrade zurück auf in_arbeit löscht sie wieder
+        setze_vollzug(&pool, 1, e, OBJEKT_ERINNERUNG, 7, VOLLZUG_IN_ARBEIT, b, "2026-06-11 12:00:00").await.unwrap();
+        let s3 = lade_status(&pool, e, OBJEKT_ERINNERUNG, 7).await.unwrap().unwrap();
+        assert!(s3.vollzogen_at.is_none(), "Downgrade löscht vollzogen_at");
+        assert!(s3.vollzogen_von_id.is_none());
+    }
 }
