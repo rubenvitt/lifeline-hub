@@ -78,7 +78,7 @@ pub async fn laden(pool: &SqlitePool, id: i64) -> Result<EtbEintragAnzeige, AppE
     sqlx::query_as::<_, EtbEintragAnzeige>(
         "SELECT e.id, e.lfd_nr, e.typ, e.inhalt, e.von, e.an, e.meldeweg, e.veranlassung, \
                 e.erfasser_id, b.anzeigename AS erfasser_name, e.ereigniszeit, e.received_at, \
-                e.erfasst_lokal_at, e.berichtigt_eintrag_id, e.lagebericht_id \
+                e.erfasst_lokal_at, e.berichtigt_eintrag_id, e.lagebericht_id, e.auftrag_id \
          FROM etb_eintrag e JOIN benutzer b ON b.id = e.erfasser_id \
          WHERE e.id = ?",
     )
@@ -140,7 +140,7 @@ pub async fn abfrage(
     let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
         "SELECT e.id, e.lfd_nr, e.typ, e.inhalt, e.von, e.an, e.meldeweg, e.veranlassung, \
                 e.erfasser_id, b.anzeigename AS erfasser_name, e.ereigniszeit, e.received_at, \
-                e.erfasst_lokal_at, e.berichtigt_eintrag_id, e.lagebericht_id \
+                e.erfasst_lokal_at, e.berichtigt_eintrag_id, e.lagebericht_id, e.auftrag_id \
          FROM etb_eintrag e JOIN benutzer b ON b.id = e.erfasser_id",
     );
 
@@ -550,5 +550,6 @@ mod tests {
             .unwrap();
 
         assert_eq!(a.lagebericht_id, None);
+        assert_eq!(a.auftrag_id, None);
     }
 }
