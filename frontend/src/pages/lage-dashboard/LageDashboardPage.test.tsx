@@ -6,6 +6,7 @@ import { Route, Routes } from 'react-router-dom';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import LageDashboardPage from './LageDashboardPage';
+import type { Auftrag } from '../../api/types';
 
 class FakeEventSource {
   url: string; closed = false;
@@ -31,6 +32,17 @@ const person = (sichtung: string | null, status = 'betroffen') => ({
   erfasst_at: '2026-06-08 09:00:00', erfasst_von: 1, geaendert_at: '2026-06-08 09:00:00',
   geaendert_von: 1, storniert_at: null, aktuelle_sichtung: sichtung, aktuelle_sichtung_at: null,
   aktueller_verbleib: null, aktuelle_uhs_id: null, aktueller_platz_id: null,
+});
+
+const auftrag = (over: Partial<Auftrag> = {}): Auftrag => ({
+  id: Math.floor(Math.random() * 1e9), einsatz_id: 1, auftrag_text: 'Deich sichern', absicht: null,
+  lage: null, ort: null, zeit: null, mittel: null, verbindung: null, sicherheit: null, prioritaet: 'normal',
+  frist_at: null, erteilt_at: '2026-06-11 09:00:00', in_arbeit_at: null, vollzugsmeldung: null,
+  abgenommen_at: null, abgenommen_von_id: null, etb_anordnung_id: 5, erstellt_von_id: 1,
+  erstellt_at: '2026-06-11 09:00:00', vollzug_status: 'offen', vollzogen_at: null, vollzogen_von_id: null,
+  empfaenger_anzahl: 1, quittiert_anzahl: 0, ist_ueberfaellig: false, bearbeitungsstatus: 'offen',
+  empfaenger: [],
+  ...over,
 });
 
 interface Daten {
@@ -98,6 +110,22 @@ describe('LageDashboardPage', () => {
     const patienten = await screen.findByText('Patienten (SK I–IV)');
     await userEvent.click(patienten);
     expect(await screen.findByText('PERSONEN-MODUL')).toBeInTheDocument();
+  });
+
+  it('Aufträge-Kachel: zählt offene/in-Arbeit und zeigt das Überfällig-Tag', async () => {
+    mockEndpunkte({
+      auftraege: [
+        auftrag({ bearbeitungsstatus: 'offen' }),
+        auftrag({ bearbeitungsstatus: 'in_arbeit', ist_ueberfaellig: true }),
+        auftrag({ bearbeitungsstatus: 'vollzogen' }),
+        auftrag({ bearbeitungsstatus: 'abgenommen' }),
+      ],
+    });
+    render();
+    // Überfällig-Tag als Lade-Anker (rendert erst nach dem Auftrags-Fetch).
+    expect(await screen.findByText('1 überfällig')).toBeInTheDocument();
+    // offen = bearbeitungsstatus ∉ {vollzogen, abgenommen} → 2
+    expect(screen.getByText('Offen / in Arbeit').closest('.ant-statistic')).toHaveTextContent('2');
   });
 
   it('Fehler-Resilienz: Gefahrenmatrix-Fehler → nur diese Kachel zeigt „—", Rest steht', async () => {
