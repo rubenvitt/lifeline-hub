@@ -72,10 +72,14 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
             config.karte_online_style_url.as_deref(),
         )?,
     };
+    let live = LiveHub::new();
+    // Zeitbasierte Erinnerungen: Hintergrund-Scheduler starten (nur im Server-Lauf).
+    lifeline_hub::erinnerung::scheduler::starte_scheduler(pool.clone(), live.clone());
+
     let app = build_router_mit_karte(
         AppState {
             pool,
-            live: LiveHub::new(),
+            live,
             fachebenen: lifeline_hub::karte::FachebenenState::neu(),
         },
         karte,
