@@ -25,6 +25,13 @@ pub struct ErinnerungAnzeige {
     pub erstellt_at: String,
     /// Abgeleitet: `faellig_at <= jetzt` zum Zeitpunkt der Abfrage.
     pub ist_faellig: bool,
+    // Geteilte Kommunikations-Achsen (LFH-84) per LEFT JOIN; Default für Zeilen
+    // ohne kommunikation_status-Eintrag: Vollzug 'offen', Quittung NULL.
+    pub quittiert_at: Option<String>,
+    pub quittiert_von_id: Option<i64>,
+    pub vollzug_status: String,
+    pub vollzogen_at: Option<String>,
+    pub vollzogen_von_id: Option<i64>,
 }
 
 pub const STATUS_OFFEN: &str = "offen";
