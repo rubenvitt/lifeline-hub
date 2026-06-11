@@ -139,7 +139,7 @@ pub async fn faellige_zum_ausloesen(
     sqlx::query_as::<_, FaelligeErinnerung>(
         "SELECT id, einsatz_id, faellig_at, intervall_minuten \
          FROM erinnerung \
-         WHERE status = 'offen' AND faellig_at <= ?1 \
+         WHERE status = 'offen' AND faellig_at <= ? \
            AND (zuletzt_ausgeloest_at IS NULL OR zuletzt_ausgeloest_at < faellig_at) \
          ORDER BY faellig_at, id",
     )
