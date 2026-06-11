@@ -36,4 +36,50 @@ describe('MetaChip', () => {
     await userEvent.type(screen.getByLabelText('Von'), '{Escape}');
     expect(onCancel).toHaveBeenCalledWith('von');
   });
+
+  it('Text-Feld mit Optionen: AutoComplete, Freitext bleibt per Enter möglich', async () => {
+    const onCommit = vi.fn();
+    renderMitProviders(
+      <MetaChip
+        feld="von"
+        editing
+        wert={undefined}
+        optionen={['Florian 1', 'RTW 1']}
+        onCommit={onCommit}
+        onCancel={vi.fn()}
+        onRemove={vi.fn()}
+        onEdit={vi.fn()}
+      />,
+    );
+    const input = screen.getByRole('combobox', { name: 'Von' });
+    await userEvent.type(input, 'Eigener Text{Enter}');
+    expect(onCommit).toHaveBeenCalledWith('von', 'Eigener Text');
+  });
+
+  it('Text-Feld mit Optionen: Klick auf Vorschlag committet sofort (onSelect)', async () => {
+    const onCommit = vi.fn();
+    renderMitProviders(
+      <MetaChip
+        feld="von"
+        editing
+        wert={undefined}
+        optionen={['Florian 1', 'RTW 1']}
+        onCommit={onCommit}
+        onCancel={vi.fn()}
+        onRemove={vi.fn()}
+        onEdit={vi.fn()}
+      />,
+    );
+    const input = screen.getByRole('combobox', { name: 'Von' });
+    await userEvent.type(input, 'Florian');
+    // Der echte klickbare Eintrag ist `.ant-select-item-option` (der role="option"-Knoten
+    // ist nur das a11y-Spiegelelement und reagiert nicht auf Klicks).
+    const eintrag = await screen.findByText(
+      (_, el) => typeof el?.className === 'string'
+        && el.className.includes('ant-select-item-option-content')
+        && el.textContent === 'Florian 1',
+    );
+    await userEvent.click(eintrag);
+    expect(onCommit).toHaveBeenCalledWith('von', 'Florian 1');
+  });
 });

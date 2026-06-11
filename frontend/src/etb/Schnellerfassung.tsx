@@ -9,6 +9,7 @@ import { ERFASSBARE_TYPEN, TYP_LABEL } from './typFarben';
 import type { BausteinFelder } from './bausteinEinsetzen';
 import MarkdownEditor, { type TextAreaRef } from '../components/MarkdownEditor';
 import MetaChip from './MetaChip';
+import { useFunkrufnamen } from './funkrufnamen';
 import SlashMenu, { type SlashMenuHandle } from './SlashMenu';
 import BausteinPlatzhalterModal from './BausteinPlatzhalterModal';
 import {
@@ -42,6 +43,10 @@ export default function Schnellerfassung({ erfassen, berichtigungZu, onBerichtig
   const [triggerStart, setTriggerStart] = useState(-1);
 
   const [bausteinOffen, setBausteinOffen] = useState<EtbBaustein | null>(null);
+
+  // Funkrufnamen disponierter Fahrzeuge/Einheiten als Vorschläge für von/an.
+  // Freitext bleibt Fallback (AC#1).
+  const funkrufnamen = useFunkrufnamen(einsatz.id);
 
   // Moduswechsel Berichtigung → alles leeren und fokussieren.
   useEffect(() => {
@@ -177,6 +182,7 @@ export default function Schnellerfassung({ erfassen, berichtigungZu, onBerichtig
             feld={feld}
             editing={editFeld === feld}
             wert={metadaten[feld]}
+            optionen={feld === 'von' || feld === 'an' ? funkrufnamen : undefined}
             onCommit={commitFeld}
             onCancel={() => { setEditFeld(null); fokusInsFeld(); }}
             onRemove={(f) => setMetadaten((m) => ({ ...m, [f]: undefined }))}
@@ -189,6 +195,7 @@ export default function Schnellerfassung({ erfassen, berichtigungZu, onBerichtig
             feld={editFeld}
             editing
             wert={undefined}
+            optionen={editFeld === 'von' || editFeld === 'an' ? funkrufnamen : undefined}
             onCommit={commitFeld}
             onCancel={() => { setEditFeld(null); fokusInsFeld(); }}
             onRemove={() => setEditFeld(null)}
