@@ -14,6 +14,7 @@ pub use crate::etb::{EtbTyp, MeldeWeg};
 /// Objekttyp für die polymorphe Referenz `(objekt_typ, objekt_id)`.
 pub const OBJEKT_CHAT_NACHRICHT: &str = "chat_nachricht";
 pub const OBJEKT_ERINNERUNG: &str = "erinnerung";
+pub const OBJEKT_AUFTRAG: &str = "auftrag";
 
 /// Vollzug-Achse (Achse 2): Bearbeitungszustand eines Objekts.
 pub const VOLLZUG_OFFEN: &str = "offen";
@@ -53,5 +54,7 @@ mod tests {
     #[test]
     fn objekt_typen_sind_eindeutig() {
         assert_ne!(OBJEKT_CHAT_NACHRICHT, OBJEKT_ERINNERUNG);
+        assert_ne!(OBJEKT_AUFTRAG, OBJEKT_ERINNERUNG);
+        assert_ne!(OBJEKT_AUFTRAG, OBJEKT_CHAT_NACHRICHT);
     }
 }
