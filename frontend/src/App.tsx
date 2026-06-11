@@ -10,6 +10,7 @@ import StammdatenPage from './pages/StammdatenPage';
 import ProfilPage from './pages/ProfilPage';
 import EtbPage from './pages/EtbPage';
 import ChatPage from './pages/ChatPage';
+import ErinnerungenPage from './pages/ErinnerungenPage';
 import EinsatzdatenPage from './pages/EinsatzdatenPage';
 import FahrzeugePage from './pages/FahrzeugePage';
 import MaterialPage from './pages/MaterialPage';
@@ -45,6 +46,7 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   'lage-dashboard': <LageDashboardPage />,
   etb: <EtbPage />,
   chat: <ChatPage />,
+  erinnerungen: <ErinnerungenPage />,
   einsatzdaten: <EinsatzdatenPage />,
   fahrzeuge: <FahrzeugePage />,
   material: <MaterialPage />,

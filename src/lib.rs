@@ -9,6 +9,7 @@ pub mod dev;
 pub mod einheit;
 pub mod einsatz;
 pub mod einsatzabschnitt;
+pub mod erinnerung;
 pub mod error;
 pub mod etb;
 pub mod etb_baustein;
