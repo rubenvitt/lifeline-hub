@@ -101,4 +101,35 @@ describe('EinsatzabschnittePage', () => {
     expect(zusammenfassung).toHaveTextContent('412_F_DRK');
     expect(zusammenfassung).toHaveTextContent(/Digitalfunk/i);
   });
+
+  it('sendet Funk-Felder getrimmt, leere als null beim Speichern', async () => {
+    let patchBody: Record<string, unknown> | null = null;
+    server.use(
+      ...handlers('einsatzleitung', 'aktiv', [{ ...funkAbschnitt, kommunikationsmittel: null, erreichbarkeit: null }]),
+      http.patch('/api/einsaetze/1/abschnitte/5', async ({ request }) => {
+        patchBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...funkAbschnitt, ...patchBody });
+      }),
+    );
+    renderPage();
+    await userEvent.click(await screen.findByText('Nord'));
+
+    // TMO geleert (→ null), DMO mit Leerzeichen befüllt (→ getrimmt),
+    // Erreichbarkeit nur Whitespace (→ null), Kommunikationsmittel via Select gewählt.
+    const tmo = await screen.findByDisplayValue('412_F_DRK');
+    await userEvent.clear(tmo);
+    await userEvent.type(screen.getByLabelText('Sprechgruppe DMO'), '  DMO 31  ');
+    await userEvent.type(screen.getByLabelText('Erreichbarkeit / Nummer'), '   ');
+    await userEvent.click(screen.getByLabelText('Kommunikationsmittel'));
+    await userEvent.click(await screen.findByText('Mobil'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(patchBody).not.toBeNull());
+    expect(patchBody).toMatchObject({
+      sprechgruppe_tmo: null,
+      sprechgruppe_dmo: 'DMO 31',
+      kommunikationsmittel: 'mobil',
+      erreichbarkeit: null,
+    });
+  });
 });

@@ -204,11 +204,7 @@ export default function EinsatzabschnittePage() {
                   <Select
                     allowClear
                     placeholder="Digitalfunk / Mobil / Festnetz"
-                    options={[
-                      { value: 'digitalfunk', label: 'Digitalfunk' },
-                      { value: 'mobil', label: 'Mobil' },
-                      { value: 'festnetz', label: 'Festnetz' },
-                    ]}
+                    options={Object.entries(KOMMUNIKATIONSMITTEL_LABEL).map(([value, label]) => ({ value, label }))}
                   />
                 </Form.Item>
                 <Form.Item label="Erreichbarkeit / Nummer" name="erreichbarkeit">
