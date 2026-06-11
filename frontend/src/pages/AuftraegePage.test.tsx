@@ -86,4 +86,14 @@ describe('AuftraegePage', () => {
     await userEvent.click(screen.getByText('quittieren'));
     await waitFor(() => expect(quittiereEmpfaenger).toHaveBeenCalledWith(1, 1, 1));
   });
+
+  it('meldet Vollzug über das Modal', async () => {
+    setzeVollzug.mockResolvedValue(auftrag({ bearbeitungsstatus: 'vollzogen' }));
+    renderPage();
+    await screen.findByText('Deich sichern');
+    await userEvent.click(screen.getByText('Vollzug melden'));
+    await userEvent.type(screen.getByPlaceholderText('Rückmeldung zur Erledigung'), 'Deich gehalten');
+    await userEvent.click(screen.getByRole('button', { name: 'Vollzug melden' }));
+    await waitFor(() => expect(setzeVollzug).toHaveBeenCalledWith(1, 1, 'vollzogen', 'Deich gehalten'));
+  });
 });

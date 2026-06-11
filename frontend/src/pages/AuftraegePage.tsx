@@ -1,13 +1,15 @@
 import { Alert, App, Breadcrumb, Col, Row, Spin, Typography } from 'antd';
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { ApiError } from '../api/client';
-import { legeAuftragAn, listeAuftraege, quittiereEmpfaenger } from '../api/auftraege';
+import { legeAuftragAn, listeAuftraege, nimmAb, quittiereEmpfaenger, setzeVollzug } from '../api/auftraege';
 import type { NeuerAuftrag } from '../api/types';
 import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
 import AuftragListe from '../auftraege/AuftragListe';
 import AuftragFormular from '../auftraege/AuftragFormular';
+import VollzugMeldenModal from '../auftraege/VollzugMeldenModal';
 
 export default function AuftraegePage() {
   const { id } = useParams();
@@ -34,6 +36,18 @@ export default function AuftraegePage() {
   const quittierenMutation = useMutation({
     mutationFn: ({ auftragId, empfaengerId }: { auftragId: number; empfaengerId: number }) =>
       quittiereEmpfaenger(einsatzId, auftragId, empfaengerId),
+    onSuccess: invalidiere,
+    onError: fehler,
+  });
+  const [vollzugFuer, setVollzugFuer] = useState<number | null>(null);
+  const vollzugMutation = useMutation({
+    mutationFn: ({ auftragId, status, text }: { auftragId: number; status: 'in_arbeit' | 'vollzogen'; text?: string }) =>
+      setzeVollzug(einsatzId, auftragId, status, text),
+    onSuccess: () => { invalidiere(); setVollzugFuer(null); },
+    onError: fehler,
+  });
+  const abnahmeMutation = useMutation({
+    mutationFn: (auftragId: number) => nimmAb(einsatzId, auftragId),
     onSuccess: invalidiere,
     onError: fehler,
   });
@@ -70,6 +84,9 @@ export default function AuftraegePage() {
             auftraege={auftraege}
             darfSchreiben={darfSchreiben}
             onQuittieren={(auftragId, empfaengerId) => quittierenMutation.mutate({ auftragId, empfaengerId })}
+            onInArbeit={(auftragId) => vollzugMutation.mutate({ auftragId, status: 'in_arbeit' })}
+            onVollzugMelden={(auftragId) => setVollzugFuer(auftragId)}
+            onAbnehmen={(auftragId) => abnahmeMutation.mutate(auftragId)}
           />
         </Col>
         {darfSchreiben && (
@@ -78,6 +95,12 @@ export default function AuftraegePage() {
           </Col>
         )}
       </Row>
+      <VollzugMeldenModal
+        offen={vollzugFuer !== null}
+        onAbbrechen={() => setVollzugFuer(null)}
+        onBestaetigen={(text) =>
+          vollzugFuer != null && vollzugMutation.mutate({ auftragId: vollzugFuer, status: 'vollzogen', text })}
+      />
     </div>
   );
 }
