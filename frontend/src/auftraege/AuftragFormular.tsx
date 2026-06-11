@@ -5,13 +5,35 @@ import type { AuftragPrioritaet, NeuerAuftrag, NeuerEmpfaenger } from '../api/ty
 
 const { TextArea } = Input;
 
+export interface ZielOption {
+  id: number;
+  name: string;
+}
+
 /** Lokale Picker-Zeit → UTC-Wireformat 'YYYY-MM-DD HH:mm:ss'. */
 function dayjsZuWire(d: dayjs.Dayjs | null): string | undefined {
   return d ? d.utc().format('YYYY-MM-DD HH:mm:ss') : undefined;
 }
 
-export default function AuftragFormular({ senden, onAnlegen }: {
+/** Wandelt ausgewählte "typ:id"-Werte + Funktions-Freitext in Empfänger-DTOs. */
+function baueEmpfaenger(ziele: string[], funktionText: string): NeuerEmpfaenger[] {
+  const strukturiert: NeuerEmpfaenger[] = ziele.map((wert) => {
+    const [typ, idRoh] = wert.split(':');
+    const id = Number(idRoh);
+    return typ === 'abschnitt'
+      ? { empfaenger_typ: 'abschnitt', abschnitt_id: id }
+      : { empfaenger_typ: 'einheit', einheit_id: id };
+  });
+  const funktionen: NeuerEmpfaenger[] = funktionText
+    .split(',').map((s) => s.trim()).filter(Boolean)
+    .map((funktion_text) => ({ empfaenger_typ: 'funktion', funktion_text }));
+  return [...strukturiert, ...funktionen];
+}
+
+export default function AuftragFormular({ senden, abschnitte, einheiten, onAnlegen }: {
   senden: boolean;
+  abschnitte: ZielOption[];
+  einheiten: ZielOption[];
   onAnlegen: (d: NeuerAuftrag) => void;
 }) {
   const { message } = App.useApp();
@@ -24,15 +46,18 @@ export default function AuftragFormular({ senden, onAnlegen }: {
   const [sicherheit, setSicherheit] = useState('');
   const [prioritaet, setPrioritaet] = useState<AuftragPrioritaet>('normal');
   const [frist, setFrist] = useState<dayjs.Dayjs | null>(null);
-  const [empfText, setEmpfText] = useState('');
+  const [ziele, setZiele] = useState<string[]>([]);
+  const [funktionText, setFunktionText] = useState('');
+
+  const zielOptionen = [
+    { label: 'Einsatzabschnitte', options: abschnitte.map((a) => ({ value: `abschnitt:${a.id}`, label: a.name })) },
+    { label: 'Einheiten', options: einheiten.map((e) => ({ value: `einheit:${e.id}`, label: e.name })) },
+  ];
 
   const absenden = () => {
     if (!text.trim()) { message.error('Auftragstext ist erforderlich'); return; }
-    if (!empfText.trim()) { message.error('Mindestens ein Empfänger ist erforderlich'); return; }
-    // MVP: Empfänger als Funktion (Freitext); strukturierte EA-/Einheit-Auswahl folgt.
-    const empfaenger: NeuerEmpfaenger[] = empfText
-      .split(',').map((s) => s.trim()).filter(Boolean)
-      .map((funktion_text) => ({ empfaenger_typ: 'funktion', funktion_text }));
+    const empfaenger = baueEmpfaenger(ziele, funktionText);
+    if (empfaenger.length === 0) { message.error('Mindestens ein Empfänger ist erforderlich'); return; }
     onAnlegen({
       auftrag_text: text.trim(),
       absicht: absicht.trim() || undefined,
@@ -46,14 +71,25 @@ export default function AuftragFormular({ senden, onAnlegen }: {
       empfaenger,
     });
     setText(''); setAbsicht(''); setLage(''); setOrt(''); setMittel('');
-    setVerbindung(''); setSicherheit(''); setFrist(null); setEmpfText('');
+    setVerbindung(''); setSicherheit(''); setFrist(null); setZiele([]); setFunktionText('');
   };
 
   return (
     <Card size="small" title="Neuer Auftrag/Befehl">
       <Form layout="vertical" onFinish={absenden}>
-        <Form.Item label="Empfänger (EA/Einheit/Funktion, kommagetrennt)" required>
-          <Input value={empfText} onChange={(e) => setEmpfText(e.target.value)} placeholder="Abschnitt Nord, 2. Zug" />
+        <Form.Item label="Empfänger – Abschnitte / Einheiten">
+          <Select
+            mode="multiple"
+            value={ziele}
+            onChange={setZiele}
+            options={zielOptionen}
+            placeholder="Abschnitte / Einheiten wählen"
+            optionFilterProp="label"
+            allowClear
+          />
+        </Form.Item>
+        <Form.Item label="Weitere Empfänger (Funktion, kommagetrennt)">
+          <Input value={funktionText} onChange={(e) => setFunktionText(e.target.value)} placeholder="z. B. S3, Fachberater" />
         </Form.Item>
         <Form.Item label="Auftrag / Was" required>
           <TextArea value={text} onChange={(e) => setText(e.target.value)} rows={2} />

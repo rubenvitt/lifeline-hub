@@ -6,12 +6,15 @@ import { App as AntApp } from 'antd';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import AuftraegePage from './AuftraegePage';
 import type { Auftrag } from '../api/types';
+import { ladeEinsatz } from '../api/einsaetze';
 
 vi.mock('../etb/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 vi.mock('../auth/AuthContext', () => ({ useAuth: () => ({ benutzer: { id: 1 } }) }));
 vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn().mockResolvedValue({ id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung' }),
 }));
+vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn().mockResolvedValue([]) }));
+vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn().mockResolvedValue([]) }));
 
 const listeAuftraege = vi.fn();
 const legeAuftragAn = vi.fn();
@@ -69,7 +72,9 @@ describe('AuftraegePage', () => {
     legeAuftragAn.mockResolvedValue(auftrag());
     renderPage();
     await screen.findByText('Deich sichern');
-    await userEvent.type(screen.getByPlaceholderText('Abschnitt Nord, 2. Zug'), 'EA Nord');
+    await userEvent.type(screen.getByPlaceholderText('z. B. S3, Fachberater'), 'EA Nord');
+    // textbox[0] = Funktions-Freitext-Input, textbox[1] = "Auftrag / Was"-TextArea.
+    // (Der Empfänger-Filter der Seite ist ein combobox, kein textbox.)
     const textareas = screen.getAllByRole('textbox');
     await userEvent.type(textareas[1], 'Erkunden');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
@@ -102,6 +107,38 @@ describe('AuftraegePage', () => {
     await screen.findByText('Deich sichern');
     // 'Vollzogen' erscheint nur im Segmented (Default-Auftrag ist 'offen') → eindeutig.
     await userEvent.click(screen.getByText('Vollzogen'));
-    await waitFor(() => expect(listeAuftraege).toHaveBeenCalledWith(1, { status: 'vollzogen' }));
+    await waitFor(() => expect(listeAuftraege).toHaveBeenCalledWith(1, {
+      status: 'vollzogen', abschnittId: undefined, einheitId: undefined,
+    }));
+  });
+
+  it('setzt einen offenen Auftrag auf „In Bearbeitung"', async () => {
+    listeAuftraege.mockResolvedValue([auftrag({ bearbeitungsstatus: 'offen' })]);
+    setzeVollzug.mockResolvedValue(auftrag({ bearbeitungsstatus: 'in_arbeit' }));
+    renderPage();
+    await screen.findByText('Deich sichern');
+    // 'In Bearbeitung' kommt auch im Segmented vor → über den Action-<a> eindeutig.
+    await userEvent.click(screen.getByText('In Bearbeitung', { selector: 'a' }));
+    await waitFor(() => expect(setzeVollzug).toHaveBeenCalledWith(1, 1, 'in_arbeit', undefined));
+  });
+
+  it('nimmt einen vollzogenen Auftrag ab', async () => {
+    listeAuftraege.mockResolvedValue([auftrag({ bearbeitungsstatus: 'vollzogen' })]);
+    nimmAb.mockResolvedValue(auftrag({ bearbeitungsstatus: 'abgenommen' }));
+    renderPage();
+    await screen.findByText('Deich sichern');
+    await userEvent.click(screen.getByText('Abnehmen'));
+    await waitFor(() => expect(nimmAb).toHaveBeenCalledWith(1, 1));
+  });
+
+  it('Beobachter sieht Aufträge, aber keine Schreib-Aktionen', async () => {
+    // Einmaliger Override: clearAllMocks setzt nur Call-Records, nicht Implementierungen zurück.
+    vi.mocked(ladeEinsatz).mockResolvedValueOnce({
+      id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'beobachter',
+    } as Awaited<ReturnType<typeof ladeEinsatz>>);
+    renderPage();
+    expect(await screen.findByText('Deich sichern')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Auftrag erteilen' })).not.toBeInTheDocument();
+    expect(screen.queryByText('quittieren')).not.toBeInTheDocument();
   });
 });

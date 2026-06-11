@@ -1,10 +1,12 @@
-import { Alert, App, Breadcrumb, Col, Row, Segmented, Spin, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Col, Row, Segmented, Select, Spin, Typography } from 'antd';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { ApiError } from '../api/client';
 import { legeAuftragAn, listeAuftraege, nimmAb, quittiereEmpfaenger, setzeVollzug } from '../api/auftraege';
+import { listeAbschnitte } from '../api/einsatzabschnitte';
+import { listeEinheiten } from '../api/einheiten';
 import type { NeuerAuftrag } from '../api/types';
 import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
 import AuftragListe from '../auftraege/AuftragListe';
@@ -20,10 +22,19 @@ export default function AuftraegePage() {
   useEinsatzLiveStream(einsatzId);
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
+  const abschnitteQuery = useQuery({ queryKey: ['einsatz-abschnitte', einsatzId], queryFn: () => listeAbschnitte(einsatzId) });
+  const einheitenQuery = useQuery({ queryKey: ['einsatz-einheiten', einsatzId], queryFn: () => listeEinheiten(einsatzId) });
+
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
+  // Empfänger-Filter (LFH-92): kodiert als "abschnitt:<id>" bzw. "einheit:<id>".
+  const [empfFilter, setEmpfFilter] = useState<string | undefined>(undefined);
+  const [empfTyp, empfId] = empfFilter ? empfFilter.split(':') : [undefined, undefined];
+  const abschnittId = empfTyp === 'abschnitt' ? Number(empfId) : undefined;
+  const einheitId = empfTyp === 'einheit' ? Number(empfId) : undefined;
+
   const auftraegeQuery = useQuery({
-    queryKey: ['einsatz-auftraege', einsatzId, statusFilter ?? 'alle'],
-    queryFn: () => listeAuftraege(einsatzId, { status: statusFilter }),
+    queryKey: ['einsatz-auftraege', einsatzId, statusFilter ?? 'alle', empfFilter ?? 'alle'],
+    queryFn: () => listeAuftraege(einsatzId, { status: statusFilter, abschnittId, einheitId }),
   });
 
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
@@ -65,6 +76,13 @@ export default function AuftraegePage() {
     (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
   const auftraege = auftraegeQuery.data ?? [];
 
+  const abschnitte = (abschnitteQuery.data ?? []).map((a) => ({ id: a.id, name: a.name }));
+  const einheiten = (einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name }));
+  const empfaengerOptionen = [
+    { label: 'Einsatzabschnitte', options: abschnitte.map((a) => ({ value: `abschnitt:${a.id}`, label: a.name })) },
+    { label: 'Einheiten', options: einheiten.map((e) => ({ value: `einheit:${e.id}`, label: e.name })) },
+  ];
+
   return (
     <div>
       <Breadcrumb
@@ -81,18 +99,28 @@ export default function AuftraegePage() {
           {auftraegeQuery.isError && (
             <Alert type="error" showIcon style={{ marginBottom: 12 }} message="Aufträge konnten nicht geladen werden" />
           )}
-          <Segmented
-            style={{ marginBottom: 12 }}
-            value={statusFilter ?? 'alle'}
-            onChange={(v) => setStatusFilter(v === 'alle' ? undefined : String(v))}
-            options={[
-              { value: 'alle', label: 'Alle' },
-              { value: 'offen', label: 'Offen' },
-              { value: 'in_arbeit', label: 'In Bearbeitung' },
-              { value: 'vollzogen', label: 'Vollzogen' },
-              { value: 'abgenommen', label: 'Abgenommen' },
-            ]}
-          />
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12, alignItems: 'center' }}>
+            <Segmented
+              value={statusFilter ?? 'alle'}
+              onChange={(v) => setStatusFilter(v === 'alle' ? undefined : String(v))}
+              options={[
+                { value: 'alle', label: 'Alle' },
+                { value: 'offen', label: 'Offen' },
+                { value: 'in_arbeit', label: 'In Bearbeitung' },
+                { value: 'vollzogen', label: 'Vollzogen' },
+                { value: 'abgenommen', label: 'Abgenommen' },
+              ]}
+            />
+            <Select
+              allowClear
+              placeholder="Empfänger filtern"
+              style={{ minWidth: 220 }}
+              value={empfFilter}
+              onChange={(v) => setEmpfFilter(v ?? undefined)}
+              options={empfaengerOptionen}
+              optionFilterProp="label"
+            />
+          </div>
           <AuftragListe
             auftraege={auftraege}
             darfSchreiben={darfSchreiben}
@@ -104,7 +132,12 @@ export default function AuftraegePage() {
         </Col>
         {darfSchreiben && (
           <Col flex="360px">
-            <AuftragFormular senden={anlegenMutation.isPending} onAnlegen={(d) => anlegenMutation.mutate(d)} />
+            <AuftragFormular
+              senden={anlegenMutation.isPending}
+              abschnitte={abschnitte}
+              einheiten={einheiten}
+              onAnlegen={(d) => anlegenMutation.mutate(d)}
+            />
           </Col>
         )}
       </Row>
