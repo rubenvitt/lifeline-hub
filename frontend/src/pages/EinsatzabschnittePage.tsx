@@ -63,6 +63,10 @@ interface AbschnittWerte {
   ueber_abschnitt_id?: number | null;
   leiter_id?: number | null;
   bemerkung?: string;
+  sprechgruppe_tmo?: string;
+  sprechgruppe_dmo?: string;
+  kommunikationsmittel?: string;
+  erreichbarkeit?: string;
 }
 
 export default function EinsatzabschnittePage() {
@@ -95,6 +99,10 @@ export default function EinsatzabschnittePage() {
         ueber_abschnitt_id: werte.ueber_abschnitt_id ?? null,
         leiter_id: werte.leiter_id ?? null,
         bemerkung: werte.bemerkung?.trim() || null,
+        sprechgruppe_tmo: werte.sprechgruppe_tmo?.trim() || null,
+        sprechgruppe_dmo: werte.sprechgruppe_dmo?.trim() || null,
+        kommunikationsmittel: werte.kommunikationsmittel || null,
+        erreichbarkeit: werte.erreichbarkeit?.trim() || null,
       };
       return aktuell ? aktualisiereAbschnitt(einsatzId, aktuell.id, daten) : legeAbschnittAn(einsatzId, daten);
     },
@@ -117,6 +125,10 @@ export default function EinsatzabschnittePage() {
       form.setFieldsValue({
         name: aktuell.name, ueber_abschnitt_id: aktuell.ueber_abschnitt_id ?? undefined,
         leiter_id: aktuell.leiter_id ?? undefined, bemerkung: aktuell.bemerkung ?? undefined,
+        sprechgruppe_tmo: aktuell.sprechgruppe_tmo ?? undefined,
+        sprechgruppe_dmo: aktuell.sprechgruppe_dmo ?? undefined,
+        kommunikationsmittel: aktuell.kommunikationsmittel ?? undefined,
+        erreichbarkeit: aktuell.erreichbarkeit ?? undefined,
       });
     }
   }, [aktuell, form]);
@@ -175,6 +187,26 @@ export default function EinsatzabschnittePage() {
                 </Form.Item>
                 <Form.Item label="Abschnittsleiter" name="leiter_id">
                   <Select allowClear showSearch optionFilterProp="label" placeholder="Disponierte Person" options={personalOptionen} />
+                </Form.Item>
+                <Form.Item label="Sprechgruppe TMO" name="sprechgruppe_tmo">
+                  <Input placeholder="z. B. 412_F_DRK" allowClear />
+                </Form.Item>
+                <Form.Item label="Sprechgruppe DMO" name="sprechgruppe_dmo">
+                  <Input placeholder="z. B. DMO 31" allowClear />
+                </Form.Item>
+                <Form.Item label="Kommunikationsmittel" name="kommunikationsmittel">
+                  <Select
+                    allowClear
+                    placeholder="Digitalfunk / Mobil / Festnetz"
+                    options={[
+                      { value: 'digitalfunk', label: 'Digitalfunk' },
+                      { value: 'mobil', label: 'Mobil' },
+                      { value: 'festnetz', label: 'Festnetz' },
+                    ]}
+                  />
+                </Form.Item>
+                <Form.Item label="Erreichbarkeit / Nummer" name="erreichbarkeit">
+                  <Input placeholder="z. B. 0151 23456" allowClear />
                 </Form.Item>
                 <Form.Item label="Bemerkung" name="bemerkung"><Input.TextArea rows={2} /></Form.Item>
                 {darfSchreiben && (
