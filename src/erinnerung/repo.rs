@@ -171,6 +171,51 @@ pub async fn markiere_ausgeloest(
     Ok(())
 }
 
+/// Generischer Auto-Quelle-Hook: erzeugt eine Erinnerung/Nachfass aus einer
+/// überschrittenen Frist eines beliebigen Bezugs (z. B. Auftrag, Meldung).
+/// **Idempotent** je offenem Bezug — der partielle UNIQUE-Index verhindert
+/// Dubletten; bei bereits vorhandener offener Auto-Erinnerung wird die
+/// bestehende zurückgeliefert. Für späteres Wiring durch das Aufträge-Modul
+/// (LFH-52); dort wird `bezug_typ='auftrag'` + Auftrags-ID übergeben.
+pub async fn anlegen_aus_frist(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    ersteller_id: i64,
+    bezug_typ: &str,
+    bezug_id: i64,
+    titel: &str,
+    faellig_at: &str,
+    jetzt: &str,
+) -> Result<ErinnerungAnzeige, AppError> {
+    // Idempotenz: existiert bereits eine offene Auto-Erinnerung für den Bezug?
+    let vorhanden: Option<i64> = sqlx::query_scalar(
+        "SELECT id FROM erinnerung \
+         WHERE quelle = 'auto_frist' AND status = 'offen' AND bezug_typ = ? AND bezug_id = ?",
+    )
+    .bind(bezug_typ)
+    .bind(bezug_id)
+    .fetch_optional(pool)
+    .await?;
+    if let Some(id) = vorhanden {
+        return laden(pool, id, jetzt).await;
+    }
+
+    let id: i64 = sqlx::query_scalar(
+        "INSERT INTO erinnerung \
+           (einsatz_id, titel, faellig_at, bezug_typ, bezug_id, quelle, erstellt_von_id) \
+         VALUES (?, ?, ?, ?, ?, 'auto_frist', ?) RETURNING id",
+    )
+    .bind(einsatz_id)
+    .bind(titel)
+    .bind(faellig_at)
+    .bind(bezug_typ)
+    .bind(bezug_id)
+    .bind(ersteller_id)
+    .fetch_one(pool)
+    .await?;
+    laden(pool, id, jetzt).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -250,5 +295,24 @@ mod tests {
         let r = anlegen(&pool, e, b, daten("X", "2026-06-11 10:00:00", None), "2026-06-11 09:00:00").await.unwrap();
         assert!(gehoert_zu_einsatz(&pool, r.id, e).await.unwrap());
         assert!(!gehoert_zu_einsatz(&pool, r.id, 999).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn auto_frist_ist_idempotent_pro_bezug() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+
+        // Test-Double: „Auftrag 42 hat Quittungsfrist überschritten".
+        let erst = anlegen_aus_frist(&pool, e, b, "auftrag", 42, "Nachfass: Auftrag 42 unquittiert", "2026-06-11 10:00:00", "2026-06-11 10:00:00").await.unwrap();
+        assert_eq!(erst.quelle, crate::erinnerung::QUELLE_AUTO_FRIST);
+        assert_eq!(erst.bezug_typ.as_deref(), Some("auftrag"));
+        assert_eq!(erst.bezug_id, Some(42));
+
+        // Zweiter Aufruf für denselben offenen Bezug → keine Dublette, gleiche ID.
+        let zweit = anlegen_aus_frist(&pool, e, b, "auftrag", 42, "Nachfass: Auftrag 42 unquittiert", "2026-06-11 10:05:00", "2026-06-11 10:05:00").await.unwrap();
+        assert_eq!(zweit.id, erst.id);
+
+        let alle = liste(&pool, e, false, "2026-06-11 10:05:00").await.unwrap();
+        assert_eq!(alle.len(), 1, "nur eine Auto-Erinnerung je Bezug");
     }
 }
