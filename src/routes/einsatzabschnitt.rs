@@ -113,7 +113,7 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
 
-/// PATCH /api/einsaetze/{id}/abschnitte/{aid} — name/parent/leiter/bemerkung/sortier.
+/// PATCH /api/einsaetze/{id}/abschnitte/{aid} — Vollersatz editierbarer Felder (kein ETB-Eintrag).
 /// Kein ETB-Eintrag (reine Korrektur; Auflösen ist die sinntragende Aktion).
 pub async fn aktualisieren(
     State(state): State<AppState>,
