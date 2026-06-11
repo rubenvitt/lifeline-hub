@@ -60,6 +60,13 @@ pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
         .route("/api/einsaetze/{id}/etb", post(routes::etb::erfassen))
         .route("/api/einsaetze/{id}/etb", get(routes::etb::liste))
         .route("/api/einsaetze/{id}/etb/stream", get(routes::etb::stream))
+        .route("/api/einsaetze/{id}/chat/kanaele", get(routes::chat::kanaele_liste))
+        .route("/api/einsaetze/{id}/chat/kanaele", post(routes::chat::kanal_anlegen))
+        .route("/api/einsaetze/{id}/chat/kanaele/{kid}/nachrichten", get(routes::chat::nachrichten_liste))
+        .route("/api/einsaetze/{id}/chat/kanaele/{kid}/nachrichten", post(routes::chat::nachricht_erfassen))
+        .route("/api/einsaetze/{id}/chat/nachrichten/{mid}", patch(routes::chat::nachricht_bearbeiten))
+        .route("/api/einsaetze/{id}/chat/nachrichten/{mid}", delete(routes::chat::nachricht_loeschen))
+        .route("/api/einsaetze/{id}/chat/nachrichten/{mid}/heraufstufen-etb", post(routes::chat::heraufstufen))
         .route(
             "/api/einsaetze/{id}/fahrzeuge",
             get(routes::einsatz_fahrzeug::liste),
