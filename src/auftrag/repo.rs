@@ -153,6 +153,41 @@ pub async fn gehoert_zu_einsatz(
     Ok(treffer.is_some())
 }
 
+/// Setzt die Quittung einer Empfänger-Zeile (idempotent: hält den ersten Zeitstempel).
+pub async fn quittiere_empfaenger(
+    pool: &SqlitePool,
+    empfaenger_id: i64,
+    von_id: i64,
+    jetzt: &str,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE auftrag_empfaenger \
+         SET quittiert_at = COALESCE(quittiert_at, ?), quittiert_von_id = COALESCE(quittiert_von_id, ?) \
+         WHERE id = ?",
+    )
+    .bind(jetzt)
+    .bind(von_id)
+    .bind(empfaenger_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Prüft, ob eine Empfänger-Zeile zum Auftrag gehört (Cross-Objekt-Schutz).
+pub async fn empfaenger_gehoert_zu_auftrag(
+    pool: &SqlitePool,
+    empfaenger_id: i64,
+    auftrag_id: i64,
+) -> Result<bool, AppError> {
+    let treffer: Option<i64> =
+        sqlx::query_scalar("SELECT 1 FROM auftrag_empfaenger WHERE id = ? AND auftrag_id = ?")
+            .bind(empfaenger_id)
+            .bind(auftrag_id)
+            .fetch_optional(pool)
+            .await?;
+    Ok(treffer.is_some())
+}
+
 /// Legt einen Auftrag inkl. Empfänger an und erzeugt im selben Commit den
 /// ETB-Anordnungseintrag (Pattern B: anlegen_tx + Backlink auftrag_id auf BEIDEN
 /// Seiten). `daten` ist vom Handler validiert (auftrag_text + >=1 Empfänger,
@@ -403,5 +438,32 @@ mod tests {
         let nach = laden(&pool, d.auftrag.id, "2026-06-11 11:30:00").await.unwrap();
         assert_eq!(nach.auftrag.vollzug_status, "vollzogen");
         assert_eq!(nach.auftrag.bearbeitungsstatus, "vollzogen");
+    }
+
+    #[tokio::test]
+    async fn quittieren_setzt_nur_quittung_nicht_vollzug() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let d = anlegen(&pool, e, b, daten("X", None, vec![funktion("EA1"), funktion("EA2")]), "2026-06-11 09:00:00").await.unwrap();
+        let empf1 = d.empfaenger[0].id;
+
+        quittiere_empfaenger(&pool, empf1, b, "2026-06-11 10:00:00").await.unwrap();
+        let nach = laden(&pool, d.auftrag.id, "2026-06-11 10:01:00").await.unwrap();
+        assert_eq!(nach.auftrag.quittiert_anzahl, 1, "ein Empfänger quittiert");
+        assert_eq!(nach.auftrag.empfaenger_anzahl, 2);
+        assert_eq!(nach.auftrag.vollzug_status, "offen", "Quittung ändert Vollzug nicht");
+        assert_eq!(nach.auftrag.bearbeitungsstatus, "offen");
+        let e1 = nach.empfaenger.iter().find(|x| x.id == empf1).unwrap();
+        assert_eq!(e1.quittiert_at.as_deref(), Some("2026-06-11 10:00:00"));
+        assert_eq!(e1.quittiert_von_id, Some(b));
+    }
+
+    #[tokio::test]
+    async fn empfaenger_gehoert_zu_auftrag_schuetzt() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let d = anlegen(&pool, e, b, daten("X", None, vec![funktion("EA1")]), "2026-06-11 09:00:00").await.unwrap();
+        assert!(empfaenger_gehoert_zu_auftrag(&pool, d.empfaenger[0].id, d.auftrag.id).await.unwrap());
+        assert!(!empfaenger_gehoert_zu_auftrag(&pool, d.empfaenger[0].id, 999).await.unwrap());
     }
 }
