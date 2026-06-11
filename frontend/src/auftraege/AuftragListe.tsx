@@ -1,6 +1,30 @@
-import { Empty, List, Space, Tag, Typography } from 'antd';
+import { Collapse, Descriptions, Empty, List, Space, Tag, Typography } from 'antd';
 import type { ReactNode } from 'react';
 import type { Auftrag } from '../api/types';
+
+/** Befehlsschema-Felder für die Read-back-Detailansicht (Reihenfolge = Anzeige). */
+const SCHEMA_FELDER: { key: keyof Auftrag; label: string }[] = [
+  { key: 'absicht', label: 'Absicht/Ziel' },
+  { key: 'lage', label: 'Lage' },
+  { key: 'ort', label: 'Ort' },
+  { key: 'zeit', label: 'Zeit' },
+  { key: 'mittel', label: 'Mittel' },
+  { key: 'verbindung', label: 'Verbindung/Meldewege' },
+  { key: 'sicherheit', label: 'Sicherheit/Besonderes' },
+  { key: 'erteilt_at', label: 'Erteilt am' },
+];
+
+/** Liefert die gesetzten (nicht-null/nicht-leer) Schemafelder eines Auftrags.
+ *  erteilt_at ist ein UTC-Zeitstempel → mit „UTC"-Suffix (wie die Frist-Zeile). */
+function gefuellteFelder(a: Auftrag): { label: string; wert: string }[] {
+  return SCHEMA_FELDER
+    .map(({ key, label }) => {
+      const roh = (a[key] ?? '') as string;
+      const wert = key === 'erteilt_at' && roh ? `${roh} UTC` : roh;
+      return { label, wert };
+    })
+    .filter(({ wert }) => typeof wert === 'string' && wert.trim() !== '');
+}
 
 const PRIO_TAG: Record<string, { color: string; label: string }> = {
   sofort: { color: 'red', label: 'Sofort' },
@@ -34,6 +58,7 @@ export default function AuftragListe({
         const prio = PRIO_TAG[a.prioritaet] ?? PRIO_TAG.normal;
         const bearb = BEARB_TAG[a.bearbeitungsstatus] ?? BEARB_TAG.offen;
         const alleQuittiert = a.empfaenger_anzahl > 0 && a.quittiert_anzahl === a.empfaenger_anzahl;
+        const details = gefuellteFelder(a);
         const aktionen: ReactNode[] = darfSchreiben
           ? [
               a.bearbeitungsstatus === 'offen' && onInArbeit
@@ -80,6 +105,23 @@ export default function AuftragListe({
                   </div>
                   {a.vollzugsmeldung && (
                     <Typography.Text type="secondary">Vollzug: {a.vollzugsmeldung}</Typography.Text>
+                  )}
+                  {details.length > 0 && (
+                    <Collapse
+                      ghost
+                      size="small"
+                      items={[{
+                        key: 'details',
+                        label: 'Befehlsdetails',
+                        children: (
+                          <Descriptions size="small" column={1} bordered>
+                            {details.map(({ label, wert }) => (
+                              <Descriptions.Item key={label} label={label}>{wert}</Descriptions.Item>
+                            ))}
+                          </Descriptions>
+                        ),
+                      }]}
+                    />
                   )}
                 </Space>
               }

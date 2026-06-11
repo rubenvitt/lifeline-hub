@@ -73,15 +73,37 @@ describe('AuftraegePage', () => {
     renderPage();
     await screen.findByText('Deich sichern');
     await userEvent.type(screen.getByPlaceholderText('z. B. S3, Fachberater'), 'EA Nord');
-    // textbox[0] = Funktions-Freitext-Input, textbox[1] = "Auftrag / Was"-TextArea.
-    // (Der Empfänger-Filter der Seite ist ein combobox, kein textbox.)
-    const textareas = screen.getAllByRole('textbox');
-    await userEvent.type(textareas[1], 'Erkunden');
+    // Robust statt index-abhängig: die "Auftrag / Was"-TextArea trägt aria-label.
+    await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
     await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
     await waitFor(() => expect(legeAuftragAn).toHaveBeenCalledWith(1, expect.objectContaining({
       auftrag_text: 'Erkunden',
       empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'EA Nord' }],
     })));
+  });
+
+  it('sendet das Befehlsschema-Feld „Zeit/Wann" mit', async () => {
+    legeAuftragAn.mockResolvedValue(auftrag());
+    renderPage();
+    await screen.findByText('Deich sichern');
+    await userEvent.type(screen.getByPlaceholderText('z. B. S3, Fachberater'), 'EA Nord');
+    await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
+    await userEvent.type(screen.getByPlaceholderText('z. B. sofort, bis 14:00, nach Eintreffen'), 'sofort');
+    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+    await waitFor(() => expect(legeAuftragAn).toHaveBeenCalledWith(1, expect.objectContaining({
+      auftrag_text: 'Erkunden',
+      zeit: 'sofort',
+    })));
+  });
+
+  it('zeigt gefüllte Befehlsschema-Details aufklappbar (Read-back)', async () => {
+    listeAuftraege.mockResolvedValue([auftrag({ ort: 'Deichkrone Süd', zeit: 'sofort' })]);
+    renderPage();
+    await screen.findByText('Deich sichern');
+    // Detail-Panel ist eingeklappt → erst nach Klick sichtbar.
+    await userEvent.click(screen.getByText('Befehlsdetails'));
+    expect(await screen.findByText('Deichkrone Süd')).toBeInTheDocument();
+    expect(screen.getByText('sofort')).toBeInTheDocument();
   });
 
   it('quittiert einen Empfänger', async () => {

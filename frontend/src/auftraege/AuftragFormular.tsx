@@ -41,11 +41,13 @@ export default function AuftragFormular({ senden, abschnitte, einheiten, onAnleg
   const [absicht, setAbsicht] = useState('');
   const [lage, setLage] = useState('');
   const [ort, setOrt] = useState('');
+  const [zeit, setZeit] = useState('');
   const [mittel, setMittel] = useState('');
   const [verbindung, setVerbindung] = useState('');
   const [sicherheit, setSicherheit] = useState('');
   const [prioritaet, setPrioritaet] = useState<AuftragPrioritaet>('normal');
   const [frist, setFrist] = useState<dayjs.Dayjs | null>(null);
+  const [erteiltAm, setErteiltAm] = useState<dayjs.Dayjs | null>(null);
   const [ziele, setZiele] = useState<string[]>([]);
   const [funktionText, setFunktionText] = useState('');
 
@@ -63,15 +65,17 @@ export default function AuftragFormular({ senden, abschnitte, einheiten, onAnleg
       absicht: absicht.trim() || undefined,
       lage: lage.trim() || undefined,
       ort: ort.trim() || undefined,
+      zeit: zeit.trim() || undefined,
       mittel: mittel.trim() || undefined,
       verbindung: verbindung.trim() || undefined,
       sicherheit: sicherheit.trim() || undefined,
       prioritaet,
       frist_at: dayjsZuWire(frist),
+      erteilt_at: dayjsZuWire(erteiltAm),
       empfaenger,
     });
-    setText(''); setAbsicht(''); setLage(''); setOrt(''); setMittel('');
-    setVerbindung(''); setSicherheit(''); setFrist(null); setZiele([]); setFunktionText('');
+    setText(''); setAbsicht(''); setLage(''); setOrt(''); setZeit(''); setMittel('');
+    setVerbindung(''); setSicherheit(''); setFrist(null); setErteiltAm(null); setZiele([]); setFunktionText('');
   };
 
   return (
@@ -92,7 +96,7 @@ export default function AuftragFormular({ senden, abschnitte, einheiten, onAnleg
           <Input value={funktionText} onChange={(e) => setFunktionText(e.target.value)} placeholder="z. B. S3, Fachberater" />
         </Form.Item>
         <Form.Item label="Auftrag / Was" required>
-          <TextArea value={text} onChange={(e) => setText(e.target.value)} rows={2} />
+          <TextArea aria-label="Auftrag / Was" value={text} onChange={(e) => setText(e.target.value)} rows={2} />
         </Form.Item>
         <Form.Item label="Absicht / Ziel">
           <TextArea value={absicht} onChange={(e) => setAbsicht(e.target.value)} rows={1} />
@@ -102,6 +106,9 @@ export default function AuftragFormular({ senden, abschnitte, einheiten, onAnleg
         </Form.Item>
         <Form.Item label="Ort / Wo">
           <Input value={ort} onChange={(e) => setOrt(e.target.value)} />
+        </Form.Item>
+        <Form.Item label="Zeit / Wann">
+          <Input value={zeit} onChange={(e) => setZeit(e.target.value)} placeholder="z. B. sofort, bis 14:00, nach Eintreffen" />
         </Form.Item>
         <Form.Item label="Mittel / Womit">
           <Input value={mittel} onChange={(e) => setMittel(e.target.value)} />
@@ -124,6 +131,9 @@ export default function AuftragFormular({ senden, abschnitte, einheiten, onAnleg
             <DatePicker showTime value={frist} onChange={setFrist} style={{ width: '100%' }} format="YYYY-MM-DD HH:mm" />
           </Form.Item>
         </div>
+        <Form.Item label="Erteilt am (mündlich/per Funk – optional)">
+          <DatePicker showTime value={erteiltAm} onChange={setErteiltAm} style={{ width: '100%' }} format="YYYY-MM-DD HH:mm" />
+        </Form.Item>
         <Button type="primary" htmlType="submit" loading={senden} block>Auftrag erteilen</Button>
       </Form>
     </Card>
