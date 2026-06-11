@@ -1,4 +1,5 @@
 use crate::error::AppError;
+use crate::kommunikation::{repo as krepo, OBJEKT_AUFTRAG, VOLLZUG_IN_ARBEIT, VOLLZUG_VOLLZOGEN};
 use sqlx::SqlitePool;
 
 use super::{
@@ -320,6 +321,80 @@ async fn empfaenger_klartext(
     Ok(teile.join(", "))
 }
 
+/// Setzt Vollzug → 'in_arbeit' (geteilte Achse) und hält den Zeitstempel am Auftrag.
+pub async fn setze_in_arbeit(
+    pool: &SqlitePool,
+    org_id: i64,
+    einsatz_id: i64,
+    auftrag_id: i64,
+    von_id: i64,
+    jetzt: &str,
+) -> Result<(), AppError> {
+    krepo::setze_vollzug(pool, org_id, einsatz_id, OBJEKT_AUFTRAG, auftrag_id, VOLLZUG_IN_ARBEIT, von_id, jetzt).await?;
+    sqlx::query("UPDATE auftrag SET in_arbeit_at = COALESCE(in_arbeit_at, ?) WHERE id = ?")
+        .bind(jetzt)
+        .bind(auftrag_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// Meldet Vollzug: Rückmeldetext am Auftrag, Vollzug-Achse → 'vollzogen' und ein
+/// ETB-Folgeeintrag (typ='meldung', gemeinsames auftrag_id). Liefert die ETB-`id`.
+pub async fn melde_vollzug(
+    pool: &SqlitePool,
+    org_id: i64,
+    einsatz_id: i64,
+    auftrag_id: i64,
+    von_id: i64,
+    vollzugsmeldung: &str,
+    jetzt: &str,
+) -> Result<i64, AppError> {
+    let mut tx = pool.begin().await?;
+    sqlx::query("UPDATE auftrag SET vollzugsmeldung = ? WHERE id = ?")
+        .bind(vollzugsmeldung)
+        .bind(auftrag_id)
+        .execute(&mut *tx)
+        .await?;
+    let etb_id = crate::etb::repo::anlegen_tx(
+        &mut tx,
+        einsatz_id,
+        von_id,
+        crate::etb::repo::EintragDaten {
+            typ: crate::etb::TYP_MELDUNG,
+            inhalt: vollzugsmeldung,
+            von: None,
+            an: None,
+            meldeweg: None,
+            veranlassung: None,
+            ereigniszeit: Some(jetzt),
+            erfasst_lokal_at: None,
+            berichtigt_eintrag_id: None,
+        },
+    )
+    .await?;
+    sqlx::query("UPDATE etb_eintrag SET auftrag_id = ? WHERE id = ?")
+        .bind(auftrag_id)
+        .bind(etb_id)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    // Vollzug-Achse außerhalb der tx (eigener Pool-Schreibpfad).
+    krepo::setze_vollzug(pool, org_id, einsatz_id, OBJEKT_AUFTRAG, auftrag_id, VOLLZUG_VOLLZOGEN, von_id, jetzt).await?;
+    Ok(etb_id)
+}
+
+/// Abnahme durch die Führung (4. Stufe). Setzt abgenommen_at/_von_id am Auftrag.
+pub async fn nimm_ab(pool: &SqlitePool, auftrag_id: i64, von_id: i64, jetzt: &str) -> Result<(), AppError> {
+    sqlx::query("UPDATE auftrag SET abgenommen_at = ?, abgenommen_von_id = ? WHERE id = ?")
+        .bind(jetzt)
+        .bind(von_id)
+        .bind(auftrag_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -465,5 +540,43 @@ mod tests {
         let d = anlegen(&pool, e, b, daten("X", None, vec![funktion("EA1")]), "2026-06-11 09:00:00").await.unwrap();
         assert!(empfaenger_gehoert_zu_auftrag(&pool, d.empfaenger[0].id, d.auftrag.id).await.unwrap());
         assert!(!empfaenger_gehoert_zu_auftrag(&pool, d.empfaenger[0].id, 999).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn in_arbeit_setzt_zeitstempel_und_status() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let d = anlegen(&pool, e, b, daten("X", None, vec![funktion("EA1")]), "2026-06-11 09:00:00").await.unwrap();
+        setze_in_arbeit(&pool, 1, e, d.auftrag.id, b, "2026-06-11 10:00:00").await.unwrap();
+        let nach = laden(&pool, d.auftrag.id, "2026-06-11 10:01:00").await.unwrap();
+        assert_eq!(nach.auftrag.bearbeitungsstatus, "in_arbeit");
+        assert_eq!(nach.auftrag.in_arbeit_at.as_deref(), Some("2026-06-11 10:00:00"));
+    }
+
+    #[tokio::test]
+    async fn melde_vollzug_setzt_text_status_und_etb_meldung() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let d = anlegen(&pool, e, b, daten("X", None, vec![funktion("EA1")]), "2026-06-11 09:00:00").await.unwrap();
+        let etb_id = melde_vollzug(&pool, 1, e, d.auftrag.id, b, "Deich gehalten", "2026-06-11 11:00:00").await.unwrap();
+        let nach = laden(&pool, d.auftrag.id, "2026-06-11 11:01:00").await.unwrap();
+        assert_eq!(nach.auftrag.bearbeitungsstatus, "vollzogen");
+        assert_eq!(nach.auftrag.vollzugsmeldung.as_deref(), Some("Deich gehalten"));
+        let (typ, backlink): (String, i64) = sqlx::query_as("SELECT typ, auftrag_id FROM etb_eintrag WHERE id = ?")
+            .bind(etb_id).fetch_one(&pool).await.unwrap();
+        assert_eq!(typ, "meldung");
+        assert_eq!(backlink, d.auftrag.id);
+    }
+
+    #[tokio::test]
+    async fn nimm_ab_setzt_abnahme_nach_vollzug() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let d = anlegen(&pool, e, b, daten("X", None, vec![funktion("EA1")]), "2026-06-11 09:00:00").await.unwrap();
+        melde_vollzug(&pool, 1, e, d.auftrag.id, b, "fertig", "2026-06-11 11:00:00").await.unwrap();
+        nimm_ab(&pool, d.auftrag.id, b, "2026-06-11 12:00:00").await.unwrap();
+        let nach = laden(&pool, d.auftrag.id, "2026-06-11 12:01:00").await.unwrap();
+        assert_eq!(nach.auftrag.bearbeitungsstatus, "abgenommen");
+        assert_eq!(nach.auftrag.abgenommen_von_id, Some(b));
     }
 }
