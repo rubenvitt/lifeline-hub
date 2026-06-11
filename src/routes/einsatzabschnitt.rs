@@ -69,6 +69,10 @@ pub struct AbschnittBody {
     pub ueber_abschnitt_id: Option<i64>,
     pub leiter_id: Option<i64>,
     pub bemerkung: Option<String>,
+    pub sprechgruppe_tmo: Option<String>,
+    pub sprechgruppe_dmo: Option<String>,
+    pub kommunikationsmittel: Option<String>,
+    pub erreichbarkeit: Option<String>,
     #[serde(default)]
     pub sortier: i64,
 }
@@ -90,11 +94,18 @@ pub async fn anlegen(
         return Err(AppError::Validation("Name darf nicht leer sein".into()));
     }
     let bemerkung = trimme(body.bemerkung);
+    let tmo = trimme(body.sprechgruppe_tmo);
+    let dmo = trimme(body.sprechgruppe_dmo);
+    let mittel = trimme(body.kommunikationsmittel);
+    let erreichbar = trimme(body.erreichbarkeit);
     let anzeige = abschnitt_repo::anlegen(
         &state.pool, einsatz_id,
         AbschnittDaten {
             name: &name, ueber_abschnitt_id: body.ueber_abschnitt_id,
-            leiter_id: body.leiter_id, bemerkung: bemerkung.as_deref(), sortier: body.sortier,
+            leiter_id: body.leiter_id, bemerkung: bemerkung.as_deref(),
+            sprechgruppe_tmo: tmo.as_deref(), sprechgruppe_dmo: dmo.as_deref(),
+            kommunikationsmittel: mittel.as_deref(), erreichbarkeit: erreichbar.as_deref(),
+            sortier: body.sortier,
         },
     ).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Abschnitt «{}» angelegt", anzeige.name)).await?;
@@ -120,11 +131,18 @@ pub async fn aktualisieren(
         return Err(AppError::Validation("Name darf nicht leer sein".into()));
     }
     let bemerkung = trimme(body.bemerkung);
+    let tmo = trimme(body.sprechgruppe_tmo);
+    let dmo = trimme(body.sprechgruppe_dmo);
+    let mittel = trimme(body.kommunikationsmittel);
+    let erreichbar = trimme(body.erreichbarkeit);
     let anzeige = abschnitt_repo::aktualisiere(
         &state.pool, einsatz_id, aid,
         AbschnittDaten {
             name: &name, ueber_abschnitt_id: body.ueber_abschnitt_id,
-            leiter_id: body.leiter_id, bemerkung: bemerkung.as_deref(), sortier: body.sortier,
+            leiter_id: body.leiter_id, bemerkung: bemerkung.as_deref(),
+            sprechgruppe_tmo: tmo.as_deref(), sprechgruppe_dmo: dmo.as_deref(),
+            kommunikationsmittel: mittel.as_deref(), erreichbarkeit: erreichbar.as_deref(),
+            sortier: body.sortier,
         },
     ).await?;
     sse_abschnitt(&state, einsatz_id, aid);
