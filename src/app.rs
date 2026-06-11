@@ -73,6 +73,7 @@ pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
         .route("/api/einsaetze/{id}/erinnerungen/{eid}/quittieren", post(routes::erinnerung::quittieren))
         .route("/api/einsaetze/{id}/auftraege", get(routes::auftrag::liste))
         .route("/api/einsaetze/{id}/auftraege", post(routes::auftrag::anlegen))
+        .route("/api/einsaetze/{id}/auftraege/{aid}/empfaenger/{empf}/quittieren", post(routes::auftrag::quittieren))
         .route(
             "/api/einsaetze/{id}/fahrzeuge",
             get(routes::einsatz_fahrzeug::liste),

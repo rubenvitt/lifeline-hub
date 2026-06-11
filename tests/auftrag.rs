@@ -150,3 +150,19 @@ async fn fremder_empfaenger_abschnitt_ist_400() {
     let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege"), &admin, Some(&body)).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
+
+#[tokio::test]
+async fn quittieren_aendert_quittung_nicht_vollzug() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (_, a) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege"), &admin, Some(&body_mit_funktion("X", "EA1"))).await;
+    let aid = a["id"].as_i64().unwrap();
+    let empf = a["empfaenger"][0]["id"].as_i64().unwrap();
+
+    let (status, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege/{aid}/empfaenger/{empf}/quittieren"), &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["quittiert_anzahl"], 1);
+    assert_eq!(json["vollzug_status"], "offen");
+    assert_eq!(json["bearbeitungsstatus"], "offen");
+}

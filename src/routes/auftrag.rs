@@ -256,3 +256,37 @@ pub async fn anlegen(
     sse(&state, einsatz_id);
     Ok((StatusCode::CREATED, Json(d)))
 }
+
+/// Gemeinsamer Vorlauf für Auftrags-Aktionen: Gates + Cross-Einsatz-Schutz.
+/// Gibt `org_id` zurück (für kommunikation_status-Schreibpfade).
+async fn fordere_bearbeitbar(
+    state: &AppState,
+    benutzer: &crate::auth::Benutzer,
+    einsatz_id: i64,
+    auftrag_id: i64,
+) -> Result<i64, AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_schreibrecht(rolle)?;
+    fordere_aktiv(&einsatz)?;
+    if !repo::gehoert_zu_einsatz(&state.pool, auftrag_id, einsatz_id).await? {
+        return Err(AppError::NotFound);
+    }
+    Ok(einsatz.org_id)
+}
+
+/// POST /api/einsaetze/{id}/auftraege/{aid}/empfaenger/{empf}/quittieren — Quittung (Achse 1).
+pub async fn quittieren(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, auftrag_id, empfaenger_id)): Path<(i64, i64, i64)>,
+) -> Result<Json<AuftragDetail>, AppError> {
+    fordere_bearbeitbar(&state, &benutzer, einsatz_id, auftrag_id).await?;
+    if !repo::empfaenger_gehoert_zu_auftrag(&state.pool, empfaenger_id, auftrag_id).await? {
+        return Err(AppError::NotFound);
+    }
+    repo::quittiere_empfaenger(&state.pool, empfaenger_id, benutzer.id, &jetzt()).await?;
+    let d = repo::laden(&state.pool, auftrag_id, &jetzt()).await?;
+    sse(&state, einsatz_id);
+    Ok(Json(d))
+}
