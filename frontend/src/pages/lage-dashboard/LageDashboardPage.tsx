@@ -11,6 +11,7 @@ import { listeSchaeden } from '../../api/einsatzSchaden';
 import { ladeGefahrengebiete } from '../../api/gefahren';
 import { listeZonen } from '../../api/lagezonen';
 import { listeLageberichte } from '../../api/lageberichte';
+import { listeAuftraege } from '../../api/auftraege';
 import { listeEinheiten } from '../../api/einheiten';
 import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
@@ -52,6 +53,7 @@ export default function LageDashboardPage() {
   const fahrzeugeQuery = useQuery({ queryKey: ['einsatz-fahrzeuge', einsatzId], queryFn: () => listeEinsatzFahrzeuge(einsatzId) });
   const materialQuery = useQuery({ queryKey: ['einsatz-material', einsatzId], queryFn: () => listeEinsatzMaterial(einsatzId) });
   const abschnitteQuery = useQuery({ queryKey: ['einsatz-abschnitte', einsatzId], queryFn: () => listeAbschnitte(einsatzId) });
+  const auftraegeQuery = useQuery({ queryKey: ['einsatz-auftraege', einsatzId], queryFn: () => listeAuftraege(einsatzId) });
 
   const kraefteFehler = einheitenQuery.isError || personalQuery.isError
     || fahrzeugeQuery.isError || materialQuery.isError || abschnitteQuery.isError;
@@ -72,6 +74,7 @@ export default function LageDashboardPage() {
   const bericht = lageberichteQuery.isError ? null : neuesterLagebericht(lageberichteQuery.data ?? []);
   const einheitenAnzahl = einheitenQuery.isError ? null : (einheitenQuery.data ?? []).length;
   const abschnitteAnzahl = abschnitteQuery.isError ? null : (abschnitteQuery.data ?? []).length;
+  const auftraege = auftraegeQuery.isError ? null : (auftraegeQuery.data ?? []);
 
   if (einsatzQuery.isLoading) {
     return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
@@ -116,7 +119,7 @@ export default function LageDashboardPage() {
         <Col xs={24} md={12} xl={8}><KraefteKachel kraefte={kraefte} einheiten={einheitenAnzahl} abschnitte={abschnitteAnzahl} onNavigate={gehe} /></Col>
         <Col xs={24} md={12} xl={8}><InfrastrukturKachel uhs={uhs} schaeden={schaeden} tiere={tiere} zonen={zonen} onNavigate={gehe} /></Col>
         <Col xs={24} md={12} xl={8}><LageberichtKachel bericht={bericht} onNavigate={gehe} /></Col>
-        <Col xs={24} md={12} xl={8}><AuftraegeKachel /></Col>
+        <Col xs={24} md={12} xl={8}><AuftraegeKachel auftraege={auftraege} onNavigate={gehe} /></Col>
       </Row>
     </div>
   );

@@ -37,7 +37,7 @@ interface Daten {
   personen?: unknown[]; uhs?: unknown[]; schaeden?: unknown[]; tiere?: unknown[];
   gefahren?: unknown[]; zonen?: unknown[]; lageberichte?: unknown[];
   einheiten?: unknown[]; personal?: unknown[]; fahrzeuge?: unknown[];
-  material?: unknown[]; abschnitte?: unknown[];
+  material?: unknown[]; abschnitte?: unknown[]; auftraege?: unknown[];
   gefahrenStatus?: number;
 }
 
@@ -58,6 +58,7 @@ function mockEndpunkte(d: Daten) {
     http.get('/api/einsaetze/1/fahrzeuge', () => json(d.fahrzeuge)),
     http.get('/api/einsaetze/1/material', () => json(d.material)),
     http.get('/api/einsaetze/1/abschnitte', () => json(d.abschnitte)),
+    http.get('/api/einsaetze/1/auftraege', () => json(d.auftraege)),
   );
 }
 
@@ -83,11 +84,12 @@ describe('LageDashboardPage', () => {
     expect(patienten).toHaveTextContent('3');
   });
 
-  it('Leerzustand: null Daten → Dashboard rendert ohne Crash, Aufträge-Platzhalter sichtbar', async () => {
+  it('Leerzustand: null Daten → Dashboard rendert ohne Crash, Aufträge-Kachel sichtbar', async () => {
     mockEndpunkte({});
     render();
     expect(await screen.findByRole('heading', { name: 'Hochwasser Musterstadt' })).toBeInTheDocument();
-    expect(screen.getByText(/Aufträge-Modul/i)).toBeInTheDocument();
+    expect(screen.getByText('Aufträge / Befehle')).toBeInTheDocument();
+    expect(screen.getByText('Offen / in Arbeit')).toBeInTheDocument();
   });
 
   it('Deep-Link: Klick auf Patienten-Leitzahl navigiert ins Personen-Modul', async () => {
