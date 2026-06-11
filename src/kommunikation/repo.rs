@@ -26,6 +26,18 @@ pub async fn setze_vollzug(
     pool: &SqlitePool, org_id: i64, einsatz_id: i64,
     objekt_typ: &str, objekt_id: i64, status: &str, von_id: i64, jetzt: &str,
 ) -> Result<(), AppError> {
+    let mut conn = pool.acquire().await?;
+    setze_vollzug_tx(&mut conn, org_id, einsatz_id, objekt_typ, objekt_id, status, von_id, jetzt).await
+}
+
+/// Wie [`setze_vollzug`], aber auf einer beliebigen Connection/Transaktion —
+/// für transaktionale Aufrufer, die die Vollzugs-Achse gemeinsam mit
+/// Folge-Updates (z. B. ETB-Vollzugsmeldung) atomar committen wollen.
+#[allow(clippy::too_many_arguments)]
+pub async fn setze_vollzug_tx(
+    conn: &mut sqlx::SqliteConnection, org_id: i64, einsatz_id: i64,
+    objekt_typ: &str, objekt_id: i64, status: &str, von_id: i64, jetzt: &str,
+) -> Result<(), AppError> {
     if status != VOLLZUG_OFFEN && status != VOLLZUG_IN_ARBEIT && status != VOLLZUG_VOLLZOGEN {
         return Err(AppError::Validation("Ungültiger Vollzug-Status".into()));
     }
@@ -40,7 +52,7 @@ pub async fn setze_vollzug(
            vollzogen_at = excluded.vollzogen_at, vollzogen_von_id = excluded.vollzogen_von_id",
     )
     .bind(org_id).bind(einsatz_id).bind(objekt_typ).bind(objekt_id).bind(status).bind(at).bind(von)
-    .execute(pool).await?;
+    .execute(&mut *conn).await?;
     Ok(())
 }
 

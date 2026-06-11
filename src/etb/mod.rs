@@ -139,6 +139,8 @@ pub struct EtbEintragAnzeige {
     /// Gesetzt, wenn dieser Eintrag der Freigabe-Snapshot eines Lageberichts ist
     /// (Timeline-Badge + Rückverlinkung). Sonst `None`.
     pub lagebericht_id: Option<i64>,
+    /// Rückverweis auf den auslösenden Auftrag (LFH-52), falls aus Auftrag/Vollzug erzeugt.
+    pub auftrag_id: Option<i64>,
 }
 
 #[cfg(test)]

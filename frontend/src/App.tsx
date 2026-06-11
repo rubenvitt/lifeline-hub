@@ -11,6 +11,7 @@ import ProfilPage from './pages/ProfilPage';
 import EtbPage from './pages/EtbPage';
 import ChatPage from './pages/ChatPage';
 import ErinnerungenPage from './pages/ErinnerungenPage';
+import AuftraegePage from './pages/AuftraegePage';
 import EinsatzdatenPage from './pages/EinsatzdatenPage';
 import FahrzeugePage from './pages/FahrzeugePage';
 import MaterialPage from './pages/MaterialPage';
@@ -47,6 +48,7 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   etb: <EtbPage />,
   chat: <ChatPage />,
   erinnerungen: <ErinnerungenPage />,
+  auftraege: <AuftraegePage />,
   einsatzdaten: <EinsatzdatenPage />,
   fahrzeuge: <FahrzeugePage />,
   material: <MaterialPage />,

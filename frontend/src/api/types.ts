@@ -749,3 +749,81 @@ export interface NeueErinnerung {
   intervall_minuten?: number;
   empfaenger_funktion?: string;
 }
+
+// ============================== LFH-52 Aufträge/Befehle ==============================
+
+export type AuftragPrioritaet = 'sofort' | 'dringend' | 'normal';
+export type AuftragBearbeitungsstatus = 'offen' | 'in_arbeit' | 'vollzogen' | 'abgenommen';
+export type EmpfaengerTyp = 'abschnitt' | 'einheit' | 'funktion' | 'person' | 'fahrzeug';
+
+export interface AuftragEmpfaenger {
+  id: number;
+  auftrag_id: number;
+  empfaenger_typ: EmpfaengerTyp;
+  abschnitt_id: number | null;
+  einheit_id: number | null;
+  person_id: number | null;
+  fahrzeug_id: number | null;
+  funktion_text: string | null;
+  snap_anzeige: string;
+  quittiert_at: string | null;
+  quittiert_von_id: number | null;
+}
+
+export interface Auftrag {
+  id: number;
+  einsatz_id: number;
+  auftrag_text: string;
+  absicht: string | null;
+  lage: string | null;
+  ort: string | null;
+  zeit: string | null;
+  mittel: string | null;
+  verbindung: string | null;
+  sicherheit: string | null;
+  prioritaet: AuftragPrioritaet;
+  frist_at: string | null;
+  erteilt_at: string;
+  in_arbeit_at: string | null;
+  vollzugsmeldung: string | null;
+  abgenommen_at: string | null;
+  abgenommen_von_id: number | null;
+  etb_anordnung_id: number | null;
+  erstellt_von_id: number;
+  erstellt_at: string;
+  vollzug_status: 'offen' | 'in_arbeit' | 'vollzogen';
+  vollzogen_at: string | null;
+  vollzogen_von_id: number | null;
+  empfaenger_anzahl: number;
+  quittiert_anzahl: number;
+  ist_ueberfaellig: boolean;
+  bearbeitungsstatus: AuftragBearbeitungsstatus;
+  /** Detail-/Anlege-/Mutations-Antwort liefert die Empfänger mit. */
+  empfaenger: AuftragEmpfaenger[];
+}
+
+export interface NeuerEmpfaenger {
+  empfaenger_typ: EmpfaengerTyp;
+  abschnitt_id?: number;
+  einheit_id?: number;
+  person_id?: number;
+  fahrzeug_id?: number;
+  funktion_text?: string;
+}
+
+export interface NeuerAuftrag {
+  auftrag_text: string;
+  absicht?: string;
+  lage?: string;
+  ort?: string;
+  zeit?: string;
+  mittel?: string;
+  verbindung?: string;
+  sicherheit?: string;
+  prioritaet?: AuftragPrioritaet;
+  /** 'YYYY-MM-DD HH:MM' (UTC). */
+  frist_at?: string;
+  /** Erteilzeitpunkt (UTC); leer = jetzt. */
+  erteilt_at?: string;
+  empfaenger: NeuerEmpfaenger[];
+}

@@ -1,4 +1,5 @@
 pub mod app;
+pub mod auftrag;
 pub mod auth;
 pub mod backup;
 pub mod chat;
