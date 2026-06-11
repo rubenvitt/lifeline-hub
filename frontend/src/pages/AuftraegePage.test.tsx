@@ -78,4 +78,12 @@ describe('AuftraegePage', () => {
       empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'EA Nord' }],
     })));
   });
+
+  it('quittiert einen Empfänger', async () => {
+    quittiereEmpfaenger.mockResolvedValue(auftrag());
+    renderPage();
+    await screen.findByText('Deich sichern');
+    await userEvent.click(screen.getByText('quittieren'));
+    await waitFor(() => expect(quittiereEmpfaenger).toHaveBeenCalledWith(1, 1, 1));
+  });
 });

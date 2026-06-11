@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { ApiError } from '../api/client';
-import { legeAuftragAn, listeAuftraege } from '../api/auftraege';
+import { legeAuftragAn, listeAuftraege, quittiereEmpfaenger } from '../api/auftraege';
 import type { NeuerAuftrag } from '../api/types';
 import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
 import AuftragListe from '../auftraege/AuftragListe';
@@ -29,6 +29,12 @@ export default function AuftraegePage() {
   const anlegenMutation = useMutation({
     mutationFn: (d: NeuerAuftrag) => legeAuftragAn(einsatzId, d),
     onSuccess: () => { invalidiere(); message.success('Auftrag erteilt'); },
+    onError: fehler,
+  });
+  const quittierenMutation = useMutation({
+    mutationFn: ({ auftragId, empfaengerId }: { auftragId: number; empfaengerId: number }) =>
+      quittiereEmpfaenger(einsatzId, auftragId, empfaengerId),
+    onSuccess: invalidiere,
     onError: fehler,
   });
 
@@ -60,7 +66,11 @@ export default function AuftraegePage() {
           {auftraegeQuery.isError && (
             <Alert type="error" showIcon style={{ marginBottom: 12 }} message="Aufträge konnten nicht geladen werden" />
           )}
-          <AuftragListe auftraege={auftraege} darfSchreiben={darfSchreiben} />
+          <AuftragListe
+            auftraege={auftraege}
+            darfSchreiben={darfSchreiben}
+            onQuittieren={(auftragId, empfaengerId) => quittierenMutation.mutate({ auftragId, empfaengerId })}
+          />
         </Col>
         {darfSchreiben && (
           <Col flex="360px">
