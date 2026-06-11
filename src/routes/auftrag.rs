@@ -57,6 +57,11 @@ pub async fn liste(
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
 
+    if params.abschnitt_id.is_some() && params.einheit_id.is_some() {
+        return Err(AppError::Validation(
+            "Nur ein Empfänger-Filter erlaubt (Abschnitt ODER Einheit)".into(),
+        ));
+    }
     let filter = (params.abschnitt_id.is_some() || params.einheit_id.is_some()).then_some(
         repo::EmpfaengerFilter {
             abschnitt_id: params.abschnitt_id,
@@ -318,6 +323,10 @@ pub async fn vollzug(
                 .map(str::trim)
                 .filter(|s| !s.is_empty())
                 .ok_or_else(|| AppError::Validation("Vollzugsmeldung darf nicht leer sein".into()))?;
+            // Doppel-Vollzug verhindern → sonst zweite ETB-Meldung (append-only).
+            if repo::laden(&state.pool, auftrag_id, &now).await?.auftrag.vollzug_status == "vollzogen" {
+                return Err(AppError::UnprocessableEntity("Auftrag ist bereits vollzogen".into()));
+            }
             let etb_id = repo::melde_vollzug(&state.pool, org_id, einsatz_id, auftrag_id, benutzer.id, text, &now).await?;
             if let Ok(etb) = crate::etb::repo::laden(&state.pool, etb_id).await {
                 if let Ok(json) = serde_json::to_string(&etb) {
