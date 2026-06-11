@@ -10,13 +10,19 @@ pub struct AbschnittDaten<'a> {
     pub ueber_abschnitt_id: Option<i64>,
     pub leiter_id: Option<i64>,
     pub bemerkung: Option<&'a str>,
+    pub sprechgruppe_tmo: Option<&'a str>,
+    pub sprechgruppe_dmo: Option<&'a str>,
+    pub kommunikationsmittel: Option<&'a str>,
+    pub erreichbarkeit: Option<&'a str>,
     pub sortier: i64,
 }
 
 const SELECT_AUFGELOEST: &str = "\
     SELECT a.id, a.einsatz_id, a.ueber_abschnitt_id, a.name, a.leiter_id, \
            p.snap_name AS leiter_name, a.bemerkung, \
-           a.flaeche_geojson, a.tz_fachaufgabe, a.tz_organisation, a.sortier \
+           a.flaeche_geojson, a.tz_fachaufgabe, a.tz_organisation, \
+           a.sprechgruppe_tmo, a.sprechgruppe_dmo, a.kommunikationsmittel, a.erreichbarkeit, \
+           a.sortier \
     FROM einsatzabschnitt a \
     LEFT JOIN einsatz_personal p ON p.id = a.leiter_id";
 
@@ -32,6 +38,10 @@ struct Row {
     flaeche_geojson: Option<String>,
     tz_fachaufgabe: Option<String>,
     tz_organisation: Option<String>,
+    sprechgruppe_tmo: Option<String>,
+    sprechgruppe_dmo: Option<String>,
+    kommunikationsmittel: Option<String>,
+    erreichbarkeit: Option<String>,
     sortier: i64,
 }
 
@@ -47,6 +57,10 @@ fn zu_anzeige(row: Row) -> EinsatzabschnittAnzeige {
         flaeche_geojson: row.flaeche_geojson,
         tz_fachaufgabe: row.tz_fachaufgabe,
         tz_organisation: row.tz_organisation,
+        sprechgruppe_tmo: row.sprechgruppe_tmo,
+        sprechgruppe_dmo: row.sprechgruppe_dmo,
+        kommunikationsmittel: row.kommunikationsmittel,
+        erreichbarkeit: row.erreichbarkeit,
         sortier: row.sortier,
     }
 }
@@ -138,11 +152,16 @@ async fn validiere(
 pub async fn anlegen(pool: &SqlitePool, einsatz_id: i64, daten: AbschnittDaten<'_>) -> Result<EinsatzabschnittAnzeige, AppError> {
     validiere(pool, einsatz_id, None, &daten).await?;
     let id = sqlx::query_scalar::<_, i64>(
-        "INSERT INTO einsatzabschnitt (einsatz_id, ueber_abschnitt_id, name, leiter_id, bemerkung, sortier) \
-         VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO einsatzabschnitt \
+            (einsatz_id, ueber_abschnitt_id, name, leiter_id, bemerkung, \
+             sprechgruppe_tmo, sprechgruppe_dmo, kommunikationsmittel, erreichbarkeit, sortier) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id).bind(daten.ueber_abschnitt_id).bind(daten.name)
-    .bind(daten.leiter_id).bind(daten.bemerkung).bind(daten.sortier)
+    .bind(daten.leiter_id).bind(daten.bemerkung)
+    .bind(daten.sprechgruppe_tmo).bind(daten.sprechgruppe_dmo)
+    .bind(daten.kommunikationsmittel).bind(daten.erreichbarkeit)
+    .bind(daten.sortier)
     .fetch_one(pool).await?;
     laden(pool, einsatz_id, id).await
 }
@@ -155,10 +174,15 @@ pub async fn aktualisiere(pool: &SqlitePool, einsatz_id: i64, id: i64, daten: Ab
     validiere(pool, einsatz_id, Some(id), &daten).await?;
     let resultat = sqlx::query(
         "UPDATE einsatzabschnitt SET ueber_abschnitt_id = ?, name = ?, leiter_id = ?, \
-                bemerkung = ?, sortier = ? WHERE id = ? AND einsatz_id = ?",
+                bemerkung = ?, sprechgruppe_tmo = ?, sprechgruppe_dmo = ?, \
+                kommunikationsmittel = ?, erreichbarkeit = ?, sortier = ? \
+         WHERE id = ? AND einsatz_id = ?",
     )
     .bind(daten.ueber_abschnitt_id).bind(daten.name).bind(daten.leiter_id)
-    .bind(daten.bemerkung).bind(daten.sortier).bind(id).bind(einsatz_id)
+    .bind(daten.bemerkung)
+    .bind(daten.sprechgruppe_tmo).bind(daten.sprechgruppe_dmo)
+    .bind(daten.kommunikationsmittel).bind(daten.erreichbarkeit)
+    .bind(daten.sortier).bind(id).bind(einsatz_id)
     .execute(pool).await?;
     if resultat.rows_affected() == 0 {
         return Err(AppError::NotFound);
@@ -231,7 +255,10 @@ mod tests {
     }
 
     fn daten<'a>(name: &'a str, parent: Option<i64>, leiter: Option<i64>) -> AbschnittDaten<'a> {
-        AbschnittDaten { name, ueber_abschnitt_id: parent, leiter_id: leiter, bemerkung: None, sortier: 0 }
+        AbschnittDaten {
+            name, ueber_abschnitt_id: parent, leiter_id: leiter, bemerkung: None, sortier: 0,
+            sprechgruppe_tmo: None, sprechgruppe_dmo: None, kommunikationsmittel: None, erreichbarkeit: None,
+        }
     }
 
     /// Org + Einsatz + ein Abschnitt; liefert (einsatz_id, abschnitt_id).
@@ -255,6 +282,33 @@ mod tests {
         }).await.unwrap();
         assert_eq!(b.flaeche_geojson, None);
         assert_eq!(b.tz_fachaufgabe.as_deref(), Some("fuehrung")); // unverändert
+    }
+
+    #[tokio::test]
+    async fn funk_felder_anlegen_und_aktualisieren() {
+        let pool = crate::db::test_pool().await;
+        let einsatz = setup(&pool).await;
+
+        let a = anlegen(&pool, einsatz, AbschnittDaten {
+            name: "Nord", ueber_abschnitt_id: None, leiter_id: None, bemerkung: None, sortier: 0,
+            sprechgruppe_tmo: Some("412_F_DRK"), sprechgruppe_dmo: Some("DMO 31"),
+            kommunikationsmittel: Some("digitalfunk"), erreichbarkeit: Some("0151 23456"),
+        }).await.unwrap();
+        assert_eq!(a.sprechgruppe_tmo.as_deref(), Some("412_F_DRK"));
+        assert_eq!(a.sprechgruppe_dmo.as_deref(), Some("DMO 31"));
+        assert_eq!(a.kommunikationsmittel.as_deref(), Some("digitalfunk"));
+        assert_eq!(a.erreichbarkeit.as_deref(), Some("0151 23456"));
+
+        // Voll-Ersatz: tmo geändert, dmo geleert (→ None), rest neu gesetzt.
+        let b = aktualisiere(&pool, einsatz, a.id, AbschnittDaten {
+            name: "Nord", ueber_abschnitt_id: None, leiter_id: None, bemerkung: None, sortier: 0,
+            sprechgruppe_tmo: Some("420_F_ASB"), sprechgruppe_dmo: None,
+            kommunikationsmittel: Some("mobil"), erreichbarkeit: None,
+        }).await.unwrap();
+        assert_eq!(b.sprechgruppe_tmo.as_deref(), Some("420_F_ASB"));
+        assert_eq!(b.sprechgruppe_dmo, None);
+        assert_eq!(b.kommunikationsmittel.as_deref(), Some("mobil"));
+        assert_eq!(b.erreichbarkeit, None);
     }
 
     #[tokio::test]

@@ -1,12 +1,25 @@
 import { createRef } from 'react';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { http, HttpResponse } from 'msw';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NeuerEintrag } from '../api/etb';
 import type { EinsatzAnzeige, EtbBaustein, EtbEintragAnzeige } from '../api/types';
+import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import MarkdownEditor, { type TextAreaRef } from '../components/MarkdownEditor';
 import Schnellerfassung from './Schnellerfassung';
+
+// Die Schnellerfassung lädt über useFunkrufnamen immer /fahrzeuge + /einheiten.
+// onUnhandledRequest: 'error' im Setup → Default-Handler (leere Listen) bereitstellen,
+// damit die Bestandstests (Freitext-Fallback) nicht an ungemockten Requests scheitern.
+// Test-spezifische server.use(...) überschreiben diese Defaults.
+beforeEach(() => {
+  server.use(
+    http.get('/api/einsaetze/:id/fahrzeuge', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/:id/einheiten', () => HttpResponse.json([])),
+  );
+});
 
 const einsatz = { id: 7, bezeichnung: 'Test', stichwort: null, leitstellen_nr: null, einsatzort: null } as unknown as EinsatzAnzeige;
 
@@ -88,6 +101,58 @@ describe('Schnellerfassung', () => {
     await userEvent.type(feld, '{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({ von: 'ELW 1' });
+  });
+
+  it('bietet disponierte Funkrufnamen als Absender-Vorschlag (Freitext bleibt Fallback)', async () => {
+    server.use(
+      http.get('/api/einsaetze/7/fahrzeuge', () =>
+        HttpResponse.json([{ id: 1, funkrufname: 'Florian 1', opta: null }]),
+      ),
+      http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
+    );
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Lage /von');
+    await userEvent.click(await screen.findByText('Von'));
+    const chip = await screen.findByRole('combobox', { name: 'Von' });
+    await userEvent.type(chip, 'Florian');
+    // Klick auf den Vorschlag committet sofort via AutoComplete onSelect → onCommit.
+    const vorschlag = await screen.findByText(
+      (_, el) => typeof el?.className === 'string'
+        && el.className.includes('ant-select-item-option-content')
+        && el.textContent === 'Florian 1',
+    );
+    await userEvent.click(vorschlag);
+    await userEvent.type(feld, '{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({ von: 'Florian 1' });
+  });
+
+  it('bietet disponierte Funkrufnamen auch als Empfänger-Vorschlag (an)', async () => {
+    server.use(
+      http.get('/api/einsaetze/7/fahrzeuge', () =>
+        HttpResponse.json([{ id: 1, funkrufname: 'Florian 1', opta: null }]),
+      ),
+      http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
+    );
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Lage /an');
+    await userEvent.click(await screen.findByText('An'));
+    const chip = await screen.findByRole('combobox', { name: 'An' });
+    await userEvent.type(chip, 'Florian');
+    // Klick auf den Vorschlag committet sofort via AutoComplete onSelect → onCommit.
+    const vorschlag = await screen.findByText(
+      (_, el) => typeof el?.className === 'string'
+        && el.className.includes('ant-select-item-option-content')
+        && el.textContent === 'Florian 1',
+    );
+    await userEvent.click(vorschlag);
+    await userEvent.type(feld, '{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({ an: 'Florian 1' });
   });
 
   it('Enter bei offenem Menü sendet nicht', async () => {

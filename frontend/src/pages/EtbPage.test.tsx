@@ -28,6 +28,10 @@ function setup() {
     http.get('/api/auth/me', () => HttpResponse.json(admin)),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     http.get('/api/einsaetze/7/etb', () => HttpResponse.json([eintrag])),
+    // Schnellerfassung lädt via useFunkrufnamen disponierte Fahrzeuge/Einheiten
+    // (Absender/Empfänger-Vorschläge). Leere Listen genügen für diesen Test.
+    http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
   );
   return renderMitProviders(
     <AuthProvider>

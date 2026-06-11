@@ -43,6 +43,7 @@ const ABSCHNITT_A1 = {
   name: 'Abschnitt Nord',
   leiter_id: null, leiter_name: null, bemerkung: null, sortier: 1,
   flaeche_geojson: null, tz_fachaufgabe: null, tz_organisation: null,
+  sprechgruppe_tmo: null, sprechgruppe_dmo: null, kommunikationsmittel: null, erreichbarkeit: null,
 };
 
 const EINHEIT_E10 = {

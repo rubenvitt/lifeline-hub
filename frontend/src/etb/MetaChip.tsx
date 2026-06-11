@@ -1,5 +1,5 @@
 import { CloseOutlined } from '@ant-design/icons';
-import { DatePicker, Input, Select, Tag } from 'antd';
+import { AutoComplete, DatePicker, Input, Select, Tag } from 'antd';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 import type { MeldeWeg } from '../api/types';
@@ -11,6 +11,9 @@ interface Props {
   feld: MetaFeld;
   editing: boolean;
   wert: Wert;
+  /** Optionale Vorschläge (z. B. Funkrufnamen für von/an) → AutoComplete statt Input.
+   *  Freitext bleibt erlaubt (AC#1). */
+  optionen?: string[];
   onCommit: (feld: MetaFeld, wert: string | dayjs.Dayjs | MeldeWeg) => void;
   onCancel: (feld: MetaFeld) => void;
   onRemove: (feld: MetaFeld) => void;
@@ -28,12 +31,34 @@ function anzeige(feld: MetaFeld, wert: Wert): string {
   return String(wert);
 }
 
-export default function MetaChip({ feld, editing, wert, onCommit, onCancel, onRemove, onEdit }: Props) {
+export default function MetaChip({ feld, editing, wert, optionen, onCommit, onCancel, onRemove, onEdit }: Props) {
   const d = feldDef(feld);
   const [text, setText] = useState(typeof wert === 'string' ? wert : '');
 
   if (editing) {
     if (d.editor === 'text') {
+      if (optionen && optionen.length > 0) {
+        return (
+          <AutoComplete
+            size="small"
+            autoFocus
+            aria-label={d.label}
+            style={{ width: 200 }}
+            value={text}
+            onChange={(v) => setText(v)}
+            // Klick auf Vorschlag feuert nur onChange → onSelect committet sofort.
+            onSelect={(v) => onCommit(feld, v)}
+            options={optionen.map((o) => ({ value: o }))}
+            filterOption={(input, option) =>
+              (option?.value ?? '').toLowerCase().includes(input.toLowerCase())
+            }
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { if (text.trim()) onCommit(feld, text.trim()); else onCancel(feld); }
+              if (e.key === 'Escape') onCancel(feld);
+            }}
+          />
+        );
+      }
       return (
         <Input
           size="small"
