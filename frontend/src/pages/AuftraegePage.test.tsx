@@ -96,4 +96,12 @@ describe('AuftraegePage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Vollzug melden' }));
     await waitFor(() => expect(setzeVollzug).toHaveBeenCalledWith(1, 1, 'vollzogen', 'Deich gehalten'));
   });
+
+  it('filtert nach Status', async () => {
+    renderPage();
+    await screen.findByText('Deich sichern');
+    // 'Vollzogen' erscheint nur im Segmented (Default-Auftrag ist 'offen') → eindeutig.
+    await userEvent.click(screen.getByText('Vollzogen'));
+    await waitFor(() => expect(listeAuftraege).toHaveBeenCalledWith(1, { status: 'vollzogen' }));
+  });
 });

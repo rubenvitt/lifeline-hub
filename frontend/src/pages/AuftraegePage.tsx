@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Col, Row, Spin, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Col, Row, Segmented, Spin, Typography } from 'antd';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -20,9 +20,10 @@ export default function AuftraegePage() {
   useEinsatzLiveStream(einsatzId);
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
+  const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
   const auftraegeQuery = useQuery({
-    queryKey: ['einsatz-auftraege', einsatzId],
-    queryFn: () => listeAuftraege(einsatzId),
+    queryKey: ['einsatz-auftraege', einsatzId, statusFilter ?? 'alle'],
+    queryFn: () => listeAuftraege(einsatzId, { status: statusFilter }),
   });
 
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
@@ -80,6 +81,18 @@ export default function AuftraegePage() {
           {auftraegeQuery.isError && (
             <Alert type="error" showIcon style={{ marginBottom: 12 }} message="Aufträge konnten nicht geladen werden" />
           )}
+          <Segmented
+            style={{ marginBottom: 12 }}
+            value={statusFilter ?? 'alle'}
+            onChange={(v) => setStatusFilter(v === 'alle' ? undefined : String(v))}
+            options={[
+              { value: 'alle', label: 'Alle' },
+              { value: 'offen', label: 'Offen' },
+              { value: 'in_arbeit', label: 'In Bearbeitung' },
+              { value: 'vollzogen', label: 'Vollzogen' },
+              { value: 'abgenommen', label: 'Abgenommen' },
+            ]}
+          />
           <AuftragListe
             auftraege={auftraege}
             darfSchreiben={darfSchreiben}
