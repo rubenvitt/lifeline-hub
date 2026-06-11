@@ -729,6 +729,11 @@ export interface Erinnerung {
   erstellt_von_id: number;
   erstellt_at: string;
   ist_faellig: boolean;
+  quittiert_at: string | null;
+  quittiert_von_id: number | null;
+  vollzug_status: 'offen' | 'in_arbeit' | 'vollzogen';
+  vollzogen_at: string | null;
+  vollzogen_von_id: number | null;
 }
 
 export interface NeueErinnerung {

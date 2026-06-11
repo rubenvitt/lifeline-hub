@@ -18,16 +18,21 @@ pub struct ErinnerungDaten<'a> {
 /// danach die WHERE-Parameter — wie im `chat`-Repo durchgehend `?` (keine
 /// numbered binds, deren sqlx-SQLite-Verhalten hier unnötig riskant wäre).
 const ANZEIGE_SELECT: &str =
-    "SELECT id, einsatz_id, titel, beschreibung, faellig_at, intervall_minuten, \
-            empfaenger_funktion, bezug_typ, bezug_id, quelle, status, erledigt_at, \
-            erstellt_von_id, erstellt_at, \
-            (faellig_at <= ?) AS ist_faellig \
-     FROM erinnerung";
+    "SELECT e.id, e.einsatz_id, e.titel, e.beschreibung, e.faellig_at, e.intervall_minuten, \
+            e.empfaenger_funktion, e.bezug_typ, e.bezug_id, e.quelle, e.status, e.erledigt_at, \
+            e.erstellt_von_id, e.erstellt_at, \
+            (e.faellig_at <= ?) AS ist_faellig, \
+            ks.quittiert_at AS quittiert_at, ks.quittiert_von_id AS quittiert_von_id, \
+            COALESCE(ks.vollzug_status, 'offen') AS vollzug_status, \
+            ks.vollzogen_at AS vollzogen_at, ks.vollzogen_von_id AS vollzogen_von_id \
+     FROM erinnerung e \
+     LEFT JOIN kommunikation_status ks \
+            ON ks.objekt_typ = 'erinnerung' AND ks.objekt_id = e.id";
 
 /// Lädt eine Erinnerung als Anzeige. `NotFound`, wenn sie nicht existiert.
 /// Bind-Reihenfolge: zuerst `jetzt` (computed column), dann `id` (WHERE).
 pub async fn laden(pool: &SqlitePool, id: i64, jetzt: &str) -> Result<ErinnerungAnzeige, AppError> {
-    sqlx::query_as::<_, ErinnerungAnzeige>(&format!("{ANZEIGE_SELECT} WHERE id = ?"))
+    sqlx::query_as::<_, ErinnerungAnzeige>(&format!("{ANZEIGE_SELECT} WHERE e.id = ?"))
         .bind(jetzt)
         .bind(id)
         .fetch_optional(pool)
@@ -45,9 +50,9 @@ pub async fn liste(
     jetzt: &str,
 ) -> Result<Vec<ErinnerungAnzeige>, AppError> {
     let sql = if nur_offen {
-        format!("{ANZEIGE_SELECT} WHERE einsatz_id = ? AND status = '{STATUS_OFFEN}' ORDER BY faellig_at, id")
+        format!("{ANZEIGE_SELECT} WHERE e.einsatz_id = ? AND e.status = '{STATUS_OFFEN}' ORDER BY e.faellig_at, e.id")
     } else {
-        format!("{ANZEIGE_SELECT} WHERE einsatz_id = ? ORDER BY faellig_at, id")
+        format!("{ANZEIGE_SELECT} WHERE e.einsatz_id = ? ORDER BY e.faellig_at, e.id")
     };
     sqlx::query_as::<_, ErinnerungAnzeige>(&sql)
         .bind(jetzt)
@@ -296,6 +301,26 @@ mod tests {
         let r = anlegen(&pool, e, b, daten("X", "2026-06-11 10:00:00", None), "2026-06-11 09:00:00").await.unwrap();
         assert!(gehoert_zu_einsatz(&pool, r.id, e).await.unwrap());
         assert!(!gehoert_zu_einsatz(&pool, r.id, 999).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn anzeige_enthaelt_kommunikation_achsen() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let r = anlegen(&pool, e, b, daten("X", "2026-06-11 10:00:00", None), "2026-06-11 09:00:00").await.unwrap();
+
+        // Default ohne kommunikation_status-Zeile: Vollzug 'offen', Quittung NULL.
+        let vorher = laden(&pool, r.id, "2026-06-11 09:00:00").await.unwrap();
+        assert_eq!(vorher.vollzug_status, "offen");
+        assert!(vorher.quittiert_at.is_none());
+
+        // Quittung über das geteilte Repo setzen → Anzeige spiegelt sie.
+        crate::kommunikation::repo::quittiere(
+            &pool, 1, e, crate::kommunikation::OBJEKT_ERINNERUNG, r.id, b, "2026-06-11 10:30:00",
+        ).await.unwrap();
+        let nachher = laden(&pool, r.id, "2026-06-11 10:31:00").await.unwrap();
+        assert_eq!(nachher.quittiert_at.as_deref(), Some("2026-06-11 10:30:00"));
+        assert_eq!(nachher.vollzug_status, "offen");
     }
 
     #[tokio::test]

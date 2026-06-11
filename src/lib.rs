@@ -17,6 +17,7 @@ pub mod fahrzeug;
 pub mod gefahr;
 pub mod karte;
 pub mod katalog;
+pub mod kommunikation;
 pub mod lagebericht;
 pub mod lage_zone;
 pub mod live;

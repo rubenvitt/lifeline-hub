@@ -4,6 +4,7 @@ use crate::einsatz::berechtigung::{fordere_aktiv, fordere_lesezugriff, fordere_s
 use crate::einsatz::repo as einsatz_repo;
 use crate::erinnerung::{repo, ErinnerungAnzeige, STATUS_ERLEDIGT, STATUS_QUITTIERT};
 use crate::error::AppError;
+use crate::kommunikation::{repo as krepo, OBJEKT_ERINNERUNG, VOLLZUG_VOLLZOGEN};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -100,12 +101,13 @@ pub async fn anlegen(
 }
 
 /// Gemeinsamer Vorlauf für Status-Übergänge: Gates + Cross-Einsatz-Schutz.
+/// Gibt `org_id` des Einsatzes zurück (für kommunikation_status-Schreibpfad).
 async fn fordere_bearbeitbar(
     state: &AppState,
     benutzer: &crate::auth::Benutzer,
     einsatz_id: i64,
     erinnerung_id: i64,
-) -> Result<(), AppError> {
+) -> Result<i64, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
@@ -113,7 +115,7 @@ async fn fordere_bearbeitbar(
     if !repo::gehoert_zu_einsatz(&state.pool, erinnerung_id, einsatz_id).await? {
         return Err(AppError::NotFound);
     }
-    Ok(())
+    Ok(einsatz.org_id)
 }
 
 /// POST /api/einsaetze/{id}/erinnerungen/{eid}/erledigen — Status → erledigt.
@@ -122,8 +124,11 @@ pub async fn erledigen(
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, erinnerung_id)): Path<(i64, i64)>,
 ) -> Result<Json<ErinnerungAnzeige>, AppError> {
-    fordere_bearbeitbar(&state, &benutzer, einsatz_id, erinnerung_id).await?;
-    let r = repo::status_setzen(&state.pool, erinnerung_id, STATUS_ERLEDIGT, &jetzt()).await?;
+    let org_id = fordere_bearbeitbar(&state, &benutzer, einsatz_id, erinnerung_id).await?;
+    let now = jetzt();
+    repo::status_setzen(&state.pool, erinnerung_id, STATUS_ERLEDIGT, &now).await?;
+    krepo::setze_vollzug(&state.pool, org_id, einsatz_id, OBJEKT_ERINNERUNG, erinnerung_id, VOLLZUG_VOLLZOGEN, benutzer.id, &now).await?;
+    let r = repo::laden(&state.pool, erinnerung_id, &now).await?;
     sse(&state, einsatz_id);
     Ok(Json(r))
 }
@@ -134,8 +139,50 @@ pub async fn quittieren(
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, erinnerung_id)): Path<(i64, i64)>,
 ) -> Result<Json<ErinnerungAnzeige>, AppError> {
-    fordere_bearbeitbar(&state, &benutzer, einsatz_id, erinnerung_id).await?;
-    let r = repo::status_setzen(&state.pool, erinnerung_id, STATUS_QUITTIERT, &jetzt()).await?;
+    let org_id = fordere_bearbeitbar(&state, &benutzer, einsatz_id, erinnerung_id).await?;
+    let now = jetzt();
+    repo::status_setzen(&state.pool, erinnerung_id, STATUS_QUITTIERT, &now).await?;
+    krepo::quittiere(&state.pool, org_id, einsatz_id, OBJEKT_ERINNERUNG, erinnerung_id, benutzer.id, &now).await?;
+    let r = repo::laden(&state.pool, erinnerung_id, &now).await?;
     sse(&state, einsatz_id);
     Ok(Json(r))
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::kommunikation::{repo as krepo, OBJEKT_ERINNERUNG, VOLLZUG_VOLLZOGEN};
+    use sqlx::SqlitePool;
+
+    async fn setup(pool: &SqlitePool) -> (i64, i64) {
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(pool).await.unwrap();
+        let b: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) VALUES (1,'L','l','h') RETURNING id")
+            .fetch_one(pool).await.unwrap();
+        let e: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id")
+            .fetch_one(pool).await.unwrap();
+        (b, e)
+    }
+
+    // Spiegelt die Wirkung des erledigen-Handlers: Scheduler-Status 'erledigt'
+    // UND geteilte Vollzugs-Achse 'vollzogen'.
+    #[tokio::test]
+    async fn erledigen_schreibt_vollzug_in_kommunikation_status() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let r = crate::erinnerung::repo::anlegen(
+            &pool, e, b,
+            crate::erinnerung::repo::ErinnerungDaten { titel: "X", beschreibung: None, faellig_at: "2026-06-11 10:00:00", intervall_minuten: None, empfaenger_funktion: None },
+            "2026-06-11 09:00:00").await.unwrap();
+
+        crate::erinnerung::repo::status_setzen(&pool, r.id, crate::erinnerung::STATUS_ERLEDIGT, "2026-06-11 11:00:00").await.unwrap();
+        krepo::setze_vollzug(&pool, 1, e, OBJEKT_ERINNERUNG, r.id, VOLLZUG_VOLLZOGEN, b, "2026-06-11 11:00:00").await.unwrap();
+
+        let s = krepo::lade_status(&pool, e, OBJEKT_ERINNERUNG, r.id).await.unwrap().unwrap();
+        assert_eq!(s.vollzug_status, VOLLZUG_VOLLZOGEN);
+        let st: String = sqlx::query_scalar("SELECT status FROM erinnerung WHERE id = ?")
+            .bind(r.id).fetch_one(&pool).await.unwrap();
+        assert_eq!(st, "erledigt", "Scheduler-Treiber bleibt gesetzt");
+    }
 }
