@@ -92,4 +92,13 @@ describe('EinsatzabschnittePage', () => {
     expect(await screen.findByDisplayValue('412_F_DRK')).toBeInTheDocument();
     expect(screen.getByDisplayValue('0151 23456')).toBeInTheDocument();
   });
+
+  it('zeigt eine Funk-Erreichbarkeits-Zusammenfassung im Detail', async () => {
+    server.use(...handlers('einsatzleitung', 'aktiv', [{ ...funkAbschnitt, erreichbarkeit: null }]));
+    renderPage();
+    await userEvent.click(await screen.findByText('Nord'));
+    const zusammenfassung = await screen.findByTestId('funk-erreichbarkeit');
+    expect(zusammenfassung).toHaveTextContent('412_F_DRK');
+    expect(zusammenfassung).toHaveTextContent(/Digitalfunk/i);
+  });
 });

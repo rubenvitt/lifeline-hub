@@ -18,6 +18,12 @@ function staerkeText(s: Staerke): string {
   return `${s.fuehrer}/${s.unterfuehrer}/${s.mannschaft}/${s.fuehrer + s.unterfuehrer + s.mannschaft}`;
 }
 
+const KOMMUNIKATIONSMITTEL_LABEL: Record<string, string> = {
+  digitalfunk: 'Digitalfunk',
+  mobil: 'Mobil',
+  festnetz: 'Festnetz',
+};
+
 function baueBaum(abschnitte: Einsatzabschnitt[]): TreeDataNode[] {
   const kinder = new Map<number | null, Einsatzabschnitt[]>();
   for (const a of abschnitte) {
@@ -220,6 +226,20 @@ export default function EinsatzabschnittePage() {
                   </Space>
                 )}
               </Form>
+
+              {(aktuell.sprechgruppe_tmo || aktuell.sprechgruppe_dmo
+                || aktuell.kommunikationsmittel || aktuell.erreichbarkeit) && (
+                <div data-testid="funk-erreichbarkeit" style={{ marginTop: 8 }}>
+                  <Space size={[4, 4]} wrap>
+                    {aktuell.sprechgruppe_tmo && <Tag color="blue">TMO: {aktuell.sprechgruppe_tmo}</Tag>}
+                    {aktuell.sprechgruppe_dmo && <Tag color="geekblue">DMO: {aktuell.sprechgruppe_dmo}</Tag>}
+                    {aktuell.kommunikationsmittel && (
+                      <Tag>{KOMMUNIKATIONSMITTEL_LABEL[aktuell.kommunikationsmittel] ?? aktuell.kommunikationsmittel}</Tag>
+                    )}
+                    {aktuell.erreichbarkeit && <Tag>☎ {aktuell.erreichbarkeit}</Tag>}
+                  </Space>
+                </div>
+              )}
 
               <Typography.Title level={5} style={{ marginTop: 16 }}>Zugeordnete Einheiten</Typography.Title>
               <List
