@@ -57,12 +57,12 @@ pub async fn liste(
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
 
-    let filter = (params.abschnitt_id.is_some() || params.einheit_id.is_some()).then(|| {
+    let filter = (params.abschnitt_id.is_some() || params.einheit_id.is_some()).then_some(
         repo::EmpfaengerFilter {
             abschnitt_id: params.abschnitt_id,
             einheit_id: params.einheit_id,
-        }
-    });
+        },
+    );
     let liste = repo::liste(
         &state.pool,
         einsatz_id,
