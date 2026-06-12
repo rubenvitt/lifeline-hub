@@ -827,3 +827,63 @@ export interface NeuerAuftrag {
   erteilt_at?: string;
   empfaenger: NeuerEmpfaenger[];
 }
+
+// --- Meldungen (eingehend) (LFH-54) ---
+
+export type MeldungPrioritaet = 'sofort' | 'dringend' | 'normal';
+export type MeldungStatus = 'neu' | 'gesichtet' | 'in_bearbeitung' | 'erledigt';
+export type Meldungsart =
+  | 'lagemeldung' | 'sofortmeldung' | 'rueckmeldung' | 'vollzugsmeldung' | 'anfrage' | 'sonstige';
+export type MeldungMeldeweg = 'funk' | 'telefon' | 'persoenlich' | 'sonstige';
+
+export interface Meldung {
+  id: number;
+  einsatz_id: number;
+  lfd_nr: number;
+  absender: string;
+  empfaenger: string | null;
+  meldeweg: MeldungMeldeweg;
+  inhalt: string;
+  meldungsart: Meldungsart;
+  prioritaet: MeldungPrioritaet;
+  status: MeldungStatus;
+  bearbeiter_id: number | null;
+  bearbeiter_name: string | null;
+  lagerelevant: boolean;
+  ereigniszeit: string;
+  eingang_at: string;
+  etb_meldung_id: number | null;
+  auftrag_id: number | null;
+  erfasst_von_id: number;
+  erstellt_at: string;
+  /** id des erzeugten Lageobjekts (LFH-95), falls an die Lage übergeben. */
+  lage_meldung_id: number | null;
+  /** Abgeleitet: status !== 'erledigt'. */
+  ist_offen: boolean;
+}
+
+export interface NeueMeldung {
+  absender: string;
+  empfaenger?: string;
+  meldeweg: MeldungMeldeweg;
+  inhalt: string;
+  meldungsart?: Meldungsart;
+  prioritaet?: MeldungPrioritaet;
+  /** Ereigniszeit (UTC) 'YYYY-MM-DD HH:mm:ss'. Pflicht (≠ Erfassungszeit). */
+  ereigniszeit: string;
+}
+
+/** Lageobjekt aus lagerelevanter Meldung (LFH-95). */
+export interface LageMeldung {
+  id: number;
+  einsatz_id: number;
+  meldung_id: number;
+  text: string;
+  lat: number | null;
+  lon: number | null;
+  erstellt_von_id: number;
+  erstellt_at: string;
+  /** Herkunft (aus JOIN meldung): zur Nachvollziehbarkeit am Lageobjekt. */
+  meldung_lfd_nr: number;
+  meldung_absender: string;
+}
