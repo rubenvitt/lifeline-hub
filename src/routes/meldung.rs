@@ -137,3 +137,50 @@ pub async fn anlegen(
     sse(&state, einsatz_id);
     Ok((StatusCode::CREATED, Json(m)))
 }
+
+/// Gemeinsamer Vorlauf für Meldungs-Aktionen: Gates + Cross-Einsatz-Schutz.
+async fn fordere_bearbeitbar(
+    state: &AppState,
+    benutzer: &crate::auth::Benutzer,
+    einsatz_id: i64,
+    meldung_id: i64,
+) -> Result<(), AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_schreibrecht(rolle)?;
+    fordere_aktiv(&einsatz)?;
+    if !repo::gehoert_zu_einsatz(&state.pool, meldung_id, einsatz_id).await? {
+        return Err(AppError::NotFound);
+    }
+    Ok(())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct StatusReq {
+    pub status: String,
+    pub bearbeiter_id: Option<i64>,
+}
+
+/// POST /api/einsaetze/{id}/meldungen/{mid}/status — Status setzen + optional Bearbeiter.
+pub async fn status(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
+    Json(req): Json<StatusReq>,
+) -> Result<Json<MeldungAnzeige>, AppError> {
+    fordere_bearbeitbar(&state, &benutzer, einsatz_id, meldung_id).await?;
+    let status = req.status.trim();
+    if !crate::meldung::status_gueltig(status) {
+        return Err(AppError::Validation("Ungültiger Status".into()));
+    }
+    // Bearbeiter (falls gesetzt) muss Einsatz-Mitglied sein (Cross-Einsatz-Schutz).
+    if let Some(bid) = req.bearbeiter_id {
+        if einsatz_repo::rolle_von(&state.pool, einsatz_id, bid).await?.is_none() {
+            return Err(AppError::Validation("Bearbeiter ist kein Einsatz-Mitglied".into()));
+        }
+    }
+    repo::setze_status(&state.pool, meldung_id, status, req.bearbeiter_id).await?;
+    let m = repo::laden(&state.pool, meldung_id).await?;
+    sse(&state, einsatz_id);
+    Ok(Json(m))
+}
