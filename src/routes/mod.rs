@@ -24,6 +24,7 @@ pub mod fahrzeug;
 pub mod fahrzeug_status;
 pub mod gefahr;
 pub mod material;
+pub mod meldung;
 pub mod health;
 pub mod organisation;
 pub mod karte;
