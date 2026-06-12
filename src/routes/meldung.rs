@@ -158,10 +158,10 @@ async fn fordere_bearbeitbar(
 #[derive(Debug, Deserialize)]
 pub struct StatusReq {
     pub status: String,
-    pub bearbeiter_id: Option<i64>,
 }
 
-/// POST /api/einsaetze/{id}/meldungen/{mid}/status — Status setzen + optional Bearbeiter.
+/// POST /api/einsaetze/{id}/meldungen/{mid}/status — NUR den Triage-Status setzen.
+/// Die Bearbeiter-Zuweisung läuft über `zuweisen` (getrennte Achse).
 pub async fn status(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -173,13 +173,33 @@ pub async fn status(
     if !crate::meldung::status_gueltig(status) {
         return Err(AppError::Validation("Ungültiger Status".into()));
     }
+    repo::setze_status(&state.pool, meldung_id, status).await?;
+    let m = repo::laden(&state.pool, meldung_id).await?;
+    sse(&state, einsatz_id);
+    Ok(Json(m))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ZuweisenReq {
+    /// `Some(id)` weist zu, `null`/None gibt frei.
+    pub bearbeiter_id: Option<i64>,
+}
+
+/// POST /api/einsaetze/{id}/meldungen/{mid}/zuweisen — Bearbeiter zuweisen/freigeben (LFH-94).
+pub async fn zuweisen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
+    Json(req): Json<ZuweisenReq>,
+) -> Result<Json<MeldungAnzeige>, AppError> {
+    fordere_bearbeitbar(&state, &benutzer, einsatz_id, meldung_id).await?;
     // Bearbeiter (falls gesetzt) muss Einsatz-Mitglied sein (Cross-Einsatz-Schutz).
     if let Some(bid) = req.bearbeiter_id {
         if einsatz_repo::rolle_von(&state.pool, einsatz_id, bid).await?.is_none() {
             return Err(AppError::Validation("Bearbeiter ist kein Einsatz-Mitglied".into()));
         }
     }
-    repo::setze_status(&state.pool, meldung_id, status, req.bearbeiter_id).await?;
+    repo::weise_bearbeiter(&state.pool, meldung_id, req.bearbeiter_id).await?;
     let m = repo::laden(&state.pool, meldung_id).await?;
     sse(&state, einsatz_id);
     Ok(Json(m))

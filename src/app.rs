@@ -79,6 +79,7 @@ pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
         .route("/api/einsaetze/{id}/meldungen", get(routes::meldung::liste))
         .route("/api/einsaetze/{id}/meldungen", post(routes::meldung::anlegen))
         .route("/api/einsaetze/{id}/meldungen/{mid}/status", post(routes::meldung::status))
+        .route("/api/einsaetze/{id}/meldungen/{mid}/zuweisen", post(routes::meldung::zuweisen))
         .route("/api/einsaetze/{id}/meldungen/{mid}/lagerelevant", post(routes::meldung::lagerelevant))
         .route("/api/einsaetze/{id}/lage/meldungen", get(routes::meldung::lage_liste))
         .route(

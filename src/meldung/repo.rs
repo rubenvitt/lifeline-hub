@@ -143,18 +143,28 @@ pub async fn gehoert_zu_einsatz(
     Ok(treffer.is_some())
 }
 
-/// Setzt den Triage-Status und den Bearbeiter (LFH-94). `bearbeiter_id` wird
-/// übernommen wie geliefert: `Some(id)` setzt/ändert, `None` entfernt eine
-/// bestehende Zuweisung (Sichten ohne Bearbeiter ist erlaubt).
-pub async fn setze_status(
+/// Setzt NUR den Triage-Status (LFH-94). Die Bearbeiter-Zuweisung ist eine
+/// getrennte Achse (`weise_bearbeiter`) — ein Statuswechsel darf eine bestehende
+/// Zuweisung nicht stillschweigend überschreiben (vgl. patch-xor-effektivzustand).
+pub async fn setze_status(pool: &SqlitePool, id: i64, status: &str) -> Result<(), AppError> {
+    debug_assert!(super::status_gueltig(status));
+    sqlx::query("UPDATE meldung SET status = ? WHERE id = ?")
+        .bind(status)
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// Setzt/entfernt die Bearbeiter-Zuweisung (LFH-94), unabhängig vom Status.
+/// `Some(id)` weist zu, `None` gibt frei. Der Aufrufer hat die Mitgliedschaft
+/// des Bearbeiters geprüft (Cross-Einsatz-Schutz).
+pub async fn weise_bearbeiter(
     pool: &SqlitePool,
     id: i64,
-    status: &str,
     bearbeiter_id: Option<i64>,
 ) -> Result<(), AppError> {
-    debug_assert!(super::status_gueltig(status));
-    sqlx::query("UPDATE meldung SET status = ?, bearbeiter_id = ? WHERE id = ?")
-        .bind(status)
+    sqlx::query("UPDATE meldung SET bearbeiter_id = ? WHERE id = ?")
         .bind(bearbeiter_id)
         .bind(id)
         .execute(pool)
@@ -333,17 +343,42 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn setze_status_fuehrt_workflow_und_bearbeiter() {
+    async fn setze_status_fuehrt_nur_status() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         let m = anlegen(&pool, e, b, daten("X", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
-        setze_status(&pool, m.id, crate::meldung::STATUS_IN_BEARBEITUNG, Some(b)).await.unwrap();
+        setze_status(&pool, m.id, crate::meldung::STATUS_IN_BEARBEITUNG).await.unwrap();
         let nach = laden(&pool, m.id).await.unwrap();
         assert_eq!(nach.status, "in_bearbeitung");
         // ist_offen = status != 'erledigt' → in_bearbeitung bleibt offen.
         assert!(nach.ist_offen);
+    }
+
+    #[tokio::test]
+    async fn weise_bearbeiter_setzt_und_gibt_frei() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(&pool, e, b, daten("X", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
+        weise_bearbeiter(&pool, m.id, Some(b)).await.unwrap();
+        let nach = laden(&pool, m.id).await.unwrap();
         assert_eq!(nach.bearbeiter_id, Some(b));
         assert_eq!(nach.bearbeiter_name.as_deref(), Some("Leit"));
+        // Freigeben.
+        weise_bearbeiter(&pool, m.id, None).await.unwrap();
+        assert_eq!(laden(&pool, m.id).await.unwrap().bearbeiter_id, None);
+    }
+
+    #[tokio::test]
+    async fn statuswechsel_loescht_die_zuweisung_nicht() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(&pool, e, b, daten("X", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
+        weise_bearbeiter(&pool, m.id, Some(b)).await.unwrap();
+        // Reiner Statuswechsel darf den Bearbeiter NICHT clobbern (Regression #2/#3).
+        setze_status(&pool, m.id, crate::meldung::STATUS_ERLEDIGT).await.unwrap();
+        let nach = laden(&pool, m.id).await.unwrap();
+        assert_eq!(nach.status, "erledigt");
+        assert_eq!(nach.bearbeiter_id, Some(b), "Zuweisung bleibt über Statuswechsel erhalten");
     }
 
     #[tokio::test]
@@ -351,7 +386,7 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         let m = anlegen(&pool, e, b, daten("X", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
-        setze_status(&pool, m.id, crate::meldung::STATUS_ERLEDIGT, None).await.unwrap();
+        setze_status(&pool, m.id, crate::meldung::STATUS_ERLEDIGT).await.unwrap();
         let nach = laden(&pool, m.id).await.unwrap();
         assert_eq!(nach.status, "erledigt");
         assert!(!nach.ist_offen);

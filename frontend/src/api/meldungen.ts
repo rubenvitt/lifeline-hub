@@ -16,16 +16,25 @@ export function legeMeldungAn(einsatzId: number, daten: NeueMeldung): Promise<Me
   return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/meldungen`, 'POST', daten);
 }
 
-/** Status setzen (sichten/in Bearbeitung/erledigt) + optional Bearbeiter zuweisen (LFH-94). */
+/** Triage-Status setzen (sichten/in Bearbeitung/erledigt) (LFH-94). */
 export function setzeMeldungStatus(
   einsatzId: number,
   meldungId: number,
   status: MeldungStatus,
-  bearbeiterId?: number | null,
 ): Promise<Meldung> {
   return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/meldungen/${meldungId}/status`, 'POST', {
     status,
-    bearbeiter_id: bearbeiterId ?? null,
+  });
+}
+
+/** Bearbeiter zuweisen (Mitglied-id) oder freigeben (null) (LFH-94). */
+export function weiseBearbeiterZu(
+  einsatzId: number,
+  meldungId: number,
+  bearbeiterId: number | null,
+): Promise<Meldung> {
+  return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/meldungen/${meldungId}/zuweisen`, 'POST', {
+    bearbeiter_id: bearbeiterId,
   });
 }
 

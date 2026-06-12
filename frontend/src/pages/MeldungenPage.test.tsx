@@ -11,16 +11,21 @@ import { ladeEinsatz } from '../api/einsaetze';
 vi.mock('../etb/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn().mockResolvedValue({ id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung' }),
+  ladeMitglieder: vi.fn().mockResolvedValue([
+    { benutzer_id: 2, anzeigename: 'Sani Schmidt', benutzername: 'sani', einsatz_rolle: 'fuehrungspersonal', zugewiesen_at: '' },
+  ]),
 }));
 
 const listeMeldungen = vi.fn();
 const legeMeldungAn = vi.fn();
 const setzeMeldungStatus = vi.fn();
+const weiseBearbeiterZu = vi.fn();
 const markiereLagerelevant = vi.fn();
 vi.mock('../api/meldungen', () => ({
   listeMeldungen: (...a: unknown[]) => listeMeldungen(...a),
   legeMeldungAn: (...a: unknown[]) => legeMeldungAn(...a),
   setzeMeldungStatus: (...a: unknown[]) => setzeMeldungStatus(...a),
+  weiseBearbeiterZu: (...a: unknown[]) => weiseBearbeiterZu(...a),
   markiereLagerelevant: (...a: unknown[]) => markiereLagerelevant(...a),
 }));
 
@@ -131,5 +136,29 @@ describe('MeldungenPage', () => {
     await screen.findByText('Florian Nord 1');
     expect(screen.getByText('Lagerelevant ✓')).toBeInTheDocument();
     expect(screen.queryByText('An Lage übergeben', { selector: 'a' })).not.toBeInTheDocument();
+  });
+
+  it('weist einer Meldung einen Bearbeiter zu', async () => {
+    weiseBearbeiterZu.mockResolvedValue(meldung({ bearbeiter_id: 2, bearbeiter_name: 'Sani Schmidt' }));
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    // antd Select über combobox-Rolle+Name öffnen, dann echten Options-Knoten klicken (Commit über onChange).
+    await userEvent.click(screen.getByRole('combobox', { name: 'Bearbeiter für Meldung 1' }));
+    await userEvent.click(await screen.findByText('Sani Schmidt'));
+    await waitFor(() => expect(weiseBearbeiterZu).toHaveBeenCalledWith(1, 1, 2));
+  });
+
+  it('filtert clientseitig auf offene Meldungen (LFH-94)', async () => {
+    listeMeldungen.mockResolvedValue([
+      meldung({ id: 1, status: 'neu', ist_offen: true }),
+      meldung({ id: 2, lfd_nr: 2, absender: 'RTW 9', status: 'erledigt', ist_offen: false }),
+    ]);
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    expect(screen.getByText('RTW 9')).toBeInTheDocument();
+    await userEvent.click(screen.getByText('Offen'));
+    // 'Offen' ist kein Server-Status → listeMeldungen ohne status; erledigte fällt clientseitig raus.
+    await waitFor(() => expect(screen.queryByText('RTW 9')).not.toBeInTheDocument());
+    expect(screen.getByText('Florian Nord 1')).toBeInTheDocument();
   });
 });

@@ -2,9 +2,9 @@ import { Alert, App, Breadcrumb, Col, Row, Segmented, Spin, Typography } from 'a
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz, ladeMitglieder } from '../api/einsaetze';
 import { ApiError } from '../api/client';
-import { legeMeldungAn, listeMeldungen, markiereLagerelevant, setzeMeldungStatus } from '../api/meldungen';
+import { legeMeldungAn, listeMeldungen, markiereLagerelevant, setzeMeldungStatus, weiseBearbeiterZu } from '../api/meldungen';
 import type { MeldungStatus, NeueMeldung } from '../api/types';
 import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
 import MeldungListe from '../meldungen/MeldungListe';
@@ -19,11 +19,17 @@ export default function MeldungenPage() {
   useEinsatzLiveStream(einsatzId);
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
+  const mitgliederQuery = useQuery({ queryKey: ['einsatz-mitglieder', einsatzId], queryFn: () => ladeMitglieder(einsatzId) });
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
+
+  // 'offen' ist eine clientseitige Sammelsicht (status != 'erledigt') über `ist_offen`;
+  // der Server filtert nur exakte Einzelstatus.
+  const REALE_STATUS = ['neu', 'gesichtet', 'in_bearbeitung', 'erledigt'];
+  const serverStatus = statusFilter && REALE_STATUS.includes(statusFilter) ? statusFilter : undefined;
 
   const meldungenQuery = useQuery({
     queryKey: ['einsatz-meldungen', einsatzId, statusFilter ?? 'alle'],
-    queryFn: () => listeMeldungen(einsatzId, { status: statusFilter }),
+    queryFn: () => listeMeldungen(einsatzId, { status: serverStatus }),
   });
 
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
@@ -37,6 +43,12 @@ export default function MeldungenPage() {
   const statusMutation = useMutation({
     mutationFn: ({ meldungId, status }: { meldungId: number; status: MeldungStatus }) =>
       setzeMeldungStatus(einsatzId, meldungId, status),
+    onSuccess: invalidiere,
+    onError: fehler,
+  });
+  const zuweisenMutation = useMutation({
+    mutationFn: ({ meldungId, bearbeiterId }: { meldungId: number; bearbeiterId: number | null }) =>
+      weiseBearbeiterZu(einsatzId, meldungId, bearbeiterId),
     onSuccess: invalidiere,
     onError: fehler,
   });
@@ -60,7 +72,10 @@ export default function MeldungenPage() {
   const darfSchreiben =
     einsatz.status === 'aktiv' &&
     (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
-  const meldungen = meldungenQuery.data ?? [];
+  const alleMeldungen = meldungenQuery.data ?? [];
+  // 'offen' (kein Server-Status) → clientseitig auf nicht-erledigte einschränken.
+  const meldungen = statusFilter === 'offen' ? alleMeldungen.filter((m) => m.ist_offen) : alleMeldungen;
+  const mitglieder = mitgliederQuery.data ?? [];
 
   return (
     <div>
@@ -84,6 +99,7 @@ export default function MeldungenPage() {
               onChange={(v) => setStatusFilter(v === 'alle' ? undefined : String(v))}
               options={[
                 { value: 'alle', label: 'Alle' },
+                { value: 'offen', label: 'Offen' },
                 { value: 'neu', label: 'Neu' },
                 { value: 'gesichtet', label: 'Gesichtet' },
                 { value: 'in_bearbeitung', label: 'In Arbeit' },
@@ -94,7 +110,9 @@ export default function MeldungenPage() {
           <MeldungListe
             meldungen={meldungen}
             darfSchreiben={darfSchreiben}
+            mitglieder={mitglieder}
             onStatus={(meldungId, status) => statusMutation.mutate({ meldungId, status })}
+            onZuweisen={(meldungId, bearbeiterId) => zuweisenMutation.mutate({ meldungId, bearbeiterId })}
             onLagerelevant={(meldungId) => lageMutation.mutate(meldungId)}
           />
         </Col>

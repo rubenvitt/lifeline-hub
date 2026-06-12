@@ -1,6 +1,11 @@
-import { Empty, List, Space, Tag, Typography } from 'antd';
+import { Empty, List, Select, Space, Tag, Typography } from 'antd';
 import type { ReactNode } from 'react';
 import type { Meldung, MeldungStatus } from '../api/types';
+
+export interface BearbeiterOption {
+  benutzer_id: number;
+  anzeigename: string;
+}
 
 const PRIO_TAG: Record<string, { color: string; label: string }> = {
   sofort: { color: 'red', label: 'Sofort' },
@@ -24,11 +29,15 @@ const WEG_LABEL: Record<string, string> = {
 export interface MeldungListeProps {
   meldungen: Meldung[];
   darfSchreiben?: boolean;
+  mitglieder?: BearbeiterOption[];
   onStatus?: (meldungId: number, status: MeldungStatus) => void;
+  onZuweisen?: (meldungId: number, bearbeiterId: number | null) => void;
   onLagerelevant?: (meldungId: number) => void;
 }
 
-export default function MeldungListe({ meldungen, darfSchreiben, onStatus, onLagerelevant }: MeldungListeProps) {
+export default function MeldungListe({
+  meldungen, darfSchreiben, mitglieder, onStatus, onZuweisen, onLagerelevant,
+}: MeldungListeProps) {
   if (meldungen.length === 0) return <Empty description="Keine Meldungen" />;
   return (
     <List
@@ -66,7 +75,21 @@ export default function MeldungListe({ meldungen, darfSchreiben, onStatus, onLag
                     <Tag color={status.color}>{status.label}</Tag>
                     <Typography.Text type="secondary">{WEG_LABEL[m.meldeweg]} · {ART_LABEL[m.meldungsart]}</Typography.Text>
                     <Typography.Text type="secondary">Ereignis: {m.ereigniszeit} UTC</Typography.Text>
-                    {m.bearbeiter_name && <Tag>Bearbeiter: {m.bearbeiter_name}</Tag>}
+                    {darfSchreiben && onZuweisen ? (
+                      <Select<number | null>
+                        size="small"
+                        allowClear
+                        style={{ minWidth: 180 }}
+                        placeholder="Bearbeiter zuweisen"
+                        value={m.bearbeiter_id ?? undefined}
+                        onChange={(v) => onZuweisen(m.id, v ?? null)}
+                        options={(mitglieder ?? []).map((mi) => ({ value: mi.benutzer_id, label: mi.anzeigename }))}
+                        optionFilterProp="label"
+                        aria-label={`Bearbeiter für Meldung ${m.lfd_nr}`}
+                      />
+                    ) : (
+                      m.bearbeiter_name && <Tag>Bearbeiter: {m.bearbeiter_name}</Tag>
+                    )}
                   </Space>
                   <Typography.Text>{m.inhalt}</Typography.Text>
                 </Space>
