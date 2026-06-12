@@ -191,17 +191,17 @@ pub async fn empfaenger_gehoert_zu_auftrag(
 
 /// Legt einen Auftrag inkl. Empfänger an und erzeugt im selben Commit den
 /// ETB-Anordnungseintrag (Pattern B: anlegen_tx + Backlink auftrag_id auf BEIDEN
-/// Seiten). `daten` ist vom Handler validiert (auftrag_text + >=1 Empfänger,
-/// Slots/Zugehörigkeit geprüft).
-pub async fn anlegen(
-    pool: &SqlitePool,
+/// Seiten). Arbeitet auf einer offenen Verbindung/Transaktion und committet NICHT
+/// selbst — so kann ein Aufrufer (z. B. die Chat-Heraufstufung, LFH-101) im selben
+/// Commit weitere Rückverweise setzen. Liefert die neue `auftrag_id`. `daten` ist
+/// vom Handler validiert (auftrag_text + >=1 Empfänger, Slots/Zugehörigkeit geprüft).
+pub async fn anlegen_tx(
+    tx: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
     ersteller_id: i64,
-    daten: AuftragDaten<'_>,
-    jetzt: &str,
-) -> Result<AuftragDetail, AppError> {
+    daten: &AuftragDaten<'_>,
+) -> Result<i64, AppError> {
     debug_assert!(prioritaet_gueltig(daten.prioritaet));
-    let mut tx = pool.begin().await?;
 
     let auftrag_id: i64 = sqlx::query_scalar(
         "INSERT INTO auftrag \
@@ -227,7 +227,7 @@ pub async fn anlegen(
 
     for e in &daten.empfaenger {
         debug_assert!(empfaenger_typ_gueltig(&e.empfaenger_typ));
-        let snap = snap_anzeige_fuer(&mut tx, e).await?;
+        let snap = snap_anzeige_fuer(&mut *tx, e).await?;
         sqlx::query(
             "INSERT INTO auftrag_empfaenger \
                (auftrag_id, empfaenger_typ, abschnitt_id, einheit_id, person_id, fahrzeug_id, funktion_text, snap_anzeige) \
@@ -246,9 +246,9 @@ pub async fn anlegen(
     }
 
     // ETB-Anordnung (Pattern B): erst NACH den Inserts, im selben Commit.
-    let an = empfaenger_klartext(&daten.empfaenger, &mut tx).await?;
+    let an = empfaenger_klartext(&daten.empfaenger, &mut *tx).await?;
     let etb_id = crate::etb::repo::anlegen_tx(
-        &mut tx,
+        &mut *tx,
         einsatz_id,
         ersteller_id,
         crate::etb::repo::EintragDaten {
@@ -275,6 +275,20 @@ pub async fn anlegen(
         .execute(&mut *tx)
         .await?;
 
+    Ok(auftrag_id)
+}
+
+/// Legt einen Auftrag an (eigener Commit) und liefert das Detail. Dünner Wrapper
+/// um [`anlegen_tx`].
+pub async fn anlegen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    ersteller_id: i64,
+    daten: AuftragDaten<'_>,
+    jetzt: &str,
+) -> Result<AuftragDetail, AppError> {
+    let mut tx = pool.begin().await?;
+    let auftrag_id = anlegen_tx(&mut tx, einsatz_id, ersteller_id, &daten).await?;
     tx.commit().await?;
     laden(pool, auftrag_id, jetzt).await
 }

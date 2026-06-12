@@ -31,4 +31,5 @@ pub struct ChatNachrichtAnzeige {
     pub bearbeitet_at: Option<String>,
     pub geloescht_at: Option<String>,
     pub etb_eintrag_id: Option<i64>,
+    pub auftrag_id: Option<i64>,
 }

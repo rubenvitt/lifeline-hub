@@ -5,16 +5,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { ApiError } from '../api/client';
 import {
-  bearbeiteNachricht, heraufstufenZuEtb, legeKanalAn, listeKanaele, listeNachrichten,
+  bearbeiteNachricht, heraufstufenZuAuftrag, heraufstufenZuEtb, legeKanalAn, listeKanaele, listeNachrichten,
   loescheNachricht, sendeNachricht,
 } from '../api/chat';
-import type { ChatNachricht, EtbTyp } from '../api/types';
+import { listeAbschnitte } from '../api/einsatzabschnitte';
+import { listeEinheiten } from '../api/einheiten';
+import type { ChatNachricht, EtbTyp, NeuerAuftrag } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
 import KanalListe from '../chat/KanalListe';
 import NachrichtenStrom from '../chat/NachrichtenStrom';
 import NachrichtEingabe from '../chat/NachrichtEingabe';
 import HeraufstufenModal from '../chat/HeraufstufenModal';
+import HeraufstufenAuftragModal from '../chat/HeraufstufenAuftragModal';
 
 export default function ChatPage() {
   const { id } = useParams();
@@ -24,6 +27,7 @@ export default function ChatPage() {
   const qc = useQueryClient();
   const [aktiverKanal, setAktiverKanal] = useState<number | null>(null);
   const [heraufstufen, setHeraufstufen] = useState<ChatNachricht | null>(null);
+  const [heraufstufenAuftrag, setHeraufstufenAuftrag] = useState<ChatNachricht | null>(null);
 
   useEinsatzLiveStream(einsatzId);
 
@@ -34,6 +38,15 @@ export default function ChatPage() {
   const kanaeleQuery = useQuery({
     queryKey: ['einsatz-chat-kanaele', einsatzId],
     queryFn: () => listeKanaele(einsatzId),
+  });
+  // Empfänger-Optionen für die Auftrag-Heraufstufung (LFH-101).
+  const abschnitteQuery = useQuery({
+    queryKey: ['einsatz-abschnitte', einsatzId],
+    queryFn: () => listeAbschnitte(einsatzId),
+  });
+  const einheitenQuery = useQuery({
+    queryKey: ['einsatz-einheiten', einsatzId],
+    queryFn: () => listeEinheiten(einsatzId),
   });
 
   const kanaele = kanaeleQuery.data ?? [];
@@ -77,6 +90,17 @@ export default function ChatPage() {
       invalidiereNachrichten();
       setHeraufstufen(null);
       message.success('Zu ETB heraufgestuft');
+    },
+    onError: fehler,
+  });
+  const heraufstufenAuftragMutation = useMutation({
+    mutationFn: ({ nid, daten }: { nid: number; daten: NeuerAuftrag }) =>
+      heraufstufenZuAuftrag(einsatzId, nid, daten),
+    onSuccess: () => {
+      invalidiereNachrichten();
+      qc.invalidateQueries({ queryKey: ['einsatz-auftraege', einsatzId] });
+      setHeraufstufenAuftrag(null);
+      message.success('Zu Auftrag heraufgestuft');
     },
     onError: fehler,
   });
@@ -134,6 +158,7 @@ export default function ChatPage() {
             }}
             onLoeschen={(n) => loeschenMutation.mutate(n.id)}
             onHeraufstufen={(n) => setHeraufstufen(n)}
+            onHeraufstufenAuftrag={(n) => setHeraufstufenAuftrag(n)}
           />
           {darfSchreiben && kanalId !== null && (
             <NachrichtEingabe onSenden={(t) => sendenMutation.mutate(t)} senden={sendenMutation.isPending} />
@@ -147,6 +172,17 @@ export default function ChatPage() {
         onAbbrechen={() => setHeraufstufen(null)}
         onBestaetigen={(typ, text) => {
           if (heraufstufen) heraufstufenMutation.mutate({ nid: heraufstufen.id, typ, text });
+        }}
+      />
+      <HeraufstufenAuftragModal
+        offen={heraufstufenAuftrag !== null}
+        nachricht={heraufstufenAuftrag}
+        abschnitte={(abschnitteQuery.data ?? []).map((a) => ({ id: a.id, name: a.name }))}
+        einheiten={(einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name }))}
+        senden={heraufstufenAuftragMutation.isPending}
+        onAbbrechen={() => setHeraufstufenAuftrag(null)}
+        onAnlegen={(daten) => {
+          if (heraufstufenAuftrag) heraufstufenAuftragMutation.mutate({ nid: heraufstufenAuftrag.id, daten });
         }}
       />
     </div>

@@ -103,7 +103,7 @@ pub struct NachrichtFilter {
 const NACHRICHT_SELECT: &str =
     "SELECT n.id, n.einsatz_id, n.kanal_id, n.autor_id, b.anzeigename AS autor_name, \
             CASE WHEN n.geloescht_at IS NULL THEN n.inhalt ELSE NULL END AS inhalt, \
-            n.erstellt_at, n.bearbeitet_at, n.geloescht_at, n.etb_eintrag_id \
+            n.erstellt_at, n.bearbeitet_at, n.geloescht_at, n.etb_eintrag_id, n.auftrag_id \
      FROM chat_nachricht n JOIN benutzer b ON b.id = n.autor_id";
 
 /// Lädt eine einzelne Nachricht als Anzeige. `NotFound`, wenn sie nicht existiert.
@@ -271,6 +271,48 @@ pub async fn heraufstufen_zu_etb(
 
     tx.commit().await?;
     Ok(etb_id)
+}
+
+/// Stuft eine Chat-Nachricht zu einem Auftrag herauf (LFH-101) — in EINEM Commit:
+/// legt den Auftrag inkl. seiner ETB-Anordnung an (`auftrag::repo::anlegen_tx`,
+/// Pattern B) und setzt den Rückverweis `chat_nachricht.auftrag_id`. Die Heraufstufung
+/// zu Auftrag ist unabhängig von der ETB-Heraufstufung — eine Nachricht darf beides
+/// tragen. Erneute Auftrag-Heraufstufung oder eine gelöschte Nachricht → `Conflict`.
+/// `daten` ist bereits vom Handler validiert (Auftragstext + >=1 Empfänger,
+/// Slots/Zugehörigkeit geprüft). Liefert die neue `auftrag_id`.
+pub async fn heraufstufen_zu_auftrag(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    nachricht_id: i64,
+    heraufstufer_id: i64,
+    daten: crate::auftrag::repo::AuftragDaten<'_>,
+) -> Result<i64, AppError> {
+    let mut tx = pool.begin().await?;
+
+    // Guard: schon zu einem Auftrag heraufgestuft oder gelöscht? (Sperrt Doppel-Heraufstufung.)
+    let zustand: Option<(Option<i64>, Option<String>)> =
+        sqlx::query_as("SELECT auftrag_id, geloescht_at FROM chat_nachricht WHERE id = ?")
+            .bind(nachricht_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+    let (auftrag_vorhanden, geloescht) = zustand.ok_or(AppError::NotFound)?;
+    if auftrag_vorhanden.is_some() {
+        return Err(AppError::Conflict("Nachricht ist bereits zu einem Auftrag heraufgestuft".into()));
+    }
+    if geloescht.is_some() {
+        return Err(AppError::Conflict("Gelöschte Nachricht kann nicht heraufgestuft werden".into()));
+    }
+
+    let auftrag_id = crate::auftrag::repo::anlegen_tx(&mut tx, einsatz_id, heraufstufer_id, &daten).await?;
+
+    sqlx::query("UPDATE chat_nachricht SET auftrag_id = ? WHERE id = ?")
+        .bind(auftrag_id)
+        .bind(nachricht_id)
+        .execute(&mut *tx)
+        .await?;
+
+    tx.commit().await?;
+    Ok(auftrag_id)
 }
 
 #[cfg(test)]
@@ -463,5 +505,76 @@ mod tests {
 
         let zweimal = heraufstufen_zu_etb(&pool, einsatz, m.id, benutzer, "meldung", "x", &m.erstellt_at).await;
         assert!(matches!(zweimal.unwrap_err(), AppError::Conflict(_)));
+    }
+
+    /// Baut minimale, valide Auftragsdaten (ein Funktions-Empfänger, keine DB-Lookups nötig).
+    fn auftrag_daten(text: &str) -> crate::auftrag::repo::AuftragDaten<'_> {
+        crate::auftrag::repo::AuftragDaten {
+            auftrag_text: text,
+            absicht: None,
+            lage: None,
+            ort: None,
+            zeit: None,
+            mittel: None,
+            verbindung: None,
+            sicherheit: None,
+            prioritaet: "normal",
+            frist_at: None,
+            erteilt_at: "2026-06-12 10:00:00",
+            empfaenger: vec![crate::auftrag::repo::EmpfaengerEingabe {
+                empfaenger_typ: "funktion".into(),
+                abschnitt_id: None,
+                einheit_id: None,
+                person_id: None,
+                fahrzeug_id: None,
+                funktion_text: Some("S4".into()),
+            }],
+        }
+    }
+
+    #[tokio::test]
+    async fn heraufstufen_zu_auftrag_legt_auftrag_an_und_setzt_rueckverweis() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let kid = kanal(&pool, einsatz, benutzer).await;
+        let m = anlegen(&pool, einsatz, benutzer, NachrichtDaten { kanal_id: kid, inhalt: "Tank fordern" }).await.unwrap();
+
+        let auftrag_id = heraufstufen_zu_auftrag(
+            &pool, einsatz, m.id, benutzer, auftrag_daten("Tank fordern"),
+        ).await.unwrap();
+
+        // Auftrag landet im Auftrag-Modul, ETB-Anordnung entsteht im selben Commit (Pattern B).
+        let detail = crate::auftrag::repo::laden(&pool, auftrag_id, "2026-06-12 10:00:00").await.unwrap();
+        assert_eq!(detail.auftrag.auftrag_text, "Tank fordern");
+        assert!(detail.auftrag.etb_anordnung_id.is_some(), "ETB-Anordnung im selben Commit erzeugt");
+        assert_eq!(detail.empfaenger.len(), 1);
+
+        // Rückverweis an der Nachricht ist gesetzt (Markierung „heraufgestuft zu Auftrag").
+        let nachher = laden(&pool, m.id).await.unwrap();
+        assert_eq!(nachher.auftrag_id, Some(auftrag_id));
+    }
+
+    #[tokio::test]
+    async fn heraufstufen_zu_auftrag_doppelt_ist_konflikt() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let kid = kanal(&pool, einsatz, benutzer).await;
+        let m = anlegen(&pool, einsatz, benutzer, NachrichtDaten { kanal_id: kid, inhalt: "x" }).await.unwrap();
+        heraufstufen_zu_auftrag(&pool, einsatz, m.id, benutzer, auftrag_daten("x")).await.unwrap();
+
+        let zweimal = heraufstufen_zu_auftrag(&pool, einsatz, m.id, benutzer, auftrag_daten("x")).await;
+        assert!(matches!(zweimal.unwrap_err(), AppError::Conflict(_)));
+    }
+
+    #[tokio::test]
+    async fn heraufstufen_zu_auftrag_geloescht_ist_konflikt() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let kid = kanal(&pool, einsatz, benutzer).await;
+        let m = anlegen(&pool, einsatz, benutzer, NachrichtDaten { kanal_id: kid, inhalt: "x" }).await.unwrap();
+        loeschen(&pool, m.id).await.unwrap();
+
+        let ergebnis = heraufstufen_zu_auftrag(&pool, einsatz, m.id, benutzer, auftrag_daten("x")).await;
+        assert!(matches!(ergebnis.unwrap_err(), AppError::Conflict(_)));
     }
 }

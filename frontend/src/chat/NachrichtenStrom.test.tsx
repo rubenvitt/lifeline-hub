@@ -9,7 +9,7 @@ function nachricht(over: Partial<ChatNachricht> = {}): ChatNachricht {
   return {
     id: 1, einsatz_id: 7, kanal_id: 1, autor_id: 1, autor_name: 'Max',
     inhalt: 'Hallo Stab', erstellt_at: '2026-06-10 10:00:00',
-    bearbeitet_at: null, geloescht_at: null, etb_eintrag_id: null, ...over,
+    bearbeitet_at: null, geloescht_at: null, etb_eintrag_id: null, auftrag_id: null, ...over,
   };
 }
 
@@ -17,7 +17,7 @@ describe('NachrichtenStrom', () => {
   it('zeigt Inhalt und Autor', () => {
     renderMitProviders(
       <NachrichtenStrom nachrichten={[nachricht()]} eigeneBenutzerId={1} darfSchreiben
-        onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={vi.fn()} />,
+        onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={vi.fn()} onHeraufstufenAuftrag={vi.fn()} />,
     );
     expect(screen.getByText('Hallo Stab')).toBeInTheDocument();
     expect(screen.getByText('Max')).toBeInTheDocument();
@@ -26,7 +26,7 @@ describe('NachrichtenStrom', () => {
   it('zeigt Tombstone für gelöschte Nachrichten ohne Aktionen', () => {
     renderMitProviders(
       <NachrichtenStrom nachrichten={[nachricht({ inhalt: null, geloescht_at: '2026-06-10 10:05:00' })]}
-        eigeneBenutzerId={1} darfSchreiben onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={vi.fn()} />,
+        eigeneBenutzerId={1} darfSchreiben onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={vi.fn()} onHeraufstufenAuftrag={vi.fn()} />,
     );
     expect(screen.getByText('Nachricht gelöscht')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
@@ -35,15 +35,24 @@ describe('NachrichtenStrom', () => {
   it('zeigt ETB-Badge bei heraufgestufter Nachricht', () => {
     renderMitProviders(
       <NachrichtenStrom nachrichten={[nachricht({ etb_eintrag_id: 42 })]} eigeneBenutzerId={1} darfSchreiben
-        onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={vi.fn()} />,
+        onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={vi.fn()} onHeraufstufenAuftrag={vi.fn()} />,
     );
     expect(screen.getByText(/heraufgestuft zu ETB/i)).toBeInTheDocument();
+  });
+
+  it('zeigt Auftrag-Badge bei zu Auftrag heraufgestufter Nachricht und blendet „Zu Auftrag" aus', () => {
+    renderMitProviders(
+      <NachrichtenStrom nachrichten={[nachricht({ auftrag_id: 7 })]} eigeneBenutzerId={1} darfSchreiben
+        onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={vi.fn()} onHeraufstufenAuftrag={vi.fn()} />,
+    );
+    expect(screen.getByText(/heraufgestuft zu Auftrag/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Zu Auftrag' })).not.toBeInTheDocument();
   });
 
   it('blendet Bearbeiten/Löschen bei fehlendem Schreibrecht aus (eigene Nachricht)', () => {
     renderMitProviders(
       <NachrichtenStrom nachrichten={[nachricht({ autor_id: 1 })]} eigeneBenutzerId={1} darfSchreiben={false}
-        onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={vi.fn()} />,
+        onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={vi.fn()} onHeraufstufenAuftrag={vi.fn()} />,
     );
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
@@ -55,11 +64,21 @@ describe('NachrichtenStrom', () => {
       <NachrichtenStrom
         nachrichten={[nachricht({ id: 1, autor_id: 1 }), nachricht({ id: 2, autor_id: 99, inhalt: 'fremd' })]}
         eigeneBenutzerId={1} darfSchreiben
-        onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={onHeraufstufen} />,
+        onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={onHeraufstufen} onHeraufstufenAuftrag={vi.fn()} />,
     );
     expect(screen.getAllByRole('button', { name: 'Löschen' })).toHaveLength(1);
     const hochButtons = screen.getAllByRole('button', { name: 'Zu ETB' });
     await userEvent.click(hochButtons[0]);
     expect(onHeraufstufen).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
+  });
+
+  it('„Zu Auftrag" löst Heraufstufungs-Callback aus', async () => {
+    const onHeraufstufenAuftrag = vi.fn();
+    renderMitProviders(
+      <NachrichtenStrom nachrichten={[nachricht({ id: 5 })]} eigeneBenutzerId={1} darfSchreiben
+        onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={vi.fn()} onHeraufstufenAuftrag={onHeraufstufenAuftrag} />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Zu Auftrag' }));
+    expect(onHeraufstufenAuftrag).toHaveBeenCalledWith(expect.objectContaining({ id: 5 }));
   });
 });

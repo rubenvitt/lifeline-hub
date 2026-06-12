@@ -1,5 +1,5 @@
 import { apiGet, apiSend } from './client';
-import type { ChatKanal, ChatNachricht, EtbTyp } from './types';
+import type { ChatKanal, ChatNachricht, EtbTyp, NeuerAuftrag } from './types';
 
 
 export function listeKanaele(einsatzId: number): Promise<ChatKanal[]> {
@@ -46,5 +46,17 @@ export function heraufstufenZuEtb(
 ): Promise<ChatNachricht> {
   return apiSend<ChatNachricht>(
     `/api/einsaetze/${einsatzId}/chat/nachrichten/${nachrichtId}/heraufstufen-etb`, 'POST', { typ, inhalt },
+  );
+}
+
+/** Stuft eine Nachricht zu einem Auftrag herauf (LFH-101); legt den Auftrag an und
+ *  liefert die markierte Nachricht zurück. */
+export function heraufstufenZuAuftrag(
+  einsatzId: number,
+  nachrichtId: number,
+  daten: NeuerAuftrag,
+): Promise<ChatNachricht> {
+  return apiSend<ChatNachricht>(
+    `/api/einsaetze/${einsatzId}/chat/nachrichten/${nachrichtId}/heraufstufen-auftrag`, 'POST', daten,
   );
 }

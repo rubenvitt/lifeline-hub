@@ -8,10 +8,11 @@ interface Props {
   onBearbeiten: (n: ChatNachricht) => void;
   onLoeschen: (n: ChatNachricht) => void;
   onHeraufstufen: (n: ChatNachricht) => void;
+  onHeraufstufenAuftrag: (n: ChatNachricht) => void;
 }
 
 export default function NachrichtenStrom({
-  nachrichten, eigeneBenutzerId, darfSchreiben, onBearbeiten, onLoeschen, onHeraufstufen,
+  nachrichten, eigeneBenutzerId, darfSchreiben, onBearbeiten, onLoeschen, onHeraufstufen, onHeraufstufenAuftrag,
 }: Props) {
   return (
     <List<ChatNachricht>
@@ -21,6 +22,7 @@ export default function NachrichtenStrom({
         const geloescht = n.geloescht_at !== null;
         const eigene = eigeneBenutzerId !== null && n.autor_id === eigeneBenutzerId;
         const heraufgestuft = n.etb_eintrag_id !== null;
+        const heraufgestuftZuAuftrag = n.auftrag_id !== null;
         return (
           <List.Item
             actions={
@@ -29,6 +31,9 @@ export default function NachrichtenStrom({
                 : [
                     ...(darfSchreiben && !heraufgestuft
                       ? [<Button key="hoch" type="link" size="small" onClick={() => onHeraufstufen(n)}>Zu ETB</Button>]
+                      : []),
+                    ...(darfSchreiben && !heraufgestuftZuAuftrag
+                      ? [<Button key="auftrag" type="link" size="small" onClick={() => onHeraufstufenAuftrag(n)}>Zu Auftrag</Button>]
                       : []),
                     ...(eigene && darfSchreiben
                       ? [
@@ -48,6 +53,7 @@ export default function NachrichtenStrom({
                   </Typography.Text>
                   {n.bearbeitet_at && <Tag>bearbeitet</Tag>}
                   {heraufgestuft && <Tag color="blue">heraufgestuft zu ETB</Tag>}
+                  {heraufgestuftZuAuftrag && <Tag color="geekblue">heraufgestuft zu Auftrag</Tag>}
                 </Space>
               }
               description={

@@ -189,19 +189,54 @@ async fn validiere_empfaenger(
     })
 }
 
-/// POST /api/einsaetze/{id}/auftraege — Auftrag anlegen + zustellen (Schreibrecht + aktiv).
-pub async fn anlegen(
-    State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
-    Json(req): Json<NeuerAuftrag>,
-) -> Result<(StatusCode, Json<AuftragDetail>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_aktiv(&einsatz)?;
+/// Validierte, besitzende Auftrags-Eingabe. Geteilt zwischen POST /auftraege und der
+/// Chat→Auftrag-Heraufstufung (LFH-101), damit BEIDE Pfade dieselben Pflicht-, Slot-
+/// und Zugehörigkeitsprüfungen durchlaufen. `daten()` baut daraus die borrowende
+/// `repo::AuftragDaten`.
+pub struct ValidierterAuftrag {
+    text: String,
+    absicht: Option<String>,
+    lage: Option<String>,
+    ort: Option<String>,
+    zeit: Option<String>,
+    mittel: Option<String>,
+    verbindung: Option<String>,
+    sicherheit: Option<String>,
+    prioritaet: String,
+    frist_at: Option<String>,
+    erteilt_at: String,
+    empfaenger: Vec<repo::EmpfaengerEingabe>,
+}
 
-    // Akzeptanzkriterium: nur absendbar mit Auftragstext UND mindestens einem Empfänger.
+impl ValidierterAuftrag {
+    pub fn daten(&self) -> repo::AuftragDaten<'_> {
+        repo::AuftragDaten {
+            auftrag_text: &self.text,
+            absicht: self.absicht.as_deref(),
+            lage: self.lage.as_deref(),
+            ort: self.ort.as_deref(),
+            zeit: self.zeit.as_deref(),
+            mittel: self.mittel.as_deref(),
+            verbindung: self.verbindung.as_deref(),
+            sicherheit: self.sicherheit.as_deref(),
+            prioritaet: &self.prioritaet,
+            frist_at: self.frist_at.as_deref(),
+            erteilt_at: &self.erteilt_at,
+            empfaenger: self.empfaenger.clone(),
+        }
+    }
+}
+
+/// Validiert + normalisiert eine Auftrags-Eingabe: Auftragstext UND >=1 Empfänger
+/// (Pflicht-Akzeptanzkriterium), Priorität, Frist/Erteilzeit (Parsing) sowie jede
+/// Empfänger-Zeile (Slot-Konsistenz + Einsatz-Zugehörigkeit). `now` ist der Default
+/// für `erteilt_at`. Gemeinsamer Eingang für POST /auftraege und die Chat-Heraufstufung.
+pub async fn validiere_neuen_auftrag(
+    pool: &sqlx::SqlitePool,
+    einsatz_id: i64,
+    req: &NeuerAuftrag,
+    now: &str,
+) -> Result<ValidierterAuftrag, AppError> {
     let text = req.auftrag_text.trim();
     if text.is_empty() {
         return Err(AppError::Validation("Auftragstext darf nicht leer sein".into()));
@@ -217,38 +252,47 @@ pub async fn anlegen(
         Some(f) => Some(parse_zeit(f)?),
         None => None,
     };
-    let now = jetzt();
     let erteilt = match trimme(&req.erteilt_at) {
         Some(e) => parse_zeit(e)?,
-        None => now.clone(),
+        None => now.to_string(),
     };
 
     let mut empfaenger = Vec::with_capacity(req.empfaenger.len());
     for r in &req.empfaenger {
-        empfaenger.push(validiere_empfaenger(&state.pool, einsatz_id, r).await?);
+        empfaenger.push(validiere_empfaenger(pool, einsatz_id, r).await?);
     }
 
-    let d = repo::anlegen(
-        &state.pool,
-        einsatz_id,
-        benutzer.id,
-        repo::AuftragDaten {
-            auftrag_text: text,
-            absicht: trimme(&req.absicht),
-            lage: trimme(&req.lage),
-            ort: trimme(&req.ort),
-            zeit: trimme(&req.zeit),
-            mittel: trimme(&req.mittel),
-            verbindung: trimme(&req.verbindung),
-            sicherheit: trimme(&req.sicherheit),
-            prioritaet,
-            frist_at: frist.as_deref(),
-            erteilt_at: &erteilt,
-            empfaenger,
-        },
-        &now,
-    )
-    .await?;
+    Ok(ValidierterAuftrag {
+        text: text.to_string(),
+        absicht: trimme(&req.absicht).map(str::to_string),
+        lage: trimme(&req.lage).map(str::to_string),
+        ort: trimme(&req.ort).map(str::to_string),
+        zeit: trimme(&req.zeit).map(str::to_string),
+        mittel: trimme(&req.mittel).map(str::to_string),
+        verbindung: trimme(&req.verbindung).map(str::to_string),
+        sicherheit: trimme(&req.sicherheit).map(str::to_string),
+        prioritaet: prioritaet.to_string(),
+        frist_at: frist,
+        erteilt_at: erteilt,
+        empfaenger,
+    })
+}
+
+/// POST /api/einsaetze/{id}/auftraege — Auftrag anlegen + zustellen (Schreibrecht + aktiv).
+pub async fn anlegen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path(einsatz_id): Path<i64>,
+    Json(req): Json<NeuerAuftrag>,
+) -> Result<(StatusCode, Json<AuftragDetail>), AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_schreibrecht(rolle)?;
+    fordere_aktiv(&einsatz)?;
+
+    let now = jetzt();
+    let validiert = validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now).await?;
+    let d = repo::anlegen(&state.pool, einsatz_id, benutzer.id, validiert.daten(), &now).await?;
 
     // ETB-Anordnung wurde im selben Commit erzeugt → ETB-Live-Event mitschicken.
     if let Some(etb_id) = d.auftrag.etb_anordnung_id {
