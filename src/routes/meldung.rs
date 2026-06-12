@@ -184,3 +184,50 @@ pub async fn status(
     sse(&state, einsatz_id);
     Ok(Json(m))
 }
+
+#[derive(Debug, Deserialize)]
+pub struct LagerelevantReq {
+    pub text: Option<String>,
+    pub lat: Option<f64>,
+    pub lon: Option<f64>,
+}
+
+/// POST /api/einsaetze/{id}/meldungen/{mid}/lagerelevant — an die Lage übergeben (LFH-95).
+pub async fn lagerelevant(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
+    Json(req): Json<LagerelevantReq>,
+) -> Result<Json<MeldungAnzeige>, AppError> {
+    fordere_bearbeitbar(&state, &benutzer, einsatz_id, meldung_id).await?;
+    // Default-Text = Meldungsinhalt, falls kein eigener Lage-Text gegeben.
+    let aktuell = repo::laden(&state.pool, meldung_id).await?;
+    let text = req
+        .text
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .unwrap_or(aktuell.inhalt);
+    let geo = match (req.lat, req.lon) {
+        (Some(a), Some(o)) => Some((a, o)),
+        (None, None) => None,
+        _ => return Err(AppError::Validation("lat und lon nur gemeinsam".into())),
+    };
+    repo::als_lagerelevant(&state.pool, einsatz_id, meldung_id, benutzer.id, &text, geo).await?;
+    let m = repo::laden(&state.pool, meldung_id).await?;
+    sse(&state, einsatz_id);
+    Ok(Json(m))
+}
+
+/// GET /api/einsaetze/{id}/lage/meldungen — Lageobjekte aus Meldungen (Lese-Oberfläche, LFH-95).
+pub async fn lage_liste(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path(einsatz_id): Path<i64>,
+) -> Result<Json<Vec<crate::meldung::LageMeldungAnzeige>>, AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    Ok(Json(repo::liste_lage_meldungen(&state.pool, einsatz_id).await?))
+}

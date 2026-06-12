@@ -1,7 +1,7 @@
 use crate::error::AppError;
 use sqlx::SqlitePool;
 
-use super::{meldungsart_gueltig, prioritaet_gueltig, MeldungAnzeige};
+use super::{meldungsart_gueltig, prioritaet_gueltig, LageMeldungAnzeige, MeldungAnzeige};
 
 /// Validierte Eingabe für eine neue Meldung (Handler hat getrimmt/normalisiert).
 #[derive(Debug)]
@@ -162,6 +162,63 @@ pub async fn setze_status(
     Ok(())
 }
 
+/// Übergibt eine Meldung an die Lage (LFH-95): setzt `lagerelevant=1` und legt
+/// (idempotent, UNIQUE meldung_id) ein Lageobjekt an. Geo optional (Meldung hat oft
+/// keine Koordinaten). `text` = Lage-Notiz (Default: Meldungsinhalt). Atomar (Tx):
+/// ein Teilfehler rollt Flag und Lageobjekt gemeinsam zurück. Liefert die Lageobjekt-id.
+pub async fn als_lagerelevant(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    meldung_id: i64,
+    von_id: i64,
+    text: &str,
+    geo: Option<(f64, f64)>,
+) -> Result<i64, AppError> {
+    let mut tx = pool.begin().await?;
+    sqlx::query("UPDATE meldung SET lagerelevant = 1 WHERE id = ?")
+        .bind(meldung_id)
+        .execute(&mut *tx)
+        .await?;
+    let (lat, lon) = match geo {
+        Some((a, o)) => (Some(a), Some(o)),
+        None => (None, None),
+    };
+    let lage_id: i64 = sqlx::query_scalar(
+        "INSERT INTO lage_meldung (einsatz_id, meldung_id, text, lat, lon, erstellt_von_id) \
+         VALUES (?, ?, ?, ?, ?, ?) \
+         ON CONFLICT(meldung_id) DO UPDATE SET text = excluded.text \
+         RETURNING id",
+    )
+    .bind(einsatz_id)
+    .bind(meldung_id)
+    .bind(text)
+    .bind(lat)
+    .bind(lon)
+    .bind(von_id)
+    .fetch_one(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(lage_id)
+}
+
+/// Listet Lageobjekte eines Einsatzes inkl. Herkunft (Quell-Meldung). Neueste zuerst.
+pub async fn liste_lage_meldungen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<Vec<LageMeldungAnzeige>, AppError> {
+    sqlx::query_as::<_, LageMeldungAnzeige>(
+        "SELECT lm.id, lm.einsatz_id, lm.meldung_id, lm.text, lm.lat, lm.lon, \
+                lm.erstellt_von_id, lm.erstellt_at, \
+                m.lfd_nr AS meldung_lfd_nr, m.absender AS meldung_absender \
+         FROM lage_meldung lm JOIN meldung m ON m.id = lm.meldung_id \
+         WHERE lm.einsatz_id = ? ORDER BY lm.id DESC",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await
+    .map_err(Into::into)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -298,5 +355,32 @@ mod tests {
         let nach = laden(&pool, m.id).await.unwrap();
         assert_eq!(nach.status, "erledigt");
         assert!(!nach.ist_offen);
+    }
+
+    #[tokio::test]
+    async fn als_lagerelevant_setzt_flag_und_erzeugt_lageobjekt_mit_herkunft() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(&pool, e, b, daten("Brücke gesperrt", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
+        let lage_id = als_lagerelevant(&pool, e, m.id, b, "Brücke gesperrt", None).await.unwrap();
+        let nach = laden(&pool, m.id).await.unwrap();
+        assert!(nach.lagerelevant);
+        assert_eq!(nach.lage_meldung_id, Some(lage_id));
+        let liste = liste_lage_meldungen(&pool, e).await.unwrap();
+        assert_eq!(liste.len(), 1);
+        assert_eq!(liste[0].meldung_lfd_nr, m.lfd_nr);
+        assert_eq!(liste[0].meldung_absender, "Florian Nord 1");
+        assert_eq!(liste[0].text, "Brücke gesperrt");
+    }
+
+    #[tokio::test]
+    async fn als_lagerelevant_ist_idempotent() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(&pool, e, b, daten("X", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
+        let id1 = als_lagerelevant(&pool, e, m.id, b, "erste", None).await.unwrap();
+        let id2 = als_lagerelevant(&pool, e, m.id, b, "zweite", None).await.unwrap();
+        assert_eq!(id1, id2, "UNIQUE meldung_id → ein Lageobjekt");
+        assert_eq!(liste_lage_meldungen(&pool, e).await.unwrap().len(), 1);
     }
 }
