@@ -23,6 +23,7 @@ pub mod lagebericht;
 pub mod lage_zone;
 pub mod live;
 pub mod material;
+pub mod meldung;
 pub mod personal;
 pub mod person;
 pub mod routes;
