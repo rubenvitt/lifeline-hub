@@ -73,6 +73,7 @@ export const modulRegistry: ModulEintrag[] = [
   { key: 'lageberichte', kategorie: 'lage', label: 'Lageberichte', icon: TbReport, route: 'lageberichte', status: 'fertig', beschreibung: 'Strukturierte Lageberichte.' },
   { key: 'kraefteuebersicht', kategorie: 'lage', label: 'Kräfteübersicht', icon: TbListDetails, route: 'kraefteuebersicht', status: 'fertig', beschreibung: 'Meldebild der eingesetzten Kräfte.' },
   { key: 'gefahrenzonen', kategorie: 'lage', label: 'Gefahren', icon: TbAlertTriangle, route: 'gefahren', status: 'fertig', beschreibung: 'Gefahrenmatrix (Gefahrentyp × Schutzobjekt → Warnstufe) und Verknüpfung der Gefahrengebiete.' },
+  { key: 'lagemeldungen', kategorie: 'lage', label: 'Lagemeldungen', icon: TbInbox, route: 'lagemeldungen', status: 'fertig', beschreibung: 'Lagerelevante Meldungen, die an die Lage übergeben wurden.' },
   // Kommunikation
   { key: 'chat', kategorie: 'kommunikation', label: 'Chat', icon: TbMessageCircle, route: 'chat', status: 'fertig', beschreibung: 'Einsatzinterner Chat (pro Einsatz, nicht einsatzübergreifend).' },
   { key: 'erinnerungen', kategorie: 'kommunikation', label: 'Erinnerungen', icon: TbBell, route: 'erinnerungen', status: 'fertig', beschreibung: 'Terminierte Erinnerungen.' },

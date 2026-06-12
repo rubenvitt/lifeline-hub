@@ -87,4 +87,49 @@ describe('MeldungenPage', () => {
     expect(await screen.findByText('Florian Nord 1')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Meldung erfassen' })).not.toBeInTheDocument();
   });
+
+  // --- LFH-94: Sichten/Status/Beobachter ---
+
+  it('sichtet eine neue Meldung', async () => {
+    setzeMeldungStatus.mockResolvedValue(meldung({ status: 'gesichtet' }));
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(screen.getByText('Sichten', { selector: 'a' }));
+    await waitFor(() => expect(setzeMeldungStatus).toHaveBeenCalledWith(1, 1, 'gesichtet'));
+  });
+
+  it('setzt eine Meldung auf erledigt', async () => {
+    setzeMeldungStatus.mockResolvedValue(meldung({ status: 'erledigt' }));
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(screen.getByText('Erledigt', { selector: 'a' }));
+    await waitFor(() => expect(setzeMeldungStatus).toHaveBeenCalledWith(1, 1, 'erledigt'));
+  });
+
+  it('Beobachter sieht keine Status-Aktionen', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValueOnce({
+      id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'beobachter',
+    } as Awaited<ReturnType<typeof ladeEinsatz>>);
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    expect(screen.queryByText('Sichten', { selector: 'a' })).not.toBeInTheDocument();
+  });
+
+  // --- LFH-95: Lage-Übergabe ---
+
+  it('übergibt eine Meldung an die Lage', async () => {
+    markiereLagerelevant.mockResolvedValue(meldung({ lagerelevant: true }));
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(screen.getByText('An Lage übergeben', { selector: 'a' }));
+    await waitFor(() => expect(markiereLagerelevant).toHaveBeenCalledWith(1, 1));
+  });
+
+  it('zeigt lagerelevante Meldung als markiert, ohne erneute Übergabe-Aktion', async () => {
+    listeMeldungen.mockResolvedValue([meldung({ lagerelevant: true, lage_meldung_id: 9 })]);
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    expect(screen.getByText('Lagerelevant ✓')).toBeInTheDocument();
+    expect(screen.queryByText('An Lage übergeben', { selector: 'a' })).not.toBeInTheDocument();
+  });
 });
