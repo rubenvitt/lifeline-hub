@@ -67,6 +67,7 @@ pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
         .route("/api/einsaetze/{id}/chat/nachrichten/{mid}", patch(routes::chat::nachricht_bearbeiten))
         .route("/api/einsaetze/{id}/chat/nachrichten/{mid}", delete(routes::chat::nachricht_loeschen))
         .route("/api/einsaetze/{id}/chat/nachrichten/{mid}/heraufstufen-etb", post(routes::chat::heraufstufen))
+        .route("/api/einsaetze/{id}/chat/nachrichten/{mid}/heraufstufen-auftrag", post(routes::chat::heraufstufen_auftrag))
         .route("/api/einsaetze/{id}/erinnerungen", get(routes::erinnerung::liste))
         .route("/api/einsaetze/{id}/erinnerungen", post(routes::erinnerung::anlegen))
         .route("/api/einsaetze/{id}/erinnerungen/{eid}/erledigen", post(routes::erinnerung::erledigen))

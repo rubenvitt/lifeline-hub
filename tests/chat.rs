@@ -176,3 +176,53 @@ async fn heraufstufen_lehnt_unzulaessige_typen_ab() {
         assert_eq!(s, StatusCode::BAD_REQUEST, "Typ {typ} muss abgelehnt werden");
     }
 }
+
+#[tokio::test]
+async fn heraufstufen_zu_auftrag_erzeugt_auftrag_und_markiert_nachricht() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    let (_, m) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"), &admin,
+        Some(r#"{"inhalt":"Tank 5000 anfordern"}"#)).await;
+    let mid = m["id"].as_i64().unwrap();
+
+    // Heraufstufen zu Auftrag mit Funktions-Empfänger + Priorität.
+    let body = r#"{"auftrag_text":"Tank 5000 anfordern","prioritaet":"dringend","empfaenger":[{"empfaenger_typ":"funktion","funktion_text":"S4"}]}"#;
+    let (s, hoch) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/heraufstufen-auftrag"), &admin,
+        Some(body)).await;
+    assert_eq!(s, StatusCode::CREATED);
+    assert!(hoch["auftrag_id"].is_i64(), "Nachricht trägt den Rückverweis auf den Auftrag");
+
+    // Auftrag landet dokumentiert im Auftrag-Modul (inkl. Priorität).
+    let (_, auftraege) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/auftraege"), &admin, None).await;
+    let arr = auftraege.as_array().unwrap();
+    assert_eq!(arr.len(), 1);
+    assert_eq!(arr[0]["auftrag_text"], "Tank 5000 anfordern");
+    assert_eq!(arr[0]["prioritaet"], "dringend");
+    assert!(arr[0]["etb_anordnung_id"].is_i64(), "ETB-Anordnung im selben Commit");
+
+    // Doppel-Heraufstufung zu Auftrag → Conflict.
+    let (s, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/heraufstufen-auftrag"), &admin,
+        Some(body)).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn heraufstufen_zu_auftrag_ohne_empfaenger_wird_abgelehnt() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    let (_, m) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"), &admin,
+        Some(r#"{"inhalt":"x"}"#)).await;
+    let mid = m["id"].as_i64().unwrap();
+
+    // Gleiche Validierung wie POST /auftraege: ohne Empfänger → 400, keine Heraufstufung.
+    let (s, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/heraufstufen-auftrag"), &admin,
+        Some(r#"{"auftrag_text":"x","empfaenger":[]}"#)).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+
+    let (_, nachher) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"), &admin, None).await;
+    assert!(nachher.as_array().unwrap()[0]["auftrag_id"].is_null(), "keine Markierung bei Validierungsfehler");
+}

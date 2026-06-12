@@ -31,7 +31,7 @@ const kanal: ChatKanal = {
 const nachricht: ChatNachricht = {
   id: 5, einsatz_id: 7, kanal_id: 1, autor_id: 1, autor_name: 'A',
   inhalt: 'Erste Lage', erstellt_at: '2026-06-10 10:00:00',
-  bearbeitet_at: null, geloescht_at: null, etb_eintrag_id: null,
+  bearbeitet_at: null, geloescht_at: null, etb_eintrag_id: null, auftrag_id: null,
 };
 
 function setup() {

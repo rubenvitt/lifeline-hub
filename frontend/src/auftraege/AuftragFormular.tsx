@@ -30,14 +30,16 @@ function baueEmpfaenger(ziele: string[], funktionText: string): NeuerEmpfaenger[
   return [...strukturiert, ...funktionen];
 }
 
-export default function AuftragFormular({ senden, abschnitte, einheiten, onAnlegen }: {
+export default function AuftragFormular({ senden, abschnitte, einheiten, onAnlegen, initialText }: {
   senden: boolean;
   abschnitte: ZielOption[];
   einheiten: ZielOption[];
   onAnlegen: (d: NeuerAuftrag) => void;
+  /** Vorbelegung des Auftragstexts (z. B. Chat-Heraufstufung, LFH-101). */
+  initialText?: string;
 }) {
   const { message } = App.useApp();
-  const [text, setText] = useState('');
+  const [text, setText] = useState(initialText ?? '');
   const [absicht, setAbsicht] = useState('');
   const [lage, setLage] = useState('');
   const [ort, setOrt] = useState('');

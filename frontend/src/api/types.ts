@@ -545,6 +545,8 @@ export interface ChatNachricht {
   bearbeitet_at: string | null;
   geloescht_at: string | null;
   etb_eintrag_id: number | null;
+  /** `null` = nicht zu einem Auftrag heraufgestuft (LFH-101). Unabhängig von `etb_eintrag_id`. */
+  auftrag_id: number | null;
 }
 
 // ============================== E‑5 Schäden ==============================

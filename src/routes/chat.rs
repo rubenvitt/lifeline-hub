@@ -247,3 +247,49 @@ pub async fn heraufstufen(
     sse_chat(&state, einsatz_id, als_json(&nachricht, einsatz_id));
     Ok(Json(nachricht))
 }
+
+/// POST /api/einsaetze/{id}/chat/nachrichten/{mid}/heraufstufen-auftrag — Nachricht → Auftrag (LFH-101).
+/// Schreibrecht + aktiv. Erzeugt aus der Nachricht einen formalen Auftrag (inkl. ETB-Anordnung,
+/// Pattern B) und markiert die Nachricht als „heraufgestuft zu Auftrag". Auftragsfelder (Empfänger,
+/// Priorität …) kommen aus dem Request und durchlaufen dieselbe Validierung wie POST /auftraege.
+pub async fn heraufstufen_auftrag(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, nachricht_id)): Path<(i64, i64)>,
+    Json(req): Json<crate::routes::auftrag::NeuerAuftrag>,
+) -> Result<(StatusCode, Json<ChatNachrichtAnzeige>), AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_schreibrecht(rolle)?;
+    fordere_aktiv(&einsatz)?;
+
+    if !repo::gehoert_nachricht_zu_einsatz(&state.pool, nachricht_id, einsatz_id).await? {
+        return Err(AppError::NotFound);
+    }
+
+    // Gleiche Validierung wie POST /auftraege (geteilt) → kein zweiter, ungeprüfter Pfad.
+    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let validiert =
+        crate::routes::auftrag::validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now).await?;
+    let auftrag_id = repo::heraufstufen_zu_auftrag(
+        &state.pool, einsatz_id, nachricht_id, benutzer.id, validiert.daten(),
+    )
+    .await?;
+
+    // ETB-Anordnung entstand im selben Commit → ETB-Live-Event + Auftrag-Board aktualisieren.
+    if let Ok(detail) = crate::auftrag::repo::laden(&state.pool, auftrag_id, &now).await {
+        if let Some(etb_id) = detail.auftrag.etb_anordnung_id {
+            if let Ok(etb) = crate::etb::repo::laden(&state.pool, etb_id).await {
+                state.live.publiziere(einsatz_id, als_json(&etb, einsatz_id));
+            }
+        }
+    }
+    state.live.publiziere_event(
+        einsatz_id,
+        "auftrag",
+        serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
+    );
+    let nachricht = repo::laden(&state.pool, nachricht_id).await?;
+    sse_chat(&state, einsatz_id, als_json(&nachricht, einsatz_id));
+    Ok((StatusCode::CREATED, Json(nachricht)))
+}
