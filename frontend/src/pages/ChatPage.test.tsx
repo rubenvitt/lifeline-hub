@@ -69,6 +69,43 @@ describe('ChatPage', () => {
     expect(await screen.findByText('Neue Meldung')).toBeInTheDocument();
   });
 
+  it('lädt ältere Nachrichten über den "Ältere laden"-Button nach (before_id)', async () => {
+    // Erste Seite: volle Seitengröße (100) → es gibt mehr → Button erscheint.
+    const ersteSeite: ChatNachricht[] = Array.from({ length: 100 }, (_, i) => ({
+      ...nachricht, id: 200 - i, inhalt: `Aktuell ${200 - i}`,
+    }));
+    let zweiteSeiteAngefragtMit: string | null = null;
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
+      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', ({ request }) => {
+        const beforeId = new URL(request.url).searchParams.get('before_id');
+        if (beforeId) {
+          zweiteSeiteAngefragtMit = beforeId;
+          return HttpResponse.json([{ ...nachricht, id: 5, inhalt: 'Uralte Nachricht' }]);
+        }
+        return HttpResponse.json(ersteSeite);
+      }),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/7/chat' },
+    );
+
+    expect(await screen.findByText('Aktuell 200')).toBeInTheDocument();
+    const button = await screen.findByRole('button', { name: 'Ältere laden' });
+    await userEvent.click(button);
+
+    expect(await screen.findByText('Uralte Nachricht')).toBeInTheDocument();
+    // Cursor = älteste (kleinste) id der ersten Seite = 101.
+    expect(zweiteSeiteAngefragtMit).toBe('101');
+  });
+
   it('bearbeitet eine eigene Nachricht über das Modal statt window.prompt', async () => {
     let bearbeitet: { inhalt: string } | null = null;
     const nachrichten: ChatNachricht[] = [nachricht];

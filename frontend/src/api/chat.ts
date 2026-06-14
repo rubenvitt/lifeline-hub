@@ -15,6 +15,11 @@ export function legeKanalAn(einsatzId: number, daten: NeuerKanal): Promise<ChatK
   return apiSend<ChatKanal>(`/api/einsaetze/${einsatzId}/chat/kanaele`, 'POST', daten);
 }
 
+/** Seitengröße der Nachrichten-Pagination. Muss dem Backend-Default (STANDARD_LIMIT,
+ *  src/routes/chat.rs) entsprechen, damit die hasNextPage-Heuristik (volle Seite = mehr da)
+ *  greift — das Frontend sendet kein eigenes limit. */
+export const CHAT_SEITENGROESSE = 100;
+
 export function listeNachrichten(
   einsatzId: number,
   kanalId: number,

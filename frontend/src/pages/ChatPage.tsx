@@ -1,12 +1,12 @@
-import { Alert, App, Breadcrumb, Col, Row, Spin, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Col, Row, Spin, Typography } from 'antd';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { ApiError } from '../api/client';
 import {
-  bearbeiteNachricht, heraufstufenZuAuftrag, heraufstufenZuEtb, ladeAnhaengeHoch, legeKanalAn, listeKanaele,
-  listeNachrichten, loescheNachricht, sendeNachricht,
+  CHAT_SEITENGROESSE, bearbeiteNachricht, heraufstufenZuAuftrag, heraufstufenZuEtb, ladeAnhaengeHoch, legeKanalAn,
+  listeKanaele, listeNachrichten, loescheNachricht, sendeNachricht,
 } from '../api/chat';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
@@ -54,9 +54,16 @@ export default function ChatPage() {
   const kanaele = kanaeleQuery.data ?? [];
   const kanalId = aktiverKanal ?? kanaele[0]?.id ?? null;
 
-  const nachrichtenQuery = useQuery({
+  const nachrichtenQuery = useInfiniteQuery({
     queryKey: ['einsatz-chat-nachrichten', einsatzId, kanalId],
-    queryFn: () => listeNachrichten(einsatzId, kanalId as number),
+    queryFn: ({ pageParam }) => listeNachrichten(einsatzId, kanalId as number, pageParam),
+    initialPageParam: undefined as number | undefined,
+    // Backend liefert je Seite id DESC (neueste zuerst); der Cursor für ältere
+    // Nachrichten ist die kleinste (= letzte) id der zuletzt geladenen Seite.
+    getNextPageParam: (letzteSeite) =>
+      letzteSeite.length === CHAT_SEITENGROESSE
+        ? letzteSeite[letzteSeite.length - 1].id
+        : undefined,
     enabled: kanalId !== null,
   });
 
@@ -130,7 +137,7 @@ export default function ChatPage() {
     einsatz.status === 'aktiv' &&
     (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
 
-  const nachrichten = [...(nachrichtenQuery.data ?? [])].sort((a, b) => a.id - b.id);
+  const nachrichten = [...(nachrichtenQuery.data?.pages.flat() ?? [])].sort((a, b) => a.id - b.id);
 
   return (
     <div>
@@ -157,6 +164,16 @@ export default function ChatPage() {
           {nachrichtenQuery.isError && (
             <Alert type="error" showIcon style={{ marginBottom: 12 }}
               message="Nachrichten konnten nicht geladen werden" />
+          )}
+          {nachrichtenQuery.hasNextPage && (
+            <div style={{ textAlign: 'center', marginBottom: 12 }}>
+              <Button
+                onClick={() => nachrichtenQuery.fetchNextPage()}
+                loading={nachrichtenQuery.isFetchingNextPage}
+              >
+                Ältere laden
+              </Button>
+            </div>
           )}
           <NachrichtenStrom
             nachrichten={nachrichten}
