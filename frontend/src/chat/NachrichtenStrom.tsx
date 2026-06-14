@@ -1,6 +1,7 @@
 import { PaperClipOutlined } from '@ant-design/icons';
-import { Button, List, Space, Tag, Typography } from 'antd';
+import { Button, List, Popover, Space, Tag, Typography } from 'antd';
 import type { BezugTyp, ChatNachricht } from '../api/types';
+import type { BezugKurzinfo } from './bezug';
 
 /** Menschlich lesbare Dateigröße. */
 function formatGroesse(bytes: number): string {
@@ -23,11 +24,14 @@ interface Props {
   onBezugLoeschen?: (n: ChatNachricht) => void;
   /** Löst einen gesetzten Bezug zu einem Anzeige-Label auf. */
   bezugLabel?: (typ: BezugTyp, id: number) => string;
+  /** Liefert die Kurzinfo für das Bezug-Popover; `null`, wenn das Objekt nicht
+   *  (mehr) geladen/verfügbar ist. Ohne diesen Callback bleibt der Tag statisch. */
+  bezugInfo?: (typ: BezugTyp, id: number) => BezugKurzinfo | null;
 }
 
 export default function NachrichtenStrom({
   nachrichten, eigeneBenutzerId, darfSchreiben, onBearbeiten, onLoeschen, onHeraufstufen, onHeraufstufenAuftrag,
-  onBezugSetzen, onBezugLoeschen, bezugLabel,
+  onBezugSetzen, onBezugLoeschen, bezugLabel, bezugInfo,
 }: Props) {
   return (
     <List<ChatNachricht>
@@ -75,18 +79,38 @@ export default function NachrichtenStrom({
                   {n.bearbeitet_at && <Tag>bearbeitet</Tag>}
                   {heraufgestuft && <Tag color="blue">heraufgestuft zu ETB</Tag>}
                   {heraufgestuftZuAuftrag && <Tag color="geekblue">heraufgestuft zu Auftrag</Tag>}
-                  {!geloescht && hatBezug && bezugLabel && (
-                    <Tag
-                      color="cyan"
-                      closable={darfSchreiben && onBezugLoeschen !== undefined}
-                      onClose={(e) => {
-                        e.preventDefault();
-                        onBezugLoeschen?.(n);
-                      }}
-                    >
-                      {bezugLabel(n.bezug_typ as BezugTyp, n.bezug_id as number)}
-                    </Tag>
-                  )}
+                  {!geloescht && hatBezug && bezugLabel && (() => {
+                    const typ = n.bezug_typ as BezugTyp;
+                    const zielId = n.bezug_id as number;
+                    const label = bezugLabel(typ, zielId);
+                    const info = bezugInfo?.(typ, zielId) ?? null;
+                    return (
+                      <Tag
+                        color="cyan"
+                        closable={darfSchreiben && onBezugLoeschen !== undefined}
+                        onClose={(e) => {
+                          e.preventDefault();
+                          onBezugLoeschen?.(n);
+                        }}
+                      >
+                        {info ? (
+                          <Popover
+                            trigger="click"
+                            title={info.titel}
+                            content={
+                              info.zeilen.length
+                                ? <Space direction="vertical" size={0}>
+                                    {info.zeilen.map((z, i) => <span key={i}>{z}</span>)}
+                                  </Space>
+                                : 'Keine weiteren Angaben'
+                            }
+                          >
+                            <span style={{ cursor: 'pointer' }}>{label}</span>
+                          </Popover>
+                        ) : label}
+                      </Tag>
+                    );
+                  })()}
                 </Space>
               }
               description={

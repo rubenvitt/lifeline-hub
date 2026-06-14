@@ -27,8 +27,9 @@ import HeraufstufenAuftragModal from '../chat/HeraufstufenAuftragModal';
 import BearbeitenModal from '../chat/BearbeitenModal';
 import BezugDialog from '../chat/BezugDialog';
 import {
-  auftragLabel, bezugLabel as loeseBezugLabel, lageberichtLabel, meldungLabel, personLabel,
-  schadenLabel, uhsLabel, type BezugOptionen,
+  auftragInfo, auftragLabel, bezugLabel as loeseBezugLabel, lageberichtInfo, lageberichtLabel,
+  meldungInfo, meldungLabel, personInfo, personLabel, schadenInfo, schadenLabel, uhsInfo, uhsLabel,
+  type BezugKurzinfo, type BezugOptionen,
 } from '../chat/bezug';
 
 export default function ChatPage() {
@@ -208,6 +209,19 @@ export default function ChatPage() {
     auftrag: (auftraegeQuery.data ?? []).map((a) => ({ value: a.id, label: auftragLabel(a) })),
   };
 
+  // Kurzinfo fürs Bezug-Popover: Objekt in der passenden (lazy geladenen) Liste suchen.
+  // `null`, wenn nicht (mehr) verfügbar → Tag bleibt ohne Popover.
+  const bezugInfo = (typ: BezugTyp, zielId: number): BezugKurzinfo | null => {
+    switch (typ) {
+      case 'schaden': { const o = schaedenQuery.data?.find((x) => x.id === zielId); return o ? schadenInfo(o) : null; }
+      case 'uhs': { const o = uhsQuery.data?.find((x) => x.id === zielId); return o ? uhsInfo(o) : null; }
+      case 'person': { const o = personenQuery.data?.find((x) => x.id === zielId); return o ? personInfo(o) : null; }
+      case 'lagebericht': { const o = lageberichteQuery.data?.find((x) => x.id === zielId); return o ? lageberichtInfo(o) : null; }
+      case 'meldung': { const o = meldungenQuery.data?.find((x) => x.id === zielId); return o ? meldungInfo(o) : null; }
+      case 'auftrag': { const o = auftraegeQuery.data?.find((x) => x.id === zielId); return o ? auftragInfo(o) : null; }
+    }
+  };
+
   return (
     <div>
       <Breadcrumb
@@ -255,6 +269,7 @@ export default function ChatPage() {
             onBezugSetzen={(n) => setBezugNachricht(n)}
             onBezugLoeschen={(n) => bezugLoeschenMutation.mutate(n.id)}
             bezugLabel={(typ, zielId) => loeseBezugLabel(typ, zielId, bezugOptionen)}
+            bezugInfo={bezugInfo}
           />
           {darfSchreiben && kanalId !== null && (
             <NachrichtEingabe

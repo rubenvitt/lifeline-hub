@@ -124,6 +124,19 @@ describe('NachrichtenStrom', () => {
     expect(screen.getByRole('button', { name: 'Bezug ändern' })).toBeInTheDocument();
   });
 
+  it('öffnet bei Klick auf den Bezug-Tag ein Popover mit Kurzinfo', async () => {
+    renderMitProviders(
+      <NachrichtenStrom nachrichten={[nachricht({ bezug_typ: 'schaden', bezug_id: 3 })]}
+        eigeneBenutzerId={1} darfSchreiben
+        bezugLabel={() => 'S-003 · sachschaden'}
+        bezugInfo={() => ({ titel: 'S-003 · sachschaden', zeilen: ['Ausmaß: gering', 'Ort: B5 km12'] })}
+        onBezugSetzen={vi.fn()} onBezugLoeschen={vi.fn()}
+        onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={vi.fn()} onHeraufstufenAuftrag={vi.fn()} />,
+    );
+    await userEvent.click(screen.getByText('S-003 · sachschaden'));
+    expect(await screen.findByText('Ort: B5 km12')).toBeInTheDocument();
+  });
+
   it('Bezug-Tag ist schließbar und löst onBezugLoeschen aus', async () => {
     const onBezugLoeschen = vi.fn();
     const { container } = renderMitProviders(
