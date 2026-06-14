@@ -18,6 +18,7 @@ import NachrichtenStrom from '../chat/NachrichtenStrom';
 import NachrichtEingabe from '../chat/NachrichtEingabe';
 import HeraufstufenModal from '../chat/HeraufstufenModal';
 import HeraufstufenAuftragModal from '../chat/HeraufstufenAuftragModal';
+import BearbeitenModal from '../chat/BearbeitenModal';
 
 export default function ChatPage() {
   const { id } = useParams();
@@ -28,6 +29,7 @@ export default function ChatPage() {
   const [aktiverKanal, setAktiverKanal] = useState<number | null>(null);
   const [heraufstufen, setHeraufstufen] = useState<ChatNachricht | null>(null);
   const [heraufstufenAuftrag, setHeraufstufenAuftrag] = useState<ChatNachricht | null>(null);
+  const [bearbeiten, setBearbeiten] = useState<ChatNachricht | null>(null);
 
   useEinsatzLiveStream(einsatzId);
 
@@ -75,7 +77,10 @@ export default function ChatPage() {
   });
   const bearbeitenMutation = useMutation({
     mutationFn: ({ id: nid, text }: { id: number; text: string }) => bearbeiteNachricht(einsatzId, nid, text),
-    onSuccess: invalidiereNachrichten,
+    onSuccess: () => {
+      invalidiereNachrichten();
+      setBearbeiten(null);
+    },
     onError: fehler,
   });
   const loeschenMutation = useMutation({
@@ -157,10 +162,7 @@ export default function ChatPage() {
             nachrichten={nachrichten}
             eigeneBenutzerId={benutzer?.id ?? null}
             darfSchreiben={darfSchreiben}
-            onBearbeiten={(n) => {
-              const text = window.prompt('Nachricht bearbeiten', n.inhalt ?? '');
-              if (text && text.trim()) bearbeitenMutation.mutate({ id: n.id, text: text.trim() });
-            }}
+            onBearbeiten={(n) => setBearbeiten(n)}
             onLoeschen={(n) => loeschenMutation.mutate(n.id)}
             onHeraufstufen={(n) => setHeraufstufen(n)}
             onHeraufstufenAuftrag={(n) => setHeraufstufenAuftrag(n)}
@@ -173,6 +175,15 @@ export default function ChatPage() {
           )}
         </Col>
       </Row>
+      <BearbeitenModal
+        offen={bearbeiten !== null}
+        nachricht={bearbeiten}
+        senden={bearbeitenMutation.isPending}
+        onAbbrechen={() => setBearbeiten(null)}
+        onBestaetigen={(text) => {
+          if (bearbeiten) bearbeitenMutation.mutate({ id: bearbeiten.id, text });
+        }}
+      />
       <HeraufstufenModal
         offen={heraufstufen !== null}
         nachricht={heraufstufen}

@@ -69,6 +69,41 @@ describe('ChatPage', () => {
     expect(await screen.findByText('Neue Meldung')).toBeInTheDocument();
   });
 
+  it('bearbeitet eine eigene Nachricht über das Modal statt window.prompt', async () => {
+    let bearbeitet: { inhalt: string } | null = null;
+    const nachrichten: ChatNachricht[] = [nachricht];
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
+      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
+      http.patch('/api/einsaetze/7/chat/nachrichten/5', async ({ request }) => {
+        bearbeitet = (await request.json()) as { inhalt: string };
+        nachrichten[0] = { ...nachricht, inhalt: bearbeitet.inhalt, bearbeitet_at: '2026-06-10 11:00:00' };
+        return HttpResponse.json(nachrichten[0]);
+      }),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/7/chat' },
+    );
+
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+    const feld = await screen.findByDisplayValue('Erste Lage');
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'Lage korrigiert');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(bearbeitet).not.toBeNull());
+    expect(bearbeitet!.inhalt).toBe('Lage korrigiert');
+    expect(await screen.findByText('Lage korrigiert')).toBeInTheDocument();
+  });
+
   it('lädt einen Anhang hoch und sendet die Nachricht mit anhang_ids', async () => {
     let gesendet: { inhalt: string; anhang_ids: number[] } | null = null;
     const nachrichten: ChatNachricht[] = [nachricht];
