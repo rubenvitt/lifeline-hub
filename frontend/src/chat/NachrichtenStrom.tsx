@@ -1,5 +1,13 @@
+import { PaperClipOutlined } from '@ant-design/icons';
 import { Button, List, Space, Tag, Typography } from 'antd';
 import type { ChatNachricht } from '../api/types';
+
+/** Menschlich lesbare Dateigröße. */
+function formatGroesse(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
 
 interface Props {
   nachrichten: ChatNachricht[];
@@ -60,7 +68,22 @@ export default function NachrichtenStrom({
                 geloescht ? (
                   <Typography.Text type="secondary" italic>Nachricht gelöscht</Typography.Text>
                 ) : (
-                  <Typography.Text>{n.inhalt}</Typography.Text>
+                  <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                    {n.inhalt && <Typography.Text>{n.inhalt}</Typography.Text>}
+                    {n.anhaenge.map((a) => (
+                      <Typography.Link
+                        key={a.id}
+                        href={`/api/einsaetze/${n.einsatz_id}/anhaenge/${a.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <PaperClipOutlined /> {a.dateiname}{' '}
+                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                          ({formatGroesse(a.groesse)})
+                        </Typography.Text>
+                      </Typography.Link>
+                    ))}
+                  </Space>
                 )
               }
             />

@@ -102,6 +102,11 @@ pub async fn nachrichten_liste(
 #[derive(Debug, Deserialize)]
 pub struct NeueNachricht {
     pub inhalt: String,
+    /// IDs zuvor hochgeladener Anhänge (über POST .../anhaenge). Optional; beim
+    /// Bearbeiten ignoriert. Eine Nachricht ohne Text ist zulässig, wenn sie
+    /// mindestens einen Anhang trägt.
+    #[serde(default)]
+    pub anhang_ids: Vec<i64>,
 }
 
 /// POST /api/einsaetze/{id}/chat/kanaele/{kid}/nachrichten — Nachricht senden.
@@ -121,12 +126,21 @@ pub async fn nachricht_erfassen(
         return Err(AppError::NotFound);
     }
     let inhalt = req.inhalt.trim();
-    if inhalt.is_empty() {
-        return Err(AppError::Validation("Nachricht darf nicht leer sein".into()));
+    if inhalt.is_empty() && req.anhang_ids.is_empty() {
+        return Err(AppError::Validation("Nachricht braucht Text oder einen Anhang".into()));
     }
 
-    let nachricht = repo::anlegen(&state.pool, einsatz_id, benutzer.id,
-        repo::NachrichtDaten { kanal_id, inhalt }).await?;
+    // Doppelte IDs deduplizieren: ein Client darf denselben Anhang zweimal nennen,
+    // ohne dass die Join-Tabellen-PK (nachricht_id, anhang_id) verletzt wird (sonst
+    // 500 statt einer sauberen Verknüpfung). Reihenfolge egal — Anzeige sortiert per id.
+    let mut anhang_ids = req.anhang_ids;
+    anhang_ids.sort_unstable();
+    anhang_ids.dedup();
+
+    // Nachricht + Anhang-Verknüpfung atomar; fremde/unbekannte Anhänge → Rollback.
+    let nachricht = repo::anlegen_mit_anhaengen(
+        &state.pool, einsatz_id, benutzer.id, kanal_id, inhalt, &anhang_ids,
+    ).await?;
     sse_chat(&state, einsatz_id, als_json(&nachricht, einsatz_id));
     Ok((StatusCode::CREATED, Json(nachricht)))
 }

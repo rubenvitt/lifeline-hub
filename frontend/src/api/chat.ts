@@ -1,5 +1,5 @@
-import { apiGet, apiSend } from './client';
-import type { ChatKanal, ChatNachricht, EtbTyp, NeuerAuftrag } from './types';
+import { apiGet, apiSend, apiUpload } from './client';
+import type { Anhang, ChatKanal, ChatNachricht, EtbTyp, NeuerAuftrag } from './types';
 
 
 export function listeKanaele(einsatzId: number): Promise<ChatKanal[]> {
@@ -24,9 +24,25 @@ export function listeNachrichten(
   return apiGet<ChatNachricht[]>(`/api/einsaetze/${einsatzId}/chat/kanaele/${kanalId}/nachrichten${q}`);
 }
 
-export function sendeNachricht(einsatzId: number, kanalId: number, inhalt: string): Promise<ChatNachricht> {
+/** Lädt Dateien hoch und liefert die Anhang-Metadaten zurück (LFH-102). Der
+ *  Upload ist von der Nachricht entkoppelt: erst hochladen, dann beim Senden die
+ *  `anhang_ids` mitgeben. */
+export function ladeAnhaengeHoch(einsatzId: number, dateien: File[]): Promise<Anhang[]> {
+  const formData = new FormData();
+  for (const datei of dateien) formData.append('datei', datei);
+  return apiUpload<Anhang[]>(`/api/einsaetze/${einsatzId}/anhaenge`, formData);
+}
+
+export function sendeNachricht(
+  einsatzId: number,
+  kanalId: number,
+  inhalt: string,
+  anhangIds: number[] = [],
+): Promise<ChatNachricht> {
   return apiSend<ChatNachricht>(
-    `/api/einsaetze/${einsatzId}/chat/kanaele/${kanalId}/nachrichten`, 'POST', { inhalt },
+    `/api/einsaetze/${einsatzId}/chat/kanaele/${kanalId}/nachrichten`,
+    'POST',
+    { inhalt, anhang_ids: anhangIds },
   );
 }
 

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = "0.8"
+axum = { version = "0.8", features = ["multipart"] }
 tokio = { version = "1", features = ["full"] }
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "migrate"] }
 libsqlite3-sys = { version = "0.30", features = ["bundled"] }
@@ -21,6 +21,8 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 axum-extra = { version = "0.10", features = ["cookie"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
 tempfile = "3"
+sha2 = "0.10"
+mime_guess = "2"
 rust-embed = "8"
 tower-http = { version = "0.6", features = ["fs"] }
 

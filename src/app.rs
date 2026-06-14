@@ -3,6 +3,7 @@ use crate::karte::FachebenenState;
 use crate::live::LiveHub;
 use crate::routes;
 use axum::{
+    extract::DefaultBodyLimit,
     routing::{delete, get, patch, post, put},
     Extension, Router,
 };
@@ -68,6 +69,13 @@ pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
         .route("/api/einsaetze/{id}/chat/nachrichten/{mid}", delete(routes::chat::nachricht_loeschen))
         .route("/api/einsaetze/{id}/chat/nachrichten/{mid}/heraufstufen-etb", post(routes::chat::heraufstufen))
         .route("/api/einsaetze/{id}/chat/nachrichten/{mid}/heraufstufen-auftrag", post(routes::chat::heraufstufen_auftrag))
+        // Generische Anhänge (LFH-102). Body-Limit etwas über MAX_GROESSE (25 MiB)
+        // für Multipart-Overhead; der Default (2 MiB) würde Uploads kappen.
+        .route(
+            "/api/einsaetze/{id}/anhaenge",
+            post(routes::anhang::hochladen).layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+        )
+        .route("/api/einsaetze/{id}/anhaenge/{aid}", get(routes::anhang::herunterladen))
         .route("/api/einsaetze/{id}/erinnerungen", get(routes::erinnerung::liste))
         .route("/api/einsaetze/{id}/erinnerungen", post(routes::erinnerung::anlegen))
         .route("/api/einsaetze/{id}/erinnerungen/{eid}/erledigen", post(routes::erinnerung::erledigen))

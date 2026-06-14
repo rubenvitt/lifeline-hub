@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { Route, Routes } from 'react-router-dom';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
@@ -31,7 +31,7 @@ const kanal: ChatKanal = {
 const nachricht: ChatNachricht = {
   id: 5, einsatz_id: 7, kanal_id: 1, autor_id: 1, autor_name: 'A',
   inhalt: 'Erste Lage', erstellt_at: '2026-06-10 10:00:00',
-  bearbeitet_at: null, geloescht_at: null, etb_eintrag_id: null, auftrag_id: null,
+  bearbeitet_at: null, geloescht_at: null, etb_eintrag_id: null, auftrag_id: null, anhaenge: [],
 };
 
 function setup() {
@@ -67,5 +67,44 @@ describe('ChatPage', () => {
     await userEvent.type(screen.getByPlaceholderText('Nachricht…'), 'Neue Meldung');
     await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
     expect(await screen.findByText('Neue Meldung')).toBeInTheDocument();
+  });
+
+  it('lädt einen Anhang hoch und sendet die Nachricht mit anhang_ids', async () => {
+    let gesendet: { inhalt: string; anhang_ids: number[] } | null = null;
+    const nachrichten: ChatNachricht[] = [nachricht];
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
+      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
+      http.post('/api/einsaetze/7/anhaenge', () =>
+        HttpResponse.json(
+          [{ id: 99, einsatz_id: 7, dateiname: 'lage.pdf', mime: 'application/pdf', groesse: 3, hochgeladen_von: 1, erstellt_at: '2026-06-10 10:00:00' }],
+          { status: 201 },
+        )),
+      http.post('/api/einsaetze/7/chat/kanaele/1/nachrichten', async ({ request }) => {
+        gesendet = (await request.json()) as { inhalt: string; anhang_ids: number[] };
+        const neu: ChatNachricht = { ...nachricht, id: 6, inhalt: gesendet.inhalt };
+        nachrichten.push(neu);
+        return HttpResponse.json(neu, { status: 201 });
+      }),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/7/chat' },
+    );
+
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    const datei = new File(['PDF'], 'lage.pdf', { type: 'application/pdf' });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await userEvent.upload(input, datei);
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+
+    await waitFor(() => expect(gesendet).not.toBeNull());
+    expect(gesendet!.anhang_ids).toEqual([99]);
   });
 });

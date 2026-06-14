@@ -5,8 +5,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { ApiError } from '../api/client';
 import {
-  bearbeiteNachricht, heraufstufenZuAuftrag, heraufstufenZuEtb, legeKanalAn, listeKanaele, listeNachrichten,
-  loescheNachricht, sendeNachricht,
+  bearbeiteNachricht, heraufstufenZuAuftrag, heraufstufenZuEtb, ladeAnhaengeHoch, legeKanalAn, listeKanaele,
+  listeNachrichten, loescheNachricht, sendeNachricht,
 } from '../api/chat';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
@@ -64,7 +64,12 @@ export default function ChatPage() {
     qc.invalidateQueries({ queryKey: ['einsatz-chat-nachrichten', einsatzId] });
 
   const sendenMutation = useMutation({
-    mutationFn: (text: string) => sendeNachricht(einsatzId, kanalId as number, text),
+    // Zweistufig: erst Anhänge hochladen (falls vorhanden), dann Nachricht mit den
+    // resultierenden anhang_ids senden.
+    mutationFn: async ({ text, dateien }: { text: string; dateien: File[] }) => {
+      const anhaenge = dateien.length > 0 ? await ladeAnhaengeHoch(einsatzId, dateien) : [];
+      return sendeNachricht(einsatzId, kanalId as number, text, anhaenge.map((a) => a.id));
+    },
     onSuccess: invalidiereNachrichten,
     onError: fehler,
   });
@@ -161,7 +166,10 @@ export default function ChatPage() {
             onHeraufstufenAuftrag={(n) => setHeraufstufenAuftrag(n)}
           />
           {darfSchreiben && kanalId !== null && (
-            <NachrichtEingabe onSenden={(t) => sendenMutation.mutate(t)} senden={sendenMutation.isPending} />
+            <NachrichtEingabe
+              onSenden={(t, d) => sendenMutation.mutate({ text: t, dateien: d })}
+              senden={sendenMutation.isPending}
+            />
           )}
         </Col>
       </Row>

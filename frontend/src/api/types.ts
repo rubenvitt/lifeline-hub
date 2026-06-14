@@ -533,6 +533,20 @@ export interface ChatKanal {
   archiviert_at: string | null;
 }
 
+/** Metadaten eines generischen Datei-Anhangs (ohne Bytes), Spiegel von
+ *  `AnhangAnzeige` im Backend. Bewusst modulübergreifend (nicht chat-spezifisch)
+ *  — Chat dockt jetzt an, ETB/Lageobjekte können denselben Typ nutzen (LFH-102).
+ *  Download über GET /api/einsaetze/{id}/anhaenge/{anhang.id}. */
+export interface Anhang {
+  id: number;
+  einsatz_id: number;
+  dateiname: string;
+  mime: string;
+  groesse: number;
+  hochgeladen_von: number;
+  erstellt_at: string;
+}
+
 export interface ChatNachricht {
   id: number;
   einsatz_id: number;
@@ -547,6 +561,8 @@ export interface ChatNachricht {
   etb_eintrag_id: number | null;
   /** `null` = nicht zu einem Auftrag heraufgestuft (LFH-101). Unabhängig von `etb_eintrag_id`. */
   auftrag_id: number | null;
+  /** Angehängte Dateien (LFH-102); leeres Array, wenn keine. */
+  anhaenge: Anhang[];
 }
 
 // ============================== E‑5 Schäden ==============================

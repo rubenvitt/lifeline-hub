@@ -1,6 +1,8 @@
 use super::{ChatKanalAnzeige, ChatNachrichtAnzeige, DEFAULT_KANAL_NAME};
+use crate::anhang::AnhangAnzeige;
 use crate::error::AppError;
 use sqlx::{QueryBuilder, Sqlite, SqlitePool};
+use std::collections::HashMap;
 
 /// Lädt alle Kanäle eines Einsatzes und stellt sicher, dass mindestens der
 /// Default-Kanal existiert (lazy-Anlage mit `default_ersteller_id` als Ersteller).
@@ -106,13 +108,71 @@ const NACHRICHT_SELECT: &str =
             n.erstellt_at, n.bearbeitet_at, n.geloescht_at, n.etb_eintrag_id, n.auftrag_id \
      FROM chat_nachricht n JOIN benutzer b ON b.id = n.autor_id";
 
-/// Lädt eine einzelne Nachricht als Anzeige. `NotFound`, wenn sie nicht existiert.
+/// Zeile der Anhang-Sammelabfrage: ein Anhang samt der Nachricht, an der er hängt.
+#[derive(sqlx::FromRow)]
+struct AnhangMitNachricht {
+    nachricht_id: i64,
+    #[sqlx(flatten)]
+    anhang: AnhangAnzeige,
+}
+
+/// Lädt alle Anhänge für die gegebenen Nachrichten in EINER Abfrage (kein N+1)
+/// und gruppiert sie je `nachricht_id`. Leere Eingabe → leere Map.
+async fn anhaenge_map(
+    pool: &SqlitePool,
+    nachricht_ids: &[i64],
+) -> Result<HashMap<i64, Vec<AnhangAnzeige>>, AppError> {
+    let mut map: HashMap<i64, Vec<AnhangAnzeige>> = HashMap::new();
+    if nachricht_ids.is_empty() {
+        return Ok(map);
+    }
+    let mut qb: QueryBuilder<Sqlite> = QueryBuilder::new(
+        "SELECT cna.nachricht_id AS nachricht_id, a.id AS id, a.einsatz_id AS einsatz_id, \
+                a.dateiname AS dateiname, a.mime AS mime, a.groesse AS groesse, \
+                a.hochgeladen_von AS hochgeladen_von, a.erstellt_at AS erstellt_at \
+         FROM chat_nachricht_anhang cna JOIN anhang a ON a.id = cna.anhang_id \
+         WHERE cna.nachricht_id IN (",
+    );
+    let mut sep = qb.separated(", ");
+    for id in nachricht_ids {
+        sep.push_bind(*id);
+    }
+    qb.push(") ORDER BY a.id");
+
+    let zeilen = qb
+        .build_query_as::<AnhangMitNachricht>()
+        .fetch_all(pool)
+        .await?;
+    for z in zeilen {
+        map.entry(z.nachricht_id).or_default().push(z.anhang);
+    }
+    Ok(map)
+}
+
+/// Hängt die Anhänge an eine bereits geladene Nachrichtenliste (in-place).
+async fn anhaenge_anreichern(
+    pool: &SqlitePool,
+    nachrichten: &mut [ChatNachrichtAnzeige],
+) -> Result<(), AppError> {
+    let ids: Vec<i64> = nachrichten.iter().map(|n| n.id).collect();
+    let mut map = anhaenge_map(pool, &ids).await?;
+    for n in nachrichten.iter_mut() {
+        n.anhaenge = map.remove(&n.id).unwrap_or_default();
+    }
+    Ok(())
+}
+
+/// Lädt eine einzelne Nachricht als Anzeige (inkl. Anhänge). `NotFound`, wenn sie
+/// nicht existiert.
 pub async fn laden(pool: &SqlitePool, id: i64) -> Result<ChatNachrichtAnzeige, AppError> {
-    sqlx::query_as::<_, ChatNachrichtAnzeige>(&format!("{NACHRICHT_SELECT} WHERE n.id = ?"))
-        .bind(id)
-        .fetch_optional(pool)
-        .await?
-        .ok_or(AppError::NotFound)
+    let mut nachricht =
+        sqlx::query_as::<_, ChatNachrichtAnzeige>(&format!("{NACHRICHT_SELECT} WHERE n.id = ?"))
+            .bind(id)
+            .fetch_optional(pool)
+            .await?
+            .ok_or(AppError::NotFound)?;
+    nachricht.anhaenge = anhaenge_map(pool, &[id]).await?.remove(&id).unwrap_or_default();
+    Ok(nachricht)
 }
 
 /// Legt eine Nachricht an und liefert sie als Anzeige.
@@ -135,8 +195,58 @@ pub async fn anlegen(
     laden(pool, id).await
 }
 
-/// Fragt Nachrichten eines Kanals ab. Sortierung: `id DESC` (neueste zuerst),
-/// Cursor über `before_id`.
+/// Legt eine Nachricht an und verknüpft sie mit bereits hochgeladenen Anhängen —
+/// alles in EINER Transaktion. Jeder `anhang_id` muss zu `einsatz_id` gehören
+/// (Cross-Einsatz-Schutz); andernfalls Rollback und `Validation`, sodass keine
+/// Nachricht ohne ihre Anhänge zurückbleibt. `inhalt` darf leer sein, wenn
+/// mindestens ein Anhang vorhanden ist (Anhang-only-Nachricht).
+pub async fn anlegen_mit_anhaengen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    autor_id: i64,
+    kanal_id: i64,
+    inhalt: &str,
+    anhang_ids: &[i64],
+) -> Result<ChatNachrichtAnzeige, AppError> {
+    let mut tx = pool.begin().await?;
+
+    for &aid in anhang_ids {
+        let treffer: Option<i64> =
+            sqlx::query_scalar("SELECT 1 FROM anhang WHERE id = ? AND einsatz_id = ?")
+                .bind(aid)
+                .bind(einsatz_id)
+                .fetch_optional(&mut *tx)
+                .await?;
+        if treffer.is_none() {
+            return Err(AppError::Validation("Unbekannter oder fremder Anhang".into()));
+        }
+    }
+
+    let id: i64 = sqlx::query_scalar(
+        "INSERT INTO chat_nachricht (einsatz_id, kanal_id, autor_id, inhalt) \
+         VALUES (?, ?, ?, ?) RETURNING id",
+    )
+    .bind(einsatz_id)
+    .bind(kanal_id)
+    .bind(autor_id)
+    .bind(inhalt)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    for &aid in anhang_ids {
+        sqlx::query("INSERT INTO chat_nachricht_anhang (nachricht_id, anhang_id) VALUES (?, ?)")
+            .bind(id)
+            .bind(aid)
+            .execute(&mut *tx)
+            .await?;
+    }
+
+    tx.commit().await?;
+    laden(pool, id).await
+}
+
+/// Fragt Nachrichten eines Kanals ab (inkl. Anhänge). Sortierung: `id DESC`
+/// (neueste zuerst), Cursor über `before_id`.
 pub async fn abfrage(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -154,10 +264,12 @@ pub async fn abfrage(
     qb.push(" ORDER BY n.id DESC LIMIT ");
     qb.push_bind(filter.limit);
 
-    qb.build_query_as::<ChatNachrichtAnzeige>()
+    let mut nachrichten = qb
+        .build_query_as::<ChatNachrichtAnzeige>()
         .fetch_all(pool)
-        .await
-        .map_err(Into::into)
+        .await?;
+    anhaenge_anreichern(pool, &mut nachrichten).await?;
+    Ok(nachrichten)
 }
 
 /// Prüft, ob eine Nachricht zum angegebenen Einsatz gehört (Cross-Einsatz-Schutz).

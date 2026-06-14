@@ -1,5 +1,6 @@
 pub mod repo;
 
+use crate::anhang::AnhangAnzeige;
 use serde::Serialize;
 
 /// Name des Default-Kanals, der pro Einsatz garantiert existiert.
@@ -32,4 +33,8 @@ pub struct ChatNachrichtAnzeige {
     pub geloescht_at: Option<String>,
     pub etb_eintrag_id: Option<i64>,
     pub auftrag_id: Option<i64>,
+    /// Angehängte Dateien (Metadaten, ohne Bytes). Wird nicht aus der
+    /// Nachrichten-Zeile gelesen (`sqlx(skip)`), sondern vom Repo nachgeladen.
+    #[sqlx(skip)]
+    pub anhaenge: Vec<AnhangAnzeige>,
 }

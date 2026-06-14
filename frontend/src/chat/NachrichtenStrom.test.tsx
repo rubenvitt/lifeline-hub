@@ -9,7 +9,7 @@ function nachricht(over: Partial<ChatNachricht> = {}): ChatNachricht {
   return {
     id: 1, einsatz_id: 7, kanal_id: 1, autor_id: 1, autor_name: 'Max',
     inhalt: 'Hallo Stab', erstellt_at: '2026-06-10 10:00:00',
-    bearbeitet_at: null, geloescht_at: null, etb_eintrag_id: null, auftrag_id: null, ...over,
+    bearbeitet_at: null, geloescht_at: null, etb_eintrag_id: null, auftrag_id: null, anhaenge: [], ...over,
   };
 }
 
@@ -80,5 +80,19 @@ describe('NachrichtenStrom', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Zu Auftrag' }));
     expect(onHeraufstufenAuftrag).toHaveBeenCalledWith(expect.objectContaining({ id: 5 }));
+  });
+
+  it('zeigt Anhänge als Download-Link mit Dateiname, href und Größe', () => {
+    const anhang = {
+      id: 42, einsatz_id: 7, dateiname: 'lage.pdf', mime: 'application/pdf',
+      groesse: 2048, hochgeladen_von: 1, erstellt_at: '2026-06-10 10:00:00',
+    };
+    renderMitProviders(
+      <NachrichtenStrom nachrichten={[nachricht({ anhaenge: [anhang] })]} eigeneBenutzerId={1} darfSchreiben
+        onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={vi.fn()} onHeraufstufenAuftrag={vi.fn()} />,
+    );
+    const link = screen.getByRole('link', { name: /lage\.pdf/ });
+    expect(link).toHaveAttribute('href', '/api/einsaetze/7/anhaenge/42');
+    expect(screen.getByText('(2 KB)')).toBeInTheDocument();
   });
 });

@@ -30,6 +30,19 @@ export async function apiGet<T>(pfad: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+/** Lädt Dateien per multipart/form-data hoch. Setzt KEINEN Content-Type-Header,
+ *  damit der Browser die Multipart-Boundary selbst bestimmt. Fehler werden wie bei
+ *  apiSend/apiGet als {@link ApiError} geworfen. */
+export async function apiUpload<T>(pfad: string, formData: FormData): Promise<T> {
+  const res = await fetch(pfad, {
+    method: 'POST',
+    credentials: 'same-origin',
+    body: formData,
+  });
+  if (!res.ok) return fehlerWerfen(res);
+  return (await res.json()) as T;
+}
+
 export async function apiSend<T>(pfad: string, methode: HttpMethode, body?: unknown): Promise<T> {
   const res = await fetch(pfad, {
     method: methode,
