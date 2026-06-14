@@ -6,11 +6,17 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { ApiError } from '../api/client';
 import {
   CHAT_SEITENGROESSE, bearbeiteNachricht, heraufstufenZuAuftrag, heraufstufenZuEtb, ladeAnhaengeHoch, legeKanalAn,
-  listeKanaele, listeNachrichten, loescheNachricht, sendeNachricht,
+  listeKanaele, listeNachrichten, loescheBezug, loescheNachricht, sendeNachricht, setzeBezug,
 } from '../api/chat';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
-import type { ChatNachricht, EtbTyp, NeuerAuftrag } from '../api/types';
+import { listeSchaeden } from '../api/einsatzSchaden';
+import { listeUhs } from '../api/einsatzUhs';
+import { listePersonen } from '../api/einsatzPerson';
+import { listeLageberichte } from '../api/lageberichte';
+import { listeMeldungen } from '../api/meldungen';
+import { listeAuftraege } from '../api/auftraege';
+import type { BezugTyp, ChatNachricht, EtbTyp, NeuerAuftrag } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
 import KanalListe from '../chat/KanalListe';
@@ -19,6 +25,11 @@ import NachrichtEingabe from '../chat/NachrichtEingabe';
 import HeraufstufenModal from '../chat/HeraufstufenModal';
 import HeraufstufenAuftragModal from '../chat/HeraufstufenAuftragModal';
 import BearbeitenModal from '../chat/BearbeitenModal';
+import BezugDialog from '../chat/BezugDialog';
+import {
+  auftragLabel, bezugLabel as loeseBezugLabel, lageberichtLabel, meldungLabel, personLabel,
+  schadenLabel, uhsLabel, type BezugOptionen,
+} from '../chat/bezug';
 
 export default function ChatPage() {
   const { id } = useParams();
@@ -30,6 +41,7 @@ export default function ChatPage() {
   const [heraufstufen, setHeraufstufen] = useState<ChatNachricht | null>(null);
   const [heraufstufenAuftrag, setHeraufstufenAuftrag] = useState<ChatNachricht | null>(null);
   const [bearbeiten, setBearbeiten] = useState<ChatNachricht | null>(null);
+  const [bezugNachricht, setBezugNachricht] = useState<ChatNachricht | null>(null);
 
   useEinsatzLiveStream(einsatzId);
 
@@ -65,6 +77,35 @@ export default function ChatPage() {
         ? letzteSeite[letzteSeite.length - 1].id
         : undefined,
     enabled: kanalId !== null,
+  });
+
+  // Sachbezug-Picker/Anzeige (LFH-103): Listen je Typ nur laden, wenn der Dialog offen
+  // ist (Picker) ODER eine geladene Nachricht diesen Typ referenziert (Label-Auflösung)
+  // — vermeidet 6 eager Requests bei jedem Chat-Öffnen.
+  const bezugDialogOffen = bezugNachricht !== null;
+  const referenzierteTypen = new Set<BezugTyp>();
+  for (const n of nachrichtenQuery.data?.pages.flat() ?? []) {
+    if (n.bezug_typ) referenzierteTypen.add(n.bezug_typ);
+  }
+  const typAktiv = (t: BezugTyp) => bezugDialogOffen || referenzierteTypen.has(t);
+
+  const schaedenQuery = useQuery({
+    queryKey: ['einsatz-schaeden', einsatzId], queryFn: () => listeSchaeden(einsatzId), enabled: typAktiv('schaden'),
+  });
+  const uhsQuery = useQuery({
+    queryKey: ['einsatz-uhs', einsatzId], queryFn: () => listeUhs(einsatzId), enabled: typAktiv('uhs'),
+  });
+  const personenQuery = useQuery({
+    queryKey: ['einsatz-personen', einsatzId], queryFn: () => listePersonen(einsatzId), enabled: typAktiv('person'),
+  });
+  const lageberichteQuery = useQuery({
+    queryKey: ['einsatz-lageberichte', einsatzId], queryFn: () => listeLageberichte(einsatzId), enabled: typAktiv('lagebericht'),
+  });
+  const meldungenQuery = useQuery({
+    queryKey: ['einsatz-meldungen', einsatzId], queryFn: () => listeMeldungen(einsatzId), enabled: typAktiv('meldung'),
+  });
+  const auftraegeQuery = useQuery({
+    queryKey: ['einsatz-auftraege', einsatzId], queryFn: () => listeAuftraege(einsatzId), enabled: typAktiv('auftrag'),
   });
 
   const fehler = (e: unknown) =>
@@ -121,6 +162,24 @@ export default function ChatPage() {
     },
     onError: fehler,
   });
+  const bezugMutation = useMutation({
+    mutationFn: ({ nid, typ, zielId }: { nid: number; typ: BezugTyp; zielId: number }) =>
+      setzeBezug(einsatzId, nid, typ, zielId),
+    onSuccess: () => {
+      invalidiereNachrichten();
+      setBezugNachricht(null);
+      message.success('Bezug gesetzt');
+    },
+    onError: fehler,
+  });
+  const bezugLoeschenMutation = useMutation({
+    mutationFn: (nid: number) => loescheBezug(einsatzId, nid),
+    onSuccess: () => {
+      invalidiereNachrichten();
+      message.success('Bezug entfernt');
+    },
+    onError: fehler,
+  });
 
   if (einsatzQuery.isLoading) {
     return (
@@ -138,6 +197,16 @@ export default function ChatPage() {
     (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
 
   const nachrichten = [...(nachrichtenQuery.data?.pages.flat() ?? [])].sort((a, b) => a.id - b.id);
+
+  // Wählbare/auflösbare Bezug-Objekte je Typ aus den (lazy geladenen) Listen.
+  const bezugOptionen: BezugOptionen = {
+    schaden: (schaedenQuery.data ?? []).map((s) => ({ value: s.id, label: schadenLabel(s) })),
+    uhs: (uhsQuery.data ?? []).map((u) => ({ value: u.id, label: uhsLabel(u) })),
+    person: (personenQuery.data ?? []).map((p) => ({ value: p.id, label: personLabel(p) })),
+    lagebericht: (lageberichteQuery.data ?? []).map((l) => ({ value: l.id, label: lageberichtLabel(l) })),
+    meldung: (meldungenQuery.data ?? []).map((m) => ({ value: m.id, label: meldungLabel(m) })),
+    auftrag: (auftraegeQuery.data ?? []).map((a) => ({ value: a.id, label: auftragLabel(a) })),
+  };
 
   return (
     <div>
@@ -183,6 +252,9 @@ export default function ChatPage() {
             onLoeschen={(n) => loeschenMutation.mutate(n.id)}
             onHeraufstufen={(n) => setHeraufstufen(n)}
             onHeraufstufenAuftrag={(n) => setHeraufstufenAuftrag(n)}
+            onBezugSetzen={(n) => setBezugNachricht(n)}
+            onBezugLoeschen={(n) => bezugLoeschenMutation.mutate(n.id)}
+            bezugLabel={(typ, zielId) => loeseBezugLabel(typ, zielId, bezugOptionen)}
           />
           {darfSchreiben && kanalId !== null && (
             <NachrichtEingabe
@@ -192,6 +264,16 @@ export default function ChatPage() {
           )}
         </Col>
       </Row>
+      <BezugDialog
+        offen={bezugNachricht !== null}
+        nachricht={bezugNachricht}
+        optionen={bezugOptionen}
+        senden={bezugMutation.isPending}
+        onAbbrechen={() => setBezugNachricht(null)}
+        onBestaetigen={(typ, zielId) => {
+          if (bezugNachricht) bezugMutation.mutate({ nid: bezugNachricht.id, typ, zielId });
+        }}
+      />
       <BearbeitenModal
         offen={bearbeiten !== null}
         nachricht={bearbeiten}

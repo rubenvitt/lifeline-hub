@@ -561,9 +561,19 @@ export interface ChatNachricht {
   etb_eintrag_id: number | null;
   /** `null` = nicht zu einem Auftrag heraufgestuft (LFH-101). Unabhängig von `etb_eintrag_id`. */
   auftrag_id: number | null;
+  /**
+   * Polymorpher Sachbezug auf ein bestehendes Domänenobjekt (LFH-103). `null`/`null`,
+   * wenn kein Bezug gesetzt ist (both-or-neither). Unabhängig von der Heraufstufung
+   * (`etb_eintrag_id`/`auftrag_id`): ein Bezug verweist, eine Heraufstufung erzeugt.
+   */
+  bezug_typ: BezugTyp | null;
+  bezug_id: number | null;
   /** Angehängte Dateien (LFH-102); leeres Array, wenn keine. */
   anhaenge: Anhang[];
 }
+
+/** Referenzierbare Objekttypen des Chat-Sachbezugs (LFH-103). Codes = Modulnamen. */
+export type BezugTyp = 'schaden' | 'uhs' | 'person' | 'lagebericht' | 'meldung' | 'auftrag';
 
 // ============================== E‑5 Schäden ==============================
 

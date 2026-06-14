@@ -9,7 +9,8 @@ function nachricht(over: Partial<ChatNachricht> = {}): ChatNachricht {
   return {
     id: 1, einsatz_id: 7, kanal_id: 1, autor_id: 1, autor_name: 'Max',
     inhalt: 'Hallo Stab', erstellt_at: '2026-06-10 10:00:00',
-    bearbeitet_at: null, geloescht_at: null, etb_eintrag_id: null, auftrag_id: null, anhaenge: [], ...over,
+    bearbeitet_at: null, geloescht_at: null, etb_eintrag_id: null, auftrag_id: null,
+    bezug_typ: null, bezug_id: null, anhaenge: [], ...over,
   };
 }
 
@@ -80,6 +81,50 @@ describe('NachrichtenStrom', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Zu Auftrag' }));
     expect(onHeraufstufenAuftrag).toHaveBeenCalledWith(expect.objectContaining({ id: 5 }));
+  });
+
+  it('zeigt den Sachbezug als Tag mit aufgelöstem Label', () => {
+    renderMitProviders(
+      <NachrichtenStrom nachrichten={[nachricht({ bezug_typ: 'schaden', bezug_id: 3 })]}
+        eigeneBenutzerId={1} darfSchreiben
+        bezugLabel={(typ, id) => `${typ} S-00${id}`}
+        onBezugSetzen={vi.fn()} onBezugLoeschen={vi.fn()}
+        onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={vi.fn()} onHeraufstufenAuftrag={vi.fn()} />,
+    );
+    expect(screen.getByText('schaden S-003')).toBeInTheDocument();
+  });
+
+  it('„Bezug" löst onBezugSetzen aus; Label wechselt zu „Bezug ändern" wenn gesetzt', async () => {
+    const onBezugSetzen = vi.fn();
+    const { rerender } = renderMitProviders(
+      <NachrichtenStrom nachrichten={[nachricht({ id: 9 })]} eigeneBenutzerId={1} darfSchreiben
+        bezugLabel={() => 'x'} onBezugSetzen={onBezugSetzen} onBezugLoeschen={vi.fn()}
+        onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={vi.fn()} onHeraufstufenAuftrag={vi.fn()} />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Bezug' }));
+    expect(onBezugSetzen).toHaveBeenCalledWith(expect.objectContaining({ id: 9 }));
+
+    rerender(
+      <NachrichtenStrom nachrichten={[nachricht({ id: 9, bezug_typ: 'meldung', bezug_id: 2 })]} eigeneBenutzerId={1} darfSchreiben
+        bezugLabel={() => 'x'} onBezugSetzen={onBezugSetzen} onBezugLoeschen={vi.fn()}
+        onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={vi.fn()} onHeraufstufenAuftrag={vi.fn()} />,
+    );
+    expect(screen.getByRole('button', { name: 'Bezug ändern' })).toBeInTheDocument();
+  });
+
+  it('Bezug-Tag ist schließbar und löst onBezugLoeschen aus', async () => {
+    const onBezugLoeschen = vi.fn();
+    const { container } = renderMitProviders(
+      <NachrichtenStrom nachrichten={[nachricht({ id: 4, bezug_typ: 'auftrag', bezug_id: 8 })]}
+        eigeneBenutzerId={1} darfSchreiben
+        bezugLabel={() => 'Auftrag-Label'} onBezugSetzen={vi.fn()} onBezugLoeschen={onBezugLoeschen}
+        onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={vi.fn()} onHeraufstufenAuftrag={vi.fn()} />,
+    );
+    // antd Tag-Close ist ein Icon ohne Accessible-Name → über die antd-Klasse greifen.
+    const close = container.querySelector('.ant-tag-close-icon') as HTMLElement;
+    expect(close).not.toBeNull();
+    await userEvent.click(close);
+    expect(onBezugLoeschen).toHaveBeenCalledWith(expect.objectContaining({ id: 4 }));
   });
 
   it('zeigt Anhänge als Download-Link mit Dateiname, href und Größe', () => {

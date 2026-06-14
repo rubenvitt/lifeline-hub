@@ -69,6 +69,8 @@ pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
         .route("/api/einsaetze/{id}/chat/nachrichten/{mid}", delete(routes::chat::nachricht_loeschen))
         .route("/api/einsaetze/{id}/chat/nachrichten/{mid}/heraufstufen-etb", post(routes::chat::heraufstufen))
         .route("/api/einsaetze/{id}/chat/nachrichten/{mid}/heraufstufen-auftrag", post(routes::chat::heraufstufen_auftrag))
+        .route("/api/einsaetze/{id}/chat/nachrichten/{mid}/bezug", put(routes::chat::bezug_setzen))
+        .route("/api/einsaetze/{id}/chat/nachrichten/{mid}/bezug", delete(routes::chat::bezug_loeschen))
         // Generische Anhänge (LFH-102). Body-Limit etwas über MAX_GROESSE (25 MiB)
         // für Multipart-Overhead; der Default (2 MiB) würde Uploads kappen.
         .route(

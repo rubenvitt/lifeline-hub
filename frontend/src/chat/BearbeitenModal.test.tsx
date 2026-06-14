@@ -8,7 +8,8 @@ import type { ChatNachricht } from '../api/types';
 const nachricht: ChatNachricht = {
   id: 1, einsatz_id: 7, kanal_id: 1, autor_id: 1, autor_name: 'Max',
   inhalt: 'Deich instabil', erstellt_at: '2026-06-10 10:00:00',
-  bearbeitet_at: null, geloescht_at: null, etb_eintrag_id: null, auftrag_id: null, anhaenge: [],
+  bearbeitet_at: null, geloescht_at: null, etb_eintrag_id: null, auftrag_id: null,
+  bezug_typ: null, bezug_id: null, anhaenge: [],
 };
 
 describe('BearbeitenModal', () => {

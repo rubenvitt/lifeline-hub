@@ -1,5 +1,5 @@
 import { apiGet, apiSend, apiUpload } from './client';
-import type { Anhang, ChatKanal, ChatNachricht, EtbTyp, NeuerAuftrag } from './types';
+import type { Anhang, BezugTyp, ChatKanal, ChatNachricht, EtbTyp, NeuerAuftrag } from './types';
 
 
 export function listeKanaele(einsatzId: number): Promise<ChatKanal[]> {
@@ -57,6 +57,26 @@ export function bearbeiteNachricht(einsatzId: number, nachrichtId: number, inhal
 
 export function loescheNachricht(einsatzId: number, nachrichtId: number): Promise<void> {
   return apiSend<void>(`/api/einsaetze/${einsatzId}/chat/nachrichten/${nachrichtId}`, 'DELETE');
+}
+
+/** Setzt/ändert den polymorphen Sachbezug einer Nachricht (LFH-103) auf ein
+ *  bestehendes Domänenobjekt im selben Einsatz. */
+export function setzeBezug(
+  einsatzId: number,
+  nachrichtId: number,
+  typ: BezugTyp,
+  zielId: number,
+): Promise<ChatNachricht> {
+  return apiSend<ChatNachricht>(
+    `/api/einsaetze/${einsatzId}/chat/nachrichten/${nachrichtId}/bezug`, 'PUT', { typ, ziel_id: zielId },
+  );
+}
+
+/** Löst den Sachbezug einer Nachricht (LFH-103). */
+export function loescheBezug(einsatzId: number, nachrichtId: number): Promise<ChatNachricht> {
+  return apiSend<ChatNachricht>(
+    `/api/einsaetze/${einsatzId}/chat/nachrichten/${nachrichtId}/bezug`, 'DELETE',
+  );
 }
 
 export function heraufstufenZuEtb(
