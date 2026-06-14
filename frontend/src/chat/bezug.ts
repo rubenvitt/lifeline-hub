@@ -52,7 +52,7 @@ export function lageberichtLabel(l: LageberichtAnzeige): string {
 }
 
 export function meldungLabel(m: Meldung): string {
-  return `M-${m.lfd_nr} · ${m.absender}`;
+  return `#${m.lfd_nr} · ${m.absender}`;
 }
 
 export function auftragLabel(a: Auftrag): string {

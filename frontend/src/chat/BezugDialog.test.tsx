@@ -38,6 +38,32 @@ describe('BezugDialog', () => {
     expect(onBestaetigen).toHaveBeenCalledWith('schaden', 3);
   });
 
+  it('setzt die Objekt-Auswahl bei Typ-Wechsel zurück', async () => {
+    const mehr: BezugOptionen = {
+      ...optionen,
+      person: [{ value: 9, label: 'P-009 · Erika' }],
+    };
+    const onBestaetigen = vi.fn();
+    renderMitProviders(
+      <BezugDialog offen nachricht={nachricht} optionen={mehr} senden={false}
+        onAbbrechen={vi.fn()} onBestaetigen={onBestaetigen} />,
+    );
+    const comboboxen = screen.getAllByRole('combobox');
+    await userEvent.click(comboboxen[0]);
+    await userEvent.click(await screen.findByText('Schaden'));
+    await userEvent.click(comboboxen[1]);
+    await userEvent.click(await screen.findByText('S-003 · sachschaden · B5'));
+    // Typ wechseln → die typ-spezifische Objekt-Auswahl muss zurückgesetzt werden.
+    await userEvent.click(comboboxen[0]);
+    await userEvent.click(await screen.findByText('Person'));
+
+    // Wäre die Auswahl nicht zurückgesetzt, würde Speichern fälschlich mit der
+    // alten Schaden-ID (3) unter dem neuen Typ feuern. Stattdessen blockt die
+    // Pflichtvalidierung des leeren Objekt-Felds.
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(onBestaetigen).not.toHaveBeenCalled();
+  });
+
   it('füllt bei bestehendem Bezug vor (Ändern-Fall)', async () => {
     renderMitProviders(
       <BezugDialog offen nachricht={{ ...nachricht, bezug_typ: 'schaden', bezug_id: 3 }}

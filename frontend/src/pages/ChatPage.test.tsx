@@ -107,6 +107,75 @@ describe('ChatPage', () => {
     expect(zweiteSeiteAngefragtMit).toBe('101');
   });
 
+  it('zeigt keinen „Ältere laden"-Button bei einer kurzen Seite', async () => {
+    setup();
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ältere laden' })).not.toBeInTheDocument();
+  });
+
+  it('lädt die Bezug-Listen nicht eager, wenn keine Nachricht einen Bezug trägt', async () => {
+    const listenAufgerufen: string[] = [];
+    const spy = (pfad: string) =>
+      http.get(`/api/einsaetze/7/${pfad}`, () => { listenAufgerufen.push(pfad); return HttpResponse.json([]); });
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
+      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json([nachricht])),
+      spy('schaeden'), spy('uhs'), spy('personen'), spy('lageberichte'), spy('meldungen'), spy('auftraege'),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes><Route path="/einsaetze/:id/chat" element={<ChatPage />} /></Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/7/chat' },
+    );
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(listenAufgerufen).toEqual([]);
+  });
+
+  it('setzt einen Sachbezug end-to-end über den Dialog (LFH-103)', async () => {
+    let gesetzt: { typ: string; ziel_id: number } | null = null;
+    const nachrichten: ChatNachricht[] = [nachricht];
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
+      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
+      http.get('/api/einsaetze/7/schaeden', () =>
+        HttpResponse.json([{ id: 3, registrier_nr: 3, typ: 'sachschaden', ort: 'B5 km12' }])),
+      http.get('/api/einsaetze/7/uhs', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/personen', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/lageberichte', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/meldungen', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/auftraege', () => HttpResponse.json([])),
+      http.put('/api/einsaetze/7/chat/nachrichten/5/bezug', async ({ request }) => {
+        gesetzt = (await request.json()) as { typ: string; ziel_id: number };
+        nachrichten[0] = { ...nachricht, bezug_typ: 'schaden', bezug_id: gesetzt.ziel_id };
+        return HttpResponse.json(nachrichten[0]);
+      }),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes><Route path="/einsaetze/:id/chat" element={<ChatPage />} /></Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/7/chat' },
+    );
+
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Bezug' }));
+    const comboboxen = screen.getAllByRole('combobox');
+    await userEvent.click(comboboxen[0]);
+    await userEvent.click(await screen.findByText('Schaden'));
+    await userEvent.click(comboboxen[1]);
+    await userEvent.click(await screen.findByText('S-003 · sachschaden · B5 km12'));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(gesetzt).not.toBeNull());
+    expect(gesetzt).toEqual({ typ: 'schaden', ziel_id: 3 });
+  });
+
   it('bearbeitet eine eigene Nachricht über das Modal statt window.prompt', async () => {
     let bearbeitet: { inhalt: string } | null = null;
     const nachrichten: ChatNachricht[] = [nachricht];

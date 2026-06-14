@@ -94,6 +94,18 @@ describe('NachrichtenStrom', () => {
     expect(screen.getByText('schaden S-003')).toBeInTheDocument();
   });
 
+  it('zeigt keinen Bezug-Tag an gelöschten Nachrichten', () => {
+    renderMitProviders(
+      <NachrichtenStrom
+        nachrichten={[nachricht({ inhalt: null, geloescht_at: '2026-06-10 10:05:00', bezug_typ: 'schaden', bezug_id: 3 })]}
+        eigeneBenutzerId={1} darfSchreiben
+        bezugLabel={() => 'S-003-Label'} onBezugSetzen={vi.fn()} onBezugLoeschen={vi.fn()}
+        onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={vi.fn()} onHeraufstufenAuftrag={vi.fn()} />,
+    );
+    expect(screen.getByText('Nachricht gelöscht')).toBeInTheDocument();
+    expect(screen.queryByText('S-003-Label')).not.toBeInTheDocument();
+  });
+
   it('„Bezug" löst onBezugSetzen aus; Label wechselt zu „Bezug ändern" wenn gesetzt', async () => {
     const onBezugSetzen = vi.fn();
     const { rerender } = renderMitProviders(

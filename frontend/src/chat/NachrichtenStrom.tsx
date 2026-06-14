@@ -75,7 +75,7 @@ export default function NachrichtenStrom({
                   {n.bearbeitet_at && <Tag>bearbeitet</Tag>}
                   {heraufgestuft && <Tag color="blue">heraufgestuft zu ETB</Tag>}
                   {heraufgestuftZuAuftrag && <Tag color="geekblue">heraufgestuft zu Auftrag</Tag>}
-                  {hatBezug && bezugLabel && (
+                  {!geloescht && hatBezug && bezugLabel && (
                     <Tag
                       color="cyan"
                       closable={darfSchreiben && onBezugLoeschen !== undefined}
