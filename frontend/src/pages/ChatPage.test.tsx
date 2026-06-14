@@ -31,7 +31,8 @@ const kanal: ChatKanal = {
 const nachricht: ChatNachricht = {
   id: 5, einsatz_id: 7, kanal_id: 1, autor_id: 1, autor_name: 'A',
   inhalt: 'Erste Lage', erstellt_at: '2026-06-10 10:00:00',
-  bearbeitet_at: null, geloescht_at: null, etb_eintrag_id: null, auftrag_id: null, anhaenge: [],
+  bearbeitet_at: null, geloescht_at: null, etb_eintrag_id: null, auftrag_id: null,
+  bezug_typ: null, bezug_id: null, anhaenge: [],
 };
 
 function setup() {
@@ -67,6 +68,147 @@ describe('ChatPage', () => {
     await userEvent.type(screen.getByPlaceholderText('Nachricht…'), 'Neue Meldung');
     await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
     expect(await screen.findByText('Neue Meldung')).toBeInTheDocument();
+  });
+
+  it('lädt ältere Nachrichten über den "Ältere laden"-Button nach (before_id)', async () => {
+    // Erste Seite: volle Seitengröße (100) → es gibt mehr → Button erscheint.
+    const ersteSeite: ChatNachricht[] = Array.from({ length: 100 }, (_, i) => ({
+      ...nachricht, id: 200 - i, inhalt: `Aktuell ${200 - i}`,
+    }));
+    let zweiteSeiteAngefragtMit: string | null = null;
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
+      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', ({ request }) => {
+        const beforeId = new URL(request.url).searchParams.get('before_id');
+        if (beforeId) {
+          zweiteSeiteAngefragtMit = beforeId;
+          return HttpResponse.json([{ ...nachricht, id: 5, inhalt: 'Uralte Nachricht' }]);
+        }
+        return HttpResponse.json(ersteSeite);
+      }),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/7/chat' },
+    );
+
+    expect(await screen.findByText('Aktuell 200')).toBeInTheDocument();
+    const button = await screen.findByRole('button', { name: 'Ältere laden' });
+    await userEvent.click(button);
+
+    expect(await screen.findByText('Uralte Nachricht')).toBeInTheDocument();
+    // Cursor = älteste (kleinste) id der ersten Seite = 101.
+    expect(zweiteSeiteAngefragtMit).toBe('101');
+  });
+
+  it('zeigt keinen „Ältere laden"-Button bei einer kurzen Seite', async () => {
+    setup();
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ältere laden' })).not.toBeInTheDocument();
+  });
+
+  it('lädt die Bezug-Listen nicht eager, wenn keine Nachricht einen Bezug trägt', async () => {
+    const listenAufgerufen: string[] = [];
+    const spy = (pfad: string) =>
+      http.get(`/api/einsaetze/7/${pfad}`, () => { listenAufgerufen.push(pfad); return HttpResponse.json([]); });
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
+      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json([nachricht])),
+      spy('schaeden'), spy('uhs'), spy('personen'), spy('lageberichte'), spy('meldungen'), spy('auftraege'),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes><Route path="/einsaetze/:id/chat" element={<ChatPage />} /></Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/7/chat' },
+    );
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(listenAufgerufen).toEqual([]);
+  });
+
+  it('setzt einen Sachbezug end-to-end über den Dialog (LFH-103)', async () => {
+    let gesetzt: { typ: string; ziel_id: number } | null = null;
+    const nachrichten: ChatNachricht[] = [nachricht];
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
+      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
+      http.get('/api/einsaetze/7/schaeden', () =>
+        HttpResponse.json([{ id: 3, registrier_nr: 3, typ: 'sachschaden', ort: 'B5 km12' }])),
+      http.get('/api/einsaetze/7/uhs', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/personen', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/lageberichte', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/meldungen', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/auftraege', () => HttpResponse.json([])),
+      http.put('/api/einsaetze/7/chat/nachrichten/5/bezug', async ({ request }) => {
+        gesetzt = (await request.json()) as { typ: string; ziel_id: number };
+        nachrichten[0] = { ...nachricht, bezug_typ: 'schaden', bezug_id: gesetzt.ziel_id };
+        return HttpResponse.json(nachrichten[0]);
+      }),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes><Route path="/einsaetze/:id/chat" element={<ChatPage />} /></Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/7/chat' },
+    );
+
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Bezug' }));
+    const comboboxen = screen.getAllByRole('combobox');
+    await userEvent.click(comboboxen[0]);
+    await userEvent.click(await screen.findByText('Schaden'));
+    await userEvent.click(comboboxen[1]);
+    await userEvent.click(await screen.findByText('S-003 · sachschaden · B5 km12'));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(gesetzt).not.toBeNull());
+    expect(gesetzt).toEqual({ typ: 'schaden', ziel_id: 3 });
+  });
+
+  it('bearbeitet eine eigene Nachricht über das Modal statt window.prompt', async () => {
+    let bearbeitet: { inhalt: string } | null = null;
+    const nachrichten: ChatNachricht[] = [nachricht];
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
+      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
+      http.patch('/api/einsaetze/7/chat/nachrichten/5', async ({ request }) => {
+        bearbeitet = (await request.json()) as { inhalt: string };
+        nachrichten[0] = { ...nachricht, inhalt: bearbeitet.inhalt, bearbeitet_at: '2026-06-10 11:00:00' };
+        return HttpResponse.json(nachrichten[0]);
+      }),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/chat" element={<ChatPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/7/chat' },
+    );
+
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+    const feld = await screen.findByDisplayValue('Erste Lage');
+    await userEvent.clear(feld);
+    await userEvent.type(feld, 'Lage korrigiert');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(bearbeitet).not.toBeNull());
+    expect(bearbeitet!.inhalt).toBe('Lage korrigiert');
+    expect(await screen.findByText('Lage korrigiert')).toBeInTheDocument();
   });
 
   it('lädt einen Anhang hoch und sendet die Nachricht mit anhang_ids', async () => {

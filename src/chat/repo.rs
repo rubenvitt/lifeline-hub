@@ -1,4 +1,4 @@
-use super::{ChatKanalAnzeige, ChatNachrichtAnzeige, DEFAULT_KANAL_NAME};
+use super::{BezugTyp, ChatKanalAnzeige, ChatNachrichtAnzeige, DEFAULT_KANAL_NAME};
 use crate::anhang::AnhangAnzeige;
 use crate::error::AppError;
 use sqlx::{QueryBuilder, Sqlite, SqlitePool};
@@ -105,7 +105,8 @@ pub struct NachrichtFilter {
 const NACHRICHT_SELECT: &str =
     "SELECT n.id, n.einsatz_id, n.kanal_id, n.autor_id, b.anzeigename AS autor_name, \
             CASE WHEN n.geloescht_at IS NULL THEN n.inhalt ELSE NULL END AS inhalt, \
-            n.erstellt_at, n.bearbeitet_at, n.geloescht_at, n.etb_eintrag_id, n.auftrag_id \
+            n.erstellt_at, n.bearbeitet_at, n.geloescht_at, n.etb_eintrag_id, n.auftrag_id, \
+            n.bezug_typ, n.bezug_id \
      FROM chat_nachricht n JOIN benutzer b ON b.id = n.autor_id";
 
 /// Zeile der Anhang-Sammelabfrage: ein Anhang samt der Nachricht, an der er hängt.
@@ -321,6 +322,88 @@ pub async fn loeschen(pool: &SqlitePool, nachricht_id: i64) -> Result<(), AppErr
         .execute(pool)
         .await?;
     Ok(())
+}
+
+/// Prüft, ob das Bezug-Ziel (polymorph, LFH-103) zum Einsatz gehört — FK-Ersatz, da
+/// `bezug_id` keinen DB-FK trägt. Dispatch auf den Typ über die bereits vorhandenen,
+/// einsatz-gescopten Lese-Funktionen der Module; `NotFound` (fremder/ungültiger
+/// Einsatz) wird zu `false`, echte DB-Fehler werden propagiert.
+async fn ziel_gehoert_zu_einsatz(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    typ: BezugTyp,
+    ziel_id: i64,
+) -> Result<bool, AppError> {
+    // Übersetzt ein einsatz-gescoptes `laden` (Ok = vorhanden, NotFound = nicht) in bool.
+    fn vorhanden<T>(r: Result<T, AppError>) -> Result<bool, AppError> {
+        match r {
+            Ok(_) => Ok(true),
+            Err(AppError::NotFound) => Ok(false),
+            Err(e) => Err(e),
+        }
+    }
+    match typ {
+        BezugTyp::Schaden => vorhanden(crate::schaden::repo::laden(pool, einsatz_id, ziel_id).await),
+        BezugTyp::Uhs => vorhanden(crate::uhs::repo::laden(pool, einsatz_id, ziel_id).await),
+        BezugTyp::Person => vorhanden(crate::person::repo::laden(pool, einsatz_id, ziel_id).await),
+        BezugTyp::Lagebericht => {
+            vorhanden(crate::lagebericht::repo::laden(pool, einsatz_id, ziel_id).await)
+        }
+        BezugTyp::Meldung => crate::meldung::repo::gehoert_zu_einsatz(pool, ziel_id, einsatz_id).await,
+        BezugTyp::Auftrag => crate::auftrag::repo::gehoert_zu_einsatz(pool, ziel_id, einsatz_id).await,
+    }
+}
+
+/// Setzt den polymorphen Sachbezug einer Nachricht auf ein bestehendes Objekt
+/// (LFH-103). Das Ziel muss zum selben Einsatz gehören (Cross-Einsatz-Guard, Muster
+/// `anlegen_mit_anhaengen`) — sonst `Validation`. Eine gelöschte Nachricht → `Conflict`.
+/// `bezug_typ` und `bezug_id` werden immer gemeinsam gesetzt (both-or-neither).
+pub async fn bezug_setzen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    nachricht_id: i64,
+    typ: BezugTyp,
+    ziel_id: i64,
+) -> Result<ChatNachrichtAnzeige, AppError> {
+    // Existenz + nicht gelöscht (analog Heraufstufen-Guard).
+    let geloescht: Option<String> =
+        sqlx::query_scalar("SELECT geloescht_at FROM chat_nachricht WHERE id = ?")
+            .bind(nachricht_id)
+            .fetch_optional(pool)
+            .await?
+            .ok_or(AppError::NotFound)?;
+    if geloescht.is_some() {
+        return Err(AppError::Conflict(
+            "Gelöschte Nachricht kann keinen Bezug erhalten".into(),
+        ));
+    }
+
+    if !ziel_gehoert_zu_einsatz(pool, einsatz_id, typ, ziel_id).await? {
+        return Err(AppError::Validation(
+            "Bezug-Ziel existiert nicht in diesem Einsatz".into(),
+        ));
+    }
+
+    sqlx::query("UPDATE chat_nachricht SET bezug_typ = ?, bezug_id = ? WHERE id = ?")
+        .bind(typ.as_str())
+        .bind(ziel_id)
+        .bind(nachricht_id)
+        .execute(pool)
+        .await?;
+    laden(pool, nachricht_id).await
+}
+
+/// Löst den Sachbezug einer Nachricht (LFH-103); setzt `bezug_typ` und `bezug_id`
+/// gemeinsam auf NULL (both-or-neither). Idempotent.
+pub async fn bezug_loesen(
+    pool: &SqlitePool,
+    nachricht_id: i64,
+) -> Result<ChatNachrichtAnzeige, AppError> {
+    sqlx::query("UPDATE chat_nachricht SET bezug_typ = NULL, bezug_id = NULL WHERE id = ?")
+        .bind(nachricht_id)
+        .execute(pool)
+        .await?;
+    laden(pool, nachricht_id).await
 }
 
 /// Stuft eine Chat-Nachricht zu einem ETB-Eintrag herauf — transaktional nach dem

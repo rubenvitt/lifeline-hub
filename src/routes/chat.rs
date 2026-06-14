@@ -1,7 +1,7 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
 use crate::chat::repo;
-use crate::chat::{ChatKanalAnzeige, ChatNachrichtAnzeige};
+use crate::chat::{BezugTyp, ChatKanalAnzeige, ChatNachrichtAnzeige};
 use crate::einsatz::berechtigung::{fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
@@ -198,6 +198,61 @@ pub async fn nachricht_loeschen(
     sse_chat(&state, einsatz_id,
         serde_json::json!({ "einsatz_id": einsatz_id, "nachricht_id": nachricht_id }).to_string());
     Ok(StatusCode::NO_CONTENT)
+}
+
+// ---- Sachbezug (LFH-103) ----
+
+#[derive(Debug, Deserialize)]
+pub struct BezugBody {
+    pub typ: String,
+    pub ziel_id: i64,
+}
+
+/// PUT /api/einsaetze/{id}/chat/nachrichten/{mid}/bezug — polymorphen Sachbezug
+/// setzen/ändern. Schreibrecht + aktiv (nicht nur Autor, anders als Bearbeiten);
+/// der Typ ist server-validiert, das Ziel muss zum Einsatz gehören (im Repo geprüft).
+pub async fn bezug_setzen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, nachricht_id)): Path<(i64, i64)>,
+    Json(req): Json<BezugBody>,
+) -> Result<Json<ChatNachrichtAnzeige>, AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_schreibrecht(rolle)?;
+    fordere_aktiv(&einsatz)?;
+
+    if !repo::gehoert_nachricht_zu_einsatz(&state.pool, nachricht_id, einsatz_id).await? {
+        return Err(AppError::NotFound);
+    }
+
+    let typ = BezugTyp::parse(&req.typ)
+        .ok_or_else(|| AppError::Validation("Ungültiger Bezug-Typ".into()))?;
+    let nachricht =
+        repo::bezug_setzen(&state.pool, einsatz_id, nachricht_id, typ, req.ziel_id).await?;
+    sse_chat(&state, einsatz_id, als_json(&nachricht, einsatz_id));
+    Ok(Json(nachricht))
+}
+
+/// DELETE /api/einsaetze/{id}/chat/nachrichten/{mid}/bezug — Sachbezug lösen.
+/// Schreibrecht + aktiv.
+pub async fn bezug_loeschen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, nachricht_id)): Path<(i64, i64)>,
+) -> Result<Json<ChatNachrichtAnzeige>, AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_schreibrecht(rolle)?;
+    fordere_aktiv(&einsatz)?;
+
+    if !repo::gehoert_nachricht_zu_einsatz(&state.pool, nachricht_id, einsatz_id).await? {
+        return Err(AppError::NotFound);
+    }
+
+    let nachricht = repo::bezug_loesen(&state.pool, nachricht_id).await?;
+    sse_chat(&state, einsatz_id, als_json(&nachricht, einsatz_id));
+    Ok(Json(nachricht))
 }
 
 // ---- Heraufstufen ----

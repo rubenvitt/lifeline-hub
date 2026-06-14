@@ -226,3 +226,131 @@ async fn heraufstufen_zu_auftrag_ohne_empfaenger_wird_abgelehnt() {
     let (_, nachher) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"), &admin, None).await;
     assert!(nachher.as_array().unwrap()[0]["auftrag_id"].is_null(), "keine Markierung bei Validierungsfehler");
 }
+
+// ---- Sachbezug (LFH-103) ----
+
+/// Legt einen minimalen Schaden an und liefert dessen id (Bezug-Ziel der Tests).
+async fn schaden_anlegen(app: &axum::Router, einsatz: i64, cookie: &str) -> i64 {
+    let (s, j) = anfrage(app, "POST", &format!("/api/einsaetze/{einsatz}/schaeden"), cookie,
+        Some(r#"{"typ":"sachschaden","ausmass":"gering","ort":"B5 km12"}"#)).await;
+    assert_eq!(s, StatusCode::CREATED);
+    j["id"].as_i64().unwrap()
+}
+
+async fn nachricht_anlegen(app: &axum::Router, einsatz: i64, kid: i64, cookie: &str, inhalt: &str) -> i64 {
+    let (s, m) = anfrage(app, "POST", &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"), cookie,
+        Some(&format!(r#"{{"inhalt":"{inhalt}"}}"#))).await;
+    assert_eq!(s, StatusCode::CREATED);
+    m["id"].as_i64().unwrap()
+}
+
+#[tokio::test]
+async fn bezug_setzen_anzeigen_und_loesen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    let mid = nachricht_anlegen(&app, einsatz, kid, &admin, "Lage am Deich").await;
+    let sid = schaden_anlegen(&app, einsatz, &admin).await;
+
+    // Setzen → 200, Antwort trägt den Bezug.
+    let (s, n) = anfrage(&app, "PUT", &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/bezug"), &admin,
+        Some(&format!(r#"{{"typ":"schaden","ziel_id":{sid}}}"#))).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(n["bezug_typ"], "schaden");
+    assert_eq!(n["bezug_id"], sid);
+
+    // In der Liste sichtbar.
+    let (_, liste) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"), &admin, None).await;
+    assert_eq!(liste.as_array().unwrap()[0]["bezug_typ"], "schaden");
+    assert_eq!(liste.as_array().unwrap()[0]["bezug_id"], sid);
+
+    // Lösen → 200, Bezug wieder leer (both-or-neither).
+    let (s, n) = anfrage(&app, "DELETE", &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/bezug"), &admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(n["bezug_typ"].is_null());
+    assert!(n["bezug_id"].is_null());
+}
+
+#[tokio::test]
+async fn bezug_auf_fremden_einsatz_abgelehnt() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz_a = einsatz_anlegen(&app, &admin).await;
+    let einsatz_b = einsatz_anlegen(&app, &admin).await;
+    let kid_a = default_kanal(&app, einsatz_a, &admin).await;
+    let mid = nachricht_anlegen(&app, einsatz_a, kid_a, &admin, "in A").await;
+    let sid_b = schaden_anlegen(&app, einsatz_b, &admin).await;
+
+    // Bezug auf ein Objekt aus einem anderen Einsatz → Cross-Einsatz-Guard, 400.
+    let (s, _) = anfrage(&app, "PUT", &format!("/api/einsaetze/{einsatz_a}/chat/nachrichten/{mid}/bezug"), &admin,
+        Some(&format!(r#"{{"typ":"schaden","ziel_id":{sid_b}}}"#))).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn bezug_ungueltiger_typ_abgelehnt() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    let mid = nachricht_anlegen(&app, einsatz, kid, &admin, "x").await;
+
+    let (s, _) = anfrage(&app, "PUT", &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/bezug"), &admin,
+        Some(r#"{"typ":"quatsch","ziel_id":1}"#)).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn bezug_durch_schreibberechtigten_nicht_nur_autor() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    let mid = nachricht_anlegen(&app, einsatz, kid, &admin, "von admin").await;
+    let sid = schaden_anlegen(&app, einsatz, &admin).await;
+
+    // Anderer Schreibberechtigter (kein Autor) darf den Bezug setzen — anders als
+    // Bearbeiten/Löschen (fordere_autor); hier zählt nur das Schreibrecht.
+    let fp = benutzer_anlegen(&app, &admin, "frank", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, fp, "fuehrungspersonal").await;
+    let frank = login_cookie(&app, "frank", "frankpw1").await;
+
+    let (s, n) = anfrage(&app, "PUT", &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/bezug"), &frank,
+        Some(&format!(r#"{{"typ":"schaden","ziel_id":{sid}}}"#))).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(n["bezug_typ"], "schaden");
+}
+
+#[tokio::test]
+async fn bezug_durch_beobachter_verboten() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    let mid = nachricht_anlegen(&app, einsatz, kid, &admin, "x").await;
+    let sid = schaden_anlegen(&app, einsatz, &admin).await;
+    let beo = benutzer_anlegen(&app, &admin, "erika", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, beo, "beobachter").await;
+    let erika = login_cookie(&app, "erika", "erikapw1").await;
+
+    let (s, _) = anfrage(&app, "PUT", &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/bezug"), &erika,
+        Some(&format!(r#"{{"typ":"schaden","ziel_id":{sid}}}"#))).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn bezug_an_geloeschter_nachricht_ist_konflikt() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+    let mid = nachricht_anlegen(&app, einsatz, kid, &admin, "x").await;
+    let sid = schaden_anlegen(&app, einsatz, &admin).await;
+    let (s, _) = anfrage(&app, "DELETE", &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}"), &admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+
+    let (s, _) = anfrage(&app, "PUT", &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/bezug"), &admin,
+        Some(&format!(r#"{{"typ":"schaden","ziel_id":{sid}}}"#))).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+}

@@ -9,7 +9,8 @@ function nachricht(over: Partial<ChatNachricht> = {}): ChatNachricht {
   return {
     id: 5, einsatz_id: 7, kanal_id: 1, autor_id: 1, autor_name: 'Max',
     inhalt: 'Tank 5000 anfordern', erstellt_at: '2026-06-10 10:00:00',
-    bearbeitet_at: null, geloescht_at: null, etb_eintrag_id: null, auftrag_id: null, anhaenge: [], ...over,
+    bearbeitet_at: null, geloescht_at: null, etb_eintrag_id: null, auftrag_id: null,
+    bezug_typ: null, bezug_id: null, anhaenge: [], ...over,
   };
 }
 
