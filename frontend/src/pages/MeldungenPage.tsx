@@ -4,10 +4,38 @@ import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz, ladeMitglieder } from '../api/einsaetze';
 import { ApiError } from '../api/client';
-import { bestaetigeMeldung, legeMeldungAn, listeMeldungen, markiereLagerelevant, setzeMeldungStatus, weiseBearbeiterZu } from '../api/meldungen';
-import type { MeldungStatus, NeueMeldung } from '../api/types';
+import { bestaetigeMeldung, erteileAuftragAusMeldung, legeMeldungAn, listeMeldungen, markiereLagerelevant, setzeMeldungStatus, weiseBearbeiterZu } from '../api/meldungen';
+import { listeAbschnitte } from '../api/einsatzabschnitte';
+import { listeEinheiten } from '../api/einheiten';
+import type { Meldung, MeldungStatus, NeueMeldung, NeuerAuftrag } from '../api/types';
+import { MELDUNG_STATUS, istAbgeschlossen, prioRang } from '../kommunikation';
 import MeldungListe from '../meldungen/MeldungListe';
 import MeldungFormular from '../meldungen/MeldungFormular';
+import AuftragErteilenModal from '../meldungen/AuftragErteilenModal';
+import LagerelevantModal, { type LagerelevantDaten } from '../meldungen/LagerelevantModal';
+
+/**
+ * Sortierung der Meldungen: Prio (sofort→dringend→normal), dann eskaliert zuerst
+ * (Alarm oben), dann Ereigniszeit absteigend. Meldungen haben keine Frist im
+ * Auftrags-Sinn → keine Fälligkeits-Gruppierung, flache Liste mit Badges.
+ */
+function vergleicheMeldung(a: Meldung, b: Meldung): number {
+  const prio = prioRang(a.prioritaet) - prioRang(b.prioritaet);
+  if (prio !== 0) return prio;
+  const eskaliert = Number(b.eskaliert) - Number(a.eskaliert);
+  if (eskaliert !== 0) return eskaliert;
+  return (b.ereigniszeit ?? '').localeCompare(a.ereigniszeit ?? '');
+}
+
+/**
+ * Sortierung der Abgeschlossen-Ansicht (LFH-113): zuletzt Erledigtes oben (erledigt_at ↓).
+ * Ohne Stempel (Altbestand vor der Spalte) Fallback auf Ereigniszeit ↓.
+ */
+function vergleicheAbgeschlossen(a: Meldung, b: Meldung): number {
+  const erledigt = (b.erledigt_at ?? '').localeCompare(a.erledigt_at ?? '');
+  if (erledigt !== 0) return erledigt;
+  return (b.ereigniszeit ?? '').localeCompare(a.ereigniszeit ?? '');
+}
 
 export default function MeldungenPage() {
   const { id } = useParams();
@@ -17,17 +45,19 @@ export default function MeldungenPage() {
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const mitgliederQuery = useQuery({ queryKey: ['einsatz-mitglieder', einsatzId], queryFn: () => ladeMitglieder(einsatzId) });
-  const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
-  const [richtungFilter, setRichtungFilter] = useState<string | undefined>(undefined);
+  // Auftrags-Ziele für das Meldung→Auftrag-Formular (wie AuftraegePage/ChatPage).
+  const abschnitteQuery = useQuery({ queryKey: ['einsatz-abschnitte', einsatzId], queryFn: () => listeAbschnitte(einsatzId) });
+  const einheitenQuery = useQuery({ queryKey: ['einsatz-einheiten', einsatzId], queryFn: () => listeEinheiten(einsatzId) });
 
-  // 'offen' ist eine clientseitige Sammelsicht (status != 'erledigt') über `ist_offen`;
-  // der Server filtert nur exakte Einzelstatus.
-  const REALE_STATUS = ['neu', 'gesichtet', 'in_bearbeitung', 'erledigt'];
-  const serverStatus = statusFilter && REALE_STATUS.includes(statusFilter) ? statusFilter : undefined;
+  // Offen/Abgeschlossen-Trennung erfolgt clientseitig (alle Meldungen laden, Server-Default).
+  const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
+  const [richtungFilter, setRichtungFilter] = useState<string | undefined>(undefined);
+  const [auftragMeldung, setAuftragMeldung] = useState<Meldung | null>(null);
+  const [lageMeldung, setLageMeldung] = useState<Meldung | null>(null);
 
   const meldungenQuery = useQuery({
-    queryKey: ['einsatz-meldungen', einsatzId, statusFilter ?? 'alle', richtungFilter ?? 'alle'],
-    queryFn: () => listeMeldungen(einsatzId, { status: serverStatus, richtung: richtungFilter }),
+    queryKey: ['einsatz-meldungen', einsatzId, richtungFilter ?? 'alle'],
+    queryFn: () => listeMeldungen(einsatzId, { richtung: richtungFilter }),
   });
 
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
@@ -51,10 +81,12 @@ export default function MeldungenPage() {
     onError: fehler,
   });
   const lageMutation = useMutation({
-    mutationFn: (meldungId: number) => markiereLagerelevant(einsatzId, meldungId),
+    mutationFn: ({ meldungId, daten }: { meldungId: number; daten: LagerelevantDaten }) =>
+      markiereLagerelevant(einsatzId, meldungId, daten),
     onSuccess: () => {
       invalidiere();
       qc.invalidateQueries({ queryKey: ['einsatz-lagemeldungen', einsatzId] });
+      setLageMeldung(null);
       message.success('An die Lage übergeben');
     },
     onError: fehler,
@@ -62,6 +94,17 @@ export default function MeldungenPage() {
   const bestaetigenMutation = useMutation({
     mutationFn: (meldungId: number) => bestaetigeMeldung(einsatzId, meldungId),
     onSuccess: () => { invalidiere(); message.success('Sofortmeldung bestätigt'); },
+    onError: fehler,
+  });
+  const auftragMutation = useMutation({
+    mutationFn: ({ meldungId, daten }: { meldungId: number; daten: NeuerAuftrag }) =>
+      erteileAuftragAusMeldung(einsatzId, meldungId, daten),
+    onSuccess: () => {
+      invalidiere();
+      qc.invalidateQueries({ queryKey: ['einsatz-auftraege', einsatzId] });
+      setAuftragMeldung(null);
+      message.success('Auftrag aus Meldung erteilt');
+    },
     onError: fehler,
   });
 
@@ -76,9 +119,32 @@ export default function MeldungenPage() {
     einsatz.status === 'aktiv' &&
     (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
   const alleMeldungen = meldungenQuery.data ?? [];
-  // 'offen' (kein Server-Status) → clientseitig auf nicht-erledigte einschränken.
-  const meldungen = statusFilter === 'offen' ? alleMeldungen.filter((m) => m.ist_offen) : alleMeldungen;
+
+  // Offen/Abgeschlossen clientseitig über die gemeinsame Phasen-Semantik trennen.
+  const phaseVon = (m: Meldung) => MELDUNG_STATUS[m.status]?.phase ?? 'offen';
+  const offene = alleMeldungen.filter((m) => !istAbgeschlossen(phaseVon(m))).sort(vergleicheMeldung);
+  const abgeschlossene = alleMeldungen.filter((m) => istAbgeschlossen(phaseVon(m))).sort(vergleicheAbgeschlossen);
+  const sichtbare = ansicht === 'offen' ? offene : abgeschlossene;
   const mitglieder = mitgliederQuery.data ?? [];
+
+  const listenProps = {
+    einsatzId,
+    darfSchreiben,
+    mitglieder,
+    onStatus: (meldungId: number, status: MeldungStatus) => statusMutation.mutate({ meldungId, status }),
+    onZuweisen: (meldungId: number, bearbeiterId: number | null) => zuweisenMutation.mutate({ meldungId, bearbeiterId }),
+    onLagerelevant: (meldungId: number) => {
+      const m = alleMeldungen.find((x) => x.id === meldungId) ?? null;
+      setLageMeldung(m);
+    },
+    onBestaetigen: (meldungId: number) => bestaetigenMutation.mutate(meldungId),
+    onAuftragErteilen: (m: Meldung) => setAuftragMeldung(m),
+  };
+
+  const auftragsZiele = {
+    abschnitte: (abschnitteQuery.data ?? []).map((a) => ({ id: a.id, name: a.name })),
+    einheiten: (einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name })),
+  };
 
   return (
     <div>
@@ -96,21 +162,16 @@ export default function MeldungenPage() {
           {meldungenQuery.isError && (
             <Alert type="error" showIcon style={{ marginBottom: 12 }} message="Meldungen konnten nicht geladen werden" />
           )}
-          <div style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12, alignItems: 'center' }}>
             <Segmented
-              value={statusFilter ?? 'alle'}
-              onChange={(v) => setStatusFilter(v === 'alle' ? undefined : String(v))}
+              value={ansicht}
+              onChange={(v) => setAnsicht(v as 'offen' | 'abgeschlossen')}
               options={[
-                { value: 'alle', label: 'Alle' },
-                { value: 'offen', label: 'Offen' },
-                { value: 'neu', label: 'Neu' },
-                { value: 'gesichtet', label: 'Gesichtet' },
-                { value: 'in_bearbeitung', label: 'In Arbeit' },
-                { value: 'erledigt', label: 'Abgeschlossen' },
+                { value: 'offen', label: `Offen (${offene.length})` },
+                { value: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossene.length})` },
               ]}
             />
             <Segmented
-              style={{ marginLeft: 12 }}
               value={richtungFilter ?? 'alle'}
               onChange={(v) => setRichtungFilter(v === 'alle' ? undefined : String(v))}
               options={[
@@ -120,15 +181,7 @@ export default function MeldungenPage() {
               ]}
             />
           </div>
-          <MeldungListe
-            meldungen={meldungen}
-            darfSchreiben={darfSchreiben}
-            mitglieder={mitglieder}
-            onStatus={(meldungId, status) => statusMutation.mutate({ meldungId, status })}
-            onZuweisen={(meldungId, bearbeiterId) => zuweisenMutation.mutate({ meldungId, bearbeiterId })}
-            onLagerelevant={(meldungId) => lageMutation.mutate(meldungId)}
-            onBestaetigen={(meldungId) => bestaetigenMutation.mutate(meldungId)}
-          />
+          <MeldungListe meldungen={sichtbare} {...listenProps} />
         </Col>
         {darfSchreiben && (
           <Col flex="360px">
@@ -136,6 +189,25 @@ export default function MeldungenPage() {
           </Col>
         )}
       </Row>
+      <LagerelevantModal
+        offen={lageMeldung !== null}
+        meldung={lageMeldung}
+        senden={lageMutation.isPending}
+        onAbbrechen={() => setLageMeldung(null)}
+        onUebergeben={(daten) => {
+          if (lageMeldung) lageMutation.mutate({ meldungId: lageMeldung.id, daten });
+        }}
+      />
+      <AuftragErteilenModal
+        meldung={auftragMeldung}
+        abschnitte={auftragsZiele.abschnitte}
+        einheiten={auftragsZiele.einheiten}
+        senden={auftragMutation.isPending}
+        onAbbrechen={() => setAuftragMeldung(null)}
+        onAnlegen={(daten) => {
+          if (auftragMeldung) auftragMutation.mutate({ meldungId: auftragMeldung.id, daten });
+        }}
+      />
     </div>
   );
 }

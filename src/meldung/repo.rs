@@ -34,6 +34,7 @@ const ANZEIGE_SELECT: &str =
             m.erfasst_von_id, m.erstellt_at, \
             (SELECT lm.id FROM lage_meldung lm WHERE lm.meldung_id = m.id) AS lage_meldung_id, \
             (m.status != 'erledigt') AS ist_offen, \
+            m.erledigt_at, \
             m.bestaetigung_pflicht, m.bestaetigung_frist_at, m.eskaliert, \
             ks.quittiert_at AS bestaetigt_at, ks.quittiert_von_id AS bestaetigt_von_id, \
             qb.anzeigename AS bestaetigt_von_name, \
@@ -183,13 +184,27 @@ pub async fn gehoert_zu_einsatz(
 /// Setzt NUR den Triage-Status (LFH-94). Die Bearbeiter-Zuweisung ist eine
 /// getrennte Achse (`weise_bearbeiter`) — ein Statuswechsel darf eine bestehende
 /// Zuweisung nicht stillschweigend überschreiben (vgl. patch-xor-effektivzustand).
-pub async fn setze_status(pool: &SqlitePool, id: i64, status: &str) -> Result<(), AppError> {
+pub async fn setze_status(
+    pool: &SqlitePool,
+    id: i64,
+    status: &str,
+    jetzt: &str,
+) -> Result<(), AppError> {
     debug_assert!(super::status_gueltig(status));
-    sqlx::query("UPDATE meldung SET status = ? WHERE id = ?")
-        .bind(status)
-        .bind(id)
-        .execute(pool)
-        .await?;
+    // Erledigt-Stempel (LFH-113): first-write-wins — nur beim Übergang nach 'erledigt'
+    // und nur solange noch NULL (COALESCE). Wird der Status später zurückgesetzt, bleibt
+    // erledigt_at erhalten; ein erneutes Erledigen überschreibt den ersten Stempel nicht.
+    sqlx::query(
+        "UPDATE meldung SET status = ?, \
+         erledigt_at = CASE WHEN ? = 'erledigt' THEN COALESCE(erledigt_at, ?) ELSE erledigt_at END \
+         WHERE id = ?",
+    )
+    .bind(status)
+    .bind(status)
+    .bind(jetzt)
+    .bind(id)
+    .execute(pool)
+    .await?;
     Ok(())
 }
 
@@ -309,6 +324,48 @@ pub async fn als_lagerelevant(
     .await?;
     tx.commit().await?;
     Ok(lage_id)
+}
+
+/// Erteilt aus einer eingegangenen Meldung einen Auftrag (LFH-113) — in EINEM Commit:
+/// legt den Auftrag inkl. seiner ETB-Anordnung an (`auftrag::repo::anlegen_tx`, Pattern B,
+/// wie Chat→Auftrag LFH-101) und setzt den Rückverweis `meldung.auftrag_id`. First-write-wins:
+/// ist die Meldung bereits mit einem Auftrag verknüpft → `Conflict` (vor der Auftrags-Anlage
+/// geprüft, sodass kein verwaister Auftrag entsteht). `daten` ist bereits vom Handler validiert
+/// (Auftragstext + >=1 Empfänger, Slots/Zugehörigkeit geprüft). Liefert die neue `auftrag_id`.
+pub async fn erteile_auftrag_tx(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    meldung_id: i64,
+    erteiler_id: i64,
+    daten: crate::auftrag::repo::AuftragDaten<'_>,
+) -> Result<i64, AppError> {
+    let mut tx = pool.begin().await?;
+
+    // Guard: schon mit einem Auftrag verknüpft? (Sperrt Doppel-Verknüpfung; first-write-wins.)
+    // Meldung kennt kein Soft-Delete (nur erledigt_at/status) → nur auftrag_id prüfen.
+    let auftrag_vorhanden: Option<Option<i64>> =
+        sqlx::query_scalar("SELECT auftrag_id FROM meldung WHERE id = ?")
+            .bind(meldung_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+    let auftrag_vorhanden = auftrag_vorhanden.ok_or(AppError::NotFound)?;
+    if auftrag_vorhanden.is_some() {
+        return Err(AppError::Conflict(
+            "Aus dieser Meldung wurde bereits ein Auftrag erteilt".into(),
+        ));
+    }
+
+    let auftrag_id =
+        crate::auftrag::repo::anlegen_tx(&mut tx, einsatz_id, erteiler_id, &daten).await?;
+
+    sqlx::query("UPDATE meldung SET auftrag_id = ? WHERE id = ?")
+        .bind(auftrag_id)
+        .bind(meldung_id)
+        .execute(&mut *tx)
+        .await?;
+
+    tx.commit().await?;
+    Ok(auftrag_id)
 }
 
 /// Listet Lageobjekte eines Einsatzes inkl. Herkunft (Quell-Meldung). Neueste zuerst.
@@ -450,11 +507,13 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         let m = anlegen(&pool, e, b, daten("X", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
-        setze_status(&pool, m.id, crate::meldung::STATUS_IN_BEARBEITUNG).await.unwrap();
+        setze_status(&pool, m.id, crate::meldung::STATUS_IN_BEARBEITUNG, "2026-06-12 09:30:00").await.unwrap();
         let nach = laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap();
         assert_eq!(nach.status, "in_bearbeitung");
         // ist_offen = status != 'erledigt' → in_bearbeitung bleibt offen.
         assert!(nach.ist_offen);
+        // Noch nicht erledigt → kein Erledigt-Stempel.
+        assert!(nach.erledigt_at.is_none());
     }
 
     #[tokio::test]
@@ -478,7 +537,7 @@ mod tests {
         let m = anlegen(&pool, e, b, daten("X", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
         weise_bearbeiter(&pool, m.id, Some(b)).await.unwrap();
         // Reiner Statuswechsel darf den Bearbeiter NICHT clobbern (Regression #2/#3).
-        setze_status(&pool, m.id, crate::meldung::STATUS_ERLEDIGT).await.unwrap();
+        setze_status(&pool, m.id, crate::meldung::STATUS_ERLEDIGT, "2026-06-12 09:30:00").await.unwrap();
         let nach = laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap();
         assert_eq!(nach.status, "erledigt");
         assert_eq!(nach.bearbeiter_id, Some(b), "Zuweisung bleibt über Statuswechsel erhalten");
@@ -489,10 +548,39 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         let m = anlegen(&pool, e, b, daten("X", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
-        setze_status(&pool, m.id, crate::meldung::STATUS_ERLEDIGT).await.unwrap();
+        setze_status(&pool, m.id, crate::meldung::STATUS_ERLEDIGT, "2026-06-12 09:30:00").await.unwrap();
         let nach = laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap();
         assert_eq!(nach.status, "erledigt");
         assert!(!nach.ist_offen);
+        // Übergang nach 'erledigt' setzt den Erledigt-Stempel (LFH-113).
+        assert_eq!(nach.erledigt_at.as_deref(), Some("2026-06-12 09:30:00"));
+    }
+
+    #[tokio::test]
+    async fn erledigt_at_ist_first_write_wins() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(&pool, e, b, daten("X", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
+        // Erstes Erledigen setzt den Stempel.
+        setze_status(&pool, m.id, crate::meldung::STATUS_ERLEDIGT, "2026-06-12 09:30:00").await.unwrap();
+        assert_eq!(
+            laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap().erledigt_at.as_deref(),
+            Some("2026-06-12 09:30:00"),
+        );
+        // Zurücksetzen (z. B. wieder in Bearbeitung) darf den Stempel NICHT löschen.
+        setze_status(&pool, m.id, crate::meldung::STATUS_IN_BEARBEITUNG, "2026-06-12 09:40:00").await.unwrap();
+        assert_eq!(
+            laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap().erledigt_at.as_deref(),
+            Some("2026-06-12 09:30:00"),
+            "Erledigt-Stempel bleibt über ein Zurücksetzen erhalten",
+        );
+        // Erneutes Erledigen darf den ersten Stempel NICHT überschreiben (first-write-wins).
+        setze_status(&pool, m.id, crate::meldung::STATUS_ERLEDIGT, "2026-06-12 09:50:00").await.unwrap();
+        assert_eq!(
+            laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap().erledigt_at.as_deref(),
+            Some("2026-06-12 09:30:00"),
+            "erneutes Erledigen behält den ersten Stempel",
+        );
     }
 
     #[tokio::test]
@@ -563,7 +651,7 @@ mod tests {
         let m = anlegen(&pool, e, b, daten_pflicht("Sofort", "2026-06-12 09:00:00", "2026-06-12 09:05:00")).await.unwrap();
         // Bearbeiter + Status gesetzt — dürfen über die Bestätigung NICHT verloren gehen.
         weise_bearbeiter(&pool, m.id, Some(b)).await.unwrap();
-        setze_status(&pool, m.id, crate::meldung::STATUS_IN_BEARBEITUNG).await.unwrap();
+        setze_status(&pool, m.id, crate::meldung::STATUS_IN_BEARBEITUNG, "2026-06-12 09:05:30").await.unwrap();
 
         bestaetige(&pool, 1, e, m.id, b, "2026-06-12 09:06:00").await.unwrap();
         let nach = laden(&pool, m.id, "2026-06-12 09:07:00").await.unwrap();
@@ -644,6 +732,78 @@ mod tests {
         // Trotz überschrittener Frist: bestätigt → keine Eskalation.
         assert!(!setze_eskaliert(&pool, m.id, "2026-06-12 09:07:00").await.unwrap());
         assert!(!laden(&pool, m.id, "2026-06-12 09:07:00").await.unwrap().eskaliert);
+    }
+
+    /// Baut minimale, valide Auftragsdaten (ein Funktions-Empfänger, keine DB-Lookups nötig).
+    fn auftrag_daten(text: &str) -> crate::auftrag::repo::AuftragDaten<'_> {
+        crate::auftrag::repo::AuftragDaten {
+            auftrag_text: text,
+            absicht: None,
+            lage: None,
+            ort: None,
+            zeit: None,
+            mittel: None,
+            verbindung: None,
+            sicherheit: None,
+            prioritaet: "normal",
+            richtung: "intern",
+            frist_at: None,
+            erteilt_at: "2026-06-12 10:00:00",
+            empfaenger: vec![crate::auftrag::repo::EmpfaengerEingabe {
+                empfaenger_typ: "funktion".into(),
+                abschnitt_id: None,
+                einheit_id: None,
+                person_id: None,
+                fahrzeug_id: None,
+                funktion_text: Some("S4".into()),
+                extern_kategorie: None,
+                extern_bezeichnung: None,
+            }],
+        }
+    }
+
+    #[tokio::test]
+    async fn erteile_auftrag_legt_auftrag_an_und_setzt_rueckverweis() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(&pool, e, b, daten("Tank fordern", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
+
+        let auftrag_id =
+            erteile_auftrag_tx(&pool, e, m.id, b, auftrag_daten("Tank fordern")).await.unwrap();
+
+        // Auftrag landet im Auftrag-Modul, ETB-Anordnung entsteht im selben Commit (Pattern B).
+        let detail = crate::auftrag::repo::laden(&pool, auftrag_id, "2026-06-12 10:00:00").await.unwrap();
+        assert_eq!(detail.auftrag.auftrag_text, "Tank fordern");
+        assert!(detail.auftrag.etb_anordnung_id.is_some(), "ETB-Anordnung im selben Commit erzeugt");
+        assert_eq!(detail.empfaenger.len(), 1);
+
+        // Rückverweis an der Meldung ist gesetzt.
+        let nachher = laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap();
+        assert_eq!(nachher.auftrag_id, Some(auftrag_id));
+    }
+
+    #[tokio::test]
+    async fn erteile_auftrag_doppelt_ist_konflikt_und_legt_keinen_zweiten_auftrag_an() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(&pool, e, b, daten("X", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
+        erteile_auftrag_tx(&pool, e, m.id, b, auftrag_daten("erster")).await.unwrap();
+
+        let zweimal = erteile_auftrag_tx(&pool, e, m.id, b, auftrag_daten("zweiter")).await;
+        assert!(matches!(zweimal.unwrap_err(), AppError::Conflict(_)));
+
+        // Kein verwaister Auftrag: die zweite (abgewiesene) Anlage darf nichts hinterlassen.
+        let anzahl: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM auftrag WHERE einsatz_id = ?")
+            .bind(e).fetch_one(&pool).await.unwrap();
+        assert_eq!(anzahl, 1, "abgewiesene Doppel-Erteilung legt keinen zweiten Auftrag an (transaktional)");
+    }
+
+    #[tokio::test]
+    async fn erteile_auftrag_unbekannte_meldung_ist_notfound() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let ergebnis = erteile_auftrag_tx(&pool, e, 999, b, auftrag_daten("x")).await;
+        assert!(matches!(ergebnis.unwrap_err(), AppError::NotFound));
     }
 
     #[tokio::test]

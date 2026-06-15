@@ -776,6 +776,9 @@ export interface NeueErinnerung {
   faellig_at: string;
   intervall_minuten?: number;
   empfaenger_funktion?: string;
+  /** Generischer Sachbezug (z. B. 'etb' + ETB-Eintrag-ID, LFH-106); both-or-neither. */
+  bezug_typ?: string;
+  bezug_id?: number;
 }
 
 // ============================== LFH-52 Aufträge/Befehle ==============================
@@ -822,6 +825,8 @@ export interface Auftrag {
   abgenommen_at: string | null;
   abgenommen_von_id: number | null;
   etb_anordnung_id: number | null;
+  /** Quell-ETB-Eintrag, aus dem dieser Auftrag erteilt wurde (LFH-112); getrennt von etb_anordnung_id. */
+  quell_etb_eintrag_id: number | null;
   erstellt_von_id: number;
   erstellt_at: string;
   vollzug_status: 'offen' | 'in_arbeit' | 'vollzogen';
@@ -897,6 +902,8 @@ export interface Meldung {
   lage_meldung_id: number | null;
   /** Abgeleitet: status !== 'erledigt'. */
   ist_offen: boolean;
+  /** Erledigt-Zeitpunkt (UTC), first-write-wins beim Übergang nach 'erledigt' (LFH-113); null solange nie erledigt. */
+  erledigt_at: string | null;
   /** Sofortmeldung & Eskalation (LFH-85/97): aktive Bestätigungspflicht. */
   bestaetigung_pflicht: boolean;
   /** Absolute Bestätigungsfrist (UTC), null wenn keine Pflicht. */

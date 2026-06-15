@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { baueMarker, baueTaktischeMarker, type TaktischeQuelle } from './marker';
-import type { EinsatzAnzeige, Schaden, Uhs } from '../../api/types';
+import { baueMarker, baueTaktischeMarker, baueLageMeldungMarker, type TaktischeQuelle } from './marker';
+import type { EinsatzAnzeige, LageMeldung, Schaden, Uhs } from '../../api/types';
 
 function uhs(partial: Partial<Uhs>): Uhs {
   return {
@@ -59,6 +59,27 @@ describe('baueMarker', () => {
 
   it('kommt mit undefined-Einsatz klar', () => {
     expect(baueMarker(undefined, [], [])).toEqual({ verortet: [], nichtVerortet: [] });
+  });
+});
+
+function lageMeldung(partial: Partial<LageMeldung>): LageMeldung {
+  return {
+    id: 1, einsatz_id: 1, meldung_id: 3, text: 'Brücke gesperrt', lat: null, lon: null,
+    erstellt_von_id: 1, erstellt_at: '', meldung_lfd_nr: 5, meldung_absender: 'Florian Nord 1', ...partial,
+  };
+}
+
+describe('baueLageMeldungMarker', () => {
+  it('erzeugt Marker nur für verortete Lagemeldungen, mit Herkunfts-Info', () => {
+    const marker = baueLageMeldungMarker([
+      lageMeldung({ id: 4, lat: 50.3, lon: 8.7 }),
+      lageMeldung({ id: 5, lat: null, lon: null }),
+    ]);
+    expect(marker.map((m) => m.schluessel)).toEqual(['lagemeldung-4']);
+    expect(marker[0].typ).toBe('lagemeldung');
+    expect(marker[0].lageMeldung).toEqual({
+      meldungLfdNr: 5, absender: 'Florian Nord 1', inhalt: 'Brücke gesperrt',
+    });
   });
 });
 

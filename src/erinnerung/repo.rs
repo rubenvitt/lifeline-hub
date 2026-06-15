@@ -11,6 +11,10 @@ pub struct ErinnerungDaten<'a> {
     pub faellig_at: &'a str,
     pub intervall_minuten: Option<i64>,
     pub empfaenger_funktion: Option<&'a str>,
+    /// Generischer Sachbezug (z. B. 'etb' + ETB-Eintrag-ID, LFH-106); both-or-neither,
+    /// vom Handler validiert. Kein FK — wie der Auto-Frist-/Chat-Bezug nur per Code geführt.
+    pub bezug_typ: Option<&'a str>,
+    pub bezug_id: Option<i64>,
 }
 
 /// SELECT-Projektion inkl. abgeleitetem `ist_faellig`. `jetzt` wird als erster
@@ -73,8 +77,8 @@ pub async fn anlegen(
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO erinnerung \
            (einsatz_id, titel, beschreibung, faellig_at, intervall_minuten, \
-            empfaenger_funktion, erstellt_von_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            empfaenger_funktion, bezug_typ, bezug_id, erstellt_von_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(daten.titel)
@@ -82,6 +86,8 @@ pub async fn anlegen(
     .bind(daten.faellig_at)
     .bind(daten.intervall_minuten)
     .bind(daten.empfaenger_funktion)
+    .bind(daten.bezug_typ)
+    .bind(daten.bezug_id)
     .bind(ersteller_id)
     .fetch_one(pool)
     .await?;
@@ -268,7 +274,7 @@ mod tests {
     }
 
     fn daten<'a>(titel: &'a str, faellig: &'a str, intervall: Option<i64>) -> ErinnerungDaten<'a> {
-        ErinnerungDaten { titel, beschreibung: None, faellig_at: faellig, intervall_minuten: intervall, empfaenger_funktion: None }
+        ErinnerungDaten { titel, beschreibung: None, faellig_at: faellig, intervall_minuten: intervall, empfaenger_funktion: None, bezug_typ: None, bezug_id: None }
     }
 
     #[tokio::test]
@@ -284,6 +290,25 @@ mod tests {
 
         let liste = liste(&pool, e, true, "2026-06-11 09:00:00").await.unwrap();
         assert_eq!(liste.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn anlegen_persistiert_etb_bezug() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+
+        let r = anlegen(
+            &pool, e, b,
+            ErinnerungDaten {
+                titel: "Wiedervorlage zu ETB #3", beschreibung: None,
+                faellig_at: "2026-06-11 10:00:00", intervall_minuten: None,
+                empfaenger_funktion: None, bezug_typ: Some("etb"), bezug_id: Some(3),
+            },
+            "2026-06-11 09:00:00",
+        ).await.unwrap();
+        assert_eq!(r.bezug_typ.as_deref(), Some("etb"));
+        assert_eq!(r.bezug_id, Some(3));
+        assert_eq!(r.quelle, QUELLE_MANUELL, "manuelle Anlage bleibt Quelle 'manuell'");
     }
 
     #[tokio::test]

@@ -23,6 +23,7 @@ const TYP_LABEL: Record<MarkerTyp, string> = {
   fuehrung: 'Führungskraft',
   abschnitt: 'Einsatzabschnitt',
   einsatzort: 'Einsatzort',
+  lagemeldung: 'Lagemeldung',
 };
 
 const FACHAUFGABE_OPTIONEN = [
@@ -57,6 +58,7 @@ export default function Inspector({
     : marker.typ === 'fahrzeug' ? `/einsaetze/${einsatzId}/fahrzeuge`
     : marker.typ === 'fuehrung' ? `/einsaetze/${einsatzId}/personal`
     : marker.typ === 'abschnitt' ? `/einsaetze/${einsatzId}/einsatzabschnitte`
+    : marker.typ === 'lagemeldung' ? `/einsaetze/${einsatzId}/meldungen`
     : `/einsaetze/${einsatzId}/einsatzdaten`;
 
   const symbolAuswahl = darfSchreiben && onSymbolAendern && TAKTISCHE_TYPEN.includes(marker.typ);
@@ -65,6 +67,12 @@ export default function Inspector({
     <KartenDetailCard titel={marker.label} akzentFarbe={marker.farbe} onSchliessen={onSchliessen}>
       <Tag color={marker.farbe} style={{ marginBottom: 8 }}>{TYP_LABEL[marker.typ]}</Tag>
       <Descriptions column={1} size="small">
+        {marker.typ === 'lagemeldung' && marker.lageMeldung && (
+          <Descriptions.Item label="Absender">{marker.lageMeldung.absender}</Descriptions.Item>
+        )}
+        {marker.typ === 'lagemeldung' && marker.lageMeldung && (
+          <Descriptions.Item label="Inhalt">{marker.lageMeldung.inhalt}</Descriptions.Item>
+        )}
         <Descriptions.Item label="Koordinate">
           {marker.lat.toFixed(5)}, {marker.lon.toFixed(5)}
         </Descriptions.Item>
@@ -97,9 +105,13 @@ export default function Inspector({
       )}
       <Space style={{ marginTop: 8 }}>
         <Link to={modulLink}>
-          <Button size="small">Im Fach-Modul öffnen</Button>
+          <Button size="small">
+            {marker.typ === 'lagemeldung' ? 'Zur Quell-Meldung' : 'Im Fach-Modul öffnen'}
+          </Button>
         </Link>
-        {darfSchreiben && marker.typ !== 'einsatzort' && (
+        {/* Lagemeldungen sind auf der Karte read-only: verortet wird ausschließlich beim
+            Übergeben (LFH-113). Re-/Ent-Verorten würde am ON-CONFLICT-Upsert ohnehin verpuffen. */}
+        {darfSchreiben && marker.typ !== 'einsatzort' && marker.typ !== 'lagemeldung' && (
           <Button size="small" danger onClick={() => onVerortungLoeschen(marker)}>
             Verortung löschen
           </Button>

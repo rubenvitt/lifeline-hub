@@ -1,8 +1,8 @@
-import type { Einheit, EinsatzAnzeige, EinsatzFahrzeug, FuehrungskraftKarte, Schaden, Uhs } from '../../api/types';
+import type { Einheit, EinsatzAnzeige, EinsatzFahrzeug, FuehrungskraftKarte, LageMeldung, Schaden, Uhs } from '../../api/types';
 import { baueTzProps, type TzProps } from './taktischesZeichen';
 
 export type MarkerTyp =
-  | 'einsatzort' | 'uhs' | 'schaden' | 'einheit' | 'fahrzeug' | 'fuehrung' | 'abschnitt';
+  | 'einsatzort' | 'uhs' | 'schaden' | 'einheit' | 'fahrzeug' | 'fuehrung' | 'abschnitt' | 'lagemeldung';
 
 export interface KarteMarker {
   /** Stabil & eindeutig über alle Typen: 'einsatzort' | 'uhs-<id>' | 'schaden-<id>'. */
@@ -18,6 +18,8 @@ export interface KarteMarker {
   tz?: TzProps;
   /** FMS-Status-Ring, nur für Fahrzeuge. */
   statusFarbe?: string | null;
+  /** Lagemeldungs-Herkunft für den Inspector-Backlink (nur typ='lagemeldung'). */
+  lageMeldung?: { meldungLfdNr: number; absender: string; inhalt: string };
 }
 
 export interface NichtVerortet {
@@ -93,6 +95,28 @@ export function baueMarker(
   }
 
   return { verortet, nichtVerortet };
+}
+
+const LAGEMELDUNG_FARBE = '#d48806';
+
+/** Leitet Marker für verortete Lagemeldungen ab (LFH-113). Unverortete bleiben außen vor —
+ *  Lagemeldungen werden NICHT auf der Karte platziert (Verorten erfolgt beim Übergeben). */
+export function baueLageMeldungMarker(lagemeldungen: LageMeldung[]): KarteMarker[] {
+  const verortet: KarteMarker[] = [];
+  for (const l of lagemeldungen) {
+    if (l.lat == null || l.lon == null) continue;
+    verortet.push({
+      schluessel: `lagemeldung-${l.id}`,
+      typ: 'lagemeldung',
+      id: l.id,
+      lat: l.lat,
+      lon: l.lon,
+      label: `Meldung #${l.meldung_lfd_nr}`,
+      farbe: LAGEMELDUNG_FARBE,
+      lageMeldung: { meldungLfdNr: l.meldung_lfd_nr, absender: l.meldung_absender, inhalt: l.text },
+    });
+  }
+  return verortet;
 }
 
 export interface TaktischeQuelle {

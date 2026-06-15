@@ -134,6 +134,59 @@ pub async fn erfassen(
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
 
+/// POST /api/einsaetze/{id}/etb/{eintrag_id}/auftrag — aus einem ETB-Eintrag direkt einen
+/// Auftrag/Befehl erteilen (ETB→Auftrag, LFH-112). Erzeugt einen formalen Auftrag (inkl.
+/// eigener ETB-Anordnung, Pattern B) und setzt am erzeugten Auftrag den Quellbezug
+/// `auftrag.quell_etb_eintrag_id` auf den auslösenden Eintrag. Die Auftragsfelder durchlaufen
+/// dieselbe Validierung wie POST /auftraege (geteilt, kein zweiter Pfad). Schreibrecht + aktiv
+/// + Cross-Einsatz-Schutz wie bei `erfassen`. Antwortet mit dem erzeugten Auftrag (201).
+pub async fn auftrag_erteilen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, eintrag_id)): Path<(i64, i64)>,
+    Json(req): Json<crate::routes::auftrag::NeuerAuftrag>,
+) -> Result<(StatusCode, Json<crate::auftrag::AuftragDetail>), AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_schreibrecht(rolle)?;
+    fordere_aktiv(&einsatz)?;
+    // Cross-Einsatz-Schutz: der Quell-Eintrag muss zu diesem Einsatz gehören.
+    if !repo::gehoert_zu_einsatz(&state.pool, eintrag_id, einsatz_id).await? {
+        return Err(AppError::NotFound);
+    }
+
+    // Gleiche Validierung wie POST /auftraege (geteilt) → kein zweiter, ungeprüfter Pfad.
+    let now = jetzt();
+    let validiert =
+        crate::routes::auftrag::validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now).await?;
+    let auftrag_id = crate::auftrag::repo::erteile_aus_etb_tx(
+        &state.pool, einsatz_id, eintrag_id, benutzer.id, validiert.daten(),
+    )
+    .await?;
+
+    let detail = crate::auftrag::repo::laden(&state.pool, auftrag_id, &now).await?;
+    // ETB-Anordnung entstand im selben Commit → ETB-Live-Event + Auftrag-Board-Event (SSE-Parität).
+    if let Some(etb_id) = detail.auftrag.etb_anordnung_id {
+        if let Ok(etb) = repo::laden(&state.pool, etb_id).await {
+            if let Ok(json) = serde_json::to_string(&etb) {
+                state.live.publiziere(einsatz_id, json);
+            }
+        }
+    }
+    state.live.publiziere_event(
+        einsatz_id,
+        "auftrag",
+        serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
+    );
+
+    Ok((StatusCode::CREATED, Json(detail)))
+}
+
+/// Kanonischer Zeitstempel „jetzt" (UTC) im DB-Format.
+fn jetzt() -> String {
+    chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()
+}
+
 #[derive(Debug, Deserialize)]
 pub struct EtbAbfrageParams {
     /// Volltext-Suchbegriff.

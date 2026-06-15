@@ -275,6 +275,18 @@ export default function ChatPage() {
               senden={sendenMutation.isPending}
             />
           )}
+          {!darfSchreiben && (
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginTop: 12 }}
+              message={
+                einsatz.status !== 'aktiv'
+                  ? 'Schreiben ist nur bei aktivem Einsatz möglich.'
+                  : 'Schreiben ist der Einsatzleitung und dem Führungspersonal vorbehalten.'
+              }
+            />
+          )}
         </Col>
       </Row>
       <BezugDialog

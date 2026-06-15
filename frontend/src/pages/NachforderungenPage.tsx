@@ -5,9 +5,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { ApiError } from '../api/client';
 import { legeNachforderungAn, lehneNachforderungAb, listeNachforderungen, setzeNachforderungStatus } from '../api/nachforderungen';
-import type { NachforderungStatus, NeueNachforderung } from '../api/types';
+import type { Nachforderung, NachforderungStatus, NeueNachforderung } from '../api/types';
+import { NACHFORDERUNG_STATUS, istAbgeschlossen, prioRang } from '../kommunikation';
 import NachforderungListe from '../nachforderungen/NachforderungListe';
 import NachforderungFormular from '../nachforderungen/NachforderungFormular';
+
+/** Schlüssel-Zeitstempel der Abgeschlossen-Ansicht: Eintreffen ODER Ablehnung. */
+function abschlussZeit(n: Nachforderung): string {
+  return n.eingetroffen_at ?? n.abgelehnt_at ?? n.angefordert_at;
+}
 
 export default function NachforderungenPage() {
   const { id } = useParams();
@@ -15,19 +21,25 @@ export default function NachforderungenPage() {
   const { message } = App.useApp();
   const qc = useQueryClient();
 
-  const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
-  const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
+  const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
   // Ablehnen-Dialog: Grund (optional) wird erhoben, bevor abgelehnt wird.
   const [ablehnenId, setAblehnenId] = useState<number | null>(null);
   const [ablehnenGrund, setAblehnenGrund] = useState('');
 
+  const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
+  // Offen/Abgeschlossen-Trennung erfolgt clientseitig → ALLE Nachforderungen laden.
   const nfQuery = useQuery({
-    queryKey: ['einsatz-nachforderungen', einsatzId, statusFilter ?? 'alle'],
-    queryFn: () => listeNachforderungen(einsatzId, { status: statusFilter }),
+    queryKey: ['einsatz-nachforderungen', einsatzId],
+    queryFn: () => listeNachforderungen(einsatzId, {}),
   });
 
-  const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
   const invalidiere = () => qc.invalidateQueries({ queryKey: ['einsatz-nachforderungen', einsatzId] });
+  // Bei Fehler (insb. 422 aus der optimistischen Sperre) zusätzlich invalidieren,
+  // damit der ggf. veraltete View den echten Status nachlädt.
+  const fehler = (e: unknown) => {
+    message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
+    invalidiere();
+  };
 
   const anlegenMutation = useMutation({
     mutationFn: (d: NeueNachforderung) => legeNachforderungAn(einsatzId, d),
@@ -63,7 +75,28 @@ export default function NachforderungenPage() {
   const darfSchreiben =
     einsatz.status === 'aktiv' &&
     (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
-  const nachforderungen = nfQuery.data ?? [];
+  const alle = nfQuery.data ?? [];
+
+  // Offen/Abgeschlossen clientseitig über die gemeinsame Phasen-Semantik trennen
+  // (eingetroffen → abgeschlossen, abgelehnt → ausnahme zählen als „abgeschlossen").
+  const istAbg = (n: Nachforderung) => istAbgeschlossen(NACHFORDERUNG_STATUS[n.status]?.phase ?? 'offen');
+  const offene = alle.filter((n) => !istAbg(n));
+  const abgeschlossene = alle.filter(istAbg);
+
+  // Offen-Ansicht: nach Priorität (sofort→dringend→normal), dann angefordert_at absteigend.
+  const offeneSortiert = [...offene].sort((a, b) => {
+    const rang = prioRang(a.prioritaet) - prioRang(b.prioritaet);
+    return rang !== 0 ? rang : b.angefordert_at.localeCompare(a.angefordert_at);
+  });
+  // Abgeschlossen-Ansicht: flach, neueste zuerst (nach Abschluss-Zeit).
+  const abgeschlosseneSortiert = [...abgeschlossene]
+    .sort((a, b) => abschlussZeit(b).localeCompare(abschlussZeit(a)));
+
+  const listenProps = {
+    darfSchreiben,
+    onStatus: (nfId: number, status: NachforderungStatus) => statusMutation.mutate({ nfId, status }),
+    onAblehnen: (nfId: number) => { setAblehnenId(nfId); setAblehnenGrund(''); },
+  };
 
   return (
     <div>
@@ -81,26 +114,21 @@ export default function NachforderungenPage() {
           {nfQuery.isError && (
             <Alert type="error" showIcon style={{ marginBottom: 12 }} message="Nachforderungen konnten nicht geladen werden" />
           )}
-          <div style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12, alignItems: 'center' }}>
             <Segmented
-              value={statusFilter ?? 'alle'}
-              onChange={(v) => setStatusFilter(v === 'alle' ? undefined : String(v))}
+              value={ansicht}
+              onChange={(v) => setAnsicht(v as 'offen' | 'abgeschlossen')}
               options={[
-                { value: 'alle', label: 'Alle' },
-                { value: 'angefordert', label: 'Angefordert' },
-                { value: 'zugesagt', label: 'Zugesagt' },
-                { value: 'unterwegs', label: 'Unterwegs' },
-                { value: 'eingetroffen', label: 'Eingetroffen' },
-                { value: 'abgelehnt', label: 'Abgelehnt' },
+                { value: 'offen', label: `Offen (${offene.length})` },
+                { value: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossene.length})` },
               ]}
             />
           </div>
-          <NachforderungListe
-            nachforderungen={nachforderungen}
-            darfSchreiben={darfSchreiben}
-            onStatus={(nfId, status) => statusMutation.mutate({ nfId, status })}
-            onAblehnen={(nfId) => { setAblehnenId(nfId); setAblehnenGrund(''); }}
-          />
+          {ansicht === 'offen' ? (
+            <NachforderungListe nachforderungen={offeneSortiert} ansicht="offen" {...listenProps} />
+          ) : (
+            <NachforderungListe nachforderungen={abgeschlosseneSortiert} ansicht="abgeschlossen" {...listenProps} />
+          )}
         </Col>
         {darfSchreiben && (
           <Col flex="360px">

@@ -22,6 +22,7 @@ const setzeMeldungStatus = vi.fn();
 const weiseBearbeiterZu = vi.fn();
 const markiereLagerelevant = vi.fn();
 const bestaetigeMeldung = vi.fn();
+const erteileAuftragAusMeldung = vi.fn();
 vi.mock('../api/meldungen', () => ({
   listeMeldungen: (...a: unknown[]) => listeMeldungen(...a),
   legeMeldungAn: (...a: unknown[]) => legeMeldungAn(...a),
@@ -29,7 +30,11 @@ vi.mock('../api/meldungen', () => ({
   weiseBearbeiterZu: (...a: unknown[]) => weiseBearbeiterZu(...a),
   markiereLagerelevant: (...a: unknown[]) => markiereLagerelevant(...a),
   bestaetigeMeldung: (...a: unknown[]) => bestaetigeMeldung(...a),
+  erteileAuftragAusMeldung: (...a: unknown[]) => erteileAuftragAusMeldung(...a),
 }));
+// Auftrags-Ziele (LFH-113): MeldungenPage lädt sie für das Meldung→Auftrag-Formular.
+vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn().mockResolvedValue([]) }));
+vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn().mockResolvedValue([]) }));
 
 const meldung = (over: Partial<Meldung> = {}): Meldung => ({
   id: 1, einsatz_id: 1, lfd_nr: 1, absender: 'Florian Nord 1', empfaenger: 'ELW 1',
@@ -37,7 +42,7 @@ const meldung = (over: Partial<Meldung> = {}): Meldung => ({
   status: 'neu', bearbeiter_id: null, bearbeiter_name: null, lagerelevant: false,
   ereigniszeit: '2026-06-12 09:00:00', eingang_at: '2026-06-12 09:05:00',
   etb_meldung_id: 7, auftrag_id: null, erfasst_von_id: 1, erstellt_at: '2026-06-12 09:05:00',
-  lage_meldung_id: null, ist_offen: true,
+  lage_meldung_id: null, ist_offen: true, erledigt_at: null,
   bestaetigung_pflicht: false, bestaetigung_frist_at: null, eskaliert: false,
   bestaetigt_at: null, bestaetigt_von_id: null, bestaetigt_von_name: null,
   ist_bestaetigt: false, ist_ueberfaellig: false, ...over,
@@ -81,12 +86,40 @@ describe('MeldungenPage', () => {
     expect(legeMeldungAn.mock.calls[0][1].ereigniszeit).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
   });
 
-  it('filtert nach Status (Posteingang)', async () => {
+  it('trennt Offen/Abgeschlossen clientseitig und zeigt Offen als Default', async () => {
+    listeMeldungen.mockResolvedValue([
+      meldung({ id: 1, status: 'neu', ist_offen: true }),
+      meldung({ id: 2, lfd_nr: 2, absender: 'RTW 9', status: 'erledigt', ist_offen: false }),
+    ]);
     renderPage();
-    await screen.findByText('Florian Nord 1');
-    // Segment-Label „Abgeschlossen" ist eindeutig (kollidiert nicht mit Action-Links).
-    await userEvent.click(screen.getByText('Abgeschlossen'));
-    await waitFor(() => expect(listeMeldungen).toHaveBeenCalledWith(1, expect.objectContaining({ status: 'erledigt' })));
+    // Default-Ansicht „Offen": nur nicht-erledigte sichtbar.
+    expect(await screen.findByText('Florian Nord 1')).toBeInTheDocument();
+    expect(screen.queryByText('RTW 9')).not.toBeInTheDocument();
+    // Server-Default: kein Status-Filter (Offen/Abgeschlossen rein clientseitig).
+    expect(listeMeldungen.mock.calls[0][1]).not.toHaveProperty('status');
+    // Umschalten auf „Abgeschlossen": nur erledigte sichtbar, ohne neuen Server-Call mit Status.
+    await userEvent.click(screen.getByText(/Abgeschlossen \(/));
+    expect(await screen.findByText('RTW 9')).toBeInTheDocument();
+    expect(screen.queryByText('Florian Nord 1')).not.toBeInTheDocument();
+  });
+
+  it('zeigt eine erledigte Meldung im Abgeschlossen-View mit Erledigt-Zeitpunkt und Quittungs-Read-back', async () => {
+    // LFH-113: Abgeschlossen zeigt den echten Erledigt-Zeitpunkt (erledigt_at) als
+    // Read-back; die Quittungs-Achse (bestaetigt_at) bleibt daneben bestehen.
+    listeMeldungen.mockResolvedValue([
+      meldung({
+        id: 2, lfd_nr: 2, absender: 'RTW 9', status: 'erledigt', ist_offen: false,
+        erledigt_at: '2026-06-12 09:30:00',
+        bestaetigung_pflicht: true, ist_bestaetigt: true,
+        bestaetigt_at: '2026-06-12 09:06:00', bestaetigt_von_name: 'Leit',
+      }),
+    ]);
+    renderPage();
+    await screen.findByText(/Abgeschlossen \(/);
+    await userEvent.click(screen.getByText(/Abgeschlossen \(/));
+    expect(await screen.findByText('RTW 9')).toBeInTheDocument();
+    expect(screen.getByText(/^Erledigt:/)).toBeInTheDocument();
+    expect(screen.getByText(/✓ Quittiert von Leit/)).toBeInTheDocument();
   });
 
   it('filtert nach Richtung extern (LFH-87)', async () => {
@@ -111,7 +144,9 @@ describe('MeldungenPage', () => {
     setzeMeldungStatus.mockResolvedValue(meldung({ status: 'gesichtet' }));
     renderPage();
     await screen.findByText('Florian Nord 1');
-    await userEvent.click(screen.getByText('Sichten', { selector: 'a' }));
+    // Link-Button öffnet Popconfirm; erst nach „Bestätigen" wird geschaltet.
+    await userEvent.click(screen.getByRole('button', { name: 'Sichten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
     await waitFor(() => expect(setzeMeldungStatus).toHaveBeenCalledWith(1, 1, 'gesichtet'));
   });
 
@@ -119,7 +154,8 @@ describe('MeldungenPage', () => {
     setzeMeldungStatus.mockResolvedValue(meldung({ status: 'erledigt' }));
     renderPage();
     await screen.findByText('Florian Nord 1');
-    await userEvent.click(screen.getByText('Erledigt', { selector: 'a' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erledigt' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
     await waitFor(() => expect(setzeMeldungStatus).toHaveBeenCalledWith(1, 1, 'erledigt'));
   });
 
@@ -129,17 +165,39 @@ describe('MeldungenPage', () => {
     } as Awaited<ReturnType<typeof ladeEinsatz>>);
     renderPage();
     await screen.findByText('Florian Nord 1');
-    expect(screen.queryByText('Sichten', { selector: 'a' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sichten' })).not.toBeInTheDocument();
   });
 
   // --- LFH-95: Lage-Übergabe ---
 
-  it('übergibt eine Meldung an die Lage', async () => {
+  it('übergibt eine Meldung an die Lage (ohne Verortung)', async () => {
     markiereLagerelevant.mockResolvedValue(meldung({ lagerelevant: true }));
     renderPage();
     await screen.findByText('Florian Nord 1');
-    await userEvent.click(screen.getByText('An Lage übergeben', { selector: 'a' }));
-    await waitFor(() => expect(markiereLagerelevant).toHaveBeenCalledWith(1, 1));
+    await userEvent.click(screen.getByRole('button', { name: 'An Lage übergeben' }));
+    // Modal öffnet sich; ohne Koordinate direkt übergeben.
+    await userEvent.click(await screen.findByRole('button', { name: 'Übergeben' }));
+    await waitFor(() => expect(markiereLagerelevant).toHaveBeenCalledTimes(1));
+    const [eid, mid, daten] = markiereLagerelevant.mock.calls[0];
+    expect(eid).toBe(1);
+    expect(mid).toBe(1);
+    expect((daten as { lat?: number }).lat).toBeUndefined();
+    expect((daten as { lon?: number }).lon).toBeUndefined();
+  });
+
+  it('übergibt eine Meldung an die Lage MIT Verortung (lat/lon im Request)', async () => {
+    markiereLagerelevant.mockResolvedValue(meldung({ lagerelevant: true }));
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(screen.getByRole('button', { name: 'An Lage übergeben' }));
+    await userEvent.type(await screen.findByLabelText('Breitengrad'), '50.1');
+    await userEvent.type(screen.getByLabelText('Längengrad'), '8.6');
+    await userEvent.click(screen.getByRole('button', { name: 'Übergeben' }));
+    await waitFor(() => expect(markiereLagerelevant).toHaveBeenCalledTimes(1));
+    const [eid, mid, daten] = markiereLagerelevant.mock.calls[0];
+    expect(eid).toBe(1);
+    expect(mid).toBe(1);
+    expect(daten).toMatchObject({ lat: 50.1, lon: 8.6 });
   });
 
   it('zeigt lagerelevante Meldung als markiert, ohne erneute Übergabe-Aktion', async () => {
@@ -147,7 +205,7 @@ describe('MeldungenPage', () => {
     renderPage();
     await screen.findByText('Florian Nord 1');
     expect(screen.getByText('Lagerelevant ✓')).toBeInTheDocument();
-    expect(screen.queryByText('An Lage übergeben', { selector: 'a' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'An Lage übergeben' })).not.toBeInTheDocument();
   });
 
   it('weist einer Meldung einen Bearbeiter zu', async () => {
@@ -160,20 +218,6 @@ describe('MeldungenPage', () => {
     await waitFor(() => expect(weiseBearbeiterZu).toHaveBeenCalledWith(1, 1, 2));
   });
 
-  it('filtert clientseitig auf offene Meldungen (LFH-94)', async () => {
-    listeMeldungen.mockResolvedValue([
-      meldung({ id: 1, status: 'neu', ist_offen: true }),
-      meldung({ id: 2, lfd_nr: 2, absender: 'RTW 9', status: 'erledigt', ist_offen: false }),
-    ]);
-    renderPage();
-    await screen.findByText('Florian Nord 1');
-    expect(screen.getByText('RTW 9')).toBeInTheDocument();
-    await userEvent.click(screen.getByText('Offen'));
-    // 'Offen' ist kein Server-Status → listeMeldungen ohne status; erledigte fällt clientseitig raus.
-    await waitFor(() => expect(screen.queryByText('RTW 9')).not.toBeInTheDocument());
-    expect(screen.getByText('Florian Nord 1')).toBeInTheDocument();
-  });
-
   // --- LFH-97: Sofortmeldung bestätigungspflichtig ---
 
   it('zeigt überfällige Sofortmeldung hervorgehoben und bestätigt sie', async () => {
@@ -184,7 +228,10 @@ describe('MeldungenPage', () => {
     renderPage();
     await screen.findByText('Florian Nord 1');
     expect(screen.getByText(/Bestätigung überfällig/)).toBeInTheDocument();
-    await userEvent.click(screen.getByText('Bestätigen', { selector: 'a' }));
+    // Link-Button „Bestätigen" öffnet Popconfirm; OK-Knopf heißt ebenfalls „Bestätigen".
+    await userEvent.click(screen.getByRole('button', { name: 'Bestätigen' }));
+    const popconfirms = await screen.findAllByRole('button', { name: 'Bestätigen' });
+    await userEvent.click(popconfirms[popconfirms.length - 1]);
     await waitFor(() => expect(bestaetigeMeldung).toHaveBeenCalledWith(1, 1));
   });
 
@@ -203,8 +250,38 @@ describe('MeldungenPage', () => {
     ]);
     renderPage();
     await screen.findByText('Florian Nord 1');
-    expect(screen.getByText(/Bestätigt ✓/)).toBeInTheDocument();
-    expect(screen.queryByText('Bestätigen', { selector: 'a' })).not.toBeInTheDocument();
+    // Bestätigt → orthogonale Quittungs-Achse (QuittungIndikator) statt Status-Badge.
+    expect(screen.getByText(/✓ Quittiert/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Bestätigen' })).not.toBeInTheDocument();
+  });
+
+  // --- LFH-113: Meldung→Auftrag ---
+
+  it('erteilt aus einer Meldung einen Auftrag, vorbefüllt mit Absender + Inhalt', async () => {
+    erteileAuftragAusMeldung.mockResolvedValue(meldung({ auftrag_id: 42 }));
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+    // Auftragstext ist mit „Absender: Inhalt" vorbelegt (Meldungsvorblendung).
+    const textfeld = await screen.findByLabelText('Auftrag / Was');
+    expect(textfeld).toHaveValue('Florian Nord 1: Deich instabil');
+    // Minimal validen Empfänger über das Funktions-Freitextfeld ergänzen.
+    await userEvent.type(screen.getByLabelText(/Weitere Empfänger/), 'S3');
+    // Submit-Button des Formulars heißt ebenfalls „Auftrag erteilen".
+    const buttons = await screen.findAllByRole('button', { name: 'Auftrag erteilen' });
+    await userEvent.click(buttons[buttons.length - 1]);
+    await waitFor(() => expect(erteileAuftragAusMeldung).toHaveBeenCalledWith(
+      1, 1, expect.objectContaining({ auftrag_text: 'Florian Nord 1: Deich instabil' }),
+    ));
+  });
+
+  it('zeigt bei verknüpfter Meldung einen Backlink zum Auftrag statt der Erteilen-Aktion', async () => {
+    listeMeldungen.mockResolvedValue([meldung({ auftrag_id: 42 })]);
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    const backlink = screen.getByRole('link', { name: /Auftrag/ });
+    expect(backlink).toHaveAttribute('href', '/einsaetze/1/auftraege');
+    expect(screen.queryByRole('button', { name: 'Auftrag erteilen' })).not.toBeInTheDocument();
   });
 
   it('Fast-Path-Button erfasst Sofortmeldung mit Bestätigungspflicht', async () => {

@@ -6,7 +6,7 @@ import { Route, Routes } from 'react-router-dom';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import LageDashboardPage from './LageDashboardPage';
-import type { Auftrag } from '../../api/types';
+import type { Auftrag, Meldung } from '../../api/types';
 
 class FakeEventSource {
   url: string; closed = false;
@@ -38,10 +38,22 @@ const auftrag = (over: Partial<Auftrag> = {}): Auftrag => ({
   id: Math.floor(Math.random() * 1e9), einsatz_id: 1, auftrag_text: 'Deich sichern', absicht: null,
   lage: null, ort: null, zeit: null, mittel: null, verbindung: null, sicherheit: null, prioritaet: 'normal', richtung: 'intern',
   frist_at: null, erteilt_at: '2026-06-11 09:00:00', in_arbeit_at: null, vollzugsmeldung: null,
-  abgenommen_at: null, abgenommen_von_id: null, etb_anordnung_id: 5, erstellt_von_id: 1,
+  abgenommen_at: null, abgenommen_von_id: null, etb_anordnung_id: 5, quell_etb_eintrag_id: null, erstellt_von_id: 1,
   erstellt_at: '2026-06-11 09:00:00', vollzug_status: 'offen', vollzogen_at: null, vollzogen_von_id: null,
   empfaenger_anzahl: 1, quittiert_anzahl: 0, ist_ueberfaellig: false, bearbeitungsstatus: 'offen',
   empfaenger: [],
+  ...over,
+});
+
+const meldung = (over: Partial<Meldung> = {}): Meldung => ({
+  id: Math.floor(Math.random() * 1e9), einsatz_id: 1, lfd_nr: 1, absender: 'Trupp 1',
+  empfaenger: null, meldeweg: 'funk', inhalt: 'Deich instabil', meldungsart: 'lagemeldung',
+  prioritaet: 'normal', richtung: 'intern', status: 'neu', bearbeiter_id: null,
+  bearbeiter_name: null, lagerelevant: false, ereigniszeit: '2026-06-11 09:00:00',
+  eingang_at: '2026-06-11 09:00:00', etb_meldung_id: null, auftrag_id: null, erfasst_von_id: 1,
+  erstellt_at: '2026-06-11 09:00:00', lage_meldung_id: null, ist_offen: true, erledigt_at: null,
+  bestaetigung_pflicht: false, bestaetigung_frist_at: null, eskaliert: false, bestaetigt_at: null,
+  bestaetigt_von_id: null, bestaetigt_von_name: null, ist_bestaetigt: false, ist_ueberfaellig: false,
   ...over,
 });
 
@@ -50,6 +62,7 @@ interface Daten {
   gefahren?: unknown[]; zonen?: unknown[]; lageberichte?: unknown[];
   einheiten?: unknown[]; personal?: unknown[]; fahrzeuge?: unknown[];
   material?: unknown[]; abschnitte?: unknown[]; auftraege?: unknown[];
+  meldungen?: unknown[];
   gefahrenStatus?: number;
 }
 
@@ -71,6 +84,7 @@ function mockEndpunkte(d: Daten) {
     http.get('/api/einsaetze/1/material', () => json(d.material)),
     http.get('/api/einsaetze/1/abschnitte', () => json(d.abschnitte)),
     http.get('/api/einsaetze/1/auftraege', () => json(d.auftraege)),
+    http.get('/api/einsaetze/1/meldungen', () => json(d.meldungen)),
   );
 }
 
@@ -126,6 +140,24 @@ describe('LageDashboardPage', () => {
     expect(await screen.findByText('1 überfällig')).toBeInTheDocument();
     // offen = bearbeitungsstatus ∉ {vollzogen, abgenommen} → 2
     expect(screen.getByText('Offen / in Arbeit').closest('.ant-statistic')).toHaveTextContent('2');
+  });
+
+  it('Meldungen-Kachel: zählt offene/neue und zeigt das Überfällig-Tag', async () => {
+    mockEndpunkte({
+      meldungen: [
+        meldung({ status: 'neu', ist_offen: true }),
+        meldung({ status: 'gesichtet', ist_offen: true, ist_ueberfaellig: true }),
+        meldung({ status: 'in_bearbeitung', ist_offen: true }),
+        meldung({ status: 'erledigt', ist_offen: false }),
+      ],
+    });
+    render();
+    // Überfällig-Tag als Lade-Anker (rendert erst nach dem Meldungs-Fetch).
+    expect(await screen.findByText('1 überfällig')).toBeInTheDocument();
+    // offen = ist_offen → 3
+    expect(screen.getByText('Offen').closest('.ant-statistic')).toHaveTextContent('3');
+    // neu = status === 'neu' → 1
+    expect(screen.getByText('Neu').closest('.ant-statistic')).toHaveTextContent('1');
   });
 
   it('Fehler-Resilienz: Gefahrenmatrix-Fehler → nur diese Kachel zeigt „—", Rest steht', async () => {

@@ -248,6 +248,13 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     // POST lagerelevant → 403.
     let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/meldungen/{mid}/lagerelevant"), &erika_c, Some("{}")).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
+
+    // POST auftrag (Meldung→Auftrag, LFH-113) → 403 (gültiger Auftrags-Body, damit der Guard greift).
+    let (status, _) = anfrage(
+        &app, "POST", &format!("/api/einsaetze/{e}/meldungen/{mid}/auftrag"), &erika_c,
+        Some(r#"{"auftrag_text":"X","empfaenger":[{"empfaenger_typ":"funktion","funktion_text":"S3"}]}"#),
+    ).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
 }
 
 #[tokio::test]
@@ -298,6 +305,58 @@ async fn cross_einsatz_lagerelevant_ist_404() {
     let (_, m) = anfrage(&app, "POST", &format!("/api/einsaetze/{a_einsatz}/meldungen"), &admin, Some(&body_funk())).await;
     let mid_a = m["id"].as_i64().unwrap();
     let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{b_einsatz}/meldungen/{mid_a}/lagerelevant"), &admin, Some("{}")).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+/// Auftrags-Body mit einem Funktions-Empfänger (minimal valide für POST .../auftrag).
+fn auftrag_body(text: &str) -> String {
+    format!(
+        r#"{{"auftrag_text":"{text}","empfaenger":[{{"empfaenger_typ":"funktion","funktion_text":"S3"}}]}}"#,
+    )
+}
+
+#[tokio::test]
+async fn meldung_auftrag_erteilen_setzt_rueckverweis_und_doppelt_ist_409() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (_, m) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/meldungen"), &admin, Some(&body_funk())).await;
+    let mid = m["id"].as_i64().unwrap();
+
+    // Erteilen → 201, Rückverweis meldung.auftrag_id gesetzt.
+    let (status, json) = anfrage(
+        &app, "POST", &format!("/api/einsaetze/{e}/meldungen/{mid}/auftrag"), &admin, Some(&auftrag_body("Tank fordern")),
+    ).await;
+    assert_eq!(status, StatusCode::CREATED);
+    let auftrag_id = json["auftrag_id"].as_i64();
+    assert!(auftrag_id.is_some(), "Antwort trägt den ausgelösten Auftrag (auftrag_id) zurück");
+
+    // Der Auftrag liegt im Auftrag-Modul des Einsatzes.
+    let (status, liste) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/auftraege"), &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(liste.as_array().unwrap().len(), 1);
+
+    // Doppelte Erteilung → 409 (first-write-wins).
+    let (status, _) = anfrage(
+        &app, "POST", &format!("/api/einsaetze/{e}/meldungen/{mid}/auftrag"), &admin, Some(&auftrag_body("zweiter")),
+    ).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    // Kein zweiter Auftrag entstanden (transaktional, kein Orphan).
+    let (_, liste) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/auftraege"), &admin, None).await;
+    assert_eq!(liste.as_array().unwrap().len(), 1, "abgewiesene Doppel-Erteilung legt keinen zweiten Auftrag an");
+}
+
+#[tokio::test]
+async fn cross_einsatz_auftrag_erteilen_ist_404() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let a_einsatz = einsatz_anlegen(&app, &admin).await;
+    let b_einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, m) = anfrage(&app, "POST", &format!("/api/einsaetze/{a_einsatz}/meldungen"), &admin, Some(&body_funk())).await;
+    let mid_a = m["id"].as_i64().unwrap();
+    let (status, _) = anfrage(
+        &app, "POST", &format!("/api/einsaetze/{b_einsatz}/meldungen/{mid_a}/auftrag"), &admin, Some(&auftrag_body("X")),
+    ).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 

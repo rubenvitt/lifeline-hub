@@ -1,5 +1,5 @@
 import { App, Button, Card, DatePicker, Form, Input, Select } from 'antd';
-import { useState } from 'react';
+import { useEffect } from 'react';
 import dayjs from 'dayjs';
 import type { AdressatKategorie, AuftragPrioritaet, NeuerAuftrag, NeuerEmpfaenger, Richtung } from '../api/types';
 
@@ -15,6 +15,26 @@ const { TextArea } = Input;
 export interface ZielOption {
   id: number;
   name: string;
+}
+
+/** Werte des Formulars (lokale Picker-Zeiten, vor der UTC-Wandlung). */
+interface FormWerte {
+  ziele: string[];
+  funktionText: string;
+  externKategorie: AdressatKategorie;
+  externBezeichnung: string;
+  text: string;
+  absicht: string;
+  lage: string;
+  ort: string;
+  zeit: string;
+  mittel: string;
+  verbindung: string;
+  sicherheit: string;
+  prioritaet: AuftragPrioritaet;
+  richtung: Richtung;
+  frist: dayjs.Dayjs | null;
+  erteiltAm: dayjs.Dayjs | null;
 }
 
 /** Lokale Picker-Zeit → UTC-Wireformat 'YYYY-MM-DD HH:mm:ss'. */
@@ -46,132 +66,132 @@ export default function AuftragFormular({ senden, abschnitte, einheiten, onAnleg
   initialText?: string;
 }) {
   const { message } = App.useApp();
-  const [text, setText] = useState(initialText ?? '');
-  const [absicht, setAbsicht] = useState('');
-  const [lage, setLage] = useState('');
-  const [ort, setOrt] = useState('');
-  const [zeit, setZeit] = useState('');
-  const [mittel, setMittel] = useState('');
-  const [verbindung, setVerbindung] = useState('');
-  const [sicherheit, setSicherheit] = useState('');
-  const [prioritaet, setPrioritaet] = useState<AuftragPrioritaet>('normal');
-  const [richtung, setRichtung] = useState<Richtung>('intern');
-  const [frist, setFrist] = useState<dayjs.Dayjs | null>(null);
-  const [erteiltAm, setErteiltAm] = useState<dayjs.Dayjs | null>(null);
-  const [ziele, setZiele] = useState<string[]>([]);
-  const [funktionText, setFunktionText] = useState('');
-  const [externKategorie, setExternKategorie] = useState<AdressatKategorie>('leitstelle');
-  const [externBezeichnung, setExternBezeichnung] = useState('');
+  const [form] = Form.useForm<FormWerte>();
+  // Richtung steuert die Sichtbarkeit der externen Adressat-Felder.
+  const richtung = Form.useWatch('richtung', form);
+
+  // initialText kann verzögert eintreffen (z. B. Heraufstufung) → ins Feld spiegeln.
+  useEffect(() => {
+    if (initialText) form.setFieldValue('text', initialText);
+  }, [initialText, form]);
+
+  const onFinish = (w: FormWerte) => {
+    const empfaenger = baueEmpfaenger(w.ziele ?? [], w.funktionText ?? '');
+    // Externer Adressat (LFH-87): bei Richtung extern als Empfänger-Zeile ergänzen.
+    if (w.richtung === 'extern' && (w.externBezeichnung ?? '').trim()) {
+      empfaenger.push({
+        empfaenger_typ: 'extern',
+        extern_kategorie: w.externKategorie,
+        extern_bezeichnung: w.externBezeichnung.trim(),
+      });
+    }
+    if (empfaenger.length === 0) { message.error('Mindestens ein Empfänger ist erforderlich'); return; }
+    onAnlegen({
+      auftrag_text: w.text.trim(),
+      absicht: w.absicht?.trim() || undefined,
+      lage: w.lage?.trim() || undefined,
+      ort: w.ort?.trim() || undefined,
+      zeit: w.zeit?.trim() || undefined,
+      mittel: w.mittel?.trim() || undefined,
+      verbindung: w.verbindung?.trim() || undefined,
+      sicherheit: w.sicherheit?.trim() || undefined,
+      prioritaet: w.prioritaet,
+      richtung: w.richtung,
+      frist_at: dayjsZuWire(w.frist ?? null),
+      erteilt_at: dayjsZuWire(w.erteiltAm ?? null),
+      empfaenger,
+    });
+    form.resetFields();
+  };
 
   const zielOptionen = [
     { label: 'Einsatzabschnitte', options: abschnitte.map((a) => ({ value: `abschnitt:${a.id}`, label: a.name })) },
     { label: 'Einheiten', options: einheiten.map((e) => ({ value: `einheit:${e.id}`, label: e.name })) },
   ];
 
-  const absenden = () => {
-    if (!text.trim()) { message.error('Auftragstext ist erforderlich'); return; }
-    const empfaenger = baueEmpfaenger(ziele, funktionText);
-    // Externer Adressat (LFH-87): bei Richtung extern als Empfänger-Zeile ergänzen.
-    if (richtung === 'extern' && externBezeichnung.trim()) {
-      empfaenger.push({
-        empfaenger_typ: 'extern',
-        extern_kategorie: externKategorie,
-        extern_bezeichnung: externBezeichnung.trim(),
-      });
-    }
-    if (empfaenger.length === 0) { message.error('Mindestens ein Empfänger ist erforderlich'); return; }
-    onAnlegen({
-      auftrag_text: text.trim(),
-      absicht: absicht.trim() || undefined,
-      lage: lage.trim() || undefined,
-      ort: ort.trim() || undefined,
-      zeit: zeit.trim() || undefined,
-      mittel: mittel.trim() || undefined,
-      verbindung: verbindung.trim() || undefined,
-      sicherheit: sicherheit.trim() || undefined,
-      prioritaet,
-      richtung,
-      frist_at: dayjsZuWire(frist),
-      erteilt_at: dayjsZuWire(erteiltAm),
-      empfaenger,
-    });
-    setText(''); setAbsicht(''); setLage(''); setOrt(''); setZeit(''); setMittel('');
-    setVerbindung(''); setSicherheit(''); setPrioritaet('normal'); setRichtung('intern');
-    setFrist(null); setErteiltAm(null); setZiele([]); setFunktionText('');
-    setExternKategorie('leitstelle'); setExternBezeichnung('');
-  };
-
   return (
     <Card size="small" title="Neuer Auftrag/Befehl">
-      <Form layout="vertical" onFinish={absenden}>
-        <Form.Item label="Empfänger – Abschnitte / Einheiten">
+      <Form<FormWerte>
+        form={form}
+        layout="vertical"
+        onFinish={onFinish}
+        initialValues={{
+          ziele: [], funktionText: '', externKategorie: 'leitstelle', externBezeichnung: '',
+          text: initialText ?? '', absicht: '', lage: '', ort: '', zeit: '', mittel: '',
+          verbindung: '', sicherheit: '', prioritaet: 'normal', richtung: 'intern',
+          frist: null, erteiltAm: dayjs(),
+        }}
+      >
+        <Form.Item name="ziele" label="Empfänger – Abschnitte / Einheiten">
           <Select
             mode="multiple"
-            value={ziele}
-            onChange={setZiele}
             options={zielOptionen}
             placeholder="Abschnitte / Einheiten wählen"
             optionFilterProp="label"
             allowClear
           />
         </Form.Item>
-        <Form.Item label="Weitere Empfänger (Funktion, kommagetrennt)">
-          <Input value={funktionText} onChange={(e) => setFunktionText(e.target.value)} placeholder="z. B. S3, Fachberater" />
+        <Form.Item name="funktionText" label="Weitere Empfänger (Funktion, kommagetrennt)">
+          <Input placeholder="z. B. S3, Fachberater" />
         </Form.Item>
         {richtung === 'extern' && (
           <div style={{ display: 'flex', gap: 8 }}>
-            <Form.Item label="Externe Stelle" style={{ flex: 1 }}>
-              <Select<AdressatKategorie> aria-label="Externe Stelle" value={externKategorie} onChange={setExternKategorie} options={EXTERN_OPTIONEN} />
+            <Form.Item name="externKategorie" label="Externe Stelle" style={{ flex: 1 }}>
+              <Select<AdressatKategorie> aria-label="Externe Stelle" options={EXTERN_OPTIONEN} />
             </Form.Item>
-            <Form.Item label="Bezeichnung der Stelle" style={{ flex: 1 }}>
-              <Input aria-label="Externe Bezeichnung" value={externBezeichnung} onChange={(e) => setExternBezeichnung(e.target.value)} placeholder="z. B. Leitstelle Nord" />
+            <Form.Item name="externBezeichnung" label="Bezeichnung der Stelle" style={{ flex: 1 }}>
+              <Input aria-label="Externe Bezeichnung" placeholder="z. B. Leitstelle Nord" />
             </Form.Item>
           </div>
         )}
-        <Form.Item label="Auftrag / Was" required>
-          <TextArea aria-label="Auftrag / Was" value={text} onChange={(e) => setText(e.target.value)} rows={2} />
+        <Form.Item
+          name="text"
+          label="Auftrag / Was"
+          rules={[{ required: true, message: 'Auftragstext ist erforderlich' }]}
+        >
+          <TextArea aria-label="Auftrag / Was" rows={2} />
         </Form.Item>
-        <Form.Item label="Absicht / Ziel">
-          <TextArea value={absicht} onChange={(e) => setAbsicht(e.target.value)} rows={1} />
+        <Form.Item name="absicht" label="Absicht / Ziel">
+          <TextArea rows={1} />
         </Form.Item>
-        <Form.Item label="Lage">
-          <TextArea value={lage} onChange={(e) => setLage(e.target.value)} rows={1} />
+        <Form.Item name="lage" label="Lage">
+          <TextArea rows={1} />
         </Form.Item>
-        <Form.Item label="Ort / Wo">
-          <Input value={ort} onChange={(e) => setOrt(e.target.value)} />
+        <Form.Item name="ort" label="Ort / Wo">
+          <Input />
         </Form.Item>
-        <Form.Item label="Zeit / Wann">
-          <Input value={zeit} onChange={(e) => setZeit(e.target.value)} placeholder="z. B. sofort, bis 14:00, nach Eintreffen" />
+        <Form.Item name="zeit" label="Zeit / Wann">
+          <Input placeholder="z. B. sofort, bis 14:00, nach Eintreffen" />
         </Form.Item>
-        <Form.Item label="Mittel / Womit">
-          <Input value={mittel} onChange={(e) => setMittel(e.target.value)} />
+        <Form.Item name="mittel" label="Mittel / Womit">
+          <Input />
         </Form.Item>
-        <Form.Item label="Verbindung / Meldewege">
-          <Input value={verbindung} onChange={(e) => setVerbindung(e.target.value)} />
+        <Form.Item name="verbindung" label="Verbindung / Meldewege">
+          <Input />
         </Form.Item>
-        <Form.Item label="Sicherheit / Besonderes">
-          <Input value={sicherheit} onChange={(e) => setSicherheit(e.target.value)} />
+        <Form.Item name="sicherheit" label="Sicherheit / Besonderes">
+          <Input />
         </Form.Item>
         <div style={{ display: 'flex', gap: 8 }}>
-          <Form.Item label="Priorität" style={{ flex: 1 }}>
-            <Select<AuftragPrioritaet> value={prioritaet} onChange={setPrioritaet} options={[
+          <Form.Item name="prioritaet" label="Priorität" style={{ flex: 1 }}>
+            <Select<AuftragPrioritaet> options={[
               { value: 'sofort', label: 'Sofort' },
               { value: 'dringend', label: 'Dringend' },
               { value: 'normal', label: 'Normal' },
             ]} />
           </Form.Item>
-          <Form.Item label="Richtung" style={{ flex: 1 }}>
-            <Select<Richtung> aria-label="Richtung" value={richtung} onChange={setRichtung} options={[
+          <Form.Item name="richtung" label="Richtung" style={{ flex: 1 }}>
+            <Select<Richtung> aria-label="Richtung" options={[
               { value: 'intern', label: 'Intern' },
               { value: 'extern', label: 'Extern' },
             ]} />
           </Form.Item>
-          <Form.Item label="Frist (Quittung/Vollzug)" style={{ flex: 1 }}>
-            <DatePicker showTime value={frist} onChange={setFrist} style={{ width: '100%' }} format="YYYY-MM-DD HH:mm" />
+          <Form.Item name="frist" label="Frist (Quittung/Vollzug)" style={{ flex: 1 }}>
+            <DatePicker showTime style={{ width: '100%' }} format="YYYY-MM-DD HH:mm" />
           </Form.Item>
         </div>
-        <Form.Item label="Erteilt am (mündlich/per Funk – optional)">
-          <DatePicker showTime value={erteiltAm} onChange={setErteiltAm} style={{ width: '100%' }} format="YYYY-MM-DD HH:mm" />
+        <Form.Item name="erteiltAm" label="Erteilt am (mündlich/per Funk – optional)">
+          <DatePicker showTime style={{ width: '100%' }} format="YYYY-MM-DD HH:mm" />
         </Form.Item>
         <Button type="primary" htmlType="submit" loading={senden} block>Auftrag erteilen</Button>
       </Form>

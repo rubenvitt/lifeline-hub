@@ -7,10 +7,21 @@ import { ApiError } from '../api/client';
 import { legeAuftragAn, listeAuftraege, nimmAb, quittiereEmpfaenger, setzeVollzug } from '../api/auftraege';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
-import type { NeuerAuftrag } from '../api/types';
+import type { Auftrag, NeuerAuftrag } from '../api/types';
+import {
+  AUFTRAG_STATUS, GRUPPE_LABEL, GRUPPE_ORDNUNG, faelligGruppe, istAbgeschlossen, prioRang,
+  type FaelligGruppe,
+} from '../kommunikation';
 import AuftragListe from '../auftraege/AuftragListe';
 import AuftragFormular from '../auftraege/AuftragFormular';
 import VollzugMeldenModal from '../auftraege/VollzugMeldenModal';
+
+/** Offene Aufträge: nach Prio (sofort→dringend→normal), dann Frist (früheste zuerst). */
+function vergleicheOffen(a: Auftrag, b: Auftrag): number {
+  const prio = prioRang(a.prioritaet) - prioRang(b.prioritaet);
+  if (prio !== 0) return prio;
+  return (a.frist_at ?? '￿').localeCompare(b.frist_at ?? '￿');
+}
 
 export default function AuftraegePage() {
   const { id } = useParams();
@@ -18,12 +29,12 @@ export default function AuftraegePage() {
   const { message } = App.useApp();
   const qc = useQueryClient();
 
-
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const abschnitteQuery = useQuery({ queryKey: ['einsatz-abschnitte', einsatzId], queryFn: () => listeAbschnitte(einsatzId) });
   const einheitenQuery = useQuery({ queryKey: ['einsatz-einheiten', einsatzId], queryFn: () => listeEinheiten(einsatzId) });
 
-  const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
+  // Offen/Abgeschlossen-Trennung erfolgt clientseitig (alle Aufträge laden).
+  const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
   const [richtungFilter, setRichtungFilter] = useState<string | undefined>(undefined);
   // Empfänger-Filter (LFH-92): kodiert als "abschnitt:<id>" bzw. "einheit:<id>".
   const [empfFilter, setEmpfFilter] = useState<string | undefined>(undefined);
@@ -32,8 +43,8 @@ export default function AuftraegePage() {
   const einheitId = empfTyp === 'einheit' ? Number(empfId) : undefined;
 
   const auftraegeQuery = useQuery({
-    queryKey: ['einsatz-auftraege', einsatzId, statusFilter ?? 'alle', richtungFilter ?? 'alle', empfFilter ?? 'alle'],
-    queryFn: () => listeAuftraege(einsatzId, { status: statusFilter, richtung: richtungFilter, abschnittId, einheitId }),
+    queryKey: ['einsatz-auftraege', einsatzId, richtungFilter ?? 'alle', empfFilter ?? 'alle'],
+    queryFn: () => listeAuftraege(einsatzId, { richtung: richtungFilter, abschnittId, einheitId }),
   });
 
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
@@ -73,7 +84,28 @@ export default function AuftraegePage() {
   const darfSchreiben =
     einsatz.status === 'aktiv' &&
     (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
-  const auftraege = auftraegeQuery.data ?? [];
+  const alleAuftraege = auftraegeQuery.data ?? [];
+
+  // Offen/Abgeschlossen clientseitig über die gemeinsame Phasen-Semantik trennen.
+  const offene = alleAuftraege.filter((a) => !istAbgeschlossen(AUFTRAG_STATUS[a.bearbeitungsstatus]?.phase ?? 'offen'));
+  const abgeschlossene = alleAuftraege.filter((a) => istAbgeschlossen(AUFTRAG_STATUS[a.bearbeitungsstatus]?.phase ?? 'offen'));
+
+  // Offen-Ansicht: nach Fälligkeit gruppieren, je Gruppe nach Prio dann Frist.
+  const offeneGruppen: { gruppe: FaelligGruppe; auftraege: Auftrag[] }[] = GRUPPE_ORDNUNG
+    .map((gruppe) => ({
+      gruppe,
+      auftraege: offene
+        .filter((a) => faelligGruppe(a.frist_at, a.ist_ueberfaellig) === gruppe)
+        .sort(vergleicheOffen),
+    }))
+    .filter(({ auftraege }) => auftraege.length > 0);
+
+  // Abgeschlossen-Ansicht: flach, neueste zuerst (nach abgenommen_at/vollzogen_at).
+  const abgeschlosseneSortiert = [...abgeschlossene].sort((a, b) => {
+    const ka = a.abgenommen_at ?? a.vollzogen_at ?? a.erstellt_at;
+    const kb = b.abgenommen_at ?? b.vollzogen_at ?? b.erstellt_at;
+    return kb.localeCompare(ka);
+  });
 
   const abschnitte = (abschnitteQuery.data ?? []).map((a) => ({ id: a.id, name: a.name }));
   const einheiten = (einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name }));
@@ -81,6 +113,15 @@ export default function AuftraegePage() {
     { label: 'Einsatzabschnitte', options: abschnitte.map((a) => ({ value: `abschnitt:${a.id}`, label: a.name })) },
     { label: 'Einheiten', options: einheiten.map((e) => ({ value: `einheit:${e.id}`, label: e.name })) },
   ];
+
+  const listenProps = {
+    einsatzId,
+    darfSchreiben,
+    onQuittieren: (auftragId: number, empfaengerId: number) => quittierenMutation.mutate({ auftragId, empfaengerId }),
+    onInArbeit: (auftragId: number) => vollzugMutation.mutate({ auftragId, status: 'in_arbeit' as const }),
+    onVollzugMelden: (auftragId: number) => setVollzugFuer(auftragId),
+    onAbnehmen: (auftragId: number) => abnahmeMutation.mutate(auftragId),
+  };
 
   return (
     <div>
@@ -100,14 +141,11 @@ export default function AuftraegePage() {
           )}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12, alignItems: 'center' }}>
             <Segmented
-              value={statusFilter ?? 'alle'}
-              onChange={(v) => setStatusFilter(v === 'alle' ? undefined : String(v))}
+              value={ansicht}
+              onChange={(v) => setAnsicht(v as 'offen' | 'abgeschlossen')}
               options={[
-                { value: 'alle', label: 'Alle' },
-                { value: 'offen', label: 'Offen' },
-                { value: 'in_arbeit', label: 'In Bearbeitung' },
-                { value: 'vollzogen', label: 'Vollzogen' },
-                { value: 'abgenommen', label: 'Abgenommen' },
+                { value: 'offen', label: `Offen (${offene.length})` },
+                { value: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossene.length})` },
               ]}
             />
             <Segmented
@@ -129,14 +167,22 @@ export default function AuftraegePage() {
               optionFilterProp="label"
             />
           </div>
-          <AuftragListe
-            auftraege={auftraege}
-            darfSchreiben={darfSchreiben}
-            onQuittieren={(auftragId, empfaengerId) => quittierenMutation.mutate({ auftragId, empfaengerId })}
-            onInArbeit={(auftragId) => vollzugMutation.mutate({ auftragId, status: 'in_arbeit' })}
-            onVollzugMelden={(auftragId) => setVollzugFuer(auftragId)}
-            onAbnehmen={(auftragId) => abnahmeMutation.mutate(auftragId)}
-          />
+          {ansicht === 'offen' ? (
+            offeneGruppen.length === 0 ? (
+              <AuftragListe auftraege={[]} ansicht="offen" {...listenProps} />
+            ) : (
+              offeneGruppen.map(({ gruppe, auftraege }) => (
+                <div key={gruppe} style={{ marginBottom: 16 }}>
+                  <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
+                    {GRUPPE_LABEL[gruppe]} ({auftraege.length})
+                  </Typography.Text>
+                  <AuftragListe auftraege={auftraege} ansicht="offen" {...listenProps} />
+                </div>
+              ))
+            )
+          ) : (
+            <AuftragListe auftraege={abgeschlosseneSortiert} ansicht="abgeschlossen" {...listenProps} />
+          )}
         </Col>
         {darfSchreiben && (
           <Col flex="360px">

@@ -64,6 +64,7 @@ const ANZEIGE_SELECT: &str =
     "SELECT a.id, a.einsatz_id, a.auftrag_text, a.absicht, a.lage, a.ort, a.zeit, a.mittel, \
             a.verbindung, a.sicherheit, a.prioritaet, a.richtung, a.frist_at, a.erteilt_at, a.in_arbeit_at, \
             a.vollzugsmeldung, a.abgenommen_at, a.abgenommen_von_id, a.etb_anordnung_id, \
+            a.quell_etb_eintrag_id, \
             a.erstellt_von_id, a.erstellt_at, \
             COALESCE(ks.vollzug_status, 'offen') AS vollzug_status, \
             ks.vollzogen_at AS vollzogen_at, ks.vollzogen_von_id AS vollzogen_von_id, \
@@ -305,6 +306,31 @@ pub async fn anlegen(
     let auftrag_id = anlegen_tx(&mut tx, einsatz_id, ersteller_id, &daten).await?;
     tx.commit().await?;
     laden(pool, auftrag_id, jetzt).await
+}
+
+/// Erteilt aus einem ETB-Eintrag einen Auftrag (ETB→Auftrag, LFH-112) — in EINEM Commit:
+/// legt den Auftrag inkl. seiner ETB-Anordnung an (`anlegen_tx`, Pattern B) und setzt am
+/// ERZEUGTEN Auftrag den Rückbezug `quell_etb_eintrag_id` auf den Quell-Eintrag. Anders als
+/// Meldung→Auftrag gibt es hier KEINEN first-write-wins-Guard: die Link-Spalte sitzt auf dem
+/// Auftrag, nicht auf der einwertigen Quelle — ein ETB-Eintrag darf mehrere Aufträge auslösen.
+/// `etb_anordnung_id` (vom Auftrag erzeugt) und `quell_etb_eintrag_id` (Quelle) sind verschieden.
+/// `daten` ist vom Handler validiert; `quell_etb_eintrag_id` muss zum Einsatz gehören (Guard).
+pub async fn erteile_aus_etb_tx(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    quell_etb_eintrag_id: i64,
+    erteiler_id: i64,
+    daten: AuftragDaten<'_>,
+) -> Result<i64, AppError> {
+    let mut tx = pool.begin().await?;
+    let auftrag_id = anlegen_tx(&mut tx, einsatz_id, erteiler_id, &daten).await?;
+    sqlx::query("UPDATE auftrag SET quell_etb_eintrag_id = ? WHERE id = ?")
+        .bind(quell_etb_eintrag_id)
+        .bind(auftrag_id)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(auftrag_id)
 }
 
 /// Ermittelt den Anzeigenamen einer Empfänger-Zeile (snap zum Erfassungszeitpunkt).
@@ -690,6 +716,57 @@ mod tests {
         assert_eq!(nur_extern.len(), 1);
         assert_eq!(nur_extern[0].auftrag.richtung, "extern");
         assert_eq!(nur_extern[0].auftrag.auftrag_text, "extern-a");
+    }
+
+    #[tokio::test]
+    async fn erteile_aus_etb_setzt_quell_und_anordnung_verschieden() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        // Quell-ETB-Eintrag, aus dem der Auftrag erteilt wird.
+        let quell_etb = crate::etb::repo::anlegen(
+            &pool, e, b,
+            crate::etb::repo::EintragDaten {
+                typ: crate::etb::TYP_MELDUNG,
+                inhalt: "Deich instabil — Auftrag nötig",
+                von: None, an: None, meldeweg: None, veranlassung: None,
+                ereigniszeit: None, erfasst_lokal_at: None, berichtigt_eintrag_id: None,
+            },
+        ).await.unwrap();
+
+        let auftrag_id = erteile_aus_etb_tx(
+            &pool, e, quell_etb.id, b, daten("Deich sichern", None, vec![funktion("EA1")]),
+        ).await.unwrap();
+
+        let detail = laden(&pool, auftrag_id, "2026-06-11 10:00:00").await.unwrap();
+        // Quell-Bezug auf den auslösenden Eintrag gesetzt.
+        assert_eq!(detail.auftrag.quell_etb_eintrag_id, Some(quell_etb.id));
+        // Eigene Anordnung im selben Commit erzeugt (Pattern B) …
+        assert!(detail.auftrag.etb_anordnung_id.is_some());
+        // … und VERSCHIEDEN vom Quell-Eintrag (getrennte Spalten, keine Heraufstufung der Quelle).
+        assert_ne!(detail.auftrag.etb_anordnung_id, detail.auftrag.quell_etb_eintrag_id);
+        assert_eq!(detail.auftrag.auftrag_text, "Deich sichern");
+    }
+
+    #[tokio::test]
+    async fn erteile_aus_etb_mehrfach_aus_einem_eintrag_erlaubt() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let quell_etb = crate::etb::repo::anlegen(
+            &pool, e, b,
+            crate::etb::repo::EintragDaten {
+                typ: crate::etb::TYP_MELDUNG, inhalt: "Lage", von: None, an: None,
+                meldeweg: None, veranlassung: None, ereigniszeit: None,
+                erfasst_lokal_at: None, berichtigt_eintrag_id: None,
+            },
+        ).await.unwrap();
+        // Anders als Meldung→Auftrag: ein ETB-Eintrag darf mehrere Aufträge auslösen (kein Conflict).
+        let a1 = erteile_aus_etb_tx(&pool, e, quell_etb.id, b, daten("erster", None, vec![funktion("EA1")])).await.unwrap();
+        let a2 = erteile_aus_etb_tx(&pool, e, quell_etb.id, b, daten("zweiter", None, vec![funktion("EA2")])).await.unwrap();
+        assert_ne!(a1, a2);
+        let d1 = laden(&pool, a1, "2026-06-11 10:00:00").await.unwrap();
+        let d2 = laden(&pool, a2, "2026-06-11 10:00:00").await.unwrap();
+        assert_eq!(d1.auftrag.quell_etb_eintrag_id, Some(quell_etb.id));
+        assert_eq!(d2.auftrag.quell_etb_eintrag_id, Some(quell_etb.id));
     }
 
     #[tokio::test]

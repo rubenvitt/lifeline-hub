@@ -156,6 +156,159 @@ async fn etb_abrufen(
     (status, json)
 }
 
+/// POST mit Cookie + JSON-Body; liefert (Status, JSON).
+async fn post_json(
+    app: &axum::Router,
+    cookie: &str,
+    uri: &str,
+    body: &str,
+) -> (StatusCode, Value) {
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(uri)
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, cookie.to_string())
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = resp.status();
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+}
+
+/// Weist `benutzer_id` die Rolle in `einsatz` zu (PUT mitglieder).
+async fn rolle_zuweisen(app: &axum::Router, admin: &str, einsatz: i64, benutzer_id: i64, rolle: &str) {
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/einsaetze/{einsatz}/mitglieder/{benutzer_id}"))
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, admin.to_string())
+                .body(Body::from(format!(r#"{{"einsatz_rolle":"{rolle}"}}"#)))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK, "Rollenzuweisung muss klappen");
+}
+
+/// Minimal valider Auftrags-Body (ein Funktions-Empfänger), wie in tests/meldung.rs.
+fn auftrag_body(text: &str) -> String {
+    format!(
+        r#"{{"auftrag_text":"{text}","empfaenger":[{{"empfaenger_typ":"funktion","funktion_text":"S3"}}]}}"#,
+    )
+}
+
+#[tokio::test]
+async fn etb_auftrag_beobachter_ist_403() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let (_, etb) =
+        eintrag_erfassen(&app, &admin, einsatz, r#"{"typ":"meldung","inhalt":"Lage"}"#).await;
+    let etb_id = etb["id"].as_i64().unwrap();
+
+    let beob_id = benutzer_anlegen(&app, &admin, "beobi", "keine").await;
+    rolle_zuweisen(&app, &admin, einsatz, beob_id, "beobachter").await;
+    let beob = login_cookie(&app, "beobi", "beobipw1").await;
+
+    let (status, _) = post_json(
+        &app, &beob,
+        &format!("/api/einsaetze/{einsatz}/etb/{etb_id}/auftrag"),
+        &auftrag_body("X"),
+    ).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "Beobachter darf keinen Auftrag erteilen");
+}
+
+#[tokio::test]
+async fn etb_auftrag_cross_einsatz_ist_404() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let a = einsatz_anlegen(&app, &admin, "Lage A").await;
+    let b = einsatz_anlegen(&app, &admin, "Lage B").await;
+    let (_, etb) = eintrag_erfassen(&app, &admin, a, r#"{"typ":"meldung","inhalt":"Lage"}"#).await;
+    let etb_id_a = etb["id"].as_i64().unwrap();
+
+    // Quell-Eintrag aus Einsatz A über Einsatz B ansprechen → 404.
+    let (status, _) = post_json(
+        &app, &admin,
+        &format!("/api/einsaetze/{b}/etb/{etb_id_a}/auftrag"),
+        &auftrag_body("X"),
+    ).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn etb_auftrag_happy_path_setzt_quellbezug() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let (_, etb) =
+        eintrag_erfassen(&app, &admin, einsatz, r#"{"typ":"meldung","inhalt":"Brand Halle 3"}"#).await;
+    let quell_id = etb["id"].as_i64().unwrap();
+
+    let (status, json) = post_json(
+        &app, &admin,
+        &format!("/api/einsaetze/{einsatz}/etb/{quell_id}/auftrag"),
+        &auftrag_body("Riegelstellung aufbauen"),
+    ).await;
+    assert_eq!(status, StatusCode::CREATED);
+    // AuftragDetail flacht AuftragAnzeige ein → Felder liegen top-level.
+    assert_eq!(json["quell_etb_eintrag_id"], quell_id, "Quellbezug zeigt auf den auslösenden Eintrag");
+    let etb_anordnung_id = json["etb_anordnung_id"].as_i64();
+    assert!(etb_anordnung_id.is_some(), "Auftrag erzeugt eine eigene ETB-Anordnung");
+    assert_ne!(
+        json["quell_etb_eintrag_id"].as_i64(), etb_anordnung_id,
+        "Quell-Eintrag und selbst erzeugte Anordnung sind verschiedene Einträge"
+    );
+}
+
+#[tokio::test]
+async fn etb_auftrag_mehrfach_aus_einem_eintrag_erlaubt() {
+    // Anders als Meldung→Auftrag (1:1, 409): aus einem ETB-Eintrag dürfen mehrere
+    // Aufträge erteilt werden — kein Rückverweis-Lock am Eintrag.
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+    let (_, etb) =
+        eintrag_erfassen(&app, &admin, einsatz, r#"{"typ":"meldung","inhalt":"Mehrere Aufträge"}"#).await;
+    let quell_id = etb["id"].as_i64().unwrap();
+    let uri = format!("/api/einsaetze/{einsatz}/etb/{quell_id}/auftrag");
+
+    let (s1, _) = post_json(&app, &admin, &uri, &auftrag_body("erster")).await;
+    assert_eq!(s1, StatusCode::CREATED);
+    let (s2, _) = post_json(&app, &admin, &uri, &auftrag_body("zweiter")).await;
+    assert_eq!(s2, StatusCode::CREATED, "zweite Erteilung aus demselben Eintrag → erneut 201");
+
+    let (_, liste) = get_auftraege(&app, &admin, einsatz).await;
+    assert_eq!(liste.as_array().unwrap().len(), 2, "beide Aufträge liegen im Auftrag-Modul");
+}
+
+/// Liest die Auftragsliste des Einsatzes (GET, kein Body).
+async fn get_auftraege(app: &axum::Router, cookie: &str, einsatz: i64) -> (StatusCode, Value) {
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/einsaetze/{einsatz}/auftraege"))
+                .header(header::COOKIE, cookie.to_string())
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = resp.status();
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+}
+
 #[tokio::test]
 async fn einsatzleitung_erfasst_eintrag() {
     let (app, _live) = setup().await;

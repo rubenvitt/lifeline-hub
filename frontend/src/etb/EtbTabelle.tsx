@@ -8,9 +8,13 @@ interface Props {
   eintraege: EtbEintragAnzeige[];
   /** Wenn gesetzt, erscheint je Eintrag eine „Berichtigen"-Aktion. */
   onBerichtigen?: (eintrag: EtbEintragAnzeige) => void;
+  /** Wenn gesetzt, erscheint je Eintrag eine „Wiedervorlage"-Aktion (ETB→Erinnerung, LFH-106). */
+  onWiedervorlage?: (eintrag: EtbEintragAnzeige) => void;
+  /** Wenn gesetzt, erscheint je Eintrag eine „Auftrag erteilen"-Aktion (ETB→Auftrag, LFH-112). */
+  onAuftragErteilen?: (eintrag: EtbEintragAnzeige) => void;
 }
 
-export default function EtbTabelle({ eintraege, onBerichtigen }: Props) {
+export default function EtbTabelle({ eintraege, onBerichtigen, onWiedervorlage, onAuftragErteilen }: Props) {
   // Map id → lfd_nr, um Berichtigungs-Ziele auf ihre laufende Nummer aufzulösen.
   const lfdNrVonId = new Map(eintraege.map((e) => [e.id, e.lfd_nr]));
 
@@ -77,17 +81,30 @@ export default function EtbTabelle({ eintraege, onBerichtigen }: Props) {
     { title: 'Erfasser', dataIndex: 'erfasser_name', width: 120 },
   ];
 
-  if (onBerichtigen) {
+  if (onBerichtigen || onWiedervorlage || onAuftragErteilen) {
     spalten.push({
       title: '',
       key: 'aktion',
-      width: 110,
-      render: (_, e) =>
-        e.typ === 'berichtigung' ? null : (
-          <Button type="link" size="small" onClick={() => onBerichtigen(e)}>
-            Berichtigen
-          </Button>
-        ),
+      width: 230,
+      render: (_, e) => (
+        <Space size={4} wrap>
+          {onBerichtigen && e.typ !== 'berichtigung' && (
+            <Button type="link" size="small" onClick={() => onBerichtigen(e)}>
+              Berichtigen
+            </Button>
+          )}
+          {onWiedervorlage && (
+            <Button type="link" size="small" onClick={() => onWiedervorlage(e)}>
+              Wiedervorlage
+            </Button>
+          )}
+          {onAuftragErteilen && (
+            <Button type="link" size="small" onClick={() => onAuftragErteilen(e)}>
+              Auftrag erteilen
+            </Button>
+          )}
+        </Space>
+      ),
     });
   }
 

@@ -17,6 +17,7 @@ export interface LayerSichtbar {
   fuehrung: boolean;
   abschnitt: boolean;
   zone: boolean;
+  lagemeldung: boolean;
 }
 
 /** Platzierbare Punkt-Typen (Fläche/Abschnitt läuft über onAbschnittZeichnenStart). */
@@ -236,6 +237,9 @@ export default function Sidebar(props: SidebarProps) {
           </Space>
           <Space>
             <Switch checked={props.layer.zone} onChange={(v) => props.onLayerToggle('zone', v)} /> Zonen
+          </Space>
+          <Space>
+            <Switch checked={props.layer.lagemeldung} onChange={(v) => props.onLayerToggle('lagemeldung', v)} /> Lagemeldungen
           </Space>
         </Space>
       </Card>

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import ErinnerungListe from './ErinnerungListe';
 import type { Erinnerung } from '../api/types';
 
@@ -16,38 +17,64 @@ function erinnerung(over: Partial<Erinnerung>): Erinnerung {
   };
 }
 
+function renderListe(ui: React.ReactElement) {
+  return render(
+    <MemoryRouter initialEntries={['/einsaetze/1/erinnerungen']}>
+      <Routes><Route path="/einsaetze/:id/erinnerungen" element={ui} /></Routes>
+    </MemoryRouter>,
+  );
+}
+
 describe('ErinnerungListe', () => {
   it('zeigt Titel und markiert fällige Erinnerungen', () => {
-    render(<ErinnerungListe erinnerungen={[erinnerung({ ist_faellig: true })]} darfSchreiben onErledigen={() => {}} onQuittieren={() => {}} />);
+    renderListe(<ErinnerungListe erinnerungen={[erinnerung({ ist_faellig: true })]} darfSchreiben onErledigen={() => {}} onQuittieren={() => {}} />);
     expect(screen.getByText('Lagemeldung')).toBeInTheDocument();
     expect(screen.getByText(/^fällig$/i)).toBeInTheDocument();
   });
 
-  it('löst onErledigen mit der ID aus', () => {
+  it('löst onErledigen nach Popconfirm-Bestätigung mit der ID aus', async () => {
     const onErledigen = vi.fn();
-    render(<ErinnerungListe erinnerungen={[erinnerung({})]} darfSchreiben onErledigen={onErledigen} onQuittieren={() => {}} />);
+    renderListe(<ErinnerungListe erinnerungen={[erinnerung({})]} darfSchreiben onErledigen={onErledigen} onQuittieren={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: /erledigt/i }));
+    // Popconfirm öffnet ein Bestätigungs-Popover mit eigenem „Erledigt"-OK-Button.
+    const popconfirm = await screen.findByRole('tooltip');
+    fireEvent.click(within(popconfirm).getByRole('button', { name: /erledigt/i }));
     expect(onErledigen).toHaveBeenCalledWith(1);
   });
 
   it('blendet Aktionen ohne Schreibrecht aus', () => {
-    render(<ErinnerungListe erinnerungen={[erinnerung({})]} darfSchreiben={false} onErledigen={() => {}} onQuittieren={() => {}} />);
+    renderListe(<ErinnerungListe erinnerungen={[erinnerung({})]} darfSchreiben={false} onErledigen={() => {}} onQuittieren={() => {}} />);
     expect(screen.queryByRole('button', { name: /erledigt/i })).not.toBeInTheDocument();
   });
 
   it('zeigt Vollzogen-Tag wenn vollzug_status vollzogen ist', () => {
-    render(<ErinnerungListe
+    renderListe(<ErinnerungListe
       erinnerungen={[erinnerung({ vollzug_status: 'vollzogen', vollzogen_at: '2026-06-11 11:00:00' })]}
       darfSchreiben onErledigen={() => {}} onQuittieren={() => {}}
     />);
     expect(screen.getByText('Vollzogen')).toBeInTheDocument();
   });
 
-  it('zeigt Quittiert-Tag wenn quittiert_at gesetzt ist', () => {
-    render(<ErinnerungListe
-      erinnerungen={[erinnerung({ quittiert_at: '2026-06-11 10:30:00' })]}
+  it('unterscheidet Erledigt und Quittiert in der Abgeschlossen-Ansicht via Status-Badge', () => {
+    renderListe(<ErinnerungListe
+      ansicht="abgeschlossen"
+      erinnerungen={[
+        erinnerung({ id: 2, titel: 'Erledigte', status: 'erledigt', erledigt_at: '2026-06-11 12:00:00' }),
+        erinnerung({ id: 3, titel: 'Quittierte', status: 'quittiert', quittiert_at: '2026-06-11 10:30:00' }),
+      ]}
       darfSchreiben onErledigen={() => {}} onQuittieren={() => {}}
     />);
-    expect(screen.getByText('Quittiert')).toBeInTheDocument();
+    // Status-Badge zeigt das jeweilige Fachlabel.
+    expect(screen.getByText('Erledigt')).toBeInTheDocument();
+    expect(screen.getAllByText(/Quittiert/).length).toBeGreaterThan(0);
+  });
+
+  it('zeigt einen Deeplink zum Bezugsobjekt (Auftrag)', () => {
+    renderListe(<ErinnerungListe
+      erinnerungen={[erinnerung({ bezug_typ: 'auftrag', bezug_id: 42 })]}
+      darfSchreiben onErledigen={() => {}} onQuittieren={() => {}}
+    />);
+    const link = screen.getByRole('link', { name: /Auftrag #42/ });
+    expect(link).toHaveAttribute('href', '/einsaetze/1/auftraege');
   });
 });
