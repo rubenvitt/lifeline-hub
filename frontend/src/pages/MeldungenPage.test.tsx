@@ -181,6 +181,15 @@ describe('MeldungenPage', () => {
     await waitFor(() => expect(bestaetigeMeldung).toHaveBeenCalledWith(1, 1));
   });
 
+  it('zeigt eskalierte (auch ohne ist_ueberfaellig) Sofortmeldung als (eskaliert)', async () => {
+    listeMeldungen.mockResolvedValue([
+      meldung({ bestaetigung_pflicht: true, ist_bestaetigt: false, ist_ueberfaellig: false, eskaliert: true, prioritaet: 'sofort' }),
+    ]);
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    expect(screen.getByText(/Bestätigung überfällig \(eskaliert\)/)).toBeInTheDocument();
+  });
+
   it('zeigt bestätigte Sofortmeldung ohne Bestätigen-Aktion', async () => {
     listeMeldungen.mockResolvedValue([
       meldung({ bestaetigung_pflicht: true, ist_bestaetigt: true, bestaetigt_at: '2026-06-12 09:06:00', bestaetigt_von_name: 'Leit' }),

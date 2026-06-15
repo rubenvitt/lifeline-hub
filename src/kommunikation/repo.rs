@@ -19,6 +19,27 @@ pub async fn quittiere(
     Ok(())
 }
 
+/// Wie [`quittiere`], aber **einmalig**: schreibt die Quittung nur, wenn noch keine
+/// existiert (Guard `quittiert_at IS NULL` im DO-UPDATE). Liefert `true`, wenn DIESER Aufruf
+/// quittiert hat — sonst `false` (bereits quittiert). Macht „Doppel-Bestätigung → 422" atomar,
+/// ohne TOCTOU (Muster wie setze_eskaliert). Die geteilte `quittiere` bleibt last-writer-wins.
+pub async fn quittiere_einmalig(
+    pool: &SqlitePool, org_id: i64, einsatz_id: i64,
+    objekt_typ: &str, objekt_id: i64, von_id: i64, jetzt: &str,
+) -> Result<bool, AppError> {
+    let r = sqlx::query(
+        "INSERT INTO kommunikation_status \
+           (org_id, einsatz_id, objekt_typ, objekt_id, quittiert_at, quittiert_von_id) \
+         VALUES (?, ?, ?, ?, ?, ?) \
+         ON CONFLICT(objekt_typ, objekt_id) DO UPDATE SET \
+           quittiert_at = excluded.quittiert_at, quittiert_von_id = excluded.quittiert_von_id \
+         WHERE kommunikation_status.quittiert_at IS NULL",
+    )
+    .bind(org_id).bind(einsatz_id).bind(objekt_typ).bind(objekt_id).bind(jetzt).bind(von_id)
+    .execute(pool).await?;
+    Ok(r.rows_affected() > 0)
+}
+
 /// Setzt die Vollzugs-Achse (UPSERT je Objekt). Quittung bleibt unberührt.
 /// `vollzogen_at`/`_von` nur bei Zielstatus `vollzogen` gesetzt.
 #[allow(clippy::too_many_arguments)]

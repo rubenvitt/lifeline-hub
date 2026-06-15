@@ -253,10 +253,10 @@ pub async fn bestaetigen(
 ) -> Result<Json<MeldungAnzeige>, AppError> {
     let org_id = fordere_bearbeitbar(&state, &benutzer, einsatz_id, meldung_id).await?;
     let now = jetzt();
-    if repo::laden(&state.pool, meldung_id, &now).await?.ist_bestaetigt {
+    // Atomar einmalig (kein read-then-write/TOCTOU): nur die Erst-Bestätigung gewinnt.
+    if !repo::bestaetige(&state.pool, org_id, einsatz_id, meldung_id, benutzer.id, &now).await? {
         return Err(AppError::UnprocessableEntity("Meldung ist bereits bestätigt".into()));
     }
-    repo::bestaetige(&state.pool, org_id, einsatz_id, meldung_id, benutzer.id, &now).await?;
     let m = repo::laden(&state.pool, meldung_id, &now).await?;
     sse(&state, einsatz_id);
     Ok(Json(m))

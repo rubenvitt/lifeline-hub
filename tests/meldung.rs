@@ -1,8 +1,14 @@
 use axum::http::StatusCode;
+use chrono::{Duration, NaiveDateTime};
 use lifeline_hub::app::{build_router, AppState};
 use lifeline_hub::live::LiveHub;
 use serde_json::Value;
 use tower::ServiceExt;
+
+/// Parst einen DB-Zeitstempel aus einer JSON-Antwort.
+fn zeit(v: &Value) -> NaiveDateTime {
+    NaiveDateTime::parse_from_str(v.as_str().unwrap(), "%Y-%m-%d %H:%M:%S").unwrap()
+}
 
 async fn setup() -> axum::Router {
     let pool = lifeline_hub::db::test_pool().await;
@@ -554,4 +560,62 @@ async fn cross_einsatz_bestaetigen_ist_404() {
     let mid_a = m["id"].as_i64().unwrap();
     let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{b}/meldungen/{mid_a}/bestaetigen"), &admin, None).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn sofort_frist_default_ist_fuenf_minuten() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (status, m) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/meldungen"), &admin, Some(&sofort_body())).await;
+    assert_eq!(status, StatusCode::CREATED);
+    // Frist = Eingang + Default (5 Min) — Delta deterministisch, beide Werte aus der Antwort.
+    assert_eq!(zeit(&m["bestaetigung_frist_at"]) - zeit(&m["eingang_at"]), Duration::minutes(5));
+}
+
+#[tokio::test]
+async fn bestaetigung_frist_override_in_minuten() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let body = serde_json::json!({
+        "absender": "Florian Nord 1", "meldeweg": "funk", "inhalt": "MANV",
+        "prioritaet": "sofort", "ereigniszeit": "2026-06-12 09:00:00",
+        "bestaetigung_pflicht": true, "bestaetigung_frist_min": 30
+    }).to_string();
+    let (status, m) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/meldungen"), &admin, Some(&body)).await;
+    assert_eq!(status, StatusCode::CREATED, "{m:?}");
+    assert_eq!(zeit(&m["bestaetigung_frist_at"]) - zeit(&m["eingang_at"]), Duration::minutes(30));
+}
+
+#[tokio::test]
+async fn bestaetigung_frist_nicht_positiv_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let body = serde_json::json!({
+        "absender": "Florian Nord 1", "meldeweg": "funk", "inhalt": "MANV",
+        "prioritaet": "sofort", "ereigniszeit": "2026-06-12 09:00:00",
+        "bestaetigung_pflicht": true, "bestaetigung_frist_min": 0
+    }).to_string();
+    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/meldungen"), &admin, Some(&body)).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn sofort_mit_pflicht_false_ueberstimmt_und_legt_keine_nachfass_an() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let body = serde_json::json!({
+        "absender": "Florian Nord 1", "meldeweg": "funk", "inhalt": "MANV",
+        "prioritaet": "sofort", "ereigniszeit": "2026-06-12 09:00:00",
+        "bestaetigung_pflicht": false
+    }).to_string();
+    let (status, m) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/meldungen"), &admin, Some(&body)).await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(m["bestaetigung_pflicht"], false, "explizites false überstimmt Sofort-Implikation");
+    assert!(m["bestaetigung_frist_at"].is_null());
+    let (_, erinn) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/erinnerungen"), &admin, None).await;
+    assert!(erinn.as_array().unwrap().is_empty(), "keine Auto-Erinnerung ohne Pflicht");
 }

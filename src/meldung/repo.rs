@@ -199,10 +199,11 @@ pub async fn weise_bearbeiter(
 }
 
 /// Bestätigt eine Sofortmeldung (LFH-97): setzt die Quittungs-Achse (kommunikation_status,
-/// objekt_typ='meldung') über das geteilte Repo und schließt eine etwaige offene
-/// Auto-Frist-Erinnerung des Bezugs (stoppt Nachfass/Eskalation). Beide Schritte sind für
-/// sich idempotent → kein gemeinsamer Tx-Zwang. Der Triage-`status` bleibt unangetastet
-/// (eigene Achse, vgl. patch-xor-effektivzustand / Bearbeiter-Entkopplung).
+/// objekt_typ='meldung') **atomar einmalig** und schließt eine etwaige offene Auto-Frist-
+/// Erinnerung des Bezugs (stoppt Nachfass/Eskalation). Liefert `true`, wenn DIESER Aufruf
+/// bestätigt hat; `false`, wenn bereits bestätigt war (→ Handler antwortet 422, ohne TOCTOU).
+/// Der Triage-`status` bleibt unangetastet (eigene Achse, vgl. patch-xor-effektivzustand);
+/// ein etwaiges `eskaliert`-Flag wird mit der Bestätigung zurückgesetzt (Daten-Hygiene + Sortierung).
 pub async fn bestaetige(
     pool: &SqlitePool,
     org_id: i64,
@@ -210,8 +211,8 @@ pub async fn bestaetige(
     meldung_id: i64,
     von_id: i64,
     jetzt: &str,
-) -> Result<(), AppError> {
-    crate::kommunikation::repo::quittiere(
+) -> Result<bool, AppError> {
+    let frisch = crate::kommunikation::repo::quittiere_einmalig(
         pool,
         org_id,
         einsatz_id,
@@ -221,6 +222,9 @@ pub async fn bestaetige(
         jetzt,
     )
     .await?;
+    if !frisch {
+        return Ok(false);
+    }
     crate::erinnerung::repo::schliesse_offene_auto(
         pool,
         crate::kommunikation::OBJEKT_MELDUNG,
@@ -228,7 +232,12 @@ pub async fn bestaetige(
         jetzt,
     )
     .await?;
-    Ok(())
+    // Eskalations-Residuum löschen: nach Bestätigung ist die Meldung nicht mehr „eskaliert".
+    sqlx::query("UPDATE meldung SET eskaliert = 0 WHERE id = ?")
+        .bind(meldung_id)
+        .execute(pool)
+        .await?;
+    Ok(true)
 }
 
 /// Setzt das Eskalations-Flag — aber NUR wenn die Meldung bestätigungspflichtig, ihre Frist
@@ -584,6 +593,34 @@ mod tests {
         assert!(laden(&pool, m.id, "2026-06-12 09:06:00").await.unwrap().eskaliert);
         // Erneut: One-Shot, kein Doppel-Highlight.
         assert!(!setze_eskaliert(&pool, m.id, "2026-06-12 09:07:00").await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn bestaetige_einmalig_erste_gewinnt_kein_overwrite() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let b2: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1,'Zwei','zwei','h') RETURNING id").fetch_one(&pool).await.unwrap();
+        let m = anlegen(&pool, e, b, daten_pflicht("Sofort", "2026-06-12 09:00:00", "2026-06-12 09:05:00")).await.unwrap();
+        // Erste Bestätigung gewinnt (true), zweite (anderer Bestätiger, später) ist No-op (false).
+        assert!(bestaetige(&pool, 1, e, m.id, b, "2026-06-12 09:06:00").await.unwrap());
+        assert!(!bestaetige(&pool, 1, e, m.id, b2, "2026-06-12 09:08:00").await.unwrap());
+        let nach = laden(&pool, m.id, "2026-06-12 09:09:00").await.unwrap();
+        assert_eq!(nach.bestaetigt_at.as_deref(), Some("2026-06-12 09:06:00"), "Erst-Quittung bleibt");
+        assert_eq!(nach.bestaetigt_von_id, Some(b), "Erst-Bestätiger bleibt (kein last-writer-wins)");
+    }
+
+    #[tokio::test]
+    async fn bestaetige_setzt_eskaliert_zurueck() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(&pool, e, b, daten_pflicht("Sofort", "2026-06-12 09:00:00", "2026-06-12 09:05:00")).await.unwrap();
+        assert!(setze_eskaliert(&pool, m.id, "2026-06-12 09:06:00").await.unwrap());
+        assert!(laden(&pool, m.id, "2026-06-12 09:06:00").await.unwrap().eskaliert);
+        // Bestätigung räumt das Eskalations-Residuum ab.
+        assert!(bestaetige(&pool, 1, e, m.id, b, "2026-06-12 09:07:00").await.unwrap());
+        assert!(!laden(&pool, m.id, "2026-06-12 09:07:00").await.unwrap().eskaliert);
     }
 
     #[tokio::test]
