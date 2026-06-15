@@ -94,6 +94,10 @@ pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
         .route("/api/einsaetze/{id}/meldungen/{mid}/bestaetigen", post(routes::meldung::bestaetigen))
         .route("/api/einsaetze/{id}/meldungen/{mid}/lagerelevant", post(routes::meldung::lagerelevant))
         .route("/api/einsaetze/{id}/lage/meldungen", get(routes::meldung::lage_liste))
+        .route("/api/einsaetze/{id}/nachforderungen", get(routes::nachforderung::liste))
+        .route("/api/einsaetze/{id}/nachforderungen", post(routes::nachforderung::anlegen))
+        .route("/api/einsaetze/{id}/nachforderungen/{nid}/status", post(routes::nachforderung::status))
+        .route("/api/einsaetze/{id}/nachforderungen/{nid}/ablehnen", post(routes::nachforderung::ablehnen))
         .route(
             "/api/einsaetze/{id}/fahrzeuge",
             get(routes::einsatz_fahrzeug::liste),

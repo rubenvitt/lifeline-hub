@@ -61,6 +61,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     };
     const onErinnerung = () => inval('einsatz-erinnerungen');
     const onAuftrag = () => inval('einsatz-auftraege');
+    const onNachforderung = () => inval('einsatz-nachforderungen');
     const onMeldung = () => { inval('einsatz-meldungen'); inval('einsatz-lagemeldungen'); };
     // Sofortmeldung (LFH-97): Liste aktualisieren UND unübersehbar alarmieren (Ton + Toast).
     // Der Toast wird einsatzweit über ein window-CustomEvent aufgelöst (SofortAlarm im Layout
@@ -87,6 +88,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       onChat();
       onErinnerung();
       onAuftrag();
+      onNachforderung();
       onMeldung();
       // Kein Ton bei lagged (Reconnect/Overflow) → sonst Fehlalarm ohne neue Sofortmeldung;
       // der Refetch + die persistente Server-Hervorhebung (ist_ueberfaellig/eskaliert) tragen.
@@ -105,6 +107,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     quelle.addEventListener('chat', onChat);
     quelle.addEventListener('erinnerung', onErinnerung);
     quelle.addEventListener('auftrag', onAuftrag);
+    quelle.addEventListener('nachforderung', onNachforderung);
     quelle.addEventListener('meldung', onMeldung);
     quelle.addEventListener('sofortmeldung', onSofort as EventListener);
     quelle.addEventListener('lagged', onLag);
@@ -122,6 +125,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       quelle.removeEventListener('chat', onChat);
       quelle.removeEventListener('erinnerung', onErinnerung);
       quelle.removeEventListener('auftrag', onAuftrag);
+      quelle.removeEventListener('nachforderung', onNachforderung);
       quelle.removeEventListener('meldung', onMeldung);
       quelle.removeEventListener('sofortmeldung', onSofort as EventListener);
       quelle.removeEventListener('lagged', onLag);

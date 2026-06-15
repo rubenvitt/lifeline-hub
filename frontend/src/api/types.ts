@@ -939,3 +939,46 @@ export interface LageMeldung {
   meldung_lfd_nr: number;
   meldung_absender: string;
 }
+
+// ============================== LFH-87 Nachforderung Kräfte/Mittel ==============================
+
+export type NachforderungPrioritaet = 'sofort' | 'dringend' | 'normal';
+export type NachforderungStatus = 'angefordert' | 'zugesagt' | 'unterwegs' | 'eingetroffen' | 'abgelehnt';
+export type AdressatKategorie = 'leitstelle' | 'nachbar_ea' | 'uebergeordnet' | 'andere_bos';
+
+export interface Nachforderung {
+  id: number;
+  einsatz_id: number;
+  art: string;
+  bezeichnung: string;
+  anzahl: number | null;
+  adressat_kategorie: AdressatKategorie;
+  adressat_bezeichnung: string | null;
+  begruendung: string | null;
+  prioritaet: NachforderungPrioritaet;
+  status: NachforderungStatus;
+  zugesagt_at: string | null;
+  unterwegs_at: string | null;
+  eingetroffen_at: string | null;
+  abgelehnt_at: string | null;
+  abgelehnt_grund: string | null;
+  angefordert_at: string;
+  etb_nachforderung_id: number | null;
+  erstellt_von_id: number;
+  erstellt_at: string;
+  erstellt_von_name: string | null;
+  /** Abgeleitet: status NOT IN ('eingetroffen','abgelehnt'). */
+  ist_offen: boolean;
+}
+
+export interface NeueNachforderung {
+  art: string;
+  bezeichnung: string;
+  anzahl?: number;
+  adressat_kategorie: AdressatKategorie;
+  adressat_bezeichnung?: string;
+  begruendung?: string;
+  prioritaet?: NachforderungPrioritaet;
+  /** Ereigniszeit der Anforderung (UTC); leer = jetzt. */
+  angefordert_at?: string;
+}
