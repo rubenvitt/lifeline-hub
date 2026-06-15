@@ -13,6 +13,7 @@ import ChatPage from './pages/ChatPage';
 import ErinnerungenPage from './pages/ErinnerungenPage';
 import AuftraegePage from './pages/AuftraegePage';
 import MeldungenPage from './pages/MeldungenPage';
+import NachforderungenPage from './pages/NachforderungenPage';
 import LagemeldungenPage from './pages/LagemeldungenPage';
 import EinsatzdatenPage from './pages/EinsatzdatenPage';
 import FahrzeugePage from './pages/FahrzeugePage';
@@ -52,6 +53,7 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   erinnerungen: <ErinnerungenPage />,
   auftraege: <AuftraegePage />,
   meldungen: <MeldungenPage />,
+  nachforderungen: <NachforderungenPage />,
   lagemeldungen: <LagemeldungenPage />,
   einsatzdaten: <EinsatzdatenPage />,
   fahrzeuge: <FahrzeugePage />,

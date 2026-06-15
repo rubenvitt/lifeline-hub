@@ -1,7 +1,14 @@
 import { App, Button, Card, DatePicker, Form, Input, Select } from 'antd';
 import { useState } from 'react';
 import dayjs from 'dayjs';
-import type { AuftragPrioritaet, NeuerAuftrag, NeuerEmpfaenger } from '../api/types';
+import type { AdressatKategorie, AuftragPrioritaet, NeuerAuftrag, NeuerEmpfaenger, Richtung } from '../api/types';
+
+const EXTERN_OPTIONEN: { value: AdressatKategorie; label: string }[] = [
+  { value: 'leitstelle', label: 'Leitstelle' },
+  { value: 'nachbar_ea', label: 'Nachbar-Einsatzabschnitt' },
+  { value: 'uebergeordnet', label: 'Übergeordnete Führung' },
+  { value: 'andere_bos', label: 'Andere BOS' },
+];
 
 const { TextArea } = Input;
 
@@ -48,10 +55,13 @@ export default function AuftragFormular({ senden, abschnitte, einheiten, onAnleg
   const [verbindung, setVerbindung] = useState('');
   const [sicherheit, setSicherheit] = useState('');
   const [prioritaet, setPrioritaet] = useState<AuftragPrioritaet>('normal');
+  const [richtung, setRichtung] = useState<Richtung>('intern');
   const [frist, setFrist] = useState<dayjs.Dayjs | null>(null);
   const [erteiltAm, setErteiltAm] = useState<dayjs.Dayjs | null>(null);
   const [ziele, setZiele] = useState<string[]>([]);
   const [funktionText, setFunktionText] = useState('');
+  const [externKategorie, setExternKategorie] = useState<AdressatKategorie>('leitstelle');
+  const [externBezeichnung, setExternBezeichnung] = useState('');
 
   const zielOptionen = [
     { label: 'Einsatzabschnitte', options: abschnitte.map((a) => ({ value: `abschnitt:${a.id}`, label: a.name })) },
@@ -61,6 +71,14 @@ export default function AuftragFormular({ senden, abschnitte, einheiten, onAnleg
   const absenden = () => {
     if (!text.trim()) { message.error('Auftragstext ist erforderlich'); return; }
     const empfaenger = baueEmpfaenger(ziele, funktionText);
+    // Externer Adressat (LFH-87): bei Richtung extern als Empfänger-Zeile ergänzen.
+    if (richtung === 'extern' && externBezeichnung.trim()) {
+      empfaenger.push({
+        empfaenger_typ: 'extern',
+        extern_kategorie: externKategorie,
+        extern_bezeichnung: externBezeichnung.trim(),
+      });
+    }
     if (empfaenger.length === 0) { message.error('Mindestens ein Empfänger ist erforderlich'); return; }
     onAnlegen({
       auftrag_text: text.trim(),
@@ -72,12 +90,15 @@ export default function AuftragFormular({ senden, abschnitte, einheiten, onAnleg
       verbindung: verbindung.trim() || undefined,
       sicherheit: sicherheit.trim() || undefined,
       prioritaet,
+      richtung,
       frist_at: dayjsZuWire(frist),
       erteilt_at: dayjsZuWire(erteiltAm),
       empfaenger,
     });
     setText(''); setAbsicht(''); setLage(''); setOrt(''); setZeit(''); setMittel('');
-    setVerbindung(''); setSicherheit(''); setFrist(null); setErteiltAm(null); setZiele([]); setFunktionText('');
+    setVerbindung(''); setSicherheit(''); setPrioritaet('normal'); setRichtung('intern');
+    setFrist(null); setErteiltAm(null); setZiele([]); setFunktionText('');
+    setExternKategorie('leitstelle'); setExternBezeichnung('');
   };
 
   return (
@@ -97,6 +118,16 @@ export default function AuftragFormular({ senden, abschnitte, einheiten, onAnleg
         <Form.Item label="Weitere Empfänger (Funktion, kommagetrennt)">
           <Input value={funktionText} onChange={(e) => setFunktionText(e.target.value)} placeholder="z. B. S3, Fachberater" />
         </Form.Item>
+        {richtung === 'extern' && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Form.Item label="Externe Stelle" style={{ flex: 1 }}>
+              <Select<AdressatKategorie> aria-label="Externe Stelle" value={externKategorie} onChange={setExternKategorie} options={EXTERN_OPTIONEN} />
+            </Form.Item>
+            <Form.Item label="Bezeichnung der Stelle" style={{ flex: 1 }}>
+              <Input aria-label="Externe Bezeichnung" value={externBezeichnung} onChange={(e) => setExternBezeichnung(e.target.value)} placeholder="z. B. Leitstelle Nord" />
+            </Form.Item>
+          </div>
+        )}
         <Form.Item label="Auftrag / Was" required>
           <TextArea aria-label="Auftrag / Was" value={text} onChange={(e) => setText(e.target.value)} rows={2} />
         </Form.Item>
@@ -127,6 +158,12 @@ export default function AuftragFormular({ senden, abschnitte, einheiten, onAnleg
               { value: 'sofort', label: 'Sofort' },
               { value: 'dringend', label: 'Dringend' },
               { value: 'normal', label: 'Normal' },
+            ]} />
+          </Form.Item>
+          <Form.Item label="Richtung" style={{ flex: 1 }}>
+            <Select<Richtung> aria-label="Richtung" value={richtung} onChange={setRichtung} options={[
+              { value: 'intern', label: 'Intern' },
+              { value: 'extern', label: 'Extern' },
             ]} />
           </Form.Item>
           <Form.Item label="Frist (Quittung/Vollzug)" style={{ flex: 1 }}>

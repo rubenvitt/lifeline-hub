@@ -11,7 +11,6 @@ import {
   schreibeLageberichtFort,
 } from '../api/lageberichte';
 import type { LageberichtAbschnitt, LageberichtAnzeige } from '../api/types';
-import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
 import { vorlage } from '../lageberichte/vorlagen';
 import Markdown from '../components/Markdown';
 import MarkdownEditor from '../components/MarkdownEditor';
@@ -26,7 +25,6 @@ export default function LageberichtDetailPage() {
   const navigate = useNavigate();
   const [form] = Form.useForm<Record<string, string>>();
 
-  useEinsatzLiveStream(einsatzId);
 
   const einsatzQuery = useQuery({
     queryKey: ['einsatz', einsatzId],

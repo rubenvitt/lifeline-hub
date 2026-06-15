@@ -3,10 +3,14 @@ use crate::auth::session::CurrentUser;
 use crate::einsatz::berechtigung::{fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
-use crate::meldung::{repo, MeldungAnzeige, ART_SONSTIGE, PRIO_NORMAL};
+use crate::meldung::{
+    repo, MeldungAnzeige, ART_SOFORTMELDUNG, ART_SONSTIGE, BESTAETIGUNG_FRIST_DEFAULT_MIN,
+    PRIO_NORMAL, PRIO_SOFORT, RICHTUNG_INTERN,
+};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
+use chrono::{Duration, NaiveDateTime};
 use serde::Deserialize;
 
 /// Kanonischer Zeitstempel „jetzt" (UTC) im DB-Format.
@@ -23,6 +27,16 @@ fn sse(state: &AppState, einsatz_id: i64) {
     );
 }
 
+/// SSE-Notify: unübersehbares Sofort-Highlight (Tag `sofortmeldung`, LFH-97). Läuft über
+/// dieselbe eine EventSource pro Einsatz; der Client löst Alarm (visuell + Ton) aus.
+fn sse_sofort(state: &AppState, einsatz_id: i64, meldung_id: i64) {
+    state.live.publiziere_event(
+        einsatz_id,
+        "sofortmeldung",
+        serde_json::json!({ "einsatz_id": einsatz_id, "meldung_id": meldung_id }).to_string(),
+    );
+}
+
 fn trimme(o: &Option<String>) -> Option<&str> {
     o.as_deref().map(str::trim).filter(|s| !s.is_empty())
 }
@@ -30,6 +44,7 @@ fn trimme(o: &Option<String>) -> Option<&str> {
 #[derive(Debug, Deserialize)]
 pub struct ListeParams {
     pub status: Option<String>,
+    pub richtung: Option<String>,
 }
 
 /// GET /api/einsaetze/{id}/meldungen — Posteingang listen (Lesezugriff, auch Beobachter).
@@ -48,7 +63,13 @@ pub async fn liste(
             return Err(AppError::Validation("Ungültiger Status-Filter".into()));
         }
     }
-    Ok(Json(repo::liste(&state.pool, einsatz_id, status).await?))
+    let richtung = params.richtung.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    if let Some(r) = richtung {
+        if !crate::meldung::richtung_gueltig(r) {
+            return Err(AppError::Validation("Ungültiger Richtungs-Filter".into()));
+        }
+    }
+    Ok(Json(repo::liste(&state.pool, einsatz_id, status, richtung, &jetzt()).await?))
 }
 
 #[derive(Debug, Deserialize)]
@@ -59,8 +80,15 @@ pub struct NeueMeldung {
     pub inhalt: String,
     pub meldungsart: Option<String>,
     pub prioritaet: Option<String>,
+    /// Richtung intern/extern (LFH-87); Default 'intern'.
+    pub richtung: Option<String>,
     /// Ereigniszeit (UTC, ISO-8601 oder SQLite-Format). Pflicht (Funk-Realität: ≠ Erfassung).
     pub ereigniszeit: String,
+    /// Sofortmeldung & Eskalation (LFH-97): Bestätigungspflicht erzwingen. `None` → aus
+    /// Sofort-Klassifikation abgeleitet (Sofortmeldung/Priorität sofort impliziert Pflicht).
+    pub bestaetigung_pflicht: Option<bool>,
+    /// Optionales Override der Default-Bestätigungsfrist (Minuten ab Eingang).
+    pub bestaetigung_frist_min: Option<i64>,
 }
 
 /// POST /api/einsaetze/{id}/meldungen — Meldung erfassen (Schreibrecht + aktiv).
@@ -105,9 +133,31 @@ pub async fn anlegen(
     if !crate::meldung::prioritaet_gueltig(prioritaet) {
         return Err(AppError::Validation("Ungültige Priorität".into()));
     }
+    let richtung = req.richtung.as_deref().map(str::trim).filter(|s| !s.is_empty()).unwrap_or(RICHTUNG_INTERN);
+    if !crate::meldung::richtung_gueltig(richtung) {
+        return Err(AppError::Validation("Ungültige Richtung".into()));
+    }
     // Ereigniszeit normalisieren (ISO-8601/SQLite → SQLite-Format), wie ETB.
     let ereigniszeit = crate::etb::normalisiere_zeit(req.ereigniszeit.trim())?;
     let eingang = jetzt();
+
+    // Sofortmeldung & Eskalation (LFH-97): Sofort impliziert Bestätigungspflicht; explizites
+    // Flag überstimmt. Frist = Eingang + (Override||Default) Minuten, nur bei Pflicht.
+    let ist_sofort = meldungsart == ART_SOFORTMELDUNG || prioritaet == PRIO_SOFORT;
+    let pflicht = req.bestaetigung_pflicht.unwrap_or(ist_sofort);
+    let frist_min = req.bestaetigung_frist_min.unwrap_or(BESTAETIGUNG_FRIST_DEFAULT_MIN);
+    if pflicht && frist_min <= 0 {
+        return Err(AppError::Validation("Bestätigungsfrist muss positiv sein".into()));
+    }
+    let frist_at: Option<String> = if pflicht {
+        // `eingang` ist im DB-Format; bei (theoretisch unmöglichem) Parse-Fehler defensiv keine
+        // Frist statt 500 (vgl. patch-xor: 422/None statt Panik).
+        NaiveDateTime::parse_from_str(&eingang, "%Y-%m-%d %H:%M:%S")
+            .ok()
+            .map(|n| (n + Duration::minutes(frist_min)).format("%Y-%m-%d %H:%M:%S").to_string())
+    } else {
+        None
+    };
 
     let m = repo::anlegen(
         &state.pool,
@@ -120,11 +170,34 @@ pub async fn anlegen(
             inhalt,
             meldungsart,
             prioritaet,
+            richtung,
             ereigniszeit: &ereigniszeit,
             eingang_at: &eingang,
+            bestaetigung_pflicht: pflicht,
+            bestaetigung_frist_at: frist_at.as_deref(),
         },
     )
     .await?;
+
+    // Nachfass/Eskalation: bei Bestätigungspflicht eine Auto-Frist-Erinnerung anlegen
+    // (idempotent, quelle='auto_frist'). Der Scheduler-Tick eskaliert bei Fristablauf und
+    // re-highlightet; Bestätigen schließt sie wieder. Erstes reales Wiring von anlegen_aus_frist.
+    if pflicht {
+        if let Some(frist) = frist_at.as_deref() {
+            let titel = format!("Sofortmeldung #{} unbestätigt", m.lfd_nr);
+            crate::erinnerung::repo::anlegen_aus_frist(
+                &state.pool,
+                einsatz_id,
+                benutzer.id,
+                crate::kommunikation::OBJEKT_MELDUNG,
+                m.id,
+                &titel,
+                frist,
+                &eingang,
+            )
+            .await?;
+        }
+    }
 
     // Dual-Publish (wie Auftrag): erzeugte ETB-Meldung in den Live-Feed + meldung-Event.
     if let Some(etb_id) = m.etb_meldung_id {
@@ -135,16 +208,21 @@ pub async fn anlegen(
         }
     }
     sse(&state, einsatz_id);
+    // Unübersehbares Sofort-Highlight (AK1): eigener Tag auf derselben Verbindung.
+    if ist_sofort {
+        sse_sofort(&state, einsatz_id, m.id);
+    }
     Ok((StatusCode::CREATED, Json(m)))
 }
 
 /// Gemeinsamer Vorlauf für Meldungs-Aktionen: Gates + Cross-Einsatz-Schutz.
+/// Gibt `org_id` zurück (für kommunikation_status-Schreibpfade).
 async fn fordere_bearbeitbar(
     state: &AppState,
     benutzer: &crate::auth::Benutzer,
     einsatz_id: i64,
     meldung_id: i64,
-) -> Result<(), AppError> {
+) -> Result<i64, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
@@ -152,7 +230,7 @@ async fn fordere_bearbeitbar(
     if !repo::gehoert_zu_einsatz(&state.pool, meldung_id, einsatz_id).await? {
         return Err(AppError::NotFound);
     }
-    Ok(())
+    Ok(einsatz.org_id)
 }
 
 #[derive(Debug, Deserialize)]
@@ -174,7 +252,26 @@ pub async fn status(
         return Err(AppError::Validation("Ungültiger Status".into()));
     }
     repo::setze_status(&state.pool, meldung_id, status).await?;
-    let m = repo::laden(&state.pool, meldung_id).await?;
+    let m = repo::laden(&state.pool, meldung_id, &jetzt()).await?;
+    sse(&state, einsatz_id);
+    Ok(Json(m))
+}
+
+/// POST /api/einsaetze/{id}/meldungen/{mid}/bestaetigen — Sofortmeldung aktiv bestätigen
+/// (LFH-97). Setzt die Quittungs-Achse (Zeitstempel + Person) und schließt die Nachfass-
+/// Erinnerung; der Triage-Status bleibt unberührt. Doppel-Bestätigung → 422.
+pub async fn bestaetigen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
+) -> Result<Json<MeldungAnzeige>, AppError> {
+    let org_id = fordere_bearbeitbar(&state, &benutzer, einsatz_id, meldung_id).await?;
+    let now = jetzt();
+    // Atomar einmalig (kein read-then-write/TOCTOU): nur die Erst-Bestätigung gewinnt.
+    if !repo::bestaetige(&state.pool, org_id, einsatz_id, meldung_id, benutzer.id, &now).await? {
+        return Err(AppError::UnprocessableEntity("Meldung ist bereits bestätigt".into()));
+    }
+    let m = repo::laden(&state.pool, meldung_id, &now).await?;
     sse(&state, einsatz_id);
     Ok(Json(m))
 }
@@ -200,7 +297,7 @@ pub async fn zuweisen(
         }
     }
     repo::weise_bearbeiter(&state.pool, meldung_id, req.bearbeiter_id).await?;
-    let m = repo::laden(&state.pool, meldung_id).await?;
+    let m = repo::laden(&state.pool, meldung_id, &jetzt()).await?;
     sse(&state, einsatz_id);
     Ok(Json(m))
 }
@@ -221,7 +318,7 @@ pub async fn lagerelevant(
 ) -> Result<Json<MeldungAnzeige>, AppError> {
     fordere_bearbeitbar(&state, &benutzer, einsatz_id, meldung_id).await?;
     // Default-Text = Meldungsinhalt, falls kein eigener Lage-Text gegeben.
-    let aktuell = repo::laden(&state.pool, meldung_id).await?;
+    let aktuell = repo::laden(&state.pool, meldung_id, &jetzt()).await?;
     let text = req
         .text
         .as_deref()
@@ -235,7 +332,7 @@ pub async fn lagerelevant(
         _ => return Err(AppError::Validation("lat und lon nur gemeinsam".into())),
     };
     repo::als_lagerelevant(&state.pool, einsatz_id, meldung_id, benutzer.id, &text, geo).await?;
-    let m = repo::laden(&state.pool, meldung_id).await?;
+    let m = repo::laden(&state.pool, meldung_id, &jetzt()).await?;
     sse(&state, einsatz_id);
     Ok(Json(m))
 }

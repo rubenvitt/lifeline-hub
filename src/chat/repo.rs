@@ -714,6 +714,7 @@ mod tests {
             verbindung: None,
             sicherheit: None,
             prioritaet: "normal",
+            richtung: "intern",
             frist_at: None,
             erteilt_at: "2026-06-12 10:00:00",
             empfaenger: vec![crate::auftrag::repo::EmpfaengerEingabe {
@@ -723,6 +724,8 @@ mod tests {
                 person_id: None,
                 fahrzeug_id: None,
                 funktion_text: Some("S4".into()),
+                extern_kategorie: None,
+                extern_bezeichnung: None,
             }],
         }
     }

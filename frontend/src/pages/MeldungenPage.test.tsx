@@ -21,21 +21,26 @@ const legeMeldungAn = vi.fn();
 const setzeMeldungStatus = vi.fn();
 const weiseBearbeiterZu = vi.fn();
 const markiereLagerelevant = vi.fn();
+const bestaetigeMeldung = vi.fn();
 vi.mock('../api/meldungen', () => ({
   listeMeldungen: (...a: unknown[]) => listeMeldungen(...a),
   legeMeldungAn: (...a: unknown[]) => legeMeldungAn(...a),
   setzeMeldungStatus: (...a: unknown[]) => setzeMeldungStatus(...a),
   weiseBearbeiterZu: (...a: unknown[]) => weiseBearbeiterZu(...a),
   markiereLagerelevant: (...a: unknown[]) => markiereLagerelevant(...a),
+  bestaetigeMeldung: (...a: unknown[]) => bestaetigeMeldung(...a),
 }));
 
 const meldung = (over: Partial<Meldung> = {}): Meldung => ({
   id: 1, einsatz_id: 1, lfd_nr: 1, absender: 'Florian Nord 1', empfaenger: 'ELW 1',
-  meldeweg: 'funk', inhalt: 'Deich instabil', meldungsart: 'sofortmeldung', prioritaet: 'normal',
+  meldeweg: 'funk', inhalt: 'Deich instabil', meldungsart: 'sofortmeldung', prioritaet: 'normal', richtung: 'intern',
   status: 'neu', bearbeiter_id: null, bearbeiter_name: null, lagerelevant: false,
   ereigniszeit: '2026-06-12 09:00:00', eingang_at: '2026-06-12 09:05:00',
   etb_meldung_id: 7, auftrag_id: null, erfasst_von_id: 1, erstellt_at: '2026-06-12 09:05:00',
-  lage_meldung_id: null, ist_offen: true, ...over,
+  lage_meldung_id: null, ist_offen: true,
+  bestaetigung_pflicht: false, bestaetigung_frist_at: null, eskaliert: false,
+  bestaetigt_at: null, bestaetigt_von_id: null, bestaetigt_von_name: null,
+  ist_bestaetigt: false, ist_ueberfaellig: false, ...over,
 });
 
 function renderPage() {
@@ -81,7 +86,14 @@ describe('MeldungenPage', () => {
     await screen.findByText('Florian Nord 1');
     // Segment-Label „Abgeschlossen" ist eindeutig (kollidiert nicht mit Action-Links).
     await userEvent.click(screen.getByText('Abgeschlossen'));
-    await waitFor(() => expect(listeMeldungen).toHaveBeenCalledWith(1, { status: 'erledigt' }));
+    await waitFor(() => expect(listeMeldungen).toHaveBeenCalledWith(1, expect.objectContaining({ status: 'erledigt' })));
+  });
+
+  it('filtert nach Richtung extern (LFH-87)', async () => {
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(screen.getByText('Extern'));
+    await waitFor(() => expect(listeMeldungen).toHaveBeenCalledWith(1, expect.objectContaining({ richtung: 'extern' })));
   });
 
   it('Beobachter sieht Posteingang, aber keine Erfassung', async () => {
@@ -160,5 +172,51 @@ describe('MeldungenPage', () => {
     // 'Offen' ist kein Server-Status → listeMeldungen ohne status; erledigte fällt clientseitig raus.
     await waitFor(() => expect(screen.queryByText('RTW 9')).not.toBeInTheDocument());
     expect(screen.getByText('Florian Nord 1')).toBeInTheDocument();
+  });
+
+  // --- LFH-97: Sofortmeldung bestätigungspflichtig ---
+
+  it('zeigt überfällige Sofortmeldung hervorgehoben und bestätigt sie', async () => {
+    listeMeldungen.mockResolvedValue([
+      meldung({ bestaetigung_pflicht: true, ist_bestaetigt: false, ist_ueberfaellig: true, prioritaet: 'sofort' }),
+    ]);
+    bestaetigeMeldung.mockResolvedValue(meldung({ bestaetigung_pflicht: true, ist_bestaetigt: true }));
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    expect(screen.getByText(/Bestätigung überfällig/)).toBeInTheDocument();
+    await userEvent.click(screen.getByText('Bestätigen', { selector: 'a' }));
+    await waitFor(() => expect(bestaetigeMeldung).toHaveBeenCalledWith(1, 1));
+  });
+
+  it('zeigt eskalierte (auch ohne ist_ueberfaellig) Sofortmeldung als (eskaliert)', async () => {
+    listeMeldungen.mockResolvedValue([
+      meldung({ bestaetigung_pflicht: true, ist_bestaetigt: false, ist_ueberfaellig: false, eskaliert: true, prioritaet: 'sofort' }),
+    ]);
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    expect(screen.getByText(/Bestätigung überfällig \(eskaliert\)/)).toBeInTheDocument();
+  });
+
+  it('zeigt bestätigte Sofortmeldung ohne Bestätigen-Aktion', async () => {
+    listeMeldungen.mockResolvedValue([
+      meldung({ bestaetigung_pflicht: true, ist_bestaetigt: true, bestaetigt_at: '2026-06-12 09:06:00', bestaetigt_von_name: 'Leit' }),
+    ]);
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    expect(screen.getByText(/Bestätigt ✓/)).toBeInTheDocument();
+    expect(screen.queryByText('Bestätigen', { selector: 'a' })).not.toBeInTheDocument();
+  });
+
+  it('Fast-Path-Button erfasst Sofortmeldung mit Bestätigungspflicht', async () => {
+    legeMeldungAn.mockResolvedValue(meldung());
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(screen.getByRole('button', { name: /Sofortmeldung/ }));
+    await userEvent.type(screen.getByLabelText('Absender'), 'RTW 2');
+    await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'MANV');
+    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledWith(1, expect.objectContaining({
+      meldungsart: 'sofortmeldung', prioritaet: 'sofort', bestaetigung_pflicht: true,
+    })));
   });
 });

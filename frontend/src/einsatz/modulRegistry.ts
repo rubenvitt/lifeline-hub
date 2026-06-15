@@ -79,6 +79,7 @@ export const modulRegistry: ModulEintrag[] = [
   { key: 'erinnerungen', kategorie: 'kommunikation', label: 'Erinnerungen', icon: TbBell, route: 'erinnerungen', status: 'fertig', beschreibung: 'Terminierte Erinnerungen.' },
   { key: 'auftraege', kategorie: 'kommunikation', label: 'Aufträge/Befehle', icon: TbClipboardList, route: 'auftraege', status: 'fertig', beschreibung: 'Aufträge und Befehle mit Quittierung.' },
   { key: 'meldungen', kategorie: 'kommunikation', label: 'Meldungen (eingehend)', icon: TbInbox, route: 'meldungen', status: 'fertig', beschreibung: 'Eingehende Meldungen zur Bearbeitung.' },
+  { key: 'nachforderungen', kategorie: 'kommunikation', label: 'Nachforderung', icon: TbPackages, route: 'nachforderungen', status: 'fertig', beschreibung: 'Nachforderung von Kräften/Mitteln bei Leitstelle/Nachbar-EA/übergeordneter Führung mit Status-Workflow.' },
   // Einstellungen
   { key: 'einsatz-einstellungen', kategorie: 'einstellungen', label: 'Einstellungen', icon: TbSettings, route: 'einstellungen', status: 'geplant', beschreibung: 'Einsatzbezogene Einstellungen.' },
 ];

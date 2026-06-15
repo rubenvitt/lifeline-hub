@@ -782,7 +782,9 @@ export interface NeueErinnerung {
 
 export type AuftragPrioritaet = 'sofort' | 'dringend' | 'normal';
 export type AuftragBearbeitungsstatus = 'offen' | 'in_arbeit' | 'vollzogen' | 'abgenommen';
-export type EmpfaengerTyp = 'abschnitt' | 'einheit' | 'funktion' | 'person' | 'fahrzeug';
+export type EmpfaengerTyp = 'abschnitt' | 'einheit' | 'funktion' | 'person' | 'fahrzeug' | 'extern';
+/** Richtungskennzeichnung intern/extern (LFH-87), an Meldung und Auftrag. */
+export type Richtung = 'intern' | 'extern';
 
 export interface AuftragEmpfaenger {
   id: number;
@@ -793,6 +795,8 @@ export interface AuftragEmpfaenger {
   person_id: number | null;
   fahrzeug_id: number | null;
   funktion_text: string | null;
+  extern_kategorie: AdressatKategorie | null;
+  extern_bezeichnung: string | null;
   snap_anzeige: string;
   quittiert_at: string | null;
   quittiert_von_id: number | null;
@@ -810,6 +814,7 @@ export interface Auftrag {
   verbindung: string | null;
   sicherheit: string | null;
   prioritaet: AuftragPrioritaet;
+  richtung: Richtung;
   frist_at: string | null;
   erteilt_at: string;
   in_arbeit_at: string | null;
@@ -837,6 +842,8 @@ export interface NeuerEmpfaenger {
   person_id?: number;
   fahrzeug_id?: number;
   funktion_text?: string;
+  extern_kategorie?: AdressatKategorie;
+  extern_bezeichnung?: string;
 }
 
 export interface NeuerAuftrag {
@@ -849,6 +856,7 @@ export interface NeuerAuftrag {
   verbindung?: string;
   sicherheit?: string;
   prioritaet?: AuftragPrioritaet;
+  richtung?: Richtung;
   /** 'YYYY-MM-DD HH:MM' (UTC). */
   frist_at?: string;
   /** Erteilzeitpunkt (UTC); leer = jetzt. */
@@ -874,6 +882,7 @@ export interface Meldung {
   inhalt: string;
   meldungsart: Meldungsart;
   prioritaet: MeldungPrioritaet;
+  richtung: Richtung;
   status: MeldungStatus;
   bearbeiter_id: number | null;
   bearbeiter_name: string | null;
@@ -888,6 +897,20 @@ export interface Meldung {
   lage_meldung_id: number | null;
   /** Abgeleitet: status !== 'erledigt'. */
   ist_offen: boolean;
+  /** Sofortmeldung & Eskalation (LFH-85/97): aktive Bestätigungspflicht. */
+  bestaetigung_pflicht: boolean;
+  /** Absolute Bestätigungsfrist (UTC), null wenn keine Pflicht. */
+  bestaetigung_frist_at: string | null;
+  /** Frist überschritten + unbestätigt (Server-/Tick-getrieben). */
+  eskaliert: boolean;
+  /** Bestätigt-um (Quittungs-Achse), null wenn unbestätigt. */
+  bestaetigt_at: string | null;
+  bestaetigt_von_id: number | null;
+  bestaetigt_von_name: string | null;
+  /** Abgeleitet: quittiert_at !== null. */
+  ist_bestaetigt: boolean;
+  /** Abgeleitet: pflichtig, unbestätigt und Frist überschritten. */
+  ist_ueberfaellig: boolean;
 }
 
 export interface NeueMeldung {
@@ -897,8 +920,13 @@ export interface NeueMeldung {
   inhalt: string;
   meldungsart?: Meldungsart;
   prioritaet?: MeldungPrioritaet;
+  richtung?: Richtung;
   /** Ereigniszeit (UTC) 'YYYY-MM-DD HH:mm:ss'. Pflicht (≠ Erfassungszeit). */
   ereigniszeit: string;
+  /** Bestätigungspflicht erzwingen; undefined ⇒ aus Sofort-Klassifikation abgeleitet (LFH-97). */
+  bestaetigung_pflicht?: boolean;
+  /** Override der Default-Bestätigungsfrist (Minuten ab Eingang). */
+  bestaetigung_frist_min?: number;
 }
 
 /** Lageobjekt aus lagerelevanter Meldung (LFH-95). */
@@ -914,4 +942,47 @@ export interface LageMeldung {
   /** Herkunft (aus JOIN meldung): zur Nachvollziehbarkeit am Lageobjekt. */
   meldung_lfd_nr: number;
   meldung_absender: string;
+}
+
+// ============================== LFH-87 Nachforderung Kräfte/Mittel ==============================
+
+export type NachforderungPrioritaet = 'sofort' | 'dringend' | 'normal';
+export type NachforderungStatus = 'angefordert' | 'zugesagt' | 'unterwegs' | 'eingetroffen' | 'abgelehnt';
+export type AdressatKategorie = 'leitstelle' | 'nachbar_ea' | 'uebergeordnet' | 'andere_bos';
+
+export interface Nachforderung {
+  id: number;
+  einsatz_id: number;
+  art: string;
+  bezeichnung: string;
+  anzahl: number | null;
+  adressat_kategorie: AdressatKategorie;
+  adressat_bezeichnung: string | null;
+  begruendung: string | null;
+  prioritaet: NachforderungPrioritaet;
+  status: NachforderungStatus;
+  zugesagt_at: string | null;
+  unterwegs_at: string | null;
+  eingetroffen_at: string | null;
+  abgelehnt_at: string | null;
+  abgelehnt_grund: string | null;
+  angefordert_at: string;
+  etb_nachforderung_id: number | null;
+  erstellt_von_id: number;
+  erstellt_at: string;
+  erstellt_von_name: string | null;
+  /** Abgeleitet: status NOT IN ('eingetroffen','abgelehnt'). */
+  ist_offen: boolean;
+}
+
+export interface NeueNachforderung {
+  art: string;
+  bezeichnung: string;
+  anzahl?: number;
+  adressat_kategorie: AdressatKategorie;
+  adressat_bezeichnung?: string;
+  begruendung?: string;
+  prioritaet?: NachforderungPrioritaet;
+  /** Ereigniszeit der Anforderung (UTC); leer = jetzt. */
+  angefordert_at?: string;
 }

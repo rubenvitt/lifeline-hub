@@ -15,7 +15,6 @@ import { listeZonen, legeZoneAn, aktualisiereZone, loescheZone } from '../api/la
 import { ladeGefahrengebiete } from '../api/gefahren';
 import { ladeOrganisation } from '../api/organisation';
 import type { EinsatzAnzeige, Warnstufe, ZoneTyp } from '../api/types';
-import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import { baueMarker, baueTaktischeMarker, type KarteMarker } from './lagekarte/marker';
 import { parsePolygon, parseGeometry, polygonZentroid } from './lagekarte/geo';
@@ -81,7 +80,6 @@ export default function LagekartePage() {
   // EINE SSE-Verbindung für alle Domänen (uhs/schaden/einheit/fahrzeug/abschnitt/zone/
   // person). Pro Domäne eine eigene EventSource würde das HTTP/1.1-Limit (6/Origin)
   // sprengen und nachfolgende Requests (z. B. Zonen-POST) endlos hängen lassen.
-  useEinsatzLiveStream(einsatzId);
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const uhsQuery = useQuery({ queryKey: ['einsatz-uhs', einsatzId], queryFn: () => listeUhs(einsatzId) });

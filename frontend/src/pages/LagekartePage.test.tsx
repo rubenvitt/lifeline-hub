@@ -247,16 +247,14 @@ describe('LagekartePage', () => {
     expect(badge).toHaveTextContent('1');
   });
 
-  it('öffnet genau EINE SSE-Verbindung für den ganzen Einsatz (HTTP/1.1-6-Verbindungslimit)', async () => {
-    // Regression: zuvor öffnete die Seite 6 EventSources (uhs/schaeden/einheiten/
-    // fahrzeuge/abschnitte/zonen) → bei HTTP/1.1 sind alle 6 Origin-Verbindungen
-    // belegt, jeder weitere Request (z. B. ein Zonen-POST) hängt endlos.
+  it('öffnet selbst KEINE SSE-Verbindung (der Live-Stream ist ins EinsatzLayout gehoben)', async () => {
+    // Regression: zuvor öffnete die Seite 6 EventSources, dann eine eigene; seit LFH-97
+    // besitzt das EinsatzLayout die EINE Verbindung pro Einsatz (HTTP/1.1-6-Limit). Die Seite
+    // darf deshalb keine eigene mehr öffnen — sonst wieder zwei Verbindungen je sichtbarer Seite.
     basisHandler();
     renderSeite();
     expect(await screen.findByText('⚠ Nicht verortet')).toBeInTheDocument();
-    expect(eventSourceUrls).toHaveLength(1);
-    expect(eventSourceUrls[0]).toContain('/api/einsaetze/1/');
-    expect(eventSourceUrls[0]).toContain('/stream');
+    expect(eventSourceUrls).toHaveLength(0);
   });
 
   it('platziert ein Objekt: Objekt wählen → Karten-Klick → PATCH mit lat/lon', async () => {

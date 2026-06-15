@@ -131,6 +131,10 @@ pub struct FaelligeErinnerung {
     pub einsatz_id: i64,
     pub faellig_at: String,
     pub intervall_minuten: Option<i64>,
+    /// Generischer Bezug (z. B. 'meldung' + Meldungs-ID) — der Scheduler hängt daran
+    /// die Eskalation des Bezugs auf (LFH-97), ohne Fremdtabellen-Polling.
+    pub bezug_typ: Option<String>,
+    pub bezug_id: Option<i64>,
 }
 
 /// Liefert offene Erinnerungen, die fällig sind (`faellig_at <= jetzt`) und für
@@ -142,7 +146,7 @@ pub async fn faellige_zum_ausloesen(
     jetzt: &str,
 ) -> Result<Vec<FaelligeErinnerung>, AppError> {
     sqlx::query_as::<_, FaelligeErinnerung>(
-        "SELECT id, einsatz_id, faellig_at, intervall_minuten \
+        "SELECT id, einsatz_id, faellig_at, intervall_minuten, bezug_typ, bezug_id \
          FROM erinnerung \
          WHERE status = 'offen' AND faellig_at <= ? \
            AND (zuletzt_ausgeloest_at IS NULL OR zuletzt_ausgeloest_at < faellig_at) \
@@ -220,6 +224,28 @@ pub async fn anlegen_aus_frist(
     .fetch_one(pool)
     .await?;
     laden(pool, id, jetzt).await
+}
+
+/// Schließt eine offene Auto-Frist-Erinnerung eines Bezugs (z. B. Meldung bestätigt):
+/// setzt `status='erledigt'`, `erledigt_at=jetzt`. Idempotent — kein Treffer = No-op.
+/// Verstummt den Nachfass-Nudge und verhindert weitere Eskalations-Ticks für den Bezug.
+pub async fn schliesse_offene_auto(
+    pool: &SqlitePool,
+    bezug_typ: &str,
+    bezug_id: i64,
+    jetzt: &str,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE erinnerung SET status = ?, erledigt_at = ? \
+         WHERE quelle = 'auto_frist' AND status = 'offen' AND bezug_typ = ? AND bezug_id = ?",
+    )
+    .bind(STATUS_ERLEDIGT)
+    .bind(jetzt)
+    .bind(bezug_typ)
+    .bind(bezug_id)
+    .execute(pool)
+    .await?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -340,5 +366,21 @@ mod tests {
 
         let alle = liste(&pool, e, false, "2026-06-11 10:05:00").await.unwrap();
         assert_eq!(alle.len(), 1, "nur eine Auto-Erinnerung je Bezug");
+    }
+
+    #[tokio::test]
+    async fn schliesse_offene_auto_setzt_erledigt_und_ist_idempotent() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        anlegen_aus_frist(&pool, e, b, "meldung", 7, "Nachfass", "2026-06-11 10:00:00", "2026-06-11 10:00:00").await.unwrap();
+
+        // Schließt die offene Auto-Erinnerung des Bezugs.
+        schliesse_offene_auto(&pool, "meldung", 7, "2026-06-11 10:05:00").await.unwrap();
+        let offen: Option<i64> = sqlx::query_scalar(
+            "SELECT id FROM erinnerung WHERE quelle='auto_frist' AND status='offen' AND bezug_typ='meldung' AND bezug_id=7",
+        ).fetch_optional(&pool).await.unwrap();
+        assert!(offen.is_none(), "keine offene Auto-Erinnerung mehr");
+        // Idempotent: zweiter Aufruf ohne Treffer ist ein No-op.
+        schliesse_offene_auto(&pool, "meldung", 7, "2026-06-11 10:06:00").await.unwrap();
     }
 }

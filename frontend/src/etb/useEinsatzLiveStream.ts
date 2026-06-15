@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
+import { spieleSofortAlarm } from '../einsatz/sofortTon';
 
 /**
  * EINE SSE-Verbindung für den gesamten Einsatz-Live-Feed.
@@ -60,7 +61,18 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     };
     const onErinnerung = () => inval('einsatz-erinnerungen');
     const onAuftrag = () => inval('einsatz-auftraege');
+    const onNachforderung = () => inval('einsatz-nachforderungen');
     const onMeldung = () => { inval('einsatz-meldungen'); inval('einsatz-lagemeldungen'); };
+    // Sofortmeldung (LFH-97): Liste aktualisieren UND unübersehbar alarmieren (Ton + Toast).
+    // Der Toast wird einsatzweit über ein window-CustomEvent aufgelöst (SofortAlarm im Layout
+    // lauscht), damit der Hook ohne Render-State auskommt und EINE EventSource bleibt.
+    const onSofort = (ev: MessageEvent) => {
+      onMeldung();
+      spieleSofortAlarm();
+      let detail: unknown = {};
+      try { detail = JSON.parse(ev.data); } catch { /* Payload optional */ }
+      window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail }));
+    };
     // Buffer-Overflow (verpasste Events) → konservativ alles refetchen.
     const onLag = () => {
       onUhs();
@@ -76,7 +88,10 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       onChat();
       onErinnerung();
       onAuftrag();
+      onNachforderung();
       onMeldung();
+      // Kein Ton bei lagged (Reconnect/Overflow) → sonst Fehlalarm ohne neue Sofortmeldung;
+      // der Refetch + die persistente Server-Hervorhebung (ist_ueberfaellig/eskaliert) tragen.
     };
 
     quelle.addEventListener('uhs', onUhs);
@@ -92,7 +107,9 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     quelle.addEventListener('chat', onChat);
     quelle.addEventListener('erinnerung', onErinnerung);
     quelle.addEventListener('auftrag', onAuftrag);
+    quelle.addEventListener('nachforderung', onNachforderung);
     quelle.addEventListener('meldung', onMeldung);
+    quelle.addEventListener('sofortmeldung', onSofort as EventListener);
     quelle.addEventListener('lagged', onLag);
     return () => {
       quelle.removeEventListener('uhs', onUhs);
@@ -108,7 +125,9 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       quelle.removeEventListener('chat', onChat);
       quelle.removeEventListener('erinnerung', onErinnerung);
       quelle.removeEventListener('auftrag', onAuftrag);
+      quelle.removeEventListener('nachforderung', onNachforderung);
       quelle.removeEventListener('meldung', onMeldung);
+      quelle.removeEventListener('sofortmeldung', onSofort as EventListener);
       quelle.removeEventListener('lagged', onLag);
       quelle.close();
     };

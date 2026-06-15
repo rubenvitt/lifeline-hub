@@ -31,12 +31,12 @@ vi.mock('../api/auftraege', () => ({
 
 const auftrag = (over: Partial<Auftrag> = {}): Auftrag => ({
   id: 1, einsatz_id: 1, auftrag_text: 'Deich sichern', absicht: null, lage: null, ort: null,
-  zeit: null, mittel: null, verbindung: null, sicherheit: null, prioritaet: 'normal',
+  zeit: null, mittel: null, verbindung: null, sicherheit: null, prioritaet: 'normal', richtung: 'intern',
   frist_at: null, erteilt_at: '2026-06-11 09:00:00', in_arbeit_at: null, vollzugsmeldung: null,
   abgenommen_at: null, abgenommen_von_id: null, etb_anordnung_id: 5, erstellt_von_id: 1,
   erstellt_at: '2026-06-11 09:00:00', vollzug_status: 'offen', vollzogen_at: null, vollzogen_von_id: null,
   empfaenger_anzahl: 1, quittiert_anzahl: 0, ist_ueberfaellig: false, bearbeitungsstatus: 'offen',
-  empfaenger: [{ id: 1, auftrag_id: 1, empfaenger_typ: 'funktion', abschnitt_id: null, einheit_id: null, person_id: null, fahrzeug_id: null, funktion_text: 'EA Nord', snap_anzeige: 'EA Nord', quittiert_at: null, quittiert_von_id: null }],
+  empfaenger: [{ id: 1, auftrag_id: 1, empfaenger_typ: 'funktion', abschnitt_id: null, einheit_id: null, person_id: null, fahrzeug_id: null, funktion_text: 'EA Nord', extern_kategorie: null, extern_bezeichnung: null, snap_anzeige: 'EA Nord', quittiert_at: null, quittiert_von_id: null }],
   ...over,
 });
 
@@ -80,6 +80,13 @@ describe('AuftraegePage', () => {
       auftrag_text: 'Erkunden',
       empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'EA Nord' }],
     })));
+  });
+
+  it('filtert Aufträge nach Richtung extern (LFH-87)', async () => {
+    renderPage();
+    await screen.findByText('Deich sichern');
+    await userEvent.click(screen.getByText('Extern'));
+    await waitFor(() => expect(listeAuftraege).toHaveBeenCalledWith(1, expect.objectContaining({ richtung: 'extern' })));
   });
 
   it('sendet das Befehlsschema-Feld „Zeit/Wann" mit', async () => {

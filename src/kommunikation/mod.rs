@@ -15,6 +15,7 @@ pub use crate::etb::{EtbTyp, MeldeWeg};
 pub const OBJEKT_CHAT_NACHRICHT: &str = "chat_nachricht";
 pub const OBJEKT_ERINNERUNG: &str = "erinnerung";
 pub const OBJEKT_AUFTRAG: &str = "auftrag";
+pub const OBJEKT_MELDUNG: &str = "meldung";
 
 /// Vollzug-Achse (Achse 2): Bearbeitungszustand eines Objekts.
 pub const VOLLZUG_OFFEN: &str = "offen";
@@ -56,5 +57,8 @@ mod tests {
         assert_ne!(OBJEKT_CHAT_NACHRICHT, OBJEKT_ERINNERUNG);
         assert_ne!(OBJEKT_AUFTRAG, OBJEKT_ERINNERUNG);
         assert_ne!(OBJEKT_AUFTRAG, OBJEKT_CHAT_NACHRICHT);
+        assert_ne!(OBJEKT_MELDUNG, OBJEKT_AUFTRAG);
+        assert_ne!(OBJEKT_MELDUNG, OBJEKT_CHAT_NACHRICHT);
+        assert_ne!(OBJEKT_MELDUNG, OBJEKT_ERINNERUNG);
     }
 }

@@ -1,5 +1,5 @@
 use crate::app::AppState;
-use crate::auftrag::{repo, AuftragDetail, EMPF_ABSCHNITT, EMPF_EINHEIT, EMPF_FAHRZEUG, EMPF_FUNKTION, EMPF_PERSON, PRIO_NORMAL};
+use crate::auftrag::{repo, AuftragDetail, EMPF_ABSCHNITT, EMPF_EINHEIT, EMPF_EXTERN, EMPF_FAHRZEUG, EMPF_FUNKTION, EMPF_PERSON, PRIO_NORMAL, RICHTUNG_INTERN};
 use crate::auth::session::CurrentUser;
 use crate::einsatz::berechtigung::{fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
 use crate::einsatz::repo as einsatz_repo;
@@ -42,6 +42,7 @@ fn trimme(o: &Option<String>) -> Option<&str> {
 #[derive(Debug, Deserialize)]
 pub struct ListeParams {
     pub status: Option<String>,
+    pub richtung: Option<String>,
     pub abschnitt_id: Option<i64>,
     pub einheit_id: Option<i64>,
 }
@@ -68,10 +69,17 @@ pub async fn liste(
             einheit_id: params.einheit_id,
         },
     );
+    let richtung = params.richtung.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    if let Some(r) = richtung {
+        if !crate::auftrag::richtung_gueltig(r) {
+            return Err(AppError::Validation("Ungültige Richtung".into()));
+        }
+    }
     let liste = repo::liste(
         &state.pool,
         einsatz_id,
         params.status.as_deref(),
+        richtung,
         filter.as_ref(),
         &jetzt(),
     )
@@ -87,6 +95,8 @@ pub struct EmpfaengerEingabeReq {
     pub person_id: Option<i64>,
     pub fahrzeug_id: Option<i64>,
     pub funktion_text: Option<String>,
+    pub extern_kategorie: Option<String>,
+    pub extern_bezeichnung: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -100,6 +110,8 @@ pub struct NeuerAuftrag {
     pub verbindung: Option<String>,
     pub sicherheit: Option<String>,
     pub prioritaet: Option<String>,
+    /// Richtung intern/extern (LFH-87); Default 'intern'.
+    pub richtung: Option<String>,
     pub frist_at: Option<String>,
     /// Optional: Erteilzeitpunkt (mündlich/per Funk nachträglich). Default = jetzt.
     pub erteilt_at: Option<String>,
@@ -118,6 +130,7 @@ async fn validiere_empfaenger(
         req.person_id.is_some(),
         req.fahrzeug_id.is_some(),
         trimme(&req.funktion_text).is_some(),
+        trimme(&req.extern_bezeichnung).is_some(),
     ]
     .iter()
     .filter(|b| **b)
@@ -176,9 +189,20 @@ async fn validiere_empfaenger(
             }
             EMPF_FUNKTION
         }
+        EMPF_EXTERN => {
+            let kat = req.extern_kategorie.as_deref().map(str::trim).unwrap_or("");
+            if !crate::auftrag::extern_kategorie_gueltig(kat) {
+                return Err(AppError::Validation("Ungültige externe Adressat-Kategorie".into()));
+            }
+            if trimme(&req.extern_bezeichnung).is_none() {
+                return Err(AppError::Validation("externe Bezeichnung fehlt".into()));
+            }
+            EMPF_EXTERN
+        }
         _ => return Err(AppError::Validation("Ungültiger Empfänger-Typ".into())),
     };
 
+    let ist_extern = typ == EMPF_EXTERN;
     Ok(repo::EmpfaengerEingabe {
         empfaenger_typ: typ.to_string(),
         abschnitt_id: req.abschnitt_id,
@@ -186,6 +210,9 @@ async fn validiere_empfaenger(
         person_id: req.person_id,
         fahrzeug_id: req.fahrzeug_id,
         funktion_text: trimme(&req.funktion_text).map(str::to_string),
+        // extern_* nur bei externem Adressat übernehmen (sonst verirrte Werte an anderen Typen).
+        extern_kategorie: ist_extern.then(|| trimme(&req.extern_kategorie).map(str::to_string)).flatten(),
+        extern_bezeichnung: ist_extern.then(|| trimme(&req.extern_bezeichnung).map(str::to_string)).flatten(),
     })
 }
 
@@ -203,6 +230,7 @@ pub struct ValidierterAuftrag {
     verbindung: Option<String>,
     sicherheit: Option<String>,
     prioritaet: String,
+    richtung: String,
     frist_at: Option<String>,
     erteilt_at: String,
     empfaenger: Vec<repo::EmpfaengerEingabe>,
@@ -220,6 +248,7 @@ impl ValidierterAuftrag {
             verbindung: self.verbindung.as_deref(),
             sicherheit: self.sicherheit.as_deref(),
             prioritaet: &self.prioritaet,
+            richtung: &self.richtung,
             frist_at: self.frist_at.as_deref(),
             erteilt_at: &self.erteilt_at,
             empfaenger: self.empfaenger.clone(),
@@ -248,6 +277,10 @@ pub async fn validiere_neuen_auftrag(
     if !crate::auftrag::prioritaet_gueltig(prioritaet) {
         return Err(AppError::Validation("Ungültige Priorität".into()));
     }
+    let richtung = req.richtung.as_deref().map(str::trim).filter(|s| !s.is_empty()).unwrap_or(RICHTUNG_INTERN);
+    if !crate::auftrag::richtung_gueltig(richtung) {
+        return Err(AppError::Validation("Ungültige Richtung".into()));
+    }
     let frist = match trimme(&req.frist_at) {
         Some(f) => Some(parse_zeit(f)?),
         None => None,
@@ -272,6 +305,7 @@ pub async fn validiere_neuen_auftrag(
         verbindung: trimme(&req.verbindung).map(str::to_string),
         sicherheit: trimme(&req.sicherheit).map(str::to_string),
         prioritaet: prioritaet.to_string(),
+        richtung: richtung.to_string(),
         frist_at: frist,
         erteilt_at: erteilt,
         empfaenger,

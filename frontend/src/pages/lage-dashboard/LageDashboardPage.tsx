@@ -17,7 +17,6 @@ import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../../api/einsatzMaterial';
 import { listeAbschnitte } from '../../api/einsatzabschnitte';
-import { useEinsatzLiveStream } from '../../etb/useEinsatzLiveStream';
 import { baueKraeftebild } from '../../kraefte/kraeftebild';
 import {
   neuesterLagebericht, verdichteGefahrengebiete, verdichtePersonen,
@@ -33,7 +32,6 @@ import AuftraegeKachel from './AuftraegeKachel';
 export default function LageDashboardPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  useEinsatzLiveStream(einsatzId);
   const navigate = useNavigate();
   const gehe = (route: string) => navigate(`/einsaetze/${einsatzId}/${route}`);
 
