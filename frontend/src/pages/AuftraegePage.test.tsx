@@ -59,7 +59,8 @@ describe('AuftraegePage', () => {
   it('zeigt Aufträge mit Quittierungs-Stand', async () => {
     renderPage();
     expect(await screen.findByText('Deich sichern')).toBeInTheDocument();
-    expect(screen.getByText('Quittiert 0/1')).toBeInTheDocument();
+    // Quittierungs-Stand jetzt als Aggregat-Zeile auf der Karte (LFH-112).
+    expect(screen.getByText('1 Empfänger · 0/1 quittiert')).toBeInTheDocument();
   });
 
   it('markiert überfällige Aufträge', async () => {
@@ -75,6 +76,10 @@ describe('AuftraegePage', () => {
     legeAuftragAn.mockResolvedValue(auftrag());
     renderPage();
     await screen.findByText('Deich sichern');
+    // Formular ist jetzt inline-getoggelt → erst aufklappen. Der Kopf-Button trägt ein Icon
+    // (accessible name „plus Auftrag erteilen") → Regex; nach dem Öffnen heißt er „Formular schließen",
+    // sodass der spätere exakte „Auftrag erteilen"-Treffer eindeutig der Formular-Submit ist.
+    await userEvent.click(screen.getByRole('button', { name: /Auftrag erteilen/ }));
     await userEvent.type(screen.getByPlaceholderText('z. B. S3, Fachberater'), 'EA Nord');
     // Robust statt index-abhängig: die "Auftrag / Was"-TextArea trägt aria-label.
     await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
@@ -96,6 +101,8 @@ describe('AuftraegePage', () => {
     legeAuftragAn.mockResolvedValue(auftrag());
     renderPage();
     await screen.findByText('Deich sichern');
+    // Kopf-Button trägt Icon → Regex zum Aufklappen (siehe Hinweis oben).
+    await userEvent.click(screen.getByRole('button', { name: /Auftrag erteilen/ }));
     await userEvent.type(screen.getByPlaceholderText('z. B. S3, Fachberater'), 'EA Nord');
     await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
     await userEvent.type(screen.getByPlaceholderText('z. B. sofort, bis 14:00, nach Eintreffen'), 'sofort');

@@ -28,6 +28,7 @@ export default function HeraufstufenAuftragModal({
       width={520}
     >
       <AuftragFormular
+        card={false}
         senden={senden}
         abschnitte={abschnitte}
         einheiten={einheiten}

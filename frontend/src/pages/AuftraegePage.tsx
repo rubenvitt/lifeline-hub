@@ -1,4 +1,5 @@
-import { Alert, App, Breadcrumb, Col, Row, Segmented, Select, Spin, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Card, Flex, Segmented, Select, Spin, Typography } from 'antd';
+import { CloseOutlined, PlusOutlined, UpOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -47,12 +48,15 @@ export default function AuftraegePage() {
     queryFn: () => listeAuftraege(einsatzId, { richtung: richtungFilter, abschnittId, einheitId }),
   });
 
+  // Inline-Anlegen-Formular (LFH-112): per Kopf-Button auf-/zugeklappt, kein Drawer/Modal.
+  const [formOffen, setFormOffen] = useState(false);
+
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
   const invalidiere = () => qc.invalidateQueries({ queryKey: ['einsatz-auftraege', einsatzId] });
 
   const anlegenMutation = useMutation({
     mutationFn: (d: NeuerAuftrag) => legeAuftragAn(einsatzId, d),
-    onSuccess: () => { invalidiere(); message.success('Auftrag erteilt'); },
+    onSuccess: () => { invalidiere(); message.success('Auftrag erteilt'); setFormOffen(false); },
     onError: fehler,
   });
   const quittierenMutation = useMutation({
@@ -124,7 +128,7 @@ export default function AuftraegePage() {
   };
 
   return (
-    <div>
+    <div style={{ maxWidth: 1040, margin: '0 auto' }}>
       <Breadcrumb
         style={{ marginBottom: 12 }}
         items={[
@@ -133,68 +137,97 @@ export default function AuftraegePage() {
           { title: 'Aufträge/Befehle' },
         ]}
       />
-      <Typography.Title level={3} style={{ marginTop: 0 }}>Aufträge/Befehle</Typography.Title>
-      <Row gutter={24}>
-        <Col flex="auto">
-          {auftraegeQuery.isError && (
-            <Alert type="error" showIcon style={{ marginBottom: 12 }} message="Aufträge konnten nicht geladen werden" />
-          )}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12, alignItems: 'center' }}>
-            <Segmented
-              value={ansicht}
-              onChange={(v) => setAnsicht(v as 'offen' | 'abgeschlossen')}
-              options={[
-                { value: 'offen', label: `Offen (${offene.length})` },
-                { value: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossene.length})` },
-              ]}
-            />
-            <Segmented
-              value={richtungFilter ?? 'alle'}
-              onChange={(v) => setRichtungFilter(v === 'alle' ? undefined : String(v))}
-              options={[
-                { value: 'alle', label: 'Alle Richtungen' },
-                { value: 'intern', label: 'Intern' },
-                { value: 'extern', label: 'Extern' },
-              ]}
-            />
-            <Select
-              allowClear
-              placeholder="Empfänger filtern"
-              style={{ minWidth: 220 }}
-              value={empfFilter}
-              onChange={(v) => setEmpfFilter(v ?? undefined)}
-              options={empfaengerOptionen}
-              optionFilterProp="label"
-            />
-          </div>
-          {ansicht === 'offen' ? (
-            offeneGruppen.length === 0 ? (
-              <AuftragListe auftraege={[]} ansicht="offen" {...listenProps} />
-            ) : (
-              offeneGruppen.map(({ gruppe, auftraege }) => (
-                <div key={gruppe} style={{ marginBottom: 16 }}>
-                  <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
-                    {GRUPPE_LABEL[gruppe]} ({auftraege.length})
-                  </Typography.Text>
-                  <AuftragListe auftraege={auftraege} ansicht="offen" {...listenProps} />
-                </div>
-              ))
-            )
-          ) : (
-            <AuftragListe auftraege={abgeschlosseneSortiert} ansicht="abgeschlossen" {...listenProps} />
-          )}
-        </Col>
+      <Flex justify="space-between" align="center" gap={16} wrap style={{ marginBottom: 16 }}>
+        <div>
+          <Typography.Title level={3} style={{ margin: 0 }}>Aufträge/Befehle</Typography.Title>
+          <Typography.Text type="secondary">
+            {offene.length} offen · {abgeschlossene.length} abgeschlossen
+          </Typography.Text>
+        </div>
         {darfSchreiben && (
-          <Col flex="360px">
-            <AuftragFormular
-              senden={anlegenMutation.isPending}
-              abschnitte={abschnitte}
-              einheiten={einheiten}
-              onAnlegen={(d) => anlegenMutation.mutate(d)}
-            />
-          </Col>
+          <Button
+            type="primary"
+            size="large"
+            icon={formOffen ? <UpOutlined /> : <PlusOutlined />}
+            onClick={() => setFormOffen((o) => !o)}
+          >
+            {formOffen ? 'Formular schließen' : 'Auftrag erteilen'}
+          </Button>
         )}
-      </Row>
+      </Flex>
+
+      {darfSchreiben && formOffen && (
+        <Card
+          size="small"
+          title="Neuer Auftrag/Befehl"
+          style={{ marginBottom: 16 }}
+          extra={(
+            <Button
+              type="text"
+              size="small"
+              icon={<CloseOutlined />}
+              onClick={() => setFormOffen(false)}
+              aria-label="Formular schließen"
+            />
+          )}
+        >
+          <AuftragFormular
+            card={false}
+            senden={anlegenMutation.isPending}
+            abschnitte={abschnitte}
+            einheiten={einheiten}
+            onAnlegen={(d) => anlegenMutation.mutate(d)}
+          />
+        </Card>
+      )}
+
+      {auftraegeQuery.isError && (
+        <Alert type="error" showIcon style={{ marginBottom: 12 }} message="Aufträge konnten nicht geladen werden" />
+      )}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16, alignItems: 'center' }}>
+        <Segmented
+          value={ansicht}
+          onChange={(v) => setAnsicht(v as 'offen' | 'abgeschlossen')}
+          options={[
+            { value: 'offen', label: `Offen (${offene.length})` },
+            { value: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossene.length})` },
+          ]}
+        />
+        <Segmented
+          value={richtungFilter ?? 'alle'}
+          onChange={(v) => setRichtungFilter(v === 'alle' ? undefined : String(v))}
+          options={[
+            { value: 'alle', label: 'Alle Richtungen' },
+            { value: 'intern', label: 'Intern' },
+            { value: 'extern', label: 'Extern' },
+          ]}
+        />
+        <Select
+          allowClear
+          placeholder="Empfänger filtern"
+          style={{ minWidth: 220 }}
+          value={empfFilter}
+          onChange={(v) => setEmpfFilter(v ?? undefined)}
+          options={empfaengerOptionen}
+          optionFilterProp="label"
+        />
+      </div>
+      {ansicht === 'offen' ? (
+        offeneGruppen.length === 0 ? (
+          <AuftragListe auftraege={[]} ansicht="offen" {...listenProps} />
+        ) : (
+          offeneGruppen.map(({ gruppe, auftraege }) => (
+            <div key={gruppe} style={{ marginBottom: 16 }}>
+              <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
+                {GRUPPE_LABEL[gruppe]} ({auftraege.length})
+              </Typography.Text>
+              <AuftragListe auftraege={auftraege} ansicht="offen" {...listenProps} />
+            </div>
+          ))
+        )
+      ) : (
+        <AuftragListe auftraege={abgeschlosseneSortiert} ansicht="abgeschlossen" {...listenProps} />
+      )}
       <VollzugMeldenModal
         offen={vollzugFuer !== null}
         onAbbrechen={() => setVollzugFuer(null)}
