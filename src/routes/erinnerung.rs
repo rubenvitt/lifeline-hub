@@ -4,7 +4,7 @@ use crate::einsatz::berechtigung::{fordere_aktiv, fordere_lesezugriff, fordere_s
 use crate::einsatz::repo as einsatz_repo;
 use crate::erinnerung::{repo, ErinnerungAnzeige, STATUS_ERLEDIGT, STATUS_QUITTIERT};
 use crate::error::AppError;
-use crate::kommunikation::{repo as krepo, OBJEKT_ERINNERUNG, VOLLZUG_VOLLZOGEN};
+use crate::kommunikation::{repo as krepo, OBJEKT_AUFTRAG, OBJEKT_ERINNERUNG, OBJEKT_MELDUNG, VOLLZUG_VOLLZOGEN};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -99,7 +99,26 @@ pub async fn anlegen(
     // Bezug both-or-neither (wie der Chat-Sachbezug): entweder beides oder nichts.
     let bezug_typ = req.bezug_typ.as_deref().map(str::trim).filter(|s| !s.is_empty());
     match (bezug_typ, req.bezug_id) {
-        (Some(_), Some(_)) | (None, None) => {}
+        (Some(typ), Some(id)) => {
+            // Allowlist + einsatz-gescopter Existenz-Check (analog Chat-Sachbezug,
+            // src/chat/repo.rs::ziel_gehoert_zu_einsatz). Schützt u. a. den Scheduler-
+            // Pfad bezug_typ='meldung' → setze_eskaliert (nicht einsatz-gescopt) vor
+            // Cross-Einsatz-Schreibzugriff. Unbekannter Typ → Validation (400);
+            // fremdes/unbekanntes Ziel → NotFound (404, wie fordere_bearbeitbar).
+            let gehoert = if typ == "etb" {
+                crate::etb::repo::gehoert_zu_einsatz(&state.pool, id, einsatz_id).await?
+            } else if typ == OBJEKT_MELDUNG {
+                crate::meldung::repo::gehoert_zu_einsatz(&state.pool, id, einsatz_id).await?
+            } else if typ == OBJEKT_AUFTRAG {
+                crate::auftrag::repo::gehoert_zu_einsatz(&state.pool, id, einsatz_id).await?
+            } else {
+                return Err(AppError::Validation("Unbekannter bezug_typ".into()));
+            };
+            if !gehoert {
+                return Err(AppError::NotFound);
+            }
+        }
+        (None, None) => {}
         _ => return Err(AppError::Validation("Bezug erfordert bezug_typ und bezug_id zusammen".into())),
     }
 
