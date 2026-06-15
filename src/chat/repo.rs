@@ -714,6 +714,7 @@ mod tests {
             verbindung: None,
             sicherheit: None,
             prioritaet: "normal",
+            richtung: "intern",
             frist_at: None,
             erteilt_at: "2026-06-12 10:00:00",
             empfaenger: vec![crate::auftrag::repo::EmpfaengerEingabe {

@@ -2,7 +2,7 @@ import { App, Button, Card, DatePicker, Form, Input, InputNumber, Select, Space,
 import { ThunderboltOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
-import type { Meldungsart, MeldungMeldeweg, MeldungPrioritaet, NeueMeldung } from '../api/types';
+import type { Meldungsart, MeldungMeldeweg, MeldungPrioritaet, NeueMeldung, Richtung } from '../api/types';
 
 const { TextArea } = Input;
 
@@ -21,6 +21,7 @@ export default function MeldungFormular({ senden, onAnlegen }: {
   const [meldeweg, setMeldeweg] = useState<MeldungMeldeweg>('funk');
   const [meldungsart, setMeldungsart] = useState<Meldungsart>('sonstige');
   const [prioritaet, setPrioritaet] = useState<MeldungPrioritaet>('normal');
+  const [richtung, setRichtung] = useState<Richtung>('intern');
   const [ereigniszeit, setEreigniszeit] = useState<dayjs.Dayjs | null>(null);
   const [inhalt, setInhalt] = useState('');
   const [bestaetigungPflicht, setBestaetigungPflicht] = useState(false);
@@ -53,13 +54,14 @@ export default function MeldungFormular({ senden, onAnlegen }: {
       inhalt: inhalt.trim(),
       meldungsart,
       prioritaet,
+      richtung,
       // Ereigniszeit Pflicht: leer ⇒ jetzt (Funk-Realität: meist „eben empfangen").
       ereigniszeit: dayjsZuWire(ereigniszeit ?? dayjs()),
       bestaetigung_pflicht: bestaetigungPflicht,
       bestaetigung_frist_min: bestaetigungPflicht && fristMin != null ? fristMin : undefined,
     });
     setAbsender(''); setEmpfaenger(''); setMeldeweg('funk'); setMeldungsart('sonstige');
-    setPrioritaet('normal'); setEreigniszeit(null); setInhalt('');
+    setPrioritaet('normal'); setRichtung('intern'); setEreigniszeit(null); setInhalt('');
     setBestaetigungPflicht(false); setFristMin(null);
   };
 
@@ -106,6 +108,12 @@ export default function MeldungFormular({ senden, onAnlegen }: {
               { value: 'sofort', label: 'Sofort' },
               { value: 'dringend', label: 'Dringend' },
               { value: 'normal', label: 'Normal' },
+            ]} />
+          </Form.Item>
+          <Form.Item label="Richtung" style={{ flex: 1 }}>
+            <Select<Richtung> aria-label="Richtung" value={richtung} onChange={setRichtung} options={[
+              { value: 'intern', label: 'Intern' },
+              { value: 'extern', label: 'Extern' },
             ]} />
           </Form.Item>
           <Form.Item label="Ereigniszeit (≠ Erfassung)" style={{ flex: 1 }}>

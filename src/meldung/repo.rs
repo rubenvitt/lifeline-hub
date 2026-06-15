@@ -12,6 +12,7 @@ pub struct MeldungDaten<'a> {
     pub inhalt: &'a str,
     pub meldungsart: &'a str,
     pub prioritaet: &'a str,
+    pub richtung: &'a str,
     pub ereigniszeit: &'a str,
     pub eingang_at: &'a str,
     /// Sofortmeldung & Eskalation (LFH-97): aktive Bestätigungspflicht.
@@ -28,7 +29,7 @@ pub struct MeldungDaten<'a> {
 /// VOR der WHERE-Klausel; alle Aufrufer binden `jetzt` als ERSTEN Parameter (Muster erinnerung).
 const ANZEIGE_SELECT: &str =
     "SELECT m.id, m.einsatz_id, m.lfd_nr, m.absender, m.empfaenger, m.meldeweg, m.inhalt, \
-            m.meldungsart, m.prioritaet, m.status, m.bearbeiter_id, b.anzeigename AS bearbeiter_name, \
+            m.meldungsart, m.prioritaet, m.richtung, m.status, m.bearbeiter_id, b.anzeigename AS bearbeiter_name, \
             m.lagerelevant, m.ereigniszeit, m.eingang_at, m.etb_meldung_id, m.auftrag_id, \
             m.erfasst_von_id, m.erstellt_at, \
             (SELECT lm.id FROM lage_meldung lm WHERE lm.meldung_id = m.id) AS lage_meldung_id, \
@@ -66,15 +67,16 @@ pub async fn anlegen(
 ) -> Result<MeldungAnzeige, AppError> {
     debug_assert!(prioritaet_gueltig(daten.prioritaet));
     debug_assert!(meldungsart_gueltig(daten.meldungsart));
+    debug_assert!(super::richtung_gueltig(daten.richtung));
     let mut tx = pool.begin().await?;
 
     // lfd_nr atomar je Einsatz (Muster etb/repo.rs).
     let meldung_id: i64 = sqlx::query_scalar(
         "INSERT INTO meldung \
            (einsatz_id, lfd_nr, absender, empfaenger, meldeweg, inhalt, meldungsart, \
-            prioritaet, ereigniszeit, eingang_at, bestaetigung_pflicht, bestaetigung_frist_at, \
+            prioritaet, richtung, ereigniszeit, eingang_at, bestaetigung_pflicht, bestaetigung_frist_at, \
             erfasst_von_id) \
-         SELECT ?, COALESCE(MAX(lfd_nr), 0) + 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? \
+         SELECT ?, COALESCE(MAX(lfd_nr), 0) + 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? \
          FROM meldung WHERE einsatz_id = ? \
          RETURNING id",
     )
@@ -85,6 +87,7 @@ pub async fn anlegen(
     .bind(daten.inhalt)
     .bind(daten.meldungsart)
     .bind(daten.prioritaet)
+    .bind(daten.richtung)
     .bind(daten.ereigniszeit)
     .bind(daten.eingang_at)
     .bind(daten.bestaetigung_pflicht)
@@ -137,19 +140,27 @@ pub async fn liste(
     pool: &SqlitePool,
     einsatz_id: i64,
     status_filter: Option<&str>,
+    richtung_filter: Option<&str>,
     jetzt: &str,
 ) -> Result<Vec<MeldungAnzeige>, AppError> {
     let mut q = format!("{ANZEIGE_SELECT} WHERE m.einsatz_id = ?");
     if status_filter.is_some() {
         q.push_str(" AND m.status = ?");
     }
+    if richtung_filter.is_some() {
+        q.push_str(" AND m.richtung = ?");
+    }
     q.push_str(
         " ORDER BY CASE m.prioritaet WHEN 'sofort' THEN 0 WHEN 'dringend' THEN 1 ELSE 2 END, \
           m.eskaliert DESC, m.ereigniszeit DESC, m.lfd_nr DESC",
     );
+    // Bind-Reihenfolge = textuelle ?-Reihenfolge: jetzt, einsatz_id, [status], [richtung].
     let mut query = sqlx::query_as::<_, MeldungAnzeige>(&q).bind(jetzt).bind(einsatz_id);
     if let Some(s) = status_filter {
         query = query.bind(s);
+    }
+    if let Some(r) = richtung_filter {
+        query = query.bind(r);
     }
     query.fetch_all(pool).await.map_err(Into::into)
 }
@@ -343,6 +354,7 @@ mod tests {
             inhalt,
             meldungsart: ART_SOFORTMELDUNG,
             prioritaet: PRIO_NORMAL,
+            richtung: "intern",
             ereigniszeit: ereignis,
             eingang_at: eingang,
             bestaetigung_pflicht: false,
@@ -408,7 +420,7 @@ mod tests {
         let d = daten("sofort", "2026-06-12 08:00:00", "2026-06-12 08:00:00");
         let sofort = MeldungDaten { prioritaet: crate::meldung::PRIO_SOFORT, ..d };
         anlegen(&pool, e, b, sofort).await.unwrap();
-        let liste = liste(&pool, e, None, "2026-06-12 10:00:00").await.unwrap();
+        let liste = liste(&pool, e, None, None, "2026-06-12 10:00:00").await.unwrap();
         assert_eq!(liste.len(), 2);
         assert_eq!(liste[0].inhalt, "sofort", "sofort vor normal trotz älterer Ereigniszeit");
     }
@@ -418,9 +430,9 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         anlegen(&pool, e, b, daten("A", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
-        let liste_neu = liste(&pool, e, Some("neu"), "2026-06-12 10:00:00").await.unwrap();
+        let liste_neu = liste(&pool, e, Some("neu"), None, "2026-06-12 10:00:00").await.unwrap();
         assert_eq!(liste_neu.len(), 1);
-        let liste_erledigt = liste(&pool, e, Some("erledigt"), "2026-06-12 10:00:00").await.unwrap();
+        let liste_erledigt = liste(&pool, e, Some("erledigt"), None, "2026-06-12 10:00:00").await.unwrap();
         assert!(liste_erledigt.is_empty());
     }
 
@@ -632,5 +644,22 @@ mod tests {
         // Trotz überschrittener Frist: bestätigt → keine Eskalation.
         assert!(!setze_eskaliert(&pool, m.id, "2026-06-12 09:07:00").await.unwrap());
         assert!(!laden(&pool, m.id, "2026-06-12 09:07:00").await.unwrap().eskaliert);
+    }
+
+    #[tokio::test]
+    async fn richtung_default_intern_und_filter_extern() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        // Default 'intern' über den daten()-Helper.
+        let m_int = anlegen(&pool, e, b, daten("intern-m", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
+        assert_eq!(m_int.richtung, "intern");
+        let extern_m = MeldungDaten { richtung: "extern", ..daten("extern-m", "2026-06-12 09:01:00", "2026-06-12 09:01:00") };
+        anlegen(&pool, e, b, extern_m).await.unwrap();
+
+        assert_eq!(liste(&pool, e, None, None, "2026-06-12 10:00:00").await.unwrap().len(), 2);
+        let nur_extern = liste(&pool, e, None, Some("extern"), "2026-06-12 10:00:00").await.unwrap();
+        assert_eq!(nur_extern.len(), 1);
+        assert_eq!(nur_extern[0].richtung, "extern");
+        assert_eq!(nur_extern[0].inhalt, "extern-m");
     }
 }

@@ -24,6 +24,7 @@ export default function AuftraegePage() {
   const einheitenQuery = useQuery({ queryKey: ['einsatz-einheiten', einsatzId], queryFn: () => listeEinheiten(einsatzId) });
 
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
+  const [richtungFilter, setRichtungFilter] = useState<string | undefined>(undefined);
   // Empfänger-Filter (LFH-92): kodiert als "abschnitt:<id>" bzw. "einheit:<id>".
   const [empfFilter, setEmpfFilter] = useState<string | undefined>(undefined);
   const [empfTyp, empfId] = empfFilter ? empfFilter.split(':') : [undefined, undefined];
@@ -31,8 +32,8 @@ export default function AuftraegePage() {
   const einheitId = empfTyp === 'einheit' ? Number(empfId) : undefined;
 
   const auftraegeQuery = useQuery({
-    queryKey: ['einsatz-auftraege', einsatzId, statusFilter ?? 'alle', empfFilter ?? 'alle'],
-    queryFn: () => listeAuftraege(einsatzId, { status: statusFilter, abschnittId, einheitId }),
+    queryKey: ['einsatz-auftraege', einsatzId, statusFilter ?? 'alle', richtungFilter ?? 'alle', empfFilter ?? 'alle'],
+    queryFn: () => listeAuftraege(einsatzId, { status: statusFilter, richtung: richtungFilter, abschnittId, einheitId }),
   });
 
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
@@ -107,6 +108,15 @@ export default function AuftraegePage() {
                 { value: 'in_arbeit', label: 'In Bearbeitung' },
                 { value: 'vollzogen', label: 'Vollzogen' },
                 { value: 'abgenommen', label: 'Abgenommen' },
+              ]}
+            />
+            <Segmented
+              value={richtungFilter ?? 'alle'}
+              onChange={(v) => setRichtungFilter(v === 'alle' ? undefined : String(v))}
+              options={[
+                { value: 'alle', label: 'Alle Richtungen' },
+                { value: 'intern', label: 'Intern' },
+                { value: 'extern', label: 'Extern' },
               ]}
             />
             <Select

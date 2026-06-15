@@ -30,6 +30,7 @@ pub struct AuftragDaten<'a> {
     pub verbindung: Option<&'a str>,
     pub sicherheit: Option<&'a str>,
     pub prioritaet: &'a str,
+    pub richtung: &'a str,
     pub frist_at: Option<&'a str>,
     pub erteilt_at: &'a str,
     pub empfaenger: Vec<EmpfaengerEingabe>,
@@ -59,7 +60,7 @@ impl EmpfaengerFilter {
 /// `jetzt` wird als ERSTER `?` gebunden (computed columns vor WHERE), dann WHERE.
 const ANZEIGE_SELECT: &str =
     "SELECT a.id, a.einsatz_id, a.auftrag_text, a.absicht, a.lage, a.ort, a.zeit, a.mittel, \
-            a.verbindung, a.sicherheit, a.prioritaet, a.frist_at, a.erteilt_at, a.in_arbeit_at, \
+            a.verbindung, a.sicherheit, a.prioritaet, a.richtung, a.frist_at, a.erteilt_at, a.in_arbeit_at, \
             a.vollzugsmeldung, a.abgenommen_at, a.abgenommen_von_id, a.etb_anordnung_id, \
             a.erstellt_von_id, a.erstellt_at, \
             COALESCE(ks.vollzug_status, 'offen') AS vollzug_status, \
@@ -108,18 +109,24 @@ pub async fn liste(
     pool: &SqlitePool,
     einsatz_id: i64,
     status_filter: Option<&str>,
+    richtung_filter: Option<&str>,
     empfaenger_filter: Option<&EmpfaengerFilter>,
     jetzt: &str,
 ) -> Result<Vec<AuftragDetail>, AppError> {
-    let auftraege = sqlx::query_as::<_, AuftragAnzeige>(&format!(
-        "{ANZEIGE_SELECT} WHERE a.einsatz_id = ? \
-         ORDER BY CASE a.prioritaet WHEN 'sofort' THEN 0 WHEN 'dringend' THEN 1 ELSE 2 END, \
-                  a.frist_at IS NULL, a.frist_at, a.id"
-    ))
-    .bind(jetzt)
-    .bind(einsatz_id)
-    .fetch_all(pool)
-    .await?;
+    let mut sql = format!("{ANZEIGE_SELECT} WHERE a.einsatz_id = ?");
+    if richtung_filter.is_some() {
+        sql.push_str(" AND a.richtung = ?");
+    }
+    sql.push_str(
+        " ORDER BY CASE a.prioritaet WHEN 'sofort' THEN 0 WHEN 'dringend' THEN 1 ELSE 2 END, \
+          a.frist_at IS NULL, a.frist_at, a.id",
+    );
+    // Bind-Reihenfolge: jetzt (computed) → einsatz_id → optional richtung.
+    let mut q = sqlx::query_as::<_, AuftragAnzeige>(&sql).bind(jetzt).bind(einsatz_id);
+    if let Some(r) = richtung_filter {
+        q = q.bind(r);
+    }
+    let auftraege = q.fetch_all(pool).await?;
 
     let mut out = Vec::with_capacity(auftraege.len());
     for auftrag in auftraege {
@@ -202,12 +209,13 @@ pub async fn anlegen_tx(
     daten: &AuftragDaten<'_>,
 ) -> Result<i64, AppError> {
     debug_assert!(prioritaet_gueltig(daten.prioritaet));
+    debug_assert!(super::richtung_gueltig(daten.richtung));
 
     let auftrag_id: i64 = sqlx::query_scalar(
         "INSERT INTO auftrag \
            (einsatz_id, auftrag_text, absicht, lage, ort, zeit, mittel, verbindung, sicherheit, \
-            prioritaet, frist_at, erteilt_at, erstellt_von_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            prioritaet, richtung, frist_at, erteilt_at, erstellt_von_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(daten.auftrag_text)
@@ -219,6 +227,7 @@ pub async fn anlegen_tx(
     .bind(daten.verbindung)
     .bind(daten.sicherheit)
     .bind(daten.prioritaet)
+    .bind(daten.richtung)
     .bind(daten.frist_at)
     .bind(daten.erteilt_at)
     .bind(ersteller_id)
@@ -446,6 +455,7 @@ mod tests {
             verbindung: None,
             sicherheit: None,
             prioritaet: super::super::PRIO_NORMAL,
+            richtung: super::super::RICHTUNG_INTERN,
             frist_at: frist,
             erteilt_at: "2026-06-11 09:00:00",
             empfaenger: empf,
@@ -509,7 +519,7 @@ mod tests {
         let (b, e) = setup(&pool).await;
         anlegen(&pool, e, b, daten("A", None, vec![funktion("EA1")]), "2026-06-11 09:00:00").await.unwrap();
         anlegen(&pool, e, b, daten("B", None, vec![funktion("EA2")]), "2026-06-11 09:00:00").await.unwrap();
-        let liste = liste(&pool, e, None, None, "2026-06-11 10:00:00").await.unwrap();
+        let liste = liste(&pool, e, None, None, None, "2026-06-11 10:00:00").await.unwrap();
         assert_eq!(liste.len(), 2);
         assert!(liste.iter().all(|d| d.empfaenger.len() == 1));
     }
@@ -624,7 +634,7 @@ mod tests {
         anlegen(&pool, e, b, daten_prio("normal-frueh", PRIO_NORMAL, Some("2026-06-11 10:00:00"), vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
         anlegen(&pool, e, b, daten_prio("dringend", PRIO_DRINGEND, None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
 
-        let liste = liste(&pool, e, None, None, "2026-06-11 09:30:00").await.unwrap();
+        let liste = liste(&pool, e, None, None, None, "2026-06-11 09:30:00").await.unwrap();
         let reihenfolge: Vec<&str> = liste.iter().map(|d| d.auftrag.auftrag_text.as_str()).collect();
         assert_eq!(
             reihenfolge,
@@ -642,5 +652,21 @@ mod tests {
         // Laden NACH der Frist: nicht überfällig, weil alle quittiert.
         let nach = laden(&pool, d.auftrag.id, "2026-06-11 10:30:00").await.unwrap();
         assert!(!nach.auftrag.ist_ueberfaellig, "alle quittiert → nicht überfällig trotz überschrittener Frist");
+    }
+
+    #[tokio::test]
+    async fn richtung_default_intern_und_liste_filtert_extern() {
+        use super::super::RICHTUNG_EXTERN;
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let d_int = anlegen(&pool, e, b, daten("intern-a", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+        assert_eq!(d_int.auftrag.richtung, "intern", "Default intern");
+        let ext = AuftragDaten { richtung: RICHTUNG_EXTERN, ..daten("extern-a", None, vec![funktion("Leitstelle")]) };
+        anlegen(&pool, e, b, ext, "2026-06-11 09:00:00").await.unwrap();
+
+        let nur_extern = liste(&pool, e, None, Some("extern"), None, "2026-06-11 10:00:00").await.unwrap();
+        assert_eq!(nur_extern.len(), 1);
+        assert_eq!(nur_extern[0].auftrag.richtung, "extern");
+        assert_eq!(nur_extern[0].auftrag.auftrag_text, "extern-a");
     }
 }

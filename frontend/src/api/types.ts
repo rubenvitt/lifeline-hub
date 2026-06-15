@@ -783,6 +783,8 @@ export interface NeueErinnerung {
 export type AuftragPrioritaet = 'sofort' | 'dringend' | 'normal';
 export type AuftragBearbeitungsstatus = 'offen' | 'in_arbeit' | 'vollzogen' | 'abgenommen';
 export type EmpfaengerTyp = 'abschnitt' | 'einheit' | 'funktion' | 'person' | 'fahrzeug';
+/** Richtungskennzeichnung intern/extern (LFH-87), an Meldung und Auftrag. */
+export type Richtung = 'intern' | 'extern';
 
 export interface AuftragEmpfaenger {
   id: number;
@@ -810,6 +812,7 @@ export interface Auftrag {
   verbindung: string | null;
   sicherheit: string | null;
   prioritaet: AuftragPrioritaet;
+  richtung: Richtung;
   frist_at: string | null;
   erteilt_at: string;
   in_arbeit_at: string | null;
@@ -849,6 +852,7 @@ export interface NeuerAuftrag {
   verbindung?: string;
   sicherheit?: string;
   prioritaet?: AuftragPrioritaet;
+  richtung?: Richtung;
   /** 'YYYY-MM-DD HH:MM' (UTC). */
   frist_at?: string;
   /** Erteilzeitpunkt (UTC); leer = jetzt. */
@@ -874,6 +878,7 @@ export interface Meldung {
   inhalt: string;
   meldungsart: Meldungsart;
   prioritaet: MeldungPrioritaet;
+  richtung: Richtung;
   status: MeldungStatus;
   bearbeiter_id: number | null;
   bearbeiter_name: string | null;
@@ -911,6 +916,7 @@ export interface NeueMeldung {
   inhalt: string;
   meldungsart?: Meldungsart;
   prioritaet?: MeldungPrioritaet;
+  richtung?: Richtung;
   /** Ereigniszeit (UTC) 'YYYY-MM-DD HH:mm:ss'. Pflicht (≠ Erfassungszeit). */
   ereigniszeit: string;
   /** Bestätigungspflicht erzwingen; undefined ⇒ aus Sofort-Klassifikation abgeleitet (LFH-97). */

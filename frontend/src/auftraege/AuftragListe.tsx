@@ -78,6 +78,7 @@ export default function AuftragListe({
               title={
                 <Space wrap>
                   <Tag color={prio.color}>{prio.label}</Tag>
+                  {a.richtung === 'extern' && <Tag color="purple">Extern</Tag>}
                   <Typography.Text strong>{a.auftrag_text}</Typography.Text>
                   {a.ist_ueberfaellig && <Tag color="error">Überfällig</Tag>}
                 </Space>

@@ -24,8 +24,16 @@ pub const BEARB_IN_ARBEIT: &str = "in_arbeit";
 pub const BEARB_VOLLZOGEN: &str = "vollzogen";
 pub const BEARB_ABGENOMMEN: &str = "abgenommen";
 
+/// Richtungskennzeichnung intern/extern (LFH-87, TEXT in der DB, im Code validiert).
+pub const RICHTUNG_INTERN: &str = "intern";
+pub const RICHTUNG_EXTERN: &str = "extern";
+
 pub fn prioritaet_gueltig(p: &str) -> bool {
     matches!(p, PRIO_SOFORT | PRIO_DRINGEND | PRIO_NORMAL)
+}
+
+pub fn richtung_gueltig(r: &str) -> bool {
+    matches!(r, RICHTUNG_INTERN | RICHTUNG_EXTERN)
 }
 
 pub fn empfaenger_typ_gueltig(t: &str) -> bool {
@@ -48,6 +56,8 @@ pub struct AuftragAnzeige {
     pub verbindung: Option<String>,
     pub sicherheit: Option<String>,
     pub prioritaet: String,
+    /// Richtung intern/extern (LFH-87).
+    pub richtung: String,
     pub frist_at: Option<String>,
     pub erteilt_at: String,
     pub in_arbeit_at: Option<String>,

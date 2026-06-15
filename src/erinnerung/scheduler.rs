@@ -200,6 +200,7 @@ mod tests {
         let m = crate::meldung::repo::anlegen(&pool, e, b, crate::meldung::repo::MeldungDaten {
             absender: "Florian Nord 1", empfaenger: None, meldeweg: "funk", inhalt: "MANV",
             meldungsart: crate::meldung::ART_SOFORTMELDUNG, prioritaet: crate::meldung::PRIO_SOFORT,
+            richtung: "intern",
             ereigniszeit: "2026-06-11 09:55:00", eingang_at: "2026-06-11 09:55:00",
             bestaetigung_pflicht: true, bestaetigung_frist_at: Some("2026-06-11 10:00:00"),
         }).await.unwrap();
@@ -226,6 +227,7 @@ mod tests {
         let m = crate::meldung::repo::anlegen(&pool, e, b, crate::meldung::repo::MeldungDaten {
             absender: "Florian Nord 1", empfaenger: None, meldeweg: "funk", inhalt: "MANV",
             meldungsart: crate::meldung::ART_SOFORTMELDUNG, prioritaet: crate::meldung::PRIO_SOFORT,
+            richtung: "intern",
             ereigniszeit: "2026-06-11 09:55:00", eingang_at: "2026-06-11 09:55:00",
             bestaetigung_pflicht: true, bestaetigung_frist_at: Some("2026-06-11 10:00:00"),
         }).await.unwrap();
@@ -250,6 +252,7 @@ mod tests {
         let m = crate::meldung::repo::anlegen(&pool, e, b, crate::meldung::repo::MeldungDaten {
             absender: "Florian Nord 1", empfaenger: None, meldeweg: "funk", inhalt: "MANV",
             meldungsart: crate::meldung::ART_SOFORTMELDUNG, prioritaet: crate::meldung::PRIO_SOFORT,
+            richtung: "intern",
             ereigniszeit: "2026-06-11 09:55:00", eingang_at: "2026-06-11 09:55:00",
             bestaetigung_pflicht: true, bestaetigung_frist_at: Some("2026-06-11 10:00:00"),
         }).await.unwrap();

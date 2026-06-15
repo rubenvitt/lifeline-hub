@@ -3,6 +3,7 @@ import type { Auftrag, NeuerAuftrag } from './types';
 
 export interface AuftragFilter {
   status?: string;
+  richtung?: string;
   abschnittId?: number;
   einheitId?: number;
 }
@@ -10,6 +11,7 @@ export interface AuftragFilter {
 export function listeAuftraege(einsatzId: number, filter: AuftragFilter = {}): Promise<Auftrag[]> {
   const p = new URLSearchParams();
   if (filter.status) p.set('status', filter.status);
+  if (filter.richtung) p.set('richtung', filter.richtung);
   if (filter.abschnittId != null) p.set('abschnitt_id', String(filter.abschnittId));
   if (filter.einheitId != null) p.set('einheit_id', String(filter.einheitId));
   const q = p.toString() ? `?${p.toString()}` : '';

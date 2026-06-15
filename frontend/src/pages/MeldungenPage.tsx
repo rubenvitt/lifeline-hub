@@ -18,6 +18,7 @@ export default function MeldungenPage() {
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const mitgliederQuery = useQuery({ queryKey: ['einsatz-mitglieder', einsatzId], queryFn: () => ladeMitglieder(einsatzId) });
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
+  const [richtungFilter, setRichtungFilter] = useState<string | undefined>(undefined);
 
   // 'offen' ist eine clientseitige Sammelsicht (status != 'erledigt') über `ist_offen`;
   // der Server filtert nur exakte Einzelstatus.
@@ -25,8 +26,8 @@ export default function MeldungenPage() {
   const serverStatus = statusFilter && REALE_STATUS.includes(statusFilter) ? statusFilter : undefined;
 
   const meldungenQuery = useQuery({
-    queryKey: ['einsatz-meldungen', einsatzId, statusFilter ?? 'alle'],
-    queryFn: () => listeMeldungen(einsatzId, { status: serverStatus }),
+    queryKey: ['einsatz-meldungen', einsatzId, statusFilter ?? 'alle', richtungFilter ?? 'alle'],
+    queryFn: () => listeMeldungen(einsatzId, { status: serverStatus, richtung: richtungFilter }),
   });
 
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
@@ -106,6 +107,16 @@ export default function MeldungenPage() {
                 { value: 'gesichtet', label: 'Gesichtet' },
                 { value: 'in_bearbeitung', label: 'In Arbeit' },
                 { value: 'erledigt', label: 'Abgeschlossen' },
+              ]}
+            />
+            <Segmented
+              style={{ marginLeft: 12 }}
+              value={richtungFilter ?? 'alle'}
+              onChange={(v) => setRichtungFilter(v === 'alle' ? undefined : String(v))}
+              options={[
+                { value: 'alle', label: 'Alle Richtungen' },
+                { value: 'intern', label: 'Intern' },
+                { value: 'extern', label: 'Extern' },
               ]}
             />
           </div>

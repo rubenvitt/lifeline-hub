@@ -12,6 +12,10 @@ const PRIO_TAG: Record<string, { color: string; label: string }> = {
   dringend: { color: 'orange', label: 'Dringend' },
   normal: { color: 'default', label: 'Normal' },
 };
+const RICHTUNG_TAG: Record<string, { color: string; label: string }> = {
+  intern: { color: 'default', label: 'Intern' },
+  extern: { color: 'purple', label: 'Extern' },
+};
 const STATUS_TAG: Record<string, { color: string; label: string }> = {
   neu: { color: 'blue', label: 'Neu' },
   gesichtet: { color: 'cyan', label: 'Gesichtet' },
@@ -85,6 +89,7 @@ export default function MeldungListe({
                 <Space wrap>
                   <Typography.Text type="secondary">#{m.lfd_nr}</Typography.Text>
                   <Tag color={prio.color}>{prio.label}</Tag>
+                  {m.richtung === 'extern' && <Tag color={RICHTUNG_TAG.extern.color}>{RICHTUNG_TAG.extern.label}</Tag>}
                   <Typography.Text strong>{m.absender}</Typography.Text>
                   {m.empfaenger && <Typography.Text type="secondary">→ {m.empfaenger}</Typography.Text>}
                   {m.lagerelevant && <Tag color="gold">Lagerelevant ✓</Tag>}

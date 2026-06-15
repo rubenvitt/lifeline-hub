@@ -36,7 +36,7 @@ const person = (sichtung: string | null, status = 'betroffen') => ({
 
 const auftrag = (over: Partial<Auftrag> = {}): Auftrag => ({
   id: Math.floor(Math.random() * 1e9), einsatz_id: 1, auftrag_text: 'Deich sichern', absicht: null,
-  lage: null, ort: null, zeit: null, mittel: null, verbindung: null, sicherheit: null, prioritaet: 'normal',
+  lage: null, ort: null, zeit: null, mittel: null, verbindung: null, sicherheit: null, prioritaet: 'normal', richtung: 'intern',
   frist_at: null, erteilt_at: '2026-06-11 09:00:00', in_arbeit_at: null, vollzugsmeldung: null,
   abgenommen_at: null, abgenommen_von_id: null, etb_anordnung_id: 5, erstellt_von_id: 1,
   erstellt_at: '2026-06-11 09:00:00', vollzug_status: 'offen', vollzogen_at: null, vollzogen_von_id: null,

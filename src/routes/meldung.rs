@@ -5,7 +5,7 @@ use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
 use crate::meldung::{
     repo, MeldungAnzeige, ART_SOFORTMELDUNG, ART_SONSTIGE, BESTAETIGUNG_FRIST_DEFAULT_MIN,
-    PRIO_NORMAL, PRIO_SOFORT,
+    PRIO_NORMAL, PRIO_SOFORT, RICHTUNG_INTERN,
 };
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -44,6 +44,7 @@ fn trimme(o: &Option<String>) -> Option<&str> {
 #[derive(Debug, Deserialize)]
 pub struct ListeParams {
     pub status: Option<String>,
+    pub richtung: Option<String>,
 }
 
 /// GET /api/einsaetze/{id}/meldungen — Posteingang listen (Lesezugriff, auch Beobachter).
@@ -62,7 +63,13 @@ pub async fn liste(
             return Err(AppError::Validation("Ungültiger Status-Filter".into()));
         }
     }
-    Ok(Json(repo::liste(&state.pool, einsatz_id, status, &jetzt()).await?))
+    let richtung = params.richtung.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    if let Some(r) = richtung {
+        if !crate::meldung::richtung_gueltig(r) {
+            return Err(AppError::Validation("Ungültiger Richtungs-Filter".into()));
+        }
+    }
+    Ok(Json(repo::liste(&state.pool, einsatz_id, status, richtung, &jetzt()).await?))
 }
 
 #[derive(Debug, Deserialize)]
@@ -73,6 +80,8 @@ pub struct NeueMeldung {
     pub inhalt: String,
     pub meldungsart: Option<String>,
     pub prioritaet: Option<String>,
+    /// Richtung intern/extern (LFH-87); Default 'intern'.
+    pub richtung: Option<String>,
     /// Ereigniszeit (UTC, ISO-8601 oder SQLite-Format). Pflicht (Funk-Realität: ≠ Erfassung).
     pub ereigniszeit: String,
     /// Sofortmeldung & Eskalation (LFH-97): Bestätigungspflicht erzwingen. `None` → aus
@@ -124,6 +133,10 @@ pub async fn anlegen(
     if !crate::meldung::prioritaet_gueltig(prioritaet) {
         return Err(AppError::Validation("Ungültige Priorität".into()));
     }
+    let richtung = req.richtung.as_deref().map(str::trim).filter(|s| !s.is_empty()).unwrap_or(RICHTUNG_INTERN);
+    if !crate::meldung::richtung_gueltig(richtung) {
+        return Err(AppError::Validation("Ungültige Richtung".into()));
+    }
     // Ereigniszeit normalisieren (ISO-8601/SQLite → SQLite-Format), wie ETB.
     let ereigniszeit = crate::etb::normalisiere_zeit(req.ereigniszeit.trim())?;
     let eingang = jetzt();
@@ -157,6 +170,7 @@ pub async fn anlegen(
             inhalt,
             meldungsart,
             prioritaet,
+            richtung,
             ereigniszeit: &ereigniszeit,
             eingang_at: &eingang,
             bestaetigung_pflicht: pflicht,

@@ -1,7 +1,7 @@
 import { App, Button, Card, DatePicker, Form, Input, Select } from 'antd';
 import { useState } from 'react';
 import dayjs from 'dayjs';
-import type { AuftragPrioritaet, NeuerAuftrag, NeuerEmpfaenger } from '../api/types';
+import type { AuftragPrioritaet, NeuerAuftrag, NeuerEmpfaenger, Richtung } from '../api/types';
 
 const { TextArea } = Input;
 
@@ -48,6 +48,7 @@ export default function AuftragFormular({ senden, abschnitte, einheiten, onAnleg
   const [verbindung, setVerbindung] = useState('');
   const [sicherheit, setSicherheit] = useState('');
   const [prioritaet, setPrioritaet] = useState<AuftragPrioritaet>('normal');
+  const [richtung, setRichtung] = useState<Richtung>('intern');
   const [frist, setFrist] = useState<dayjs.Dayjs | null>(null);
   const [erteiltAm, setErteiltAm] = useState<dayjs.Dayjs | null>(null);
   const [ziele, setZiele] = useState<string[]>([]);
@@ -72,12 +73,14 @@ export default function AuftragFormular({ senden, abschnitte, einheiten, onAnleg
       verbindung: verbindung.trim() || undefined,
       sicherheit: sicherheit.trim() || undefined,
       prioritaet,
+      richtung,
       frist_at: dayjsZuWire(frist),
       erteilt_at: dayjsZuWire(erteiltAm),
       empfaenger,
     });
     setText(''); setAbsicht(''); setLage(''); setOrt(''); setZeit(''); setMittel('');
-    setVerbindung(''); setSicherheit(''); setFrist(null); setErteiltAm(null); setZiele([]); setFunktionText('');
+    setVerbindung(''); setSicherheit(''); setPrioritaet('normal'); setRichtung('intern');
+    setFrist(null); setErteiltAm(null); setZiele([]); setFunktionText('');
   };
 
   return (
@@ -127,6 +130,12 @@ export default function AuftragFormular({ senden, abschnitte, einheiten, onAnleg
               { value: 'sofort', label: 'Sofort' },
               { value: 'dringend', label: 'Dringend' },
               { value: 'normal', label: 'Normal' },
+            ]} />
+          </Form.Item>
+          <Form.Item label="Richtung" style={{ flex: 1 }}>
+            <Select<Richtung> aria-label="Richtung" value={richtung} onChange={setRichtung} options={[
+              { value: 'intern', label: 'Intern' },
+              { value: 'extern', label: 'Extern' },
             ]} />
           </Form.Item>
           <Form.Item label="Frist (Quittung/Vollzug)" style={{ flex: 1 }}>

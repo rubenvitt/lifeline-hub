@@ -33,7 +33,7 @@ vi.mock('../api/meldungen', () => ({
 
 const meldung = (over: Partial<Meldung> = {}): Meldung => ({
   id: 1, einsatz_id: 1, lfd_nr: 1, absender: 'Florian Nord 1', empfaenger: 'ELW 1',
-  meldeweg: 'funk', inhalt: 'Deich instabil', meldungsart: 'sofortmeldung', prioritaet: 'normal',
+  meldeweg: 'funk', inhalt: 'Deich instabil', meldungsart: 'sofortmeldung', prioritaet: 'normal', richtung: 'intern',
   status: 'neu', bearbeiter_id: null, bearbeiter_name: null, lagerelevant: false,
   ereigniszeit: '2026-06-12 09:00:00', eingang_at: '2026-06-12 09:05:00',
   etb_meldung_id: 7, auftrag_id: null, erfasst_von_id: 1, erstellt_at: '2026-06-12 09:05:00',

@@ -51,6 +51,14 @@ pub fn status_gueltig(s: &str) -> bool {
     matches!(s, STATUS_NEU | STATUS_GESICHTET | STATUS_IN_BEARBEITUNG | STATUS_ERLEDIGT)
 }
 
+/// Richtungskennzeichnung intern/extern (LFH-87, TEXT in der DB, im Code validiert).
+pub const RICHTUNG_INTERN: &str = "intern";
+pub const RICHTUNG_EXTERN: &str = "extern";
+
+pub fn richtung_gueltig(r: &str) -> bool {
+    matches!(r, RICHTUNG_INTERN | RICHTUNG_EXTERN)
+}
+
 /// Anzeige einer Meldung inkl. abgeleiteter Felder (Bearbeitername per JOIN,
 /// `lage_meldung_id` als Herkunfts-Rückverweis, `ist_offen` für Posteingang-Filter).
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
@@ -64,6 +72,8 @@ pub struct MeldungAnzeige {
     pub inhalt: String,
     pub meldungsart: String,
     pub prioritaet: String,
+    /// Richtung intern/extern (LFH-87).
+    pub richtung: String,
     pub status: String,
     pub bearbeiter_id: Option<i64>,
     pub bearbeiter_name: Option<String>,
