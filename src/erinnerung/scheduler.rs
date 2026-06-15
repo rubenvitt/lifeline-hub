@@ -52,6 +52,24 @@ pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>
             "erinnerung",
             serde_json::json!({ "einsatz_id": f.einsatz_id }).to_string(),
         );
+        // Eskalation einer bestätigungspflichtigen Sofortmeldung (LFH-97): die Auto-Frist-
+        // Erinnerung trägt bezug_typ='meldung' + die Meldungs-ID. Reitet auf demselben Tick,
+        // ohne Fremdtabellen-Polling/neuen Timer. setze_eskaliert ist One-Shot und prüft
+        // unbestätigt+überfällig; nur bei frischer Eskalation folgt ein Re-Highlight.
+        if f.bezug_typ.as_deref() == Some(crate::kommunikation::OBJEKT_MELDUNG) {
+            if let Some(mid) = f.bezug_id {
+                match crate::meldung::repo::setze_eskaliert(pool, mid, &jetzt_s).await {
+                    Ok(true) => live.publiziere_event(
+                        f.einsatz_id,
+                        "sofortmeldung",
+                        serde_json::json!({ "einsatz_id": f.einsatz_id, "meldung_id": mid })
+                            .to_string(),
+                    ),
+                    Ok(false) => {}
+                    Err(e) => tracing::warn!("Eskalation Meldung {mid} fehlgeschlagen: {e}"),
+                }
+            }
+        }
         ausgeloest += 1;
     }
     ausgeloest
@@ -156,5 +174,55 @@ mod tests {
         assert_eq!(tick_einmal(&pool, &live, t("2026-06-11 10:01:00")).await, 1);
         let nachricht = rx.recv().await.unwrap();
         assert_eq!(nachricht.event, "erinnerung");
+    }
+
+    /// LFH-97: die Auto-Frist-Erinnerung einer bestätigungspflichtigen Sofortmeldung
+    /// (bezug_typ='meldung') eskaliert die Meldung beim Frist-Tick und re-highlightet via
+    /// SSE-Tag 'sofortmeldung' — auf demselben Tick, ohne Fremdtabellen-Polling.
+    #[tokio::test]
+    async fn meldung_frist_eskaliert_und_publiziert_sofortmeldung() {
+        use crate::kommunikation::OBJEKT_MELDUNG;
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let live = LiveHub::new();
+        let mut rx = live.abonniere(e);
+
+        // Bestätigungspflichtige Sofortmeldung + Auto-Frist-Erinnerung mit Bezug.
+        let m = crate::meldung::repo::anlegen(&pool, e, b, crate::meldung::repo::MeldungDaten {
+            absender: "Florian Nord 1", empfaenger: None, meldeweg: "funk", inhalt: "MANV",
+            meldungsart: crate::meldung::ART_SOFORTMELDUNG, prioritaet: crate::meldung::PRIO_SOFORT,
+            ereigniszeit: "2026-06-11 09:55:00", eingang_at: "2026-06-11 09:55:00",
+            bestaetigung_pflicht: true, bestaetigung_frist_at: Some("2026-06-11 10:00:00"),
+        }).await.unwrap();
+        repo::anlegen_aus_frist(&pool, e, b, OBJEKT_MELDUNG, m.id, "Nachfass", "2026-06-11 10:00:00", "2026-06-11 09:55:00").await.unwrap();
+
+        // Tick nach Frist: ein Auslösen, Meldung eskaliert, und ein 'sofortmeldung'-Event folgt.
+        assert_eq!(tick_einmal(&pool, &live, t("2026-06-11 10:01:00")).await, 1);
+        assert!(crate::meldung::repo::laden(&pool, m.id, "2026-06-11 10:01:00").await.unwrap().eskaliert);
+        let mut tags = vec![rx.recv().await.unwrap().event, rx.recv().await.unwrap().event];
+        tags.sort();
+        assert_eq!(tags, vec!["erinnerung", "sofortmeldung"]);
+    }
+
+    /// Bereits bestätigt → Tick eskaliert NICHT (Erinnerung wurde geschlossen, Meldung quittiert).
+    #[tokio::test]
+    async fn bestaetigte_meldung_eskaliert_nicht() {
+        use crate::kommunikation::OBJEKT_MELDUNG;
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let live = LiveHub::new();
+        let m = crate::meldung::repo::anlegen(&pool, e, b, crate::meldung::repo::MeldungDaten {
+            absender: "Florian Nord 1", empfaenger: None, meldeweg: "funk", inhalt: "MANV",
+            meldungsart: crate::meldung::ART_SOFORTMELDUNG, prioritaet: crate::meldung::PRIO_SOFORT,
+            ereigniszeit: "2026-06-11 09:55:00", eingang_at: "2026-06-11 09:55:00",
+            bestaetigung_pflicht: true, bestaetigung_frist_at: Some("2026-06-11 10:00:00"),
+        }).await.unwrap();
+        repo::anlegen_aus_frist(&pool, e, b, OBJEKT_MELDUNG, m.id, "Nachfass", "2026-06-11 10:00:00", "2026-06-11 09:55:00").await.unwrap();
+        // Bestätigen schließt die Erinnerung + quittiert die Meldung.
+        crate::meldung::repo::bestaetige(&pool, 1, e, m.id, b, "2026-06-11 09:58:00").await.unwrap();
+
+        // Kein fälliger Nudge mehr (Erinnerung erledigt), keine Eskalation.
+        assert_eq!(tick_einmal(&pool, &live, t("2026-06-11 10:01:00")).await, 0);
+        assert!(!crate::meldung::repo::laden(&pool, m.id, "2026-06-11 10:01:00").await.unwrap().eskaliert);
     }
 }

@@ -117,4 +117,24 @@ describe('useEinsatzLiveStream', () => {
       expect(calls).toContainEqual(['einsatz-chat-nachrichten', 42]);
     });
   });
+
+  it('invalidiert einsatz-meldungen und feuert window-Alarm bei sofortmeldung-Event (LFH-97)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    const alarm = vi.fn();
+    window.addEventListener('lfh:sofortmeldung', alarm);
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={7} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit('sofortmeldung', JSON.stringify({ einsatz_id: 7, meldung_id: 3 }));
+    await waitFor(() => {
+      const keys = spy.mock.calls.map((c) => (c[0] as { queryKey: string[] }).queryKey[0]);
+      expect(keys).toContain('einsatz-meldungen');
+      expect(alarm).toHaveBeenCalled();
+    });
+    window.removeEventListener('lfh:sofortmeldung', alarm);
+  });
 });

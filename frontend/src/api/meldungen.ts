@@ -38,6 +38,11 @@ export function weiseBearbeiterZu(
   });
 }
 
+/** Sofortmeldung aktiv bestätigen (Quittung mit Zeitstempel + Person) (LFH-97). */
+export function bestaetigeMeldung(einsatzId: number, meldungId: number): Promise<Meldung> {
+  return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/meldungen/${meldungId}/bestaetigen`, 'POST', {});
+}
+
 /** Als lagerelevant an die Lage übergeben (LFH-95). */
 export function markiereLagerelevant(
   einsatzId: number,

@@ -1,5 +1,6 @@
-import { App, Button, Card, DatePicker, Form, Input, Select } from 'antd';
-import { useState } from 'react';
+import { App, Button, Card, DatePicker, Form, Input, InputNumber, Select, Space, Switch } from 'antd';
+import { ThunderboltOutlined } from '@ant-design/icons';
+import { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
 import type { Meldungsart, MeldungMeldeweg, MeldungPrioritaet, NeueMeldung } from '../api/types';
 
@@ -22,10 +23,29 @@ export default function MeldungFormular({ senden, onAnlegen }: {
   const [prioritaet, setPrioritaet] = useState<MeldungPrioritaet>('normal');
   const [ereigniszeit, setEreigniszeit] = useState<dayjs.Dayjs | null>(null);
   const [inhalt, setInhalt] = useState('');
+  const [bestaetigungPflicht, setBestaetigungPflicht] = useState(false);
+  const [fristMin, setFristMin] = useState<number | null>(null);
+
+  // Sofort (Art oder Priorität) ⇒ Bestätigungspflicht automatisch an (LFH-97). Der Nutzer
+  // kann sie danach manuell wieder abwählen.
+  const istSofort = meldungsart === 'sofortmeldung' || prioritaet === 'sofort';
+  useEffect(() => {
+    if (istSofort) setBestaetigungPflicht(true);
+  }, [istSofort]);
+
+  /** Fast-Path: Sofortmeldung vorbelegen (Art + Priorität sofort), Fokus auf den Wortlaut. */
+  const sofortVorbelegen = () => {
+    setMeldungsart('sofortmeldung');
+    setPrioritaet('sofort');
+    setBestaetigungPflicht(true);
+  };
 
   const absenden = () => {
     if (!absender.trim()) { message.error('Absender ist erforderlich'); return; }
     if (!inhalt.trim()) { message.error('Inhalt ist erforderlich'); return; }
+    if (bestaetigungPflicht && fristMin != null && fristMin <= 0) {
+      message.error('Bestätigungsfrist muss positiv sein'); return;
+    }
     onAnlegen({
       absender: absender.trim(),
       empfaenger: empfaenger.trim() || undefined,
@@ -35,13 +55,24 @@ export default function MeldungFormular({ senden, onAnlegen }: {
       prioritaet,
       // Ereigniszeit Pflicht: leer ⇒ jetzt (Funk-Realität: meist „eben empfangen").
       ereigniszeit: dayjsZuWire(ereigniszeit ?? dayjs()),
+      bestaetigung_pflicht: bestaetigungPflicht,
+      bestaetigung_frist_min: bestaetigungPflicht && fristMin != null ? fristMin : undefined,
     });
     setAbsender(''); setEmpfaenger(''); setMeldeweg('funk'); setMeldungsart('sonstige');
     setPrioritaet('normal'); setEreigniszeit(null); setInhalt('');
+    setBestaetigungPflicht(false); setFristMin(null);
   };
 
   return (
-    <Card size="small" title="Neue Meldung erfassen">
+    <Card
+      size="small"
+      title="Neue Meldung erfassen"
+      extra={
+        <Button danger size="small" icon={<ThunderboltOutlined />} onClick={sofortVorbelegen}>
+          Sofortmeldung
+        </Button>
+      }
+    >
       <Form layout="vertical" onFinish={absenden}>
         <Form.Item label="Absender (Funkrufname/Stelle)" required>
           <Input aria-label="Absender" value={absender} onChange={(e) => setAbsender(e.target.value)} />
@@ -82,6 +113,25 @@ export default function MeldungFormular({ senden, onAnlegen }: {
               format="YYYY-MM-DD HH:mm" placeholder="leer = jetzt" />
           </Form.Item>
         </div>
+        <Form.Item label="Bestätigung erforderlich (Sofortmeldung)">
+          <Space>
+            <Switch
+              checked={bestaetigungPflicht}
+              onChange={setBestaetigungPflicht}
+              aria-label="Bestätigung erforderlich"
+            />
+            {bestaetigungPflicht && (
+              <InputNumber
+                min={1}
+                value={fristMin}
+                onChange={(v) => setFristMin(v)}
+                addonAfter="Min"
+                placeholder="Frist (Default 5)"
+                aria-label="Bestätigungsfrist in Minuten"
+              />
+            )}
+          </Space>
+        </Form.Item>
         <Form.Item label="Inhalt / Wortlaut" required>
           <TextArea aria-label="Inhalt / Wortlaut" value={inhalt} onChange={(e) => setInhalt(e.target.value)} rows={3} />
         </Form.Item>

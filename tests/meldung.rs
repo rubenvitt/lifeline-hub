@@ -455,3 +455,103 @@ async fn lagerelevant_erzeugt_lageobjekt_und_ist_idempotent() {
     assert_eq!(lage[0]["meldung_absender"], "Florian Nord 1");
     assert_eq!(lage[0]["text"], "Brücke gesperrt");
 }
+
+/// Sofortmeldungs-Body (Priorität sofort → implizit bestätigungspflichtig).
+fn sofort_body() -> String {
+    serde_json::json!({
+        "absender": "Florian Nord 1",
+        "empfaenger": "ELW 1",
+        "meldeweg": "funk",
+        "inhalt": "MANV ausgelöst",
+        "prioritaet": "sofort",
+        "ereigniszeit": "2026-06-12 09:00:00"
+    })
+    .to_string()
+}
+
+#[tokio::test]
+async fn sofortmeldung_ist_bestaetigungspflichtig_mit_frist_und_nachfass() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+
+    let (status, m) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/meldungen"), &admin, Some(&sofort_body())).await;
+    assert_eq!(status, StatusCode::CREATED, "{m:?}");
+    assert_eq!(m["prioritaet"], "sofort");
+    assert_eq!(m["bestaetigung_pflicht"], true, "Sofort impliziert Bestätigungspflicht");
+    assert!(m["bestaetigung_frist_at"].is_string(), "Frist gesetzt");
+    assert_eq!(m["ist_bestaetigt"], false);
+
+    // Nachfass: genau eine offene Auto-Frist-Erinnerung mit Bezug auf die Meldung.
+    let (_, erinn) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/erinnerungen"), &admin, None).await;
+    let auto: Vec<_> = erinn.as_array().unwrap().iter()
+        .filter(|x| x["quelle"] == "auto_frist" && x["bezug_typ"] == "meldung")
+        .collect();
+    assert_eq!(auto.len(), 1, "eine Nachfass-Erinnerung je Sofortmeldung");
+    assert_eq!(auto[0]["bezug_id"], m["id"]);
+}
+
+#[tokio::test]
+async fn nicht_sofort_ohne_pflicht_legt_keine_nachfass_an() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (status, m) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/meldungen"), &admin, Some(&body_funk())).await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(m["bestaetigung_pflicht"], false);
+    assert!(m["bestaetigung_frist_at"].is_null());
+    let (_, erinn) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/erinnerungen"), &admin, None).await;
+    assert!(erinn.as_array().unwrap().is_empty(), "keine Auto-Erinnerung ohne Pflicht");
+}
+
+#[tokio::test]
+async fn bestaetigen_setzt_quittung_und_doppelt_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (_, m) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/meldungen"), &admin, Some(&sofort_body())).await;
+    let mid = m["id"].as_i64().unwrap();
+
+    let (status, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/meldungen/{mid}/bestaetigen"), &admin, None).await;
+    assert_eq!(status, StatusCode::OK, "{json:?}");
+    assert_eq!(json["ist_bestaetigt"], true);
+    assert!(json["bestaetigt_at"].is_string());
+    assert_eq!(json["bestaetigt_von_name"], "Administrator");
+
+    // Nachfass-Erinnerung ist nach Bestätigung nicht mehr offen.
+    let (_, erinn) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/erinnerungen?nur_offen=true"), &admin, None).await;
+    assert!(erinn.as_array().unwrap().iter().all(|x| x["bezug_typ"] != "meldung"),
+            "Bestätigung schließt die offene Nachfass-Erinnerung");
+
+    // Doppel-Bestätigung → 422.
+    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/meldungen/{mid}/bestaetigen"), &admin, None).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn bestaetigen_beobachter_ist_403() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (_, m) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/meldungen"), &admin, Some(&sofort_body())).await;
+    let mid = m["id"].as_i64().unwrap();
+
+    let erika = benutzer_anlegen(&app, &admin, "erika", "keine").await;
+    rolle_setzen(&app, &admin, e, erika, "beobachter").await;
+    let erika_c = login_cookie(&app, "erika", "erikapw1").await;
+
+    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/meldungen/{mid}/bestaetigen"), &erika_c, None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn cross_einsatz_bestaetigen_ist_404() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let a = einsatz_anlegen(&app, &admin).await;
+    let b = einsatz_anlegen(&app, &admin).await;
+    let (_, m) = anfrage(&app, "POST", &format!("/api/einsaetze/{a}/meldungen"), &admin, Some(&sofort_body())).await;
+    let mid_a = m["id"].as_i64().unwrap();
+    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{b}/meldungen/{mid_a}/bestaetigen"), &admin, None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}

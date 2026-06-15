@@ -8,7 +8,6 @@ import { legeAuftragAn, listeAuftraege, nimmAb, quittiereEmpfaenger, setzeVollzu
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import type { NeuerAuftrag } from '../api/types';
-import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
 import AuftragListe from '../auftraege/AuftragListe';
 import AuftragFormular from '../auftraege/AuftragFormular';
 import VollzugMeldenModal from '../auftraege/VollzugMeldenModal';
@@ -19,7 +18,6 @@ export default function AuftraegePage() {
   const { message } = App.useApp();
   const qc = useQueryClient();
 
-  useEinsatzLiveStream(einsatzId);
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const abschnitteQuery = useQuery({ queryKey: ['einsatz-abschnitte', einsatzId], queryFn: () => listeAbschnitte(einsatzId) });

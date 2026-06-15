@@ -33,10 +33,24 @@ export interface MeldungListeProps {
   onStatus?: (meldungId: number, status: MeldungStatus) => void;
   onZuweisen?: (meldungId: number, bearbeiterId: number | null) => void;
   onLagerelevant?: (meldungId: number) => void;
+  onBestaetigen?: (meldungId: number) => void;
+}
+
+/** Bestätigungs-Status-Tag (LFH-97): grün bestätigt, rot überfällig/eskaliert, orange offen. */
+function bestaetigungsTag(m: Meldung): ReactNode {
+  if (!m.bestaetigung_pflicht) return null;
+  if (m.ist_bestaetigt) {
+    const von = m.bestaetigt_von_name ? ` von ${m.bestaetigt_von_name}` : '';
+    return <Tag color="green">Bestätigt ✓ {m.bestaetigt_at} UTC{von}</Tag>;
+  }
+  if (m.ist_ueberfaellig || m.eskaliert) {
+    return <Tag color="red">Bestätigung überfällig{m.eskaliert ? ' (eskaliert)' : ''}</Tag>;
+  }
+  return <Tag color="orange">Bestätigung offen bis {m.bestaetigung_frist_at} UTC</Tag>;
 }
 
 export default function MeldungListe({
-  meldungen, darfSchreiben, mitglieder, onStatus, onZuweisen, onLagerelevant,
+  meldungen, darfSchreiben, mitglieder, onStatus, onZuweisen, onLagerelevant, onBestaetigen,
 }: MeldungListeProps) {
   if (meldungen.length === 0) return <Empty description="Keine Meldungen" />;
   return (
@@ -45,8 +59,15 @@ export default function MeldungListe({
       renderItem={(m) => {
         const prio = PRIO_TAG[m.prioritaet] ?? PRIO_TAG.normal;
         const status = STATUS_TAG[m.status] ?? STATUS_TAG.neu;
+        // Unübersehbare Hervorhebung (AK1/AK3): unbestätigte überfällige/eskalierte Sofortmeldung.
+        const alarmiert = m.bestaetigung_pflicht && !m.ist_bestaetigt && (m.ist_ueberfaellig || m.eskaliert);
+        const rowStyle = alarmiert
+          ? { background: 'rgba(255,77,79,0.12)', borderLeft: '3px solid #ff4d4f', paddingLeft: 8 }
+          : undefined;
         const aktionen: ReactNode[] = darfSchreiben
           ? [
+              m.bestaetigung_pflicht && !m.ist_bestaetigt && onBestaetigen
+                ? <a key="be" onClick={() => onBestaetigen(m.id)}>Bestätigen</a> : null,
               m.status === 'neu' && onStatus
                 ? <a key="si" onClick={() => onStatus(m.id, 'gesichtet')}>Sichten</a> : null,
               (m.status === 'neu' || m.status === 'gesichtet') && onStatus
@@ -58,7 +79,7 @@ export default function MeldungListe({
             ].filter(Boolean) as ReactNode[]
           : [];
         return (
-          <List.Item actions={aktionen.length ? aktionen : undefined}>
+          <List.Item actions={aktionen.length ? aktionen : undefined} style={rowStyle}>
             <List.Item.Meta
               title={
                 <Space wrap>
@@ -67,6 +88,7 @@ export default function MeldungListe({
                   <Typography.Text strong>{m.absender}</Typography.Text>
                   {m.empfaenger && <Typography.Text type="secondary">→ {m.empfaenger}</Typography.Text>}
                   {m.lagerelevant && <Tag color="gold">Lagerelevant ✓</Tag>}
+                  {bestaetigungsTag(m)}
                 </Space>
               }
               description={

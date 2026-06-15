@@ -7,7 +7,6 @@ import {
   erledigeErinnerung, legeErinnerungAn, listeErinnerungen, quittiereErinnerung,
 } from '../api/erinnerungen';
 import type { NeueErinnerung } from '../api/types';
-import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
 import ErinnerungListe from '../erinnerung/ErinnerungListe';
 import ErinnerungFormular from '../erinnerung/ErinnerungFormular';
 
@@ -17,7 +16,6 @@ export default function ErinnerungenPage() {
   const { message } = App.useApp();
   const qc = useQueryClient();
 
-  useEinsatzLiveStream(einsatzId);
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const erinnerungenQuery = useQuery({

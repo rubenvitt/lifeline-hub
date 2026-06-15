@@ -9,7 +9,6 @@ import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../api/einsatzMaterial';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
-import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
 import {
   baueKraeftebild,
   filtereKraefte,
@@ -89,7 +88,6 @@ function alleKeys(zeilen: MeldebildZeile[]): string[] {
 export default function KraefteuebersichtPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  useEinsatzLiveStream(einsatzId);
   const navigate = useNavigate();
   const { message } = AntApp.useApp();
 

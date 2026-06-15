@@ -6,7 +6,6 @@ import type { BewertungEingabe } from '../../api/gefahren';
 import { ApiError } from '../../api/client';
 import { benenneGefahrengebiet, gefahrengebietName, ladeGefahrengebiete, ladeMatrix, setzeBewertung } from '../../api/gefahren';
 import { ladeEinsatz } from '../../api/einsaetze';
-import { useEinsatzLiveStream } from '../../etb/useEinsatzLiveStream';
 import { warnstufeFarbe } from './gefahrenSchema';
 import GefahrenMatrix from './GefahrenMatrix';
 
@@ -17,7 +16,6 @@ export default function GefahrenPage() {
   const { message } = App.useApp();
   const [gewaehlt, setGewaehlt] = useState<number | null>(null);
 
-  useEinsatzLiveStream(einsatzId);
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const gebieteQuery = useQuery({ queryKey: ['gefahrengebiete', einsatzId], queryFn: () => ladeGefahrengebiete(einsatzId) });

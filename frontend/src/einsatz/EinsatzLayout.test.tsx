@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
@@ -69,4 +69,23 @@ describe('EinsatzLayout', () => {
     setupRoute('/einsaetze/7/unfallhilfsstellen/liste', 'unfallhilfsstellen/liste');
     expect(await screen.findByRole('button', { name: 'Unfallhilfsstellen' })).toBeInTheDocument();
   });
+
+  it('öffnet genau EINE SSE-Verbindung für den Einsatz (Stream im Layout, LFH-97)', async () => {
+    // Der Live-Stream ist hier gehoistet; das Layout ist immer gemountet → genau eine
+    // Verbindung pro Einsatz, unabhängig von der offenen Modul-Seite (HTTP/1.1-6-Limit).
+    const urls: string[] = [];
+    class FakeEventSource {
+      constructor(url: string) { urls.push(url); }
+      addEventListener() {}
+      removeEventListener() {}
+      close() {}
+    }
+    vi.stubGlobal('EventSource', FakeEventSource);
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    expect(urls).toHaveLength(1);
+    expect(urls[0]).toBe('/api/einsaetze/7/etb/stream');
+  });
 });
+
+afterEach(() => vi.unstubAllGlobals());

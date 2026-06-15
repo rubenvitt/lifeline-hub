@@ -18,7 +18,6 @@ import { listeMeldungen } from '../api/meldungen';
 import { listeAuftraege } from '../api/auftraege';
 import type { BezugTyp, ChatNachricht, EtbTyp, NeuerAuftrag } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
-import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
 import KanalListe from '../chat/KanalListe';
 import NachrichtenStrom from '../chat/NachrichtenStrom';
 import NachrichtEingabe from '../chat/NachrichtEingabe';
@@ -44,7 +43,6 @@ export default function ChatPage() {
   const [bearbeiten, setBearbeiten] = useState<ChatNachricht | null>(null);
   const [bezugNachricht, setBezugNachricht] = useState<ChatNachricht | null>(null);
 
-  useEinsatzLiveStream(einsatzId);
 
   const einsatzQuery = useQuery({
     queryKey: ['einsatz', einsatzId],

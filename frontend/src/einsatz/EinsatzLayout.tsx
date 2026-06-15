@@ -11,8 +11,10 @@ import {
 import EinsatzSwitcher from './EinsatzSwitcher';
 import IconRail from './IconRail';
 import ModulPanel from './ModulPanel';
+import SofortAlarm from './SofortAlarm';
 import ThemeToggle from '../components/ThemeToggle';
 import BenutzerMenu from '../components/BenutzerMenu';
+import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
 
 const { Header, Content } = Layout;
 
@@ -23,6 +25,11 @@ export default function EinsatzLayout() {
   const { benutzer } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+
+  // EINE SSE-Verbindung für den gesamten Einsatz-Workspace (hier gehoistet, NICHT pro Page),
+  // damit der Sofort-Alarm seitenunabhängig auflöst und das HTTP/1.1-6-Verbindungslimit
+  // sicher eingehalten wird (siehe useEinsatzLiveStream-Doku).
+  useEinsatzLiveStream(einsatzId);
 
   // Modul-Segment ist der Pfad-Teil direkt nach der Einsatz-ID
   // (…/einsaetze/:id/<route>/…) — nicht das letzte Segment, sonst verliert das
@@ -60,6 +67,7 @@ export default function EinsatzLayout() {
           <EinsatzSwitcher aktuellName={einsatz?.bezeichnung ?? 'Einsatz'} />
         )}
         <Space style={{ marginLeft: 'auto' }} size="middle">
+          <SofortAlarm />
           <ThemeToggle />
           <BenutzerMenu />
         </Space>

@@ -14,22 +14,41 @@ pub struct MeldungDaten<'a> {
     pub prioritaet: &'a str,
     pub ereigniszeit: &'a str,
     pub eingang_at: &'a str,
+    /// Sofortmeldung & Eskalation (LFH-97): aktive Bestätigungspflicht.
+    pub bestaetigung_pflicht: bool,
+    /// Absolute Bestätigungsfrist (UTC), nur bei Pflicht gesetzt.
+    pub bestaetigung_frist_at: Option<&'a str>,
 }
 
 /// SELECT-Projektion inkl. Bearbeitername (LEFT JOIN benutzer), Herkunfts-Rückverweis
-/// (Subquery lage_meldung) und abgeleiteten Feldern. Reihenfolge der Spalten = Struct.
+/// (Subquery lage_meldung), Bestätigungs-Achse (LEFT JOIN kommunikation_status, objekt_typ
+/// ='meldung') und abgeleiteten Feldern. Reihenfolge der Spalten = Struct (FromRow positional).
+///
+/// `ist_ueberfaellig` ist eine computed column mit `jetzt`-Vergleich → ihr `?` steht textuell
+/// VOR der WHERE-Klausel; alle Aufrufer binden `jetzt` als ERSTEN Parameter (Muster erinnerung).
 const ANZEIGE_SELECT: &str =
     "SELECT m.id, m.einsatz_id, m.lfd_nr, m.absender, m.empfaenger, m.meldeweg, m.inhalt, \
             m.meldungsart, m.prioritaet, m.status, m.bearbeiter_id, b.anzeigename AS bearbeiter_name, \
             m.lagerelevant, m.ereigniszeit, m.eingang_at, m.etb_meldung_id, m.auftrag_id, \
             m.erfasst_von_id, m.erstellt_at, \
             (SELECT lm.id FROM lage_meldung lm WHERE lm.meldung_id = m.id) AS lage_meldung_id, \
-            (m.status != 'erledigt') AS ist_offen \
-     FROM meldung m LEFT JOIN benutzer b ON b.id = m.bearbeiter_id";
+            (m.status != 'erledigt') AS ist_offen, \
+            m.bestaetigung_pflicht, m.bestaetigung_frist_at, m.eskaliert, \
+            ks.quittiert_at AS bestaetigt_at, ks.quittiert_von_id AS bestaetigt_von_id, \
+            qb.anzeigename AS bestaetigt_von_name, \
+            (ks.quittiert_at IS NOT NULL) AS ist_bestaetigt, \
+            (m.bestaetigung_pflicht = 1 AND ks.quittiert_at IS NULL \
+             AND m.bestaetigung_frist_at IS NOT NULL AND m.bestaetigung_frist_at <= ?) AS ist_ueberfaellig \
+     FROM meldung m \
+     LEFT JOIN benutzer b ON b.id = m.bearbeiter_id \
+     LEFT JOIN kommunikation_status ks ON ks.objekt_typ = 'meldung' AND ks.objekt_id = m.id \
+     LEFT JOIN benutzer qb ON qb.id = ks.quittiert_von_id";
 
 /// Lädt eine Meldung als Anzeige. `NotFound`, wenn unbekannt.
-pub async fn laden(pool: &SqlitePool, id: i64) -> Result<MeldungAnzeige, AppError> {
+/// Bind-Reihenfolge: zuerst `jetzt` (computed `ist_ueberfaellig`), dann `id` (WHERE).
+pub async fn laden(pool: &SqlitePool, id: i64, jetzt: &str) -> Result<MeldungAnzeige, AppError> {
     sqlx::query_as::<_, MeldungAnzeige>(&format!("{ANZEIGE_SELECT} WHERE m.id = ?"))
+        .bind(jetzt)
         .bind(id)
         .fetch_optional(pool)
         .await?
@@ -53,8 +72,9 @@ pub async fn anlegen(
     let meldung_id: i64 = sqlx::query_scalar(
         "INSERT INTO meldung \
            (einsatz_id, lfd_nr, absender, empfaenger, meldeweg, inhalt, meldungsart, \
-            prioritaet, ereigniszeit, eingang_at, erfasst_von_id) \
-         SELECT ?, COALESCE(MAX(lfd_nr), 0) + 1, ?, ?, ?, ?, ?, ?, ?, ?, ? \
+            prioritaet, ereigniszeit, eingang_at, bestaetigung_pflicht, bestaetigung_frist_at, \
+            erfasst_von_id) \
+         SELECT ?, COALESCE(MAX(lfd_nr), 0) + 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? \
          FROM meldung WHERE einsatz_id = ? \
          RETURNING id",
     )
@@ -67,6 +87,8 @@ pub async fn anlegen(
     .bind(daten.prioritaet)
     .bind(daten.ereigniszeit)
     .bind(daten.eingang_at)
+    .bind(daten.bestaetigung_pflicht)
+    .bind(daten.bestaetigung_frist_at)
     .bind(erfasser_id)
     .bind(einsatz_id)
     .fetch_one(&mut *tx)
@@ -103,15 +125,19 @@ pub async fn anlegen(
         .await?;
 
     tx.commit().await?;
-    laden(pool, meldung_id).await
+    // `eingang_at` ist der Erfassungszeitpunkt = „jetzt" für die frisch erzeugte Meldung;
+    // ist_ueberfaellig ist hier ohnehin false (Frist liegt in der Zukunft).
+    laden(pool, meldung_id, daten.eingang_at).await
 }
 
 /// Listet Meldungen eines Einsatzes (optional Status-Filter). Sortierung:
-/// Priorität (sofort→normal), dann neueste Ereigniszeit zuerst, dann lfd_nr.
+/// Priorität (sofort→normal), eskalierte zuerst, dann neueste Ereigniszeit, dann lfd_nr.
+/// Bind-Reihenfolge: zuerst `jetzt` (computed `ist_ueberfaellig`), dann WHERE-Parameter.
 pub async fn liste(
     pool: &SqlitePool,
     einsatz_id: i64,
     status_filter: Option<&str>,
+    jetzt: &str,
 ) -> Result<Vec<MeldungAnzeige>, AppError> {
     let mut q = format!("{ANZEIGE_SELECT} WHERE m.einsatz_id = ?");
     if status_filter.is_some() {
@@ -119,9 +145,9 @@ pub async fn liste(
     }
     q.push_str(
         " ORDER BY CASE m.prioritaet WHEN 'sofort' THEN 0 WHEN 'dringend' THEN 1 ELSE 2 END, \
-          m.ereigniszeit DESC, m.lfd_nr DESC",
+          m.eskaliert DESC, m.ereigniszeit DESC, m.lfd_nr DESC",
     );
-    let mut query = sqlx::query_as::<_, MeldungAnzeige>(&q).bind(einsatz_id);
+    let mut query = sqlx::query_as::<_, MeldungAnzeige>(&q).bind(jetzt).bind(einsatz_id);
     if let Some(s) = status_filter {
         query = query.bind(s);
     }
@@ -170,6 +196,60 @@ pub async fn weise_bearbeiter(
         .execute(pool)
         .await?;
     Ok(())
+}
+
+/// Bestätigt eine Sofortmeldung (LFH-97): setzt die Quittungs-Achse (kommunikation_status,
+/// objekt_typ='meldung') über das geteilte Repo und schließt eine etwaige offene
+/// Auto-Frist-Erinnerung des Bezugs (stoppt Nachfass/Eskalation). Beide Schritte sind für
+/// sich idempotent → kein gemeinsamer Tx-Zwang. Der Triage-`status` bleibt unangetastet
+/// (eigene Achse, vgl. patch-xor-effektivzustand / Bearbeiter-Entkopplung).
+pub async fn bestaetige(
+    pool: &SqlitePool,
+    org_id: i64,
+    einsatz_id: i64,
+    meldung_id: i64,
+    von_id: i64,
+    jetzt: &str,
+) -> Result<(), AppError> {
+    crate::kommunikation::repo::quittiere(
+        pool,
+        org_id,
+        einsatz_id,
+        crate::kommunikation::OBJEKT_MELDUNG,
+        meldung_id,
+        von_id,
+        jetzt,
+    )
+    .await?;
+    crate::erinnerung::repo::schliesse_offene_auto(
+        pool,
+        crate::kommunikation::OBJEKT_MELDUNG,
+        meldung_id,
+        jetzt,
+    )
+    .await?;
+    Ok(())
+}
+
+/// Setzt das Eskalations-Flag — aber NUR wenn die Meldung bestätigungspflichtig, ihre Frist
+/// überschritten und sie noch unbestätigt ist und noch nicht eskaliert war. Liefert `true`,
+/// wenn dieser Aufruf frisch eskaliert hat (→ genau ein Re-Highlight). Der `eskaliert = 0`-Guard
+/// macht es One-Shot; aufgerufen ausschließlich aus dem Erinnerungs-Tick (kein eigener Timer).
+pub async fn setze_eskaliert(pool: &SqlitePool, meldung_id: i64, jetzt: &str) -> Result<bool, AppError> {
+    let rows = sqlx::query(
+        "UPDATE meldung SET eskaliert = 1 \
+         WHERE id = ? AND bestaetigung_pflicht = 1 AND eskaliert = 0 \
+           AND bestaetigung_frist_at IS NOT NULL AND bestaetigung_frist_at <= ? \
+           AND NOT EXISTS ( \
+             SELECT 1 FROM kommunikation_status ks \
+             WHERE ks.objekt_typ = 'meldung' AND ks.objekt_id = meldung.id \
+               AND ks.quittiert_at IS NOT NULL)",
+    )
+    .bind(meldung_id)
+    .bind(jetzt)
+    .execute(pool)
+    .await?;
+    Ok(rows.rows_affected() > 0)
 }
 
 /// Übergibt eine Meldung an die Lage (LFH-95): setzt `lagerelevant=1` und legt
@@ -256,6 +336,8 @@ mod tests {
             prioritaet: PRIO_NORMAL,
             ereigniszeit: ereignis,
             eingang_at: eingang,
+            bestaetigung_pflicht: false,
+            bestaetigung_frist_at: None,
         }
     }
 
@@ -306,7 +388,7 @@ mod tests {
     async fn laden_unbekannt_ist_notfound() {
         let pool = crate::db::test_pool().await;
         setup(&pool).await;
-        assert!(matches!(laden(&pool, 999).await.unwrap_err(), AppError::NotFound));
+        assert!(matches!(laden(&pool, 999, "2026-06-12 10:00:00").await.unwrap_err(), AppError::NotFound));
     }
 
     #[tokio::test]
@@ -317,7 +399,7 @@ mod tests {
         let d = daten("sofort", "2026-06-12 08:00:00", "2026-06-12 08:00:00");
         let sofort = MeldungDaten { prioritaet: crate::meldung::PRIO_SOFORT, ..d };
         anlegen(&pool, e, b, sofort).await.unwrap();
-        let liste = liste(&pool, e, None).await.unwrap();
+        let liste = liste(&pool, e, None, "2026-06-12 10:00:00").await.unwrap();
         assert_eq!(liste.len(), 2);
         assert_eq!(liste[0].inhalt, "sofort", "sofort vor normal trotz älterer Ereigniszeit");
     }
@@ -327,9 +409,9 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         anlegen(&pool, e, b, daten("A", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
-        let liste_neu = liste(&pool, e, Some("neu")).await.unwrap();
+        let liste_neu = liste(&pool, e, Some("neu"), "2026-06-12 10:00:00").await.unwrap();
         assert_eq!(liste_neu.len(), 1);
-        let liste_erledigt = liste(&pool, e, Some("erledigt")).await.unwrap();
+        let liste_erledigt = liste(&pool, e, Some("erledigt"), "2026-06-12 10:00:00").await.unwrap();
         assert!(liste_erledigt.is_empty());
     }
 
@@ -348,7 +430,7 @@ mod tests {
         let (b, e) = setup(&pool).await;
         let m = anlegen(&pool, e, b, daten("X", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
         setze_status(&pool, m.id, crate::meldung::STATUS_IN_BEARBEITUNG).await.unwrap();
-        let nach = laden(&pool, m.id).await.unwrap();
+        let nach = laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap();
         assert_eq!(nach.status, "in_bearbeitung");
         // ist_offen = status != 'erledigt' → in_bearbeitung bleibt offen.
         assert!(nach.ist_offen);
@@ -360,12 +442,12 @@ mod tests {
         let (b, e) = setup(&pool).await;
         let m = anlegen(&pool, e, b, daten("X", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
         weise_bearbeiter(&pool, m.id, Some(b)).await.unwrap();
-        let nach = laden(&pool, m.id).await.unwrap();
+        let nach = laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap();
         assert_eq!(nach.bearbeiter_id, Some(b));
         assert_eq!(nach.bearbeiter_name.as_deref(), Some("Leit"));
         // Freigeben.
         weise_bearbeiter(&pool, m.id, None).await.unwrap();
-        assert_eq!(laden(&pool, m.id).await.unwrap().bearbeiter_id, None);
+        assert_eq!(laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap().bearbeiter_id, None);
     }
 
     #[tokio::test]
@@ -376,7 +458,7 @@ mod tests {
         weise_bearbeiter(&pool, m.id, Some(b)).await.unwrap();
         // Reiner Statuswechsel darf den Bearbeiter NICHT clobbern (Regression #2/#3).
         setze_status(&pool, m.id, crate::meldung::STATUS_ERLEDIGT).await.unwrap();
-        let nach = laden(&pool, m.id).await.unwrap();
+        let nach = laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap();
         assert_eq!(nach.status, "erledigt");
         assert_eq!(nach.bearbeiter_id, Some(b), "Zuweisung bleibt über Statuswechsel erhalten");
     }
@@ -387,7 +469,7 @@ mod tests {
         let (b, e) = setup(&pool).await;
         let m = anlegen(&pool, e, b, daten("X", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
         setze_status(&pool, m.id, crate::meldung::STATUS_ERLEDIGT).await.unwrap();
-        let nach = laden(&pool, m.id).await.unwrap();
+        let nach = laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap();
         assert_eq!(nach.status, "erledigt");
         assert!(!nach.ist_offen);
     }
@@ -398,7 +480,7 @@ mod tests {
         let (b, e) = setup(&pool).await;
         let m = anlegen(&pool, e, b, daten("Brücke gesperrt", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
         let lage_id = als_lagerelevant(&pool, e, m.id, b, "Brücke gesperrt", None).await.unwrap();
-        let nach = laden(&pool, m.id).await.unwrap();
+        let nach = laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap();
         assert!(nach.lagerelevant);
         assert_eq!(nach.lage_meldung_id, Some(lage_id));
         let liste = liste_lage_meldungen(&pool, e).await.unwrap();
@@ -417,5 +499,101 @@ mod tests {
         let id2 = als_lagerelevant(&pool, e, m.id, b, "zweite", None).await.unwrap();
         assert_eq!(id1, id2, "UNIQUE meldung_id → ein Lageobjekt");
         assert_eq!(liste_lage_meldungen(&pool, e).await.unwrap().len(), 1);
+    }
+
+    /// Hilfsdaten für eine bestätigungspflichtige Sofortmeldung mit absoluter Frist.
+    fn daten_pflicht<'a>(inhalt: &'a str, eingang: &'a str, frist: &'a str) -> MeldungDaten<'a> {
+        MeldungDaten {
+            bestaetigung_pflicht: true,
+            bestaetigung_frist_at: Some(frist),
+            ..daten(inhalt, eingang, eingang)
+        }
+    }
+
+    #[tokio::test]
+    async fn anlegen_speichert_bestaetigungspflicht_und_frist() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(&pool, e, b, daten_pflicht("Sofort", "2026-06-12 09:00:00", "2026-06-12 09:05:00")).await.unwrap();
+        assert!(m.bestaetigung_pflicht);
+        assert_eq!(m.bestaetigung_frist_at.as_deref(), Some("2026-06-12 09:05:00"));
+        assert!(!m.eskaliert);
+        assert!(!m.ist_bestaetigt, "frisch angelegt → unbestätigt");
+        assert!(m.bestaetigt_at.is_none());
+    }
+
+    #[tokio::test]
+    async fn ist_ueberfaellig_wird_aus_jetzt_abgeleitet() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(&pool, e, b, daten_pflicht("Sofort", "2026-06-12 09:00:00", "2026-06-12 09:05:00")).await.unwrap();
+        // Vor Frist: nicht überfällig.
+        let vor = laden(&pool, m.id, "2026-06-12 09:04:00").await.unwrap();
+        assert!(!vor.ist_ueberfaellig);
+        // Nach Frist + unbestätigt: überfällig.
+        let nach = laden(&pool, m.id, "2026-06-12 09:06:00").await.unwrap();
+        assert!(nach.ist_ueberfaellig);
+    }
+
+    #[tokio::test]
+    async fn bestaetige_setzt_quittung_ohne_status_clobber() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(&pool, e, b, daten_pflicht("Sofort", "2026-06-12 09:00:00", "2026-06-12 09:05:00")).await.unwrap();
+        // Bearbeiter + Status gesetzt — dürfen über die Bestätigung NICHT verloren gehen.
+        weise_bearbeiter(&pool, m.id, Some(b)).await.unwrap();
+        setze_status(&pool, m.id, crate::meldung::STATUS_IN_BEARBEITUNG).await.unwrap();
+
+        bestaetige(&pool, 1, e, m.id, b, "2026-06-12 09:06:00").await.unwrap();
+        let nach = laden(&pool, m.id, "2026-06-12 09:07:00").await.unwrap();
+        assert!(nach.ist_bestaetigt);
+        assert_eq!(nach.bestaetigt_at.as_deref(), Some("2026-06-12 09:06:00"));
+        assert_eq!(nach.bestaetigt_von_id, Some(b));
+        assert_eq!(nach.bestaetigt_von_name.as_deref(), Some("Leit"));
+        assert!(!nach.ist_ueberfaellig, "bestätigt → nicht mehr überfällig");
+        assert_eq!(nach.status, "in_bearbeitung", "Triage-Status bleibt unberührt");
+        assert_eq!(nach.bearbeiter_id, Some(b), "Zuweisung bleibt erhalten");
+    }
+
+    #[tokio::test]
+    async fn bestaetige_schliesst_offene_auto_erinnerung() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(&pool, e, b, daten_pflicht("Sofort", "2026-06-12 09:00:00", "2026-06-12 09:05:00")).await.unwrap();
+        crate::erinnerung::repo::anlegen_aus_frist(
+            &pool, e, b, crate::kommunikation::OBJEKT_MELDUNG, m.id, "Nachfass", "2026-06-12 09:05:00", "2026-06-12 09:00:00",
+        ).await.unwrap();
+
+        bestaetige(&pool, 1, e, m.id, b, "2026-06-12 09:06:00").await.unwrap();
+        // Keine offene Auto-Erinnerung für den Bezug mehr.
+        let offen: Option<i64> = sqlx::query_scalar(
+            "SELECT id FROM erinnerung WHERE quelle='auto_frist' AND status='offen' AND bezug_typ=? AND bezug_id=?",
+        ).bind(crate::kommunikation::OBJEKT_MELDUNG).bind(m.id).fetch_optional(&pool).await.unwrap();
+        assert!(offen.is_none(), "Bestätigung schließt die Nachfass-Erinnerung");
+    }
+
+    #[tokio::test]
+    async fn setze_eskaliert_nur_ueberfaellig_unbestaetigt_und_one_shot() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(&pool, e, b, daten_pflicht("Sofort", "2026-06-12 09:00:00", "2026-06-12 09:05:00")).await.unwrap();
+        // Vor Frist: keine Eskalation.
+        assert!(!setze_eskaliert(&pool, m.id, "2026-06-12 09:04:00").await.unwrap());
+        // Nach Frist + unbestätigt: frische Eskalation (true).
+        assert!(setze_eskaliert(&pool, m.id, "2026-06-12 09:06:00").await.unwrap());
+        assert!(laden(&pool, m.id, "2026-06-12 09:06:00").await.unwrap().eskaliert);
+        // Erneut: One-Shot, kein Doppel-Highlight.
+        assert!(!setze_eskaliert(&pool, m.id, "2026-06-12 09:07:00").await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn setze_eskaliert_nicht_nach_bestaetigung() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(&pool, e, b, daten_pflicht("Sofort", "2026-06-12 09:00:00", "2026-06-12 09:05:00")).await.unwrap();
+        bestaetige(&pool, 1, e, m.id, b, "2026-06-12 09:06:00").await.unwrap();
+        // Trotz überschrittener Frist: bestätigt → keine Eskalation.
+        assert!(!setze_eskaliert(&pool, m.id, "2026-06-12 09:07:00").await.unwrap());
+        assert!(!laden(&pool, m.id, "2026-06-12 09:07:00").await.unwrap().eskaliert);
     }
 }

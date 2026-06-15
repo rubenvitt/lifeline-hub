@@ -7,7 +7,6 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { ApiError } from '../api/client';
 import { legeLageberichtAn, listeLageberichte, type NeuerLagebericht } from '../api/lageberichte';
 import type { LageberichtAnzeige } from '../api/types';
-import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
 import { VORLAGEN } from '../lageberichte/vorlagen';
 
 export default function LageberichtePage() {
@@ -18,7 +17,6 @@ export default function LageberichtePage() {
   const [anlegenOffen, setAnlegenOffen] = useState(false);
   const [form] = Form.useForm<NeuerLagebericht>();
 
-  useEinsatzLiveStream(einsatzId);
 
   const einsatzQuery = useQuery({
     queryKey: ['einsatz', einsatzId],

@@ -15,6 +15,10 @@ pub const PRIO_SOFORT: &str = "sofort";
 pub const PRIO_DRINGEND: &str = "dringend";
 pub const PRIO_NORMAL: &str = "normal";
 
+/// Default-Bestätigungsfrist (Minuten ab Eingang) für bestätigungspflichtige
+/// Sofortmeldungen (LFH-97), wenn der Absetzer kein Override angibt.
+pub const BESTAETIGUNG_FRIST_DEFAULT_MIN: i64 = 5;
+
 /// Meldungsart (Nachrichtenvordruck-Klassifikation).
 pub const ART_LAGEMELDUNG: &str = "lagemeldung";
 pub const ART_SOFORTMELDUNG: &str = "sofortmeldung";
@@ -74,6 +78,22 @@ pub struct MeldungAnzeige {
     pub lage_meldung_id: Option<i64>,
     /// Abgeleitet: status != 'erledigt' (Posteingang = offene Meldungen).
     pub ist_offen: bool,
+    /// Sofortmeldung & Eskalation (LFH-85/97): aktive Bestätigungspflicht.
+    pub bestaetigung_pflicht: bool,
+    /// Absolute Bestätigungsfrist (UTC), NULL wenn keine Pflicht.
+    pub bestaetigung_frist_at: Option<String>,
+    /// Frist überschritten + unbestätigt (vom Erinnerungs-Tick gesetzt, Re-Highlight).
+    pub eskaliert: bool,
+    /// Abgeleitet (kommunikation_status, Quittungs-Achse): Bestätigt-um.
+    pub bestaetigt_at: Option<String>,
+    /// Abgeleitet: Bestätigt-von (Benutzer-id).
+    pub bestaetigt_von_id: Option<i64>,
+    /// Abgeleitet: Bestätigt-von (Anzeigename, JOIN benutzer).
+    pub bestaetigt_von_name: Option<String>,
+    /// Abgeleitet: quittiert_at IS NOT NULL.
+    pub ist_bestaetigt: bool,
+    /// Abgeleitet: pflichtig, unbestätigt und Frist <= jetzt.
+    pub ist_ueberfaellig: bool,
 }
 
 /// Lageobjekt aus lagerelevanter Meldung (LFH-95). Herkunfts-Felder (meldung_*)

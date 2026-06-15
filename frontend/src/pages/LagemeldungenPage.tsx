@@ -3,12 +3,10 @@ import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeLageMeldungen } from '../api/meldungen';
-import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
 
 export default function LagemeldungenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  useEinsatzLiveStream(einsatzId);
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const lageQuery = useQuery({

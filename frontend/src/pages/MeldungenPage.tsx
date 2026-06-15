@@ -4,9 +4,8 @@ import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz, ladeMitglieder } from '../api/einsaetze';
 import { ApiError } from '../api/client';
-import { legeMeldungAn, listeMeldungen, markiereLagerelevant, setzeMeldungStatus, weiseBearbeiterZu } from '../api/meldungen';
+import { bestaetigeMeldung, legeMeldungAn, listeMeldungen, markiereLagerelevant, setzeMeldungStatus, weiseBearbeiterZu } from '../api/meldungen';
 import type { MeldungStatus, NeueMeldung } from '../api/types';
-import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
 import MeldungListe from '../meldungen/MeldungListe';
 import MeldungFormular from '../meldungen/MeldungFormular';
 
@@ -15,8 +14,6 @@ export default function MeldungenPage() {
   const einsatzId = Number(id);
   const { message } = App.useApp();
   const qc = useQueryClient();
-
-  useEinsatzLiveStream(einsatzId);
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const mitgliederQuery = useQuery({ queryKey: ['einsatz-mitglieder', einsatzId], queryFn: () => ladeMitglieder(einsatzId) });
@@ -59,6 +56,11 @@ export default function MeldungenPage() {
       qc.invalidateQueries({ queryKey: ['einsatz-lagemeldungen', einsatzId] });
       message.success('An die Lage übergeben');
     },
+    onError: fehler,
+  });
+  const bestaetigenMutation = useMutation({
+    mutationFn: (meldungId: number) => bestaetigeMeldung(einsatzId, meldungId),
+    onSuccess: () => { invalidiere(); message.success('Sofortmeldung bestätigt'); },
     onError: fehler,
   });
 
@@ -114,6 +116,7 @@ export default function MeldungenPage() {
             onStatus={(meldungId, status) => statusMutation.mutate({ meldungId, status })}
             onZuweisen={(meldungId, bearbeiterId) => zuweisenMutation.mutate({ meldungId, bearbeiterId })}
             onLagerelevant={(meldungId) => lageMutation.mutate(meldungId)}
+            onBestaetigen={(meldungId) => bestaetigenMutation.mutate(meldungId)}
           />
         </Col>
         {darfSchreiben && (

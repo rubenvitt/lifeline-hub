@@ -888,6 +888,20 @@ export interface Meldung {
   lage_meldung_id: number | null;
   /** Abgeleitet: status !== 'erledigt'. */
   ist_offen: boolean;
+  /** Sofortmeldung & Eskalation (LFH-85/97): aktive Bestätigungspflicht. */
+  bestaetigung_pflicht: boolean;
+  /** Absolute Bestätigungsfrist (UTC), null wenn keine Pflicht. */
+  bestaetigung_frist_at: string | null;
+  /** Frist überschritten + unbestätigt (Server-/Tick-getrieben). */
+  eskaliert: boolean;
+  /** Bestätigt-um (Quittungs-Achse), null wenn unbestätigt. */
+  bestaetigt_at: string | null;
+  bestaetigt_von_id: number | null;
+  bestaetigt_von_name: string | null;
+  /** Abgeleitet: quittiert_at !== null. */
+  ist_bestaetigt: boolean;
+  /** Abgeleitet: pflichtig, unbestätigt und Frist überschritten. */
+  ist_ueberfaellig: boolean;
 }
 
 export interface NeueMeldung {
@@ -899,6 +913,10 @@ export interface NeueMeldung {
   prioritaet?: MeldungPrioritaet;
   /** Ereigniszeit (UTC) 'YYYY-MM-DD HH:mm:ss'. Pflicht (≠ Erfassungszeit). */
   ereigniszeit: string;
+  /** Bestätigungspflicht erzwingen; undefined ⇒ aus Sofort-Klassifikation abgeleitet (LFH-97). */
+  bestaetigung_pflicht?: boolean;
+  /** Override der Default-Bestätigungsfrist (Minuten ab Eingang). */
+  bestaetigung_frist_min?: number;
 }
 
 /** Lageobjekt aus lagerelevanter Meldung (LFH-95). */
