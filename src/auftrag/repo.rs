@@ -16,6 +16,8 @@ pub struct EmpfaengerEingabe {
     pub person_id: Option<i64>,
     pub fahrzeug_id: Option<i64>,
     pub funktion_text: Option<String>,
+    pub extern_kategorie: Option<String>,
+    pub extern_bezeichnung: Option<String>,
 }
 
 /// Validierte Eingabe für einen neuen Auftrag (Handler hat getrimmt/normalisiert).
@@ -94,7 +96,7 @@ pub async fn empfaenger_von(
 ) -> Result<Vec<AuftragEmpfaengerAnzeige>, AppError> {
     sqlx::query_as::<_, AuftragEmpfaengerAnzeige>(
         "SELECT id, auftrag_id, empfaenger_typ, abschnitt_id, einheit_id, person_id, fahrzeug_id, \
-                funktion_text, snap_anzeige, quittiert_at, quittiert_von_id \
+                funktion_text, extern_kategorie, extern_bezeichnung, snap_anzeige, quittiert_at, quittiert_von_id \
          FROM auftrag_empfaenger WHERE auftrag_id = ? ORDER BY id",
     )
     .bind(auftrag_id)
@@ -239,8 +241,9 @@ pub async fn anlegen_tx(
         let snap = snap_anzeige_fuer(&mut *tx, e).await?;
         sqlx::query(
             "INSERT INTO auftrag_empfaenger \
-               (auftrag_id, empfaenger_typ, abschnitt_id, einheit_id, person_id, fahrzeug_id, funktion_text, snap_anzeige) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+               (auftrag_id, empfaenger_typ, abschnitt_id, einheit_id, person_id, fahrzeug_id, funktion_text, \
+                extern_kategorie, extern_bezeichnung, snap_anzeige) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(auftrag_id)
         .bind(&e.empfaenger_typ)
@@ -249,6 +252,8 @@ pub async fn anlegen_tx(
         .bind(e.person_id)
         .bind(e.fahrzeug_id)
         .bind(e.funktion_text.as_deref())
+        .bind(e.extern_kategorie.as_deref())
+        .bind(e.extern_bezeichnung.as_deref())
         .bind(&snap)
         .execute(&mut *tx)
         .await?;
@@ -325,10 +330,12 @@ async fn snap_anzeige_fuer(
             .bind(e.fahrzeug_id)
             .fetch_optional(&mut *tx)
             .await?,
+        "extern" => e.extern_bezeichnung.clone(),
         _ => e.funktion_text.clone(),
     };
     Ok(name
         .or_else(|| e.funktion_text.clone())
+        .or_else(|| e.extern_bezeichnung.clone())
         .unwrap_or_else(|| "—".to_string()))
 }
 
@@ -470,6 +477,21 @@ mod tests {
             person_id: None,
             fahrzeug_id: None,
             funktion_text: Some(t.into()),
+            extern_kategorie: None,
+            extern_bezeichnung: None,
+        }
+    }
+
+    fn extern_empf(kat: &str, bez: &str) -> EmpfaengerEingabe {
+        EmpfaengerEingabe {
+            empfaenger_typ: "extern".into(),
+            abschnitt_id: None,
+            einheit_id: None,
+            person_id: None,
+            fahrzeug_id: None,
+            funktion_text: None,
+            extern_kategorie: Some(kat.into()),
+            extern_bezeichnung: Some(bez.into()),
         }
     }
 
@@ -668,5 +690,18 @@ mod tests {
         assert_eq!(nur_extern.len(), 1);
         assert_eq!(nur_extern[0].auftrag.richtung, "extern");
         assert_eq!(nur_extern[0].auftrag.auftrag_text, "extern-a");
+    }
+
+    #[tokio::test]
+    async fn externer_adressat_wird_gespeichert_und_snap_aus_bezeichnung() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let d = anlegen(&pool, e, b, daten("an Leitstelle", None, vec![extern_empf("leitstelle", "Leitstelle Nord")]), "2026-06-11 09:00:00").await.unwrap();
+        assert_eq!(d.empfaenger.len(), 1);
+        let empf = &d.empfaenger[0];
+        assert_eq!(empf.empfaenger_typ, "extern");
+        assert_eq!(empf.extern_kategorie.as_deref(), Some("leitstelle"));
+        assert_eq!(empf.extern_bezeichnung.as_deref(), Some("Leitstelle Nord"));
+        assert_eq!(empf.snap_anzeige, "Leitstelle Nord", "snap aus Bezeichnung");
     }
 }

@@ -17,6 +17,18 @@ pub const EMPF_EINHEIT: &str = "einheit";
 pub const EMPF_FUNKTION: &str = "funktion";
 pub const EMPF_PERSON: &str = "person";
 pub const EMPF_FAHRZEUG: &str = "fahrzeug";
+/// Externer Adressat (LFH-87): Leitstelle, Nachbar-EA, übergeordnete Führung, andere BOS.
+pub const EMPF_EXTERN: &str = "extern";
+
+/// Externe Adressat-Kategorie (code-validiert, kein DB-CHECK).
+pub const EXTERN_LEITSTELLE: &str = "leitstelle";
+pub const EXTERN_NACHBAR_EA: &str = "nachbar_ea";
+pub const EXTERN_UEBERGEORDNET: &str = "uebergeordnet";
+pub const EXTERN_ANDERE_BOS: &str = "andere_bos";
+
+pub fn extern_kategorie_gueltig(k: &str) -> bool {
+    matches!(k, EXTERN_LEITSTELLE | EXTERN_NACHBAR_EA | EXTERN_UEBERGEORDNET | EXTERN_ANDERE_BOS)
+}
 
 /// Effektiver Bearbeitungsstatus (abgeleitet, fürs Frontend).
 pub const BEARB_OFFEN: &str = "offen";
@@ -37,7 +49,7 @@ pub fn richtung_gueltig(r: &str) -> bool {
 }
 
 pub fn empfaenger_typ_gueltig(t: &str) -> bool {
-    matches!(t, EMPF_ABSCHNITT | EMPF_EINHEIT | EMPF_FUNKTION | EMPF_PERSON | EMPF_FAHRZEUG)
+    matches!(t, EMPF_ABSCHNITT | EMPF_EINHEIT | EMPF_FUNKTION | EMPF_PERSON | EMPF_FAHRZEUG | EMPF_EXTERN)
 }
 
 /// Anzeige eines Auftrags inkl. abgeleiteter Felder und der Vollzugs-Achse aus
@@ -91,6 +103,9 @@ pub struct AuftragEmpfaengerAnzeige {
     pub person_id: Option<i64>,
     pub fahrzeug_id: Option<i64>,
     pub funktion_text: Option<String>,
+    /// Externer Adressat (LFH-87): Kategorie + Bezeichnung (nur bei empfaenger_typ='extern').
+    pub extern_kategorie: Option<String>,
+    pub extern_bezeichnung: Option<String>,
     pub snap_anzeige: String,
     pub quittiert_at: Option<String>,
     pub quittiert_von_id: Option<i64>,

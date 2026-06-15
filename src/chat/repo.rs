@@ -724,6 +724,8 @@ mod tests {
                 person_id: None,
                 fahrzeug_id: None,
                 funktion_text: Some("S4".into()),
+                extern_kategorie: None,
+                extern_bezeichnung: None,
             }],
         }
     }

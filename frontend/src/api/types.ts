@@ -782,7 +782,7 @@ export interface NeueErinnerung {
 
 export type AuftragPrioritaet = 'sofort' | 'dringend' | 'normal';
 export type AuftragBearbeitungsstatus = 'offen' | 'in_arbeit' | 'vollzogen' | 'abgenommen';
-export type EmpfaengerTyp = 'abschnitt' | 'einheit' | 'funktion' | 'person' | 'fahrzeug';
+export type EmpfaengerTyp = 'abschnitt' | 'einheit' | 'funktion' | 'person' | 'fahrzeug' | 'extern';
 /** Richtungskennzeichnung intern/extern (LFH-87), an Meldung und Auftrag. */
 export type Richtung = 'intern' | 'extern';
 
@@ -795,6 +795,8 @@ export interface AuftragEmpfaenger {
   person_id: number | null;
   fahrzeug_id: number | null;
   funktion_text: string | null;
+  extern_kategorie: AdressatKategorie | null;
+  extern_bezeichnung: string | null;
   snap_anzeige: string;
   quittiert_at: string | null;
   quittiert_von_id: number | null;
@@ -840,6 +842,8 @@ export interface NeuerEmpfaenger {
   person_id?: number;
   fahrzeug_id?: number;
   funktion_text?: string;
+  extern_kategorie?: AdressatKategorie;
+  extern_bezeichnung?: string;
 }
 
 export interface NeuerAuftrag {

@@ -1,5 +1,5 @@
 use crate::app::AppState;
-use crate::auftrag::{repo, AuftragDetail, EMPF_ABSCHNITT, EMPF_EINHEIT, EMPF_FAHRZEUG, EMPF_FUNKTION, EMPF_PERSON, PRIO_NORMAL, RICHTUNG_INTERN};
+use crate::auftrag::{repo, AuftragDetail, EMPF_ABSCHNITT, EMPF_EINHEIT, EMPF_EXTERN, EMPF_FAHRZEUG, EMPF_FUNKTION, EMPF_PERSON, PRIO_NORMAL, RICHTUNG_INTERN};
 use crate::auth::session::CurrentUser;
 use crate::einsatz::berechtigung::{fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
 use crate::einsatz::repo as einsatz_repo;
@@ -95,6 +95,8 @@ pub struct EmpfaengerEingabeReq {
     pub person_id: Option<i64>,
     pub fahrzeug_id: Option<i64>,
     pub funktion_text: Option<String>,
+    pub extern_kategorie: Option<String>,
+    pub extern_bezeichnung: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -128,6 +130,7 @@ async fn validiere_empfaenger(
         req.person_id.is_some(),
         req.fahrzeug_id.is_some(),
         trimme(&req.funktion_text).is_some(),
+        trimme(&req.extern_bezeichnung).is_some(),
     ]
     .iter()
     .filter(|b| **b)
@@ -186,6 +189,16 @@ async fn validiere_empfaenger(
             }
             EMPF_FUNKTION
         }
+        EMPF_EXTERN => {
+            let kat = req.extern_kategorie.as_deref().map(str::trim).unwrap_or("");
+            if !crate::auftrag::extern_kategorie_gueltig(kat) {
+                return Err(AppError::Validation("Ungültige externe Adressat-Kategorie".into()));
+            }
+            if trimme(&req.extern_bezeichnung).is_none() {
+                return Err(AppError::Validation("externe Bezeichnung fehlt".into()));
+            }
+            EMPF_EXTERN
+        }
         _ => return Err(AppError::Validation("Ungültiger Empfänger-Typ".into())),
     };
 
@@ -196,6 +209,8 @@ async fn validiere_empfaenger(
         person_id: req.person_id,
         fahrzeug_id: req.fahrzeug_id,
         funktion_text: trimme(&req.funktion_text).map(str::to_string),
+        extern_kategorie: trimme(&req.extern_kategorie).map(str::to_string),
+        extern_bezeichnung: trimme(&req.extern_bezeichnung).map(str::to_string),
     })
 }
 
