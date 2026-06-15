@@ -1,5 +1,6 @@
 import { Button, Empty, List, Popconfirm, Select, Space, Tag, Typography } from 'antd';
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import type { Meldung, MeldungStatus } from '../api/types';
 import { MELDUNG_STATUS, PrioBadge, QuittungIndikator, StatusBadge, formatZeit } from '../kommunikation';
 
@@ -19,12 +20,16 @@ const WEG_LABEL: Record<string, string> = {
 
 export interface MeldungListeProps {
   meldungen: Meldung[];
+  /** Einsatz-id für den Backlink auf den ausgelösten Auftrag (`/einsaetze/:id/auftraege`). */
+  einsatzId: number;
   darfSchreiben?: boolean;
   mitglieder?: BearbeiterOption[];
   onStatus?: (meldungId: number, status: MeldungStatus) => void;
   onZuweisen?: (meldungId: number, bearbeiterId: number | null) => void;
   onLagerelevant?: (meldungId: number) => void;
   onBestaetigen?: (meldungId: number) => void;
+  /** Öffnet das Auftrags-Formular zur Meldung→Auftrag-Erteilung (LFH-113). */
+  onAuftragErteilen?: (m: Meldung) => void;
 }
 
 /**
@@ -54,7 +59,8 @@ function aktion(key: string, label: string, frage: string, onConfirm: () => void
 }
 
 export default function MeldungListe({
-  meldungen, darfSchreiben, mitglieder, onStatus, onZuweisen, onLagerelevant, onBestaetigen,
+  meldungen, einsatzId, darfSchreiben, mitglieder, onStatus, onZuweisen, onLagerelevant, onBestaetigen,
+  onAuftragErteilen,
 }: MeldungListeProps) {
   if (meldungen.length === 0) return <Empty description="Keine Meldungen" />;
   return (
@@ -79,6 +85,14 @@ export default function MeldungListe({
                 ? aktion('er', 'Erledigt', 'Meldung auf „Erledigt“ setzen?', () => onStatus(m.id, 'erledigt')) : null,
               !m.lagerelevant && onLagerelevant
                 ? aktion('lr', 'An Lage übergeben', 'Meldung an die Lage übergeben?', () => onLagerelevant(m.id)) : null,
+              // Meldung→Auftrag (LFH-113): nur solange noch kein Auftrag erteilt. Öffnet ein
+              // Formular-Modal (kein Popconfirm) → eigener Link-Button statt aktion().
+              m.auftrag_id == null && onAuftragErteilen
+                ? (
+                    <Button key="ae" type="link" size="small" style={{ padding: 0 }} onClick={() => onAuftragErteilen(m)}>
+                      Auftrag erteilen
+                    </Button>
+                  ) : null,
             ].filter(Boolean) as ReactNode[]
           : [];
         return (
@@ -92,6 +106,9 @@ export default function MeldungListe({
                   <Typography.Text strong>{m.absender}</Typography.Text>
                   {m.empfaenger && <Typography.Text type="secondary">→ {m.empfaenger}</Typography.Text>}
                   {m.lagerelevant && <Tag color="gold">Lagerelevant ✓</Tag>}
+                  {m.auftrag_id != null && (
+                    <Link to={`/einsaetze/${einsatzId}/auftraege`}>↗ Auftrag</Link>
+                  )}
                   {bestaetigungsAchse(m)}
                 </Space>
               }

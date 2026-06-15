@@ -4,11 +4,14 @@ import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz, ladeMitglieder } from '../api/einsaetze';
 import { ApiError } from '../api/client';
-import { bestaetigeMeldung, legeMeldungAn, listeMeldungen, markiereLagerelevant, setzeMeldungStatus, weiseBearbeiterZu } from '../api/meldungen';
-import type { Meldung, MeldungStatus, NeueMeldung } from '../api/types';
+import { bestaetigeMeldung, erteileAuftragAusMeldung, legeMeldungAn, listeMeldungen, markiereLagerelevant, setzeMeldungStatus, weiseBearbeiterZu } from '../api/meldungen';
+import { listeAbschnitte } from '../api/einsatzabschnitte';
+import { listeEinheiten } from '../api/einheiten';
+import type { Meldung, MeldungStatus, NeueMeldung, NeuerAuftrag } from '../api/types';
 import { MELDUNG_STATUS, istAbgeschlossen } from '../kommunikation';
 import MeldungListe from '../meldungen/MeldungListe';
 import MeldungFormular from '../meldungen/MeldungFormular';
+import AuftragErteilenModal from '../meldungen/AuftragErteilenModal';
 
 const PRIO_ORDNUNG: Record<string, number> = { sofort: 0, dringend: 1, normal: 2 };
 
@@ -43,10 +46,14 @@ export default function MeldungenPage() {
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const mitgliederQuery = useQuery({ queryKey: ['einsatz-mitglieder', einsatzId], queryFn: () => ladeMitglieder(einsatzId) });
+  // Auftrags-Ziele für das Meldung→Auftrag-Formular (wie AuftraegePage/ChatPage).
+  const abschnitteQuery = useQuery({ queryKey: ['einsatz-abschnitte', einsatzId], queryFn: () => listeAbschnitte(einsatzId) });
+  const einheitenQuery = useQuery({ queryKey: ['einsatz-einheiten', einsatzId], queryFn: () => listeEinheiten(einsatzId) });
 
   // Offen/Abgeschlossen-Trennung erfolgt clientseitig (alle Meldungen laden, Server-Default).
   const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
   const [richtungFilter, setRichtungFilter] = useState<string | undefined>(undefined);
+  const [auftragMeldung, setAuftragMeldung] = useState<Meldung | null>(null);
 
   const meldungenQuery = useQuery({
     queryKey: ['einsatz-meldungen', einsatzId, richtungFilter ?? 'alle'],
@@ -87,6 +94,17 @@ export default function MeldungenPage() {
     onSuccess: () => { invalidiere(); message.success('Sofortmeldung bestätigt'); },
     onError: fehler,
   });
+  const auftragMutation = useMutation({
+    mutationFn: ({ meldungId, daten }: { meldungId: number; daten: NeuerAuftrag }) =>
+      erteileAuftragAusMeldung(einsatzId, meldungId, daten),
+    onSuccess: () => {
+      invalidiere();
+      qc.invalidateQueries({ queryKey: ['einsatz-auftraege', einsatzId] });
+      setAuftragMeldung(null);
+      message.success('Auftrag aus Meldung erteilt');
+    },
+    onError: fehler,
+  });
 
   if (einsatzQuery.isLoading) {
     return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
@@ -108,12 +126,19 @@ export default function MeldungenPage() {
   const mitglieder = mitgliederQuery.data ?? [];
 
   const listenProps = {
+    einsatzId,
     darfSchreiben,
     mitglieder,
     onStatus: (meldungId: number, status: MeldungStatus) => statusMutation.mutate({ meldungId, status }),
     onZuweisen: (meldungId: number, bearbeiterId: number | null) => zuweisenMutation.mutate({ meldungId, bearbeiterId }),
     onLagerelevant: (meldungId: number) => lageMutation.mutate(meldungId),
     onBestaetigen: (meldungId: number) => bestaetigenMutation.mutate(meldungId),
+    onAuftragErteilen: (m: Meldung) => setAuftragMeldung(m),
+  };
+
+  const auftragsZiele = {
+    abschnitte: (abschnitteQuery.data ?? []).map((a) => ({ id: a.id, name: a.name })),
+    einheiten: (einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name })),
   };
 
   return (
@@ -159,6 +184,17 @@ export default function MeldungenPage() {
           </Col>
         )}
       </Row>
+      <AuftragErteilenModal
+        offen={auftragMeldung !== null}
+        meldung={auftragMeldung}
+        abschnitte={auftragsZiele.abschnitte}
+        einheiten={auftragsZiele.einheiten}
+        senden={auftragMutation.isPending}
+        onAbbrechen={() => setAuftragMeldung(null)}
+        onAnlegen={(daten) => {
+          if (auftragMeldung) auftragMutation.mutate({ meldungId: auftragMeldung.id, daten });
+        }}
+      />
     </div>
   );
 }

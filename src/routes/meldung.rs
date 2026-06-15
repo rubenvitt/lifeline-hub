@@ -338,6 +338,49 @@ pub async fn lagerelevant(
     Ok(Json(m))
 }
 
+/// POST /api/einsaetze/{id}/meldungen/{mid}/auftrag — aus einer eingegangenen Meldung direkt
+/// einen Auftrag/Befehl erteilen (Meldung→Auftrag, LFH-113). Erzeugt einen formalen Auftrag
+/// (inkl. ETB-Anordnung, Pattern B) und setzt den Rückbezug `meldung.auftrag_id` first-write-wins.
+/// Auftragsfelder durchlaufen dieselbe Validierung wie POST /auftraege (geteilt, kein zweiter Pfad).
+/// Schreibrecht + aktiv + Cross-Einsatz-Schutz über `fordere_bearbeitbar` (wie die anderen Mutationen).
+pub async fn auftrag_erteilen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
+    Json(req): Json<crate::routes::auftrag::NeuerAuftrag>,
+) -> Result<(StatusCode, Json<MeldungAnzeige>), AppError> {
+    fordere_bearbeitbar(&state, &benutzer, einsatz_id, meldung_id).await?;
+
+    // Gleiche Validierung wie POST /auftraege (geteilt) → kein zweiter, ungeprüfter Pfad.
+    let now = jetzt();
+    let validiert =
+        crate::routes::auftrag::validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now).await?;
+    let auftrag_id = repo::erteile_auftrag_tx(
+        &state.pool, einsatz_id, meldung_id, benutzer.id, validiert.daten(),
+    )
+    .await?;
+
+    // ETB-Anordnung entstand im selben Commit → ETB-Live-Event + Auftrag-Board + meldung-Tag (SSE-Parität).
+    if let Ok(detail) = crate::auftrag::repo::laden(&state.pool, auftrag_id, &now).await {
+        if let Some(etb_id) = detail.auftrag.etb_anordnung_id {
+            if let Ok(etb) = crate::etb::repo::laden(&state.pool, etb_id).await {
+                if let Ok(json) = serde_json::to_string(&etb) {
+                    state.live.publiziere(einsatz_id, json);
+                }
+            }
+        }
+    }
+    state.live.publiziere_event(
+        einsatz_id,
+        "auftrag",
+        serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
+    );
+    sse(&state, einsatz_id);
+
+    let m = repo::laden(&state.pool, meldung_id, &now).await?;
+    Ok((StatusCode::CREATED, Json(m)))
+}
+
 /// GET /api/einsaetze/{id}/lage/meldungen — Lageobjekte aus Meldungen (Lese-Oberfläche, LFH-95).
 pub async fn lage_liste(
     State(state): State<AppState>,

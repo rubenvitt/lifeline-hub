@@ -1,5 +1,5 @@
 import { apiGet, apiSend } from './client';
-import type { LageMeldung, Meldung, MeldungStatus, NeueMeldung } from './types';
+import type { LageMeldung, Meldung, MeldungStatus, NeueMeldung, NeuerAuftrag } from './types';
 
 export interface MeldungFilter {
   status?: string;
@@ -52,6 +52,16 @@ export function markiereLagerelevant(
   text?: string,
 ): Promise<Meldung> {
   return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/meldungen/${meldungId}/lagerelevant`, 'POST', { text });
+}
+
+/** Aus einer eingegangenen Meldung direkt einen Auftrag erteilen (Meldung→Auftrag, LFH-113).
+ *  Legt den Auftrag an und setzt `meldung.auftrag_id`; liefert die markierte Meldung zurück. */
+export function erteileAuftragAusMeldung(
+  einsatzId: number,
+  meldungId: number,
+  daten: NeuerAuftrag,
+): Promise<Meldung> {
+  return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/meldungen/${meldungId}/auftrag`, 'POST', daten);
 }
 
 /** Lageobjekte (aus lagerelevanten Meldungen) listen (LFH-95, Lage-Kategorie). */

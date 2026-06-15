@@ -22,6 +22,7 @@ const setzeMeldungStatus = vi.fn();
 const weiseBearbeiterZu = vi.fn();
 const markiereLagerelevant = vi.fn();
 const bestaetigeMeldung = vi.fn();
+const erteileAuftragAusMeldung = vi.fn();
 vi.mock('../api/meldungen', () => ({
   listeMeldungen: (...a: unknown[]) => listeMeldungen(...a),
   legeMeldungAn: (...a: unknown[]) => legeMeldungAn(...a),
@@ -29,7 +30,11 @@ vi.mock('../api/meldungen', () => ({
   weiseBearbeiterZu: (...a: unknown[]) => weiseBearbeiterZu(...a),
   markiereLagerelevant: (...a: unknown[]) => markiereLagerelevant(...a),
   bestaetigeMeldung: (...a: unknown[]) => bestaetigeMeldung(...a),
+  erteileAuftragAusMeldung: (...a: unknown[]) => erteileAuftragAusMeldung(...a),
 }));
+// Auftrags-Ziele (LFH-113): MeldungenPage lädt sie für das Meldung→Auftrag-Formular.
+vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn().mockResolvedValue([]) }));
+vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn().mockResolvedValue([]) }));
 
 const meldung = (over: Partial<Meldung> = {}): Meldung => ({
   id: 1, einsatz_id: 1, lfd_nr: 1, absender: 'Florian Nord 1', empfaenger: 'ELW 1',
@@ -227,6 +232,35 @@ describe('MeldungenPage', () => {
     // Bestätigt → orthogonale Quittungs-Achse (QuittungIndikator) statt Status-Badge.
     expect(screen.getByText(/✓ Quittiert/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Bestätigen' })).not.toBeInTheDocument();
+  });
+
+  // --- LFH-113: Meldung→Auftrag ---
+
+  it('erteilt aus einer Meldung einen Auftrag, vorbefüllt mit Absender + Inhalt', async () => {
+    erteileAuftragAusMeldung.mockResolvedValue(meldung({ auftrag_id: 42 }));
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
+    // Auftragstext ist mit „Absender: Inhalt" vorbelegt (Meldungsvorblendung).
+    const textfeld = await screen.findByLabelText('Auftrag / Was');
+    expect(textfeld).toHaveValue('Florian Nord 1: Deich instabil');
+    // Minimal validen Empfänger über das Funktions-Freitextfeld ergänzen.
+    await userEvent.type(screen.getByLabelText(/Weitere Empfänger/), 'S3');
+    // Submit-Button des Formulars heißt ebenfalls „Auftrag erteilen".
+    const buttons = await screen.findAllByRole('button', { name: 'Auftrag erteilen' });
+    await userEvent.click(buttons[buttons.length - 1]);
+    await waitFor(() => expect(erteileAuftragAusMeldung).toHaveBeenCalledWith(
+      1, 1, expect.objectContaining({ auftrag_text: 'Florian Nord 1: Deich instabil' }),
+    ));
+  });
+
+  it('zeigt bei verknüpfter Meldung einen Backlink zum Auftrag statt der Erteilen-Aktion', async () => {
+    listeMeldungen.mockResolvedValue([meldung({ auftrag_id: 42 })]);
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    const backlink = screen.getByRole('link', { name: /Auftrag/ });
+    expect(backlink).toHaveAttribute('href', '/einsaetze/1/auftraege');
+    expect(screen.queryByRole('button', { name: 'Auftrag erteilen' })).not.toBeInTheDocument();
   });
 
   it('Fast-Path-Button erfasst Sofortmeldung mit Bestätigungspflicht', async () => {

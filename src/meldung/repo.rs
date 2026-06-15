@@ -326,6 +326,48 @@ pub async fn als_lagerelevant(
     Ok(lage_id)
 }
 
+/// Erteilt aus einer eingegangenen Meldung einen Auftrag (LFH-113) — in EINEM Commit:
+/// legt den Auftrag inkl. seiner ETB-Anordnung an (`auftrag::repo::anlegen_tx`, Pattern B,
+/// wie Chat→Auftrag LFH-101) und setzt den Rückverweis `meldung.auftrag_id`. First-write-wins:
+/// ist die Meldung bereits mit einem Auftrag verknüpft → `Conflict` (vor der Auftrags-Anlage
+/// geprüft, sodass kein verwaister Auftrag entsteht). `daten` ist bereits vom Handler validiert
+/// (Auftragstext + >=1 Empfänger, Slots/Zugehörigkeit geprüft). Liefert die neue `auftrag_id`.
+pub async fn erteile_auftrag_tx(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    meldung_id: i64,
+    erteiler_id: i64,
+    daten: crate::auftrag::repo::AuftragDaten<'_>,
+) -> Result<i64, AppError> {
+    let mut tx = pool.begin().await?;
+
+    // Guard: schon mit einem Auftrag verknüpft? (Sperrt Doppel-Verknüpfung; first-write-wins.)
+    // Meldung kennt kein Soft-Delete (nur erledigt_at/status) → nur auftrag_id prüfen.
+    let auftrag_vorhanden: Option<Option<i64>> =
+        sqlx::query_scalar("SELECT auftrag_id FROM meldung WHERE id = ?")
+            .bind(meldung_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+    let auftrag_vorhanden = auftrag_vorhanden.ok_or(AppError::NotFound)?;
+    if auftrag_vorhanden.is_some() {
+        return Err(AppError::Conflict(
+            "Aus dieser Meldung wurde bereits ein Auftrag erteilt".into(),
+        ));
+    }
+
+    let auftrag_id =
+        crate::auftrag::repo::anlegen_tx(&mut tx, einsatz_id, erteiler_id, &daten).await?;
+
+    sqlx::query("UPDATE meldung SET auftrag_id = ? WHERE id = ?")
+        .bind(auftrag_id)
+        .bind(meldung_id)
+        .execute(&mut *tx)
+        .await?;
+
+    tx.commit().await?;
+    Ok(auftrag_id)
+}
+
 /// Listet Lageobjekte eines Einsatzes inkl. Herkunft (Quell-Meldung). Neueste zuerst.
 pub async fn liste_lage_meldungen(
     pool: &SqlitePool,
@@ -690,6 +732,78 @@ mod tests {
         // Trotz überschrittener Frist: bestätigt → keine Eskalation.
         assert!(!setze_eskaliert(&pool, m.id, "2026-06-12 09:07:00").await.unwrap());
         assert!(!laden(&pool, m.id, "2026-06-12 09:07:00").await.unwrap().eskaliert);
+    }
+
+    /// Baut minimale, valide Auftragsdaten (ein Funktions-Empfänger, keine DB-Lookups nötig).
+    fn auftrag_daten(text: &str) -> crate::auftrag::repo::AuftragDaten<'_> {
+        crate::auftrag::repo::AuftragDaten {
+            auftrag_text: text,
+            absicht: None,
+            lage: None,
+            ort: None,
+            zeit: None,
+            mittel: None,
+            verbindung: None,
+            sicherheit: None,
+            prioritaet: "normal",
+            richtung: "intern",
+            frist_at: None,
+            erteilt_at: "2026-06-12 10:00:00",
+            empfaenger: vec![crate::auftrag::repo::EmpfaengerEingabe {
+                empfaenger_typ: "funktion".into(),
+                abschnitt_id: None,
+                einheit_id: None,
+                person_id: None,
+                fahrzeug_id: None,
+                funktion_text: Some("S4".into()),
+                extern_kategorie: None,
+                extern_bezeichnung: None,
+            }],
+        }
+    }
+
+    #[tokio::test]
+    async fn erteile_auftrag_legt_auftrag_an_und_setzt_rueckverweis() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(&pool, e, b, daten("Tank fordern", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
+
+        let auftrag_id =
+            erteile_auftrag_tx(&pool, e, m.id, b, auftrag_daten("Tank fordern")).await.unwrap();
+
+        // Auftrag landet im Auftrag-Modul, ETB-Anordnung entsteht im selben Commit (Pattern B).
+        let detail = crate::auftrag::repo::laden(&pool, auftrag_id, "2026-06-12 10:00:00").await.unwrap();
+        assert_eq!(detail.auftrag.auftrag_text, "Tank fordern");
+        assert!(detail.auftrag.etb_anordnung_id.is_some(), "ETB-Anordnung im selben Commit erzeugt");
+        assert_eq!(detail.empfaenger.len(), 1);
+
+        // Rückverweis an der Meldung ist gesetzt.
+        let nachher = laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap();
+        assert_eq!(nachher.auftrag_id, Some(auftrag_id));
+    }
+
+    #[tokio::test]
+    async fn erteile_auftrag_doppelt_ist_konflikt_und_legt_keinen_zweiten_auftrag_an() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(&pool, e, b, daten("X", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
+        erteile_auftrag_tx(&pool, e, m.id, b, auftrag_daten("erster")).await.unwrap();
+
+        let zweimal = erteile_auftrag_tx(&pool, e, m.id, b, auftrag_daten("zweiter")).await;
+        assert!(matches!(zweimal.unwrap_err(), AppError::Conflict(_)));
+
+        // Kein verwaister Auftrag: die zweite (abgewiesene) Anlage darf nichts hinterlassen.
+        let anzahl: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM auftrag WHERE einsatz_id = ?")
+            .bind(e).fetch_one(&pool).await.unwrap();
+        assert_eq!(anzahl, 1, "abgewiesene Doppel-Erteilung legt keinen zweiten Auftrag an (transaktional)");
+    }
+
+    #[tokio::test]
+    async fn erteile_auftrag_unbekannte_meldung_ist_notfound() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let ergebnis = erteile_auftrag_tx(&pool, e, 999, b, auftrag_daten("x")).await;
+        assert!(matches!(ergebnis.unwrap_err(), AppError::NotFound));
     }
 
     #[tokio::test]
