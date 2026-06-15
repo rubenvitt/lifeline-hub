@@ -13,10 +13,11 @@ import { listeFuehrungskraefte, verortePerson } from '../api/einsatzPersonal';
 import { listeAbschnitte, zeichneAbschnitt } from '../api/einsatzabschnitte';
 import { listeZonen, legeZoneAn, aktualisiereZone, loescheZone } from '../api/lagezonen';
 import { ladeGefahrengebiete } from '../api/gefahren';
+import { listeLageMeldungen } from '../api/meldungen';
 import { ladeOrganisation } from '../api/organisation';
 import type { EinsatzAnzeige, Warnstufe, ZoneTyp } from '../api/types';
 import { useThemeMode } from '../theme/ThemeModeProvider';
-import { baueMarker, baueTaktischeMarker, type KarteMarker } from './lagekarte/marker';
+import { baueMarker, baueTaktischeMarker, baueLageMeldungMarker, type KarteMarker } from './lagekarte/marker';
 import { parsePolygon, parseGeometry, polygonZentroid } from './lagekarte/geo';
 import { baueTzProps } from './lagekarte/taktischesZeichen';
 import { baueBasemapStyle, aktuelleAttribution, type BasemapModus } from './lagekarte/basemapStil';
@@ -70,7 +71,7 @@ export default function LagekartePage() {
   const [onlineStilName, setOnlineStilName] = useState<string | null>(null);
   const [flyToZiel, setFlyToZiel] = useState<{ lng: number; lat: number } | null>(null);
   const [layer, setLayer] = useState<LayerSichtbar>({
-    einsatzort: true, uhs: true, schaden: true, einheit: true, fahrzeug: true, fuehrung: true, abschnitt: true, zone: true,
+    einsatzort: true, uhs: true, schaden: true, einheit: true, fahrzeug: true, fuehrung: true, abschnitt: true, zone: true, lagemeldung: true,
   });
   const [matrixGebiet, setMatrixGebiet] = useState<number | null>(null);
   // Angeklicktes Fachebenen-Objekt (externe Daten) → Detail-Panel.
@@ -104,6 +105,10 @@ export default function LagekartePage() {
     queryFn: () => listeZonen(einsatzId),
   });
   const gebieteQuery = useQuery({ queryKey: ['gefahrengebiete', einsatzId], queryFn: () => ladeGefahrengebiete(einsatzId) });
+  const lageMeldungenQuery = useQuery({
+    queryKey: ['einsatz-lagemeldungen', einsatzId],
+    queryFn: () => listeLageMeldungen(einsatzId),
+  });
   const fkQuery = useQuery({
     queryKey: ['einsatz-fuehrungskraefte', einsatzId],
     queryFn: () => listeFuehrungskraefte(einsatzId),
@@ -254,9 +259,14 @@ export default function LagekartePage() {
     [zonenQuery.data, zoneAuswahl],
   );
 
+  const lageMeldungMarker = useMemo(
+    () => baueLageMeldungMarker(lageMeldungenQuery.data ?? []),
+    [lageMeldungenQuery.data],
+  );
+
   const alleVerortet = useMemo(
-    () => [...verortet, ...taktisch.verortet, ...flaechen.map((f) => f.tzMarker)],
-    [verortet, taktisch.verortet, flaechen],
+    () => [...verortet, ...taktisch.verortet, ...flaechen.map((f) => f.tzMarker), ...lageMeldungMarker],
+    [verortet, taktisch.verortet, flaechen, lageMeldungMarker],
   );
 
   const nichtVerortetAlle = useMemo(

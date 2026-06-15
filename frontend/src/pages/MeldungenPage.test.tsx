@@ -170,13 +170,34 @@ describe('MeldungenPage', () => {
 
   // --- LFH-95: Lage-Übergabe ---
 
-  it('übergibt eine Meldung an die Lage', async () => {
+  it('übergibt eine Meldung an die Lage (ohne Verortung)', async () => {
     markiereLagerelevant.mockResolvedValue(meldung({ lagerelevant: true }));
     renderPage();
     await screen.findByText('Florian Nord 1');
     await userEvent.click(screen.getByRole('button', { name: 'An Lage übergeben' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
-    await waitFor(() => expect(markiereLagerelevant).toHaveBeenCalledWith(1, 1));
+    // Modal öffnet sich; ohne Koordinate direkt übergeben.
+    await userEvent.click(await screen.findByRole('button', { name: 'Übergeben' }));
+    await waitFor(() => expect(markiereLagerelevant).toHaveBeenCalledTimes(1));
+    const [eid, mid, daten] = markiereLagerelevant.mock.calls[0];
+    expect(eid).toBe(1);
+    expect(mid).toBe(1);
+    expect((daten as { lat?: number }).lat).toBeUndefined();
+    expect((daten as { lon?: number }).lon).toBeUndefined();
+  });
+
+  it('übergibt eine Meldung an die Lage MIT Verortung (lat/lon im Request)', async () => {
+    markiereLagerelevant.mockResolvedValue(meldung({ lagerelevant: true }));
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(screen.getByRole('button', { name: 'An Lage übergeben' }));
+    await userEvent.type(await screen.findByLabelText('Breitengrad'), '50.1');
+    await userEvent.type(screen.getByLabelText('Längengrad'), '8.6');
+    await userEvent.click(screen.getByRole('button', { name: 'Übergeben' }));
+    await waitFor(() => expect(markiereLagerelevant).toHaveBeenCalledTimes(1));
+    const [eid, mid, daten] = markiereLagerelevant.mock.calls[0];
+    expect(eid).toBe(1);
+    expect(mid).toBe(1);
+    expect(daten).toMatchObject({ lat: 50.1, lon: 8.6 });
   });
 
   it('zeigt lagerelevante Meldung als markiert, ohne erneute Übergabe-Aktion', async () => {

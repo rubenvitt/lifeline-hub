@@ -45,13 +45,16 @@ export function bestaetigeMeldung(einsatzId: number, meldungId: number): Promise
   return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/meldungen/${meldungId}/bestaetigen`, 'POST', {});
 }
 
-/** Als lagerelevant an die Lage übergeben (LFH-95). */
+/** Als lagerelevant an die Lage übergeben (LFH-95).
+ *  Optional direkt verorten (LFH-113): lat/lon nur gemeinsam — das Backend persistiert die
+ *  Koordinate beim erstmaligen Übergeben (INSERT). Re-Verorten bestehender Lageobjekte ist
+ *  bewusst kein Pfad (Übergabe-Aktion ist einmalig, siehe MeldungListe). */
 export function markiereLagerelevant(
   einsatzId: number,
   meldungId: number,
-  text?: string,
+  daten: { text?: string; lat?: number; lon?: number } = {},
 ): Promise<Meldung> {
-  return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/meldungen/${meldungId}/lagerelevant`, 'POST', { text });
+  return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/meldungen/${meldungId}/lagerelevant`, 'POST', daten);
 }
 
 /** Aus einer eingegangenen Meldung direkt einen Auftrag erteilen (Meldung→Auftrag, LFH-113).

@@ -158,6 +158,19 @@ const SCHADEN_VERORTET = {
   geschaedigt_organisation_name: null,
 };
 
+const LAGEMELDUNG_VERORTET = {
+  id: 4,
+  einsatz_id: 1,
+  meldung_id: 12,
+  text: 'Brücke gesperrt',
+  lat: 50.3,
+  lon: 8.7,
+  erstellt_von_id: 1,
+  erstellt_at: '2026-06-12 09:00:00',
+  meldung_lfd_nr: 5,
+  meldung_absender: 'Florian Nord 1',
+};
+
 // --- L‑2 taktische Mock-Objekte ---------------------------------------------
 // Nur die Felder, die der Code (baueTaktischeMarker/baueTzProps/flaechen) liest.
 // Bewusst NICHT als voller Typ annotiert: HttpResponse.json prüft nicht gegen den
@@ -221,6 +234,7 @@ function basisHandler(
     http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/zonen', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/karte/fuehrungskraefte', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/lage/meldungen', () => HttpResponse.json([])),
     http.get('/api/organisation', () => HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null })),
     http.get('/api/karte/config', () => HttpResponse.json(config)),
   );
@@ -300,6 +314,22 @@ describe('LagekartePage', () => {
     await user.click(await screen.findByText('marker-schaden-9'));
     const link = await screen.findByRole('link', { name: /Im Fach-Modul öffnen/ });
     expect(link).toHaveAttribute('href', '/einsaetze/1/schaeden?schaden=9');
+  });
+
+  it('rendert verortete Lagemeldungen als Marker; Klick öffnet Inspector mit Backlink zur Quell-Meldung', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1/lage/meldungen', () => HttpResponse.json([LAGEMELDUNG_VERORTET])),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByText('marker-lagemeldung-4'));
+    // Kurzinfo der Meldung im Inspector + Rückverweis auf die Meldungen-Ansicht.
+    expect(await screen.findByText('Florian Nord 1')).toBeInTheDocument();
+    expect(screen.getByText('Brücke gesperrt')).toBeInTheDocument();
+    const link = await screen.findByRole('link', { name: /Zur Quell-Meldung/ });
+    expect(link).toHaveAttribute('href', '/einsaetze/1/meldungen');
+    // Lagemeldungs-Marker sind kartenseitig read-only (Verorten nur beim Übergeben).
+    expect(screen.queryByRole('button', { name: /Verortung löschen/ })).not.toBeInTheDocument();
   });
 
   it('Basemap-Umschalter: von Online auf Blind wechseln, Marker bleiben sichtbar', async () => {

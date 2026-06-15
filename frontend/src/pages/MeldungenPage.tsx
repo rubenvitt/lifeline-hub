@@ -12,6 +12,7 @@ import { MELDUNG_STATUS, istAbgeschlossen } from '../kommunikation';
 import MeldungListe from '../meldungen/MeldungListe';
 import MeldungFormular from '../meldungen/MeldungFormular';
 import AuftragErteilenModal from '../meldungen/AuftragErteilenModal';
+import LagerelevantModal, { type LagerelevantDaten } from '../meldungen/LagerelevantModal';
 
 const PRIO_ORDNUNG: Record<string, number> = { sofort: 0, dringend: 1, normal: 2 };
 
@@ -54,6 +55,7 @@ export default function MeldungenPage() {
   const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
   const [richtungFilter, setRichtungFilter] = useState<string | undefined>(undefined);
   const [auftragMeldung, setAuftragMeldung] = useState<Meldung | null>(null);
+  const [lageMeldung, setLageMeldung] = useState<Meldung | null>(null);
 
   const meldungenQuery = useQuery({
     queryKey: ['einsatz-meldungen', einsatzId, richtungFilter ?? 'alle'],
@@ -81,10 +83,12 @@ export default function MeldungenPage() {
     onError: fehler,
   });
   const lageMutation = useMutation({
-    mutationFn: (meldungId: number) => markiereLagerelevant(einsatzId, meldungId),
+    mutationFn: ({ meldungId, daten }: { meldungId: number; daten: LagerelevantDaten }) =>
+      markiereLagerelevant(einsatzId, meldungId, daten),
     onSuccess: () => {
       invalidiere();
       qc.invalidateQueries({ queryKey: ['einsatz-lagemeldungen', einsatzId] });
+      setLageMeldung(null);
       message.success('An die Lage übergeben');
     },
     onError: fehler,
@@ -131,7 +135,10 @@ export default function MeldungenPage() {
     mitglieder,
     onStatus: (meldungId: number, status: MeldungStatus) => statusMutation.mutate({ meldungId, status }),
     onZuweisen: (meldungId: number, bearbeiterId: number | null) => zuweisenMutation.mutate({ meldungId, bearbeiterId }),
-    onLagerelevant: (meldungId: number) => lageMutation.mutate(meldungId),
+    onLagerelevant: (meldungId: number) => {
+      const m = alleMeldungen.find((x) => x.id === meldungId) ?? null;
+      setLageMeldung(m);
+    },
     onBestaetigen: (meldungId: number) => bestaetigenMutation.mutate(meldungId),
     onAuftragErteilen: (m: Meldung) => setAuftragMeldung(m),
   };
@@ -184,6 +191,15 @@ export default function MeldungenPage() {
           </Col>
         )}
       </Row>
+      <LagerelevantModal
+        offen={lageMeldung !== null}
+        meldung={lageMeldung}
+        senden={lageMutation.isPending}
+        onAbbrechen={() => setLageMeldung(null)}
+        onUebergeben={(daten) => {
+          if (lageMeldung) lageMutation.mutate({ meldungId: lageMeldung.id, daten });
+        }}
+      />
       <AuftragErteilenModal
         offen={auftragMeldung !== null}
         meldung={auftragMeldung}

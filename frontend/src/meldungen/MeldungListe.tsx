@@ -83,8 +83,14 @@ export default function MeldungListe({
                 ? aktion('ib', 'In Bearbeitung', 'Meldung auf „In Bearbeitung“ setzen?', () => onStatus(m.id, 'in_bearbeitung')) : null,
               m.status !== 'erledigt' && onStatus
                 ? aktion('er', 'Erledigt', 'Meldung auf „Erledigt“ setzen?', () => onStatus(m.id, 'erledigt')) : null,
+              // An die Lage übergeben (LFH-95/113): öffnet ein Formular-Modal (optionale
+              // Verortung) statt Popconfirm → eigener Link-Button wie „Auftrag erteilen".
               !m.lagerelevant && onLagerelevant
-                ? aktion('lr', 'An Lage übergeben', 'Meldung an die Lage übergeben?', () => onLagerelevant(m.id)) : null,
+                ? (
+                    <Button key="lr" type="link" size="small" style={{ padding: 0 }} onClick={() => onLagerelevant(m.id)}>
+                      An Lage übergeben
+                    </Button>
+                  ) : null,
               // Meldung→Auftrag (LFH-113): nur solange noch kein Auftrag erteilt. Öffnet ein
               // Formular-Modal (kein Popconfirm) → eigener Link-Button statt aktion().
               m.auftrag_id == null && onAuftragErteilen
