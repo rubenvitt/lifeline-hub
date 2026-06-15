@@ -825,6 +825,8 @@ export interface Auftrag {
   abgenommen_at: string | null;
   abgenommen_von_id: number | null;
   etb_anordnung_id: number | null;
+  /** Quell-ETB-Eintrag, aus dem dieser Auftrag erteilt wurde (LFH-112); getrennt von etb_anordnung_id. */
+  quell_etb_eintrag_id: number | null;
   erstellt_von_id: number;
   erstellt_at: string;
   vollzug_status: 'offen' | 'in_arbeit' | 'vollzogen';

@@ -10,9 +10,11 @@ interface Props {
   onBerichtigen?: (eintrag: EtbEintragAnzeige) => void;
   /** Wenn gesetzt, erscheint je Eintrag eine „Wiedervorlage"-Aktion (ETB→Erinnerung, LFH-106). */
   onWiedervorlage?: (eintrag: EtbEintragAnzeige) => void;
+  /** Wenn gesetzt, erscheint je Eintrag eine „Auftrag erteilen"-Aktion (ETB→Auftrag, LFH-112). */
+  onAuftragErteilen?: (eintrag: EtbEintragAnzeige) => void;
 }
 
-export default function EtbTabelle({ eintraege, onBerichtigen, onWiedervorlage }: Props) {
+export default function EtbTabelle({ eintraege, onBerichtigen, onWiedervorlage, onAuftragErteilen }: Props) {
   // Map id → lfd_nr, um Berichtigungs-Ziele auf ihre laufende Nummer aufzulösen.
   const lfdNrVonId = new Map(eintraege.map((e) => [e.id, e.lfd_nr]));
 
@@ -79,13 +81,13 @@ export default function EtbTabelle({ eintraege, onBerichtigen, onWiedervorlage }
     { title: 'Erfasser', dataIndex: 'erfasser_name', width: 120 },
   ];
 
-  if (onBerichtigen || onWiedervorlage) {
+  if (onBerichtigen || onWiedervorlage || onAuftragErteilen) {
     spalten.push({
       title: '',
       key: 'aktion',
-      width: 150,
+      width: 230,
       render: (_, e) => (
-        <Space size={4}>
+        <Space size={4} wrap>
           {onBerichtigen && e.typ !== 'berichtigung' && (
             <Button type="link" size="small" onClick={() => onBerichtigen(e)}>
               Berichtigen
@@ -94,6 +96,11 @@ export default function EtbTabelle({ eintraege, onBerichtigen, onWiedervorlage }
           {onWiedervorlage && (
             <Button type="link" size="small" onClick={() => onWiedervorlage(e)}>
               Wiedervorlage
+            </Button>
+          )}
+          {onAuftragErteilen && (
+            <Button type="link" size="small" onClick={() => onAuftragErteilen(e)}>
+              Auftrag erteilen
             </Button>
           )}
         </Space>

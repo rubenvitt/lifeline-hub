@@ -61,6 +61,7 @@ pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
         .route("/api/einsaetze/{id}/etb", post(routes::etb::erfassen))
         .route("/api/einsaetze/{id}/etb", get(routes::etb::liste))
         .route("/api/einsaetze/{id}/etb/stream", get(routes::etb::stream))
+        .route("/api/einsaetze/{id}/etb/{eintrag_id}/auftrag", post(routes::etb::auftrag_erteilen))
         .route("/api/einsaetze/{id}/chat/kanaele", get(routes::chat::kanaele_liste))
         .route("/api/einsaetze/{id}/chat/kanaele", post(routes::chat::kanal_anlegen))
         .route("/api/einsaetze/{id}/chat/kanaele/{kid}/nachrichten", get(routes::chat::nachrichten_liste))

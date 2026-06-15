@@ -33,6 +33,8 @@ function setup() {
     // (Absender/Empfänger-Vorschläge). Leere Listen genügen für diesen Test.
     http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
+    // Auftrags-Ziele für das ETB→Auftrag-Formular (LFH-112).
+    http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
   );
   return renderMitProviders(
     <AuthProvider>
@@ -52,6 +54,31 @@ describe('EtbPage', () => {
       expect(screen.getByRole('heading', { name: 'Hochwasser Nord' })).toBeInTheDocument(),
     );
     expect(await screen.findByText('Erste Meldung')).toBeInTheDocument();
+  });
+
+  it('erteilt aus einem ETB-Eintrag einen Auftrag (Text vorbefüllt, POST an /etb/:id/auftrag)', async () => {
+    let body: Record<string, unknown> | null = null;
+    server.use(
+      http.post('/api/einsaetze/7/etb/1/auftrag', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: 42 }, { status: 201 });
+      }),
+    );
+    setup();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Auftrag erteilen' }));
+    // Auftragstext ist aus dem Eintragstext vorbefüllt.
+    expect(await screen.findByDisplayValue('Erste Meldung')).toBeInTheDocument();
+    // Einen Funktions-Empfänger ergänzen (Pflicht: >=1 Empfänger).
+    await user.type(screen.getByPlaceholderText(/S3, Fachberater/), 'S3');
+    // Modal-Submit ("Auftrag erteilen") ist der zweite gleichnamige Button (Trigger + Submit).
+    const buttons = screen.getAllByRole('button', { name: 'Auftrag erteilen' });
+    await user.click(buttons[buttons.length - 1]);
+
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body!.auftrag_text).toBe('Erste Meldung');
+    expect(body!.empfaenger).toEqual([{ empfaenger_typ: 'funktion', funktion_text: 'S3' }]);
   });
 
   it('legt aus einem ETB-Eintrag eine Wiedervorlage mit ETB-Bezug an', async () => {

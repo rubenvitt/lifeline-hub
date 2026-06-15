@@ -77,6 +77,9 @@ pub struct AuftragAnzeige {
     pub abgenommen_at: Option<String>,
     pub abgenommen_von_id: Option<i64>,
     pub etb_anordnung_id: Option<i64>,
+    /// Quell-ETB-Eintrag, AUS DEM dieser Auftrag erteilt wurde (LFH-112). Klar getrennt
+    /// von `etb_anordnung_id` (= der vom Auftrag SELBST erzeugte Anordnungs-Eintrag).
+    pub quell_etb_eintrag_id: Option<i64>,
     pub erstellt_von_id: i64,
     pub erstellt_at: String,
     // Vollzugs-Achse aus kommunikation_status (Default 'offen').

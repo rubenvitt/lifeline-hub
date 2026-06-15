@@ -3,14 +3,17 @@ import { Link, useParams } from 'react-router-dom';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz, schliesseEinsatzAb } from '../api/einsaetze';
 import { listeBausteine } from '../api/etbBaustein';
-import { SEITENGROESSE, listeEtb, type EtbFilterWerte, type NeuerEintrag } from '../api/etb';
+import { SEITENGROESSE, erteileAuftragAusEtb, listeEtb, type EtbFilterWerte, type NeuerEintrag } from '../api/etb';
+import { listeAbschnitte } from '../api/einsatzabschnitte';
+import { listeEinheiten } from '../api/einheiten';
 import { ApiError } from '../api/client';
-import type { EtbEintragAnzeige } from '../api/types';
+import type { EtbEintragAnzeige, NeuerAuftrag } from '../api/types';
 import { useState } from 'react';
 import EtbTabelle from '../etb/EtbTabelle';
 import EtbFilterleiste from '../etb/EtbFilterleiste';
 import MitgliederPanel from '../etb/MitgliederPanel';
 import WiedervorlageModal from '../etb/WiedervorlageModal';
+import AuftragAusEtbModal from '../etb/AuftragAusEtbModal';
 import Schnellerfassung from '../etb/Schnellerfassung';
 import { useEtbStream } from '../etb/useEtbStream';
 import { useEtbErfassung } from '../offline/useEtbErfassung';
@@ -28,6 +31,10 @@ export default function EtbPage() {
 
   const bausteineQuery = useQuery({ queryKey: ['etb-bausteine'], queryFn: listeBausteine });
 
+  // Auftrags-Ziele für das ETB→Auftrag-Formular (wie AuftraegePage/MeldungenPage).
+  const abschnitteQuery = useQuery({ queryKey: ['einsatz-abschnitte', einsatzId], queryFn: () => listeAbschnitte(einsatzId) });
+  const einheitenQuery = useQuery({ queryKey: ['einsatz-einheiten', einsatzId], queryFn: () => listeEinheiten(einsatzId) });
+
   const etbQuery = useInfiniteQuery({
     queryKey: ['etb', einsatzId, filter],
     queryFn: ({ pageParam }) => listeEtb(einsatzId, { ...filter, before_lfd_nr: pageParam }),
@@ -44,6 +51,7 @@ export default function EtbPage() {
   const { message } = App.useApp();
   const [berichtigungZu, setBerichtigungZu] = useState<EtbEintragAnzeige | null>(null);
   const [wiedervorlageZu, setWiedervorlageZu] = useState<EtbEintragAnzeige | null>(null);
+  const [auftragZu, setAuftragZu] = useState<EtbEintragAnzeige | null>(null);
   const [mitgliederOffen, setMitgliederOffen] = useState(false);
   const { erfassen, ausstehend, abgelehnt } = useEtbErfassung(einsatzId);
 
@@ -56,6 +64,19 @@ export default function EtbPage() {
     },
     onError: (e) =>
       message.error(e instanceof ApiError ? e.message : 'Abschließen fehlgeschlagen'),
+  });
+
+  const auftragMutation = useMutation({
+    mutationFn: ({ eintragId, daten }: { eintragId: number; daten: NeuerAuftrag }) =>
+      erteileAuftragAusEtb(einsatzId, eintragId, daten),
+    onSuccess: () => {
+      // ETB (neue Anordnung) + Auftrags-Board aktualisieren.
+      qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
+      qc.invalidateQueries({ queryKey: ['einsatz-auftraege', einsatzId] });
+      setAuftragZu(null);
+      message.success('Auftrag aus ETB-Eintrag erteilt');
+    },
+    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Auftrag erteilen fehlgeschlagen'),
   });
 
   async function erfassenMitMeldung(e: NeuerEintrag) {
@@ -168,6 +189,7 @@ export default function EtbPage() {
         eintraege={eintraege}
         onBerichtigen={darfSchreiben ? (e) => setBerichtigungZu(e) : undefined}
         onWiedervorlage={darfSchreiben ? (e) => setWiedervorlageZu(e) : undefined}
+        onAuftragErteilen={darfSchreiben ? (e) => setAuftragZu(e) : undefined}
       />
 
       {etbQuery.hasNextPage && (
@@ -200,6 +222,18 @@ export default function EtbPage() {
           einsatzId={einsatzId}
           eintrag={wiedervorlageZu}
           onClose={() => setWiedervorlageZu(null)}
+        />
+      )}
+      {darfSchreiben && (
+        <AuftragAusEtbModal
+          eintrag={auftragZu}
+          abschnitte={(abschnitteQuery.data ?? []).map((a) => ({ id: a.id, name: a.name }))}
+          einheiten={(einheitenQuery.data ?? []).map((e) => ({ id: e.id, name: e.name }))}
+          senden={auftragMutation.isPending}
+          onAbbrechen={() => setAuftragZu(null)}
+          onAnlegen={(daten) => {
+            if (auftragZu) auftragMutation.mutate({ eintragId: auftragZu.id, daten });
+          }}
         />
       )}
     </div>

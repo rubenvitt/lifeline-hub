@@ -1,5 +1,6 @@
 import { Button, Collapse, Descriptions, Empty, List, Popconfirm, Space, Tag, Typography } from 'antd';
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import type { Auftrag } from '../api/types';
 import { AUFTRAG_STATUS, PHASE_META, PrioBadge, StatusBadge, formatZeit } from '../kommunikation';
 
@@ -31,6 +32,8 @@ export interface AuftragListeProps {
   auftraege: Auftrag[];
   /** Steuert die Read-back-Spalten (Vollzug/Abnahme) in der Abgeschlossen-Ansicht. */
   ansicht?: 'offen' | 'abgeschlossen';
+  /** Für den Rückverweis auf den Quell-ETB-Eintrag (LFH-112). Ohne ihn kein Backlink. */
+  einsatzId?: number;
   darfSchreiben?: boolean;
   onQuittieren?: (auftragId: number, empfaengerId: number) => void;
   onInArbeit?: (auftragId: number) => void;
@@ -39,7 +42,7 @@ export interface AuftragListeProps {
 }
 
 export default function AuftragListe({
-  auftraege, ansicht = 'offen', darfSchreiben, onQuittieren, onInArbeit, onVollzugMelden, onAbnehmen,
+  auftraege, ansicht = 'offen', einsatzId, darfSchreiben, onQuittieren, onInArbeit, onVollzugMelden, onAbnehmen,
 }: AuftragListeProps) {
   if (auftraege.length === 0) return <Empty description="Keine Aufträge" />;
   return (
@@ -92,6 +95,9 @@ export default function AuftragListe({
                   {a.richtung === 'extern' && <Tag color="purple">Extern</Tag>}
                   <Typography.Text strong>{a.auftrag_text}</Typography.Text>
                   {a.ist_ueberfaellig && <Tag color={PHASE_META.ausnahme.color}>Überfällig</Tag>}
+                  {a.quell_etb_eintrag_id != null && einsatzId != null && (
+                    <Link to={`/einsaetze/${einsatzId}/etb`}>↗ ETB-Eintrag</Link>
+                  )}
                 </Space>
               }
               description={

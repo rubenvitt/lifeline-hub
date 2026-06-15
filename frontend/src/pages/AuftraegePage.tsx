@@ -117,6 +117,7 @@ export default function AuftraegePage() {
   ];
 
   const listenProps = {
+    einsatzId,
     darfSchreiben,
     onQuittieren: (auftragId: number, empfaengerId: number) => quittierenMutation.mutate({ auftragId, empfaengerId }),
     onInArbeit: (auftragId: number) => vollzugMutation.mutate({ auftragId, status: 'in_arbeit' as const }),

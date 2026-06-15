@@ -1,0 +1,13 @@
+-- ETB→Auftrag-Kopplung (LFH-112): Aktion „Auftrag/Befehl erteilen" am ETB-Eintrag.
+-- Hält den Quell-ETB-Eintrag fest, AUS DEM der Auftrag erteilt wurde, damit die
+-- Auftragsliste auf den Tagebuch-Ursprung zurückverweisen kann.
+--
+-- Abgrenzung zu auftrag.etb_anordnung_id (0048): JENE Spalte zeigt auf den vom Auftrag
+-- SELBST erzeugten Anordnungs-Eintrag (Pattern B, 1:1-Reverse-FK, auftrag → anordnung).
+-- DIESE Spalte zeigt umgekehrt auf den BESTEHENDEN ETB-Eintrag, der den Auftrag ausgelöst
+-- hat (Referenz auf Vorhandenes, kein erzeugender Reverse-Pointer). Beide sind verschieden.
+-- Bewusst NICHT in etb_eintrag.auftrag_id gepackt (das ist die Pattern-B-Kopplung der
+-- erzeugten Einträge) und KEIN generisches bezug-Feld.
+--
+-- Nullable + additiv: Bestandsaufträge (und alle nicht aus dem ETB erteilten) bleiben NULL.
+ALTER TABLE auftrag ADD COLUMN quell_etb_eintrag_id INTEGER REFERENCES etb_eintrag(id);
