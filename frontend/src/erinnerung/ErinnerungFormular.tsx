@@ -1,11 +1,21 @@
-import { useState } from 'react';
-import { Button, DatePicker, Input, InputNumber, Space, Form } from 'antd';
-import { type Dayjs } from 'dayjs';
+import { Button, Card, DatePicker, Input, InputNumber, Form } from 'antd';
+import dayjs, { type Dayjs } from 'dayjs';
 import type { NeueErinnerung } from '../api/types';
+
+const { TextArea } = Input;
 
 /// Lokale Picker-Zeit → UTC-Wireformat 'YYYY-MM-DD HH:mm:ss' (rein, testbar).
 export function dayjsZuWire(d: Dayjs): string {
   return d.utc().format('YYYY-MM-DD HH:mm:ss');
+}
+
+/** Werte des Formulars (lokale Picker-Zeit vor der UTC-Wandlung). */
+interface FormWerte {
+  titel: string;
+  beschreibung: string;
+  faellig: Dayjs | null;
+  intervall: number | null;
+  empfaenger: string;
 }
 
 interface Props {
@@ -14,39 +24,53 @@ interface Props {
 }
 
 export default function ErinnerungFormular({ senden, onAnlegen }: Props) {
-  const [titel, setTitel] = useState('');
-  const [faellig, setFaellig] = useState<Dayjs | null>(null);
-  const [intervall, setIntervall] = useState<number | null>(null);
-  const [empfaenger, setEmpfaenger] = useState('');
+  const [form] = Form.useForm<FormWerte>();
 
-  const absenden = () => {
-    if (!titel.trim() || !faellig) return;
+  const onFinish = (w: FormWerte) => {
+    if (!w.faellig) return; // durch Pflicht-Rule abgedeckt, hier nur Typ-Guard
     onAnlegen({
-      titel: titel.trim(),
-      faellig_at: dayjsZuWire(faellig),
-      intervall_minuten: intervall ?? undefined,
-      empfaenger_funktion: empfaenger.trim() || undefined,
+      titel: w.titel.trim(),
+      beschreibung: w.beschreibung?.trim() || undefined,
+      faellig_at: dayjsZuWire(w.faellig),
+      intervall_minuten: w.intervall ?? undefined,
+      empfaenger_funktion: w.empfaenger?.trim() || undefined,
     });
-    setTitel(''); setFaellig(null); setIntervall(null); setEmpfaenger('');
+    form.resetFields(); // Default-Datum (initialValues) bleibt erhalten
   };
 
   return (
-    <Form layout="vertical" onFinish={absenden}>
-      <Form.Item label="Titel / Anlass">
-        <Input aria-label="Titel" value={titel} onChange={(e) => setTitel(e.target.value)} placeholder="z. B. Lagemeldung aller EA" />
-      </Form.Item>
-      <Form.Item label="Fällig">
-        <DatePicker showTime format="YYYY-MM-DD HH:mm" value={faellig} onChange={setFaellig} style={{ width: '100%' }} />
-      </Form.Item>
-      <Space>
-        <Form.Item label="Intervall (Min, optional)">
-          <InputNumber aria-label="Intervall" min={1} value={intervall} onChange={setIntervall} placeholder="30" />
+    <Card size="small" title="Neue Erinnerung">
+      <Form<FormWerte>
+        form={form}
+        layout="vertical"
+        onFinish={onFinish}
+        initialValues={{ titel: '', beschreibung: '', faellig: dayjs(), intervall: null, empfaenger: '' }}
+      >
+        <Form.Item
+          name="titel"
+          label="Titel / Anlass"
+          rules={[{ required: true, message: 'Titel ist erforderlich' }]}
+        >
+          <Input aria-label="Titel" placeholder="z. B. Lagemeldung aller EA" />
         </Form.Item>
-        <Form.Item label="Empfänger/Funktion (optional)">
-          <Input aria-label="Empfänger" value={empfaenger} onChange={(e) => setEmpfaenger(e.target.value)} />
+        <Form.Item name="beschreibung" label="Beschreibung (optional)">
+          <TextArea aria-label="Beschreibung" rows={2} />
         </Form.Item>
-      </Space>
-      <Button type="primary" htmlType="submit" loading={senden}>Anlegen</Button>
-    </Form>
+        <Form.Item
+          name="faellig"
+          label="Fällig"
+          rules={[{ required: true, message: 'Fälligkeit ist erforderlich' }]}
+        >
+          <DatePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: '100%' }} />
+        </Form.Item>
+        <Form.Item name="intervall" label="Intervall (Min, optional)">
+          <InputNumber aria-label="Intervall" min={1} placeholder="30" style={{ width: '100%' }} />
+        </Form.Item>
+        <Form.Item name="empfaenger" label="Empfänger/Funktion (optional)">
+          <Input aria-label="Empfänger" />
+        </Form.Item>
+        <Button type="primary" htmlType="submit" loading={senden} block>Anlegen</Button>
+      </Form>
+    </Card>
   );
 }
