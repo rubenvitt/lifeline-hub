@@ -1,5 +1,5 @@
 import { App, Button, Card, DatePicker, Form, Input, InputNumber, Select, Space, Switch } from 'antd';
-import { ThunderboltOutlined } from '@ant-design/icons';
+import { ThunderboltOutlined, SendOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
 import type { Meldungsart, MeldungMeldeweg, MeldungPrioritaet, NeueMeldung, Richtung } from '../api/types';
@@ -41,6 +41,12 @@ export default function MeldungFormular({ senden, onAnlegen }: {
     setBestaetigungPflicht(true);
   };
 
+  /** Fast-Path: Lagemeldung an übergeordnete Führung (extern, LFH-87). */
+  const lagemeldungVorbelegen = () => {
+    setMeldungsart('lagemeldung');
+    setRichtung('extern');
+  };
+
   const absenden = () => {
     if (!absender.trim()) { message.error('Absender ist erforderlich'); return; }
     if (!inhalt.trim()) { message.error('Inhalt ist erforderlich'); return; }
@@ -70,9 +76,14 @@ export default function MeldungFormular({ senden, onAnlegen }: {
       size="small"
       title="Neue Meldung erfassen"
       extra={
-        <Button danger size="small" icon={<ThunderboltOutlined />} onClick={sofortVorbelegen}>
-          Sofortmeldung
-        </Button>
+        <Space>
+          <Button danger size="small" icon={<ThunderboltOutlined />} onClick={sofortVorbelegen}>
+            Sofortmeldung
+          </Button>
+          <Button size="small" icon={<SendOutlined />} onClick={lagemeldungVorbelegen}>
+            Lagemeldung (extern)
+          </Button>
+        </Space>
       }
     >
       <Form layout="vertical" onFinish={absenden}>

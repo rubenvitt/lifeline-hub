@@ -38,6 +38,17 @@ describe('MeldungFormular', () => {
     }));
   });
 
+  it('Lagemeldung-Fast-Path belegt meldungsart + richtung extern vor', async () => {
+    const onAnlegen = renderFormular();
+    await userEvent.click(screen.getByRole('button', { name: /Lagemeldung \(extern\)/ }));
+    await userEvent.type(screen.getByLabelText('Absender'), 'S3');
+    await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Lage: ...');
+    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    expect(onAnlegen).toHaveBeenCalledWith(expect.objectContaining({
+      meldungsart: 'lagemeldung', richtung: 'extern',
+    }));
+  });
+
   it('sendet ohne Pflicht keine Frist', async () => {
     const onAnlegen = renderFormular();
     await userEvent.type(screen.getByLabelText('Absender'), 'RTW 2');
