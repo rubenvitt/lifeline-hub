@@ -149,39 +149,48 @@ pub async fn gehoert_zu_einsatz(pool: &SqlitePool, id: i64, einsatz_id: i64) -> 
 }
 
 /// Schaltet den Bedarfs-Status weiter (linear) und setzt den zugehörigen Zeitstempel
-/// (first-write-wins via COALESCE). Übergangsprüfung erfolgt im Handler gegen den
-/// Bestandswert. `abgelehnt` läuft über [`lehne_ab`] (eigener Grund-Parameter).
-pub async fn setze_status(pool: &SqlitePool, id: i64, neuer_status: &str, jetzt: &str) -> Result<(), AppError> {
+/// (first-write-wins via COALESCE). `erwartet` ist der vom Handler geprüfte Bestandsstatus:
+/// das UPDATE greift NUR, wenn er unverändert ist (optimistische Sperre gegen TOCTOU —
+/// die FSM ist back-edge-frei, daher kann der Guard keinen gültigen Übergang fälschlich
+/// abweisen). Liefert `true`, wenn eine Zeile geändert wurde; `false` = Status zwischenzeitlich
+/// geändert. `abgelehnt` läuft über [`lehne_ab`].
+pub async fn setze_status(pool: &SqlitePool, id: i64, neuer_status: &str, erwartet: &str, jetzt: &str) -> Result<bool, AppError> {
     let stempel_spalte = match neuer_status {
         super::STATUS_ZUGESAGT => "zugesagt_at",
         super::STATUS_UNTERWEGS => "unterwegs_at",
         super::STATUS_EINGETROFFEN => "eingetroffen_at",
         _ => return Err(AppError::Validation("Ungültiger Zielstatus".into())),
     };
-    let sql = format!("UPDATE nachforderung SET status = ?, {stempel_spalte} = COALESCE({stempel_spalte}, ?) WHERE id = ?");
-    sqlx::query(&sql).bind(neuer_status).bind(jetzt).bind(id).execute(pool).await?;
-    Ok(())
+    let sql = format!(
+        "UPDATE nachforderung SET status = ?, {stempel_spalte} = COALESCE({stempel_spalte}, ?) \
+         WHERE id = ? AND status = ?"
+    );
+    let r = sqlx::query(&sql).bind(neuer_status).bind(jetzt).bind(id).bind(erwartet).execute(pool).await?;
+    Ok(r.rows_affected() > 0)
 }
 
-/// Lehnt eine Nachforderung ab (Abzweig): setzt status='abgelehnt', Zeitstempel und Grund.
-pub async fn lehne_ab(pool: &SqlitePool, id: i64, grund: Option<&str>, jetzt: &str) -> Result<(), AppError> {
-    sqlx::query(
+/// Lehnt eine Nachforderung ab (Abzweig): setzt status='abgelehnt', Zeitstempel und Grund —
+/// nur wenn der Bestandsstatus `erwartet` unverändert ist (optimistische Sperre). Liefert
+/// `true` bei erfolgter Änderung.
+pub async fn lehne_ab(pool: &SqlitePool, id: i64, grund: Option<&str>, erwartet: &str, jetzt: &str) -> Result<bool, AppError> {
+    let r = sqlx::query(
         "UPDATE nachforderung SET status = ?, abgelehnt_at = COALESCE(abgelehnt_at, ?), \
-         abgelehnt_grund = COALESCE(abgelehnt_grund, ?) WHERE id = ?",
+         abgelehnt_grund = COALESCE(abgelehnt_grund, ?) WHERE id = ? AND status = ?",
     )
     .bind(super::STATUS_ABGELEHNT)
     .bind(jetzt)
     .bind(grund)
     .bind(id)
+    .bind(erwartet)
     .execute(pool)
     .await?;
-    Ok(())
+    Ok(r.rows_affected() > 0)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::nachforderung::{ADRESSAT_LEITSTELLE, PRIO_NORMAL, STATUS_EINGETROFFEN, STATUS_UNTERWEGS, STATUS_ZUGESAGT};
+    use crate::nachforderung::{ADRESSAT_LEITSTELLE, PRIO_NORMAL, STATUS_ANGEFORDERT, STATUS_EINGETROFFEN, STATUS_UNTERWEGS, STATUS_ZUGESAGT};
 
     async fn setup(pool: &SqlitePool) -> (i64, i64) {
         sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
@@ -246,16 +255,18 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         let n = anlegen(&pool, e, b, daten("RTW", "x")).await.unwrap();
-        setze_status(&pool, n.id, STATUS_ZUGESAGT, "2026-06-12 09:05:00").await.unwrap();
-        setze_status(&pool, n.id, STATUS_UNTERWEGS, "2026-06-12 09:10:00").await.unwrap();
+        assert!(setze_status(&pool, n.id, STATUS_ZUGESAGT, STATUS_ANGEFORDERT, "2026-06-12 09:05:00").await.unwrap());
+        assert!(setze_status(&pool, n.id, STATUS_UNTERWEGS, STATUS_ZUGESAGT, "2026-06-12 09:10:00").await.unwrap());
         let nach = laden(&pool, n.id).await.unwrap();
         assert_eq!(nach.status, "unterwegs");
         assert_eq!(nach.zugesagt_at.as_deref(), Some("2026-06-12 09:05:00"));
         assert_eq!(nach.unterwegs_at.as_deref(), Some("2026-06-12 09:10:00"));
         assert!(nach.ist_offen);
         // eingetroffen → terminal, nicht mehr offen.
-        setze_status(&pool, n.id, STATUS_EINGETROFFEN, "2026-06-12 09:30:00").await.unwrap();
+        assert!(setze_status(&pool, n.id, STATUS_EINGETROFFEN, STATUS_UNTERWEGS, "2026-06-12 09:30:00").await.unwrap());
         assert!(!laden(&pool, n.id).await.unwrap().ist_offen);
+        // Optimistische Sperre: erneuter Übergang mit veraltetem `erwartet` greift nicht.
+        assert!(!setze_status(&pool, n.id, STATUS_ZUGESAGT, STATUS_ANGEFORDERT, "2026-06-12 09:40:00").await.unwrap());
     }
 
     #[tokio::test]
@@ -263,7 +274,7 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         let n = anlegen(&pool, e, b, daten("RTW", "x")).await.unwrap();
-        lehne_ab(&pool, n.id, Some("keine Reserven"), "2026-06-12 09:05:00").await.unwrap();
+        assert!(lehne_ab(&pool, n.id, Some("keine Reserven"), STATUS_ANGEFORDERT, "2026-06-12 09:05:00").await.unwrap());
         let nach = laden(&pool, n.id).await.unwrap();
         assert_eq!(nach.status, "abgelehnt");
         assert_eq!(nach.abgelehnt_grund.as_deref(), Some("keine Reserven"));

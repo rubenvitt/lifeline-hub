@@ -73,12 +73,22 @@ describe('NachforderungenPage', () => {
     await waitFor(() => expect(setzeNachforderungStatus).toHaveBeenCalledWith(1, 1, 'zugesagt'));
   });
 
-  it('lehnt eine Nachforderung ab', async () => {
+  it('lehnt eine Nachforderung mit Grund ab (über Dialog)', async () => {
     lehneNachforderungAb.mockResolvedValue(nf({ status: 'abgelehnt' }));
     renderPage();
     await screen.findByText('2 RTW zur Verstärkung');
     await userEvent.click(screen.getByText('Ablehnen', { selector: 'a' }));
-    await waitFor(() => expect(lehneNachforderungAb).toHaveBeenCalledWith(1, 1));
+    // Dialog öffnet: Grund erfassen und bestätigen.
+    await userEvent.type(await screen.findByLabelText('Ablehnungsgrund'), 'keine Reserven');
+    await userEvent.click(screen.getByRole('button', { name: 'Ablehnen' }));
+    await waitFor(() => expect(lehneNachforderungAb).toHaveBeenCalledWith(1, 1, 'keine Reserven'));
+  });
+
+  it('filtert nach Status', async () => {
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    await userEvent.click(screen.getByText('Eingetroffen'));
+    await waitFor(() => expect(listeNachforderungen).toHaveBeenCalledWith(1, { status: 'eingetroffen' }));
   });
 
   it('eingetroffene Nachforderung zeigt keine Aktionen', async () => {

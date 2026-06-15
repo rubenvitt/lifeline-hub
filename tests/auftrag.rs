@@ -341,3 +341,84 @@ async fn abnehmen_nach_vollzug_ist_erfolgreich() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["bearbeitungsstatus"], "abgenommen");
 }
+
+// --- LFH-87: externer Adressat + Richtungs-Filter ---
+
+#[tokio::test]
+async fn anlegen_mit_externem_adressat_und_richtung_extern() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let body = serde_json::json!({
+        "auftrag_text": "Lagemeldung an Leitstelle",
+        "richtung": "extern",
+        "empfaenger": [{ "empfaenger_typ": "extern", "extern_kategorie": "leitstelle", "extern_bezeichnung": "Leitstelle Nord" }]
+    }).to_string();
+    let (status, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege"), &admin, Some(&body)).await;
+    assert_eq!(status, StatusCode::CREATED, "{json:?}");
+    assert_eq!(json["richtung"], "extern");
+    assert_eq!(json["empfaenger"][0]["empfaenger_typ"], "extern");
+    assert_eq!(json["empfaenger"][0]["extern_kategorie"], "leitstelle");
+    assert_eq!(json["empfaenger"][0]["snap_anzeige"], "Leitstelle Nord");
+}
+
+#[tokio::test]
+async fn extern_ohne_bezeichnung_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let body = serde_json::json!({
+        "auftrag_text": "X",
+        "empfaenger": [{ "empfaenger_typ": "extern", "extern_kategorie": "leitstelle" }]
+    }).to_string();
+    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege"), &admin, Some(&body)).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn extern_ungueltige_kategorie_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let body = serde_json::json!({
+        "auftrag_text": "X",
+        "empfaenger": [{ "empfaenger_typ": "extern", "extern_kategorie": "irgendwer", "extern_bezeichnung": "Y" }]
+    }).to_string();
+    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege"), &admin, Some(&body)).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn extern_plus_zweites_ziel_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let body = serde_json::json!({
+        "auftrag_text": "X",
+        "empfaenger": [{ "empfaenger_typ": "extern", "extern_kategorie": "leitstelle", "extern_bezeichnung": "Y", "funktion_text": "S3" }]
+    }).to_string();
+    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege"), &admin, Some(&body)).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn richtung_filter_trennt_intern_extern() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege"), &admin, Some(&body_mit_funktion("intern-auftrag", "EA"))).await;
+    let extern_body = serde_json::json!({
+        "auftrag_text": "extern-auftrag", "richtung": "extern",
+        "empfaenger": [{ "empfaenger_typ": "extern", "extern_kategorie": "leitstelle", "extern_bezeichnung": "LtS" }]
+    }).to_string();
+    anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege"), &admin, Some(&extern_body)).await;
+
+    let (status, json) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/auftraege?richtung=extern"), &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    let liste = json.as_array().unwrap();
+    assert_eq!(liste.len(), 1);
+    assert_eq!(liste[0]["auftrag_text"], "extern-auftrag");
+
+    let (status, _) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/auftraege?richtung=quatsch"), &admin, None).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}

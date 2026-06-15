@@ -86,7 +86,14 @@ describe('MeldungenPage', () => {
     await screen.findByText('Florian Nord 1');
     // Segment-Label „Abgeschlossen" ist eindeutig (kollidiert nicht mit Action-Links).
     await userEvent.click(screen.getByText('Abgeschlossen'));
-    await waitFor(() => expect(listeMeldungen).toHaveBeenCalledWith(1, { status: 'erledigt' }));
+    await waitFor(() => expect(listeMeldungen).toHaveBeenCalledWith(1, expect.objectContaining({ status: 'erledigt' })));
+  });
+
+  it('filtert nach Richtung extern (LFH-87)', async () => {
+    renderPage();
+    await screen.findByText('Florian Nord 1');
+    await userEvent.click(screen.getByText('Extern'));
+    await waitFor(() => expect(listeMeldungen).toHaveBeenCalledWith(1, expect.objectContaining({ richtung: 'extern' })));
   });
 
   it('Beobachter sieht Posteingang, aber keine Erfassung', async () => {

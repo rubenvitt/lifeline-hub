@@ -174,6 +174,10 @@ pub async fn status(
 ) -> Result<Json<NachforderungAnzeige>, AppError> {
     fordere_bearbeitbar(&state, &benutzer, einsatz_id, nachforderung_id).await?;
     let neu = req.status.trim();
+    // Ablehnung hat einen eigenen Pfad (mit Grund) — hier sauber abweisen statt im Repo auf 400 zu fallen.
+    if neu == STATUS_ABGELEHNT {
+        return Err(AppError::UnprocessableEntity("Ablehnung erfolgt über den /ablehnen-Endpoint".into()));
+    }
     let aktuell = repo::laden(&state.pool, nachforderung_id).await?;
     if !crate::nachforderung::uebergang_erlaubt(&aktuell.status, neu) {
         return Err(AppError::UnprocessableEntity(format!(
@@ -181,7 +185,10 @@ pub async fn status(
             aktuell.status
         )));
     }
-    repo::setze_status(&state.pool, nachforderung_id, neu, &jetzt()).await?;
+    // Optimistische Sperre gegen TOCTOU: UPDATE greift nur bei unverändertem Bestandsstatus.
+    if !repo::setze_status(&state.pool, nachforderung_id, neu, &aktuell.status, &jetzt()).await? {
+        return Err(AppError::UnprocessableEntity("Status wurde zwischenzeitlich geändert".into()));
+    }
     let n = repo::laden(&state.pool, nachforderung_id).await?;
     sse(&state, einsatz_id);
     Ok(Json(n))
@@ -206,7 +213,9 @@ pub async fn ablehnen(
             "Nachforderung kann in diesem Zustand nicht abgelehnt werden".into(),
         ));
     }
-    repo::lehne_ab(&state.pool, nachforderung_id, trimme(&req.grund), &jetzt()).await?;
+    if !repo::lehne_ab(&state.pool, nachforderung_id, trimme(&req.grund), &aktuell.status, &jetzt()).await? {
+        return Err(AppError::UnprocessableEntity("Status wurde zwischenzeitlich geändert".into()));
+    }
     let n = repo::laden(&state.pool, nachforderung_id).await?;
     sse(&state, einsatz_id);
     Ok(Json(n))

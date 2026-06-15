@@ -619,3 +619,27 @@ async fn sofort_mit_pflicht_false_ueberstimmt_und_legt_keine_nachfass_an() {
     let (_, erinn) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/erinnerungen"), &admin, None).await;
     assert!(erinn.as_array().unwrap().is_empty(), "keine Auto-Erinnerung ohne Pflicht");
 }
+
+#[tokio::test]
+async fn richtung_filter_trennt_intern_extern() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    // Default intern.
+    anfrage(&app, "POST", &format!("/api/einsaetze/{e}/meldungen"), &admin, Some(&body_funk())).await;
+    let extern_body = serde_json::json!({
+        "absender": "S3", "meldeweg": "funk", "inhalt": "Lage an übergeordnete Führung",
+        "meldungsart": "lagemeldung", "richtung": "extern", "ereigniszeit": "2026-06-12 09:00:00"
+    }).to_string();
+    anfrage(&app, "POST", &format!("/api/einsaetze/{e}/meldungen"), &admin, Some(&extern_body)).await;
+
+    let (status, json) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/meldungen?richtung=extern"), &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    let liste = json.as_array().unwrap();
+    assert_eq!(liste.len(), 1);
+    assert_eq!(liste[0]["richtung"], "extern");
+    assert_eq!(liste[0]["meldungsart"], "lagemeldung");
+
+    let (status, _) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/meldungen?richtung=quatsch"), &admin, None).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}

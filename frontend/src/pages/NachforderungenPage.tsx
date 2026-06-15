@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Col, Row, Segmented, Spin, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Col, Input, Modal, Row, Segmented, Spin, Typography } from 'antd';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -17,6 +17,9 @@ export default function NachforderungenPage() {
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
+  // Ablehnen-Dialog: Grund (optional) wird erhoben, bevor abgelehnt wird.
+  const [ablehnenId, setAblehnenId] = useState<number | null>(null);
+  const [ablehnenGrund, setAblehnenGrund] = useState('');
 
   const nfQuery = useQuery({
     queryKey: ['einsatz-nachforderungen', einsatzId, statusFilter ?? 'alle'],
@@ -38,10 +41,17 @@ export default function NachforderungenPage() {
     onError: fehler,
   });
   const ablehnenMutation = useMutation({
-    mutationFn: (nfId: number) => lehneNachforderungAb(einsatzId, nfId),
+    mutationFn: ({ nfId, grund }: { nfId: number; grund?: string }) => lehneNachforderungAb(einsatzId, nfId, grund),
     onSuccess: () => { invalidiere(); message.success('Nachforderung abgelehnt'); },
     onError: fehler,
   });
+  const ablehnenBestaetigen = () => {
+    if (ablehnenId != null) {
+      ablehnenMutation.mutate({ nfId: ablehnenId, grund: ablehnenGrund.trim() || undefined });
+    }
+    setAblehnenId(null);
+    setAblehnenGrund('');
+  };
 
   if (einsatzQuery.isLoading) {
     return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
@@ -89,7 +99,7 @@ export default function NachforderungenPage() {
             nachforderungen={nachforderungen}
             darfSchreiben={darfSchreiben}
             onStatus={(nfId, status) => statusMutation.mutate({ nfId, status })}
-            onAblehnen={(nfId) => ablehnenMutation.mutate(nfId)}
+            onAblehnen={(nfId) => { setAblehnenId(nfId); setAblehnenGrund(''); }}
           />
         </Col>
         {darfSchreiben && (
@@ -98,6 +108,22 @@ export default function NachforderungenPage() {
           </Col>
         )}
       </Row>
+      <Modal
+        open={ablehnenId != null}
+        title="Nachforderung ablehnen"
+        okText="Ablehnen"
+        okButtonProps={{ danger: true }}
+        onOk={ablehnenBestaetigen}
+        onCancel={() => { setAblehnenId(null); setAblehnenGrund(''); }}
+      >
+        <Input.TextArea
+          aria-label="Ablehnungsgrund"
+          value={ablehnenGrund}
+          onChange={(e) => setAblehnenGrund(e.target.value)}
+          placeholder="Grund (optional), z. B. keine Reserven verfügbar"
+          rows={3}
+        />
+      </Modal>
     </div>
   );
 }

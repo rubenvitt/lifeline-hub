@@ -202,6 +202,7 @@ async fn validiere_empfaenger(
         _ => return Err(AppError::Validation("Ungültiger Empfänger-Typ".into())),
     };
 
+    let ist_extern = typ == EMPF_EXTERN;
     Ok(repo::EmpfaengerEingabe {
         empfaenger_typ: typ.to_string(),
         abschnitt_id: req.abschnitt_id,
@@ -209,8 +210,9 @@ async fn validiere_empfaenger(
         person_id: req.person_id,
         fahrzeug_id: req.fahrzeug_id,
         funktion_text: trimme(&req.funktion_text).map(str::to_string),
-        extern_kategorie: trimme(&req.extern_kategorie).map(str::to_string),
-        extern_bezeichnung: trimme(&req.extern_bezeichnung).map(str::to_string),
+        // extern_* nur bei externem Adressat übernehmen (sonst verirrte Werte an anderen Typen).
+        extern_kategorie: ist_extern.then(|| trimme(&req.extern_kategorie).map(str::to_string)).flatten(),
+        extern_bezeichnung: ist_extern.then(|| trimme(&req.extern_bezeichnung).map(str::to_string)).flatten(),
     })
 }
 

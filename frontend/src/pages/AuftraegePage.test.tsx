@@ -82,6 +82,13 @@ describe('AuftraegePage', () => {
     })));
   });
 
+  it('filtert Aufträge nach Richtung extern (LFH-87)', async () => {
+    renderPage();
+    await screen.findByText('Deich sichern');
+    await userEvent.click(screen.getByText('Extern'));
+    await waitFor(() => expect(listeAuftraege).toHaveBeenCalledWith(1, expect.objectContaining({ richtung: 'extern' })));
+  });
+
   it('sendet das Befehlsschema-Feld „Zeit/Wann" mit', async () => {
     legeAuftragAn.mockResolvedValue(auftrag());
     renderPage();

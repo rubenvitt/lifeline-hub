@@ -125,6 +125,18 @@ async fn status_workflow_und_ungueltiger_uebergang_ist_422() {
 }
 
 #[tokio::test]
+async fn status_abgelehnt_ueber_status_endpoint_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (_, n) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/nachforderungen"), &admin, Some(&body())).await;
+    let nid = n["id"].as_i64().unwrap();
+    // 'abgelehnt' gehört auf den /ablehnen-Pfad → /status weist sauber mit 422 ab (kein 400).
+    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/nachforderungen/{nid}/status"), &admin, Some(r#"{"status":"abgelehnt"}"#)).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
 async fn ablehnen_setzt_grund() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
