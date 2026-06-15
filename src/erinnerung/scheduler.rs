@@ -124,7 +124,7 @@ mod tests {
         let live = LiveHub::new();
         repo::anlegen(&pool, e, b, ErinnerungDaten {
             titel: "Einmal", beschreibung: None, faellig_at: "2026-06-11 10:00:00",
-            intervall_minuten: None, empfaenger_funktion: None,
+            intervall_minuten: None, empfaenger_funktion: None, bezug_typ: None, bezug_id: None,
         }, "2026-06-11 09:00:00").await.unwrap();
 
         // Vor Fälligkeit: nichts.
@@ -142,7 +142,7 @@ mod tests {
         let live = LiveHub::new();
         let r = repo::anlegen(&pool, e, b, ErinnerungDaten {
             titel: "Lagemeldung", beschreibung: None, faellig_at: "2026-06-11 10:00:00",
-            intervall_minuten: Some(30), empfaenger_funktion: None,
+            intervall_minuten: Some(30), empfaenger_funktion: None, bezug_typ: None, bezug_id: None,
         }, "2026-06-11 09:00:00").await.unwrap();
 
         // Server „2h weg": jetzt 12:10 → ein Nudge, nächster Slot 12:30 (kein Sturm).
@@ -160,7 +160,7 @@ mod tests {
         let live = LiveHub::new();
         let r = repo::anlegen(&pool, e, b, ErinnerungDaten {
             titel: "X", beschreibung: None, faellig_at: "2026-06-11 10:00:00",
-            intervall_minuten: None, empfaenger_funktion: None,
+            intervall_minuten: None, empfaenger_funktion: None, bezug_typ: None, bezug_id: None,
         }, "2026-06-11 09:00:00").await.unwrap();
         repo::status_setzen(&pool, r.id, crate::erinnerung::STATUS_ERLEDIGT, "2026-06-11 09:30:00").await.unwrap();
 
@@ -177,7 +177,7 @@ mod tests {
         let mut rx = live.abonniere(e);
         repo::anlegen(&pool, e, b, ErinnerungDaten {
             titel: "Lagemeldung", beschreibung: None, faellig_at: "2026-06-11 10:00:00",
-            intervall_minuten: None, empfaenger_funktion: None,
+            intervall_minuten: None, empfaenger_funktion: None, bezug_typ: None, bezug_id: None,
         }, "2026-06-11 09:00:00").await.unwrap();
 
         assert_eq!(tick_einmal(&pool, &live, t("2026-06-11 10:01:00")).await, 1);

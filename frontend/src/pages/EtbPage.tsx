@@ -10,6 +10,7 @@ import { useState } from 'react';
 import EtbTabelle from '../etb/EtbTabelle';
 import EtbFilterleiste from '../etb/EtbFilterleiste';
 import MitgliederPanel from '../etb/MitgliederPanel';
+import WiedervorlageModal from '../etb/WiedervorlageModal';
 import Schnellerfassung from '../etb/Schnellerfassung';
 import { useEtbStream } from '../etb/useEtbStream';
 import { useEtbErfassung } from '../offline/useEtbErfassung';
@@ -42,6 +43,7 @@ export default function EtbPage() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [berichtigungZu, setBerichtigungZu] = useState<EtbEintragAnzeige | null>(null);
+  const [wiedervorlageZu, setWiedervorlageZu] = useState<EtbEintragAnzeige | null>(null);
   const [mitgliederOffen, setMitgliederOffen] = useState(false);
   const { erfassen, ausstehend, abgelehnt } = useEtbErfassung(einsatzId);
 
@@ -165,6 +167,7 @@ export default function EtbPage() {
       <EtbTabelle
         eintraege={eintraege}
         onBerichtigen={darfSchreiben ? (e) => setBerichtigungZu(e) : undefined}
+        onWiedervorlage={darfSchreiben ? (e) => setWiedervorlageZu(e) : undefined}
       />
 
       {etbQuery.hasNextPage && (
@@ -190,6 +193,13 @@ export default function EtbPage() {
           istAktiv={einsatz.status === 'aktiv'}
           offen={mitgliederOffen}
           onClose={() => setMitgliederOffen(false)}
+        />
+      )}
+      {darfSchreiben && (
+        <WiedervorlageModal
+          einsatzId={einsatzId}
+          eintrag={wiedervorlageZu}
+          onClose={() => setWiedervorlageZu(null)}
         />
       )}
     </div>

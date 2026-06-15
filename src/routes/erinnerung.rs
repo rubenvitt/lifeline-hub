@@ -53,6 +53,10 @@ pub struct NeueErinnerung {
     pub faellig_at: String,
     pub intervall_minuten: Option<i64>,
     pub empfaenger_funktion: Option<String>,
+    /// Generischer Sachbezug (z. B. 'etb' + ETB-Eintrag-ID, LFH-106). Both-or-neither:
+    /// beide gesetzt oder beide leer — kein FK, nur code-validiert.
+    pub bezug_typ: Option<String>,
+    pub bezug_id: Option<i64>,
 }
 
 /// Normalisiert einen Eingabe-Zeitstempel auf 'YYYY-MM-DD HH:MM:SS' (UTC).
@@ -92,9 +96,17 @@ pub async fn anlegen(
     let beschreibung = req.beschreibung.as_deref().map(str::trim).filter(|s| !s.is_empty());
     let empfaenger = req.empfaenger_funktion.as_deref().map(str::trim).filter(|s| !s.is_empty());
 
+    // Bezug both-or-neither (wie der Chat-Sachbezug): entweder beides oder nichts.
+    let bezug_typ = req.bezug_typ.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    match (bezug_typ, req.bezug_id) {
+        (Some(_), Some(_)) | (None, None) => {}
+        _ => return Err(AppError::Validation("Bezug erfordert bezug_typ und bezug_id zusammen".into())),
+    }
+
     let r = repo::anlegen(&state.pool, einsatz_id, benutzer.id, repo::ErinnerungDaten {
         titel, beschreibung, faellig_at: &faellig,
         intervall_minuten: req.intervall_minuten, empfaenger_funktion: empfaenger,
+        bezug_typ, bezug_id: req.bezug_id,
     }, &jetzt()).await?;
     sse(&state, einsatz_id);
     Ok((StatusCode::CREATED, Json(r)))
@@ -173,7 +185,7 @@ mod tests {
         let (b, e) = setup(&pool).await;
         let r = crate::erinnerung::repo::anlegen(
             &pool, e, b,
-            crate::erinnerung::repo::ErinnerungDaten { titel: "X", beschreibung: None, faellig_at: "2026-06-11 10:00:00", intervall_minuten: None, empfaenger_funktion: None },
+            crate::erinnerung::repo::ErinnerungDaten { titel: "X", beschreibung: None, faellig_at: "2026-06-11 10:00:00", intervall_minuten: None, empfaenger_funktion: None, bezug_typ: None, bezug_id: None },
             "2026-06-11 09:00:00").await.unwrap();
 
         crate::erinnerung::repo::status_setzen(&pool, r.id, crate::erinnerung::STATUS_ERLEDIGT, "2026-06-11 11:00:00").await.unwrap();

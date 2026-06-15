@@ -776,6 +776,9 @@ export interface NeueErinnerung {
   faellig_at: string;
   intervall_minuten?: number;
   empfaenger_funktion?: string;
+  /** Generischer Sachbezug (z. B. 'etb' + ETB-Eintrag-ID, LFH-106); both-or-neither. */
+  bezug_typ?: string;
+  bezug_id?: number;
 }
 
 // ============================== LFH-52 Aufträge/Befehle ==============================

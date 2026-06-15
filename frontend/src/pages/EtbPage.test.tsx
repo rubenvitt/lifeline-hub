@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
 import { server } from '../test/server';
@@ -51,5 +52,27 @@ describe('EtbPage', () => {
       expect(screen.getByRole('heading', { name: 'Hochwasser Nord' })).toBeInTheDocument(),
     );
     expect(await screen.findByText('Erste Meldung')).toBeInTheDocument();
+  });
+
+  it('legt aus einem ETB-Eintrag eine Wiedervorlage mit ETB-Bezug an', async () => {
+    let body: Record<string, unknown> | null = null;
+    server.use(
+      http.post('/api/einsaetze/7/erinnerungen', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: 99 }, { status: 201 });
+      }),
+    );
+    setup();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Wiedervorlage' }));
+    // Titel ist aus dem Eintragstext vorbefüllt.
+    expect(await screen.findByDisplayValue(/Wiedervorlage: Erste Meldung/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Anlegen' }));
+
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body!.bezug_typ).toBe('etb');
+    expect(body!.bezug_id).toBe(1);
+    expect(body!.titel).toMatch(/Erste Meldung/);
   });
 });

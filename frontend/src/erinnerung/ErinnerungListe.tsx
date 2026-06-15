@@ -12,6 +12,7 @@ const TOOLTIP_ERLEDIGT = 'Erledigt = die erinnerte Handlung wurde durchgeführt 
 const BEZUG_ROUTE: Record<string, { modul: string; wort: string }> = {
   auftrag: { modul: 'auftraege', wort: 'Auftrag' },
   meldung: { modul: 'meldungen', wort: 'Meldung' },
+  etb: { modul: 'etb', wort: 'ETB-Eintrag' },
 };
 
 export interface ErinnerungListeProps {
