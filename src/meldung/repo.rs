@@ -34,6 +34,7 @@ const ANZEIGE_SELECT: &str =
             m.erfasst_von_id, m.erstellt_at, \
             (SELECT lm.id FROM lage_meldung lm WHERE lm.meldung_id = m.id) AS lage_meldung_id, \
             (m.status != 'erledigt') AS ist_offen, \
+            m.erledigt_at, \
             m.bestaetigung_pflicht, m.bestaetigung_frist_at, m.eskaliert, \
             ks.quittiert_at AS bestaetigt_at, ks.quittiert_von_id AS bestaetigt_von_id, \
             qb.anzeigename AS bestaetigt_von_name, \
@@ -183,13 +184,27 @@ pub async fn gehoert_zu_einsatz(
 /// Setzt NUR den Triage-Status (LFH-94). Die Bearbeiter-Zuweisung ist eine
 /// getrennte Achse (`weise_bearbeiter`) — ein Statuswechsel darf eine bestehende
 /// Zuweisung nicht stillschweigend überschreiben (vgl. patch-xor-effektivzustand).
-pub async fn setze_status(pool: &SqlitePool, id: i64, status: &str) -> Result<(), AppError> {
+pub async fn setze_status(
+    pool: &SqlitePool,
+    id: i64,
+    status: &str,
+    jetzt: &str,
+) -> Result<(), AppError> {
     debug_assert!(super::status_gueltig(status));
-    sqlx::query("UPDATE meldung SET status = ? WHERE id = ?")
-        .bind(status)
-        .bind(id)
-        .execute(pool)
-        .await?;
+    // Erledigt-Stempel (LFH-113): first-write-wins — nur beim Übergang nach 'erledigt'
+    // und nur solange noch NULL (COALESCE). Wird der Status später zurückgesetzt, bleibt
+    // erledigt_at erhalten; ein erneutes Erledigen überschreibt den ersten Stempel nicht.
+    sqlx::query(
+        "UPDATE meldung SET status = ?, \
+         erledigt_at = CASE WHEN ? = 'erledigt' THEN COALESCE(erledigt_at, ?) ELSE erledigt_at END \
+         WHERE id = ?",
+    )
+    .bind(status)
+    .bind(status)
+    .bind(jetzt)
+    .bind(id)
+    .execute(pool)
+    .await?;
     Ok(())
 }
 
@@ -450,11 +465,13 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         let m = anlegen(&pool, e, b, daten("X", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
-        setze_status(&pool, m.id, crate::meldung::STATUS_IN_BEARBEITUNG).await.unwrap();
+        setze_status(&pool, m.id, crate::meldung::STATUS_IN_BEARBEITUNG, "2026-06-12 09:30:00").await.unwrap();
         let nach = laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap();
         assert_eq!(nach.status, "in_bearbeitung");
         // ist_offen = status != 'erledigt' → in_bearbeitung bleibt offen.
         assert!(nach.ist_offen);
+        // Noch nicht erledigt → kein Erledigt-Stempel.
+        assert!(nach.erledigt_at.is_none());
     }
 
     #[tokio::test]
@@ -478,7 +495,7 @@ mod tests {
         let m = anlegen(&pool, e, b, daten("X", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
         weise_bearbeiter(&pool, m.id, Some(b)).await.unwrap();
         // Reiner Statuswechsel darf den Bearbeiter NICHT clobbern (Regression #2/#3).
-        setze_status(&pool, m.id, crate::meldung::STATUS_ERLEDIGT).await.unwrap();
+        setze_status(&pool, m.id, crate::meldung::STATUS_ERLEDIGT, "2026-06-12 09:30:00").await.unwrap();
         let nach = laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap();
         assert_eq!(nach.status, "erledigt");
         assert_eq!(nach.bearbeiter_id, Some(b), "Zuweisung bleibt über Statuswechsel erhalten");
@@ -489,10 +506,39 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         let m = anlegen(&pool, e, b, daten("X", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
-        setze_status(&pool, m.id, crate::meldung::STATUS_ERLEDIGT).await.unwrap();
+        setze_status(&pool, m.id, crate::meldung::STATUS_ERLEDIGT, "2026-06-12 09:30:00").await.unwrap();
         let nach = laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap();
         assert_eq!(nach.status, "erledigt");
         assert!(!nach.ist_offen);
+        // Übergang nach 'erledigt' setzt den Erledigt-Stempel (LFH-113).
+        assert_eq!(nach.erledigt_at.as_deref(), Some("2026-06-12 09:30:00"));
+    }
+
+    #[tokio::test]
+    async fn erledigt_at_ist_first_write_wins() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(&pool, e, b, daten("X", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
+        // Erstes Erledigen setzt den Stempel.
+        setze_status(&pool, m.id, crate::meldung::STATUS_ERLEDIGT, "2026-06-12 09:30:00").await.unwrap();
+        assert_eq!(
+            laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap().erledigt_at.as_deref(),
+            Some("2026-06-12 09:30:00"),
+        );
+        // Zurücksetzen (z. B. wieder in Bearbeitung) darf den Stempel NICHT löschen.
+        setze_status(&pool, m.id, crate::meldung::STATUS_IN_BEARBEITUNG, "2026-06-12 09:40:00").await.unwrap();
+        assert_eq!(
+            laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap().erledigt_at.as_deref(),
+            Some("2026-06-12 09:30:00"),
+            "Erledigt-Stempel bleibt über ein Zurücksetzen erhalten",
+        );
+        // Erneutes Erledigen darf den ersten Stempel NICHT überschreiben (first-write-wins).
+        setze_status(&pool, m.id, crate::meldung::STATUS_ERLEDIGT, "2026-06-12 09:50:00").await.unwrap();
+        assert_eq!(
+            laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap().erledigt_at.as_deref(),
+            Some("2026-06-12 09:30:00"),
+            "erneutes Erledigen behält den ersten Stempel",
+        );
     }
 
     #[tokio::test]
@@ -563,7 +609,7 @@ mod tests {
         let m = anlegen(&pool, e, b, daten_pflicht("Sofort", "2026-06-12 09:00:00", "2026-06-12 09:05:00")).await.unwrap();
         // Bearbeiter + Status gesetzt — dürfen über die Bestätigung NICHT verloren gehen.
         weise_bearbeiter(&pool, m.id, Some(b)).await.unwrap();
-        setze_status(&pool, m.id, crate::meldung::STATUS_IN_BEARBEITUNG).await.unwrap();
+        setze_status(&pool, m.id, crate::meldung::STATUS_IN_BEARBEITUNG, "2026-06-12 09:05:30").await.unwrap();
 
         bestaetige(&pool, 1, e, m.id, b, "2026-06-12 09:06:00").await.unwrap();
         let nach = laden(&pool, m.id, "2026-06-12 09:07:00").await.unwrap();

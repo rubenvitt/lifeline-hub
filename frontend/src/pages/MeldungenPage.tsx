@@ -25,6 +25,16 @@ function vergleicheMeldung(a: Meldung, b: Meldung): number {
   return (b.ereigniszeit ?? '').localeCompare(a.ereigniszeit ?? '');
 }
 
+/**
+ * Sortierung der Abgeschlossen-Ansicht (LFH-113): zuletzt Erledigtes oben (erledigt_at ↓).
+ * Ohne Stempel (Altbestand vor der Spalte) Fallback auf Ereigniszeit ↓.
+ */
+function vergleicheAbgeschlossen(a: Meldung, b: Meldung): number {
+  const erledigt = (b.erledigt_at ?? '').localeCompare(a.erledigt_at ?? '');
+  if (erledigt !== 0) return erledigt;
+  return (b.ereigniszeit ?? '').localeCompare(a.ereigniszeit ?? '');
+}
+
 export default function MeldungenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
@@ -93,7 +103,7 @@ export default function MeldungenPage() {
   // Offen/Abgeschlossen clientseitig über die gemeinsame Phasen-Semantik trennen.
   const phaseVon = (m: Meldung) => MELDUNG_STATUS[m.status]?.phase ?? 'offen';
   const offene = alleMeldungen.filter((m) => !istAbgeschlossen(phaseVon(m))).sort(vergleicheMeldung);
-  const abgeschlossene = alleMeldungen.filter((m) => istAbgeschlossen(phaseVon(m))).sort(vergleicheMeldung);
+  const abgeschlossene = alleMeldungen.filter((m) => istAbgeschlossen(phaseVon(m))).sort(vergleicheAbgeschlossen);
   const sichtbare = ansicht === 'offen' ? offene : abgeschlossene;
   const mitglieder = mitgliederQuery.data ?? [];
 

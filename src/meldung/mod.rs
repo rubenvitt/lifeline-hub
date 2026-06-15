@@ -88,6 +88,9 @@ pub struct MeldungAnzeige {
     pub lage_meldung_id: Option<i64>,
     /// Abgeleitet: status != 'erledigt' (Posteingang = offene Meldungen).
     pub ist_offen: bool,
+    /// Erledigt-Zeitpunkt (UTC), first-write-wins beim Übergang nach 'erledigt' (LFH-113);
+    /// NULL solange nie erledigt. Bleibt erhalten, falls der Status später zurückgesetzt wird.
+    pub erledigt_at: Option<String>,
     /// Sofortmeldung & Eskalation (LFH-85/97): aktive Bestätigungspflicht.
     pub bestaetigung_pflicht: bool,
     /// Absolute Bestätigungsfrist (UTC), NULL wenn keine Pflicht.

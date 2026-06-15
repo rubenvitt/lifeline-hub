@@ -251,8 +251,9 @@ pub async fn status(
     if !crate::meldung::status_gueltig(status) {
         return Err(AppError::Validation("Ungültiger Status".into()));
     }
-    repo::setze_status(&state.pool, meldung_id, status).await?;
-    let m = repo::laden(&state.pool, meldung_id, &jetzt()).await?;
+    let jetzt = jetzt();
+    repo::setze_status(&state.pool, meldung_id, status, &jetzt).await?;
+    let m = repo::laden(&state.pool, meldung_id, &jetzt).await?;
     sse(&state, einsatz_id);
     Ok(Json(m))
 }

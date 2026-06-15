@@ -897,6 +897,8 @@ export interface Meldung {
   lage_meldung_id: number | null;
   /** Abgeleitet: status !== 'erledigt'. */
   ist_offen: boolean;
+  /** Erledigt-Zeitpunkt (UTC), first-write-wins beim Übergang nach 'erledigt' (LFH-113); null solange nie erledigt. */
+  erledigt_at: string | null;
   /** Sofortmeldung & Eskalation (LFH-85/97): aktive Bestätigungspflicht. */
   bestaetigung_pflicht: boolean;
   /** Absolute Bestätigungsfrist (UTC), null wenn keine Pflicht. */

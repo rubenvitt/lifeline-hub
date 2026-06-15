@@ -37,7 +37,7 @@ const meldung = (over: Partial<Meldung> = {}): Meldung => ({
   status: 'neu', bearbeiter_id: null, bearbeiter_name: null, lagerelevant: false,
   ereigniszeit: '2026-06-12 09:00:00', eingang_at: '2026-06-12 09:05:00',
   etb_meldung_id: 7, auftrag_id: null, erfasst_von_id: 1, erstellt_at: '2026-06-12 09:05:00',
-  lage_meldung_id: null, ist_offen: true,
+  lage_meldung_id: null, ist_offen: true, erledigt_at: null,
   bestaetigung_pflicht: false, bestaetigung_frist_at: null, eskaliert: false,
   bestaetigt_at: null, bestaetigt_von_id: null, bestaetigt_von_name: null,
   ist_bestaetigt: false, ist_ueberfaellig: false, ...over,
@@ -98,13 +98,13 @@ describe('MeldungenPage', () => {
     expect(screen.queryByText('Florian Nord 1')).not.toBeInTheDocument();
   });
 
-  it('zeigt eine erledigte Meldung im Abgeschlossen-View mit Quittungs-Read-back', async () => {
-    // Hinweis: Meldung hat KEIN erledigt_at (Daten-Lücke, s. Rückgabe) → der
-    // verfügbare zeitliche Read-back in Abgeschlossen ist die Quittungs-Achse
-    // (bestaetigt_at) der bestätigten Sofortmeldung via QuittungIndikator.
+  it('zeigt eine erledigte Meldung im Abgeschlossen-View mit Erledigt-Zeitpunkt und Quittungs-Read-back', async () => {
+    // LFH-113: Abgeschlossen zeigt den echten Erledigt-Zeitpunkt (erledigt_at) als
+    // Read-back; die Quittungs-Achse (bestaetigt_at) bleibt daneben bestehen.
     listeMeldungen.mockResolvedValue([
       meldung({
         id: 2, lfd_nr: 2, absender: 'RTW 9', status: 'erledigt', ist_offen: false,
+        erledigt_at: '2026-06-12 09:30:00',
         bestaetigung_pflicht: true, ist_bestaetigt: true,
         bestaetigt_at: '2026-06-12 09:06:00', bestaetigt_von_name: 'Leit',
       }),
@@ -113,6 +113,7 @@ describe('MeldungenPage', () => {
     await screen.findByText(/Abgeschlossen \(/);
     await userEvent.click(screen.getByText(/Abgeschlossen \(/));
     expect(await screen.findByText('RTW 9')).toBeInTheDocument();
+    expect(screen.getByText(/^Erledigt:/)).toBeInTheDocument();
     expect(screen.getByText(/✓ Quittiert von Leit/)).toBeInTheDocument();
   });
 

@@ -101,6 +101,9 @@ export default function MeldungListe({
                     <StatusBadge phase={status.phase} label={status.label} />
                     <Typography.Text type="secondary">{WEG_LABEL[m.meldeweg]} · {ART_LABEL[m.meldungsart]}</Typography.Text>
                     <Typography.Text type="secondary">Ereignis: {formatZeit(m.ereigniszeit)}</Typography.Text>
+                    {m.erledigt_at && (
+                      <Typography.Text type="secondary">Erledigt: {formatZeit(m.erledigt_at)}</Typography.Text>
+                    )}
                     {darfSchreiben && onZuweisen ? (
                       <Select<number | null>
                         size="small"
