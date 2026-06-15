@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
@@ -65,11 +65,13 @@ describe('NachforderungenPage', () => {
     })));
   });
 
-  it('schaltet den Status linear weiter', async () => {
+  it('schaltet den Status linear weiter (Popconfirm)', async () => {
     setzeNachforderungStatus.mockResolvedValue(nf({ status: 'zugesagt' }));
     renderPage();
     await screen.findByText('2 RTW zur Verstärkung');
-    await userEvent.click(screen.getByText('→ Zugesagt', { selector: 'a' }));
+    // Link-Button öffnet Popconfirm; erst nach Bestätigen wird geschaltet.
+    await userEvent.click(screen.getByRole('button', { name: '→ Zugesagt' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
     await waitFor(() => expect(setzeNachforderungStatus).toHaveBeenCalledWith(1, 1, 'zugesagt'));
   });
 
@@ -77,25 +79,41 @@ describe('NachforderungenPage', () => {
     lehneNachforderungAb.mockResolvedValue(nf({ status: 'abgelehnt' }));
     renderPage();
     await screen.findByText('2 RTW zur Verstärkung');
-    await userEvent.click(screen.getByText('Ablehnen', { selector: 'a' }));
-    // Dialog öffnet: Grund erfassen und bestätigen.
-    await userEvent.type(await screen.findByLabelText('Ablehnungsgrund'), 'keine Reserven');
+    // Listen-Aktion „Ablehnen" (link-button) öffnet das Modal.
     await userEvent.click(screen.getByRole('button', { name: 'Ablehnen' }));
+    // Dialog öffnet: Grund erfassen und bestätigen. „Ablehnen" existiert nun
+    // doppelt (Listen-Aktion + Modal-OK) → im Dialog scopen.
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Ablehnungsgrund'), 'keine Reserven');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ablehnen' }));
     await waitFor(() => expect(lehneNachforderungAb).toHaveBeenCalledWith(1, 1, 'keine Reserven'));
   });
 
-  it('filtert nach Status', async () => {
+  it('trennt Offen und Abgeschlossen clientseitig', async () => {
+    // Eine offene + eine eingetroffene Nachforderung in EINER Antwort (kein Status-Filter mehr).
+    listeNachforderungen.mockResolvedValue([
+      nf({ id: 1, bezeichnung: '2 RTW zur Verstärkung', status: 'angefordert', ist_offen: true }),
+      nf({ id: 2, bezeichnung: 'Eingetroffene SEG', status: 'eingetroffen', ist_offen: false, eingetroffen_at: '2026-06-12 10:00:00' }),
+    ]);
     renderPage();
-    await screen.findByText('2 RTW zur Verstärkung');
-    await userEvent.click(screen.getByText('Eingetroffen'));
-    await waitFor(() => expect(listeNachforderungen).toHaveBeenCalledWith(1, { status: 'eingetroffen' }));
+    // Default = Offen: nur die offene ist sichtbar.
+    expect(await screen.findByText('2 RTW zur Verstärkung')).toBeInTheDocument();
+    expect(screen.queryByText('Eingetroffene SEG')).not.toBeInTheDocument();
+    // Page lädt alle (ohne Status-Filter).
+    expect(listeNachforderungen).toHaveBeenCalledWith(1, {});
+    // Auf Abgeschlossen wechseln → eingetroffene erscheint, offene verschwindet.
+    await userEvent.click(screen.getByText(/Abgeschlossen \(/));
+    expect(await screen.findByText('Eingetroffene SEG')).toBeInTheDocument();
+    expect(screen.queryByText('2 RTW zur Verstärkung')).not.toBeInTheDocument();
   });
 
   it('eingetroffene Nachforderung zeigt keine Aktionen', async () => {
-    listeNachforderungen.mockResolvedValue([nf({ status: 'eingetroffen', ist_offen: false })]);
+    listeNachforderungen.mockResolvedValue([nf({ status: 'eingetroffen', ist_offen: false, eingetroffen_at: '2026-06-12 10:00:00' })]);
     renderPage();
+    // Eingetroffen landet in der Abgeschlossen-Ansicht → dorthin wechseln.
+    await userEvent.click(await screen.findByText(/Abgeschlossen \(/));
     await screen.findByText('2 RTW zur Verstärkung');
-    expect(screen.queryByText('Ablehnen', { selector: 'a' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ablehnen' })).not.toBeInTheDocument();
     expect(screen.getByText('Eingetroffen', { selector: '.ant-tag' })).toBeInTheDocument();
   });
 });

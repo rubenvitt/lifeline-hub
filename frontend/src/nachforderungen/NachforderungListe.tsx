@@ -1,19 +1,9 @@
-import { Empty, List, Space, Tag, Typography } from 'antd';
+import { Button, Empty, List, Popconfirm, Space, Typography } from 'antd';
 import type { ReactNode } from 'react';
 import type { Nachforderung, NachforderungStatus } from '../api/types';
+import { NACHFORDERUNG_STATUS, PrioBadge, StatusBadge, formatZeit } from '../kommunikation';
 
-const PRIO_TAG: Record<string, { color: string; label: string }> = {
-  sofort: { color: 'red', label: 'Sofort' },
-  dringend: { color: 'orange', label: 'Dringend' },
-  normal: { color: 'default', label: 'Normal' },
-};
-const STATUS_TAG: Record<string, { color: string; label: string }> = {
-  angefordert: { color: 'default', label: 'Angefordert' },
-  zugesagt: { color: 'processing', label: 'Zugesagt' },
-  unterwegs: { color: 'blue', label: 'Unterwegs' },
-  eingetroffen: { color: 'success', label: 'Eingetroffen' },
-  abgelehnt: { color: 'red', label: 'Abgelehnt' },
-};
+/** Adressat-Kategorie → Anzeigelabel (modul-spezifisch, bleibt lokal). */
 const ADRESSAT_LABEL: Record<string, string> = {
   leitstelle: 'Leitstelle', nachbar_ea: 'Nachbar-EA', uebergeordnet: 'Übergeordnete Führung', andere_bos: 'Andere BOS',
 };
@@ -24,26 +14,41 @@ const NAECHSTER: Partial<Record<NachforderungStatus, NachforderungStatus>> = {
 
 export interface NachforderungListeProps {
   nachforderungen: Nachforderung[];
+  /** Steuert die Übergangs-Zeitstempel/Grund-Zeilen in der Abgeschlossen-Ansicht. */
+  ansicht?: 'offen' | 'abgeschlossen';
   darfSchreiben?: boolean;
   onStatus?: (id: number, status: NachforderungStatus) => void;
   onAblehnen?: (id: number) => void;
 }
 
-export default function NachforderungListe({ nachforderungen, darfSchreiben, onStatus, onAblehnen }: NachforderungListeProps) {
+export default function NachforderungListe({
+  nachforderungen, ansicht = 'offen', darfSchreiben, onStatus, onAblehnen,
+}: NachforderungListeProps) {
   if (nachforderungen.length === 0) return <Empty description="Keine Nachforderungen" />;
   return (
     <List
       dataSource={nachforderungen}
       renderItem={(n) => {
-        const prio = PRIO_TAG[n.prioritaet] ?? PRIO_TAG.normal;
-        const status = STATUS_TAG[n.status] ?? STATUS_TAG.angefordert;
+        const status = NACHFORDERUNG_STATUS[n.status] ?? NACHFORDERUNG_STATUS.angefordert;
         const next = NAECHSTER[n.status];
+        const istAbg = ansicht === 'abgeschlossen';
         const aktionen: ReactNode[] = darfSchreiben && n.ist_offen
           ? [
               next && onStatus
-                ? <a key="next" onClick={() => onStatus(n.id, next)}>→ {STATUS_TAG[next].label}</a> : null,
+                ? (
+                  <Popconfirm
+                    key="next"
+                    title={`Status auf „${NACHFORDERUNG_STATUS[next].label}“ setzen?`}
+                    okText="Bestätigen"
+                    cancelText="Abbrechen"
+                    onConfirm={() => onStatus(n.id, next)}
+                  >
+                    <Button type="link" size="small" style={{ padding: 0 }}>→ {NACHFORDERUNG_STATUS[next].label}</Button>
+                  </Popconfirm>
+                ) : null,
+              // „Ablehnen" öffnet das Modal (= eigene Bestätigung mit Grund) → kein Popconfirm.
               onAblehnen
-                ? <a key="ab" onClick={() => onAblehnen(n.id)}>Ablehnen</a> : null,
+                ? <Button key="ab" type="link" size="small" style={{ padding: 0 }} onClick={() => onAblehnen(n.id)}>Ablehnen</Button> : null,
             ].filter(Boolean) as ReactNode[]
           : [];
         const menge = n.anzahl != null ? `${n.anzahl}× ` : '';
@@ -52,11 +57,11 @@ export default function NachforderungListe({ nachforderungen, darfSchreiben, onS
             <List.Item.Meta
               title={
                 <Space wrap>
-                  <Tag color={prio.color}>{prio.label}</Tag>
-                  <Tag color={status.color}>{status.label}</Tag>
+                  <PrioBadge prio={n.prioritaet} />
+                  <StatusBadge phase={status.phase} label={status.label} />
                   <Typography.Text strong>{menge}{n.art}</Typography.Text>
                   <Typography.Text type="secondary">
-                    → {ADRESSAT_LABEL[n.adressat_kategorie]}{n.adressat_bezeichnung ? ` (${n.adressat_bezeichnung})` : ''}
+                    → {ADRESSAT_LABEL[n.adressat_kategorie] ?? n.adressat_kategorie}{n.adressat_bezeichnung ? ` (${n.adressat_bezeichnung})` : ''}
                   </Typography.Text>
                 </Space>
               }
@@ -64,8 +69,30 @@ export default function NachforderungListe({ nachforderungen, darfSchreiben, onS
                 <Space direction="vertical" size={2} style={{ width: '100%' }}>
                   <Typography.Text>{n.bezeichnung}</Typography.Text>
                   {n.begruendung && <Typography.Text type="secondary">{n.begruendung}</Typography.Text>}
-                  {n.status === 'abgelehnt' && n.abgelehnt_grund && (
-                    <Typography.Text type="danger">Abgelehnt: {n.abgelehnt_grund}</Typography.Text>
+                  <Typography.Text type="secondary">
+                    Angefordert: {formatZeit(n.angefordert_at)}
+                    {n.erstellt_von_name ? ` · ${n.erstellt_von_name}` : ''}
+                  </Typography.Text>
+                  {/* Übergangs-Zeitstempel: in der Abgeschlossen-Ansicht vollständig,
+                      in der Offen-Ansicht ab „unterwegs" (Zwischenstände sichtbar machen). */}
+                  {(istAbg || n.status === 'unterwegs') && (
+                    <Space direction="vertical" size={0}>
+                      {n.zugesagt_at && (
+                        <Typography.Text type="secondary">Zugesagt: {formatZeit(n.zugesagt_at)}</Typography.Text>
+                      )}
+                      {n.unterwegs_at && (
+                        <Typography.Text type="secondary">Unterwegs: {formatZeit(n.unterwegs_at)}</Typography.Text>
+                      )}
+                      {n.eingetroffen_at && (
+                        <Typography.Text type="secondary">Eingetroffen: {formatZeit(n.eingetroffen_at)}</Typography.Text>
+                      )}
+                    </Space>
+                  )}
+                  {n.status === 'abgelehnt' && (
+                    <Typography.Text type="danger">
+                      Abgelehnt{n.abgelehnt_at ? ` (${formatZeit(n.abgelehnt_at)})` : ''}
+                      {n.abgelehnt_grund ? `: ${n.abgelehnt_grund}` : ''}
+                    </Typography.Text>
                   )}
                 </Space>
               }
