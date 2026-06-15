@@ -81,12 +81,39 @@ describe('MeldungenPage', () => {
     expect(legeMeldungAn.mock.calls[0][1].ereigniszeit).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
   });
 
-  it('filtert nach Status (Posteingang)', async () => {
+  it('trennt Offen/Abgeschlossen clientseitig und zeigt Offen als Default', async () => {
+    listeMeldungen.mockResolvedValue([
+      meldung({ id: 1, status: 'neu', ist_offen: true }),
+      meldung({ id: 2, lfd_nr: 2, absender: 'RTW 9', status: 'erledigt', ist_offen: false }),
+    ]);
     renderPage();
-    await screen.findByText('Florian Nord 1');
-    // Segment-Label „Abgeschlossen" ist eindeutig (kollidiert nicht mit Action-Links).
-    await userEvent.click(screen.getByText('Abgeschlossen'));
-    await waitFor(() => expect(listeMeldungen).toHaveBeenCalledWith(1, expect.objectContaining({ status: 'erledigt' })));
+    // Default-Ansicht „Offen": nur nicht-erledigte sichtbar.
+    expect(await screen.findByText('Florian Nord 1')).toBeInTheDocument();
+    expect(screen.queryByText('RTW 9')).not.toBeInTheDocument();
+    // Server-Default: kein Status-Filter (Offen/Abgeschlossen rein clientseitig).
+    expect(listeMeldungen.mock.calls[0][1]).not.toHaveProperty('status');
+    // Umschalten auf „Abgeschlossen": nur erledigte sichtbar, ohne neuen Server-Call mit Status.
+    await userEvent.click(screen.getByText(/Abgeschlossen \(/));
+    expect(await screen.findByText('RTW 9')).toBeInTheDocument();
+    expect(screen.queryByText('Florian Nord 1')).not.toBeInTheDocument();
+  });
+
+  it('zeigt eine erledigte Meldung im Abgeschlossen-View mit Quittungs-Read-back', async () => {
+    // Hinweis: Meldung hat KEIN erledigt_at (Daten-Lücke, s. Rückgabe) → der
+    // verfügbare zeitliche Read-back in Abgeschlossen ist die Quittungs-Achse
+    // (bestaetigt_at) der bestätigten Sofortmeldung via QuittungIndikator.
+    listeMeldungen.mockResolvedValue([
+      meldung({
+        id: 2, lfd_nr: 2, absender: 'RTW 9', status: 'erledigt', ist_offen: false,
+        bestaetigung_pflicht: true, ist_bestaetigt: true,
+        bestaetigt_at: '2026-06-12 09:06:00', bestaetigt_von_name: 'Leit',
+      }),
+    ]);
+    renderPage();
+    await screen.findByText(/Abgeschlossen \(/);
+    await userEvent.click(screen.getByText(/Abgeschlossen \(/));
+    expect(await screen.findByText('RTW 9')).toBeInTheDocument();
+    expect(screen.getByText(/✓ Quittiert von Leit/)).toBeInTheDocument();
   });
 
   it('filtert nach Richtung extern (LFH-87)', async () => {
@@ -111,7 +138,9 @@ describe('MeldungenPage', () => {
     setzeMeldungStatus.mockResolvedValue(meldung({ status: 'gesichtet' }));
     renderPage();
     await screen.findByText('Florian Nord 1');
-    await userEvent.click(screen.getByText('Sichten', { selector: 'a' }));
+    // Link-Button öffnet Popconfirm; erst nach „Bestätigen" wird geschaltet.
+    await userEvent.click(screen.getByRole('button', { name: 'Sichten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
     await waitFor(() => expect(setzeMeldungStatus).toHaveBeenCalledWith(1, 1, 'gesichtet'));
   });
 
@@ -119,7 +148,8 @@ describe('MeldungenPage', () => {
     setzeMeldungStatus.mockResolvedValue(meldung({ status: 'erledigt' }));
     renderPage();
     await screen.findByText('Florian Nord 1');
-    await userEvent.click(screen.getByText('Erledigt', { selector: 'a' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erledigt' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
     await waitFor(() => expect(setzeMeldungStatus).toHaveBeenCalledWith(1, 1, 'erledigt'));
   });
 
@@ -129,7 +159,7 @@ describe('MeldungenPage', () => {
     } as Awaited<ReturnType<typeof ladeEinsatz>>);
     renderPage();
     await screen.findByText('Florian Nord 1');
-    expect(screen.queryByText('Sichten', { selector: 'a' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sichten' })).not.toBeInTheDocument();
   });
 
   // --- LFH-95: Lage-Übergabe ---
@@ -138,7 +168,8 @@ describe('MeldungenPage', () => {
     markiereLagerelevant.mockResolvedValue(meldung({ lagerelevant: true }));
     renderPage();
     await screen.findByText('Florian Nord 1');
-    await userEvent.click(screen.getByText('An Lage übergeben', { selector: 'a' }));
+    await userEvent.click(screen.getByRole('button', { name: 'An Lage übergeben' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
     await waitFor(() => expect(markiereLagerelevant).toHaveBeenCalledWith(1, 1));
   });
 
@@ -147,7 +178,7 @@ describe('MeldungenPage', () => {
     renderPage();
     await screen.findByText('Florian Nord 1');
     expect(screen.getByText('Lagerelevant ✓')).toBeInTheDocument();
-    expect(screen.queryByText('An Lage übergeben', { selector: 'a' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'An Lage übergeben' })).not.toBeInTheDocument();
   });
 
   it('weist einer Meldung einen Bearbeiter zu', async () => {
@@ -160,20 +191,6 @@ describe('MeldungenPage', () => {
     await waitFor(() => expect(weiseBearbeiterZu).toHaveBeenCalledWith(1, 1, 2));
   });
 
-  it('filtert clientseitig auf offene Meldungen (LFH-94)', async () => {
-    listeMeldungen.mockResolvedValue([
-      meldung({ id: 1, status: 'neu', ist_offen: true }),
-      meldung({ id: 2, lfd_nr: 2, absender: 'RTW 9', status: 'erledigt', ist_offen: false }),
-    ]);
-    renderPage();
-    await screen.findByText('Florian Nord 1');
-    expect(screen.getByText('RTW 9')).toBeInTheDocument();
-    await userEvent.click(screen.getByText('Offen'));
-    // 'Offen' ist kein Server-Status → listeMeldungen ohne status; erledigte fällt clientseitig raus.
-    await waitFor(() => expect(screen.queryByText('RTW 9')).not.toBeInTheDocument());
-    expect(screen.getByText('Florian Nord 1')).toBeInTheDocument();
-  });
-
   // --- LFH-97: Sofortmeldung bestätigungspflichtig ---
 
   it('zeigt überfällige Sofortmeldung hervorgehoben und bestätigt sie', async () => {
@@ -184,7 +201,10 @@ describe('MeldungenPage', () => {
     renderPage();
     await screen.findByText('Florian Nord 1');
     expect(screen.getByText(/Bestätigung überfällig/)).toBeInTheDocument();
-    await userEvent.click(screen.getByText('Bestätigen', { selector: 'a' }));
+    // Link-Button „Bestätigen" öffnet Popconfirm; OK-Knopf heißt ebenfalls „Bestätigen".
+    await userEvent.click(screen.getByRole('button', { name: 'Bestätigen' }));
+    const popconfirms = await screen.findAllByRole('button', { name: 'Bestätigen' });
+    await userEvent.click(popconfirms[popconfirms.length - 1]);
     await waitFor(() => expect(bestaetigeMeldung).toHaveBeenCalledWith(1, 1));
   });
 
@@ -203,8 +223,9 @@ describe('MeldungenPage', () => {
     ]);
     renderPage();
     await screen.findByText('Florian Nord 1');
-    expect(screen.getByText(/Bestätigt ✓/)).toBeInTheDocument();
-    expect(screen.queryByText('Bestätigen', { selector: 'a' })).not.toBeInTheDocument();
+    // Bestätigt → orthogonale Quittungs-Achse (QuittungIndikator) statt Status-Badge.
+    expect(screen.getByText(/✓ Quittiert/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Bestätigen' })).not.toBeInTheDocument();
   });
 
   it('Fast-Path-Button erfasst Sofortmeldung mit Bestätigungspflicht', async () => {

@@ -5,9 +5,25 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz, ladeMitglieder } from '../api/einsaetze';
 import { ApiError } from '../api/client';
 import { bestaetigeMeldung, legeMeldungAn, listeMeldungen, markiereLagerelevant, setzeMeldungStatus, weiseBearbeiterZu } from '../api/meldungen';
-import type { MeldungStatus, NeueMeldung } from '../api/types';
+import type { Meldung, MeldungStatus, NeueMeldung } from '../api/types';
+import { MELDUNG_STATUS, istAbgeschlossen } from '../kommunikation';
 import MeldungListe from '../meldungen/MeldungListe';
 import MeldungFormular from '../meldungen/MeldungFormular';
+
+const PRIO_ORDNUNG: Record<string, number> = { sofort: 0, dringend: 1, normal: 2 };
+
+/**
+ * Sortierung der Meldungen: Prio (sofort→dringend→normal), dann eskaliert zuerst
+ * (Alarm oben), dann Ereigniszeit absteigend. Meldungen haben keine Frist im
+ * Auftrags-Sinn → keine Fälligkeits-Gruppierung, flache Liste mit Badges.
+ */
+function vergleicheMeldung(a: Meldung, b: Meldung): number {
+  const prio = (PRIO_ORDNUNG[a.prioritaet] ?? 99) - (PRIO_ORDNUNG[b.prioritaet] ?? 99);
+  if (prio !== 0) return prio;
+  const eskaliert = Number(b.eskaliert) - Number(a.eskaliert);
+  if (eskaliert !== 0) return eskaliert;
+  return (b.ereigniszeit ?? '').localeCompare(a.ereigniszeit ?? '');
+}
 
 export default function MeldungenPage() {
   const { id } = useParams();
@@ -17,17 +33,14 @@ export default function MeldungenPage() {
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const mitgliederQuery = useQuery({ queryKey: ['einsatz-mitglieder', einsatzId], queryFn: () => ladeMitglieder(einsatzId) });
-  const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
+
+  // Offen/Abgeschlossen-Trennung erfolgt clientseitig (alle Meldungen laden, Server-Default).
+  const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
   const [richtungFilter, setRichtungFilter] = useState<string | undefined>(undefined);
 
-  // 'offen' ist eine clientseitige Sammelsicht (status != 'erledigt') über `ist_offen`;
-  // der Server filtert nur exakte Einzelstatus.
-  const REALE_STATUS = ['neu', 'gesichtet', 'in_bearbeitung', 'erledigt'];
-  const serverStatus = statusFilter && REALE_STATUS.includes(statusFilter) ? statusFilter : undefined;
-
   const meldungenQuery = useQuery({
-    queryKey: ['einsatz-meldungen', einsatzId, statusFilter ?? 'alle', richtungFilter ?? 'alle'],
-    queryFn: () => listeMeldungen(einsatzId, { status: serverStatus, richtung: richtungFilter }),
+    queryKey: ['einsatz-meldungen', einsatzId, richtungFilter ?? 'alle'],
+    queryFn: () => listeMeldungen(einsatzId, { richtung: richtungFilter }),
   });
 
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
@@ -76,9 +89,22 @@ export default function MeldungenPage() {
     einsatz.status === 'aktiv' &&
     (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
   const alleMeldungen = meldungenQuery.data ?? [];
-  // 'offen' (kein Server-Status) → clientseitig auf nicht-erledigte einschränken.
-  const meldungen = statusFilter === 'offen' ? alleMeldungen.filter((m) => m.ist_offen) : alleMeldungen;
+
+  // Offen/Abgeschlossen clientseitig über die gemeinsame Phasen-Semantik trennen.
+  const phaseVon = (m: Meldung) => MELDUNG_STATUS[m.status]?.phase ?? 'offen';
+  const offene = alleMeldungen.filter((m) => !istAbgeschlossen(phaseVon(m))).sort(vergleicheMeldung);
+  const abgeschlossene = alleMeldungen.filter((m) => istAbgeschlossen(phaseVon(m))).sort(vergleicheMeldung);
+  const sichtbare = ansicht === 'offen' ? offene : abgeschlossene;
   const mitglieder = mitgliederQuery.data ?? [];
+
+  const listenProps = {
+    darfSchreiben,
+    mitglieder,
+    onStatus: (meldungId: number, status: MeldungStatus) => statusMutation.mutate({ meldungId, status }),
+    onZuweisen: (meldungId: number, bearbeiterId: number | null) => zuweisenMutation.mutate({ meldungId, bearbeiterId }),
+    onLagerelevant: (meldungId: number) => lageMutation.mutate(meldungId),
+    onBestaetigen: (meldungId: number) => bestaetigenMutation.mutate(meldungId),
+  };
 
   return (
     <div>
@@ -96,21 +122,16 @@ export default function MeldungenPage() {
           {meldungenQuery.isError && (
             <Alert type="error" showIcon style={{ marginBottom: 12 }} message="Meldungen konnten nicht geladen werden" />
           )}
-          <div style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12, alignItems: 'center' }}>
             <Segmented
-              value={statusFilter ?? 'alle'}
-              onChange={(v) => setStatusFilter(v === 'alle' ? undefined : String(v))}
+              value={ansicht}
+              onChange={(v) => setAnsicht(v as 'offen' | 'abgeschlossen')}
               options={[
-                { value: 'alle', label: 'Alle' },
-                { value: 'offen', label: 'Offen' },
-                { value: 'neu', label: 'Neu' },
-                { value: 'gesichtet', label: 'Gesichtet' },
-                { value: 'in_bearbeitung', label: 'In Arbeit' },
-                { value: 'erledigt', label: 'Abgeschlossen' },
+                { value: 'offen', label: `Offen (${offene.length})` },
+                { value: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossene.length})` },
               ]}
             />
             <Segmented
-              style={{ marginLeft: 12 }}
               value={richtungFilter ?? 'alle'}
               onChange={(v) => setRichtungFilter(v === 'alle' ? undefined : String(v))}
               options={[
@@ -120,15 +141,7 @@ export default function MeldungenPage() {
               ]}
             />
           </div>
-          <MeldungListe
-            meldungen={meldungen}
-            darfSchreiben={darfSchreiben}
-            mitglieder={mitglieder}
-            onStatus={(meldungId, status) => statusMutation.mutate({ meldungId, status })}
-            onZuweisen={(meldungId, bearbeiterId) => zuweisenMutation.mutate({ meldungId, bearbeiterId })}
-            onLagerelevant={(meldungId) => lageMutation.mutate(meldungId)}
-            onBestaetigen={(meldungId) => bestaetigenMutation.mutate(meldungId)}
-          />
+          <MeldungListe meldungen={sichtbare} {...listenProps} />
         </Col>
         {darfSchreiben && (
           <Col flex="360px">
