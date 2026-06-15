@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
@@ -65,7 +65,10 @@ describe('AuftraegePage', () => {
   it('markiert überfällige Aufträge', async () => {
     listeAuftraege.mockResolvedValue([auftrag({ ist_ueberfaellig: true, frist_at: '2026-06-11 08:00:00' })]);
     renderPage();
-    expect(await screen.findByText('Überfällig')).toBeInTheDocument();
+    await screen.findByText('Deich sichern');
+    // Auftrags-Tag „Überfällig" (exakt) + Gruppen-Überschrift „Überfällig (1)".
+    expect(screen.getByText('Überfällig')).toBeInTheDocument();
+    expect(screen.getByText('Überfällig (1)')).toBeInTheDocument();
   });
 
   it('legt einen Auftrag an (Empfänger + Text Pflicht)', async () => {
@@ -117,7 +120,9 @@ describe('AuftraegePage', () => {
     quittiereEmpfaenger.mockResolvedValue(auftrag());
     renderPage();
     await screen.findByText('Deich sichern');
+    // Aktion ist jetzt in einen Popconfirm gewickelt → Trigger + Bestätigen.
     await userEvent.click(screen.getByText('quittieren'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
     await waitFor(() => expect(quittiereEmpfaenger).toHaveBeenCalledWith(1, 1, 1));
   });
 
@@ -125,20 +130,36 @@ describe('AuftraegePage', () => {
     setzeVollzug.mockResolvedValue(auftrag({ bearbeitungsstatus: 'vollzogen' }));
     renderPage();
     await screen.findByText('Deich sichern');
-    await userEvent.click(screen.getByText('Vollzug melden'));
-    await userEvent.type(screen.getByPlaceholderText('Rückmeldung zur Erledigung'), 'Deich gehalten');
+    // Aktions-Button öffnet das Modal; der Bestätigen-Button liegt im Dialog.
     await userEvent.click(screen.getByRole('button', { name: 'Vollzug melden' }));
+    await userEvent.type(screen.getByPlaceholderText('Rückmeldung zur Erledigung'), 'Deich gehalten');
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Vollzug melden' }));
     await waitFor(() => expect(setzeVollzug).toHaveBeenCalledWith(1, 1, 'vollzogen', 'Deich gehalten'));
   });
 
-  it('filtert nach Status', async () => {
+  it('trennt Offen/Abgeschlossen clientseitig (Read-back in Abgeschlossen)', async () => {
+    // Status-Segmented entfällt; Aufträge werden ungefiltert geladen und clientseitig
+    // über die Phasen-Semantik gesplittet. Ein abgenommener Auftrag landet in „Abgeschlossen".
+    listeAuftraege.mockResolvedValue([
+      auftrag({ id: 1, auftrag_text: 'Offener Auftrag', bearbeitungsstatus: 'offen' }),
+      auftrag({
+        id: 2, auftrag_text: 'Fertiger Auftrag', bearbeitungsstatus: 'abgenommen',
+        vollzogen_at: '2026-06-11 10:00:00', abgenommen_at: '2026-06-11 11:00:00',
+        vollzugsmeldung: 'Deich gehalten',
+      }),
+    ]);
     renderPage();
-    await screen.findByText('Deich sichern');
-    // 'Vollzogen' erscheint nur im Segmented (Default-Auftrag ist 'offen') → eindeutig.
-    await userEvent.click(screen.getByText('Vollzogen'));
-    await waitFor(() => expect(listeAuftraege).toHaveBeenCalledWith(1, {
-      status: 'vollzogen', abschnittId: undefined, einheitId: undefined,
-    }));
+    await screen.findByText('Offener Auftrag');
+    // Default = Offen-Ansicht: nur der offene Auftrag, kein Server-Status-Filter.
+    expect(screen.queryByText('Fertiger Auftrag')).not.toBeInTheDocument();
+    expect(listeAuftraege).toHaveBeenCalledWith(1, { richtung: undefined, abschnittId: undefined, einheitId: undefined });
+    // In die Abgeschlossen-Ansicht wechseln (Segmented-Label enthält den Count).
+    await userEvent.click(screen.getByText(/^Abgeschlossen/));
+    expect(await screen.findByText('Fertiger Auftrag')).toBeInTheDocument();
+    expect(screen.queryByText('Offener Auftrag')).not.toBeInTheDocument();
+    // Read-back-Spalten der Abgeschlossen-Ansicht.
+    expect(screen.getByText(/Vollzugsvermerk: Deich gehalten/)).toBeInTheDocument();
   });
 
   it('setzt einen offenen Auftrag auf „In Bearbeitung"', async () => {
@@ -146,8 +167,9 @@ describe('AuftraegePage', () => {
     setzeVollzug.mockResolvedValue(auftrag({ bearbeitungsstatus: 'in_arbeit' }));
     renderPage();
     await screen.findByText('Deich sichern');
-    // 'In Bearbeitung' kommt auch im Segmented vor → über den Action-<a> eindeutig.
-    await userEvent.click(screen.getByText('In Bearbeitung', { selector: 'a' }));
+    // Aktion ist jetzt ein Button mit Popconfirm (kein <a>, kein Status-Segmented mehr).
+    await userEvent.click(screen.getByRole('button', { name: 'In Bearbeitung' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
     await waitFor(() => expect(setzeVollzug).toHaveBeenCalledWith(1, 1, 'in_arbeit', undefined));
   });
 
@@ -155,8 +177,11 @@ describe('AuftraegePage', () => {
     listeAuftraege.mockResolvedValue([auftrag({ bearbeitungsstatus: 'vollzogen' })]);
     nimmAb.mockResolvedValue(auftrag({ bearbeitungsstatus: 'abgenommen' }));
     renderPage();
+    // 'vollzogen' zählt zur Abgeschlossen-Phase → dort wird der „Abnehmen"-Button gezeigt.
+    await userEvent.click(await screen.findByText(/^Abgeschlossen/));
     await screen.findByText('Deich sichern');
-    await userEvent.click(screen.getByText('Abnehmen'));
+    await userEvent.click(screen.getByRole('button', { name: 'Abnehmen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
     await waitFor(() => expect(nimmAb).toHaveBeenCalledWith(1, 1));
   });
 
