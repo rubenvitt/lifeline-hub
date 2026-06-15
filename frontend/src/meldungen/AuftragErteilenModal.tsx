@@ -3,7 +3,6 @@ import type { Meldung, NeuerAuftrag } from '../api/types';
 import AuftragFormular, { type ZielOption } from '../auftraege/AuftragFormular';
 
 interface Props {
-  offen: boolean;
   meldung: Meldung | null;
   abschnitte: ZielOption[];
   einheiten: ZielOption[];
@@ -22,11 +21,11 @@ function initialText(m: Meldung | null): string {
  *  Meldungsinhalt vorbelegt — gespiegelt von der Chat-Heraufstufung (HeraufstufenAuftragModal).
  *  `destroyOnHidden` remountet das Formular bei jedem Öffnen, sodass `initialText` frisch greift. */
 export default function AuftragErteilenModal({
-  offen, meldung, abschnitte, einheiten, senden, onAbbrechen, onAnlegen,
+  meldung, abschnitte, einheiten, senden, onAbbrechen, onAnlegen,
 }: Props) {
   return (
     <Modal
-      open={offen}
+      open={meldung !== null}
       title="Aus Meldung Auftrag erteilen"
       footer={null}
       onCancel={onAbbrechen}

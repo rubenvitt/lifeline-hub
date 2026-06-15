@@ -24,6 +24,15 @@ export const PRIO_META: Record<KommPrio, { color: string; label: string }> = {
   normal: { color: 'default', label: 'Normal' },
 };
 
+/** Reihenfolge der Prioritäten (dringlichste zuerst) = Schlüsselreihenfolge von PRIO_META. */
+export const PRIO_ORDNUNG = Object.keys(PRIO_META) as KommPrio[];
+
+/** Sortier-Rang einer Priorität: sofort(0) < dringend(1) < normal(2); Unbekanntes zuletzt. */
+export function prioRang(prio: string): number {
+  const rang = PRIO_ORDNUNG.indexOf(prio as KommPrio);
+  return rang === -1 ? PRIO_ORDNUNG.length : rang;
+}
+
 /** Status-Deskriptor eines Moduls: Fachlabel + gemeinsame Ober-Phase. */
 export type StatusDeskriptor = Record<string, { label: string; phase: KommPhase }>;
 

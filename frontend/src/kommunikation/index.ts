@@ -10,6 +10,8 @@ export {
   NACHFORDERUNG_STATUS,
   ERINNERUNG_STATUS,
   istAbgeschlossen,
+  PRIO_ORDNUNG,
+  prioRang,
 } from './phase';
 export type { KommPhase, KommPrio, StatusDeskriptor } from './phase';
 

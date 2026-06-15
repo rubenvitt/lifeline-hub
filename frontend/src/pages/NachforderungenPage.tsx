@@ -6,12 +6,9 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { ApiError } from '../api/client';
 import { legeNachforderungAn, lehneNachforderungAb, listeNachforderungen, setzeNachforderungStatus } from '../api/nachforderungen';
 import type { Nachforderung, NachforderungStatus, NeueNachforderung } from '../api/types';
-import { NACHFORDERUNG_STATUS, istAbgeschlossen } from '../kommunikation';
+import { NACHFORDERUNG_STATUS, istAbgeschlossen, prioRang } from '../kommunikation';
 import NachforderungListe from '../nachforderungen/NachforderungListe';
 import NachforderungFormular from '../nachforderungen/NachforderungFormular';
-
-/** Prio-Rang für die Offen-Sortierung (sofort zuerst). */
-const PRIO_RANG: Record<string, number> = { sofort: 0, dringend: 1, normal: 2 };
 
 /** Schlüssel-Zeitstempel der Abgeschlossen-Ansicht: Eintreffen ODER Ablehnung. */
 function abschlussZeit(n: Nachforderung): string {
@@ -88,7 +85,7 @@ export default function NachforderungenPage() {
 
   // Offen-Ansicht: nach Priorität (sofort→dringend→normal), dann angefordert_at absteigend.
   const offeneSortiert = [...offene].sort((a, b) => {
-    const rang = (PRIO_RANG[a.prioritaet] ?? 9) - (PRIO_RANG[b.prioritaet] ?? 9);
+    const rang = prioRang(a.prioritaet) - prioRang(b.prioritaet);
     return rang !== 0 ? rang : b.angefordert_at.localeCompare(a.angefordert_at);
   });
   // Abgeschlossen-Ansicht: flach, neueste zuerst (nach Abschluss-Zeit).

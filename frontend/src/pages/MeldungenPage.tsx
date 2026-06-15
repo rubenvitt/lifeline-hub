@@ -8,13 +8,11 @@ import { bestaetigeMeldung, erteileAuftragAusMeldung, legeMeldungAn, listeMeldun
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import type { Meldung, MeldungStatus, NeueMeldung, NeuerAuftrag } from '../api/types';
-import { MELDUNG_STATUS, istAbgeschlossen } from '../kommunikation';
+import { MELDUNG_STATUS, istAbgeschlossen, prioRang } from '../kommunikation';
 import MeldungListe from '../meldungen/MeldungListe';
 import MeldungFormular from '../meldungen/MeldungFormular';
 import AuftragErteilenModal from '../meldungen/AuftragErteilenModal';
 import LagerelevantModal, { type LagerelevantDaten } from '../meldungen/LagerelevantModal';
-
-const PRIO_ORDNUNG: Record<string, number> = { sofort: 0, dringend: 1, normal: 2 };
 
 /**
  * Sortierung der Meldungen: Prio (sofort→dringend→normal), dann eskaliert zuerst
@@ -22,7 +20,7 @@ const PRIO_ORDNUNG: Record<string, number> = { sofort: 0, dringend: 1, normal: 2
  * Auftrags-Sinn → keine Fälligkeits-Gruppierung, flache Liste mit Badges.
  */
 function vergleicheMeldung(a: Meldung, b: Meldung): number {
-  const prio = (PRIO_ORDNUNG[a.prioritaet] ?? 99) - (PRIO_ORDNUNG[b.prioritaet] ?? 99);
+  const prio = prioRang(a.prioritaet) - prioRang(b.prioritaet);
   if (prio !== 0) return prio;
   const eskaliert = Number(b.eskaliert) - Number(a.eskaliert);
   if (eskaliert !== 0) return eskaliert;
@@ -201,7 +199,6 @@ export default function MeldungenPage() {
         }}
       />
       <AuftragErteilenModal
-        offen={auftragMeldung !== null}
         meldung={auftragMeldung}
         abschnitte={auftragsZiele.abschnitte}
         einheiten={auftragsZiele.einheiten}

@@ -9,18 +9,16 @@ import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import type { Auftrag, NeuerAuftrag } from '../api/types';
 import {
-  AUFTRAG_STATUS, GRUPPE_LABEL, GRUPPE_ORDNUNG, faelligGruppe, istAbgeschlossen,
+  AUFTRAG_STATUS, GRUPPE_LABEL, GRUPPE_ORDNUNG, faelligGruppe, istAbgeschlossen, prioRang,
   type FaelligGruppe,
 } from '../kommunikation';
 import AuftragListe from '../auftraege/AuftragListe';
 import AuftragFormular from '../auftraege/AuftragFormular';
 import VollzugMeldenModal from '../auftraege/VollzugMeldenModal';
 
-const PRIO_ORDNUNG: Record<string, number> = { sofort: 0, dringend: 1, normal: 2 };
-
 /** Offene Aufträge: nach Prio (sofort→dringend→normal), dann Frist (früheste zuerst). */
 function vergleicheOffen(a: Auftrag, b: Auftrag): number {
-  const prio = (PRIO_ORDNUNG[a.prioritaet] ?? 99) - (PRIO_ORDNUNG[b.prioritaet] ?? 99);
+  const prio = prioRang(a.prioritaet) - prioRang(b.prioritaet);
   if (prio !== 0) return prio;
   return (a.frist_at ?? '￿').localeCompare(b.frist_at ?? '￿');
 }
