@@ -1,6 +1,8 @@
-import { PaperClipOutlined } from '@ant-design/icons';
-import { Button, List, Popover, Space, Tag, Typography } from 'antd';
+import { MoreOutlined, PaperClipOutlined } from '@ant-design/icons';
+import { Button, Dropdown, List, Popconfirm, Popover, Space, Tag, Tooltip, Typography } from 'antd';
+import type { MenuProps } from 'antd';
 import type { BezugTyp, ChatNachricht } from '../api/types';
+import { formatZeit, formatZeitKurz } from '../kommunikation';
 import type { BezugKurzinfo } from './bezug';
 
 /** Menschlich lesbare Dateigröße. */
@@ -43,40 +45,69 @@ export default function NachrichtenStrom({
         const heraufgestuft = n.etb_eintrag_id !== null;
         const heraufgestuftZuAuftrag = n.auftrag_id !== null;
         const hatBezug = n.bezug_typ !== null && n.bezug_id !== null;
+        // Aktionen kompakt in ein „⋯"-Dropdown gruppieren statt als Reihe von
+        // type=link-Buttons. Geloeschte/Tombstone-Nachrichten zeigen keine Aktionen.
+        const menuItems: MenuProps['items'] = geloescht
+          ? []
+          : [
+              ...(darfSchreiben && !heraufgestuft
+                ? [{ key: 'hoch', label: 'Zu ETB', onClick: () => onHeraufstufen(n) }]
+                : []),
+              ...(darfSchreiben && !heraufgestuftZuAuftrag
+                ? [{ key: 'auftrag', label: 'Zu Auftrag', onClick: () => onHeraufstufenAuftrag(n) }]
+                : []),
+              ...(darfSchreiben && onBezugSetzen
+                ? [{ key: 'bezug', label: hatBezug ? 'Bezug ändern' : 'Bezug', onClick: () => onBezugSetzen(n) }]
+                : []),
+              ...(eigene && darfSchreiben
+                ? [
+                    { key: 'edit', label: 'Bearbeiten', onClick: () => onBearbeiten(n) },
+                    {
+                      key: 'del',
+                      danger: true,
+                      // Lösch-Bestätigung: Popconfirm im Label, das Klick-Event stoppt das
+                      // Auto-Schließen des Menüs, damit die Bestätigungsblase erscheint.
+                      label: (
+                        <Popconfirm
+                          title="Nachricht wirklich löschen?"
+                          okText="Ja, löschen"
+                          cancelText="Abbrechen"
+                          okButtonProps={{ danger: true }}
+                          onConfirm={() => onLoeschen(n)}
+                        >
+                          <span onClick={(e) => e.stopPropagation()}>Löschen</span>
+                        </Popconfirm>
+                      ),
+                    },
+                  ]
+                : []),
+            ];
         return (
           <List.Item
             actions={
-              geloescht
-                ? []
-                : [
-                    ...(darfSchreiben && !heraufgestuft
-                      ? [<Button key="hoch" type="link" size="small" onClick={() => onHeraufstufen(n)}>Zu ETB</Button>]
-                      : []),
-                    ...(darfSchreiben && !heraufgestuftZuAuftrag
-                      ? [<Button key="auftrag" type="link" size="small" onClick={() => onHeraufstufenAuftrag(n)}>Zu Auftrag</Button>]
-                      : []),
-                    ...(darfSchreiben && onBezugSetzen
-                      ? [<Button key="bezug" type="link" size="small" onClick={() => onBezugSetzen(n)}>
-                          {hatBezug ? 'Bezug ändern' : 'Bezug'}
-                        </Button>]
-                      : []),
-                    ...(eigene && darfSchreiben
-                      ? [
-                          <Button key="edit" type="link" size="small" onClick={() => onBearbeiten(n)}>Bearbeiten</Button>,
-                          <Button key="del" type="link" size="small" danger onClick={() => onLoeschen(n)}>Löschen</Button>,
-                        ]
-                      : []),
+              menuItems && menuItems.length > 0
+                ? [
+                    <Dropdown key="aktionen" trigger={['click']} menu={{ items: menuItems }}>
+                      <Button type="text" size="small" aria-label="Aktionen" icon={<MoreOutlined />} />
+                    </Dropdown>,
                   ]
+                : []
             }
           >
             <List.Item.Meta
               title={
                 <Space size="small">
                   <Typography.Text strong>{n.autor_name}</Typography.Text>
-                  <Typography.Text type="secondary" style={{ fontWeight: 'normal', fontSize: 12 }}>
-                    {n.erstellt_at}
-                  </Typography.Text>
-                  {n.bearbeitet_at && <Tag>bearbeitet</Tag>}
+                  <Tooltip title={formatZeit(n.erstellt_at)}>
+                    <Typography.Text type="secondary" style={{ fontWeight: 'normal', fontSize: 12 }}>
+                      {formatZeitKurz(n.erstellt_at)}
+                    </Typography.Text>
+                  </Tooltip>
+                  {n.bearbeitet_at && (
+                    <Tooltip title={`bearbeitet am ${formatZeit(n.bearbeitet_at)}`}>
+                      <Tag>bearbeitet</Tag>
+                    </Tooltip>
+                  )}
                   {heraufgestuft && <Tag color="blue">heraufgestuft zu ETB</Tag>}
                   {heraufgestuftZuAuftrag && <Tag color="geekblue">heraufgestuft zu Auftrag</Tag>}
                   {!geloescht && hatBezug && bezugLabel && (() => {

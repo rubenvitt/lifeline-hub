@@ -164,7 +164,8 @@ describe('ChatPage', () => {
     );
 
     expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Bezug' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Bezug' }));
     const comboboxen = screen.getAllByRole('combobox');
     await userEvent.click(comboboxen[0]);
     await userEvent.click(await screen.findByText('Schaden'));
@@ -200,7 +201,8 @@ describe('ChatPage', () => {
     );
 
     expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Bearbeiten' }));
     const feld = await screen.findByDisplayValue('Erste Lage');
     await userEvent.clear(feld);
     await userEvent.type(feld, 'Lage korrigiert');
@@ -209,6 +211,42 @@ describe('ChatPage', () => {
     await waitFor(() => expect(bearbeitet).not.toBeNull());
     expect(bearbeitet!.inhalt).toBe('Lage korrigiert');
     expect(await screen.findByText('Lage korrigiert')).toBeInTheDocument();
+  });
+
+  it('zeigt bei abgeschlossenem Einsatz einen Read-only-Hinweis statt der Eingabe', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () => HttpResponse.json({ ...einsatz, status: 'abgeschlossen' })),
+      http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
+      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json([nachricht])),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes><Route path="/einsaetze/:id/chat" element={<ChatPage />} /></Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/7/chat' },
+    );
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    expect(screen.getByText(/nur bei aktivem Einsatz/i)).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Nachricht…')).not.toBeInTheDocument();
+  });
+
+  it('zeigt ohne Führungsrolle einen Read-only-Hinweis (Einsatz aktiv)', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () => HttpResponse.json({ ...einsatz, meine_rolle: 'beobachter' })),
+      http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
+      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json([nachricht])),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes><Route path="/einsaetze/:id/chat" element={<ChatPage />} /></Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/7/chat' },
+    );
+    expect(await screen.findByText('Erste Lage')).toBeInTheDocument();
+    expect(screen.getByText(/Einsatzleitung und dem Führungspersonal vorbehalten/i)).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Nachricht…')).not.toBeInTheDocument();
   });
 
   it('lädt einen Anhang hoch und sendet die Nachricht mit anhang_ids', async () => {

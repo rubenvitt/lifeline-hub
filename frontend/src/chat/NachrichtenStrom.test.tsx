@@ -30,7 +30,8 @@ describe('NachrichtenStrom', () => {
         eigeneBenutzerId={1} darfSchreiben onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={vi.fn()} onHeraufstufenAuftrag={vi.fn()} />,
     );
     expect(screen.getByText('Nachricht gelöscht')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
+    // Tombstone hat kein Aktions-Dropdown.
+    expect(screen.queryByRole('button', { name: 'Aktionen' })).not.toBeInTheDocument();
   });
 
   it('zeigt ETB-Badge bei heraufgestufter Nachricht', () => {
@@ -41,13 +42,15 @@ describe('NachrichtenStrom', () => {
     expect(screen.getByText(/heraufgestuft zu ETB/i)).toBeInTheDocument();
   });
 
-  it('zeigt Auftrag-Badge bei zu Auftrag heraufgestufter Nachricht und blendet „Zu Auftrag" aus', () => {
+  it('zeigt Auftrag-Badge bei zu Auftrag heraufgestufter Nachricht und blendet „Zu Auftrag" aus', async () => {
     renderMitProviders(
       <NachrichtenStrom nachrichten={[nachricht({ auftrag_id: 7 })]} eigeneBenutzerId={1} darfSchreiben
         onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={vi.fn()} onHeraufstufenAuftrag={vi.fn()} />,
     );
     expect(screen.getByText(/heraufgestuft zu Auftrag/i)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Zu Auftrag' })).not.toBeInTheDocument();
+    // Dropdown öffnen und prüfen, dass „Zu Auftrag" fehlt.
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen' }));
+    expect(screen.queryByRole('menuitem', { name: 'Zu Auftrag' })).not.toBeInTheDocument();
   });
 
   it('blendet Bearbeiten/Löschen bei fehlendem Schreibrecht aus (eigene Nachricht)', () => {
@@ -55,8 +58,8 @@ describe('NachrichtenStrom', () => {
       <NachrichtenStrom nachrichten={[nachricht({ autor_id: 1 })]} eigeneBenutzerId={1} darfSchreiben={false}
         onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={vi.fn()} onHeraufstufenAuftrag={vi.fn()} />,
     );
-    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
+    // Ohne Schreibrecht bleibt die Aktionsliste leer → kein Dropdown-Trigger.
+    expect(screen.queryByRole('button', { name: 'Aktionen' })).not.toBeInTheDocument();
   });
 
   it('Aktionen nur an eigenen Nachrichten; Heraufstufen löst Callback aus', async () => {
@@ -67,9 +70,13 @@ describe('NachrichtenStrom', () => {
         eigeneBenutzerId={1} darfSchreiben
         onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={onHeraufstufen} onHeraufstufenAuftrag={vi.fn()} />,
     );
-    expect(screen.getAllByRole('button', { name: 'Löschen' })).toHaveLength(1);
-    const hochButtons = screen.getAllByRole('button', { name: 'Zu ETB' });
-    await userEvent.click(hochButtons[0]);
+    // Beide Nachrichten haben ein Dropdown (Zu ETB/Auftrag/Bezug brauchen nur darfSchreiben),
+    // aber „Löschen" nur die eigene (id 1, erstes Dropdown).
+    const trigger = screen.getAllByRole('button', { name: 'Aktionen' });
+    expect(trigger).toHaveLength(2);
+    await userEvent.click(trigger[0]);
+    expect(screen.getByRole('menuitem', { name: 'Löschen' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Zu ETB' }));
     expect(onHeraufstufen).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
   });
 
@@ -79,8 +86,24 @@ describe('NachrichtenStrom', () => {
       <NachrichtenStrom nachrichten={[nachricht({ id: 5 })]} eigeneBenutzerId={1} darfSchreiben
         onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={vi.fn()} onHeraufstufenAuftrag={onHeraufstufenAuftrag} />,
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Zu Auftrag' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Zu Auftrag' }));
     expect(onHeraufstufenAuftrag).toHaveBeenCalledWith(expect.objectContaining({ id: 5 }));
+  });
+
+  it('„Löschen" verlangt Bestätigung via Popconfirm, bevor onLoeschen feuert', async () => {
+    const onLoeschen = vi.fn();
+    renderMitProviders(
+      <NachrichtenStrom nachrichten={[nachricht({ id: 5, autor_id: 1 })]} eigeneBenutzerId={1} darfSchreiben
+        onBearbeiten={vi.fn()} onLoeschen={onLoeschen} onHeraufstufen={vi.fn()} onHeraufstufenAuftrag={vi.fn()} />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen' }));
+    // Popconfirm-Trigger ist der Text im Menüeintrag (stoppt das Auto-Schließen des Menüs).
+    await userEvent.click(screen.getByText('Löschen'));
+    // Noch nicht gelöscht – erst die Bestätigung.
+    expect(onLoeschen).not.toHaveBeenCalled();
+    await userEvent.click(await screen.findByRole('button', { name: 'Ja, löschen' }));
+    expect(onLoeschen).toHaveBeenCalledWith(expect.objectContaining({ id: 5 }));
   });
 
   it('zeigt den Sachbezug als Tag mit aufgelöstem Label', () => {
@@ -113,7 +136,8 @@ describe('NachrichtenStrom', () => {
         bezugLabel={() => 'x'} onBezugSetzen={onBezugSetzen} onBezugLoeschen={vi.fn()}
         onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={vi.fn()} onHeraufstufenAuftrag={vi.fn()} />,
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Bezug' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Bezug' }));
     expect(onBezugSetzen).toHaveBeenCalledWith(expect.objectContaining({ id: 9 }));
 
     rerender(
@@ -121,7 +145,8 @@ describe('NachrichtenStrom', () => {
         bezugLabel={() => 'x'} onBezugSetzen={onBezugSetzen} onBezugLoeschen={vi.fn()}
         onBearbeiten={vi.fn()} onLoeschen={vi.fn()} onHeraufstufen={vi.fn()} onHeraufstufenAuftrag={vi.fn()} />,
     );
-    expect(screen.getByRole('button', { name: 'Bezug ändern' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen' }));
+    expect(screen.getByRole('menuitem', { name: 'Bezug ändern' })).toBeInTheDocument();
   });
 
   it('öffnet bei Klick auf den Bezug-Tag ein Popover mit Kurzinfo', async () => {
