@@ -11,7 +11,6 @@ pub enum UhsTyp {
     Patientenablage,
     Behandlungsplatz,
     Verletztensammelstelle,
-    Bereitstellungsraum,
     Sonstige,
 }
 
@@ -21,7 +20,6 @@ impl UhsTyp {
             UhsTyp::Patientenablage => "patientenablage",
             UhsTyp::Behandlungsplatz => "behandlungsplatz",
             UhsTyp::Verletztensammelstelle => "verletztensammelstelle",
-            UhsTyp::Bereitstellungsraum => "bereitstellungsraum",
             UhsTyp::Sonstige => "sonstige",
         }
     }
@@ -31,7 +29,6 @@ impl UhsTyp {
             "patientenablage" => Some(UhsTyp::Patientenablage),
             "behandlungsplatz" => Some(UhsTyp::Behandlungsplatz),
             "verletztensammelstelle" => Some(UhsTyp::Verletztensammelstelle),
-            "bereitstellungsraum" => Some(UhsTyp::Bereitstellungsraum),
             "sonstige" => Some(UhsTyp::Sonstige),
             _ => None,
         }
@@ -43,7 +40,6 @@ impl UhsTyp {
             UhsTyp::Patientenablage => "Patientenablage",
             UhsTyp::Behandlungsplatz => "Behandlungsplatz",
             UhsTyp::Verletztensammelstelle => "Verletztensammelstelle",
-            UhsTyp::Bereitstellungsraum => "Bereitstellungsraum",
             UhsTyp::Sonstige => "Sonstige",
         }
     }
@@ -268,10 +264,11 @@ mod tests {
     #[test]
     fn uhs_typ_roundtrip() {
         for t in ["patientenablage", "behandlungsplatz", "verletztensammelstelle",
-                  "bereitstellungsraum", "sonstige"] {
+                  "sonstige"] {
             assert_eq!(UhsTyp::parse(t).unwrap().as_str(), t);
         }
         assert!(UhsTyp::parse("zeltkrankenhaus").is_none());
+        assert!(UhsTyp::parse("bereitstellungsraum").is_none());
         assert_eq!(UhsTyp::parse("behandlungsplatz").unwrap().anzeige_label(), "Behandlungsplatz");
     }
 
