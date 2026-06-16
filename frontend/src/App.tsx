@@ -39,9 +39,6 @@ import { modulRegistry } from './einsatz/modulRegistry';
 
 const LagekartePage = lazy(() => import('./pages/LagekartePage'));
 const KraefteuebersichtPage = lazy(() => import('./pages/KraefteuebersichtPage'));
-// DEV-only: Design-Vorschau der Aufträge-Ansicht mit Mock-Daten (kein Backend/Auth).
-const AuftraegePreview = lazy(() => import('./pages/preview/AuftraegePreview'));
-const AuftraegePreviewNeu = lazy(() => import('./pages/preview/AuftraegePreviewNeu'));
 
 /**
  * Module mit echter Implementierung; alle übrigen rendern den ModulStub.
@@ -86,16 +83,6 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      {import.meta.env.DEV && (
-        <Route path="/preview/auftraege" element={
-          <Suspense fallback={<div style={{ padding: 24 }}>Vorschau lädt…</div>}><AuftraegePreview /></Suspense>
-        } />
-      )}
-      {import.meta.env.DEV && (
-        <Route path="/preview/auftraege-neu" element={
-          <Suspense fallback={<div style={{ padding: 24 }}>Vorschau lädt…</div>}><AuftraegePreviewNeu /></Suspense>
-        } />
-      )}
       <Route element={<RequireAuth />}>
         {/* Ebene 1 — globale Shell */}
         <Route element={<AppLayout />}>
