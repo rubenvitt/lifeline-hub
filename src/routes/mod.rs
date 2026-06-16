@@ -16,6 +16,7 @@ pub mod einsatz_tier;
 pub mod einsatz_personal;
 pub mod einsatz_einheit;
 pub mod einsatz_uhs;
+pub mod einsatz_bereitstellungsraum;
 pub mod einsatzabschnitt;
 pub mod erinnerung;
 pub mod etb;
