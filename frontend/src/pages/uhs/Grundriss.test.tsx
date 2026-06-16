@@ -94,3 +94,24 @@ describe('Grundriss – Zurückweisen (LFH-17)', () => {
     expect(screen.queryByRole('button', { name: 'zurückweisen' })).not.toBeInTheDocument();
   });
 });
+
+describe('Grundriss – Plätze nach Typ anlegen (LFH-16)', () => {
+  it('legt über Typ + Menge mehrere Plätze an (Bulk, ohne Namensvergabe)', async () => {
+    const uhs = uhsDetail({ plaetze: [] });
+    let body: { typ?: string; menge?: number } | null = null;
+    server.use(
+      http.post('/api/einsaetze/1/uhs/1/plaetze/bulk', async ({ request }) => {
+        body = (await request.json()) as { typ?: string; menge?: number };
+        return HttpResponse.json([]);
+      }),
+    );
+    renderGrundriss(uhs, []);
+    await userEvent.click(screen.getByRole('button', { name: '+ Platz' }));
+    const menge = await screen.findByRole('spinbutton', { name: 'Menge' });
+    await userEvent.clear(menge);
+    await userEvent.type(menge, '3');
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body).toEqual({ typ: 'bett', menge: 3 });
+  });
+});

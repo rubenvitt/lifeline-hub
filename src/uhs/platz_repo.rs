@@ -70,6 +70,44 @@ pub async fn anlegen(pool: &SqlitePool, uhs_id: i64, neu: NeuerPlatz<'_>) -> Res
     laden(pool, uhs_id, id).await
 }
 
+/// Legt `menge` Plätze desselben Typs mit automatisch fortlaufenden Bezeichnungen
+/// `"<label> <n>"` an (LFH-16: „nach Typ anlegen statt jedes Mal einen Namen vergeben").
+/// `n` setzt hinter der höchsten bereits vergebenen Nummer dieses Labels fort — auch
+/// **stornierte** Zeilen zählen mit, weil `UNIQUE(uhs_id, bezeichnung)` Soft-Deletes
+/// umfasst und eine wiederverwendete Nummer sonst kollidiert. Rückgabe in Anlegereihenfolge.
+pub async fn anlegen_bulk(
+    pool: &SqlitePool,
+    uhs_id: i64,
+    typ: &str,
+    label: &str,
+    menge: i64,
+) -> Result<Vec<PlatzAnzeige>, AppError> {
+    let praefix = format!("{label} ");
+    let bestehende: Vec<String> = sqlx::query_scalar(
+        "SELECT bezeichnung FROM uhs_platz WHERE uhs_id = ? AND bezeichnung LIKE ?",
+    )
+    .bind(uhs_id)
+    .bind(format!("{praefix}%"))
+    .fetch_all(pool)
+    .await?;
+    let mut max = 0_i64;
+    for b in &bestehende {
+        if let Some(rest) = b.strip_prefix(&praefix) {
+            if let Ok(n) = rest.trim().parse::<i64>() {
+                max = max.max(n);
+            }
+        }
+    }
+    let mut neue = Vec::with_capacity(menge.max(0) as usize);
+    for i in 1..=menge {
+        let bezeichnung = format!("{label} {}", max + i);
+        neue.push(
+            anlegen(pool, uhs_id, NeuerPlatz { typ, bezeichnung: &bezeichnung, pos_x: None, pos_y: None }).await?,
+        );
+    }
+    Ok(neue)
+}
+
 /// Aktualisiert Stamm/Layout eines Platzes (NICHT Verfügbarkeit — eigene Funktion).
 /// `Some(None)` = explizites NULL; `None` = unverändert.
 pub async fn aktualisiere(
@@ -319,6 +357,34 @@ mod tests {
         let err = storniere(&pool, u, p.id).await.unwrap_err();
         assert!(matches!(err, AppError::Conflict(_)));
         let _ = b;
+    }
+
+    #[tokio::test]
+    async fn anlegen_bulk_nummeriert_fortlaufend_inkl_storno() {
+        let pool = test_pool().await;
+        let (_b, _e, u, _, _) = setup(&pool).await;
+        let erste = anlegen_bulk(&pool, u, "bett", "Bett", 2).await.unwrap();
+        assert_eq!(
+            erste.iter().map(|p| p.bezeichnung.clone()).collect::<Vec<_>>(),
+            vec!["Bett 1", "Bett 2"]
+        );
+        // Bett 1 stornieren — Nummerierung darf die Lücke NICHT wiederverwenden
+        // (UNIQUE umfasst stornierte Zeilen).
+        storniere(&pool, u, erste[0].id).await.unwrap();
+        let zweite = anlegen_bulk(&pool, u, "bett", "Bett", 2).await.unwrap();
+        assert_eq!(
+            zweite.iter().map(|p| p.bezeichnung.clone()).collect::<Vec<_>>(),
+            vec!["Bett 3", "Bett 4"]
+        );
+    }
+
+    #[tokio::test]
+    async fn anlegen_bulk_zaehlt_je_typ_label_getrennt() {
+        let pool = test_pool().await;
+        let (_b, _e, u, _, _) = setup(&pool).await;
+        anlegen_bulk(&pool, u, "bett", "Bett", 2).await.unwrap();
+        let intensiv = anlegen_bulk(&pool, u, "intensivplatz", "Intensivplatz", 1).await.unwrap();
+        assert_eq!(intensiv[0].bezeichnung, "Intensivplatz 1");
     }
 
     #[tokio::test]

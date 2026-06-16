@@ -173,6 +173,7 @@ pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
         .route("/api/einsaetze/{id}/uhs/{uid}/status", post(routes::einsatz_uhs::status_wechsel))
         .route("/api/einsaetze/{id}/uhs/{uid}", delete(routes::einsatz_uhs::stornieren))
         .route("/api/einsaetze/{id}/uhs/{uid}/plaetze", post(routes::einsatz_uhs::platz_anlegen))
+        .route("/api/einsaetze/{id}/uhs/{uid}/plaetze/bulk", post(routes::einsatz_uhs::plaetze_bulk_anlegen))
         .route("/api/einsaetze/{id}/uhs/{uid}/plaetze/{pid}", patch(routes::einsatz_uhs::platz_aktualisieren))
         .route("/api/einsaetze/{id}/uhs/{uid}/plaetze/{pid}/verfuegbarkeit",
                post(routes::einsatz_uhs::platz_verfuegbarkeit))

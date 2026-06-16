@@ -1,12 +1,12 @@
-import { App, Button, Card, Dropdown, Popconfirm, Space, Tag, Typography } from 'antd';
+import { App, Button, Card, Dropdown, InputNumber, Select, Space, Tag, Typography } from 'antd';
 import { DndContext, useDraggable, useDroppable, type DragEndEvent, KeyboardSensor, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import {
-  aenderePersonBelegung, aktualisierePlatz, legePlatzAn, setzePlatzVerfuegbarkeit, stornierePlatz,
+  aenderePersonBelegung, aktualisierePlatz, legePlaetzeAn, setzePlatzVerfuegbarkeit, stornierePlatz,
 } from '../../api/einsatzUhs';
 import { listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
-import type { Person, UhsDetail, UhsPlatz, Verfuegbarkeit } from '../../api/types';
+import type { Person, PlatzTyp, UhsDetail, UhsPlatz, Verfuegbarkeit } from '../../api/types';
 import PersonenOhneUhsSidebar from './PersonenOhneUhsSidebar';
 import { ApiError } from '../../api/client';
 
@@ -246,28 +246,52 @@ export default function Grundriss({
   );
 }
 
+const PLATZ_TYPEN: { value: PlatzTyp; label: string }[] = [
+  { value: 'wartebereich', label: 'Wartebereich' },
+  { value: 'behandlungsplatz', label: 'Behandlungsplatz' },
+  { value: 'bett', label: 'Bett' },
+  { value: 'intensivplatz', label: 'Intensivplatz' },
+  { value: 'trage', label: 'Trage' },
+  { value: 'transport_bereitstellung', label: 'Transport-Bereitstellung' },
+  { value: 'sonstige', label: 'Sonstige' },
+];
+
+// LFH-16: Plätze nach Typ + Menge anlegen — Bezeichnungen vergibt der Server
+// automatisch fortlaufend („Bett 1", „Bett 2", …), keine manuelle Namensvergabe.
 function NeuerPlatzKnopf({ einsatzId, uhsId, onSuccess }: { einsatzId: number; uhsId: number; onSuccess: () => void }) {
   const { message } = App.useApp();
   const [open, setOpen] = useState(false);
-  const [bez, setBez] = useState('');
+  const [typ, setTyp] = useState<PlatzTyp>('bett');
+  const [menge, setMenge] = useState(1);
   const mut = useMutation({
-    mutationFn: () => legePlatzAn(einsatzId, uhsId, { typ: 'bett', bezeichnung: bez }),
-    onSuccess: () => { message.success('Platz angelegt'); setBez(''); setOpen(false); onSuccess(); },
+    mutationFn: () => legePlaetzeAn(einsatzId, uhsId, { typ, menge }),
+    onSuccess: (plaetze) => {
+      message.success(plaetze.length === 1 ? 'Platz angelegt' : `${plaetze.length} Plätze angelegt`);
+      setMenge(1); setOpen(false); onSuccess();
+    },
     onError: (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Anlegen fehlgeschlagen'),
   });
+  if (!open) {
+    return <Button style={{ marginTop: 8 }} onClick={() => setOpen(true)}>+ Platz</Button>;
+  }
   return (
-    <Popconfirm
-      title="Neuen Platz anlegen"
-      description={
-        <input value={bez} onChange={(e) => setBez(e.target.value)}
-               placeholder="Bezeichnung (z. B. Bett 3)" autoFocus />
-      }
-      open={open}
-      onOpenChange={setOpen}
-      onConfirm={() => mut.mutate()}
-      okButtonProps={{ disabled: !bez.trim() }}
-    >
-      <Button style={{ marginTop: 8 }}>+ Platz</Button>
-    </Popconfirm>
+    <Space style={{ marginTop: 8 }} align="center" wrap>
+      <Select<PlatzTyp>
+        value={typ}
+        onChange={setTyp}
+        options={PLATZ_TYPEN}
+        style={{ width: 200 }}
+        aria-label="Platz-Typ"
+      />
+      <InputNumber
+        min={1}
+        max={50}
+        value={menge}
+        onChange={(v) => setMenge(v ?? 1)}
+        aria-label="Menge"
+      />
+      <Button type="primary" loading={mut.isPending} onClick={() => mut.mutate()}>Anlegen</Button>
+      <Button onClick={() => setOpen(false)}>Abbrechen</Button>
+    </Space>
   );
 }

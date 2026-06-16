@@ -134,6 +134,20 @@ impl PlatzTyp {
             _ => None,
         }
     }
+
+    /// Anzeige-Label, Basis für automatisch generierte Platz-Bezeichnungen
+    /// („Bett 1", „Intensivplatz 1", …) bei der Typ-basierten Bulk-Anlage (LFH-16).
+    pub fn anzeige_label(&self) -> &'static str {
+        match self {
+            PlatzTyp::Wartebereich => "Wartebereich",
+            PlatzTyp::Behandlungsplatz => "Behandlungsplatz",
+            PlatzTyp::Bett => "Bett",
+            PlatzTyp::Intensivplatz => "Intensivplatz",
+            PlatzTyp::Trage => "Trage",
+            PlatzTyp::TransportBereitstellung => "Transport-Bereitstellung",
+            PlatzTyp::Sonstige => "Sonstige",
+        }
+    }
 }
 
 /// Verfügbarkeit eines Platzes (getrennt von Belegung). String = CHECK in
