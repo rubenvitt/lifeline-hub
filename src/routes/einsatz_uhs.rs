@@ -227,8 +227,14 @@ pub async fn aktualisieren(
     fordere_schreibrecht(rolle)?;
     fordere_aktiv(&einsatz)?;
 
-    // lat/lon als Paar: Effektivzustand nach dem Patch prüfen (422 statt 500).
     let vorher = uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?; // 404 falls fremd
+    if vorher.storniert_at.is_some() {
+        return Err(AppError::Conflict(
+            "Stornierte UHS kann nicht geändert werden".into(),
+        ));
+    }
+
+    // lat/lon als Paar: Effektivzustand nach dem Patch prüfen (422 statt 500).
     let eff_lat = match body.lat { Some(opt) => opt, None => vorher.lat };
     let eff_lon = match body.lon { Some(opt) => opt, None => vorher.lon };
     if eff_lat.is_some() != eff_lon.is_some() {

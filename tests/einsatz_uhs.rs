@@ -830,6 +830,27 @@ async fn verorten_loeschen_setzt_beide_auf_null() {
 }
 
 #[tokio::test]
+async fn patch_auf_storniertem_uhs_ist_409() {
+    let (app, _) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &cookie).await;
+    let (_s, v) = json_request(
+        &app, "POST", &format!("/api/einsaetze/{einsatz}/uhs"), &cookie,
+        Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
+    ).await;
+    let uhs_id = v["id"].as_i64().unwrap();
+    let (s, _) = json_request(
+        &app, "DELETE", &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"), &cookie, None,
+    ).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, _) = json_request(
+        &app, "PATCH", &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"), &cookie,
+        Some(&json!({"bezeichnung": "BHP 99"})),
+    ).await;
+    assert_eq!(s, StatusCode::CONFLICT, "PATCH auf stornierte UHS muss 409 sein (Asymmetrie zu Schaden)");
+}
+
+#[tokio::test]
 async fn verorten_nur_lat_ist_422() {
     let (app, _) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
