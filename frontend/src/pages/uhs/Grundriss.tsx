@@ -1,12 +1,12 @@
-import { App, Button, Card, Dropdown, Popconfirm, Space, Tag, Typography } from 'antd';
+import { App, Button, Card, Dropdown, InputNumber, Select, Space, Tag, Typography } from 'antd';
 import { DndContext, useDraggable, useDroppable, type DragEndEvent, KeyboardSensor, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import {
-  aenderePersonBelegung, aktualisierePlatz, legePlatzAn, setzePlatzVerfuegbarkeit, stornierePlatz,
+  aenderePersonBelegung, aktualisierePlatz, legePlaetzeAn, setzePlatzVerfuegbarkeit, stornierePlatz,
 } from '../../api/einsatzUhs';
 import { listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
-import type { Person, UhsDetail, UhsPlatz, Verfuegbarkeit } from '../../api/types';
+import type { Person, PlatzTyp, UhsDetail, UhsPlatz, Verfuegbarkeit } from '../../api/types';
 import PersonenOhneUhsSidebar from './PersonenOhneUhsSidebar';
 import { ApiError } from '../../api/client';
 
@@ -30,10 +30,11 @@ interface PlatzKarteProps {
   belegtVon: Person | undefined;
   schreibgeschuetzt: boolean;
   onVerfuegbarkeit: (v: Verfuegbarkeit) => void;
+  onAustritt: () => void;
   onStorno: () => void;
 }
 
-function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, onVerfuegbarkeit, onStorno }: PlatzKarteProps) {
+function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, onVerfuegbarkeit, onAustritt, onStorno }: PlatzKarteProps) {
   // Platz-Karte ist sowohl Drop-Target (Personen darauf droppen) als auch
   // Drag-Source (Layout-Verschiebung). Mit @dnd-kit beides am selben Knoten via useDraggable + useDroppable.
   const { attributes, listeners, setNodeRef: setDragRef, transform } = useDraggable({
@@ -49,7 +50,9 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, onVerfuegbarkeit, onS
     top: platz.pos_y ?? 10,
     width: 140,
     border: `2px solid ${VERF_FARBE[platz.verfuegbarkeit]}`,
-    background: isOver ? '#e6f4ff' : 'white',
+    // Belegung ist orthogonal zur Verfügbarkeit (Spec): Verfügbarkeits-Rahmen bleibt,
+    // belegte Plätze werden zusätzlich durch Hintergrund + „belegt"-Tag kenntlich gemacht.
+    background: isOver ? '#e6f4ff' : belegtVon ? '#f0f5ff' : 'white',
     padding: 6,
     borderRadius: 4,
     transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
@@ -71,8 +74,22 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, onVerfuegbarkeit, onS
   return (
     <div ref={setRef} style={style} {...attributes} {...listeners}>
       <Typography.Text strong>{platz.bezeichnung}</Typography.Text>
-      <div><Tag color={VERF_FARBE[platz.verfuegbarkeit]}>{platz.verfuegbarkeit}</Tag></div>
+      <div>
+        <Tag color={VERF_FARBE[platz.verfuegbarkeit]}>{platz.verfuegbarkeit}</Tag>
+        {belegtVon && <Tag color="blue">belegt</Tag>}
+      </div>
       <Personenkarte person={belegtVon} />
+      {belegtVon && !schreibgeschuetzt && (
+        // Person aus dem Platz (und der UHS) zurückweisen = Austritt (Spec-BelegungsArt).
+        <Button
+          size="small"
+          danger
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={onAustritt}
+        >
+          zurückweisen
+        </Button>
+      )}
       {!schreibgeschuetzt && (
         <Dropdown menu={menu} trigger={['click']}>
           {/* stopPropagation: sonst startet eine kleine Mausbewegung beim Klick aufs "…" einen Drag. */}
@@ -155,6 +172,10 @@ export default function Grundriss({
     },
     onSuccess: () => invalidate(), onError: fehler,
   });
+  const austrittMut = useMutation({
+    mutationFn: (personId: number) => aenderePersonBelegung(einsatzId, personId, { art: 'austritt' }),
+    onSuccess: () => invalidate(), onError: fehler,
+  });
   const verfMut = useMutation({
     mutationFn: ({ platzId, verf }: { platzId: number; verf: Verfuegbarkeit }) =>
       setzePlatzVerfuegbarkeit(einsatzId, uhs.id, platzId, verf, null),
@@ -203,6 +224,7 @@ export default function Grundriss({
               belegtVon={belegtAn(p.id)}
               schreibgeschuetzt={schreibgeschuetzt}
               onVerfuegbarkeit={(v) => verfMut.mutate({ platzId: p.id, verf: v })}
+              onAustritt={() => { const b = belegtAn(p.id); if (b) austrittMut.mutate(b.id); }}
               onStorno={() => stornoMut.mutate(p.id)}
             />
           ))}
@@ -224,28 +246,52 @@ export default function Grundriss({
   );
 }
 
+const PLATZ_TYPEN: { value: PlatzTyp; label: string }[] = [
+  { value: 'wartebereich', label: 'Wartebereich' },
+  { value: 'behandlungsplatz', label: 'Behandlungsplatz' },
+  { value: 'bett', label: 'Bett' },
+  { value: 'intensivplatz', label: 'Intensivplatz' },
+  { value: 'trage', label: 'Trage' },
+  { value: 'transport_bereitstellung', label: 'Transport-Bereitstellung' },
+  { value: 'sonstige', label: 'Sonstige' },
+];
+
+// LFH-16: Plätze nach Typ + Menge anlegen — Bezeichnungen vergibt der Server
+// automatisch fortlaufend („Bett 1", „Bett 2", …), keine manuelle Namensvergabe.
 function NeuerPlatzKnopf({ einsatzId, uhsId, onSuccess }: { einsatzId: number; uhsId: number; onSuccess: () => void }) {
   const { message } = App.useApp();
   const [open, setOpen] = useState(false);
-  const [bez, setBez] = useState('');
+  const [typ, setTyp] = useState<PlatzTyp>('bett');
+  const [menge, setMenge] = useState(1);
   const mut = useMutation({
-    mutationFn: () => legePlatzAn(einsatzId, uhsId, { typ: 'bett', bezeichnung: bez }),
-    onSuccess: () => { message.success('Platz angelegt'); setBez(''); setOpen(false); onSuccess(); },
+    mutationFn: () => legePlaetzeAn(einsatzId, uhsId, { typ, menge }),
+    onSuccess: (plaetze) => {
+      message.success(plaetze.length === 1 ? 'Platz angelegt' : `${plaetze.length} Plätze angelegt`);
+      setMenge(1); setOpen(false); onSuccess();
+    },
     onError: (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Anlegen fehlgeschlagen'),
   });
+  if (!open) {
+    return <Button style={{ marginTop: 8 }} onClick={() => setOpen(true)}>+ Platz</Button>;
+  }
   return (
-    <Popconfirm
-      title="Neuen Platz anlegen"
-      description={
-        <input value={bez} onChange={(e) => setBez(e.target.value)}
-               placeholder="Bezeichnung (z. B. Bett 3)" autoFocus />
-      }
-      open={open}
-      onOpenChange={setOpen}
-      onConfirm={() => mut.mutate()}
-      okButtonProps={{ disabled: !bez.trim() }}
-    >
-      <Button style={{ marginTop: 8 }}>+ Platz</Button>
-    </Popconfirm>
+    <Space style={{ marginTop: 8 }} align="center" wrap>
+      <Select<PlatzTyp>
+        value={typ}
+        onChange={setTyp}
+        options={PLATZ_TYPEN}
+        style={{ width: 200 }}
+        aria-label="Platz-Typ"
+      />
+      <InputNumber
+        min={1}
+        max={50}
+        value={menge}
+        onChange={(v) => setMenge(v ?? 1)}
+        aria-label="Menge"
+      />
+      <Button type="primary" loading={mut.isPending} onClick={() => mut.mutate()}>Anlegen</Button>
+      <Button onClick={() => setOpen(false)}>Abbrechen</Button>
+    </Space>
   );
 }

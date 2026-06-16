@@ -227,8 +227,14 @@ pub async fn aktualisieren(
     fordere_schreibrecht(rolle)?;
     fordere_aktiv(&einsatz)?;
 
-    // lat/lon als Paar: Effektivzustand nach dem Patch prüfen (422 statt 500).
     let vorher = uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?; // 404 falls fremd
+    if vorher.storniert_at.is_some() {
+        return Err(AppError::Conflict(
+            "Stornierte UHS kann nicht geändert werden".into(),
+        ));
+    }
+
+    // lat/lon als Paar: Effektivzustand nach dem Patch prüfen (422 statt 500).
     let eff_lat = match body.lat { Some(opt) => opt, None => vorher.lat };
     let eff_lon = match body.lon { Some(opt) => opt, None => vorher.lon };
     if eff_lat.is_some() != eff_lon.is_some() {
@@ -401,6 +407,49 @@ pub async fn platz_anlegen(
     let _ = benutzer; // benutzer.id wird hier nicht persistiert (kein Audit-Feld auf uhs_platz)
     sse_uhs(&state, einsatz_id, uhs_id);
     Ok((StatusCode::CREATED, Json(platz)))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PlatzBulkBody {
+    pub typ: String,
+    pub menge: i64,
+}
+
+/// POST /api/einsaetze/{id}/uhs/{uid}/plaetze/bulk — mehrere Plätze eines Typs mit
+/// automatisch fortlaufenden Bezeichnungen anlegen (LFH-16, „nach Typ statt Name").
+/// KEIN ETB (interne Logistik). SSE.
+pub async fn plaetze_bulk_anlegen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, uhs_id)): Path<(i64, i64)>,
+    Json(body): Json<PlatzBulkBody>,
+) -> Result<(StatusCode, Json<Vec<PlatzAnzeige>>), AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_schreibrecht(rolle)?;
+    fordere_aktiv(&einsatz)?;
+
+    let Some(typ) = PlatzTyp::parse(&body.typ) else {
+        return Err(AppError::Validation("Unbekannter Platz-Typ".into()));
+    };
+    if !(1..=50).contains(&body.menge) {
+        return Err(AppError::UnprocessableEntity(
+            "Menge muss zwischen 1 und 50 liegen".into(),
+        ));
+    }
+    uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?; // 404 falls fremd
+
+    let plaetze = platz_repo::anlegen_bulk(
+        &state.pool,
+        uhs_id,
+        typ.as_str(),
+        typ.anzeige_label(),
+        body.menge,
+    )
+    .await?;
+    let _ = benutzer; // kein Audit-Feld auf uhs_platz
+    sse_uhs(&state, einsatz_id, uhs_id);
+    Ok((StatusCode::CREATED, Json(plaetze)))
 }
 
 #[derive(Debug, Deserialize)]

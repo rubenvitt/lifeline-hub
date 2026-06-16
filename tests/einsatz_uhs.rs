@@ -830,6 +830,71 @@ async fn verorten_loeschen_setzt_beide_auf_null() {
 }
 
 #[tokio::test]
+async fn patch_auf_storniertem_uhs_ist_409() {
+    let (app, _) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &cookie).await;
+    let (_s, v) = json_request(
+        &app, "POST", &format!("/api/einsaetze/{einsatz}/uhs"), &cookie,
+        Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
+    ).await;
+    let uhs_id = v["id"].as_i64().unwrap();
+    let (s, _) = json_request(
+        &app, "DELETE", &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"), &cookie, None,
+    ).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, _) = json_request(
+        &app, "PATCH", &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"), &cookie,
+        Some(&json!({"bezeichnung": "BHP 99"})),
+    ).await;
+    assert_eq!(s, StatusCode::CONFLICT, "PATCH auf stornierte UHS muss 409 sein (Asymmetrie zu Schaden)");
+}
+
+#[tokio::test]
+async fn plaetze_bulk_legt_mehrere_mit_auto_namen_an() {
+    let (app, _) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &cookie).await;
+    let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
+    let (s, v) = json_request(
+        &app, "POST", &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plaetze/bulk"), &cookie,
+        Some(&json!({"typ": "bett", "menge": 3})),
+    ).await;
+    assert_eq!(s, StatusCode::CREATED);
+    let namen: Vec<String> = v.as_array().unwrap().iter()
+        .map(|p| p["bezeichnung"].as_str().unwrap().to_string()).collect();
+    assert_eq!(namen, vec!["Bett 1", "Bett 2", "Bett 3"]);
+}
+
+#[tokio::test]
+async fn plaetze_bulk_unbekannter_typ_ist_400() {
+    let (app, _) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &cookie).await;
+    let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
+    let (s, _) = json_request(
+        &app, "POST", &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plaetze/bulk"), &cookie,
+        Some(&json!({"typ": "zeltbett", "menge": 2})),
+    ).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "unbekannter Platz-Typ → 400 (Validation)");
+}
+
+#[tokio::test]
+async fn plaetze_bulk_menge_null_oder_zu_gross_ist_422() {
+    let (app, _) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &cookie).await;
+    let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
+    for menge in [0, 51] {
+        let (s, _) = json_request(
+            &app, "POST", &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plaetze/bulk"), &cookie,
+            Some(&json!({"typ": "bett", "menge": menge})),
+        ).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "menge {menge} muss 422 sein");
+    }
+}
+
+#[tokio::test]
 async fn verorten_nur_lat_ist_422() {
     let (app, _) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;

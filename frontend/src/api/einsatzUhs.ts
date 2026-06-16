@@ -66,6 +66,19 @@ export function legePlatzAn(einsatzId: number, uhsId: number, daten: PlatzEingab
   return apiSend<UhsPlatz>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/plaetze`, 'POST', daten);
 }
 
+export interface PlatzBulkEingabe {
+  typ: PlatzTyp;
+  menge: number;
+}
+
+/** Legt mehrere Plätze eines Typs an; Bezeichnungen werden server-seitig
+ *  automatisch fortlaufend vergeben (LFH-16). */
+export function legePlaetzeAn(
+  einsatzId: number, uhsId: number, daten: PlatzBulkEingabe,
+): Promise<UhsPlatz[]> {
+  return apiSend<UhsPlatz[]>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/plaetze/bulk`, 'POST', daten);
+}
+
 export interface PlatzPatch {
   bezeichnung?: string;
   pos_x?: number | null;
