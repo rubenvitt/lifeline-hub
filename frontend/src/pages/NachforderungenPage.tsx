@@ -1,4 +1,5 @@
-import { Alert, App, Breadcrumb, Col, Input, Modal, Row, Segmented, Spin, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Card, Flex, Input, Modal, Segmented, Spin, Typography } from 'antd';
+import { CloseOutlined, PlusOutlined, UpOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -22,6 +23,8 @@ export default function NachforderungenPage() {
   const qc = useQueryClient();
 
   const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
+  // Inline-Erfassen-Formular (LFH-112): per Kopf-Button auf-/zugeklappt, kein Drawer/Sidebar.
+  const [formOffen, setFormOffen] = useState(false);
   // Ablehnen-Dialog: Grund (optional) wird erhoben, bevor abgelehnt wird.
   const [ablehnenId, setAblehnenId] = useState<number | null>(null);
   const [ablehnenGrund, setAblehnenGrund] = useState('');
@@ -43,7 +46,7 @@ export default function NachforderungenPage() {
 
   const anlegenMutation = useMutation({
     mutationFn: (d: NeueNachforderung) => legeNachforderungAn(einsatzId, d),
-    onSuccess: () => { invalidiere(); message.success('Nachforderung abgesetzt'); },
+    onSuccess: () => { invalidiere(); message.success('Nachforderung abgesetzt'); setFormOffen(false); },
     onError: fehler,
   });
   const statusMutation = useMutation({
@@ -99,7 +102,7 @@ export default function NachforderungenPage() {
   };
 
   return (
-    <div>
+    <div style={{ maxWidth: 1040, margin: '0 auto' }}>
       <Breadcrumb
         style={{ marginBottom: 12 }}
         items={[
@@ -108,34 +111,66 @@ export default function NachforderungenPage() {
           { title: 'Nachforderung' },
         ]}
       />
-      <Typography.Title level={3} style={{ marginTop: 0 }}>Nachforderung Kräfte/Mittel</Typography.Title>
-      <Row gutter={24}>
-        <Col flex="auto">
-          {nfQuery.isError && (
-            <Alert type="error" showIcon style={{ marginBottom: 12 }} message="Nachforderungen konnten nicht geladen werden" />
-          )}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12, alignItems: 'center' }}>
-            <Segmented
-              value={ansicht}
-              onChange={(v) => setAnsicht(v as 'offen' | 'abgeschlossen')}
-              options={[
-                { value: 'offen', label: `Offen (${offene.length})` },
-                { value: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossene.length})` },
-              ]}
-            />
-          </div>
-          {ansicht === 'offen' ? (
-            <NachforderungListe nachforderungen={offeneSortiert} ansicht="offen" {...listenProps} />
-          ) : (
-            <NachforderungListe nachforderungen={abgeschlosseneSortiert} ansicht="abgeschlossen" {...listenProps} />
-          )}
-        </Col>
+      <Flex justify="space-between" align="center" gap={16} wrap style={{ marginBottom: 16 }}>
+        <div>
+          <Typography.Title level={3} style={{ margin: 0 }}>Nachforderung Kräfte/Mittel</Typography.Title>
+          <Typography.Text type="secondary">
+            {offene.length} offen · {abgeschlossene.length} abgeschlossen
+          </Typography.Text>
+        </div>
         {darfSchreiben && (
-          <Col flex="360px">
-            <NachforderungFormular senden={anlegenMutation.isPending} onAnlegen={(d) => anlegenMutation.mutate(d)} />
-          </Col>
+          <Button
+            type="primary"
+            size="large"
+            icon={formOffen ? <UpOutlined /> : <PlusOutlined />}
+            onClick={() => setFormOffen((o) => !o)}
+          >
+            {formOffen ? 'Formular schließen' : 'Nachforderung anlegen'}
+          </Button>
         )}
-      </Row>
+      </Flex>
+
+      {darfSchreiben && formOffen && (
+        <Card
+          size="small"
+          title="Neue Nachforderung"
+          style={{ marginBottom: 16 }}
+          extra={(
+            <Button
+              type="text"
+              size="small"
+              icon={<CloseOutlined />}
+              onClick={() => setFormOffen(false)}
+              aria-label="Formular schließen"
+            />
+          )}
+        >
+          <NachforderungFormular
+            card={false}
+            senden={anlegenMutation.isPending}
+            onAnlegen={(d) => anlegenMutation.mutate(d)}
+          />
+        </Card>
+      )}
+
+      {nfQuery.isError && (
+        <Alert type="error" showIcon style={{ marginBottom: 12 }} message="Nachforderungen konnten nicht geladen werden" />
+      )}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16, alignItems: 'center' }}>
+        <Segmented
+          value={ansicht}
+          onChange={(v) => setAnsicht(v as 'offen' | 'abgeschlossen')}
+          options={[
+            { value: 'offen', label: `Offen (${offene.length})` },
+            { value: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossene.length})` },
+          ]}
+        />
+      </div>
+      {ansicht === 'offen' ? (
+        <NachforderungListe nachforderungen={offeneSortiert} ansicht="offen" {...listenProps} />
+      ) : (
+        <NachforderungListe nachforderungen={abgeschlosseneSortiert} ansicht="abgeschlossen" {...listenProps} />
+      )}
       <Modal
         open={ablehnenId != null}
         title="Nachforderung ablehnen"

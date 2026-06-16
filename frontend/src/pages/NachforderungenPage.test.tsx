@@ -57,6 +57,8 @@ describe('NachforderungenPage', () => {
     legeNachforderungAn.mockResolvedValue(nf());
     renderPage();
     await screen.findByText('2 RTW zur Verstärkung');
+    // Formular liegt jetzt hinter dem Kopf-Toggle (LFH-112) → erst aufklappen.
+    await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
     await userEvent.type(screen.getByLabelText('Art'), 'SEG');
     await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Eine SEG');
     await userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));

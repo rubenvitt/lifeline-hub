@@ -32,6 +32,7 @@ export default function AuftragAusEtbModal({
       width={520}
     >
       <AuftragFormular
+        card={false}
         senden={senden}
         abschnitte={abschnitte}
         einheiten={einheiten}

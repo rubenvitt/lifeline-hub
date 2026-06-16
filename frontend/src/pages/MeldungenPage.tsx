@@ -1,4 +1,5 @@
-import { Alert, App, Breadcrumb, Col, Row, Segmented, Spin, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Card, Flex, Segmented, Spin, Typography } from 'antd';
+import { CloseOutlined, PlusOutlined, UpOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -54,6 +55,8 @@ export default function MeldungenPage() {
   const [richtungFilter, setRichtungFilter] = useState<string | undefined>(undefined);
   const [auftragMeldung, setAuftragMeldung] = useState<Meldung | null>(null);
   const [lageMeldung, setLageMeldung] = useState<Meldung | null>(null);
+  // Inline-Erfassen-Formular (LFH-112): per Kopf-Button auf-/zugeklappt, kein Drawer/Sidebar.
+  const [formOffen, setFormOffen] = useState(false);
 
   const meldungenQuery = useQuery({
     queryKey: ['einsatz-meldungen', einsatzId, richtungFilter ?? 'alle'],
@@ -65,7 +68,7 @@ export default function MeldungenPage() {
 
   const anlegenMutation = useMutation({
     mutationFn: (d: NeueMeldung) => legeMeldungAn(einsatzId, d),
-    onSuccess: () => { invalidiere(); message.success('Meldung erfasst'); },
+    onSuccess: () => { invalidiere(); message.success('Meldung erfasst'); setFormOffen(false); },
     onError: fehler,
   });
   const statusMutation = useMutation({
@@ -147,7 +150,7 @@ export default function MeldungenPage() {
   };
 
   return (
-    <div>
+    <div style={{ maxWidth: 1040, margin: '0 auto' }}>
       <Breadcrumb
         style={{ marginBottom: 12 }}
         items={[
@@ -156,39 +159,71 @@ export default function MeldungenPage() {
           { title: 'Meldungen (eingehend)' },
         ]}
       />
-      <Typography.Title level={3} style={{ marginTop: 0 }}>Meldungen (eingehend)</Typography.Title>
-      <Row gutter={24}>
-        <Col flex="auto">
-          {meldungenQuery.isError && (
-            <Alert type="error" showIcon style={{ marginBottom: 12 }} message="Meldungen konnten nicht geladen werden" />
-          )}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12, alignItems: 'center' }}>
-            <Segmented
-              value={ansicht}
-              onChange={(v) => setAnsicht(v as 'offen' | 'abgeschlossen')}
-              options={[
-                { value: 'offen', label: `Offen (${offene.length})` },
-                { value: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossene.length})` },
-              ]}
-            />
-            <Segmented
-              value={richtungFilter ?? 'alle'}
-              onChange={(v) => setRichtungFilter(v === 'alle' ? undefined : String(v))}
-              options={[
-                { value: 'alle', label: 'Alle Richtungen' },
-                { value: 'intern', label: 'Intern' },
-                { value: 'extern', label: 'Extern' },
-              ]}
-            />
-          </div>
-          <MeldungListe meldungen={sichtbare} {...listenProps} />
-        </Col>
+      <Flex justify="space-between" align="center" gap={16} wrap style={{ marginBottom: 16 }}>
+        <div>
+          <Typography.Title level={3} style={{ margin: 0 }}>Meldungen (eingehend)</Typography.Title>
+          <Typography.Text type="secondary">
+            {offene.length} offen · {abgeschlossene.length} abgeschlossen
+          </Typography.Text>
+        </div>
         {darfSchreiben && (
-          <Col flex="360px">
-            <MeldungFormular senden={anlegenMutation.isPending} onAnlegen={(d) => anlegenMutation.mutate(d)} />
-          </Col>
+          <Button
+            type="primary"
+            size="large"
+            icon={formOffen ? <UpOutlined /> : <PlusOutlined />}
+            onClick={() => setFormOffen((o) => !o)}
+          >
+            {formOffen ? 'Formular schließen' : 'Meldung erfassen'}
+          </Button>
         )}
-      </Row>
+      </Flex>
+
+      {darfSchreiben && formOffen && (
+        <Card
+          size="small"
+          title="Neue Meldung erfassen"
+          style={{ marginBottom: 16 }}
+          extra={(
+            <Button
+              type="text"
+              size="small"
+              icon={<CloseOutlined />}
+              onClick={() => setFormOffen(false)}
+              aria-label="Formular schließen"
+            />
+          )}
+        >
+          <MeldungFormular
+            card={false}
+            senden={anlegenMutation.isPending}
+            onAnlegen={(d) => anlegenMutation.mutate(d)}
+          />
+        </Card>
+      )}
+
+      {meldungenQuery.isError && (
+        <Alert type="error" showIcon style={{ marginBottom: 12 }} message="Meldungen konnten nicht geladen werden" />
+      )}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16, alignItems: 'center' }}>
+        <Segmented
+          value={ansicht}
+          onChange={(v) => setAnsicht(v as 'offen' | 'abgeschlossen')}
+          options={[
+            { value: 'offen', label: `Offen (${offene.length})` },
+            { value: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossene.length})` },
+          ]}
+        />
+        <Segmented
+          value={richtungFilter ?? 'alle'}
+          onChange={(v) => setRichtungFilter(v === 'alle' ? undefined : String(v))}
+          options={[
+            { value: 'alle', label: 'Alle Richtungen' },
+            { value: 'intern', label: 'Intern' },
+            { value: 'extern', label: 'Extern' },
+          ]}
+        />
+      </div>
+      <MeldungListe meldungen={sichtbare} ansicht={ansicht} {...listenProps} />
       <LagerelevantModal
         offen={lageMeldung !== null}
         meldung={lageMeldung}

@@ -76,8 +76,11 @@ describe('MeldungenPage', () => {
     legeMeldungAn.mockResolvedValue(meldung());
     renderPage();
     await screen.findByText('Florian Nord 1');
+    // Inline-Formular (LFH-112): erst per Kopf-Button aufklappen (Icon → Name „plus …").
+    await userEvent.click(screen.getByRole('button', { name: /Meldung erfassen/ }));
     await userEvent.type(screen.getByLabelText('Absender'), 'RTW 2');
     await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Eingetroffen');
+    // Kopf-Button heißt jetzt „Formular schließen" → exakt „Meldung erfassen" ist der Submit.
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
     await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledWith(1, expect.objectContaining({
       absender: 'RTW 2', inhalt: 'Eingetroffen', meldeweg: 'funk',
@@ -288,9 +291,12 @@ describe('MeldungenPage', () => {
     legeMeldungAn.mockResolvedValue(meldung());
     renderPage();
     await screen.findByText('Florian Nord 1');
+    // Inline-Formular (LFH-112): erst aufklappen (Icon → Name „plus …"), dann Fast-Path + Submit.
+    await userEvent.click(screen.getByRole('button', { name: /Meldung erfassen/ }));
     await userEvent.click(screen.getByRole('button', { name: /Sofortmeldung/ }));
     await userEvent.type(screen.getByLabelText('Absender'), 'RTW 2');
     await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'MANV');
+    // Kopf-Button heißt jetzt „Formular schließen" → exakt „Meldung erfassen" ist der Submit.
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
     await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledWith(1, expect.objectContaining({
       meldungsart: 'sofortmeldung', prioritaet: 'sofort', bestaetigung_pflicht: true,

@@ -33,6 +33,7 @@ export default function AuftragErteilenModal({
       width={520}
     >
       <AuftragFormular
+        card={false}
         senden={senden}
         abschnitte={abschnitte}
         einheiten={einheiten}
