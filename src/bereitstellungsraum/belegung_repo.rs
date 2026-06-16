@@ -36,9 +36,12 @@ pub async fn belege(
     let belegungs_art = BrBelegungsArt::parse(art)
         .ok_or_else(|| AppError::Validation(format!("Unbekannte art: '{art}'")))?;
 
-    // 3. Ziel-BR laden und auf aktiv prüfen (nutzt pool direkt, vor Tx)
+    // 3. Ziel-BR laden und auf aktiv prüfen (nutzt pool direkt, vor Tx).
+    // `repo::laden` liefert auch stornierte BRs; ein stornierter BR behält
+    // `status='aktiv'` (storniere setzt nur storniert_at), daher zusätzlich
+    // `storniert_at IS NULL` fordern — analog UHS (`pruefe_uhs_aktiv`).
     let br = repo::laden(pool, einsatz_id, br_id).await?;
-    if br.status != "aktiv" {
+    if br.status != "aktiv" || br.storniert_at.is_some() {
         return Err(AppError::UnprocessableEntity(format!(
             "Bereitstellungsraum hat Status '{}' — Belegung nur bei aktivem BR möglich",
             br.status
@@ -131,7 +134,7 @@ async fn belege_einheit(
     let aktueller_br_id = cache.ok_or(AppError::NotFound)?;
 
     // 6. Art-Vorbedingung
-    pruefe_art_vorbedingung(&art, aktueller_br_id)?;
+    pruefe_art_vorbedingung(&art, aktueller_br_id, br_id)?;
 
     // 7a. Event-Insert
     let event_id = insert_event(
@@ -189,7 +192,7 @@ async fn belege_fahrzeug(
     }
 
     // 6. Art-Vorbedingung
-    pruefe_art_vorbedingung(&art, aktueller_br_id)?;
+    pruefe_art_vorbedingung(&art, aktueller_br_id, br_id)?;
 
     // 7a. Event-Insert
     let event_id = insert_event(
@@ -221,9 +224,13 @@ async fn belege_fahrzeug(
 /// Prüft die Art-Vorbedingung (Annahme 4 der Spec):
 /// - eintritt: aktueller_br_id muss NULL sein
 /// - wechsel / austritt: aktueller_br_id muss gesetzt sein
+/// - austritt zusätzlich: der übergebene `br_id` muss dem `aktueller_br_id` des
+///   Objekts entsprechen — sonst trägt das Event eine falsche br_id (ETB-Text
+///   „verlässt BR X" wäre falsch). Bei Mismatch `Conflict`.
 fn pruefe_art_vorbedingung(
     art: &BrBelegungsArt,
     aktueller_br_id: Option<i64>,
+    br_id: i64,
 ) -> Result<(), AppError> {
     match art {
         BrBelegungsArt::Eintritt if aktueller_br_id.is_some() => Err(AppError::Conflict(
@@ -235,6 +242,9 @@ fn pruefe_art_vorbedingung(
         )),
         BrBelegungsArt::Austritt if aktueller_br_id.is_none() => Err(AppError::Conflict(
             "Objekt hat keinen aktiven Bereitstellungsraum".into(),
+        )),
+        BrBelegungsArt::Austritt if aktueller_br_id != Some(br_id) => Err(AppError::Conflict(
+            "Objekt ist nicht in diesem Bereitstellungsraum".into(),
         )),
         _ => Ok(()),
     }
@@ -451,6 +461,68 @@ mod tests {
         br_repo::setze_status(&pool, e, br, "aufgeloest", b)
             .await
             .unwrap();
+    }
+
+    // ─── Finding 1: stornierter BR ──────────────────────────────────────────
+
+    #[tokio::test]
+    async fn stornierter_br_akzeptiert_keine_belegung() {
+        let pool = test_pool().await;
+        let (b, e) = basis_setup(&pool).await;
+        let br = aktiven_br(&pool, e, b, "BR Storno").await;
+        let einheit = neue_einheit(&pool, e).await;
+        // BR stornieren: storniert_at gesetzt, status bleibt 'aktiv'
+        br_repo::storniere(&pool, e, br, b).await.unwrap();
+
+        let err = belege(&pool, e, br, "einheit", einheit, "eintritt", None, b)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, AppError::UnprocessableEntity(_)),
+            "stornierter BR → UnprocessableEntity (422), auch wenn status='aktiv'"
+        );
+    }
+
+    // ─── Finding 2: austritt-br_id gegen Cache prüfen ───────────────────────
+
+    #[tokio::test]
+    async fn austritt_mit_falschem_br_id_ist_konflikt() {
+        let pool = test_pool().await;
+        let (b, e) = basis_setup(&pool).await;
+        let br1 = aktiven_br(&pool, e, b, "BR Echt").await;
+        let br2 = aktiven_br(&pool, e, b, "BR Falsch").await;
+        let einheit = neue_einheit(&pool, e).await;
+        belege(&pool, e, br1, "einheit", einheit, "eintritt", None, b)
+            .await
+            .unwrap();
+
+        // Austritt mit br2 angeben, obwohl Einheit in br1 ist → Conflict
+        let err = belege(&pool, e, br2, "einheit", einheit, "austritt", None, b)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, AppError::Conflict(_)),
+            "Austritt mit falschem br_id → Conflict"
+        );
+        // Cache bleibt unangetastet
+        assert_eq!(cache_einheit(&pool, einheit).await, Some(br1));
+    }
+
+    #[tokio::test]
+    async fn austritt_mit_korrektem_br_id_traegt_korrekte_br_id() {
+        let pool = test_pool().await;
+        let (b, e) = basis_setup(&pool).await;
+        let br = aktiven_br(&pool, e, b, "BR Korrekt").await;
+        let einheit = neue_einheit(&pool, e).await;
+        belege(&pool, e, br, "einheit", einheit, "eintritt", None, b)
+            .await
+            .unwrap();
+
+        let ev = belege(&pool, e, br, "einheit", einheit, "austritt", None, b)
+            .await
+            .unwrap();
+        assert_eq!(ev.br_id, br, "Austritt-Event trägt die korrekte br_id");
+        assert_eq!(cache_einheit(&pool, einheit).await, None);
     }
 
     // ─── Fahrzeug-Tests ─────────────────────────────────────────────────────
