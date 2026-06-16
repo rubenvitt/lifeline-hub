@@ -368,7 +368,20 @@ pub async fn belegung(
     {
         etb_system(&state, einsatz_id, benutzer.id, &etb_text).await?;
     }
+
     sse_br(&state, einsatz_id, br_id);
+    // Kräfte-Ansichten (Einheiten/Fahrzeuge) live refetchen lassen: zusätzliches
+    // objekt-typ-spezifisches SSE-Event (string-basiert, analog `person` in UHS).
+    let objekt_event = match event.objekt_typ.as_str() {
+        "einheit" => Some("einheit"),
+        "fahrzeug" => Some("fahrzeug"),
+        _ => None,
+    };
+    if let Some(ev) = objekt_event {
+        let data =
+            serde_json::json!({ "einsatz_id": einsatz_id, "objekt_id": event.objekt_id }).to_string();
+        state.live.publiziere_event(einsatz_id, ev, data);
+    }
     Ok((StatusCode::CREATED, Json(event)))
 }
 
@@ -379,6 +392,8 @@ async fn belegungs_etb_text(
     br_bezeichnung: &str,
     event: &BrBelegungAnzeige,
 ) -> Result<Option<String>, AppError> {
+    // `belege()` hat die Objekt-Existenz bereits geprüft; ein fehlender Name
+    // wäre ein inkonsistenter Zustand → NotFound statt leerer ETB-Text.
     let obj_name = match event.objekt_typ.as_str() {
         "einheit" => sqlx::query_scalar::<_, String>(
             "SELECT name FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
@@ -387,7 +402,7 @@ async fn belegungs_etb_text(
         .bind(einsatz_id)
         .fetch_optional(pool)
         .await?
-        .unwrap_or_default(),
+        .ok_or(AppError::NotFound)?,
         "fahrzeug" => sqlx::query_scalar::<_, String>(
             "SELECT snap_funkrufname FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?",
         )
@@ -395,7 +410,7 @@ async fn belegungs_etb_text(
         .bind(einsatz_id)
         .fetch_optional(pool)
         .await?
-        .unwrap_or_default(),
+        .ok_or(AppError::NotFound)?,
         _ => return Ok(None),
     };
 

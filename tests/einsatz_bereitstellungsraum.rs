@@ -14,16 +14,24 @@ use tower::ServiceExt;
 // ---------- Harness ----------
 
 async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
+    let (router, pool, _live) = setup_mit_live().await;
+    (router, pool)
+}
+
+/// Wie `setup_mit_pool`, gibt aber zusätzlich den `LiveHub` zurück, um in
+/// SSE-Tests Events zu abonnieren.
+async fn setup_mit_live() -> (axum::Router, sqlx::SqlitePool, LiveHub) {
     let pool = db::test_pool().await;
     bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
         .await
         .unwrap();
+    let live = LiveHub::new();
     let router = build_router(AppState {
         pool: pool.clone(),
-        live: LiveHub::new(),
+        live: live.clone(),
         fachebenen: lifeline_hub::karte::FachebenenState::neu(),
     });
-    (router, pool)
+    (router, pool, live)
 }
 
 async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) -> String {
@@ -667,4 +675,168 @@ async fn abgeschlossener_einsatz_blockt_schreibrouten() {
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT, "PATCH bei abgeschlossenem Einsatz");
+}
+
+/// Wechsel: Einheit von BR A nach BR B → 201, Detail B zeigt sie, A nicht.
+#[tokio::test]
+async fn wechsel_verschiebt_einheit_zwischen_br() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br_a = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR A").await;
+    let br_b = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR B").await;
+
+    let einheit_id: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Wechselzug') RETURNING id",
+    )
+    .bind(eid)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    // Eintritt in BR A
+    let (s, _) = json_request(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_a}/belegung"),
+        &cookie,
+        Some(&json!({"objekt_typ": "einheit", "objekt_id": einheit_id, "art": "eintritt"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+
+    // Wechsel nach BR B
+    let (s, _) = json_request(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_b}/belegung"),
+        &cookie,
+        Some(&json!({"objekt_typ": "einheit", "objekt_id": einheit_id, "art": "wechsel"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "Wechsel nach BR B");
+
+    // Detail B zeigt die Einheit
+    let (_, vb) = json_request(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_b}"),
+        &cookie,
+        None,
+    )
+    .await;
+    let einheiten_b = vb["einheiten"].as_array().unwrap();
+    assert_eq!(einheiten_b.len(), 1, "Einheit jetzt in BR B: {vb}");
+    assert_eq!(einheiten_b[0]["id"], einheit_id);
+
+    // Detail A zeigt sie nicht mehr
+    let (_, va) = json_request(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_a}"),
+        &cookie,
+        None,
+    )
+    .await;
+    assert!(
+        va["einheiten"].as_array().unwrap().is_empty(),
+        "Einheit nicht mehr in BR A: {va}"
+    );
+}
+
+/// Belegung einer Einheit feuert ein `einheit`-SSE-Event (+ `bereitstellungsraum`),
+/// damit die Kräfte-Ansicht live refetchen kann.
+#[tokio::test]
+async fn belegung_einheit_feuert_einheit_sse() {
+    let (app, pool, live) = setup_mit_live().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br_id = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR SSE").await;
+
+    let einheit_id: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'SSE-Zug') RETURNING id",
+    )
+    .bind(eid)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    // VOR der Belegung abonnieren, damit das Broadcast-Event ankommt.
+    let mut rx = live.abonniere(eid);
+
+    let (s, _) = json_request(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_id}/belegung"),
+        &cookie,
+        Some(&json!({"objekt_typ": "einheit", "objekt_id": einheit_id, "art": "eintritt"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+
+    // Alle gepufferten Events drainen und auf `einheit` mit objekt_id prüfen.
+    let mut sah_einheit = false;
+    while let Ok(n) = rx.try_recv() {
+        if n.event == "einheit" && n.data.contains(&einheit_id.to_string()) {
+            sah_einheit = true;
+        }
+    }
+    assert!(sah_einheit, "Belegung muss ein `einheit`-SSE-Event mit objekt_id feuern");
+}
+
+/// Belegung eines Fahrzeugs feuert ein `fahrzeug`-SSE-Event.
+#[tokio::test]
+async fn belegung_fahrzeug_feuert_fahrzeug_sse() {
+    let (app, pool, live) = setup_mit_live().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br_id = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR SSE Fz").await;
+
+    let fz_id: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) \
+         VALUES (?, 'Florian 9/99') RETURNING id",
+    )
+    .bind(eid)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    let mut rx = live.abonniere(eid);
+
+    let (s, _) = json_request(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_id}/belegung"),
+        &cookie,
+        Some(&json!({"objekt_typ": "fahrzeug", "objekt_id": fz_id, "art": "eintritt"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+
+    let mut sah_fahrzeug = false;
+    while let Ok(n) = rx.try_recv() {
+        if n.event == "fahrzeug" && n.data.contains(&fz_id.to_string()) {
+            sah_fahrzeug = true;
+        }
+    }
+    assert!(sah_fahrzeug, "Belegung muss ein `fahrzeug`-SSE-Event mit objekt_id feuern");
+}
+
+/// Belegung mit nicht existierendem objekt_id → 404.
+#[tokio::test]
+async fn belegung_unbekanntes_objekt_404() {
+    let (app, _pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &cookie).await;
+    let br_id = br_anlegen_und_aktivieren(&app, &cookie, eid, "BR NF").await;
+
+    let (s, _) = json_request(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{eid}/bereitstellungsraeume/{br_id}/belegung"),
+        &cookie,
+        Some(&json!({"objekt_typ": "einheit", "objekt_id": 99999, "art": "eintritt"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
 }
