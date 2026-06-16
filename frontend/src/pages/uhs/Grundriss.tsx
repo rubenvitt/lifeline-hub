@@ -49,7 +49,9 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, onVerfuegbarkeit, onS
     top: platz.pos_y ?? 10,
     width: 140,
     border: `2px solid ${VERF_FARBE[platz.verfuegbarkeit]}`,
-    background: isOver ? '#e6f4ff' : 'white',
+    // Belegung ist orthogonal zur Verfügbarkeit (Spec): Verfügbarkeits-Rahmen bleibt,
+    // belegte Plätze werden zusätzlich durch Hintergrund + „belegt"-Tag kenntlich gemacht.
+    background: isOver ? '#e6f4ff' : belegtVon ? '#f0f5ff' : 'white',
     padding: 6,
     borderRadius: 4,
     transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
@@ -71,7 +73,10 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, onVerfuegbarkeit, onS
   return (
     <div ref={setRef} style={style} {...attributes} {...listeners}>
       <Typography.Text strong>{platz.bezeichnung}</Typography.Text>
-      <div><Tag color={VERF_FARBE[platz.verfuegbarkeit]}>{platz.verfuegbarkeit}</Tag></div>
+      <div>
+        <Tag color={VERF_FARBE[platz.verfuegbarkeit]}>{platz.verfuegbarkeit}</Tag>
+        {belegtVon && <Tag color="blue">belegt</Tag>}
+      </div>
       <Personenkarte person={belegtVon} />
       {!schreibgeschuetzt && (
         <Dropdown menu={menu} trigger={['click']}>
