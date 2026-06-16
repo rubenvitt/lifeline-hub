@@ -34,4 +34,5 @@ pub mod staerke;
 pub mod static_files;
 pub mod stichwort;
 pub mod tier;
+pub mod bereitstellungsraum;
 pub mod uhs;
