@@ -56,6 +56,7 @@ const EINHEIT_E10 = {
   ist_kumuliert: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
   personal_mitglieder: [], fahrzeug_mitglieder: [], material_mitglieder: [],
   lat: null, lon: null, tz_fachaufgabe: null, tz_organisation: null,
+  aktueller_br_id: null,
 };
 
 const FAHRZEUG_F1 = {
@@ -67,6 +68,7 @@ const FAHRZEUG_F1 = {
   status_farbe: null, bemerkung: null,
   disponiert_at: '2024-01-01T00:00:00', disponiert_von: null,
   lat: null, lon: null, tz_fachaufgabe: null, tz_organisation: null,
+  aktueller_br_id: null,
 };
 
 beforeEach(() => {

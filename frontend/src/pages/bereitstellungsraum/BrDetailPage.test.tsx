@@ -7,7 +7,7 @@ import { server } from '../../test/server';
 import { App as AntApp } from 'antd';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import BrDetailPage from './BrDetailPage';
-import type { BrDetail, EinsatzAnzeige, EinsatzFahrzeug } from '../../api/types';
+import type { BrDetail, EinsatzAnzeige, Einheit, EinsatzFahrzeug } from '../../api/types';
 
 // -------- Fixture-Builder --------
 
@@ -41,6 +41,21 @@ function fahrzeug(over: Partial<EinsatzFahrzeug> = {}): EinsatzFahrzeug {
     status_kategorie: null, status_farbe: null, bemerkung: null,
     disponiert_at: 'x', disponiert_von: null,
     lat: null, lon: null, tz_fachaufgabe: null, tz_organisation: null,
+    aktueller_br_id: null,
+    ...over,
+  };
+}
+
+function einheit(over: Partial<Einheit> = {}): Einheit {
+  return {
+    id: 30, einsatz_id: 1, abschnitt_id: null, abschnitt_name: null,
+    ueber_einheit_id: null, typ_id: null, typ_label: null, name: 'Einheit Beta',
+    fuehrer_id: null, fuehrer_name: null, bemerkung: null, sortier: 0,
+    soll: null, ist: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
+    ist_kumuliert: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
+    personal_mitglieder: [], fahrzeug_mitglieder: [], material_mitglieder: [],
+    lat: null, lon: null, tz_fachaufgabe: null, tz_organisation: null,
+    aktueller_br_id: null,
     ...over,
   };
 }
@@ -135,5 +150,70 @@ describe('BrDetailPage – Sidebar zuweisen (LFH-14)', () => {
 
     await waitFor(() => expect(capturedBody).not.toBeNull());
     expect(capturedBody).toMatchObject({ art: 'eintritt', objekt_typ: 'fahrzeug', objekt_id: 20 });
+  });
+});
+
+describe('BrDetailPage – Sidebar filtert auf aktueller_br_id == null (LFH-14)', () => {
+  it('blendet Kräfte aus, die bereits in einem anderen BR sind', async () => {
+    const br = brDetail({ id: 1, einheiten: [], fahrzeuge: [] });
+    // Eine Einheit in keinem BR (frei), eine in einem ANDEREN BR (br 99).
+    const frei = einheit({ id: 30, name: 'Einheit Frei', aktueller_br_id: null });
+    const anderswo = einheit({ id: 31, name: 'Einheit Anderswo', aktueller_br_id: 99 });
+
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([frei, anderswo])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+    );
+
+    renderBrDetail();
+
+    // Freie Einheit erscheint in der Sidebar …
+    expect(await screen.findByText('Einheit Frei')).toBeInTheDocument();
+    // … die in einem anderen BR darf NICHT erscheinen.
+    expect(screen.queryByText('Einheit Anderswo')).not.toBeInTheDocument();
+  });
+});
+
+describe('BrDetailPage – Schreibschutz (LFH-14)', () => {
+  it('zeigt bei BR-Status geplant keine entfernen-/zuweisen-Buttons', async () => {
+    // geplant → schreibgeschützt; bereitgestellte Einheit + freie Kraft in Sidebar.
+    const br = brDetail({ status: 'geplant', einheiten: [{ id: 10, name: 'Einheit Alpha' }] });
+    const frei = einheit({ id: 30, name: 'Einheit Frei', aktueller_br_id: null });
+
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([frei])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+    );
+
+    renderBrDetail();
+
+    // Kräfte sind sichtbar …
+    expect(await screen.findByText('Einheit Alpha')).toBeInTheDocument();
+    expect(screen.getByText('Einheit Frei')).toBeInTheDocument();
+    // … aber keine Schreibaktionen (entfernen/zuweisen).
+    expect(screen.queryByRole('button', { name: 'entfernen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'zuweisen' })).not.toBeInTheDocument();
+  });
+
+  it('zeigt für Beobachter keine entfernen-/zuweisen-Buttons (BR aktiv)', async () => {
+    const br = brDetail({ status: 'aktiv', einheiten: [{ id: 10, name: 'Einheit Alpha' }] });
+    const frei = einheit({ id: 30, name: 'Einheit Frei', aktueller_br_id: null });
+
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz({ meine_rolle: 'beobachter' }))),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([frei])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+    );
+
+    renderBrDetail();
+
+    expect(await screen.findByText('Einheit Alpha')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'entfernen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'zuweisen' })).not.toBeInTheDocument();
   });
 });

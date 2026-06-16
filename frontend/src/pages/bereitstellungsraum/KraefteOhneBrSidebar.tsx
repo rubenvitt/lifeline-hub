@@ -16,11 +16,10 @@ interface Props {
 }
 
 /**
- * Sidebar: Einheiten und einheitenlose Fahrzeuge, die nicht im aktuellen BR sind.
- *
- * Hinweis (Concern): Einheiten/Fahrzeuge in *anderen aktiven* BRs werden ebenfalls
- * angezeigt, da `aktueller_br_id` nicht im Listen-Response enthalten ist. Ein
- * Klick auf „zuweisen" führt dann zu 422, das als Fehlermeldung angezeigt wird.
+ * Sidebar „Kräfte ohne BR": zeigt Einheiten und einheitenlose Fahrzeuge mit
+ * `aktueller_br_id == null` (in keinem BR bereitgestellt). Mitglieder des
+ * aktuellen BR werden zusätzlich ausgeblendet — Defense-in-Depth, falls der
+ * Listen-Cache und der BR-Detail-Cache kurzzeitig auseinanderlaufen.
  */
 export default function KraefteOhneBrSidebar({
   alleEinheiten,
@@ -34,12 +33,14 @@ export default function KraefteOhneBrSidebar({
   const brEinheitIds = new Set(brEinheiten.map((e) => e.id));
   const brFahrzeugIds = new Set(brFahrzeuge.map((f) => f.id));
 
-  // Einheiten, die noch nicht im BR sind
-  const freieEinheiten = alleEinheiten.filter((e) => !brEinheitIds.has(e.id));
+  // Einheiten in keinem BR (aktueller_br_id == null) und nicht im aktuellen BR
+  const freieEinheiten = alleEinheiten.filter(
+    (e) => e.aktueller_br_id == null && !brEinheitIds.has(e.id),
+  );
 
-  // Einheitenlose Fahrzeuge, die noch nicht im BR sind
+  // Einheitenlose Fahrzeuge in keinem BR und nicht im aktuellen BR
   const freiFahrzeuge = alleFahrzeuge.filter(
-    (f) => f.einheit_id == null && !brFahrzeugIds.has(f.id),
+    (f) => f.einheit_id == null && f.aktueller_br_id == null && !brFahrzeugIds.has(f.id),
   );
 
   const leer = freieEinheiten.length === 0 && freiFahrzeuge.length === 0;

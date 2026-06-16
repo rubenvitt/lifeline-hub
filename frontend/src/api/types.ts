@@ -154,6 +154,8 @@ export interface EinsatzFahrzeug {
   lon: number | null;
   tz_fachaufgabe: string | null;
   tz_organisation: string | null;
+  /** BR‑1: aktuell bereitgestellter Bereitstellungsraum (null = in keinem BR). */
+  aktueller_br_id: number | null;
 }
 
 export type MaterialStatus =
@@ -338,6 +340,8 @@ export interface Einheit {
   lon: number | null;
   tz_fachaufgabe: string | null;
   tz_organisation: string | null;
+  /** BR‑1: aktuell bereitgestellter Bereitstellungsraum (null = in keinem BR). */
+  aktueller_br_id: number | null;
 }
 
 /** L‑2: Führungskraft-Marker für die Lagekarte (aus GET …/karte/fuehrungskraefte

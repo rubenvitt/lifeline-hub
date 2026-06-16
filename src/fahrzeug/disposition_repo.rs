@@ -9,6 +9,7 @@ const SELECT_AUFGELOEST: &str = "\
            ef.snap_funkrufname, ef.snap_kennzeichen, ef.snap_fahrzeugtyp, ef.snap_opta, \
            ef.snap_traegerorganisation, ef.bemerkung, \
            ef.lat, ef.lon, ef.tz_fachaufgabe, ef.tz_organisation, \
+           ef.aktueller_br_id, \
            ef.disponiert_at, ef.disponiert_von, \
            f.funkrufname AS live_funkrufname, f.kennzeichen AS live_kennzeichen, \
            f.fahrzeugtyp AS live_fahrzeugtyp, f.opta AS live_opta, \
@@ -35,6 +36,7 @@ struct Row {
     lon: Option<f64>,
     tz_fachaufgabe: Option<String>,
     tz_organisation: Option<String>,
+    aktueller_br_id: Option<i64>,
     disponiert_at: String,
     disponiert_von: Option<i64>,
     live_funkrufname: Option<String>,
@@ -93,6 +95,7 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzFahrzeugAnzeige {
         lon: row.lon,
         tz_fachaufgabe: row.tz_fachaufgabe,
         tz_organisation: row.tz_organisation,
+        aktueller_br_id: row.aktueller_br_id,
         disponiert_at: row.disponiert_at,
         disponiert_von: row.disponiert_von,
     }
