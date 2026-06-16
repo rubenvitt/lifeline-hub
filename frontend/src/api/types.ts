@@ -466,7 +466,7 @@ export interface PersonZugriff {
 
 export type UhsTyp =
   | 'patientenablage' | 'behandlungsplatz' | 'verletztensammelstelle'
-  | 'bereitstellungsraum' | 'sonstige';
+  | 'sonstige';
 
 export type UhsStatus = 'geplant' | 'aktiv' | 'aufgeloest';
 

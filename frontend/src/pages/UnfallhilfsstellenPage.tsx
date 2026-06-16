@@ -12,7 +12,6 @@ const UHS_TYP_LABEL: Record<UhsTyp, string> = {
   patientenablage: 'Patientenablage',
   behandlungsplatz: 'Behandlungsplatz',
   verletztensammelstelle: 'Verletztensammelstelle',
-  bereitstellungsraum: 'Bereitstellungsraum',
   sonstige: 'Sonstige',
 };
 
