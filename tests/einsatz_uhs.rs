@@ -867,6 +867,19 @@ async fn plaetze_bulk_legt_mehrere_mit_auto_namen_an() {
 }
 
 #[tokio::test]
+async fn plaetze_bulk_unbekannter_typ_ist_400() {
+    let (app, _) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &cookie).await;
+    let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
+    let (s, _) = json_request(
+        &app, "POST", &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plaetze/bulk"), &cookie,
+        Some(&json!({"typ": "zeltbett", "menge": 2})),
+    ).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "unbekannter Platz-Typ → 400 (Validation)");
+}
+
+#[tokio::test]
 async fn plaetze_bulk_menge_null_oder_zu_gross_ist_422() {
     let (app, _) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;

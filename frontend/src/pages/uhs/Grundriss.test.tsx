@@ -56,6 +56,9 @@ describe('Grundriss – Belegt-Anzeige (LFH-18)', () => {
     expect(await screen.findByText(/R-007|R-7|· unbekannt/)).toBeInTheDocument();
     // … und der Platz muss als belegt gekennzeichnet sein (nicht nur als „frei").
     expect(screen.getByText('belegt')).toBeInTheDocument();
+    // Orthogonalität (E-3): der Verfügbarkeits-Tag bleibt DANEBEN bestehen —
+    // „belegt" ersetzt ihn nicht (es gibt keinen Verfügbarkeitswert „belegt").
+    expect(screen.getByText('frei')).toBeInTheDocument();
   });
 
   it('zeigt einen unbelegten Platz NICHT als belegt', async () => {
@@ -113,5 +116,36 @@ describe('Grundriss – Plätze nach Typ anlegen (LFH-16)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
     await waitFor(() => expect(body).not.toBeNull());
     expect(body).toEqual({ typ: 'bett', menge: 3 });
+  });
+
+  it('überträgt den im Select gewählten Typ', async () => {
+    const uhs = uhsDetail({ plaetze: [] });
+    let body: { typ?: string; menge?: number } | null = null;
+    server.use(
+      http.post('/api/einsaetze/1/uhs/1/plaetze/bulk', async ({ request }) => {
+        body = (await request.json()) as { typ?: string; menge?: number };
+        return HttpResponse.json([]);
+      }),
+    );
+    renderGrundriss(uhs, []);
+    await userEvent.click(screen.getByRole('button', { name: '+ Platz' }));
+    await userEvent.click(await screen.findByRole('combobox', { name: 'Platz-Typ' }));
+    await userEvent.click(await screen.findByText('Intensivplatz'));
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body!.typ).toBe('intensivplatz');
+  });
+});
+
+describe('Grundriss – Read-only (schreibgeschuetzt)', () => {
+  it('blendet Schreibaktionen aus, wenn schreibgeschuetzt', async () => {
+    const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    renderGrundriss(uhs, [p], true);
+    // belegter Platz ist sichtbar …
+    expect(await screen.findByText('belegt')).toBeInTheDocument();
+    // … aber keine Schreibaktionen.
+    expect(screen.queryByRole('button', { name: 'zurückweisen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '+ Platz' })).not.toBeInTheDocument();
   });
 });
