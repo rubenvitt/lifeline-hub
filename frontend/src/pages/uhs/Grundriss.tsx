@@ -30,10 +30,11 @@ interface PlatzKarteProps {
   belegtVon: Person | undefined;
   schreibgeschuetzt: boolean;
   onVerfuegbarkeit: (v: Verfuegbarkeit) => void;
+  onAustritt: () => void;
   onStorno: () => void;
 }
 
-function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, onVerfuegbarkeit, onStorno }: PlatzKarteProps) {
+function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, onVerfuegbarkeit, onAustritt, onStorno }: PlatzKarteProps) {
   // Platz-Karte ist sowohl Drop-Target (Personen darauf droppen) als auch
   // Drag-Source (Layout-Verschiebung). Mit @dnd-kit beides am selben Knoten via useDraggable + useDroppable.
   const { attributes, listeners, setNodeRef: setDragRef, transform } = useDraggable({
@@ -78,6 +79,17 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, onVerfuegbarkeit, onS
         {belegtVon && <Tag color="blue">belegt</Tag>}
       </div>
       <Personenkarte person={belegtVon} />
+      {belegtVon && !schreibgeschuetzt && (
+        // Person aus dem Platz (und der UHS) zurückweisen = Austritt (Spec-BelegungsArt).
+        <Button
+          size="small"
+          danger
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={onAustritt}
+        >
+          zurückweisen
+        </Button>
+      )}
       {!schreibgeschuetzt && (
         <Dropdown menu={menu} trigger={['click']}>
           {/* stopPropagation: sonst startet eine kleine Mausbewegung beim Klick aufs "…" einen Drag. */}
@@ -160,6 +172,10 @@ export default function Grundriss({
     },
     onSuccess: () => invalidate(), onError: fehler,
   });
+  const austrittMut = useMutation({
+    mutationFn: (personId: number) => aenderePersonBelegung(einsatzId, personId, { art: 'austritt' }),
+    onSuccess: () => invalidate(), onError: fehler,
+  });
   const verfMut = useMutation({
     mutationFn: ({ platzId, verf }: { platzId: number; verf: Verfuegbarkeit }) =>
       setzePlatzVerfuegbarkeit(einsatzId, uhs.id, platzId, verf, null),
@@ -208,6 +224,7 @@ export default function Grundriss({
               belegtVon={belegtAn(p.id)}
               schreibgeschuetzt={schreibgeschuetzt}
               onVerfuegbarkeit={(v) => verfMut.mutate({ platzId: p.id, verf: v })}
+              onAustritt={() => { const b = belegtAn(p.id); if (b) austrittMut.mutate(b.id); }}
               onStorno={() => stornoMut.mutate(p.id)}
             />
           ))}

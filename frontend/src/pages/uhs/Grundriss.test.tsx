@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
@@ -62,5 +63,34 @@ describe('Grundriss – Belegt-Anzeige (LFH-18)', () => {
     renderGrundriss(uhs, []);
     expect(await screen.findByText('Bett 1')).toBeInTheDocument();
     expect(screen.queryByText('belegt')).not.toBeInTheDocument();
+  });
+});
+
+describe('Grundriss – Zurückweisen (LFH-17)', () => {
+  it('weist eine belegte Person per Button als Austritt zurück', async () => {
+    const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    let body: { art?: string } | null = null;
+    server.use(
+      http.post('/api/einsaetze/1/personen/7/uhs-belegung', async ({ request }) => {
+        body = (await request.json()) as { art?: string };
+        return HttpResponse.json({
+          id: 1, einsatz_id: 1, person_id: 7, uhs_id: 1, platz_id: null,
+          art: 'austritt', notiz: null, zeitpunkt_at: 'x', erfasst_von: 1,
+        });
+      }),
+    );
+    renderGrundriss(uhs, [p]);
+    const btn = await screen.findByRole('button', { name: 'zurückweisen' });
+    await userEvent.click(btn);
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body!.art).toBe('austritt');
+  });
+
+  it('zeigt keinen Zurückweisen-Button für unbelegte Plätze', async () => {
+    const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    renderGrundriss(uhs, []);
+    await screen.findByText('Bett 1');
+    expect(screen.queryByRole('button', { name: 'zurückweisen' })).not.toBeInTheDocument();
   });
 });
