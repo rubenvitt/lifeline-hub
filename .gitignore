@@ -8,6 +8,7 @@
 node_modules/
 dist/
 build/
+.pnpm-store/
 # Embed-Ordner muss für die Compile-Zeit existieren (rust-embed):
 !frontend/dist/
 !frontend/dist/.gitkeep
@@ -16,6 +17,7 @@ build/
 .DS_Store
 *.local
 .env
+.idea/
 
 # Lokale SQLite-Datenbanken
 *.db
@@ -23,3 +25,4 @@ build/
 *.db-shm
 
 .claude/worktrees
+.claire/worktrees

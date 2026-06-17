@@ -1,0 +1,58 @@
+{
+  // Lifeline Hub — Dev Container
+  // Backend: Rust (axum + sqlx/SQLite, bundled libsqlite3, rustls).
+  // Frontend: React/TS via pnpm + Vite; wird per rust-embed ins Binary gebacken.
+  "name": "Lifeline Hub",
+
+  // Rust-Basisimage (Debian bookworm) bringt cargo, rustup, build-essential und
+  // pkg-config mit — letztere braucht libsqlite3-sys (feature = "bundled") zum
+  // Kompilieren des mitgelieferten SQLite. rustls statt OpenSSL → kein libssl nötig.
+  "image": "mcr.microsoft.com/devcontainers/rust:1-bookworm",
+
+  "features": {
+    // Node 26 + corepack (für pnpm). pnpm-Version steuert das packageManager-Feld
+    // in frontend/package.json (pnpm@11.0.9) via corepack im post-create.
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "26"
+    }
+  },
+
+  "containerEnv": {
+    // Backend an alle Interfaces binden, damit das geforwardete Port vom Host
+    // erreichbar ist (Default in src/config.rs ist 127.0.0.1:8080).
+    "LIFELINE_BIND": "0.0.0.0:8080"
+  },
+
+  // 8080 = Backend (axum), 5173 = Frontend (Vite-Dev mit Proxy aufs Backend).
+  "forwardPorts": [8080, 5173],
+  "portsAttributes": {
+    "8080": { "label": "Backend (axum)" },
+    "5173": { "label": "Frontend (Vite)" }
+  },
+
+  // Toolchain + Abhängigkeiten installieren und frontend/dist erzeugen, damit der
+  // erste `cargo build` (rust-embed erwartet frontend/dist) sofort durchläuft.
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-playwright.playwright"
+      ],
+      "settings": {
+        "rust-analyzer.check.command": "clippy",
+        "editor.formatOnSave": true,
+        "[rust]": {
+          "editor.defaultFormatter": "rust-lang.rust-analyzer"
+        }
+      }
+    }
+  },
+
+  // Im offiziellen Rust-Image existiert der non-root-User "vscode".
+  "remoteUser": "vscode"
+}

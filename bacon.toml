@@ -1,0 +1,25 @@
+# bacon.toml — Dev-Auto-Reload für das Backend.
+#
+# Bei jeder Änderung an src/, migrations/ oder Cargo.toml baut bacon das Backend
+# neu und startet den laufenden Server neu (kill_then_restart).
+#
+#   bacon            # nutzt default_job „serve"
+#   bacon serve      # explizit
+#
+# Das Frontend braucht das NICHT — Vite (`cd frontend && pnpm dev`) hat eigenes HMR.
+# Installation einmalig: cargo install bacon --locked
+
+default_job = "serve"
+
+# Migrationen werden via sqlx::migrate!("./migrations") zur Compile-Zeit eingebettet,
+# daher muss der Ordner mitüberwacht werden (src/ + Cargo.* sind bacon-Default).
+[jobs.serve]
+command = ["cargo", "run", "--features", "dev-seeds"]
+watch = ["migrations"]
+need_stdout = true
+allow_warnings = true
+background = false
+on_change_strategy = "kill_then_restart"
+# pkill -TERM -P <cargo-pid>: terminiert das eigentliche Server-Binary (Kind von cargo),
+# bevor der Neustart läuft. bacon hängt die cargo-PID an.
+kill = ["pkill", "-TERM", "-P"]
