@@ -37,6 +37,7 @@ struct Row {
     lon: Option<f64>,
     tz_fachaufgabe: Option<String>,
     tz_organisation: Option<String>,
+    aktueller_br_id: Option<i64>,
     soll_fuehrer: Option<i64>,
     soll_unterfuehrer: Option<i64>,
     soll_mannschaft: Option<i64>,
@@ -50,6 +51,7 @@ const SELECT_AUFGELOEST: &str = "\
            e.ueber_einheit_id, e.typ_id, t.label AS typ_label, e.name, \
            e.fuehrer_id, fp.snap_name AS fuehrer_name, e.bemerkung, e.sortier, \
            e.lat, e.lon, e.tz_fachaufgabe, e.tz_organisation, \
+           e.aktueller_br_id, \
            e.soll_fuehrer, e.soll_unterfuehrer, e.soll_mannschaft, \
            t.soll_fuehrer AS typ_soll_fuehrer, t.soll_unterfuehrer AS typ_soll_unterfuehrer, \
            t.soll_mannschaft AS typ_soll_mannschaft \
@@ -88,6 +90,7 @@ async fn zu_anzeige(pool: &SqlitePool, row: Row) -> Result<EinheitAnzeige, AppEr
         lon: row.lon,
         tz_fachaufgabe: row.tz_fachaufgabe,
         tz_organisation: row.tz_organisation,
+        aktueller_br_id: row.aktueller_br_id,
         soll,
         ist,
         ist_kumuliert,

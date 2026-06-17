@@ -5,7 +5,7 @@ import {
   TbClipboardText, TbFirstAidKit, TbPaw, TbHome,
   TbMap2, TbLayoutDashboard, TbReport, TbListDetails, TbAlertTriangle,
   TbMessage, TbMessageCircle, TbBell, TbClipboardList, TbInbox,
-  TbSettings,
+  TbSettings, TbBuildingWarehouse,
 } from 'react-icons/tb';
 import type { BenutzerAnzeige } from '../api/types';
 
@@ -61,6 +61,7 @@ export const modulRegistry: ModulEintrag[] = [
   { key: 'personal', kategorie: 'kraefte', label: 'Personal', icon: TbUser, route: 'personal', status: 'fertig', beschreibung: 'Im Einsatz aktive Personen aus dem Stammdaten-Pool plus Ad-hoc-Kräfte.' },
   { key: 'fahrzeuge', kategorie: 'kraefte', label: 'Fahrzeuge', icon: TbTruck, route: 'fahrzeuge', status: 'fertig', beschreibung: 'Disponierte Fahrzeuge des Einsatzes.' },
   { key: 'material', kategorie: 'kraefte', label: 'Material', icon: TbPackages, route: 'material', status: 'fertig', beschreibung: 'Material und Verbrauchsgüter im Einsatz.' },
+  { key: 'bereitstellungsraeume', kategorie: 'kraefte', label: 'Bereitstellungsräume', icon: TbBuildingWarehouse, route: 'bereitstellungsraeume', status: 'fertig', beschreibung: 'Bereitstellungsräume: bereitgestellte Einheiten und Fahrzeuge.' },
   // Erfassung
   { key: 'etb', kategorie: 'erfassung', label: 'ETB', icon: TbClipboardText, route: 'etb', status: 'fertig', beschreibung: 'Einsatztagebuch.' },
   { key: 'personen', kategorie: 'erfassung', label: 'Personen', icon: TbUsers, route: 'personen', status: 'fertig', beschreibung: 'Ein Personenstamm mit Status-Lebenszyklus (vermisst → betroffen → Patient → verstorben).' },

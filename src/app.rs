@@ -180,6 +180,13 @@ pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
         .route("/api/einsaetze/{id}/uhs/{uid}/plaetze/{pid}", delete(routes::einsatz_uhs::platz_stornieren))
         .route("/api/einsaetze/{id}/personen/{pid}/uhs-belegung",
                post(routes::einsatz_uhs::belegung))
+        .route("/api/einsaetze/{id}/bereitstellungsraeume", get(routes::einsatz_bereitstellungsraum::liste))
+        .route("/api/einsaetze/{id}/bereitstellungsraeume", post(routes::einsatz_bereitstellungsraum::anlegen))
+        .route("/api/einsaetze/{id}/bereitstellungsraeume/{bid}", get(routes::einsatz_bereitstellungsraum::detail))
+        .route("/api/einsaetze/{id}/bereitstellungsraeume/{bid}", patch(routes::einsatz_bereitstellungsraum::aktualisieren))
+        .route("/api/einsaetze/{id}/bereitstellungsraeume/{bid}/status", post(routes::einsatz_bereitstellungsraum::status_wechsel))
+        .route("/api/einsaetze/{id}/bereitstellungsraeume/{bid}", delete(routes::einsatz_bereitstellungsraum::stornieren))
+        .route("/api/einsaetze/{id}/bereitstellungsraeume/{bid}/belegung", post(routes::einsatz_bereitstellungsraum::belegung))
         .route("/api/einsaetze/{id}/abschnitte", get(routes::einsatzabschnitt::liste))
         .route("/api/einsaetze/{id}/abschnitte", post(routes::einsatzabschnitt::anlegen))
         .route("/api/einsaetze/{id}/abschnitte/stream", get(routes::einsatzabschnitt::stream))

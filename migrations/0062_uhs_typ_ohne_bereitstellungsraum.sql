@@ -1,0 +1,25 @@
+-- LFH-14: `bereitstellungsraum` aus dem UhsTyp-Enum entfernen.
+-- `Bereitstellungsraum` ist jetzt ein eigenes Modul; der inerte Enum-Wert in der
+-- UHS-Schicht (patienten-zentrisch) entfällt.
+--
+-- Etwaige Altdaten werden auf `sonstige` migriert. Der typ-CHECK der uhs-Tabelle
+-- könnte eng nachgezogen werden (Rebuild ohne 'bereitstellungsraum'), wurde aber
+-- BEWUSST ZURÜCKGESTELLT:
+--
+-- sqlx-sqlite 0.8.6 wickelt jede Migration IMMER in eine eigene Transaktion
+-- (migrate.rs apply(), Zeile 136: `self.begin()` ohne Prüfung von `migration.no_tx`).
+-- `-- no-transaction` wird zwar geparst, vom SQLite-Backend aber ignoriert.
+-- `PRAGMA foreign_keys = OFF` innerhalb dieser Transaktion ist deshalb ein No-op
+-- (SQLite-Doku: FK-Toggle in offener Tx wirkungslos). Ein `DROP TABLE uhs` beim
+-- Rebuild würde `uhs_platz.uhs_id` (ON DELETE CASCADE) und `person_uhs_belegung.uhs_id`
+-- (NOT NULL FK) gefährden → stille Daten-Vernichtung oder „FOREIGN KEY constraint
+-- failed" → Blockade des Deployments.
+--
+-- Diese Migration enthält daher NUR die sichere Daten-Bereinigung. Der CHECK erlaubt
+-- 'bereitstellungsraum' im DB-Layer weiterhin (Defense-in-Depth-Lücke); die Schicht
+-- darüber (UhsTyp::parse) lehnt den Wert bereits ab. CHECK-Nachzug erfordert
+-- entweder ein sqlx-Upgrade (>= 0.8 mit funktionierendem no_tx für SQLite) oder
+-- einen außer-Migrations-Rebuild-Skript und ist für einen Folge-Task vorgemerkt.
+
+-- Altdaten: bereitstellungsraum → sonstige.
+UPDATE uhs SET typ = 'sonstige' WHERE typ = 'bereitstellungsraum';

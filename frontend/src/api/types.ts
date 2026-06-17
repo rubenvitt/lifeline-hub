@@ -154,6 +154,8 @@ export interface EinsatzFahrzeug {
   lon: number | null;
   tz_fachaufgabe: string | null;
   tz_organisation: string | null;
+  /** BR‑1: aktuell bereitgestellter Bereitstellungsraum (null = in keinem BR). */
+  aktueller_br_id: number | null;
 }
 
 export type MaterialStatus =
@@ -338,6 +340,8 @@ export interface Einheit {
   lon: number | null;
   tz_fachaufgabe: string | null;
   tz_organisation: string | null;
+  /** BR‑1: aktuell bereitgestellter Bereitstellungsraum (null = in keinem BR). */
+  aktueller_br_id: number | null;
 }
 
 /** L‑2: Führungskraft-Marker für die Lagekarte (aus GET …/karte/fuehrungskraefte
@@ -462,7 +466,7 @@ export interface PersonZugriff {
 
 export type UhsTyp =
   | 'patientenablage' | 'behandlungsplatz' | 'verletztensammelstelle'
-  | 'bereitstellungsraum' | 'sonstige';
+  | 'sonstige';
 
 export type UhsStatus = 'geplant' | 'aktiv' | 'aufgeloest';
 
@@ -521,6 +525,62 @@ export interface UhsDetail extends Uhs {
   plaetze: UhsPlatz[];
   belegungen: UhsBelegung[];
   material: EinsatzMaterial[];
+}
+
+// ============================== LFH-14 Bereitstellungsräume ==============================
+
+export type BrStatus = 'geplant' | 'aktiv' | 'aufgeloest';
+
+/** Objekt-Typ für BR-Belegung: Einheit oder einheitenloses Fahrzeug. */
+export type ObjektTyp = 'einheit' | 'fahrzeug';
+
+export type BrBelegungsArt = 'eintritt' | 'wechsel' | 'austritt';
+
+/** Serialisierbare BR-Anzeige (1:1 zur Tabelle `bereitstellungsraum`). */
+export interface Bereitstellungsraum {
+  id: number;
+  einsatz_id: number;
+  abschnitt_id: number | null;
+  bezeichnung: string;
+  standort: string | null;
+  notiz: string | null;
+  status: BrStatus;
+  erfasst_at: string;
+  erfasst_von: number;
+  geaendert_at: string;
+  geaendert_von: number;
+  storniert_at: string | null;
+}
+
+/** Detail-Antwort: BR-Stamm + aktuell bereitgestellte Einheiten + Fahrzeuge. */
+export interface BrDetail extends Bereitstellungsraum {
+  einheiten: BrEinheitKurz[];
+  fahrzeuge: BrFahrzeugKurz[];
+}
+
+/** Schlanke Einheiten-Info für den Detail-Response. */
+export interface BrEinheitKurz {
+  id: number;
+  name: string;
+}
+
+/** Schlanke Fahrzeug-Info für den Detail-Response. */
+export interface BrFahrzeugKurz {
+  id: number;
+  funkrufname: string;
+}
+
+/** Belegungs-Verlaufseintrag (1:1 zu `br_belegung`). */
+export interface BrBelegung {
+  id: number;
+  einsatz_id: number;
+  br_id: number;
+  objekt_typ: ObjektTyp;
+  objekt_id: number;
+  art: BrBelegungsArt;
+  notiz: string | null;
+  zeitpunkt_at: string;
+  erfasst_von: number;
 }
 
 export interface ChatKanal {

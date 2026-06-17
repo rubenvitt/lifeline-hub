@@ -81,6 +81,8 @@ pub struct EinheitAnzeige {
     pub lon: Option<f64>,
     pub tz_fachaufgabe: Option<String>,
     pub tz_organisation: Option<String>,
+    /// BR‑1: aktuell bereitgestellter Bereitstellungsraum (NULL = in keinem BR).
+    pub aktueller_br_id: Option<i64>,
     pub soll: Option<crate::staerke::Staerke>,
     pub ist: crate::staerke::Staerke,
     pub ist_kumuliert: crate::staerke::Staerke,

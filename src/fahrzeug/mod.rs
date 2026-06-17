@@ -147,6 +147,8 @@ pub struct EinsatzFahrzeugAnzeige {
     pub lon: Option<f64>,
     pub tz_fachaufgabe: Option<String>,
     pub tz_organisation: Option<String>,
+    /// BR‑1: aktuell bereitgestellter Bereitstellungsraum (NULL = in keinem BR).
+    pub aktueller_br_id: Option<i64>,
     pub disponiert_at: String,
     pub disponiert_von: Option<i64>,
 }

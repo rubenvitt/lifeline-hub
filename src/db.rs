@@ -1037,4 +1037,95 @@ mod tests {
             ", 1, 'Stadtwerke'").await;
         assert!(res.is_err(), "Organisation UND Freitext gleichzeitig muss vom CHECK abgelehnt werden");
     }
+
+    // --- Migration 0062: uhs FK-Integrität nach Daten-Bereinigung ---
+    //
+    // Was dieser Test absichert:
+    // Migration 0062 migriert Altdaten (typ='bereitstellungsraum' → 'sonstige'). Der
+    // Tabellen-Rebuild (CHECK-Nachzug) wurde zurückgestellt, weil sqlx-sqlite 0.8.6
+    // jede Migration in einer eigenen Transaktion ausführt und `migration.no_tx` für
+    // das SQLite-Backend ignoriert → `PRAGMA foreign_keys=OFF` innerhalb der Tx ist
+    // ein No-op → `DROP TABLE uhs` würde eingehende FKs (uhs_platz ON DELETE CASCADE,
+    // person_uhs_belegung NOT NULL) gefährden (stille Daten-Vernichtung oder Deploy-Blockade).
+    //
+    // Dieser Test verifiziert, dass nach allen Migrationen (test_pool() spielt 0001–0062
+    // ein) die `uhs`-Tabelle mit ihren eingehenden FKs korrekt nutzbar ist: Einfügen
+    // von uhs + uhs_platz + person_uhs_belegung und Lesen aller drei Zeilen beweist, dass
+    // das Schema FK-konsistent ist.
+    //
+    // HINWEIS: Der DB-CHECK erlaubt 'bereitstellungsraum' weiterhin (CHECK-Nachzug
+    // zurückgestellt); das Verbot ist in UhsTyp::parse() auf Applikationsebene durchgesetzt.
+    // Dieser Test prüft die CHECK-Ablehnung daher NICHT — das würde fälschlicherweise
+    // fehlschlagen. Regression-Absicherung des CHECK-Nachzugs muss nach dem sqlx-Upgrade
+    // ergänzt werden.
+    #[tokio::test]
+    async fn migration_0062_uhs_fk_integritaet_nach_datenbereinigung() {
+        let pool = test_pool().await;
+
+        // Minimale Stammdaten anlegen (alle NOT-NULL-FKs).
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Test-Orga')")
+            .execute(&pool).await.unwrap();
+        let benutzer_id: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'Leiter', 'leiter', 'hash') RETURNING id",
+        )
+        .fetch_one(&pool).await.unwrap();
+        let einsatz_id: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Testlage') RETURNING id",
+        )
+        .fetch_one(&pool).await.unwrap();
+
+        // uhs anlegen.
+        let uhs_id: i64 = sqlx::query_scalar(
+            "INSERT INTO uhs \
+             (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
+             VALUES (?, 'behandlungsplatz', 'BHP 1', ?, ?) RETURNING id",
+        )
+        .bind(einsatz_id).bind(benutzer_id).bind(benutzer_id)
+        .fetch_one(&pool).await
+        .expect("uhs-Einfügen muss nach Migration funktionieren");
+
+        // uhs_platz anlegen: FK uhs_platz.uhs_id → uhs(id) muss greifen.
+        let platz_id: i64 = sqlx::query_scalar(
+            "INSERT INTO uhs_platz (uhs_id, typ, bezeichnung) \
+             VALUES (?, 'bett', 'Bett 1') RETURNING id",
+        )
+        .bind(uhs_id)
+        .fetch_one(&pool).await
+        .expect("uhs_platz-Einfügen mit FK auf uhs muss funktionieren");
+
+        // einsatz_person anlegen (für person_uhs_belegung.person_id).
+        let ep_id: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person \
+             (einsatz_id, registrier_nr, status, erfasst_von, geaendert_von) \
+             VALUES (?, 1, 'betroffen', ?, ?) RETURNING id",
+        )
+        .bind(einsatz_id).bind(benutzer_id).bind(benutzer_id)
+        .fetch_one(&pool).await.unwrap();
+
+        // person_uhs_belegung anlegen: FK .uhs_id → uhs(id) NOT NULL muss greifen.
+        sqlx::query(
+            "INSERT INTO person_uhs_belegung \
+             (einsatz_id, person_id, uhs_id, platz_id, art, erfasst_von) \
+             VALUES (?, ?, ?, ?, 'eintritt', ?)",
+        )
+        .bind(einsatz_id).bind(ep_id).bind(uhs_id).bind(platz_id).bind(benutzer_id)
+        .execute(&pool).await
+        .expect("person_uhs_belegung mit FK auf uhs muss funktionieren");
+
+        // Alle drei Zeilen müssen existieren und FK-konsistent sein.
+        let uhs_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM uhs WHERE id = ?")
+            .bind(uhs_id).fetch_one(&pool).await.unwrap();
+        assert_eq!(uhs_count, 1, "uhs-Zeile muss nach Migration vorhanden sein");
+
+        let platz_count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM uhs_platz WHERE uhs_id = ?")
+                .bind(uhs_id).fetch_one(&pool).await.unwrap();
+        assert_eq!(platz_count, 1, "uhs_platz-Zeile muss FK auf uhs tragen");
+
+        let belegung_count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM person_uhs_belegung WHERE uhs_id = ?")
+                .bind(uhs_id).fetch_one(&pool).await.unwrap();
+        assert_eq!(belegung_count, 1, "person_uhs_belegung-Zeile muss FK auf uhs tragen");
+    }
 }

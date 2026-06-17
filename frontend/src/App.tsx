@@ -31,6 +31,8 @@ import LageberichtDetailPage from './pages/LageberichtDetailPage';
 import UnfallhilfsstellenPage from './pages/UnfallhilfsstellenPage';
 import UnfallhilfsstellenDefault from './pages/UnfallhilfsstellenDefault';
 import UhsDetailPage from './pages/uhs/UhsDetailPage';
+import BereitstellungsraeumePage from './pages/bereitstellungsraum/BereitstellungsraeumePage';
+import BrDetailPage from './pages/bereitstellungsraum/BrDetailPage';
 import EinsatzLayout from './einsatz/EinsatzLayout';
 import DefaultModulRedirect from './einsatz/DefaultModulRedirect';
 import ModulRedirect from './einsatz/ModulRedirect';
@@ -63,6 +65,7 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   einsatzabschnitte: <EinsatzabschnittePage />,
   personen: <PersonenPage />,
   unfallhilfsstellen: <UnfallhilfsstellenDefault />,
+  bereitstellungsraeume: <BereitstellungsraeumePage />,
   tiere: <TierePage />,
   schaeden: <SchaedenPage />,
   lageberichte: <LageberichtePage />,
@@ -107,6 +110,7 @@ export default function App() {
           ))}
           <Route path="unfallhilfsstellen/liste" element={<UnfallhilfsstellenPage />} />
           <Route path="unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />
+          <Route path="bereitstellungsraeume/:brId" element={<BrDetailPage />} />
           <Route path="lageberichte/:lbId" element={<LageberichtDetailPage />} />
         </Route>
       </Route>
