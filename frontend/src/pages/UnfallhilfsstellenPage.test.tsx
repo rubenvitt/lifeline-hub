@@ -94,7 +94,7 @@ describe('UnfallhilfsstellenPage', () => {
 });
 
 describe('Grundriss DnD', () => {
-  it('öffnet Detail-Drawer und zeigt Tab „Grundriss"', async () => {
+  it('öffnet Detail und zeigt den Grundriss mit Plätzen', async () => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([
@@ -115,7 +115,9 @@ describe('Grundriss DnD', () => {
     );
     renderPage();
     await userEvent.click(await screen.findByText('BHP 50'));
-    expect(await screen.findByRole('tab', { name: 'Grundriss' })).toBeInTheDocument();
+    // Grundriss ist jetzt immer sichtbar (keine Tabs mehr) — die Mittelspalte trägt
+    // den Titel „Unfallhilfsstelle" und zeigt die angelegten Plätze direkt.
+    expect(await screen.findByText('Unfallhilfsstelle')).toBeInTheDocument();
     expect(await screen.findByText('Bett 3')).toBeInTheDocument();
   });
 });

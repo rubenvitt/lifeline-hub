@@ -1,13 +1,12 @@
 import { App, Button, Card, Dropdown, InputNumber, Select, Space, Tag, Typography } from 'antd';
 import { DndContext, useDraggable, useDroppable, type DragEndEvent, KeyboardSensor, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   aenderePersonBelegung, aktualisierePlatz, legePlaetzeAn, setzePlatzVerfuegbarkeit, stornierePlatz,
 } from '../../api/einsatzUhs';
 import { listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
 import type { Person, PlatzTyp, UhsDetail, UhsPlatz, Verfuegbarkeit } from '../../api/types';
-import PersonenOhneUhsSidebar from './PersonenOhneUhsSidebar';
 import { ApiError } from '../../api/client';
 
 const VERF_FARBE: Record<Verfuegbarkeit, string> = {
@@ -18,27 +17,47 @@ const VERF_FARBE: Record<Verfuegbarkeit, string> = {
   reserviert: '#1677ff',
 };
 
+function personLabel(person: Person): string {
+  const nr = registrierAnzeige(person.registrier_nr);
+  return person.name ? `${nr} · ${person.name}` : `${nr} · unbekannt`;
+}
+
 interface PersonenkartenProps { person: Person | undefined; }
 function Personenkarte({ person }: PersonenkartenProps) {
   if (!person) return null;
-  const label = person.name ? `${registrierAnzeige(person.registrier_nr)} · ${person.name}` : `${registrierAnzeige(person.registrier_nr)} · unbekannt`;
-  return <Tag color="default" style={{ margin: 2 }}>{label}</Tag>;
+  return <Tag color="default" style={{ margin: 2 }}>{personLabel(person)}</Tag>;
+}
+
+function PersonenkarteDrag({ person, disabled }: { person: Person; disabled: boolean }) {
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    id: `person-${person.id}`, data: { kind: 'person', personId: person.id }, disabled,
+  });
+  const style: React.CSSProperties = {
+    cursor: disabled ? 'default' : 'grab',
+    transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
+  };
+  return (
+    <div ref={setNodeRef} {...attributes} {...listeners} style={style}>
+      <Personenkarte person={person} />
+    </div>
+  );
 }
 
 interface PlatzKarteProps {
   platz: UhsPlatz;
   belegtVon: Person | undefined;
   schreibgeschuetzt: boolean;
+  bearbeitbar: boolean;
   onVerfuegbarkeit: (v: Verfuegbarkeit) => void;
   onAustritt: () => void;
   onStorno: () => void;
 }
 
-function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, onVerfuegbarkeit, onAustritt, onStorno }: PlatzKarteProps) {
-  // Platz-Karte ist sowohl Drop-Target (Personen darauf droppen) als auch
-  // Drag-Source (Layout-Verschiebung). Mit @dnd-kit beides am selben Knoten via useDraggable + useDroppable.
+function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfuegbarkeit, onAustritt, onStorno }: PlatzKarteProps) {
+  // Platz-Karte ist Drop-Target (Personen zuweisen) und — nur im Bearbeiten-Modus —
+  // Drag-Source (Layout verschieben). Mit @dnd-kit beides am selben Knoten.
   const { attributes, listeners, setNodeRef: setDragRef, transform } = useDraggable({
-    id: `platz-${platz.id}`, data: { kind: 'platz', platzId: platz.id }, disabled: schreibgeschuetzt,
+    id: `platz-${platz.id}`, data: { kind: 'platz', platzId: platz.id }, disabled: !bearbeitbar,
   });
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: `drop-platz-${platz.id}`, data: { kind: 'platz', platzId: platz.id, uhsId: platz.uhs_id },
@@ -49,6 +68,7 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, onVerfuegbarkeit, onA
     left: platz.pos_x ?? 10,
     top: platz.pos_y ?? 10,
     width: 140,
+    cursor: bearbeitbar ? 'grab' : 'default',
     border: `2px solid ${VERF_FARBE[platz.verfuegbarkeit]}`,
     // Belegung ist orthogonal zur Verfügbarkeit (Spec): Verfügbarkeits-Rahmen bleibt,
     // belegte Plätze werden zusätzlich durch Hintergrund + „belegt"-Tag kenntlich gemacht.
@@ -90,7 +110,7 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, onVerfuegbarkeit, onA
           zurückweisen
         </Button>
       )}
-      {!schreibgeschuetzt && (
+      {bearbeitbar && (
         <Dropdown menu={menu} trigger={['click']}>
           {/* stopPropagation: sonst startet eine kleine Mausbewegung beim Klick aufs "…" einen Drag. */}
           <Button size="small" type="text" onPointerDown={(e) => e.stopPropagation()}>…</Button>
@@ -100,34 +120,47 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, onVerfuegbarkeit, onA
   );
 }
 
-function InboxContainer({ personen, schreibgeschuetzt }: { personen: Person[]; schreibgeschuetzt: boolean }) {
-  const { setNodeRef, isOver } = useDroppable({ id: 'drop-inbox', data: { kind: 'inbox' } });
+/** Schmale Personen-Liste als Spalten-Karte (links: Eingang/Wartebereich). */
+function PersonenSpalte({
+  titel, personen, schreibgeschuetzt, droppableId, leerText,
+}: {
+  titel: string;
+  personen: Person[];
+  schreibgeschuetzt: boolean;
+  droppableId?: string;
+  leerText: string;
+}) {
+  // Optionales Drop-Target (Wartebereich nimmt Personen ohne Platz auf).
+  const drop = useDroppable({ id: droppableId ?? `nodrop-${titel}`, data: { kind: 'inbox' }, disabled: !droppableId });
   return (
     <Card
-      title="Inbox (Eingang)"
+      title={titel}
       size="small"
-      style={{ width: 220, minHeight: 400, background: isOver ? '#e6f4ff' : undefined }}
+      styles={{ body: { padding: 8 } }}
+      style={{ background: droppableId && drop.isOver ? '#e6f4ff' : undefined }}
     >
-      <div ref={setNodeRef} style={{ minHeight: 300 }}>
+      <div ref={droppableId ? drop.setNodeRef : undefined} style={{ minHeight: 48 }}>
         {personen.map((p) => <PersonenkarteDrag key={p.id} person={p} disabled={schreibgeschuetzt} />)}
-        {personen.length === 0 && <Typography.Text type="secondary">leer</Typography.Text>}
+        {personen.length === 0 && <Typography.Text type="secondary">{leerText}</Typography.Text>}
       </div>
     </Card>
   );
 }
 
-function PersonenkarteDrag({ person, disabled }: { person: Person; disabled: boolean }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: `person-${person.id}`, data: { kind: 'person', personId: person.id }, disabled,
-  });
-  const style: React.CSSProperties = {
-    cursor: disabled ? 'default' : 'grab',
-    transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
-  };
+/** Rechte Spalte: aus DIESER UHS heraus auf Transport gebrachte Personen (read-only). */
+function TransportSpalte({ personen }: { personen: Person[] }) {
   return (
-    <div ref={setNodeRef} {...attributes} {...listeners} style={style}>
-      <Personenkarte person={person} />
-    </div>
+    <Card title="Auf Transport gebracht" size="small" styles={{ body: { padding: 8 } }}>
+      {personen.map((p) => (
+        <div key={p.id} style={{ marginBottom: 6 }}>
+          <Tag color="orange" style={{ margin: 0 }}>{personLabel(p)}</Tag>
+          {p.aktueller_verbleib && (
+            <div><Typography.Text type="secondary" style={{ fontSize: 12 }}>{p.aktueller_verbleib}</Typography.Text></div>
+          )}
+        </div>
+      ))}
+      {personen.length === 0 && <Typography.Text type="secondary">keine</Typography.Text>}
+    </Card>
   );
 }
 
@@ -140,16 +173,46 @@ export default function Grundriss({
   // KeyboardSensor für Tests/Accessibility.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), useSensor(KeyboardSensor));
 
+  // Bauphase (geplant) → Plätze-Bearbeitung ist Primäraktion und standardmäßig an.
+  // Aktiv → Patienten zuweisen steht im Vordergrund, Bearbeiten ist sekundär (Toggle).
+  const [platzBearbeitung, setPlatzBearbeitung] = useState(() => uhs.status === 'geplant');
+  useEffect(() => {
+    setPlatzBearbeitung(uhs.status === 'geplant');
+  }, [uhs.status]);
+  const platzEditAktiv = platzBearbeitung && !schreibgeschuetzt;
+
   const personenQuery = useQuery({
     queryKey: ['einsatz-personen', einsatzId],
     queryFn: () => listePersonen(einsatzId),
   });
   const personen = personenQuery.data ?? [];
   const personenInUhs = personen.filter((p) => p.aktuelle_uhs_id === uhs.id);
-  const inboxPersonen = personenInUhs.filter((p) => p.aktueller_platz_id == null);
+  const wartebereichPersonen = personenInUhs.filter((p) => p.aktueller_platz_id == null);
+  // „Noch nicht aufgenommen" = aufnehmbar in diese UHS: in keiner UHS, nicht storniert
+  // und noch nicht final disponiert. Transport/Entlassung/Verstorben leeren `aktuelle_uhs_id`
+  // (Auto-Austritt) — ohne diesen Filter erschienen sie hier UND rechts in der Transport-Spalte.
+  const nichtAufgenommen = personen.filter(
+    (p) => p.aktuelle_uhs_id == null && !p.storniert_at && !p.aktueller_verbleib,
+  );
   function belegtAn(platzId: number): Person | undefined {
     return personenInUhs.find((p) => p.aktueller_platz_id === platzId);
   }
+
+  // Rechte Spalte: Personen, die aus DIESER UHS heraus auf Transport gingen. Quelle ist
+  // die UHS-eigene Austritts-Historie (uhs.belegungen) ∩ aktueller Verbleib „Transport".
+  const ausgetretenIds = new Set(
+    uhs.belegungen.filter((b) => b.art === 'austritt').map((b) => b.person_id),
+  );
+  const transportiert = personen
+    .filter((p) => ausgetretenIds.has(p.id) && p.aktueller_verbleib?.startsWith('Transport'))
+    .sort((a, b) => a.registrier_nr - b.registrier_nr);
+
+  // Innenfläche so groß wählen, dass alle Plätze hineinpassen — sie scrollt INNERHALB
+  // der Mittelspalte, sprengt also nie die Seitenbreite.
+  const maxX = Math.max(0, ...uhs.plaetze.map((p) => p.pos_x ?? 0));
+  const maxY = Math.max(0, ...uhs.plaetze.map((p) => p.pos_y ?? 0));
+  const flaecheBreite = Math.max(700, maxX + 160);
+  const flaecheHoehe = Math.max(420, maxY + 140);
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: ['einsatz-uhs', einsatzId] });
@@ -201,7 +264,7 @@ export default function Grundriss({
       layoutMut.mutate({ pid: data.platzId, pos_x: nx, pos_y: ny });
       return;
     }
-    // Person-Drop: braucht ein Drop-Target (Platz oder Inbox).
+    // Person-Drop: braucht ein Drop-Target (Platz oder Wartebereich).
     if (data.kind === 'person' && data.personId != null) {
       const target = over?.data.current as { kind: string; platzId?: number } | undefined;
       if (!target) return;
@@ -214,34 +277,75 @@ export default function Grundriss({
 
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-      <Space align="start">
-        <InboxContainer personen={inboxPersonen} schreibgeschuetzt={schreibgeschuetzt} />
-        <div style={{ position: 'relative', width: 1000, height: 600, border: '1px dashed #d9d9d9', background: '#fafafa' }}>
-          {uhs.plaetze.map((p) => (
-            <PlatzKarte
-              key={p.id}
-              platz={p}
-              belegtVon={belegtAn(p.id)}
-              schreibgeschuetzt={schreibgeschuetzt}
-              onVerfuegbarkeit={(v) => verfMut.mutate({ platzId: p.id, verf: v })}
-              onAustritt={() => { const b = belegtAn(p.id); if (b) austrittMut.mutate(b.id); }}
-              onStorno={() => stornoMut.mutate(p.id)}
-            />
-          ))}
-          {uhs.plaetze.length === 0 && (
-            <Typography.Text type="secondary" style={{ padding: 10, display: 'block' }}>
-              Keine Plätze. Lege Plätze über das „+"-Menü an.
-            </Typography.Text>
-          )}
+      <div style={{ display: 'flex', gap: 12, height: '100%', minHeight: 0, alignItems: 'stretch' }}>
+        {/* LINKS: Eingang / Wartebereich */}
+        <div style={{ width: 240, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12, overflow: 'auto' }}>
+          <PersonenSpalte
+            titel="Noch nicht aufgenommen"
+            personen={nichtAufgenommen}
+            schreibgeschuetzt={schreibgeschuetzt}
+            leerText="keine"
+          />
+          <PersonenSpalte
+            titel="Wartebereich (Eingang)"
+            personen={wartebereichPersonen}
+            schreibgeschuetzt={schreibgeschuetzt}
+            droppableId="drop-inbox"
+            leerText="leer"
+          />
         </div>
-        <PersonenOhneUhsSidebar
-          personen={personen.filter((p) => p.aktuelle_uhs_id == null && !p.storniert_at)}
-          schreibgeschuetzt={schreibgeschuetzt}
-        />
-      </Space>
-      {!schreibgeschuetzt && (
-        <NeuerPlatzKnopf einsatzId={einsatzId} uhsId={uhs.id} onSuccess={invalidate} />
-      )}
+
+        {/* MITTE: Unfallhilfsstelle */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8 }}>
+            <Typography.Text strong>Unfallhilfsstelle</Typography.Text>
+            {!schreibgeschuetzt && (
+              uhs.status === 'geplant'
+                ? <NeuerPlatzKnopf einsatzId={einsatzId} uhsId={uhs.id} primaer onSuccess={invalidate} />
+                : (
+                  <Space>
+                    <Button
+                      size="small"
+                      type={platzBearbeitung ? 'primary' : 'text'}
+                      onClick={() => setPlatzBearbeitung((v) => !v)}
+                    >
+                      {platzBearbeitung ? 'Bearbeiten beenden' : 'Plätze bearbeiten'}
+                    </Button>
+                    {platzEditAktiv && <NeuerPlatzKnopf einsatzId={einsatzId} uhsId={uhs.id} onSuccess={invalidate} />}
+                  </Space>
+                )
+            )}
+          </div>
+          <div style={{ flex: 1, minHeight: 0, overflow: 'auto', border: '1px dashed #d9d9d9', background: '#fafafa', borderRadius: 4 }}>
+            <div style={{ position: 'relative', width: flaecheBreite, height: flaecheHoehe }}>
+              {uhs.plaetze.map((p) => (
+                <PlatzKarte
+                  key={p.id}
+                  platz={p}
+                  belegtVon={belegtAn(p.id)}
+                  schreibgeschuetzt={schreibgeschuetzt}
+                  bearbeitbar={platzEditAktiv}
+                  onVerfuegbarkeit={(v) => verfMut.mutate({ platzId: p.id, verf: v })}
+                  onAustritt={() => { const b = belegtAn(p.id); if (b) austrittMut.mutate(b.id); }}
+                  onStorno={() => stornoMut.mutate(p.id)}
+                />
+              ))}
+              {uhs.plaetze.length === 0 && (
+                <Typography.Text type="secondary" style={{ padding: 10, display: 'block' }}>
+                  {schreibgeschuetzt
+                    ? 'Keine Plätze angelegt.'
+                    : 'Keine Plätze. Lege Plätze über „Plätze anlegen" an.'}
+                </Typography.Text>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* RECHTS: Auf Transport gebracht */}
+        <div style={{ width: 240, flexShrink: 0, overflow: 'auto' }}>
+          <TransportSpalte personen={transportiert} />
+        </div>
+      </div>
     </DndContext>
   );
 }
@@ -258,7 +362,7 @@ const PLATZ_TYPEN: { value: PlatzTyp; label: string }[] = [
 
 // LFH-16: Plätze nach Typ + Menge anlegen — Bezeichnungen vergibt der Server
 // automatisch fortlaufend („Bett 1", „Bett 2", …), keine manuelle Namensvergabe.
-function NeuerPlatzKnopf({ einsatzId, uhsId, onSuccess }: { einsatzId: number; uhsId: number; onSuccess: () => void }) {
+function NeuerPlatzKnopf({ einsatzId, uhsId, onSuccess, primaer }: { einsatzId: number; uhsId: number; onSuccess: () => void; primaer?: boolean }) {
   const { message } = App.useApp();
   const [open, setOpen] = useState(false);
   const [typ, setTyp] = useState<PlatzTyp>('bett');
@@ -272,16 +376,17 @@ function NeuerPlatzKnopf({ einsatzId, uhsId, onSuccess }: { einsatzId: number; u
     onError: (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Anlegen fehlgeschlagen'),
   });
   if (!open) {
-    return <Button style={{ marginTop: 8 }} onClick={() => setOpen(true)}>+ Platz</Button>;
+    return <Button size="small" type={primaer ? 'primary' : 'default'} onClick={() => setOpen(true)}>Plätze anlegen</Button>;
   }
   return (
-    <Space style={{ marginTop: 8 }} align="center" wrap>
+    <Space align="center" wrap>
       <Select<PlatzTyp>
         value={typ}
         onChange={setTyp}
         options={PLATZ_TYPEN}
         style={{ width: 200 }}
         aria-label="Platz-Typ"
+        size="small"
       />
       <InputNumber
         min={1}
@@ -289,9 +394,10 @@ function NeuerPlatzKnopf({ einsatzId, uhsId, onSuccess }: { einsatzId: number; u
         value={menge}
         onChange={(v) => setMenge(v ?? 1)}
         aria-label="Menge"
+        size="small"
       />
-      <Button type="primary" loading={mut.isPending} onClick={() => mut.mutate()}>Anlegen</Button>
-      <Button onClick={() => setOpen(false)}>Abbrechen</Button>
+      <Button size="small" type="primary" loading={mut.isPending} onClick={() => mut.mutate()}>Anlegen</Button>
+      <Button size="small" onClick={() => setOpen(false)}>Abbrechen</Button>
     </Space>
   );
 }

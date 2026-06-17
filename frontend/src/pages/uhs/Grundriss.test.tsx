@@ -6,7 +6,7 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { App as AntApp } from 'antd';
 import Grundriss from './Grundriss';
-import type { Person, UhsDetail, UhsPlatz } from '../../api/types';
+import type { Person, UhsBelegung, UhsDetail, UhsPlatz } from '../../api/types';
 
 function person(over: Partial<Person>): Person {
   return {
@@ -100,7 +100,7 @@ describe('Grundriss – Zurückweisen (LFH-17)', () => {
 
 describe('Grundriss – Plätze nach Typ anlegen (LFH-16)', () => {
   it('legt über Typ + Menge mehrere Plätze an (Bulk, ohne Namensvergabe)', async () => {
-    const uhs = uhsDetail({ plaetze: [] });
+    const uhs = uhsDetail({ plaetze: [], status: 'geplant' });
     let body: { typ?: string; menge?: number } | null = null;
     server.use(
       http.post('/api/einsaetze/1/uhs/1/plaetze/bulk', async ({ request }) => {
@@ -109,7 +109,7 @@ describe('Grundriss – Plätze nach Typ anlegen (LFH-16)', () => {
       }),
     );
     renderGrundriss(uhs, []);
-    await userEvent.click(screen.getByRole('button', { name: '+ Platz' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Plätze anlegen' }));
     const menge = await screen.findByRole('spinbutton', { name: 'Menge' });
     await userEvent.clear(menge);
     await userEvent.type(menge, '3');
@@ -119,7 +119,7 @@ describe('Grundriss – Plätze nach Typ anlegen (LFH-16)', () => {
   });
 
   it('überträgt den im Select gewählten Typ', async () => {
-    const uhs = uhsDetail({ plaetze: [] });
+    const uhs = uhsDetail({ plaetze: [], status: 'geplant' });
     let body: { typ?: string; menge?: number } | null = null;
     server.use(
       http.post('/api/einsaetze/1/uhs/1/plaetze/bulk', async ({ request }) => {
@@ -128,12 +128,48 @@ describe('Grundriss – Plätze nach Typ anlegen (LFH-16)', () => {
       }),
     );
     renderGrundriss(uhs, []);
-    await userEvent.click(screen.getByRole('button', { name: '+ Platz' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Plätze anlegen' }));
     await userEvent.click(await screen.findByRole('combobox', { name: 'Platz-Typ' }));
     await userEvent.click(await screen.findByText('Intensivplatz'));
     await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
     await waitFor(() => expect(body).not.toBeNull());
     expect(body!.typ).toBe('intensivplatz');
+  });
+});
+
+describe('Grundriss – Spalten-Fluss (LFH-58)', () => {
+  it('zeigt aus DIESER UHS abtransportierte Personen in der rechten Spalte', async () => {
+    const p = person({ id: 9, registrier_nr: 9, aktuelle_uhs_id: null, aktueller_verbleib: 'Transport → KH Mitte' });
+    const austritt: UhsBelegung = {
+      id: 1, einsatz_id: 1, person_id: 9, uhs_id: 1, platz_id: null,
+      art: 'austritt', notiz: null, zeitpunkt_at: 'x', erfasst_von: 1,
+    };
+    const uhs = uhsDetail({ belegungen: [austritt] });
+    renderGrundriss(uhs, [p]);
+    expect(await screen.findByText('Auf Transport gebracht')).toBeInTheDocument();
+    expect(await screen.findByText('Transport → KH Mitte')).toBeInTheDocument();
+    // Auto-Austritt leert aktuelle_uhs_id → die Person darf NICHT zusätzlich links
+    // unter „Noch nicht aufgenommen" auftauchen (sonst Doppelanzeige).
+    expect(screen.getAllByText(/R-009/)).toHaveLength(1);
+  });
+
+  it('zeigt noch nicht aufgenommene Personen in der linken Spalte', async () => {
+    const p = person({ id: 5, registrier_nr: 5, aktuelle_uhs_id: null });
+    renderGrundriss(uhsDetail({}), [p]);
+    expect(await screen.findByText('Noch nicht aufgenommen')).toBeInTheDocument();
+    expect(await screen.findByText(/R-005|· unbekannt/)).toBeInTheDocument();
+  });
+});
+
+describe('Grundriss – Platz-Aktion kontextabhängig (LFH-58)', () => {
+  it('versteckt „Plätze anlegen" bei aktiver UHS hinter „Plätze bearbeiten"', async () => {
+    renderGrundriss(uhsDetail({ status: 'aktiv' }), []);
+    // Aktiv: Anlegen ist NICHT sofort sichtbar, nur der sekundäre Bearbeiten-Umschalter.
+    const toggle = await screen.findByRole('button', { name: 'Plätze bearbeiten' });
+    expect(screen.queryByRole('button', { name: 'Plätze anlegen' })).not.toBeInTheDocument();
+    // Nach Klick erscheint die Anlegen-Aktion.
+    await userEvent.click(toggle);
+    expect(await screen.findByRole('button', { name: 'Plätze anlegen' })).toBeInTheDocument();
   });
 });
 
@@ -146,6 +182,6 @@ describe('Grundriss – Read-only (schreibgeschuetzt)', () => {
     expect(await screen.findByText('belegt')).toBeInTheDocument();
     // … aber keine Schreibaktionen.
     expect(screen.queryByRole('button', { name: 'zurückweisen' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '+ Platz' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Plätze anlegen' })).not.toBeInTheDocument();
   });
 });

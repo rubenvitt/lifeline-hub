@@ -1,7 +1,7 @@
-import { Alert, App, Breadcrumb, Button, Descriptions, Popconfirm, Space, Spin, Tabs, Tag } from 'antd';
+import { Alert, App, Breadcrumb, Button, Drawer, Popconfirm, Space, Spin, Tag, Typography } from 'antd';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { ladeUhs, setzeUhsStatus, storniereUhs } from '../../api/einsatzUhs';
 import { useUhsStream } from '../../etb/useUhsStream';
@@ -19,6 +19,8 @@ const STATUS_LABEL: Record<UhsStatus, { label: string; color: string }> = {
   aufgeloest: { label: 'aufgelöst', color: 'red' },
 };
 
+type DrawerKey = 'material' | 'bewegungen' | null;
+
 export default function UhsDetailPage() {
   const { id, uhsId: uhsIdParam } = useParams();
   const einsatzId = Number(id);
@@ -28,6 +30,7 @@ export default function UhsDetailPage() {
 
   const qc = useQueryClient();
   const { message } = App.useApp();
+  const [drawer, setDrawer] = useState<DrawerKey>(null);
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const detailQuery = useQuery({
@@ -75,20 +78,28 @@ export default function UhsDetailPage() {
   const ist_beobachter = einsatz.meine_rolle === 'beobachter';
   const schreibgeschuetzt = !ist_aktiv || ist_beobachter;
 
+  const meta = [
+    `Typ: ${uhs.typ}`,
+    `Standort: ${uhs.standort ?? '—'}`,
+    ...(uhs.notiz ? [`Notiz: ${uhs.notiz}`] : []),
+  ].join('  ·  ');
+
   return (
-    <div style={{ padding: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 112px)' }}>
       <Breadcrumb items={[
         { title: <Link to="/einsaetze">Einsätze</Link> },
         { title: <Link to={`/einsaetze/${einsatzId}`}>{einsatz.bezeichnung}</Link> },
         { title: <Link to={listenPfad}>Unfallhilfsstellen</Link> },
         { title: uhs.bezeichnung },
       ]} />
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginTop: 12, marginBottom: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, gap: 8, flexWrap: 'wrap' }}>
         <Space>
           <UhsSwitcher einsatzId={einsatzId} aktuelleUhs={uhs} />
           <Tag color={STATUS_LABEL[uhs.status].color}>{STATUS_LABEL[uhs.status].label}</Tag>
         </Space>
-        <Space>
+        <Space wrap>
+          <Button size="small" onClick={() => setDrawer('material')}>Material</Button>
+          <Button size="small" onClick={() => setDrawer('bewegungen')}>Bewegungen</Button>
           {!schreibgeschuetzt && uhs.status === 'geplant' && (
             <>
               <Button type="primary" onClick={() => statusMut.mutate('aktiv')} loading={statusMut.isPending}>
@@ -109,23 +120,24 @@ export default function UhsDetailPage() {
             </Popconfirm>
           )}
         </Space>
-      </Space>
-      <Descriptions size="small" column={2} style={{ marginBottom: 12 }}>
-        <Descriptions.Item label="Typ">{uhs.typ}</Descriptions.Item>
-        <Descriptions.Item label="Standort">{uhs.standort ?? '—'}</Descriptions.Item>
-        <Descriptions.Item label="Notiz" span={2}>{uhs.notiz ?? '—'}</Descriptions.Item>
-      </Descriptions>
-      <Tabs
-        defaultActiveKey="grundriss"
-        items={[
-          { key: 'grundriss', label: 'Grundriss',
-            children: <Grundriss einsatzId={einsatzId} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} /> },
-          { key: 'material', label: 'Material',
-            children: <MaterialTab einsatzId={einsatzId} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} /> },
-          { key: 'bewegungen', label: 'Bewegungen',
-            children: <BewegungenTab uhs={uhs} /> },
-        ]}
-      />
+      </div>
+      <Typography.Text type="secondary" style={{ fontSize: 12, margin: '4px 0 8px' }}>{meta}</Typography.Text>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <Grundriss einsatzId={einsatzId} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />
+      </div>
+
+      <Drawer
+        open={drawer !== null}
+        onClose={() => setDrawer(null)}
+        width={640}
+        title={drawer === 'material' ? 'Material' : 'Bewegungen'}
+        destroyOnHidden
+      >
+        {drawer === 'material' && (
+          <MaterialTab einsatzId={einsatzId} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />
+        )}
+        {drawer === 'bewegungen' && <BewegungenTab uhs={uhs} />}
+      </Drawer>
     </div>
   );
 }

@@ -98,14 +98,41 @@ pub async fn anlegen_bulk(
             }
         }
     }
+    // Auto-Layout: Neue Plätze auf ein Raster setzen, sonst landen sie alle auf der
+    // Default-Position und liegen im Grundriss übereinander. Start hinter den bereits
+    // sichtbaren (nicht stornierten) Plätzen; Feinanordnung bleibt per Drag möglich.
+    let belegt: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM uhs_platz WHERE uhs_id = ? AND storniert_at IS NULL",
+    )
+    .bind(uhs_id)
+    .fetch_one(pool)
+    .await?;
     let mut neue = Vec::with_capacity(menge.max(0) as usize);
     for i in 1..=menge {
         let bezeichnung = format!("{label} {}", max + i);
+        let (pos_x, pos_y) = raster_position(belegt + i - 1);
         neue.push(
-            anlegen(pool, uhs_id, NeuerPlatz { typ, bezeichnung: &bezeichnung, pos_x: None, pos_y: None }).await?,
+            anlegen(
+                pool,
+                uhs_id,
+                NeuerPlatz { typ, bezeichnung: &bezeichnung, pos_x: Some(pos_x), pos_y: Some(pos_y) },
+            )
+            .await?,
         );
     }
     Ok(neue)
+}
+
+/// Rasterposition (5 Spalten) für den `n`-ten Platz (0-basiert). Verhindert, dass
+/// mehrere in einem Bulk angelegte Plätze auf derselben Default-Position liegen.
+fn raster_position(n: i64) -> (f64, f64) {
+    const SPALTEN: i64 = 5;
+    const SCHRITT_X: f64 = 160.0;
+    const SCHRITT_Y: f64 = 120.0;
+    const RAND: f64 = 10.0;
+    let spalte = n.rem_euclid(SPALTEN);
+    let zeile = n.div_euclid(SPALTEN);
+    (RAND + spalte as f64 * SCHRITT_X, RAND + zeile as f64 * SCHRITT_Y)
 }
 
 /// Aktualisiert Stamm/Layout eines Platzes (NICHT Verfügbarkeit — eigene Funktion).
@@ -279,6 +306,24 @@ mod tests {
         assert_eq!(p.verfuegbarkeit, "frei");
         assert_eq!(p.pos_x, Some(100.0));
         assert!(p.reserviert_fuer_person_id.is_none());
+    }
+
+    #[tokio::test]
+    async fn anlegen_bulk_vergibt_unterschiedliche_positionen() {
+        let pool = test_pool().await;
+        let (_b, _e, u, _, _) = setup(&pool).await;
+        let plaetze = anlegen_bulk(&pool, u, "bett", "Bett", 3).await.unwrap();
+        assert_eq!(plaetze.len(), 3);
+        // Jeder Platz hat eine Position (sonst Default-Überlagerung im Grundriss) …
+        for p in &plaetze {
+            assert!(p.pos_x.is_some() && p.pos_y.is_some(), "Bulk-Plätze brauchen eine Position");
+        }
+        // … und keine zwei Plätze teilen sich dieselbe Position.
+        let eindeutig: std::collections::HashSet<(i64, i64)> = plaetze
+            .iter()
+            .map(|p| (p.pos_x.unwrap() as i64, p.pos_y.unwrap() as i64))
+            .collect();
+        assert_eq!(eindeutig.len(), 3, "alle drei Positionen müssen verschieden sein");
     }
 
     #[tokio::test]
