@@ -238,6 +238,13 @@ Neues Modul „Bereitstellungsräume" (Kategorie Kräfte/Mittel), Muster analog 
 
 ## Offene Punkte / Folge-Specs
 
+- **DB-CHECK von `uhs.typ` nachziehen** (Wert `'bereitstellungsraum'` aus dem CHECK
+  entfernen): in der Implementierung aufgeschoben, weil sqlx-sqlite 0.8.6 die
+  `-- no-transaction`-Direktive ignoriert (jede Migration läuft in einer Tx) und damit
+  ein FK-sicherer Tabellen-Rebuild (`PRAGMA foreign_keys=OFF`) nicht möglich ist. Migration
+  `0062` macht daher nur den defensiven `UPDATE … → 'sonstige'`; das Ablehnen von
+  `'bereitstellungsraum'` erfolgt zuverlässig auf App-Ebene (`UhsTyp::parse()` + Handler).
+  Nachziehen nach sqlx-Upgrade mit funktionierendem `no_tx` oder via Out-of-Pipeline-Skript.
 - Stärke-Aggregation im BR (Summen) — später.
 - Cross-Modul-Auto-Austritt (Einheit/Fahrzeug abgemeldet → BR-Austritt) — später.
 - Karten-Verortung (T4), BR-Templates — später.
