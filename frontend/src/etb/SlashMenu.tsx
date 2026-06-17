@@ -1,5 +1,5 @@
 // src/etb/SlashMenu.tsx
-import { Typography } from 'antd';
+import { Typography, theme } from 'antd';
 import { useEffect, useImperativeHandle, useMemo, useState, forwardRef } from 'react';
 import type { EtbBaustein } from '../api/types';
 import { filterSlashEintraege, type MetaFeld, type SlashEintrag } from './schnellerfassungModell';
@@ -28,6 +28,10 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
   );
   const flach: SlashEintrag[] = useMemo(() => [...treffer.felder, ...treffer.bausteine], [treffer]);
   const [aktiv, setAktiv] = useState(0);
+  // Aufgelöste Theme-Tokens statt antd-CSS-Variablen: cssVar ist nicht aktiviert,
+  // daher würde `var(--ant-color-bg-elevated, …)` immer den Fallback nehmen
+  // (dunkel) und im Light Mode schwarzen Grund mit schwarzem Text erzeugen.
+  const { token } = theme.useToken();
 
   useEffect(() => setAktiv(0), [filter, offen]);
 
@@ -66,8 +70,8 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
               aria-selected={idx === aktiv}
               onMouseDown={(ev) => { ev.preventDefault(); onWahl(e); }}
               style={{
-                padding: '6px 12px', cursor: 'pointer',
-                background: idx === aktiv ? 'rgba(22,119,255,0.15)' : undefined,
+                padding: '6px 12px', cursor: 'pointer', color: token.colorText,
+                background: idx === aktiv ? token.controlItemBgActive : undefined,
               }}
             >
               {e.label}{e.gesetzt ? ' ✓' : ''}
@@ -83,9 +87,9 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
       data-testid="slash-menu"
       style={{
         position: 'absolute', zIndex: 10, minWidth: 240, marginTop: 4,
-        background: 'var(--ant-color-bg-elevated, #1f1f1f)',
-        border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8,
-        boxShadow: '0 6px 18px rgba(0,0,0,0.4)', maxHeight: 280, overflow: 'auto',
+        background: token.colorBgElevated, color: token.colorText,
+        border: `1px solid ${token.colorBorderSecondary}`, borderRadius: token.borderRadiusLG,
+        boxShadow: token.boxShadowSecondary, maxHeight: 280, overflow: 'auto',
       }}
     >
       {flach.length === 0 ? (

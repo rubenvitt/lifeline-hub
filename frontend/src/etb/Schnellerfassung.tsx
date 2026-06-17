@@ -141,7 +141,7 @@ export default function Schnellerfassung({ erfassen, berichtigungZu, onBerichtig
   }
 
   return (
-    <Card size="small" style={{ marginTop: 16 }}>
+    <Card size="small" className="etb-erfassung-card">
       {berichtigungZu && (
         <Alert
           type="warning" showIcon style={{ marginBottom: 12 }}

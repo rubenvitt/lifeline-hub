@@ -145,6 +145,22 @@ export default function EtbPage() {
         </Space>
       </Space>
 
+      {/* Erfassung als angepinnte Kommandozeile am Kopf des Tagebuchs: Da die
+          Tabelle neueste-zuerst sortiert, erscheint ein neuer Eintrag direkt
+          unter dem Eingabefeld — kein Scrollen an der ganzen Liste vorbei mehr.
+          Die Leiste bleibt beim Blättern durch ältere Einträge sichtbar (sticky). */}
+      {darfSchreiben && (
+        <div className="etb-erfassung-sticky">
+          <Schnellerfassung
+            erfassen={erfassenMitMeldung}
+            berichtigungZu={berichtigungZu}
+            onBerichtigungAbbrechen={() => setBerichtigungZu(null)}
+            bausteine={bausteineQuery.data ?? []}
+            einsatz={einsatz}
+          />
+        </div>
+      )}
+
       {etbQuery.isError && (
         <Alert
           type="error"
@@ -200,15 +216,6 @@ export default function EtbPage() {
         </div>
       )}
 
-      {darfSchreiben && (
-        <Schnellerfassung
-          erfassen={erfassenMitMeldung}
-          berichtigungZu={berichtigungZu}
-          onBerichtigungAbbrechen={() => setBerichtigungZu(null)}
-          bausteine={bausteineQuery.data ?? []}
-          einsatz={einsatz}
-        />
-      )}
       {istEinsatzleitung && (
         <MitgliederPanel
           einsatzId={einsatzId}

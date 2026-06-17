@@ -17,3 +17,40 @@ body {
 [data-theme='dark'] .etb-berichtigung > td {
   background-color: #2a1215;
 }
+
+/* ETB-Erfassung als angepinnte Kommandoleiste am Kopf des Tagebuchs.
+   Das Eingabefeld bleibt beim Scrollen durch ältere Einträge sichtbar; neue
+   Einträge erscheinen direkt darunter (Tabelle ist neueste-zuerst sortiert).
+   Negative Seitenränder ziehen die Leiste randlos über die 24px-Polsterung
+   des Content-Bereichs, damit beim Scrollen kein Tabelleninhalt seitlich
+   durchscheint. Hintergrund = colorBgLayout je Theme, deckt die durchlaufende
+   Liste sauber ab. */
+.etb-erfassung-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin: 0 -24px 16px;
+  padding: 12px 24px 14px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #e8e8e8;
+  box-shadow: 0 8px 16px -12px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme='dark'] .etb-erfassung-sticky {
+  background: #000;
+  border-bottom-color: #1f1f1f;
+  box-shadow: 0 8px 16px -10px rgba(0, 0, 0, 0.7);
+}
+
+/* Roter Primär-Akzent (colorPrimary) markiert das Eingabefeld als aktive
+   Schreibfläche – klar abgesetzt von der neutralen Tabelle darunter. */
+.etb-erfassung-card {
+  border-left: 3px solid #a8071a;
+}
+
+/* Höhe der aufgeklappten Markdown-Vorschau in der angepinnten Leiste deckeln,
+   damit der Worst-Case (Berichtigung + offene Vorschau) nicht den halben
+   Viewport frisst. overflow:auto erbt die Vorschau bereits. */
+.etb-erfassung-sticky .markdown-editor__vorschau {
+  max-height: 28vh;
+}
