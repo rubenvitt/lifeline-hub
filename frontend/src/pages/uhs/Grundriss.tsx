@@ -1,13 +1,22 @@
-import { App, Button, Card, Dropdown, InputNumber, Select, Space, Tag, Typography } from 'antd';
-import { DndContext, useDraggable, useDroppable, type DragEndEvent, KeyboardSensor, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
+import { App, Button, Card, Dropdown, Form, Input, InputNumber, Modal, Select, Space, Tag, Tooltip, Typography, theme } from 'antd';
+import {
+  CarOutlined, CheckCircleOutlined, DeleteOutlined, LockOutlined, LogoutOutlined,
+  SyncOutlined, ToolOutlined,
+} from '@ant-design/icons';
+import { DndContext, DragOverlay, useDraggable, useDroppable, type DragEndEvent, type DragStartEvent, KeyboardSensor, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import {
   aenderePersonBelegung, aktualisierePlatz, legePlaetzeAn, setzePlatzVerfuegbarkeit, stornierePlatz,
 } from '../../api/einsatzUhs';
-import { listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
+import { erfasseVerbleib, listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
 import type { Person, PlatzTyp, UhsDetail, UhsPlatz, Verfuegbarkeit } from '../../api/types';
 import { ApiError } from '../../api/client';
+
+// Feste Karten-Höhe. Muss unter dem Raster-Zeilenabstand (raster_position SCHRITT_Y=120
+// im Backend) bleiben, damit absolut platzierte Karten einander nicht überlappen, und
+// groß genug für den Worst Case (2-zeiliger Titel + Tag + Belegung + Aktionszeile).
+const PLATZ_KARTE_HOEHE = 116;
 
 const VERF_FARBE: Record<Verfuegbarkeit, string> = {
   frei: '#52c41a',
@@ -22,23 +31,32 @@ function personLabel(person: Person): string {
   return person.name ? `${nr} · ${person.name}` : `${nr} · unbekannt`;
 }
 
-interface PersonenkartenProps { person: Person | undefined; }
-function Personenkarte({ person }: PersonenkartenProps) {
+interface PersonenkartenProps { person: Person | undefined; kompakt?: boolean; }
+function Personenkarte({ person, kompakt }: PersonenkartenProps) {
   if (!person) return null;
-  return <Tag color="default" style={{ margin: 2 }}>{personLabel(person)}</Tag>;
+  // `kompakt` (auf der Platz-Karte): Label einzeilig mit Ellipsis kappen, damit die
+  // absolut positionierte, belegte Karte unabhängig von der Namenslänge eine stabile
+  // Höhe behält und nicht in die darunterliegende Karte hineinwächst (Layout-Bruch).
+  const style: React.CSSProperties = kompakt
+    ? { margin: 2, maxWidth: 124, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+    : { margin: 2 };
+  return <Tag color="default" style={style} title={kompakt ? personLabel(person) : undefined}>{personLabel(person)}</Tag>;
 }
 
-function PersonenkarteDrag({ person, disabled }: { person: Person; disabled: boolean }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+function PersonenkarteDrag({ person, disabled, kompakt }: { person: Person; disabled: boolean; kompakt?: boolean }) {
+  // Kein Inline-`transform`: die gezogene Karte rendert als DragOverlay (Portal, s. u.).
+  // Würde der Originalknoten hier transformiert, vergrößerte er die scroll-bare Region
+  // seiner overflow:auto-Spalte → wachsende Scrollbar (Regression LFH-58-Folgebug).
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `person-${person.id}`, data: { kind: 'person', personId: person.id }, disabled,
   });
   const style: React.CSSProperties = {
     cursor: disabled ? 'default' : 'grab',
-    transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
+    opacity: isDragging ? 0.4 : undefined,
   };
   return (
     <div ref={setNodeRef} {...attributes} {...listeners} style={style}>
-      <Personenkarte person={person} />
+      <Personenkarte person={person} kompakt={kompakt} />
     </div>
   );
 }
@@ -50,10 +68,11 @@ interface PlatzKarteProps {
   bearbeitbar: boolean;
   onVerfuegbarkeit: (v: Verfuegbarkeit) => void;
   onAustritt: () => void;
+  onTransport: () => void;
   onStorno: () => void;
 }
 
-function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfuegbarkeit, onAustritt, onStorno }: PlatzKarteProps) {
+function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfuegbarkeit, onAustritt, onTransport, onStorno }: PlatzKarteProps) {
   // Platz-Karte ist Drop-Target (Personen zuweisen) und — nur im Bearbeiten-Modus —
   // Drag-Source (Layout verschieben). Mit @dnd-kit beides am selben Knoten.
   const { attributes, listeners, setNodeRef: setDragRef, transform } = useDraggable({
@@ -62,60 +81,126 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: `drop-platz-${platz.id}`, data: { kind: 'platz', platzId: platz.id, uhsId: platz.uhs_id },
   });
+  const { token } = theme.useToken();
   const setRef = (n: HTMLDivElement | null) => { setDragRef(n); setDropRef(n); };
   const style: React.CSSProperties = {
     position: 'absolute',
     left: platz.pos_x ?? 10,
     top: platz.pos_y ?? 10,
     width: 140,
+    // FESTE Höhe + overflow:hidden: die Kartengröße ist invariant gegen Belegung, Titel-
+    // Umbruch und Tag-Anzahl (Titel/Tags/Person/Aktionen sind unten je auf feste Höhe
+    // gedeckelt). Alle Karten eines Rasters sind damit exakt gleich groß und bleiben unter
+    // dem Raster-Zeilenabstand (120px) → keine Überlappung mit der Karte darunter.
+    height: PLATZ_KARTE_HOEHE,
+    overflow: 'hidden',
+    boxSizing: 'border-box',
     cursor: bearbeitbar ? 'grab' : 'default',
     border: `2px solid ${VERF_FARBE[platz.verfuegbarkeit]}`,
-    // Belegung ist orthogonal zur Verfügbarkeit (Spec): Verfügbarkeits-Rahmen bleibt,
-    // belegte Plätze werden zusätzlich durch Hintergrund + „belegt"-Tag kenntlich gemacht.
-    background: isOver ? '#e6f4ff' : belegtVon ? '#f0f5ff' : 'white',
+    // Belegte Plätze: Hintergrund + „belegt"-Tag. „frei" und „belegt" schließen sich aus
+    // (s. u. tag-Logik); andere Verfügbarkeiten (defekt/gesperrt/…) bleiben daneben sichtbar.
+    // Theme-Tokens statt fixer Hex-Werte, damit die Karten im Dark Mode mitziehen.
+    background: isOver ? token.colorPrimaryBg : belegtVon ? token.colorInfoBg : token.colorBgContainer,
     padding: 6,
     borderRadius: 4,
     transform: transform ? `translate(${transform.x}px, ${transform.y}px)` : undefined,
   };
+  // Verfügbarkeits-Optionen immer; „Platz löschen" ist eine Layout-/Setup-Aktion und
+  // bleibt dem Bearbeiten-Modus vorbehalten. Das Menü selbst ist jedoch auch im
+  // Nicht-Edit-Modus verfügbar (Verfügbarkeit ändern gehört zum laufenden Betrieb).
+  const verfItems = [
+    { key: 'frei', label: 'als frei markieren', icon: <CheckCircleOutlined /> },
+    { key: 'defekt', label: 'als defekt markieren', icon: <ToolOutlined /> },
+    { key: 'aufbereitung', label: 'als in Aufbereitung markieren', icon: <SyncOutlined /> },
+    { key: 'gesperrt', label: 'als gesperrt markieren', icon: <LockOutlined /> },
+  ];
   const menu = {
-    items: [
-      { key: 'frei', label: 'als frei markieren' },
-      { key: 'defekt', label: 'als defekt markieren' },
-      { key: 'aufbereitung', label: 'als in Aufbereitung markieren' },
-      { key: 'gesperrt', label: 'als gesperrt markieren' },
-      { type: 'divider' as const },
-      { key: 'storno', label: 'Platz löschen', danger: true },
-    ],
+    items: bearbeitbar
+      ? [...verfItems, { type: 'divider' as const }, { key: 'storno', label: 'Platz löschen', icon: <DeleteOutlined />, danger: true }]
+      : verfItems,
     onClick: ({ key }: { key: string }) => {
       if (key === 'storno') onStorno();
       else onVerfuegbarkeit(key as Verfuegbarkeit);
     },
   };
+  // „frei" und „belegt" widersprechen sich — bei belegtem freien Platz nur „belegt" zeigen.
+  // Echte Sonderzustände (defekt/aufbereitung/gesperrt/reserviert) bleiben auch belegt sichtbar.
+  const zeigeVerfTag = !(belegtVon && platz.verfuegbarkeit === 'frei');
+  // dnd-kit-Drag-Props NUR im Bearbeiten-Modus spreizen. Sonst setzt useDraggable (disabled)
+  // role="button" + aria-disabled="true" auf die Karte → der ganze Subtree (inkl. der
+  // Aktions-Buttons) gilt als deaktiviert (Screenreader + Tests können nicht klicken).
+  const dragProps = bearbeitbar ? { ...attributes, ...listeners } : {};
   return (
-    <div ref={setRef} style={style} {...attributes} {...listeners}>
-      <Typography.Text strong>{platz.bezeichnung}</Typography.Text>
-      <div>
-        <Tag color={VERF_FARBE[platz.verfuegbarkeit]}>{platz.verfuegbarkeit}</Tag>
+    <div ref={setRef} data-testid="platz-karte" style={style} {...dragProps}>
+      {/* Titel: max. 2 Zeilen, dann Ellipsis (voller Name im Tooltip). Feste maxHeight,
+          damit ein Umbruch die Karte NICHT vergrößert. */}
+      <Typography.Text
+        strong
+        title={platz.bezeichnung}
+        style={{
+          display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2,
+          overflow: 'hidden', lineHeight: '15px', fontSize: 13, maxHeight: 30,
+        }}
+      >
+        {platz.bezeichnung}
+      </Typography.Text>
+      {/* Status-Tags: eine Zeile, kein Umbruch (feste Höhe). */}
+      <div style={{ height: 24, overflow: 'hidden', whiteSpace: 'nowrap' }}>
+        {zeigeVerfTag && <Tag color={VERF_FARBE[platz.verfuegbarkeit]}>{platz.verfuegbarkeit}</Tag>}
         {belegtVon && <Tag color="blue">belegt</Tag>}
       </div>
-      <Personenkarte person={belegtVon} />
-      {belegtVon && !schreibgeschuetzt && (
-        // Person aus dem Platz (und der UHS) zurückweisen = Austritt (Spec-BelegungsArt).
-        <Button
-          size="small"
-          danger
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={onAustritt}
-        >
-          zurückweisen
-        </Button>
-      )}
-      {bearbeitbar && (
-        <Dropdown menu={menu} trigger={['click']}>
-          {/* stopPropagation: sonst startet eine kleine Mausbewegung beim Klick aufs "…" einen Drag. */}
-          <Button size="small" type="text" onPointerDown={(e) => e.stopPropagation()}>…</Button>
-        </Dropdown>
-      )}
+      {/* Belegung: feste Höhe reserviert, auch wenn leer → Karte bleibt gleich groß.
+          Belegte Person ist ziehbar (→ Wartebereich links oder Transport rechts); im
+          Bearbeiten-Modus deaktiviert, damit sie nicht mit dem Platz-Drag kollidiert. */}
+      <div style={{ height: 24, overflow: 'hidden' }}>
+        {belegtVon && <PersonenkarteDrag person={belegtVon} disabled={schreibgeschuetzt || bearbeitbar} kompakt />}
+      </div>
+      {/* Aktionszeile UNTER der Belegung als direkte Icon-Buttons (kein Menü); feste Höhe. */}
+      <div style={{ display: 'flex', gap: 4, height: 24, alignItems: 'center' }}>
+        {belegtVon && !schreibgeschuetzt && (
+          <>
+            <Tooltip title="in Transport bringen">
+              {/* stopPropagation: sonst startet eine kleine Mausbewegung beim Klick einen Drag. */}
+              <Button
+                size="small"
+                aria-label="in Transport bringen"
+                icon={<CarOutlined />}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={onTransport}
+              />
+            </Tooltip>
+            <Tooltip title="zurückweisen">
+              <Button
+                size="small"
+                danger
+                aria-label="zurückweisen"
+                icon={<LogoutOutlined />}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={onAustritt}
+              />
+            </Tooltip>
+          </>
+        )}
+        {/* Primäraktion direkt (kein Menü): ein nicht-freier Platz wird per Klick frei
+            gemacht (z. B. Aufbereitung abgeschlossen). Auch im Nicht-Edit-Modus. */}
+        {!schreibgeschuetzt && platz.verfuegbarkeit !== 'frei' && (
+          <Tooltip title="als frei markieren">
+            <Button
+              size="small"
+              aria-label="als frei markieren"
+              icon={<CheckCircleOutlined />}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => onVerfuegbarkeit('frei')}
+            />
+          </Tooltip>
+        )}
+        {/* Weitere Platz-Aktionen (Verfügbarkeit, im Edit auch Löschen) — auch Nicht-Edit. */}
+        {!schreibgeschuetzt && (
+          <Dropdown menu={menu} trigger={['click']}>
+            <Button size="small" type="text" aria-label="Platzaktionen" onPointerDown={(e) => e.stopPropagation()}>…</Button>
+          </Dropdown>
+        )}
+      </div>
     </div>
   );
 }
@@ -132,12 +217,13 @@ function PersonenSpalte({
 }) {
   // Optionales Drop-Target (Wartebereich nimmt Personen ohne Platz auf).
   const drop = useDroppable({ id: droppableId ?? `nodrop-${titel}`, data: { kind: 'inbox' }, disabled: !droppableId });
+  const { token } = theme.useToken();
   return (
     <Card
       title={titel}
       size="small"
       styles={{ body: { padding: 8 } }}
-      style={{ background: droppableId && drop.isOver ? '#e6f4ff' : undefined }}
+      style={{ background: droppableId && drop.isOver ? token.colorPrimaryBg : undefined }}
     >
       <div ref={droppableId ? drop.setNodeRef : undefined} style={{ minHeight: 48 }}>
         {personen.map((p) => <PersonenkarteDrag key={p.id} person={p} disabled={schreibgeschuetzt} />)}
@@ -147,10 +233,19 @@ function PersonenSpalte({
   );
 }
 
-/** Rechte Spalte: aus DIESER UHS heraus auf Transport gebrachte Personen (read-only). */
-function TransportSpalte({ personen }: { personen: Person[] }) {
+/** Rechte Spalte: aus DIESER UHS heraus auf Transport gebrachte Personen.
+ *  Drop-Target: eine belegte Person hierher ziehen öffnet den Transport-Abschluss-Screen. */
+function TransportSpalte({ personen, schreibgeschuetzt }: { personen: Person[]; schreibgeschuetzt: boolean }) {
+  const drop = useDroppable({ id: 'drop-transport', data: { kind: 'transport' }, disabled: schreibgeschuetzt });
+  const { token } = theme.useToken();
   return (
-    <Card title="Auf Transport gebracht" size="small" styles={{ body: { padding: 8 } }}>
+    <Card
+      title="Auf Transport gebracht"
+      size="small"
+      styles={{ body: { padding: 8 } }}
+      style={{ background: !schreibgeschuetzt && drop.isOver ? token.colorPrimaryBg : undefined }}
+    >
+      <div ref={schreibgeschuetzt ? undefined : drop.setNodeRef} style={{ minHeight: 48 }}>
       {personen.map((p) => (
         <div key={p.id} style={{ marginBottom: 6 }}>
           <Tag color="orange" style={{ margin: 0 }}>{personLabel(p)}</Tag>
@@ -160,6 +255,7 @@ function TransportSpalte({ personen }: { personen: Person[] }) {
         </div>
       ))}
       {personen.length === 0 && <Typography.Text type="secondary">keine</Typography.Text>}
+      </div>
     </Card>
   );
 }
@@ -169,6 +265,7 @@ export default function Grundriss({
 }: { einsatzId: number; uhs: UhsDetail; schreibgeschuetzt: boolean }) {
   const qc = useQueryClient();
   const { message } = App.useApp();
+  const { token } = theme.useToken();
   // Sensors: PointerSensor mit 5px-Aktivierungsdistanz (sonst klickt jeder Click den Drag aus),
   // KeyboardSensor für Tests/Accessibility.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), useSensor(KeyboardSensor));
@@ -180,6 +277,14 @@ export default function Grundriss({
     setPlatzBearbeitung(uhs.status === 'geplant');
   }, [uhs.status]);
   const platzEditAktiv = platzBearbeitung && !schreibgeschuetzt;
+
+  // Aktiv gezogene Person → wird im DragOverlay (Portal) gerendert. Platz-Drags nutzen
+  // weiterhin ihren Inline-Transform innerhalb der Fläche (kein Overlay nötig/gewollt).
+  const [aktivePersonId, setAktivePersonId] = useState<number | null>(null);
+
+  // Zielperson des „In Transport bringen"-Abschluss-Screens (null = geschlossen).
+  const [transportPerson, setTransportPerson] = useState<Person | null>(null);
+  const [transportForm] = Form.useForm<{ ziel?: string; transportmittel?: string; notiz?: string }>();
 
   const personenQuery = useQuery({
     queryKey: ['einsatz-personen', einsatzId],
@@ -239,6 +344,17 @@ export default function Grundriss({
     mutationFn: (personId: number) => aenderePersonBelegung(einsatzId, personId, { art: 'austritt' }),
     onSuccess: () => invalidate(), onError: fehler,
   });
+  // „In Transport bringen": Verbleib=transport. Der Server trägt die Person dabei
+  // automatisch aus der UHS aus (Auto-Austritt) → sie wandert rechts in „Auf Transport gebracht".
+  const transportMut = useMutation({
+    mutationFn: ({ personId, ziel, transportmittel, notiz }: { personId: number; ziel?: string; transportmittel?: string; notiz?: string }) =>
+      erfasseVerbleib(einsatzId, personId, {
+        art: 'transport', ziel: ziel ?? null, transportmittel: transportmittel ?? null,
+        status: 'abtransportiert', notiz: notiz ?? null,
+      }),
+    onSuccess: () => { message.success('Auf Transport gebracht'); setTransportPerson(null); transportForm.resetFields(); invalidate(); },
+    onError: fehler,
+  });
   const verfMut = useMutation({
     mutationFn: ({ platzId, verf }: { platzId: number; verf: Verfuegbarkeit }) =>
       setzePlatzVerfuegbarkeit(einsatzId, uhs.id, platzId, verf, null),
@@ -249,7 +365,20 @@ export default function Grundriss({
     onSuccess: () => { message.success('Platz gelöscht'); invalidate(); }, onError: fehler,
   });
 
+  function onDragStart(event: DragStartEvent) {
+    const data = event.active.data.current as { kind: string; personId?: number } | undefined;
+    if (data?.kind === 'person' && data.personId != null) setAktivePersonId(data.personId);
+  }
+
+  // Overlay-State IMMER zuerst zurücksetzen — onDragEnd hat mehrere frühe `return`-Pfade
+  // (kein Drop-Target, keine Verschiebung); ein Reset am Ende ließe sonst einen Geister-
+  // Karten-Overlay stehen.
+  function onDragCancel() {
+    setAktivePersonId(null);
+  }
+
   function onDragEnd(event: DragEndEvent) {
+    setAktivePersonId(null);
     const { active, over, delta } = event;
     const data = active.data.current as { kind: string; personId?: number; platzId?: number } | undefined;
     if (!data) return;
@@ -264,19 +393,25 @@ export default function Grundriss({
       layoutMut.mutate({ pid: data.platzId, pos_x: nx, pos_y: ny });
       return;
     }
-    // Person-Drop: braucht ein Drop-Target (Platz oder Wartebereich).
+    // Person-Drop: braucht ein Drop-Target (Platz, Wartebereich oder Transport).
     if (data.kind === 'person' && data.personId != null) {
       const target = over?.data.current as { kind: string; platzId?: number } | undefined;
       if (!target) return;
       if (target.kind === 'inbox') belegMut.mutate({ personId: data.personId, platzId: null });
       else if (target.kind === 'platz' && target.platzId != null) {
         belegMut.mutate({ personId: data.personId, platzId: target.platzId });
+      } else if (target.kind === 'transport') {
+        // Transport ändert Patientendaten (Verbleib) → Abschluss-Screen öffnen statt sofort buchen.
+        const person = personen.find((p) => p.id === data.personId);
+        if (person) setTransportPerson(person);
       }
     }
   }
 
+  const aktivePerson = aktivePersonId != null ? personen.find((p) => p.id === aktivePersonId) : undefined;
+
   return (
-    <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+    <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
       <div style={{ display: 'flex', gap: 12, height: '100%', minHeight: 0, alignItems: 'stretch' }}>
         {/* LINKS: Eingang / Wartebereich */}
         <div style={{ width: 240, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12, overflow: 'auto' }}>
@@ -316,7 +451,7 @@ export default function Grundriss({
                 )
             )}
           </div>
-          <div style={{ flex: 1, minHeight: 0, overflow: 'auto', border: '1px dashed #d9d9d9', background: '#fafafa', borderRadius: 4 }}>
+          <div style={{ flex: 1, minHeight: 0, overflow: 'auto', border: `1px dashed ${token.colorBorder}`, background: token.colorBgLayout, borderRadius: 4 }}>
             <div style={{ position: 'relative', width: flaecheBreite, height: flaecheHoehe }}>
               {uhs.plaetze.map((p) => (
                 <PlatzKarte
@@ -327,6 +462,7 @@ export default function Grundriss({
                   bearbeitbar={platzEditAktiv}
                   onVerfuegbarkeit={(v) => verfMut.mutate({ platzId: p.id, verf: v })}
                   onAustritt={() => { const b = belegtAn(p.id); if (b) austrittMut.mutate(b.id); }}
+                  onTransport={() => { const b = belegtAn(p.id); if (b) setTransportPerson(b); }}
                   onStorno={() => stornoMut.mutate(p.id)}
                 />
               ))}
@@ -343,9 +479,34 @@ export default function Grundriss({
 
         {/* RECHTS: Auf Transport gebracht */}
         <div style={{ width: 240, flexShrink: 0, overflow: 'auto' }}>
-          <TransportSpalte personen={transportiert} />
+          <TransportSpalte personen={transportiert} schreibgeschuetzt={schreibgeschuetzt} />
         </div>
       </div>
+      {/* Portal-Overlay: folgt dem Cursor auf Body-Ebene, beeinflusst keine Scroll-Region. */}
+      <DragOverlay>
+        {aktivePerson ? <Personenkarte person={aktivePerson} /> : null}
+      </DragOverlay>
+
+      {/* Abschluss-Screen „In Transport bringen" (Verbleib=transport). */}
+      <Modal
+        open={transportPerson != null}
+        title={transportPerson ? `In Transport bringen — ${personLabel(transportPerson)}` : 'In Transport bringen'}
+        okText="In Transport"
+        confirmLoading={transportMut.isPending}
+        onOk={() => transportForm.submit()}
+        onCancel={() => { setTransportPerson(null); transportForm.resetFields(); }}
+        destroyOnHidden
+      >
+        <Form
+          form={transportForm}
+          layout="vertical"
+          onFinish={(v) => { if (transportPerson) transportMut.mutate({ personId: transportPerson.id, ...v }); }}
+        >
+          <Form.Item label="Ziel (z. B. Krankenhaus, Freitext)" name="ziel"><Input /></Form.Item>
+          <Form.Item label="Transportmittel (RTW/KTW …)" name="transportmittel"><Input /></Form.Item>
+          <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
+        </Form>
+      </Modal>
     </DndContext>
   );
 }

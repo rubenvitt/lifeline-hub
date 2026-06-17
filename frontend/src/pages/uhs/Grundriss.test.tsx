@@ -54,11 +54,21 @@ describe('Grundriss – Belegt-Anzeige (LFH-18)', () => {
     renderGrundriss(uhs, [p]);
     // Person-Tag bestätigt, dass die Belegung geladen ist …
     expect(await screen.findByText(/R-007|R-7|· unbekannt/)).toBeInTheDocument();
-    // … und der Platz muss als belegt gekennzeichnet sein (nicht nur als „frei").
+    // … und der Platz muss als belegt gekennzeichnet sein.
     expect(screen.getByText('belegt')).toBeInTheDocument();
-    // Orthogonalität (E-3): der Verfügbarkeits-Tag bleibt DANEBEN bestehen —
-    // „belegt" ersetzt ihn nicht (es gibt keinen Verfügbarkeitswert „belegt").
-    expect(screen.getByText('frei')).toBeInTheDocument();
+    // Ein belegter „freier" Platz ist nicht mehr frei: der „frei"-Tag entfällt,
+    // „belegt" ist der einzige Status (Bug-Fix: zuvor „frei / belegt" parallel).
+    expect(screen.queryByText('frei')).not.toBeInTheDocument();
+  });
+
+  it('zeigt bei belegtem, NICHT-freiem Platz beide Status (z. B. defekt + belegt)', async () => {
+    // Nur „frei" widerspricht „belegt". defekt/gesperrt/… sind eigenständige
+    // Zustände, die auch bei Belegung informativ bleiben.
+    const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'defekt' })] });
+    renderGrundriss(uhs, [p]);
+    expect(await screen.findByText('belegt')).toBeInTheDocument();
+    expect(screen.getByText('defekt')).toBeInTheDocument();
   });
 
   it('zeigt einen unbelegten Platz NICHT als belegt', async () => {
@@ -66,11 +76,13 @@ describe('Grundriss – Belegt-Anzeige (LFH-18)', () => {
     renderGrundriss(uhs, []);
     expect(await screen.findByText('Bett 1')).toBeInTheDocument();
     expect(screen.queryByText('belegt')).not.toBeInTheDocument();
+    // Unbelegt → Verfügbarkeit „frei" bleibt sichtbar.
+    expect(screen.getByText('frei')).toBeInTheDocument();
   });
 });
 
 describe('Grundriss – Zurückweisen (LFH-17)', () => {
-  it('weist eine belegte Person per Button als Austritt zurück', async () => {
+  it('weist eine belegte Person über das Aktionsmenü als Austritt zurück', async () => {
     const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
     const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     let body: { art?: string } | null = null;
@@ -84,17 +96,44 @@ describe('Grundriss – Zurückweisen (LFH-17)', () => {
       }),
     );
     renderGrundriss(uhs, [p]);
-    const btn = await screen.findByRole('button', { name: 'zurückweisen' });
-    await userEvent.click(btn);
+    await userEvent.click(await screen.findByRole('button', { name: 'zurückweisen' }));
     await waitFor(() => expect(body).not.toBeNull());
     expect(body!.art).toBe('austritt');
   });
 
-  it('zeigt keinen Zurückweisen-Button für unbelegte Plätze', async () => {
+  it('zeigt keine Patientenaktionen für unbelegte Plätze', async () => {
     const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     renderGrundriss(uhs, []);
     await screen.findByText('Bett 1');
     expect(screen.queryByRole('button', { name: 'zurückweisen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'in Transport bringen' })).not.toBeInTheDocument();
+  });
+});
+
+describe('Grundriss – in Transport bringen (LFH-17)', () => {
+  it('bringt eine belegte Person über Menü + Modal auf Transport (Verbleib=transport)', async () => {
+    const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    let body: { art?: string; ziel?: string | null; transportmittel?: string | null } | null = null;
+    server.use(
+      http.post('/api/einsaetze/1/personen/7/verbleib', async ({ request }) => {
+        body = (await request.json()) as typeof body;
+        return HttpResponse.json({
+          id: 1, einsatz_id: 1, person_id: 7, art: 'transport', transportmittel: 'RTW',
+          ziel: 'KH Mitte', status: 'abtransportiert', notiz: null, zeitpunkt_at: 'x', erfasst_von: 1,
+        });
+      }),
+    );
+    renderGrundriss(uhs, [p]);
+    await userEvent.click(await screen.findByRole('button', { name: 'in Transport bringen' }));
+    // Abschluss-Screen: Ziel + Transportmittel erfassen, dann bestätigen.
+    await userEvent.type(await screen.findByRole('textbox', { name: /Ziel/ }), 'KH Mitte');
+    await userEvent.type(screen.getByRole('textbox', { name: /Transportmittel/ }), 'RTW');
+    await userEvent.click(screen.getByRole('button', { name: 'In Transport' }));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body!.art).toBe('transport');
+    expect(body!.ziel).toBe('KH Mitte');
+    expect(body!.transportmittel).toBe('RTW');
   });
 });
 
@@ -173,6 +212,40 @@ describe('Grundriss – Platz-Aktion kontextabhängig (LFH-58)', () => {
   });
 });
 
+describe('Grundriss – Platz-Verfügbarkeit ohne Edit-Modus (LFH-17)', () => {
+  it('bietet die Platz-Aktionen auch im Nicht-Edit-Modus (aktive UHS)', async () => {
+    const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    renderGrundriss(uhs, []);
+    await screen.findByText('Bett 1');
+    // Kein „Plätze bearbeiten" aktiviert → trotzdem Platzaktionen erreichbar.
+    expect(screen.getByRole('button', { name: 'Platzaktionen' })).toBeInTheDocument();
+  });
+
+  it('zeigt „als frei markieren" als direkte Primäraktion für einen Platz in Aufbereitung', async () => {
+    const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'aufbereitung' })] });
+    let body: { verfuegbarkeit?: string } | null = null;
+    server.use(
+      http.post('/api/einsaetze/1/uhs/1/plaetze/10/verfuegbarkeit', async ({ request }) => {
+        body = (await request.json()) as { verfuegbarkeit?: string };
+        return HttpResponse.json({});
+      }),
+    );
+    renderGrundriss(uhs, []);
+    await userEvent.click(await screen.findByRole('button', { name: 'als frei markieren' }));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body!.verfuegbarkeit).toBe('frei');
+  });
+
+  it('zeigt KEINE „als frei markieren"-Primäraktion für einen bereits freien Platz', async () => {
+    const uhs = uhsDetail({ status: 'aktiv', plaetze: [platz({ id: 10, bezeichnung: 'Bett 1', verfuegbarkeit: 'frei' })] });
+    renderGrundriss(uhs, []);
+    await screen.findByText('Bett 1');
+    expect(screen.queryByRole('button', { name: 'als frei markieren' })).not.toBeInTheDocument();
+    // Das vollständige Menü bleibt aber erreichbar.
+    expect(screen.getByRole('button', { name: 'Platzaktionen' })).toBeInTheDocument();
+  });
+});
+
 describe('Grundriss – Read-only (schreibgeschuetzt)', () => {
   it('blendet Schreibaktionen aus, wenn schreibgeschuetzt', async () => {
     const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
@@ -182,6 +255,8 @@ describe('Grundriss – Read-only (schreibgeschuetzt)', () => {
     expect(await screen.findByText('belegt')).toBeInTheDocument();
     // … aber keine Schreibaktionen.
     expect(screen.queryByRole('button', { name: 'zurückweisen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'in Transport bringen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Platzaktionen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Plätze anlegen' })).not.toBeInTheDocument();
   });
 });
