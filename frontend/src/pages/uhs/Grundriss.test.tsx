@@ -3,10 +3,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { http, HttpResponse } from 'msw';
+import { MemoryRouter } from 'react-router-dom';
 import { server } from '../../test/server';
 import { App as AntApp } from 'antd';
 import Grundriss from './Grundriss';
-import type { Person, UhsBelegung, UhsDetail, UhsPlatz } from '../../api/types';
+import type { Person, PersonDetail, UhsBelegung, UhsDetail, UhsPlatz } from '../../api/types';
 
 function person(over: Partial<Person>): Person {
   return {
@@ -39,11 +40,15 @@ function renderGrundriss(uhs: UhsDetail, personen: Person[], schreibgeschuetzt =
   server.use(http.get('/api/einsaetze/1/personen', () => HttpResponse.json(personen)));
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   render(
-    <QueryClientProvider client={qc}>
-      <AntApp>
-        <Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />
-      </AntApp>
-    </QueryClientProvider>
+    // MemoryRouter: der Detail-Drawer (PersonDetailDrawer) nutzt useNavigate; in der App
+    // läuft Grundriss immer unter einer Route.
+    <MemoryRouter>
+      <QueryClientProvider client={qc}>
+        <AntApp>
+          <Grundriss einsatzId={1} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />
+        </AntApp>
+      </QueryClientProvider>
+    </MemoryRouter>
   );
 }
 
@@ -106,15 +111,15 @@ describe('Grundriss – Zurückweisen (LFH-17)', () => {
     renderGrundriss(uhs, []);
     await screen.findByText('Bett 1');
     expect(screen.queryByRole('button', { name: 'zurückweisen' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'in Transport bringen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Verbleib / Entlassung erfassen' })).not.toBeInTheDocument();
   });
 });
 
-describe('Grundriss – in Transport bringen (LFH-17)', () => {
-  it('bringt eine belegte Person über Menü + Modal auf Transport (Verbleib=transport)', async () => {
+describe('Grundriss – Verbleib / Entlassung erfassen (LFH-17)', () => {
+  it('erfasst Transport (Default-Art) über den Platz-Button + Modal', async () => {
     const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
     const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
-    let body: { art?: string; ziel?: string | null; transportmittel?: string | null } | null = null;
+    let body: { art?: string; ziel?: string | null; transportmittel?: string | null; status?: string | null } | null = null;
     server.use(
       http.post('/api/einsaetze/1/personen/7/verbleib', async ({ request }) => {
         body = (await request.json()) as typeof body;
@@ -125,15 +130,41 @@ describe('Grundriss – in Transport bringen (LFH-17)', () => {
       }),
     );
     renderGrundriss(uhs, [p]);
-    await userEvent.click(await screen.findByRole('button', { name: 'in Transport bringen' }));
-    // Abschluss-Screen: Ziel + Transportmittel erfassen, dann bestätigen.
+    await userEvent.click(await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen' }));
+    // Abschluss-Screen: Art ist mit Transport vorbelegt → nur Ziel + Transportmittel erfassen.
     await userEvent.type(await screen.findByRole('textbox', { name: /Ziel/ }), 'KH Mitte');
     await userEvent.type(screen.getByRole('textbox', { name: /Transportmittel/ }), 'RTW');
-    await userEvent.click(screen.getByRole('button', { name: 'In Transport' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(body).not.toBeNull());
     expect(body!.art).toBe('transport');
+    expect(body!.status).toBe('abtransportiert');
     expect(body!.ziel).toBe('KH Mitte');
     expect(body!.transportmittel).toBe('RTW');
+  });
+
+  it('erfasst eine Entlassung vor Ort (Art umgestellt) ohne abtransportiert-Status', async () => {
+    const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    let body: { art?: string; status?: string | null } | null = null;
+    server.use(
+      http.post('/api/einsaetze/1/personen/7/verbleib', async ({ request }) => {
+        body = (await request.json()) as typeof body;
+        return HttpResponse.json({
+          id: 1, einsatz_id: 1, person_id: 7, art: 'entlassung', transportmittel: null,
+          ziel: null, status: null, notiz: null, zeitpunkt_at: 'x', erfasst_von: 1,
+        });
+      }),
+    );
+    renderGrundriss(uhs, [p]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen' }));
+    // Art von Transport auf „Entlassung vor Ort" umstellen.
+    await userEvent.click(await screen.findByRole('combobox', { name: 'Art' }));
+    await userEvent.click(await screen.findByText('Entlassung vor Ort'));
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body!.art).toBe('entlassung');
+    // status=abtransportiert NUR bei Transport → sonst null (Spiegel der Patienten-Ansicht).
+    expect(body!.status).toBeNull();
   });
 });
 
@@ -255,8 +286,50 @@ describe('Grundriss – Read-only (schreibgeschuetzt)', () => {
     expect(await screen.findByText('belegt')).toBeInTheDocument();
     // … aber keine Schreibaktionen.
     expect(screen.queryByRole('button', { name: 'zurückweisen' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'in Transport bringen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Verbleib / Entlassung erfassen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Platzaktionen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Plätze anlegen' })).not.toBeInTheDocument();
+  });
+});
+
+describe('Grundriss – Patient-Detail-Drawer (Klick)', () => {
+  function detail(p: Person): PersonDetail {
+    return { ...p, sichtungen: [], notizen: [], verbleib: [], abgleiche: [] };
+  }
+
+  it('öffnet beim Klick auf eine Wartebereichs-Karte den Detail-Drawer', async () => {
+    const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: null });
+    server.use(http.get('/api/einsaetze/1/personen/7', () => HttpResponse.json(detail(p))));
+    renderGrundriss(uhsDetail({}), [p]);
+    await userEvent.click(await screen.findByText(/R-007|· unbekannt/));
+    expect(await screen.findByText('Medizinischer Verlauf (neueste zuerst)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Vollständig öffnen' })).toBeInTheDocument();
+  });
+
+  it('öffnet den Detail-Drawer auch für eine belegte Platz-Person', async () => {
+    const p = person({ id: 8, registrier_nr: 8, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    server.use(http.get('/api/einsaetze/1/personen/8', () => HttpResponse.json(detail(p))));
+    renderGrundriss(uhs, [p]);
+    await userEvent.click(await screen.findByText(/R-008|· unbekannt/));
+    expect(await screen.findByText('Medizinischer Verlauf (neueste zuerst)')).toBeInTheDocument();
+  });
+
+  it('öffnet den Detail-Drawer auch im schreibgeschützten Modus (nur ansehen)', async () => {
+    const p = person({ id: 9, registrier_nr: 9, aktuelle_uhs_id: null });
+    server.use(http.get('/api/einsaetze/1/personen/9', () => HttpResponse.json(detail(p))));
+    renderGrundriss(uhsDetail({}), [p], true);
+    await userEvent.click(await screen.findByText(/R-009|· unbekannt/));
+    expect(await screen.findByText('Medizinischer Verlauf (neueste zuerst)')).toBeInTheDocument();
+  });
+
+  it('zeigt eine Fehleranzeige, wenn der Detail-Abruf scheitert (kein leerer Drawer)', async () => {
+    const p = person({ id: 11, registrier_nr: 11, aktuelle_uhs_id: null });
+    server.use(http.get('/api/einsaetze/1/personen/11', () =>
+      HttpResponse.json({ error: 'kaputt' }, { status: 500 })));
+    renderGrundriss(uhsDetail({}), [p]);
+    await userEvent.click(await screen.findByText(/R-011|· unbekannt/));
+    expect(await screen.findByText('Person konnte nicht geladen werden')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut versuchen' })).toBeInTheDocument();
   });
 });

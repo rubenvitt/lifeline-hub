@@ -10,8 +10,9 @@ import {
   aenderePersonBelegung, aktualisierePlatz, legePlaetzeAn, setzePlatzVerfuegbarkeit, stornierePlatz,
 } from '../../api/einsatzUhs';
 import { erfasseVerbleib, listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
-import type { Person, PlatzTyp, UhsDetail, UhsPlatz, Verfuegbarkeit } from '../../api/types';
+import type { Person, PlatzTyp, UhsDetail, UhsPlatz, VerbleibArt, Verfuegbarkeit } from '../../api/types';
 import { ApiError } from '../../api/client';
+import PersonDetailDrawer from '../../personen/PersonDetailDrawer';
 
 // Feste Karten-Höhe. Muss unter dem Raster-Zeilenabstand (raster_position SCHRITT_Y=120
 // im Backend) bleiben, damit absolut platzierte Karten einander nicht überlappen, und
@@ -43,19 +44,28 @@ function Personenkarte({ person, kompakt }: PersonenkartenProps) {
   return <Tag color="default" style={style} title={kompakt ? personLabel(person) : undefined}>{personLabel(person)}</Tag>;
 }
 
-function PersonenkarteDrag({ person, disabled, kompakt }: { person: Person; disabled: boolean; kompakt?: boolean }) {
+function PersonenkarteDrag({ person, disabled, kompakt, onOeffnen }: { person: Person; disabled: boolean; kompakt?: boolean; onOeffnen?: (personId: number) => void }) {
   // Kein Inline-`transform`: die gezogene Karte rendert als DragOverlay (Portal, s. u.).
   // Würde der Originalknoten hier transformiert, vergrößerte er die scroll-bare Region
   // seiner overflow:auto-Spalte → wachsende Scrollbar (Regression LFH-58-Folgebug).
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `person-${person.id}`, data: { kind: 'person', personId: person.id }, disabled,
   });
+  // Klick (ohne 5px-Bewegung → kein Drag, s. PointerSensor) öffnet den Detail-Drawer.
+  // `onClick` koexistiert mit den Drag-Listenern: ein echter Drag unterdrückt den nativen
+  // Click, ein reiner Klick lässt ihn durch.
   const style: React.CSSProperties = {
-    cursor: disabled ? 'default' : 'grab',
+    cursor: disabled ? 'pointer' : 'grab',
     opacity: isDragging ? 0.4 : undefined,
   };
   return (
-    <div ref={setNodeRef} {...attributes} {...listeners} style={style}>
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      style={style}
+      onClick={onOeffnen ? () => onOeffnen(person.id) : undefined}
+    >
       <Personenkarte person={person} kompakt={kompakt} />
     </div>
   );
@@ -70,9 +80,10 @@ interface PlatzKarteProps {
   onAustritt: () => void;
   onTransport: () => void;
   onStorno: () => void;
+  onOeffnen: (personId: number) => void;
 }
 
-function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfuegbarkeit, onAustritt, onTransport, onStorno }: PlatzKarteProps) {
+function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfuegbarkeit, onAustritt, onTransport, onStorno, onOeffnen }: PlatzKarteProps) {
   // Platz-Karte ist Drop-Target (Personen zuweisen) und — nur im Bearbeiten-Modus —
   // Drag-Source (Layout verschieben). Mit @dnd-kit beides am selben Knoten.
   const { attributes, listeners, setNodeRef: setDragRef, transform } = useDraggable({
@@ -153,17 +164,17 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
           Belegte Person ist ziehbar (→ Wartebereich links oder Transport rechts); im
           Bearbeiten-Modus deaktiviert, damit sie nicht mit dem Platz-Drag kollidiert. */}
       <div style={{ height: 24, overflow: 'hidden' }}>
-        {belegtVon && <PersonenkarteDrag person={belegtVon} disabled={schreibgeschuetzt || bearbeitbar} kompakt />}
+        {belegtVon && <PersonenkarteDrag person={belegtVon} disabled={schreibgeschuetzt || bearbeitbar} kompakt onOeffnen={onOeffnen} />}
       </div>
       {/* Aktionszeile UNTER der Belegung als direkte Icon-Buttons (kein Menü); feste Höhe. */}
       <div style={{ display: 'flex', gap: 4, height: 24, alignItems: 'center' }}>
         {belegtVon && !schreibgeschuetzt && (
           <>
-            <Tooltip title="in Transport bringen">
+            <Tooltip title="Verbleib / Entlassung erfassen">
               {/* stopPropagation: sonst startet eine kleine Mausbewegung beim Klick einen Drag. */}
               <Button
                 size="small"
-                aria-label="in Transport bringen"
+                aria-label="Verbleib / Entlassung erfassen"
                 icon={<CarOutlined />}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={onTransport}
@@ -207,13 +218,14 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
 
 /** Schmale Personen-Liste als Spalten-Karte (links: Eingang/Wartebereich). */
 function PersonenSpalte({
-  titel, personen, schreibgeschuetzt, droppableId, leerText,
+  titel, personen, schreibgeschuetzt, droppableId, leerText, onOeffnen,
 }: {
   titel: string;
   personen: Person[];
   schreibgeschuetzt: boolean;
   droppableId?: string;
   leerText: string;
+  onOeffnen: (personId: number) => void;
 }) {
   // Optionales Drop-Target (Wartebereich nimmt Personen ohne Platz auf).
   const drop = useDroppable({ id: droppableId ?? `nodrop-${titel}`, data: { kind: 'inbox' }, disabled: !droppableId });
@@ -226,7 +238,7 @@ function PersonenSpalte({
       style={{ background: droppableId && drop.isOver ? token.colorPrimaryBg : undefined }}
     >
       <div ref={droppableId ? drop.setNodeRef : undefined} style={{ minHeight: 48 }}>
-        {personen.map((p) => <PersonenkarteDrag key={p.id} person={p} disabled={schreibgeschuetzt} />)}
+        {personen.map((p) => <PersonenkarteDrag key={p.id} person={p} disabled={schreibgeschuetzt} onOeffnen={onOeffnen} />)}
         {personen.length === 0 && <Typography.Text type="secondary">{leerText}</Typography.Text>}
       </div>
     </Card>
@@ -235,7 +247,7 @@ function PersonenSpalte({
 
 /** Rechte Spalte: aus DIESER UHS heraus auf Transport gebrachte Personen.
  *  Drop-Target: eine belegte Person hierher ziehen öffnet den Transport-Abschluss-Screen. */
-function TransportSpalte({ personen, schreibgeschuetzt }: { personen: Person[]; schreibgeschuetzt: boolean }) {
+function TransportSpalte({ personen, schreibgeschuetzt, onOeffnen }: { personen: Person[]; schreibgeschuetzt: boolean; onOeffnen: (personId: number) => void }) {
   const drop = useDroppable({ id: 'drop-transport', data: { kind: 'transport' }, disabled: schreibgeschuetzt });
   const { token } = theme.useToken();
   return (
@@ -248,7 +260,7 @@ function TransportSpalte({ personen, schreibgeschuetzt }: { personen: Person[]; 
       <div ref={schreibgeschuetzt ? undefined : drop.setNodeRef} style={{ minHeight: 48 }}>
       {personen.map((p) => (
         <div key={p.id} style={{ marginBottom: 6 }}>
-          <Tag color="orange" style={{ margin: 0 }}>{personLabel(p)}</Tag>
+          <Tag color="orange" style={{ margin: 0, cursor: 'pointer' }} onClick={() => onOeffnen(p.id)}>{personLabel(p)}</Tag>
           {p.aktueller_verbleib && (
             <div><Typography.Text type="secondary" style={{ fontSize: 12 }}>{p.aktueller_verbleib}</Typography.Text></div>
           )}
@@ -282,9 +294,12 @@ export default function Grundriss({
   // weiterhin ihren Inline-Transform innerhalb der Fläche (kein Overlay nötig/gewollt).
   const [aktivePersonId, setAktivePersonId] = useState<number | null>(null);
 
-  // Zielperson des „In Transport bringen"-Abschluss-Screens (null = geschlossen).
+  // Zielperson des „Verbleib erfassen"-Abschluss-Screens (null = geschlossen).
   const [transportPerson, setTransportPerson] = useState<Person | null>(null);
-  const [transportForm] = Form.useForm<{ ziel?: string; transportmittel?: string; notiz?: string }>();
+  const [transportForm] = Form.useForm<{ art: VerbleibArt; ziel?: string; transportmittel?: string; notiz?: string }>();
+
+  // Klick auf eine Patientenkarte öffnet den schlanken Detail-Drawer (nur ansehen).
+  const [detailPersonId, setDetailPersonId] = useState<number | null>(null);
 
   const personenQuery = useQuery({
     queryKey: ['einsatz-personen', einsatzId],
@@ -344,15 +359,17 @@ export default function Grundriss({
     mutationFn: (personId: number) => aenderePersonBelegung(einsatzId, personId, { art: 'austritt' }),
     onSuccess: () => invalidate(), onError: fehler,
   });
-  // „In Transport bringen": Verbleib=transport. Der Server trägt die Person dabei
-  // automatisch aus der UHS aus (Auto-Austritt) → sie wandert rechts in „Auf Transport gebracht".
+  // Verbleib erfassen (Transport / Entlassung / vor Ort / verstorben — wie in der
+  // Patienten-Ansicht). Der Server trägt die Person dabei aus der UHS aus (Auto-Austritt);
+  // bei Transport wandert sie rechts in „Auf Transport gebracht". status=abtransportiert
+  // nur bei Transport (sonst null) — gleiche Semantik wie PersonenPage.
   const transportMut = useMutation({
-    mutationFn: ({ personId, ziel, transportmittel, notiz }: { personId: number; ziel?: string; transportmittel?: string; notiz?: string }) =>
+    mutationFn: ({ personId, art, ziel, transportmittel, notiz }: { personId: number; art: VerbleibArt; ziel?: string; transportmittel?: string; notiz?: string }) =>
       erfasseVerbleib(einsatzId, personId, {
-        art: 'transport', ziel: ziel ?? null, transportmittel: transportmittel ?? null,
-        status: 'abtransportiert', notiz: notiz ?? null,
+        art, ziel: ziel ?? null, transportmittel: transportmittel ?? null,
+        status: art === 'transport' ? 'abtransportiert' : null, notiz: notiz ?? null,
       }),
-    onSuccess: () => { message.success('Auf Transport gebracht'); setTransportPerson(null); transportForm.resetFields(); invalidate(); },
+    onSuccess: () => { message.success('Verbleib erfasst'); setTransportPerson(null); transportForm.resetFields(); invalidate(); },
     onError: fehler,
   });
   const verfMut = useMutation({
@@ -420,6 +437,7 @@ export default function Grundriss({
             personen={nichtAufgenommen}
             schreibgeschuetzt={schreibgeschuetzt}
             leerText="keine"
+            onOeffnen={setDetailPersonId}
           />
           <PersonenSpalte
             titel="Wartebereich (Eingang)"
@@ -427,6 +445,7 @@ export default function Grundriss({
             schreibgeschuetzt={schreibgeschuetzt}
             droppableId="drop-inbox"
             leerText="leer"
+            onOeffnen={setDetailPersonId}
           />
         </div>
 
@@ -464,6 +483,7 @@ export default function Grundriss({
                   onAustritt={() => { const b = belegtAn(p.id); if (b) austrittMut.mutate(b.id); }}
                   onTransport={() => { const b = belegtAn(p.id); if (b) setTransportPerson(b); }}
                   onStorno={() => stornoMut.mutate(p.id)}
+                  onOeffnen={setDetailPersonId}
                 />
               ))}
               {uhs.plaetze.length === 0 && (
@@ -479,7 +499,7 @@ export default function Grundriss({
 
         {/* RECHTS: Auf Transport gebracht */}
         <div style={{ width: 240, flexShrink: 0, overflow: 'auto' }}>
-          <TransportSpalte personen={transportiert} schreibgeschuetzt={schreibgeschuetzt} />
+          <TransportSpalte personen={transportiert} schreibgeschuetzt={schreibgeschuetzt} onOeffnen={setDetailPersonId} />
         </div>
       </div>
       {/* Portal-Overlay: folgt dem Cursor auf Body-Ebene, beeinflusst keine Scroll-Region. */}
@@ -487,11 +507,12 @@ export default function Grundriss({
         {aktivePerson ? <Personenkarte person={aktivePerson} /> : null}
       </DragOverlay>
 
-      {/* Abschluss-Screen „In Transport bringen" (Verbleib=transport). */}
+      {/* Abschluss-Screen „Verbleib erfassen" — Art wählbar (Default Transport, vom
+          Platz-Button und vom Drag auf „Auf Transport gebracht" vorbelegt). */}
       <Modal
         open={transportPerson != null}
-        title={transportPerson ? `In Transport bringen — ${personLabel(transportPerson)}` : 'In Transport bringen'}
-        okText="In Transport"
+        title={transportPerson ? `Verbleib erfassen — ${personLabel(transportPerson)}` : 'Verbleib erfassen'}
+        okText="Erfassen"
         confirmLoading={transportMut.isPending}
         onOk={() => transportForm.submit()}
         onCancel={() => { setTransportPerson(null); transportForm.resetFields(); }}
@@ -500,13 +521,25 @@ export default function Grundriss({
         <Form
           form={transportForm}
           layout="vertical"
+          initialValues={{ art: 'transport' }}
           onFinish={(v) => { if (transportPerson) transportMut.mutate({ personId: transportPerson.id, ...v }); }}
         >
+          <Form.Item label="Art" name="art" rules={[{ required: true }]}>
+            <Select options={[
+              { value: 'transport', label: 'Transport' },
+              { value: 'entlassung', label: 'Entlassung vor Ort' },
+              { value: 'vor_ort', label: 'verbleibt vor Ort' },
+              { value: 'verstorben', label: 'Verbleib des Leichnams' },
+            ]} />
+          </Form.Item>
           <Form.Item label="Ziel (z. B. Krankenhaus, Freitext)" name="ziel"><Input /></Form.Item>
           <Form.Item label="Transportmittel (RTW/KTW …)" name="transportmittel"><Input /></Form.Item>
           <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
         </Form>
       </Modal>
+
+      {/* Schlanker Detail-Drawer beim Klick auf eine Patientenkarte (nur ansehen). */}
+      <PersonDetailDrawer einsatzId={einsatzId} personId={detailPersonId} onClose={() => setDetailPersonId(null)} />
     </DndContext>
   );
 }

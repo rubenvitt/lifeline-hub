@@ -1,7 +1,7 @@
 import { Alert, App, Breadcrumb, Button, Descriptions, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Spin, Table, Tabs, Tag, Typography, type TableColumnsType } from 'antd';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { aktualisierePerson, entscheideAbgleich, erfasseSichtung, erfasseVerbleib, ladePerson, ladePersonAudit, legeNotizAn, legePersonAn, listePersonen, registrierAnzeige, schlageAbgleichVor, setzePersonStatus, stornierePerson, type PersonEingabe } from '../api/einsatzPerson';
 import { ApiError } from '../api/client';
@@ -118,6 +118,20 @@ export default function PersonenPage() {
   const [offenePersonId, setOffenePersonId] = useState<number | null>(null);
   const [bearbeiten, setBearbeiten] = useState(false);
   const [editForm] = Form.useForm<PersonEingabe>();
+
+  // Deep-Link: ?person=<id> öffnet direkt den Detail-Drawer (z. B. „Vollständig öffnen"
+  // aus dem schlanken UHS-Drawer). Param nach dem Öffnen entfernen, damit Schließen +
+  // erneutes Navigieren sauber funktioniert.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const pid = searchParams.get('person');
+    if (pid) {
+      setOffenePersonId(Number(pid));
+      setBearbeiten(false);
+      searchParams.delete('person');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const detailQuery = useQuery({
     queryKey: ['einsatz-person', einsatzId, offenePersonId],
@@ -647,6 +661,15 @@ export default function PersonenPage() {
         onClose={() => { setOffenePersonId(null); setBearbeiten(false); }}
       >
         {detailQuery.isLoading && <Spin />}
+        {detailQuery.isError && (
+          <Alert
+            type="error"
+            showIcon
+            message="Person konnte nicht geladen werden"
+            description={detailQuery.error instanceof ApiError ? detailQuery.error.message : undefined}
+            action={<Button size="small" onClick={() => detailQuery.refetch()}>Erneut versuchen</Button>}
+          />
+        )}
         {detailQuery.data && drawerInhalt(detailQuery.data)}
       </Drawer>
 

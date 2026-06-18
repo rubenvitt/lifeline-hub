@@ -40,7 +40,7 @@ const person = {
 };
 const unbekannt = { ...person, id: 11, registrier_nr: 2, name: null, vorname: null, status: 'vermisst' };
 
-function render(einsatzObj: typeof einsatzAktiv, personen: unknown[]) {
+function render(einsatzObj: typeof einsatzAktiv, personen: unknown[], route = '/einsaetze/1/personen') {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(admin)),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
@@ -57,7 +57,7 @@ function render(einsatzObj: typeof einsatzAktiv, personen: unknown[]) {
         <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
       </Routes>
     </AuthProvider>,
-    { route: '/einsaetze/1/personen' },
+    { route },
   );
 }
 
@@ -97,6 +97,23 @@ describe('PersonenPage', () => {
     render(einsatzAktiv, [person]);
     const zelle = (await screen.findAllByText('Mustermann, Max'))[0];
     await userEvent.click(zelle);
+    expect(await screen.findByText('Person R-001')).toBeInTheDocument();
+  });
+
+  it('zeigt eine Fehleranzeige im Drawer, wenn der Detail-Abruf scheitert (kein leerer Drawer)', async () => {
+    server.use(http.get('/api/einsaetze/1/personen/10', () =>
+      HttpResponse.json({ error: 'kaputt' }, { status: 500 })));
+    render(einsatzAktiv, [person]);
+    await userEvent.click((await screen.findAllByText('Mustermann, Max'))[0]);
+    expect(await screen.findByText('Person konnte nicht geladen werden')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut versuchen' })).toBeInTheDocument();
+  });
+
+  it('öffnet den Detail-Drawer direkt über den Deep-Link ?person=<id>', async () => {
+    server.use(http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(person)));
+    render(einsatzAktiv, [person], '/einsaetze/1/personen?person=10');
+    // Ohne Klick: der Drawer öffnet sich aus dem Query-Param (z. B. „Vollständig öffnen"
+    // aus dem schlanken UHS-Drawer).
     expect(await screen.findByText('Person R-001')).toBeInTheDocument();
   });
 
