@@ -2,6 +2,7 @@ use crate::app::AppState;
 use crate::auth::session::CurrentUser;
 use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_einsatzleitung, fordere_lesezugriff, fordere_schreibrecht_oder_admin,
+    ist_fristverkuerzung,
 };
 use crate::einsatz::{
     ist_gueltige_einsatzart, repo, EinsatzAnzeige, EinsatzRolle, MitgliedAnzeige,
@@ -83,6 +84,69 @@ pub async fn abschliessen(
     fordere_aktiv(&einsatz)?;
 
     let aktualisiert = repo::abschliessen(&state.pool, id, benutzer.id).await?;
+    Ok(Json(
+        aktualisiert.anzeige(rolle.map(|r| r.as_str().to_string())),
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct FristSetzen {
+    /// Neue Aufbewahrungsfrist (ISO-8601/RFC3339 oder SQLite-Format); `null`/leer
+    /// hebt die Frist auf (unbegrenzt).
+    pub retention_bis: Option<String>,
+    /// Pflicht-Bestätigung bei Verkürzung der Frist (sonst 409).
+    #[serde(default)]
+    pub bestaetigt: bool,
+}
+
+/// PUT /api/einsaetze/{id}/aufbewahrungsfrist — Aufbewahrungsfrist setzen, ändern
+/// oder aufheben (LFH-130). Nur Einsatzleitung oder System-Admin. Eine Verkürzung
+/// (inkl. erstmaligem Setzen auf einen bislang unbegrenzten Einsatz) erfordert
+/// `bestaetigt=true`. Schreibt einen ETB-System-Eintrag als Audit. Die Frist greift
+/// erst ab Einsatzabschluss (reaktive Lese-Sperre), nie auf aktive Einsätze.
+pub async fn aufbewahrungsfrist_setzen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path(id): Path<i64>,
+    Json(req): Json<FristSetzen>,
+) -> Result<Json<EinsatzAnzeige>, AppError> {
+    let einsatz = repo::laden(&state.pool, id).await?;
+    let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
+    // Administrativ: Einsatzleitung (Mitgliedschaft) oder System-Admin.
+    if !benutzer.ist_admin() {
+        fordere_einsatzleitung(rolle)?;
+    }
+
+    // Neue Frist normalisieren; leer/None = aufheben.
+    let neue_frist = match req
+        .retention_bis
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        Some(s) => Some(crate::etb::normalisiere_zeit(s)?),
+        None => None,
+    };
+
+    let alt = einsatz.retention_bis.as_deref();
+    // Unverändert → kein UPDATE, kein Audit-Eintrag (kein Rauschen im ETB).
+    if alt == neue_frist.as_deref() {
+        return Ok(Json(einsatz.anzeige(rolle.map(|r| r.as_str().to_string()))));
+    }
+    if ist_fristverkuerzung(alt, neue_frist.as_deref()) && !req.bestaetigt {
+        return Err(AppError::Conflict(
+            "Verkürzung der Aufbewahrungsfrist muss bestätigt werden".into(),
+        ));
+    }
+
+    let audit = match (alt, neue_frist.as_deref()) {
+        (_, None) => "Aufbewahrungsfrist aufgehoben (unbegrenzt)".to_string(),
+        (None, Some(neu)) => format!("Aufbewahrungsfrist gesetzt auf {neu}"),
+        (Some(a), Some(neu)) => format!("Aufbewahrungsfrist geändert von {a} auf {neu}"),
+    };
+
+    let aktualisiert =
+        repo::frist_setzen(&state.pool, id, benutzer.id, neue_frist.as_deref(), &audit).await?;
     Ok(Json(
         aktualisiert.anzeige(rolle.map(|r| r.as_str().to_string())),
     ))

@@ -99,6 +99,12 @@ pub struct Einsatz {
     pub meldende_stelle: Option<String>,
     pub sachverhalt: Option<String>,
     pub anzahl_betroffene_initial: Option<i64>,
+    /// Aufbewahrungsfrist (LFH-130): ab diesem Zeitpunkt ist ein abgeschlossener
+    /// Einsatz nicht mehr lesbar. `None` = keine Frist. Greift nie auf aktive Einsätze.
+    pub retention_bis: Option<String>,
+    /// Soft-Delete-Tombstone (LFH-130). Hier nur abgebildet; das Kippen folgt im
+    /// Archiv-Feature (LFH-135).
+    pub geloescht_at: Option<String>,
     /// Read-only Join-Feld (organisation.name der eigenen Org); via `laden` befüllt.
     pub org_name: String,
 }
@@ -132,6 +138,7 @@ impl Einsatz {
             meldende_stelle: self.meldende_stelle.clone(),
             sachverhalt: self.sachverhalt.clone(),
             anzahl_betroffene_initial: self.anzahl_betroffene_initial,
+            retention_bis: self.retention_bis.clone(),
             meine_rolle,
         }
     }
@@ -160,6 +167,8 @@ pub struct EinsatzAnzeige {
     pub meldende_stelle: Option<String>,
     pub sachverhalt: Option<String>,
     pub anzahl_betroffene_initial: Option<i64>,
+    /// Aufbewahrungsfrist (LFH-130); `None` = keine Frist gesetzt.
+    pub retention_bis: Option<String>,
     pub meine_rolle: Option<String>,
 }
 
@@ -229,6 +238,8 @@ mod tests {
             meldende_stelle: None,
             sachverhalt: None,
             anzahl_betroffene_initial: None,
+            retention_bis: None,
+            geloescht_at: None,
         };
         assert!(e.ist_aktiv());
         e.status = STATUS_ABGESCHLOSSEN.into();

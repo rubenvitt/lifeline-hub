@@ -47,6 +47,10 @@ pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
             post(routes::einsatz::abschliessen),
         )
         .route(
+            "/api/einsaetze/{id}/aufbewahrungsfrist",
+            put(routes::einsatz::aufbewahrungsfrist_setzen),
+        )
+        .route(
             "/api/einsaetze/{id}/mitglieder",
             get(routes::einsatz::mitglieder),
         )

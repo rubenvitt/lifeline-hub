@@ -923,3 +923,215 @@ async fn anlegen_vergibt_einsatznummer_im_format() {
     assert!(nr_a.ends_with("-001"), "erste Nummer endet auf -001: {nr_a}");
     assert!(nr_b.ends_with("-002"), "zweite Nummer endet auf -002: {nr_b}");
 }
+
+/// PUT /api/einsaetze/{id}/aufbewahrungsfrist mit Cookie + JSON-Body.
+async fn frist_setzen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz_id: i64,
+    body: Value,
+) -> (StatusCode, Value) {
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/einsaetze/{einsatz_id}/aufbewahrungsfrist"))
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, cookie.to_string())
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = resp.status();
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+    (status, json)
+}
+
+async fn abschliessen(app: &axum::Router, cookie: &str, einsatz_id: i64) -> StatusCode {
+    app.clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/einsaetze/{einsatz_id}/abschliessen"))
+                .header(header::COOKIE, cookie.to_string())
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap()
+        .status()
+}
+
+#[tokio::test]
+async fn aufbewahrungsfrist_verkuerzung_ohne_bestaetigung_ist_409() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, e) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = e["id"].as_i64().unwrap();
+
+    // Setzen auf einen bislang unbegrenzten Einsatz = Verkürzung → ohne Bestätigung 409.
+    let (status, _) = frist_setzen(
+        &app,
+        &admin,
+        id,
+        json!({ "retention_bis": "2030-01-01 00:00:00" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn aufbewahrungsfrist_mit_bestaetigung_setzt_wert() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, e) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = e["id"].as_i64().unwrap();
+
+    let (status, json) = frist_setzen(
+        &app,
+        &admin,
+        id,
+        json!({ "retention_bis": "2030-01-01 00:00:00", "bestaetigt": true }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["retention_bis"].as_str(), Some("2030-01-01 00:00:00"));
+}
+
+#[tokio::test]
+async fn aufbewahrungsfrist_greift_erst_nach_abschluss_und_sperrt_dann_alle() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, e) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = e["id"].as_i64().unwrap();
+
+    // Frist in der Vergangenheit setzen (bestätigt). Solange aktiv → weiter lesbar.
+    let (status, _) = frist_setzen(
+        &app,
+        &admin,
+        id,
+        json!({ "retention_bis": "2020-01-01 00:00:00", "bestaetigt": true }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(detail_status(&app, &admin, id).await, StatusCode::OK);
+
+    // Nach Abschluss greift die abgelaufene Frist → gesperrt, auch für den Admin.
+    assert_eq!(abschliessen(&app, &admin, id).await, StatusCode::OK);
+    assert_eq!(detail_status(&app, &admin, id).await, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn aufbewahrungsfrist_nicht_admin_einsatzleitung_darf_setzen() {
+    // Erfolgs-Pfad ohne ist_admin()-Short-Circuit: reine Einsatzleitung (Führungskraft).
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin, "frieda", "fuehrungskraft").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let (_, e) = einsatz_anlegen(&app, &frieda, "Frieda-Lage").await;
+    let id = e["id"].as_i64().unwrap();
+
+    let (status, json) = frist_setzen(
+        &app,
+        &frieda,
+        id,
+        json!({ "retention_bis": "2030-01-01 00:00:00", "bestaetigt": true }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["retention_bis"].as_str(), Some("2030-01-01 00:00:00"));
+}
+
+#[tokio::test]
+async fn aufbewahrungsfrist_fremder_ohne_rolle_ist_403() {
+    // Ablehn-Pfad: Nicht-Mitglied ohne höhere Berechtigung → fordere_einsatzleitung greift.
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, e) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = e["id"].as_i64().unwrap();
+
+    benutzer_anlegen(&app, &admin, "erika", "keine").await;
+    let erika = login_cookie(&app, "erika", "erikapw1").await;
+    let (status, _) = frist_setzen(
+        &app,
+        &erika,
+        id,
+        json!({ "retention_bis": "2030-01-01 00:00:00", "bestaetigt": true }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn abgelaufene_frist_sperrt_auch_personen_export() {
+    // Belegt die transitive Sperre über den fordere_lesezugriff()-Chokepoint:
+    // nicht nur das Einsatz-Detail, auch der Personen-CSV-Export wird 403.
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, e) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = e["id"].as_i64().unwrap();
+
+    let (status, _) = frist_setzen(
+        &app,
+        &admin,
+        id,
+        json!({ "retention_bis": "2020-01-01 00:00:00", "bestaetigt": true }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(abschliessen(&app, &admin, id).await, StatusCode::OK);
+
+    let export_status = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!("/api/einsaetze/{id}/personen/export"))
+                .header(header::COOKIE, admin.clone())
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap()
+        .status();
+    assert_eq!(export_status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn aufbewahrungsfrist_verlaengern_und_aufheben_ohne_bestaetigung() {
+    // Nicht-Verkürzung darf OHNE bestaetigt durchgehen (fängt ein zu striktes Gate
+    // wie `if !bestaetigt` statt `if ist_fristverkuerzung && !bestaetigt`).
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, e) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = e["id"].as_i64().unwrap();
+
+    // Ausgangsfrist setzen (Verkürzung von unbegrenzt → bestätigt).
+    let (status, _) = frist_setzen(
+        &app,
+        &admin,
+        id,
+        json!({ "retention_bis": "2030-01-01 00:00:00", "bestaetigt": true }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Verlängern auf späteren Zeitpunkt OHNE bestaetigt → 200.
+    let (status, json) = frist_setzen(
+        &app,
+        &admin,
+        id,
+        json!({ "retention_bis": "2031-01-01 00:00:00" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["retention_bis"].as_str(), Some("2031-01-01 00:00:00"));
+
+    // Aufheben (null) OHNE bestaetigt → 200, Frist weg.
+    let (status, json) = frist_setzen(&app, &admin, id, json!({ "retention_bis": null })).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(json["retention_bis"].is_null());
+}

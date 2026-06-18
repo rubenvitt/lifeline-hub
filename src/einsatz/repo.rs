@@ -72,6 +72,7 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Einsatz, AppErr
                 e.abgeschlossen_at, e.abgeschlossen_von, e.einsatzart, e.einsatznummer_intern, \
                 e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
                 e.meldende_stelle, e.sachverhalt, e.anzahl_betroffene_initial, \
+                e.retention_bis, e.geloescht_at, \
                 o.name AS org_name \
          FROM einsatz e \
          LEFT JOIN organisation o ON o.id = e.org_id \
@@ -128,6 +129,7 @@ pub async fn liste_fuer(
         meldende_stelle: Option<String>,
         sachverhalt: Option<String>,
         anzahl_betroffene_initial: Option<i64>,
+        retention_bis: Option<String>,
         meine_rolle: Option<String>,
     }
 
@@ -136,6 +138,7 @@ pub async fn liste_fuer(
                 e.abgeschlossen_at, e.abgeschlossen_von, e.einsatzart, e.einsatznummer_intern, \
                 e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
                 e.meldende_stelle, e.sachverhalt, e.anzahl_betroffene_initial, \
+                e.retention_bis, \
                 m.einsatz_rolle AS meine_rolle \
          FROM einsatz e \
          LEFT JOIN organisation o ON o.id = e.org_id \
@@ -155,6 +158,7 @@ pub async fn liste_fuer(
                 benutzer,
                 &r.status,
                 r.abgeschlossen_at.as_deref(),
+                r.retention_bis.as_deref(),
                 r.meine_rolle.as_deref().and_then(EinsatzRolle::parse),
                 jetzt,
             )
@@ -179,6 +183,7 @@ pub async fn liste_fuer(
             meldende_stelle: r.meldende_stelle,
             sachverhalt: r.sachverhalt,
             anzahl_betroffene_initial: r.anzahl_betroffene_initial,
+            retention_bis: r.retention_bis,
             meine_rolle: r.meine_rolle,
         })
         .collect())
@@ -202,6 +207,45 @@ pub async fn abschliessen(
     .bind(einsatz_id)
     .execute(pool)
     .await?;
+    laden(pool, einsatz_id).await
+}
+
+/// Setzt die Aufbewahrungsfrist (`retention_bis`) eines Einsatzes und schreibt in
+/// derselben Transaktion einen ETB-System-Eintrag als Audit (LFH-130, ETB-Kopplung
+/// Pattern B). `neue_frist = None` hebt die Frist auf (unbegrenzt). Der Audit-Text
+/// wird vom Aufrufer gebildet (er kennt alten/neuen Wert). Die Verkürzungs-
+/// Bestätigung ist Sache des Handlers.
+pub async fn frist_setzen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    erfasser_id: i64,
+    neue_frist: Option<&str>,
+    audit_inhalt: &str,
+) -> Result<Einsatz, AppError> {
+    let mut tx = pool.begin().await?;
+    sqlx::query("UPDATE einsatz SET retention_bis = ? WHERE id = ?")
+        .bind(neue_frist)
+        .bind(einsatz_id)
+        .execute(&mut *tx)
+        .await?;
+    crate::etb::repo::anlegen_tx(
+        &mut tx,
+        einsatz_id,
+        erfasser_id,
+        crate::etb::repo::EintragDaten {
+            typ: crate::etb::TYP_SYSTEM,
+            inhalt: audit_inhalt,
+            von: None,
+            an: None,
+            meldeweg: None,
+            veranlassung: None,
+            ereigniszeit: None,
+            erfasst_lokal_at: None,
+            berichtigt_eintrag_id: None,
+        },
+    )
+    .await?;
+    tx.commit().await?;
     laden(pool, einsatz_id).await
 }
 
@@ -400,6 +444,53 @@ mod tests {
         assert!(abgeschlossen.abgeschlossen_at.is_some());
         assert_eq!(abgeschlossen.abgeschlossen_von, Some(leit));
         assert!(!abgeschlossen.ist_aktiv());
+    }
+
+    #[tokio::test]
+    async fn frist_setzen_speichert_und_schreibt_etb_audit() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        assert_eq!(einsatz.retention_bis, None);
+
+        let aktualisiert = frist_setzen(
+            &pool,
+            einsatz.id,
+            leit,
+            Some("2030-01-01 00:00:00"),
+            "Aufbewahrungsfrist gesetzt auf 2030-01-01 00:00:00",
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            aktualisiert.retention_bis.as_deref(),
+            Some("2030-01-01 00:00:00")
+        );
+
+        // Genau ein ETB-System-Eintrag als Audit entstanden.
+        let anzahl: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'system'",
+        )
+        .bind(einsatz.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(anzahl, 1);
+    }
+
+    #[tokio::test]
+    async fn frist_setzen_none_hebt_frist_auf() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        frist_setzen(&pool, einsatz.id, leit, Some("2030-01-01 00:00:00"), "set")
+            .await
+            .unwrap();
+
+        let aufgehoben = frist_setzen(&pool, einsatz.id, leit, None, "aufgehoben")
+            .await
+            .unwrap();
+        assert_eq!(aufgehoben.retention_bis, None);
     }
 
     #[tokio::test]
