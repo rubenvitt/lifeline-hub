@@ -289,6 +289,45 @@ async fn nicht_ausblendbares_modul_verstecken_ist_400() {
 }
 
 #[tokio::test]
+async fn nicht_ausblendbares_modul_rollen_beschraenken_ist_400() {
+    // Selbst-Aussperr-Schutz auf der Rollen-Dimension: einsatz-einstellungen darf
+    // nicht rollen-beschränkt werden (sonst Aussperrung aus den Einstellungen).
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+    for key in ["einsatzdaten", "einsatz-einstellungen"] {
+        assert_eq!(
+            override_setzen(&app, &admin, eid, key, true, Some("fuehrungskraft")).await,
+            StatusCode::BAD_REQUEST,
+            "{key} darf nicht rollen-beschränkt werden"
+        );
+    }
+}
+
+#[tokio::test]
+async fn einsatzleitung_sperrt_sich_nicht_aus_einstellungen_aus() {
+    // Selbst aus einem (defensiv ohnehin abgelehnten) Rollen-Override darf keine
+    // Aussperrung folgen: eine nicht-admin Einsatzleitung erreicht die Einstellungen
+    // und ihre Stammdaten immer.
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+    let lid = benutzer_anlegen(&app, &admin, "lotta", "keine").await;
+    mitglied_setzen(&app, &admin, eid, lid, "einsatzleitung").await;
+    let lotta = login_cookie(&app, "lotta", "lottapw1").await;
+
+    // GET der Einstellungen + Stammdaten bleibt für die Einsatzleitung erreichbar.
+    assert_eq!(
+        get_status(&app, &lotta, &format!("/api/einsaetze/{eid}/einstellungen")).await,
+        StatusCode::OK
+    );
+    assert_eq!(
+        get_status(&app, &lotta, &format!("/api/einsaetze/{eid}")).await,
+        StatusCode::OK
+    );
+}
+
+#[tokio::test]
 async fn unbekannter_modul_key_ist_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;

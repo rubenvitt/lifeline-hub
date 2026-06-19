@@ -183,14 +183,21 @@ pub fn fordere_modul_zugriff(
         return Ok(());
     }
 
+    // 2. Nicht-ausblendbare Module (Stammdaten, Einstellungen) sind NIE sperrbar —
+    //    weder versteckt noch rollen-beschränkt (Selbst-Aussperr-Schutz, beide
+    //    Dimensionen). Ein etwaiger Override darauf wird defensiv ignoriert.
+    if !ist_ausblendbar(modul_key) {
+        return Ok(());
+    }
+
     let ueberschreibung = overrides.get(modul_key);
 
-    // 2. Ausblend-Schranke (nur für ausblendbare Module).
-    if ist_ausblendbar(modul_key) && ueberschreibung.is_some_and(|o| !o.sichtbar) {
+    // 3. Ausblend-Schranke.
+    if ueberschreibung.is_some_and(|o| !o.sichtbar) {
         return Err(AppError::Forbidden);
     }
 
-    // 3. Rollen-Schranke (Override sonst Registry-Default).
+    // 4. Rollen-Schranke (Override sonst Registry-Default).
     let benoetigte = ueberschreibung
         .and_then(|o| o.benoetigte_rolle.as_deref())
         .or_else(|| registry_benoetigte_rolle(modul_key));
@@ -622,18 +629,16 @@ mod tests {
     }
 
     #[test]
-    fn modul_zugriff_nicht_ausblendbar_respektiert_rollen_schranke() {
-        // Nicht-ausblendbar heißt nur „nicht versteckbar" — eine Rollen-Schranke
-        // darauf greift weiterhin (z. B. Einstellungen nur für Führungskräfte).
+    fn modul_zugriff_nicht_ausblendbar_nie_rollen_gesperrt() {
+        // Nicht-ausblendbare Module sind in BEIDEN Dimensionen exempt: ein (defensiv
+        // ohnehin abgelehnter) Rollen-Override darf niemanden aussperren — sonst
+        // könnte sich eine Einsatzleitung aus den Einstellungen selbst aussperren.
         let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         let ov = overrides_mit(vec![override_zeile(
             "einsatz-einstellungen",
             false,
             Some("fuehrungskraft"),
         )]);
-        assert!(matches!(
-            fordere_modul_zugriff(&ov, "einsatz-einstellungen", &normal).unwrap_err(),
-            AppError::Forbidden
-        ));
+        assert!(fordere_modul_zugriff(&ov, "einsatz-einstellungen", &normal).is_ok());
     }
 }

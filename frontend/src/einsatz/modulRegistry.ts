@@ -117,6 +117,9 @@ export function istModulGesperrt(
   overrides?: ModulOverrides,
 ): boolean {
   if (benutzer?.system_rolle === 'admin') return false;
+  // Nicht-ausblendbare Module sind nie sperrbar (Selbst-Aussperr-Schutz, beide
+  // Dimensionen) — spiegelt das Backend fordere_modul_zugriff.
+  if (!istModulAusblendbar(modul.key)) return false;
   const benoetigt = overrides?.[modul.key]?.benoetigte_rolle ?? modul.benoetigteRolle ?? null;
   if (!benoetigt) return false;
   if (benoetigt === 'admin') return true; // Admin ist oben bereits frei.

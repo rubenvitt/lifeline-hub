@@ -90,6 +90,12 @@ describe('modulRegistry', () => {
     expect(istModulSichtbar(einsatzdaten, ov('einsatzdaten', false))).toBe(true);
   });
 
+  it('istModulGesperrt: nicht-ausblendbares Modul nie rollen-gesperrt (Selbst-Aussperr-Schutz)', () => {
+    const einstellungen = modulRegistry.find((m) => m.key === 'einsatz-einstellungen')!;
+    // Selbst mit (defensiv ohnehin abgelehntem) Rollen-Override bleibt es frei.
+    expect(istModulGesperrt(einstellungen, ohne, ov('einsatz-einstellungen', true, 'fuehrungskraft'))).toBe(false);
+  });
+
   it('istModulGesperrt: Override-Rolle hat Vorrang vor Registry-Default', () => {
     // offen hat keinen Registry-Default; Override fordert fuehrungskraft.
     expect(istModulGesperrt(offen, ohne, ov('x', true, 'fuehrungskraft'))).toBe(true);

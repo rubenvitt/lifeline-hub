@@ -99,8 +99,9 @@ describe('EinsatzEinstellungenPage', () => {
     rendern();
 
     expect(await screen.findByText('Modul-Sichtbarkeit & Berechtigungen')).toBeInTheDocument();
-    // Stammdaten lassen sich nicht ausblenden → Switch deaktiviert.
+    // Stammdaten lassen sich nicht ausblenden → Switch UND Rollen-Select deaktiviert.
     expect(screen.getByRole('switch', { name: 'Sichtbar: Einsatzdaten' })).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: 'Benötigte Rolle: Einsatzdaten' })).toBeDisabled();
     // ETB ist ausblendbar → Switch aktiv und (Default) eingeschaltet.
     const etbSwitch = screen.getByRole('switch', { name: 'Sichtbar: ETB' });
     expect(etbSwitch).toBeEnabled();

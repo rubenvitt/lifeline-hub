@@ -275,13 +275,15 @@ pub async fn modul_override_setzen(
     if !modul::ist_gueltiger_modul_key(&modul_key) {
         return Err(AppError::Validation("Unbekannter Modul-Key".into()));
     }
-    // Selbst-Aussperr-Schutz: nicht-ausblendbare Module dürfen nicht versteckt werden.
-    if !req.sichtbar && !modul::ist_ausblendbar(&modul_key) {
+    // Selbst-Aussperr-Schutz: nicht-ausblendbare Module dürfen weder versteckt noch
+    // rollen-beschränkt werden (beide Dimensionen, sonst Aussperrung aus den
+    // Einstellungen möglich).
+    let benoetigte_rolle = bereinige(req.benoetigte_rolle);
+    if !modul::ist_ausblendbar(&modul_key) && (!req.sichtbar || benoetigte_rolle.is_some()) {
         return Err(AppError::Validation(
-            "Dieses Modul kann nicht ausgeblendet werden".into(),
+            "Dieses Modul kann nicht ausgeblendet oder rollen-beschränkt werden".into(),
         ));
     }
-    let benoetigte_rolle = bereinige(req.benoetigte_rolle);
     if let Some(r) = benoetigte_rolle.as_deref() {
         if !modul::ist_gueltige_benoetigte_rolle(r) {
             return Err(AppError::Validation("Ungültige benoetigte_rolle".into()));

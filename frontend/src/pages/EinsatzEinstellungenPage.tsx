@@ -233,7 +233,7 @@ export default function EinsatzEinstellungenPage() {
                 aria-label={`Benötigte Rolle: ${m.label}`}
                 style={{ width: 180 }}
                 value={rolle ?? ''}
-                disabled={!darfModuleVerwalten || overrideMutation.isPending}
+                disabled={!darfModuleVerwalten || !ausblendbar || overrideMutation.isPending}
                 options={ROLLEN_OPTIONEN}
                 onChange={(val) =>
                   overrideMutation.mutate({
