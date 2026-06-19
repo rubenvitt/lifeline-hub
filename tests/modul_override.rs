@@ -5,7 +5,7 @@ use axum::http::{header, Request, StatusCode};
 use lifeline_hub::app::{build_router, AppState};
 use lifeline_hub::auth::bootstrap::bootstrap_admin;
 use lifeline_hub::db;
-use lifeline_hub::einsatz::modul::MODUL_KEYS;
+use lifeline_hub::einsatz::modul::{MODUL_KEYS, NICHT_AUSBLENDBAR};
 use lifeline_hub::live::LiveHub;
 use serde_json::Value;
 use std::collections::BTreeSet;
@@ -517,6 +517,38 @@ const MODUL_STREAM_PFADE: &[(&str, &str)] = &[
     ("einsatzabschnitte", "abschnitte/stream"),
     ("lagekarte", "zonen/stream"),
 ];
+
+/// Module ohne eigene daten-besitzende Backend-Routen (reine Aggregation/Sicht):
+/// kein Guard-Pfad möglich, daher legitim NICHT in MODUL_GET_PFADE.
+const OHNE_EIGENE_ROUTEN: &[&str] = &["stab", "lage-dashboard", "kraefteuebersicht"];
+/// ETB ist das exemplarisch zuerst gegatete Modul mit eigenem dedizierten Guard-Test.
+const SEPARAT_GETESTET: &[&str] = &["etb"];
+
+/// Vollständigkeits-Wächter (Review LFH-132): koppelt die Guard-403-Abdeckung
+/// datengetrieben an `MODUL_KEYS`. Jeder ausblendbare Key mit eigenen Routen MUSS
+/// in `MODUL_GET_PFADE` einen 403-Nachweis haben. Verhindert, dass ein künftig in
+/// beide Registries eingetragenes Modul (Drift-Test bleibt grün) ohne
+/// serverseitigen Guard-Nachweis durchrutscht (SSE-/Route-Bypass). Ein neuer
+/// ausblendbarer Key erzwingt damit automatisch einen Pfad-Eintrag oder eine
+/// dokumentierte Ausnahme oben.
+#[test]
+fn jeder_ausblendbare_modul_key_ist_guard_abgedeckt() {
+    let abgedeckt: BTreeSet<&str> = MODUL_GET_PFADE.iter().map(|(k, _)| *k).collect();
+    let erwartet: BTreeSet<&str> = MODUL_KEYS
+        .iter()
+        .copied()
+        .filter(|k| !NICHT_AUSBLENDBAR.contains(k))
+        .filter(|k| !OHNE_EIGENE_ROUTEN.contains(k))
+        .filter(|k| !SEPARAT_GETESTET.contains(k))
+        .collect();
+    assert_eq!(
+        erwartet, abgedeckt,
+        "Jeder ausblendbare Modul-Key mit eigenen Routen braucht einen 403-Nachweis in MODUL_GET_PFADE.\n\
+         Fehlt im Guard-Test (ungeschützt?): {:?}\nIm Test, aber nicht (mehr) erwartet: {:?}",
+        erwartet.difference(&abgedeckt).collect::<Vec<_>>(),
+        abgedeckt.difference(&erwartet).collect::<Vec<_>>(),
+    );
+}
 
 #[tokio::test]
 async fn alle_modul_gruppen_gegated_get_baseline_und_versteckt() {
