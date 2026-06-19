@@ -312,6 +312,130 @@ pub async fn frist_setzen(
     laden(pool, einsatz_id).await
 }
 
+// ---------- Aufbewahrung / Purge (LFH-135) ----------
+
+/// Ermittelt einen gültigen Benutzer als Akteur für System-ETB-Einträge des
+/// Purge-Schedulers (`erfasser_id` ist NOT NULL FK). Bevorzugt, wer den Einsatz
+/// abgeschlossen hat; ersatzweise eine Einsatzleitung. `None`, wenn keiner
+/// auffindbar ist (dann wird der ETB-Audit übersprungen, die Mutation läuft
+/// trotzdem). Läuft auf der übergebenen tx-Verbindung.
+async fn ermittle_system_akteur(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+) -> Result<Option<i64>, AppError> {
+    let von: Option<i64> = sqlx::query_scalar(
+        "SELECT abgeschlossen_von FROM einsatz WHERE id = ? AND abgeschlossen_von IS NOT NULL",
+    )
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    if von.is_some() {
+        return Ok(von);
+    }
+    let leit: Option<i64> = sqlx::query_scalar(
+        "SELECT benutzer_id FROM einsatz_mitgliedschaft \
+         WHERE einsatz_id = ? AND einsatz_rolle = ? ORDER BY benutzer_id LIMIT 1",
+    )
+    .bind(einsatz_id)
+    .bind(EINSATZ_ROLLE_LEITUNG)
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(leit)
+}
+
+/// Schreibt einen System-ETB-Audit auf der tx-Verbindung, sofern ein Akteur
+/// auffindbar ist (best effort — fehlt jeder Benutzer, wird nur geloggt). Der
+/// Startwert kommt aus den Einstellungen (Nummernkreis), `inhalt` ist der Audit-Text.
+async fn system_audit_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    etb_startwert: i64,
+    inhalt: &str,
+) -> Result<(), AppError> {
+    let Some(akteur) = ermittle_system_akteur(conn, einsatz_id).await? else {
+        tracing::warn!(
+            einsatz_id,
+            "Purge: kein Benutzer als ETB-Akteur auffindbar — System-Audit übersprungen"
+        );
+        return Ok(());
+    };
+    crate::etb::repo::anlegen_tx(
+        conn,
+        einsatz_id,
+        akteur,
+        etb_startwert,
+        crate::etb::repo::EintragDaten {
+            typ: crate::etb::TYP_SYSTEM,
+            inhalt,
+            von: None,
+            an: None,
+            meldeweg: None,
+            veranlassung: None,
+            ereigniszeit: None,
+            erfasst_lokal_at: None,
+            berichtigt_eintrag_id: None,
+        },
+    )
+    .await?;
+    Ok(())
+}
+
+/// IDs ABGESCHLOSSENER Einsätze, deren Aufbewahrungsfrist abgelaufen ist und die
+/// noch nicht soft-gelöscht sind (Phase-A-Kandidaten). `status='abgeschlossen'`
+/// ist hart im WHERE — aktive Einsätze sind NIE fällig. Lexikografischer
+/// Zeitvergleich (kanonisches Format). Org-isoliert über die `einsatz`-Tabelle.
+pub async fn faellige_soft_delete(pool: &SqlitePool, jetzt: &str) -> Result<Vec<i64>, AppError> {
+    let ids = sqlx::query_scalar::<_, i64>(
+        "SELECT id FROM einsatz \
+         WHERE status = ? AND retention_bis IS NOT NULL \
+           AND ? >= retention_bis AND geloescht_at IS NULL \
+         ORDER BY id",
+    )
+    .bind(STATUS_ABGESCHLOSSEN)
+    .bind(jetzt)
+    .fetch_all(pool)
+    .await?;
+    Ok(ids)
+}
+
+/// Setzt den Soft-Delete-Tombstone (`geloescht_at`) eines fälligen Einsatzes und
+/// schreibt einen System-ETB-Audit in derselben Transaktion. Idempotent über den
+/// `geloescht_at IS NULL`-Guard: ein bereits soft-gelöschter Einsatz liefert
+/// `false` (kein Doppel-Audit). Reversibel (Karenz vor der Schwärzung).
+pub async fn soft_delete_einsatz(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    jetzt: &str,
+) -> Result<bool, AppError> {
+    let etb_startwert = super::einstellungen::laden_oder_default(pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    let mut tx = pool.begin().await?;
+    let res = sqlx::query(
+        "UPDATE einsatz SET geloescht_at = ? \
+         WHERE id = ? AND status = ? AND geloescht_at IS NULL",
+    )
+    .bind(jetzt)
+    .bind(einsatz_id)
+    .bind(STATUS_ABGESCHLOSSEN)
+    .execute(&mut *tx)
+    .await?;
+    if res.rows_affected() == 0 {
+        // Nichts zu tun (schon soft-gelöscht oder nicht abgeschlossen) — kein Audit.
+        return Ok(false);
+    }
+    system_audit_tx(
+        &mut tx,
+        einsatz_id,
+        etb_startwert,
+        "Aufbewahrungsfrist abgelaufen — Einsatz zur Löschung vorgemerkt (Soft-Delete). \
+         Die Karenz bis zur unwiderruflichen PII-Schwärzung läuft.",
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(true)
+}
+
 /// Editierbare Kopffelder für `aktualisiere_kopf`. Optional-Strings sind bereits
 /// vom Handler getrimmt; leere Werte werden als `None` übergeben (→ NULL).
 #[derive(Debug)]
@@ -611,6 +735,70 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(anzahl, 1);
+    }
+
+    #[tokio::test]
+    async fn faellige_soft_delete_nur_abgeschlossen_abgelaufen_offen() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+
+        // (1) abgeschlossen + Frist abgelaufen + nicht gelöscht → fällig.
+        let faellig: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_von, retention_bis) \
+             VALUES (1,'Faellig','abgeschlossen', ?, '2026-01-01 00:00:00') RETURNING id",
+        )
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        // (2) AKTIV mit abgelaufener Frist → NIE fällig (harter status-Guard).
+        sqlx::query(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, retention_bis) \
+             VALUES (1,'Aktiv','aktiv','2026-01-01 00:00:00')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        // (3) abgeschlossen, Frist NICHT abgelaufen → nicht fällig.
+        sqlx::query(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_von, retention_bis) \
+             VALUES (1,'Zukunft','abgeschlossen', ?, '2099-01-01 00:00:00')",
+        )
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
+        // (4) abgeschlossen, keine Frist → nicht fällig.
+        sqlx::query(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_von) \
+             VALUES (1,'OhneFrist','abgeschlossen', ?)",
+        )
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
+        // (5) abgeschlossen, abgelaufen, ABER schon soft-gelöscht → nicht erneut fällig.
+        sqlx::query(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_von, retention_bis, geloescht_at) \
+             VALUES (1,'Schon','abgeschlossen', ?, '2026-01-01 00:00:00','2026-02-01 00:00:00')",
+        )
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let ids = faellige_soft_delete(&pool, "2026-06-01 00:00:00").await.unwrap();
+        assert_eq!(ids, vec![faellig], "nur der abgeschlossene, abgelaufene, offene Einsatz");
+
+        // soft_delete_einsatz kippt den Tombstone + ist idempotent (zweiter Aufruf false).
+        assert!(soft_delete_einsatz(&pool, faellig, "2026-06-01 00:00:00").await.unwrap());
+        assert!(!soft_delete_einsatz(&pool, faellig, "2026-06-02 00:00:00").await.unwrap());
+        let g: Option<String> = sqlx::query_scalar("SELECT geloescht_at FROM einsatz WHERE id = ?")
+            .bind(faellig)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(g.as_deref(), Some("2026-06-01 00:00:00"));
     }
 
     #[tokio::test]

@@ -75,6 +75,8 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     let live = LiveHub::new();
     // Zeitbasierte Erinnerungen: Hintergrund-Scheduler starten (nur im Server-Lauf).
     lifeline_hub::erinnerung::scheduler::starte_scheduler(pool.clone(), live.clone());
+    // Aufbewahrung & Archiv (LFH-135): Purge-Scheduler (Soft-Delete + PII-Schwärzung).
+    lifeline_hub::einsatz::purge_scheduler::starte_purge_scheduler(pool.clone());
 
     let app = build_router_mit_karte(
         AppState {
