@@ -1232,6 +1232,21 @@ async fn einstellungen_put_ungueltiger_modus_ist_400() {
 }
 
 #[tokio::test]
+async fn einstellungen_put_zoom_ausserhalb_bereich_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, einsatz) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = einsatz["id"].as_i64().unwrap();
+
+    // Zoom > 28 → 400.
+    let (status, _) = einstellungen_put(&app, &admin, id, json!({ "karten_zoom_start": 99 })).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    // Zoom < 0 → 400.
+    let (status, _) = einstellungen_put(&app, &admin, id, json!({ "karten_zoom_start": -1 })).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
 async fn einstellungen_put_auf_abgeschlossenem_ist_409() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;

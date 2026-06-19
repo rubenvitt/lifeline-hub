@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
 import { renderMitProviders } from '../test/utils';
@@ -14,7 +14,7 @@ vi.mock('../api/einsaetze', () => ({
   speichereEinstellungen: vi.fn(),
 }));
 
-import { ladeEinsatz, ladeEinstellungen } from '../api/einsaetze';
+import { ladeEinsatz, ladeEinstellungen, speichereEinstellungen } from '../api/einsaetze';
 
 function rendern() {
   return renderMitProviders(
@@ -50,6 +50,35 @@ describe('EinsatzEinstellungenPage', () => {
     expect(screen.getByText('Karten-Defaults')).toBeInTheDocument();
     expect(screen.getByText('ETB')).toBeInTheDocument(); // gewähltes Standard-Modul
     expect(screen.getByText('Offline')).toBeInTheDocument(); // gewählte Basemap
+  });
+
+  it('speichert den transformierten Payload (Fachebenen-Array → Objekt, Zoom-Passthrough)', async () => {
+    vi.mocked(ladeEinstellungen).mockResolvedValue({
+      einsatz_id: 1,
+      standard_modul: 'etb',
+      basemap_modus: 'offline',
+      karten_zoom_start: 12,
+      fachebenen_sichtbar: { nina: true, dwd: false, pegelonline: false, kritis: false },
+      geaendert_at: null,
+      geaendert_von: null,
+    });
+    vi.mocked(speichereEinstellungen).mockResolvedValue({} as never);
+
+    rendern();
+
+    const btn = await screen.findByRole('button', { name: 'Speichern' });
+    fireEvent.click(btn);
+
+    await waitFor(() =>
+      expect(speichereEinstellungen).toHaveBeenCalledWith(1, {
+        standard_modul: 'etb',
+        basemap_modus: 'offline',
+        // Start-Zoom wird unverändert durchgereicht (UI erhebt ihn noch nicht).
+        karten_zoom_start: 12,
+        // Checkbox-Array → Boolean-Objekt.
+        fachebenen_sichtbar: { nina: true, dwd: false, pegelonline: false, kritis: false },
+      }),
+    );
   });
 
   it('blendet einen Hinweis ein, wenn der Einsatz abgeschlossen ist', async () => {
