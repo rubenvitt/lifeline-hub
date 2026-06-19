@@ -1,4 +1,4 @@
-import { Alert, App, Button, Checkbox, Form, Select, Spin, Switch, Typography } from 'antd';
+import { Alert, App, AutoComplete, Button, Checkbox, Form, Select, Spin, Switch, Typography } from 'antd';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -9,7 +9,8 @@ import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { modulRegistry, istModulAusblendbar } from '../einsatz/modulRegistry';
 import type {
-  BasemapModus, EinstellungenUpdate, FachebenenSichtbar, ModulOverrideUpdate,
+  BasemapModus, EinheitenSystem, EinstellungenUpdate, FachebenenSichtbar,
+  Koordinatenformat, ModulOverrideUpdate, Zeitformat,
 } from '../api/types';
 
 /** Optionen für die benötigte Rolle eines Moduls; '' = frei (für alle sichtbaren). */
@@ -32,11 +33,38 @@ const FACHEBENEN_OPTIONEN: { value: keyof FachebenenSichtbar; label: string }[] 
   { value: 'kritis', label: 'KRITIS' },
 ];
 
+// Anzeige-Konventionen (LFH-136). Kuratierte IANA-Zeitzonen + Freitext (AutoComplete).
+const ZEITZONEN_OPTIONEN = [
+  'Europe/Berlin', 'Europe/London', 'Europe/Paris', 'Europe/Zurich', 'Europe/Vienna',
+  'Europe/Warsaw', 'Europe/Moscow', 'UTC', 'America/New_York', 'America/Los_Angeles',
+  'Asia/Istanbul', 'Asia/Dubai', 'Asia/Tokyo',
+].map((z) => ({ value: z }));
+
+const ZEITFORMAT_OPTIONEN: { value: Zeitformat; label: string }[] = [
+  { value: '24h', label: '24 Stunden' },
+  { value: '12h', label: '12 Stunden (AM/PM)' },
+];
+
+const EINHEITEN_OPTIONEN: { value: EinheitenSystem; label: string }[] = [
+  { value: 'metrisch', label: 'Metrisch (m, km)' },
+  { value: 'imperial', label: 'Imperial (ft, mi)' },
+];
+
+const KOORDINATEN_OPTIONEN: { value: Koordinatenformat; label: string }[] = [
+  { value: 'wgs84', label: 'WGS84 dezimal' },
+  { value: 'mgrs', label: 'MGRS' },
+  { value: 'utm', label: 'UTM' },
+];
+
 /** Formularwerte; Fachebenen als Liste der aktiven Keys (Checkbox.Group). */
 interface FormWerte {
   standard_modul?: string;
   basemap_modus?: BasemapModus;
   fachebenen: (keyof FachebenenSichtbar)[];
+  zeitzone?: string;
+  zeitformat?: Zeitformat;
+  einheiten?: EinheitenSystem;
+  koordinatenformat?: Koordinatenformat;
 }
 
 export default function EinsatzEinstellungenPage() {
@@ -119,6 +147,10 @@ export default function EinsatzEinstellungenPage() {
     fachebenen: aktiveFachebenen
       ? FACHEBENEN_OPTIONEN.map((o) => o.value).filter((k) => aktiveFachebenen[k])
       : [],
+    zeitzone: einstellungen.zeitzone ?? undefined,
+    zeitformat: einstellungen.zeitformat ?? undefined,
+    einheiten: einstellungen.einheiten ?? undefined,
+    koordinatenformat: einstellungen.koordinatenformat ?? undefined,
   };
 
   function speichern(werte: FormWerte) {
@@ -136,6 +168,11 @@ export default function EinsatzEinstellungenPage() {
       // Anzeige-Konventionen-Folge-Subtask; Spalte bleibt als Fundament erhalten.
       karten_zoom_start: einstellungen.karten_zoom_start,
       fachebenen_sichtbar,
+      // Anzeige-Konventionen (LFH-136); leer = projektweiter Default (null).
+      zeitzone: werte.zeitzone?.trim() || null,
+      zeitformat: werte.zeitformat ?? null,
+      einheiten: werte.einheiten ?? null,
+      koordinatenformat: werte.koordinatenformat ?? null,
     };
     speichernMutation.mutate(felder);
   }
@@ -188,6 +225,34 @@ export default function EinsatzEinstellungenPage() {
         </Form.Item>
         <Form.Item label="Aktive Lage-Layer" name="fachebenen">
           <Checkbox.Group options={FACHEBENEN_OPTIONEN} />
+        </Form.Item>
+
+        <Typography.Title level={5}>Anzeige-Konventionen</Typography.Title>
+        <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
+          Gemeinsame Darstellung für diesen Einsatz (Lagebild). Leer = Standard.
+        </Typography.Paragraph>
+        <Form.Item
+          label="Zeitzone"
+          name="zeitzone"
+          tooltip="IANA-Zeitzone (z. B. Europe/Berlin). Leer = lokale Zeit des Geräts."
+        >
+          <AutoComplete
+            allowClear
+            options={ZEITZONEN_OPTIONEN}
+            placeholder="Europe/Berlin (Standard)"
+            filterOption={(eingabe, option) =>
+              (option?.value ?? '').toLowerCase().includes(eingabe.toLowerCase())
+            }
+          />
+        </Form.Item>
+        <Form.Item label="Zeitformat" name="zeitformat">
+          <Select allowClear placeholder="24 Stunden (Standard)" options={ZEITFORMAT_OPTIONEN} />
+        </Form.Item>
+        <Form.Item label="Einheiten" name="einheiten">
+          <Select allowClear placeholder="Metrisch (Standard)" options={EINHEITEN_OPTIONEN} />
+        </Form.Item>
+        <Form.Item label="Koordinatenformat" name="koordinatenformat">
+          <Select allowClear placeholder="WGS84 dezimal (Standard)" options={KOORDINATEN_OPTIONEN} />
         </Form.Item>
 
         <Button type="primary" htmlType="submit" loading={speichernMutation.isPending} disabled={!darfBearbeiten}>

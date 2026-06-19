@@ -86,7 +86,44 @@ describe('EinsatzEinstellungenPage', () => {
         karten_zoom_start: 12,
         // Checkbox-Array → Boolean-Objekt.
         fachebenen_sichtbar: { nina: true, dwd: false, pegelonline: false, kritis: false },
+        // Anzeige-Konventionen (LFH-136) — hier nicht gesetzt → null (Default).
+        zeitzone: null,
+        zeitformat: null,
+        einheiten: null,
+        koordinatenformat: null,
       }),
+    );
+  });
+
+  it('zeigt die gespeicherten Anzeige-Konventionen vor und sendet sie im Payload (LFH-136)', async () => {
+    vi.mocked(ladeEinstellungen).mockResolvedValue({
+      einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
+      fachebenen_sichtbar: null,
+      zeitzone: 'Europe/Berlin', zeitformat: '12h', einheiten: 'imperial', koordinatenformat: 'mgrs',
+      geaendert_at: null, geaendert_von: null,
+    });
+    vi.mocked(speichereEinstellungen).mockResolvedValue({} as never);
+
+    rendern();
+
+    // Sektion + vorbelegte Werte sichtbar.
+    expect(await screen.findByText('Anzeige-Konventionen')).toBeInTheDocument();
+    expect(screen.getByTitle('12 Stunden (AM/PM)')).toBeInTheDocument();
+    expect(screen.getByTitle('Imperial (ft, mi)')).toBeInTheDocument();
+    expect(screen.getByTitle('MGRS')).toBeInTheDocument();
+
+    // Speichern reicht die geladenen Konventionen durch (Feldabdeckung).
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(speichereEinstellungen).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          zeitzone: 'Europe/Berlin',
+          zeitformat: '12h',
+          einheiten: 'imperial',
+          koordinatenformat: 'mgrs',
+        }),
+      ),
     );
   });
 
