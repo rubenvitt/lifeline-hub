@@ -1562,3 +1562,33 @@ async fn einstellungen_freeze_ist_org_isoliert() {
     let (s, _) = einstellungen_put(&app, &admin, id_a, json!({ "etb_nummer_start": 5 })).await;
     assert_eq!(s, StatusCode::OK, "fremder Einsatz mit Einträgen darf A nicht einfrieren");
 }
+
+#[tokio::test]
+async fn einstellungen_get_enthalt_org_defaults() {
+    let (app, pool) = setup_with_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, einsatz) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = einsatz["id"].as_i64().unwrap();
+    let org_id = einsatz["org_id"].as_i64().unwrap();
+
+    // Org-Default setzen: zeitzone = Europe/Berlin für die korrekte org_id.
+    sqlx::query(
+        "INSERT INTO org_einstellungen (org_id, zeitzone) VALUES (?, ?) \
+         ON CONFLICT(org_id) DO UPDATE SET zeitzone = excluded.zeitzone",
+    )
+    .bind(org_id)
+    .bind("Europe/Berlin")
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Einsatz-zeitzone bleibt NULL (kein Override gesetzt).
+    let (status, v) = einstellungen_get(&app, &admin, id).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(v["zeitzone"].is_null(), "Einsatz-Override zeitzone muss null sein, war: {:?}", v["zeitzone"]);
+    assert_eq!(
+        v["org_defaults"]["zeitzone"],
+        "Europe/Berlin",
+        "Org-Default zeitzone muss unter org_defaults erscheinen"
+    );
+}

@@ -12,7 +12,7 @@ use crate::error::AppError;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Debug, Deserialize)]
@@ -187,13 +187,29 @@ pub async fn einstellungen_laden(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path(id): Path<i64>,
-) -> Result<Json<einstellungen::EinstellungenAnzeige>, AppError> {
+) -> Result<Json<EinstellungenMitOrgDefaults>, AppError> {
     let einsatz = repo::laden(&state.pool, id).await?;
     let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
     let gespeichert = einstellungen::laden_oder_default(&state.pool, id).await?;
     let (etb_fr, meldung_fr, auftrag_fr) = freeze_flags(&state.pool, id).await?;
-    Ok(Json(gespeichert.anzeige_mit_freeze(etb_fr, meldung_fr, auftrag_fr)))
+    let org_defaults =
+        crate::org::einstellungen::laden_oder_default(&state.pool, einsatz.org_id)
+            .await?
+            .anzeige();
+    Ok(Json(EinstellungenMitOrgDefaults {
+        einstellungen: gespeichert.anzeige_mit_freeze(etb_fr, meldung_fr, auftrag_fr),
+        org_defaults,
+    }))
+}
+
+/// Antwort-Shape von `einstellungen_laden`: rohe Einsatz-Override-Werte (geflacht)
+/// plus org-weite Defaults als eingebettetes Objekt.
+#[derive(Debug, Serialize)]
+pub struct EinstellungenMitOrgDefaults {
+    #[serde(flatten)]
+    einstellungen: einstellungen::EinstellungenAnzeige,
+    org_defaults: crate::org::einstellungen::OrgEinstellungenAnzeige,
 }
 
 /// Ermittelt die Freeze-Flags je Nummernkreis (LFH-133) aus der Daten-Existenz.
