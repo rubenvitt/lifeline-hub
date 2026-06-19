@@ -165,6 +165,38 @@ async fn overrides_laden(app: &axum::Router, cookie: &str, einsatz_id: i64) -> (
     (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
 }
 
+/// GET-Status einer beliebigen Route.
+async fn get_status(app: &axum::Router, cookie: &str, pfad: &str) -> StatusCode {
+    app.clone()
+        .oneshot(
+            Request::builder()
+                .uri(pfad)
+                .header(header::COOKIE, cookie.to_string())
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap()
+        .status()
+}
+
+/// POST-Status einer beliebigen Route mit JSON-Body.
+async fn post_status(app: &axum::Router, cookie: &str, pfad: &str, body: &str) -> StatusCode {
+    app.clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(pfad)
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, cookie.to_string())
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap()
+        .status()
+}
+
 // ----------------------------- Drift-Wächter -----------------------------
 
 /// Source-of-Truth-Drift-Wächter: Die Backend-`MODUL_KEYS` müssen exakt mit den
@@ -319,5 +351,91 @@ async fn overrides_sind_pro_einsatz_isoliert() {
     assert!(
         json_b.as_object().unwrap().is_empty(),
         "Einsatz B darf den Override von A nicht sehen"
+    );
+}
+
+// ----------------------------- Task 5: Guard in Modul-Handlern (Muster ETB) -----------------------------
+
+/// Richtet Einsatz + ein Führungspersonal-Mitglied "frieda" ein; liefert
+/// (admin_cookie, frieda_cookie, einsatz_id). Frieda darf normal lesen+schreiben.
+async fn etb_fixture(app: &axum::Router) -> (String, String, i64) {
+    let admin = login_cookie(app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(app, &admin, "Lage").await;
+    let fid = benutzer_anlegen(app, &admin, "frieda", "keine").await;
+    mitglied_setzen(app, &admin, eid, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(app, "frieda", "friedapw1").await;
+    (admin, frieda, eid)
+}
+
+#[tokio::test]
+async fn verstecktes_etb_blockt_mitglied_auf_get_stream_und_post() {
+    let app = setup().await;
+    let (admin, frieda, eid) = etb_fixture(&app).await;
+
+    // Vor dem Verstecken: Frieda darf lesen.
+    assert_eq!(
+        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/etb")).await,
+        StatusCode::OK
+    );
+
+    // ETB ausblenden.
+    assert_eq!(
+        override_setzen(&app, &admin, eid, "etb", false, None).await,
+        StatusCode::OK
+    );
+
+    // GET, Stream und POST des versteckten Moduls → 403 (auch SSE-Bypass dicht).
+    assert_eq!(
+        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/etb")).await,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/etb/stream")).await,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        post_status(
+            &app,
+            &frieda,
+            &format!("/api/einsaetze/{eid}/etb"),
+            r#"{"typ":"meldung","inhalt":"Test"}"#
+        )
+        .await,
+        StatusCode::FORBIDDEN
+    );
+}
+
+#[tokio::test]
+async fn verstecktes_etb_laesst_admin_durch() {
+    let app = setup().await;
+    let (admin, _frieda, eid) = etb_fixture(&app).await;
+    override_setzen(&app, &admin, eid, "etb", false, None).await;
+
+    // Admin-Mindest-Guard: trotz versteckt 200.
+    assert_eq!(
+        get_status(&app, &admin, &format!("/api/einsaetze/{eid}/etb")).await,
+        StatusCode::OK
+    );
+}
+
+#[tokio::test]
+async fn etb_rollen_schranke_blockt_normales_mitglied() {
+    let app = setup().await;
+    let (admin, frieda, eid) = etb_fixture(&app).await;
+
+    // ETB sichtbar, aber Rolle fuehrungskraft erforderlich. Frieda hat org_rolle 'keine'.
+    override_setzen(&app, &admin, eid, "etb", true, Some("fuehrungskraft")).await;
+    assert_eq!(
+        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/etb")).await,
+        StatusCode::FORBIDDEN
+    );
+
+    // Eine org-weite Führungskraft (Mitglied) darf weiterhin.
+    let gid = benutzer_anlegen(&app, &admin, "gustav", "fuehrungskraft").await;
+    mitglied_setzen(&app, &admin, eid, gid, "fuehrungspersonal").await;
+    let gustav = login_cookie(&app, "gustav", "gustavpw1").await;
+    assert_eq!(
+        get_status(&app, &gustav, &format!("/api/einsaetze/{eid}/etb")).await,
+        StatusCode::OK
     );
 }
