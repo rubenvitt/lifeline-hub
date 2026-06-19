@@ -41,6 +41,13 @@ describe('formatZeit', () => {
     expect(formatZeit(undefined)).toBe('');
     expect(formatZeit('')).toBe('');
   });
+
+  it('ungültige Zeitzone crasht nicht, fällt auf lokal zurück (Review LFH-136)', () => {
+    const wire = '2026-06-11 09:00:00';
+    const lokal = formatZeit(wire); // Default = lokal
+    expect(() => formatZeit(wire, { zeitzone: 'Europe/Brelin' })).not.toThrow();
+    expect(formatZeit(wire, { zeitzone: 'Müll/Quatsch' })).toBe(lokal);
+  });
 });
 
 describe('formatZeitKurz', () => {

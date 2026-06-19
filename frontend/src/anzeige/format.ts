@@ -33,10 +33,23 @@ export const DEFAULT_KONVENTIONEN: AnzeigeKonventionen = {
   koordinatenformat: null,
 };
 
-/** UTC-Wirestring → dayjs in der gewünschten Zeitzone (sonst lokal). */
+/**
+ * UTC-Wirestring → dayjs in der gewünschten Zeitzone (sonst lokal).
+ *
+ * `d.tz(zone)` wirft bei ungültiger IANA-Zone einen `RangeError` (intern
+ * `Intl.DateTimeFormat`). Da das Zeitzonen-Feld Freitext ist und das Backend nur
+ * „nicht-leer" prüft, könnte ein Tippfehler (z. B. `Europe/Brelin`) sonst bei
+ * JEDEM Zeit-Rendering den ganzen Einsatz-Subtree crashen. Defensiver Fallback
+ * auf lokale Zeit (Review LFH-136).
+ */
 function inZone(utcStr: string, konv: AnzeigeKonventionen) {
   const d = dayjs.utc(utcStr);
-  return konv.zeitzone ? d.tz(konv.zeitzone) : d.local();
+  if (!konv.zeitzone) return d.local();
+  try {
+    return d.tz(konv.zeitzone);
+  } catch {
+    return d.local();
+  }
 }
 
 /** Zeitformat-Maske für Uhrzeit-Teil (12h → `hh:mm A`, sonst `HH:mm`). */
