@@ -29,6 +29,8 @@ const VERHALTEN_DEFAULTS = {
   meldung_bestaetigung_frist_min: null, auftrag_quittierung_frist_min: null,
   auto_etb_eintraege: null,
   etb_nummer_eingefroren: false, meldung_nummer_eingefroren: false, auftrag_nummer_eingefroren: false,
+  // Aufbewahrung & Archiv (LFH-135).
+  retention_dauer_tage: null,
 };
 
 function rendern() {
@@ -116,6 +118,8 @@ describe('EinsatzEinstellungenPage', () => {
         auftrag_quittierung_frist_min: null,
         // auto_etb: null im Datensatz → Switch an (Default).
         auto_etb_eintraege: true,
+        // Aufbewahrung & Archiv (LFH-135) — nicht gesetzt → null.
+        retention_dauer_tage: null,
       }),
     );
   });
@@ -247,6 +251,50 @@ describe('EinsatzEinstellungenPage', () => {
         }),
       ),
     );
+  });
+
+  it('zeigt die Aufbewahrungs-Dauer vor und sendet sie im Payload (LFH-135)', async () => {
+    vi.mocked(ladeEinstellungen).mockResolvedValue({
+      einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
+      fachebenen_sichtbar: null,
+      zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+      ...VERHALTEN_DEFAULTS,
+      retention_dauer_tage: 365,
+      geaendert_at: null, geaendert_von: null,
+    });
+    vi.mocked(speichereEinstellungen).mockResolvedValue({} as never);
+
+    rendern();
+
+    // Sektion + vorbelegter Wert sichtbar.
+    expect(await screen.findByText('Aufbewahrung & Archiv')).toBeInTheDocument();
+    expect((screen.getByLabelText('Aufbewahrungs-Dauer (Tage)') as HTMLInputElement).value).toBe('365');
+
+    // Speichern reicht die Dauer durch (Feldabdeckung).
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(speichereEinstellungen).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ retention_dauer_tage: 365 }),
+      ),
+    );
+  });
+
+  it('deaktiviert das Aufbewahrungs-Feld bei abgeschlossenem Einsatz (LFH-135)', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue({
+      id: 1, bezeichnung: 'Lage', status: 'abgeschlossen', meine_rolle: 'einsatzleitung',
+    } as never);
+    vi.mocked(ladeEinstellungen).mockResolvedValue({
+      einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
+      fachebenen_sichtbar: null,
+      zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+      ...VERHALTEN_DEFAULTS,
+      geaendert_at: null, geaendert_von: null,
+    });
+
+    rendern();
+
+    expect(await screen.findByLabelText('Aufbewahrungs-Dauer (Tage)')).toBeDisabled();
   });
 
   it('sperrt Präfix/Startwert eines eingefrorenen Nummernkreises (LFH-133)', async () => {

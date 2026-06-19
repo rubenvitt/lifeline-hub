@@ -75,6 +75,8 @@ interface FormWerte {
   meldung_bestaetigung_frist_min?: number;
   auftrag_quittierung_frist_min?: number;
   auto_etb_eintraege: boolean;
+  // Aufbewahrung & Archiv (LFH-135).
+  retention_dauer_tage?: number;
 }
 
 export default function EinsatzEinstellungenPage() {
@@ -172,6 +174,8 @@ export default function EinsatzEinstellungenPage() {
     auftrag_quittierung_frist_min: einstellungen.auftrag_quittierung_frist_min ?? undefined,
     // 0 = aus; null/1 = an (Default an).
     auto_etb_eintraege: einstellungen.auto_etb_eintraege !== 0,
+    // Aufbewahrung & Archiv (LFH-135).
+    retention_dauer_tage: einstellungen.retention_dauer_tage ?? undefined,
   };
 
   function speichern(werte: FormWerte) {
@@ -204,6 +208,8 @@ export default function EinsatzEinstellungenPage() {
       meldung_bestaetigung_frist_min: werte.meldung_bestaetigung_frist_min ?? null,
       auftrag_quittierung_frist_min: werte.auftrag_quittierung_frist_min ?? null,
       auto_etb_eintraege: werte.auto_etb_eintraege,
+      // Aufbewahrung & Archiv (LFH-135); leer = keine Auto-Frist (null).
+      retention_dauer_tage: werte.retention_dauer_tage ?? null,
     };
     speichernMutation.mutate(felder);
   }
@@ -340,6 +346,23 @@ export default function EinsatzEinstellungenPage() {
           tooltip="Meldungen und Aufträge erzeugen automatisch einen verknüpften ETB-Eintrag. Aus = kein automatischer ETB-Eintrag."
         >
           <Switch />
+        </Form.Item>
+
+        <Typography.Title level={5}>Aufbewahrung &amp; Archiv</Typography.Title>
+        <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
+          Aufbewahrungs-Dauer in Tagen für diesen Einsatz. Die Frist greift erst beim
+          Abschluss (sie wird daraus als Zeitpunkt berechnet) und wirkt nie auf den
+          laufenden Einsatz. Nach Fristablauf wird der Einsatz zunächst gesperrt und
+          später unwiderruflich von Personendaten bereinigt (ETB und Statistik bleiben
+          erhalten). Leer = keine automatische Frist. Eine spätere Verkürzung einer
+          bereits gesetzten Frist ist gesondert (manuelle Frist) bestätigungspflichtig.
+        </Typography.Paragraph>
+        <Form.Item
+          label="Aufbewahrungs-Dauer (Tage)"
+          name="retention_dauer_tage"
+          tooltip="1 bis 3650 Tage. Leer = keine automatische Aufbewahrungsfrist."
+        >
+          <InputNumber min={1} max={3650} style={{ width: 200 }} placeholder="keine" />
         </Form.Item>
 
         <Button type="primary" htmlType="submit" loading={speichernMutation.isPending} disabled={!darfBearbeiten}>
