@@ -211,6 +211,7 @@ pub async fn anlegen_tx(
     ersteller_id: i64,
     auftrag_startwert: i64,
     etb_startwert: i64,
+    auto_etb: bool,
     daten: &AuftragDaten<'_>,
 ) -> Result<i64, AppError> {
     debug_assert!(prioritaet_gueltig(daten.prioritaet));
@@ -270,35 +271,39 @@ pub async fn anlegen_tx(
     }
 
     // ETB-Anordnung (Pattern B): erst NACH den Inserts, im selben Commit.
-    let an = empfaenger_klartext(&daten.empfaenger, &mut *tx).await?;
-    let etb_id = crate::etb::repo::anlegen_tx(
-        &mut *tx,
-        einsatz_id,
-        ersteller_id,
-        etb_startwert,
-        crate::etb::repo::EintragDaten {
-            typ: crate::etb::TYP_ANORDNUNG,
-            inhalt: daten.auftrag_text,
-            von: None,
-            an: Some(&an),
-            meldeweg: None,
-            veranlassung: None,
-            ereigniszeit: Some(daten.erteilt_at),
-            erfasst_lokal_at: None,
-            berichtigt_eintrag_id: None,
-        },
-    )
-    .await?;
-    sqlx::query("UPDATE etb_eintrag SET auftrag_id = ? WHERE id = ?")
-        .bind(auftrag_id)
-        .bind(etb_id)
-        .execute(&mut *tx)
+    // Auto-ETB-Schalter (LFH-133): bei abgeschaltetem Dual-Publish wird kein
+    // ETB-Folgeeintrag erzeugt; etb_anordnung_id bleibt NULL.
+    if auto_etb {
+        let an = empfaenger_klartext(&daten.empfaenger, &mut *tx).await?;
+        let etb_id = crate::etb::repo::anlegen_tx(
+            &mut *tx,
+            einsatz_id,
+            ersteller_id,
+            etb_startwert,
+            crate::etb::repo::EintragDaten {
+                typ: crate::etb::TYP_ANORDNUNG,
+                inhalt: daten.auftrag_text,
+                von: None,
+                an: Some(&an),
+                meldeweg: None,
+                veranlassung: None,
+                ereigniszeit: Some(daten.erteilt_at),
+                erfasst_lokal_at: None,
+                berichtigt_eintrag_id: None,
+            },
+        )
         .await?;
-    sqlx::query("UPDATE auftrag SET etb_anordnung_id = ? WHERE id = ?")
-        .bind(etb_id)
-        .bind(auftrag_id)
-        .execute(&mut *tx)
-        .await?;
+        sqlx::query("UPDATE etb_eintrag SET auftrag_id = ? WHERE id = ?")
+            .bind(auftrag_id)
+            .bind(etb_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("UPDATE auftrag SET etb_anordnung_id = ? WHERE id = ?")
+            .bind(etb_id)
+            .bind(auftrag_id)
+            .execute(&mut *tx)
+            .await?;
+    }
 
     Ok(auftrag_id)
 }
@@ -320,6 +325,7 @@ pub async fn anlegen(
         ersteller_id,
         einst.auftrag_startwert(),
         einst.etb_startwert(),
+        einst.auto_etb_aktiv(),
         &daten,
     )
     .await?;
@@ -349,6 +355,7 @@ pub async fn erteile_aus_etb_tx(
         erteiler_id,
         einst.auftrag_startwert(),
         einst.etb_startwert(),
+        einst.auto_etb_aktiv(),
         &daten,
     )
     .await?;
@@ -601,6 +608,36 @@ mod tests {
             .bind(a.auftrag.etb_anordnung_id.unwrap())
             .fetch_one(&pool).await.unwrap();
         assert_eq!(etb_lfd, 200, "ETB-Anordnung nutzt den ETB-Startwert, nicht den Auftrags-Startwert");
+    }
+
+    #[tokio::test]
+    async fn auto_etb_aus_unterdrueckt_die_anordnung() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        // Auto-ETB abschalten (Some(0)).
+        crate::einsatz::einstellungen::speichern(
+            &pool, e, b,
+            crate::einsatz::einstellungen::EinstellungenDaten {
+                auto_etb_eintraege: Some(0),
+                ..Default::default()
+            },
+        ).await.unwrap();
+
+        let d = anlegen(&pool, e, b, daten("ohne ETB", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+        assert!(d.auftrag.etb_anordnung_id.is_none(), "Auto-ETB aus → keine ETB-Anordnung");
+        // Kein ETB-Eintrag im Einsatz.
+        let etb_anzahl: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?")
+            .bind(e).fetch_one(&pool).await.unwrap();
+        assert_eq!(etb_anzahl, 0);
+    }
+
+    #[tokio::test]
+    async fn auto_etb_default_an_erzeugt_anordnung() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        // Ohne Setting (NULL) = Default an → Anordnung wie heute.
+        let d = anlegen(&pool, e, b, daten("mit ETB", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+        assert!(d.auftrag.etb_anordnung_id.is_some(), "Default an → ETB-Anordnung");
     }
 
     #[tokio::test]

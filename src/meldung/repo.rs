@@ -104,34 +104,38 @@ pub async fn anlegen(
 
     // ETB-Meldung (Pattern B) im selben Commit. Nachrichtenvordruck-Felder mappen
     // direkt: von=absender, an=empfaenger, meldeweg, inhalt, ereigniszeit.
-    let etb_id = crate::etb::repo::anlegen_tx(
-        &mut tx,
-        einsatz_id,
-        erfasser_id,
-        etb_startwert,
-        crate::etb::repo::EintragDaten {
-            typ: crate::etb::TYP_MELDUNG,
-            inhalt: daten.inhalt,
-            von: Some(daten.absender),
-            an: daten.empfaenger,
-            meldeweg: Some(daten.meldeweg),
-            veranlassung: None,
-            ereigniszeit: Some(daten.ereigniszeit),
-            erfasst_lokal_at: None,
-            berichtigt_eintrag_id: None,
-        },
-    )
-    .await?;
-    sqlx::query("UPDATE etb_eintrag SET meldung_id = ? WHERE id = ?")
-        .bind(meldung_id)
-        .bind(etb_id)
-        .execute(&mut *tx)
+    // Auto-ETB-Schalter (LFH-133): bei abgeschaltetem Dual-Publish entsteht kein
+    // ETB-Folgeeintrag; etb_meldung_id bleibt NULL.
+    if einst.auto_etb_aktiv() {
+        let etb_id = crate::etb::repo::anlegen_tx(
+            &mut tx,
+            einsatz_id,
+            erfasser_id,
+            etb_startwert,
+            crate::etb::repo::EintragDaten {
+                typ: crate::etb::TYP_MELDUNG,
+                inhalt: daten.inhalt,
+                von: Some(daten.absender),
+                an: daten.empfaenger,
+                meldeweg: Some(daten.meldeweg),
+                veranlassung: None,
+                ereigniszeit: Some(daten.ereigniszeit),
+                erfasst_lokal_at: None,
+                berichtigt_eintrag_id: None,
+            },
+        )
         .await?;
-    sqlx::query("UPDATE meldung SET etb_meldung_id = ? WHERE id = ?")
-        .bind(etb_id)
-        .bind(meldung_id)
-        .execute(&mut *tx)
-        .await?;
+        sqlx::query("UPDATE etb_eintrag SET meldung_id = ? WHERE id = ?")
+            .bind(meldung_id)
+            .bind(etb_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("UPDATE meldung SET etb_meldung_id = ? WHERE id = ?")
+            .bind(etb_id)
+            .bind(meldung_id)
+            .execute(&mut *tx)
+            .await?;
+    }
 
     tx.commit().await?;
     // `eingang_at` ist der Erfassungszeitpunkt = „jetzt" für die frisch erzeugte Meldung;
@@ -367,6 +371,7 @@ pub async fn erteile_auftrag_tx(
         erteiler_id,
         einst.auftrag_startwert(),
         einst.etb_startwert(),
+        einst.auto_etb_aktiv(),
         &daten,
     )
     .await?;
@@ -500,6 +505,25 @@ mod tests {
             .bind(m.etb_meldung_id.unwrap())
             .fetch_one(&pool).await.unwrap();
         assert_eq!(etb_lfd, 300, "ETB-Meldung nutzt den ETB-Startwert, nicht den Meldungs-Startwert");
+    }
+
+    #[tokio::test]
+    async fn auto_etb_aus_unterdrueckt_etb_meldung() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        crate::einsatz::einstellungen::speichern(
+            &pool, e, b,
+            crate::einsatz::einstellungen::EinstellungenDaten {
+                auto_etb_eintraege: Some(0),
+                ..Default::default()
+            },
+        ).await.unwrap();
+
+        let m = anlegen(&pool, e, b, daten("ohne ETB", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
+        assert!(m.etb_meldung_id.is_none(), "Auto-ETB aus → keine ETB-Meldung");
+        let etb_anzahl: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?")
+            .bind(e).fetch_one(&pool).await.unwrap();
+        assert_eq!(etb_anzahl, 0);
     }
 
     #[tokio::test]

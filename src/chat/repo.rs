@@ -509,6 +509,7 @@ pub async fn heraufstufen_zu_auftrag(
         heraufstufer_id,
         einst.auftrag_startwert(),
         einst.etb_startwert(),
+        einst.auto_etb_aktiv(),
         &daten,
     )
     .await?;
