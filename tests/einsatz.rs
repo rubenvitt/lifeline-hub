@@ -1135,3 +1135,124 @@ async fn aufbewahrungsfrist_verlaengern_und_aufheben_ohne_bestaetigung() {
     assert_eq!(status, StatusCode::OK);
     assert!(json["retention_bis"].is_null());
 }
+
+// --- Einsatz-Einstellungen (LFH-131) ---
+
+/// GET der Einstellungen eines Einsatzes.
+async fn einstellungen_get(app: &axum::Router, cookie: &str, id: i64) -> (StatusCode, Value) {
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!("/api/einsaetze/{id}/einstellungen"))
+                .header(header::COOKIE, cookie.to_string())
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = resp.status();
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+}
+
+/// PUT der Einstellungen.
+async fn einstellungen_put(
+    app: &axum::Router,
+    cookie: &str,
+    id: i64,
+    body: Value,
+) -> (StatusCode, Value) {
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/einsaetze/{id}/einstellungen"))
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, cookie.to_string())
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = resp.status();
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+}
+
+#[tokio::test]
+async fn einstellungen_get_default_dann_put_speichert() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, einsatz) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = einsatz["id"].as_i64().unwrap();
+
+    // GET → Defaults (alle null).
+    let (status, v) = einstellungen_get(&app, &admin, id).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(v["standard_modul"].is_null());
+    assert!(v["fachebenen_sichtbar"].is_null());
+
+    // PUT.
+    let (status, v) = einstellungen_put(
+        &app,
+        &admin,
+        id,
+        json!({
+            "standard_modul": "lagekarte",
+            "basemap_modus": "offline",
+            "karten_zoom_start": 12,
+            "fachebenen_sichtbar": {"nina": true, "dwd": false, "pegelonline": false, "kritis": false}
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(v["standard_modul"], "lagekarte");
+    assert_eq!(v["basemap_modus"], "offline");
+    // fachebenen_sichtbar kommt als Objekt zurück (symmetrisch zur Eingabe).
+    assert_eq!(v["fachebenen_sichtbar"]["nina"], true);
+
+    // GET liefert die gespeicherten Werte.
+    let (_, v) = einstellungen_get(&app, &admin, id).await;
+    assert_eq!(v["standard_modul"], "lagekarte");
+}
+
+#[tokio::test]
+async fn einstellungen_put_ungueltiger_modus_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, einsatz) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = einsatz["id"].as_i64().unwrap();
+
+    // Validation-Fehler → 400 (Hauskonvention, wie bei ungültiger einsatzart).
+    let (status, _) = einstellungen_put(&app, &admin, id, json!({ "basemap_modus": "satellit" })).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn einstellungen_put_auf_abgeschlossenem_ist_409() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, einsatz) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = einsatz["id"].as_i64().unwrap();
+
+    // abschließen
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/einsaetze/{id}/abschliessen"))
+                .header(header::COOKIE, admin.clone())
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let (status, _) = einstellungen_put(&app, &admin, id, json!({ "basemap_modus": "online" })).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+}

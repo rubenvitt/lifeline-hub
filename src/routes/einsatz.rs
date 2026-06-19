@@ -5,7 +5,7 @@ use crate::einsatz::berechtigung::{
     ist_fristverkuerzung,
 };
 use crate::einsatz::{
-    ist_gueltige_einsatzart, repo, EinsatzAnzeige, EinsatzRolle, MitgliedAnzeige,
+    einstellungen, ist_gueltige_einsatzart, repo, EinsatzAnzeige, EinsatzRolle, MitgliedAnzeige,
     EINSATZ_ROLLE_LEITUNG,
 };
 use crate::error::AppError;
@@ -150,6 +150,85 @@ pub async fn aufbewahrungsfrist_setzen(
     Ok(Json(
         aktualisiert.anzeige(rolle.map(|r| r.as_str().to_string())),
     ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct EinstellungenUpdate {
+    pub standard_modul: Option<String>,
+    pub basemap_modus: Option<String>,
+    pub karten_zoom_start: Option<f64>,
+    /// JSON-Objekt {nina,dwd,pegelonline,kritis}; wird als Text gespeichert.
+    pub fachebenen_sichtbar: Option<serde_json::Value>,
+}
+
+/// GET /api/einsaetze/{id}/einstellungen — Einsatz-Einstellungen (LFH-131).
+/// Lesezugriff gemäß DSGVO-Lese-Policy; existiert keine Zeile → Defaults.
+pub async fn einstellungen_laden(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path(id): Path<i64>,
+) -> Result<Json<einstellungen::EinstellungenAnzeige>, AppError> {
+    let einsatz = repo::laden(&state.pool, id).await?;
+    let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
+    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    Ok(Json(
+        einstellungen::laden_oder_default(&state.pool, id)
+            .await?
+            .anzeige(),
+    ))
+}
+
+/// PUT /api/einsaetze/{id}/einstellungen — Einstellungen setzen (Vollersatz).
+/// Gate: Einsatz-Schreibrecht ODER System-Admin, plus aktiver Einsatz (Freeze → 409).
+pub async fn einstellungen_setzen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path(id): Path<i64>,
+    Json(req): Json<EinstellungenUpdate>,
+) -> Result<Json<einstellungen::EinstellungenAnzeige>, AppError> {
+    let einsatz = repo::laden(&state.pool, id).await?;
+    let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
+    fordere_schreibrecht_oder_admin(&benutzer, rolle)?;
+    fordere_aktiv(&einsatz)?; // Freeze bei Abschluss
+
+    let standard_modul = bereinige(req.standard_modul);
+    let basemap_modus = bereinige(req.basemap_modus);
+    if let Some(m) = basemap_modus.as_deref() {
+        if !einstellungen::ist_gueltiger_basemap_modus(m) {
+            return Err(AppError::Validation("Ungültiger basemap_modus".into()));
+        }
+    }
+    if let Some(z) = req.karten_zoom_start {
+        if !(0.0..=28.0).contains(&z) {
+            return Err(AppError::Validation(
+                "karten_zoom_start muss zwischen 0 und 28 liegen".into(),
+            ));
+        }
+    }
+    // Fachebenen-JSON: muss Objekt sein; als kompakter String gespeichert.
+    let fachebenen = match &req.fachebenen_sichtbar {
+        Some(v) if v.is_object() => Some(v.to_string()),
+        Some(serde_json::Value::Null) | None => None,
+        Some(_) => {
+            return Err(AppError::Validation(
+                "fachebenen_sichtbar muss ein Objekt sein".into(),
+            ))
+        }
+    };
+
+    let gespeichert = einstellungen::speichern(
+        &state.pool,
+        id,
+        benutzer.id,
+        einstellungen::EinstellungenDaten {
+            standard_modul: standard_modul.as_deref(),
+            basemap_modus: basemap_modus.as_deref(),
+            karten_zoom_start: req.karten_zoom_start,
+            fachebenen_sichtbar: fachebenen.as_deref(),
+        },
+    )
+    .await?;
+    Ok(Json(gespeichert.anzeige()))
 }
 
 #[derive(Debug, Deserialize)]

@@ -51,6 +51,10 @@ pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
             put(routes::einsatz::aufbewahrungsfrist_setzen),
         )
         .route(
+            "/api/einsaetze/{id}/einstellungen",
+            get(routes::einsatz::einstellungen_laden).put(routes::einsatz::einstellungen_setzen),
+        )
+        .route(
             "/api/einsaetze/{id}/mitglieder",
             get(routes::einsatz::mitglieder),
         )
