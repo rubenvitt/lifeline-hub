@@ -83,6 +83,21 @@ export interface EinsatzEinstellungen {
   zeitformat: Zeitformat | null;
   einheiten: EinheitenSystem | null;
   koordinatenformat: Koordinatenformat | null;
+  // Verhalten & Automatik (LFH-133); null = projektweiter Default.
+  etb_nummer_praefix: string | null;
+  etb_nummer_start: number | null;
+  meldung_nummer_praefix: string | null;
+  meldung_nummer_start: number | null;
+  auftrag_nummer_praefix: string | null;
+  auftrag_nummer_start: number | null;
+  meldung_bestaetigung_frist_min: number | null;
+  auftrag_quittierung_frist_min: number | null;
+  /** 0 = Auto-ETB aus; null/1 = an (Default). */
+  auto_etb_eintraege: number | null;
+  /** Freeze pro Nummernkreis (nur Anzeige): true = Präfix/Startwert read-only. */
+  etb_nummer_eingefroren: boolean;
+  meldung_nummer_eingefroren: boolean;
+  auftrag_nummer_eingefroren: boolean;
   geaendert_at: string | null;
   geaendert_von: number | null;
 }
@@ -97,6 +112,17 @@ export interface EinstellungenUpdate {
   zeitformat: Zeitformat | null;
   einheiten: EinheitenSystem | null;
   koordinatenformat: Koordinatenformat | null;
+  // Verhalten & Automatik (LFH-133).
+  etb_nummer_praefix: string | null;
+  etb_nummer_start: number | null;
+  meldung_nummer_praefix: string | null;
+  meldung_nummer_start: number | null;
+  auftrag_nummer_praefix: string | null;
+  auftrag_nummer_start: number | null;
+  meldung_bestaetigung_frist_min: number | null;
+  auftrag_quittierung_frist_min: number | null;
+  /** Auto-ETB-Dual-Publish: false schaltet ab; true/null = an. */
+  auto_etb_eintraege: boolean | null;
 }
 
 /**

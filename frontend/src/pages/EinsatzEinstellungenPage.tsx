@@ -1,4 +1,4 @@
-import { Alert, App, AutoComplete, Button, Checkbox, Form, Select, Spin, Switch, Typography } from 'antd';
+import { Alert, App, AutoComplete, Button, Checkbox, Form, Input, InputNumber, Select, Spin, Switch, Typography } from 'antd';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -65,6 +65,16 @@ interface FormWerte {
   zeitformat?: Zeitformat;
   einheiten?: EinheitenSystem;
   koordinatenformat?: Koordinatenformat;
+  // Verhalten & Automatik (LFH-133).
+  etb_nummer_praefix?: string;
+  etb_nummer_start?: number;
+  meldung_nummer_praefix?: string;
+  meldung_nummer_start?: number;
+  auftrag_nummer_praefix?: string;
+  auftrag_nummer_start?: number;
+  meldung_bestaetigung_frist_min?: number;
+  auftrag_quittierung_frist_min?: number;
+  auto_etb_eintraege: boolean;
 }
 
 export default function EinsatzEinstellungenPage() {
@@ -151,6 +161,17 @@ export default function EinsatzEinstellungenPage() {
     zeitformat: einstellungen.zeitformat ?? undefined,
     einheiten: einstellungen.einheiten ?? undefined,
     koordinatenformat: einstellungen.koordinatenformat ?? undefined,
+    // Verhalten & Automatik (LFH-133).
+    etb_nummer_praefix: einstellungen.etb_nummer_praefix ?? undefined,
+    etb_nummer_start: einstellungen.etb_nummer_start ?? undefined,
+    meldung_nummer_praefix: einstellungen.meldung_nummer_praefix ?? undefined,
+    meldung_nummer_start: einstellungen.meldung_nummer_start ?? undefined,
+    auftrag_nummer_praefix: einstellungen.auftrag_nummer_praefix ?? undefined,
+    auftrag_nummer_start: einstellungen.auftrag_nummer_start ?? undefined,
+    meldung_bestaetigung_frist_min: einstellungen.meldung_bestaetigung_frist_min ?? undefined,
+    auftrag_quittierung_frist_min: einstellungen.auftrag_quittierung_frist_min ?? undefined,
+    // 0 = aus; null/1 = an (Default an).
+    auto_etb_eintraege: einstellungen.auto_etb_eintraege !== 0,
   };
 
   function speichern(werte: FormWerte) {
@@ -173,6 +194,16 @@ export default function EinsatzEinstellungenPage() {
       zeitformat: werte.zeitformat ?? null,
       einheiten: werte.einheiten ?? null,
       koordinatenformat: werte.koordinatenformat ?? null,
+      // Verhalten & Automatik (LFH-133) — alle Felder durchreichen (Vollersatz-PUT).
+      etb_nummer_praefix: werte.etb_nummer_praefix?.trim() || null,
+      etb_nummer_start: werte.etb_nummer_start ?? null,
+      meldung_nummer_praefix: werte.meldung_nummer_praefix?.trim() || null,
+      meldung_nummer_start: werte.meldung_nummer_start ?? null,
+      auftrag_nummer_praefix: werte.auftrag_nummer_praefix?.trim() || null,
+      auftrag_nummer_start: werte.auftrag_nummer_start ?? null,
+      meldung_bestaetigung_frist_min: werte.meldung_bestaetigung_frist_min ?? null,
+      auftrag_quittierung_frist_min: werte.auftrag_quittierung_frist_min ?? null,
+      auto_etb_eintraege: werte.auto_etb_eintraege,
     };
     speichernMutation.mutate(felder);
   }
@@ -253,6 +284,62 @@ export default function EinsatzEinstellungenPage() {
         </Form.Item>
         <Form.Item label="Koordinatenformat" name="koordinatenformat">
           <Select allowClear placeholder="WGS84 dezimal (Standard)" options={KOORDINATEN_OPTIONEN} />
+        </Form.Item>
+
+        <Typography.Title level={5}>Verhalten &amp; Automatik</Typography.Title>
+        <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
+          Nummernkreise (Präfix + Startwert), Default-Fristen und automatische ETB-Einträge für
+          diesen Einsatz. Präfixe sind reine Anzeige. Sobald die erste Nummer eines Kreises
+          vergeben ist, sind Präfix und Startwert nicht mehr änderbar.
+        </Typography.Paragraph>
+
+        {([
+          { key: 'etb', label: 'ETB', eingefroren: einstellungen.etb_nummer_eingefroren },
+          { key: 'meldung', label: 'Meldungen', eingefroren: einstellungen.meldung_nummer_eingefroren },
+          { key: 'auftrag', label: 'Aufträge', eingefroren: einstellungen.auftrag_nummer_eingefroren },
+        ] as const).map((nk) => (
+          <div key={nk.key} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+            <Form.Item
+              label={`Präfix ${nk.label}`}
+              name={`${nk.key}_nummer_praefix`}
+              style={{ flex: 1 }}
+              tooltip="Wird der laufenden Nummer vorangestellt (z. B. EB-). Max. 8 Zeichen."
+              extra={nk.eingefroren ? 'Erste Nummer bereits vergeben — nicht mehr änderbar' : undefined}
+            >
+              <Input maxLength={8} placeholder="z. B. EB-" disabled={nk.eingefroren} />
+            </Form.Item>
+            <Form.Item
+              label={`Startwert ${nk.label}`}
+              name={`${nk.key}_nummer_start`}
+              style={{ width: 160 }}
+              tooltip="Erste laufende Nummer (Default 1)."
+            >
+              <InputNumber min={1} max={999999} style={{ width: '100%' }} placeholder="1" disabled={nk.eingefroren} />
+            </Form.Item>
+          </div>
+        ))}
+
+        <Form.Item
+          label="Default-Bestätigungsfrist Meldungen (Minuten)"
+          name="meldung_bestaetigung_frist_min"
+          tooltip="Frist für die Bestätigung pflichtiger Meldungen. Leer = projektweiter Standard."
+        >
+          <InputNumber min={1} max={10080} style={{ width: 200 }} placeholder="Standard" />
+        </Form.Item>
+        <Form.Item
+          label="Default-Quittierfrist Aufträge (Minuten)"
+          name="auftrag_quittierung_frist_min"
+          tooltip="Frist für unquittierte Aufträge ohne explizite Frist. Leer = keine automatische Frist."
+        >
+          <InputNumber min={1} max={10080} style={{ width: 200 }} placeholder="keine" />
+        </Form.Item>
+        <Form.Item
+          label="Automatische ETB-Einträge"
+          name="auto_etb_eintraege"
+          valuePropName="checked"
+          tooltip="Meldungen und Aufträge erzeugen automatisch einen verknüpften ETB-Eintrag. Aus = kein automatischer ETB-Eintrag."
+        >
+          <Switch />
         </Form.Item>
 
         <Button type="primary" htmlType="submit" loading={speichernMutation.isPending} disabled={!darfBearbeiten}>

@@ -28,7 +28,7 @@ describe('DefaultModulRedirect', () => {
       einsatz_id: 7, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
       fachebenen_sichtbar: null,
       zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
-      geaendert_at: null, geaendert_von: null,
+      etb_nummer_praefix: null, etb_nummer_start: null, meldung_nummer_praefix: null, meldung_nummer_start: null, auftrag_nummer_praefix: null, auftrag_nummer_start: null, meldung_bestaetigung_frist_min: null, auftrag_quittierung_frist_min: null, auto_etb_eintraege: null, etb_nummer_eingefroren: false, meldung_nummer_eingefroren: false, auftrag_nummer_eingefroren: false, geaendert_at: null, geaendert_von: null,
     });
     rendern();
     expect(await screen.findByText('Dashboard-Inhalt')).toBeInTheDocument();
@@ -39,7 +39,7 @@ describe('DefaultModulRedirect', () => {
       einsatz_id: 7, standard_modul: 'etb', basemap_modus: null, karten_zoom_start: null,
       fachebenen_sichtbar: null,
       zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
-      geaendert_at: null, geaendert_von: null,
+      etb_nummer_praefix: null, etb_nummer_start: null, meldung_nummer_praefix: null, meldung_nummer_start: null, auftrag_nummer_praefix: null, auftrag_nummer_start: null, meldung_bestaetigung_frist_min: null, auftrag_quittierung_frist_min: null, auto_etb_eintraege: null, etb_nummer_eingefroren: false, meldung_nummer_eingefroren: false, auftrag_nummer_eingefroren: false, geaendert_at: null, geaendert_von: null,
     });
     rendern();
     expect(await screen.findByText('ETB-Inhalt')).toBeInTheDocument();
@@ -50,7 +50,7 @@ describe('DefaultModulRedirect', () => {
       einsatz_id: 7, standard_modul: 'gibtsnicht', basemap_modus: null, karten_zoom_start: null,
       fachebenen_sichtbar: null,
       zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
-      geaendert_at: null, geaendert_von: null,
+      etb_nummer_praefix: null, etb_nummer_start: null, meldung_nummer_praefix: null, meldung_nummer_start: null, auftrag_nummer_praefix: null, auftrag_nummer_start: null, meldung_bestaetigung_frist_min: null, auftrag_quittierung_frist_min: null, auto_etb_eintraege: null, etb_nummer_eingefroren: false, meldung_nummer_eingefroren: false, auftrag_nummer_eingefroren: false, geaendert_at: null, geaendert_von: null,
     });
     rendern();
     expect(await screen.findByText('Dashboard-Inhalt')).toBeInTheDocument();

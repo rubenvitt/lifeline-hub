@@ -21,6 +21,16 @@ import {
   ladeModulOverrides, setzeModulOverride,
 } from '../api/einsaetze';
 
+// Verhalten & Automatik (LFH-133) — Default-Felder, in jeden Einstellungs-Mock gespreizt.
+const VERHALTEN_DEFAULTS = {
+  etb_nummer_praefix: null, etb_nummer_start: null,
+  meldung_nummer_praefix: null, meldung_nummer_start: null,
+  auftrag_nummer_praefix: null, auftrag_nummer_start: null,
+  meldung_bestaetigung_frist_min: null, auftrag_quittierung_frist_min: null,
+  auto_etb_eintraege: null,
+  etb_nummer_eingefroren: false, meldung_nummer_eingefroren: false, auftrag_nummer_eingefroren: false,
+};
+
 function rendern() {
   return renderMitProviders(
     <Routes>
@@ -47,6 +57,7 @@ describe('EinsatzEinstellungenPage', () => {
       karten_zoom_start: 12,
       fachebenen_sichtbar: { nina: true, dwd: false, pegelonline: false, kritis: false },
       zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+      ...VERHALTEN_DEFAULTS,
       geaendert_at: null,
       geaendert_von: null,
     });
@@ -70,6 +81,7 @@ describe('EinsatzEinstellungenPage', () => {
       karten_zoom_start: 12,
       fachebenen_sichtbar: { nina: true, dwd: false, pegelonline: false, kritis: false },
       zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+      ...VERHALTEN_DEFAULTS,
       geaendert_at: null,
       geaendert_von: null,
     });
@@ -93,6 +105,17 @@ describe('EinsatzEinstellungenPage', () => {
         zeitformat: null,
         einheiten: null,
         koordinatenformat: null,
+        // Verhalten & Automatik (LFH-133) — Feldabdeckung: alle Felder im Payload.
+        etb_nummer_praefix: null,
+        etb_nummer_start: null,
+        meldung_nummer_praefix: null,
+        meldung_nummer_start: null,
+        auftrag_nummer_praefix: null,
+        auftrag_nummer_start: null,
+        meldung_bestaetigung_frist_min: null,
+        auftrag_quittierung_frist_min: null,
+        // auto_etb: null im Datensatz → Switch an (Default).
+        auto_etb_eintraege: true,
       }),
     );
   });
@@ -102,6 +125,7 @@ describe('EinsatzEinstellungenPage', () => {
       einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
       fachebenen_sichtbar: null,
       zeitzone: 'Europe/Berlin', zeitformat: '12h', einheiten: 'imperial', koordinatenformat: 'mgrs',
+      ...VERHALTEN_DEFAULTS,
       geaendert_at: null, geaendert_von: null,
     });
     vi.mocked(speichereEinstellungen).mockResolvedValue({} as never);
@@ -134,6 +158,7 @@ describe('EinsatzEinstellungenPage', () => {
       einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
       fachebenen_sichtbar: null,
       zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+      ...VERHALTEN_DEFAULTS,
       geaendert_at: null, geaendert_von: null,
     });
 
@@ -154,6 +179,7 @@ describe('EinsatzEinstellungenPage', () => {
       einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
       fachebenen_sichtbar: null,
       zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+      ...VERHALTEN_DEFAULTS,
       geaendert_at: null, geaendert_von: null,
     });
 
@@ -178,11 +204,65 @@ describe('EinsatzEinstellungenPage', () => {
       einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
       fachebenen_sichtbar: null,
       zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+      ...VERHALTEN_DEFAULTS,
       geaendert_at: null, geaendert_von: null,
     });
 
     rendern();
 
     expect(await screen.findByText(/eingefroren/)).toBeInTheDocument();
+  });
+
+  it('zeigt die Verhalten-Felder vor und sendet sie im Payload (LFH-133)', async () => {
+    vi.mocked(ladeEinstellungen).mockResolvedValue({
+      einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
+      fachebenen_sichtbar: null,
+      zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+      ...VERHALTEN_DEFAULTS,
+      etb_nummer_praefix: 'EB-', etb_nummer_start: 100,
+      meldung_bestaetigung_frist_min: 30, auftrag_quittierung_frist_min: 45,
+      auto_etb_eintraege: 0,
+      geaendert_at: null, geaendert_von: null,
+    });
+    vi.mocked(speichereEinstellungen).mockResolvedValue({} as never);
+
+    rendern();
+
+    // Sektion + vorbelegte Werte sichtbar.
+    expect(await screen.findByText('Verhalten & Automatik')).toBeInTheDocument();
+    expect((screen.getByLabelText('Präfix ETB') as HTMLInputElement).value).toBe('EB-');
+
+    // Speichern reicht die Verhalten-Felder durch (Feldabdeckung).
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(speichereEinstellungen).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          etb_nummer_praefix: 'EB-',
+          etb_nummer_start: 100,
+          meldung_bestaetigung_frist_min: 30,
+          auftrag_quittierung_frist_min: 45,
+          // auto_etb_eintraege: 0 im Datensatz → Switch aus → false im Payload.
+          auto_etb_eintraege: false,
+        }),
+      ),
+    );
+  });
+
+  it('sperrt Präfix/Startwert eines eingefrorenen Nummernkreises (LFH-133)', async () => {
+    vi.mocked(ladeEinstellungen).mockResolvedValue({
+      einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
+      fachebenen_sichtbar: null,
+      zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+      ...VERHALTEN_DEFAULTS,
+      etb_nummer_eingefroren: true,
+      geaendert_at: null, geaendert_von: null,
+    });
+
+    rendern();
+
+    // ETB-Kreis eingefroren → Präfix-Feld disabled; Auftrags-Kreis frei → editierbar.
+    expect(await screen.findByLabelText('Präfix ETB')).toBeDisabled();
+    expect(screen.getByLabelText('Präfix Aufträge')).toBeEnabled();
   });
 });
