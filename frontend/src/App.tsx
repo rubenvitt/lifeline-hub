@@ -16,6 +16,7 @@ import MeldungenPage from './pages/MeldungenPage';
 import NachforderungenPage from './pages/NachforderungenPage';
 import LagemeldungenPage from './pages/LagemeldungenPage';
 import EinsatzdatenPage from './pages/EinsatzdatenPage';
+import EinsatzEinstellungenPage from './pages/EinsatzEinstellungenPage';
 import FahrzeugePage from './pages/FahrzeugePage';
 import MaterialPage from './pages/MaterialPage';
 import PersonalPage from './pages/PersonalPage';
@@ -58,6 +59,7 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   nachforderungen: <NachforderungenPage />,
   lagemeldungen: <LagemeldungenPage />,
   einsatzdaten: <EinsatzdatenPage />,
+  'einsatz-einstellungen': <EinsatzEinstellungenPage />,
   fahrzeuge: <FahrzeugePage />,
   material: <MaterialPage />,
   personal: <PersonalPage />,
