@@ -5,12 +5,13 @@ import {
   ladeEinsatz, ladeEinstellungen, speichereEinstellungen,
   ladeModulOverrides, setzeModulOverride,
 } from '../api/einsaetze';
+import { ladeOrgModulEinstellungen } from '../api/orgEinstellungen';
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { modulRegistry, istModulAusblendbar } from '../einsatz/modulRegistry';
 import type {
   BasemapModus, EinheitenSystem, EinstellungenUpdate, FachebenenSichtbar,
-  Koordinatenformat, ModulOverrideUpdate, Zeitformat,
+  Koordinatenformat, ModulOverrideUpdate, OrgModulEinstellungen, Zeitformat,
 } from '../api/types';
 
 /** Optionen für die benötigte Rolle eines Moduls; '' = frei (für alle sichtbaren). */
@@ -99,6 +100,11 @@ export default function EinsatzEinstellungenPage() {
     queryKey: ['modulOverrides', einsatzId],
     queryFn: () => ladeModulOverrides(einsatzId),
   });
+  // Org-Modul-Rollen-Defaults (optional, nicht-blockierend).
+  const orgModulQuery = useQuery({
+    queryKey: ['orgModulEinstellungen'],
+    queryFn: () => ladeOrgModulEinstellungen(),
+  });
 
   const overrideMutation = useMutation({
     mutationFn: (vars: { modulKey: string; update: ModulOverrideUpdate }) =>
@@ -133,6 +139,8 @@ export default function EinsatzEinstellungenPage() {
   }
   const einsatz = einsatzQuery.data;
   const einstellungen = einstellungenQuery.data;
+  const orgDefaults = einstellungen.org_defaults;
+  const orgModulDefaults: OrgModulEinstellungen = orgModulQuery.data ?? {};
 
   const istAdmin = benutzer?.system_rolle === 'admin';
   const istAktiv = einsatz.status === 'aktiv';
@@ -177,6 +185,35 @@ export default function EinsatzEinstellungenPage() {
     // Aufbewahrung & Archiv (LFH-135).
     retention_dauer_tage: einstellungen.retention_dauer_tage ?? undefined,
   };
+
+  /** Gibt „Standard (Org): X" zurück wenn ein Org-Default gesetzt ist, sonst undefined. */
+  function orgHinweisWert(wert: string | number | null | undefined, suffix?: string): string | undefined {
+    if (wert == null) return undefined;
+    return `Standard (Org): ${wert}${suffix ? ` ${suffix}` : ''}`;
+  }
+
+  function orgHinweisSelect<T extends string>(
+    wert: T | null | undefined,
+    optionen: { value: T; label: string }[],
+  ): string | undefined {
+    if (wert == null) return undefined;
+    const opt = optionen.find((o) => o.value === wert);
+    return opt ? `Standard (Org): ${opt.label}` : undefined;
+  }
+
+  /** Hint für auto_etb_eintraege: 0 = Aus, 1/andere = An. */
+  function orgHinweisAutoEtb(wert: number | null | undefined): string | undefined {
+    if (wert == null) return undefined;
+    return `Standard (Org): ${wert === 0 ? 'Aus' : 'An'}`;
+  }
+
+  /** Org-Rollen-Hinweis im Modul-Override (z.B. „Org: Führungskraft"). */
+  function orgRollenHinweis(rolle: 'admin' | 'fuehrungskraft' | null | undefined): string | undefined {
+    if (rolle == null) return undefined;
+    if (rolle === 'fuehrungskraft') return 'Org: Führungskraft';
+    if (rolle === 'admin') return 'Org: Admin';
+    return undefined;
+  }
 
   function speichern(werte: FormWerte) {
     const gewaehlt = new Set(werte.fachebenen ?? []);
@@ -272,6 +309,7 @@ export default function EinsatzEinstellungenPage() {
           label="Zeitzone"
           name="zeitzone"
           tooltip="IANA-Zeitzone (z. B. Europe/Berlin). Leer = lokale Zeit des Geräts."
+          extra={orgHinweisWert(orgDefaults?.zeitzone)}
         >
           <AutoComplete
             allowClear
@@ -282,13 +320,25 @@ export default function EinsatzEinstellungenPage() {
             }
           />
         </Form.Item>
-        <Form.Item label="Zeitformat" name="zeitformat">
+        <Form.Item
+          label="Zeitformat"
+          name="zeitformat"
+          extra={orgHinweisSelect(orgDefaults?.zeitformat, ZEITFORMAT_OPTIONEN)}
+        >
           <Select allowClear placeholder="24 Stunden (Standard)" options={ZEITFORMAT_OPTIONEN} />
         </Form.Item>
-        <Form.Item label="Einheiten" name="einheiten">
+        <Form.Item
+          label="Einheiten"
+          name="einheiten"
+          extra={orgHinweisSelect(orgDefaults?.einheiten, EINHEITEN_OPTIONEN)}
+        >
           <Select allowClear placeholder="Metrisch (Standard)" options={EINHEITEN_OPTIONEN} />
         </Form.Item>
-        <Form.Item label="Koordinatenformat" name="koordinatenformat">
+        <Form.Item
+          label="Koordinatenformat"
+          name="koordinatenformat"
+          extra={orgHinweisSelect(orgDefaults?.koordinatenformat, KOORDINATEN_OPTIONEN)}
+        >
           <Select allowClear placeholder="WGS84 dezimal (Standard)" options={KOORDINATEN_OPTIONEN} />
         </Form.Item>
 
@@ -300,9 +350,18 @@ export default function EinsatzEinstellungenPage() {
         </Typography.Paragraph>
 
         {([
-          { key: 'etb', label: 'ETB', eingefroren: einstellungen.etb_nummer_eingefroren },
-          { key: 'meldung', label: 'Meldungen', eingefroren: einstellungen.meldung_nummer_eingefroren },
-          { key: 'auftrag', label: 'Aufträge', eingefroren: einstellungen.auftrag_nummer_eingefroren },
+          {
+            key: 'etb', label: 'ETB', eingefroren: einstellungen.etb_nummer_eingefroren,
+            orgPraefix: orgDefaults?.etb_nummer_praefix,
+          },
+          {
+            key: 'meldung', label: 'Meldungen', eingefroren: einstellungen.meldung_nummer_eingefroren,
+            orgPraefix: orgDefaults?.meldung_nummer_praefix,
+          },
+          {
+            key: 'auftrag', label: 'Aufträge', eingefroren: einstellungen.auftrag_nummer_eingefroren,
+            orgPraefix: orgDefaults?.auftrag_nummer_praefix,
+          },
         ] as const).map((nk) => (
           <div key={nk.key} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
             <Form.Item
@@ -310,7 +369,11 @@ export default function EinsatzEinstellungenPage() {
               name={`${nk.key}_nummer_praefix`}
               style={{ flex: 1 }}
               tooltip="Wird der laufenden Nummer vorangestellt (z. B. EB-). Max. 8 Zeichen."
-              extra={nk.eingefroren ? 'Erste Nummer bereits vergeben — nicht mehr änderbar' : undefined}
+              extra={
+                nk.eingefroren
+                  ? 'Erste Nummer bereits vergeben — nicht mehr änderbar'
+                  : orgHinweisWert(nk.orgPraefix)
+              }
             >
               <Input maxLength={8} placeholder="z. B. EB-" disabled={nk.eingefroren} />
             </Form.Item>
@@ -329,6 +392,7 @@ export default function EinsatzEinstellungenPage() {
           label="Default-Bestätigungsfrist Meldungen (Minuten)"
           name="meldung_bestaetigung_frist_min"
           tooltip="Frist für die Bestätigung pflichtiger Meldungen. Leer = projektweiter Standard."
+          extra={orgHinweisWert(orgDefaults?.meldung_bestaetigung_frist_min, 'Min.')}
         >
           <InputNumber min={1} max={10080} style={{ width: 200 }} placeholder="Standard" />
         </Form.Item>
@@ -336,6 +400,7 @@ export default function EinsatzEinstellungenPage() {
           label="Default-Quittierfrist Aufträge (Minuten)"
           name="auftrag_quittierung_frist_min"
           tooltip="Frist für unquittierte Aufträge ohne explizite Frist. Leer = keine automatische Frist."
+          extra={orgHinweisWert(orgDefaults?.auftrag_quittierung_frist_min, 'Min.')}
         >
           <InputNumber min={1} max={10080} style={{ width: 200 }} placeholder="keine" />
         </Form.Item>
@@ -344,6 +409,7 @@ export default function EinsatzEinstellungenPage() {
           name="auto_etb_eintraege"
           valuePropName="checked"
           tooltip="Meldungen und Aufträge erzeugen automatisch einen verknüpften ETB-Eintrag. Aus = kein automatischer ETB-Eintrag."
+          extra={orgHinweisAutoEtb(orgDefaults?.auto_etb_eintraege)}
         >
           <Switch />
         </Form.Item>
@@ -361,6 +427,7 @@ export default function EinsatzEinstellungenPage() {
           label="Aufbewahrungs-Dauer (Tage)"
           name="retention_dauer_tage"
           tooltip="1 bis 3650 Tage. Leer = keine automatische Aufbewahrungsfrist."
+          extra={orgHinweisWert(orgDefaults?.retention_dauer_tage, 'Tage')}
         >
           <InputNumber min={1} max={3650} style={{ width: 200 }} placeholder="keine" />
         </Form.Item>
@@ -388,6 +455,7 @@ export default function EinsatzEinstellungenPage() {
           const ov = overrides[m.key];
           const sichtbar = ausblendbar ? ov?.sichtbar ?? true : true;
           const rolle = ov?.benoetigte_rolle ?? null;
+          const orgRolleHinweis = orgRollenHinweis(orgModulDefaults[m.key]);
           return (
             <div key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <span style={{ flex: 1 }}>{m.label}</span>
@@ -404,22 +472,29 @@ export default function EinsatzEinstellungenPage() {
                   }
                 />
               </div>
-              <Select
-                aria-label={`Benötigte Rolle: ${m.label}`}
-                style={{ width: 180 }}
-                value={rolle ?? ''}
-                disabled={!darfModuleVerwalten || !ausblendbar || overrideMutation.isPending}
-                options={ROLLEN_OPTIONEN}
-                onChange={(val) =>
-                  overrideMutation.mutate({
-                    modulKey: m.key,
-                    update: {
-                      sichtbar,
-                      benoetigte_rolle: (val || null) as ModulOverrideUpdate['benoetigte_rolle'],
-                    },
-                  })
-                }
-              />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Select
+                  aria-label={`Benötigte Rolle: ${m.label}`}
+                  style={{ width: 180 }}
+                  value={rolle ?? ''}
+                  disabled={!darfModuleVerwalten || !ausblendbar || overrideMutation.isPending}
+                  options={ROLLEN_OPTIONEN}
+                  onChange={(val) =>
+                    overrideMutation.mutate({
+                      modulKey: m.key,
+                      update: {
+                        sichtbar,
+                        benoetigte_rolle: (val || null) as ModulOverrideUpdate['benoetigte_rolle'],
+                      },
+                    })
+                  }
+                />
+                {orgRolleHinweis && (
+                  <span style={{ fontSize: 11, color: 'var(--ant-color-text-secondary, rgba(0,0,0,0.45))' }}>
+                    {orgRolleHinweis}
+                  </span>
+                )}
+              </div>
             </div>
           );
         })}
