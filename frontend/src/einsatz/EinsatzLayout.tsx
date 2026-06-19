@@ -15,6 +15,7 @@ import SofortAlarm from './SofortAlarm';
 import ThemeToggle from '../components/ThemeToggle';
 import BenutzerMenu from '../components/BenutzerMenu';
 import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
+import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 
 const { Header, Content } = Layout;
 
@@ -96,7 +97,9 @@ export default function EinsatzLayout() {
           />
         )}
         <Content style={{ padding: 24 }}>
-          <Outlet />
+          <EinsatzAnzeigeProvider einsatzId={einsatzId}>
+            <Outlet />
+          </EinsatzAnzeigeProvider>
         </Content>
       </Layout>
     </Layout>
