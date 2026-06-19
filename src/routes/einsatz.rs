@@ -5,14 +5,15 @@ use crate::einsatz::berechtigung::{
     ist_fristverkuerzung,
 };
 use crate::einsatz::{
-    einstellungen, ist_gueltige_einsatzart, repo, EinsatzAnzeige, EinsatzRolle, MitgliedAnzeige,
-    EINSATZ_ROLLE_LEITUNG,
+    einstellungen, ist_gueltige_einsatzart, modul, modul_override, repo, EinsatzAnzeige,
+    EinsatzRolle, MitgliedAnzeige, EINSATZ_ROLLE_LEITUNG,
 };
 use crate::error::AppError;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
+use std::collections::HashMap;
 
 #[derive(Debug, Deserialize)]
 pub struct NeuerEinsatz {
@@ -229,6 +230,74 @@ pub async fn einstellungen_setzen(
     )
     .await?;
     Ok(Json(gespeichert.anzeige()))
+}
+
+/// GET /api/einsaetze/{id}/modul-overrides — alle Modul-Overrides eines Einsatzes
+/// (LFH-132), als Map `modul_key → Override`. Lesezugriff gemäß DSGVO-Lese-Policy;
+/// existieren keine Overrides, ist die Map leer (= alle Module sichtbar, frei).
+pub async fn modul_overrides_laden(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path(id): Path<i64>,
+) -> Result<Json<HashMap<String, modul_override::EinsatzModulOverride>>, AppError> {
+    let einsatz = repo::laden(&state.pool, id).await?;
+    let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
+    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    Ok(Json(modul_override::laden_alle(&state.pool, id).await?))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ModulOverrideUpdate {
+    pub sichtbar: bool,
+    /// 'admin' | 'fuehrungskraft' | null (= frei).
+    pub benoetigte_rolle: Option<String>,
+}
+
+/// PUT /api/einsaetze/{id}/modul-overrides/{modul_key} — Sichtbarkeit + benötigte
+/// Rolle eines Moduls überschreiben (LFH-132). Gate: Einsatzleitung ODER System-Admin,
+/// plus aktiver Einsatz (Freeze → 409). Unbekannter Modul-Key → 400. Nicht-ausblendbare
+/// Module (einsatzdaten, einsatz-einstellungen) lassen sich nicht verstecken
+/// (Selbst-Aussperr-Schutz) → 400. Ungültige `benoetigte_rolle` → 400.
+pub async fn modul_override_setzen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((id, modul_key)): Path<(i64, String)>,
+    Json(req): Json<ModulOverrideUpdate>,
+) -> Result<Json<modul_override::EinsatzModulOverride>, AppError> {
+    let einsatz = repo::laden(&state.pool, id).await?;
+    let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
+    // Administrativ: Einsatzleitung (Mitgliedschaft) oder System-Admin.
+    if !benutzer.ist_admin() {
+        fordere_einsatzleitung(rolle)?;
+    }
+    fordere_aktiv(&einsatz)?; // Freeze bei Abschluss
+
+    if !modul::ist_gueltiger_modul_key(&modul_key) {
+        return Err(AppError::Validation("Unbekannter Modul-Key".into()));
+    }
+    // Selbst-Aussperr-Schutz: nicht-ausblendbare Module dürfen nicht versteckt werden.
+    if !req.sichtbar && !modul::ist_ausblendbar(&modul_key) {
+        return Err(AppError::Validation(
+            "Dieses Modul kann nicht ausgeblendet werden".into(),
+        ));
+    }
+    let benoetigte_rolle = bereinige(req.benoetigte_rolle);
+    if let Some(r) = benoetigte_rolle.as_deref() {
+        if !modul::ist_gueltige_benoetigte_rolle(r) {
+            return Err(AppError::Validation("Ungültige benoetigte_rolle".into()));
+        }
+    }
+
+    let gespeichert = modul_override::setzen(
+        &state.pool,
+        id,
+        &modul_key,
+        req.sichtbar,
+        benoetigte_rolle.as_deref(),
+        benutzer.id,
+    )
+    .await?;
+    Ok(Json(gespeichert))
 }
 
 #[derive(Debug, Deserialize)]
