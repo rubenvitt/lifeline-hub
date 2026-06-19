@@ -1271,3 +1271,72 @@ async fn einstellungen_put_auf_abgeschlossenem_ist_409() {
     let (status, _) = einstellungen_put(&app, &admin, id, json!({ "basemap_modus": "online" })).await;
     assert_eq!(status, StatusCode::CONFLICT);
 }
+
+#[tokio::test]
+async fn einstellungen_put_anzeige_konventionen_speichert_und_liest_zurueck() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, einsatz) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = einsatz["id"].as_i64().unwrap();
+
+    let (status, v) = einstellungen_put(
+        &app,
+        &admin,
+        id,
+        json!({
+            "zeitzone": "Europe/Berlin",
+            "zeitformat": "12h",
+            "einheiten": "imperial",
+            "koordinatenformat": "mgrs"
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(v["zeitzone"], "Europe/Berlin");
+    assert_eq!(v["zeitformat"], "12h");
+    assert_eq!(v["einheiten"], "imperial");
+    assert_eq!(v["koordinatenformat"], "mgrs");
+
+    // GET liest die Konventionen zurück.
+    let (_, v) = einstellungen_get(&app, &admin, id).await;
+    assert_eq!(v["zeitzone"], "Europe/Berlin");
+    assert_eq!(v["koordinatenformat"], "mgrs");
+}
+
+#[tokio::test]
+async fn einstellungen_put_ungueltige_konventionen_sind_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, einsatz) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = einsatz["id"].as_i64().unwrap();
+
+    let (status, _) = einstellungen_put(&app, &admin, id, json!({ "zeitformat": "48h" })).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, _) =
+        einstellungen_put(&app, &admin, id, json!({ "einheiten": "nautisch" })).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, _) =
+        einstellungen_put(&app, &admin, id, json!({ "koordinatenformat": "gauss" })).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    // Leere/blanke Zeitzone wird via bereinige zu „unset" (None) → 200, nicht 400.
+    let (status, _) = einstellungen_put(&app, &admin, id, json!({ "zeitzone": "   " })).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn einstellungen_konventionen_fuer_nicht_mitglied_sind_403() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, einsatz) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = einsatz["id"].as_i64().unwrap();
+
+    benutzer_anlegen(&app, &admin, "erika", "keine").await;
+    let erika = login_cookie(&app, "erika", "erikapw1").await;
+
+    // Org-Isolation: Nicht-Mitglied darf weder lesen noch schreiben.
+    let (status, _) = einstellungen_get(&app, &erika, id).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let (status, _) =
+        einstellungen_put(&app, &erika, id, json!({ "koordinatenformat": "utm" })).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}

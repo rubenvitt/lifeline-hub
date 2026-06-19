@@ -160,6 +160,11 @@ pub struct EinstellungenUpdate {
     pub karten_zoom_start: Option<f64>,
     /// JSON-Objekt {nina,dwd,pegelonline,kritis}; wird als Text gespeichert.
     pub fachebenen_sichtbar: Option<serde_json::Value>,
+    // Anzeige-Konventionen (LFH-136); None/leer = projektweiter Default.
+    pub zeitzone: Option<String>,
+    pub zeitformat: Option<String>,
+    pub einheiten: Option<String>,
+    pub koordinatenformat: Option<String>,
 }
 
 /// GET /api/einsaetze/{id}/einstellungen — Einsatz-Einstellungen (LFH-131).
@@ -217,6 +222,32 @@ pub async fn einstellungen_setzen(
         }
     };
 
+    // Anzeige-Konventionen (LFH-136): bereinigen + Whitelist (Fehler ⇒ 400).
+    let zeitzone = bereinige(req.zeitzone);
+    if let Some(z) = zeitzone.as_deref() {
+        if !einstellungen::ist_gueltige_zeitzone(z) {
+            return Err(AppError::Validation("Ungültige zeitzone".into()));
+        }
+    }
+    let zeitformat = bereinige(req.zeitformat);
+    if let Some(f) = zeitformat.as_deref() {
+        if !einstellungen::ist_gueltiges_zeitformat(f) {
+            return Err(AppError::Validation("Ungültiges zeitformat".into()));
+        }
+    }
+    let einheiten = bereinige(req.einheiten);
+    if let Some(e) = einheiten.as_deref() {
+        if !einstellungen::ist_gueltiges_einheiten_system(e) {
+            return Err(AppError::Validation("Ungültiges einheiten-System".into()));
+        }
+    }
+    let koordinatenformat = bereinige(req.koordinatenformat);
+    if let Some(k) = koordinatenformat.as_deref() {
+        if !einstellungen::ist_gueltiges_koordinatenformat(k) {
+            return Err(AppError::Validation("Ungültiges koordinatenformat".into()));
+        }
+    }
+
     let gespeichert = einstellungen::speichern(
         &state.pool,
         id,
@@ -226,11 +257,10 @@ pub async fn einstellungen_setzen(
             basemap_modus: basemap_modus.as_deref(),
             karten_zoom_start: req.karten_zoom_start,
             fachebenen_sichtbar: fachebenen.as_deref(),
-            // Anzeige-Konventionen (LFH-136): in Task 2 verdrahtet/validiert.
-            zeitzone: None,
-            zeitformat: None,
-            einheiten: None,
-            koordinatenformat: None,
+            zeitzone: zeitzone.as_deref(),
+            zeitformat: zeitformat.as_deref(),
+            einheiten: einheiten.as_deref(),
+            koordinatenformat: koordinatenformat.as_deref(),
         },
     )
     .await?;
