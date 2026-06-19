@@ -82,7 +82,7 @@ export const modulRegistry: ModulEintrag[] = [
   { key: 'meldungen', kategorie: 'kommunikation', label: 'Meldungen (eingehend)', icon: TbInbox, route: 'meldungen', status: 'fertig', beschreibung: 'Eingehende Meldungen zur Bearbeitung.' },
   { key: 'nachforderungen', kategorie: 'kommunikation', label: 'Nachforderung', icon: TbPackages, route: 'nachforderungen', status: 'fertig', beschreibung: 'Nachforderung von Kräften/Mitteln bei Leitstelle/Nachbar-EA/übergeordneter Führung mit Status-Workflow.' },
   // Einstellungen
-  { key: 'einsatz-einstellungen', kategorie: 'einstellungen', label: 'Einstellungen', icon: TbSettings, route: 'einstellungen', status: 'geplant', beschreibung: 'Einsatzbezogene Einstellungen.' },
+  { key: 'einsatz-einstellungen', kategorie: 'einstellungen', label: 'Einstellungen', icon: TbSettings, route: 'einstellungen', status: 'fertig', beschreibung: 'Einsatzbezogene Einstellungen.' },
 ];
 
 export function moduleNachKategorie(kategorie: KategorieKey): ModulEintrag[] {
@@ -106,4 +106,19 @@ export function istModulGesperrt(modul: ModulEintrag, benutzer: BenutzerAnzeige 
 export function redirectZiel(register: ModulEintrag[] = modulRegistry): string {
   const dashboard = register.find((m) => m.key === 'lage-dashboard');
   return dashboard && dashboard.status === 'fertig' ? dashboard.route : 'etb';
+}
+
+/**
+ * Auflösung des Einsatz-Default-Moduls (LFH-131): liefert die Ziel-Route, wenn
+ * `standardModul` auf einen existierenden Eintrag mit Status 'fertig' zeigt —
+ * sonst den globalen `redirectZiel()`-Fallback. Pre-Mortem: kein Sprung auf
+ * geplante/unbekannte Module (das würde ins Leere/auf einen Platzhalter führen).
+ */
+export function aufloeseStandardModul(
+  standardModul: string | null | undefined,
+  register: ModulEintrag[] = modulRegistry,
+): string {
+  const modul = register.find((m) => m.key === standardModul);
+  if (modul && modul.status === 'fertig') return modulZielRoute(modul);
+  return redirectZiel(register);
 }

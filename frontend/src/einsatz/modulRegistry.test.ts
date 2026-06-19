@@ -6,6 +6,7 @@ import {
   istModulGesperrt,
   redirectZiel,
   modulZielRoute,
+  aufloeseStandardModul,
   type ModulEintrag,
 } from './modulRegistry';
 import type { BenutzerAnzeige } from '../api/types';
@@ -69,6 +70,26 @@ describe('modulRegistry', () => {
       m.key === 'lage-dashboard' ? { ...m, status: 'geplant' as const } : m,
     );
     expect(redirectZiel(ohneFertigesDashboard)).toBe('etb');
+  });
+
+  it('aufloeseStandardModul: liefert Route eines fertigen Standard-Moduls', () => {
+    expect(aufloeseStandardModul('etb')).toBe('etb');
+  });
+
+  it('aufloeseStandardModul: Fallback auf redirectZiel bei null', () => {
+    expect(aufloeseStandardModul(null)).toBe(redirectZiel());
+  });
+
+  it('aufloeseStandardModul: Fallback bei unbekanntem Modul-Key', () => {
+    expect(aufloeseStandardModul('gibtsnicht')).toBe(redirectZiel());
+  });
+
+  it('aufloeseStandardModul: Fallback bei nicht-fertigem Modul (wip)', () => {
+    expect(aufloeseStandardModul('stab')).toBe(redirectZiel()); // stab = wip
+  });
+
+  it('aufloeseStandardModul: nutzt modulZielRoute (key!=route, z.B. gefahrenzonen)', () => {
+    expect(aufloeseStandardModul('gefahrenzonen')).toBe('gefahren');
   });
 
   it('fahrzeuge ist fertig, abrollbehaelter ist entfernt', () => {
