@@ -363,13 +363,20 @@ pub async fn auftrag_nummer_vergeben(pool: &SqlitePool, einsatz_id: i64) -> Resu
 
 /// EXISTS-Check pro Nummernkreis. `tabelle` ist eine feste, interne Konstante
 /// (kein User-Input) — kein Injection-Risiko.
+///
+/// `AND lfd_nr IS NOT NULL` ist entscheidend: `auftrag.lfd_nr` ist nullable
+/// (Migration 0067 ohne Backfill), Vor-0067-Aufträge tragen NULL und konsumieren
+/// noch keine Nummer (`COALESCE(MAX(lfd_nr)+1, startwert)`). Ohne den Filter
+/// würde der Freeze schon bei bloßer Zeilen-Existenz feuern und Präfix/Startwert
+/// dauerhaft fälschlich sperren (409). Für ETB/Meldung (`lfd_nr NOT NULL`) ist
+/// der Filter ein No-op.
 async fn nummer_vergeben(
     pool: &SqlitePool,
     tabelle: &str,
     einsatz_id: i64,
 ) -> Result<bool, AppError> {
     let treffer: Option<i64> = sqlx::query_scalar(&format!(
-        "SELECT 1 FROM {tabelle} WHERE einsatz_id = ? LIMIT 1"
+        "SELECT 1 FROM {tabelle} WHERE einsatz_id = ? AND lfd_nr IS NOT NULL LIMIT 1"
     ))
     .bind(einsatz_id)
     .fetch_optional(pool)
@@ -656,6 +663,27 @@ mod tests {
         assert!(!auftrag_nummer_vergeben(&pool, eid).await.unwrap());
 
         // Erster Auftrag friert den Auftrags-Kreis ein.
+        auftrag_anlegen(&pool, eid, bid).await;
+        assert!(auftrag_nummer_vergeben(&pool, eid).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn auftrag_freeze_ignoriert_null_lfd_nr() {
+        // Regression (Review LFH-133): Vor-0067-Aufträge tragen lfd_nr = NULL und
+        // konsumieren noch keine Nummer. Der Freeze darf erst feuern, wenn eine
+        // echte Nummer vergeben wurde — sonst dauerhafter Falsch-409-Lockout.
+        let pool = crate::db::test_pool().await;
+        let (eid, bid) = fixture(&pool).await;
+        sqlx::query(
+            "INSERT INTO auftrag (einsatz_id, lfd_nr, auftrag_text, erteilt_at, erstellt_von_id) \
+             VALUES (?, NULL, 'legacy', '2026-06-19 09:00:00', ?)",
+        )
+        .bind(eid).bind(bid).execute(&pool).await.unwrap();
+        assert!(
+            !auftrag_nummer_vergeben(&pool, eid).await.unwrap(),
+            "Auftrag mit lfd_nr=NULL darf den Nummernkreis nicht einfrieren"
+        );
+        // Erst eine echte Nummer friert ein.
         auftrag_anlegen(&pool, eid, bid).await;
         assert!(auftrag_nummer_vergeben(&pool, eid).await.unwrap());
     }
