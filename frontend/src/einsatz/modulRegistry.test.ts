@@ -4,12 +4,14 @@ import {
   kategorien,
   moduleNachKategorie,
   istModulGesperrt,
+  istModulSichtbar,
+  istModulAusblendbar,
   redirectZiel,
   modulZielRoute,
   aufloeseStandardModul,
   type ModulEintrag,
 } from './modulRegistry';
-import type { BenutzerAnzeige } from '../api/types';
+import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
 
 const admin: BenutzerAnzeige = {
   id: 1, anzeigename: 'A', benutzername: 'a', system_rolle: 'admin',
@@ -59,6 +61,48 @@ describe('modulRegistry', () => {
     expect(istModulGesperrt(fkModul, admin)).toBe(false);
     expect(istModulGesperrt(fkModul, fk)).toBe(false);
     expect(istModulGesperrt(fkModul, ohne)).toBe(true);
+  });
+
+  // --- Override-Kontext (LFH-132) ---
+
+  const ov = (key: string, sichtbar: boolean, rolle: 'admin' | 'fuehrungskraft' | null = null): ModulOverrides => ({
+    [key]: { einsatz_id: 1, modul_key: key, sichtbar, benoetigte_rolle: rolle, geaendert_at: null, geaendert_von: null },
+  });
+
+  it('istModulAusblendbar: Stammdaten + Einstellungen nicht ausblendbar', () => {
+    expect(istModulAusblendbar('einsatzdaten')).toBe(false);
+    expect(istModulAusblendbar('einsatz-einstellungen')).toBe(false);
+    expect(istModulAusblendbar('etb')).toBe(true);
+  });
+
+  it('istModulSichtbar: ohne Override sichtbar', () => {
+    expect(istModulSichtbar(offen)).toBe(true);
+    expect(istModulSichtbar(offen, {})).toBe(true);
+  });
+
+  it('istModulSichtbar: Override sichtbar=false versteckt ausblendbares Modul', () => {
+    expect(istModulSichtbar(offen, ov('x', false))).toBe(false);
+    expect(istModulSichtbar(offen, ov('x', true))).toBe(true);
+  });
+
+  it('istModulSichtbar: nicht-ausblendbares Modul bleibt trotz Override sichtbar', () => {
+    const einsatzdaten = modulRegistry.find((m) => m.key === 'einsatzdaten')!;
+    expect(istModulSichtbar(einsatzdaten, ov('einsatzdaten', false))).toBe(true);
+  });
+
+  it('istModulGesperrt: Override-Rolle hat Vorrang vor Registry-Default', () => {
+    // offen hat keinen Registry-Default; Override fordert fuehrungskraft.
+    expect(istModulGesperrt(offen, ohne, ov('x', true, 'fuehrungskraft'))).toBe(true);
+    expect(istModulGesperrt(offen, fk, ov('x', true, 'fuehrungskraft'))).toBe(false);
+    // Admin nie gesperrt, auch bei admin-Override.
+    expect(istModulGesperrt(offen, admin, ov('x', true, 'admin'))).toBe(false);
+  });
+
+  it('istModulGesperrt: Override-Rolle null faellt auf Registry-Default zurueck', () => {
+    // adminModul hat Registry-Default 'admin'; Override setzt nur Sichtbarkeit (Rolle null).
+    // Wie das Backend (or_else(registry_default)) greift dann weiterhin der Default 'admin'.
+    expect(istModulGesperrt(adminModul, ohne, ov('x', true, null))).toBe(true);
+    expect(istModulGesperrt(adminModul, admin, ov('x', true, null))).toBe(false);
   });
 
   it('redirectZiel: Dashboard ist Default sobald fertig', () => {

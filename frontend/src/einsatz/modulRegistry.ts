@@ -7,7 +7,7 @@ import {
   TbMessage, TbMessageCircle, TbBell, TbClipboardList, TbInbox,
   TbSettings, TbBuildingWarehouse,
 } from 'react-icons/tb';
-import type { BenutzerAnzeige } from '../api/types';
+import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
 
 export type ModulStatus = 'fertig' | 'geplant' | 'wip';
 export type KategorieKey =
@@ -94,12 +94,44 @@ export function modulZielRoute(modul: ModulEintrag): string {
   return modul.verweistAuf ?? modul.route;
 }
 
-/** Grundsatz „disabled statt versteckt": liefert, ob das Modul für den Benutzer gesperrt ist. */
-export function istModulGesperrt(modul: ModulEintrag, benutzer: BenutzerAnzeige | null): boolean {
-  if (!modul.benoetigteRolle) return false;
-  const istAdmin = benutzer?.system_rolle === 'admin';
-  if (modul.benoetigteRolle === 'admin') return !istAdmin;
-  return !(istAdmin || benutzer?.org_rolle === 'fuehrungskraft');
+/**
+ * Module, die nicht ausgeblendet werden dürfen (Spiegel des Backends
+ * `src/einsatz/modul.rs::NICHT_AUSBLENDBAR`): Stammdaten + Einstellungen selbst.
+ */
+export const NICHT_AUSBLENDBARE_MODULE = ['einsatzdaten', 'einsatz-einstellungen'] as const;
+
+/** Ob ein Modul ausgeblendet werden darf (alle außer den nicht-ausblendbaren). */
+export function istModulAusblendbar(key: string): boolean {
+  return !(NICHT_AUSBLENDBARE_MODULE as readonly string[]).includes(key);
+}
+
+/**
+ * Grundsatz „disabled statt versteckt" (Rollen-Schranke): liefert, ob das Modul für
+ * den Benutzer rollen-gesperrt ist. Berücksichtigt den Override-Kontext (LFH-132):
+ * die effektive benötigte Rolle ist die des Overrides, sonst der Registry-Default.
+ * Admin ist nie gesperrt (Admin-Mindest-Guard).
+ */
+export function istModulGesperrt(
+  modul: ModulEintrag,
+  benutzer: BenutzerAnzeige | null,
+  overrides?: ModulOverrides,
+): boolean {
+  if (benutzer?.system_rolle === 'admin') return false;
+  const benoetigt = overrides?.[modul.key]?.benoetigte_rolle ?? modul.benoetigteRolle ?? null;
+  if (!benoetigt) return false;
+  if (benoetigt === 'admin') return true; // Admin ist oben bereits frei.
+  return benutzer?.org_rolle !== 'fuehrungskraft';
+}
+
+/**
+ * Sichtbarkeit eines Moduls im Einsatz (Override-Kontext, LFH-132): nicht-ausblendbare
+ * Module sind immer sichtbar; sonst ist ein Modul versteckt, wenn sein Override
+ * `sichtbar=false` setzt. Steuert das Rendern in der Navigation (versteckt = nicht
+ * gerendert) — unabhängig vom Benutzer (Einsatz-Konfiguration).
+ */
+export function istModulSichtbar(modul: ModulEintrag, overrides?: ModulOverrides): boolean {
+  if (!istModulAusblendbar(modul.key)) return true;
+  return overrides?.[modul.key]?.sichtbar !== false;
 }
 
 /** Ziel der Default-Route /einsaetze/:id: Lage-Dashboard sobald fertig, sonst ETB-Fallback. */
