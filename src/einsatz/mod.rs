@@ -1,6 +1,7 @@
 pub mod berechtigung;
 pub mod einstellungen;
 pub mod modul;
+pub mod modul_override;
 pub mod repo;
 
 use serde::Serialize;
