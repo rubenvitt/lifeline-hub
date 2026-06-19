@@ -318,6 +318,11 @@ pub async fn anlegen(
     jetzt: &str,
 ) -> Result<AuftragDetail, AppError> {
     let einst = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id).await?;
+    let org_id: Option<i64> = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+        .bind(einsatz_id)
+        .fetch_optional(pool)
+        .await?;
+    let org_einst = crate::org::einstellungen::laden_oder_default(pool, org_id.unwrap_or(0)).await?;
     let mut tx = pool.begin().await?;
     let auftrag_id = anlegen_tx(
         &mut tx,
@@ -325,7 +330,7 @@ pub async fn anlegen(
         ersteller_id,
         einst.auftrag_startwert(),
         einst.etb_startwert(),
-        einst.auto_etb_aktiv(),
+        crate::einsatz::effektiv::effektiv_auto_etb_aktiv(&einst, &org_einst),
         &daten,
     )
     .await?;
@@ -348,6 +353,11 @@ pub async fn erteile_aus_etb_tx(
     daten: AuftragDaten<'_>,
 ) -> Result<i64, AppError> {
     let einst = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id).await?;
+    let org_id: Option<i64> = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+        .bind(einsatz_id)
+        .fetch_optional(pool)
+        .await?;
+    let org_einst = crate::org::einstellungen::laden_oder_default(pool, org_id.unwrap_or(0)).await?;
     let mut tx = pool.begin().await?;
     let auftrag_id = anlegen_tx(
         &mut tx,
@@ -355,7 +365,7 @@ pub async fn erteile_aus_etb_tx(
         erteiler_id,
         einst.auftrag_startwert(),
         einst.etb_startwert(),
-        einst.auto_etb_aktiv(),
+        crate::einsatz::effektiv::effektiv_auto_etb_aktiv(&einst, &org_einst),
         &daten,
     )
     .await?;
@@ -899,5 +909,45 @@ mod tests {
         assert_eq!(empf.extern_kategorie.as_deref(), Some("leitstelle"));
         assert_eq!(empf.extern_bezeichnung.as_deref(), Some("Leitstelle Nord"));
         assert_eq!(empf.snap_anzeige, "Leitstelle Nord", "snap aus Bezeichnung");
+    }
+
+    #[tokio::test]
+    async fn auto_etb_einsatz_null_org_aus_kein_etb_anordnung() {
+        // Einsatz-Setting NULL + Org=0 → effektiv aus → kein ETB-Folgeeintrag
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        crate::org::einstellungen::speichern(
+            &pool, 1, b,
+            crate::org::einstellungen::OrgEinstellungenDaten {
+                auto_etb_eintraege: Some(0),
+                ..Default::default()
+            },
+        ).await.unwrap();
+        // Einsatz-Setting bleibt NULL (kein Override)
+        let d = anlegen(&pool, e, b, daten("X", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+        assert!(d.auftrag.etb_anordnung_id.is_none(), "Einsatz=NULL, Org=0 → kein ETB-Folgeeintrag");
+    }
+
+    #[tokio::test]
+    async fn auto_etb_einsatz_an_schlaegt_org_aus_anordnung() {
+        // Einsatz=1 schlägt Org=0 → ETB-Folgeeintrag wird trotz Org-Aus erzeugt
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        crate::org::einstellungen::speichern(
+            &pool, 1, b,
+            crate::org::einstellungen::OrgEinstellungenDaten {
+                auto_etb_eintraege: Some(0),
+                ..Default::default()
+            },
+        ).await.unwrap();
+        crate::einsatz::einstellungen::speichern(
+            &pool, e, b,
+            crate::einsatz::einstellungen::EinstellungenDaten {
+                auto_etb_eintraege: Some(1),
+                ..Default::default()
+            },
+        ).await.unwrap();
+        let d = anlegen(&pool, e, b, daten("Y", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+        assert!(d.auftrag.etb_anordnung_id.is_some(), "Einsatz=1 schlägt Org=0 → ETB-Folgeeintrag erzeugt");
     }
 }
