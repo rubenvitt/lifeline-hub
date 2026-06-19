@@ -16,6 +16,7 @@
 //! `status='abgeschlossen'` in jeder Purge-Query hart ausgeschlossen.
 
 use super::repo;
+use super::retention::{karenz_abgelaufen, KARENZ_TAGE};
 use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
 use std::time::Duration;
@@ -52,7 +53,28 @@ pub async fn tick_einmal(pool: &SqlitePool, jetzt: DateTime<Utc>) -> usize {
         Err(e) => tracing::warn!("Purge Phase A: Abfrage fehlgeschlagen: {e}"),
     }
 
-    // Phase B (PII-Schwärzung nach Karenz) wird in LFH-135 Task 6 ergänzt.
+    // --- Phase B: PII-Schwärzung nach Ablauf der Karenz (IRREVERSIBEL) ---
+    match repo::faellige_purge(pool, KARENZ_TAGE).await {
+        Ok(kandidaten) => {
+            for (id, geloescht_at) in kandidaten {
+                // Karenz-Grenze in Rust prüfen (injiziertes jetzt; defensiv gegen
+                // unparsebare Tombstones → kein Scrub).
+                if !karenz_abgelaufen(Some(&geloescht_at), jetzt) {
+                    continue;
+                }
+                tracing::warn!(
+                    einsatz_id = id,
+                    "Purge Phase B: PII-SCHWÄRZUNG (irreversibel) — Karenz abgelaufen"
+                );
+                match repo::schwaerze_einsatz(pool, id, &jetzt_s).await {
+                    Ok(true) => anzahl += 1,
+                    Ok(false) => {} // Bereits geschwärzt (Idempotenz).
+                    Err(e) => tracing::error!(einsatz_id = id, "Purge Phase B fehlgeschlagen: {e}"),
+                }
+            }
+        }
+        Err(e) => tracing::warn!("Purge Phase B: Abfrage fehlgeschlagen: {e}"),
+    }
 
     anzahl
 }
@@ -161,6 +183,99 @@ mod tests {
                 .unwrap();
         assert_eq!(g, None, "aktiver Einsatz nie soft-gelöscht");
         assert_eq!(s, None, "aktiver Einsatz nie geschwärzt");
+    }
+
+    /// Vollständiger Phase-B-Durchlauf inkl. aller CHECK/NOT-NULL-Fallen und einer
+    /// STORNIERTEN Person (die ebenfalls reale PII trägt und gescrubbt werden muss).
+    #[tokio::test]
+    async fn phase_b_schwaerzt_alle_pii_inkl_stornierte_und_haelt_skelett() {
+        let pool = crate::db::test_pool().await;
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let b: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1,'Leit','leit','h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        // Abgeschlossen + Frist abgelaufen + bereits soft-gelöscht (Karenz-Start lange her).
+        let e: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_at, abgeschlossen_von, retention_bis, geloescht_at) \
+             VALUES (1,'Lage','abgeschlossen','2026-01-01 00:00:00', ?, '2026-02-01 00:00:00','2026-02-15 00:00:00') RETURNING id",
+        )
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        // PII-Bestand: normale + STORNIERTE Person, Verlaufsnotiz, Tier, Schaden
+        // (status='uebergeben' → uebergeben_an NOT NULL via CHECK!), Ad-hoc-Personal.
+        let p1: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, status, name, vorname, geburtsdatum, herkunft_adresse, melder_kontakt, notiz, erfasst_von, geaendert_von) \
+             VALUES (?,1,'betroffen','Mustermann','Max','1980-01-01','Hauptstr 1','Angeh. 0170','frei', ?, ?) RETURNING id",
+        ).bind(e).bind(b).bind(b).fetch_one(&pool).await.unwrap();
+        // STORNIERTE Person (trägt trotzdem PII).
+        sqlx::query(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, status, name, vorname, storniert_at, erfasst_von, geaendert_von) \
+             VALUES (?,2,'erfasst','Storno','Erika','2026-01-05 00:00:00', ?, ?)",
+        ).bind(e).bind(b).bind(b).execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO person_verlaufsnotiz (einsatz_id, person_id, text, erfasst_von) VALUES (?,?, 'Verdacht auf XY', ?)")
+            .bind(e).bind(p1).bind(b).execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO einsatz_tier (einsatz_id, registrier_nr, spezies, halter_kontakt, antreff_ort, notiz, erfasst_von, geaendert_von) VALUES (?,1,'hund','Müller 0170','Wald','x', ?, ?)")
+            .bind(e).bind(b).bind(b).execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO einsatz_schaden (einsatz_id, registrier_nr, status, typ, ausmass, ort, beschreibung, geschaedigt_kontakt, uebergeben_an, uebergeben_at, erfasst_von, geaendert_von) VALUES (?,1,'uebergeben','sachschaden','gering','Hauptstr','Schaden','Geschäd. Person','Polizist Schmidt','2026-01-02 00:00:00', ?, ?)")
+            .bind(e).bind(b).bind(b).execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO einsatz_personal (einsatz_id, personal_id, snap_name, snap_funktion, bemerkung) VALUES (?, NULL, 'Externer Hans', 'Helfer', 'kam spontan')")
+            .bind(e).execute(&pool).await.unwrap();
+        // Eine bestehende ETB-Zeile (Skelett, muss erhalten bleiben).
+        sqlx::query("INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) VALUES (?,1,'meldung','ORIGINAL', ?, '2026-01-01 09:00:00')")
+            .bind(e).bind(b).execute(&pool).await.unwrap();
+
+        // Tick nach Ablauf der Karenz → eine Schwärzung.
+        assert_eq!(tick_einmal(&pool, t("2026-06-01 12:00:00")).await, 1);
+
+        // (a) PII genullt/platzhalter — auch die STORNIERTE Person.
+        let namen: Vec<Option<String>> = sqlx::query_scalar("SELECT name FROM einsatz_person WHERE einsatz_id = ? ORDER BY registrier_nr")
+            .bind(e).fetch_all(&pool).await.unwrap();
+        assert_eq!(namen, vec![None, None], "alle Personen (inkl. stornierte) gescrubbt");
+        let vtext: String = sqlx::query_scalar("SELECT text FROM person_verlaufsnotiz WHERE einsatz_id = ?")
+            .bind(e).fetch_one(&pool).await.unwrap();
+        assert_eq!(vtext, super::repo::SCHWAERZUNG_PLATZHALTER);
+        let halter: Option<String> = sqlx::query_scalar("SELECT halter_kontakt FROM einsatz_tier WHERE einsatz_id = ?")
+            .bind(e).fetch_one(&pool).await.unwrap();
+        assert_eq!(halter, None);
+        // (b) Schaden bei status='uebergeben' brach NICHT (uebergeben_an → Platzhalter).
+        let (uebergeben_an, geschaedigt, status): (String, Option<String>, String) =
+            sqlx::query_as("SELECT uebergeben_an, geschaedigt_kontakt, status FROM einsatz_schaden WHERE einsatz_id = ?")
+            .bind(e).fetch_one(&pool).await.unwrap();
+        assert_eq!(uebergeben_an, super::repo::SCHWAERZUNG_PLATZHALTER);
+        assert_eq!(geschaedigt, None);
+        assert_eq!(status, "uebergeben");
+        let snap: String = sqlx::query_scalar("SELECT snap_name FROM einsatz_personal WHERE einsatz_id = ?")
+            .bind(e).fetch_one(&pool).await.unwrap();
+        assert_eq!(snap, super::repo::SCHWAERZUNG_PLATZHALTER);
+
+        // (c) Skelett intakt: Einsatz + registrier_nr + ETB-Original erhalten.
+        let person_anzahl: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_person WHERE einsatz_id = ?")
+            .bind(e).fetch_one(&pool).await.unwrap();
+        assert_eq!(person_anzahl, 2, "Personen-Zeilen bleiben (nur Inhalt gescrubbt)");
+        let etb_original: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ? AND inhalt = 'ORIGINAL'")
+            .bind(e).fetch_one(&pool).await.unwrap();
+        assert_eq!(etb_original, 1, "ETB-Skelett erhalten");
+
+        // (d) geschwaerzt_at gesetzt.
+        let s: Option<String> = sqlx::query_scalar("SELECT geschwaerzt_at FROM einsatz WHERE id = ?")
+            .bind(e).fetch_one(&pool).await.unwrap();
+        assert_eq!(s.as_deref(), Some("2026-06-01 12:00:00"));
+
+        // (e) Zweiter Tick: idempotent, kein Doppel-Scrub.
+        assert_eq!(tick_einmal(&pool, t("2026-06-02 12:00:00")).await, 0);
+        let s2: Option<String> = sqlx::query_scalar("SELECT geschwaerzt_at FROM einsatz WHERE id = ?")
+            .bind(e).fetch_one(&pool).await.unwrap();
+        assert_eq!(s2.as_deref(), Some("2026-06-01 12:00:00"), "Tombstone unverändert");
     }
 
     #[tokio::test]

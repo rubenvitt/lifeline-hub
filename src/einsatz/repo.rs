@@ -436,6 +436,160 @@ pub async fn soft_delete_einsatz(
     Ok(true)
 }
 
+/// Platzhalter für gescrubbte PII-Felder, die wegen NOT-NULL- bzw. CHECK-Constraints
+/// nicht auf NULL gesetzt werden dürfen (verlaufsnotiz.text, einsatz_personal.snap_name,
+/// einsatz_schaden.uebergeben_an bei status='uebergeben').
+pub const SCHWAERZUNG_PLATZHALTER: &str = "[geschwärzt]";
+
+/// Phase-B-Kandidaten: ABGESCHLOSSENE, soft-gelöschte, noch nicht geschwärzte
+/// Einsätze, als `(id, geloescht_at)`. Die Karenz-Grenze (`geloescht_at + KARENZ_TAGE`)
+/// prüft der Aufrufer in Rust (`retention::karenz_abgelaufen`) gegen das injizierte
+/// `jetzt`. `status='abgeschlossen'` ist hart im WHERE — aktive Einsätze sind nie dabei.
+pub async fn faellige_purge(
+    pool: &SqlitePool,
+    _karenz_tage: i64,
+) -> Result<Vec<(i64, String)>, AppError> {
+    let rows = sqlx::query_as::<_, (i64, String)>(
+        "SELECT id, geloescht_at FROM einsatz \
+         WHERE status = ? AND geloescht_at IS NOT NULL AND geschwaerzt_at IS NULL \
+         ORDER BY id",
+    )
+    .bind(STATUS_ABGESCHLOSSEN)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+/// IRREVERSIBLE PII-Schwärzung eines Einsatzes (Phase B, LFH-135). Scrubbt die
+/// Personendaten in allen einsatz-scoped PII-Tabellen (strikt per `einsatz_id`,
+/// OHNE `storniert_at`-Filter — auch stornierte Zeilen tragen reale PII), setzt den
+/// `geschwaerzt_at`-Tombstone und schreibt einen System-ETB-Audit — alles in EINER
+/// Transaktion (partieller Scrub rollt zurück). Das operative Skelett (Einsatz, ETB,
+/// Zähler/registrier_nr, aggregierte Lage) bleibt erhalten.
+///
+/// Idempotent: der `geschwaerzt_at IS NULL`-Guard liefert `false`, wenn der Einsatz
+/// schon geschwärzt (oder nicht soft-gelöscht/abgeschlossen) ist — kein Doppel-Scrub.
+///
+/// Gescrubbte Tabellen/Spalten (siehe Commit-Message für die vollständige Begründung):
+/// - einsatz_person: name, vorname, geschlecht, geburtsdatum, alter_geschaetzt,
+///   herkunft_adresse, antreff_ort, melder_kontakt, notiz
+/// - person_sichtung: notiz · person_verlaufsnotiz: text (→ Platzhalter, NOT NULL)
+/// - person_verbleib: ziel, notiz · person_uhs_belegung: notiz
+/// - einsatz_tier: halter_kontakt, antreff_ort, abschluss_ziel, notiz
+/// - einsatz_schaden: geschaedigt_kontakt, uebergeben_an (→ Platzhalter wenn gesetzt,
+///   wegen CHECK status='uebergeben' ⇒ uebergeben_an NOT NULL)
+/// - einsatz_personal (NUR Ad-hoc-extern, personal_id IS NULL): snap_name (→ Platzhalter),
+///   snap_funktion, snap_traegerorganisation, bemerkung
+pub async fn schwaerze_einsatz(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    jetzt: &str,
+) -> Result<bool, AppError> {
+    let etb_startwert = super::einstellungen::laden_oder_default(pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    let mut tx = pool.begin().await?;
+
+    // Idempotenz-/Sicherheits-Guard: nur abgeschlossene, soft-gelöschte, noch nicht
+    // geschwärzte Einsätze. Setzt zugleich den Tombstone. rows_affected==0 → fertig.
+    let res = sqlx::query(
+        "UPDATE einsatz SET geschwaerzt_at = ? \
+         WHERE id = ? AND status = ? AND geloescht_at IS NOT NULL AND geschwaerzt_at IS NULL",
+    )
+    .bind(jetzt)
+    .bind(einsatz_id)
+    .bind(STATUS_ABGESCHLOSSEN)
+    .execute(&mut *tx)
+    .await?;
+    if res.rows_affected() == 0 {
+        return Ok(false);
+    }
+
+    // --- PII-Scrub (strikt per einsatz_id, KEIN storniert_at-Filter) ---
+    sqlx::query(
+        "UPDATE einsatz_person SET \
+            name = NULL, vorname = NULL, geschlecht = NULL, geburtsdatum = NULL, \
+            alter_geschaetzt = NULL, herkunft_adresse = NULL, antreff_ort = NULL, \
+            melder_kontakt = NULL, notiz = NULL \
+         WHERE einsatz_id = ?",
+    )
+    .bind(einsatz_id)
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query("UPDATE person_sichtung SET notiz = NULL WHERE einsatz_id = ?")
+        .bind(einsatz_id)
+        .execute(&mut *tx)
+        .await?;
+
+    // text ist NOT NULL → Platzhalter statt NULL.
+    sqlx::query("UPDATE person_verlaufsnotiz SET text = ? WHERE einsatz_id = ?")
+        .bind(SCHWAERZUNG_PLATZHALTER)
+        .bind(einsatz_id)
+        .execute(&mut *tx)
+        .await?;
+
+    sqlx::query("UPDATE person_verbleib SET ziel = NULL, notiz = NULL WHERE einsatz_id = ?")
+        .bind(einsatz_id)
+        .execute(&mut *tx)
+        .await?;
+
+    sqlx::query("UPDATE person_uhs_belegung SET notiz = NULL WHERE einsatz_id = ?")
+        .bind(einsatz_id)
+        .execute(&mut *tx)
+        .await?;
+
+    sqlx::query(
+        "UPDATE einsatz_tier SET \
+            halter_kontakt = NULL, antreff_ort = NULL, abschluss_ziel = NULL, notiz = NULL \
+         WHERE einsatz_id = ?",
+    )
+    .bind(einsatz_id)
+    .execute(&mut *tx)
+    .await?;
+
+    // uebergeben_an: NULL bleibt NULL, ein gesetzter Wert → Platzhalter (CHECK
+    // status='uebergeben' ⇒ uebergeben_an IS NOT NULL würde sonst brechen).
+    sqlx::query(
+        "UPDATE einsatz_schaden SET \
+            geschaedigt_kontakt = NULL, \
+            uebergeben_an = CASE WHEN uebergeben_an IS NULL THEN NULL ELSE ? END \
+         WHERE einsatz_id = ?",
+    )
+    .bind(SCHWAERZUNG_PLATZHALTER)
+    .bind(einsatz_id)
+    .execute(&mut *tx)
+    .await?;
+
+    // einsatz_personal: NUR Ad-hoc-externe (personal_id IS NULL) sind einsatz-scoped PII.
+    // Dispositionen echter Stamm-Kräfte (personal_id gesetzt) sind Stammdaten → unberührt.
+    // snap_name ist NOT NULL → Platzhalter.
+    sqlx::query(
+        "UPDATE einsatz_personal SET \
+            snap_name = ?, snap_funktion = NULL, snap_traegerorganisation = NULL, bemerkung = NULL \
+         WHERE einsatz_id = ? AND personal_id IS NULL",
+    )
+    .bind(SCHWAERZUNG_PLATZHALTER)
+    .bind(einsatz_id)
+    .execute(&mut *tx)
+    .await?;
+
+    system_audit_tx(
+        &mut tx,
+        einsatz_id,
+        etb_startwert,
+        "PII-Schwärzung durchgeführt (Aufbewahrungsfrist + Karenz abgelaufen). \
+         Personenbezogene Daten wurden unwiderruflich entfernt; das operative Skelett \
+         (Einsatz, ETB-Einträge, Zähler) bleibt für die gesetzliche/statistische \
+         Aufbewahrung erhalten.",
+    )
+    .await?;
+
+    tx.commit().await?;
+    tracing::warn!(einsatz_id, "Purge Phase B abgeschlossen: PII geschwärzt (geschwaerzt_at gesetzt)");
+    Ok(true)
+}
+
 /// Editierbare Kopffelder für `aktualisiere_kopf`. Optional-Strings sind bereits
 /// vom Handler getrimmt; leere Werte werden als `None` übergeben (→ NULL).
 #[derive(Debug)]
