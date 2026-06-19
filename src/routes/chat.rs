@@ -2,8 +2,12 @@ use crate::app::AppState;
 use crate::auth::session::CurrentUser;
 use crate::chat::repo;
 use crate::chat::{BezugTyp, ChatKanalAnzeige, ChatNachrichtAnzeige};
-use crate::einsatz::berechtigung::{fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
+use crate::einsatz::berechtigung::{fordere_modul_zugriff, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
 use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::modul_override;
+
+/// Modul-Key dieses Route-Moduls (LFH-132).
+const MODUL_KEY: &str = "chat";
 use crate::error::AppError;
 // Vokabular modulübergreifend über das Kommunikations-Fundament referenziert
 // (LFH-84) statt direkt aus `etb` — Single Source of Truth bleibt `etb`.
@@ -37,6 +41,8 @@ pub async fn kanaele_liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
     Ok(Json(repo::liste_kanaele(&state.pool, einsatz_id, benutzer.id).await?))
 }
 
@@ -56,6 +62,8 @@ pub async fn kanal_anlegen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
     fordere_aktiv(&einsatz)?;
 
     let name = req.name.trim();
@@ -88,6 +96,8 @@ pub async fn nachrichten_liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
 
     // Cross-Einsatz-Schutz: Kanal muss zu diesem Einsatz gehören.
     if !repo::gehoert_kanal_zu_einsatz(&state.pool, kanal_id, einsatz_id).await? {
@@ -120,6 +130,8 @@ pub async fn nachricht_erfassen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
     fordere_aktiv(&einsatz)?;
 
     if !repo::gehoert_kanal_zu_einsatz(&state.pool, kanal_id, einsatz_id).await? {
@@ -156,6 +168,8 @@ async fn fordere_autor(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, benutzer)?;
     fordere_aktiv(&einsatz)?;
 
     // Cross-Einsatz-Schutz + Existenz.
@@ -220,6 +234,8 @@ pub async fn bezug_setzen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
     fordere_aktiv(&einsatz)?;
 
     if !repo::gehoert_nachricht_zu_einsatz(&state.pool, nachricht_id, einsatz_id).await? {
@@ -244,6 +260,8 @@ pub async fn bezug_loeschen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
     fordere_aktiv(&einsatz)?;
 
     if !repo::gehoert_nachricht_zu_einsatz(&state.pool, nachricht_id, einsatz_id).await? {
@@ -275,6 +293,8 @@ pub async fn heraufstufen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
     fordere_aktiv(&einsatz)?;
 
     if !repo::gehoert_nachricht_zu_einsatz(&state.pool, nachricht_id, einsatz_id).await? {
@@ -330,6 +350,8 @@ pub async fn heraufstufen_auftrag(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
     fordere_aktiv(&einsatz)?;
 
     if !repo::gehoert_nachricht_zu_einsatz(&state.pool, nachricht_id, einsatz_id).await? {

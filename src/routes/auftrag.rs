@@ -1,8 +1,12 @@
 use crate::app::AppState;
 use crate::auftrag::{repo, AuftragDetail, EMPF_ABSCHNITT, EMPF_EINHEIT, EMPF_EXTERN, EMPF_FAHRZEUG, EMPF_FUNKTION, EMPF_PERSON, PRIO_NORMAL, RICHTUNG_INTERN};
 use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
+use crate::einsatz::berechtigung::{fordere_modul_zugriff, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
 use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::modul_override;
+
+/// Modul-Key dieses Route-Moduls (LFH-132).
+const MODUL_KEY: &str = "auftraege";
 use crate::error::AppError;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -57,6 +61,8 @@ pub async fn liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
 
     if params.abschnitt_id.is_some() && params.einheit_id.is_some() {
         return Err(AppError::Validation(
@@ -322,6 +328,8 @@ pub async fn anlegen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
     fordere_aktiv(&einsatz)?;
 
     let now = jetzt();
@@ -351,6 +359,8 @@ async fn fordere_bearbeitbar(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, benutzer)?;
     fordere_aktiv(&einsatz)?;
     if !repo::gehoert_zu_einsatz(&state.pool, auftrag_id, einsatz_id).await? {
         return Err(AppError::NotFound);

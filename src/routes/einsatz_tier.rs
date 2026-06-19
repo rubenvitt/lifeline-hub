@@ -1,7 +1,11 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
+use crate::einsatz::berechtigung::{fordere_modul_zugriff, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
 use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::modul_override;
+
+/// Modul-Key dieses Route-Moduls (LFH-132).
+const MODUL_KEY: &str = "tiere";
 use crate::error::AppError;
 use crate::etb::{self, repo as etb_repo};
 use crate::person::repo as person_repo; // Org-Isolation der Halter-FK (404 bei fremder Person)
@@ -103,6 +107,8 @@ pub async fn liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
 
     if let Some(s) = &params.status {
         if TierStatus::parse(s).is_none() {
@@ -155,6 +161,8 @@ pub async fn anlegen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
     fordere_aktiv(&einsatz)?;
 
     // Spezies (Pflicht) prüfen.
@@ -233,6 +241,8 @@ pub async fn detail(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
     Ok(Json(tier_repo::laden(&state.pool, einsatz_id, tier_id).await?))
 }
 
@@ -266,6 +276,8 @@ pub async fn aktualisieren(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
     fordere_aktiv(&einsatz)?;
     pruefe_geschlecht(&body.geschlecht)?;
 
@@ -350,6 +362,8 @@ pub async fn status_wechsel(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
     fordere_aktiv(&einsatz)?;
 
     if TierStatus::parse(&body.status).is_none() {
@@ -413,6 +427,8 @@ pub async fn stornieren(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
     fordere_aktiv(&einsatz)?;
 
     let tier = tier_repo::laden(&state.pool, einsatz_id, tier_id).await?;
@@ -452,6 +468,8 @@ pub async fn export(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
 
     let tiere = tier_repo::liste(&state.pool, einsatz_id, None, None, None).await?;
     let mut csv = String::from("registrier_nr;status;spezies;rufname;rasse;geschlecht;alter;antreff_ort\n");
@@ -486,6 +504,8 @@ pub async fn stream(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
 
     let rx = state.live.abonniere(einsatz_id);
     let stream = BroadcastStream::new(rx).map(|res| {

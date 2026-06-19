@@ -439,3 +439,103 @@ async fn etb_rollen_schranke_blockt_normales_mitglied() {
         StatusCode::OK
     );
 }
+
+// ----------------------------- Task 5: Guard-Abdeckung aller Modul-Gruppen -----------------------------
+
+/// (modul_key, GET-Pfad-Suffix) je Modul-Gruppe. Pfade liefern für einen leeren
+/// Einsatz normal 200; bei verstecktem Modul muss ein Mitglied 403 bekommen.
+const MODUL_GET_PFADE: &[(&str, &str)] = &[
+    ("chat", "chat/kanaele"),
+    ("erinnerungen", "erinnerungen"),
+    ("auftraege", "auftraege"),
+    ("meldungen", "meldungen"),
+    ("nachforderungen", "nachforderungen"),
+    ("fahrzeuge", "fahrzeuge"),
+    ("personal", "personal"),
+    ("material", "material"),
+    ("personen", "personen"),
+    ("tiere", "tiere"),
+    ("schaeden", "schaeden"),
+    ("unfallhilfsstellen", "uhs"),
+    ("bereitstellungsraeume", "bereitstellungsraeume"),
+    ("einheiten", "einheiten"),
+    ("einsatzabschnitte", "abschnitte"),
+    ("lageberichte", "lageberichte"),
+    ("gefahrenzonen", "gefahrengebiete"),
+    ("lagekarte", "zonen"),
+    ("lagekarte", "karte/fuehrungskraefte"),
+    ("lagemeldungen", "lage/meldungen"),
+];
+
+/// Stream-Routen (SSE-Bypass-Schutz): bei verstecktem Modul → 403.
+const MODUL_STREAM_PFADE: &[(&str, &str)] = &[
+    ("fahrzeuge", "fahrzeuge/stream"),
+    ("personen", "personen/stream"),
+    ("tiere", "tiere/stream"),
+    ("schaeden", "schaeden/stream"),
+    ("unfallhilfsstellen", "uhs/stream"),
+    ("einheiten", "einheiten/stream"),
+    ("einsatzabschnitte", "abschnitte/stream"),
+    ("lagekarte", "zonen/stream"),
+];
+
+#[tokio::test]
+async fn alle_modul_gruppen_gegated_get_baseline_und_versteckt() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    mitglied_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+
+    // Baseline: alle Pfade für das Mitglied sichtbar → 200.
+    for (key, suffix) in MODUL_GET_PFADE {
+        let st = get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/{suffix}")).await;
+        assert_eq!(st, StatusCode::OK, "Baseline {key} ({suffix}) muss 200 sein, war {st}");
+    }
+
+    // Alle eindeutigen Keys verstecken.
+    let mut keys: Vec<&str> = MODUL_GET_PFADE.iter().map(|(k, _)| *k).collect();
+    keys.sort_unstable();
+    keys.dedup();
+    for key in &keys {
+        assert_eq!(
+            override_setzen(&app, &admin, eid, key, false, None).await,
+            StatusCode::OK
+        );
+    }
+
+    // Mitglied → 403 auf jedem Pfad; Admin-Mindest-Guard → 200.
+    for (key, suffix) in MODUL_GET_PFADE {
+        let pfad = format!("/api/einsaetze/{eid}/{suffix}");
+        assert_eq!(
+            get_status(&app, &frieda, &pfad).await,
+            StatusCode::FORBIDDEN,
+            "verstecktes {key} ({suffix}) muss 403 fürs Mitglied sein"
+        );
+        assert_eq!(
+            get_status(&app, &admin, &pfad).await,
+            StatusCode::OK,
+            "Admin muss {key} ({suffix}) trotz versteckt lesen"
+        );
+    }
+}
+
+#[tokio::test]
+async fn versteckte_module_blocken_stream_routen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    mitglied_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+
+    for (key, suffix) in MODUL_STREAM_PFADE {
+        override_setzen(&app, &admin, eid, key, false, None).await;
+        assert_eq!(
+            get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/{suffix}")).await,
+            StatusCode::FORBIDDEN,
+            "verstecktes {key}: Stream {suffix} muss 403 sein (kein SSE-Bypass)"
+        );
+    }
+}

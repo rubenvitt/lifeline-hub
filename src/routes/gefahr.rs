@@ -1,7 +1,11 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
+use crate::einsatz::berechtigung::{fordere_modul_zugriff, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
 use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::modul_override;
+
+/// Modul-Key dieses Route-Moduls (LFH-132).
+const MODUL_KEY: &str = "gefahrenzonen";
 use crate::error::AppError;
 use crate::etb::{self, repo as etb_repo};
 use crate::gefahr::repo::{self as gefahr_repo, BewertungDaten};
@@ -61,6 +65,8 @@ pub async fn gebiete(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
     Ok(Json(
         gefahr_repo::gebiete_liste(&state.pool, einsatz_id).await?,
     ))
@@ -75,6 +81,8 @@ pub async fn matrix(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
     // Ownership-Gate: Gebiet muss zum Einsatz gehören (sonst NotFound).
     gefahr_repo::gebiet_laden(&state.pool, einsatz_id, gid).await?;
     Ok(Json(gefahr_repo::liste(&state.pool, gid).await?))
@@ -99,6 +107,8 @@ pub async fn bewerten(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
     fordere_aktiv(&einsatz)?;
     let gebiet = gefahr_repo::gebiet_laden(&state.pool, einsatz_id, gid).await?; // Ownership-Gate
 
@@ -184,6 +194,8 @@ pub async fn umbenennen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
     fordere_aktiv(&einsatz)?;
     gefahr_repo::gebiet_laden(&state.pool, einsatz_id, gid).await?; // Ownership-Gate
     let label = trimme(body.label);
