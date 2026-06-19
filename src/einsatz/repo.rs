@@ -506,11 +506,15 @@ pub async fn schwaerze_einsatz(
     }
 
     // --- PII-Scrub (strikt per einsatz_id, KEIN storniert_at-Filter) ---
+    // aktueller_verbleib (denormalisierter Cache, Migration 0022) trägt für
+    // Transporte den Klartext "Transport → {ziel}" (Klinikname). Muss mit
+    // gescrubbt werden, sonst überlebt der Verbringungsort die irreversible
+    // Schwärzung, obwohl person_verbleib.ziel genullt wird (Review LFH-135).
     sqlx::query(
         "UPDATE einsatz_person SET \
             name = NULL, vorname = NULL, geschlecht = NULL, geburtsdatum = NULL, \
             alter_geschaetzt = NULL, herkunft_adresse = NULL, antreff_ort = NULL, \
-            melder_kontakt = NULL, notiz = NULL \
+            melder_kontakt = NULL, notiz = NULL, aktueller_verbleib = NULL \
          WHERE einsatz_id = ?",
     )
     .bind(einsatz_id)
@@ -539,9 +543,14 @@ pub async fn schwaerze_einsatz(
         .execute(&mut *tx)
         .await?;
 
+    // kennzeichnung (Chip-Nr./Tätowierung) ist ein im Haustierregister auf den
+    // Halter registrierter, eindeutiger Identifikator → personenverknüpfend, muss
+    // mit gescrubbt werden (Review LFH-135). rufname/rasse/farbe/groesse bleiben
+    // (reine Tierbeschreibung).
     sqlx::query(
         "UPDATE einsatz_tier SET \
-            halter_kontakt = NULL, antreff_ort = NULL, abschluss_ziel = NULL, notiz = NULL \
+            halter_kontakt = NULL, antreff_ort = NULL, abschluss_ziel = NULL, \
+            notiz = NULL, kennzeichnung = NULL \
          WHERE einsatz_id = ?",
     )
     .bind(einsatz_id)

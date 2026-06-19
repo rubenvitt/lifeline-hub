@@ -214,8 +214,8 @@ mod tests {
         // PII-Bestand: normale + STORNIERTE Person, Verlaufsnotiz, Tier, Schaden
         // (status='uebergeben' → uebergeben_an NOT NULL via CHECK!), Ad-hoc-Personal.
         let p1: i64 = sqlx::query_scalar(
-            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, status, name, vorname, geburtsdatum, herkunft_adresse, melder_kontakt, notiz, erfasst_von, geaendert_von) \
-             VALUES (?,1,'betroffen','Mustermann','Max','1980-01-01','Hauptstr 1','Angeh. 0170','frei', ?, ?) RETURNING id",
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, status, name, vorname, geburtsdatum, herkunft_adresse, melder_kontakt, notiz, aktueller_verbleib, erfasst_von, geaendert_von) \
+             VALUES (?,1,'betroffen','Mustermann','Max','1980-01-01','Hauptstr 1','Angeh. 0170','frei','Transport → KH Mitte', ?, ?) RETURNING id",
         ).bind(e).bind(b).bind(b).fetch_one(&pool).await.unwrap();
         // STORNIERTE Person (trägt trotzdem PII).
         sqlx::query(
@@ -224,7 +224,7 @@ mod tests {
         ).bind(e).bind(b).bind(b).execute(&pool).await.unwrap();
         sqlx::query("INSERT INTO person_verlaufsnotiz (einsatz_id, person_id, text, erfasst_von) VALUES (?,?, 'Verdacht auf XY', ?)")
             .bind(e).bind(p1).bind(b).execute(&pool).await.unwrap();
-        sqlx::query("INSERT INTO einsatz_tier (einsatz_id, registrier_nr, spezies, halter_kontakt, antreff_ort, notiz, erfasst_von, geaendert_von) VALUES (?,1,'hund','Müller 0170','Wald','x', ?, ?)")
+        sqlx::query("INSERT INTO einsatz_tier (einsatz_id, registrier_nr, spezies, halter_kontakt, antreff_ort, notiz, kennzeichnung, erfasst_von, geaendert_von) VALUES (?,1,'hund','Müller 0170','Wald','x','CHIP-276098106012345', ?, ?)")
             .bind(e).bind(b).bind(b).execute(&pool).await.unwrap();
         sqlx::query("INSERT INTO einsatz_schaden (einsatz_id, registrier_nr, status, typ, ausmass, ort, beschreibung, geschaedigt_kontakt, uebergeben_an, uebergeben_at, erfasst_von, geaendert_von) VALUES (?,1,'uebergeben','sachschaden','gering','Hauptstr','Schaden','Geschäd. Person','Polizist Schmidt','2026-01-02 00:00:00', ?, ?)")
             .bind(e).bind(b).bind(b).execute(&pool).await.unwrap();
@@ -244,9 +244,15 @@ mod tests {
         let vtext: String = sqlx::query_scalar("SELECT text FROM person_verlaufsnotiz WHERE einsatz_id = ?")
             .bind(e).fetch_one(&pool).await.unwrap();
         assert_eq!(vtext, super::repo::SCHWAERZUNG_PLATZHALTER);
-        let halter: Option<String> = sqlx::query_scalar("SELECT halter_kontakt FROM einsatz_tier WHERE einsatz_id = ?")
+        let (halter, kennzeichnung): (Option<String>, Option<String>) =
+            sqlx::query_as("SELECT halter_kontakt, kennzeichnung FROM einsatz_tier WHERE einsatz_id = ?")
             .bind(e).fetch_one(&pool).await.unwrap();
         assert_eq!(halter, None);
+        assert_eq!(kennzeichnung, None, "Chip-/Tätowierungsnummer (personenverknüpfend) gescrubbt");
+        // aktueller_verbleib-Cache (Klinikname „Transport → …") überlebt die Schwärzung nicht.
+        let verbleib: Option<String> = sqlx::query_scalar("SELECT aktueller_verbleib FROM einsatz_person WHERE einsatz_id = ? AND registrier_nr = 1")
+            .bind(e).fetch_one(&pool).await.unwrap();
+        assert_eq!(verbleib, None, "denormalisierter Verbleib-Cache (PII) gescrubbt");
         // (b) Schaden bei status='uebergeben' brach NICHT (uebergeben_an → Platzhalter).
         let (uebergeben_an, geschaedigt, status): (String, Option<String>, String) =
             sqlx::query_as("SELECT uebergeben_an, geschaedigt_kontakt, status FROM einsatz_schaden WHERE einsatz_id = ?")
