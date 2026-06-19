@@ -197,7 +197,11 @@ pub async fn abschliessen(
     einsatz_id: i64,
     von_benutzer_id: i64,
 ) -> Result<Einsatz, AppError> {
-    sqlx::query(
+    // Dauer-Politik vor der tx laden (eigener Pool-Borrow); steuert die Auto-Befüllung.
+    let einstellungen = super::einstellungen::laden_oder_default(pool, einsatz_id).await?;
+
+    let mut tx = pool.begin().await?;
+    let ergebnis = sqlx::query(
         "UPDATE einsatz \
          SET status = ?, abgeschlossen_at = datetime('now'), abgeschlossen_von = ? \
          WHERE id = ? AND status = 'aktiv'",
@@ -205,8 +209,61 @@ pub async fn abschliessen(
     .bind(STATUS_ABGESCHLOSSEN)
     .bind(von_benutzer_id)
     .bind(einsatz_id)
-    .execute(pool)
+    .execute(&mut *tx)
     .await?;
+
+    // Auto-Befüllung der Aufbewahrungsfrist NUR, wenn dieser Aufruf den Einsatz
+    // tatsächlich abgeschlossen hat (rows_affected == 1, nicht ein Re-Close-No-Op),
+    // eine Dauer-Politik gesetzt ist UND noch keine Frist existiert. Letzteres
+    // schützt eine manuell gesetzte Frist (überschreibt nie). Setzt direkt im
+    // Abschluss-tx, NICHT über frist_setzen — der Verkürzungs-Gate (None→Some)
+    // würde das sonst als bestätigungspflichtige Verkürzung werten (LFH-135).
+    if ergebnis.rows_affected() == 1 {
+        if let Some(dauer) = einstellungen.retention_dauer_tage {
+            let (abgeschlossen_at, retention_bis): (Option<String>, Option<String>) =
+                sqlx::query_as("SELECT abgeschlossen_at, retention_bis FROM einsatz WHERE id = ?")
+                    .bind(einsatz_id)
+                    .fetch_one(&mut *tx)
+                    .await?;
+            if retention_bis.is_none() {
+                if let Some(neue_frist) = abgeschlossen_at
+                    .as_deref()
+                    .and_then(|a| super::retention::berechne_retention_bis(a, dauer))
+                {
+                    sqlx::query(
+                        "UPDATE einsatz SET retention_bis = ? WHERE id = ? AND retention_bis IS NULL",
+                    )
+                    .bind(&neue_frist)
+                    .bind(einsatz_id)
+                    .execute(&mut *tx)
+                    .await?;
+                    let audit = format!(
+                        "Aufbewahrungsfrist automatisch gesetzt auf {neue_frist} \
+                         (Aufbewahrungs-Dauer {dauer} Tage ab Abschluss)"
+                    );
+                    crate::etb::repo::anlegen_tx(
+                        &mut tx,
+                        einsatz_id,
+                        von_benutzer_id,
+                        einstellungen.etb_startwert(),
+                        crate::etb::repo::EintragDaten {
+                            typ: crate::etb::TYP_SYSTEM,
+                            inhalt: &audit,
+                            von: None,
+                            an: None,
+                            meldeweg: None,
+                            veranlassung: None,
+                            ereigniszeit: None,
+                            erfasst_lokal_at: None,
+                            berichtigt_eintrag_id: None,
+                        },
+                    )
+                    .await?;
+                }
+            }
+        }
+    }
+    tx.commit().await?;
     laden(pool, einsatz_id).await
 }
 
@@ -448,6 +505,78 @@ mod tests {
         assert!(abgeschlossen.abgeschlossen_at.is_some());
         assert_eq!(abgeschlossen.abgeschlossen_von, Some(leit));
         assert!(!abgeschlossen.ist_aktiv());
+    }
+
+    /// Setzt die Dauer-Politik direkt in der DB (umgeht die Route, reiner Repo-Test).
+    async fn setze_dauer(pool: &SqlitePool, einsatz_id: i64, bid: i64, tage: i64) {
+        super::super::einstellungen::speichern(
+            pool,
+            einsatz_id,
+            bid,
+            super::super::einstellungen::EinstellungenDaten {
+                retention_dauer_tage: Some(tage),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn abschliessen_befuellt_retention_bis_aus_dauer_und_schreibt_audit() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        setze_dauer(&pool, einsatz.id, leit, 30).await;
+
+        let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        // retention_bis = abgeschlossen_at + 30 Tage (gleiche Uhrzeit, kanonisches Format).
+        let erwartet = super::super::retention::berechne_retention_bis(
+            abgeschlossen.abgeschlossen_at.as_deref().unwrap(),
+            30,
+        )
+        .unwrap();
+        assert_eq!(abgeschlossen.retention_bis.as_deref(), Some(erwartet.as_str()));
+
+        // Ein ETB-System-Audit über die Auto-Frist entstanden.
+        let anzahl: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'system' \
+             AND inhalt LIKE 'Aufbewahrungsfrist automatisch gesetzt%'",
+        )
+        .bind(einsatz.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(anzahl, 1);
+    }
+
+    #[tokio::test]
+    async fn abschliessen_ohne_dauer_setzt_keine_frist() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+
+        let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        assert_eq!(abgeschlossen.retention_bis, None);
+    }
+
+    #[tokio::test]
+    async fn abschliessen_ueberschreibt_manuelle_frist_nicht() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        setze_dauer(&pool, einsatz.id, leit, 30).await;
+        // Manuell gesetzte Frist VOR Abschluss.
+        frist_setzen(&pool, einsatz.id, leit, Some("2099-01-01 00:00:00"), "manuell")
+            .await
+            .unwrap();
+
+        let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        // Auto-Fill darf die manuelle Frist nicht überschreiben.
+        assert_eq!(
+            abgeschlossen.retention_bis.as_deref(),
+            Some("2099-01-01 00:00:00")
+        );
     }
 
     #[tokio::test]
