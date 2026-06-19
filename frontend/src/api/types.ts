@@ -82,6 +82,28 @@ export interface EinstellungenUpdate {
   fachebenen_sichtbar: FachebenenSichtbar | null;
 }
 
+/**
+ * Modul-Override pro Einsatz (LFH-132): überschreibt Sichtbarkeit und benötigte
+ * Rolle eines Moduls. `benoetigte_rolle = null` = frei (für alle sichtbaren).
+ */
+export interface ModulOverride {
+  einsatz_id: number;
+  modul_key: string;
+  sichtbar: boolean;
+  benoetigte_rolle: 'admin' | 'fuehrungskraft' | null;
+  geaendert_at: string | null;
+  geaendert_von: number | null;
+}
+
+/** Map `modul_key → Override`; fehlt ein Key, gilt der Registry-Default (sichtbar, frei). */
+export type ModulOverrides = Record<string, ModulOverride>;
+
+/** PUT-Eingabe eines einzelnen Modul-Overrides. */
+export interface ModulOverrideUpdate {
+  sichtbar: boolean;
+  benoetigte_rolle: 'admin' | 'fuehrungskraft' | null;
+}
+
 /** Org-weiter Einsatzstichwort-Vorschlag für die Combobox. */
 export interface StichwortVorschlag {
   id: number;
