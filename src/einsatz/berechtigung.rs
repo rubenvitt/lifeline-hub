@@ -1,7 +1,10 @@
+use super::modul::{ist_ausblendbar, registry_benoetigte_rolle};
+use super::modul_override::EinsatzModulOverride;
 use super::{Einsatz, EinsatzRolle, STATUS_ABGESCHLOSSEN, STATUS_AKTIV};
 use crate::auth::Benutzer;
 use crate::error::AppError;
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
+use std::collections::HashMap;
 
 /// DSGVO-Schonfrist in Stunden: solange bleibt ein abgeschlossener Einsatz
 /// für alle Mitglieder lesbar; danach nur noch für höhere Berechtigungen.
@@ -154,6 +157,53 @@ pub fn fordere_aktiv(einsatz: &Einsatz) -> Result<(), AppError> {
         Err(AppError::Conflict(
             "Einsatz ist abgeschlossen und schreibgeschützt".into(),
         ))
+    }
+}
+
+/// Per-Handler-Guard für die Modul-Sichtbarkeit/Berechtigung (LFH-132). Rein und
+/// testbar gegen die bereits geladene Override-Map eines Einsatzes.
+///
+/// Reihenfolge (additive Verschärfung NACH dem bestehenden Lese-/Schreibrecht-Gate;
+/// loosened nie eine bestehende Schranke):
+/// 1. System-Admin behält IMMER Zugriff (Mindest-Guard), unabhängig vom Override.
+/// 2. Ausblenden: ist das Modul ausblendbar und der Override setzt `sichtbar=false`,
+///    → `Forbidden`. Nicht-ausblendbare Module (einsatzdaten, einsatz-einstellungen)
+///    werden NIE versteckt — ein `sichtbar=false` darauf wird defensiv ignoriert.
+/// 3. Rollen-Schranke: benötigte Rolle = Override-Wert, sonst Registry-Default
+///    (heute `None` für alle). `admin` → nur System-Admin (oben schon durch),
+///    sonst `Forbidden`; `fuehrungskraft` → System-Admin oder org-weite Führungskraft
+///    (`ist_hoehere_berechtigung`), sonst `Forbidden`. `None` → frei.
+pub fn fordere_modul_zugriff(
+    overrides: &HashMap<String, EinsatzModulOverride>,
+    modul_key: &str,
+    benutzer: &Benutzer,
+) -> Result<(), AppError> {
+    // 1. Admin-Mindest-Guard.
+    if benutzer.ist_admin() {
+        return Ok(());
+    }
+
+    let ueberschreibung = overrides.get(modul_key);
+
+    // 2. Ausblend-Schranke (nur für ausblendbare Module).
+    if ist_ausblendbar(modul_key) && ueberschreibung.is_some_and(|o| !o.sichtbar) {
+        return Err(AppError::Forbidden);
+    }
+
+    // 3. Rollen-Schranke (Override sonst Registry-Default).
+    let benoetigte = ueberschreibung
+        .and_then(|o| o.benoetigte_rolle.as_deref())
+        .or_else(|| registry_benoetigte_rolle(modul_key));
+    match benoetigte {
+        Some("admin") => Err(AppError::Forbidden), // System-Admin ist oben bereits durch.
+        Some("fuehrungskraft") => {
+            if benutzer.ist_hoehere_berechtigung() {
+                Ok(())
+            } else {
+                Err(AppError::Forbidden)
+            }
+        }
+        _ => Ok(()),
     }
 }
 
@@ -485,6 +535,104 @@ mod tests {
         let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
         assert!(matches!(
             fordere_schreibrecht_oder_admin(&fk, None).unwrap_err(),
+            AppError::Forbidden
+        ));
+    }
+
+    // --- Modul-Zugriff-Guard (LFH-132) ---
+
+    fn override_zeile(
+        modul_key: &str,
+        sichtbar: bool,
+        benoetigte_rolle: Option<&str>,
+    ) -> EinsatzModulOverride {
+        EinsatzModulOverride {
+            einsatz_id: 1,
+            modul_key: modul_key.into(),
+            sichtbar,
+            benoetigte_rolle: benoetigte_rolle.map(str::to_string),
+            geaendert_at: None,
+            geaendert_von: None,
+        }
+    }
+
+    fn overrides_mit(zeilen: Vec<EinsatzModulOverride>) -> HashMap<String, EinsatzModulOverride> {
+        zeilen.into_iter().map(|o| (o.modul_key.clone(), o)).collect()
+    }
+
+    #[test]
+    fn modul_zugriff_ohne_override_ist_frei() {
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        let leer = HashMap::new();
+        assert!(fordere_modul_zugriff(&leer, "etb", &normal).is_ok());
+    }
+
+    #[test]
+    fn modul_zugriff_versteckt_blockt_normalen_benutzer() {
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        let ov = overrides_mit(vec![override_zeile("etb", false, None)]);
+        assert!(matches!(
+            fordere_modul_zugriff(&ov, "etb", &normal).unwrap_err(),
+            AppError::Forbidden
+        ));
+    }
+
+    #[test]
+    fn modul_zugriff_admin_kommt_immer_durch() {
+        let admin = benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE);
+        // Selbst bei versteckt + admin-Rolle erforderlich: Admin-Mindest-Guard.
+        let ov = overrides_mit(vec![override_zeile("etb", false, Some("admin"))]);
+        assert!(fordere_modul_zugriff(&ov, "etb", &admin).is_ok());
+    }
+
+    #[test]
+    fn modul_zugriff_rolle_fuehrungskraft_blockt_normalen_erlaubt_fuehrungskraft() {
+        let ov = overrides_mit(vec![override_zeile("etb", true, Some("fuehrungskraft"))]);
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        assert!(matches!(
+            fordere_modul_zugriff(&ov, "etb", &normal).unwrap_err(),
+            AppError::Forbidden
+        ));
+        let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
+        assert!(fordere_modul_zugriff(&ov, "etb", &fk).is_ok());
+    }
+
+    #[test]
+    fn modul_zugriff_rolle_admin_blockt_auch_fuehrungskraft() {
+        let ov = overrides_mit(vec![override_zeile("etb", true, Some("admin"))]);
+        let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
+        assert!(matches!(
+            fordere_modul_zugriff(&ov, "etb", &fk).unwrap_err(),
+            AppError::Forbidden
+        ));
+    }
+
+    #[test]
+    fn modul_zugriff_nicht_ausblendbar_ignoriert_versteckt() {
+        // einsatzdaten/einsatz-einstellungen dürfen nie versteckt werden — ein
+        // sichtbar=false darauf wird defensiv ignoriert (Selbst-Aussperr-Schutz).
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        for key in ["einsatzdaten", "einsatz-einstellungen"] {
+            let ov = overrides_mit(vec![override_zeile(key, false, None)]);
+            assert!(
+                fordere_modul_zugriff(&ov, key, &normal).is_ok(),
+                "{key} darf nicht versteckt werden"
+            );
+        }
+    }
+
+    #[test]
+    fn modul_zugriff_nicht_ausblendbar_respektiert_rollen_schranke() {
+        // Nicht-ausblendbar heißt nur „nicht versteckbar" — eine Rollen-Schranke
+        // darauf greift weiterhin (z. B. Einstellungen nur für Führungskräfte).
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        let ov = overrides_mit(vec![override_zeile(
+            "einsatz-einstellungen",
+            false,
+            Some("fuehrungskraft"),
+        )]);
+        assert!(matches!(
+            fordere_modul_zugriff(&ov, "einsatz-einstellungen", &normal).unwrap_err(),
             AppError::Forbidden
         ));
     }

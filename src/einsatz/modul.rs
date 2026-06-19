@@ -66,6 +66,14 @@ pub fn ist_gueltige_benoetigte_rolle(rolle: &str) -> bool {
     BENOETIGTE_ROLLEN.contains(&rolle)
 }
 
+/// Registry-Default der benötigten Rolle eines Moduls. Heute hat KEIN Modul einen
+/// Default (alle frei → `None`); die Funktion existiert, damit der Guard die
+/// Präzedenz „Override sonst Registry-Default" explizit verdrahtet und ein künftiger
+/// Default hier einen Platz hat (LFH-129).
+pub fn registry_benoetigte_rolle(_key: &str) -> Option<&'static str> {
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
