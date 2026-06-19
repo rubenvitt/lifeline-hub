@@ -146,8 +146,20 @@ impl EinsatzEinstellungen {
     }
 
     /// API-Darstellung: `fachebenen_sichtbar` als geparstes Objekt (symmetrisch zur
-    /// PUT-Eingabe). Ungültiges/leeres JSON → `None`.
+    /// PUT-Eingabe). Ungültiges/leeres JSON → `None`. Freeze-Flags alle `false`
+    /// (für Aufrufer ohne Daten-Existenz-Kontext); sonst [`anzeige_mit_freeze`].
     pub fn anzeige(&self) -> EinstellungenAnzeige {
+        self.anzeige_mit_freeze(false, false, false)
+    }
+
+    /// Wie [`anzeige`], aber mit den Freeze-Flags je Nummernkreis (LFH-133).
+    /// Der Aufrufer ermittelt sie aus der Daten-Existenz ([`etb_nummer_vergeben`] etc.).
+    pub fn anzeige_mit_freeze(
+        &self,
+        etb_eingefroren: bool,
+        meldung_eingefroren: bool,
+        auftrag_eingefroren: bool,
+    ) -> EinstellungenAnzeige {
         EinstellungenAnzeige {
             einsatz_id: self.einsatz_id,
             standard_modul: self.standard_modul.clone(),
@@ -170,10 +182,9 @@ impl EinsatzEinstellungen {
             meldung_bestaetigung_frist_min: self.meldung_bestaetigung_frist_min,
             auftrag_quittierung_frist_min: self.auftrag_quittierung_frist_min,
             auto_etb_eintraege: self.auto_etb_eintraege,
-            // Freeze-Flags werden vom Aufrufer mit Daten-Existenz gefüllt (anzeige_mit_freeze).
-            etb_nummer_eingefroren: false,
-            meldung_nummer_eingefroren: false,
-            auftrag_nummer_eingefroren: false,
+            etb_nummer_eingefroren: etb_eingefroren,
+            meldung_nummer_eingefroren: meldung_eingefroren,
+            auftrag_nummer_eingefroren: auftrag_eingefroren,
             geaendert_at: self.geaendert_at.clone(),
             geaendert_von: self.geaendert_von,
         }
@@ -314,6 +325,39 @@ pub async fn speichern(
     .execute(pool)
     .await?;
     laden_oder_default(pool, einsatz_id).await
+}
+
+/// Ob der ETB-Nummernkreis dieses Einsatzes bereits eine Nummer vergeben hat
+/// (Freeze-Trigger, LFH-133). Strikt per `einsatz_id` — ein fremder Einsatz mit
+/// Einträgen friert diesen Kreis NICHT ein (Org-Isolation).
+pub async fn etb_nummer_vergeben(pool: &SqlitePool, einsatz_id: i64) -> Result<bool, AppError> {
+    nummer_vergeben(pool, "etb_eintrag", einsatz_id).await
+}
+
+/// Ob der Meldungs-Nummernkreis dieses Einsatzes bereits eine Nummer vergeben hat.
+pub async fn meldung_nummer_vergeben(pool: &SqlitePool, einsatz_id: i64) -> Result<bool, AppError> {
+    nummer_vergeben(pool, "meldung", einsatz_id).await
+}
+
+/// Ob der Auftrags-Nummernkreis dieses Einsatzes bereits eine Nummer vergeben hat.
+pub async fn auftrag_nummer_vergeben(pool: &SqlitePool, einsatz_id: i64) -> Result<bool, AppError> {
+    nummer_vergeben(pool, "auftrag", einsatz_id).await
+}
+
+/// EXISTS-Check pro Nummernkreis. `tabelle` ist eine feste, interne Konstante
+/// (kein User-Input) — kein Injection-Risiko.
+async fn nummer_vergeben(
+    pool: &SqlitePool,
+    tabelle: &str,
+    einsatz_id: i64,
+) -> Result<bool, AppError> {
+    let treffer: Option<i64> = sqlx::query_scalar(&format!(
+        "SELECT 1 FROM {tabelle} WHERE einsatz_id = ? LIMIT 1"
+    ))
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(treffer.is_some())
 }
 
 #[cfg(test)]
@@ -508,6 +552,80 @@ mod tests {
         assert_eq!(e.auftrag_startwert(), 1);
         // Auto-ETB: Default an.
         assert!(e.auto_etb_aktiv());
+    }
+
+    async fn etb_eintrag_anlegen(pool: &SqlitePool, eid: i64, bid: i64) {
+        sqlx::query(
+            "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
+             VALUES (?, 1, 'meldung', 'x', ?, '2026-06-19 09:00:00')",
+        )
+        .bind(eid).bind(bid).execute(pool).await.unwrap();
+    }
+    async fn meldung_anlegen(pool: &SqlitePool, eid: i64, bid: i64) {
+        sqlx::query(
+            "INSERT INTO meldung (einsatz_id, lfd_nr, absender, meldeweg, inhalt, ereigniszeit, eingang_at, erfasst_von_id) \
+             VALUES (?, 1, 'A', 'funk', 'x', '2026-06-19 09:00:00', '2026-06-19 09:00:00', ?)",
+        )
+        .bind(eid).bind(bid).execute(pool).await.unwrap();
+    }
+    async fn auftrag_anlegen(pool: &SqlitePool, eid: i64, bid: i64) {
+        sqlx::query(
+            "INSERT INTO auftrag (einsatz_id, lfd_nr, auftrag_text, erteilt_at, erstellt_von_id) \
+             VALUES (?, 1, 'x', '2026-06-19 09:00:00', ?)",
+        )
+        .bind(eid).bind(bid).execute(pool).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn freeze_nur_bei_daten_existenz_pro_nummernkreis() {
+        let pool = crate::db::test_pool().await;
+        let (eid, bid) = fixture(&pool).await;
+        // Frisch: nichts eingefroren.
+        assert!(!etb_nummer_vergeben(&pool, eid).await.unwrap());
+        assert!(!meldung_nummer_vergeben(&pool, eid).await.unwrap());
+        assert!(!auftrag_nummer_vergeben(&pool, eid).await.unwrap());
+
+        // Erster ETB-Eintrag friert NUR den ETB-Kreis ein.
+        etb_eintrag_anlegen(&pool, eid, bid).await;
+        assert!(etb_nummer_vergeben(&pool, eid).await.unwrap());
+        assert!(!meldung_nummer_vergeben(&pool, eid).await.unwrap(), "ETB-Freeze ist unabhängig von Meldung");
+        assert!(!auftrag_nummer_vergeben(&pool, eid).await.unwrap());
+
+        // Erste Meldung friert NUR den Meldungs-Kreis ein (zusätzlich).
+        meldung_anlegen(&pool, eid, bid).await;
+        assert!(meldung_nummer_vergeben(&pool, eid).await.unwrap());
+        assert!(!auftrag_nummer_vergeben(&pool, eid).await.unwrap());
+
+        // Erster Auftrag friert den Auftrags-Kreis ein.
+        auftrag_anlegen(&pool, eid, bid).await;
+        assert!(auftrag_nummer_vergeben(&pool, eid).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn freeze_ist_org_isoliert() {
+        let pool = crate::db::test_pool().await;
+        let (eid, bid) = fixture(&pool).await;
+        let fremd: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, einsatznummer_intern) \
+             VALUES (1, 'Fremd', '2026-002') RETURNING id",
+        )
+        .fetch_one(&pool).await.unwrap();
+        // Einträge im FREMDEN Einsatz dürfen den Freeze dieses Einsatzes nicht auslösen.
+        etb_eintrag_anlegen(&pool, fremd, bid).await;
+        auftrag_anlegen(&pool, fremd, bid).await;
+        assert!(!etb_nummer_vergeben(&pool, eid).await.unwrap());
+        assert!(!auftrag_nummer_vergeben(&pool, eid).await.unwrap());
+        // Der fremde Einsatz selbst ist eingefroren.
+        assert!(etb_nummer_vergeben(&pool, fremd).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn anzeige_mit_freeze_setzt_flags() {
+        let e = EinsatzEinstellungen::leer(1);
+        let a = e.anzeige_mit_freeze(true, false, true);
+        assert!(a.etb_nummer_eingefroren);
+        assert!(!a.meldung_nummer_eingefroren);
+        assert!(a.auftrag_nummer_eingefroren);
     }
 
     #[tokio::test]
