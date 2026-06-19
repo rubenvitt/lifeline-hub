@@ -1247,6 +1247,63 @@ async fn einstellungen_put_zoom_ausserhalb_bereich_ist_400() {
 }
 
 #[tokio::test]
+async fn geloescht_at_tombstone_sperrt_detail_export_stream_403() {
+    // LFH-135: ein gesetzter geloescht_at-Tombstone sperrt den Lesezugriff über
+    // fordere_lesezugriff in ALLEN Routen — auch für den System-Admin (höhere
+    // Berechtigung). Geprüft an Detail, Personen-Export und Personen-Stream.
+    let (app, pool) = setup_with_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, einsatz) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = einsatz["id"].as_i64().unwrap();
+
+    // Vor dem Tombstone: Detail ist lesbar.
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!("/api/einsaetze/{id}"))
+                .header(header::COOKIE, admin.clone())
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Tombstone direkt in der DB setzen (Soft-Delete des Purge-Schedulers).
+    sqlx::query("UPDATE einsatz SET geloescht_at = '2026-01-01 00:00:00' WHERE id = ?")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    for uri in [
+        format!("/api/einsaetze/{id}"),
+        format!("/api/einsaetze/{id}/personen/export"),
+        format!("/api/einsaetze/{id}/personen/stream"),
+    ] {
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri(&uri)
+                    .header(header::COOKIE, admin.clone())
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            resp.status(),
+            StatusCode::FORBIDDEN,
+            "Tombstone muss {uri} sperren (auch für Admin)"
+        );
+    }
+}
+
+#[tokio::test]
 async fn einstellungen_put_retention_dauer_persistiert_validiert_und_hebt_auf() {
     // LFH-135: Aufbewahrungs-Dauer-Politik über PUT setzen, validieren, aufheben.
     let app = setup().await;

@@ -130,6 +130,7 @@ pub async fn liste_fuer(
         sachverhalt: Option<String>,
         anzahl_betroffene_initial: Option<i64>,
         retention_bis: Option<String>,
+        geloescht_at: Option<String>,
         meine_rolle: Option<String>,
     }
 
@@ -138,7 +139,7 @@ pub async fn liste_fuer(
                 e.abgeschlossen_at, e.abgeschlossen_von, e.einsatzart, e.einsatznummer_intern, \
                 e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
                 e.meldende_stelle, e.sachverhalt, e.anzahl_betroffene_initial, \
-                e.retention_bis, \
+                e.retention_bis, e.geloescht_at, \
                 m.einsatz_rolle AS meine_rolle \
          FROM einsatz e \
          LEFT JOIN organisation o ON o.id = e.org_id \
@@ -159,6 +160,7 @@ pub async fn liste_fuer(
                 &r.status,
                 r.abgeschlossen_at.as_deref(),
                 r.retention_bis.as_deref(),
+                r.geloescht_at.as_deref(),
                 r.meine_rolle.as_deref().and_then(EinsatzRolle::parse),
                 jetzt,
             )

@@ -69,6 +69,10 @@ pub fn ist_fristverkuerzung(alt: Option<&str>, neu: Option<&str>) -> bool {
 ///   für NIEMANDEN lesbar, auch nicht für höhere Berechtigungen (DSGVO-Löschpflicht;
 ///   die Daten sind physisch noch da, der Purge folgt im Archiv-Feature). Greift nie
 ///   auf aktive Einsätze.
+/// - Soft-Delete-Tombstone (`geloescht_at`, LFH-135): gesetzt → für NIEMANDEN lesbar,
+///   vor allen anderen Checks (auch höhere Berechtigung, auch aktive Einsätze — der
+///   Tombstone wird ausschließlich vom Purge auf abgeschlossene Einsätze gesetzt,
+///   die Sperre ist aber bewusst statusunabhängig defensiv).
 ///
 /// `jetzt` wird injiziert (Testbarkeit).
 pub fn darf_lesen(
@@ -76,9 +80,14 @@ pub fn darf_lesen(
     status: &str,
     abgeschlossen_at: Option<&str>,
     retention_bis: Option<&str>,
+    geloescht_at: Option<&str>,
     rolle: Option<EinsatzRolle>,
     jetzt: DateTime<Utc>,
 ) -> bool {
+    // Soft-Delete-Tombstone → harte Sperre vor allen anderen Checks (auch höhere Berechtigung).
+    if geloescht_at.is_some_and(|s| !s.is_empty()) {
+        return false;
+    }
     // Aufbewahrungsfrist abgelaufen → harte Sperre vor allen anderen Checks.
     if status == STATUS_ABGESCHLOSSEN && retention_abgelaufen(retention_bis, jetzt) {
         return false;
@@ -106,6 +115,7 @@ pub fn fordere_lesezugriff(
         &einsatz.status,
         einsatz.abgeschlossen_at.as_deref(),
         einsatz.retention_bis.as_deref(),
+        einsatz.geloescht_at.as_deref(),
         rolle,
         Utc::now(),
     ) {
@@ -297,6 +307,7 @@ mod tests {
             STATUS_AKTIV,
             None,
             None,
+            None,
             Some(EinsatzRolle::Beobachter),
             jetzt()
         ));
@@ -305,7 +316,7 @@ mod tests {
     #[test]
     fn darf_lesen_aktiv_nicht_mitglied_normal_ist_false() {
         let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
-        assert!(!darf_lesen(&b, STATUS_AKTIV, None, None, None, jetzt()));
+        assert!(!darf_lesen(&b, STATUS_AKTIV, None, None, None, None, jetzt()));
     }
 
     #[test]
@@ -315,6 +326,7 @@ mod tests {
             &b,
             STATUS_ABGESCHLOSSEN,
             Some("2026-05-25 11:00:00"),
+            None,
             None,
             Some(EinsatzRolle::Beobachter),
             jetzt()
@@ -329,6 +341,7 @@ mod tests {
             STATUS_ABGESCHLOSSEN,
             Some("2026-05-24 11:00:00"),
             None,
+            None,
             Some(EinsatzRolle::Beobachter),
             jetzt()
         ));
@@ -341,6 +354,7 @@ mod tests {
             &b,
             STATUS_ABGESCHLOSSEN,
             Some("2026-05-24 11:00:00"),
+            None,
             None,
             Some(EinsatzRolle::Einsatzleitung),
             jetzt()
@@ -356,6 +370,7 @@ mod tests {
             Some("2026-05-24 11:00:00"),
             None,
             None,
+            None,
             jetzt()
         ));
     }
@@ -367,6 +382,7 @@ mod tests {
             &b,
             STATUS_ABGESCHLOSSEN,
             Some("2026-05-24 11:00:00"),
+            None,
             None,
             None,
             jetzt()
@@ -404,6 +420,7 @@ mod tests {
             STATUS_ABGESCHLOSSEN,
             Some("2026-05-25 11:00:00"),
             Some("2026-05-24 12:00:00"),
+            None,
             Some(EinsatzRolle::Einsatzleitung),
             jetzt()
         ));
@@ -419,6 +436,7 @@ mod tests {
             Some("2026-05-24 11:00:00"),
             Some("2026-05-24 12:00:00"),
             None,
+            None,
             jetzt()
         ));
     }
@@ -432,6 +450,7 @@ mod tests {
             STATUS_AKTIV,
             None,
             Some("2026-05-24 12:00:00"),
+            None,
             Some(EinsatzRolle::Beobachter),
             jetzt()
         ));
@@ -473,7 +492,70 @@ mod tests {
             STATUS_ABGESCHLOSSEN,
             Some("2026-05-24 11:00:00"),
             Some("2026-06-24 12:00:00"),
+            None,
             Some(EinsatzRolle::Einsatzleitung),
+            jetzt()
+        ));
+    }
+
+    // --- Soft-Delete-Tombstone (geloescht_at), LFH-135 ---
+
+    #[test]
+    fn darf_lesen_tombstone_sperrt_mitglied() {
+        // Gesetzter geloescht_at-Tombstone sperrt selbst die Einsatzleitung eines
+        // ansonsten frisch abgeschlossenen Einsatzes (gültige Frist, in Schonfrist).
+        let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        assert!(!darf_lesen(
+            &b,
+            STATUS_ABGESCHLOSSEN,
+            Some("2026-05-25 11:00:00"),
+            Some("2026-06-24 12:00:00"),
+            Some("2026-05-24 12:00:00"),
+            Some(EinsatzRolle::Einsatzleitung),
+            jetzt()
+        ));
+    }
+
+    #[test]
+    fn darf_lesen_tombstone_sperrt_auch_admin() {
+        // Höhere Berechtigung wird durch den Tombstone überstimmt (vor allen Checks).
+        let admin = benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE);
+        assert!(!darf_lesen(
+            &admin,
+            STATUS_ABGESCHLOSSEN,
+            Some("2026-05-25 11:00:00"),
+            None,
+            Some("2026-05-24 12:00:00"),
+            None,
+            jetzt()
+        ));
+    }
+
+    #[test]
+    fn darf_lesen_tombstone_sperrt_auch_fuehrungskraft() {
+        let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
+        assert!(!darf_lesen(
+            &fk,
+            STATUS_ABGESCHLOSSEN,
+            Some("2026-05-25 11:00:00"),
+            None,
+            Some("2026-05-24 12:00:00"),
+            None,
+            jetzt()
+        ));
+    }
+
+    #[test]
+    fn darf_lesen_ohne_tombstone_unveraendert() {
+        // Ungesetzter Tombstone (None) → Verhalten wie bisher (Mitglied liest aktiven Einsatz).
+        let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        assert!(darf_lesen(
+            &b,
+            STATUS_AKTIV,
+            None,
+            None,
+            None,
+            Some(EinsatzRolle::Beobachter),
             jetzt()
         ));
     }
