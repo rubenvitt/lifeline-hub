@@ -10,8 +10,9 @@ export interface GespeicherteBasemap {
 
 /**
  * Wählt die initiale Kartenwahl für den Einstieg in die Lagekarte.
- * Priorität: gemerkte Wahl, sofern mit der aktuellen Server-Config noch gültig —
- * sonst der Verfügbarkeits-Default (online → offline → blind).
+ * Priorität: gemerkte Wahl (localStorage) → Einsatz-Default (LFH-131) →
+ * Verfügbarkeits-Default (online → offline → blind). Jede Stufe wird gegen die
+ * aktuelle Server-Config validiert; ungültige Stufen werden übersprungen.
  *
  * Gültigkeitsprüfung gegen die Config, weil sich Verfügbarkeit/Views serverseitig
  * geändert haben können (z. B. Offline gemerkt, aber pmtiles nicht mehr verfügbar;
@@ -20,6 +21,7 @@ export interface GespeicherteBasemap {
 export function waehleInitialeBasemap(
   config: KarteServerConfig,
   gespeichert: GespeicherteBasemap | null,
+  einsatzDefault: BasemapModus | null = null,
 ): GespeicherteBasemap {
   const hatOnline = config.online_styles.length > 0;
   const viewGueltig = (name: string | null): name is string =>
@@ -28,7 +30,12 @@ export function waehleInitialeBasemap(
   const modusGueltig = (m: BasemapModus): boolean =>
     m === 'blind' || (m === 'online' && hatOnline) || (m === 'offline' && config.pmtiles_verfuegbar);
 
-  const modus = gespeichert && modusGueltig(gespeichert.modus) ? gespeichert.modus : defaultModus(config);
+  const modus =
+    gespeichert && modusGueltig(gespeichert.modus)
+      ? gespeichert.modus
+      : einsatzDefault && modusGueltig(einsatzDefault)
+        ? einsatzDefault
+        : defaultModus(config);
 
   const onlineView = viewGueltig(gespeichert?.onlineView ?? null)
     ? gespeichert!.onlineView

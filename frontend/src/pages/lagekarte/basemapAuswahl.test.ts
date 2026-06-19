@@ -60,6 +60,22 @@ describe('waehleInitialeBasemap', () => {
     expect(waehleInitialeBasemap(config(), { modus: 'blind', onlineView: null }))
       .toEqual({ modus: 'blind', onlineView: 'Liberty' });
   });
+
+  it('nutzt den Einsatz-Default, wenn keine gemerkte Wahl existiert', () => {
+    const c = config({ pmtiles_verfuegbar: true, pmtiles_url: '/x.pmtiles' });
+    expect(waehleInitialeBasemap(c, null, 'offline')).toEqual({ modus: 'offline', onlineView: 'Liberty' });
+  });
+
+  it('ignoriert einen ungültigen Einsatz-Default und nimmt den Verfügbarkeits-Default', () => {
+    // offline als Einsatz-Default, aber pmtiles nicht verfügbar → online-Default.
+    expect(waehleInitialeBasemap(config(), null, 'offline')).toEqual({ modus: 'online', onlineView: 'Liberty' });
+  });
+
+  it('gemerkte Wahl schlägt den Einsatz-Default', () => {
+    const c = config({ pmtiles_verfuegbar: true, pmtiles_url: '/x.pmtiles' });
+    expect(waehleInitialeBasemap(c, { modus: 'blind', onlineView: null }, 'offline'))
+      .toEqual({ modus: 'blind', onlineView: 'Liberty' });
+  });
 });
 
 describe('letzte-Basemap-Speicher', () => {

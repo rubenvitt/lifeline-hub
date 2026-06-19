@@ -1,4 +1,4 @@
-import { Alert, App, Button, Checkbox, Form, InputNumber, Select, Spin, Typography } from 'antd';
+import { Alert, App, Button, Checkbox, Form, Select, Spin, Typography } from 'antd';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz, ladeEinstellungen, speichereEinstellungen } from '../api/einsaetze';
@@ -24,7 +24,6 @@ const FACHEBENEN_OPTIONEN: { value: keyof FachebenenSichtbar; label: string }[] 
 interface FormWerte {
   standard_modul?: string;
   basemap_modus?: BasemapModus;
-  karten_zoom_start?: number | null;
   fachebenen: (keyof FachebenenSichtbar)[];
 }
 
@@ -86,7 +85,6 @@ export default function EinsatzEinstellungenPage() {
   const initialWerte: FormWerte = {
     standard_modul: einstellungen.standard_modul ?? undefined,
     basemap_modus: einstellungen.basemap_modus ?? undefined,
-    karten_zoom_start: einstellungen.karten_zoom_start ?? undefined,
     fachebenen: aktiveFachebenen
       ? FACHEBENEN_OPTIONEN.map((o) => o.value).filter((k) => aktiveFachebenen[k])
       : [],
@@ -103,7 +101,9 @@ export default function EinsatzEinstellungenPage() {
     const felder: EinstellungenUpdate = {
       standard_modul: werte.standard_modul || null,
       basemap_modus: werte.basemap_modus ?? null,
-      karten_zoom_start: werte.karten_zoom_start ?? null,
+      // Start-Zoom wird hier (noch) nicht erhoben — Anwendung im Karten-Kern folgt im
+      // Anzeige-Konventionen-Folge-Subtask; Spalte bleibt als Fundament erhalten.
+      karten_zoom_start: einstellungen.karten_zoom_start,
       fachebenen_sichtbar,
     };
     speichernMutation.mutate(felder);
@@ -154,9 +154,6 @@ export default function EinsatzEinstellungenPage() {
           tooltip="Kartenhintergrund beim ersten Öffnen der Lagekarte. Leer = automatische Wahl."
         >
           <Select allowClear placeholder="Automatisch (Verfügbarkeit)" options={BASEMAP_OPTIONEN} />
-        </Form.Item>
-        <Form.Item label="Start-Zoom" name="karten_zoom_start" tooltip="Zoomstufe 0–28 beim Einstieg in die Lagekarte.">
-          <InputNumber min={0} max={28} style={{ width: 180 }} placeholder="Karten-Default" />
         </Form.Item>
         <Form.Item label="Aktive Lage-Layer" name="fachebenen">
           <Checkbox.Group options={FACHEBENEN_OPTIONEN} />

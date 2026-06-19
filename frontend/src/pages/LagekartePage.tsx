@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { App, Spin } from 'antd';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
-import { aktualisiereEinsatz, ladeEinsatz, type KopfdatenUpdate } from '../api/einsaetze';
+import { aktualisiereEinsatz, ladeEinsatz, ladeEinstellungen, type KopfdatenUpdate } from '../api/einsaetze';
 import { listeUhs, aktualisiereUhs } from '../api/einsatzUhs';
 import { listeSchaeden, aktualisiereSchaden } from '../api/einsatzSchaden';
 import { ladeKarteConfig } from '../api/karte';
@@ -115,6 +115,12 @@ export default function LagekartePage() {
   });
   const orgQuery = useQuery({ queryKey: ['organisation'], queryFn: ladeOrganisation });
   const configQuery = useQuery({ queryKey: ['karte-config'], queryFn: ladeKarteConfig });
+  // Einsatz-Einstellungen als Karten-Defaults (LFH-131): Basemap-Vorwahl + Lage-Layer.
+  // Geteilter queryKey mit Einstellungen-Seite/Redirect → i. d. R. bereits gecacht.
+  const einstellungenQuery = useQuery({
+    queryKey: ['einsatz-einstellungen', einsatzId],
+    queryFn: () => ladeEinstellungen(einsatzId),
+  });
 
   // Fachebenen-Sichtbarkeit: einmal aus localStorage laden (analog basemap-Persistenz).
   // Muss VOR den Fachebenen-Queries stehen, damit enabled korrekt ist.
@@ -124,11 +130,16 @@ export default function LagekartePage() {
   const [kartenZoom, setKartenZoom] = useState<number | null>(null);
   const fachebenenInitRef = useRef(false);
   useEffect(() => {
-    if (fachebenenInitRef.current) return;
+    // Erst initialisieren, wenn die Einsatz-Einstellungen geladen (oder fehlgeschlagen)
+    // sind — sonst ginge der Einsatz-Default als Fallback verloren.
+    if (fachebenenInitRef.current || einstellungenQuery.isLoading) return;
     fachebenenInitRef.current = true;
+    // Priorität: gemerkte (localStorage) Auswahl → Einsatz-Default → alles aus.
     const gespeichert = liesFachebenenSichtbar(einsatzId);
+    const einsatzDefault = einstellungenQuery.data?.fachebenen_sichtbar ?? null;
     if (gespeichert) setFachebenenSichtbar(gespeichert);
-  }, [einsatzId]);
+    else if (einsatzDefault) setFachebenenSichtbar(einsatzDefault);
+  }, [einsatzId, einstellungenQuery.isLoading, einstellungenQuery.data]);
   useEffect(() => {
     if (!fachebenenInitRef.current) return;
     merkeFachebenenSichtbar(einsatzId, fachebenenSichtbar);
@@ -163,12 +174,16 @@ export default function LagekartePage() {
   // ein Effekt jede Änderung.
   const basemapInitiiertRef = useRef(false);
   useEffect(() => {
-    if (basemapInitiiertRef.current || !configQuery.data) return;
+    if (basemapInitiiertRef.current || !configQuery.data || einstellungenQuery.isLoading) return;
     basemapInitiiertRef.current = true;
-    const { modus, onlineView } = waehleInitialeBasemap(configQuery.data, liesLetzteBasemap(einsatzId));
+    const { modus, onlineView } = waehleInitialeBasemap(
+      configQuery.data,
+      liesLetzteBasemap(einsatzId),
+      einstellungenQuery.data?.basemap_modus ?? null,
+    );
     setBasemap(modus);
     setOnlineStilName(onlineView);
-  }, [configQuery.data, einsatzId]);
+  }, [configQuery.data, einsatzId, einstellungenQuery.isLoading, einstellungenQuery.data]);
 
   // Jede Änderung der Kartenwahl pro Einsatz merken (erst nach der Initialisierung,
   // damit der gemerkte Wert nicht durch den transienten Default überschrieben wird).
