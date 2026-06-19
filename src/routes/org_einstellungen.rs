@@ -1,7 +1,10 @@
-//! HTTP-Routen für die org-weiten Einstellungen (admin-einstellungen, Task 4).
+//! HTTP-Routen für die org-weiten Einstellungen (admin-einstellungen, Task 4 + 5).
 //!
 //! GET  /api/org-einstellungen — Lesen: system_rolle=admin ODER org_rolle=fuehrungskraft.
 //! PUT  /api/org-einstellungen — Schreiben: nur system_rolle=admin (sonst 403).
+//!
+//! GET  /api/org-modul-einstellungen — Lesen: admin ODER fuehrungskraft.
+//! PUT  /api/org-modul-einstellungen/:modul_key — Schreiben: nur system_rolle=admin (sonst 403).
 //!
 //! `org_id` stammt stets aus dem eingeloggten Benutzer; nie aus dem Body (Org-Isolation).
 
@@ -12,10 +15,13 @@ use crate::einsatz::einstellungen::{
     ist_gueltiges_einheiten_system, ist_gueltiges_koordinatenformat, ist_gueltiges_nummer_praefix,
     ist_gueltiges_zeitformat,
 };
+use crate::einsatz::modul::{ist_gueltige_benoetigte_rolle, ist_gueltiger_modul_key};
 use crate::error::AppError;
 use crate::org::einstellungen::{self, OrgEinstellungenAnzeige, OrgEinstellungenDaten};
-use axum::extract::State;
+use crate::org::modul_einstellung;
+use axum::extract::{Path, State};
 use axum::Json;
+use std::collections::HashMap;
 use serde::Deserialize;
 
 /// PUT-Body für org-weite Einstellungen. Felder spiegeln `EinstellungenUpdate` (Einsatz)
@@ -148,4 +154,58 @@ pub async fn setzen(
 /// Trimmt und filtert leere Strings (None bei leerem Wert).
 fn bereinige(feld: Option<String>) -> Option<String> {
     feld.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
+}
+
+// ── Modul-Rollen-Defaults (Task 5) ──────────────────────────────────────────
+
+/// PUT-Body für einen Modul-Rollen-Default.
+#[derive(Debug, serde::Deserialize)]
+pub struct ModulRolleUpdate {
+    /// `None` = freier Zugang (keine Rolle erforderlich), `Some(rolle)` = Pflichtrolle.
+    pub benoetigte_rolle: Option<String>,
+}
+
+/// GET /api/org-modul-einstellungen — Alle Modul-Rollen-Defaults lesen.
+/// Berechtigung: system_rolle=admin ODER org_rolle=fuehrungskraft.
+/// Antwort: `{ <modul_key>: <rolle|null> }` — sparse (nur gesetzte Keys).
+pub async fn modul_einstellungen_lesen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+) -> Result<Json<HashMap<String, Option<String>>>, AppError> {
+    if !benutzer.darf_admin_bereich() {
+        return Err(AppError::Forbidden);
+    }
+    let map = modul_einstellung::laden_alle(&state.pool, benutzer.org_id).await?;
+    Ok(Json(map))
+}
+
+/// PUT /api/org-modul-einstellungen/:modul_key — Rollen-Default für ein Modul setzen.
+/// Berechtigung: nur system_rolle=admin (fuehrungskraft → 403).
+/// Validierung: modul_key muss bekannt sein; benoetigte_rolle None (frei) oder gültige Rolle.
+pub async fn modul_einstellung_setzen(
+    State(state): State<AppState>,
+    AdminUser(benutzer): AdminUser,
+    Path(modul_key): Path<String>,
+    Json(req): Json<ModulRolleUpdate>,
+) -> Result<(), AppError> {
+    // Modul-Key validieren (400 bei unbekanntem Key).
+    if !ist_gueltiger_modul_key(&modul_key) {
+        return Err(AppError::Validation(format!(
+            "Unbekannter modul_key '{modul_key}'"
+        )));
+    }
+
+    // Rolle bereinigen (Leerstring → None = frei) und validieren.
+    let rolle = bereinige(req.benoetigte_rolle);
+    if let Some(r) = rolle.as_deref() {
+        if !ist_gueltige_benoetigte_rolle(r) {
+            return Err(AppError::Validation(format!(
+                "Ungültige benoetigte_rolle '{r}' (erlaubt: admin, fuehrungskraft)"
+            )));
+        }
+    }
+
+    modul_einstellung::setzen(&state.pool, benutzer.org_id, &modul_key, rolle.as_deref())
+        .await?;
+    Ok(())
 }
