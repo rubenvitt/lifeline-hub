@@ -26,7 +26,9 @@ describe('DefaultModulRedirect', () => {
   it('leitet ohne Override auf das Lage-Dashboard um', async () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue({
       einsatz_id: 7, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
-      fachebenen_sichtbar: null, geaendert_at: null, geaendert_von: null,
+      fachebenen_sichtbar: null,
+      zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+      geaendert_at: null, geaendert_von: null,
     });
     rendern();
     expect(await screen.findByText('Dashboard-Inhalt')).toBeInTheDocument();
@@ -35,7 +37,9 @@ describe('DefaultModulRedirect', () => {
   it('leitet auf das konfigurierte Standard-Modul um', async () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue({
       einsatz_id: 7, standard_modul: 'etb', basemap_modus: null, karten_zoom_start: null,
-      fachebenen_sichtbar: null, geaendert_at: null, geaendert_von: null,
+      fachebenen_sichtbar: null,
+      zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+      geaendert_at: null, geaendert_von: null,
     });
     rendern();
     expect(await screen.findByText('ETB-Inhalt')).toBeInTheDocument();
@@ -44,7 +48,9 @@ describe('DefaultModulRedirect', () => {
   it('fällt bei unbekanntem Standard-Modul auf das Dashboard zurück', async () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue({
       einsatz_id: 7, standard_modul: 'gibtsnicht', basemap_modus: null, karten_zoom_start: null,
-      fachebenen_sichtbar: null, geaendert_at: null, geaendert_von: null,
+      fachebenen_sichtbar: null,
+      zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+      geaendert_at: null, geaendert_von: null,
     });
     rendern();
     expect(await screen.findByText('Dashboard-Inhalt')).toBeInTheDocument();

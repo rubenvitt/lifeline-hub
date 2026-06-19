@@ -46,6 +46,7 @@ describe('EinsatzEinstellungenPage', () => {
       basemap_modus: 'offline',
       karten_zoom_start: 12,
       fachebenen_sichtbar: { nina: true, dwd: false, pegelonline: false, kritis: false },
+      zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
       geaendert_at: null,
       geaendert_von: null,
     });
@@ -68,6 +69,7 @@ describe('EinsatzEinstellungenPage', () => {
       basemap_modus: 'offline',
       karten_zoom_start: 12,
       fachebenen_sichtbar: { nina: true, dwd: false, pegelonline: false, kritis: false },
+      zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
       geaendert_at: null,
       geaendert_von: null,
     });
@@ -130,7 +132,9 @@ describe('EinsatzEinstellungenPage', () => {
   it('zeigt die Modul-Sichtbarkeits-Sektion; nicht-ausblendbare Module sind gesperrt (LFH-132)', async () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue({
       einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
-      fachebenen_sichtbar: null, geaendert_at: null, geaendert_von: null,
+      fachebenen_sichtbar: null,
+      zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+      geaendert_at: null, geaendert_von: null,
     });
 
     rendern();
@@ -148,7 +152,9 @@ describe('EinsatzEinstellungenPage', () => {
   it('speichert das Ausblenden eines Moduls sofort per PUT (LFH-132)', async () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue({
       einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
-      fachebenen_sichtbar: null, geaendert_at: null, geaendert_von: null,
+      fachebenen_sichtbar: null,
+      zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+      geaendert_at: null, geaendert_von: null,
     });
 
     rendern();
@@ -170,7 +176,9 @@ describe('EinsatzEinstellungenPage', () => {
     } as never);
     vi.mocked(ladeEinstellungen).mockResolvedValue({
       einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
-      fachebenen_sichtbar: null, geaendert_at: null, geaendert_von: null,
+      fachebenen_sichtbar: null,
+      zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+      geaendert_at: null, geaendert_von: null,
     });
 
     rendern();
