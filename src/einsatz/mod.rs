@@ -1,4 +1,5 @@
 pub mod berechtigung;
+pub mod einstellungen;
 pub mod repo;
 
 use serde::Serialize;
