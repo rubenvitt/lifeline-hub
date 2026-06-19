@@ -165,6 +165,17 @@ pub struct EinstellungenUpdate {
     pub zeitformat: Option<String>,
     pub einheiten: Option<String>,
     pub koordinatenformat: Option<String>,
+    // Verhalten & Automatik (LFH-133). Präfixe display-only; Startwerte/Fristen 1-basiert.
+    pub etb_nummer_praefix: Option<String>,
+    pub etb_nummer_start: Option<i64>,
+    pub meldung_nummer_praefix: Option<String>,
+    pub meldung_nummer_start: Option<i64>,
+    pub auftrag_nummer_praefix: Option<String>,
+    pub auftrag_nummer_start: Option<i64>,
+    pub meldung_bestaetigung_frist_min: Option<i64>,
+    pub auftrag_quittierung_frist_min: Option<i64>,
+    /// Auto-ETB-Dual-Publish: `false` schaltet ab (gespeichert als 0), `true`/fehlend = an.
+    pub auto_etb_eintraege: Option<bool>,
 }
 
 /// GET /api/einsaetze/{id}/einstellungen — Einsatz-Einstellungen (LFH-131).
@@ -177,10 +188,20 @@ pub async fn einstellungen_laden(
     let einsatz = repo::laden(&state.pool, id).await?;
     let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    Ok(Json(
-        einstellungen::laden_oder_default(&state.pool, id)
-            .await?
-            .anzeige(),
+    let gespeichert = einstellungen::laden_oder_default(&state.pool, id).await?;
+    let (etb_fr, meldung_fr, auftrag_fr) = freeze_flags(&state.pool, id).await?;
+    Ok(Json(gespeichert.anzeige_mit_freeze(etb_fr, meldung_fr, auftrag_fr)))
+}
+
+/// Ermittelt die Freeze-Flags je Nummernkreis (LFH-133) aus der Daten-Existenz.
+async fn freeze_flags(
+    pool: &sqlx::SqlitePool,
+    einsatz_id: i64,
+) -> Result<(bool, bool, bool), AppError> {
+    Ok((
+        einstellungen::etb_nummer_vergeben(pool, einsatz_id).await?,
+        einstellungen::meldung_nummer_vergeben(pool, einsatz_id).await?,
+        einstellungen::auftrag_nummer_vergeben(pool, einsatz_id).await?,
     ))
 }
 
@@ -248,6 +269,62 @@ pub async fn einstellungen_setzen(
         }
     }
 
+    // Verhalten & Automatik (LFH-133) — Präfixe bereinigen + validieren (400).
+    let etb_nummer_praefix = bereinige(req.etb_nummer_praefix);
+    let meldung_nummer_praefix = bereinige(req.meldung_nummer_praefix);
+    let auftrag_nummer_praefix = bereinige(req.auftrag_nummer_praefix);
+    for p in [&etb_nummer_praefix, &meldung_nummer_praefix, &auftrag_nummer_praefix] {
+        if let Some(v) = p.as_deref() {
+            if !einstellungen::ist_gueltiges_nummer_praefix(v) {
+                return Err(AppError::Validation(
+                    "Ungültiges Nummern-Präfix (max. 8 Zeichen, nur A-Z a-z 0-9 - _ / Leerzeichen)".into(),
+                ));
+            }
+        }
+    }
+    // Startwerte validieren (400).
+    for s in [req.etb_nummer_start, req.meldung_nummer_start, req.auftrag_nummer_start] {
+        if let Some(v) = s {
+            if !einstellungen::ist_gueltiger_startwert(v) {
+                return Err(AppError::Validation("Startwert muss zwischen 1 und 999999 liegen".into()));
+            }
+        }
+    }
+    // Default-Fristen validieren (400).
+    for f in [req.meldung_bestaetigung_frist_min, req.auftrag_quittierung_frist_min] {
+        if let Some(v) = f {
+            if !einstellungen::ist_gueltige_frist_min(v) {
+                return Err(AppError::Validation(
+                    "Default-Frist muss zwischen 1 und 10080 Minuten liegen".into(),
+                ));
+            }
+        }
+    }
+
+    // Freeze-Guard (409): sobald ein Nummernkreis eine Nummer vergeben hat, sind Präfix+Startwert
+    // read-only. XOR gegen Bestand (vgl. patch-xor): ein unveränderter Vollersatz-PUT darf sich
+    // NICHT selbst aussperren — nur eine tatsächliche Wertänderung wird abgelehnt.
+    let bestand = einstellungen::laden_oder_default(&state.pool, id).await?;
+    let (etb_fr, meldung_fr, auftrag_fr) = freeze_flags(&state.pool, id).await?;
+    let geaendert = |alt_p: &Option<String>, neu_p: &Option<String>, alt_s: Option<i64>, neu_s: Option<i64>| {
+        alt_p.as_deref() != neu_p.as_deref() || alt_s != neu_s
+    };
+    if etb_fr && geaendert(&bestand.etb_nummer_praefix, &etb_nummer_praefix, bestand.etb_nummer_start, req.etb_nummer_start) {
+        return Err(AppError::Conflict(
+            "ETB-Nummernkreis ist eingefroren (erste Nummer bereits vergeben)".into(),
+        ));
+    }
+    if meldung_fr && geaendert(&bestand.meldung_nummer_praefix, &meldung_nummer_praefix, bestand.meldung_nummer_start, req.meldung_nummer_start) {
+        return Err(AppError::Conflict(
+            "Meldungs-Nummernkreis ist eingefroren (erste Nummer bereits vergeben)".into(),
+        ));
+    }
+    if auftrag_fr && geaendert(&bestand.auftrag_nummer_praefix, &auftrag_nummer_praefix, bestand.auftrag_nummer_start, req.auftrag_nummer_start) {
+        return Err(AppError::Conflict(
+            "Auftrags-Nummernkreis ist eingefroren (erste Nummer bereits vergeben)".into(),
+        ));
+    }
+
     let gespeichert = einstellungen::speichern(
         &state.pool,
         id,
@@ -261,12 +338,21 @@ pub async fn einstellungen_setzen(
             zeitformat: zeitformat.as_deref(),
             einheiten: einheiten.as_deref(),
             koordinatenformat: koordinatenformat.as_deref(),
-            // Verhalten & Automatik (LFH-133): vollständige Annahme + Freeze-Guard folgt in Task 5.
-            ..Default::default()
+            etb_nummer_praefix: etb_nummer_praefix.as_deref(),
+            etb_nummer_start: req.etb_nummer_start,
+            meldung_nummer_praefix: meldung_nummer_praefix.as_deref(),
+            meldung_nummer_start: req.meldung_nummer_start,
+            auftrag_nummer_praefix: auftrag_nummer_praefix.as_deref(),
+            auftrag_nummer_start: req.auftrag_nummer_start,
+            meldung_bestaetigung_frist_min: req.meldung_bestaetigung_frist_min,
+            auftrag_quittierung_frist_min: req.auftrag_quittierung_frist_min,
+            // bool → 0/1; None bleibt None (= Default an).
+            auto_etb_eintraege: req.auto_etb_eintraege.map(i64::from),
         },
     )
     .await?;
-    Ok(Json(gespeichert.anzeige()))
+    // Freeze-Flags nach dem Speichern unverändert (Daten-Existenz ändert sich durch ein PUT nicht).
+    Ok(Json(gespeichert.anzeige_mit_freeze(etb_fr, meldung_fr, auftrag_fr)))
 }
 
 /// GET /api/einsaetze/{id}/modul-overrides — alle Modul-Overrides eines Einsatzes

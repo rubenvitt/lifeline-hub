@@ -1340,3 +1340,140 @@ async fn einstellungen_konventionen_fuer_nicht_mitglied_sind_403() {
         einstellungen_put(&app, &erika, id, json!({ "koordinatenformat": "utm" })).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 }
+
+// --- Verhalten & Automatik: Nummernkreise + Default-Fristen (LFH-133) ---
+
+/// Fügt direkt einen ETB-Eintrag in die DB ein (umgeht die API), um den
+/// ETB-Nummernkreis-Freeze isoliert zu testen.
+async fn etb_eintrag_direkt(pool: &SqlitePool, einsatz_id: i64) {
+    sqlx::query(
+        "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
+         SELECT ?, 1, 'meldung', 'x', (SELECT id FROM benutzer LIMIT 1), '2026-06-19 09:00:00'",
+    )
+    .bind(einsatz_id)
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+/// Fügt direkt einen Auftrag ein (ohne ETB-Anordnung), um den Auftrags-Freeze
+/// unabhängig vom ETB-Kreis zu testen.
+async fn auftrag_direkt(pool: &SqlitePool, einsatz_id: i64) {
+    sqlx::query(
+        "INSERT INTO auftrag (einsatz_id, lfd_nr, auftrag_text, erteilt_at, erstellt_von_id) \
+         SELECT ?, 1, 'x', '2026-06-19 09:00:00', (SELECT id FROM benutzer LIMIT 1)",
+    )
+    .bind(einsatz_id)
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn einstellungen_verhalten_speichert_und_liest_zurueck() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, einsatz) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = einsatz["id"].as_i64().unwrap();
+
+    let (status, v) = einstellungen_put(
+        &app,
+        &admin,
+        id,
+        json!({
+            "etb_nummer_praefix": "EB-", "etb_nummer_start": 100,
+            "meldung_nummer_praefix": "M-", "meldung_nummer_start": 5,
+            "auftrag_nummer_praefix": "A-", "auftrag_nummer_start": 10,
+            "meldung_bestaetigung_frist_min": 30, "auftrag_quittierung_frist_min": 45,
+            "auto_etb_eintraege": false
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(v["etb_nummer_praefix"], "EB-");
+    assert_eq!(v["etb_nummer_start"], 100);
+    assert_eq!(v["auftrag_nummer_start"], 10);
+    assert_eq!(v["meldung_bestaetigung_frist_min"], 30);
+    assert_eq!(v["auto_etb_eintraege"], 0);
+    // Ohne vergebene Nummern: nichts eingefroren.
+    assert_eq!(v["etb_nummer_eingefroren"], false);
+
+    let (_, v) = einstellungen_get(&app, &admin, id).await;
+    assert_eq!(v["meldung_nummer_praefix"], "M-");
+    assert_eq!(v["auftrag_quittierung_frist_min"], 45);
+}
+
+#[tokio::test]
+async fn einstellungen_verhalten_ungueltig_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, einsatz) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = einsatz["id"].as_i64().unwrap();
+
+    let (s, _) = einstellungen_put(&app, &admin, id, json!({ "etb_nummer_praefix": "123456789" })).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Präfix > 8 Zeichen");
+    let (s, _) = einstellungen_put(&app, &admin, id, json!({ "etb_nummer_praefix": "EB#" })).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Präfix mit ungültigem Zeichen");
+    let (s, _) = einstellungen_put(&app, &admin, id, json!({ "etb_nummer_start": 0 })).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Startwert 0");
+    let (s, _) = einstellungen_put(&app, &admin, id, json!({ "meldung_bestaetigung_frist_min": 0 })).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Frist 0");
+    let (s, _) = einstellungen_put(&app, &admin, id, json!({ "auftrag_quittierung_frist_min": 99999 })).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Frist > 1 Woche");
+}
+
+#[tokio::test]
+async fn einstellungen_freeze_409_je_nummernkreis_und_xor() {
+    let (app, pool) = setup_with_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, einsatz) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = einsatz["id"].as_i64().unwrap();
+
+    // Erste ETB-Nummer vergeben → ETB-Kreis eingefroren, Auftrags-Kreis frei.
+    etb_eintrag_direkt(&pool, id).await;
+
+    let (_, v) = einstellungen_get(&app, &admin, id).await;
+    assert_eq!(v["etb_nummer_eingefroren"], true);
+    assert_eq!(v["auftrag_nummer_eingefroren"], false);
+
+    // Änderung am eingefrorenen ETB-Kreis → 409.
+    let (s, _) = einstellungen_put(&app, &admin, id, json!({ "etb_nummer_start": 5 })).await;
+    assert_eq!(s, StatusCode::CONFLICT, "geänderter Startwert bei vergebener Nummer → 409");
+    let (s, _) = einstellungen_put(&app, &admin, id, json!({ "etb_nummer_praefix": "EB-" })).await;
+    assert_eq!(s, StatusCode::CONFLICT, "geändertes Präfix bei vergebener Nummer → 409");
+
+    // Freier Auftrags-Kreis bleibt änderbar (Kreise sind getrennt).
+    let (s, _) = einstellungen_put(&app, &admin, id, json!({ "auftrag_nummer_start": 7 })).await;
+    assert_eq!(s, StatusCode::OK, "anderer (freier) Nummernkreis bleibt setzbar");
+
+    // XOR: unveränderter ETB-Wert (weiterhin null) sperrt sich NICHT selbst aus.
+    let (s, _) = einstellungen_put(
+        &app,
+        &admin,
+        id,
+        json!({ "etb_nummer_praefix": null, "etb_nummer_start": null, "zeitformat": "12h" }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "unveränderter Vollersatz-PUT darf trotz Freeze durch");
+}
+
+#[tokio::test]
+async fn einstellungen_freeze_ist_org_isoliert() {
+    let (app, pool) = setup_with_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, ea) = einsatz_anlegen(&app, &admin, "Lage A").await;
+    let (_, eb) = einsatz_anlegen(&app, &admin, "Lage B").await;
+    let id_a = ea["id"].as_i64().unwrap();
+    let id_b = eb["id"].as_i64().unwrap();
+
+    // Einträge NUR im fremden Einsatz B.
+    etb_eintrag_direkt(&pool, id_b).await;
+    auftrag_direkt(&pool, id_b).await;
+
+    // Einsatz A bleibt frei — Freeze ist strikt per einsatz_id.
+    let (_, v) = einstellungen_get(&app, &admin, id_a).await;
+    assert_eq!(v["etb_nummer_eingefroren"], false);
+    assert_eq!(v["auftrag_nummer_eingefroren"], false);
+    let (s, _) = einstellungen_put(&app, &admin, id_a, json!({ "etb_nummer_start": 5 })).await;
+    assert_eq!(s, StatusCode::OK, "fremder Einsatz mit Einträgen darf A nicht einfrieren");
+}
