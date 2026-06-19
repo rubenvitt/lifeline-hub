@@ -36,7 +36,7 @@ pub struct OrgEinstellungen {
 }
 
 impl OrgEinstellungen {
-    fn leer(org_id: i64) -> Self {
+    pub(crate) fn leer(org_id: i64) -> Self {
         Self {
             org_id,
             zeitzone: None,

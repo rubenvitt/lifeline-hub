@@ -112,7 +112,7 @@ pub struct EinsatzEinstellungen {
 }
 
 impl EinsatzEinstellungen {
-    fn leer(einsatz_id: i64) -> Self {
+    pub(crate) fn leer(einsatz_id: i64) -> Self {
         Self {
             einsatz_id,
             standard_modul: None,
