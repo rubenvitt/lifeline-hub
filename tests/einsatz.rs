@@ -1247,6 +1247,34 @@ async fn einstellungen_put_zoom_ausserhalb_bereich_ist_400() {
 }
 
 #[tokio::test]
+async fn einstellungen_put_retention_dauer_persistiert_validiert_und_hebt_auf() {
+    // LFH-135: Aufbewahrungs-Dauer-Politik über PUT setzen, validieren, aufheben.
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, einsatz) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = einsatz["id"].as_i64().unwrap();
+
+    // Gültige Dauer persistiert.
+    let (status, v) = einstellungen_put(&app, &admin, id, json!({ "retention_dauer_tage": 365 })).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(v["retention_dauer_tage"], 365);
+    let (_, v) = einstellungen_get(&app, &admin, id).await;
+    assert_eq!(v["retention_dauer_tage"], 365);
+
+    // Ungültige Dauer (0 = Instant-Purge) → 400.
+    let (status, _) = einstellungen_put(&app, &admin, id, json!({ "retention_dauer_tage": 0 })).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    // Zu groß → 400.
+    let (status, _) = einstellungen_put(&app, &admin, id, json!({ "retention_dauer_tage": 3651 })).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+
+    // null hebt die Politik auf (Vollersatz-PUT).
+    let (status, v) = einstellungen_put(&app, &admin, id, json!({ "retention_dauer_tage": null })).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(v["retention_dauer_tage"].is_null());
+}
+
+#[tokio::test]
 async fn einstellungen_put_auf_abgeschlossenem_ist_409() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;

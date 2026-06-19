@@ -176,6 +176,9 @@ pub struct EinstellungenUpdate {
     pub auftrag_quittierung_frist_min: Option<i64>,
     /// Auto-ETB-Dual-Publish: `false` schaltet ab (gespeichert als 0), `true`/fehlend = an.
     pub auto_etb_eintraege: Option<bool>,
+    /// Aufbewahrungs-Dauer-Politik in Tagen (LFH-135); `null`/0 hebt sie auf bzw. ist
+    /// ungültig (1..=3650). Greift erst beim Abschluss.
+    pub retention_dauer_tage: Option<i64>,
 }
 
 /// GET /api/einsaetze/{id}/einstellungen — Einsatz-Einstellungen (LFH-131).
@@ -300,6 +303,15 @@ pub async fn einstellungen_setzen(
             }
         }
     }
+    // Aufbewahrungs-Dauer validieren (400): nur ein gesetzter Wert wird geprüft;
+    // None (= keine Politik) ist zulässig und hebt eine bestehende Dauer auf.
+    if let Some(v) = req.retention_dauer_tage {
+        if !einstellungen::ist_gueltige_retention_dauer(v) {
+            return Err(AppError::Validation(
+                "Aufbewahrungs-Dauer muss zwischen 1 und 3650 Tagen liegen".into(),
+            ));
+        }
+    }
 
     // Freeze-Guard (409): sobald ein Nummernkreis eine Nummer vergeben hat, sind Präfix+Startwert
     // read-only. XOR gegen Bestand (vgl. patch-xor): ein unveränderter Vollersatz-PUT darf sich
@@ -348,6 +360,7 @@ pub async fn einstellungen_setzen(
             auftrag_quittierung_frist_min: req.auftrag_quittierung_frist_min,
             // bool → 0/1; None bleibt None (= Default an).
             auto_etb_eintraege: req.auto_etb_eintraege.map(i64::from),
+            retention_dauer_tage: req.retention_dauer_tage,
         },
     )
     .await?;

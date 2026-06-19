@@ -65,6 +65,13 @@ pub fn ist_gueltige_frist_min(n: i64) -> bool {
     (1..=10_080).contains(&n)
 }
 
+/// Ob `n` eine gültige Aufbewahrungs-Dauer in Tagen ist (1..=3650 = zehn Jahre).
+/// 0/negativ ist unzulässig (kein Instant-Purge); `None` (keine Politik) wird vom
+/// Aufrufer separat behandelt (= keine Auto-Frist). LFH-135.
+pub fn ist_gueltige_retention_dauer(tage: i64) -> bool {
+    (1..=3650).contains(&tage)
+}
+
 /// Ob `s` eine pragmatisch gültige Zeitzone ist. Volle IANA-TZ-DB-Prüfung wäre
 /// Over-Engineering (siehe Plan-Risiken) — Backend prüft nur „nicht-leer"; die UI
 /// bietet eine kuratierte Liste + Freitext.
@@ -97,6 +104,9 @@ pub struct EinsatzEinstellungen {
     pub auftrag_quittierung_frist_min: Option<i64>,
     /// 0 = Auto-ETB-Dual-Publish aus; NULL/1 = an (heutiges Verhalten).
     pub auto_etb_eintraege: Option<i64>,
+    /// Aufbewahrungs-Dauer-Politik in Tagen (LFH-135). NULL = keine Auto-Frist.
+    /// Der Zeitpunkt (`einsatz.retention_bis`) wird daraus erst beim Abschluss berechnet.
+    pub retention_dauer_tage: Option<i64>,
     pub geaendert_at: Option<String>,
     pub geaendert_von: Option<i64>,
 }
@@ -122,6 +132,7 @@ impl EinsatzEinstellungen {
             meldung_bestaetigung_frist_min: None,
             auftrag_quittierung_frist_min: None,
             auto_etb_eintraege: None,
+            retention_dauer_tage: None,
             geaendert_at: None,
             geaendert_von: None,
         }
@@ -182,6 +193,7 @@ impl EinsatzEinstellungen {
             meldung_bestaetigung_frist_min: self.meldung_bestaetigung_frist_min,
             auftrag_quittierung_frist_min: self.auftrag_quittierung_frist_min,
             auto_etb_eintraege: self.auto_etb_eintraege,
+            retention_dauer_tage: self.retention_dauer_tage,
             etb_nummer_eingefroren: etb_eingefroren,
             meldung_nummer_eingefroren: meldung_eingefroren,
             auftrag_nummer_eingefroren: auftrag_eingefroren,
@@ -213,6 +225,8 @@ pub struct EinstellungenAnzeige {
     pub meldung_bestaetigung_frist_min: Option<i64>,
     pub auftrag_quittierung_frist_min: Option<i64>,
     pub auto_etb_eintraege: Option<i64>,
+    /// Aufbewahrungs-Dauer-Politik in Tagen (LFH-135); `None` = keine Auto-Frist.
+    pub retention_dauer_tage: Option<i64>,
     /// Freeze pro Nummernkreis (LFH-133): true, sobald die erste Nummer vergeben ist
     /// (Präfix + Startwert dann read-only). Aus Daten-Existenz abgeleitet, nicht gespeichert.
     pub etb_nummer_eingefroren: bool,
@@ -233,7 +247,7 @@ pub async fn laden_oder_default(
                 fachebenen_sichtbar, zeitzone, zeitformat, einheiten, koordinatenformat, \
                 etb_nummer_praefix, etb_nummer_start, meldung_nummer_praefix, meldung_nummer_start, \
                 auftrag_nummer_praefix, auftrag_nummer_start, meldung_bestaetigung_frist_min, \
-                auftrag_quittierung_frist_min, auto_etb_eintraege, \
+                auftrag_quittierung_frist_min, auto_etb_eintraege, retention_dauer_tage, \
                 geaendert_at, geaendert_von \
          FROM einsatz_einstellungen WHERE einsatz_id = ?",
     )
@@ -264,6 +278,7 @@ pub struct EinstellungenDaten<'a> {
     pub meldung_bestaetigung_frist_min: Option<i64>,
     pub auftrag_quittierung_frist_min: Option<i64>,
     pub auto_etb_eintraege: Option<i64>,
+    pub retention_dauer_tage: Option<i64>,
 }
 
 /// Speichert die Einstellungen (UPSERT auf `einsatz_id`); setzt die Audit-Felder.
@@ -279,9 +294,9 @@ pub async fn speichern(
              fachebenen_sichtbar, zeitzone, zeitformat, einheiten, koordinatenformat, \
              etb_nummer_praefix, etb_nummer_start, meldung_nummer_praefix, meldung_nummer_start, \
              auftrag_nummer_praefix, auftrag_nummer_start, meldung_bestaetigung_frist_min, \
-             auftrag_quittierung_frist_min, auto_etb_eintraege, \
+             auftrag_quittierung_frist_min, auto_etb_eintraege, retention_dauer_tage, \
              geaendert_at, geaendert_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?) \
          ON CONFLICT(einsatz_id) DO UPDATE SET \
              standard_modul = excluded.standard_modul, \
              basemap_modus = excluded.basemap_modus, \
@@ -300,6 +315,7 @@ pub async fn speichern(
              meldung_bestaetigung_frist_min = excluded.meldung_bestaetigung_frist_min, \
              auftrag_quittierung_frist_min = excluded.auftrag_quittierung_frist_min, \
              auto_etb_eintraege = excluded.auto_etb_eintraege, \
+             retention_dauer_tage = excluded.retention_dauer_tage, \
              geaendert_at = excluded.geaendert_at, \
              geaendert_von = excluded.geaendert_von",
     )
@@ -321,6 +337,7 @@ pub async fn speichern(
     .bind(daten.meldung_bestaetigung_frist_min)
     .bind(daten.auftrag_quittierung_frist_min)
     .bind(daten.auto_etb_eintraege)
+    .bind(daten.retention_dauer_tage)
     .bind(erfasser_id)
     .execute(pool)
     .await?;
@@ -534,6 +551,48 @@ mod tests {
         assert!(ist_gueltige_frist_min(10_080));
         assert!(!ist_gueltige_frist_min(0));
         assert!(!ist_gueltige_frist_min(10_081));
+    }
+
+    #[test]
+    fn retention_dauer_validator_grenzen() {
+        // Gültig: 1..=3650 Tage.
+        assert!(ist_gueltige_retention_dauer(1));
+        assert!(ist_gueltige_retention_dauer(30));
+        assert!(ist_gueltige_retention_dauer(3650));
+        // 0/negativ → kein Instant-Purge.
+        assert!(!ist_gueltige_retention_dauer(0));
+        assert!(!ist_gueltige_retention_dauer(-1));
+        // Zu groß.
+        assert!(!ist_gueltige_retention_dauer(3651));
+    }
+
+    #[tokio::test]
+    async fn speichern_round_trip_retention_dauer() {
+        let pool = crate::db::test_pool().await;
+        let (eid, bid) = fixture(&pool).await;
+        // Default: keine Politik.
+        let leer = laden_oder_default(&pool, eid).await.unwrap();
+        assert_eq!(leer.retention_dauer_tage, None);
+
+        let g = speichern(
+            &pool,
+            eid,
+            bid,
+            EinstellungenDaten {
+                retention_dauer_tage: Some(365),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(g.retention_dauer_tage, Some(365));
+        assert_eq!(g.anzeige().retention_dauer_tage, Some(365));
+
+        // Vollersatz-Upsert ohne Dauer hebt die Politik wieder auf.
+        let aufgehoben = speichern(&pool, eid, bid, EinstellungenDaten::default())
+            .await
+            .unwrap();
+        assert_eq!(aufgehoben.retention_dauer_tage, None);
     }
 
     #[test]
