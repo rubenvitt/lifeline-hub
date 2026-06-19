@@ -226,6 +226,11 @@ pub async fn einstellungen_setzen(
             basemap_modus: basemap_modus.as_deref(),
             karten_zoom_start: req.karten_zoom_start,
             fachebenen_sichtbar: fachebenen.as_deref(),
+            // Anzeige-Konventionen (LFH-136): in Task 2 verdrahtet/validiert.
+            zeitzone: None,
+            zeitformat: None,
+            einheiten: None,
+            koordinatenformat: None,
         },
     )
     .await?;
