@@ -1,9 +1,11 @@
 use super::modul::{ist_ausblendbar, registry_benoetigte_rolle};
 use super::modul_override::EinsatzModulOverride;
-use super::{Einsatz, EinsatzRolle, STATUS_ABGESCHLOSSEN, STATUS_AKTIV};
+use super::{modul_override, Einsatz, EinsatzRolle, STATUS_ABGESCHLOSSEN, STATUS_AKTIV};
 use crate::auth::Benutzer;
+use crate::einsatz::effektiv::effektive_modul_rolle;
 use crate::error::AppError;
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
+use sqlx::SqlitePool;
 use std::collections::HashMap;
 
 /// DSGVO-Schonfrist in Stunden: solange bleibt ein abgeschlossener Einsatz
@@ -171,7 +173,7 @@ pub fn fordere_aktiv(einsatz: &Einsatz) -> Result<(), AppError> {
 }
 
 /// Per-Handler-Guard für die Modul-Sichtbarkeit/Berechtigung (LFH-132). Rein und
-/// testbar gegen die bereits geladene Override-Map eines Einsatzes.
+/// testbar gegen die bereits geladenen Override-Maps eines Einsatzes.
 ///
 /// Reihenfolge (additive Verschärfung NACH dem bestehenden Lese-/Schreibrecht-Gate;
 /// loosened nie eine bestehende Schranke):
@@ -179,12 +181,13 @@ pub fn fordere_aktiv(einsatz: &Einsatz) -> Result<(), AppError> {
 /// 2. Ausblenden: ist das Modul ausblendbar und der Override setzt `sichtbar=false`,
 ///    → `Forbidden`. Nicht-ausblendbare Module (einsatzdaten, einsatz-einstellungen)
 ///    werden NIE versteckt — ein `sichtbar=false` darauf wird defensiv ignoriert.
-/// 3. Rollen-Schranke: benötigte Rolle = Override-Wert, sonst Registry-Default
-///    (heute `None` für alle). `admin` → nur System-Admin (oben schon durch),
-///    sonst `Forbidden`; `fuehrungskraft` → System-Admin oder org-weite Führungskraft
-///    (`ist_hoehere_berechtigung`), sonst `Forbidden`. `None` → frei.
+/// 3. Rollen-Schranke: effektive Rolle = Einsatz-Override ?? Org-Default ??
+///    Registry-Default (heute `None` für alle). `admin` → nur System-Admin (oben schon
+///    durch), sonst `Forbidden`; `fuehrungskraft` → System-Admin oder org-weite
+///    Führungskraft (`ist_hoehere_berechtigung`), sonst `Forbidden`. `None` → frei.
 pub fn fordere_modul_zugriff(
     overrides: &HashMap<String, EinsatzModulOverride>,
+    org_defaults: &HashMap<String, Option<String>>,
     modul_key: &str,
     benutzer: &Benutzer,
 ) -> Result<(), AppError> {
@@ -207,10 +210,11 @@ pub fn fordere_modul_zugriff(
         return Err(AppError::Forbidden);
     }
 
-    // 4. Rollen-Schranke (Override sonst Registry-Default).
-    let benoetigte = ueberschreibung
-        .and_then(|o| o.benoetigte_rolle.as_deref())
-        .or_else(|| registry_benoetigte_rolle(modul_key));
+    // 4. Rollen-Schranke: Einsatz-Override ?? Org-Default ?? Registry-Default.
+    let einsatz_override_rolle = ueberschreibung.and_then(|o| o.benoetigte_rolle.as_deref());
+    let org_default = org_defaults.get(modul_key).and_then(|r| r.as_deref());
+    let effektiv = effektive_modul_rolle(einsatz_override_rolle, org_default);
+    let benoetigte = effektiv.as_deref().or_else(|| registry_benoetigte_rolle(modul_key));
     match benoetigte {
         Some("admin") => Err(AppError::Forbidden), // System-Admin ist oben bereits durch.
         Some("fuehrungskraft") => {
@@ -222,6 +226,24 @@ pub fn fordere_modul_zugriff(
         }
         _ => Ok(()),
     }
+}
+
+/// Async-Wrapper für Route-Handler: lädt Einsatz-Override-Map + Org-Modul-Defaults
+/// aus der DB und ruft dann `fordere_modul_zugriff` auf.
+///
+/// Ersetzt in jedem Handler das Muster
+/// `let overrides = modul_override::laden_alle(...); fordere_modul_zugriff(&overrides, ...)`
+/// durch einen einzigen Aufruf.
+pub async fn fordere_modul_zugriff_laden(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    org_id: i64,
+    modul_key: &str,
+    benutzer: &Benutzer,
+) -> Result<(), AppError> {
+    let overrides = modul_override::laden_alle(pool, einsatz_id).await?;
+    let org_defaults = crate::org::modul_einstellung::laden_alle(pool, org_id).await?;
+    fordere_modul_zugriff(&overrides, &org_defaults, modul_key, benutzer)
 }
 
 #[cfg(test)]
@@ -649,11 +671,21 @@ mod tests {
         zeilen.into_iter().map(|o| (o.modul_key.clone(), o)).collect()
     }
 
+    fn leere_org_defaults() -> HashMap<String, Option<String>> {
+        HashMap::new()
+    }
+
+    fn org_defaults_mit(modul_key: &str, rolle: Option<&str>) -> HashMap<String, Option<String>> {
+        let mut m = HashMap::new();
+        m.insert(modul_key.to_string(), rolle.map(str::to_string));
+        m
+    }
+
     #[test]
     fn modul_zugriff_ohne_override_ist_frei() {
         let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         let leer = HashMap::new();
-        assert!(fordere_modul_zugriff(&leer, "etb", &normal).is_ok());
+        assert!(fordere_modul_zugriff(&leer, &leere_org_defaults(), "etb", &normal).is_ok());
     }
 
     #[test]
@@ -661,7 +693,7 @@ mod tests {
         let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         let ov = overrides_mit(vec![override_zeile("etb", false, None)]);
         assert!(matches!(
-            fordere_modul_zugriff(&ov, "etb", &normal).unwrap_err(),
+            fordere_modul_zugriff(&ov, &leere_org_defaults(), "etb", &normal).unwrap_err(),
             AppError::Forbidden
         ));
     }
@@ -671,7 +703,7 @@ mod tests {
         let admin = benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE);
         // Selbst bei versteckt + admin-Rolle erforderlich: Admin-Mindest-Guard.
         let ov = overrides_mit(vec![override_zeile("etb", false, Some("admin"))]);
-        assert!(fordere_modul_zugriff(&ov, "etb", &admin).is_ok());
+        assert!(fordere_modul_zugriff(&ov, &leere_org_defaults(), "etb", &admin).is_ok());
     }
 
     #[test]
@@ -679,11 +711,11 @@ mod tests {
         let ov = overrides_mit(vec![override_zeile("etb", true, Some("fuehrungskraft"))]);
         let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         assert!(matches!(
-            fordere_modul_zugriff(&ov, "etb", &normal).unwrap_err(),
+            fordere_modul_zugriff(&ov, &leere_org_defaults(), "etb", &normal).unwrap_err(),
             AppError::Forbidden
         ));
         let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
-        assert!(fordere_modul_zugriff(&ov, "etb", &fk).is_ok());
+        assert!(fordere_modul_zugriff(&ov, &leere_org_defaults(), "etb", &fk).is_ok());
     }
 
     #[test]
@@ -691,7 +723,7 @@ mod tests {
         let ov = overrides_mit(vec![override_zeile("etb", true, Some("admin"))]);
         let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
         assert!(matches!(
-            fordere_modul_zugriff(&ov, "etb", &fk).unwrap_err(),
+            fordere_modul_zugriff(&ov, &leere_org_defaults(), "etb", &fk).unwrap_err(),
             AppError::Forbidden
         ));
     }
@@ -704,7 +736,7 @@ mod tests {
         for key in ["einsatzdaten", "einsatz-einstellungen"] {
             let ov = overrides_mit(vec![override_zeile(key, false, None)]);
             assert!(
-                fordere_modul_zugriff(&ov, key, &normal).is_ok(),
+                fordere_modul_zugriff(&ov, &leere_org_defaults(), key, &normal).is_ok(),
                 "{key} darf nicht versteckt werden"
             );
         }
@@ -721,6 +753,111 @@ mod tests {
             false,
             Some("fuehrungskraft"),
         )]);
-        assert!(fordere_modul_zugriff(&ov, "einsatz-einstellungen", &normal).is_ok());
+        assert!(fordere_modul_zugriff(&ov, &leere_org_defaults(), "einsatz-einstellungen", &normal).is_ok());
+    }
+
+    // --- Org-Default-Tests (Task 11) ---
+
+    #[test]
+    fn modul_zugriff_org_default_fuehrungskraft_blockt_normal() {
+        // Kein Einsatz-Override, aber Org-Default „etb → fuehrungskraft":
+        // normaler Benutzer ohne Führungskraft-Rolle bekommt 403.
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        let leer = HashMap::new();
+        let org = org_defaults_mit("etb", Some("fuehrungskraft"));
+        assert!(matches!(
+            fordere_modul_zugriff(&leer, &org, "etb", &normal).unwrap_err(),
+            AppError::Forbidden
+        ));
+        // Führungskraft kommt durch.
+        let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
+        assert!(fordere_modul_zugriff(&leer, &org, "etb", &fk).is_ok());
+    }
+
+    #[test]
+    fn modul_zugriff_einsatz_override_schlaegt_org_default() {
+        // Einsatz-Override „etb → admin" schlägt Org-Default „etb → fuehrungskraft":
+        // Führungskraft ist NICHT Admin → 403.
+        let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
+        let ov = overrides_mit(vec![override_zeile("etb", true, Some("admin"))]);
+        let org = org_defaults_mit("etb", Some("fuehrungskraft"));
+        assert!(matches!(
+            fordere_modul_zugriff(&ov, &org, "etb", &fk).unwrap_err(),
+            AppError::Forbidden
+        ));
+    }
+
+    #[test]
+    fn modul_zugriff_kein_override_kein_org_default_frei() {
+        // Weder Einsatz-Override noch Org-Default → frei (Registry-Default = None).
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        let leer: HashMap<String, EinsatzModulOverride> = HashMap::new();
+        assert!(fordere_modul_zugriff(&leer, &leere_org_defaults(), "etb", &normal).is_ok());
+    }
+
+    #[test]
+    fn modul_zugriff_org_default_null_rolle_ist_frei() {
+        // Org-Default mit explizit NULL-Rolle (Some(None) im HashMap) → kein Rollenzwang.
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        let leer: HashMap<String, EinsatzModulOverride> = HashMap::new();
+        let org = org_defaults_mit("etb", None); // NULL in DB: Some(None) in Map
+        assert!(fordere_modul_zugriff(&leer, &org, "etb", &normal).is_ok());
+    }
+
+    #[test]
+    fn modul_zugriff_nicht_ausblendbar_ignoriert_org_default() {
+        // Org-Default auf nicht-ausblendbarem Modul darf nicht aussperren
+        // (gleicher Selbst-Aussperr-Schutz wie bei Einsatz-Override).
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        let leer: HashMap<String, EinsatzModulOverride> = HashMap::new();
+        let org = org_defaults_mit("einsatz-einstellungen", Some("fuehrungskraft"));
+        assert!(
+            fordere_modul_zugriff(&leer, &org, "einsatz-einstellungen", &normal).is_ok(),
+            "Org-Default darf nicht-ausblendbares Modul nicht sperren"
+        );
+    }
+
+    // --- Integrationstest: DB + Guard-Kette (Task 11) ---
+
+    #[tokio::test]
+    async fn org_default_fuehrungskraft_blockt_normal_via_db() {
+        let pool = crate::db::test_pool().await;
+
+        // Org + Benutzer anlegen und Modul-Default setzen.
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'TestOrg')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let bid: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'a', 'a', 'h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        crate::org::modul_einstellung::setzen(&pool, 1, "etb", Some("fuehrungskraft"), bid)
+            .await
+            .unwrap();
+
+        // Org-Defaults laden (DB-Integration).
+        let org_defaults = crate::org::modul_einstellung::laden_alle(&pool, 1).await.unwrap();
+
+        // Leere Einsatz-Override-Map.
+        let leer: HashMap<String, EinsatzModulOverride> = HashMap::new();
+
+        // Normaler Benutzer → 403.
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        assert!(matches!(
+            fordere_modul_zugriff(&leer, &org_defaults, "etb", &normal).unwrap_err(),
+            AppError::Forbidden
+        ));
+
+        // Führungskraft → OK.
+        let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
+        assert!(fordere_modul_zugriff(&leer, &org_defaults, "etb", &fk).is_ok());
+
+        // Admin → OK (Mindest-Guard).
+        let admin = benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE);
+        assert!(fordere_modul_zugriff(&leer, &org_defaults, "etb", &admin).is_ok());
     }
 }

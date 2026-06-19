@@ -16,10 +16,15 @@ vi.mock('../api/einsaetze', () => ({
   setzeModulOverride: vi.fn(),
 }));
 
+vi.mock('../api/orgEinstellungen', () => ({
+  ladeOrgModulEinstellungen: vi.fn(),
+}));
+
 import {
   ladeEinsatz, ladeEinstellungen, speichereEinstellungen,
   ladeModulOverrides, setzeModulOverride,
 } from '../api/einsaetze';
+import { ladeOrgModulEinstellungen } from '../api/orgEinstellungen';
 
 // Verhalten & Automatik (LFH-133) — Default-Felder, in jeden Einstellungs-Mock gespreizt.
 const VERHALTEN_DEFAULTS = {
@@ -49,6 +54,7 @@ describe('EinsatzEinstellungenPage', () => {
     } as never);
     vi.mocked(ladeModulOverrides).mockResolvedValue({});
     vi.mocked(setzeModulOverride).mockResolvedValue({} as never);
+    vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({});
   });
 
   it('zeigt die gespeicherten Werte (Default-Modul + Basemap)', async () => {
@@ -116,8 +122,8 @@ describe('EinsatzEinstellungenPage', () => {
         auftrag_nummer_start: null,
         meldung_bestaetigung_frist_min: null,
         auftrag_quittierung_frist_min: null,
-        // auto_etb: null im Datensatz → Switch an (Default).
-        auto_etb_eintraege: true,
+        // auto_etb: null im Datensatz → Select leer (Org-Standard erben) → null im Payload.
+        auto_etb_eintraege: null,
         // Aufbewahrung & Archiv (LFH-135) — nicht gesetzt → null.
         retention_dauer_tage: null,
       }),
@@ -312,5 +318,156 @@ describe('EinsatzEinstellungenPage', () => {
     // ETB-Kreis eingefroren → Präfix-Feld disabled; Auftrags-Kreis frei → editierbar.
     expect(await screen.findByLabelText('Präfix ETB')).toBeDisabled();
     expect(screen.getByLabelText('Präfix Aufträge')).toBeEnabled();
+  });
+
+  // Task 15: Org-Standard-Hinweise
+
+  it('zeigt Org-Standard-Hinweise bei leeren Einsatz-Feldern (Task 15)', async () => {
+    vi.mocked(ladeEinstellungen).mockResolvedValue({
+      einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
+      fachebenen_sichtbar: null,
+      // Einsatz-Felder alle leer → Org-Standard soll angezeigt werden.
+      zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+      ...VERHALTEN_DEFAULTS,
+      geaendert_at: null, geaendert_von: null,
+      org_defaults: {
+        zeitzone: 'Europe/Berlin',
+        zeitformat: '24h',
+        einheiten: 'metrisch',
+        koordinatenformat: 'wgs84',
+        retention_dauer_tage: 365,
+        etb_nummer_praefix: 'EB-',
+        meldung_nummer_praefix: 'ME-',
+        auftrag_nummer_praefix: 'AU-',
+        meldung_bestaetigung_frist_min: 30,
+        auftrag_quittierung_frist_min: 60,
+        auto_etb_eintraege: 1,
+        geaendert_at: null,
+        geaendert_von: null,
+      },
+    });
+
+    rendern();
+
+    // Zeitzone-Hinweis.
+    expect(await screen.findByText('Standard (Org): Europe/Berlin')).toBeInTheDocument();
+    // Zeitformat-Hinweis (Label aus ZEITFORMAT_OPTIONEN).
+    expect(screen.getByText('Standard (Org): 24 Stunden')).toBeInTheDocument();
+    // Einheiten-Hinweis.
+    expect(screen.getByText('Standard (Org): Metrisch (m, km)')).toBeInTheDocument();
+    // Koordinatenformat-Hinweis.
+    expect(screen.getByText('Standard (Org): WGS84 dezimal')).toBeInTheDocument();
+    // Aufbewahrung-Hinweis.
+    expect(screen.getByText('Standard (Org): 365 Tage')).toBeInTheDocument();
+    // Präfix-Hinweise.
+    expect(screen.getByText('Standard (Org): EB-')).toBeInTheDocument();
+    // Meldungs-Frist-Hinweis.
+    expect(screen.getByText('Standard (Org): 30 Min.')).toBeInTheDocument();
+    // Auftrags-Frist-Hinweis.
+    expect(screen.getByText('Standard (Org): 60 Min.')).toBeInTheDocument();
+    // Auto-ETB-Hinweis (1 = an).
+    expect(screen.getByText('Standard (Org): An')).toBeInTheDocument();
+  });
+
+  it('sendet weiterhin null für leere Felder wenn org_defaults gesetzt sind (Task 15)', async () => {
+    vi.mocked(ladeEinstellungen).mockResolvedValue({
+      einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
+      fachebenen_sichtbar: null,
+      zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+      ...VERHALTEN_DEFAULTS,
+      geaendert_at: null, geaendert_von: null,
+      org_defaults: {
+        zeitzone: 'Europe/Berlin',
+        zeitformat: '24h',
+        einheiten: 'metrisch',
+        koordinatenformat: 'wgs84',
+        retention_dauer_tage: 365,
+        etb_nummer_praefix: 'EB-',
+        meldung_nummer_praefix: 'ME-',
+        auftrag_nummer_praefix: 'AU-',
+        meldung_bestaetigung_frist_min: 30,
+        auftrag_quittierung_frist_min: 60,
+        auto_etb_eintraege: 1,
+        geaendert_at: null,
+        geaendert_von: null,
+      },
+    });
+    vi.mocked(speichereEinstellungen).mockResolvedValue({} as never);
+
+    rendern();
+
+    const btn = await screen.findByRole('button', { name: 'Speichern' });
+    fireEvent.click(btn);
+
+    // Org-Defaults dürfen NICHT in den Payload fließen — leer = null (Org-Standard greift im Backend).
+    await waitFor(() =>
+      expect(speichereEinstellungen).toHaveBeenCalledWith(1, expect.objectContaining({
+        zeitzone: null,
+        zeitformat: null,
+        einheiten: null,
+        koordinatenformat: null,
+        retention_dauer_tage: null,
+        etb_nummer_praefix: null,
+        meldung_bestaetigung_frist_min: null,
+        auftrag_quittierung_frist_min: null,
+      })),
+    );
+  });
+
+  // Finding E: Tristate auto_etb_eintraege
+  it('erbt Org-Standard für auto_etb (einsatz=null + org_default=Aus) → Payload null', async () => {
+    vi.mocked(ladeEinstellungen).mockResolvedValue({
+      einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
+      fachebenen_sichtbar: null,
+      zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+      ...VERHALTEN_DEFAULTS,
+      // Einsatz hat keinen Override → null (erbt Org).
+      auto_etb_eintraege: null,
+      geaendert_at: null, geaendert_von: null,
+      org_defaults: {
+        zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+        retention_dauer_tage: null,
+        etb_nummer_praefix: null, meldung_nummer_praefix: null, auftrag_nummer_praefix: null,
+        meldung_bestaetigung_frist_min: null, auftrag_quittierung_frist_min: null,
+        // Org-Default: 0 = Aus.
+        auto_etb_eintraege: 0,
+        geaendert_at: null, geaendert_von: null,
+      },
+    });
+    vi.mocked(speichereEinstellungen).mockResolvedValue({} as never);
+
+    rendern();
+
+    // Org-Hinweis „Standard (Org): Aus" soll angezeigt werden.
+    expect(await screen.findByText('Standard (Org): Aus')).toBeInTheDocument();
+
+    // Submit sendet null (kein Einsatz-Override; Backend löst Org-Default auf).
+    const btn = screen.getByRole('button', { name: 'Speichern' });
+    fireEvent.click(btn);
+
+    await waitFor(() =>
+      expect(speichereEinstellungen).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ auto_etb_eintraege: null }),
+      ),
+    );
+  });
+
+  it('zeigt Org-Rollen-Hinweis im Modul-Override (Task 15)', async () => {
+    vi.mocked(ladeEinstellungen).mockResolvedValue({
+      einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
+      fachebenen_sichtbar: null,
+      zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+      ...VERHALTEN_DEFAULTS,
+      geaendert_at: null, geaendert_von: null,
+    });
+    vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({
+      etb: 'fuehrungskraft',
+    });
+
+    rendern();
+
+    // Org-Rollen-Default für ETB-Modul soll sichtbar sein.
+    expect(await screen.findByText('Org: Führungskraft')).toBeInTheDocument();
   });
 });

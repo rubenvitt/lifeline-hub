@@ -1,8 +1,7 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{fordere_modul_zugriff, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
+use crate::einsatz::berechtigung::{fordere_modul_zugriff_laden, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
 use crate::einsatz::repo as einsatz_repo;
-use crate::einsatz::modul_override;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "meldungen";
@@ -45,6 +44,19 @@ fn trimme(o: &Option<String>) -> Option<&str> {
     o.as_deref().map(str::trim).filter(|s| !s.is_empty())
 }
 
+/// Leitet die Bestätigungs-Frist in Minuten ab.
+/// Fallback-Kette: Request-Override ?? effektive_meldung_frist_min(Einsatz ?? Org) ?? Konstante.
+fn meldung_bestaetigung_frist_min_ableiten(
+    e: &crate::einsatz::einstellungen::EinsatzEinstellungen,
+    o: &crate::org::einstellungen::OrgEinstellungen,
+    req_override: Option<i64>,
+    konstante: i64,
+) -> i64 {
+    req_override
+        .or_else(|| crate::einsatz::effektiv::effektive_meldung_frist_min(e, o))
+        .unwrap_or(konstante)
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ListeParams {
     pub status: Option<String>,
@@ -61,8 +73,7 @@ pub async fn liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
-    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
+    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
     let status = params.status.as_deref().map(str::trim).filter(|s| !s.is_empty());
     if let Some(s) = status {
         if !crate::meldung::status_gueltig(s) {
@@ -107,8 +118,7 @@ pub async fn anlegen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
-    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
+    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
     fordere_aktiv(&einsatz)?;
 
     // Mindestfelder: Absender, Inhalt, Meldeweg.
@@ -153,13 +163,11 @@ pub async fn anlegen(
     // Flag überstimmt. Frist = Eingang + (Override||Default) Minuten, nur bei Pflicht.
     let ist_sofort = meldungsart == ART_SOFORTMELDUNG || prioritaet == PRIO_SOFORT;
     let pflicht = req.bestaetigung_pflicht.unwrap_or(ist_sofort);
-    // Bestätigungsfrist-Default (LFH-133): expliziter Request-Wert schlägt das Einsatz-Setting,
-    // dieses schlägt die Konstante (finaler Fallback, wenn nichts konfiguriert ist).
+    // Bestätigungsfrist-Default (Task 8/LFH-133): Fallback-Kette:
+    // Request-Override ?? effektive_meldung_frist_min(Einsatz ?? Org) ?? Konstante.
     let einst = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id).await?;
-    let frist_min = req
-        .bestaetigung_frist_min
-        .or(einst.meldung_bestaetigung_frist_min)
-        .unwrap_or(BESTAETIGUNG_FRIST_DEFAULT_MIN);
+    let org_einst = crate::org::einstellungen::laden_oder_default(&state.pool, einsatz.org_id).await?;
+    let frist_min = meldung_bestaetigung_frist_min_ableiten(&einst, &org_einst, req.bestaetigung_frist_min, BESTAETIGUNG_FRIST_DEFAULT_MIN);
     if pflicht && frist_min <= 0 {
         return Err(AppError::Validation("Bestätigungsfrist muss positiv sein".into()));
     }
@@ -240,8 +248,7 @@ async fn fordere_bearbeitbar(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
-    fordere_modul_zugriff(&overrides, MODUL_KEY, benutzer)?;
+    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
     fordere_aktiv(&einsatz)?;
     if !repo::gehoert_zu_einsatz(&state.pool, meldung_id, einsatz_id).await? {
         return Err(AppError::NotFound);
@@ -406,7 +413,61 @@ pub async fn lage_liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
-    fordere_modul_zugriff(&overrides, "lagemeldungen", &benutzer)?;
+    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, "lagemeldungen", &benutzer).await?;
     Ok(Json(repo::liste_lage_meldungen(&state.pool, einsatz_id).await?))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::einsatz::einstellungen::EinsatzEinstellungen;
+    use crate::meldung::BESTAETIGUNG_FRIST_DEFAULT_MIN;
+    use crate::org::einstellungen::OrgEinstellungen;
+
+    fn e() -> EinsatzEinstellungen {
+        EinsatzEinstellungen::leer(1)
+    }
+    fn o() -> OrgEinstellungen {
+        OrgEinstellungen::leer(1)
+    }
+
+    /// Kein Request-Override, Einsatz-Frist NULL, Org-Frist=30 → 30 (Org-Default greift).
+    #[test]
+    fn frist_aus_org_wenn_einsatz_null() {
+        let o = OrgEinstellungen { meldung_bestaetigung_frist_min: Some(30), ..o() };
+        assert_eq!(
+            meldung_bestaetigung_frist_min_ableiten(&e(), &o, None, BESTAETIGUNG_FRIST_DEFAULT_MIN),
+            30
+        );
+    }
+
+    /// Kein Override, beide NULL → Konstante.
+    #[test]
+    fn frist_aus_konstante_wenn_org_null() {
+        assert_eq!(
+            meldung_bestaetigung_frist_min_ableiten(&e(), &o(), None, BESTAETIGUNG_FRIST_DEFAULT_MIN),
+            BESTAETIGUNG_FRIST_DEFAULT_MIN
+        );
+    }
+
+    /// Request-Override schlägt Org-Frist.
+    #[test]
+    fn request_override_schlaegt_org_und_konstante() {
+        let o = OrgEinstellungen { meldung_bestaetigung_frist_min: Some(30), ..o() };
+        assert_eq!(
+            meldung_bestaetigung_frist_min_ableiten(&e(), &o, Some(5), BESTAETIGUNG_FRIST_DEFAULT_MIN),
+            5
+        );
+    }
+
+    /// Einsatz-Override schlägt Org-Frist.
+    #[test]
+    fn einsatz_schlaegt_org() {
+        let e = EinsatzEinstellungen { meldung_bestaetigung_frist_min: Some(10), ..e() };
+        let o = OrgEinstellungen { meldung_bestaetigung_frist_min: Some(30), ..o() };
+        assert_eq!(
+            meldung_bestaetigung_frist_min_ableiten(&e, &o, None, BESTAETIGUNG_FRIST_DEFAULT_MIN),
+            10
+        );
+    }
 }

@@ -1,4 +1,5 @@
 pub mod berechtigung;
+pub mod effektiv;
 pub mod einstellungen;
 pub mod modul;
 pub mod modul_override;

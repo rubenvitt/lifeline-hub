@@ -1,9 +1,8 @@
 use crate::app::AppState;
 use crate::auftrag::{repo, AuftragDetail, EMPF_ABSCHNITT, EMPF_EINHEIT, EMPF_EXTERN, EMPF_FAHRZEUG, EMPF_FUNKTION, EMPF_PERSON, PRIO_NORMAL, RICHTUNG_INTERN};
 use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{fordere_modul_zugriff, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
+use crate::einsatz::berechtigung::{fordere_modul_zugriff_laden, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
 use crate::einsatz::repo as einsatz_repo;
-use crate::einsatz::modul_override;
 use crate::einsatz::einstellungen;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -62,8 +61,7 @@ pub async fn liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
-    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
+    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
 
     if params.abschnitt_id.is_some() && params.einheit_id.is_some() {
         return Err(AppError::Validation(
@@ -271,6 +269,15 @@ fn frist_aus_minuten(erteilt: &str, min: i64) -> Option<String> {
         .map(|n| (n + Duration::minutes(min)).format("%Y-%m-%d %H:%M:%S").to_string())
 }
 
+/// Leitet die Default-Quittierungs-Frist (Minuten) aus Einsatz- und Org-Einstellungen ab.
+/// Fallback-Kette: Einsatz ?? Org ?? None (kein Default → keine automatische Frist).
+fn auftrag_default_quittierung_frist_min(
+    e: &einstellungen::EinsatzEinstellungen,
+    o: &crate::org::einstellungen::OrgEinstellungen,
+) -> Option<i64> {
+    crate::einsatz::effektiv::effektive_auftrag_quittierung_frist_min(e, o)
+}
+
 /// Validiert + normalisiert eine Auftrags-Eingabe: Auftragstext UND >=1 Empfänger
 /// (Pflicht-Akzeptanzkriterium), Priorität, Frist/Erteilzeit (Parsing) sowie jede
 /// Empfänger-Zeile (Slot-Konsistenz + Einsatz-Zugehörigkeit). `now` ist der Default
@@ -342,16 +349,15 @@ pub async fn anlegen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
-    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
+    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
     fordere_aktiv(&einsatz)?;
 
     let now = jetzt();
-    // Default-Quittierfrist (LFH-133): nur für die direkte Auftragserfassung; greift, wenn der
-    // Client keine frist_at mitschickt.
-    let default_frist = einstellungen::laden_oder_default(&state.pool, einsatz_id)
-        .await?
-        .auftrag_quittierung_frist_min;
+    // Default-Quittierfrist (Task 8/LFH-133): Fallback-Kette Einsatz ?? Org ?? None.
+    // Nur für die direkte Auftragserfassung; greift, wenn der Client keine frist_at mitschickt.
+    let einst = einstellungen::laden_oder_default(&state.pool, einsatz_id).await?;
+    let org_einst = crate::org::einstellungen::laden_oder_default(&state.pool, einsatz.org_id).await?;
+    let default_frist = auftrag_default_quittierung_frist_min(&einst, &org_einst);
     let validiert = validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now, default_frist).await?;
     let d = repo::anlegen(&state.pool, einsatz_id, benutzer.id, validiert.daten(), &now).await?;
 
@@ -378,8 +384,7 @@ async fn fordere_bearbeitbar(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
-    fordere_modul_zugriff(&overrides, MODUL_KEY, benutzer)?;
+    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
     fordere_aktiv(&einsatz)?;
     if !repo::gehoert_zu_einsatz(&state.pool, auftrag_id, einsatz_id).await? {
         return Err(AppError::NotFound);
@@ -466,4 +471,38 @@ pub async fn abnehmen(
     let d = repo::laden(&state.pool, auftrag_id, &now).await?;
     sse(&state, einsatz_id);
     Ok(Json(d))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::org::einstellungen::OrgEinstellungen;
+
+    fn e() -> einstellungen::EinsatzEinstellungen {
+        einstellungen::EinsatzEinstellungen::leer(1)
+    }
+    fn o() -> OrgEinstellungen {
+        OrgEinstellungen::leer(1)
+    }
+
+    /// Kein Einsatz-Override, Org-Frist=45 → 45 (Org-Default greift).
+    #[test]
+    fn quittierung_frist_aus_org_wenn_einsatz_null() {
+        let o = OrgEinstellungen { auftrag_quittierung_frist_min: Some(45), ..o() };
+        assert_eq!(auftrag_default_quittierung_frist_min(&e(), &o), Some(45));
+    }
+
+    /// Beide NULL → None (keine automatische Frist).
+    #[test]
+    fn quittierung_frist_none_wenn_beide_null() {
+        assert_eq!(auftrag_default_quittierung_frist_min(&e(), &o()), None);
+    }
+
+    /// Einsatz-Override schlägt Org.
+    #[test]
+    fn quittierung_einsatz_schlaegt_org() {
+        let e = einstellungen::EinsatzEinstellungen { auftrag_quittierung_frist_min: Some(15), ..e() };
+        let o = OrgEinstellungen { auftrag_quittierung_frist_min: Some(45), ..o() };
+        assert_eq!(auftrag_default_quittierung_frist_min(&e, &o), Some(15));
+    }
 }

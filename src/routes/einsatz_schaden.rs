@@ -1,8 +1,7 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{fordere_modul_zugriff, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
+use crate::einsatz::berechtigung::{fordere_modul_zugriff_laden, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
 use crate::einsatz::repo as einsatz_repo;
-use crate::einsatz::modul_override;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "schaeden";
@@ -86,8 +85,7 @@ pub async fn liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
-    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
+    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
 
     if let Some(s) = &params.status {
         if crate::schaden::SchadenStatus::parse(s).is_none() {
@@ -142,8 +140,7 @@ pub async fn anlegen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
-    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
+    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
     fordere_aktiv(&einsatz)?;
 
     if let Some(s) = &body.status {
@@ -233,8 +230,7 @@ pub async fn detail(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
-    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
+    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
     Ok(Json(schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?))
 }
 
@@ -273,8 +269,7 @@ pub async fn aktualisieren(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
-    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
+    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
     fordere_aktiv(&einsatz)?;
 
     let vorher = schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?; // 404
@@ -432,8 +427,7 @@ pub async fn uebergeben(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
-    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
+    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
     fordere_aktiv(&einsatz)?;
 
     let adressat = match trimme(body.uebergeben_an.clone()) {
@@ -476,8 +470,7 @@ pub async fn abschliessen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
-    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
+    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
     fordere_aktiv(&einsatz)?;
 
     let grund = match trimme(body.abschluss_grund.clone()).as_deref().and_then(AbschlussGrund::parse) {
@@ -519,8 +512,7 @@ pub async fn stornieren(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
-    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
+    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
     fordere_aktiv(&einsatz)?;
 
     let vorher = schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?; // 404
@@ -549,8 +541,7 @@ pub async fn stream(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
-    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
+    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
 
     let rx = state.live.abonniere(einsatz_id);
     let stream = BroadcastStream::new(rx).map(|res| {

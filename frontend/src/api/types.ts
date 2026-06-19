@@ -68,6 +68,50 @@ export type EinheitenSystem = 'metrisch' | 'imperial';
 /** Koordinaten-Anzeigeformat. */
 export type Koordinatenformat = 'wgs84' | 'mgrs' | 'utm';
 
+// ============================== Admin — Org-weite Einstellungen ==============================
+
+/**
+ * Org-weite Default-Einstellungen (admin-einstellungen, GET /api/org-einstellungen).
+ * Alle Felder nullable — null = kein Org-Default, hartkodierter Fallback greift.
+ * `auto_etb_eintraege`: 0 = aus, 1/null = an (same wire-Format wie EinsatzEinstellungen).
+ */
+export interface OrgEinstellungen {
+  zeitzone: string | null;
+  zeitformat: Zeitformat | null;
+  einheiten: EinheitenSystem | null;
+  koordinatenformat: Koordinatenformat | null;
+  retention_dauer_tage: number | null;
+  etb_nummer_praefix: string | null;
+  meldung_nummer_praefix: string | null;
+  auftrag_nummer_praefix: string | null;
+  meldung_bestaetigung_frist_min: number | null;
+  auftrag_quittierung_frist_min: number | null;
+  /** 0 = Auto-ETB aus; null/1 = an (Default). */
+  auto_etb_eintraege: number | null;
+  geaendert_at: string | null;
+  geaendert_von: number | null;
+}
+
+/** PUT-Body für org-weite Einstellungen (PUT /api/org-einstellungen, Vollersatz). */
+export interface OrgEinstellungenUpdate {
+  zeitzone: string | null;
+  zeitformat: Zeitformat | null;
+  einheiten: EinheitenSystem | null;
+  koordinatenformat: Koordinatenformat | null;
+  retention_dauer_tage: number | null;
+  etb_nummer_praefix: string | null;
+  meldung_nummer_praefix: string | null;
+  auftrag_nummer_praefix: string | null;
+  meldung_bestaetigung_frist_min: number | null;
+  auftrag_quittierung_frist_min: number | null;
+  /** Auto-ETB-Dual-Publish: false schaltet ab; true/null = an. */
+  auto_etb_eintraege: boolean | null;
+}
+
+/** Org-weite Modul-Rollen-Defaults (GET /api/org-modul-einstellungen).
+ *  Map modul_key → benoetigte_rolle; fehlt ein Key = kein Org-Default (frei). */
+export type OrgModulEinstellungen = Record<string, 'admin' | 'fuehrungskraft' | null>;
+
 /**
  * Einsatz-Einstellungen (LFH-55/131). `fachebenen_sichtbar` wird vom Backend
  * (EinstellungenAnzeige) als Objekt geliefert; `null` = nicht gesetzt → Default.
@@ -102,6 +146,8 @@ export interface EinsatzEinstellungen {
   auftrag_nummer_eingefroren: boolean;
   geaendert_at: string | null;
   geaendert_von: number | null;
+  /** Org-weite Defaults (Task 6); eingebettet für Effektivwert-Anzeige im Frontend. */
+  org_defaults?: OrgEinstellungen;
 }
 
 /** PUT-Eingabe (Vollersatz) der Einsatz-Einstellungen. */

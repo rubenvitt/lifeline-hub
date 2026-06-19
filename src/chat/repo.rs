@@ -487,6 +487,11 @@ pub async fn heraufstufen_zu_auftrag(
     daten: crate::auftrag::repo::AuftragDaten<'_>,
 ) -> Result<i64, AppError> {
     let einst = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id).await?;
+    let org_id: Option<i64> = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+        .bind(einsatz_id)
+        .fetch_optional(pool)
+        .await?;
+    let org_einst = crate::org::einstellungen::laden_oder_default(pool, org_id.unwrap_or(0)).await?;
     let mut tx = pool.begin().await?;
 
     // Guard: schon zu einem Auftrag heraufgestuft oder gelöscht? (Sperrt Doppel-Heraufstufung.)
@@ -509,7 +514,7 @@ pub async fn heraufstufen_zu_auftrag(
         heraufstufer_id,
         einst.auftrag_startwert(),
         einst.etb_startwert(),
-        einst.auto_etb_aktiv(),
+        crate::einsatz::effektiv::effektiv_auto_etb_aktiv(&einst, &org_einst),
         &daten,
     )
     .await?;

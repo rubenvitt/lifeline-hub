@@ -30,7 +30,7 @@ describe('AppLayout (globale Topbar)', () => {
   it('Admin: Stammdaten und Benutzer sind Links, Profil/Abmelden im Benutzermenü', async () => {
     setup(admin);
     await waitFor(() => expect(screen.getByText('Chef')).toBeInTheDocument());
-    expect(screen.getByRole('link', { name: 'Stammdaten' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Verwaltung' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Benutzer' })).toBeInTheDocument();
     expect(screen.getByText('Inhalt')).toBeInTheDocument();
     // Profil und Abmelden liegen jetzt im Benutzermenü (Dropdown).
@@ -39,20 +39,20 @@ describe('AppLayout (globale Topbar)', () => {
     expect(screen.getByText('Abmelden')).toBeInTheDocument();
   });
 
-  it('Fuehrungskraft: Stammdaten frei, Benutzer gesperrt (🔒, kein Link)', async () => {
+  it('Fuehrungskraft: Verwaltung frei, Benutzer gesperrt (🔒, kein Link)', async () => {
     setup({ ...admin, system_rolle: 'keiner', org_rolle: 'fuehrungskraft', anzeigename: 'Eva' });
     await waitFor(() => expect(screen.getByText('Eva')).toBeInTheDocument());
-    expect(screen.getByRole('link', { name: 'Stammdaten' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Verwaltung' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Benutzer' })).not.toBeInTheDocument();
     expect(screen.getByText('Benutzer 🔒')).toBeInTheDocument();
   });
 
-  it('Sonstige: Stammdaten und Benutzer gesperrt, kein Admin-Tag', async () => {
+  it('Sonstige: Verwaltung und Benutzer gesperrt, kein Admin-Tag', async () => {
     setup({ ...admin, system_rolle: 'keiner', org_rolle: 'keine', anzeigename: 'Max' });
     await waitFor(() => expect(screen.getByText('Max')).toBeInTheDocument());
-    expect(screen.queryByRole('link', { name: 'Stammdaten' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Verwaltung' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Benutzer' })).not.toBeInTheDocument();
-    expect(screen.getByText('Stammdaten 🔒')).toBeInTheDocument();
+    expect(screen.getByText('Verwaltung 🔒')).toBeInTheDocument();
     expect(screen.getByText('Benutzer 🔒')).toBeInTheDocument();
     expect(screen.queryByText('Admin')).not.toBeInTheDocument();
   });

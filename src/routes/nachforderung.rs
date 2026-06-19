@@ -1,7 +1,6 @@
 use crate::app::AppState;
-use crate::einsatz::berechtigung::{fordere_modul_zugriff, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
+use crate::einsatz::berechtigung::{fordere_modul_zugriff_laden, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
 use crate::einsatz::repo as einsatz_repo;
-use crate::einsatz::modul_override;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "nachforderungen";
@@ -58,8 +57,7 @@ pub async fn liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
-    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
+    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
     let status = params.status.as_deref().map(str::trim).filter(|s| !s.is_empty());
     if let Some(s) = status {
         if !crate::nachforderung::status_gueltig(s) {
@@ -92,8 +90,7 @@ pub async fn anlegen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
-    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
+    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
     fordere_aktiv(&einsatz)?;
 
     let art = req.art.trim();
@@ -161,8 +158,7 @@ async fn fordere_bearbeitbar(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
-    fordere_modul_zugriff(&overrides, MODUL_KEY, benutzer)?;
+    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
     fordere_aktiv(&einsatz)?;
     if !repo::gehoert_zu_einsatz(&state.pool, nachforderung_id, einsatz_id).await? {
         return Err(AppError::NotFound);

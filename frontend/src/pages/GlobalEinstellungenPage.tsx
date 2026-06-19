@@ -1,0 +1,311 @@
+import { Alert, App, AutoComplete, Button, Form, Input, InputNumber, Select, Spin, Switch, Typography } from 'antd';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  ladeOrgEinstellungen, speichereOrgEinstellungen,
+  ladeOrgModulEinstellungen, setzeOrgModulEinstellung,
+} from '../api/orgEinstellungen';
+import { ApiError } from '../api/client';
+import { useAuth } from '../auth/AuthContext';
+import { modulRegistry, istModulAusblendbar } from '../einsatz/modulRegistry';
+import type { EinheitenSystem, Koordinatenformat, OrgEinstellungenUpdate, Zeitformat } from '../api/types';
+
+// Anzeige-Konventionen — kuratierte IANA-Zeitzonen + Freitext (AutoComplete).
+const ZEITZONEN_OPTIONEN = [
+  'Europe/Berlin', 'Europe/London', 'Europe/Paris', 'Europe/Zurich', 'Europe/Vienna',
+  'Europe/Warsaw', 'Europe/Moscow', 'UTC', 'America/New_York', 'America/Los_Angeles',
+  'Asia/Istanbul', 'Asia/Dubai', 'Asia/Tokyo',
+].map((z) => ({ value: z }));
+
+const ZEITFORMAT_OPTIONEN: { value: Zeitformat; label: string }[] = [
+  { value: '24h', label: '24 Stunden' },
+  { value: '12h', label: '12 Stunden (AM/PM)' },
+];
+
+const EINHEITEN_OPTIONEN: { value: EinheitenSystem; label: string }[] = [
+  { value: 'metrisch', label: 'Metrisch (m, km)' },
+  { value: 'imperial', label: 'Imperial (ft, mi)' },
+];
+
+const KOORDINATEN_OPTIONEN: { value: Koordinatenformat; label: string }[] = [
+  { value: 'wgs84', label: 'WGS84 dezimal' },
+  { value: 'mgrs', label: 'MGRS' },
+  { value: 'utm', label: 'UTM' },
+];
+
+/** Optionen für den Modul-Rollen-Default; '' = kein Rollen-Zwang (frei). */
+const ROLLEN_OPTIONEN: { value: string; label: string }[] = [
+  { value: '', label: 'Frei (alle)' },
+  { value: 'fuehrungskraft', label: 'Führungskraft' },
+  { value: 'admin', label: 'Admin' },
+];
+
+interface FormWerte {
+  zeitzone?: string;
+  zeitformat?: Zeitformat;
+  einheiten?: EinheitenSystem;
+  koordinatenformat?: Koordinatenformat;
+  retention_dauer_tage?: number;
+  etb_nummer_praefix?: string;
+  meldung_nummer_praefix?: string;
+  auftrag_nummer_praefix?: string;
+  meldung_bestaetigung_frist_min?: number;
+  auftrag_quittierung_frist_min?: number;
+  auto_etb_eintraege: boolean;
+}
+
+/**
+ * Admin-Seite: org-weite Einstellungs-Defaults unter /admin/einstellungen.
+ * Edit-Recht: nur system_rolle=admin; Führungskräfte sehen die Werte read-only.
+ */
+export default function GlobalEinstellungenPage() {
+  const { benutzer } = useAuth();
+  const qc = useQueryClient();
+  const { message } = App.useApp();
+  const [form] = Form.useForm<FormWerte>();
+
+  const istAdmin = benutzer?.system_rolle === 'admin';
+
+  const einstellungenQuery = useQuery({
+    queryKey: ['org-einstellungen'],
+    queryFn: ladeOrgEinstellungen,
+  });
+
+  const modulQuery = useQuery({
+    queryKey: ['org-modul-einstellungen'],
+    queryFn: ladeOrgModulEinstellungen,
+  });
+
+  const speichernMutation = useMutation({
+    mutationFn: (felder: OrgEinstellungenUpdate) => speichereOrgEinstellungen(felder),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['org-einstellungen'] });
+      message.success('Einstellungen gespeichert');
+    },
+    onError: (e) =>
+      message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
+  });
+
+  const modulMutation = useMutation({
+    mutationFn: (vars: { modulKey: string; rolle: 'admin' | 'fuehrungskraft' | null }) =>
+      setzeOrgModulEinstellung(vars.modulKey, vars.rolle),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['org-modul-einstellungen'] });
+      message.success('Modul-Default gespeichert');
+    },
+    onError: (e) =>
+      message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
+  });
+
+  if (einstellungenQuery.isLoading || modulQuery.isLoading) {
+    return (
+      <div style={{ textAlign: 'center', paddingTop: 80 }}>
+        <Spin size="large" />
+      </div>
+    );
+  }
+
+  if (einstellungenQuery.isError || !einstellungenQuery.data) {
+    return <Alert type="error" message="Einstellungen nicht ladbar oder kein Zugriff" showIcon />;
+  }
+
+  const einstellungen = einstellungenQuery.data;
+  const orgModul = modulQuery.data ?? {};
+
+  const initialWerte: FormWerte = {
+    zeitzone: einstellungen.zeitzone ?? undefined,
+    zeitformat: einstellungen.zeitformat ?? undefined,
+    einheiten: einstellungen.einheiten ?? undefined,
+    koordinatenformat: einstellungen.koordinatenformat ?? undefined,
+    retention_dauer_tage: einstellungen.retention_dauer_tage ?? undefined,
+    etb_nummer_praefix: einstellungen.etb_nummer_praefix ?? undefined,
+    meldung_nummer_praefix: einstellungen.meldung_nummer_praefix ?? undefined,
+    auftrag_nummer_praefix: einstellungen.auftrag_nummer_praefix ?? undefined,
+    meldung_bestaetigung_frist_min: einstellungen.meldung_bestaetigung_frist_min ?? undefined,
+    auftrag_quittierung_frist_min: einstellungen.auftrag_quittierung_frist_min ?? undefined,
+    // 0 = aus; null/1 = an (Default an).
+    auto_etb_eintraege: einstellungen.auto_etb_eintraege !== 0,
+  };
+
+  function speichern(werte: FormWerte) {
+    const felder: OrgEinstellungenUpdate = {
+      zeitzone: werte.zeitzone?.trim() || null,
+      zeitformat: werte.zeitformat ?? null,
+      einheiten: werte.einheiten ?? null,
+      koordinatenformat: werte.koordinatenformat ?? null,
+      retention_dauer_tage: werte.retention_dauer_tage ?? null,
+      etb_nummer_praefix: werte.etb_nummer_praefix?.trim() || null,
+      meldung_nummer_praefix: werte.meldung_nummer_praefix?.trim() || null,
+      auftrag_nummer_praefix: werte.auftrag_nummer_praefix?.trim() || null,
+      meldung_bestaetigung_frist_min: werte.meldung_bestaetigung_frist_min ?? null,
+      auftrag_quittierung_frist_min: werte.auftrag_quittierung_frist_min ?? null,
+      auto_etb_eintraege: werte.auto_etb_eintraege,
+    };
+    speichernMutation.mutate(felder);
+  }
+
+  return (
+    <div style={{ maxWidth: 640 }}>
+      <Typography.Title level={3} style={{ marginTop: 0 }}>
+        Globale Einstellungen
+      </Typography.Title>
+      <Typography.Paragraph type="secondary">
+        Org-weite Defaults für alle Einsätze. Einsatzspezifische Einstellungen überschreiben
+        diese Werte. Bearbeitung nur für System-Admins.
+      </Typography.Paragraph>
+
+      <Form<FormWerte>
+        form={form}
+        layout="vertical"
+        initialValues={initialWerte}
+        onFinish={speichern}
+        disabled={!istAdmin}
+      >
+        {/* ── Sektion 1: Anzeige-Konventionen ─────────────────────── */}
+        <Typography.Title level={5}>Anzeige-Konventionen</Typography.Title>
+        <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
+          Gemeinsame Darstellungs-Defaults (Lagebild). Leer = hartkodierter Fallback.
+        </Typography.Paragraph>
+
+        <Form.Item
+          label="Zeitzone"
+          name="zeitzone"
+          tooltip="IANA-Zeitzone (z. B. Europe/Berlin). Leer = lokale Zeit des Geräts."
+        >
+          <AutoComplete
+            allowClear
+            options={ZEITZONEN_OPTIONEN}
+            placeholder="Europe/Berlin (Fallback)"
+            filterOption={(eingabe, option) =>
+              (option?.value ?? '').toLowerCase().includes(eingabe.toLowerCase())
+            }
+          />
+        </Form.Item>
+        <Form.Item label="Zeitformat" name="zeitformat">
+          <Select allowClear placeholder="24 Stunden (Fallback)" options={ZEITFORMAT_OPTIONEN} />
+        </Form.Item>
+        <Form.Item label="Einheiten" name="einheiten">
+          <Select allowClear placeholder="Metrisch (Fallback)" options={EINHEITEN_OPTIONEN} />
+        </Form.Item>
+        <Form.Item label="Koordinatenformat" name="koordinatenformat">
+          <Select allowClear placeholder="WGS84 dezimal (Fallback)" options={KOORDINATEN_OPTIONEN} />
+        </Form.Item>
+
+        {/* ── Sektion 2: Aufbewahrung ───────────────────────────────── */}
+        <Typography.Title level={5}>Aufbewahrung</Typography.Title>
+        <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
+          Default-Aufbewahrungs-Dauer für neue Einsätze. Leer = keine automatische Frist.
+        </Typography.Paragraph>
+
+        <Form.Item
+          label="Aufbewahrungs-Dauer (Tage)"
+          name="retention_dauer_tage"
+          tooltip="1 bis 3650 Tage. Leer = keine automatische Aufbewahrungsfrist."
+        >
+          <InputNumber min={1} max={3650} style={{ width: 200 }} placeholder="keine" />
+        </Form.Item>
+
+        {/* ── Sektion 3: Verhalten & Automatik ─────────────────────── */}
+        <Typography.Title level={5}>Verhalten &amp; Automatik</Typography.Title>
+        <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
+          Nummernkreis-Präfixe und Default-Fristen für neue Einsätze.
+          Präfixe sind reine Anzeige. Leer = kein Default (hartkodierter Fallback).
+        </Typography.Paragraph>
+
+        <Form.Item
+          label="Präfix ETB"
+          name="etb_nummer_praefix"
+          tooltip="Wird der laufenden ETB-Nummer vorangestellt (z. B. EB-). Max. 8 Zeichen."
+        >
+          <Input maxLength={8} placeholder="z. B. EB-" style={{ width: 200 }} />
+        </Form.Item>
+        <Form.Item
+          label="Präfix Meldungen"
+          name="meldung_nummer_praefix"
+          tooltip="Wird der laufenden Meldungs-Nummer vorangestellt. Max. 8 Zeichen."
+        >
+          <Input maxLength={8} placeholder="z. B. M-" style={{ width: 200 }} />
+        </Form.Item>
+        <Form.Item
+          label="Präfix Aufträge"
+          name="auftrag_nummer_praefix"
+          tooltip="Wird der laufenden Auftrags-Nummer vorangestellt. Max. 8 Zeichen."
+        >
+          <Input maxLength={8} placeholder="z. B. A-" style={{ width: 200 }} />
+        </Form.Item>
+
+        <Form.Item
+          label="Default-Bestätigungsfrist Meldungen (Minuten)"
+          name="meldung_bestaetigung_frist_min"
+          tooltip="Frist für die Bestätigung pflichtiger Meldungen. Leer = kein Default."
+        >
+          <InputNumber min={1} max={10080} style={{ width: 200 }} placeholder="kein Default" />
+        </Form.Item>
+        <Form.Item
+          label="Default-Quittierungsfrist Aufträge (Minuten)"
+          name="auftrag_quittierung_frist_min"
+          tooltip="Frist für unquittierte Aufträge ohne explizite Frist. Leer = kein Default."
+        >
+          <InputNumber min={1} max={10080} style={{ width: 200 }} placeholder="kein Default" />
+        </Form.Item>
+
+        <Form.Item
+          label="Automatische ETB-Einträge"
+          name="auto_etb_eintraege"
+          valuePropName="checked"
+          tooltip="Meldungen und Aufträge erzeugen automatisch einen verknüpften ETB-Eintrag."
+        >
+          <Switch />
+        </Form.Item>
+
+        {istAdmin && (
+          <Button type="primary" htmlType="submit" loading={speichernMutation.isPending}>
+            Speichern
+          </Button>
+        )}
+      </Form>
+
+      {/* ── Sektion 4: Modul-Rollen-Default ──────────────────────── */}
+      <Typography.Title level={5} style={{ marginTop: 32 }}>
+        Modul-Rollen-Default
+      </Typography.Title>
+      <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
+        Org-weiter Default für die benötigte Rolle je Modul. Kann pro Einsatz überschrieben werden.
+        Änderungen werden sofort gespeichert.
+      </Typography.Paragraph>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div
+          style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            fontSize: 12, opacity: 0.6,
+          }}
+        >
+          <span style={{ flex: 1 }}>Modul</span>
+          <span style={{ width: 180 }}>Benötigte Rolle (Default)</span>
+        </div>
+        {modulRegistry.map((m) => {
+          const rolle = orgModul[m.key] ?? null;
+          const ausblendbar = istModulAusblendbar(m.key);
+          return (
+            <div key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ flex: 1 }}>{m.label}</span>
+              <Select
+                aria-label={`Benötigte Rolle: ${m.label}`}
+                style={{ width: 180 }}
+                value={rolle ?? ''}
+                disabled={!istAdmin || !ausblendbar || modulMutation.isPending}
+                options={ROLLEN_OPTIONEN}
+                onChange={(val) =>
+                  modulMutation.mutate({
+                    modulKey: m.key,
+                    rolle: (val || null) as 'admin' | 'fuehrungskraft' | null,
+                  })
+                }
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

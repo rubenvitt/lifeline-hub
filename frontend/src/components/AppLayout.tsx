@@ -26,7 +26,7 @@ function GlobalLink({ to, label, gesperrt }: { to: string; label: string; gesper
   );
 }
 
-function darfStammdaten(b: BenutzerAnzeige | null): boolean {
+function darfAdmin(b: BenutzerAnzeige | null): boolean {
   return b?.system_rolle === 'admin' || b?.org_rolle === 'fuehrungskraft';
 }
 
@@ -39,7 +39,7 @@ export default function AppLayout() {
         <Link to="/einsaetze" style={{ color: '#fff', fontWeight: 600, fontSize: 18 }}>
           lifeline-hub
         </Link>
-        <GlobalLink to="/stammdaten" label="Stammdaten" gesperrt={!darfStammdaten(benutzer)} />
+        <GlobalLink to="/admin" label="Verwaltung" gesperrt={!darfAdmin(benutzer)} />
         <GlobalLink to="/benutzer" label="Benutzer" gesperrt={benutzer?.system_rolle !== 'admin'} />
         <Space style={{ marginLeft: 'auto' }} size="middle">
           <ThemeToggle />

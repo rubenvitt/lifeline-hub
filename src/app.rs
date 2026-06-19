@@ -226,6 +226,18 @@ pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
         .route("/api/einsaetze/{id}/gefahrengebiete/{gid}/matrix/bewertung", put(routes::gefahr::bewerten))
         .route("/api/organisation", get(routes::organisation::lesen))
         .route("/api/organisation", patch(routes::organisation::aktualisieren))
+        .route(
+            "/api/org-einstellungen",
+            get(routes::org_einstellungen::lesen).put(routes::org_einstellungen::setzen),
+        )
+        .route(
+            "/api/org-modul-einstellungen",
+            get(routes::org_einstellungen::modul_einstellungen_lesen),
+        )
+        .route(
+            "/api/org-modul-einstellungen/{modul_key}",
+            put(routes::org_einstellungen::modul_einstellung_setzen),
+        )
         .route("/api/stichwort-vorschlaege", get(routes::stichwort::liste))
         .route("/api/stichwort-vorschlaege", post(routes::stichwort::anlegen))
         .route(

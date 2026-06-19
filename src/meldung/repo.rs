@@ -70,6 +70,11 @@ pub async fn anlegen(
     debug_assert!(meldungsart_gueltig(daten.meldungsart));
     debug_assert!(super::richtung_gueltig(daten.richtung));
     let einst = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id).await?;
+    let org_id: Option<i64> = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+        .bind(einsatz_id)
+        .fetch_optional(pool)
+        .await?;
+    let org_einst = crate::org::einstellungen::laden_oder_default(pool, org_id.unwrap_or(0)).await?;
     let etb_startwert = einst.etb_startwert();
     let meldung_startwert = einst.meldung_startwert();
     let mut tx = pool.begin().await?;
@@ -106,7 +111,7 @@ pub async fn anlegen(
     // direkt: von=absender, an=empfaenger, meldeweg, inhalt, ereigniszeit.
     // Auto-ETB-Schalter (LFH-133): bei abgeschaltetem Dual-Publish entsteht kein
     // ETB-Folgeeintrag; etb_meldung_id bleibt NULL.
-    if einst.auto_etb_aktiv() {
+    if crate::einsatz::effektiv::effektiv_auto_etb_aktiv(&einst, &org_einst) {
         let etb_id = crate::etb::repo::anlegen_tx(
             &mut tx,
             einsatz_id,
@@ -349,6 +354,11 @@ pub async fn erteile_auftrag_tx(
     daten: crate::auftrag::repo::AuftragDaten<'_>,
 ) -> Result<i64, AppError> {
     let einst = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id).await?;
+    let org_id: Option<i64> = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+        .bind(einsatz_id)
+        .fetch_optional(pool)
+        .await?;
+    let org_einst = crate::org::einstellungen::laden_oder_default(pool, org_id.unwrap_or(0)).await?;
     let mut tx = pool.begin().await?;
 
     // Guard: schon mit einem Auftrag verknüpft? (Sperrt Doppel-Verknüpfung; first-write-wins.)
@@ -371,7 +381,7 @@ pub async fn erteile_auftrag_tx(
         erteiler_id,
         einst.auftrag_startwert(),
         einst.etb_startwert(),
-        einst.auto_etb_aktiv(),
+        crate::einsatz::effektiv::effektiv_auto_etb_aktiv(&einst, &org_einst),
         &daten,
     )
     .await?;
@@ -885,5 +895,45 @@ mod tests {
         assert_eq!(nur_extern.len(), 1);
         assert_eq!(nur_extern[0].richtung, "extern");
         assert_eq!(nur_extern[0].inhalt, "extern-m");
+    }
+
+    #[tokio::test]
+    async fn auto_etb_einsatz_null_org_aus_kein_etb() {
+        // Einsatz-Setting NULL + Org=0 → effektiv aus → kein ETB-Folgeeintrag
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        crate::org::einstellungen::speichern(
+            &pool, 1, b,
+            crate::org::einstellungen::OrgEinstellungenDaten {
+                auto_etb_eintraege: Some(0),
+                ..Default::default()
+            },
+        ).await.unwrap();
+        // Einsatz-Setting bleibt NULL (kein Override)
+        let m = anlegen(&pool, e, b, daten("X", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
+        assert!(m.etb_meldung_id.is_none(), "Einsatz=NULL, Org=0 → kein ETB-Folgeeintrag");
+    }
+
+    #[tokio::test]
+    async fn auto_etb_einsatz_an_schlaegt_org_aus() {
+        // Einsatz=1 schlägt Org=0 → ETB-Folgeeintrag wird trotz Org-Aus erzeugt
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        crate::org::einstellungen::speichern(
+            &pool, 1, b,
+            crate::org::einstellungen::OrgEinstellungenDaten {
+                auto_etb_eintraege: Some(0),
+                ..Default::default()
+            },
+        ).await.unwrap();
+        crate::einsatz::einstellungen::speichern(
+            &pool, e, b,
+            crate::einsatz::einstellungen::EinstellungenDaten {
+                auto_etb_eintraege: Some(1),
+                ..Default::default()
+            },
+        ).await.unwrap();
+        let m = anlegen(&pool, e, b, daten("Y", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
+        assert!(m.etb_meldung_id.is_some(), "Einsatz=1 schlägt Org=0 → ETB-Folgeeintrag erzeugt");
     }
 }

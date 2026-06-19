@@ -201,6 +201,13 @@ pub async fn abschliessen(
 ) -> Result<Einsatz, AppError> {
     // Dauer-Politik vor der tx laden (eigener Pool-Borrow); steuert die Auto-Befüllung.
     let einstellungen = super::einstellungen::laden_oder_default(pool, einsatz_id).await?;
+    let org_id: Option<i64> =
+        sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+            .bind(einsatz_id)
+            .fetch_optional(pool)
+            .await?;
+    let org_einstellungen =
+        crate::org::einstellungen::laden_oder_default(pool, org_id.unwrap_or(0)).await?;
 
     let mut tx = pool.begin().await?;
     let ergebnis = sqlx::query(
@@ -221,7 +228,7 @@ pub async fn abschliessen(
     // Abschluss-tx, NICHT über frist_setzen — der Verkürzungs-Gate (None→Some)
     // würde das sonst als bestätigungspflichtige Verkürzung werten (LFH-135).
     if ergebnis.rows_affected() == 1 {
-        if let Some(dauer) = einstellungen.retention_dauer_tage {
+        if let Some(dauer) = super::effektiv::effektive_retention_dauer_tage(&einstellungen, &org_einstellungen) {
             let (abgeschlossen_at, retention_bis): (Option<String>, Option<String>) =
                 sqlx::query_as("SELECT abgeschlossen_at, retention_bis FROM einsatz WHERE id = ?")
                     .bind(einsatz_id)
@@ -811,6 +818,21 @@ mod tests {
         .unwrap();
     }
 
+    /// Setzt die Org-Retention-Dauer direkt in der DB (reiner Repo-Test).
+    async fn setze_org_dauer(pool: &SqlitePool, org_id: i64, bid: i64, tage: i64) {
+        crate::org::einstellungen::speichern(
+            pool,
+            org_id,
+            bid,
+            crate::org::einstellungen::OrgEinstellungenDaten {
+                retention_dauer_tage: Some(tage),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    }
+
     #[tokio::test]
     async fn abschliessen_befuellt_retention_bis_aus_dauer_und_schreibt_audit() {
         let pool = crate::db::test_pool().await;
@@ -847,6 +869,50 @@ mod tests {
 
         let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap();
         assert_eq!(abgeschlossen.retention_bis, None);
+    }
+
+    /// Einsatz-Override NULL, Org-Default=30 → Effektivwert 30 → retention_bis gesetzt.
+    #[tokio::test]
+    async fn abschliessen_org_default_befuellt_retention_bis() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        // Kein Einsatz-Override; Org-Default=30.
+        setze_org_dauer(&pool, einsatz.org_id, leit, 30).await;
+
+        let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        let erwartet = super::super::retention::berechne_retention_bis(
+            abgeschlossen.abgeschlossen_at.as_deref().unwrap(),
+            30,
+        )
+        .unwrap();
+        assert_eq!(
+            abgeschlossen.retention_bis.as_deref(),
+            Some(erwartet.as_str()),
+            "Org-Default (30) soll greifen wenn kein Einsatz-Override gesetzt"
+        );
+    }
+
+    /// Einsatz-Override=60 schlägt Org-Default=30 → Effektivwert 60.
+    #[tokio::test]
+    async fn abschliessen_einsatz_dauer_schlaegt_org_default() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        setze_dauer(&pool, einsatz.id, leit, 60).await;
+        setze_org_dauer(&pool, einsatz.org_id, leit, 30).await;
+
+        let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        let erwartet = super::super::retention::berechne_retention_bis(
+            abgeschlossen.abgeschlossen_at.as_deref().unwrap(),
+            60,
+        )
+        .unwrap();
+        assert_eq!(
+            abgeschlossen.retention_bis.as_deref(),
+            Some(erwartet.as_str()),
+            "Einsatz-Override (60) soll Org-Default (30) schlagen"
+        );
     }
 
     #[tokio::test]
