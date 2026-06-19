@@ -209,6 +209,7 @@ pub async fn anlegen_tx(
     tx: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
     ersteller_id: i64,
+    auftrag_startwert: i64,
     etb_startwert: i64,
     daten: &AuftragDaten<'_>,
 ) -> Result<i64, AppError> {
@@ -217,16 +218,17 @@ pub async fn anlegen_tx(
 
     // lfd_nr atomar je Einsatz (Muster etb/meldung: INSERT … SELECT COALESCE(MAX(lfd_nr)+1, ?)
     // FROM auftrag WHERE einsatz_id = ? — die Vergabe liegt in derselben Transaktion wie der
-    // Insert, kein read-then-write). Startwert vorerst fest 1 (im Nummernkreis-Task durchgereicht).
+    // Insert, kein read-then-write). Startwert aus den Einstellungen (Default 1).
     let auftrag_id: i64 = sqlx::query_scalar(
         "INSERT INTO auftrag \
            (einsatz_id, lfd_nr, auftrag_text, absicht, lage, ort, zeit, mittel, verbindung, sicherheit, \
             prioritaet, richtung, frist_at, erteilt_at, erstellt_von_id) \
-         SELECT ?, COALESCE(MAX(lfd_nr) + 1, 1), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? \
+         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? \
          FROM auftrag WHERE einsatz_id = ? \
          RETURNING id",
     )
     .bind(einsatz_id)
+    .bind(auftrag_startwert)
     .bind(daten.auftrag_text)
     .bind(daten.absicht)
     .bind(daten.lage)
@@ -310,11 +312,17 @@ pub async fn anlegen(
     daten: AuftragDaten<'_>,
     jetzt: &str,
 ) -> Result<AuftragDetail, AppError> {
-    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let einst = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id).await?;
     let mut tx = pool.begin().await?;
-    let auftrag_id = anlegen_tx(&mut tx, einsatz_id, ersteller_id, etb_startwert, &daten).await?;
+    let auftrag_id = anlegen_tx(
+        &mut tx,
+        einsatz_id,
+        ersteller_id,
+        einst.auftrag_startwert(),
+        einst.etb_startwert(),
+        &daten,
+    )
+    .await?;
     tx.commit().await?;
     laden(pool, auftrag_id, jetzt).await
 }
@@ -333,11 +341,17 @@ pub async fn erteile_aus_etb_tx(
     erteiler_id: i64,
     daten: AuftragDaten<'_>,
 ) -> Result<i64, AppError> {
-    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let einst = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id).await?;
     let mut tx = pool.begin().await?;
-    let auftrag_id = anlegen_tx(&mut tx, einsatz_id, erteiler_id, etb_startwert, &daten).await?;
+    let auftrag_id = anlegen_tx(
+        &mut tx,
+        einsatz_id,
+        erteiler_id,
+        einst.auftrag_startwert(),
+        einst.etb_startwert(),
+        &daten,
+    )
+    .await?;
     sqlx::query("UPDATE auftrag SET quell_etb_eintrag_id = ? WHERE id = ?")
         .bind(quell_etb_eintrag_id)
         .bind(auftrag_id)
@@ -560,6 +574,33 @@ mod tests {
         let a2 = anlegen(&pool, e, b, daten("zweiter", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
         assert_eq!(a1.auftrag.lfd_nr, Some(1));
         assert_eq!(a2.auftrag.lfd_nr, Some(2));
+    }
+
+    #[tokio::test]
+    async fn auftrag_startwert_aus_einstellungen_wirkt_und_etb_eigener_startwert() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        // Auftrags-Startwert 20, ETB-Startwert 200 — getrennte Nummernkreise.
+        crate::einsatz::einstellungen::speichern(
+            &pool,
+            e,
+            b,
+            crate::einsatz::einstellungen::EinstellungenDaten {
+                auftrag_nummer_start: Some(20),
+                etb_nummer_start: Some(200),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        let a = anlegen(&pool, e, b, daten("Deich sichern", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+        assert_eq!(a.auftrag.lfd_nr, Some(20), "Auftrags-lfd_nr startet beim Auftrags-Startwert");
+        // Die im selben Commit erzeugte ETB-Anordnung nutzt ihren EIGENEN Startwert (200).
+        let etb_lfd: i64 = sqlx::query_scalar("SELECT lfd_nr FROM etb_eintrag WHERE id = ?")
+            .bind(a.auftrag.etb_anordnung_id.unwrap())
+            .fetch_one(&pool).await.unwrap();
+        assert_eq!(etb_lfd, 200, "ETB-Anordnung nutzt den ETB-Startwert, nicht den Auftrags-Startwert");
     }
 
     #[tokio::test]

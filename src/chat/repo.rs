@@ -486,9 +486,7 @@ pub async fn heraufstufen_zu_auftrag(
     heraufstufer_id: i64,
     daten: crate::auftrag::repo::AuftragDaten<'_>,
 ) -> Result<i64, AppError> {
-    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let einst = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id).await?;
     let mut tx = pool.begin().await?;
 
     // Guard: schon zu einem Auftrag heraufgestuft oder gelöscht? (Sperrt Doppel-Heraufstufung.)
@@ -505,7 +503,15 @@ pub async fn heraufstufen_zu_auftrag(
         return Err(AppError::Conflict("Gelöschte Nachricht kann nicht heraufgestuft werden".into()));
     }
 
-    let auftrag_id = crate::auftrag::repo::anlegen_tx(&mut tx, einsatz_id, heraufstufer_id, etb_startwert, &daten).await?;
+    let auftrag_id = crate::auftrag::repo::anlegen_tx(
+        &mut tx,
+        einsatz_id,
+        heraufstufer_id,
+        einst.auftrag_startwert(),
+        einst.etb_startwert(),
+        &daten,
+    )
+    .await?;
 
     sqlx::query("UPDATE chat_nachricht SET auftrag_id = ? WHERE id = ?")
         .bind(auftrag_id)

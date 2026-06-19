@@ -69,22 +69,23 @@ pub async fn anlegen(
     debug_assert!(prioritaet_gueltig(daten.prioritaet));
     debug_assert!(meldungsart_gueltig(daten.meldungsart));
     debug_assert!(super::richtung_gueltig(daten.richtung));
-    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let einst = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id).await?;
+    let etb_startwert = einst.etb_startwert();
+    let meldung_startwert = einst.meldung_startwert();
     let mut tx = pool.begin().await?;
 
-    // lfd_nr atomar je Einsatz (Muster etb/repo.rs).
+    // lfd_nr atomar je Einsatz (Muster etb/repo.rs); erste Nummer = Startwert aus Einstellungen.
     let meldung_id: i64 = sqlx::query_scalar(
         "INSERT INTO meldung \
            (einsatz_id, lfd_nr, absender, empfaenger, meldeweg, inhalt, meldungsart, \
             prioritaet, richtung, ereigniszeit, eingang_at, bestaetigung_pflicht, bestaetigung_frist_at, \
             erfasst_von_id) \
-         SELECT ?, COALESCE(MAX(lfd_nr), 0) + 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? \
+         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? \
          FROM meldung WHERE einsatz_id = ? \
          RETURNING id",
     )
     .bind(einsatz_id)
+    .bind(meldung_startwert)
     .bind(daten.absender)
     .bind(daten.empfaenger)
     .bind(daten.meldeweg)
@@ -343,9 +344,7 @@ pub async fn erteile_auftrag_tx(
     erteiler_id: i64,
     daten: crate::auftrag::repo::AuftragDaten<'_>,
 ) -> Result<i64, AppError> {
-    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
-        .await?
-        .etb_startwert();
+    let einst = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id).await?;
     let mut tx = pool.begin().await?;
 
     // Guard: schon mit einem Auftrag verknüpft? (Sperrt Doppel-Verknüpfung; first-write-wins.)
@@ -362,8 +361,15 @@ pub async fn erteile_auftrag_tx(
         ));
     }
 
-    let auftrag_id =
-        crate::auftrag::repo::anlegen_tx(&mut tx, einsatz_id, erteiler_id, etb_startwert, &daten).await?;
+    let auftrag_id = crate::auftrag::repo::anlegen_tx(
+        &mut tx,
+        einsatz_id,
+        erteiler_id,
+        einst.auftrag_startwert(),
+        einst.etb_startwert(),
+        &daten,
+    )
+    .await?;
 
     sqlx::query("UPDATE meldung SET auftrag_id = ? WHERE id = ?")
         .bind(auftrag_id)
@@ -467,6 +473,33 @@ mod tests {
         let m2 = anlegen(&pool, e, b, daten("B", "2026-06-12 09:01:00", "2026-06-12 09:01:00")).await.unwrap();
         assert_eq!(m1.lfd_nr, 1);
         assert_eq!(m2.lfd_nr, 2);
+    }
+
+    #[tokio::test]
+    async fn meldung_startwert_wirkt_und_etb_hat_eigenen_startwert() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        // Meldungs-Startwert 50, ETB-Startwert 300 — getrennte Nummernkreise.
+        crate::einsatz::einstellungen::speichern(
+            &pool,
+            e,
+            b,
+            crate::einsatz::einstellungen::EinstellungenDaten {
+                meldung_nummer_start: Some(50),
+                etb_nummer_start: Some(300),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        let m = anlegen(&pool, e, b, daten("A", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
+        assert_eq!(m.lfd_nr, 50, "Meldungs-lfd_nr startet beim Meldungs-Startwert");
+        // Die im selben Commit erzeugte ETB-Meldung nutzt ihren EIGENEN Startwert (300).
+        let etb_lfd: i64 = sqlx::query_scalar("SELECT lfd_nr FROM etb_eintrag WHERE id = ?")
+            .bind(m.etb_meldung_id.unwrap())
+            .fetch_one(&pool).await.unwrap();
+        assert_eq!(etb_lfd, 300, "ETB-Meldung nutzt den ETB-Startwert, nicht den Meldungs-Startwert");
     }
 
     #[tokio::test]
