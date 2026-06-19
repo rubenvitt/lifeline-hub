@@ -153,7 +153,13 @@ pub async fn anlegen(
     // Flag überstimmt. Frist = Eingang + (Override||Default) Minuten, nur bei Pflicht.
     let ist_sofort = meldungsart == ART_SOFORTMELDUNG || prioritaet == PRIO_SOFORT;
     let pflicht = req.bestaetigung_pflicht.unwrap_or(ist_sofort);
-    let frist_min = req.bestaetigung_frist_min.unwrap_or(BESTAETIGUNG_FRIST_DEFAULT_MIN);
+    // Bestätigungsfrist-Default (LFH-133): expliziter Request-Wert schlägt das Einsatz-Setting,
+    // dieses schlägt die Konstante (finaler Fallback, wenn nichts konfiguriert ist).
+    let einst = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id).await?;
+    let frist_min = req
+        .bestaetigung_frist_min
+        .or(einst.meldung_bestaetigung_frist_min)
+        .unwrap_or(BESTAETIGUNG_FRIST_DEFAULT_MIN);
     if pflicht && frist_min <= 0 {
         return Err(AppError::Validation("Bestätigungsfrist muss positiv sein".into()));
     }
@@ -364,7 +370,7 @@ pub async fn auftrag_erteilen(
     // Gleiche Validierung wie POST /auftraege (geteilt) → kein zweiter, ungeprüfter Pfad.
     let now = jetzt();
     let validiert =
-        crate::routes::auftrag::validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now).await?;
+        crate::routes::auftrag::validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now, None).await?;
     let auftrag_id = repo::erteile_auftrag_tx(
         &state.pool, einsatz_id, meldung_id, benutzer.id, validiert.daten(),
     )

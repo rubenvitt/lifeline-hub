@@ -4,6 +4,7 @@ use crate::auth::session::CurrentUser;
 use crate::einsatz::berechtigung::{fordere_modul_zugriff, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
 use crate::einsatz::repo as einsatz_repo;
 use crate::einsatz::modul_override;
+use crate::einsatz::einstellungen;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "auftraege";
@@ -11,7 +12,7 @@ use crate::error::AppError;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
-use chrono::{NaiveDateTime, Utc};
+use chrono::{Duration, NaiveDateTime, Utc};
 use serde::Deserialize;
 
 /// Kanonischer Zeitstempel „jetzt" (UTC) im DB-Format.
@@ -262,15 +263,26 @@ impl ValidierterAuftrag {
     }
 }
 
+/// Leitet aus Erteilzeit + Default-Minuten eine absolute Quittierfrist ab (DB-Format).
+/// Defensiv `None` statt Panik bei (theoretisch unmöglichem) Parse-Fehler.
+fn frist_aus_minuten(erteilt: &str, min: i64) -> Option<String> {
+    NaiveDateTime::parse_from_str(erteilt, "%Y-%m-%d %H:%M:%S")
+        .ok()
+        .map(|n| (n + Duration::minutes(min)).format("%Y-%m-%d %H:%M:%S").to_string())
+}
+
 /// Validiert + normalisiert eine Auftrags-Eingabe: Auftragstext UND >=1 Empfänger
 /// (Pflicht-Akzeptanzkriterium), Priorität, Frist/Erteilzeit (Parsing) sowie jede
 /// Empfänger-Zeile (Slot-Konsistenz + Einsatz-Zugehörigkeit). `now` ist der Default
-/// für `erteilt_at`. Gemeinsamer Eingang für POST /auftraege und die Chat-Heraufstufung.
+/// für `erteilt_at`. Fehlt `frist_at` und ist `default_quittierung_frist_min` gesetzt
+/// (LFH-133), wird die Frist aus Erteilzeit + Minuten abgeleitet. Gemeinsamer Eingang
+/// für POST /auftraege und die Heraufstufungen.
 pub async fn validiere_neuen_auftrag(
     pool: &sqlx::SqlitePool,
     einsatz_id: i64,
     req: &NeuerAuftrag,
     now: &str,
+    default_quittierung_frist_min: Option<i64>,
 ) -> Result<ValidierterAuftrag, AppError> {
     let text = req.auftrag_text.trim();
     if text.is_empty() {
@@ -287,13 +299,15 @@ pub async fn validiere_neuen_auftrag(
     if !crate::auftrag::richtung_gueltig(richtung) {
         return Err(AppError::Validation("Ungültige Richtung".into()));
     }
-    let frist = match trimme(&req.frist_at) {
-        Some(f) => Some(parse_zeit(f)?),
-        None => None,
-    };
     let erteilt = match trimme(&req.erteilt_at) {
         Some(e) => parse_zeit(e)?,
         None => now.to_string(),
+    };
+    // Frist: expliziter Request-Wert; sonst (LFH-133) aus Default-Quittierfrist abgeleitet
+    // (Erteilzeit + Minuten); ohne beides keine Frist (heutiges Verhalten).
+    let frist = match trimme(&req.frist_at) {
+        Some(f) => Some(parse_zeit(f)?),
+        None => default_quittierung_frist_min.and_then(|min| frist_aus_minuten(&erteilt, min)),
     };
 
     let mut empfaenger = Vec::with_capacity(req.empfaenger.len());
@@ -333,7 +347,12 @@ pub async fn anlegen(
     fordere_aktiv(&einsatz)?;
 
     let now = jetzt();
-    let validiert = validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now).await?;
+    // Default-Quittierfrist (LFH-133): nur für die direkte Auftragserfassung; greift, wenn der
+    // Client keine frist_at mitschickt.
+    let default_frist = einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .auftrag_quittierung_frist_min;
+    let validiert = validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now, default_frist).await?;
     let d = repo::anlegen(&state.pool, einsatz_id, benutzer.id, validiert.daten(), &now).await?;
 
     // ETB-Anordnung wurde im selben Commit erzeugt → ETB-Live-Event mitschicken.

@@ -422,3 +422,57 @@ async fn richtung_filter_trennt_intern_extern() {
     let (status, _) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/auftraege?richtung=quatsch"), &admin, None).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
+
+// --- Default-Quittierfrist aus Einstellungen (LFH-133) ---
+
+#[tokio::test]
+async fn auftrag_default_quittierfrist_aus_einstellungen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    // Default-Quittierfrist 60 Min konfigurieren.
+    let (s, _) = anfrage(
+        &app, "PUT", &format!("/api/einsaetze/{e}/einstellungen"), &admin,
+        Some(r#"{"auftrag_quittierung_frist_min":60}"#),
+    ).await;
+    assert_eq!(s, StatusCode::OK);
+    // Auftrag mit explizitem erteilt_at, OHNE frist_at → Frist = Erteilzeit + 60 Min.
+    let body = serde_json::json!({
+        "auftrag_text": "X", "erteilt_at": "2026-06-19 09:00:00",
+        "empfaenger": [{ "empfaenger_typ": "funktion", "funktion_text": "EA" }]
+    }).to_string();
+    let (status, a) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege"), &admin, Some(&body)).await;
+    assert_eq!(status, StatusCode::CREATED, "{a:?}");
+    assert_eq!(a["frist_at"], "2026-06-19 10:00:00");
+}
+
+#[tokio::test]
+async fn auftrag_ohne_setting_keine_frist() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    // Ohne Setting + ohne frist_at → keine Frist (heutiges Verhalten).
+    let (status, a) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege"), &admin, Some(&body_mit_funktion("X", "EA"))).await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert!(a["frist_at"].is_null());
+}
+
+#[tokio::test]
+async fn auftrag_explizite_frist_schlaegt_default() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (s, _) = anfrage(
+        &app, "PUT", &format!("/api/einsaetze/{e}/einstellungen"), &admin,
+        Some(r#"{"auftrag_quittierung_frist_min":60}"#),
+    ).await;
+    assert_eq!(s, StatusCode::OK);
+    // Expliziter frist_at schlägt den Default.
+    let body = serde_json::json!({
+        "auftrag_text": "X", "erteilt_at": "2026-06-19 09:00:00", "frist_at": "2026-06-19 09:15:00",
+        "empfaenger": [{ "empfaenger_typ": "funktion", "funktion_text": "EA" }]
+    }).to_string();
+    let (status, a) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/auftraege"), &admin, Some(&body)).await;
+    assert_eq!(status, StatusCode::CREATED, "{a:?}");
+    assert_eq!(a["frist_at"], "2026-06-19 09:15:00");
+}
