@@ -49,6 +49,39 @@ export interface MitgliedAnzeige {
   zugewiesen_at: string;
 }
 
+/** Sichtbarkeit der externen Lage-Layer (LFH-69) als Karten-Default pro Einsatz. */
+export interface FachebenenSichtbar {
+  nina: boolean;
+  dwd: boolean;
+  pegelonline: boolean;
+  kritis: boolean;
+}
+
+/** Basemap-Modus als Karten-Default pro Einsatz. */
+export type BasemapModus = 'online' | 'offline' | 'blind';
+
+/**
+ * Einsatz-Einstellungen (LFH-55/131). `fachebenen_sichtbar` wird vom Backend
+ * (EinstellungenAnzeige) als Objekt geliefert; `null` = nicht gesetzt → Default.
+ */
+export interface EinsatzEinstellungen {
+  einsatz_id: number;
+  standard_modul: string | null;
+  basemap_modus: BasemapModus | null;
+  karten_zoom_start: number | null;
+  fachebenen_sichtbar: FachebenenSichtbar | null;
+  geaendert_at: string | null;
+  geaendert_von: number | null;
+}
+
+/** PUT-Eingabe (Vollersatz) der Einsatz-Einstellungen. */
+export interface EinstellungenUpdate {
+  standard_modul: string | null;
+  basemap_modus: BasemapModus | null;
+  karten_zoom_start: number | null;
+  fachebenen_sichtbar: FachebenenSichtbar | null;
+}
+
 /** Org-weiter Einsatzstichwort-Vorschlag für die Combobox. */
 export interface StichwortVorschlag {
   id: number;

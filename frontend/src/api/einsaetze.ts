@@ -1,4 +1,7 @@
-import type { Einsatzart, EinsatzAnzeige, EinsatzRolle, MitgliedAnzeige } from './types';
+import type {
+  Einsatzart, EinsatzAnzeige, EinsatzRolle, MitgliedAnzeige,
+  EinsatzEinstellungen, EinstellungenUpdate,
+} from './types';
 import { apiGet, apiSend } from './client';
 
 export function listeEinsaetze(): Promise<EinsatzAnzeige[]> {
@@ -54,4 +57,17 @@ export interface KopfdatenUpdate {
 
 export function aktualisiereEinsatz(id: number, felder: KopfdatenUpdate): Promise<EinsatzAnzeige> {
   return apiSend<EinsatzAnzeige>(`/api/einsaetze/${id}`, 'PATCH', felder);
+}
+
+/** Einsatz-Einstellungen laden (LFH-131); existiert keine Zeile → Defaults (alle null). */
+export function ladeEinstellungen(id: number): Promise<EinsatzEinstellungen> {
+  return apiGet<EinsatzEinstellungen>(`/api/einsaetze/${id}/einstellungen`);
+}
+
+/** Einsatz-Einstellungen setzen (Vollersatz); nur bei aktivem Einsatz (sonst 409). */
+export function speichereEinstellungen(
+  id: number,
+  felder: EinstellungenUpdate,
+): Promise<EinsatzEinstellungen> {
+  return apiSend<EinsatzEinstellungen>(`/api/einsaetze/${id}/einstellungen`, 'PUT', felder);
 }
