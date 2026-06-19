@@ -69,6 +69,9 @@ pub async fn anlegen(
     debug_assert!(prioritaet_gueltig(daten.prioritaet));
     debug_assert!(meldungsart_gueltig(daten.meldungsart));
     debug_assert!(super::richtung_gueltig(daten.richtung));
+    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
+        .await?
+        .etb_startwert();
     let mut tx = pool.begin().await?;
 
     // lfd_nr atomar je Einsatz (Muster etb/repo.rs).
@@ -104,6 +107,7 @@ pub async fn anlegen(
         &mut tx,
         einsatz_id,
         erfasser_id,
+        etb_startwert,
         crate::etb::repo::EintragDaten {
             typ: crate::etb::TYP_MELDUNG,
             inhalt: daten.inhalt,
@@ -339,6 +343,9 @@ pub async fn erteile_auftrag_tx(
     erteiler_id: i64,
     daten: crate::auftrag::repo::AuftragDaten<'_>,
 ) -> Result<i64, AppError> {
+    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
+        .await?
+        .etb_startwert();
     let mut tx = pool.begin().await?;
 
     // Guard: schon mit einem Auftrag verknüpft? (Sperrt Doppel-Verknüpfung; first-write-wins.)
@@ -356,7 +363,7 @@ pub async fn erteile_auftrag_tx(
     }
 
     let auftrag_id =
-        crate::auftrag::repo::anlegen_tx(&mut tx, einsatz_id, erteiler_id, &daten).await?;
+        crate::auftrag::repo::anlegen_tx(&mut tx, einsatz_id, erteiler_id, etb_startwert, &daten).await?;
 
     sqlx::query("UPDATE meldung SET auftrag_id = ? WHERE id = ?")
         .bind(auftrag_id)

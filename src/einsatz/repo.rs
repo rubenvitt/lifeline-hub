@@ -222,6 +222,9 @@ pub async fn frist_setzen(
     neue_frist: Option<&str>,
     audit_inhalt: &str,
 ) -> Result<Einsatz, AppError> {
+    let etb_startwert = super::einstellungen::laden_oder_default(pool, einsatz_id)
+        .await?
+        .etb_startwert();
     let mut tx = pool.begin().await?;
     sqlx::query("UPDATE einsatz SET retention_bis = ? WHERE id = ?")
         .bind(neue_frist)
@@ -232,6 +235,7 @@ pub async fn frist_setzen(
         &mut tx,
         einsatz_id,
         erfasser_id,
+        etb_startwert,
         crate::etb::repo::EintragDaten {
             typ: crate::etb::TYP_SYSTEM,
             inhalt: audit_inhalt,

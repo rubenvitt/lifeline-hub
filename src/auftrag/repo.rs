@@ -209,6 +209,7 @@ pub async fn anlegen_tx(
     tx: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
     ersteller_id: i64,
+    etb_startwert: i64,
     daten: &AuftragDaten<'_>,
 ) -> Result<i64, AppError> {
     debug_assert!(prioritaet_gueltig(daten.prioritaet));
@@ -272,6 +273,7 @@ pub async fn anlegen_tx(
         &mut *tx,
         einsatz_id,
         ersteller_id,
+        etb_startwert,
         crate::etb::repo::EintragDaten {
             typ: crate::etb::TYP_ANORDNUNG,
             inhalt: daten.auftrag_text,
@@ -308,8 +310,11 @@ pub async fn anlegen(
     daten: AuftragDaten<'_>,
     jetzt: &str,
 ) -> Result<AuftragDetail, AppError> {
+    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
+        .await?
+        .etb_startwert();
     let mut tx = pool.begin().await?;
-    let auftrag_id = anlegen_tx(&mut tx, einsatz_id, ersteller_id, &daten).await?;
+    let auftrag_id = anlegen_tx(&mut tx, einsatz_id, ersteller_id, etb_startwert, &daten).await?;
     tx.commit().await?;
     laden(pool, auftrag_id, jetzt).await
 }
@@ -328,8 +333,11 @@ pub async fn erteile_aus_etb_tx(
     erteiler_id: i64,
     daten: AuftragDaten<'_>,
 ) -> Result<i64, AppError> {
+    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
+        .await?
+        .etb_startwert();
     let mut tx = pool.begin().await?;
-    let auftrag_id = anlegen_tx(&mut tx, einsatz_id, erteiler_id, &daten).await?;
+    let auftrag_id = anlegen_tx(&mut tx, einsatz_id, erteiler_id, etb_startwert, &daten).await?;
     sqlx::query("UPDATE auftrag SET quell_etb_eintrag_id = ? WHERE id = ?")
         .bind(quell_etb_eintrag_id)
         .bind(auftrag_id)
@@ -412,6 +420,9 @@ pub async fn melde_vollzug(
     vollzugsmeldung: &str,
     jetzt: &str,
 ) -> Result<i64, AppError> {
+    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
+        .await?
+        .etb_startwert();
     let mut tx = pool.begin().await?;
     sqlx::query("UPDATE auftrag SET vollzugsmeldung = ? WHERE id = ?")
         .bind(vollzugsmeldung)
@@ -422,6 +433,7 @@ pub async fn melde_vollzug(
         &mut tx,
         einsatz_id,
         von_id,
+        etb_startwert,
         crate::etb::repo::EintragDaten {
             typ: crate::etb::TYP_MELDUNG,
             inhalt: vollzugsmeldung,

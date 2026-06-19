@@ -44,6 +44,7 @@ pub async fn anlegen_tx(
     tx: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
     ersteller_id: i64,
+    etb_startwert: i64,
     daten: &NachforderungDaten<'_>,
 ) -> Result<i64, AppError> {
     debug_assert!(prioritaet_gueltig(daten.prioritaet));
@@ -75,6 +76,7 @@ pub async fn anlegen_tx(
         &mut *tx,
         einsatz_id,
         ersteller_id,
+        etb_startwert,
         crate::etb::repo::EintragDaten {
             typ: crate::etb::TYP_MELDUNG,
             inhalt: &inhalt,
@@ -109,8 +111,11 @@ pub async fn anlegen(
     ersteller_id: i64,
     daten: NachforderungDaten<'_>,
 ) -> Result<NachforderungAnzeige, AppError> {
+    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
+        .await?
+        .etb_startwert();
     let mut tx = pool.begin().await?;
-    let id = anlegen_tx(&mut tx, einsatz_id, ersteller_id, &daten).await?;
+    let id = anlegen_tx(&mut tx, einsatz_id, ersteller_id, etb_startwert, &daten).await?;
     tx.commit().await?;
     laden(pool, id).await
 }
