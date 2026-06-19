@@ -6,7 +6,7 @@ import {
 } from '../api/orgEinstellungen';
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
-import { modulRegistry } from '../einsatz/modulRegistry';
+import { modulRegistry, istModulAusblendbar } from '../einsatz/modulRegistry';
 import type { EinheitenSystem, Koordinatenformat, OrgEinstellungenUpdate, Zeitformat } from '../api/types';
 
 // Anzeige-Konventionen — kuratierte IANA-Zeitzonen + Freitext (AutoComplete).
@@ -285,6 +285,7 @@ export default function GlobalEinstellungenPage() {
         </div>
         {modulRegistry.map((m) => {
           const rolle = orgModul[m.key] ?? null;
+          const ausblendbar = istModulAusblendbar(m.key);
           return (
             <div key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <span style={{ flex: 1 }}>{m.label}</span>
@@ -292,7 +293,7 @@ export default function GlobalEinstellungenPage() {
                 aria-label={`Benötigte Rolle: ${m.label}`}
                 style={{ width: 180 }}
                 value={rolle ?? ''}
-                disabled={!istAdmin || modulMutation.isPending}
+                disabled={!istAdmin || !ausblendbar || modulMutation.isPending}
                 options={ROLLEN_OPTIONEN}
                 onChange={(val) =>
                   modulMutation.mutate({

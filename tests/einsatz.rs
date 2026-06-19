@@ -1246,6 +1246,30 @@ async fn einstellungen_put_zoom_ausserhalb_bereich_ist_400() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
+/// org_defaults in GET /einstellungen enthält kein geaendert_von (Audit-Leak-Schutz).
+#[tokio::test]
+async fn einstellungen_get_org_defaults_ohne_audit() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, einsatz) = einsatz_anlegen(&app, &admin, "Lage").await;
+    let id = einsatz["id"].as_i64().unwrap();
+
+    let (status, v) = einstellungen_get(&app, &admin, id).await;
+    assert_eq!(status, StatusCode::OK);
+
+    // org_defaults muss vorhanden sein (auch wenn alle Felder null).
+    assert!(v["org_defaults"].is_object(), "org_defaults fehlt in Antwort");
+    // Audit-Felder dürfen NICHT im org_defaults-Objekt auftauchen (Sicherheitsanforderung).
+    assert!(
+        v["org_defaults"].get("geaendert_von").is_none(),
+        "geaendert_von darf nicht in org_defaults serialisiert werden"
+    );
+    assert!(
+        v["org_defaults"].get("geaendert_at").is_none(),
+        "geaendert_at darf nicht in org_defaults serialisiert werden"
+    );
+}
+
 #[tokio::test]
 async fn geloescht_at_tombstone_sperrt_detail_export_stream_403() {
     // LFH-135: ein gesetzter geloescht_at-Tombstone sperrt den Lesezugriff über

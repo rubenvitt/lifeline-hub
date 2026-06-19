@@ -196,7 +196,7 @@ pub async fn einstellungen_laden(
     let org_defaults =
         crate::org::einstellungen::laden_oder_default(&state.pool, einsatz.org_id)
             .await?
-            .anzeige();
+            .anzeige_hinweis();
     Ok(Json(EinstellungenMitOrgDefaults {
         einstellungen: gespeichert.anzeige_mit_freeze(etb_fr, meldung_fr, auftrag_fr),
         org_defaults,
@@ -204,12 +204,12 @@ pub async fn einstellungen_laden(
 }
 
 /// Antwort-Shape von `einstellungen_laden`: rohe Einsatz-Override-Werte (geflacht)
-/// plus org-weite Defaults als eingebettetes Objekt.
+/// plus org-weite Defaults als eingebettetes Objekt (ohne Audit-Felder).
 #[derive(Debug, Serialize)]
 pub struct EinstellungenMitOrgDefaults {
     #[serde(flatten)]
     einstellungen: einstellungen::EinstellungenAnzeige,
-    org_defaults: crate::org::einstellungen::OrgEinstellungenAnzeige,
+    org_defaults: crate::org::einstellungen::OrgEinstellungenHinweis,
 }
 
 /// Ermittelt die Freeze-Flags je Nummernkreis (LFH-133) aus der Daten-Existenz.

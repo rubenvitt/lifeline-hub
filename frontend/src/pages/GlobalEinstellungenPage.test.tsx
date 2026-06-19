@@ -201,6 +201,28 @@ describe('GlobalEinstellungenPage', () => {
     }
   });
 
+  it('deaktiviert nicht-ausblendbare Modul-Selects auch als Admin', async () => {
+    // 'einsatzdaten' und 'einsatz-einstellungen' sind NICHT_AUSBLENDBAR —
+    // der Rollen-Default-Select soll für Admins trotzdem deaktiviert sein.
+    rendern();
+
+    await screen.findByText('Modul-Rollen-Default');
+
+    const einsatzdatenSelect = screen.getByRole('combobox', {
+      name: 'Benötigte Rolle: Einsatzdaten',
+    });
+    expect(einsatzdatenSelect).toBeDisabled();
+
+    const einstellungenSelect = screen.getByRole('combobox', {
+      name: 'Benötigte Rolle: Einstellungen',
+    });
+    expect(einstellungenSelect).toBeDisabled();
+
+    // Ein ausblendbareres Modul (z. B. ETB) soll als Admin editierbar sein.
+    const etbSelect = screen.getByRole('combobox', { name: 'Benötigte Rolle: ETB' });
+    expect(etbSelect).not.toBeDisabled();
+  });
+
   // --- Modul-Rollen-Default: Sofortmutation ---
 
   it('speichert Modul-Rollen-Default sofort per PUT', async () => {

@@ -57,6 +57,12 @@ const KOORDINATEN_OPTIONEN: { value: Koordinatenformat; label: string }[] = [
   { value: 'utm', label: 'UTM' },
 ];
 
+/** Tristate-Optionen für automatische ETB-Einträge (null=erbt Org, true=An, false=Aus). */
+const AUTO_ETB_OPTIONEN: { value: boolean; label: string }[] = [
+  { value: true, label: 'An' },
+  { value: false, label: 'Aus' },
+];
+
 /** Formularwerte; Fachebenen als Liste der aktiven Keys (Checkbox.Group). */
 interface FormWerte {
   standard_modul?: string;
@@ -75,7 +81,8 @@ interface FormWerte {
   auftrag_nummer_start?: number;
   meldung_bestaetigung_frist_min?: number;
   auftrag_quittierung_frist_min?: number;
-  auto_etb_eintraege: boolean;
+  // undefined = Org-Standard erben; true = An; false = Aus.
+  auto_etb_eintraege: boolean | undefined;
   // Aufbewahrung & Archiv (LFH-135).
   retention_dauer_tage?: number;
 }
@@ -180,8 +187,13 @@ export default function EinsatzEinstellungenPage() {
     auftrag_nummer_start: einstellungen.auftrag_nummer_start ?? undefined,
     meldung_bestaetigung_frist_min: einstellungen.meldung_bestaetigung_frist_min ?? undefined,
     auftrag_quittierung_frist_min: einstellungen.auftrag_quittierung_frist_min ?? undefined,
-    // 0 = aus; null/1 = an (Default an).
-    auto_etb_eintraege: einstellungen.auto_etb_eintraege !== 0,
+    // null = Org-Standard erben (tristate); 0 = Aus; 1 = An.
+    auto_etb_eintraege:
+      einstellungen.auto_etb_eintraege === null
+        ? undefined
+        : einstellungen.auto_etb_eintraege === 0
+          ? false
+          : true,
     // Aufbewahrung & Archiv (LFH-135).
     retention_dauer_tage: einstellungen.retention_dauer_tage ?? undefined,
   };
@@ -244,7 +256,8 @@ export default function EinsatzEinstellungenPage() {
       auftrag_nummer_start: werte.auftrag_nummer_start ?? null,
       meldung_bestaetigung_frist_min: werte.meldung_bestaetigung_frist_min ?? null,
       auftrag_quittierung_frist_min: werte.auftrag_quittierung_frist_min ?? null,
-      auto_etb_eintraege: werte.auto_etb_eintraege,
+      // undefined (Org-Standard) → null im Payload (Backend-Semantik: erbt Org-Default).
+      auto_etb_eintraege: werte.auto_etb_eintraege ?? null,
       // Aufbewahrung & Archiv (LFH-135); leer = keine Auto-Frist (null).
       retention_dauer_tage: werte.retention_dauer_tage ?? null,
     };
@@ -407,11 +420,15 @@ export default function EinsatzEinstellungenPage() {
         <Form.Item
           label="Automatische ETB-Einträge"
           name="auto_etb_eintraege"
-          valuePropName="checked"
-          tooltip="Meldungen und Aufträge erzeugen automatisch einen verknüpften ETB-Eintrag. Aus = kein automatischer ETB-Eintrag."
+          tooltip="Meldungen und Aufträge erzeugen automatisch einen verknüpften ETB-Eintrag. Leer = Org-Standard erben."
           extra={orgHinweisAutoEtb(orgDefaults?.auto_etb_eintraege)}
         >
-          <Switch />
+          <Select
+            allowClear
+            placeholder="Org-Standard"
+            options={AUTO_ETB_OPTIONEN}
+            style={{ width: 200 }}
+          />
         </Form.Item>
 
         <Typography.Title level={5}>Aufbewahrung &amp; Archiv</Typography.Title>

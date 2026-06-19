@@ -122,8 +122,8 @@ describe('EinsatzEinstellungenPage', () => {
         auftrag_nummer_start: null,
         meldung_bestaetigung_frist_min: null,
         auftrag_quittierung_frist_min: null,
-        // auto_etb: null im Datensatz → Switch an (Default).
-        auto_etb_eintraege: true,
+        // auto_etb: null im Datensatz → Select leer (Org-Standard erben) → null im Payload.
+        auto_etb_eintraege: null,
         // Aufbewahrung & Archiv (LFH-135) — nicht gesetzt → null.
         retention_dauer_tage: null,
       }),
@@ -411,6 +411,45 @@ describe('EinsatzEinstellungenPage', () => {
         meldung_bestaetigung_frist_min: null,
         auftrag_quittierung_frist_min: null,
       })),
+    );
+  });
+
+  // Finding E: Tristate auto_etb_eintraege
+  it('erbt Org-Standard für auto_etb (einsatz=null + org_default=Aus) → Payload null', async () => {
+    vi.mocked(ladeEinstellungen).mockResolvedValue({
+      einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
+      fachebenen_sichtbar: null,
+      zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+      ...VERHALTEN_DEFAULTS,
+      // Einsatz hat keinen Override → null (erbt Org).
+      auto_etb_eintraege: null,
+      geaendert_at: null, geaendert_von: null,
+      org_defaults: {
+        zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+        retention_dauer_tage: null,
+        etb_nummer_praefix: null, meldung_nummer_praefix: null, auftrag_nummer_praefix: null,
+        meldung_bestaetigung_frist_min: null, auftrag_quittierung_frist_min: null,
+        // Org-Default: 0 = Aus.
+        auto_etb_eintraege: 0,
+        geaendert_at: null, geaendert_von: null,
+      },
+    });
+    vi.mocked(speichereEinstellungen).mockResolvedValue({} as never);
+
+    rendern();
+
+    // Org-Hinweis „Standard (Org): Aus" soll angezeigt werden.
+    expect(await screen.findByText('Standard (Org): Aus')).toBeInTheDocument();
+
+    // Submit sendet null (kein Einsatz-Override; Backend löst Org-Default auf).
+    const btn = screen.getByRole('button', { name: 'Speichern' });
+    fireEvent.click(btn);
+
+    await waitFor(() =>
+      expect(speichereEinstellungen).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ auto_etb_eintraege: null }),
+      ),
     );
   });
 

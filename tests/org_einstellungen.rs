@@ -366,6 +366,32 @@ async fn modul_put_ungueltige_rolle_ist_400() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
+/// GET /api/org-einstellungen als Benutzer mit org_rolle=keine → 403.
+#[tokio::test]
+async fn get_als_keine_liefert_403() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    benutzer_anlegen(&app, &admin_cookie, "kein1", "keinpw12", "keine").await;
+    let kein_cookie = login_cookie(&app, "kein1", "keinpw12").await;
+
+    let (status, _body) = get_einstellungen(&app, Some(&kein_cookie)).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+/// GET /api/org-modul-einstellungen als Benutzer mit org_rolle=keine → 403.
+#[tokio::test]
+async fn modul_get_als_keine_liefert_403() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    benutzer_anlegen(&app, &admin_cookie, "kein2", "keinpw12", "keine").await;
+    let kein_cookie = login_cookie(&app, "kein2", "keinpw12").await;
+
+    let (status, _body) = get_modul_einstellungen(&app, &kein_cookie).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
 /// PUT mit modul_key aus NICHT_AUSBLENDBAR → 200 (Rollen-Default ≠ Sichtbarkeit, kein Sonderfall).
 #[tokio::test]
 async fn modul_put_nicht_ausblendbar_key_ist_erlaubt() {

@@ -55,7 +55,7 @@ impl OrgEinstellungen {
         }
     }
 
-    /// API-Darstellung: flache 1:1-Spiegelung aller Felder.
+    /// API-Darstellung: flache 1:1-Spiegelung aller Felder inkl. Audit (Admin-Endpunkt).
     pub fn anzeige(&self) -> OrgEinstellungenAnzeige {
         OrgEinstellungenAnzeige {
             org_id: self.org_id,
@@ -72,6 +72,25 @@ impl OrgEinstellungen {
             auto_etb_eintraege: self.auto_etb_eintraege,
             geaendert_at: self.geaendert_at.clone(),
             geaendert_von: self.geaendert_von,
+        }
+    }
+
+    /// Schlanke API-Darstellung ohne Audit-Felder — für Einsatz-Endpoint (non-admin).
+    /// Schützt `geaendert_at`/`geaendert_von` vor Leak an Einsatz-Mitglieder.
+    pub fn anzeige_hinweis(&self) -> OrgEinstellungenHinweis {
+        OrgEinstellungenHinweis {
+            org_id: self.org_id,
+            zeitzone: self.zeitzone.clone(),
+            zeitformat: self.zeitformat.clone(),
+            einheiten: self.einheiten.clone(),
+            koordinatenformat: self.koordinatenformat.clone(),
+            retention_dauer_tage: self.retention_dauer_tage,
+            etb_nummer_praefix: self.etb_nummer_praefix.clone(),
+            meldung_nummer_praefix: self.meldung_nummer_praefix.clone(),
+            auftrag_nummer_praefix: self.auftrag_nummer_praefix.clone(),
+            meldung_bestaetigung_frist_min: self.meldung_bestaetigung_frist_min,
+            auftrag_quittierung_frist_min: self.auftrag_quittierung_frist_min,
+            auto_etb_eintraege: self.auto_etb_eintraege,
         }
     }
 }
@@ -93,6 +112,24 @@ pub struct OrgEinstellungenAnzeige {
     pub auto_etb_eintraege: Option<i64>,
     pub geaendert_at: Option<String>,
     pub geaendert_von: Option<i64>,
+}
+
+/// Schlanke API-Darstellung für den Einsatz-Endpoint: nur Konventions-Felder,
+/// KEIN `geaendert_at`, KEIN `geaendert_von` — Audit-Schutz für Non-Admin-Mitglieder.
+#[derive(Debug, Clone, Serialize)]
+pub struct OrgEinstellungenHinweis {
+    pub org_id: i64,
+    pub zeitzone: Option<String>,
+    pub zeitformat: Option<String>,
+    pub einheiten: Option<String>,
+    pub koordinatenformat: Option<String>,
+    pub retention_dauer_tage: Option<i64>,
+    pub etb_nummer_praefix: Option<String>,
+    pub meldung_nummer_praefix: Option<String>,
+    pub auftrag_nummer_praefix: Option<String>,
+    pub meldung_bestaetigung_frist_min: Option<i64>,
+    pub auftrag_quittierung_frist_min: Option<i64>,
+    pub auto_etb_eintraege: Option<i64>,
 }
 
 /// Eingabe für `speichern`; bereits vom Handler getrimmt/validiert.

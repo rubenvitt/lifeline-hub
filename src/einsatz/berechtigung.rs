@@ -823,12 +823,19 @@ mod tests {
     async fn org_default_fuehrungskraft_blockt_normal_via_db() {
         let pool = crate::db::test_pool().await;
 
-        // Org anlegen und Modul-Default setzen.
+        // Org + Benutzer anlegen und Modul-Default setzen.
         sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'TestOrg')")
             .execute(&pool)
             .await
             .unwrap();
-        crate::org::modul_einstellung::setzen(&pool, 1, "etb", Some("fuehrungskraft"))
+        let bid: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'a', 'a', 'h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        crate::org::modul_einstellung::setzen(&pool, 1, "etb", Some("fuehrungskraft"), bid)
             .await
             .unwrap();
 

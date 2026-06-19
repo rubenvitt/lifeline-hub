@@ -205,7 +205,7 @@ pub async fn modul_einstellung_setzen(
         }
     }
 
-    modul_einstellung::setzen(&state.pool, benutzer.org_id, &modul_key, rolle.as_deref())
+    modul_einstellung::setzen(&state.pool, benutzer.org_id, &modul_key, rolle.as_deref(), benutzer.id)
         .await?;
     Ok(())
 }
