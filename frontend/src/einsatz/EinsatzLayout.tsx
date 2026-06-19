@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Layout, Space, Spin } from 'antd';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
 import { useAuth } from '../auth/AuthContext';
 import {
   kategorien, modulRegistry, moduleNachKategorie, modulZielRoute,
@@ -50,6 +50,13 @@ export default function EinsatzLayout() {
     queryFn: () => ladeEinsatz(einsatzId),
   });
 
+  // Modul-Overrides (LFH-132) für die Nav-Reflexion; geteilter queryKey wie die
+  // Einstellungen (Hot-Path, einmal gecacht je Einsatz).
+  const { data: modulOverrides } = useQuery({
+    queryKey: ['modulOverrides', einsatzId],
+    queryFn: () => ladeModulOverrides(einsatzId),
+  });
+
   function onKategorieKlick(key: KategorieKey) {
     setOffeneKategorie((aktuell) => (aktuell === key ? null : key));
   }
@@ -83,6 +90,7 @@ export default function EinsatzLayout() {
             titel={kategorien.find((k) => k.key === offeneKategorie)!.label}
             module={moduleNachKategorie(offeneKategorie)}
             benutzer={benutzer}
+            overrides={modulOverrides}
             aktiverModulKey={aktuellesModul?.key ?? null}
             onModulKlick={onModulKlick}
           />

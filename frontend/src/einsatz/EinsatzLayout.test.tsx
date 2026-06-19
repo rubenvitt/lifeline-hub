@@ -17,11 +17,12 @@ const einsatz = {
   abgeschlossen_von: null, meine_rolle: 'einsatzleitung',
 };
 
-function setup() {
+function setup(overrides: Record<string, unknown> = {}) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(admin)),
     http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+    http.get('/api/einsaetze/7/modul-overrides', () => HttpResponse.json(overrides)),
   );
   return renderMitProviders(
     <AuthProvider>
@@ -40,6 +41,7 @@ function setupRoute(route: string, childPath: string) {
     http.get('/api/auth/me', () => HttpResponse.json(admin)),
     http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+    http.get('/api/einsaetze/7/modul-overrides', () => HttpResponse.json({})),
   );
   return renderMitProviders(
     <AuthProvider>
@@ -61,6 +63,20 @@ describe('EinsatzLayout', () => {
     );
     expect(screen.getByRole('navigation', { name: 'Kategorien' })).toBeInTheDocument();
     expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument();
+  });
+
+  it('blendet ein verstecktes Modul aus der Navigation aus (LFH-132)', async () => {
+    // 'personen' (Kategorie Erfassung) ausblenden; das Erfassung-Panel ist via
+    // /etb offen. ETB bleibt sichtbar, Personen verschwindet aus der Nav.
+    setup({
+      personen: {
+        einsatz_id: 7, modul_key: 'personen', sichtbar: false,
+        benoetigte_rolle: null, geaendert_at: null, geaendert_von: null,
+      },
+    });
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'ETB' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Personen' })).not.toBeInTheDocument();
   });
 
   it('hält das aktive Modul auf einer Sub-Route hervorgehoben (Panel bleibt offen)', async () => {
