@@ -40,6 +40,31 @@ pub fn ist_gueltiges_koordinatenformat(s: &str) -> bool {
     KOORDINATENFORMATE.contains(&s)
 }
 
+// Verhalten & Automatik (LFH-133) — Validatoren in Rust statt DB-CHECK.
+
+/// Maximale Präfix-Länge (Nummernkreise). Display-only, nie pro Zeile gespeichert.
+pub const NUMMER_PRAEFIX_MAX_LEN: usize = 8;
+
+/// Ob `s` ein gültiges Nummernkreis-Präfix ist: getrimmt höchstens
+/// [`NUMMER_PRAEFIX_MAX_LEN`] Zeichen, Whitelist `[A-Za-z0-9-_/ ]`. Ein leerer
+/// (getrimmter) Wert ist gültig und bedeutet „kein Präfix" (Handler → None).
+pub fn ist_gueltiges_nummer_praefix(s: &str) -> bool {
+    let t = s.trim();
+    t.chars().count() <= NUMMER_PRAEFIX_MAX_LEN
+        && t.chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '/' | ' '))
+}
+
+/// Ob `n` ein gültiger Startwert einer laufenden Nummer ist (1..=999_999).
+pub fn ist_gueltiger_startwert(n: i64) -> bool {
+    (1..=999_999).contains(&n)
+}
+
+/// Ob `n` eine gültige Default-Frist in Minuten ist (1..=10_080 = eine Woche).
+pub fn ist_gueltige_frist_min(n: i64) -> bool {
+    (1..=10_080).contains(&n)
+}
+
 /// Ob `s` eine pragmatisch gültige Zeitzone ist. Volle IANA-TZ-DB-Prüfung wäre
 /// Over-Engineering (siehe Plan-Risiken) — Backend prüft nur „nicht-leer"; die UI
 /// bietet eine kuratierte Liste + Freitext.
@@ -61,6 +86,17 @@ pub struct EinsatzEinstellungen {
     pub zeitformat: Option<String>,
     pub einheiten: Option<String>,
     pub koordinatenformat: Option<String>,
+    // Verhalten & Automatik (LFH-133); None = projektweiter Default.
+    pub etb_nummer_praefix: Option<String>,
+    pub etb_nummer_start: Option<i64>,
+    pub meldung_nummer_praefix: Option<String>,
+    pub meldung_nummer_start: Option<i64>,
+    pub auftrag_nummer_praefix: Option<String>,
+    pub auftrag_nummer_start: Option<i64>,
+    pub meldung_bestaetigung_frist_min: Option<i64>,
+    pub auftrag_quittierung_frist_min: Option<i64>,
+    /// 0 = Auto-ETB-Dual-Publish aus; NULL/1 = an (heutiges Verhalten).
+    pub auto_etb_eintraege: Option<i64>,
     pub geaendert_at: Option<String>,
     pub geaendert_von: Option<i64>,
 }
@@ -77,9 +113,36 @@ impl EinsatzEinstellungen {
             zeitformat: None,
             einheiten: None,
             koordinatenformat: None,
+            etb_nummer_praefix: None,
+            etb_nummer_start: None,
+            meldung_nummer_praefix: None,
+            meldung_nummer_start: None,
+            auftrag_nummer_praefix: None,
+            auftrag_nummer_start: None,
+            meldung_bestaetigung_frist_min: None,
+            auftrag_quittierung_frist_min: None,
+            auto_etb_eintraege: None,
             geaendert_at: None,
             geaendert_von: None,
         }
+    }
+
+    /// Startwert der ETB-Nummerierung (Default 1, wenn nicht konfiguriert).
+    pub fn etb_startwert(&self) -> i64 {
+        self.etb_nummer_start.unwrap_or(1)
+    }
+    /// Startwert der Meldungs-Nummerierung (Default 1).
+    pub fn meldung_startwert(&self) -> i64 {
+        self.meldung_nummer_start.unwrap_or(1)
+    }
+    /// Startwert der Auftrags-Nummerierung (Default 1).
+    pub fn auftrag_startwert(&self) -> i64 {
+        self.auftrag_nummer_start.unwrap_or(1)
+    }
+    /// Ob Auto-ETB-Folgeeinträge (Pattern B) erzeugt werden. Default an;
+    /// nur ein explizites `Some(0)` schaltet das Dual-Publish ab.
+    pub fn auto_etb_aktiv(&self) -> bool {
+        self.auto_etb_eintraege != Some(0)
     }
 
     /// API-Darstellung: `fachebenen_sichtbar` als geparstes Objekt (symmetrisch zur
@@ -98,6 +161,19 @@ impl EinsatzEinstellungen {
             zeitformat: self.zeitformat.clone(),
             einheiten: self.einheiten.clone(),
             koordinatenformat: self.koordinatenformat.clone(),
+            etb_nummer_praefix: self.etb_nummer_praefix.clone(),
+            etb_nummer_start: self.etb_nummer_start,
+            meldung_nummer_praefix: self.meldung_nummer_praefix.clone(),
+            meldung_nummer_start: self.meldung_nummer_start,
+            auftrag_nummer_praefix: self.auftrag_nummer_praefix.clone(),
+            auftrag_nummer_start: self.auftrag_nummer_start,
+            meldung_bestaetigung_frist_min: self.meldung_bestaetigung_frist_min,
+            auftrag_quittierung_frist_min: self.auftrag_quittierung_frist_min,
+            auto_etb_eintraege: self.auto_etb_eintraege,
+            // Freeze-Flags werden vom Aufrufer mit Daten-Existenz gefüllt (anzeige_mit_freeze).
+            etb_nummer_eingefroren: false,
+            meldung_nummer_eingefroren: false,
+            auftrag_nummer_eingefroren: false,
             geaendert_at: self.geaendert_at.clone(),
             geaendert_von: self.geaendert_von,
         }
@@ -116,6 +192,21 @@ pub struct EinstellungenAnzeige {
     pub zeitformat: Option<String>,
     pub einheiten: Option<String>,
     pub koordinatenformat: Option<String>,
+    // Verhalten & Automatik (LFH-133).
+    pub etb_nummer_praefix: Option<String>,
+    pub etb_nummer_start: Option<i64>,
+    pub meldung_nummer_praefix: Option<String>,
+    pub meldung_nummer_start: Option<i64>,
+    pub auftrag_nummer_praefix: Option<String>,
+    pub auftrag_nummer_start: Option<i64>,
+    pub meldung_bestaetigung_frist_min: Option<i64>,
+    pub auftrag_quittierung_frist_min: Option<i64>,
+    pub auto_etb_eintraege: Option<i64>,
+    /// Freeze pro Nummernkreis (LFH-133): true, sobald die erste Nummer vergeben ist
+    /// (Präfix + Startwert dann read-only). Aus Daten-Existenz abgeleitet, nicht gespeichert.
+    pub etb_nummer_eingefroren: bool,
+    pub meldung_nummer_eingefroren: bool,
+    pub auftrag_nummer_eingefroren: bool,
     pub geaendert_at: Option<String>,
     pub geaendert_von: Option<i64>,
 }
@@ -129,6 +220,9 @@ pub async fn laden_oder_default(
     let row = sqlx::query_as::<_, EinsatzEinstellungen>(
         "SELECT einsatz_id, standard_modul, basemap_modus, karten_zoom_start, \
                 fachebenen_sichtbar, zeitzone, zeitformat, einheiten, koordinatenformat, \
+                etb_nummer_praefix, etb_nummer_start, meldung_nummer_praefix, meldung_nummer_start, \
+                auftrag_nummer_praefix, auftrag_nummer_start, meldung_bestaetigung_frist_min, \
+                auftrag_quittierung_frist_min, auto_etb_eintraege, \
                 geaendert_at, geaendert_von \
          FROM einsatz_einstellungen WHERE einsatz_id = ?",
     )
@@ -139,7 +233,7 @@ pub async fn laden_oder_default(
 }
 
 /// Eingabe für `speichern`; bereits vom Handler getrimmt/validiert.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct EinstellungenDaten<'a> {
     pub standard_modul: Option<&'a str>,
     pub basemap_modus: Option<&'a str>,
@@ -149,6 +243,16 @@ pub struct EinstellungenDaten<'a> {
     pub zeitformat: Option<&'a str>,
     pub einheiten: Option<&'a str>,
     pub koordinatenformat: Option<&'a str>,
+    // Verhalten & Automatik (LFH-133).
+    pub etb_nummer_praefix: Option<&'a str>,
+    pub etb_nummer_start: Option<i64>,
+    pub meldung_nummer_praefix: Option<&'a str>,
+    pub meldung_nummer_start: Option<i64>,
+    pub auftrag_nummer_praefix: Option<&'a str>,
+    pub auftrag_nummer_start: Option<i64>,
+    pub meldung_bestaetigung_frist_min: Option<i64>,
+    pub auftrag_quittierung_frist_min: Option<i64>,
+    pub auto_etb_eintraege: Option<i64>,
 }
 
 /// Speichert die Einstellungen (UPSERT auf `einsatz_id`); setzt die Audit-Felder.
@@ -162,8 +266,11 @@ pub async fn speichern(
         "INSERT INTO einsatz_einstellungen \
             (einsatz_id, standard_modul, basemap_modus, karten_zoom_start, \
              fachebenen_sichtbar, zeitzone, zeitformat, einheiten, koordinatenformat, \
+             etb_nummer_praefix, etb_nummer_start, meldung_nummer_praefix, meldung_nummer_start, \
+             auftrag_nummer_praefix, auftrag_nummer_start, meldung_bestaetigung_frist_min, \
+             auftrag_quittierung_frist_min, auto_etb_eintraege, \
              geaendert_at, geaendert_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?) \
          ON CONFLICT(einsatz_id) DO UPDATE SET \
              standard_modul = excluded.standard_modul, \
              basemap_modus = excluded.basemap_modus, \
@@ -173,6 +280,15 @@ pub async fn speichern(
              zeitformat = excluded.zeitformat, \
              einheiten = excluded.einheiten, \
              koordinatenformat = excluded.koordinatenformat, \
+             etb_nummer_praefix = excluded.etb_nummer_praefix, \
+             etb_nummer_start = excluded.etb_nummer_start, \
+             meldung_nummer_praefix = excluded.meldung_nummer_praefix, \
+             meldung_nummer_start = excluded.meldung_nummer_start, \
+             auftrag_nummer_praefix = excluded.auftrag_nummer_praefix, \
+             auftrag_nummer_start = excluded.auftrag_nummer_start, \
+             meldung_bestaetigung_frist_min = excluded.meldung_bestaetigung_frist_min, \
+             auftrag_quittierung_frist_min = excluded.auftrag_quittierung_frist_min, \
+             auto_etb_eintraege = excluded.auto_etb_eintraege, \
              geaendert_at = excluded.geaendert_at, \
              geaendert_von = excluded.geaendert_von",
     )
@@ -185,6 +301,15 @@ pub async fn speichern(
     .bind(daten.zeitformat)
     .bind(daten.einheiten)
     .bind(daten.koordinatenformat)
+    .bind(daten.etb_nummer_praefix)
+    .bind(daten.etb_nummer_start)
+    .bind(daten.meldung_nummer_praefix)
+    .bind(daten.meldung_nummer_start)
+    .bind(daten.auftrag_nummer_praefix)
+    .bind(daten.auftrag_nummer_start)
+    .bind(daten.meldung_bestaetigung_frist_min)
+    .bind(daten.auftrag_quittierung_frist_min)
+    .bind(daten.auto_etb_eintraege)
     .bind(erfasser_id)
     .execute(pool)
     .await?;
@@ -253,6 +378,7 @@ mod tests {
                 zeitformat: Some("24h"),
                 einheiten: Some("metrisch"),
                 koordinatenformat: Some("mgrs"),
+                ..Default::default()
             },
         )
         .await
@@ -281,6 +407,7 @@ mod tests {
                 zeitformat: None,
                 einheiten: None,
                 koordinatenformat: None,
+                ..Default::default()
             },
         )
         .await
@@ -303,17 +430,8 @@ mod tests {
     #[tokio::test]
     async fn anzeige_parst_fachebenen_zu_objekt() {
         let e = EinsatzEinstellungen {
-            einsatz_id: 1,
-            standard_modul: None,
-            basemap_modus: None,
-            karten_zoom_start: None,
             fachebenen_sichtbar: Some(r#"{"nina":true,"dwd":false,"pegelonline":false,"kritis":false}"#.into()),
-            zeitzone: None,
-            zeitformat: None,
-            einheiten: None,
-            koordinatenformat: None,
-            geaendert_at: None,
-            geaendert_von: None,
+            ..EinsatzEinstellungen::leer(1)
         };
         let a = e.anzeige();
         assert_eq!(a.fachebenen_sichtbar.as_ref().unwrap()["nina"], true);
@@ -344,5 +462,94 @@ mod tests {
         assert!(ist_gueltige_zeitzone("UTC"));
         assert!(!ist_gueltige_zeitzone(""));
         assert!(!ist_gueltige_zeitzone("   "));
+    }
+
+    #[test]
+    fn verhalten_validatoren() {
+        // Präfix: Whitelist + Länge ≤ 8 (getrimmt).
+        assert!(ist_gueltiges_nummer_praefix("EB-"));
+        assert!(ist_gueltiges_nummer_praefix("M_2026/"));
+        assert!(ist_gueltiges_nummer_praefix("A B-1")); // interner Space erlaubt
+        assert!(ist_gueltiges_nummer_praefix("")); // leer = kein Präfix
+        assert!(ist_gueltiges_nummer_praefix("  EB-  ")); // getrimmt 3 Zeichen
+        assert!(!ist_gueltiges_nummer_praefix("123456789")); // 9 Zeichen
+        assert!(!ist_gueltiges_nummer_praefix("EB#")); // '#' nicht in Whitelist
+        assert!(!ist_gueltiges_nummer_praefix("EB!")); // '!' nicht in Whitelist
+
+        // Startwert: 1..=999_999.
+        assert!(ist_gueltiger_startwert(1));
+        assert!(ist_gueltiger_startwert(100));
+        assert!(ist_gueltiger_startwert(999_999));
+        assert!(!ist_gueltiger_startwert(0));
+        assert!(!ist_gueltiger_startwert(-5));
+        assert!(!ist_gueltiger_startwert(1_000_000));
+
+        // Frist (Minuten): 1..=10_080.
+        assert!(ist_gueltige_frist_min(1));
+        assert!(ist_gueltige_frist_min(30));
+        assert!(ist_gueltige_frist_min(10_080));
+        assert!(!ist_gueltige_frist_min(0));
+        assert!(!ist_gueltige_frist_min(10_081));
+    }
+
+    #[test]
+    fn leer_ist_alle_none_und_startwert_default_eins() {
+        let e = EinsatzEinstellungen::leer(7);
+        assert_eq!(e.etb_nummer_praefix, None);
+        assert_eq!(e.etb_nummer_start, None);
+        assert_eq!(e.meldung_nummer_start, None);
+        assert_eq!(e.auftrag_nummer_start, None);
+        assert_eq!(e.meldung_bestaetigung_frist_min, None);
+        assert_eq!(e.auftrag_quittierung_frist_min, None);
+        assert_eq!(e.auto_etb_eintraege, None);
+        // Startwert-Auflösung: Default 1, wenn nicht gesetzt.
+        assert_eq!(e.etb_startwert(), 1);
+        assert_eq!(e.meldung_startwert(), 1);
+        assert_eq!(e.auftrag_startwert(), 1);
+        // Auto-ETB: Default an.
+        assert!(e.auto_etb_aktiv());
+    }
+
+    #[tokio::test]
+    async fn speichern_round_trip_verhalten_felder() {
+        let pool = crate::db::test_pool().await;
+        let (eid, bid) = fixture(&pool).await;
+        let g = speichern(
+            &pool,
+            eid,
+            bid,
+            EinstellungenDaten {
+                etb_nummer_praefix: Some("EB-"),
+                etb_nummer_start: Some(100),
+                meldung_nummer_praefix: Some("M-"),
+                meldung_nummer_start: Some(5),
+                auftrag_nummer_praefix: Some("A-"),
+                auftrag_nummer_start: Some(10),
+                meldung_bestaetigung_frist_min: Some(30),
+                auftrag_quittierung_frist_min: Some(45),
+                auto_etb_eintraege: Some(0),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(g.etb_nummer_praefix.as_deref(), Some("EB-"));
+        assert_eq!(g.etb_nummer_start, Some(100));
+        assert_eq!(g.meldung_nummer_praefix.as_deref(), Some("M-"));
+        assert_eq!(g.meldung_nummer_start, Some(5));
+        assert_eq!(g.auftrag_nummer_praefix.as_deref(), Some("A-"));
+        assert_eq!(g.auftrag_nummer_start, Some(10));
+        assert_eq!(g.meldung_bestaetigung_frist_min, Some(30));
+        assert_eq!(g.auftrag_quittierung_frist_min, Some(45));
+        assert_eq!(g.auto_etb_eintraege, Some(0));
+        assert_eq!(g.etb_startwert(), 100);
+        assert_eq!(g.auftrag_startwert(), 10);
+        assert!(!g.auto_etb_aktiv(), "Some(0) → Auto-ETB aus");
+
+        // Anzeige spiegelt die Felder (Freeze-Flags hier defaultmäßig false).
+        let a = g.anzeige();
+        assert_eq!(a.etb_nummer_start, Some(100));
+        assert_eq!(a.auto_etb_eintraege, Some(0));
+        assert!(!a.etb_nummer_eingefroren);
     }
 }

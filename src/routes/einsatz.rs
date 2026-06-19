@@ -261,6 +261,8 @@ pub async fn einstellungen_setzen(
             zeitformat: zeitformat.as_deref(),
             einheiten: einheiten.as_deref(),
             koordinatenformat: koordinatenformat.as_deref(),
+            // Verhalten & Automatik (LFH-133): vollständige Annahme + Freeze-Guard folgt in Task 5.
+            ..Default::default()
         },
     )
     .await?;
