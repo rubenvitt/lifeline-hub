@@ -12,9 +12,14 @@ vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn(),
   ladeEinstellungen: vi.fn(),
   speichereEinstellungen: vi.fn(),
+  ladeModulOverrides: vi.fn(),
+  setzeModulOverride: vi.fn(),
 }));
 
-import { ladeEinsatz, ladeEinstellungen, speichereEinstellungen } from '../api/einsaetze';
+import {
+  ladeEinsatz, ladeEinstellungen, speichereEinstellungen,
+  ladeModulOverrides, setzeModulOverride,
+} from '../api/einsaetze';
 
 function rendern() {
   return renderMitProviders(
@@ -30,6 +35,8 @@ describe('EinsatzEinstellungenPage', () => {
     vi.mocked(ladeEinsatz).mockResolvedValue({
       id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung',
     } as never);
+    vi.mocked(ladeModulOverrides).mockResolvedValue({});
+    vi.mocked(setzeModulOverride).mockResolvedValue({} as never);
   });
 
   it('zeigt die gespeicherten Werte (Default-Modul + Basemap)', async () => {
@@ -48,8 +55,10 @@ describe('EinsatzEinstellungenPage', () => {
     // Sektionen + gespeicherte Werte sichtbar (async: nach Query-Auflösung).
     expect(await screen.findByText('Standard-Modul (Einstieg)')).toBeInTheDocument();
     expect(screen.getByText('Karten-Defaults')).toBeInTheDocument();
-    expect(screen.getByText('ETB')).toBeInTheDocument(); // gewähltes Standard-Modul
-    expect(screen.getByText('Offline')).toBeInTheDocument(); // gewählte Basemap
+    // Gewähltes Standard-Modul: das Select-Selection-Item trägt title="ETB"
+    // ('ETB' kommt jetzt auch als Modul-Label in der Sichtbarkeits-Sektion vor).
+    expect(screen.getByTitle('ETB')).toBeInTheDocument();
+    expect(screen.getByTitle('Offline')).toBeInTheDocument(); // gewählte Basemap
   });
 
   it('speichert den transformierten Payload (Fachebenen-Array → Objekt, Zoom-Passthrough)', async () => {
@@ -77,6 +86,42 @@ describe('EinsatzEinstellungenPage', () => {
         karten_zoom_start: 12,
         // Checkbox-Array → Boolean-Objekt.
         fachebenen_sichtbar: { nina: true, dwd: false, pegelonline: false, kritis: false },
+      }),
+    );
+  });
+
+  it('zeigt die Modul-Sichtbarkeits-Sektion; nicht-ausblendbare Module sind gesperrt (LFH-132)', async () => {
+    vi.mocked(ladeEinstellungen).mockResolvedValue({
+      einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
+      fachebenen_sichtbar: null, geaendert_at: null, geaendert_von: null,
+    });
+
+    rendern();
+
+    expect(await screen.findByText('Modul-Sichtbarkeit & Berechtigungen')).toBeInTheDocument();
+    // Stammdaten lassen sich nicht ausblenden → Switch deaktiviert.
+    expect(screen.getByRole('switch', { name: 'Sichtbar: Einsatzdaten' })).toBeDisabled();
+    // ETB ist ausblendbar → Switch aktiv und (Default) eingeschaltet.
+    const etbSwitch = screen.getByRole('switch', { name: 'Sichtbar: ETB' });
+    expect(etbSwitch).toBeEnabled();
+    expect(etbSwitch).toBeChecked();
+  });
+
+  it('speichert das Ausblenden eines Moduls sofort per PUT (LFH-132)', async () => {
+    vi.mocked(ladeEinstellungen).mockResolvedValue({
+      einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
+      fachebenen_sichtbar: null, geaendert_at: null, geaendert_von: null,
+    });
+
+    rendern();
+
+    const etbSwitch = await screen.findByRole('switch', { name: 'Sichtbar: ETB' });
+    fireEvent.click(etbSwitch);
+
+    await waitFor(() =>
+      expect(setzeModulOverride).toHaveBeenCalledWith(1, 'etb', {
+        sichtbar: false,
+        benoetigte_rolle: null,
       }),
     );
   });

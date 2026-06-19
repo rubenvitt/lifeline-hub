@@ -1,11 +1,23 @@
-import { Alert, App, Button, Checkbox, Form, Select, Spin, Typography } from 'antd';
+import { Alert, App, Button, Checkbox, Form, Select, Spin, Switch, Typography } from 'antd';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ladeEinsatz, ladeEinstellungen, speichereEinstellungen } from '../api/einsaetze';
+import {
+  ladeEinsatz, ladeEinstellungen, speichereEinstellungen,
+  ladeModulOverrides, setzeModulOverride,
+} from '../api/einsaetze';
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
-import { modulRegistry } from '../einsatz/modulRegistry';
-import type { BasemapModus, EinstellungenUpdate, FachebenenSichtbar } from '../api/types';
+import { modulRegistry, istModulAusblendbar } from '../einsatz/modulRegistry';
+import type {
+  BasemapModus, EinstellungenUpdate, FachebenenSichtbar, ModulOverrideUpdate,
+} from '../api/types';
+
+/** Optionen für die benötigte Rolle eines Moduls; '' = frei (für alle sichtbaren). */
+const ROLLEN_OPTIONEN: { value: string; label: string }[] = [
+  { value: '', label: 'Frei (alle)' },
+  { value: 'fuehrungskraft', label: 'Führungskraft' },
+  { value: 'admin', label: 'Admin' },
+];
 
 const BASEMAP_OPTIONEN: { value: BasemapModus; label: string }[] = [
   { value: 'online', label: 'Online' },
@@ -43,6 +55,21 @@ export default function EinsatzEinstellungenPage() {
     queryKey: ['einsatz-einstellungen', einsatzId],
     queryFn: () => ladeEinstellungen(einsatzId),
   });
+  const overridesQuery = useQuery({
+    queryKey: ['modulOverrides', einsatzId],
+    queryFn: () => ladeModulOverrides(einsatzId),
+  });
+
+  const overrideMutation = useMutation({
+    mutationFn: (vars: { modulKey: string; update: ModulOverrideUpdate }) =>
+      setzeModulOverride(einsatzId, vars.modulKey, vars.update),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['modulOverrides', einsatzId] });
+      message.success('Modul-Einstellung gespeichert');
+    },
+    onError: (e) =>
+      message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
+  });
 
   const speichernMutation = useMutation({
     mutationFn: (felder: EinstellungenUpdate) => speichereEinstellungen(einsatzId, felder),
@@ -54,7 +81,7 @@ export default function EinsatzEinstellungenPage() {
       message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
   });
 
-  if (einsatzQuery.isLoading || einstellungenQuery.isLoading) {
+  if (einsatzQuery.isLoading || einstellungenQuery.isLoading || overridesQuery.isLoading) {
     return (
       <div style={{ textAlign: 'center', paddingTop: 80 }}>
         <Spin size="large" />
@@ -74,6 +101,10 @@ export default function EinsatzEinstellungenPage() {
     (einsatz.meine_rolle === 'einsatzleitung' ||
       einsatz.meine_rolle === 'fuehrungspersonal' ||
       istAdmin);
+  // Modul-Overrides darf nur die Einsatzleitung oder ein System-Admin verwalten
+  // (deckt das Backend-Gate einsatzleitung|admin ab).
+  const darfModuleVerwalten = istAktiv && (einsatz.meine_rolle === 'einsatzleitung' || istAdmin);
+  const overrides = overridesQuery.data ?? {};
 
   // Nur fertige Module sind als Default-Modul wählbar (Pre-Mortem: kein Sprung
   // auf geplante/WIP-Module).
@@ -163,6 +194,61 @@ export default function EinsatzEinstellungenPage() {
           Speichern
         </Button>
       </Form>
+
+      <Typography.Title level={5} style={{ marginTop: 32 }}>
+        Modul-Sichtbarkeit &amp; Berechtigungen
+      </Typography.Title>
+      <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
+        Module für diesen Einsatz ausblenden oder auf eine Rolle beschränken. Einsatzdaten und
+        Einstellungen lassen sich nicht ausblenden. Änderungen werden sofort gespeichert.
+      </Typography.Paragraph>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, opacity: 0.6 }}>
+          <span style={{ flex: 1 }}>Modul</span>
+          <span style={{ width: 64, textAlign: 'center' }}>Sichtbar</span>
+          <span style={{ width: 180 }}>Benötigte Rolle</span>
+        </div>
+        {modulRegistry.map((m) => {
+          const ausblendbar = istModulAusblendbar(m.key);
+          const ov = overrides[m.key];
+          const sichtbar = ausblendbar ? ov?.sichtbar ?? true : true;
+          const rolle = ov?.benoetigte_rolle ?? null;
+          return (
+            <div key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ flex: 1 }}>{m.label}</span>
+              <div style={{ width: 64, textAlign: 'center' }}>
+                <Switch
+                  aria-label={`Sichtbar: ${m.label}`}
+                  checked={sichtbar}
+                  disabled={!darfModuleVerwalten || !ausblendbar || overrideMutation.isPending}
+                  onChange={(checked) =>
+                    overrideMutation.mutate({
+                      modulKey: m.key,
+                      update: { sichtbar: checked, benoetigte_rolle: rolle },
+                    })
+                  }
+                />
+              </div>
+              <Select
+                aria-label={`Benötigte Rolle: ${m.label}`}
+                style={{ width: 180 }}
+                value={rolle ?? ''}
+                disabled={!darfModuleVerwalten || overrideMutation.isPending}
+                options={ROLLEN_OPTIONEN}
+                onChange={(val) =>
+                  overrideMutation.mutate({
+                    modulKey: m.key,
+                    update: {
+                      sichtbar,
+                      benoetigte_rolle: (val || null) as ModulOverrideUpdate['benoetigte_rolle'],
+                    },
+                  })
+                }
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
