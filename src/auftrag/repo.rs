@@ -61,7 +61,7 @@ impl EmpfaengerFilter {
 /// Quittungs-Aggregat (Subquery auf auftrag_empfaenger) und abgeleiteten Feldern.
 /// `jetzt` wird als ERSTER `?` gebunden (computed columns vor WHERE), dann WHERE.
 const ANZEIGE_SELECT: &str =
-    "SELECT a.id, a.einsatz_id, a.auftrag_text, a.absicht, a.lage, a.ort, a.zeit, a.mittel, \
+    "SELECT a.id, a.einsatz_id, a.lfd_nr, a.auftrag_text, a.absicht, a.lage, a.ort, a.zeit, a.mittel, \
             a.verbindung, a.sicherheit, a.prioritaet, a.richtung, a.frist_at, a.erteilt_at, a.in_arbeit_at, \
             a.vollzugsmeldung, a.abgenommen_at, a.abgenommen_von_id, a.etb_anordnung_id, \
             a.quell_etb_eintrag_id, \
@@ -214,11 +214,16 @@ pub async fn anlegen_tx(
     debug_assert!(prioritaet_gueltig(daten.prioritaet));
     debug_assert!(super::richtung_gueltig(daten.richtung));
 
+    // lfd_nr atomar je Einsatz (Muster etb/meldung: INSERT … SELECT COALESCE(MAX(lfd_nr)+1, ?)
+    // FROM auftrag WHERE einsatz_id = ? — die Vergabe liegt in derselben Transaktion wie der
+    // Insert, kein read-then-write). Startwert vorerst fest 1 (im Nummernkreis-Task durchgereicht).
     let auftrag_id: i64 = sqlx::query_scalar(
         "INSERT INTO auftrag \
-           (einsatz_id, auftrag_text, absicht, lage, ort, zeit, mittel, verbindung, sicherheit, \
+           (einsatz_id, lfd_nr, auftrag_text, absicht, lage, ort, zeit, mittel, verbindung, sicherheit, \
             prioritaet, richtung, frist_at, erteilt_at, erstellt_von_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+         SELECT ?, COALESCE(MAX(lfd_nr) + 1, 1), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? \
+         FROM auftrag WHERE einsatz_id = ? \
+         RETURNING id",
     )
     .bind(einsatz_id)
     .bind(daten.auftrag_text)
@@ -234,6 +239,7 @@ pub async fn anlegen_tx(
     .bind(daten.frist_at)
     .bind(daten.erteilt_at)
     .bind(ersteller_id)
+    .bind(einsatz_id)
     .fetch_one(&mut *tx)
     .await?;
 
@@ -532,6 +538,29 @@ mod tests {
             prioritaet: prio,
             ..daten(text, frist, empf)
         }
+    }
+
+    #[tokio::test]
+    async fn lfd_nr_startet_bei_eins_und_zaehlt_hoch() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let a1 = anlegen(&pool, e, b, daten("erster", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+        let a2 = anlegen(&pool, e, b, daten("zweiter", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+        assert_eq!(a1.auftrag.lfd_nr, Some(1));
+        assert_eq!(a2.auftrag.lfd_nr, Some(2));
+    }
+
+    #[tokio::test]
+    async fn lfd_nr_ist_pro_einsatz_unabhaengig() {
+        let pool = crate::db::test_pool().await;
+        let (b, e_a) = setup(&pool).await;
+        let e_b: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage B') RETURNING id")
+            .fetch_one(&pool).await.unwrap();
+        anlegen(&pool, e_a, b, daten("A1", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+        let b1 = anlegen(&pool, e_b, b, daten("B1", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+        // Fremder Einsatz mit Auftrag darf die Nummerierung dieses Einsatzes nicht beeinflussen.
+        assert_eq!(b1.auftrag.lfd_nr, Some(1));
     }
 
     #[tokio::test]
