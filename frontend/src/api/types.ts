@@ -60,6 +60,14 @@ export interface FachebenenSichtbar {
 /** Basemap-Modus als Karten-Default pro Einsatz. */
 export type BasemapModus = 'online' | 'offline' | 'blind';
 
+// Anzeige-Konventionen pro Einsatz (LFH-136). null = projektweiter Default.
+/** Zeitformat: 24-Stunden vs. 12-Stunden (AM/PM). */
+export type Zeitformat = '24h' | '12h';
+/** Einheiten-System für Größenanzeigen. */
+export type EinheitenSystem = 'metrisch' | 'imperial';
+/** Koordinaten-Anzeigeformat. */
+export type Koordinatenformat = 'wgs84' | 'mgrs' | 'utm';
+
 /**
  * Einsatz-Einstellungen (LFH-55/131). `fachebenen_sichtbar` wird vom Backend
  * (EinstellungenAnzeige) als Objekt geliefert; `null` = nicht gesetzt → Default.
@@ -70,6 +78,11 @@ export interface EinsatzEinstellungen {
   basemap_modus: BasemapModus | null;
   karten_zoom_start: number | null;
   fachebenen_sichtbar: FachebenenSichtbar | null;
+  // Anzeige-Konventionen (LFH-136); null = projektweiter Default.
+  zeitzone: string | null;
+  zeitformat: Zeitformat | null;
+  einheiten: EinheitenSystem | null;
+  koordinatenformat: Koordinatenformat | null;
   geaendert_at: string | null;
   geaendert_von: number | null;
 }
@@ -80,6 +93,10 @@ export interface EinstellungenUpdate {
   basemap_modus: BasemapModus | null;
   karten_zoom_start: number | null;
   fachebenen_sichtbar: FachebenenSichtbar | null;
+  zeitzone: string | null;
+  zeitformat: Zeitformat | null;
+  einheiten: EinheitenSystem | null;
+  koordinatenformat: Koordinatenformat | null;
 }
 
 /**
