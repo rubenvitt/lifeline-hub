@@ -2,6 +2,7 @@ import { Button, Descriptions, Select, Space, Tag } from 'antd';
 import { Link } from 'react-router-dom';
 import type { KarteMarker, MarkerTyp } from './marker';
 import KartenDetailCard from './KartenDetailCard';
+import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 
 export interface InspectorProps {
   einsatzId: number;
@@ -51,6 +52,7 @@ const TAKTISCHE_TYPEN: MarkerTyp[] = ['einheit', 'fahrzeug', 'fuehrung', 'abschn
 export default function Inspector({
   einsatzId, marker, darfSchreiben, onSchliessen, onVerortungLoeschen, onSymbolAendern,
 }: InspectorProps) {
+  const { formatKoordinate } = useAnzeigeKonventionen();
   const modulLink =
     marker.typ === 'uhs' ? `/einsaetze/${einsatzId}/unfallhilfsstellen/${marker.id}`
     : marker.typ === 'schaden' ? `/einsaetze/${einsatzId}/schaeden?schaden=${marker.id}`
@@ -74,7 +76,7 @@ export default function Inspector({
           <Descriptions.Item label="Inhalt">{marker.lageMeldung.inhalt}</Descriptions.Item>
         )}
         <Descriptions.Item label="Koordinate">
-          {marker.lat.toFixed(5)}, {marker.lon.toFixed(5)}
+          {formatKoordinate(marker.lat, marker.lon)}
         </Descriptions.Item>
       </Descriptions>
       {symbolAuswahl && (
