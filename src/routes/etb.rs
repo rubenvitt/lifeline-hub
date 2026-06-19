@@ -1,8 +1,14 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
+use crate::einsatz::berechtigung::{
+    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff, fordere_schreibrecht,
+};
+use crate::einsatz::modul_override;
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
+
+/// Modul-Key dieses Route-Moduls (LFH-132); gegen die Override-Map geprüft.
+const MODUL_KEY: &str = "etb";
 use crate::etb::{normalisiere_zeit, repo, EtbEintragAnzeige, EtbTyp, MeldeWeg};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -46,6 +52,8 @@ pub async fn erfassen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
     fordere_aktiv(&einsatz)?;
 
     // Typ validieren; System ist nicht client-erfassbar.
@@ -149,6 +157,8 @@ pub async fn auftrag_erteilen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
     fordere_aktiv(&einsatz)?;
     // Cross-Einsatz-Schutz: der Quell-Eintrag muss zu diesem Einsatz gehören.
     if !repo::gehoert_zu_einsatz(&state.pool, eintrag_id, einsatz_id).await? {
@@ -158,7 +168,7 @@ pub async fn auftrag_erteilen(
     // Gleiche Validierung wie POST /auftraege (geteilt) → kein zweiter, ungeprüfter Pfad.
     let now = jetzt();
     let validiert =
-        crate::routes::auftrag::validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now).await?;
+        crate::routes::auftrag::validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now, None).await?;
     let auftrag_id = crate::auftrag::repo::erteile_aus_etb_tx(
         &state.pool, einsatz_id, eintrag_id, benutzer.id, validiert.daten(),
     )
@@ -217,6 +227,8 @@ pub async fn liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?; // 404, wenn unbekannt
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
 
     // Typ validieren, falls gesetzt.
     if let Some(t) = &params.typ {
@@ -274,6 +286,8 @@ pub async fn stream(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?; // 404, wenn unbekannt
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
 
     let rx = state.live.abonniere(einsatz_id);
     let stream = BroadcastStream::new(rx).map(|res| {

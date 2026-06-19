@@ -648,6 +648,44 @@ async fn bestaetigung_frist_override_in_minuten() {
 }
 
 #[tokio::test]
+async fn bestaetigung_frist_default_aus_einstellungen_schlaegt_konstante() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    // Einsatz-Default 20 Min (≠ Konstante 5) konfigurieren (LFH-133).
+    let (s, _) = anfrage(
+        &app, "PUT", &format!("/api/einsaetze/{e}/einstellungen"), &admin,
+        Some(r#"{"meldung_bestaetigung_frist_min":20}"#),
+    ).await;
+    assert_eq!(s, StatusCode::OK);
+    // Sofortmeldung ohne Override → Frist = Eingang + 20 (Setting schlägt Konstante).
+    let (status, m) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/meldungen"), &admin, Some(&sofort_body())).await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(zeit(&m["bestaetigung_frist_at"]) - zeit(&m["eingang_at"]), Duration::minutes(20));
+}
+
+#[tokio::test]
+async fn bestaetigung_frist_request_override_schlaegt_einstellung() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (s, _) = anfrage(
+        &app, "PUT", &format!("/api/einsaetze/{e}/einstellungen"), &admin,
+        Some(r#"{"meldung_bestaetigung_frist_min":20}"#),
+    ).await;
+    assert_eq!(s, StatusCode::OK);
+    // Expliziter Request-Wert (8) schlägt das Setting (20).
+    let body = serde_json::json!({
+        "absender": "Florian Nord 1", "meldeweg": "funk", "inhalt": "MANV",
+        "prioritaet": "sofort", "ereigniszeit": "2026-06-12 09:00:00",
+        "bestaetigung_pflicht": true, "bestaetigung_frist_min": 8
+    }).to_string();
+    let (status, m) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/meldungen"), &admin, Some(&body)).await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(zeit(&m["bestaetigung_frist_at"]) - zeit(&m["eingang_at"]), Duration::minutes(8));
+}
+
+#[tokio::test]
 async fn bestaetigung_frist_nicht_positiv_ist_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
@@ -701,4 +739,22 @@ async fn richtung_filter_trennt_intern_extern() {
 
     let (status, _) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/meldungen?richtung=quatsch"), &admin, None).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn auto_etb_aus_unterdrueckt_etb_meldung_am_http_rand() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (s, _) = anfrage(
+        &app, "PUT", &format!("/api/einsaetze/{e}/einstellungen"), &admin,
+        Some(r#"{"auto_etb_eintraege":false}"#),
+    ).await;
+    assert_eq!(s, StatusCode::OK);
+
+    let (status, m) = anfrage(&app, "POST", &format!("/api/einsaetze/{e}/meldungen"), &admin, Some(&body_funk())).await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert!(m["etb_meldung_id"].is_null(), "Auto-ETB aus → keine ETB-Meldung");
+    let (_, etb) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}/etb"), &admin, None).await;
+    assert!(etb.as_array().unwrap().is_empty());
 }

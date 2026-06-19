@@ -61,7 +61,7 @@ impl EmpfaengerFilter {
 /// Quittungs-Aggregat (Subquery auf auftrag_empfaenger) und abgeleiteten Feldern.
 /// `jetzt` wird als ERSTER `?` gebunden (computed columns vor WHERE), dann WHERE.
 const ANZEIGE_SELECT: &str =
-    "SELECT a.id, a.einsatz_id, a.auftrag_text, a.absicht, a.lage, a.ort, a.zeit, a.mittel, \
+    "SELECT a.id, a.einsatz_id, a.lfd_nr, a.auftrag_text, a.absicht, a.lage, a.ort, a.zeit, a.mittel, \
             a.verbindung, a.sicherheit, a.prioritaet, a.richtung, a.frist_at, a.erteilt_at, a.in_arbeit_at, \
             a.vollzugsmeldung, a.abgenommen_at, a.abgenommen_von_id, a.etb_anordnung_id, \
             a.quell_etb_eintrag_id, \
@@ -209,18 +209,27 @@ pub async fn anlegen_tx(
     tx: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
     ersteller_id: i64,
+    auftrag_startwert: i64,
+    etb_startwert: i64,
+    auto_etb: bool,
     daten: &AuftragDaten<'_>,
 ) -> Result<i64, AppError> {
     debug_assert!(prioritaet_gueltig(daten.prioritaet));
     debug_assert!(super::richtung_gueltig(daten.richtung));
 
+    // lfd_nr atomar je Einsatz (Muster etb/meldung: INSERT … SELECT COALESCE(MAX(lfd_nr)+1, ?)
+    // FROM auftrag WHERE einsatz_id = ? — die Vergabe liegt in derselben Transaktion wie der
+    // Insert, kein read-then-write). Startwert aus den Einstellungen (Default 1).
     let auftrag_id: i64 = sqlx::query_scalar(
         "INSERT INTO auftrag \
-           (einsatz_id, auftrag_text, absicht, lage, ort, zeit, mittel, verbindung, sicherheit, \
+           (einsatz_id, lfd_nr, auftrag_text, absicht, lage, ort, zeit, mittel, verbindung, sicherheit, \
             prioritaet, richtung, frist_at, erteilt_at, erstellt_von_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? \
+         FROM auftrag WHERE einsatz_id = ? \
+         RETURNING id",
     )
     .bind(einsatz_id)
+    .bind(auftrag_startwert)
     .bind(daten.auftrag_text)
     .bind(daten.absicht)
     .bind(daten.lage)
@@ -234,6 +243,7 @@ pub async fn anlegen_tx(
     .bind(daten.frist_at)
     .bind(daten.erteilt_at)
     .bind(ersteller_id)
+    .bind(einsatz_id)
     .fetch_one(&mut *tx)
     .await?;
 
@@ -261,34 +271,39 @@ pub async fn anlegen_tx(
     }
 
     // ETB-Anordnung (Pattern B): erst NACH den Inserts, im selben Commit.
-    let an = empfaenger_klartext(&daten.empfaenger, &mut *tx).await?;
-    let etb_id = crate::etb::repo::anlegen_tx(
-        &mut *tx,
-        einsatz_id,
-        ersteller_id,
-        crate::etb::repo::EintragDaten {
-            typ: crate::etb::TYP_ANORDNUNG,
-            inhalt: daten.auftrag_text,
-            von: None,
-            an: Some(&an),
-            meldeweg: None,
-            veranlassung: None,
-            ereigniszeit: Some(daten.erteilt_at),
-            erfasst_lokal_at: None,
-            berichtigt_eintrag_id: None,
-        },
-    )
-    .await?;
-    sqlx::query("UPDATE etb_eintrag SET auftrag_id = ? WHERE id = ?")
-        .bind(auftrag_id)
-        .bind(etb_id)
-        .execute(&mut *tx)
+    // Auto-ETB-Schalter (LFH-133): bei abgeschaltetem Dual-Publish wird kein
+    // ETB-Folgeeintrag erzeugt; etb_anordnung_id bleibt NULL.
+    if auto_etb {
+        let an = empfaenger_klartext(&daten.empfaenger, &mut *tx).await?;
+        let etb_id = crate::etb::repo::anlegen_tx(
+            &mut *tx,
+            einsatz_id,
+            ersteller_id,
+            etb_startwert,
+            crate::etb::repo::EintragDaten {
+                typ: crate::etb::TYP_ANORDNUNG,
+                inhalt: daten.auftrag_text,
+                von: None,
+                an: Some(&an),
+                meldeweg: None,
+                veranlassung: None,
+                ereigniszeit: Some(daten.erteilt_at),
+                erfasst_lokal_at: None,
+                berichtigt_eintrag_id: None,
+            },
+        )
         .await?;
-    sqlx::query("UPDATE auftrag SET etb_anordnung_id = ? WHERE id = ?")
-        .bind(etb_id)
-        .bind(auftrag_id)
-        .execute(&mut *tx)
-        .await?;
+        sqlx::query("UPDATE etb_eintrag SET auftrag_id = ? WHERE id = ?")
+            .bind(auftrag_id)
+            .bind(etb_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("UPDATE auftrag SET etb_anordnung_id = ? WHERE id = ?")
+            .bind(etb_id)
+            .bind(auftrag_id)
+            .execute(&mut *tx)
+            .await?;
+    }
 
     Ok(auftrag_id)
 }
@@ -302,8 +317,18 @@ pub async fn anlegen(
     daten: AuftragDaten<'_>,
     jetzt: &str,
 ) -> Result<AuftragDetail, AppError> {
+    let einst = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id).await?;
     let mut tx = pool.begin().await?;
-    let auftrag_id = anlegen_tx(&mut tx, einsatz_id, ersteller_id, &daten).await?;
+    let auftrag_id = anlegen_tx(
+        &mut tx,
+        einsatz_id,
+        ersteller_id,
+        einst.auftrag_startwert(),
+        einst.etb_startwert(),
+        einst.auto_etb_aktiv(),
+        &daten,
+    )
+    .await?;
     tx.commit().await?;
     laden(pool, auftrag_id, jetzt).await
 }
@@ -322,8 +347,18 @@ pub async fn erteile_aus_etb_tx(
     erteiler_id: i64,
     daten: AuftragDaten<'_>,
 ) -> Result<i64, AppError> {
+    let einst = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id).await?;
     let mut tx = pool.begin().await?;
-    let auftrag_id = anlegen_tx(&mut tx, einsatz_id, erteiler_id, &daten).await?;
+    let auftrag_id = anlegen_tx(
+        &mut tx,
+        einsatz_id,
+        erteiler_id,
+        einst.auftrag_startwert(),
+        einst.etb_startwert(),
+        einst.auto_etb_aktiv(),
+        &daten,
+    )
+    .await?;
     sqlx::query("UPDATE auftrag SET quell_etb_eintrag_id = ? WHERE id = ?")
         .bind(quell_etb_eintrag_id)
         .bind(auftrag_id)
@@ -406,6 +441,9 @@ pub async fn melde_vollzug(
     vollzugsmeldung: &str,
     jetzt: &str,
 ) -> Result<i64, AppError> {
+    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
+        .await?
+        .etb_startwert();
     let mut tx = pool.begin().await?;
     sqlx::query("UPDATE auftrag SET vollzugsmeldung = ? WHERE id = ?")
         .bind(vollzugsmeldung)
@@ -416,6 +454,7 @@ pub async fn melde_vollzug(
         &mut tx,
         einsatz_id,
         von_id,
+        etb_startwert,
         crate::etb::repo::EintragDaten {
             typ: crate::etb::TYP_MELDUNG,
             inhalt: vollzugsmeldung,
@@ -532,6 +571,86 @@ mod tests {
             prioritaet: prio,
             ..daten(text, frist, empf)
         }
+    }
+
+    #[tokio::test]
+    async fn lfd_nr_startet_bei_eins_und_zaehlt_hoch() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let a1 = anlegen(&pool, e, b, daten("erster", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+        let a2 = anlegen(&pool, e, b, daten("zweiter", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+        assert_eq!(a1.auftrag.lfd_nr, Some(1));
+        assert_eq!(a2.auftrag.lfd_nr, Some(2));
+    }
+
+    #[tokio::test]
+    async fn auftrag_startwert_aus_einstellungen_wirkt_und_etb_eigener_startwert() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        // Auftrags-Startwert 20, ETB-Startwert 200 — getrennte Nummernkreise.
+        crate::einsatz::einstellungen::speichern(
+            &pool,
+            e,
+            b,
+            crate::einsatz::einstellungen::EinstellungenDaten {
+                auftrag_nummer_start: Some(20),
+                etb_nummer_start: Some(200),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        let a = anlegen(&pool, e, b, daten("Deich sichern", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+        assert_eq!(a.auftrag.lfd_nr, Some(20), "Auftrags-lfd_nr startet beim Auftrags-Startwert");
+        // Die im selben Commit erzeugte ETB-Anordnung nutzt ihren EIGENEN Startwert (200).
+        let etb_lfd: i64 = sqlx::query_scalar("SELECT lfd_nr FROM etb_eintrag WHERE id = ?")
+            .bind(a.auftrag.etb_anordnung_id.unwrap())
+            .fetch_one(&pool).await.unwrap();
+        assert_eq!(etb_lfd, 200, "ETB-Anordnung nutzt den ETB-Startwert, nicht den Auftrags-Startwert");
+    }
+
+    #[tokio::test]
+    async fn auto_etb_aus_unterdrueckt_die_anordnung() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        // Auto-ETB abschalten (Some(0)).
+        crate::einsatz::einstellungen::speichern(
+            &pool, e, b,
+            crate::einsatz::einstellungen::EinstellungenDaten {
+                auto_etb_eintraege: Some(0),
+                ..Default::default()
+            },
+        ).await.unwrap();
+
+        let d = anlegen(&pool, e, b, daten("ohne ETB", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+        assert!(d.auftrag.etb_anordnung_id.is_none(), "Auto-ETB aus → keine ETB-Anordnung");
+        // Kein ETB-Eintrag im Einsatz.
+        let etb_anzahl: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?")
+            .bind(e).fetch_one(&pool).await.unwrap();
+        assert_eq!(etb_anzahl, 0);
+    }
+
+    #[tokio::test]
+    async fn auto_etb_default_an_erzeugt_anordnung() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        // Ohne Setting (NULL) = Default an → Anordnung wie heute.
+        let d = anlegen(&pool, e, b, daten("mit ETB", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+        assert!(d.auftrag.etb_anordnung_id.is_some(), "Default an → ETB-Anordnung");
+    }
+
+    #[tokio::test]
+    async fn lfd_nr_ist_pro_einsatz_unabhaengig() {
+        let pool = crate::db::test_pool().await;
+        let (b, e_a) = setup(&pool).await;
+        let e_b: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage B') RETURNING id")
+            .fetch_one(&pool).await.unwrap();
+        anlegen(&pool, e_a, b, daten("A1", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+        let b1 = anlegen(&pool, e_b, b, daten("B1", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+        // Fremder Einsatz mit Auftrag darf die Nummerierung dieses Einsatzes nicht beeinflussen.
+        assert_eq!(b1.auftrag.lfd_nr, Some(1));
     }
 
     #[tokio::test]

@@ -2,9 +2,16 @@ use crate::app::AppState;
 use crate::auth::session::CurrentUser;
 use crate::einheit::repo::{self as einheit_repo, EinheitDaten};
 use crate::einheit::{mitglied_repo, EinheitAnzeige};
-use crate::einsatz::berechtigung::{fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
+use crate::auth::Benutzer;
+use crate::einsatz::berechtigung::{
+    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff, fordere_schreibrecht,
+};
+use crate::einsatz::modul_override;
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
+
+/// Modul-Key dieses Route-Moduls (LFH-132).
+const MODUL_KEY: &str = "einheiten";
 use crate::etb::{self, repo as etb_repo};
 use crate::staerke::Staerke;
 use axum::extract::{Path, State};
@@ -73,10 +80,12 @@ fn trimme(s: Option<String>) -> Option<String> {
 }
 
 /// Holt den Einsatz + Rolle und prüft Schreibrecht + aktiv. Liefert den Einsatz.
-async fn schreib_gate(state: &AppState, einsatz_id: i64, benutzer_id: i64) -> Result<crate::einsatz::Einsatz, AppError> {
+async fn schreib_gate(state: &AppState, benutzer: &Benutzer, einsatz_id: i64) -> Result<crate::einsatz::Einsatz, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, benutzer)?;
     fordere_aktiv(&einsatz)?;
     Ok(einsatz)
 }
@@ -98,6 +107,8 @@ pub async fn liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
     Ok(Json(einheit_repo::liste(&state.pool, einsatz_id).await?))
 }
 
@@ -123,7 +134,7 @@ pub async fn bilden(
     Path(einsatz_id): Path<i64>,
     Json(body): Json<EinheitBody>,
 ) -> Result<(StatusCode, Json<EinheitAnzeige>), AppError> {
-    let einsatz = schreib_gate(&state, einsatz_id, benutzer.id).await?;
+    let einsatz = schreib_gate(&state, &benutzer, einsatz_id).await?;
     let name = body.name.trim().to_string();
     if name.is_empty() {
         return Err(AppError::Validation("Name darf nicht leer sein".into()));
@@ -152,7 +163,7 @@ pub async fn aktualisieren(
     Path((einsatz_id, eid)): Path<(i64, i64)>,
     Json(body): Json<EinheitBody>,
 ) -> Result<Json<EinheitAnzeige>, AppError> {
-    let einsatz = schreib_gate(&state, einsatz_id, benutzer.id).await?;
+    let einsatz = schreib_gate(&state, &benutzer, einsatz_id).await?;
     let name = body.name.trim().to_string();
     if name.is_empty() {
         return Err(AppError::Validation("Name darf nicht leer sein".into()));
@@ -210,7 +221,7 @@ pub async fn aufloesen(
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, eid)): Path<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    schreib_gate(&state, einsatz_id, benutzer.id).await?;
+    schreib_gate(&state, &benutzer, einsatz_id).await?;
     let name = einheit_name(&state, einsatz_id, eid).await?;
     einheit_repo::loese_auf(&state.pool, einsatz_id, eid).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}» aufgelöst", name)).await?;
@@ -224,7 +235,7 @@ pub async fn personal_zuordnen(
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, eid, ep_id)): Path<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    schreib_gate(&state, einsatz_id, benutzer.id).await?;
+    schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let person = mitglied_repo::ordne_personal_zu(&state.pool, einsatz_id, eid, ep_id).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: «{}» zugeordnet", einheit, person)).await?;
@@ -239,7 +250,7 @@ pub async fn personal_freigeben(
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, eid, ep_id)): Path<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    schreib_gate(&state, einsatz_id, benutzer.id).await?;
+    schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let person = mitglied_repo::gib_personal_frei(&state.pool, einsatz_id, eid, ep_id).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: «{}» freigegeben", einheit, person)).await?;
@@ -254,7 +265,7 @@ pub async fn fahrzeug_zuordnen(
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, eid, ef_id)): Path<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    schreib_gate(&state, einsatz_id, benutzer.id).await?;
+    schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let fz = mitglied_repo::ordne_fahrzeug_zu(&state.pool, einsatz_id, eid, ef_id).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: Fahrzeug «{}» zugeordnet", einheit, fz)).await?;
@@ -269,7 +280,7 @@ pub async fn fahrzeug_freigeben(
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, eid, ef_id)): Path<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    schreib_gate(&state, einsatz_id, benutzer.id).await?;
+    schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let fz = mitglied_repo::gib_fahrzeug_frei(&state.pool, einsatz_id, eid, ef_id).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: Fahrzeug «{}» freigegeben", einheit, fz)).await?;
@@ -284,7 +295,7 @@ pub async fn material_zuordnen(
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, eid, em_id)): Path<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    schreib_gate(&state, einsatz_id, benutzer.id).await?;
+    schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let (bez, menge) = mitglied_repo::ordne_material_zu(&state.pool, einsatz_id, eid, em_id).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: Material «{}» (×{}) zugeordnet", einheit, bez, menge)).await?;
@@ -299,7 +310,7 @@ pub async fn material_freigeben(
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, eid, em_id)): Path<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    schreib_gate(&state, einsatz_id, benutzer.id).await?;
+    schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let (bez, menge) = mitglied_repo::gib_material_frei(&state.pool, einsatz_id, eid, em_id).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: Material «{}» (×{}) freigegeben", einheit, bez, menge)).await?;
@@ -330,6 +341,8 @@ pub async fn position(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
     fordere_aktiv(&einsatz)?;
 
     let vorher = einheit_repo::laden(&state.pool, einsatz_id, einheit_id).await?; // 404 falls fremd
@@ -377,6 +390,8 @@ pub async fn stream(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    let overrides = modul_override::laden_alle(&state.pool, einsatz_id).await?;
+    fordere_modul_zugriff(&overrides, MODUL_KEY, &benutzer)?;
 
     let rx = state.live.abonniere(einsatz_id);
     let stream = BroadcastStream::new(rx).map(|res| {

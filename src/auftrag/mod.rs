@@ -59,6 +59,9 @@ pub fn empfaenger_typ_gueltig(t: &str) -> bool {
 pub struct AuftragAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
+    /// Laufende Nummer je Einsatz (LFH-133). Nullable, weil per ADD COLUMN eingeführt;
+    /// alle ab LFH-133 angelegten Aufträge tragen einen Wert.
+    pub lfd_nr: Option<i64>,
     pub auftrag_text: String,
     pub absicht: Option<String>,
     pub lage: Option<String>,

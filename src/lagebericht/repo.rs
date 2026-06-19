@@ -187,13 +187,17 @@ pub async fn freigeben(
     render: &str,
     zeitstand: &str,
 ) -> Result<LageberichtAnzeige, AppError> {
+    let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
+        .await?
+        .etb_startwert();
     let mut tx = pool.begin().await?;
 
-    // 1. ETB-Snapshot anlegen (server-autoritative lfd_nr).
+    // 1. ETB-Snapshot anlegen (server-autoritative lfd_nr, Startwert aus Einstellungen).
     let etb_id = etb_repo::anlegen_tx(
         &mut *tx,
         einsatz_id,
         freigeber_id,
+        etb_startwert,
         etb_repo::EintragDaten {
             typ: etb::TYP_LAGE,
             inhalt: render,

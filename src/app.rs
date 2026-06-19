@@ -55,6 +55,14 @@ pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
             get(routes::einsatz::einstellungen_laden).put(routes::einsatz::einstellungen_setzen),
         )
         .route(
+            "/api/einsaetze/{id}/modul-overrides",
+            get(routes::einsatz::modul_overrides_laden),
+        )
+        .route(
+            "/api/einsaetze/{id}/modul-overrides/{modul_key}",
+            put(routes::einsatz::modul_override_setzen),
+        )
+        .route(
             "/api/einsaetze/{id}/mitglieder",
             get(routes::einsatz::mitglieder),
         )

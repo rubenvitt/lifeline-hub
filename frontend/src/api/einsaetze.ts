@@ -1,6 +1,7 @@
 import type {
   Einsatzart, EinsatzAnzeige, EinsatzRolle, MitgliedAnzeige,
   EinsatzEinstellungen, EinstellungenUpdate,
+  ModulOverride, ModulOverrides, ModulOverrideUpdate,
 } from './types';
 import { apiGet, apiSend } from './client';
 
@@ -70,4 +71,18 @@ export function speichereEinstellungen(
   felder: EinstellungenUpdate,
 ): Promise<EinsatzEinstellungen> {
   return apiSend<EinsatzEinstellungen>(`/api/einsaetze/${id}/einstellungen`, 'PUT', felder);
+}
+
+/** Modul-Overrides eines Einsatzes laden (LFH-132); Map modul_key→Override (leer = Defaults). */
+export function ladeModulOverrides(id: number): Promise<ModulOverrides> {
+  return apiGet<ModulOverrides>(`/api/einsaetze/${id}/modul-overrides`);
+}
+
+/** Sichtbarkeit + benötigte Rolle eines Moduls überschreiben; nur Einsatzleitung/Admin, aktiver Einsatz. */
+export function setzeModulOverride(
+  id: number,
+  modulKey: string,
+  update: ModulOverrideUpdate,
+): Promise<ModulOverride> {
+  return apiSend<ModulOverride>(`/api/einsaetze/${id}/modul-overrides/${modulKey}`, 'PUT', update);
 }

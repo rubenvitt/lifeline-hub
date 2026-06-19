@@ -130,6 +130,7 @@ pub async fn liste_fuer(
         sachverhalt: Option<String>,
         anzahl_betroffene_initial: Option<i64>,
         retention_bis: Option<String>,
+        geloescht_at: Option<String>,
         meine_rolle: Option<String>,
     }
 
@@ -138,7 +139,7 @@ pub async fn liste_fuer(
                 e.abgeschlossen_at, e.abgeschlossen_von, e.einsatzart, e.einsatznummer_intern, \
                 e.angelegt_at, e.leitstellen_nr, e.einsatzort, e.einsatzort_lat, e.einsatzort_lon, \
                 e.meldende_stelle, e.sachverhalt, e.anzahl_betroffene_initial, \
-                e.retention_bis, \
+                e.retention_bis, e.geloescht_at, \
                 m.einsatz_rolle AS meine_rolle \
          FROM einsatz e \
          LEFT JOIN organisation o ON o.id = e.org_id \
@@ -159,6 +160,7 @@ pub async fn liste_fuer(
                 &r.status,
                 r.abgeschlossen_at.as_deref(),
                 r.retention_bis.as_deref(),
+                r.geloescht_at.as_deref(),
                 r.meine_rolle.as_deref().and_then(EinsatzRolle::parse),
                 jetzt,
             )
@@ -197,7 +199,11 @@ pub async fn abschliessen(
     einsatz_id: i64,
     von_benutzer_id: i64,
 ) -> Result<Einsatz, AppError> {
-    sqlx::query(
+    // Dauer-Politik vor der tx laden (eigener Pool-Borrow); steuert die Auto-Befüllung.
+    let einstellungen = super::einstellungen::laden_oder_default(pool, einsatz_id).await?;
+
+    let mut tx = pool.begin().await?;
+    let ergebnis = sqlx::query(
         "UPDATE einsatz \
          SET status = ?, abgeschlossen_at = datetime('now'), abgeschlossen_von = ? \
          WHERE id = ? AND status = 'aktiv'",
@@ -205,8 +211,61 @@ pub async fn abschliessen(
     .bind(STATUS_ABGESCHLOSSEN)
     .bind(von_benutzer_id)
     .bind(einsatz_id)
-    .execute(pool)
+    .execute(&mut *tx)
     .await?;
+
+    // Auto-Befüllung der Aufbewahrungsfrist NUR, wenn dieser Aufruf den Einsatz
+    // tatsächlich abgeschlossen hat (rows_affected == 1, nicht ein Re-Close-No-Op),
+    // eine Dauer-Politik gesetzt ist UND noch keine Frist existiert. Letzteres
+    // schützt eine manuell gesetzte Frist (überschreibt nie). Setzt direkt im
+    // Abschluss-tx, NICHT über frist_setzen — der Verkürzungs-Gate (None→Some)
+    // würde das sonst als bestätigungspflichtige Verkürzung werten (LFH-135).
+    if ergebnis.rows_affected() == 1 {
+        if let Some(dauer) = einstellungen.retention_dauer_tage {
+            let (abgeschlossen_at, retention_bis): (Option<String>, Option<String>) =
+                sqlx::query_as("SELECT abgeschlossen_at, retention_bis FROM einsatz WHERE id = ?")
+                    .bind(einsatz_id)
+                    .fetch_one(&mut *tx)
+                    .await?;
+            if retention_bis.is_none() {
+                if let Some(neue_frist) = abgeschlossen_at
+                    .as_deref()
+                    .and_then(|a| super::retention::berechne_retention_bis(a, dauer))
+                {
+                    sqlx::query(
+                        "UPDATE einsatz SET retention_bis = ? WHERE id = ? AND retention_bis IS NULL",
+                    )
+                    .bind(&neue_frist)
+                    .bind(einsatz_id)
+                    .execute(&mut *tx)
+                    .await?;
+                    let audit = format!(
+                        "Aufbewahrungsfrist automatisch gesetzt auf {neue_frist} \
+                         (Aufbewahrungs-Dauer {dauer} Tage ab Abschluss)"
+                    );
+                    crate::etb::repo::anlegen_tx(
+                        &mut tx,
+                        einsatz_id,
+                        von_benutzer_id,
+                        einstellungen.etb_startwert(),
+                        crate::etb::repo::EintragDaten {
+                            typ: crate::etb::TYP_SYSTEM,
+                            inhalt: &audit,
+                            von: None,
+                            an: None,
+                            meldeweg: None,
+                            veranlassung: None,
+                            ereigniszeit: None,
+                            erfasst_lokal_at: None,
+                            berichtigt_eintrag_id: None,
+                        },
+                    )
+                    .await?;
+                }
+            }
+        }
+    }
+    tx.commit().await?;
     laden(pool, einsatz_id).await
 }
 
@@ -222,6 +281,9 @@ pub async fn frist_setzen(
     neue_frist: Option<&str>,
     audit_inhalt: &str,
 ) -> Result<Einsatz, AppError> {
+    let etb_startwert = super::einstellungen::laden_oder_default(pool, einsatz_id)
+        .await?
+        .etb_startwert();
     let mut tx = pool.begin().await?;
     sqlx::query("UPDATE einsatz SET retention_bis = ? WHERE id = ?")
         .bind(neue_frist)
@@ -232,6 +294,7 @@ pub async fn frist_setzen(
         &mut tx,
         einsatz_id,
         erfasser_id,
+        etb_startwert,
         crate::etb::repo::EintragDaten {
             typ: crate::etb::TYP_SYSTEM,
             inhalt: audit_inhalt,
@@ -247,6 +310,293 @@ pub async fn frist_setzen(
     .await?;
     tx.commit().await?;
     laden(pool, einsatz_id).await
+}
+
+// ---------- Aufbewahrung / Purge (LFH-135) ----------
+
+/// Ermittelt einen gültigen Benutzer als Akteur für System-ETB-Einträge des
+/// Purge-Schedulers (`erfasser_id` ist NOT NULL FK). Bevorzugt, wer den Einsatz
+/// abgeschlossen hat; ersatzweise eine Einsatzleitung. `None`, wenn keiner
+/// auffindbar ist (dann wird der ETB-Audit übersprungen, die Mutation läuft
+/// trotzdem). Läuft auf der übergebenen tx-Verbindung.
+async fn ermittle_system_akteur(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+) -> Result<Option<i64>, AppError> {
+    let von: Option<i64> = sqlx::query_scalar(
+        "SELECT abgeschlossen_von FROM einsatz WHERE id = ? AND abgeschlossen_von IS NOT NULL",
+    )
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    if von.is_some() {
+        return Ok(von);
+    }
+    let leit: Option<i64> = sqlx::query_scalar(
+        "SELECT benutzer_id FROM einsatz_mitgliedschaft \
+         WHERE einsatz_id = ? AND einsatz_rolle = ? ORDER BY benutzer_id LIMIT 1",
+    )
+    .bind(einsatz_id)
+    .bind(EINSATZ_ROLLE_LEITUNG)
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(leit)
+}
+
+/// Schreibt einen System-ETB-Audit auf der tx-Verbindung, sofern ein Akteur
+/// auffindbar ist (best effort — fehlt jeder Benutzer, wird nur geloggt). Der
+/// Startwert kommt aus den Einstellungen (Nummernkreis), `inhalt` ist der Audit-Text.
+async fn system_audit_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    etb_startwert: i64,
+    inhalt: &str,
+) -> Result<(), AppError> {
+    let Some(akteur) = ermittle_system_akteur(conn, einsatz_id).await? else {
+        tracing::warn!(
+            einsatz_id,
+            "Purge: kein Benutzer als ETB-Akteur auffindbar — System-Audit übersprungen"
+        );
+        return Ok(());
+    };
+    crate::etb::repo::anlegen_tx(
+        conn,
+        einsatz_id,
+        akteur,
+        etb_startwert,
+        crate::etb::repo::EintragDaten {
+            typ: crate::etb::TYP_SYSTEM,
+            inhalt,
+            von: None,
+            an: None,
+            meldeweg: None,
+            veranlassung: None,
+            ereigniszeit: None,
+            erfasst_lokal_at: None,
+            berichtigt_eintrag_id: None,
+        },
+    )
+    .await?;
+    Ok(())
+}
+
+/// IDs ABGESCHLOSSENER Einsätze, deren Aufbewahrungsfrist abgelaufen ist und die
+/// noch nicht soft-gelöscht sind (Phase-A-Kandidaten). `status='abgeschlossen'`
+/// ist hart im WHERE — aktive Einsätze sind NIE fällig. Lexikografischer
+/// Zeitvergleich (kanonisches Format). Org-isoliert über die `einsatz`-Tabelle.
+pub async fn faellige_soft_delete(pool: &SqlitePool, jetzt: &str) -> Result<Vec<i64>, AppError> {
+    let ids = sqlx::query_scalar::<_, i64>(
+        "SELECT id FROM einsatz \
+         WHERE status = ? AND retention_bis IS NOT NULL \
+           AND ? >= retention_bis AND geloescht_at IS NULL \
+         ORDER BY id",
+    )
+    .bind(STATUS_ABGESCHLOSSEN)
+    .bind(jetzt)
+    .fetch_all(pool)
+    .await?;
+    Ok(ids)
+}
+
+/// Setzt den Soft-Delete-Tombstone (`geloescht_at`) eines fälligen Einsatzes und
+/// schreibt einen System-ETB-Audit in derselben Transaktion. Idempotent über den
+/// `geloescht_at IS NULL`-Guard: ein bereits soft-gelöschter Einsatz liefert
+/// `false` (kein Doppel-Audit). Reversibel (Karenz vor der Schwärzung).
+pub async fn soft_delete_einsatz(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    jetzt: &str,
+) -> Result<bool, AppError> {
+    let etb_startwert = super::einstellungen::laden_oder_default(pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    let mut tx = pool.begin().await?;
+    let res = sqlx::query(
+        "UPDATE einsatz SET geloescht_at = ? \
+         WHERE id = ? AND status = ? AND geloescht_at IS NULL",
+    )
+    .bind(jetzt)
+    .bind(einsatz_id)
+    .bind(STATUS_ABGESCHLOSSEN)
+    .execute(&mut *tx)
+    .await?;
+    if res.rows_affected() == 0 {
+        // Nichts zu tun (schon soft-gelöscht oder nicht abgeschlossen) — kein Audit.
+        return Ok(false);
+    }
+    system_audit_tx(
+        &mut tx,
+        einsatz_id,
+        etb_startwert,
+        "Aufbewahrungsfrist abgelaufen — Einsatz zur Löschung vorgemerkt (Soft-Delete). \
+         Die Karenz bis zur unwiderruflichen PII-Schwärzung läuft.",
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(true)
+}
+
+/// Platzhalter für gescrubbte PII-Felder, die wegen NOT-NULL- bzw. CHECK-Constraints
+/// nicht auf NULL gesetzt werden dürfen (verlaufsnotiz.text, einsatz_personal.snap_name,
+/// einsatz_schaden.uebergeben_an bei status='uebergeben').
+pub const SCHWAERZUNG_PLATZHALTER: &str = "[geschwärzt]";
+
+/// Phase-B-Kandidaten: ABGESCHLOSSENE, soft-gelöschte, noch nicht geschwärzte
+/// Einsätze, als `(id, geloescht_at)`. Die Karenz-Grenze (`geloescht_at + KARENZ_TAGE`)
+/// prüft der Aufrufer in Rust (`retention::karenz_abgelaufen`) gegen das injizierte
+/// `jetzt`. `status='abgeschlossen'` ist hart im WHERE — aktive Einsätze sind nie dabei.
+pub async fn faellige_purge(
+    pool: &SqlitePool,
+    _karenz_tage: i64,
+) -> Result<Vec<(i64, String)>, AppError> {
+    let rows = sqlx::query_as::<_, (i64, String)>(
+        "SELECT id, geloescht_at FROM einsatz \
+         WHERE status = ? AND geloescht_at IS NOT NULL AND geschwaerzt_at IS NULL \
+         ORDER BY id",
+    )
+    .bind(STATUS_ABGESCHLOSSEN)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+/// IRREVERSIBLE PII-Schwärzung eines Einsatzes (Phase B, LFH-135). Scrubbt die
+/// Personendaten in allen einsatz-scoped PII-Tabellen (strikt per `einsatz_id`,
+/// OHNE `storniert_at`-Filter — auch stornierte Zeilen tragen reale PII), setzt den
+/// `geschwaerzt_at`-Tombstone und schreibt einen System-ETB-Audit — alles in EINER
+/// Transaktion (partieller Scrub rollt zurück). Das operative Skelett (Einsatz, ETB,
+/// Zähler/registrier_nr, aggregierte Lage) bleibt erhalten.
+///
+/// Idempotent: der `geschwaerzt_at IS NULL`-Guard liefert `false`, wenn der Einsatz
+/// schon geschwärzt (oder nicht soft-gelöscht/abgeschlossen) ist — kein Doppel-Scrub.
+///
+/// Gescrubbte Tabellen/Spalten (siehe Commit-Message für die vollständige Begründung):
+/// - einsatz_person: name, vorname, geschlecht, geburtsdatum, alter_geschaetzt,
+///   herkunft_adresse, antreff_ort, melder_kontakt, notiz
+/// - person_sichtung: notiz · person_verlaufsnotiz: text (→ Platzhalter, NOT NULL)
+/// - person_verbleib: ziel, notiz · person_uhs_belegung: notiz
+/// - einsatz_tier: halter_kontakt, antreff_ort, abschluss_ziel, notiz
+/// - einsatz_schaden: geschaedigt_kontakt, uebergeben_an (→ Platzhalter wenn gesetzt,
+///   wegen CHECK status='uebergeben' ⇒ uebergeben_an NOT NULL)
+/// - einsatz_personal (NUR Ad-hoc-extern, personal_id IS NULL): snap_name (→ Platzhalter),
+///   snap_funktion, snap_traegerorganisation, bemerkung
+pub async fn schwaerze_einsatz(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    jetzt: &str,
+) -> Result<bool, AppError> {
+    let etb_startwert = super::einstellungen::laden_oder_default(pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    let mut tx = pool.begin().await?;
+
+    // Idempotenz-/Sicherheits-Guard: nur abgeschlossene, soft-gelöschte, noch nicht
+    // geschwärzte Einsätze. Setzt zugleich den Tombstone. rows_affected==0 → fertig.
+    let res = sqlx::query(
+        "UPDATE einsatz SET geschwaerzt_at = ? \
+         WHERE id = ? AND status = ? AND geloescht_at IS NOT NULL AND geschwaerzt_at IS NULL",
+    )
+    .bind(jetzt)
+    .bind(einsatz_id)
+    .bind(STATUS_ABGESCHLOSSEN)
+    .execute(&mut *tx)
+    .await?;
+    if res.rows_affected() == 0 {
+        return Ok(false);
+    }
+
+    // --- PII-Scrub (strikt per einsatz_id, KEIN storniert_at-Filter) ---
+    // aktueller_verbleib (denormalisierter Cache, Migration 0022) trägt für
+    // Transporte den Klartext "Transport → {ziel}" (Klinikname). Muss mit
+    // gescrubbt werden, sonst überlebt der Verbringungsort die irreversible
+    // Schwärzung, obwohl person_verbleib.ziel genullt wird (Review LFH-135).
+    sqlx::query(
+        "UPDATE einsatz_person SET \
+            name = NULL, vorname = NULL, geschlecht = NULL, geburtsdatum = NULL, \
+            alter_geschaetzt = NULL, herkunft_adresse = NULL, antreff_ort = NULL, \
+            melder_kontakt = NULL, notiz = NULL, aktueller_verbleib = NULL \
+         WHERE einsatz_id = ?",
+    )
+    .bind(einsatz_id)
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query("UPDATE person_sichtung SET notiz = NULL WHERE einsatz_id = ?")
+        .bind(einsatz_id)
+        .execute(&mut *tx)
+        .await?;
+
+    // text ist NOT NULL → Platzhalter statt NULL.
+    sqlx::query("UPDATE person_verlaufsnotiz SET text = ? WHERE einsatz_id = ?")
+        .bind(SCHWAERZUNG_PLATZHALTER)
+        .bind(einsatz_id)
+        .execute(&mut *tx)
+        .await?;
+
+    sqlx::query("UPDATE person_verbleib SET ziel = NULL, notiz = NULL WHERE einsatz_id = ?")
+        .bind(einsatz_id)
+        .execute(&mut *tx)
+        .await?;
+
+    sqlx::query("UPDATE person_uhs_belegung SET notiz = NULL WHERE einsatz_id = ?")
+        .bind(einsatz_id)
+        .execute(&mut *tx)
+        .await?;
+
+    // kennzeichnung (Chip-Nr./Tätowierung) ist ein im Haustierregister auf den
+    // Halter registrierter, eindeutiger Identifikator → personenverknüpfend, muss
+    // mit gescrubbt werden (Review LFH-135). rufname/rasse/farbe/groesse bleiben
+    // (reine Tierbeschreibung).
+    sqlx::query(
+        "UPDATE einsatz_tier SET \
+            halter_kontakt = NULL, antreff_ort = NULL, abschluss_ziel = NULL, \
+            notiz = NULL, kennzeichnung = NULL \
+         WHERE einsatz_id = ?",
+    )
+    .bind(einsatz_id)
+    .execute(&mut *tx)
+    .await?;
+
+    // uebergeben_an: NULL bleibt NULL, ein gesetzter Wert → Platzhalter (CHECK
+    // status='uebergeben' ⇒ uebergeben_an IS NOT NULL würde sonst brechen).
+    sqlx::query(
+        "UPDATE einsatz_schaden SET \
+            geschaedigt_kontakt = NULL, \
+            uebergeben_an = CASE WHEN uebergeben_an IS NULL THEN NULL ELSE ? END \
+         WHERE einsatz_id = ?",
+    )
+    .bind(SCHWAERZUNG_PLATZHALTER)
+    .bind(einsatz_id)
+    .execute(&mut *tx)
+    .await?;
+
+    // einsatz_personal: NUR Ad-hoc-externe (personal_id IS NULL) sind einsatz-scoped PII.
+    // Dispositionen echter Stamm-Kräfte (personal_id gesetzt) sind Stammdaten → unberührt.
+    // snap_name ist NOT NULL → Platzhalter.
+    sqlx::query(
+        "UPDATE einsatz_personal SET \
+            snap_name = ?, snap_funktion = NULL, snap_traegerorganisation = NULL, bemerkung = NULL \
+         WHERE einsatz_id = ? AND personal_id IS NULL",
+    )
+    .bind(SCHWAERZUNG_PLATZHALTER)
+    .bind(einsatz_id)
+    .execute(&mut *tx)
+    .await?;
+
+    system_audit_tx(
+        &mut tx,
+        einsatz_id,
+        etb_startwert,
+        "PII-Schwärzung durchgeführt (Aufbewahrungsfrist + Karenz abgelaufen). \
+         Personenbezogene Daten wurden unwiderruflich entfernt; das operative Skelett \
+         (Einsatz, ETB-Einträge, Zähler) bleibt für die gesetzliche/statistische \
+         Aufbewahrung erhalten.",
+    )
+    .await?;
+
+    tx.commit().await?;
+    tracing::warn!(einsatz_id, "Purge Phase B abgeschlossen: PII geschwärzt (geschwaerzt_at gesetzt)");
+    Ok(true)
 }
 
 /// Editierbare Kopffelder für `aktualisiere_kopf`. Optional-Strings sind bereits
@@ -446,6 +796,78 @@ mod tests {
         assert!(!abgeschlossen.ist_aktiv());
     }
 
+    /// Setzt die Dauer-Politik direkt in der DB (umgeht die Route, reiner Repo-Test).
+    async fn setze_dauer(pool: &SqlitePool, einsatz_id: i64, bid: i64, tage: i64) {
+        super::super::einstellungen::speichern(
+            pool,
+            einsatz_id,
+            bid,
+            super::super::einstellungen::EinstellungenDaten {
+                retention_dauer_tage: Some(tage),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn abschliessen_befuellt_retention_bis_aus_dauer_und_schreibt_audit() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        setze_dauer(&pool, einsatz.id, leit, 30).await;
+
+        let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        // retention_bis = abgeschlossen_at + 30 Tage (gleiche Uhrzeit, kanonisches Format).
+        let erwartet = super::super::retention::berechne_retention_bis(
+            abgeschlossen.abgeschlossen_at.as_deref().unwrap(),
+            30,
+        )
+        .unwrap();
+        assert_eq!(abgeschlossen.retention_bis.as_deref(), Some(erwartet.as_str()));
+
+        // Ein ETB-System-Audit über die Auto-Frist entstanden.
+        let anzahl: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'system' \
+             AND inhalt LIKE 'Aufbewahrungsfrist automatisch gesetzt%'",
+        )
+        .bind(einsatz.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(anzahl, 1);
+    }
+
+    #[tokio::test]
+    async fn abschliessen_ohne_dauer_setzt_keine_frist() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+
+        let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        assert_eq!(abgeschlossen.retention_bis, None);
+    }
+
+    #[tokio::test]
+    async fn abschliessen_ueberschreibt_manuelle_frist_nicht() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        setze_dauer(&pool, einsatz.id, leit, 30).await;
+        // Manuell gesetzte Frist VOR Abschluss.
+        frist_setzen(&pool, einsatz.id, leit, Some("2099-01-01 00:00:00"), "manuell")
+            .await
+            .unwrap();
+
+        let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        // Auto-Fill darf die manuelle Frist nicht überschreiben.
+        assert_eq!(
+            abgeschlossen.retention_bis.as_deref(),
+            Some("2099-01-01 00:00:00")
+        );
+    }
+
     #[tokio::test]
     async fn frist_setzen_speichert_und_schreibt_etb_audit() {
         let pool = crate::db::test_pool().await;
@@ -476,6 +898,70 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(anzahl, 1);
+    }
+
+    #[tokio::test]
+    async fn faellige_soft_delete_nur_abgeschlossen_abgelaufen_offen() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+
+        // (1) abgeschlossen + Frist abgelaufen + nicht gelöscht → fällig.
+        let faellig: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_von, retention_bis) \
+             VALUES (1,'Faellig','abgeschlossen', ?, '2026-01-01 00:00:00') RETURNING id",
+        )
+        .bind(leit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        // (2) AKTIV mit abgelaufener Frist → NIE fällig (harter status-Guard).
+        sqlx::query(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, retention_bis) \
+             VALUES (1,'Aktiv','aktiv','2026-01-01 00:00:00')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        // (3) abgeschlossen, Frist NICHT abgelaufen → nicht fällig.
+        sqlx::query(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_von, retention_bis) \
+             VALUES (1,'Zukunft','abgeschlossen', ?, '2099-01-01 00:00:00')",
+        )
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
+        // (4) abgeschlossen, keine Frist → nicht fällig.
+        sqlx::query(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_von) \
+             VALUES (1,'OhneFrist','abgeschlossen', ?)",
+        )
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
+        // (5) abgeschlossen, abgelaufen, ABER schon soft-gelöscht → nicht erneut fällig.
+        sqlx::query(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_von, retention_bis, geloescht_at) \
+             VALUES (1,'Schon','abgeschlossen', ?, '2026-01-01 00:00:00','2026-02-01 00:00:00')",
+        )
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let ids = faellige_soft_delete(&pool, "2026-06-01 00:00:00").await.unwrap();
+        assert_eq!(ids, vec![faellig], "nur der abgeschlossene, abgelaufene, offene Einsatz");
+
+        // soft_delete_einsatz kippt den Tombstone + ist idempotent (zweiter Aufruf false).
+        assert!(soft_delete_einsatz(&pool, faellig, "2026-06-01 00:00:00").await.unwrap());
+        assert!(!soft_delete_einsatz(&pool, faellig, "2026-06-02 00:00:00").await.unwrap());
+        let g: Option<String> = sqlx::query_scalar("SELECT geloescht_at FROM einsatz WHERE id = ?")
+            .bind(faellig)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(g.as_deref(), Some("2026-06-01 00:00:00"));
     }
 
     #[tokio::test]

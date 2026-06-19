@@ -60,6 +60,14 @@ export interface FachebenenSichtbar {
 /** Basemap-Modus als Karten-Default pro Einsatz. */
 export type BasemapModus = 'online' | 'offline' | 'blind';
 
+// Anzeige-Konventionen pro Einsatz (LFH-136). null = projektweiter Default.
+/** Zeitformat: 24-Stunden vs. 12-Stunden (AM/PM). */
+export type Zeitformat = '24h' | '12h';
+/** Einheiten-System für Größenanzeigen. */
+export type EinheitenSystem = 'metrisch' | 'imperial';
+/** Koordinaten-Anzeigeformat. */
+export type Koordinatenformat = 'wgs84' | 'mgrs' | 'utm';
+
 /**
  * Einsatz-Einstellungen (LFH-55/131). `fachebenen_sichtbar` wird vom Backend
  * (EinstellungenAnzeige) als Objekt geliefert; `null` = nicht gesetzt → Default.
@@ -70,6 +78,28 @@ export interface EinsatzEinstellungen {
   basemap_modus: BasemapModus | null;
   karten_zoom_start: number | null;
   fachebenen_sichtbar: FachebenenSichtbar | null;
+  // Anzeige-Konventionen (LFH-136); null = projektweiter Default.
+  zeitzone: string | null;
+  zeitformat: Zeitformat | null;
+  einheiten: EinheitenSystem | null;
+  koordinatenformat: Koordinatenformat | null;
+  // Verhalten & Automatik (LFH-133); null = projektweiter Default.
+  etb_nummer_praefix: string | null;
+  etb_nummer_start: number | null;
+  meldung_nummer_praefix: string | null;
+  meldung_nummer_start: number | null;
+  auftrag_nummer_praefix: string | null;
+  auftrag_nummer_start: number | null;
+  meldung_bestaetigung_frist_min: number | null;
+  auftrag_quittierung_frist_min: number | null;
+  /** 0 = Auto-ETB aus; null/1 = an (Default). */
+  auto_etb_eintraege: number | null;
+  /** Aufbewahrungs-Dauer-Politik in Tagen (LFH-135); null = keine Auto-Frist. */
+  retention_dauer_tage: number | null;
+  /** Freeze pro Nummernkreis (nur Anzeige): true = Präfix/Startwert read-only. */
+  etb_nummer_eingefroren: boolean;
+  meldung_nummer_eingefroren: boolean;
+  auftrag_nummer_eingefroren: boolean;
   geaendert_at: string | null;
   geaendert_von: number | null;
 }
@@ -80,6 +110,45 @@ export interface EinstellungenUpdate {
   basemap_modus: BasemapModus | null;
   karten_zoom_start: number | null;
   fachebenen_sichtbar: FachebenenSichtbar | null;
+  zeitzone: string | null;
+  zeitformat: Zeitformat | null;
+  einheiten: EinheitenSystem | null;
+  koordinatenformat: Koordinatenformat | null;
+  // Verhalten & Automatik (LFH-133).
+  etb_nummer_praefix: string | null;
+  etb_nummer_start: number | null;
+  meldung_nummer_praefix: string | null;
+  meldung_nummer_start: number | null;
+  auftrag_nummer_praefix: string | null;
+  auftrag_nummer_start: number | null;
+  meldung_bestaetigung_frist_min: number | null;
+  auftrag_quittierung_frist_min: number | null;
+  /** Auto-ETB-Dual-Publish: false schaltet ab; true/null = an. */
+  auto_etb_eintraege: boolean | null;
+  /** Aufbewahrungs-Dauer-Politik in Tagen (LFH-135); null/0 = keine Auto-Frist. */
+  retention_dauer_tage: number | null;
+}
+
+/**
+ * Modul-Override pro Einsatz (LFH-132): überschreibt Sichtbarkeit und benötigte
+ * Rolle eines Moduls. `benoetigte_rolle = null` = frei (für alle sichtbaren).
+ */
+export interface ModulOverride {
+  einsatz_id: number;
+  modul_key: string;
+  sichtbar: boolean;
+  benoetigte_rolle: 'admin' | 'fuehrungskraft' | null;
+  geaendert_at: string | null;
+  geaendert_von: number | null;
+}
+
+/** Map `modul_key → Override`; fehlt ein Key, gilt der Registry-Default (sichtbar, frei). */
+export type ModulOverrides = Record<string, ModulOverride>;
+
+/** PUT-Eingabe eines einzelnen Modul-Overrides. */
+export interface ModulOverrideUpdate {
+  sichtbar: boolean;
+  benoetigte_rolle: 'admin' | 'fuehrungskraft' | null;
 }
 
 /** Org-weiter Einsatzstichwort-Vorschlag für die Combobox. */

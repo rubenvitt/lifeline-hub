@@ -1,6 +1,10 @@
 pub mod berechtigung;
 pub mod einstellungen;
+pub mod modul;
+pub mod modul_override;
+pub mod purge_scheduler;
 pub mod repo;
+pub mod retention;
 
 use serde::Serialize;
 

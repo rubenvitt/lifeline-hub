@@ -1,7 +1,10 @@
+use super::modul::{ist_ausblendbar, registry_benoetigte_rolle};
+use super::modul_override::EinsatzModulOverride;
 use super::{Einsatz, EinsatzRolle, STATUS_ABGESCHLOSSEN, STATUS_AKTIV};
 use crate::auth::Benutzer;
 use crate::error::AppError;
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
+use std::collections::HashMap;
 
 /// DSGVO-Schonfrist in Stunden: solange bleibt ein abgeschlossener Einsatz
 /// für alle Mitglieder lesbar; danach nur noch für höhere Berechtigungen.
@@ -66,6 +69,10 @@ pub fn ist_fristverkuerzung(alt: Option<&str>, neu: Option<&str>) -> bool {
 ///   für NIEMANDEN lesbar, auch nicht für höhere Berechtigungen (DSGVO-Löschpflicht;
 ///   die Daten sind physisch noch da, der Purge folgt im Archiv-Feature). Greift nie
 ///   auf aktive Einsätze.
+/// - Soft-Delete-Tombstone (`geloescht_at`, LFH-135): gesetzt → für NIEMANDEN lesbar,
+///   vor allen anderen Checks (auch höhere Berechtigung, auch aktive Einsätze — der
+///   Tombstone wird ausschließlich vom Purge auf abgeschlossene Einsätze gesetzt,
+///   die Sperre ist aber bewusst statusunabhängig defensiv).
 ///
 /// `jetzt` wird injiziert (Testbarkeit).
 pub fn darf_lesen(
@@ -73,9 +80,14 @@ pub fn darf_lesen(
     status: &str,
     abgeschlossen_at: Option<&str>,
     retention_bis: Option<&str>,
+    geloescht_at: Option<&str>,
     rolle: Option<EinsatzRolle>,
     jetzt: DateTime<Utc>,
 ) -> bool {
+    // Soft-Delete-Tombstone → harte Sperre vor allen anderen Checks (auch höhere Berechtigung).
+    if geloescht_at.is_some_and(|s| !s.is_empty()) {
+        return false;
+    }
     // Aufbewahrungsfrist abgelaufen → harte Sperre vor allen anderen Checks.
     if status == STATUS_ABGESCHLOSSEN && retention_abgelaufen(retention_bis, jetzt) {
         return false;
@@ -103,6 +115,7 @@ pub fn fordere_lesezugriff(
         &einsatz.status,
         einsatz.abgeschlossen_at.as_deref(),
         einsatz.retention_bis.as_deref(),
+        einsatz.geloescht_at.as_deref(),
         rolle,
         Utc::now(),
     ) {
@@ -154,6 +167,60 @@ pub fn fordere_aktiv(einsatz: &Einsatz) -> Result<(), AppError> {
         Err(AppError::Conflict(
             "Einsatz ist abgeschlossen und schreibgeschützt".into(),
         ))
+    }
+}
+
+/// Per-Handler-Guard für die Modul-Sichtbarkeit/Berechtigung (LFH-132). Rein und
+/// testbar gegen die bereits geladene Override-Map eines Einsatzes.
+///
+/// Reihenfolge (additive Verschärfung NACH dem bestehenden Lese-/Schreibrecht-Gate;
+/// loosened nie eine bestehende Schranke):
+/// 1. System-Admin behält IMMER Zugriff (Mindest-Guard), unabhängig vom Override.
+/// 2. Ausblenden: ist das Modul ausblendbar und der Override setzt `sichtbar=false`,
+///    → `Forbidden`. Nicht-ausblendbare Module (einsatzdaten, einsatz-einstellungen)
+///    werden NIE versteckt — ein `sichtbar=false` darauf wird defensiv ignoriert.
+/// 3. Rollen-Schranke: benötigte Rolle = Override-Wert, sonst Registry-Default
+///    (heute `None` für alle). `admin` → nur System-Admin (oben schon durch),
+///    sonst `Forbidden`; `fuehrungskraft` → System-Admin oder org-weite Führungskraft
+///    (`ist_hoehere_berechtigung`), sonst `Forbidden`. `None` → frei.
+pub fn fordere_modul_zugriff(
+    overrides: &HashMap<String, EinsatzModulOverride>,
+    modul_key: &str,
+    benutzer: &Benutzer,
+) -> Result<(), AppError> {
+    // 1. Admin-Mindest-Guard.
+    if benutzer.ist_admin() {
+        return Ok(());
+    }
+
+    // 2. Nicht-ausblendbare Module (Stammdaten, Einstellungen) sind NIE sperrbar —
+    //    weder versteckt noch rollen-beschränkt (Selbst-Aussperr-Schutz, beide
+    //    Dimensionen). Ein etwaiger Override darauf wird defensiv ignoriert.
+    if !ist_ausblendbar(modul_key) {
+        return Ok(());
+    }
+
+    let ueberschreibung = overrides.get(modul_key);
+
+    // 3. Ausblend-Schranke.
+    if ueberschreibung.is_some_and(|o| !o.sichtbar) {
+        return Err(AppError::Forbidden);
+    }
+
+    // 4. Rollen-Schranke (Override sonst Registry-Default).
+    let benoetigte = ueberschreibung
+        .and_then(|o| o.benoetigte_rolle.as_deref())
+        .or_else(|| registry_benoetigte_rolle(modul_key));
+    match benoetigte {
+        Some("admin") => Err(AppError::Forbidden), // System-Admin ist oben bereits durch.
+        Some("fuehrungskraft") => {
+            if benutzer.ist_hoehere_berechtigung() {
+                Ok(())
+            } else {
+                Err(AppError::Forbidden)
+            }
+        }
+        _ => Ok(()),
     }
 }
 
@@ -240,6 +307,7 @@ mod tests {
             STATUS_AKTIV,
             None,
             None,
+            None,
             Some(EinsatzRolle::Beobachter),
             jetzt()
         ));
@@ -248,7 +316,7 @@ mod tests {
     #[test]
     fn darf_lesen_aktiv_nicht_mitglied_normal_ist_false() {
         let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
-        assert!(!darf_lesen(&b, STATUS_AKTIV, None, None, None, jetzt()));
+        assert!(!darf_lesen(&b, STATUS_AKTIV, None, None, None, None, jetzt()));
     }
 
     #[test]
@@ -258,6 +326,7 @@ mod tests {
             &b,
             STATUS_ABGESCHLOSSEN,
             Some("2026-05-25 11:00:00"),
+            None,
             None,
             Some(EinsatzRolle::Beobachter),
             jetzt()
@@ -272,6 +341,7 @@ mod tests {
             STATUS_ABGESCHLOSSEN,
             Some("2026-05-24 11:00:00"),
             None,
+            None,
             Some(EinsatzRolle::Beobachter),
             jetzt()
         ));
@@ -284,6 +354,7 @@ mod tests {
             &b,
             STATUS_ABGESCHLOSSEN,
             Some("2026-05-24 11:00:00"),
+            None,
             None,
             Some(EinsatzRolle::Einsatzleitung),
             jetzt()
@@ -299,6 +370,7 @@ mod tests {
             Some("2026-05-24 11:00:00"),
             None,
             None,
+            None,
             jetzt()
         ));
     }
@@ -310,6 +382,7 @@ mod tests {
             &b,
             STATUS_ABGESCHLOSSEN,
             Some("2026-05-24 11:00:00"),
+            None,
             None,
             None,
             jetzt()
@@ -347,6 +420,7 @@ mod tests {
             STATUS_ABGESCHLOSSEN,
             Some("2026-05-25 11:00:00"),
             Some("2026-05-24 12:00:00"),
+            None,
             Some(EinsatzRolle::Einsatzleitung),
             jetzt()
         ));
@@ -362,6 +436,7 @@ mod tests {
             Some("2026-05-24 11:00:00"),
             Some("2026-05-24 12:00:00"),
             None,
+            None,
             jetzt()
         ));
     }
@@ -375,6 +450,7 @@ mod tests {
             STATUS_AKTIV,
             None,
             Some("2026-05-24 12:00:00"),
+            None,
             Some(EinsatzRolle::Beobachter),
             jetzt()
         ));
@@ -416,7 +492,70 @@ mod tests {
             STATUS_ABGESCHLOSSEN,
             Some("2026-05-24 11:00:00"),
             Some("2026-06-24 12:00:00"),
+            None,
             Some(EinsatzRolle::Einsatzleitung),
+            jetzt()
+        ));
+    }
+
+    // --- Soft-Delete-Tombstone (geloescht_at), LFH-135 ---
+
+    #[test]
+    fn darf_lesen_tombstone_sperrt_mitglied() {
+        // Gesetzter geloescht_at-Tombstone sperrt selbst die Einsatzleitung eines
+        // ansonsten frisch abgeschlossenen Einsatzes (gültige Frist, in Schonfrist).
+        let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        assert!(!darf_lesen(
+            &b,
+            STATUS_ABGESCHLOSSEN,
+            Some("2026-05-25 11:00:00"),
+            Some("2026-06-24 12:00:00"),
+            Some("2026-05-24 12:00:00"),
+            Some(EinsatzRolle::Einsatzleitung),
+            jetzt()
+        ));
+    }
+
+    #[test]
+    fn darf_lesen_tombstone_sperrt_auch_admin() {
+        // Höhere Berechtigung wird durch den Tombstone überstimmt (vor allen Checks).
+        let admin = benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE);
+        assert!(!darf_lesen(
+            &admin,
+            STATUS_ABGESCHLOSSEN,
+            Some("2026-05-25 11:00:00"),
+            None,
+            Some("2026-05-24 12:00:00"),
+            None,
+            jetzt()
+        ));
+    }
+
+    #[test]
+    fn darf_lesen_tombstone_sperrt_auch_fuehrungskraft() {
+        let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
+        assert!(!darf_lesen(
+            &fk,
+            STATUS_ABGESCHLOSSEN,
+            Some("2026-05-25 11:00:00"),
+            None,
+            Some("2026-05-24 12:00:00"),
+            None,
+            jetzt()
+        ));
+    }
+
+    #[test]
+    fn darf_lesen_ohne_tombstone_unveraendert() {
+        // Ungesetzter Tombstone (None) → Verhalten wie bisher (Mitglied liest aktiven Einsatz).
+        let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        assert!(darf_lesen(
+            &b,
+            STATUS_AKTIV,
+            None,
+            None,
+            None,
+            Some(EinsatzRolle::Beobachter),
             jetzt()
         ));
     }
@@ -487,5 +626,101 @@ mod tests {
             fordere_schreibrecht_oder_admin(&fk, None).unwrap_err(),
             AppError::Forbidden
         ));
+    }
+
+    // --- Modul-Zugriff-Guard (LFH-132) ---
+
+    fn override_zeile(
+        modul_key: &str,
+        sichtbar: bool,
+        benoetigte_rolle: Option<&str>,
+    ) -> EinsatzModulOverride {
+        EinsatzModulOverride {
+            einsatz_id: 1,
+            modul_key: modul_key.into(),
+            sichtbar,
+            benoetigte_rolle: benoetigte_rolle.map(str::to_string),
+            geaendert_at: None,
+            geaendert_von: None,
+        }
+    }
+
+    fn overrides_mit(zeilen: Vec<EinsatzModulOverride>) -> HashMap<String, EinsatzModulOverride> {
+        zeilen.into_iter().map(|o| (o.modul_key.clone(), o)).collect()
+    }
+
+    #[test]
+    fn modul_zugriff_ohne_override_ist_frei() {
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        let leer = HashMap::new();
+        assert!(fordere_modul_zugriff(&leer, "etb", &normal).is_ok());
+    }
+
+    #[test]
+    fn modul_zugriff_versteckt_blockt_normalen_benutzer() {
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        let ov = overrides_mit(vec![override_zeile("etb", false, None)]);
+        assert!(matches!(
+            fordere_modul_zugriff(&ov, "etb", &normal).unwrap_err(),
+            AppError::Forbidden
+        ));
+    }
+
+    #[test]
+    fn modul_zugriff_admin_kommt_immer_durch() {
+        let admin = benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE);
+        // Selbst bei versteckt + admin-Rolle erforderlich: Admin-Mindest-Guard.
+        let ov = overrides_mit(vec![override_zeile("etb", false, Some("admin"))]);
+        assert!(fordere_modul_zugriff(&ov, "etb", &admin).is_ok());
+    }
+
+    #[test]
+    fn modul_zugriff_rolle_fuehrungskraft_blockt_normalen_erlaubt_fuehrungskraft() {
+        let ov = overrides_mit(vec![override_zeile("etb", true, Some("fuehrungskraft"))]);
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        assert!(matches!(
+            fordere_modul_zugriff(&ov, "etb", &normal).unwrap_err(),
+            AppError::Forbidden
+        ));
+        let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
+        assert!(fordere_modul_zugriff(&ov, "etb", &fk).is_ok());
+    }
+
+    #[test]
+    fn modul_zugriff_rolle_admin_blockt_auch_fuehrungskraft() {
+        let ov = overrides_mit(vec![override_zeile("etb", true, Some("admin"))]);
+        let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
+        assert!(matches!(
+            fordere_modul_zugriff(&ov, "etb", &fk).unwrap_err(),
+            AppError::Forbidden
+        ));
+    }
+
+    #[test]
+    fn modul_zugriff_nicht_ausblendbar_ignoriert_versteckt() {
+        // einsatzdaten/einsatz-einstellungen dürfen nie versteckt werden — ein
+        // sichtbar=false darauf wird defensiv ignoriert (Selbst-Aussperr-Schutz).
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        for key in ["einsatzdaten", "einsatz-einstellungen"] {
+            let ov = overrides_mit(vec![override_zeile(key, false, None)]);
+            assert!(
+                fordere_modul_zugriff(&ov, key, &normal).is_ok(),
+                "{key} darf nicht versteckt werden"
+            );
+        }
+    }
+
+    #[test]
+    fn modul_zugriff_nicht_ausblendbar_nie_rollen_gesperrt() {
+        // Nicht-ausblendbare Module sind in BEIDEN Dimensionen exempt: ein (defensiv
+        // ohnehin abgelehnter) Rollen-Override darf niemanden aussperren — sonst
+        // könnte sich eine Einsatzleitung aus den Einstellungen selbst aussperren.
+        let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        let ov = overrides_mit(vec![override_zeile(
+            "einsatz-einstellungen",
+            false,
+            Some("fuehrungskraft"),
+        )]);
+        assert!(fordere_modul_zugriff(&ov, "einsatz-einstellungen", &normal).is_ok());
     }
 }

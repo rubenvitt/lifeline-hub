@@ -1,0 +1,70 @@
+import { describe, it, expect } from 'vitest';
+import { wgs84ZuUtm, wgs84ZuMgrs, utmZone } from './koordinaten';
+
+// Referenzpunkte mit extern verifizierten Soll-Werten (NICHT aus dieser
+// Implementierung abgeleitet — sonst beweist der Test nichts):
+//   • Belgien 51.1°N 4.1°E → UTM 31N 577019.527 / 5661520.775; MGRS 31U ES 77019 61520
+//     (sf/PROJ, mm-genau; ungerade Zone 31 → testet Zeilen-Parität)
+//     Quelle: tutorials.inbo.be/articles/spatial_mgrs
+//   • Red Sand (Weser) 53°51'18"N 8°4'54"E → UTM 32N 439596 / 5967780; MGRS 32U ME 39596 67780
+//     (gerade Zone 32) Quelle: killetsoft.de/t_0901_e.htm
+//   • 79.9°S 6.1°E → UTM Zone 32 Süd, MGRS-Quadrat MS, Band C
+//     (Südhalbkugel → testet False-Northing) Quelle: GeographicLib GeoConvert(1)
+
+describe('utmZone', () => {
+  it('bestimmt die Zone aus der Länge (DE: 32 westlich 12°E, 33 östlich)', () => {
+    expect(utmZone(53.855, 8.0817)).toBe(32);
+    expect(utmZone(51.1, 4.1)).toBe(31);
+    expect(utmZone(52.52, 13.4)).toBe(33); // Berlin
+  });
+});
+
+describe('wgs84ZuUtm', () => {
+  it('Belgien (ungerade Zone 31) trifft die PROJ-Referenz auf <0,5 m', () => {
+    const u = wgs84ZuUtm(51.1, 4.1);
+    expect(u.zone).toBe(31);
+    expect(u.band).toBe('U');
+    expect(u.hemisphere).toBe('N');
+    expect(Math.abs(u.easting - 577019.527)).toBeLessThan(0.5);
+    expect(Math.abs(u.northing - 5661520.775)).toBeLessThan(0.5);
+  });
+
+  it('Red Sand (gerade Zone 32) trifft die Referenz auf <1 m', () => {
+    // Quelle gibt die Lage nur bogensekundengenau + gerundetes UTM an → 1-m-Toleranz.
+    const u = wgs84ZuUtm(53.855, 8.0816667);
+    expect(u.zone).toBe(32);
+    expect(u.band).toBe('U');
+    expect(Math.abs(u.easting - 439596)).toBeLessThan(1.0);
+    expect(Math.abs(u.northing - 5967780)).toBeLessThan(1.0);
+  });
+
+  it('Südhalbkugel wendet False-Northing (10.000.000 m) an', () => {
+    const u = wgs84ZuUtm(-79.9, 6.1);
+    expect(u.zone).toBe(32);
+    expect(u.band).toBe('C');
+    expect(u.hemisphere).toBe('S');
+    // Nordwert nach False-Northing zwischen 1,0 und 1,2 Mio. m.
+    expect(u.northing).toBeGreaterThan(1_000_000);
+    expect(u.northing).toBeLessThan(1_200_000);
+  });
+});
+
+describe('wgs84ZuMgrs', () => {
+  it('Belgien (ungerade Zone) → 31U ES 77019 61520', () => {
+    expect(wgs84ZuMgrs(51.1, 4.1)).toBe('31U ES 77019 61520');
+  });
+
+  it('Red Sand (gerade Zone) → 32U ME 3959 6778 (10-m-Präzision, quellen-robust)', () => {
+    // Auf 10 m stimmen Truncation (hier) und gerundete Quelle überein.
+    expect(wgs84ZuMgrs(53.855, 8.0816667, 4)).toBe('32U ME 3959 6778');
+  });
+
+  it('Südhalbkugel: korrektes 100-km-Quadrat MS in Band C', () => {
+    // Quadrat-Buchstaben (Spalte/Zeile) sind der parität-empfindliche Kern.
+    expect(wgs84ZuMgrs(-79.9, 6.1)).toContain('32C MS ');
+  });
+
+  it('respektiert die gewünschte Stellenzahl (1-km-Präzision = 2+2 Stellen)', () => {
+    expect(wgs84ZuMgrs(53.855, 8.0816667, 2)).toBe('32U ME 39 67');
+  });
+});

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { formatZeit, formatZeitKurz } from './zeit';
+import { formatZeit, formatZeitKurz, formatZeitMitKonvention } from './zeit';
 
 dayjs.extend(utc);
 
@@ -35,5 +35,14 @@ describe('formatZeitKurz', () => {
   it('gibt leeren String bei leer zurück', () => {
     expect(formatZeitKurz(null)).toBe('');
     expect(formatZeitKurz('')).toBe('');
+  });
+});
+
+describe('formatZeitMitKonvention', () => {
+  it('wendet Zeitzone + 12h-Format an (LFH-136)', () => {
+    const wire = '2026-06-11 15:00:00';
+    expect(
+      formatZeitMitKonvention(wire, { zeitzone: 'Europe/Berlin', zeitformat: '12h' }),
+    ).toBe('11.06.2026 05:00 PM');
   });
 });

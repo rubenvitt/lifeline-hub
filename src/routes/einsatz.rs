@@ -5,14 +5,15 @@ use crate::einsatz::berechtigung::{
     ist_fristverkuerzung,
 };
 use crate::einsatz::{
-    einstellungen, ist_gueltige_einsatzart, repo, EinsatzAnzeige, EinsatzRolle, MitgliedAnzeige,
-    EINSATZ_ROLLE_LEITUNG,
+    einstellungen, ist_gueltige_einsatzart, modul, modul_override, repo, EinsatzAnzeige,
+    EinsatzRolle, MitgliedAnzeige, EINSATZ_ROLLE_LEITUNG,
 };
 use crate::error::AppError;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
+use std::collections::HashMap;
 
 #[derive(Debug, Deserialize)]
 pub struct NeuerEinsatz {
@@ -159,6 +160,25 @@ pub struct EinstellungenUpdate {
     pub karten_zoom_start: Option<f64>,
     /// JSON-Objekt {nina,dwd,pegelonline,kritis}; wird als Text gespeichert.
     pub fachebenen_sichtbar: Option<serde_json::Value>,
+    // Anzeige-Konventionen (LFH-136); None/leer = projektweiter Default.
+    pub zeitzone: Option<String>,
+    pub zeitformat: Option<String>,
+    pub einheiten: Option<String>,
+    pub koordinatenformat: Option<String>,
+    // Verhalten & Automatik (LFH-133). Präfixe display-only; Startwerte/Fristen 1-basiert.
+    pub etb_nummer_praefix: Option<String>,
+    pub etb_nummer_start: Option<i64>,
+    pub meldung_nummer_praefix: Option<String>,
+    pub meldung_nummer_start: Option<i64>,
+    pub auftrag_nummer_praefix: Option<String>,
+    pub auftrag_nummer_start: Option<i64>,
+    pub meldung_bestaetigung_frist_min: Option<i64>,
+    pub auftrag_quittierung_frist_min: Option<i64>,
+    /// Auto-ETB-Dual-Publish: `false` schaltet ab (gespeichert als 0), `true`/fehlend = an.
+    pub auto_etb_eintraege: Option<bool>,
+    /// Aufbewahrungs-Dauer-Politik in Tagen (LFH-135); `null`/0 hebt sie auf bzw. ist
+    /// ungültig (1..=3650). Greift erst beim Abschluss.
+    pub retention_dauer_tage: Option<i64>,
 }
 
 /// GET /api/einsaetze/{id}/einstellungen — Einsatz-Einstellungen (LFH-131).
@@ -171,10 +191,20 @@ pub async fn einstellungen_laden(
     let einsatz = repo::laden(&state.pool, id).await?;
     let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    Ok(Json(
-        einstellungen::laden_oder_default(&state.pool, id)
-            .await?
-            .anzeige(),
+    let gespeichert = einstellungen::laden_oder_default(&state.pool, id).await?;
+    let (etb_fr, meldung_fr, auftrag_fr) = freeze_flags(&state.pool, id).await?;
+    Ok(Json(gespeichert.anzeige_mit_freeze(etb_fr, meldung_fr, auftrag_fr)))
+}
+
+/// Ermittelt die Freeze-Flags je Nummernkreis (LFH-133) aus der Daten-Existenz.
+async fn freeze_flags(
+    pool: &sqlx::SqlitePool,
+    einsatz_id: i64,
+) -> Result<(bool, bool, bool), AppError> {
+    Ok((
+        einstellungen::etb_nummer_vergeben(pool, einsatz_id).await?,
+        einstellungen::meldung_nummer_vergeben(pool, einsatz_id).await?,
+        einstellungen::auftrag_nummer_vergeben(pool, einsatz_id).await?,
     ))
 }
 
@@ -216,6 +246,97 @@ pub async fn einstellungen_setzen(
         }
     };
 
+    // Anzeige-Konventionen (LFH-136): bereinigen + Whitelist (Fehler ⇒ 400).
+    let zeitzone = bereinige(req.zeitzone);
+    if let Some(z) = zeitzone.as_deref() {
+        if !einstellungen::ist_gueltige_zeitzone(z) {
+            return Err(AppError::Validation("Ungültige zeitzone".into()));
+        }
+    }
+    let zeitformat = bereinige(req.zeitformat);
+    if let Some(f) = zeitformat.as_deref() {
+        if !einstellungen::ist_gueltiges_zeitformat(f) {
+            return Err(AppError::Validation("Ungültiges zeitformat".into()));
+        }
+    }
+    let einheiten = bereinige(req.einheiten);
+    if let Some(e) = einheiten.as_deref() {
+        if !einstellungen::ist_gueltiges_einheiten_system(e) {
+            return Err(AppError::Validation("Ungültiges einheiten-System".into()));
+        }
+    }
+    let koordinatenformat = bereinige(req.koordinatenformat);
+    if let Some(k) = koordinatenformat.as_deref() {
+        if !einstellungen::ist_gueltiges_koordinatenformat(k) {
+            return Err(AppError::Validation("Ungültiges koordinatenformat".into()));
+        }
+    }
+
+    // Verhalten & Automatik (LFH-133) — Präfixe bereinigen + validieren (400).
+    let etb_nummer_praefix = bereinige(req.etb_nummer_praefix);
+    let meldung_nummer_praefix = bereinige(req.meldung_nummer_praefix);
+    let auftrag_nummer_praefix = bereinige(req.auftrag_nummer_praefix);
+    for p in [&etb_nummer_praefix, &meldung_nummer_praefix, &auftrag_nummer_praefix] {
+        if let Some(v) = p.as_deref() {
+            if !einstellungen::ist_gueltiges_nummer_praefix(v) {
+                return Err(AppError::Validation(
+                    "Ungültiges Nummern-Präfix (max. 8 Zeichen, nur A-Z a-z 0-9 - _ / Leerzeichen)".into(),
+                ));
+            }
+        }
+    }
+    // Startwerte validieren (400).
+    for s in [req.etb_nummer_start, req.meldung_nummer_start, req.auftrag_nummer_start] {
+        if let Some(v) = s {
+            if !einstellungen::ist_gueltiger_startwert(v) {
+                return Err(AppError::Validation("Startwert muss zwischen 1 und 999999 liegen".into()));
+            }
+        }
+    }
+    // Default-Fristen validieren (400).
+    for f in [req.meldung_bestaetigung_frist_min, req.auftrag_quittierung_frist_min] {
+        if let Some(v) = f {
+            if !einstellungen::ist_gueltige_frist_min(v) {
+                return Err(AppError::Validation(
+                    "Default-Frist muss zwischen 1 und 10080 Minuten liegen".into(),
+                ));
+            }
+        }
+    }
+    // Aufbewahrungs-Dauer validieren (400): nur ein gesetzter Wert wird geprüft;
+    // None (= keine Politik) ist zulässig und hebt eine bestehende Dauer auf.
+    if let Some(v) = req.retention_dauer_tage {
+        if !einstellungen::ist_gueltige_retention_dauer(v) {
+            return Err(AppError::Validation(
+                "Aufbewahrungs-Dauer muss zwischen 1 und 3650 Tagen liegen".into(),
+            ));
+        }
+    }
+
+    // Freeze-Guard (409): sobald ein Nummernkreis eine Nummer vergeben hat, sind Präfix+Startwert
+    // read-only. XOR gegen Bestand (vgl. patch-xor): ein unveränderter Vollersatz-PUT darf sich
+    // NICHT selbst aussperren — nur eine tatsächliche Wertänderung wird abgelehnt.
+    let bestand = einstellungen::laden_oder_default(&state.pool, id).await?;
+    let (etb_fr, meldung_fr, auftrag_fr) = freeze_flags(&state.pool, id).await?;
+    let geaendert = |alt_p: &Option<String>, neu_p: &Option<String>, alt_s: Option<i64>, neu_s: Option<i64>| {
+        alt_p.as_deref() != neu_p.as_deref() || alt_s != neu_s
+    };
+    if etb_fr && geaendert(&bestand.etb_nummer_praefix, &etb_nummer_praefix, bestand.etb_nummer_start, req.etb_nummer_start) {
+        return Err(AppError::Conflict(
+            "ETB-Nummernkreis ist eingefroren (erste Nummer bereits vergeben)".into(),
+        ));
+    }
+    if meldung_fr && geaendert(&bestand.meldung_nummer_praefix, &meldung_nummer_praefix, bestand.meldung_nummer_start, req.meldung_nummer_start) {
+        return Err(AppError::Conflict(
+            "Meldungs-Nummernkreis ist eingefroren (erste Nummer bereits vergeben)".into(),
+        ));
+    }
+    if auftrag_fr && geaendert(&bestand.auftrag_nummer_praefix, &auftrag_nummer_praefix, bestand.auftrag_nummer_start, req.auftrag_nummer_start) {
+        return Err(AppError::Conflict(
+            "Auftrags-Nummernkreis ist eingefroren (erste Nummer bereits vergeben)".into(),
+        ));
+    }
+
     let gespeichert = einstellungen::speichern(
         &state.pool,
         id,
@@ -225,10 +346,96 @@ pub async fn einstellungen_setzen(
             basemap_modus: basemap_modus.as_deref(),
             karten_zoom_start: req.karten_zoom_start,
             fachebenen_sichtbar: fachebenen.as_deref(),
+            zeitzone: zeitzone.as_deref(),
+            zeitformat: zeitformat.as_deref(),
+            einheiten: einheiten.as_deref(),
+            koordinatenformat: koordinatenformat.as_deref(),
+            etb_nummer_praefix: etb_nummer_praefix.as_deref(),
+            etb_nummer_start: req.etb_nummer_start,
+            meldung_nummer_praefix: meldung_nummer_praefix.as_deref(),
+            meldung_nummer_start: req.meldung_nummer_start,
+            auftrag_nummer_praefix: auftrag_nummer_praefix.as_deref(),
+            auftrag_nummer_start: req.auftrag_nummer_start,
+            meldung_bestaetigung_frist_min: req.meldung_bestaetigung_frist_min,
+            auftrag_quittierung_frist_min: req.auftrag_quittierung_frist_min,
+            // bool → 0/1; None bleibt None (= Default an).
+            auto_etb_eintraege: req.auto_etb_eintraege.map(i64::from),
+            retention_dauer_tage: req.retention_dauer_tage,
         },
     )
     .await?;
-    Ok(Json(gespeichert.anzeige()))
+    // Freeze-Flags nach dem Speichern unverändert (Daten-Existenz ändert sich durch ein PUT nicht).
+    Ok(Json(gespeichert.anzeige_mit_freeze(etb_fr, meldung_fr, auftrag_fr)))
+}
+
+/// GET /api/einsaetze/{id}/modul-overrides — alle Modul-Overrides eines Einsatzes
+/// (LFH-132), als Map `modul_key → Override`. Lesezugriff gemäß DSGVO-Lese-Policy;
+/// existieren keine Overrides, ist die Map leer (= alle Module sichtbar, frei).
+pub async fn modul_overrides_laden(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path(id): Path<i64>,
+) -> Result<Json<HashMap<String, modul_override::EinsatzModulOverride>>, AppError> {
+    let einsatz = repo::laden(&state.pool, id).await?;
+    let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
+    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    Ok(Json(modul_override::laden_alle(&state.pool, id).await?))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ModulOverrideUpdate {
+    pub sichtbar: bool,
+    /// 'admin' | 'fuehrungskraft' | null (= frei).
+    pub benoetigte_rolle: Option<String>,
+}
+
+/// PUT /api/einsaetze/{id}/modul-overrides/{modul_key} — Sichtbarkeit + benötigte
+/// Rolle eines Moduls überschreiben (LFH-132). Gate: Einsatzleitung ODER System-Admin,
+/// plus aktiver Einsatz (Freeze → 409). Unbekannter Modul-Key → 400. Nicht-ausblendbare
+/// Module (einsatzdaten, einsatz-einstellungen) lassen sich nicht verstecken
+/// (Selbst-Aussperr-Schutz) → 400. Ungültige `benoetigte_rolle` → 400.
+pub async fn modul_override_setzen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((id, modul_key)): Path<(i64, String)>,
+    Json(req): Json<ModulOverrideUpdate>,
+) -> Result<Json<modul_override::EinsatzModulOverride>, AppError> {
+    let einsatz = repo::laden(&state.pool, id).await?;
+    let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
+    // Administrativ: Einsatzleitung (Mitgliedschaft) oder System-Admin.
+    if !benutzer.ist_admin() {
+        fordere_einsatzleitung(rolle)?;
+    }
+    fordere_aktiv(&einsatz)?; // Freeze bei Abschluss
+
+    if !modul::ist_gueltiger_modul_key(&modul_key) {
+        return Err(AppError::Validation("Unbekannter Modul-Key".into()));
+    }
+    // Selbst-Aussperr-Schutz: nicht-ausblendbare Module dürfen weder versteckt noch
+    // rollen-beschränkt werden (beide Dimensionen, sonst Aussperrung aus den
+    // Einstellungen möglich).
+    let benoetigte_rolle = bereinige(req.benoetigte_rolle);
+    if !modul::ist_ausblendbar(&modul_key) && (!req.sichtbar || benoetigte_rolle.is_some()) {
+        return Err(AppError::Validation(
+            "Dieses Modul kann nicht ausgeblendet oder rollen-beschränkt werden".into(),
+        ));
+    }
+    if let Some(r) = benoetigte_rolle.as_deref() {
+        if !modul::ist_gueltige_benoetigte_rolle(r) {
+            return Err(AppError::Validation("Ungültige benoetigte_rolle".into()));
+        }
+    }
+
+    let gespeichert = modul_override::setzen(
+        &state.pool,
+        id,
+        &modul_key,
+        req.sichtbar,
+        benoetigte_rolle.as_deref(),
+        benutzer.id,
+    )
+    .await?;
+    Ok(Json(gespeichert))
 }
 
 #[derive(Debug, Deserialize)]

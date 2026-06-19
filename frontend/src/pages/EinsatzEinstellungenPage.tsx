@@ -1,11 +1,24 @@
-import { Alert, App, Button, Checkbox, Form, Select, Spin, Typography } from 'antd';
+import { Alert, App, AutoComplete, Button, Checkbox, Form, Input, InputNumber, Select, Spin, Switch, Typography } from 'antd';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ladeEinsatz, ladeEinstellungen, speichereEinstellungen } from '../api/einsaetze';
+import {
+  ladeEinsatz, ladeEinstellungen, speichereEinstellungen,
+  ladeModulOverrides, setzeModulOverride,
+} from '../api/einsaetze';
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
-import { modulRegistry } from '../einsatz/modulRegistry';
-import type { BasemapModus, EinstellungenUpdate, FachebenenSichtbar } from '../api/types';
+import { modulRegistry, istModulAusblendbar } from '../einsatz/modulRegistry';
+import type {
+  BasemapModus, EinheitenSystem, EinstellungenUpdate, FachebenenSichtbar,
+  Koordinatenformat, ModulOverrideUpdate, Zeitformat,
+} from '../api/types';
+
+/** Optionen für die benötigte Rolle eines Moduls; '' = frei (für alle sichtbaren). */
+const ROLLEN_OPTIONEN: { value: string; label: string }[] = [
+  { value: '', label: 'Frei (alle)' },
+  { value: 'fuehrungskraft', label: 'Führungskraft' },
+  { value: 'admin', label: 'Admin' },
+];
 
 const BASEMAP_OPTIONEN: { value: BasemapModus; label: string }[] = [
   { value: 'online', label: 'Online' },
@@ -20,11 +33,50 @@ const FACHEBENEN_OPTIONEN: { value: keyof FachebenenSichtbar; label: string }[] 
   { value: 'kritis', label: 'KRITIS' },
 ];
 
+// Anzeige-Konventionen (LFH-136). Kuratierte IANA-Zeitzonen + Freitext (AutoComplete).
+const ZEITZONEN_OPTIONEN = [
+  'Europe/Berlin', 'Europe/London', 'Europe/Paris', 'Europe/Zurich', 'Europe/Vienna',
+  'Europe/Warsaw', 'Europe/Moscow', 'UTC', 'America/New_York', 'America/Los_Angeles',
+  'Asia/Istanbul', 'Asia/Dubai', 'Asia/Tokyo',
+].map((z) => ({ value: z }));
+
+const ZEITFORMAT_OPTIONEN: { value: Zeitformat; label: string }[] = [
+  { value: '24h', label: '24 Stunden' },
+  { value: '12h', label: '12 Stunden (AM/PM)' },
+];
+
+const EINHEITEN_OPTIONEN: { value: EinheitenSystem; label: string }[] = [
+  { value: 'metrisch', label: 'Metrisch (m, km)' },
+  { value: 'imperial', label: 'Imperial (ft, mi)' },
+];
+
+const KOORDINATEN_OPTIONEN: { value: Koordinatenformat; label: string }[] = [
+  { value: 'wgs84', label: 'WGS84 dezimal' },
+  { value: 'mgrs', label: 'MGRS' },
+  { value: 'utm', label: 'UTM' },
+];
+
 /** Formularwerte; Fachebenen als Liste der aktiven Keys (Checkbox.Group). */
 interface FormWerte {
   standard_modul?: string;
   basemap_modus?: BasemapModus;
   fachebenen: (keyof FachebenenSichtbar)[];
+  zeitzone?: string;
+  zeitformat?: Zeitformat;
+  einheiten?: EinheitenSystem;
+  koordinatenformat?: Koordinatenformat;
+  // Verhalten & Automatik (LFH-133).
+  etb_nummer_praefix?: string;
+  etb_nummer_start?: number;
+  meldung_nummer_praefix?: string;
+  meldung_nummer_start?: number;
+  auftrag_nummer_praefix?: string;
+  auftrag_nummer_start?: number;
+  meldung_bestaetigung_frist_min?: number;
+  auftrag_quittierung_frist_min?: number;
+  auto_etb_eintraege: boolean;
+  // Aufbewahrung & Archiv (LFH-135).
+  retention_dauer_tage?: number;
 }
 
 export default function EinsatzEinstellungenPage() {
@@ -43,6 +95,21 @@ export default function EinsatzEinstellungenPage() {
     queryKey: ['einsatz-einstellungen', einsatzId],
     queryFn: () => ladeEinstellungen(einsatzId),
   });
+  const overridesQuery = useQuery({
+    queryKey: ['modulOverrides', einsatzId],
+    queryFn: () => ladeModulOverrides(einsatzId),
+  });
+
+  const overrideMutation = useMutation({
+    mutationFn: (vars: { modulKey: string; update: ModulOverrideUpdate }) =>
+      setzeModulOverride(einsatzId, vars.modulKey, vars.update),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['modulOverrides', einsatzId] });
+      message.success('Modul-Einstellung gespeichert');
+    },
+    onError: (e) =>
+      message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
+  });
 
   const speichernMutation = useMutation({
     mutationFn: (felder: EinstellungenUpdate) => speichereEinstellungen(einsatzId, felder),
@@ -54,7 +121,7 @@ export default function EinsatzEinstellungenPage() {
       message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
   });
 
-  if (einsatzQuery.isLoading || einstellungenQuery.isLoading) {
+  if (einsatzQuery.isLoading || einstellungenQuery.isLoading || overridesQuery.isLoading) {
     return (
       <div style={{ textAlign: 'center', paddingTop: 80 }}>
         <Spin size="large" />
@@ -74,6 +141,10 @@ export default function EinsatzEinstellungenPage() {
     (einsatz.meine_rolle === 'einsatzleitung' ||
       einsatz.meine_rolle === 'fuehrungspersonal' ||
       istAdmin);
+  // Modul-Overrides darf nur die Einsatzleitung oder ein System-Admin verwalten
+  // (deckt das Backend-Gate einsatzleitung|admin ab).
+  const darfModuleVerwalten = istAktiv && (einsatz.meine_rolle === 'einsatzleitung' || istAdmin);
+  const overrides = overridesQuery.data ?? {};
 
   // Nur fertige Module sind als Default-Modul wählbar (Pre-Mortem: kein Sprung
   // auf geplante/WIP-Module).
@@ -88,6 +159,23 @@ export default function EinsatzEinstellungenPage() {
     fachebenen: aktiveFachebenen
       ? FACHEBENEN_OPTIONEN.map((o) => o.value).filter((k) => aktiveFachebenen[k])
       : [],
+    zeitzone: einstellungen.zeitzone ?? undefined,
+    zeitformat: einstellungen.zeitformat ?? undefined,
+    einheiten: einstellungen.einheiten ?? undefined,
+    koordinatenformat: einstellungen.koordinatenformat ?? undefined,
+    // Verhalten & Automatik (LFH-133).
+    etb_nummer_praefix: einstellungen.etb_nummer_praefix ?? undefined,
+    etb_nummer_start: einstellungen.etb_nummer_start ?? undefined,
+    meldung_nummer_praefix: einstellungen.meldung_nummer_praefix ?? undefined,
+    meldung_nummer_start: einstellungen.meldung_nummer_start ?? undefined,
+    auftrag_nummer_praefix: einstellungen.auftrag_nummer_praefix ?? undefined,
+    auftrag_nummer_start: einstellungen.auftrag_nummer_start ?? undefined,
+    meldung_bestaetigung_frist_min: einstellungen.meldung_bestaetigung_frist_min ?? undefined,
+    auftrag_quittierung_frist_min: einstellungen.auftrag_quittierung_frist_min ?? undefined,
+    // 0 = aus; null/1 = an (Default an).
+    auto_etb_eintraege: einstellungen.auto_etb_eintraege !== 0,
+    // Aufbewahrung & Archiv (LFH-135).
+    retention_dauer_tage: einstellungen.retention_dauer_tage ?? undefined,
   };
 
   function speichern(werte: FormWerte) {
@@ -105,6 +193,23 @@ export default function EinsatzEinstellungenPage() {
       // Anzeige-Konventionen-Folge-Subtask; Spalte bleibt als Fundament erhalten.
       karten_zoom_start: einstellungen.karten_zoom_start,
       fachebenen_sichtbar,
+      // Anzeige-Konventionen (LFH-136); leer = projektweiter Default (null).
+      zeitzone: werte.zeitzone?.trim() || null,
+      zeitformat: werte.zeitformat ?? null,
+      einheiten: werte.einheiten ?? null,
+      koordinatenformat: werte.koordinatenformat ?? null,
+      // Verhalten & Automatik (LFH-133) — alle Felder durchreichen (Vollersatz-PUT).
+      etb_nummer_praefix: werte.etb_nummer_praefix?.trim() || null,
+      etb_nummer_start: werte.etb_nummer_start ?? null,
+      meldung_nummer_praefix: werte.meldung_nummer_praefix?.trim() || null,
+      meldung_nummer_start: werte.meldung_nummer_start ?? null,
+      auftrag_nummer_praefix: werte.auftrag_nummer_praefix?.trim() || null,
+      auftrag_nummer_start: werte.auftrag_nummer_start ?? null,
+      meldung_bestaetigung_frist_min: werte.meldung_bestaetigung_frist_min ?? null,
+      auftrag_quittierung_frist_min: werte.auftrag_quittierung_frist_min ?? null,
+      auto_etb_eintraege: werte.auto_etb_eintraege,
+      // Aufbewahrung & Archiv (LFH-135); leer = keine Auto-Frist (null).
+      retention_dauer_tage: werte.retention_dauer_tage ?? null,
     };
     speichernMutation.mutate(felder);
   }
@@ -159,10 +264,166 @@ export default function EinsatzEinstellungenPage() {
           <Checkbox.Group options={FACHEBENEN_OPTIONEN} />
         </Form.Item>
 
+        <Typography.Title level={5}>Anzeige-Konventionen</Typography.Title>
+        <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
+          Gemeinsame Darstellung für diesen Einsatz (Lagebild). Leer = Standard.
+        </Typography.Paragraph>
+        <Form.Item
+          label="Zeitzone"
+          name="zeitzone"
+          tooltip="IANA-Zeitzone (z. B. Europe/Berlin). Leer = lokale Zeit des Geräts."
+        >
+          <AutoComplete
+            allowClear
+            options={ZEITZONEN_OPTIONEN}
+            placeholder="Europe/Berlin (Standard)"
+            filterOption={(eingabe, option) =>
+              (option?.value ?? '').toLowerCase().includes(eingabe.toLowerCase())
+            }
+          />
+        </Form.Item>
+        <Form.Item label="Zeitformat" name="zeitformat">
+          <Select allowClear placeholder="24 Stunden (Standard)" options={ZEITFORMAT_OPTIONEN} />
+        </Form.Item>
+        <Form.Item label="Einheiten" name="einheiten">
+          <Select allowClear placeholder="Metrisch (Standard)" options={EINHEITEN_OPTIONEN} />
+        </Form.Item>
+        <Form.Item label="Koordinatenformat" name="koordinatenformat">
+          <Select allowClear placeholder="WGS84 dezimal (Standard)" options={KOORDINATEN_OPTIONEN} />
+        </Form.Item>
+
+        <Typography.Title level={5}>Verhalten &amp; Automatik</Typography.Title>
+        <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
+          Nummernkreise (Präfix + Startwert), Default-Fristen und automatische ETB-Einträge für
+          diesen Einsatz. Präfixe sind reine Anzeige. Sobald die erste Nummer eines Kreises
+          vergeben ist, sind Präfix und Startwert nicht mehr änderbar.
+        </Typography.Paragraph>
+
+        {([
+          { key: 'etb', label: 'ETB', eingefroren: einstellungen.etb_nummer_eingefroren },
+          { key: 'meldung', label: 'Meldungen', eingefroren: einstellungen.meldung_nummer_eingefroren },
+          { key: 'auftrag', label: 'Aufträge', eingefroren: einstellungen.auftrag_nummer_eingefroren },
+        ] as const).map((nk) => (
+          <div key={nk.key} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+            <Form.Item
+              label={`Präfix ${nk.label}`}
+              name={`${nk.key}_nummer_praefix`}
+              style={{ flex: 1 }}
+              tooltip="Wird der laufenden Nummer vorangestellt (z. B. EB-). Max. 8 Zeichen."
+              extra={nk.eingefroren ? 'Erste Nummer bereits vergeben — nicht mehr änderbar' : undefined}
+            >
+              <Input maxLength={8} placeholder="z. B. EB-" disabled={nk.eingefroren} />
+            </Form.Item>
+            <Form.Item
+              label={`Startwert ${nk.label}`}
+              name={`${nk.key}_nummer_start`}
+              style={{ width: 160 }}
+              tooltip="Erste laufende Nummer (Default 1)."
+            >
+              <InputNumber min={1} max={999999} style={{ width: '100%' }} placeholder="1" disabled={nk.eingefroren} />
+            </Form.Item>
+          </div>
+        ))}
+
+        <Form.Item
+          label="Default-Bestätigungsfrist Meldungen (Minuten)"
+          name="meldung_bestaetigung_frist_min"
+          tooltip="Frist für die Bestätigung pflichtiger Meldungen. Leer = projektweiter Standard."
+        >
+          <InputNumber min={1} max={10080} style={{ width: 200 }} placeholder="Standard" />
+        </Form.Item>
+        <Form.Item
+          label="Default-Quittierfrist Aufträge (Minuten)"
+          name="auftrag_quittierung_frist_min"
+          tooltip="Frist für unquittierte Aufträge ohne explizite Frist. Leer = keine automatische Frist."
+        >
+          <InputNumber min={1} max={10080} style={{ width: 200 }} placeholder="keine" />
+        </Form.Item>
+        <Form.Item
+          label="Automatische ETB-Einträge"
+          name="auto_etb_eintraege"
+          valuePropName="checked"
+          tooltip="Meldungen und Aufträge erzeugen automatisch einen verknüpften ETB-Eintrag. Aus = kein automatischer ETB-Eintrag."
+        >
+          <Switch />
+        </Form.Item>
+
+        <Typography.Title level={5}>Aufbewahrung &amp; Archiv</Typography.Title>
+        <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
+          Aufbewahrungs-Dauer in Tagen für diesen Einsatz. Die Frist greift erst beim
+          Abschluss (sie wird daraus als Zeitpunkt berechnet) und wirkt nie auf den
+          laufenden Einsatz. Nach Fristablauf wird der Einsatz zunächst gesperrt und
+          später unwiderruflich von Personendaten bereinigt (ETB und Statistik bleiben
+          erhalten). Leer = keine automatische Frist. Eine spätere Verkürzung einer
+          bereits gesetzten Frist ist gesondert (manuelle Frist) bestätigungspflichtig.
+        </Typography.Paragraph>
+        <Form.Item
+          label="Aufbewahrungs-Dauer (Tage)"
+          name="retention_dauer_tage"
+          tooltip="1 bis 3650 Tage. Leer = keine automatische Aufbewahrungsfrist."
+        >
+          <InputNumber min={1} max={3650} style={{ width: 200 }} placeholder="keine" />
+        </Form.Item>
+
         <Button type="primary" htmlType="submit" loading={speichernMutation.isPending} disabled={!darfBearbeiten}>
           Speichern
         </Button>
       </Form>
+
+      <Typography.Title level={5} style={{ marginTop: 32 }}>
+        Modul-Sichtbarkeit &amp; Berechtigungen
+      </Typography.Title>
+      <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
+        Module für diesen Einsatz ausblenden oder auf eine Rolle beschränken. Einsatzdaten und
+        Einstellungen lassen sich nicht ausblenden. Änderungen werden sofort gespeichert.
+      </Typography.Paragraph>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, opacity: 0.6 }}>
+          <span style={{ flex: 1 }}>Modul</span>
+          <span style={{ width: 64, textAlign: 'center' }}>Sichtbar</span>
+          <span style={{ width: 180 }}>Benötigte Rolle</span>
+        </div>
+        {modulRegistry.map((m) => {
+          const ausblendbar = istModulAusblendbar(m.key);
+          const ov = overrides[m.key];
+          const sichtbar = ausblendbar ? ov?.sichtbar ?? true : true;
+          const rolle = ov?.benoetigte_rolle ?? null;
+          return (
+            <div key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ flex: 1 }}>{m.label}</span>
+              <div style={{ width: 64, textAlign: 'center' }}>
+                <Switch
+                  aria-label={`Sichtbar: ${m.label}`}
+                  checked={sichtbar}
+                  disabled={!darfModuleVerwalten || !ausblendbar || overrideMutation.isPending}
+                  onChange={(checked) =>
+                    overrideMutation.mutate({
+                      modulKey: m.key,
+                      update: { sichtbar: checked, benoetigte_rolle: rolle },
+                    })
+                  }
+                />
+              </div>
+              <Select
+                aria-label={`Benötigte Rolle: ${m.label}`}
+                style={{ width: 180 }}
+                value={rolle ?? ''}
+                disabled={!darfModuleVerwalten || !ausblendbar || overrideMutation.isPending}
+                options={ROLLEN_OPTIONEN}
+                onChange={(val) =>
+                  overrideMutation.mutate({
+                    modulKey: m.key,
+                    update: {
+                      sichtbar,
+                      benoetigte_rolle: (val || null) as ModulOverrideUpdate['benoetigte_rolle'],
+                    },
+                  })
+                }
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

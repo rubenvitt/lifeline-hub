@@ -1,11 +1,13 @@
 import { theme, Typography } from 'antd';
-import { istModulGesperrt, type ModulEintrag } from './modulRegistry';
-import type { BenutzerAnzeige } from '../api/types';
+import { istModulGesperrt, istModulSichtbar, type ModulEintrag } from './modulRegistry';
+import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
 
 interface Props {
   titel: string;
   module: ModulEintrag[];
   benutzer: BenutzerAnzeige | null;
+  /** Modul-Overrides des Einsatzes (LFH-132); steuert Sichtbarkeit + Rollen-Schranke. */
+  overrides?: ModulOverrides;
   aktiverModulKey: string | null;
   onModulKlick: (modul: ModulEintrag) => void;
 }
@@ -15,10 +17,13 @@ export default function ModulPanel({
   titel,
   module,
   benutzer,
+  overrides,
   aktiverModulKey,
   onModulKlick,
 }: Props) {
   const { token } = theme.useToken();
+  // Ausgeblendete Module nicht rendern (nicht-ausblendbare bleiben immer sichtbar).
+  const sichtbareModule = module.filter((m) => istModulSichtbar(m, overrides));
   return (
     <div
       style={{ width: 220, padding: 12, borderRight: `1px solid ${token.colorBorderSecondary}` }}
@@ -27,8 +32,8 @@ export default function ModulPanel({
         {titel}
       </Typography.Text>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 8 }}>
-        {module.map((m) => {
-          const gesperrt = istModulGesperrt(m, benutzer);
+        {sichtbareModule.map((m) => {
+          const gesperrt = istModulGesperrt(m, benutzer, overrides);
           const aktiv = m.key === aktiverModulKey;
           const Icon = m.icon;
           return (

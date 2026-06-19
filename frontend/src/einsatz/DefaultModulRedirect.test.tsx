@@ -26,7 +26,9 @@ describe('DefaultModulRedirect', () => {
   it('leitet ohne Override auf das Lage-Dashboard um', async () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue({
       einsatz_id: 7, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
-      fachebenen_sichtbar: null, geaendert_at: null, geaendert_von: null,
+      fachebenen_sichtbar: null,
+      zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+      etb_nummer_praefix: null, etb_nummer_start: null, meldung_nummer_praefix: null, meldung_nummer_start: null, auftrag_nummer_praefix: null, auftrag_nummer_start: null, meldung_bestaetigung_frist_min: null, auftrag_quittierung_frist_min: null, auto_etb_eintraege: null, etb_nummer_eingefroren: false, meldung_nummer_eingefroren: false, auftrag_nummer_eingefroren: false, retention_dauer_tage: null, geaendert_at: null, geaendert_von: null,
     });
     rendern();
     expect(await screen.findByText('Dashboard-Inhalt')).toBeInTheDocument();
@@ -35,7 +37,9 @@ describe('DefaultModulRedirect', () => {
   it('leitet auf das konfigurierte Standard-Modul um', async () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue({
       einsatz_id: 7, standard_modul: 'etb', basemap_modus: null, karten_zoom_start: null,
-      fachebenen_sichtbar: null, geaendert_at: null, geaendert_von: null,
+      fachebenen_sichtbar: null,
+      zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+      etb_nummer_praefix: null, etb_nummer_start: null, meldung_nummer_praefix: null, meldung_nummer_start: null, auftrag_nummer_praefix: null, auftrag_nummer_start: null, meldung_bestaetigung_frist_min: null, auftrag_quittierung_frist_min: null, auto_etb_eintraege: null, etb_nummer_eingefroren: false, meldung_nummer_eingefroren: false, auftrag_nummer_eingefroren: false, retention_dauer_tage: null, geaendert_at: null, geaendert_von: null,
     });
     rendern();
     expect(await screen.findByText('ETB-Inhalt')).toBeInTheDocument();
@@ -44,7 +48,9 @@ describe('DefaultModulRedirect', () => {
   it('fällt bei unbekanntem Standard-Modul auf das Dashboard zurück', async () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue({
       einsatz_id: 7, standard_modul: 'gibtsnicht', basemap_modus: null, karten_zoom_start: null,
-      fachebenen_sichtbar: null, geaendert_at: null, geaendert_von: null,
+      fachebenen_sichtbar: null,
+      zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+      etb_nummer_praefix: null, etb_nummer_start: null, meldung_nummer_praefix: null, meldung_nummer_start: null, auftrag_nummer_praefix: null, auftrag_nummer_start: null, meldung_bestaetigung_frist_min: null, auftrag_quittierung_frist_min: null, auto_etb_eintraege: null, etb_nummer_eingefroren: false, meldung_nummer_eingefroren: false, auftrag_nummer_eingefroren: false, retention_dauer_tage: null, geaendert_at: null, geaendert_von: null,
     });
     rendern();
     expect(await screen.findByText('Dashboard-Inhalt')).toBeInTheDocument();

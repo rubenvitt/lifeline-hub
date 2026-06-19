@@ -20,26 +20,29 @@ pub struct EintragDaten<'a> {
 }
 
 /// Legt einen ETB-Eintrag auf einer beliebigen Connection/Transaktion an und
-/// liefert die neue `id`. Vergibt `lfd_nr` atomar (`COALESCE(MAX(lfd_nr),0)+1`
-/// über alle Einträge desselben Einsatzes); `received_at` per Spalten-Default.
-/// Für transaktionale Aufrufer (z. B. Lagebericht-Freigabe), die den Eintrag
-/// gemeinsam mit Folge-Updates committen wollen.
+/// liefert die neue `id`. Vergibt `lfd_nr` atomar (`COALESCE(MAX(lfd_nr)+1, ?startwert)`
+/// über alle Einträge desselben Einsatzes — die erste Nummer ist `startwert`, danach
+/// fortlaufend); `received_at` per Spalten-Default. Der `startwert` stammt aus den
+/// Einsatz-Einstellungen (LFH-133); der pool-besitzende Aufrufer lädt ihn und reicht
+/// `etb_startwert()` durch (Default 1 = altes Verhalten).
 pub async fn anlegen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     erfasser_id: i64,
+    startwert: i64,
     daten: EintragDaten<'_>,
 ) -> Result<i64, AppError> {
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO etb_eintrag \
             (einsatz_id, lfd_nr, typ, inhalt, von, an, meldeweg, veranlassung, \
              erfasser_id, ereigniszeit, erfasst_lokal_at, berichtigt_eintrag_id) \
-         SELECT ?, COALESCE(MAX(lfd_nr), 0) + 1, ?, ?, ?, ?, ?, ?, ?, \
+         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, \
                 COALESCE(?, datetime('now')), ?, ? \
          FROM etb_eintrag WHERE einsatz_id = ? \
          RETURNING id",
     )
     .bind(einsatz_id)
+    .bind(startwert)
     .bind(daten.typ)
     .bind(daten.inhalt)
     .bind(daten.von)
@@ -57,16 +60,20 @@ pub async fn anlegen_tx(
 }
 
 /// Legt einen ETB-Eintrag an und liefert ihn als Anzeige zurück.
-/// Dünner Wrapper um `anlegen_tx` auf einer frischen Pool-Connection.
+/// Dünner Wrapper um `anlegen_tx` auf einer frischen Pool-Connection. Lädt den
+/// ETB-Startwert (LFH-133) aus den Einsatz-Einstellungen (Default 1) und reicht ihn durch.
 pub async fn anlegen(
     pool: &SqlitePool,
     einsatz_id: i64,
     erfasser_id: i64,
     daten: EintragDaten<'_>,
 ) -> Result<EtbEintragAnzeige, AppError> {
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
+        .await?
+        .etb_startwert();
     let id = {
         let mut conn = pool.acquire().await?;
-        anlegen_tx(&mut *conn, einsatz_id, erfasser_id, daten).await?
+        anlegen_tx(&mut *conn, einsatz_id, erfasser_id, startwert, daten).await?
         // conn fällt hier aus dem Scope → PoolConnection::drop gibt die Verbindung zurück
     };
     laden(pool, id).await
@@ -278,6 +285,38 @@ mod tests {
         assert_eq!(e2.lfd_nr, 2);
         assert_eq!(e1.erfasser_name, "Leitung");
         assert!(!e1.received_at.is_empty());
+    }
+
+    #[tokio::test]
+    async fn startwert_aus_einstellungen_wirkt_auf_erste_nummer() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        // Nummernkreis-Startwert 100 konfigurieren (LFH-133).
+        crate::einsatz::einstellungen::speichern(
+            &pool,
+            einsatz,
+            benutzer,
+            crate::einsatz::einstellungen::EinstellungenDaten {
+                etb_nummer_start: Some(100),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        let e1 = anlegen(&pool, einsatz, benutzer, daten("Erste")).await.unwrap();
+        let e2 = anlegen(&pool, einsatz, benutzer, daten("Zweite")).await.unwrap();
+        assert_eq!(e1.lfd_nr, 100, "erste Nummer = Startwert");
+        assert_eq!(e2.lfd_nr, 101, "danach fortlaufend");
+    }
+
+    #[tokio::test]
+    async fn ohne_einstellung_startet_lfd_nr_weiter_bei_eins() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        // Keine Einstellungen → Default-Startwert 1 (altes Verhalten unverändert).
+        let e1 = anlegen(&pool, einsatz, benutzer, daten("Erste")).await.unwrap();
+        assert_eq!(e1.lfd_nr, 1);
     }
 
     #[tokio::test]
