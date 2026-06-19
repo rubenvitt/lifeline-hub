@@ -610,3 +610,79 @@ async fn versteckte_module_blocken_stream_routen() {
         );
     }
 }
+
+// ----------------------------- Task 11: Org-Modul-Default über HTTP-Route erzwungen -----------------------------
+
+/// PUT /api/org-modul-einstellungen/:modul_key; liefert nur den Status.
+async fn org_default_setzen(
+    app: &axum::Router,
+    admin_cookie: &str,
+    modul_key: &str,
+    benoetigte_rolle: Option<&str>,
+) -> StatusCode {
+    let rolle_json = match benoetigte_rolle {
+        Some(r) => format!(r#""{r}""#),
+        None => "null".into(),
+    };
+    let body = format!(r#"{{"benoetigte_rolle":{rolle_json}}}"#);
+    app.clone()
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri(format!("/api/org-modul-einstellungen/{modul_key}"))
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, admin_cookie.to_string())
+                .body(Body::from(body))
+                .unwrap(),
+        )
+        .await
+        .unwrap()
+        .status()
+}
+
+/// Task 11: Org-Default `fuehrungskraft` auf ETB blockt normales Mitglied über die echte
+/// HTTP-Route (beweist die vollständige Verdrahtung `fordere_modul_zugriff_laden`).
+///
+/// Einsatz 2 (einsatz_id=2) wird genutzt, damit einsatz_id ≠ org_id (=1) — ein Param-
+/// Tausch in der Wrapper-Signatur würde hier auffallen (falsche org → kein Default geladen).
+#[tokio::test]
+async fn org_default_fuehrungskraft_blockt_normales_mitglied_via_route() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+
+    // Einsatz 1 anlegen, damit Einsatz 2 einsatz_id=2 hat (≠ org_id=1).
+    einsatz_anlegen(&app, &admin, "Dummy").await;
+    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    mitglied_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+
+    // Baseline: kein Override, kein Org-Default → Frieda darf ETB lesen.
+    assert_eq!(
+        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/etb")).await,
+        StatusCode::OK,
+        "Baseline ohne Default muss 200 sein"
+    );
+
+    // Org-weiten Default setzen: ETB erfordert ab jetzt 'fuehrungskraft'.
+    assert_eq!(
+        org_default_setzen(&app, &admin, "etb", Some("fuehrungskraft")).await,
+        StatusCode::OK,
+        "org_default_setzen muss 200 liefern"
+    );
+
+    // Frieda (org_rolle='keine', kein Einsatz-Override) → 403.
+    assert_eq!(
+        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/etb")).await,
+        StatusCode::FORBIDDEN,
+        "Org-Default fuehrungskraft muss normales Mitglied blocken"
+    );
+
+    // Admin-Mindest-Guard: Admin kommt trotz Org-Default durch.
+    assert_eq!(
+        get_status(&app, &admin, &format!("/api/einsaetze/{eid}/etb")).await,
+        StatusCode::OK,
+        "Admin muss trotz Org-Default durchkommen"
+    );
+}
