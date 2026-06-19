@@ -34,6 +34,7 @@ import UnfallhilfsstellenDefault from './pages/UnfallhilfsstellenDefault';
 import UhsDetailPage from './pages/uhs/UhsDetailPage';
 import BereitstellungsraeumePage from './pages/bereitstellungsraum/BereitstellungsraeumePage';
 import BrDetailPage from './pages/bereitstellungsraum/BrDetailPage';
+import AdminLayout from './admin/AdminLayout';
 import EinsatzLayout from './einsatz/EinsatzLayout';
 import DefaultModulRedirect from './einsatz/DefaultModulRedirect';
 import ModulRedirect from './einsatz/ModulRedirect';
@@ -93,8 +94,21 @@ export default function App() {
         <Route element={<AppLayout />}>
           <Route path="/einsaetze" element={<EinsaetzePage />} />
           <Route path="/benutzer" element={<BenutzerPage />} />
-          <Route path="/stammdaten" element={<StammdatenPage />} />
+          {/* Alt-Route bleibt für externe Links / EinsatzSwitcher erhalten */}
+          <Route path="/stammdaten" element={<Navigate to="/admin/stammdaten" replace />} />
           <Route path="/profil" element={<ProfilPage />} />
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<Navigate to="/admin/stammdaten" replace />} />
+            <Route path="stammdaten" element={<StammdatenPage />} />
+            <Route
+              path="einstellungen"
+              element={
+                <div style={{ padding: 24, color: 'var(--ant-color-text-secondary, #888)' }}>
+                  Globale Einstellungen – kommt bald (Task 14)
+                </div>
+              }
+            />
+          </Route>
         </Route>
         {/* Ebene 2 — Einsatz-Workspace */}
         <Route path="/einsaetze/:id" element={<EinsatzLayout />}>
