@@ -45,6 +45,15 @@ impl Benutzer {
         self.ist_admin() || self.org_rolle == ORG_ROLLE_FUEHRUNGSKRAFT
     }
 
+    /// Ob dieser Benutzer den Admin-Bereich sehen darf (Stammdaten + globale
+    /// Einstellungen lesen): System-Admin ODER org-weite Führungskraft.
+    ///
+    /// Bewusst eigenständig — „Admin-Bereich lesen" und „Einsatz anlegen" sind
+    /// verschiedene Konzepte, auch wenn das Prädikat heute identisch ist.
+    pub fn darf_admin_bereich(&self) -> bool {
+        self.ist_admin() || self.org_rolle == ORG_ROLLE_FUEHRUNGSKRAFT
+    }
+
     /// Höhere Berechtigung mit erweitertem Einsatz-Zugriff: System-Admin oder
     /// org-weite Führungskraft. Darf u.a. abgeschlossene Einsätze auch nach der
     /// DSGVO-Schonfrist sowie fremde Einsätze lesen.
