@@ -130,14 +130,21 @@ function parseGk(text: string): LatLon {
 }
 
 export function formatiere(lat: number, lon: number, system: Koordinatenformat): string {
-  switch (system) {
-    case 'dms': return formatiereDms(lat, lon);
-    case 'utm': return formatiereUtm(lat, lon);
-    case 'mgrs': return formatiereMgrs(lat, lon);
-    case 'gk': return formatiereGk(lat, lon);
-    case 'wgs84':
-    default:
-      return formatiereWgs84(lat, lon);
+  try {
+    switch (system) {
+      case 'dms': return formatiereDms(lat, lon);
+      case 'utm': return formatiereUtm(lat, lon);
+      case 'mgrs': return formatiereMgrs(lat, lon);
+      case 'gk': return formatiereGk(lat, lon);
+      case 'wgs84':
+      default:
+        return formatiereWgs84(lat, lon);
+    }
+  } catch {
+    // formatiere läuft ungeschützt im Render-Pfad; projizierte Systeme (GK außerhalb
+    // der DE-Zonen 2–5, MGRS außerhalb 80S–84N) können werfen → WGS84-Dezimal-Fallback
+    // statt App-Crash.
+    return formatiereWgs84(lat, lon);
   }
 }
 

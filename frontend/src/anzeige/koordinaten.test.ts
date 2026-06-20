@@ -92,3 +92,20 @@ describe('formatiere/parse — Gauß-Krüger', () => {
     expect(() => parse('R abc H def', 'gk')).toThrow(KoordinatenParseFehler);
   });
 });
+
+describe('formatiere — Fallback-Schutz bei out-of-range', () => {
+  it('GK Zone 1 (Belgien, lon 4.1) wirft nicht, gibt WGS84-Dezimal zurück', () => {
+    // gkZone(4.1) = Math.round(4.1/3) = 1 → EPSG:31465 nicht registriert → proj4 würde werfen
+    expect(() => formatiere(51.1, 4.1, 'gk')).not.toThrow();
+    expect(formatiere(51.1, 4.1, 'gk')).toBe('51.10000, 4.10000');
+  });
+  it('MGRS bei lat > 84°N wirft nicht, gibt WGS84-Dezimal zurück', () => {
+    // mgrs.forward wirft für Breitengrade außerhalb 80S–84N
+    expect(() => formatiere(85, 10, 'mgrs')).not.toThrow();
+    expect(formatiere(85, 10, 'mgrs')).toBe('85.00000, 10.00000');
+  });
+  it('gültiger DE-GK-Koordinate (Stuttgart) formatiert weiterhin als GK', () => {
+    // Sanity: der Fallback darf den Happy-Path nicht kaputt machen
+    expect(formatiere(48.782, 9.177, 'gk')).toMatch(/^R 35\d{5}  H 5\d{6}$/);
+  });
+});
