@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { useState } from 'react';
 import KoordinatenEingabe from './KoordinatenEingabe';
 import { setzeOverride } from './koordinatenSystemStore';
@@ -53,5 +53,27 @@ describe('KoordinatenEingabe', () => {
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: '51.5, 10.2' } });
     expect(input).toHaveValue('51.5, 10.2'); // NICHT '51.50000, 10.20000'
+  });
+
+  it('reicht status=warning an den Input durch', () => {
+    const { container } = render(
+      <KoordinatenEingabe value={{ lat: 51.5, lon: 10.25 }} onChange={() => {}} status="warning" />,
+    );
+    expect(container.querySelector('.ant-input-status-warning')).not.toBeNull();
+  });
+
+  it('interner Fehler überschreibt externen status (error hat Vorrang vor warning)', () => {
+    const { container } = render(
+      <KoordinatenEingabe value={null} onChange={() => {}} />,
+    );
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'quatsch' } });
+    expect(container.querySelector('.ant-input-status-error')).not.toBeNull();
+  });
+
+  it('Live-Switch: Systemwechsel via setzeOverride reformatiert den angezeigten Wert', () => {
+    render(<KoordinatenEingabe value={{ lat: 51.5, lon: 10.25 }} onChange={() => {}} />);
+    expect(screen.getByRole('textbox')).toHaveValue('51.50000, 10.25000');
+    act(() => setzeOverride('dms'));
+    expect(screen.getByRole('textbox')).toHaveValue('51°30\'00"N 010°15\'00"E');
   });
 });

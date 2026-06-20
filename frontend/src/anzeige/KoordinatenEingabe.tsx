@@ -61,7 +61,7 @@ export default function KoordinatenEingabe({ value, onChange, status }: Props) {
           onChange={(e) => bearbeiten(e.target.value)}
           onFocus={() => setFokus(true)}
           onBlur={() => setFokus(false)}
-          status={fehler || status === 'error' ? 'error' : undefined}
+          status={fehler ? 'error' : status ?? undefined}
           placeholder="Koordinate eingeben"
         />
         <Select<Koordinatenformat>
