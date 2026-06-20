@@ -142,3 +142,22 @@ describe('formatiere/parse — MGRS', () => {
     expect(() => parse('XX', 'mgrs')).toThrow(KoordinatenParseFehler);
   });
 });
+
+describe('formatiere/parse — Gauß-Krüger', () => {
+  it('formatiert Rechts-/Hochwert, Zone 3 für Stuttgart (lon 9.177)', () => {
+    const s = formatiere(48.782, 9.177, 'gk');
+    expect(s).toMatch(/^R 35\d{5}  H 5\d{6}$/); // Rechtswert beginnt mit 3 = Zone 3
+  });
+  it('round-trip (< 3 m ≈ 1e-4 Grad)', () => {
+    const s = formatiere(48.782, 9.177, 'gk');
+    const p = parse(s, 'gk');
+    expect(p.lat).toBeCloseTo(48.782, 4);
+    expect(p.lon).toBeCloseTo(9.177, 4);
+  });
+  it('wählt Zone 4 für Berlin (Rechtswert beginnt mit 4)', () => {
+    expect(formatiere(52.52, 13.4, 'gk')).toMatch(/^R 4/);
+  });
+  it('wirft bei Müll', () => {
+    expect(() => parse('R abc H def', 'gk')).toThrow(KoordinatenParseFehler);
+  });
+});

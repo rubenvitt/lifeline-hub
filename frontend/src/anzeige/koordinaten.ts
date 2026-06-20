@@ -109,11 +109,32 @@ function parseMgrs(text: string): LatLon {
   return { lat, lon };
 }
 
+function gkZone(lon: number): number {
+  return Math.round(lon / 3); // lon_0 = 3·Zone
+}
+function formatiereGk(lat: number, lon: number): string {
+  const zone = gkZone(lon);
+  const [r, h] = proj4('EPSG:4326', `EPSG:${31464 + zone}`, [lon, lat]);
+  return `R ${Math.round(r)}  H ${Math.round(h)}`;
+}
+const GK_RE = /R?\s*(\d{7})\s+H?\s*(\d{7})/i;
+function parseGk(text: string): LatLon {
+  const m = GK_RE.exec(text.trim());
+  if (!m) throw new Error('Format');
+  const r = Number(m[1]);
+  const zone = Math.floor(r / 1_000_000); // führende Ziffer = Zone
+  if (zone < 2 || zone > 5) throw new Error('Zone');
+  const [lon, lat] = proj4(`EPSG:${31464 + zone}`, 'EPSG:4326', [r, Number(m[2])]);
+  pruefeBereich(lat, lon);
+  return { lat, lon };
+}
+
 export function formatiere(lat: number, lon: number, system: Koordinatenformat): string {
   switch (system) {
     case 'dms': return formatiereDms(lat, lon);
     case 'utm': return formatiereUtm(lat, lon);
     case 'mgrs': return formatiereMgrs(lat, lon);
+    case 'gk': return formatiereGk(lat, lon);
     case 'wgs84':
     default:
       return formatiereWgs84(lat, lon);
@@ -126,6 +147,7 @@ export function parse(text: string, system: Koordinatenformat): LatLon {
       case 'dms': return parseDms(text);
       case 'utm': return parseUtm(text);
       case 'mgrs': return parseMgrs(text);
+      case 'gk': return parseGk(text);
       case 'wgs84':
       default:
         return parseWgs84(text);
