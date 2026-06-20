@@ -31,6 +31,7 @@ pub mod nachforderung;
 pub mod health;
 pub mod organisation;
 pub mod org_einstellungen;
+pub mod ort_vorschau;
 pub mod karte;
 pub mod lage_zone;
 pub mod personal;

@@ -112,6 +112,7 @@ pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
         .route("/api/einsaetze/{id}/meldungen/{mid}/lagerelevant", post(routes::meldung::lagerelevant))
         .route("/api/einsaetze/{id}/meldungen/{mid}/auftrag", post(routes::meldung::auftrag_erteilen))
         .route("/api/einsaetze/{id}/lage/meldungen", get(routes::meldung::lage_liste))
+        .route("/api/einsaetze/{id}/ort-vorschau", get(routes::ort_vorschau::vorschau))
         .route("/api/einsaetze/{id}/nachforderungen", get(routes::nachforderung::liste))
         .route("/api/einsaetze/{id}/nachforderungen", post(routes::nachforderung::anlegen))
         .route("/api/einsaetze/{id}/nachforderungen/{nid}/status", post(routes::nachforderung::status))
