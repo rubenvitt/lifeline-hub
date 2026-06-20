@@ -2,6 +2,9 @@ import {
   Alert, App, AutoComplete, Breadcrumb, Button, DatePicker, Descriptions,
   Form, Input, InputNumber, Select, Space, Spin, Tag, Typography,
 } from 'antd';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import KoordinatenEingabe from '../anzeige/KoordinatenEingabe';
+import type { LatLon } from '../anzeige/koordinaten';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -33,8 +36,7 @@ interface FormWerte {
   einsatznummer_intern?: string;
   leitstellen_nr?: string;
   einsatzort?: string;
-  einsatzort_lat?: number;
-  einsatzort_lon?: number;
+  einsatzort_koord?: LatLon | null;
   meldende_stelle?: string;
   sachverhalt?: string;
   anzahl_betroffene_initial?: number;
@@ -47,6 +49,7 @@ export default function EinsatzdatenPage() {
   const { benutzer } = useAuth();
   const qc = useQueryClient();
   const { message } = App.useApp();
+  const { formatKoordinate } = useAnzeigeKonventionen();
   const [bearbeiten, setBearbeiten] = useState(false);
   const [form] = Form.useForm<FormWerte>();
 
@@ -109,8 +112,10 @@ export default function EinsatzdatenPage() {
       einsatznummer_intern: einsatz.einsatznummer_intern ?? undefined,
       leitstellen_nr: einsatz.leitstellen_nr ?? undefined,
       einsatzort: einsatz.einsatzort ?? undefined,
-      einsatzort_lat: einsatz.einsatzort_lat ?? undefined,
-      einsatzort_lon: einsatz.einsatzort_lon ?? undefined,
+      einsatzort_koord:
+        einsatz.einsatzort_lat != null && einsatz.einsatzort_lon != null
+          ? { lat: einsatz.einsatzort_lat, lon: einsatz.einsatzort_lon }
+          : null,
       meldende_stelle: einsatz.meldende_stelle ?? undefined,
       sachverhalt: einsatz.sachverhalt ?? undefined,
       anzahl_betroffene_initial: einsatz.anzahl_betroffene_initial ?? undefined,
@@ -127,8 +132,8 @@ export default function EinsatzdatenPage() {
       einsatznummer_intern: leerZuNull(werte.einsatznummer_intern),
       leitstellen_nr: leerZuNull(werte.leitstellen_nr),
       einsatzort: leerZuNull(werte.einsatzort),
-      einsatzort_lat: werte.einsatzort_lat ?? null,
-      einsatzort_lon: werte.einsatzort_lon ?? null,
+      einsatzort_lat: werte.einsatzort_koord?.lat ?? null,
+      einsatzort_lon: werte.einsatzort_koord?.lon ?? null,
       meldende_stelle: leerZuNull(werte.meldende_stelle),
       sachverhalt: leerZuNull(werte.sachverhalt),
       anzahl_betroffene_initial: werte.anzahl_betroffene_initial ?? null,
@@ -189,14 +194,9 @@ export default function EinsatzdatenPage() {
           <Form.Item label="Einsatzort (Adresse)" name="einsatzort">
             <Input />
           </Form.Item>
-          <Space>
-            <Form.Item label="Breitengrad (Lat)" name="einsatzort_lat">
-              <InputNumber style={{ width: 180 }} step={0.0001} />
-            </Form.Item>
-            <Form.Item label="Längengrad (Lon)" name="einsatzort_lon">
-              <InputNumber style={{ width: 180 }} step={0.0001} />
-            </Form.Item>
-          </Space>
+          <Form.Item label="Koordinate" name="einsatzort_koord">
+            <KoordinatenEingabe />
+          </Form.Item>
           <Form.Item label="Meldende/anfordernde Stelle" name="meldende_stelle">
             <Input />
           </Form.Item>
@@ -231,7 +231,7 @@ export default function EinsatzdatenPage() {
           <Descriptions.Item label="Einsatzort">{einsatz.einsatzort ?? '—'}</Descriptions.Item>
           <Descriptions.Item label="Koordinate">
             {einsatz.einsatzort_lat != null && einsatz.einsatzort_lon != null
-              ? `${einsatz.einsatzort_lat}, ${einsatz.einsatzort_lon}`
+              ? formatKoordinate(einsatz.einsatzort_lat, einsatz.einsatzort_lon)
               : '—'}
           </Descriptions.Item>
           <Descriptions.Item label="Meldende Stelle">
