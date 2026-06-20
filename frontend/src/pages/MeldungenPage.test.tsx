@@ -193,8 +193,9 @@ describe('MeldungenPage', () => {
     renderPage();
     await screen.findByText('Florian Nord 1');
     await userEvent.click(screen.getByRole('button', { name: 'An Lage übergeben' }));
-    await userEvent.type(await screen.findByLabelText('Breitengrad'), '50.1');
-    await userEvent.type(screen.getByLabelText('Längengrad'), '8.6');
+    // Seit der formatbewussten Eingabe (KoordinatenEingabe) ein einzelnes Feld:
+    // im WGS84-Default wird "lat, lon" getippt.
+    await userEvent.type(await screen.findByPlaceholderText('Koordinate eingeben'), '50.1, 8.6');
     await userEvent.click(screen.getByRole('button', { name: 'Übergeben' }));
     await waitFor(() => expect(markiereLagerelevant).toHaveBeenCalledTimes(1));
     const [eid, mid, daten] = markiereLagerelevant.mock.calls[0];

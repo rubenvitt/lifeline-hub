@@ -63,6 +63,30 @@ describe('EinsatzdatenPage', () => {
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
   });
 
+  it('zeigt Koordinaten über formatKoordinate (WGS84-Default: toFixed(5))', async () => {
+    setup({ einsatz: { einsatzort_lat: 48.1234, einsatzort_lon: 11.5678 } });
+    // Ohne EinsatzAnzeigeProvider greift DEFAULT_KONVENTIONEN → WGS84 → lat.toFixed(5), lon.toFixed(5)
+    expect(await screen.findByText('48.12340, 11.56780')).toBeInTheDocument();
+  });
+
+  it('speichert einsatzort_koord als einsatzort_lat/lon im PATCH-Body', async () => {
+    let patchBody: Record<string, unknown> = {};
+    setup({ einsatz: { einsatzort_lat: 48.1234, einsatzort_lon: 11.5678 } });
+    server.use(
+      http.patch('/api/einsaetze/7', async ({ request }) => {
+        patchBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...basisEinsatz, einsatzort_lat: 48.1234, einsatzort_lon: 11.5678 });
+      }),
+    );
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(patchBody.einsatzort_lat).toBeCloseTo(48.1234, 4));
+    expect(patchBody.einsatzort_lon).toBeCloseTo(11.5678, 4);
+  });
+
   it('zeigt den Bearbeiten-Button für schreibberechtigten, aktiven Einsatz', async () => {
     setup();
     expect(await screen.findByRole('button', { name: 'Bearbeiten' })).toBeInTheDocument();

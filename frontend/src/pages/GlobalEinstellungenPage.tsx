@@ -28,8 +28,10 @@ const EINHEITEN_OPTIONEN: { value: EinheitenSystem; label: string }[] = [
 
 const KOORDINATEN_OPTIONEN: { value: Koordinatenformat; label: string }[] = [
   { value: 'wgs84', label: 'WGS84 dezimal' },
-  { value: 'mgrs', label: 'MGRS' },
+  { value: 'dms', label: 'WGS84 (Grad/Min/Sek)' },
   { value: 'utm', label: 'UTM' },
+  { value: 'mgrs', label: 'MGRS' },
+  { value: 'gk', label: 'Gauß-Krüger' },
 ];
 
 /** Optionen für den Modul-Rollen-Default; '' = kein Rollen-Zwang (frei). */

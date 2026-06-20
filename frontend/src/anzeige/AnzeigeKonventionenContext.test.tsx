@@ -1,7 +1,8 @@
-import { screen, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { screen, waitFor, act } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderMitProviders } from '../test/utils';
 import { EinsatzAnzeigeProvider, useAnzeigeKonventionen } from './AnzeigeKonventionenContext';
+import { setzeOverride } from './koordinatenSystemStore';
 
 vi.mock('../api/einsaetze', () => ({ ladeEinstellungen: vi.fn() }));
 import { ladeEinstellungen } from '../api/einsaetze';
@@ -20,6 +21,7 @@ function Sonde() {
 
 describe('useAnzeigeKonventionen', () => {
   beforeEach(() => vi.resetAllMocks());
+  afterEach(() => localStorage.clear());
 
   it('liefert ohne Provider die Defaults (kein Throw)', () => {
     renderMitProviders(<Sonde />);
@@ -66,5 +68,32 @@ describe('useAnzeigeKonventionen', () => {
     // Default-Koordinate bleibt dezimal.
     await waitFor(() => expect(ladeEinstellungen).toHaveBeenCalledWith(1));
     expect(screen.getByTestId('koord').textContent).toBe('51.10000, 4.10000');
+  });
+
+  it('Override übersteuert das geladene Koordinatenformat in formatKoordinate', async () => {
+    vi.mocked(ladeEinstellungen).mockResolvedValue({
+      einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
+      fachebenen_sichtbar: null,
+      zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: 'wgs84',
+      etb_nummer_praefix: null, etb_nummer_start: null, meldung_nummer_praefix: null, meldung_nummer_start: null, auftrag_nummer_praefix: null, auftrag_nummer_start: null, meldung_bestaetigung_frist_min: null, auftrag_quittierung_frist_min: null, auto_etb_eintraege: null, etb_nummer_eingefroren: false, meldung_nummer_eingefroren: false, auftrag_nummer_eingefroren: false, retention_dauer_tage: null, geaendert_at: null, geaendert_von: null,
+    });
+
+    renderMitProviders(
+      <EinsatzAnzeigeProvider einsatzId={1}>
+        <Sonde />
+      </EinsatzAnzeigeProvider>,
+    );
+
+    // Warte bis wgs84 geladen ist.
+    await waitFor(() =>
+      expect(screen.getByTestId('koord').textContent).toBe('51.10000, 4.10000'),
+    );
+
+    // Override auf DMS setzen — Anzeige muss reaktiv wechseln.
+    act(() => setzeOverride('dms'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('koord').textContent).toBe("51°06'00\"N 004°06'00\"E"),
+    );
   });
 });
