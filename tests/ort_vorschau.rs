@@ -162,3 +162,13 @@ async fn ortsname_aus_cache_ohne_netz() {
     assert_eq!(v["ortsname"].as_str(), Some("Teststr. 1, Musterstadt"));
     assert_eq!(v["peilung"]["richtung"].as_str(), Some("N")); // Peilung steht weiterhin
 }
+
+#[tokio::test]
+async fn out_of_range_koordinate_ist_400() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_mit_einsatzort(&pool).await;
+    // lat=999 liegt außerhalb des gültigen Bereichs (-90..=90) → Handler gibt 400 zurück.
+    let (s, _v) = get(&app, &format!("/api/einsaetze/{eid}/ort-vorschau?lat=999&lon=10.0"), &cookie).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+}
