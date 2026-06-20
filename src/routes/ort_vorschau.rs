@@ -74,9 +74,11 @@ pub async fn vorschau(
         bezug_label: p.bezug_label,
     });
 
-    // Ortsname: parallel-erprobt, hart getimeoutet, rate-limitiert. Jeder Fehler → None.
+    // Org-Einstellungen laden (DB-Fehler hier = echter 500; das `?` ist KEIN Geocoder-Fehlerpfad).
     let org = org_einst::laden_oder_default(&state.pool, einsatz.org_id).await?;
     let base = org.geocoder_url.as_deref().unwrap_or(geocoding::NOMINATIM_DEFAULT);
+    // Ortsname best-effort: reverse() liefert bei offline/Timeout/Rate-Limit None — die Peilung
+    // steht trotzdem, der Request wird nie wegen eines Geocoder-Fehlers abgebrochen.
     let ortsname = geocoding::reverse(&state.pool, base, params.lat, params.lon).await;
 
     Ok(Json(OrtVorschauAntwort { peilung, ortsname }))

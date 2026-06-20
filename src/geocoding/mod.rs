@@ -99,6 +99,9 @@ pub async fn reverse_mit(
     // 2. Rate-Limit: überzählig → None (Peilung kommt ja sowieso).
     // Guard wird im Block gehalten und vor dem ersten .await freigegeben;
     // explizites drop() reicht nicht für die async-Send-Analyse des Compilers.
+    // Das Block-Ende ist der für Rusts async-Send-Analyse maßgebliche Drop-Punkt des Guards;
+    // ein vorgezogenes `drop()` wird dort NICHT erkannt. Nur der `bool` (Copy, keine
+    // Lock-Lifetime) verlässt den Block.
     let darf_anfragen = {
         let mut bucket_guard = bucket.lock().unwrap_or_else(|e| e.into_inner());
         bucket_guard.try_take()
