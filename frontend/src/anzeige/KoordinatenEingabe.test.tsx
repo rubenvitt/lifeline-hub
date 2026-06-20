@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { useState } from 'react';
+import { http, HttpResponse } from 'msw';
+import { server } from '../test/server';
+import { renderMitProviders } from '../test/utils';
 import KoordinatenEingabe from './KoordinatenEingabe';
 import { setzeOverride } from './koordinatenSystemStore';
 import type { LatLon } from './koordinaten';
@@ -75,5 +78,41 @@ describe('KoordinatenEingabe', () => {
     expect(screen.getByRole('textbox')).toHaveValue('51.50000, 10.25000');
     act(() => setzeOverride('dms'));
     expect(screen.getByRole('textbox')).toHaveValue('51°30\'00"N 010°15\'00"E');
+  });
+
+  it('ohne einsatzId rendert keine Ort-Zeile (keine Provider nötig)', () => {
+    // Bewusst bare render ohne QueryClient — darf NICHT werfen.
+    render(<KoordinatenEingabe value={{ lat: 51.5, lon: 10.25 }} onChange={() => {}} />);
+    expect(screen.queryByText(/vom|·/)).not.toBeInTheDocument();
+  });
+
+  it('rendert die Peilungs-Zeile (ortsname null)', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/ort-vorschau', () =>
+        HttpResponse.json({
+          peilung: { distanz_m: 1200, richtung: 'NO', bezug_label: 'Einsatzort' },
+          ortsname: null,
+        }),
+      ),
+    );
+    renderMitProviders(
+      <KoordinatenEingabe value={{ lat: 51.5, lon: 10.25 }} onChange={() => {}} einsatzId={1} />,
+    );
+    expect(await screen.findByText(/NO von Einsatzort/)).toBeInTheDocument();
+  });
+
+  it('rendert Ortsname und Peilung verkettet', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/ort-vorschau', () =>
+        HttpResponse.json({
+          peilung: { distanz_m: 1200, richtung: 'NO', bezug_label: 'Einsatzort' },
+          ortsname: 'Hauptstr. 5, Musterstadt',
+        }),
+      ),
+    );
+    renderMitProviders(
+      <KoordinatenEingabe value={{ lat: 51.5, lon: 10.25 }} onChange={() => {}} einsatzId={1} />,
+    );
+    expect(await screen.findByText(/Hauptstr\. 5, Musterstadt · 1[.,]20 km NO von Einsatzort/)).toBeInTheDocument();
   });
 });

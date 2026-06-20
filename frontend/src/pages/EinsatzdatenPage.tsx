@@ -195,7 +195,7 @@ export default function EinsatzdatenPage() {
             <Input />
           </Form.Item>
           <Form.Item label="Koordinate" name="einsatzort_koord">
-            <KoordinatenEingabe />
+            <KoordinatenEingabe einsatzId={einsatzId} exclude={`einsatzort:${einsatzId}`} />
           </Form.Item>
           <Form.Item label="Meldende/anfordernde Stelle" name="meldende_stelle">
             <Input />
