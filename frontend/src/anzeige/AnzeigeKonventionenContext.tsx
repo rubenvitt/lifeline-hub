@@ -10,6 +10,7 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ladeEinstellungen } from '../api/einsaetze';
+import { useKoordinatenSystemOverride } from './koordinatenSystemStore';
 import {
   DEFAULT_KONVENTIONEN,
   formatKoordinate,
@@ -60,15 +61,17 @@ export function EinsatzAnzeigeProvider({
     queryFn: () => ladeEinstellungen(einsatzId),
   });
 
+  const override = useKoordinatenSystemOverride();
+
   const wert = useMemo<AnzeigeKonventionenHook>(() => {
     const konventionen: AnzeigeKonventionen = {
       zeitzone: data?.zeitzone ?? null,
       zeitformat: data?.zeitformat ?? null,
       einheiten: data?.einheiten ?? null,
-      koordinatenformat: data?.koordinatenformat ?? null,
+      koordinatenformat: override ?? data?.koordinatenformat ?? null,
     };
     return bindeFormatter(konventionen);
-  }, [data?.zeitzone, data?.zeitformat, data?.einheiten, data?.koordinatenformat]);
+  }, [data?.zeitzone, data?.zeitformat, data?.einheiten, data?.koordinatenformat, override]);
 
   return (
     <AnzeigeKonventionenContext.Provider value={wert}>
