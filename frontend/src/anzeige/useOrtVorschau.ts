@@ -19,7 +19,7 @@ export function useOrtVorschau(
   exclude?: string,
   debounceMs = 700,
 ) {
-  const [debounced, setDebounced] = useState<LatLon | null>(koord);
+  const [debounced, setDebounced] = useState<LatLon | null>(null);
 
   useEffect(() => {
     if (!koord) {

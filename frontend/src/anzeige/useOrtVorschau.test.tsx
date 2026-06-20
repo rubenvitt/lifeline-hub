@@ -48,7 +48,7 @@ describe('useOrtVorschau', () => {
     expect(treffer).not.toHaveBeenCalled();
   });
 
-  it('feuert nicht vor Ablauf des Debounce-Fensters', () => {
+  it('feuert nicht vor Ablauf des Debounce-Fensters, aber danach genau einmal', async () => {
     const treffer = vi.fn();
     server.use(
       http.get('/api/einsaetze/1/ort-vorschau', () => {
@@ -56,10 +56,17 @@ describe('useOrtVorschau', () => {
         return HttpResponse.json({ peilung: null, ortsname: null });
       }),
     );
-    // Großzügiges Fenster; unmittelbar nach dem Render darf noch nichts gefeuert haben.
-    renderHook(() => useOrtVorschau(1, { lat: 51.5, lon: 10.25 }, undefined, 500), {
-      wrapper: wrapper(),
-    });
+    const { result } = renderHook(
+      () => useOrtVorschau(1, { lat: 51.5, lon: 10.25 }, undefined, 120),
+      { wrapper: wrapper() },
+    );
+    // Unmittelbar nach dem Mount: noch kein Call (Debounce nicht initial umgangen).
     expect(treffer).not.toHaveBeenCalled();
+    // Mitten im Debounce-Fenster (< 120 ms): immer noch kein Call.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(treffer).not.toHaveBeenCalled();
+    // Nach Ablauf des Fensters: genau ein Call, Daten da.
+    await waitFor(() => expect(result.current.data).toBeDefined());
+    expect(treffer).toHaveBeenCalledTimes(1);
   });
 });
