@@ -88,6 +88,8 @@ export interface OrgEinstellungen {
   auftrag_quittierung_frist_min: number | null;
   /** 0 = Auto-ETB aus; null/1 = an (Default). */
   auto_etb_eintraege: number | null;
+  /** Konfigurierbare Geocoder-Basis-URL; null = öffentlicher Nominatim. */
+  geocoder_url: string | null;
   geaendert_at: string | null;
   geaendert_von: number | null;
 }
@@ -106,6 +108,7 @@ export interface OrgEinstellungenUpdate {
   auftrag_quittierung_frist_min: number | null;
   /** Auto-ETB-Dual-Publish: false schaltet ab; true/null = an. */
   auto_etb_eintraege: boolean | null;
+  geocoder_url: string | null;
 }
 
 /** Org-weite Modul-Rollen-Defaults (GET /api/org-modul-einstellungen).

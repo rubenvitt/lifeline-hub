@@ -53,6 +53,7 @@ interface FormWerte {
   meldung_bestaetigung_frist_min?: number;
   auftrag_quittierung_frist_min?: number;
   auto_etb_eintraege: boolean;
+  geocoder_url?: string;
 }
 
 /**
@@ -126,6 +127,7 @@ export default function GlobalEinstellungenPage() {
     auftrag_quittierung_frist_min: einstellungen.auftrag_quittierung_frist_min ?? undefined,
     // 0 = aus; null/1 = an (Default an).
     auto_etb_eintraege: einstellungen.auto_etb_eintraege !== 0,
+    geocoder_url: einstellungen.geocoder_url ?? undefined,
   };
 
   function speichern(werte: FormWerte) {
@@ -141,6 +143,7 @@ export default function GlobalEinstellungenPage() {
       meldung_bestaetigung_frist_min: werte.meldung_bestaetigung_frist_min ?? null,
       auftrag_quittierung_frist_min: werte.auftrag_quittierung_frist_min ?? null,
       auto_etb_eintraege: werte.auto_etb_eintraege,
+      geocoder_url: werte.geocoder_url?.trim() || null,
     };
     speichernMutation.mutate(felder);
   }
@@ -190,6 +193,13 @@ export default function GlobalEinstellungenPage() {
         </Form.Item>
         <Form.Item label="Koordinatenformat" name="koordinatenformat">
           <Select allowClear placeholder="WGS84 dezimal (Fallback)" options={KOORDINATEN_OPTIONEN} />
+        </Form.Item>
+        <Form.Item
+          label="Geocoder-URL"
+          name="geocoder_url"
+          tooltip="Nominatim-kompatible Basis-URL für die Ort-Vorschau (Reverse-Geocoding). Leer = öffentlicher Nominatim. Die Einsatz-Koordinate wird an diesen Dienst gesendet — für Produktivlast/Datenschutz eigenen Geocoder hinterlegen."
+        >
+          <Input placeholder="https://nominatim.openstreetmap.org (Default)" allowClear style={{ width: '100%' }} />
         </Form.Item>
 
         {/* ── Sektion 2: Aufbewahrung ───────────────────────────────── */}

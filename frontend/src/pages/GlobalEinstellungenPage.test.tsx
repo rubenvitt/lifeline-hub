@@ -1,4 +1,5 @@
 import { screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { renderMitProviders } from '../test/utils';
 import GlobalEinstellungenPage from './GlobalEinstellungenPage';
@@ -38,6 +39,7 @@ const LEERE_EINSTELLUNGEN = {
   meldung_bestaetigung_frist_min: null,
   auftrag_quittierung_frist_min: null,
   auto_etb_eintraege: null,
+  geocoder_url: null,
   geaendert_at: null,
   geaendert_von: null,
 };
@@ -86,6 +88,7 @@ describe('GlobalEinstellungenPage', () => {
       meldung_bestaetigung_frist_min: 30,
       auftrag_quittierung_frist_min: 45,
       auto_etb_eintraege: 0,
+      geocoder_url: null,
       geaendert_at: null,
       geaendert_von: null,
     });
@@ -110,6 +113,7 @@ describe('GlobalEinstellungenPage', () => {
         auftrag_quittierung_frist_min: 45,
         // auto_etb_eintraege: 0 → Switch aus → false
         auto_etb_eintraege: false,
+        geocoder_url: null,
       }),
     );
   });
@@ -134,6 +138,7 @@ describe('GlobalEinstellungenPage', () => {
         auftrag_quittierung_frist_min: null,
         // auto_etb_eintraege: null → Standard = an → true
         auto_etb_eintraege: true,
+        geocoder_url: null,
       }),
     );
   });
@@ -224,6 +229,24 @@ describe('GlobalEinstellungenPage', () => {
   });
 
   // --- Modul-Rollen-Default: Sofortmutation ---
+
+  // --- Geocoder-URL ---
+
+  it('zeigt das Geocoder-URL-Feld und sendet es beim Speichern', async () => {
+    vi.mocked(speichereOrgEinstellungen).mockResolvedValue({ ...LEERE_EINSTELLUNGEN });
+
+    rendern();
+
+    const feld = await screen.findByLabelText(/Geocoder-URL/i);
+    await userEvent.type(feld, 'https://nominatim.example.org');
+    fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() =>
+      expect(speichereOrgEinstellungen).toHaveBeenCalledWith(
+        expect.objectContaining({ geocoder_url: 'https://nominatim.example.org' }),
+      ),
+    );
+  });
 
   it('speichert Modul-Rollen-Default sofort per PUT', async () => {
     vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({ etb: 'fuehrungskraft' });

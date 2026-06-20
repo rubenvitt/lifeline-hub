@@ -342,6 +342,7 @@ describe('EinsatzEinstellungenPage', () => {
         meldung_bestaetigung_frist_min: 30,
         auftrag_quittierung_frist_min: 60,
         auto_etb_eintraege: 1,
+        geocoder_url: null,
         geaendert_at: null,
         geaendert_von: null,
       },
@@ -388,6 +389,7 @@ describe('EinsatzEinstellungenPage', () => {
         meldung_bestaetigung_frist_min: 30,
         auftrag_quittierung_frist_min: 60,
         auto_etb_eintraege: 1,
+        geocoder_url: null,
         geaendert_at: null,
         geaendert_von: null,
       },
@@ -431,6 +433,7 @@ describe('EinsatzEinstellungenPage', () => {
         meldung_bestaetigung_frist_min: null, auftrag_quittierung_frist_min: null,
         // Org-Default: 0 = Aus.
         auto_etb_eintraege: 0,
+        geocoder_url: null,
         geaendert_at: null, geaendert_von: null,
       },
     });
