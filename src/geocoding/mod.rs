@@ -97,9 +97,13 @@ pub async fn reverse_mit(
     }
 
     // 2. Rate-Limit: überzählig → None (Peilung kommt ja sowieso).
-    if !bucket.lock().unwrap().try_take() {
+    // Vergifteten Bucket-Mutex tolerieren (try_take ist rein arithmetisch, kann nicht
+    // selbst vergiften) — eine Geocoder-Abfrage darf nie den Request crashen.
+    let mut bucket_guard = bucket.lock().unwrap_or_else(|e| e.into_inner());
+    if !bucket_guard.try_take() {
         return None;
     }
+    drop(bucket_guard);
 
     // 3. HTTP (mit dem hart getimeouteten Client).
     let url = format!(
@@ -155,7 +159,7 @@ mod tests {
         );
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
-        let handle = tokio::spawn(async move { axum::serve(listener, app).await.unwrap(); });
+        let handle = tokio::spawn(async move { axum::serve(listener, app).await.ok(); });
         (format!("http://{addr}"), handle)
     }
 
