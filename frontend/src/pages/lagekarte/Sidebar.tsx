@@ -1,4 +1,4 @@
-import { Badge, Button, Card, Empty, InputNumber, List, Radio, Select, Space, Spin, Switch, Tooltip, Typography } from 'antd';
+import { Badge, Button, Card, Empty, List, Radio, Select, Space, Spin, Switch, Tooltip, Typography } from 'antd';
 import { useState } from 'react';
 import type { KarteMarker, NichtVerortet } from './marker';
 import type { BasemapModus } from './basemapStil';
@@ -7,6 +7,8 @@ import type { ZoneTyp } from '../../api/types';
 import type { ZeichenModus } from './zeichnen';
 import { ZONE_TYPEN } from './zonenStil';
 import { FACHEBENEN, fachebeneKeys } from './fachebenen';
+import KoordinatenEingabe from '../../anzeige/KoordinatenEingabe';
+import type { LatLon } from '../../anzeige/koordinaten';
 
 export interface LayerSichtbar {
   einsatzort: boolean;
@@ -66,8 +68,7 @@ export interface SidebarProps {
 
 export default function Sidebar(props: SidebarProps) {
   const { nichtVerortet, verortet, darfSchreiben, platzierungZiel } = props;
-  const [manuellLat, setManuellLat] = useState<number | null>(null);
-  const [manuellLon, setManuellLon] = useState<number | null>(null);
+  const [koord, setKoord] = useState<LatLon | null>(null);
   const uhsVerortet = verortet.filter((m) => m.typ === 'uhs');
   const schadenVerortet = verortet.filter((m) => m.typ === 'schaden');
 
@@ -136,33 +137,23 @@ export default function Sidebar(props: SidebarProps) {
           <Typography.Text type="secondary">
             Klick auf die Karte setzt die Koordinate. (Abbrechen beendet.)
           </Typography.Text>
-          <Space style={{ marginTop: 8 }} wrap>
-            <InputNumber
-              size="small"
-              placeholder="Lat"
-              aria-label="Breitengrad"
-              value={manuellLat}
-              onChange={(v) => setManuellLat(v)}
-              style={{ width: 90 }}
-            />
-            <InputNumber
-              size="small"
-              placeholder="Lon"
-              aria-label="Längengrad"
-              value={manuellLon}
-              onChange={(v) => setManuellLon(v)}
-              style={{ width: 90 }}
-            />
+          <div style={{ marginTop: 8 }}>
+            <KoordinatenEingabe value={koord} onChange={setKoord} />
+          </div>
+          <div style={{ marginTop: 8 }}>
             <Button
               size="small"
-              disabled={manuellLat == null || manuellLon == null}
+              disabled={!koord}
               onClick={() => {
-                if (manuellLat != null && manuellLon != null) props.onKoordinateEingeben(manuellLat, manuellLon);
+                if (koord) {
+                  props.onKoordinateEingeben(koord.lat, koord.lon);
+                  setKoord(null);
+                }
               }}
             >
               Übernehmen
             </Button>
-          </Space>
+          </div>
         </Card>
       )}
 
