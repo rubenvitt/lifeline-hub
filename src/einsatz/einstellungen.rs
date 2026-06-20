@@ -23,7 +23,7 @@ pub const ZEITFORMATE: [&str; 2] = ["24h", "12h"];
 /// Gültige Einheiten-Systeme.
 pub const EINHEITEN_SYSTEME: [&str; 2] = ["metrisch", "imperial"];
 /// Gültige Koordinatenformate.
-pub const KOORDINATENFORMATE: [&str; 3] = ["wgs84", "mgrs", "utm"];
+pub const KOORDINATENFORMATE: [&str; 5] = ["wgs84", "dms", "utm", "mgrs", "gk"];
 
 /// Ob `s` ein gültiges Zeitformat ist.
 pub fn ist_gueltiges_zeitformat(s: &str) -> bool {
@@ -504,6 +504,14 @@ mod tests {
         let a = e.anzeige();
         assert_eq!(a.fachebenen_sichtbar.as_ref().unwrap()["nina"], true);
         assert_eq!(a.fachebenen_sichtbar.as_ref().unwrap()["dwd"], false);
+    }
+
+    #[test]
+    fn koordinatenformat_dms_und_gk_sind_gueltig() {
+        assert!(ist_gueltiges_koordinatenformat("dms"));
+        assert!(ist_gueltiges_koordinatenformat("gk"));
+        assert!(ist_gueltiges_koordinatenformat("wgs84"));
+        assert!(!ist_gueltiges_koordinatenformat("xyz"));
     }
 
     #[test]
