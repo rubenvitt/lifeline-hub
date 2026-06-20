@@ -1,5 +1,23 @@
 import { describe, it, expect } from 'vitest';
 import { wgs84ZuUtm, wgs84ZuMgrs, utmZone } from './koordinaten';
+import { formatiere, parse, KoordinatenParseFehler } from './koordinaten';
+
+describe('formatiere/parse — WGS84 dezimal', () => {
+  it('formatiert byte-exakt mit 5 Nachkommastellen', () => {
+    expect(formatiere(51.5, 10.25, 'wgs84')).toBe('51.50000, 10.25000');
+  });
+  it('parst und ist round-trip-stabil', () => {
+    const p = parse('51.50000, 10.25000', 'wgs84');
+    expect(p.lat).toBeCloseTo(51.5, 5);
+    expect(p.lon).toBeCloseTo(10.25, 5);
+  });
+  it('wirft KoordinatenParseFehler bei Müll', () => {
+    expect(() => parse('kein wert', 'wgs84')).toThrow(KoordinatenParseFehler);
+  });
+  it('wirft bei out-of-range', () => {
+    expect(() => parse('123, 10', 'wgs84')).toThrow(KoordinatenParseFehler);
+  });
+});
 
 // Referenzpunkte mit extern verifizierten Soll-Werten (NICHT aus dieser
 // Implementierung abgeleitet — sonst beweist der Test nichts):

@@ -8,7 +8,56 @@
  * Bewusste Grenzen (siehe Plan-Risiken): die UTM-Zonen-Ausnahmen für
  * Norwegen (32V) und Svalbard (31X/33X/35X/37X) sind NICHT abgebildet — für
  * Deutschland/Mitteleuropa irrelevant. Polnahe Bereiche (UPS) ebenfalls nicht.
+ * GK-Genauigkeit ca. 3 m (Gauss-Krüger via proj4, Bessel-Ellipsoid).
  */
+
+import type { Koordinatenformat } from '../api/types';
+import './proj4Setup';
+
+export interface LatLon { lat: number; lon: number; }
+
+export class KoordinatenParseFehler extends Error {
+  constructor(text: string, system: Koordinatenformat) {
+    super(`Ungültige ${system}-Koordinate: "${text}"`);
+    this.name = 'KoordinatenParseFehler';
+  }
+}
+
+function pruefeBereich(lat: number, lon: number): void {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error('NaN');
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) throw new Error('Bereich');
+}
+
+function formatiereWgs84(lat: number, lon: number): string {
+  return `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+}
+function parseWgs84(text: string): LatLon {
+  const teile = text.split(',').map((s) => Number(s.trim()));
+  if (teile.length !== 2 || teile.some((n) => !Number.isFinite(n))) throw new Error('Format');
+  const [lat, lon] = teile;
+  pruefeBereich(lat, lon);
+  return { lat, lon };
+}
+
+export function formatiere(lat: number, lon: number, system: Koordinatenformat): string {
+  switch (system) {
+    case 'wgs84':
+    default:
+      return formatiereWgs84(lat, lon);
+  }
+}
+
+export function parse(text: string, system: Koordinatenformat): LatLon {
+  try {
+    switch (system) {
+      case 'wgs84':
+      default:
+        return parseWgs84(text);
+    }
+  } catch {
+    throw new KoordinatenParseFehler(text, system);
+  }
+}
 
 const A = 6_378_137.0; // WGS84 große Halbachse
 const F = 1 / 298.257223563; // Abplattung

@@ -66,7 +66,7 @@ export type Zeitformat = '24h' | '12h';
 /** Einheiten-System für Größenanzeigen. */
 export type EinheitenSystem = 'metrisch' | 'imperial';
 /** Koordinaten-Anzeigeformat. */
-export type Koordinatenformat = 'wgs84' | 'mgrs' | 'utm';
+export type Koordinatenformat = 'wgs84' | 'dms' | 'utm' | 'mgrs' | 'gk';
 
 // ============================== Admin — Org-weite Einstellungen ==============================
 
