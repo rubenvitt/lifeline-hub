@@ -122,3 +122,23 @@ describe('formatiere/parse — UTM', () => {
     expect(() => parse('garnix', 'utm')).toThrow(KoordinatenParseFehler);
   });
 });
+
+describe('formatiere/parse — MGRS', () => {
+  it('formatiert lesbar gruppiert GZD + Quadrat + 5+5 Stellen', () => {
+    expect(formatiere(51.16, 10.45, 'mgrs')).toMatch(/^\d{1,2}[C-X] [A-Z]{2} \d{5} \d{5}$/);
+  });
+  it('round-trip via Zellzentrum (< 1 m)', () => {
+    const s = formatiere(51.16, 10.45, 'mgrs');
+    const p = parse(s, 'mgrs');
+    expect(p.lat).toBeCloseTo(51.16, 3);
+    expect(p.lon).toBeCloseTo(10.45, 3);
+  });
+  it('parst auch ohne Leerzeichen', () => {
+    const kompakt = formatiere(51.16, 10.45, 'mgrs').replace(/\s+/g, '');
+    const p = parse(kompakt, 'mgrs');
+    expect(p.lat).toBeCloseTo(51.16, 3);
+  });
+  it('wirft bei Müll', () => {
+    expect(() => parse('XX', 'mgrs')).toThrow(KoordinatenParseFehler);
+  });
+});

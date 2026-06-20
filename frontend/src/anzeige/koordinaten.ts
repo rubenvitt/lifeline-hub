@@ -98,10 +98,22 @@ function parseUtm(text: string): LatLon {
   return { lat, lon };
 }
 
+function formatiereMgrs(lat: number, lon: number): string {
+  const s = mgrsForward([lon, lat], 5); // kompakt, z.B. "32UNB1234567890"
+  const m = /^(\d{1,2}[C-X])([A-Z]{2})(\d{5})(\d{5})$/.exec(s);
+  return m ? `${m[1]} ${m[2]} ${m[3]} ${m[4]}` : s;
+}
+function parseMgrs(text: string): LatLon {
+  const [lon, lat] = mgrsToPoint(text.replace(/\s+/g, '').toUpperCase());
+  pruefeBereich(lat, lon);
+  return { lat, lon };
+}
+
 export function formatiere(lat: number, lon: number, system: Koordinatenformat): string {
   switch (system) {
     case 'dms': return formatiereDms(lat, lon);
     case 'utm': return formatiereUtm(lat, lon);
+    case 'mgrs': return formatiereMgrs(lat, lon);
     case 'wgs84':
     default:
       return formatiereWgs84(lat, lon);
@@ -113,6 +125,7 @@ export function parse(text: string, system: Koordinatenformat): LatLon {
     switch (system) {
       case 'dms': return parseDms(text);
       case 'utm': return parseUtm(text);
+      case 'mgrs': return parseMgrs(text);
       case 'wgs84':
       default:
         return parseWgs84(text);
