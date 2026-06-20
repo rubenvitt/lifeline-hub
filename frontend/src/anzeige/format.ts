@@ -12,7 +12,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import type { Zeitformat, EinheitenSystem, Koordinatenformat } from '../api/types';
-import { wgs84ZuMgrs, wgs84ZuUtm } from './koordinaten';
+import { formatiere } from './koordinaten';
 
 // Idempotent (mehrfaches extend ist unschädlich) — robust bei isoliertem Import.
 dayjs.extend(utc);
@@ -85,18 +85,7 @@ export function formatKoordinate(
   lon: number,
   konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
 ): string {
-  switch (konv.koordinatenformat) {
-    case 'mgrs':
-      return wgs84ZuMgrs(lat, lon);
-    case 'utm': {
-      const u = wgs84ZuUtm(lat, lon);
-      return `${u.zone}${u.band} ${Math.round(u.easting)} ${Math.round(u.northing)}`;
-    }
-    case 'wgs84':
-    default:
-      // Byte-identisch zur bisherigen Inspector-Anzeige.
-      return `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-  }
+  return formatiere(lat, lon, konv.koordinatenformat ?? 'wgs84');
 }
 
 /** Distanz in Metern → Anzeige-String je Einheiten-System (Default: metrisch). */

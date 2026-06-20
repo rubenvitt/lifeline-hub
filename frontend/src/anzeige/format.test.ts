@@ -78,6 +78,18 @@ describe('formatKoordinate', () => {
       '31U 577020 5661521',
     );
   });
+
+  it('formatiert dms über die Konvention', () => {
+    expect(formatKoordinate(51.5, 10.25, { koordinatenformat: 'dms' })).toBe('51°30\'00"N 010°15\'00"E');
+  });
+
+  it('formatiert gk über die Konvention', () => {
+    expect(formatKoordinate(48.782, 9.177, { koordinatenformat: 'gk' })).toMatch(/^R 35\d{5}  H 5\d{6}$/);
+  });
+
+  it('WGS84-Default bleibt byte-exakt', () => {
+    expect(formatKoordinate(51.16040, 10.45140)).toBe('51.16040, 10.45140');
+  });
 });
 
 describe('formatDistanz', () => {
