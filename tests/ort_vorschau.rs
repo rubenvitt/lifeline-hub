@@ -7,9 +7,27 @@ use lifeline_hub::live::LiveHub;
 use serde_json::Value;
 use tower::ServiceExt;
 
+/// Gibt eine garantiert verweigerte Geocoder-URL zurück (Ephemeral-Port binden + sofort freigeben).
+fn geschlossener_geocoder() -> String {
+    let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = l.local_addr().unwrap().port();
+    drop(l);
+    format!("http://127.0.0.1:{port}")
+}
+
 async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
     let pool = db::test_pool().await;
     bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12")).await.unwrap();
+    // Deterministisch: Org-1-Geocoder auf garantiert verweigerte Adresse setzen,
+    // damit ortsname-null-Tests netzunabhängig bleiben (Cache-Treffer umgehen dies).
+    sqlx::query(
+        "INSERT INTO org_einstellungen (org_id, geocoder_url) VALUES (1, ?) \
+         ON CONFLICT(org_id) DO UPDATE SET geocoder_url = excluded.geocoder_url",
+    )
+    .bind(geschlossener_geocoder())
+    .execute(&pool)
+    .await
+    .unwrap();
     let router = build_router(AppState {
         pool: pool.clone(),
         live: LiveHub::new(),
@@ -128,4 +146,19 @@ async fn ohne_login_ist_401() {
             .body(Body::empty()).unwrap(),
     ).await.unwrap();
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn ortsname_aus_cache_ohne_netz() {
+    let (app, pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_mit_einsatzort(&pool).await;
+    // Cache vorbefüllen für die Anfrage-Koordinate.
+    let (la, lo) = lifeline_hub::geocoding::cache::schluessel(50.9, 10.0);
+    lifeline_hub::geocoding::cache::schreibe(&pool, la, lo, "Teststr. 1, Musterstadt").await;
+
+    let (s, v) = get(&app, &format!("/api/einsaetze/{eid}/ort-vorschau?lat=50.9&lon=10.0"), &cookie).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(v["ortsname"].as_str(), Some("Teststr. 1, Musterstadt"));
+    assert_eq!(v["peilung"]["richtung"].as_str(), Some("N")); // Peilung steht weiterhin
 }

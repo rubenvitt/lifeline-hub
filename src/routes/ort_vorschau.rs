@@ -2,7 +2,7 @@
 //!
 //! Liefert `{peilung, ortsname}` für die Koordinaten-Plausibilitätsprüfung.
 //! Die Peilung (nächster verorteter Marker) wird bedingungslos berechnet; `ortsname`
-//! ist in Phase 1 stets null und wird in Phase 2 (Reverse-Geocoding) gefüllt.
+//! wird via Reverse-Geocoding gefüllt (org-konfigurierbarer Geocoder, Cache, Rate-Limit).
 //! Auth/Scope wie andere /api/einsaetze/:id/*-Routen (Einsatz-Mitglied, Lesezugriff).
 
 use crate::app::AppState;
@@ -10,7 +10,8 @@ use crate::auth::session::CurrentUser;
 use crate::einsatz::berechtigung::fordere_lesezugriff;
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
-use crate::geocoding::{marker, peilung};
+use crate::geocoding::{self, marker, peilung};
+use crate::org::einstellungen as org_einst;
 use axum::extract::{Path, Query, State};
 use axum::Json;
 use serde::{Deserialize, Serialize};
@@ -73,6 +74,10 @@ pub async fn vorschau(
         bezug_label: p.bezug_label,
     });
 
-    // Ortsname: Phase 1 immer null (Phase 2 füllt via Reverse-Geocoding).
-    Ok(Json(OrtVorschauAntwort { peilung, ortsname: None }))
+    // Ortsname: parallel-erprobt, hart getimeoutet, rate-limitiert. Jeder Fehler → None.
+    let org = org_einst::laden_oder_default(&state.pool, einsatz.org_id).await?;
+    let base = org.geocoder_url.as_deref().unwrap_or(geocoding::NOMINATIM_DEFAULT);
+    let ortsname = geocoding::reverse(&state.pool, base, params.lat, params.lon).await;
+
+    Ok(Json(OrtVorschauAntwort { peilung, ortsname }))
 }

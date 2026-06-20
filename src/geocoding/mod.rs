@@ -97,13 +97,15 @@ pub async fn reverse_mit(
     }
 
     // 2. Rate-Limit: überzählig → None (Peilung kommt ja sowieso).
-    // Vergifteten Bucket-Mutex tolerieren (try_take ist rein arithmetisch, kann nicht
-    // selbst vergiften) — eine Geocoder-Abfrage darf nie den Request crashen.
-    let mut bucket_guard = bucket.lock().unwrap_or_else(|e| e.into_inner());
-    if !bucket_guard.try_take() {
+    // Guard wird im Block gehalten und vor dem ersten .await freigegeben;
+    // explizites drop() reicht nicht für die async-Send-Analyse des Compilers.
+    let darf_anfragen = {
+        let mut bucket_guard = bucket.lock().unwrap_or_else(|e| e.into_inner());
+        bucket_guard.try_take()
+    };
+    if !darf_anfragen {
         return None;
     }
-    drop(bucket_guard);
 
     // 3. HTTP (mit dem hart getimeouteten Client).
     let url = format!(
