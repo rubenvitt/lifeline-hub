@@ -40,6 +40,13 @@ pub fn ist_gueltiges_koordinatenformat(s: &str) -> bool {
     KOORDINATENFORMATE.contains(&s)
 }
 
+/// Geocoder-Basis-URL: nur http/https, nicht leer. Bewusst leichtgewichtig (kein
+/// vollständiges URL-Parsing) — fehlkonfigurierte URLs werden zur Laufzeit wie offline
+/// behandelt (`ortsname: null`), nie ein Crash.
+pub fn ist_gueltige_geocoder_url(s: &str) -> bool {
+    (s.starts_with("http://") || s.starts_with("https://")) && s.len() > 10
+}
+
 // Verhalten & Automatik (LFH-133) — Validatoren in Rust statt DB-CHECK.
 
 /// Maximale Präfix-Länge (Nummernkreise). Display-only, nie pro Zeile gespeichert.
@@ -694,6 +701,15 @@ mod tests {
         // Erst eine echte Nummer friert ein.
         auftrag_anlegen(&pool, eid, bid).await;
         assert!(auftrag_nummer_vergeben(&pool, eid).await.unwrap());
+    }
+
+    #[test]
+    fn geocoder_url_nur_http_s() {
+        assert!(super::ist_gueltige_geocoder_url("https://nominatim.example.org"));
+        assert!(super::ist_gueltige_geocoder_url("http://10.0.0.5:8080"));
+        assert!(!super::ist_gueltige_geocoder_url("ftp://x"));
+        assert!(!super::ist_gueltige_geocoder_url("kein-schema"));
+        assert!(!super::ist_gueltige_geocoder_url(""));
     }
 
     #[tokio::test]

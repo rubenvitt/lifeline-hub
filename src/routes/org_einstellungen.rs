@@ -11,9 +11,9 @@
 use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
 use crate::einsatz::einstellungen::{
-    ist_gueltige_frist_min, ist_gueltige_retention_dauer, ist_gueltige_zeitzone,
-    ist_gueltiges_einheiten_system, ist_gueltiges_koordinatenformat, ist_gueltiges_nummer_praefix,
-    ist_gueltiges_zeitformat,
+    ist_gueltige_frist_min, ist_gueltige_geocoder_url, ist_gueltige_retention_dauer,
+    ist_gueltige_zeitzone, ist_gueltiges_einheiten_system, ist_gueltiges_koordinatenformat,
+    ist_gueltiges_nummer_praefix, ist_gueltiges_zeitformat,
 };
 use crate::einsatz::modul::{ist_gueltige_benoetigte_rolle, ist_gueltiger_modul_key};
 use crate::error::AppError;
@@ -45,6 +45,8 @@ pub struct OrgEinstellungenUpdate {
     /// Auto-ETB-Dual-Publish: `false` schaltet ab (gespeichert als 0), `true`/fehlend = an.
     /// Identisch mit `EinstellungenUpdate.auto_etb_eintraege` — bool auf Draht, i64 intern.
     pub auto_etb_eintraege: Option<bool>,
+    /// Geocoder-Basis-URL (nur http/https); serverseitig für Ort-Vorschau (Task 9).
+    pub geocoder_url: Option<String>,
 }
 
 /// GET /api/org-einstellungen — Org-weite Einstellungen lesen.
@@ -128,6 +130,14 @@ pub async fn setzen(
         }
     }
 
+    // Geocoder-URL validieren (400): nur http/https zulässig.
+    let geocoder_url = bereinige(req.geocoder_url);
+    if let Some(u) = geocoder_url.as_deref() {
+        if !ist_gueltige_geocoder_url(u) {
+            return Err(AppError::Validation("Ungültige Geocoder-URL (nur http/https)".into()));
+        }
+    }
+
     let gespeichert = einstellungen::speichern(
         &state.pool,
         benutzer.org_id,
@@ -145,6 +155,7 @@ pub async fn setzen(
             auftrag_quittierung_frist_min: req.auftrag_quittierung_frist_min,
             // bool → 0/1; None bleibt None (= Default an).
             auto_etb_eintraege: req.auto_etb_eintraege.map(i64::from),
+            geocoder_url: geocoder_url.as_deref(),
         },
     )
     .await?;

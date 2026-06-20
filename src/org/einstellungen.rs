@@ -31,6 +31,8 @@ pub struct OrgEinstellungen {
     pub auftrag_quittierung_frist_min: Option<i64>,
     // Auto-ETB-Schalter: 0 = aus; NULL/1 = an.
     pub auto_etb_eintraege: Option<i64>,
+    // Geocoder-Basis-URL (serverseitig; kein Leak an Mitglieder).
+    pub geocoder_url: Option<String>,
     pub geaendert_at: Option<String>,
     pub geaendert_von: Option<i64>,
 }
@@ -50,6 +52,7 @@ impl OrgEinstellungen {
             meldung_bestaetigung_frist_min: None,
             auftrag_quittierung_frist_min: None,
             auto_etb_eintraege: None,
+            geocoder_url: None,
             geaendert_at: None,
             geaendert_von: None,
         }
@@ -70,6 +73,7 @@ impl OrgEinstellungen {
             meldung_bestaetigung_frist_min: self.meldung_bestaetigung_frist_min,
             auftrag_quittierung_frist_min: self.auftrag_quittierung_frist_min,
             auto_etb_eintraege: self.auto_etb_eintraege,
+            geocoder_url: self.geocoder_url.clone(),
             geaendert_at: self.geaendert_at.clone(),
             geaendert_von: self.geaendert_von,
         }
@@ -110,6 +114,7 @@ pub struct OrgEinstellungenAnzeige {
     pub meldung_bestaetigung_frist_min: Option<i64>,
     pub auftrag_quittierung_frist_min: Option<i64>,
     pub auto_etb_eintraege: Option<i64>,
+    pub geocoder_url: Option<String>,
     pub geaendert_at: Option<String>,
     pub geaendert_von: Option<i64>,
 }
@@ -147,6 +152,7 @@ pub struct OrgEinstellungenDaten<'a> {
     pub meldung_bestaetigung_frist_min: Option<i64>,
     pub auftrag_quittierung_frist_min: Option<i64>,
     pub auto_etb_eintraege: Option<i64>,
+    pub geocoder_url: Option<&'a str>,
 }
 
 /// Lädt die Org-Einstellungen; existiert keine Zeile, werden Defaults
@@ -159,7 +165,7 @@ pub async fn laden_oder_default(
         "SELECT org_id, zeitzone, zeitformat, einheiten, koordinatenformat, \
                 retention_dauer_tage, etb_nummer_praefix, meldung_nummer_praefix, \
                 auftrag_nummer_praefix, meldung_bestaetigung_frist_min, \
-                auftrag_quittierung_frist_min, auto_etb_eintraege, \
+                auftrag_quittierung_frist_min, auto_etb_eintraege, geocoder_url, \
                 geaendert_at, geaendert_von \
          FROM org_einstellungen WHERE org_id = ?",
     )
@@ -182,9 +188,9 @@ pub async fn speichern(
             (org_id, zeitzone, zeitformat, einheiten, koordinatenformat, \
              retention_dauer_tage, etb_nummer_praefix, meldung_nummer_praefix, \
              auftrag_nummer_praefix, meldung_bestaetigung_frist_min, \
-             auftrag_quittierung_frist_min, auto_etb_eintraege, \
+             auftrag_quittierung_frist_min, auto_etb_eintraege, geocoder_url, \
              geaendert_at, geaendert_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?) \
          ON CONFLICT(org_id) DO UPDATE SET \
              zeitzone = excluded.zeitzone, \
              zeitformat = excluded.zeitformat, \
@@ -197,6 +203,7 @@ pub async fn speichern(
              meldung_bestaetigung_frist_min = excluded.meldung_bestaetigung_frist_min, \
              auftrag_quittierung_frist_min = excluded.auftrag_quittierung_frist_min, \
              auto_etb_eintraege = excluded.auto_etb_eintraege, \
+             geocoder_url = excluded.geocoder_url, \
              geaendert_at = excluded.geaendert_at, \
              geaendert_von = excluded.geaendert_von",
     )
@@ -212,6 +219,7 @@ pub async fn speichern(
     .bind(daten.meldung_bestaetigung_frist_min)
     .bind(daten.auftrag_quittierung_frist_min)
     .bind(daten.auto_etb_eintraege)
+    .bind(daten.geocoder_url)
     .bind(erfasser_id)
     .execute(pool)
     .await?;
@@ -284,6 +292,7 @@ mod tests {
                 meldung_bestaetigung_frist_min: Some(30),
                 auftrag_quittierung_frist_min: Some(45),
                 auto_etb_eintraege: Some(0),
+                geocoder_url: Some("https://nominatim.example.org"),
             },
         )
         .await
@@ -301,6 +310,7 @@ mod tests {
         assert_eq!(g.meldung_bestaetigung_frist_min, Some(30));
         assert_eq!(g.auftrag_quittierung_frist_min, Some(45));
         assert_eq!(g.auto_etb_eintraege, Some(0));
+        assert_eq!(g.geocoder_url.as_deref(), Some("https://nominatim.example.org"));
         assert!(g.geaendert_at.is_some());
         assert_eq!(g.geaendert_von, Some(bid));
 
@@ -309,6 +319,7 @@ mod tests {
         assert_eq!(a.org_id, 1);
         assert_eq!(a.retention_dauer_tage, Some(365));
         assert_eq!(a.auto_etb_eintraege, Some(0));
+        assert_eq!(a.geocoder_url.as_deref(), Some("https://nominatim.example.org"));
 
         // Upsert: zweites Speichern überschreibt dieselbe Zeile (Vollersatz).
         let zweite = speichern(

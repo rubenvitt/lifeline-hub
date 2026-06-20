@@ -392,6 +392,35 @@ async fn modul_get_als_keine_liefert_403() {
     assert_eq!(status, StatusCode::FORBIDDEN);
 }
 
+/// PUT mit gültiger geocoder_url → 200, GET zeigt die URL; PUT mit ftp:// → 400.
+#[tokio::test]
+async fn put_geocoder_url_gueltig_und_ungueltig() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    // Gültige URL: PUT → 200, GET zeigt den Wert.
+    let (status, resp_body) = put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"geocoder_url": "https://nominatim.example.org"}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "PUT mit gültiger geocoder_url muss 200 liefern; body={resp_body}");
+
+    let (get_status, get_body) = get_einstellungen(&app, Some(&admin_cookie)).await;
+    assert_eq!(get_status, StatusCode::OK);
+    assert_eq!(get_body["geocoder_url"], "https://nominatim.example.org");
+
+    // Ungültige URL (ftp://): PUT → 400.
+    let (status_bad, _body_bad) = put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"geocoder_url": "ftp://x"}),
+    )
+    .await;
+    assert_eq!(status_bad, StatusCode::BAD_REQUEST, "PUT mit ftp:// muss 400 liefern");
+}
+
 /// PUT mit modul_key aus NICHT_AUSBLENDBAR → 200 (Rollen-Default ≠ Sichtbarkeit, kein Sonderfall).
 #[tokio::test]
 async fn modul_put_nicht_ausblendbar_key_ist_erlaubt() {
