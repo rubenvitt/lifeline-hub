@@ -17,6 +17,7 @@ pub mod etb;
 pub mod etb_baustein;
 pub mod fahrzeug;
 pub mod gefahr;
+pub mod geocoding;
 pub mod karte;
 pub mod katalog;
 pub mod kommunikation;
