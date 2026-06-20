@@ -11,6 +11,8 @@
  * GK-Genauigkeit ca. 3 m (Gauss-Krüger via proj4, Bessel-Ellipsoid).
  */
 
+import proj4 from 'proj4';
+import { forward as mgrsForward, toPoint as mgrsToPoint } from 'mgrs';
 import type { Koordinatenformat } from '../api/types';
 import './proj4Setup';
 
@@ -39,8 +41,41 @@ function parseWgs84(text: string): LatLon {
   return { lat, lon };
 }
 
+function dmsTeil(wert: number, istBreite: boolean): string {
+  const hemi = istBreite ? (wert >= 0 ? 'N' : 'S') : (wert >= 0 ? 'E' : 'W');
+  const abs = Math.abs(wert);
+  let grad = Math.floor(abs);
+  const restMin = (abs - grad) * 60;
+  let min = Math.floor(restMin);
+  let sek = Math.round((restMin - min) * 60);
+  if (sek === 60) { sek = 0; min += 1; }
+  if (min === 60) { min = 0; grad += 1; }
+  const g = String(grad).padStart(istBreite ? 2 : 3, '0');
+  return `${g}°${String(min).padStart(2, '0')}'${String(sek).padStart(2, '0')}"${hemi}`;
+}
+function formatiereDms(lat: number, lon: number): string {
+  return `${dmsTeil(lat, true)} ${dmsTeil(lon, false)}`;
+}
+const DMS_RE = /(\d+(?:\.\d+)?)°\s*(\d+(?:\.\d+)?)'\s*(\d+(?:\.\d+)?)"?\s*([NSEWnsew])/g;
+function parseDms(text: string): LatLon {
+  const treffer = [...text.matchAll(DMS_RE)];
+  if (treffer.length !== 2) throw new Error('Format');
+  let lat: number | null = null;
+  let lon: number | null = null;
+  for (const t of treffer) {
+    const dez = Number(t[1]) + Number(t[2]) / 60 + Number(t[3]) / 3600;
+    const hemi = t[4].toUpperCase();
+    if (hemi === 'N' || hemi === 'S') lat = hemi === 'S' ? -dez : dez;
+    else lon = hemi === 'W' ? -dez : dez;
+  }
+  if (lat === null || lon === null) throw new Error('Achse');
+  pruefeBereich(lat, lon);
+  return { lat, lon };
+}
+
 export function formatiere(lat: number, lon: number, system: Koordinatenformat): string {
   switch (system) {
+    case 'dms': return formatiereDms(lat, lon);
     case 'wgs84':
     default:
       return formatiereWgs84(lat, lon);
@@ -50,6 +85,7 @@ export function formatiere(lat: number, lon: number, system: Koordinatenformat):
 export function parse(text: string, system: Koordinatenformat): LatLon {
   try {
     switch (system) {
+      case 'dms': return parseDms(text);
       case 'wgs84':
       default:
         return parseWgs84(text);

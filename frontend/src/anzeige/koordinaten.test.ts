@@ -86,3 +86,20 @@ describe('wgs84ZuMgrs', () => {
     expect(wgs84ZuMgrs(53.855, 8.0816667, 2)).toBe('32U ME 39 67');
   });
 });
+
+describe('formatiere/parse — DMS', () => {
+  it('formatiert mit Hemisphären-Suffix, 3-stelliger Länge', () => {
+    expect(formatiere(51.5, 10.25, 'dms')).toBe('51°30\'00"N 010°15\'00"E');
+  });
+  it('formatiert Süd/West negativ als S/W', () => {
+    expect(formatiere(-1.5, -0.25, 'dms')).toBe('01°30\'00"S 000°15\'00"W');
+  });
+  it('round-trip', () => {
+    const p = parse('51°30\'00"N 010°15\'00"E', 'dms');
+    expect(p.lat).toBeCloseTo(51.5, 4);
+    expect(p.lon).toBeCloseTo(10.25, 4);
+  });
+  it('wirft bei Müll', () => {
+    expect(() => parse('51 nord', 'dms')).toThrow(KoordinatenParseFehler);
+  });
+});
