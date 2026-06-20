@@ -83,7 +83,7 @@ describe('KoordinatenEingabe', () => {
   it('ohne einsatzId rendert keine Ort-Zeile (keine Provider nötig)', () => {
     // Bewusst bare render ohne QueryClient — darf NICHT werfen.
     render(<KoordinatenEingabe value={{ lat: 51.5, lon: 10.25 }} onChange={() => {}} />);
-    expect(screen.queryByText(/vom|·/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/vom|·|ermittelt/)).not.toBeInTheDocument();
   });
 
   it('rendert die Peilungs-Zeile (ortsname null)', async () => {
