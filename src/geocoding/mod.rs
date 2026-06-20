@@ -13,3 +13,4 @@
 //! eine eigene Geocoder-URL hinterlegen. Die Peilung kommt ohne jeden externen Dienst aus.
 
 pub mod peilung;
+pub mod marker;
