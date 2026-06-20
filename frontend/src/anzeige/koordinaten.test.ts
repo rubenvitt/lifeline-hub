@@ -103,3 +103,22 @@ describe('formatiere/parse — DMS', () => {
     expect(() => parse('51 nord', 'dms')).toThrow(KoordinatenParseFehler);
   });
 });
+
+describe('formatiere/parse — UTM', () => {
+  it('formatiert Zone+Band+Easting/Northing (Mitte DE = Zone 32 U)', () => {
+    const s = formatiere(51.16, 10.45, 'utm');
+    expect(s).toMatch(/^32U \d{6} \d{7}$/);
+  });
+  it('wählt Zone 33 für Berlin (lon 13.4)', () => {
+    expect(formatiere(52.52, 13.4, 'utm')).toMatch(/^33U /);
+  });
+  it('round-trip (< 1 m ≈ 1e-4 Grad)', () => {
+    const s = formatiere(51.16, 10.45, 'utm');
+    const p = parse(s, 'utm');
+    expect(p.lat).toBeCloseTo(51.16, 4);
+    expect(p.lon).toBeCloseTo(10.45, 4);
+  });
+  it('wirft bei Müll', () => {
+    expect(() => parse('garnix', 'utm')).toThrow(KoordinatenParseFehler);
+  });
+});

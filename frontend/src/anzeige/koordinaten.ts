@@ -73,9 +73,35 @@ function parseDms(text: string): LatLon {
   return { lat, lon };
 }
 
+const UTM_BANDS = 'CDEFGHJKLMNPQRSTUVWX';
+function utmZoneNr(lon: number): number {
+  return Math.floor(((lon + 180) % 360) / 6) + 1;
+}
+function breitenband(lat: number): string {
+  const idx = Math.max(0, Math.min(UTM_BANDS.length - 1, Math.floor((lat + 80) / 8)));
+  return UTM_BANDS[idx];
+}
+function formatiereUtm(lat: number, lon: number): string {
+  const zone = utmZoneNr(lon);
+  const [e, n] = proj4('EPSG:4326', `EPSG:326${String(zone).padStart(2, '0')}`, [lon, lat]);
+  return `${zone}${breitenband(lat)} ${Math.round(e)} ${Math.round(n)}`;
+}
+const UTM_RE = /^(\d{1,2})\s*([C-Xc-x])\s+(\d+)\s+(\d+)$/;
+function parseUtm(text: string): LatLon {
+  const m = UTM_RE.exec(text.trim());
+  if (!m) throw new Error('Format');
+  const zone = Number(m[1]);
+  const nord = m[2].toUpperCase() >= 'N';
+  const epsg = `EPSG:${nord ? '326' : '327'}${String(zone).padStart(2, '0')}`;
+  const [lon, lat] = proj4(epsg, 'EPSG:4326', [Number(m[3]), Number(m[4])]);
+  pruefeBereich(lat, lon);
+  return { lat, lon };
+}
+
 export function formatiere(lat: number, lon: number, system: Koordinatenformat): string {
   switch (system) {
     case 'dms': return formatiereDms(lat, lon);
+    case 'utm': return formatiereUtm(lat, lon);
     case 'wgs84':
     default:
       return formatiereWgs84(lat, lon);
@@ -86,6 +112,7 @@ export function parse(text: string, system: Koordinatenformat): LatLon {
   try {
     switch (system) {
       case 'dms': return parseDms(text);
+      case 'utm': return parseUtm(text);
       case 'wgs84':
       default:
         return parseWgs84(text);
