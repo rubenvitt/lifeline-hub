@@ -2,7 +2,7 @@ import {
   Alert, App, AutoComplete, Breadcrumb, Button, DatePicker, Descriptions,
   Form, Input, InputNumber, Select, Space, Spin, Tag, Typography,
 } from 'antd';
-import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
 import KoordinatenEingabe from '../anzeige/KoordinatenEingabe';
 import type { LatLon } from '../anzeige/koordinaten';
 import { Link, useParams } from 'react-router-dom';
@@ -49,7 +49,6 @@ export default function EinsatzdatenPage() {
   const { benutzer } = useAuth();
   const qc = useQueryClient();
   const { message } = App.useApp();
-  const { formatKoordinate } = useAnzeigeKonventionen();
   const [bearbeiten, setBearbeiten] = useState(false);
   const [form] = Form.useForm<FormWerte>();
 
@@ -231,7 +230,7 @@ export default function EinsatzdatenPage() {
           <Descriptions.Item label="Einsatzort">{einsatz.einsatzort ?? '—'}</Descriptions.Item>
           <Descriptions.Item label="Koordinate">
             {einsatz.einsatzort_lat != null && einsatz.einsatzort_lon != null
-              ? formatKoordinate(einsatz.einsatzort_lat, einsatz.einsatzort_lon)
+              ? <KoordinatenAnzeige lat={einsatz.einsatzort_lat} lon={einsatz.einsatzort_lon} einsatzId={einsatzId} exclude={`einsatzort:${einsatzId}`} />
               : '—'}
           </Descriptions.Item>
           <Descriptions.Item label="Meldende Stelle">

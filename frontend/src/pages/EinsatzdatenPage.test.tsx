@@ -43,6 +43,7 @@ function setup(opts: SetupOpts = {}) {
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json(mitglieder)),
     http.get('/api/stichwort-vorschlaege', () => HttpResponse.json(vorschlaege)),
+    http.get('/api/einsaetze/:id/ort-vorschau', () => HttpResponse.json({ peilung: null, ortsname: null })),
   );
   return renderMitProviders(
     <AuthProvider>

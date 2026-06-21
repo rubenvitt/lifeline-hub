@@ -2,7 +2,7 @@ import { Button, Descriptions, Select, Space, Tag } from 'antd';
 import { Link } from 'react-router-dom';
 import type { KarteMarker, MarkerTyp } from './marker';
 import KartenDetailCard from './KartenDetailCard';
-import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
+import KoordinatenAnzeige from '../../anzeige/KoordinatenAnzeige';
 
 export interface InspectorProps {
   einsatzId: number;
@@ -48,11 +48,26 @@ const ORG_OPTIONEN = [
 
 const TAKTISCHE_TYPEN: MarkerTyp[] = ['einheit', 'fahrzeug', 'fuehrung', 'abschnitt'];
 
+/** Mappt Marker-Typ auf Backend-Tag für exclude-Parameter der Ort-Vorschau.
+ *  `fuehrung` → `personal` (Führungskraft liegt in der personal-Tabelle).
+ *  `abschnitt` → kein eindeutiges Backend-Tag → undefined (exclude weggelassen). */
+function inspectorExclude(m: KarteMarker): string | undefined {
+  switch (m.typ) {
+    case 'einsatzort': return `einsatzort:${m.id}`;
+    case 'uhs':        return `uhs:${m.id}`;
+    case 'schaden':    return `schaden:${m.id}`;
+    case 'einheit':    return `einheit:${m.id}`;
+    case 'fahrzeug':   return `fahrzeug:${m.id}`;
+    case 'fuehrung':   return `personal:${m.id}`;
+    case 'lagemeldung': return `lagemeldung:${m.id}`;
+    case 'abschnitt':  return undefined;
+  }
+}
+
 /** Kompakter Marker-Inspector mit Link ins jeweilige Fach-Modul. */
 export default function Inspector({
   einsatzId, marker, darfSchreiben, onSchliessen, onVerortungLoeschen, onSymbolAendern,
 }: InspectorProps) {
-  const { formatKoordinate } = useAnzeigeKonventionen();
   const modulLink =
     marker.typ === 'uhs' ? `/einsaetze/${einsatzId}/unfallhilfsstellen/${marker.id}`
     : marker.typ === 'schaden' ? `/einsaetze/${einsatzId}/schaeden?schaden=${marker.id}`
@@ -76,7 +91,7 @@ export default function Inspector({
           <Descriptions.Item label="Inhalt">{marker.lageMeldung.inhalt}</Descriptions.Item>
         )}
         <Descriptions.Item label="Koordinate">
-          {formatKoordinate(marker.lat, marker.lon)}
+          <KoordinatenAnzeige lat={marker.lat} lon={marker.lon} einsatzId={einsatzId} exclude={inspectorExclude(marker)} />
         </Descriptions.Item>
       </Descriptions>
       {symbolAuswahl && (

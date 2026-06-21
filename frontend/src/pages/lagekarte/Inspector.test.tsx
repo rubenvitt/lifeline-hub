@@ -1,7 +1,9 @@
 import type { ReactElement } from 'react';
 import { screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { http, HttpResponse } from 'msw';
 import { renderMitProviders, neuerQueryClient } from '../../test/utils';
+import { server } from '../../test/server';
 import Inspector from './Inspector';
 import type { KarteMarker } from './marker';
 import { EinsatzAnzeigeProvider } from '../../anzeige/AnzeigeKonventionenContext';
@@ -39,6 +41,12 @@ function einstellungen(format: EinsatzEinstellungen['koordinatenformat']): Einsa
 }
 
 describe('Inspector Koordinatenanzeige', () => {
+  beforeEach(() => {
+    server.use(
+      http.get('/api/einsaetze/:id/ort-vorschau', () => HttpResponse.json({ peilung: null, ortsname: null })),
+    );
+  });
+
   it('zeigt ohne Provider die dezimale WGS84-Koordinate (Alt-Verhalten)', () => {
     renderMitProviders(inspector());
     expect(screen.getByText('51.10000, 4.10000')).toBeInTheDocument();

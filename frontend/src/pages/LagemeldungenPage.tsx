@@ -3,12 +3,11 @@ import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeLageMeldungen } from '../api/meldungen';
-import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
 
 export default function LagemeldungenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const { formatKoordinate } = useAnzeigeKonventionen();
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const lageQuery = useQuery({
@@ -52,7 +51,7 @@ export default function LagemeldungenPage() {
                       Herkunft: Meldung #{l.meldung_lfd_nr} von {l.meldung_absender}
                     </Typography.Text>
                     {l.lat != null && l.lon != null && (
-                      <Typography.Text type="secondary">Geo: {formatKoordinate(l.lat, l.lon)}</Typography.Text>
+                      <KoordinatenAnzeige lat={l.lat} lon={l.lon} einsatzId={einsatzId} exclude={`lagemeldung:${l.id}`} />
                     )}
                   </Space>
                 }
