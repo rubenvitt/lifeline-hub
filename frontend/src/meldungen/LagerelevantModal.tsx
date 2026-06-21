@@ -14,6 +14,7 @@ interface Props {
   offen: boolean;
   meldung: Meldung | null;
   senden: boolean;
+  einsatzId: number;
   onAbbrechen: () => void;
   onUebergeben: (d: LagerelevantDaten) => void;
 }
@@ -30,7 +31,7 @@ interface FormWerte {
  * KoordinatenEingabe liefert immer lat+lon gemeinsam oder null — kein Paar-Validator nötig.
  * Die Übergabe-Aktion ist einmalig (MeldungListe blendet sie danach aus).
  */
-export default function LagerelevantModal({ offen, meldung, senden, onAbbrechen, onUebergeben }: Props) {
+export default function LagerelevantModal({ offen, meldung, senden, einsatzId, onAbbrechen, onUebergeben }: Props) {
   const [form] = Form.useForm<FormWerte>();
 
   // Bei jedem Öffnen frisch: Text mit dem Meldungsinhalt vorbelegen, Koordinaten leer.
@@ -60,7 +61,7 @@ export default function LagerelevantModal({ offen, meldung, senden, onAbbrechen,
           Optional verorten — Koordinate setzt die Meldung als Marker auf die Lagekarte.
         </Typography.Text>
         <Form.Item name="koord" label="Verortung (optional)">
-          <KoordinatenEingabe />
+          <KoordinatenEingabe einsatzId={einsatzId} />
         </Form.Item>
         <Alert
           type="info"

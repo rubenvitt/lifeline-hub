@@ -228,6 +228,7 @@ export default function MeldungenPage() {
         offen={lageMeldung !== null}
         meldung={lageMeldung}
         senden={lageMutation.isPending}
+        einsatzId={einsatzId}
         onAbbrechen={() => setLageMeldung(null)}
         onUebergeben={(daten) => {
           if (lageMeldung) lageMutation.mutate({ meldungId: lageMeldung.id, daten });

@@ -34,7 +34,20 @@ const NICHT_VERORTET_LABEL: Record<NichtVerortet['typ'], string> = {
   abschnitt: 'Abschnitt',
 };
 
+/** Platzierungsziel → exclude-Tag (typ:id) für die Ort-Vorschau (Selbst-Ausschluss). */
+function ortVorschauExclude(ziel: SidebarProps['platzierungZiel']): string | undefined {
+  if (!ziel) return undefined;
+  // Sidebar-Typen → Backend-Marker-Typ-Tags. 'fuehrung' = Personal-Führung → 'personal'.
+  const map: Record<string, string> = {
+    uhs: 'uhs', schaden: 'schaden', einheit: 'einheit',
+    fahrzeug: 'fahrzeug', fuehrung: 'personal', einsatzort: 'einsatzort',
+  };
+  const typ = map[ziel.typ];
+  return typ ? `${typ}:${ziel.id}` : undefined;
+}
+
 export interface SidebarProps {
+  einsatzId: number;
   nichtVerortet: NichtVerortet[];
   verortet: KarteMarker[];
   darfSchreiben: boolean;
@@ -138,7 +151,12 @@ export default function Sidebar(props: SidebarProps) {
             Klick auf die Karte setzt die Koordinate. (Abbrechen beendet.)
           </Typography.Text>
           <div style={{ marginTop: 8 }}>
-            <KoordinatenEingabe value={koord} onChange={setKoord} />
+            <KoordinatenEingabe
+              value={koord}
+              onChange={setKoord}
+              einsatzId={props.einsatzId}
+              exclude={ortVorschauExclude(props.platzierungZiel)}
+            />
           </div>
           <div style={{ marginTop: 8 }}>
             <Button

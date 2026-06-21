@@ -470,6 +470,7 @@ export default function LagekartePage() {
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 120px)', position: 'relative' }}>
       <Sidebar
+        einsatzId={einsatzId}
         nichtVerortet={nichtVerortetAlle}
         verortet={alleVerortet}
         darfSchreiben={!!darfSchreiben}
