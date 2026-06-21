@@ -12,11 +12,8 @@ import {
   aktualisiereAbschnitt, legeAbschnittAn, listeAbschnitte, loeseAbschnittAuf, type AbschnittEingabe,
 } from '../api/einsatzabschnitte';
 import { ApiError } from '../api/client';
-import type { Einsatzabschnitt, Staerke } from '../api/types';
-
-function staerkeText(s: Staerke): string {
-  return `${s.fuehrer}/${s.unterfuehrer}/${s.mannschaft}/${s.fuehrer + s.unterfuehrer + s.mannschaft}`;
-}
+import type { Einsatzabschnitt } from '../api/types';
+import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 
 const KOMMUNIKATIONSMITTEL_LABEL: Record<string, string> = {
   digitalfunk: 'Digitalfunk',
@@ -247,7 +244,7 @@ export default function EinsatzabschnittePage() {
                     <Space>
                       <span>{e.name}</span>
                       {e.typ_label && <Tag>{e.typ_label}</Tag>}
-                      <Tag color="blue">kumuliert {staerkeText(e.ist_kumuliert)}</Tag>
+                      <Tag color="blue">kumuliert <StaerkeAnzeige wert={e.ist_kumuliert} /></Tag>
                     </Space>
                   </List.Item>
                 )}

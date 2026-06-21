@@ -1,5 +1,5 @@
 import {
-  Alert, App, Breadcrumb, Button, Card, Empty, Form, Input, InputNumber, Popconfirm, Select,
+  Alert, App, Breadcrumb, Button, Card, Empty, Form, Input, Popconfirm, Select,
   Space, Spin, Tag, Tree, TreeSelect, Typography, type TreeDataNode,
 } from 'antd';
 import { Link, useParams } from 'react-router-dom';
@@ -17,11 +17,8 @@ import {
 } from '../api/einheiten';
 import { ApiError } from '../api/client';
 import type { Einheit, Staerke } from '../api/types';
-
-/** "F/UF/M/Σ" einer Stärke. */
-function staerkeText(s: Staerke): string {
-  return `${s.fuehrer}/${s.unterfuehrer}/${s.mannschaft}/${s.fuehrer + s.unterfuehrer + s.mannschaft}`;
-}
+import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
+import StaerkeEingabe from '../anzeige/StaerkeEingabe';
 
 /** Baut antd-Tree-Daten aus der flachen Einheitenliste (nach ueber_einheit_id). */
 function baueBaum(einheiten: Einheit[]): TreeDataNode[] {
@@ -38,7 +35,7 @@ function baueBaum(einheiten: Einheit[]): TreeDataNode[] {
         <Space size={4}>
           <span>{e.name}</span>
           {e.typ_label && <Tag>{e.typ_label}</Tag>}
-          <Tag color="blue">{staerkeText(e.ist)}{e.soll ? ` / Soll ${staerkeText(e.soll)}` : ''}</Tag>
+          <Tag color="blue"><StaerkeAnzeige wert={e.ist} />{e.soll ? <> / Soll <StaerkeAnzeige wert={e.soll} /></> : null}</Tag>
           {e.fuehrer_name && <span style={{ color: '#888' }}>👤 {e.fuehrer_name}</span>}
         </Space>
       ),
@@ -72,9 +69,7 @@ interface KopfWerte {
   typ_id?: number | null;
   abschnitt_id?: number | null;
   ueber_einheit_id?: number | null;
-  soll_fuehrer?: number;
-  soll_unterfuehrer?: number;
-  soll_mannschaft?: number;
+  soll?: Staerke | null;
   bemerkung?: string;
 }
 
@@ -114,9 +109,9 @@ export default function EinheitenPage() {
         abschnitt_id: werte.abschnitt_id ?? null,
         ueber_einheit_id: werte.ueber_einheit_id ?? null,
         fuehrer_id: aktuell?.fuehrer_id ?? null, // Führer unverändert (authoritativ)
-        soll_fuehrer: werte.soll_fuehrer ?? null,
-        soll_unterfuehrer: werte.soll_unterfuehrer ?? null,
-        soll_mannschaft: werte.soll_mannschaft ?? null,
+        soll_fuehrer: werte.soll?.fuehrer ?? null,
+        soll_unterfuehrer: werte.soll?.unterfuehrer ?? null,
+        soll_mannschaft: werte.soll?.mannschaft ?? null,
         bemerkung: werte.bemerkung?.trim() || null,
       };
       return aktuell ? aktualisiereEinheit(einsatzId, aktuell.id, daten) : bildeEinheit(einsatzId, daten);
@@ -179,8 +174,8 @@ export default function EinheitenPage() {
     if (aktuell) {
       form.setFieldsValue({
         name: aktuell.name, typ_id: aktuell.typ_id ?? undefined, abschnitt_id: aktuell.abschnitt_id ?? undefined,
-        ueber_einheit_id: aktuell.ueber_einheit_id ?? undefined, soll_fuehrer: aktuell.soll?.fuehrer,
-        soll_unterfuehrer: aktuell.soll?.unterfuehrer, soll_mannschaft: aktuell.soll?.mannschaft, bemerkung: aktuell.bemerkung ?? undefined,
+        ueber_einheit_id: aktuell.ueber_einheit_id ?? undefined, soll: aktuell.soll,
+        bemerkung: aktuell.bemerkung ?? undefined,
       });
     }
   }, [aktuell, form]);
@@ -254,11 +249,11 @@ export default function EinheitenPage() {
                 <TreeSelect allowClear placeholder="Unterstellung" treeData={parentOptionen} />
               </Form.Item>
               <Form.Item label="Soll-Override (vollständig oder leer)">
-                <Space>
-                  <Form.Item name="soll_fuehrer" noStyle><InputNumber min={0} placeholder="F" /></Form.Item>
-                  <Form.Item name="soll_unterfuehrer" noStyle><InputNumber min={0} placeholder="UF" /></Form.Item>
-                  <Form.Item name="soll_mannschaft" noStyle><InputNumber min={0} placeholder="M" /></Form.Item>
-                  <span style={{ color: '#888' }}>Ist: {staerkeText(aktuell.ist)} · kumuliert: {staerkeText(aktuell.ist_kumuliert)}</span>
+                <Space align="end" wrap>
+                  <Form.Item name="soll" noStyle><StaerkeEingabe /></Form.Item>
+                  <span style={{ color: '#888' }}>
+                    Ist: <StaerkeAnzeige wert={aktuell.ist} /> · kumuliert: <StaerkeAnzeige wert={aktuell.ist_kumuliert} />
+                  </span>
                 </Space>
               </Form.Item>
               <Form.Item label="Bemerkung" name="bemerkung"><Input.TextArea rows={2} /></Form.Item>

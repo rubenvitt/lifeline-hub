@@ -8,21 +8,14 @@ import { ApiError } from '../api/client';
 import {
   aktualisiereTyp, deaktiviereTyp, legeTypAn, listeEinheitTypen, type TypEingabe,
 } from '../api/einheitTypen';
-import type { EinheitTyp } from '../api/types';
+import type { EinheitTyp, Staerke } from '../api/types';
+import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
+import StaerkeEingabe from '../anzeige/StaerkeEingabe';
 
 interface FormWerte {
   label: string;
-  soll_fuehrer?: number;
-  soll_unterfuehrer?: number;
-  soll_mannschaft?: number;
+  soll?: Staerke | null;
   sortier: number;
-}
-
-/** "F/UF/M/Gesamt" oder "—", wenn keine Soll-Stärke definiert ist. */
-function sollAnzeige(t: EinheitTyp): string {
-  if (!t.soll) return '—';
-  const { fuehrer, unterfuehrer, mannschaft } = t.soll;
-  return `${fuehrer}/${unterfuehrer}/${mannschaft}/${fuehrer + unterfuehrer + mannschaft}`;
 }
 
 export default function EinheitTypenTab() {
@@ -40,9 +33,9 @@ export default function EinheitTypenTab() {
     mutationFn: (werte: FormWerte) => {
       const daten: TypEingabe = {
         label: werte.label.trim(),
-        soll_fuehrer: werte.soll_fuehrer ?? null,
-        soll_unterfuehrer: werte.soll_unterfuehrer ?? null,
-        soll_mannschaft: werte.soll_mannschaft ?? null,
+        soll_fuehrer: werte.soll?.fuehrer ?? null,
+        soll_unterfuehrer: werte.soll?.unterfuehrer ?? null,
+        soll_mannschaft: werte.soll?.mannschaft ?? null,
         sortier: werte.sortier ?? 0,
       };
       return bearbeite ? aktualisiereTyp(bearbeite.id, daten) : legeTypAn(daten);
@@ -62,9 +55,7 @@ export default function EinheitTypenTab() {
     if (bearbeite) {
       form.setFieldsValue({
         label: bearbeite.label,
-        soll_fuehrer: bearbeite.soll?.fuehrer,
-        soll_unterfuehrer: bearbeite.soll?.unterfuehrer,
-        soll_mannschaft: bearbeite.soll?.mannschaft,
+        soll: bearbeite.soll,
         sortier: bearbeite.sortier,
       });
     } else {
@@ -75,7 +66,7 @@ export default function EinheitTypenTab() {
 
   const spalten: TableColumnsType<EinheitTyp> = [
     { title: 'Label', dataIndex: 'label', key: 'label' },
-    { title: 'Soll-Stärke (F/UF/M/Σ)', key: 'soll', render: (_, t) => sollAnzeige(t) },
+    { title: 'Soll-Stärke (F/UF/M/Σ)', key: 'soll', render: (_, t) => <StaerkeAnzeige wert={t.soll} /> },
     { title: 'Sortierung', dataIndex: 'sortier', key: 'sortier' },
     ...(istAdmin
       ? ([
@@ -123,12 +114,8 @@ export default function EinheitTypenTab() {
           <Form.Item label="Label" name="label" rules={[{ required: true, whitespace: true }]}>
             <Input placeholder="z. B. Zug" />
           </Form.Item>
-          <Form.Item label="Soll-Stärke (vollständig oder leer lassen)">
-            <Space>
-              <Form.Item name="soll_fuehrer" noStyle><InputNumber min={0} placeholder="Führer" /></Form.Item>
-              <Form.Item name="soll_unterfuehrer" noStyle><InputNumber min={0} placeholder="Unterführer" /></Form.Item>
-              <Form.Item name="soll_mannschaft" noStyle><InputNumber min={0} placeholder="Mannschaft" /></Form.Item>
-            </Space>
+          <Form.Item label="Soll-Stärke (vollständig oder leer lassen)" name="soll">
+            <StaerkeEingabe />
           </Form.Item>
           <Form.Item label="Sortierung" name="sortier"><InputNumber min={0} style={{ width: 120 }} /></Form.Item>
         </Form>
