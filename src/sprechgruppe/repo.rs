@@ -185,4 +185,57 @@ mod tests {
         // Nach Deaktivierung ist die gleiche Bezeichnung neu anlegbar (Partial-Index nur aktiv).
         assert!(anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO")).await.is_ok());
     }
+    #[tokio::test]
+    async fn aktualisieren_ersetzt_felder() {
+        let pool = crate::db::test_pool().await; org(&pool, 1).await;
+        let sg = anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO")).await.unwrap();
+        let neu = KatalogDaten {
+            bezeichnung: "490_F_DRK", betriebsart: "TMO", hinweis: Some("Marschkanal"), sortier: 5,
+        };
+        let g = aktualisiere_katalog(&pool, 1, sg.id, neu).await.unwrap();
+        assert_eq!(g.bezeichnung, "490_F_DRK");
+        assert_eq!(g.hinweis.as_deref(), Some("Marschkanal"));
+        assert_eq!(g.sortier, 5);
+        // laden reflektiert die neuen Werte.
+        let geladen = laden(&pool, 1, sg.id).await.unwrap();
+        assert_eq!(geladen.bezeichnung, "490_F_DRK");
+        assert_eq!(geladen.hinweis.as_deref(), Some("Marschkanal"));
+        assert_eq!(geladen.sortier, 5);
+    }
+    #[tokio::test]
+    async fn aktualisieren_auf_geschwister_ist_conflict() {
+        let pool = crate::db::test_pool().await; org(&pool, 1).await;
+        anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO")).await.unwrap();
+        let zweite = anlegen_katalog(&pool, 1, daten("490_F_DRK", "TMO")).await.unwrap();
+        // Umbenennen auf die Bezeichnung des Geschwisters (gleiche Betriebsart) → Conflict.
+        assert!(matches!(
+            aktualisiere_katalog(&pool, 1, zweite.id, daten("412_F_DRK", "TMO")).await.unwrap_err(),
+            AppError::Conflict(_)
+        ));
+    }
+    #[tokio::test]
+    async fn aktualisieren_fremde_org_ist_notfound() {
+        let pool = crate::db::test_pool().await; org(&pool, 1).await; org(&pool, 2).await;
+        let sg = anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO")).await.unwrap();
+        assert!(matches!(
+            aktualisiere_katalog(&pool, 2, sg.id, daten("490_F_DRK", "TMO")).await.unwrap_err(),
+            AppError::NotFound
+        ));
+    }
+    #[tokio::test]
+    async fn aktualisieren_trifft_einsatz_lokale_zeile_nicht() {
+        let pool = crate::db::test_pool().await; org(&pool, 1).await;
+        let einsatz_id: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        ).fetch_one(&pool).await.unwrap();
+        let lokal_id: i64 = sqlx::query_scalar(
+            "INSERT INTO sprechgruppe (org_id, einsatz_id, bezeichnung, betriebsart) \
+             VALUES (1, ?, 'lokal', 'TMO') RETURNING id",
+        ).bind(einsatz_id).fetch_one(&pool).await.unwrap();
+        // Der einsatz_id IS NULL-Guard darf einsatz-lokale Zeilen nicht treffen → NotFound.
+        assert!(matches!(
+            aktualisiere_katalog(&pool, 1, lokal_id, daten("umbenannt", "TMO")).await.unwrap_err(),
+            AppError::NotFound
+        ));
+    }
 }
