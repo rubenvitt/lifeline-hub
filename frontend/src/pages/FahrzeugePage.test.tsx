@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
 import { server } from '../test/server';
@@ -92,11 +92,26 @@ describe('FahrzeugePage', () => {
     expect(screen.queryByRole('button', { name: 'Entfernen' })).not.toBeInTheDocument();
   });
 
-  it('zeigt die Besatzung des Fahrzeugs und einen Frei-Pool-Picker', async () => {
+  it('zeigt die Ist/Soll-Besatzungsstärke kompakt in der Tabelle (ohne Aufklappen)', async () => {
+    const crew = person({ id: 100, name: 'Anna', fahrzeug_id: 10, staerke_position: 'fuehrer' });
+    render(einsatz(), [crew]);
+    await screen.findByText('Florian 1');
+    // Besatzungs-Spalte: Ist (1 Führer → 1/0/0//1) / Soll (aus ef.soll_besatzung 0/1/8//9),
+    // dauerhaft sichtbar, ohne dass der Block aufgeklappt werden muss.
+    expect(screen.getByRole('columnheader', { name: 'Besatzung' })).toBeInTheDocument();
+    expect(screen.getByText(/1\/0\/0\/\/1 \/ Soll 0\/1\/8\/\/9/)).toBeInTheDocument();
+  });
+
+  it('zeigt die Besatzung des Fahrzeugs und einen Frei-Pool-Picker nach dem Aufklappen', async () => {
     const crew = person({ id: 100, name: 'Anna Crew', fahrzeug_id: 10, staerke_position: 'mannschaft' });
     const frei = person({ id: 101, name: 'Bert Frei', fahrzeug_id: null, staerke_position: 'fuehrer' });
-    render(einsatz(), [crew, frei]);
+    const { container } = render(einsatz(), [crew, frei]);
     await screen.findByText('Florian 1');
+
+    // Besatzung ist standardmäßig eingeklappt → Zeile per Icon aufklappen.
+    const expandIcon = container.querySelector('.ant-table-row-expand-icon-collapsed');
+    expect(expandIcon).not.toBeNull();
+    fireEvent.click(expandIcon!);
 
     // Besatzungsmitglied (fahrzeug_id === 10) wird angezeigt, mit Freigeben-Aktion.
     expect(await screen.findByText(/Anna Crew/)).toBeInTheDocument();
@@ -106,10 +121,11 @@ describe('FahrzeugePage', () => {
   });
 
   it('markiert eine Besatzung aus anderer Einheit als das Fahrzeug', async () => {
-    // Fahrzeug ef.einheit_id = null, Person in Einheit 3 → Diskrepanz-Tag.
+    // Fahrzeug ef.einheit_id = null, Person in Einheit 3 → Diskrepanz-Tag nach Aufklappen.
     const crew = person({ id: 100, name: 'Cara Diskrepanz', fahrzeug_id: 10, einheit_id: 3 });
-    render(einsatz(), [crew]);
+    const { container } = render(einsatz(), [crew]);
     await screen.findByText('Florian 1');
+    fireEvent.click(container.querySelector('.ant-table-row-expand-icon-collapsed')!);
     expect(await screen.findByText(/Cara Diskrepanz/)).toBeInTheDocument();
     expect(screen.getByText('andere Einheit')).toBeInTheDocument();
   });

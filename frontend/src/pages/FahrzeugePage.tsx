@@ -74,12 +74,12 @@ function BesatzungsBlock({
       ) : (
         crew.map((m) => (
           <Space key={m.id} style={{ display: 'flex', justifyContent: 'space-between', maxWidth: 420 }}>
-            <span>
-              {m.name}{m.staerke_position ? ` (${m.staerke_position})` : ''}
+            <Space size="small">
+              <span>{m.name}{m.staerke_position ? ` (${m.staerke_position})` : ''}</span>
               {m.einheit_id != null && m.einheit_id !== ef.einheit_id && (
-                <Tag color="orange" style={{ marginLeft: 4 }}>andere Einheit</Tag>
+                <Tag color="orange" style={{ margin: 0 }}>andere Einheit</Tag>
               )}
-            </span>
+            </Space>
             {darfSchreiben && (
               <Button size="small" danger onClick={() => onFreigeben(m.id)}>Freigeben</Button>
             )}
@@ -218,6 +218,17 @@ export default function FahrzeugePage() {
         ),
     },
     {
+      title: 'Besatzung',
+      key: 'besatzung',
+      render: (_, ef) => (
+        <Tag color="blue">
+          <StaerkeAnzeige wert={istBesatzungsStaerke(personal.filter((p) => p.fahrzeug_id === ef.id))} />
+          {' / Soll '}
+          <StaerkeAnzeige wert={ef.soll_besatzung} />
+        </Tag>
+      ),
+    },
+    {
       title: 'Bemerkung',
       key: 'bemerkung',
       render: (_, ef) =>
@@ -291,10 +302,8 @@ export default function FahrzeugePage() {
         pagination={false}
         locale={{ emptyText: 'Noch keine Fahrzeuge disponiert' }}
         expandable={{
-          // Besatzungs-Block je Fahrzeug dauerhaft sichtbar (operative Übersicht): alle
-          // Zeilen kontrolliert expandiert, ohne separate Aufklapp-Spalte.
-          showExpandColumn: false,
-          expandedRowKeys: efs.map((e) => e.id),
+          // Besatzung je Fahrzeug standardmäßig eingeklappt, per Icon aufklappbar;
+          // die kompakte Ist/Soll-Stärke steht dauerhaft in der Besatzungs-Spalte.
           expandedRowRender: (ef) => (
             <BesatzungsBlock
               ef={ef}
