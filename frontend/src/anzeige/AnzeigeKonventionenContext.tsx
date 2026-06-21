@@ -64,14 +64,24 @@ export function EinsatzAnzeigeProvider({
   const override = useKoordinatenSystemOverride();
 
   const wert = useMemo<AnzeigeKonventionenHook>(() => {
+    // Effektivwert je Konvention: Einsatz-Override sticht den globalen Org-Default, dieser
+    // den hartkodierten Fallback (null). Spiegelt den Backend-Resolver `effektive_*`, damit
+    // ein org-weit gesetzter Default auch ohne Einsatz-Override in der Anzeige greift.
     const konventionen: AnzeigeKonventionen = {
-      zeitzone: data?.zeitzone ?? null,
-      zeitformat: data?.zeitformat ?? null,
-      einheiten: data?.einheiten ?? null,
-      koordinatenformat: override ?? data?.koordinatenformat ?? null,
+      zeitzone: data?.zeitzone ?? data?.org_defaults?.zeitzone ?? null,
+      zeitformat: data?.zeitformat ?? data?.org_defaults?.zeitformat ?? null,
+      einheiten: data?.einheiten ?? data?.org_defaults?.einheiten ?? null,
+      // Der app-weite Anwender-Override (localStorage) sticht zusätzlich alles.
+      koordinatenformat:
+        override ?? data?.koordinatenformat ?? data?.org_defaults?.koordinatenformat ?? null,
     };
     return bindeFormatter(konventionen);
-  }, [data?.zeitzone, data?.zeitformat, data?.einheiten, data?.koordinatenformat, override]);
+  }, [
+    data?.zeitzone, data?.zeitformat, data?.einheiten, data?.koordinatenformat,
+    data?.org_defaults?.zeitzone, data?.org_defaults?.zeitformat,
+    data?.org_defaults?.einheiten, data?.org_defaults?.koordinatenformat,
+    override,
+  ]);
 
   return (
     <AnzeigeKonventionenContext.Provider value={wert}>
