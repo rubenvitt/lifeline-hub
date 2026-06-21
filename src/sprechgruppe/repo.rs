@@ -182,6 +182,128 @@ pub async fn liste_fuer_einsatz(
     .map_err(Into::into)
 }
 
+/// Prüft, ob alle `ids` zur `org_id` als Katalog-Eintrag (`einsatz_id IS NULL`)
+/// **oder** als einsatz-lokale Sprechgruppe mit genau diesem `einsatz_id` gehören.
+/// Jede ID, die diese Bedingung nicht erfüllt, ergibt `UnprocessableEntity`.
+async fn pruefe_zuordenbar(
+    pool: &SqlitePool,
+    org_id: i64,
+    einsatz_id: i64,
+    ids: &[i64],
+) -> Result<(), AppError> {
+    for &id in ids {
+        let ok: Option<i64> = sqlx::query_scalar(
+            "SELECT 1 FROM sprechgruppe \
+             WHERE id = ? AND org_id = ? AND (einsatz_id IS NULL OR einsatz_id = ?)",
+        )
+        .bind(id)
+        .bind(org_id)
+        .bind(einsatz_id)
+        .fetch_optional(pool)
+        .await?;
+        if ok.is_none() {
+            return Err(AppError::UnprocessableEntity(format!(
+                "Sprechgruppe {id} ist für diese Organisation/diesen Einsatz nicht zuordenbar"
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Ersetzt die Sprechgruppen-Zuordnung eines Abschnitts vollständig.
+/// Validiert jede ID gegen `org_id`/`einsatz_id` — fremde oder falsche Einsätze → `UnprocessableEntity`.
+pub async fn setze_abschnitt_sprechgruppen(
+    pool: &SqlitePool,
+    org_id: i64,
+    einsatz_id: i64,
+    abschnitt_id: i64,
+    ids: &[i64],
+) -> Result<(), AppError> {
+    pruefe_zuordenbar(pool, org_id, einsatz_id, ids).await?;
+    let mut tx = pool.begin().await?;
+    sqlx::query("DELETE FROM einsatzabschnitt_sprechgruppe WHERE abschnitt_id = ?")
+        .bind(abschnitt_id)
+        .execute(&mut *tx)
+        .await?;
+    for &id in ids {
+        sqlx::query(
+            "INSERT INTO einsatzabschnitt_sprechgruppe (abschnitt_id, sprechgruppe_id) VALUES (?, ?)",
+        )
+        .bind(abschnitt_id)
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    }
+    tx.commit().await?;
+    Ok(())
+}
+
+/// Lädt alle Sprechgruppen eines Abschnitts, sortiert nach `betriebsart, sortier, bezeichnung`.
+pub async fn lade_abschnitt_sprechgruppen(
+    pool: &SqlitePool,
+    abschnitt_id: i64,
+) -> Result<Vec<Sprechgruppe>, AppError> {
+    sqlx::query_as::<_, Sprechgruppe>(
+        "SELECT sg.id, sg.org_id, sg.einsatz_id, sg.bezeichnung, sg.betriebsart, \
+                sg.hinweis, sg.aktiv, sg.sortier, sg.angelegt_at \
+         FROM sprechgruppe sg \
+         JOIN einsatzabschnitt_sprechgruppe eas ON eas.sprechgruppe_id = sg.id \
+         WHERE eas.abschnitt_id = ? \
+         ORDER BY sg.betriebsart, sg.sortier, sg.bezeichnung",
+    )
+    .bind(abschnitt_id)
+    .fetch_all(pool)
+    .await
+    .map_err(Into::into)
+}
+
+/// Ersetzt die Sprechgruppen-Zuordnung einer Einheit vollständig.
+/// Validiert jede ID gegen `org_id`/`einsatz_id` — fremde oder falsche Einsätze → `UnprocessableEntity`.
+pub async fn setze_einheit_sprechgruppen(
+    pool: &SqlitePool,
+    org_id: i64,
+    einsatz_id: i64,
+    einheit_id: i64,
+    ids: &[i64],
+) -> Result<(), AppError> {
+    pruefe_zuordenbar(pool, org_id, einsatz_id, ids).await?;
+    let mut tx = pool.begin().await?;
+    sqlx::query("DELETE FROM einsatz_einheit_sprechgruppe WHERE einheit_id = ?")
+        .bind(einheit_id)
+        .execute(&mut *tx)
+        .await?;
+    for &id in ids {
+        sqlx::query(
+            "INSERT INTO einsatz_einheit_sprechgruppe (einheit_id, sprechgruppe_id) VALUES (?, ?)",
+        )
+        .bind(einheit_id)
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    }
+    tx.commit().await?;
+    Ok(())
+}
+
+/// Lädt alle Sprechgruppen einer Einheit, sortiert nach `betriebsart, sortier, bezeichnung`.
+pub async fn lade_einheit_sprechgruppen(
+    pool: &SqlitePool,
+    einheit_id: i64,
+) -> Result<Vec<Sprechgruppe>, AppError> {
+    sqlx::query_as::<_, Sprechgruppe>(
+        "SELECT sg.id, sg.org_id, sg.einsatz_id, sg.bezeichnung, sg.betriebsart, \
+                sg.hinweis, sg.aktiv, sg.sortier, sg.angelegt_at \
+         FROM sprechgruppe sg \
+         JOIN einsatz_einheit_sprechgruppe ees ON ees.sprechgruppe_id = sg.id \
+         WHERE ees.einheit_id = ? \
+         ORDER BY sg.betriebsart, sg.sortier, sg.bezeichnung",
+    )
+    .bind(einheit_id)
+    .fetch_all(pool)
+    .await
+    .map_err(Into::into)
+}
+
 /// Deaktiviert eine Katalog-Sprechgruppe (Soft-Delete `aktiv = 0`).
 /// Nur für Katalog-Einträge (`einsatz_id IS NULL`); rows_affected == 0 → `NotFound`.
 pub async fn deaktiviere(pool: &SqlitePool, org_id: i64, id: i64) -> Result<(), AppError> {
@@ -209,6 +331,51 @@ mod tests {
     }
     fn daten<'a>(bez: &'a str, ba: &'a str) -> KatalogDaten<'a> {
         KatalogDaten { bezeichnung: bez, betriebsart: ba, hinweis: None, sortier: 0 }
+    }
+
+    async fn setup_einsatz_abschnitt(pool: &SqlitePool) -> (i64, i64) {
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1,'Orga')").execute(pool).await.unwrap();
+        let e: i64 = sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id").fetch_one(pool).await.unwrap();
+        let a: i64 = sqlx::query_scalar("INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, 'Nord') RETURNING id").bind(e).fetch_one(pool).await.unwrap();
+        (e, a)
+    }
+    #[tokio::test]
+    async fn setze_und_lade_abschnitt_sprechgruppen() {
+        let pool = crate::db::test_pool().await;
+        let (e, a) = setup_einsatz_abschnitt(&pool).await;
+        let kat = anlegen_katalog(&pool, 1, KatalogDaten{bezeichnung:"412_F_DRK",betriebsart:"TMO",hinweis:None,sortier:0}).await.unwrap();
+        let lokal = anlegen_einsatz_lokal(&pool, 1, e, "Sonder 1", "DMO", None).await.unwrap();
+        setze_abschnitt_sprechgruppen(&pool, 1, e, a, &[kat.id, lokal.id]).await.unwrap();
+        assert_eq!(lade_abschnitt_sprechgruppen(&pool, a).await.unwrap().len(), 2);
+        // Ersetzen: nur noch eine.
+        setze_abschnitt_sprechgruppen(&pool, 1, e, a, &[kat.id]).await.unwrap();
+        let nach = lade_abschnitt_sprechgruppen(&pool, a).await.unwrap();
+        assert_eq!(nach.len(), 1);
+        assert_eq!(nach[0].id, kat.id);
+    }
+    #[tokio::test]
+    async fn fremde_oder_anderer_einsatz_sprechgruppe_ist_unprocessable() {
+        let pool = crate::db::test_pool().await;
+        let (e, a) = setup_einsatz_abschnitt(&pool).await;
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (2,'Fremd')").execute(&pool).await.unwrap();
+        let fremd = anlegen_katalog(&pool, 2, KatalogDaten{bezeichnung:"X",betriebsart:"TMO",hinweis:None,sortier:0}).await.unwrap();
+        let anderer_einsatz: i64 = sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Andere') RETURNING id").fetch_one(&pool).await.unwrap();
+        let lokal_woanders = anlegen_einsatz_lokal(&pool, 1, anderer_einsatz, "Sonder 9", "DMO", None).await.unwrap();
+        assert!(matches!(setze_abschnitt_sprechgruppen(&pool, 1, e, a, &[fremd.id]).await.unwrap_err(), AppError::UnprocessableEntity(_)));
+        assert!(matches!(setze_abschnitt_sprechgruppen(&pool, 1, e, a, &[lokal_woanders.id]).await.unwrap_err(), AppError::UnprocessableEntity(_)));
+    }
+    #[tokio::test]
+    async fn setze_und_lade_einheit_sprechgruppen() {
+        let pool = crate::db::test_pool().await;
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1,'Orga')").execute(&pool).await.unwrap();
+        let e: i64 = sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id").fetch_one(&pool).await.unwrap();
+        let einheit_id: i64 = sqlx::query_scalar("INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Zug') RETURNING id").bind(e).fetch_one(&pool).await.unwrap();
+        let kat = anlegen_katalog(&pool, 1, KatalogDaten{bezeichnung:"412_F_DRK",betriebsart:"TMO",hinweis:None,sortier:0}).await.unwrap();
+        setze_einheit_sprechgruppen(&pool, 1, e, einheit_id, &[kat.id]).await.unwrap();
+        assert_eq!(lade_einheit_sprechgruppen(&pool, einheit_id).await.unwrap().len(), 1);
+        // Ersetzen: leer.
+        setze_einheit_sprechgruppen(&pool, 1, e, einheit_id, &[]).await.unwrap();
+        assert_eq!(lade_einheit_sprechgruppen(&pool, einheit_id).await.unwrap().len(), 0);
     }
     #[tokio::test]
     async fn anlegen_listen_und_laden() {
