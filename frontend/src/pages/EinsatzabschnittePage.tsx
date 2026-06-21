@@ -14,6 +14,7 @@ import {
 import { ApiError } from '../api/client';
 import type { Einsatzabschnitt } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
+import SprechgruppenPicker from '../components/SprechgruppenPicker';
 
 const KOMMUNIKATIONSMITTEL_LABEL: Record<string, string> = {
   digitalfunk: 'Digitalfunk',
@@ -66,8 +67,7 @@ interface AbschnittWerte {
   ueber_abschnitt_id?: number | null;
   leiter_id?: number | null;
   bemerkung?: string;
-  sprechgruppe_tmo?: string;
-  sprechgruppe_dmo?: string;
+  sprechgruppe_ids?: number[];
   kommunikationsmittel?: string;
   erreichbarkeit?: string;
 }
@@ -102,8 +102,7 @@ export default function EinsatzabschnittePage() {
         ueber_abschnitt_id: werte.ueber_abschnitt_id ?? null,
         leiter_id: werte.leiter_id ?? null,
         bemerkung: werte.bemerkung?.trim() || null,
-        sprechgruppe_tmo: werte.sprechgruppe_tmo?.trim() || null,
-        sprechgruppe_dmo: werte.sprechgruppe_dmo?.trim() || null,
+        sprechgruppe_ids: werte.sprechgruppe_ids ?? [],
         kommunikationsmittel: werte.kommunikationsmittel || null,
         erreichbarkeit: werte.erreichbarkeit?.trim() || null,
       };
@@ -128,8 +127,7 @@ export default function EinsatzabschnittePage() {
       form.setFieldsValue({
         name: aktuell.name, ueber_abschnitt_id: aktuell.ueber_abschnitt_id ?? undefined,
         leiter_id: aktuell.leiter_id ?? undefined, bemerkung: aktuell.bemerkung ?? undefined,
-        sprechgruppe_tmo: aktuell.sprechgruppe_tmo ?? undefined,
-        sprechgruppe_dmo: aktuell.sprechgruppe_dmo ?? undefined,
+        sprechgruppe_ids: aktuell.sprechgruppen?.map((s) => s.id) ?? [],
         kommunikationsmittel: aktuell.kommunikationsmittel ?? undefined,
         erreichbarkeit: aktuell.erreichbarkeit ?? undefined,
       });
@@ -191,11 +189,8 @@ export default function EinsatzabschnittePage() {
                 <Form.Item label="Abschnittsleiter" name="leiter_id">
                   <Select allowClear showSearch optionFilterProp="label" placeholder="Disponierte Person" options={personalOptionen} />
                 </Form.Item>
-                <Form.Item label="Sprechgruppe TMO" name="sprechgruppe_tmo">
-                  <Input placeholder="z. B. 412_F_DRK" allowClear />
-                </Form.Item>
-                <Form.Item label="Sprechgruppe DMO" name="sprechgruppe_dmo">
-                  <Input placeholder="z. B. DMO 31" allowClear />
+                <Form.Item label="Sprechgruppen" name="sprechgruppe_ids">
+                  <SprechgruppenPicker einsatzId={einsatzId} />
                 </Form.Item>
                 <Form.Item label="Kommunikationsmittel" name="kommunikationsmittel">
                   <Select
@@ -220,12 +215,16 @@ export default function EinsatzabschnittePage() {
                 )}
               </Form>
 
-              {(aktuell.sprechgruppe_tmo || aktuell.sprechgruppe_dmo
+              {((aktuell.sprechgruppen?.length ?? 0) > 0
                 || aktuell.kommunikationsmittel || aktuell.erreichbarkeit) && (
                 <div data-testid="funk-erreichbarkeit" style={{ marginTop: 8 }}>
                   <Space size={[4, 4]} wrap>
-                    {aktuell.sprechgruppe_tmo && <Tag color="blue">TMO: {aktuell.sprechgruppe_tmo}</Tag>}
-                    {aktuell.sprechgruppe_dmo && <Tag color="geekblue">DMO: {aktuell.sprechgruppe_dmo}</Tag>}
+                    {aktuell.sprechgruppen?.filter((s) => s.betriebsart === 'TMO').map((s) => (
+                      <Tag key={s.id} color="blue">TMO: {s.bezeichnung}</Tag>
+                    ))}
+                    {aktuell.sprechgruppen?.filter((s) => s.betriebsart === 'DMO').map((s) => (
+                      <Tag key={s.id} color="geekblue">DMO: {s.bezeichnung}</Tag>
+                    ))}
                     {aktuell.kommunikationsmittel && (
                       <Tag>{KOMMUNIKATIONSMITTEL_LABEL[aktuell.kommunikationsmittel] ?? aktuell.kommunikationsmittel}</Tag>
                     )}

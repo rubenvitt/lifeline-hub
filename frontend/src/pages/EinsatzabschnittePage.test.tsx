@@ -7,6 +7,15 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import EinsatzabschnittePage from './EinsatzabschnittePage';
 
+const tmoSprechgruppe = {
+  id: 7, einsatz_id: 1, einsatz_lokal: false, bezeichnung: '412_F_DRK',
+  betriebsart: 'TMO' as const, hinweis: null, aktiv: true, sortier: 0,
+};
+const dmoSprechgruppe = {
+  id: 8, einsatz_id: 1, einsatz_lokal: false, bezeichnung: 'DMO 31',
+  betriebsart: 'DMO' as const, hinweis: null, aktiv: true, sortier: 1,
+};
+
 /** Abschnitt mit gefüllten Funk-Feldern für Vorbelegungs-/Anzeige-Tests. */
 const funkAbschnitt = {
   id: 5, einsatz_id: 1, ueber_abschnitt_id: null, name: 'Nord',
@@ -14,6 +23,7 @@ const funkAbschnitt = {
   flaeche_geojson: null, tz_fachaufgabe: null, tz_organisation: null,
   sprechgruppe_tmo: '412_F_DRK', sprechgruppe_dmo: null,
   kommunikationsmittel: 'digitalfunk', erreichbarkeit: '0151 23456', sortier: 0,
+  sprechgruppen: [tmoSprechgruppe],
 };
 
 function renderPage() {
@@ -38,12 +48,14 @@ function handlers(
   abschnitte: unknown[] = [
     { id: 5, einsatz_id: 1, ueber_abschnitt_id: null, name: 'Nord', leiter_id: null, leiter_name: 'Leiter Nord', bemerkung: null, sortier: 0 },
   ],
+  sprechgruppen: unknown[] = [tmoSprechgruppe, dmoSprechgruppe],
 ) {
   return [
     http.get('/api/einsaetze/1', () => HttpResponse.json({ ...einsatz, meine_rolle: rolle, status })),
     http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json(abschnitte)),
     http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/sprechgruppen', () => HttpResponse.json(sprechgruppen)),
   ];
 }
 
@@ -85,12 +97,20 @@ describe('EinsatzabschnittePage', () => {
     );
   });
 
-  it('zeigt Funk-Felder eines Abschnitts im Formular', async () => {
+  it('zeigt SprechgruppenPicker im Formular statt Freitext-Inputs', async () => {
     server.use(...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]));
     renderPage();
     await userEvent.click(await screen.findByText('Nord'));
-    expect(await screen.findByDisplayValue('412_F_DRK')).toBeInTheDocument();
+    // Alte Freitext-Inputs sind weg
+    expect(screen.queryByLabelText('Sprechgruppe TMO')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Sprechgruppe DMO')).not.toBeInTheDocument();
+    // Erreichbarkeit-Feld ist noch da
     expect(screen.getByDisplayValue('0151 23456')).toBeInTheDocument();
+    // Picker-Label ist sichtbar
+    expect(await screen.findByText('Sprechgruppen')).toBeInTheDocument();
+    // Sprechgruppen-Checkboxen werden gerendert
+    expect(await screen.findByText('412_F_DRK')).toBeInTheDocument();
+    expect(await screen.findByText('DMO 31')).toBeInTheDocument();
   });
 
   it('zeigt eine Funk-Erreichbarkeits-Zusammenfassung im Detail', async () => {
@@ -102,7 +122,7 @@ describe('EinsatzabschnittePage', () => {
     expect(zusammenfassung).toHaveTextContent(/Digitalfunk/i);
   });
 
-  it('sendet Funk-Felder getrimmt, leere als null beim Speichern', async () => {
+  it('sendet sprechgruppe_ids beim Speichern, nicht mehr tmo/dmo-Freitextfelder', async () => {
     let patchBody: Record<string, unknown> | null = null;
     server.use(
       ...handlers('einsatzleitung', 'aktiv', [{ ...funkAbschnitt, kommunikationsmittel: null, erreichbarkeit: null }]),
@@ -114,20 +134,22 @@ describe('EinsatzabschnittePage', () => {
     renderPage();
     await userEvent.click(await screen.findByText('Nord'));
 
-    // TMO geleert (→ null), DMO mit Leerzeichen befüllt (→ getrimmt),
-    // Erreichbarkeit nur Whitespace (→ null), Kommunikationsmittel via Select gewählt.
-    const tmo = await screen.findByDisplayValue('412_F_DRK');
-    await userEvent.clear(tmo);
-    await userEvent.type(screen.getByLabelText('Sprechgruppe DMO'), '  DMO 31  ');
-    await userEvent.type(screen.getByLabelText('Erreichbarkeit / Nummer'), '   ');
+    // Erreichbarkeit mit Whitespace befüllen (→ null), Kommunikationsmittel via Select
+    await userEvent.type(await screen.findByLabelText('Erreichbarkeit / Nummer'), '   ');
     await userEvent.click(screen.getByLabelText('Kommunikationsmittel'));
     await userEvent.click(await screen.findByText('Mobil'));
 
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(patchBody).not.toBeNull());
+
+    // Kein sprechgruppe_tmo / _dmo mehr im Payload
+    expect(patchBody).not.toHaveProperty('sprechgruppe_tmo');
+    expect(patchBody).not.toHaveProperty('sprechgruppe_dmo');
+    // sprechgruppe_ids wird gesendet (vorbelegt mit tmoSprechgruppe.id=7)
+    expect(patchBody).toHaveProperty('sprechgruppe_ids');
+    expect((patchBody!['sprechgruppe_ids'] as number[])).toContain(7);
+    // Kommunikationsmittel und getrimmte Erreichbarkeit bleiben
     expect(patchBody).toMatchObject({
-      sprechgruppe_tmo: null,
-      sprechgruppe_dmo: 'DMO 31',
       kommunikationsmittel: 'mobil',
       erreichbarkeit: null,
     });
