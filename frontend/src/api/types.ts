@@ -307,6 +307,8 @@ export interface EinsatzFahrzeug {
   tz_organisation: string | null;
   /** BR‑1: aktuell bereitgestellter Bereitstellungsraum (null = in keinem BR). */
   aktueller_br_id: number | null;
+  /** LFH-9: Soll-Besatzung (taktische Soll-Stärke) aus dem Stamm; null für Ad-hoc. */
+  soll_besatzung: Staerke | null;
 }
 
 export type MaterialStatus =
@@ -414,6 +416,8 @@ export interface EinsatzPersonal {
   einsatz_id: number;
   personal_id: number | null;
   einheit_id: number | null;
+  /** LFH-9: Fahrzeug, dessen Besatzung die Kraft ist; null = keinem Fahrzeug zugeteilt. */
+  fahrzeug_id: number | null;
   ist_adhoc: boolean;
   name: string;
   funktion: string | null;

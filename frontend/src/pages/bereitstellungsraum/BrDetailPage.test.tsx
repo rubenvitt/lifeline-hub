@@ -41,7 +41,7 @@ function fahrzeug(over: Partial<EinsatzFahrzeug> = {}): EinsatzFahrzeug {
     status_kategorie: null, status_farbe: null, bemerkung: null,
     disponiert_at: 'x', disponiert_von: null,
     lat: null, lon: null, tz_fachaufgabe: null, tz_organisation: null,
-    aktueller_br_id: null,
+    aktueller_br_id: null, soll_besatzung: null,
     ...over,
   };
 }

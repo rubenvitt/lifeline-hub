@@ -7,6 +7,7 @@ use crate::einsatz::repo as einsatz_repo;
 const MODUL_KEY: &str = "fahrzeuge";
 use crate::error::AppError;
 use crate::etb::{self, repo as etb_repo};
+use crate::fahrzeug::besatzung_repo;
 use crate::fahrzeug::disposition_repo::{self, AdhocDaten};
 use crate::fahrzeug::status_repo;
 use crate::fahrzeug::EinsatzFahrzeugAnzeige;
@@ -33,6 +34,13 @@ where
 fn sse_fahrzeug(state: &AppState, einsatz_id: i64, ef_id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "fahrzeug_id": ef_id }).to_string();
     state.live.publiziere_event(einsatz_id, "fahrzeug", data);
+}
+
+/// SSE-Notify (Lage-Karte): betroffene Person aktualisieren (z.B. bei Besatzungs-Zuordnung/
+/// -Freigabe). Lokaler Spiegel von `routes::einsatz_personal::sse_personal` (Tag `person`).
+fn sse_personal(state: &AppState, einsatz_id: i64, ep_id: i64) {
+    let data = serde_json::json!({ "einsatz_id": einsatz_id, "person_id": ep_id }).to_string();
+    state.live.publiziere_event(einsatz_id, "person", data);
 }
 
 /// Schreibt einen automatischen System-ETB-Eintrag für die handelnde Person und
@@ -238,6 +246,60 @@ pub async fn entfernen(
     )
     .await?;
     sse_fahrzeug(&state, einsatz_id, ef_id);
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// PUT /api/einsaetze/{id}/fahrzeuge/{ef_id}/besatzung/{ep_id} — Kraft als Besatzung
+/// zuordnen (LFH-9, exklusiv: Wechsel überschreibt). Append-only System-ETB + SSE.
+pub async fn besatzung_zuordnen(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, ef_id, ep_id)): Path<(i64, i64, i64)>,
+) -> Result<StatusCode, AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_schreibrecht(rolle)?;
+    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_aktiv(&einsatz)?;
+
+    let person = besatzung_repo::ordne_besatzung_zu(&state.pool, einsatz_id, ef_id, ep_id).await?;
+    let fahrzeug = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ef_id, einsatz.ist_aktiv()).await?;
+    etb_system(
+        &state,
+        einsatz_id,
+        benutzer.id,
+        &format!("Fahrzeug «{}»: «{}» als Besatzung zugeordnet", fahrzeug.funkrufname, person),
+    )
+    .await?;
+    sse_fahrzeug(&state, einsatz_id, ef_id);
+    sse_personal(&state, einsatz_id, ep_id);
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// DELETE /api/einsaetze/{id}/fahrzeuge/{ef_id}/besatzung/{ep_id} — Kraft aus der
+/// Fahrzeug-Besatzung freigeben (LFH-9). Append-only System-ETB + SSE.
+pub async fn besatzung_freigeben(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Path((einsatz_id, ef_id, ep_id)): Path<(i64, i64, i64)>,
+) -> Result<StatusCode, AppError> {
+    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
+    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
+    fordere_schreibrecht(rolle)?;
+    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_aktiv(&einsatz)?;
+
+    let person = besatzung_repo::gib_besatzung_frei(&state.pool, einsatz_id, ef_id, ep_id).await?;
+    let fahrzeug = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ef_id, einsatz.ist_aktiv()).await?;
+    etb_system(
+        &state,
+        einsatz_id,
+        benutzer.id,
+        &format!("Fahrzeug «{}»: «{}» aus der Besatzung freigegeben", fahrzeug.funkrufname, person),
+    )
+    .await?;
+    sse_fahrzeug(&state, einsatz_id, ef_id);
+    sse_personal(&state, einsatz_id, ep_id);
     Ok(StatusCode::NO_CONTENT)
 }
 

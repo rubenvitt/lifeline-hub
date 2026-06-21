@@ -1,5 +1,6 @@
 use super::{status_repo, EinsatzFahrzeugAnzeige, DIENSTSTATUS_IN_DIENST, KATEGORIE_GEBUNDEN};
 use crate::error::AppError;
+use crate::staerke::Staerke;
 use sqlx::SqlitePool;
 
 /// SELECT mit aufgelöster Live-Identität (LEFT JOIN fahrzeug) und Status (LEFT JOIN
@@ -14,6 +15,8 @@ const SELECT_AUFGELOEST: &str = "\
            f.funkrufname AS live_funkrufname, f.kennzeichen AS live_kennzeichen, \
            f.fahrzeugtyp AS live_fahrzeugtyp, f.opta AS live_opta, \
            f.traegerorganisation AS live_traegerorganisation, f.dienststatus AS live_dienststatus, \
+           f.staerke_fuehrer AS soll_fuehrer, f.staerke_unterfuehrer AS soll_unterfuehrer, \
+           f.staerke_mannschaft AS soll_mannschaft, \
            s.label AS status_label, s.kategorie AS status_kategorie, s.farbe AS status_farbe \
     FROM einsatz_fahrzeug ef \
     LEFT JOIN fahrzeug f ON f.id = ef.fahrzeug_id \
@@ -45,6 +48,9 @@ struct Row {
     live_opta: Option<String>,
     live_traegerorganisation: Option<String>,
     live_dienststatus: Option<String>,
+    soll_fuehrer: Option<i64>,
+    soll_unterfuehrer: Option<i64>,
+    soll_mannschaft: Option<i64>,
     status_label: Option<String>,
     status_kategorie: Option<String>,
     status_farbe: Option<String>,
@@ -96,6 +102,12 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzFahrzeugAnzeige {
         tz_fachaufgabe: row.tz_fachaufgabe,
         tz_organisation: row.tz_organisation,
         aktueller_br_id: row.aktueller_br_id,
+        // Soll-Besatzung aus dem Stamm-Live-Join: nur vollständig gepflegte Soll-Stärke
+        // ergibt `Some`; Ad-hoc-Fahrzeuge (kein Stamm-Join) liefern lauter NULL → `None`.
+        soll_besatzung: match (row.soll_fuehrer, row.soll_unterfuehrer, row.soll_mannschaft) {
+            (Some(f), Some(u), Some(m)) => Some(Staerke::neu(f as u16, u as u16, m as u16)),
+            _ => None,
+        },
         disponiert_at: row.disponiert_at,
         disponiert_von: row.disponiert_von,
     }
@@ -304,15 +316,26 @@ pub async fn aktualisiere_position(
 
 /// Entfernt eine Dispositionszeile aus dem Einsatz (der Stamm bleibt). `NotFound`,
 /// falls nicht zum Einsatz gehörend.
+///
+/// Transaktional (LFH-9): vor dem DELETE wird die Fahrzeug-Besatzung freigegeben
+/// (`einsatz_personal.fahrzeug_id = NULL`). Die Kräfte werden frei, nicht gelöscht;
+/// ohne diesen Schritt scheitert das DELETE am FK-Constraint. Schlägt das DELETE auf
+/// `NotFound` durch (fremdes/unbekanntes Fahrzeug), rollt die TX die Freigabe zurück.
 pub async fn entferne(pool: &SqlitePool, einsatz_id: i64, ef_id: i64) -> Result<(), AppError> {
+    let mut tx = pool.begin().await?;
+    sqlx::query("UPDATE einsatz_personal SET fahrzeug_id = NULL WHERE fahrzeug_id = ?")
+        .bind(ef_id)
+        .execute(&mut *tx)
+        .await?;
     let resultat = sqlx::query("DELETE FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?")
         .bind(ef_id)
         .bind(einsatz_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
     if resultat.rows_affected() == 0 {
         return Err(AppError::NotFound);
     }
+    tx.commit().await?;
     Ok(())
 }
 
@@ -490,5 +513,51 @@ mod tests {
 
         entferne(&pool, einsatz, ef).await.unwrap();
         assert!(matches!(laden_anzeige(&pool, einsatz, ef, true).await.unwrap_err(), AppError::NotFound));
+    }
+
+    /// LFH-9: Soll-Besatzung = Live-Join der Stamm-`staerke_*`. Nur Stamm-Fahrzeuge mit
+    /// vollständiger Soll-Stärke liefern `Some`; Ad-hoc-Fahrzeuge (kein Stamm) liefern
+    /// `None` — nicht 0/0/0 vortäuschen.
+    #[tokio::test]
+    async fn soll_besatzung_aus_stamm_staerke_adhoc_none() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+
+        let mut daten = fz_daten("Florian 1");
+        daten.staerke = Some(Staerke::neu(0, 1, 8));
+        let fz = fz_repo::anlegen(&pool, 1, daten).await.unwrap();
+        let ef = disponiere_stamm(&pool, einsatz, 1, fz.id, benutzer).await.unwrap();
+        assert_eq!(
+            laden_anzeige(&pool, einsatz, ef, true).await.unwrap().soll_besatzung,
+            Some(Staerke::neu(0, 1, 8)),
+        );
+
+        let adhoc = disponiere_adhoc(&pool, einsatz, 1, AdhocDaten {
+            funkrufname: "Extern 1", fahrzeugtyp: None, kennzeichen: None, opta: None, traegerorganisation: None,
+        }, benutzer).await.unwrap();
+        assert_eq!(
+            laden_anzeige(&pool, einsatz, adhoc, true).await.unwrap().soll_besatzung,
+            None, "Ad-hoc-Fahrzeug hat keine Soll-Besatzung",
+        );
+    }
+
+    /// LFH-9 (höchstes Risiko): Fahrzeug entfernen gibt die Besatzung transaktional frei —
+    /// kein Orphan. Ohne die Freigabe vor dem DELETE scheitert dieses am FK-Constraint
+    /// (FK-Enforcement ist an), die Kraft bleibt als freie Kraft erhalten.
+    #[tokio::test]
+    async fn entferne_gibt_besatzung_frei_statt_orphan() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, ef) = seed_fahrzeug(&pool).await;
+        let ep: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_personal (einsatz_id, snap_name, fahrzeug_id) VALUES (?, 'Crew', ?) RETURNING id",
+        ).bind(einsatz).bind(ef).fetch_one(&pool).await.unwrap();
+
+        entferne(&pool, einsatz, ef).await.unwrap();
+
+        // Fahrzeug weg, Person bleibt als freie Kraft (fahrzeug_id NULL).
+        assert!(matches!(laden_anzeige(&pool, einsatz, ef, true).await.unwrap_err(), AppError::NotFound));
+        let fahrzeug_id: Option<i64> = sqlx::query_scalar("SELECT fahrzeug_id FROM einsatz_personal WHERE id = ?")
+            .bind(ep).fetch_one(&pool).await.unwrap();
+        assert_eq!(fahrzeug_id, None, "Besatzung wird frei, nicht gelöscht");
     }
 }

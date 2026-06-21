@@ -109,6 +109,9 @@ pub struct EinsatzPersonalAnzeige {
     pub personal_id: Option<i64>,
     /// Zugeordnete Einheit (K&M‑3); `None` = freie, nicht zugeordnete Kraft.
     pub einheit_id: Option<i64>,
+    /// Fahrzeug, dessen Besatzung die Kraft ist (LFH-9); `None` = keinem Fahrzeug zugeteilt.
+    /// Unabhängig von `einheit_id` (orthogonale Zuordnung).
+    pub fahrzeug_id: Option<i64>,
     pub ist_adhoc: bool,
     pub name: String,
     /// Qualifikationen/Funktion als flacher Text (Live recomposed oder Snapshot).

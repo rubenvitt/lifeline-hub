@@ -30,7 +30,7 @@ vi.mock('react-router-dom', async (orig) => ({ ...(await orig()), useNavigate: (
 const EINSATZ = { id: 1, bezeichnung: 'Testeinsatz', status: 'aktiv', meine_rolle: 'einsatzleitung' } as EinsatzAnzeige;
 
 const PERSON_P1 = {
-  id: 1, einsatz_id: 1, personal_id: null, einheit_id: null, ist_adhoc: false,
+  id: 1, einsatz_id: 1, personal_id: null, einheit_id: null, fahrzeug_id: null, ist_adhoc: false,
   name: 'P1', funktion: null, traegerorganisation: null,
   staerke_position: 'mannschaft' as const, status_id: null,
   status_label: null, status_kategorie: 'gebunden' as const,
@@ -68,7 +68,7 @@ const FAHRZEUG_F1 = {
   status_farbe: null, bemerkung: null,
   disponiert_at: '2024-01-01T00:00:00', disponiert_von: null,
   lat: null, lon: null, tz_fachaufgabe: null, tz_organisation: null,
-  aktueller_br_id: null,
+  aktueller_br_id: null, soll_besatzung: null,
 };
 
 beforeEach(() => {

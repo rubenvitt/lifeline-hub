@@ -141,6 +141,14 @@ pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
             "/api/einsaetze/{id}/fahrzeuge/{ef_id}",
             delete(routes::einsatz_fahrzeug::entfernen),
         )
+        .route(
+            "/api/einsaetze/{id}/fahrzeuge/{ef_id}/besatzung/{ep_id}",
+            put(routes::einsatz_fahrzeug::besatzung_zuordnen),
+        )
+        .route(
+            "/api/einsaetze/{id}/fahrzeuge/{ef_id}/besatzung/{ep_id}",
+            delete(routes::einsatz_fahrzeug::besatzung_freigeben),
+        )
         .route("/api/einsaetze/{id}/personal", get(routes::einsatz_personal::liste))
         .route("/api/einsaetze/{id}/personal", post(routes::einsatz_personal::disponieren))
         .route("/api/einsaetze/{id}/personal/{ep_id}", patch(routes::einsatz_personal::aktualisieren))

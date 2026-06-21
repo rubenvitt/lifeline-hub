@@ -1,0 +1,14 @@
+-- Fahrzeug-Besatzung = exklusive Zuordnung einer Kraft zu einem disponierten
+-- Fahrzeug, modelliert wie die K&M‑3-Mitgliedschaft (FK-Spalte direkt an der
+-- Dispozeile, kein Join-Table). NULL = freie, keinem Fahrzeug zugeordnete Kraft.
+-- Exklusivität (1 Person → max. 1 Fahrzeug) ergibt sich gratis aus der Einzelspalte.
+--
+-- Bewusst UNABHÄNGIG/orthogonal zu einheit_id: Besatzung eines Fahrzeugs ist NICHT
+-- die Einheiten-Mitgliedschaft (eine Kraft darf Fahrzeug in Einheit A bemannen und
+-- Mitglied von Einheit B sein) — keine Kopplung, keine Auto-Heraufstufung.
+--
+-- Kein ON DELETE (SQLite-Grenze bei nachträglichem ADD COLUMN): das Freigeben beim
+-- Entfernen des Fahrzeugs passiert explizit in einer Repo-Transaktion
+-- (fahrzeug::disposition_repo::entferne), sonst verwaisen die Besatzungszeilen bzw.
+-- scheitert das DELETE am FK-Constraint.
+ALTER TABLE einsatz_personal ADD COLUMN fahrzeug_id INTEGER REFERENCES einsatz_fahrzeug(id);

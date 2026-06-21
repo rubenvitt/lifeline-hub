@@ -10,10 +10,12 @@ import { listeFahrzeuge } from '../api/fahrzeuge';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
 import {
   aktualisiereDisposition, disponiereAdhoc, disponiereFahrzeug, entferneDisposition,
-  listeEinsatzFahrzeuge, type AdhocEingabe,
+  gibBesatzungFrei, listeEinsatzFahrzeuge, ordneBesatzungZu, type AdhocEingabe,
 } from '../api/einsatzFahrzeuge';
+import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { ApiError } from '../api/client';
-import type { EinsatzFahrzeug, StatusKategorie } from '../api/types';
+import type { EinsatzFahrzeug, EinsatzPersonal, Staerke, StatusKategorie } from '../api/types';
+import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 
 const KATEGORIE_FALLBACK: Record<StatusKategorie, string> = {
   verfuegbar: 'green',
@@ -25,6 +27,79 @@ function StatusBadge({ ef }: { ef: EinsatzFahrzeug }) {
   if (!ef.status_label || !ef.status_kategorie) return <Tag>kein Status</Tag>;
   const farbe = ef.status_farbe ?? KATEGORIE_FALLBACK[ef.status_kategorie];
   return <Tag color={farbe}>{ef.status_label}</Tag>;
+}
+
+/**
+ * Ist-Besatzungsstärke aus den Stärke-Positionen der zugeordneten Kräfte (clientseitig
+ * gezählt; LFH-9 hält das bewusst orthogonal zur Einheiten-Stärke — kein Backend-Aggregat).
+ */
+function istBesatzungsStaerke(crew: EinsatzPersonal[]): Staerke {
+  const s: Staerke = { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 };
+  for (const m of crew) {
+    if (m.staerke_position === 'fuehrer') s.fuehrer += 1;
+    else if (m.staerke_position === 'unterfuehrer') s.unterfuehrer += 1;
+    else if (m.staerke_position === 'mannschaft') s.mannschaft += 1;
+  }
+  return s;
+}
+
+/**
+ * Besatzungs-Block je disponiertem Fahrzeug (LFH-9): Mitglieder (gefiltert über
+ * `fahrzeug_id`), Ist/Soll als `Staerke`, Frei-Pool-Picker (nur `fahrzeug_id == null`).
+ * Eine Kraft, die in einer anderen Einheit als das Fahrzeug ist, wird markiert
+ * (Transparenz der bewusst orthogonalen Zuordnung).
+ */
+function BesatzungsBlock({
+  ef, personal, darfSchreiben, onZuordnen, onFreigeben,
+}: {
+  ef: EinsatzFahrzeug;
+  personal: EinsatzPersonal[];
+  darfSchreiben: boolean;
+  onZuordnen: (epId: number) => void;
+  onFreigeben: (epId: number) => void;
+}) {
+  const crew = personal.filter((p) => p.fahrzeug_id === ef.id);
+  const frei = personal.filter((p) => p.fahrzeug_id == null);
+  const ist = istBesatzungsStaerke(crew);
+  return (
+    <div style={{ paddingLeft: 8 }}>
+      <Space size={8} style={{ marginBottom: 8 }}>
+        <Typography.Text type="secondary">Besatzung</Typography.Text>
+        <Tag color="blue">
+          Ist <StaerkeAnzeige wert={ist} /> / Soll <StaerkeAnzeige wert={ef.soll_besatzung} />
+        </Tag>
+      </Space>
+      {crew.length === 0 ? (
+        <div><Typography.Text type="secondary">Keine Besatzung zugeordnet</Typography.Text></div>
+      ) : (
+        crew.map((m) => (
+          <Space key={m.id} style={{ display: 'flex', justifyContent: 'space-between', maxWidth: 420 }}>
+            <span>
+              {m.name}{m.staerke_position ? ` (${m.staerke_position})` : ''}
+              {m.einheit_id != null && m.einheit_id !== ef.einheit_id && (
+                <Tag color="orange" style={{ marginLeft: 4 }}>andere Einheit</Tag>
+              )}
+            </span>
+            {darfSchreiben && (
+              <Button size="small" danger onClick={() => onFreigeben(m.id)}>Freigeben</Button>
+            )}
+          </Space>
+        ))
+      )}
+      {darfSchreiben && (
+        <Select
+          showSearch
+          style={{ width: '100%', maxWidth: 420, marginTop: 8 }}
+          placeholder="Kraft zur Besatzung …"
+          value={null}
+          optionFilterProp="label"
+          notFoundContent="Keine freien Kräfte"
+          options={frei.map((p) => ({ value: p.id, label: p.name }))}
+          onSelect={(epId) => onZuordnen(Number(epId))}
+        />
+      )}
+    </div>
+  );
 }
 
 export default function FahrzeugePage() {
@@ -42,9 +117,14 @@ export default function FahrzeugePage() {
   });
   const statusQuery = useQuery({ queryKey: ['fahrzeug-status'], queryFn: listeFahrzeugStatus });
   const poolQuery = useQuery({ queryKey: ['fahrzeuge', 'im-dienst'], queryFn: () => listeFahrzeuge(true) });
+  const personalQuery = useQuery({
+    queryKey: ['einsatz-personal', einsatzId],
+    queryFn: () => listeEinsatzPersonal(einsatzId),
+  });
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: ['einsatz-fahrzeuge', einsatzId] });
+    qc.invalidateQueries({ queryKey: ['einsatz-personal', einsatzId] });
     qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
   }
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
@@ -76,6 +156,16 @@ export default function FahrzeugePage() {
     onSuccess: invalidate,
     onError: fehler,
   });
+  const besatzungZuMutation = useMutation({
+    mutationFn: (v: { efId: number; epId: number }) => ordneBesatzungZu(einsatzId, v.efId, v.epId),
+    onSuccess: invalidate,
+    onError: fehler,
+  });
+  const besatzungFreiMutation = useMutation({
+    mutationFn: (v: { efId: number; epId: number }) => gibBesatzungFrei(einsatzId, v.efId, v.epId),
+    onSuccess: invalidate,
+    onError: fehler,
+  });
 
   if (einsatzQuery.isLoading) {
     return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
@@ -90,6 +180,7 @@ export default function FahrzeugePage() {
 
   const efs = efQuery.data ?? [];
   const stati = statusQuery.data ?? [];
+  const personal = personalQuery.data ?? [];
   const disponierteIds = new Set(efs.map((e) => e.fahrzeug_id).filter((x): x is number => x != null));
   const poolOptionen = (poolQuery.data ?? [])
     .filter((f) => !disponierteIds.has(f.id))
@@ -199,6 +290,21 @@ export default function FahrzeugePage() {
         columns={spalten}
         pagination={false}
         locale={{ emptyText: 'Noch keine Fahrzeuge disponiert' }}
+        expandable={{
+          // Besatzungs-Block je Fahrzeug dauerhaft sichtbar (operative Übersicht): alle
+          // Zeilen kontrolliert expandiert, ohne separate Aufklapp-Spalte.
+          showExpandColumn: false,
+          expandedRowKeys: efs.map((e) => e.id),
+          expandedRowRender: (ef) => (
+            <BesatzungsBlock
+              ef={ef}
+              personal={personal}
+              darfSchreiben={darfSchreiben}
+              onZuordnen={(epId) => besatzungZuMutation.mutate({ efId: ef.id, epId })}
+              onFreigeben={(epId) => besatzungFreiMutation.mutate({ efId: ef.id, epId })}
+            />
+          ),
+        }}
       />
 
       <Modal

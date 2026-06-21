@@ -24,21 +24,32 @@ function einsatz(overrides: Record<string, unknown> = {}) {
 }
 
 const ef = {
-  id: 10, einsatz_id: 7, fahrzeug_id: 1, ist_adhoc: false, funkrufname: 'Florian 1',
+  id: 10, einsatz_id: 7, fahrzeug_id: 1, einheit_id: null, ist_adhoc: false, funkrufname: 'Florian 1',
   kennzeichen: 'XX-AB 1', fahrzeugtyp: 'LF 20', opta: null, traegerorganisation: null,
   status_id: 2, status_label: 'disponiert', status_kategorie: 'gebunden', status_farbe: null,
   bemerkung: null, disponiert_at: '2026-05-26 09:10:00', disponiert_von: 1,
+  soll_besatzung: { fuehrer: 0, unterfuehrer: 1, mannschaft: 8 },
 };
 const stati = [
   { id: 2, label: 'disponiert', kategorie: 'gebunden', farbe: null, fms_anker: 3, sortier: 20 },
   { id: 3, label: 'vor_ort', kategorie: 'gebunden', farbe: null, fms_anker: 4, sortier: 40 },
 ];
 
-function render(einsatzObj: ReturnType<typeof einsatz>) {
+function person(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 100, einsatz_id: 7, personal_id: 5, einheit_id: null, fahrzeug_id: null, ist_adhoc: false,
+    name: 'Anna Crew', funktion: null, traegerorganisation: null, staerke_position: 'mannschaft',
+    status_id: null, status_label: null, status_kategorie: null, status_farbe: null,
+    bemerkung: null, disponiert_at: '2026-05-26 09:10:00', disponiert_von: 1, ...overrides,
+  };
+}
+
+function render(einsatzObj: ReturnType<typeof einsatz>, personal: ReturnType<typeof person>[] = []) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(admin)),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([ef])),
+    http.get('/api/einsaetze/7/personal', () => HttpResponse.json(personal)),
     http.get('/api/fahrzeug-status', () => HttpResponse.json(stati)),
     http.get('/api/fahrzeuge', () => HttpResponse.json([])), // Pool (nur_im_dienst)
   );
@@ -79,5 +90,27 @@ describe('FahrzeugePage', () => {
     await screen.findByText('Florian 1');
     expect(screen.getByText(/abgeschlossen — nur Ansicht/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Entfernen' })).not.toBeInTheDocument();
+  });
+
+  it('zeigt die Besatzung des Fahrzeugs und einen Frei-Pool-Picker', async () => {
+    const crew = person({ id: 100, name: 'Anna Crew', fahrzeug_id: 10, staerke_position: 'mannschaft' });
+    const frei = person({ id: 101, name: 'Bert Frei', fahrzeug_id: null, staerke_position: 'fuehrer' });
+    render(einsatz(), [crew, frei]);
+    await screen.findByText('Florian 1');
+
+    // Besatzungsmitglied (fahrzeug_id === 10) wird angezeigt, mit Freigeben-Aktion.
+    expect(await screen.findByText(/Anna Crew/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Freigeben' })).toBeInTheDocument();
+    // Frei-Pool-Picker vorhanden (nur freie Kräfte).
+    expect(screen.getByText('Kraft zur Besatzung …')).toBeInTheDocument();
+  });
+
+  it('markiert eine Besatzung aus anderer Einheit als das Fahrzeug', async () => {
+    // Fahrzeug ef.einheit_id = null, Person in Einheit 3 → Diskrepanz-Tag.
+    const crew = person({ id: 100, name: 'Cara Diskrepanz', fahrzeug_id: 10, einheit_id: 3 });
+    render(einsatz(), [crew]);
+    await screen.findByText('Florian 1');
+    expect(await screen.findByText(/Cara Diskrepanz/)).toBeInTheDocument();
+    expect(screen.getByText('andere Einheit')).toBeInTheDocument();
   });
 });

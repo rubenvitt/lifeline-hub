@@ -15,7 +15,7 @@ const eh = (id: number, abschnitt_id: number | null, ueber_einheit_id: number | 
      lat: null, lon: null, tz_fachaufgabe: null, tz_organisation: null, aktueller_br_id: null });
 const p = (id: number, einheit_id: number | null, pos: EinsatzPersonal['staerke_position'],
            kat: EinsatzPersonal['status_kategorie'] = 'gebunden'): EinsatzPersonal =>
-  ({ id, einsatz_id: 1, personal_id: null, einheit_id, ist_adhoc: false, name: `P${id}`,
+  ({ id, einsatz_id: 1, personal_id: null, einheit_id, fahrzeug_id: null, ist_adhoc: false, name: `P${id}`,
      funktion: null, traegerorganisation: null, staerke_position: pos, status_id: null,
      status_label: null, status_kategorie: kat, status_farbe: null, disponiert_at: '', disponiert_von: null, bemerkung: null });
 const fz = (id: number, einheit_id: number | null, kat: EinsatzFahrzeug['status_kategorie'] = 'verfuegbar',
@@ -24,7 +24,7 @@ const fz = (id: number, einheit_id: number | null, kat: EinsatzFahrzeug['status_
      kennzeichen: null, fahrzeugtyp: 'LF', opta: null, traegerorganisation: null, status_id: null,
      status_label: `${fms}`, status_kategorie: kat, status_farbe: null, bemerkung: null,
      disponiert_at: '', disponiert_von: null, lat: null, lon: null, tz_fachaufgabe: null, tz_organisation: null,
-     aktueller_br_id: null });
+     aktueller_br_id: null, soll_besatzung: null });
 
 it('Invariante: Kopf zählt jede Kraft genau einmal', () => {
   const personal = [p(1, 10, 'fuehrer'), p(2, 10, 'mannschaft'), p(3, null, 'mannschaft')];

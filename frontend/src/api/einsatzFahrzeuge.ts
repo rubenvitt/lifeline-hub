@@ -42,3 +42,13 @@ export function entferneDisposition(einsatzId: number, efId: number): Promise<vo
 export function verorteFahrzeug(einsatzId: number, efId: number, daten: PositionPatch): Promise<EinsatzFahrzeug> {
   return apiSend<EinsatzFahrzeug>(`/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/position`, 'PATCH', daten);
 }
+
+/** LFH-9: Ordnet eine Kraft (einsatz_personal.id) einem Fahrzeug als Besatzung zu. */
+export function ordneBesatzungZu(einsatzId: number, efId: number, epId: number): Promise<void> {
+  return apiSend<void>(`/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/besatzung/${epId}`, 'PUT');
+}
+
+/** LFH-9: Gibt eine Kraft aus der Fahrzeug-Besatzung frei. */
+export function gibBesatzungFrei(einsatzId: number, efId: number, epId: number): Promise<void> {
+  return apiSend<void>(`/api/einsaetze/${einsatzId}/fahrzeuge/${efId}/besatzung/${epId}`, 'DELETE');
+}

@@ -8,7 +8,7 @@ use sqlx::SqlitePool;
 /// Subquery über aktive Qualifikationen — identisch zu `qualifikation_repo::funktion_text`)
 /// und Status (LEFT JOIN personal_status). Live vs. Snapshot wählt `zu_anzeige`.
 const SELECT_AUFGELOEST: &str = "\
-    SELECT ep.id, ep.einsatz_id, ep.personal_id, ep.einheit_id, ep.status_id, \
+    SELECT ep.id, ep.einsatz_id, ep.personal_id, ep.einheit_id, ep.fahrzeug_id, ep.status_id, \
            ep.staerke_position AS ep_staerke_position, \
            ep.snap_name, ep.snap_funktion, ep.snap_traegerorganisation, \
            ep.bemerkung, ep.disponiert_at, ep.disponiert_von, \
@@ -31,6 +31,7 @@ struct Row {
     einsatz_id: i64,
     personal_id: Option<i64>,
     einheit_id: Option<i64>,
+    fahrzeug_id: Option<i64>,
     status_id: Option<i64>,
     ep_staerke_position: Option<String>,
     snap_name: String,
@@ -72,6 +73,7 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzPersonalAnzeige {
         einsatz_id: row.einsatz_id,
         personal_id: row.personal_id,
         einheit_id: row.einheit_id,
+        fahrzeug_id: row.fahrzeug_id,
         ist_adhoc: row.personal_id.is_none(),
         name,
         funktion,
@@ -597,5 +599,24 @@ mod tests {
         // Some(None) = explizit auf NULL.
         aktualisiere(&pool, einsatz, ep, None, Some(None), None).await.unwrap();
         assert_eq!(roh(&pool, ep).await, None, "explizit null entfernt Override");
+    }
+
+    /// LFH-9: Die Besatzungs-FK `fahrzeug_id` wird in die Anzeige serialisiert (sonst zeigt
+    /// der Frei-Pool-Picker bereits einem Fahrzeug zugeteilte Kräfte). NULL → `None`.
+    #[tokio::test]
+    async fn fahrzeug_id_wird_serialisiert() {
+        let pool = crate::db::test_pool().await;
+        let (_benutzer, einsatz) = setup(&pool).await;
+        let frei: i64 = sqlx::query_scalar("INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Frei') RETURNING id")
+            .bind(einsatz).fetch_one(&pool).await.unwrap();
+        let crew: i64 = sqlx::query_scalar("INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Crew') RETURNING id")
+            .bind(einsatz).fetch_one(&pool).await.unwrap();
+        let ef: i64 = sqlx::query_scalar("INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, 'Florian 1') RETURNING id")
+            .bind(einsatz).fetch_one(&pool).await.unwrap();
+        sqlx::query("UPDATE einsatz_personal SET fahrzeug_id = ? WHERE id = ?")
+            .bind(ef).bind(crew).execute(&pool).await.unwrap();
+
+        assert_eq!(laden_anzeige(&pool, einsatz, frei, true).await.unwrap().fahrzeug_id, None);
+        assert_eq!(laden_anzeige(&pool, einsatz, crew, true).await.unwrap().fahrzeug_id, Some(ef));
     }
 }

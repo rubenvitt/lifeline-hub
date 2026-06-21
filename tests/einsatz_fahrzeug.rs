@@ -120,6 +120,87 @@ async fn system_etb_anzahl(app: &axum::Router, cookie: &str, einsatz: i64) -> us
     json.as_array().unwrap().iter().filter(|e| e["typ"] == "system").count()
 }
 
+/// Legt eine Stamm-Person an + disponiert sie in den Einsatz → liefert einsatz_personal.id.
+async fn person_anlegen(app: &axum::Router, admin: &str, einsatz: i64, name: &str) -> i64 {
+    let (s1, stamm) = anfrage(app, "POST", "/api/personal", admin, Some(&format!(r#"{{"name":"{name}"}}"#))).await;
+    assert_eq!(s1, StatusCode::CREATED);
+    let pid = stamm["id"].as_i64().unwrap();
+    let (s2, dispo) = anfrage(app, "POST", &format!("/api/einsaetze/{einsatz}/personal"), admin,
+        Some(&format!(r#"{{"personal_id":{pid}}}"#))).await;
+    assert_eq!(s2, StatusCode::CREATED);
+    dispo["id"].as_i64().unwrap()
+}
+
+/// Disponiert ein Stamm-Fahrzeug in den Einsatz → liefert einsatz_fahrzeug.id.
+async fn fahrzeug_disponieren(app: &axum::Router, admin: &str, einsatz: i64, funkrufname: &str) -> i64 {
+    let fz = fahrzeug_anlegen(app, admin, funkrufname).await;
+    let (s, json) = anfrage(app, "POST", &format!("/api/einsaetze/{einsatz}/fahrzeuge"), admin,
+        Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#))).await;
+    assert_eq!(s, StatusCode::CREATED);
+    json["id"].as_i64().unwrap()
+}
+
+// ---------- Besatzung (LFH-9) ----------
+
+#[tokio::test]
+async fn besatzung_zuordnen_freigeben_mit_etb() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
+    let ep = person_anlegen(&app, &admin, einsatz, "Anna").await;
+
+    // Vor Zuordnung: freie Kraft (fahrzeug_id null) → erscheint im Frei-Pool-Picker.
+    let (_, personal) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/personal"), &admin, None).await;
+    assert!(personal.as_array().unwrap().iter().find(|p| p["id"] == ep).unwrap()["fahrzeug_id"].is_null());
+
+    let etb_vor = system_etb_anzahl(&app, &admin, einsatz).await;
+
+    // Zuordnen → 204, fahrzeug_id gesetzt.
+    assert_eq!(anfrage(&app, "PUT", &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/besatzung/{ep}"), &admin, None).await.0, StatusCode::NO_CONTENT);
+    let (_, personal2) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/personal"), &admin, None).await;
+    assert_eq!(personal2.as_array().unwrap().iter().find(|p| p["id"] == ep).unwrap()["fahrzeug_id"], ef);
+
+    // Freigeben → 204, wieder frei.
+    assert_eq!(anfrage(&app, "DELETE", &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/besatzung/{ep}"), &admin, None).await.0, StatusCode::NO_CONTENT);
+    let (_, personal3) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/personal"), &admin, None).await;
+    assert!(personal3.as_array().unwrap().iter().find(|p| p["id"] == ep).unwrap()["fahrzeug_id"].is_null());
+
+    // Zuordnen + Freigeben = je ein append-only System-ETB.
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, etb_vor + 2, "Zuordnen + Freigeben = 2 System-ETB");
+}
+
+#[tokio::test]
+async fn besatzung_beobachter_darf_nicht_zuordnen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
+    let ep = person_anlegen(&app, &admin, einsatz, "Anna").await;
+
+    let erika_id = benutzer_anlegen(&app, &admin, "erika", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, erika_id, "beobachter").await;
+    let erika = login_cookie(&app, "erika", "erikapw1").await;
+    // Schreibrecht-Gating (MODUL_KEY=fahrzeuge): Beobachter darf nicht zuordnen.
+    assert_eq!(anfrage(&app, "PUT", &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/besatzung/{ep}"), &erika, None).await.0, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn fahrzeug_entfernen_gibt_besatzung_frei() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
+    let ep = person_anlegen(&app, &admin, einsatz, "Anna").await;
+    assert_eq!(anfrage(&app, "PUT", &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/besatzung/{ep}"), &admin, None).await.0, StatusCode::NO_CONTENT);
+
+    // Fahrzeug entfernen → 204 (kein FK-Fehler trotz Besatzung); Kraft bleibt frei.
+    assert_eq!(anfrage(&app, "DELETE", &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"), &admin, None).await.0, StatusCode::NO_CONTENT);
+    let (_, personal) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/personal"), &admin, None).await;
+    assert!(personal.as_array().unwrap().iter().find(|p| p["id"] == ep).unwrap()["fahrzeug_id"].is_null(),
+        "Besatzung wird beim Fahrzeug-Entfernen frei, nicht gelöscht");
+}
+
 // ---------- Tests ----------
 
 #[tokio::test]

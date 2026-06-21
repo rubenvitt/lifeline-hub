@@ -1,3 +1,4 @@
+pub mod besatzung_repo;
 pub mod disposition_repo;
 pub mod repo;
 pub mod status_repo;
@@ -149,6 +150,10 @@ pub struct EinsatzFahrzeugAnzeige {
     pub tz_organisation: Option<String>,
     /// BR‑1: aktuell bereitgestellter Bereitstellungsraum (NULL = in keinem BR).
     pub aktueller_br_id: Option<i64>,
+    /// Soll-Besatzung (taktische Soll-Stärke) aus dem Stamm-Fahrzeug (LFH-9); `None` für
+    /// Ad-hoc-Fahrzeuge oder unvollständig gepflegte Soll-Stärke. Das Ist berechnet das
+    /// Frontend aus den Besatzungs-Positionen (orthogonal, keine Backend-Aggregation).
+    pub soll_besatzung: Option<Staerke>,
     pub disponiert_at: String,
     pub disponiert_von: Option<i64>,
 }
