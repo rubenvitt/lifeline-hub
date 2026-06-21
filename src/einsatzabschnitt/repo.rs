@@ -418,4 +418,38 @@ mod tests {
         ));
         assert!(matches!(loese_auf(&pool, 999, a.id).await.unwrap_err(), AppError::NotFound));
     }
+
+    #[tokio::test]
+    async fn datenmigration_freitext_zu_einsatz_lokal_dedupliziert_und_teilt() {
+        let pool = crate::db::test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1,'Orga')").execute(&pool).await.unwrap();
+        let e: i64 = sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id")
+            .fetch_one(&pool).await.unwrap();
+        // Zwei Abschnitte mit GLEICHEM Freitext-TMO-Wert.
+        for name in ["Nord", "Süd"] {
+            sqlx::query("INSERT INTO einsatzabschnitt (einsatz_id, name, sprechgruppe_tmo) VALUES (?, ?, '412_F_DRK')")
+                .bind(e).bind(name).execute(&pool).await.unwrap();
+        }
+        // TMO-Daten-Migration aus 0073 erneut ausführen (idempotent dank INSERT OR IGNORE):
+        sqlx::query(
+            "INSERT OR IGNORE INTO sprechgruppe (org_id, einsatz_id, bezeichnung, betriebsart) \
+             SELECT DISTINCT e.org_id, ea.einsatz_id, trim(ea.sprechgruppe_tmo), 'TMO' \
+             FROM einsatzabschnitt ea JOIN einsatz e ON e.id = ea.einsatz_id \
+             WHERE ea.sprechgruppe_tmo IS NOT NULL AND trim(ea.sprechgruppe_tmo) <> ''",
+        ).execute(&pool).await.unwrap();
+        sqlx::query(
+            "INSERT OR IGNORE INTO einsatzabschnitt_sprechgruppe (abschnitt_id, sprechgruppe_id) \
+             SELECT ea.id, sg.id FROM einsatzabschnitt ea \
+             JOIN sprechgruppe sg ON sg.einsatz_id = ea.einsatz_id AND sg.betriebsart = 'TMO' \
+                                 AND sg.bezeichnung = trim(ea.sprechgruppe_tmo) \
+             WHERE ea.sprechgruppe_tmo IS NOT NULL AND trim(ea.sprechgruppe_tmo) <> ''",
+        ).execute(&pool).await.unwrap();
+
+        let sg: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sprechgruppe WHERE einsatz_id = ?")
+            .bind(e).fetch_one(&pool).await.unwrap();
+        let joins: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatzabschnitt_sprechgruppe")
+            .fetch_one(&pool).await.unwrap();
+        assert_eq!(sg, 1, "ein geteilter einsatz-lokaler Eintrag (Dedup)");
+        assert_eq!(joins, 2, "beide Abschnitte verknüpft (Sharing)");
+    }
 }
