@@ -283,3 +283,23 @@ async fn dispo_position_explizit_null_entfernt_absent_behaelt() {
     ).await;
     assert!(b["staerke_position"].is_null(), "explizit null entfernt den Positions-Override");
 }
+
+#[tokio::test]
+async fn dispo_position_ungueltiger_wert_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let person = person_anlegen(&app, &admin, "Thomas").await;
+    let (_, json) = anfrage(
+        &app, "POST", &format!("/api/einsaetze/{einsatz}/personal"), &admin,
+        Some(&format!(r#"{{"personal_id":{person}}}"#)),
+    ).await;
+    let ep = json["id"].as_i64().unwrap();
+    // Tri-State Some(Some("quatsch")) → die Inline-Validierung lehnt den Wert ab.
+    let (status, body) = anfrage(
+        &app, "PATCH", &format!("/api/einsaetze/{einsatz}/personal/{ep}"), &admin,
+        Some(r#"{"staerke_position":"quatsch"}"#),
+    ).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(body["error"], "Ungültige Stärke-Position");
+}
