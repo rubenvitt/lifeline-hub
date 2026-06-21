@@ -12,6 +12,8 @@ export interface EinheitEingabe {
   soll_mannschaft?: number | null;
   bemerkung?: string | null;
   sortier?: number;
+  /** LFH-109: IDs der zuzuordnenden Sprechgruppen aus dem Katalog. */
+  sprechgruppe_ids?: number[];
 }
 
 export function listeEinheiten(einsatzId: number): Promise<Einheit[]> {

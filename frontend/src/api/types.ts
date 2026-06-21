@@ -432,6 +432,31 @@ export interface EinsatzPersonal {
   disponiert_von: number | null;
 }
 
+// ============================== LFH-109 Sprechgruppen-Katalog ==============================
+
+/** Betriebsart einer Sprechgruppe: Trunked Mode (TMO) oder Direct Mode (DMO). */
+export type Betriebsart = 'TMO' | 'DMO';
+
+/** Org-weiter oder einsatz-lokaler Sprechgruppen-Katalog-Eintrag. */
+export interface Sprechgruppe {
+  id: number;
+  einsatz_id: number | null;
+  einsatz_lokal: boolean;
+  bezeichnung: string;
+  betriebsart: Betriebsart;
+  hinweis: string | null;
+  aktiv: boolean;
+  sortier: number;
+}
+
+/** Eingabe-Body für Anlegen und PATCH einer Sprechgruppe. */
+export interface SprechgruppeEingabe {
+  bezeichnung: string;
+  betriebsart: Betriebsart;
+  hinweis?: string | null;
+  sortier?: number;
+}
+
 /** Aufgelöster Einsatzabschnitt (flach; Baum baut das FE über ueber_abschnitt_id). */
 export interface Einsatzabschnitt {
   id: number;
@@ -447,10 +472,14 @@ export interface Einsatzabschnitt {
   tz_fachaufgabe: string | null;
   tz_organisation: string | null;
   // LFH-86: Funk-/Kommunikations-Stammdaten je Abschnitt (einsatz-scoped).
+  /** @deprecated Freitextfeld; ersetzt durch sprechgruppen (LFH-109). Bleibt read-only für historische Daten. */
   sprechgruppe_tmo: string | null;
+  /** @deprecated Freitextfeld; ersetzt durch sprechgruppen (LFH-109). Bleibt read-only für historische Daten. */
   sprechgruppe_dmo: string | null;
   kommunikationsmittel: string | null;
   erreichbarkeit: string | null;
+  // LFH-109: zugeordnete Sprechgruppen aus dem Katalog.
+  sprechgruppen?: Sprechgruppe[];
 }
 
 /** Personal-Mitglied einer Einheit (leichtgewichtig). */
@@ -497,6 +526,8 @@ export interface Einheit {
   tz_organisation: string | null;
   /** BR‑1: aktuell bereitgestellter Bereitstellungsraum (null = in keinem BR). */
   aktueller_br_id: number | null;
+  // LFH-109: zugeordnete Sprechgruppen aus dem Katalog.
+  sprechgruppen?: Sprechgruppe[];
 }
 
 /** L‑2: Führungskraft-Marker für die Lagekarte (aus GET …/karte/fuehrungskraefte

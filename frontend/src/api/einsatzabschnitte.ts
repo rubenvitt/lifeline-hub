@@ -6,11 +6,15 @@ export interface AbschnittEingabe {
   ueber_abschnitt_id?: number | null;
   leiter_id?: number | null;
   bemerkung?: string | null;
+  /** @deprecated Backend akzeptiert das Feld nicht mehr (LFH-109); wird in Task 13 entfernt. */
   sprechgruppe_tmo?: string | null;
+  /** @deprecated Backend akzeptiert das Feld nicht mehr (LFH-109); wird in Task 13 entfernt. */
   sprechgruppe_dmo?: string | null;
   kommunikationsmittel?: string | null;
   erreichbarkeit?: string | null;
   sortier?: number;
+  /** LFH-109: IDs der zuzuordnenden Sprechgruppen aus dem Katalog. */
+  sprechgruppe_ids?: number[];
 }
 
 export function listeAbschnitte(einsatzId: number): Promise<Einsatzabschnitt[]> {
