@@ -1,3 +1,5 @@
+pub mod repo;
+
 use serde::Serialize;
 
 /// Interner Sprechgruppen-Datensatz (alle Spalten von `sprechgruppe`).
