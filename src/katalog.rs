@@ -16,6 +16,15 @@ pub fn ist_gueltige_kategorie(s: &str) -> bool {
     matches!(s, KATEGORIE_VERFUEGBAR | KATEGORIE_GEBUNDEN | KATEGORIE_NICHT_VERFUEGBAR)
 }
 
+/// Betriebsart einer TETRA-Sprechgruppe.
+pub const BETRIEBSART_TMO: &str = "TMO";
+pub const BETRIEBSART_DMO: &str = "DMO";
+
+/// Gültige Betriebsart einer Sprechgruppe (TETRA: TMO = Netz, DMO = Direkt).
+pub fn ist_gueltige_betriebsart(s: &str) -> bool {
+    matches!(s, BETRIEBSART_TMO | BETRIEBSART_DMO)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -24,5 +33,13 @@ mod tests {
     fn kategorie_validierung() {
         assert!(ist_gueltige_kategorie("gebunden"));
         assert!(!ist_gueltige_kategorie("irgendwas"));
+    }
+
+    #[test]
+    fn betriebsart_validierung() {
+        assert!(ist_gueltige_betriebsart("TMO"));
+        assert!(ist_gueltige_betriebsart("DMO"));
+        assert!(!ist_gueltige_betriebsart("FOO"));
+        assert!(!ist_gueltige_betriebsart("tmo"));
     }
 }
