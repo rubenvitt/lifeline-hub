@@ -17,7 +17,8 @@ pub mod marker;
 pub mod cache;
 
 use sqlx::SqlitePool;
-use std::sync::{Mutex, OnceLock};
+use std::collections::HashSet;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 /// Öffentlicher Nominatim als Default-Geocoder (Admin kann pro Org überschreiben).
@@ -26,10 +27,14 @@ pub const NOMINATIM_DEFAULT: &str = "https://nominatim.openstreetmap.org";
 /// Harter Timeout je Geocoder-Anfrage — die Peilung wartet nie aufs Netz.
 const GEOCODER_TIMEOUT: Duration = Duration::from_millis(1500);
 
+/// Cache-Einträge gelten 90 Tage als frisch; ältere lösen einen Hintergrund-Refresh aus.
+const CACHE_TTL_SEKUNDEN: i64 = 90 * 24 * 3600;
+
 /// Token-Bucket-Rate-Limit gegen den Geocoder (Nominatim-ToS: ≤ 1 req/s).
 struct Statics {
     client: reqwest::Client,
-    bucket: Mutex<TokenBucket>,
+    bucket: Arc<Mutex<TokenBucket>>,
+    inflight: Arc<Mutex<HashSet<String>>>,
 }
 
 static STATICS: OnceLock<Statics> = OnceLock::new();
@@ -41,7 +46,8 @@ fn statics() -> &'static Statics {
             .user_agent("LifelineHub-Geocoder/1.0 (+https://github.com/)")
             .build()
             .expect("reqwest-Client baubar"),
-        bucket: Mutex::new(TokenBucket::neu(1.0, 1.0)),
+        bucket: Arc::new(Mutex::new(TokenBucket::neu(1.0, 1.0))),
+        inflight: Arc::new(Mutex::new(HashSet::new())),
     })
 }
 
@@ -76,12 +82,12 @@ impl TokenBucket {
 /// Reverse-Geocoding (prod): nutzt den prozess-globalen Client + Token-Bucket.
 pub async fn reverse(pool: &SqlitePool, base_url: &str, lat: f64, lon: f64) -> Option<String> {
     let s = statics();
-    reverse_mit(&s.client, &s.bucket, pool, base_url, lat, lon).await
+    reverse_mit(&s.client, &s.bucket, &s.inflight, pool, base_url, lat, lon).await
 }
 
-/// Reverse-Geocoding (injizierbar, für Tests). Reihenfolge: Cache → Rate-Limit → HTTP.
-/// Cache-Treffer umgeht Rate-Limit UND Timeout. Jeder Fehlerpfad liefert `None`.
-pub async fn reverse_mit(
+/// Rate-limitierter Geocode + Cache-Write (keine Cache-Lesung). None bei Limit/Offline/leer.
+/// Guard NICHT über das await halten (Send): Scope in `{}` block, nur `bool` verlässt diesen.
+async fn geocode_und_schreibe(
     client: &reqwest::Client,
     bucket: &Mutex<TokenBucket>,
     pool: &SqlitePool,
@@ -89,57 +95,83 @@ pub async fn reverse_mit(
     lat: f64,
     lon: f64,
 ) -> Option<String> {
-    let (lat_key, lon_key) = cache::schluessel(lat, lon);
-
-    // 1. Cache.
-    if let Some(name) = cache::lese(pool, lat_key, lon_key).await {
-        return Some(name);
-    }
-
-    // 2. Rate-Limit: überzählig → None (Peilung kommt ja sowieso).
-    // Guard wird im Block gehalten und vor dem ersten .await freigegeben;
-    // explizites drop() reicht nicht für die async-Send-Analyse des Compilers.
-    // Das Block-Ende ist der für Rusts async-Send-Analyse maßgebliche Drop-Punkt des Guards;
-    // ein vorgezogenes `drop()` wird dort NICHT erkannt. Nur der `bool` (Copy, keine
-    // Lock-Lifetime) verlässt den Block.
+    // Rate-Limit: Guard im Block halten — kein await innerhalb, nur bool heraus.
     let darf_anfragen = {
-        let mut bucket_guard = bucket.lock().unwrap_or_else(|e| e.into_inner());
-        bucket_guard.try_take()
+        let mut g = bucket.lock().unwrap_or_else(|e| e.into_inner());
+        g.try_take()
     };
     if !darf_anfragen {
         return None;
     }
-
-    // 3. HTTP (mit dem hart getimeouteten Client).
+    let (lat_key, lon_key) = cache::schluessel(lat, lon);
     let url = format!(
         "{}/reverse?lat={lat}&lon={lon}&format=jsonv2&zoom=18&accept-language=de",
         base_url.trim_end_matches('/')
     );
     let name = match client.get(&url).send().await {
-        Ok(resp) if resp.status().is_success() => match resp.json::<serde_json::Value>().await {
+        Ok(r) if r.status().is_success() => match r.json::<serde_json::Value>().await {
             Ok(v) => v.get("display_name").and_then(|n| n.as_str()).map(String::from),
             Err(e) => {
-                tracing::debug!("Geocoder-JSON-Parse fehlgeschlagen: {e}");
+                tracing::debug!("Geocoder-JSON-Parse: {e}");
                 None
             }
         },
-        Ok(resp) => {
-            tracing::debug!("Geocoder HTTP {}", resp.status());
+        Ok(r) => {
+            tracing::debug!("Geocoder HTTP {}", r.status());
             None
         }
         Err(e) => {
-            tracing::debug!("Geocoder-Fetch fehlgeschlagen: {e}");
+            tracing::debug!("Geocoder-Fetch: {e}");
             None
         }
     };
-
-    // 4. Erfolg cachen.
     if let Some(n) = &name {
         if !n.is_empty() {
             cache::schreibe(pool, lat_key, lon_key, n).await;
         }
     }
-    name
+    name.filter(|n| !n.is_empty())
+}
+
+/// Reverse-Geocoding (injizierbar, für Tests). Reihenfolge: Cache → Rate-Limit → HTTP.
+/// Cache-Treffer umgeht Rate-Limit UND Timeout. Stale Cache-Treffer lösen Hintergrund-Refresh aus.
+/// Jeder Fehlerpfad liefert `None`.
+pub async fn reverse_mit(
+    client: &reqwest::Client,
+    bucket: &Arc<Mutex<TokenBucket>>,
+    inflight: &Arc<Mutex<HashSet<String>>>,
+    pool: &SqlitePool,
+    base_url: &str,
+    lat: f64,
+    lon: f64,
+) -> Option<String> {
+    let (lat_key, lon_key) = cache::schluessel(lat, lon);
+
+    // 1. Cache (mit Alter).
+    if let Some((name, alter)) = cache::lese_mit_alter(pool, lat_key, lon_key).await {
+        if alter > CACHE_TTL_SEKUNDEN {
+            // Stale → alten Wert SOFORT liefern, im Hintergrund auffrischen (1× pro Key).
+            let key = format!("{lat_key}:{lon_key}");
+            let claimed = inflight.lock().unwrap_or_else(|e| e.into_inner()).insert(key.clone());
+            if claimed {
+                let (client, bucket, inflight, pool, base) = (
+                    client.clone(),
+                    bucket.clone(),
+                    inflight.clone(),
+                    pool.clone(),
+                    base_url.to_string(),
+                );
+                tokio::spawn(async move {
+                    geocode_und_schreibe(&client, &bucket, &pool, &base, lat, lon).await;
+                    inflight.lock().unwrap_or_else(|e| e.into_inner()).remove(&key);
+                });
+            }
+        }
+        return Some(name);
+    }
+
+    // 2. Kalt → foreground holen.
+    geocode_und_schreibe(client, bucket, pool, base_url, lat, lon).await
 }
 
 #[cfg(test)]
@@ -183,12 +215,23 @@ mod tests {
             .unwrap()
     }
 
+    fn arc_bucket(drain: bool) -> Arc<Mutex<TokenBucket>> {
+        let mut b = TokenBucket::neu(1.0, 1.0);
+        if drain {
+            b.try_take();
+        }
+        Arc::new(Mutex::new(b))
+    }
+
+    fn arc_inflight() -> Arc<Mutex<HashSet<String>>> {
+        Arc::new(Mutex::new(HashSet::new()))
+    }
+
     #[tokio::test]
     async fn erfolg_liefert_display_name_und_cached() {
         let pool = crate::db::test_pool().await;
         let (base, _h) = stub(serde_json::json!({ "display_name": "Hauptstr. 5, Musterstadt" })).await;
-        let bucket = Mutex::new(TokenBucket::neu(1.0, 1.0));
-        let name = reverse_mit(&test_client(), &bucket, &pool, &base, 51.1604, 10.4514).await;
+        let name = reverse_mit(&test_client(), &arc_bucket(false), &arc_inflight(), &pool, &base, 51.1604, 10.4514).await;
         assert_eq!(name.as_deref(), Some("Hauptstr. 5, Musterstadt"));
         // In den Cache geschrieben.
         let (la, lo) = cache::schluessel(51.1604, 10.4514);
@@ -201,18 +244,14 @@ mod tests {
         let (la, lo) = cache::schluessel(51.1604, 10.4514);
         cache::schreibe(&pool, la, lo, "Aus Cache").await;
         // Base zeigt auf geschlossenen Port; Bucket leer → trotzdem Treffer aus Cache.
-        let mut leer = TokenBucket::neu(1.0, 1.0);
-        leer.try_take(); // Token verbrauchen
-        let bucket = Mutex::new(leer);
-        let name = reverse_mit(&test_client(), &bucket, &pool, &geschlossener_port(), 51.1604, 10.4514).await;
+        let name = reverse_mit(&test_client(), &arc_bucket(true), &arc_inflight(), &pool, &geschlossener_port(), 51.1604, 10.4514).await;
         assert_eq!(name.as_deref(), Some("Aus Cache"));
     }
 
     #[tokio::test]
     async fn offline_liefert_none() {
         let pool = crate::db::test_pool().await;
-        let bucket = Mutex::new(TokenBucket::neu(1.0, 1.0));
-        let name = reverse_mit(&test_client(), &bucket, &pool, &geschlossener_port(), 51.0, 10.0).await;
+        let name = reverse_mit(&test_client(), &arc_bucket(false), &arc_inflight(), &pool, &geschlossener_port(), 51.0, 10.0).await;
         assert!(name.is_none());
     }
 
@@ -220,11 +259,56 @@ mod tests {
     async fn rate_limit_ueberzaehlig_liefert_none() {
         let pool = crate::db::test_pool().await;
         let (base, _h) = stub(serde_json::json!({ "display_name": "X" })).await;
-        let mut leer = TokenBucket::neu(1.0, 1.0);
-        leer.try_take(); // einziges Token weg
-        let bucket = Mutex::new(leer);
         // Kein Cache-Eintrag, Bucket leer → None (ohne HTTP).
-        let name = reverse_mit(&test_client(), &bucket, &pool, &base, 48.0, 11.0).await;
+        let name = reverse_mit(&test_client(), &arc_bucket(true), &arc_inflight(), &pool, &base, 48.0, 11.0).await;
         assert!(name.is_none());
+    }
+
+    #[tokio::test]
+    async fn frischer_cache_kein_refresh() {
+        let pool = crate::db::test_pool().await;
+        let (la, lo) = cache::schluessel(51.0, 10.0);
+        cache::schreibe(&pool, la, lo, "Frisch").await; // erstellt_at = jetzt
+        let name = reverse_mit(
+            &test_client(),
+            &arc_bucket(false),
+            &arc_inflight(),
+            &pool,
+            &geschlossener_port(),
+            51.0,
+            10.0,
+        )
+        .await;
+        assert_eq!(name.as_deref(), Some("Frisch")); // sofort aus Cache, kein Block trotz toter URL
+    }
+
+    #[tokio::test]
+    async fn stale_liefert_alten_wert_und_stoesst_refresh_an() {
+        let pool = crate::db::test_pool().await;
+        let (la, lo) = cache::schluessel(52.0, 13.0);
+        // Eintrag künstlich altern: erstellt_at weit in der Vergangenheit.
+        sqlx::query(
+            "INSERT INTO geocoding_cache (lat_key, lon_key, ortsname, erstellt_at) \
+             VALUES (?, ?, 'Alt', datetime('now','-200 days'))",
+        )
+        .bind(la)
+        .bind(lo)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let (base, _h) = stub(serde_json::json!({ "display_name": "Neu" })).await;
+        let inflight = arc_inflight();
+        let name = reverse_mit(&test_client(), &arc_bucket(false), &inflight, &pool, &base, 52.0, 13.0).await;
+        assert_eq!(name.as_deref(), Some("Alt")); // alter Wert SOFORT
+        // Hintergrund-Refresh aktualisiert den Cache auf "Neu" (kurz pollen).
+        let mut aktualisiert = false;
+        for _ in 0..50 {
+            if cache::lese(&pool, la, lo).await.as_deref() == Some("Neu") {
+                aktualisiert = true;
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        assert!(aktualisiert, "Hintergrund-Refresh hätte den Cache aktualisieren müssen");
     }
 }

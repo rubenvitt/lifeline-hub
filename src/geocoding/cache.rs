@@ -25,6 +25,22 @@ pub async fn lese(pool: &SqlitePool, lat_key: i64, lon_key: i64) -> Option<Strin
     })
 }
 
+/// Cache-Treffer samt Alter in Sekunden (für Stale-while-revalidate), sonst None.
+pub async fn lese_mit_alter(pool: &SqlitePool, lat_key: i64, lon_key: i64) -> Option<(String, i64)> {
+    sqlx::query_as::<_, (String, i64)>(
+        "SELECT ortsname, unixepoch() - unixepoch(erstellt_at) \
+         FROM geocoding_cache WHERE lat_key = ? AND lon_key = ?",
+    )
+    .bind(lat_key)
+    .bind(lon_key)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or_else(|e| {
+        tracing::warn!("Geocoding-Cache: Lesefehler (alter): {e}");
+        None
+    })
+}
+
 /// Ortsnamen speichern (Upsert auf den Koordinaten-Schlüssel).
 pub async fn schreibe(pool: &SqlitePool, lat_key: i64, lon_key: i64, ortsname: &str) {
     if let Err(e) = sqlx::query(
