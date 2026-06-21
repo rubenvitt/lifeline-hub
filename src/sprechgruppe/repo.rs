@@ -124,6 +124,64 @@ pub async fn aktualisiere_katalog(
     laden(pool, org_id, id).await
 }
 
+/// Legt eine einsatz-lokale Sprechgruppe an — idempotent: trifft die Zeile
+/// bereits den Unique-Index `(einsatz_id, betriebsart, bezeichnung)`, wird der
+/// vorhandene Eintrag zurückgegeben statt ein Fehler ausgelöst.
+pub async fn anlegen_einsatz_lokal(
+    pool: &SqlitePool,
+    org_id: i64,
+    einsatz_id: i64,
+    bezeichnung: &str,
+    betriebsart: &str,
+    hinweis: Option<&str>,
+) -> Result<Sprechgruppe, AppError> {
+    sqlx::query(
+        "INSERT INTO sprechgruppe (org_id, einsatz_id, bezeichnung, betriebsart, hinweis) \
+         VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
+    )
+    .bind(org_id)
+    .bind(einsatz_id)
+    .bind(bezeichnung)
+    .bind(betriebsart)
+    .bind(hinweis)
+    .execute(pool)
+    .await?;
+
+    let sg = sqlx::query_as::<_, Sprechgruppe>(&format!(
+        "SELECT {SPALTEN} FROM sprechgruppe \
+         WHERE org_id = ? AND einsatz_id = ? AND betriebsart = ? AND bezeichnung = ?",
+    ))
+    .bind(org_id)
+    .bind(einsatz_id)
+    .bind(betriebsart)
+    .bind(bezeichnung)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)?;
+
+    Ok(sg)
+}
+
+/// Gibt den aktiven Katalog (`einsatz_id IS NULL AND aktiv = 1`) **plus** alle
+/// einsatz-lokalen Sprechgruppen dieses Einsatzes zurück, sortiert nach
+/// `betriebsart, sortier, bezeichnung`.
+pub async fn liste_fuer_einsatz(
+    pool: &SqlitePool,
+    org_id: i64,
+    einsatz_id: i64,
+) -> Result<Vec<Sprechgruppe>, AppError> {
+    sqlx::query_as::<_, Sprechgruppe>(&format!(
+        "SELECT {SPALTEN} FROM sprechgruppe \
+         WHERE org_id = ? AND (einsatz_id IS NULL AND aktiv = 1 OR einsatz_id = ?) \
+         ORDER BY betriebsart, sortier, bezeichnung",
+    ))
+    .bind(org_id)
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await
+    .map_err(Into::into)
+}
+
 /// Deaktiviert eine Katalog-Sprechgruppe (Soft-Delete `aktiv = 0`).
 /// Nur für Katalog-Einträge (`einsatz_id IS NULL`); rows_affected == 0 → `NotFound`.
 pub async fn deaktiviere(pool: &SqlitePool, org_id: i64, id: i64) -> Result<(), AppError> {
@@ -237,5 +295,27 @@ mod tests {
             aktualisiere_katalog(&pool, 1, lokal_id, daten("umbenannt", "TMO")).await.unwrap_err(),
             AppError::NotFound
         ));
+    }
+    #[tokio::test]
+    async fn einsatz_lokal_anlegen_ist_idempotent() {
+        let pool = crate::db::test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1,'Orga')").execute(&pool).await.unwrap();
+        let e: i64 = sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id").fetch_one(&pool).await.unwrap();
+        let a = anlegen_einsatz_lokal(&pool, 1, e, "Sonder 1", "DMO", None).await.unwrap();
+        let b = anlegen_einsatz_lokal(&pool, 1, e, "Sonder 1", "DMO", None).await.unwrap();
+        assert_eq!(a.id, b.id, "kein Duplikat, gleicher Eintrag");
+        assert_eq!(a.einsatz_id, Some(e));
+    }
+    #[tokio::test]
+    async fn liste_fuer_einsatz_vereint_katalog_und_lokal() {
+        let pool = crate::db::test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1,'Orga')").execute(&pool).await.unwrap();
+        let e: i64 = sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id").fetch_one(&pool).await.unwrap();
+        let kat = anlegen_katalog(&pool, 1, KatalogDaten{bezeichnung:"412_F_DRK",betriebsart:"TMO",hinweis:None,sortier:0}).await.unwrap();
+        deaktiviere(&pool, 1, anlegen_katalog(&pool, 1, KatalogDaten{bezeichnung:"alt",betriebsart:"TMO",hinweis:None,sortier:0}).await.unwrap().id).await.unwrap();
+        let lokal = anlegen_einsatz_lokal(&pool, 1, e, "Sonder 1", "DMO", None).await.unwrap();
+        let ids: Vec<i64> = liste_fuer_einsatz(&pool, 1, e).await.unwrap().into_iter().map(|s| s.id).collect();
+        assert!(ids.contains(&kat.id) && ids.contains(&lokal.id));
+        assert_eq!(ids.len(), 2, "inaktiver Katalogeintrag nicht enthalten");
     }
 }
