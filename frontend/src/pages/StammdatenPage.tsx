@@ -9,6 +9,7 @@ import EinheitTypenTab from '../stammdaten/EinheitTypenTab';
 import MaterialTab from '../stammdaten/MaterialTab';
 import OrganisationTab from '../stammdaten/OrganisationTab';
 import EtbBausteineTab from '../stammdaten/EtbBausteineTab';
+import SprechgruppenTab from '../stammdaten/SprechgruppenTab';
 
 export default function StammdatenPage() {
   return (
@@ -27,6 +28,7 @@ export default function StammdatenPage() {
           { key: 'etb-bausteine', label: 'ETB-Schnellbausteine', children: <EtbBausteineTab /> },
           { key: 'einheit-typen', label: 'Einheitstypen', children: <EinheitTypenTab /> },
           { key: 'organisation', label: 'Organisation', children: <OrganisationTab /> },
+          { key: 'sprechgruppen', label: 'Sprechgruppen', children: <SprechgruppenTab /> },
         ]}
       />
     </div>
