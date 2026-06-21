@@ -32,15 +32,46 @@ function StatusBadge({ ef }: { ef: EinsatzFahrzeug }) {
 /**
  * Ist-Besatzungsstärke aus den Stärke-Positionen der zugeordneten Kräfte (clientseitig
  * gezählt; LFH-9 hält das bewusst orthogonal zur Einheiten-Stärke — kein Backend-Aggregat).
+ *
+ * Eine Kraft ohne explizite F/UF-Position (`staerke_position == null`) ist trotzdem physisch
+ * auf dem Fahrzeug und zählt zur Stärke — in der BOS-Schreibweise als Mannschaft (Sammeltopf),
+ * sodass Σ die tatsächliche Kopfzahl der Besatzung bleibt.
  */
 function istBesatzungsStaerke(crew: EinsatzPersonal[]): Staerke {
   const s: Staerke = { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 };
   for (const m of crew) {
     if (m.staerke_position === 'fuehrer') s.fuehrer += 1;
     else if (m.staerke_position === 'unterfuehrer') s.unterfuehrer += 1;
-    else if (m.staerke_position === 'mannschaft') s.mannschaft += 1;
+    else s.mannschaft += 1;
   }
   return s;
+}
+
+/** Soll gilt als erfüllt, wenn Ist in JEDER Position (F/UF/M) ≥ Soll ist (Überbesetzung zählt mit). */
+function istSollErfuellt(ist: Staerke, soll: Staerke): boolean {
+  return ist.fuehrer >= soll.fuehrer
+    && ist.unterfuehrer >= soll.unterfuehrer
+    && ist.mannschaft >= soll.mannschaft;
+}
+
+/**
+ * Besatzungs-Ist als Ampel-Badge (LFH-9): blau ohne hinterlegtes Soll (kein „erfüllt"-Urteil
+ * möglich), grün bei erfülltem Soll (nur Ist, ohne redundanten Soll-Text), sonst rot mit Soll
+ * in Klammern. Die Klammer ist zugleich das nicht-farbliche Signal für Unterbesetzung (a11y),
+ * `title` ergänzt grün/blau um ein nicht-farbliches Signal.
+ */
+function BesatzungsStaerkeBadge({ ist, soll }: { ist: Staerke; soll: Staerke | null }) {
+  if (!soll) {
+    return <Tag color="blue" title="kein Soll hinterlegt"><StaerkeAnzeige wert={ist} /></Tag>;
+  }
+  if (istSollErfuellt(ist, soll)) {
+    return <Tag color="green" title="Soll erfüllt"><StaerkeAnzeige wert={ist} /></Tag>;
+  }
+  return (
+    <Tag color="red" title="unterbesetzt">
+      <StaerkeAnzeige wert={ist} /> (Soll <StaerkeAnzeige wert={soll} />)
+    </Tag>
+  );
 }
 
 /**
@@ -65,9 +96,7 @@ function BesatzungsBlock({
     <div style={{ paddingLeft: 8 }}>
       <Space size={8} style={{ marginBottom: 8 }}>
         <Typography.Text type="secondary">Besatzung</Typography.Text>
-        <Tag color="blue">
-          Ist <StaerkeAnzeige wert={ist} /> / Soll <StaerkeAnzeige wert={ef.soll_besatzung} />
-        </Tag>
+        <BesatzungsStaerkeBadge ist={ist} soll={ef.soll_besatzung} />
       </Space>
       {crew.length === 0 ? (
         <div><Typography.Text type="secondary">Keine Besatzung zugeordnet</Typography.Text></div>
@@ -221,11 +250,10 @@ export default function FahrzeugePage() {
       title: 'Besatzung',
       key: 'besatzung',
       render: (_, ef) => (
-        <Tag color="blue">
-          <StaerkeAnzeige wert={istBesatzungsStaerke(personal.filter((p) => p.fahrzeug_id === ef.id))} />
-          {' / Soll '}
-          <StaerkeAnzeige wert={ef.soll_besatzung} />
-        </Tag>
+        <BesatzungsStaerkeBadge
+          ist={istBesatzungsStaerke(personal.filter((p) => p.fahrzeug_id === ef.id))}
+          soll={ef.soll_besatzung}
+        />
       ),
     },
     {
