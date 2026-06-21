@@ -29,6 +29,7 @@ import TierePage from './pages/TierePage';
 import SchaedenPage from './pages/SchaedenPage';
 import LageberichtePage from './pages/LageberichtePage';
 import LageberichtDetailPage from './pages/LageberichtDetailPage';
+import BefehlDetailPage from './pages/BefehlDetailPage';
 import UnfallhilfsstellenPage from './pages/UnfallhilfsstellenPage';
 import UnfallhilfsstellenDefault from './pages/UnfallhilfsstellenDefault';
 import UhsDetailPage from './pages/uhs/UhsDetailPage';
@@ -122,6 +123,7 @@ export default function App() {
           <Route path="unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />
           <Route path="bereitstellungsraeume/:brId" element={<BrDetailPage />} />
           <Route path="lageberichte/:lbId" element={<LageberichtDetailPage />} />
+          <Route path="auftraege/befehle/:bid" element={<BefehlDetailPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/einsaetze" replace />} />
