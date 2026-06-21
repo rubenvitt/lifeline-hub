@@ -2,16 +2,10 @@ import { App, AutoComplete, Form, Input, Modal, Select } from 'antd';
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
-import { aktualisierePerson, legePersonAn, type PersonalEingabe } from '../api/personal';
+import { aktualisierePerson, legePersonAn, POSITION_OPTIONEN, type PersonalEingabe } from '../api/personal';
 import { listeQualifikationen } from '../api/qualifikationen';
 import { listeBenutzer } from '../api/benutzer';
 import type { Personal, PersonalVorschlaege, StaerkePosition } from '../api/types';
-
-const POSITION_LABELS: Record<StaerkePosition, string> = {
-  fuehrer: 'Führer',
-  unterfuehrer: 'Unterführer',
-  mannschaft: 'Mannschaft',
-};
 
 interface FormWerte {
   name: string;
@@ -129,13 +123,7 @@ export default function PersonalFormModal({
         </Form.Item>
         <Form.Item label="Telefon" name="telefon"><Input /></Form.Item>
         <Form.Item label="Stärke-Position" name="staerke_position">
-          <Select
-            allowClear
-            placeholder="optional"
-            options={(Object.keys(POSITION_LABELS) as StaerkePosition[]).map((p) => ({
-              value: p, label: POSITION_LABELS[p],
-            }))}
-          />
+          <Select allowClear placeholder="optional" options={POSITION_OPTIONEN} />
         </Form.Item>
         <Form.Item label="Qualifikationen" name="qualifikation_ids">
           <Select mode="multiple" allowClear options={qualOptionen} optionFilterProp="label" placeholder="Qualifikationen wählen" />

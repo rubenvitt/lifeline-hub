@@ -6,7 +6,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
-import { listePersonal } from '../api/personal';
+import { listePersonal, POSITION_LABELS, POSITION_OPTIONEN } from '../api/personal';
 import { listePersonalStatus } from '../api/personalStatus';
 import {
   aktualisiereDisposition, disponiereAdhoc, disponierePerson, entferneDisposition,
@@ -20,16 +20,6 @@ const KATEGORIE_FALLBACK: Record<StatusKategorie, string> = {
   gebunden: 'orange',
   nicht_verfuegbar: 'red',
 };
-
-const POSITION_LABELS: Record<StaerkePosition, string> = {
-  fuehrer: 'Führer',
-  unterfuehrer: 'Unterführer',
-  mannschaft: 'Mannschaft',
-};
-
-const POSITION_OPTIONEN = (Object.keys(POSITION_LABELS) as StaerkePosition[]).map((p) => ({
-  value: p, label: POSITION_LABELS[p],
-}));
 
 function StatusBadge({ ep }: { ep: EinsatzPersonal }) {
   if (!ep.status_label || !ep.status_kategorie) return <Tag>kein Status</Tag>;
@@ -76,7 +66,7 @@ export default function PersonalPage() {
     onError: fehler,
   });
   const positionMutation = useMutation({
-    mutationFn: (v: { epId: number; position: StaerkePosition }) =>
+    mutationFn: (v: { epId: number; position: StaerkePosition | null }) =>
       aktualisiereDisposition(einsatzId, v.epId, { staerke_position: v.position }),
     onSuccess: invalidate,
     onError: fehler,
@@ -134,8 +124,9 @@ export default function PersonalPage() {
             style={{ minWidth: 130 }}
             value={ep.staerke_position ?? undefined}
             placeholder="—"
+            allowClear
             options={POSITION_OPTIONEN}
-            onChange={(position) => positionMutation.mutate({ epId: ep.id, position })}
+            onChange={(position) => positionMutation.mutate({ epId: ep.id, position: position ?? null })}
           />
         ) : (
           ep.staerke_position ? POSITION_LABELS[ep.staerke_position] : '—'

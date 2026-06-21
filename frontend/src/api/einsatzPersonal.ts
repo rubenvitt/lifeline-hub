@@ -33,7 +33,7 @@ export function disponiereAdhoc(einsatzId: number, adhoc: AdhocEingabe): Promise
 export function aktualisiereDisposition(
   einsatzId: number,
   epId: number,
-  felder: { status_id?: number; staerke_position?: StaerkePosition; bemerkung?: string },
+  felder: { status_id?: number; staerke_position?: StaerkePosition | null; bemerkung?: string },
 ): Promise<EinsatzPersonal> {
   return apiSend<EinsatzPersonal>(`/api/einsaetze/${einsatzId}/personal/${epId}`, 'PATCH', felder);
 }

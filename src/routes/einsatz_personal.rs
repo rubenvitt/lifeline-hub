@@ -161,7 +161,12 @@ pub async fn disponieren(
             )
             .await?
         }
-        _ => {
+        (None, None) => {
+            return Err(AppError::Validation(
+                "Entweder personal_id (Stamm) oder adhoc angeben".into(),
+            ))
+        }
+        (Some(_), Some(_)) => {
             return Err(AppError::Validation(
                 "Entweder personal_id (Stamm) oder adhoc angeben, nicht beides".into(),
             ))
@@ -183,7 +188,9 @@ pub async fn disponieren(
 #[derive(Debug, Deserialize)]
 pub struct DispoPatchBody {
     pub status_id: Option<i64>,
-    pub staerke_position: Option<String>,
+    /// Tri-State (LFH-4): fehlend = unverändert, `null` = Override entfernen, Wert = setzen.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub staerke_position: Option<Option<String>>,
     pub bemerkung: Option<String>,
 }
 
@@ -206,7 +213,12 @@ pub async fn aktualisieren(
             return Err(AppError::Validation("Unbekannter Status".into()));
         }
     }
-    pruefe_position(&body.staerke_position)?;
+    // staerke_position ist Tri-State; nur ein konkret gesetzter Wert wird validiert.
+    if let Some(Some(pos)) = &body.staerke_position {
+        if StaerkePosition::parse(pos).is_none() {
+            return Err(AppError::Validation("Ungültige Stärke-Position".into()));
+        }
+    }
 
     let vorher = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ep_id, true).await?;
     // Bemerkung: gesetzt (auch "") → setzen; absent/null → unverändert (COALESCE).
@@ -216,7 +228,7 @@ pub async fn aktualisieren(
         einsatz_id,
         ep_id,
         body.status_id,
-        body.staerke_position.as_deref(),
+        body.staerke_position.as_ref().map(|o| o.as_deref()),
         bemerkung,
     )
     .await?;

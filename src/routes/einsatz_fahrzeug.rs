@@ -141,7 +141,12 @@ pub async fn disponieren(
             )
             .await?
         }
-        _ => {
+        (None, None) => {
+            return Err(AppError::Validation(
+                "Entweder fahrzeug_id (Stamm) oder adhoc angeben".into(),
+            ))
+        }
+        (Some(_), Some(_)) => {
             return Err(AppError::Validation(
                 "Entweder fahrzeug_id (Stamm) oder adhoc angeben, nicht beides".into(),
             ))

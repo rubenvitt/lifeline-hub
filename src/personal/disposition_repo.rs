@@ -213,25 +213,28 @@ pub async fn disponiere_adhoc(
     Ok(id)
 }
 
-/// Aktualisiert Status, Stärke-Position und/oder Bemerkung (COALESCE: `None` = unverändert).
+/// Aktualisiert Status, Stärke-Position und/oder Bemerkung. `status_id`/`bemerkung` nutzen
+/// COALESCE (`None` = unverändert). `staerke_position` ist Drei-Zustands (wie `PositionPatch`):
+/// `None` = unverändert, `Some(None)` = Override explizit auf NULL, `Some(Some(x))` = setzen.
 /// `NotFound`, falls die Zeile nicht zum Einsatz gehört.
 pub async fn aktualisiere(
     pool: &SqlitePool,
     einsatz_id: i64,
     ep_id: i64,
     status_id: Option<i64>,
-    staerke_position: Option<&str>,
+    staerke_position: Option<Option<&str>>,
     bemerkung: Option<&str>,
 ) -> Result<(), AppError> {
     let resultat = sqlx::query(
         "UPDATE einsatz_personal \
          SET status_id = COALESCE(?, status_id), \
-             staerke_position = COALESCE(?, staerke_position), \
+             staerke_position = CASE WHEN ? THEN ? ELSE staerke_position END, \
              bemerkung = COALESCE(?, bemerkung) \
          WHERE id = ? AND einsatz_id = ?",
     )
     .bind(status_id)
-    .bind(staerke_position)
+    .bind(staerke_position.is_some())
+    .bind(staerke_position.flatten())
     .bind(bemerkung)
     .bind(ep_id)
     .bind(einsatz_id)
@@ -551,7 +554,7 @@ mod tests {
             label: "im Einsatz", kategorie: KATEGORIE_GEBUNDEN, farbe: None, sortier: 40,
         }).await.unwrap();
 
-        aktualisiere(&pool, einsatz, ep, Some(neuer.id), Some("mannschaft"), Some("vor Ort")).await.unwrap();
+        aktualisiere(&pool, einsatz, ep, Some(neuer.id), Some(Some("mannschaft")), Some("vor Ort")).await.unwrap();
         let a = laden_anzeige(&pool, einsatz, ep, true).await.unwrap();
         assert_eq!(a.status_id, Some(neuer.id));
         assert_eq!(a.staerke_position.as_deref(), Some("mannschaft"));
@@ -566,5 +569,33 @@ mod tests {
 
         entferne(&pool, einsatz, ep).await.unwrap();
         assert!(matches!(laden_anzeige(&pool, einsatz, ep, true).await.unwrap_err(), AppError::NotFound));
+    }
+
+    /// LFH-4 P1: Drei-Zustands-Semantik von `staerke_position` auf der rohen Override-Spalte
+    /// (umgeht die `.or(live)`-Auflösung der Anzeige).
+    #[tokio::test]
+    async fn aktualisiere_staerke_position_tri_state() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[]).await.unwrap();
+        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, Some("mannschaft"), benutzer).await.unwrap();
+
+        async fn roh(pool: &SqlitePool, ep: i64) -> Option<String> {
+            sqlx::query_scalar("SELECT staerke_position FROM einsatz_personal WHERE id = ?")
+                .bind(ep).fetch_one(pool).await.unwrap()
+        }
+        assert_eq!(roh(&pool, ep).await.as_deref(), Some("mannschaft"));
+
+        // None = unverändert.
+        aktualisiere(&pool, einsatz, ep, None, None, None).await.unwrap();
+        assert_eq!(roh(&pool, ep).await.as_deref(), Some("mannschaft"), "absent lässt Override");
+
+        // Some(Some(x)) = setzen.
+        aktualisiere(&pool, einsatz, ep, None, Some(Some("unterfuehrer")), None).await.unwrap();
+        assert_eq!(roh(&pool, ep).await.as_deref(), Some("unterfuehrer"), "Wert setzt Override");
+
+        // Some(None) = explizit auf NULL.
+        aktualisiere(&pool, einsatz, ep, None, Some(None), None).await.unwrap();
+        assert_eq!(roh(&pool, ep).await, None, "explizit null entfernt Override");
     }
 }

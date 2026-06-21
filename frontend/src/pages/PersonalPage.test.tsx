@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
 import { server } from '../test/server';
@@ -70,5 +70,26 @@ describe('PersonalPage', () => {
     await screen.findByText('Thomas Müller');
     expect(screen.queryByRole('button', { name: 'Ad-hoc-Person' })).not.toBeInTheDocument();
     expect(screen.getByText(/abgeschlossen — nur Ansicht/)).toBeInTheDocument();
+  });
+
+  // LFH-4 P1: Position-Select ist leerbar; Clear muss explizit null senden (nicht absent),
+  // sonst verschluckt JSON.stringify das Feld und das Backend behält den Altwert.
+  it('Position leeren sendet explizit null', async () => {
+    let patchBody: unknown = 'NICHT_AUFGERUFEN';
+    server.use(
+      http.patch('/api/einsaetze/7/personal/10', async ({ request }) => {
+        patchBody = await request.json();
+        return HttpResponse.json({ ...disponiert[0], staerke_position: null });
+      }),
+    );
+    const { container } = render(einsatz());
+    await screen.findByText('Thomas Müller');
+
+    const clear = container.querySelector('.ant-select-clear');
+    expect(clear, 'Position-Select muss allowClear haben').not.toBeNull();
+    fireEvent.mouseDown(clear!);
+    fireEvent.click(clear!);
+
+    await waitFor(() => expect(patchBody).toEqual({ staerke_position: null }));
   });
 });

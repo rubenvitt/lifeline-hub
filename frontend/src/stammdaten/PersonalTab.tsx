@@ -3,15 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
-import { ladePersonalVorschlaege, listePersonal, setzeDienststatus } from '../api/personal';
+import { ladePersonalVorschlaege, listePersonal, POSITION_LABELS, setzeDienststatus } from '../api/personal';
 import type { Personal, StaerkePosition } from '../api/types';
 import PersonalFormModal from './PersonalFormModal';
-
-const POSITION_LABELS: Record<StaerkePosition, string> = {
-  fuehrer: 'Führer',
-  unterfuehrer: 'Unterführer',
-  mannschaft: 'Mannschaft',
-};
 
 export default function PersonalTab() {
   const { benutzer } = useAuth();

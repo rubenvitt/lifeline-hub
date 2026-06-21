@@ -261,3 +261,28 @@ async fn bemerkung_setzen_und_leeren() {
     // status_id absent → Status bleibt; eine reine Bemerkung-Änderung schreibt KEINEN ETB.
     assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, 1, "nur die Disposition selbst");
 }
+
+// LFH-4 P2: XOR-Fehlermeldung differenziert both-None vs both-Some.
+#[tokio::test]
+async fn disponieren_leerer_body_meldet_entweder_oder() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    // Weder fahrzeug_id noch adhoc → "angeben", NICHT "nicht beides".
+    let (status, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/fahrzeuge"), &admin, Some("{}")).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(json["error"], "Entweder fahrzeug_id (Stamm) oder adhoc angeben");
+}
+
+#[tokio::test]
+async fn disponieren_beides_meldet_nicht_beides() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let fz = fahrzeug_anlegen(&app, &admin, "Florian 1").await;
+    // fahrzeug_id UND adhoc → "nicht beides".
+    let body = format!(r#"{{"fahrzeug_id":{fz},"adhoc":{{"funkrufname":"FW Extern"}}}}"#);
+    let (status, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/fahrzeuge"), &admin, Some(&body)).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(json["error"], "Entweder fahrzeug_id (Stamm) oder adhoc angeben, nicht beides");
+}

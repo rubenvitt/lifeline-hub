@@ -228,3 +228,58 @@ async fn snapshot_bleibt_nach_stamm_aenderung_bei_abgeschlossenem_einsatz() {
     let (_, snap) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/personal"), &admin, None).await;
     assert_eq!(snap[0]["name"], "Thomas Müller", "Snapshot bei abgeschlossenem Einsatz");
 }
+
+// LFH-4 P2: XOR-Fehlermeldung differenziert both-None vs both-Some.
+#[tokio::test]
+async fn disponieren_leerer_body_meldet_entweder_oder() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    // Weder personal_id noch adhoc → "angeben", NICHT "nicht beides".
+    let (status, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/personal"), &admin, Some("{}")).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(json["error"], "Entweder personal_id (Stamm) oder adhoc angeben");
+}
+
+#[tokio::test]
+async fn disponieren_beides_meldet_nicht_beides() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let person = person_anlegen(&app, &admin, "Thomas").await;
+    // personal_id UND adhoc → "nicht beides".
+    let body = format!(r#"{{"personal_id":{person},"adhoc":{{"name":"Extern"}}}}"#);
+    let (status, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/personal"), &admin, Some(&body)).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(json["error"], "Entweder personal_id (Stamm) oder adhoc angeben, nicht beides");
+}
+
+// LFH-4 P1: staerke_position im Dispo-PATCH ist Tri-State — explizit null entfernt den
+// Override, fehlendes Feld lässt ihn unverändert.
+#[tokio::test]
+async fn dispo_position_explizit_null_entfernt_absent_behaelt() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let person = person_anlegen(&app, &admin, "Thomas").await; // Stamm ohne Position
+    let (_, json) = anfrage(
+        &app, "POST", &format!("/api/einsaetze/{einsatz}/personal"), &admin,
+        Some(&format!(r#"{{"personal_id":{person},"staerke_position":"fuehrer"}}"#)),
+    ).await;
+    let ep = json["id"].as_i64().unwrap();
+    assert_eq!(json["staerke_position"], "fuehrer");
+
+    // Feld absent (nur Bemerkung) → Position unverändert.
+    let (_, a) = anfrage(
+        &app, "PATCH", &format!("/api/einsaetze/{einsatz}/personal/{ep}"), &admin,
+        Some(r#"{"bemerkung":"vor Ort"}"#),
+    ).await;
+    assert_eq!(a["staerke_position"], "fuehrer", "absentes Feld lässt die Position unverändert");
+
+    // Explizit null → Override entfernt (Stamm hat keine Position → null).
+    let (_, b) = anfrage(
+        &app, "PATCH", &format!("/api/einsaetze/{einsatz}/personal/{ep}"), &admin,
+        Some(r#"{"staerke_position":null}"#),
+    ).await;
+    assert!(b["staerke_position"].is_null(), "explizit null entfernt den Positions-Override");
+}

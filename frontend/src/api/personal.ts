@@ -1,6 +1,19 @@
 import type { Personal, PersonalVorschlaege, StaerkePosition } from './types';
 import { apiGet, apiSend } from './client';
 
+/** Deutsche Labels der taktischen Stärke-Position (zentral, LFH-4). */
+export const POSITION_LABELS: Record<StaerkePosition, string> = {
+  fuehrer: 'Führer',
+  unterfuehrer: 'Unterführer',
+  mannschaft: 'Mannschaft',
+};
+
+/** Aus POSITION_LABELS abgeleitete Optionen für Position-Selects. */
+export const POSITION_OPTIONEN = (Object.keys(POSITION_LABELS) as StaerkePosition[]).map((p) => ({
+  value: p,
+  label: POSITION_LABELS[p],
+}));
+
 /** Editierbare Stammfelder (Anlegen + Vollersatz-PATCH). */
 export interface PersonalEingabe {
   name: string;
