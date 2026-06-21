@@ -19,6 +19,7 @@ import { ApiError } from '../api/client';
 import type { Einheit, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StaerkeEingabe from '../anzeige/StaerkeEingabe';
+import SprechgruppenPicker from '../components/SprechgruppenPicker';
 
 /** Baut antd-Tree-Daten aus der flachen Einheitenliste (nach ueber_einheit_id). */
 function baueBaum(einheiten: Einheit[]): TreeDataNode[] {
@@ -71,6 +72,7 @@ interface KopfWerte {
   ueber_einheit_id?: number | null;
   soll?: Staerke | null;
   bemerkung?: string;
+  sprechgruppe_ids?: number[];
 }
 
 export default function EinheitenPage() {
@@ -113,6 +115,7 @@ export default function EinheitenPage() {
         soll_unterfuehrer: werte.soll?.unterfuehrer ?? null,
         soll_mannschaft: werte.soll?.mannschaft ?? null,
         bemerkung: werte.bemerkung?.trim() || null,
+        sprechgruppe_ids: werte.sprechgruppe_ids ?? [],
       };
       return aktuell ? aktualisiereEinheit(einsatzId, aktuell.id, daten) : bildeEinheit(einsatzId, daten);
     },
@@ -176,6 +179,7 @@ export default function EinheitenPage() {
         name: aktuell.name, typ_id: aktuell.typ_id ?? undefined, abschnitt_id: aktuell.abschnitt_id ?? undefined,
         ueber_einheit_id: aktuell.ueber_einheit_id ?? undefined, soll: aktuell.soll,
         bemerkung: aktuell.bemerkung ?? undefined,
+        sprechgruppe_ids: aktuell.sprechgruppen?.map((s) => s.id) ?? [],
       });
     }
   }, [aktuell, form]);
@@ -256,6 +260,9 @@ export default function EinheitenPage() {
                   </span>
                 </Space>
               </Form.Item>
+              <Form.Item label="Sprechgruppen" name="sprechgruppe_ids">
+                <SprechgruppenPicker einsatzId={einsatzId} />
+              </Form.Item>
               <Form.Item label="Bemerkung" name="bemerkung"><Input.TextArea rows={2} /></Form.Item>
               {darfSchreiben && (
                 <Space>
@@ -268,6 +275,19 @@ export default function EinheitenPage() {
                     <Button danger>Auflösen</Button>
                   </Popconfirm>
                 </Space>
+              )}
+
+              {(aktuell.sprechgruppen?.length ?? 0) > 0 && (
+                <div data-testid="sprechgruppen-tags" style={{ marginTop: 8 }}>
+                  <Space size={[4, 4]} wrap>
+                    {aktuell.sprechgruppen?.filter((s) => s.betriebsart === 'TMO').map((s) => (
+                      <Tag key={s.id} color="blue">TMO: {s.bezeichnung}</Tag>
+                    ))}
+                    {aktuell.sprechgruppen?.filter((s) => s.betriebsart === 'DMO').map((s) => (
+                      <Tag key={s.id} color="geekblue">DMO: {s.bezeichnung}</Tag>
+                    ))}
+                  </Space>
+                </div>
               )}
 
               <Typography.Title level={5} style={{ marginTop: 16 }}>Personal</Typography.Title>
