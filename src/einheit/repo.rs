@@ -60,8 +60,8 @@ const SELECT_AUFGELOEST: &str = "\
     LEFT JOIN einsatzabschnitt ab ON ab.id = e.abschnitt_id \
     LEFT JOIN einsatz_personal fp ON fp.id = e.fuehrer_id";
 
-/// Setzt die abgeleitete Anzeige aus Row + Mitgliedern + Stärke zusammen. `soll` ist
-/// Override (falls vollständig) sonst Typ-Soll (falls vorhanden) sonst `None`.
+/// Setzt die abgeleitete Anzeige aus Row + Mitgliedern + Stärke + Sprechgruppen zusammen.
+/// `soll` ist Override (falls vollständig) sonst Typ-Soll (falls vorhanden) sonst `None`.
 async fn zu_anzeige(pool: &SqlitePool, row: Row) -> Result<EinheitAnzeige, AppError> {
     let override_soll = Staerke::aus_optionen(row.soll_fuehrer, row.soll_unterfuehrer, row.soll_mannschaft).unwrap_or(None);
     let typ_soll = Staerke::aus_optionen(row.typ_soll_fuehrer, row.typ_soll_unterfuehrer, row.typ_soll_mannschaft).unwrap_or(None);
@@ -72,6 +72,8 @@ async fn zu_anzeige(pool: &SqlitePool, row: Row) -> Result<EinheitAnzeige, AppEr
     let personal_mitglieder = mitglied_repo::personal_mitglieder(pool, row.id).await?;
     let fahrzeug_mitglieder = mitglied_repo::fahrzeug_mitglieder(pool, row.id).await?;
     let material_mitglieder = mitglied_repo::material_mitglieder(pool, row.id).await?;
+    let sgs = crate::sprechgruppe::repo::lade_einheit_sprechgruppen(pool, row.id).await?;
+    let sprechgruppen = sgs.into_iter().map(|s| s.anzeige()).collect();
 
     Ok(EinheitAnzeige {
         id: row.id,
@@ -97,6 +99,7 @@ async fn zu_anzeige(pool: &SqlitePool, row: Row) -> Result<EinheitAnzeige, AppEr
         personal_mitglieder,
         fahrzeug_mitglieder,
         material_mitglieder,
+        sprechgruppen,
     })
 }
 
@@ -523,6 +526,27 @@ mod tests {
         assert_eq!(laden(&pool, einsatz, trupp.id).await.unwrap().ueber_einheit_id, Some(zug.id));
         // Gruppe ist weg.
         assert!(matches!(laden(&pool, einsatz, gruppe.id).await.unwrap_err(), AppError::NotFound));
+    }
+
+    #[tokio::test]
+    async fn einheit_anzeige_enthaelt_zugeordnete_sprechgruppen() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, b) = setup(&pool).await;
+        let e = anlegen(&pool, einsatz, 1, daten("Trupp", None, None, None, None), b).await.unwrap();
+        let kat = crate::sprechgruppe::repo::anlegen_katalog(
+            &pool, 1,
+            crate::sprechgruppe::repo::KatalogDaten {
+                bezeichnung: "412_F_DRK", betriebsart: "TMO", hinweis: None, sortier: 0,
+            },
+        ).await.unwrap();
+        crate::sprechgruppe::repo::setze_einheit_sprechgruppen(&pool, 1, einsatz, e.id, &[kat.id]).await.unwrap();
+        let geladen = laden(&pool, einsatz, e.id).await.unwrap();
+        assert_eq!(geladen.sprechgruppen.len(), 1);
+        assert_eq!(geladen.sprechgruppen[0].bezeichnung, "412_F_DRK");
+        // Leeren: kein Eintrag mehr.
+        crate::sprechgruppe::repo::setze_einheit_sprechgruppen(&pool, 1, einsatz, e.id, &[]).await.unwrap();
+        let geleert = laden(&pool, einsatz, e.id).await.unwrap();
+        assert_eq!(geleert.sprechgruppen.len(), 0);
     }
 
     #[tokio::test]

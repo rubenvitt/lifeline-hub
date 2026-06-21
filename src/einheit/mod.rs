@@ -2,6 +2,7 @@ pub mod repo;
 pub mod mitglied_repo;
 pub mod typ_repo;
 
+use crate::sprechgruppe::SprechgruppeAnzeige;
 use crate::staerke::Staerke;
 use serde::Serialize;
 
@@ -89,6 +90,7 @@ pub struct EinheitAnzeige {
     pub personal_mitglieder: Vec<EinheitMitgliedPerson>,
     pub fahrzeug_mitglieder: Vec<EinheitMitgliedFahrzeug>,
     pub material_mitglieder: Vec<EinheitMitgliedMaterial>,
+    pub sprechgruppen: Vec<SprechgruppeAnzeige>,
 }
 
 #[cfg(test)]

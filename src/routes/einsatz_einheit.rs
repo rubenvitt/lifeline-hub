@@ -122,6 +122,7 @@ pub struct EinheitBody {
     pub bemerkung: Option<String>,
     #[serde(default)]
     pub sortier: i64,
+    pub sprechgruppe_ids: Option<Vec<i64>>,
 }
 
 /// POST /api/einsaetze/{id}/einheiten — Einheit bilden. ETB-Eintrag.
@@ -147,6 +148,12 @@ pub async fn bilden(
         },
         benutzer.id,
     ).await?;
+    if let Some(ids) = &body.sprechgruppe_ids {
+        crate::sprechgruppe::repo::setze_einheit_sprechgruppen(
+            &state.pool, einsatz.org_id, einsatz_id, anzeige.id, ids,
+        ).await?;
+    }
+    let anzeige = einheit_repo::laden(&state.pool, einsatz_id, anzeige.id).await?;
     etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}» gebildet", anzeige.name)).await?;
     sse_einheit(&state, einsatz_id, anzeige.id);
     Ok((StatusCode::CREATED, Json(anzeige)))
@@ -187,7 +194,12 @@ pub async fn aktualisieren(
     if vorher.fuehrer_id != body.fuehrer_id {
         einheit_repo::setze_fuehrer(&state.pool, einsatz_id, eid, body.fuehrer_id).await?;
     }
-    // Endgültige Anzeige (inkl. neu aufgelöstem Führer-Namen).
+    if let Some(ids) = &body.sprechgruppe_ids {
+        crate::sprechgruppe::repo::setze_einheit_sprechgruppen(
+            &state.pool, einsatz.org_id, einsatz_id, eid, ids,
+        ).await?;
+    }
+    // Endgültige Anzeige (inkl. neu aufgelöstem Führer-Namen und Sprechgruppen).
     let final_anzeige = einheit_repo::laden(&state.pool, einsatz_id, eid).await?;
 
     if vorher.fuehrer_id != body.fuehrer_id {
