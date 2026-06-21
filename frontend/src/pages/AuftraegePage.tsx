@@ -38,7 +38,7 @@ export default function AuftraegePage() {
           {
             key: 'auftraege',
             label: 'Aufträge',
-            children: <AuftraegeListe einsatzId={einsatzId} einsatz={einsatz} darfSchreiben={darfSchreiben} />,
+            children: <AuftraegeListe einsatzId={einsatzId} darfSchreiben={darfSchreiben} />,
           },
           {
             key: 'befehle',

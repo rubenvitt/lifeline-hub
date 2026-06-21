@@ -6,7 +6,7 @@ import { ApiError } from '../api/client';
 import { legeAuftragAn, listeAuftraege, nimmAb, quittiereEmpfaenger, setzeVollzug } from '../api/auftraege';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
-import type { Auftrag, EinsatzAnzeige, NeuerAuftrag } from '../api/types';
+import type { Auftrag, NeuerAuftrag } from '../api/types';
 import {
   AUFTRAG_STATUS, GRUPPE_LABEL, GRUPPE_ORDNUNG, faelligGruppe, istAbgeschlossen, prioRang,
   type FaelligGruppe,
@@ -24,7 +24,6 @@ function vergleicheOffen(a: Auftrag, b: Auftrag): number {
 
 export default function AuftraegeListe({ einsatzId, darfSchreiben }: {
   einsatzId: number;
-  einsatz: EinsatzAnzeige;
   darfSchreiben: boolean;
 }) {
   const { message } = App.useApp();
@@ -120,7 +119,7 @@ export default function AuftraegeListe({ einsatzId, darfSchreiben }: {
     <>
       <Flex justify="space-between" align="center" gap={16} wrap style={{ marginBottom: 16 }}>
         <div>
-          <Typography.Title level={3} style={{ margin: 0 }}>Aufträge/Befehle</Typography.Title>
+          <Typography.Title level={3} style={{ margin: 0 }}>Aufträge</Typography.Title>
           <Typography.Text type="secondary">
             {offene.length} offen · {abgeschlossene.length} abgeschlossen
           </Typography.Text>
