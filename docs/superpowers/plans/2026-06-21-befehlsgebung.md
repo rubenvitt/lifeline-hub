@@ -19,14 +19,17 @@
 
 ---
 
-### Task 1: Migration — `befehl`-Tabelle + ETB-Rückverweis
+### Task 1: Migration — `befehl`-Tabelle + ETB-Rückverweis (gelesen, nicht write-only)
 
 **Files:**
 - Create: `migrations/0073_befehl.sql`
+- Modify: `src/etb/mod.rs` (`EtbEintragAnzeige` + `befehl_id`), `src/etb/repo.rs` (Row + SELECT + Mapping)
 - Test: `src/befehl/mod.rs` (temporärer Smoke-Test, in Task 2 ersetzt)
 
 **Interfaces:**
-- Produces: Tabelle `befehl` (Spalten wie unten), additive Spalte `etb_eintrag.befehl_id`.
+- Produces: Tabelle `befehl`, additive Spalte `etb_eintrag.befehl_id`, und deren Lese-Surface `EtbEintragAnzeige.befehl_id` (Backend-API, konsistent mit den bestehenden `lagebericht_id`/`auftrag_id` — die Spalte wird damit gelesen, nicht write-only).
+
+**Hintergrund:** Der Befehl-Snapshot landet als `typ='anordnung'` — derselbe Typ, den auch Aufträge/manuelle Einträge erzeugen. Damit ein freigegebener Befehl in der ETB-API als solcher identifizierbar bleibt, wird `befehl_id` exakt so verdrahtet, wie `lagebericht_id` heute schon verdrahtet ist. (Ein Timeline-Badge im Frontend hat auch das Lagebericht-Vorbild nicht — bewusst kein Scope-Creep hier.)
 
 - [ ] **Step 1: Migration schreiben**
 
@@ -64,7 +67,19 @@ CREATE INDEX idx_befehl_einsatz ON befehl(einsatz_id, status, zeitstand);
 ALTER TABLE etb_eintrag ADD COLUMN befehl_id INTEGER REFERENCES befehl(id);
 ```
 
-- [ ] **Step 2: Smoke-Test schreiben**
+- [ ] **Step 2: `befehl_id` in der ETB-Anzeige verdrahten (Mirror von `lagebericht_id`)**
+
+Suche in `src/etb/` alle Vorkommen von `lagebericht_id` und ergänze `befehl_id` parallel an jeder Stelle:
+- `src/etb/mod.rs` `struct EtbEintragAnzeige`: nach `pub auftrag_id: Option<i64>,` (Zeile ~143) ergänzen:
+  ```rust
+  /// Gesetzt, wenn dieser Eintrag der Freigabe-Snapshot eines Befehls ist (LFH-64). Sonst `None`.
+  pub befehl_id: Option<i64>,
+  ```
+- `src/etb/repo.rs`: im `FromRow`-Row-Struct das Feld `befehl_id: Option<i64>` ergänzen (neben `lagebericht_id`); in beiden `SELECT`-Strings (Zeile ~88 und ~150) `e.lagebericht_id, e.auftrag_id` → `e.lagebericht_id, e.auftrag_id, e.befehl_id`; in der Mapping-Funktion `zu_anzeige` (oder dem Konstruktor) `befehl_id: row.befehl_id` ergänzen.
+
+Do NOT touch the frontend `EtbEintragAnzeige` type — like `lagebericht_id`/`auftrag_id`, this field is backend-only API surface for now.
+
+- [ ] **Step 3: Smoke-Test schreiben**
 
 Create `src/befehl/mod.rs` mit nur diesem Test (wird in Task 2 erweitert):
 
@@ -92,16 +107,16 @@ mod tests {
 
 Register the module: add `pub mod befehl;` to `src/lib.rs` next to `pub mod lagebericht;` (line ~24).
 
-- [ ] **Step 3: Run test — verify it fails then passes**
+- [ ] **Step 4: Run test + compile — verify green**
 
-Run: `cargo test -p <crate> befehl::tests::migration_legt_befehl_tabelle_an`
-Expected: PASS (test_pool führt alle Migrationen inkl. 0073 aus).
-If it fails to compile because `pub mod befehl;` missing → add it.
+Run: `cargo test befehl::tests::migration_legt_befehl_tabelle_an` then `cargo build`
+Expected: test PASS (test_pool führt alle Migrationen inkl. 0073 aus); build clean (ETB-Anzeige-Änderung kompiliert, alle `befehl_id`-Stellen verdrahtet).
+If it fails to compile because `pub mod befehl;` missing → add it. If a `Row`/SELECT column-count mismatch panics at runtime → a `befehl_id` SELECT entry or Row field is missing.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add migrations/0073_befehl.sql src/befehl/mod.rs src/lib.rs
+git add migrations/0073_befehl.sql src/befehl/mod.rs src/lib.rs src/etb/mod.rs src/etb/repo.rs
 git commit -m "feat(befehl): Migration befehl-Tabelle + ETB-Rückverweis (LFH-64)
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
@@ -308,6 +323,11 @@ Mirror the `lagebericht/repo.rs` tests (`setup`, `anlegen_erzeugt_entwurf_mit_sk
             "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'anordnung' AND befehl_id = ?",
         ).bind(einsatz).bind(b.id).fetch_one(&pool).await.unwrap();
         assert_eq!(anzahl, 1);
+
+        // befehl_id ist auch über die ETB-Anzeige gelesen (nicht write-only):
+        let etb = crate::etb::repo::laden(&pool, frei.etb_eintrag_id.unwrap()).await.unwrap();
+        assert_eq!(etb.befehl_id, Some(b.id));
+        assert_eq!(etb.typ, "anordnung");
 ```
 
 Note: a fully-filled befehl for freigabe must fill **all** vorlage sections (validiere_freigabe requires structure). Use a helper that maps `vorlage(key).abschnitte` to filled `Abschnitt`s.
@@ -526,7 +546,7 @@ describe('Befehlsvorlagen', () => {
 
 - [ ] **Step 5: Run test**
 
-Run: `mise exec pnpm@<ver> -- pnpm -C <abs-frontend> vitest run src/befehle/vorlagen.test.ts`
+Run: `mise exec pnpm@11.0.9 -- pnpm -C /Users/rubeen/dev/personal/lifeline-hub/.claude/worktrees/feat+lfh-64-befehlsgebung/frontend vitest run src/befehle/vorlagen.test.ts`
 Expected: PASS (3 tests).
 
 - [ ] **Step 6: Commit**
@@ -639,7 +659,7 @@ describe('BefehlDetailPage', () => {
 
 - [ ] **Step 5: Run test**
 
-Run: `mise exec pnpm@<ver> -- pnpm -C <abs-frontend> vitest run src/pages/BefehlDetailPage.test.tsx`
+Run: `mise exec pnpm@11.0.9 -- pnpm -C /Users/rubeen/dev/personal/lifeline-hub/.claude/worktrees/feat+lfh-64-befehlsgebung/frontend vitest run src/pages/BefehlDetailPage.test.tsx`
 Expected: PASS (2 tests). Fix selectors against the actual rendered markup if needed (don't loosen assertions to force green).
 
 - [ ] **Step 6: Commit**
@@ -653,18 +673,17 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 ---
 
-### Task 7: Frontend — `BefehlListe` + AuftraegePage-Tab-Integration
+### Task 7: Frontend — `BefehlListe`-Komponente (additiv)
 
 **Files:**
 - Create: `frontend/src/auftraege/BefehlListe.tsx`
-- Modify: `frontend/src/pages/AuftraegePage.tsx` (Tabs wrapper)
-- Test: `frontend/src/auftraege/BefehlListe.test.tsx`; verify `frontend/src/pages/AuftraegePage.test.tsx` still passes
+- Test: `frontend/src/auftraege/BefehlListe.test.tsx`
 
 **Interfaces:**
 - Consumes: `api/befehle.ts`, `befehle/vorlagen.ts` `VORLAGEN`, `BefehlAnzeige`.
-- Produces: `<BefehlListe einsatzId darfSchreiben />` component; tab "Befehle" in AuftraegePage.
+- Produces: `<BefehlListe einsatzId darfSchreiben />` component (consumed by Task 8).
 
-`BefehlListe` is the body of `LageberichtePage` (Table + "Befehl erteilen" modal) without the Breadcrumb/page-title (the AuftraegePage already has those), and links to `/einsaetze/${einsatzId}/auftraege/befehle/${b.id}`.
+`BefehlListe` is the body of `LageberichtePage` (Table + "Befehl erteilen" modal) without the Breadcrumb/page-title, and links to `/einsaetze/${einsatzId}/auftraege/befehle/${b.id}`. This task is purely additive — it touches no existing file, so existing tests stay green.
 
 - [ ] **Step 1: Write `frontend/src/auftraege/BefehlListe.tsx`**
 
@@ -747,42 +766,7 @@ export default function BefehlListe({ einsatzId, darfSchreiben }: { einsatzId: n
 }
 ```
 
-- [ ] **Step 2: Integrate Tabs in `AuftraegePage.tsx`**
-
-Import `Tabs` from antd and `BefehlListe`. Wrap the existing content. The existing Auftrags-content (everything from the filters `<div>` down through `<VollzugMeldenModal>`) moves into the "Aufträge" tab; keep the Breadcrumb + page header (`Aufträge/Befehle` title + "Auftrag erteilen" button + inline form) **above** the Tabs so they stay shared. Add:
-
-```tsx
-import { Tabs } from 'antd';
-import BefehlListe from '../auftraege/BefehlListe';
-```
-
-Insert directly above the existing filter `<div style={{ display: 'flex', flexWrap: 'wrap' ...}}>` a Tabs wrapper. Concretely, replace the block from that filter `<div>` … through the closing of the offen/abgeschlossen render and `<VollzugMeldenModal/>` with:
-
-```tsx
-      <Tabs
-        defaultActiveKey="auftraege"
-        items={[
-          {
-            key: 'auftraege',
-            label: 'Aufträge',
-            children: (
-              <>
-                {/* ...existing filter <div>, offen/abgeschlossen render, VollzugMeldenModal... */}
-              </>
-            ),
-          },
-          {
-            key: 'befehle',
-            label: 'Befehle',
-            children: <BefehlListe einsatzId={einsatzId} darfSchreiben={darfSchreiben} />,
-          },
-        ]}
-      />
-```
-
-Keep the "Auftrag erteilen" header button + inline `formOffen` Card above the Tabs (they belong to the Aufträge workflow; acceptable to leave shared for now). Note: antd Tabs renders only the active panel by default, so the existing AuftraegePage tests (default tab = Aufträge) keep seeing their elements.
-
-- [ ] **Step 3: Write `frontend/src/auftraege/BefehlListe.test.tsx`**
+- [ ] **Step 2: Write `frontend/src/auftraege/BefehlListe.test.tsx`**
 
 ```tsx
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -832,19 +816,88 @@ describe('BefehlListe', () => {
 });
 ```
 
-- [ ] **Step 4: Run tests (new + existing AuftraegePage)**
+- [ ] **Step 3: Run test**
 
-Run:
+Run: `mise exec pnpm@11.0.9 -- pnpm -C /Users/rubeen/dev/personal/lifeline-hub/.claude/worktrees/feat+lfh-64-befehlsgebung/frontend vitest run src/auftraege/BefehlListe.test.tsx`
+Expected: PASS (2 tests).
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add frontend/src/auftraege/BefehlListe.tsx frontend/src/auftraege/BefehlListe.test.tsx
+git commit -m "feat(befehl): Befehls-Liste-Komponente (LFH-64)
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
-mise exec pnpm@<ver> -- pnpm -C <abs-frontend> vitest run src/auftraege/BefehlListe.test.tsx src/pages/AuftraegePage.test.tsx
+
+---
+
+### Task 8: Frontend — `AuftraegeListe`-Extraktion + Tab-Integration
+
+**Files:**
+- Create: `frontend/src/auftraege/AuftraegeListe.tsx`
+- Modify: `frontend/src/pages/AuftraegePage.tsx` (wird zu Breadcrumb + Tabs)
+- Test: anpassen `frontend/src/pages/AuftraegePage.test.tsx`
+
+**Interfaces:**
+- Consumes: `<BefehlListe>` (Task 7), the existing Auftrags-API/components.
+- Produces: `<AuftraegeListe einsatzId einsatz darfSchreiben />`; AuftraegePage with two tabs.
+
+**Rationale:** Statt fummeliger Inline-JSX-Operation am 239-Zeilen-File wird der bestehende Aufträge-Body in eine eigene Komponente extrahiert (symmetrisch zu `BefehlListe`). Per-Tab-Aktionen („Auftrag erteilen"-Button, Counts) wandern damit **in** den Aufträge-Tab — sonst stünden sie sichtbar über den Tabs, auch wenn der Befehle-Tab aktiv ist.
+
+- [ ] **Step 1: Extract `frontend/src/auftraege/AuftraegeListe.tsx`**
+
+Move the entire Auftrags-body of `AuftraegePage` into a new component `AuftraegeListe({ einsatzId, einsatz, darfSchreiben })`. That is: the queries (`abschnitteQuery`, `einheitenQuery`, `auftraegeQuery`), all state (`ansicht`, `richtungFilter`, `empfFilter`, `formOffen`, `vollzugFuer`), all mutations, the derived lists/groups, and the JSX from the page-header `<Flex>` (title counts + "Auftrag erteilen" button) down through `<VollzugMeldenModal>`. The component takes the loaded `einsatz` + `darfSchreiben` as props (no second `ladeEinsatz`). Drop only the outer `<div maxWidth>` wrapper and the `<Breadcrumb>` (those stay in the page). Keep the props type:
+
+```tsx
+export default function AuftraegeListe({ einsatzId, einsatz, darfSchreiben }:
+  { einsatzId: number; einsatz: Einsatz; darfSchreiben: boolean }) { /* moved body */ }
 ```
-Expected: PASS. If AuftraegePage tests break due to the Tabs wrapper, adjust the test (e.g. it may need to find elements within the default Aufträge tab) — do not remove coverage.
+Import the `Einsatz` type from `../api/types`. Remove now-unused imports from `AuftraegePage` (e.g. `Segmented`, `Select`, the auftrag-API fns) — they live in `AuftraegeListe` now.
+
+- [ ] **Step 2: Rewrite `AuftraegePage.tsx` as Breadcrumb + Tabs**
+
+`AuftraegePage` keeps only: `useParams`, `einsatzQuery` (for breadcrumb label + `darfSchreiben`), the loading/error guards, and renders:
+
+```tsx
+import { Tabs } from 'antd';
+import AuftraegeListe from '../auftraege/AuftraegeListe';
+import BefehlListe from '../auftraege/BefehlListe';
+// ... einsatzQuery + darfSchreiben as today ...
+return (
+  <div style={{ maxWidth: 1040, margin: '0 auto' }}>
+    <Breadcrumb style={{ marginBottom: 12 }} items={[
+      { title: <Link to="/einsaetze">Einsätze</Link> },
+      { title: einsatz.bezeichnung },
+      { title: 'Aufträge/Befehle' },
+    ]} />
+    <Tabs
+      defaultActiveKey="auftraege"
+      items={[
+        { key: 'auftraege', label: 'Aufträge',
+          children: <AuftraegeListe einsatzId={einsatzId} einsatz={einsatz} darfSchreiben={darfSchreiben} /> },
+        { key: 'befehle', label: 'Befehle',
+          children: <BefehlListe einsatzId={einsatzId} darfSchreiben={darfSchreiben} /> },
+      ]}
+    />
+  </div>
+);
+```
+
+- [ ] **Step 3: Fix `AuftraegePage.test.tsx`**
+
+Run the existing test first to see what breaks. The main hazard: "Aufträge" now appears as **breadcrumb crumb AND tab label** (and the title moved into `AuftraegeListe`), so a bare `getByText('Aufträge')` becomes ambiguous. Scope such queries — e.g. select the tab via `screen.getByRole('tab', { name: 'Aufträge' })`, and assert auftrags-content (which renders in the default-active tab) via its specific elements (e.g. the "Auftrag erteilen" button, a known auftrag title). Do **not** delete assertions to force green; re-scope them. If a test really targeted page-level composition, move it; otherwise the bulk of auftrags-behavior coverage can stay (default tab = Aufträge renders it).
+
+- [ ] **Step 4: Run tests**
+
+Run: `mise exec pnpm@11.0.9 -- pnpm -C /Users/rubeen/dev/personal/lifeline-hub/.claude/worktrees/feat+lfh-64-befehlsgebung/frontend vitest run src/pages/AuftraegePage.test.tsx`
+Expected: PASS. Then a focused render check that both tabs exist: switching to the "Befehle" tab shows the BefehlListe ("Befehl erteilen" button).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add frontend/src/auftraege/BefehlListe.tsx frontend/src/auftraege/BefehlListe.test.tsx frontend/src/pages/AuftraegePage.tsx
-git commit -m "feat(befehl): Befehls-Liste als Tab in AuftraegePage (LFH-64)
+git add frontend/src/auftraege/AuftraegeListe.tsx frontend/src/pages/AuftraegePage.tsx frontend/src/pages/AuftraegePage.test.tsx
+git commit -m "feat(befehl): AuftraegePage in Tabs Aufträge/Befehle (AuftraegeListe extrahiert) (LFH-64)
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ```
@@ -855,16 +908,17 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 
 - [ ] Backend: `cargo test befehl` (alle Backend-Befehl-Tests grün) + `cargo build` clean.
 - [ ] Frontend: gezielte Vitest-Läufe der neuen Dateien grün; danach Gate via
-      `mise exec pnpm@<ver> -- pnpm -C <abs-frontend> vitest run --no-file-parallelism`
+      `mise exec pnpm@11.0.9 -- pnpm -C /Users/rubeen/dev/personal/lifeline-hub/.claude/worktrees/feat+lfh-64-befehlsgebung/frontend vitest run --no-file-parallelism`
       (volle Suite ist unter Last flaky — `--no-file-parallelism` für ehrliches Pass/Fail).
-- [ ] Lint/Typecheck: `pnpm -C <abs-frontend> tsc --noEmit` (oder Projekt-Lint-Skript).
-- [ ] Smoke: Frontend bauen (`pnpm -C <abs-frontend> build`) + Backend starten, in einem aktiven Einsatz unter „Aufträge/Befehle" → Tab „Befehle" → Befehl anlegen, befüllen, freigeben, ETB-Eintrag (typ Anordnung) prüfen, drucken, fortschreiben. (rust-embed: Frontend-Build vor Backend-Start nötig.)
+- [ ] Lint/Typecheck: `pnpm -C /Users/rubeen/dev/personal/lifeline-hub/.claude/worktrees/feat+lfh-64-befehlsgebung/frontend tsc --noEmit` (oder Projekt-Lint-Skript).
+- [ ] Smoke: Frontend bauen (`pnpm -C /Users/rubeen/dev/personal/lifeline-hub/.claude/worktrees/feat+lfh-64-befehlsgebung/frontend build`) + Backend starten, in einem aktiven Einsatz unter „Aufträge/Befehle" → Tab „Befehle" → Befehl anlegen, befüllen, freigeben, ETB-Eintrag (typ Anordnung) prüfen, drucken, fortschreiben. (rust-embed: Frontend-Build vor Backend-Start nötig.)
 
 ## Self-Review Notes (Plan vs. Spec)
 
-- Spec „eigenes Entity, in auftraege integriert (Tab)" → Tasks 1–4 (Entity) + Task 7 (Tab). ✓
-- Spec 4 Schemata flach + Hilfetext → Task 2 (Backend, ohne hilfetext) + Task 5/6 (Frontend hilfetext via `extra`). ✓ (Hilfetext bewusst Frontend-only — Abweichung vom Spec-Wortlaut „AbschnittDef + hilfetext im Backend", da das Backend den Hilfetext nicht rendert; im Plan dokumentiert.)
-- Spec ETB-Snapshot `typ=anordnung` + Reverse-FK `befehl_id` → Task 1 + Task 3. ✓
+- Spec „eigenes Entity, in auftraege integriert (Tab)" → Tasks 1–4 (Entity) + Task 7 (BefehlListe) + Task 8 (Tabs in AuftraegePage). ✓
+- Spec 4 Schemata flach + Hilfetext → Task 2 (Backend, ohne hilfetext) + Task 5/6 (Frontend hilfetext via `extra`). ✓ (Hilfetext bewusst Frontend-only — das Backend rendert ihn nicht; im Plan dokumentiert.)
+- Spec ETB-Snapshot `typ=anordnung` + Reverse-FK `befehl_id` → Task 1 (Spalte + Lese-Surface in `EtbEintragAnzeige`, nicht write-only) + Task 3 (Snapshot + Test). ✓
 - Spec Fortschreibung → Task 3 (repo) + Task 6 (Button). ✓
 - Spec Druck → Task 6 (`befehlPrint.css`). ✓
 - Spec SSE `"befehl"` → Task 4. ✓
+- Task-Reihenfolge/Abhängigkeiten: 1→2→3→4 (Backend, sequenziell), 5 (FE-Basis, nach 4), 6 (nach 5), 7 (nach 5, additiv), 8 (nach 7). Tasks 5–7 sind FE-seitig unabhängig testbar (gemockte API).
