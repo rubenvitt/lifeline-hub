@@ -43,3 +43,12 @@ export async function setzeOrt(key: string, name: string): Promise<void> {
     console.warn('ortCache: Schreibfehler', e);
   }
 }
+
+/** Nur für Tests: leert den persistenten Store (Isolation zwischen Testdateien). */
+export async function leereOrtCache(): Promise<void> {
+  try {
+    await (await db()).clear(STORE);
+  } catch {
+    /* idb evtl. nicht verfügbar */
+  }
+}

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { LatLon } from './koordinaten';
 import { ladeOrtVorschau, type OrtVorschau } from '../api/ortVorschau';
+import { ortKeyVon, holeOrt, setzeOrt } from './ortCache';
 
 /** Auf ~100 m runden (3 Nachkommastellen) — teilt den serverseitigen Cache-Treffer. */
 function runde(n: number): number {
@@ -38,9 +39,26 @@ export function useOrtVorschau(
       debounced ? runde(debounced.lon) : null,
       exclude ?? null,
     ],
-    queryFn: () => ladeOrtVorschau(einsatzId, debounced!.lat, debounced!.lon, exclude),
+    queryFn: async () => {
+      const key = ortKeyVon(debounced!.lat, debounced!.lon);
+      try {
+        const live = await ladeOrtVorschau(einsatzId, debounced!.lat, debounced!.lon, exclude);
+        if (live.ortsname) {
+          await setzeOrt(key, live.ortsname); // Ortsname (unveränderlich) lang persistieren
+          return live;
+        }
+        // Live ohne Ortsname (offline/Rate-Limit) → persistierten Ort als Fallback zeigen
+        return { peilung: live.peilung, ortsname: await holeOrt(key) };
+      } catch (e) {
+        // Server nicht erreichbar → Peilung fehlt, aber persistierter Ort kann existieren
+        const persisted = await holeOrt(key);
+        if (persisted) return { peilung: null, ortsname: persisted };
+        throw e;
+      }
+    },
     enabled: Number.isFinite(einsatzId) && debounced != null,
-    // Ergebnis ist faktisch unveränderlich (Ort einer Koordinate) → nicht neu laden.
-    staleTime: Infinity,
+    // Peilung bleibt live (Marker ändern sich) — KEIN Infinity. Der Ortsname ist über den
+    // persistenten Local-Store ohnehin dauerhaft.
+    staleTime: 30_000,
   });
 }
