@@ -51,9 +51,9 @@ const TAKTISCHE_TYPEN: MarkerTyp[] = ['einheit', 'fahrzeug', 'fuehrung', 'abschn
 /** Mappt Marker-Typ auf Backend-Tag für exclude-Parameter der Ort-Vorschau.
  *  `fuehrung` → `personal` (Führungskraft liegt in der personal-Tabelle).
  *  `abschnitt` → kein eindeutiges Backend-Tag → undefined (exclude weggelassen). */
-function inspectorExclude(m: KarteMarker): string | undefined {
+function inspectorExclude(m: KarteMarker, einsatzId: number): string | undefined {
   switch (m.typ) {
-    case 'einsatzort': return `einsatzort:${m.id}`;
+    case 'einsatzort': return `einsatzort:${einsatzId}`;
     case 'uhs':        return `uhs:${m.id}`;
     case 'schaden':    return `schaden:${m.id}`;
     case 'einheit':    return `einheit:${m.id}`;
@@ -91,7 +91,7 @@ export default function Inspector({
           <Descriptions.Item label="Inhalt">{marker.lageMeldung.inhalt}</Descriptions.Item>
         )}
         <Descriptions.Item label="Koordinate">
-          <KoordinatenAnzeige lat={marker.lat} lon={marker.lon} einsatzId={einsatzId} exclude={inspectorExclude(marker)} />
+          <KoordinatenAnzeige lat={marker.lat} lon={marker.lon} einsatzId={einsatzId} exclude={inspectorExclude(marker, einsatzId)} />
         </Descriptions.Item>
       </Descriptions>
       {symbolAuswahl && (
