@@ -17,6 +17,11 @@ export default defineConfig(({ mode }) => {
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['favicon.svg'],
+        workbox: {
+          // Der App-Haupt-Chunk überschreitet das 2-MiB-Default-Precache-Limit.
+          // Workaround bis zum Code-Splitting (eigener Folge-Task: MapLibre/antd lazy laden).
+          maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+        },
         manifest: {
           name: 'lifeline-hub',
           short_name: 'lifeline',
