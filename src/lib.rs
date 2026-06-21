@@ -21,6 +21,7 @@ pub mod geocoding;
 pub mod karte;
 pub mod katalog;
 pub mod kommunikation;
+pub mod befehl;
 pub mod lagebericht;
 pub mod lage_zone;
 pub mod live;
