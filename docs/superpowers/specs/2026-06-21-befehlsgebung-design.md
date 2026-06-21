@@ -93,7 +93,8 @@ Reverse-FK für Badge/Rücklink in der ETB-Timeline (analog `lagebericht_id`).
 
 ### Backend (Mirror von `lagebericht`)
 
-- `src/befehl/mod.rs` — Status-Konstanten, `AbschnittDef` (**+ optionales `hilfetext`-Feld**),
+- `src/befehl/mod.rs` — Status-Konstanten, `AbschnittDef` (`{schluessel, label}`, **ohne**
+  `hilfetext` — das Backend rendert nur Label + Inhalt; Hilfetext ist Frontend-only),
   `VorlageDef`, `VORLAGEN`-Registry (4 Schemata), `leere_abschnitte`, `render_snapshot`
   (deterministisches Markdown), `validiere_freigabe` (Struktur- + Non-Empty-Gate).
 - `src/befehl/repo.rs` — `liste`, `laden`, `anlegen`, `aktualisiere` (nur Entwurf,
