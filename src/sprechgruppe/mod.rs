@@ -33,7 +33,7 @@ impl Sprechgruppe {
 }
 
 /// Öffentliche Sprechgruppen-Darstellung (ohne `org_id`, mit `einsatz_lokal`-Flag).
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct SprechgruppeAnzeige {
     pub id: i64,
     pub einsatz_id: Option<i64>,

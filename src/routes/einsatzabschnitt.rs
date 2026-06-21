@@ -73,12 +73,12 @@ pub struct AbschnittBody {
     pub ueber_abschnitt_id: Option<i64>,
     pub leiter_id: Option<i64>,
     pub bemerkung: Option<String>,
-    pub sprechgruppe_tmo: Option<String>,
-    pub sprechgruppe_dmo: Option<String>,
     pub kommunikationsmittel: Option<String>,
     pub erreichbarkeit: Option<String>,
     #[serde(default)]
     pub sortier: i64,
+    /// Sprechgruppen-IDs; `Some` ersetzt die Zuordnung vollständig, `None` lässt sie unverändert.
+    pub sprechgruppe_ids: Option<Vec<i64>>,
 }
 
 /// POST /api/einsaetze/{id}/abschnitte — anlegen. Schreibrecht + aktiv. ETB-Eintrag.
@@ -99,20 +99,23 @@ pub async fn anlegen(
         return Err(AppError::Validation("Name darf nicht leer sein".into()));
     }
     let bemerkung = trimme(body.bemerkung);
-    let tmo = trimme(body.sprechgruppe_tmo);
-    let dmo = trimme(body.sprechgruppe_dmo);
     let mittel = trimme(body.kommunikationsmittel);
     let erreichbar = trimme(body.erreichbarkeit);
-    let anzeige = abschnitt_repo::anlegen(
+    let mut anzeige = abschnitt_repo::anlegen(
         &state.pool, einsatz_id,
         AbschnittDaten {
             name: &name, ueber_abschnitt_id: body.ueber_abschnitt_id,
             leiter_id: body.leiter_id, bemerkung: bemerkung.as_deref(),
-            sprechgruppe_tmo: tmo.as_deref(), sprechgruppe_dmo: dmo.as_deref(),
             kommunikationsmittel: mittel.as_deref(), erreichbarkeit: erreichbar.as_deref(),
             sortier: body.sortier,
         },
     ).await?;
+    if let Some(ids) = body.sprechgruppe_ids {
+        crate::sprechgruppe::repo::setze_abschnitt_sprechgruppen(
+            &state.pool, einsatz.org_id, einsatz_id, anzeige.id, &ids,
+        ).await?;
+        anzeige = abschnitt_repo::laden(&state.pool, einsatz_id, anzeige.id).await?;
+    }
     etb_system(&state, einsatz_id, benutzer.id, &format!("Abschnitt «{}» angelegt", anzeige.name)).await?;
     sse_abschnitt(&state, einsatz_id, anzeige.id);
     Ok((StatusCode::CREATED, Json(anzeige)))
@@ -137,20 +140,23 @@ pub async fn aktualisieren(
         return Err(AppError::Validation("Name darf nicht leer sein".into()));
     }
     let bemerkung = trimme(body.bemerkung);
-    let tmo = trimme(body.sprechgruppe_tmo);
-    let dmo = trimme(body.sprechgruppe_dmo);
     let mittel = trimme(body.kommunikationsmittel);
     let erreichbar = trimme(body.erreichbarkeit);
-    let anzeige = abschnitt_repo::aktualisiere(
+    let mut anzeige = abschnitt_repo::aktualisiere(
         &state.pool, einsatz_id, aid,
         AbschnittDaten {
             name: &name, ueber_abschnitt_id: body.ueber_abschnitt_id,
             leiter_id: body.leiter_id, bemerkung: bemerkung.as_deref(),
-            sprechgruppe_tmo: tmo.as_deref(), sprechgruppe_dmo: dmo.as_deref(),
             kommunikationsmittel: mittel.as_deref(), erreichbarkeit: erreichbar.as_deref(),
             sortier: body.sortier,
         },
     ).await?;
+    if let Some(ids) = body.sprechgruppe_ids {
+        crate::sprechgruppe::repo::setze_abschnitt_sprechgruppen(
+            &state.pool, einsatz.org_id, einsatz_id, aid, &ids,
+        ).await?;
+        anzeige = abschnitt_repo::laden(&state.pool, einsatz_id, aid).await?;
+    }
     sse_abschnitt(&state, einsatz_id, aid);
     Ok(Json(anzeige))
 }

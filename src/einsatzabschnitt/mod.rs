@@ -1,5 +1,6 @@
 pub mod repo;
 
+use crate::sprechgruppe::SprechgruppeAnzeige;
 use serde::Serialize;
 
 /// Aufgelöste Abschnitts-Anzeige (flach; der Baum wird im FE über
@@ -17,9 +18,13 @@ pub struct EinsatzabschnittAnzeige {
     pub flaeche_geojson: Option<String>,
     pub tz_fachaufgabe: Option<String>,
     pub tz_organisation: Option<String>,
+    /// Historischer Freitext-Wert (eingefroren; nicht mehr schreibbar).
     pub sprechgruppe_tmo: Option<String>,
+    /// Historischer Freitext-Wert (eingefroren; nicht mehr schreibbar).
     pub sprechgruppe_dmo: Option<String>,
     pub kommunikationsmittel: Option<String>,
     pub erreichbarkeit: Option<String>,
     pub sortier: i64,
+    /// Zugeordnete Sprechgruppen (aus Katalogeintrag oder einsatz-lokal).
+    pub sprechgruppen: Vec<SprechgruppeAnzeige>,
 }

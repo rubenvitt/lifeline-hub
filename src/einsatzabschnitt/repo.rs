@@ -4,14 +4,14 @@ use sqlx::SqlitePool;
 
 /// Editierbare Felder eines Abschnitts (bereits getrimmt/validiert durch den Handler,
 /// hier zusätzlich auf Einsatz-Zugehörigkeit von parent/leiter geprüft).
+/// Hinweis: `sprechgruppe_tmo`/`_dmo` sind eingefroren (Freitext-Migration LFH-109);
+/// Sprechgruppen werden über die Join-Tabelle via `setze_abschnitt_sprechgruppen` gesetzt.
 #[derive(Debug)]
 pub struct AbschnittDaten<'a> {
     pub name: &'a str,
     pub ueber_abschnitt_id: Option<i64>,
     pub leiter_id: Option<i64>,
     pub bemerkung: Option<&'a str>,
-    pub sprechgruppe_tmo: Option<&'a str>,
-    pub sprechgruppe_dmo: Option<&'a str>,
     pub kommunikationsmittel: Option<&'a str>,
     pub erreichbarkeit: Option<&'a str>,
     pub sortier: i64,
@@ -62,6 +62,7 @@ fn zu_anzeige(row: Row) -> EinsatzabschnittAnzeige {
         kommunikationsmittel: row.kommunikationsmittel,
         erreichbarkeit: row.erreichbarkeit,
         sortier: row.sortier,
+        sprechgruppen: Vec::new(), // befüllt durch laden()/liste()
     }
 }
 
@@ -72,16 +73,27 @@ pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<Einsatzabsc
     ))
     .bind(einsatz_id)
     .fetch_all(pool).await?;
-    Ok(rows.into_iter().map(zu_anzeige).collect())
+    let mut ergebnis = Vec::with_capacity(rows.len());
+    for row in rows {
+        let id = row.id;
+        let mut anzeige = zu_anzeige(row);
+        let sgs = crate::sprechgruppe::repo::lade_abschnitt_sprechgruppen(pool, id).await?;
+        anzeige.sprechgruppen = sgs.into_iter().map(|s| s.anzeige()).collect();
+        ergebnis.push(anzeige);
+    }
+    Ok(ergebnis)
 }
 
 /// Lädt einen Abschnitt (aufgelöst); `NotFound`, falls nicht zum Einsatz.
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<EinsatzabschnittAnzeige, AppError> {
-    sqlx::query_as::<_, Row>(&format!("{SELECT_AUFGELOEST} WHERE a.id = ? AND a.einsatz_id = ?"))
+    let mut anzeige = sqlx::query_as::<_, Row>(&format!("{SELECT_AUFGELOEST} WHERE a.id = ? AND a.einsatz_id = ?"))
         .bind(id).bind(einsatz_id)
         .fetch_optional(pool).await?
         .map(zu_anzeige)
-        .ok_or(AppError::NotFound)
+        .ok_or(AppError::NotFound)?;
+    let sgs = crate::sprechgruppe::repo::lade_abschnitt_sprechgruppen(pool, id).await?;
+    anzeige.sprechgruppen = sgs.into_iter().map(|s| s.anzeige()).collect();
+    Ok(anzeige)
 }
 
 /// Prüft, ob ein Abschnitt zum Einsatz gehört (für Parent-Validierung). `NotFound` sonst.
@@ -154,12 +166,11 @@ pub async fn anlegen(pool: &SqlitePool, einsatz_id: i64, daten: AbschnittDaten<'
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatzabschnitt \
             (einsatz_id, ueber_abschnitt_id, name, leiter_id, bemerkung, \
-             sprechgruppe_tmo, sprechgruppe_dmo, kommunikationsmittel, erreichbarkeit, sortier) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             kommunikationsmittel, erreichbarkeit, sortier) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id).bind(daten.ueber_abschnitt_id).bind(daten.name)
     .bind(daten.leiter_id).bind(daten.bemerkung)
-    .bind(daten.sprechgruppe_tmo).bind(daten.sprechgruppe_dmo)
     .bind(daten.kommunikationsmittel).bind(daten.erreichbarkeit)
     .bind(daten.sortier)
     .fetch_one(pool).await?;
@@ -174,13 +185,11 @@ pub async fn aktualisiere(pool: &SqlitePool, einsatz_id: i64, id: i64, daten: Ab
     validiere(pool, einsatz_id, Some(id), &daten).await?;
     let resultat = sqlx::query(
         "UPDATE einsatzabschnitt SET ueber_abschnitt_id = ?, name = ?, leiter_id = ?, \
-                bemerkung = ?, sprechgruppe_tmo = ?, sprechgruppe_dmo = ?, \
-                kommunikationsmittel = ?, erreichbarkeit = ?, sortier = ? \
+                bemerkung = ?, kommunikationsmittel = ?, erreichbarkeit = ?, sortier = ? \
          WHERE id = ? AND einsatz_id = ?",
     )
     .bind(daten.ueber_abschnitt_id).bind(daten.name).bind(daten.leiter_id)
     .bind(daten.bemerkung)
-    .bind(daten.sprechgruppe_tmo).bind(daten.sprechgruppe_dmo)
     .bind(daten.kommunikationsmittel).bind(daten.erreichbarkeit)
     .bind(daten.sortier).bind(id).bind(einsatz_id)
     .execute(pool).await?;
@@ -257,7 +266,7 @@ mod tests {
     fn daten<'a>(name: &'a str, parent: Option<i64>, leiter: Option<i64>) -> AbschnittDaten<'a> {
         AbschnittDaten {
             name, ueber_abschnitt_id: parent, leiter_id: leiter, bemerkung: None, sortier: 0,
-            sprechgruppe_tmo: None, sprechgruppe_dmo: None, kommunikationsmittel: None, erreichbarkeit: None,
+            kommunikationsmittel: None, erreichbarkeit: None,
         }
     }
 
@@ -291,22 +300,16 @@ mod tests {
 
         let a = anlegen(&pool, einsatz, AbschnittDaten {
             name: "Nord", ueber_abschnitt_id: None, leiter_id: None, bemerkung: None, sortier: 0,
-            sprechgruppe_tmo: Some("412_F_DRK"), sprechgruppe_dmo: Some("DMO 31"),
             kommunikationsmittel: Some("digitalfunk"), erreichbarkeit: Some("0151 23456"),
         }).await.unwrap();
-        assert_eq!(a.sprechgruppe_tmo.as_deref(), Some("412_F_DRK"));
-        assert_eq!(a.sprechgruppe_dmo.as_deref(), Some("DMO 31"));
         assert_eq!(a.kommunikationsmittel.as_deref(), Some("digitalfunk"));
         assert_eq!(a.erreichbarkeit.as_deref(), Some("0151 23456"));
 
-        // Voll-Ersatz: tmo geändert, dmo geleert (→ None), rest neu gesetzt.
+        // Voll-Ersatz: kommunikationsmittel geändert, erreichbarkeit geleert (→ None).
         let b = aktualisiere(&pool, einsatz, a.id, AbschnittDaten {
             name: "Nord", ueber_abschnitt_id: None, leiter_id: None, bemerkung: None, sortier: 0,
-            sprechgruppe_tmo: Some("420_F_ASB"), sprechgruppe_dmo: None,
             kommunikationsmittel: Some("mobil"), erreichbarkeit: None,
         }).await.unwrap();
-        assert_eq!(b.sprechgruppe_tmo.as_deref(), Some("420_F_ASB"));
-        assert_eq!(b.sprechgruppe_dmo, None);
         assert_eq!(b.kommunikationsmittel.as_deref(), Some("mobil"));
         assert_eq!(b.erreichbarkeit, None);
     }
@@ -417,6 +420,19 @@ mod tests {
             AppError::NotFound
         ));
         assert!(matches!(loese_auf(&pool, 999, a.id).await.unwrap_err(), AppError::NotFound));
+    }
+
+    #[tokio::test]
+    async fn abschnitt_anzeige_enthaelt_zugeordnete_sprechgruppen() {
+        let pool = crate::db::test_pool().await;
+        let einsatz = setup(&pool).await;
+        let a = anlegen(&pool, einsatz, daten("Nord", None, None)).await.unwrap();
+        let kat = crate::sprechgruppe::repo::anlegen_katalog(&pool, 1,
+            crate::sprechgruppe::repo::KatalogDaten{bezeichnung:"412_F_DRK",betriebsart:"TMO",hinweis:None,sortier:0}).await.unwrap();
+        crate::sprechgruppe::repo::setze_abschnitt_sprechgruppen(&pool, 1, einsatz, a.id, &[kat.id]).await.unwrap();
+        let neu = laden(&pool, einsatz, a.id).await.unwrap();
+        assert_eq!(neu.sprechgruppen.len(), 1);
+        assert_eq!(neu.sprechgruppen[0].bezeichnung, "412_F_DRK");
     }
 
     #[tokio::test]
