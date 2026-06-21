@@ -33,10 +33,12 @@ verlustfrei migriert.
 
 ## Entschiedene Designfragen
 
-1. **Alt-Freitextspalten** `einsatzabschnitt.sprechgruppe_tmo`/`_dmo` werden **behalten**
-   (read-only Reserve, niedrigstes Risiko; vermeidet SQLite-Rebuild der Nicht-Leaf-Tabelle
-   `einsatzabschnitt`). Das Formular schreibt sie nicht mehr; die Daten wandern per Migration ins
-   Join-Modell.
+1. **Alt-Freitextspalten** `einsatzabschnitt.sprechgruppe_tmo`/`_dmo` werden **eingefroren**: aus
+   dem Schreibpfad entfernt (`AbschnittDaten`/INSERT/UPDATE/`AbschnittBody`), aber in DB + Anzeige
+   als historischer Lesewert behalten (Spalten bleiben, kein SQLite-Rebuild der Nicht-Leaf-Tabelle).
+   Die Daten wandern per Migration ins Join-Modell. Grep-verifiziert: außer dem einsatzabschnitt-
+   Modul/-Route + der Abschnitt-Form liest **nichts** diese Spalten (sonst nur Test-Fixtures), daher
+   ist das Einfrieren ohne Folgeschäden — keine Lage-Popup-/PDF-/ETB-/Dashboard-Leser.
 2. **Einsatz-lokales Anlegen** darf **jeder Bearbeiter** (`CurrentUser`); Katalogpflege bleibt
    **Admin** (`AdminUser`).
 3. **Einsatz-lokale Sprechgruppen sind im ganzen Einsatz wiederverwendbar** (alle Abschnitte +

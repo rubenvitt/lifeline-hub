@@ -127,7 +127,47 @@ WHERE ea.sprechgruppe_dmo IS NOT NULL AND trim(ea.sprechgruppe_dmo) <> '';
 
 - [ ] **Step 2: Migration lädt sauber** — `cargo test --lib db::` (oder ein bestehender Test, der `test_pool()` nutzt). Erwartet: PASS (alle Migrations inkl. 0073 anwendbar).
 
-- [ ] **Step 3: Commit** — `git add migrations/0073_sprechgruppe.sql && git commit -m "feat(sprechgruppe): Migration 0073 — Katalog + Joins + LFH-86-Datenmigration (LFH-109)"`
+- [ ] **Step 3: Daten-Migration testen** (in `src/einsatzabschnitt/repo.rs` `#[cfg(test)] mod tests`). In `test_pool` läuft die 0073-Daten-Migration auf leerer DB (No-op) — daher die TMO-Statements explizit gegen geseedete Altdaten ausführen und Dedup + Sharing prüfen (das ist der AC#2-Kern). **Die beiden SQL-Strings wörtlich aus `0073_sprechgruppe.sql` übernehmen.**
+
+```rust
+#[tokio::test]
+async fn datenmigration_freitext_zu_einsatz_lokal_dedupliziert_und_teilt() {
+    let pool = crate::db::test_pool().await;
+    sqlx::query("INSERT INTO organisation (id, name) VALUES (1,'Orga')").execute(&pool).await.unwrap();
+    let e: i64 = sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id")
+        .fetch_one(&pool).await.unwrap();
+    // Zwei Abschnitte mit GLEICHEM Freitext-TMO-Wert.
+    for name in ["Nord", "Süd"] {
+        sqlx::query("INSERT INTO einsatzabschnitt (einsatz_id, name, sprechgruppe_tmo) VALUES (?, ?, '412_F_DRK')")
+            .bind(e).bind(name).execute(&pool).await.unwrap();
+    }
+    // TMO-Daten-Migration aus 0073 erneut ausführen (idempotent dank INSERT OR IGNORE):
+    sqlx::query(
+        "INSERT OR IGNORE INTO sprechgruppe (org_id, einsatz_id, bezeichnung, betriebsart) \
+         SELECT DISTINCT e.org_id, ea.einsatz_id, trim(ea.sprechgruppe_tmo), 'TMO' \
+         FROM einsatzabschnitt ea JOIN einsatz e ON e.id = ea.einsatz_id \
+         WHERE ea.sprechgruppe_tmo IS NOT NULL AND trim(ea.sprechgruppe_tmo) <> ''",
+    ).execute(&pool).await.unwrap();
+    sqlx::query(
+        "INSERT OR IGNORE INTO einsatzabschnitt_sprechgruppe (abschnitt_id, sprechgruppe_id) \
+         SELECT ea.id, sg.id FROM einsatzabschnitt ea \
+         JOIN sprechgruppe sg ON sg.einsatz_id = ea.einsatz_id AND sg.betriebsart = 'TMO' \
+                             AND sg.bezeichnung = trim(ea.sprechgruppe_tmo) \
+         WHERE ea.sprechgruppe_tmo IS NOT NULL AND trim(ea.sprechgruppe_tmo) <> ''",
+    ).execute(&pool).await.unwrap();
+
+    let sg: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sprechgruppe WHERE einsatz_id = ?")
+        .bind(e).fetch_one(&pool).await.unwrap();
+    let joins: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatzabschnitt_sprechgruppe")
+        .fetch_one(&pool).await.unwrap();
+    assert_eq!(sg, 1, "ein geteilter einsatz-lokaler Eintrag (Dedup)");
+    assert_eq!(joins, 2, "beide Abschnitte verknüpft (Sharing)");
+}
+```
+
+Run: `cargo test --lib einsatzabschnitt::repo::tests::datenmigration_freitext_zu_einsatz_lokal_dedupliziert_und_teilt` → PASS.
+
+- [ ] **Step 4: Commit** — `git add -A && git commit -m "feat(sprechgruppe): Migration 0073 — Katalog + Joins + LFH-86-Datenmigration (LFH-109)"`
 
 ---
 
@@ -440,13 +480,17 @@ mod tests {
 **Files:**
 - Modify: `src/einsatzabschnitt/mod.rs` (Anzeige), `src/einsatzabschnitt/repo.rs` (Anzeige befüllen), `src/routes/einsatzabschnitt.rs` (`AbschnittBody.sprechgruppe_ids`, Join setzen)
 
-**Interfaces:**
-- `EinsatzabschnittAnzeige` erhält `pub sprechgruppen: Vec<SprechgruppeAnzeige>` (Serialize).
-- `AbschnittBody` erhält `pub sprechgruppe_ids: Option<Vec<i64>>` (None = unverändert lassen; Some = ersetzen).
-- Im Handler `anlegen`/`aktualisieren`: nach `abschnitt_repo::anlegen/aktualisiere` und vorhandener Auth, falls `sprechgruppe_ids` `Some`, `sprechgruppe::repo::setze_abschnitt_sprechgruppen(&pool, einsatz.org_id, einsatz_id, anzeige.id, &ids)` aufrufen, dann Anzeige neu laden (`abschnitt_repo::laden`) zurückgeben.
-- `abschnitt_repo`: in `zu_anzeige`/`laden`/`liste` die `sprechgruppen` befüllen (separater Query `lade_abschnitt_sprechgruppen` pro Zeile genügt; bei `liste` Map über die Abschnitte). Initial leeres `Vec` in den Bestands-Tests ist ok.
+**Spalten-Entscheidung (eingefroren):** Grep bestätigt — `sprechgruppe_tmo`/`_dmo` werden NUR im einsatzabschnitt-Modul/-Route + der Abschnitt-Form gelesen (sonst nur Test-Fixtures, die `null` setzen). Daher: Die Freitextspalten aus dem **Schreibpfad entfernen** (eingefroren auf ihren migrierten Wert), aber in DB + Anzeige als historischen Lesewert behalten. `kommunikationsmittel`/`erreichbarkeit` bleiben unverändert editierbar.
 
-- [ ] **Step 1: Failing test** (in `src/einsatzabschnitt/repo.rs` tests; bestehender `funk_felder_anlegen_und_aktualisieren` bleibt unverändert grün)
+**Interfaces:**
+- `EinsatzabschnittAnzeige` erhält `pub sprechgruppen: Vec<SprechgruppeAnzeige>` (Serialize); `sprechgruppe_tmo`/`_dmo` bleiben als Felder (read-only historisch).
+- `AbschnittDaten` **verliert** `sprechgruppe_tmo`/`sprechgruppe_dmo`; `kommunikationsmittel`/`erreichbarkeit` bleiben. Repo-`INSERT`/`UPDATE` lassen die beiden Spalten weg (Bestandswerte bleiben unangetastet; neue Zeilen → NULL).
+- `AbschnittBody` **verliert** `sprechgruppe_tmo`/`sprechgruppe_dmo`, **erhält** `pub sprechgruppe_ids: Option<Vec<i64>>` (None = unverändert; Some = ersetzen). `kommunikationsmittel`/`erreichbarkeit` bleiben.
+- Im Handler `anlegen`/`aktualisieren`: nach `abschnitt_repo::anlegen/aktualisiere` (Auth bereits erfolgt), falls `sprechgruppe_ids` `Some`, `sprechgruppe::repo::setze_abschnitt_sprechgruppen(&pool, einsatz.org_id, einsatz_id, anzeige.id, &ids)` aufrufen, dann Anzeige neu laden (`abschnitt_repo::laden`) zurückgeben.
+- `abschnitt_repo`: in `laden`/`liste` die `sprechgruppen` via `lade_abschnitt_sprechgruppen` befüllen (bei `liste` Map über die Abschnitte).
+- **Bestehenden Test `funk_felder_anlegen_und_aktualisieren` (`src/einsatzabschnitt/repo.rs`) anpassen:** die `sprechgruppe_tmo`/`_dmo`-Zeilen aus `AbschnittDaten`-Literalen und Assertions entfernen; `kommunikationsmittel`/`erreichbarkeit` bleiben. Alle weiteren `AbschnittDaten`-Literale im Test-Modul (z. B. `daten()`-Helfer) entsprechend kürzen.
+
+- [ ] **Step 1: Failing test** (in `src/einsatzabschnitt/repo.rs` tests)
 
 ```rust
 #[tokio::test]
@@ -464,9 +508,9 @@ async fn abschnitt_anzeige_enthaelt_zugeordnete_sprechgruppen() {
 ```
 
 - [ ] **Step 2: Run, expect FAIL.**
-- [ ] **Step 3: Implementieren** (Anzeige-Feld + Befüllung + Route-Verdrahtung). `setup`-Helper legt Org(1) an, daher org_id=1.
-- [ ] **Step 4: Run, expect PASS** — `cargo test --lib einsatzabschnitt` (alle, inkl. Bestands-Funk-Test).
-- [ ] **Step 5: Commit** — `git commit -am "feat(sprechgruppe): Zuordnung an Einsatzabschnitt (Anzeige + PATCH/POST) (LFH-109)"`
+- [ ] **Step 3: Implementieren** — Anzeige-Feld `sprechgruppen` + Befüllung; `sprechgruppe_tmo`/`_dmo` aus `AbschnittDaten`/INSERT/UPDATE/`AbschnittBody`/Handler entfernen (eingefroren); `sprechgruppe_ids`-Join verdrahten; `daten()`-Helfer + `funk_felder_anlegen_und_aktualisieren` im Test-Modul anpassen. `setup`-Helper legt Org(1) an, daher org_id=1.
+- [ ] **Step 4: Run, expect PASS** — `cargo test --lib einsatzabschnitt` (alle, inkl. angepasstem Funk-Test).
+- [ ] **Step 5: Commit** — `git commit -am "feat(sprechgruppe): Zuordnung an Einsatzabschnitt; Freitext-Sprechgruppe eingefroren (LFH-109)"`
 
 ---
 
@@ -508,7 +552,7 @@ async fn abschnitt_anzeige_enthaelt_zugeordnete_sprechgruppen() {
 - `interface SprechgruppeEingabe { bezeichnung: string; betriebsart: Betriebsart; hinweis?: string | null; sortier?: number }`
 - API-Funktionen: `listeSprechgruppen(nurAktive?: boolean)`, `legeSprechgruppeAn(eingabe)`, `aktualisiereSprechgruppe(id, eingabe)`, `deaktiviereSprechgruppe(id)`, `listeEinsatzSprechgruppen(einsatzId)`, `legeEinsatzSprechgruppeAn(einsatzId, {bezeichnung, betriebsart, hinweis?})`.
 
-- [ ] **Step 1:** Client + Typen nach Muster `api/fahrzeuge.ts` schreiben (gleiche `fetch`/Fehler-Helfer). `AbschnittEingabe`/`EinheitEingabe` um `sprechgruppe_ids?: number[]`, Anzeige-Interfaces um `sprechgruppen: Sprechgruppe[]`.
+- [ ] **Step 1:** Client + Typen nach Muster `api/fahrzeuge.ts` schreiben (gleiche `fetch`/Fehler-Helfer). `AbschnittEingabe`/`EinheitEingabe` um `sprechgruppe_ids?: number[]` ergänzen und `sprechgruppe_tmo`/`_dmo` aus `AbschnittEingabe` entfernen (Backend nimmt sie nicht mehr); Anzeige-Interfaces (`types.ts`) um `sprechgruppen: Sprechgruppe[]` ergänzen — `sprechgruppe_tmo`/`_dmo` dort als read-only belassen (Fixtures `kraeftebild.test.ts`/`KraefteuebersichtPage.test.tsx` bleiben unverändert).
 - [ ] **Step 2: Typecheck** — `mise exec pnpm@<ver> -- pnpm -C <abs>/frontend exec tsc --noEmit` → PASS.
 - [ ] **Step 3: Commit** — `git commit -am "feat(sprechgruppe): Frontend-API-Client + Typen (LFH-109)"`
 
