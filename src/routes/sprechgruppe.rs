@@ -169,7 +169,8 @@ pub async fn liste_fuer_einsatz(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    let sgs = sg_repo::liste_fuer_einsatz(&state.pool, benutzer.org_id, einsatz_id).await?;
+    // org_id kommt vom Einsatz, nicht vom Aufrufer (Cross-Org-Zugriff möglich).
+    let sgs = sg_repo::liste_fuer_einsatz(&state.pool, einsatz.org_id, einsatz_id).await?;
     Ok(Json(sgs.iter().map(Sprechgruppe::anzeige).collect()))
 }
 
@@ -186,9 +187,10 @@ pub async fn anlegen_einsatz_lokal(
     fordere_schreibrecht(rolle)?;
     fordere_aktiv(&einsatz)?;
     let n = normalisiere_lokal(body)?;
+    // org_id kommt vom Einsatz, nicht vom Aufrufer (Cross-Org-Zugriff möglich).
     let sg = sg_repo::anlegen_einsatz_lokal(
         &state.pool,
-        benutzer.org_id,
+        einsatz.org_id,
         einsatz_id,
         &n.bezeichnung,
         &n.betriebsart,

@@ -227,7 +227,7 @@ pub async fn setze_abschnitt_sprechgruppen(
         .await?;
     for &id in ids {
         sqlx::query(
-            "INSERT INTO einsatzabschnitt_sprechgruppe (abschnitt_id, sprechgruppe_id) VALUES (?, ?)",
+            "INSERT OR IGNORE INTO einsatzabschnitt_sprechgruppe (abschnitt_id, sprechgruppe_id) VALUES (?, ?)",
         )
         .bind(abschnitt_id)
         .bind(id)
@@ -274,7 +274,7 @@ pub async fn setze_einheit_sprechgruppen(
         .await?;
     for &id in ids {
         sqlx::query(
-            "INSERT INTO einsatz_einheit_sprechgruppe (einheit_id, sprechgruppe_id) VALUES (?, ?)",
+            "INSERT OR IGNORE INTO einsatz_einheit_sprechgruppe (einheit_id, sprechgruppe_id) VALUES (?, ?)",
         )
         .bind(einheit_id)
         .bind(id)
@@ -363,6 +363,16 @@ mod tests {
         let lokal_woanders = anlegen_einsatz_lokal(&pool, 1, anderer_einsatz, "Sonder 9", "DMO", None).await.unwrap();
         assert!(matches!(setze_abschnitt_sprechgruppen(&pool, 1, e, a, &[fremd.id]).await.unwrap_err(), AppError::UnprocessableEntity(_)));
         assert!(matches!(setze_abschnitt_sprechgruppen(&pool, 1, e, a, &[lokal_woanders.id]).await.unwrap_err(), AppError::UnprocessableEntity(_)));
+    }
+    #[tokio::test]
+    async fn setze_abschnitt_sprechgruppen_duplikat_in_ids_ignoriert() {
+        let pool = crate::db::test_pool().await;
+        let (e, a) = setup_einsatz_abschnitt(&pool).await;
+        let kat = anlegen_katalog(&pool, 1, KatalogDaten{bezeichnung:"412_F_DRK",betriebsart:"TMO",hinweis:None,sortier:0}).await.unwrap();
+        // Gleiche ID zweimal — darf keinen PK-Fehler auslösen.
+        setze_abschnitt_sprechgruppen(&pool, 1, e, a, &[kat.id, kat.id]).await.unwrap();
+        let nach = lade_abschnitt_sprechgruppen(&pool, a).await.unwrap();
+        assert_eq!(nach.len(), 1, "Duplikat-ID darf nur einen Eintrag erzeugen");
     }
     #[tokio::test]
     async fn setze_und_lade_einheit_sprechgruppen() {

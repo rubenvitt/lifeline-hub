@@ -14,8 +14,8 @@ export function aktualisiereSprechgruppe(id: number, eingabe: SprechgruppeEingab
   return apiSend<Sprechgruppe>(`/api/sprechgruppen/${id}`, 'PATCH', eingabe);
 }
 
-export function deaktiviereSprechgruppe(id: number): Promise<Sprechgruppe> {
-  return apiSend<Sprechgruppe>(`/api/sprechgruppen/${id}/deaktivieren`, 'POST');
+export function deaktiviereSprechgruppe(id: number): Promise<void> {
+  return apiSend<void>(`/api/sprechgruppen/${id}/deaktivieren`, 'POST');
 }
 
 export function listeEinsatzSprechgruppen(einsatzId: number): Promise<Sprechgruppe[]> {
