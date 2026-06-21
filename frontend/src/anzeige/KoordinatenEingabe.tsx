@@ -4,7 +4,7 @@ import type { Koordinatenformat } from '../api/types';
 import { formatiere, parse, type LatLon } from './koordinaten';
 import { useAnzeigeKonventionen } from './AnzeigeKonventionenContext';
 import { setzeOverride, useKoordinatenSystemOverride } from './koordinatenSystemStore';
-import { useOrtVorschau } from './useOrtVorschau';
+import { OrtZeile } from './OrtZeile';
 
 const OPTIONEN: { value: Koordinatenformat; label: string }[] = [
   { value: 'wgs84', label: 'WGS84 dezimal' },
@@ -24,41 +24,6 @@ interface Props {
   exclude?: string;
 }
 
-/** Sekundäre Ort-Zeile (additiv, degradiert leer). Nur gemountet, wenn einsatzId gesetzt
- *  ist — so verlangt der React-Query-Hook nur dann einen QueryClient. */
-function OrtVorschauZeile({
-  einsatzId,
-  koord,
-  exclude,
-}: {
-  einsatzId: number;
-  koord: LatLon;
-  exclude?: string;
-}) {
-  const { formatDistanz } = useAnzeigeKonventionen();
-  const { data, isFetching } = useOrtVorschau(einsatzId, koord, exclude);
-
-  if (!data) {
-    return isFetching ? (
-      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-        Ort wird ermittelt …
-      </Typography.Text>
-    ) : null;
-  }
-
-  const teile: string[] = [];
-  if (data.ortsname) teile.push(data.ortsname);
-  if (data.peilung) {
-    teile.push(`${formatDistanz(data.peilung.distanz_m)} ${data.peilung.richtung} von ${data.peilung.bezug_label}`);
-  }
-  if (teile.length === 0) return null;
-
-  return (
-    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-      {teile.join(' · ')}
-    </Typography.Text>
-  );
-}
 
 export default function KoordinatenEingabe({ value, onChange, status, einsatzId, exclude }: Props) {
   const override = useKoordinatenSystemOverride();
@@ -120,7 +85,7 @@ export default function KoordinatenEingabe({ value, onChange, status, einsatzId,
         </Typography.Text>
       ) : null}
       {!fehler && value && einsatzId != null && (
-        <OrtVorschauZeile einsatzId={einsatzId} koord={value} exclude={exclude} />
+        <OrtZeile einsatzId={einsatzId} koord={value} exclude={exclude} />
       )}
     </Space>
   );
