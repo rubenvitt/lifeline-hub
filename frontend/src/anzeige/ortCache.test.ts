@@ -1,7 +1,9 @@
-import { describe, it, expect } from 'vitest';
-import { ortKeyVon, holeOrt, setzeOrt } from './ortCache';
+import { describe, it, expect, afterEach } from 'vitest';
+import { ortKeyVon, holeOrt, setzeOrt, leereOrtCache } from './ortCache';
 
 describe('ortCache', () => {
+  afterEach(() => leereOrtCache());
+
   it('rundet den Key auf 3 Nachkommastellen (~100 m)', () => {
     expect(ortKeyVon(51.16040, 10.45140)).toBe('51.160,10.451');
     expect(ortKeyVon(51.16042, 10.45138)).toBe(ortKeyVon(51.16040, 10.45140));

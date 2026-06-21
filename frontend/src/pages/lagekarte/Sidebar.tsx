@@ -34,13 +34,15 @@ const NICHT_VERORTET_LABEL: Record<NichtVerortet['typ'], string> = {
   abschnitt: 'Abschnitt',
 };
 
-/** Platzierungsziel → exclude-Tag (typ:id) für die Ort-Vorschau (Selbst-Ausschluss). */
-function ortVorschauExclude(ziel: SidebarProps['platzierungZiel']): string | undefined {
+/** Platzierungsziel → exclude-Tag (typ:id) für die Ort-Vorschau (Selbst-Ausschluss).
+ *  Einsatzort-Marker trägt die echte einsatzId, nicht die Dummy-0 aus dem Platzierungs-Ziel. */
+export function ortVorschauExclude(ziel: SidebarProps['platzierungZiel'], einsatzId: number): string | undefined {
   if (!ziel) return undefined;
+  if (ziel.typ === 'einsatzort') return `einsatzort:${einsatzId}`; // Marker-id = echte Einsatz-ID, nicht 0
   // Sidebar-Typen → Backend-Marker-Typ-Tags. 'fuehrung' = Personal-Führung → 'personal'.
   const map: Record<string, string> = {
     uhs: 'uhs', schaden: 'schaden', einheit: 'einheit',
-    fahrzeug: 'fahrzeug', fuehrung: 'personal', einsatzort: 'einsatzort',
+    fahrzeug: 'fahrzeug', fuehrung: 'personal',
   };
   const typ = map[ziel.typ];
   return typ ? `${typ}:${ziel.id}` : undefined;
@@ -155,7 +157,7 @@ export default function Sidebar(props: SidebarProps) {
               value={koord}
               onChange={setKoord}
               einsatzId={props.einsatzId}
-              exclude={ortVorschauExclude(props.platzierungZiel)}
+              exclude={ortVorschauExclude(props.platzierungZiel, props.einsatzId)}
             />
           </div>
           <div style={{ marginTop: 8 }}>
