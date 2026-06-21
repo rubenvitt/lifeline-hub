@@ -37,4 +37,5 @@ pub mod lage_zone;
 pub mod personal;
 pub mod personal_status;
 pub mod qualifikation;
+pub mod sprechgruppe;
 pub mod stichwort;
