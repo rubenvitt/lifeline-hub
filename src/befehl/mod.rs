@@ -1,3 +1,5 @@
+pub mod repo;
+
 use crate::error::AppError;
 use serde::{Deserialize, Serialize};
 
