@@ -175,7 +175,7 @@ export default function KraefteuebersichtPage() {
         <Space size="large" align="start" style={{ flexWrap: 'nowrap' }}>
           {/* Achse 1: Personalstärke */}
           <Space size="large">
-            <Statistic title="Gesamtstärke (F/UF/M/Ges)" value={staerkeText(v.staerke)} />
+            <Statistic title="Gesamtstärke (F/UF/M//Ges)" value={staerkeText(v.staerke)} />
             <Statistic title="Personal" value={v.anzahlPersonal} />
           </Space>
 

@@ -49,7 +49,7 @@ export default function KennzahlenLeiste(props: Props) {
   return (
     <Card size="small" style={{ marginBottom: 16 }} styles={{ body: { overflowX: 'auto' } }}>
       <Space size="large" align="start" style={{ flexWrap: 'nowrap' }}>
-        <Kennzahl titel="Kräfte (F/UF/M/Ges)" value={kraefte ? staerkeText(kraefte.staerke) : STRICH} onClick={() => onNavigate('kraefteuebersicht')} />
+        <Kennzahl titel="Kräfte (F/UF/M//Ges)" value={kraefte ? staerkeText(kraefte.staerke) : STRICH} onClick={() => onNavigate('kraefteuebersicht')} />
         <Kennzahl titel="Patienten (SK I–IV)" value={patienten ?? STRICH} onClick={() => onNavigate('personen')} />
         <Kennzahl titel="Vermisst" value={vermisst ?? STRICH} onClick={() => onNavigate('personen')} />
         <Kennzahl titel="Höchste Warnstufe" value={warnstufe ? WARNSTUFE_LABEL[warnstufe] : STRICH} farbe={warnstufe ? WARNSTUFE_TEXTFARBE[warnstufe] : undefined} onClick={() => onNavigate('gefahren')} />

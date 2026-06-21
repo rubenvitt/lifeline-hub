@@ -33,7 +33,7 @@ describe('EinheitTypenTab', () => {
   it('zeigt Typen mit Soll-Stärke und „—" bei fehlender Soll', async () => {
     render(nichtAdmin);
     expect(await screen.findByText('Zug')).toBeInTheDocument();
-    expect(screen.getByText('1/3/18/22')).toBeInTheDocument();
+    expect(screen.getByText('1/3/18//22')).toBeInTheDocument();
     expect(screen.getByText('Sonstige')).toBeInTheDocument();
   });
 

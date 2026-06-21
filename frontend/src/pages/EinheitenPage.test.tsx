@@ -41,9 +41,9 @@ describe('EinheitenPage', () => {
       { route: '/einsaetze/1/einheiten' },
     );
     expect(await screen.findByText('1. Zug')).toBeInTheDocument();
-    // Ist 1/0/2 (Σ3) und Soll 1/3/18 (Σ22) werden angezeigt.
-    expect(screen.getByText(/1\/0\/2\/3/)).toBeInTheDocument();
-    expect(screen.getByText(/1\/3\/18\/22/)).toBeInTheDocument();
+    // Ist 1/0/2 (Σ3) und Soll 1/3/18 (Σ22) werden angezeigt (BOS-Doppelstrich vor Gesamt).
+    expect(screen.getByText(/1\/0\/2\/\/3/)).toBeInTheDocument();
+    expect(screen.getByText(/1\/3\/18\/\/22/)).toBeInTheDocument();
   });
 
   it('zeigt „Einheit bilden" bei Schreibrecht', async () => {

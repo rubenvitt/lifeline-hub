@@ -244,7 +244,7 @@ mod tests {
         org(&pool, 1).await;
         let f = anlegen(&pool, 1, daten("Florian 1")).await.unwrap();
         assert_eq!(f.funkrufname, "Florian 1");
-        assert_eq!(f.staerke().unwrap().anzeige(), "0/1/8/9");
+        assert_eq!(f.staerke().unwrap().anzeige(), "0/1/8//9");
         assert_eq!(laden(&pool, 1, f.id).await.unwrap().id, f.id);
     }
 

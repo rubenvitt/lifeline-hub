@@ -390,9 +390,9 @@ export function filtereKraefte(roh: Rohdaten, f: FilterWerte): Rohdaten {
 
 // ── Formatierung ──────────────────────────────────────────────────────────────
 
-/** Formatiert eine Stärke als „F/UF/M/Ges" (z. B. „1/0/5/6"). */
+/** Formatiert eine Stärke als „F/UF/M//Ges" (BOS-Doppelstrich vor Gesamt; z. B. „1/0/5//6"). */
 export function staerkeText(s: StaerkeSumme): string {
-  return `${s.fuehrer}/${s.unterfuehrer}/${s.mannschaft}/${s.gesamt}`;
+  return `${s.fuehrer}/${s.unterfuehrer}/${s.mannschaft}//${s.gesamt}`;
 }
 
 // ── Markdown-Renderer ─────────────────────────────────────────────────────────
@@ -404,7 +404,7 @@ function rendereMeldebildZeileMarkdown(zeile: MeldebildZeile, tiefe: number): st
     // Abschnitte tragen keinen Einzug — die Tiefe steckt in der Heading-Hierarchie (## / ###).
     const prefix = tiefe === 0 ? '##' : '###';
     zeilen.push(`${prefix} ${zeile.bezeichnung}`);
-    zeilen.push(`Stärke (F/UF/M/Ges): ${staerkeText(zeile.staerke)}`);
+    zeilen.push(`Stärke (F/UF/M//Ges): ${staerkeText(zeile.staerke)}`);
   } else if (zeile.art === 'einheit') {
     const einzug = '  '.repeat(Math.max(0, tiefe - 1));
     const detail = zeile.detail ? ` (${zeile.detail})` : '';
@@ -452,7 +452,7 @@ export function rendereMeldebildMarkdown(bild: Kraeftebild, stand: string): stri
   // Verdichtungsblock
   zeilen.push('## Lagebild gesamt');
   zeilen.push('');
-  zeilen.push(`**Gesamtstärke (F/UF/M/Ges):** ${staerkeText(v.staerke)}`);
+  zeilen.push(`**Gesamtstärke (F/UF/M//Ges):** ${staerkeText(v.staerke)}`);
   zeilen.push(`**Fahrzeuge:** ${v.anzahlFahrzeuge} gesamt (frei: ${v.fahrzeugStatus.verfuegbar}, gebunden: ${v.fahrzeugStatus.gebunden}, n.v.: ${v.fahrzeugStatus.nicht_verfuegbar})`);
   zeilen.push(`**Material (Positionen):** ${v.anzahlMaterialPositionen}`);
   if (v.anzahlMaterialPositionen > 0) {

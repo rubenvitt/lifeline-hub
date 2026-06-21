@@ -66,7 +66,7 @@ export default function EinheitTypenTab() {
 
   const spalten: TableColumnsType<EinheitTyp> = [
     { title: 'Label', dataIndex: 'label', key: 'label' },
-    { title: 'Soll-Stärke (F/UF/M/Σ)', key: 'soll', render: (_, t) => <StaerkeAnzeige wert={t.soll} /> },
+    { title: 'Soll-Stärke (F/UF/M//Σ)', key: 'soll', render: (_, t) => <StaerkeAnzeige wert={t.soll} /> },
     { title: 'Sortierung', dataIndex: 'sortier', key: 'sortier' },
     ...(istAdmin
       ? ([

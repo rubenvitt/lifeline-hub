@@ -183,7 +183,7 @@ mod tests {
     fn staerke_aufgeloest_wenn_vollstaendig() {
         let f = fahrzeug();
         let s = f.staerke().unwrap();
-        assert_eq!(s.anzeige(), "0/1/8/9");
+        assert_eq!(s.anzeige(), "0/1/8//9");
         assert_eq!(f.anzeige().staerke, Some(s));
     }
 

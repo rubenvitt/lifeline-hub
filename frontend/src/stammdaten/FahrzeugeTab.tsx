@@ -10,7 +10,7 @@ import FahrzeugFormModal from './FahrzeugFormModal';
 function staerkeText(f: Fahrzeug): string {
   if (!f.staerke) return '—';
   const { fuehrer, unterfuehrer, mannschaft } = f.staerke;
-  return `${fuehrer}/${unterfuehrer}/${mannschaft}/${fuehrer + unterfuehrer + mannschaft}`;
+  return `${fuehrer}/${unterfuehrer}/${mannschaft}//${fuehrer + unterfuehrer + mannschaft}`;
 }
 
 export default function FahrzeugeTab() {

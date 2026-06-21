@@ -21,9 +21,9 @@ impl Staerke {
         self.fuehrer as u32 + self.unterfuehrer as u32 + self.mannschaft as u32
     }
 
-    /// 4-stellige Anzeige "F/UF/M/Gesamt", z. B. "1/3/18/22".
+    /// 4-stellige Anzeige "F/UF/M//Gesamt" (BOS-Doppelstrich vor der Gesamtstärke), z. B. "1/3/18//22".
     pub fn anzeige(&self) -> String {
-        format!("{}/{}/{}/{}", self.fuehrer, self.unterfuehrer, self.mannschaft, self.gesamt())
+        format!("{}/{}/{}//{}", self.fuehrer, self.unterfuehrer, self.mannschaft, self.gesamt())
     }
 
     /// Baut eine optionale Stärke aus drei Eingabe-/DB-Optionen (i64, da SQLite
@@ -113,8 +113,8 @@ mod tests {
 
     #[test]
     fn anzeige_ist_vierstellig() {
-        assert_eq!(Staerke::neu(1, 3, 18).anzeige(), "1/3/18/22");
-        assert_eq!(Staerke::neu(0, 1, 5).anzeige(), "0/1/5/6");
+        assert_eq!(Staerke::neu(1, 3, 18).anzeige(), "1/3/18//22");
+        assert_eq!(Staerke::neu(0, 1, 5).anzeige(), "0/1/5//6");
     }
 
     #[test]

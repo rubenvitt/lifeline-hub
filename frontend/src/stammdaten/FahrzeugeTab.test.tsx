@@ -38,7 +38,7 @@ describe('FahrzeugeTab', () => {
   it('zeigt Fahrzeuge inkl. Stärke', async () => {
     render(admin);
     expect(await screen.findByText('Florian 1')).toBeInTheDocument();
-    expect(screen.getByText('0/1/8/9')).toBeInTheDocument();
+    expect(screen.getByText('0/1/8//9')).toBeInTheDocument();
   });
 
   it('Admin sieht „Fahrzeug anlegen" und Aktionen', async () => {

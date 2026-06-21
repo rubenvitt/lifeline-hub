@@ -104,8 +104,8 @@ describe('KraefteuebersichtPage', () => {
     vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]);
     setup();
     expect(await screen.findByRole('heading', { name: 'Kräfteübersicht' })).toBeInTheDocument();
-    const statCard = screen.getByText('Gesamtstärke (F/UF/M/Ges)').closest('.ant-statistic')!;
-    expect(await within(statCard as HTMLElement).findByText('0/0/1/1')).toBeInTheDocument();
+    const statCard = screen.getByText('Gesamtstärke (F/UF/M//Ges)').closest('.ant-statistic')!;
+    expect(await within(statCard as HTMLElement).findByText('0/0/1//1')).toBeInTheDocument();
   });
 
   it('rendert Abschnitt, Einheit und Einzelmittel als aufklappbare Zeilen', async () => {
