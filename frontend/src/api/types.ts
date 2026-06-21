@@ -959,6 +959,35 @@ export interface LageberichtAnzeige {
   etb_eintrag_id: number | null;
 }
 
+// ============================== LFH-64 Befehlsgebung ==============================
+export type BefehlVorlageKey = 'befehl_lad' | 'befehl_ladef' | 'befehl_schnee' | 'befehl_ea_zmw';
+export type BefehlStatus = 'entwurf' | 'freigegeben';
+
+export interface BefehlAbschnitt {
+  schluessel: string;
+  text: string;
+}
+
+export interface BefehlAnzeige {
+  id: number;
+  einsatz_id: number;
+  vorlage: BefehlVorlageKey;
+  titel: string;
+  zeitstand: string;
+  status: BefehlStatus;
+  abschnitte: BefehlAbschnitt[];
+  version: number;
+  vorgaenger_id: number | null;
+  ersteller_id: number;
+  ersteller_name: string;
+  erstellt_at: string;
+  aktualisiert_at: string;
+  freigegeben_von_id: number | null;
+  freigegeben_von_name: string | null;
+  freigegeben_at: string | null;
+  etb_eintrag_id: number | null;
+}
+
 // ============================== LFH-51 Terminierte Erinnerungen ==============================
 
 export interface Erinnerung {
