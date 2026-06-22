@@ -9,6 +9,7 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import MarkdownEditor, { type TextAreaRef } from '../components/MarkdownEditor';
 import Schnellerfassung from './Schnellerfassung';
+import type { EntwurfWerte } from './entwuerfe/entwurfModell';
 
 // Die Schnellerfassung lädt über useFunkrufnamen immer /fahrzeuge + /einheiten.
 // onUnhandledRequest: 'error' im Setup → Default-Handler (leere Listen) bereitstellen,
@@ -224,5 +225,30 @@ describe('Schnellerfassung', () => {
     await userEvent.click(screen.getByRole('combobox'));
     await userEvent.click(await screen.findByText('Lage'));
     expect(await screen.findByRole('button', { name: /strukturierten Lagebericht/i })).toBeInTheDocument();
+  });
+});
+
+describe('Schnellerfassung – Entwurf-Anbindung', () => {
+  it('übernimmt initialWerte in das Eingabefeld', () => {
+    const p = props({ initialWerte: { inhalt: 'Vorbefüllt', typ: 'meldung', metadaten: {} } });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue('Vorbefüllt');
+  });
+
+  it('feuert onWerteChange NICHT beim Mount', () => {
+    const onWerteChange = vi.fn();
+    const p = props({ initialWerte: { inhalt: 'Vorbefüllt', typ: 'meldung', metadaten: {} }, onWerteChange });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    expect(onWerteChange).not.toHaveBeenCalled();
+  });
+
+  it('feuert onWerteChange bei echter Eingabe mit aktuellem Inhalt', async () => {
+    const onWerteChange = vi.fn();
+    const p = props({ onWerteChange });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Hi');
+    await waitFor(() => expect(onWerteChange).toHaveBeenCalled());
+    const letzter = onWerteChange.mock.calls.at(-1)![0] as EntwurfWerte;
+    expect(letzter.inhalt).toBe('Hi');
   });
 });
