@@ -158,7 +158,7 @@ function geschaedigtFelder(
 export default function SchaedenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { message } = App.useApp();
   const qc = useQueryClient();
 
@@ -200,6 +200,20 @@ export default function SchaedenPage() {
     const n = Number(ziel);
     if (ziel && !Number.isNaN(n)) setOffenerSchadenId(n);
   }, [searchParams]);
+
+  const einsatz = einsatzQuery.data;
+  const darfSchreiben =
+    einsatz?.status === 'aktiv' &&
+    (einsatz?.meine_rolle === 'einsatzleitung' || einsatz?.meine_rolle === 'fuehrungspersonal');
+
+  // Schnellaktion: ?neu=1 öffnet die Erfassung (Command-Palette, LFH-11).
+  useEffect(() => {
+    if (searchParams.get('neu') !== '1') return;
+    if (einsatzQuery.isLoading || !darfSchreiben) return;
+    setErfassenOffen(true);
+    searchParams.delete('neu');
+    setSearchParams(searchParams, { replace: true });
+  }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreiben]);
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: ['einsatz-schaeden', einsatzId] });
@@ -253,11 +267,6 @@ export default function SchaedenPage() {
     },
     onError: fehler,
   });
-
-  const einsatz = einsatzQuery.data;
-  const darfSchreiben =
-    einsatz?.status === 'aktiv' &&
-    (einsatz?.meine_rolle === 'einsatzleitung' || einsatz?.meine_rolle === 'fuehrungspersonal');
 
   const alle = schaedenQuery.data ?? [];
   const sichtbar = alle

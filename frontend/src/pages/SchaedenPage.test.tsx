@@ -67,6 +67,44 @@ function render(einsatzObj: object, schaeden: object[], personen: object[] = [],
   );
 }
 
+/** Rendert SchaedenPage mit konfigurierbarer Route (z.B. mit Query-Params). */
+function renderSchaedenPage(route: string) {
+  server.use(
+    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+    http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
+  );
+  return renderMitProviders(
+    <AuthProvider>
+      <Routes>
+        <Route path="/einsaetze/:id/schaeden" element={<SchaedenPage />} />
+      </Routes>
+    </AuthProvider>,
+    { route },
+  );
+}
+
+/** Rendert SchaedenPage mit wählbarem Einsatz-Objekt und Route. */
+function renderSchaedenPageMitEinsatz(einsatzObj: object, route: string) {
+  server.use(
+    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
+    http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
+  );
+  return renderMitProviders(
+    <AuthProvider>
+      <Routes>
+        <Route path="/einsaetze/:id/schaeden" element={<SchaedenPage />} />
+      </Routes>
+    </AuthProvider>,
+    { route },
+  );
+}
+
 /** antd-Dropdown-Option im Portal anhand des Anzeige-Labels treffen (Tabellenzellen
  *  tragen denselben Text → über `.ant-select-item-option` abgrenzen). */
 async function waehleOption(label: string) {
@@ -255,6 +293,18 @@ describe('SchaedenPage', () => {
     await waehleOption('behoben');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abschließen' }));
     await vi.waitFor(() => expect(body.abschluss_grund).toBe('behoben'));
+  });
+
+  it('öffnet via ?neu=1 die Schadens-Erfassung', async () => {
+    renderSchaedenPage('/einsaetze/1/schaeden?neu=1');
+    expect(await screen.findByText('Schaden erfassen')).toBeInTheDocument();
+  });
+
+  it('öffnet via ?neu=1 die Erfassungsmaske NICHT für Beobachter', async () => {
+    renderSchaedenPageMitEinsatz(einsatzBeobachter, '/einsaetze/1/schaeden?neu=1');
+    // Tabelle muss laden (Seite ist gerendert)
+    await screen.findByText('Keine Schäden in dieser Sicht');
+    expect(screen.queryByText('Schaden erfassen')).not.toBeInTheDocument();
   });
 
   it('öffnet per ?schaden=-Query den Detail-Drawer', async () => {
