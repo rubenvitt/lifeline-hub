@@ -86,6 +86,11 @@ describe('baueBefehle — Schnellaktionen', () => {
     const overrides = { etb: ueberschreibung({ sichtbar: false }) };
     expect(baueBefehle(kontext({ overrides })).some((x) => x.id === 'aktion:etb')).toBe(false);
   });
+  it('folgt dem Rollen-Lock: gesperrte Trägermodule liefern keine Schnellaktion', () => {
+    const overrides = { etb: ueberschreibung({ benoetigte_rolle: 'fuehrungskraft' }) };
+    expect(baueBefehle(kontext({ benutzer: sichter, overrides })).some((x) => x.id === 'aktion:etb')).toBe(false);
+    expect(baueBefehle(kontext({ benutzer: fuehrungskraft, overrides })).some((x) => x.id === 'aktion:etb')).toBe(true);
+  });
 });
 
 describe('baueBefehle — Einsatz-Wechsel', () => {

@@ -3,6 +3,7 @@ import { TbList, TbUser, TbSettings, TbLogout, TbPlus, TbSun, TbMoon, TbDeviceDe
 import {
   modulRegistry, istModulSichtbar, istModulGesperrt, modulZielRoute,
 } from '../einsatz/modulRegistry';
+import type { IconType } from 'react-icons';
 import type { Befehl, BefehlKontext } from './typen';
 import type { ThemeModus } from '../theme/ThemeModeProvider';
 import type { Koordinatenformat } from '../api/types';
@@ -14,7 +15,7 @@ const SCHNELLAKTIONEN: { modulKey: string; route: string; label: string; schlagw
   { modulKey: 'schaeden', route: 'schaeden', label: 'Neuen Schaden erfassen', schlagworte: ['schaden', 'objekt'] },
 ];
 
-const THEME_BEFEHLE: { id: string; label: string; modus: ThemeModus; icon: typeof TbSun }[] = [
+const THEME_BEFEHLE: { id: string; label: string; modus: ThemeModus; icon: IconType }[] = [
   { id: 'theme:system', label: 'Darstellung: System', modus: 'system', icon: TbDeviceDesktop },
   { id: 'theme:light', label: 'Darstellung: Hell', modus: 'light', icon: TbSun },
   { id: 'theme:dark', label: 'Darstellung: Dunkel', modus: 'dark', icon: TbMoon },
@@ -69,7 +70,7 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
 
   // 4. Schnelleinstellungen — global
   for (const t of THEME_BEFEHLE) {
-    befehle.push({ id: t.id, gruppe: 'einstellungen', label: t.label, icon: t.icon, schlagworte: ['theme', 'dark', 'hell', 'dunkel'], ausfuehren: () => k.setThemeModus(t.modus) });
+    befehle.push({ id: t.id, gruppe: 'einstellungen', label: t.label, icon: t.icon, schlagworte: ['theme', 'hell', 'dunkel'], ausfuehren: () => k.setThemeModus(t.modus) });
   }
   for (const c of KOORD_BEFEHLE) {
     befehle.push({ id: `koord:${c.format}`, gruppe: 'einstellungen', label: `Koordinaten: ${c.label}`, icon: TbWorld, schlagworte: ['koordinaten', 'format', c.format], ausfuehren: () => k.setKoordinaten(c.format) });
