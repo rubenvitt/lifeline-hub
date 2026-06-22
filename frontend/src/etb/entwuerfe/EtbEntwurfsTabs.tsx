@@ -18,14 +18,6 @@ export default function EtbEntwurfsTabs({ einsatzId, erfassen, bausteine, einsat
   const { entwuerfe, aktiverId, neuerEntwurf, entwurfSchliessen, entwurfAktualisieren, aktivenSetzen } =
     useEtbEntwuerfe(einsatzId);
 
-  const erfassenUndSchliessen = useCallback(
-    async (eintrag: NeuerEintrag) => {
-      await erfassen(eintrag); // wirft bei fachlicher Ablehnung → Entwurf bleibt
-      if (aktiverId) await entwurfSchliessen(aktiverId);
-    },
-    [erfassen, aktiverId, entwurfSchliessen],
-  );
-
   const onEdit = useCallback(
     (targetKey: React.MouseEvent | React.KeyboardEvent | string, action: 'add' | 'remove') => {
       if (action === 'add') neuerEntwurf();
@@ -42,7 +34,10 @@ export default function EtbEntwurfsTabs({ einsatzId, erfassen, bausteine, einsat
       e.id === aktiverId ? (
         <Schnellerfassung
           key={e.id}
-          erfassen={erfassenUndSchliessen}
+          erfassen={async (eintrag) => {
+            await erfassen(eintrag); // wirft bei fachlicher Ablehnung → Entwurf bleibt
+            await entwurfSchliessen(e.id); // genau diesen Tab schließen, nicht den aktiven
+          }}
           berichtigungZu={null}
           onBerichtigungAbbrechen={() => {}}
           bausteine={bausteine}

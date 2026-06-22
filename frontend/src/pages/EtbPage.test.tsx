@@ -6,11 +6,13 @@ import { Route, Routes } from 'react-router-dom';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
-import { entwuerfeLeerenFuerTests } from '../etb/entwuerfe/entwurfStore';
+import { entwuerfeLaden, entwuerfeLeerenFuerTests } from '../etb/entwuerfe/entwurfStore';
+import { queueLeerenFuerTests } from '../offline/queue';
 import EtbPage from './EtbPage';
 
 beforeEach(async () => {
   await entwuerfeLeerenFuerTests();
+  await queueLeerenFuerTests();
   localStorage.clear();
 });
 
@@ -101,6 +103,18 @@ describe('EtbPage', () => {
     await user.type(feld, 'Neuer Eintrag X{Enter}');
     await waitFor(() => expect(body).not.toBeNull());
     expect(body!.inhalt).toBe('Neuer Eintrag X');
+  });
+
+  it('entfernt den Entwurf auch bei Offline-Enqueue (Netzwerkfehler → eingereiht statt abgelehnt)', async () => {
+    // erfasseEtb wirft bei Netzwerkfehler einen TypeError → useEtbErfassung reiht offline ein
+    // und RESOLVED (kein throw). Der Entwurf muss trotzdem entfernt werden (Spec: weg, sobald
+    // erfassen ohne Exception zurückkehrt — Server-Erfolg ODER offline eingereiht).
+    server.use(http.post('/api/einsaetze/7/etb', () => HttpResponse.error()));
+    setup();
+    const user = userEvent.setup();
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await user.type(feld, 'Offline-Eintrag{Enter}');
+    await waitFor(async () => expect(await entwuerfeLaden(7)).toHaveLength(0));
   });
 
   it('legt aus einem ETB-Eintrag eine Wiedervorlage mit ETB-Bezug an', async () => {
