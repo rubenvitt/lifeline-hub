@@ -41,7 +41,7 @@ export function zuWerte(e: EtbEntwurf): EntwurfWerte {
   };
 }
 
-type EntwurfPatch = Pick<EtbEntwurf, 'inhalt' | 'typ' | 'von' | 'an' | 'meldeweg' | 'veranlassung' | 'ereigniszeit'>;
+export type EntwurfPatch = Pick<EtbEntwurf, 'inhalt' | 'typ' | 'von' | 'an' | 'meldeweg' | 'veranlassung' | 'ereigniszeit'>;
 
 export function werteZuPatch(w: EntwurfWerte): EntwurfPatch {
   const m = w.metadaten;
