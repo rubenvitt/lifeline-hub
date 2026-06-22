@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes, useLocation } from 'react-router-dom';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
@@ -32,7 +32,13 @@ const eintrag = {
   erfasst_lokal_at: null, berichtigt_eintrag_id: null,
 };
 
-function setup() {
+/** Zeigt den aktuellen Search-String im DOM — ermöglicht Param-Bereinigung zu prüfen. */
+function OrtSpy() {
+  const ort = useLocation();
+  return <div data-testid="ort-suche">{ort.search}</div>;
+}
+
+function setupMSW() {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(admin)),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
@@ -44,13 +50,18 @@ function setup() {
     // Auftrags-Ziele für das ETB→Auftrag-Formular (LFH-112).
     http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
   );
+}
+
+function setup(route = '/einsaetze/7/etb') {
+  setupMSW();
   return renderMitProviders(
     <AuthProvider>
       <Routes>
         <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
       </Routes>
+      <OrtSpy />
     </AuthProvider>,
-    { route: '/einsaetze/7/etb' },
+    { route },
   );
 }
 
@@ -137,5 +148,17 @@ describe('EtbPage', () => {
     expect(body!.bezug_typ).toBe('etb');
     expect(body!.bezug_id).toBe(1);
     expect(body!.titel).toMatch(/Erste Meldung/);
+  });
+
+  it('verarbeitet ?neu=1 und entfernt den Param', async () => {
+    setup('/einsaetze/7/etb?neu=1');
+    // Erfassungszeile ist bei Schreibrecht (aktiv + einsatzleitung) vorhanden.
+    await waitFor(() =>
+      expect(document.querySelector('.etb-erfassung-sticky')).toBeTruthy(),
+    );
+    // Der ?neu=1-Handler muss den Param aus der URL entfernen.
+    await waitFor(() =>
+      expect(screen.getByTestId('ort-suche').textContent).not.toContain('neu'),
+    );
   });
 });
