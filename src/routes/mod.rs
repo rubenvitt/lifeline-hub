@@ -20,6 +20,7 @@ pub mod einsatz_bereitstellungsraum;
 pub mod einsatzabschnitt;
 pub mod erinnerung;
 pub mod etb;
+pub mod befehl;
 pub mod lagebericht;
 pub mod etb_baustein;
 pub mod fahrzeug;

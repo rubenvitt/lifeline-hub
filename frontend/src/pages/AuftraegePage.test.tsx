@@ -13,6 +13,7 @@ vi.mock('../auth/AuthContext', () => ({ useAuth: () => ({ benutzer: { id: 1 } })
 vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn().mockResolvedValue({ id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung' }),
 }));
+vi.mock('../api/befehle', () => ({ listeBefehle: vi.fn().mockResolvedValue([]), legeBefehlAn: vi.fn() }));
 vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn().mockResolvedValue([]) }));
 vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn().mockResolvedValue([]) }));
 
@@ -201,5 +202,17 @@ describe('AuftraegePage', () => {
     expect(await screen.findByText('Deich sichern')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Auftrag erteilen' })).not.toBeInTheDocument();
     expect(screen.queryByText('quittieren')).not.toBeInTheDocument();
+  });
+
+  it('Tab-Wechsel zu Befehle zeigt BefehlListe mit „Befehl erteilen"-Button', async () => {
+    renderPage();
+    // Default-Tab "Aufträge" ist aktiv — erst Aufträge-Tab sichtbar
+    await screen.findByText('Deich sichern');
+    expect(screen.getByRole('tab', { name: 'Aufträge' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Befehle' })).toBeInTheDocument();
+    // Zum Befehle-Tab wechseln
+    await userEvent.click(screen.getByRole('tab', { name: 'Befehle' }));
+    // BefehlListe rendert den „Befehl erteilen"-Button (darfSchreiben = true)
+    expect(await screen.findByRole('button', { name: 'Befehl erteilen' })).toBeInTheDocument();
   });
 });

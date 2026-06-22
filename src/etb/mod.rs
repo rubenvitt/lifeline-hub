@@ -141,6 +141,8 @@ pub struct EtbEintragAnzeige {
     pub lagebericht_id: Option<i64>,
     /// Rückverweis auf den auslösenden Auftrag (LFH-52), falls aus Auftrag/Vollzug erzeugt.
     pub auftrag_id: Option<i64>,
+    /// Gesetzt, wenn dieser Eintrag der Freigabe-Snapshot eines Befehls ist (LFH-64). Sonst `None`.
+    pub befehl_id: Option<i64>,
 }
 
 #[cfg(test)]
