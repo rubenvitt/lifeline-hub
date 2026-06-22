@@ -600,7 +600,7 @@ export default function PersonenPage() {
                   dataSource={gruppe}
                   columns={spalten}
                   pagination={false}
-                  onRow={(p) => ({ onClick: () => { setOffenePersonId(p.id); setBearbeiten(false); }, style: { cursor: 'pointer' } })}
+                  onRow={(p) => ({ onClick: () => navigate(`/einsaetze/${einsatzId}/personen/${p.id}`), style: { cursor: 'pointer' } })}
                 />
               </div>
             );
@@ -618,7 +618,7 @@ export default function PersonenPage() {
           columns={[...spalten, ...aktionsSpalte]}
           pagination={false}
           locale={{ emptyText: 'Keine Personen in dieser Sicht' }}
-          onRow={(p) => ({ onClick: () => { setOffenePersonId(p.id); setBearbeiten(false); }, style: { cursor: 'pointer' } })}
+          onRow={(p) => ({ onClick: () => navigate(`/einsaetze/${einsatzId}/personen/${p.id}`), style: { cursor: 'pointer' } })}
         />
       )}
 

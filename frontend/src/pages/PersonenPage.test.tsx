@@ -7,6 +7,7 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
 import PersonenPage from './PersonenPage';
+import PersonenDetailPage from './PersonenDetailPage';
 import type { PersonDetail } from '../api/types';
 
 class FakeEventSource {
@@ -55,6 +56,7 @@ function render(einsatzObj: typeof einsatzAktiv, personen: unknown[], route = '/
     <AuthProvider>
       <Routes>
         <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
+        <Route path="/einsaetze/:id/personen/:personId" element={<PersonenDetailPage />} />
       </Routes>
     </AuthProvider>,
     { route },
@@ -313,6 +315,14 @@ describe('PersonenPage', () => {
     // Seite lädt durch (Tabelle ist leer, kein Spinner mehr)
     await screen.findByRole('heading', { name: 'Personen' });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('navigiert beim Klick auf eine Zeile zur Detailseite', async () => {
+    server.use(http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(person)));
+    render(einsatzAktiv, [person]);
+    await userEvent.click((await screen.findAllByText('Mustermann, Max'))[0]);
+    // Detailseite zeigt den Personen-Titel als Heading:
+    expect(await screen.findByRole('heading', { name: /Person R-001/ })).toBeInTheDocument();
   });
 
   it('zeigt den „Als Geschädigte bei Schäden"-Block im Personen-Drawer', async () => {
