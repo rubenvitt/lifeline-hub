@@ -2,7 +2,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { baueBefehle } from './befehle';
 import type { BefehlKontext } from './typen';
-import type { BenutzerAnzeige, ModulOverride } from '../api/types';
+import type { BenutzerAnzeige, EinsatzAnzeige, ModulOverride, Koordinatenformat } from '../api/types';
 
 const fuehrungskraft: BenutzerAnzeige = {
   id: 1, anzeigename: 'EL', benutzername: 'el', system_rolle: 'keiner',
@@ -58,5 +58,54 @@ describe('baueBefehle — Navigation/Berechtigung', () => {
     const b = baueBefehle(kontext({ einsatzId: null, benutzer: sichter }));
     expect(b.some((x) => x.id === 'nav:abmelden')).toBe(true);
     expect(b.some((x) => x.id === 'nav:einsaetze')).toBe(true);
+  });
+});
+
+const aktiverEinsatz: EinsatzAnzeige = {
+  id: 7, bezeichnung: 'Hochwasser Nord', stichwort: 'THW', status: 'aktiv',
+  begonnen_at: '', abgeschlossen_at: null, abgeschlossen_von: null, einsatzart: 'realeinsatz',
+  einsatznummer_intern: null, angelegt_at: '', leitstellen_nr: null, einsatzort: null,
+  einsatzort_lat: null, einsatzort_lon: null, meldende_stelle: null, sachverhalt: null,
+  anzahl_betroffene_initial: null, meine_rolle: 'einsatzleitung', org_id: 1, org_name: 'KV',
+};
+const beendet: EinsatzAnzeige = { ...aktiverEinsatz, id: 8, bezeichnung: 'Altfall', status: 'abgeschlossen' };
+
+describe('baueBefehle — Schnellaktionen', () => {
+  it('verdrahtet die Top-4-Aktionen mit ?neu=1 für Berechtigte', () => {
+    const k = kontext();
+    const b = baueBefehle(k);
+    const person = b.find((x) => x.id === 'aktion:personen');
+    expect(person).toBeDefined();
+    person!.ausfuehren();
+    expect(k.navigate).toHaveBeenCalledWith('/einsaetze/5/personen?neu=1');
+    expect(b.map((x) => x.id).filter((id) => id.startsWith('aktion:'))).toEqual(
+      ['aktion:personen', 'aktion:etb', 'aktion:unfallhilfsstellen', 'aktion:schaeden'],
+    );
+  });
+  it('folgt dem Modulfilter: versteckte Trägermodule liefern keine Schnellaktion', () => {
+    const overrides = { etb: ueberschreibung({ sichtbar: false }) };
+    expect(baueBefehle(kontext({ overrides })).some((x) => x.id === 'aktion:etb')).toBe(false);
+  });
+});
+
+describe('baueBefehle — Einsatz-Wechsel', () => {
+  it('listet nur aktive Einsätze', () => {
+    const k = kontext({ einsaetze: [aktiverEinsatz, beendet] });
+    const b = baueBefehle(k);
+    expect(b.some((x) => x.id === 'einsatz:7')).toBe(true);
+    expect(b.some((x) => x.id === 'einsatz:8')).toBe(false);
+    b.find((x) => x.id === 'einsatz:7')!.ausfuehren();
+    expect(k.navigate).toHaveBeenCalledWith('/einsaetze/7');
+  });
+});
+
+describe('baueBefehle — Schnelleinstellungen', () => {
+  it('schaltet Theme und Koordinatensystem', () => {
+    const k = kontext();
+    const b = baueBefehle(k);
+    b.find((x) => x.id === 'theme:dark')!.ausfuehren();
+    expect(k.setThemeModus).toHaveBeenCalledWith('dark');
+    b.find((x) => x.id === 'koord:mgrs')!.ausfuehren();
+    expect(k.setKoordinaten).toHaveBeenCalledWith('mgrs' as Koordinatenformat);
   });
 });
