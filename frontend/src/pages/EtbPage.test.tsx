@@ -1,12 +1,18 @@
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
+import { entwuerfeLeerenFuerTests } from '../etb/entwuerfe/entwurfStore';
 import EtbPage from './EtbPage';
+
+beforeEach(async () => {
+  await entwuerfeLeerenFuerTests();
+  localStorage.clear();
+});
 
 const admin = {
   id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
@@ -79,6 +85,22 @@ describe('EtbPage', () => {
     await waitFor(() => expect(body).not.toBeNull());
     expect(body!.auftrag_text).toBe('Erste Meldung');
     expect(body!.empfaenger).toEqual([{ empfaenger_typ: 'funktion', funktion_text: 'S3' }]);
+  });
+
+  it('erfasst einen neuen Eintrag über den Entwurf-Tab (POST an /etb)', async () => {
+    let body: Record<string, unknown> | null = null;
+    server.use(
+      http.post('/api/einsaetze/7/etb', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...eintrag, id: 2, lfd_nr: 2, inhalt: 'Neuer Eintrag X' }, { status: 201 });
+      }),
+    );
+    setup();
+    const user = userEvent.setup();
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await user.type(feld, 'Neuer Eintrag X{Enter}');
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body!.inhalt).toBe('Neuer Eintrag X');
   });
 
   it('legt aus einem ETB-Eintrag eine Wiedervorlage mit ETB-Bezug an', async () => {
