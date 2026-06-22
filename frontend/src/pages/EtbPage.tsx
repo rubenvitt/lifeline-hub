@@ -15,6 +15,7 @@ import MitgliederPanel from '../etb/MitgliederPanel';
 import WiedervorlageModal from '../etb/WiedervorlageModal';
 import AuftragAusEtbModal from '../etb/AuftragAusEtbModal';
 import Schnellerfassung from '../etb/Schnellerfassung';
+import EtbEntwurfsTabs from '../etb/entwuerfe/EtbEntwurfsTabs';
 import { useEtbStream } from '../etb/useEtbStream';
 import { useEtbErfassung } from '../offline/useEtbErfassung';
 
@@ -151,13 +152,23 @@ export default function EtbPage() {
           Die Leiste bleibt beim Blättern durch ältere Einträge sichtbar (sticky). */}
       {darfSchreiben && (
         <div className="etb-erfassung-sticky">
-          <Schnellerfassung
-            erfassen={erfassenMitMeldung}
-            berichtigungZu={berichtigungZu}
-            onBerichtigungAbbrechen={() => setBerichtigungZu(null)}
-            bausteine={bausteineQuery.data ?? []}
-            einsatz={einsatz}
-          />
+          {berichtigungZu ? (
+            <Schnellerfassung
+              key="berichtigung"
+              erfassen={erfassenMitMeldung}
+              berichtigungZu={berichtigungZu}
+              onBerichtigungAbbrechen={() => setBerichtigungZu(null)}
+              bausteine={bausteineQuery.data ?? []}
+              einsatz={einsatz}
+            />
+          ) : (
+            <EtbEntwurfsTabs
+              einsatzId={einsatzId}
+              erfassen={erfassenMitMeldung}
+              bausteine={bausteineQuery.data ?? []}
+              einsatz={einsatz}
+            />
+          )}
         </div>
       )}
 

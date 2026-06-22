@@ -16,6 +16,7 @@ import {
   baueEintrag, erkenneSlashTrigger, METADATEN_FELDER,
   type MetadatenWerte, type MetaFeld, type SlashEintrag,
 } from './schnellerfassungModell';
+import type { EntwurfWerte } from './entwuerfe/entwurfModell';
 
 interface Props {
   erfassen: (eintrag: NeuerEintrag) => Promise<void>;
@@ -23,18 +24,22 @@ interface Props {
   onBerichtigungAbbrechen: () => void;
   bausteine: EtbBaustein[];
   einsatz: EinsatzAnzeige;
+  initialWerte?: EntwurfWerte;
+  onWerteChange?: (werte: EntwurfWerte) => void;
 }
 
 const TYP_OPTIONEN = ERFASSBARE_TYPEN.map((t) => ({ value: t, label: TYP_LABEL[t] }));
 
-export default function Schnellerfassung({ erfassen, berichtigungZu, onBerichtigungAbbrechen, bausteine, einsatz }: Props) {
+export default function Schnellerfassung({
+  erfassen, berichtigungZu, onBerichtigungAbbrechen, bausteine, einsatz, initialWerte, onWerteChange,
+}: Props) {
   const navigate = useNavigate();
   const textRef = useRef<TextAreaRef>(null);
   const menuRef = useRef<SlashMenuHandle>(null);
 
-  const [inhalt, setInhalt] = useState('');
-  const [typ, setTyp] = useState<EtbTyp>('meldung');
-  const [metadaten, setMetadaten] = useState<MetadatenWerte>({});
+  const [inhalt, setInhalt] = useState(initialWerte?.inhalt ?? '');
+  const [typ, setTyp] = useState<EtbTyp>(initialWerte?.typ ?? 'meldung');
+  const [metadaten, setMetadaten] = useState<MetadatenWerte>(initialWerte?.metadaten ?? {});
   const [editFeld, setEditFeld] = useState<MetaFeld | null>(null);
   const [sendet, setSendet] = useState(false);
 
@@ -48,11 +53,30 @@ export default function Schnellerfassung({ erfassen, berichtigungZu, onBerichtig
   // Freitext bleibt Fallback (AC#1).
   const funkrufnamen = useFunkrufnamen(einsatz.id);
 
-  // Moduswechsel Berichtigung → alles leeren und fokussieren.
+  // onWerteChange in einer Ref halten: Der Autosave-Effekt darf NUR auf echte
+  // Wertänderungen (inhalt/typ/metadaten) feuern — nicht, wenn der Container bei
+  // jedem Render eine neue Callback-Referenz liefert. Stünde onWerteChange in den
+  // Effekt-Deps, triggerte jedes Container-Re-Render (das entwurfAktualisieren
+  // auslöst) den Effekt erneut → Re-Trigger-/Endlosschleife.
+  const onWerteChangeRef = useRef(onWerteChange);
   useEffect(() => {
-    setInhalt(''); setMetadaten({}); setEditFeld(null); setMenuOffen(false);
+    onWerteChangeRef.current = onWerteChange;
+  }, [onWerteChange]);
+
+  const ersterRender = useRef(true);
+  useEffect(() => {
+    if (ersterRender.current) {
+      ersterRender.current = false;
+      return; // kein Write beim Mount/initialem Laden
+    }
+    onWerteChangeRef.current?.({ inhalt, typ, metadaten });
+  }, [inhalt, typ, metadaten]);
+
+  // Fokus beim Mount. State-Reset bei Tab-/Modus-Wechsel erfolgt über key-basiertes
+  // Remounting im Container (EtbEntwurfsTabs / EtbPage-Berichtigung).
+  useEffect(() => {
     textRef.current?.focus();
-  }, [berichtigungZu]);
+  }, []);
 
   const gesetzteFelder = METADATEN_FELDER.map((d) => d.feld).filter((f) => metadaten[f] != null);
 
