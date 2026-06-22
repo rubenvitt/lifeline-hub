@@ -27,7 +27,7 @@ export default function PersonenDetailPage() {
   const einsatz = einsatzQuery.data;
   const zurueck = `/einsaetze/${einsatzId}/personen`;
 
-  if (detailQuery.isError || !detailQuery.data) {
+  if (detailQuery.isError) {
     return (
       <Alert
         type="error" showIcon
@@ -36,6 +36,9 @@ export default function PersonenDetailPage() {
         action={<Button size="small" onClick={() => detailQuery.refetch()}>Erneut versuchen</Button>}
       />
     );
+  }
+  if (!detailQuery.data) {
+    return <Alert type="error" message="Person nicht gefunden" showIcon />;
   }
   const p = detailQuery.data;
 
