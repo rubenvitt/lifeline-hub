@@ -89,9 +89,8 @@ describe('EinheitenPage', () => {
     await userEvent.click(await screen.findByText('1. Zug'));
     // Picker-Label ist sichtbar
     expect(await screen.findByText('Sprechgruppen')).toBeInTheDocument();
-    // Sprechgruppen-Checkboxen aus dem Katalog werden gerendert
+    // Die zugeordnete Sprechgruppe erscheint als ausgewähltes Tag im Multi-Select
     expect(await screen.findByText('412_F_DRK')).toBeInTheDocument();
-    expect(await screen.findByText('DMO 31')).toBeInTheDocument();
   });
 
   it('sendet sprechgruppe_ids beim Speichern einer Einheit', async () => {

@@ -1,177 +1,135 @@
-import { App, Button, Checkbox, Form, Input, Select, Space, Tag, Typography } from 'antd';
+import { App, Button, Input, Select, Space } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { legeEinsatzSprechgruppeAn, listeEinsatzSprechgruppen } from '../api/sprechgruppen';
 import type { Betriebsart, Sprechgruppe } from '../api/types';
 import { ApiError } from '../api/client';
 
-const { Text } = Typography;
-
-interface InlineFormWerte {
-  bezeichnung: string;
-  betriebsart: Betriebsart;
-  hinweis?: string;
-}
-
 interface SprechgruppenPickerProps {
   einsatzId: number;
+  /** Ausgewählte Sprechgruppen-IDs (antd-Form-Control-Vertrag). */
   value?: number[];
   onChange?: (ids: number[]) => void;
 }
 
+/**
+ * Mehrfachauswahl von Sprechgruppen (org-weiter Katalog + einsatz-lokale) als ein
+ * `Select mode="multiple"`, gruppiert nach Betriebsart. Darunter ein kompaktes
+ * Inline-Formular zum Anlegen einer einsatz-lokalen Sprechgruppe.
+ *
+ * Bewusst KEIN verschachteltes `<Form>`/Submit-Button: der Picker wird selbst in einem
+ * antd-`<Form>` (Abschnitt/Einheit) gerendert — ein innerer Submit würde das äußere
+ * Formular nativ abschicken (Seiten-Reload). Anlegen läuft daher rein über `onClick`.
+ */
 export default function SprechgruppenPicker({ einsatzId, value = [], onChange }: SprechgruppenPickerProps) {
   const { message } = App.useApp();
   const qc = useQueryClient();
-  const [inlineOffen, setInlineOffen] = useState(false);
-  const [form] = Form.useForm<InlineFormWerte>();
+  const [anlegenOffen, setAnlegenOffen] = useState(false);
+  const [neuBezeichnung, setNeuBezeichnung] = useState('');
+  const [neuBetriebsart, setNeuBetriebsart] = useState<Betriebsart | undefined>(undefined);
 
   const { data: sprechgruppen = [] } = useQuery({
     queryKey: ['einsatz-sprechgruppen', einsatzId],
     queryFn: () => listeEinsatzSprechgruppen(einsatzId),
   });
 
-  const tmo = sprechgruppen.filter((s) => s.betriebsart === 'TMO');
-  const dmo = sprechgruppen.filter((s) => s.betriebsart === 'DMO');
-  const tmoIds = tmo.map((s) => s.id);
-  const dmoIds = dmo.map((s) => s.id);
+  const labelVon = (s: Sprechgruppe) => (s.einsatz_lokal ? `${s.bezeichnung} (lokal)` : s.bezeichnung);
+  const optionenFuer = (ba: Betriebsart) =>
+    sprechgruppen.filter((s) => s.betriebsart === ba).map((s) => ({ value: s.id, label: labelVon(s) }));
+  const gruppen = [
+    { label: 'TMO', title: 'TMO', options: optionenFuer('TMO') },
+    { label: 'DMO', title: 'DMO', options: optionenFuer('DMO') },
+  ].filter((g) => g.options.length > 0);
 
-  const handleTmoChange = (checked: (string | number | boolean)[]) => {
-    const checkedNums = checked as number[];
-    onChange?.([...checkedNums, ...value.filter((id) => dmoIds.includes(id))]);
-  };
-
-  const handleDmoChange = (checked: (string | number | boolean)[]) => {
-    const checkedNums = checked as number[];
-    onChange?.([...value.filter((id) => tmoIds.includes(id)), ...checkedNums]);
-  };
+  const kannAnlegen = neuBezeichnung.trim().length > 0 && !!neuBetriebsart;
 
   const mutation = useMutation({
-    mutationFn: (werte: InlineFormWerte) =>
+    mutationFn: () =>
       legeEinsatzSprechgruppeAn(einsatzId, {
-        bezeichnung: werte.bezeichnung.trim(),
-        betriebsart: werte.betriebsart,
-        hinweis: werte.hinweis?.trim() || undefined,
+        bezeichnung: neuBezeichnung.trim(),
+        betriebsart: neuBetriebsart as Betriebsart,
       }),
     onSuccess: (neu: Sprechgruppe) => {
       qc.invalidateQueries({ queryKey: ['einsatz-sprechgruppen', einsatzId] });
-      onChange?.([...(value ?? []), neu.id]);
-      form.resetFields();
-      setInlineOffen(false);
+      onChange?.([...value, neu.id]);
+      setNeuBezeichnung('');
+      setNeuBetriebsart(undefined);
+      setAnlegenOffen(false);
+      message.success(`Sprechgruppe „${neu.bezeichnung}" angelegt`);
     },
-    onError: (e) =>
-      message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
+    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Anlegen fehlgeschlagen'),
   });
 
-  function checkboxOption(s: Sprechgruppe) {
-    return {
-      value: s.id,
-      label: (
-        <span>
-          {s.bezeichnung}
-          {s.einsatz_lokal && (
-            <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>
-              lokal
-            </Tag>
-          )}
-        </span>
-      ),
-    };
-  }
+  const anlegen = () => {
+    if (kannAnlegen && !mutation.isPending) mutation.mutate();
+  };
 
   return (
     <div>
-      {tmo.length > 0 && (
-        <div style={{ marginBottom: 8 }}>
-          <Text strong>TMO</Text>
-          <div>
-            <Checkbox.Group
-              options={tmo.map(checkboxOption)}
-              value={value.filter((id) => tmoIds.includes(id))}
-              onChange={handleTmoChange}
-            />
-          </div>
-        </div>
-      )}
+      <Select
+        mode="multiple"
+        value={value}
+        onChange={(ids: number[]) => onChange?.(ids)}
+        options={gruppen}
+        placeholder="Sprechgruppen auswählen"
+        style={{ width: '100%' }}
+        optionFilterProp="label"
+        allowClear
+      />
 
-      {dmo.length > 0 && (
-        <div style={{ marginBottom: 8 }}>
-          <Text strong>DMO</Text>
-          <div>
-            <Checkbox.Group
-              options={dmo.map(checkboxOption)}
-              value={value.filter((id) => dmoIds.includes(id))}
-              onChange={handleDmoChange}
-            />
-          </div>
-        </div>
-      )}
-
-      {!inlineOffen && (
+      {!anlegenOffen && (
         <Button
-          type="dashed"
+          type="link"
           size="small"
-          onClick={() => setInlineOffen(true)}
+          icon={<PlusOutlined />}
+          style={{ padding: 0, marginTop: 4 }}
+          onClick={() => setAnlegenOffen(true)}
         >
-          + neue Sprechgruppe
+          neue Sprechgruppe anlegen
         </Button>
       )}
 
-      {inlineOffen && (
-        <Form<InlineFormWerte>
-          form={form}
-          layout="inline"
-          onFinish={(w) => mutation.mutate(w)}
-          style={{ marginTop: 8, flexWrap: 'wrap', gap: 4 }}
-        >
-          <Form.Item
-            label="Bezeichnung"
-            name="bezeichnung"
-            rules={[{ required: true, whitespace: true, message: 'Pflichtfeld' }]}
+      {anlegenOffen && (
+        <Space.Compact style={{ marginTop: 6, width: '100%' }}>
+          <Input
+            aria-label="Neue Bezeichnung"
+            placeholder="z. B. 412_F_DRK"
+            value={neuBezeichnung}
+            onChange={(e) => setNeuBezeichnung(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter darf NICHT das umgebende Abschnitt-/Einheit-Formular abschicken.
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation();
+                anlegen();
+              }
+            }}
+          />
+          <Select<Betriebsart>
+            aria-label="Neue Betriebsart"
+            placeholder="Betriebsart"
+            value={neuBetriebsart}
+            onChange={(v) => setNeuBetriebsart(v)}
+            style={{ width: 130 }}
+            options={[
+              { value: 'TMO', label: 'TMO' },
+              { value: 'DMO', label: 'DMO' },
+            ]}
+          />
+          <Button type="primary" onClick={anlegen} loading={mutation.isPending} disabled={!kannAnlegen}>
+            Anlegen
+          </Button>
+          <Button
+            onClick={() => {
+              setNeuBezeichnung('');
+              setNeuBetriebsart(undefined);
+              setAnlegenOffen(false);
+            }}
           >
-            <Input size="small" placeholder="z. B. 412_F_DRK" />
-          </Form.Item>
-
-          <Form.Item
-            label="Betriebsart"
-            name="betriebsart"
-            rules={[{ required: true, message: 'Pflichtfeld' }]}
-          >
-            <Select
-              size="small"
-              style={{ minWidth: 160 }}
-              options={[
-                { value: 'TMO', label: 'TMO – Trunked Mode' },
-                { value: 'DMO', label: 'DMO – Direct Mode' },
-              ]}
-            />
-          </Form.Item>
-
-          <Form.Item label="Hinweis" name="hinweis">
-            <Input size="small" placeholder="Optional" />
-          </Form.Item>
-
-          <Form.Item>
-            <Space>
-              <Button
-                type="primary"
-                size="small"
-                htmlType="submit"
-                loading={mutation.isPending}
-              >
-                Speichern
-              </Button>
-              <Button
-                size="small"
-                onClick={() => {
-                  form.resetFields();
-                  setInlineOffen(false);
-                }}
-              >
-                Abbrechen
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
+            Abbrechen
+          </Button>
+        </Space.Compact>
       )}
     </div>
   );

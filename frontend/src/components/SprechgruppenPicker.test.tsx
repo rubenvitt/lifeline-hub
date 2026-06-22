@@ -24,24 +24,22 @@ const MOCK_LISTE: Sprechgruppe[] = [
 ];
 
 describe('SprechgruppenPicker', () => {
-  it('rendert nach Betriebsart gruppierte Checkboxen und meldet Auswahl', async () => {
+  it('listet Sprechgruppen im Multi-Select und meldet die Auswahl', async () => {
     vi.mocked(listeEinsatzSprechgruppen).mockResolvedValue(MOCK_LISTE);
 
     const onChange = vi.fn();
-    renderMitProviders(
-      <SprechgruppenPicker einsatzId={5} value={[]} onChange={onChange} />,
-    );
+    renderMitProviders(<SprechgruppenPicker einsatzId={5} value={[]} onChange={onChange} />);
 
-    // Gruppenüberschriften
-    await screen.findByText('TMO');
-    await screen.findByText('DMO 31');
+    // Multi-Select öffnen (einzige combobox, solange das Anlegen-Formular zu ist)
+    const select = screen.getByRole('combobox');
+    await userEvent.click(select);
 
-    // Checkbox für '412' anklicken — erwartet [1] als ids
-    await userEvent.click(screen.getByLabelText('412'));
+    // Optionen erscheinen erst beim Öffnen; '412' anklicken → ids = [1]
+    await userEvent.click(await screen.findByText('412'));
     expect(onChange).toHaveBeenCalledWith([1]);
   });
 
-  it('legt einsatz-lokale Sprechgruppe an und hakt sie an', async () => {
+  it('legt eine einsatz-lokale Sprechgruppe an und hakt sie an (ohne Form-Submit/Reload)', async () => {
     vi.mocked(listeEinsatzSprechgruppen).mockResolvedValue(MOCK_LISTE);
     const neueSprechgruppe: Sprechgruppe = {
       id: 9, einsatz_id: 5, einsatz_lokal: true, bezeichnung: 'Sonder 1',
@@ -50,35 +48,28 @@ describe('SprechgruppenPicker', () => {
     vi.mocked(legeEinsatzSprechgruppeAn).mockResolvedValue(neueSprechgruppe);
 
     const onChange = vi.fn();
-    renderMitProviders(
-      <SprechgruppenPicker einsatzId={5} value={[]} onChange={onChange} />,
-    );
+    renderMitProviders(<SprechgruppenPicker einsatzId={5} value={[]} onChange={onChange} />);
 
-    // Warten bis geladen
-    await screen.findByText('412');
-
-    // "+ neue Sprechgruppe" anklicken
-    await userEvent.click(screen.getByRole('button', { name: /neue sprechgruppe/i }));
+    // Inline-Anlegen aufklappen
+    await userEvent.click(await screen.findByRole('button', { name: /neue sprechgruppe anlegen/i }));
 
     // Bezeichnung eingeben
-    await userEvent.type(screen.getByLabelText(/bezeichnung/i), 'Sonder 1');
+    await userEvent.type(screen.getByLabelText('Neue Bezeichnung'), 'Sonder 1');
 
-    // Betriebsart-Select: combobox öffnen und DMO-Option klicken
-    const betriebsartCombobox = screen.getByRole('combobox', { name: /betriebsart/i });
-    await userEvent.click(betriebsartCombobox);
+    // Betriebsart wählen: zweite combobox (nach dem Multi-Select) öffnen, Option 'DMO' klicken
+    const comboboxen = screen.getAllByRole('combobox');
+    await userEvent.click(comboboxen[1]); // [0] = Multi-Select, [1] = Betriebsart
+    // Den Options-CONTENT-Knoten klicken (der role=option-Wrapper committet in antd nicht zuverlässig)
     const dmoOption = await screen.findByText(
-      (_, el) =>
-        typeof el?.className === 'string' &&
-        el.className.includes('ant-select-item-option-content') &&
-        el.textContent === 'DMO – Direct Mode',
+      (_, el) => el?.className === 'ant-select-item-option-content' && el?.textContent === 'DMO',
     );
     await userEvent.click(dmoOption);
 
-    // Speichern
-    await userEvent.click(screen.getByRole('button', { name: /speichern/i }));
+    // Anlegen (reiner onClick-Button, kein Submit)
+    await userEvent.click(screen.getByRole('button', { name: /^anlegen$/i }));
 
-    // onChange muss mit Array aufgerufen worden sein, das 9 enthält
     await vi.waitFor(() => {
+      expect(legeEinsatzSprechgruppeAn).toHaveBeenCalledWith(5, { bezeichnung: 'Sonder 1', betriebsart: 'DMO' });
       expect(onChange).toHaveBeenCalledWith(expect.arrayContaining([9]));
     });
   });

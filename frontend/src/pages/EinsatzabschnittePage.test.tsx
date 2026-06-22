@@ -108,9 +108,8 @@ describe('EinsatzabschnittePage', () => {
     expect(screen.getByDisplayValue('0151 23456')).toBeInTheDocument();
     // Picker-Label ist sichtbar
     expect(await screen.findByText('Sprechgruppen')).toBeInTheDocument();
-    // Sprechgruppen-Checkboxen werden gerendert
+    // Die zugeordnete Sprechgruppe erscheint als ausgewähltes Tag im Multi-Select
     expect(await screen.findByText('412_F_DRK')).toBeInTheDocument();
-    expect(await screen.findByText('DMO 31')).toBeInTheDocument();
   });
 
   it('zeigt eine Funk-Erreichbarkeits-Zusammenfassung im Detail', async () => {
