@@ -46,6 +46,15 @@ function renderPage(route = '/einsaetze/1/unfallhilfsstellen/liste') {
 }
 
 describe('UnfallhilfsstellenPage', () => {
+  it('öffnet via ?neu=1 den Anlegen-Drawer (aktiver Einsatz)', async () => {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
+      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+    );
+    renderPage('/einsaetze/1/unfallhilfsstellen/liste?neu=1');
+    expect(await screen.findByText('Unfallhilfsstelle anlegen')).toBeInTheDocument();
+  });
+
   it('rendert die UHS-Liste mit Status-Badge', async () => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),

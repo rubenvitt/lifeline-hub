@@ -133,6 +133,20 @@ export default function PersonenPage() {
     }
   }, [searchParams, setSearchParams]);
 
+  // Schnellaktion: ?neu=1 öffnet die Schnellerfassung (Command-Palette, LFH-11).
+  // Warten bis der Einsatz geladen ist; Param immer löschen, aber Modal nur bei Schreibrecht öffnen.
+  useEffect(() => {
+    if (searchParams.get('neu') !== '1') return;
+    if (einsatzQuery.isLoading) return;
+    const e = einsatzQuery.data;
+    const darfSchr =
+      e?.status === 'aktiv' &&
+      (e?.meine_rolle === 'einsatzleitung' || e?.meine_rolle === 'fuehrungspersonal');
+    if (darfSchr) setModus('schnell');
+    searchParams.delete('neu');
+    setSearchParams(searchParams, { replace: true });
+  }, [searchParams, setSearchParams, einsatzQuery.isLoading, einsatzQuery.data]);
+
   const detailQuery = useQuery({
     queryKey: ['einsatz-person', einsatzId, offenePersonId],
     queryFn: () => ladePerson(einsatzId, offenePersonId!),

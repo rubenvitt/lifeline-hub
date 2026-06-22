@@ -1,7 +1,7 @@
 import { Alert, Breadcrumb, Button, Space, Spin, Table, Tag, Typography, type TableColumnsType } from 'antd';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeUhs } from '../api/einsatzUhs';
 import { useUhsStream } from '../etb/useUhsStream';
@@ -37,6 +37,16 @@ export default function UnfallhilfsstellenPage() {
   const ist_aktiv = einsatzQuery.data?.status === 'aktiv';
   const ist_beobachter = einsatzQuery.data?.meine_rolle === 'beobachter';
   const schreibgeschuetzt = !ist_aktiv || ist_beobachter;
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Schnellaktion: ?neu=1 öffnet den Anlegen-Drawer, sobald die Rechte feststehen (LFH-11).
+  useEffect(() => {
+    if (searchParams.get('neu') !== '1') return;
+    if (einsatzQuery.isLoading) return;
+    if (!schreibgeschuetzt) setAnlegen(true);
+    searchParams.delete('neu');
+    setSearchParams(searchParams, { replace: true });
+  }, [searchParams, setSearchParams, einsatzQuery.isLoading, schreibgeschuetzt]);
 
   const spalten: TableColumnsType<Uhs> = [
     { title: 'Bezeichnung', dataIndex: 'bezeichnung', render: (b: string, u) =>

@@ -1,5 +1,5 @@
 import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Spin, Tag, Typography } from 'antd';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz, schliesseEinsatzAb } from '../api/einsaetze';
 import { listeBausteine } from '../api/etbBaustein';
@@ -8,7 +8,7 @@ import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import { ApiError } from '../api/client';
 import type { EtbEintragAnzeige, NeuerAuftrag } from '../api/types';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import EtbTabelle from '../etb/EtbTabelle';
 import EtbFilterleiste from '../etb/EtbFilterleiste';
 import MitgliederPanel from '../etb/MitgliederPanel';
@@ -55,6 +55,20 @@ export default function EtbPage() {
   const [auftragZu, setAuftragZu] = useState<EtbEintragAnzeige | null>(null);
   const [mitgliederOffen, setMitgliederOffen] = useState(false);
   const { erfassen, ausstehend, abgelehnt } = useEtbErfassung(einsatzId);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Schnellaktion: ?neu=1 fokussiert die angepinnte Erfassungszeile (Command-Palette, LFH-11).
+  useEffect(() => {
+    if (searchParams.get('neu') !== '1') return;
+    const leiste = document.querySelector('.etb-erfassung-sticky');
+    if (leiste instanceof HTMLElement) {
+      leiste.scrollIntoView({ block: 'start' });
+      const feld = leiste.querySelector('textarea, input');
+      if (feld instanceof HTMLElement) feld.focus();
+    }
+    searchParams.delete('neu');
+    setSearchParams(searchParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const abschliessenMutation = useMutation({
     mutationFn: () => schliesseEinsatzAb(einsatzId),
