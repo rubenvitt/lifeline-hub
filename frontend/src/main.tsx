@@ -11,6 +11,7 @@ import utc from 'dayjs/plugin/utc';
 import App from './App';
 import { ThemeModeProvider } from './theme/ThemeModeProvider';
 import { AuthProvider } from './auth/AuthContext';
+import { CommandPaletteProvider } from './command-palette/CommandPaletteProvider';
 
 dayjs.extend(utc);
 
@@ -27,7 +28,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <AntApp>
           <BrowserRouter>
             <AuthProvider>
-              <App />
+              <CommandPaletteProvider>
+                <App />
+              </CommandPaletteProvider>
             </AuthProvider>
           </BrowserRouter>
         </AntApp>
