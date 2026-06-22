@@ -19,6 +19,7 @@ export interface BefehlKontext {
   benutzer: BenutzerAnzeige | null;
   einsaetze: EinsatzAnzeige[];
   overrides?: ModulOverrides;
+  darfSchreibenImEinsatz: boolean;
   navigate: (pfad: string) => void;
   setThemeModus: (m: ThemeModus) => void;
   setKoordinaten: (f: Koordinatenformat) => void;

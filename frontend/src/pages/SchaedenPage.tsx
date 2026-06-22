@@ -207,10 +207,11 @@ export default function SchaedenPage() {
     (einsatz?.meine_rolle === 'einsatzleitung' || einsatz?.meine_rolle === 'fuehrungspersonal');
 
   // Schnellaktion: ?neu=1 öffnet die Erfassung (Command-Palette, LFH-11).
+  // Warten bis der Einsatz geladen ist; Param immer löschen, aber Modal nur bei Schreibrecht öffnen.
   useEffect(() => {
     if (searchParams.get('neu') !== '1') return;
-    if (einsatzQuery.isLoading || !darfSchreiben) return;
-    setErfassenOffen(true);
+    if (einsatzQuery.isLoading) return;
+    if (darfSchreiben) setErfassenOffen(true);
     searchParams.delete('neu');
     setSearchParams(searchParams, { replace: true });
   }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreiben]);

@@ -19,4 +19,12 @@ describe('CommandPaletteProvider', () => {
     await u.keyboard('{Control>}k{/Control}');
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
+
+  it('öffnet die Palette auch mit CMD+K (Meta-Taste, AK1)', async () => {
+    const u = userEvent.setup();
+    renderMitProviders(<CommandPaletteProvider><div>App-Inhalt</div></CommandPaletteProvider>);
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    await u.keyboard('{Meta>}k{/Meta}');
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+  });
 });

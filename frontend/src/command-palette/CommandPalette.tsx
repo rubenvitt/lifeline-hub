@@ -66,7 +66,7 @@ export function CommandPalette({ befehle, schliesse }: Props) {
       width={640}
       zIndex={2000}
       styles={{ body: { padding: 0 } }}
-      destroyOnClose
+      destroyOnHidden
     >
       <div>
         <Input
@@ -76,7 +76,7 @@ export function CommandPalette({ befehle, schliesse }: Props) {
           size="large"
           placeholder="Suchen: Module, Aktionen, Einstellungen …"
           role="combobox"
-          aria-expanded
+          aria-expanded={flach.length > 0}
           aria-controls="cmd-liste"
           aria-activedescendant={aktiverId ? `cmd-${aktiverId}` : undefined}
           value={suche}

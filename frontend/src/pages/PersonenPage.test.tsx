@@ -308,6 +308,13 @@ describe('PersonenPage', () => {
     expect(dialog).toHaveTextContent('Schnellerfassung');
   });
 
+  it('öffnet via ?neu=1 die Schnellerfassung NICHT für Beobachter', async () => {
+    render(einsatzBeobachter, [], '/einsaetze/1/personen?neu=1');
+    // Seite lädt durch (Tabelle ist leer, kein Spinner mehr)
+    await screen.findByRole('heading', { name: 'Personen' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('zeigt den „Als Geschädigte bei Schäden"-Block im Personen-Drawer', async () => {
     const detail = { ...person, aktuelle_sichtung: null, aktuelle_sichtung_at: null,
       aktueller_verbleib: null, aktuelle_uhs_id: null, aktueller_platz_id: null,

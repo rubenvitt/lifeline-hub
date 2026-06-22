@@ -46,15 +46,17 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
       });
     }
 
-    // 2. Schnellaktionen — nur Träger-Module, die der User darf
-    for (const a of SCHNELLAKTIONEN) {
-      const m = modulRegistry.find((x) => x.key === a.modulKey);
-      if (!m || !istModulSichtbar(m, k.overrides) || istModulGesperrt(m, k.benutzer, k.overrides)) continue;
-      const ziel = `/einsaetze/${k.einsatzId}/${a.route}?neu=1`;
-      befehle.push({
-        id: `aktion:${a.modulKey}`, gruppe: 'schnellaktionen', label: a.label,
-        icon: TbPlus, schlagworte: a.schlagworte, ausfuehren: () => k.navigate(ziel),
-      });
+    // 2. Schnellaktionen — nur wenn der User schreiben darf (kein Beobachter, aktiver Einsatz)
+    if (k.darfSchreibenImEinsatz) {
+      for (const a of SCHNELLAKTIONEN) {
+        const m = modulRegistry.find((x) => x.key === a.modulKey);
+        if (!m || !istModulSichtbar(m, k.overrides) || istModulGesperrt(m, k.benutzer, k.overrides)) continue;
+        const ziel = `/einsaetze/${k.einsatzId}/${a.route}?neu=1`;
+        befehle.push({
+          id: `aktion:${a.modulKey}`, gruppe: 'schnellaktionen', label: a.label,
+          icon: TbPlus, schlagworte: a.schlagworte, ausfuehren: () => k.navigate(ziel),
+        });
+      }
     }
   }
 

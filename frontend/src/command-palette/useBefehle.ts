@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { useThemeMode } from '../theme/ThemeModeProvider';
-import { listeEinsaetze, ladeModulOverrides } from '../api/einsaetze';
+import { listeEinsaetze, ladeModulOverrides, ladeEinsatz } from '../api/einsaetze';
 import { setzeOverride } from '../anzeige/koordinatenSystemStore';
 import { einsatzIdAusPfad } from './einsatzPfad';
 import { baueBefehle } from './befehle';
@@ -24,15 +24,22 @@ export function useBefehle(): Befehl[] {
     queryFn: () => ladeModulOverrides(einsatzId!),
     enabled: einsatzId != null,
   });
+  const { data: aktuellerEinsatz } = useQuery({
+    queryKey: ['einsatz', einsatzId],
+    queryFn: () => ladeEinsatz(einsatzId!),
+    enabled: einsatzId != null,
+  });
+  const darfSchreibenImEinsatz =
+    aktuellerEinsatz?.status === 'aktiv' && aktuellerEinsatz?.meine_rolle !== 'beobachter';
 
   return useMemo(
     () => baueBefehle({
-      einsatzId, benutzer, einsaetze, overrides,
+      einsatzId, benutzer, einsaetze, overrides, darfSchreibenImEinsatz: darfSchreibenImEinsatz ?? false,
       navigate: (p) => navigate(p),
       setThemeModus: setModus,
       setKoordinaten: setzeOverride,
       logout: () => { void logout(); },
     }),
-    [einsatzId, benutzer, einsaetze, overrides, navigate, setModus, logout],
+    [einsatzId, benutzer, einsaetze, overrides, darfSchreibenImEinsatz, navigate, setModus, logout],
   );
 }

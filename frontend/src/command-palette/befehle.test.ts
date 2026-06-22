@@ -19,6 +19,7 @@ function ueberschreibung(felder: Partial<ModulOverride>): ModulOverride {
 function kontext(over: Partial<BefehlKontext> = {}): BefehlKontext {
   return {
     einsatzId: 5, benutzer: fuehrungskraft, einsaetze: [], overrides: undefined,
+    darfSchreibenImEinsatz: true,
     navigate: vi.fn(), setThemeModus: vi.fn(), setKoordinaten: vi.fn(), logout: vi.fn(),
     ...over,
   };
@@ -90,6 +91,12 @@ describe('baueBefehle — Schnellaktionen', () => {
     const overrides = { etb: ueberschreibung({ benoetigte_rolle: 'fuehrungskraft' }) };
     expect(baueBefehle(kontext({ benutzer: sichter, overrides })).some((x) => x.id === 'aktion:etb')).toBe(false);
     expect(baueBefehle(kontext({ benutzer: fuehrungskraft, overrides })).some((x) => x.id === 'aktion:etb')).toBe(true);
+  });
+  it('versteckt ALLE Schnellaktionen wenn darfSchreibenImEinsatz=false (Beobachter/abgeschlossen)', () => {
+    const b = baueBefehle(kontext({ darfSchreibenImEinsatz: false }));
+    expect(b.some((x) => x.id.startsWith('aktion:'))).toBe(false);
+    // Modul-Navigation bleibt trotzdem sichtbar
+    expect(b.some((x) => x.id === 'modul:etb')).toBe(true);
   });
 });
 
