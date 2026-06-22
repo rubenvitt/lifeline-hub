@@ -42,7 +42,7 @@ describe('EtbEntwurfsTabs', () => {
     await userEvent.type(await screen.findByPlaceholderText(/Inhalt/), 'Lagemeldung');
     await waitFor(async () => {
       const liste = await entwuerfeLaden(7);
-      expect(liste.at(0)?.inhalt).toBe('Lagemeldung');
+      expect(liste[0]?.inhalt).toBe('Lagemeldung');
     });
   });
 
@@ -69,7 +69,7 @@ describe('EtbEntwurfsTabs', () => {
     // Entwurf wurde durch das Tippen persistiert und bleibt nach Reject erhalten.
     await waitFor(async () => {
       const liste = await entwuerfeLaden(7);
-      expect(liste.at(0)?.inhalt).toBe('Bleibt');
+      expect(liste[0]?.inhalt).toBe('Bleibt');
     });
 
     // Listener wiederherstellen

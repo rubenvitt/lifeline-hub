@@ -248,7 +248,7 @@ describe('Schnellerfassung – Entwurf-Anbindung', () => {
     renderMitProviders(<Schnellerfassung {...p} />);
     await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Hi');
     await waitFor(() => expect(onWerteChange).toHaveBeenCalled());
-    const letzter = onWerteChange.mock.calls.at(-1)![0] as EntwurfWerte;
+    const letzter = onWerteChange.mock.calls[onWerteChange.mock.calls.length - 1][0] as EntwurfWerte;
     expect(letzter.inhalt).toBe('Hi');
   });
 });
