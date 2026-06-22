@@ -301,6 +301,13 @@ describe('PersonenPage', () => {
     expect(screen.queryByText('Patient')).not.toBeInTheDocument();
   });
 
+  it('öffnet via ?neu=1 die Schnellerfassung', async () => {
+    render(einsatzAktiv, [], '/einsaetze/1/personen?neu=1');
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toBeInTheDocument();
+    expect(dialog).toHaveTextContent('Schnellerfassung');
+  });
+
   it('zeigt den „Als Geschädigte bei Schäden"-Block im Personen-Drawer', async () => {
     const detail = { ...person, aktuelle_sichtung: null, aktuelle_sichtung_at: null,
       aktueller_verbleib: null, aktuelle_uhs_id: null, aktueller_platz_id: null,

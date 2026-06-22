@@ -133,6 +133,15 @@ export default function PersonenPage() {
     }
   }, [searchParams, setSearchParams]);
 
+  // Schnellaktion: ?neu=1 öffnet die Schnellerfassung (Command-Palette, LFH-11).
+  useEffect(() => {
+    if (searchParams.get('neu') === '1') {
+      setModus('schnell');
+      searchParams.delete('neu');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
   const detailQuery = useQuery({
     queryKey: ['einsatz-person', einsatzId, offenePersonId],
     queryFn: () => ladePerson(einsatzId, offenePersonId!),
