@@ -111,12 +111,11 @@ describe('PersonenPage', () => {
     expect(screen.getByRole('button', { name: 'Erneut versuchen' })).toBeInTheDocument();
   });
 
-  it('öffnet den Detail-Drawer direkt über den Deep-Link ?person=<id>', async () => {
+  it('leitet den Alt-Deep-Link ?person=<id> auf die Detailseite um', async () => {
     server.use(http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(person)));
     render(einsatzAktiv, [person], '/einsaetze/1/personen?person=10');
-    // Ohne Klick: der Drawer öffnet sich aus dem Query-Param (z. B. „Vollständig öffnen"
-    // aus dem schlanken UHS-Drawer).
-    expect(await screen.findByText('Person R-001')).toBeInTheDocument();
+    // Redirect → Detailseite rendert den Heading:
+    expect(await screen.findByRole('heading', { name: /Person R-001/ })).toBeInTheDocument();
   });
 
   it('zeigt SK-Badge und Lagebild-Zählungen', async () => {
