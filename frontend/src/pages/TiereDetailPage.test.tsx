@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
@@ -31,6 +31,12 @@ const einsatzAktiv = {
 };
 const einsatzBeobachter = { ...einsatzAktiv, meine_rolle: 'beobachter' };
 
+// Quelle der Halter-Combobox (lädt beim Öffnen des Edit-Formulars). Minimalobjekt — der
+// HalterPicker liest nur id/registrier_nr/name/vorname.
+const einePerson = {
+  id: 5, einsatz_id: 1, registrier_nr: 7, status: 'betroffen', name: 'Meier', vorname: 'Anna',
+};
+
 const tierBasis: Tier = {
   id: 10, einsatz_id: 1, registrier_nr: 1, status: 'aktiv', spezies: 'hund',
   rasse_beschreibung: 'Schäferhund', rufname: 'Rex', geschlecht: 'maennlich',
@@ -51,6 +57,7 @@ function render(
     http.get('/api/auth/me', () => HttpResponse.json(admin)),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json(tier)),
+    http.get('/api/einsaetze/1/personen', () => HttpResponse.json([einePerson])),
   );
   // extra-Handler separat prependen, damit sie Vorrang vor den Default-Handlern haben.
   if (extra.length > 0) server.use(...extra);
@@ -74,19 +81,21 @@ describe('TiereDetailPage — Stammdaten', () => {
     expect(screen.getByText('Weide')).toBeInTheDocument();
   });
 
-  it('Einsatzleitung kann bearbeiten und speichern', async () => {
+  it('Einsatzleitung kann bearbeiten und speichern (ohne Halter → beide null)', async () => {
     // Edit-Modus öffnen, das mit den Bestandswerten vorbefüllte Formular direkt speichern
     // und den PATCH-Aufruf verifizieren (kein getByLabelText — antd bindet label/htmlFor nicht zuverlässig).
-    let gesendet = false;
+    let body: { halter_person_id?: number | null; halter_kontakt?: string | null } | null = null;
     render(einsatzAktiv, tierBasis, [
-      http.patch('/api/einsaetze/1/tiere/10', async () => {
-        gesendet = true;
+      http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
+        body = await request.json() as NonNullable<typeof body>;
         return HttpResponse.json({ ...tierBasis });
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-    await vi.waitFor(() => expect(gesendet).toBe(true));
+    await vi.waitFor(() => expect(body).not.toBeNull());
+    expect(body!.halter_person_id).toBeNull();
+    expect(body!.halter_kontakt).toBeNull();
   });
 
   it('Beobachter sieht keinen Bearbeiten-Button', async () => {
@@ -102,19 +111,66 @@ describe('TiereDetailPage — Stammdaten', () => {
     expect(await screen.findByText('PERSON-DETAIL')).toBeInTheDocument();
   });
 
-  it('Edit: Halter-Modus „unbekannt" sendet halter_person_id und halter_kontakt als null', async () => {
-    // Trickreichste Edit-Logik: beim Modus-Wechsel immer beide Halter-Felder explizit
-    // senden (eines null). Start mit FK-Halter, auf „unbekannt" umstellen → beide null.
-    const mitHalter: Tier = { ...tierBasis, halter_person_id: 5, halter_registrier_nr: 7 };
+  it('Edit: Halter-Combobox auf betroffene Person setzen → halter_person_id', async () => {
     let body: { halter_person_id?: number | null; halter_kontakt?: string | null } = {};
-    render(einsatzAktiv, mitHalter, [
+    render(einsatzAktiv, tierBasis, [
+      http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
+        body = await request.json() as typeof body;
+        return HttpResponse.json({ ...tierBasis });
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    // Comboboxen im Edit-Formular: [0] Geschlecht, [1] Halter.
+    await userEvent.click(screen.getAllByRole('combobox')[1]);
+    const option = (await screen.findAllByText('R-007 · Anna Meier')).find((el) =>
+      el.closest('.ant-select-item-option'),
+    );
+    expect(option).toBeTruthy();
+    await userEvent.click(option!);
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await vi.waitFor(() => expect(body.halter_person_id).toBe(5));
+    expect(body.halter_kontakt).toBeNull();
+  });
+
+  it('Edit: Freitext in der Halter-Combobox → externer Kontakt (halter_kontakt)', async () => {
+    let body: { halter_person_id?: number | null; halter_kontakt?: string | null } = {};
+    render(einsatzAktiv, tierBasis, [
+      http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
+        body = await request.json() as typeof body;
+        return HttpResponse.json({ ...tierBasis });
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const halterCb = screen.getAllByRole('combobox')[1];
+    await userEvent.click(halterCb);
+    await userEvent.type(halterCb, 'Familie Krause');
+    const extern = (await screen.findAllByText(/Als externen Kontakt/)).find((el) =>
+      el.closest('.ant-select-item-option'),
+    );
+    expect(extern).toBeTruthy();
+    await userEvent.click(extern!);
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await vi.waitFor(() => expect(body.halter_kontakt).toBe('Familie Krause'));
+    expect(body.halter_person_id).toBeNull();
+  });
+
+  it('Edit: Halter leeren sendet halter_person_id und halter_kontakt als null', async () => {
+    // Start mit FK-Halter, Combobox leeren → beide Felder explizit null.
+    const mitHalter: Tier = { ...tierBasis, geschlecht: null, halter_person_id: 5, halter_registrier_nr: 7 };
+    let body: { halter_person_id?: number | null; halter_kontakt?: string | null } = {};
+    const { container } = render(einsatzAktiv, mitHalter, [
       http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
         body = await request.json() as typeof body;
         return HttpResponse.json({ ...mitHalter });
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-    await userEvent.click(await screen.findByRole('radio', { name: 'unbekannt' }));
+    // Halter ist der letzte allowClear-Select im Formular → letztes Clear-Icon.
+    const clears = container.querySelectorAll('.ant-select-clear');
+    const clear = clears[clears.length - 1];
+    expect(clear, 'Halter-Combobox muss allowClear haben').toBeTruthy();
+    fireEvent.mouseDown(clear);
+    fireEvent.click(clear);
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await vi.waitFor(() => expect(body.halter_person_id).toBeNull());
     expect(body.halter_kontakt).toBeNull();

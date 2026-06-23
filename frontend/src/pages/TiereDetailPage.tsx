@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Descriptions, Form, Input, InputNumber, Modal, Popconfirm, Radio, Select, Space, Spin, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Descriptions, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Spin, Tag, Typography } from 'antd';
 import { useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -7,6 +7,7 @@ import { aktualisiereTier, ladeTier, setzeTierStatus, storniereTier, tierRegistr
 import { ApiError } from '../api/client';
 import { parseRouteId, personDetailPfad, tierePfad } from '../routing/deeplinks';
 import type { AbschlussGrund, Spezies, Tier, TierStatus } from '../api/types';
+import HalterPicker, { type HalterWert } from './HalterPicker';
 
 const STATUS_META: Record<TierStatus, { label: string; color: string }> = {
   aktiv: { label: 'aktiv', color: 'green' },
@@ -56,7 +57,7 @@ export default function TiereDetailPage() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [bearbeiten, setBearbeiten] = useState(false);
-  const [editForm] = Form.useForm<TierPatch & { halter_modus?: 'fk' | 'freitext' | 'keiner' }>();
+  const [editForm] = Form.useForm<TierPatch & { halter?: HalterWert }>();
   const [abschlussOffen, setAbschlussOffen] = useState(false);
   const [abschlussForm] = Form.useForm<{ abschluss_grund: AbschlussGrund; abschluss_ziel?: string }>();
 
@@ -131,6 +132,42 @@ export default function TiereDetailPage() {
     einsatz.status === 'aktiv' &&
     (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
 
+  // Eine Detail-Zelle: im Edit-Modus ein noStyle-Form.Item mit Input, sonst die Read-Anzeige.
+  // So bleibt beim Bearbeiten dieselbe Descriptions-Tabelle stehen — nur die Werte werden zu Feldern,
+  // statt die ganze Ansicht gegen ein separates Formular zu tauschen.
+  const zelle = (name: string, input: React.ReactNode, anzeige: React.ReactNode) =>
+    bearbeiten ? <Form.Item name={name} noStyle>{input}</Form.Item> : anzeige;
+
+  const detailAnsicht = (
+    <Descriptions column={1} size="small" bordered>
+      <Descriptions.Item label="Rufname">{zelle('rufname', <Input placeholder="Rufname" />, t.rufname ?? '—')}</Descriptions.Item>
+      <Descriptions.Item label="Rasse / Beschreibung">{zelle('rasse_beschreibung', <Input />, t.rasse_beschreibung ?? '—')}</Descriptions.Item>
+      <Descriptions.Item label="Geschlecht">
+        {zelle('geschlecht',
+          <Select allowClear style={{ minWidth: 160 }} placeholder="—" options={[
+            { value: 'maennlich', label: 'männlich' }, { value: 'weiblich', label: 'weiblich' },
+            { value: 'unbekannt', label: 'unbekannt' },
+          ]} />,
+          t.geschlecht ?? '—')}
+      </Descriptions.Item>
+      <Descriptions.Item label="Alter in Jahren (geschätzt)">{zelle('alter_geschaetzt', <InputNumber min={0} max={120} />, t.alter_geschaetzt ?? '—')}</Descriptions.Item>
+      <Descriptions.Item label="Farbe / Erscheinung">{zelle('farbe_beschreibung', <Input />, t.farbe_beschreibung ?? '—')}</Descriptions.Item>
+      <Descriptions.Item label="Kennzeichnung">{zelle('kennzeichnung', <Input placeholder="Chip / Tätowierung / Halsband" />, t.kennzeichnung ?? '—')}</Descriptions.Item>
+      <Descriptions.Item label="Größe / Gewicht">{zelle('groesse_gewicht', <Input />, t.groesse_gewicht ?? '—')}</Descriptions.Item>
+      <Descriptions.Item label="Antreffort">{zelle('antreff_ort', <Input />, t.antreff_ort ?? '—')}</Descriptions.Item>
+      <Descriptions.Item label="Halter">
+        {zelle('halter', <HalterPicker einsatzId={einsatzId} />,
+          // Klick auf R-nnn führt direkt zur (auditierten) Personen-Detailseite des Halters.
+          t.halter_person_id != null ? (
+            <Button type="link" style={{ padding: 0 }} onClick={() => navigate(personDetailPfad(einsatzId, t.halter_person_id!))}>
+              {halterAnzeige(t)}
+            </Button>
+          ) : halterAnzeige(t))}
+      </Descriptions.Item>
+      <Descriptions.Item label="Notiz">{zelle('notiz', <Input.TextArea rows={2} />, t.notiz ?? '—')}</Descriptions.Item>
+    </Descriptions>
+  );
+
   return (
     <div>
       <Breadcrumb
@@ -175,9 +212,9 @@ export default function TiereDetailPage() {
                   groesse_gewicht: t.groesse_gewicht,
                   antreff_ort: t.antreff_ort,
                   notiz: t.notiz,
-                  halter_person_id: t.halter_person_id,
-                  halter_kontakt: t.halter_kontakt,
-                  halter_modus: t.halter_person_id != null ? 'fk' : t.halter_kontakt ? 'freitext' : 'keiner',
+                  halter: t.halter_person_id != null
+                    ? { typ: 'person', refId: t.halter_person_id, label: t.halter_registrier_nr != null ? `R-${String(t.halter_registrier_nr).padStart(3, '0')}` : 'Halter' }
+                    : t.halter_kontakt ? { typ: 'extern', kontakt: t.halter_kontakt } : null,
                 });
               }}>Bearbeiten</Button>
               <Popconfirm title="Tier stornieren (Soft-Delete)?" onConfirm={() => stornoMutation.mutate(t.id)}>
@@ -191,75 +228,27 @@ export default function TiereDetailPage() {
 
       <Space direction="vertical" style={{ width: '100%' }} size="large">
         {bearbeiten ? (
-          <Form form={editForm} layout="vertical"
+          <Form form={editForm}
             onFinish={(daten) => {
-              const modus = daten.halter_modus ?? 'keiner';
+              const h = daten.halter ?? null;
               const patch: TierPatch = {
                 rasse_beschreibung: daten.rasse_beschreibung, rufname: daten.rufname,
                 geschlecht: daten.geschlecht, alter_geschaetzt: daten.alter_geschaetzt,
                 farbe_beschreibung: daten.farbe_beschreibung, kennzeichnung: daten.kennzeichnung,
                 groesse_gewicht: daten.groesse_gewicht, antreff_ort: daten.antreff_ort, notiz: daten.notiz,
-                // Halter-Toggle: immer beide Felder explizit senden (eines null).
-                halter_person_id: modus === 'fk' ? daten.halter_person_id ?? null : null,
-                halter_kontakt: modus === 'freitext' ? daten.halter_kontakt ?? null : null,
+                // Halter XOR: immer beide Felder explizit senden (das nicht gewählte ist null).
+                halter_person_id: h?.typ === 'person' ? h.refId : null,
+                halter_kontakt: h?.typ === 'extern' ? h.kontakt : null,
               };
               editMutation.mutate(patch);
             }}>
-            <Form.Item label="Rufname" name="rufname"><Input /></Form.Item>
-            <Form.Item label="Rasse / Beschreibung" name="rasse_beschreibung"><Input /></Form.Item>
-            <Form.Item label="Geschlecht" name="geschlecht">
-              <Select allowClear options={[
-                { value: 'maennlich', label: 'männlich' }, { value: 'weiblich', label: 'weiblich' },
-                { value: 'unbekannt', label: 'unbekannt' },
-              ]} />
-            </Form.Item>
-            <Form.Item label="Geschätztes Alter (Jahre)" name="alter_geschaetzt"><InputNumber min={0} max={120} /></Form.Item>
-            <Form.Item label="Farbe / Erscheinung" name="farbe_beschreibung"><Input /></Form.Item>
-            <Form.Item label="Kennzeichnung (Chip/Tätowierung/Halsband)" name="kennzeichnung"><Input /></Form.Item>
-            <Form.Item label="Größe / Gewicht" name="groesse_gewicht"><Input /></Form.Item>
-            <Form.Item label="Antreffort" name="antreff_ort"><Input /></Form.Item>
-            <Form.Item label="Halter" name="halter_modus">
-              <Radio.Group options={[
-                { value: 'keiner', label: 'unbekannt' },
-                { value: 'fk', label: 'Person im Einsatz (R-Nr.)' },
-                { value: 'freitext', label: 'Freitext (extern)' },
-              ]} />
-            </Form.Item>
-            <Form.Item noStyle shouldUpdate={(p, c) => p.halter_modus !== c.halter_modus}>
-              {() => {
-                const m = editForm.getFieldValue('halter_modus');
-                if (m === 'fk') return <Form.Item label="Halter-Person-ID" name="halter_person_id"><InputNumber min={1} style={{ width: 200 }} /></Form.Item>;
-                if (m === 'freitext') return <Form.Item label="Halter-Kontakt (Name, Tel.)" name="halter_kontakt"><Input /></Form.Item>;
-                return null;
-              }}
-            </Form.Item>
-            <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
-            <Space>
+            {detailAnsicht}
+            <Space style={{ marginTop: 16 }}>
               <Button type="primary" htmlType="submit" loading={editMutation.isPending}>Speichern</Button>
               <Button onClick={() => setBearbeiten(false)}>Abbrechen</Button>
             </Space>
           </Form>
-        ) : (
-          <Descriptions column={1} size="small" bordered>
-            <Descriptions.Item label="Rufname">{t.rufname ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Rasse / Beschreibung">{t.rasse_beschreibung ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Geschlecht">{t.geschlecht ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Alter (geschätzt)">{t.alter_geschaetzt ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Farbe / Erscheinung">{t.farbe_beschreibung ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Kennzeichnung">{t.kennzeichnung ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Größe / Gewicht">{t.groesse_gewicht ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Antreffort">{t.antreff_ort ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Halter">
-              {/* Klick auf R-nnn führt direkt zur (auditierten) Personen-Detailseite des Halters. */}
-              {t.halter_person_id != null ? (
-                <Button type="link" style={{ padding: 0 }} onClick={() => navigate(personDetailPfad(einsatzId, t.halter_person_id!))}>
-                  {halterAnzeige(t)}
-                </Button>
-              ) : halterAnzeige(t)}
-            </Descriptions.Item>
-            <Descriptions.Item label="Notiz">{t.notiz ?? '—'}</Descriptions.Item>
-          </Descriptions>
-        )}
+        ) : detailAnsicht}
 
         {t.status === 'abgeschlossen' && (
           <Descriptions column={1} size="small" title="Abschluss">
