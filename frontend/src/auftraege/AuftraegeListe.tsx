@@ -1,8 +1,9 @@
 import { Alert, App, Button, Card, Flex, Segmented, Select, Typography } from 'antd';
 import { CloseOutlined, PlusOutlined, UpOutlined } from '@ant-design/icons';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
+import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { legeAuftragAn, listeAuftraege, nimmAb, quittiereEmpfaenger, setzeVollzug } from '../api/auftraege';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
@@ -45,6 +46,23 @@ export default function AuftraegeListe({ einsatzId, darfSchreiben }: {
     queryKey: ['einsatz-auftraege', einsatzId, richtungFilter ?? 'alle', empfFilter ?? 'alle'],
     queryFn: () => listeAuftraege(einsatzId, { richtung: richtungFilter, abschnittId, einheitId }),
   });
+
+  // Cross-Modul-Deeplink (LFH-153): ?auftrag=<id> (z. B. ETB-Backlink) hebt den Auftrag hervor.
+  // Ansicht/Richtungs-/Empfänger-Filter zurücksetzen, damit das Ziel garantiert sichtbar ist;
+  // Scroll ist best-effort (jsdom-No-op).
+  const [highlightAuftragId, setHighlightAuftragId] = useState<number | null>(null);
+  useQueryParamSelektion('auftrag', auftraegeQuery.isSuccess, (aid) => {
+    const a = (auftraegeQuery.data ?? []).find((x) => x.id === aid);
+    if (!a) return;
+    setAnsicht(istAbgeschlossen(AUFTRAG_STATUS[a.bearbeitungsstatus]?.phase ?? 'offen') ? 'abgeschlossen' : 'offen');
+    setRichtungFilter(undefined);
+    setEmpfFilter(undefined);
+    setHighlightAuftragId(aid);
+  });
+  useEffect(() => {
+    if (highlightAuftragId == null) return;
+    document.querySelector(`[data-auftrag-id="${highlightAuftragId}"]`)?.scrollIntoView?.({ block: 'center' });
+  }, [highlightAuftragId]);
 
   // Inline-Anlegen-Formular (LFH-112): per Kopf-Button auf-/zugeklappt, kein Drawer/Modal.
   const [formOffen, setFormOffen] = useState(false);
@@ -109,6 +127,7 @@ export default function AuftraegeListe({ einsatzId, darfSchreiben }: {
   const listenProps = {
     einsatzId,
     darfSchreiben,
+    highlightId: highlightAuftragId,
     onQuittieren: (auftragId: number, empfaengerId: number) => quittierenMutation.mutate({ auftragId, empfaengerId }),
     onInArbeit: (auftragId: number) => vollzugMutation.mutate({ auftragId, status: 'in_arbeit' as const }),
     onVollzugMelden: (auftragId: number) => setVollzugFuer(auftragId),

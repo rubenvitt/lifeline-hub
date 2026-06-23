@@ -39,6 +39,8 @@ export interface AuftragKarteProps {
   ansicht?: 'offen' | 'abgeschlossen';
   einsatzId?: number;
   darfSchreiben?: boolean;
+  /** Deeplink-Hervorhebung (?auftrag=, LFH-153): markierte Karte + scroll-adressierbar. */
+  hervorgehoben?: boolean;
   onQuittieren?: (auftragId: number, empfaengerId: number) => void;
   onInArbeit?: (auftragId: number) => void;
   onVollzugMelden?: (auftragId: number) => void;
@@ -51,7 +53,7 @@ export interface AuftragKarteProps {
  * (colorErrorBg/colorError) statt hartkodiertem Rosa.
  */
 export default function AuftragKarte({
-  auftrag: a, ansicht = 'offen', einsatzId, darfSchreiben,
+  auftrag: a, ansicht = 'offen', einsatzId, darfSchreiben, hervorgehoben,
   onQuittieren, onInArbeit, onVollzugMelden, onAbnehmen,
 }: AuftragKarteProps) {
   const { token } = theme.useToken();
@@ -97,10 +99,13 @@ export default function AuftragKarte({
   return (
     <Card
       size="small"
+      data-auftrag-id={a.id}
+      data-hervorgehoben={hervorgehoben ? 'true' : undefined}
       style={{
         marginBottom: 10,
         borderInlineStart: `3px solid ${ueberfaellig ? token.colorError : 'transparent'}`,
         background: ueberfaellig ? token.colorErrorBg : undefined,
+        boxShadow: hervorgehoben ? `0 0 0 2px ${token.colorPrimary}` : undefined,
       }}
       styles={{ body: { padding: '12px 16px' } }}
     >

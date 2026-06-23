@@ -1,8 +1,9 @@
 import { Alert, App, Breadcrumb, Button, Card, Flex, Segmented, Spin, Typography } from 'antd';
 import { CloseOutlined, PlusOutlined, UpOutlined } from '@ant-design/icons';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { ladeEinsatz, ladeMitglieder } from '../api/einsaetze';
 import { ApiError } from '../api/client';
 import { bestaetigeMeldung, erteileAuftragAusMeldung, legeMeldungAn, listeMeldungen, markiereLagerelevant, setzeMeldungStatus, weiseBearbeiterZu } from '../api/meldungen';
@@ -62,6 +63,22 @@ export default function MeldungenPage() {
     queryKey: ['einsatz-meldungen', einsatzId, richtungFilter ?? 'alle'],
     queryFn: () => listeMeldungen(einsatzId, { richtung: richtungFilter }),
   });
+
+  // Cross-Modul-Deeplink (LFH-153): ?meldung=<id> (z. B. Lagekarte-Inspector) hebt die Meldung
+  // hervor; Ansicht (offen/abgeschlossen) + Richtungsfilter so setzen, dass sie sichtbar ist.
+  // Scroll ist best-effort (jsdom-No-op).
+  const [highlightMeldungId, setHighlightMeldungId] = useState<number | null>(null);
+  useQueryParamSelektion('meldung', meldungenQuery.isSuccess, (mid) => {
+    const m = (meldungenQuery.data ?? []).find((x) => x.id === mid);
+    if (!m) return;
+    setAnsicht(istAbgeschlossen(MELDUNG_STATUS[m.status]?.phase ?? 'offen') ? 'abgeschlossen' : 'offen');
+    setRichtungFilter(undefined);
+    setHighlightMeldungId(mid);
+  });
+  useEffect(() => {
+    if (highlightMeldungId == null) return;
+    document.querySelector(`[data-meldung-id="${highlightMeldungId}"]`)?.scrollIntoView?.({ block: 'center' });
+  }, [highlightMeldungId]);
 
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
   const invalidiere = () => qc.invalidateQueries({ queryKey: ['einsatz-meldungen', einsatzId] });
@@ -134,6 +151,7 @@ export default function MeldungenPage() {
     einsatzId,
     darfSchreiben,
     mitglieder,
+    highlightId: highlightMeldungId,
     onStatus: (meldungId: number, status: MeldungStatus) => statusMutation.mutate({ meldungId, status }),
     onZuweisen: (meldungId: number, bearbeiterId: number | null) => zuweisenMutation.mutate({ meldungId, bearbeiterId }),
     onLagerelevant: (meldungId: number) => {

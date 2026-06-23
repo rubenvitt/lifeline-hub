@@ -28,6 +28,8 @@ export interface MeldungKarteProps {
   einsatzId: number;
   darfSchreiben?: boolean;
   mitglieder?: BearbeiterOption[];
+  /** Deeplink-Hervorhebung (?meldung=, LFH-153): markierte Karte + scroll-adressierbar. */
+  hervorgehoben?: boolean;
   onStatus?: (meldungId: number, status: MeldungStatus) => void;
   onZuweisen?: (meldungId: number, bearbeiterId: number | null) => void;
   onLagerelevant?: (meldungId: number) => void;
@@ -60,7 +62,7 @@ function bestaetigungsAchse(m: Meldung): ReactNode {
  * orthogonal zum Triage-Status (LFH-97).
  */
 export default function MeldungKarte({
-  meldung: m, ansicht = 'offen', einsatzId, darfSchreiben, mitglieder,
+  meldung: m, ansicht = 'offen', einsatzId, darfSchreiben, mitglieder, hervorgehoben,
   onStatus, onZuweisen, onLagerelevant, onBestaetigen, onAuftragErteilen,
 }: MeldungKarteProps) {
   const { token } = theme.useToken();
@@ -132,10 +134,13 @@ export default function MeldungKarte({
   return (
     <Card
       size="small"
+      data-meldung-id={m.id}
+      data-hervorgehoben={hervorgehoben ? 'true' : undefined}
       style={{
         marginBottom: 10,
         borderInlineStart: `3px solid ${alarmiert ? token.colorError : 'transparent'}`,
         background: alarmiert ? token.colorErrorBg : undefined,
+        boxShadow: hervorgehoben ? `0 0 0 2px ${token.colorPrimary}` : undefined,
       }}
       styles={{ body: { padding: '12px 16px' } }}
     >

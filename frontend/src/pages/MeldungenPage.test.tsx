@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import MeldungenPage from './MeldungenPage';
 import type { Meldung } from '../api/types';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -48,12 +48,18 @@ const meldung = (over: Partial<Meldung> = {}): Meldung => ({
   ist_bestaetigt: false, ist_ueberfaellig: false, ...over,
 });
 
-function renderPage() {
+/** Macht den aktuellen Query-String im DOM sichtbar (für apply-then-clean-Assertions). */
+function LocationProbe() {
+  return <span data-testid="loc-search">{useLocation().search}</span>;
+}
+
+function renderPage(route = '/einsaetze/1/meldungen') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <AntApp>
-        <MemoryRouter initialEntries={['/einsaetze/1/meldungen']}>
+        <MemoryRouter initialEntries={[route]}>
+          <LocationProbe />
           <Routes><Route path="/einsaetze/:id/meldungen" element={<MeldungenPage />} /></Routes>
         </MemoryRouter>
       </AntApp>
@@ -302,5 +308,33 @@ describe('MeldungenPage', () => {
     await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledWith(1, expect.objectContaining({
       meldungsart: 'sofortmeldung', prioritaet: 'sofort', bestaetigung_pflicht: true,
     })));
+  });
+
+  // --- LFH-153: Deeplink-Selektion ?meldung= ---
+
+  it('?meldung=<id> hebt die Ziel-Meldung hervor und räumt den Param', async () => {
+    listeMeldungen.mockResolvedValue([
+      meldung({ id: 1, inhalt: 'Andere Meldung' }),
+      meldung({ id: 5, lfd_nr: 5, inhalt: 'Ziel-Meldung' }),
+    ]);
+    const { container } = renderPage('/einsaetze/1/meldungen?meldung=5');
+    await screen.findByText('Ziel-Meldung');
+    const karte = container.querySelector('[data-meldung-id="5"]');
+    expect(karte).toBeTruthy();
+    await waitFor(() => expect(karte).toHaveAttribute('data-hervorgehoben', 'true'));
+    expect(container.querySelector('[data-meldung-id="1"]')).not.toHaveAttribute('data-hervorgehoben');
+    // apply-then-clean: der Selektions-Param ist aus der URL geräumt.
+    await waitFor(() => expect(screen.getByTestId('loc-search').textContent).toBe(''));
+  });
+
+  it('?meldung=<id> einer erledigten Meldung schaltet auf die Abgeschlossen-Ansicht', async () => {
+    listeMeldungen.mockResolvedValue([
+      meldung({ id: 1, inhalt: 'Offene Meldung', status: 'neu', ist_offen: true }),
+      meldung({ id: 9, lfd_nr: 9, inhalt: 'Erledigte Meldung', status: 'erledigt', ist_offen: false, erledigt_at: '2026-06-12 12:00:00' }),
+    ]);
+    const { container } = renderPage('/einsaetze/1/meldungen?meldung=9');
+    // Ohne Umschaltung wäre die erledigte Meldung in der Default-Offen-Ansicht unsichtbar.
+    expect(await screen.findByText('Erledigte Meldung')).toBeInTheDocument();
+    await waitFor(() => expect(container.querySelector('[data-meldung-id="9"]')).toHaveAttribute('data-hervorgehoben', 'true'));
   });
 });

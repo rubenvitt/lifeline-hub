@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import AuftraegePage from './AuftraegePage';
 import type { Auftrag } from '../api/types';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -41,12 +41,18 @@ const auftrag = (over: Partial<Auftrag> = {}): Auftrag => ({
   ...over,
 });
 
-function renderPage() {
+/** Macht den aktuellen Query-String im DOM sichtbar (für apply-then-clean-Assertions). */
+function LocationProbe() {
+  return <span data-testid="loc-search">{useLocation().search}</span>;
+}
+
+function renderPage(route = '/einsaetze/1/auftraege') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <AntApp>
-        <MemoryRouter initialEntries={['/einsaetze/1/auftraege']}>
+        <MemoryRouter initialEntries={[route]}>
+          <LocationProbe />
           <Routes><Route path="/einsaetze/:id/auftraege" element={<AuftraegePage />} /></Routes>
         </MemoryRouter>
       </AntApp>
@@ -202,6 +208,36 @@ describe('AuftraegePage', () => {
     expect(await screen.findByText('Deich sichern')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Auftrag erteilen' })).not.toBeInTheDocument();
     expect(screen.queryByText('quittieren')).not.toBeInTheDocument();
+  });
+
+  it('?auftrag=<id> hebt den Ziel-Auftrag hervor und räumt den Param (LFH-153)', async () => {
+    listeAuftraege.mockResolvedValue([
+      auftrag({ id: 1, auftrag_text: 'Anderer Auftrag' }),
+      auftrag({ id: 7, auftrag_text: 'Ziel-Auftrag' }),
+    ]);
+    const { container } = renderPage('/einsaetze/1/auftraege?auftrag=7');
+    await screen.findByText('Ziel-Auftrag');
+    const karte = container.querySelector('[data-auftrag-id="7"]');
+    expect(karte).toBeTruthy();
+    await waitFor(() => expect(karte).toHaveAttribute('data-hervorgehoben', 'true'));
+    // Nicht-Ziel-Karte bleibt unmarkiert.
+    expect(container.querySelector('[data-auftrag-id="1"]')).not.toHaveAttribute('data-hervorgehoben');
+    // apply-then-clean: der Selektions-Param ist aus der URL geräumt.
+    await waitFor(() => expect(screen.getByTestId('loc-search').textContent).toBe(''));
+  });
+
+  it('?auftrag=<id> einer abgeschlossenen Auftrags schaltet auf die Abgeschlossen-Ansicht (LFH-153)', async () => {
+    listeAuftraege.mockResolvedValue([
+      auftrag({ id: 1, auftrag_text: 'Offener Auftrag', bearbeitungsstatus: 'offen' }),
+      auftrag({
+        id: 8, auftrag_text: 'Fertiger Auftrag', bearbeitungsstatus: 'abgenommen',
+        vollzogen_at: '2026-06-11 10:00:00', abgenommen_at: '2026-06-11 11:00:00',
+      }),
+    ]);
+    const { container } = renderPage('/einsaetze/1/auftraege?auftrag=8');
+    // Ohne Umschaltung wäre der abgenommene Auftrag in der Default-Offen-Ansicht unsichtbar.
+    expect(await screen.findByText('Fertiger Auftrag')).toBeInTheDocument();
+    await waitFor(() => expect(container.querySelector('[data-auftrag-id="8"]')).toHaveAttribute('data-hervorgehoben', 'true'));
   });
 
   it('Tab-Wechsel zu Befehle zeigt BefehlListe mit „Befehl erteilen"-Button', async () => {
