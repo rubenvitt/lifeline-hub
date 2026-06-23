@@ -30,6 +30,7 @@ function original(): EtbEintragAnzeige {
     meldeweg: null, veranlassung: null, erfasser_id: 1, erfasser_name: 'Max',
     ereigniszeit: '2026-05-23 10:00:00', received_at: '2026-05-23 10:00:01',
     erfasst_lokal_at: null, berichtigt_eintrag_id: null,
+    lagebericht_id: null, auftrag_id: null, befehl_id: null,
   };
 }
 

@@ -60,4 +60,11 @@ describe('BefehlDetailPage', () => {
     renderAt('abc');
     expect(await screen.findByText('AUFTRAEGE-LISTE')).toBeInTheDocument();
   });
+
+  it('verlinkt vom freigegebenen Befehl per ?eintrag= auf den ETB-Eintrag (LFH-25)', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('freigegeben') as never);
+    renderAt(7);
+    const link = await screen.findByRole('link', { name: /ETB-Eintrag/ });
+    expect(link).toHaveAttribute('href', '/einsaetze/1/etb?eintrag=5');
+  });
 });

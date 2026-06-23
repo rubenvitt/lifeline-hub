@@ -2,10 +2,15 @@ import { Button, Space, Table, Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { EtbEintragAnzeige } from '../api/types';
 import Markdown from '../components/Markdown';
+import EtbBacklinkBadges from './EtbBacklinkBadges';
 import { TYP_FARBE, TYP_LABEL, istNachgetragen } from './typFarben';
 
 interface Props {
   eintraege: EtbEintragAnzeige[];
+  /** Einsatz-id für die Deeplink-Backlink-Badges (ETB → Befehl/Lagebericht/Auftrag). */
+  einsatzId: number;
+  /** Per ?eintrag=<id> adressierter Eintrag — wird hervorgehoben (LFH-25). */
+  highlightId?: number | null;
   /** Wenn gesetzt, erscheint je Eintrag eine „Berichtigen"-Aktion. */
   onBerichtigen?: (eintrag: EtbEintragAnzeige) => void;
   /** Wenn gesetzt, erscheint je Eintrag eine „Wiedervorlage"-Aktion (ETB→Erinnerung, LFH-106). */
@@ -14,7 +19,9 @@ interface Props {
   onAuftragErteilen?: (eintrag: EtbEintragAnzeige) => void;
 }
 
-export default function EtbTabelle({ eintraege, onBerichtigen, onWiedervorlage, onAuftragErteilen }: Props) {
+export default function EtbTabelle({
+  eintraege, einsatzId, highlightId, onBerichtigen, onWiedervorlage, onAuftragErteilen,
+}: Props) {
   // Map id → lfd_nr, um Berichtigungs-Ziele auf ihre laufende Nummer aufzulösen.
   const lfdNrVonId = new Map(eintraege.map((e) => [e.id, e.lfd_nr]));
 
@@ -73,6 +80,11 @@ export default function EtbTabelle({ eintraege, onBerichtigen, onWiedervorlage, 
                 )}
               </div>
             )}
+            {(e.befehl_id != null || e.lagebericht_id != null || e.auftrag_id != null) && (
+              <div style={{ marginBottom: 4 }}>
+                <EtbBacklinkBadges eintrag={e} einsatzId={einsatzId} />
+              </div>
+            )}
             <Markdown variante="kompakt">{e.inhalt}</Markdown>
           </div>
         );
@@ -115,7 +127,12 @@ export default function EtbTabelle({ eintraege, onBerichtigen, onWiedervorlage, 
       columns={spalten}
       dataSource={eintraege}
       pagination={false}
-      rowClassName={(e) => (e.typ === 'berichtigung' ? 'etb-berichtigung' : '')}
+      rowClassName={(e) =>
+        [
+          e.typ === 'berichtigung' ? 'etb-berichtigung' : '',
+          e.id === highlightId ? 'zeile-hervorgehoben' : '',
+        ].filter(Boolean).join(' ')
+      }
     />
   );
 }

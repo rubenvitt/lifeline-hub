@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
-import { parseRouteId, lageberichtePfad, lageberichtDetailPfad } from '../routing/deeplinks';
+import { parseRouteId, lageberichtePfad, lageberichtDetailPfad, etbPfad } from '../routing/deeplinks';
 import { ApiError } from '../api/client';
 import {
   aktualisiereLagebericht,
@@ -166,7 +166,7 @@ export default function LageberichtDetailPage() {
         <Space>
           <Button onClick={() => window.print()}>Drucken / als PDF</Button>
           {!istEntwurf && bericht.etb_eintrag_id != null && (
-            <Link to={`/einsaetze/${einsatzId}/etb`}>Zum ETB-Eintrag</Link>
+            <Link to={etbPfad(einsatzId, { eintrag: bericht.etb_eintrag_id })}>Zum ETB-Eintrag</Link>
           )}
           {!istEntwurf && darfSchreiben && (
             <Button onClick={() => fortschreibenMutation.mutate()} loading={fortschreibenMutation.isPending}>

@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { Auftrag } from '../api/types';
 import { AUFTRAG_STATUS, PRIO_META, StatusBadge, formatZeit } from '../kommunikation';
+import { etbPfad } from '../routing/deeplinks';
 
 const { Text } = Typography;
 
@@ -109,7 +110,7 @@ export default function AuftragKarte({
           <StatusBadge phase={status.phase} label={status.label} />
           {a.richtung === 'extern' && <Tag color="purple" style={{ margin: 0 }}>Extern</Tag>}
           {a.quell_etb_eintrag_id != null && einsatzId != null && (
-            <Link to={`/einsaetze/${einsatzId}/etb`}>↗ ETB-Eintrag</Link>
+            <Link to={etbPfad(einsatzId, { eintrag: a.quell_etb_eintrag_id })}>↗ ETB-Eintrag</Link>
           )}
         </Space>
         <Space size={10} wrap>
