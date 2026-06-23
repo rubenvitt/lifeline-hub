@@ -1,6 +1,8 @@
 import { Table, Tag } from 'antd';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
+import { personDetailPfad } from '../../routing/deeplinks';
 import type { UhsBelegung, UhsDetail, BelegungsArt } from '../../api/types';
 
 const ART_FARBE: Record<BelegungsArt, string> = {
@@ -42,10 +44,13 @@ export default function BewegungenTab({ uhs }: Props) {
       key: 'person_id',
       render: (personId: number) => {
         const person = personenById.get(personId);
+        // Aufgelöste Person → Deeplink auf die Detailseite (LFH-25). Unbekannte/nicht
+        // geladene Person bleibt unverlinkter Fallback (#id, kein garantiertes Ziel).
         if (!person) return `#${personId}`;
-        return person.name
+        const label = person.name
           ? `${registrierAnzeige(person.registrier_nr)} · ${person.name}`
           : registrierAnzeige(person.registrier_nr);
+        return <Link to={personDetailPfad(uhs.einsatz_id, personId)}>{label}</Link>;
       },
     },
     {

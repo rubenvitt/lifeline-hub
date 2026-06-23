@@ -364,4 +364,25 @@ describe('SchaedenPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(screen.getByTestId('loc-search').textContent).toBe(''));
   });
+
+  it('verlinkt eine geschädigte Person auf ihre Detailseite (LFH-25)', async () => {
+    render(einsatzAktiv, [basisSchaden({ id: 1, geschaedigt_person_id: 50, geschaedigt_registrier_nr: 7 })]);
+    const link = await screen.findByRole('link', { name: /R-007/ });
+    expect(link).toHaveAttribute('href', '/einsaetze/1/personen/50');
+  });
+
+  it('verlinkt eine geschädigte Einsatzkraft auf die Personal-Liste (LFH-25)', async () => {
+    render(einsatzAktiv, [basisSchaden({ id: 2, geschaedigt_personal_id: 99, geschaedigt_personal_name: 'Schulz' })]);
+    const link = await screen.findByRole('link', { name: /Schulz/ });
+    expect(link).toHaveAttribute('href', '/einsaetze/1/personal?personal=99');
+  });
+
+  it('verlinkt eine stornierte Geschädigt-Person NICHT (bleibt grauer Text)', async () => {
+    render(einsatzAktiv, [basisSchaden({
+      id: 3, geschaedigt_person_id: 50, geschaedigt_registrier_nr: 7,
+      geschaedigt_storniert_at: '2026-05-30 10:00:00',
+    })]);
+    expect(await screen.findByText(/Geschädigt \(storniert\): R-007/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /R-007/ })).not.toBeInTheDocument();
+  });
 });

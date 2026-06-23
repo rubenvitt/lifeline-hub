@@ -11,7 +11,7 @@ import { SK_META, STATUS_META } from '../personen/personMeta';
 import { useTiereStream } from '../etb/useTiereStream';
 import { useSchaedenStream } from '../etb/useSchaedenStream';
 import type { PersonDetail, PersonStatus, PersonZugriff, Schaden, Sichtungskategorie, Spezies, Tier, Verbleib, VerbleibArt } from '../api/types';
-import { parseRouteId, personenPfad } from '../routing/deeplinks';
+import { parseRouteId, personenPfad, schaedenPfad } from '../routing/deeplinks';
 
 const TIER_SPEZIES_LABEL: Record<Spezies, string> = {
   hund: 'Hund', katze: 'Katze', grosstier: 'Großtier', nutzgefluegel: 'Nutzgeflügel',
@@ -361,14 +361,11 @@ export default function PersonenDetailPage() {
           ) : (
             <Space wrap style={{ marginTop: 4 }}>
               {(schaedenDerPersonQuery.data ?? []).map((sch: Schaden) => (
-                <Tag
-                  key={sch.id}
-                  color="orange"
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => navigate(`/einsaetze/${einsatzId}/schaeden`)}
-                >
-                  {schadenRegistrierAnzeige(sch.registrier_nr)} {sch.typ} ({sch.ausmass}) — {sch.status}
-                </Tag>
+                <Link key={sch.id} to={schaedenPfad(einsatzId, { schaden: sch.id })}>
+                  <Tag color="orange" style={{ cursor: 'pointer' }}>
+                    {schadenRegistrierAnzeige(sch.registrier_nr)} {sch.typ} ({sch.ausmass}) — {sch.status}
+                  </Tag>
+                </Link>
               ))}
             </Space>
           )}

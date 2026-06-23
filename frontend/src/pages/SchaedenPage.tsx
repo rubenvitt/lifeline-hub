@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { personDetailPfad, personalPfad } from '../routing/deeplinks';
 import {
   App,
   Button,
@@ -87,17 +88,27 @@ function pad3(nr: number): string {
   return String(nr).padStart(3, '0');
 }
 
-function geschaedigtAnzeige(s: Schaden): React.ReactNode {
+function geschaedigtAnzeige(s: Schaden, einsatzId: number): React.ReactNode {
   if (s.geschaedigt_registrier_nr != null) {
     const label = `R-${pad3(s.geschaedigt_registrier_nr)}`;
-    return s.geschaedigt_storniert_at ? (
-      <Typography.Text type="secondary">Geschädigt (storniert): {label}</Typography.Text>
+    // Storniert bleibt grauer Text ohne Deeplink (Status-quo-Optik).
+    if (s.geschaedigt_storniert_at) {
+      return <Typography.Text type="secondary">Geschädigt (storniert): {label}</Typography.Text>;
+    }
+    // Deeplink auf die Personen-Detailseite (LFH-25), falls die Person-id bekannt ist.
+    return s.geschaedigt_person_id != null ? (
+      <Link to={personDetailPfad(einsatzId, s.geschaedigt_person_id)}><Tag color="blue">{label}</Tag></Link>
     ) : (
       <Tag color="blue">{label}</Tag>
     );
   }
   if (s.geschaedigt_personal_id != null) {
-    return <Tag color="geekblue">{s.geschaedigt_personal_name ?? 'Einsatzkraft'}</Tag>;
+    // Einsatzkraft → Personal-Liste mit Zeilen-Selektion (?personal=, LFH-25).
+    return (
+      <Link to={personalPfad(einsatzId, { personal: s.geschaedigt_personal_id })}>
+        <Tag color="geekblue">{s.geschaedigt_personal_name ?? 'Einsatzkraft'}</Tag>
+      </Link>
+    );
   }
   if (s.geschaedigt_organisation_id != null) {
     return <Tag color="purple">{s.geschaedigt_organisation_name ?? 'Eigene Organisation'}</Tag>;
@@ -314,7 +325,7 @@ export default function SchaedenPage() {
         </Tag>
       ),
     },
-    { title: 'Geschädigt', key: 'geschaedigt', render: (_, row) => geschaedigtAnzeige(row) },
+    { title: 'Geschädigt', key: 'geschaedigt', render: (_, row) => geschaedigtAnzeige(row, einsatzId) },
   ];
 
   const orgId = einsatz?.org_id ?? 0;
@@ -477,7 +488,7 @@ export default function SchaedenPage() {
               <Descriptions column={1} size="small" bordered>
                 <Descriptions.Item label="Ort">{s.ort}</Descriptions.Item>
                 <Descriptions.Item label="Beschreibung">{s.beschreibung || '—'}</Descriptions.Item>
-                <Descriptions.Item label="Geschädigt">{geschaedigtAnzeige(s)}</Descriptions.Item>
+                <Descriptions.Item label="Geschädigt">{geschaedigtAnzeige(s, einsatzId)}</Descriptions.Item>
                 {s.status !== 'offen' && (
                   <Descriptions.Item label="Übergeben an">{s.uebergeben_an || '—'}</Descriptions.Item>
                 )}

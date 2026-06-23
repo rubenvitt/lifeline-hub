@@ -85,6 +85,17 @@ describe('PersonenDetailPage — Deeplink-Robustheit (LFH-25)', () => {
     renderBei('/einsaetze/1/personen/abc');
     expect(await screen.findByText('LISTE')).toBeInTheDocument();
   });
+
+  it('verlinkt „Als Geschädigte" auf den konkreten Schaden via ?schaden= (LFH-25)', async () => {
+    const schaden = {
+      id: 99, einsatz_id: 1, registrier_nr: 5, typ: 'sachschaden', ausmass: 'gering', status: 'offen',
+    };
+    render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([schaden])),
+    ]);
+    const link = await screen.findByRole('link', { name: /sachschaden/ });
+    expect(link).toHaveAttribute('href', '/einsaetze/1/schaeden?schaden=99');
+  });
 });
 
 describe('PersonenDetailPage — med. Verlauf', () => {
