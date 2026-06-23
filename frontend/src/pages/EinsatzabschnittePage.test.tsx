@@ -72,6 +72,17 @@ describe('EinsatzabschnittePage', () => {
     expect(screen.getByText(/Leiter Nord/)).toBeInTheDocument();
   });
 
+  it('selektiert per ?abschnitt=<id> den Abschnitt (LFH-25 Inspector-Deeplink)', async () => {
+    server.use(...handlers());
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/einsatzabschnitte" element={<EinsatzabschnittePage />} />
+      </Routes>,
+      { route: '/einsaetze/1/einsatzabschnitte?abschnitt=5' },
+    );
+    expect(await screen.findByText('Abschnitt: Nord')).toBeInTheDocument();
+  });
+
   it('zeigt „Abschnitt anlegen" bei Schreibrecht', async () => {
     server.use(...handlers());
     renderMitProviders(

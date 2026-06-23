@@ -18,6 +18,17 @@ body {
   background-color: #2a1215;
 }
 
+/* Cross-Modul-Deeplink-Highlight (LFH-25): eine per ?<modul>=<id> angesteuerte Tabellenzeile
+   dezent hervorheben, damit das Zielobjekt nach dem Sprung auffindbar ist. */
+.zeile-hervorgehoben > td {
+  background-color: #fffbe6;
+  transition: background-color 0.4s ease;
+}
+
+[data-theme='dark'] .zeile-hervorgehoben > td {
+  background-color: #2b2611;
+}
+
 /* ETB-Erfassung als angepinnte Kommandoleiste am Kopf des Tagebuchs.
    Das Eingabefeld bleibt beim Scrollen durch ältere Einträge sichtbar; neue
    Einträge erscheinen direkt darunter (Tabelle ist neueste-zuerst sortiert).

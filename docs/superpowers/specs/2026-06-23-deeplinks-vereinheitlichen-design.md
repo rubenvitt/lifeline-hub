@@ -77,5 +77,11 @@ Sorgen (Anzeige-Text vs. Pfad). Wer einen Bezugstyp ändert, muss beide Stellen 
 - **ETB-Deeplink auf ältere Einträge:** Die ETB-Liste ist Infinite-Scroll. `?eintrag=<id>`
   lädt ältere Seiten gezielt nach, bis der Eintrag gefunden ist (durch das Pagination-Ende
   begrenzt), und scrollt/hebt ihn dann hervor.
-- **`?auftrag=`-Selektion** auf der Auftrags-Liste ist nur dort aktiv, wo eine Listen-
-  Selektion existiert; andernfalls ist der Badge reine Listen-Navigation.
+- **Listen-Selektion konsumiert** auf Einheiten (`?einheit=`), Abschnitten (`?abschnitt=`),
+  Personal (`?personal=`) und Fahrzeugen (`?fahrzeug=`) — gemeinsamer Hook
+  `useQueryParamSelektion` (apply-then-clean). Flach-Tabellen (Personal/Fahrzeuge) heben die
+  Zeile hervor + scrollen best-effort (Scroll in jsdom nicht testbar → manuell/e2e).
+- **Noch nicht konsumiert (Inspector-Link navigiert nur zur Liste):** Meldungen (`?meldung=`,
+  Karten + Tab-Umschaltung) und die Auftrags-Liste (`?auftrag=` aus dem ETB-Backlink). Beide
+  als Folge-Task vorgemerkt; der Deeplink-Param ist bereits korrekt vorhanden und
+  vorwärtskompatibel.

@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
 import { server } from '../test/server';
@@ -71,6 +71,29 @@ describe('FahrzeugePage', () => {
   it('zeigt disponierte Fahrzeuge', async () => {
     render(einsatz());
     expect(await screen.findByText('Florian 1')).toBeInTheDocument();
+  });
+
+  it('hebt per ?fahrzeug=<id> die Zeile hervor (LFH-25 Inspector-Deeplink)', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([ef])),
+      http.get('/api/einsaetze/7/personal', () => HttpResponse.json([])),
+      http.get('/api/fahrzeug-status', () => HttpResponse.json(stati)),
+      http.get('/api/fahrzeuge', () => HttpResponse.json([])),
+    );
+    const { container } = renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/fahrzeuge" element={<FahrzeugePage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/7/fahrzeuge?fahrzeug=10' },
+    );
+    await screen.findByText('Florian 1');
+    await waitFor(() =>
+      expect(container.querySelector('[data-row-key="10"]')).toHaveClass('zeile-hervorgehoben'),
+    );
   });
 
   it('Einsatzleitung im aktiven Einsatz sieht Disponieren-/Entfernen-Aktionen', async () => {

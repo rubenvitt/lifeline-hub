@@ -58,6 +58,15 @@ describe('EinheitenPage', () => {
     expect(screen.getByText(/1\/3\/18\/\/22/)).toBeInTheDocument();
   });
 
+  it('selektiert per ?einheit=<id> die Einheit (LFH-25 Inspector-Deeplink)', async () => {
+    server.use(...handlers());
+    renderMitProviders(
+      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
+      { route: '/einsaetze/1/einheiten?einheit=10' },
+    );
+    expect(await screen.findByText('Einheit: 1. Zug')).toBeInTheDocument();
+  });
+
   it('zeigt „Einheit bilden" bei Schreibrecht', async () => {
     server.use(...handlers());
     renderMitProviders(

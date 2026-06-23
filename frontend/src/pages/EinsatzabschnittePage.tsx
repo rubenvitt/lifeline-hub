@@ -15,6 +15,7 @@ import { ApiError } from '../api/client';
 import type { Einsatzabschnitt } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import SprechgruppenPicker from '../components/SprechgruppenPicker';
+import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 
 const KOMMUNIKATIONSMITTEL_LABEL: Record<string, string> = {
   digitalfunk: 'Digitalfunk',
@@ -84,6 +85,11 @@ export default function EinsatzabschnittePage() {
   const abschnitteQuery = useQuery({ queryKey: ['abschnitte', einsatzId], queryFn: () => listeAbschnitte(einsatzId) });
   const personalQuery = useQuery({ queryKey: ['einsatz-personal', einsatzId], queryFn: () => listeEinsatzPersonal(einsatzId) });
   const einheitenQuery = useQuery({ queryKey: ['einheiten', einsatzId], queryFn: () => listeEinheiten(einsatzId) });
+
+  // Cross-Modul-Deeplink (LFH-25): ?abschnitt=<id> selektiert den Abschnitt, sofern vorhanden.
+  useQueryParamSelektion('abschnitt', abschnitteQuery.isSuccess, (zid) => {
+    if ((abschnitteQuery.data ?? []).some((a) => a.id === zid)) setGewaehlt(zid);
+  });
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: ['abschnitte', einsatzId] });

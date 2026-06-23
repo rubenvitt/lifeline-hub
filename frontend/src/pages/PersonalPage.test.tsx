@@ -58,6 +58,30 @@ describe('PersonalPage', () => {
     expect(screen.getByText('Sanitäter, Gruppenführer')).toBeInTheDocument();
   });
 
+  it('hebt per ?personal=<id> die Zeile hervor (LFH-25 Inspector-Deeplink)', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/7/personal', () => HttpResponse.json(disponiert)),
+      http.get('/api/personal-status', () => HttpResponse.json([
+        { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
+      ])),
+      http.get('/api/personal', () => HttpResponse.json([])),
+    );
+    const { container } = renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/personal" element={<PersonalPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/7/personal?personal=10' },
+    );
+    await screen.findByText('Thomas Müller');
+    await waitFor(() =>
+      expect(container.querySelector('[data-row-key="10"]')).toHaveClass('zeile-hervorgehoben'),
+    );
+  });
+
   it('Leitung im aktiven Einsatz sieht Dispositions-Aktionen', async () => {
     render(einsatz());
     await screen.findByText('Thomas Müller');
