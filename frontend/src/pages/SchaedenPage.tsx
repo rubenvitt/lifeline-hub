@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { personDetailPfad, personalPfad, parseRouteId } from '../routing/deeplinks';
 import {
   App,
   Button,
@@ -87,17 +88,27 @@ function pad3(nr: number): string {
   return String(nr).padStart(3, '0');
 }
 
-function geschaedigtAnzeige(s: Schaden): React.ReactNode {
+function geschaedigtAnzeige(s: Schaden, einsatzId: number): React.ReactNode {
   if (s.geschaedigt_registrier_nr != null) {
     const label = `R-${pad3(s.geschaedigt_registrier_nr)}`;
-    return s.geschaedigt_storniert_at ? (
-      <Typography.Text type="secondary">Geschädigt (storniert): {label}</Typography.Text>
+    // Storniert bleibt grauer Text ohne Deeplink (Status-quo-Optik).
+    if (s.geschaedigt_storniert_at) {
+      return <Typography.Text type="secondary">Geschädigt (storniert): {label}</Typography.Text>;
+    }
+    // Deeplink auf die Personen-Detailseite (LFH-25), falls die Person-id bekannt ist.
+    return s.geschaedigt_person_id != null ? (
+      <Link to={personDetailPfad(einsatzId, s.geschaedigt_person_id)}><Tag color="blue">{label}</Tag></Link>
     ) : (
       <Tag color="blue">{label}</Tag>
     );
   }
   if (s.geschaedigt_personal_id != null) {
-    return <Tag color="geekblue">{s.geschaedigt_personal_name ?? 'Einsatzkraft'}</Tag>;
+    // Einsatzkraft → Personal-Liste mit Zeilen-Selektion (?personal=, LFH-25).
+    return (
+      <Link to={personalPfad(einsatzId, { personal: s.geschaedigt_personal_id })}>
+        <Tag color="geekblue">{s.geschaedigt_personal_name ?? 'Einsatzkraft'}</Tag>
+      </Link>
+    );
   }
   if (s.geschaedigt_organisation_id != null) {
     return <Tag color="purple">{s.geschaedigt_organisation_name ?? 'Eigene Organisation'}</Tag>;
@@ -196,9 +207,9 @@ export default function SchaedenPage() {
   });
 
   useEffect(() => {
-    const ziel = searchParams.get('schaden');
-    const n = Number(ziel);
-    if (ziel && !Number.isNaN(n)) setOffenerSchadenId(n);
+    // Konsistent mit allen anderen Deeplink-Pfaden: nur positive Ganzzahlen (LFH-25).
+    const id = parseRouteId(searchParams.get('schaden') ?? undefined);
+    if (id != null) setOffenerSchadenId(id);
   }, [searchParams]);
 
   const einsatz = einsatzQuery.data;
@@ -215,6 +226,17 @@ export default function SchaedenPage() {
     searchParams.delete('neu');
     setSearchParams(searchParams, { replace: true });
   }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreiben]);
+
+  // Drawer schließen und den Deeplink-Param ?schaden= aus der URL räumen (LFH-25), damit
+  // Browser-Back/Reload den Drawer nicht erneut öffnet. Spiegelt das ?neu=1-Cleanup-Muster;
+  // der Consume-Effect oben re-läuft danach mit leerem Param und ist ein No-op (kein Reopen).
+  function schliesseDrawer() {
+    setOffenerSchadenId(null);
+    if (searchParams.has('schaden')) {
+      searchParams.delete('schaden');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: ['einsatz-schaeden', einsatzId] });
@@ -264,7 +286,7 @@ export default function SchaedenPage() {
     mutationFn: () => storniereSchaden(einsatzId, offenerSchadenId!),
     onSuccess: () => {
       invalidate();
-      setOffenerSchadenId(null);
+      schliesseDrawer();
     },
     onError: fehler,
   });
@@ -303,7 +325,7 @@ export default function SchaedenPage() {
         </Tag>
       ),
     },
-    { title: 'Geschädigt', key: 'geschaedigt', render: (_, row) => geschaedigtAnzeige(row) },
+    { title: 'Geschädigt', key: 'geschaedigt', render: (_, row) => geschaedigtAnzeige(row, einsatzId) },
   ];
 
   const orgId = einsatz?.org_id ?? 0;
@@ -435,7 +457,7 @@ export default function SchaedenPage() {
       <Drawer
         width={520}
         open={offenerSchadenId != null}
-        onClose={() => setOffenerSchadenId(null)}
+        onClose={schliesseDrawer}
         title={s ? `${schadenRegistrierAnzeige(s.registrier_nr)} · ${TYP_LABEL[s.typ]}` : 'Schaden'}
         loading={detailQuery.isLoading}
       >
@@ -466,7 +488,7 @@ export default function SchaedenPage() {
               <Descriptions column={1} size="small" bordered>
                 <Descriptions.Item label="Ort">{s.ort}</Descriptions.Item>
                 <Descriptions.Item label="Beschreibung">{s.beschreibung || '—'}</Descriptions.Item>
-                <Descriptions.Item label="Geschädigt">{geschaedigtAnzeige(s)}</Descriptions.Item>
+                <Descriptions.Item label="Geschädigt">{geschaedigtAnzeige(s, einsatzId)}</Descriptions.Item>
                 {s.status !== 'offen' && (
                   <Descriptions.Item label="Übergeben an">{s.uebergeben_an || '—'}</Descriptions.Item>
                 )}

@@ -75,6 +75,78 @@ describe('EtbPage', () => {
     expect(await screen.findByText('Erste Meldung')).toBeInTheDocument();
   });
 
+  it('hebt per ?eintrag=<id> den geladenen Eintrag hervor und räumt den Param (LFH-25)', async () => {
+    const { container } = setup('/einsaetze/7/etb?eintrag=1');
+    await screen.findByText('Erste Meldung');
+    await waitFor(() =>
+      expect(container.querySelector('[data-row-key="1"]')).toHaveClass('zeile-hervorgehoben'),
+    );
+    // Adressier-Param wird nach dem Anwenden geräumt (apply-then-clean).
+    await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(''));
+  });
+
+  it('lädt ältere Seiten nach, bis der ?eintrag=<id> gefunden ist (laden-bis-gefunden)', async () => {
+    const seite1 = Array.from({ length: 100 }, (_, i) => ({
+      ...eintrag, id: 101 + i, lfd_nr: 200 - i, inhalt: `Eintrag ${101 + i}`,
+    }));
+    const ziel = { ...eintrag, id: 5, lfd_nr: 1, inhalt: 'Ziel-Eintrag' };
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/etb', ({ request }) => {
+        const url = new URL(request.url);
+        return HttpResponse.json(url.searchParams.has('before_lfd_nr') ? [ziel] : seite1);
+      }),
+      http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
+    );
+    const { container } = renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
+        </Routes>
+        <OrtSpy />
+      </AuthProvider>,
+      { route: '/einsaetze/7/etb?eintrag=5' },
+    );
+    // Der Ziel-Eintrag liegt erst auf Seite 2 → muss automatisch nachgeladen werden.
+    expect(await screen.findByText('Ziel-Eintrag')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(container.querySelector('[data-row-key="5"]')).toHaveClass('zeile-hervorgehoben'),
+    );
+  });
+
+  it('räumt ?eintrag= ohne Highlight, wenn der Eintrag nicht existiert (Pagination erschöpft, kein Endlos-Fetch)', async () => {
+    let folgeSeiten = 0;
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/etb', ({ request }) => {
+        if (new URL(request.url).searchParams.has('before_lfd_nr')) folgeSeiten += 1;
+        return HttpResponse.json([eintrag]); // 1 < SEITENGROESSE → keine weitere Seite
+      }),
+      http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
+    );
+    const { container } = renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/einsaetze/:id/etb" element={<EtbPage />} />
+        </Routes>
+        <OrtSpy />
+      </AuthProvider>,
+      { route: '/einsaetze/7/etb?eintrag=999' },
+    );
+    await screen.findByText('Erste Meldung');
+    // Param geräumt, kein Highlight — und keine Folge-Seite nachgeladen (Abbruchbedingung greift).
+    await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(''));
+    expect(container.querySelector('.zeile-hervorgehoben')).toBeNull();
+    // Kein endloses Nachladen: keine before_lfd_nr-Folgeseite, weil hasNextPage=false.
+    expect(folgeSeiten).toBe(0);
+  });
+
   it('erteilt aus einem ETB-Eintrag einen Auftrag (Text vorbefüllt, POST an /etb/:id/auftrag)', async () => {
     let body: Record<string, unknown> | null = null;
     server.use(

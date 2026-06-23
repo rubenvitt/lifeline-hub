@@ -226,6 +226,10 @@ export interface EtbEintragAnzeige {
   received_at: string;
   erfasst_lokal_at: string | null;
   berichtigt_eintrag_id: number | null;
+  /** Backlinks auf erzeugende/gekoppelte Objekte (gesetzt bei Freigabe/Snapshot, LFH-25). */
+  lagebericht_id: number | null;
+  auftrag_id: number | null;
+  befehl_id: number | null;
 }
 
 export interface EtbBaustein {

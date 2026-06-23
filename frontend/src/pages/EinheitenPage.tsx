@@ -20,6 +20,7 @@ import type { Einheit, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StaerkeEingabe from '../anzeige/StaerkeEingabe';
 import SprechgruppenPicker from '../components/SprechgruppenPicker';
+import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 
 /** Baut antd-Tree-Daten aus der flachen Einheitenliste (nach ueber_einheit_id). */
 function baueBaum(einheiten: Einheit[]): TreeDataNode[] {
@@ -90,6 +91,11 @@ export default function EinheitenPage() {
   const personalQuery = useQuery({ queryKey: ['einsatz-personal', einsatzId], queryFn: () => listeEinsatzPersonal(einsatzId) });
   const fahrzeugeQuery = useQuery({ queryKey: ['einsatz-fahrzeuge', einsatzId], queryFn: () => listeEinsatzFahrzeuge(einsatzId) });
   const materialQuery = useQuery({ queryKey: ['einsatz-material', einsatzId], queryFn: () => listeEinsatzMaterial(einsatzId) });
+
+  // Cross-Modul-Deeplink (LFH-25): ?einheit=<id> selektiert die Einheit, sofern vorhanden.
+  useQueryParamSelektion('einheit', einheitenQuery.isSuccess, (id) => {
+    if ((einheitenQuery.data ?? []).some((e) => e.id === id)) setGewaehlt(id);
+  });
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: ['einheiten', einsatzId] });

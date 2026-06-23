@@ -64,6 +64,40 @@ function render(einsatzObj: typeof einsatzAktiv, person: PersonDetail, extra: Pa
   );
 }
 
+function renderBei(route: string) {
+  server.use(
+    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+  );
+  return renderMitProviders(
+    <AuthProvider>
+      <Routes>
+        <Route path="/einsaetze/:id/personen" element={<div>LISTE</div>} />
+        <Route path="/einsaetze/:id/personen/:personId" element={<PersonenDetailPage />} />
+      </Routes>
+    </AuthProvider>,
+    { route },
+  );
+}
+
+describe('PersonenDetailPage — Deeplink-Robustheit (LFH-25)', () => {
+  it('leitet bei ungültiger Personen-ID auf die Personen-Liste um', async () => {
+    renderBei('/einsaetze/1/personen/abc');
+    expect(await screen.findByText('LISTE')).toBeInTheDocument();
+  });
+
+  it('verlinkt „Als Geschädigte" auf den konkreten Schaden via ?schaden= (LFH-25)', async () => {
+    const schaden = {
+      id: 99, einsatz_id: 1, registrier_nr: 5, typ: 'sachschaden', ausmass: 'gering', status: 'offen',
+    };
+    render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([schaden])),
+    ]);
+    const link = await screen.findByRole('link', { name: /sachschaden/ });
+    expect(link).toHaveAttribute('href', '/einsaetze/1/schaeden?schaden=99');
+  });
+});
+
 describe('PersonenDetailPage — med. Verlauf', () => {
   it('Re-Sichten ruft erfasseSichtung mit SK II', async () => {
     let gerufen: { kategorie?: string } = {};

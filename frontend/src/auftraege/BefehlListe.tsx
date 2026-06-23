@@ -7,6 +7,7 @@ import { ApiError } from '../api/client';
 import { legeBefehlAn, listeBefehle, type NeuerBefehl } from '../api/befehle';
 import type { BefehlAnzeige } from '../api/types';
 import { VORLAGEN } from '../befehle/vorlagen';
+import { befehlDetailPfad } from '../routing/deeplinks';
 
 export default function BefehlListe({ einsatzId, darfSchreiben }: { einsatzId: number; darfSchreiben: boolean }) {
   const { message } = App.useApp();
@@ -29,7 +30,7 @@ export default function BefehlListe({ einsatzId, darfSchreiben }: { einsatzId: n
 
   const spalten: TableColumnsType<BefehlAnzeige> = [
     { title: 'Titel', dataIndex: 'titel', render: (titel: string, b) => (
-        <Link to={`/einsaetze/${einsatzId}/auftraege/befehle/${b.id}`}>{titel}</Link>
+        <Link to={befehlDetailPfad(einsatzId, b.id)}>{titel}</Link>
       ) },
     { title: 'Schema', dataIndex: 'vorlage', render: (v: string) => VORLAGEN.find((x) => x.schluessel === v)?.label ?? v },
     { title: 'Zeitstand', dataIndex: 'zeitstand' },

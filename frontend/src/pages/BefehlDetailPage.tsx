@@ -1,8 +1,9 @@
 import { App, Breadcrumb, Button, Form, Input, Space, Spin, Tag, Typography } from 'antd';
 import { useEffect } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
+import { parseRouteId, befehlDetailPfad, auftraegePfad, etbPfad } from '../routing/deeplinks';
 import { ApiError } from '../api/client';
 import {
   aktualisiereBefehl,
@@ -17,9 +18,10 @@ import MarkdownEditor from '../components/MarkdownEditor';
 import './befehlPrint.css';
 
 export default function BefehlDetailPage() {
-  const { id, bid } = useParams();
+  const { id, befehlId: befehlIdParam } = useParams();
   const einsatzId = Number(id);
-  const befehlId = Number(bid);
+  const befehlId = Number(befehlIdParam);
+  const idGueltig = parseRouteId(befehlIdParam) != null;
   const { message, modal } = App.useApp();
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -32,6 +34,7 @@ export default function BefehlDetailPage() {
   const befehlQuery = useQuery({
     queryKey: ['einsatz-befehl', einsatzId, befehlId],
     queryFn: () => ladeBefehl(einsatzId, befehlId),
+    enabled: idGueltig,
   });
 
   useEffect(() => {
@@ -82,11 +85,15 @@ export default function BefehlDetailPage() {
     mutationFn: () => schreibeBefehlFort(einsatzId, befehlId),
     onSuccess: (neu: BefehlAnzeige) => {
       qc.invalidateQueries({ queryKey: ['einsatz-befehle', einsatzId] });
-      navigate(`/einsaetze/${einsatzId}/auftraege/befehle/${neu.id}`);
+      navigate(befehlDetailPfad(einsatzId, neu.id));
     },
     onError: fehler,
   });
 
+  // Deeplink-Robustheit (LFH-25): ungültige Befehl-ID → zurück zu Aufträge/Befehle.
+  if (!idGueltig) {
+    return <Navigate to={auftraegePfad(einsatzId)} replace />;
+  }
   if (einsatzQuery.isLoading || befehlQuery.isLoading) {
     return (
       <div style={{ textAlign: 'center', paddingTop: 80 }}>
@@ -142,7 +149,7 @@ export default function BefehlDetailPage() {
         items={[
           { title: <Link to="/einsaetze">Einsätze</Link> },
           { title: einsatz.bezeichnung },
-          { title: <Link to={`/einsaetze/${einsatzId}/auftraege`}>Aufträge/Befehle</Link> },
+          { title: <Link to={auftraegePfad(einsatzId)}>Aufträge/Befehle</Link> },
           { title: befehl.titel },
         ]}
       />
@@ -158,7 +165,7 @@ export default function BefehlDetailPage() {
         <Space>
           <Button onClick={() => window.print()}>Drucken / als PDF</Button>
           {!istEntwurf && befehl.etb_eintrag_id != null && (
-            <Link to={`/einsaetze/${einsatzId}/etb`}>Zum ETB-Eintrag</Link>
+            <Link to={etbPfad(einsatzId, { eintrag: befehl.etb_eintrag_id })}>Zum ETB-Eintrag</Link>
           )}
           {!istEntwurf && darfSchreiben && (
             <Button onClick={() => fortschreibenMutation.mutate()} loading={fortschreibenMutation.isPending}>

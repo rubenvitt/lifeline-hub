@@ -8,6 +8,7 @@ import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import { ApiError } from '../api/client';
 import type { EtbEintragAnzeige, NeuerAuftrag } from '../api/types';
+import { parseRouteId } from '../routing/deeplinks';
 import { useEffect, useState } from 'react';
 import EtbTabelle from '../etb/EtbTabelle';
 import EtbFilterleiste from '../etb/EtbFilterleiste';
@@ -54,6 +55,7 @@ export default function EtbPage() {
   const [wiedervorlageZu, setWiedervorlageZu] = useState<EtbEintragAnzeige | null>(null);
   const [auftragZu, setAuftragZu] = useState<EtbEintragAnzeige | null>(null);
   const [mitgliederOffen, setMitgliederOffen] = useState(false);
+  const [highlightId, setHighlightId] = useState<number | null>(null);
   const { erfassen, ausstehend, abgelehnt } = useEtbErfassung(einsatzId);
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -69,6 +71,29 @@ export default function EtbPage() {
     searchParams.delete('neu');
     setSearchParams(searchParams, { replace: true });
   }, [searchParams, setSearchParams]);
+
+  // Deeplink ?eintrag=<id> (LFH-25): adressiert einen ETB-Eintrag. Da die Liste neueste-zuerst
+  // paginiert ist, werden ältere Seiten gezielt nachgeladen, bis der Eintrag gefunden ist
+  // (durch das Pagination-Ende begrenzt). Danach Highlight setzen und den Param räumen.
+  const zielEintragId = parseRouteId(searchParams.get('eintrag') ?? undefined);
+  useEffect(() => {
+    if (zielEintragId == null) return;
+    if (etbQuery.isLoading) return;
+    const gefunden = (etbQuery.data?.pages.flat() ?? []).some((e) => e.id === zielEintragId);
+    if (!gefunden && etbQuery.hasNextPage) {
+      if (!etbQuery.isFetchingNextPage) etbQuery.fetchNextPage();
+      return; // nach dem Laden re-läuft der Effekt (etbQuery.data ändert sich)
+    }
+    if (gefunden) setHighlightId(zielEintragId);
+    searchParams.delete('eintrag');
+    setSearchParams(searchParams, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zielEintragId, etbQuery.data, etbQuery.hasNextPage, etbQuery.isFetchingNextPage, etbQuery.isLoading]);
+
+  useEffect(() => {
+    if (highlightId == null) return;
+    document.querySelector(`[data-row-key="${highlightId}"]`)?.scrollIntoView?.({ block: 'center' });
+  }, [highlightId]);
 
   const abschliessenMutation = useMutation({
     mutationFn: () => schliesseEinsatzAb(einsatzId),
@@ -228,6 +253,8 @@ export default function EtbPage() {
       )}
       <EtbTabelle
         eintraege={eintraege}
+        einsatzId={einsatzId}
+        highlightId={highlightId}
         onBerichtigen={darfSchreiben ? (e) => setBerichtigungZu(e) : undefined}
         onWiedervorlage={darfSchreiben ? (e) => setWiedervorlageZu(e) : undefined}
         onAuftragErteilen={darfSchreiben ? (e) => setAuftragZu(e) : undefined}

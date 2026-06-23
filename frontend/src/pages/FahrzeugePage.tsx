@@ -4,8 +4,9 @@ import {
 } from 'antd';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
+import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { listeFahrzeuge } from '../api/fahrzeuge';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
 import {
@@ -137,6 +138,7 @@ export default function FahrzeugePage() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [adhocOffen, setAdhocOffen] = useState(false);
+  const [highlightId, setHighlightId] = useState<number | null>(null);
   const [form] = Form.useForm<AdhocEingabe>();
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
@@ -150,6 +152,15 @@ export default function FahrzeugePage() {
     queryKey: ['einsatz-personal', einsatzId],
     queryFn: () => listeEinsatzPersonal(einsatzId),
   });
+
+  // Cross-Modul-Deeplink (LFH-25): ?fahrzeug=<id> hebt die Zeile hervor (Scroll best-effort).
+  useQueryParamSelektion('fahrzeug', efQuery.isSuccess, (fid) => {
+    if ((efQuery.data ?? []).some((f) => f.id === fid)) setHighlightId(fid);
+  });
+  useEffect(() => {
+    if (highlightId == null) return;
+    document.querySelector(`[data-row-key="${highlightId}"]`)?.scrollIntoView?.({ block: 'center' });
+  }, [highlightId]);
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: ['einsatz-fahrzeuge', einsatzId] });
@@ -328,6 +339,7 @@ export default function FahrzeugePage() {
         dataSource={efs}
         columns={spalten}
         pagination={false}
+        rowClassName={(r) => (r.id === highlightId ? 'zeile-hervorgehoben' : '')}
         locale={{ emptyText: 'Noch keine Fahrzeuge disponiert' }}
         expandable={{
           // Besatzung je Fahrzeug standardmäßig eingeklappt, per Icon aufklappbar;

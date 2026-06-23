@@ -18,8 +18,9 @@ export interface KarteMarker {
   tz?: TzProps;
   /** FMS-Status-Ring, nur für Fahrzeuge. */
   statusFarbe?: string | null;
-  /** Lagemeldungs-Herkunft für den Inspector-Backlink (nur typ='lagemeldung'). */
-  lageMeldung?: { meldungLfdNr: number; absender: string; inhalt: string };
+  /** Lagemeldungs-Herkunft für den Inspector-Backlink (nur typ='lagemeldung').
+   *  `meldungId` = id der QUELL-Meldung (Deeplink-Ziel ?meldung=), `meldungLfdNr` = Anzeigenr. */
+  lageMeldung?: { meldungId: number; meldungLfdNr: number; absender: string; inhalt: string };
 }
 
 export interface NichtVerortet {
@@ -113,7 +114,7 @@ export function baueLageMeldungMarker(lagemeldungen: LageMeldung[]): KarteMarker
       lon: l.lon,
       label: `Meldung #${l.meldung_lfd_nr}`,
       farbe: LAGEMELDUNG_FARBE,
-      lageMeldung: { meldungLfdNr: l.meldung_lfd_nr, absender: l.meldung_absender, inhalt: l.text },
+      lageMeldung: { meldungId: l.meldung_id, meldungLfdNr: l.meldung_lfd_nr, absender: l.meldung_absender, inhalt: l.text },
     });
   }
   return verortet;

@@ -124,7 +124,7 @@ export default function App() {
           <Route path="unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />
           <Route path="bereitstellungsraeume/:brId" element={<BrDetailPage />} />
           <Route path="lageberichte/:lbId" element={<LageberichtDetailPage />} />
-          <Route path="auftraege/befehle/:bid" element={<BefehlDetailPage />} />
+          <Route path="auftraege/befehle/:befehlId" element={<BefehlDetailPage />} />
           <Route path="personen/:personId" element={<PersonenDetailPage />} />
         </Route>
       </Route>

@@ -1,8 +1,9 @@
 import { App, Breadcrumb, Button, Form, Input, Space, Spin, Tag, Typography } from 'antd';
 import { useEffect } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
+import { parseRouteId, lageberichtePfad, lageberichtDetailPfad, etbPfad } from '../routing/deeplinks';
 import { ApiError } from '../api/client';
 import {
   aktualisiereLagebericht,
@@ -20,6 +21,7 @@ export default function LageberichtDetailPage() {
   const { id, lbId } = useParams();
   const einsatzId = Number(id);
   const berichtId = Number(lbId);
+  const idGueltig = parseRouteId(lbId) != null;
   const { message, modal } = App.useApp();
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -33,6 +35,7 @@ export default function LageberichtDetailPage() {
   const berichtQuery = useQuery({
     queryKey: ['einsatz-lagebericht', einsatzId, berichtId],
     queryFn: () => ladeLagebericht(einsatzId, berichtId),
+    enabled: idGueltig,
   });
 
   useEffect(() => {
@@ -83,11 +86,15 @@ export default function LageberichtDetailPage() {
     mutationFn: () => schreibeLageberichtFort(einsatzId, berichtId),
     onSuccess: (neu: LageberichtAnzeige) => {
       qc.invalidateQueries({ queryKey: ['einsatz-lageberichte', einsatzId] });
-      navigate(`/einsaetze/${einsatzId}/lageberichte/${neu.id}`);
+      navigate(lageberichtDetailPfad(einsatzId, neu.id));
     },
     onError: fehler,
   });
 
+  // Deeplink-Robustheit (LFH-25): ungültige Lagebericht-ID → zurück zur Liste.
+  if (!idGueltig) {
+    return <Navigate to={lageberichtePfad(einsatzId)} replace />;
+  }
   if (einsatzQuery.isLoading || berichtQuery.isLoading) {
     return (
       <div style={{ textAlign: 'center', paddingTop: 80 }}>
@@ -143,7 +150,7 @@ export default function LageberichtDetailPage() {
         items={[
           { title: <Link to="/einsaetze">Einsätze</Link> },
           { title: einsatz.bezeichnung },
-          { title: <Link to={`/einsaetze/${einsatzId}/lageberichte`}>Lageberichte</Link> },
+          { title: <Link to={lageberichtePfad(einsatzId)}>Lageberichte</Link> },
           { title: bericht.titel },
         ]}
       />
@@ -159,7 +166,7 @@ export default function LageberichtDetailPage() {
         <Space>
           <Button onClick={() => window.print()}>Drucken / als PDF</Button>
           {!istEntwurf && bericht.etb_eintrag_id != null && (
-            <Link to={`/einsaetze/${einsatzId}/etb`}>Zum ETB-Eintrag</Link>
+            <Link to={etbPfad(einsatzId, { eintrag: bericht.etb_eintrag_id })}>Zum ETB-Eintrag</Link>
           )}
           {!istEntwurf && darfSchreiben && (
             <Button onClick={() => fortschreibenMutation.mutate()} loading={fortschreibenMutation.isPending}>

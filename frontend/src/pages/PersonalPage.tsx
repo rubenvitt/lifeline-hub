@@ -4,7 +4,8 @@ import {
 } from 'antd';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listePersonal, POSITION_LABELS, POSITION_OPTIONEN } from '../api/personal';
 import { listePersonalStatus } from '../api/personalStatus';
@@ -33,6 +34,7 @@ export default function PersonalPage() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [adhocOffen, setAdhocOffen] = useState(false);
+  const [highlightId, setHighlightId] = useState<number | null>(null);
   const [form] = Form.useForm<AdhocEingabe>();
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
@@ -42,6 +44,16 @@ export default function PersonalPage() {
   });
   const statusQuery = useQuery({ queryKey: ['personal-status'], queryFn: listePersonalStatus });
   const poolQuery = useQuery({ queryKey: ['personal', 'im-dienst'], queryFn: () => listePersonal(true) });
+
+  // Cross-Modul-Deeplink (LFH-25): ?personal=<id> (z. B. Lagekarte-Führungskraft) hebt die
+  // Zeile hervor und scrollt sie ins Bild (Scroll best-effort, jsdom-No-op).
+  useQueryParamSelektion('personal', epQuery.isSuccess, (pid) => {
+    if ((epQuery.data ?? []).some((p) => p.id === pid)) setHighlightId(pid);
+  });
+  useEffect(() => {
+    if (highlightId == null) return;
+    document.querySelector(`[data-row-key="${highlightId}"]`)?.scrollIntoView?.({ block: 'center' });
+  }, [highlightId]);
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: ['einsatz-personal', einsatzId] });
@@ -216,6 +228,7 @@ export default function PersonalPage() {
         dataSource={eps}
         columns={spalten}
         pagination={false}
+        rowClassName={(r) => (r.id === highlightId ? 'zeile-hervorgehoben' : '')}
         locale={{ emptyText: 'Noch kein Personal disponiert' }}
       />
 

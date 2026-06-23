@@ -12,14 +12,15 @@ vi.mock('../api/einsaetze');
 
 const einsatz = { id: 1, bezeichnung: 'Übung', status: 'aktiv', meine_rolle: 'einsatzleitung' };
 
-function renderAt(bid: number) {
+function renderAt(bid: number | string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
       <AntApp>
         <MemoryRouter initialEntries={[`/einsaetze/1/auftraege/befehle/${bid}`]}>
           <Routes>
-            <Route path="/einsaetze/:id/auftraege/befehle/:bid" element={<BefehlDetailPage />} />
+            <Route path="/einsaetze/:id/auftraege" element={<div>AUFTRAEGE-LISTE</div>} />
+            <Route path="/einsaetze/:id/auftraege/befehle/:befehlId" element={<BefehlDetailPage />} />
           </Routes>
         </MemoryRouter>
       </AntApp>
@@ -53,5 +54,17 @@ describe('BefehlDetailPage', () => {
     vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('freigegeben') as never);
     renderAt(7);
     expect(await screen.findByRole('button', { name: 'Fortschreiben' })).toBeInTheDocument();
+  });
+
+  it('leitet bei ungültiger Befehl-ID auf die Auftrags-Liste um (LFH-25)', async () => {
+    renderAt('abc');
+    expect(await screen.findByText('AUFTRAEGE-LISTE')).toBeInTheDocument();
+  });
+
+  it('verlinkt vom freigegebenen Befehl per ?eintrag= auf den ETB-Eintrag (LFH-25)', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('freigegeben') as never);
+    renderAt(7);
+    const link = await screen.findByRole('link', { name: /ETB-Eintrag/ });
+    expect(link).toHaveAttribute('href', '/einsaetze/1/etb?eintrag=5');
   });
 });

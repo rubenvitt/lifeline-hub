@@ -25,3 +25,23 @@ Die UI-Form richtet sich nach Umfang/Interaktion des Inhalts (LFH-19):
 Faustregel: Sobald ein Drawer Tabs bekommt, einen Edit-Modus mit vielen Feldern trägt
 oder breiter als ~480 px sein muss, gehört der Inhalt auf eine eigene Route.
 Details/Inventar: `docs/superpowers/specs/2026-06-22-drawer-nutzung-reduzieren-design.md`.
+
+## Frontend — Deeplink-Muster (Route vs. Query-Param)
+
+Modulübergreifende Deeplinks folgen einem festen Muster (LFH-25):
+
+- **Item-Route** `/einsaetze/:id/<modul>/:<modul>Id` → das Modul hat eine eigene
+  Vollseiten-Detailansicht (uhs, br, lagebericht, befehl, person).
+- **Query-Param-Selektion** `/einsaetze/:id/<modul>?<modul>=<id>` → das Zielobjekt wird in
+  einer Listenseite selektiert/als Drawer geöffnet, weil (noch) keine Detail-Route existiert
+  (`?schaden=`, `?einheit=`, `?fahrzeug=`, `?personal=`, `?abschnitt=`, `?meldung=`,
+  `?auftrag=`, ETB `?eintrag=`). `?neu=1` fokussiert die Schnellerfassung.
+
+Faustregel: Vollseiten-Detail vorhanden → Item-Route, sonst Query-Param. Param-Namen sind
+sprechend (`:<modul>Id`, Query-Key Modul-Singular) und nutzen die stabile DB-`id` (nicht die
+laufende Anzeigennummer).
+
+**Quelle der Wahrheit:** `frontend/src/routing/deeplinks.ts` (zentrale, unit-getestete
+URL-Builder) — keine inline-Template-Literals für Einsatz-Pfade. `parseRouteId` dort
+validiert Route-IDs (positive Ganzzahl, sonst Redirect auf die Liste).
+Details: `docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-design.md`.

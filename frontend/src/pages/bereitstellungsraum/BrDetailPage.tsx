@@ -1,7 +1,8 @@
 import { Alert, App, Breadcrumb, Button, Descriptions, List, Popconfirm, Space, Spin, Tag } from 'antd';
-import { Link, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../../api/einsaetze';
+import { parseRouteId, bereitstellungsraeumePfad } from '../../routing/deeplinks';
 import { ladeBr, setzeBrStatus, storniereBr, belegeBr } from '../../api/einsatzBereitstellungsraum';
 import { listeEinheiten } from '../../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
@@ -19,7 +20,8 @@ export default function BrDetailPage() {
   const { id, brId: brIdParam } = useParams();
   const einsatzId = Number(id);
   const brId = Number(brIdParam);
-  const listenPfad = `/einsaetze/${einsatzId}/bereitstellungsraeume`;
+  const idGueltig = parseRouteId(brIdParam) != null;
+  const listenPfad = bereitstellungsraeumePfad(einsatzId);
 
   const qc = useQueryClient();
   const { message } = App.useApp();
@@ -31,6 +33,7 @@ export default function BrDetailPage() {
   const detailQuery = useQuery({
     queryKey: ['einsatz-br-detail', einsatzId, brId],
     queryFn: () => ladeBr(einsatzId, brId),
+    enabled: idGueltig,
   });
   const einheitenQuery = useQuery({
     queryKey: ['einsatz-einheiten', einsatzId],
@@ -70,6 +73,10 @@ export default function BrDetailPage() {
     onError: fehler,
   });
 
+  // Deeplink-Robustheit (LFH-25): ungültige BR-ID → zurück zur Liste (nach allen Hooks).
+  if (!idGueltig) {
+    return <Navigate to={listenPfad} replace />;
+  }
   if (einsatzQuery.isLoading || detailQuery.isLoading) {
     return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
   }

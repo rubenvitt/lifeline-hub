@@ -21,7 +21,8 @@ describe('AuftragListe — ETB-Backlink (LFH-112)', () => {
       <AuftragListe auftraege={[auftrag({ quell_etb_eintrag_id: 99 })]} einsatzId={7} />,
     );
     const link = screen.getByRole('link', { name: /ETB-Eintrag/ });
-    expect(link).toHaveAttribute('href', '/einsaetze/7/etb');
+    // Deeplink auf den konkreten Quell-Eintrag (LFH-25).
+    expect(link).toHaveAttribute('href', '/einsaetze/7/etb?eintrag=99');
   });
 
   it('zeigt keinen Backlink ohne quell_etb_eintrag_id', () => {
