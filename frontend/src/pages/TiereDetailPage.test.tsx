@@ -101,6 +101,35 @@ describe('TiereDetailPage — Stammdaten', () => {
     await userEvent.click(await screen.findByText('R-007'));
     expect(await screen.findByText('PERSON-DETAIL')).toBeInTheDocument();
   });
+
+  it('Edit: Halter-Modus „unbekannt" sendet halter_person_id und halter_kontakt als null', async () => {
+    // Trickreichste Edit-Logik: beim Modus-Wechsel immer beide Halter-Felder explizit
+    // senden (eines null). Start mit FK-Halter, auf „unbekannt" umstellen → beide null.
+    const mitHalter: Tier = { ...tierBasis, halter_person_id: 5, halter_registrier_nr: 7 };
+    let body: { halter_person_id?: number | null; halter_kontakt?: string | null } = {};
+    render(einsatzAktiv, mitHalter, [
+      http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
+        body = await request.json() as typeof body;
+        return HttpResponse.json({ ...mitHalter });
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(await screen.findByRole('radio', { name: 'unbekannt' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await vi.waitFor(() => expect(body.halter_person_id).toBeNull());
+    expect(body.halter_kontakt).toBeNull();
+  });
+
+  it('Stornieren bestätigt per Popconfirm, ruft DELETE und navigiert zur Liste', async () => {
+    let geloescht = false;
+    render(einsatzAktiv, tierBasis, [
+      http.delete('/api/einsaetze/1/tiere/10', () => { geloescht = true; return new HttpResponse(null, { status: 204 }); }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Stornieren' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'OK' })); // Popconfirm bestätigen
+    await vi.waitFor(() => expect(geloescht).toBe(true));
+    expect(await screen.findByText('LISTE')).toBeInTheDocument();
+  });
 });
 
 describe('TiereDetailPage — Status/Abschluss', () => {
