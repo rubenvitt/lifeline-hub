@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, within } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
@@ -52,6 +52,7 @@ function render(einsatzObj: typeof einsatzAktiv, tiere: Tier[]) {
     <AuthProvider>
       <Routes>
         <Route path="/einsaetze/:id/tiere" element={<TierePage />} />
+        <Route path="/einsaetze/:id/tiere/:tierId" element={<div>DETAIL-SEITE</div>} />
         <Route path="/einsaetze/:id/personen" element={<div>Personen-Modul</div>} />
       </Routes>
     </AuthProvider>,
@@ -126,44 +127,11 @@ describe('TierePage', () => {
     await vi.waitFor(() => expect(body.status).toBe('vermisst'));
   });
 
-  it('öffnet den Detail-Drawer und zeigt den Abschluss-Block bei abgeschlossen', async () => {
-    const abgeschlossen: Tier = { ...tierBasis, status: 'abgeschlossen', abschluss_grund: 'uebergabe_tierarzt', abschluss_ziel: 'Tierarzt Müller' };
-    server.use(http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json(abgeschlossen)));
-    render(einsatzAktiv, [abgeschlossen]);
-    await userEvent.click(await screen.findByRole('tab', { name: 'Abgeschlossen' }));
-    await userEvent.click((await screen.findAllByText('Rex'))[0]);
-    expect(await screen.findByText('Tier T-001')).toBeInTheDocument();
-    expect(await screen.findByText('Übergabe an Tierarzt')).toBeInTheDocument();
-    expect(screen.getByText('Tierarzt Müller')).toBeInTheDocument();
-  });
-
-  it('Abschließen-Modal erzwingt einen Grund und schickt ihn', async () => {
-    let body: { status?: string; abschluss_grund?: string } = {};
-    server.use(
-      http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json(tierBasis)),
-      http.post('/api/einsaetze/1/tiere/10/status', async ({ request }) => {
-        body = await request.json() as { status?: string; abschluss_grund?: string };
-        return HttpResponse.json({ ...tierBasis, status: 'abgeschlossen', abschluss_grund: 'freilauf' });
-      }),
-    );
+  it('navigiert beim Klick auf eine Zeile zur Detail-Vollseite', async () => {
     render(einsatzAktiv, [tierBasis]);
     await userEvent.click((await screen.findAllByText('Rex'))[0]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Abschließen' }));
-    // Ohne Grund: Submit blockiert (Pflichtfeld) → kein Request.
-    // antd Drawer trägt ebenfalls role="dialog"; Modal-Titel ist nicht als accessible name verdrahtet → über Klasse abgrenzen.
-    const dialog = (await screen.findAllByRole('dialog')).find(
-      (d) => !d.classList.contains('ant-drawer-content'),
-    )!;
-    expect(dialog).toBeTruthy();
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Abschließen' })); // OK-Button im Modal
-    expect(await screen.findByText('Grund ist Pflicht')).toBeInTheDocument();
-    expect(body.status).toBeUndefined();
-    // Mit Grund:
-    await userEvent.click(within(dialog).getByRole('combobox'));
-    await userEvent.click(await screen.findByText('Freilauf')); // Option rendert im Portal → global, NICHT auf dialog scopen
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Abschließen' }));
-    await vi.waitFor(() => expect(body.abschluss_grund).toBe('freilauf'));
-    expect(body.status).toBe('abgeschlossen');
+    // Drawer entfernt (LFH-147) → Zeilen-Klick navigiert auf /tiere/:tierId.
+    expect(await screen.findByText('DETAIL-SEITE')).toBeInTheDocument();
   });
 
   it('zeigt die Halter-R-Nr und „storniert" aus den Join-Feldern', async () => {

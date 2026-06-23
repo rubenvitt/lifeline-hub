@@ -11,7 +11,7 @@ import { SK_META, STATUS_META } from '../personen/personMeta';
 import { useTiereStream } from '../etb/useTiereStream';
 import { useSchaedenStream } from '../etb/useSchaedenStream';
 import type { PersonDetail, PersonStatus, PersonZugriff, Schaden, Sichtungskategorie, Spezies, Tier, Verbleib, VerbleibArt } from '../api/types';
-import { parseRouteId, personenPfad, schaedenPfad } from '../routing/deeplinks';
+import { parseRouteId, personenPfad, schaedenPfad, tiereDetailPfad } from '../routing/deeplinks';
 
 const TIER_SPEZIES_LABEL: Record<Spezies, string> = {
   hund: 'Hund', katze: 'Katze', grosstier: 'Großtier', nutzgefluegel: 'Nutzgeflügel',
@@ -342,7 +342,7 @@ export default function PersonenDetailPage() {
                   key={t.id}
                   color="cyan"
                   style={{ cursor: 'pointer' }}
-                  onClick={() => navigate(`/einsaetze/${einsatzId}/tiere`)}
+                  onClick={() => navigate(tiereDetailPfad(einsatzId, t.id))}
                 >
                   {tierRegistrierAnzeige(t.registrier_nr)} {TIER_SPEZIES_LABEL[t.spezies] ?? t.spezies}
                   {t.rufname ? ` „${t.rufname}"` : ''}

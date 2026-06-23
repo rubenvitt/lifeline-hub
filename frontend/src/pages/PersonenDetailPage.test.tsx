@@ -58,6 +58,7 @@ function render(einsatzObj: typeof einsatzAktiv, person: PersonDetail, extra: Pa
       <Routes>
         <Route path="/einsaetze/:id/personen" element={<div>LISTE</div>} />
         <Route path="/einsaetze/:id/personen/:personId" element={<PersonenDetailPage />} />
+        <Route path="/einsaetze/:id/tiere/:tierId" element={<div>TIERE-DETAIL</div>} />
       </Routes>
     </AuthProvider>,
     { route: '/einsaetze/1/personen/10' },
@@ -74,6 +75,7 @@ function renderBei(route: string) {
       <Routes>
         <Route path="/einsaetze/:id/personen" element={<div>LISTE</div>} />
         <Route path="/einsaetze/:id/personen/:personId" element={<PersonenDetailPage />} />
+        <Route path="/einsaetze/:id/tiere/:tierId" element={<div>TIERE-DETAIL</div>} />
       </Routes>
     </AuthProvider>,
     { route },
@@ -186,7 +188,7 @@ describe('PersonenDetailPage — Abgleich / Tiere / Schäden', () => {
     await vi.waitFor(() => expect(entscheidung).toBe('bestaetigt'));
   });
 
-  it('zeigt den „Zugeordnete Tiere"-Block im Personen-Drawer', async () => {
+  it('zeigt den „Zugeordnete Tiere"-Block und verlinkt auf die Tier-Detailseite', async () => {
     render(einsatzAktiv, detail, [
       http.get('/api/einsaetze/1/tiere', ({ request }) => {
         const url = new URL(request.url);
@@ -207,6 +209,9 @@ describe('PersonenDetailPage — Abgleich / Tiere / Schäden', () => {
     expect(await screen.findByText(/Zugeordnete Tiere/i)).toBeInTheDocument();
     expect(await screen.findByText(/T-007/)).toBeInTheDocument();
     expect(screen.getByText(/Rex/)).toBeInTheDocument();
+    // Klick auf den Tier-Tag deeplinkt auf die Tier-Detail-Vollseite (LFH-147), nicht mehr auf die Liste.
+    await userEvent.click(screen.getByText(/Rex/));
+    expect(await screen.findByText('TIERE-DETAIL')).toBeInTheDocument();
   });
 
   it('zeigt den „Als Geschädigte bei Schäden"-Block im Personen-Drawer', async () => {

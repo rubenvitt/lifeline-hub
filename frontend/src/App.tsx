@@ -26,6 +26,7 @@ import GefahrenPage from './pages/gefahren/GefahrenPage';
 import PersonenPage from './pages/PersonenPage';
 import LageDashboardPage from './pages/lage-dashboard/LageDashboardPage';
 import TierePage from './pages/TierePage';
+import TiereDetailPage from './pages/TiereDetailPage';
 import SchaedenPage from './pages/SchaedenPage';
 import PersonenDetailPage from './pages/PersonenDetailPage';
 import LageberichtePage from './pages/LageberichtePage';
@@ -126,6 +127,7 @@ export default function App() {
           <Route path="lageberichte/:lbId" element={<LageberichtDetailPage />} />
           <Route path="auftraege/befehle/:befehlId" element={<BefehlDetailPage />} />
           <Route path="personen/:personId" element={<PersonenDetailPage />} />
+          <Route path="tiere/:tierId" element={<TiereDetailPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/einsaetze" replace />} />
