@@ -1,0 +1,94 @@
+import { http, HttpResponse } from 'msw';
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Route, Routes } from 'react-router-dom';
+import { server } from '../test/server';
+import { renderMitProviders } from '../test/utils';
+import { AuthProvider } from '../auth/AuthContext';
+import PersonenDetailPage from './PersonenDetailPage';
+import type { PersonDetail } from '../api/types';
+
+class FakeEventSource {
+  url: string; closed = false;
+  constructor(url: string) { this.url = url; }
+  addEventListener() {} removeEventListener() {} close() { this.closed = true; }
+}
+beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
+afterEach(() => vi.unstubAllGlobals());
+
+const admin = {
+  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
+  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-27 10:00:00',
+};
+const einsatzAktiv = {
+  id: 1, bezeichnung: 'Hochwasser', stichwort: null, status: 'aktiv',
+  begonnen_at: '2026-05-27 08:00:00', abgeschlossen_at: null, abgeschlossen_von: null,
+  einsatzart: 'realeinsatz', einsatznummer_intern: null, angelegt_at: '2026-05-27 08:00:00',
+  leitstellen_nr: null, einsatzort: null, einsatzort_lat: null, einsatzort_lon: null,
+  meldende_stelle: null, sachverhalt: null, anzahl_betroffene_initial: null,
+  meine_rolle: 'einsatzleitung',
+};
+const einsatzBeobachter = { ...einsatzAktiv, meine_rolle: 'beobachter' };
+
+const detail = {
+  id: 10, einsatz_id: 1, registrier_nr: 1, status: 'erfasst',
+  name: 'Mustermann', vorname: 'Max', geschlecht: 'maennlich', geburtsdatum: null,
+  alter_geschaetzt: 40, herkunft_adresse: null, antreff_ort: 'Brücke', melder_kontakt: null,
+  notiz: null, erfasst_at: '2026-05-27 09:00:00', erfasst_von: 1,
+  geaendert_at: '2026-05-27 09:00:00', geaendert_von: 1, storniert_at: null,
+  aktuelle_sichtung: null, aktuelle_sichtung_at: null, aktueller_verbleib: null,
+  aktuelle_uhs_id: null, aktueller_platz_id: null,
+  sichtungen: [], notizen: [], verbleib: [], abgleiche: [],
+} as PersonDetail;
+
+function render(einsatzObj: typeof einsatzAktiv, person: PersonDetail, extra: Parameters<typeof server.use> = []) {
+  server.use(
+    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
+    http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(person)),
+    http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+    ...extra,
+  );
+  return renderMitProviders(
+    <AuthProvider>
+      <Routes>
+        <Route path="/einsaetze/:id/personen" element={<div>LISTE</div>} />
+        <Route path="/einsaetze/:id/personen/:personId" element={<PersonenDetailPage />} />
+      </Routes>
+    </AuthProvider>,
+    { route: '/einsaetze/1/personen/10' },
+  );
+}
+
+describe('PersonenDetailPage — Stammdaten', () => {
+  it('zeigt Read-Modus mit Stammdaten', async () => {
+    render(einsatzAktiv, detail);
+    expect(await screen.findByRole('heading', { name: /Person R-001/ })).toBeInTheDocument();
+    expect(screen.getByText('Mustermann')).toBeInTheDocument();
+    expect(screen.getByText('Brücke')).toBeInTheDocument();
+  });
+
+  it('Einsatzleitung kann bearbeiten und speichern', async () => {
+    // Robust: kein getByLabelText (antd Form bindet label/htmlFor nicht zuverlässig).
+    // Edit-Modus öffnen, das mit initialValues={p} vorbefüllte Formular direkt speichern
+    // und den PATCH-Aufruf verifizieren.
+    let gesendet = false;
+    render(einsatzAktiv, detail, [
+      http.patch('/api/einsaetze/1/personen/10', async () => {
+        gesendet = true;
+        return HttpResponse.json({ ...detail });
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await vi.waitFor(() => expect(gesendet).toBe(true));
+  });
+
+  it('Beobachter sieht keinen Bearbeiten-Button', async () => {
+    render(einsatzBeobachter, detail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+  });
+});
