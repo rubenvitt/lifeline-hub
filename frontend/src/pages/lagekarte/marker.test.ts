@@ -78,7 +78,7 @@ describe('baueLageMeldungMarker', () => {
     expect(marker.map((m) => m.schluessel)).toEqual(['lagemeldung-4']);
     expect(marker[0].typ).toBe('lagemeldung');
     expect(marker[0].lageMeldung).toEqual({
-      meldungLfdNr: 5, absender: 'Florian Nord 1', inhalt: 'Brücke gesperrt',
+      meldungId: 3, meldungLfdNr: 5, absender: 'Florian Nord 1', inhalt: 'Brücke gesperrt',
     });
   });
 });

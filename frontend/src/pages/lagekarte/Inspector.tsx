@@ -1,6 +1,7 @@
 import { Button, Descriptions, Select, Space, Tag } from 'antd';
 import { Link } from 'react-router-dom';
 import type { KarteMarker, MarkerTyp } from './marker';
+import { markerToUrl } from './markerToUrl';
 import KartenDetailCard from './KartenDetailCard';
 import KoordinatenAnzeige from '../../anzeige/KoordinatenAnzeige';
 
@@ -68,15 +69,7 @@ function inspectorExclude(m: KarteMarker, einsatzId: number): string | undefined
 export default function Inspector({
   einsatzId, marker, darfSchreiben, onSchliessen, onVerortungLoeschen, onSymbolAendern,
 }: InspectorProps) {
-  const modulLink =
-    marker.typ === 'uhs' ? `/einsaetze/${einsatzId}/unfallhilfsstellen/${marker.id}`
-    : marker.typ === 'schaden' ? `/einsaetze/${einsatzId}/schaeden?schaden=${marker.id}`
-    : marker.typ === 'einheit' ? `/einsaetze/${einsatzId}/einheiten`
-    : marker.typ === 'fahrzeug' ? `/einsaetze/${einsatzId}/fahrzeuge`
-    : marker.typ === 'fuehrung' ? `/einsaetze/${einsatzId}/personal`
-    : marker.typ === 'abschnitt' ? `/einsaetze/${einsatzId}/einsatzabschnitte`
-    : marker.typ === 'lagemeldung' ? `/einsaetze/${einsatzId}/meldungen`
-    : `/einsaetze/${einsatzId}/einsatzdaten`;
+  const modulLink = markerToUrl(marker, einsatzId);
 
   const symbolAuswahl = darfSchreiben && onSymbolAendern && TAKTISCHE_TYPEN.includes(marker.typ);
 
