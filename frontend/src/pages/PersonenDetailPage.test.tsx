@@ -118,4 +118,13 @@ describe('PersonenDetailPage — Stammdaten', () => {
     await screen.findByRole('heading', { name: /Person R-001/ });
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
   });
+
+  it('zeigt Stammdaten UND med. Verlauf gleichzeitig (zwei Spalten, ohne Tabs)', async () => {
+    render(einsatzAktiv, detail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(screen.getByText('Stammdaten')).toBeInTheDocument();
+    expect(screen.getByText(/Chronologischer Verlauf/)).toBeInTheDocument();
+    // Keine Tab-Leiste mehr:
+    expect(screen.queryByRole('tab', { name: 'Medizinischer Verlauf' })).not.toBeInTheDocument();
+  });
 });

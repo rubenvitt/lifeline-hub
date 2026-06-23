@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Descriptions, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Spin, Table, Tag, Typography, type TableColumnsType } from 'antd';
+import { Alert, App, Breadcrumb, Button, Col, Descriptions, Form, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Spin, Table, Tag, Typography, type TableColumnsType } from 'antd';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -419,9 +419,15 @@ export default function PersonenDetailPage() {
         </Space>
       </Space>
 
-      {stammdatenSpalte(p)}
-
-      {medSpalte(p)}
+      <Row gutter={24}>
+        <Col xs={24} lg={12}>
+          <Typography.Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>Stammdaten</Typography.Text>
+          {stammdatenSpalte(p)}
+        </Col>
+        <Col xs={24} lg={12}>
+          {medSpalte(p)}
+        </Col>
+      </Row>
 
       <Modal
         open={reSichtenOffen}
