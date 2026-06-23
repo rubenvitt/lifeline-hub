@@ -327,7 +327,8 @@ describe('LagekartePage', () => {
     expect(await screen.findByText('Florian Nord 1')).toBeInTheDocument();
     expect(screen.getByText('Brücke gesperrt')).toBeInTheDocument();
     const link = await screen.findByRole('link', { name: /Zur Quell-Meldung/ });
-    expect(link).toHaveAttribute('href', '/einsaetze/1/meldungen');
+    // Deeplink auf die konkrete Quell-Meldung (LFH-25): meldung_id, nicht LageMeldung-id.
+    expect(link).toHaveAttribute('href', '/einsaetze/1/meldungen?meldung=12');
     // Lagemeldungs-Marker sind kartenseitig read-only (Verorten nur beim Übergeben).
     expect(screen.queryByRole('button', { name: /Verortung löschen/ })).not.toBeInTheDocument();
   });
@@ -476,7 +477,8 @@ describe('LagekartePage', () => {
     renderSeite();
     await user.click(await screen.findByText('marker-einheit-1'));
     const link = await screen.findByRole('link', { name: /Im Fach-Modul öffnen/ });
-    expect(link).toHaveAttribute('href', '/einsaetze/1/einheiten');
+    // Deeplink mit Listen-Selektion der Einheit (LFH-25).
+    expect(link).toHaveAttribute('href', '/einsaetze/1/einheiten?einheit=1');
   });
 
   it('Online-Sub-Switcher: zwischen zwei Views wechseln aktualisiert die Attribution', async () => {
