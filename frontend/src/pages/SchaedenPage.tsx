@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { personDetailPfad, personalPfad } from '../routing/deeplinks';
+import { personDetailPfad, personalPfad, parseRouteId } from '../routing/deeplinks';
 import {
   App,
   Button,
@@ -207,9 +207,9 @@ export default function SchaedenPage() {
   });
 
   useEffect(() => {
-    const ziel = searchParams.get('schaden');
-    const n = Number(ziel);
-    if (ziel && !Number.isNaN(n)) setOffenerSchadenId(n);
+    // Konsistent mit allen anderen Deeplink-Pfaden: nur positive Ganzzahlen (LFH-25).
+    const id = parseRouteId(searchParams.get('schaden') ?? undefined);
+    if (id != null) setOffenerSchadenId(id);
   }, [searchParams]);
 
   const einsatz = einsatzQuery.data;

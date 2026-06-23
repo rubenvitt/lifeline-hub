@@ -385,4 +385,11 @@ describe('SchaedenPage', () => {
     expect(await screen.findByText(/Geschädigt \(storniert\): R-007/)).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /R-007/ })).not.toBeInTheDocument();
   });
+
+  it('öffnet den Detail-Drawer NICHT bei ungültigem ?schaden= (parseRouteId, LFH-25)', async () => {
+    renderSchaedenPage('/einsaetze/1/schaeden?schaden=-1');
+    await screen.findByText('Keine Schäden in dieser Sicht');
+    // Ungültige ID (negativ/dezimal) → kein Drawer (sonst erschiene der Schließen-Button).
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
+  });
 });

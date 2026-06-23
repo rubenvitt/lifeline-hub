@@ -1,10 +1,14 @@
 /**
  * Zentrale, typsichere Deeplink-/URL-Builder für den Einsatz-Workspace (LFH-25).
  *
- * Eine Quelle der Wahrheit für alle modulübergreifenden Pfade. Statt inline
- * Template-Literals (`/einsaetze/${id}/...`) über die Codebasis verstreut bauen
- * Komponenten ihre Links hierüber — das hält die Routen-Strings, die Param-Namen
- * und die Query-Konventionen an EINER Stelle und macht sie unit-testbar.
+ * Maßgebliche Quelle der Wahrheit für modulübergreifende Pfade und der Zielzustand für
+ * alle Einsatz-Deeplinks: statt inline Template-Literals (`/einsaetze/${id}/...`) über die
+ * Codebasis verstreut bauen Komponenten ihre Links hierüber — das hält Routen-Strings,
+ * Param-Namen und Query-Konventionen an EINER Stelle und macht sie unit-testbar.
+ *
+ * Hinweis: Einige bestehende gleich-Modul-Inline-Pfade (Liste→Detail) sind noch nicht
+ * migriert (Folge-Task, s. Spec). Bei Routen-/Param-Änderungen daher auch nach Inline-
+ * Literalen suchen, nicht nur hier ändern.
  *
  * Muster (siehe docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-design.md
  * und die UI-Form-Leitlinie in CLAUDE.md):

@@ -25,4 +25,11 @@ describe('BewegungenTab (LFH-25)', () => {
     const link = await screen.findByRole('link', { name: /Müller/ });
     expect(link).toHaveAttribute('href', '/einsaetze/1/personen/10');
   });
+
+  it('zeigt #id ohne Link, wenn die Person nicht geladen ist (bewusster Fallback)', async () => {
+    server.use(http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])));
+    renderMitProviders(<BewegungenTab uhs={uhs} />, { route: '/einsaetze/1/unfallhilfsstellen/3' });
+    expect(await screen.findByText('#10')).toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
 });

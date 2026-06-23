@@ -150,7 +150,7 @@ export default function LageberichtDetailPage() {
         items={[
           { title: <Link to="/einsaetze">Einsätze</Link> },
           { title: einsatz.bezeichnung },
-          { title: <Link to={`/einsaetze/${einsatzId}/lageberichte`}>Lageberichte</Link> },
+          { title: <Link to={lageberichtePfad(einsatzId)}>Lageberichte</Link> },
           { title: bericht.titel },
         ]}
       />

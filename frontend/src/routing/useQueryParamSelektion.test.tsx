@@ -37,6 +37,19 @@ describe('useQueryParamSelektion (LFH-25)', () => {
     expect(angewendet).toEqual([]);
   });
 
+  it('räumt den Param auch, wenn die anwenden-Closure die ID ablehnt (Existenz-Guard false)', async () => {
+    const angewendet: number[] = [];
+    const { result } = renderHook(
+      () => {
+        useQueryParamSelektion('einheit', true, (id) => { if (id === 5) angewendet.push(id); });
+        return useLocation();
+      },
+      { wrapper: wrapper('/x?einheit=99') },
+    );
+    await waitFor(() => expect(result.current.search).toBe(''));
+    expect(angewendet).toEqual([]);
+  });
+
   it('wartet auf bereit=true (lässt Param stehen, solange nicht bereit)', () => {
     const angewendet: number[] = [];
     const { result } = renderHook(

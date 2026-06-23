@@ -47,10 +47,18 @@ an einer Stelle).
 
 ## Zentraler URL-Builder
 
-`frontend/src/routing/deeplinks.ts` ist die **einzige Quelle der Wahrheit** für
-Einsatz-Deeplinks. Reine, unit-getestete String-Funktionen (`deeplinks.test.ts`); keine
-inline-Template-Literals mehr in Komponenten. Builder gehen von gültigen, positiven
-Integer-IDs aus.
+`frontend/src/routing/deeplinks.ts` ist die **maßgebliche Quelle der Wahrheit** für
+Einsatz-Deeplinks und der **Zielzustand**: neue Links und alle modulübergreifenden
+Querverweise (Inspector, ETB-Backlinks, Geschädigt-Bezüge, NaN-Redirect-Ziele) werden
+ausschließlich darüber gebaut. Reine, unit-getestete String-Funktionen (`deeplinks.test.ts`);
+Builder gehen von gültigen, positiven Integer-IDs aus.
+
+**Noch nicht vollständig migriert:** einige bestehende gleich-Modul-Inline-Pfade
+(Liste → Detail, z. B. `LageberichtePage`, `UnfallhilfsstellenPage`, `PersonenPage`,
+`UhsSwitcher`, `PersonDetailDrawer`, `KraefteuebersichtPage`, `MeldungKarte`) bauen ihren
+Pfad noch als Template-Literal. Sie sind funktional identisch, aber bei einer Routen-/Param-
+Änderung separat nachzuziehen → schrittweise Migration als Folge-Task. Wer eine Route ändert,
+prüft daher zusätzlich diese Inline-Stellen, nicht nur `deeplinks.ts`.
 
 Der Lagekarte-Inspector adaptiert das über `frontend/src/pages/lagekarte/markerToUrl.ts`
 (dünner Adapter auf die Builder; nimmt den ganzen Marker, weil der `lagemeldung`-Marker auf
