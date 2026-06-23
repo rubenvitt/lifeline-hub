@@ -49,6 +49,7 @@ function render(einsatzObj: typeof einsatzAktiv, person: PersonDetail, extra: Pa
     http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(person)),
     http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/personen/10/audit', () => HttpResponse.json([])),
     ...extra,
   );
   return renderMitProviders(
