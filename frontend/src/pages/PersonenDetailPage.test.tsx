@@ -50,8 +50,9 @@ function render(einsatzObj: typeof einsatzAktiv, person: PersonDetail, extra: Pa
     http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/personen/10/audit', () => HttpResponse.json([])),
-    ...extra,
   );
+  // extra-Handler separat prependen, damit sie Vorrang vor den Default-Handlern haben.
+  if (extra.length > 0) server.use(...extra);
   return renderMitProviders(
     <AuthProvider>
       <Routes>
@@ -126,5 +127,30 @@ describe('PersonenDetailPage — Stammdaten', () => {
     expect(screen.getByText(/Chronologischer Verlauf/)).toBeInTheDocument();
     // Keine Tab-Leiste mehr:
     expect(screen.queryByRole('tab', { name: 'Medizinischer Verlauf' })).not.toBeInTheDocument();
+  });
+});
+
+describe('PersonenDetailPage — Robustheit', () => {
+  it('zeigt eine Fehleranzeige, wenn der Detail-Abruf scheitert', async () => {
+    render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json({ error: 'kaputt' }, { status: 500 })),
+    ]);
+    expect(await screen.findByText('Person konnte nicht geladen werden')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Erneut versuchen' })).toBeInTheDocument();
+  });
+
+  it('zeigt das Patient-Tag bei gesichteter Person (SK I)', async () => {
+    const patient = { ...detail, status: 'betroffen', aktuelle_sichtung: 'sk1',
+      aktuelle_sichtung_at: '2026-05-27 10:00:00' } as PersonDetail;
+    render(einsatzAktiv, patient);
+    expect((await screen.findAllByText('Patient')).length).toBeGreaterThan(0);
+  });
+
+  it('zeigt KEIN Patient-Tag bei unverletzter Person', async () => {
+    const unverletzt = { ...detail, status: 'betroffen', aktuelle_sichtung: 'unverletzt',
+      aktuelle_sichtung_at: '2026-05-27 10:00:00' } as PersonDetail;
+    render(einsatzAktiv, unverletzt);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(screen.queryByText('Patient')).not.toBeInTheDocument();
   });
 });

@@ -8,7 +8,6 @@ import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
 import PersonenPage from './PersonenPage';
 import PersonenDetailPage from './PersonenDetailPage';
-import type { PersonDetail } from '../api/types';
 
 class FakeEventSource {
   url: string; closed = false;
@@ -46,10 +45,7 @@ function render(einsatzObj: typeof einsatzAktiv, personen: unknown[], route = '/
     http.get('/api/auth/me', () => HttpResponse.json(admin)),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/personen', () => HttpResponse.json(personen)),
-    // Default-Fallback für den „Zugeordnete Tiere"-Block (Cross-Modul-Fetch).
-    // Jeder Test, der einen spezifischen Handler braucht, überschreibt ihn via server.use().
     http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
-    // Default-Fallback für den „Als Geschädigte bei Schäden"-Block (Cross-Modul-Fetch).
     http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
   );
   return renderMitProviders(
@@ -94,23 +90,6 @@ describe('PersonenPage', () => {
     expect(screen.queryByRole('button', { name: 'Schnellerfassung' })).not.toBeInTheDocument();
   });
 
-  it('öffnet den Detail-Drawer beim Klick auf eine Zeile', async () => {
-    server.use(http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(person)));
-    render(einsatzAktiv, [person]);
-    const zelle = (await screen.findAllByText('Mustermann, Max'))[0];
-    await userEvent.click(zelle);
-    expect(await screen.findByText('Person R-001')).toBeInTheDocument();
-  });
-
-  it('zeigt eine Fehleranzeige im Drawer, wenn der Detail-Abruf scheitert (kein leerer Drawer)', async () => {
-    server.use(http.get('/api/einsaetze/1/personen/10', () =>
-      HttpResponse.json({ error: 'kaputt' }, { status: 500 })));
-    render(einsatzAktiv, [person]);
-    await userEvent.click((await screen.findAllByText('Mustermann, Max'))[0]);
-    expect(await screen.findByText('Person konnte nicht geladen werden')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Erneut versuchen' })).toBeInTheDocument();
-  });
-
   it('leitet den Alt-Deep-Link ?person=<id> auf die Detailseite um', async () => {
     server.use(http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(person)));
     render(einsatzAktiv, [person], '/einsaetze/1/personen?person=10');
@@ -129,101 +108,6 @@ describe('PersonenPage', () => {
     // Lagebild: „SK II: 1", „ungesichtet: 2" (person + unbekannt)
     expect(screen.getByText(/SK II:\s*1/)).toBeInTheDocument();
     expect(screen.getByText(/ungesichtet:\s*2/)).toBeInTheDocument();
-  });
-
-  it('Re-Sichten-Aktion ruft erfasseSichtung mit SK II und löst Refetch aus', async () => {
-    const detail = { ...person, aktuelle_sichtung: null, aktuelle_sichtung_at: null,
-      aktueller_verbleib: null, aktuelle_uhs_id: null, aktueller_platz_id: null,
-      sichtungen: [], notizen: [], verbleib: [], abgleiche: [] } as PersonDetail;
-    let gerufen: { kategorie?: string } = {};
-    server.use(
-      http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(detail)),
-      http.post('/api/einsaetze/1/personen/10/sichtung', async ({ request }) => {
-        gerufen = await request.json() as { kategorie?: string };
-        return HttpResponse.json({ id: 1, einsatz_id: 1, person_id: 10, kategorie: 'sk2',
-          notiz: null, gesichtet_at: '2026-05-27 10:00:00', gesichtet_von: 1 }, { status: 201 });
-      }),
-    );
-    render(einsatzAktiv, [person]);
-    await userEvent.click((await screen.findAllByText('Mustermann, Max'))[0]);
-    await userEvent.click(await screen.findByRole('tab', { name: 'Medizinischer Verlauf' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Re-Sichten' }));
-    await userEvent.click(await screen.findByRole('combobox', { name: /Kategorie/ }));
-    await userEvent.click(await screen.findByText('SK II'));
-    await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
-    await vi.waitFor(() => expect(gerufen.kategorie).toBe('sk2'));
-  });
-
-  it('Einsatzleitung kann einen Verdachts-Abgleich bestätigen', async () => {
-    const vermisst = { ...person, id: 20, status: 'vermisst' as const };
-    const gefunden = { ...person, id: 21, registrier_nr: 4, status: 'betroffen' as const };
-    const detail = { ...vermisst, aktuelle_sichtung: null, aktuelle_sichtung_at: null,
-      aktueller_verbleib: null, aktuelle_uhs_id: null, aktueller_platz_id: null,
-      sichtungen: [], notizen: [], verbleib: [],
-      abgleiche: [{ id: 5, einsatz_id: 1, vermisst_person_id: 20, gefunden_person_id: 21,
-        status: 'verdacht', erstellt_at: '2026-05-27 10:00:00', erstellt_von: 1,
-        entschieden_at: null, entschieden_von: null }] } as PersonDetail;
-    let entscheidung: string | undefined;
-    server.use(
-      http.get('/api/einsaetze/1/personen/20', () => HttpResponse.json(detail)),
-      http.post('/api/einsaetze/1/personen/20/abgleich/5/entscheidung', async ({ request }) => {
-        entscheidung = ((await request.json()) as { entscheidung: string }).entscheidung;
-        return HttpResponse.json({ ...detail.abgleiche[0], status: 'bestaetigt' });
-      }),
-    );
-    render(einsatzAktiv, [vermisst, gefunden]);
-    await userEvent.click(await screen.findByRole('tab', { name: 'Vermisst' }));
-    await userEvent.click((await screen.findAllByText('Mustermann, Max'))[0]);
-    await userEvent.click(await screen.findByRole('tab', { name: 'Medizinischer Verlauf' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
-    await vi.waitFor(() => expect(entscheidung).toBe('bestaetigt'));
-  });
-
-  it('zeigt bei Sichtung=tot den Hinweis „Status → verstorben"', async () => {
-    const detail = { ...person, aktuelle_sichtung: 'tot', aktuelle_sichtung_at: '2026-05-27 10:00:00',
-      aktueller_verbleib: null, aktuelle_uhs_id: null, aktueller_platz_id: null,
-      sichtungen: [{ id: 1, einsatz_id: 1, person_id: 10, kategorie: 'tot',
-        notiz: null, gesichtet_at: '2026-05-27 10:00:00', gesichtet_von: 1 }],
-      notizen: [], verbleib: [], abgleiche: [] } as PersonDetail;
-    server.use(http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(detail)));
-    render(einsatzAktiv, [person]);
-    await userEvent.click((await screen.findAllByText('Mustermann, Max'))[0]);
-    await userEvent.click(await screen.findByRole('tab', { name: 'Medizinischer Verlauf' }));
-    expect(await screen.findByRole('button', { name: /Status → verstorben/ })).toBeInTheDocument();
-  });
-
-  it('zeigt den „Zugeordnete Tiere"-Block im Personen-Drawer', async () => {
-    const detail = { ...person, aktuelle_sichtung: null, aktuelle_sichtung_at: null,
-      aktueller_verbleib: null, aktuelle_uhs_id: null, aktueller_platz_id: null,
-      sichtungen: [], notizen: [], verbleib: [], abgleiche: [] } as PersonDetail;
-    server.use(
-      http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(detail)),
-    );
-    render(einsatzAktiv, [person]);
-    // Tiere-Handler nach render() einsetzen, damit er Vorrang gegenüber dem
-    // Default-Fallback aus render() hat (MSW-Prepend-Semantik).
-    server.use(
-      http.get('/api/einsaetze/1/tiere', ({ request }) => {
-        const url = new URL(request.url);
-        // Nur der Cross-Modul-Fetch trägt halter_person_id.
-        if (url.searchParams.get('halter_person_id') === '10') {
-          return HttpResponse.json([{
-            id: 30, einsatz_id: 1, registrier_nr: 7, status: 'aktiv', spezies: 'hund',
-            rasse_beschreibung: null, rufname: 'Rex', geschlecht: null, alter_geschaetzt: null,
-            farbe_beschreibung: null, kennzeichnung: null, groesse_gewicht: null,
-            halter_person_id: 10, halter_kontakt: null, antreff_ort: null, notiz: null,
-            abschluss_grund: null, abschluss_ziel: null, erfasst_at: '2026-05-27 09:00:00',
-            erfasst_von: 1, geaendert_at: '2026-05-27 09:00:00', geaendert_von: 1,
-            storniert_at: null, halter_registrier_nr: 1, halter_storniert_at: null,
-          }]);
-        }
-        return HttpResponse.json([]);
-      }),
-    );
-    await userEvent.click((await screen.findAllByText('Mustermann, Max'))[0]);
-    expect(await screen.findByText(/Zugeordnete Tiere/i)).toBeInTheDocument();
-    expect(await screen.findByText(/T-007/)).toBeInTheDocument();
-    expect(screen.getByText(/Rex/)).toBeInTheDocument();
   });
 
   it('Patienten-Tab gruppiert SK I–IV + tot in Abschnitte, ohne unverletzt/ungesichtet', async () => {
@@ -269,39 +153,6 @@ describe('PersonenPage', () => {
     expect(await screen.findByText(/Patienten:\s*2/)).toBeInTheDocument();
   });
 
-  it('Detail-Drawer zeigt das „Patient"-Tag bei gesichteter Person', async () => {
-    const patient = { ...person, status: 'betroffen' as const,
-      aktuelle_sichtung: 'sk1' as const, aktuelle_sichtung_at: '2026-05-27 10:00:00' };
-    const detail = {
-      ...patient,
-      aktueller_verbleib: null, aktuelle_uhs_id: null, aktueller_platz_id: null,
-      sichtungen: [], notizen: [], verbleib: [], abgleiche: [],
-    } as PersonDetail;
-    render(einsatzAktiv, [patient]);
-    server.use(http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(detail)));
-    await userEvent.click(await screen.findByRole('tab', { name: 'Alle' }));
-    await userEvent.click(await screen.findByText('R-001'));
-    const tags = await screen.findAllByText('Patient');
-    expect(tags.length).toBeGreaterThan(0);
-  });
-
-  it('Detail-Drawer zeigt KEIN „Patient"-Tag bei unverletzter Person', async () => {
-    const unverletztPerson = { ...person, status: 'betroffen' as const,
-      aktuelle_sichtung: 'unverletzt' as const, aktuelle_sichtung_at: '2026-05-27 10:00:00' };
-    const detail = {
-      ...unverletztPerson,
-      aktueller_verbleib: null, aktuelle_uhs_id: null, aktueller_platz_id: null,
-      sichtungen: [], notizen: [], verbleib: [], abgleiche: [],
-    } as PersonDetail;
-    render(einsatzAktiv, [unverletztPerson]);
-    server.use(http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(detail)));
-    await userEvent.click(await screen.findByRole('tab', { name: 'Alle' }));
-    await userEvent.click(await screen.findByText('R-001'));
-    // Drawer offen (Stammdaten sichtbar), aber kein Patient-Tag:
-    expect(await screen.findByText('Stammdaten')).toBeInTheDocument();
-    expect(screen.queryByText('Patient')).not.toBeInTheDocument();
-  });
-
   it('öffnet via ?neu=1 die Schnellerfassung', async () => {
     render(einsatzAktiv, [], '/einsaetze/1/personen?neu=1');
     const dialog = await screen.findByRole('dialog');
@@ -322,38 +173,5 @@ describe('PersonenPage', () => {
     await userEvent.click((await screen.findAllByText('Mustermann, Max'))[0]);
     // Detailseite zeigt den Personen-Titel als Heading:
     expect(await screen.findByRole('heading', { name: /Person R-001/ })).toBeInTheDocument();
-  });
-
-  it('zeigt den „Als Geschädigte bei Schäden"-Block im Personen-Drawer', async () => {
-    const detail = { ...person, aktuelle_sichtung: null, aktuelle_sichtung_at: null,
-      aktueller_verbleib: null, aktuelle_uhs_id: null, aktueller_platz_id: null,
-      sichtungen: [], notizen: [], verbleib: [], abgleiche: [] } as PersonDetail;
-    server.use(
-      http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(detail)),
-    );
-    render(einsatzAktiv, [person]);
-    // Schäden-Handler nach render() einsetzen, damit er Vorrang gegenüber dem
-    // Default-Fallback aus render() hat (MSW-Prepend-Semantik).
-    server.use(
-      http.get('/api/einsaetze/1/schaeden', ({ request }) => {
-        const url = new URL(request.url);
-        // Nur der Cross-Modul-Fetch trägt geschaedigt_person_id.
-        if (url.searchParams.get('geschaedigt_person_id') === '10') {
-          return HttpResponse.json([{
-            id: 7, einsatz_id: 1, registrier_nr: 3, status: 'offen', typ: 'umweltschaden',
-            ausmass: 'mittel', ort: 'Hauptstr. 1', beschreibung: '', geschaedigt_person_id: 10,
-            geschaedigt_kontakt: null, uebergeben_an: null, uebergeben_at: null,
-            abschluss_grund: null, abschluss_at: null, erfasst_at: '2026-05-29 10:00:00',
-            erfasst_von: 1, geaendert_at: '2026-05-29 10:00:00', geaendert_von: 1,
-            storniert_at: null, storniert_von: null, geschaedigt_registrier_nr: null,
-            geschaedigt_storniert_at: null,
-          }]);
-        }
-        return HttpResponse.json([]);
-      }),
-    );
-    await userEvent.click((await screen.findAllByText('Mustermann, Max'))[0]);
-    expect(await screen.findByText(/Als Geschädigte bei Schäden/i)).toBeInTheDocument();
-    expect(await screen.findByText((t) => t.includes('S-003'))).toBeInTheDocument();
   });
 });
