@@ -1,7 +1,7 @@
 import type { KarteMarker } from './marker';
 import {
   uhsDetailPfad,
-  schaedenPfad,
+  schadenDetailPfad,
   einheitenPfad,
   fahrzeugePfad,
   personalPfad,
@@ -16,15 +16,15 @@ import {
  *
  * Nimmt bewusst den ganzen Marker (nicht typ+id): `lagemeldung` verlinkt auf die QUELL-Meldung
  * (`lageMeldung.meldungId`), nicht auf `marker.id` (= LageMeldung-id). UHS hat eine echte
- * Item-Route; Schaden bleibt Query-Param-Drawer (Scope LFH-25); die taktischen Listen
- * (Einheit/Fahrzeug/Personal/Abschnitt) werden per Query-Param selektiert.
+ * Item-Route; Schaden hat seit LFH-148 ebenfalls eine Vollseiten-Item-Route; die taktischen
+ * Listen (Einheit/Fahrzeug/Personal/Abschnitt) werden per Query-Param selektiert.
  */
 export function markerToUrl(marker: KarteMarker, einsatzId: number): string {
   switch (marker.typ) {
     case 'uhs':
       return uhsDetailPfad(einsatzId, marker.id);
     case 'schaden':
-      return schaedenPfad(einsatzId, { schaden: marker.id });
+      return schadenDetailPfad(einsatzId, marker.id);
     case 'einheit':
       return einheitenPfad(einsatzId, { einheit: marker.id });
     case 'fahrzeug':

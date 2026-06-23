@@ -28,6 +28,7 @@ import LageDashboardPage from './pages/lage-dashboard/LageDashboardPage';
 import TierePage from './pages/TierePage';
 import TiereDetailPage from './pages/TiereDetailPage';
 import SchaedenPage from './pages/SchaedenPage';
+import SchaedenDetailPage from './pages/SchaedenDetailPage';
 import PersonenDetailPage from './pages/PersonenDetailPage';
 import LageberichtePage from './pages/LageberichtePage';
 import LageberichtDetailPage from './pages/LageberichtDetailPage';
@@ -128,6 +129,7 @@ export default function App() {
           <Route path="auftraege/befehle/:befehlId" element={<BefehlDetailPage />} />
           <Route path="personen/:personId" element={<PersonenDetailPage />} />
           <Route path="tiere/:tierId" element={<TiereDetailPage />} />
+          <Route path="schaeden/:schadenId" element={<SchaedenDetailPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/einsaetze" replace />} />

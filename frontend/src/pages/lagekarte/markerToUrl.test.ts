@@ -11,8 +11,8 @@ describe('markerToUrl (LFH-25) — Inspector-Deeplinks je Marker-Typ', () => {
   it('uhs → Item-Route', () => {
     expect(markerToUrl(m({ typ: 'uhs', id: 9 }), E)).toBe('/einsaetze/7/unfallhilfsstellen/9');
   });
-  it('schaden → Query-Param-Drawer', () => {
-    expect(markerToUrl(m({ typ: 'schaden', id: 5 }), E)).toBe('/einsaetze/7/schaeden?schaden=5');
+  it('schaden → Item-Route (LFH-148)', () => {
+    expect(markerToUrl(m({ typ: 'schaden', id: 5 }), E)).toBe('/einsaetze/7/schaeden/5');
   });
   it('einheit → Listen-Selektion', () => {
     expect(markerToUrl(m({ typ: 'einheit', id: 3 }), E)).toBe('/einsaetze/7/einheiten?einheit=3');

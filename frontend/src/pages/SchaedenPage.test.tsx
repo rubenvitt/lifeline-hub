@@ -1,8 +1,8 @@
 import { http, HttpResponse } from 'msw';
-import { screen, within, waitFor } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes, useLocation } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
@@ -47,11 +47,6 @@ function basisSchaden(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** Macht den aktuellen Query-String im DOM sichtbar (für URL-Cleanup-Assertions). */
-function LocationProbe() {
-  return <span data-testid="loc-search">{useLocation().search}</span>;
-}
-
 function render(einsatzObj: object, schaeden: object[], personen: object[] = [], personal: object[] = []) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(admin)),
@@ -65,6 +60,7 @@ function render(einsatzObj: object, schaeden: object[], personen: object[] = [],
     <AuthProvider>
       <Routes>
         <Route path="/einsaetze/:id/schaeden" element={<SchaedenPage />} />
+        <Route path="/einsaetze/:id/schaeden/:schadenId" element={<div>SCHADEN-DETAIL</div>} />
         <Route path="/einsaetze/:id/personen" element={<div>Personen-Modul</div>} />
       </Routes>
     </AuthProvider>,
@@ -118,9 +114,9 @@ async function waehleOption(label: string) {
   await userEvent.click(option!);
 }
 
-/** Modal-Dialog vom Drawer-Dialog (`ant-drawer-content`) abgrenzen. */
+/** Modal-Dialog isolieren (auf der List-only-Seite gibt es nur die Schnellerfassung). */
 async function modalDialog() {
-  return (await screen.findAllByRole('dialog')).find((d) => !d.classList.contains('ant-drawer-content'))!;
+  return (await screen.findAllByRole('dialog'))[0];
 }
 
 describe('SchaedenPage', () => {
@@ -149,6 +145,12 @@ describe('SchaedenPage', () => {
     render(einsatzBeobachter, [basisSchaden()]);
     await screen.findByText('S-001');
     expect(screen.queryByRole('button', { name: 'Schnellerfassung' })).not.toBeInTheDocument();
+  });
+
+  it('Zeilen-Klick navigiert auf die Schaden-Detailseite', async () => {
+    render(einsatzAktiv, [basisSchaden({ id: 10, registrier_nr: 1 })]);
+    await userEvent.click((await screen.findAllByText('Hauptstr. 17'))[0]);
+    expect(await screen.findByText('SCHADEN-DETAIL')).toBeInTheDocument();
   });
 
   it('Schnellerfassung schickt Pflichtfelder', async () => {
@@ -257,49 +259,6 @@ describe('SchaedenPage', () => {
     expect(body.geschaedigt_organisation_id).toBeNull();
   });
 
-  it('Übergeben-Modal erzwingt einen Adressaten und schickt ihn', async () => {
-    let body: { uebergeben_an?: string } = {};
-    server.use(
-      http.get('/api/einsaetze/1/schaeden/10', () => HttpResponse.json(basisSchaden())),
-      http.post('/api/einsaetze/1/schaeden/10/uebergeben', async ({ request }) => {
-        body = (await request.json()) as { uebergeben_an?: string };
-        return HttpResponse.json(basisSchaden({ status: 'uebergeben', uebergeben_an: body.uebergeben_an }));
-      }),
-    );
-    render(einsatzAktiv, [basisSchaden()]);
-    await userEvent.click((await screen.findAllByText('Hauptstr. 17'))[0]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Übergeben' }));
-    const dialog = await modalDialog();
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Übergeben' }));
-    expect(await screen.findByText('Adressat ist Pflicht')).toBeInTheDocument();
-    expect(body.uebergeben_an).toBeUndefined();
-    await userEvent.type(within(dialog).getByLabelText('Übergeben an'), 'Stadtwerke');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Übergeben' }));
-    await vi.waitFor(() => expect(body.uebergeben_an).toBe('Stadtwerke'));
-  });
-
-  it('Abschließen-Modal erzwingt einen Grund', async () => {
-    let body: { abschluss_grund?: string } = {};
-    server.use(
-      http.get('/api/einsaetze/1/schaeden/10', () => HttpResponse.json(basisSchaden())),
-      http.post('/api/einsaetze/1/schaeden/10/abschliessen', async ({ request }) => {
-        body = (await request.json()) as { abschluss_grund?: string };
-        return HttpResponse.json(basisSchaden({ status: 'abgeschlossen', abschluss_grund: body.abschluss_grund }));
-      }),
-    );
-    render(einsatzAktiv, [basisSchaden()]);
-    await userEvent.click((await screen.findAllByText('Hauptstr. 17'))[0]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Abschließen' }));
-    const dialog = await modalDialog();
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Abschließen' }));
-    expect(await screen.findByText('Grund ist Pflicht')).toBeInTheDocument();
-    expect(body.abschluss_grund).toBeUndefined();
-    await userEvent.click(within(dialog).getByRole('combobox'));
-    await waehleOption('behoben');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Abschließen' }));
-    await vi.waitFor(() => expect(body.abschluss_grund).toBe('behoben'));
-  });
-
   it('öffnet via ?neu=1 die Schadens-Erfassung', async () => {
     renderSchaedenPage('/einsaetze/1/schaeden?neu=1');
     expect(await screen.findByText('Schaden erfassen')).toBeInTheDocument();
@@ -310,59 +269,6 @@ describe('SchaedenPage', () => {
     // Tabelle muss laden (Seite ist gerendert)
     await screen.findByText('Keine Schäden in dieser Sicht');
     expect(screen.queryByText('Schaden erfassen')).not.toBeInTheDocument();
-  });
-
-  it('öffnet per ?schaden=-Query den Detail-Drawer', async () => {
-    const schaden5 = basisSchaden({
-      id: 5, registrier_nr: 7, ort: 'Gartenstr. 42',
-      beschreibung: 'Riss', ausmass: 'gross',
-    });
-    server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
-      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([schaden5])),
-      http.get('/api/einsaetze/1/schaeden/5', () => HttpResponse.json(schaden5)),
-      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
-    );
-    renderMitProviders(
-      <AuthProvider>
-        <Routes>
-          <Route path="/einsaetze/:id/schaeden" element={<SchaedenPage />} />
-        </Routes>
-      </AuthProvider>,
-      { route: '/einsaetze/1/schaeden?schaden=5' },
-    );
-    // Drawer-Titel enthält die S-Nummer und den Typ — erscheint nur im Drawer, nicht in der Tabelle.
-    expect(await screen.findByText('S-007 · Sachschaden')).toBeInTheDocument();
-  });
-
-  it('räumt ?schaden= aus der URL, wenn der Detail-Drawer geschlossen wird (LFH-25)', async () => {
-    const schaden5 = basisSchaden({
-      id: 5, registrier_nr: 7, ort: 'Gartenstr. 42', beschreibung: 'Riss', ausmass: 'gross',
-    });
-    server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
-      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([schaden5])),
-      http.get('/api/einsaetze/1/schaeden/5', () => HttpResponse.json(schaden5)),
-      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
-    );
-    renderMitProviders(
-      <AuthProvider>
-        <LocationProbe />
-        <Routes>
-          <Route path="/einsaetze/:id/schaeden" element={<SchaedenPage />} />
-        </Routes>
-      </AuthProvider>,
-      { route: '/einsaetze/1/schaeden?schaden=5' },
-    );
-    await screen.findByText('S-007 · Sachschaden');
-    expect(screen.getByTestId('loc-search')).toHaveTextContent('schaden=5');
-    // Drawer schließen → URL muss ?schaden= verlieren und der Drawer darf nicht reopen-loopen.
-    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
-    await waitFor(() => expect(screen.getByTestId('loc-search').textContent).toBe(''));
   });
 
   it('verlinkt eine geschädigte Person auf ihre Detailseite (LFH-25)', async () => {
@@ -384,12 +290,5 @@ describe('SchaedenPage', () => {
     })]);
     expect(await screen.findByText(/Geschädigt \(storniert\): R-007/)).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /R-007/ })).not.toBeInTheDocument();
-  });
-
-  it('öffnet den Detail-Drawer NICHT bei ungültigem ?schaden= (parseRouteId, LFH-25)', async () => {
-    renderSchaedenPage('/einsaetze/1/schaeden?schaden=-1');
-    await screen.findByText('Keine Schäden in dieser Sicht');
-    // Ungültige ID (negativ/dezimal) → kein Drawer (sonst erschiene der Schließen-Button).
-    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
   });
 });

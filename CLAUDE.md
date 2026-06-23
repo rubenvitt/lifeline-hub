@@ -31,10 +31,10 @@ Details/Inventar: `docs/superpowers/specs/2026-06-22-drawer-nutzung-reduzieren-d
 Modulübergreifende Deeplinks folgen einem festen Muster (LFH-25):
 
 - **Item-Route** `/einsaetze/:id/<modul>/:<modul>Id` → das Modul hat eine eigene
-  Vollseiten-Detailansicht (uhs, br, lagebericht, befehl, person, tier).
+  Vollseiten-Detailansicht (uhs, br, lagebericht, befehl, person, tier, schaden).
 - **Query-Param-Selektion** `/einsaetze/:id/<modul>?<modul>=<id>` → das Zielobjekt wird in
   einer Listenseite selektiert/als Drawer geöffnet, weil (noch) keine Detail-Route existiert
-  (`?schaden=`, `?einheit=`, `?fahrzeug=`, `?personal=`, `?abschnitt=`, `?meldung=`,
+  (`?einheit=`, `?fahrzeug=`, `?personal=`, `?abschnitt=`, `?meldung=`,
   `?auftrag=`, ETB `?eintrag=`). `?neu=1` fokussiert die Schnellerfassung.
 
 Faustregel: Vollseiten-Detail vorhanden → Item-Route, sonst Query-Param. Param-Namen sind

@@ -13,9 +13,9 @@
  * Muster (siehe docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-design.md
  * und die UI-Form-Leitlinie in CLAUDE.md):
  *  - **Item-Route** `/einsaetze/:id/<modul>/:<modul>Id` → Vollseiten-Detail (uhs, br,
- *    lagebericht, befehl, person, tier).
+ *    lagebericht, befehl, person, tier, schaden).
  *  - **Query-Param** `?<modul>=<id>` → Selektion/Drawer auf der Listenseite, wenn das
- *    Modul (noch) keine eigene Detail-Route hat (schaden, einheit, fahrzeug, personal,
+ *    Modul (noch) keine eigene Detail-Route hat (einheit, fahrzeug, personal,
  *    abschnitt, meldung, auftrag) bzw. ein Eintrag in einer Liste adressiert wird (etb).
  *  - **`?neu=1`** → Schnellerfassung auf der Listenseite fokussieren.
  *
@@ -64,6 +64,10 @@ export function tiereDetailPfad(einsatzId: number, tierId: number): string {
   return `${einsatzModulPfad(einsatzId, 'tiere')}/${tierId}`;
 }
 
+export function schadenDetailPfad(einsatzId: number, schadenId: number): string {
+  return `${einsatzModulPfad(einsatzId, 'schaeden')}/${schadenId}`;
+}
+
 // ── Listen-Routes (auch NaN-Redirect-Ziele) ──────────────────────────────────
 
 export function unfallhilfsstellenListePfad(einsatzId: number): string {
@@ -98,12 +102,8 @@ export function personenPfad(
   });
 }
 
-export function schaedenPfad(
-  einsatzId: number,
-  opts: { schaden?: number; neu?: boolean } = {},
-): string {
+export function schaedenPfad(einsatzId: number, opts: { neu?: boolean } = {}): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'schaeden'), {
-    schaden: opts.schaden,
     neu: opts.neu ? 1 : undefined,
   });
 }

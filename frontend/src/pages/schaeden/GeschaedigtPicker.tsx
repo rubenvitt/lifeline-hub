@@ -39,11 +39,12 @@ interface Props {
   /** Anzeigename der eigenen Organisation (für die Org-Option). Die Org-ID wird vom
    *  Aufrufer beim Submit gesetzt und serverseitig ohnehin auf die Einsatz-Org geklemmt. */
   orgName: string;
-  value: GeschaedigtWert;
-  onChange: (v: GeschaedigtWert) => void;
+  /** value/onChange optional → als Form.Item-Kind nutzbar (Form injiziert beide). */
+  value?: GeschaedigtWert;
+  onChange?: (v: GeschaedigtWert) => void;
 }
 
-export default function GeschaedigtPicker({ einsatzId, orgName, value, onChange }: Props) {
+export default function GeschaedigtPicker({ einsatzId, orgName, value = null, onChange }: Props) {
   const [suche, setSuche] = useState('');
 
   const personenQuery = useQuery({
@@ -165,19 +166,19 @@ export default function GeschaedigtPicker({ einsatzId, orgName, value, onChange 
         const roh = Array.isArray(option) ? option[0] : option;
         const opt = roh as GeschaedigtOption | undefined;
         if (!opt || !opt.typ) {
-          onChange(null);
+          onChange?.(null);
           return;
         }
         if (opt.typ === 'person' && opt.refId != null) {
-          onChange({ typ: 'person', refId: opt.refId, label: opt.label });
+          onChange?.({ typ: 'person', refId: opt.refId, label: opt.label });
         } else if (opt.typ === 'personal' && opt.refId != null) {
-          onChange({ typ: 'personal', refId: opt.refId, label: opt.label });
+          onChange?.({ typ: 'personal', refId: opt.refId, label: opt.label });
         } else if (opt.typ === 'organisation') {
-          onChange({ typ: 'organisation', label: orgName });
+          onChange?.({ typ: 'organisation', label: orgName });
         } else if (opt.typ === 'extern' && opt.kontakt != null) {
-          onChange({ typ: 'extern', kontakt: opt.kontakt });
+          onChange?.({ typ: 'extern', kontakt: opt.kontakt });
         } else {
-          onChange(null);
+          onChange?.(null);
         }
       }}
     />
