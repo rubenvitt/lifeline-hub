@@ -59,6 +59,7 @@ function render(
       <Routes>
         <Route path="/einsaetze/:id/tiere" element={<div>LISTE</div>} />
         <Route path="/einsaetze/:id/tiere/:tierId" element={<TiereDetailPage />} />
+        <Route path="/einsaetze/:id/personen/:personId" element={<div>PERSON-DETAIL</div>} />
       </Routes>
     </AuthProvider>,
     { route },
@@ -92,6 +93,13 @@ describe('TiereDetailPage — Stammdaten', () => {
     render(einsatzBeobachter, tierBasis);
     await screen.findByRole('heading', { name: /Tier T-001/ });
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+  });
+
+  it('Halter-Link deeplinkt bei bekanntem Halter auf die Personen-Detailseite', async () => {
+    const mitHalter: Tier = { ...tierBasis, halter_person_id: 5, halter_registrier_nr: 7 };
+    render(einsatzAktiv, mitHalter);
+    await userEvent.click(await screen.findByText('R-007'));
+    expect(await screen.findByText('PERSON-DETAIL')).toBeInTheDocument();
   });
 });
 

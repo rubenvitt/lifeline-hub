@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { aktualisiereTier, ladeTier, setzeTierStatus, storniereTier, tierRegistrierAnzeige, type TierPatch } from '../api/einsatzTier';
 import { ApiError } from '../api/client';
-import { parseRouteId, personenPfad, tierePfad } from '../routing/deeplinks';
+import { parseRouteId, personDetailPfad, tierePfad } from '../routing/deeplinks';
 import type { AbschlussGrund, Spezies, Tier, TierStatus } from '../api/types';
 
 const STATUS_META: Record<TierStatus, { label: string; color: string }> = {
@@ -250,9 +250,9 @@ export default function TiereDetailPage() {
             <Descriptions.Item label="Größe / Gewicht">{t.groesse_gewicht ?? '—'}</Descriptions.Item>
             <Descriptions.Item label="Antreffort">{t.antreff_ort ?? '—'}</Descriptions.Item>
             <Descriptions.Item label="Halter">
-              {/* Klick auf R-nnn führt in den (auditierten) Personen-Pfad. */}
+              {/* Klick auf R-nnn führt direkt zur (auditierten) Personen-Detailseite des Halters. */}
               {t.halter_person_id != null ? (
-                <Button type="link" style={{ padding: 0 }} onClick={() => navigate(personenPfad(einsatzId))}>
+                <Button type="link" style={{ padding: 0 }} onClick={() => navigate(personDetailPfad(einsatzId, t.halter_person_id!))}>
                   {halterAnzeige(t)}
                 </Button>
               ) : halterAnzeige(t)}
