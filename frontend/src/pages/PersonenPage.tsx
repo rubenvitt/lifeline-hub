@@ -2,6 +2,7 @@ import { Alert, App, Breadcrumb, Button, Form, Input, InputNumber, Modal, Select
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
+import { personDetailPfad } from '../routing/deeplinks';
 import { ladeEinsatz } from '../api/einsaetze';
 import { legePersonAn, listePersonen, registrierAnzeige, schlageAbgleichVor, setzePersonStatus, type PersonEingabe } from '../api/einsatzPerson';
 import { ApiError } from '../api/client';
@@ -87,7 +88,7 @@ export default function PersonenPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
     const pid = searchParams.get('person');
-    if (pid) navigate(`/einsaetze/${einsatzId}/personen/${pid}`, { replace: true });
+    if (pid) navigate(personDetailPfad(einsatzId, Number(pid)), { replace: true });
   }, [searchParams, einsatzId, navigate]);
 
   // Schnellaktion: ?neu=1 öffnet die Schnellerfassung (Command-Palette, LFH-11).
@@ -236,7 +237,7 @@ export default function PersonenPage() {
                   dataSource={gruppe}
                   columns={spalten}
                   pagination={false}
-                  onRow={(p) => ({ onClick: () => navigate(`/einsaetze/${einsatzId}/personen/${p.id}`), style: { cursor: 'pointer' } })}
+                  onRow={(p) => ({ onClick: () => navigate(personDetailPfad(einsatzId, p.id)), style: { cursor: 'pointer' } })}
                 />
               </div>
             );
@@ -254,7 +255,7 @@ export default function PersonenPage() {
           columns={[...spalten, ...aktionsSpalte]}
           pagination={false}
           locale={{ emptyText: 'Keine Personen in dieser Sicht' }}
-          onRow={(p) => ({ onClick: () => navigate(`/einsaetze/${einsatzId}/personen/${p.id}`), style: { cursor: 'pointer' } })}
+          onRow={(p) => ({ onClick: () => navigate(personDetailPfad(einsatzId, p.id)), style: { cursor: 'pointer' } })}
         />
       )}
 

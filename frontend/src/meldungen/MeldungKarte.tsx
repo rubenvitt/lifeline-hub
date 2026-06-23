@@ -2,6 +2,7 @@ import { Button, Card, Flex, Popconfirm, Select, Space, Tag, Typography, theme }
 import { ClockCircleOutlined } from '@ant-design/icons';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { auftraegePfad } from '../routing/deeplinks';
 import type { Meldung, MeldungStatus } from '../api/types';
 import { MELDUNG_STATUS, PrioBadge, QuittungIndikator, StatusBadge, formatZeit } from '../kommunikation';
 
@@ -152,7 +153,7 @@ export default function MeldungKarte({
           {m.richtung === 'extern' && <Tag color="purple" style={{ margin: 0 }}>Extern</Tag>}
           {m.lagerelevant && <Tag color="gold" style={{ margin: 0 }}>Lagerelevant ✓</Tag>}
           {m.auftrag_id != null && (
-            <Link to={`/einsaetze/${einsatzId}/auftraege`}>↗ Auftrag</Link>
+            <Link to={auftraegePfad(einsatzId)}>↗ Auftrag</Link>
           )}
         </Space>
         <Space size={10} wrap>

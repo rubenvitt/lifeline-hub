@@ -3,6 +3,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { lageberichtDetailPfad } from '../routing/deeplinks';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
@@ -133,7 +134,7 @@ export default function KraefteuebersichtPage() {
       await aktualisiereLagebericht(einsatzId, lb.id, { abschnitte: [{ schluessel: 'text', text: md }] });
       return lb.id;
     },
-    onSuccess: (lbId) => navigate(`/einsaetze/${einsatzId}/lageberichte/${lbId}`),
+    onSuccess: (lbId) => navigate(lageberichtDetailPfad(einsatzId, lbId)),
     onError: () => message.error('Übernahme fehlgeschlagen'),
   });
 

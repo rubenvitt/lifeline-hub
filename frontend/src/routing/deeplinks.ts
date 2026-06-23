@@ -6,9 +6,9 @@
  * Codebasis verstreut bauen Komponenten ihre Links hierüber — das hält Routen-Strings,
  * Param-Namen und Query-Konventionen an EINER Stelle und macht sie unit-testbar.
  *
- * Hinweis: Einige bestehende gleich-Modul-Inline-Pfade (Liste→Detail) sind noch nicht
- * migriert (Folge-Task, s. Spec). Bei Routen-/Param-Änderungen daher auch nach Inline-
- * Literalen suchen, nicht nur hier ändern.
+ * Hinweis: Bare `/einsaetze/:id`-Breadcrumbs und dynamische Modul-Basis-Navigationen
+ * (`modulZielRoute(...)`) bleiben bewusst inline (kein passender Builder). Bei Routen-/
+ * Param-Änderungen daher auch nach Inline-Literalen suchen, nicht nur hier ändern.
  *
  * Muster (siehe docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-design.md
  * und die UI-Form-Leitlinie in CLAUDE.md):

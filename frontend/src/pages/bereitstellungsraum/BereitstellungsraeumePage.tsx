@@ -5,6 +5,7 @@ import {
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { bereitstellungsraumDetailPfad } from '../../routing/deeplinks';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { listeBr, legeBrAn, type BrEingabe } from '../../api/einsatzBereitstellungsraum';
 import { ApiError } from '../../api/client';
@@ -47,7 +48,7 @@ export default function BereitstellungsraeumePage() {
       qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
       setAnlegen(false);
       form.resetFields();
-      navigate(`/einsaetze/${einsatzId}/bereitstellungsraeume/${br.id}`);
+      navigate(bereitstellungsraumDetailPfad(einsatzId, br.id));
     },
     onError: (e: unknown) =>
       message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
@@ -58,7 +59,7 @@ export default function BereitstellungsraeumePage() {
       title: 'Bezeichnung',
       dataIndex: 'bezeichnung',
       render: (b: string, br) => (
-        <Link to={`/einsaetze/${einsatzId}/bereitstellungsraeume/${br.id}`}>{b}</Link>
+        <Link to={bereitstellungsraumDetailPfad(einsatzId, br.id)}>{b}</Link>
       ),
     },
     {

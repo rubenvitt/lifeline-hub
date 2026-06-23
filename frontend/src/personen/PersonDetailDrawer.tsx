@@ -1,6 +1,7 @@
 import { Alert, Button, Descriptions, Drawer, Space, Spin, Tag, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { personDetailPfad } from '../routing/deeplinks';
 import { ladePerson, registrierAnzeige } from '../api/einsatzPerson';
 import { ApiError } from '../api/client';
 import type { PersonDetail, Sichtungskategorie, Verbleib } from '../api/types';
@@ -79,7 +80,7 @@ export default function PersonDetailDrawer({
       title={p ? `Person ${registrierAnzeige(p.registrier_nr)}` : 'Person'}
       onClose={onClose}
       extra={p && (
-        <Button type="link" size="small" onClick={() => navigate(`/einsaetze/${einsatzId}/personen/${p.id}`)}>
+        <Button type="link" size="small" onClick={() => navigate(personDetailPfad(einsatzId, p.id))}>
           Vollständig öffnen
         </Button>
       )}

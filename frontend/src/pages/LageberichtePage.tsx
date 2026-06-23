@@ -3,6 +3,7 @@ import type { TableColumnsType } from 'antd';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { lageberichtDetailPfad } from '../routing/deeplinks';
 import { ladeEinsatz } from '../api/einsaetze';
 import { ApiError } from '../api/client';
 import { legeLageberichtAn, listeLageberichte, type NeuerLagebericht } from '../api/lageberichte';
@@ -63,7 +64,7 @@ export default function LageberichtePage() {
       title: 'Titel',
       dataIndex: 'titel',
       render: (titel: string, lb) => (
-        <Link to={`/einsaetze/${einsatzId}/lageberichte/${lb.id}`}>{titel}</Link>
+        <Link to={lageberichtDetailPfad(einsatzId, lb.id)}>{titel}</Link>
       ),
     },
     {
