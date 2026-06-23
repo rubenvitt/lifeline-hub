@@ -130,6 +130,74 @@ describe('PersonenDetailPage — Stammdaten', () => {
   });
 });
 
+describe('PersonenDetailPage — Abgleich / Tiere / Schäden', () => {
+  it('Einsatzleitung kann einen Verdachts-Abgleich bestätigen', async () => {
+    const vermissteDetail = {
+      ...detail,
+      status: 'vermisst' as const,
+      abgleiche: [{
+        id: 5, einsatz_id: 1, vermisst_person_id: 10, gefunden_person_id: 21,
+        status: 'verdacht', erstellt_at: '2026-05-27 10:00:00', erstellt_von: 1,
+        entschieden_at: null, entschieden_von: null,
+      }],
+    } as PersonDetail;
+    let entscheidung: string | undefined;
+    render(einsatzAktiv, vermissteDetail, [
+      http.post('/api/einsaetze/1/personen/10/abgleich/5/entscheidung', async ({ request }) => {
+        entscheidung = ((await request.json()) as { entscheidung: string }).entscheidung;
+        return HttpResponse.json({ ...vermissteDetail.abgleiche[0], status: 'bestaetigt' });
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
+    await vi.waitFor(() => expect(entscheidung).toBe('bestaetigt'));
+  });
+
+  it('zeigt den „Zugeordnete Tiere"-Block im Personen-Drawer', async () => {
+    render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1/tiere', ({ request }) => {
+        const url = new URL(request.url);
+        if (url.searchParams.get('halter_person_id') === '10') {
+          return HttpResponse.json([{
+            id: 30, einsatz_id: 1, registrier_nr: 7, status: 'aktiv', spezies: 'hund',
+            rasse_beschreibung: null, rufname: 'Rex', geschlecht: null, alter_geschaetzt: null,
+            farbe_beschreibung: null, kennzeichnung: null, groesse_gewicht: null,
+            halter_person_id: 10, halter_kontakt: null, antreff_ort: null, notiz: null,
+            abschluss_grund: null, abschluss_ziel: null, erfasst_at: '2026-05-27 09:00:00',
+            erfasst_von: 1, geaendert_at: '2026-05-27 09:00:00', geaendert_von: 1,
+            storniert_at: null, halter_registrier_nr: 1, halter_storniert_at: null,
+          }]);
+        }
+        return HttpResponse.json([]);
+      }),
+    ]);
+    expect(await screen.findByText(/Zugeordnete Tiere/i)).toBeInTheDocument();
+    expect(await screen.findByText(/T-007/)).toBeInTheDocument();
+    expect(screen.getByText(/Rex/)).toBeInTheDocument();
+  });
+
+  it('zeigt den „Als Geschädigte bei Schäden"-Block im Personen-Drawer', async () => {
+    render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1/schaeden', ({ request }) => {
+        const url = new URL(request.url);
+        if (url.searchParams.get('geschaedigt_person_id') === '10') {
+          return HttpResponse.json([{
+            id: 7, einsatz_id: 1, registrier_nr: 3, status: 'offen', typ: 'umweltschaden',
+            ausmass: 'mittel', ort: 'Hauptstr. 1', beschreibung: '', geschaedigt_person_id: 10,
+            geschaedigt_kontakt: null, uebergeben_an: null, uebergeben_at: null,
+            abschluss_grund: null, abschluss_at: null, erfasst_at: '2026-05-29 10:00:00',
+            erfasst_von: 1, geaendert_at: '2026-05-29 10:00:00', geaendert_von: 1,
+            storniert_at: null, storniert_von: null, geschaedigt_registrier_nr: null,
+            geschaedigt_storniert_at: null,
+          }]);
+        }
+        return HttpResponse.json([]);
+      }),
+    ]);
+    expect(await screen.findByText(/Als Geschädigte bei Schäden/i)).toBeInTheDocument();
+    expect(await screen.findByText((t) => t.includes('S-003'))).toBeInTheDocument();
+  });
+});
+
 describe('PersonenDetailPage — Robustheit', () => {
   it('zeigt eine Fehleranzeige, wenn der Detail-Abruf scheitert', async () => {
     render(einsatzAktiv, detail, [
