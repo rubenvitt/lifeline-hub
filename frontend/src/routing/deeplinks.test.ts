@@ -9,6 +9,8 @@ import {
   lageberichtePfad,
   befehlDetailPfad,
   personDetailPfad,
+  tiereDetailPfad,
+  tierePfad,
   personenPfad,
   schaedenPfad,
   etbPfad,
@@ -46,6 +48,9 @@ describe('deeplinks — Item-Routes (Vollseiten-Detail)', () => {
   it('personDetailPfad', () => {
     expect(personDetailPfad(E, 10)).toBe('/einsaetze/5/personen/10');
   });
+  it('tiereDetailPfad', () => {
+    expect(tiereDetailPfad(E, 10)).toBe('/einsaetze/5/tiere/10');
+  });
 });
 
 describe('deeplinks — Listen-Routes (NaN-Redirect-Ziele)', () => {
@@ -57,6 +62,9 @@ describe('deeplinks — Listen-Routes (NaN-Redirect-Ziele)', () => {
   });
   it('lageberichtePfad', () => {
     expect(lageberichtePfad(E)).toBe('/einsaetze/5/lageberichte');
+  });
+  it('tierePfad (Liste / NaN-Redirect-Ziel)', () => {
+    expect(tierePfad(E)).toBe('/einsaetze/5/tiere');
   });
 });
 
