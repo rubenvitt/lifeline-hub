@@ -1,16 +1,16 @@
-import { Alert, App, Breadcrumb, Button, Descriptions, Form, Input, InputNumber, Popconfirm, Select, Space, Spin, Table, Tag, Typography, type TableColumnsType } from 'antd';
+import { Alert, App, Breadcrumb, Button, Descriptions, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Spin, Table, Tag, Typography, type TableColumnsType } from 'antd';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
-import { aktualisierePerson, ladePerson, ladePersonAudit, registrierAnzeige, setzePersonStatus, stornierePerson, type PersonEingabe } from '../api/einsatzPerson';
+import { aktualisierePerson, entscheideAbgleich, erfasseSichtung, erfasseVerbleib, ladePerson, ladePersonAudit, legeNotizAn, registrierAnzeige, setzePersonStatus, stornierePerson, type PersonEingabe } from '../api/einsatzPerson';
 import { listeTiere, tierRegistrierAnzeige } from '../api/einsatzTier';
 import { listeSchaeden, schadenRegistrierAnzeige } from '../api/einsatzSchaden';
 import { ApiError } from '../api/client';
 import { SK_META, STATUS_META } from '../personen/personMeta';
 import { useTiereStream } from '../etb/useTiereStream';
 import { useSchaedenStream } from '../etb/useSchaedenStream';
-import type { PersonDetail, PersonStatus, PersonZugriff, Schaden, Spezies, Tier } from '../api/types';
+import type { PersonDetail, PersonStatus, PersonZugriff, Schaden, Sichtungskategorie, Spezies, Tier, Verbleib, VerbleibArt } from '../api/types';
 
 const TIER_SPEZIES_LABEL: Record<Spezies, string> = {
   hund: 'Hund', katze: 'Katze', grosstier: 'Großtier', nutzgefluegel: 'Nutzgeflügel',
@@ -25,6 +25,25 @@ function naechsteStatus(aktuell: PersonStatus): PersonStatus[] {
     case 'betroffen': return ['vermisst', 'verstorben', 'abgemeldet'];
     case 'verstorben':
     case 'abgemeldet': return ['erfasst', 'vermisst', 'betroffen'];
+  }
+}
+
+/** Triage-Reihenfolge der Patienten-Abschnitte (SK I zuerst, tot zuletzt). */
+const PATIENT_SK: Sichtungskategorie[] = ['sk1', 'sk2', 'sk3', 'sk4', 'tot'];
+
+/** Patient = gesichtet mit behandlungsrelevanter Kategorie (SK I–IV oder tot). */
+function istPatient(p: PersonDetail): boolean {
+  return p.aktuelle_sichtung != null && PATIENT_SK.includes(p.aktuelle_sichtung);
+}
+
+function kurzVerbleib(v: Verbleib): string {
+  const ziel = v.ziel ? ` → ${v.ziel}` : '';
+  const tm = v.transportmittel ? ` (${v.transportmittel})` : '';
+  switch (v.art) {
+    case 'transport': return `Transport${ziel}${tm}`;
+    case 'entlassung': return 'entlassen';
+    case 'vor_ort': return 'verbleibt vor Ort';
+    case 'verstorben': return 'Verbleib des Leichnams';
   }
 }
 
@@ -82,6 +101,43 @@ export default function PersonenDetailPage() {
     onSuccess: () => { invalidate(); navigate(`/einsaetze/${einsatzId}/personen`); }, onError: fehler,
   });
 
+  // E-2: Sichtung
+  const [reSichtenOffen, setReSichtenOffen] = useState(false);
+  const [sichtungForm] = Form.useForm<{ kategorie: Sichtungskategorie; notiz?: string }>();
+  const sichtungMutation = useMutation({
+    mutationFn: (v: { kategorie: Sichtungskategorie; notiz?: string }) =>
+      erfasseSichtung(einsatzId, personId, v.kategorie, v.notiz ?? null),
+    onSuccess: () => { invalidateDetail(); setReSichtenOffen(false); sichtungForm.resetFields(); },
+    onError: fehler,
+  });
+
+  // E-2: Verlaufsnotiz
+  const [notizForm] = Form.useForm<{ text: string }>();
+  const notizMutation = useMutation({
+    mutationFn: (v: { text: string }) => legeNotizAn(einsatzId, personId, v.text),
+    onSuccess: () => { invalidateDetail(); notizForm.resetFields(); },
+    onError: fehler,
+  });
+
+  // E-2: Verbleib
+  const [verbleibOffen, setVerbleibOffen] = useState(false);
+  const [verbleibForm] = Form.useForm<{ art: VerbleibArt; ziel?: string; transportmittel?: string; notiz?: string }>();
+  const verbleibMutation = useMutation({
+    mutationFn: (v: { art: VerbleibArt; ziel?: string; transportmittel?: string; notiz?: string }) =>
+      erfasseVerbleib(einsatzId, personId, {
+        art: v.art, ziel: v.ziel ?? null, transportmittel: v.transportmittel ?? null,
+        status: v.art === 'transport' ? 'abtransportiert' : null, notiz: v.notiz ?? null,
+      }),
+    onSuccess: () => { invalidateDetail(); setVerbleibOffen(false); verbleibForm.resetFields(); },
+    onError: fehler,
+  });
+
+  const abgleichEntscheidenMutation = useMutation({
+    mutationFn: (v: { vermisstId: number; abgleichId: number; entscheidung: 'bestaetigt' | 'verworfen' }) =>
+      entscheideAbgleich(einsatzId, v.vermisstId, v.abgleichId, v.entscheidung),
+    onSuccess: invalidateDetail, onError: fehler,
+  });
+
   useTiereStream(einsatzId);
   useSchaedenStream(einsatzId);
 
@@ -118,6 +174,110 @@ export default function PersonenDetailPage() {
     { title: 'Wer', dataIndex: 'benutzer_name', key: 'benutzer_name' },
     { title: 'Art', dataIndex: 'art', key: 'art' },
   ];
+
+  function medSpalte(person: PersonDetail) {
+    const eintraege: Array<{ key: string; at: string; node: React.ReactNode }> = [
+      ...(person.sichtungen ?? []).map((s) => ({
+        key: `s-${s.id}`, at: s.gesichtet_at,
+        node: <span><Tag color={SK_META[s.kategorie].color}>{SK_META[s.kategorie].label}</Tag>
+          {s.notiz && <Typography.Text type="secondary"> — {s.notiz}</Typography.Text>}</span>,
+      })),
+      ...(person.notizen ?? []).map((n) => ({
+        key: `n-${n.id}`, at: n.erfasst_at,
+        node: <span><Tag>Notiz</Tag> {n.text}</span>,
+      })),
+      ...(person.verbleib ?? []).map((v) => ({
+        key: `v-${v.id}`, at: v.zeitpunkt_at,
+        node: <span><Tag color="purple">Verbleib</Tag> {kurzVerbleib(v)}</span>,
+      })),
+    ].sort((a, b) => b.at.localeCompare(a.at));
+
+    return (
+      <Space direction="vertical" style={{ width: '100%' }} size="large">
+        <Space wrap>
+          {istPatient(person) && <Tag color="geekblue">Patient</Tag>}
+          {person.aktuelle_sichtung
+            ? <Tag color={SK_META[person.aktuelle_sichtung].color}>SK: {SK_META[person.aktuelle_sichtung].label}</Tag>
+            : <Tag>ungesichtet</Tag>}
+          {person.aktueller_verbleib && <Tag color="purple">{person.aktueller_verbleib}</Tag>}
+        </Space>
+        {darfSchreiben && !person.storniert_at && (
+          <Space wrap>
+            <Button onClick={() => setReSichtenOffen(true)}>Re-Sichten</Button>
+            <Button onClick={() => setVerbleibOffen(true)}>Verbleib erfassen</Button>
+          </Space>
+        )}
+        {darfSchreiben && person.aktuelle_sichtung === 'tot' && person.status !== 'verstorben' && (
+          <Alert
+            type="warning" showIcon
+            message="Sichtung = tot. Admin-Status wurde NICHT automatisch geändert."
+            action={
+              <Button size="small" onClick={() => statusMutation.mutate({ personId: person.id, status: 'verstorben' })}>
+                Status → verstorben
+              </Button>
+            }
+          />
+        )}
+        {darfSchreiben && !person.storniert_at && (
+          <Form form={notizForm} layout="vertical" onFinish={notizMutation.mutate}>
+            <Form.Item label="Befund/Verlaufsnotiz (append-only, kein ETB)" name="text"
+              rules={[{ required: true, message: 'Bitte Text eingeben' }]}>
+              <Input.TextArea rows={2} />
+            </Form.Item>
+            <Button type="primary" htmlType="submit" loading={notizMutation.isPending}>Notiz anlegen</Button>
+          </Form>
+        )}
+        <div>
+          <Typography.Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
+            Chronologischer Verlauf (neueste zuerst)
+          </Typography.Text>
+          {eintraege.length === 0
+            ? <Typography.Text type="secondary"> noch leer</Typography.Text>
+            : <ul style={{ listStyle: 'none', paddingLeft: 0 }}>
+                {eintraege.map((e) => (
+                  <li key={e.key} style={{ padding: '4px 0', borderBottom: '1px solid #f0f0f0' }}>
+                    <Typography.Text type="secondary" style={{ fontSize: 12, marginRight: 8 }}>{e.at}</Typography.Text>
+                    {e.node}
+                  </li>
+                ))}
+              </ul>}
+        </div>
+        {(person.abgleiche?.length ?? 0) > 0 && (
+          <div>
+            <Typography.Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
+              Vermisstenabgleich
+            </Typography.Text>
+            <ul style={{ listStyle: 'none', paddingLeft: 0 }}>
+              {person.abgleiche.map((a) => (
+                <li key={a.id} style={{ padding: '4px 0' }}>
+                  <Tag color={a.status === 'bestaetigt' ? 'green' : a.status === 'verworfen' ? 'default' : 'gold'}>{a.status}</Tag>
+                  <Typography.Text>
+                    R-{String(a.vermisst_person_id === person.id ? a.gefunden_person_id : a.vermisst_person_id).padStart(3, '0')}
+                  </Typography.Text>
+                  {a.status === 'verdacht' && a.vermisst_person_id === person.id && (
+                    <Space style={{ marginLeft: 12 }}>
+                      <Button size="small" type="primary"
+                        disabled={einsatz.meine_rolle !== 'einsatzleitung'}
+                        onClick={() => abgleichEntscheidenMutation.mutate({
+                          vermisstId: person.id, abgleichId: a.id, entscheidung: 'bestaetigt' })}>
+                        Bestätigen
+                      </Button>
+                      <Button size="small" danger
+                        disabled={einsatz.meine_rolle !== 'einsatzleitung'}
+                        onClick={() => abgleichEntscheidenMutation.mutate({
+                          vermisstId: person.id, abgleichId: a.id, entscheidung: 'verworfen' })}>
+                        Verwerfen
+                      </Button>
+                    </Space>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </Space>
+    );
+  }
 
   function stammdatenSpalte(person: PersonDetail) {
     return (
@@ -260,6 +420,51 @@ export default function PersonenDetailPage() {
       </Space>
 
       {stammdatenSpalte(p)}
+
+      {medSpalte(p)}
+
+      <Modal
+        open={reSichtenOffen}
+        title="Sichtung erfassen"
+        okText="Übernehmen"
+        confirmLoading={sichtungMutation.isPending}
+        onOk={() => sichtungForm.submit()}
+        onCancel={() => { setReSichtenOffen(false); sichtungForm.resetFields(); }}
+        destroyOnHidden
+      >
+        <Form form={sichtungForm} layout="vertical" onFinish={sichtungMutation.mutate}>
+          <Form.Item label="Kategorie" name="kategorie" rules={[{ required: true }]}>
+            <Select options={(Object.keys(SK_META) as Sichtungskategorie[]).map((k) => ({ value: k, label: SK_META[k].label }))} />
+          </Form.Item>
+          <Form.Item label="Kurzbegründung (optional)" name="notiz">
+            <Input />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        open={verbleibOffen}
+        title="Verbleib erfassen"
+        okText="Erfassen"
+        confirmLoading={verbleibMutation.isPending}
+        onOk={() => verbleibForm.submit()}
+        onCancel={() => { setVerbleibOffen(false); verbleibForm.resetFields(); }}
+        destroyOnHidden
+      >
+        <Form form={verbleibForm} layout="vertical" onFinish={verbleibMutation.mutate}>
+          <Form.Item label="Art" name="art" rules={[{ required: true }]}>
+            <Select options={[
+              { value: 'transport', label: 'Transport' },
+              { value: 'entlassung', label: 'Entlassung vor Ort' },
+              { value: 'vor_ort', label: 'verbleibt vor Ort' },
+              { value: 'verstorben', label: 'Verbleib des Leichnams' },
+            ]} />
+          </Form.Item>
+          <Form.Item label="Ziel (z. B. Krankenhaus, Freitext)" name="ziel"><Input /></Form.Item>
+          <Form.Item label="Transportmittel (RTW/KTW …)" name="transportmittel"><Input /></Form.Item>
+          <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }

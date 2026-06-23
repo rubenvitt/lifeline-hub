@@ -7,7 +7,7 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
 import PersonenDetailPage from './PersonenDetailPage';
-import type { PersonDetail } from '../api/types';
+import type { PersonDetail, Sichtungskategorie } from '../api/types';
 
 class FakeEventSource {
   url: string; closed = false;
@@ -62,6 +62,32 @@ function render(einsatzObj: typeof einsatzAktiv, person: PersonDetail, extra: Pa
     { route: '/einsaetze/1/personen/10' },
   );
 }
+
+describe('PersonenDetailPage — med. Verlauf', () => {
+  it('Re-Sichten ruft erfasseSichtung mit SK II', async () => {
+    let gerufen: { kategorie?: string } = {};
+    render(einsatzAktiv, detail, [
+      http.post('/api/einsaetze/1/personen/10/sichtung', async ({ request }) => {
+        gerufen = await request.json() as { kategorie?: string };
+        return HttpResponse.json({ id: 1, einsatz_id: 1, person_id: 10, kategorie: 'sk2',
+          notiz: null, gesichtet_at: '2026-05-27 10:00:00', gesichtet_von: 1 }, { status: 201 });
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Re-Sichten' }));
+    await userEvent.click(await screen.findByRole('combobox', { name: /Kategorie/ }));
+    await userEvent.click(await screen.findByText('SK II'));
+    await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
+    await vi.waitFor(() => expect(gerufen.kategorie).toBe('sk2'));
+  });
+
+  it('zeigt bei Sichtung=tot den Hinweis „Status → verstorben"', async () => {
+    const totDetail = { ...detail, aktuelle_sichtung: 'tot' as Sichtungskategorie, aktuelle_sichtung_at: '2026-05-27 10:00:00',
+      sichtungen: [{ id: 1, einsatz_id: 1, person_id: 10, kategorie: 'tot' as Sichtungskategorie,
+        notiz: null, gesichtet_at: '2026-05-27 10:00:00', gesichtet_von: 1 }] } as PersonDetail;
+    render(einsatzAktiv, totDetail);
+    expect(await screen.findByRole('button', { name: /Status → verstorben/ })).toBeInTheDocument();
+  });
+});
 
 describe('PersonenDetailPage — Stammdaten', () => {
   it('zeigt Read-Modus mit Stammdaten', async () => {
