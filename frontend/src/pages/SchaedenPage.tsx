@@ -216,6 +216,17 @@ export default function SchaedenPage() {
     setSearchParams(searchParams, { replace: true });
   }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreiben]);
 
+  // Drawer schließen und den Deeplink-Param ?schaden= aus der URL räumen (LFH-25), damit
+  // Browser-Back/Reload den Drawer nicht erneut öffnet. Spiegelt das ?neu=1-Cleanup-Muster;
+  // der Consume-Effect oben re-läuft danach mit leerem Param und ist ein No-op (kein Reopen).
+  function schliesseDrawer() {
+    setOffenerSchadenId(null);
+    if (searchParams.has('schaden')) {
+      searchParams.delete('schaden');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }
+
   function invalidate() {
     qc.invalidateQueries({ queryKey: ['einsatz-schaeden', einsatzId] });
     qc.invalidateQueries({ queryKey: ['einsatz-schaden', einsatzId] });
@@ -264,7 +275,7 @@ export default function SchaedenPage() {
     mutationFn: () => storniereSchaden(einsatzId, offenerSchadenId!),
     onSuccess: () => {
       invalidate();
-      setOffenerSchadenId(null);
+      schliesseDrawer();
     },
     onError: fehler,
   });
@@ -435,7 +446,7 @@ export default function SchaedenPage() {
       <Drawer
         width={520}
         open={offenerSchadenId != null}
-        onClose={() => setOffenerSchadenId(null)}
+        onClose={schliesseDrawer}
         title={s ? `${schadenRegistrierAnzeige(s.registrier_nr)} · ${TYP_LABEL[s.typ]}` : 'Schaden'}
         loading={detailQuery.isLoading}
       >

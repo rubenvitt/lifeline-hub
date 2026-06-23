@@ -64,6 +64,29 @@ function render(einsatzObj: typeof einsatzAktiv, person: PersonDetail, extra: Pa
   );
 }
 
+function renderBei(route: string) {
+  server.use(
+    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+  );
+  return renderMitProviders(
+    <AuthProvider>
+      <Routes>
+        <Route path="/einsaetze/:id/personen" element={<div>LISTE</div>} />
+        <Route path="/einsaetze/:id/personen/:personId" element={<PersonenDetailPage />} />
+      </Routes>
+    </AuthProvider>,
+    { route },
+  );
+}
+
+describe('PersonenDetailPage — Deeplink-Robustheit (LFH-25)', () => {
+  it('leitet bei ungültiger Personen-ID auf die Personen-Liste um', async () => {
+    renderBei('/einsaetze/1/personen/abc');
+    expect(await screen.findByText('LISTE')).toBeInTheDocument();
+  });
+});
+
 describe('PersonenDetailPage — med. Verlauf', () => {
   it('Re-Sichten ruft erfasseSichtung mit SK II', async () => {
     let gerufen: { kategorie?: string } = {};

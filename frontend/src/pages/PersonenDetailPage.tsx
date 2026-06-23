@@ -1,6 +1,6 @@
 import { Alert, App, Breadcrumb, Button, Col, Descriptions, Form, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Spin, Table, Tag, Typography, type TableColumnsType } from 'antd';
 import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { aktualisierePerson, entscheideAbgleich, erfasseSichtung, erfasseVerbleib, ladePerson, ladePersonAudit, legeNotizAn, registrierAnzeige, setzePersonStatus, stornierePerson, type PersonEingabe } from '../api/einsatzPerson';
@@ -11,6 +11,7 @@ import { SK_META, STATUS_META } from '../personen/personMeta';
 import { useTiereStream } from '../etb/useTiereStream';
 import { useSchaedenStream } from '../etb/useSchaedenStream';
 import type { PersonDetail, PersonStatus, PersonZugriff, Schaden, Sichtungskategorie, Spezies, Tier, Verbleib, VerbleibArt } from '../api/types';
+import { parseRouteId, personenPfad } from '../routing/deeplinks';
 
 const TIER_SPEZIES_LABEL: Record<Spezies, string> = {
   hund: 'Hund', katze: 'Katze', grosstier: 'Großtier', nutzgefluegel: 'Nutzgeflügel',
@@ -51,6 +52,7 @@ export default function PersonenDetailPage() {
   const { id, personId: personIdParam } = useParams();
   const einsatzId = Number(id);
   const personId = Number(personIdParam);
+  const idGueltig = parseRouteId(personIdParam) != null;
   const navigate = useNavigate();
 
   const qc = useQueryClient();
@@ -73,19 +75,22 @@ export default function PersonenDetailPage() {
   const detailQuery = useQuery({
     queryKey: ['einsatz-person', einsatzId, personId],
     queryFn: () => ladePerson(einsatzId, personId),
+    enabled: idGueltig,
   });
   const tiereDerPersonQuery = useQuery({
     queryKey: ['einsatz-tiere', einsatzId, 'halter', personId],
     queryFn: () => listeTiere(einsatzId, { halterPersonId: personId }),
+    enabled: idGueltig,
   });
   const schaedenDerPersonQuery = useQuery({
     queryKey: ['einsatz-schaeden', einsatzId, 'geschaedigt', personId],
     queryFn: () => listeSchaeden(einsatzId, { geschaedigtPersonId: personId, inklStorniert: false }),
+    enabled: idGueltig,
   });
   const auditQuery = useQuery({
     queryKey: ['einsatz-person-audit', einsatzId, personId],
     queryFn: () => ladePersonAudit(einsatzId, personId),
-    enabled: einsatzQuery.data?.meine_rolle === 'einsatzleitung',
+    enabled: idGueltig && einsatzQuery.data?.meine_rolle === 'einsatzleitung',
   });
 
   const statusMutation = useMutation({
@@ -98,7 +103,7 @@ export default function PersonenDetailPage() {
   });
   const stornoMutation = useMutation({
     mutationFn: (pid: number) => stornierePerson(einsatzId, pid),
-    onSuccess: () => { invalidate(); navigate(`/einsaetze/${einsatzId}/personen`); }, onError: fehler,
+    onSuccess: () => { invalidate(); navigate(personenPfad(einsatzId)); }, onError: fehler,
   });
 
   // E-2: Sichtung
@@ -141,6 +146,12 @@ export default function PersonenDetailPage() {
   useTiereStream(einsatzId);
   useSchaedenStream(einsatzId);
 
+  // Deeplink-Robustheit (LFH-25): strukturell ungültige Personen-ID → zurück zur Liste,
+  // statt mit NaN aussichtslos zu laden. Steht nach allen Hooks (Rules-of-Hooks).
+  if (!idGueltig) {
+    return <Navigate to={personenPfad(einsatzId)} replace />;
+  }
+
   if (einsatzQuery.isLoading || detailQuery.isLoading) {
     return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
   }
@@ -148,7 +159,7 @@ export default function PersonenDetailPage() {
     return <Alert type="error" message="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
-  const zurueck = `/einsaetze/${einsatzId}/personen`;
+  const zurueck = personenPfad(einsatzId);
 
   if (detailQuery.isError) {
     return (

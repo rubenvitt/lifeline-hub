@@ -1,8 +1,8 @@
 import { http, HttpResponse } from 'msw';
-import { screen, within } from '@testing-library/react';
+import { screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes, useLocation } from 'react-router-dom';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
@@ -45,6 +45,11 @@ function basisSchaden(overrides: Record<string, unknown> = {}) {
     geschaedigt_personal_name: null, geschaedigt_organisation_name: null,
     ...overrides,
   };
+}
+
+/** Macht den aktuellen Query-String im DOM sichtbar (für URL-Cleanup-Assertions). */
+function LocationProbe() {
+  return <span data-testid="loc-search">{useLocation().search}</span>;
 }
 
 function render(einsatzObj: object, schaeden: object[], personen: object[] = [], personal: object[] = []) {
@@ -330,5 +335,33 @@ describe('SchaedenPage', () => {
     );
     // Drawer-Titel enthält die S-Nummer und den Typ — erscheint nur im Drawer, nicht in der Tabelle.
     expect(await screen.findByText('S-007 · Sachschaden')).toBeInTheDocument();
+  });
+
+  it('räumt ?schaden= aus der URL, wenn der Detail-Drawer geschlossen wird (LFH-25)', async () => {
+    const schaden5 = basisSchaden({
+      id: 5, registrier_nr: 7, ort: 'Gartenstr. 42', beschreibung: 'Riss', ausmass: 'gross',
+    });
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([schaden5])),
+      http.get('/api/einsaetze/1/schaeden/5', () => HttpResponse.json(schaden5)),
+      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <LocationProbe />
+        <Routes>
+          <Route path="/einsaetze/:id/schaeden" element={<SchaedenPage />} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/einsaetze/1/schaeden?schaden=5' },
+    );
+    await screen.findByText('S-007 · Sachschaden');
+    expect(screen.getByTestId('loc-search')).toHaveTextContent('schaden=5');
+    // Drawer schließen → URL muss ?schaden= verlieren und der Drawer darf nicht reopen-loopen.
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.getByTestId('loc-search').textContent).toBe(''));
   });
 });

@@ -77,7 +77,30 @@ function renderBrDetail(brId = 1) {
   );
 }
 
+function renderBrBei(route: string) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  render(
+    <QueryClientProvider client={qc}>
+      <AntApp>
+        <MemoryRouter initialEntries={[route]}>
+          <Routes>
+            <Route path="/einsaetze/:id/bereitstellungsraeume" element={<div>BR-LISTE</div>} />
+            <Route path="/einsaetze/:id/bereitstellungsraeume/:brId" element={<BrDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </AntApp>
+    </QueryClientProvider>,
+  );
+}
+
 // -------- Tests --------
+
+describe('BrDetailPage — Deeplink-Robustheit (LFH-25)', () => {
+  it('leitet bei ungültiger BR-ID auf die Liste um', async () => {
+    renderBrBei('/einsaetze/1/bereitstellungsraeume/abc');
+    expect(await screen.findByText('BR-LISTE')).toBeInTheDocument();
+  });
+});
 
 describe('BrDetailPage – bereitgestellte Einheiten + Austritt (LFH-14)', () => {
   it('zeigt bereitgestellte Einheiten und entfernt per Austritt', async () => {

@@ -1,8 +1,9 @@
 import { Alert, App, Breadcrumb, Button, Drawer, Popconfirm, Space, Spin, Tag, Typography } from 'antd';
-import { Link, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { ladeEinsatz } from '../../api/einsaetze';
+import { parseRouteId, unfallhilfsstellenListePfad } from '../../routing/deeplinks';
 import { ladeUhs, setzeUhsStatus, storniereUhs } from '../../api/einsatzUhs';
 import { useUhsStream } from '../../etb/useUhsStream';
 import { ApiError } from '../../api/client';
@@ -25,7 +26,8 @@ export default function UhsDetailPage() {
   const { id, uhsId: uhsIdParam } = useParams();
   const einsatzId = Number(id);
   const uhsId = Number(uhsIdParam);
-  const listenPfad = `/einsaetze/${einsatzId}/unfallhilfsstellen/liste`;
+  const idGueltig = parseRouteId(uhsIdParam) != null;
+  const listenPfad = unfallhilfsstellenListePfad(einsatzId);
   useUhsStream(einsatzId);
 
   const qc = useQueryClient();
@@ -36,6 +38,7 @@ export default function UhsDetailPage() {
   const detailQuery = useQuery({
     queryKey: ['einsatz-uhs-detail', einsatzId, uhsId],
     queryFn: () => ladeUhs(einsatzId, uhsId),
+    enabled: idGueltig,
   });
 
   // Diese UHS als „zuletzt ausgewählt" merken — der Default-Einstieg landet beim
@@ -62,6 +65,10 @@ export default function UhsDetailPage() {
     onError: fehler,
   });
 
+  // Deeplink-Robustheit (LFH-25): ungültige UHS-ID → zurück zur UHS-Liste (nach allen Hooks).
+  if (!idGueltig) {
+    return <Navigate to={listenPfad} replace />;
+  }
   if (einsatzQuery.isLoading || detailQuery.isLoading) {
     return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
   }
