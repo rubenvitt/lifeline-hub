@@ -79,7 +79,7 @@ export default function PersonDetailDrawer({
       title={p ? `Person ${registrierAnzeige(p.registrier_nr)}` : 'Person'}
       onClose={onClose}
       extra={p && (
-        <Button type="link" size="small" onClick={() => navigate(`/einsaetze/${einsatzId}/personen?person=${p.id}`)}>
+        <Button type="link" size="small" onClick={() => navigate(`/einsaetze/${einsatzId}/personen/${p.id}`)}>
           Vollständig öffnen
         </Button>
       )}
