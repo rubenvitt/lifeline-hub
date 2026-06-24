@@ -1,7 +1,7 @@
-import { Alert, App, Breadcrumb, Button, Drawer, Popconfirm, Space, Spin, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Spin, Tabs, Tag, Typography } from 'antd';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { parseRouteId, unfallhilfsstellenListePfad } from '../../routing/deeplinks';
 import { ladeUhs, setzeUhsStatus, storniereUhs } from '../../api/einsatzUhs';
@@ -20,8 +20,6 @@ const STATUS_LABEL: Record<UhsStatus, { label: string; color: string }> = {
   aufgeloest: { label: 'aufgelöst', color: 'red' },
 };
 
-type DrawerKey = 'material' | 'bewegungen' | null;
-
 export default function UhsDetailPage() {
   const { id, uhsId: uhsIdParam } = useParams();
   const einsatzId = Number(id);
@@ -32,7 +30,6 @@ export default function UhsDetailPage() {
 
   const qc = useQueryClient();
   const { message } = App.useApp();
-  const [drawer, setDrawer] = useState<DrawerKey>(null);
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const detailQuery = useQuery({
@@ -92,7 +89,7 @@ export default function UhsDetailPage() {
   ].join('  ·  ');
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 112px)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
       <Breadcrumb items={[
         { title: <Link to="/einsaetze">Einsätze</Link> },
         { title: <Link to={`/einsaetze/${einsatzId}`}>{einsatz.bezeichnung}</Link> },
@@ -105,8 +102,6 @@ export default function UhsDetailPage() {
           <Tag color={STATUS_LABEL[uhs.status].color}>{STATUS_LABEL[uhs.status].label}</Tag>
         </Space>
         <Space wrap>
-          <Button size="small" onClick={() => setDrawer('material')}>Material</Button>
-          <Button size="small" onClick={() => setDrawer('bewegungen')}>Bewegungen</Button>
           {!schreibgeschuetzt && uhs.status === 'geplant' && (
             <>
               <Button type="primary" onClick={() => statusMut.mutate('aktiv')} loading={statusMut.isPending}>
@@ -129,22 +124,23 @@ export default function UhsDetailPage() {
         </Space>
       </div>
       <Typography.Text type="secondary" style={{ fontSize: 12, margin: '4px 0 8px' }}>{meta}</Typography.Text>
-      <div style={{ flex: 1, minHeight: 0 }}>
+      {/* Grundriss bleibt Hauptinhalt mit bemessener Höhe (Grundriss-Root ist height:100%);
+          die Seite scrollt, die Material/Bewegungen-Tabs liegen darunter (LFH-149, kein Drawer). */}
+      <div style={{ height: 'calc(100vh - 300px)', minHeight: 380 }}>
         <Grundriss einsatzId={einsatzId} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />
       </div>
 
-      <Drawer
-        open={drawer !== null}
-        onClose={() => setDrawer(null)}
-        width={640}
-        title={drawer === 'material' ? 'Material' : 'Bewegungen'}
-        destroyOnHidden
-      >
-        {drawer === 'material' && (
-          <MaterialTab einsatzId={einsatzId} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />
-        )}
-        {drawer === 'bewegungen' && <BewegungenTab uhs={uhs} />}
-      </Drawer>
+      <Tabs
+        style={{ marginTop: 16 }}
+        items={[
+          {
+            key: 'material',
+            label: 'Material',
+            children: <MaterialTab einsatzId={einsatzId} uhs={uhs} schreibgeschuetzt={schreibgeschuetzt} />,
+          },
+          { key: 'bewegungen', label: 'Bewegungen', children: <BewegungenTab uhs={uhs} /> },
+        ]}
+      />
     </div>
   );
 }
