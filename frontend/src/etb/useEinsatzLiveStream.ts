@@ -66,6 +66,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     // bereitstellungsraum: Liste + Detail (Prefix-Match: ['einsatz-br-detail', einsatzId]
     // trifft alle brIds, da invalidateQueries per Prefix filtert).
     const onBr = () => { inval('einsatz-br'); inval('einsatz-br-detail'); };
+    const onKarteBild = () => inval('einsatz-kartenbilder');
     // Sofortmeldung (LFH-97): Liste aktualisieren UND unübersehbar alarmieren (Ton + Toast).
     // Der Toast wird einsatzweit über ein window-CustomEvent aufgelöst (SofortAlarm im Layout
     // lauscht), damit der Hook ohne Render-State auskommt und EINE EventSource bleibt.
@@ -94,6 +95,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       onNachforderung();
       onMeldung();
       onBr();
+      onKarteBild();
       // Kein Ton bei lagged (Reconnect/Overflow) → sonst Fehlalarm ohne neue Sofortmeldung;
       // der Refetch + die persistente Server-Hervorhebung (ist_ueberfaellig/eskaliert) tragen.
     };
@@ -115,6 +117,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     quelle.addEventListener('meldung', onMeldung);
     quelle.addEventListener('sofortmeldung', onSofort as EventListener);
     quelle.addEventListener('bereitstellungsraum', onBr);
+    quelle.addEventListener('karte_bild', onKarteBild);
     quelle.addEventListener('lagged', onLag);
     return () => {
       quelle.removeEventListener('uhs', onUhs);
@@ -134,6 +137,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       quelle.removeEventListener('meldung', onMeldung);
       quelle.removeEventListener('sofortmeldung', onSofort as EventListener);
       quelle.removeEventListener('bereitstellungsraum', onBr);
+      quelle.removeEventListener('karte_bild', onKarteBild);
       quelle.removeEventListener('lagged', onLag);
       quelle.close();
     };

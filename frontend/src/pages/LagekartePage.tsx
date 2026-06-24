@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { App, Spin } from 'antd';
+import { listeHintergrundbilder, aktualisiereHintergrundbild, ladeHintergrundbildHoch,
+         loescheHintergrundbild, ladeBildBlobUrl, type Ecken } from '../api/kartenbilder';
+import { eckenAusBounds } from './lagekarte/bildGeometrie';
+import type { BildOverlay } from './lagekarte/bildLayer';
+import BildPlatzierenPanel from './lagekarte/BildPlatzierenPanel';
 import { gefahrenPfad } from '../routing/deeplinks';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
@@ -77,6 +82,8 @@ export default function LagekartePage() {
   // Angeklicktes Fachebenen-Objekt (externe Daten) → Detail-Panel.
   const [fachebeneAuswahl, setFachebeneAuswahl] =
     useState<{ quelle: FachebeneQuelle; properties: Record<string, unknown> } | null>(null);
+  const [bildPlatzierenId, setBildPlatzierenId] = useState<number | null>(null);
+  const [blobUrls, setBlobUrls] = useState<Record<number, string>>({});
 
   // EINE SSE-Verbindung für alle Domänen (uhs/schaden/einheit/fahrzeug/abschnitt/zone/
   // person). Pro Domäne eine eigene EventSource würde das HTTP/1.1-Limit (6/Origin)
@@ -120,6 +127,10 @@ export default function LagekartePage() {
   const einstellungenQuery = useQuery({
     queryKey: ['einsatz-einstellungen', einsatzId],
     queryFn: () => ladeEinstellungen(einsatzId),
+  });
+  const bilderQuery = useQuery({
+    queryKey: ['einsatz-kartenbilder', einsatzId],
+    queryFn: () => listeHintergrundbilder(einsatzId),
   });
 
   // Fachebenen-Sichtbarkeit: einmal aus localStorage laden (analog basemap-Persistenz).
@@ -191,6 +202,30 @@ export default function LagekartePage() {
     if (!basemapInitiiertRef.current || basemap == null) return;
     merkeLetzteBasemap(einsatzId, { modus: basemap, onlineView: onlineStilName });
   }, [basemap, onlineStilName, einsatzId]);
+
+  // Blob-URLs für Kartenbilder laden (und bei entfernten Bildern revoken).
+  // blobUrls bewusst NICHT in den deps: das Map-Objekt würde den Effekt endlos neu auslösen.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const bilder = bilderQuery.data ?? [];
+    let abgebrochen = false;
+    for (const b of bilder) {
+      if (!blobUrls[b.id]) {
+        ladeBildBlobUrl(einsatzId, b.id).then((url) => {
+          if (!abgebrochen) setBlobUrls((m) => ({ ...m, [b.id]: url }));
+        }).catch(() => {});
+      }
+    }
+    const aktiveIds = new Set(bilder.map((b) => b.id));
+    for (const idStr of Object.keys(blobUrls)) {
+      const id = Number(idStr);
+      if (!aktiveIds.has(id)) {
+        URL.revokeObjectURL(blobUrls[id]);
+        setBlobUrls((m) => { const n = { ...m }; delete n[id]; return n; });
+      }
+    }
+    return () => { abgebrochen = true; };
+  }, [bilderQuery.data, einsatzId]);
 
   const einsatz = einsatzQuery.data;
   const darfSchreiben =
@@ -375,6 +410,51 @@ export default function LagekartePage() {
 
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
+  const invalidiereBilder = () => qc.invalidateQueries({ queryKey: ['einsatz-kartenbilder', einsatzId] });
+
+  const bildOverlays: BildOverlay[] = (bilderQuery.data ?? [])
+    .filter((b) => blobUrls[b.id])
+    .map((b) => ({
+      id: b.id,
+      blobUrl: blobUrls[b.id],
+      ecken: JSON.parse(b.ecken_json) as Ecken,
+      opazitaet: b.opazitaet,
+      sichtbar: b.sichtbar,
+    }));
+
+  const onBildUpload = async (datei: File) => {
+    // LagekartePage hat keinen direkten Zugriff auf mapRef (intern in Kartenflaeche).
+    // Fallback-Bounds: Bild landet mittig im deutschlandweiten Viewport; Nutzer positioniert
+    // es danach über das Platzieren-Panel neu.
+    const ecken: Ecken = eckenAusBounds(9, 49.9, 9.1, 50);
+    await ladeHintergrundbildHoch(einsatzId, datei, ecken, datei.name);
+    invalidiereBilder();
+  };
+  const onBildToggle = async (id: number, sichtbar: boolean) => {
+    await aktualisiereHintergrundbild(einsatzId, id, { sichtbar });
+    invalidiereBilder();
+  };
+  const onBildOpazitaet = async (id: number, opazitaet: number) => {
+    await aktualisiereHintergrundbild(einsatzId, id, { opazitaet });
+    invalidiereBilder();
+  };
+  const onBildLoeschen = async (id: number) => {
+    await loescheHintergrundbild(einsatzId, id);
+    invalidiereBilder();
+  };
+  const onPlatzierGeometrie = async (ecken: Ecken) => {
+    if (bildPlatzierenId == null) return;
+    await aktualisiereHintergrundbild(einsatzId, bildPlatzierenId, { ecken_json: JSON.stringify(ecken) });
+    invalidiereBilder();
+  };
+
+  const aktivesPlatzierBild = useMemo(() => {
+    if (bildPlatzierenId == null) return null;
+    const b = (bilderQuery.data ?? []).find((x) => x.id === bildPlatzierenId);
+    if (!b) return null;
+    return { id: b.id, ecken: JSON.parse(b.ecken_json) as Ecken };
+  }, [bildPlatzierenId, bilderQuery.data]);
+
   // Verorten je nach Ziel-Typ (UHS/Schaden live; Einsatzort über Kopf-PATCH, dann invalidieren).
   const verortenMutation = useMutation({
     mutationFn: async (p: { lat: number | null; lon: number | null }) => {
@@ -519,13 +599,19 @@ export default function LagekartePage() {
           fachebenenSichtbar.kritis && kartenZoom != null && kartenZoom < KRITIS_MIN_ZOOM
         }
         fachebenenLaedt={fachebenenLaedt}
-        bilder={[]}
-        onBildUpload={() => {}}
-        onBildToggle={() => {}}
-        onBildOpazitaet={() => {}}
-        onBildPlatzieren={() => {}}
-        onBildLoeschen={() => {}}
-        bildPlatzierenId={null}
+        bilder={bilderQuery.data ?? []}
+        onBildUpload={onBildUpload}
+        onBildToggle={onBildToggle}
+        onBildOpazitaet={onBildOpazitaet}
+        onBildPlatzieren={(id) => {
+          setBildPlatzierenId(id);
+          setZoneEntwurf(null);
+          setZeichneAbschnittId(null);
+          setPlatzierungZiel(null);
+          setAuswahl(null);
+        }}
+        onBildLoeschen={onBildLoeschen}
+        bildPlatzierenId={bildPlatzierenId}
       />
       <div style={{ flex: 1, position: 'relative' }}>
         <Kartenflaeche
@@ -578,6 +664,9 @@ export default function LagekartePage() {
             setAuswahl(null);
             setZoneAuswahl(null);
           }}
+          bilder={bildOverlays}
+          platzierBild={aktivesPlatzierBild}
+          onPlatzierGeometrie={onPlatzierGeometrie}
         />
         {aktiverMarker && (
           <Inspector
@@ -621,6 +710,16 @@ export default function LagekartePage() {
                 .catch(fehler)
             }
           />
+        )}
+        {bildPlatzierenId != null && aktivesPlatzierBild != null && (
+          <div style={{ position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 10, width: 340 }}>
+            <BildPlatzierenPanel
+              einsatzId={einsatzId}
+              ecken={aktivesPlatzierBild.ecken}
+              onChange={onPlatzierGeometrie}
+              onFertig={() => setBildPlatzierenId(null)}
+            />
+          </div>
         )}
       </div>
     </div>

@@ -9,6 +9,11 @@ import type { KarteServerConfig } from '../api/karte';
 import type { KartenflaecheProps } from './lagekarte/Kartenflaeche';
 import LagekartePage from './LagekartePage';
 
+// URL.createObjectURL / revokeObjectURL fehlen in jsdom → Stubs definieren bevor Tests laufen.
+// Direkt auf URL setzen (nicht via spyOn, da die Methoden in jsdom gar nicht existieren).
+(URL as unknown as Record<string, unknown>).createObjectURL = vi.fn(() => 'blob:mock-bild');
+(URL as unknown as Record<string, unknown>).revokeObjectURL = vi.fn();
+
 // Kartenflaeche mocken: kein WebGL. Der Stub exponiert Buttons, die die
 // Callbacks (Karten-Klick, Marker-Klick) mit festen Werten feuern.
 // Prop-Typ wird vom echten Komponenten-Interface abgeleitet → ein künftiges
@@ -17,6 +22,7 @@ vi.mock('./lagekarte/Kartenflaeche', () => ({
   default: (props: Partial<KartenflaecheProps>) => (
     <div data-testid="kartenflaeche-stub">
       <div data-testid="attribution">{props.attribution ?? ''}</div>
+      <div data-testid="bilder-count">{(props.bilder ?? []).length}</div>
       <button onClick={() => props.onKarteKlick?.({ lng: 8.6, lat: 50.1 })}>karte-klick</button>
       {(props.markers ?? []).map((m) => (
         <button key={m.schluessel} onClick={() => props.onMarkerKlick?.(m.schluessel)}>
@@ -237,6 +243,7 @@ function basisHandler(
     http.get('/api/einsaetze/1/lage/meldungen', () => HttpResponse.json([])),
     http.get('/api/organisation', () => HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null })),
     http.get('/api/karte/config', () => HttpResponse.json(config)),
+    http.get('/api/einsaetze/1/karte/hintergrundbilder', () => HttpResponse.json([])),
   );
 }
 
@@ -581,5 +588,38 @@ describe('LagekartePage', () => {
     await user.click(await screen.findByText('zone-7'));
     await user.click(await screen.findByRole('button', { name: 'Zone aufheben' }));
     await waitFor(() => expect(geloescht).toBe(true));
+  });
+
+  // --- Bild-Hintergründe -------------------------------------------------------
+
+  it('Smoke: Bild in der Liste → Blob-URL wird geladen → BildOverlay landet an Kartenflaeche', async () => {
+    const BILD = {
+      id: 3,
+      einsatz_id: 1,
+      name: 'lageplan.png',
+      mime: 'image/png',
+      groesse: 12345,
+      ecken_json: JSON.stringify([[9.0, 50.0], [9.1, 50.0], [9.1, 49.9], [9.0, 49.9]]),
+      opazitaet: 80,
+      sichtbar: true,
+      reihenfolge: 1,
+      hochgeladen_von: 1,
+      erstellt_at: '',
+      geaendert_at: '',
+    };
+    basisHandler([
+      http.get('/api/einsaetze/1/karte/hintergrundbilder', () => HttpResponse.json([BILD])),
+      http.get('/api/einsaetze/1/karte/hintergrundbilder/3/download', () =>
+        new HttpResponse(new Blob(['pixeldata'], { type: 'image/png' }), {
+          status: 200,
+          headers: { 'Content-Type': 'image/png' },
+        }),
+      ),
+    ]);
+    renderSeite();
+    // Wenn Blob-URL geladen → bilder-count an Kartenflaeche steigt auf 1.
+    await waitFor(() => {
+      expect(screen.getByTestId('bilder-count')).toHaveTextContent('1');
+    });
   });
 });
