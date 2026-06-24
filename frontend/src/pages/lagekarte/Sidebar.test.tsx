@@ -46,8 +46,28 @@ const basisProps: SidebarProps = {
   onBildToggle: vi.fn(),
   onBildOpazitaet: vi.fn(),
   onBildPlatzieren: vi.fn(),
+  onBildPlatzierenFertig: vi.fn(),
   onBildLoeschen: vi.fn(),
+  onBildZentrieren: vi.fn(),
+  onBildUmbenennen: vi.fn(),
+  onBildMittelpunkt: vi.fn(),
   bildPlatzierenId: null,
+  bildPlatzierZentrum: null,
+};
+
+const bildLageplan = {
+  id: 1,
+  name: 'Lageplan',
+  opazitaet: 80,
+  sichtbar: true,
+  einsatz_id: 7,
+  mime: 'image/png',
+  groesse: 1,
+  ecken_json: '[]',
+  reihenfolge: 0,
+  hochgeladen_von: 1,
+  erstellt_at: '',
+  geaendert_at: '',
 };
 
 describe('Sidebar Bild-Hintergründe', () => {
@@ -91,5 +111,56 @@ describe('Sidebar Bild-Hintergründe', () => {
       />,
     );
     expect(screen.queryByText(/Bild hochladen/i)).not.toBeInTheDocument();
+  });
+
+  it('Zentrieren-Button fliegt die Karte auf das Bild (auch ohne Schreibrecht)', () => {
+    const onBildZentrieren = vi.fn();
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        darfSchreiben={false}
+        bilder={[bildLageplan]}
+        onBildZentrieren={onBildZentrieren}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Lageplan zentrieren/i }));
+    expect(onBildZentrieren).toHaveBeenCalledWith(1);
+  });
+
+  it('Platzier-Modus zeigt Mittelpunkt-Eingabe und beendet über „Fertig"', () => {
+    const onBildPlatzierenFertig = vi.fn();
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        darfSchreiben
+        bilder={[bildLageplan]}
+        bildPlatzierenId={1}
+        bildPlatzierZentrum={{ lat: 50, lon: 9 }}
+        onBildPlatzierenFertig={onBildPlatzierenFertig}
+      />,
+    );
+    // Hinweistext + „Mittelpunkt setzen" (zunächst disabled, kein Entwurf) erscheinen nur im Platzier-Modus.
+    expect(screen.getByText(/Ecken ziehen/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Mittelpunkt setzen/i })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: /^Fertig$/i }));
+    expect(onBildPlatzierenFertig).toHaveBeenCalled();
+  });
+
+  it('benennt ein Bild über die Inline-Bearbeitung um', () => {
+    const onBildUmbenennen = vi.fn();
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        darfSchreiben
+        bilder={[bildLageplan]}
+        onBildUmbenennen={onBildUmbenennen}
+      />,
+    );
+    // antd Typography editable: Edit-Auslöser hat aria-label „Umbenennen".
+    fireEvent.click(screen.getByRole('button', { name: /Umbenennen/i }));
+    const input = screen.getByRole('textbox');
+    fireEvent.change(input, { target: { value: 'Objektskizze' } });
+    fireEvent.blur(input); // antd Editable committet bei Blur (und Enter-keyUp)
+    expect(onBildUmbenennen).toHaveBeenCalledWith(1, 'Objektskizze');
   });
 });
