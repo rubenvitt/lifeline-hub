@@ -232,7 +232,6 @@ export default function LagekartePage() {
   // den Ref zu leeren → der Guard unten verhindert ein Neuladen → Bilder bleiben blank
   // (spätestens nach Theme-/Basemap-Wechsel mit Source-Neuaufbau). Der Unmount-Leak-Schutz
   // liegt deshalb in einem separaten, leeren-deps-Effekt weiter unten.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const bilder = bilderQuery.data ?? [];
     let abgebrochen = false;
@@ -265,6 +264,9 @@ export default function LagekartePage() {
     return () => {
       abgebrochen = true;
     };
+    // `fehler` (stabiler App.useApp-Handler) bewusst nicht in den Deps — soll den Effekt nicht
+    // neu auslösen; Deps absichtlich nur [bilderQuery.data, einsatzId] (s. o.).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bilderQuery.data, einsatzId]);
 
   // Unmount-only: beim Verlassen der Karte alle dann noch aktuellen Blob-URLs freigeben.
