@@ -108,7 +108,7 @@ export default function BereitstellungsraeumePage() {
         title="Bereitstellungsraum anlegen"
         open={anlegen}
         onClose={() => { setAnlegen(false); form.resetFields(); }}
-        width={420}
+        size={420}
         destroyOnHidden
       >
         <Form<BrEingabe>
