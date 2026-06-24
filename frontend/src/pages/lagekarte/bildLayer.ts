@@ -34,9 +34,9 @@ export function sorgeFuerBildLayer(map: MapLibreMap, ov: BildOverlay, beforeId?:
       source: sid,
       paint: { 'raster-opacity': opacityWert(ov), 'raster-fade-duration': 0 },
     }, vorAnker);
+  } else {
+    map.setPaintProperty(lid, 'raster-opacity', opacityWert(ov));
   }
-  // immer setzen (auch nach addLayer), damit _paint im Test konsistent ist
-  map.setPaintProperty(lid, 'raster-opacity', opacityWert(ov));
 }
 
 export function setzeBildGeometrie(map: MapLibreMap, id: number, ecken: Ecken) {

@@ -33,11 +33,34 @@ describe('bildLayer', () => {
     expect(map._layers.has(bildLayerId(3))).toBe(true);
   });
 
-  it('opazitaet*sichtbar steuert raster-opacity', () => {
+  it('erstanlage setzt raster-opacity=0 und raster-fade-duration=0 via addLayer-paint (unsichtbar)', () => {
     const map = fakeMap();
     sorgeFuerBildLayer(map as never, { id: 3, blobUrl: 'blob:x', ecken: ECKEN, opazitaet: 50, sichtbar: false });
-    // unsichtbar → 0, egal welche opazitaet
-    expect(map._paint[bildLayerId(3)]['raster-opacity']).toBe(0);
+    // unsichtbar → raster-opacity 0 im addLayer-paint
+    const layerArg = map.addLayer.mock.calls[0][0] as { id: string; paint: Record<string, unknown> };
+    expect(layerArg.paint['raster-opacity']).toBe(0);
+    expect(layerArg.paint['raster-fade-duration']).toBe(0);
+    // setPaintProperty darf beim Erstanlegen NICHT aufgerufen werden
+    expect(map.setPaintProperty).not.toHaveBeenCalled();
+  });
+
+  it('erstanlage setzt raster-opacity=0.8 via addLayer-paint (sichtbar, opazitaet:80)', () => {
+    const map = fakeMap();
+    sorgeFuerBildLayer(map as never, { id: 3, blobUrl: 'blob:x', ecken: ECKEN, opazitaet: 80, sichtbar: true });
+    const layerArg = map.addLayer.mock.calls[0][0] as { id: string; paint: Record<string, unknown> };
+    expect(layerArg.paint['raster-opacity']).toBe(0.8);
+    expect(layerArg.paint['raster-fade-duration']).toBe(0);
+    expect(map.setPaintProperty).not.toHaveBeenCalled();
+  });
+
+  it('update-pfad: zweiter Aufruf mit geänderter Opazität ruft setPaintProperty', () => {
+    const map = fakeMap();
+    const ov = { id: 3, blobUrl: 'blob:x', ecken: ECKEN, opazitaet: 80, sichtbar: true };
+    sorgeFuerBildLayer(map as never, ov); // Erstanlage
+    expect(map.setPaintProperty).not.toHaveBeenCalled();
+    // zweiter Aufruf mit anderer Opazität → Update-Pfad
+    sorgeFuerBildLayer(map as never, { ...ov, opazitaet: 40 });
+    expect(map.setPaintProperty).toHaveBeenCalledWith(bildLayerId(3), 'raster-opacity', 0.4);
   });
 
   it('entferneBildLayer entfernt layer und source', () => {

@@ -41,7 +41,7 @@ export function ladeHintergrundbildHoch(
   const fd = new FormData();
   fd.append('datei', datei);
   fd.append('ecken', JSON.stringify(ecken));
-  if (name) fd.append('name', name);
+  if (name !== undefined) fd.append('name', name);
   return apiUpload<Hintergrundbild>(basis(einsatzId), fd);
 }
 
