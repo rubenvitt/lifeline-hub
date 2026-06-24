@@ -3,9 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { App, Spin } from 'antd';
 import { listeHintergrundbilder, aktualisiereHintergrundbild, ladeHintergrundbildHoch,
          loescheHintergrundbild, ladeBildBlobUrl, type Ecken } from '../api/kartenbilder';
-import { eckenAusBounds } from './lagekarte/bildGeometrie';
+import { eckenAusBounds, zentroid, verschiebeEcken } from './lagekarte/bildGeometrie';
 import type { BildOverlay } from './lagekarte/bildLayer';
-import BildPlatzierenPanel from './lagekarte/BildPlatzierenPanel';
 import { gefahrenPfad } from '../routing/deeplinks';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
@@ -28,7 +27,7 @@ import { parsePolygon, parseGeometry, polygonZentroid } from './lagekarte/geo';
 import { baueTzProps } from './lagekarte/taktischesZeichen';
 import { baueBasemapStyle, aktuelleAttribution, type BasemapModus } from './lagekarte/basemapStil';
 import { waehleInitialeBasemap, liesLetzteBasemap, merkeLetzteBasemap } from './lagekarte/basemapAuswahl';
-import Kartenflaeche, { type ZoneFeature } from './lagekarte/Kartenflaeche';
+import Kartenflaeche, { type ZoneFeature, type KartenHandle } from './lagekarte/Kartenflaeche';
 import Sidebar, { type LayerSichtbar, type PlatzierenPunktTyp } from './lagekarte/Sidebar';
 import Inspector from './lagekarte/Inspector';
 import ZonenInspector from './lagekarte/ZonenInspector';
@@ -39,6 +38,23 @@ import { ladeFachebene, type FachebeneQuelle, type FachebeneStatus, type Feature
 import { FACHEBENEN, fachebeneKeys, KRITIS_MIN_ZOOM, rasterBbox, mergeFeatures } from './lagekarte/fachebenen';
 import { liesFachebenenSichtbar, merkeFachebenenSichtbar, defaultFachebenenSichtbar, type FachebenenSichtbar } from './lagekarte/fachebenenAuswahl';
 import type { AktiveFachebene } from './lagekarte/kartenLayer';
+
+/** Seitenverhältnis (Breite/Höhe) eines Bilds aus der Datei lesen; Fallback 1 (quadratisch). */
+function leseBildSeitenverhaeltnis(datei: File): Promise<number> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(datei);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img.naturalHeight > 0 ? img.naturalWidth / img.naturalHeight : 1);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(1);
+    };
+    img.src = url;
+  });
+}
 
 /** EinsatzAnzeige → KopfdatenUpdate (Vollersatz) mit überschriebener Koordinate. */
 function kopfMitKoordinate(e: EinsatzAnzeige, lat: number | null, lon: number | null): KopfdatenUpdate {
@@ -87,6 +103,8 @@ export default function LagekartePage() {
   // Spiegelt blobUrls als Ref, damit der Cleanup-Return des Blob-URL-Effekts beim
   // Unmount alle aktuellen URLs revoken kann (Leak-Schutz) — ohne Stale-Closure.
   const blobUrlsRef = useRef<Record<number, string>>({});
+  // Imperative Karten-API (Upload-Platzierung in Viewport-Mitte, Auf-Bild-Zentrieren).
+  const kartenRef = useRef<KartenHandle>(null);
 
   // EINE SSE-Verbindung für alle Domänen (uhs/schaden/einheit/fahrzeug/abschnitt/zone/
   // person). Pro Domäne eine eigene EventSource würde das HTTP/1.1-Limit (6/Origin)
@@ -455,10 +473,10 @@ export default function LagekartePage() {
   );
 
   const onBildUpload = async (datei: File) => {
-    // LagekartePage hat keinen direkten Zugriff auf mapRef (intern in Kartenflaeche).
-    // Fallback-Bounds: Bild landet mittig im deutschlandweiten Viewport; Nutzer positioniert
-    // es danach über das Platzieren-Panel neu.
-    const ecken: Ecken = eckenAusBounds(9, 49.9, 9.1, 50);
+    // Bild-Seitenverhältnis lesen → mittig im aktuellen Viewport platzieren, unverzerrt.
+    // Fallback (Karte noch nicht bereit): kleines achsenparalleles Rechteck.
+    const ar = await leseBildSeitenverhaeltnis(datei);
+    const ecken: Ecken = kartenRef.current?.initialeEckenFuerBild(ar) ?? eckenAusBounds(9, 49.95, 9.1, 50);
     await ladeHintergrundbildHoch(einsatzId, datei, ecken, datei.name);
     invalidiereBilder();
   };
@@ -479,6 +497,25 @@ export default function LagekartePage() {
     await aktualisiereHintergrundbild(einsatzId, bildPlatzierenId, { ecken_json: JSON.stringify(ecken) });
     invalidiereBilder();
   };
+  const onBildZentrieren = (id: number) => {
+    const b = (bilderQuery.data ?? []).find((x) => x.id === id);
+    if (b) kartenRef.current?.zentriereAufEcken(JSON.parse(b.ecken_json) as Ecken);
+  };
+  const onBildUmbenennen = async (id: number, name: string) => {
+    await aktualisiereHintergrundbild(einsatzId, id, { name });
+    invalidiereBilder();
+  };
+  // Mittelpunkt des Platzier-Bilds numerisch setzen: Ecken um die Differenz verschieben.
+  const onBildMittelpunkt = async (lat: number, lon: number) => {
+    if (bildPlatzierenId == null) return;
+    const b = (bilderQuery.data ?? []).find((x) => x.id === bildPlatzierenId);
+    if (!b) return;
+    const ecken = JSON.parse(b.ecken_json) as Ecken;
+    const [clng, clat] = zentroid(ecken);
+    const neu = verschiebeEcken(ecken, lon - clng, lat - clat);
+    await aktualisiereHintergrundbild(einsatzId, bildPlatzierenId, { ecken_json: JSON.stringify(neu) });
+    invalidiereBilder();
+  };
 
   const aktivesPlatzierBild = useMemo(() => {
     if (bildPlatzierenId == null) return null;
@@ -486,6 +523,13 @@ export default function LagekartePage() {
     if (!b) return null;
     return { id: b.id, ecken: JSON.parse(b.ecken_json) as Ecken };
   }, [bildPlatzierenId, bilderQuery.data]);
+
+  // Aktueller Mittelpunkt des Platzier-Bilds für die numerische Eingabe in der Sidebar.
+  const bildPlatzierZentrum = useMemo<{ lat: number; lon: number } | null>(() => {
+    if (!aktivesPlatzierBild) return null;
+    const [lng, lat] = zentroid(aktivesPlatzierBild.ecken);
+    return { lat, lon: lng };
+  }, [aktivesPlatzierBild]);
 
   // Verorten je nach Ziel-Typ (UHS/Schaden live; Einsatzort über Kopf-PATCH, dann invalidieren).
   const verortenMutation = useMutation({
@@ -642,11 +686,17 @@ export default function LagekartePage() {
           setPlatzierungZiel(null);
           setAuswahl(null);
         }}
+        onBildPlatzierenFertig={() => setBildPlatzierenId(null)}
         onBildLoeschen={onBildLoeschen}
+        onBildZentrieren={onBildZentrieren}
+        onBildUmbenennen={onBildUmbenennen}
+        onBildMittelpunkt={onBildMittelpunkt}
         bildPlatzierenId={bildPlatzierenId}
+        bildPlatzierZentrum={bildPlatzierZentrum}
       />
       <div style={{ flex: 1, position: 'relative' }}>
         <Kartenflaeche
+          ref={kartenRef}
           style={style}
           attribution={attribution}
           markers={sichtbareMarker}
@@ -742,16 +792,6 @@ export default function LagekartePage() {
                 .catch(fehler)
             }
           />
-        )}
-        {bildPlatzierenId != null && aktivesPlatzierBild != null && (
-          <div style={{ position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 10, width: 340 }}>
-            <BildPlatzierenPanel
-              einsatzId={einsatzId}
-              ecken={aktivesPlatzierBild.ecken}
-              onChange={onPlatzierGeometrie}
-              onFertig={() => setBildPlatzierenId(null)}
-            />
-          </div>
         )}
       </div>
     </div>

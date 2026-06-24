@@ -1,6 +1,6 @@
 import { Badge, Button, Card, Empty, List, Popconfirm, Radio, Select, Slider, Space, Spin, Switch, Tooltip, Typography, Upload } from 'antd';
-import { AimOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons';
-import { useState } from 'react';
+import { AimOutlined, DeleteOutlined, FullscreenOutlined, UploadOutlined } from '@ant-design/icons';
+import { useEffect, useState } from 'react';
 import type { KarteMarker, NichtVerortet } from './marker';
 import type { BasemapModus } from './basemapStil';
 import type { OnlineStyle } from '../../api/karte';
@@ -87,13 +87,24 @@ export interface SidebarProps {
   onBildToggle: (id: number, sichtbar: boolean) => void;
   onBildOpazitaet: (id: number, opazitaet: number) => void;
   onBildPlatzieren: (id: number) => void;
+  onBildPlatzierenFertig: () => void;
   onBildLoeschen: (id: number) => void;
+  onBildZentrieren: (id: number) => void;
+  onBildUmbenennen: (id: number, name: string) => void;
+  /** Mittelpunkt des gerade platzierten Bilds numerisch setzen. */
+  onBildMittelpunkt: (lat: number, lon: number) => void;
   bildPlatzierenId: number | null;
+  /** Aktueller Mittelpunkt des Platzier-Bilds (für die numerische Eingabe). */
+  bildPlatzierZentrum: LatLon | null;
 }
 
 export default function Sidebar(props: SidebarProps) {
   const { nichtVerortet, verortet, darfSchreiben, platzierungZiel } = props;
   const [koord, setKoord] = useState<LatLon | null>(null);
+  // Entwurfswert der numerischen Mittelpunkt-Eingabe im Bild-Platzier-Modus.
+  const [bildMitte, setBildMitte] = useState<LatLon | null>(null);
+  // Entwurf verwerfen, sobald ein anderes Bild platziert wird oder der Modus endet.
+  useEffect(() => setBildMitte(null), [props.bildPlatzierenId]);
   const uhsVerortet = verortet.filter((m) => m.typ === 'uhs');
   const schadenVerortet = verortet.filter((m) => m.typ === 'schaden');
 
@@ -309,47 +320,105 @@ export default function Sidebar(props: SidebarProps) {
 
       <Card size="small" title="Bild-Hintergründe" style={{ marginBottom: 12 }}>
         <Space direction="vertical" style={{ width: '100%' }}>
-          {props.bilder.map((b) => (
-            <div key={b.id} style={{ borderBottom: '1px solid #f0f0f0', paddingBottom: 6 }}>
-              <Space style={{ justifyContent: 'space-between', width: '100%' }}>
-                <Space>
+          {props.bilder.map((b) => {
+            const imPlatzieren = props.bildPlatzierenId === b.id;
+            return (
+              <div key={b.id} style={{ borderBottom: '1px solid #f0f0f0', paddingBottom: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Switch
+                    size="small"
                     checked={b.sichtbar}
                     aria-label={b.name}
                     onChange={(v) => props.onBildToggle(b.id, v)}
+                    style={{ flexShrink: 0 }}
                   />
-                  <span>{b.name}</span>
-                </Space>
-                {darfSchreiben && (
-                  <Space>
-                    <Button
-                      size="small"
-                      type={props.bildPlatzierenId === b.id ? 'primary' : 'default'}
-                      icon={<AimOutlined />}
-                      onClick={() => props.onBildPlatzieren(b.id)}
-                      aria-label={`${b.name} platzieren`}
-                    />
-                    <Popconfirm
-                      title="Bild entfernen?"
-                      onConfirm={() => props.onBildLoeschen(b.id)}
-                      okText="Entfernen"
-                      cancelText="Abbrechen"
-                    >
-                      <Button size="small" danger icon={<DeleteOutlined />} aria-label={`${b.name} löschen`} />
-                    </Popconfirm>
+                  <Typography.Text
+                    ellipsis={{ tooltip: b.name }}
+                    editable={darfSchreiben ? {
+                      tooltip: 'Umbenennen',
+                      onChange: (val) => {
+                        const t = val.trim();
+                        if (t && t !== b.name) props.onBildUmbenennen(b.id, t);
+                      },
+                    } : false}
+                    style={{ flex: 1, minWidth: 0 }}
+                  >
+                    {b.name}
+                  </Typography.Text>
+                  <Space size={4} style={{ flexShrink: 0 }}>
+                    <Tooltip title="Auf Bild zentrieren">
+                      <Button
+                        size="small"
+                        icon={<FullscreenOutlined />}
+                        onClick={() => props.onBildZentrieren(b.id)}
+                        aria-label={`${b.name} zentrieren`}
+                      />
+                    </Tooltip>
+                    {darfSchreiben && (
+                      <>
+                        <Tooltip title={imPlatzieren ? 'Platzieren beenden' : 'Auf der Karte platzieren'}>
+                          <Button
+                            size="small"
+                            type={imPlatzieren ? 'primary' : 'default'}
+                            icon={<AimOutlined />}
+                            onClick={() => (imPlatzieren ? props.onBildPlatzierenFertig() : props.onBildPlatzieren(b.id))}
+                            aria-label={`${b.name} platzieren`}
+                          />
+                        </Tooltip>
+                        <Popconfirm
+                          title="Bild entfernen?"
+                          onConfirm={() => props.onBildLoeschen(b.id)}
+                          okText="Entfernen"
+                          cancelText="Abbrechen"
+                        >
+                          <Button size="small" danger icon={<DeleteOutlined />} aria-label={`${b.name} löschen`} />
+                        </Popconfirm>
+                      </>
+                    )}
                   </Space>
+                </div>
+                <Slider
+                  min={0}
+                  max={100}
+                  value={b.opazitaet}
+                  disabled={!darfSchreiben}
+                  onChange={(v) => props.onBildOpazitaet(b.id, v as number)}
+                  tooltip={{ formatter: (v) => `${v}%` }}
+                />
+                {imPlatzieren && darfSchreiben && (
+                  <div style={{ padding: 8, background: 'rgba(22,119,255,.06)', borderRadius: 4 }}>
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      Auf der Karte: Ecken = Größe (Seitenverhältnis), Kanten = frei strecken, ↻ = drehen, Mitte = verschieben. Oder Mittelpunkt numerisch:
+                    </Typography.Text>
+                    <div style={{ marginTop: 6 }}>
+                      <KoordinatenEingabe
+                        value={bildMitte ?? props.bildPlatzierZentrum}
+                        onChange={setBildMitte}
+                        einsatzId={props.einsatzId}
+                      />
+                    </div>
+                    <Space style={{ marginTop: 6, width: '100%', justifyContent: 'space-between' }}>
+                      <Button
+                        size="small"
+                        disabled={!bildMitte}
+                        onClick={() => {
+                          if (bildMitte) {
+                            props.onBildMittelpunkt(bildMitte.lat, bildMitte.lon);
+                            setBildMitte(null);
+                          }
+                        }}
+                      >
+                        Mittelpunkt setzen
+                      </Button>
+                      <Button size="small" type="primary" onClick={props.onBildPlatzierenFertig}>
+                        Fertig
+                      </Button>
+                    </Space>
+                  </div>
                 )}
-              </Space>
-              <Slider
-                min={0}
-                max={100}
-                value={b.opazitaet}
-                disabled={!darfSchreiben}
-                onChange={(v) => props.onBildOpazitaet(b.id, v as number)}
-                tooltip={{ formatter: (v) => `${v}%` }}
-              />
-            </div>
-          ))}
+              </div>
+            );
+          })}
           {darfSchreiben && (
             <Upload
               accept="image/png,image/jpeg"
