@@ -81,7 +81,7 @@ export default function NachforderungKarte({
         {menge}{n.art} <Text type="secondary" style={{ fontWeight: 400 }}>→ {adressat}</Text>
       </Text>
 
-      <Space direction="vertical" size={2} style={{ width: '100%', marginBottom: 8 }}>
+      <Space orientation="vertical" size={2} style={{ width: '100%', marginBottom: 8 }}>
         <Text>{n.bezeichnung}</Text>
         {n.begruendung && <Text type="secondary">{n.begruendung}</Text>}
         <Text type="secondary" style={{ fontSize: 13 }}>
@@ -91,7 +91,7 @@ export default function NachforderungKarte({
         {/* Übergangs-Zeitstempel: in der Abgeschlossen-Ansicht vollständig,
             in der Offen-Ansicht ab „unterwegs" (Zwischenstände sichtbar machen). */}
         {(istAbg || n.status === 'unterwegs') && (
-          <Space direction="vertical" size={0}>
+          <Space orientation="vertical" size={0}>
             {n.zugesagt_at && <Text type="secondary" style={{ fontSize: 13 }}>Zugesagt: {formatZeit(n.zugesagt_at)}</Text>}
             {n.unterwegs_at && <Text type="secondary" style={{ fontSize: 13 }}>Unterwegs: {formatZeit(n.unterwegs_at)}</Text>}
             {n.eingetroffen_at && <Text type="secondary" style={{ fontSize: 13 }}>Eingetroffen: {formatZeit(n.eingetroffen_at)}</Text>}

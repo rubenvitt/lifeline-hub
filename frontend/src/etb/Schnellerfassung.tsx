@@ -169,7 +169,7 @@ export default function Schnellerfassung({
       {berichtigungZu && (
         <Alert
           type="warning" showIcon style={{ marginBottom: 12 }}
-          message={`Berichtigung zu #${berichtigungZu.lfd_nr}`}
+          title={`Berichtigung zu #${berichtigungZu.lfd_nr}`}
           action={<Button size="small" onClick={onBerichtigungAbbrechen}>Abbrechen</Button>}
         />
       )}

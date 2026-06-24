@@ -81,10 +81,10 @@ export default function BrDetailPage() {
     return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
   }
   if (einsatzQuery.error || !einsatzQuery.data) {
-    return <Alert type="error" message="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+    return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   if (detailQuery.error || !detailQuery.data) {
-    return <Alert type="error" message="Bereitstellungsraum konnte nicht geladen werden" showIcon />;
+    return <Alert type="error" title="Bereitstellungsraum konnte nicht geladen werden" showIcon />;
   }
 
   const einsatz = einsatzQuery.data;
@@ -151,7 +151,7 @@ export default function BrDetailPage() {
       </Space>
 
       <Descriptions size="small" column={2} style={{ marginBottom: 16 }}>
-        <Descriptions.Item label="Standort">{br.standort ?? '—'}</Descriptions.Item>
+        <Descriptions.Item label="Standort" span={2}>{br.standort ?? '—'}</Descriptions.Item>
         <Descriptions.Item label="Notiz" span={2}>{br.notiz ?? '—'}</Descriptions.Item>
       </Descriptions>
 

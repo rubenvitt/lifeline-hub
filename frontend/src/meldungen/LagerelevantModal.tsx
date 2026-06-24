@@ -67,7 +67,7 @@ export default function LagerelevantModal({ offen, meldung, senden, einsatzId, o
           type="info"
           showIcon
           style={{ marginBottom: 12 }}
-          message="Die Verortung kann nur beim Übergeben gesetzt werden."
+          title="Die Verortung kann nur beim Übergeben gesetzt werden."
         />
         <Space style={{ justifyContent: 'flex-end', width: '100%' }}>
           <Button onClick={onAbbrechen}>Abbrechen</Button>

@@ -36,7 +36,7 @@ export default function UnfallhilfsstellenDefault() {
 
   if (!entscheidung.current) {
     if (uhsQuery.error) {
-      return <Alert type="error" message="Unfallhilfsstellen konnten nicht geladen werden" showIcon />;
+      return <Alert type="error" title="Unfallhilfsstellen konnten nicht geladen werden" showIcon />;
     }
     return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
   }

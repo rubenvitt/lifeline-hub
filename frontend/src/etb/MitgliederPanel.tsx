@@ -91,7 +91,7 @@ export default function MitgliederPanel({ einsatzId, istAktiv, offen, onClose }:
   ];
 
   return (
-    <Drawer title="Mitglieder" open={offen} onClose={onClose} width={480}>
+    <Drawer title="Mitglieder" open={offen} onClose={onClose} size={480}>
       {istAktiv && (
         <Space style={{ marginBottom: 16 }} wrap>
           <Select

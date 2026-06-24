@@ -38,7 +38,7 @@ function Kennzahl(props: {
       <Statistic
         title={props.titel}
         value={props.value}
-        valueStyle={props.farbe ? { color: props.farbe } : undefined}
+        styles={{ content: props.farbe ? { color: props.farbe } : undefined }}
       />
     </div>
   );

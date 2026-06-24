@@ -76,7 +76,7 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
   ];
 
   return (
-    <Space direction="vertical" style={{ width: '100%' }}>
+    <Space orientation="vertical" style={{ width: '100%' }}>
       {!schreibgeschuetzt && (
         <Button
           onClick={() => setZuordnenOffen(true)}

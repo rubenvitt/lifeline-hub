@@ -116,7 +116,7 @@ export default function PersonenPage() {
     return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
-    return <Alert type="error" message="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+    return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben =
@@ -197,7 +197,7 @@ export default function PersonenPage() {
       />
 
       {!darfSchreiben && einsatz.status !== 'aktiv' && (
-        <Alert style={{ marginBottom: 12 }} type="info" showIcon message="Einsatz ist abgeschlossen — nur Ansicht." />
+        <Alert style={{ marginBottom: 12 }} type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
       )}
 
       {(() => {
@@ -220,7 +220,7 @@ export default function PersonenPage() {
 
       {sicht === 'patienten' ? (
         <Spin spinning={personenQuery.isLoading}>
-        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <Space orientation="vertical" size="large" style={{ width: '100%' }}>
           {PATIENT_SK.map((sk) => {
             const gruppe = alle.filter((p) => p.aktuelle_sichtung === sk);
             if (gruppe.length === 0) return null;
@@ -243,7 +243,7 @@ export default function PersonenPage() {
             );
           })}
           {!personenQuery.isLoading && !alle.some(istPatient) && (
-            <Alert type="info" showIcon message="Keine Patienten in diesem Einsatz." />
+            <Alert type="info" showIcon title="Keine Patienten in diesem Einsatz." />
           )}
         </Space>
         </Spin>

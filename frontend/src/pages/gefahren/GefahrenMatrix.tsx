@@ -23,7 +23,7 @@ function DetailPopover({ zelle, onSpeichern, speichert }: {
   const speichern = () => { onSpeichern(beschreibung.trim() || null, gemeldetVon.trim() || null); setOffen(false); };
   return (
     <Popover trigger="click" open={offen} onOpenChange={oeffnen} title="Details" content={
-      <Space direction="vertical" style={{ width: 240 }}>
+      <Space orientation="vertical" style={{ width: 240 }}>
         <Input.TextArea aria-label="Beschreibung" rows={2} placeholder="Beschreibung" value={beschreibung} onChange={(e) => setBeschreibung(e.target.value)} />
         <Input aria-label="Gemeldet von" placeholder="Gemeldet von" value={gemeldetVon} onChange={(e) => setGemeldetVon(e.target.value)} />
         <Button type="primary" size="small" loading={speichert} onClick={speichern}>Speichern</Button>

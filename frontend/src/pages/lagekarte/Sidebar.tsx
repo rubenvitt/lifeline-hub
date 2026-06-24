@@ -244,7 +244,7 @@ export default function Sidebar(props: SidebarProps) {
       </Card>
 
       <Card size="small" title="Ebenen" style={{ marginBottom: 12 }}>
-        <Space direction="vertical">
+        <Space orientation="vertical">
           <Space>
             <Switch checked={props.layer.einsatzort} onChange={(v) => props.onLayerToggle('einsatzort', v)} />
             Einsatzort
@@ -277,7 +277,7 @@ export default function Sidebar(props: SidebarProps) {
       </Card>
 
       <Card size="small" title="Fachebenen (extern)" style={{ marginBottom: 12 }}>
-        <Space direction="vertical" style={{ width: '100%' }}>
+        <Space orientation="vertical" style={{ width: '100%' }}>
           {fachebeneKeys().map((key) => {
             const def = FACHEBENEN[key];
             const status = props.fachebenenStatus[key];
@@ -319,7 +319,7 @@ export default function Sidebar(props: SidebarProps) {
       </Card>
 
       <Card size="small" title="Bild-Hintergründe" style={{ marginBottom: 12 }}>
-        <Space direction="vertical" style={{ width: '100%' }}>
+        <Space orientation="vertical" style={{ width: '100%' }}>
           {props.bilder.map((b) => {
             const imPlatzieren = props.bildPlatzierenId === b.id;
             return (
@@ -436,7 +436,7 @@ export default function Sidebar(props: SidebarProps) {
 
       {darfSchreiben && (
         <Card size="small" title="Zone zeichnen" style={{ marginBottom: 12 }}>
-          <Space direction="vertical" style={{ width: '100%' }}>
+          <Space orientation="vertical" style={{ width: '100%' }}>
             {ZONE_TYPEN.map((t) => {
               if (t.geometrie === 'beides') {
                 return (

@@ -136,7 +136,7 @@ export default function AuftragKarte({
         </Text>
         <Space size={4} wrap>
           {sichtbareEmpf.map((e) => (
-            <Tag key={e.id} bordered={false} color={e.quittiert_at ? 'green' : 'default'} style={{ margin: 0, fontSize: 12 }}>
+            <Tag key={e.id} variant="filled" color={e.quittiert_at ? 'green' : 'default'} style={{ margin: 0, fontSize: 12 }}>
               {e.snap_anzeige}{e.quittiert_at ? ' ✓' : ''}
               {darfSchreiben && !e.quittiert_at && onQuittieren && (
                 <Popconfirm
@@ -155,7 +155,7 @@ export default function AuftragKarte({
       </Flex>
 
       {ansicht === 'abgeschlossen' && (
-        <Space direction="vertical" size={0} style={{ marginBottom: 8 }}>
+        <Space orientation="vertical" size={0} style={{ marginBottom: 8 }}>
           {a.vollzogen_at && <Text type="secondary" style={{ fontSize: 13 }}>Vollzogen am: {formatZeit(a.vollzogen_at)}</Text>}
           {a.abgenommen_at && <Text type="secondary" style={{ fontSize: 13 }}>Abgenommen am: {formatZeit(a.abgenommen_at)}</Text>}
           {a.vollzugsmeldung && <Text type="secondary" style={{ fontSize: 13 }}>Vollzugsvermerk: {a.vollzugsmeldung}</Text>}

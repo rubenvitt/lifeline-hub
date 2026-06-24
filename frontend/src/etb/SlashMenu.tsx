@@ -28,9 +28,10 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
   );
   const flach: SlashEintrag[] = useMemo(() => [...treffer.felder, ...treffer.bausteine], [treffer]);
   const [aktiv, setAktiv] = useState(0);
-  // Aufgelöste Theme-Tokens statt antd-CSS-Variablen: cssVar ist nicht aktiviert,
-  // daher würde `var(--ant-color-bg-elevated, …)` immer den Fallback nehmen
-  // (dunkel) und im Light Mode schwarzen Grund mit schwarzem Text erzeugen.
+  // Aufgelöste Theme-Tokens (theme.useToken()) statt antd-CSS-Variablen: robust
+  // gegenüber dem Theme-Modus. (antd 6 aktiviert cssVar zwar standardmäßig, doch
+  // aufgelöste Tokens bleiben hier die klarere, modussichere Wahl — vermeidet den
+  // früheren Fehler, dass `var(--ant-color-bg-elevated, …)` den dunklen Fallback nahm.)
   const { token } = theme.useToken();
 
   useEffect(() => setAktiv(0), [filter, offen]);

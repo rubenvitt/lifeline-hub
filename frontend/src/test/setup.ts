@@ -43,6 +43,18 @@ if (typeof globalThis.localStorage === 'undefined') {
   });
 }
 
+// antd 6 nutzt rc-resize-observer flächendeckend (Table, Space, Tabs …) — jsdom kennt
+// ResizeObserver nicht, sonst wirft jeder Render ReferenceError und reißt die Suite ab.
+// No-op reicht: Tests prüfen Inhalt/Verhalten, keine gemessenen Größen.
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  class ResizeObserverStub {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
+}
+
 // antd verwendet window.matchMedia (responsive observer) — in jsdom nicht vorhanden.
 Object.defineProperty(window, 'matchMedia', {
   writable: true,

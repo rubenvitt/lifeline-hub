@@ -19,7 +19,7 @@ export default function LagemeldungenPage() {
     return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
-    return <Alert type="error" message="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+    return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
   const eintraege = lageQuery.data ?? [];
@@ -33,7 +33,7 @@ export default function LagemeldungenPage() {
       ]} />
       <Typography.Title level={3} style={{ marginTop: 0 }}>Lagerelevante Meldungen</Typography.Title>
       {lageQuery.isError && (
-        <Alert type="error" showIcon style={{ marginBottom: 12 }} message="Lageobjekte konnten nicht geladen werden" />
+        <Alert type="error" showIcon style={{ marginBottom: 12 }} title="Lageobjekte konnten nicht geladen werden" />
       )}
       {eintraege.length === 0 ? (
         <Empty description="Noch keine lagerelevanten Meldungen übergeben" />

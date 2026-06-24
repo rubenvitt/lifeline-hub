@@ -32,7 +32,7 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
       akzentFarbe={zoneStil(zone.typ, zone.farbe).lineColor}
       onSchliessen={onSchliessen}
     >
-      <Space direction="vertical" style={{ width: '100%' }}>
+      <Space orientation="vertical" style={{ width: '100%' }}>
         {darfSchreiben ? (
           <Select<ZoneTyp> aria-label="Zonen-Typ" value={zone.typ} style={{ width: '100%' }}
             options={erlaubteTypen.map((t) => ({ value: t.typ, label: t.label }))}
