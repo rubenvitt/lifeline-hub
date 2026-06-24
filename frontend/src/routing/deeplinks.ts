@@ -14,9 +14,10 @@
  * und die UI-Form-Leitlinie in CLAUDE.md):
  *  - **Item-Route** `/einsaetze/:id/<modul>/:<modul>Id` → Vollseiten-Detail (uhs, br,
  *    lagebericht, befehl, person, tier, schaden).
- *  - **Query-Param** `?<modul>=<id>` → Selektion/Drawer auf der Listenseite, wenn das
+ *  - **Query-Param** `?<modul>=<id>` → Selektion auf der Modul-/Listenseite, wenn das
  *    Modul (noch) keine eigene Detail-Route hat (einheit, fahrzeug, personal,
- *    abschnitt, meldung, auftrag) bzw. ein Eintrag in einer Liste adressiert wird (etb).
+ *    abschnitt, meldung, auftrag, gefahrengebiet) bzw. ein Eintrag in einer Liste
+ *    adressiert wird (etb).
  *  - **`?neu=1`** → Schnellerfassung auf der Listenseite fokussieren.
  *
  * Die Builder sind reine String-Funktionen und gehen von gültigen, positiven
@@ -140,6 +141,10 @@ export function meldungenPfad(einsatzId: number, opts: { meldung?: number } = {}
 
 export function auftraegePfad(einsatzId: number, opts: { auftrag?: number } = {}): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'auftraege'), { auftrag: opts.auftrag });
+}
+
+export function gefahrenPfad(einsatzId: number, opts: { gefahrengebiet?: number } = {}): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'gefahren'), { gefahrengebiet: opts.gefahrengebiet });
 }
 
 // ── Route-Param-Robustheit ───────────────────────────────────────────────────

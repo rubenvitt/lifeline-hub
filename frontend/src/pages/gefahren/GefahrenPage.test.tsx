@@ -76,6 +76,26 @@ describe('GefahrenPage', () => {
     await waitFor(() => expect(matrix8Angefragt).toBe(true));
   });
 
+  it('?gefahrengebiet=<id> wählt das Zielgebiet statt des ersten (LFH-150)', async () => {
+    const nord = { id: 7, einsatz_id: 1, label: 'Nord', zonen_ids: [9], hoechste_warnstufe: 'hoch' };
+    const sued = { id: 8, einsatz_id: 1, label: 'Süd', zonen_ids: [11], hoechste_warnstufe: 'mittel' };
+    let matrix8Angefragt = false;
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json([nord, sued])),
+      http.get('/api/einsaetze/1/gefahrengebiete/7/matrix', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/gefahrengebiete/8/matrix', () => { matrix8Angefragt = true; return HttpResponse.json([]); }),
+    );
+    renderMitProviders(
+      <Routes><Route path="/einsaetze/:id/gefahren" element={<GefahrenPage />} /></Routes>,
+      { route: '/einsaetze/1/gefahren?gefahrengebiet=8' },
+    );
+    // Deeplink-Ziel (Süd, id 8) ist gewählt — die Matrix von Gebiet 8 wird geladen, nicht
+    // die des per Default ersten Gebiets (Nord, id 7).
+    expect((await screen.findAllByText('Süd'))[0]).toBeInTheDocument();
+    await waitFor(() => expect(matrix8Angefragt).toBe(true));
+  });
+
   it('setzt eine Warnstufe (PUT auf das gewählte Gebiet)', async () => {
     let put: Record<string, unknown> | null = null;
     server.use(

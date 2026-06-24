@@ -6,6 +6,7 @@ import type { BewertungEingabe } from '../../api/gefahren';
 import { ApiError } from '../../api/client';
 import { benenneGefahrengebiet, gefahrengebietName, ladeGefahrengebiete, ladeMatrix, setzeBewertung } from '../../api/gefahren';
 import { ladeEinsatz } from '../../api/einsaetze';
+import { useQueryParamSelektion } from '../../routing/useQueryParamSelektion';
 import { warnstufeFarbe } from './gefahrenSchema';
 import GefahrenMatrix from './GefahrenMatrix';
 
@@ -26,6 +27,12 @@ export default function GefahrenPage() {
     if (gebiete.length === 0) { setGewaehlt(null); return; }
     if (gewaehlt == null || !gebiete.some((g) => g.id === gewaehlt)) setGewaehlt(gebiete[0].id);
   }, [gebiete, gewaehlt]);
+
+  // Deeplink von der Lagekarte (LFH-150): ?gefahrengebiet=<id> selektiert das Zielgebiet
+  // (überschreibt den Default aufs erste Gebiet), sofern es existiert. apply-then-clean.
+  useQueryParamSelektion('gefahrengebiet', gebieteQuery.isSuccess, (gid) => {
+    if (gebiete.some((g) => g.id === gid)) setGewaehlt(gid);
+  });
 
   const matrixQuery = useQuery({
     queryKey: ['gefahrenmatrix', einsatzId, gewaehlt],

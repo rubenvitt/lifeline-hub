@@ -21,6 +21,7 @@ import {
   einsatzabschnittePfad,
   meldungenPfad,
   auftraegePfad,
+  gefahrenPfad,
   einsatzdatenPfad,
   parseRouteId,
 } from './deeplinks';
@@ -114,6 +115,12 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   });
   it('auftraegePfad ohne Optionen', () => {
     expect(auftraegePfad(E)).toBe('/einsaetze/5/auftraege');
+  });
+  it('gefahrenPfad ohne Optionen', () => {
+    expect(gefahrenPfad(E)).toBe('/einsaetze/5/gefahren');
+  });
+  it('gefahrenPfad mit ?gefahrengebiet=', () => {
+    expect(gefahrenPfad(E, { gefahrengebiet: 4 })).toBe('/einsaetze/5/gefahren?gefahrengebiet=4');
   });
   it('einsatzdatenPfad', () => {
     expect(einsatzdatenPfad(E)).toBe('/einsaetze/5/einsatzdaten');
