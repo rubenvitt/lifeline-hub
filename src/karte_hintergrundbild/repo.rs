@@ -204,6 +204,9 @@ mod tests {
         assert_eq!(p.opazitaet, 60);
         assert!(!p.sichtbar);
         assert_eq!(p.ecken_json, neu);
+        // Nicht gepatchte Felder (name/reihenfolge waren None) bleiben unverändert.
+        assert_eq!(p.name, a.name);
+        assert_eq!(p.reihenfolge, a.reihenfolge);
     }
 
     #[tokio::test]
@@ -213,9 +216,16 @@ mod tests {
         let a = anlegen(&pool, eid, uid, "p.png", "image/png", &[0x89], ecken())
             .await
             .unwrap();
-        // anderer Einsatz
+        // anderer Einsatz: ALLE einsatz-scoped Pfade müssen das fremde Bild abweisen.
         let (eid2, _) = setup(&pool).await;
         assert!(laden(&pool, eid2, a.id).await.is_err());
+        assert!(laden_bytes(&pool, eid2, a.id).await.is_err());
+        assert!(aktualisiere(&pool, eid2, a.id, BildPatch::default())
+            .await
+            .is_err());
+        assert!(loeschen(&pool, eid2, a.id).await.is_err());
+        // Das echte Bild bleibt unter seinem Einsatz unangetastet.
+        assert!(laden(&pool, eid, a.id).await.is_ok());
     }
 
     #[tokio::test]
@@ -227,5 +237,7 @@ mod tests {
             .unwrap();
         loeschen(&pool, eid, a.id).await.unwrap();
         assert!(liste(&pool, eid).await.unwrap().is_empty());
+        // Zweites Löschen trifft keine Zeile mehr → NotFound (rows_affected == 0).
+        assert!(loeschen(&pool, eid, a.id).await.is_err());
     }
 }
