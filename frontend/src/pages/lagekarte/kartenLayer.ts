@@ -5,6 +5,9 @@ import { wendeKartenDatenAn } from './kartenDaten';
 import { sorgeFuerFachebeneLayer, setzeFachebeneDaten } from './fachebenenLayer';
 import type { FachebeneDef } from './fachebenen';
 import type { FeatureCollection } from '../../api/fachebenen';
+import { synchronisiereBildLayer, type BildOverlay } from './bildLayer';
+
+export type { BildOverlay };
 
 export interface AktiveFachebene {
   def: FachebeneDef;
@@ -149,7 +152,11 @@ export function reAnlegenAlles(
   flaechen: FlaechenFeatureCollection,
   zonen: ZonenFeatureCollection,
   fachebenen: AktiveFachebene[] = [],
+  bilder: BildOverlay[] = [],
 ) {
+  // Bilder zuerst (vor abschnitte-fill, das gleich angelegt wird → beforeId noch nicht da:
+  // daher OHNE beforeId anlegen und danach abschnitte/zonen drüber legen).
+  synchronisiereBildLayer(map, bilder);
   sorgeFuerAbschnittLayer(map, flaechen);
   (map.getSource('abschnitte') as GeoJSONSource | undefined)?.setData(flaechen as never);
   sorgeFuerZonenLayer(map, zonen);
@@ -176,6 +183,7 @@ export function planeReAnlegenNachStyle(
   getFlaechen: () => FlaechenFeatureCollection,
   getZonen: () => ZonenFeatureCollection,
   getFachebenen: () => AktiveFachebene[] = () => [],
+  getBilder: () => BildOverlay[] = () => [],
 ) {
-  wendeKartenDatenAn(map, () => reAnlegenAlles(map, getFlaechen(), getZonen(), getFachebenen()));
+  wendeKartenDatenAn(map, () => reAnlegenAlles(map, getFlaechen(), getZonen(), getFachebenen(), getBilder()));
 }

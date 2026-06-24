@@ -24,6 +24,9 @@ import {
   entferneFachebeneLayer,
   fachebeneClickLayerId,
 } from './fachebenenLayer';
+import { synchronisiereBildLayer, entferneBildLayer, type BildOverlay } from './bildLayer';
+import { eckenAusRechteck, rechteckAusEcken } from './bildGeometrie';
+import type { Ecken } from '../../api/kartenbilder';
 import { KRITIS_MIN_ZOOM } from './fachebenen';
 import type { FachebeneQuelle } from '../../api/fachebenen';
 
@@ -70,12 +73,18 @@ export interface KartenflaecheProps {
   onZoneKlick?: (id: number) => void;
   /** Aktive Fachebenen mit Daten (externe Overlays). */
   fachebenen?: AktiveFachebene[];
+  /** Bild-Hintergründe (Overlays über der Basemap, unter Abschnitten/Zonen/Markern). */
+  bilder?: BildOverlay[];
   /** Karten-Viewport (west,sued,ost,nord) nach Bewegung — für bbox-abhängige Ebenen. */
   onBboxAenderung?: (bbox: string) => void;
   /** Aktuelles Zoom-Level nach Bewegung — z. B. um „näher heranzoomen"-Hinweise zu steuern. */
   onZoomAenderung?: (zoom: number) => void;
   /** Klick auf ein Fachebenen-Objekt → liefert dessen Properties + Quelle (für Detail-Panel). */
   onFachebeneKlick?: (properties: Record<string, unknown>, quelle: FachebeneQuelle) => void;
+  /** Aktiv zu platzierendes Bild (null = kein Platzier-Modus). Zeigt Mittelpunkt-Drag-Handle. */
+  platzierBild?: { id: number; ecken: Ecken } | null;
+  /** Callback, wenn Platzier-Geometrie per Drag verändert wurde. */
+  onPlatzierGeometrie?: (ecken: Ecken) => void;
 }
 
 export default function Kartenflaeche({
@@ -83,6 +92,7 @@ export default function Kartenflaeche({
   flaechen, zeichnen, onFlaecheGezeichnet, onFlaecheKlick,
   zonen, zoneZeichnen, onZoneGezeichnet, onZoneKlick,
   fachebenen, onBboxAenderung, onZoomAenderung, onFachebeneKlick,
+  bilder, platzierBild, onPlatzierGeometrie,
 }: KartenflaecheProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -100,6 +110,9 @@ export default function Kartenflaeche({
   // Aktuelle Fachebenen; nach setStyle re-angelegt.
   const fachebenenRef = useRef<AktiveFachebene[]>(fachebenen ?? []);
   fachebenenRef.current = fachebenen ?? [];
+  // Aktuelle Bild-Overlays; nach setStyle re-angelegt.
+  const bilderRef = useRef<BildOverlay[]>([]);
+  const vorherigeBilderRef = useRef<Set<number>>(new Set());
   // Zuletzt angewandter Style. Der Konstruktor wendet den initialen Style an → der
   // [style]-Effekt soll NUR auf echte Wechsel reagieren (sonst lädt diff:false beim
   // Mount den Style unnötig komplett neu).
@@ -133,6 +146,7 @@ export default function Kartenflaeche({
       for (const fe of fachebenenRef.current) {
         sorgeFuerFachebeneLayer(map, fe.def, fe.daten);
       }
+      synchronisiereBildLayer(map, bilderRef.current, 'abschnitte-fill');
     });
     mapRef.current = map;
     return () => {
@@ -162,7 +176,13 @@ export default function Kartenflaeche({
     if (style === angewandterStyleRef.current) return; // Mount: Konstruktor hat ihn schon
     angewandterStyleRef.current = style;
     map.setStyle(style, { diff: false });
-    planeReAnlegenNachStyle(map, () => flaechenDatenRef.current, () => zonenDatenRef.current, () => fachebenenRef.current);
+    planeReAnlegenNachStyle(
+      map,
+      () => flaechenDatenRef.current,
+      () => zonenDatenRef.current,
+      () => fachebenenRef.current,
+      () => bilderRef.current,
+    );
   }, [style]);
 
   // AttributionControl je nach aktivem View neu setzen (config-autoritativ). MapLibre
@@ -324,6 +344,22 @@ export default function Kartenflaeche({
     });
   }, [fachebenen]);
 
+  // Bild-Overlays synchronisieren: anlegen/aktualisieren/entfernen.
+  // Analog zum Fachebenen-Effekt; beforeId='abschnitte-fill' hält Bilder unter den Vektorlayern.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const aktiv = bilder ?? [];
+    bilderRef.current = aktiv;
+    wendeKartenDatenAn(map, () => {
+      const aktivIds = synchronisiereBildLayer(map, aktiv, 'abschnitte-fill');
+      for (const id of vorherigeBilderRef.current) {
+        if (!aktivIds.has(id)) entferneBildLayer(map, id);
+      }
+      vorherigeBilderRef.current = aktivIds;
+    });
+  }, [bilder]);
+
   // Viewport nach Kartenbewegung melden: Zoom (für „näher heranzoomen"-Hinweise) immer,
   // bbox (für bbox-abhängige Ebenen wie KRITIS) nur ab KRITIS_MIN_ZOOM — verhindert riesige
   // Overpass-Anfragen. Sendet sofort beim Wirksamwerden und dann nach jedem moveend (600ms-Debounce).
@@ -419,6 +455,37 @@ export default function Kartenflaeche({
     zoneDrawRef.current?.zerstoeren();
     zoneDrawRef.current = null;
   }, []);
+
+  // Stabile Ref für onPlatzierGeometrie (Callback-Identität soll den Effekt nicht neu auslösen).
+  const onPlatzierGeometrieRef = useRef(onPlatzierGeometrie);
+  onPlatzierGeometrieRef.current = onPlatzierGeometrie;
+
+  // Platzier-Modus: Mittelpunkt-Drag-Handle. Wird neu erzeugt, wenn sich das aktive Bild ändert.
+  // MVP: Nur Mittelpunkt-Handle (Drag verschiebt das ganze Bild). Drehung/Größe über das Panel.
+  // Ausbaustufe: Einzeln ziehbare Eck-Handles — bewusst zurückgestellt (LFH-35 MVP-Schnitt).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !platzierBild) return;
+    const markers: maplibregl.Marker[] = [];
+    const r = rechteckAusEcken(platzierBild.ecken);
+    const center = new maplibregl.Marker({ draggable: true, color: '#1677ff' })
+      .setLngLat(r.center as [number, number])
+      .addTo(map);
+    center.on('drag', () => {
+      const ll = center.getLngLat();
+      const neu = eckenAusRechteck({
+        ...rechteckAusEcken(platzierBild.ecken),
+        center: [ll.lng, ll.lat],
+      });
+      onPlatzierGeometrieRef.current?.(neu);
+    });
+    markers.push(center);
+    return () => {
+      for (const m of markers) m.remove();
+    };
+  // platzierBild als Abhängigkeit: neue Ecken → Handle neu platzieren (Mittelp. kann sich geändert haben).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platzierBild]);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} data-testid="kartenflaeche" />;
 }
