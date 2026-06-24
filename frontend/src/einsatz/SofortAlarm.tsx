@@ -64,11 +64,15 @@ export default function SofortAlarm() {
         aria-pressed={gemutet}
         onClick={umschalten}
         icon={
+          // Header ist in beiden Modi dunkel → Icon immer weiß. Die Farbe MUSS am
+          // Icon selbst sitzen, nicht am Button: der Badge-Wrapper setzt via
+          // resetComponent ein eigenes color: colorText, das eine vom Button nur
+          // vererbte Farbe überschreiben würde (im Light-Mode → schwarzes Icon).
           gemutet ? (
-            <BellOutlined style={{ opacity: 0.45 }} />
+            <BellOutlined style={{ color: '#fff', opacity: 0.45 }} />
           ) : (
             <Badge dot status="error">
-              <NotificationOutlined />
+              <NotificationOutlined style={{ color: '#fff' }} />
             </Badge>
           )
         }
