@@ -60,6 +60,19 @@ describe('baueMarker', () => {
   it('kommt mit undefined-Einsatz klar', () => {
     expect(baueMarker(undefined, [], [])).toEqual({ verortet: [], nichtVerortet: [] });
   });
+
+  it('setzt taktische Zeichen für Einsatzort, UHS (je Typ) und Schaden', () => {
+    const einsatz = { einsatzort: 'ELW', einsatzort_lat: 50, einsatzort_lon: 8 } as EinsatzAnzeige;
+    const { verortet } = baueMarker(
+      einsatz,
+      [uhs({ id: 5, typ: 'patientenablage', lat: 50.1, lon: 8.1 })],
+      [schaden({ id: 9, ausmass: 'mittel', lat: 51, lon: 7 })],
+    );
+    const byKey = (k: string) => verortet.find((m) => m.schluessel === k);
+    expect(byKey('einsatzort')?.tz?.grundzeichen).toBe('anlass');
+    expect(byKey('uhs-5')?.tz).toEqual({ grundzeichen: 'stelle', symbol: 'sammelplatz-betroffene' });
+    expect(byKey('schaden-9')?.tz).toEqual({ grundzeichen: 'gefahr', farbe: '#faad14' });
+  });
 });
 
 function lageMeldung(partial: Partial<LageMeldung>): LageMeldung {
@@ -80,6 +93,11 @@ describe('baueLageMeldungMarker', () => {
     expect(marker[0].lageMeldung).toEqual({
       meldungId: 3, meldungLfdNr: 5, absender: 'Florian Nord 1', inhalt: 'Brücke gesperrt',
     });
+  });
+
+  it('setzt kein taktisches Zeichen (Lagemeldung bleibt Kreis)', () => {
+    const marker = baueLageMeldungMarker([lageMeldung({ id: 4, lat: 50.3, lon: 8.7 })]);
+    expect(marker[0].tz).toBeUndefined();
   });
 });
 

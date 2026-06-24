@@ -2,6 +2,7 @@ import type {
   EinheitId, FachaufgabeId, GrundzeichenId, OrganisationId,
   TaktischesZeichen as TZSpec,
 } from 'taktische-zeichen-react';
+import type { Ausmass, UhsTyp } from '../../api/types';
 
 export type Objekttyp = 'einheit' | 'fahrzeug' | 'fuehrung' | 'abschnitt';
 
@@ -30,7 +31,7 @@ export interface TzEingabe {
   orgDefault?: string | null;    // Org-Default aus /api/organisation
 }
 
-export type TzProps = Pick<TZSpec, 'grundzeichen' | 'organisation' | 'fachaufgabe' | 'einheit'>;
+export type TzProps = Pick<TZSpec, 'grundzeichen' | 'organisation' | 'fachaufgabe' | 'einheit' | 'symbol' | 'farbe'>;
 
 /** Leitet die DV-102-Spec aus App-Feldern ab (Org-Default + Objekt-Override + Fachaufgabe). */
 export function baueTzProps(e: TzEingabe): TzProps {
@@ -44,4 +45,37 @@ export function baueTzProps(e: TzEingabe): TzProps {
     fachaufgabe,
     einheit: e.objekttyp === 'einheit' ? groesseAusLabel(e.einheitTypLabel) : undefined,
   };
+}
+
+// Schaden-Ausmaß → Farbe (einzige Quelle; marker.ts bezieht die Schaden-Farbe über schadenTz).
+const AUSMASS_FARBE: Record<string, string> = {
+  gering: '#52c41a',
+  mittel: '#faad14',
+  gross: '#fa8c16',
+  katastrophal: '#f5222d',
+};
+const AUSMASS_FALLBACK = '#8c8c8c';
+
+/** Einsatzort (id:0): DV-102-Grundzeichen „anlass" (Einsatz-/Schadensanlass). */
+export function einsatzortTz(): TzProps {
+  return { grundzeichen: 'anlass' };
+}
+
+/** Schaden: Warn-Dreieck „gefahr"; das Ausmaß steuert ausschließlich die Farbe (Form trägt
+ *  die Bedeutung, daher farbenblind-tauglich). Farbe ist garantiert gesetzt. */
+export function schadenTz(ausmass: Ausmass): TzProps & { farbe: string } {
+  return { grundzeichen: 'gefahr', farbe: AUSMASS_FARBE[ausmass] ?? AUSMASS_FALLBACK };
+}
+
+// UHS: „stelle" (Kreis) + sanitätsdienstliches Overlay je UhsTyp.
+const UHS_TZ: Record<UhsTyp, TzProps> = {
+  behandlungsplatz: { grundzeichen: 'stelle', fachaufgabe: 'aerztliche-versorgung' },
+  patientenablage: { grundzeichen: 'stelle', symbol: 'sammelplatz-betroffene' },
+  verletztensammelstelle: { grundzeichen: 'stelle', symbol: 'sammeln' },
+  sonstige: { grundzeichen: 'stelle', fachaufgabe: 'rettungswesen' },
+};
+
+/** Unfallhilfsstelle: Grundzeichen „stelle" + Overlay nach UhsTyp. */
+export function uhsTz(typ: UhsTyp): TzProps {
+  return UHS_TZ[typ];
 }
