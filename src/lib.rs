@@ -20,6 +20,7 @@ pub mod gefahr;
 pub mod sprechgruppe;
 pub mod geocoding;
 pub mod karte;
+pub mod karte_hintergrundbild;
 pub mod katalog;
 pub mod kommunikation;
 pub mod befehl;
