@@ -673,7 +673,7 @@ In `src/routes/mod.rs`: `pub mod karte_hintergrundbild;`.
 
 - [ ] **Step 3: Handler-Test (Berechtigung + Upload-Roundtrip)**
 
-Test nach dem Muster bestehender Routen-Tests (grep `async fn` in einem `tests/`-File oder Routen-`#[cfg(test)]`). Mindest-Abdeckung:
+Test nach den bestehenden Integrationstests in `tests/`. **Konkrete Vorbilder:** `tests/anhang.rs` (Multipart-Upload-Aufbau: Boundary, `datei`-Feld, Body-Bytes) und `tests/einsatz_schaden.rs` bzw. `tests/karte.rs` (einsatz-scoped Setup: Login-Cookie, Rollen Leitung/Beobachter, aktiver vs. abgeschlossener Einsatz). Den dortigen Test-Harness-Helper (Router-Builder + Test-Client + Seed-Funktionen) übernehmen — Namen `test_app`/`seed_aktiver_einsatz` unten sind Platzhalter für die realen Helfer aus diesen Dateien. Mindest-Abdeckung:
 
 ```rust
 // Pseudo-Struktur — an die Projekt-Test-Harness (Router-Builder + Test-Client) anpassen.
@@ -949,13 +949,17 @@ describe('bildGeometrie', () => {
     expect(((zurueck.rotationGrad % 360) + 360) % 360).toBeCloseTo(30, 4);
   });
 
-  it('Rotation ist winkeltreu (Seitenverhältnis bleibt bei Bildschirm-Metrik)', () => {
-    const r = { center: [9, 50] as [number, number], breiteGrad: 0.2, hoeheGrad: 0.2, rotationGrad: 45 };
-    const e = eckenAusRechteck(r);
+  it('Rotation ändert die Kantenlängen nicht (winkeltreu)', () => {
+    // Die korrekte Invariante: DIESELBE Kante ist bei 0° und 45° gleich lang
+    // (Rotation verzerrt nicht). NICHT breite==hoehe vergleichen — breiteGrad (lng-Grad)
+    // und hoeheGrad (lat-Grad) haben verschiedene Bildschirm-Einheiten.
+    const basis = { center: [9, 50] as [number, number], breiteGrad: 0.2, hoeheGrad: 0.1, rotationGrad: 0 };
+    const e0 = eckenAusRechteck(basis);
+    const e45 = eckenAusRechteck({ ...basis, rotationGrad: 45 });
     const latCos = Math.cos(50 * Math.PI / 180);
     const dist = (a: number[], b: number[]) => Math.hypot((a[0]-b[0])*latCos, a[1]-b[1]);
-    // gleichseitig in Bildschirm-Metrik (breite==hoehe) → alle Kanten gleich lang
-    expect(dist(e[0], e[1])).toBeCloseTo(dist(e[1], e[2]), 6);
+    expect(dist(e45[0], e45[1])).toBeCloseTo(dist(e0[0], e0[1]), 6); // obere Kante
+    expect(dist(e45[1], e45[2])).toBeCloseTo(dist(e0[1], e0[2]), 6); // rechte Kante
   });
 
   it('eckenAusBounds liefert achsenparallele 4 Ecken', () => {
@@ -1064,6 +1068,8 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
   - `setzeBildOpazitaet(map, id, opazitaet, sichtbar)`
   - `entferneBildLayer(map, id)`
   - `synchronisiereBildLayer(map, overlays, beforeId?)` (anlegen/aktualisieren/entfernen gegen Soll-Liste)
+
+> **Keystone-Annahme verifiziert (context7, MapLibre GL JS v5):** Eine `image`/`video`-Source rendert ein **beliebiges 4-Eck** — die 4 `coordinates` müssen NICHT achsenparallel sein (offizielles Beispiel nutzt ein schräggestelltes Viereck bei `bearing: -96`). Damit funktioniert das gedrehte Rechteck aus Task 6 direkt; kein Spike nötig. `raster-fade-duration: 0` verhindert das Einblend-Flackern beim Geometrie-Update. `ImageSource.setCoordinates(coords)` aktualisiert die Position ohne Neuladen des Bildes.
 
 - [ ] **Step 1: Test** (fakeMap-Muster aus `fachebenenLayer.test.ts`, erweitert um setPaintProperty/getSource.setCoordinates)
 
