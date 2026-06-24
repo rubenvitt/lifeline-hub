@@ -590,6 +590,13 @@ pub async fn schwaerze_einsatz(
     .execute(&mut *tx)
     .await?;
 
+    // Bild-Hintergründe (LFH-35): Dateiname kann PII tragen → Platzhalter; BLOB bleibt (Kartografie).
+    sqlx::query("UPDATE karte_hintergrundbild SET name = ? WHERE einsatz_id = ?")
+        .bind(SCHWAERZUNG_PLATZHALTER)
+        .bind(einsatz_id)
+        .execute(&mut *tx)
+        .await?;
+
     system_audit_tx(
         &mut tx,
         einsatz_id,

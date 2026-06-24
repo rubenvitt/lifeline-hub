@@ -1,4 +1,5 @@
-import { Badge, Button, Card, Empty, List, Radio, Select, Space, Spin, Switch, Tooltip, Typography } from 'antd';
+import { Badge, Button, Card, Empty, List, Popconfirm, Radio, Select, Slider, Space, Spin, Switch, Tooltip, Typography, Upload } from 'antd';
+import { AimOutlined, DeleteOutlined, UploadOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import type { KarteMarker, NichtVerortet } from './marker';
 import type { BasemapModus } from './basemapStil';
@@ -9,6 +10,7 @@ import { ZONE_TYPEN } from './zonenStil';
 import { FACHEBENEN, fachebeneKeys } from './fachebenen';
 import KoordinatenEingabe from '../../anzeige/KoordinatenEingabe';
 import type { LatLon } from '../../anzeige/koordinaten';
+import type { Hintergrundbild } from '../../api/kartenbilder';
 
 export interface LayerSichtbar {
   einsatzort: boolean;
@@ -79,6 +81,14 @@ export interface SidebarProps {
   kritisZoomZuKlein?: boolean;
   /** Lade-Zustand je Fachebene (z. B. KRITIS/Overpass lädt länger → Spinner). */
   fachebenenLaedt?: Partial<Record<import('../../api/fachebenen').FachebeneQuelle, boolean>>;
+  /** Bild-Hintergründe */
+  bilder: Hintergrundbild[];
+  onBildUpload: (datei: File) => void;
+  onBildToggle: (id: number, sichtbar: boolean) => void;
+  onBildOpazitaet: (id: number, opazitaet: number) => void;
+  onBildPlatzieren: (id: number) => void;
+  onBildLoeschen: (id: number) => void;
+  bildPlatzierenId: number | null;
 }
 
 export default function Sidebar(props: SidebarProps) {
@@ -294,6 +304,64 @@ export default function Sidebar(props: SidebarProps) {
               </Space>
             );
           })}
+        </Space>
+      </Card>
+
+      <Card size="small" title="Bild-Hintergründe" style={{ marginBottom: 12 }}>
+        <Space direction="vertical" style={{ width: '100%' }}>
+          {props.bilder.map((b) => (
+            <div key={b.id} style={{ borderBottom: '1px solid #f0f0f0', paddingBottom: 6 }}>
+              <Space style={{ justifyContent: 'space-between', width: '100%' }}>
+                <Space>
+                  <Switch
+                    checked={b.sichtbar}
+                    aria-label={b.name}
+                    onChange={(v) => props.onBildToggle(b.id, v)}
+                  />
+                  <span>{b.name}</span>
+                </Space>
+                {darfSchreiben && (
+                  <Space>
+                    <Button
+                      size="small"
+                      type={props.bildPlatzierenId === b.id ? 'primary' : 'default'}
+                      icon={<AimOutlined />}
+                      onClick={() => props.onBildPlatzieren(b.id)}
+                      aria-label={`${b.name} platzieren`}
+                    />
+                    <Popconfirm
+                      title="Bild entfernen?"
+                      onConfirm={() => props.onBildLoeschen(b.id)}
+                      okText="Entfernen"
+                      cancelText="Abbrechen"
+                    >
+                      <Button size="small" danger icon={<DeleteOutlined />} aria-label={`${b.name} löschen`} />
+                    </Popconfirm>
+                  </Space>
+                )}
+              </Space>
+              <Slider
+                min={0}
+                max={100}
+                value={b.opazitaet}
+                disabled={!darfSchreiben}
+                onChange={(v) => props.onBildOpazitaet(b.id, v as number)}
+                tooltip={{ formatter: (v) => `${v}%` }}
+              />
+            </div>
+          ))}
+          {darfSchreiben && (
+            <Upload
+              accept="image/png,image/jpeg"
+              showUploadList={false}
+              beforeUpload={(datei) => {
+                props.onBildUpload(datei as File);
+                return false;
+              }}
+            >
+              <Button icon={<UploadOutlined />} size="small">Bild hochladen</Button>
+            </Upload>
+          )}
         </Space>
       </Card>
 

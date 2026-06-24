@@ -8,6 +8,9 @@ import {
 } from './kartenLayer';
 import { FACHEBENEN } from './fachebenen';
 
+const leereFlaechen = baueFlaechenFc([]);
+const leereZonen = baueZonenFc([]);
+
 /**
  * Regressionsschutz für „alle Zeichnungen verschwinden beim Basemap-/Theme-Wechsel,
  * erst nach dem Zeichnen einer neuen erscheinen sie wieder".
@@ -44,6 +47,25 @@ function fakeMap(istGeladen: () => boolean) {
   return { map: map as any, addSource: map.addSource, setData };
 }
 
+/** Erweiterte Fake-Map mit image-source-Support (setCoordinates) und setPaintProperty. */
+function fakeMapMitBild() {
+  const sources = new Map<string, { setData: ReturnType<typeof vi.fn>; setCoordinates: ReturnType<typeof vi.fn> }>();
+  const layers = new Set<string>();
+  return {
+    isStyleLoaded: () => true,
+    on: vi.fn(),
+    off: vi.fn(),
+    getSource: vi.fn((id: string) => sources.get(id)),
+    addSource: vi.fn((id: string) => { sources.set(id, { setData: vi.fn(), setCoordinates: vi.fn() }); }),
+    removeSource: vi.fn((id: string) => { sources.delete(id); }),
+    getLayer: vi.fn((id: string) => (layers.has(id) ? {} : undefined)),
+    addLayer: vi.fn((spec: { id: string }) => { layers.add(spec.id); }),
+    removeLayer: vi.fn((id: string) => { layers.delete(id); }),
+    setPaintProperty: vi.fn(),
+    _layers: layers,
+  };
+}
+
 const ZONE: ZoneFeature = {
   id: 1,
   geometrie: { type: 'Polygon', coordinates: [[[8.6, 50.1], [8.7, 50.1], [8.7, 50.2], [8.6, 50.1]]] },
@@ -69,6 +91,14 @@ describe('reAnlegenAlles', () => {
     ];
     reAnlegenAlles(map, baueFlaechenFc([]), baueZonenFc([]), aktive as never);
     expect(map.getLayer('fachebene-dwd-fill')).toBeTruthy();
+  });
+
+  it('reAnlegenAlles legt Bild-Layer mit an', () => {
+    const map = fakeMapMitBild();
+    reAnlegenAlles(map as never, leereFlaechen, leereZonen, [], [
+      { id: 5, blobUrl: 'blob:x', ecken: [[9, 50], [9.1, 50], [9.1, 49.9], [9, 49.9]], opazitaet: 100, sichtbar: true },
+    ]);
+    expect(map._layers.has('bild-5-raster')).toBe(true);
   });
 });
 

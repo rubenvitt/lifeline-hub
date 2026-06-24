@@ -235,6 +235,14 @@ pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
         .route("/api/einsaetze/{id}/zonen/stream", get(routes::lage_zone::stream))
         .route("/api/einsaetze/{id}/zonen/{zid}", patch(routes::lage_zone::aktualisieren))
         .route("/api/einsaetze/{id}/zonen/{zid}", delete(routes::lage_zone::aufloesen))
+        .route("/api/einsaetze/{id}/karte/hintergrundbilder", get(routes::karte_hintergrundbild::liste))
+        .route(
+            "/api/einsaetze/{id}/karte/hintergrundbilder",
+            post(routes::karte_hintergrundbild::hochladen).layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+        )
+        .route("/api/einsaetze/{id}/karte/hintergrundbilder/{bildId}/download", get(routes::karte_hintergrundbild::herunterladen))
+        .route("/api/einsaetze/{id}/karte/hintergrundbilder/{bildId}", patch(routes::karte_hintergrundbild::aktualisieren))
+        .route("/api/einsaetze/{id}/karte/hintergrundbilder/{bildId}", delete(routes::karte_hintergrundbild::loeschen))
         .route("/api/einsaetze/{id}/gefahrengebiete", get(routes::gefahr::gebiete))
         .route("/api/einsaetze/{id}/gefahrengebiete/{gid}", patch(routes::gefahr::umbenennen))
         .route("/api/einsaetze/{id}/gefahrengebiete/{gid}/matrix", get(routes::gefahr::matrix))

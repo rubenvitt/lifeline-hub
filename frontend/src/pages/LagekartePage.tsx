@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { App, Spin } from 'antd';
+import { listeHintergrundbilder, aktualisiereHintergrundbild, ladeHintergrundbildHoch,
+         loescheHintergrundbild, ladeBildBlobUrl, type Ecken } from '../api/kartenbilder';
+import { eckenAusBounds } from './lagekarte/bildGeometrie';
+import type { BildOverlay } from './lagekarte/bildLayer';
+import BildPlatzierenPanel from './lagekarte/BildPlatzierenPanel';
 import { gefahrenPfad } from '../routing/deeplinks';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
@@ -77,6 +82,11 @@ export default function LagekartePage() {
   // Angeklicktes Fachebenen-Objekt (externe Daten) → Detail-Panel.
   const [fachebeneAuswahl, setFachebeneAuswahl] =
     useState<{ quelle: FachebeneQuelle; properties: Record<string, unknown> } | null>(null);
+  const [bildPlatzierenId, setBildPlatzierenId] = useState<number | null>(null);
+  const [blobUrls, setBlobUrls] = useState<Record<number, string>>({});
+  // Spiegelt blobUrls als Ref, damit der Cleanup-Return des Blob-URL-Effekts beim
+  // Unmount alle aktuellen URLs revoken kann (Leak-Schutz) — ohne Stale-Closure.
+  const blobUrlsRef = useRef<Record<number, string>>({});
 
   // EINE SSE-Verbindung für alle Domänen (uhs/schaden/einheit/fahrzeug/abschnitt/zone/
   // person). Pro Domäne eine eigene EventSource würde das HTTP/1.1-Limit (6/Origin)
@@ -120,6 +130,10 @@ export default function LagekartePage() {
   const einstellungenQuery = useQuery({
     queryKey: ['einsatz-einstellungen', einsatzId],
     queryFn: () => ladeEinstellungen(einsatzId),
+  });
+  const bilderQuery = useQuery({
+    queryKey: ['einsatz-kartenbilder', einsatzId],
+    queryFn: () => listeHintergrundbilder(einsatzId),
   });
 
   // Fachebenen-Sichtbarkeit: einmal aus localStorage laden (analog basemap-Persistenz).
@@ -191,6 +205,54 @@ export default function LagekartePage() {
     if (!basemapInitiiertRef.current || basemap == null) return;
     merkeLetzteBasemap(einsatzId, { modus: basemap, onlineView: onlineStilName });
   }, [basemap, onlineStilName, einsatzId]);
+
+  // Blob-URLs für Kartenbilder laden (und bei entfernten Bildern inkrementell revoken).
+  // blobUrls bewusst NICHT in den deps: das Map-Objekt würde den Effekt endlos neu auslösen.
+  // WICHTIG: Hier KEIN pauschales revoke aller URLs im Cleanup — React führt den Cleanup
+  // vor JEDEM Re-Run aus (jedes Refetch der Bilderliste, z. B. via SSE/Upload/Toggle/Move).
+  // Ein pauschales revoke würde bestehende, weiterhin aktive URLs unbrauchbar machen, ohne
+  // den Ref zu leeren → der Guard unten verhindert ein Neuladen → Bilder bleiben blank
+  // (spätestens nach Theme-/Basemap-Wechsel mit Source-Neuaufbau). Der Unmount-Leak-Schutz
+  // liegt deshalb in einem separaten, leeren-deps-Effekt weiter unten.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const bilder = bilderQuery.data ?? [];
+    let abgebrochen = false;
+    for (const b of bilder) {
+      if (!blobUrlsRef.current[b.id]) {
+        ladeBildBlobUrl(einsatzId, b.id).then((url) => {
+          if (!abgebrochen) {
+            blobUrlsRef.current = { ...blobUrlsRef.current, [b.id]: url };
+            setBlobUrls(blobUrlsRef.current);
+          }
+        }).catch((e) => {
+          // Lade-Fehler sichtbar machen statt lautlos schlucken (maskierte sonst C1).
+          if (!abgebrochen) fehler(e);
+        });
+      }
+    }
+    // Entfernte Bilder (z. B. gelöscht, oder Einsatzwechsel/Listen-Swap) inkrementell
+    // freigeben — das deckt den Leak ab, ohne aktive URLs zu treffen.
+    const aktiveIds = new Set(bilder.map((b) => b.id));
+    for (const idStr of Object.keys(blobUrlsRef.current)) {
+      const id = Number(idStr);
+      if (!aktiveIds.has(id)) {
+        URL.revokeObjectURL(blobUrlsRef.current[id]);
+        const { [id]: _, ...rest } = blobUrlsRef.current;
+        blobUrlsRef.current = rest;
+        setBlobUrls(blobUrlsRef.current);
+      }
+    }
+    return () => {
+      abgebrochen = true;
+    };
+  }, [bilderQuery.data, einsatzId]);
+
+  // Unmount-only: beim Verlassen der Karte alle dann noch aktuellen Blob-URLs freigeben.
+  // Separater Effekt mit leeren deps → läuft NUR beim Unmount, nicht bei jedem Refetch.
+  useEffect(() => () => {
+    Object.values(blobUrlsRef.current).forEach(URL.revokeObjectURL);
+  }, []);
 
   const einsatz = einsatzQuery.data;
   const darfSchreiben =
@@ -375,6 +437,56 @@ export default function LagekartePage() {
 
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
+  const invalidiereBilder = () => qc.invalidateQueries({ queryKey: ['einsatz-kartenbilder', einsatzId] });
+
+  // Memoisiert: ohne useMemo entsteht pro Render eine neue Array-Identität (+ JSON.parse),
+  // was den bilder-Effekt der Kartenflaeche bei jedem Render unnötig feuert.
+  const bildOverlays = useMemo<BildOverlay[]>(
+    () => (bilderQuery.data ?? [])
+      .filter((b) => blobUrls[b.id])
+      .map((b) => ({
+        id: b.id,
+        blobUrl: blobUrls[b.id],
+        ecken: JSON.parse(b.ecken_json) as Ecken,
+        opazitaet: b.opazitaet,
+        sichtbar: b.sichtbar,
+      })),
+    [bilderQuery.data, blobUrls],
+  );
+
+  const onBildUpload = async (datei: File) => {
+    // LagekartePage hat keinen direkten Zugriff auf mapRef (intern in Kartenflaeche).
+    // Fallback-Bounds: Bild landet mittig im deutschlandweiten Viewport; Nutzer positioniert
+    // es danach über das Platzieren-Panel neu.
+    const ecken: Ecken = eckenAusBounds(9, 49.9, 9.1, 50);
+    await ladeHintergrundbildHoch(einsatzId, datei, ecken, datei.name);
+    invalidiereBilder();
+  };
+  const onBildToggle = async (id: number, sichtbar: boolean) => {
+    await aktualisiereHintergrundbild(einsatzId, id, { sichtbar });
+    invalidiereBilder();
+  };
+  const onBildOpazitaet = async (id: number, opazitaet: number) => {
+    await aktualisiereHintergrundbild(einsatzId, id, { opazitaet });
+    invalidiereBilder();
+  };
+  const onBildLoeschen = async (id: number) => {
+    await loescheHintergrundbild(einsatzId, id);
+    invalidiereBilder();
+  };
+  const onPlatzierGeometrie = async (ecken: Ecken) => {
+    if (bildPlatzierenId == null) return;
+    await aktualisiereHintergrundbild(einsatzId, bildPlatzierenId, { ecken_json: JSON.stringify(ecken) });
+    invalidiereBilder();
+  };
+
+  const aktivesPlatzierBild = useMemo(() => {
+    if (bildPlatzierenId == null) return null;
+    const b = (bilderQuery.data ?? []).find((x) => x.id === bildPlatzierenId);
+    if (!b) return null;
+    return { id: b.id, ecken: JSON.parse(b.ecken_json) as Ecken };
+  }, [bildPlatzierenId, bilderQuery.data]);
+
   // Verorten je nach Ziel-Typ (UHS/Schaden live; Einsatzort über Kopf-PATCH, dann invalidieren).
   const verortenMutation = useMutation({
     mutationFn: async (p: { lat: number | null; lon: number | null }) => {
@@ -519,6 +631,19 @@ export default function LagekartePage() {
           fachebenenSichtbar.kritis && kartenZoom != null && kartenZoom < KRITIS_MIN_ZOOM
         }
         fachebenenLaedt={fachebenenLaedt}
+        bilder={bilderQuery.data ?? []}
+        onBildUpload={onBildUpload}
+        onBildToggle={onBildToggle}
+        onBildOpazitaet={onBildOpazitaet}
+        onBildPlatzieren={(id) => {
+          setBildPlatzierenId(id);
+          setZoneEntwurf(null);
+          setZeichneAbschnittId(null);
+          setPlatzierungZiel(null);
+          setAuswahl(null);
+        }}
+        onBildLoeschen={onBildLoeschen}
+        bildPlatzierenId={bildPlatzierenId}
       />
       <div style={{ flex: 1, position: 'relative' }}>
         <Kartenflaeche
@@ -571,6 +696,9 @@ export default function LagekartePage() {
             setAuswahl(null);
             setZoneAuswahl(null);
           }}
+          bilder={bildOverlays}
+          platzierBild={aktivesPlatzierBild}
+          onPlatzierGeometrie={onPlatzierGeometrie}
         />
         {aktiverMarker && (
           <Inspector
@@ -614,6 +742,16 @@ export default function LagekartePage() {
                 .catch(fehler)
             }
           />
+        )}
+        {bildPlatzierenId != null && aktivesPlatzierBild != null && (
+          <div style={{ position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 10, width: 340 }}>
+            <BildPlatzierenPanel
+              einsatzId={einsatzId}
+              ecken={aktivesPlatzierBild.ecken}
+              onChange={onPlatzierGeometrie}
+              onFertig={() => setBildPlatzierenId(null)}
+            />
+          </div>
         )}
       </div>
     </div>

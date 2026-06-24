@@ -24,6 +24,9 @@ import {
   entferneFachebeneLayer,
   fachebeneClickLayerId,
 } from './fachebenenLayer';
+import { synchronisiereBildLayer, entferneBildLayer, setzeBildGeometrie, type BildOverlay } from './bildLayer';
+import { eckenAusRechteck, rechteckAusEcken } from './bildGeometrie';
+import type { Ecken } from '../../api/kartenbilder';
 import { KRITIS_MIN_ZOOM } from './fachebenen';
 import type { FachebeneQuelle } from '../../api/fachebenen';
 
@@ -70,12 +73,18 @@ export interface KartenflaecheProps {
   onZoneKlick?: (id: number) => void;
   /** Aktive Fachebenen mit Daten (externe Overlays). */
   fachebenen?: AktiveFachebene[];
+  /** Bild-Hintergründe (Overlays über der Basemap, unter Abschnitten/Zonen/Markern). */
+  bilder?: BildOverlay[];
   /** Karten-Viewport (west,sued,ost,nord) nach Bewegung — für bbox-abhängige Ebenen. */
   onBboxAenderung?: (bbox: string) => void;
   /** Aktuelles Zoom-Level nach Bewegung — z. B. um „näher heranzoomen"-Hinweise zu steuern. */
   onZoomAenderung?: (zoom: number) => void;
   /** Klick auf ein Fachebenen-Objekt → liefert dessen Properties + Quelle (für Detail-Panel). */
   onFachebeneKlick?: (properties: Record<string, unknown>, quelle: FachebeneQuelle) => void;
+  /** Aktiv zu platzierendes Bild (null = kein Platzier-Modus). Zeigt Mittelpunkt-Drag-Handle. */
+  platzierBild?: { id: number; ecken: Ecken } | null;
+  /** Callback, wenn Platzier-Geometrie per Drag verändert wurde. */
+  onPlatzierGeometrie?: (ecken: Ecken) => void;
 }
 
 export default function Kartenflaeche({
@@ -83,6 +92,7 @@ export default function Kartenflaeche({
   flaechen, zeichnen, onFlaecheGezeichnet, onFlaecheKlick,
   zonen, zoneZeichnen, onZoneGezeichnet, onZoneKlick,
   fachebenen, onBboxAenderung, onZoomAenderung, onFachebeneKlick,
+  bilder, platzierBild, onPlatzierGeometrie,
 }: KartenflaecheProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -100,6 +110,9 @@ export default function Kartenflaeche({
   // Aktuelle Fachebenen; nach setStyle re-angelegt.
   const fachebenenRef = useRef<AktiveFachebene[]>(fachebenen ?? []);
   fachebenenRef.current = fachebenen ?? [];
+  // Aktuelle Bild-Overlays; nach setStyle re-angelegt.
+  const bilderRef = useRef<BildOverlay[]>([]);
+  const vorherigeBilderRef = useRef<Set<number>>(new Set());
   // Zuletzt angewandter Style. Der Konstruktor wendet den initialen Style an → der
   // [style]-Effekt soll NUR auf echte Wechsel reagieren (sonst lädt diff:false beim
   // Mount den Style unnötig komplett neu).
@@ -133,6 +146,7 @@ export default function Kartenflaeche({
       for (const fe of fachebenenRef.current) {
         sorgeFuerFachebeneLayer(map, fe.def, fe.daten);
       }
+      synchronisiereBildLayer(map, bilderRef.current, 'abschnitte-fill');
     });
     mapRef.current = map;
     return () => {
@@ -162,7 +176,13 @@ export default function Kartenflaeche({
     if (style === angewandterStyleRef.current) return; // Mount: Konstruktor hat ihn schon
     angewandterStyleRef.current = style;
     map.setStyle(style, { diff: false });
-    planeReAnlegenNachStyle(map, () => flaechenDatenRef.current, () => zonenDatenRef.current, () => fachebenenRef.current);
+    planeReAnlegenNachStyle(
+      map,
+      () => flaechenDatenRef.current,
+      () => zonenDatenRef.current,
+      () => fachebenenRef.current,
+      () => bilderRef.current,
+    );
   }, [style]);
 
   // AttributionControl je nach aktivem View neu setzen (config-autoritativ). MapLibre
@@ -324,6 +344,22 @@ export default function Kartenflaeche({
     });
   }, [fachebenen]);
 
+  // Bild-Overlays synchronisieren: anlegen/aktualisieren/entfernen.
+  // Analog zum Fachebenen-Effekt; beforeId='abschnitte-fill' hält Bilder unter den Vektorlayern.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const aktiv = bilder ?? [];
+    bilderRef.current = aktiv;
+    wendeKartenDatenAn(map, () => {
+      const aktivIds = synchronisiereBildLayer(map, aktiv, 'abschnitte-fill');
+      for (const id of vorherigeBilderRef.current) {
+        if (!aktivIds.has(id)) entferneBildLayer(map, id);
+      }
+      vorherigeBilderRef.current = aktivIds;
+    });
+  }, [bilder]);
+
   // Viewport nach Kartenbewegung melden: Zoom (für „näher heranzoomen"-Hinweise) immer,
   // bbox (für bbox-abhängige Ebenen wie KRITIS) nur ab KRITIS_MIN_ZOOM — verhindert riesige
   // Overpass-Anfragen. Sendet sofort beim Wirksamwerden und dann nach jedem moveend (600ms-Debounce).
@@ -419,6 +455,82 @@ export default function Kartenflaeche({
     zoneDrawRef.current?.zerstoeren();
     zoneDrawRef.current = null;
   }, []);
+
+  // Stabile Ref für onPlatzierGeometrie (Callback-Identität soll den Effekt nicht neu auslösen).
+  const onPlatzierGeometrieRef = useRef(onPlatzierGeometrie);
+  onPlatzierGeometrieRef.current = onPlatzierGeometrie;
+
+  // Aktuelle Ecken des Platzier-Bilds als Ref: drag-Handler liest stets die aktuellsten Ecken
+  // ohne den Marker zu zerstören/neu zu erzeugen (verhindert Stutter mid-drag).
+  const platzierBildEckenRef = useRef(platzierBild?.ecken ?? null);
+  platzierBildEckenRef.current = platzierBild?.ecken ?? null;
+
+  // Ref auf den aktuellen Mittelpunkt-Handle: ermöglicht separatem Effekt, die Position
+  // nach Panel-Änderungen (Slider) nachzuführen, ohne den Marker neu zu erzeugen.
+  const platzierCenterMarkerRef = useRef<maplibregl.Marker | null>(null);
+
+  // Platzier-Modus: Mittelpunkt-Drag-Handle. Wird NUR neu erzeugt, wenn sich die Bild-ID ändert.
+  // MVP: Nur Mittelpunkt-Handle (Drag verschiebt das ganze Bild). Drehung/Größe über das Panel.
+  // Ausbaustufe: Einzeln ziehbare Eck-Handles — bewusst zurückgestellt (LFH-35 MVP-Schnitt).
+  //
+  // Live-Vorschau: 'drag'-Event ruft setzeBildGeometrie direkt auf dem MapLibre-Layer auf
+  // (kein React-State-Update → kein Re-Render, kein Stutter).
+  // Persistenz: nur 'dragend' ruft onPlatzierGeometrie (→ PATCH) — verhindert chatty PATCHs.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !platzierBild) {
+      platzierCenterMarkerRef.current = null;
+      return;
+    }
+    const dragMarkers: maplibregl.Marker[] = [];
+    const r = rechteckAusEcken(platzierBild.ecken);
+    const center = new maplibregl.Marker({ draggable: true, color: '#1677ff' })
+      .setLngLat(r.center as [number, number])
+      .addTo(map);
+    platzierCenterMarkerRef.current = center;
+    center.on('drag', () => {
+      const ecken = platzierBildEckenRef.current;
+      if (!ecken) return;
+      const ll = center.getLngLat();
+      const neu = eckenAusRechteck({
+        ...rechteckAusEcken(ecken),
+        center: [ll.lng, ll.lat],
+      });
+      // Nur Live-Vorschau — kein React-State, kein Re-Render, kein PATCH.
+      setzeBildGeometrie(map, platzierBild.id, neu);
+    });
+    center.on('dragend', () => {
+      const ecken = platzierBildEckenRef.current;
+      if (!ecken) return;
+      const ll = center.getLngLat();
+      const neu = eckenAusRechteck({
+        ...rechteckAusEcken(ecken),
+        center: [ll.lng, ll.lat],
+      });
+      // Einmaliger PATCH am Ende des Drags (persistiert).
+      onPlatzierGeometrieRef.current?.(neu);
+    });
+    dragMarkers.push(center);
+    return () => {
+      for (const m of dragMarkers) m.remove();
+      platzierCenterMarkerRef.current = null;
+    };
+  // Dep-Array auf platzierBild?.id beschränken: Ecken-Änderungen (z. B. aus dem Slider)
+  // sollen den Marker nicht zerstören/neu erzeugen (würde mid-drag unterbrechen).
+  // Aktuelle Ecken werden stets über platzierBildEckenRef gelesen.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platzierBild?.id]);
+
+  // Mittelpunkt-Handle nach Panel-Änderungen (Slider / Koordinaten-Eingabe) nachführen:
+  // Wenn ecken sich ändern (aber id gleich bleibt), Handle-Position aktualisieren.
+  // Läuft nicht mid-drag (drag setzt die Position selbst kontinuierlich).
+  useEffect(() => {
+    const marker = platzierCenterMarkerRef.current;
+    if (!marker || !platzierBild) return;
+    const r = rechteckAusEcken(platzierBild.ecken);
+    marker.setLngLat(r.center as [number, number]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platzierBild?.ecken]);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} data-testid="kartenflaeche" />;
 }

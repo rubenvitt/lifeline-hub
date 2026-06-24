@@ -9,6 +9,11 @@ import type { KarteServerConfig } from '../api/karte';
 import type { KartenflaecheProps } from './lagekarte/Kartenflaeche';
 import LagekartePage from './LagekartePage';
 
+// URL.createObjectURL / revokeObjectURL fehlen in jsdom → Stubs definieren bevor Tests laufen.
+// Direkt auf URL setzen (nicht via spyOn, da die Methoden in jsdom gar nicht existieren).
+(URL as unknown as Record<string, unknown>).createObjectURL = vi.fn(() => 'blob:mock-bild');
+(URL as unknown as Record<string, unknown>).revokeObjectURL = vi.fn();
+
 // Kartenflaeche mocken: kein WebGL. Der Stub exponiert Buttons, die die
 // Callbacks (Karten-Klick, Marker-Klick) mit festen Werten feuern.
 // Prop-Typ wird vom echten Komponenten-Interface abgeleitet → ein künftiges
@@ -17,6 +22,7 @@ vi.mock('./lagekarte/Kartenflaeche', () => ({
   default: (props: Partial<KartenflaecheProps>) => (
     <div data-testid="kartenflaeche-stub">
       <div data-testid="attribution">{props.attribution ?? ''}</div>
+      <div data-testid="bilder-count">{(props.bilder ?? []).length}</div>
       <button onClick={() => props.onKarteKlick?.({ lng: 8.6, lat: 50.1 })}>karte-klick</button>
       {(props.markers ?? []).map((m) => (
         <button key={m.schluessel} onClick={() => props.onMarkerKlick?.(m.schluessel)}>
@@ -237,6 +243,7 @@ function basisHandler(
     http.get('/api/einsaetze/1/lage/meldungen', () => HttpResponse.json([])),
     http.get('/api/organisation', () => HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null })),
     http.get('/api/karte/config', () => HttpResponse.json(config)),
+    http.get('/api/einsaetze/1/karte/hintergrundbilder', () => HttpResponse.json([])),
   );
 }
 
@@ -581,5 +588,120 @@ describe('LagekartePage', () => {
     await user.click(await screen.findByText('zone-7'));
     await user.click(await screen.findByRole('button', { name: 'Zone aufheben' }));
     await waitFor(() => expect(geloescht).toBe(true));
+  });
+
+  // --- Bild-Hintergründe -------------------------------------------------------
+
+  it('Smoke: Bild in der Liste → Blob-URL wird geladen → BildOverlay landet an Kartenflaeche', async () => {
+    const BILD = {
+      id: 3,
+      einsatz_id: 1,
+      name: 'lageplan.png',
+      mime: 'image/png',
+      groesse: 12345,
+      ecken_json: JSON.stringify([[9.0, 50.0], [9.1, 50.0], [9.1, 49.9], [9.0, 49.9]]),
+      opazitaet: 80,
+      sichtbar: true,
+      reihenfolge: 1,
+      hochgeladen_von: 1,
+      erstellt_at: '',
+      geaendert_at: '',
+    };
+    basisHandler([
+      http.get('/api/einsaetze/1/karte/hintergrundbilder', () => HttpResponse.json([BILD])),
+      http.get('/api/einsaetze/1/karte/hintergrundbilder/3/download', () =>
+        new HttpResponse(new Blob(['pixeldata'], { type: 'image/png' }), {
+          status: 200,
+          headers: { 'Content-Type': 'image/png' },
+        }),
+      ),
+    ]);
+    renderSeite();
+    // Wenn Blob-URL geladen → bilder-count an Kartenflaeche steigt auf 1.
+    await waitFor(() => {
+      expect(screen.getByTestId('bilder-count')).toHaveTextContent('1');
+    });
+  });
+
+  it('Refetch mit weiterhin vorhandenem Bild: bestehende Blob-URL wird NICHT revoked, nur neue geladen; entferntes Bild wird revoked', async () => {
+    // Regression LFH-35 (C1): Der Cleanup des Blob-URL-Effekts läuft vor JEDEM Re-Run
+    // (jedes Refetch der Bilderliste). Ein pauschales revoke aller URLs würde bestehende,
+    // weiterhin aktive Bilder unbrauchbar machen (und der Guard verhinderte ein Neuladen).
+    // Dieser Test BEWEIST, dass ein Refetch, in dem Bild A erhalten bleibt, A's URL NICHT
+    // revoked — und dass ein Refetch, in dem A entfernt ist, A's URL doch revoked.
+    const erstelle = vi.mocked(URL.createObjectURL as (b: Blob) => string);
+    const revoke = vi.mocked(URL.revokeObjectURL as (u: string) => void);
+    erstelle.mockReset();
+    revoke.mockReset();
+    // Distinkte URLs je Aufruf (Reihenfolge: A=erster, B=zweiter), damit wir A's URL
+    // gezielt prüfen können. Der globale Stub liefert sonst für alle denselben String.
+    let n = 0;
+    erstelle.mockImplementation(() => `blob:url-${++n}`);
+
+    const bild = (id: number, name: string) => ({
+      id,
+      einsatz_id: 1,
+      name,
+      mime: 'image/png',
+      groesse: 12345,
+      ecken_json: JSON.stringify([[9.0, 50.0], [9.1, 50.0], [9.1, 49.9], [9.0, 49.9]]),
+      opazitaet: 80,
+      sichtbar: true,
+      reihenfolge: 1,
+      hochgeladen_von: 1,
+      erstellt_at: '',
+      geaendert_at: '',
+    });
+    const A = bild(3, 'a.png');
+    const B = bild(4, 'b.png');
+
+    let bilderListe = [A];
+    basisHandler([
+      http.get('/api/einsaetze/1/karte/hintergrundbilder', () => HttpResponse.json(bilderListe)),
+      // Beide Downloads liefern Pixeldaten — die konkrete id steckt im Pfad.
+      http.get('/api/einsaetze/1/karte/hintergrundbilder/:bildId/download', () =>
+        new HttpResponse(new Blob(['pixeldata'], { type: 'image/png' }), {
+          status: 200,
+          headers: { 'Content-Type': 'image/png' },
+        }),
+      ),
+    ]);
+    const { client, unmount } = renderSeite();
+
+    // revoke wird via Array.forEach(URL.revokeObjectURL) aufgerufen → Mock zeichnet auch
+    // (index, array) als weitere Argumente auf. Daher gegen das ERSTE Argument prüfen.
+    const wurdeRevoked = (url: string) => revoke.mock.calls.some((c) => c[0] === url);
+
+    // 1) A geladen → genau ein createObjectURL-Aufruf (A's URL).
+    await waitFor(() => expect(screen.getByTestId('bilder-count')).toHaveTextContent('1'));
+    expect(erstelle).toHaveBeenCalledTimes(1);
+    const urlVonA = 'blob:url-1';
+
+    // 2) Refetch mit erweiterter Liste [A, B] (Längenänderung → garantiert neue Array-Ref →
+    //    Effekt läuft erneut, inkl. Cleanup des vorherigen Laufs).
+    bilderListe = [A, B];
+    await client.invalidateQueries({ queryKey: ['einsatz-kartenbilder', 1] });
+
+    // B wird geladen → zwei Overlays.
+    await waitFor(() => expect(screen.getByTestId('bilder-count')).toHaveTextContent('2'));
+    // Diskriminierende Assertion (schlägt gegen den kaputten Pauschal-Revoke fehl):
+    // A's weiterhin aktive URL darf beim Refetch NICHT freigegeben worden sein.
+    expect(revoke).not.toHaveBeenCalled();
+    // A wurde NICHT erneut geladen (Guard greift korrekt): genau A + B, kein Doppel-Load von A.
+    expect(erstelle).toHaveBeenCalledTimes(2);
+
+    // 3) Refetch mit entferntem A (nur noch B) → A's URL wird inkrementell revoked.
+    bilderListe = [B];
+    await client.invalidateQueries({ queryKey: ['einsatz-kartenbilder', 1] });
+    await waitFor(() => expect(screen.getByTestId('bilder-count')).toHaveTextContent('1'));
+    await waitFor(() => expect(wurdeRevoked(urlVonA)).toBe(true));
+    // Kein weiterer Load durch das Entfernen.
+    expect(erstelle).toHaveBeenCalledTimes(2);
+
+    // 4) Unmount (Navigation weg von der Karte) → der separate Unmount-Effekt gibt die
+    //    dann noch aktive URL (B = 'blob:url-2') frei (Leak-Schutz bleibt erhalten).
+    expect(wurdeRevoked('blob:url-2')).toBe(false);
+    unmount();
+    expect(wurdeRevoked('blob:url-2')).toBe(true);
   });
 });
