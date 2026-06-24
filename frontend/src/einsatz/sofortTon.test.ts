@@ -11,7 +11,12 @@ function mockAudio() {
     createOscillator: vi.fn(() => ({ type: '', frequency: { value: 0 }, connect: vi.fn(), start, stop: vi.fn() })),
     createGain: vi.fn(() => ({ gain: { value: 0, setValueAtTime: vi.fn() }, connect: vi.fn() })),
   };
-  const AC = vi.fn(() => ctx);
+  // AudioContext wird per `new AC()` instanziiert. Seit Vitest 4 wirft `new` auf einem
+  // vi.fn() mit Arrow-Implementierung (Arrows sind keine Konstruktoren) — daher eine
+  // reguläre Funktion, deren zurückgegebenes Objekt `new` korrekt überschreibt.
+  const AC = vi.fn(function () {
+    return ctx;
+  });
   vi.stubGlobal('AudioContext', AC);
   return { AC, start };
 }

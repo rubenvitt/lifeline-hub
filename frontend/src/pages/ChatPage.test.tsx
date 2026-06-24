@@ -210,7 +210,12 @@ describe('ChatPage', () => {
 
     await waitFor(() => expect(bearbeitet).not.toBeNull());
     expect(bearbeitet!.inhalt).toBe('Lage korrigiert');
-    expect(await screen.findByText('Lage korrigiert')).toBeInTheDocument();
+    // jsdom 29 spiegelt den getippten Textarea-Wert in den textContent; die noch
+    // mountete Edit-Textarea würde sonst zusätzlich matchen. Wir prüfen den gerenderten
+    // Nachrichtentext, nicht den Formularwert → Formularfelder ignorieren.
+    expect(
+      await screen.findByText('Lage korrigiert', { ignore: 'script, style, textarea' }),
+    ).toBeInTheDocument();
   });
 
   it('zeigt bei abgeschlossenem Einsatz einen Read-only-Hinweis statt der Eingabe', async () => {

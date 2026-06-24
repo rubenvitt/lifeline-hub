@@ -1,9 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import { type Mock, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../../test/utils';
 import type { Gefahrengebiet, LageZone } from '../../api/types';
-import ZonenInspector from './ZonenInspector';
+import ZonenInspector, { type ZonenInspectorProps } from './ZonenInspector';
 
 const basisZone: LageZone = {
   id: 1,
@@ -37,13 +37,13 @@ function renderInspector(opts: {
   zone?: LageZone;
   gebiete?: Gefahrengebiet[];
   darfSchreiben?: boolean;
-  onAendern?: ReturnType<typeof vi.fn>;
-  onLoeschen?: ReturnType<typeof vi.fn>;
-  onMatrixOeffnen?: ReturnType<typeof vi.fn>;
+  onAendern?: Mock<ZonenInspectorProps['onAendern']>;
+  onLoeschen?: Mock<ZonenInspectorProps['onLoeschen']>;
+  onMatrixOeffnen?: Mock<ZonenInspectorProps['onMatrixOeffnen']>;
 }) {
-  const onAendern = opts.onAendern ?? vi.fn();
-  const onLoeschen = opts.onLoeschen ?? vi.fn();
-  const onMatrixOeffnen = opts.onMatrixOeffnen ?? vi.fn();
+  const onAendern = opts.onAendern ?? vi.fn<ZonenInspectorProps['onAendern']>();
+  const onLoeschen = opts.onLoeschen ?? vi.fn<ZonenInspectorProps['onLoeschen']>();
+  const onMatrixOeffnen = opts.onMatrixOeffnen ?? vi.fn<ZonenInspectorProps['onMatrixOeffnen']>();
   renderMitProviders(
     <ZonenInspector
       zone={opts.zone ?? basisZone}
@@ -71,14 +71,14 @@ describe('ZonenInspector — Gefahrengebiet-Gruppe', () => {
   });
 
   it('ruft onMatrixOeffnen mit der gefahrengebiet_id auf', async () => {
-    const onMatrixOeffnen = vi.fn();
+    const onMatrixOeffnen = vi.fn<ZonenInspectorProps['onMatrixOeffnen']>();
     renderInspector({ onMatrixOeffnen });
     await userEvent.click(screen.getByRole('button', { name: /Gefahrenmatrix bearbeiten/i }));
     expect(onMatrixOeffnen).toHaveBeenCalledWith(10);
   });
 
   it('wählt ein anderes Gebiet → ruft onAendern mit gefahrengebiet_id auf', async () => {
-    const onAendern = vi.fn();
+    const onAendern = vi.fn<ZonenInspectorProps['onAendern']>();
     const gebiete: Gefahrengebiet[] = [
       gebiet,
       { id: 20, einsatz_id: 1, label: 'Süd', zonen_ids: [], hoechste_warnstufe: 'keine' },
@@ -93,7 +93,7 @@ describe('ZonenInspector — Gefahrengebiet-Gruppe', () => {
   });
 
   it('Split: „+ Neues Gefahrengebiet" (Sentinel) ruft onAendern mit gefahrengebiet_id null', async () => {
-    const onAendern = vi.fn();
+    const onAendern = vi.fn<ZonenInspectorProps['onAendern']>();
     renderInspector({ onAendern });
     const select = screen.getAllByLabelText('Gehört zu Gefahrengebiet')[0];
     const selector = select.querySelector('.ant-select-selector') ?? select;

@@ -3,6 +3,7 @@ dist/
 dist-ssr/
 playwright-report/
 test-results/
+coverage/
 .playwright/
 .env
 .env.local
