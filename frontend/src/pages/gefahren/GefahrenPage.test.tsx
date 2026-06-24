@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
@@ -76,24 +77,31 @@ describe('GefahrenPage', () => {
     await waitFor(() => expect(matrix8Angefragt).toBe(true));
   });
 
-  it('?gefahrengebiet=<id> wählt das Zielgebiet statt des ersten (LFH-150)', async () => {
+  it('?gefahrengebiet= wählt das Zielgebiet statt des ersten — auch unter StrictMode (LFH-150)', async () => {
     const nord = { id: 7, einsatz_id: 1, label: 'Nord', zonen_ids: [9], hoechste_warnstufe: 'hoch' };
     const sued = { id: 8, einsatz_id: 1, label: 'Süd', zonen_ids: [11], hoechste_warnstufe: 'mittel' };
-    let matrix8Angefragt = false;
+    const client = neuerQueryClient();
+    // Wie nach Navigation von der Lagekarte: einsatz + gefahrengebiete sind bereits gecached
+    // (gebieteQuery.isSuccess ist beim ersten Render true).
+    client.setQueryData(['einsatz', 1], einsatz);
+    client.setQueryData(['gefahrengebiete', 1], [nord, sued]);
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json([nord, sued])),
       http.get('/api/einsaetze/1/gefahrengebiete/7/matrix', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/gefahrengebiete/8/matrix', () => { matrix8Angefragt = true; return HttpResponse.json([]); }),
+      http.get('/api/einsaetze/1/gefahrengebiete/8/matrix', () => HttpResponse.json([])),
     );
+    // StrictMode wie in der echten App (main.tsx): Effekte laufen doppelt — deckt das
+    // Race zwischen Default-auf-erstes-Gebiet und Deeplink-Selektion auf.
     renderMitProviders(
-      <Routes><Route path="/einsaetze/:id/gefahren" element={<GefahrenPage />} /></Routes>,
-      { route: '/einsaetze/1/gefahren?gefahrengebiet=8' },
+      <StrictMode>
+        <Routes><Route path="/einsaetze/:id/gefahren" element={<GefahrenPage />} /></Routes>
+      </StrictMode>,
+      { route: '/einsaetze/1/gefahren?gefahrengebiet=8', client },
     );
-    // Deeplink-Ziel (Süd, id 8) ist gewählt — die Matrix von Gebiet 8 wird geladen, nicht
-    // die des per Default ersten Gebiets (Nord, id 7).
-    expect((await screen.findAllByText('Süd'))[0]).toBeInTheDocument();
-    await waitFor(() => expect(matrix8Angefragt).toBe(true));
+    // FINALE Auswahl: der editierbare Titel (h5) zeigt NUR das gewählte Gebiet.
+    const titel = await screen.findByRole('heading', { level: 5 });
+    expect(titel).toHaveTextContent('Süd'); // NICHT 'Nord' (= Default aufs erste Gebiet)
   });
 
   it('setzt eine Warnstufe (PUT auf das gewählte Gebiet)', async () => {

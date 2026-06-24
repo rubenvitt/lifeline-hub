@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, App, Empty, List, Space, Spin, Tag, Typography } from 'antd';
 import type { BewertungEingabe } from '../../api/gefahren';
 import { ApiError } from '../../api/client';
 import { benenneGefahrengebiet, gefahrengebietName, ladeGefahrengebiete, ladeMatrix, setzeBewertung } from '../../api/gefahren';
 import { ladeEinsatz } from '../../api/einsaetze';
-import { useQueryParamSelektion } from '../../routing/useQueryParamSelektion';
+import { parseRouteId } from '../../routing/deeplinks';
 import { warnstufeFarbe } from './gefahrenSchema';
 import GefahrenMatrix from './GefahrenMatrix';
 
@@ -16,23 +16,33 @@ export default function GefahrenPage() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [gewaehlt, setGewaehlt] = useState<number | null>(null);
-
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const gebieteQuery = useQuery({ queryKey: ['gefahrengebiete', einsatzId], queryFn: () => ladeGefahrengebiete(einsatzId) });
 
-  const gebiete = gebieteQuery.data ?? [];
-  // Auswahl auf das erste Gebiet defaulten / korrigieren, wenn das gewählte verschwindet.
+  // Stabile Referenz → der Auswahl-Effekt läuft nicht bei jedem Render neu.
+  const gebiete = useMemo(() => gebieteQuery.data ?? [], [gebieteQuery.data]);
+  // Auswahl in EINEM Effekt (kein Race → StrictMode-fest, LFH-150): das Deeplink-Ziel
+  // ?gefahrengebiet=<id> (z. B. von der Lagekarte) hat Vorrang vor dem Default aufs erste
+  // Gebiet; nach dem Anwenden wird der Param geräumt (apply-then-clean), damit eine spätere
+  // manuelle Auswahl nicht wieder überschrieben wird. Sonst: erstes Gebiet defaulten bzw.
+  // korrigieren, wenn das gewählte verschwindet.
   useEffect(() => {
+    if (!gebieteQuery.isSuccess) return;
     if (gebiete.length === 0) { setGewaehlt(null); return; }
+    const ziel = parseRouteId(searchParams.get('gefahrengebiet') ?? undefined);
+    if (ziel != null && gebiete.some((g) => g.id === ziel)) {
+      setGewaehlt(ziel);
+      // searchParams NICHT in-place mutieren (.delete) — sonst sähe der zweite
+      // StrictMode-Durchlauf das Ziel nicht mehr und defaultete aufs erste Gebiet.
+      const naechste = new URLSearchParams(searchParams);
+      naechste.delete('gefahrengebiet');
+      setSearchParams(naechste, { replace: true });
+      return;
+    }
     if (gewaehlt == null || !gebiete.some((g) => g.id === gewaehlt)) setGewaehlt(gebiete[0].id);
-  }, [gebiete, gewaehlt]);
-
-  // Deeplink von der Lagekarte (LFH-150): ?gefahrengebiet=<id> selektiert das Zielgebiet
-  // (überschreibt den Default aufs erste Gebiet), sofern es existiert. apply-then-clean.
-  useQueryParamSelektion('gefahrengebiet', gebieteQuery.isSuccess, (gid) => {
-    if (gebiete.some((g) => g.id === gid)) setGewaehlt(gid);
-  });
+  }, [gebieteQuery.isSuccess, gebiete, gewaehlt, searchParams, setSearchParams]);
 
   const matrixQuery = useQuery({
     queryKey: ['gefahrenmatrix', einsatzId, gewaehlt],
