@@ -1,61 +1,107 @@
 import type { Ecke, Ecken } from '../../api/kartenbilder';
 
-export interface Rechteck {
-  center: Ecke;        // [lng, lat]
-  breiteGrad: number;  // lng-Ausdehnung in Grad bei rotation=0
-  hoeheGrad: number;   // lat-Ausdehnung in Grad
-  rotationGrad: number;
+/** Generischer 2D-Punkt — i. d. R. Bildschirm-Pixel aus `map.project`. */
+export type Punkt = [number, number];
+type Vier = [Punkt, Punkt, Punkt, Punkt];
+
+/** Schwerpunkt der vier Ecken (in derselben Metrik wie die Eingabe — lng/lat ODER Pixel). */
+export function zentroid(ecken: Ecken | Vier): Punkt {
+  let sx = 0;
+  let sy = 0;
+  for (const [x, y] of ecken) {
+    sx += x;
+    sy += y;
+  }
+  return [sx / ecken.length, sy / ecken.length];
 }
 
-const grad = (r: number) => (r * Math.PI) / 180;
-
-/** Rechteck → 4 Ecken (TL, TR, BR, BL). Rotation winkeltreu in Bildschirm-Metrik
- *  (lng wird mit cos(lat) skaliert, damit Drehung das Bild nicht verzerrt). */
-export function eckenAusRechteck(r: Rechteck): Ecken {
-  const [clng, clat] = r.center;
-  const latCos = Math.cos(grad(clat)) || 1e-9;
-  const cos = Math.cos(grad(r.rotationGrad));
-  const sin = Math.sin(grad(r.rotationGrad));
-  const hw = r.breiteGrad / 2;
-  const hh = r.hoeheGrad / 2;
-  // lokale Offsets [dLng, dLat] vor Rotation: TL, TR, BR, BL
-  const lokal: Ecke[] = [[-hw, hh], [hw, hh], [hw, -hh], [-hw, -hh]];
-  const ecken = lokal.map(([dx, dy]) => {
-    // in isotropen (Bildschirm-)Raum: x metrisch = dLng * latCos
-    const mx = dx * latCos;
-    const my = dy;
-    const rx = mx * cos - my * sin;
-    const ry = mx * sin + my * cos;
-    return [clng + rx / latCos, clat + ry] as Ecke;
-  });
-  return ecken as Ecken;
+/** Alle Ecken um (dLng, dLat) verschieben — reine Translation, keine Verzerrung. */
+export function verschiebeEcken(ecken: Ecken, dLng: number, dLat: number): Ecken {
+  return ecken.map(([lng, lat]) => [lng + dLng, lat + dLat] as Ecke) as Ecken;
 }
 
-/** 4 Ecken → Rechteck. center = Schwerpunkt; breite/hoehe aus Kantenlängen
- *  (TL-TR bzw. TL-BL), Rotation aus dem Winkel der oberen Kante. */
-export function rechteckAusEcken(e: Ecken): Rechteck {
-  const [tl, tr, , bl] = e;
-  const clng = (e[0][0] + e[1][0] + e[2][0] + e[3][0]) / 4;
-  const clat = (e[0][1] + e[1][1] + e[2][1] + e[3][1]) / 4;
-  const latCos = Math.cos(grad(clat)) || 1e-9;
-  // obere Kante TL→TR in Bildschirm-Metrik
-  const ox = (tr[0] - tl[0]) * latCos;
-  const oy = tr[1] - tl[1];
-  const breiteScreen = Math.hypot(ox, oy);
-  // linke Kante TL→BL
-  const lx = (bl[0] - tl[0]) * latCos;
-  const ly = bl[1] - tl[1];
-  const hoeheScreen = Math.hypot(lx, ly);
-  const rotationGrad = (Math.atan2(oy, ox) * 180) / Math.PI;
-  return {
-    center: [clng, clat],
-    breiteGrad: breiteScreen / latCos,
-    hoeheGrad: hoeheScreen,
-    rotationGrad,
-  };
+/** Uniform um die dem Griff gegenüberliegende Ecke (Anker) skalieren.
+ *  Gleichmäßige Skalierung erhält Seitenverhältnis UND Drehung exakt — genau das
+ *  gewünschte „Seitenverhältnis immer erhalten". Punkte in Bildschirm-Pixeln;
+ *  `maus` ist die aktuelle Zeigerposition. Der Faktor ist die Projektion des
+ *  Vektors anker→maus auf die Diagonale anker→griff (so folgt der Griff der Maus
+ *  entlang der Diagonale, ohne das Rechteck zu scheren). */
+export function skaliereUmAnker(ecken: Vier, griffIndex: number, maus: Punkt, minFaktor = 0.05): Vier {
+  const anker = ecken[(griffIndex + 2) % 4];
+  const griff = ecken[griffIndex];
+  const dx = griff[0] - anker[0];
+  const dy = griff[1] - anker[1];
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return ecken;
+  const mx = maus[0] - anker[0];
+  const my = maus[1] - anker[1];
+  const s = Math.max((mx * dx + my * dy) / len2, minFaktor);
+  return ecken.map(([x, y]) => [anker[0] + s * (x - anker[0]), anker[1] + s * (y - anker[1])] as Punkt) as Vier;
 }
 
-/** Achsenparallele Ecken aus Bounds (für initialen Upload aus dem Viewport). */
+export type Kante = 'oben' | 'rechts' | 'unten' | 'links';
+
+// Pro Kante: die zwei Ecken, die mitwandern (gezogen), und die zwei der gegenüberliegenden
+// Kante (anker, bleiben fix). Indizes: 0=TL, 1=TR, 2=BR, 3=BL. gezogen[k] ist die direkt
+// gegenüber von anker[k] liegende Ecke derselben Längsseite.
+const KANTEN_ECKEN: Record<Kante, { gezogen: [number, number]; anker: [number, number] }> = {
+  oben: { gezogen: [0, 1], anker: [3, 2] },
+  rechts: { gezogen: [1, 2], anker: [0, 3] },
+  unten: { gezogen: [3, 2], anker: [0, 1] },
+  links: { gezogen: [0, 3], anker: [1, 2] },
+};
+
+/** Eine Kante entlang der Bild-Normalen verschieben (1D-Resize; gegenüberliegende Kante
+ *  als Anker). Ändert NUR diese Dimension → Seitenverhältnis darf sich ändern (freies
+ *  Strecken wie bei einem Rechteck). Drehung bleibt erhalten. Pixel-Raum; `maus` ist die
+ *  Zeigerposition, die neue Ausdehnung ist deren Projektion auf die Normale ab dem Anker. */
+export function skaliereKante(ecken: Vier, kante: Kante, maus: Punkt, minPx = 8): Vier {
+  const { gezogen, anker } = KANTEN_ECKEN[kante];
+  const a0 = ecken[anker[0]];
+  const g0 = ecken[gezogen[0]];
+  let nx = g0[0] - a0[0];
+  let ny = g0[1] - a0[1];
+  const len = Math.hypot(nx, ny);
+  if (len === 0) return ecken;
+  nx /= len;
+  ny /= len;
+  const dim = Math.max((maus[0] - a0[0]) * nx + (maus[1] - a0[1]) * ny, minPx);
+  const next = [...ecken] as Vier;
+  for (let k = 0; k < 2; k++) {
+    const a = ecken[anker[k]];
+    next[gezogen[k]] = [a[0] + nx * dim, a[1] + ny * dim];
+  }
+  return next;
+}
+
+/** Alle Ecken um ihren Schwerpunkt um `deltaRad` drehen (Pixel-Raum). */
+export function rotiereUmZentroid(ecken: Vier, deltaRad: number): Vier {
+  const [cx, cy] = zentroid(ecken);
+  const cos = Math.cos(deltaRad);
+  const sin = Math.sin(deltaRad);
+  return ecken.map(([x, y]) => {
+    const dx = x - cx;
+    const dy = y - cy;
+    return [cx + dx * cos - dy * sin, cy + dx * sin + dy * cos] as Punkt;
+  }) as Vier;
+}
+
+/** Achsenparalleles Rechteck (Pixel) um `centerPx`, Breite `breitePx`,
+ *  Seitenverhältnis `ar` = Breite/Höhe. Reihenfolge TL, TR, BR, BL — passend zur
+ *  image-source-Konvention; Pixel-Y wächst nach unten (TL/TR oben). */
+export function eckenInitialPixel(centerPx: Punkt, breitePx: number, ar: number): Vier {
+  const hw = breitePx / 2;
+  const hh = hw / ar;
+  const [cx, cy] = centerPx;
+  return [
+    [cx - hw, cy - hh],
+    [cx + hw, cy - hh],
+    [cx + hw, cy + hh],
+    [cx - hw, cy + hh],
+  ];
+}
+
+/** Achsenparallele Ecken aus Bounds (Fallback, wenn die Karte noch nicht bereit ist). */
 export function eckenAusBounds(west: number, sued: number, ost: number, nord: number): Ecken {
   return [[west, nord], [ost, nord], [ost, sued], [west, sued]];
 }

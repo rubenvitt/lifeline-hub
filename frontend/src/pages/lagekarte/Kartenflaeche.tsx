@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import maplibregl, { type LngLatLike, type StyleSpecification } from 'maplibre-gl';
 import { Protocol } from 'pmtiles';
 import { erzeugeTaktischesZeichen } from 'taktische-zeichen-react';
@@ -24,8 +24,9 @@ import {
   entferneFachebeneLayer,
   fachebeneClickLayerId,
 } from './fachebenenLayer';
-import { synchronisiereBildLayer, entferneBildLayer, setzeBildGeometrie, type BildOverlay } from './bildLayer';
-import { eckenAusRechteck, rechteckAusEcken } from './bildGeometrie';
+import { synchronisiereBildLayer, entferneBildLayer, type BildOverlay } from './bildLayer';
+import { eckenInitialPixel, type Punkt } from './bildGeometrie';
+import { erzeugeBildHandles, type BildHandles } from './bildHandles';
 import type { Ecken } from '../../api/kartenbilder';
 import { KRITIS_MIN_ZOOM } from './fachebenen';
 import type { FachebeneQuelle } from '../../api/fachebenen';
@@ -87,13 +88,22 @@ export interface KartenflaecheProps {
   onPlatzierGeometrie?: (ecken: Ecken) => void;
 }
 
-export default function Kartenflaeche({
+/** Imperative Karten-API für die Page: Upload-Platzierung + Auf-Bild-Zentrieren. */
+export interface KartenHandle {
+  /** Initiale Bild-Ecken für einen Upload: achsenparalleles Rechteck mittig im
+   *  aktuellen Viewport, Breite ~50 % der kürzeren View-Kante, Seitenverhältnis = `ar`. */
+  initialeEckenFuerBild(ar: number): Ecken | null;
+  /** Karte auf die Bild-Ecken einpassen (fitBounds). */
+  zentriereAufEcken(ecken: Ecken): void;
+}
+
+const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kartenflaeche({
   style, markers, onKarteKlick, onMarkerKlick, flyToZiel, onStyleFehler, attribution,
   flaechen, zeichnen, onFlaecheGezeichnet, onFlaecheKlick,
   zonen, zoneZeichnen, onZoneGezeichnet, onZoneKlick,
   fachebenen, onBboxAenderung, onZoomAenderung, onFachebeneKlick,
   bilder, platzierBild, onPlatzierGeometrie,
-}: KartenflaecheProps) {
+}, ref) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markerObjekteRef = useRef<maplibregl.Marker[]>([]);
@@ -126,6 +136,30 @@ export default function Kartenflaeche({
   onFlaecheGezeichnetRef.current = onFlaecheGezeichnet;
   const onZoneGezeichnetRef = useRef(onZoneGezeichnet);
   onZoneGezeichnetRef.current = onZoneGezeichnet;
+
+  // Imperative API für die Page: Upload-Platzierung (Viewport-Mitte, Bild-Seitenverhältnis)
+  // und Auf-Bild-Zentrieren. Pixel-Raum via project/unproject → exakt, ohne cos(lat)-Verzerrung.
+  useImperativeHandle(ref, () => ({
+    initialeEckenFuerBild(ar) {
+      const map = mapRef.current;
+      if (!map) return null;
+      const el = map.getContainer();
+      const mittePx: Punkt = [el.clientWidth / 2, el.clientHeight / 2];
+      const breitePx = Math.min(el.clientWidth, el.clientHeight) * 0.5;
+      const px = eckenInitialPixel(mittePx, breitePx, ar > 0 ? ar : 1);
+      return px.map((p) => {
+        const ll = map.unproject(p);
+        return [ll.lng, ll.lat];
+      }) as Ecken;
+    },
+    zentriereAufEcken(ecken) {
+      const map = mapRef.current;
+      if (!map) return;
+      const b = new maplibregl.LngLatBounds();
+      for (const e of ecken) b.extend(e as [number, number]);
+      map.fitBounds(b, { padding: 60, maxZoom: 18, duration: 600 });
+    },
+  }), []);
 
   // Karte einmalig erzeugen.
   useEffect(() => {
@@ -460,77 +494,39 @@ export default function Kartenflaeche({
   const onPlatzierGeometrieRef = useRef(onPlatzierGeometrie);
   onPlatzierGeometrieRef.current = onPlatzierGeometrie;
 
-  // Aktuelle Ecken des Platzier-Bilds als Ref: drag-Handler liest stets die aktuellsten Ecken
-  // ohne den Marker zu zerstören/neu zu erzeugen (verhindert Stutter mid-drag).
-  const platzierBildEckenRef = useRef(platzierBild?.ecken ?? null);
-  platzierBildEckenRef.current = platzierBild?.ecken ?? null;
+  // Bild-Manipulationsgriffe (Ecken/Drehen/Verschieben) im Platzier-Modus.
+  const handlesRef = useRef<BildHandles | null>(null);
 
-  // Ref auf den aktuellen Mittelpunkt-Handle: ermöglicht separatem Effekt, die Position
-  // nach Panel-Änderungen (Slider) nachzuführen, ohne den Marker neu zu erzeugen.
-  const platzierCenterMarkerRef = useRef<maplibregl.Marker | null>(null);
-
-  // Platzier-Modus: Mittelpunkt-Drag-Handle. Wird NUR neu erzeugt, wenn sich die Bild-ID ändert.
-  // MVP: Nur Mittelpunkt-Handle (Drag verschiebt das ganze Bild). Drehung/Größe über das Panel.
-  // Ausbaustufe: Einzeln ziehbare Eck-Handles — bewusst zurückgestellt (LFH-35 MVP-Schnitt).
-  //
-  // Live-Vorschau: 'drag'-Event ruft setzeBildGeometrie direkt auf dem MapLibre-Layer auf
-  // (kein React-State-Update → kein Re-Render, kein Stutter).
-  // Persistenz: nur 'dragend' ruft onPlatzierGeometrie (→ PATCH) — verhindert chatty PATCHs.
+  // Griffe erzeugen/zerstören — NUR an der Bild-ID hängen, damit ecken-Änderungen
+  // (numerische Eingabe / Refetch nach Commit) die Griffe nicht zerstören/neu erzeugen
+  // (würde eine laufende Ziehgeste unterbrechen). Live-Vorschau + PATCH erst bei dragend
+  // kapselt bildHandles selbst.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !platzierBild) {
-      platzierCenterMarkerRef.current = null;
+      handlesRef.current?.zerstoeren();
+      handlesRef.current = null;
       return;
     }
-    const dragMarkers: maplibregl.Marker[] = [];
-    const r = rechteckAusEcken(platzierBild.ecken);
-    const center = new maplibregl.Marker({ draggable: true, color: '#1677ff' })
-      .setLngLat(r.center as [number, number])
-      .addTo(map);
-    platzierCenterMarkerRef.current = center;
-    center.on('drag', () => {
-      const ecken = platzierBildEckenRef.current;
-      if (!ecken) return;
-      const ll = center.getLngLat();
-      const neu = eckenAusRechteck({
-        ...rechteckAusEcken(ecken),
-        center: [ll.lng, ll.lat],
-      });
-      // Nur Live-Vorschau — kein React-State, kein Re-Render, kein PATCH.
-      setzeBildGeometrie(map, platzierBild.id, neu);
+    const handles = erzeugeBildHandles(map, platzierBild.id, platzierBild.ecken, (ecken) => {
+      onPlatzierGeometrieRef.current?.(ecken);
     });
-    center.on('dragend', () => {
-      const ecken = platzierBildEckenRef.current;
-      if (!ecken) return;
-      const ll = center.getLngLat();
-      const neu = eckenAusRechteck({
-        ...rechteckAusEcken(ecken),
-        center: [ll.lng, ll.lat],
-      });
-      // Einmaliger PATCH am Ende des Drags (persistiert).
-      onPlatzierGeometrieRef.current?.(neu);
-    });
-    dragMarkers.push(center);
+    handlesRef.current = handles;
     return () => {
-      for (const m of dragMarkers) m.remove();
-      platzierCenterMarkerRef.current = null;
+      handles.zerstoeren();
+      handlesRef.current = null;
     };
-  // Dep-Array auf platzierBild?.id beschränken: Ecken-Änderungen (z. B. aus dem Slider)
-  // sollen den Marker nicht zerstören/neu erzeugen (würde mid-drag unterbrechen).
-  // Aktuelle Ecken werden stets über platzierBildEckenRef gelesen.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [platzierBild?.id]);
 
-  // Mittelpunkt-Handle nach Panel-Änderungen (Slider / Koordinaten-Eingabe) nachführen:
-  // Wenn ecken sich ändern (aber id gleich bleibt), Handle-Position aktualisieren.
-  // Läuft nicht mid-drag (drag setzt die Position selbst kontinuierlich).
+  // Externe Ecken-Änderungen (numerische Mittelpunkt-Eingabe / Refetch nach Commit) an die
+  // Griffe spiegeln. Läuft nicht mid-drag (der drag setzt die Geometrie selbst kontinuierlich).
   useEffect(() => {
-    const marker = platzierCenterMarkerRef.current;
-    if (!marker || !platzierBild) return;
-    const r = rechteckAusEcken(platzierBild.ecken);
-    marker.setLngLat(r.center as [number, number]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (platzierBild) handlesRef.current?.setzeEcken(platzierBild.ecken);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [platzierBild?.ecken]);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} data-testid="kartenflaeche" />;
-}
+});
+
+export default Kartenflaeche;

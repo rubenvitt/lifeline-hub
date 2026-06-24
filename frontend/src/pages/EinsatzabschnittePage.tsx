@@ -98,7 +98,7 @@ export default function EinsatzabschnittePage() {
   }
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
-  const abschnitte = abschnitteQuery.data ?? [];
+  const abschnitte = useMemo(() => abschnitteQuery.data ?? [], [abschnitteQuery.data]);
   const aktuell = abschnitte.find((a) => a.id === gewaehlt) ?? null;
 
   const speichern = useMutation({

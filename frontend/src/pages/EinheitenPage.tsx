@@ -106,7 +106,7 @@ export default function EinheitenPage() {
   }
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
-  const einheiten = einheitenQuery.data ?? [];
+  const einheiten = useMemo(() => einheitenQuery.data ?? [], [einheitenQuery.data]);
   const aktuell = einheiten.find((e) => e.id === gewaehlt) ?? null;
 
   const speichern = useMutation({
