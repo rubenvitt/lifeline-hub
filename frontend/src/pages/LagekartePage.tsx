@@ -206,9 +206,14 @@ export default function LagekartePage() {
     merkeLetzteBasemap(einsatzId, { modus: basemap, onlineView: onlineStilName });
   }, [basemap, onlineStilName, einsatzId]);
 
-  // Blob-URLs für Kartenbilder laden (und bei entfernten Bildern revoken).
+  // Blob-URLs für Kartenbilder laden (und bei entfernten Bildern inkrementell revoken).
   // blobUrls bewusst NICHT in den deps: das Map-Objekt würde den Effekt endlos neu auslösen.
-  // blobUrlsRef spiegelt stets den aktuellen Stand für den Cleanup-Return (Unmount-Leak-Schutz).
+  // WICHTIG: Hier KEIN pauschales revoke aller URLs im Cleanup — React führt den Cleanup
+  // vor JEDEM Re-Run aus (jedes Refetch der Bilderliste, z. B. via SSE/Upload/Toggle/Move).
+  // Ein pauschales revoke würde bestehende, weiterhin aktive URLs unbrauchbar machen, ohne
+  // den Ref zu leeren → der Guard unten verhindert ein Neuladen → Bilder bleiben blank
+  // (spätestens nach Theme-/Basemap-Wechsel mit Source-Neuaufbau). Der Unmount-Leak-Schutz
+  // liegt deshalb in einem separaten, leeren-deps-Effekt weiter unten.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const bilder = bilderQuery.data ?? [];
@@ -220,9 +225,14 @@ export default function LagekartePage() {
             blobUrlsRef.current = { ...blobUrlsRef.current, [b.id]: url };
             setBlobUrls(blobUrlsRef.current);
           }
-        }).catch(() => {});
+        }).catch((e) => {
+          // Lade-Fehler sichtbar machen statt lautlos schlucken (maskierte sonst C1).
+          if (!abgebrochen) fehler(e);
+        });
       }
     }
+    // Entfernte Bilder (z. B. gelöscht, oder Einsatzwechsel/Listen-Swap) inkrementell
+    // freigeben — das deckt den Leak ab, ohne aktive URLs zu treffen.
     const aktiveIds = new Set(bilder.map((b) => b.id));
     for (const idStr of Object.keys(blobUrlsRef.current)) {
       const id = Number(idStr);
@@ -235,10 +245,14 @@ export default function LagekartePage() {
     }
     return () => {
       abgebrochen = true;
-      // Beim Unmount (Navigation weg von der Karte) alle aktuellen Blob-URLs freigeben.
-      Object.values(blobUrlsRef.current).forEach(URL.revokeObjectURL);
     };
   }, [bilderQuery.data, einsatzId]);
+
+  // Unmount-only: beim Verlassen der Karte alle dann noch aktuellen Blob-URLs freigeben.
+  // Separater Effekt mit leeren deps → läuft NUR beim Unmount, nicht bei jedem Refetch.
+  useEffect(() => () => {
+    Object.values(blobUrlsRef.current).forEach(URL.revokeObjectURL);
+  }, []);
 
   const einsatz = einsatzQuery.data;
   const darfSchreiben =
@@ -425,15 +439,20 @@ export default function LagekartePage() {
 
   const invalidiereBilder = () => qc.invalidateQueries({ queryKey: ['einsatz-kartenbilder', einsatzId] });
 
-  const bildOverlays: BildOverlay[] = (bilderQuery.data ?? [])
-    .filter((b) => blobUrls[b.id])
-    .map((b) => ({
-      id: b.id,
-      blobUrl: blobUrls[b.id],
-      ecken: JSON.parse(b.ecken_json) as Ecken,
-      opazitaet: b.opazitaet,
-      sichtbar: b.sichtbar,
-    }));
+  // Memoisiert: ohne useMemo entsteht pro Render eine neue Array-Identität (+ JSON.parse),
+  // was den bilder-Effekt der Kartenflaeche bei jedem Render unnötig feuert.
+  const bildOverlays = useMemo<BildOverlay[]>(
+    () => (bilderQuery.data ?? [])
+      .filter((b) => blobUrls[b.id])
+      .map((b) => ({
+        id: b.id,
+        blobUrl: blobUrls[b.id],
+        ecken: JSON.parse(b.ecken_json) as Ecken,
+        opazitaet: b.opazitaet,
+        sichtbar: b.sichtbar,
+      })),
+    [bilderQuery.data, blobUrls],
+  );
 
   const onBildUpload = async (datei: File) => {
     // LagekartePage hat keinen direkten Zugriff auf mapRef (intern in Kartenflaeche).
