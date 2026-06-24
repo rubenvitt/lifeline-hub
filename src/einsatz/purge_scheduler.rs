@@ -233,6 +233,11 @@ mod tests {
         // Eine bestehende ETB-Zeile (Skelett, muss erhalten bleiben).
         sqlx::query("INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) VALUES (?,1,'meldung','ORIGINAL', ?, '2026-01-01 09:00:00')")
             .bind(e).bind(b).execute(&pool).await.unwrap();
+        // Bild-Hintergrund (LFH-35): name kann PII tragen (z.B. „Lageplan Familie Müller.png").
+        let bild = crate::karte_hintergrundbild::repo::anlegen(
+            &pool, e, b, "Lageplan Familie Müller.png", "image/png",
+            &[0x89, b'P', b'N', b'G'], "[[9.0,50.0],[9.1,50.0],[9.1,49.9],[9.0,49.9]]",
+        ).await.unwrap();
 
         // Tick nach Ablauf der Karenz → eine Schwärzung.
         assert_eq!(tick_einmal(&pool, t("2026-06-01 12:00:00")).await, 1);
@@ -263,6 +268,11 @@ mod tests {
         let snap: String = sqlx::query_scalar("SELECT snap_name FROM einsatz_personal WHERE einsatz_id = ?")
             .bind(e).fetch_one(&pool).await.unwrap();
         assert_eq!(snap, super::repo::SCHWAERZUNG_PLATZHALTER);
+        // (b2) Bild-Hintergrund: name geschwärzt, BLOB (Kartografie) bleibt erhalten.
+        let nachher = crate::karte_hintergrundbild::repo::liste(&pool, e).await.unwrap();
+        assert_eq!(nachher[0].name, super::repo::SCHWAERZUNG_PLATZHALTER, "Bildname (PII) geschwärzt");
+        let (_, daten) = crate::karte_hintergrundbild::repo::laden_bytes(&pool, e, bild.id).await.unwrap();
+        assert!(!daten.is_empty(), "Bild-BLOB (Kartografie) bleibt erhalten");
 
         // (c) Skelett intakt: Einsatz + registrier_nr + ETB-Original erhalten.
         let person_anzahl: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_person WHERE einsatz_id = ?")
