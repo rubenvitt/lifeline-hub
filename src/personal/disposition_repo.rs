@@ -104,9 +104,9 @@ pub async fn liste(
     einsatz_id: i64,
     einsatz_aktiv: bool,
 ) -> Result<Vec<EinsatzPersonalAnzeige>, AppError> {
-    let rows = sqlx::query_as::<_, Row>(&format!(
+    let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
         "{SELECT_AUFGELOEST} WHERE ep.einsatz_id = ? ORDER BY ep.disponiert_at, ep.id"
-    ))
+    )))
     .bind(einsatz_id)
     .fetch_all(pool)
     .await?;
@@ -120,9 +120,9 @@ pub async fn laden_anzeige(
     ep_id: i64,
     einsatz_aktiv: bool,
 ) -> Result<EinsatzPersonalAnzeige, AppError> {
-    let row = sqlx::query_as::<_, Row>(&format!(
+    let row = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
         "{SELECT_AUFGELOEST} WHERE ep.id = ? AND ep.einsatz_id = ?"
-    ))
+    )))
     .bind(ep_id)
     .bind(einsatz_id)
     .fetch_optional(pool)

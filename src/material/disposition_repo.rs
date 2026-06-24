@@ -95,9 +95,9 @@ pub async fn liste(
     einsatz_id: i64,
     einsatz_aktiv: bool,
 ) -> Result<Vec<EinsatzMaterialAnzeige>, AppError> {
-    let rows = sqlx::query_as::<_, Row>(&format!(
+    let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
         "{SELECT_AUFGELOEST} WHERE em.einsatz_id = ? ORDER BY em.disponiert_at, em.id"
-    ))
+    )))
     .bind(einsatz_id)
     .fetch_all(pool)
     .await?;
@@ -111,9 +111,9 @@ pub async fn laden_anzeige(
     em_id: i64,
     einsatz_aktiv: bool,
 ) -> Result<EinsatzMaterialAnzeige, AppError> {
-    let row = sqlx::query_as::<_, Row>(&format!(
+    let row = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
         "{SELECT_AUFGELOEST} WHERE em.id = ? AND em.einsatz_id = ?"
-    ))
+    )))
     .bind(em_id)
     .bind(einsatz_id)
     .fetch_optional(pool)
@@ -242,9 +242,9 @@ pub async fn liste_je_uhs(
     uhs_id: i64,
     einsatz_aktiv: bool,
 ) -> Result<Vec<EinsatzMaterialAnzeige>, AppError> {
-    let rows = sqlx::query_as::<_, Row>(&format!(
+    let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
         "{SELECT_AUFGELOEST} WHERE em.einsatz_id = ? AND em.uhs_id = ? ORDER BY em.disponiert_at, em.id"
-    ))
+    )))
     .bind(einsatz_id)
     .bind(uhs_id)
     .fetch_all(pool)

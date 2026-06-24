@@ -139,9 +139,9 @@ pub async fn austritt_intern(
 
 /// Belegungs-Verlauf einer UHS (neueste zuerst).
 pub async fn liste_je_uhs(pool: &SqlitePool, uhs_id: i64) -> Result<Vec<BelegungAnzeige>, AppError> {
-    Ok(sqlx::query_as::<_, BelegungAnzeige>(&format!(
+    Ok(sqlx::query_as::<_, BelegungAnzeige>(sqlx::AssertSqlSafe(format!(
         "{SELECT_ALLE} WHERE uhs_id = ? ORDER BY zeitpunkt_at DESC, id DESC"
-    ))
+    )))
     .bind(uhs_id)
     .fetch_all(pool)
     .await?)
@@ -149,9 +149,9 @@ pub async fn liste_je_uhs(pool: &SqlitePool, uhs_id: i64) -> Result<Vec<Belegung
 
 /// Belegungs-Verlauf einer Person (neueste zuerst).
 pub async fn liste_je_person(pool: &SqlitePool, einsatz_id: i64, person_id: i64) -> Result<Vec<BelegungAnzeige>, AppError> {
-    Ok(sqlx::query_as::<_, BelegungAnzeige>(&format!(
+    Ok(sqlx::query_as::<_, BelegungAnzeige>(sqlx::AssertSqlSafe(format!(
         "{SELECT_ALLE} WHERE einsatz_id = ? AND person_id = ? ORDER BY zeitpunkt_at DESC, id DESC"
-    ))
+    )))
     .bind(einsatz_id)
     .bind(person_id)
     .fetch_all(pool)
@@ -160,7 +160,7 @@ pub async fn liste_je_person(pool: &SqlitePool, einsatz_id: i64, person_id: i64)
 
 /// Lädt ein einzelnes Event; `NotFound` außerhalb des Einsatzes.
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<BelegungAnzeige, AppError> {
-    sqlx::query_as::<_, BelegungAnzeige>(&format!("{SELECT_ALLE} WHERE id = ? AND einsatz_id = ?"))
+    sqlx::query_as::<_, BelegungAnzeige>(sqlx::AssertSqlSafe(format!("{SELECT_ALLE} WHERE id = ? AND einsatz_id = ?")))
         .bind(id)
         .bind(einsatz_id)
         .fetch_optional(pool)

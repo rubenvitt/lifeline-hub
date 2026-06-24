@@ -92,9 +92,9 @@ fn zu_anzeige(row: Row) -> Result<BefehlAnzeige, AppError> {
 
 /// Alle Befehle eines Einsatzes, neueste Fortschreibung/Anlage zuerst.
 pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<BefehlAnzeige>, AppError> {
-    let rows = sqlx::query_as::<_, Row>(&format!(
+    let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
         "{SELECT} WHERE l.einsatz_id = ? ORDER BY l.zeitstand DESC, l.id DESC"
-    ))
+    )))
     .bind(einsatz_id)
     .fetch_all(pool)
     .await?;
@@ -103,7 +103,7 @@ pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<BefehlAnzei
 
 /// Lädt einen Befehl (aufgelöst); `NotFound`, wenn nicht zum Einsatz.
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<BefehlAnzeige, AppError> {
-    let row = sqlx::query_as::<_, Row>(&format!("{SELECT} WHERE l.id = ? AND l.einsatz_id = ?"))
+    let row = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!("{SELECT} WHERE l.id = ? AND l.einsatz_id = ?")))
         .bind(id)
         .bind(einsatz_id)
         .fetch_optional(pool)

@@ -49,7 +49,7 @@ const ANZEIGE_SELECT: &str =
 /// Lädt eine Meldung als Anzeige. `NotFound`, wenn unbekannt.
 /// Bind-Reihenfolge: zuerst `jetzt` (computed `ist_ueberfaellig`), dann `id` (WHERE).
 pub async fn laden(pool: &SqlitePool, id: i64, jetzt: &str) -> Result<MeldungAnzeige, AppError> {
-    sqlx::query_as::<_, MeldungAnzeige>(&format!("{ANZEIGE_SELECT} WHERE m.id = ?"))
+    sqlx::query_as::<_, MeldungAnzeige>(sqlx::AssertSqlSafe(format!("{ANZEIGE_SELECT} WHERE m.id = ?")))
         .bind(jetzt)
         .bind(id)
         .fetch_optional(pool)
@@ -170,7 +170,7 @@ pub async fn liste(
           m.eskaliert DESC, m.ereigniszeit DESC, m.lfd_nr DESC",
     );
     // Bind-Reihenfolge = textuelle ?-Reihenfolge: jetzt, einsatz_id, [status], [richtung].
-    let mut query = sqlx::query_as::<_, MeldungAnzeige>(&q).bind(jetzt).bind(einsatz_id);
+    let mut query = sqlx::query_as::<_, MeldungAnzeige>(sqlx::AssertSqlSafe(&*q)).bind(jetzt).bind(einsatz_id);
     if let Some(s) = status_filter {
         query = query.bind(s);
     }

@@ -27,9 +27,9 @@ pub struct PatchPlatz<'a> {
 
 /// Plätze einer UHS (ohne stornierte), sortiert nach Bezeichnung.
 pub async fn liste_je_uhs(pool: &SqlitePool, uhs_id: i64) -> Result<Vec<PlatzAnzeige>, AppError> {
-    Ok(sqlx::query_as::<_, PlatzAnzeige>(&format!(
+    Ok(sqlx::query_as::<_, PlatzAnzeige>(sqlx::AssertSqlSafe(format!(
         "{SELECT_ALLE} WHERE uhs_id = ? AND storniert_at IS NULL ORDER BY bezeichnung"
-    ))
+    )))
     .bind(uhs_id)
     .fetch_all(pool)
     .await?)
@@ -37,7 +37,7 @@ pub async fn liste_je_uhs(pool: &SqlitePool, uhs_id: i64) -> Result<Vec<PlatzAnz
 
 /// Lädt einen Platz; `NotFound`, falls nicht zur UHS gehörend.
 pub async fn laden(pool: &SqlitePool, uhs_id: i64, id: i64) -> Result<PlatzAnzeige, AppError> {
-    sqlx::query_as::<_, PlatzAnzeige>(&format!("{SELECT_ALLE} WHERE id = ? AND uhs_id = ?"))
+    sqlx::query_as::<_, PlatzAnzeige>(sqlx::AssertSqlSafe(format!("{SELECT_ALLE} WHERE id = ? AND uhs_id = ?")))
         .bind(id)
         .bind(uhs_id)
         .fetch_optional(pool)

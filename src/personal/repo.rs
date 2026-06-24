@@ -91,9 +91,9 @@ async fn setze_qualifikationen(
 
 /// Lädt eine Person der eigenen Org (roh); `NotFound` bei fremder/unbekannter id.
 pub async fn laden(pool: &SqlitePool, org_id: i64, id: i64) -> Result<Personal, AppError> {
-    sqlx::query_as::<_, Personal>(&format!(
+    sqlx::query_as::<_, Personal>(sqlx::AssertSqlSafe(format!(
         "SELECT {SPALTEN} FROM personal WHERE id = ? AND org_id = ?"
-    ))
+    )))
     .bind(id).bind(org_id).fetch_optional(pool).await?.ok_or(AppError::NotFound)
 }
 
@@ -152,7 +152,7 @@ pub async fn liste_anzeige(
     } else {
         format!("SELECT {SPALTEN} FROM personal WHERE org_id = ? ORDER BY name")
     };
-    let personen = sqlx::query_as::<_, Personal>(&sql).bind(org_id).fetch_all(pool).await?;
+    let personen = sqlx::query_as::<_, Personal>(sqlx::AssertSqlSafe(&*sql)).bind(org_id).fetch_all(pool).await?;
 
     // Alle Qualifikations-Zuordnungen der Org in einer Abfrage holen und gruppieren.
     let zuordnungen = sqlx::query_as::<_, (i64, i64, String)>(

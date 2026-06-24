@@ -80,7 +80,7 @@ const ANZEIGE_SELECT: &str =
 /// Lädt einen Auftrag samt Empfängern. `NotFound`, wenn unbekannt.
 /// Bind-Reihenfolge: zuerst `jetzt` (computed column), dann `id` (WHERE).
 pub async fn laden(pool: &SqlitePool, id: i64, jetzt: &str) -> Result<AuftragDetail, AppError> {
-    let auftrag = sqlx::query_as::<_, AuftragAnzeige>(&format!("{ANZEIGE_SELECT} WHERE a.id = ?"))
+    let auftrag = sqlx::query_as::<_, AuftragAnzeige>(sqlx::AssertSqlSafe(format!("{ANZEIGE_SELECT} WHERE a.id = ?")))
         .bind(jetzt)
         .bind(id)
         .fetch_optional(pool)
@@ -125,7 +125,7 @@ pub async fn liste(
           a.frist_at IS NULL, a.frist_at, a.id",
     );
     // Bind-Reihenfolge: jetzt (computed) → einsatz_id → optional richtung.
-    let mut q = sqlx::query_as::<_, AuftragAnzeige>(&sql).bind(jetzt).bind(einsatz_id);
+    let mut q = sqlx::query_as::<_, AuftragAnzeige>(sqlx::AssertSqlSafe(&*sql)).bind(jetzt).bind(einsatz_id);
     if let Some(r) = richtung_filter {
         q = q.bind(r);
     }

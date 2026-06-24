@@ -69,7 +69,7 @@ pub async fn liste(
          AND (?5 IS NULL OR s.geschaedigt_person_id = ?5) \
          ORDER BY s.registrier_nr DESC"
     );
-    Ok(sqlx::query_as::<_, SchadenAnzeige>(&sql)
+    Ok(sqlx::query_as::<_, SchadenAnzeige>(sqlx::AssertSqlSafe(&*sql))
         .bind(einsatz_id)
         .bind(status)
         .bind(typ)
@@ -80,7 +80,7 @@ pub async fn liste(
 }
 
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64, schaden_id: i64) -> Result<SchadenAnzeige, AppError> {
-    sqlx::query_as::<_, SchadenAnzeige>(&format!("{SELECT_ALLE} WHERE s.id = ? AND s.einsatz_id = ?"))
+    sqlx::query_as::<_, SchadenAnzeige>(sqlx::AssertSqlSafe(format!("{SELECT_ALLE} WHERE s.id = ? AND s.einsatz_id = ?")))
         .bind(schaden_id)
         .bind(einsatz_id)
         .fetch_optional(pool)

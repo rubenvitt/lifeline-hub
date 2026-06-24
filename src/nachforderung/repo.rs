@@ -30,7 +30,7 @@ const ANZEIGE_SELECT: &str =
 
 /// Lädt eine Nachforderung als Anzeige. `NotFound`, wenn unbekannt.
 pub async fn laden(pool: &SqlitePool, id: i64) -> Result<NachforderungAnzeige, AppError> {
-    sqlx::query_as::<_, NachforderungAnzeige>(&format!("{ANZEIGE_SELECT} WHERE n.id = ?"))
+    sqlx::query_as::<_, NachforderungAnzeige>(sqlx::AssertSqlSafe(format!("{ANZEIGE_SELECT} WHERE n.id = ?")))
         .bind(id)
         .fetch_optional(pool)
         .await?
@@ -135,7 +135,7 @@ pub async fn liste(
         " ORDER BY CASE n.prioritaet WHEN 'sofort' THEN 0 WHEN 'dringend' THEN 1 ELSE 2 END, \
           n.angefordert_at DESC, n.id DESC",
     );
-    let mut query = sqlx::query_as::<_, NachforderungAnzeige>(&q).bind(einsatz_id);
+    let mut query = sqlx::query_as::<_, NachforderungAnzeige>(sqlx::AssertSqlSafe(&*q)).bind(einsatz_id);
     if let Some(s) = status_filter {
         query = query.bind(s);
     }
@@ -170,7 +170,7 @@ pub async fn setze_status(pool: &SqlitePool, id: i64, neuer_status: &str, erwart
         "UPDATE nachforderung SET status = ?, {stempel_spalte} = COALESCE({stempel_spalte}, ?) \
          WHERE id = ? AND status = ?"
     );
-    let r = sqlx::query(&sql).bind(neuer_status).bind(jetzt).bind(id).bind(erwartet).execute(pool).await?;
+    let r = sqlx::query(sqlx::AssertSqlSafe(&*sql)).bind(neuer_status).bind(jetzt).bind(id).bind(erwartet).execute(pool).await?;
     Ok(r.rows_affected() > 0)
 }
 

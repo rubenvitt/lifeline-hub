@@ -36,7 +36,7 @@ const ANZEIGE_SELECT: &str =
 /// Lädt eine Erinnerung als Anzeige. `NotFound`, wenn sie nicht existiert.
 /// Bind-Reihenfolge: zuerst `jetzt` (computed column), dann `id` (WHERE).
 pub async fn laden(pool: &SqlitePool, id: i64, jetzt: &str) -> Result<ErinnerungAnzeige, AppError> {
-    sqlx::query_as::<_, ErinnerungAnzeige>(&format!("{ANZEIGE_SELECT} WHERE e.id = ?"))
+    sqlx::query_as::<_, ErinnerungAnzeige>(sqlx::AssertSqlSafe(format!("{ANZEIGE_SELECT} WHERE e.id = ?")))
         .bind(jetzt)
         .bind(id)
         .fetch_optional(pool)
@@ -58,7 +58,7 @@ pub async fn liste(
     } else {
         format!("{ANZEIGE_SELECT} WHERE e.einsatz_id = ? ORDER BY e.faellig_at, e.id")
     };
-    sqlx::query_as::<_, ErinnerungAnzeige>(&sql)
+    sqlx::query_as::<_, ErinnerungAnzeige>(sqlx::AssertSqlSafe(&*sql))
         .bind(jetzt)
         .bind(einsatz_id)
         .fetch_all(pool)

@@ -72,7 +72,7 @@ pub async fn erfassen(
 
 /// Lädt eine Sichtung; `NotFound`, falls nicht zum Einsatz.
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<SichtungAnzeige, AppError> {
-    sqlx::query_as::<_, SichtungAnzeige>(&format!("{SELECT_SICHTUNG} WHERE id = ? AND einsatz_id = ?"))
+    sqlx::query_as::<_, SichtungAnzeige>(sqlx::AssertSqlSafe(format!("{SELECT_SICHTUNG} WHERE id = ? AND einsatz_id = ?")))
         .bind(id)
         .bind(einsatz_id)
         .fetch_optional(pool)
@@ -86,10 +86,10 @@ pub async fn liste_je_person(
     einsatz_id: i64,
     person_id: i64,
 ) -> Result<Vec<SichtungAnzeige>, AppError> {
-    Ok(sqlx::query_as::<_, SichtungAnzeige>(&format!(
+    Ok(sqlx::query_as::<_, SichtungAnzeige>(sqlx::AssertSqlSafe(format!(
         "{SELECT_SICHTUNG} WHERE einsatz_id = ? AND person_id = ? \
          ORDER BY gesichtet_at DESC, id DESC"
-    ))
+    )))
     .bind(einsatz_id)
     .bind(person_id)
     .fetch_all(pool)

@@ -46,9 +46,9 @@ fn label_conflict<T>(e: sqlx::Error) -> Result<T, AppError> {
 
 /// Lädt einen Typ der Org; `NotFound` bei fremder/unbekannter id (ignoriert aktiv-Flag).
 pub async fn laden(pool: &SqlitePool, org_id: i64, id: i64) -> Result<EinheitTyp, AppError> {
-    sqlx::query_as::<_, Row>(&format!(
+    sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
         "SELECT {SPALTEN} FROM einheit_typ WHERE id = ? AND org_id = ?"
-    ))
+    )))
     .bind(id).bind(org_id)
     .fetch_optional(pool).await?
     .map(zu_typ)
@@ -57,9 +57,9 @@ pub async fn laden(pool: &SqlitePool, org_id: i64, id: i64) -> Result<EinheitTyp
 
 /// Nur aktive Typen der Org, sortiert nach `sortier`, dann `id`.
 pub async fn liste(pool: &SqlitePool, org_id: i64) -> Result<Vec<EinheitTyp>, AppError> {
-    let rows = sqlx::query_as::<_, Row>(&format!(
+    let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
         "SELECT {SPALTEN} FROM einheit_typ WHERE org_id = ? AND aktiv = 1 ORDER BY sortier, id"
-    ))
+    )))
     .bind(org_id)
     .fetch_all(pool).await?;
     Ok(rows.into_iter().map(zu_typ).collect())

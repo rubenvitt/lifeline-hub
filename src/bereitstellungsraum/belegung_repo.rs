@@ -87,9 +87,9 @@ pub async fn liste_je_br(
     pool: &SqlitePool,
     br_id: i64,
 ) -> Result<Vec<BrBelegungAnzeige>, AppError> {
-    Ok(sqlx::query_as::<_, BrBelegungAnzeige>(&format!(
+    Ok(sqlx::query_as::<_, BrBelegungAnzeige>(sqlx::AssertSqlSafe(format!(
         "{SELECT_ALLE} WHERE br_id = ? ORDER BY zeitpunkt_at DESC, id DESC"
-    ))
+    )))
     .bind(br_id)
     .fetch_all(pool)
     .await?)
@@ -101,9 +101,9 @@ pub async fn laden(
     einsatz_id: i64,
     id: i64,
 ) -> Result<BrBelegungAnzeige, AppError> {
-    sqlx::query_as::<_, BrBelegungAnzeige>(&format!(
+    sqlx::query_as::<_, BrBelegungAnzeige>(sqlx::AssertSqlSafe(format!(
         "{SELECT_ALLE} WHERE id = ? AND einsatz_id = ?"
-    ))
+    )))
     .bind(id)
     .bind(einsatz_id)
     .fetch_optional(pool)
