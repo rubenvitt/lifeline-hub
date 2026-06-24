@@ -84,6 +84,9 @@ export default function LagekartePage() {
     useState<{ quelle: FachebeneQuelle; properties: Record<string, unknown> } | null>(null);
   const [bildPlatzierenId, setBildPlatzierenId] = useState<number | null>(null);
   const [blobUrls, setBlobUrls] = useState<Record<number, string>>({});
+  // Spiegelt blobUrls als Ref, damit der Cleanup-Return des Blob-URL-Effekts beim
+  // Unmount alle aktuellen URLs revoken kann (Leak-Schutz) — ohne Stale-Closure.
+  const blobUrlsRef = useRef<Record<number, string>>({});
 
   // EINE SSE-Verbindung für alle Domänen (uhs/schaden/einheit/fahrzeug/abschnitt/zone/
   // person). Pro Domäne eine eigene EventSource würde das HTTP/1.1-Limit (6/Origin)
@@ -205,26 +208,36 @@ export default function LagekartePage() {
 
   // Blob-URLs für Kartenbilder laden (und bei entfernten Bildern revoken).
   // blobUrls bewusst NICHT in den deps: das Map-Objekt würde den Effekt endlos neu auslösen.
+  // blobUrlsRef spiegelt stets den aktuellen Stand für den Cleanup-Return (Unmount-Leak-Schutz).
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const bilder = bilderQuery.data ?? [];
     let abgebrochen = false;
     for (const b of bilder) {
-      if (!blobUrls[b.id]) {
+      if (!blobUrlsRef.current[b.id]) {
         ladeBildBlobUrl(einsatzId, b.id).then((url) => {
-          if (!abgebrochen) setBlobUrls((m) => ({ ...m, [b.id]: url }));
+          if (!abgebrochen) {
+            blobUrlsRef.current = { ...blobUrlsRef.current, [b.id]: url };
+            setBlobUrls(blobUrlsRef.current);
+          }
         }).catch(() => {});
       }
     }
     const aktiveIds = new Set(bilder.map((b) => b.id));
-    for (const idStr of Object.keys(blobUrls)) {
+    for (const idStr of Object.keys(blobUrlsRef.current)) {
       const id = Number(idStr);
       if (!aktiveIds.has(id)) {
-        URL.revokeObjectURL(blobUrls[id]);
-        setBlobUrls((m) => { const n = { ...m }; delete n[id]; return n; });
+        URL.revokeObjectURL(blobUrlsRef.current[id]);
+        const { [id]: _, ...rest } = blobUrlsRef.current;
+        blobUrlsRef.current = rest;
+        setBlobUrls(blobUrlsRef.current);
       }
     }
-    return () => { abgebrochen = true; };
+    return () => {
+      abgebrochen = true;
+      // Beim Unmount (Navigation weg von der Karte) alle aktuellen Blob-URLs freigeben.
+      Object.values(blobUrlsRef.current).forEach(URL.revokeObjectURL);
+    };
   }, [bilderQuery.data, einsatzId]);
 
   const einsatz = einsatzQuery.data;

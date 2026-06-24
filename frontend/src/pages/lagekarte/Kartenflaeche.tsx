@@ -24,7 +24,7 @@ import {
   entferneFachebeneLayer,
   fachebeneClickLayerId,
 } from './fachebenenLayer';
-import { synchronisiereBildLayer, entferneBildLayer, type BildOverlay } from './bildLayer';
+import { synchronisiereBildLayer, entferneBildLayer, setzeBildGeometrie, type BildOverlay } from './bildLayer';
 import { eckenAusRechteck, rechteckAusEcken } from './bildGeometrie';
 import type { Ecken } from '../../api/kartenbilder';
 import { KRITIS_MIN_ZOOM } from './fachebenen';
@@ -460,32 +460,77 @@ export default function Kartenflaeche({
   const onPlatzierGeometrieRef = useRef(onPlatzierGeometrie);
   onPlatzierGeometrieRef.current = onPlatzierGeometrie;
 
-  // Platzier-Modus: Mittelpunkt-Drag-Handle. Wird neu erzeugt, wenn sich das aktive Bild ändert.
+  // Aktuelle Ecken des Platzier-Bilds als Ref: drag-Handler liest stets die aktuellsten Ecken
+  // ohne den Marker zu zerstören/neu zu erzeugen (verhindert Stutter mid-drag).
+  const platzierBildEckenRef = useRef(platzierBild?.ecken ?? null);
+  platzierBildEckenRef.current = platzierBild?.ecken ?? null;
+
+  // Ref auf den aktuellen Mittelpunkt-Handle: ermöglicht separatem Effekt, die Position
+  // nach Panel-Änderungen (Slider) nachzuführen, ohne den Marker neu zu erzeugen.
+  const platzierCenterMarkerRef = useRef<maplibregl.Marker | null>(null);
+
+  // Platzier-Modus: Mittelpunkt-Drag-Handle. Wird NUR neu erzeugt, wenn sich die Bild-ID ändert.
   // MVP: Nur Mittelpunkt-Handle (Drag verschiebt das ganze Bild). Drehung/Größe über das Panel.
   // Ausbaustufe: Einzeln ziehbare Eck-Handles — bewusst zurückgestellt (LFH-35 MVP-Schnitt).
+  //
+  // Live-Vorschau: 'drag'-Event ruft setzeBildGeometrie direkt auf dem MapLibre-Layer auf
+  // (kein React-State-Update → kein Re-Render, kein Stutter).
+  // Persistenz: nur 'dragend' ruft onPlatzierGeometrie (→ PATCH) — verhindert chatty PATCHs.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !platzierBild) return;
-    const markers: maplibregl.Marker[] = [];
+    if (!map || !platzierBild) {
+      platzierCenterMarkerRef.current = null;
+      return;
+    }
+    const dragMarkers: maplibregl.Marker[] = [];
     const r = rechteckAusEcken(platzierBild.ecken);
     const center = new maplibregl.Marker({ draggable: true, color: '#1677ff' })
       .setLngLat(r.center as [number, number])
       .addTo(map);
+    platzierCenterMarkerRef.current = center;
     center.on('drag', () => {
+      const ecken = platzierBildEckenRef.current;
+      if (!ecken) return;
       const ll = center.getLngLat();
       const neu = eckenAusRechteck({
-        ...rechteckAusEcken(platzierBild.ecken),
+        ...rechteckAusEcken(ecken),
         center: [ll.lng, ll.lat],
       });
+      // Nur Live-Vorschau — kein React-State, kein Re-Render, kein PATCH.
+      setzeBildGeometrie(map, platzierBild.id, neu);
+    });
+    center.on('dragend', () => {
+      const ecken = platzierBildEckenRef.current;
+      if (!ecken) return;
+      const ll = center.getLngLat();
+      const neu = eckenAusRechteck({
+        ...rechteckAusEcken(ecken),
+        center: [ll.lng, ll.lat],
+      });
+      // Einmaliger PATCH am Ende des Drags (persistiert).
       onPlatzierGeometrieRef.current?.(neu);
     });
-    markers.push(center);
+    dragMarkers.push(center);
     return () => {
-      for (const m of markers) m.remove();
+      for (const m of dragMarkers) m.remove();
+      platzierCenterMarkerRef.current = null;
     };
-  // platzierBild als Abhängigkeit: neue Ecken → Handle neu platzieren (Mittelp. kann sich geändert haben).
+  // Dep-Array auf platzierBild?.id beschränken: Ecken-Änderungen (z. B. aus dem Slider)
+  // sollen den Marker nicht zerstören/neu erzeugen (würde mid-drag unterbrechen).
+  // Aktuelle Ecken werden stets über platzierBildEckenRef gelesen.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [platzierBild]);
+  }, [platzierBild?.id]);
+
+  // Mittelpunkt-Handle nach Panel-Änderungen (Slider / Koordinaten-Eingabe) nachführen:
+  // Wenn ecken sich ändern (aber id gleich bleibt), Handle-Position aktualisieren.
+  // Läuft nicht mid-drag (drag setzt die Position selbst kontinuierlich).
+  useEffect(() => {
+    const marker = platzierCenterMarkerRef.current;
+    if (!marker || !platzierBild) return;
+    const r = rechteckAusEcken(platzierBild.ecken);
+    marker.setLngLat(r.center as [number, number]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platzierBild?.ecken]);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} data-testid="kartenflaeche" />;
 }
