@@ -519,6 +519,13 @@ export default function LagekartePage() {
           fachebenenSichtbar.kritis && kartenZoom != null && kartenZoom < KRITIS_MIN_ZOOM
         }
         fachebenenLaedt={fachebenenLaedt}
+        bilder={[]}
+        onBildUpload={() => {}}
+        onBildToggle={() => {}}
+        onBildOpazitaet={() => {}}
+        onBildPlatzieren={() => {}}
+        onBildLoeschen={() => {}}
+        bildPlatzierenId={null}
       />
       <div style={{ flex: 1, position: 'relative' }}>
         <Kartenflaeche
