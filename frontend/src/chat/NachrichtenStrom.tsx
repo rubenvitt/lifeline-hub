@@ -130,7 +130,7 @@ export default function NachrichtenStrom({
                             title={info.titel}
                             content={
                               info.zeilen.length
-                                ? <Space direction="vertical" size={0}>
+                                ? <Space orientation="vertical" size={0}>
                                     {info.zeilen.map((z, i) => <span key={i}>{z}</span>)}
                                   </Space>
                                 : 'Keine weiteren Angaben'
@@ -148,7 +148,7 @@ export default function NachrichtenStrom({
                 geloescht ? (
                   <Typography.Text type="secondary" italic>Nachricht gelöscht</Typography.Text>
                 ) : (
-                  <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                  <Space orientation="vertical" size={4} style={{ width: '100%' }}>
                     {n.inhalt && <Typography.Text>{n.inhalt}</Typography.Text>}
                     {n.anhaenge.map((a) => (
                       <Typography.Link

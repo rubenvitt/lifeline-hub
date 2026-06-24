@@ -18,7 +18,7 @@ const zeile = (label: string, wert: string) => (
 export default function InfrastrukturKachel({ uhs, schaeden, tiere, zonen, onNavigate }: Props) {
   return (
     <Card size="small" title="Infrastruktur & Gefahren" style={{ height: '100%' }}>
-      <Space direction="vertical" size={6} style={{ width: '100%' }}>
+      <Space orientation="vertical" size={6} style={{ width: '100%' }}>
         <KlickbareZeile onClick={() => onNavigate('unfallhilfsstellen')}>
           {uhs ? zeile('UHS', `${uhs.gesamt} (${uhs.aktiv} aktiv)`) : zeile('UHS', STRICH)}
         </KlickbareZeile>

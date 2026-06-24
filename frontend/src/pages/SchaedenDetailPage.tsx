@@ -92,7 +92,7 @@ export default function SchaedenDetailPage() {
     return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
-    return <Alert type="error" message="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+    return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
   const zurueck = schaedenPfad(einsatzId);
@@ -101,14 +101,14 @@ export default function SchaedenDetailPage() {
     return (
       <Alert
         type="error" showIcon
-        message="Schaden konnte nicht geladen werden"
+        title="Schaden konnte nicht geladen werden"
         description={detailQuery.error instanceof ApiError ? detailQuery.error.message : undefined}
         action={<Button size="small" onClick={() => detailQuery.refetch()}>Erneut versuchen</Button>}
       />
     );
   }
   if (!detailQuery.data) {
-    return <Alert type="error" message="Schaden nicht gefunden" showIcon />;
+    return <Alert type="error" title="Schaden nicht gefunden" showIcon />;
   }
   const s = detailQuery.data;
   const orgId = einsatz.org_id ?? 0;

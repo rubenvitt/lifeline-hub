@@ -72,7 +72,7 @@ export default function NachforderungenPage() {
     return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
-    return <Alert type="error" message="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+    return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben =
@@ -154,7 +154,7 @@ export default function NachforderungenPage() {
       )}
 
       {nfQuery.isError && (
-        <Alert type="error" showIcon style={{ marginBottom: 12 }} message="Nachforderungen konnten nicht geladen werden" />
+        <Alert type="error" showIcon style={{ marginBottom: 12 }} title="Nachforderungen konnten nicht geladen werden" />
       )}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16, alignItems: 'center' }}>
         <Segmented

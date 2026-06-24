@@ -61,7 +61,7 @@ export default function UnfallhilfsstellenPage() {
   ];
 
   if (einsatzQuery.isLoading || uhsQuery.isLoading) return <Spin />;
-  if (einsatzQuery.error) return <Alert type="error" message="Einsatz konnte nicht geladen werden" />;
+  if (einsatzQuery.error) return <Alert type="error" title="Einsatz konnte nicht geladen werden" />;
 
   return (
     <div style={{ padding: 16 }}>

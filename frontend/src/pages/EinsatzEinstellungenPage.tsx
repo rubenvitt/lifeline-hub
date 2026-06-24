@@ -144,7 +144,7 @@ export default function EinsatzEinstellungenPage() {
     );
   }
   if (einsatzQuery.isError || !einsatzQuery.data || einstellungenQuery.isError || !einstellungenQuery.data) {
-    return <Alert type="error" message="Einstellungen nicht ladbar oder kein Zugriff" showIcon />;
+    return <Alert type="error" title="Einstellungen nicht ladbar oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
   const einstellungen = einstellungenQuery.data;
@@ -280,7 +280,7 @@ export default function EinsatzEinstellungenPage() {
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message="Einsatz abgeschlossen — Einstellungen sind eingefroren und können nicht mehr geändert werden."
+          title="Einsatz abgeschlossen — Einstellungen sind eingefroren und können nicht mehr geändert werden."
         />
       )}
 

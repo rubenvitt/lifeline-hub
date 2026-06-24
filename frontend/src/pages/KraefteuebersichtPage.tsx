@@ -153,7 +153,7 @@ export default function KraefteuebersichtPage() {
   };
 
   if (einsatzQuery.isLoading) return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
-  if (einsatzQuery.isError || !einsatzQuery.data) return <Alert type="error" message="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+  if (einsatzQuery.isError || !einsatzQuery.data) return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   const einsatz = einsatzQuery.data;
   const v = bild.verdichtung;
   const darfSchreiben = einsatz.status === 'aktiv' && (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
@@ -185,9 +185,9 @@ export default function KraefteuebersichtPage() {
           {/* Achse 2: Fahrzeug-Verfügbarkeit */}
           <Space size="large">
             <Statistic title="Fahrzeuge" value={v.anzahlFahrzeuge} />
-            <Statistic title="Fzg frei" value={v.fahrzeugStatus.verfuegbar} valueStyle={{ color: '#52c41a' }} />
-            <Statistic title="Fzg gebunden" value={v.fahrzeugStatus.gebunden} valueStyle={{ color: '#faad14' }} />
-            <Statistic title="Fzg n. einsatzbereit" value={v.fahrzeugStatus.nicht_verfuegbar} valueStyle={{ color: '#ff4d4f' }} />
+            <Statistic title="Fzg frei" value={v.fahrzeugStatus.verfuegbar} styles={{ content: { color: '#52c41a' } }} />
+            <Statistic title="Fzg gebunden" value={v.fahrzeugStatus.gebunden} styles={{ content: { color: '#faad14' } }} />
+            <Statistic title="Fzg n. einsatzbereit" value={v.fahrzeugStatus.nicht_verfuegbar} styles={{ content: { color: '#ff4d4f' } }} />
           </Space>
 
           {achsenTrenner}
@@ -201,7 +201,7 @@ export default function KraefteuebersichtPage() {
                   key={key}
                   title={label}
                   value={v.materialStatus[key]}
-                  valueStyle={farbe ? { color: farbe } : undefined}
+                  styles={{ content: farbe ? { color: farbe } : undefined }}
                 />
               ) : null,
             )}

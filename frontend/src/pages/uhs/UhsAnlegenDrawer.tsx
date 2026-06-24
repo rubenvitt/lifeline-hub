@@ -44,7 +44,7 @@ export default function UhsAnlegenDrawer({ einsatzId, open, onClose, onAngelegt 
       title="Unfallhilfsstelle anlegen"
       open={open}
       onClose={onClose}
-      width={420}
+      size={420}
       destroyOnHidden
     >
       <Form<UhsEingabe>

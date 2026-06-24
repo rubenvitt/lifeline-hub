@@ -108,7 +108,7 @@ export default function TiereDetailPage() {
     return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
-    return <Alert type="error" message="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+    return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
   const zurueck = tierePfad(einsatzId);
@@ -117,14 +117,14 @@ export default function TiereDetailPage() {
     return (
       <Alert
         type="error" showIcon
-        message="Tier konnte nicht geladen werden"
+        title="Tier konnte nicht geladen werden"
         description={detailQuery.error instanceof ApiError ? detailQuery.error.message : undefined}
         action={<Button size="small" onClick={() => detailQuery.refetch()}>Erneut versuchen</Button>}
       />
     );
   }
   if (!detailQuery.data) {
-    return <Alert type="error" message="Tier nicht gefunden" showIcon />;
+    return <Alert type="error" title="Tier nicht gefunden" showIcon />;
   }
   const t = detailQuery.data;
 
@@ -226,7 +226,7 @@ export default function TiereDetailPage() {
         </Space>
       </Space>
 
-      <Space direction="vertical" style={{ width: '100%' }} size="large">
+      <Space orientation="vertical" style={{ width: '100%' }} size="large">
         {bearbeiten ? (
           <Form form={editForm}
             onFinish={(daten) => {

@@ -60,7 +60,7 @@ export default function KoordinatenEingabe({ value, onChange, status, einsatzId,
   }
 
   return (
-    <Space direction="vertical" size={2} style={{ width: '100%' }}>
+    <Space orientation="vertical" size={2} style={{ width: '100%' }}>
       <Space.Compact style={{ width: '100%' }}>
         <Input
           value={text}

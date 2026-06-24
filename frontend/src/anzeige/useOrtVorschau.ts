@@ -22,14 +22,18 @@ export function useOrtVorschau(
 ) {
   const [debounced, setDebounced] = useState<LatLon | null>(null);
 
+  // lat/lon als Primitive ziehen: der Effekt soll auf Wertänderung reagieren, nicht auf die
+  // Objekt-Identität von `koord` (die sonst jedes Render das Debounce zurücksetzen würde).
+  const lat = koord?.lat;
+  const lon = koord?.lon;
   useEffect(() => {
-    if (!koord) {
+    if (lat == null || lon == null) {
       setDebounced(null);
       return;
     }
-    const t = setTimeout(() => setDebounced({ lat: koord.lat, lon: koord.lon }), debounceMs);
+    const t = setTimeout(() => setDebounced({ lat, lon }), debounceMs);
     return () => clearTimeout(t);
-  }, [koord?.lat, koord?.lon, debounceMs]);
+  }, [lat, lon, debounceMs]);
 
   return useQuery<OrtVorschau>({
     queryKey: [

@@ -156,7 +156,7 @@ export default function PersonenDetailPage() {
     return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
-    return <Alert type="error" message="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+    return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
   const zurueck = personenPfad(einsatzId);
@@ -165,14 +165,14 @@ export default function PersonenDetailPage() {
     return (
       <Alert
         type="error" showIcon
-        message="Person konnte nicht geladen werden"
+        title="Person konnte nicht geladen werden"
         description={detailQuery.error instanceof ApiError ? detailQuery.error.message : undefined}
         action={<Button size="small" onClick={() => detailQuery.refetch()}>Erneut versuchen</Button>}
       />
     );
   }
   if (!detailQuery.data) {
-    return <Alert type="error" message="Person nicht gefunden" showIcon />;
+    return <Alert type="error" title="Person nicht gefunden" showIcon />;
   }
   const p = detailQuery.data;
 
@@ -204,7 +204,7 @@ export default function PersonenDetailPage() {
     ].sort((a, b) => b.at.localeCompare(a.at));
 
     return (
-      <Space direction="vertical" style={{ width: '100%' }} size="large">
+      <Space orientation="vertical" style={{ width: '100%' }} size="large">
         <Space wrap>
           {istPatient(person) && <Tag color="geekblue">Patient</Tag>}
           {person.aktuelle_sichtung
@@ -221,7 +221,7 @@ export default function PersonenDetailPage() {
         {darfSchreiben && person.aktuelle_sichtung === 'tot' && person.status !== 'verstorben' && (
           <Alert
             type="warning" showIcon
-            message="Sichtung = tot. Admin-Status wurde NICHT automatisch geändert."
+            title="Sichtung = tot. Admin-Status wurde NICHT automatisch geändert."
             action={
               <Button size="small" onClick={() => statusMutation.mutate({ personId: person.id, status: 'verstorben' })}>
                 Status → verstorben
@@ -292,7 +292,7 @@ export default function PersonenDetailPage() {
 
   function stammdatenSpalte(person: PersonDetail) {
     return (
-      <Space direction="vertical" style={{ width: '100%' }} size="large">
+      <Space orientation="vertical" style={{ width: '100%' }} size="large">
         {bearbeiten ? (
           <Form form={editForm} layout="vertical" initialValues={person}
             onFinish={(daten) => editMutation.mutate(daten)}>

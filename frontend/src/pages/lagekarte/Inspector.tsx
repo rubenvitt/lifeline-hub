@@ -88,7 +88,7 @@ export default function Inspector({
         </Descriptions.Item>
       </Descriptions>
       {symbolAuswahl && (
-        <Space direction="vertical" size="small" style={{ width: '100%', marginTop: 8 }}>
+        <Space orientation="vertical" size="small" style={{ width: '100%', marginTop: 8 }}>
           <label style={{ display: 'block' }}>
             <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>Fachaufgabe</div>
             <Select

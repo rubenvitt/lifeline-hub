@@ -76,7 +76,7 @@ export default function PersonDetailDrawer({
   return (
     <Drawer
       open={personId != null}
-      width={460}
+      size={460}
       title={p ? `Person ${registrierAnzeige(p.registrier_nr)}` : 'Person'}
       onClose={onClose}
       extra={p && (
@@ -90,13 +90,13 @@ export default function PersonDetailDrawer({
         <Alert
           type="error"
           showIcon
-          message="Person konnte nicht geladen werden"
+          title="Person konnte nicht geladen werden"
           description={detailQuery.error instanceof ApiError ? detailQuery.error.message : undefined}
           action={<Button size="small" onClick={() => detailQuery.refetch()}>Erneut versuchen</Button>}
         />
       )}
       {p && (
-        <Space direction="vertical" style={{ width: '100%' }} size="large">
+        <Space orientation="vertical" style={{ width: '100%' }} size="large">
           <Space wrap>
             <Tag color={STATUS_META[p.status].color}>{STATUS_META[p.status].label}</Tag>
             {istPatient(p) && <Tag color="geekblue">Patient</Tag>}

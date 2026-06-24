@@ -163,7 +163,7 @@ export default function MeldungFormular({ senden, onAnlegen, card = true }: {
             <Form.Item name="frist_min" noStyle>
               <InputNumber
                 min={1}
-                addonAfter="Min"
+                suffix="Min"
                 placeholder="Frist (Default 5)"
                 aria-label="Bestätigungsfrist in Minuten"
               />

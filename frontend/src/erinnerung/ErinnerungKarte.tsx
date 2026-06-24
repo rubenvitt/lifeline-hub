@@ -117,7 +117,7 @@ export default function ErinnerungKarte({
         </Space>
       </Flex>
 
-      <Space direction="vertical" size={2} style={{ marginBottom: aktionen.length ? 8 : 0 }}>
+      <Space orientation="vertical" size={2} style={{ marginBottom: aktionen.length ? 8 : 0 }}>
         {e.empfaenger_funktion && (
           <Text type="secondary" style={{ fontSize: 13 }}>für: {e.empfaenger_funktion}</Text>
         )}

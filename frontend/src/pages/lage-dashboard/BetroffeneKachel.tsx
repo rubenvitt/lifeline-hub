@@ -17,7 +17,7 @@ export default function BetroffeneKachel({ betroffene, onNavigate }: Props) {
       {betroffene === null ? (
         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Daten nicht verfügbar" />
       ) : (
-        <Space direction="vertical" size={8} style={{ width: '100%' }}>
+        <Space orientation="vertical" size={8} style={{ width: '100%' }}>
           <Typography.Text type="secondary">{betroffene.gesamt} Personen erfasst</Typography.Text>
           <Space size={4} wrap>
             {SK_REIHENFOLGE.map((sk) => (

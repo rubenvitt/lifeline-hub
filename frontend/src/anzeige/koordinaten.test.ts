@@ -77,7 +77,7 @@ describe('formatiere/parse — MGRS', () => {
 describe('formatiere/parse — Gauß-Krüger', () => {
   it('formatiert Rechts-/Hochwert, Zone 3 für Stuttgart (lon 9.177)', () => {
     const s = formatiere(48.782, 9.177, 'gk');
-    expect(s).toMatch(/^R 35\d{5}  H 5\d{6}$/); // Rechtswert beginnt mit 3 = Zone 3
+    expect(s).toMatch(/^R 35\d{5} {2}H 5\d{6}$/); // Rechtswert beginnt mit 3 = Zone 3
   });
   it('round-trip (< 3 m ≈ 1e-4 Grad)', () => {
     const s = formatiere(48.782, 9.177, 'gk');
@@ -106,6 +106,6 @@ describe('formatiere — Fallback-Schutz bei out-of-range', () => {
   });
   it('gültiger DE-GK-Koordinate (Stuttgart) formatiert weiterhin als GK', () => {
     // Sanity: der Fallback darf den Happy-Path nicht kaputt machen
-    expect(formatiere(48.782, 9.177, 'gk')).toMatch(/^R 35\d{5}  H 5\d{6}$/);
+    expect(formatiere(48.782, 9.177, 'gk')).toMatch(/^R 35\d{5} {2}H 5\d{6}$/);
   });
 });

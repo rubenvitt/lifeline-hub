@@ -66,13 +66,13 @@ export default function GefahrenPage() {
   });
 
   if (einsatzQuery.isLoading) return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
-  if (einsatzQuery.isError || !einsatzQuery.data) return <Alert type="error" message="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+  if (einsatzQuery.isError || !einsatzQuery.data) return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
 
   const einsatz = einsatzQuery.data;
   const darfSchreiben = einsatz.status === 'aktiv' && (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
 
   if (gebieteQuery.isLoading) return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
-  if (gebieteQuery.isError) return <Alert type="error" message="Gefahrengebiete konnten nicht geladen werden" showIcon />;
+  if (gebieteQuery.isError) return <Alert type="error" title="Gefahrengebiete konnten nicht geladen werden" showIcon />;
 
   if (gebiete.length === 0) {
     return <Empty description="Noch keine Gefahrengebiete – auf der Lagekarte ein Gefahrengebiet zeichnen." style={{ marginTop: 64 }} />;
@@ -114,10 +114,10 @@ export default function GefahrenPage() {
           </Typography.Title>
         )}
         {!darfSchreiben && (
-          <Alert type="info" showIcon message="Nur Lesezugriff – Bewertungen können nicht geändert werden." style={{ marginBottom: 12 }} />
+          <Alert type="info" showIcon title="Nur Lesezugriff – Bewertungen können nicht geändert werden." style={{ marginBottom: 12 }} />
         )}
         {matrixQuery.isError ? (
-          <Alert type="error" message="Matrix konnte nicht geladen werden" showIcon />
+          <Alert type="error" title="Matrix konnte nicht geladen werden" showIcon />
         ) : (
           <GefahrenMatrix
             matrix={matrixQuery.data ?? []}
