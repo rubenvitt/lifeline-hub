@@ -2,6 +2,7 @@ import { Button, Card, Flex, Popconfirm, Select, Space, Tag, Typography, theme }
 import { ClockCircleOutlined } from '@ant-design/icons';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { auftraegePfad } from '../routing/deeplinks';
 import type { Meldung, MeldungStatus } from '../api/types';
 import { MELDUNG_STATUS, PrioBadge, QuittungIndikator, StatusBadge, formatZeit } from '../kommunikation';
 
@@ -28,6 +29,8 @@ export interface MeldungKarteProps {
   einsatzId: number;
   darfSchreiben?: boolean;
   mitglieder?: BearbeiterOption[];
+  /** Deeplink-Hervorhebung (?meldung=, LFH-153): markierte Karte + scroll-adressierbar. */
+  hervorgehoben?: boolean;
   onStatus?: (meldungId: number, status: MeldungStatus) => void;
   onZuweisen?: (meldungId: number, bearbeiterId: number | null) => void;
   onLagerelevant?: (meldungId: number) => void;
@@ -60,7 +63,7 @@ function bestaetigungsAchse(m: Meldung): ReactNode {
  * orthogonal zum Triage-Status (LFH-97).
  */
 export default function MeldungKarte({
-  meldung: m, ansicht = 'offen', einsatzId, darfSchreiben, mitglieder,
+  meldung: m, ansicht = 'offen', einsatzId, darfSchreiben, mitglieder, hervorgehoben,
   onStatus, onZuweisen, onLagerelevant, onBestaetigen, onAuftragErteilen,
 }: MeldungKarteProps) {
   const { token } = theme.useToken();
@@ -132,10 +135,13 @@ export default function MeldungKarte({
   return (
     <Card
       size="small"
+      data-meldung-id={m.id}
+      data-hervorgehoben={hervorgehoben ? 'true' : undefined}
       style={{
         marginBottom: 10,
         borderInlineStart: `3px solid ${alarmiert ? token.colorError : 'transparent'}`,
         background: alarmiert ? token.colorErrorBg : undefined,
+        boxShadow: hervorgehoben ? `0 0 0 2px ${token.colorPrimary}` : undefined,
       }}
       styles={{ body: { padding: '12px 16px' } }}
     >
@@ -147,7 +153,7 @@ export default function MeldungKarte({
           {m.richtung === 'extern' && <Tag color="purple" style={{ margin: 0 }}>Extern</Tag>}
           {m.lagerelevant && <Tag color="gold" style={{ margin: 0 }}>Lagerelevant ✓</Tag>}
           {m.auftrag_id != null && (
-            <Link to={`/einsaetze/${einsatzId}/auftraege`}>↗ Auftrag</Link>
+            <Link to={auftraegePfad(einsatzId)}>↗ Auftrag</Link>
           )}
         </Space>
         <Space size={10} wrap>

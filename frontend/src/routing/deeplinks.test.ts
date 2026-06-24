@@ -10,6 +10,7 @@ import {
   befehlDetailPfad,
   personDetailPfad,
   tiereDetailPfad,
+  schadenDetailPfad,
   tierePfad,
   personenPfad,
   schaedenPfad,
@@ -20,6 +21,7 @@ import {
   einsatzabschnittePfad,
   meldungenPfad,
   auftraegePfad,
+  gefahrenPfad,
   einsatzdatenPfad,
   parseRouteId,
 } from './deeplinks';
@@ -51,6 +53,9 @@ describe('deeplinks — Item-Routes (Vollseiten-Detail)', () => {
   it('tiereDetailPfad', () => {
     expect(tiereDetailPfad(E, 10)).toBe('/einsaetze/5/tiere/10');
   });
+  it('schadenDetailPfad', () => {
+    expect(schadenDetailPfad(E, 8)).toBe('/einsaetze/5/schaeden/8');
+  });
 });
 
 describe('deeplinks — Listen-Routes (NaN-Redirect-Ziele)', () => {
@@ -78,8 +83,8 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   it('personenPfad mit ?neu=1', () => {
     expect(personenPfad(E, { neu: true })).toBe('/einsaetze/5/personen?neu=1');
   });
-  it('schaedenPfad mit ?schaden=', () => {
-    expect(schaedenPfad(E, { schaden: 8 })).toBe('/einsaetze/5/schaeden?schaden=8');
+  it('schaedenPfad ohne Optionen', () => {
+    expect(schaedenPfad(E)).toBe('/einsaetze/5/schaeden');
   });
   it('schaedenPfad mit ?neu=1', () => {
     expect(schaedenPfad(E, { neu: true })).toBe('/einsaetze/5/schaeden?neu=1');
@@ -110,6 +115,12 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   });
   it('auftraegePfad ohne Optionen', () => {
     expect(auftraegePfad(E)).toBe('/einsaetze/5/auftraege');
+  });
+  it('gefahrenPfad ohne Optionen', () => {
+    expect(gefahrenPfad(E)).toBe('/einsaetze/5/gefahren');
+  });
+  it('gefahrenPfad mit ?gefahrengebiet=', () => {
+    expect(gefahrenPfad(E, { gefahrengebiet: 4 })).toBe('/einsaetze/5/gefahren?gefahrengebiet=4');
   });
   it('einsatzdatenPfad', () => {
     expect(einsatzdatenPfad(E)).toBe('/einsaetze/5/einsatzdaten');

@@ -6,17 +6,18 @@
  * Codebasis verstreut bauen Komponenten ihre Links hierüber — das hält Routen-Strings,
  * Param-Namen und Query-Konventionen an EINER Stelle und macht sie unit-testbar.
  *
- * Hinweis: Einige bestehende gleich-Modul-Inline-Pfade (Liste→Detail) sind noch nicht
- * migriert (Folge-Task, s. Spec). Bei Routen-/Param-Änderungen daher auch nach Inline-
- * Literalen suchen, nicht nur hier ändern.
+ * Hinweis: Bare `/einsaetze/:id`-Breadcrumbs und dynamische Modul-Basis-Navigationen
+ * (`modulZielRoute(...)`) bleiben bewusst inline (kein passender Builder). Bei Routen-/
+ * Param-Änderungen daher auch nach Inline-Literalen suchen, nicht nur hier ändern.
  *
  * Muster (siehe docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-design.md
  * und die UI-Form-Leitlinie in CLAUDE.md):
  *  - **Item-Route** `/einsaetze/:id/<modul>/:<modul>Id` → Vollseiten-Detail (uhs, br,
- *    lagebericht, befehl, person, tier).
- *  - **Query-Param** `?<modul>=<id>` → Selektion/Drawer auf der Listenseite, wenn das
- *    Modul (noch) keine eigene Detail-Route hat (schaden, einheit, fahrzeug, personal,
- *    abschnitt, meldung, auftrag) bzw. ein Eintrag in einer Liste adressiert wird (etb).
+ *    lagebericht, befehl, person, tier, schaden).
+ *  - **Query-Param** `?<modul>=<id>` → Selektion auf der Modul-/Listenseite, wenn das
+ *    Modul (noch) keine eigene Detail-Route hat (einheit, fahrzeug, personal,
+ *    abschnitt, meldung, auftrag, gefahrengebiet) bzw. ein Eintrag in einer Liste
+ *    adressiert wird (etb).
  *  - **`?neu=1`** → Schnellerfassung auf der Listenseite fokussieren.
  *
  * Die Builder sind reine String-Funktionen und gehen von gültigen, positiven
@@ -64,6 +65,10 @@ export function tiereDetailPfad(einsatzId: number, tierId: number): string {
   return `${einsatzModulPfad(einsatzId, 'tiere')}/${tierId}`;
 }
 
+export function schadenDetailPfad(einsatzId: number, schadenId: number): string {
+  return `${einsatzModulPfad(einsatzId, 'schaeden')}/${schadenId}`;
+}
+
 // ── Listen-Routes (auch NaN-Redirect-Ziele) ──────────────────────────────────
 
 export function unfallhilfsstellenListePfad(einsatzId: number): string {
@@ -98,12 +103,8 @@ export function personenPfad(
   });
 }
 
-export function schaedenPfad(
-  einsatzId: number,
-  opts: { schaden?: number; neu?: boolean } = {},
-): string {
+export function schaedenPfad(einsatzId: number, opts: { neu?: boolean } = {}): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'schaeden'), {
-    schaden: opts.schaden,
     neu: opts.neu ? 1 : undefined,
   });
 }
@@ -140,6 +141,10 @@ export function meldungenPfad(einsatzId: number, opts: { meldung?: number } = {}
 
 export function auftraegePfad(einsatzId: number, opts: { auftrag?: number } = {}): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'auftraege'), { auftrag: opts.auftrag });
+}
+
+export function gefahrenPfad(einsatzId: number, opts: { gefahrengebiet?: number } = {}): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'gefahren'), { gefahrengebiet: opts.gefahrengebiet });
 }
 
 // ── Route-Param-Robustheit ───────────────────────────────────────────────────

@@ -53,12 +53,12 @@ Querverweise (Inspector, ETB-Backlinks, Geschädigt-Bezüge, NaN-Redirect-Ziele)
 ausschließlich darüber gebaut. Reine, unit-getestete String-Funktionen (`deeplinks.test.ts`);
 Builder gehen von gültigen, positiven Integer-IDs aus.
 
-**Noch nicht vollständig migriert:** einige bestehende gleich-Modul-Inline-Pfade
-(Liste → Detail, z. B. `LageberichtePage`, `UnfallhilfsstellenPage`, `PersonenPage`,
-`UhsSwitcher`, `PersonDetailDrawer`, `KraefteuebersichtPage`, `MeldungKarte`) bauen ihren
-Pfad noch als Template-Literal. Sie sind funktional identisch, aber bei einer Routen-/Param-
-Änderung separat nachzuziehen → schrittweise Migration als Folge-Task. Wer eine Route ändert,
-prüft daher zusätzlich diese Inline-Stellen, nicht nur `deeplinks.ts`.
+**Migriert (LFH-154):** die zuvor verbliebenen gleich-Modul-Inline-Pfade (Liste → Detail in
+`LageberichtePage`, `UnfallhilfsstellenPage`, `PersonenPage`, `UhsSwitcher`,
+`PersonDetailDrawer`, `KraefteuebersichtPage`, `BereitstellungsraeumePage`, `MeldungKarte`)
+nutzen nun die Builder. Bewusst inline bleiben nur bare `/einsaetze/:id`-Breadcrumbs und
+dynamische Modul-Basis-Navigationen (`modulZielRoute(...)`) — für sie gibt es keinen
+passenden Builder. Wer eine Route ändert, prüft daher zusätzlich diese Inline-Stellen.
 
 Der Lagekarte-Inspector adaptiert das über `frontend/src/pages/lagekarte/markerToUrl.ts`
 (dünner Adapter auf die Builder; nimmt den ganzen Marker, weil der `lagemeldung`-Marker auf

@@ -1,6 +1,7 @@
 import { Alert, Breadcrumb, Button, Space, Spin, Table, Tag, Typography, type TableColumnsType } from 'antd';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { uhsDetailPfad } from '../routing/deeplinks';
 import { useEffect, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeUhs } from '../api/einsatzUhs';
@@ -50,7 +51,7 @@ export default function UnfallhilfsstellenPage() {
 
   const spalten: TableColumnsType<Uhs> = [
     { title: 'Bezeichnung', dataIndex: 'bezeichnung', render: (b: string, u) =>
-        <Link to={`/einsaetze/${einsatzId}/unfallhilfsstellen/${u.id}`}>{b}</Link> },
+        <Link to={uhsDetailPfad(einsatzId, u.id)}>{b}</Link> },
     { title: 'Typ', dataIndex: 'typ', render: (t: UhsTyp) => UHS_TYP_LABEL[t] },
     { title: 'Status', dataIndex: 'status', render: (s: UhsStatus) => {
       const meta = STATUS_META[s];

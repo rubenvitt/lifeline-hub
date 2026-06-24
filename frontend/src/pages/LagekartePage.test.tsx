@@ -313,7 +313,7 @@ describe('LagekartePage', () => {
     renderSeite();
     await user.click(await screen.findByText('marker-schaden-9'));
     const link = await screen.findByRole('link', { name: /Im Fach-Modul öffnen/ });
-    expect(link).toHaveAttribute('href', '/einsaetze/1/schaeden?schaden=9');
+    expect(link).toHaveAttribute('href', '/einsaetze/1/schaeden/9');
   });
 
   it('rendert verortete Lagemeldungen als Marker; Klick öffnet Inspector mit Backlink zur Quell-Meldung', async () => {

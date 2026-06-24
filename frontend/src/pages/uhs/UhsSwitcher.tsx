@@ -3,6 +3,7 @@ import { DownOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
+import { uhsDetailPfad } from '../../routing/deeplinks';
 import { listeUhs } from '../../api/einsatzUhs';
 import UhsAnlegenDrawer from './UhsAnlegenDrawer';
 import type { Uhs, UhsStatus } from '../../api/types';
@@ -17,7 +18,7 @@ const STATUS_META: Record<UhsStatus, { label: string; color: string; rang: numbe
 export default function UhsSwitcher({ einsatzId, aktuelleUhs }: { einsatzId: number; aktuelleUhs: Uhs }) {
   const navigate = useNavigate();
   const [anlegen, setAnlegen] = useState(false);
-  const detailPfad = (uhsId: number) => `/einsaetze/${einsatzId}/unfallhilfsstellen/${uhsId}`;
+  const detailPfad = (uhsId: number) => uhsDetailPfad(einsatzId, uhsId);
 
   const { data: liste = [] } = useQuery({
     queryKey: ['einsatz-uhs', einsatzId],

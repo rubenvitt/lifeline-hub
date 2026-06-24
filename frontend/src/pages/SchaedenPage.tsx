@@ -1,16 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { personDetailPfad, personalPfad, parseRouteId } from '../routing/deeplinks';
+import { schadenDetailPfad } from '../routing/deeplinks';
 import {
   App,
   Button,
-  Descriptions,
-  Drawer,
   Form,
   Input,
   Modal,
-  Popconfirm,
   Select,
   Space,
   Table,
@@ -22,59 +19,15 @@ import type { TableColumnsType } from 'antd';
 import { ApiError } from '../api/client';
 import { ladeEinsatz } from '../api/einsaetze';
 import {
-  aktualisiereSchaden,
-  ladeSchaden,
   legeSchadenAn,
   listeSchaeden,
   schadenRegistrierAnzeige,
-  schliesseSchadenAb,
-  storniereSchaden,
-  uebergebeSchaden,
   type SchadenEingabe,
-  type SchadenPatch,
 } from '../api/einsatzSchaden';
-import type {
-  Ausmass,
-  Schaden,
-  SchadenAbschlussGrund,
-  SchadenStatus,
-  SchadenTyp,
-} from '../api/types';
+import type { Ausmass, Schaden, SchadenStatus, SchadenTyp } from '../api/types';
 import { useSchaedenStream } from '../etb/useSchaedenStream';
 import GeschaedigtPicker, { type GeschaedigtWert } from './schaeden/GeschaedigtPicker';
-
-const STATUS_META: Record<SchadenStatus, { label: string; color: string }> = {
-  offen: { label: 'offen', color: 'gold' },
-  uebergeben: { label: 'übergeben', color: 'blue' },
-  abgeschlossen: { label: 'abgeschlossen', color: 'default' },
-};
-
-const TYP_LABEL: Record<SchadenTyp, string> = {
-  sachschaden: 'Sachschaden',
-  verkehrshindernis: 'Verkehrshindernis',
-  infrastruktur: 'Infrastruktur',
-  umweltschaden: 'Umweltschaden',
-  tierkadaver: 'Tierkadaver',
-  sonstige: 'Sonstige',
-};
-
-const AUSMASS_META: Record<Ausmass, { label: string; color: string }> = {
-  gering: { label: 'gering', color: 'green' },
-  mittel: { label: 'mittel', color: 'gold' },
-  gross: { label: 'groß', color: 'orange' },
-  katastrophal: { label: 'katastrophal', color: 'red' },
-};
-
-const ABSCHLUSS_LABEL: Record<SchadenAbschlussGrund, string> = {
-  behoben: 'behoben',
-  kein_handlungsbedarf: 'kein Handlungsbedarf',
-  abgewiesen: 'abgewiesen',
-};
-
-const ABSCHLUSS_GRUENDE = (Object.keys(ABSCHLUSS_LABEL) as SchadenAbschlussGrund[]).map((g) => ({
-  value: g,
-  label: ABSCHLUSS_LABEL[g],
-}));
+import { AUSMASS_META, STATUS_META, TYP_LABEL, geschaedigtAnzeige, geschaedigtFelder } from './schaeden/schadenHelfer';
 
 type Sicht = 'offen' | 'uebergeben' | 'abgeschlossen' | 'alle';
 const SICHTEN: { key: Sicht; label: string }[] = [
@@ -84,91 +37,10 @@ const SICHTEN: { key: Sicht; label: string }[] = [
   { key: 'alle', label: 'Alle' },
 ];
 
-function pad3(nr: number): string {
-  return String(nr).padStart(3, '0');
-}
-
-function geschaedigtAnzeige(s: Schaden, einsatzId: number): React.ReactNode {
-  if (s.geschaedigt_registrier_nr != null) {
-    const label = `R-${pad3(s.geschaedigt_registrier_nr)}`;
-    // Storniert bleibt grauer Text ohne Deeplink (Status-quo-Optik).
-    if (s.geschaedigt_storniert_at) {
-      return <Typography.Text type="secondary">Geschädigt (storniert): {label}</Typography.Text>;
-    }
-    // Deeplink auf die Personen-Detailseite (LFH-25), falls die Person-id bekannt ist.
-    return s.geschaedigt_person_id != null ? (
-      <Link to={personDetailPfad(einsatzId, s.geschaedigt_person_id)}><Tag color="blue">{label}</Tag></Link>
-    ) : (
-      <Tag color="blue">{label}</Tag>
-    );
-  }
-  if (s.geschaedigt_personal_id != null) {
-    // Einsatzkraft → Personal-Liste mit Zeilen-Selektion (?personal=, LFH-25).
-    return (
-      <Link to={personalPfad(einsatzId, { personal: s.geschaedigt_personal_id })}>
-        <Tag color="geekblue">{s.geschaedigt_personal_name ?? 'Einsatzkraft'}</Tag>
-      </Link>
-    );
-  }
-  if (s.geschaedigt_organisation_id != null) {
-    return <Tag color="purple">{s.geschaedigt_organisation_name ?? 'Eigene Organisation'}</Tag>;
-  }
-  if (s.geschaedigt_kontakt) return <Typography.Text>{s.geschaedigt_kontakt}</Typography.Text>;
-  return <Typography.Text type="secondary">—</Typography.Text>;
-}
-
-/** Strukturierten Geschädigt-Wert aus einem geladenen Schaden ableiten (Edit-Seeding). */
-function geschaedigtAusSchaden(s: Schaden): GeschaedigtWert {
-  if (s.geschaedigt_person_id != null) {
-    return {
-      typ: 'person',
-      refId: s.geschaedigt_person_id,
-      label:
-        s.geschaedigt_registrier_nr != null ? `R-${pad3(s.geschaedigt_registrier_nr)}` : 'Betroffene Person',
-    };
-  }
-  if (s.geschaedigt_personal_id != null) {
-    return { typ: 'personal', refId: s.geschaedigt_personal_id, label: s.geschaedigt_personal_name ?? 'Einsatzkraft' };
-  }
-  if (s.geschaedigt_organisation_id != null) {
-    return { typ: 'organisation', label: s.geschaedigt_organisation_name ?? 'Eigene Organisation' };
-  }
-  if (s.geschaedigt_kontakt) return { typ: 'extern', kontakt: s.geschaedigt_kontakt };
-  return null;
-}
-
-/** GeschaedigtWert → die vier Backend-Felder (genau eines gesetzt). orgId für die eigene Org. */
-function geschaedigtFelder(
-  wert: GeschaedigtWert,
-  orgId: number,
-): {
-  geschaedigt_person_id: number | null;
-  geschaedigt_personal_id: number | null;
-  geschaedigt_organisation_id: number | null;
-  geschaedigt_kontakt: string | null;
-} {
-  const leer = {
-    geschaedigt_person_id: null,
-    geschaedigt_personal_id: null,
-    geschaedigt_organisation_id: null,
-    geschaedigt_kontakt: null,
-  };
-  if (wert == null) return leer;
-  switch (wert.typ) {
-    case 'person':
-      return { ...leer, geschaedigt_person_id: wert.refId };
-    case 'personal':
-      return { ...leer, geschaedigt_personal_id: wert.refId };
-    case 'organisation':
-      return { ...leer, geschaedigt_organisation_id: orgId };
-    case 'extern':
-      return { ...leer, geschaedigt_kontakt: wert.kontakt };
-  }
-}
-
 export default function SchaedenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { message } = App.useApp();
   const qc = useQueryClient();
@@ -178,20 +50,10 @@ export default function SchaedenPage() {
   const [ausmassFilter, setAusmassFilter] = useState<Ausmass | undefined>(undefined);
   const [suche, setSuche] = useState('');
 
-  const [offenerSchadenId, setOffenerSchadenId] = useState<number | null>(null);
-  const [bearbeiten, setBearbeiten] = useState(false);
   const [erfassenOffen, setErfassenOffen] = useState(false);
-  const [uebergebenOffen, setUebergebenOffen] = useState(false);
-  const [abschlussOffen, setAbschlussOffen] = useState(false);
-
   const [erfassForm] = Form.useForm<SchadenEingabe>();
-  const [editForm] = Form.useForm<SchadenPatch>();
-  const [uebergebForm] = Form.useForm<{ uebergeben_an: string }>();
-  const [abschlussForm] = Form.useForm<{ abschluss_grund: string; notiz?: string }>();
-
   // Geschädigt ist ein strukturierter Wert → lokaler State (kein Form.Item).
   const [erfassGeschaedigt, setErfassGeschaedigt] = useState<GeschaedigtWert>(null);
-  const [editGeschaedigt, setEditGeschaedigt] = useState<GeschaedigtWert>(null);
 
   useSchaedenStream(einsatzId);
 
@@ -200,17 +62,6 @@ export default function SchaedenPage() {
     queryKey: ['einsatz-schaeden', einsatzId],
     queryFn: () => listeSchaeden(einsatzId),
   });
-  const detailQuery = useQuery({
-    queryKey: ['einsatz-schaden', einsatzId, offenerSchadenId],
-    queryFn: () => ladeSchaden(einsatzId, offenerSchadenId!),
-    enabled: offenerSchadenId != null,
-  });
-
-  useEffect(() => {
-    // Konsistent mit allen anderen Deeplink-Pfaden: nur positive Ganzzahlen (LFH-25).
-    const id = parseRouteId(searchParams.get('schaden') ?? undefined);
-    if (id != null) setOffenerSchadenId(id);
-  }, [searchParams]);
 
   const einsatz = einsatzQuery.data;
   const darfSchreiben =
@@ -227,20 +78,8 @@ export default function SchaedenPage() {
     setSearchParams(searchParams, { replace: true });
   }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreiben]);
 
-  // Drawer schließen und den Deeplink-Param ?schaden= aus der URL räumen (LFH-25), damit
-  // Browser-Back/Reload den Drawer nicht erneut öffnet. Spiegelt das ?neu=1-Cleanup-Muster;
-  // der Consume-Effect oben re-läuft danach mit leerem Param und ist ein No-op (kein Reopen).
-  function schliesseDrawer() {
-    setOffenerSchadenId(null);
-    if (searchParams.has('schaden')) {
-      searchParams.delete('schaden');
-      setSearchParams(searchParams, { replace: true });
-    }
-  }
-
   function invalidate() {
     qc.invalidateQueries({ queryKey: ['einsatz-schaeden', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['einsatz-schaden', einsatzId] });
     qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
   }
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
@@ -252,41 +91,6 @@ export default function SchaedenPage() {
       setErfassenOffen(false);
       erfassForm.resetFields();
       setErfassGeschaedigt(null);
-    },
-    onError: fehler,
-  });
-  const editMutation = useMutation({
-    mutationFn: (v: SchadenPatch) => aktualisiereSchaden(einsatzId, offenerSchadenId!, v),
-    onSuccess: () => {
-      invalidate();
-      setBearbeiten(false);
-    },
-    onError: fehler,
-  });
-  const uebergebMutation = useMutation({
-    mutationFn: (an: string) => uebergebeSchaden(einsatzId, offenerSchadenId!, an),
-    onSuccess: () => {
-      invalidate();
-      setUebergebenOffen(false);
-      uebergebForm.resetFields();
-    },
-    onError: fehler,
-  });
-  const abschlussMutation = useMutation({
-    mutationFn: (v: { abschluss_grund: string; notiz?: string }) =>
-      schliesseSchadenAb(einsatzId, offenerSchadenId!, v.abschluss_grund, v.notiz),
-    onSuccess: () => {
-      invalidate();
-      setAbschlussOffen(false);
-      abschlussForm.resetFields();
-    },
-    onError: fehler,
-  });
-  const stornoMutation = useMutation({
-    mutationFn: () => storniereSchaden(einsatzId, offenerSchadenId!),
-    onSuccess: () => {
-      invalidate();
-      schliesseDrawer();
     },
     onError: fehler,
   });
@@ -339,19 +143,6 @@ export default function SchaedenPage() {
       ...geschaedigtFelder(erfassGeschaedigt, orgId),
     });
   }
-
-  function onEdit(daten: SchadenPatch) {
-    editMutation.mutate({
-      typ: daten.typ,
-      ausmass: daten.ausmass,
-      ort: daten.ort,
-      beschreibung: daten.beschreibung,
-      // Patch ersetzt die Auswahl: immer alle vier Felder explizit senden.
-      ...geschaedigtFelder(editGeschaedigt, orgId),
-    });
-  }
-
-  const s = detailQuery.data;
 
   return (
     <div style={{ padding: 16 }}>
@@ -411,10 +202,7 @@ export default function SchaedenPage() {
         pagination={false}
         locale={{ emptyText: 'Keine Schäden in dieser Sicht' }}
         onRow={(row) => ({
-          onClick: () => {
-            setOffenerSchadenId(row.id);
-            setBearbeiten(false);
-          },
+          onClick: () => navigate(schadenDetailPfad(einsatzId, row.id)),
           style: { cursor: 'pointer' },
         })}
       />
@@ -449,156 +237,6 @@ export default function SchaedenPage() {
               value={erfassGeschaedigt}
               onChange={setErfassGeschaedigt}
             />
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      {/* Detail-Drawer */}
-      <Drawer
-        width={520}
-        open={offenerSchadenId != null}
-        onClose={schliesseDrawer}
-        title={s ? `${schadenRegistrierAnzeige(s.registrier_nr)} · ${TYP_LABEL[s.typ]}` : 'Schaden'}
-        loading={detailQuery.isLoading}
-      >
-        {s && (
-          <Space direction="vertical" style={{ width: '100%' }} size="middle">
-            <Space wrap>
-              <Tag color={STATUS_META[s.status].color}>{STATUS_META[s.status].label}</Tag>
-              <Tag color={AUSMASS_META[s.ausmass].color}>{AUSMASS_META[s.ausmass].label}</Tag>
-              {s.storniert_at && <Tag color="red">storniert</Tag>}
-            </Space>
-
-            {darfSchreiben && !s.storniert_at && (
-              <Space wrap>
-                <Button size="small" disabled={s.status !== 'offen'} onClick={() => setUebergebenOffen(true)}>
-                  Übergeben
-                </Button>
-                <Button
-                  size="small"
-                  disabled={s.status === 'abgeschlossen'}
-                  onClick={() => setAbschlussOffen(true)}
-                >
-                  Abschließen
-                </Button>
-              </Space>
-            )}
-
-            {!bearbeiten ? (
-              <Descriptions column={1} size="small" bordered>
-                <Descriptions.Item label="Ort">{s.ort}</Descriptions.Item>
-                <Descriptions.Item label="Beschreibung">{s.beschreibung || '—'}</Descriptions.Item>
-                <Descriptions.Item label="Geschädigt">{geschaedigtAnzeige(s, einsatzId)}</Descriptions.Item>
-                {s.status !== 'offen' && (
-                  <Descriptions.Item label="Übergeben an">{s.uebergeben_an || '—'}</Descriptions.Item>
-                )}
-                {s.status === 'abgeschlossen' && (
-                  <Descriptions.Item label="Abschlussgrund">
-                    {s.abschluss_grund ? ABSCHLUSS_LABEL[s.abschluss_grund] : '—'}
-                  </Descriptions.Item>
-                )}
-              </Descriptions>
-            ) : (
-              <Form
-                form={editForm}
-                layout="vertical"
-                onFinish={onEdit}
-                initialValues={{
-                  typ: s.typ,
-                  ausmass: s.ausmass,
-                  ort: s.ort,
-                  beschreibung: s.beschreibung,
-                }}
-              >
-                <Form.Item label="Typ" name="typ">
-                  <Select options={(Object.keys(TYP_LABEL) as SchadenTyp[]).map((t) => ({ value: t, label: TYP_LABEL[t] }))} />
-                </Form.Item>
-                <Form.Item label="Ausmaß" name="ausmass">
-                  <Select options={(Object.keys(AUSMASS_META) as Ausmass[]).map((a) => ({ value: a, label: AUSMASS_META[a].label }))} />
-                </Form.Item>
-                <Form.Item label="Ort" name="ort" rules={[{ required: true, message: 'Ort ist Pflicht' }]}>
-                  <Input />
-                </Form.Item>
-                <Form.Item label="Beschreibung" name="beschreibung">
-                  <Input.TextArea rows={2} />
-                </Form.Item>
-                <Form.Item label="Geschädigt">
-                  <GeschaedigtPicker
-                    einsatzId={einsatzId}
-                    orgName={einsatz?.org_name ?? 'Eigene Organisation'}
-                    value={editGeschaedigt}
-                    onChange={setEditGeschaedigt}
-                  />
-                </Form.Item>
-                <Space>
-                  <Button type="primary" htmlType="submit" loading={editMutation.isPending}>
-                    Speichern
-                  </Button>
-                  <Button onClick={() => setBearbeiten(false)}>Abbrechen</Button>
-                </Space>
-              </Form>
-            )}
-
-            {darfSchreiben && !s.storniert_at && !bearbeiten && (
-              <Space>
-                <Button
-                  onClick={() => {
-                    setEditGeschaedigt(geschaedigtAusSchaden(s));
-                    setBearbeiten(true);
-                  }}
-                >
-                  Bearbeiten
-                </Button>
-                <Popconfirm title="Schaden stornieren?" onConfirm={() => stornoMutation.mutate()} okText="Stornieren">
-                  <Button danger>Stornieren</Button>
-                </Popconfirm>
-              </Space>
-            )}
-          </Space>
-        )}
-      </Drawer>
-
-      {/* Übergeben-Modal */}
-      <Modal
-        title="Schaden übergeben"
-        open={uebergebenOffen}
-        onCancel={() => setUebergebenOffen(false)}
-        onOk={() => uebergebForm.submit()}
-        okText="Übergeben"
-        confirmLoading={uebergebMutation.isPending}
-        destroyOnHidden
-      >
-        <Form form={uebergebForm} layout="vertical" onFinish={(v) => uebergebMutation.mutate(v.uebergeben_an)}>
-          <Form.Item
-            label="Übergeben an"
-            name="uebergeben_an"
-            rules={[{ required: true, message: 'Adressat ist Pflicht' }]}
-          >
-            <Input placeholder="z. B. Stadtwerke, Bauhof, Umweltamt" />
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      {/* Abschließen-Modal */}
-      <Modal
-        title="Schaden abschließen"
-        open={abschlussOffen}
-        onCancel={() => setAbschlussOffen(false)}
-        onOk={() => abschlussForm.submit()}
-        okText="Abschließen"
-        confirmLoading={abschlussMutation.isPending}
-        destroyOnHidden
-      >
-        <Form form={abschlussForm} layout="vertical" onFinish={(v) => abschlussMutation.mutate(v)}>
-          <Form.Item
-            label="Abschlussgrund"
-            name="abschluss_grund"
-            rules={[{ required: true, message: 'Grund ist Pflicht' }]}
-          >
-            <Select options={ABSCHLUSS_GRUENDE} />
-          </Form.Item>
-          <Form.Item label="Notiz (optional, wird an Beschreibung angehängt)" name="notiz">
-            <Input.TextArea rows={2} />
           </Form.Item>
         </Form>
       </Modal>

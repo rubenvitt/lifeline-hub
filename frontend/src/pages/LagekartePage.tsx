@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { App, Spin } from 'antd';
+import { gefahrenPfad } from '../routing/deeplinks';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
 import { aktualisiereEinsatz, ladeEinsatz, ladeEinstellungen, type KopfdatenUpdate } from '../api/einsaetze';
@@ -28,7 +29,6 @@ import Inspector from './lagekarte/Inspector';
 import ZonenInspector from './lagekarte/ZonenInspector';
 import FachebenenInspector from './lagekarte/FachebenenInspector';
 import { zoneStil, gefahrengebietStil } from './lagekarte/zonenStil';
-import GefahrengebietMatrixDrawer from './lagekarte/GefahrengebietMatrixDrawer';
 import type { ZeichenModus } from './lagekarte/zeichnen';
 import { ladeFachebene, type FachebeneQuelle, type FachebeneStatus, type FeatureCollection } from '../api/fachebenen';
 import { FACHEBENEN, fachebeneKeys, KRITIS_MIN_ZOOM, rasterBbox, mergeFeatures } from './lagekarte/fachebenen';
@@ -73,7 +73,7 @@ export default function LagekartePage() {
   const [layer, setLayer] = useState<LayerSichtbar>({
     einsatzort: true, uhs: true, schaden: true, einheit: true, fahrzeug: true, fuehrung: true, abschnitt: true, zone: true, lagemeldung: true,
   });
-  const [matrixGebiet, setMatrixGebiet] = useState<number | null>(null);
+  const navigate = useNavigate();
   // Angeklicktes Fachebenen-Objekt (externe Daten) → Detail-Panel.
   const [fachebeneAuswahl, setFachebeneAuswahl] =
     useState<{ quelle: FachebeneQuelle; properties: Record<string, unknown> } | null>(null);
@@ -603,7 +603,7 @@ export default function LagekartePage() {
                 })
                 .catch(fehler)
             }
-            onMatrixOeffnen={(gid) => setMatrixGebiet(gid)}
+            onMatrixOeffnen={(gid) => navigate(gefahrenPfad(einsatzId, { gefahrengebiet: gid }))}
             onLoeschen={() =>
               loescheZone(einsatzId, ausgewaehlteZone.id)
                 .then(() => {
@@ -615,12 +615,6 @@ export default function LagekartePage() {
             }
           />
         )}
-        <GefahrengebietMatrixDrawer
-          einsatzId={einsatzId}
-          gefahrengebietId={matrixGebiet}
-          darfSchreiben={!!darfSchreiben}
-          onClose={() => setMatrixGebiet(null)}
-        />
       </div>
     </div>
   );

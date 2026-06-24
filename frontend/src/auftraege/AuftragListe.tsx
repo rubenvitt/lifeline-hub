@@ -9,6 +9,8 @@ export interface AuftragListeProps {
   /** Für den Rückverweis auf den Quell-ETB-Eintrag (LFH-112). Ohne ihn kein Backlink. */
   einsatzId?: number;
   darfSchreiben?: boolean;
+  /** Hervorzuhebender Auftrag (?auftrag=-Deeplink, LFH-153). */
+  highlightId?: number | null;
   onQuittieren?: (auftragId: number, empfaengerId: number) => void;
   onInArbeit?: (auftragId: number) => void;
   onVollzugMelden?: (auftragId: number) => void;
@@ -18,7 +20,8 @@ export interface AuftragListeProps {
 /** Kartenboard der Aufträge/Befehle (LFH-112). Reicht alle Props an die einzelne
  *  AuftragKarte durch; Darstellung/Logik liegen vollständig in der Karte. */
 export default function AuftragListe({
-  auftraege, ansicht = 'offen', einsatzId, darfSchreiben, onQuittieren, onInArbeit, onVollzugMelden, onAbnehmen,
+  auftraege, ansicht = 'offen', einsatzId, darfSchreiben, highlightId,
+  onQuittieren, onInArbeit, onVollzugMelden, onAbnehmen,
 }: AuftragListeProps) {
   if (auftraege.length === 0) return <Empty description="Keine Aufträge" />;
   return (
@@ -30,6 +33,7 @@ export default function AuftragListe({
           ansicht={ansicht}
           einsatzId={einsatzId}
           darfSchreiben={darfSchreiben}
+          hervorgehoben={a.id === highlightId}
           onQuittieren={onQuittieren}
           onInArbeit={onInArbeit}
           onVollzugMelden={onVollzugMelden}

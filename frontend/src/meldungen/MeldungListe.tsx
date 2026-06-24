@@ -15,6 +15,8 @@ export interface MeldungListeProps {
   einsatzId: number;
   darfSchreiben?: boolean;
   mitglieder?: BearbeiterOption[];
+  /** Hervorzuhebende Meldung (?meldung=-Deeplink, LFH-153). */
+  highlightId?: number | null;
   onStatus?: (meldungId: number, status: MeldungStatus) => void;
   onZuweisen?: (meldungId: number, bearbeiterId: number | null) => void;
   onLagerelevant?: (meldungId: number) => void;
@@ -29,7 +31,7 @@ export interface MeldungListeProps {
  * ist in die Karte gewandert.
  */
 export default function MeldungListe({
-  meldungen, ansicht = 'offen', einsatzId, darfSchreiben, mitglieder,
+  meldungen, ansicht = 'offen', einsatzId, darfSchreiben, mitglieder, highlightId,
   onStatus, onZuweisen, onLagerelevant, onBestaetigen, onAuftragErteilen,
 }: MeldungListeProps) {
   if (meldungen.length === 0) return <Empty description="Keine Meldungen" />;
@@ -43,6 +45,7 @@ export default function MeldungListe({
           einsatzId={einsatzId}
           darfSchreiben={darfSchreiben}
           mitglieder={mitglieder}
+          hervorgehoben={m.id === highlightId}
           onStatus={onStatus}
           onZuweisen={onZuweisen}
           onLagerelevant={onLagerelevant}
