@@ -71,7 +71,7 @@ pub async fn liste(
          AND (?4 IS NULL OR t.halter_person_id = ?4) \
          ORDER BY t.registrier_nr DESC"
     );
-    Ok(sqlx::query_as::<_, TierAnzeige>(&sql)
+    Ok(sqlx::query_as::<_, TierAnzeige>(sqlx::AssertSqlSafe(&*sql))
         .bind(einsatz_id)
         .bind(status)
         .bind(spezies)
@@ -87,9 +87,9 @@ pub async fn laden(
     einsatz_id: i64,
     tier_id: i64,
 ) -> Result<TierAnzeige, AppError> {
-    sqlx::query_as::<_, TierAnzeige>(&format!(
+    sqlx::query_as::<_, TierAnzeige>(sqlx::AssertSqlSafe(format!(
         "{SELECT_ALLE} WHERE t.id = ? AND t.einsatz_id = ?"
-    ))
+    )))
     .bind(tier_id)
     .bind(einsatz_id)
     .fetch_optional(pool)

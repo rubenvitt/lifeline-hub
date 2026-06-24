@@ -26,9 +26,9 @@ fn label_conflict<T>(e: sqlx::Error) -> Result<T, AppError> {
 
 /// Lädt einen Status der Org; `NotFound` bei fremder/unbekannter id.
 pub async fn laden(pool: &SqlitePool, org_id: i64, id: i64) -> Result<FahrzeugStatus, AppError> {
-    sqlx::query_as::<_, FahrzeugStatus>(&format!(
+    sqlx::query_as::<_, FahrzeugStatus>(sqlx::AssertSqlSafe(format!(
         "SELECT {SPALTEN} FROM fahrzeug_status WHERE id = ? AND org_id = ?"
-    ))
+    )))
     .bind(id)
     .bind(org_id)
     .fetch_optional(pool)
@@ -38,9 +38,9 @@ pub async fn laden(pool: &SqlitePool, org_id: i64, id: i64) -> Result<FahrzeugSt
 
 /// Nur aktive Status der Org, sortiert nach `sortier`, dann `id`.
 pub async fn liste(pool: &SqlitePool, org_id: i64) -> Result<Vec<FahrzeugStatus>, AppError> {
-    sqlx::query_as::<_, FahrzeugStatus>(&format!(
+    sqlx::query_as::<_, FahrzeugStatus>(sqlx::AssertSqlSafe(format!(
         "SELECT {SPALTEN} FROM fahrzeug_status WHERE org_id = ? AND aktiv = 1 ORDER BY sortier, id"
-    ))
+    )))
     .bind(org_id)
     .fetch_all(pool)
     .await

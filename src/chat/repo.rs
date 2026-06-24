@@ -167,7 +167,7 @@ async fn anhaenge_anreichern(
 /// nicht existiert.
 pub async fn laden(pool: &SqlitePool, id: i64) -> Result<ChatNachrichtAnzeige, AppError> {
     let mut nachricht =
-        sqlx::query_as::<_, ChatNachrichtAnzeige>(&format!("{NACHRICHT_SELECT} WHERE n.id = ?"))
+        sqlx::query_as::<_, ChatNachrichtAnzeige>(sqlx::AssertSqlSafe(format!("{NACHRICHT_SELECT} WHERE n.id = ?")))
             .bind(id)
             .fetch_optional(pool)
             .await?

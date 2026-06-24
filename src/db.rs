@@ -705,7 +705,7 @@ mod tests {
         // Tabellen existieren (leeres SELECT wirft nicht).
         for tabelle in ["personal", "qualifikation", "personal_qualifikation", "personal_status", "einsatz_personal"] {
             let sql = format!("SELECT COUNT(*) FROM {tabelle}");
-            let n: i64 = sqlx::query_scalar(&sql).fetch_one(&pool).await.unwrap();
+            let n: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(&*sql)).fetch_one(&pool).await.unwrap();
             assert_eq!(n, 0, "{tabelle} startet leer (keine Org auf test_pool)");
         }
     }
@@ -919,7 +919,7 @@ mod tests {
                 (einsatz_id, registrier_nr, typ, ausmass, ort, erfasst_von, geaendert_von{extra_spalten}) \
              VALUES ({einsatz_id}, 1, 'sachschaden', 'gering', 'Hauptstr. 1', {benutzer_id}, {benutzer_id}{extra_werte})"
         );
-        sqlx::query(&sql).execute(pool).await
+        sqlx::query(sqlx::AssertSqlSafe(&*sql)).execute(pool).await
     }
 
     #[tokio::test]

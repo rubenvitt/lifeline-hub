@@ -382,9 +382,9 @@ async fn nummer_vergeben(
     tabelle: &str,
     einsatz_id: i64,
 ) -> Result<bool, AppError> {
-    let treffer: Option<i64> = sqlx::query_scalar(&format!(
+    let treffer: Option<i64> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
         "SELECT 1 FROM {tabelle} WHERE einsatz_id = ? AND lfd_nr IS NOT NULL LIMIT 1"
-    ))
+    )))
     .bind(einsatz_id)
     .fetch_optional(pool)
     .await?;

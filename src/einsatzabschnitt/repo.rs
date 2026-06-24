@@ -68,9 +68,9 @@ fn zu_anzeige(row: Row) -> EinsatzabschnittAnzeige {
 
 /// Alle Abschnitte eines Einsatzes (flach, aufgelöst), sortiert nach `sortier`, dann `id`.
 pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<EinsatzabschnittAnzeige>, AppError> {
-    let rows = sqlx::query_as::<_, Row>(&format!(
+    let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
         "{SELECT_AUFGELOEST} WHERE a.einsatz_id = ? ORDER BY a.sortier, a.id"
-    ))
+    )))
     .bind(einsatz_id)
     .fetch_all(pool).await?;
     let mut ergebnis = Vec::with_capacity(rows.len());
@@ -86,7 +86,7 @@ pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<Einsatzabsc
 
 /// Lädt einen Abschnitt (aufgelöst); `NotFound`, falls nicht zum Einsatz.
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<EinsatzabschnittAnzeige, AppError> {
-    let mut anzeige = sqlx::query_as::<_, Row>(&format!("{SELECT_AUFGELOEST} WHERE a.id = ? AND a.einsatz_id = ?"))
+    let mut anzeige = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!("{SELECT_AUFGELOEST} WHERE a.id = ? AND a.einsatz_id = ?")))
         .bind(id).bind(einsatz_id)
         .fetch_optional(pool).await?
         .map(zu_anzeige)

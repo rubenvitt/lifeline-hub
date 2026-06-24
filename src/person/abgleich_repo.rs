@@ -47,7 +47,7 @@ pub async fn anlegen_verdacht(
 
 /// Lädt einen Abgleich; `NotFound`, falls nicht zum Einsatz.
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<AbgleichAnzeige, AppError> {
-    sqlx::query_as::<_, AbgleichAnzeige>(&format!("{SELECT_ABGLEICH} WHERE id = ? AND einsatz_id = ?"))
+    sqlx::query_as::<_, AbgleichAnzeige>(sqlx::AssertSqlSafe(format!("{SELECT_ABGLEICH} WHERE id = ? AND einsatz_id = ?")))
         .bind(id)
         .bind(einsatz_id)
         .fetch_optional(pool)
@@ -113,11 +113,11 @@ pub async fn liste_je_person(
     einsatz_id: i64,
     person_id: i64,
 ) -> Result<Vec<AbgleichAnzeige>, AppError> {
-    Ok(sqlx::query_as::<_, AbgleichAnzeige>(&format!(
+    Ok(sqlx::query_as::<_, AbgleichAnzeige>(sqlx::AssertSqlSafe(format!(
         "{SELECT_ABGLEICH} WHERE einsatz_id = ? \
          AND (vermisst_person_id = ? OR gefunden_person_id = ?) \
          ORDER BY erstellt_at DESC, id DESC"
-    ))
+    )))
     .bind(einsatz_id)
     .bind(person_id)
     .bind(person_id)

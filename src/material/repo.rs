@@ -31,9 +31,9 @@ fn bestandsnummer_conflict<T>(e: sqlx::Error) -> Result<T, AppError> {
 
 /// Lädt ein Material der eigenen Org; `NotFound`, falls unbekannt oder fremde Org.
 pub async fn laden(pool: &SqlitePool, org_id: i64, id: i64) -> Result<Material, AppError> {
-    sqlx::query_as::<_, Material>(&format!(
+    sqlx::query_as::<_, Material>(sqlx::AssertSqlSafe(format!(
         "SELECT {SPALTEN} FROM material WHERE id = ? AND org_id = ?"
-    ))
+    )))
     .bind(id)
     .bind(org_id)
     .fetch_optional(pool)
@@ -53,7 +53,7 @@ pub async fn liste(
     } else {
         format!("SELECT {SPALTEN} FROM material WHERE org_id = ? ORDER BY bezeichnung")
     };
-    sqlx::query_as::<_, Material>(&sql)
+    sqlx::query_as::<_, Material>(sqlx::AssertSqlSafe(&*sql))
         .bind(org_id)
         .fetch_all(pool)
         .await

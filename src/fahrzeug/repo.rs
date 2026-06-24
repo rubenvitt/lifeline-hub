@@ -47,9 +47,9 @@ fn funkrufname_conflict<T>(e: sqlx::Error) -> Result<T, AppError> {
 
 /// Lädt ein Fahrzeug der eigenen Org; `NotFound`, falls unbekannt oder fremde Org.
 pub async fn laden(pool: &SqlitePool, org_id: i64, id: i64) -> Result<Fahrzeug, AppError> {
-    sqlx::query_as::<_, Fahrzeug>(&format!(
+    sqlx::query_as::<_, Fahrzeug>(sqlx::AssertSqlSafe(format!(
         "SELECT {SPALTEN} FROM fahrzeug WHERE id = ? AND org_id = ?"
-    ))
+    )))
     .bind(id)
     .bind(org_id)
     .fetch_optional(pool)
@@ -69,7 +69,7 @@ pub async fn liste(
     } else {
         format!("SELECT {SPALTEN} FROM fahrzeug WHERE org_id = ? ORDER BY funkrufname")
     };
-    sqlx::query_as::<_, Fahrzeug>(&sql)
+    sqlx::query_as::<_, Fahrzeug>(sqlx::AssertSqlSafe(&*sql))
         .bind(org_id)
         .fetch_all(pool)
         .await
@@ -80,11 +80,11 @@ pub async fn liste(
 /// `spalte` wird in die Query interpoliert und darf daher AUSSCHLIESSLICH mit
 /// festen Literalen aufgerufen werden (keine Nutzereingabe).
 async fn distinct_werte(pool: &SqlitePool, org_id: i64, spalte: &str) -> Result<Vec<String>, AppError> {
-    sqlx::query_scalar::<_, String>(&format!(
+    sqlx::query_scalar::<_, String>(sqlx::AssertSqlSafe(format!(
         "SELECT DISTINCT {spalte} FROM fahrzeug \
          WHERE org_id = ? AND {spalte} IS NOT NULL AND {spalte} <> '' \
          ORDER BY {spalte}"
-    ))
+    )))
     .bind(org_id)
     .fetch_all(pool)
     .await

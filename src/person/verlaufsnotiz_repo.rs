@@ -35,7 +35,7 @@ pub async fn anlegen(
     .bind(erfasst_von)
     .fetch_one(pool)
     .await?;
-    sqlx::query_as::<_, NotizAnzeige>(&format!("{SELECT_NOTIZ} WHERE id = ?"))
+    sqlx::query_as::<_, NotizAnzeige>(sqlx::AssertSqlSafe(format!("{SELECT_NOTIZ} WHERE id = ?")))
         .bind(id)
         .fetch_one(pool)
         .await
@@ -48,10 +48,10 @@ pub async fn liste_je_person(
     einsatz_id: i64,
     person_id: i64,
 ) -> Result<Vec<NotizAnzeige>, AppError> {
-    Ok(sqlx::query_as::<_, NotizAnzeige>(&format!(
+    Ok(sqlx::query_as::<_, NotizAnzeige>(sqlx::AssertSqlSafe(format!(
         "{SELECT_NOTIZ} WHERE einsatz_id = ? AND person_id = ? \
          ORDER BY erfasst_at DESC, id DESC"
-    ))
+    )))
     .bind(einsatz_id)
     .bind(person_id)
     .fetch_all(pool)

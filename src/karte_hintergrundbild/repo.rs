@@ -18,7 +18,7 @@ fn hex(bytes: &[u8]) -> String {
 
 pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<HintergrundbildAnzeige>, AppError> {
     Ok(sqlx::query_as::<_, HintergrundbildAnzeige>(
-        &format!("{ANZEIGE_SELECT} WHERE einsatz_id = ? ORDER BY reihenfolge, id"),
+        sqlx::AssertSqlSafe(format!("{ANZEIGE_SELECT} WHERE einsatz_id = ? ORDER BY reihenfolge, id")),
     )
     .bind(einsatz_id)
     .fetch_all(pool)
@@ -27,7 +27,7 @@ pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<Hintergrund
 
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<HintergrundbildAnzeige, AppError> {
     sqlx::query_as::<_, HintergrundbildAnzeige>(
-        &format!("{ANZEIGE_SELECT} WHERE id = ? AND einsatz_id = ?"),
+        sqlx::AssertSqlSafe(format!("{ANZEIGE_SELECT} WHERE id = ? AND einsatz_id = ?")),
     )
     .bind(id)
     .bind(einsatz_id)

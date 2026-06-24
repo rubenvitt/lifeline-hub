@@ -53,7 +53,7 @@ pub async fn liste(
         "{SELECT_ALLE} WHERE einsatz_id = ?1 AND storniert_at IS NULL \
          AND (?2 IS NULL OR status = ?2) ORDER BY registrier_nr"
     );
-    Ok(sqlx::query_as::<_, PersonAnzeige>(&sql)
+    Ok(sqlx::query_as::<_, PersonAnzeige>(sqlx::AssertSqlSafe(&*sql))
         .bind(einsatz_id)
         .bind(status)
         .fetch_all(pool)
@@ -67,9 +67,9 @@ pub async fn laden(
     einsatz_id: i64,
     person_id: i64,
 ) -> Result<PersonAnzeige, AppError> {
-    sqlx::query_as::<_, PersonAnzeige>(&format!(
+    sqlx::query_as::<_, PersonAnzeige>(sqlx::AssertSqlSafe(format!(
         "{SELECT_ALLE} WHERE id = ? AND einsatz_id = ?"
-    ))
+    )))
     .bind(person_id)
     .bind(einsatz_id)
     .fetch_optional(pool)

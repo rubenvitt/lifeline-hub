@@ -151,7 +151,7 @@ async fn validiere_empfaenger(
         einsatz_id: i64,
     ) -> Result<bool, AppError> {
         let q = format!("SELECT 1 FROM {tab} WHERE id = ? AND einsatz_id = ?");
-        Ok(sqlx::query_scalar::<_, i64>(&q)
+        Ok(sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(&*q))
             .bind(id)
             .bind(einsatz_id)
             .fetch_optional(pool)

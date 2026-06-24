@@ -30,9 +30,9 @@ fn label_conflict<T>(e: sqlx::Error) -> Result<T, AppError> {
 /// Lädt einen Baustein der Org (ignoriert `aktiv`, bleibt referenzierbar);
 /// `NotFound` bei fremder/unbekannter id.
 pub async fn laden(pool: &SqlitePool, org_id: i64, id: i64) -> Result<EtbBaustein, AppError> {
-    sqlx::query_as::<_, EtbBaustein>(&format!(
+    sqlx::query_as::<_, EtbBaustein>(sqlx::AssertSqlSafe(format!(
         "SELECT {SPALTEN} FROM etb_baustein WHERE id = ? AND org_id = ?"
-    ))
+    )))
     .bind(id)
     .bind(org_id)
     .fetch_optional(pool)
@@ -42,10 +42,10 @@ pub async fn laden(pool: &SqlitePool, org_id: i64, id: i64) -> Result<EtbBaustei
 
 /// Nur aktive Bausteine der Org (`aktiv = 1`), sortiert nach `sortier`, dann `id`.
 pub async fn liste(pool: &SqlitePool, org_id: i64) -> Result<Vec<EtbBaustein>, AppError> {
-    sqlx::query_as::<_, EtbBaustein>(&format!(
+    sqlx::query_as::<_, EtbBaustein>(sqlx::AssertSqlSafe(format!(
         "SELECT {SPALTEN} FROM etb_baustein \
          WHERE org_id = ? AND aktiv = 1 ORDER BY sortier, id"
-    ))
+    )))
     .bind(org_id)
     .fetch_all(pool)
     .await

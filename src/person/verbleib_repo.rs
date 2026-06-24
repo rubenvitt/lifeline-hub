@@ -73,7 +73,7 @@ pub async fn erfassen(
 
 /// Lädt ein Verbleib-Ereignis; `NotFound`, falls nicht zum Einsatz.
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<VerbleibAnzeige, AppError> {
-    sqlx::query_as::<_, VerbleibAnzeige>(&format!("{SELECT_VERBLEIB} WHERE id = ? AND einsatz_id = ?"))
+    sqlx::query_as::<_, VerbleibAnzeige>(sqlx::AssertSqlSafe(format!("{SELECT_VERBLEIB} WHERE id = ? AND einsatz_id = ?")))
         .bind(id)
         .bind(einsatz_id)
         .fetch_optional(pool)
@@ -87,10 +87,10 @@ pub async fn liste_je_person(
     einsatz_id: i64,
     person_id: i64,
 ) -> Result<Vec<VerbleibAnzeige>, AppError> {
-    Ok(sqlx::query_as::<_, VerbleibAnzeige>(&format!(
+    Ok(sqlx::query_as::<_, VerbleibAnzeige>(sqlx::AssertSqlSafe(format!(
         "{SELECT_VERBLEIB} WHERE einsatz_id = ? AND person_id = ? \
          ORDER BY zeitpunkt_at DESC, id DESC"
-    ))
+    )))
     .bind(einsatz_id)
     .bind(person_id)
     .fetch_all(pool)

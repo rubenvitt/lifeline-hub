@@ -64,7 +64,7 @@ fn zu_anzeige(r: Row) -> LageZoneAnzeige {
 
 /// Alle Zonen eines Einsatzes, älteste zuerst.
 pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<LageZoneAnzeige>, AppError> {
-    let rows = sqlx::query_as::<_, Row>(&format!("{SELECT_ALLE} WHERE einsatz_id = ? ORDER BY id"))
+    let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!("{SELECT_ALLE} WHERE einsatz_id = ? ORDER BY id")))
         .bind(einsatz_id)
         .fetch_all(pool)
         .await?;
@@ -77,7 +77,7 @@ pub async fn laden(
     einsatz_id: i64,
     id: i64,
 ) -> Result<LageZoneAnzeige, AppError> {
-    sqlx::query_as::<_, Row>(&format!("{SELECT_ALLE} WHERE id = ? AND einsatz_id = ?"))
+    sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!("{SELECT_ALLE} WHERE id = ? AND einsatz_id = ?")))
         .bind(id)
         .bind(einsatz_id)
         .fetch_optional(pool)

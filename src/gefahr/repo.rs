@@ -52,10 +52,10 @@ pub async fn liste(
     pool: &SqlitePool,
     gefahrengebiet_id: i64,
 ) -> Result<Vec<GefahrBewertungAnzeige>, AppError> {
-    let rows = sqlx::query_as::<_, Row>(&format!(
+    let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
         "{SELECT_ALLE} WHERE gefahrengebiet_id = ? AND warnstufe != 'keine' \
          ORDER BY gefahrentyp, schutzobjekt"
-    ))
+    )))
     .bind(gefahrengebiet_id)
     .fetch_all(pool)
     .await?;
@@ -114,7 +114,7 @@ pub async fn upsert_bewertung(
 
 /// Lädt eine Zelle per id (für die Anzeige nach Upsert).
 async fn laden(pool: &SqlitePool, id: i64) -> Result<GefahrBewertungAnzeige, AppError> {
-    sqlx::query_as::<_, Row>(&format!("{SELECT_ALLE} WHERE id = ?"))
+    sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!("{SELECT_ALLE} WHERE id = ?")))
         .bind(id)
         .fetch_optional(pool)
         .await?

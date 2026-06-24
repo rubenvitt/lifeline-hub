@@ -24,7 +24,7 @@ pub fn sha256_hex(daten: &[u8]) -> String {
 
 /// Lädt die Anzeige eines Anhangs. `NotFound`, wenn er nicht existiert.
 pub async fn anzeige_laden(pool: &SqlitePool, id: i64) -> Result<AnhangAnzeige, AppError> {
-    sqlx::query_as::<_, AnhangAnzeige>(&format!("{ANZEIGE_SELECT} WHERE id = ?"))
+    sqlx::query_as::<_, AnhangAnzeige>(sqlx::AssertSqlSafe(format!("{ANZEIGE_SELECT} WHERE id = ?")))
         .bind(id)
         .fetch_optional(pool)
         .await?

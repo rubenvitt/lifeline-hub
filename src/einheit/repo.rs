@@ -140,9 +140,9 @@ async fn ist_kumuliert(pool: &SqlitePool, einsatz_id: i64, wurzel_id: i64) -> Re
 
 /// Alle Einheiten eines Einsatzes (flach, aufgelöst inkl. Mitgliedern/Stärke).
 pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<EinheitAnzeige>, AppError> {
-    let rows = sqlx::query_as::<_, Row>(&format!(
+    let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
         "{SELECT_AUFGELOEST} WHERE e.einsatz_id = ? ORDER BY e.sortier, e.id"
-    )).bind(einsatz_id).fetch_all(pool).await?;
+    ))).bind(einsatz_id).fetch_all(pool).await?;
     let mut out = Vec::with_capacity(rows.len());
     for row in rows {
         out.push(zu_anzeige(pool, row).await?);
@@ -152,7 +152,7 @@ pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<EinheitAnze
 
 /// Lädt eine Einheit (aufgelöst); `NotFound`, falls nicht zum Einsatz.
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<EinheitAnzeige, AppError> {
-    let row = sqlx::query_as::<_, Row>(&format!("{SELECT_AUFGELOEST} WHERE e.id = ? AND e.einsatz_id = ?"))
+    let row = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!("{SELECT_AUFGELOEST} WHERE e.id = ? AND e.einsatz_id = ?")))
         .bind(id).bind(einsatz_id)
         .fetch_optional(pool).await?
         .ok_or(AppError::NotFound)?;

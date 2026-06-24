@@ -28,9 +28,9 @@ fn sprechgruppe_conflict<T>(e: sqlx::Error) -> Result<T, AppError> {
 
 /// Lädt eine Sprechgruppe der eigenen Org; `NotFound`, falls unbekannt oder fremde Org.
 pub async fn laden(pool: &SqlitePool, org_id: i64, id: i64) -> Result<Sprechgruppe, AppError> {
-    sqlx::query_as::<_, Sprechgruppe>(&format!(
+    sqlx::query_as::<_, Sprechgruppe>(sqlx::AssertSqlSafe(format!(
         "SELECT {SPALTEN} FROM sprechgruppe WHERE id = ? AND org_id = ?"
-    ))
+    )))
     .bind(id)
     .bind(org_id)
     .fetch_optional(pool)
@@ -58,7 +58,7 @@ pub async fn liste_katalog(
              ORDER BY betriebsart, sortier, bezeichnung"
         )
     };
-    sqlx::query_as::<_, Sprechgruppe>(&sql)
+    sqlx::query_as::<_, Sprechgruppe>(sqlx::AssertSqlSafe(&*sql))
         .bind(org_id)
         .fetch_all(pool)
         .await
@@ -147,10 +147,10 @@ pub async fn anlegen_einsatz_lokal(
     .execute(pool)
     .await?;
 
-    let sg = sqlx::query_as::<_, Sprechgruppe>(&format!(
+    let sg = sqlx::query_as::<_, Sprechgruppe>(sqlx::AssertSqlSafe(format!(
         "SELECT {SPALTEN} FROM sprechgruppe \
          WHERE org_id = ? AND einsatz_id = ? AND betriebsart = ? AND bezeichnung = ?",
-    ))
+    )))
     .bind(org_id)
     .bind(einsatz_id)
     .bind(betriebsart)
@@ -170,11 +170,11 @@ pub async fn liste_fuer_einsatz(
     org_id: i64,
     einsatz_id: i64,
 ) -> Result<Vec<Sprechgruppe>, AppError> {
-    sqlx::query_as::<_, Sprechgruppe>(&format!(
+    sqlx::query_as::<_, Sprechgruppe>(sqlx::AssertSqlSafe(format!(
         "SELECT {SPALTEN} FROM sprechgruppe \
          WHERE org_id = ? AND (einsatz_id IS NULL AND aktiv = 1 OR einsatz_id = ?) \
          ORDER BY betriebsart, sortier, bezeichnung",
-    ))
+    )))
     .bind(org_id)
     .bind(einsatz_id)
     .fetch_all(pool)

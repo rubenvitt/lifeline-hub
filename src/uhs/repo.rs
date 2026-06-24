@@ -43,7 +43,7 @@ pub async fn liste(
          AND (?3 IS NULL OR abschnitt_id = ?3) \
          ORDER BY bezeichnung"
     );
-    Ok(sqlx::query_as::<_, UhsAnzeige>(&sql)
+    Ok(sqlx::query_as::<_, UhsAnzeige>(sqlx::AssertSqlSafe(&*sql))
         .bind(einsatz_id)
         .bind(status)
         .bind(abschnitt_id)
@@ -54,7 +54,7 @@ pub async fn liste(
 /// Lädt eine UHS (auch stornierte) eines Einsatzes; `NotFound`, falls sie nicht
 /// zum Einsatz gehört (Org-Isolation via `einsatz_id`-Prädikat).
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<UhsAnzeige, AppError> {
-    sqlx::query_as::<_, UhsAnzeige>(&format!("{SELECT_ALLE} WHERE id = ? AND einsatz_id = ?"))
+    sqlx::query_as::<_, UhsAnzeige>(sqlx::AssertSqlSafe(format!("{SELECT_ALLE} WHERE id = ? AND einsatz_id = ?")))
         .bind(id)
         .bind(einsatz_id)
         .fetch_optional(pool)
