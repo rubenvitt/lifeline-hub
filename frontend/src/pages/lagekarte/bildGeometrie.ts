@@ -39,6 +39,41 @@ export function skaliereUmAnker(ecken: Vier, griffIndex: number, maus: Punkt, mi
   return ecken.map(([x, y]) => [anker[0] + s * (x - anker[0]), anker[1] + s * (y - anker[1])] as Punkt) as Vier;
 }
 
+export type Kante = 'oben' | 'rechts' | 'unten' | 'links';
+
+// Pro Kante: die zwei Ecken, die mitwandern (gezogen), und die zwei der gegenüberliegenden
+// Kante (anker, bleiben fix). Indizes: 0=TL, 1=TR, 2=BR, 3=BL. gezogen[k] ist die direkt
+// gegenüber von anker[k] liegende Ecke derselben Längsseite.
+const KANTEN_ECKEN: Record<Kante, { gezogen: [number, number]; anker: [number, number] }> = {
+  oben: { gezogen: [0, 1], anker: [3, 2] },
+  rechts: { gezogen: [1, 2], anker: [0, 3] },
+  unten: { gezogen: [3, 2], anker: [0, 1] },
+  links: { gezogen: [0, 3], anker: [1, 2] },
+};
+
+/** Eine Kante entlang der Bild-Normalen verschieben (1D-Resize; gegenüberliegende Kante
+ *  als Anker). Ändert NUR diese Dimension → Seitenverhältnis darf sich ändern (freies
+ *  Strecken wie bei einem Rechteck). Drehung bleibt erhalten. Pixel-Raum; `maus` ist die
+ *  Zeigerposition, die neue Ausdehnung ist deren Projektion auf die Normale ab dem Anker. */
+export function skaliereKante(ecken: Vier, kante: Kante, maus: Punkt, minPx = 8): Vier {
+  const { gezogen, anker } = KANTEN_ECKEN[kante];
+  const a0 = ecken[anker[0]];
+  const g0 = ecken[gezogen[0]];
+  let nx = g0[0] - a0[0];
+  let ny = g0[1] - a0[1];
+  const len = Math.hypot(nx, ny);
+  if (len === 0) return ecken;
+  nx /= len;
+  ny /= len;
+  const dim = Math.max((maus[0] - a0[0]) * nx + (maus[1] - a0[1]) * ny, minPx);
+  const next = [...ecken] as Vier;
+  for (let k = 0; k < 2; k++) {
+    const a = ecken[anker[k]];
+    next[gezogen[k]] = [a[0] + nx * dim, a[1] + ny * dim];
+  }
+  return next;
+}
+
 /** Alle Ecken um ihren Schwerpunkt um `deltaRad` drehen (Pixel-Raum). */
 export function rotiereUmZentroid(ecken: Vier, deltaRad: number): Vier {
   const [cx, cy] = zentroid(ecken);

@@ -388,7 +388,7 @@ export default function Sidebar(props: SidebarProps) {
                 {imPlatzieren && darfSchreiben && (
                   <div style={{ padding: 8, background: 'rgba(22,119,255,.06)', borderRadius: 4 }}>
                     <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      Auf der Karte: Ecken ziehen = Größe, ↻ = drehen, Mitte = verschieben. Oder Mittelpunkt numerisch:
+                      Auf der Karte: Ecken = Größe (Seitenverhältnis), Kanten = frei strecken, ↻ = drehen, Mitte = verschieben. Oder Mittelpunkt numerisch:
                     </Typography.Text>
                     <div style={{ marginTop: 6 }}>
                       <KoordinatenEingabe

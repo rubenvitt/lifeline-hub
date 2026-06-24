@@ -140,7 +140,7 @@ describe('Sidebar Bild-Hintergründe', () => {
       />,
     );
     // Hinweistext + „Mittelpunkt setzen" (zunächst disabled, kein Entwurf) erscheinen nur im Platzier-Modus.
-    expect(screen.getByText(/Ecken ziehen/i)).toBeInTheDocument();
+    expect(screen.getByText(/frei strecken/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Mittelpunkt setzen/i })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: /^Fertig$/i }));
     expect(onBildPlatzierenFertig).toHaveBeenCalled();

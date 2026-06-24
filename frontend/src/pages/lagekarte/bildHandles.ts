@@ -1,7 +1,7 @@
 import maplibregl, { type Map as MapLibreMap, type Marker } from 'maplibre-gl';
 import type { Ecke, Ecken } from '../../api/kartenbilder';
 import { setzeBildGeometrie } from './bildLayer';
-import { zentroid, skaliereUmAnker, rotiereUmZentroid, type Punkt } from './bildGeometrie';
+import { zentroid, skaliereUmAnker, skaliereKante, rotiereUmZentroid, type Kante, type Punkt } from './bildGeometrie';
 
 type Vier = [Punkt, Punkt, Punkt, Punkt];
 
@@ -12,6 +12,14 @@ function eckGriffEl(): HTMLElement {
   const el = document.createElement('div');
   el.style.cssText =
     'width:12px;height:12px;background:#fff;border:2px solid #1677ff;border-radius:2px;cursor:pointer;box-shadow:0 0 2px rgba(0,0,0,.5)';
+  return el;
+}
+// Kantengriff bewusst rund (vs. eckiges Quadrat der proportionalen Eckgriffe), damit der
+// freie 1D-Strecken-Griff visuell unterscheidbar ist.
+function kantenGriffEl(): HTMLElement {
+  const el = document.createElement('div');
+  el.style.cssText =
+    'width:11px;height:11px;background:#fff;border:2px solid #1677ff;border-radius:50%;cursor:pointer;box-shadow:0 0 2px rgba(0,0,0,.5)';
   return el;
 }
 function drehGriffEl(): HTMLElement {
@@ -65,13 +73,19 @@ export function erzeugeBildHandles(
       .setLngLat(ecken[i] as [number, number])
       .addTo(map),
   );
+  const KANTEN: Kante[] = ['oben', 'rechts', 'unten', 'links'];
+  const kantenGriffe: Marker[] = KANTEN.map(() =>
+    new maplibregl.Marker({ element: kantenGriffEl(), draggable: true })
+      .setLngLat(ecken[0] as [number, number])
+      .addTo(map),
+  );
   const drehGriff = new maplibregl.Marker({ element: drehGriffEl(), draggable: true })
     .setLngLat(ecken[0] as [number, number])
     .addTo(map);
   const mitteGriff = new maplibregl.Marker({ element: mitteGriffEl(), draggable: true })
     .setLngLat(ecken[0] as [number, number])
     .addTo(map);
-  const alle = [...eckGriffe, drehGriff, mitteGriff];
+  const alle = [...eckGriffe, ...kantenGriffe, drehGriff, mitteGriff];
 
   /** Drehgriff-Position: über der Mitte der oberen Kante, in Bild-„oben"-Richtung versetzt. */
   function drehGriffPos(e: Ecken): [number, number] {
@@ -87,21 +101,51 @@ export function erzeugeBildHandles(
     return [ll.lng, ll.lat];
   }
 
+  // Eck-Indizes der vier Kanten (für die Kantengriff-Position = Kantenmitte).
+  const KANTEN_PUNKTE: Record<Kante, [number, number]> = {
+    oben: [0, 1], rechts: [1, 2], unten: [2, 3], links: [3, 0],
+  };
+  function kantenMitte(e: Ecken, kante: Kante): [number, number] {
+    const [i, j] = KANTEN_PUNKTE[kante];
+    const p1 = map.project(e[i] as [number, number]);
+    const p2 = map.project(e[j] as [number, number]);
+    const ll = map.unproject([(p1.x + p2.x) / 2, (p1.y + p2.y) / 2]);
+    return [ll.lng, ll.lat];
+  }
+
   /** Alle Griffe aus `ecken` neu positionieren (außer dem gerade gezogenen). */
   function positioniere(ausser?: Marker) {
     for (let i = 0; i < 4; i++) {
       if (eckGriffe[i] !== ausser) eckGriffe[i].setLngLat(ecken[i] as [number, number]);
+    }
+    for (let i = 0; i < 4; i++) {
+      if (kantenGriffe[i] !== ausser) kantenGriffe[i].setLngLat(kantenMitte(ecken, KANTEN[i]));
     }
     if (drehGriff !== ausser) drehGriff.setLngLat(drehGriffPos(ecken));
     if (mitteGriff !== ausser) mitteGriff.setLngLat(zentroid(ecken) as [number, number]);
   }
   positioniere();
 
-  // Eckgriffe — uniform skalieren um die Anker-Ecke.
+  // Eckgriffe — uniform skalieren um die Anker-Ecke (Seitenverhältnis bleibt).
   eckGriffe.forEach((m, i) => {
     m.on('drag', () => {
       const q = map.project(m.getLngLat());
       ecken = unprojAll(skaliereUmAnker(projAll(ecken), i, [q.x, q.y]));
+      setzeBildGeometrie(map, bildId, ecken);
+      positioniere(m);
+    });
+    m.on('dragend', () => {
+      positioniere();
+      onCommit(ecken);
+    });
+  });
+
+  // Kantengriffe — eine Dimension frei strecken (Seitenverhältnis darf sich ändern).
+  kantenGriffe.forEach((m, i) => {
+    const kante = KANTEN[i];
+    m.on('drag', () => {
+      const q = map.project(m.getLngLat());
+      ecken = unprojAll(skaliereKante(projAll(ecken), kante, [q.x, q.y]));
       setzeBildGeometrie(map, bildId, ecken);
       positioniere(m);
     });

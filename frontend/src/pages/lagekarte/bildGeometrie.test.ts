@@ -3,6 +3,7 @@ import {
   zentroid,
   verschiebeEcken,
   skaliereUmAnker,
+  skaliereKante,
   rotiereUmZentroid,
   eckenInitialPixel,
   eckenAusBounds,
@@ -54,6 +55,31 @@ describe('bildGeometrie', () => {
     // Faktor auf 0,1 geklemmt → Griff bei [1,1], nicht negativ.
     expect(e[2][0]).toBeCloseTo(1, 6);
     expect(e[2][1]).toBeCloseTo(1, 6);
+  });
+
+  it('skaliereKante „rechts": streckt nur die Breite, Anker links + Höhe bleiben', () => {
+    const e = skaliereKante(quadrat, 'rechts', [20, 5]);
+    expect(e[0]).toEqual([0, 0]);   // TL (Anker) fix
+    expect(e[3]).toEqual([0, 10]);  // BL (Anker) fix
+    expect(e[1]).toEqual([20, 0]);  // TR auf neue Breite
+    expect(e[2]).toEqual([20, 10]); // BR auf neue Breite
+    // Höhe unverändert (10), Breite jetzt 20 → Seitenverhältnis bewusst geändert.
+    expect(e[3][1] - e[0][1]).toBe(10);
+  });
+
+  it('skaliereKante „unten": streckt nur die Höhe, Anker oben + Breite bleiben', () => {
+    const e = skaliereKante(quadrat, 'unten', [5, 30]);
+    expect(e[0]).toEqual([0, 0]);   // TL fix
+    expect(e[1]).toEqual([10, 0]);  // TR fix
+    expect(e[3]).toEqual([0, 30]);  // BL auf neue Höhe
+    expect(e[2]).toEqual([10, 30]); // BR auf neue Höhe
+    expect(e[1][0] - e[0][0]).toBe(10); // Breite unverändert
+  });
+
+  it('skaliereKante: minPx verhindert Kollaps/Umklappen', () => {
+    const e = skaliereKante(quadrat, 'rechts', [-50, 5], 8);
+    expect(e[1]).toEqual([8, 0]);
+    expect(e[2]).toEqual([8, 10]);
   });
 
   it('rotiereUmZentroid: 90° dreht das Quadrat um seine Mitte', () => {
