@@ -1,5 +1,5 @@
 import type { Einheit, EinsatzAnzeige, EinsatzFahrzeug, FuehrungskraftKarte, LageMeldung, Schaden, Uhs } from '../../api/types';
-import { baueTzProps, type TzProps } from './taktischesZeichen';
+import { baueTzProps, einsatzortTz, schadenTz, uhsTz, type TzProps } from './taktischesZeichen';
 
 export type MarkerTyp =
   | 'einsatzort' | 'uhs' | 'schaden' | 'einheit' | 'fahrzeug' | 'fuehrung' | 'abschnitt' | 'lagemeldung';
@@ -31,12 +31,6 @@ export interface NichtVerortet {
 
 const EINSATZORT_FARBE = '#a8071a';
 const UHS_FARBE = '#1677ff';
-const AUSMASS_FARBE: Record<string, string> = {
-  gering: '#52c41a',
-  mittel: '#faad14',
-  gross: '#fa8c16',
-  katastrophal: '#f5222d',
-};
 
 function schadenLabel(registrierNr: number): string {
   return `S-${String(registrierNr).padStart(3, '0')}`;
@@ -60,6 +54,7 @@ export function baueMarker(
       lon: einsatz.einsatzort_lon,
       label: einsatz.einsatzort ?? 'Einsatzort',
       farbe: EINSATZORT_FARBE,
+      tz: einsatzortTz(),
     });
   }
 
@@ -73,6 +68,7 @@ export function baueMarker(
         lon: u.lon,
         label: u.bezeichnung,
         farbe: UHS_FARBE,
+        tz: uhsTz(u.typ),
       });
     } else {
       nichtVerortet.push({ typ: 'uhs', id: u.id, label: u.bezeichnung });
@@ -81,6 +77,7 @@ export function baueMarker(
 
   for (const s of schaeden) {
     if (s.lat != null && s.lon != null) {
+      const tz = schadenTz(s.ausmass);
       verortet.push({
         schluessel: `schaden-${s.id}`,
         typ: 'schaden',
@@ -88,7 +85,8 @@ export function baueMarker(
         lat: s.lat,
         lon: s.lon,
         label: schadenLabel(s.registrier_nr),
-        farbe: AUSMASS_FARBE[s.ausmass] ?? '#8c8c8c',
+        farbe: tz.farbe,
+        tz,
       });
     } else {
       nichtVerortet.push({ typ: 'schaden', id: s.id, label: schadenLabel(s.registrier_nr) });
