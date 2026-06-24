@@ -17,6 +17,7 @@ import { parseRouteId, schaedenPfad } from '../routing/deeplinks';
 import type { Ausmass, SchadenTyp } from '../api/types';
 import GeschaedigtPicker, { type GeschaedigtWert } from './schaeden/GeschaedigtPicker';
 import {
+  ABSCHLUSS_GRUENDE,
   ABSCHLUSS_LABEL,
   AUSMASS_META,
   STATUS_META,
@@ -28,10 +29,6 @@ import {
 
 const TYP_OPTIONS = (Object.keys(TYP_LABEL) as SchadenTyp[]).map((t) => ({ value: t, label: TYP_LABEL[t] }));
 const AUSMASS_OPTIONS = (Object.keys(AUSMASS_META) as Ausmass[]).map((a) => ({ value: a, label: AUSMASS_META[a].label }));
-const ABSCHLUSS_OPTIONS = (Object.keys(ABSCHLUSS_LABEL) as (keyof typeof ABSCHLUSS_LABEL)[]).map((g) => ({
-  value: g,
-  label: ABSCHLUSS_LABEL[g],
-}));
 
 type EditWerte = SchadenPatch & { geschaedigt?: GeschaedigtWert };
 
@@ -246,7 +243,7 @@ export default function SchaedenDetailPage() {
       >
         <Form form={abschlussForm} layout="vertical" onFinish={(v) => abschlussMutation.mutate(v)}>
           <Form.Item label="Abschlussgrund" name="abschluss_grund" rules={[{ required: true, message: 'Grund ist Pflicht' }]}>
-            <Select options={ABSCHLUSS_OPTIONS} />
+            <Select options={ABSCHLUSS_GRUENDE} />
           </Form.Item>
           <Form.Item label="Notiz (optional, wird an Beschreibung angehängt)" name="notiz">
             <Input.TextArea rows={2} />
