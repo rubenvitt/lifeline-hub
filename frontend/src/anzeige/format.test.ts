@@ -84,7 +84,7 @@ describe('formatKoordinate', () => {
   });
 
   it('formatiert gk über die Konvention', () => {
-    expect(formatKoordinate(48.782, 9.177, { koordinatenformat: 'gk' })).toMatch(/^R 35\d{5}  H 5\d{6}$/);
+    expect(formatKoordinate(48.782, 9.177, { koordinatenformat: 'gk' })).toMatch(/^R 35\d{5} {2}H 5\d{6}$/);
   });
 
   it('WGS84-Default bleibt byte-exakt', () => {
