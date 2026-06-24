@@ -45,3 +45,18 @@ laufende Anzeigennummer).
 URL-Builder) — keine inline-Template-Literals für Einsatz-Pfade. `parseRouteId` dort
 validiert Route-IDs (positive Ganzzahl, sonst Redirect auf die Liste).
 Details: `docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-design.md`.
+
+## Frontend — Lint-Disziplin
+
+`pnpm lint` läuft mit `--max-warnings 0`: Warnings brechen das Gate genauso hart wie
+Errors (LFH-168). Sie werden **behoben, nicht ignoriert** — und zwar an der Wurzel:
+
+- `react-hooks/exhaustive-deps` strukturell lösen (z. B. Primitive statt Objekt in die
+  Deps, `useMemo`/`useCallback` zur Identitäts-Stabilisierung), nicht die fehlende
+  Dependency stumpf hineinzwingen, wenn das den Effekt ungewollt neu auslösen würde.
+- `eslint-disable` nur als **begründete Ausnahme**, wenn der echte Fix nachweislich falsch
+  wäre (z. B. eine Dependency, die den Effekt bewusst *nicht* neu triggern soll): dann
+  zeilengenau (`eslint-disable-next-line <regel>`) **an der gemeldeten Stelle** — die
+  exhaustive-deps-Warnung sitzt auf der Deps-Array-Zeile, nicht auf dem `useEffect(` — und
+  **mit Kommentar, warum**. Keine pauschalen Datei-/Block-Disables, keine toten Direktiven
+  (eslint meldet ungenutzte Disables selbst). Referenz: `LagekartePage` Blob-URL-Effekt (LFH-166).
