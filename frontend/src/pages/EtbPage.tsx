@@ -136,7 +136,7 @@ export default function EtbPage() {
     );
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
-    return <Alert type="error" message="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+    return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
 
@@ -216,7 +216,7 @@ export default function EtbPage() {
           type="error"
           showIcon
           style={{ marginBottom: 12 }}
-          message="ETB-Einträge konnten nicht geladen werden"
+          title="ETB-Einträge konnten nicht geladen werden"
         />
       )}
 
@@ -226,7 +226,7 @@ export default function EtbPage() {
           type="error"
           showIcon
           style={{ marginBottom: 12 }}
-          message={`${abgelehnt.length} gepufferte(r) Eintrag/Einträge wurde(n) vom Server abgelehnt und NICHT gespeichert`}
+          title={`${abgelehnt.length} gepufferte(r) Eintrag/Einträge wurde(n) vom Server abgelehnt und NICHT gespeichert`}
           description={
             <ul style={{ margin: 0, paddingLeft: 18 }}>
               {abgelehnt.map((a, i) => (
@@ -241,7 +241,7 @@ export default function EtbPage() {
           type="info"
           showIcon
           style={{ marginBottom: 12 }}
-          message={`${ausstehend.length} Eintrag/Einträge werden gesendet, sobald wieder Verbindung besteht`}
+          title={`${ausstehend.length} Eintrag/Einträge werden gesendet, sobald wieder Verbindung besteht`}
           description={
             <ul style={{ margin: 0, paddingLeft: 18 }}>
               {ausstehend.map((a) => (

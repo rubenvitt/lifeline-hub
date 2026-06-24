@@ -33,7 +33,9 @@ describe('GefahrenMatrix', () => {
   it('graut ungültige Kombinationen aus', () => {
     renderMitProviders(<GefahrenMatrix matrix={[]} darfSchreiben pending={false} onSetzen={() => {}} />);
     const zellen = screen.getAllByLabelText('Warnstufe atemgifte × sachwerte');
-    expect(zellen[0]).toHaveClass('ant-select-disabled');
+    // antd 6: das aria-label sitzt am inneren .ant-select-input; der disabled-Zustand
+    // bleibt am .ant-select-Wrapper. Daher auf den Wrapper hochlaufen.
+    expect(zellen[0].closest('.ant-select')).toHaveClass('ant-select-disabled');
   });
 
   it('behält beschreibung/gemeldet_von bei Warnstufen-Wechsel', async () => {

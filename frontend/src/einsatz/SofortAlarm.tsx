@@ -29,10 +29,10 @@ export default function SofortAlarm() {
       const key = detail.meldung_id != null ? `sofort-${detail.meldung_id}` : `sofort-${++zaehler.current}`;
       notification.warning({
         key,
-        message: 'Sofortmeldung eingegangen',
+        title: 'Sofortmeldung eingegangen',
         description: 'Eine Sofortmeldung erfordert Aufmerksamkeit — bitte sichten und bestätigen.',
         duration: 0,
-        btn: (
+        actions: (
           <Button
             type="primary"
             size="small"

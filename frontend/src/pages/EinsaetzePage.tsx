@@ -45,12 +45,12 @@ export default function EinsaetzePage() {
     <Card
       key={e.id}
       hoverable
-      size={klein ? 'small' : 'default'}
+      size={klein ? 'small' : 'medium'}
       title={e.bezeichnung}
       style={klein ? { opacity: 0.65 } : undefined}
       onClick={() => navigate(`/einsaetze/${e.id}`)}
     >
-      <Space direction="vertical">
+      <Space orientation="vertical">
         <Space>
           <Tag color={STATUS_FARBE[e.status]}>{e.status}</Tag>
           {e.meine_rolle && <Tag>{e.meine_rolle}</Tag>}

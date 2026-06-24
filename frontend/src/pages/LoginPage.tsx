@@ -65,7 +65,7 @@ export default function LoginPage() {
           <h1 className="login-marke__name">lifeline-hub</h1>
           <p className="login-marke__untertitel">Einsatzführung &amp; Einsatztagebuch</p>
         </div>
-        {fehler && <Alert type="error" message={fehler} style={{ marginBottom: 20 }} showIcon />}
+        {fehler && <Alert type="error" title={fehler} style={{ marginBottom: 20 }} showIcon />}
         {/* Dev-Schnellanmeldung: nur im Dev-Build und nur wenn der Endpoint Benutzer lieferte. */}
         {import.meta.env.DEV && devBenutzer.length > 0 && (
           <div className="login-dev">

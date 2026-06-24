@@ -18,7 +18,7 @@ export default function KoordinatenAnzeige({
 }) {
   const { formatKoordinate } = useAnzeigeKonventionen();
   return (
-    <Space direction="vertical" size={0}>
+    <Space orientation="vertical" size={0}>
       <Typography.Text>{formatKoordinate(lat, lon)}</Typography.Text>
       {einsatzId != null && (
         <OrtZeile einsatzId={einsatzId} koord={{ lat, lon }} exclude={exclude} debounceMs={0} />

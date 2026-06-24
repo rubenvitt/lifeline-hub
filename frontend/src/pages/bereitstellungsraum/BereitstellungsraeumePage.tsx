@@ -77,7 +77,7 @@ export default function BereitstellungsraeumePage() {
     return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
   }
   if (einsatzQuery.error) {
-    return <Alert type="error" message="Einsatz konnte nicht geladen werden" showIcon />;
+    return <Alert type="error" title="Einsatz konnte nicht geladen werden" showIcon />;
   }
 
   return (

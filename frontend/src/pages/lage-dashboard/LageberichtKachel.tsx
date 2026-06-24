@@ -13,7 +13,7 @@ export default function LageberichtKachel({ bericht, onNavigate }: Props) {
       {bericht === null ? (
         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Noch kein Lagebericht" />
       ) : (
-        <Space direction="vertical" size={4} style={{ width: '100%' }}>
+        <Space orientation="vertical" size={4} style={{ width: '100%' }}>
           <Typography.Text strong>{bericht.titel}</Typography.Text>
           <Space size={6}>
             <Tag color={bericht.status === 'freigegeben' ? 'green' : 'default'}>{bericht.status}</Tag>

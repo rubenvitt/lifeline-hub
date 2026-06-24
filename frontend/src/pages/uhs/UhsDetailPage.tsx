@@ -70,10 +70,10 @@ export default function UhsDetailPage() {
     return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
   }
   if (einsatzQuery.error || !einsatzQuery.data) {
-    return <Alert type="error" message="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+    return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   if (detailQuery.error || !detailQuery.data) {
-    return <Alert type="error" message="UHS konnte nicht geladen werden" showIcon />;
+    return <Alert type="error" title="UHS konnte nicht geladen werden" showIcon />;
   }
 
   const einsatz = einsatzQuery.data;

@@ -206,7 +206,7 @@ export default function EinheitenPage() {
     return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
-    return <Alert type="error" message="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+    return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben =
@@ -225,7 +225,7 @@ export default function EinheitenPage() {
         {darfSchreiben && <Button type="primary" onClick={() => bilden.mutate()}>Einheit bilden</Button>}
       </Space>
       {!darfSchreiben && einsatz.status !== 'aktiv' && (
-        <Alert style={{ marginBottom: 12 }} type="info" showIcon message="Einsatz ist abgeschlossen — nur Ansicht." />
+        <Alert style={{ marginBottom: 12 }} type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
       )}
 
       <div style={{ display: 'flex', gap: 16 }}>

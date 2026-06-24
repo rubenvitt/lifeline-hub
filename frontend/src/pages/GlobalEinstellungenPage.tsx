@@ -108,7 +108,7 @@ export default function GlobalEinstellungenPage() {
   }
 
   if (einstellungenQuery.isError || !einstellungenQuery.data) {
-    return <Alert type="error" message="Einstellungen nicht ladbar oder kein Zugriff" showIcon />;
+    return <Alert type="error" title="Einstellungen nicht ladbar oder kein Zugriff" showIcon />;
   }
 
   const einstellungen = einstellungenQuery.data;

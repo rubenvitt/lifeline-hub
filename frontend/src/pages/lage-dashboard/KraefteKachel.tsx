@@ -16,7 +16,7 @@ export default function KraefteKachel({ kraefte, einheiten, abschnitte, onNaviga
       {kraefte === null ? (
         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Daten nicht verfügbar" />
       ) : (
-        <Space direction="vertical" size={8} style={{ width: '100%' }}>
+        <Space orientation="vertical" size={8} style={{ width: '100%' }}>
           <Statistic title="Gesamtstärke (F/UF/M//Ges)" value={staerkeText(kraefte.staerke)} />
           <Space size={4} wrap>
             <Tag color="green">{kraefte.fahrzeugStatus.verfuegbar} Fzg frei</Tag>

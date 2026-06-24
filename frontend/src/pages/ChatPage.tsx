@@ -188,7 +188,7 @@ export default function ChatPage() {
     );
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
-    return <Alert type="error" message="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+    return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben =
@@ -244,7 +244,7 @@ export default function ChatPage() {
         <Col flex="auto">
           {nachrichtenQuery.isError && (
             <Alert type="error" showIcon style={{ marginBottom: 12 }}
-              message="Nachrichten konnten nicht geladen werden" />
+              title="Nachrichten konnten nicht geladen werden" />
           )}
           {nachrichtenQuery.hasNextPage && (
             <div style={{ textAlign: 'center', marginBottom: 12 }}>
@@ -280,7 +280,7 @@ export default function ChatPage() {
               type="info"
               showIcon
               style={{ marginTop: 12 }}
-              message={
+              title={
                 einsatz.status !== 'aktiv'
                   ? 'Schreiben ist nur bei aktivem Einsatz möglich.'
                   : 'Schreiben ist der Einsatzleitung und dem Führungspersonal vorbehalten.'

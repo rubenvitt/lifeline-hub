@@ -37,7 +37,7 @@ export default function BausteinPlatzhalterModal({ baustein, einsatz, onEinsetze
 
   return (
     <Modal open={dialogOffen} title="Baustein einsetzen" footer={null} onCancel={onAbbrechenAll} destroyOnHidden>
-      <Space direction="vertical" style={{ width: '100%' }}>
+      <Space orientation="vertical" style={{ width: '100%' }}>
         {offenePlatzhalter.map((name) => (
           <Form.Item key={name} label={name} style={{ marginBottom: 8 }}>
             <Input

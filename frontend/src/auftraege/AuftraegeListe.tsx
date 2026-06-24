@@ -181,7 +181,7 @@ export default function AuftraegeListe({ einsatzId, darfSchreiben }: {
       )}
 
       {auftraegeQuery.isError && (
-        <Alert type="error" showIcon style={{ marginBottom: 12 }} message="Aufträge konnten nicht geladen werden" />
+        <Alert type="error" showIcon style={{ marginBottom: 12 }} title="Aufträge konnten nicht geladen werden" />
       )}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16, alignItems: 'center' }}>
         <Segmented

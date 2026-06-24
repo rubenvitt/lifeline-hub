@@ -42,7 +42,7 @@ export default function OrganisationTab() {
   });
 
   return (
-    <Space direction="vertical" size="middle" style={{ width: '100%', maxWidth: 480 }}>
+    <Space orientation="vertical" size="middle" style={{ width: '100%', maxWidth: 480 }}>
       <Typography.Paragraph type="secondary">
         Standard-Organisation für taktische Zeichen; pro Objekt überschreibbar.
       </Typography.Paragraph>
