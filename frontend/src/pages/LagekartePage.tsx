@@ -256,7 +256,8 @@ export default function LagekartePage() {
       const id = Number(idStr);
       if (!aktiveIds.has(id)) {
         URL.revokeObjectURL(blobUrlsRef.current[id]);
-        const { [id]: _, ...rest } = blobUrlsRef.current;
+        const rest = { ...blobUrlsRef.current };
+        delete rest[id];
         blobUrlsRef.current = rest;
         setBlobUrls(blobUrlsRef.current);
       }
