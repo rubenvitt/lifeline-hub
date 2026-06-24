@@ -18,7 +18,14 @@ export default tseslint.config(
   {
     files: ['**/*.{ts,tsx}'],
     plugins: { 'react-hooks': reactHooks },
-    rules: { ...reactHooks.configs.recommended.rules },
+    // eslint-plugin-react-hooks 7 schaltet in `configs.recommended` zusätzlich die
+    // React-Compiler-Regeln scharf (purity, immutability, set-state-in-effect …).
+    // Wir erzwingen bewusst nur das bisherige Set, damit dieses Toolchain-Upgrade
+    // das Lint-Gate nicht verändert; die neuen Regeln sind eine eigene Entscheidung.
+    rules: {
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
+    },
   },
   {
     files: ['scripts/**/*.{js,mjs}'],
