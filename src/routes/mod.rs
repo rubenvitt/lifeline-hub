@@ -34,6 +34,7 @@ pub mod organisation;
 pub mod org_einstellungen;
 pub mod ort_vorschau;
 pub mod karte;
+pub mod karte_hintergrundbild;
 pub mod lage_zone;
 pub mod personal;
 pub mod personal_status;
