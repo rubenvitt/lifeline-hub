@@ -1,12 +1,15 @@
 import type { Map as MapLibreMap, GeoJSONSource } from 'maplibre-gl';
 import type { KarteMarker } from './marker';
 import { tzIconKey } from './markerIcons';
+import { clusterTypProperties } from './clusterDonut';
 
-// Nur Felder, die eine Layer-Expression, ein Filter oder der Klick-Handler liest:
-// schluessel (Klick→Inspector), farbe (marker-kreis circle-color), icon (marker-symbol icon-image +
-// kreis/symbol-Diskriminierung), statusFarbe (marker-status-ring). Bewusst KEIN typ/label (write-only).
+// Felder, die eine Layer-Expression, ein Filter, der Klick-Handler oder die Cluster-Aggregation liest:
+// schluessel (Klick→Inspector), typ (clusterProperties → Donut-Segmente), farbe (marker-kreis
+// circle-color), icon (marker-symbol icon-image + kreis/symbol-Diskriminierung), statusFarbe
+// (marker-status-ring). label bewusst weggelassen (write-only).
 export interface MarkerProps {
   schluessel: string;
+  typ: string;
   farbe: string;
   icon?: string;
   statusFarbe?: string;
@@ -24,7 +27,7 @@ export type MarkerFeatureCollection = {
 };
 
 function toFeature(mk: KarteMarker): MarkerFeature {
-  const properties: MarkerProps = { schluessel: mk.schluessel, farbe: mk.farbe };
+  const properties: MarkerProps = { schluessel: mk.schluessel, typ: mk.typ, farbe: mk.farbe };
   if (mk.tz) properties.icon = tzIconKey(mk.tz);
   if (mk.statusFarbe) properties.statusFarbe = mk.statusFarbe;
   return { type: 'Feature', properties, geometry: { type: 'Point', coordinates: [mk.lon, mk.lat] } };
@@ -51,18 +54,18 @@ export const MARKER_EINSATZORT_QUELLE = 'marker-einsatzort';
 export const MARKER_KLICK_LAYER = [
   'marker-symbol', 'marker-kreis', 'marker-status-ring', 'marker-einsatzort-symbol',
 ] as const;
-export const CLUSTER_LAYER = 'marker-cluster-bubble';
 
+// Cluster werden als DOM-Donut-Marker gerendert (clusterDonut + Kartenflaeche), NICHT als
+// circle/symbol-Layer → kein Cluster-Layer in dieser Liste.
 const MARKER_LAYER_REIHENFOLGE = [
-  'marker-status-ring', 'marker-kreis', 'marker-symbol',
-  'marker-cluster-bubble', 'marker-cluster-count', 'marker-einsatzort-symbol',
+  'marker-status-ring', 'marker-kreis', 'marker-symbol', 'marker-einsatzort-symbol',
 ] as const;
 
 /**
  * Idempotent: Sources (Cluster + ungeclusterter Einsatzort) und circle/symbol-Layer für
  * Marker + Clustering. Style-Wechsel entfernt Sources/Layer → bei der Re-Anlage erneut aufrufen.
  * Layer-Reihenfolge (Mal-Reihenfolge von unten): Status-Ring, Kreis (Lagemeldung), TZ-Symbol,
- * Cluster-Bubble, Cluster-Zahl, Einsatzort-Symbol.
+ * Einsatzort-Symbol. Cluster sind separate DOM-Donut-Marker (clusterDonut), kein Layer.
  */
 export function sorgeFuerMarkerLayer(
   map: MapLibreMap,
@@ -75,6 +78,8 @@ export function sorgeFuerMarkerLayer(
     // wird nicht mehr geclustert (Einzelmarker), passend zur Detailarbeit auf Stadt-/Objektebene.
     map.addSource(MARKER_CLUSTER_QUELLE, {
       type: 'geojson', data: marker as never, cluster: true, clusterRadius: 45, clusterMaxZoom: 14,
+      // per-Typ-Counts am Cluster-Feature → speisen die Donut-Segmente (clusterDonut).
+      clusterProperties: clusterTypProperties() as never,
     });
   }
   if (!map.getSource(MARKER_EINSATZORT_QUELLE)) {
@@ -110,26 +115,9 @@ export function sorgeFuerMarkerLayer(
       layout: { 'icon-image': ['get', 'icon'], 'icon-size': 1, 'icon-allow-overlap': true },
     });
   }
-  // Cluster-Bubble (dezent), Radius gestuft nach point_count.
-  if (!map.getLayer('marker-cluster-bubble')) {
-    map.addLayer({
-      id: 'marker-cluster-bubble', type: 'circle', source: MARKER_CLUSTER_QUELLE,
-      filter: ['has', 'point_count'],
-      paint: {
-        'circle-color': '#1f4e79', 'circle-opacity': 0.85,
-        'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.5,
-        'circle-radius': ['step', ['get', 'point_count'], 14, 10, 18, 50, 24],
-      },
-    });
-  }
-  if (!map.getLayer('marker-cluster-count')) {
-    map.addLayer({
-      id: 'marker-cluster-count', type: 'symbol', source: MARKER_CLUSTER_QUELLE,
-      filter: ['has', 'point_count'],
-      layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-size': 12 },
-      paint: { 'text-color': '#ffffff' },
-    });
-  }
+  // Cluster-Bubbles bewusst NICHT als circle/symbol-Layer — sie werden als DOM-Donut-Marker
+  // gerendert (clusterDonut + DOM-Sync in Kartenflaeche): weiche Schatten + Typ-Zusammensetzung,
+  // was WebGL-circle nicht kann. Die unclustered Einzelpunkte bleiben die Layer oben.
   // Einsatzort (eigene, ungeclusterte Source) — immer als Einzelsymbol sichtbar.
   if (!map.getLayer('marker-einsatzort-symbol')) {
     map.addLayer({
