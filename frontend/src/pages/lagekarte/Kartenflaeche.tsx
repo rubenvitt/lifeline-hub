@@ -540,10 +540,13 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     const leer = { type: 'FeatureCollection' as const, features: [] };
 
     const schliesse = () => {
-      spiderTokenRef.current++;            // in-flight getClusterLeaves entwerten
+      spiderTokenRef.current++;            // in-flight getClusterLeaves entwerten (load-bearing)
       if (spiderOffenRef.current === null) return;
       spiderOffenRef.current = null;
-      setzeSpiderDaten(map, leer, leer);
+      // mapRef wird im Map-Cleanup ZUERST genullt (Effekt-Reihenfolge) → beim Unmount mit offenem
+      // Spider ist die Map schon entfernt; getSource würfe sonst (kein internes Guard). Token-Bump
+      // läuft trotzdem, damit kein in-flight-Lauf nach dem Unmount noch malt.
+      if (mapRef.current) setzeSpiderDaten(map, leer, leer);
     };
 
     const oeffne = (clusterId: string, center: [number, number], anzahl: number) => {
