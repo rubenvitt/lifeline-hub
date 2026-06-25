@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { baueMarkerFc, baueEinsatzortFc } from './markerLayer';
+import { describe, it, expect, vi } from 'vitest';
+import {
+  baueMarkerFc, baueEinsatzortFc, sorgeFuerMarkerLayer, reAnlegenMarker,
+  MARKER_CLUSTER_QUELLE, MARKER_EINSATZORT_QUELLE,
+} from './markerLayer';
 import type { KarteMarker } from './marker';
 
 const mk = (p: Partial<KarteMarker>): KarteMarker => ({
@@ -57,5 +60,84 @@ describe('baueEinsatzortFc', () => {
 
   it('ist leer, wenn kein Einsatzort verortet ist', () => {
     expect(baueEinsatzortFc([mk({ schluessel: 'uhs-5' })]).features).toHaveLength(0);
+  });
+});
+
+function fakeMap() {
+  const sources = new Map<string, { spec: unknown; setData: ReturnType<typeof vi.fn> }>();
+  const layers = new Map<string, unknown>();
+  const moves: string[] = [];
+  const map = {
+    getSource: vi.fn((id: string) => sources.get(id)),
+    addSource: vi.fn((id: string, spec: unknown) => { sources.set(id, { spec, setData: vi.fn() }); }),
+    getLayer: vi.fn((id: string) => layers.get(id)),
+    addLayer: vi.fn((spec: { id: string }) => { layers.set(spec.id, spec); }),
+    moveLayer: vi.fn((id: string) => { moves.push(id); }),
+  };
+  return { map, sources, layers, moves };
+}
+
+const leer = { type: 'FeatureCollection' as const, features: [] };
+
+describe('sorgeFuerMarkerLayer', () => {
+  it('legt die Cluster-Source mit cluster:true an', () => {
+    const { map, sources } = fakeMap();
+    sorgeFuerMarkerLayer(map as never, leer, leer);
+    expect((sources.get(MARKER_CLUSTER_QUELLE)!.spec as { cluster: boolean }).cluster).toBe(true);
+    expect(sources.has(MARKER_EINSATZORT_QUELLE)).toBe(true);
+  });
+
+  it('legt alle Marker- und Cluster-Layer an', () => {
+    const { map, layers } = fakeMap();
+    sorgeFuerMarkerLayer(map as never, leer, leer);
+    for (const id of [
+      'marker-status-ring', 'marker-kreis', 'marker-symbol',
+      'marker-cluster-bubble', 'marker-cluster-count', 'marker-einsatzort-symbol',
+    ]) {
+      expect(layers.has(id)).toBe(true);
+    }
+  });
+
+  it('ist idempotent (zweiter Aufruf legt nichts doppelt an)', () => {
+    const { map } = fakeMap();
+    sorgeFuerMarkerLayer(map as never, leer, leer);
+    const addSourceCalls = map.addSource.mock.calls.length;
+    sorgeFuerMarkerLayer(map as never, leer, leer);
+    expect(map.addSource.mock.calls.length).toBe(addSourceCalls);
+  });
+
+  it('trennt clusterbare Marker per Filter von Cluster-Bubbles (Negation nicht gate-blind)', () => {
+    const { map, layers } = fakeMap();
+    sorgeFuerMarkerLayer(map as never, leer, leer);
+    const symbol = layers.get('marker-symbol') as { filter: unknown };
+    const bubble = layers.get('marker-cluster-bubble') as { filter: unknown };
+    // Der Symbol-Layer MUSS Cluster ausschließen (Negation '!'); der Bubble-Layer NICHT.
+    // (Nur `toContain('point_count')` wäre für beide Filter wahr → gate-blind.)
+    expect(JSON.stringify(symbol.filter)).toContain('"!"');
+    expect(JSON.stringify(bubble.filter)).not.toContain('"!"');
+    expect(symbol.filter).not.toEqual(bubble.filter);
+  });
+
+  it('pinnt die Marker-Layer nach oben (über Abschnitten/Zonen/Bildern)', () => {
+    const { map, moves } = fakeMap();
+    sorgeFuerMarkerLayer(map as never, leer, leer);
+    // Jeder Marker-Layer wird per moveLayer (ohne beforeId) ans Ende = nach oben geschoben,
+    // in Mal-Reihenfolge (Status-Ring unten … Einsatzort-Symbol oben).
+    expect(moves).toEqual([
+      'marker-status-ring', 'marker-kreis', 'marker-symbol',
+      'marker-cluster-bubble', 'marker-cluster-count', 'marker-einsatzort-symbol',
+    ]);
+  });
+});
+
+describe('reAnlegenMarker', () => {
+  it('legt an und spielt die (nicht-leeren) Daten unverändert in beide Sources ein', () => {
+    const { map, sources } = fakeMap();
+    const marker = baueMarkerFc([mk({ schluessel: 'uhs-5' }), mk({ schluessel: 'schaden-9', typ: 'schaden' })]);
+    const einsatzort = baueEinsatzortFc([mk({ schluessel: 'einsatzort', typ: 'einsatzort' })]);
+    reAnlegenMarker(map as never, marker, einsatzort);
+    expect(sources.get(MARKER_CLUSTER_QUELLE)!.setData).toHaveBeenCalledWith(marker);
+    expect(sources.get(MARKER_EINSATZORT_QUELLE)!.setData).toHaveBeenCalledWith(einsatzort);
+    expect(marker.features).toHaveLength(2); // Daten unverändert durchgereicht
   });
 });
