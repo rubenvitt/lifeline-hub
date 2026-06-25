@@ -7,6 +7,7 @@ import {
   type ZoneFeature,
 } from './kartenLayer';
 import { FACHEBENEN } from './fachebenen';
+import { MARKER_CLUSTER_QUELLE } from './markerLayer';
 
 const leereFlaechen = baueFlaechenFc([]);
 const leereZonen = baueZonenFc([]);
@@ -41,6 +42,7 @@ function fakeMap(istGeladen: () => boolean) {
     addSource: vi.fn((id: string) => { sources.add(id); }),
     getLayer: vi.fn((id: string) => (layers.has(id) ? {} : undefined)),
     addLayer: vi.fn((spec: { id: string }) => { layers.add(spec.id); }),
+    moveLayer: vi.fn(),
     feuere: (ev: string) => (handler[ev] ?? []).slice().forEach((h) => h()),
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -141,5 +143,37 @@ describe('planeReAnlegenNachStyle', () => {
     map.feuere('render');
 
     expect(setData).toHaveBeenCalledWith(aktuell);
+  });
+});
+
+describe('reAnlegenAlles — Marker', () => {
+  it('legt die Marker-Cluster-Source mit an, wenn Marker-Daten übergeben werden', () => {
+    const { map } = fakeMap(() => true);
+    const marker = { type: 'FeatureCollection' as const, features: [] };
+    const einsatzort = { type: 'FeatureCollection' as const, features: [] };
+    reAnlegenAlles(map, leereFlaechen, leereZonen, [], [], marker as never, einsatzort as never);
+    expect(map.getSource(MARKER_CLUSTER_QUELLE)).toBeTruthy();
+  });
+
+  it('lässt Marker weg, wenn keine Marker-Daten übergeben werden (abwärtskompatibel)', () => {
+    const { map } = fakeMap(() => true);
+    reAnlegenAlles(map, leereFlaechen, leereZonen);
+    expect(map.getSource(MARKER_CLUSTER_QUELLE)).toBeFalsy();
+  });
+});
+
+describe('planeReAnlegenNachStyle — Marker', () => {
+  it('legt Marker beim ersten geladenen Frame mit an', () => {
+    let geladen = false;
+    const { map } = fakeMap(() => geladen);
+    const marker = { type: 'FeatureCollection' as const, features: [] };
+    const einsatzort = { type: 'FeatureCollection' as const, features: [] };
+    planeReAnlegenNachStyle(
+      map, () => leereFlaechen, () => leereZonen, () => [], () => [],
+      () => marker as never, () => einsatzort as never,
+    );
+    geladen = true;
+    map.feuere('render');
+    expect(map.getSource(MARKER_CLUSTER_QUELLE)).toBeTruthy();
   });
 });

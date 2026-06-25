@@ -6,6 +6,7 @@ import { sorgeFuerFachebeneLayer, setzeFachebeneDaten } from './fachebenenLayer'
 import type { FachebeneDef } from './fachebenen';
 import type { FeatureCollection } from '../../api/fachebenen';
 import { synchronisiereBildLayer, type BildOverlay } from './bildLayer';
+import { reAnlegenMarker, type MarkerFeatureCollection } from './markerLayer';
 
 export type { BildOverlay };
 
@@ -153,6 +154,8 @@ export function reAnlegenAlles(
   zonen: ZonenFeatureCollection,
   fachebenen: AktiveFachebene[] = [],
   bilder: BildOverlay[] = [],
+  marker?: MarkerFeatureCollection,
+  einsatzort?: MarkerFeatureCollection,
 ) {
   // Bilder zuerst (vor abschnitte-fill, das gleich angelegt wird → beforeId noch nicht da:
   // daher OHNE beforeId anlegen und danach abschnitte/zonen drüber legen).
@@ -165,6 +168,8 @@ export function reAnlegenAlles(
     sorgeFuerFachebeneLayer(map, fe.def, fe.daten);
     setzeFachebeneDaten(map, fe.def.key, fe.daten);
   }
+  // Marker zuletzt (= oberste Layer; sorgeFuerMarkerLayer pinnt sie zusätzlich nach oben).
+  if (marker && einsatzort) reAnlegenMarker(map, marker, einsatzort);
 }
 
 /**
@@ -184,6 +189,11 @@ export function planeReAnlegenNachStyle(
   getZonen: () => ZonenFeatureCollection,
   getFachebenen: () => AktiveFachebene[] = () => [],
   getBilder: () => BildOverlay[] = () => [],
+  getMarker?: () => MarkerFeatureCollection,
+  getEinsatzort?: () => MarkerFeatureCollection,
 ) {
-  wendeKartenDatenAn(map, () => reAnlegenAlles(map, getFlaechen(), getZonen(), getFachebenen(), getBilder()));
+  wendeKartenDatenAn(map, () => reAnlegenAlles(
+    map, getFlaechen(), getZonen(), getFachebenen(), getBilder(),
+    getMarker?.(), getEinsatzort?.(),
+  ));
 }
