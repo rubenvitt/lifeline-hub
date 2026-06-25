@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   baueMarkerFc, baueEinsatzortFc, sorgeFuerMarkerLayer, reAnlegenMarker,
   MARKER_CLUSTER_QUELLE, MARKER_EINSATZORT_QUELLE, MARKER_KLICK_LAYER,
+  SPIDER_LEAVES_QUELLE, SPIDER_LEGS_QUELLE, SPIDER_KLICK_LAYER, setzeSpiderDaten,
 } from './markerLayer';
 import type { KarteMarker } from './marker';
 
@@ -123,12 +124,15 @@ describe('sorgeFuerMarkerLayer', () => {
     expect(symbol.filter).not.toEqual(kreis.filter);
   });
 
-  it('pinnt die Marker-Layer nach oben (über Abschnitten/Zonen/Bildern)', () => {
+  it('pinnt Marker- UND Spider-Layer nach oben (Beinchen unter den Leaf-Symbolen)', () => {
     const { map, moves } = fakeMap();
     sorgeFuerMarkerLayer(map as never, leer, leer);
-    // Jeder Marker-Layer wird per moveLayer (ohne beforeId) ans Ende = nach oben geschoben,
-    // in Mal-Reihenfolge (Status-Ring unten … Einsatzort-Symbol oben). Cluster = DOM-Marker (kein Layer).
-    expect(moves).toEqual(['marker-status-ring', 'marker-kreis', 'marker-symbol', 'marker-einsatzort-symbol']);
+    // Jeder Layer wird per moveLayer (ohne beforeId) ans Ende = nach oben geschoben, in Mal-Reihenfolge.
+    // Marker zuerst, dann der transiente Spider darüber (Beinchen unter den Leaf-Symbolen). Cluster = DOM-Marker.
+    expect(moves).toEqual([
+      'marker-status-ring', 'marker-kreis', 'marker-symbol', 'marker-einsatzort-symbol',
+      'spider-legs-line', 'spider-status-ring', 'spider-kreis', 'spider-symbol',
+    ]);
   });
 
   it('legt alle in MARKER_KLICK_LAYER referenzierten Layer real an (Konstanten-Kopplung)', () => {
@@ -149,5 +153,34 @@ describe('reAnlegenMarker', () => {
     expect(sources.get(MARKER_CLUSTER_QUELLE)!.setData).toHaveBeenCalledWith(marker);
     expect(sources.get(MARKER_EINSATZORT_QUELLE)!.setData).toHaveBeenCalledWith(einsatzort);
     expect(marker.features).toHaveLength(2); // Daten unverändert durchgereicht
+  });
+});
+
+describe('Spider-Layer', () => {
+  it('legt Spider-Sources (ungeclustert) + Beinchen-Linie + Leaf-Layer an', () => {
+    const { map, sources, layers } = fakeMap();
+    sorgeFuerMarkerLayer(map as never, leer, leer);
+    expect(sources.has(SPIDER_LEAVES_QUELLE)).toBe(true);
+    expect(sources.has(SPIDER_LEGS_QUELLE)).toBe(true);
+    expect((sources.get(SPIDER_LEAVES_QUELLE)!.spec as { cluster?: boolean }).cluster).toBeUndefined();
+    for (const id of ['spider-legs-line', 'spider-status-ring', 'spider-kreis', 'spider-symbol']) {
+      expect(layers.has(id)).toBe(true);
+    }
+  });
+
+  it('alle SPIDER_KLICK_LAYER existieren real (Konstanten-Kopplung)', () => {
+    const { map, layers } = fakeMap();
+    sorgeFuerMarkerLayer(map as never, leer, leer);
+    for (const id of SPIDER_KLICK_LAYER) expect(layers.has(id)).toBe(true);
+  });
+
+  it('setzeSpiderDaten spielt Leaves + Beinchen in die Spider-Sources', () => {
+    const { map, sources } = fakeMap();
+    sorgeFuerMarkerLayer(map as never, leer, leer);
+    const leaves = { type: 'FeatureCollection' as const, features: [] };
+    const legs = { type: 'FeatureCollection' as const, features: [] };
+    setzeSpiderDaten(map as never, leaves, legs);
+    expect(sources.get(SPIDER_LEAVES_QUELLE)!.setData).toHaveBeenCalledWith(leaves);
+    expect(sources.get(SPIDER_LEGS_QUELLE)!.setData).toHaveBeenCalledWith(legs);
   });
 });
