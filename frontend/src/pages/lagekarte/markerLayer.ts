@@ -2,10 +2,11 @@ import type { Map as MapLibreMap, GeoJSONSource } from 'maplibre-gl';
 import type { KarteMarker } from './marker';
 import { tzIconKey } from './markerIcons';
 
+// Nur Felder, die eine Layer-Expression, ein Filter oder der Klick-Handler liest:
+// schluessel (Klick→Inspector), farbe (marker-kreis circle-color), icon (marker-symbol icon-image +
+// kreis/symbol-Diskriminierung), statusFarbe (marker-status-ring). Bewusst KEIN typ/label (write-only).
 export interface MarkerProps {
   schluessel: string;
-  typ: string;
-  label: string;
   farbe: string;
   icon?: string;
   statusFarbe?: string;
@@ -23,9 +24,7 @@ export type MarkerFeatureCollection = {
 };
 
 function toFeature(mk: KarteMarker): MarkerFeature {
-  const properties: MarkerProps = {
-    schluessel: mk.schluessel, typ: mk.typ, label: mk.label, farbe: mk.farbe,
-  };
+  const properties: MarkerProps = { schluessel: mk.schluessel, farbe: mk.farbe };
   if (mk.tz) properties.icon = tzIconKey(mk.tz);
   if (mk.statusFarbe) properties.statusFarbe = mk.statusFarbe;
   return { type: 'Feature', properties, geometry: { type: 'Point', coordinates: [mk.lon, mk.lat] } };
@@ -71,6 +70,9 @@ export function sorgeFuerMarkerLayer(
   einsatzort: MarkerFeatureCollection,
 ) {
   if (!map.getSource(MARKER_CLUSTER_QUELLE)) {
+    // clusterRadius:45 px — moderates Zusammenfassen erst bei echtem Gedränge (dezent, kein
+    // aggressives Verschmelzen schon bei lockerer Streuung). clusterMaxZoom:14 — ab Zoom 14
+    // wird nicht mehr geclustert (Einzelmarker), passend zur Detailarbeit auf Stadt-/Objektebene.
     map.addSource(MARKER_CLUSTER_QUELLE, {
       type: 'geojson', data: marker as never, cluster: true, clusterRadius: 45, clusterMaxZoom: 14,
     });
@@ -135,10 +137,20 @@ export function sorgeFuerMarkerLayer(
       layout: { 'icon-image': ['get', 'icon'], 'icon-size': 1, 'icon-allow-overlap': true },
     });
   }
-  // Marker-Layer verlässlich nach oben pinnen (über Abschnitten/Zonen/Bildern). Die render-Poller
-  // der anderen Daten-Layer racen beim Mount mit dem Marker-Poller; ohne explizites Pinnen könnten
-  // Marker unter den Flächen landen (DOM-Marker lagen früher immer über dem Canvas). moveLayer ohne
-  // beforeId schiebt ans Ende = oben; die Reihenfolge erhält die Mal-Reihenfolge.
+  pinneMarkerLayerNachOben(map);
+}
+
+/**
+ * Hält die Marker-Layer über allen anderen Daten-Layern (Abschnitte/Zonen/Bilder/Fachebenen).
+ * moveLayer ohne beforeId schiebt ans Ende (= oben); die Reihenfolge erhält die Mal-Reihenfolge
+ * (Status-Ring unten … Einsatzort-Symbol oben).
+ *
+ * Muss nach JEDER dynamischen Layer-Anlage einer anderen Ebene erneut laufen: jene legen ohne
+ * beforeId an und landen sonst über den Markern (verdecken sie + fangen ihre Klicks ab). Beim
+ * Mount racet zudem der Marker-render-Poller mit den anderen Daten-Pollern; das Pinnen macht die
+ * Reihenfolge unabhängig davon. (DOM-Marker lagen früher immer über dem Canvas.)
+ */
+export function pinneMarkerLayerNachOben(map: MapLibreMap) {
   for (const id of MARKER_LAYER_REIHENFOLGE) {
     if (map.getLayer(id)) map.moveLayer(id);
   }

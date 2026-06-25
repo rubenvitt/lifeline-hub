@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   baueMarkerFc, baueEinsatzortFc, sorgeFuerMarkerLayer, reAnlegenMarker,
-  MARKER_CLUSTER_QUELLE, MARKER_EINSATZORT_QUELLE,
+  MARKER_CLUSTER_QUELLE, MARKER_EINSATZORT_QUELLE, MARKER_KLICK_LAYER, CLUSTER_LAYER,
 } from './markerLayer';
 import type { KarteMarker } from './marker';
 
@@ -127,6 +127,15 @@ describe('sorgeFuerMarkerLayer', () => {
       'marker-status-ring', 'marker-kreis', 'marker-symbol',
       'marker-cluster-bubble', 'marker-cluster-count', 'marker-einsatzort-symbol',
     ]);
+  });
+
+  it('legt alle in MARKER_KLICK_LAYER/CLUSTER_LAYER referenzierten Layer real an (Konstanten-Kopplung)', () => {
+    const { map, layers } = fakeMap();
+    sorgeFuerMarkerLayer(map as never, leer, leer);
+    // Schützt vor stillen Klick-Toten: eine Layer-ID-Umbenennung ohne Nachziehen der Konstante
+    // bände den Klick-Handler an einen nicht existierenden Layer — hier rot statt unbemerkt.
+    for (const id of MARKER_KLICK_LAYER) expect(layers.has(id)).toBe(true);
+    expect(layers.has(CLUSTER_LAYER)).toBe(true);
   });
 });
 

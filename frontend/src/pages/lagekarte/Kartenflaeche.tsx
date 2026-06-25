@@ -5,7 +5,7 @@ import { erzeugeTaktischesZeichen } from 'taktische-zeichen-react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { KarteMarker } from './marker';
 import {
-  baueMarkerFc, baueEinsatzortFc, reAnlegenMarker,
+  baueMarkerFc, baueEinsatzortFc, reAnlegenMarker, pinneMarkerLayerNachOben,
   MARKER_CLUSTER_QUELLE, MARKER_KLICK_LAYER, CLUSTER_LAYER,
   type MarkerFeatureCollection,
 } from './markerLayer';
@@ -203,8 +203,18 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       if (map.hasImage(id) || ladendeIcons.has(id)) return;
       const tz = tzRegistryRef.current.get(id);
       if (!tz) return;
+      // erzeugeTaktischesZeichen kann bei nicht-DV-102-konformen tz-Werten (organisation/fachaufgabe
+      // werden in baueTzProps ungeprüft gecastet) synchron werfen. ZUERST erzeugen, ERST DANACH zu
+      // ladendeIcons hinzufügen — sonst bliebe die id bei einem Throw dauerhaft im Guard hängen
+      // (Icon nie wieder ladbar) und der Fehler flöge ungefangen aus dem MapLibre-Callback.
+      let bild;
+      try {
+        bild = erzeugeTaktischesZeichen(tz);
+      } catch {
+        return;
+      }
       ladendeIcons.add(id);
-      const { dataUrl, size } = erzeugeTaktischesZeichen(tz);
+      const { dataUrl, size } = bild;
       const img = new Image(size[0], size[1]);
       img.onload = () => {
         // Auf einheitliche Marker-Größe normieren: pixelRatio so, dass die größere Symboldimension
@@ -380,6 +390,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         setzeFachebeneDaten(map, fe.def.key, fe.daten);
       }
       vorherigeFachebenenRef.current = aktivKeys as Set<string>;
+      // Fachebenen-Layer werden ohne beforeId angelegt (landen oben) → Marker erneut nach oben
+      // pinnen, sonst verdecken frisch aktivierte Fachebenen die Marker und fangen ihre Klicks ab.
+      pinneMarkerLayerNachOben(map);
     });
   }, [fachebenen]);
 
