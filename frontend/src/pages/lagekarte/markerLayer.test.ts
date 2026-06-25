@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   baueMarkerFc, baueEinsatzortFc, sorgeFuerMarkerLayer, reAnlegenMarker,
-  MARKER_CLUSTER_QUELLE, MARKER_EINSATZORT_QUELLE, MARKER_KLICK_LAYER, CLUSTER_LAYER,
+  MARKER_CLUSTER_QUELLE, MARKER_EINSATZORT_QUELLE, MARKER_KLICK_LAYER,
 } from './markerLayer';
 import type { KarteMarker } from './marker';
 
@@ -38,12 +38,13 @@ describe('baueMarkerFc', () => {
     expect(fc.features[0].geometry).toEqual({ type: 'Point', coordinates: [8.6, 50.1] });
   });
 
-  it('behält Reihenfolge und propagiert die Schaden-Farbe in die Properties', () => {
+  it('behält Reihenfolge, propagiert Schaden-Farbe und schreibt typ (für die Cluster-Aggregation)', () => {
     const fc = baueMarkerFc([
       mk({ schluessel: 'uhs-5' }),
       mk({ schluessel: 'schaden-9', typ: 'schaden', farbe: '#f5222d', tz: { grundzeichen: 'gefahr', farbe: '#f5222d' } }),
     ]);
     expect(fc.features.map((f) => f.properties.schluessel)).toEqual(['uhs-5', 'schaden-9']);
+    expect(fc.features.map((f) => f.properties.typ)).toEqual(['uhs', 'schaden']);
     expect(fc.features[1].properties.farbe).toBe('#f5222d');
   });
 });
@@ -80,22 +81,24 @@ function fakeMap() {
 const leer = { type: 'FeatureCollection' as const, features: [] };
 
 describe('sorgeFuerMarkerLayer', () => {
-  it('legt die Cluster-Source mit cluster:true an', () => {
+  it('legt die Cluster-Source mit cluster:true und per-Typ clusterProperties an', () => {
     const { map, sources } = fakeMap();
     sorgeFuerMarkerLayer(map as never, leer, leer);
-    expect((sources.get(MARKER_CLUSTER_QUELLE)!.spec as { cluster: boolean }).cluster).toBe(true);
+    const spec = sources.get(MARKER_CLUSTER_QUELLE)!.spec as { cluster: boolean; clusterProperties: Record<string, unknown> };
+    expect(spec.cluster).toBe(true);
+    expect(spec.clusterProperties.c_fahrzeug).toBeDefined(); // Donut-Aggregation pro Typ
+    expect(spec.clusterProperties.c_schaden).toBeDefined();
     expect(sources.has(MARKER_EINSATZORT_QUELLE)).toBe(true);
   });
 
-  it('legt alle Marker- und Cluster-Layer an', () => {
+  it('legt die Einzelmarker-Layer an, aber KEINE circle/symbol-Cluster-Layer (Cluster = DOM-Donut)', () => {
     const { map, layers } = fakeMap();
     sorgeFuerMarkerLayer(map as never, leer, leer);
-    for (const id of [
-      'marker-status-ring', 'marker-kreis', 'marker-symbol',
-      'marker-cluster-bubble', 'marker-cluster-count', 'marker-einsatzort-symbol',
-    ]) {
+    for (const id of ['marker-status-ring', 'marker-kreis', 'marker-symbol', 'marker-einsatzort-symbol']) {
       expect(layers.has(id)).toBe(true);
     }
+    expect(layers.has('marker-cluster-bubble')).toBe(false);
+    expect(layers.has('marker-cluster-count')).toBe(false);
   });
 
   it('ist idempotent (zweiter Aufruf legt nichts doppelt an)', () => {
@@ -106,36 +109,34 @@ describe('sorgeFuerMarkerLayer', () => {
     expect(map.addSource.mock.calls.length).toBe(addSourceCalls);
   });
 
-  it('trennt clusterbare Marker per Filter von Cluster-Bubbles (Negation nicht gate-blind)', () => {
+  it('die Einzelmarker-Layer schließen Cluster aus (point_count-Negation, nicht gate-blind)', () => {
     const { map, layers } = fakeMap();
     sorgeFuerMarkerLayer(map as never, leer, leer);
     const symbol = layers.get('marker-symbol') as { filter: unknown };
-    const bubble = layers.get('marker-cluster-bubble') as { filter: unknown };
-    // Der Symbol-Layer MUSS Cluster ausschließen (Negation '!'); der Bubble-Layer NICHT.
-    // (Nur `toContain('point_count')` wäre für beide Filter wahr → gate-blind.)
-    expect(JSON.stringify(symbol.filter)).toContain('"!"');
-    expect(JSON.stringify(bubble.filter)).not.toContain('"!"');
-    expect(symbol.filter).not.toEqual(bubble.filter);
+    const kreis = layers.get('marker-kreis') as { filter: unknown };
+    // Beide Einzelmarker-Layer MÜSSEN die Cluster-Aggregate ausschließen (Negation '!' + point_count).
+    for (const f of [symbol.filter, kreis.filter]) {
+      expect(JSON.stringify(f)).toContain('"!"');
+      expect(JSON.stringify(f)).toContain('point_count');
+    }
+    // … und sich am icon unterscheiden (symbol: hat icon; kreis: kein icon).
+    expect(symbol.filter).not.toEqual(kreis.filter);
   });
 
   it('pinnt die Marker-Layer nach oben (über Abschnitten/Zonen/Bildern)', () => {
     const { map, moves } = fakeMap();
     sorgeFuerMarkerLayer(map as never, leer, leer);
     // Jeder Marker-Layer wird per moveLayer (ohne beforeId) ans Ende = nach oben geschoben,
-    // in Mal-Reihenfolge (Status-Ring unten … Einsatzort-Symbol oben).
-    expect(moves).toEqual([
-      'marker-status-ring', 'marker-kreis', 'marker-symbol',
-      'marker-cluster-bubble', 'marker-cluster-count', 'marker-einsatzort-symbol',
-    ]);
+    // in Mal-Reihenfolge (Status-Ring unten … Einsatzort-Symbol oben). Cluster = DOM-Marker (kein Layer).
+    expect(moves).toEqual(['marker-status-ring', 'marker-kreis', 'marker-symbol', 'marker-einsatzort-symbol']);
   });
 
-  it('legt alle in MARKER_KLICK_LAYER/CLUSTER_LAYER referenzierten Layer real an (Konstanten-Kopplung)', () => {
+  it('legt alle in MARKER_KLICK_LAYER referenzierten Layer real an (Konstanten-Kopplung)', () => {
     const { map, layers } = fakeMap();
     sorgeFuerMarkerLayer(map as never, leer, leer);
     // Schützt vor stillen Klick-Toten: eine Layer-ID-Umbenennung ohne Nachziehen der Konstante
     // bände den Klick-Handler an einen nicht existierenden Layer — hier rot statt unbemerkt.
     for (const id of MARKER_KLICK_LAYER) expect(layers.has(id)).toBe(true);
-    expect(layers.has(CLUSTER_LAYER)).toBe(true);
   });
 });
 

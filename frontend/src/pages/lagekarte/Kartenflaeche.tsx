@@ -6,10 +6,11 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import type { KarteMarker } from './marker';
 import {
   baueMarkerFc, baueEinsatzortFc, reAnlegenMarker, pinneMarkerLayerNachOben,
-  MARKER_CLUSTER_QUELLE, MARKER_KLICK_LAYER, CLUSTER_LAYER,
+  MARKER_CLUSTER_QUELLE, MARKER_KLICK_LAYER,
   type MarkerFeatureCollection,
 } from './markerLayer';
 import { tzIconKey } from './markerIcons';
+import { baueClusterDonut } from './clusterDonut';
 import type { TzProps } from './taktischesZeichen';
 import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
 import { createZeichnung, type Zeichnung, type ZeichenModus } from './zeichnen';
@@ -118,6 +119,10 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   const einsatzortDatenRef = useRef<MarkerFeatureCollection>({ type: 'FeatureCollection', features: [] });
   // Image-Key → TzProps; der styleimagemissing-Handler erzeugt daraus lazy die Karten-Icons.
   const tzRegistryRef = useRef<Map<string, TzProps>>(new Map());
+  // Cluster-DOM-Donut-Marker (cluster_id → Marker). clusterDomRef = alle bekannten,
+  // clusterDomOnScreenRef = aktuell auf der Karte (Mapbox-Donut-Sync-Muster).
+  const clusterDomRef = useRef<Record<string, maplibregl.Marker>>({});
+  const clusterDomOnScreenRef = useRef<Record<string, maplibregl.Marker>>({});
   // true, sobald der initiale Style geladen ist → danach gelten error-Events als
   // transient (einzelne Tiles), NICHT als Style-Ladefehler.
   const stilGeladenRef = useRef(false);
@@ -431,26 +436,21 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     }
     tzRegistryRef.current = registry;
     wendeKartenDatenAn(map, () => reAnlegenMarker(map, markerDatenRef.current, einsatzortDatenRef.current));
+    // Cluster-Zusammensetzung kann sich geändert haben → DOM-Donuts verwerfen; der render-Sync baut
+    // sie mit frischen Typ-Counts neu auf (ein wiederverwendeter cluster_id zeigte sonst stale Segmente).
+    for (const id in clusterDomOnScreenRef.current) clusterDomOnScreenRef.current[id].remove();
+    clusterDomOnScreenRef.current = {};
+    clusterDomRef.current = {};
   }, [markers]);
 
-  // Marker-/Cluster-Klick + Cursor. Marker-Klick → Inspector (schluessel); Cluster-Klick → reinzoomen.
+  // Einzel-Marker-Klick → Inspector (schluessel) + Cursor. Cluster-Klick läuft über die
+  // DOM-Donut-Marker (eigener Effekt unten).
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     const klickMarker = (e: maplibregl.MapLayerMouseEvent) => {
       const schluessel = e.features?.[0]?.properties?.schluessel;
       if (typeof schluessel === 'string') onMarkerKlick?.(schluessel);
-    };
-    const klickCluster = (e: maplibregl.MapLayerMouseEvent) => {
-      const f = e.features?.[0];
-      const clusterId = f?.properties?.cluster_id;
-      if (clusterId == null) return;
-      const src = map.getSource(MARKER_CLUSTER_QUELLE) as GeoJSONSource | undefined;
-      if (!src) return;
-      src.getClusterExpansionZoom(clusterId as number).then((zoom) => {
-        const coords = (f!.geometry as GeoJSON.Point).coordinates as [number, number];
-        map.easeTo({ center: coords, zoom });
-      }).catch(() => { /* Cluster nach Daten-Update verschwunden → ignorieren */ });
     };
     const enter = () => { map.getCanvas().style.cursor = 'pointer'; };
     const leave = () => { map.getCanvas().style.cursor = ''; };
@@ -459,20 +459,60 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       map.on('mouseenter', id, enter);
       map.on('mouseleave', id, leave);
     }
-    map.on('click', CLUSTER_LAYER, klickCluster);
-    map.on('mouseenter', CLUSTER_LAYER, enter);
-    map.on('mouseleave', CLUSTER_LAYER, leave);
     return () => {
       for (const id of MARKER_KLICK_LAYER) {
         map.off('click', id, klickMarker);
         map.off('mouseenter', id, enter);
         map.off('mouseleave', id, leave);
       }
-      map.off('click', CLUSTER_LAYER, klickCluster);
-      map.off('mouseenter', CLUSTER_LAYER, enter);
-      map.off('mouseleave', CLUSTER_LAYER, leave);
     };
   }, [onMarkerKlick]);
+
+  // Cluster als DOM-Donut-Marker (Mapbox-Donut-Muster): bei jedem render die sichtbaren Cluster aus
+  // der Source lesen und HTML-Donut-Marker erzeugen/wiederverwenden/entfernen. Der Donut zeigt die
+  // Typ-Zusammensetzung + Gesamtzahl mit weichem Schatten (was ein WebGL-circle nicht kann); Klick
+  // zoomt auf den Auflösungs-Zoom. Einzelmarker bleiben die GeoJSON-Symbol/Circle-Layer.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const aktualisiere = () => {
+      if (!map.isSourceLoaded(MARKER_CLUSTER_QUELLE)) return;
+      const neu: Record<string, maplibregl.Marker> = {};
+      for (const f of map.querySourceFeatures(MARKER_CLUSTER_QUELLE)) {
+        const props = f.properties as Record<string, unknown>;
+        if (!props.cluster) continue;
+        const id = String(props.cluster_id);
+        if (neu[id]) continue; // querySourceFeatures kann denselben Cluster über mehrere Tiles liefern
+        let marker = clusterDomRef.current[id];
+        if (!marker) {
+          const coords = (f.geometry as GeoJSON.Point).coordinates as [number, number];
+          const el = baueClusterDonut(props);
+          el.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            const src = map.getSource(MARKER_CLUSTER_QUELLE) as GeoJSONSource | undefined;
+            src?.getClusterExpansionZoom(props.cluster_id as number)
+              .then((zoom) => map.easeTo({ center: coords, zoom }))
+              .catch(() => { /* Cluster nach Daten-Update weg → ignorieren */ });
+          });
+          marker = new maplibregl.Marker({ element: el }).setLngLat(coords);
+          clusterDomRef.current[id] = marker;
+        }
+        neu[id] = marker;
+        if (!clusterDomOnScreenRef.current[id]) marker.addTo(map);
+      }
+      for (const id in clusterDomOnScreenRef.current) {
+        if (!neu[id]) { clusterDomOnScreenRef.current[id].remove(); delete clusterDomRef.current[id]; }
+      }
+      clusterDomOnScreenRef.current = neu;
+    };
+    map.on('render', aktualisiere);
+    return () => {
+      map.off('render', aktualisiere);
+      for (const id in clusterDomOnScreenRef.current) clusterDomOnScreenRef.current[id].remove();
+      clusterDomOnScreenRef.current = {};
+      clusterDomRef.current = {};
+    };
+  }, []);
 
   // Viewport nach Kartenbewegung melden: Zoom (für „näher heranzoomen"-Hinweise) immer,
   // bbox (für bbox-abhängige Ebenen wie KRITIS) nur ab KRITIS_MIN_ZOOM — verhindert riesige
