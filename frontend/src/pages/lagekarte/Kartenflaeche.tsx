@@ -6,9 +6,10 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import type { KarteMarker } from './marker';
 import {
   baueMarkerFc, baueEinsatzortFc, reAnlegenMarker, pinneMarkerLayerNachOben,
-  MARKER_CLUSTER_QUELLE, MARKER_KLICK_LAYER,
-  type MarkerFeatureCollection,
+  MARKER_CLUSTER_QUELLE, MARKER_KLICK_LAYER, SPIDER_KLICK_LAYER, setzeSpiderDaten,
+  type MarkerFeatureCollection, type MarkerProps,
 } from './markerLayer';
+import { baueSpiderFc, SPIDER_CAP, type SpiderProjektor } from './spiderfy';
 import { tzIconKey } from './markerIcons';
 import { baueClusterDonut } from './clusterDonut';
 import type { TzProps } from './taktischesZeichen';
@@ -123,6 +124,14 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   // clusterDomOnScreenRef = aktuell auf der Karte (Mapbox-Donut-Sync-Muster).
   const clusterDomRef = useRef<Record<string, maplibregl.Marker>>({});
   const clusterDomOnScreenRef = useRef<Record<string, maplibregl.Marker>>({});
+  // Offener Spider: cluster_id (String) oder null. spiderTokenRef entwertet in-flight getClusterLeaves
+  // (Race-Guard: schneller A→B-Wechsel darf nicht A's Leaves über B malen).
+  const spiderOffenRef = useRef<string | null>(null);
+  const spiderTokenRef = useRef(0);
+  // Controller-Funktionen als Refs, damit der DOM-Donut-Klickhandler + die Daten-/Style-Effekte sie
+  // aufrufen können, ohne als Dependency neu zu binden.
+  const oeffneSpiderRef = useRef<(clusterId: string, center: [number, number], anzahl: number) => void>(() => {});
+  const schliesseSpiderRef = useRef<() => void>(() => {});
   // true, sobald der initiale Style geladen ist → danach gelten error-Events als
   // transient (einzelne Tiles), NICHT als Style-Ladefehler.
   const stilGeladenRef = useRef(false);
@@ -259,6 +268,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     const map = mapRef.current;
     if (!map) return;
     if (style === angewandterStyleRef.current) return; // Mount: Konstruktor hat ihn schon
+    schliesseSpiderRef.current?.(); // setStyle wischt Spider-Sources/Layer → Controller-State sonst stale
     angewandterStyleRef.current = style;
     map.setStyle(style, { diff: false });
     planeReAnlegenNachStyle(
@@ -441,6 +451,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     for (const id in clusterDomOnScreenRef.current) clusterDomOnScreenRef.current[id].remove();
     clusterDomOnScreenRef.current = {};
     clusterDomRef.current = {};
+    // Offener Spider hielte einen veralteten getClusterLeaves-Snapshot (cluster_ids ändern sich) →
+    // bei jeder Daten-Änderung (SSE/Query-Invalidation) einklappen.
+    schliesseSpiderRef.current?.();
   }, [markers]);
 
   // Einzel-Marker-Klick → Inspector (schluessel) + Cursor. Cluster-Klick läuft über die
@@ -454,13 +467,15 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     };
     const enter = () => { map.getCanvas().style.cursor = 'pointer'; };
     const leave = () => { map.getCanvas().style.cursor = ''; };
-    for (const id of MARKER_KLICK_LAYER) {
+    // Aufgefächerte Spider-Leaves verhalten sich wie Einzelmarker (Klick → onMarkerKlick, Cursor).
+    const klickLayer = [...MARKER_KLICK_LAYER, ...SPIDER_KLICK_LAYER];
+    for (const id of klickLayer) {
       map.on('click', id, klickMarker);
       map.on('mouseenter', id, enter);
       map.on('mouseleave', id, leave);
     }
     return () => {
-      for (const id of MARKER_KLICK_LAYER) {
+      for (const id of klickLayer) {
         map.off('click', id, klickMarker);
         map.off('mouseenter', id, enter);
         map.off('mouseleave', id, leave);
@@ -489,10 +504,10 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
           const el = baueClusterDonut(props);
           el.addEventListener('click', (ev) => {
             ev.stopPropagation();
-            const src = map.getSource(MARKER_CLUSTER_QUELLE) as GeoJSONSource | undefined;
-            src?.getClusterExpansionZoom(props.cluster_id as number)
-              .then((zoom) => map.easeTo({ center: coords, zoom }))
-              .catch(() => { /* Cluster nach Daten-Update weg → ignorieren */ });
+            // Donut-Klick fächert auf (statt reinzuzoomen); der Controller toggelt/fällt bei
+            // Großclustern auf Reinzoomen zurück. stopPropagation → erreicht den allgemeinen
+            // map-click NICHT (Re-Klick läuft über oeffne, nicht über das Leer-Klick-Einklappen).
+            oeffneSpiderRef.current?.(id, coords, Number(props.point_count ?? 0));
           });
           marker = new maplibregl.Marker({ element: el }).setLngLat(coords);
           clusterDomRef.current[id] = marker;
@@ -511,6 +526,66 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       for (const id in clusterDomOnScreenRef.current) clusterDomOnScreenRef.current[id].remove();
       clusterDomOnScreenRef.current = {};
       clusterDomRef.current = {};
+    };
+  }, []);
+
+  // Spider-Controller: Cluster-Donut-Klick fächert die Leaves auf (statt reinzuzoomen) und klappt
+  // zuverlässig wieder ein. WebGL-Laufzeit → lebt hier (einzige MapLibre-Stelle). Setup-once ([]),
+  // Map über Ref. Einklapp-Trigger: Karten-Move/Zoom, leerer Klick, ESC, erneuter/anderer
+  // Cluster-Klick (Toggle/A→B via oeffne); Live-Daten-Änderung ([markers]-Effekt) und Style-Wechsel
+  // ([style]-Effekt) rufen schliesse() über schliesseSpiderRef.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const leer = { type: 'FeatureCollection' as const, features: [] };
+
+    const schliesse = () => {
+      spiderTokenRef.current++;            // in-flight getClusterLeaves entwerten
+      if (spiderOffenRef.current === null) return;
+      spiderOffenRef.current = null;
+      setzeSpiderDaten(map, leer, leer);
+    };
+
+    const oeffne = (clusterId: string, center: [number, number], anzahl: number) => {
+      if (spiderOffenRef.current === clusterId) { schliesse(); return; } // Toggle / erneuter Klick
+      schliesse();                                                        // A→B: A einklappen
+      const src = map.getSource(MARKER_CLUSTER_QUELLE) as GeoJSONSource | undefined;
+      if (!src) return;
+      // Großcluster → Fallback: reinzoomen (verkleinert Cluster, dann erneut auffächerbar).
+      if (anzahl > SPIDER_CAP) {
+        src.getClusterExpansionZoom(Number(clusterId))
+          .then((zoom) => map.easeTo({ center, zoom }))
+          .catch(() => { /* Cluster nach Daten-Update weg → ignorieren */ });
+        return;
+      }
+      const token = ++spiderTokenRef.current;
+      src.getClusterLeaves(Number(clusterId), SPIDER_CAP, 0)
+        .then((leaves) => {
+          if (token !== spiderTokenRef.current) return; // stale (anderer Cluster geklickt / eingeklappt)
+          const projektor: SpiderProjektor = {
+            project: (ll) => map.project(ll),
+            unproject: (px) => map.unproject([px.x, px.y]),
+          };
+          const props = leaves.map((f) => f.properties as MarkerProps);
+          const { leaves: leafFc, legs } = baueSpiderFc(props, center, projektor);
+          setzeSpiderDaten(map, leafFc, legs);
+          spiderOffenRef.current = clusterId;
+        })
+        .catch(() => { /* Cluster nach Daten-Update weg → ignorieren */ });
+    };
+
+    oeffneSpiderRef.current = oeffne;
+    schliesseSpiderRef.current = schliesse;
+
+    const aufKey = (e: KeyboardEvent) => { if (e.key === 'Escape') schliesse(); };
+    map.on('movestart', schliesse);  // jede Karten-Bewegung/Zoom klappt ein
+    map.on('click', schliesse);      // leerer Klick (und nach Leaf-Routing) klappt ein
+    window.addEventListener('keydown', aufKey);
+    return () => {
+      map.off('movestart', schliesse);
+      map.off('click', schliesse);
+      window.removeEventListener('keydown', aufKey);
+      schliesse();
     };
   }, []);
 
