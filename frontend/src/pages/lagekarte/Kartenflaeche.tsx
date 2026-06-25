@@ -1,9 +1,16 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
-import maplibregl, { type LngLatLike, type StyleSpecification } from 'maplibre-gl';
+import maplibregl, { type LngLatLike, type StyleSpecification, type GeoJSONSource } from 'maplibre-gl';
 import { Protocol } from 'pmtiles';
 import { erzeugeTaktischesZeichen } from 'taktische-zeichen-react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { KarteMarker } from './marker';
+import {
+  baueMarkerFc, baueEinsatzortFc, reAnlegenMarker, pinneMarkerLayerNachOben,
+  MARKER_CLUSTER_QUELLE, MARKER_KLICK_LAYER, CLUSTER_LAYER,
+  type MarkerFeatureCollection,
+} from './markerLayer';
+import { tzIconKey } from './markerIcons';
+import type { TzProps } from './taktischesZeichen';
 import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
 import { createZeichnung, type Zeichnung, type ZeichenModus } from './zeichnen';
 import { wendeKartenDatenAn } from './kartenDaten';
@@ -106,7 +113,11 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
 }, ref) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
-  const markerObjekteRef = useRef<maplibregl.Marker[]>([]);
+  // Aktuelle Marker-Daten als FeatureCollections; nach setStyle re-angelegt (analog flaechenDatenRef).
+  const markerDatenRef = useRef<MarkerFeatureCollection>({ type: 'FeatureCollection', features: [] });
+  const einsatzortDatenRef = useRef<MarkerFeatureCollection>({ type: 'FeatureCollection', features: [] });
+  // Image-Key → TzProps; der styleimagemissing-Handler erzeugt daraus lazy die Karten-Icons.
+  const tzRegistryRef = useRef<Map<string, TzProps>>(new Map());
   // true, sobald der initiale Style geladen ist → danach gelten error-Events als
   // transient (einzelne Tiles), NICHT als Style-Ladefehler.
   const stilGeladenRef = useRef(false);
@@ -182,6 +193,41 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       }
       synchronisiereBildLayer(map, bilderRef.current, 'abschnitte-fill');
     });
+    // Taktische Zeichen lazy als Karten-Icons: MapLibre meldet fehlende icon-image-IDs; wir rendern
+    // das TZ on-demand und registrieren es. Race-Guard, weil das Event während des async Bild-Ladens
+    // mehrfach für dieselbe ID feuern kann (sonst wirft addImage "image already exists").
+    const ladendeIcons = new Set<string>();
+    map.on('styleimagemissing', (e) => {
+      const id = e.id;
+      if (!id.startsWith('tz|')) return;             // fremde IDs ignorieren
+      if (map.hasImage(id) || ladendeIcons.has(id)) return;
+      const tz = tzRegistryRef.current.get(id);
+      if (!tz) return;
+      // erzeugeTaktischesZeichen kann bei nicht-DV-102-konformen tz-Werten (organisation/fachaufgabe
+      // werden in baueTzProps ungeprüft gecastet) synchron werfen. ZUERST erzeugen, ERST DANACH zu
+      // ladendeIcons hinzufügen — sonst bliebe die id bei einem Throw dauerhaft im Guard hängen
+      // (Icon nie wieder ladbar) und der Fehler flöge ungefangen aus dem MapLibre-Callback.
+      let bild;
+      try {
+        bild = erzeugeTaktischesZeichen(tz);
+      } catch {
+        return;
+      }
+      ladendeIcons.add(id);
+      const { dataUrl, size } = bild;
+      const img = new Image(size[0], size[1]);
+      img.onload = () => {
+        // Auf einheitliche Marker-Größe normieren: pixelRatio so, dass die größere Symboldimension
+        // ~ZIEL_PX wird (TZ-SVGs haben je Grundzeichen abweichende size). Erst dadurch deckt der
+        // feste Status-Ring-Radius (markerLayer.ts, radius:20=40px) das Symbol verlässlich ab.
+        const ZIEL_PX = 34;
+        const pixelRatio = Math.max(size[0], size[1]) / ZIEL_PX;
+        if (!map.hasImage(id)) map.addImage(id, img, { pixelRatio });
+        ladendeIcons.delete(id);
+      };
+      img.onerror = () => { ladendeIcons.delete(id); };
+      img.src = dataUrl;
+    });
     mapRef.current = map;
     return () => {
       map.remove(); // zerstört auch die AttributionControl
@@ -216,6 +262,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       () => zonenDatenRef.current,
       () => fachebenenRef.current,
       () => bilderRef.current,
+      () => markerDatenRef.current,
+      () => einsatzortDatenRef.current,
     );
   }, [style]);
 
@@ -254,39 +302,6 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       map.off('error', fehler);
     };
   }, [onKarteKlick, onStyleFehler]);
-
-  // Marker re-rendern, wenn sich die Liste ändert.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    for (const m of markerObjekteRef.current) m.remove();
-    markerObjekteRef.current = markers.map((mk) => {
-      const el = document.createElement('div');
-      el.title = mk.label;
-      el.style.cursor = 'pointer';
-      if (mk.tz) {
-        // Per DOM-API bauen (kein innerHTML). dataUrl/statusFarbe stammen aus kontrollierten Enum-Werten.
-        const { dataUrl } = erzeugeTaktischesZeichen(mk.tz);
-        const wrap = document.createElement('div');
-        wrap.style.display = 'flex';
-        if (mk.statusFarbe) {
-          wrap.style.cssText += `border:3px solid ${mk.statusFarbe};border-radius:6px;padding:1px;background:rgba(255,255,255,.85);`;
-        }
-        const img = document.createElement('img');
-        img.src = dataUrl;
-        img.width = 34; img.height = 34; img.alt = '';
-        wrap.appendChild(img);
-        el.appendChild(wrap);
-      } else {
-        el.style.cssText += `width:18px;height:18px;border-radius:50%;border:2px solid #fff;background:${mk.farbe};box-shadow:0 0 3px rgba(0,0,0,.5)`;
-      }
-      el.addEventListener('click', (ev) => {
-        ev.stopPropagation(); // nicht als Karten-Klick werten
-        onMarkerKlick?.(mk.schluessel);
-      });
-      return new maplibregl.Marker({ element: el }).setLngLat([mk.lon, mk.lat]).addTo(map);
-    });
-  }, [markers, onMarkerKlick]);
 
   // fly-to bei Auswahl.
   useEffect(() => {
@@ -375,6 +390,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         setzeFachebeneDaten(map, fe.def.key, fe.daten);
       }
       vorherigeFachebenenRef.current = aktivKeys as Set<string>;
+      // Fachebenen-Layer werden ohne beforeId angelegt (landen oben) → Marker erneut nach oben
+      // pinnen, sonst verdecken frisch aktivierte Fachebenen die Marker und fangen ihre Klicks ab.
+      pinneMarkerLayerNachOben(map);
     });
   }, [fachebenen]);
 
@@ -393,6 +411,68 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       vorherigeBilderRef.current = aktivIds;
     });
   }, [bilder]);
+
+  // Marker als GeoJSON-Layer rendern + Clustering. Ersetzt das frühere DOM-Marker-Rendering.
+  // ALS LETZTER Daten-Effekt registriert (nach dem Bild-Effekt) → der Marker-render-Poller läuft
+  // zuletzt, die Marker-Layer liegen über Abschnitten/Zonen/Bildern; zusätzlich pinnt
+  // sorgeFuerMarkerLayer sie per moveLayer nach oben.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const marker = baueMarkerFc(markers);
+    const einsatzort = baueEinsatzortFc(markers);
+    markerDatenRef.current = marker;
+    einsatzortDatenRef.current = einsatzort;
+    // Registry für styleimagemissing füllen (Key → TzProps). tzIconKey ist die EINE Quelle der
+    // Key-Bildung (identisch zum icon-Property aus baueMarkerFc) → DRY.
+    const registry = new Map<string, TzProps>();
+    for (const mk of markers) {
+      if (mk.tz) registry.set(tzIconKey(mk.tz), mk.tz);
+    }
+    tzRegistryRef.current = registry;
+    wendeKartenDatenAn(map, () => reAnlegenMarker(map, markerDatenRef.current, einsatzortDatenRef.current));
+  }, [markers]);
+
+  // Marker-/Cluster-Klick + Cursor. Marker-Klick → Inspector (schluessel); Cluster-Klick → reinzoomen.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const klickMarker = (e: maplibregl.MapLayerMouseEvent) => {
+      const schluessel = e.features?.[0]?.properties?.schluessel;
+      if (typeof schluessel === 'string') onMarkerKlick?.(schluessel);
+    };
+    const klickCluster = (e: maplibregl.MapLayerMouseEvent) => {
+      const f = e.features?.[0];
+      const clusterId = f?.properties?.cluster_id;
+      if (clusterId == null) return;
+      const src = map.getSource(MARKER_CLUSTER_QUELLE) as GeoJSONSource | undefined;
+      if (!src) return;
+      src.getClusterExpansionZoom(clusterId as number).then((zoom) => {
+        const coords = (f!.geometry as GeoJSON.Point).coordinates as [number, number];
+        map.easeTo({ center: coords, zoom });
+      }).catch(() => { /* Cluster nach Daten-Update verschwunden → ignorieren */ });
+    };
+    const enter = () => { map.getCanvas().style.cursor = 'pointer'; };
+    const leave = () => { map.getCanvas().style.cursor = ''; };
+    for (const id of MARKER_KLICK_LAYER) {
+      map.on('click', id, klickMarker);
+      map.on('mouseenter', id, enter);
+      map.on('mouseleave', id, leave);
+    }
+    map.on('click', CLUSTER_LAYER, klickCluster);
+    map.on('mouseenter', CLUSTER_LAYER, enter);
+    map.on('mouseleave', CLUSTER_LAYER, leave);
+    return () => {
+      for (const id of MARKER_KLICK_LAYER) {
+        map.off('click', id, klickMarker);
+        map.off('mouseenter', id, enter);
+        map.off('mouseleave', id, leave);
+      }
+      map.off('click', CLUSTER_LAYER, klickCluster);
+      map.off('mouseenter', CLUSTER_LAYER, enter);
+      map.off('mouseleave', CLUSTER_LAYER, leave);
+    };
+  }, [onMarkerKlick]);
 
   // Viewport nach Kartenbewegung melden: Zoom (für „näher heranzoomen"-Hinweise) immer,
   // bbox (für bbox-abhängige Ebenen wie KRITIS) nur ab KRITIS_MIN_ZOOM — verhindert riesige
