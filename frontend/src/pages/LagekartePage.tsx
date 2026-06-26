@@ -452,9 +452,12 @@ export default function LagekartePage() {
   }, [fachebenenSichtbar, ninaQuery.data, dwdQuery.data, pegelQuery.data, kritisQuery.data]);
 
   const attribution = useMemo(() => {
-    const teile = [aktuelleAttribution(basemap ?? 'blind', onlineStil), ...fachebenenAttribution].filter(Boolean) as string[];
+    const teile = [
+      aktuelleAttribution(basemap ?? 'blind', onlineStil, configQuery.data),
+      ...fachebenenAttribution,
+    ].filter(Boolean) as string[];
     return teile.length ? teile.join(' · ') : null;
-  }, [basemap, onlineStil, fachebenenAttribution]);
+  }, [basemap, onlineStil, configQuery.data, fachebenenAttribution]);
 
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 

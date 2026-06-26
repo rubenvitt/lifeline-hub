@@ -19,6 +19,12 @@ pub struct AppState {
     /// `config::default_karten_dir`). Maschinen-lokaler Filesystem-Root — bewusst NICHT in der DB
     /// (ein gespeicherter absoluter Pfad wäre nach Backup/Restore auf anderem Host falsch).
     pub karten_dir: PathBuf,
+    /// Dedizierter HTTP-Client für Offline-Karten-Downloads (LFH-181): connect-Timeout, KEIN
+    /// Globaltimeout (große Downloads), SSRF-prüfende Redirect-Policy. Separat vom kurzlebigen
+    /// `fachebenen.client` (8 s Timeout).
+    pub download_client: reqwest::Client,
+    /// Transienter Download-Fortschritt je Karte-`id` (in-memory, keine DB-Spalte).
+    pub download_fortschritt: crate::karte::download::FortschrittMap,
 }
 
 /// Baut den Axum-Router mit allen Routen und dem geteilten Zustand. Die Kartenkonfig kommt
@@ -370,9 +376,22 @@ pub fn build_router(state: AppState) -> Router {
             "/api/karte/offline-karten",
             get(routes::karte::offline_liste).post(routes::karte::offline_registrieren),
         )
+        // Statische Segmente (katalog/download) vor /{id} — matchit priorisiert statisch.
+        .route(
+            "/api/karte/offline-karten/katalog",
+            get(routes::karte::offline_katalog),
+        )
+        .route(
+            "/api/karte/offline-karten/download",
+            post(routes::karte::offline_download),
+        )
         .route(
             "/api/karte/offline-karten/{id}/aktivieren",
             post(routes::karte::offline_aktivieren),
+        )
+        .route(
+            "/api/karte/offline-karten/{id}/abbrechen",
+            post(routes::karte::offline_abbrechen),
         )
         .route(
             "/api/karte/offline-karten/{id}",

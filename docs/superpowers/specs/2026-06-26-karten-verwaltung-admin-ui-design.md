@@ -154,3 +154,85 @@ Abweichend vom oben skizzierten Design wurde bei der Umsetzung von LFH-179 entsc
   reversibel).
 - **`karten_dir`** (Datenverzeichnis für Offline-Karten) wird aus `db_path` abgeleitet
   (`<dir>/karten`) und ist ein `AppState`-Feld — **keine eigene ENV/CLI-Option**.
+
+## LFH-181 — Umsetzungs-Design (abgenommen 2026-06-26)
+
+Ergebnis von zwei Scope/Research-Workflows + Advisor-Review. Die „Offene Punkte" oben sind
+hiermit aufgelöst. **LFH-182 (Server-Proxy) wurde zurückgestellt** (kein konkreter Nutzen ohne
+key-basierte Quellen; Begründung am Task). v1-Scope = **nur LFH-181**.
+
+### Quelle / kuratierter Katalog
+- **Knackpunkt:** Es gibt keine fertige öffentliche DACH-`.pmtiles` im Protomaps-Schema. Aber
+  **Project N.O.M.A.D.** (`github.com/whitespring/project-nomad-maps-europe`, Release `v1`,
+  Stand 2026-03-20) hostet **direkt downloadbare Protomaps-v4-`.pmtiles` pro Bundesland**
+  (Bremen ~42 MB … Bayern ~1,7 GB, DE gesamt ~9,3 GB) + Österreich (~1,9 GB) + Schweiz (~932 MB).
+- **Empirisch verifiziert:** Diese Files rendern mit dem **bestehenden glyph-freien
+  `offlineStyle()` ohne jede Style-Arbeit** — `de_bremen`-Tile inspiziert, `vector_layers`
+  enthalten earth/landuse/water/roads/buildings. PMTiles v3, z0–15, HTTP-Range (206) bestätigt.
+- **Entscheidung (User):** v1-Katalog zeigt auf die N.O.M.A.D.-URLs (DE-Bundesländer + AT + CH),
+  Provenienz-Hinweis im UI. **Folge-Task** für eigenen Mirror/Self-Extract (Supply-Chain: Single-
+  Maintainer-Repo). Self-Build-Pfad (dokumentiert, nicht v1): `pmtiles extract
+  https://build.protomaps.com/<daily>.pmtiles de.pmtiles --region=de.geojson --maxzoom=14`.
+- **VersaTiles/Shortbread zurückgestellt:** nur Planet (62 GB) → Self-Build nötig **und** bräuchte
+  einen neuen Shortbread-Style (unser Protomaps-Style rendert Shortbread nicht). Dokumentierte
+  Option, nicht v1.
+- Katalog als `default_offline_katalog()` in `src/config.rs` (analog `default_online_styles`),
+  je Eintrag name/url/region/groesse/lizenz/attribution/kachel_schema. **Kein sha256 vorab-pinnen**
+  (wird beim Download berechnet).
+
+### Backend (Download-Manager, alles hinter `AdminUser`)
+- **Netz-Seam (TDD-tragend):** `validiere_download_url()` (reine Funktion, gegen böse URLs
+  unit-getestet) **getrennt** von der Download-Core (`lade_offline_karte`), die gegen einen
+  lokalen Loopback-Fixture-Server integrationsgetestet wird. Guard blockt Loopback, Core nicht.
+- **SSRF-Guard:** https-only; Loopback/Link-local/Private-Ranges (127/8, ::1, 169.254/16, 10/8,
+  172.16/12, 192.168/16, fc00::/7) ablehnen; **bei JEDEM Redirect-Hop neu validieren** (custom
+  reqwest-Redirect-Policy) — N.O.M.A.D. redirectet `github.com`→`release-assets.githubusercontent.com`,
+  Redirect ist der klassische SSRF-Bypass.
+- **FSM:** `registriert→laedt→bereit/fehler`. `registriere_offline_karte` (Status `bereit`) NICHT
+  überladen — neue Repo-Fns `setze_status`/`markiere_bereit(pfad,groesse,sha256,download_at)`/`markiere_fehler`.
+- **Download-Core:** dedizierter `reqwest::Client` (connect_timeout, **kein** Globaltimeout),
+  chunked via `Response::chunk()` (kein neues Cargo-Feature), Redirect-folgend; streamt nach
+  `karten_dir/karte-{id}.pmtiles.part`, **inkrementelles sha256** (`Sha256::update`), bei Erfolg
+  atomarer Rename → `.pmtiles`, dann `markiere_bereit`. **Kein Range-Resume in v1** (einmaliger
+  Prep-Download; bei Fehler `.part` löschen + Status `fehler`, Admin re-triggert).
+- **Aktive Karte:** **Re-Download der aktiven Basemap verboten** (`Conflict`) — sonst geht die
+  Live-Lagekarte während des Mehr-GB-Downloads blind (`tiles()`/`pmtiles_verfuegbar` gaten auf
+  `status='bereit' AND aktiv_basemap=1`). Hot-Swap an gleicher Zeile = v1.x.
+- **Fortschritt:** transientes `AppState`-Feld `Arc<RwLock<HashMap<i64, Fortschritt{geladen,gesamt,abbruch}>>>`
+  nach `fachebenen.inflight`-Muster — **keine DB-Spalte**. Einträge in **allen** Pfaden
+  (Erfolg/Fehler/Abbruch) wieder **entfernen**.
+- **Abbruch:** `AtomicBool` im Fortschritt-Eintrag, je Chunk geprüft (kein neuer Dep).
+- **Concurrency-Guard:** POST `Conflict`, wenn Zielzeile bereits `laedt` (spiegelt inflight-Dedup).
+- **Plattenplatz-Check vor Download:** Crate **`fs4`** (maintained Fork von fs2). Gegen
+  `Content-Length` prüfen; fehlt sie hinter dem Redirect → Fallback auf die **bekannte
+  Katalog-Größe**.
+- **Crash-Recovery beim Start** (in `main.rs` bei den Schedulern): hängende `status='laedt'` →
+  `fehler` + verwaiste `*.part` in `karten_dir` löschen (spawned Tasks überleben keinen Neustart).
+- **Endpunkte:** `POST /api/karte/offline-karten/download` (Body: url+name+lizenz+kachel_schema,
+  ODER `katalog_id`), `POST /{id}/abbrechen`, `GET /api/karte/offline-karten/katalog`.
+
+### Frontend (spiegelt LFH-180 1:1)
+- Neuer Seam `frontend/src/api/offlineKarten.ts` + Komponente `OfflineKartenVerwaltung.tsx` als
+  **zweiter Abschnitt** auf `/admin/karten` (Slot reserviert), antd `<Table>` + farbige `<Tag>`-Status
+  + admin-only Aktionsspalte (`<Popconfirm>`). Download/Registrieren via Form-in-Modal
+  (Vorlage `OnlineQuelleFormModal`), Katalog via Modal+List (Vorlage `AusKatalogModal`).
+- **Fortschritt = Status-Polling:** Liste pollt (`refetchInterval`) solange eine Zeile `laedt`;
+  optional grobe Bytes-% aus dem In-Memory-State im JSON. Kein SSE (LiveHub ist einsatz-scoped).
+  Indeterminierter `<Progress>`/`<Spin>` reicht für v1.
+- Nach Download-Abschluss/Aktivieren **`invalidiereKarte(qc)`** rufen (invalidiert auch
+  `['karte-config']` → Lagekarte sieht `pmtiles_verfuegbar`-Umsprung ohne Reload).
+
+### Consumer-Seite (Lagekarte)
+- **Cache-Busting** der `pmtiles_url`: `config()` hängt `?v=<token>` an (verhindert korrupte Tiles
+  bei Karten-**Wechsel**, weil die pmtiles-Lib auf die URL cached). Token = **`sha256 ?? geaendert_at`**
+  (registrierte Dateien ohne Download haben kein sha256). `ServeFile` ignoriert Query-Params.
+- **Offline-Attribution** (echte Lücke): `aktuelleAttribution()` liefert offline heute `null`.
+  Die `lizenz` der aktiven Offline-Karte in `KarteConfigAntwort` ausspielen + offline-Zweig in
+  `aktuelleAttribution()` → ODbL „© OpenStreetMap contributors" wird offline sichtbar. **`lizenz`
+  für Katalog-/Download-Einträge zur Pflicht** machen (Parität zur Online-Attribution-Pflicht).
+- `offlineStyle()` bleibt v1 unverändert glyph-frei. Labels offline = v1.x (Latein-SDF-Glyphs
+  ~<2 MB + Sprite via rust-embed + zweiter beschrifteter Style).
+
+### Verifikation (verification-before-completion)
+Echter Beweis: kleinste Datei (Bremen ~42 MB) durch den Manager laden + auf der Lagekarte
+rendern — schließt empirisch die „rendert mit bestehendem Style"-Schleife.

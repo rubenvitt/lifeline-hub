@@ -1,7 +1,8 @@
 use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
-use crate::config::{default_online_styles, OnlineStyle};
+use crate::config::{default_offline_katalog, default_online_styles, OfflineKatalogEintrag, OnlineStyle};
 use crate::error::AppError;
+use crate::karte::download::{self, Fortschritt};
 use crate::karte::quellen;
 use crate::karte::registry::repo::{
     self, OfflineKarte, OfflineKarteEingabe, OnlineQuelle, OnlineQuelleEingabe,
@@ -14,6 +15,8 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Component, Path as FsPath};
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use tower::ServiceExt; // oneshot
 use tower_http::services::ServeFile;
 
@@ -25,17 +28,31 @@ pub struct KarteConfigAntwort {
     pub online_styles: Vec<OnlineStyle>,
     pub pmtiles_verfuegbar: bool,
     /// Relative URL des Tile-Endpoints, wenn eine aktive Offline-Karte ausliefer-bereit ist.
+    /// Trägt `?v=<token>` (Cache-Bust): wechselt bei Karten-Swap, sonst cacht die pmtiles-Lib
+    /// den alten Archiv-Aufbau unter gleicher URL → korrupte Tiles.
     pub pmtiles_url: Option<String>,
+    /// Pflicht-Attribution der aktiven Offline-Karte (offline sichtbar, z.B. ODbL). `None`,
+    /// wenn keine aktive Karte oder keine Lizenz hinterlegt ist.
+    pub pmtiles_attribution: Option<String>,
 }
 
 /// GET /api/karte/config — Basemap-Verfügbarkeit fürs Frontend, frisch aus der DB-Registry.
 pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAntwort>, AppError> {
     let online_styles = repo::aktive_online_styles(&state.pool).await?;
-    let pmtiles_verfuegbar = repo::pmtiles_verfuegbar(&state.pool).await?;
+    let aktiv = repo::aktive_offline_karte(&state.pool).await?;
+    let (pmtiles_url, pmtiles_attribution) = match &aktiv {
+        Some(k) => {
+            // Cache-Bust-Token URL-safe halten (geaendert_at enthält Leerzeichen/Doppelpunkte).
+            let v: String = k.version.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+            (Some(format!("/api/karte/tiles.pmtiles?v={v}")), k.lizenz.clone())
+        }
+        None => (None, None),
+    };
     Ok(Json(KarteConfigAntwort {
         online_styles,
-        pmtiles_verfuegbar,
-        pmtiles_url: pmtiles_verfuegbar.then(|| "/api/karte/tiles.pmtiles".to_string()),
+        pmtiles_verfuegbar: aktiv.is_some(),
+        pmtiles_url,
+        pmtiles_attribution,
     }))
 }
 
@@ -297,5 +314,146 @@ pub async fn offline_loeschen(
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err(AppError::NotFound)
+    }
+}
+
+// ===== Offline-Karten-Download-Manager (LFH-181) =====
+
+/// GET /api/karte/offline-karten/katalog — kuratierter Download-Vorschlagskatalog (Admin).
+pub async fn offline_katalog(
+    _admin: AdminUser,
+) -> Result<Json<Vec<OfflineKatalogEintrag>>, AppError> {
+    Ok(Json(default_offline_katalog()))
+}
+
+/// Request-Body zum Starten eines Offline-Karten-Downloads (aus Katalog oder eigener URL).
+#[derive(Debug, Deserialize)]
+pub struct OfflineDownloadBody {
+    pub name: String,
+    pub url: String,
+    pub lizenz: String,
+    pub kachel_schema: Option<String>,
+    /// Erwartete Größe (Bytes) aus dem Katalog — für den Plattenplatz-Check vorab.
+    #[serde(default)]
+    pub groesse_erwartet: Option<i64>,
+}
+
+/// POST /api/karte/offline-karten/download — startet einen Hintergrund-Download (Admin).
+///
+/// Legt IMMER eine NEUE Zeile an (kein Re-Download in eine aktive Karte) — die Live-Lagekarte
+/// bleibt während des Mehr-GB-Downloads verfügbar, bis der Admin die neue Karte aktiviert.
+/// Antwortet sofort `202` mit der Zeile (Status `laedt`); das Frontend pollt die Liste.
+/// „Aktualisieren" = neue Karte laden + aktivieren + alte löschen (In-Place-Hot-Swap ist v1.x).
+pub async fn offline_download(
+    State(state): State<AppState>,
+    _admin: AdminUser,
+    Json(body): Json<OfflineDownloadBody>,
+) -> Result<(StatusCode, Json<OfflineKarte>), AppError> {
+    let name = body.name.trim();
+    if name.is_empty() {
+        return Err(AppError::Validation("Name darf nicht leer sein".into()));
+    }
+    // Attribution ist Pflicht (Lizenzauflage, offline sichtbar) — Parität zur Online-Quelle.
+    let lizenz = body.lizenz.trim();
+    if lizenz.is_empty() {
+        return Err(AppError::Validation(
+            "Lizenz/Attribution ist Pflicht (offline sichtbar)".into(),
+        ));
+    }
+    // SSRF-Guard: nur https, keine internen Ziele. Redirects werden je Hop erneut geprüft.
+    let url = download::validiere_download_url(&body.url).map_err(AppError::Validation)?;
+    let kachel_schema = body
+        .kachel_schema
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("protomaps")
+        .to_string();
+
+    // Plattenplatz-Check vorab gegen die erwartete (Katalog-)Größe, mit 10 % Reserve.
+    if let Some(erwartet) = body.groesse_erwartet.filter(|g| *g > 0) {
+        if let Ok(frei) = fs4::available_space(&state.karten_dir) {
+            let benoetigt = (erwartet as u64).saturating_add(erwartet as u64 / 10);
+            if frei < benoetigt {
+                return Err(AppError::UnprocessableEntity(format!(
+                    "Nicht genug Speicherplatz im Kartenverzeichnis: {frei} Bytes frei, \
+                     ~{benoetigt} Bytes benötigt"
+                )));
+            }
+        }
+    }
+
+    let karte = repo::neue_download_karte(
+        &state.pool,
+        &repo::OfflineDownloadEingabe {
+            name: name.to_string(),
+            quell_url: url.to_string(),
+            lizenz: lizenz.to_string(),
+            kachel_schema,
+            sortier: 0,
+        },
+    )
+    .await?;
+
+    // Fortschritt registrieren, dann den eigentlichen Download in einen Hintergrund-Task auslagern.
+    let fortschritt = Arc::new(Fortschritt::default());
+    state
+        .download_fortschritt
+        .write()
+        .unwrap()
+        .insert(karte.id, fortschritt.clone());
+
+    let pool = state.pool.clone();
+    let client = state.download_client.clone();
+    let karten_dir = state.karten_dir.clone();
+    let fortschritt_map = state.download_fortschritt.clone();
+    let id = karte.id;
+    tokio::spawn(async move {
+        let dateiname = format!("karte-{id}.pmtiles");
+        let part = karten_dir.join(format!("{dateiname}.part"));
+        let ergebnis = download::lade_datei(&client, url, &part, &fortschritt).await;
+        match ergebnis {
+            Ok(erg) => {
+                // Atomarer Swap: erst nach vollständigem Download .part → finalen Pfad.
+                let ziel = karten_dir.join(&dateiname);
+                if let Err(e) = tokio::fs::rename(&part, &ziel).await {
+                    tracing::error!("Rename der Kartendatei {id} fehlgeschlagen: {e}");
+                    let _ = tokio::fs::remove_file(&part).await;
+                    let _ = repo::setze_status(&pool, id, "fehler").await;
+                } else if let Err(e) =
+                    repo::markiere_bereit(&pool, id, &dateiname, erg.groesse, &erg.sha256).await
+                {
+                    tracing::error!("markiere_bereit({id}) fehlgeschlagen: {e}");
+                    let _ = repo::setze_status(&pool, id, "fehler").await;
+                }
+            }
+            Err(fehler) => {
+                tracing::warn!("Download der Karte {id} fehlgeschlagen: {fehler}");
+                let _ = tokio::fs::remove_file(&part).await; // Teil-Datei aufräumen
+                let _ = repo::setze_status(&pool, id, "fehler").await;
+            }
+        }
+        // Fortschritt-Eintrag in JEDEM Ausgang entfernen (sonst wächst die Map unbegrenzt).
+        fortschritt_map.write().unwrap().remove(&id);
+    });
+
+    Ok((StatusCode::ACCEPTED, Json(karte)))
+}
+
+/// POST /api/karte/offline-karten/{id}/abbrechen — laufenden Download abbrechen (Admin).
+/// Setzt das Abbruch-Flag; der Task bricht beim nächsten Chunk ab, räumt die `.part`-Datei auf
+/// und setzt den Status auf `fehler`. `404`, wenn für die `id` kein Download läuft.
+pub async fn offline_abbrechen(
+    State(state): State<AppState>,
+    _admin: AdminUser,
+    Path(id): Path<i64>,
+) -> Result<StatusCode, AppError> {
+    let laufend = state.download_fortschritt.read().unwrap().get(&id).cloned();
+    match laufend {
+        Some(f) => {
+            f.abbruch.store(true, Ordering::Relaxed);
+            Ok(StatusCode::NO_CONTENT)
+        }
+        None => Err(AppError::NotFound),
     }
 }

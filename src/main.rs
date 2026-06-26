@@ -70,6 +70,17 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     let karten_dir = lifeline_hub::config::default_karten_dir(&config.db_path);
     std::fs::create_dir_all(&karten_dir)?;
 
+    // Crash-Recovery (LFH-181): hängende 'laedt'-Downloads auf 'fehler' setzen und verwaiste
+    // .part-Dateien löschen — gespawnte Download-Tasks überleben keinen Neustart.
+    match lifeline_hub::karte::registry::repo::reset_haengende_downloads(&pool).await {
+        Ok(ids) => {
+            for id in ids {
+                let _ = std::fs::remove_file(karten_dir.join(format!("karte-{id}.pmtiles.part")));
+            }
+        }
+        Err(e) => tracing::warn!("Crash-Recovery der Offline-Downloads fehlgeschlagen: {e}"),
+    }
+
     let live = LiveHub::new();
     // Zeitbasierte Erinnerungen: Hintergrund-Scheduler starten (nur im Server-Lauf).
     lifeline_hub::erinnerung::scheduler::starte_scheduler(pool.clone(), live.clone());
@@ -81,6 +92,8 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         live,
         fachebenen: lifeline_hub::karte::FachebenenState::neu(),
         karten_dir,
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
     });
 
     let listener = tokio::net::TcpListener::bind(&config.bind).await?;

@@ -3,6 +3,7 @@
 //! einheitlichen Umschlag mit definiertem Offline-Verhalten.
 
 pub mod cache;
+pub mod download;
 pub mod normalisierung;
 pub mod quellen;
 pub mod registry;

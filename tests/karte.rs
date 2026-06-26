@@ -18,7 +18,7 @@ fn app_mit_pool(pool: sqlx::SqlitePool) -> axum::Router {
     build_router(AppState {
         pool,
         live: LiveHub::new(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(), download_client: lifeline_hub::karte::download::download_client(), download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
         karten_dir: std::env::temp_dir(),
     })
 }
@@ -107,7 +107,7 @@ async fn tiles_route_liefert_range_aus() {
     let app = build_router(AppState {
         pool,
         live: LiveHub::new(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(), download_client: lifeline_hub::karte::download::download_client(), download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
         karten_dir: dir.path().to_path_buf(),
     });
     let req = Request::builder()
@@ -160,7 +160,14 @@ async fn config_endpoint_meldet_verfuegbarkeit() {
     assert_eq!(res.status(), StatusCode::OK);
     let v = json(res).await;
     assert_eq!(v["pmtiles_verfuegbar"].as_bool(), Some(true));
-    assert_eq!(v["pmtiles_url"].as_str(), Some("/api/karte/tiles.pmtiles"));
+    // pmtiles_url trägt jetzt einen Cache-Bust-Token (?v=<sha256|geaendert_at>), damit die
+    // pmtiles-Lib bei Karten-Wechsel nicht den alten Archiv-Aufbau unter gleicher URL cacht
+    // (LFH-181). Token ist dynamisch → Präfix prüfen.
+    let pmtiles_url = v["pmtiles_url"].as_str().unwrap();
+    assert!(
+        pmtiles_url.starts_with("/api/karte/tiles.pmtiles?v="),
+        "pmtiles_url mit Cache-Bust-Token erwartet, war: {pmtiles_url}"
+    );
     assert_eq!(v["online_styles"][0]["url"].as_str(), Some("https://tiles.example/style.json"));
     assert_eq!(v["online_styles"][0]["typ"].as_str(), Some("vektor"));
 }
@@ -474,6 +481,87 @@ async fn offline_aktivieren_unbekannt_ist_404() {
 async fn offline_loeschen_unbekannt_ist_404() {
     let (app, cookie) = admin_app().await;
     let res = anfrage(&app, "DELETE", "/api/karte/offline-karten/999", Some(&cookie), None).await;
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}
+
+// ===== Offline-Download-Manager (LFH-181) =====
+
+#[tokio::test]
+async fn offline_katalog_liefert_kuratierte_liste() {
+    let (app, cookie) = admin_app().await;
+    let res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/offline-karten/katalog",
+        Some(&cookie),
+        None,
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let v = json(res).await;
+    let liste = v.as_array().expect("Array");
+    assert_eq!(liste.len(), 18, "16 Bundesländer + AT + CH");
+    // Statische /katalog-Route gewinnt gegen /{id} (matchit-Priorität).
+    assert!(liste[0]["url"].as_str().unwrap().starts_with("https://"));
+    assert!(!liste[0]["lizenz"].as_str().unwrap().is_empty());
+    assert_eq!(liste[0]["kachel_schema"].as_str(), Some("protomaps"));
+}
+
+#[tokio::test]
+async fn offline_katalog_ohne_session_ist_401() {
+    let app = app_mit_pool(pool().await);
+    let res = anfrage(&app, "GET", "/api/karte/offline-karten/katalog", None, None).await;
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn offline_download_ohne_lizenz_ist_400() {
+    let (app, cookie) = admin_app().await;
+    let res = anfrage(
+        &app,
+        "POST",
+        "/api/karte/offline-karten/download",
+        Some(&cookie),
+        Some(r#"{"name":"DE","url":"https://example.test/de.pmtiles","lizenz":"  "}"#),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST, "Attribution ist Pflicht");
+}
+
+#[tokio::test]
+async fn offline_download_interne_url_ist_400_ssrf() {
+    let (app, cookie) = admin_app().await;
+    // SSRF-Guard: interne IP / http müssen abgelehnt werden (kein Server-seitiger Fetch darauf).
+    for url in [
+        "http://example.test/de.pmtiles",       // kein https
+        "https://169.254.169.254/latest/meta",  // Cloud-Metadaten
+        "https://127.0.0.1/de.pmtiles",          // Loopback
+        "https://192.168.1.1/de.pmtiles",        // privates Netz
+    ] {
+        let body = format!(r#"{{"name":"X","url":"{url}","lizenz":"© OSM"}}"#);
+        let res = anfrage(
+            &app,
+            "POST",
+            "/api/karte/offline-karten/download",
+            Some(&cookie),
+            Some(&body),
+        )
+        .await;
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST, "abgelehnt: {url}");
+    }
+}
+
+#[tokio::test]
+async fn offline_abbrechen_ohne_laufenden_download_ist_404() {
+    let (app, cookie) = admin_app().await;
+    let res = anfrage(
+        &app,
+        "POST",
+        "/api/karte/offline-karten/999/abbrechen",
+        Some(&cookie),
+        None,
+    )
+    .await;
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
 }
 

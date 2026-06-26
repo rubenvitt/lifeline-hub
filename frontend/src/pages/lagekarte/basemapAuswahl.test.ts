@@ -16,6 +16,7 @@ function config(over: Partial<KarteServerConfig> = {}): KarteServerConfig {
     online_styles: [view('Liberty'), view('basemap.de')],
     pmtiles_verfuegbar: false,
     pmtiles_url: null,
+    pmtiles_attribution: null,
     ...over,
   };
 }

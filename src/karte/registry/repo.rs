@@ -288,6 +288,154 @@ pub async fn loesche_offline_karte(pool: &SqlitePool, id: i64) -> Result<bool, s
     Ok(betroffen > 0)
 }
 
+// --- Offline-Download-Lebenszyklus (LFH-181) ---
+// Verdrahtet den Download-Manager in die schon vorhandenen Lifecycle-Felder (Migration 0076):
+// FSM laedt → bereit/fehler. `registriere_offline_karte` (Status 'bereit') wird NICHT überladen.
+
+/// Eingabefelder zum Anlegen einer herunterzuladenden Offline-Karte. `quell_url` und `lizenz`
+/// sind Pflicht (Server-seitiger Fetch + Offline-Attributionspflicht); der `pfad` wird nicht
+/// übergeben, sondern aus der erzeugten `id` abgeleitet (`markiere_bereit`).
+pub struct OfflineDownloadEingabe {
+    pub name: String,
+    pub quell_url: String,
+    pub lizenz: String,
+    pub kachel_schema: String,
+    pub sortier: i64,
+}
+
+/// Legt eine Download-Zeile im Status `'laedt'` an (noch ohne Datei; `pfad` leerer Platzhalter,
+/// bis `markiere_bereit` den finalen relativen Pfad setzt). Nicht aktiv.
+pub async fn neue_download_karte(
+    pool: &SqlitePool,
+    eingabe: &OfflineDownloadEingabe,
+) -> Result<OfflineKarte, sqlx::Error> {
+    let id = sqlx::query(
+        "INSERT INTO karte_offline_karte \
+             (name, pfad, quell_url, lizenz, kachel_schema, sortier, status, aktiv_basemap) \
+         VALUES (?, '', ?, ?, ?, ?, 'laedt', 0)",
+    )
+    .bind(&eingabe.name)
+    .bind(&eingabe.quell_url)
+    .bind(&eingabe.lizenz)
+    .bind(&eingabe.kachel_schema)
+    .bind(eingabe.sortier)
+    .execute(pool)
+    .await?
+    .last_insert_rowid();
+    hole_offline_karte(pool, id).await
+}
+
+/// Setzt den Status (FSM-Übergang). `Ok(true)`, wenn eine Zeile betroffen war. Aufrufer geben
+/// nur DB-CHECK-gültige Werte (`registriert`/`laedt`/`bereit`/`fehler`).
+pub async fn setze_status(pool: &SqlitePool, id: i64, status: &str) -> Result<bool, sqlx::Error> {
+    let betroffen = sqlx::query(
+        "UPDATE karte_offline_karte SET status = ?, geaendert_at = datetime('now') WHERE id = ?",
+    )
+    .bind(status)
+    .bind(id)
+    .execute(pool)
+    .await?
+    .rows_affected();
+    Ok(betroffen > 0)
+}
+
+/// Markiert eine ladende Karte als `'bereit'`: finaler relativer Pfad + Download-Metadaten
+/// (groesse/sha256/download_at). `Ok(None)`, wenn keine Zeile mit `id` existiert.
+pub async fn markiere_bereit(
+    pool: &SqlitePool,
+    id: i64,
+    pfad: &str,
+    groesse: i64,
+    sha256: &str,
+) -> Result<Option<OfflineKarte>, sqlx::Error> {
+    let betroffen = sqlx::query(
+        "UPDATE karte_offline_karte \
+         SET status = 'bereit', pfad = ?, groesse = ?, sha256 = ?, \
+             download_at = datetime('now'), geaendert_at = datetime('now') \
+         WHERE id = ?",
+    )
+    .bind(pfad)
+    .bind(groesse)
+    .bind(sha256)
+    .bind(id)
+    .execute(pool)
+    .await?
+    .rows_affected();
+    if betroffen == 0 {
+        return Ok(None);
+    }
+    hole_offline_karte(pool, id).await.map(Some)
+}
+
+/// Crash-Recovery beim Start: alle im Status `'laedt'` hängenden Zeilen auf `'fehler'` setzen
+/// und ihre `id`s zurückgeben (Aufrufer löscht die verwaisten `*.part`-Dateien). Spawned
+/// Download-Tasks überleben keinen Neustart.
+pub async fn reset_haengende_downloads(pool: &SqlitePool) -> Result<Vec<i64>, sqlx::Error> {
+    let ids: Vec<i64> =
+        sqlx::query_scalar("SELECT id FROM karte_offline_karte WHERE status = 'laedt'")
+            .fetch_all(pool)
+            .await?;
+    if !ids.is_empty() {
+        sqlx::query(
+            "UPDATE karte_offline_karte SET status = 'fehler', geaendert_at = datetime('now') \
+             WHERE status = 'laedt'",
+        )
+        .execute(pool)
+        .await?;
+    }
+    Ok(ids)
+}
+
+/// Eine Offline-Karte per `id`, oder `None` — für Guards (Re-Download der aktiven Karte,
+/// Concurrency gegen Doppel-Download).
+pub async fn finde_offline_karte(
+    pool: &SqlitePool,
+    id: i64,
+) -> Result<Option<OfflineKarte>, sqlx::Error> {
+    sqlx::query_as::<_, OfflineKarte>(
+        "SELECT id, name, pfad, quell_url, lizenz, kachel_schema, groesse, sha256, download_at, \
+                status, aktiv_basemap, sortier \
+         FROM karte_offline_karte WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await
+}
+
+/// Ausspielungs-Infos der aktiven Offline-Karte für `GET /api/karte/config`.
+pub struct AktiveOfflineKarte {
+    pub pfad: String,
+    /// Cache-Bust-Token (`?v=…`): `sha256`, sonst `geaendert_at` (registrierte Dateien ohne
+    /// Download tragen kein sha256). Wechselt bei jedem Karten-Swap → frischer pmtiles-Cache.
+    pub version: String,
+    /// Lizenz/Attribution der aktiven Karte (offline sichtbar zu machen).
+    pub lizenz: Option<String>,
+}
+
+/// Die aktive, ausliefer-bereite Offline-Karte mit Cache-Bust-Token + Lizenz, oder `None`.
+pub async fn aktive_offline_karte(
+    pool: &SqlitePool,
+) -> Result<Option<AktiveOfflineKarte>, sqlx::Error> {
+    #[derive(sqlx::FromRow)]
+    struct Row {
+        pfad: String,
+        sha256: Option<String>,
+        geaendert_at: String,
+        lizenz: Option<String>,
+    }
+    let row = sqlx::query_as::<_, Row>(
+        "SELECT pfad, sha256, geaendert_at, lizenz FROM karte_offline_karte \
+         WHERE aktiv_basemap = 1 AND status = 'bereit' LIMIT 1",
+    )
+    .fetch_optional(pool)
+    .await?;
+    Ok(row.map(|r| AktiveOfflineKarte {
+        pfad: r.pfad,
+        version: r.sha256.unwrap_or(r.geaendert_at),
+        lizenz: r.lizenz,
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -524,5 +672,129 @@ mod tests {
             .unwrap();
         assert!(loesche_offline_karte(&pool, k.id).await.unwrap());
         assert!(!loesche_offline_karte(&pool, k.id).await.unwrap());
+    }
+
+    // --- Offline-Download-Lebenszyklus (LFH-181) ---
+
+    fn download_eingabe(name: &str) -> OfflineDownloadEingabe {
+        OfflineDownloadEingabe {
+            name: name.into(),
+            quell_url: format!("https://example.test/{name}.pmtiles"),
+            lizenz: "© OpenStreetMap contributors (ODbL)".into(),
+            kachel_schema: "protomaps".into(),
+            sortier: 0,
+        }
+    }
+
+    #[tokio::test]
+    async fn neue_download_karte_ist_laedt_inaktiv_ohne_datei() {
+        let pool = test_pool().await;
+        let k = neue_download_karte(&pool, &download_eingabe("A")).await.unwrap();
+        assert!(k.id > 0);
+        assert_eq!(k.status, "laedt");
+        assert!(!k.aktiv_basemap);
+        assert_eq!(k.pfad, "", "Pfad-Platzhalter bis markiere_bereit");
+        assert_eq!(k.groesse, None);
+        assert_eq!(k.sha256, None);
+        assert_eq!(k.download_at, None);
+        // Solange nicht 'bereit' → nicht ausgeliefert.
+        assert!(!pmtiles_verfuegbar(&pool).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn markiere_bereit_setzt_pfad_groesse_sha256_und_status() {
+        let pool = test_pool().await;
+        let k = neue_download_karte(&pool, &download_eingabe("A")).await.unwrap();
+        let fertig = markiere_bereit(&pool, k.id, "karte-1.pmtiles", 4242, "deadbeef")
+            .await
+            .unwrap()
+            .expect("Zeile existiert");
+        assert_eq!(fertig.status, "bereit");
+        assert_eq!(fertig.pfad, "karte-1.pmtiles");
+        assert_eq!(fertig.groesse, Some(4242));
+        assert_eq!(fertig.sha256.as_deref(), Some("deadbeef"));
+        assert!(fertig.download_at.is_some(), "download_at gesetzt");
+    }
+
+    #[tokio::test]
+    async fn markiere_bereit_unbekannt_gibt_none() {
+        let pool = test_pool().await;
+        assert!(markiere_bereit(&pool, 999, "x.pmtiles", 1, "h")
+            .await
+            .unwrap()
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn setze_status_fehler_aendert_status() {
+        let pool = test_pool().await;
+        let k = neue_download_karte(&pool, &download_eingabe("A")).await.unwrap();
+        assert!(setze_status(&pool, k.id, "fehler").await.unwrap());
+        let nach = finde_offline_karte(&pool, k.id).await.unwrap().unwrap();
+        assert_eq!(nach.status, "fehler");
+        assert!(!setze_status(&pool, 999, "fehler").await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn reset_haengende_downloads_setzt_nur_laedt_auf_fehler() {
+        let pool = test_pool().await;
+        let a = neue_download_karte(&pool, &download_eingabe("A")).await.unwrap();
+        let b = neue_download_karte(&pool, &download_eingabe("B")).await.unwrap();
+        let bereit = registriere_offline_karte(&pool, &offline_eingabe("C"))
+            .await
+            .unwrap();
+        let mut ids = reset_haengende_downloads(&pool).await.unwrap();
+        ids.sort();
+        assert_eq!(ids, vec![a.id, b.id], "nur die laedt-Zeilen");
+        assert_eq!(finde_offline_karte(&pool, a.id).await.unwrap().unwrap().status, "fehler");
+        assert_eq!(finde_offline_karte(&pool, b.id).await.unwrap().unwrap().status, "fehler");
+        assert_eq!(
+            finde_offline_karte(&pool, bereit.id).await.unwrap().unwrap().status,
+            "bereit",
+            "bereite Karte unangetastet"
+        );
+        // Idempotent: kein laedt mehr übrig.
+        assert!(reset_haengende_downloads(&pool).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn finde_offline_karte_some_und_none() {
+        let pool = test_pool().await;
+        let k = neue_download_karte(&pool, &download_eingabe("A")).await.unwrap();
+        assert_eq!(finde_offline_karte(&pool, k.id).await.unwrap().unwrap().id, k.id);
+        assert!(finde_offline_karte(&pool, 999).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn aktive_offline_karte_version_aus_sha256_und_lizenz() {
+        let pool = test_pool().await;
+        assert!(aktive_offline_karte(&pool).await.unwrap().is_none());
+        let k = neue_download_karte(&pool, &download_eingabe("A")).await.unwrap();
+        markiere_bereit(&pool, k.id, "karte-1.pmtiles", 10, "cafef00d")
+            .await
+            .unwrap();
+        // bereit, aber noch nicht aktiv.
+        assert!(aktive_offline_karte(&pool).await.unwrap().is_none());
+        aktiviere_offline_karte(&pool, k.id).await.unwrap();
+        let aktiv = aktive_offline_karte(&pool).await.unwrap().expect("aktiv");
+        assert_eq!(aktiv.pfad, "karte-1.pmtiles");
+        assert_eq!(aktiv.version, "cafef00d", "sha256 als Cache-Bust-Token");
+        assert_eq!(
+            aktiv.lizenz.as_deref(),
+            Some("© OpenStreetMap contributors (ODbL)")
+        );
+    }
+
+    #[tokio::test]
+    async fn aktive_offline_karte_version_faellt_auf_geaendert_at_zurueck() {
+        let pool = test_pool().await;
+        // Registrierte Datei (kein Download) hat kein sha256 → Token = geaendert_at.
+        let k = registriere_offline_karte(&pool, &offline_eingabe("A"))
+            .await
+            .unwrap();
+        aktiviere_offline_karte(&pool, k.id).await.unwrap();
+        let aktiv = aktive_offline_karte(&pool).await.unwrap().expect("aktiv");
+        assert!(!aktiv.version.is_empty(), "geaendert_at-Fallback nicht leer");
+        assert_ne!(aktiv.version, "", "Token vorhanden trotz fehlendem sha256");
     }
 }
