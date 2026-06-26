@@ -1,5 +1,5 @@
 use clap::Parser;
-use lifeline_hub::app::{build_router_mit_karte, AppState};
+use lifeline_hub::app::{build_router, AppState};
 use lifeline_hub::backup;
 use lifeline_hub::config::{Command, Config};
 use lifeline_hub::db;
@@ -65,27 +65,23 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         );
     }
 
-    let karte = lifeline_hub::config::KarteConfig {
-        pmtiles_path: config.pmtiles_path.clone(),
-        online_styles: lifeline_hub::config::online_styles_aufloesen(
-            config.karte_styles.as_deref(),
-            config.karte_online_style_url.as_deref(),
-        )?,
-    };
+    // Offline-Karten-Verzeichnis aus dem DB-Pfad ableiten (keine eigene ENV/CLI-Option, LFH-179)
+    // und beim Start anlegen — die Tile-Auslieferung löst relative Pfade dagegen auf.
+    let karten_dir = lifeline_hub::config::default_karten_dir(&config.db_path);
+    std::fs::create_dir_all(&karten_dir)?;
+
     let live = LiveHub::new();
     // Zeitbasierte Erinnerungen: Hintergrund-Scheduler starten (nur im Server-Lauf).
     lifeline_hub::erinnerung::scheduler::starte_scheduler(pool.clone(), live.clone());
     // Aufbewahrung & Archiv (LFH-135): Purge-Scheduler (Soft-Delete + PII-Schwärzung).
     lifeline_hub::einsatz::purge_scheduler::starte_purge_scheduler(pool.clone());
 
-    let app = build_router_mit_karte(
-        AppState {
-            pool,
-            live,
-            fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        },
-        karte,
-    );
+    let app = build_router(AppState {
+        pool,
+        live,
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        karten_dir,
+    });
 
     let listener = tokio::net::TcpListener::bind(&config.bind).await?;
     tracing::info!("Server lauscht auf {}", config.bind);

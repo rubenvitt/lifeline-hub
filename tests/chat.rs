@@ -10,7 +10,7 @@ use tower::ServiceExt;
 async fn setup() -> axum::Router {
     let pool = db::test_pool().await;
     bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12")).await.unwrap();
-    build_router(AppState { pool, live: LiveHub::new(), fachebenen: lifeline_hub::karte::FachebenenState::neu() })
+    build_router(AppState { pool, live: LiveHub::new(), karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu() })
 }
 
 async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) -> String {

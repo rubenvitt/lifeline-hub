@@ -1,14 +1,13 @@
-use crate::config::KarteConfig;
 use crate::karte::FachebenenState;
 use crate::live::LiveHub;
 use crate::routes;
 use axum::{
     extract::DefaultBodyLimit,
     routing::{delete, get, patch, post, put},
-    Extension, Router,
+    Router,
 };
 use sqlx::SqlitePool;
-use tower_http::services::ServeFile;
+use std::path::PathBuf;
 
 /// Geteilter Anwendungszustand, der an alle Handler übergeben wird.
 #[derive(Clone)]
@@ -16,16 +15,15 @@ pub struct AppState {
     pub pool: SqlitePool,
     pub live: LiveHub,
     pub fachebenen: FachebenenState,
+    /// Lokales Daten-Verzeichnis für Offline-Karten (aus `db_path` abgeleitet, siehe
+    /// `config::default_karten_dir`). Maschinen-lokaler Filesystem-Root — bewusst NICHT in der DB
+    /// (ein gespeicherter absoluter Pfad wäre nach Backup/Restore auf anderem Host falsch).
+    pub karten_dir: PathBuf,
 }
 
-/// Baut den Router mit Default-Karte (keine Basemap konfiguriert → Blind-Modus).
-/// Bestehende Aufrufer und Tests bleiben unverändert.
+/// Baut den Axum-Router mit allen Routen und dem geteilten Zustand. Die Kartenkonfig kommt
+/// zur Laufzeit aus der DB-Registry (kein Karte-Parameter/Extension mehr — LFH-179).
 pub fn build_router(state: AppState) -> Router {
-    build_router_mit_karte(state, KarteConfig::default())
-}
-
-/// Baut den Axum-Router mit allen Routen, dem geteilten Zustand und der Basemap.
-pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
     let router = Router::new()
         .route("/api/health", get(routes::health::health))
         .route("/api/backup", get(routes::backup::download))
@@ -346,21 +344,42 @@ pub fn build_router_mit_karte(state: AppState, karte: KarteConfig) -> Router {
     #[cfg(feature = "dev-seeds")]
     let router = router.route("/api/dev/users", get(routes::dev::users));
 
-    let router = router.route("/api/karte/config", get(routes::karte::config));
-    let router = router.route(
-        "/api/karte/fachebenen/{quelle}",
-        get(routes::karte::fachebenen),
-    );
-
-    // PMTiles-Tile-Service: nur mounten, wenn eine Datei konfiguriert ist.
-    // ServeFile (eine feste Datei, kein ServeDir) beherrscht HTTP-Range nativ.
-    let router = match &karte.pmtiles_path {
-        Some(pfad) => router.route_service("/api/karte/tiles.pmtiles", ServeFile::new(pfad)),
-        None => router.route("/api/karte/tiles.pmtiles", get(routes::karte::tiles_fehlt)),
-    };
+    let router = router
+        .route("/api/karte/config", get(routes::karte::config))
+        .route(
+            "/api/karte/fachebenen/{quelle}",
+            get(routes::karte::fachebenen),
+        )
+        // PMTiles-Tile-Service: unkonditional gemountet. Der Handler liest die aktive Karte
+        // zur Laufzeit aus der DB und liefert sie per HTTP-Range aus (oder 404, wenn keine).
+        .route("/api/karte/tiles.pmtiles", get(routes::karte::tiles))
+        // Admin-CRUD der Karten-Registry (Online-Quellen + Offline-Karten), hinter AdminUser.
+        .route(
+            "/api/karte/online-quellen",
+            get(routes::karte::online_liste).post(routes::karte::online_anlegen),
+        )
+        .route(
+            "/api/karte/online-quellen/katalog",
+            get(routes::karte::online_katalog),
+        )
+        .route(
+            "/api/karte/online-quellen/{id}",
+            patch(routes::karte::online_aktualisieren).delete(routes::karte::online_loeschen),
+        )
+        .route(
+            "/api/karte/offline-karten",
+            get(routes::karte::offline_liste).post(routes::karte::offline_registrieren),
+        )
+        .route(
+            "/api/karte/offline-karten/{id}/aktivieren",
+            post(routes::karte::offline_aktivieren),
+        )
+        .route(
+            "/api/karte/offline-karten/{id}",
+            delete(routes::karte::offline_loeschen),
+        );
 
     router
-        .layer(Extension(karte))
         .fallback(crate::static_files::serve)
         .with_state(state)
 }

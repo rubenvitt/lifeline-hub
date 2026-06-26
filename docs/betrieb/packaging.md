@@ -35,9 +35,6 @@ Konfiguration per CLI-Flag oder ENV (Auszug):
 | `--org-name` | `LIFELINE_ORG_NAME` | `Meine Organisation` | Org-Name beim ersten Start |
 | `--admin-user` | `LIFELINE_ADMIN_USER` | `admin` | Initialer Admin (erster Start) |
 | `--admin-password` | `LIFELINE_ADMIN_PASSWORD` | *(generiert)* | Fehlt es, wird beim ersten Start ein Zufallspasswort ins Log geschrieben |
-| `--pmtiles-path` | `LIFELINE_PMTILES_PATH` | *(leer)* | Lokale PMTiles-Basemap (Offline-Karte), per HTTP-Range ausgeliefert |
-| `--karte-styles` | `LIFELINE_KARTE_STYLES` | *(Default-Shortlist)* | JSON-Liste benannter Online-Views: `[{"name","url","typ":"vektor\|raster","attribution"}]`. Hat Vorrang vor `--karte-online-style-url` |
-| `--karte-online-style-url` | `LIFELINE_KARTE_STYLE_URL` | *(leer)* | Online-MapLibre-Style-JSON-URL (Einzel-URL-Kurzform; ergibt einen Ein-Element-View „Online") |
 
 > **Erstes Admin-Passwort:** Wurde kein `--admin-password` gesetzt, schreibt die
 > Binary beim ersten Start ein Zufallspasswort als Warnung ins Log. Mit systemd:
@@ -60,30 +57,28 @@ LAN ist HTTP zulässig.
 
 ## Lagekarte / Basemap
 
-Die Lagekarte (Modul „Lagekarte") rendert mit MapLibre GL und ist offline-fähig. Zwei
-Konfigurationsquellen, beide optional:
+Die Lagekarte (Modul „Lagekarte") rendert mit MapLibre GL und ist offline-fähig. Die
+Kartenkonfiguration ist **DB-gestützt und zur Laufzeit über das Admin-UI verwaltbar**
+(`/admin/karten`) — **keine ENV/CLI-Optionen mehr** (LFH-179). Die Registry **startet leer**;
+die Karte läuft im **Blind-Modus**, bis ein Admin Quellen hinzufügt:
 
-- **`--pmtiles-path` / `LIFELINE_PMTILES_PATH`** — Pfad zu einer lokalen **PMTiles**-Datei
-  (z. B. ein Protomaps-Build von [build.protomaps.com](https://build.protomaps.com),
-  DE-weit mehrere GB). Der Server liefert sie per **HTTP-Range** unter
-  `/api/karte/tiles.pmtiles` aus. Ideal für den ELW ohne Netz.
-- **`--karte-styles` / `LIFELINE_KARTE_STYLES`** — mehrere Online-Views als JSON-Liste.
-  Jeder View: `name` (Anzeigename im Switcher), `url` (Vektor-Style-JSON-URL **oder**
-  Raster-Tile-Template mit `{z}/{y}/{x}`), `typ` (`vektor` Default | `raster`),
-  `attribution` (Pflicht-Attribution, wird je View angezeigt). Fehlt diese ENV **und**
-  `LIFELINE_KARTE_STYLE_URL`, liefert der Server eine eingebaute schlüsselfreie Shortlist
-  (OpenFreeMap, basemap.de, TopPlusOpen). Key-basierte Anbieter (MapTiler/Stadia) **nicht**
-  mit Secret hier hinterlegen — nur serverseitig/Domain-Restriction.
-- **`--karte-online-style-url` / `LIFELINE_KARTE_STYLE_URL`** — Einzel-URL-Kurzform für eine
-  vollständige MapLibre-**Style-JSON-URL** (online). Ergibt einen Ein-Element-View „Online";
-  wird ignoriert, sobald `LIFELINE_KARTE_STYLES` gesetzt ist.
+- **Online-Quellen** (Vektor-Style-JSON oder Raster-Tile-Template mit `{z}/{y}/{x}`): pro Quelle
+  `name`, `url`, `typ` (`vektor`|`raster`) und eine **Pflicht-Attribution** (je View angezeigt).
+  Ein kuratierter, schlüsselfreier **Vorschlagskatalog** (OpenFreeMap, basemap.de, TopPlusOpen)
+  steht zum Hinzufügen bereit. Key-basierte Anbieter (MapTiler/Stadia) **nicht** mit Secret in der
+  URL hinterlegen — nur serverseitig/Domain-Restriction.
+- **Offline-Karte (PMTiles)**: eine **lokale PMTiles-Datei** (z. B. ein Protomaps-Build von
+  [build.protomaps.com](https://build.protomaps.com), DE-weit mehrere GB) wird als Offline-Karte
+  registriert und aktiviert; der Server liefert die aktive Karte per **HTTP-Range** unter
+  `/api/karte/tiles.pmtiles` aus. Ideal für den ELW ohne Netz. Das Datenverzeichnis leitet sich
+  aus dem DB-Pfad ab (`<Verzeichnis von --db-path>/karten`) und wird beim Start angelegt.
 
 **Laufzeit-Bevorzugung im Frontend:** online (falls erreichbar) → Offline-PMTiles →
 **Blind-Modus** (neutrales Raster). Im Blind-Modus funktionieren Marker und das Verorten
 weiterhin — nur der Kartenhintergrund fehlt. Ein Umschalter in der Sidebar erlaubt
 die manuelle Wahl; im Modus **Online** erscheint zusätzlich ein **Sub-Switcher**, mit dem
 zwischen den konfigurierten Online-Views umgeschaltet wird (Stil + Pflicht-Attribution
-wechseln dynamisch). Fehlt der PMTiles-Pfad, liefert `/api/karte/tiles.pmtiles` 404 und das
+wechseln dynamisch). Ohne aktive Offline-Karte liefert `/api/karte/tiles.pmtiles` 404 und das
 Frontend nutzt automatisch Online bzw. Blind.
 
 **Schema-Hinweis (Offline-Vektor-Style):** Der gebündelte Offline-Style nimmt das

@@ -5,6 +5,7 @@
 pub mod cache;
 pub mod normalisierung;
 pub mod quellen;
+pub mod registry;
 pub mod typen;
 
 use std::collections::HashSet;

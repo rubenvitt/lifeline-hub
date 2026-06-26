@@ -14,7 +14,7 @@ async fn setup() -> axum::Router {
     bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
         .await
         .unwrap();
-    build_router(AppState { pool, live: LiveHub::new(), fachebenen: lifeline_hub::karte::FachebenenState::neu() })
+    build_router(AppState { pool, live: LiveHub::new(), karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu() })
 }
 
 /// Wie `setup`, behält aber ein Handle auf den `LiveHub`, um Live-Events zu abonnieren.
@@ -27,7 +27,7 @@ async fn setup_mit_hub() -> (axum::Router, LiveHub) {
     let router = build_router(AppState {
         pool,
         live: live.clone(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu(),
     });
     (router, live)
 }

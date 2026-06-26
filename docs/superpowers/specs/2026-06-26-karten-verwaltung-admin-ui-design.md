@@ -139,3 +139,18 @@ am Grundstein (LFH-179).
 - `frontend/src/pages/lagekarte/basemapStil.ts` (`offlineStyle`, Protomaps-Schema-Annahme, Fallback-Kette)
 - `docs/betrieb/packaging.md` (Abschnitt „Lagekarte / Basemap")
 - `docs/superpowers/specs/2026-06-25-basemap-persistenz-entscheidung.md` (LFH-34, localStorage bleibt)
+
+## Nachtrag 2026-06-26 (Nutzer-Entscheidung bei der Umsetzung)
+
+Abweichend vom oben skizzierten Design wurde bei der Umsetzung von LFH-179 entschieden:
+
+- **ENV-Kartenkonfig + Rückwärtskompatibilität + Seeding entfallen vollständig.** Es gibt keine
+  `--pmtiles-path` / `--karte-styles` / `--karte-online-style-url`-Optionen mehr und keinen
+  automatischen DB-Seed aus `default_online_styles`. Die frühere `KarteConfig` und
+  `online_styles_aufloesen` wurden entfernt.
+- **Die Registry startet leer.** Die Karte läuft **blind**, bis ein Admin im Admin-UI Quellen aus
+  dem kuratierten Katalog (`default_online_styles`, weiterhin als Vorschlagskatalog erhalten)
+  hinzufügt oder eigene Quellen anlegt. Konsequenz bewusst akzeptiert (Prep-Phase, trivial
+  reversibel).
+- **`karten_dir`** (Datenverzeichnis für Offline-Karten) wird aus `db_path` abgeleitet
+  (`<dir>/karten`) und ist ein `AppState`-Feld — **keine eigene ENV/CLI-Option**.

@@ -48,18 +48,10 @@ pub struct OnlineStyle {
     pub attribution: Option<String>,
 }
 
-/// Karten-/Basemap-Konfiguration, die zur Laufzeit an die Karte-Routen geht.
-/// `Default` (leer/None) → kein Tile-Service, Frontend geht in den Blind-Modus.
-/// Die eingebaute Default-Shortlist wird NICHT hier, sondern erst beim Serverstart
-/// über `online_styles_aufloesen` injiziert (Tests mit `build_router` bleiben Blind).
-#[derive(Clone, Debug, Default)]
-pub struct KarteConfig {
-    pub pmtiles_path: Option<String>,
-    pub online_styles: Vec<OnlineStyle>,
-}
-
 /// Eingebaute, schlüsselfreie Default-Shortlist (alle ohne API-Key, MapLibre-GL-tauglich,
-/// behördlich/kommerziell nutzbar — Stand Recherche 30.05.2026).
+/// behördlich/kommerziell nutzbar — Stand Recherche 30.05.2026). Dient als kuratierter
+/// Vorschlagskatalog (`GET /api/karte/online-quellen/katalog`) — NICHT als automatischer Seed;
+/// die DB-Registry startet leer (LFH-179: ENV-Kartenkonfig + Seeding entfernt).
 pub fn default_online_styles() -> Vec<OnlineStyle> {
     vec![
         OnlineStyle {
@@ -95,28 +87,15 @@ pub fn default_online_styles() -> Vec<OnlineStyle> {
     ]
 }
 
-/// Bestimmt die Online-Views beim Serverstart. Präzedenz:
-/// 1. `LIFELINE_KARTE_STYLES` (JSON-Liste) — bei Malformed JSON HARTER Fehler.
-/// 2. sonst altes `LIFELINE_KARTE_STYLE_URL` → Ein-Element-Vektor-View „Online".
-/// 3. sonst eingebaute Default-Shortlist.
-pub fn online_styles_aufloesen(
-    styles_json: Option<&str>,
-    single_url: Option<&str>,
-) -> anyhow::Result<Vec<OnlineStyle>> {
-    if let Some(json) = styles_json {
-        let liste: Vec<OnlineStyle> = serde_json::from_str(json)
-            .map_err(|e| anyhow::anyhow!("LIFELINE_KARTE_STYLES ist kein gültiges JSON: {e}"))?;
-        return Ok(liste);
-    }
-    if let Some(url) = single_url {
-        return Ok(vec![OnlineStyle {
-            name: "Online".into(),
-            url: url.into(),
-            typ: OnlineStyleTyp::Vektor,
-            attribution: None,
-        }]);
-    }
-    Ok(default_online_styles())
+/// Lokales Daten-Verzeichnis für Offline-Karten, abgeleitet aus dem DB-Pfad
+/// (`<Verzeichnis von db_path>/karten`). Bewusst KEINE eigene ENV/CLI-Option (LFH-179: ENV
+/// für die Karte entfällt) — der Pfad folgt dem DB-Pfad; angelegt wird er beim Serverstart.
+pub fn default_karten_dir(db_path: &str) -> std::path::PathBuf {
+    std::path::Path::new(db_path)
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| std::path::Path::new("."))
+        .join("karten")
 }
 
 /// Laufzeit-Konfiguration für den lifeline-hub-Server.
@@ -143,20 +122,6 @@ pub struct Config {
     /// ein Zufalls-Passwort erzeugt und ins Log geschrieben.
     #[arg(long, env = "LIFELINE_ADMIN_PASSWORD")]
     pub admin_password: Option<GeheimesPasswort>,
-
-    /// Pfad zur lokalen PMTiles-Basemap (Offline-Karte). Fehlt er, gibt es keinen
-    /// Offline-Tile-Service; das Frontend nutzt dann Online-URL oder Blind-Modus.
-    #[arg(long, env = "LIFELINE_PMTILES_PATH")]
-    pub pmtiles_path: Option<String>,
-
-    /// Online-Style-URL (MapLibre-Style-JSON), bevorzugt wenn das Netz erreichbar ist.
-    #[arg(long, env = "LIFELINE_KARTE_STYLE_URL")]
-    pub karte_online_style_url: Option<String>,
-
-    /// Mehrere Online-Views als JSON-Liste: `[{"name":..,"url":..,"typ":"vektor|raster","attribution":..}]`.
-    /// Hat Vorrang vor `--karte-online-style-url`. Fehlt beides, liefert der Server die Default-Shortlist.
-    #[arg(long, env = "LIFELINE_KARTE_STYLES")]
-    pub karte_styles: Option<String>,
 
     /// Optionales Subkommando. Ohne Subkommando wird der Server gestartet.
     #[command(subcommand)]
@@ -269,16 +234,29 @@ mod tests {
     }
 
     #[test]
-    fn karte_flags_werden_geparst() {
-        let config = Config::parse_from([
-            "lifeline-hub",
-            "--pmtiles-path", "/data/de.pmtiles",
-            "--karte-online-style-url", "https://tiles.example/style.json",
-        ]);
-        assert_eq!(config.pmtiles_path.as_deref(), Some("/data/de.pmtiles"));
+    fn default_karten_dir_folgt_db_pfad() {
         assert_eq!(
-            config.karte_online_style_url.as_deref(),
-            Some("https://tiles.example/style.json")
+            default_karten_dir("/var/lib/lifeline/lifeline.db"),
+            std::path::PathBuf::from("/var/lib/lifeline/karten")
+        );
+        // Ohne Verzeichnis-Anteil (relativer Default-DB-Name) → ./karten.
+        assert_eq!(
+            default_karten_dir("lifeline.db"),
+            std::path::Path::new(".").join("karten")
+        );
+    }
+
+    #[test]
+    fn default_online_styles_hat_raster_und_durchgaengige_attribution() {
+        let styles = default_online_styles();
+        assert!(styles.len() >= 2, "Katalog sollte mehrere Views haben");
+        assert!(
+            styles.iter().any(|s| s.typ == OnlineStyleTyp::Raster),
+            "mind. ein Raster-View"
+        );
+        assert!(
+            styles.iter().all(|s| s.attribution.is_some()),
+            "jeder Katalog-View trägt eine Pflicht-Attribution"
         );
     }
 
@@ -300,43 +278,5 @@ mod tests {
         .unwrap();
         assert_eq!(s.typ, OnlineStyleTyp::Raster);
         assert_eq!(s.attribution.as_deref(), Some("© BKG"));
-    }
-
-    #[test]
-    fn aufloesen_parst_json_liste() {
-        let json = r#"[{"name":"A","url":"https://a"},{"name":"B","url":"https://b","typ":"raster"}]"#;
-        let liste = online_styles_aufloesen(Some(json), None).unwrap();
-        assert_eq!(liste.len(), 2);
-        assert_eq!(liste[0].typ, OnlineStyleTyp::Vektor);
-        assert_eq!(liste[1].typ, OnlineStyleTyp::Raster);
-    }
-
-    #[test]
-    fn aufloesen_malformed_json_ist_fehler() {
-        let err = online_styles_aufloesen(Some("kein json"), None);
-        assert!(err.is_err());
-    }
-
-    #[test]
-    fn aufloesen_faellt_auf_single_url_zurueck() {
-        let liste = online_styles_aufloesen(None, Some("https://einzel/style.json")).unwrap();
-        assert_eq!(liste.len(), 1);
-        assert_eq!(liste[0].name, "Online");
-        assert_eq!(liste[0].url, "https://einzel/style.json");
-        assert_eq!(liste[0].typ, OnlineStyleTyp::Vektor);
-    }
-
-    #[test]
-    fn aufloesen_ohne_config_liefert_default_shortlist() {
-        let liste = online_styles_aufloesen(None, None).unwrap();
-        assert!(liste.len() >= 3, "Default-Shortlist sollte mehrere Views haben");
-        assert!(liste.iter().any(|s| s.typ == OnlineStyleTyp::Raster), "mind. ein Raster-View");
-    }
-
-    #[test]
-    fn default_karte_config_ist_leer_blind() {
-        let k = KarteConfig::default();
-        assert!(k.online_styles.is_empty());
-        assert!(k.pmtiles_path.is_none());
     }
 }
