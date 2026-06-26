@@ -25,6 +25,10 @@ export interface OfflineKarte {
   /** Live-Download-Fortschritt (Bytes), nur für status='laedt'. `gesamt` null ohne Content-Length. */
   geladen?: number | null;
   gesamt?: number | null;
+  /** True, wenn der Katalog für dieselbe Karte eine neuere Quelle führt → „Update verfügbar". */
+  update_verfuegbar?: boolean;
+  /** Aktuelle Katalog-URL für den Re-Download, wenn ein Update verfügbar ist. */
+  katalog_url?: string | null;
 }
 
 /** Body zum Starten eines Downloads (aus Katalog oder eigener URL). `lizenz` ist Pflicht. */
