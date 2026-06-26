@@ -11,6 +11,7 @@ export function darfAdmin(b: BenutzerAnzeige | null): boolean {
 const TAB_ITEMS = [
   { key: 'stammdaten', label: 'Stammdaten' },
   { key: 'einstellungen', label: 'Einstellungen' },
+  { key: 'karten', label: 'Karten' },
 ];
 
 /**
@@ -35,7 +36,10 @@ export default function AdminLayout() {
     return <Navigate to="/einsaetze" replace />;
   }
 
-  const activeKey = pathname.startsWith('/admin/einstellungen') ? 'einstellungen' : 'stammdaten';
+  // Explizites Segment-Matching (/admin/<segment>) statt binärer startsWith-Heuristik:
+  // sonst würde /admin/karten fälschlich „Stammdaten" highlighten.
+  const segment = pathname.split('/')[2] ?? '';
+  const activeKey = TAB_ITEMS.some((t) => t.key === segment) ? segment : 'stammdaten';
 
   return (
     <div>

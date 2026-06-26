@@ -40,6 +40,7 @@ import BereitstellungsraeumePage from './pages/bereitstellungsraum/Bereitstellun
 import BrDetailPage from './pages/bereitstellungsraum/BrDetailPage';
 import AdminLayout from './admin/AdminLayout';
 import GlobalEinstellungenPage from './pages/GlobalEinstellungenPage';
+import KartenVerwaltungPage from './karten/KartenVerwaltungPage';
 import EinsatzLayout from './einsatz/EinsatzLayout';
 import DefaultModulRedirect from './einsatz/DefaultModulRedirect';
 import ModulRedirect from './einsatz/ModulRedirect';
@@ -106,6 +107,7 @@ export default function App() {
             <Route index element={<Navigate to="/admin/stammdaten" replace />} />
             <Route path="stammdaten" element={<StammdatenPage />} />
             <Route path="einstellungen" element={<GlobalEinstellungenPage />} />
+            <Route path="karten" element={<KartenVerwaltungPage />} />
           </Route>
         </Route>
         {/* Ebene 2 — Einsatz-Workspace */}

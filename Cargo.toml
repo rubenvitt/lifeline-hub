@@ -25,11 +25,11 @@ sha2 = "0.11"
 mime_guess = "2"
 rust-embed = "8"
 tower-http = { version = "0.7", features = ["fs"] }
+# Prod-Abhängigkeit: der PMTiles-Tile-Handler nutzt `tower::ServiceExt::oneshot`,
+# um `ServeFile` per Request laufen zu lassen (siehe routes/karte.rs).
+tower = { version = "0.5", features = ["util"] }
 
 [features]
 # Dev-only: aktiviert Seed-Testdaten und den /api/dev/users-Endpoint.
 # Niemals im Release-Build aktivieren (kein Default-Feature).
 dev-seeds = []
-
-[dev-dependencies]
-tower = { version = "0.5", features = ["util"] }

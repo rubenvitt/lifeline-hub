@@ -14,7 +14,7 @@ async fn setup() -> axum::Router {
     bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
         .await
         .unwrap();
-    build_router(AppState { pool, live: LiveHub::new(), fachebenen: lifeline_hub::karte::FachebenenState::neu() })
+    build_router(AppState { pool, live: LiveHub::new(), karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu() })
 }
 
 /// Wie `setup`, liefert aber zusätzlich den Pool (für Direktquery-Verifikation).
@@ -22,7 +22,7 @@ async fn setup() -> axum::Router {
 async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
     let pool = db::test_pool().await;
     bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12")).await.unwrap();
-    let router = build_router(AppState { pool: pool.clone(), live: LiveHub::new(), fachebenen: lifeline_hub::karte::FachebenenState::neu() });
+    let router = build_router(AppState { pool: pool.clone(), live: LiveHub::new(), karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu() });
     (router, pool)
 }
 
@@ -159,7 +159,7 @@ async fn sse_person_event_enthaelt_nur_ids_keinen_befundtext() {
     let pool = lifeline_hub::db::test_pool().await;
     lifeline_hub::auth::bootstrap::bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12")).await.unwrap();
     let live = lifeline_hub::live::LiveHub::new();
-    let app = lifeline_hub::app::build_router(lifeline_hub::app::AppState { pool: pool.clone(), live: live.clone(), fachebenen: lifeline_hub::karte::FachebenenState::neu() });
+    let app = lifeline_hub::app::build_router(lifeline_hub::app::AppState { pool: pool.clone(), live: live.clone(), karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu() });
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let p = person_anlegen(&app, &admin, e, r#"{"name":"Mustermann"}"#).await;

@@ -31,6 +31,7 @@ function setup(me: Record<string, unknown>, route = '/admin') {
           <Route index element={<Navigate to="/admin/stammdaten" replace />} />
           <Route path="stammdaten" element={<div>SD-Inhalt</div>} />
           <Route path="einstellungen" element={<div>Einst-Inhalt</div>} />
+          <Route path="karten" element={<div>Karten-Inhalt</div>} />
         </Route>
         <Route path="/stammdaten" element={<Navigate to="/admin/stammdaten" replace />} />
         <Route path="/einsaetze" element={<div>Einsätze</div>} />
@@ -41,12 +42,13 @@ function setup(me: Record<string, unknown>, route = '/admin') {
 }
 
 describe('AdminLayout', () => {
-  it('Fuehrungskraft: Sub-Nav „Stammdaten" und „Einstellungen" sichtbar', async () => {
+  it('Fuehrungskraft: Sub-Nav „Stammdaten", „Einstellungen" und „Karten" sichtbar', async () => {
     setup(fuehrungskraft);
     await waitFor(() =>
       expect(screen.getByRole('tab', { name: 'Stammdaten' })).toBeInTheDocument(),
     );
     expect(screen.getByRole('tab', { name: 'Einstellungen' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Karten' })).toBeInTheDocument();
   });
 
   it('Admin: Sub-Nav ebenfalls sichtbar', async () => {
@@ -55,6 +57,7 @@ describe('AdminLayout', () => {
       expect(screen.getByRole('tab', { name: 'Stammdaten' })).toBeInTheDocument(),
     );
     expect(screen.getByRole('tab', { name: 'Einstellungen' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Karten' })).toBeInTheDocument();
   });
 
   it('Nicht-Berechtigter: Redirect zu /einsaetze, kein Sub-Nav', async () => {
@@ -62,6 +65,14 @@ describe('AdminLayout', () => {
     await waitFor(() => expect(screen.getByText('Einsätze')).toBeInTheDocument());
     expect(screen.queryByRole('tab', { name: 'Stammdaten' })).not.toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: 'Einstellungen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Karten' })).not.toBeInTheDocument();
+  });
+
+  it('/admin/karten highlightet „Karten" (nicht „Stammdaten")', async () => {
+    setup(fuehrungskraft, '/admin/karten');
+    await waitFor(() => expect(screen.getByText('Karten-Inhalt')).toBeInTheDocument());
+    expect(screen.getByRole('tab', { name: 'Karten', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Stammdaten', selected: false })).toBeInTheDocument();
   });
 
   it('/stammdaten leitet zu /admin/stammdaten weiter (kein toter Link)', async () => {

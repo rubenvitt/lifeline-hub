@@ -23,7 +23,7 @@ async fn setup() -> axum::Router {
     build_router(AppState {
         pool,
         live: LiveHub::new(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu(),
     })
 }
 

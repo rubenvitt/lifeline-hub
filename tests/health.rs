@@ -11,7 +11,7 @@ async fn health_endpoint_returns_ok() {
     let app = build_router(AppState {
         pool,
         live: LiveHub::new(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu(),
     });
 
     let response = app
@@ -43,7 +43,7 @@ async fn health_endpoint_reports_degraded_when_db_down() {
     let app = build_router(AppState {
         pool,
         live: LiveHub::new(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu(),
     });
 
     let response = app

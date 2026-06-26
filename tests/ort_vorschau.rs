@@ -31,7 +31,7 @@ async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
     let router = build_router(AppState {
         pool: pool.clone(),
         live: LiveHub::new(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu(),
     });
     (router, pool)
 }

@@ -13,7 +13,7 @@ async fn dev_users_route_fehlt_ohne_feature() {
     let app = build_router(AppState {
         pool,
         live: LiveHub::new(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu(),
     });
     let resp = app
         .oneshot(
