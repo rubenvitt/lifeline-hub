@@ -14,7 +14,10 @@ export interface OnlineStyle {
 export interface KarteServerConfig {
   online_styles: OnlineStyle[];
   pmtiles_verfuegbar: boolean;
+  /** Tile-Endpoint-URL inkl. Cache-Bust-Token (`?v=…`), wenn eine aktive Offline-Karte bereit ist. */
   pmtiles_url: string | null;
+  /** Pflicht-Attribution der aktiven Offline-Karte (offline sichtbar, z. B. ODbL); `null` ohne aktive Karte. */
+  pmtiles_attribution: string | null;
 }
 
 export function ladeKarteConfig(): Promise<KarteServerConfig> {

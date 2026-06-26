@@ -226,7 +226,12 @@ const ORG_DRK = { id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' };
 
 function basisHandler(
   extra: ReturnType<typeof http.get>[] = [],
-  config: KarteServerConfig = { online_styles: [], pmtiles_verfuegbar: false, pmtiles_url: null },
+  config: KarteServerConfig = {
+    online_styles: [],
+    pmtiles_verfuegbar: false,
+    pmtiles_url: null,
+    pmtiles_attribution: null,
+  },
 ) {
   // extra ZUERST: MSW nimmt den ersten Treffer → Tests können einzelne GET-Defaults
   // (z. B. /einheiten) gezielt überschreiben, ohne die übrigen Defaults anzufassen.
@@ -345,6 +350,7 @@ describe('LagekartePage', () => {
       online_styles: [{ name: 'Online', url: 'https://x/style.json', typ: 'vektor', attribution: '© X' }],
       pmtiles_verfuegbar: true,
       pmtiles_url: '/api/karte/tiles.pmtiles',
+      pmtiles_attribution: null,
     });
     const user = userEvent.setup();
     renderSeite();
@@ -384,6 +390,7 @@ describe('LagekartePage', () => {
       online_styles: [{ name: 'Online', url: 'https://x/style.json', typ: 'vektor', attribution: '© X' }],
       pmtiles_verfuegbar: true,
       pmtiles_url: '/api/karte/tiles.pmtiles',
+      pmtiles_attribution: null,
     });
     renderSeite();
     await screen.findByText('marker-schaden-9');
@@ -398,6 +405,7 @@ describe('LagekartePage', () => {
       online_styles: [],
       pmtiles_verfuegbar: true,
       pmtiles_url: '/api/karte/tiles.pmtiles',
+      pmtiles_attribution: null,
     });
     renderSeite();
     await screen.findByText('marker-schaden-9');
@@ -496,6 +504,7 @@ describe('LagekartePage', () => {
       ],
       pmtiles_verfuegbar: false,
       pmtiles_url: null,
+      pmtiles_attribution: null,
     });
     const user = userEvent.setup();
     renderSeite();

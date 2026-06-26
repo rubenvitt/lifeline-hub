@@ -28,6 +28,7 @@ tower-http = { version = "0.7", features = ["fs"] }
 # Prod-Abhängigkeit: der PMTiles-Tile-Handler nutzt `tower::ServiceExt::oneshot`,
 # um `ServeFile` per Request laufen zu lassen (siehe routes/karte.rs).
 tower = { version = "0.5", features = ["util"] }
+fs4 = "1.1.0"
 
 [features]
 # Dev-only: aktiviert Seed-Testdaten und den /api/dev/users-Endpoint.

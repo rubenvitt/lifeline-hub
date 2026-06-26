@@ -19,12 +19,16 @@ const rasterView: OnlineStyle = {
 const beides: KarteServerConfig = {
   online_styles: [vektorView],
   pmtiles_verfuegbar: true,
-  pmtiles_url: '/api/karte/tiles.pmtiles',
+  pmtiles_url: '/api/karte/tiles.pmtiles?v=abc',
+  pmtiles_attribution: null,
 };
 const nurOffline: KarteServerConfig = {
-  online_styles: [], pmtiles_verfuegbar: true, pmtiles_url: '/api/karte/tiles.pmtiles',
+  online_styles: [], pmtiles_verfuegbar: true, pmtiles_url: '/api/karte/tiles.pmtiles?v=abc',
+  pmtiles_attribution: '© OpenStreetMap contributors (ODbL)',
 };
-const leer: KarteServerConfig = { online_styles: [], pmtiles_verfuegbar: false, pmtiles_url: null };
+const leer: KarteServerConfig = {
+  online_styles: [], pmtiles_verfuegbar: false, pmtiles_url: null, pmtiles_attribution: null,
+};
 
 describe('basemapStil', () => {
   it('blindStyle rendert nur einen Hintergrund-Layer', () => {
@@ -71,10 +75,15 @@ describe('basemapStil', () => {
     expect(defaultModus(leer)).toBe('blind');
   });
 
-  it('aktuelleAttribution: online liefert View-Attribution, sonst null', () => {
-    expect(aktuelleAttribution('online', vektorView)).toBe('© A');
-    expect(aktuelleAttribution('online', undefined)).toBeNull();
-    expect(aktuelleAttribution('offline', vektorView)).toBeNull();
-    expect(aktuelleAttribution('blind', rasterView)).toBeNull();
+  it('aktuelleAttribution: online View-Attribution, offline pmtiles_attribution, sonst null', () => {
+    expect(aktuelleAttribution('online', vektorView, beides)).toBe('© A');
+    expect(aktuelleAttribution('online', undefined, beides)).toBeNull();
+    // Offline: Lizenz der aktiven Offline-Karte aus der Config (LFH-181, offline sichtbar).
+    expect(aktuelleAttribution('offline', undefined, nurOffline)).toBe(
+      '© OpenStreetMap contributors (ODbL)',
+    );
+    // Offline ohne hinterlegte Lizenz → null.
+    expect(aktuelleAttribution('offline', vektorView, leer)).toBeNull();
+    expect(aktuelleAttribution('blind', rasterView, beides)).toBeNull();
   });
 });

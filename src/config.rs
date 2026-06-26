@@ -87,6 +87,89 @@ pub fn default_online_styles() -> Vec<OnlineStyle> {
     ]
 }
 
+/// Ein kuratierter, herunterladbarer Offline-Karten-Vorschlag (LFH-181). `groesse` ist die
+/// UNGEFÄHRE Dateigröße in Bytes (für den Plattenplatz-Check vorab; die exakte Größe liefert
+/// die Content-Length bzw. der fertige Download). Alle Einträge sind Protomaps-Schema und
+/// rendern mit dem bestehenden glyph-freien Offline-Style.
+#[derive(Clone, Debug, Serialize)]
+pub struct OfflineKatalogEintrag {
+    pub name: String,
+    pub url: String,
+    pub region: String,
+    pub groesse: i64,
+    pub lizenz: String,
+    pub kachel_schema: String,
+    /// Provenienz-Hinweis fürs UI (Quelle ist ein Community-Repo, kein eigener Mirror).
+    pub quelle: String,
+}
+
+/// Kuratierter Offline-Karten-Katalog (`GET /api/karte/offline-karten/katalog`) — analog zum
+/// Online-Vorschlagskatalog `default_online_styles`. v1: direkt herunterladbare Protomaps-v4-
+/// PMTiles aus Project N.O.M.A.D. (DE-Bundesländer + AT + CH, ODbL, per GitHub-API verifiziert,
+/// Stand 2026-03-20). Bewusst Bundesland-granular: eine Behörde lädt nur ihr Land (ELW-tauglich
+/// klein). Größen sind gemessene Näherungen. Folge-Task: Eigen-Mirror/-Extract (Supply-Chain).
+pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {
+    const BASIS: &str =
+        "https://github.com/whitespring/project-nomad-maps-europe/releases/download/v1";
+    const DATUM: &str = "20260320";
+    const ODBL: &str = "© OpenStreetMap contributors (ODbL)";
+    const QUELLE: &str = "Project N.O.M.A.D. (Community-Repo whitespring/project-nomad-maps-europe)";
+    let mb = |m: i64| m * 1024 * 1024;
+
+    // (Datei-Slug, Bundesland-Anzeigename, ~MB) — gemessene Näherungswerte.
+    let bundeslaender: [(&str, &str, i64); 16] = [
+        ("baden_wuerttemberg", "Baden-Württemberg", 900),
+        ("bayern", "Bayern", 1710),
+        ("berlin", "Berlin", 77),
+        ("brandenburg", "Brandenburg", 542),
+        ("bremen", "Bremen", 42),
+        ("hamburg", "Hamburg", 54),
+        ("hessen", "Hessen", 685),
+        ("mecklenburg_vorpommern", "Mecklenburg-Vorpommern", 260),
+        ("niedersachsen", "Niedersachsen", 1340),
+        ("nordrhein_westfalen", "Nordrhein-Westfalen", 1300),
+        ("rheinland_pfalz", "Rheinland-Pfalz", 628),
+        ("saarland", "Saarland", 78),
+        ("sachsen", "Sachsen", 493),
+        ("sachsen_anhalt", "Sachsen-Anhalt", 423),
+        ("schleswig_holstein", "Schleswig-Holstein", 344),
+        ("thueringen", "Thüringen", 392),
+    ];
+
+    let mut katalog: Vec<OfflineKatalogEintrag> = bundeslaender
+        .into_iter()
+        .map(|(slug, name, m)| OfflineKatalogEintrag {
+            name: format!("Deutschland – {name}"),
+            url: format!("{BASIS}/de_{slug}_{DATUM}.pmtiles"),
+            region: format!("DE/{name}"),
+            groesse: mb(m),
+            lizenz: ODBL.into(),
+            kachel_schema: "protomaps".into(),
+            quelle: QUELLE.into(),
+        })
+        .collect();
+
+    katalog.push(OfflineKatalogEintrag {
+        name: "Österreich".into(),
+        url: format!("{BASIS}/austria_{DATUM}.pmtiles"),
+        region: "AT".into(),
+        groesse: mb(1910),
+        lizenz: ODBL.into(),
+        kachel_schema: "protomaps".into(),
+        quelle: QUELLE.into(),
+    });
+    katalog.push(OfflineKatalogEintrag {
+        name: "Schweiz".into(),
+        url: format!("{BASIS}/switzerland_{DATUM}.pmtiles"),
+        region: "CH".into(),
+        groesse: mb(932),
+        lizenz: ODBL.into(),
+        kachel_schema: "protomaps".into(),
+        quelle: QUELLE.into(),
+    });
+    katalog
+}
+
 /// Lokales Daten-Verzeichnis für Offline-Karten, abgeleitet aus dem DB-Pfad
 /// (`<Verzeichnis von db_path>/karten`). Bewusst KEINE eigene ENV/CLI-Option (LFH-179: ENV
 /// für die Karte entfällt) — der Pfad folgt dem DB-Pfad; angelegt wird er beim Serverstart.
@@ -169,6 +252,25 @@ mod tests {
     fn db_path_flag_overrides_default() {
         let config = Config::parse_from(["lifeline-hub", "--db-path", "/tmp/test.db"]);
         assert_eq!(config.db_path, "/tmp/test.db");
+    }
+
+    #[test]
+    fn offline_katalog_ist_kuratiert_und_konsistent() {
+        let katalog = default_offline_katalog();
+        assert_eq!(katalog.len(), 18, "16 Bundesländer + AT + CH");
+        for e in &katalog {
+            assert!(e.url.starts_with("https://"), "nur https: {}", e.url);
+            assert!(e.url.ends_with(".pmtiles"), "PMTiles: {}", e.url);
+            assert_eq!(e.kachel_schema, "protomaps", "v1 nur Protomaps-Schema");
+            assert!(!e.lizenz.is_empty(), "Attribution Pflicht: {}", e.name);
+            assert!(e.groesse > 0, "Größe für Plattenplatz-Check: {}", e.name);
+        }
+        assert!(
+            katalog.iter().any(|e| e.name.contains("Bremen")),
+            "Bundesland-granular (kleinste Datei vorhanden)"
+        );
+        assert!(katalog.iter().any(|e| e.region == "AT"));
+        assert!(katalog.iter().any(|e| e.region == "CH"));
     }
 
     #[test]

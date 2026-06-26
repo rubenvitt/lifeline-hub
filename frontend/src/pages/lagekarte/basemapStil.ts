@@ -91,11 +91,17 @@ export function baueBasemapStyle(
   return blindStyle(theme);
 }
 
-/** Config-autoritative Pflicht-Attribution des aktiven Views (nur online). */
+/**
+ * Config-autoritative Pflicht-Attribution des aktiven Views. Online: Attribution des Views;
+ * Offline: Lizenz der aktiven Offline-Karte (`pmtiles_attribution`, z. B. ODbL — auch ohne Netz
+ * rechtlich sichtbar, LFH-181); blind: keine.
+ */
 export function aktuelleAttribution(
   modus: BasemapModus,
   onlineStil: OnlineStyle | undefined,
+  config: KarteServerConfig | undefined,
 ): string | null {
   if (modus === 'online' && onlineStil) return onlineStil.attribution;
+  if (modus === 'offline') return config?.pmtiles_attribution ?? null;
   return null;
 }

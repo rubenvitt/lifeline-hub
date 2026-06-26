@@ -1,12 +1,12 @@
 import { Alert, Typography } from 'antd';
 import { useAuth } from '../auth/AuthContext';
 import OnlineQuellenVerwaltung from './OnlineQuellenVerwaltung';
+import OfflineKartenVerwaltung from './OfflineKartenVerwaltung';
 
 /**
- * Admin-Sub-Seite `/admin/karten`: Verwaltung der Karten-Quellen.
- * Aktuell nur die Online-Basemap-Quellen (LFH-180); der Offline-Manager (LFH-181)
- * dockt hier später als zweite Sektion an. Schreiben nur System-Admin —
- * Führungskräfte sehen die Tabelle read-only (Hinweis-Banner).
+ * Admin-Sub-Seite `/admin/karten`: Verwaltung der Karten-Quellen — Online-Basemap-Quellen
+ * (LFH-180) und Offline-Karten-Manager (LFH-181, In-App-Download von PMTiles). Schreiben nur
+ * System-Admin — Führungskräfte sehen die Tabellen read-only (Hinweis-Banner).
  */
 export default function KartenVerwaltungPage() {
   const { benutzer } = useAuth();
@@ -34,6 +34,15 @@ export default function KartenVerwaltungPage() {
 
       <Typography.Title level={5}>Online-Quellen</Typography.Title>
       <OnlineQuellenVerwaltung />
+
+      <Typography.Title level={5} style={{ marginTop: 32 }}>
+        Offline-Karten
+      </Typography.Title>
+      <Typography.Paragraph type="secondary">
+        PMTiles für den netzlosen Betrieb. In der Prep-Phase (mit Netz) herunterladen; die aktive
+        Karte wird im Feld offline ausgeliefert. Pflicht-Attribution ist auf der Karte sichtbar.
+      </Typography.Paragraph>
+      <OfflineKartenVerwaltung />
     </div>
   );
 }
