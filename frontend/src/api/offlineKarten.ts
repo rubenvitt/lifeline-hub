@@ -22,6 +22,9 @@ export interface OfflineKarte {
   status: OfflineKarteStatus;
   aktiv_basemap: boolean;
   sortier: number;
+  /** Live-Download-Fortschritt (Bytes), nur für status='laedt'. `gesamt` null ohne Content-Length. */
+  geladen?: number | null;
+  gesamt?: number | null;
 }
 
 /** Body zum Starten eines Downloads (aus Katalog oder eigener URL). `lizenz` ist Pflicht. */

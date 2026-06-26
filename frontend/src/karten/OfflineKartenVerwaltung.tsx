@@ -1,4 +1,8 @@
-import { Alert, App, Button, Popconfirm, Space, Spin, Table, Tag, type TableColumnsType } from 'antd';
+import {
+  Alert, App, Button, Popconfirm, Progress, Space, Table, Tag, Typography,
+  type TableColumnsType,
+} from 'antd';
+import { LoadingOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
@@ -71,12 +75,27 @@ export default function OfflineKartenVerwaltung() {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (s: OfflineKarteStatus) => {
-        const t = STATUS_TAG[s];
+      render: (s: OfflineKarteStatus, k: OfflineKarte) => {
+        if (s !== 'laedt') {
+          const t = STATUS_TAG[s];
+          return <Tag color={t.color}>{t.label}</Tag>;
+        }
+        // Live-Fortschritt aus dem Backend (geladen/gesamt). Ohne Content-Length (gesamt null)
+        // → geladene Bytes statt Prozent.
+        const prozent =
+          k.geladen != null && k.gesamt ? Math.floor((k.geladen / k.gesamt) * 100) : undefined;
         return (
-          <Space size={4}>
-            <Tag color={t.color}>{t.label}</Tag>
-            {s === 'laedt' && <Spin size="small" />}
+          <Space size={8}>
+            <Tag icon={<LoadingOutlined spin />} color="processing" style={{ marginInlineEnd: 0 }}>
+              lädt
+            </Tag>
+            {prozent != null ? (
+              <Progress percent={prozent} size="small" style={{ width: 120, marginBottom: 0 }} />
+            ) : (
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                {formatGroesse(k.geladen)}
+              </Typography.Text>
+            )}
           </Space>
         );
       },

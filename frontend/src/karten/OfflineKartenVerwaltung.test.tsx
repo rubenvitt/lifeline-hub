@@ -129,6 +129,14 @@ describe('OfflineKartenVerwaltung', () => {
     expect(screen.queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
   });
 
+  it('lädt-Zustand mit Fortschritt: zeigt Prozent-Balken aus geladen/gesamt', async () => {
+    mockBasis(admin, [{ ...karteLaedt, geladen: 22020096, gesamt: 44040192 }]);
+    render();
+    await screen.findByText('Deutschland – Bayern');
+    // antd Progress rendert den Prozentwert (50 %) als Text.
+    expect(await screen.findByText('50%')).toBeInTheDocument();
+  });
+
   it('Abbrechen ruft den Abbrechen-Endpunkt', async () => {
     let abgebrochen = false;
     mockBasis(admin, [karteLaedt]);
