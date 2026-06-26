@@ -115,10 +115,17 @@ pub fn validiere_download_url(roh: &str) -> Result<Url, String> {
     Ok(url)
 }
 
-/// Dedizierter Download-Client: connect-Timeout (gegen tote Hosts), aber KEIN Globaltimeout
-/// (sonst würde ein gesunder, langsamer Mehrhundert-MB-Download gekillt). Redirects werden
-/// gefolgt, aber JEDER Hop wird neu auf SSRF geprüft (N.O.M.A.D. redirectet github.com →
-/// release-assets.githubusercontent.com).
+/// Idle-/Read-Timeout: bricht ab, wenn der Upstream die Verbindung offen hält, aber für so lange
+/// KEINE Bytes mehr liefert (stockender CDN/Proxy, half-open). Bewusst NICHT der Globaltimeout —
+/// `read_timeout` setzt sich nach jedem erfolgreichen Read zurück, killt also keinen gesunden,
+/// langsamen Großdownload, begrenzt aber den Stall (sonst hinge `chunk().await` ewig und das
+/// Abbruch-Flag, das nur zwischen den Chunks geprüft wird, würde nie greifen).
+const READ_TIMEOUT_SEKUNDEN: u64 = 60;
+
+/// Dedizierter Download-Client: connect-Timeout (gegen tote Hosts) + read/idle-Timeout (gegen
+/// stockende Verbindungen), aber KEIN Globaltimeout (sonst würde ein gesunder, langsamer
+/// Mehrhundert-MB-Download gekillt). Redirects werden gefolgt, aber JEDER Hop wird neu auf SSRF
+/// geprüft (N.O.M.A.D. redirectet github.com → release-assets.githubusercontent.com).
 pub fn download_client() -> reqwest::Client {
     let policy = reqwest::redirect::Policy::custom(|attempt| {
         if attempt.previous().len() >= 10 {
@@ -131,10 +138,20 @@ pub fn download_client() -> reqwest::Client {
     });
     reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(20))
+        .read_timeout(Duration::from_secs(READ_TIMEOUT_SEKUNDEN))
         .user_agent("LifelineHub-Kartendownload/1.0 (+https://github.com/)")
         .redirect(policy)
         .build()
         .expect("Download-Client baubar")
+}
+
+/// Entfernt die vom Download-Manager VERWALTETEN Dateien einer Karte (finale `karte-{id}.pmtiles`
+/// + evtl. `.part`-Rest). Best-effort (Fehler werden ignoriert). NUR für gemanagte Downloads
+/// aufrufen — extern via `offline_registrieren` registrierte Karten haben einen beliebigen,
+/// admin-gelieferten Pfad und dürfen NICHT angefasst werden.
+pub async fn entferne_download_dateien(karten_dir: &Path, id: i64) {
+    let _ = tokio::fs::remove_file(karten_dir.join(format!("karte-{id}.pmtiles"))).await;
+    let _ = tokio::fs::remove_file(karten_dir.join(format!("karte-{id}.pmtiles.part"))).await;
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -298,5 +315,23 @@ mod tests {
             .await
             .unwrap_err();
         assert!(matches!(err, DownloadFehler::Abgebrochen));
+    }
+
+    #[tokio::test]
+    async fn entferne_download_dateien_loescht_nur_id_dateien() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path();
+        std::fs::write(dir.join("karte-7.pmtiles"), b"final").unwrap();
+        std::fs::write(dir.join("karte-7.pmtiles.part"), b"rest").unwrap();
+        // Extern registrierte Fremddatei mit beliebigem Namen — darf NICHT angefasst werden.
+        std::fs::write(dir.join("fremd.pmtiles"), b"extern").unwrap();
+
+        entferne_download_dateien(dir, 7).await;
+
+        assert!(!dir.join("karte-7.pmtiles").exists(), "finale Datei entfernt");
+        assert!(!dir.join("karte-7.pmtiles.part").exists(), ".part entfernt");
+        assert!(dir.join("fremd.pmtiles").exists(), "Fremddatei unangetastet");
+        // Idempotent: zweiter Aufruf ohne Dateien ist ein No-Op (kein Panic).
+        entferne_download_dateien(dir, 7).await;
     }
 }

@@ -272,6 +272,16 @@ pub async fn offline_registrieren(
             "Kartenpfad muss relativ und ohne '..' sein".into(),
         ));
     }
+    // Attribution ist Pflicht — Parität zu offline_download/validiere_online. Die Offline-Basemap
+    // rendert sie quellen-unabhängig (config.pmtiles_attribution); ohne Lizenz würde eine
+    // aktivierte registrierte Karte offline ohne Pflicht-Attribution gezeigt (Lizenzverstoß).
+    let lizenz = body
+        .lizenz
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| AppError::Validation("Lizenz/Attribution ist Pflicht (offline sichtbar)".into()))?
+        .to_string();
     // Kachel-Schema ist erweiterbar; ohne Angabe gilt der Protomaps-Default (Migration-Default).
     let kachel_schema = body
         .kachel_schema
@@ -284,7 +294,7 @@ pub async fn offline_registrieren(
         name: name.to_string(),
         pfad: pfad.to_string(),
         quell_url: body.quell_url,
-        lizenz: body.lizenz,
+        lizenz: Some(lizenz),
         kachel_schema,
         sortier: body.sortier,
     };
@@ -305,16 +315,30 @@ pub async fn offline_aktivieren(
 }
 
 /// DELETE /api/karte/offline-karten/{id} — Offline-Karte löschen (Admin).
+///
+/// Entfernt zusätzlich die vom Download-Manager VERWALTETE Datei (`karte-{id}.pmtiles` + evtl.
+/// `.part`), sonst leckt jeder Download→Löschen-Zyklus mehrere GB. Extern registrierte Karten
+/// (beliebiger admin-gelieferter Pfad) werden bewusst NICHT von der Platte gelöscht.
 pub async fn offline_loeschen(
     State(state): State<AppState>,
     _admin: AdminUser,
     Path(id): Path<i64>,
 ) -> Result<StatusCode, AppError> {
-    if repo::loesche_offline_karte(&state.pool, id).await? {
-        Ok(StatusCode::NO_CONTENT)
-    } else {
-        Err(AppError::NotFound)
+    // Zeile vor dem DB-Delete lesen, um gemanagte Downloads von extern Registrierten zu trennen.
+    let karte = repo::finde_offline_karte(&state.pool, id).await?;
+    if !repo::loesche_offline_karte(&state.pool, id).await? {
+        return Err(AppError::NotFound);
     }
+    if let Some(k) = karte {
+        // Gemanagt = von uns heruntergeladen: download_at gesetzt, Pfad-Platzhalter (Download lief
+        // bzw. scheiterte vor markiere_bereit) oder der abgeleitete Download-Dateiname.
+        let ist_gemanagt =
+            k.download_at.is_some() || k.pfad.is_empty() || k.pfad == format!("karte-{id}.pmtiles");
+        if ist_gemanagt {
+            download::entferne_download_dateien(&state.karten_dir, id).await;
+        }
+    }
+    Ok(StatusCode::NO_CONTENT)
 }
 
 // ===== Offline-Karten-Download-Manager (LFH-181) =====
@@ -424,6 +448,8 @@ pub async fn offline_download(
                     repo::markiere_bereit(&pool, id, &dateiname, erg.groesse, &erg.sha256).await
                 {
                     tracing::error!("markiere_bereit({id}) fehlgeschlagen: {e}");
+                    // Bereits umbenannte finale Datei aufräumen, sonst verwaist sie ohne DB-Record.
+                    let _ = tokio::fs::remove_file(&ziel).await;
                     let _ = repo::setze_status(&pool, id, "fehler").await;
                 }
             }

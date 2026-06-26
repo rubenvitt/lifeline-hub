@@ -421,7 +421,7 @@ async fn offline_registrieren_aktivieren_loeschen() {
         "POST",
         "/api/karte/offline-karten",
         Some(&cookie),
-        Some(r#"{"name":"DE","pfad":"de.pmtiles"}"#),
+        Some(r#"{"name":"DE","pfad":"de.pmtiles","lizenz":"© OpenStreetMap contributors (ODbL)"}"#),
     )
     .await;
     assert_eq!(res.status(), StatusCode::CREATED);
@@ -465,6 +465,21 @@ async fn offline_registrieren_ohne_pfad_ist_400() {
         "/api/karte/offline-karten",
         Some(&cookie),
         Some(r#"{"name":"DE","pfad":"  "}"#),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn offline_registrieren_ohne_lizenz_ist_400() {
+    // Attribution ist Pflicht (offline sichtbar) — Parität zu Download/Online-Quelle.
+    let (app, cookie) = admin_app().await;
+    let res = anfrage(
+        &app,
+        "POST",
+        "/api/karte/offline-karten",
+        Some(&cookie),
+        Some(r#"{"name":"DE","pfad":"de.pmtiles"}"#),
     )
     .await;
     assert_eq!(res.status(), StatusCode::BAD_REQUEST);

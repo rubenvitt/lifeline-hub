@@ -23,6 +23,11 @@ const karte: OfflineKarte = {
   status: 'bereit', aktiv_basemap: false, sortier: 0,
 };
 
+const karteLaedt: OfflineKarte = {
+  ...karte, id: 2, name: 'Deutschland – Bayern', status: 'laedt',
+  groesse: null, sha256: null, download_at: null, aktiv_basemap: false, pfad: '',
+};
+
 const katalogEintrag = {
   name: 'Deutschland – Bremen', url: 'https://example.test/de_bremen.pmtiles', region: 'DE/Bremen',
   groesse: 44040192, lizenz: '© OpenStreetMap contributors (ODbL)', kachel_schema: 'protomaps',
@@ -111,6 +116,56 @@ describe('OfflineKartenVerwaltung', () => {
       lizenz: '© OpenStreetMap contributors (ODbL)',
       kachel_schema: 'protomaps',
       groesse_erwartet: 44040192,
+    });
+  });
+
+  it('lädt-Zustand: zeigt Abbrechen, kein Aktivieren/Löschen', async () => {
+    mockBasis(admin, [karteLaedt]);
+    render();
+    await screen.findByText('Deutschland – Bayern');
+    expect(screen.getByText('lädt')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Aktivieren' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
+  });
+
+  it('Abbrechen ruft den Abbrechen-Endpunkt', async () => {
+    let abgebrochen = false;
+    mockBasis(admin, [karteLaedt]);
+    server.use(
+      http.post('/api/karte/offline-karten/2/abbrechen', () => {
+        abgebrochen = true;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    render();
+    await userEvent.click(await screen.findByRole('button', { name: 'Abbrechen' }));
+    await waitFor(() => expect(abgebrochen).toBe(true));
+  });
+
+  it('URL-Download: Modal-Submit → POST /download mit kachel_schema protomaps', async () => {
+    let postBody: unknown = null;
+    mockBasis(admin, []);
+    server.use(
+      http.post('/api/karte/offline-karten/download', async ({ request }) => {
+        postBody = await request.json();
+        return HttpResponse.json({ ...karte, status: 'laedt' }, { status: 202 });
+      }),
+    );
+    render();
+    await userEvent.click(await screen.findByRole('button', { name: 'Per URL herunterladen' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Name'), 'Eigener Extrakt');
+    await userEvent.type(within(dialog).getByLabelText('URL'), 'https://example.test/de.pmtiles');
+    await userEvent.type(within(dialog).getByLabelText('Attribution / Lizenz'), '© OSM');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Download starten' }));
+
+    await waitFor(() => expect(postBody).not.toBeNull());
+    expect(postBody).toEqual({
+      name: 'Eigener Extrakt',
+      url: 'https://example.test/de.pmtiles',
+      lizenz: '© OSM',
+      kachel_schema: 'protomaps',
     });
   });
 });
