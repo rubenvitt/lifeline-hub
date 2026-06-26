@@ -12,6 +12,7 @@ import {
   brecheOfflineDownloadAb,
   listeOfflineKarten,
   loescheOfflineKarte,
+  starteOfflineDownload,
   type OfflineKarte,
   type OfflineKarteStatus,
 } from '../api/offlineKarten';
@@ -26,6 +27,12 @@ const STATUS_TAG: Record<OfflineKarteStatus, { color: string; label: string }> =
   bereit: { color: 'green', label: 'bereit' },
   fehler: { color: 'red', label: 'Fehler' },
 };
+
+/** Datenstand aus der Quell-URL (datums-stempel YYYYMMDD) → „YYYY-MM-DD", sonst null. */
+function standAusUrl(url: string | null | undefined): string | null {
+  const m = url?.match(/(\d{4})(\d{2})(\d{2})/);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
+}
 
 /**
  * Verwaltungstabelle der Offline-Karten (PMTiles) mit In-App-Download-Manager (LFH-181).
@@ -68,9 +75,50 @@ export default function OfflineKartenVerwaltung() {
     onSuccess: () => invalidiereKarte(qc),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Löschen fehlgeschlagen'),
   });
+  // „Aktualisieren" = neueren Katalog-Stand herunterladen (neue Zeile; danach aktivieren/löschen).
+  const aktualisierenMutation = useMutation({
+    mutationFn: (k: OfflineKarte) =>
+      starteOfflineDownload({
+        name: k.name,
+        url: k.katalog_url!,
+        lizenz: k.lizenz ?? '',
+        kachel_schema: k.kachel_schema,
+      }),
+    onSuccess: () => {
+      invalidiereKarte(qc);
+      message.success('Update-Download gestartet');
+    },
+    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Aktualisieren fehlgeschlagen'),
+  });
 
   const spalten: TableColumnsType<OfflineKarte> = [
-    { title: 'Name', dataIndex: 'name', key: 'name' },
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+      render: (name: string, k: OfflineKarte) => {
+        const stand = standAusUrl(k.quell_url);
+        return (
+          <div>
+            <div>{name}</div>
+            {(stand || k.update_verfuegbar) && (
+              <Space size={6} style={{ marginTop: 2 }}>
+                {stand && (
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    Stand {stand}
+                  </Typography.Text>
+                )}
+                {k.update_verfuegbar && (
+                  <Tag color="orange" style={{ marginInlineEnd: 0 }}>
+                    Update verfügbar
+                  </Tag>
+                )}
+              </Space>
+            )}
+          </div>
+        );
+      },
+    },
     {
       title: 'Status',
       dataIndex: 'status',
@@ -132,6 +180,11 @@ export default function OfflineKartenVerwaltung() {
                     onClick={() => aktivierenMutation.mutate(k.id)}
                   >
                     Aktivieren
+                  </Button>
+                )}
+                {k.status === 'bereit' && k.update_verfuegbar && k.katalog_url && (
+                  <Button size="small" onClick={() => aktualisierenMutation.mutate(k)}>
+                    Aktualisieren
                   </Button>
                 )}
                 {k.status === 'laedt' && (

@@ -137,6 +137,43 @@ describe('OfflineKartenVerwaltung', () => {
     expect(await screen.findByText('50%')).toBeInTheDocument();
   });
 
+  it('Update verfügbar: zeigt Hinweis + Datenstand + Aktualisieren-Button', async () => {
+    mockBasis(admin, [{
+      ...karte,
+      quell_url: 'https://example.test/de_bremen_20250101.pmtiles',
+      update_verfuegbar: true,
+      katalog_url: 'https://example.test/de_bremen_20260320.pmtiles',
+    }]);
+    render();
+    await screen.findByText('Deutschland – Bremen');
+    expect(screen.getByText('Update verfügbar')).toBeInTheDocument();
+    expect(screen.getByText('Stand 2025-01-01')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Aktualisieren' })).toBeInTheDocument();
+  });
+
+  it('Aktualisieren lädt die neuere Katalog-URL', async () => {
+    let postBody: unknown = null;
+    mockBasis(admin, [{
+      ...karte,
+      quell_url: 'https://example.test/de_bremen_20250101.pmtiles',
+      update_verfuegbar: true,
+      katalog_url: 'https://example.test/de_bremen_20260320.pmtiles',
+    }]);
+    server.use(
+      http.post('/api/karte/offline-karten/download', async ({ request }) => {
+        postBody = await request.json();
+        return HttpResponse.json({ ...karte, status: 'laedt' }, { status: 202 });
+      }),
+    );
+    render();
+    await userEvent.click(await screen.findByRole('button', { name: 'Aktualisieren' }));
+    await waitFor(() => expect(postBody).not.toBeNull());
+    expect(postBody).toMatchObject({
+      name: 'Deutschland – Bremen',
+      url: 'https://example.test/de_bremen_20260320.pmtiles',
+    });
+  });
+
   it('Abbrechen ruft den Abbrechen-Endpunkt', async () => {
     let abgebrochen = false;
     mockBasis(admin, [karteLaedt]);

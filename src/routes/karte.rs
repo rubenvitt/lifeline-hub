@@ -246,6 +246,13 @@ pub struct OfflineKarteAntwort {
     pub karte: OfflineKarte,
     pub geladen: Option<i64>,
     pub gesamt: Option<i64>,
+    /// True, wenn der Katalog für DIESELBE Karte (über den Namen) inzwischen eine ANDERE (neuere)
+    /// Quell-URL führt als die installierte `quell_url` → im UI „Update verfügbar". Offline-Check
+    /// (rein gegen den eingebauten Katalog, kein Netz). Lädt der Katalog/Mirror einen neueren
+    /// Stand (anderes Datum in der URL), wird das hier automatisch sichtbar.
+    pub update_verfuegbar: bool,
+    /// Aktuelle Katalog-URL dieser Karte, wenn ein Update verfügbar ist (für den Re-Download).
+    pub katalog_url: Option<String>,
 }
 
 /// GET /api/karte/offline-karten — alle Offline-Karten. Lesen: admin ODER Führungskraft (read-only).
@@ -257,6 +264,7 @@ pub async fn offline_liste(
         return Err(AppError::Forbidden);
     }
     let rows = repo::liste_offline_karten(&state.pool).await?;
+    let katalog = default_offline_katalog();
     // Ladende Karten mit Live-Bytes aus dem In-Memory-Fortschritt anreichern (kein await unter
     // dem Lock).
     let map = state.download_fortschritt.read().unwrap();
@@ -277,10 +285,19 @@ pub async fn offline_liste(
             } else {
                 (None, None)
             };
+            // Update-Erkennung: gleicher Karten-Name, aber der Katalog führt eine andere URL als
+            // die installierte Quelle (= neuerer Build). Karten ohne quell_url / ohne Katalog-Treffer
+            // (z.B. eigene URL) gelten als aktuell.
+            let neuere = k
+                .quell_url
+                .as_ref()
+                .and_then(|qu| katalog.iter().find(|e| e.name == k.name && &e.url != qu));
             OfflineKarteAntwort {
                 karte: k,
                 geladen,
                 gesamt,
+                update_verfuegbar: neuere.is_some(),
+                katalog_url: neuere.map(|e| e.url.clone()),
             }
         })
         .collect();

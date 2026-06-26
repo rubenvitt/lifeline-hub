@@ -580,6 +580,54 @@ async fn offline_abbrechen_ohne_laufenden_download_ist_404() {
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
 }
 
+#[tokio::test]
+async fn offline_liste_meldet_update_wenn_katalog_neuere_quelle_fuehrt() {
+    let (app, cookie) = admin_app().await;
+    // Installiert mit ALTER Quell-URL (anderes Datum), Name = Katalog-Name → Katalog ist neuer.
+    let res = anfrage(
+        &app,
+        "POST",
+        "/api/karte/offline-karten",
+        Some(&cookie),
+        Some(
+            r#"{"name":"Deutschland – Bremen","pfad":"bremen.pmtiles","lizenz":"© OSM",
+                "quell_url":"https://github.com/whitespring/project-nomad-maps-europe/releases/download/v1/de_bremen_20250101.pmtiles"}"#,
+        ),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::CREATED);
+
+    let liste = json(anfrage(&app, "GET", "/api/karte/offline-karten", Some(&cookie), None).await).await;
+    let eintrag = &liste.as_array().unwrap()[0];
+    assert_eq!(eintrag["update_verfuegbar"], true);
+    assert!(
+        eintrag["katalog_url"].as_str().unwrap().contains("de_bremen_20260320"),
+        "Katalog-URL zeigt auf den neueren Stand"
+    );
+}
+
+#[tokio::test]
+async fn offline_liste_kein_update_bei_aktueller_katalog_quelle() {
+    let (app, cookie) = admin_app().await;
+    let res = anfrage(
+        &app,
+        "POST",
+        "/api/karte/offline-karten",
+        Some(&cookie),
+        Some(
+            r#"{"name":"Deutschland – Bremen","pfad":"bremen.pmtiles","lizenz":"© OSM",
+                "quell_url":"https://github.com/whitespring/project-nomad-maps-europe/releases/download/v1/de_bremen_20260320.pmtiles"}"#,
+        ),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::CREATED);
+
+    let liste = json(anfrage(&app, "GET", "/api/karte/offline-karten", Some(&cookie), None).await).await;
+    let eintrag = &liste.as_array().unwrap()[0];
+    assert_eq!(eintrag["update_verfuegbar"], false);
+    assert!(eintrag["katalog_url"].is_null());
+}
+
 // ===== AdminUser-Gate =====
 
 #[tokio::test]
