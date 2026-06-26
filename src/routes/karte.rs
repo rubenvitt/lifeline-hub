@@ -236,14 +236,56 @@ pub async fn online_loeschen(
 }
 
 /// GET /api/karte/offline-karten — alle Offline-Karten. Lesen: admin ODER Führungskraft (read-only).
+/// Listen-Antwort = DB-Zeile + Live-Download-Fortschritt. `geladen`/`gesamt` (Bytes) kommen nur
+/// für `status='laedt'` aus dem transienten In-Memory-State (keine DB-Spalte); `gesamt` ist
+/// `null`, wenn die Quelle keine Content-Length lieferte. Das Frontend rendert daraus den
+/// Fortschrittsbalken.
+#[derive(Debug, Serialize)]
+pub struct OfflineKarteAntwort {
+    #[serde(flatten)]
+    pub karte: OfflineKarte,
+    pub geladen: Option<i64>,
+    pub gesamt: Option<i64>,
+}
+
+/// GET /api/karte/offline-karten — alle Offline-Karten. Lesen: admin ODER Führungskraft (read-only).
 pub async fn offline_liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-) -> Result<Json<Vec<OfflineKarte>>, AppError> {
+) -> Result<Json<Vec<OfflineKarteAntwort>>, AppError> {
     if !benutzer.darf_admin_bereich() {
         return Err(AppError::Forbidden);
     }
-    Ok(Json(repo::liste_offline_karten(&state.pool).await?))
+    let rows = repo::liste_offline_karten(&state.pool).await?;
+    // Ladende Karten mit Live-Bytes aus dem In-Memory-Fortschritt anreichern (kein await unter
+    // dem Lock).
+    let map = state.download_fortschritt.read().unwrap();
+    let antwort: Vec<OfflineKarteAntwort> = rows
+        .into_iter()
+        .map(|k| {
+            let (geladen, gesamt) = if k.status == "laedt" {
+                match map.get(&k.id) {
+                    Some(f) => {
+                        let g = f.gesamt.load(Ordering::Relaxed);
+                        (
+                            Some(f.geladen.load(Ordering::Relaxed) as i64),
+                            (g > 0).then_some(g as i64),
+                        )
+                    }
+                    None => (None, None),
+                }
+            } else {
+                (None, None)
+            };
+            OfflineKarteAntwort {
+                karte: k,
+                geladen,
+                gesamt,
+            }
+        })
+        .collect();
+    drop(map);
+    Ok(Json(antwort))
 }
 
 /// POST /api/karte/offline-karten — vorhandene Offline-Karte registrieren (Admin).
@@ -435,6 +477,7 @@ pub async fn offline_download(
     tokio::spawn(async move {
         let dateiname = format!("karte-{id}.pmtiles");
         let part = karten_dir.join(format!("{dateiname}.part"));
+        tracing::info!("Offline-Karte {id}: Download startet von {url}");
         let ergebnis = download::lade_datei(&client, url, &part, &fortschritt).await;
         match ergebnis {
             Ok(erg) => {
@@ -451,6 +494,11 @@ pub async fn offline_download(
                     // Bereits umbenannte finale Datei aufräumen, sonst verwaist sie ohne DB-Record.
                     let _ = tokio::fs::remove_file(&ziel).await;
                     let _ = repo::setze_status(&pool, id, "fehler").await;
+                } else {
+                    tracing::info!(
+                        "Offline-Karte {id}: Download fertig ({} Bytes)",
+                        erg.groesse
+                    );
                 }
             }
             Err(fehler) => {
