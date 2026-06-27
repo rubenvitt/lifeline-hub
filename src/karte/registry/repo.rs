@@ -379,7 +379,13 @@ pub async fn ersetze_aktive_offline_karte(
         .execute(&mut *tx)
         .await?;
     tx.commit().await?;
-    hole_offline_karte(pool, neu_id).await.map(Some)
+    // Nach dem Commit die neue Karte zurückgeben. Wurde `neu_id` nebenläufig gelöscht, ist das
+    // konsistent mit dem Initial-Check `Ok(None)` (statt eines RowNotFound-Fehlers).
+    match hole_offline_karte(pool, neu_id).await {
+        Ok(k) => Ok(Some(k)),
+        Err(sqlx::Error::RowNotFound) => Ok(None),
+        Err(e) => Err(e),
+    }
 }
 
 /// Löscht eine Offline-Karte. `Ok(true)`, wenn eine Zeile entfernt wurde.

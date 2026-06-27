@@ -496,6 +496,38 @@ pub struct OfflineDownloadBody {
     pub ersetzt_karte_id: Option<i64>,
 }
 
+/// Finalisiert einen erfolgreich heruntergeladenen Download: aktiviert die fertige Karte passend.
+/// Bei einem Update (`ersetzt_karte_id = Some`) wird die neue Version aktiviert (erbt den
+/// Aktiv-Status der alten) und die alte Karte + Datei entfernt; sonst wird die erste bereite Karte
+/// automatisch aktiviert, solange keine andere aktiv ist (Bestand bleibt). Best-effort — Fehler
+/// werden geloggt, nicht propagiert (der Download selbst ist bereits `bereit`).
+async fn finalisiere_erfolgreichen_download(
+    pool: &sqlx::SqlitePool,
+    karten_dir: &FsPath,
+    id: i64,
+    ersetzt_karte_id: Option<i64>,
+) {
+    if let Some(alt) = ersetzt_karte_id {
+        // One-Click-Update (B2): neue Version aktivieren (erbt Aktiv-Status), alte Karte + Datei
+        // entfernen. Bei Download-Fehler wird diese Fn nicht aufgerufen → alte Karte bleibt aktiv.
+        match repo::ersetze_aktive_offline_karte(pool, id, alt).await {
+            Ok(Some(_)) => {
+                download::entferne_download_dateien(karten_dir, alt).await;
+                tracing::info!("Offline-Karte {id}: Update aktiviert, alte Karte {alt} entfernt");
+            }
+            Ok(None) => tracing::warn!("Update-Swap {id}: neue Karte verschwand"),
+            Err(e) => tracing::error!("Update-Swap {id}->ersetzt {alt} fehlgeschlagen: {e}"),
+        }
+    } else {
+        // Erst-Download: erste fertige Karte automatisch aktivieren, solange keine andere aktiv ist.
+        match repo::aktiviere_wenn_keine_aktive(pool, id).await {
+            Ok(true) => tracing::info!("Offline-Karte {id}: als Basemap aktiviert (erste bereite)"),
+            Ok(false) => {}
+            Err(e) => tracing::warn!("Auto-Aktivieren der Offline-Karte {id} fehlgeschlagen: {e}"),
+        }
+    }
+}
+
 /// POST /api/karte/offline-karten/download — startet einen Hintergrund-Download (Admin).
 ///
 /// Legt IMMER eine NEUE Zeile an (kein Re-Download in eine aktive Karte) — die Live-Lagekarte
@@ -594,37 +626,8 @@ pub async fn offline_download(
                         "Offline-Karte {id}: Download fertig ({} Bytes)",
                         erg.groesse
                     );
-                    if let Some(alt) = ersetzt_karte_id {
-                        // One-Click-Update (B2): neue Version aktivieren (erbt Aktiv-Status), alte
-                        // Karte + Datei entfernen. Bei Download-Fehler kommen wir hier nicht hin →
-                        // die alte Karte bleibt aktiv (fail-safe).
-                        match repo::ersetze_aktive_offline_karte(&pool, id, alt).await {
-                            Ok(Some(_)) => {
-                                download::entferne_download_dateien(&karten_dir, alt).await;
-                                tracing::info!(
-                                    "Offline-Karte {id}: Update aktiviert, alte Karte {alt} entfernt"
-                                );
-                            }
-                            Ok(None) => {
-                                tracing::warn!("Update-Swap {id}: neue Karte verschwand")
-                            }
-                            Err(e) => {
-                                tracing::error!("Update-Swap {id}->ersetzt {alt} fehlgeschlagen: {e}")
-                            }
-                        }
-                    } else {
-                        // Erst-Download: erste fertige Karte automatisch aktivieren, solange noch
-                        // keine andere aktiv ist. Eine bereits aktive Karte wird NICHT verdrängt.
-                        match repo::aktiviere_wenn_keine_aktive(&pool, id).await {
-                            Ok(true) => {
-                                tracing::info!("Offline-Karte {id}: als Basemap aktiviert (erste bereite)");
-                            }
-                            Ok(false) => {}
-                            Err(e) => {
-                                tracing::warn!("Auto-Aktivieren der Offline-Karte {id} fehlgeschlagen: {e}");
-                            }
-                        }
-                    }
+                    finalisiere_erfolgreichen_download(&pool, &karten_dir, id, ersetzt_karte_id)
+                        .await;
                 }
             }
             Err(fehler) => {
@@ -831,5 +834,63 @@ mod proxy_antwort_tests {
         assert_eq!(r.status(), StatusCode::OK);
         assert_eq!(r.headers().get(header::CONTENT_TYPE).unwrap(), "application/json");
         assert_eq!(r.headers().get(header::CACHE_CONTROL).unwrap(), "no-cache");
+    }
+}
+
+#[cfg(test)]
+mod finalisierung_tests {
+    use super::*;
+
+    fn dl(name: &str) -> repo::OfflineDownloadEingabe {
+        repo::OfflineDownloadEingabe {
+            name: name.into(),
+            quell_url: format!("https://example.test/{name}.pmtiles"),
+            lizenz: "© OpenStreetMap contributors (ODbL)".into(),
+            kachel_schema: "protomaps".into(),
+            sortier: 0,
+        }
+    }
+
+    async fn bereite_karte(pool: &sqlx::SqlitePool, name: &str) -> i64 {
+        let k = repo::neue_download_karte(pool, &dl(name)).await.unwrap();
+        repo::markiere_bereit(pool, k.id, &format!("karte-{}.pmtiles", k.id), 10, "h")
+            .await
+            .unwrap();
+        k.id
+    }
+
+    // One-Click-Update über die Handler-Finalisierung: aktiviert die neue Version, entfernt alt.
+    #[tokio::test]
+    async fn finalisiere_update_aktiviert_neu_und_entfernt_alt() {
+        let pool = crate::db::test_pool().await;
+        let tmp = tempfile::tempdir().unwrap();
+        let alt = bereite_karte(&pool, "A").await;
+        repo::aktiviere_offline_karte(&pool, alt).await.unwrap();
+        let neu = bereite_karte(&pool, "A2").await;
+
+        finalisiere_erfolgreichen_download(&pool, tmp.path(), neu, Some(alt)).await;
+
+        let liste = repo::liste_offline_karten(&pool).await.unwrap();
+        assert!(liste.iter().all(|k| k.id != alt), "alte Karte entfernt");
+        assert!(
+            liste.iter().find(|k| k.id == neu).unwrap().aktiv_basemap,
+            "neue Version aktiv"
+        );
+    }
+
+    // Erst-Download (ohne ersetzt_karte_id): erste bereite Karte wird automatisch aktiviert.
+    #[tokio::test]
+    async fn finalisiere_erstdownload_aktiviert_erste_bereite() {
+        let pool = crate::db::test_pool().await;
+        let tmp = tempfile::tempdir().unwrap();
+        let m = bereite_karte(&pool, "M").await;
+
+        finalisiere_erfolgreichen_download(&pool, tmp.path(), m, None).await;
+
+        let liste = repo::liste_offline_karten(&pool).await.unwrap();
+        assert!(
+            liste.iter().find(|k| k.id == m).unwrap().aktiv_basemap,
+            "erste bereite Karte automatisch aktiviert"
+        );
     }
 }

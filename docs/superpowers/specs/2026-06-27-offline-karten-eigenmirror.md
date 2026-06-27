@@ -105,3 +105,8 @@ eingebaute Katalog eine neuere URL führt als die installierte Karte (Datums-Ver
   ein `laedt`-Guard am Button.
 - **Koexistenz Online+Offline (Overlay):** aktuell ist die Basemap umschaltbar (eine aktiv), nicht
   additiv überlagert — bewusst nicht Teil von LFH-183.
+- **HashMismatch-Pfad nicht HTTP-integration-getestet:** Der Pin-Vergleich ist in `lade_datei`
+  unit-getestet; bei Mismatch greift im Download-Handler der bestehende (vor LFH-183 vorhandene)
+  Fehler-Arm (`.part` entfernen + Status `fehler`). Ein End-to-End-Test über `POST /download` ist
+  durch den SSRF-Guard (blockt Loopback-Fixtures) nicht trivial — die neue Branch-Auswahl der
+  Erfolgs-Finalisierung ist stattdessen direkt unit-getestet (`finalisierung_tests`).
