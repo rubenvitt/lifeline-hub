@@ -65,8 +65,18 @@ die Karte läuft im **Blind-Modus**, bis ein Admin Quellen hinzufügt:
 - **Online-Quellen** (Vektor-Style-JSON oder Raster-Tile-Template mit `{z}/{y}/{x}`): pro Quelle
   `name`, `url`, `typ` (`vektor`|`raster`) und eine **Pflicht-Attribution** (je View angezeigt).
   Ein kuratierter, schlüsselfreier **Vorschlagskatalog** (OpenFreeMap, basemap.de, TopPlusOpen)
-  steht zum Hinzufügen bereit. Key-basierte Anbieter (MapTiler/Stadia) **nicht** mit Secret in der
-  URL hinterlegen — nur serverseitig/Domain-Restriction.
+  steht zum Hinzufügen bereit.
+- **Server-Proxy für key-basierte Anbieter** (LFH-182): Pro Online-Quelle lässt sich
+  **„Über Server proxen"** aktivieren. Dann trägt der Admin die **volle Upstream-URL inkl. Key**
+  ein; `/api/karte/config` gibt für diese Quelle nur relative `/api/karte/proxy/{id}/…`-URLs aus,
+  der Server holt Style/Tiles/Sprite/Glyphs und reicht sie durch — **der Key bleibt server-seitig
+  und erscheint nie im Browser** (für Nicht-Admins ist die URL in der Verwaltungsliste maskiert).
+  Schlüssellose Quellen bleiben ohne Proxy (laufen direkt). Jeder Upstream-Abruf ist SSRF-geschützt
+  (https-only, interne Ziele + DNS-Rebinding blockiert). **v1-Grenzen:** unterstützte Tile-/Glyphs-
+  Platzhalter `{z}/{x}/{y}/{-y}`, `{fontstack}/{range}` (andere werden beim Speichern abgelehnt);
+  **kein** serverseitiges Style-Caching/Rate-Limiting (die unauthentifizierten Proxy-Endpunkte
+  reichen Upstream-Cache-Header durch, könnten ein abgerechnetes Kontingent aber durch Volumen
+  beanspruchen — für Feld-Deployments unkritisch, dokumentierte Bedrohungslage).
 - **Offline-Karte (PMTiles)**: eine **lokale PMTiles-Datei** (z. B. ein Protomaps-Build von
   [build.protomaps.com](https://build.protomaps.com), DE-weit mehrere GB) wird als Offline-Karte
   registriert und aktiviert; der Server liefert die aktive Karte per **HTTP-Range** unter
