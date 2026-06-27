@@ -563,11 +563,13 @@ pub async fn offline_download(
     let karten_dir = state.karten_dir.clone();
     let fortschritt_map = state.download_fortschritt.clone();
     let id = karte.id;
+    let sha256_erwartet = body.sha256_erwartet.clone();
     tokio::spawn(async move {
         let dateiname = format!("karte-{id}.pmtiles");
         let part = karten_dir.join(format!("{dateiname}.part"));
         tracing::info!("Offline-Karte {id}: Download startet von {url}");
-        let ergebnis = download::lade_datei(&client, url, &part, &fortschritt).await;
+        let ergebnis =
+            download::lade_datei(&client, url, &part, &fortschritt, sha256_erwartet.as_deref()).await;
         match ergebnis {
             Ok(erg) => {
                 // Atomarer Swap: erst nach vollständigem Download .part → finalen Pfad.
