@@ -16,6 +16,7 @@ import type { TzProps } from './taktischesZeichen';
 import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
 import { createZeichnung, type Zeichnung, type ZeichenModus } from './zeichnen';
 import { wendeKartenDatenAn } from './kartenDaten';
+import { absolutiereProxyAnfrage } from './basemapStil';
 import {
   baueFlaechenFc,
   baueZonenFc,
@@ -196,6 +197,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       center: [10.45, 51.16], // Mitte DE als neutraler Start
       zoom: 5,
       attributionControl: false,
+      // Server-Proxy-URLs (/api/karte/proxy/…, LFH-182) sind root-relativ; im Tile-Worker ohne
+      // Dokument-Base scheitern sie sonst. Hier gegen die Origin absolutieren.
+      transformRequest: absolutiereProxyAnfrage,
     });
     map.addControl(new maplibregl.NavigationControl(), 'top-right');
     map.on('load', () => {
