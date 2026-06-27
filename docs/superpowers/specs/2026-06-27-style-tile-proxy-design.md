@@ -290,6 +290,30 @@ Sprite + Glyphs laden über `/api/karte/proxy/…`), (b) **kein** Request geht a
 einen Loopback-Fixture-Upstream, der einen vollständigen Vektor-Style (style+sprite+glyphs+tiles)
 nachstellt.
 
+## Nachtrag 2026-06-27 (Umsetzung + adversariale Review + Browser-Smoke)
+
+Abweichungen/Präzisierungen gegenüber dem Design oben, aus der Umsetzung und der Multi-Agent-Review:
+
+- **Proxy-Client als Prozess-Singleton** (`OnceLock`), **kein** `AppState`-Feld (vermeidet ~45
+  Konstruktionsstellen). **In-Memory-Slot-Cache entfällt in v1** (DB-Read pro Tile ist lokal
+  schnell, kein Live-Konsument) — dokumentierte Vereinfachung.
+- **Slot-Identität inkl. `art`:** `UNIQUE (quelle_id, upstream_url, art)` (Review #5), sonst macht
+  `ON CONFLICT DO UPDATE SET art` eine Asset-Art unauflösbar.
+- **`contains_secret` scannt nur Query-Werte ≥12 Zeichen** (`MIN_SECRET_LEN`, Review #2) — sonst
+  False-Positive-fail-closed durch kurze benigne Params (`v=1`).
+- **Key-Log-Hygiene:** Upstream-Fetch-Fehler via `reqwest::Error::without_url()` (Review #1), sonst
+  landet `?key=…` in der geloggten Fehlermeldung.
+- **SSRF:** `ip_ist_intern` fängt zusätzlich **IPv6-eingebettetes IPv4** (NAT64/6to4/compat,
+  Review #4).
+- **Walker schont fremde URI-Schemata** (`ist_proxybar`: mapbox:/pmtiles:/data: unangetastet,
+  Review #6).
+- **Frontend `transformRequest`** (`absolutiereProxyAnfrage`): MapLibre lädt Tiles im Worker ohne
+  Dokument-Base → root-relative `/api/karte/proxy/…`-URLs scheitern dort. Im **Browser-Smoke gegen
+  OpenFreeMap** gefunden und behoben (1052 Features gerendert).
+- **Verifikations-Grenze (offen):** Der Browser-Render-Beweis lief mit injiziertem CDN-MapLibre +
+  Inline-`transformRequest`, nicht mit dem App-Bundle + `Kartenflaeche`-Wiring (tsc-typisiert,
+  trivial). Voll schließen, sobald die erste echte keybasierte Quelle hinzugefügt wird.
+
 ## Referenzen
 
 - `src/routes/karte.rs` (`config`, `tiles`, Online-CRUD), `src/config.rs` (`OnlineStyle`)
