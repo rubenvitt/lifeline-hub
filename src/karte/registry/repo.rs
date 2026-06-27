@@ -124,13 +124,11 @@ pub async fn slots_loeschen(pool: &SqlitePool, quelle_id: i64) -> Result<u64, sq
 
 /// Eine Online-Quelle per `id` lesen (interner Helfer für Anlegen/Aktualisieren).
 async fn hole_online_quelle(pool: &SqlitePool, id: i64) -> Result<OnlineQuelle, sqlx::Error> {
-    sqlx::query_as::<_, OnlineQuelle>(
-        "SELECT id, name, url, typ, attribution, sortier, aktiv, proxy \
-         FROM karte_online_quelle WHERE id = ?",
-    )
-    .bind(id)
-    .fetch_one(pool)
-    .await
+    // Delegiert an finde_online_quelle (gleiche Spaltenliste) — `RowNotFound` erhält die bisherige
+    // fetch_one-Semantik für Anlegen/Aktualisieren.
+    finde_online_quelle(pool, id)
+        .await?
+        .ok_or(sqlx::Error::RowNotFound)
 }
 
 /// Alle Online-Quellen (auch inaktive) für die Admin-Liste, nach `sortier`, `id`.
@@ -698,13 +696,16 @@ mod tests {
 
     #[tokio::test]
     async fn slots_cascade_beim_loeschen_der_quelle() {
+        // FK ON DELETE CASCADE (test_pool aktiviert PRAGMA foreign_keys): Löschen der Quelle
+        // entfernt ihre Slots auch OHNE den expliziten slots_loeschen-Aufruf des Handlers.
         let pool = test_pool().await;
         let q = anlegen_online_quelle(&pool, &eingabe("C", 1, true)).await.unwrap();
         let s = slot_upsert(&pool, q.id, "https://h/x", "tilejson").await.unwrap();
-        // Expliziter Purge (Handler) + CASCADE: nach Löschen der Quelle kein Slot mehr.
-        slots_loeschen(&pool, q.id).await.unwrap();
         loesche_online_quelle(&pool, q.id).await.unwrap();
-        assert!(slot_aufloesen(&pool, q.id, s, "tilejson").await.unwrap().is_none());
+        assert!(
+            slot_aufloesen(&pool, q.id, s, "tilejson").await.unwrap().is_none(),
+            "CASCADE entfernt Slots ohne expliziten Purge"
+        );
     }
 
     fn offline_eingabe(name: &str) -> OfflineKarteEingabe {

@@ -677,6 +677,26 @@ fn asset_antwort(a: crate::karte::proxy::AssetAntwort) -> Response {
     b.body(Body::from(a.bytes)).unwrap()
 }
 
+/// Löst einen Slot der Quelle auf (scoped auf `quelle_id` UND `art`) oder liefert `404`.
+async fn slot_oder_nf(
+    state: &AppState,
+    id: i64,
+    slot: i64,
+    art: proxy::SlotArt,
+) -> Result<String, AppError> {
+    repo::slot_aufloesen(&state.pool, id, slot, art.as_str())
+        .await?
+        .ok_or(AppError::NotFound)
+}
+
+/// Holt ein Binär-Asset über den geteilten Proxy-Client (SSRF-gepinnt) und baut die Antwort.
+async fn proxy_asset(u: reqwest::Url) -> Result<Response, AppError> {
+    let asset = proxy::hole_asset(proxy::proxy_client(), u, proxy::ASSET_BYTE_CAP)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(asset_antwort(asset))
+}
+
 /// GET /api/karte/proxy/{id}/style.json — Vektor-Style serverseitig holen + key-frei umschreiben.
 pub async fn proxy_style(
     State(state): State<AppState>,
@@ -697,10 +717,7 @@ pub async fn proxy_raster(
 ) -> Result<Response, AppError> {
     let q = aktive_proxy_quelle(&state, id).await?;
     let u = ssrf_geprueft(&proxy::subst_template(&q.url, z, x, y))?;
-    let asset = proxy::hole_asset(proxy::proxy_client(), u, proxy::ASSET_BYTE_CAP)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-    Ok(asset_antwort(asset))
+    proxy_asset(u).await
 }
 
 /// GET /api/karte/proxy/{id}/tile/{slot}/{z}/{x}/{y} — Vektor-/Raster-Tile aus einem Style-Slot.
@@ -709,16 +726,9 @@ pub async fn proxy_tile(
     Path((id, slot, z, x, y)): Path<(i64, i64, i64, i64, i64)>,
 ) -> Result<Response, AppError> {
     aktive_proxy_quelle(&state, id).await?;
-    let Some(template) =
-        repo::slot_aufloesen(&state.pool, id, slot, proxy::SlotArt::Template.as_str()).await?
-    else {
-        return Err(AppError::NotFound);
-    };
+    let template = slot_oder_nf(&state, id, slot, proxy::SlotArt::Template).await?;
     let u = ssrf_geprueft(&proxy::subst_template(&template, z, x, y))?;
-    let asset = proxy::hole_asset(proxy::proxy_client(), u, proxy::ASSET_BYTE_CAP)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-    Ok(asset_antwort(asset))
+    proxy_asset(u).await
 }
 
 /// GET /api/karte/proxy/{id}/tilejson/{slot} — TileJSON-Indirektion holen + key-frei umschreiben.
@@ -727,11 +737,7 @@ pub async fn proxy_tilejson(
     Path((id, slot)): Path<(i64, i64)>,
 ) -> Result<Response, AppError> {
     aktive_proxy_quelle(&state, id).await?;
-    let Some(upstream) =
-        repo::slot_aufloesen(&state.pool, id, slot, proxy::SlotArt::Tilejson.as_str()).await?
-    else {
-        return Err(AppError::NotFound);
-    };
+    let upstream = slot_oder_nf(&state, id, slot, proxy::SlotArt::Tilejson).await?;
     let u = ssrf_geprueft(&upstream)?;
     let json = proxy::hole_tilejson(proxy::proxy_client(), &state.pool, id, u)
         .await
@@ -746,16 +752,9 @@ pub async fn proxy_sprite(
 ) -> Result<Response, AppError> {
     aktive_proxy_quelle(&state, id).await?;
     let (slot, suffix) = proxy::split_slot_suffix(&rest).map_err(AppError::Validation)?;
-    let Some(base) =
-        repo::slot_aufloesen(&state.pool, id, slot, proxy::SlotArt::Sprite.as_str()).await?
-    else {
-        return Err(AppError::NotFound);
-    };
+    let base = slot_oder_nf(&state, id, slot, proxy::SlotArt::Sprite).await?;
     let u = ssrf_geprueft(&proxy::sprite_upstream(&base, &suffix))?;
-    let asset = proxy::hole_asset(proxy::proxy_client(), u, proxy::ASSET_BYTE_CAP)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-    Ok(asset_antwort(asset))
+    proxy_asset(u).await
 }
 
 /// GET /api/karte/proxy/{id}/glyphs/{slot}/{fontstack}/{range} — Glyphs aus einem Style-Slot.
@@ -766,14 +765,39 @@ pub async fn proxy_glyphs(
     aktive_proxy_quelle(&state, id).await?;
     proxy::validiere_fontstack(&fontstack).map_err(AppError::Validation)?;
     proxy::validiere_range(&range).map_err(AppError::Validation)?;
-    let Some(template) =
-        repo::slot_aufloesen(&state.pool, id, slot, proxy::SlotArt::Glyphs.as_str()).await?
-    else {
-        return Err(AppError::NotFound);
-    };
+    let template = slot_oder_nf(&state, id, slot, proxy::SlotArt::Glyphs).await?;
     let u = ssrf_geprueft(&proxy::subst_glyphs(&template, &fontstack, &range))?;
-    let asset = proxy::hole_asset(proxy::proxy_client(), u, proxy::ASSET_BYTE_CAP)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-    Ok(asset_antwort(asset))
+    proxy_asset(u).await
+}
+
+#[cfg(test)]
+mod proxy_antwort_tests {
+    use super::*;
+
+    #[test]
+    fn asset_antwort_setzt_nosniff_und_reicht_header_durch() {
+        let a = proxy::AssetAntwort {
+            bytes: b"TILE".to_vec(),
+            content_type: "application/x-protobuf".into(),
+            content_encoding: Some("gzip".into()),
+            cache_control: Some("public, max-age=60".into()),
+            etag: Some("\"abc\"".into()),
+        };
+        let r = asset_antwort(a);
+        assert_eq!(r.status(), StatusCode::OK);
+        let h = r.headers();
+        assert_eq!(h.get(header::CONTENT_TYPE).unwrap(), "application/x-protobuf");
+        assert_eq!(h.get(header::X_CONTENT_TYPE_OPTIONS).unwrap(), "nosniff");
+        assert_eq!(h.get(header::CONTENT_ENCODING).unwrap(), "gzip");
+        assert_eq!(h.get(header::CACHE_CONTROL).unwrap(), "public, max-age=60");
+        assert_eq!(h.get(header::ETAG).unwrap(), "\"abc\"");
+    }
+
+    #[test]
+    fn json_proxy_antwort_ist_json_no_cache() {
+        let r = json_proxy_antwort("{}".into());
+        assert_eq!(r.status(), StatusCode::OK);
+        assert_eq!(r.headers().get(header::CONTENT_TYPE).unwrap(), "application/json");
+        assert_eq!(r.headers().get(header::CACHE_CONTROL).unwrap(), "no-cache");
+    }
 }

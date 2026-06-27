@@ -1196,4 +1196,20 @@ mod service_tests {
         let upstream = repo::slot_aufloesen(&pool, qid, slot, "template").await.unwrap().unwrap();
         assert!(upstream.contains("{-y}"), "TMS-Flip im Upstream-Template: {upstream}");
     }
+
+    #[tokio::test]
+    async fn ssrf_redirect_policy_lehnt_redirect_auf_intern_ab() {
+        // 302 → interne Adresse: die geteilte Redirect-Policy (download_client + proxy_client)
+        // verweigert das Folgen. Über download_client getestet (kein pinnender Resolver → der
+        // initiale Loopback-Request geht durch; geprüft wird der Redirect-Hop).
+        let url = spawn_response(
+            StatusCode::FOUND, // 302
+            vec![("location", "https://10.0.0.5/x".into())],
+            Vec::new(),
+        )
+        .await;
+        let client = crate::karte::download::download_client();
+        let res = client.get(&url).send().await;
+        assert!(res.is_err(), "Redirect auf interne Adresse muss abgebrochen werden");
+    }
 }

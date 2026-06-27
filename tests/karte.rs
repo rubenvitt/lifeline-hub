@@ -892,6 +892,43 @@ async fn proxy_glyphs_ungueltiger_range_ist_400() {
 }
 
 #[tokio::test]
+async fn online_patch_und_delete_purgen_proxy_slots() {
+    use lifeline_hub::karte::registry::repo;
+    let pool = pool().await;
+    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12")).await.unwrap();
+    insert_proxy_quelle(&pool, "Q", "https://x/style.json?key=K", "vektor", 1, 1, 0).await; // id 1
+    sqlx::query("INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) VALUES (1, 'https://x/sprite?key=K', 'sprite')")
+        .execute(&pool).await.unwrap(); // slot 1
+    let app = app_mit_pool(pool.clone());
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    // Slot existiert vor dem PATCH.
+    assert!(repo::slot_aufloesen(&pool, 1, 1, "sprite").await.unwrap().is_some());
+    // PATCH mit GEÄNDERTER url → Handler purged die (jetzt stale) Slots.
+    let res = anfrage(
+        &app, "PATCH", "/api/karte/online-quellen/1", Some(&cookie),
+        Some(r#"{"name":"Q","url":"https://x/anders.json?key=K2","typ":"vektor","attribution":"© X","proxy":true}"#),
+    ).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    assert!(
+        repo::slot_aufloesen(&pool, 1, 1, "sprite").await.unwrap().is_none(),
+        "PATCH (URL-Wechsel) purged stale Slots"
+    );
+
+    // Neuen Slot anlegen, dann DELETE → ebenfalls weg (Handler-Purge + CASCADE).
+    sqlx::query("INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) VALUES (1, 'https://x/s2?key=K2', 'sprite')")
+        .execute(&pool).await.unwrap();
+    let slot2: i64 = sqlx::query_scalar("SELECT id FROM karte_proxy_asset WHERE quelle_id = 1 LIMIT 1")
+        .fetch_one(&pool).await.unwrap();
+    let res = anfrage(&app, "DELETE", "/api/karte/online-quellen/1", Some(&cookie), None).await;
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    assert!(
+        repo::slot_aufloesen(&pool, 1, slot2, "sprite").await.unwrap().is_none(),
+        "DELETE entfernt die Slots"
+    );
+}
+
+#[tokio::test]
 async fn proxy_tile_slot_auf_interne_adresse_ist_fehler_ssrf() {
     let pool = pool().await;
     insert_proxy_quelle(&pool, "S", "https://x/s.json?key=K", "vektor", 1, 1, 0).await;
