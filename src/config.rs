@@ -34,6 +34,8 @@ pub enum OnlineStyleTyp {
     #[default]
     Vektor,
     Raster,
+    /// Protomaps (key-basiert): registrierte TileJSON, beschrifteter Style wird im Frontend gebaut.
+    Protomaps,
 }
 
 /// Ein benannter Online-Basemap-View. `attribution` ist die config-autoritative
@@ -407,5 +409,13 @@ mod tests {
         .unwrap();
         assert_eq!(s.typ, OnlineStyleTyp::Raster);
         assert_eq!(s.attribution.as_deref(), Some("© BKG"));
+    }
+
+    #[test]
+    fn online_style_typ_protomaps_serde() {
+        let j = serde_json::to_string(&OnlineStyleTyp::Protomaps).unwrap();
+        assert_eq!(j, "\"protomaps\"");
+        let back: OnlineStyleTyp = serde_json::from_str("\"protomaps\"").unwrap();
+        assert_eq!(back, OnlineStyleTyp::Protomaps);
     }
 }

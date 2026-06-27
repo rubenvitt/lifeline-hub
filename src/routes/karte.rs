@@ -49,12 +49,14 @@ pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAnt
         .await?
         .into_iter()
         .map(|q| {
-            let typ = if q.typ == "raster" {
-                OnlineStyleTyp::Raster
-            } else {
-                OnlineStyleTyp::Vektor
+            let typ = match q.typ.as_str() {
+                "raster" => OnlineStyleTyp::Raster,
+                "protomaps" => OnlineStyleTyp::Protomaps,
+                _ => OnlineStyleTyp::Vektor,
             };
-            let url = if q.proxy {
+            // protomaps trägt den Key in der Upstream-URL → IMMER proxied ausliefern (nie roh),
+            // auch als Defense-in-Depth falls proxy versehentlich false wäre.
+            let url = if q.proxy || matches!(typ, OnlineStyleTyp::Protomaps) {
                 proxy::proxy_config_url(q.id, &typ)
             } else {
                 q.url

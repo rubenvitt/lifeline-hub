@@ -47,6 +47,7 @@ pub fn proxy_config_url(id: i64, typ: &OnlineStyleTyp) -> String {
     match typ {
         OnlineStyleTyp::Vektor => format!("/api/karte/proxy/{id}/style.json"),
         OnlineStyleTyp::Raster => format!("/api/karte/proxy/{id}/raster/{{z}}/{{x}}/{{y}}"),
+        OnlineStyleTyp::Protomaps => format!("/api/karte/proxy/{id}/tilejson"),
     }
 }
 
@@ -670,6 +671,14 @@ mod tests {
         assert_eq!(
             proxy_config_url(7, &OnlineStyleTyp::Raster),
             "/api/karte/proxy/7/raster/{z}/{x}/{y}"
+        );
+    }
+
+    #[test]
+    fn proxy_config_url_protomaps_ist_tilejson_entry() {
+        assert_eq!(
+            proxy_config_url(7, &OnlineStyleTyp::Protomaps),
+            "/api/karte/proxy/7/tilejson"
         );
     }
 
