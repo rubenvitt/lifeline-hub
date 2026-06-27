@@ -9,7 +9,7 @@ use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 
 /// Art eines Proxy-Assets — bestimmt Endpunkt-Form und bindet einen Slot an seinen Abruf-Pfad
 /// (Defense-in-Depth: ein Sprite-Slot darf nicht als Tile geladen werden).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SlotArt {
     Static,
     Template,
@@ -391,6 +391,7 @@ pub fn contains_secret(serialisiert: &str, upstream: &Url) -> bool {
 
 // ===== Service-Schicht (Task 5+): pinnender SSRF-Resolver + dedizierter Client =====
 
+use crate::karte::registry::repo;
 use reqwest::dns::{Addrs, Name, Resolve, Resolving};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -537,6 +538,87 @@ pub async fn hole_asset(
         cache_control,
         etag,
     })
+}
+
+/// Obergrenze umgeschriebener URLs/Slots pro Style/TileJSON (DoS-Schutz gegen riesige Dokumente).
+const MAX_SLOTS: usize = 500;
+
+/// Signatur der in-place-Rewrite-Funktionen (`rewrite_style`/`rewrite_tilejson`).
+type Rewriter =
+    fn(&mut Value, &Url, &mut dyn FnMut(&str, SlotArt) -> String, usize) -> Result<(), RewriteFehler>;
+
+/// Holt ein JSON-Dokument, schreibt es mit `rewriter` um (Slots via `repo::slot_upsert`) und liefert
+/// den key-freien String. Zweiphasig, damit der Walker rein/synchron bleibt: (1) auf einem Klon die
+/// `(url, art)`-Paare sammeln, (2) alle Slots async upserten, (3) auf dem Original anwenden.
+/// **fail-closed:** taucht nach dem Rewrite noch ein Query-Key der Upstream-URL im Ergebnis auf →
+/// `Secret` (nicht ausliefern).
+async fn hole_und_rewrite(
+    client: &reqwest::Client,
+    pool: &sqlx::SqlitePool,
+    quelle_id: i64,
+    url: Url,
+    rewriter: Rewriter,
+) -> Result<String, ProxyFehler> {
+    let asset = hole_asset(client, url.clone(), ASSET_BYTE_CAP).await?;
+    let text = String::from_utf8(asset.bytes).map_err(|_| ProxyFehler::Http("Antwort nicht UTF-8".into()))?;
+    let mut v: Value =
+        serde_json::from_str(&text).map_err(|e| ProxyFehler::Http(format!("JSON nicht parsebar: {e}")))?;
+    let basis = url.clone();
+
+    // (1) Sammeln auf einem Klon (Ergebnis verworfen).
+    let mut paare: Vec<(String, SlotArt)> = Vec::new();
+    {
+        let mut klon = v.clone();
+        let mut sammeln = |u: &str, a: SlotArt| {
+            paare.push((u.to_string(), a));
+            String::new()
+        };
+        rewriter(&mut klon, &basis, &mut sammeln, MAX_SLOTS).map_err(|e| ProxyFehler::Http(e.to_string()))?;
+    }
+
+    // (2) Slots async upserten → Map (url, art) → Proxy-URL.
+    let mut map: std::collections::HashMap<(String, SlotArt), String> = std::collections::HashMap::new();
+    for (u, a) in &paare {
+        let key = (u.clone(), *a);
+        if let std::collections::hash_map::Entry::Vacant(e) = map.entry(key) {
+            let slot = repo::slot_upsert(pool, quelle_id, u, a.as_str())
+                .await
+                .map_err(|e| ProxyFehler::Http(e.to_string()))?;
+            e.insert(proxy_url(quelle_id, *a, slot));
+        }
+    }
+
+    // (3) Anwenden auf dem Original.
+    {
+        let mut anwenden = |u: &str, a: SlotArt| map.get(&(u.to_string(), a)).cloned().unwrap_or_default();
+        rewriter(&mut v, &basis, &mut anwenden, MAX_SLOTS).map_err(|e| ProxyFehler::Http(e.to_string()))?;
+    }
+
+    let s = serde_json::to_string(&v).map_err(|e| ProxyFehler::Http(e.to_string()))?;
+    if contains_secret(&s, &url) {
+        return Err(ProxyFehler::Secret);
+    }
+    Ok(s)
+}
+
+/// Holt + rewrited einen Vektor-Style (`style.json`). Siehe `hole_und_rewrite`.
+pub async fn hole_style(
+    client: &reqwest::Client,
+    pool: &sqlx::SqlitePool,
+    quelle_id: i64,
+    url: Url,
+) -> Result<String, ProxyFehler> {
+    hole_und_rewrite(client, pool, quelle_id, url, rewrite_style).await
+}
+
+/// Holt + rewrited ein TileJSON-Dokument (`source.url`-Indirektion). Siehe `hole_und_rewrite`.
+pub async fn hole_tilejson(
+    client: &reqwest::Client,
+    pool: &sqlx::SqlitePool,
+    quelle_id: i64,
+    url: Url,
+) -> Result<String, ProxyFehler> {
+    hole_und_rewrite(client, pool, quelle_id, url, rewrite_tilejson).await
 }
 
 #[cfg(test)]
@@ -914,5 +996,133 @@ mod service_tests {
         let url = spawn_response(StatusCode::NOT_FOUND, vec![], b"upstream detail".to_vec()).await;
         let err = hole_asset(&plain(), Url::parse(&url).unwrap(), 1024).await.unwrap_err();
         assert!(matches!(err, ProxyFehler::Status(404)));
+    }
+
+    // --- hole_style / hole_tilejson (Loopback + test_pool für echte Slots) ---
+
+    use crate::db::test_pool;
+    use crate::karte::registry::repo;
+
+    /// Bindet einen Loopback-Server, der unter `pfad` ein festes JSON liefert (Body kennt den
+    /// eigenen Port). Liefert (voll-url-inkl-query, port).
+    async fn spawn_json(pfad: &'static str, baue_body: impl FnOnce(u16) -> String, query: &str) -> (String, u16) {
+        use axum::{routing::get, Router};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let body = baue_body(port);
+        let app = Router::new().route(
+            pfad,
+            get(move || {
+                let b = body.clone();
+                async move { ([("content-type", "application/json")], b) }
+            }),
+        );
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        let url = if query.is_empty() {
+            format!("http://127.0.0.1:{port}{pfad}")
+        } else {
+            format!("http://127.0.0.1:{port}{pfad}?{query}")
+        };
+        (url, port)
+    }
+
+    async fn proxy_quelle(pool: &sqlx::SqlitePool, url: &str) -> i64 {
+        repo::anlegen_online_quelle(
+            pool,
+            &repo::OnlineQuelleEingabe {
+                name: "T".into(),
+                url: url.into(),
+                typ: "vektor".into(),
+                attribution: Some("© T".into()),
+                sortier: 0,
+                aktiv: true,
+                proxy: true,
+            },
+        )
+        .await
+        .unwrap()
+        .id
+    }
+
+    #[tokio::test]
+    async fn hole_style_voll_kette_keyfrei_und_slots_aufloesbar() {
+        // Style mit allen Asset-Arten, Key in style-url-query UND in den Sub-URLs.
+        let (url, port) = spawn_json(
+            "/style.json",
+            |p| {
+                format!(
+                    r#"{{"version":8,"sources":{{
+                        "v":{{"type":"vector","url":"http://127.0.0.1:{p}/tiles.json?key=GEHEIM"}},
+                        "r":{{"type":"raster","tiles":["http://127.0.0.1:{p}/t/{{z}}/{{x}}/{{y}}.png?key=GEHEIM"]}},
+                        "g":{{"type":"geojson","data":"http://127.0.0.1:{p}/d.geojson?key=GEHEIM"}}
+                    }},
+                    "sprite":"http://127.0.0.1:{p}/sprite?key=GEHEIM",
+                    "glyphs":"http://127.0.0.1:{p}/fonts/{{fontstack}}/{{range}}.pbf?key=GEHEIM"}}"#
+                )
+            },
+            "key=GEHEIM",
+        )
+        .await;
+        let pool = test_pool().await;
+        let qid = proxy_quelle(&pool, &url).await;
+
+        let s = hole_style(&plain(), &pool, qid, Url::parse(&url).unwrap()).await.unwrap();
+        assert!(!s.contains("GEHEIM"), "kein Key im Ergebnis: {s}");
+        assert!(!s.contains(&format!("127.0.0.1:{port}")), "kein Upstream-Host: {s}");
+
+        // Der TileJSON-Slot löst auf die Upstream-URL (mit Key) auf.
+        let v: serde_json::Value = serde_json::from_str(&s).unwrap();
+        let tj = v["sources"]["v"]["url"].as_str().unwrap();
+        assert!(tj.starts_with(&format!("/api/karte/proxy/{qid}/tilejson/")), "tilejson-Proxy-URL: {tj}");
+        let slot: i64 = tj.rsplit('/').next().unwrap().parse().unwrap();
+        let upstream = repo::slot_aufloesen(&pool, qid, slot, "tilejson").await.unwrap().unwrap();
+        assert!(upstream.contains("tiles.json?key=GEHEIM"), "Slot → Upstream mit Key: {upstream}");
+    }
+
+    #[tokio::test]
+    async fn hole_style_fail_closed_bei_rest_key() {
+        // Key NUR in attribution-HTML (kein rewritebarer URL-Slot) → bleibt → contains_secret fängt
+        // ihn (style-url trägt key=GEHEIM als Query) → Secret.
+        let (url, _port) = spawn_json(
+            "/style.json",
+            |p| {
+                format!(
+                    r#"{{"version":8,"sources":{{}},"metadata":{{"attribution":"<a href=\"http://127.0.0.1:{p}/x?key=GEHEIM\">©</a>"}}}}"#
+                )
+            },
+            "key=GEHEIM",
+        )
+        .await;
+        let pool = test_pool().await;
+        let qid = proxy_quelle(&pool, &url).await;
+        let err = hole_style(&plain(), &pool, qid, Url::parse(&url).unwrap()).await.unwrap_err();
+        assert!(matches!(err, ProxyFehler::Secret), "fail-closed bei Rest-Key");
+    }
+
+    #[tokio::test]
+    async fn hole_tilejson_keyfrei_und_tms_normalisiert() {
+        let (url, _port) = spawn_json(
+            "/tiles.json",
+            |p| {
+                format!(
+                    r#"{{"tiles":["http://127.0.0.1:{p}/{{z}}/{{x}}/{{y}}.pbf?key=GEHEIM"],"scheme":"tms"}}"#
+                )
+            },
+            "key=GEHEIM",
+        )
+        .await;
+        let pool = test_pool().await;
+        let qid = proxy_quelle(&pool, &url).await;
+        let s = hole_tilejson(&plain(), &pool, qid, Url::parse(&url).unwrap()).await.unwrap();
+        assert!(!s.contains("GEHEIM"), "key-frei: {s}");
+        let v: serde_json::Value = serde_json::from_str(&s).unwrap();
+        assert_eq!(v["scheme"].as_str(), Some("xyz"), "tms→xyz");
+        // Der Tile-Slot trägt {-y} (Server-Flip). Pfad: /api/karte/proxy/{id}/tile/{slot}/{z}/{x}/{y}
+        let tile = v["tiles"][0].as_str().unwrap();
+        let slot: i64 = tile.split('/').nth(6).unwrap().parse().unwrap();
+        let upstream = repo::slot_aufloesen(&pool, qid, slot, "template").await.unwrap().unwrap();
+        assert!(upstream.contains("{-y}"), "TMS-Flip im Upstream-Template: {upstream}");
     }
 }
