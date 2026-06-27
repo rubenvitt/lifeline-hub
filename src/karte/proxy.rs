@@ -441,6 +441,104 @@ pub fn proxy_client() -> reqwest::Client {
         .expect("Proxy-Client baubar")
 }
 
+/// Obergrenze pro geproxytem Asset (Tiles/Sprite/Glyphs sind klein). Content-Length wird NICHT
+/// vertraut — beim Streamen hart gekappt.
+pub const ASSET_BYTE_CAP: usize = 8 * 1024 * 1024;
+
+/// Ergebnis eines geproxyten Assets: Bytes + hygienisierte, durchgereichte Header.
+#[derive(Debug)]
+pub struct AssetAntwort {
+    pub bytes: Vec<u8>,
+    /// Content-Type — `text/*` ist auf `application/octet-stream` geklemmt (Anti-XSS; Handler
+    /// setzt zusätzlich `X-Content-Type-Options: nosniff`).
+    pub content_type: String,
+    /// Verbatim durchgereicht (kein serverseitiges Dekomprimieren — reqwest läuft ohne gzip-Feature).
+    pub content_encoding: Option<String>,
+    pub cache_control: Option<String>,
+    pub etag: Option<String>,
+}
+
+/// Fehlerursachen der Proxy-Service-Schicht.
+#[derive(Debug)]
+pub enum ProxyFehler {
+    /// Upstream-Nicht-Erfolgs-Status (Body wird NICHT weitergereicht).
+    Status(u16),
+    /// Netzwerk-/reqwest-Fehler.
+    Http(String),
+    /// Asset überschreitet `ASSET_BYTE_CAP`.
+    ZuGross,
+    /// Backstop: ein Key war nach dem Rewrite noch im Dokument → fail-closed (Task 7).
+    Secret,
+}
+
+impl std::fmt::Display for ProxyFehler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ProxyFehler::Status(c) => write!(f, "Upstream antwortete mit HTTP {c}"),
+            ProxyFehler::Http(e) => write!(f, "Netzwerkfehler: {e}"),
+            ProxyFehler::ZuGross => write!(f, "Asset überschreitet die Größengrenze"),
+            ProxyFehler::Secret => write!(f, "Key nach Rewrite nicht entfernt (fail-closed)"),
+        }
+    }
+}
+
+fn kopf(h: &reqwest::header::HeaderMap, name: reqwest::header::HeaderName) -> Option<String> {
+    h.get(name).and_then(|v| v.to_str().ok()).map(str::to_string)
+}
+
+/// Holt ein Upstream-Asset und streamt es bis `byte_cap`. Reicht Content-Type (text/* geklemmt),
+/// Content-Encoding, Cache-Control und ETag per Allowlist durch; alle anderen Header (insb.
+/// `Location`/`Set-Cookie`) fallen weg. **Validiert NICHT** selbst (Loopback-testbar) — das
+/// SSRF-Gate sitzt im Handler.
+pub async fn hole_asset(
+    client: &reqwest::Client,
+    url: Url,
+    byte_cap: usize,
+) -> Result<AssetAntwort, ProxyFehler> {
+    use reqwest::header::{CACHE_CONTROL, CONTENT_ENCODING, CONTENT_TYPE, ETAG};
+    let resp = client
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| ProxyFehler::Http(e.to_string()))?;
+    if !resp.status().is_success() {
+        return Err(ProxyFehler::Status(resp.status().as_u16()));
+    }
+    let h = resp.headers();
+    let roh_ct = kopf(h, CONTENT_TYPE);
+    let content_encoding = kopf(h, CONTENT_ENCODING);
+    let cache_control = kopf(h, CACHE_CONTROL);
+    let etag = kopf(h, ETAG);
+    // Gefährliche Typen klemmen (verhindert XSS, falls ein Upstream HTML zurückgibt).
+    let content_type = match roh_ct {
+        Some(ct) if ct.trim_start().to_ascii_lowercase().starts_with("text/") => {
+            "application/octet-stream".to_string()
+        }
+        Some(ct) => ct,
+        None => "application/octet-stream".to_string(),
+    };
+
+    let mut resp = resp;
+    let mut bytes: Vec<u8> = Vec::new();
+    while let Some(chunk) = resp
+        .chunk()
+        .await
+        .map_err(|e| ProxyFehler::Http(e.to_string()))?
+    {
+        if bytes.len() + chunk.len() > byte_cap {
+            return Err(ProxyFehler::ZuGross);
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    Ok(AssetAntwort {
+        bytes,
+        content_type,
+        content_encoding,
+        cache_control,
+        etag,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -714,5 +812,107 @@ mod rewrite_tests {
     fn proxy_client_baut() {
         // Smoke: Client baubar (Gesamt-Timeout + pinnender Resolver + Redirect-Policy gesetzt).
         let _ = proxy_client();
+    }
+}
+
+#[cfg(test)]
+mod service_tests {
+    use super::*;
+    use axum::http::StatusCode;
+    use reqwest::Url;
+
+    /// Loopback-Fixture mit konfigurierbarem Status/Headern/Body unter `/a`. Liefert die URL.
+    async fn spawn_response(
+        status: StatusCode,
+        headers: Vec<(&'static str, String)>,
+        body: Vec<u8>,
+    ) -> String {
+        use axum::{response::Response, routing::get, Router};
+        let app = Router::new().route(
+            "/a",
+            get(move || {
+                let body = body.clone();
+                let headers = headers.clone();
+                async move {
+                    let mut b = Response::builder().status(status);
+                    for (k, v) in headers {
+                        b = b.header(k, v);
+                    }
+                    b.body(axum::body::Body::from(body)).unwrap()
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        format!("http://127.0.0.1:{}/a", addr.port())
+    }
+
+    /// Plain-Client (ohne pinnenden Resolver) — der würde Loopback blocken. In Prod nutzt der
+    /// Handler `proxy_client`; die Service-Schicht selbst ist client-agnostisch.
+    fn plain() -> reqwest::Client {
+        reqwest::Client::builder().build().unwrap()
+    }
+
+    #[tokio::test]
+    async fn hole_asset_liefert_bytes_und_content_type() {
+        let url = spawn_response(
+            StatusCode::OK,
+            vec![("content-type", "application/x-protobuf".into())],
+            b"TILEBYTES".to_vec(),
+        )
+        .await;
+        let a = hole_asset(&plain(), Url::parse(&url).unwrap(), 1024).await.unwrap();
+        assert_eq!(a.bytes, b"TILEBYTES");
+        assert_eq!(a.content_type, "application/x-protobuf");
+    }
+
+    #[tokio::test]
+    async fn hole_asset_byte_cap_greift() {
+        let url = spawn_response(
+            StatusCode::OK,
+            vec![("content-type", "application/octet-stream".into())],
+            vec![b'x'; 5000],
+        )
+        .await;
+        let err = hole_asset(&plain(), Url::parse(&url).unwrap(), 1024).await.unwrap_err();
+        assert!(matches!(err, ProxyFehler::ZuGross));
+    }
+
+    #[tokio::test]
+    async fn hole_asset_reicht_content_encoding_durch() {
+        let url = spawn_response(
+            StatusCode::OK,
+            vec![
+                ("content-type", "application/x-protobuf".into()),
+                ("content-encoding", "gzip".into()),
+            ],
+            b"ROHGZIP".to_vec(),
+        )
+        .await;
+        let a = hole_asset(&plain(), Url::parse(&url).unwrap(), 1024).await.unwrap();
+        assert_eq!(a.content_encoding.as_deref(), Some("gzip"));
+        assert_eq!(a.bytes, b"ROHGZIP", "Bytes unverändert (kein serverseitiges Dekomprimieren)");
+    }
+
+    #[tokio::test]
+    async fn hole_asset_klemmt_text_html() {
+        let url = spawn_response(
+            StatusCode::OK,
+            vec![("content-type", "text/html; charset=utf-8".into())],
+            b"<script>".to_vec(),
+        )
+        .await;
+        let a = hole_asset(&plain(), Url::parse(&url).unwrap(), 1024).await.unwrap();
+        assert_eq!(a.content_type, "application/octet-stream", "Anti-XSS clamp");
+    }
+
+    #[tokio::test]
+    async fn hole_asset_non_2xx_ohne_body() {
+        let url = spawn_response(StatusCode::NOT_FOUND, vec![], b"upstream detail".to_vec()).await;
+        let err = hole_asset(&plain(), Url::parse(&url).unwrap(), 1024).await.unwrap_err();
+        assert!(matches!(err, ProxyFehler::Status(404)));
     }
 }
