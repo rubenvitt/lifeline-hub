@@ -75,7 +75,9 @@ export default function OfflineKartenVerwaltung() {
     onSuccess: () => invalidiereKarte(qc),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Löschen fehlgeschlagen'),
   });
-  // „Aktualisieren" = neueren Katalog-Stand herunterladen (neue Zeile; danach aktivieren/löschen).
+  // „Aktualisieren" = One-Click-Update: neueren Katalog-Stand laden; das Backend aktiviert die
+  // neue Version nach Erfolg automatisch und entfernt die alte (ersetzt_karte_id). Der Katalog-Pin
+  // (katalog_sha256) wird zur verifizierten Re-Download-Prüfung mitgeschickt.
   const aktualisierenMutation = useMutation({
     mutationFn: (k: OfflineKarte) =>
       starteOfflineDownload({
@@ -83,10 +85,14 @@ export default function OfflineKartenVerwaltung() {
         url: k.katalog_url!,
         lizenz: k.lizenz ?? '',
         kachel_schema: k.kachel_schema,
+        sha256_erwartet: k.katalog_sha256 ?? undefined,
+        ersetzt_karte_id: k.id,
+        // Während des Updates liegen alt+neu gleichzeitig auf der Platte → ~2× Peak.
+        groesse_erwartet: k.groesse ?? undefined,
       }),
     onSuccess: () => {
       invalidiereKarte(qc);
-      message.success('Update-Download gestartet');
+      message.success('Update lädt — wird nach Abschluss automatisch aktiviert');
     },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Aktualisieren fehlgeschlagen'),
   });
