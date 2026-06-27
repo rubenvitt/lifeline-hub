@@ -8,6 +8,7 @@ use crate::error::AppError;
 use crate::karte::download::{self, Fortschritt};
 use crate::karte::proxy;
 use crate::karte::quellen;
+use crate::karte::tile_cache;
 use crate::karte::registry::repo::{
     self, OfflineKarte, OfflineKarteEingabe, OnlineQuelle, OnlineQuelleEingabe,
 };
@@ -730,11 +731,21 @@ async fn slot_oder_nf(
         .ok_or(AppError::NotFound)
 }
 
-/// Holt ein Binär-Asset über den geteilten Proxy-Client (SSRF-gepinnt) und baut die Antwort.
-async fn proxy_asset(u: reqwest::Url) -> Result<Response, AppError> {
-    let asset = proxy::hole_asset(proxy::proxy_client(), u, proxy::ASSET_BYTE_CAP)
+/// Holt ein Binär-Asset über den geteilten Proxy-Client (SSRF-gepinnt), **serverseitig gecacht**
+/// (LFH-190, separate `tile-cache.db` im `karten_dir`), und baut die Antwort.
+async fn proxy_asset(state: &AppState, u: reqwest::Url) -> Result<Response, AppError> {
+    let cache = tile_cache::cache_pool(&state.karten_dir)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;
+    let asset = tile_cache::hole_asset_cached(
+        &cache,
+        proxy::proxy_client(),
+        u,
+        proxy::ASSET_BYTE_CAP,
+        tile_cache::unix_now(),
+    )
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))?;
     Ok(asset_antwort(asset))
 }
 
@@ -758,7 +769,7 @@ pub async fn proxy_raster(
 ) -> Result<Response, AppError> {
     let q = aktive_proxy_quelle(&state, id).await?;
     let u = ssrf_geprueft(&proxy::subst_template(&q.url, z, x, y))?;
-    proxy_asset(u).await
+    proxy_asset(&state, u).await
 }
 
 /// GET /api/karte/proxy/{id}/tile/{slot}/{z}/{x}/{y} — Vektor-/Raster-Tile aus einem Style-Slot.
@@ -769,7 +780,7 @@ pub async fn proxy_tile(
     aktive_proxy_quelle(&state, id).await?;
     let template = slot_oder_nf(&state, id, slot, proxy::SlotArt::Template).await?;
     let u = ssrf_geprueft(&proxy::subst_template(&template, z, x, y))?;
-    proxy_asset(u).await
+    proxy_asset(&state, u).await
 }
 
 /// GET /api/karte/proxy/{id}/tilejson/{slot} — TileJSON-Indirektion holen + key-frei umschreiben.
@@ -809,7 +820,7 @@ pub async fn proxy_sprite(
     let (slot, suffix) = proxy::split_slot_suffix(&rest).map_err(AppError::Validation)?;
     let base = slot_oder_nf(&state, id, slot, proxy::SlotArt::Sprite).await?;
     let u = ssrf_geprueft(&proxy::sprite_upstream(&base, &suffix))?;
-    proxy_asset(u).await
+    proxy_asset(&state, u).await
 }
 
 /// GET /api/karte/proxy/{id}/glyphs/{slot}/{fontstack}/{range} — Glyphs aus einem Style-Slot.
@@ -822,7 +833,7 @@ pub async fn proxy_glyphs(
     proxy::validiere_range(&range).map_err(AppError::Validation)?;
     let template = slot_oder_nf(&state, id, slot, proxy::SlotArt::Glyphs).await?;
     let u = ssrf_geprueft(&proxy::subst_glyphs(&template, &fontstack, &range))?;
-    proxy_asset(u).await
+    proxy_asset(&state, u).await
 }
 
 #[cfg(test)]
