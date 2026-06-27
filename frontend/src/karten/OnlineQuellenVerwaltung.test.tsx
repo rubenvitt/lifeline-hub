@@ -210,9 +210,11 @@ describe('OnlineQuellenVerwaltung', () => {
     );
     await userEvent.click(option);
 
-    // Proxy-Switch ist für protomaps deaktiviert (kein Umschalten nötig/möglich).
+    // Proxy-Switch ist für protomaps deaktiviert (kein Umschalten nötig/möglich)
+    // und muss CHECKED sein — UI soll zeigen was tatsächlich gesendet wird (proxy=true).
     const proxyItem = within(dialog).getByText('Über Server proxen').closest('.ant-form-item');
     expect(within(proxyItem as HTMLElement).getByRole('switch')).toBeDisabled();
+    expect(within(proxyItem as HTMLElement).getByRole('switch')).toBeChecked();
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
 

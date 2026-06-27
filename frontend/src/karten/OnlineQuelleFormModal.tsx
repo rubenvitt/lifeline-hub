@@ -73,6 +73,14 @@ export default function OnlineQuelleFormModal({
     }
   }, [offen, quelle, naechsteSortier, form]);
 
+  // Protomaps erzwingt immer proxy=true — Switch-Feld mitführen, damit die UI (disabled+checked)
+  // mit dem tatsächlich gesendeten Body übereinstimmt (mutationFn-Guard bleibt autoritativ).
+  useEffect(() => {
+    if (typ === 'protomaps') {
+      form.setFieldValue('proxy', true);
+    }
+  }, [typ, form]);
+
   const mutation = useMutation({
     mutationFn: (werte: FormWerte) => {
       const body: OnlineQuelleBody = {

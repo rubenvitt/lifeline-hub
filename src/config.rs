@@ -26,8 +26,9 @@ impl GeheimesPasswort {
     }
 }
 
-/// Typ eines Online-Views: Vektor-Style-JSON (URL direkt an MapLibre) oder
-/// Raster-Tile-Template (`{z}/{y}/{x}`), das das Frontend in einen Raster-Style verpackt.
+/// Typ eines Online-Views: Vektor-Style-JSON (URL direkt an MapLibre),
+/// Raster-Tile-Template (`{z}/{y}/{x}`, das das Frontend in einen Raster-Style verpackt)
+/// oder Protomaps (key-basiert, TileJSON-Entry über den Proxy-Endpunkt).
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum OnlineStyleTyp {

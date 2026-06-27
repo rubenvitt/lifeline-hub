@@ -952,13 +952,14 @@ async fn protomaps_quelle_erzwingt_proxy_und_tilejson_entry_ist_registriert() {
     let (app, cookie) = admin_app().await;
 
     // Part (a): typ=protomaps + proxy=false → serverseitig auf proxy=true hochgestuft.
-    // URL muss SSRF-Check bestehen (https, keine interne IP, keine unbekannten Platzhalter).
+    // Nicht-auflösbarer Host (https://x/...) besteht den SSRF-Check (kein http, keine interne IP)
+    // und schlägt beim Connect deterministisch fehl — kein echter Netzwerkaufruf im Test.
     let res = anfrage(
         &app,
         "POST",
         "/api/karte/online-quellen",
         Some(&cookie),
-        Some(r#"{"name":"Protomaps","url":"https://api.protomaps.com/tiles/v4.json?key=GEHEIM","typ":"protomaps","attribution":"© Protomaps, © OSM","sortier":0}"#),
+        Some(r#"{"name":"Protomaps","url":"https://x/tiles/v4.json?key=GEHEIM","typ":"protomaps","attribution":"© Protomaps, © OSM","sortier":0}"#),
     )
     .await;
     assert_eq!(res.status(), StatusCode::CREATED, "protomaps-Quelle angelegt");
@@ -976,8 +977,9 @@ async fn protomaps_quelle_erzwingt_proxy_und_tilejson_entry_ist_registriert() {
         "404 als JSON (Handler, nicht SPA-HTML)"
     );
 
-    // Bekannte ID: SSRF-Gate blockiert Upstream-Abruf (keine echte Netzverbindung im Test) →
-    // 5xx. Dies beweist, dass der Handler aufgerufen wird und die Quelle gefunden wurde.
+    // Bekannte ID: SSRF-Gate passiert (externer Host), Upstream-Connect schlägt fehl
+    // (nicht-auflösbarer Host) → 5xx. Beweist, dass der Handler aufgerufen und die Quelle
+    // gefunden wurde; offline+deterministisch (kein echter Netzwerkaufruf).
     let res_bekannt = anfrage(&app, "GET", &format!("/api/karte/proxy/{id}/tilejson"), None, None).await;
     assert!(
         res_bekannt.status().is_server_error(),

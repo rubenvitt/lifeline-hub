@@ -42,7 +42,8 @@ impl SlotArt {
 }
 
 /// Client-URL, die `/api/karte/config` für eine proxied Quelle ausgibt (statt der Upstream-URL).
-/// Vektor → Style-JSON-Endpunkt; Raster → XYZ-Tile-Template, das MapLibre clientseitig füllt.
+/// Vektor → Style-JSON-Endpunkt; Raster → XYZ-Tile-Template, das MapLibre clientseitig füllt;
+/// Protomaps → slot-loser TileJSON-Entry-Endpunkt (Key-freie TileJSON, Tiles als Slot-Template).
 pub fn proxy_config_url(id: i64, typ: &OnlineStyleTyp) -> String {
     match typ {
         OnlineStyleTyp::Vektor => format!("/api/karte/proxy/{id}/style.json"),
