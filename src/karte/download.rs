@@ -63,7 +63,8 @@ impl std::fmt::Display for DownloadFehler {
 }
 
 /// True, wenn eine IP in einem internen/nicht-routbaren Bereich liegt (SSRF-Schutz).
-fn ip_ist_intern(ip: &IpAddr) -> bool {
+/// `pub(crate)`, damit der pinnende Proxy-Resolver (`karte::proxy`) dieselbe Klassifikation nutzt.
+pub(crate) fn ip_ist_intern(ip: &IpAddr) -> bool {
     match ip {
         IpAddr::V4(v4) => {
             v4.is_loopback()
@@ -126,8 +127,10 @@ const READ_TIMEOUT_SEKUNDEN: u64 = 60;
 /// stockende Verbindungen), aber KEIN Globaltimeout (sonst würde ein gesunder, langsamer
 /// Mehrhundert-MB-Download gekillt). Redirects werden gefolgt, aber JEDER Hop wird neu auf SSRF
 /// geprüft (N.O.M.A.D. redirectet github.com → release-assets.githubusercontent.com).
-pub fn download_client() -> reqwest::Client {
-    let policy = reqwest::redirect::Policy::custom(|attempt| {
+/// Redirect-Policy, die JEDEN Hop erneut auf SSRF-Sicherheit prüft (max. 10 Hops). Herausgezogen,
+/// damit der Proxy-Client (`karte::proxy`) dieselbe per-Hop-Prüfung teilt (LFH-182).
+pub fn ssrf_redirect_policy() -> reqwest::redirect::Policy {
+    reqwest::redirect::Policy::custom(|attempt| {
         if attempt.previous().len() >= 10 {
             return attempt.error(std::io::Error::other("zu viele Redirects"));
         }
@@ -135,12 +138,18 @@ pub fn download_client() -> reqwest::Client {
             Ok(()) => attempt.follow(),
             Err(grund) => attempt.error(std::io::Error::other(grund)),
         }
-    });
+    })
+}
+
+/// Dedizierter Download-Client (siehe Modul-Doku). Nutzt die geteilte SSRF-Redirect-Policy.
+/// HINWEIS: bewusst OHNE pinnenden DNS-Resolver (anders als `proxy::proxy_client`) — der
+/// Download-Pfad ist admin-only (admin-vetted Katalog-/URL), das DNS-Rebinding-Risiko sekundär.
+pub fn download_client() -> reqwest::Client {
     reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(20))
         .read_timeout(Duration::from_secs(READ_TIMEOUT_SEKUNDEN))
         .user_agent("LifelineHub-Kartendownload/1.0 (+https://github.com/)")
-        .redirect(policy)
+        .redirect(ssrf_redirect_policy())
         .build()
         .expect("Download-Client baubar")
 }

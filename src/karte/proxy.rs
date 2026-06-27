@@ -389,6 +389,58 @@ pub fn contains_secret(serialisiert: &str, upstream: &Url) -> bool {
         .any(|(_, val)| !val.is_empty() && serialisiert.contains(val.as_ref()))
 }
 
+// ===== Service-Schicht (Task 5+): pinnender SSRF-Resolver + dedizierter Client =====
+
+use reqwest::dns::{Addrs, Name, Resolve, Resolving};
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::time::Duration;
+
+/// Filtert aufgelöste Adressen: liefert sie nur, wenn **keine** intern ist (fail-closed). Sobald
+/// eine Adresse intern/nicht-routbar ist (auch bei gemischtem Ergebnis), kommt nichts zurück —
+/// das schließt DNS-Rebinding (Name→intern) als SSRF-Vektor. Reine Funktion (unit-getestet).
+pub fn nur_public(addrs: Vec<SocketAddr>) -> Vec<SocketAddr> {
+    if addrs.iter().any(|a| crate::karte::download::ip_ist_intern(&a.ip())) {
+        Vec::new()
+    } else {
+        addrs
+    }
+}
+
+/// Auflösender, **pinnender** DNS-Resolver: löst den Host selbst auf, filtert über `nur_public`
+/// und gibt nur public IPs an reqwest — reqwest connectet exakt auf diese Adressen, es gibt also
+/// kein Re-Resolve-/Rebind-Fenster zwischen Prüfung und Connect. `url_ist_sicher` (Schema/Literal)
+/// bleibt zusätzlich als Pre-Check im Handler.
+pub struct SichererResolver;
+
+impl Resolve for SichererResolver {
+    fn resolve(&self, name: Name) -> Resolving {
+        let host = name.as_str().to_string();
+        Box::pin(async move {
+            // Port 0: reqwest/hyper überschreibt ihn mit dem Ziel-Port aus der URL.
+            let addrs: Vec<SocketAddr> = tokio::net::lookup_host((host.as_str(), 0))
+                .await
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?
+                .collect();
+            Ok(Box::new(nur_public(addrs).into_iter()) as Addrs)
+        })
+    }
+}
+
+/// Dedizierter Proxy-Client: moderate Timeouts inkl. **Gesamt-Timeout** (Proxy-Assets sind klein —
+/// anders als der GB-Download-Client ohne Globaltimeout), geteilte SSRF-Redirect-Policy und der
+/// pinnende Resolver.
+pub fn proxy_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(30))
+        .user_agent("LifelineHub-Kartenproxy/1.0 (+https://github.com/)")
+        .dns_resolver(Arc::new(SichererResolver))
+        .redirect(crate::karte::download::ssrf_redirect_policy())
+        .build()
+        .expect("Proxy-Client baubar")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -643,5 +695,24 @@ mod rewrite_tests {
         let up = Url::parse("https://h/x?key=SECRET123&foo=bar").unwrap();
         assert!(contains_secret("...key=SECRET123...", &up));
         assert!(!contains_secret("nichts geheimes", &up));
+    }
+
+    #[test]
+    fn nur_public_filtert_interne_fail_closed() {
+        use std::net::SocketAddr;
+        let pub1: SocketAddr = "8.8.8.8:0".parse().unwrap();
+        let pub2: SocketAddr = "1.1.1.1:0".parse().unwrap();
+        let intern: SocketAddr = "10.0.0.5:0".parse().unwrap();
+        let loopback: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        assert_eq!(nur_public(vec![pub1, pub2]), vec![pub1, pub2], "alle public → durch");
+        assert!(nur_public(vec![pub1, intern]).is_empty(), "gemischt → fail-closed leer");
+        assert!(nur_public(vec![loopback]).is_empty(), "loopback raus");
+        assert!(nur_public(vec![]).is_empty());
+    }
+
+    #[test]
+    fn proxy_client_baut() {
+        // Smoke: Client baubar (Gesamt-Timeout + pinnender Resolver + Redirect-Policy gesetzt).
+        let _ = proxy_client();
     }
 }
