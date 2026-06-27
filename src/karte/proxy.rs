@@ -231,6 +231,29 @@ fn absolutiere(basis: &Url, referenz: &str) -> Option<String> {
     Some(format!("{scheme}://{host}{port}{}{r}", &pfad[..dir_ende]))
 }
 
+/// True, wenn eine Style-Referenz geproxyt werden soll: absolute http(s)-URL, protokoll-relativ
+/// (`//host/…`) oder relativer Pfad. Nicht-http-Schemata (`mapbox:`, `pmtiles:`, `data:`) bleiben
+/// **unangetastet** (würden sonst gegen die Style-Basis absolutiert → verstümmelt).
+fn ist_proxybar(referenz: &str) -> bool {
+    let r = referenz.trim();
+    ist_absolute_http_url(r) || !hat_fremdes_schema(r)
+}
+
+/// True, wenn die Referenz mit einem URI-Schema (`xyz:`) beginnt, das nicht http(s) ist — also
+/// `mapbox:`, `pmtiles:`, `data:` etc. Schema = `^[A-Za-z][A-Za-z0-9+.-]*:` VOR dem ersten `/`
+/// (so wird ein relativer Pfad mit Doppelpunkt nach einem `/` nicht fälschlich als Schema gewertet).
+fn hat_fremdes_schema(referenz: &str) -> bool {
+    let vor_slash = referenz.split('/').next().unwrap_or(referenz);
+    match vor_slash.find(':') {
+        Some(pos) if pos > 0 => {
+            let s = &vor_slash[..pos];
+            s.as_bytes()[0].is_ascii_alphabetic()
+                && s.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'-' | b'.'))
+        }
+        _ => false,
+    }
+}
+
 /// Hilfsfunktion mit Slot-Obergrenze: zählt jede Slot-Vergabe, bricht über `max` ab.
 fn mint_mit_cap(
     zaehler: &mut usize,
@@ -295,7 +318,7 @@ pub fn rewrite_style(
             let Some(obj) = src.as_object_mut() else { continue };
             if let Some(tiles) = obj.get_mut("tiles").and_then(Value::as_array_mut) {
                 for t in tiles.iter_mut() {
-                    if let Some(s) = t.as_str() {
+                    if let Some(s) = t.as_str().filter(|s| ist_proxybar(s)) {
                         if let Some(abs) = absolutiere(basis, s) {
                             let pu = mint_mit_cap(&mut n, max_slots, mint, &abs, SlotArt::Template)?;
                             *t = Value::String(pu);
@@ -303,32 +326,32 @@ pub fn rewrite_style(
                     }
                 }
             }
-            if let Some(u) = obj.get("url").and_then(Value::as_str) {
+            if let Some(u) = obj.get("url").and_then(Value::as_str).filter(|u| ist_proxybar(u)) {
                 if let Some(abs) = absolutiere(basis, u) {
                     let pu = mint_mit_cap(&mut n, max_slots, mint, &abs, SlotArt::Tilejson)?;
                     obj.insert("url".into(), Value::String(pu));
                 }
             }
-            if let Some(d) = obj.get("data").and_then(Value::as_str) {
-                if ist_absolute_http_url(d) {
-                    if let Some(abs) = absolutiere(basis, d) {
-                        let pu = mint_mit_cap(&mut n, max_slots, mint, &abs, SlotArt::Static)?;
-                        obj.insert("data".into(), Value::String(pu));
-                    }
+            if let Some(d) = obj.get("data").and_then(Value::as_str).filter(|d| ist_proxybar(d)) {
+                if let Some(abs) = absolutiere(basis, d) {
+                    let pu = mint_mit_cap(&mut n, max_slots, mint, &abs, SlotArt::Static)?;
+                    obj.insert("data".into(), Value::String(pu));
                 }
             }
         }
     }
     match style.get_mut("sprite") {
         Some(Value::String(s)) => {
-            if let Some(abs) = absolutiere(basis, s) {
-                let pu = mint_mit_cap(&mut n, max_slots, mint, &abs, SlotArt::Sprite)?;
-                *style.get_mut("sprite").unwrap() = Value::String(pu);
+            if ist_proxybar(s) {
+                if let Some(abs) = absolutiere(basis, s) {
+                    let pu = mint_mit_cap(&mut n, max_slots, mint, &abs, SlotArt::Sprite)?;
+                    *style.get_mut("sprite").unwrap() = Value::String(pu);
+                }
             }
         }
         Some(Value::Array(arr)) => {
             for entry in arr.iter_mut() {
-                if let Some(u) = entry.get("url").and_then(Value::as_str) {
+                if let Some(u) = entry.get("url").and_then(Value::as_str).filter(|u| ist_proxybar(u)) {
                     if let Some(abs) = absolutiere(basis, u) {
                         let pu = mint_mit_cap(&mut n, max_slots, mint, &abs, SlotArt::Sprite)?;
                         entry.as_object_mut().unwrap().insert("url".into(), Value::String(pu));
@@ -338,7 +361,7 @@ pub fn rewrite_style(
         }
         _ => {}
     }
-    if let Some(g) = style.get("glyphs").and_then(Value::as_str) {
+    if let Some(g) = style.get("glyphs").and_then(Value::as_str).filter(|g| ist_proxybar(g)) {
         if let Some(abs) = absolutiere(basis, g) {
             let pu = mint_mit_cap(&mut n, max_slots, mint, &abs, SlotArt::Glyphs)?;
             style.as_object_mut().unwrap().insert("glyphs".into(), Value::String(pu));
@@ -865,6 +888,36 @@ mod rewrite_tests {
             rewrite_style(&mut style, &basis, &mut m, 3),
             Err(RewriteFehler::ZuVieleSlots)
         );
+    }
+
+    #[test]
+    fn ist_proxybar_gating() {
+        for ja in [
+            "https://h/a", "HTTP://h/a", "//h/a", "tiles.json",
+            "fonts/{fontstack}/{range}.pbf", "/abs/path", "sprite",
+        ] {
+            assert!(ist_proxybar(ja), "proxybar: {ja}");
+        }
+        for nein in ["mapbox://mapbox.streets", "pmtiles://x.pmtiles", "data:image/png;base64,AAA", "foo:bar"] {
+            assert!(!ist_proxybar(nein), "nicht proxybar: {nein}");
+        }
+    }
+
+    #[test]
+    fn rewrite_style_laesst_fremde_schemata_unangetastet() {
+        let basis = Url::parse("https://h/s.json").unwrap();
+        let mut style = json!({"version":8,"sources":{
+            "m":{"type":"vector","url":"mapbox://mapbox.streets"},
+            "p":{"type":"vector","url":"pmtiles://https://h/x.pmtiles"}
+        }});
+        let mut log = vec![];
+        let mut m = fake_mint(&mut log);
+        rewrite_style(&mut style, &basis, &mut m, 500).unwrap();
+        drop(m);
+        assert!(log.is_empty(), "nicht-http-Schemata werden nicht gemintet");
+        let s = serde_json::to_string(&style).unwrap();
+        assert!(s.contains("mapbox://mapbox.streets"), "mapbox: bleibt unangetastet: {s}");
+        assert!(s.contains("pmtiles://"), "pmtiles: bleibt unangetastet: {s}");
     }
 
     #[test]
