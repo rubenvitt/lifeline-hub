@@ -812,3 +812,93 @@ async fn online_liste_maskiert_proxy_url_fuer_fuehrungskraft() {
         "kein Key für die Führungskraft"
     );
 }
+
+// ===== Proxy-Endpunkte: Ablehnung/Scoping (Happy-Path via Service-Loopback-Tests bewiesen) =====
+
+async fn insert_proxy_quelle(pool: &sqlx::SqlitePool, name: &str, url: &str, typ: &str, aktiv: i64, proxy: i64, sortier: i64) {
+    sqlx::query("INSERT INTO karte_online_quelle (name,url,typ,attribution,sortier,aktiv,proxy) VALUES (?,?,?,?,?,?,?)")
+        .bind(name).bind(url).bind(typ).bind("© X").bind(sortier).bind(aktiv).bind(proxy)
+        .execute(pool).await.unwrap();
+}
+
+#[tokio::test]
+async fn proxy_style_unbekannte_id_ist_404() {
+    let app = app_mit_pool(pool().await);
+    // Route ist registriert → Handler-404 (JSON), nicht der SPA-HTML-Fallback.
+    let res = anfrage(&app, "GET", "/api/karte/proxy/999/style.json", None, None).await;
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    assert_eq!(
+        res.headers().get(header::CONTENT_TYPE).unwrap(),
+        "application/json"
+    );
+}
+
+#[tokio::test]
+async fn proxy_style_proxy0_oder_inaktiv_ist_404() {
+    let pool = pool().await;
+    insert_proxy_quelle(&pool, "Direkt", "https://x/s.json", "vektor", 1, 0, 0).await; // id 1: proxy=0
+    insert_proxy_quelle(&pool, "Inaktiv", "https://x/s.json?key=K", "vektor", 0, 1, 1).await; // id 2: inaktiv
+    let app = app_mit_pool(pool);
+    for id in [1, 2] {
+        let res = anfrage(&app, "GET", &format!("/api/karte/proxy/{id}/style.json"), None, None).await;
+        assert_eq!(res.status(), StatusCode::NOT_FOUND, "id {id} nicht proxybar");
+    }
+}
+
+#[tokio::test]
+async fn proxy_style_interne_gespeicherte_url_ist_fehler() {
+    let pool = pool().await;
+    // proxy=1 mit interner url direkt in DB (umgeht validiere_online) → SSRF-Gate im Handler.
+    insert_proxy_quelle(&pool, "Boese", "https://169.254.169.254/style.json", "vektor", 1, 1, 0).await;
+    let app = app_mit_pool(pool);
+    let res = anfrage(&app, "GET", "/api/karte/proxy/1/style.json", None, None).await;
+    assert!(res.status().is_server_error(), "SSRF-Gate vor Connect: {}", res.status());
+}
+
+#[tokio::test]
+async fn proxy_tile_art_mismatch_und_fremde_quelle_404() {
+    let pool = pool().await;
+    insert_proxy_quelle(&pool, "Q", "https://x/s.json?key=K", "vektor", 1, 1, 0).await; // id 1
+    insert_proxy_quelle(&pool, "Q2", "https://y/s.json?key=K", "vektor", 1, 1, 1).await; // id 2
+    // Sprite-Slot (id 1) für quelle 1.
+    sqlx::query("INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) VALUES (1, 'https://x/sprite?key=K', 'sprite')")
+        .execute(&pool).await.unwrap();
+    let app = app_mit_pool(pool);
+    // Slot 1 ist 'sprite' → als Tile angefragt → 404 (art-Mismatch).
+    let res = anfrage(&app, "GET", "/api/karte/proxy/1/tile/1/1/1/1", None, None).await;
+    assert_eq!(res.status(), StatusCode::NOT_FOUND, "art-Mismatch");
+    // Slot 1 gehört quelle 1; unter quelle 2 angefragt → 404 (cross-quelle).
+    let res = anfrage(&app, "GET", "/api/karte/proxy/2/tile/1/1/1/1", None, None).await;
+    assert_eq!(res.status(), StatusCode::NOT_FOUND, "fremde quelle");
+}
+
+#[tokio::test]
+async fn proxy_raster_nicht_numerisches_z_ist_400() {
+    let pool = pool().await;
+    insert_proxy_quelle(&pool, "R", "https://x/{z}/{x}/{y}.png?key=K", "raster", 1, 1, 0).await;
+    let app = app_mit_pool(pool);
+    let res = anfrage(&app, "GET", "/api/karte/proxy/1/raster/abc/1/1", None, None).await;
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST, "z nicht-numerisch → Path-Fehler");
+}
+
+#[tokio::test]
+async fn proxy_glyphs_ungueltiger_range_ist_400() {
+    let pool = pool().await;
+    insert_proxy_quelle(&pool, "G", "https://x/s.json?key=K", "vektor", 1, 1, 0).await;
+    let app = app_mit_pool(pool);
+    // range ohne Bindestrich → validiere_range schlägt fehl (vor slot_aufloesen) → 400.
+    let res = anfrage(&app, "GET", "/api/karte/proxy/1/glyphs/1/Arial/0_255", None, None).await;
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn proxy_tile_slot_auf_interne_adresse_ist_fehler_ssrf() {
+    let pool = pool().await;
+    insert_proxy_quelle(&pool, "S", "https://x/s.json?key=K", "vektor", 1, 1, 0).await;
+    // Ein (z.B. von kompromittiertem Upstream eingeschleuster) Slot zeigt auf eine interne Adresse.
+    sqlx::query("INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) VALUES (1, 'https://169.254.169.254/{z}/{x}/{y}', 'template')")
+        .execute(&pool).await.unwrap();
+    let app = app_mit_pool(pool);
+    let res = anfrage(&app, "GET", "/api/karte/proxy/1/tile/1/1/1/1", None, None).await;
+    assert!(res.status().is_server_error(), "SSRF-Gate blockt internen Slot: {}", res.status());
+}

@@ -428,18 +428,22 @@ impl Resolve for SichererResolver {
     }
 }
 
-/// Dedizierter Proxy-Client: moderate Timeouts inkl. **Gesamt-Timeout** (Proxy-Assets sind klein —
-/// anders als der GB-Download-Client ohne Globaltimeout), geteilte SSRF-Redirect-Policy und der
-/// pinnende Resolver.
-pub fn proxy_client() -> reqwest::Client {
-    reqwest::Client::builder()
-        .connect_timeout(Duration::from_secs(10))
-        .timeout(Duration::from_secs(30))
-        .user_agent("LifelineHub-Kartenproxy/1.0 (+https://github.com/)")
-        .dns_resolver(Arc::new(SichererResolver))
-        .redirect(crate::karte::download::ssrf_redirect_policy())
-        .build()
-        .expect("Proxy-Client baubar")
+/// Prozess-globaler Proxy-Client (lazy): moderate Timeouts inkl. **Gesamt-Timeout** (Proxy-Assets
+/// sind klein — anders als der GB-Download-Client ohne Globaltimeout), geteilte SSRF-Redirect-Policy
+/// und der pinnende Resolver. Bewusst KEIN `AppState`-Feld (würde ~45 Konstruktionsstellen berühren)
+/// — reqwest-Clients sind für Wiederverwendung gedacht, ein Prozess-Singleton genügt.
+pub fn proxy_client() -> &'static reqwest::Client {
+    static CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
+    CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(30))
+            .user_agent("LifelineHub-Kartenproxy/1.0 (+https://github.com/)")
+            .dns_resolver(Arc::new(SichererResolver))
+            .redirect(crate::karte::download::ssrf_redirect_policy())
+            .build()
+            .expect("Proxy-Client baubar")
+    })
 }
 
 /// Obergrenze pro geproxytem Asset (Tiles/Sprite/Glyphs sind klein). Content-Length wird NICHT

@@ -47,6 +47,20 @@ pub struct OnlineQuelleConfig {
     pub proxy: bool,
 }
 
+/// Eine Online-Quelle per `id`, oder `None` — für die Proxy-Handler (Existenz + proxy/aktiv prüfen).
+pub async fn finde_online_quelle(
+    pool: &SqlitePool,
+    id: i64,
+) -> Result<Option<OnlineQuelle>, sqlx::Error> {
+    sqlx::query_as::<_, OnlineQuelle>(
+        "SELECT id, name, url, typ, attribution, sortier, aktiv, proxy \
+         FROM karte_online_quelle WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await
+}
+
 /// Aktive Online-Quellen (mit `id`+`proxy`) für den Config-Rewrite, nach `sortier`, `id`.
 pub async fn aktive_online_quellen_fuer_config(
     pool: &SqlitePool,

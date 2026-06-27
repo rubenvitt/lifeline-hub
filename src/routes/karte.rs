@@ -13,7 +13,7 @@ use crate::karte::registry::repo::{
 };
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
-use axum::http::{Request, StatusCode};
+use axum::http::{header, Request, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::{Deserialize, Serialize};
@@ -624,4 +624,156 @@ pub async fn offline_abbrechen(
         }
         None => Err(AppError::NotFound),
     }
+}
+
+// ===== Style-/Tile-Proxy (LFH-182, öffentlich — wie /config & /tiles) =====
+//
+// Alle Endpunkte: Quelle muss existieren + proxy=1 + aktiv=1 (sonst 404). Jede Upstream-URL läuft
+// VOR dem Fetch durch `url_ist_sicher` (Schema/Literal); der `proxy_client` ergänzt den pinnenden
+// DNS-Resolver (Anti-Rebinding) + per-Hop-Redirect-Prüfung. Clients können nie eine eigene
+// Ziel-URL wählen — nur die gespeicherte Quelle-`url` (style/raster) bzw. recordete Slots.
+
+/// Lädt die Quelle und stellt sicher, dass sie geproxyt werden DARF (existiert, proxy=1, aktiv=1).
+async fn aktive_proxy_quelle(state: &AppState, id: i64) -> Result<OnlineQuelle, AppError> {
+    match repo::finde_online_quelle(&state.pool, id).await? {
+        Some(q) if q.proxy && q.aktiv => Ok(q),
+        _ => Err(AppError::NotFound),
+    }
+}
+
+/// SSRF-Gate vor jedem Upstream-Fetch: parst die URL und prüft Schema/Literal-IP.
+fn ssrf_geprueft(upstream: &str) -> Result<reqwest::Url, AppError> {
+    let u = reqwest::Url::parse(upstream)
+        .map_err(|e| AppError::Internal(format!("ungültige Upstream-URL: {e}")))?;
+    download::url_ist_sicher(&u).map_err(AppError::Internal)?;
+    Ok(u)
+}
+
+/// JSON-Proxy-Antwort (style.json / tilejson): key-frei, nicht cachen.
+fn json_proxy_antwort(json: String) -> Response {
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::CACHE_CONTROL, "no-cache")
+        .body(Body::from(json))
+        .unwrap()
+}
+
+/// Binär-Asset-Antwort (Tiles/Sprite/Glyphs): hygienisierte Header + nosniff durchreichen.
+fn asset_antwort(a: crate::karte::proxy::AssetAntwort) -> Response {
+    let mut b = Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, a.content_type)
+        .header(header::X_CONTENT_TYPE_OPTIONS, "nosniff");
+    if let Some(ce) = a.content_encoding {
+        b = b.header(header::CONTENT_ENCODING, ce);
+    }
+    if let Some(cc) = a.cache_control {
+        b = b.header(header::CACHE_CONTROL, cc);
+    }
+    if let Some(et) = a.etag {
+        b = b.header(header::ETAG, et);
+    }
+    b.body(Body::from(a.bytes)).unwrap()
+}
+
+/// GET /api/karte/proxy/{id}/style.json — Vektor-Style serverseitig holen + key-frei umschreiben.
+pub async fn proxy_style(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<Response, AppError> {
+    let q = aktive_proxy_quelle(&state, id).await?;
+    let u = ssrf_geprueft(&q.url)?;
+    let json = proxy::hole_style(proxy::proxy_client(), &state.pool, id, u)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(json_proxy_antwort(json))
+}
+
+/// GET /api/karte/proxy/{id}/raster/{z}/{x}/{y} — Raster-Tile aus der gespeicherten Template-URL.
+pub async fn proxy_raster(
+    State(state): State<AppState>,
+    Path((id, z, x, y)): Path<(i64, i64, i64, i64)>,
+) -> Result<Response, AppError> {
+    let q = aktive_proxy_quelle(&state, id).await?;
+    let u = ssrf_geprueft(&proxy::subst_template(&q.url, z, x, y))?;
+    let asset = proxy::hole_asset(proxy::proxy_client(), u, proxy::ASSET_BYTE_CAP)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(asset_antwort(asset))
+}
+
+/// GET /api/karte/proxy/{id}/tile/{slot}/{z}/{x}/{y} — Vektor-/Raster-Tile aus einem Style-Slot.
+pub async fn proxy_tile(
+    State(state): State<AppState>,
+    Path((id, slot, z, x, y)): Path<(i64, i64, i64, i64, i64)>,
+) -> Result<Response, AppError> {
+    aktive_proxy_quelle(&state, id).await?;
+    let Some(template) =
+        repo::slot_aufloesen(&state.pool, id, slot, proxy::SlotArt::Template.as_str()).await?
+    else {
+        return Err(AppError::NotFound);
+    };
+    let u = ssrf_geprueft(&proxy::subst_template(&template, z, x, y))?;
+    let asset = proxy::hole_asset(proxy::proxy_client(), u, proxy::ASSET_BYTE_CAP)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(asset_antwort(asset))
+}
+
+/// GET /api/karte/proxy/{id}/tilejson/{slot} — TileJSON-Indirektion holen + key-frei umschreiben.
+pub async fn proxy_tilejson(
+    State(state): State<AppState>,
+    Path((id, slot)): Path<(i64, i64)>,
+) -> Result<Response, AppError> {
+    aktive_proxy_quelle(&state, id).await?;
+    let Some(upstream) =
+        repo::slot_aufloesen(&state.pool, id, slot, proxy::SlotArt::Tilejson.as_str()).await?
+    else {
+        return Err(AppError::NotFound);
+    };
+    let u = ssrf_geprueft(&upstream)?;
+    let json = proxy::hole_tilejson(proxy::proxy_client(), &state.pool, id, u)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(json_proxy_antwort(json))
+}
+
+/// GET /api/karte/proxy/{id}/sprite/{rest} — Sprite (`{rest}` = `{slot}.json|.png|@2x…`).
+pub async fn proxy_sprite(
+    State(state): State<AppState>,
+    Path((id, rest)): Path<(i64, String)>,
+) -> Result<Response, AppError> {
+    aktive_proxy_quelle(&state, id).await?;
+    let (slot, suffix) = proxy::split_slot_suffix(&rest).map_err(AppError::Validation)?;
+    let Some(base) =
+        repo::slot_aufloesen(&state.pool, id, slot, proxy::SlotArt::Sprite.as_str()).await?
+    else {
+        return Err(AppError::NotFound);
+    };
+    let u = ssrf_geprueft(&proxy::sprite_upstream(&base, &suffix))?;
+    let asset = proxy::hole_asset(proxy::proxy_client(), u, proxy::ASSET_BYTE_CAP)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(asset_antwort(asset))
+}
+
+/// GET /api/karte/proxy/{id}/glyphs/{slot}/{fontstack}/{range} — Glyphs aus einem Style-Slot.
+pub async fn proxy_glyphs(
+    State(state): State<AppState>,
+    Path((id, slot, fontstack, range)): Path<(i64, i64, String, String)>,
+) -> Result<Response, AppError> {
+    aktive_proxy_quelle(&state, id).await?;
+    proxy::validiere_fontstack(&fontstack).map_err(AppError::Validation)?;
+    proxy::validiere_range(&range).map_err(AppError::Validation)?;
+    let Some(template) =
+        repo::slot_aufloesen(&state.pool, id, slot, proxy::SlotArt::Glyphs.as_str()).await?
+    else {
+        return Err(AppError::NotFound);
+    };
+    let u = ssrf_geprueft(&proxy::subst_glyphs(&template, &fontstack, &range))?;
+    let asset = proxy::hole_asset(proxy::proxy_client(), u, proxy::ASSET_BYTE_CAP)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(asset_antwort(asset))
 }
