@@ -18,6 +18,7 @@ interface FormWerte {
   attribution: string;
   sortier: number;
   aktiv: boolean;
+  proxy: boolean;
 }
 
 const TYP_OPTIONEN: { value: OnlineStyleTyp; label: string }[] = [
@@ -62,10 +63,11 @@ export default function OnlineQuelleFormModal({
         attribution: quelle.attribution ?? '',
         sortier: quelle.sortier,
         aktiv: quelle.aktiv,
+        proxy: quelle.proxy,
       });
     } else {
       form.resetFields();
-      form.setFieldsValue({ typ: 'vektor', sortier: naechsteSortier, aktiv: true });
+      form.setFieldsValue({ typ: 'vektor', sortier: naechsteSortier, aktiv: true, proxy: false });
     }
   }, [offen, quelle, naechsteSortier, form]);
 
@@ -78,6 +80,7 @@ export default function OnlineQuelleFormModal({
         attribution: werte.attribution.trim(),
         sortier: werte.sortier ?? 0,
         aktiv: werte.aktiv ?? true,
+        proxy: werte.proxy ?? false,
       };
       return quelle ? aktualisiereOnlineQuelle(quelle.id, body) : legeOnlineQuelleAn(body);
     },
@@ -102,11 +105,12 @@ export default function OnlineQuelleFormModal({
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
-        title="Keine Schlüssel-/Secret-Quellen"
+        title="Schlüsselbasierte Anbieter"
         description={
-          'Schlüsselbasierte Anbieter (z. B. MapTiler, Stadia) NICHT mit API-Key/Secret hier ' +
-          'eintragen — die URL läuft im Browser und der Schlüssel wäre offen einsehbar. Solche ' +
-          'Quellen kommen später über einen Server-Proxy (LFH-182).'
+          'Für key-basierte Anbieter (z. B. MapTiler, Stadia) „Über Server proxen" aktivieren und ' +
+          'die volle URL inkl. Schlüssel eintragen — der Server holt die Karte, der Schlüssel ' +
+          'bleibt server-seitig und erscheint nie im Browser. Ohne Proxy läuft die URL direkt im ' +
+          'Browser; dann keinen Schlüssel eintragen.'
         }
       />
       <Form<FormWerte> form={form} layout="vertical" onFinish={(w) => mutation.mutate(w)}>
@@ -147,6 +151,14 @@ export default function OnlineQuelleFormModal({
           name="aktiv"
           valuePropName="checked"
           tooltip="Nur aktive Quellen erscheinen im Basemap-Switcher der Lagekarte."
+        >
+          <Switch />
+        </Form.Item>
+        <Form.Item
+          label="Über Server proxen"
+          name="proxy"
+          valuePropName="checked"
+          tooltip="Key-basierte Anbieter: Der Server holt Style/Tiles/Sprite/Glyphs, der Schlüssel bleibt server-seitig und erscheint nie im Browser (LFH-182)."
         >
           <Switch />
         </Form.Item>

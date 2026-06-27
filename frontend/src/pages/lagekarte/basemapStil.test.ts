@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  absolutiereProxyAnfrage,
   aktuelleAttribution,
   baueBasemapStyle,
   baueOnlineStyle,
@@ -45,6 +46,36 @@ describe('basemapStil', () => {
 
   it('baueOnlineStyle: Vektor liefert die URL als String', () => {
     expect(baueOnlineStyle(vektorView)).toBe('https://tiles.example/style.json');
+  });
+
+  it('absolutiereProxyAnfrage: root-relative Proxy-URL → absolut, andere unangetastet (LFH-182)', () => {
+    const o = window.location.origin;
+    // MapLibre ruft transformRequest mit substituierter Tile-URL (keine {z}-Platzhalter mehr).
+    expect(absolutiereProxyAnfrage('/api/karte/proxy/1/tile/5/6/34/22')).toEqual({
+      url: `${o}/api/karte/proxy/1/tile/5/6/34/22`,
+    });
+    expect(absolutiereProxyAnfrage('https://x/y')).toEqual({ url: 'https://x/y' });
+    expect(absolutiereProxyAnfrage('//host/x')).toEqual({ url: '//host/x' });
+    expect(absolutiereProxyAnfrage('pmtiles://https://x/a')).toEqual({ url: 'pmtiles://https://x/a' });
+  });
+
+  it('baueOnlineStyle: relative Vektor-Proxy-URL wird gegen die Origin absolutiert (LFH-182)', () => {
+    const proxyView: OnlineStyle = {
+      name: 'P', url: '/api/karte/proxy/1/style.json', typ: 'vektor', attribution: null,
+    };
+    expect(baueOnlineStyle(proxyView)).toBe(
+      new URL('/api/karte/proxy/1/style.json', window.location.origin).href,
+    );
+  });
+
+  it('baueOnlineStyle: relatives Raster-Proxy-Template bleibt relatives tiles[0] (LFH-182)', () => {
+    const proxyRaster: OnlineStyle = {
+      name: 'P', url: '/api/karte/proxy/1/raster/{z}/{x}/{y}', typ: 'raster', attribution: null,
+    };
+    const s = baueOnlineStyle(proxyRaster) as {
+      sources: Record<string, { tiles: string[] }>;
+    };
+    expect(s.sources.raster.tiles).toEqual(['/api/karte/proxy/1/raster/{z}/{x}/{y}']);
   });
 
   it('baueOnlineStyle: Raster verpackt das Template in einen Raster-Style', () => {

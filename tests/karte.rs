@@ -667,3 +667,275 @@ async fn online_quellen_als_fuehrungskraft_read_only() {
     .await;
     assert_eq!(res.status(), StatusCode::FORBIDDEN, "Führungskraft darf nicht schreiben");
 }
+
+// ===== Proxy-Quellen-Validierung (LFH-182) =====
+
+#[tokio::test]
+async fn online_anlegen_proxy_interne_url_ist_400_ssrf() {
+    let (app, cookie) = admin_app().await;
+    // proxy=1 → Server holt selbst → SSRF-Vorabprüfung: kein http, keine internen Ziele.
+    for url in [
+        "http://example.test/style.json",
+        "https://10.0.0.5/style.json?key=K",
+        "https://169.254.169.254/style.json",
+        "https://127.0.0.1/style.json",
+    ] {
+        let body =
+            format!(r#"{{"name":"P","url":"{url}","typ":"vektor","attribution":"© X","proxy":true}}"#);
+        let res = anfrage(&app, "POST", "/api/karte/online-quellen", Some(&cookie), Some(&body)).await;
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST, "proxy+intern abgelehnt: {url}");
+    }
+}
+
+#[tokio::test]
+async fn online_anlegen_proxy_gueltig_ist_201_mit_proxy_true() {
+    let (app, cookie) = admin_app().await;
+    let res = anfrage(
+        &app,
+        "POST",
+        "/api/karte/online-quellen",
+        Some(&cookie),
+        Some(r#"{"name":"MapTiler","url":"https://api.maptiler.com/maps/streets/style.json?key=GEHEIM","typ":"vektor","attribution":"© MapTiler","proxy":true}"#),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::CREATED);
+    assert_eq!(json(res).await["proxy"], true);
+}
+
+#[tokio::test]
+async fn online_anlegen_default_proxy_false() {
+    let (app, cookie) = admin_app().await;
+    let res = anfrage(
+        &app,
+        "POST",
+        "/api/karte/online-quellen",
+        Some(&cookie),
+        Some(r#"{"name":"OFM","url":"https://tiles.example/liberty","typ":"vektor","attribution":"© OSM"}"#),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::CREATED);
+    assert_eq!(json(res).await["proxy"], false, "Default ohne proxy-Feld");
+}
+
+#[tokio::test]
+async fn online_anlegen_proxy_unbekannter_platzhalter_ist_400() {
+    let (app, cookie) = admin_app().await;
+    let res = anfrage(
+        &app,
+        "POST",
+        "/api/karte/online-quellen",
+        Some(&cookie),
+        Some(r#"{"name":"R","url":"https://h/{z}/{quadkey}.png","typ":"raster","attribution":"© X","proxy":true}"#),
+    )
+    .await;
+    assert_eq!(
+        res.status(),
+        StatusCode::BAD_REQUEST,
+        "unbekannter Platzhalter {{quadkey}} fail-fast"
+    );
+}
+
+#[tokio::test]
+async fn config_proxy_quelle_gibt_relative_url_und_verbirgt_key() {
+    let pool = pool().await;
+    // proxy=1 Vektor (Key in url), proxy=1 Raster, proxy=0 direkt — frischer Pool → ids 1,2,3.
+    sqlx::query("INSERT INTO karte_online_quelle (name,url,typ,attribution,sortier,aktiv,proxy) VALUES (?,?,?,?,?,?,?)")
+        .bind("MapTiler").bind("https://api.maptiler.com/maps/streets/style.json?key=GEHEIM")
+        .bind("vektor").bind("© MapTiler").bind(0).bind(1).bind(1)
+        .execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO karte_online_quelle (name,url,typ,attribution,sortier,aktiv,proxy) VALUES (?,?,?,?,?,?,?)")
+        .bind("Stadia").bind("https://tiles.stadiamaps.com/{z}/{x}/{y}.png?api_key=GEHEIM2")
+        .bind("raster").bind("© Stadia").bind(1).bind(1).bind(1)
+        .execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO karte_online_quelle (name,url,typ,attribution,sortier,aktiv,proxy) VALUES (?,?,?,?,?,?,?)")
+        .bind("OFM").bind("https://tiles.example/liberty").bind("vektor").bind("© OSM").bind(2).bind(1).bind(0)
+        .execute(&pool).await.unwrap();
+
+    let app = app_mit_pool(pool);
+    let res = anfrage(&app, "GET", "/api/karte/config", None, None).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let roh = String::from_utf8(bytes.to_vec()).unwrap();
+    // Weder Key noch Upstream-Host stehen IRGENDWO im öffentlichen config-Body.
+    assert!(!roh.contains("GEHEIM"), "kein Key im config-Body: {roh}");
+    assert!(!roh.contains("api.maptiler.com"), "kein Upstream-Host (vektor)");
+    assert!(!roh.contains("stadiamaps.com"), "kein Upstream-Host (raster)");
+
+    let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let styles = v["online_styles"].as_array().unwrap();
+    assert_eq!(styles.len(), 3);
+    // Vektor-proxy → /api/karte/proxy/{id}/style.json, Attribution erhalten.
+    assert!(styles[0]["url"].as_str().unwrap().starts_with("/api/karte/proxy/"));
+    assert!(styles[0]["url"].as_str().unwrap().ends_with("/style.json"));
+    assert_eq!(styles[0]["attribution"], "© MapTiler");
+    // Raster-proxy → /api/karte/proxy/{id}/raster/{z}/{x}/{y}
+    assert!(styles[1]["url"].as_str().unwrap().ends_with("/raster/{z}/{x}/{y}"));
+    // proxy=0 → unverändert
+    assert_eq!(styles[2]["url"], "https://tiles.example/liberty");
+}
+
+#[tokio::test]
+async fn online_liste_maskiert_proxy_url_fuer_fuehrungskraft() {
+    let (app, admin) = admin_app().await;
+    let res = anfrage(
+        &app,
+        "POST",
+        "/api/karte/online-quellen",
+        Some(&admin),
+        Some(r#"{"name":"MapTiler","url":"https://api.maptiler.com/maps/streets/style.json?key=GEHEIM","typ":"vektor","attribution":"© MapTiler","proxy":true}"#),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::CREATED);
+
+    // Admin sieht die volle url (er hat sie eingegeben und muss sie editieren können).
+    let liste = json(anfrage(&app, "GET", "/api/karte/online-quellen", Some(&admin), None).await).await;
+    assert!(
+        liste[0]["url"].as_str().unwrap().contains("GEHEIM"),
+        "Admin sieht den Key voll"
+    );
+
+    // Führungskraft (darf_admin_bereich, !ist_admin) sieht die url maskiert.
+    let res = anfrage(
+        &app,
+        "POST",
+        "/api/benutzer",
+        Some(&admin),
+        Some(r#"{"anzeigename":"Frieda","benutzername":"frieda","passwort":"friedapw1","org_rolle":"fuehrungskraft"}"#),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let liste = json(anfrage(&app, "GET", "/api/karte/online-quellen", Some(&frieda), None).await).await;
+    assert_eq!(liste[0]["url"], "***", "Führungskraft sieht maskierte url");
+    assert!(
+        !liste[0]["url"].as_str().unwrap().contains("GEHEIM"),
+        "kein Key für die Führungskraft"
+    );
+}
+
+// ===== Proxy-Endpunkte: Ablehnung/Scoping (Happy-Path via Service-Loopback-Tests bewiesen) =====
+
+async fn insert_proxy_quelle(pool: &sqlx::SqlitePool, name: &str, url: &str, typ: &str, aktiv: i64, proxy: i64, sortier: i64) {
+    sqlx::query("INSERT INTO karte_online_quelle (name,url,typ,attribution,sortier,aktiv,proxy) VALUES (?,?,?,?,?,?,?)")
+        .bind(name).bind(url).bind(typ).bind("© X").bind(sortier).bind(aktiv).bind(proxy)
+        .execute(pool).await.unwrap();
+}
+
+#[tokio::test]
+async fn proxy_style_unbekannte_id_ist_404() {
+    let app = app_mit_pool(pool().await);
+    // Route ist registriert → Handler-404 (JSON), nicht der SPA-HTML-Fallback.
+    let res = anfrage(&app, "GET", "/api/karte/proxy/999/style.json", None, None).await;
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    assert_eq!(
+        res.headers().get(header::CONTENT_TYPE).unwrap(),
+        "application/json"
+    );
+}
+
+#[tokio::test]
+async fn proxy_style_proxy0_oder_inaktiv_ist_404() {
+    let pool = pool().await;
+    insert_proxy_quelle(&pool, "Direkt", "https://x/s.json", "vektor", 1, 0, 0).await; // id 1: proxy=0
+    insert_proxy_quelle(&pool, "Inaktiv", "https://x/s.json?key=K", "vektor", 0, 1, 1).await; // id 2: inaktiv
+    let app = app_mit_pool(pool);
+    for id in [1, 2] {
+        let res = anfrage(&app, "GET", &format!("/api/karte/proxy/{id}/style.json"), None, None).await;
+        assert_eq!(res.status(), StatusCode::NOT_FOUND, "id {id} nicht proxybar");
+    }
+}
+
+#[tokio::test]
+async fn proxy_style_interne_gespeicherte_url_ist_fehler() {
+    let pool = pool().await;
+    // proxy=1 mit interner url direkt in DB (umgeht validiere_online) → SSRF-Gate im Handler.
+    insert_proxy_quelle(&pool, "Boese", "https://169.254.169.254/style.json", "vektor", 1, 1, 0).await;
+    let app = app_mit_pool(pool);
+    let res = anfrage(&app, "GET", "/api/karte/proxy/1/style.json", None, None).await;
+    assert!(res.status().is_server_error(), "SSRF-Gate vor Connect: {}", res.status());
+}
+
+#[tokio::test]
+async fn proxy_tile_art_mismatch_und_fremde_quelle_404() {
+    let pool = pool().await;
+    insert_proxy_quelle(&pool, "Q", "https://x/s.json?key=K", "vektor", 1, 1, 0).await; // id 1
+    insert_proxy_quelle(&pool, "Q2", "https://y/s.json?key=K", "vektor", 1, 1, 1).await; // id 2
+    // Sprite-Slot (id 1) für quelle 1.
+    sqlx::query("INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) VALUES (1, 'https://x/sprite?key=K', 'sprite')")
+        .execute(&pool).await.unwrap();
+    let app = app_mit_pool(pool);
+    // Slot 1 ist 'sprite' → als Tile angefragt → 404 (art-Mismatch).
+    let res = anfrage(&app, "GET", "/api/karte/proxy/1/tile/1/1/1/1", None, None).await;
+    assert_eq!(res.status(), StatusCode::NOT_FOUND, "art-Mismatch");
+    // Slot 1 gehört quelle 1; unter quelle 2 angefragt → 404 (cross-quelle).
+    let res = anfrage(&app, "GET", "/api/karte/proxy/2/tile/1/1/1/1", None, None).await;
+    assert_eq!(res.status(), StatusCode::NOT_FOUND, "fremde quelle");
+}
+
+#[tokio::test]
+async fn proxy_raster_nicht_numerisches_z_ist_400() {
+    let pool = pool().await;
+    insert_proxy_quelle(&pool, "R", "https://x/{z}/{x}/{y}.png?key=K", "raster", 1, 1, 0).await;
+    let app = app_mit_pool(pool);
+    let res = anfrage(&app, "GET", "/api/karte/proxy/1/raster/abc/1/1", None, None).await;
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST, "z nicht-numerisch → Path-Fehler");
+}
+
+#[tokio::test]
+async fn proxy_glyphs_ungueltiger_range_ist_400() {
+    let pool = pool().await;
+    insert_proxy_quelle(&pool, "G", "https://x/s.json?key=K", "vektor", 1, 1, 0).await;
+    let app = app_mit_pool(pool);
+    // range ohne Bindestrich → validiere_range schlägt fehl (vor slot_aufloesen) → 400.
+    let res = anfrage(&app, "GET", "/api/karte/proxy/1/glyphs/1/Arial/0_255", None, None).await;
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn online_patch_und_delete_purgen_proxy_slots() {
+    use lifeline_hub::karte::registry::repo;
+    let pool = pool().await;
+    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12")).await.unwrap();
+    insert_proxy_quelle(&pool, "Q", "https://x/style.json?key=K", "vektor", 1, 1, 0).await; // id 1
+    sqlx::query("INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) VALUES (1, 'https://x/sprite?key=K', 'sprite')")
+        .execute(&pool).await.unwrap(); // slot 1
+    let app = app_mit_pool(pool.clone());
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    // Slot existiert vor dem PATCH.
+    assert!(repo::slot_aufloesen(&pool, 1, 1, "sprite").await.unwrap().is_some());
+    // PATCH mit GEÄNDERTER url → Handler purged die (jetzt stale) Slots.
+    let res = anfrage(
+        &app, "PATCH", "/api/karte/online-quellen/1", Some(&cookie),
+        Some(r#"{"name":"Q","url":"https://x/anders.json?key=K2","typ":"vektor","attribution":"© X","proxy":true}"#),
+    ).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    assert!(
+        repo::slot_aufloesen(&pool, 1, 1, "sprite").await.unwrap().is_none(),
+        "PATCH (URL-Wechsel) purged stale Slots"
+    );
+
+    // Neuen Slot anlegen, dann DELETE → ebenfalls weg (Handler-Purge + CASCADE).
+    sqlx::query("INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) VALUES (1, 'https://x/s2?key=K2', 'sprite')")
+        .execute(&pool).await.unwrap();
+    let slot2: i64 = sqlx::query_scalar("SELECT id FROM karte_proxy_asset WHERE quelle_id = 1 LIMIT 1")
+        .fetch_one(&pool).await.unwrap();
+    let res = anfrage(&app, "DELETE", "/api/karte/online-quellen/1", Some(&cookie), None).await;
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+    assert!(
+        repo::slot_aufloesen(&pool, 1, slot2, "sprite").await.unwrap().is_none(),
+        "DELETE entfernt die Slots"
+    );
+}
+
+#[tokio::test]
+async fn proxy_tile_slot_auf_interne_adresse_ist_fehler_ssrf() {
+    let pool = pool().await;
+    insert_proxy_quelle(&pool, "S", "https://x/s.json?key=K", "vektor", 1, 1, 0).await;
+    // Ein (z.B. von kompromittiertem Upstream eingeschleuster) Slot zeigt auf eine interne Adresse.
+    sqlx::query("INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) VALUES (1, 'https://169.254.169.254/{z}/{x}/{y}', 'template')")
+        .execute(&pool).await.unwrap();
+    let app = app_mit_pool(pool);
+    let res = anfrage(&app, "GET", "/api/karte/proxy/1/tile/1/1/1/1", None, None).await;
+    assert!(res.status().is_server_error(), "SSRF-Gate blockt internen Slot: {}", res.status());
+}

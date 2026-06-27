@@ -5,6 +5,7 @@
 pub mod cache;
 pub mod download;
 pub mod normalisierung;
+pub mod proxy;
 pub mod quellen;
 pub mod registry;
 pub mod typen;

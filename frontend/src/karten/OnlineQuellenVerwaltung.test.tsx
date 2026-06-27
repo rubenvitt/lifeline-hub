@@ -19,7 +19,7 @@ const fuehrungskraft = {
 
 const quelle: OnlineQuelle = {
   id: 1, name: 'OpenStreetMap', url: 'https://tile.osm.org/{z}/{x}/{y}.png',
-  typ: 'raster', attribution: '© OSM-Mitwirkende', sortier: 0, aktiv: true,
+  typ: 'raster', attribution: '© OSM-Mitwirkende', sortier: 0, aktiv: true, proxy: false,
 };
 
 const katalogEintrag = {
@@ -107,6 +107,7 @@ describe('OnlineQuellenVerwaltung', () => {
       attribution: '© OpenFreeMap',
       sortier: 1,
       aktiv: true,
+      proxy: false,
     });
   });
 
@@ -179,6 +180,34 @@ describe('OnlineQuellenVerwaltung', () => {
       typ: 'raster',
       attribution: '© Beispiel',
       aktiv: true,
+      proxy: false, // ohne Umschalten Default false
     });
+  });
+
+  it('Proxy-Schalter: aktiviert → POST-Body proxy:true (LFH-182)', async () => {
+    let postBody: unknown = null;
+    mockBasis(admin, []);
+    server.use(
+      http.post('/api/karte/online-quellen', async ({ request }) => {
+        postBody = await request.json();
+        return HttpResponse.json({ id: 9, ...(postBody as object) }, { status: 201 });
+      }),
+    );
+    render();
+    await userEvent.click(await screen.findByRole('button', { name: 'Quelle hinzufügen' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Name'), 'MapTiler');
+    await userEvent.type(within(dialog).getByLabelText('URL'), 'https://api.maptiler.com/maps/streets/style.json');
+    await userEvent.type(within(dialog).getByLabelText('Attribution'), '© MapTiler');
+
+    // Den „Über Server proxen"-Switch in seinem Form-Item gezielt umschalten (zwei Switches im Form).
+    const proxyItem = within(dialog).getByText('Über Server proxen').closest('.ant-form-item');
+    await userEvent.click(within(proxyItem as HTMLElement).getByRole('switch'));
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(postBody).not.toBeNull());
+    expect(postBody).toMatchObject({ name: 'MapTiler', proxy: true });
   });
 });

@@ -1,6 +1,5 @@
 //! CRUD- und Lese-Queries der Karten-Registry (runtime-queries, Muster wie `benutzer.rs`).
 
-use crate::config::{OnlineStyle, OnlineStyleTyp};
 use serde::Serialize;
 use sqlx::SqlitePool;
 
@@ -16,6 +15,9 @@ pub struct OnlineQuelle {
     pub attribution: Option<String>,
     pub sortier: i64,
     pub aktiv: bool,
+    /// Serverseitig proxen (key-basierte Anbieter): `/config` gibt nur relative Proxy-URLs aus,
+    /// die Upstream-`url` (inkl. Key) bleibt server-seitig (LFH-182).
+    pub proxy: bool,
 }
 
 /// Eingabefelder zum Anlegen/Aktualisieren einer Online-Quelle (vom Handler aus dem JSON-Body).
@@ -26,63 +28,113 @@ pub struct OnlineQuelleEingabe {
     pub attribution: Option<String>,
     pub sortier: i64,
     pub aktiv: bool,
-}
-
-/// FromRow-Helfer: liest eine Online-Quelle und mappt den `typ`-String aufs Enum.
-/// (Hält `config.rs` serde-only — kein `sqlx::Type`-Derive auf `OnlineStyleTyp`.)
-#[derive(sqlx::FromRow)]
-struct OnlineStyleRow {
-    name: String,
-    url: String,
-    typ: String,
-    attribution: Option<String>,
-}
-
-impl From<OnlineStyleRow> for OnlineStyle {
-    fn from(r: OnlineStyleRow) -> Self {
-        // `typ` ist per CHECK auf 'vektor'|'raster' beschränkt → `_` sicher als Vektor.
-        let typ = match r.typ.as_str() {
-            "raster" => OnlineStyleTyp::Raster,
-            _ => OnlineStyleTyp::Vektor,
-        };
-        OnlineStyle {
-            name: r.name,
-            url: r.url,
-            typ,
-            attribution: r.attribution,
-        }
-    }
-}
-
-/// Aktive Online-Quellen als `OnlineStyle` (für `GET /api/karte/config`), nach `sortier`, `id`.
-pub async fn aktive_online_styles(pool: &SqlitePool) -> Result<Vec<OnlineStyle>, sqlx::Error> {
-    let rows = sqlx::query_as::<_, OnlineStyleRow>(
-        "SELECT name, url, typ, attribution FROM karte_online_quelle \
-         WHERE aktiv = 1 ORDER BY sortier, id",
-    )
-    .fetch_all(pool)
-    .await?;
-    Ok(rows.into_iter().map(OnlineStyle::from).collect())
+    pub proxy: bool,
 }
 
 // Hinweis (sqlx 0.9): `query_as` akzeptiert nur `&'static str` (SqlSafeStr) — kein `format!`-
 // String. Die Spaltenliste wird daher als Literal je Query wiederholt, nicht zentral geteilt.
 
-/// Eine Online-Quelle per `id` lesen (interner Helfer für Anlegen/Aktualisieren).
-async fn hole_online_quelle(pool: &SqlitePool, id: i64) -> Result<OnlineQuelle, sqlx::Error> {
+/// Aktive Online-Quelle für `GET /api/karte/config` — trägt zusätzlich `id` und `proxy`, die der
+/// Config-Handler für den Proxy-URL-Rewrite braucht (LFH-182). Ersetzt `aktive_online_styles` als
+/// Datenquelle des Handlers (das schlanke `OnlineStyle` kennt weder `id` noch `proxy`).
+#[derive(Debug, sqlx::FromRow)]
+pub struct OnlineQuelleConfig {
+    pub id: i64,
+    pub name: String,
+    pub url: String,
+    pub typ: String,
+    pub attribution: Option<String>,
+    pub proxy: bool,
+}
+
+/// Eine Online-Quelle per `id`, oder `None` — für die Proxy-Handler (Existenz + proxy/aktiv prüfen).
+pub async fn finde_online_quelle(
+    pool: &SqlitePool,
+    id: i64,
+) -> Result<Option<OnlineQuelle>, sqlx::Error> {
     sqlx::query_as::<_, OnlineQuelle>(
-        "SELECT id, name, url, typ, attribution, sortier, aktiv \
+        "SELECT id, name, url, typ, attribution, sortier, aktiv, proxy \
          FROM karte_online_quelle WHERE id = ?",
     )
     .bind(id)
+    .fetch_optional(pool)
+    .await
+}
+
+/// Aktive Online-Quellen (mit `id`+`proxy`) für den Config-Rewrite, nach `sortier`, `id`.
+pub async fn aktive_online_quellen_fuer_config(
+    pool: &SqlitePool,
+) -> Result<Vec<OnlineQuelleConfig>, sqlx::Error> {
+    sqlx::query_as::<_, OnlineQuelleConfig>(
+        "SELECT id, name, url, typ, attribution, proxy FROM karte_online_quelle \
+         WHERE aktiv = 1 ORDER BY sortier, id",
+    )
+    .fetch_all(pool)
+    .await
+}
+
+// --- Proxy-Slot-Map (LFH-182): opake Slot-IDs ↔ Upstream-URLs (inkl. Key; nur server-seitig) ---
+
+/// Legt einen Slot für (`quelle_id`, `upstream_url`) an oder gibt den bestehenden zurück
+/// (dedup via UNIQUE). Liefert die Slot-`id`.
+pub async fn slot_upsert(
+    pool: &SqlitePool,
+    quelle_id: i64,
+    upstream_url: &str,
+    art: &str,
+) -> Result<i64, sqlx::Error> {
+    sqlx::query_scalar::<_, i64>(
+        "INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) VALUES (?, ?, ?) \
+         ON CONFLICT(quelle_id, upstream_url, art) DO UPDATE SET art = excluded.art RETURNING id",
+    )
+    .bind(quelle_id)
+    .bind(upstream_url)
+    .bind(art)
     .fetch_one(pool)
     .await
+}
+
+/// Löst einen Slot zu seiner Upstream-URL auf — nur bei passender `quelle_id` UND `art`
+/// (Defense-in-Depth gegen art-Verwechslung / cross-quelle-Zugriff). `None` sonst.
+pub async fn slot_aufloesen(
+    pool: &SqlitePool,
+    quelle_id: i64,
+    slot: i64,
+    art: &str,
+) -> Result<Option<String>, sqlx::Error> {
+    sqlx::query_scalar::<_, String>(
+        "SELECT upstream_url FROM karte_proxy_asset WHERE id = ? AND quelle_id = ? AND art = ?",
+    )
+    .bind(slot)
+    .bind(quelle_id)
+    .bind(art)
+    .fetch_optional(pool)
+    .await
+}
+
+/// Entfernt alle Slots einer Quelle (bei URL-Änderung/Löschen). Liefert die Anzahl.
+pub async fn slots_loeschen(pool: &SqlitePool, quelle_id: i64) -> Result<u64, sqlx::Error> {
+    let n = sqlx::query("DELETE FROM karte_proxy_asset WHERE quelle_id = ?")
+        .bind(quelle_id)
+        .execute(pool)
+        .await?
+        .rows_affected();
+    Ok(n)
+}
+
+/// Eine Online-Quelle per `id` lesen (interner Helfer für Anlegen/Aktualisieren).
+async fn hole_online_quelle(pool: &SqlitePool, id: i64) -> Result<OnlineQuelle, sqlx::Error> {
+    // Delegiert an finde_online_quelle (gleiche Spaltenliste) — `RowNotFound` erhält die bisherige
+    // fetch_one-Semantik für Anlegen/Aktualisieren.
+    finde_online_quelle(pool, id)
+        .await?
+        .ok_or(sqlx::Error::RowNotFound)
 }
 
 /// Alle Online-Quellen (auch inaktive) für die Admin-Liste, nach `sortier`, `id`.
 pub async fn liste_online_quellen(pool: &SqlitePool) -> Result<Vec<OnlineQuelle>, sqlx::Error> {
     sqlx::query_as::<_, OnlineQuelle>(
-        "SELECT id, name, url, typ, attribution, sortier, aktiv \
+        "SELECT id, name, url, typ, attribution, sortier, aktiv, proxy \
          FROM karte_online_quelle ORDER BY sortier, id",
     )
     .fetch_all(pool)
@@ -95,8 +147,8 @@ pub async fn anlegen_online_quelle(
     eingabe: &OnlineQuelleEingabe,
 ) -> Result<OnlineQuelle, sqlx::Error> {
     let id = sqlx::query(
-        "INSERT INTO karte_online_quelle (name, url, typ, attribution, sortier, aktiv) \
-         VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO karte_online_quelle (name, url, typ, attribution, sortier, aktiv, proxy) \
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&eingabe.name)
     .bind(&eingabe.url)
@@ -104,6 +156,7 @@ pub async fn anlegen_online_quelle(
     .bind(&eingabe.attribution)
     .bind(eingabe.sortier)
     .bind(eingabe.aktiv)
+    .bind(eingabe.proxy)
     .execute(pool)
     .await?
     .last_insert_rowid();
@@ -118,7 +171,7 @@ pub async fn aktualisiere_online_quelle(
 ) -> Result<Option<OnlineQuelle>, sqlx::Error> {
     let betroffen = sqlx::query(
         "UPDATE karte_online_quelle \
-         SET name = ?, url = ?, typ = ?, attribution = ?, sortier = ?, aktiv = ?, \
+         SET name = ?, url = ?, typ = ?, attribution = ?, sortier = ?, aktiv = ?, proxy = ?, \
              geaendert_at = datetime('now') \
          WHERE id = ?",
     )
@@ -128,6 +181,7 @@ pub async fn aktualisiere_online_quelle(
     .bind(&eingabe.attribution)
     .bind(eingabe.sortier)
     .bind(eingabe.aktiv)
+    .bind(eingabe.proxy)
     .bind(id)
     .execute(pool)
     .await?
@@ -463,49 +517,24 @@ mod tests {
     use crate::db::test_pool;
 
     #[tokio::test]
-    async fn aktive_online_styles_nur_aktive_sortiert() {
+    async fn aktive_online_quellen_fuer_config_nur_aktive_sortiert() {
         let pool = test_pool().await;
-        sqlx::query(
-            "INSERT INTO karte_online_quelle (name,url,typ,attribution,sortier,aktiv) \
-             VALUES (?,?,?,?,?,?)",
-        )
-        .bind("B")
-        .bind("https://b")
-        .bind("vektor")
-        .bind(None::<String>)
-        .bind(2)
-        .bind(1)
-        .execute(&pool)
-        .await
-        .unwrap();
-        sqlx::query(
-            "INSERT INTO karte_online_quelle (name,url,typ,attribution,sortier,aktiv) \
-             VALUES (?,?,?,?,?,?)",
-        )
-        .bind("A")
-        .bind("https://a")
-        .bind("raster")
-        .bind(Some("© X"))
-        .bind(1)
-        .bind(1)
-        .execute(&pool)
-        .await
-        .unwrap();
+        sqlx::query("INSERT INTO karte_online_quelle (name,url,typ,attribution,sortier,aktiv) VALUES (?,?,?,?,?,?)")
+            .bind("B").bind("https://b").bind("vektor").bind(None::<String>).bind(2).bind(1)
+            .execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO karte_online_quelle (name,url,typ,attribution,sortier,aktiv) VALUES (?,?,?,?,?,?)")
+            .bind("A").bind("https://a").bind("raster").bind(Some("© X")).bind(1).bind(1)
+            .execute(&pool).await.unwrap();
         sqlx::query("INSERT INTO karte_online_quelle (name,url,typ,sortier,aktiv) VALUES (?,?,?,?,?)")
-            .bind("Inaktiv")
-            .bind("https://i")
-            .bind("vektor")
-            .bind(0)
-            .bind(0)
-            .execute(&pool)
-            .await
-            .unwrap();
+            .bind("Inaktiv").bind("https://i").bind("vektor").bind(0).bind(0)
+            .execute(&pool).await.unwrap();
 
-        let styles = aktive_online_styles(&pool).await.unwrap();
-        assert_eq!(styles.len(), 2, "inaktive Quelle ausgeschlossen");
-        assert_eq!(styles[0].name, "A", "sortier 1 vor 2");
-        assert_eq!(styles[0].typ, OnlineStyleTyp::Raster);
-        assert_eq!(styles[1].name, "B");
+        let q = aktive_online_quellen_fuer_config(&pool).await.unwrap();
+        assert_eq!(q.len(), 2, "inaktive Quelle ausgeschlossen");
+        assert_eq!(q[0].name, "A", "sortier 1 vor 2");
+        assert_eq!(q[0].typ, "raster");
+        assert!(!q[0].proxy, "Default proxy=false");
+        assert_eq!(q[1].name, "B");
     }
 
     fn eingabe(name: &str, sortier: i64, aktiv: bool) -> OnlineQuelleEingabe {
@@ -516,6 +545,7 @@ mod tests {
             attribution: Some("© Test".into()),
             sortier,
             aktiv,
+            proxy: false,
         }
     }
 
@@ -554,6 +584,7 @@ mod tests {
             attribution: None,
             sortier: 9,
             aktiv: false,
+            proxy: false,
         };
         let akt = aktualisiere_online_quelle(&pool, q.id, &neu)
             .await
@@ -585,6 +616,96 @@ mod tests {
             "zweites Löschen entfernt nichts"
         );
         assert!(liste_online_quellen(&pool).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn online_quelle_round_trippt_proxy() {
+        let pool = test_pool().await;
+        let mut e = eingabe("X", 1, true);
+        e.proxy = true;
+        let q = anlegen_online_quelle(&pool, &e).await.unwrap();
+        assert!(q.proxy, "proxy=true gespeichert+gelesen");
+        let q2 = anlegen_online_quelle(&pool, &eingabe("Y", 2, true)).await.unwrap();
+        assert!(!q2.proxy, "Default proxy=false");
+        // direkter INSERT ohne proxy-Spalte → Default 0
+        sqlx::query("INSERT INTO karte_online_quelle (name,url,typ,sortier,aktiv) VALUES (?,?,?,?,?)")
+            .bind("Z").bind("https://z").bind("vektor").bind(3).bind(1)
+            .execute(&pool).await.unwrap();
+        let z = liste_online_quellen(&pool).await.unwrap().into_iter().find(|r| r.name == "Z").unwrap();
+        assert!(!z.proxy);
+    }
+
+    #[tokio::test]
+    async fn aktive_online_quellen_fuer_config_traegt_id_und_proxy() {
+        let pool = test_pool().await;
+        let mut e = eingabe("P", 1, true);
+        e.proxy = true;
+        let q = anlegen_online_quelle(&pool, &e).await.unwrap();
+        anlegen_online_quelle(&pool, &eingabe("Inaktiv", 2, false)).await.unwrap();
+        let liste = aktive_online_quellen_fuer_config(&pool).await.unwrap();
+        assert_eq!(liste.len(), 1, "nur aktive");
+        let row = &liste[0];
+        assert_eq!(row.id, q.id);
+        assert!(row.proxy);
+        assert_eq!(row.typ, "vektor");
+    }
+
+    #[tokio::test]
+    async fn slot_upsert_dedupliziert_und_aufloesen_scoped() {
+        let pool = test_pool().await;
+        let q = anlegen_online_quelle(&pool, &eingabe("S", 1, true)).await.unwrap();
+        let s1 = slot_upsert(&pool, q.id, "https://h/a?key=K", "template").await.unwrap();
+        let s1b = slot_upsert(&pool, q.id, "https://h/a?key=K", "template").await.unwrap();
+        assert_eq!(s1, s1b, "gleiche url → gleiche id (dedup)");
+        let s2 = slot_upsert(&pool, q.id, "https://h/b", "sprite").await.unwrap();
+        assert_ne!(s1, s2, "andere url → neue id");
+        assert_eq!(
+            slot_aufloesen(&pool, q.id, s1, "template").await.unwrap().as_deref(),
+            Some("https://h/a?key=K")
+        );
+        assert!(slot_aufloesen(&pool, q.id, s1, "sprite").await.unwrap().is_none(), "falsche art → None");
+        assert!(slot_aufloesen(&pool, 999, s1, "template").await.unwrap().is_none(), "fremde quelle → None");
+        assert!(slot_aufloesen(&pool, q.id, 99999, "template").await.unwrap().is_none(), "unbekannter slot → None");
+    }
+
+    #[tokio::test]
+    async fn slot_upsert_gleiche_url_zwei_arten_zwei_slots() {
+        // art ist Teil der Identität: dieselbe URL in zwei Rollen bekommt zwei Slots, jeder über
+        // seine art auflösbar (sonst würde ON CONFLICT eine Art überschreiben → unauflösbar).
+        let pool = test_pool().await;
+        let q = anlegen_online_quelle(&pool, &eingabe("U", 1, true)).await.unwrap();
+        let a = slot_upsert(&pool, q.id, "https://h/x", "sprite").await.unwrap();
+        let b = slot_upsert(&pool, q.id, "https://h/x", "tilejson").await.unwrap();
+        assert_ne!(a, b, "gleiche URL, andere art → eigener Slot");
+        assert_eq!(slot_aufloesen(&pool, q.id, a, "sprite").await.unwrap().as_deref(), Some("https://h/x"));
+        assert_eq!(slot_aufloesen(&pool, q.id, b, "tilejson").await.unwrap().as_deref(), Some("https://h/x"));
+    }
+
+    #[tokio::test]
+    async fn slots_loeschen_nur_eigene() {
+        let pool = test_pool().await;
+        let a = anlegen_online_quelle(&pool, &eingabe("A", 1, true)).await.unwrap();
+        let b = anlegen_online_quelle(&pool, &eingabe("B", 2, true)).await.unwrap();
+        let sa = slot_upsert(&pool, a.id, "https://h/a", "static").await.unwrap();
+        let sb = slot_upsert(&pool, b.id, "https://h/b", "static").await.unwrap();
+        let n = slots_loeschen(&pool, a.id).await.unwrap();
+        assert_eq!(n, 1);
+        assert!(slot_aufloesen(&pool, a.id, sa, "static").await.unwrap().is_none(), "A-Slot weg");
+        assert!(slot_aufloesen(&pool, b.id, sb, "static").await.unwrap().is_some(), "B-Slot bleibt");
+    }
+
+    #[tokio::test]
+    async fn slots_cascade_beim_loeschen_der_quelle() {
+        // FK ON DELETE CASCADE (test_pool aktiviert PRAGMA foreign_keys): Löschen der Quelle
+        // entfernt ihre Slots auch OHNE den expliziten slots_loeschen-Aufruf des Handlers.
+        let pool = test_pool().await;
+        let q = anlegen_online_quelle(&pool, &eingabe("C", 1, true)).await.unwrap();
+        let s = slot_upsert(&pool, q.id, "https://h/x", "tilejson").await.unwrap();
+        loesche_online_quelle(&pool, q.id).await.unwrap();
+        assert!(
+            slot_aufloesen(&pool, q.id, s, "tilejson").await.unwrap().is_none(),
+            "CASCADE entfernt Slots ohne expliziten Purge"
+        );
     }
 
     fn offline_eingabe(name: &str) -> OfflineKarteEingabe {

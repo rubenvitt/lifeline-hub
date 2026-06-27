@@ -359,6 +359,31 @@ pub fn build_router(state: AppState) -> Router {
         // PMTiles-Tile-Service: unkonditional gemountet. Der Handler liest die aktive Karte
         // zur Laufzeit aus der DB und liefert sie per HTTP-Range aus (oder 404, wenn keine).
         .route("/api/karte/tiles.pmtiles", get(routes::karte::tiles))
+        // Style-/Tile-Proxy (LFH-182, öffentlich): verbirgt Upstream-Key/-URL für proxied Quellen.
+        .route(
+            "/api/karte/proxy/{id}/style.json",
+            get(routes::karte::proxy_style),
+        )
+        .route(
+            "/api/karte/proxy/{id}/raster/{z}/{x}/{y}",
+            get(routes::karte::proxy_raster),
+        )
+        .route(
+            "/api/karte/proxy/{id}/tile/{slot}/{z}/{x}/{y}",
+            get(routes::karte::proxy_tile),
+        )
+        .route(
+            "/api/karte/proxy/{id}/tilejson/{slot}",
+            get(routes::karte::proxy_tilejson),
+        )
+        .route(
+            "/api/karte/proxy/{id}/sprite/{rest}",
+            get(routes::karte::proxy_sprite),
+        )
+        .route(
+            "/api/karte/proxy/{id}/glyphs/{slot}/{fontstack}/{range}",
+            get(routes::karte::proxy_glyphs),
+        )
         // Admin-CRUD der Karten-Registry (Online-Quellen + Offline-Karten), hinter AdminUser.
         .route(
             "/api/karte/online-quellen",

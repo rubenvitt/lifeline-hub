@@ -1259,6 +1259,7 @@ dependencies = [
  "futures",
  "libsqlite3-sys",
  "mime_guess",
+ "percent-encoding",
  "reqwest",
  "rust-embed",
  "serde",

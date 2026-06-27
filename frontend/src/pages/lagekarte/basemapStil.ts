@@ -70,10 +70,29 @@ function rasterStyle(stil: OnlineStyle): StyleSpecification {
   } as StyleSpecification;
 }
 
+/**
+ * `transformRequest` für MapLibre: absolutiert **root-relative** URLs (`/api/karte/proxy/…`,
+ * LFH-182) gegen die Origin. MapLibre lädt Tiles in einem Web-Worker ohne Dokument-Base-URL —
+ * dort scheitern root-relative Tile-URLs mit „Failed to parse URL". Absolute URLs (Online direkt,
+ * `pmtiles://…`) bleiben unangetastet; protokoll-relative `//host` werden bewusst ausgenommen.
+ */
+export function absolutiereProxyAnfrage(url: string): { url: string } {
+  // Bewusst String-Konkatenation statt new URL(): Letzteres würde `{z}`/`{x}`/`{y}` im Pfad
+  // percent-kodieren. (MapLibre ruft transformRequest zwar mit substituierten URLs, der Schutz
+  // ist defensiv.)
+  if (url.startsWith('/') && !url.startsWith('//')) {
+    return { url: window.location.origin + url };
+  }
+  return { url };
+}
+
 /** Style für einen Online-View: Vektor → URL-String, Raster → verpackter Raster-Style. */
 export function baueOnlineStyle(stil: OnlineStyle): StyleSpecification | string {
   if (stil.typ === 'raster') return rasterStyle(stil);
-  return stil.url;
+  // Vektor: Style-JSON-URL. Relative Proxy-URLs (/api/karte/proxy/{id}/style.json, LFH-182) gegen
+  // die Origin absolutieren (idempotent für absolute URLs) — analog zu offlineStyle für pmtiles,
+  // damit MapLibre die setStyle-URL zuverlässig auflöst.
+  return new URL(stil.url, window.location.origin).href;
 }
 
 /**

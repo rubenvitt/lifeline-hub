@@ -1,15 +1,19 @@
 use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
-use crate::config::{default_offline_katalog, default_online_styles, OfflineKatalogEintrag, OnlineStyle};
+use crate::config::{
+    default_offline_katalog, default_online_styles, OfflineKatalogEintrag, OnlineStyle,
+    OnlineStyleTyp,
+};
 use crate::error::AppError;
 use crate::karte::download::{self, Fortschritt};
+use crate::karte::proxy;
 use crate::karte::quellen;
 use crate::karte::registry::repo::{
     self, OfflineKarte, OfflineKarteEingabe, OnlineQuelle, OnlineQuelleEingabe,
 };
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
-use axum::http::{Request, StatusCode};
+use axum::http::{header, Request, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::{Deserialize, Serialize};
@@ -38,7 +42,31 @@ pub struct KarteConfigAntwort {
 
 /// GET /api/karte/config — Basemap-Verfügbarkeit fürs Frontend, frisch aus der DB-Registry.
 pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAntwort>, AppError> {
-    let online_styles = repo::aktive_online_styles(&state.pool).await?;
+    // Proxied Quellen (proxy=1) bekommen relative /api/karte/proxy/...-URLs; die Upstream-`url`
+    // (inkl. Key) verlässt den Server NIE über diesen öffentlichen Endpunkt. Direkte Quellen
+    // (proxy=0) werden unverändert ausgeliefert (Browser lädt sie selbst).
+    let online_styles: Vec<OnlineStyle> = repo::aktive_online_quellen_fuer_config(&state.pool)
+        .await?
+        .into_iter()
+        .map(|q| {
+            let typ = if q.typ == "raster" {
+                OnlineStyleTyp::Raster
+            } else {
+                OnlineStyleTyp::Vektor
+            };
+            let url = if q.proxy {
+                proxy::proxy_config_url(q.id, &typ)
+            } else {
+                q.url
+            };
+            OnlineStyle {
+                name: q.name,
+                url,
+                typ,
+                attribution: q.attribution,
+            }
+        })
+        .collect();
     let aktiv = repo::aktive_offline_karte(&state.pool).await?;
     let (pmtiles_url, pmtiles_attribution) = match &aktiv {
         Some(k) => {
@@ -131,6 +159,9 @@ pub struct OnlineQuelleBody {
     pub sortier: i64,
     #[serde(default = "default_aktiv")]
     pub aktiv: bool,
+    /// Serverseitig proxen (key-basierte Anbieter, LFH-182). Default false → Quelle läuft direkt.
+    #[serde(default)]
+    pub proxy: bool,
 }
 
 /// Request-Body zum Registrieren einer Offline-Karte (Grundstein: vorhandene Datei).
@@ -170,6 +201,23 @@ fn validiere_online(body: OnlineQuelleBody) -> Result<OnlineQuelleEingabe, AppEr
             AppError::Validation("Attribution ist Pflicht (Lizenzauflage)".into())
         })?
         .to_string();
+    // Proxied Quellen (key-basiert): URL roh speichern (kein Url-Roundtrip — würde `{}`
+    // percent-kodieren), aber vorab validieren: nur unterstützte Platzhalter, und SSRF-Check auf
+    // einer materialisierten Probe (Platzhalter durch 0/Dummy ersetzt). Direkte Quellen (proxy=0)
+    // bleiben unverändert: der Browser lädt sie selbst, keine Server-seitige Prüfung nötig.
+    if body.proxy {
+        let unbekannt = proxy::unbekannte_platzhalter(url);
+        if !unbekannt.is_empty() {
+            return Err(AppError::Validation(format!(
+                "Nicht unterstützte Platzhalter in der Proxy-URL: {}",
+                unbekannt.join(", ")
+            )));
+        }
+        let probe = proxy::subst_template(&proxy::subst_glyphs(url, "a", "0-0"), 0, 0, 0);
+        let parsed = reqwest::Url::parse(&probe)
+            .map_err(|e| AppError::Validation(format!("Ungültige Proxy-URL: {e}")))?;
+        download::url_ist_sicher(&parsed).map_err(AppError::Validation)?;
+    }
     Ok(OnlineQuelleEingabe {
         name: name.to_string(),
         url: url.to_string(),
@@ -177,6 +225,7 @@ fn validiere_online(body: OnlineQuelleBody) -> Result<OnlineQuelleEingabe, AppEr
         attribution: Some(attribution),
         sortier: body.sortier,
         aktiv: body.aktiv,
+        proxy: body.proxy,
     })
 }
 
@@ -189,7 +238,18 @@ pub async fn online_liste(
     if !benutzer.darf_admin_bereich() {
         return Err(AppError::Forbidden);
     }
-    Ok(Json(repo::liste_online_quellen(&state.pool).await?))
+    let mut quellen = repo::liste_online_quellen(&state.pool).await?;
+    // darf_admin_bereich() schließt Führungskräfte (read-only) ein. Die Upstream-`url` einer
+    // proxied Quelle enthält den Key → nur dem echten Admin (der sie eingegeben hat) im Klartext
+    // zeigen, für alle anderen maskieren.
+    if !benutzer.ist_admin() {
+        for q in &mut quellen {
+            if q.proxy {
+                q.url = "***".into();
+            }
+        }
+    }
+    Ok(Json(quellen))
 }
 
 /// POST /api/karte/online-quellen — neue Online-Quelle anlegen (Admin).
@@ -216,10 +276,12 @@ pub async fn online_aktualisieren(
     Json(body): Json<OnlineQuelleBody>,
 ) -> Result<Json<OnlineQuelle>, AppError> {
     let eingabe = validiere_online(body)?;
-    repo::aktualisiere_online_quelle(&state.pool, id, &eingabe)
-        .await?
-        .map(Json)
-        .ok_or(AppError::NotFound)
+    let aktualisiert = repo::aktualisiere_online_quelle(&state.pool, id, &eingabe).await?;
+    if aktualisiert.is_some() {
+        // URL kann sich geändert haben → alte Proxy-Slots sind stale und müssen weg.
+        repo::slots_loeschen(&state.pool, id).await?;
+    }
+    aktualisiert.map(Json).ok_or(AppError::NotFound)
 }
 
 /// DELETE /api/karte/online-quellen/{id} — Online-Quelle löschen (Admin).
@@ -229,6 +291,9 @@ pub async fn online_loeschen(
     Path(id): Path<i64>,
 ) -> Result<StatusCode, AppError> {
     if repo::loesche_online_quelle(&state.pool, id).await? {
+        // Verwaiste Proxy-Slots explizit entfernen (zusätzlich zu ON DELETE CASCADE, dessen
+        // Enforcement in SQLite PRAGMA-abhängig ist).
+        repo::slots_loeschen(&state.pool, id).await?;
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err(AppError::NotFound)
@@ -558,5 +623,181 @@ pub async fn offline_abbrechen(
             Ok(StatusCode::NO_CONTENT)
         }
         None => Err(AppError::NotFound),
+    }
+}
+
+// ===== Style-/Tile-Proxy (LFH-182, öffentlich — wie /config & /tiles) =====
+//
+// Alle Endpunkte: Quelle muss existieren + proxy=1 + aktiv=1 (sonst 404). Jede Upstream-URL läuft
+// VOR dem Fetch durch `url_ist_sicher` (Schema/Literal); der `proxy_client` ergänzt den pinnenden
+// DNS-Resolver (Anti-Rebinding) + per-Hop-Redirect-Prüfung. Clients können nie eine eigene
+// Ziel-URL wählen — nur die gespeicherte Quelle-`url` (style/raster) bzw. recordete Slots.
+
+/// Lädt die Quelle und stellt sicher, dass sie geproxyt werden DARF (existiert, proxy=1, aktiv=1).
+async fn aktive_proxy_quelle(state: &AppState, id: i64) -> Result<OnlineQuelle, AppError> {
+    match repo::finde_online_quelle(&state.pool, id).await? {
+        Some(q) if q.proxy && q.aktiv => Ok(q),
+        _ => Err(AppError::NotFound),
+    }
+}
+
+/// SSRF-Gate vor jedem Upstream-Fetch: parst die URL und prüft Schema/Literal-IP.
+fn ssrf_geprueft(upstream: &str) -> Result<reqwest::Url, AppError> {
+    let u = reqwest::Url::parse(upstream)
+        .map_err(|e| AppError::Internal(format!("ungültige Upstream-URL: {e}")))?;
+    download::url_ist_sicher(&u).map_err(AppError::Internal)?;
+    Ok(u)
+}
+
+/// JSON-Proxy-Antwort (style.json / tilejson): key-frei, nicht cachen.
+fn json_proxy_antwort(json: String) -> Response {
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::CACHE_CONTROL, "no-cache")
+        .body(Body::from(json))
+        .unwrap()
+}
+
+/// Binär-Asset-Antwort (Tiles/Sprite/Glyphs): hygienisierte Header + nosniff durchreichen.
+fn asset_antwort(a: crate::karte::proxy::AssetAntwort) -> Response {
+    let mut b = Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, a.content_type)
+        .header(header::X_CONTENT_TYPE_OPTIONS, "nosniff");
+    if let Some(ce) = a.content_encoding {
+        b = b.header(header::CONTENT_ENCODING, ce);
+    }
+    if let Some(cc) = a.cache_control {
+        b = b.header(header::CACHE_CONTROL, cc);
+    }
+    if let Some(et) = a.etag {
+        b = b.header(header::ETAG, et);
+    }
+    b.body(Body::from(a.bytes)).unwrap()
+}
+
+/// Löst einen Slot der Quelle auf (scoped auf `quelle_id` UND `art`) oder liefert `404`.
+async fn slot_oder_nf(
+    state: &AppState,
+    id: i64,
+    slot: i64,
+    art: proxy::SlotArt,
+) -> Result<String, AppError> {
+    repo::slot_aufloesen(&state.pool, id, slot, art.as_str())
+        .await?
+        .ok_or(AppError::NotFound)
+}
+
+/// Holt ein Binär-Asset über den geteilten Proxy-Client (SSRF-gepinnt) und baut die Antwort.
+async fn proxy_asset(u: reqwest::Url) -> Result<Response, AppError> {
+    let asset = proxy::hole_asset(proxy::proxy_client(), u, proxy::ASSET_BYTE_CAP)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(asset_antwort(asset))
+}
+
+/// GET /api/karte/proxy/{id}/style.json — Vektor-Style serverseitig holen + key-frei umschreiben.
+pub async fn proxy_style(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<Response, AppError> {
+    let q = aktive_proxy_quelle(&state, id).await?;
+    let u = ssrf_geprueft(&q.url)?;
+    let json = proxy::hole_style(proxy::proxy_client(), &state.pool, id, u)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(json_proxy_antwort(json))
+}
+
+/// GET /api/karte/proxy/{id}/raster/{z}/{x}/{y} — Raster-Tile aus der gespeicherten Template-URL.
+pub async fn proxy_raster(
+    State(state): State<AppState>,
+    Path((id, z, x, y)): Path<(i64, i64, i64, i64)>,
+) -> Result<Response, AppError> {
+    let q = aktive_proxy_quelle(&state, id).await?;
+    let u = ssrf_geprueft(&proxy::subst_template(&q.url, z, x, y))?;
+    proxy_asset(u).await
+}
+
+/// GET /api/karte/proxy/{id}/tile/{slot}/{z}/{x}/{y} — Vektor-/Raster-Tile aus einem Style-Slot.
+pub async fn proxy_tile(
+    State(state): State<AppState>,
+    Path((id, slot, z, x, y)): Path<(i64, i64, i64, i64, i64)>,
+) -> Result<Response, AppError> {
+    aktive_proxy_quelle(&state, id).await?;
+    let template = slot_oder_nf(&state, id, slot, proxy::SlotArt::Template).await?;
+    let u = ssrf_geprueft(&proxy::subst_template(&template, z, x, y))?;
+    proxy_asset(u).await
+}
+
+/// GET /api/karte/proxy/{id}/tilejson/{slot} — TileJSON-Indirektion holen + key-frei umschreiben.
+pub async fn proxy_tilejson(
+    State(state): State<AppState>,
+    Path((id, slot)): Path<(i64, i64)>,
+) -> Result<Response, AppError> {
+    aktive_proxy_quelle(&state, id).await?;
+    let upstream = slot_oder_nf(&state, id, slot, proxy::SlotArt::Tilejson).await?;
+    let u = ssrf_geprueft(&upstream)?;
+    let json = proxy::hole_tilejson(proxy::proxy_client(), &state.pool, id, u)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(json_proxy_antwort(json))
+}
+
+/// GET /api/karte/proxy/{id}/sprite/{rest} — Sprite (`{rest}` = `{slot}.json|.png|@2x…`).
+pub async fn proxy_sprite(
+    State(state): State<AppState>,
+    Path((id, rest)): Path<(i64, String)>,
+) -> Result<Response, AppError> {
+    aktive_proxy_quelle(&state, id).await?;
+    let (slot, suffix) = proxy::split_slot_suffix(&rest).map_err(AppError::Validation)?;
+    let base = slot_oder_nf(&state, id, slot, proxy::SlotArt::Sprite).await?;
+    let u = ssrf_geprueft(&proxy::sprite_upstream(&base, &suffix))?;
+    proxy_asset(u).await
+}
+
+/// GET /api/karte/proxy/{id}/glyphs/{slot}/{fontstack}/{range} — Glyphs aus einem Style-Slot.
+pub async fn proxy_glyphs(
+    State(state): State<AppState>,
+    Path((id, slot, fontstack, range)): Path<(i64, i64, String, String)>,
+) -> Result<Response, AppError> {
+    aktive_proxy_quelle(&state, id).await?;
+    proxy::validiere_fontstack(&fontstack).map_err(AppError::Validation)?;
+    proxy::validiere_range(&range).map_err(AppError::Validation)?;
+    let template = slot_oder_nf(&state, id, slot, proxy::SlotArt::Glyphs).await?;
+    let u = ssrf_geprueft(&proxy::subst_glyphs(&template, &fontstack, &range))?;
+    proxy_asset(u).await
+}
+
+#[cfg(test)]
+mod proxy_antwort_tests {
+    use super::*;
+
+    #[test]
+    fn asset_antwort_setzt_nosniff_und_reicht_header_durch() {
+        let a = proxy::AssetAntwort {
+            bytes: b"TILE".to_vec(),
+            content_type: "application/x-protobuf".into(),
+            content_encoding: Some("gzip".into()),
+            cache_control: Some("public, max-age=60".into()),
+            etag: Some("\"abc\"".into()),
+        };
+        let r = asset_antwort(a);
+        assert_eq!(r.status(), StatusCode::OK);
+        let h = r.headers();
+        assert_eq!(h.get(header::CONTENT_TYPE).unwrap(), "application/x-protobuf");
+        assert_eq!(h.get(header::X_CONTENT_TYPE_OPTIONS).unwrap(), "nosniff");
+        assert_eq!(h.get(header::CONTENT_ENCODING).unwrap(), "gzip");
+        assert_eq!(h.get(header::CACHE_CONTROL).unwrap(), "public, max-age=60");
+        assert_eq!(h.get(header::ETAG).unwrap(), "\"abc\"");
+    }
+
+    #[test]
+    fn json_proxy_antwort_ist_json_no_cache() {
+        let r = json_proxy_antwort("{}".into());
+        assert_eq!(r.status(), StatusCode::OK);
+        assert_eq!(r.headers().get(header::CONTENT_TYPE).unwrap(), "application/json");
+        assert_eq!(r.headers().get(header::CACHE_CONTROL).unwrap(), "no-cache");
     }
 }
