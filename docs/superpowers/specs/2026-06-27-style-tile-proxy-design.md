@@ -47,8 +47,11 @@ proxied Quellen wie normale (jetzt relative, same-origin) Quellen aussehen.
 - Key-basierte Quellen: Admin legt die **volle Upstream-URL inkl. Key** in `url` ab und setzt
   `proxy=1`.
 - Für `proxy=1`-Quellen wird `url` **nie** über `/api/karte/config` serialisiert (öffentlicher
-  Endpunkt). Die Admin-Liste (`GET /api/karte/online-quellen`, admin-only) zeigt `url` weiterhin
-  — der Admin hat sie selbst eingegeben und muss sie editieren können.
+  Endpunkt). Die Verwaltungsliste (`GET /api/karte/online-quellen`) ist **nicht admin-only** —
+  `darf_admin_bereich()` schließt **Führungskräfte** (read-only) ein. Daher maskiert `online_liste`
+  die `url` einer `proxy=1`-Quelle, **wenn der Benutzer nicht `ist_admin()`** ist; nur der echte
+  Admin (der die URL eingegeben hat und editieren muss) sieht sie voll. (Korrigiert die frühere
+  „admin-only"-Annahme.)
 - `proxy` ist **backend-only**: der Frontend-`OnlineStyle`-Typ (`{name,url,typ,attribution}`)
   bleibt unverändert. Das Frontend erfährt nur die fertig umgeschriebene relative `url`.
 
@@ -65,6 +68,13 @@ proxied Quellen wie normale (jetzt relative, same-origin) Quellen aussehen.
 `attribution` bleibt unverändert (config-autoritativ, Frontend zeigt sie via
 `customAttribution`). Die Pflicht-Attribution gilt für proxied Quellen genau wie für direkte.
 
+**Repo-Konsequenz:** Das heutige `aktive_online_styles()` liefert nur `name,url,typ,attribution`
+(→ `OnlineStyle`) — **ohne `id`/`proxy`**, der Config-Handler könnte den Rewrite damit gar nicht
+durchführen (sonst stünde der Klartext-Key default-mäßig öffentlich im `/config`). Daher ein neuer
+Query `aktive_online_quellen_fuer_config()`, der zusätzlich `id` und `proxy` liefert; der Handler
+baut daraus die (ggf. umgeschriebene) `OnlineStyle`-Liste. `aktive_online_styles()` wird ersetzt
+(alter Unit-Test angepasst).
+
 ## 3. Proxy-Endpunkte
 
 Alle Proxy-Endpunkte sind **öffentlich** (kein Auth-Extractor) — wie `/api/karte/config` und
@@ -73,9 +83,10 @@ Endpunkte können **nur** server-vorgegebene Ziele treffen (gespeicherte `url` b
 Slots), nie client-gelieferte URLs. Admin-CRUD bleibt admin-only.
 
 - `GET /api/karte/proxy/{id}/style.json`
-  Holt den Upstream-Style (gespeicherte `url` inkl. Key), parst JSON, **schreibt jede absolute
-  http(s)-URL im Dokument** auf Proxy-Slot-URLs um und liefert key-freies Style-JSON zurück.
-  Rewrite ist **fail-safe**: lieber eine URL zu viel umschreiben als einen Key durchlassen.
+  Holt den Upstream-Style (gespeicherte `url` inkl. Key), parst JSON, schreibt **strukturell** nur
+  bekannte Asset-Positionen auf Proxy-Slot-URLs um (siehe §5 Key-Hiding), **neutralisiert** absolute
+  URLs an unbekannten Positionen, absolutiert relative Asset-Refs gegen die Style-Basis-URL, läuft
+  durch den `contains_secret`-Backstop (fail-closed) und liefert key-freies Style-JSON.
   `Cache-Control: no-cache` (klein, bei Bedarf neu geholt).
 
 - `GET /api/karte/proxy/{id}/raster/{z}/{x}/{y}`
@@ -141,22 +152,53 @@ ELW-Sessions DB-gestützt.
 Key-Strippen + anbieter-/host-abhängige Re-Injektion + stabiles Server-Secret. Die Slot-Map
 verbirgt Keys ohne jede Key-Param-Logik und ist konzeptionell einfacher.
 
-## 5. Sicherheit
+## 5. Sicherheit (gehärtet nach adversarialer Design-Review)
 
-- **Key-Hiding:** Keys leben ausschließlich in `karte_online_quelle.url` und
-  `karte_proxy_asset.upstream_url` (beide server-seitig in der DB). Kein Endpunkt serialisiert
-  sie an den Client. Der Style-Rewrite ist fail-safe (alle absoluten URLs werden umgeschrieben).
-- **SSRF:** **jeder** Upstream-Fetch (style.json, tilejson, tile, raster, sprite, glyphs) läuft
-  durch `url_ist_sicher` + den Redirect-je-Hop-prüfenden Client (wiederverwendet aus
-  `karte::download`). Schützt auch gegen einen **kompromittierten/böswilligen Upstream**, der z.B.
-  `sprite: "http://169.254.169.254/…"` zurückgibt — die geparsten Sub-URLs werden vor dem Fetch
-  ebenso geprüft.
-- **Kein Open-Proxy:** Clients können nur (a) existierende Slots der Quelle oder (b) das
-  gespeicherte Raster-Template treffen — **nie** eine client-gelieferte Ziel-URL. Slot-IDs sind
-  opake Integer, an `quelle_id` gebunden.
-- **Dedizierter `proxy_client`** (`reqwest::Client`): moderate Timeouts inkl. **Gesamt-Timeout**
-  (Assets sind klein — anders als der GB-Download-Client, der bewusst keinen Globaltimeout hat).
-  Größenlimit pro Asset gegen Speicher-Blowup.
+- **Key-Hiding (mehrschichtig):**
+  - Keys leben ausschließlich in `karte_online_quelle.url` und `karte_proxy_asset.upstream_url`
+    (beide server-seitig in der DB). Kein client-gerichteter Endpunkt serialisiert sie.
+  - **Rewrite ist strukturell-zuerst** (NICHT „alle absoluten URLs → Slot"): nur **bekannte
+    Asset-Positionen** werden zu fetchbaren Slots (`sources[].tiles`→template,
+    `sources[].url`→tilejson, `sprite`, `glyphs`, `sources[].data`→static). Absolute URLs an
+    **unbekannten** Positionen werden **neutralisiert** (Schlüssel/Wert entfernt) — nie zu einem
+    fetchbaren Slot. Das verbindet Key-Entfernung mit Open-Proxy-Schutz.
+  - **Backstop `contains_secret` (fail-closed):** vor dem Ausliefern wird das serialisierte
+    style.json/tilejson gegen die **Query-Param-Werte** der gespeicherten Upstream-URL gescannt;
+    Treffer → Fehler statt Auslieferung. *Ehrliche Grenze:* Keys in Pfadsegmenten/Subdomains
+    sind so nicht zuverlässig scanbar — dokumentierte Restgrenze, nicht „vollständig".
+- **SSRF (auflösend + pinnend — Spec-Korrektur):** Das frühere Versprechen „`url_ist_sicher`
+  schützt" war **unvollständig**: `url_ist_sicher` prüft nur **IP-Literale**, nicht aufgelöste
+  Hostnamen. Das `http://169.254…`-Beispiel ist durch https-only ohnehin tot; die reale Lücke ist
+  **`https://rebind.evil/` → interne IP** (Name→intern + DNS-Rebinding). Fix:
+  - Ein **auflösender, pinnender DNS-Resolver** (`reqwest 0.13.4 ClientBuilder::dns_resolver` +
+    `reqwest::dns::Resolve`-Trait, API verifiziert): löst den Host selbst auf, prüft **alle**
+    A/AAAA gegen `ip_ist_intern` und gibt nur public IPs an reqwest zurück → reqwest connectet
+    exakt auf diese Adressen, **kein Re-Resolve/Rebind-Fenster**. Greift auch in der Redirect-Policy.
+  - `url_ist_sicher` bleibt als Schema-/Literal-Pre-Check **vor jedem** Fetch (style, tilejson,
+    tile, raster, sprite, glyphs, geojson-data) — schützt auch gegen einen **kompromittierten
+    Upstream**, der `sprite: "https://intern/…"` zurückgibt.
+- **Kein Ziel-Open-Proxy:** Clients können nur (a) existierende Slots der Quelle (an `quelle_id`
+  UND `art` gebunden) oder (b) das gespeicherte Raster-Template treffen — **nie** eine
+  client-gelieferte Ziel-URL. Slot-IDs sind opake Integer.
+- **Param-Injection-Guards:** `z/x/y` als `i64`-`Path`; `range` strikt `^\d+-\d+$`; `fontstack`
+  auf erlaubte Zeichen whitelisten und **pro Komma-Segment percent-encodieren**; sprite-`rest`
+  gegen feste Suffix-Allowlist (`@2x?\.(json|png)`). Keine rohe Konkatenation client-gelieferter
+  Segmente in die Upstream-URL.
+- **Antwort-Hygiene (`hole_asset`):** Content-Type, **Content-Encoding** (gzip/br verbatim — kein
+  serverseitiges Dekomprimieren), ETag/Last-Modified/Cache-Control per **Allowlist** durchreichen;
+  gefährliche Typen (`text/html`, `text/*`) auf `application/octet-stream` +
+  `X-Content-Type-Options: nosniff` klemmen (Anti-XSS). `Location`/`Set-Cookie` strippen; bei
+  non-2xx generischer Fehler **ohne** Upstream-Body. **Byte-Cap** pro Asset (Content-Length nicht
+  vertrauen) gegen Speicher-Blowup.
+- **Dedizierter `proxy_client`:** moderate Timeouts inkl. **Gesamt-Timeout** (Assets sind klein —
+  anders als der GB-Download-Client ohne Globaltimeout). Nutzt den pinnenden Resolver.
+- **DoS-Grenze beim Rewrite:** harte Obergrenze umgeschriebener URLs/Slots pro Style (z.B. 500) →
+  darüber Rewrite-Abbruch (Quelle als fehlerhaft behandeln); Slot-Tabelle wächst nicht unbegrenzt.
+- **Volumen-Open-Proxy (bewusste Grenze):** die unauthentifizierten Endpunkte können den
+  abgerechneten Upstream-Key durch Volumen drainieren. v1 begrenzt sich aufs Billige (Tiles reichen
+  Upstream-`Cache-Control`/`ETag` durch → Browser/CDN absorbieren Wiederholungen);
+  serverseitiges Style-Caching/Rate-Limiting ist **OUT-OF-SCOPE** (kein Key-Konsument vorhanden) —
+  als Bedrohungslage hier dokumentiert.
 
 ## 6. Frontend
 
@@ -174,20 +216,45 @@ Praktisch **keine** funktionale Änderung am Karten-Rendering:
 
 ## 7. Backend-Komponenten (Schnitt)
 
-- **`src/karte/proxy.rs`** (neu): reine, unit-testbare Bausteine —
-  - `proxy_client()` (dedizierter reqwest-Client).
-  - Style-/TileJSON-**Rewrite-Walker**: nimmt JSON + eine Slot-Vergabe-Closure, ersetzt jede
-    absolute http(s)-URL strukturabhängig (sources[].tiles → template-Slots, sprite-Key →
-    sprite-Slot, glyphs-Key → glyphs-Slot, sources[].url → tilejson-Slot, sonstige → static-Slot)
-    durch die passende `/api/karte/proxy/{id}/…`-URL. Tile-Template-Erkennung via Platzhalter.
-  - Template-Substitution (`{z}/{x}/{y}/{-y}`, `{fontstack}/{range}`).
+- **`src/karte/proxy.rs`** (neu): reine, unit-testbare Bausteine + nicht-validierende Service-Schicht —
+  - **URL-Bauer:** `proxy_config_url(id,typ)` und `proxy_url(id, art, …)` (5 Client-Formen,
+    **root-relativ** mit führendem `/`).
+  - **Rewrite-Walker** (`rewrite_style`, `rewrite_tilejson`): nimmt JSON + Slot-Vergabe-Closure,
+    schreibt **strukturell** (nur bekannte Positionen) auf Slots um, **neutralisiert** unbekannt
+    positionierte absolute URLs, absolutiert relative Refs gegen die Style-Basis, mit
+    Slot-Obergrenze (DoS). `ist_absolute_http_url` (https/HTTPS/protokoll-relativ, lehnt
+    relative/`pmtiles:`/`mapbox:` ab). `contains_secret(json, upstream_url)` Backstop.
+  - **Substitution:** `subst_template` (`{z}/{x}/{y}` namensbasiert + `{-y}`/TMS, roher String
+    behält `{…}`), `subst_glyphs` (`{fontstack}` percent-encodet pro Segment, `{range}`),
+    `validiere_range`, `validiere_fontstack`, `sprite_upstream` (Suffix vor den Query),
+    `split_slot_suffix`.
+  - **SSRF-Resolver:** `sicherer_resolver` (auflösend+pinnend, `reqwest::dns::Resolve`) und
+    `proxy_client()` (dedizierter reqwest-Client **mit** Gesamt-Timeout, nutzt den Resolver).
+  - **Service-Schicht (nicht-validierend, Loopback-testbar wie `download::lade_datei`):**
+    `hole_asset` (Bytes + hygienisierte Header), `hole_style`/`hole_tilejson` (fetch + rewrite +
+    Slots minten + fail-closed). Das SSRF-Gate (`url_ist_sicher` + Resolver) sitzt im **Handler**.
+- **`src/karte/download.rs`**: `ssrf_redirect_policy()` aus `download_client()` herausziehen, damit
+  der `proxy_client` die per-Hop-Prüfung teilt (bestehendes Verhalten unverändert/grün).
 - **`src/karte/registry/repo.rs`**: `proxy`-Spalte in `OnlineQuelle`/`OnlineQuelleEingabe` +
-  Queries; Slot-Map-CRUD (`slot_upsert`, `slot_aufloesen`, `slots_loeschen(quelle_id)`).
-- **`src/routes/karte.rs`**: `OnlineQuelleBody`+`validiere_online` um `proxy` erweitern (SSRF-Check
-  der `url` beim Speichern für `proxy=1`); `config`-Rewrite; die Proxy-Handler.
-- **`src/app.rs`**: Routen registrieren; ggf. Slot-Cache-Feld im `AppState`.
-- **Migration** `migrations/00XX_karte_proxy.sql` (additiv: `ALTER TABLE … ADD COLUMN proxy` +
-  `CREATE TABLE karte_proxy_asset`). Rein additiv → kein CHECK-Rebuild.
+  Queries; neuer `aktive_online_quellen_fuer_config()` (mit `id`+`proxy`, ersetzt
+  `aktive_online_styles`); Slot-Map-CRUD (`slot_upsert` via `ON CONFLICT(quelle_id,upstream_url)
+  DO UPDATE SET art RETURNING id`, `slot_aufloesen(quelle_id,slot,art)`,
+  `slots_loeschen(quelle_id)`).
+- **`src/routes/karte.rs`**: `OnlineQuelleBody`+`OnlineQuelleEingabe`+`validiere_online` um `proxy`
+  erweitern. Für `proxy=1`: `url` **roh** (getrimmt) speichern (kein `Url`-Roundtrip — `url`-crate
+  percent-encodet `{}`); SSRF-Check via `url_ist_sicher` auf einer **materialisierten Probe**
+  (z=0/x=0/y=0 bzw. style-URL); **unbekannte `{…}`-Platzhalter ablehnen** (422, fail-fast).
+  `online_liste` maskiert `url` für `proxy=1` wenn nicht `ist_admin()`. `config`-Rewrite. Die
+  Proxy-Handler (öffentlich; prüfen Quelle existiert + `proxy=1` + `aktiv`, sonst 404; SSRF-Gate
+  vor jedem Fetch).
+- **`src/app.rs` + `src/main.rs` + `tests/*.rs`**: Routen registrieren; **ein gruppiertes
+  `ProxyState{client, slots}`-Feld** im `AppState` (genau eine Zeile je Konstruktionsstelle —
+  mechanischer, compile-getriebener Rollout wie der LFH-181-`download_client`; `rg`-Stellenliste
+  vorab). `slots` = In-Memory-Cache (`Arc<RwLock<HashMap>>`) vor der Slot-Tabelle.
+- **Migration** `migrations/0077_karte_proxy.sql` (additiv: `ALTER TABLE karte_online_quelle ADD
+  COLUMN proxy …` + `CREATE TABLE karte_proxy_asset …`). Rein additiv → kein CHECK-Rebuild.
+  **Vor Merge** gegen den dann-aktuellen `migrations/`-Stand re-prüfen (0077 könnte mit einem
+  Parallel-Branch kollidieren → ggf. höher umbenennen).
 
 ## 8. Tests (TDD)
 
