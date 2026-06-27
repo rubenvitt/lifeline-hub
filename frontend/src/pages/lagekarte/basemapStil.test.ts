@@ -47,6 +47,25 @@ describe('basemapStil', () => {
     expect(baueOnlineStyle(vektorView)).toBe('https://tiles.example/style.json');
   });
 
+  it('baueOnlineStyle: relative Vektor-Proxy-URL wird gegen die Origin absolutiert (LFH-182)', () => {
+    const proxyView: OnlineStyle = {
+      name: 'P', url: '/api/karte/proxy/1/style.json', typ: 'vektor', attribution: null,
+    };
+    expect(baueOnlineStyle(proxyView)).toBe(
+      new URL('/api/karte/proxy/1/style.json', window.location.origin).href,
+    );
+  });
+
+  it('baueOnlineStyle: relatives Raster-Proxy-Template bleibt relatives tiles[0] (LFH-182)', () => {
+    const proxyRaster: OnlineStyle = {
+      name: 'P', url: '/api/karte/proxy/1/raster/{z}/{x}/{y}', typ: 'raster', attribution: null,
+    };
+    const s = baueOnlineStyle(proxyRaster) as {
+      sources: Record<string, { tiles: string[] }>;
+    };
+    expect(s.sources.raster.tiles).toEqual(['/api/karte/proxy/1/raster/{z}/{x}/{y}']);
+  });
+
   it('baueOnlineStyle: Raster verpackt das Template in einen Raster-Style', () => {
     const s = baueOnlineStyle(rasterView);
     expect(typeof s).toBe('object');

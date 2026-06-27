@@ -73,7 +73,10 @@ function rasterStyle(stil: OnlineStyle): StyleSpecification {
 /** Style für einen Online-View: Vektor → URL-String, Raster → verpackter Raster-Style. */
 export function baueOnlineStyle(stil: OnlineStyle): StyleSpecification | string {
   if (stil.typ === 'raster') return rasterStyle(stil);
-  return stil.url;
+  // Vektor: Style-JSON-URL. Relative Proxy-URLs (/api/karte/proxy/{id}/style.json, LFH-182) gegen
+  // die Origin absolutieren (idempotent für absolute URLs) — analog zu offlineStyle für pmtiles,
+  // damit MapLibre die setStyle-URL zuverlässig auflöst.
+  return new URL(stil.url, window.location.origin).href;
 }
 
 /**

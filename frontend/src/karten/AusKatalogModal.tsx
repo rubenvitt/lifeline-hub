@@ -40,6 +40,7 @@ export default function AusKatalogModal({
         attribution: eintrag.attribution,
         sortier: naechsteSortier,
         aktiv: true,
+        proxy: false, // Katalog-Quellen sind schlüssellos → kein Proxy nötig.
       };
       return legeOnlineQuelleAn(body);
     },

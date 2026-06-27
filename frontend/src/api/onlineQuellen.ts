@@ -17,6 +17,9 @@ export interface OnlineQuelle {
   attribution: string | null;
   sortier: number;
   aktiv: boolean;
+  /** Serverseitig proxen (key-basierte Anbieter, LFH-182). Bei aktivem Proxy maskiert der Server
+   *  die `url` für Nicht-Admins (`***`); der echte Admin sieht/editiert sie weiter. */
+  proxy: boolean;
 }
 
 /**
@@ -31,6 +34,8 @@ export interface OnlineQuelleBody {
   attribution: string | null;
   sortier: number;
   aktiv: boolean;
+  /** Über den Server proxen (key-basierte Anbieter, LFH-182). Default false. */
+  proxy: boolean;
 }
 
 export function listeOnlineQuellen(): Promise<OnlineQuelle[]> {
