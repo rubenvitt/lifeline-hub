@@ -40,7 +40,9 @@ export default function AusKatalogModal({
         attribution: eintrag.attribution,
         sortier: naechsteSortier,
         aktiv: true,
-        proxy: false, // Katalog-Quellen sind schlüssellos → kein Proxy nötig.
+        // LFH-190: Katalog-Quellen (OpenFreeMap/basemap.de — alle proxy-freundlich, kein
+        // OSM-Standard) serverseitig proxen + cachen.
+        proxy: true,
       };
       return legeOnlineQuelleAn(body);
     },
