@@ -24,5 +24,8 @@ build/
 *.db-wal
 *.db-shm
 
+# Heruntergeladene Offline-Karten (PMTiles, LFH-181) — Laufzeitdaten, gehören nicht ins Repo
+/karten/
+
 .claude/worktrees
 .claire/worktrees

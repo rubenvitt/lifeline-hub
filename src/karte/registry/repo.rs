@@ -367,6 +367,27 @@ pub async fn markiere_bereit(
     hole_offline_karte(pool, id).await.map(Some)
 }
 
+/// Aktiviert die `bereit`e Karte `id` als Basemap, ABER nur solange noch KEINE andere Karte aktiv
+/// ist — die erste fertig heruntergeladene Karte wird automatisch ausgeliefert (sonst bliebe der
+/// Offline-Schalter trotz Download „nicht konfiguriert"). Eine bereits aktive Karte wird bewusst
+/// NICHT verdrängt. `Ok(true)`, wenn aktiviert wurde; `Ok(false)` ist der erwartete No-op
+/// (schon eine aktiv, Karte nicht `bereit` oder unbekannt). Der `NOT EXISTS`-Guard macht das Setzen
+/// race-sicher: SQLite serialisiert Writer, ein zweiter parallel fertig werdender Download sieht
+/// die aktive Zeile und greift nicht — der partielle Unique-Index `idx_offline_eine_aktive`
+/// bleibt der Backstop.
+pub async fn aktiviere_wenn_keine_aktive(pool: &SqlitePool, id: i64) -> Result<bool, sqlx::Error> {
+    let betroffen = sqlx::query(
+        "UPDATE karte_offline_karte SET aktiv_basemap = 1, geaendert_at = datetime('now') \
+         WHERE id = ? AND status = 'bereit' \
+           AND NOT EXISTS (SELECT 1 FROM karte_offline_karte WHERE aktiv_basemap = 1)",
+    )
+    .bind(id)
+    .execute(pool)
+    .await?
+    .rows_affected();
+    Ok(betroffen > 0)
+}
+
 /// Crash-Recovery beim Start: alle im Status `'laedt'` hängenden Zeilen auf `'fehler'` setzen
 /// und ihre `id`s zurückgeben (Aufrufer löscht die verwaisten `*.part`-Dateien). Spawned
 /// Download-Tasks überleben keinen Neustart.
@@ -796,5 +817,54 @@ mod tests {
         let aktiv = aktive_offline_karte(&pool).await.unwrap().expect("aktiv");
         assert!(!aktiv.version.is_empty(), "geaendert_at-Fallback nicht leer");
         assert_ne!(aktiv.version, "", "Token vorhanden trotz fehlendem sha256");
+    }
+
+    #[tokio::test]
+    async fn aktiviere_wenn_keine_aktive_aktiviert_erste_bereite() {
+        let pool = test_pool().await;
+        let k = neue_download_karte(&pool, &download_eingabe("A")).await.unwrap();
+        markiere_bereit(&pool, k.id, "karte-1.pmtiles", 10, "cafef00d")
+            .await
+            .unwrap();
+        // Keine aktive Karte → die erste fertige wird automatisch ausgeliefert.
+        assert!(aktiviere_wenn_keine_aktive(&pool, k.id).await.unwrap(), "aktiviert");
+        let nach = finde_offline_karte(&pool, k.id).await.unwrap().unwrap();
+        assert!(nach.aktiv_basemap);
+        assert!(pmtiles_verfuegbar(&pool).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn aktiviere_wenn_keine_aktive_noop_wenn_schon_aktiv() {
+        let pool = test_pool().await;
+        let a = neue_download_karte(&pool, &download_eingabe("A")).await.unwrap();
+        markiere_bereit(&pool, a.id, "karte-1.pmtiles", 10, "aaaa").await.unwrap();
+        aktiviere_offline_karte(&pool, a.id).await.unwrap();
+        // Zweite Karte fertig, A ist schon aktiv → kein Verdrängen, kein Wechsel.
+        let b = neue_download_karte(&pool, &download_eingabe("B")).await.unwrap();
+        markiere_bereit(&pool, b.id, "karte-2.pmtiles", 20, "bbbb").await.unwrap();
+        assert!(
+            !aktiviere_wenn_keine_aktive(&pool, b.id).await.unwrap(),
+            "bereits eine aktiv → No-op"
+        );
+        let aktive: Vec<_> = liste_offline_karten(&pool)
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|k| k.aktiv_basemap)
+            .collect();
+        assert_eq!(aktive.len(), 1, "weiterhin genau eine aktive Karte");
+        assert_eq!(aktive[0].id, a.id, "A bleibt aktiv");
+    }
+
+    #[tokio::test]
+    async fn aktiviere_wenn_keine_aktive_noop_wenn_nicht_bereit() {
+        let pool = test_pool().await;
+        // Noch im Status 'laedt' (markiere_bereit nicht aufgerufen).
+        let k = neue_download_karte(&pool, &download_eingabe("A")).await.unwrap();
+        assert!(
+            !aktiviere_wenn_keine_aktive(&pool, k.id).await.unwrap(),
+            "nicht bereit → nicht aktivierbar"
+        );
+        assert!(!finde_offline_karte(&pool, k.id).await.unwrap().unwrap().aktiv_basemap);
     }
 }

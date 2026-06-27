@@ -516,6 +516,18 @@ pub async fn offline_download(
                         "Offline-Karte {id}: Download fertig ({} Bytes)",
                         erg.groesse
                     );
+                    // Erste fertige Karte automatisch als Basemap aktivieren, solange noch keine
+                    // andere aktiv ist — sonst bliebe „Offline" trotz Download „nicht konfiguriert".
+                    // Eine bereits aktive Karte wird NICHT verdrängt (No-op).
+                    match repo::aktiviere_wenn_keine_aktive(&pool, id).await {
+                        Ok(true) => {
+                            tracing::info!("Offline-Karte {id}: als Basemap aktiviert (erste bereite)");
+                        }
+                        Ok(false) => {}
+                        Err(e) => {
+                            tracing::warn!("Auto-Aktivieren der Offline-Karte {id} fehlgeschlagen: {e}");
+                        }
+                    }
                 }
             }
             Err(fehler) => {
