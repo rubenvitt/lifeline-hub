@@ -212,7 +212,8 @@ impl std::fmt::Display for RewriteFehler {
 /// aufgelöst. `None`, wenn die Basis keinen Host hat.
 fn absolutiere(basis: &Url, referenz: &str) -> Option<String> {
     let r = referenz.trim();
-    if r.to_ascii_lowercase().starts_with("http://") || r.to_ascii_lowercase().starts_with("https://") {
+    let rl = r.to_ascii_lowercase();
+    if rl.starts_with("http://") || rl.starts_with("https://") {
         return Some(r.to_string());
     }
     let scheme = basis.scheme();
@@ -380,13 +381,19 @@ pub fn rewrite_tilejson(
     Ok(())
 }
 
-/// Backstop: true, wenn ein nicht-leerer Query-Param-**Wert** der Upstream-URL als Substring im
-/// serialisierten Dokument vorkommt (Key wäre durchgerutscht → fail-closed im Aufrufer).
+/// Mindestlänge eines Query-Werts, der als möglicher Key gescannt wird. Kurze, benigne Params
+/// (`v=1`, `language=de`, `format=png`, Cache-Buster) würden sonst praktisch immer irgendwo im
+/// Style-Body matchen → False-Positive-fail-closed, der die Quelle bei jedem Abruf hart 500t.
+/// Echte Anbieter-Keys (MapTiler/Stadia) sind ≥32 Zeichen.
+const MIN_SECRET_LEN: usize = 12;
+
+/// Backstop: true, wenn ein hinreichend langer Query-Param-**Wert** der Upstream-URL als Substring
+/// im serialisierten Dokument vorkommt (Key wäre durchgerutscht → fail-closed im Aufrufer).
 /// Ehrliche Grenze: Keys in Pfadsegmenten/Subdomains werden so nicht erkannt.
 pub fn contains_secret(serialisiert: &str, upstream: &Url) -> bool {
     upstream
         .query_pairs()
-        .any(|(_, val)| !val.is_empty() && serialisiert.contains(val.as_ref()))
+        .any(|(_, val)| val.len() >= MIN_SECRET_LEN && serialisiert.contains(val.as_ref()))
 }
 
 // ===== Service-Schicht (Task 5+): pinnender SSRF-Resolver + dedizierter Client =====
@@ -501,11 +508,13 @@ pub async fn hole_asset(
     byte_cap: usize,
 ) -> Result<AssetAntwort, ProxyFehler> {
     use reqwest::header::{CACHE_CONTROL, CONTENT_ENCODING, CONTENT_TYPE, ETAG};
-    let resp = client
+    // `without_url()`: reqwest hängt im Error-Display die volle URL inkl. `?key=…` an — die darf
+    // NICHT in die (geloggte) Fehlermeldung gelangen (Key-Konfinierung, Spec §5).
+    let mut resp = client
         .get(url)
         .send()
         .await
-        .map_err(|e| ProxyFehler::Http(e.to_string()))?;
+        .map_err(|e| ProxyFehler::Http(e.without_url().to_string()))?;
     if !resp.status().is_success() {
         return Err(ProxyFehler::Status(resp.status().as_u16()));
     }
@@ -523,12 +532,11 @@ pub async fn hole_asset(
         None => "application/octet-stream".to_string(),
     };
 
-    let mut resp = resp;
     let mut bytes: Vec<u8> = Vec::new();
     while let Some(chunk) = resp
         .chunk()
         .await
-        .map_err(|e| ProxyFehler::Http(e.to_string()))?
+        .map_err(|e| ProxyFehler::Http(e.without_url().to_string()))?
     {
         if bytes.len() + chunk.len() > byte_cap {
             return Err(ProxyFehler::ZuGross);
@@ -835,14 +843,14 @@ mod rewrite_tests {
     fn rewrite_style_laesst_attribution_html_unangetastet() {
         // URL ist nur EINGEBETTET (kein bare-URL-String) → Sweep fasst sie nicht an,
         // contains_secret fängt den Key später.
-        let basis = Url::parse("https://h/s.json?key=K").unwrap();
-        let mut style = json!({"version":8,"sources":{},"metadata":{"attribution":"<a href=\"https://h/x?key=K\">©</a>"}});
+        let basis = Url::parse("https://h/s.json?key=KEYTOKEN123456").unwrap();
+        let mut style = json!({"version":8,"sources":{},"metadata":{"attribution":"<a href=\"https://h/x?key=KEYTOKEN123456\">©</a>"}});
         let mut log = vec![];
         let mut m = fake_mint(&mut log);
         rewrite_style(&mut style, &basis, &mut m, 500).unwrap();
         drop(m); // Borrow von log freigeben, bevor wir es lesen
         let s = serde_json::to_string(&style).unwrap();
-        assert!(s.contains("key=K"), "eingebettete URL bleibt (Backstop-Fall): {s}");
+        assert!(s.contains("key=KEYTOKEN123456"), "eingebettete URL bleibt (Backstop-Fall): {s}");
         assert!(contains_secret(&s, &basis), "contains_secret erkennt den Rest-Key");
     }
 
@@ -875,10 +883,16 @@ mod rewrite_tests {
     }
 
     #[test]
-    fn contains_secret_findet_query_werte() {
-        let up = Url::parse("https://h/x?key=SECRET123&foo=bar").unwrap();
-        assert!(contains_secret("...key=SECRET123...", &up));
+    fn contains_secret_findet_langen_key_ignoriert_kurze_params() {
+        let up = Url::parse("https://h/x?key=SECRETTOKEN1234&v=1&language=de").unwrap();
+        assert!(contains_secret("…key=SECRETTOKEN1234…", &up), "langer Key erkannt");
         assert!(!contains_secret("nichts geheimes", &up));
+        // Kurze, benigne Params (v=1, language=de) lösen KEINEN False-Positive-fail-closed aus,
+        // auch wenn sie im Style-Body vorkommen.
+        assert!(
+            !contains_secret(r#"{"layers":[{"maxzoom":1}],"name":"name:de"}"#, &up),
+            "kurze Param-Werte triggern fail-closed nicht"
+        );
     }
 
     #[test]
@@ -1058,22 +1072,22 @@ mod service_tests {
             |p| {
                 format!(
                     r#"{{"version":8,"sources":{{
-                        "v":{{"type":"vector","url":"http://127.0.0.1:{p}/tiles.json?key=GEHEIM"}},
-                        "r":{{"type":"raster","tiles":["http://127.0.0.1:{p}/t/{{z}}/{{x}}/{{y}}.png?key=GEHEIM"]}},
-                        "g":{{"type":"geojson","data":"http://127.0.0.1:{p}/d.geojson?key=GEHEIM"}}
+                        "v":{{"type":"vector","url":"http://127.0.0.1:{p}/tiles.json?key=GEHEIMTOKEN12345"}},
+                        "r":{{"type":"raster","tiles":["http://127.0.0.1:{p}/t/{{z}}/{{x}}/{{y}}.png?key=GEHEIMTOKEN12345"]}},
+                        "g":{{"type":"geojson","data":"http://127.0.0.1:{p}/d.geojson?key=GEHEIMTOKEN12345"}}
                     }},
-                    "sprite":"http://127.0.0.1:{p}/sprite?key=GEHEIM",
-                    "glyphs":"http://127.0.0.1:{p}/fonts/{{fontstack}}/{{range}}.pbf?key=GEHEIM"}}"#
+                    "sprite":"http://127.0.0.1:{p}/sprite?key=GEHEIMTOKEN12345",
+                    "glyphs":"http://127.0.0.1:{p}/fonts/{{fontstack}}/{{range}}.pbf?key=GEHEIMTOKEN12345"}}"#
                 )
             },
-            "key=GEHEIM",
+            "key=GEHEIMTOKEN12345",
         )
         .await;
         let pool = test_pool().await;
         let qid = proxy_quelle(&pool, &url).await;
 
         let s = hole_style(&plain(), &pool, qid, Url::parse(&url).unwrap()).await.unwrap();
-        assert!(!s.contains("GEHEIM"), "kein Key im Ergebnis: {s}");
+        assert!(!s.contains("GEHEIMTOKEN12345"), "kein Key im Ergebnis: {s}");
         assert!(!s.contains(&format!("127.0.0.1:{port}")), "kein Upstream-Host: {s}");
 
         // Der TileJSON-Slot löst auf die Upstream-URL (mit Key) auf.
@@ -1082,21 +1096,21 @@ mod service_tests {
         assert!(tj.starts_with(&format!("/api/karte/proxy/{qid}/tilejson/")), "tilejson-Proxy-URL: {tj}");
         let slot: i64 = tj.rsplit('/').next().unwrap().parse().unwrap();
         let upstream = repo::slot_aufloesen(&pool, qid, slot, "tilejson").await.unwrap().unwrap();
-        assert!(upstream.contains("tiles.json?key=GEHEIM"), "Slot → Upstream mit Key: {upstream}");
+        assert!(upstream.contains("tiles.json?key=GEHEIMTOKEN12345"), "Slot → Upstream mit Key: {upstream}");
     }
 
     #[tokio::test]
     async fn hole_style_fail_closed_bei_rest_key() {
         // Key NUR in attribution-HTML (kein rewritebarer URL-Slot) → bleibt → contains_secret fängt
-        // ihn (style-url trägt key=GEHEIM als Query) → Secret.
+        // ihn (style-url trägt key=GEHEIMTOKEN12345 als Query) → Secret.
         let (url, _port) = spawn_json(
             "/style.json",
             |p| {
                 format!(
-                    r#"{{"version":8,"sources":{{}},"metadata":{{"attribution":"<a href=\"http://127.0.0.1:{p}/x?key=GEHEIM\">©</a>"}}}}"#
+                    r#"{{"version":8,"sources":{{}},"metadata":{{"attribution":"<a href=\"http://127.0.0.1:{p}/x?key=GEHEIMTOKEN12345\">©</a>"}}}}"#
                 )
             },
-            "key=GEHEIM",
+            "key=GEHEIMTOKEN12345",
         )
         .await;
         let pool = test_pool().await;
@@ -1111,16 +1125,16 @@ mod service_tests {
             "/tiles.json",
             |p| {
                 format!(
-                    r#"{{"tiles":["http://127.0.0.1:{p}/{{z}}/{{x}}/{{y}}.pbf?key=GEHEIM"],"scheme":"tms"}}"#
+                    r#"{{"tiles":["http://127.0.0.1:{p}/{{z}}/{{x}}/{{y}}.pbf?key=GEHEIMTOKEN12345"],"scheme":"tms"}}"#
                 )
             },
-            "key=GEHEIM",
+            "key=GEHEIMTOKEN12345",
         )
         .await;
         let pool = test_pool().await;
         let qid = proxy_quelle(&pool, &url).await;
         let s = hole_tilejson(&plain(), &pool, qid, Url::parse(&url).unwrap()).await.unwrap();
-        assert!(!s.contains("GEHEIM"), "key-frei: {s}");
+        assert!(!s.contains("GEHEIMTOKEN12345"), "key-frei: {s}");
         let v: serde_json::Value = serde_json::from_str(&s).unwrap();
         assert_eq!(v["scheme"].as_str(), Some("xyz"), "tms→xyz");
         // Der Tile-Slot trägt {-y} (Server-Flip). Pfad: /api/karte/proxy/{id}/tile/{slot}/{z}/{x}/{y}
