@@ -3,6 +3,7 @@ use crate::auth::session::{AdminUser, CurrentUser};
 use crate::config::{default_offline_katalog, default_online_styles, OfflineKatalogEintrag, OnlineStyle};
 use crate::error::AppError;
 use crate::karte::download::{self, Fortschritt};
+use crate::karte::proxy;
 use crate::karte::quellen;
 use crate::karte::registry::repo::{
     self, OfflineKarte, OfflineKarteEingabe, OnlineQuelle, OnlineQuelleEingabe,
@@ -131,6 +132,9 @@ pub struct OnlineQuelleBody {
     pub sortier: i64,
     #[serde(default = "default_aktiv")]
     pub aktiv: bool,
+    /// Serverseitig proxen (key-basierte Anbieter, LFH-182). Default false → Quelle läuft direkt.
+    #[serde(default)]
+    pub proxy: bool,
 }
 
 /// Request-Body zum Registrieren einer Offline-Karte (Grundstein: vorhandene Datei).
@@ -170,6 +174,23 @@ fn validiere_online(body: OnlineQuelleBody) -> Result<OnlineQuelleEingabe, AppEr
             AppError::Validation("Attribution ist Pflicht (Lizenzauflage)".into())
         })?
         .to_string();
+    // Proxied Quellen (key-basiert): URL roh speichern (kein Url-Roundtrip — würde `{}`
+    // percent-kodieren), aber vorab validieren: nur unterstützte Platzhalter, und SSRF-Check auf
+    // einer materialisierten Probe (Platzhalter durch 0/Dummy ersetzt). Direkte Quellen (proxy=0)
+    // bleiben unverändert: der Browser lädt sie selbst, keine Server-seitige Prüfung nötig.
+    if body.proxy {
+        let unbekannt = proxy::unbekannte_platzhalter(url);
+        if !unbekannt.is_empty() {
+            return Err(AppError::Validation(format!(
+                "Nicht unterstützte Platzhalter in der Proxy-URL: {}",
+                unbekannt.join(", ")
+            )));
+        }
+        let probe = proxy::subst_template(&proxy::subst_glyphs(url, "a", "0-0"), 0, 0, 0);
+        let parsed = reqwest::Url::parse(&probe)
+            .map_err(|e| AppError::Validation(format!("Ungültige Proxy-URL: {e}")))?;
+        download::url_ist_sicher(&parsed).map_err(AppError::Validation)?;
+    }
     Ok(OnlineQuelleEingabe {
         name: name.to_string(),
         url: url.to_string(),
@@ -177,6 +198,7 @@ fn validiere_online(body: OnlineQuelleBody) -> Result<OnlineQuelleEingabe, AppEr
         attribution: Some(attribution),
         sortier: body.sortier,
         aktiv: body.aktiv,
+        proxy: body.proxy,
     })
 }
 
@@ -216,10 +238,12 @@ pub async fn online_aktualisieren(
     Json(body): Json<OnlineQuelleBody>,
 ) -> Result<Json<OnlineQuelle>, AppError> {
     let eingabe = validiere_online(body)?;
-    repo::aktualisiere_online_quelle(&state.pool, id, &eingabe)
-        .await?
-        .map(Json)
-        .ok_or(AppError::NotFound)
+    let aktualisiert = repo::aktualisiere_online_quelle(&state.pool, id, &eingabe).await?;
+    if aktualisiert.is_some() {
+        // URL kann sich geändert haben → alte Proxy-Slots sind stale und müssen weg.
+        repo::slots_loeschen(&state.pool, id).await?;
+    }
+    aktualisiert.map(Json).ok_or(AppError::NotFound)
 }
 
 /// DELETE /api/karte/online-quellen/{id} — Online-Quelle löschen (Admin).
@@ -229,6 +253,9 @@ pub async fn online_loeschen(
     Path(id): Path<i64>,
 ) -> Result<StatusCode, AppError> {
     if repo::loesche_online_quelle(&state.pool, id).await? {
+        // Verwaiste Proxy-Slots explizit entfernen (zusätzlich zu ON DELETE CASCADE, dessen
+        // Enforcement in SQLite PRAGMA-abhängig ist).
+        repo::slots_loeschen(&state.pool, id).await?;
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err(AppError::NotFound)

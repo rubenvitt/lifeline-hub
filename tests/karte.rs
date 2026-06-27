@@ -667,3 +667,70 @@ async fn online_quellen_als_fuehrungskraft_read_only() {
     .await;
     assert_eq!(res.status(), StatusCode::FORBIDDEN, "Führungskraft darf nicht schreiben");
 }
+
+// ===== Proxy-Quellen-Validierung (LFH-182) =====
+
+#[tokio::test]
+async fn online_anlegen_proxy_interne_url_ist_400_ssrf() {
+    let (app, cookie) = admin_app().await;
+    // proxy=1 → Server holt selbst → SSRF-Vorabprüfung: kein http, keine internen Ziele.
+    for url in [
+        "http://example.test/style.json",
+        "https://10.0.0.5/style.json?key=K",
+        "https://169.254.169.254/style.json",
+        "https://127.0.0.1/style.json",
+    ] {
+        let body =
+            format!(r#"{{"name":"P","url":"{url}","typ":"vektor","attribution":"© X","proxy":true}}"#);
+        let res = anfrage(&app, "POST", "/api/karte/online-quellen", Some(&cookie), Some(&body)).await;
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST, "proxy+intern abgelehnt: {url}");
+    }
+}
+
+#[tokio::test]
+async fn online_anlegen_proxy_gueltig_ist_201_mit_proxy_true() {
+    let (app, cookie) = admin_app().await;
+    let res = anfrage(
+        &app,
+        "POST",
+        "/api/karte/online-quellen",
+        Some(&cookie),
+        Some(r#"{"name":"MapTiler","url":"https://api.maptiler.com/maps/streets/style.json?key=GEHEIM","typ":"vektor","attribution":"© MapTiler","proxy":true}"#),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::CREATED);
+    assert_eq!(json(res).await["proxy"], true);
+}
+
+#[tokio::test]
+async fn online_anlegen_default_proxy_false() {
+    let (app, cookie) = admin_app().await;
+    let res = anfrage(
+        &app,
+        "POST",
+        "/api/karte/online-quellen",
+        Some(&cookie),
+        Some(r#"{"name":"OFM","url":"https://tiles.example/liberty","typ":"vektor","attribution":"© OSM"}"#),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::CREATED);
+    assert_eq!(json(res).await["proxy"], false, "Default ohne proxy-Feld");
+}
+
+#[tokio::test]
+async fn online_anlegen_proxy_unbekannter_platzhalter_ist_400() {
+    let (app, cookie) = admin_app().await;
+    let res = anfrage(
+        &app,
+        "POST",
+        "/api/karte/online-quellen",
+        Some(&cookie),
+        Some(r#"{"name":"R","url":"https://h/{z}/{quadkey}.png","typ":"raster","attribution":"© X","proxy":true}"#),
+    )
+    .await;
+    assert_eq!(
+        res.status(),
+        StatusCode::BAD_REQUEST,
+        "unbekannter Platzhalter {{quadkey}} fail-fast"
+    );
+}
