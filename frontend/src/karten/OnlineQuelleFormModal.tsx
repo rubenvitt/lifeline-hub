@@ -29,6 +29,7 @@ const TYP_OPTIONEN: { value: OnlineStyleTyp; label: string }[] = [
 const URL_PLATZHALTER: Record<OnlineStyleTyp, string> = {
   vektor: 'https://…/style.json',
   raster: 'https://…/{z}/{x}/{y}.png',
+  protomaps: '/api/karte/proxy/{id}/tilejson',
 };
 
 /**
