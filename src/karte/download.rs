@@ -49,6 +49,8 @@ pub enum DownloadFehler {
     Http(String),
     /// Lokaler I/O-Fehler beim Schreiben der Datei.
     Io(String),
+    /// Heruntergeladene Datei stimmt nicht mit dem erwarteten SHA256-Pin überein (Supply-Chain).
+    HashMismatch { erwartet: String, ist: String },
 }
 
 impl std::fmt::Display for DownloadFehler {
@@ -58,6 +60,9 @@ impl std::fmt::Display for DownloadFehler {
             DownloadFehler::Status(c) => write!(f, "Quelle antwortete mit HTTP {c}"),
             DownloadFehler::Http(e) => write!(f, "Netzwerkfehler: {e}"),
             DownloadFehler::Io(e) => write!(f, "Schreibfehler: {e}"),
+            DownloadFehler::HashMismatch { erwartet, ist } => {
+                write!(f, "SHA256 stimmt nicht: erwartet {erwartet}, war {ist}")
+            }
         }
     }
 }
@@ -209,6 +214,7 @@ pub async fn lade_datei(
     url: Url,
     ziel_part: &Path,
     fortschritt: &Fortschritt,
+    erwartet_sha256: Option<&str>,
 ) -> Result<DownloadErgebnis, DownloadFehler> {
     let resp = client
         .get(url)
@@ -255,9 +261,18 @@ pub async fn lade_datei(
         .await
         .map_err(|e| DownloadFehler::Io(e.to_string()))?;
 
+    let ist = hex(&hasher.finalize());
+    if let Some(erwartet) = erwartet_sha256 {
+        if !erwartet.eq_ignore_ascii_case(&ist) {
+            return Err(DownloadFehler::HashMismatch {
+                erwartet: erwartet.to_string(),
+                ist,
+            });
+        }
+    }
     Ok(DownloadErgebnis {
         groesse: geladen as i64,
-        sha256: hex(&hasher.finalize()),
+        sha256: ist,
     })
 }
 
@@ -339,7 +354,7 @@ mod tests {
         let fortschritt = Fortschritt::default();
         let url = Url::parse(&url_str).unwrap();
 
-        let erg = lade_datei(&client, url, &ziel, &fortschritt).await.unwrap();
+        let erg = lade_datei(&client, url, &ziel, &fortschritt, None).await.unwrap();
 
         assert_eq!(erg.groesse, body.len() as i64);
         assert_eq!(erg.sha256, erwarteter_hash(&body));
@@ -362,10 +377,50 @@ mod tests {
         let fortschritt = Fortschritt::default();
         fortschritt.abbruch.store(true, Ordering::Relaxed); // vor dem ersten Chunk
 
-        let err = lade_datei(&client, Url::parse(&url_str).unwrap(), &ziel, &fortschritt)
+        let err = lade_datei(&client, Url::parse(&url_str).unwrap(), &ziel, &fortschritt, None)
             .await
             .unwrap_err();
         assert!(matches!(err, DownloadFehler::Abgebrochen));
+    }
+
+    #[tokio::test]
+    async fn lade_datei_akzeptiert_korrekten_pin_und_lehnt_falschen_ab() {
+        let body = b"PMTiles\x03-pin-test".repeat(40);
+        let url_str = spawn_fixture(body.clone()).await;
+        let tmp = tempfile::tempdir().unwrap();
+        let client = download_client();
+
+        // Korrekter Pin → Ok.
+        let f1 = Fortschritt::default();
+        let erg = lade_datei(
+            &client,
+            Url::parse(&url_str).unwrap(),
+            &tmp.path().join("ok.part"),
+            &f1,
+            Some(&erwarteter_hash(&body)),
+        )
+        .await
+        .unwrap();
+        assert_eq!(erg.sha256, erwarteter_hash(&body));
+
+        // Falscher Pin → HashMismatch (erwartet vs. ist).
+        let f2 = Fortschritt::default();
+        let err = lade_datei(
+            &client,
+            Url::parse(&url_str).unwrap(),
+            &tmp.path().join("bad.part"),
+            &f2,
+            Some("deadbeef"),
+        )
+        .await
+        .unwrap_err();
+        match err {
+            DownloadFehler::HashMismatch { erwartet, ist } => {
+                assert_eq!(erwartet, "deadbeef");
+                assert_eq!(ist, erwarteter_hash(&body));
+            }
+            other => panic!("HashMismatch erwartet, war {other:?}"),
+        }
     }
 
     #[tokio::test]

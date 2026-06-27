@@ -31,7 +31,7 @@ const karteLaedt: OfflineKarte = {
 const katalogEintrag = {
   name: 'Deutschland – Bremen', url: 'https://example.test/de_bremen.pmtiles', region: 'DE/Bremen',
   groesse: 44040192, lizenz: '© OpenStreetMap contributors (ODbL)', kachel_schema: 'protomaps',
-  quelle: 'Project N.O.M.A.D.',
+  quelle: 'Project N.O.M.A.D.', sha256: 'cafef00d',
 };
 
 function mockBasis(benutzer: typeof admin, karten: OfflineKarte[] = [karte], katalog = [katalogEintrag]) {
@@ -116,6 +116,7 @@ describe('OfflineKartenVerwaltung', () => {
       lizenz: '© OpenStreetMap contributors (ODbL)',
       kachel_schema: 'protomaps',
       groesse_erwartet: 44040192,
+      sha256_erwartet: 'cafef00d',
     });
   });
 
@@ -151,13 +152,14 @@ describe('OfflineKartenVerwaltung', () => {
     expect(screen.getByRole('button', { name: 'Aktualisieren' })).toBeInTheDocument();
   });
 
-  it('Aktualisieren lädt die neuere Katalog-URL', async () => {
+  it('Aktualisieren lädt die neuere Katalog-URL (One-Click: Pin + ersetzt_karte_id)', async () => {
     let postBody: unknown = null;
     mockBasis(admin, [{
       ...karte,
       quell_url: 'https://example.test/de_bremen_20250101.pmtiles',
       update_verfuegbar: true,
       katalog_url: 'https://example.test/de_bremen_20260320.pmtiles',
+      katalog_sha256: 'cafef00d',
     }]);
     server.use(
       http.post('/api/karte/offline-karten/download', async ({ request }) => {
@@ -171,6 +173,9 @@ describe('OfflineKartenVerwaltung', () => {
     expect(postBody).toMatchObject({
       name: 'Deutschland – Bremen',
       url: 'https://example.test/de_bremen_20260320.pmtiles',
+      sha256_erwartet: 'cafef00d',
+      ersetzt_karte_id: 1,
+      groesse_erwartet: 44040192,
     });
   });
 

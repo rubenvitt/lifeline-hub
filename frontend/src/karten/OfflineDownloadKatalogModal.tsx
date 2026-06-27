@@ -40,6 +40,7 @@ export default function OfflineDownloadKatalogModal({
         lizenz: eintrag.lizenz,
         kachel_schema: eintrag.kachel_schema,
         groesse_erwartet: eintrag.groesse,
+        sha256_erwartet: eintrag.sha256 ?? undefined,
       }),
     onSuccess: () => {
       invalidiereKarte(qc);

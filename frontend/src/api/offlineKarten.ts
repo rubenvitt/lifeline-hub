@@ -29,6 +29,8 @@ export interface OfflineKarte {
   update_verfuegbar?: boolean;
   /** Aktuelle Katalog-URL für den Re-Download, wenn ein Update verfügbar ist. */
   katalog_url?: string | null;
+  /** SHA256-Pin der aktuellen Katalog-URL — für den verifizierten Re-Download beim Update. */
+  katalog_sha256?: string | null;
 }
 
 /** Body zum Starten eines Downloads (aus Katalog oder eigener URL). `lizenz` ist Pflicht. */
@@ -39,6 +41,10 @@ export interface OfflineDownloadBody {
   kachel_schema?: string;
   /** Erwartete Größe (Bytes) aus dem Katalog — für den Plattenplatz-Check vorab. */
   groesse_erwartet?: number;
+  /** Erwarteter SHA256 (hex) aus dem Katalog-Pin — Backend verifiziert beim Download. */
+  sha256_erwartet?: string;
+  /** One-Click-Update: id der Karte, die dieser Download ersetzt (Backend swappt nach Erfolg). */
+  ersetzt_karte_id?: number;
 }
 
 /** Ein kuratierter, herunterladbarer Vorschlag (Server-autoritativ). */
@@ -50,6 +56,8 @@ export interface OfflineKatalogEintrag {
   lizenz: string;
   kachel_schema: string;
   quelle: string;
+  /** Optionaler SHA256-Pin (hex); null/undefined = kein Pin. */
+  sha256?: string | null;
 }
 
 export function listeOfflineKarten(): Promise<OfflineKarte[]> {
