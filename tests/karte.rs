@@ -939,3 +939,49 @@ async fn proxy_tile_slot_auf_interne_adresse_ist_fehler_ssrf() {
     let res = anfrage(&app, "GET", "/api/karte/proxy/1/tile/1/1/1/1", None, None).await;
     assert!(res.status().is_server_error(), "SSRF-Gate blockt internen Slot: {}", res.status());
 }
+
+// ===== Protomaps-Quelle (LFH-192): proxy-Zwang + slot-loser TileJSON-Entry-Endpunkt =====
+
+/// Beweist (a) Proxy-Zwang: Quelle mit typ=protomaps, proxy=false wird mit proxy=true gespeichert.
+/// Beweist (b) Route-Registrierung: GET /api/karte/proxy/{id}/tilejson trifft den Handler (404
+/// JSON, nicht HTML-Fallback). Die Schlüssel-Entfernung + Tile-URL-Rewrite beweist
+/// cargo test --lib karte::proxy (hole_tilejson_keyfrei_und_tms_normalisiert) — Happy-Paths via
+/// Service-Loopback-Tests (vgl. Datei-Konvention, Zeile ~816).
+#[tokio::test]
+async fn protomaps_quelle_erzwingt_proxy_und_tilejson_entry_ist_registriert() {
+    let (app, cookie) = admin_app().await;
+
+    // Part (a): typ=protomaps + proxy=false → serverseitig auf proxy=true hochgestuft.
+    // URL muss SSRF-Check bestehen (https, keine interne IP, keine unbekannten Platzhalter).
+    let res = anfrage(
+        &app,
+        "POST",
+        "/api/karte/online-quellen",
+        Some(&cookie),
+        Some(r#"{"name":"Protomaps","url":"https://api.protomaps.com/tiles/v4.json?key=GEHEIM","typ":"protomaps","attribution":"© Protomaps, © OSM","sortier":0}"#),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::CREATED, "protomaps-Quelle angelegt");
+    let q = json(res).await;
+    assert_eq!(q["proxy"], true, "protomaps erzwingt proxy (war false implizit)");
+    let id = q["id"].as_i64().unwrap();
+
+    // Part (b): Slot-loser Entry-Endpunkt ist registriert — unbekannte ID → 404 JSON (nicht
+    // 404/405 via SPA-Fallback-HTML). Prove route existiert.
+    let res_unbekannt = anfrage(&app, "GET", "/api/karte/proxy/999/tilejson", None, None).await;
+    assert_eq!(res_unbekannt.status(), StatusCode::NOT_FOUND, "unbekannte ID: 404");
+    assert_eq!(
+        res_unbekannt.headers().get(header::CONTENT_TYPE).unwrap(),
+        "application/json",
+        "404 als JSON (Handler, nicht SPA-HTML)"
+    );
+
+    // Bekannte ID: SSRF-Gate blockiert Upstream-Abruf (keine echte Netzverbindung im Test) →
+    // 5xx. Dies beweist, dass der Handler aufgerufen wird und die Quelle gefunden wurde.
+    let res_bekannt = anfrage(&app, "GET", &format!("/api/karte/proxy/{id}/tilejson"), None, None).await;
+    assert!(
+        res_bekannt.status().is_server_error(),
+        "bekannte ID: Handler aufgerufen, Upstream nicht erreichbar → 5xx (war: {})",
+        res_bekannt.status()
+    );
+}
