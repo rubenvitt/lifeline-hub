@@ -101,6 +101,9 @@ pub struct OfflineKatalogEintrag {
     pub kachel_schema: String,
     /// Provenienz-Hinweis fürs UI (Quelle ist ein Community-Repo, kein eigener Mirror).
     pub quelle: String,
+    /// Optionaler SHA256-Pin (hex, lowercase). Gesetzt beim Eigen-Mirror (LFH-183): der Download
+    /// verifiziert den berechneten gegen diesen Hash. `None` = kein Pin (v1 / N.O.M.A.D.).
+    pub sha256: Option<String>,
 }
 
 /// Kuratierter Offline-Karten-Katalog (`GET /api/karte/offline-karten/katalog`) — analog zum
@@ -146,6 +149,7 @@ pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {
             lizenz: ODBL.into(),
             kachel_schema: "protomaps".into(),
             quelle: QUELLE.into(),
+            sha256: None,
         })
         .collect();
 
@@ -157,6 +161,7 @@ pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {
         lizenz: ODBL.into(),
         kachel_schema: "protomaps".into(),
         quelle: QUELLE.into(),
+        sha256: None,
     });
     katalog.push(OfflineKatalogEintrag {
         name: "Schweiz".into(),
@@ -166,6 +171,7 @@ pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {
         lizenz: ODBL.into(),
         kachel_schema: "protomaps".into(),
         quelle: QUELLE.into(),
+        sha256: None,
     });
     katalog
 }
@@ -271,6 +277,27 @@ mod tests {
         );
         assert!(katalog.iter().any(|e| e.region == "AT"));
         assert!(katalog.iter().any(|e| e.region == "CH"));
+    }
+
+    #[test]
+    fn katalog_eintrag_sha256_optional_und_serialisiert() {
+        // v1-Default: noch kein Pin (Hashes kommen mit dem Eigen-Mirror, LFH-183 Task 5).
+        for e in default_offline_katalog() {
+            assert!(e.sha256.is_none(), "v1 pinnt noch nicht: {}", e.name);
+        }
+        // Mit gesetztem Pin landet der Hash im JSON (Frontend-Kontrakt).
+        let mit_pin = OfflineKatalogEintrag {
+            name: "x".into(),
+            url: "https://e/x.pmtiles".into(),
+            region: "DE".into(),
+            groesse: 1,
+            lizenz: "l".into(),
+            kachel_schema: "protomaps".into(),
+            quelle: "q".into(),
+            sha256: Some("abc123".into()),
+        };
+        let j = serde_json::to_string(&mit_pin).unwrap();
+        assert!(j.contains("\"sha256\":\"abc123\""), "sha256 im JSON: {j}");
     }
 
     #[test]

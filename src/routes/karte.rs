@@ -484,6 +484,13 @@ pub struct OfflineDownloadBody {
     /// Erwartete Größe (Bytes) aus dem Katalog — für den Plattenplatz-Check vorab.
     #[serde(default)]
     pub groesse_erwartet: Option<i64>,
+    /// Erwarteter SHA256 (hex) aus dem Katalog-Pin — gegen den berechneten Hash verifiziert.
+    #[serde(default)]
+    pub sha256_erwartet: Option<String>,
+    /// One-Click-Update (B2): id der Karte, die dieser Download ERSETZT. Nach Erfolg wird die neue
+    /// Karte aktiviert und die alte (id) gelöscht. `None` = normaler Erst-Download.
+    #[serde(default)]
+    pub ersetzt_karte_id: Option<i64>,
 }
 
 /// POST /api/karte/offline-karten/download — startet einen Hintergrund-Download (Admin).
