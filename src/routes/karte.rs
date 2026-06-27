@@ -151,6 +151,12 @@ fn default_aktiv() -> bool {
     true
 }
 
+/// Proxy ist Default-an (LFH-190): neue Quellen werden serverseitig geproxt + gecacht. Abschaltbar
+/// pro Quelle (manche Anbieter, z. B. OSM-Standard-Tiles, verbieten Proxying/Caching).
+fn default_proxy() -> bool {
+    true
+}
+
 /// Request-Body zum Anlegen/Aktualisieren einer Online-Quelle.
 #[derive(Debug, Deserialize)]
 pub struct OnlineQuelleBody {
@@ -162,8 +168,9 @@ pub struct OnlineQuelleBody {
     pub sortier: i64,
     #[serde(default = "default_aktiv")]
     pub aktiv: bool,
-    /// Serverseitig proxen (key-basierte Anbieter, LFH-182). Default false → Quelle läuft direkt.
-    #[serde(default)]
+    /// Serverseitig proxen + cachen (LFH-182/190). Default **true** (Weglassen ⇒ proxen);
+    /// abschaltbar pro Quelle für proxy-verbotene Anbieter.
+    #[serde(default = "default_proxy")]
     pub proxy: bool,
 }
 
