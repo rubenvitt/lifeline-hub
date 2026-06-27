@@ -85,7 +85,7 @@ pub async fn slot_upsert(
 ) -> Result<i64, sqlx::Error> {
     sqlx::query_scalar::<_, i64>(
         "INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) VALUES (?, ?, ?) \
-         ON CONFLICT(quelle_id, upstream_url) DO UPDATE SET art = excluded.art RETURNING id",
+         ON CONFLICT(quelle_id, upstream_url, art) DO UPDATE SET art = excluded.art RETURNING id",
     )
     .bind(quelle_id)
     .bind(upstream_url)
@@ -668,6 +668,19 @@ mod tests {
         assert!(slot_aufloesen(&pool, q.id, s1, "sprite").await.unwrap().is_none(), "falsche art → None");
         assert!(slot_aufloesen(&pool, 999, s1, "template").await.unwrap().is_none(), "fremde quelle → None");
         assert!(slot_aufloesen(&pool, q.id, 99999, "template").await.unwrap().is_none(), "unbekannter slot → None");
+    }
+
+    #[tokio::test]
+    async fn slot_upsert_gleiche_url_zwei_arten_zwei_slots() {
+        // art ist Teil der Identität: dieselbe URL in zwei Rollen bekommt zwei Slots, jeder über
+        // seine art auflösbar (sonst würde ON CONFLICT eine Art überschreiben → unauflösbar).
+        let pool = test_pool().await;
+        let q = anlegen_online_quelle(&pool, &eingabe("U", 1, true)).await.unwrap();
+        let a = slot_upsert(&pool, q.id, "https://h/x", "sprite").await.unwrap();
+        let b = slot_upsert(&pool, q.id, "https://h/x", "tilejson").await.unwrap();
+        assert_ne!(a, b, "gleiche URL, andere art → eigener Slot");
+        assert_eq!(slot_aufloesen(&pool, q.id, a, "sprite").await.unwrap().as_deref(), Some("https://h/x"));
+        assert_eq!(slot_aufloesen(&pool, q.id, b, "tilejson").await.unwrap().as_deref(), Some("https://h/x"));
     }
 
     #[tokio::test]

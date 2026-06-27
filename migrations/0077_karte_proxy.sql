@@ -17,5 +17,8 @@ CREATE TABLE karte_proxy_asset (
     upstream_url TEXT    NOT NULL,
     art          TEXT    NOT NULL CHECK (art IN ('static', 'template', 'tilejson', 'sprite', 'glyphs')),
     erstellt_at  TEXT    NOT NULL DEFAULT (datetime('now')),
-    UNIQUE (quelle_id, upstream_url)
+    -- art ist Teil der Identität: dieselbe Upstream-URL kann (selten) in zwei Rollen auftreten;
+    -- jede Art bekommt ihren eigenen Slot, sonst macht ON CONFLICT DO UPDATE SET art eine Art
+    -- unauflösbar (slot_aufloesen filtert auf art → 404).
+    UNIQUE (quelle_id, upstream_url, art)
 );
