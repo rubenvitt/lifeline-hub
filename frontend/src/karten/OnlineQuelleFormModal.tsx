@@ -24,12 +24,13 @@ interface FormWerte {
 const TYP_OPTIONEN: { value: OnlineStyleTyp; label: string }[] = [
   { value: 'vektor', label: 'Vektor (Style-JSON)' },
   { value: 'raster', label: 'Raster (XYZ-Kacheln)' },
+  { value: 'protomaps', label: 'Protomaps (API-Key, beschriftet)' },
 ];
 
 const URL_PLATZHALTER: Record<OnlineStyleTyp, string> = {
   vektor: 'https://…/style.json',
   raster: 'https://…/{z}/{x}/{y}.png',
-  protomaps: '/api/karte/proxy/{id}/tilejson',
+  protomaps: 'https://api.protomaps.com/tiles/v4.json?key=…',
 };
 
 /**
@@ -81,7 +82,7 @@ export default function OnlineQuelleFormModal({
         attribution: werte.attribution.trim(),
         sortier: werte.sortier ?? 0,
         aktiv: werte.aktiv ?? true,
-        proxy: werte.proxy ?? false,
+        proxy: werte.typ === 'protomaps' ? true : (werte.proxy ?? false),
       };
       return quelle ? aktualisiereOnlineQuelle(quelle.id, body) : legeOnlineQuelleAn(body);
     },
@@ -161,7 +162,7 @@ export default function OnlineQuelleFormModal({
           valuePropName="checked"
           tooltip="Key-basierte Anbieter: Der Server holt Style/Tiles/Sprite/Glyphs, der Schlüssel bleibt server-seitig und erscheint nie im Browser (LFH-182)."
         >
-          <Switch />
+          <Switch disabled={typ === 'protomaps'} />
         </Form.Item>
       </Form>
     </Modal>
