@@ -734,3 +734,81 @@ async fn online_anlegen_proxy_unbekannter_platzhalter_ist_400() {
         "unbekannter Platzhalter {{quadkey}} fail-fast"
     );
 }
+
+#[tokio::test]
+async fn config_proxy_quelle_gibt_relative_url_und_verbirgt_key() {
+    let pool = pool().await;
+    // proxy=1 Vektor (Key in url), proxy=1 Raster, proxy=0 direkt — frischer Pool → ids 1,2,3.
+    sqlx::query("INSERT INTO karte_online_quelle (name,url,typ,attribution,sortier,aktiv,proxy) VALUES (?,?,?,?,?,?,?)")
+        .bind("MapTiler").bind("https://api.maptiler.com/maps/streets/style.json?key=GEHEIM")
+        .bind("vektor").bind("© MapTiler").bind(0).bind(1).bind(1)
+        .execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO karte_online_quelle (name,url,typ,attribution,sortier,aktiv,proxy) VALUES (?,?,?,?,?,?,?)")
+        .bind("Stadia").bind("https://tiles.stadiamaps.com/{z}/{x}/{y}.png?api_key=GEHEIM2")
+        .bind("raster").bind("© Stadia").bind(1).bind(1).bind(1)
+        .execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO karte_online_quelle (name,url,typ,attribution,sortier,aktiv,proxy) VALUES (?,?,?,?,?,?,?)")
+        .bind("OFM").bind("https://tiles.example/liberty").bind("vektor").bind("© OSM").bind(2).bind(1).bind(0)
+        .execute(&pool).await.unwrap();
+
+    let app = app_mit_pool(pool);
+    let res = anfrage(&app, "GET", "/api/karte/config", None, None).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    let roh = String::from_utf8(bytes.to_vec()).unwrap();
+    // Weder Key noch Upstream-Host stehen IRGENDWO im öffentlichen config-Body.
+    assert!(!roh.contains("GEHEIM"), "kein Key im config-Body: {roh}");
+    assert!(!roh.contains("api.maptiler.com"), "kein Upstream-Host (vektor)");
+    assert!(!roh.contains("stadiamaps.com"), "kein Upstream-Host (raster)");
+
+    let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let styles = v["online_styles"].as_array().unwrap();
+    assert_eq!(styles.len(), 3);
+    // Vektor-proxy → /api/karte/proxy/{id}/style.json, Attribution erhalten.
+    assert!(styles[0]["url"].as_str().unwrap().starts_with("/api/karte/proxy/"));
+    assert!(styles[0]["url"].as_str().unwrap().ends_with("/style.json"));
+    assert_eq!(styles[0]["attribution"], "© MapTiler");
+    // Raster-proxy → /api/karte/proxy/{id}/raster/{z}/{x}/{y}
+    assert!(styles[1]["url"].as_str().unwrap().ends_with("/raster/{z}/{x}/{y}"));
+    // proxy=0 → unverändert
+    assert_eq!(styles[2]["url"], "https://tiles.example/liberty");
+}
+
+#[tokio::test]
+async fn online_liste_maskiert_proxy_url_fuer_fuehrungskraft() {
+    let (app, admin) = admin_app().await;
+    let res = anfrage(
+        &app,
+        "POST",
+        "/api/karte/online-quellen",
+        Some(&admin),
+        Some(r#"{"name":"MapTiler","url":"https://api.maptiler.com/maps/streets/style.json?key=GEHEIM","typ":"vektor","attribution":"© MapTiler","proxy":true}"#),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::CREATED);
+
+    // Admin sieht die volle url (er hat sie eingegeben und muss sie editieren können).
+    let liste = json(anfrage(&app, "GET", "/api/karte/online-quellen", Some(&admin), None).await).await;
+    assert!(
+        liste[0]["url"].as_str().unwrap().contains("GEHEIM"),
+        "Admin sieht den Key voll"
+    );
+
+    // Führungskraft (darf_admin_bereich, !ist_admin) sieht die url maskiert.
+    let res = anfrage(
+        &app,
+        "POST",
+        "/api/benutzer",
+        Some(&admin),
+        Some(r#"{"anzeigename":"Frieda","benutzername":"frieda","passwort":"friedapw1","org_rolle":"fuehrungskraft"}"#),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let liste = json(anfrage(&app, "GET", "/api/karte/online-quellen", Some(&frieda), None).await).await;
+    assert_eq!(liste[0]["url"], "***", "Führungskraft sieht maskierte url");
+    assert!(
+        !liste[0]["url"].as_str().unwrap().contains("GEHEIM"),
+        "kein Key für die Führungskraft"
+    );
+}

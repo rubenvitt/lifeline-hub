@@ -1,6 +1,9 @@
 use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
-use crate::config::{default_offline_katalog, default_online_styles, OfflineKatalogEintrag, OnlineStyle};
+use crate::config::{
+    default_offline_katalog, default_online_styles, OfflineKatalogEintrag, OnlineStyle,
+    OnlineStyleTyp,
+};
 use crate::error::AppError;
 use crate::karte::download::{self, Fortschritt};
 use crate::karte::proxy;
@@ -39,7 +42,31 @@ pub struct KarteConfigAntwort {
 
 /// GET /api/karte/config — Basemap-Verfügbarkeit fürs Frontend, frisch aus der DB-Registry.
 pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAntwort>, AppError> {
-    let online_styles = repo::aktive_online_styles(&state.pool).await?;
+    // Proxied Quellen (proxy=1) bekommen relative /api/karte/proxy/...-URLs; die Upstream-`url`
+    // (inkl. Key) verlässt den Server NIE über diesen öffentlichen Endpunkt. Direkte Quellen
+    // (proxy=0) werden unverändert ausgeliefert (Browser lädt sie selbst).
+    let online_styles: Vec<OnlineStyle> = repo::aktive_online_quellen_fuer_config(&state.pool)
+        .await?
+        .into_iter()
+        .map(|q| {
+            let typ = if q.typ == "raster" {
+                OnlineStyleTyp::Raster
+            } else {
+                OnlineStyleTyp::Vektor
+            };
+            let url = if q.proxy {
+                proxy::proxy_config_url(q.id, &typ)
+            } else {
+                q.url
+            };
+            OnlineStyle {
+                name: q.name,
+                url,
+                typ,
+                attribution: q.attribution,
+            }
+        })
+        .collect();
     let aktiv = repo::aktive_offline_karte(&state.pool).await?;
     let (pmtiles_url, pmtiles_attribution) = match &aktiv {
         Some(k) => {
@@ -211,7 +238,18 @@ pub async fn online_liste(
     if !benutzer.darf_admin_bereich() {
         return Err(AppError::Forbidden);
     }
-    Ok(Json(repo::liste_online_quellen(&state.pool).await?))
+    let mut quellen = repo::liste_online_quellen(&state.pool).await?;
+    // darf_admin_bereich() schließt Führungskräfte (read-only) ein. Die Upstream-`url` einer
+    // proxied Quelle enthält den Key → nur dem echten Admin (der sie eingegeben hat) im Klartext
+    // zeigen, für alle anderen maskieren.
+    if !benutzer.ist_admin() {
+        for q in &mut quellen {
+            if q.proxy {
+                q.url = "***".into();
+            }
+        }
+    }
+    Ok(Json(quellen))
 }
 
 /// POST /api/karte/online-quellen — neue Online-Quelle anlegen (Admin).

@@ -1,6 +1,5 @@
 //! CRUD- und Lese-Queries der Karten-Registry (runtime-queries, Muster wie `benutzer.rs`).
 
-use crate::config::{OnlineStyle, OnlineStyleTyp};
 use serde::Serialize;
 use sqlx::SqlitePool;
 
@@ -30,43 +29,6 @@ pub struct OnlineQuelleEingabe {
     pub sortier: i64,
     pub aktiv: bool,
     pub proxy: bool,
-}
-
-/// FromRow-Helfer: liest eine Online-Quelle und mappt den `typ`-String aufs Enum.
-/// (Hält `config.rs` serde-only — kein `sqlx::Type`-Derive auf `OnlineStyleTyp`.)
-#[derive(sqlx::FromRow)]
-struct OnlineStyleRow {
-    name: String,
-    url: String,
-    typ: String,
-    attribution: Option<String>,
-}
-
-impl From<OnlineStyleRow> for OnlineStyle {
-    fn from(r: OnlineStyleRow) -> Self {
-        // `typ` ist per CHECK auf 'vektor'|'raster' beschränkt → `_` sicher als Vektor.
-        let typ = match r.typ.as_str() {
-            "raster" => OnlineStyleTyp::Raster,
-            _ => OnlineStyleTyp::Vektor,
-        };
-        OnlineStyle {
-            name: r.name,
-            url: r.url,
-            typ,
-            attribution: r.attribution,
-        }
-    }
-}
-
-/// Aktive Online-Quellen als `OnlineStyle` (für `GET /api/karte/config`), nach `sortier`, `id`.
-pub async fn aktive_online_styles(pool: &SqlitePool) -> Result<Vec<OnlineStyle>, sqlx::Error> {
-    let rows = sqlx::query_as::<_, OnlineStyleRow>(
-        "SELECT name, url, typ, attribution FROM karte_online_quelle \
-         WHERE aktiv = 1 ORDER BY sortier, id",
-    )
-    .fetch_all(pool)
-    .await?;
-    Ok(rows.into_iter().map(OnlineStyle::from).collect())
 }
 
 // Hinweis (sqlx 0.9): `query_as` akzeptiert nur `&'static str` (SqlSafeStr) — kein `format!`-
@@ -543,49 +505,24 @@ mod tests {
     use crate::db::test_pool;
 
     #[tokio::test]
-    async fn aktive_online_styles_nur_aktive_sortiert() {
+    async fn aktive_online_quellen_fuer_config_nur_aktive_sortiert() {
         let pool = test_pool().await;
-        sqlx::query(
-            "INSERT INTO karte_online_quelle (name,url,typ,attribution,sortier,aktiv) \
-             VALUES (?,?,?,?,?,?)",
-        )
-        .bind("B")
-        .bind("https://b")
-        .bind("vektor")
-        .bind(None::<String>)
-        .bind(2)
-        .bind(1)
-        .execute(&pool)
-        .await
-        .unwrap();
-        sqlx::query(
-            "INSERT INTO karte_online_quelle (name,url,typ,attribution,sortier,aktiv) \
-             VALUES (?,?,?,?,?,?)",
-        )
-        .bind("A")
-        .bind("https://a")
-        .bind("raster")
-        .bind(Some("© X"))
-        .bind(1)
-        .bind(1)
-        .execute(&pool)
-        .await
-        .unwrap();
+        sqlx::query("INSERT INTO karte_online_quelle (name,url,typ,attribution,sortier,aktiv) VALUES (?,?,?,?,?,?)")
+            .bind("B").bind("https://b").bind("vektor").bind(None::<String>).bind(2).bind(1)
+            .execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO karte_online_quelle (name,url,typ,attribution,sortier,aktiv) VALUES (?,?,?,?,?,?)")
+            .bind("A").bind("https://a").bind("raster").bind(Some("© X")).bind(1).bind(1)
+            .execute(&pool).await.unwrap();
         sqlx::query("INSERT INTO karte_online_quelle (name,url,typ,sortier,aktiv) VALUES (?,?,?,?,?)")
-            .bind("Inaktiv")
-            .bind("https://i")
-            .bind("vektor")
-            .bind(0)
-            .bind(0)
-            .execute(&pool)
-            .await
-            .unwrap();
+            .bind("Inaktiv").bind("https://i").bind("vektor").bind(0).bind(0)
+            .execute(&pool).await.unwrap();
 
-        let styles = aktive_online_styles(&pool).await.unwrap();
-        assert_eq!(styles.len(), 2, "inaktive Quelle ausgeschlossen");
-        assert_eq!(styles[0].name, "A", "sortier 1 vor 2");
-        assert_eq!(styles[0].typ, OnlineStyleTyp::Raster);
-        assert_eq!(styles[1].name, "B");
+        let q = aktive_online_quellen_fuer_config(&pool).await.unwrap();
+        assert_eq!(q.len(), 2, "inaktive Quelle ausgeschlossen");
+        assert_eq!(q[0].name, "A", "sortier 1 vor 2");
+        assert_eq!(q[0].typ, "raster");
+        assert!(!q[0].proxy, "Default proxy=false");
+        assert_eq!(q[1].name, "B");
     }
 
     fn eingabe(name: &str, sortier: i64, aktiv: bool) -> OnlineQuelleEingabe {
