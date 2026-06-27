@@ -186,6 +186,209 @@ pub fn unbekannte_platzhalter(template: &str) -> Vec<String> {
     out
 }
 
+// ===== Rewrite-Walker (Task 2): strukturell-zuerst + neutralize =====
+
+use reqwest::Url;
+use serde_json::Value;
+
+/// Fehler beim Rewrite eines Style-/TileJSON-Dokuments.
+#[derive(Debug, PartialEq, Eq)]
+pub enum RewriteFehler {
+    /// Mehr umzuschreibende URLs als die Obergrenze erlaubt (DoS-Schutz / fehlerhafte Quelle).
+    ZuVieleSlots,
+}
+
+impl std::fmt::Display for RewriteFehler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RewriteFehler::ZuVieleSlots => write!(f, "Style referenziert zu viele Assets"),
+        }
+    }
+}
+
+/// Löst eine (relative oder absolute) Asset-Referenz gegen die Style-Basis auf — **brace-sicher**
+/// (kein `Url::join`, das `{}` percent-kodieren würde). Absolute http(s)-URLs bleiben unverändert;
+/// `//host/…` bekommt das Basis-Schema; relative Pfade werden gegen Host+Verzeichnis der Basis
+/// aufgelöst. `None`, wenn die Basis keinen Host hat.
+fn absolutiere(basis: &Url, referenz: &str) -> Option<String> {
+    let r = referenz.trim();
+    if r.to_ascii_lowercase().starts_with("http://") || r.to_ascii_lowercase().starts_with("https://") {
+        return Some(r.to_string());
+    }
+    let scheme = basis.scheme();
+    if let Some(rest) = r.strip_prefix("//") {
+        return Some(format!("{scheme}://{rest}"));
+    }
+    let host = basis.host_str()?;
+    let port = basis.port().map(|p| format!(":{p}")).unwrap_or_default();
+    if let Some(rest) = r.strip_prefix('/') {
+        return Some(format!("{scheme}://{host}{port}/{rest}"));
+    }
+    // Relativ zum Verzeichnis der Basis (alles bis zum letzten '/').
+    let pfad = basis.path();
+    let dir_ende = pfad.rfind('/').map(|i| i + 1).unwrap_or(0);
+    Some(format!("{scheme}://{host}{port}{}{r}", &pfad[..dir_ende]))
+}
+
+/// Hilfsfunktion mit Slot-Obergrenze: zählt jede Slot-Vergabe, bricht über `max` ab.
+fn mint_mit_cap(
+    zaehler: &mut usize,
+    max: usize,
+    mint: &mut dyn FnMut(&str, SlotArt) -> String,
+    url: &str,
+    art: SlotArt,
+) -> Result<String, RewriteFehler> {
+    *zaehler += 1;
+    if *zaehler > max {
+        return Err(RewriteFehler::ZuVieleSlots);
+    }
+    Ok(mint(url, art))
+}
+
+/// Entfernt/neutralisiert verbleibende absolute http-URLs an **unbekannten** Positionen (nach dem
+/// strukturellen Rewrite): Objekt-Schlüssel werden gelöscht, Array-Elemente auf `null` gesetzt.
+/// Verhindert, dass beliebige (ggf. key-tragende) URLs als fetchbare Slots oder im Klartext im
+/// Client-Dokument landen. Strings, in denen eine URL nur *eingebettet* ist (z.B. attribution-HTML),
+/// werden NICHT angefasst — die fängt der `contains_secret`-Backstop.
+fn neutralisiere_unbekannte(v: &mut Value) {
+    match v {
+        Value::Object(map) => {
+            let zu_entfernen: Vec<String> = map
+                .iter()
+                .filter(|(_, val)| val.as_str().is_some_and(ist_absolute_http_url))
+                .map(|(k, _)| k.clone())
+                .collect();
+            for k in zu_entfernen {
+                map.remove(&k);
+            }
+            for val in map.values_mut() {
+                neutralisiere_unbekannte(val);
+            }
+        }
+        Value::Array(arr) => {
+            for el in arr.iter_mut() {
+                if el.as_str().is_some_and(ist_absolute_http_url) {
+                    *el = Value::Null;
+                } else {
+                    neutralisiere_unbekannte(el);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Schreibt einen MapLibre-Style **in place** um: bekannte Asset-Positionen → Proxy-Slot-URLs
+/// (`mint(upstream_url, art)` liefert die fertige Client-URL), unbekannte absolute URLs werden
+/// neutralisiert. `mint` wird synchron aufgerufen (im Handler: zweiphasig um den async Slot-Upsert,
+/// siehe `hole_style`). Bricht über `max_slots` mit `ZuVieleSlots` ab.
+pub fn rewrite_style(
+    style: &mut Value,
+    basis: &Url,
+    mint: &mut dyn FnMut(&str, SlotArt) -> String,
+    max_slots: usize,
+) -> Result<(), RewriteFehler> {
+    let mut n = 0usize;
+    if let Some(sources) = style.get_mut("sources").and_then(Value::as_object_mut) {
+        for src in sources.values_mut() {
+            let Some(obj) = src.as_object_mut() else { continue };
+            if let Some(tiles) = obj.get_mut("tiles").and_then(Value::as_array_mut) {
+                for t in tiles.iter_mut() {
+                    if let Some(s) = t.as_str() {
+                        if let Some(abs) = absolutiere(basis, s) {
+                            let pu = mint_mit_cap(&mut n, max_slots, mint, &abs, SlotArt::Template)?;
+                            *t = Value::String(pu);
+                        }
+                    }
+                }
+            }
+            if let Some(u) = obj.get("url").and_then(Value::as_str) {
+                if let Some(abs) = absolutiere(basis, u) {
+                    let pu = mint_mit_cap(&mut n, max_slots, mint, &abs, SlotArt::Tilejson)?;
+                    obj.insert("url".into(), Value::String(pu));
+                }
+            }
+            if let Some(d) = obj.get("data").and_then(Value::as_str) {
+                if ist_absolute_http_url(d) {
+                    if let Some(abs) = absolutiere(basis, d) {
+                        let pu = mint_mit_cap(&mut n, max_slots, mint, &abs, SlotArt::Static)?;
+                        obj.insert("data".into(), Value::String(pu));
+                    }
+                }
+            }
+        }
+    }
+    match style.get_mut("sprite") {
+        Some(Value::String(s)) => {
+            if let Some(abs) = absolutiere(basis, s) {
+                let pu = mint_mit_cap(&mut n, max_slots, mint, &abs, SlotArt::Sprite)?;
+                *style.get_mut("sprite").unwrap() = Value::String(pu);
+            }
+        }
+        Some(Value::Array(arr)) => {
+            for entry in arr.iter_mut() {
+                if let Some(u) = entry.get("url").and_then(Value::as_str) {
+                    if let Some(abs) = absolutiere(basis, u) {
+                        let pu = mint_mit_cap(&mut n, max_slots, mint, &abs, SlotArt::Sprite)?;
+                        entry.as_object_mut().unwrap().insert("url".into(), Value::String(pu));
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+    if let Some(g) = style.get("glyphs").and_then(Value::as_str) {
+        if let Some(abs) = absolutiere(basis, g) {
+            let pu = mint_mit_cap(&mut n, max_slots, mint, &abs, SlotArt::Glyphs)?;
+            style.as_object_mut().unwrap().insert("glyphs".into(), Value::String(pu));
+        }
+    }
+    neutralisiere_unbekannte(style);
+    Ok(())
+}
+
+/// Schreibt ein TileJSON-Dokument um: top-level `tiles[]` → Template-Slots. Bei `scheme: "tms"`
+/// wird `{y}`→`{-y}` in der gespeicherten Upstream-URL ersetzt (Server flippt) und `scheme` auf
+/// `xyz` normalisiert, damit MapLibre nicht ein zweites Mal flippt (kein Doppel-Flip).
+pub fn rewrite_tilejson(
+    tj: &mut Value,
+    basis: &Url,
+    mint: &mut dyn FnMut(&str, SlotArt) -> String,
+    max_slots: usize,
+) -> Result<(), RewriteFehler> {
+    let mut n = 0usize;
+    let ist_tms = tj.get("scheme").and_then(Value::as_str) == Some("tms");
+    if let Some(tiles) = tj.get_mut("tiles").and_then(Value::as_array_mut) {
+        for t in tiles.iter_mut() {
+            if let Some(s) = t.as_str() {
+                if let Some(mut abs) = absolutiere(basis, s) {
+                    if ist_tms {
+                        abs = abs.replace("{y}", "{-y}");
+                    }
+                    let pu = mint_mit_cap(&mut n, max_slots, mint, &abs, SlotArt::Template)?;
+                    *t = Value::String(pu);
+                }
+            }
+        }
+    }
+    if ist_tms {
+        if let Some(obj) = tj.as_object_mut() {
+            obj.insert("scheme".into(), Value::String("xyz".into()));
+        }
+    }
+    neutralisiere_unbekannte(tj);
+    Ok(())
+}
+
+/// Backstop: true, wenn ein nicht-leerer Query-Param-**Wert** der Upstream-URL als Substring im
+/// serialisierten Dokument vorkommt (Key wäre durchgerutscht → fail-closed im Aufrufer).
+/// Ehrliche Grenze: Keys in Pfadsegmenten/Subdomains werden so nicht erkannt.
+pub fn contains_secret(serialisiert: &str, upstream: &Url) -> bool {
+    upstream
+        .query_pairs()
+        .any(|(_, val)| !val.is_empty() && serialisiert.contains(val.as_ref()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -313,5 +516,132 @@ mod tests {
             unbekannte_platzhalter("https://h/{z}/{quadkey}/{ratio}"),
             vec!["{quadkey}".to_string(), "{ratio}".to_string()]
         );
+    }
+}
+
+#[cfg(test)]
+mod rewrite_tests {
+    use super::*;
+    use reqwest::Url;
+    use serde_json::json;
+
+    /// Deterministischer Fake-`mint`, der die (url, art)-Aufrufe protokolliert und eine
+    /// relative Proxy-URL zurückgibt (key-frei, nicht-absolut → vom Sweep unangetastet).
+    fn fake_mint(log: &mut Vec<(String, SlotArt)>) -> impl FnMut(&str, SlotArt) -> String + '_ {
+        move |u, a| {
+            log.push((u.to_string(), a));
+            format!("/api/karte/proxy/1/{}/{}", a.as_str(), log.len())
+        }
+    }
+
+    #[test]
+    fn rewrite_style_mintet_strukturell_und_ist_keyfrei() {
+        let basis = Url::parse("https://api.host/maps/x/style.json?key=K").unwrap();
+        let mut style = json!({
+            "version": 8,
+            "sources": {
+                "v": { "type": "vector", "url": "https://api.host/maps/x/tiles.json?key=K" },
+                "r": { "type": "raster", "tiles": ["https://api.host/t/{z}/{x}/{y}.png?key=K"] },
+                "g": { "type": "geojson", "data": "https://api.host/d.geojson?key=K" }
+            },
+            "sprite": "https://api.host/maps/x/sprite?key=K",
+            "glyphs": "https://api.host/fonts/{fontstack}/{range}.pbf?key=K"
+        });
+        let mut log = vec![];
+        let mut m = fake_mint(&mut log);
+        rewrite_style(&mut style, &basis, &mut m, 500).unwrap();
+        drop(m); // Borrow von log freigeben, bevor wir es lesen
+        let s = serde_json::to_string(&style).unwrap();
+        assert!(!s.contains("key=K"), "kein Key im Ergebnis: {s}");
+        assert!(!s.contains("api.host"), "kein Upstream-Host: {s}");
+        let arten: Vec<&str> = log.iter().map(|(_, a)| a.as_str()).collect();
+        for a in ["tilejson", "template", "static", "sprite", "glyphs"] {
+            assert!(arten.contains(&a), "Art {a} gemintet");
+        }
+    }
+
+    #[test]
+    fn rewrite_style_absolutiert_relative_refs() {
+        let basis = Url::parse("https://h/maps/x/style.json?key=K").unwrap();
+        let mut style = json!({
+            "version": 8, "sources": {},
+            "sprite": "sprite",
+            "glyphs": "fonts/{fontstack}/{range}.pbf"
+        });
+        let mut log = vec![];
+        let mut m = fake_mint(&mut log);
+        rewrite_style(&mut style, &basis, &mut m, 500).unwrap();
+        drop(m); // Borrow von log freigeben, bevor wir es lesen
+        assert!(
+            log.iter().any(|(u, a)| u == "https://h/maps/x/sprite" && *a == SlotArt::Sprite),
+            "relative 'sprite' gegen Basis absolutiert: {log:?}"
+        );
+        assert!(
+            log.iter().any(|(u, a)| u == "https://h/maps/x/fonts/{fontstack}/{range}.pbf" && *a == SlotArt::Glyphs),
+            "relative glyphs absolutiert, braces erhalten: {log:?}"
+        );
+    }
+
+    #[test]
+    fn rewrite_style_neutralisiert_unbekannte_absolute_url() {
+        let basis = Url::parse("https://h/s.json?key=K").unwrap();
+        let mut style = json!({"version":8,"sources":{},"x_evil":"https://api.host/secret?key=K"});
+        let mut log = vec![];
+        let mut m = fake_mint(&mut log);
+        rewrite_style(&mut style, &basis, &mut m, 500).unwrap();
+        drop(m); // Borrow von log freigeben, bevor wir es lesen
+        let s = serde_json::to_string(&style).unwrap();
+        assert!(!s.contains("api.host") && !s.contains("key=K"), "neutralisiert: {s}");
+        assert!(log.is_empty(), "unbekannte Position wird NICHT zum fetchbaren Slot");
+    }
+
+    #[test]
+    fn rewrite_style_laesst_attribution_html_unangetastet() {
+        // URL ist nur EINGEBETTET (kein bare-URL-String) → Sweep fasst sie nicht an,
+        // contains_secret fängt den Key später.
+        let basis = Url::parse("https://h/s.json?key=K").unwrap();
+        let mut style = json!({"version":8,"sources":{},"metadata":{"attribution":"<a href=\"https://h/x?key=K\">©</a>"}});
+        let mut log = vec![];
+        let mut m = fake_mint(&mut log);
+        rewrite_style(&mut style, &basis, &mut m, 500).unwrap();
+        drop(m); // Borrow von log freigeben, bevor wir es lesen
+        let s = serde_json::to_string(&style).unwrap();
+        assert!(s.contains("key=K"), "eingebettete URL bleibt (Backstop-Fall): {s}");
+        assert!(contains_secret(&s, &basis), "contains_secret erkennt den Rest-Key");
+    }
+
+    #[test]
+    fn rewrite_style_slot_obergrenze() {
+        let basis = Url::parse("https://h/s.json").unwrap();
+        let tiles: Vec<String> = (0..10).map(|i| format!("https://h/{i}/{{z}}/{{x}}/{{y}}")).collect();
+        let mut style = json!({"version":8,"sources":{"r":{"type":"raster","tiles": tiles}}});
+        let mut log = vec![];
+        let mut m = fake_mint(&mut log);
+        assert_eq!(
+            rewrite_style(&mut style, &basis, &mut m, 3),
+            Err(RewriteFehler::ZuVieleSlots)
+        );
+    }
+
+    #[test]
+    fn rewrite_tilejson_normalisiert_tms() {
+        let basis = Url::parse("https://h/tiles.json?key=K").unwrap();
+        let mut tj = json!({"tiles":["https://h/{z}/{x}/{y}.pbf?key=K"], "scheme":"tms"});
+        let mut log = vec![];
+        let mut m = fake_mint(&mut log);
+        rewrite_tilejson(&mut tj, &basis, &mut m, 500).unwrap();
+        drop(m); // Borrow von log freigeben, bevor wir es lesen
+        let s = serde_json::to_string(&tj).unwrap();
+        assert!(!s.contains("key=K"), "key-frei: {s}");
+        assert_eq!(tj.get("scheme").and_then(Value::as_str), Some("xyz"), "tms→xyz");
+        // Upstream-Template trägt {-y} (Server flippt), nicht {y}.
+        assert!(log[0].0.contains("{-y}"), "tms-Flip server-seitig: {:?}", log[0].0);
+    }
+
+    #[test]
+    fn contains_secret_findet_query_werte() {
+        let up = Url::parse("https://h/x?key=SECRET123&foo=bar").unwrap();
+        assert!(contains_secret("...key=SECRET123...", &up));
+        assert!(!contains_secret("nichts geheimes", &up));
     }
 }
