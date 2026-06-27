@@ -49,12 +49,14 @@ pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAnt
         .await?
         .into_iter()
         .map(|q| {
-            let typ = if q.typ == "raster" {
-                OnlineStyleTyp::Raster
-            } else {
-                OnlineStyleTyp::Vektor
+            let typ = match q.typ.as_str() {
+                "raster" => OnlineStyleTyp::Raster,
+                "protomaps" => OnlineStyleTyp::Protomaps,
+                _ => OnlineStyleTyp::Vektor,
             };
-            let url = if q.proxy {
+            // protomaps trägt den Key in der Upstream-URL → IMMER proxied ausliefern (nie roh),
+            // auch als Defense-in-Depth falls proxy versehentlich false wäre.
+            let url = if q.proxy || matches!(typ, OnlineStyleTyp::Protomaps) {
                 proxy::proxy_config_url(q.id, &typ)
             } else {
                 q.url
@@ -177,7 +179,9 @@ pub struct OfflineKarteBody {
 }
 
 /// Validiert + normalisiert einen Online-Quelle-Body (Anlegen wie Vollersatz-PATCH teilen das).
-/// Name/URL nicht leer (getrimmt), `typ ∈ {vektor,raster}`, **Attribution Pflicht** (Lizenzauflage).
+/// Name/URL nicht leer (getrimmt), `typ ∈ {vektor,raster,protomaps}`, **Attribution Pflicht** (Lizenzauflage).
+/// `protomaps` trägt den Key in der Upstream-URL → `proxy` wird serverseitig auf `true` erzwungen
+/// (nie roh ausliefern), unabhängig davon, was der Client sendet.
 fn validiere_online(body: OnlineQuelleBody) -> Result<OnlineQuelleEingabe, AppError> {
     let name = body.name.trim();
     if name.is_empty() {
@@ -187,9 +191,9 @@ fn validiere_online(body: OnlineQuelleBody) -> Result<OnlineQuelleEingabe, AppEr
     if url.is_empty() {
         return Err(AppError::Validation("URL darf nicht leer sein".into()));
     }
-    if body.typ != "vektor" && body.typ != "raster" {
+    if body.typ != "vektor" && body.typ != "raster" && body.typ != "protomaps" {
         return Err(AppError::Validation(
-            "Typ muss 'vektor' oder 'raster' sein".into(),
+            "Typ muss 'vektor', 'raster' oder 'protomaps' sein".into(),
         ));
     }
     let attribution = body
@@ -201,11 +205,13 @@ fn validiere_online(body: OnlineQuelleBody) -> Result<OnlineQuelleEingabe, AppEr
             AppError::Validation("Attribution ist Pflicht (Lizenzauflage)".into())
         })?
         .to_string();
+    // protomaps trägt den Key in der URL → Proxy ist Pflicht (nie roh ausliefern).
+    let proxy_effektiv = body.proxy || body.typ == "protomaps";
     // Proxied Quellen (key-basiert): URL roh speichern (kein Url-Roundtrip — würde `{}`
     // percent-kodieren), aber vorab validieren: nur unterstützte Platzhalter, und SSRF-Check auf
     // einer materialisierten Probe (Platzhalter durch 0/Dummy ersetzt). Direkte Quellen (proxy=0)
     // bleiben unverändert: der Browser lädt sie selbst, keine Server-seitige Prüfung nötig.
-    if body.proxy {
+    if proxy_effektiv {
         let unbekannt = proxy::unbekannte_platzhalter(url);
         if !unbekannt.is_empty() {
             return Err(AppError::Validation(format!(
@@ -225,7 +231,7 @@ fn validiere_online(body: OnlineQuelleBody) -> Result<OnlineQuelleEingabe, AppEr
         attribution: Some(attribution),
         sortier: body.sortier,
         aktiv: body.aktiv,
-        proxy: body.proxy,
+        proxy: proxy_effektiv,
     })
 }
 
@@ -774,6 +780,20 @@ pub async fn proxy_tilejson(
     aktive_proxy_quelle(&state, id).await?;
     let upstream = slot_oder_nf(&state, id, slot, proxy::SlotArt::Tilejson).await?;
     let u = ssrf_geprueft(&upstream)?;
+    let json = proxy::hole_tilejson(proxy::proxy_client(), &state.pool, id, u)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(json_proxy_antwort(json))
+}
+
+/// GET /api/karte/proxy/{id}/tilejson — registrierte TileJSON-Quelle (z. B. Protomaps) holen +
+/// key-frei umschreiben. SLOT-LOS: die Quelle-`url` IST die TileJSON (analog `proxy_style`).
+pub async fn proxy_tilejson_entry(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> Result<Response, AppError> {
+    let q = aktive_proxy_quelle(&state, id).await?;
+    let u = ssrf_geprueft(&q.url)?;
     let json = proxy::hole_tilejson(proxy::proxy_client(), &state.pool, id, u)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;

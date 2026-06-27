@@ -1,6 +1,6 @@
 import { apiGet } from './client';
 
-export type OnlineStyleTyp = 'vektor' | 'raster';
+export type OnlineStyleTyp = 'vektor' | 'raster' | 'protomaps';
 
 /** Ein benannter Online-Basemap-View (vom Backend geliefert). */
 export interface OnlineStyle {

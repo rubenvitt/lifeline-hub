@@ -8,10 +8,12 @@ const FARBEN: Record<KartenTheme, Record<string, string>> = {
   light: {
     erde: '#f5f5f3', wasser: '#a8cdf0', landuse: '#eaf0e2',
     strasse: '#ffffff', gebaeude: '#e4e0da', hintergrund: '#e8e8e8',
+    label: '#3a3a3a', labelHalo: '#ffffff',
   },
   dark: {
     erde: '#15181d', wasser: '#15233f', landuse: '#1b2119',
     strasse: '#33373d', gebaeude: '#23262b', hintergrund: '#0f1115',
+    label: '#d6d6d6', labelHalo: '#0f1115',
   },
 };
 
@@ -46,6 +48,41 @@ export function offlineStyle(theme: KartenTheme, pmtilesUrl: string): StyleSpeci
       { id: 'wasser', source: 'protomaps', 'source-layer': 'water', type: 'fill', paint: { 'fill-color': f.wasser } },
       { id: 'strassen', source: 'protomaps', 'source-layer': 'roads', type: 'line', paint: { 'line-color': f.strasse, 'line-width': 1.2 } },
       { id: 'gebaeude', source: 'protomaps', 'source-layer': 'buildings', type: 'fill', paint: { 'fill-color': f.gebaeude } },
+    ],
+  } as StyleSpecification;
+}
+
+/**
+ * Beschrifteter Protomaps-Style für ONLINE: dieselben Flächen/Linien-Layer wie offlineStyle,
+ * aber Vektor-Quelle = proxied TileJSON (LFH-182, Key serverseitig) statt pmtiles://, PLUS
+ * Orts-/Straßennamen-Labels mit öffentlichen Protomaps-Glyphs (key-frei).
+ */
+export function protomapsLabeledStyle(theme: KartenTheme, tilejsonUrl: string): StyleSpecification {
+  const f = FARBEN[theme];
+  const absolut = new URL(tilejsonUrl, window.location.origin).href;
+  return {
+    version: 8,
+    glyphs: 'https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf',
+    sources: {
+      protomaps: { type: 'vector', url: absolut },
+    },
+    layers: [
+      { id: 'hintergrund', type: 'background', paint: { 'background-color': f.erde } },
+      { id: 'erde', source: 'protomaps', 'source-layer': 'earth', type: 'fill', paint: { 'fill-color': f.erde } },
+      { id: 'landuse', source: 'protomaps', 'source-layer': 'landuse', type: 'fill', paint: { 'fill-color': f.landuse } },
+      { id: 'wasser', source: 'protomaps', 'source-layer': 'water', type: 'fill', paint: { 'fill-color': f.wasser } },
+      { id: 'strassen', source: 'protomaps', 'source-layer': 'roads', type: 'line', paint: { 'line-color': f.strasse, 'line-width': 1.2 } },
+      { id: 'gebaeude', source: 'protomaps', 'source-layer': 'buildings', type: 'fill', paint: { 'fill-color': f.gebaeude } },
+      {
+        id: 'strassennamen', source: 'protomaps', 'source-layer': 'roads', type: 'symbol',
+        layout: { 'symbol-placement': 'line', 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Regular'], 'text-size': 11 },
+        paint: { 'text-color': f.label, 'text-halo-color': f.labelHalo, 'text-halo-width': 1.2 },
+      },
+      {
+        id: 'orte', source: 'protomaps', 'source-layer': 'places', type: 'symbol',
+        layout: { 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Regular'], 'text-size': 12 },
+        paint: { 'text-color': f.label, 'text-halo-color': f.labelHalo, 'text-halo-width': 1.2 },
+      },
     ],
   } as StyleSpecification;
 }
@@ -105,7 +142,10 @@ export function baueBasemapStyle(
   config: KarteServerConfig | undefined,
   onlineStil: OnlineStyle | undefined,
 ): StyleSpecification | string {
-  if (modus === 'online' && onlineStil) return baueOnlineStyle(onlineStil);
+  if (modus === 'online' && onlineStil) {
+    if (onlineStil.typ === 'protomaps') return protomapsLabeledStyle(theme, onlineStil.url);
+    return baueOnlineStyle(onlineStil);
+  }
   if (modus === 'offline' && config?.pmtiles_url) return offlineStyle(theme, config.pmtiles_url);
   return blindStyle(theme);
 }

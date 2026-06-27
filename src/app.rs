@@ -377,6 +377,10 @@ pub fn build_router(state: AppState) -> Router {
             get(routes::karte::proxy_tilejson),
         )
         .route(
+            "/api/karte/proxy/{id}/tilejson",
+            get(routes::karte::proxy_tilejson_entry),
+        )
+        .route(
             "/api/karte/proxy/{id}/sprite/{rest}",
             get(routes::karte::proxy_sprite),
         )
