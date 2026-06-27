@@ -332,6 +332,56 @@ pub async fn aktiviere_offline_karte(
     hole_offline_karte(pool, id).await.map(Some)
 }
 
+/// One-Click-Update (B2): ersetzt die Karte `alt_id` durch `neu_id` in EINER Transaktion.
+/// Die neue Version ERBT den Aktiv-Status der alten: war `alt` die aktive Basemap, wird `neu`
+/// aktiv (und alle anderen deaktiviert); war `alt` eine INAKTIVE Hintergrundkarte, bleibt die
+/// gerade aktive Basemap UNANGETASTET (sonst klaut ein Update einer Hintergrundkarte die aktive
+/// Basemap). `alt` wird immer gelöscht; den Datei-Cleanup (`entferne_download_dateien`) macht der
+/// Aufrufer. `Ok(None)`, wenn `neu_id` nicht existiert.
+pub async fn ersetze_aktive_offline_karte(
+    pool: &SqlitePool,
+    neu_id: i64,
+    alt_id: i64,
+) -> Result<Option<OfflineKarte>, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    let existiert: Option<i64> =
+        sqlx::query_scalar("SELECT id FROM karte_offline_karte WHERE id = ?")
+            .bind(neu_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+    if existiert.is_none() {
+        return Ok(None);
+    }
+    // Aktiv-Status der ersetzten Karte lesen (None, falls alt nebenläufig schon weg ist).
+    let alt_war_aktiv: Option<bool> =
+        sqlx::query_scalar("SELECT aktiv_basemap FROM karte_offline_karte WHERE id = ?")
+            .bind(alt_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+    if alt_war_aktiv == Some(true) {
+        // Nur wenn alt die aktive Basemap war: deaktivieren → neu aktivieren (Index-sicher).
+        sqlx::query(
+            "UPDATE karte_offline_karte SET aktiv_basemap = 0, geaendert_at = datetime('now') \
+             WHERE aktiv_basemap = 1",
+        )
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query(
+            "UPDATE karte_offline_karte SET aktiv_basemap = 1, geaendert_at = datetime('now') \
+             WHERE id = ?",
+        )
+        .bind(neu_id)
+        .execute(&mut *tx)
+        .await?;
+    }
+    sqlx::query("DELETE FROM karte_offline_karte WHERE id = ?")
+        .bind(alt_id)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    hole_offline_karte(pool, neu_id).await.map(Some)
+}
+
 /// Löscht eine Offline-Karte. `Ok(true)`, wenn eine Zeile entfernt wurde.
 pub async fn loesche_offline_karte(pool: &SqlitePool, id: i64) -> Result<bool, sqlx::Error> {
     let betroffen = sqlx::query("DELETE FROM karte_offline_karte WHERE id = ?")
@@ -814,6 +864,60 @@ mod tests {
             .unwrap();
         assert!(loesche_offline_karte(&pool, k.id).await.unwrap());
         assert!(!loesche_offline_karte(&pool, k.id).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn ersetze_aktive_offline_karte_aktiviert_neu_und_loescht_alt() {
+        let pool = test_pool().await;
+        let alt = registriere_offline_karte(&pool, &offline_eingabe("DE-v1"))
+            .await
+            .unwrap();
+        aktiviere_offline_karte(&pool, alt.id).await.unwrap();
+        let neu = registriere_offline_karte(&pool, &offline_eingabe("DE-v2"))
+            .await
+            .unwrap();
+
+        let aktiv = ersetze_aktive_offline_karte(&pool, neu.id, alt.id)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(aktiv.id, neu.id);
+        assert!(aktiv.aktiv_basemap, "neue Karte erbt aktiv (alt war aktiv)");
+        let liste = liste_offline_karten(&pool).await.unwrap();
+        assert_eq!(liste.len(), 1, "alte Zeile gelöscht");
+        assert_eq!(liste[0].id, neu.id);
+    }
+
+    /// Diskriminierend: Update einer INAKTIVEN Hintergrundkarte darf die aktive Basemap NICHT klauen.
+    #[tokio::test]
+    async fn ersetze_offline_karte_inaktiv_laesst_aktive_basemap_unberuehrt() {
+        let pool = test_pool().await;
+        // A ist die aktive Basemap.
+        let a = registriere_offline_karte(&pool, &offline_eingabe("A"))
+            .await
+            .unwrap();
+        aktiviere_offline_karte(&pool, a.id).await.unwrap();
+        // B inaktiv + bereit, B2 ist die heruntergeladene neue Version.
+        let b = registriere_offline_karte(&pool, &offline_eingabe("B-v1"))
+            .await
+            .unwrap();
+        let b2 = registriere_offline_karte(&pool, &offline_eingabe("B-v2"))
+            .await
+            .unwrap();
+
+        let neu = ersetze_aktive_offline_karte(&pool, b2.id, b.id)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert!(!neu.aktiv_basemap, "neue B-Version bleibt inaktiv");
+        let liste = liste_offline_karten(&pool).await.unwrap();
+        assert!(
+            liste.iter().find(|k| k.id == a.id).unwrap().aktiv_basemap,
+            "aktive Basemap A unverändert"
+        );
+        assert!(liste.iter().all(|k| k.id != b.id), "alte B-Zeile gelöscht");
     }
 
     // --- Offline-Download-Lebenszyklus (LFH-181) ---

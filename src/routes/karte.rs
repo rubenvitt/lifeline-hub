@@ -318,6 +318,8 @@ pub struct OfflineKarteAntwort {
     pub update_verfuegbar: bool,
     /// Aktuelle Katalog-URL dieser Karte, wenn ein Update verfügbar ist (für den Re-Download).
     pub katalog_url: Option<String>,
+    /// SHA256-Pin der aktuellen Katalog-URL (für den verifizierten Re-Download beim Update).
+    pub katalog_sha256: Option<String>,
 }
 
 /// GET /api/karte/offline-karten — alle Offline-Karten. Lesen: admin ODER Führungskraft (read-only).
@@ -363,6 +365,7 @@ pub async fn offline_liste(
                 gesamt,
                 update_verfuegbar: neuere.is_some(),
                 katalog_url: neuere.map(|e| e.url.clone()),
+                katalog_sha256: neuere.and_then(|e| e.sha256.clone()),
             }
         })
         .collect();
@@ -564,6 +567,7 @@ pub async fn offline_download(
     let fortschritt_map = state.download_fortschritt.clone();
     let id = karte.id;
     let sha256_erwartet = body.sha256_erwartet.clone();
+    let ersetzt_karte_id = body.ersetzt_karte_id;
     tokio::spawn(async move {
         let dateiname = format!("karte-{id}.pmtiles");
         let part = karten_dir.join(format!("{dateiname}.part"));
@@ -590,16 +594,35 @@ pub async fn offline_download(
                         "Offline-Karte {id}: Download fertig ({} Bytes)",
                         erg.groesse
                     );
-                    // Erste fertige Karte automatisch als Basemap aktivieren, solange noch keine
-                    // andere aktiv ist — sonst bliebe „Offline" trotz Download „nicht konfiguriert".
-                    // Eine bereits aktive Karte wird NICHT verdrängt (No-op).
-                    match repo::aktiviere_wenn_keine_aktive(&pool, id).await {
-                        Ok(true) => {
-                            tracing::info!("Offline-Karte {id}: als Basemap aktiviert (erste bereite)");
+                    if let Some(alt) = ersetzt_karte_id {
+                        // One-Click-Update (B2): neue Version aktivieren (erbt Aktiv-Status), alte
+                        // Karte + Datei entfernen. Bei Download-Fehler kommen wir hier nicht hin →
+                        // die alte Karte bleibt aktiv (fail-safe).
+                        match repo::ersetze_aktive_offline_karte(&pool, id, alt).await {
+                            Ok(Some(_)) => {
+                                download::entferne_download_dateien(&karten_dir, alt).await;
+                                tracing::info!(
+                                    "Offline-Karte {id}: Update aktiviert, alte Karte {alt} entfernt"
+                                );
+                            }
+                            Ok(None) => {
+                                tracing::warn!("Update-Swap {id}: neue Karte verschwand")
+                            }
+                            Err(e) => {
+                                tracing::error!("Update-Swap {id}->ersetzt {alt} fehlgeschlagen: {e}")
+                            }
                         }
-                        Ok(false) => {}
-                        Err(e) => {
-                            tracing::warn!("Auto-Aktivieren der Offline-Karte {id} fehlgeschlagen: {e}");
+                    } else {
+                        // Erst-Download: erste fertige Karte automatisch aktivieren, solange noch
+                        // keine andere aktiv ist. Eine bereits aktive Karte wird NICHT verdrängt.
+                        match repo::aktiviere_wenn_keine_aktive(&pool, id).await {
+                            Ok(true) => {
+                                tracing::info!("Offline-Karte {id}: als Basemap aktiviert (erste bereite)");
+                            }
+                            Ok(false) => {}
+                            Err(e) => {
+                                tracing::warn!("Auto-Aktivieren der Offline-Karte {id} fehlgeschlagen: {e}");
+                            }
                         }
                     }
                 }
