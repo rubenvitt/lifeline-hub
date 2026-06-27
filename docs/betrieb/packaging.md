@@ -66,17 +66,25 @@ die Karte läuft im **Blind-Modus**, bis ein Admin Quellen hinzufügt:
   `name`, `url`, `typ` (`vektor`|`raster`) und eine **Pflicht-Attribution** (je View angezeigt).
   Ein kuratierter, schlüsselfreier **Vorschlagskatalog** (OpenFreeMap, basemap.de, TopPlusOpen)
   steht zum Hinzufügen bereit.
-- **Server-Proxy für key-basierte Anbieter** (LFH-182): Pro Online-Quelle lässt sich
-  **„Über Server proxen"** aktivieren. Dann trägt der Admin die **volle Upstream-URL inkl. Key**
-  ein; `/api/karte/config` gibt für diese Quelle nur relative `/api/karte/proxy/{id}/…`-URLs aus,
-  der Server holt Style/Tiles/Sprite/Glyphs und reicht sie durch — **der Key bleibt server-seitig
-  und erscheint nie im Browser** (für Nicht-Admins ist die URL in der Verwaltungsliste maskiert).
-  Schlüssellose Quellen bleiben ohne Proxy (laufen direkt). Jeder Upstream-Abruf ist SSRF-geschützt
-  (https-only, interne Ziele + DNS-Rebinding blockiert). **v1-Grenzen:** unterstützte Tile-/Glyphs-
-  Platzhalter `{z}/{x}/{y}/{-y}`, `{fontstack}/{range}` (andere werden beim Speichern abgelehnt);
-  **kein** serverseitiges Style-Caching/Rate-Limiting (die unauthentifizierten Proxy-Endpunkte
-  reichen Upstream-Cache-Header durch, könnten ein abgerechnetes Kontingent aber durch Volumen
-  beanspruchen — für Feld-Deployments unkritisch, dokumentierte Bedrohungslage).
+- **Server-Proxy + Tile-Cache** (LFH-182/190): Online-Quellen werden **standardmäßig** „über
+  Server geproxt" (pro Quelle abschaltbar). `/api/karte/config` gibt dann nur relative
+  `/api/karte/proxy/{id}/…`-URLs aus; der Server holt Style/Tiles/Sprite/Glyphs und reicht sie
+  durch — **ein Key in der Upstream-URL bleibt server-seitig und erscheint nie im Browser** (für
+  Nicht-Admins ist die URL in der Verwaltungsliste maskiert). Jeder Upstream-Abruf ist SSRF-geschützt
+  (https-only, interne Ziele + DNS-Rebinding/IPv6-eingebettetes IPv4 blockiert, pinnender Resolver).
+  - **Tile-Cache:** Binär-Assets (Tiles/Sprite/Glyphs) werden serverseitig zwischengespeichert
+    (separate `tile-cache.db` im `karten_dir`, damit Tile-Writes nicht gegen operative Writes
+    konkurrieren). Respektiert die Upstream-Header (`no-store`/`private` → nie cachen, `max-age`
+    → TTL, `ETag` → bedingte Revalidierung); LRU-Eviction unter **256 MB** Cap; bei Upstream-Ausfall
+    wird der (Stale-)Cache weiter serviert (Resilienz). Damit trifft eine im Einsatz geteilte
+    Kachel den Anbieter **nur einmal**. Style/TileJSON werden nicht gecacht (selten, key-frei
+    umgeschrieben).
+  - **ToS-Pflicht:** Proxy/Cache **nur** aktivieren, wenn der Anbieter Proxying/Caching erlaubt.
+    OpenFreeMap und basemap.de/BKG (eingebauter Katalog) sind erlaubt; **OSM-Standard-Tiles**
+    (`tile.openstreetmap.org`) **verbieten** es → dort Proxy pro Quelle abschalten.
+  - **v1-Grenzen:** unterstützte Platzhalter `{z}/{x}/{y}/{-y}`, `{fontstack}/{range}` (andere
+    werden beim Speichern abgelehnt); kein Single-Flight (parallele Erst-Misses derselben Kachel
+    erzeugen je einen Upstream-Fetch, konvergieren danach).
 - **Offline-Karte (PMTiles)**: eine **lokale PMTiles-Datei** (z. B. ein Protomaps-Build von
   [build.protomaps.com](https://build.protomaps.com), DE-weit mehrere GB) wird als Offline-Karte
   registriert und aktiviert; der Server liefert die aktive Karte per **HTTP-Range** unter
