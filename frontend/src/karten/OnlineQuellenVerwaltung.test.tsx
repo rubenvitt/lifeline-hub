@@ -107,7 +107,7 @@ describe('OnlineQuellenVerwaltung', () => {
       attribution: '© OpenFreeMap',
       sortier: 1,
       aktiv: true,
-      proxy: false,
+      proxy: true, // LFH-190: Katalog-Quellen werden default geproxt + gecacht
     });
   });
 
@@ -180,7 +180,7 @@ describe('OnlineQuellenVerwaltung', () => {
       typ: 'raster',
       attribution: '© Beispiel',
       aktiv: true,
-      proxy: false, // ohne Umschalten Default false
+      proxy: true, // LFH-190: Default-an ohne Umschalten
     });
   });
 
@@ -222,7 +222,7 @@ describe('OnlineQuellenVerwaltung', () => {
     expect(postBody).toMatchObject({ typ: 'protomaps', proxy: true });
   });
 
-  it('Proxy-Schalter: aktiviert → POST-Body proxy:true (LFH-182)', async () => {
+  it('Proxy-Schalter: abschalten → POST-Body proxy:false (LFH-190, Default-an)', async () => {
     let postBody: unknown = null;
     mockBasis(admin, []);
     server.use(
@@ -239,13 +239,14 @@ describe('OnlineQuellenVerwaltung', () => {
     await userEvent.type(within(dialog).getByLabelText('URL'), 'https://api.maptiler.com/maps/streets/style.json');
     await userEvent.type(within(dialog).getByLabelText('Attribution'), '© MapTiler');
 
-    // Den „Über Server proxen"-Switch in seinem Form-Item gezielt umschalten (zwei Switches im Form).
+    // Default ist an (LFH-190); den „Über Server proxen"-Switch gezielt AUSschalten
+    // (zwei Switches im Form) → proxy:false (Fall: Anbieter verbietet Proxying).
     const proxyItem = within(dialog).getByText('Über Server proxen').closest('.ant-form-item');
     await userEvent.click(within(proxyItem as HTMLElement).getByRole('switch'));
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
 
     await waitFor(() => expect(postBody).not.toBeNull());
-    expect(postBody).toMatchObject({ name: 'MapTiler', proxy: true });
+    expect(postBody).toMatchObject({ name: 'MapTiler', proxy: false });
   });
 });

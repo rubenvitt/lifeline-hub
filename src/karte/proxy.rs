@@ -523,23 +523,15 @@ fn kopf(h: &reqwest::header::HeaderMap, name: reqwest::header::HeaderName) -> Op
     h.get(name).and_then(|v| v.to_str().ok()).map(str::to_string)
 }
 
-/// Holt ein Upstream-Asset und streamt es bis `byte_cap`. Reicht Content-Type (text/* geklemmt),
-/// Content-Encoding, Cache-Control und ETag per Allowlist durch; alle anderen Header (insb.
-/// `Location`/`Set-Cookie`) fallen weg. **Validiert NICHT** selbst (Loopback-testbar) — das
-/// SSRF-Gate sitzt im Handler.
-pub async fn hole_asset(
-    client: &reqwest::Client,
-    url: Url,
+/// Verarbeitet eine erfolgreiche Upstream-Antwort: Status-Check, Header-Allowlist (Content-Type
+/// `text/*` geklemmt, Content-Encoding/Cache-Control/ETag durchgereicht — alle anderen, insb.
+/// `Location`/`Set-Cookie`, fallen weg) und Byte-Cap-Streaming. Geteilt von `hole_asset` +
+/// `hole_asset_revalidiert`.
+async fn verarbeite_antwort(
+    mut resp: reqwest::Response,
     byte_cap: usize,
 ) -> Result<AssetAntwort, ProxyFehler> {
     use reqwest::header::{CACHE_CONTROL, CONTENT_ENCODING, CONTENT_TYPE, ETAG};
-    // `without_url()`: reqwest hängt im Error-Display die volle URL inkl. `?key=…` an — die darf
-    // NICHT in die (geloggte) Fehlermeldung gelangen (Key-Konfinierung, Spec §5).
-    let mut resp = client
-        .get(url)
-        .send()
-        .await
-        .map_err(|e| ProxyFehler::Http(e.without_url().to_string()))?;
     if !resp.status().is_success() {
         return Err(ProxyFehler::Status(resp.status().as_u16()));
     }
@@ -575,6 +567,54 @@ pub async fn hole_asset(
         cache_control,
         etag,
     })
+}
+
+/// Holt ein Upstream-Asset und streamt es bis `byte_cap`. **Validiert NICHT** selbst
+/// (Loopback-testbar) — das SSRF-Gate sitzt im Handler.
+pub async fn hole_asset(
+    client: &reqwest::Client,
+    url: Url,
+    byte_cap: usize,
+) -> Result<AssetAntwort, ProxyFehler> {
+    // `without_url()`: reqwest hängt im Error-Display die volle URL inkl. `?key=…` an — die darf
+    // NICHT in die (geloggte) Fehlermeldung gelangen (Key-Konfinierung, Spec §5).
+    let resp = client
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| ProxyFehler::Http(e.without_url().to_string()))?;
+    verarbeite_antwort(resp, byte_cap).await
+}
+
+/// Ergebnis einer bedingten Revalidierung (`If-None-Match`).
+pub enum Revalidiert {
+    /// `304 Not Modified` — der Cache-Eintrag ist weiter gültig; `cache_control` aus der 304-Antwort
+    /// (für neue TTL).
+    NichtVeraendert { cache_control: Option<String> },
+    /// `200` mit frischem Body (ETag passte nicht mehr).
+    Frisch(AssetAntwort),
+}
+
+/// Wie `hole_asset`, aber mit `If-None-Match: <etag>`. `304` → `NichtVeraendert` (kein Body),
+/// sonst `Frisch`. Für den Tile-Cache (LFH-190).
+pub async fn hole_asset_revalidiert(
+    client: &reqwest::Client,
+    url: Url,
+    byte_cap: usize,
+    etag: &str,
+) -> Result<Revalidiert, ProxyFehler> {
+    use reqwest::header::{CACHE_CONTROL, IF_NONE_MATCH};
+    let resp = client
+        .get(url)
+        .header(IF_NONE_MATCH, etag)
+        .send()
+        .await
+        .map_err(|e| ProxyFehler::Http(e.without_url().to_string()))?;
+    if resp.status() == reqwest::StatusCode::NOT_MODIFIED {
+        let cache_control = kopf(resp.headers(), CACHE_CONTROL);
+        return Ok(Revalidiert::NichtVeraendert { cache_control });
+    }
+    Ok(Revalidiert::Frisch(verarbeite_antwort(resp, byte_cap).await?))
 }
 
 /// Obergrenze umgeschriebener URLs/Slots pro Style/TileJSON (DoS-Schutz gegen riesige Dokumente).

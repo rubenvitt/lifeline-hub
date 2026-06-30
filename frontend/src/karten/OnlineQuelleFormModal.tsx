@@ -69,7 +69,8 @@ export default function OnlineQuelleFormModal({
       });
     } else {
       form.resetFields();
-      form.setFieldsValue({ typ: 'vektor', sortier: naechsteSortier, aktiv: true, proxy: false });
+      // LFH-190: Proxy ist Default-an (key-frei + serverseitig gecacht).
+      form.setFieldsValue({ typ: 'vektor', sortier: naechsteSortier, aktiv: true, proxy: true });
     }
   }, [offen, quelle, naechsteSortier, form]);
 
@@ -90,7 +91,8 @@ export default function OnlineQuelleFormModal({
         attribution: werte.attribution.trim(),
         sortier: werte.sortier ?? 0,
         aktiv: werte.aktiv ?? true,
-        proxy: werte.typ === 'protomaps' ? true : (werte.proxy ?? false),
+        // Protomaps erzwingt proxy=true (Key in der URL); sonst Default-an (LFH-190).
+        proxy: werte.typ === 'protomaps' ? true : (werte.proxy ?? true),
       };
       return quelle ? aktualisiereOnlineQuelle(quelle.id, body) : legeOnlineQuelleAn(body);
     },
@@ -115,12 +117,13 @@ export default function OnlineQuelleFormModal({
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
-        title="Schlüsselbasierte Anbieter"
+        title="Über Server proxen (Standard)"
         description={
-          'Für key-basierte Anbieter (z. B. MapTiler, Stadia) „Über Server proxen" aktivieren und ' +
-          'die volle URL inkl. Schlüssel eintragen — der Server holt die Karte, der Schlüssel ' +
-          'bleibt server-seitig und erscheint nie im Browser. Ohne Proxy läuft die URL direkt im ' +
-          'Browser; dann keinen Schlüssel eintragen.'
+          'Empfohlen: Der Server holt Style/Tiles/Sprite/Glyphs und speichert sie zwischen — ' +
+          'Schlüssel bleiben server-seitig (erscheinen nie im Browser) und gleiche Kacheln treffen ' +
+          'den Anbieter nur einmal. Für key-basierte Anbieter (z. B. MapTiler, Stadia) die volle ' +
+          'URL inkl. Schlüssel eintragen. Proxy nur abschalten, wenn der Anbieter Proxying/Caching ' +
+          'untersagt (z. B. OSM-Standard-Tiles) — dann läuft die URL direkt im Browser.'
         }
       />
       <Form<FormWerte> form={form} layout="vertical" onFinish={(w) => mutation.mutate(w)}>
@@ -168,7 +171,7 @@ export default function OnlineQuelleFormModal({
           label="Über Server proxen"
           name="proxy"
           valuePropName="checked"
-          tooltip="Key-basierte Anbieter: Der Server holt Style/Tiles/Sprite/Glyphs, der Schlüssel bleibt server-seitig und erscheint nie im Browser (LFH-182)."
+          tooltip="Standard an: Server holt Style/Tiles/Sprite/Glyphs, hält Schlüssel server-seitig und cacht die Antworten (LFH-182/190). Abschalten nur, wenn der Anbieter Proxying/Caching untersagt."
         >
           <Switch disabled={typ === 'protomaps'} />
         </Form.Item>

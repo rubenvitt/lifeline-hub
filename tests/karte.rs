@@ -703,7 +703,9 @@ async fn online_anlegen_proxy_gueltig_ist_201_mit_proxy_true() {
 }
 
 #[tokio::test]
-async fn online_anlegen_default_proxy_false() {
+async fn online_anlegen_default_proxy_true() {
+    // LFH-190: Proxy ist Default-an. Wird `proxy` im Body weggelassen ⇒ true (serverseitig
+    // geproxt + gecacht).
     let (app, cookie) = admin_app().await;
     let res = anfrage(
         &app,
@@ -714,7 +716,7 @@ async fn online_anlegen_default_proxy_false() {
     )
     .await;
     assert_eq!(res.status(), StatusCode::CREATED);
-    assert_eq!(json(res).await["proxy"], false, "Default ohne proxy-Feld");
+    assert_eq!(json(res).await["proxy"], true, "Default ohne proxy-Feld ⇒ true (LFH-190)");
 }
 
 #[tokio::test]

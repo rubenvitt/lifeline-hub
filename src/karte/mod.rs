@@ -8,6 +8,7 @@ pub mod normalisierung;
 pub mod proxy;
 pub mod quellen;
 pub mod registry;
+pub mod tile_cache;
 pub mod typen;
 
 use std::collections::HashSet;
