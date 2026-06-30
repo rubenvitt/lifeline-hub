@@ -336,6 +336,27 @@ pub async fn hole_asset_cached(
     Ok(a)
 }
 
+/// Cache-bewusster Asset-Abruf, der den Cache-Pool selbst beschafft. Schlägt die Beschaffung
+/// fehl (korrupte/nicht öffenbare `tile-cache.db`, volle Platte), wird auf einen Direkt-Fetch
+/// OHNE Cache degradiert — **Cache-Fehler sind NIE fatal** (Modulvertrag, s. o.): eine verwerfbare
+/// Cache-Datei darf zu „kein Caching" führen, nicht zu „keine Kacheln" (sonst stürbe der ganze
+/// Online-Proxy ab, obwohl der Direkt-Fetch funktioniert).
+pub async fn hole_asset_via_cache_oder_direkt(
+    karten_dir: &Path,
+    client: &reqwest::Client,
+    url: reqwest::Url,
+    byte_cap: usize,
+    now: i64,
+) -> Result<AssetAntwort, ProxyFehler> {
+    match cache_pool(karten_dir).await {
+        Ok(pool) => hole_asset_cached(&pool, client, url, byte_cap, now).await,
+        Err(e) => {
+            tracing::warn!("Tile-Cache: Pool nicht verfügbar ({e}), Direkt-Fetch ohne Cache");
+            proxy::hole_asset(client, url, byte_cap).await
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -516,5 +537,24 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(rest, vec!["b", "c"], "ältester (a, niedrigster letzter_zugriff) evictet");
+    }
+
+    #[tokio::test]
+    async fn pool_fehler_degradiert_auf_direkt_fetch() {
+        // `karten_dir` unter eine reguläre DATEI legen → cache_pool() kann dort keine
+        // tile-cache.db anlegen (Parent ist kein Verzeichnis → ENOTDIR) → Err. Erwartung: KEIN
+        // Fehler nach außen, sondern Direkt-Fetch (Cache-Fehler sind nie fatal, Modulvertrag).
+        let client = reqwest::Client::new();
+        let (u, hits) = spawn_zaehlend("public, max-age=300", None, b"DIRECT".to_vec()).await;
+        let tmp = tempfile::tempdir().unwrap();
+        let datei = tmp.path().join("eine-datei");
+        std::fs::write(&datei, b"x").unwrap();
+        let karten_dir = datei.join("unterhalb"); // Parent ist eine Datei → unbaubar
+
+        let a = hole_asset_via_cache_oder_direkt(&karten_dir, &client, url(&u), 1 << 20, 1000)
+            .await
+            .unwrap();
+        assert_eq!(a.bytes, b"DIRECT", "Pool-Fehler → Direkt-Fetch liefert die Bytes");
+        assert_eq!(hits.load(Ordering::SeqCst), 1, "genau ein Upstream-Call (Direkt-Fetch)");
     }
 }

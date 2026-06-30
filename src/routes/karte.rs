@@ -741,11 +741,11 @@ async fn slot_oder_nf(
 /// Holt ein Binär-Asset über den geteilten Proxy-Client (SSRF-gepinnt), **serverseitig gecacht**
 /// (LFH-190, separate `tile-cache.db` im `karten_dir`), und baut die Antwort.
 async fn proxy_asset(state: &AppState, u: reqwest::Url) -> Result<Response, AppError> {
-    let cache = tile_cache::cache_pool(&state.karten_dir)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-    let asset = tile_cache::hole_asset_cached(
-        &cache,
+    // Pool-Beschaffung + Fallback liegen in tile_cache (Modulvertrag „Cache-Fehler sind nie
+    // fatal"): ist die Cache-DB nicht verfügbar, wird auf einen Direkt-Fetch ohne Cache degradiert
+    // statt die Kachel-Auslieferung mit 500 abzuwürgen.
+    let asset = tile_cache::hole_asset_via_cache_oder_direkt(
+        &state.karten_dir,
         proxy::proxy_client(),
         u,
         proxy::ASSET_BYTE_CAP,
