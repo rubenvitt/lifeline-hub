@@ -3,6 +3,7 @@ use axum::http::{header, Request, StatusCode};
 use axum::response::Response;
 use lifeline_hub::app::{build_router, AppState};
 use lifeline_hub::auth::bootstrap::bootstrap_admin;
+use lifeline_hub::config::default_offline_katalog;
 use lifeline_hub::live::LiveHub;
 use std::io::Write;
 use tower::ServiceExt; // oneshot
@@ -88,49 +89,136 @@ async fn json(res: Response) -> serde_json::Value {
     serde_json::from_slice(&bytes).unwrap()
 }
 
-// ===== /api/karte/tiles.pmtiles + /api/karte/config (eingefrorener Frontend-Vertrag) =====
+// ===== /api/karte/offline/tiles/{z}/{x}/{y} + /api/karte/config (eingefrorener Frontend-Vertrag) =====
 
-#[tokio::test]
-async fn tiles_route_liefert_range_aus() {
-    let pool = pool().await;
-    // Karte liegt im verwalteten karten_dir; in der DB steht der RELATIVE Dateiname.
-    let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("de.pmtiles"), b"PMTILESDATA0123456789").unwrap();
+// ===== /api/karte/offline/tiles/{z}/{x}/{y} (MBTiles, LFH-195) =====
+
+/// Schreibt eine Mini-MBTiles-Fixture: `tiles`-Tabelle mit genau einer Kachel bei
+/// TMS (z=1, tile_column=0, tile_row=1) = XYZ (z=1, x=0, y=0). Eigener SCHREIBBARER Pool
+/// (die Datei existiert noch nicht) — der Produktionscode liest sie nur read-only.
+async fn schreibe_fixture_mbtiles(pfad: &std::path::Path, daten: &[u8]) {
+    use sqlx::sqlite::SqliteConnectOptions;
+    let opts = SqliteConnectOptions::new().filename(pfad).create_if_missing(true);
+    let pool = sqlx::sqlite::SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect_with(opts)
+        .await
+        .unwrap();
     sqlx::query(
-        "INSERT INTO karte_offline_karte (name, pfad, status, aktiv_basemap) \
-         VALUES ('DE', 'de.pmtiles', 'bereit', 1)",
+        "CREATE TABLE tiles (zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER, tile_data BLOB)",
     )
     .execute(&pool)
     .await
     .unwrap();
+    sqlx::query("INSERT INTO tiles VALUES (1, 0, 1, ?1)")
+        .bind(daten)
+        .execute(&pool)
+        .await
+        .unwrap();
+    pool.close().await;
+}
+
+/// Registriert + aktiviert eine Offline-Karte mit `pfad` (relativ zum `karten_dir`), sodass
+/// `repo::aktive_offline_karte_pfad` sie liefert (Status wird von `registriere_offline_karte`
+/// bereits als `bereit` angelegt).
+async fn registriere_und_aktiviere(pool: &sqlx::SqlitePool, pfad: &str) -> i64 {
+    use lifeline_hub::karte::registry::repo;
+    let karte = repo::registriere_offline_karte(
+        pool,
+        &repo::OfflineKarteEingabe {
+            name: "Test-Shortbread".into(),
+            pfad: pfad.into(),
+            quell_url: None,
+            lizenz: Some("© Test".into()),
+            kachel_schema: "shortbread".into(),
+            sortier: 0,
+        },
+    )
+    .await
+    .unwrap();
+    repo::aktiviere_offline_karte(pool, karte.id).await.unwrap();
+    karte.id
+}
+
+#[tokio::test]
+async fn offline_tiles_liefert_gzip_mvt_mit_tms_flip() {
+    let pool = pool().await;
+    let dir = tempfile::tempdir().unwrap();
+    let dateiname = "karte-1.mbtiles";
+    schreibe_fixture_mbtiles(&dir.path().join(dateiname), &[0xAB, 0xCD]).await;
+    registriere_und_aktiviere(&pool, dateiname).await;
 
     let app = build_router(AppState {
         pool,
         live: LiveHub::new(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(), download_client: lifeline_hub::karte::download::download_client(), download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
         karten_dir: dir.path().to_path_buf(),
     });
+
+    // Vorhandene Kachel: XYZ (z=1,x=0,y=0) -> TMS row = (2^1-1)-0 = 1 -> Treffer.
     let req = Request::builder()
-        .uri("/api/karte/tiles.pmtiles")
-        .header("Range", "bytes=0-7")
+        .uri("/api/karte/offline/tiles/1/0/0")
+        .body(Body::empty())
+        .unwrap();
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(
+        res.headers().get(header::CONTENT_TYPE).unwrap(),
+        "application/x-protobuf"
+    );
+    assert_eq!(res.headers().get(header::CONTENT_ENCODING).unwrap(), "gzip");
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    assert_eq!(&bytes[..], &[0xAB, 0xCD]);
+
+    // Fehlende Kachel -> 204.
+    let req = Request::builder()
+        .uri("/api/karte/offline/tiles/1/1/1")
         .body(Body::empty())
         .unwrap();
     let res = app.oneshot(req).await.unwrap();
-    assert_eq!(res.status(), StatusCode::PARTIAL_CONTENT); // 206
-    let bytes = axum::body::to_bytes(res.into_body(), 1024).await.unwrap();
-    assert_eq!(&bytes[..], b"PMTILESD");
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
 }
 
 #[tokio::test]
-async fn tiles_route_404_ohne_konfigurierten_pfad() {
+async fn offline_tiles_ohne_aktive_karte_liefert_204() {
     let pool = pool().await; // leere offline-Tabelle
     let app = app_mit_pool(pool);
     let req = Request::builder()
-        .uri("/api/karte/tiles.pmtiles")
+        .uri("/api/karte/offline/tiles/1/0/0")
         .body(Body::empty())
         .unwrap();
     let res = app.oneshot(req).await.unwrap();
-    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+}
+
+#[tokio::test]
+async fn offline_tiles_ungueltiges_z_liefert_204_ohne_panic() {
+    // z=99 würde `lies_tile`s `1i64 << z`-TMS-Flip absurd überlaufen lassen (Debug-Panic /
+    // Release-Maskierung) — der Range-Guard muss VOR reader_fuer/lies_tile greifen. Mit einer
+    // registrierten + aktiven Karte, damit der Guard tatsächlich geprüft wird (nicht nur der
+    // frühere "keine aktive Karte"-204-Pfad).
+    let pool = pool().await;
+    let dir = tempfile::tempdir().unwrap();
+    let dateiname = "karte-1.mbtiles";
+    schreibe_fixture_mbtiles(&dir.path().join(dateiname), &[0xAB, 0xCD]).await;
+    registriere_und_aktiviere(&pool, dateiname).await;
+
+    let app = build_router(AppState {
+        pool,
+        live: LiveHub::new(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_dir: dir.path().to_path_buf(),
+    });
+    let req = Request::builder()
+        .uri("/api/karte/offline/tiles/99/0/0")
+        .body(Body::empty())
+        .unwrap();
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
 }
 
 #[tokio::test]
@@ -159,14 +247,14 @@ async fn config_endpoint_meldet_verfuegbarkeit() {
     let res = app.oneshot(req).await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);
     let v = json(res).await;
-    assert_eq!(v["pmtiles_verfuegbar"].as_bool(), Some(true));
-    // pmtiles_url trägt jetzt einen Cache-Bust-Token (?v=<sha256|geaendert_at>), damit die
-    // pmtiles-Lib bei Karten-Wechsel nicht den alten Archiv-Aufbau unter gleicher URL cacht
+    assert_eq!(v["offline_verfuegbar"].as_bool(), Some(true));
+    // offline_tiles_url trägt jetzt einen Cache-Bust-Token (?v=<sha256|geaendert_at>), damit
+    // MapLibre bei Karten-Wechsel nicht den alten Tile-Aufbau unter gleicher URL cacht
     // (LFH-181). Token ist dynamisch → Präfix prüfen.
-    let pmtiles_url = v["pmtiles_url"].as_str().unwrap();
+    let offline_tiles_url = v["offline_tiles_url"].as_str().unwrap();
     assert!(
-        pmtiles_url.starts_with("/api/karte/tiles.pmtiles?v="),
-        "pmtiles_url mit Cache-Bust-Token erwartet, war: {pmtiles_url}"
+        offline_tiles_url.starts_with("/api/karte/offline/tiles/{z}/{x}/{y}?v="),
+        "offline_tiles_url mit Cache-Bust-Token erwartet, war: {offline_tiles_url}"
     );
     assert_eq!(v["online_styles"][0]["url"].as_str(), Some("https://tiles.example/style.json"));
     assert_eq!(v["online_styles"][0]["typ"].as_str(), Some("vektor"));
@@ -180,8 +268,8 @@ async fn config_endpoint_blind_modus_ohne_konfiguration() {
     let res = app.oneshot(req).await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);
     let v = json(res).await;
-    assert_eq!(v["pmtiles_verfuegbar"].as_bool(), Some(false));
-    assert!(v["pmtiles_url"].is_null());
+    assert_eq!(v["offline_verfuegbar"].as_bool(), Some(false));
+    assert!(v["offline_tiles_url"].is_null());
     assert!(v["online_styles"].as_array().unwrap().is_empty());
 }
 
@@ -205,9 +293,10 @@ async fn offline_registrieren_lehnt_absolute_und_traversal_pfade_ab() {
 }
 
 #[tokio::test]
-async fn tiles_route_lehnt_absoluten_pfad_in_db_ab() {
+async fn offline_tiles_lehnt_absoluten_pfad_in_db_ab() {
     // Defense-in-Depth: selbst wenn ein absoluter Pfad direkt in der DB landet (Umgehung der
-    // Handler-Validierung), liefert tiles() ihn NICHT über den unauthentifizierten Endpunkt aus.
+    // Handler-Validierung), liefert offline_tiles() ihn NICHT über den unauthentifizierten
+    // Endpunkt aus (kein Info-Leak/Blob-Zugriff auf beliebige Server-Dateien).
     let pool = pool().await;
     let mut datei = tempfile::NamedTempFile::new().unwrap();
     datei.write_all(b"GEHEIM").unwrap();
@@ -222,10 +311,10 @@ async fn tiles_route_lehnt_absoluten_pfad_in_db_ab() {
     .await
     .unwrap();
     let app = app_mit_pool(pool);
-    let res = anfrage(&app, "GET", "/api/karte/tiles.pmtiles", None, None).await;
+    let res = anfrage(&app, "GET", "/api/karte/offline/tiles/1/0/0", None, None).await;
     assert_eq!(
         res.status(),
-        StatusCode::NOT_FOUND,
+        StatusCode::NO_CONTENT,
         "absoluter Pfad wird nicht ausgeliefert"
     );
     drop(datei);
@@ -429,7 +518,7 @@ async fn offline_registrieren_aktivieren_loeschen() {
     let id = k["id"].as_i64().unwrap();
     assert_eq!(k["status"], "bereit");
     assert_eq!(k["aktiv_basemap"], false);
-    assert_eq!(k["kachel_schema"], "protomaps"); // Default
+    assert_eq!(k["kachel_schema"], "shortbread"); // Default
 
     let res = anfrage(
         &app,
@@ -515,11 +604,11 @@ async fn offline_katalog_liefert_kuratierte_liste() {
     assert_eq!(res.status(), StatusCode::OK);
     let v = json(res).await;
     let liste = v.as_array().expect("Array");
-    assert_eq!(liste.len(), 18, "16 Bundesländer + AT + CH");
+    assert_eq!(liste.len(), 1, "ein Shortbread-DE-Eintrag (LFH-195)");
     // Statische /katalog-Route gewinnt gegen /{id} (matchit-Priorität).
     assert!(liste[0]["url"].as_str().unwrap().starts_with("https://"));
     assert!(!liste[0]["lizenz"].as_str().unwrap().is_empty());
-    assert_eq!(liste[0]["kachel_schema"].as_str(), Some("protomaps"));
+    assert_eq!(liste[0]["kachel_schema"].as_str(), Some("shortbread"));
 }
 
 #[tokio::test]
@@ -583,15 +672,16 @@ async fn offline_abbrechen_ohne_laufenden_download_ist_404() {
 #[tokio::test]
 async fn offline_liste_meldet_update_wenn_katalog_neuere_quelle_fuehrt() {
     let (app, cookie) = admin_app().await;
-    // Installiert mit ALTER Quell-URL (anderes Datum), Name = Katalog-Name → Katalog ist neuer.
+    // Installiert mit ALTER Quell-URL, Name = Katalog-Name (Shortbread-DE-Eintrag, LFH-195) →
+    // Katalog führt eine andere URL als die installierte → Update erkannt.
     let res = anfrage(
         &app,
         "POST",
         "/api/karte/offline-karten",
         Some(&cookie),
         Some(
-            r#"{"name":"Deutschland – Bremen","pfad":"bremen.pmtiles","lizenz":"© OSM",
-                "quell_url":"https://github.com/whitespring/project-nomad-maps-europe/releases/download/v1/de_bremen_20250101.pmtiles"}"#,
+            r#"{"name":"Deutschland (Shortbread)","pfad":"germany.mbtiles","lizenz":"© OSM",
+                "quell_url":"https://example.test/germany.shortbread.alt.mbtiles"}"#,
         ),
     )
     .await;
@@ -600,24 +690,26 @@ async fn offline_liste_meldet_update_wenn_katalog_neuere_quelle_fuehrt() {
     let liste = json(anfrage(&app, "GET", "/api/karte/offline-karten", Some(&cookie), None).await).await;
     let eintrag = &liste.as_array().unwrap()[0];
     assert_eq!(eintrag["update_verfuegbar"], true);
-    assert!(
-        eintrag["katalog_url"].as_str().unwrap().contains("de_bremen_20260320"),
-        "Katalog-URL zeigt auf den neueren Stand"
+    assert_eq!(
+        eintrag["katalog_url"].as_str().unwrap(),
+        default_offline_katalog()[0].url,
+        "Katalog-URL zeigt auf den aktuellen Katalog-Eintrag"
     );
 }
 
 #[tokio::test]
 async fn offline_liste_kein_update_bei_aktueller_katalog_quelle() {
     let (app, cookie) = admin_app().await;
+    let katalog_url = default_offline_katalog()[0].url.clone();
     let res = anfrage(
         &app,
         "POST",
         "/api/karte/offline-karten",
         Some(&cookie),
-        Some(
-            r#"{"name":"Deutschland – Bremen","pfad":"bremen.pmtiles","lizenz":"© OSM",
-                "quell_url":"https://github.com/whitespring/project-nomad-maps-europe/releases/download/v1/de_bremen_20260320.pmtiles"}"#,
-        ),
+        Some(&format!(
+            r#"{{"name":"Deutschland (Shortbread)","pfad":"germany.mbtiles","lizenz":"© OSM",
+                "quell_url":"{katalog_url}"}}"#
+        )),
     )
     .await;
     assert_eq!(res.status(), StatusCode::CREATED);
@@ -942,50 +1034,3 @@ async fn proxy_tile_slot_auf_interne_adresse_ist_fehler_ssrf() {
     assert!(res.status().is_server_error(), "SSRF-Gate blockt internen Slot: {}", res.status());
 }
 
-// ===== Protomaps-Quelle (LFH-192): proxy-Zwang + slot-loser TileJSON-Entry-Endpunkt =====
-
-/// Beweist (a) Proxy-Zwang: Quelle mit typ=protomaps, proxy=false wird mit proxy=true gespeichert.
-/// Beweist (b) Route-Registrierung: GET /api/karte/proxy/{id}/tilejson trifft den Handler (404
-/// JSON, nicht HTML-Fallback). Die Schlüssel-Entfernung + Tile-URL-Rewrite beweist
-/// cargo test --lib karte::proxy (hole_tilejson_keyfrei_und_tms_normalisiert) — Happy-Paths via
-/// Service-Loopback-Tests (vgl. Datei-Konvention, Zeile ~816).
-#[tokio::test]
-async fn protomaps_quelle_erzwingt_proxy_und_tilejson_entry_ist_registriert() {
-    let (app, cookie) = admin_app().await;
-
-    // Part (a): typ=protomaps + proxy=false → serverseitig auf proxy=true hochgestuft.
-    // Nicht-auflösbarer Host (https://x/...) besteht den SSRF-Check (kein http, keine interne IP)
-    // und schlägt beim Connect deterministisch fehl — kein echter Netzwerkaufruf im Test.
-    let res = anfrage(
-        &app,
-        "POST",
-        "/api/karte/online-quellen",
-        Some(&cookie),
-        Some(r#"{"name":"Protomaps","url":"https://x/tiles/v4.json?key=GEHEIM","typ":"protomaps","attribution":"© Protomaps, © OSM","sortier":0}"#),
-    )
-    .await;
-    assert_eq!(res.status(), StatusCode::CREATED, "protomaps-Quelle angelegt");
-    let q = json(res).await;
-    assert_eq!(q["proxy"], true, "protomaps erzwingt proxy (war false implizit)");
-    let id = q["id"].as_i64().unwrap();
-
-    // Part (b): Slot-loser Entry-Endpunkt ist registriert — unbekannte ID → 404 JSON (nicht
-    // 404/405 via SPA-Fallback-HTML). Prove route existiert.
-    let res_unbekannt = anfrage(&app, "GET", "/api/karte/proxy/999/tilejson", None, None).await;
-    assert_eq!(res_unbekannt.status(), StatusCode::NOT_FOUND, "unbekannte ID: 404");
-    assert_eq!(
-        res_unbekannt.headers().get(header::CONTENT_TYPE).unwrap(),
-        "application/json",
-        "404 als JSON (Handler, nicht SPA-HTML)"
-    );
-
-    // Bekannte ID: SSRF-Gate passiert (externer Host), Upstream-Connect schlägt fehl
-    // (nicht-auflösbarer Host) → 5xx. Beweist, dass der Handler aufgerufen und die Quelle
-    // gefunden wurde; offline+deterministisch (kein echter Netzwerkaufruf).
-    let res_bekannt = anfrage(&app, "GET", &format!("/api/karte/proxy/{id}/tilejson"), None, None).await;
-    assert!(
-        res_bekannt.status().is_server_error(),
-        "bekannte ID: Handler aufgerufen, Upstream nicht erreichbar → 5xx (war: {})",
-        res_bekannt.status()
-    );
-}

@@ -17,9 +17,9 @@ const fuehrungskraft = {
 };
 
 const karte: OfflineKarte = {
-  id: 1, name: 'Deutschland – Bremen', pfad: 'karte-1.pmtiles',
-  quell_url: 'https://example.test/de_bremen.pmtiles', lizenz: '© OpenStreetMap contributors (ODbL)',
-  kachel_schema: 'protomaps', groesse: 44040192, sha256: 'abc', download_at: '2026-06-26 11:00:00',
+  id: 1, name: 'Deutschland – Bremen', pfad: 'karte-1.mbtiles',
+  quell_url: 'https://example.test/de_bremen.mbtiles', lizenz: '© OpenStreetMap contributors (ODbL)',
+  kachel_schema: 'shortbread', groesse: 44040192, sha256: 'abc', download_at: '2026-06-26 11:00:00',
   status: 'bereit', aktiv_basemap: false, sortier: 0,
 };
 
@@ -29,8 +29,8 @@ const karteLaedt: OfflineKarte = {
 };
 
 const katalogEintrag = {
-  name: 'Deutschland – Bremen', url: 'https://example.test/de_bremen.pmtiles', region: 'DE/Bremen',
-  groesse: 44040192, lizenz: '© OpenStreetMap contributors (ODbL)', kachel_schema: 'protomaps',
+  name: 'Deutschland – Bremen', url: 'https://example.test/de_bremen.mbtiles', region: 'DE/Bremen',
+  groesse: 44040192, lizenz: '© OpenStreetMap contributors (ODbL)', kachel_schema: 'shortbread',
   quelle: 'Project N.O.M.A.D.', sha256: 'cafef00d',
 };
 
@@ -112,9 +112,9 @@ describe('OfflineKartenVerwaltung', () => {
     await waitFor(() => expect(postBody).not.toBeNull());
     expect(postBody).toEqual({
       name: 'Deutschland – Bremen',
-      url: 'https://example.test/de_bremen.pmtiles',
+      url: 'https://example.test/de_bremen.mbtiles',
       lizenz: '© OpenStreetMap contributors (ODbL)',
-      kachel_schema: 'protomaps',
+      kachel_schema: 'shortbread',
       groesse_erwartet: 44040192,
       sha256_erwartet: 'cafef00d',
     });
@@ -141,9 +141,9 @@ describe('OfflineKartenVerwaltung', () => {
   it('Update verfügbar: zeigt Hinweis + Datenstand + Aktualisieren-Button', async () => {
     mockBasis(admin, [{
       ...karte,
-      quell_url: 'https://example.test/de_bremen_20250101.pmtiles',
+      quell_url: 'https://example.test/de_bremen_20250101.mbtiles',
       update_verfuegbar: true,
-      katalog_url: 'https://example.test/de_bremen_20260320.pmtiles',
+      katalog_url: 'https://example.test/de_bremen_20260320.mbtiles',
     }]);
     render();
     await screen.findByText('Deutschland – Bremen');
@@ -156,9 +156,9 @@ describe('OfflineKartenVerwaltung', () => {
     let postBody: unknown = null;
     mockBasis(admin, [{
       ...karte,
-      quell_url: 'https://example.test/de_bremen_20250101.pmtiles',
+      quell_url: 'https://example.test/de_bremen_20250101.mbtiles',
       update_verfuegbar: true,
-      katalog_url: 'https://example.test/de_bremen_20260320.pmtiles',
+      katalog_url: 'https://example.test/de_bremen_20260320.mbtiles',
       katalog_sha256: 'cafef00d',
     }]);
     server.use(
@@ -172,7 +172,7 @@ describe('OfflineKartenVerwaltung', () => {
     await waitFor(() => expect(postBody).not.toBeNull());
     expect(postBody).toMatchObject({
       name: 'Deutschland – Bremen',
-      url: 'https://example.test/de_bremen_20260320.pmtiles',
+      url: 'https://example.test/de_bremen_20260320.mbtiles',
       sha256_erwartet: 'cafef00d',
       ersetzt_karte_id: 1,
       groesse_erwartet: 44040192,
@@ -193,7 +193,7 @@ describe('OfflineKartenVerwaltung', () => {
     await waitFor(() => expect(abgebrochen).toBe(true));
   });
 
-  it('URL-Download: Modal-Submit → POST /download mit kachel_schema protomaps', async () => {
+  it('URL-Download: Modal-Submit → POST /download mit kachel_schema shortbread', async () => {
     let postBody: unknown = null;
     mockBasis(admin, []);
     server.use(
@@ -206,16 +206,16 @@ describe('OfflineKartenVerwaltung', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Per URL herunterladen' }));
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(within(dialog).getByLabelText('Name'), 'Eigener Extrakt');
-    await userEvent.type(within(dialog).getByLabelText('URL'), 'https://example.test/de.pmtiles');
+    await userEvent.type(within(dialog).getByLabelText('URL'), 'https://example.test/de.mbtiles');
     await userEvent.type(within(dialog).getByLabelText('Attribution / Lizenz'), '© OSM');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Download starten' }));
 
     await waitFor(() => expect(postBody).not.toBeNull());
     expect(postBody).toEqual({
       name: 'Eigener Extrakt',
-      url: 'https://example.test/de.pmtiles',
+      url: 'https://example.test/de.mbtiles',
       lizenz: '© OSM',
-      kachel_schema: 'protomaps',
+      kachel_schema: 'shortbread',
     });
   });
 });

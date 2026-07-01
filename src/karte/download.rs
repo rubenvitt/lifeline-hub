@@ -188,13 +188,13 @@ pub fn download_client() -> reqwest::Client {
         .expect("Download-Client baubar")
 }
 
-/// Entfernt die vom Download-Manager VERWALTETEN Dateien einer Karte (finale `karte-{id}.pmtiles`
+/// Entfernt die vom Download-Manager VERWALTETEN Dateien einer Karte (finale `karte-{id}.mbtiles`
 /// + evtl. `.part`-Rest). Best-effort (Fehler werden ignoriert). NUR für gemanagte Downloads
 /// aufrufen — extern via `offline_registrieren` registrierte Karten haben einen beliebigen,
 /// admin-gelieferten Pfad und dürfen NICHT angefasst werden.
 pub async fn entferne_download_dateien(karten_dir: &Path, id: i64) {
-    let _ = tokio::fs::remove_file(karten_dir.join(format!("karte-{id}.pmtiles"))).await;
-    let _ = tokio::fs::remove_file(karten_dir.join(format!("karte-{id}.pmtiles.part"))).await;
+    let _ = tokio::fs::remove_file(karten_dir.join(format!("karte-{id}.mbtiles"))).await;
+    let _ = tokio::fs::remove_file(karten_dir.join(format!("karte-{id}.mbtiles.part"))).await;
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -427,16 +427,16 @@ mod tests {
     async fn entferne_download_dateien_loescht_nur_id_dateien() {
         let tmp = tempfile::tempdir().unwrap();
         let dir = tmp.path();
-        std::fs::write(dir.join("karte-7.pmtiles"), b"final").unwrap();
-        std::fs::write(dir.join("karte-7.pmtiles.part"), b"rest").unwrap();
+        std::fs::write(dir.join("karte-7.mbtiles"), b"final").unwrap();
+        std::fs::write(dir.join("karte-7.mbtiles.part"), b"rest").unwrap();
         // Extern registrierte Fremddatei mit beliebigem Namen — darf NICHT angefasst werden.
-        std::fs::write(dir.join("fremd.pmtiles"), b"extern").unwrap();
+        std::fs::write(dir.join("fremd.mbtiles"), b"extern").unwrap();
 
         entferne_download_dateien(dir, 7).await;
 
-        assert!(!dir.join("karte-7.pmtiles").exists(), "finale Datei entfernt");
-        assert!(!dir.join("karte-7.pmtiles.part").exists(), ".part entfernt");
-        assert!(dir.join("fremd.pmtiles").exists(), "Fremddatei unangetastet");
+        assert!(!dir.join("karte-7.mbtiles").exists(), "finale Datei entfernt");
+        assert!(!dir.join("karte-7.mbtiles.part").exists(), ".part entfernt");
+        assert!(dir.join("fremd.mbtiles").exists(), "Fremddatei unangetastet");
         // Idempotent: zweiter Aufruf ohne Dateien ist ein No-Op (kein Panic).
         entferne_download_dateien(dir, 7).await;
     }

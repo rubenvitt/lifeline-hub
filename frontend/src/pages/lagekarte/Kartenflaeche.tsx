@@ -1,6 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import maplibregl, { type LngLatLike, type StyleSpecification, type GeoJSONSource } from 'maplibre-gl';
-import { Protocol } from 'pmtiles';
 import { erzeugeTaktischesZeichen } from 'taktische-zeichen-react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { KarteMarker } from './marker';
@@ -43,15 +42,6 @@ import type { FachebeneQuelle } from '../../api/fachebenen';
 
 // Re-Export: LagekartePage importiert ZoneFeature weiterhin aus Kartenflaeche.
 export type { ZoneFeature };
-
-// pmtiles-Protokoll genau einmal global registrieren.
-let pmtilesRegistriert = false;
-function registrierePmtiles() {
-  if (pmtilesRegistriert) return;
-  const protocol = new Protocol();
-  maplibregl.addProtocol('pmtiles', protocol.tile);
-  pmtilesRegistriert = true;
-}
 
 export interface KartenflaecheProps {
   style: StyleSpecification | string;
@@ -189,7 +179,6 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
 
   // Karte einmalig erzeugen.
   useEffect(() => {
-    registrierePmtiles();
     if (!containerRef.current) return;
     const map = new maplibregl.Map({
       container: containerRef.current,

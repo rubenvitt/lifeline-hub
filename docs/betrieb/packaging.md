@@ -85,22 +85,35 @@ die Karte läuft im **Blind-Modus**, bis ein Admin Quellen hinzufügt:
   - **v1-Grenzen:** unterstützte Platzhalter `{z}/{x}/{y}/{-y}`, `{fontstack}/{range}` (andere
     werden beim Speichern abgelehnt); kein Single-Flight (parallele Erst-Misses derselben Kachel
     erzeugen je einen Upstream-Fetch, konvergieren danach).
-- **Offline-Karte (PMTiles)**: eine **lokale PMTiles-Datei** (z. B. ein Protomaps-Build von
-  [build.protomaps.com](https://build.protomaps.com), DE-weit mehrere GB) wird als Offline-Karte
-  registriert und aktiviert; der Server liefert die aktive Karte per **HTTP-Range** unter
-  `/api/karte/tiles.pmtiles` aus. Ideal für den ELW ohne Netz. Das Datenverzeichnis leitet sich
-  aus dem DB-Pfad ab (`<Verzeichnis von --db-path>/karten`) und wird beim Start angelegt.
+- **Offline-Karte (Shortbread/MBTiles)** (LFH-195): eine **lokale MBTiles-Datei** (= SQLite)
+  im **Shortbread-Schema** wird als Offline-Karte registriert/aktiviert; der Server liest die
+  Kacheln selbst aus der SQLite-DB und liefert sie unter `/api/karte/offline/tiles/{z}/{x}/{y}`
+  aus (XYZ, TMS-Y-Flip, `Content-Encoding: gzip`). **Glyphs (OFL) und Sprite (CC0)** sind ins
+  Binary eingebettet und werden lokal unter `/api/karte/offline/{fonts,sprites}/…` serviert →
+  **Beschriftung offline verfügbar**, kein Fremd-Abruf. Ideal für den ELW ohne Netz. Das
+  Datenverzeichnis leitet sich aus dem DB-Pfad ab (`<Verzeichnis von --db-path>/karten`) und
+  wird beim Start angelegt.
+  - **Erzeugen des MBTiles** (bau-zeitig, nicht in der App): das Repo-Projekt `karten-build/`
+    (Docker + **Planetiler-Shortbread**) baut ein Regions-Bundle, Default **Deutschland z0–14**
+    (`make -C karten-build tiles AREA=germany`, ~einige GB). Das fertige `germany.shortbread.mbtiles`
+    wird als GitHub-Release / an einer stabilen URL gehostet; URL + gemessene Größe + SHA256 gehen
+    in `default_offline_katalog()` (`src/config.rs`). **Kein Laufzeit-Docker / kein externer
+    Tile-Service** — die App serviert die MBTiles selbst (LFH-178-Eckpunkt „alles in-App").
+  - **Laden/Aktualisieren über die Admin-UI:** der Offline-Karten-Manager lädt das Bundle per
+    verifiziertem Download (SHA256-Pin, SSRF-Guard) und aktiviert es; „Aktualisieren" = neue
+    Version laden + aktivieren + alte entfernen (One-Click-Update).
 
-**Laufzeit-Bevorzugung im Frontend:** online (falls erreichbar) → Offline-PMTiles →
+**Laufzeit-Bevorzugung im Frontend:** online (falls erreichbar) → Offline (Shortbread/MBTiles) →
 **Blind-Modus** (neutrales Raster). Im Blind-Modus funktionieren Marker und das Verorten
 weiterhin — nur der Kartenhintergrund fehlt. Ein Umschalter in der Sidebar erlaubt
 die manuelle Wahl; im Modus **Online** erscheint zusätzlich ein **Sub-Switcher**, mit dem
 zwischen den konfigurierten Online-Views umgeschaltet wird (Stil + Pflicht-Attribution
-wechseln dynamisch). Ohne aktive Offline-Karte liefert `/api/karte/tiles.pmtiles` 404 und das
-Frontend nutzt automatisch Online bzw. Blind.
+wechseln dynamisch). Ohne aktive Offline-Karte liefert `/api/karte/offline/tiles/{z}/{x}/{y}`
+`204 No Content` und das Frontend nutzt automatisch Online bzw. Blind.
 
-**Schema-Hinweis (Offline-Vektor-Style):** Der gebündelte Offline-Style nimmt das
-**Protomaps-Schema** an (Source-Layer `earth`/`landuse`/`water`/`roads`/`buildings`) und
-rendert bewusst **ohne Beschriftung** — so werden keine Glyphs/Offline-Fonts benötigt.
-PMTiles-Dateien mit einem anderen Schema brauchen einen angepassten Offline-Style
-(`frontend/src/pages/lagekarte/basemapStil.ts`) oder die Online-Style-URL.
+**Schema-Hinweis (Offline-Vektor-Style):** Der Offline-Style
+(`frontend/src/pages/lagekarte/basemapStil.ts`) nimmt das **Shortbread-Schema** an und rendert
+**mit Beschriftung** (`name_de`-Label-Layer über die lokal eingebetteten Glyphs/Sprite). Die
+exakte visuelle Stil-Feinjustage (colorful/graybeard/„amtlich"-getunt) ist eine spätere
+Entscheidung an Live-Demos. Der frühere Protomaps-PMTiles-Pfad (Online-Protomaps + statischer
+`/api/karte/tiles.pmtiles`-Serve) ist entfernt (LFH-196).

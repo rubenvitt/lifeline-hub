@@ -15,7 +15,7 @@ export interface GespeicherteBasemap {
  * aktuelle Server-Config validiert; ungültige Stufen werden übersprungen.
  *
  * Gültigkeitsprüfung gegen die Config, weil sich Verfügbarkeit/Views serverseitig
- * geändert haben können (z. B. Offline gemerkt, aber pmtiles nicht mehr verfügbar;
+ * geändert haben können (z. B. Offline gemerkt, aber offline nicht mehr verfügbar;
  * Online-View gemerkt, aber umbenannt/entfernt).
  */
 export function waehleInitialeBasemap(
@@ -28,7 +28,7 @@ export function waehleInitialeBasemap(
     name != null && config.online_styles.some((s) => s.name === name);
 
   const modusGueltig = (m: BasemapModus): boolean =>
-    m === 'blind' || (m === 'online' && hatOnline) || (m === 'offline' && config.pmtiles_verfuegbar);
+    m === 'blind' || (m === 'online' && hatOnline) || (m === 'offline' && config.offline_verfuegbar);
 
   const modus =
     gespeichert && modusGueltig(gespeichert.modus)

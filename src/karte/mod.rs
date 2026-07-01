@@ -2,8 +2,10 @@
 //! Holt externe Geodaten, normalisiert sie zu GeoJSON und liefert einen
 //! einheitlichen Umschlag mit definiertem Offline-Verhalten.
 
+pub mod assets;
 pub mod cache;
 pub mod download;
+pub mod mbtiles;
 pub mod normalisierung;
 pub mod proxy;
 pub mod quellen;

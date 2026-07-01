@@ -184,44 +184,6 @@ describe('OnlineQuellenVerwaltung', () => {
     });
   });
 
-  it('Protomaps: erzwingt proxy:true im POST-Body ohne Switch-Interaktion (LFH-192)', async () => {
-    let postBody: unknown = null;
-    mockBasis(admin, []);
-    server.use(
-      http.post('/api/karte/online-quellen', async ({ request }) => {
-        postBody = await request.json();
-        return HttpResponse.json({ id: 9, ...(postBody as object) }, { status: 201 });
-      }),
-    );
-    render();
-    await userEvent.click(await screen.findByRole('button', { name: 'Quelle hinzufügen' }));
-
-    const dialog = await screen.findByRole('dialog');
-    await userEvent.type(within(dialog).getByLabelText('Name'), 'Protomaps-Quelle');
-    await userEvent.type(within(dialog).getByLabelText('URL'), 'https://api.protomaps.com/tiles/v4.json?key=testkey');
-    await userEvent.type(within(dialog).getByLabelText('Attribution'), '© Protomaps');
-
-    // Typ auf Protomaps setzen (Option liegt im Portal außerhalb des Dialogs).
-    await userEvent.click(within(dialog).getByRole('combobox'));
-    const option = await screen.findByText(
-      (_, el) => typeof el?.className === 'string'
-        && el.className.includes('ant-select-item-option-content')
-        && el.textContent === 'Protomaps (API-Key, beschriftet)',
-    );
-    await userEvent.click(option);
-
-    // Proxy-Switch ist für protomaps deaktiviert (kein Umschalten nötig/möglich)
-    // und muss CHECKED sein — UI soll zeigen was tatsächlich gesendet wird (proxy=true).
-    const proxyItem = within(dialog).getByText('Über Server proxen').closest('.ant-form-item');
-    expect(within(proxyItem as HTMLElement).getByRole('switch')).toBeDisabled();
-    expect(within(proxyItem as HTMLElement).getByRole('switch')).toBeChecked();
-
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
-
-    await waitFor(() => expect(postBody).not.toBeNull());
-    expect(postBody).toMatchObject({ typ: 'protomaps', proxy: true });
-  });
-
   it('Proxy-Schalter: abschalten → POST-Body proxy:false (LFH-190, Default-an)', async () => {
     let postBody: unknown = null;
     mockBasis(admin, []);

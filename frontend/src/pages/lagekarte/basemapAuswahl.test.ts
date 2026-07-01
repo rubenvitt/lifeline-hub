@@ -14,9 +14,9 @@ function view(name: string): OnlineStyle {
 function config(over: Partial<KarteServerConfig> = {}): KarteServerConfig {
   return {
     online_styles: [view('Liberty'), view('basemap.de')],
-    pmtiles_verfuegbar: false,
-    pmtiles_url: null,
-    pmtiles_attribution: null,
+    offline_verfuegbar: false,
+    offline_tiles_url: null,
+    offline_attribution: null,
     ...over,
   };
 }
@@ -26,12 +26,12 @@ describe('waehleInitialeBasemap', () => {
     expect(waehleInitialeBasemap(config(), null)).toEqual({ modus: 'online', onlineView: 'Liberty' });
   });
 
-  it('fällt ohne Online auf offline zurück, wenn pmtiles verfügbar', () => {
-    const c = config({ online_styles: [], pmtiles_verfuegbar: true, pmtiles_url: '/x.pmtiles' });
+  it('fällt ohne Online auf offline zurück, wenn offline verfügbar', () => {
+    const c = config({ online_styles: [], offline_verfuegbar: true, offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=x' });
     expect(waehleInitialeBasemap(c, null)).toEqual({ modus: 'offline', onlineView: null });
   });
 
-  it('fällt ohne Online und ohne pmtiles auf blind zurück', () => {
+  it('fällt ohne Online und ohne offline auf blind zurück', () => {
     expect(waehleInitialeBasemap(config({ online_styles: [] }), null)).toEqual({ modus: 'blind', onlineView: null });
   });
 
@@ -45,15 +45,15 @@ describe('waehleInitialeBasemap', () => {
     expect(waehleInitialeBasemap(config(), gespeichert)).toEqual({ modus: 'online', onlineView: 'Liberty' });
   });
 
-  it('verwirft gemerktes offline, wenn pmtiles nicht (mehr) verfügbar', () => {
+  it('verwirft gemerktes offline, wenn offline nicht (mehr) verfügbar', () => {
     const gespeichert: GespeicherteBasemap = { modus: 'offline', onlineView: 'Liberty' };
-    // pmtiles_verfuegbar=false → offline ungültig → Default online
+    // offline_verfuegbar=false → offline ungültig → Default online
     expect(waehleInitialeBasemap(config(), gespeichert)).toEqual({ modus: 'online', onlineView: 'Liberty' });
   });
 
   it('verwirft gemerktes online, wenn keine Online-Views (mehr) existieren', () => {
     const gespeichert: GespeicherteBasemap = { modus: 'online', onlineView: 'Liberty' };
-    const c = config({ online_styles: [], pmtiles_verfuegbar: true, pmtiles_url: '/x.pmtiles' });
+    const c = config({ online_styles: [], offline_verfuegbar: true, offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=x' });
     expect(waehleInitialeBasemap(c, gespeichert)).toEqual({ modus: 'offline', onlineView: null });
   });
 
@@ -63,17 +63,17 @@ describe('waehleInitialeBasemap', () => {
   });
 
   it('nutzt den Einsatz-Default, wenn keine gemerkte Wahl existiert', () => {
-    const c = config({ pmtiles_verfuegbar: true, pmtiles_url: '/x.pmtiles' });
+    const c = config({ offline_verfuegbar: true, offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=x' });
     expect(waehleInitialeBasemap(c, null, 'offline')).toEqual({ modus: 'offline', onlineView: 'Liberty' });
   });
 
   it('ignoriert einen ungültigen Einsatz-Default und nimmt den Verfügbarkeits-Default', () => {
-    // offline als Einsatz-Default, aber pmtiles nicht verfügbar → online-Default.
+    // offline als Einsatz-Default, aber offline nicht verfügbar → online-Default.
     expect(waehleInitialeBasemap(config(), null, 'offline')).toEqual({ modus: 'online', onlineView: 'Liberty' });
   });
 
   it('gemerkte Wahl schlägt den Einsatz-Default', () => {
-    const c = config({ pmtiles_verfuegbar: true, pmtiles_url: '/x.pmtiles' });
+    const c = config({ offline_verfuegbar: true, offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=x' });
     expect(waehleInitialeBasemap(c, { modus: 'blind', onlineView: null }, 'offline'))
       .toEqual({ modus: 'blind', onlineView: 'Liberty' });
   });

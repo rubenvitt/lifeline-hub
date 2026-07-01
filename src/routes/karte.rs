@@ -14,7 +14,7 @@ use crate::karte::registry::repo::{
 };
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
-use axum::http::{header, Request, StatusCode};
+use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::{Deserialize, Serialize};
@@ -22,23 +22,21 @@ use std::collections::HashMap;
 use std::path::{Component, Path as FsPath};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use tower::ServiceExt; // oneshot
-use tower_http::services::ServeFile;
 
 /// Antwort von `GET /api/karte/config`. Liefert NUR, was die Karte zur Laufzeit braucht —
-/// NICHT den Server-Dateipfad der PMTiles-Datei. Shape ist eingefroren (Frontend-Vertrag,
+/// NICHT den Server-Dateipfad der Offline-Kartendatei. Shape ist eingefroren (Frontend-Vertrag,
 /// `frontend/src/api/karte.ts`); nur die Datenquelle wechselte von ENV/Extension auf die DB.
 #[derive(Debug, Serialize)]
 pub struct KarteConfigAntwort {
     pub online_styles: Vec<OnlineStyle>,
-    pub pmtiles_verfuegbar: bool,
-    /// Relative URL des Tile-Endpoints, wenn eine aktive Offline-Karte ausliefer-bereit ist.
-    /// Trägt `?v=<token>` (Cache-Bust): wechselt bei Karten-Swap, sonst cacht die pmtiles-Lib
-    /// den alten Archiv-Aufbau unter gleicher URL → korrupte Tiles.
-    pub pmtiles_url: Option<String>,
+    pub offline_verfuegbar: bool,
+    /// Tile-Endpoint-Template der aktiven Offline-Karte inkl. Cache-Bust `?v=<token>`.
+    /// Der Token wechselt bei Karten-Swap, sonst cacht MapLibre den alten Tile-Aufbau unter
+    /// gleicher URL → korrupte Tiles.
+    pub offline_tiles_url: Option<String>,
     /// Pflicht-Attribution der aktiven Offline-Karte (offline sichtbar, z.B. ODbL). `None`,
     /// wenn keine aktive Karte oder keine Lizenz hinterlegt ist.
-    pub pmtiles_attribution: Option<String>,
+    pub offline_attribution: Option<String>,
 }
 
 /// GET /api/karte/config — Basemap-Verfügbarkeit fürs Frontend, frisch aus der DB-Registry.
@@ -52,12 +50,9 @@ pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAnt
         .map(|q| {
             let typ = match q.typ.as_str() {
                 "raster" => OnlineStyleTyp::Raster,
-                "protomaps" => OnlineStyleTyp::Protomaps,
                 _ => OnlineStyleTyp::Vektor,
             };
-            // protomaps trägt den Key in der Upstream-URL → IMMER proxied ausliefern (nie roh),
-            // auch als Defense-in-Depth falls proxy versehentlich false wäre.
-            let url = if q.proxy || matches!(typ, OnlineStyleTyp::Protomaps) {
+            let url = if q.proxy {
                 proxy::proxy_config_url(q.id, &typ)
             } else {
                 q.url
@@ -71,57 +66,140 @@ pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAnt
         })
         .collect();
     let aktiv = repo::aktive_offline_karte(&state.pool).await?;
-    let (pmtiles_url, pmtiles_attribution) = match &aktiv {
+    let (offline_tiles_url, offline_attribution) = match &aktiv {
         Some(k) => {
             // Cache-Bust-Token URL-safe halten (geaendert_at enthält Leerzeichen/Doppelpunkte).
             let v: String = k.version.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
-            (Some(format!("/api/karte/tiles.pmtiles?v={v}")), k.lizenz.clone())
+            (
+                Some(format!("/api/karte/offline/tiles/{{z}}/{{x}}/{{y}}?v={v}")),
+                k.lizenz.clone(),
+            )
         }
         None => (None, None),
     };
     Ok(Json(KarteConfigAntwort {
         online_styles,
-        pmtiles_verfuegbar: aktiv.is_some(),
-        pmtiles_url,
-        pmtiles_attribution,
+        offline_verfuegbar: aktiv.is_some(),
+        offline_tiles_url,
+        offline_attribution,
     }))
 }
 
-/// GET /api/karte/tiles.pmtiles — liefert die aktive Offline-Karte per HTTP-Range aus.
-///
-/// Der Pfad kommt zur Laufzeit aus der DB (nicht mehr zur Router-Bauzeit). Die Byte-/Range-/206-
-/// Mechanik bleibt vollständig bei `tower_http::ServeFile` (per-Request `oneshot`) — derselbe
-/// Service wie zuvor, nur mit dynamisch aufgelöstem Pfad. `Request` ist der letzte, body-
-/// konsumierende Extractor; `State` davor ist zulässig.
-pub async fn tiles(State(state): State<AppState>, req: Request<Body>) -> Result<Response, AppError> {
-    let Some(pfad) = repo::aktive_offline_karte_pfad(&state.pool).await? else {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+/// GET /api/karte/offline/tiles/{z}/{x}/{y} — Vektor-Kachel der aktiven Offline-MBTiles.
+/// Öffnet die aktive Datei read-only (gecacht per Pfad in mbtiles::reader_fuer), Y-Flip + gzip in mbtiles.rs.
+pub async fn offline_tiles(
+    State(state): State<AppState>,
+    Path((z, x, y)): Path<(i64, i64, i64)>,
+) -> Result<Response, AppError> {
+    use crate::karte::mbtiles;
+    // Range-Guard VOR jedem Datei-/DB-Zugriff: z/x/y kommen roh (netzwerk-kontrolliert) aus der
+    // URL. `lies_tile` shiftet `1i64 << z` für den TMS-Y-Flip — ein absurdes z (negativ oder
+    // > 24) würde im Debug-Build panicken bzw. im Release-Build maskiert überlaufen. Kein valider
+    // XYZ-Zoom liegt außerhalb von 0..=24.
+    if !(0..=24).contains(&z) || x < 0 || y < 0 {
+        return Ok(StatusCode::NO_CONTENT.into_response());
+    }
+    let Some(pfad_rel) = repo::aktive_offline_karte_pfad(&state.pool).await? else {
+        return Ok(StatusCode::NO_CONTENT.into_response());
     };
-
-    // Nur relative Pfade im verwalteten karten_dir ausliefern. Absolute Pfade und ..-Traversal →
-    // 404 (kein Info-Leak am unauthentifizierten Endpunkt). Böse Pfade werden zwar schon bei der
-    // Registrierung abgelehnt; dieser Guard ist Defense-in-Depth gegen Alt-/Fremddaten in der DB.
-    let p = FsPath::new(&pfad);
+    // Pfad-Guard analog zum bisherigen tiles-Handler (relativ, kein Traversal).
+    let p = FsPath::new(&pfad_rel);
     if p.is_absolute() || p.components().any(|c| matches!(c, Component::ParentDir)) {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Ok(StatusCode::NO_CONTENT.into_response());
     }
     let voll = state.karten_dir.join(p);
     // Containment via canonicalize fängt zusätzlich Symlinks: der reale Zielpfad MUSS unter dem
-    // realen karten_dir liegen, sonst keine Auslieferung (z.B. ein Symlink aus dem Verzeichnis heraus).
+    // realen karten_dir liegen, sonst keine Auslieferung (Parität zum `tiles`-Handler,
+    // Defense-in-Depth gegen einen Symlink auf eine fremde SQLite-Datei → kein Blob-Leak).
     let basis = state
         .karten_dir
         .canonicalize()
         .map_err(|e| AppError::Internal(format!("karten_dir nicht auflösbar: {e}")))?;
     let real = match voll.canonicalize() {
         Ok(r) if r.starts_with(&basis) => r,
-        _ => return Ok(StatusCode::NOT_FOUND.into_response()),
+        _ => return Ok(StatusCode::NO_CONTENT.into_response()),
     };
-
-    let antwort = ServeFile::new(real)
-        .oneshot(req)
+    let pool = mbtiles::reader_fuer(&real)
         .await
-        .map_err(|e| AppError::Internal(format!("Tile-Auslieferung fehlgeschlagen: {e}")))?;
-    Ok(antwort.map(Body::new).into_response())
+        .map_err(|e| AppError::Internal(format!("MBTiles öffnen: {e}")))?;
+    match mbtiles::lies_tile(&pool, z, x, y).await {
+        Ok(Some(daten)) => Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/x-protobuf")
+            .header(header::CONTENT_ENCODING, "gzip")
+            .header(header::CACHE_CONTROL, "public, max-age=86400")
+            .body(Body::from(daten))
+            .unwrap()),
+        Ok(None) => Ok(StatusCode::NO_CONTENT.into_response()),
+        Err(e) => Err(AppError::Internal(format!("Tile lesen: {e}"))),
+    }
+}
+
+/// Baut die Antwort für ein eingebettetes Offline-Asset (Glyphs/Sprite) oder `404`, wenn es
+/// unter `pfad` nicht in `KartenAssets` liegt.
+fn embedded_antwort(pfad: &str, content_type: &str) -> Response {
+    match crate::karte::assets::KartenAssets::get(pfad) {
+        Some(f) => Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, content_type)
+            .header(header::CACHE_CONTROL, "public, max-age=604800")
+            .body(Body::from(f.data.into_owned()))
+            .unwrap(),
+        None => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+/// GET /api/karte/offline/fonts/{fontstack}/{datei} — eingebettete SDF-Glyphs (OFL).
+/// `{datei}` = `<range>.pbf` (z. B. `0-255.pbf`), so wie MapLibres glyphs-Template es anfragt.
+pub async fn offline_fonts(Path((fontstack, datei)): Path<(String, String)>) -> Response {
+    // `.pbf` abstreifen: validiere_range erwartet `<int>-<int>` OHNE Suffix (src/karte/proxy.rs).
+    let Some(range) = datei.strip_suffix(".pbf") else {
+        return StatusCode::BAD_REQUEST.into_response();
+    };
+    // Proxy-Validatoren gegen Path-Traversal wiederverwenden.
+    if proxy::validiere_fontstack(&fontstack).is_err() || proxy::validiere_range(range).is_err() {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    embedded_antwort(&format!("fonts/{fontstack}/{datei}"), "application/x-protobuf")
+}
+
+/// GET /api/karte/offline/sprites/{datei} — eingebettetes Sprite (png/json, +@2x).
+pub async fn offline_sprite(Path(datei): Path<String>) -> Response {
+    // Nur bekannte Basisnamen zulassen (kein Traversal).
+    let ct = if datei.ends_with(".png") {
+        "image/png"
+    } else if datei.ends_with(".json") {
+        "application/json"
+    } else {
+        return StatusCode::BAD_REQUEST.into_response();
+    };
+    if datei.contains('/') || datei.contains("..") {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    embedded_antwort(&format!("sprites/{datei}"), ct)
+}
+
+#[cfg(test)]
+mod offline_assets_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn offline_fonts_lehnt_bad_range_ab() {
+        // Handler direkt aufrufen (kein Server nötig): Path ist ein Tuple-Wrapper.
+        let r = offline_fonts(axum::extract::Path((
+            "Noto Sans Regular".into(),
+            "boese.pbf".into(),
+        )))
+        .await;
+        assert_eq!(r.status(), StatusCode::BAD_REQUEST);
+        // Ohne .pbf-Suffix ebenfalls ablehnen.
+        let r2 = offline_fonts(axum::extract::Path((
+            "Noto Sans Regular".into(),
+            "0-255".into(),
+        )))
+        .await;
+        assert_eq!(r2.status(), StatusCode::BAD_REQUEST);
+    }
 }
 
 /// GET /api/karte/fachebenen/{quelle} — externe Lagedaten als GeoJSON-Umschlag.
@@ -187,9 +265,7 @@ pub struct OfflineKarteBody {
 }
 
 /// Validiert + normalisiert einen Online-Quelle-Body (Anlegen wie Vollersatz-PATCH teilen das).
-/// Name/URL nicht leer (getrimmt), `typ ∈ {vektor,raster,protomaps}`, **Attribution Pflicht** (Lizenzauflage).
-/// `protomaps` trägt den Key in der Upstream-URL → `proxy` wird serverseitig auf `true` erzwungen
-/// (nie roh ausliefern), unabhängig davon, was der Client sendet.
+/// Name/URL nicht leer (getrimmt), `typ ∈ {vektor,raster}`, **Attribution Pflicht** (Lizenzauflage).
 fn validiere_online(body: OnlineQuelleBody) -> Result<OnlineQuelleEingabe, AppError> {
     let name = body.name.trim();
     if name.is_empty() {
@@ -199,9 +275,9 @@ fn validiere_online(body: OnlineQuelleBody) -> Result<OnlineQuelleEingabe, AppEr
     if url.is_empty() {
         return Err(AppError::Validation("URL darf nicht leer sein".into()));
     }
-    if body.typ != "vektor" && body.typ != "raster" && body.typ != "protomaps" {
+    if body.typ != "vektor" && body.typ != "raster" {
         return Err(AppError::Validation(
-            "Typ muss 'vektor', 'raster' oder 'protomaps' sein".into(),
+            "Typ muss 'vektor' oder 'raster' sein".into(),
         ));
     }
     let attribution = body
@@ -213,8 +289,7 @@ fn validiere_online(body: OnlineQuelleBody) -> Result<OnlineQuelleEingabe, AppEr
             AppError::Validation("Attribution ist Pflicht (Lizenzauflage)".into())
         })?
         .to_string();
-    // protomaps trägt den Key in der URL → Proxy ist Pflicht (nie roh ausliefern).
-    let proxy_effektiv = body.proxy || body.typ == "protomaps";
+    let proxy_effektiv = body.proxy;
     // Proxied Quellen (key-basiert): URL roh speichern (kein Url-Roundtrip — würde `{}`
     // percent-kodieren), aber vorab validieren: nur unterstützte Platzhalter, und SSRF-Check auf
     // einer materialisierten Probe (Platzhalter durch 0/Dummy ersetzt). Direkte Quellen (proxy=0)
@@ -414,7 +489,7 @@ pub async fn offline_registrieren(
         ));
     }
     // Attribution ist Pflicht — Parität zu offline_download/validiere_online. Die Offline-Basemap
-    // rendert sie quellen-unabhängig (config.pmtiles_attribution); ohne Lizenz würde eine
+    // rendert sie quellen-unabhängig (config.offline_attribution); ohne Lizenz würde eine
     // aktivierte registrierte Karte offline ohne Pflicht-Attribution gezeigt (Lizenzverstoß).
     let lizenz = body
         .lizenz
@@ -423,13 +498,13 @@ pub async fn offline_registrieren(
         .filter(|s| !s.is_empty())
         .ok_or_else(|| AppError::Validation("Lizenz/Attribution ist Pflicht (offline sichtbar)".into()))?
         .to_string();
-    // Kachel-Schema ist erweiterbar; ohne Angabe gilt der Protomaps-Default (Migration-Default).
+    // Kachel-Schema ist erweiterbar; ohne Angabe gilt der Shortbread-Default (Migration-Default).
     let kachel_schema = body
         .kachel_schema
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .unwrap_or("protomaps")
+        .unwrap_or("shortbread")
         .to_string();
     let eingabe = OfflineKarteEingabe {
         name: name.to_string(),
@@ -457,7 +532,7 @@ pub async fn offline_aktivieren(
 
 /// DELETE /api/karte/offline-karten/{id} — Offline-Karte löschen (Admin).
 ///
-/// Entfernt zusätzlich die vom Download-Manager VERWALTETE Datei (`karte-{id}.pmtiles` + evtl.
+/// Entfernt zusätzlich die vom Download-Manager VERWALTETE Datei (`karte-{id}.mbtiles` + evtl.
 /// `.part`), sonst leckt jeder Download→Löschen-Zyklus mehrere GB. Extern registrierte Karten
 /// (beliebiger admin-gelieferter Pfad) werden bewusst NICHT von der Platte gelöscht.
 pub async fn offline_loeschen(
@@ -474,9 +549,14 @@ pub async fn offline_loeschen(
         // Gemanagt = von uns heruntergeladen: download_at gesetzt, Pfad-Platzhalter (Download lief
         // bzw. scheiterte vor markiere_bereit) oder der abgeleitete Download-Dateiname.
         let ist_gemanagt =
-            k.download_at.is_some() || k.pfad.is_empty() || k.pfad == format!("karte-{id}.pmtiles");
+            k.download_at.is_some() || k.pfad.is_empty() || k.pfad == format!("karte-{id}.mbtiles");
         if ist_gemanagt {
             download::entferne_download_dateien(&state.karten_dir, id).await;
+            // Reader-Cache ist NUR nach Pfad gekeyt: ein Neu-Download kann denselben Pfad
+            // (`karte-{id}.mbtiles`, rowid-Wiederverwendung ohne AUTOINCREMENT) bei neuer Inode
+            // erhalten — ohne Invalidierung würde der alte, gecachte Reader (Datei-Handle auf die
+            // entlinkte Datei) weiterservieren.
+            crate::karte::mbtiles::invalidate_reader().await;
         }
     }
     Ok(StatusCode::NO_CONTENT)
@@ -527,6 +607,9 @@ async fn finalisiere_erfolgreichen_download(
         match repo::ersetze_aktive_offline_karte(pool, id, alt).await {
             Ok(Some(_)) => {
                 download::entferne_download_dateien(karten_dir, alt).await;
+                // Reader-Cache s. offline_loeschen: gleicher Pfad, neue Inode möglich — sonst
+                // würde der alte, gecachte Reader die entlinkte Datei weiterservieren.
+                crate::karte::mbtiles::invalidate_reader().await;
                 tracing::info!("Offline-Karte {id}: Update aktiviert, alte Karte {alt} entfernt");
             }
             Ok(None) => tracing::warn!("Update-Swap {id}: neue Karte verschwand"),
@@ -571,7 +654,7 @@ pub async fn offline_download(
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .unwrap_or("protomaps")
+        .unwrap_or("shortbread")
         .to_string();
 
     // Plattenplatz-Check vorab gegen die erwartete (Katalog-)Größe, mit 10 % Reserve.
@@ -615,7 +698,7 @@ pub async fn offline_download(
     let sha256_erwartet = body.sha256_erwartet.clone();
     let ersetzt_karte_id = body.ersetzt_karte_id;
     tokio::spawn(async move {
-        let dateiname = format!("karte-{id}.pmtiles");
+        let dateiname = format!("karte-{id}.mbtiles");
         let part = karten_dir.join(format!("{dateiname}.part"));
         tracing::info!("Offline-Karte {id}: Download startet von {url}");
         let ergebnis =
@@ -804,20 +887,6 @@ pub async fn proxy_tilejson(
     Ok(json_proxy_antwort(json))
 }
 
-/// GET /api/karte/proxy/{id}/tilejson — registrierte TileJSON-Quelle (z. B. Protomaps) holen +
-/// key-frei umschreiben. SLOT-LOS: die Quelle-`url` IST die TileJSON (analog `proxy_style`).
-pub async fn proxy_tilejson_entry(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> Result<Response, AppError> {
-    let q = aktive_proxy_quelle(&state, id).await?;
-    let u = ssrf_geprueft(&q.url)?;
-    let json = proxy::hole_tilejson(proxy::proxy_client(), &state.pool, id, u)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-    Ok(json_proxy_antwort(json))
-}
-
 /// GET /api/karte/proxy/{id}/sprite/{rest} — Sprite (`{rest}` = `{slot}.json|.png|@2x…`).
 pub async fn proxy_sprite(
     State(state): State<AppState>,
@@ -884,14 +953,14 @@ mod finalisierung_tests {
             name: name.into(),
             quell_url: format!("https://example.test/{name}.pmtiles"),
             lizenz: "© OpenStreetMap contributors (ODbL)".into(),
-            kachel_schema: "protomaps".into(),
+            kachel_schema: "shortbread".into(),
             sortier: 0,
         }
     }
 
     async fn bereite_karte(pool: &sqlx::SqlitePool, name: &str) -> i64 {
         let k = repo::neue_download_karte(pool, &dl(name)).await.unwrap();
-        repo::markiere_bereit(pool, k.id, &format!("karte-{}.pmtiles", k.id), 10, "h")
+        repo::markiere_bereit(pool, k.id, &format!("karte-{}.mbtiles", k.id), 10, "h")
             .await
             .unwrap();
         k.id

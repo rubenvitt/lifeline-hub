@@ -1,6 +1,6 @@
 import { apiGet } from './client';
 
-export type OnlineStyleTyp = 'vektor' | 'raster' | 'protomaps';
+export type OnlineStyleTyp = 'vektor' | 'raster';
 
 /** Ein benannter Online-Basemap-View (vom Backend geliefert). */
 export interface OnlineStyle {
@@ -13,11 +13,11 @@ export interface OnlineStyle {
 /** Was die Karte zur Laufzeit über die Basemap-Verfügbarkeit wissen muss. */
 export interface KarteServerConfig {
   online_styles: OnlineStyle[];
-  pmtiles_verfuegbar: boolean;
-  /** Tile-Endpoint-URL inkl. Cache-Bust-Token (`?v=…`), wenn eine aktive Offline-Karte bereit ist. */
-  pmtiles_url: string | null;
-  /** Pflicht-Attribution der aktiven Offline-Karte (offline sichtbar, z. B. ODbL); `null` ohne aktive Karte. */
-  pmtiles_attribution: string | null;
+  offline_verfuegbar: boolean;
+  /** Tile-Endpoint-Template (`{z}/{x}/{y}`) inkl. Cache-Bust `?v=…`, wenn eine Offline-Karte aktiv ist. */
+  offline_tiles_url: string | null;
+  /** Pflicht-Attribution der aktiven Offline-Karte (offline sichtbar, z. B. ODbL). */
+  offline_attribution: string | null;
 }
 
 export function ladeKarteConfig(): Promise<KarteServerConfig> {

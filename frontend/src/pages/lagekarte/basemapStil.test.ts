@@ -7,7 +7,6 @@ import {
   blindStyle,
   defaultModus,
   offlineStyle,
-  protomapsLabeledStyle,
 } from './basemapStil';
 import type { KarteServerConfig, OnlineStyle } from '../../api/karte';
 
@@ -20,16 +19,16 @@ const rasterView: OnlineStyle = {
 
 const beides: KarteServerConfig = {
   online_styles: [vektorView],
-  pmtiles_verfuegbar: true,
-  pmtiles_url: '/api/karte/tiles.pmtiles?v=abc',
-  pmtiles_attribution: null,
+  offline_verfuegbar: true,
+  offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
+  offline_attribution: null,
 };
 const nurOffline: KarteServerConfig = {
-  online_styles: [], pmtiles_verfuegbar: true, pmtiles_url: '/api/karte/tiles.pmtiles?v=abc',
-  pmtiles_attribution: '© OpenStreetMap contributors (ODbL)',
+  online_styles: [], offline_verfuegbar: true, offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
+  offline_attribution: '© OpenStreetMap contributors (ODbL)',
 };
 const leer: KarteServerConfig = {
-  online_styles: [], pmtiles_verfuegbar: false, pmtiles_url: null, pmtiles_attribution: null,
+  online_styles: [], offline_verfuegbar: false, offline_tiles_url: null, offline_attribution: null,
 };
 
 describe('basemapStil', () => {
@@ -37,12 +36,6 @@ describe('basemapStil', () => {
     const s = blindStyle('dark');
     expect(s.layers).toHaveLength(1);
     expect(s.layers[0].type).toBe('background');
-  });
-
-  it('offlineStyle referenziert die pmtiles-Source', () => {
-    const s = offlineStyle('light', '/api/karte/tiles.pmtiles');
-    expect(JSON.stringify(s.sources)).toContain('pmtiles://');
-    expect(s.layers.some((l) => l.type === 'symbol')).toBe(false);
   });
 
   it('baueOnlineStyle: Vektor liefert die URL als String', () => {
@@ -57,7 +50,6 @@ describe('basemapStil', () => {
     });
     expect(absolutiereProxyAnfrage('https://x/y')).toEqual({ url: 'https://x/y' });
     expect(absolutiereProxyAnfrage('//host/x')).toEqual({ url: '//host/x' });
-    expect(absolutiereProxyAnfrage('pmtiles://https://x/a')).toEqual({ url: 'pmtiles://https://x/a' });
   });
 
   it('baueOnlineStyle: relative Vektor-Proxy-URL wird gegen die Origin absolutiert (LFH-182)', () => {
@@ -107,7 +99,7 @@ describe('basemapStil', () => {
     expect(defaultModus(leer)).toBe('blind');
   });
 
-  it('aktuelleAttribution: online View-Attribution, offline pmtiles_attribution, sonst null', () => {
+  it('aktuelleAttribution: online View-Attribution, offline offline_attribution, sonst null', () => {
     expect(aktuelleAttribution('online', vektorView, beides)).toBe('© A');
     expect(aktuelleAttribution('online', undefined, beides)).toBeNull();
     // Offline: Lizenz der aktiven Offline-Karte aus der Config (LFH-181, offline sichtbar).
@@ -119,28 +111,30 @@ describe('basemapStil', () => {
     expect(aktuelleAttribution('blind', rasterView, beides)).toBeNull();
   });
 
-  it('protomapsLabeledStyle: Label-Layer + glyphs + proxied Quelle', () => {
-    const s = protomapsLabeledStyle('light', '/api/karte/proxy/3/tilejson') as {
-      glyphs: string;
-      sources: Record<string, { url: string }>;
-      layers: Array<{ id: string; type: string; layout?: Record<string, unknown> }>;
-    };
-    expect(s.glyphs).toContain('protomaps.github.io');
-    expect(s.sources.protomaps.url).toBe(`${window.location.origin}/api/karte/proxy/3/tilejson`);
-    const ids = s.layers.map((l) => l.id);
-    expect(ids).toEqual(expect.arrayContaining(['orte', 'strassennamen', 'erde', 'wasser']));
-    // Jeder Symbol-Layer hat text-font (sonst rendert MapLibre keine Glyphs).
-    for (const l of s.layers.filter((l) => l.type === 'symbol')) {
-      expect(l.layout?.['text-font']).toBeTruthy();
-    }
-  });
+});
 
-  it('baueBasemapStyle: protomaps-Quelle → Protomaps-Style (Objekt, nicht URL-String)', () => {
-    const s = baueBasemapStyle('online', 'light', undefined, {
-      name: 'Protomaps', url: '/api/karte/proxy/3/tilejson', typ: 'protomaps', attribution: '©',
-    });
-    expect(typeof s).toBe('object');
-    const style = s as { sources: Record<string, unknown> };
-    expect(style.sources.protomaps).toBeTruthy();
+describe('offlineStyle (Shortbread)', () => {
+  const style = offlineStyle('light', '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc') as {
+    glyphs: string;
+    sprite: string;
+    sources: Record<string, { type: string; tiles: string[] }>;
+    layers: Array<{ id: string; type: string; 'source-layer'?: string; layout?: Record<string, unknown> }>;
+  };
+  it('nutzt lokale Glyphs/Sprite (offline)', () => {
+    expect(style.glyphs).toBe('/api/karte/offline/fonts/{fontstack}/{range}.pbf');
+    expect(style.sprite).toBe('/api/karte/offline/sprites/basemap');
+  });
+  it('bindet eine Vektor-Source mit dem Tile-Template', () => {
+    const src = style.sources.basemap;
+    expect(src.type).toBe('vector');
+    expect(src.tiles[0]).toContain('/api/karte/offline/tiles/{z}/{x}/{y}');
+  });
+  it('rendert Shortbread-Layer inkl. Ortslabels mit name_de', () => {
+    const ids = style.layers.map((l) => l.id);
+    expect(ids).toContain('wasser');
+    expect(ids).toContain('strassen');
+    const orte = style.layers.find((l) => l.id === 'orte');
+    expect(orte?.['source-layer']).toBe('place_labels');
+    expect(orte?.layout?.['text-field']).toEqual(['coalesce', ['get', 'name_de'], ['get', 'name']]);
   });
 });

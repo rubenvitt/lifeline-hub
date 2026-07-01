@@ -670,7 +670,7 @@ export default function LagekartePage() {
         onBasemapWechsel={setBasemap}
         onMarkerWaehlen={onMarkerWaehlen}
         onlineVerfuegbar={(configQuery.data?.online_styles.length ?? 0) > 0}
-        offlineVerfuegbar={!!configQuery.data?.pmtiles_verfuegbar}
+        offlineVerfuegbar={!!configQuery.data?.offline_verfuegbar}
         onlineStyles={configQuery.data?.online_styles ?? []}
         onlineStilName={onlineStilName}
         onOnlineStilWechsel={setOnlineStilName}

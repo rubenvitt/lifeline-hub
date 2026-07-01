@@ -35,7 +35,7 @@ function standAusUrl(url: string | null | undefined): string | null {
 }
 
 /**
- * Verwaltungstabelle der Offline-Karten (PMTiles) mit In-App-Download-Manager (LFH-181).
+ * Verwaltungstabelle der Offline-Karten (MBTiles) mit In-App-Download-Manager (LFH-181).
  * Lesen für alle Admin-Bereichs-Berechtigten; Schreiben (Download/Aktivieren/Abbrechen/Löschen)
  * nur System-Admin. Solange eine Zeile lädt, pollt die Liste (Status-Polling statt SSE).
  */

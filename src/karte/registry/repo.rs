@@ -244,7 +244,7 @@ async fn hole_offline_karte(pool: &SqlitePool, id: i64) -> Result<OfflineKarte, 
     .await
 }
 
-/// Pfad der aktiven, ausliefer-bereiten Offline-Karte (für `GET /api/karte/tiles.pmtiles`).
+/// Pfad der aktiven, ausliefer-bereiten Offline-Karte (für `GET /api/karte/offline/tiles/{z}/{x}/{y}`).
 pub async fn aktive_offline_karte_pfad(pool: &SqlitePool) -> Result<Option<String>, sqlx::Error> {
     sqlx::query_scalar::<_, String>(
         "SELECT pfad FROM karte_offline_karte \
@@ -770,7 +770,7 @@ mod tests {
             pfad: format!("/karten/{name}.pmtiles"),
             quell_url: Some("https://quelle".into()),
             lizenz: Some("CC0".into()),
-            kachel_schema: "protomaps".into(),
+            kachel_schema: "shortbread".into(),
             sortier: 0,
         }
     }
@@ -786,7 +786,7 @@ mod tests {
         assert_eq!(k.pfad, "/karten/A.pmtiles");
         assert_eq!(k.status, "bereit");
         assert!(!k.aktiv_basemap, "registriert ist nicht automatisch aktiv");
-        assert_eq!(k.kachel_schema, "protomaps");
+        assert_eq!(k.kachel_schema, "shortbread");
     }
 
     #[tokio::test]
@@ -933,7 +933,7 @@ mod tests {
             name: name.into(),
             quell_url: format!("https://example.test/{name}.pmtiles"),
             lizenz: "© OpenStreetMap contributors (ODbL)".into(),
-            kachel_schema: "protomaps".into(),
+            kachel_schema: "shortbread".into(),
             sortier: 0,
         }
     }
