@@ -4,12 +4,11 @@ use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
 /// Öffnet eine `.mbtiles`-Datei als read-only-Pool (immutable: keine Sperren, kein WAL-Write).
+/// `.filename(pfad)` statt einer `sqlite://`-URI aus `format!` — sonst müssten Sonderzeichen/
+/// Leerzeichen im Pfad URI-escaped werden (gleiche API wie der Test-Fixture-Helper).
 pub async fn oeffne_readonly(pfad: &Path) -> Result<sqlx::SqlitePool, sqlx::Error> {
     use sqlx::sqlite::SqliteConnectOptions;
-    use std::str::FromStr;
-    let opts = SqliteConnectOptions::from_str(&format!("sqlite://{}", pfad.display()))?
-        .read_only(true)
-        .immutable(true);
+    let opts = SqliteConnectOptions::new().filename(pfad).read_only(true).immutable(true);
     sqlx::sqlite::SqlitePoolOptions::new().max_connections(4).connect_with(opts).await
 }
 
@@ -53,6 +52,12 @@ pub async fn reader_fuer(pfad: &Path) -> Result<sqlx::SqlitePool, sqlx::Error> {
     Ok(neu)
 }
 
+/// Verwirft den gecachten Reader-Pool (nach Löschen/Ersetzen der aktiven Karte aufrufen —
+/// sonst würde bei rowid-/Pfad-Wiederverwendung die alte Datei weiterserviert).
+pub async fn invalidate_reader() {
+    *READER.write().await = None;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -80,5 +85,51 @@ mod tests {
     async fn fehlende_kachel_ist_none() {
         let pool = fixture().await;
         assert_eq!(lies_tile(&pool, 1, 1, 1).await.unwrap(), None);
+    }
+
+    /// Schreibt eine Datei-MBTiles mit genau einer Kachel bei TMS (z=1, col=0, row=1) = XYZ
+    /// (z=1,x=0,y=0) und `daten` als Inhalt. Eigener SCHREIBBARER Pool (Produktionscode liest
+    /// nur read-only); die Datei darf noch nicht existieren (`create_if_missing`).
+    async fn schreibe_datei_fixture(pfad: &Path, daten: &[u8]) {
+        let opts = SqlitePoolOptions::new().connect_with(
+            sqlx::sqlite::SqliteConnectOptions::new().filename(pfad).create_if_missing(true),
+        );
+        let pool = opts.await.unwrap();
+        sqlx::query(
+            "CREATE TABLE tiles (zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER, tile_data BLOB)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO tiles VALUES (1, 0, 1, ?1)").bind(daten).execute(&pool).await.unwrap();
+        pool.close().await;
+    }
+
+    // Beweist: (1) reader_fuer cacht per Pfad (gleicher Pfad, überschriebene Datei liefert noch
+    // den alten Inhalt), (2) invalidate_reader() verwirft den Cache und der nächste reader_fuer
+    // sieht den neuen Inhalt. Reproduziert den LFH-195-Bug: Karte löschen + neu herunterladen
+    // vergibt denselben Pfad (`karte-{id}.mbtiles`, rowid-Wiederverwendung ohne AUTOINCREMENT)
+    // bei neuer Inode — ohne Invalidierung würde der alte FD weiterserviert.
+    #[tokio::test]
+    async fn invalidate_reader_verwirft_gecachten_pool() {
+        let dir = tempfile::tempdir().unwrap();
+        let pfad = dir.path().join("karte-1.mbtiles");
+
+        schreibe_datei_fixture(&pfad, &[0xAA]).await;
+        let pool_a = reader_fuer(&pfad).await.unwrap();
+        assert_eq!(lies_tile(&pool_a, 1, 0, 0).await.unwrap(), Some(vec![0xAA]));
+
+        // "Löschen + Neu-Download": gleicher Pfad, neue Inode, anderer Inhalt.
+        std::fs::remove_file(&pfad).unwrap();
+        schreibe_datei_fixture(&pfad, &[0xBB]).await;
+
+        // Ohne Invalidierung liefert der gecachte Pool (Pfad unverändert) weiterhin A.
+        let pool_noch_a = reader_fuer(&pfad).await.unwrap();
+        assert_eq!(lies_tile(&pool_noch_a, 1, 0, 0).await.unwrap(), Some(vec![0xAA]));
+
+        // Nach Invalidierung: frischer Pool, liest B.
+        invalidate_reader().await;
+        let pool_b = reader_fuer(&pfad).await.unwrap();
+        assert_eq!(lies_tile(&pool_b, 1, 0, 0).await.unwrap(), Some(vec![0xBB]));
     }
 }

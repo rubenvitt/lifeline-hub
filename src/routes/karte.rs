@@ -552,6 +552,11 @@ pub async fn offline_loeschen(
             k.download_at.is_some() || k.pfad.is_empty() || k.pfad == format!("karte-{id}.mbtiles");
         if ist_gemanagt {
             download::entferne_download_dateien(&state.karten_dir, id).await;
+            // Reader-Cache ist NUR nach Pfad gekeyt: ein Neu-Download kann denselben Pfad
+            // (`karte-{id}.mbtiles`, rowid-Wiederverwendung ohne AUTOINCREMENT) bei neuer Inode
+            // erhalten — ohne Invalidierung würde der alte, gecachte Reader (Datei-Handle auf die
+            // entlinkte Datei) weiterservieren.
+            crate::karte::mbtiles::invalidate_reader().await;
         }
     }
     Ok(StatusCode::NO_CONTENT)
@@ -602,6 +607,9 @@ async fn finalisiere_erfolgreichen_download(
         match repo::ersetze_aktive_offline_karte(pool, id, alt).await {
             Ok(Some(_)) => {
                 download::entferne_download_dateien(karten_dir, alt).await;
+                // Reader-Cache s. offline_loeschen: gleicher Pfad, neue Inode möglich — sonst
+                // würde der alte, gecachte Reader die entlinkte Datei weiterservieren.
+                crate::karte::mbtiles::invalidate_reader().await;
                 tracing::info!("Offline-Karte {id}: Update aktiviert, alte Karte {alt} entfernt");
             }
             Ok(None) => tracing::warn!("Update-Swap {id}: neue Karte verschwand"),
