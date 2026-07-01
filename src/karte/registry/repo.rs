@@ -770,7 +770,7 @@ mod tests {
             pfad: format!("/karten/{name}.pmtiles"),
             quell_url: Some("https://quelle".into()),
             lizenz: Some("CC0".into()),
-            kachel_schema: "protomaps".into(),
+            kachel_schema: "shortbread".into(),
             sortier: 0,
         }
     }
@@ -786,7 +786,7 @@ mod tests {
         assert_eq!(k.pfad, "/karten/A.pmtiles");
         assert_eq!(k.status, "bereit");
         assert!(!k.aktiv_basemap, "registriert ist nicht automatisch aktiv");
-        assert_eq!(k.kachel_schema, "protomaps");
+        assert_eq!(k.kachel_schema, "shortbread");
     }
 
     #[tokio::test]
@@ -933,7 +933,7 @@ mod tests {
             name: name.into(),
             quell_url: format!("https://example.test/{name}.pmtiles"),
             lizenz: "© OpenStreetMap contributors (ODbL)".into(),
-            kachel_schema: "protomaps".into(),
+            kachel_schema: "shortbread".into(),
             sortier: 0,
         }
     }

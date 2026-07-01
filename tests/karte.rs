@@ -3,6 +3,7 @@ use axum::http::{header, Request, StatusCode};
 use axum::response::Response;
 use lifeline_hub::app::{build_router, AppState};
 use lifeline_hub::auth::bootstrap::bootstrap_admin;
+use lifeline_hub::config::default_offline_katalog;
 use lifeline_hub::live::LiveHub;
 use std::io::Write;
 use tower::ServiceExt; // oneshot
@@ -517,7 +518,7 @@ async fn offline_registrieren_aktivieren_loeschen() {
     let id = k["id"].as_i64().unwrap();
     assert_eq!(k["status"], "bereit");
     assert_eq!(k["aktiv_basemap"], false);
-    assert_eq!(k["kachel_schema"], "protomaps"); // Default
+    assert_eq!(k["kachel_schema"], "shortbread"); // Default
 
     let res = anfrage(
         &app,
@@ -603,11 +604,11 @@ async fn offline_katalog_liefert_kuratierte_liste() {
     assert_eq!(res.status(), StatusCode::OK);
     let v = json(res).await;
     let liste = v.as_array().expect("Array");
-    assert_eq!(liste.len(), 18, "16 Bundesländer + AT + CH");
+    assert_eq!(liste.len(), 1, "ein Shortbread-DE-Eintrag (LFH-195)");
     // Statische /katalog-Route gewinnt gegen /{id} (matchit-Priorität).
     assert!(liste[0]["url"].as_str().unwrap().starts_with("https://"));
     assert!(!liste[0]["lizenz"].as_str().unwrap().is_empty());
-    assert_eq!(liste[0]["kachel_schema"].as_str(), Some("protomaps"));
+    assert_eq!(liste[0]["kachel_schema"].as_str(), Some("shortbread"));
 }
 
 #[tokio::test]
@@ -671,15 +672,16 @@ async fn offline_abbrechen_ohne_laufenden_download_ist_404() {
 #[tokio::test]
 async fn offline_liste_meldet_update_wenn_katalog_neuere_quelle_fuehrt() {
     let (app, cookie) = admin_app().await;
-    // Installiert mit ALTER Quell-URL (anderes Datum), Name = Katalog-Name → Katalog ist neuer.
+    // Installiert mit ALTER Quell-URL, Name = Katalog-Name (Shortbread-DE-Eintrag, LFH-195) →
+    // Katalog führt eine andere URL als die installierte → Update erkannt.
     let res = anfrage(
         &app,
         "POST",
         "/api/karte/offline-karten",
         Some(&cookie),
         Some(
-            r#"{"name":"Deutschland – Bremen","pfad":"bremen.pmtiles","lizenz":"© OSM",
-                "quell_url":"https://github.com/whitespring/project-nomad-maps-europe/releases/download/v1/de_bremen_20250101.pmtiles"}"#,
+            r#"{"name":"Deutschland (Shortbread)","pfad":"germany.mbtiles","lizenz":"© OSM",
+                "quell_url":"https://example.test/germany.shortbread.alt.mbtiles"}"#,
         ),
     )
     .await;
@@ -688,24 +690,26 @@ async fn offline_liste_meldet_update_wenn_katalog_neuere_quelle_fuehrt() {
     let liste = json(anfrage(&app, "GET", "/api/karte/offline-karten", Some(&cookie), None).await).await;
     let eintrag = &liste.as_array().unwrap()[0];
     assert_eq!(eintrag["update_verfuegbar"], true);
-    assert!(
-        eintrag["katalog_url"].as_str().unwrap().contains("de_bremen_20260320"),
-        "Katalog-URL zeigt auf den neueren Stand"
+    assert_eq!(
+        eintrag["katalog_url"].as_str().unwrap(),
+        default_offline_katalog()[0].url,
+        "Katalog-URL zeigt auf den aktuellen Katalog-Eintrag"
     );
 }
 
 #[tokio::test]
 async fn offline_liste_kein_update_bei_aktueller_katalog_quelle() {
     let (app, cookie) = admin_app().await;
+    let katalog_url = default_offline_katalog()[0].url.clone();
     let res = anfrage(
         &app,
         "POST",
         "/api/karte/offline-karten",
         Some(&cookie),
-        Some(
-            r#"{"name":"Deutschland – Bremen","pfad":"bremen.pmtiles","lizenz":"© OSM",
-                "quell_url":"https://github.com/whitespring/project-nomad-maps-europe/releases/download/v1/de_bremen_20260320.pmtiles"}"#,
-        ),
+        Some(&format!(
+            r#"{{"name":"Deutschland (Shortbread)","pfad":"germany.mbtiles","lizenz":"© OSM",
+                "quell_url":"{katalog_url}"}}"#
+        )),
     )
     .await;
     assert_eq!(res.status(), StatusCode::CREATED);

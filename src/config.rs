@@ -89,8 +89,8 @@ pub fn default_online_styles() -> Vec<OnlineStyle> {
 
 /// Ein kuratierter, herunterladbarer Offline-Karten-Vorschlag (LFH-181). `groesse` ist die
 /// UNGEFÄHRE Dateigröße in Bytes (für den Plattenplatz-Check vorab; die exakte Größe liefert
-/// die Content-Length bzw. der fertige Download). Alle Einträge sind Protomaps-Schema und
-/// rendern mit dem bestehenden glyph-freien Offline-Style.
+/// die Content-Length bzw. der fertige Download). Einträge sind Shortbread-MBTiles (LFH-195)
+/// und rendern mit dem beschrifteten Offline-Style (Shortbread-Layer + eingebettete Glyphs/Sprite).
 #[derive(Clone, Debug, Serialize)]
 pub struct OfflineKatalogEintrag {
     pub name: String,
@@ -101,79 +101,28 @@ pub struct OfflineKatalogEintrag {
     pub kachel_schema: String,
     /// Provenienz-Hinweis fürs UI (Quelle ist ein Community-Repo, kein eigener Mirror).
     pub quelle: String,
-    /// Optionaler SHA256-Pin (hex, lowercase). Gesetzt beim Eigen-Mirror (LFH-183): der Download
-    /// verifiziert den berechneten gegen diesen Hash. `None` = kein Pin (v1 / N.O.M.A.D.).
+    /// Optionaler SHA256-Pin (hex, lowercase). Gesetzt beim Eigen-Mirror: der Download
+    /// verifiziert den berechneten gegen diesen Hash. `None` = kein Pin (vor erstem Release-Pin).
     pub sha256: Option<String>,
 }
 
 /// Kuratierter Offline-Karten-Katalog (`GET /api/karte/offline-karten/katalog`) — analog zum
-/// Online-Vorschlagskatalog `default_online_styles`. v1: direkt herunterladbare Protomaps-v4-
-/// PMTiles aus Project N.O.M.A.D. (DE-Bundesländer + AT + CH, ODbL, per GitHub-API verifiziert,
-/// Stand 2026-03-20). Bewusst Bundesland-granular: eine Behörde lädt nur ihr Land (ELW-tauglich
-/// klein). Größen sind gemessene Näherungen. Folge-Task: Eigen-Mirror/-Extract (Supply-Chain).
+/// Online-Vorschlagskatalog `default_online_styles`. Eigenbau (`karten-build`, Planetiler-
+/// Shortbread, z0–14, ODbL): ein gesamtdeutscher Shortbread-MBTiles-Eintrag, als GitHub-Release
+/// des eigenen Build-Projekts gehostet (LFH-195: Community-Katalog vorheriger Bauart entfällt).
 pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {
-    const BASIS: &str =
-        "https://github.com/whitespring/project-nomad-maps-europe/releases/download/v1";
-    const DATUM: &str = "20260320";
-    const ODBL: &str = "© OpenStreetMap contributors (ODbL)";
-    const QUELLE: &str = "Project N.O.M.A.D. (Community-Repo whitespring/project-nomad-maps-europe)";
-    let mb = |m: i64| m * 1024 * 1024;
-
-    // (Datei-Slug, Bundesland-Anzeigename, ~MB) — gemessene Näherungswerte.
-    let bundeslaender: [(&str, &str, i64); 16] = [
-        ("baden_wuerttemberg", "Baden-Württemberg", 900),
-        ("bayern", "Bayern", 1710),
-        ("berlin", "Berlin", 77),
-        ("brandenburg", "Brandenburg", 542),
-        ("bremen", "Bremen", 42),
-        ("hamburg", "Hamburg", 54),
-        ("hessen", "Hessen", 685),
-        ("mecklenburg_vorpommern", "Mecklenburg-Vorpommern", 260),
-        ("niedersachsen", "Niedersachsen", 1340),
-        ("nordrhein_westfalen", "Nordrhein-Westfalen", 1300),
-        ("rheinland_pfalz", "Rheinland-Pfalz", 628),
-        ("saarland", "Saarland", 78),
-        ("sachsen", "Sachsen", 493),
-        ("sachsen_anhalt", "Sachsen-Anhalt", 423),
-        ("schleswig_holstein", "Schleswig-Holstein", 344),
-        ("thueringen", "Thüringen", 392),
-    ];
-
-    let mut katalog: Vec<OfflineKatalogEintrag> = bundeslaender
-        .into_iter()
-        .map(|(slug, name, m)| OfflineKatalogEintrag {
-            name: format!("Deutschland – {name}"),
-            url: format!("{BASIS}/de_{slug}_{DATUM}.pmtiles"),
-            region: format!("DE/{name}"),
-            groesse: mb(m),
-            lizenz: ODBL.into(),
-            kachel_schema: "protomaps".into(),
-            quelle: QUELLE.into(),
-            sha256: None,
-        })
-        .collect();
-
-    katalog.push(OfflineKatalogEintrag {
-        name: "Österreich".into(),
-        url: format!("{BASIS}/austria_{DATUM}.pmtiles"),
-        region: "AT".into(),
-        groesse: mb(1910),
-        lizenz: ODBL.into(),
-        kachel_schema: "protomaps".into(),
-        quelle: QUELLE.into(),
-        sha256: None,
-    });
-    katalog.push(OfflineKatalogEintrag {
-        name: "Schweiz".into(),
-        url: format!("{BASIS}/switzerland_{DATUM}.pmtiles"),
-        region: "CH".into(),
-        groesse: mb(932),
-        lizenz: ODBL.into(),
-        kachel_schema: "protomaps".into(),
-        quelle: QUELLE.into(),
-        sha256: None,
-    });
-    katalog
+    // URL + SHA256 werden mit dem ersten karten-build-Release gesetzt (README karten-build);
+    // bis dahin ein klar erkennbarer, aber gültiger https-Platzhalter.
+    vec![OfflineKatalogEintrag {
+        name: "Deutschland (Shortbread)".into(),
+        url: "https://TODO-karten-build-release/germany.shortbread.mbtiles".into(),
+        region: "DE".into(),
+        groesse: 3 * 1024 * 1024 * 1024, // grobe Schätzung, nach erstem Build durch Messung ersetzen
+        lizenz: "© OpenStreetMap contributors (ODbL)".into(),
+        kachel_schema: "shortbread".into(),
+        quelle: "Eigenbau (karten-build, Planetiler-Shortbread)".into(),
+        sha256: None, // nach erstem Build gepinnt
+    }]
 }
 
 /// Lokales Daten-Verzeichnis für Offline-Karten, abgeleitet aus dem DB-Pfad
@@ -261,38 +210,32 @@ mod tests {
     }
 
     #[test]
-    fn offline_katalog_ist_kuratiert_und_konsistent() {
+    fn offline_katalog_ist_shortbread_de() {
         let katalog = default_offline_katalog();
-        assert_eq!(katalog.len(), 18, "16 Bundesländer + AT + CH");
+        assert!(!katalog.is_empty());
         for e in &katalog {
             assert!(e.url.starts_with("https://"), "nur https: {}", e.url);
-            assert!(e.url.ends_with(".pmtiles"), "PMTiles: {}", e.url);
-            assert_eq!(e.kachel_schema, "protomaps", "v1 nur Protomaps-Schema");
+            assert_eq!(e.kachel_schema, "shortbread", "nur Shortbread-Schema");
             assert!(!e.lizenz.is_empty(), "Attribution Pflicht: {}", e.name);
             assert!(e.groesse > 0, "Größe für Plattenplatz-Check: {}", e.name);
         }
-        assert!(
-            katalog.iter().any(|e| e.name.contains("Bremen")),
-            "Bundesland-granular (kleinste Datei vorhanden)"
-        );
-        assert!(katalog.iter().any(|e| e.region == "AT"));
-        assert!(katalog.iter().any(|e| e.region == "CH"));
+        assert!(katalog.iter().any(|e| e.region.starts_with("DE")));
     }
 
     #[test]
     fn katalog_eintrag_sha256_optional_und_serialisiert() {
-        // v1-Default: noch kein Pin (Hashes kommen mit dem Eigen-Mirror, LFH-183 Task 5).
+        // Default: noch kein Pin (Hash kommt mit dem ersten karten-build-Release).
         for e in default_offline_katalog() {
-            assert!(e.sha256.is_none(), "v1 pinnt noch nicht: {}", e.name);
+            assert!(e.sha256.is_none(), "noch kein Pin: {}", e.name);
         }
         // Mit gesetztem Pin landet der Hash im JSON (Frontend-Kontrakt).
         let mit_pin = OfflineKatalogEintrag {
             name: "x".into(),
-            url: "https://e/x.pmtiles".into(),
+            url: "https://e/x.mbtiles".into(),
             region: "DE".into(),
             groesse: 1,
             lizenz: "l".into(),
-            kachel_schema: "protomaps".into(),
+            kachel_schema: "shortbread".into(),
             quelle: "q".into(),
             sha256: Some("abc123".into()),
         };

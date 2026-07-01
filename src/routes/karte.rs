@@ -498,13 +498,13 @@ pub async fn offline_registrieren(
         .filter(|s| !s.is_empty())
         .ok_or_else(|| AppError::Validation("Lizenz/Attribution ist Pflicht (offline sichtbar)".into()))?
         .to_string();
-    // Kachel-Schema ist erweiterbar; ohne Angabe gilt der Protomaps-Default (Migration-Default).
+    // Kachel-Schema ist erweiterbar; ohne Angabe gilt der Shortbread-Default (Migration-Default).
     let kachel_schema = body
         .kachel_schema
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .unwrap_or("protomaps")
+        .unwrap_or("shortbread")
         .to_string();
     let eingabe = OfflineKarteEingabe {
         name: name.to_string(),
@@ -646,7 +646,7 @@ pub async fn offline_download(
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .unwrap_or("protomaps")
+        .unwrap_or("shortbread")
         .to_string();
 
     // Plattenplatz-Check vorab gegen die erwartete (Katalog-)Größe, mit 10 % Reserve.
@@ -945,7 +945,7 @@ mod finalisierung_tests {
             name: name.into(),
             quell_url: format!("https://example.test/{name}.pmtiles"),
             lizenz: "© OpenStreetMap contributors (ODbL)".into(),
-            kachel_schema: "protomaps".into(),
+            kachel_schema: "shortbread".into(),
             sortier: 0,
         }
     }
