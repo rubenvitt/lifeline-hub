@@ -66,41 +66,6 @@ export function offlineStyle(theme: KartenTheme, tilesUrl: string): StyleSpecifi
   } as StyleSpecification;
 }
 
-/**
- * Beschrifteter Protomaps-Style für ONLINE: dieselben Flächen/Linien-Layer wie offlineStyle,
- * aber Vektor-Quelle = proxied TileJSON (LFH-182, Key serverseitig) statt pmtiles://, PLUS
- * Orts-/Straßennamen-Labels mit öffentlichen Protomaps-Glyphs (key-frei).
- */
-export function protomapsLabeledStyle(theme: KartenTheme, tilejsonUrl: string): StyleSpecification {
-  const f = FARBEN[theme];
-  const absolut = new URL(tilejsonUrl, window.location.origin).href;
-  return {
-    version: 8,
-    glyphs: 'https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf',
-    sources: {
-      protomaps: { type: 'vector', url: absolut },
-    },
-    layers: [
-      { id: 'hintergrund', type: 'background', paint: { 'background-color': f.erde } },
-      { id: 'erde', source: 'protomaps', 'source-layer': 'earth', type: 'fill', paint: { 'fill-color': f.erde } },
-      { id: 'landuse', source: 'protomaps', 'source-layer': 'landuse', type: 'fill', paint: { 'fill-color': f.landuse } },
-      { id: 'wasser', source: 'protomaps', 'source-layer': 'water', type: 'fill', paint: { 'fill-color': f.wasser } },
-      { id: 'strassen', source: 'protomaps', 'source-layer': 'roads', type: 'line', paint: { 'line-color': f.strasse, 'line-width': 1.2 } },
-      { id: 'gebaeude', source: 'protomaps', 'source-layer': 'buildings', type: 'fill', paint: { 'fill-color': f.gebaeude } },
-      {
-        id: 'strassennamen', source: 'protomaps', 'source-layer': 'roads', type: 'symbol',
-        layout: { 'symbol-placement': 'line', 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Regular'], 'text-size': 11 },
-        paint: { 'text-color': f.label, 'text-halo-color': f.labelHalo, 'text-halo-width': 1.2 },
-      },
-      {
-        id: 'orte', source: 'protomaps', 'source-layer': 'places', type: 'symbol',
-        layout: { 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Regular'], 'text-size': 12 },
-        paint: { 'text-color': f.label, 'text-halo-color': f.labelHalo, 'text-halo-width': 1.2 },
-      },
-    ],
-  } as StyleSpecification;
-}
-
 /** Default-Modus nach Verfügbarkeit: online → offline → blind. */
 export function defaultModus(config: KarteServerConfig | undefined): BasemapModus {
   if (config && config.online_styles.length > 0) return 'online';
@@ -124,8 +89,8 @@ function rasterStyle(stil: OnlineStyle): StyleSpecification {
 /**
  * `transformRequest` für MapLibre: absolutiert **root-relative** URLs (`/api/karte/proxy/…`,
  * LFH-182) gegen die Origin. MapLibre lädt Tiles in einem Web-Worker ohne Dokument-Base-URL —
- * dort scheitern root-relative Tile-URLs mit „Failed to parse URL". Absolute URLs (Online direkt,
- * `pmtiles://…`) bleiben unangetastet; protokoll-relative `//host` werden bewusst ausgenommen.
+ * dort scheitern root-relative Tile-URLs mit „Failed to parse URL". Bereits absolute URLs
+ * (Online direkt) bleiben unangetastet; protokoll-relative `//host` werden bewusst ausgenommen.
  */
 export function absolutiereProxyAnfrage(url: string): { url: string } {
   // Bewusst String-Konkatenation statt new URL(): Letzteres würde `{z}`/`{x}`/`{y}` im Pfad
@@ -141,14 +106,14 @@ export function absolutiereProxyAnfrage(url: string): { url: string } {
 export function baueOnlineStyle(stil: OnlineStyle): StyleSpecification | string {
   if (stil.typ === 'raster') return rasterStyle(stil);
   // Vektor: Style-JSON-URL. Relative Proxy-URLs (/api/karte/proxy/{id}/style.json, LFH-182) gegen
-  // die Origin absolutieren (idempotent für absolute URLs) — analog zu offlineStyle für pmtiles,
-  // damit MapLibre die setStyle-URL zuverlässig auflöst.
+  // die Origin absolutieren (idempotent für bereits absolute URLs), damit MapLibre die
+  // setStyle-URL zuverlässig auflöst.
   return new URL(stil.url, window.location.origin).href;
 }
 
 /**
  * Wählt den Style passend zu Modus + Theme + Verfügbarkeit. Im Online-Modus wird der
- * übergebene View verwendet; fehlt er → Blind-Style. Offline → pmtiles-Style.
+ * übergebene View verwendet; fehlt er → Blind-Style. Offline → Shortbread-Style.
  */
 export function baueBasemapStyle(
   modus: BasemapModus,
@@ -156,10 +121,7 @@ export function baueBasemapStyle(
   config: KarteServerConfig | undefined,
   onlineStil: OnlineStyle | undefined,
 ): StyleSpecification | string {
-  if (modus === 'online' && onlineStil) {
-    if (onlineStil.typ === 'protomaps') return protomapsLabeledStyle(theme, onlineStil.url);
-    return baueOnlineStyle(onlineStil);
-  }
+  if (modus === 'online' && onlineStil) return baueOnlineStyle(onlineStil);
   if (modus === 'offline' && config?.offline_tiles_url) return offlineStyle(theme, config.offline_tiles_url);
   return blindStyle(theme);
 }

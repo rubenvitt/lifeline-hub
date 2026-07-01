@@ -52,7 +52,7 @@ export default function OfflineDownloadKatalogModal({
   return (
     <Modal open={offen} title="Aus Katalog herunterladen" footer={null} onCancel={onClose} destroyOnHidden>
       <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-        Lädt eine Offline-Karte (PMTiles) in der Prep-Phase herunter. Quelle: Community-Repo
+        Lädt eine Offline-Karte (MBTiles) in der Prep-Phase herunter. Quelle: Community-Repo
         (Project N.O.M.A.D.). Pflicht-Attribution wird offline angezeigt.
       </Typography.Paragraph>
       {katalogQuery.isLoading ? (

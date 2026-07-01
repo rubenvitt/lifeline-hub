@@ -5,7 +5,7 @@ import OfflineKartenVerwaltung from './OfflineKartenVerwaltung';
 
 /**
  * Admin-Sub-Seite `/admin/karten`: Verwaltung der Karten-Quellen — Online-Basemap-Quellen
- * (LFH-180) und Offline-Karten-Manager (LFH-181, In-App-Download von PMTiles). Schreiben nur
+ * (LFH-180) und Offline-Karten-Manager (LFH-181, In-App-Download von MBTiles). Schreiben nur
  * System-Admin — Führungskräfte sehen die Tabellen read-only (Hinweis-Banner).
  */
 export default function KartenVerwaltungPage() {
@@ -39,7 +39,7 @@ export default function KartenVerwaltungPage() {
         Offline-Karten
       </Typography.Title>
       <Typography.Paragraph type="secondary">
-        PMTiles für den netzlosen Betrieb. In der Prep-Phase (mit Netz) herunterladen; die aktive
+        MBTiles für den netzlosen Betrieb. In der Prep-Phase (mit Netz) herunterladen; die aktive
         Karte wird im Feld offline ausgeliefert. Pflicht-Attribution ist auf der Karte sichtbar.
       </Typography.Paragraph>
       <OfflineKartenVerwaltung />

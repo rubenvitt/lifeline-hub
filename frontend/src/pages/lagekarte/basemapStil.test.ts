@@ -7,7 +7,6 @@ import {
   blindStyle,
   defaultModus,
   offlineStyle,
-  protomapsLabeledStyle,
 } from './basemapStil';
 import type { KarteServerConfig, OnlineStyle } from '../../api/karte';
 
@@ -51,7 +50,6 @@ describe('basemapStil', () => {
     });
     expect(absolutiereProxyAnfrage('https://x/y')).toEqual({ url: 'https://x/y' });
     expect(absolutiereProxyAnfrage('//host/x')).toEqual({ url: '//host/x' });
-    expect(absolutiereProxyAnfrage('pmtiles://https://x/a')).toEqual({ url: 'pmtiles://https://x/a' });
   });
 
   it('baueOnlineStyle: relative Vektor-Proxy-URL wird gegen die Origin absolutiert (LFH-182)', () => {
@@ -113,30 +111,6 @@ describe('basemapStil', () => {
     expect(aktuelleAttribution('blind', rasterView, beides)).toBeNull();
   });
 
-  it('protomapsLabeledStyle: Label-Layer + glyphs + proxied Quelle', () => {
-    const s = protomapsLabeledStyle('light', '/api/karte/proxy/3/tilejson') as {
-      glyphs: string;
-      sources: Record<string, { url: string }>;
-      layers: Array<{ id: string; type: string; layout?: Record<string, unknown> }>;
-    };
-    expect(s.glyphs).toContain('protomaps.github.io');
-    expect(s.sources.protomaps.url).toBe(`${window.location.origin}/api/karte/proxy/3/tilejson`);
-    const ids = s.layers.map((l) => l.id);
-    expect(ids).toEqual(expect.arrayContaining(['orte', 'strassennamen', 'erde', 'wasser']));
-    // Jeder Symbol-Layer hat text-font (sonst rendert MapLibre keine Glyphs).
-    for (const l of s.layers.filter((l) => l.type === 'symbol')) {
-      expect(l.layout?.['text-font']).toBeTruthy();
-    }
-  });
-
-  it('baueBasemapStyle: protomaps-Quelle → Protomaps-Style (Objekt, nicht URL-String)', () => {
-    const s = baueBasemapStyle('online', 'light', undefined, {
-      name: 'Protomaps', url: '/api/karte/proxy/3/tilejson', typ: 'protomaps', attribution: '©',
-    });
-    expect(typeof s).toBe('object');
-    const style = s as { sources: Record<string, unknown> };
-    expect(style.sources.protomaps).toBeTruthy();
-  });
 });
 
 describe('offlineStyle (Shortbread)', () => {

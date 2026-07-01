@@ -13,8 +13,8 @@ interface FormWerte {
 
 /**
  * Schlanke Schnellerfassung für einen Offline-Download per eigener URL (CLAUDE.md-Leitlinie:
- * kurzes Formular ≤~3 Felder → Modal). Für selbst gebaute/gehostete PMTiles-Extrakte. `lizenz`
- * ist Pflicht (Server erzwingt es; offline sichtbar). v1: Protomaps-Schema fest.
+ * kurzes Formular ≤~3 Felder → Modal). Für selbst gebaute/gehostete MBTiles-Extrakte. `lizenz`
+ * ist Pflicht (Server erzwingt es; offline sichtbar). v1: Shortbread-Schema fest.
  */
 export default function OfflineDownloadUrlModal({
   offen,
@@ -37,7 +37,7 @@ export default function OfflineDownloadUrlModal({
         name: werte.name.trim(),
         url: werte.url.trim(),
         lizenz: werte.lizenz.trim(),
-        kachel_schema: 'protomaps',
+        kachel_schema: 'shortbread',
       }),
     onSuccess: () => {
       invalidiereKarte(qc);
@@ -61,9 +61,9 @@ export default function OfflineDownloadUrlModal({
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
-        title="PMTiles im Protomaps-Schema"
+        title="MBTiles im Shortbread-Schema"
         description={
-          'Die URL muss auf eine herunterladbare .pmtiles-Datei (Protomaps-Schema) zeigen — nur ' +
+          'Die URL muss auf eine herunterladbare .mbtiles-Datei (Shortbread-Schema) zeigen — nur ' +
           'https, keine internen Adressen. Wird in der Prep-Phase (mit Netz) geladen und im Feld ' +
           'offline ausgeliefert.'
         }
@@ -81,7 +81,7 @@ export default function OfflineDownloadUrlModal({
           name="url"
           rules={[{ required: true, whitespace: true, message: 'URL darf nicht leer sein' }]}
         >
-          <Input placeholder="https://…/de.pmtiles" />
+          <Input placeholder="https://…/de.mbtiles" />
         </Form.Item>
         <Form.Item
           label="Attribution / Lizenz"

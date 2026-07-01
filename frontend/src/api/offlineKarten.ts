@@ -80,7 +80,7 @@ export function loescheOfflineKarte(id: number): Promise<void> {
   return apiSend<void>(`/api/karte/offline-karten/${id}`, 'DELETE');
 }
 
-/** Server-autoritativer Download-Vorschlagskatalog (kuratierte PMTiles-Quellen). */
+/** Server-autoritativer Download-Vorschlagskatalog (kuratierte MBTiles-Quellen). */
 export function ladeOfflineKatalog(): Promise<OfflineKatalogEintrag[]> {
   return apiGet<OfflineKatalogEintrag[]>('/api/karte/offline-karten/katalog');
 }
