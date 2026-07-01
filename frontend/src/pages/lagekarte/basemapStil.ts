@@ -29,25 +29,39 @@ export function blindStyle(theme: KartenTheme): StyleSpecification {
 }
 
 /**
- * Offline-Vektor-Style über `pmtiles://`. Annahme: Protomaps-Schema-PMTiles
- * (Source-Layer earth/landuse/water/roads/buildings). BEWUSST ohne Text-Layer →
- * keine Glyphs nötig → voll offline. Theme-Farben kommen aus FARBEN.
+ * Offline-Vektor-Style über die selbst-servierten Shortbread-MBTiles-Kacheln (LFH-195).
+ * Glyphs/Sprite kommen lokal aus dem Binary → Beschriftung offline verfügbar. Theme-Farben aus FARBEN.
  */
-export function offlineStyle(theme: KartenTheme, pmtilesUrl: string): StyleSpecification {
+export function offlineStyle(theme: KartenTheme, tilesUrl: string): StyleSpecification {
   const f = FARBEN[theme];
-  const absolut = new URL(pmtilesUrl, window.location.origin).href;
+  // tilesUrl bleibt ROOT-RELATIV mit literalen {z}/{x}/{y}: NICHT via new URL() absolutieren —
+  // das würde die Platzhalter percent-kodieren (%7Bz%7D), MapLibre substituiert sie dann nie →
+  // 0 Tiles. (Siehe absolutiereProxyAnfrage-Kommentar + Memory [[maplibre-rootrelative-url-worker]].)
+  // Der global verdrahtete transformRequest (absolutiereProxyAnfrage, Kartenflaeche.tsx:202)
+  // absolutiert die substituierte Kachel-/Glyph-/Sprite-URL im Worker gegen die Origin.
   return {
     version: 8,
+    glyphs: '/api/karte/offline/fonts/{fontstack}/{range}.pbf',
+    sprite: '/api/karte/offline/sprites/basemap',
     sources: {
-      protomaps: { type: 'vector', url: `pmtiles://${absolut}` },
+      basemap: { type: 'vector', tiles: [tilesUrl], minzoom: 0, maxzoom: 14, attribution: '© OpenStreetMap contributors' },
     },
     layers: [
       { id: 'hintergrund', type: 'background', paint: { 'background-color': f.erde } },
-      { id: 'erde', source: 'protomaps', 'source-layer': 'earth', type: 'fill', paint: { 'fill-color': f.erde } },
-      { id: 'landuse', source: 'protomaps', 'source-layer': 'landuse', type: 'fill', paint: { 'fill-color': f.landuse } },
-      { id: 'wasser', source: 'protomaps', 'source-layer': 'water', type: 'fill', paint: { 'fill-color': f.wasser } },
-      { id: 'strassen', source: 'protomaps', 'source-layer': 'roads', type: 'line', paint: { 'line-color': f.strasse, 'line-width': 1.2 } },
-      { id: 'gebaeude', source: 'protomaps', 'source-layer': 'buildings', type: 'fill', paint: { 'fill-color': f.gebaeude } },
+      { id: 'landuse', source: 'basemap', 'source-layer': 'landuse', type: 'fill', paint: { 'fill-color': f.landuse } },
+      { id: 'wasser', source: 'basemap', 'source-layer': 'water_polygons', type: 'fill', paint: { 'fill-color': f.wasser } },
+      { id: 'gebaeude', source: 'basemap', 'source-layer': 'buildings', type: 'fill', paint: { 'fill-color': f.gebaeude } },
+      { id: 'strassen', source: 'basemap', 'source-layer': 'streets', type: 'line', paint: { 'line-color': f.strasse, 'line-width': 1.2 } },
+      {
+        id: 'strassennamen', source: 'basemap', 'source-layer': 'street_labels', type: 'symbol',
+        layout: { 'symbol-placement': 'line', 'text-field': ['coalesce', ['get', 'name_de'], ['get', 'name']], 'text-font': ['Noto Sans Regular'], 'text-size': 11 },
+        paint: { 'text-color': f.label, 'text-halo-color': f.labelHalo, 'text-halo-width': 1.2 },
+      },
+      {
+        id: 'orte', source: 'basemap', 'source-layer': 'place_labels', type: 'symbol',
+        layout: { 'text-field': ['coalesce', ['get', 'name_de'], ['get', 'name']], 'text-font': ['Noto Sans Regular'], 'text-size': 12 },
+        paint: { 'text-color': f.label, 'text-halo-color': f.labelHalo, 'text-halo-width': 1.2 },
+      },
     ],
   } as StyleSpecification;
 }
