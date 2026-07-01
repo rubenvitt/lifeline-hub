@@ -492,13 +492,18 @@ fn embedded_antwort(pfad: &str, content_type: &str) -> Response {
     }
 }
 
-/// GET /api/karte/offline/fonts/{fontstack}/{range}.pbf — eingebettete SDF-Glyphs (OFL).
-pub async fn offline_fonts(Path((fontstack, range)): Path<(String, String)>) -> Response {
-    // fontstack/range validieren (Wiederverwendung der Proxy-Validatoren gegen Path-Traversal).
-    if proxy::validiere_fontstack(&fontstack).is_err() || proxy::validiere_range(&range).is_err() {
+/// GET /api/karte/offline/fonts/{fontstack}/{datei} — eingebettete SDF-Glyphs (OFL).
+/// `{datei}` = `<range>.pbf` (z. B. `0-255.pbf`), so wie MapLibres glyphs-Template es anfragt.
+pub async fn offline_fonts(Path((fontstack, datei)): Path<(String, String)>) -> Response {
+    // `.pbf` abstreifen: validiere_range erwartet `<int>-<int>` OHNE Suffix (src/karte/proxy.rs).
+    let Some(range) = datei.strip_suffix(".pbf") else {
+        return StatusCode::BAD_REQUEST.into_response();
+    };
+    // Proxy-Validatoren gegen Path-Traversal wiederverwenden.
+    if proxy::validiere_fontstack(&fontstack).is_err() || proxy::validiere_range(range).is_err() {
         return StatusCode::BAD_REQUEST.into_response();
     }
-    embedded_antwort(&format!("fonts/{fontstack}/{range}"), "application/x-protobuf")
+    embedded_antwort(&format!("fonts/{fontstack}/{datei}"), "application/x-protobuf")
 }
 
 /// GET /api/karte/offline/sprites/{datei} — eingebettetes Sprite (png/json, +@2x).
@@ -511,12 +516,12 @@ pub async fn offline_sprite(Path(datei): Path<String>) -> Response {
     embedded_antwort(&format!("sprites/{datei}"), ct)
 }
 ```
-`range`-Format enthält kein `.pbf`-Suffix im Pfad — MapLibre fragt `…/{fontstack}/{range}.pbf`; die Route fängt `{range}` inkl. `.pbf`. Deshalb im Embed-Pfad das `.pbf` anhängen: `format!("fonts/{fontstack}/{range}")` mit `range` = z. B. `0-255.pbf`. Sicherstellen, dass die eingecheckten Dateien exakt `0-255.pbf` heißen. Modul deklarieren: `pub mod assets;` in `src/karte/mod.rs`.
+MapLibre fragt `…/{fontstack}/{range}.pbf`; die Route fängt `{datei}` inkl. `.pbf` (z. B. `0-255.pbf`), streift `.pbf` für `validiere_range` und liefert die eingebettete Datei `fonts/{fontstack}/{datei}`. Sicherstellen, dass die eingecheckten Dateien exakt `0-255.pbf` heißen (Task 1.2) und der Fontstack-Ordnername zum Style-`text-font` passt (`Noto Sans Regular`). Modul deklarieren: `pub mod assets;` in `src/karte/mod.rs`.
 
 Routen in `src/app.rs`:
 ```rust
 .route(
-    "/api/karte/offline/fonts/{fontstack}/{range}",
+    "/api/karte/offline/fonts/{fontstack}/{datei}",
     get(routes::karte::offline_fonts),
 )
 .route(
@@ -524,6 +529,22 @@ Routen in `src/app.rs`:
     get(routes::karte::offline_sprite),
 )
 ```
+
+- [ ] **Step 3b: Failing test — Fonts-Route validiert range/fontstack** (in `src/routes/karte.rs`, `#[cfg(test)]`)
+
+```rust
+#[tokio::test]
+async fn offline_fonts_lehnt_bad_range_ab() {
+    // Handler direkt aufrufen (kein Server nötig): Path ist ein Tuple-Wrapper.
+    let r = offline_fonts(axum::extract::Path(("Noto Sans Regular".into(), "boese.pbf".into()))).await;
+    assert_eq!(r.status(), StatusCode::BAD_REQUEST);
+    // Ohne .pbf-Suffix ebenfalls ablehnen.
+    let r2 = offline_fonts(axum::extract::Path(("Noto Sans Regular".into(), "0-255".into()))).await;
+    assert_eq!(r2.status(), StatusCode::BAD_REQUEST);
+}
+```
+
+Run: `cargo test -p lifeline-hub offline_fonts` → nach Task-Implementierung PASS (Bad-Range/kein-Suffix → 400).
 
 - [ ] **Step 4: Test grün**
 
@@ -694,13 +715,17 @@ Expected: FAIL.
  */
 export function offlineStyle(theme: KartenTheme, tilesUrl: string): StyleSpecification {
   const f = FARBEN[theme];
-  const absolut = new URL(tilesUrl, window.location.origin).href;
+  // tilesUrl bleibt ROOT-RELATIV mit literalen {z}/{x}/{y}: NICHT via new URL() absolutieren —
+  // das würde die Platzhalter percent-kodieren (%7Bz%7D), MapLibre substituiert sie dann nie →
+  // 0 Tiles. (Siehe absolutiereProxyAnfrage-Kommentar + Memory [[maplibre-rootrelative-url-worker]].)
+  // Der global verdrahtete transformRequest (absolutiereProxyAnfrage, Kartenflaeche.tsx:202)
+  // absolutiert die substituierte Kachel-/Glyph-/Sprite-URL im Worker gegen die Origin.
   return {
     version: 8,
     glyphs: '/api/karte/offline/fonts/{fontstack}/{range}.pbf',
     sprite: '/api/karte/offline/sprites/basemap',
     sources: {
-      basemap: { type: 'vector', tiles: [absolut], minzoom: 0, maxzoom: 14, attribution: '© OpenStreetMap contributors' },
+      basemap: { type: 'vector', tiles: [tilesUrl], minzoom: 0, maxzoom: 14, attribution: '© OpenStreetMap contributors' },
     },
     layers: [
       { id: 'hintergrund', type: 'background', paint: { 'background-color': f.erde } },
@@ -781,7 +806,7 @@ git commit -m "feat(lfh-195): Frontend Offline-Style Shortbread + lokale Labels;
 **Files:**
 - Create: `migrations/0079_karte_protomaps_ausbau.sql`
 
-- [ ] **Step 1: Migration schreiben** (Muster: 0078, no-tx, FK-sicher):
+- [ ] **Step 1: Migration schreiben** (Muster: 0078, no-tx, FK-sicher). **Zuerst höchste vorhandene Nummer prüfen** (`ls migrations/ | tail`) — bei paralleler main-Bewegung kann `0079` belegt sein → dann höher nummerieren (Memory [[migrations-nummernkollision-merge]]):
 
 ```sql
 -- no-transaction
