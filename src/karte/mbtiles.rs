@@ -1,6 +1,7 @@
 //! Liest Vektor-Kacheln aus einer MBTiles-Datei (= SQLite). MBTiles speichert `tile_row` in
 //! TMS-Orientierung; MapLibre fragt in XYZ → Y-Flip nötig. MVT-Kacheln sind gzip-komprimiert.
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
 /// Öffnet eine `.mbtiles`-Datei als read-only-Pool (immutable: keine Sperren, kein WAL-Write).
 pub async fn oeffne_readonly(pfad: &Path) -> Result<sqlx::SqlitePool, sqlx::Error> {
@@ -29,6 +30,27 @@ pub async fn lies_tile(
     .fetch_optional(pool)
     .await?;
     Ok(row.map(|(d,)| d))
+}
+
+/// Prozessweiter read-only-Pool der AKTIVEN Offline-MBTiles (genau eine aktive Basemap). Per Pfad
+/// gekeyt; bei Karten-Swap (anderer Pfad) wird neu geöffnet. tokio-RwLock, damit der Guard
+/// Send-sicher über das await beim Öffnen gehalten werden darf (std-RwLock → !Send, s. axum).
+static READER: LazyLock<tokio::sync::RwLock<Option<(PathBuf, sqlx::SqlitePool)>>> =
+    LazyLock::new(|| tokio::sync::RwLock::new(None));
+
+/// Liefert den (gecachten) read-only-Pool für `pfad`, öffnet bei Cache-Miss/Pfadwechsel neu.
+pub async fn reader_fuer(pfad: &Path) -> Result<sqlx::SqlitePool, sqlx::Error> {
+    {
+        let g = READER.read().await;
+        if let Some((p, pool)) = g.as_ref() {
+            if p == pfad {
+                return Ok(pool.clone());
+            }
+        }
+    } // read-Guard hier fallen lassen, DANN erst awaiten/öffnen
+    let neu = oeffne_readonly(pfad).await?;
+    *READER.write().await = Some((pfad.to_path_buf(), neu.clone()));
+    Ok(neu)
 }
 
 #[cfg(test)]

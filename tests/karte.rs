@@ -133,6 +133,108 @@ async fn tiles_route_404_ohne_konfigurierten_pfad() {
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
 }
 
+// ===== /api/karte/offline/tiles/{z}/{x}/{y} (MBTiles, LFH-195) =====
+
+/// Schreibt eine Mini-MBTiles-Fixture: `tiles`-Tabelle mit genau einer Kachel bei
+/// TMS (z=1, tile_column=0, tile_row=1) = XYZ (z=1, x=0, y=0). Eigener SCHREIBBARER Pool
+/// (die Datei existiert noch nicht) — der Produktionscode liest sie nur read-only.
+async fn schreibe_fixture_mbtiles(pfad: &std::path::Path, daten: &[u8]) {
+    use sqlx::sqlite::SqliteConnectOptions;
+    let opts = SqliteConnectOptions::new().filename(pfad).create_if_missing(true);
+    let pool = sqlx::sqlite::SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect_with(opts)
+        .await
+        .unwrap();
+    sqlx::query(
+        "CREATE TABLE tiles (zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER, tile_data BLOB)",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query("INSERT INTO tiles VALUES (1, 0, 1, ?1)")
+        .bind(daten)
+        .execute(&pool)
+        .await
+        .unwrap();
+    pool.close().await;
+}
+
+/// Registriert + aktiviert eine Offline-Karte mit `pfad` (relativ zum `karten_dir`), sodass
+/// `repo::aktive_offline_karte_pfad` sie liefert (Status wird von `registriere_offline_karte`
+/// bereits als `bereit` angelegt).
+async fn registriere_und_aktiviere(pool: &sqlx::SqlitePool, pfad: &str) -> i64 {
+    use lifeline_hub::karte::registry::repo;
+    let karte = repo::registriere_offline_karte(
+        pool,
+        &repo::OfflineKarteEingabe {
+            name: "Test-Shortbread".into(),
+            pfad: pfad.into(),
+            quell_url: None,
+            lizenz: Some("© Test".into()),
+            kachel_schema: "shortbread".into(),
+            sortier: 0,
+        },
+    )
+    .await
+    .unwrap();
+    repo::aktiviere_offline_karte(pool, karte.id).await.unwrap();
+    karte.id
+}
+
+#[tokio::test]
+async fn offline_tiles_liefert_gzip_mvt_mit_tms_flip() {
+    let pool = pool().await;
+    let dir = tempfile::tempdir().unwrap();
+    let dateiname = "karte-1.mbtiles";
+    schreibe_fixture_mbtiles(&dir.path().join(dateiname), &[0xAB, 0xCD]).await;
+    registriere_und_aktiviere(&pool, dateiname).await;
+
+    let app = build_router(AppState {
+        pool,
+        live: LiveHub::new(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_dir: dir.path().to_path_buf(),
+    });
+
+    // Vorhandene Kachel: XYZ (z=1,x=0,y=0) -> TMS row = (2^1-1)-0 = 1 -> Treffer.
+    let req = Request::builder()
+        .uri("/api/karte/offline/tiles/1/0/0")
+        .body(Body::empty())
+        .unwrap();
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(
+        res.headers().get(header::CONTENT_TYPE).unwrap(),
+        "application/x-protobuf"
+    );
+    assert_eq!(res.headers().get(header::CONTENT_ENCODING).unwrap(), "gzip");
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    assert_eq!(&bytes[..], &[0xAB, 0xCD]);
+
+    // Fehlende Kachel -> 204.
+    let req = Request::builder()
+        .uri("/api/karte/offline/tiles/1/1/1")
+        .body(Body::empty())
+        .unwrap();
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+}
+
+#[tokio::test]
+async fn offline_tiles_ohne_aktive_karte_liefert_204() {
+    let pool = pool().await; // leere offline-Tabelle
+    let app = app_mit_pool(pool);
+    let req = Request::builder()
+        .uri("/api/karte/offline/tiles/1/0/0")
+        .body(Body::empty())
+        .unwrap();
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+}
+
 #[tokio::test]
 async fn config_endpoint_meldet_verfuegbarkeit() {
     let pool = pool().await;

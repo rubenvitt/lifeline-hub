@@ -359,6 +359,12 @@ pub fn build_router(state: AppState) -> Router {
         // PMTiles-Tile-Service: unkonditional gemountet. Der Handler liest die aktive Karte
         // zur Laufzeit aus der DB und liefert sie per HTTP-Range aus (oder 404, wenn keine).
         .route("/api/karte/tiles.pmtiles", get(routes::karte::tiles))
+        // Offline-Tile-Endpoint (LFH-195, Shortbread/MBTiles): liest die aktive Karte per
+        // gecachtem read-only-Reader (mbtiles::reader_fuer) statt sie komplett auszuliefern.
+        .route(
+            "/api/karte/offline/tiles/{z}/{x}/{y}",
+            get(routes::karte::offline_tiles),
+        )
         // Style-/Tile-Proxy (LFH-182, öffentlich): verbirgt Upstream-Key/-URL für proxied Quellen.
         .route(
             "/api/karte/proxy/{id}/style.json",

@@ -124,6 +124,38 @@ pub async fn tiles(State(state): State<AppState>, req: Request<Body>) -> Result<
     Ok(antwort.map(Body::new).into_response())
 }
 
+/// GET /api/karte/offline/tiles/{z}/{x}/{y} — Vektor-Kachel der aktiven Offline-MBTiles.
+/// Öffnet die aktive Datei read-only (gecacht per Pfad in mbtiles::reader_fuer), Y-Flip + gzip in mbtiles.rs.
+pub async fn offline_tiles(
+    State(state): State<AppState>,
+    Path((z, x, y)): Path<(i64, i64, i64)>,
+) -> Result<Response, AppError> {
+    use crate::karte::mbtiles;
+    let Some(pfad_rel) = repo::aktive_offline_karte_pfad(&state.pool).await? else {
+        return Ok(StatusCode::NO_CONTENT.into_response());
+    };
+    // Pfad-Guard analog zum bisherigen tiles-Handler (relativ, kein Traversal).
+    let p = FsPath::new(&pfad_rel);
+    if p.is_absolute() || p.components().any(|c| matches!(c, Component::ParentDir)) {
+        return Ok(StatusCode::NO_CONTENT.into_response());
+    }
+    let voll = state.karten_dir.join(p);
+    let pool = mbtiles::reader_fuer(&voll)
+        .await
+        .map_err(|e| AppError::Internal(format!("MBTiles öffnen: {e}")))?;
+    match mbtiles::lies_tile(&pool, z, x, y).await {
+        Ok(Some(daten)) => Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/x-protobuf")
+            .header(header::CONTENT_ENCODING, "gzip")
+            .header(header::CACHE_CONTROL, "public, max-age=86400")
+            .body(Body::from(daten))
+            .unwrap()),
+        Ok(None) => Ok(StatusCode::NO_CONTENT.into_response()),
+        Err(e) => Err(AppError::Internal(format!("Tile lesen: {e}"))),
+    }
+}
+
 /// GET /api/karte/fachebenen/{quelle} — externe Lagedaten als GeoJSON-Umschlag.
 pub async fn fachebenen(
     State(state): State<AppState>,
