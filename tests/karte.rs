@@ -236,6 +236,34 @@ async fn offline_tiles_ohne_aktive_karte_liefert_204() {
 }
 
 #[tokio::test]
+async fn offline_tiles_ungueltiges_z_liefert_204_ohne_panic() {
+    // z=99 würde `lies_tile`s `1i64 << z`-TMS-Flip absurd überlaufen lassen (Debug-Panic /
+    // Release-Maskierung) — der Range-Guard muss VOR reader_fuer/lies_tile greifen. Mit einer
+    // registrierten + aktiven Karte, damit der Guard tatsächlich geprüft wird (nicht nur der
+    // frühere "keine aktive Karte"-204-Pfad).
+    let pool = pool().await;
+    let dir = tempfile::tempdir().unwrap();
+    let dateiname = "karte-1.mbtiles";
+    schreibe_fixture_mbtiles(&dir.path().join(dateiname), &[0xAB, 0xCD]).await;
+    registriere_und_aktiviere(&pool, dateiname).await;
+
+    let app = build_router(AppState {
+        pool,
+        live: LiveHub::new(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_dir: dir.path().to_path_buf(),
+    });
+    let req = Request::builder()
+        .uri("/api/karte/offline/tiles/99/0/0")
+        .body(Body::empty())
+        .unwrap();
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::NO_CONTENT);
+}
+
+#[tokio::test]
 async fn config_endpoint_meldet_verfuegbarkeit() {
     let pool = pool().await;
     sqlx::query(

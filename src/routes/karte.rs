@@ -134,6 +134,13 @@ pub async fn offline_tiles(
     Path((z, x, y)): Path<(i64, i64, i64)>,
 ) -> Result<Response, AppError> {
     use crate::karte::mbtiles;
+    // Range-Guard VOR jedem Datei-/DB-Zugriff: z/x/y kommen roh (netzwerk-kontrolliert) aus der
+    // URL. `lies_tile` shiftet `1i64 << z` für den TMS-Y-Flip — ein absurdes z (negativ oder
+    // > 24) würde im Debug-Build panicken bzw. im Release-Build maskiert überlaufen. Kein valider
+    // XYZ-Zoom liegt außerhalb von 0..=24.
+    if !(0..=24).contains(&z) || x < 0 || y < 0 {
+        return Ok(StatusCode::NO_CONTENT.into_response());
+    }
     let Some(pfad_rel) = repo::aktive_offline_karte_pfad(&state.pool).await? else {
         return Ok(StatusCode::NO_CONTENT.into_response());
     };
@@ -143,7 +150,18 @@ pub async fn offline_tiles(
         return Ok(StatusCode::NO_CONTENT.into_response());
     }
     let voll = state.karten_dir.join(p);
-    let pool = mbtiles::reader_fuer(&voll)
+    // Containment via canonicalize fängt zusätzlich Symlinks: der reale Zielpfad MUSS unter dem
+    // realen karten_dir liegen, sonst keine Auslieferung (Parität zum `tiles`-Handler,
+    // Defense-in-Depth gegen einen Symlink auf eine fremde SQLite-Datei → kein Blob-Leak).
+    let basis = state
+        .karten_dir
+        .canonicalize()
+        .map_err(|e| AppError::Internal(format!("karten_dir nicht auflösbar: {e}")))?;
+    let real = match voll.canonicalize() {
+        Ok(r) if r.starts_with(&basis) => r,
+        _ => return Ok(StatusCode::NO_CONTENT.into_response()),
+    };
+    let pool = mbtiles::reader_fuer(&real)
         .await
         .map_err(|e| AppError::Internal(format!("MBTiles öffnen: {e}")))?;
     match mbtiles::lies_tile(&pool, z, x, y).await {
