@@ -365,6 +365,15 @@ pub fn build_router(state: AppState) -> Router {
             "/api/karte/offline/tiles/{z}/{x}/{y}",
             get(routes::karte::offline_tiles),
         )
+        // Eingebettete Offline-Glyphs/Sprite (LFH-195, Task 2.4): rust-embed statt Proxy/Fetch.
+        .route(
+            "/api/karte/offline/fonts/{fontstack}/{datei}",
+            get(routes::karte::offline_fonts),
+        )
+        .route(
+            "/api/karte/offline/sprites/{datei}",
+            get(routes::karte::offline_sprite),
+        )
         // Style-/Tile-Proxy (LFH-182, öffentlich): verbirgt Upstream-Key/-URL für proxied Quellen.
         .route(
             "/api/karte/proxy/{id}/style.json",

@@ -156,6 +156,73 @@ pub async fn offline_tiles(
     }
 }
 
+/// Baut die Antwort für ein eingebettetes Offline-Asset (Glyphs/Sprite) oder `404`, wenn es
+/// unter `pfad` nicht in `KartenAssets` liegt.
+fn embedded_antwort(pfad: &str, content_type: &str) -> Response {
+    match crate::karte::assets::KartenAssets::get(pfad) {
+        Some(f) => Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, content_type)
+            .header(header::CACHE_CONTROL, "public, max-age=604800")
+            .body(Body::from(f.data.into_owned()))
+            .unwrap(),
+        None => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+/// GET /api/karte/offline/fonts/{fontstack}/{datei} — eingebettete SDF-Glyphs (OFL).
+/// `{datei}` = `<range>.pbf` (z. B. `0-255.pbf`), so wie MapLibres glyphs-Template es anfragt.
+pub async fn offline_fonts(Path((fontstack, datei)): Path<(String, String)>) -> Response {
+    // `.pbf` abstreifen: validiere_range erwartet `<int>-<int>` OHNE Suffix (src/karte/proxy.rs).
+    let Some(range) = datei.strip_suffix(".pbf") else {
+        return StatusCode::BAD_REQUEST.into_response();
+    };
+    // Proxy-Validatoren gegen Path-Traversal wiederverwenden.
+    if proxy::validiere_fontstack(&fontstack).is_err() || proxy::validiere_range(range).is_err() {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    embedded_antwort(&format!("fonts/{fontstack}/{datei}"), "application/x-protobuf")
+}
+
+/// GET /api/karte/offline/sprites/{datei} — eingebettetes Sprite (png/json, +@2x).
+pub async fn offline_sprite(Path(datei): Path<String>) -> Response {
+    // Nur bekannte Basisnamen zulassen (kein Traversal).
+    let ct = if datei.ends_with(".png") {
+        "image/png"
+    } else if datei.ends_with(".json") {
+        "application/json"
+    } else {
+        return StatusCode::BAD_REQUEST.into_response();
+    };
+    if datei.contains('/') || datei.contains("..") {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    embedded_antwort(&format!("sprites/{datei}"), ct)
+}
+
+#[cfg(test)]
+mod offline_assets_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn offline_fonts_lehnt_bad_range_ab() {
+        // Handler direkt aufrufen (kein Server nötig): Path ist ein Tuple-Wrapper.
+        let r = offline_fonts(axum::extract::Path((
+            "Noto Sans Regular".into(),
+            "boese.pbf".into(),
+        )))
+        .await;
+        assert_eq!(r.status(), StatusCode::BAD_REQUEST);
+        // Ohne .pbf-Suffix ebenfalls ablehnen.
+        let r2 = offline_fonts(axum::extract::Path((
+            "Noto Sans Regular".into(),
+            "0-255".into(),
+        )))
+        .await;
+        assert_eq!(r2.status(), StatusCode::BAD_REQUEST);
+    }
+}
+
 /// GET /api/karte/fachebenen/{quelle} — externe Lagedaten als GeoJSON-Umschlag.
 pub async fn fachebenen(
     State(state): State<AppState>,
