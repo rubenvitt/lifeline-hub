@@ -75,7 +75,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     match lifeline_hub::karte::registry::repo::reset_haengende_downloads(&pool).await {
         Ok(ids) => {
             for id in ids {
-                let _ = std::fs::remove_file(karten_dir.join(format!("karte-{id}.pmtiles.part")));
+                let _ = std::fs::remove_file(karten_dir.join(format!("karte-{id}.mbtiles.part")));
             }
         }
         Err(e) => tracing::warn!("Crash-Recovery der Offline-Downloads fehlgeschlagen: {e}"),

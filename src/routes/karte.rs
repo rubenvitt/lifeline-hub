@@ -26,19 +26,19 @@ use tower::ServiceExt; // oneshot
 use tower_http::services::ServeFile;
 
 /// Antwort von `GET /api/karte/config`. Liefert NUR, was die Karte zur Laufzeit braucht —
-/// NICHT den Server-Dateipfad der PMTiles-Datei. Shape ist eingefroren (Frontend-Vertrag,
+/// NICHT den Server-Dateipfad der Offline-Kartendatei. Shape ist eingefroren (Frontend-Vertrag,
 /// `frontend/src/api/karte.ts`); nur die Datenquelle wechselte von ENV/Extension auf die DB.
 #[derive(Debug, Serialize)]
 pub struct KarteConfigAntwort {
     pub online_styles: Vec<OnlineStyle>,
-    pub pmtiles_verfuegbar: bool,
-    /// Relative URL des Tile-Endpoints, wenn eine aktive Offline-Karte ausliefer-bereit ist.
-    /// Trägt `?v=<token>` (Cache-Bust): wechselt bei Karten-Swap, sonst cacht die pmtiles-Lib
-    /// den alten Archiv-Aufbau unter gleicher URL → korrupte Tiles.
-    pub pmtiles_url: Option<String>,
+    pub offline_verfuegbar: bool,
+    /// Tile-Endpoint-Template der aktiven Offline-Karte inkl. Cache-Bust `?v=<token>`.
+    /// Der Token wechselt bei Karten-Swap, sonst cacht MapLibre den alten Tile-Aufbau unter
+    /// gleicher URL → korrupte Tiles.
+    pub offline_tiles_url: Option<String>,
     /// Pflicht-Attribution der aktiven Offline-Karte (offline sichtbar, z.B. ODbL). `None`,
     /// wenn keine aktive Karte oder keine Lizenz hinterlegt ist.
-    pub pmtiles_attribution: Option<String>,
+    pub offline_attribution: Option<String>,
 }
 
 /// GET /api/karte/config — Basemap-Verfügbarkeit fürs Frontend, frisch aus der DB-Registry.
@@ -71,19 +71,22 @@ pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAnt
         })
         .collect();
     let aktiv = repo::aktive_offline_karte(&state.pool).await?;
-    let (pmtiles_url, pmtiles_attribution) = match &aktiv {
+    let (offline_tiles_url, offline_attribution) = match &aktiv {
         Some(k) => {
             // Cache-Bust-Token URL-safe halten (geaendert_at enthält Leerzeichen/Doppelpunkte).
             let v: String = k.version.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
-            (Some(format!("/api/karte/tiles.pmtiles?v={v}")), k.lizenz.clone())
+            (
+                Some(format!("/api/karte/offline/tiles/{{z}}/{{x}}/{{y}}?v={v}")),
+                k.lizenz.clone(),
+            )
         }
         None => (None, None),
     };
     Ok(Json(KarteConfigAntwort {
         online_styles,
-        pmtiles_verfuegbar: aktiv.is_some(),
-        pmtiles_url,
-        pmtiles_attribution,
+        offline_verfuegbar: aktiv.is_some(),
+        offline_tiles_url,
+        offline_attribution,
     }))
 }
 
@@ -513,7 +516,7 @@ pub async fn offline_registrieren(
         ));
     }
     // Attribution ist Pflicht — Parität zu offline_download/validiere_online. Die Offline-Basemap
-    // rendert sie quellen-unabhängig (config.pmtiles_attribution); ohne Lizenz würde eine
+    // rendert sie quellen-unabhängig (config.offline_attribution); ohne Lizenz würde eine
     // aktivierte registrierte Karte offline ohne Pflicht-Attribution gezeigt (Lizenzverstoß).
     let lizenz = body
         .lizenz
@@ -556,7 +559,7 @@ pub async fn offline_aktivieren(
 
 /// DELETE /api/karte/offline-karten/{id} — Offline-Karte löschen (Admin).
 ///
-/// Entfernt zusätzlich die vom Download-Manager VERWALTETE Datei (`karte-{id}.pmtiles` + evtl.
+/// Entfernt zusätzlich die vom Download-Manager VERWALTETE Datei (`karte-{id}.mbtiles` + evtl.
 /// `.part`), sonst leckt jeder Download→Löschen-Zyklus mehrere GB. Extern registrierte Karten
 /// (beliebiger admin-gelieferter Pfad) werden bewusst NICHT von der Platte gelöscht.
 pub async fn offline_loeschen(
@@ -573,7 +576,7 @@ pub async fn offline_loeschen(
         // Gemanagt = von uns heruntergeladen: download_at gesetzt, Pfad-Platzhalter (Download lief
         // bzw. scheiterte vor markiere_bereit) oder der abgeleitete Download-Dateiname.
         let ist_gemanagt =
-            k.download_at.is_some() || k.pfad.is_empty() || k.pfad == format!("karte-{id}.pmtiles");
+            k.download_at.is_some() || k.pfad.is_empty() || k.pfad == format!("karte-{id}.mbtiles");
         if ist_gemanagt {
             download::entferne_download_dateien(&state.karten_dir, id).await;
         }
@@ -714,7 +717,7 @@ pub async fn offline_download(
     let sha256_erwartet = body.sha256_erwartet.clone();
     let ersetzt_karte_id = body.ersetzt_karte_id;
     tokio::spawn(async move {
-        let dateiname = format!("karte-{id}.pmtiles");
+        let dateiname = format!("karte-{id}.mbtiles");
         let part = karten_dir.join(format!("{dateiname}.part"));
         tracing::info!("Offline-Karte {id}: Download startet von {url}");
         let ergebnis =
@@ -990,7 +993,7 @@ mod finalisierung_tests {
 
     async fn bereite_karte(pool: &sqlx::SqlitePool, name: &str) -> i64 {
         let k = repo::neue_download_karte(pool, &dl(name)).await.unwrap();
-        repo::markiere_bereit(pool, k.id, &format!("karte-{}.pmtiles", k.id), 10, "h")
+        repo::markiere_bereit(pool, k.id, &format!("karte-{}.mbtiles", k.id), 10, "h")
             .await
             .unwrap();
         k.id

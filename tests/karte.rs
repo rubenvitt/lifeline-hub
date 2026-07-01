@@ -261,14 +261,14 @@ async fn config_endpoint_meldet_verfuegbarkeit() {
     let res = app.oneshot(req).await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);
     let v = json(res).await;
-    assert_eq!(v["pmtiles_verfuegbar"].as_bool(), Some(true));
-    // pmtiles_url trägt jetzt einen Cache-Bust-Token (?v=<sha256|geaendert_at>), damit die
-    // pmtiles-Lib bei Karten-Wechsel nicht den alten Archiv-Aufbau unter gleicher URL cacht
+    assert_eq!(v["offline_verfuegbar"].as_bool(), Some(true));
+    // offline_tiles_url trägt jetzt einen Cache-Bust-Token (?v=<sha256|geaendert_at>), damit
+    // MapLibre bei Karten-Wechsel nicht den alten Tile-Aufbau unter gleicher URL cacht
     // (LFH-181). Token ist dynamisch → Präfix prüfen.
-    let pmtiles_url = v["pmtiles_url"].as_str().unwrap();
+    let offline_tiles_url = v["offline_tiles_url"].as_str().unwrap();
     assert!(
-        pmtiles_url.starts_with("/api/karte/tiles.pmtiles?v="),
-        "pmtiles_url mit Cache-Bust-Token erwartet, war: {pmtiles_url}"
+        offline_tiles_url.starts_with("/api/karte/offline/tiles/{z}/{x}/{y}?v="),
+        "offline_tiles_url mit Cache-Bust-Token erwartet, war: {offline_tiles_url}"
     );
     assert_eq!(v["online_styles"][0]["url"].as_str(), Some("https://tiles.example/style.json"));
     assert_eq!(v["online_styles"][0]["typ"].as_str(), Some("vektor"));
@@ -282,8 +282,8 @@ async fn config_endpoint_blind_modus_ohne_konfiguration() {
     let res = app.oneshot(req).await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);
     let v = json(res).await;
-    assert_eq!(v["pmtiles_verfuegbar"].as_bool(), Some(false));
-    assert!(v["pmtiles_url"].is_null());
+    assert_eq!(v["offline_verfuegbar"].as_bool(), Some(false));
+    assert!(v["offline_tiles_url"].is_null());
     assert!(v["online_styles"].as_array().unwrap().is_empty());
 }
 
