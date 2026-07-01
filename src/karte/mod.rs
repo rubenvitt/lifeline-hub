@@ -4,6 +4,7 @@
 
 pub mod cache;
 pub mod download;
+pub mod mbtiles;
 pub mod normalisierung;
 pub mod proxy;
 pub mod quellen;
