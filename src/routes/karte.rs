@@ -14,7 +14,7 @@ use crate::karte::registry::repo::{
 };
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
-use axum::http::{header, Request, StatusCode};
+use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::{Deserialize, Serialize};
@@ -22,8 +22,6 @@ use std::collections::HashMap;
 use std::path::{Component, Path as FsPath};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use tower::ServiceExt; // oneshot
-use tower_http::services::ServeFile;
 
 /// Antwort von `GET /api/karte/config`. Liefert NUR, was die Karte zur Laufzeit braucht —
 /// NICHT den Server-Dateipfad der Offline-Kartendatei. Shape ist eingefroren (Frontend-Vertrag,
@@ -52,12 +50,9 @@ pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAnt
         .map(|q| {
             let typ = match q.typ.as_str() {
                 "raster" => OnlineStyleTyp::Raster,
-                "protomaps" => OnlineStyleTyp::Protomaps,
                 _ => OnlineStyleTyp::Vektor,
             };
-            // protomaps trägt den Key in der Upstream-URL → IMMER proxied ausliefern (nie roh),
-            // auch als Defense-in-Depth falls proxy versehentlich false wäre.
-            let url = if q.proxy || matches!(typ, OnlineStyleTyp::Protomaps) {
+            let url = if q.proxy {
                 proxy::proxy_config_url(q.id, &typ)
             } else {
                 q.url
@@ -88,43 +83,6 @@ pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAnt
         offline_tiles_url,
         offline_attribution,
     }))
-}
-
-/// GET /api/karte/tiles.pmtiles — liefert die aktive Offline-Karte per HTTP-Range aus.
-///
-/// Der Pfad kommt zur Laufzeit aus der DB (nicht mehr zur Router-Bauzeit). Die Byte-/Range-/206-
-/// Mechanik bleibt vollständig bei `tower_http::ServeFile` (per-Request `oneshot`) — derselbe
-/// Service wie zuvor, nur mit dynamisch aufgelöstem Pfad. `Request` ist der letzte, body-
-/// konsumierende Extractor; `State` davor ist zulässig.
-pub async fn tiles(State(state): State<AppState>, req: Request<Body>) -> Result<Response, AppError> {
-    let Some(pfad) = repo::aktive_offline_karte_pfad(&state.pool).await? else {
-        return Ok(StatusCode::NOT_FOUND.into_response());
-    };
-
-    // Nur relative Pfade im verwalteten karten_dir ausliefern. Absolute Pfade und ..-Traversal →
-    // 404 (kein Info-Leak am unauthentifizierten Endpunkt). Böse Pfade werden zwar schon bei der
-    // Registrierung abgelehnt; dieser Guard ist Defense-in-Depth gegen Alt-/Fremddaten in der DB.
-    let p = FsPath::new(&pfad);
-    if p.is_absolute() || p.components().any(|c| matches!(c, Component::ParentDir)) {
-        return Ok(StatusCode::NOT_FOUND.into_response());
-    }
-    let voll = state.karten_dir.join(p);
-    // Containment via canonicalize fängt zusätzlich Symlinks: der reale Zielpfad MUSS unter dem
-    // realen karten_dir liegen, sonst keine Auslieferung (z.B. ein Symlink aus dem Verzeichnis heraus).
-    let basis = state
-        .karten_dir
-        .canonicalize()
-        .map_err(|e| AppError::Internal(format!("karten_dir nicht auflösbar: {e}")))?;
-    let real = match voll.canonicalize() {
-        Ok(r) if r.starts_with(&basis) => r,
-        _ => return Ok(StatusCode::NOT_FOUND.into_response()),
-    };
-
-    let antwort = ServeFile::new(real)
-        .oneshot(req)
-        .await
-        .map_err(|e| AppError::Internal(format!("Tile-Auslieferung fehlgeschlagen: {e}")))?;
-    Ok(antwort.map(Body::new).into_response())
 }
 
 /// GET /api/karte/offline/tiles/{z}/{x}/{y} — Vektor-Kachel der aktiven Offline-MBTiles.
@@ -307,9 +265,7 @@ pub struct OfflineKarteBody {
 }
 
 /// Validiert + normalisiert einen Online-Quelle-Body (Anlegen wie Vollersatz-PATCH teilen das).
-/// Name/URL nicht leer (getrimmt), `typ ∈ {vektor,raster,protomaps}`, **Attribution Pflicht** (Lizenzauflage).
-/// `protomaps` trägt den Key in der Upstream-URL → `proxy` wird serverseitig auf `true` erzwungen
-/// (nie roh ausliefern), unabhängig davon, was der Client sendet.
+/// Name/URL nicht leer (getrimmt), `typ ∈ {vektor,raster}`, **Attribution Pflicht** (Lizenzauflage).
 fn validiere_online(body: OnlineQuelleBody) -> Result<OnlineQuelleEingabe, AppError> {
     let name = body.name.trim();
     if name.is_empty() {
@@ -319,9 +275,9 @@ fn validiere_online(body: OnlineQuelleBody) -> Result<OnlineQuelleEingabe, AppEr
     if url.is_empty() {
         return Err(AppError::Validation("URL darf nicht leer sein".into()));
     }
-    if body.typ != "vektor" && body.typ != "raster" && body.typ != "protomaps" {
+    if body.typ != "vektor" && body.typ != "raster" {
         return Err(AppError::Validation(
-            "Typ muss 'vektor', 'raster' oder 'protomaps' sein".into(),
+            "Typ muss 'vektor' oder 'raster' sein".into(),
         ));
     }
     let attribution = body
@@ -333,8 +289,7 @@ fn validiere_online(body: OnlineQuelleBody) -> Result<OnlineQuelleEingabe, AppEr
             AppError::Validation("Attribution ist Pflicht (Lizenzauflage)".into())
         })?
         .to_string();
-    // protomaps trägt den Key in der URL → Proxy ist Pflicht (nie roh ausliefern).
-    let proxy_effektiv = body.proxy || body.typ == "protomaps";
+    let proxy_effektiv = body.proxy;
     // Proxied Quellen (key-basiert): URL roh speichern (kein Url-Roundtrip — würde `{}`
     // percent-kodieren), aber vorab validieren: nur unterstützte Platzhalter, und SSRF-Check auf
     // einer materialisierten Probe (Platzhalter durch 0/Dummy ersetzt). Direkte Quellen (proxy=0)
@@ -918,20 +873,6 @@ pub async fn proxy_tilejson(
     aktive_proxy_quelle(&state, id).await?;
     let upstream = slot_oder_nf(&state, id, slot, proxy::SlotArt::Tilejson).await?;
     let u = ssrf_geprueft(&upstream)?;
-    let json = proxy::hole_tilejson(proxy::proxy_client(), &state.pool, id, u)
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?;
-    Ok(json_proxy_antwort(json))
-}
-
-/// GET /api/karte/proxy/{id}/tilejson — registrierte TileJSON-Quelle (z. B. Protomaps) holen +
-/// key-frei umschreiben. SLOT-LOS: die Quelle-`url` IST die TileJSON (analog `proxy_style`).
-pub async fn proxy_tilejson_entry(
-    State(state): State<AppState>,
-    Path(id): Path<i64>,
-) -> Result<Response, AppError> {
-    let q = aktive_proxy_quelle(&state, id).await?;
-    let u = ssrf_geprueft(&q.url)?;
     let json = proxy::hole_tilejson(proxy::proxy_client(), &state.pool, id, u)
         .await
         .map_err(|e| AppError::Internal(e.to_string()))?;

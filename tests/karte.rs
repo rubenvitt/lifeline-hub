@@ -88,50 +88,7 @@ async fn json(res: Response) -> serde_json::Value {
     serde_json::from_slice(&bytes).unwrap()
 }
 
-// ===== /api/karte/tiles.pmtiles + /api/karte/config (eingefrorener Frontend-Vertrag) =====
-
-#[tokio::test]
-async fn tiles_route_liefert_range_aus() {
-    let pool = pool().await;
-    // Karte liegt im verwalteten karten_dir; in der DB steht der RELATIVE Dateiname.
-    let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("de.pmtiles"), b"PMTILESDATA0123456789").unwrap();
-    sqlx::query(
-        "INSERT INTO karte_offline_karte (name, pfad, status, aktiv_basemap) \
-         VALUES ('DE', 'de.pmtiles', 'bereit', 1)",
-    )
-    .execute(&pool)
-    .await
-    .unwrap();
-
-    let app = build_router(AppState {
-        pool,
-        live: LiveHub::new(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(), download_client: lifeline_hub::karte::download::download_client(), download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_dir: dir.path().to_path_buf(),
-    });
-    let req = Request::builder()
-        .uri("/api/karte/tiles.pmtiles")
-        .header("Range", "bytes=0-7")
-        .body(Body::empty())
-        .unwrap();
-    let res = app.oneshot(req).await.unwrap();
-    assert_eq!(res.status(), StatusCode::PARTIAL_CONTENT); // 206
-    let bytes = axum::body::to_bytes(res.into_body(), 1024).await.unwrap();
-    assert_eq!(&bytes[..], b"PMTILESD");
-}
-
-#[tokio::test]
-async fn tiles_route_404_ohne_konfigurierten_pfad() {
-    let pool = pool().await; // leere offline-Tabelle
-    let app = app_mit_pool(pool);
-    let req = Request::builder()
-        .uri("/api/karte/tiles.pmtiles")
-        .body(Body::empty())
-        .unwrap();
-    let res = app.oneshot(req).await.unwrap();
-    assert_eq!(res.status(), StatusCode::NOT_FOUND);
-}
+// ===== /api/karte/offline/tiles/{z}/{x}/{y} + /api/karte/config (eingefrorener Frontend-Vertrag) =====
 
 // ===== /api/karte/offline/tiles/{z}/{x}/{y} (MBTiles, LFH-195) =====
 
@@ -335,9 +292,10 @@ async fn offline_registrieren_lehnt_absolute_und_traversal_pfade_ab() {
 }
 
 #[tokio::test]
-async fn tiles_route_lehnt_absoluten_pfad_in_db_ab() {
+async fn offline_tiles_lehnt_absoluten_pfad_in_db_ab() {
     // Defense-in-Depth: selbst wenn ein absoluter Pfad direkt in der DB landet (Umgehung der
-    // Handler-Validierung), liefert tiles() ihn NICHT über den unauthentifizierten Endpunkt aus.
+    // Handler-Validierung), liefert offline_tiles() ihn NICHT über den unauthentifizierten
+    // Endpunkt aus (kein Info-Leak/Blob-Zugriff auf beliebige Server-Dateien).
     let pool = pool().await;
     let mut datei = tempfile::NamedTempFile::new().unwrap();
     datei.write_all(b"GEHEIM").unwrap();
@@ -352,10 +310,10 @@ async fn tiles_route_lehnt_absoluten_pfad_in_db_ab() {
     .await
     .unwrap();
     let app = app_mit_pool(pool);
-    let res = anfrage(&app, "GET", "/api/karte/tiles.pmtiles", None, None).await;
+    let res = anfrage(&app, "GET", "/api/karte/offline/tiles/1/0/0", None, None).await;
     assert_eq!(
         res.status(),
-        StatusCode::NOT_FOUND,
+        StatusCode::NO_CONTENT,
         "absoluter Pfad wird nicht ausgeliefert"
     );
     drop(datei);
@@ -1072,50 +1030,3 @@ async fn proxy_tile_slot_auf_interne_adresse_ist_fehler_ssrf() {
     assert!(res.status().is_server_error(), "SSRF-Gate blockt internen Slot: {}", res.status());
 }
 
-// ===== Protomaps-Quelle (LFH-192): proxy-Zwang + slot-loser TileJSON-Entry-Endpunkt =====
-
-/// Beweist (a) Proxy-Zwang: Quelle mit typ=protomaps, proxy=false wird mit proxy=true gespeichert.
-/// Beweist (b) Route-Registrierung: GET /api/karte/proxy/{id}/tilejson trifft den Handler (404
-/// JSON, nicht HTML-Fallback). Die Schlüssel-Entfernung + Tile-URL-Rewrite beweist
-/// cargo test --lib karte::proxy (hole_tilejson_keyfrei_und_tms_normalisiert) — Happy-Paths via
-/// Service-Loopback-Tests (vgl. Datei-Konvention, Zeile ~816).
-#[tokio::test]
-async fn protomaps_quelle_erzwingt_proxy_und_tilejson_entry_ist_registriert() {
-    let (app, cookie) = admin_app().await;
-
-    // Part (a): typ=protomaps + proxy=false → serverseitig auf proxy=true hochgestuft.
-    // Nicht-auflösbarer Host (https://x/...) besteht den SSRF-Check (kein http, keine interne IP)
-    // und schlägt beim Connect deterministisch fehl — kein echter Netzwerkaufruf im Test.
-    let res = anfrage(
-        &app,
-        "POST",
-        "/api/karte/online-quellen",
-        Some(&cookie),
-        Some(r#"{"name":"Protomaps","url":"https://x/tiles/v4.json?key=GEHEIM","typ":"protomaps","attribution":"© Protomaps, © OSM","sortier":0}"#),
-    )
-    .await;
-    assert_eq!(res.status(), StatusCode::CREATED, "protomaps-Quelle angelegt");
-    let q = json(res).await;
-    assert_eq!(q["proxy"], true, "protomaps erzwingt proxy (war false implizit)");
-    let id = q["id"].as_i64().unwrap();
-
-    // Part (b): Slot-loser Entry-Endpunkt ist registriert — unbekannte ID → 404 JSON (nicht
-    // 404/405 via SPA-Fallback-HTML). Prove route existiert.
-    let res_unbekannt = anfrage(&app, "GET", "/api/karte/proxy/999/tilejson", None, None).await;
-    assert_eq!(res_unbekannt.status(), StatusCode::NOT_FOUND, "unbekannte ID: 404");
-    assert_eq!(
-        res_unbekannt.headers().get(header::CONTENT_TYPE).unwrap(),
-        "application/json",
-        "404 als JSON (Handler, nicht SPA-HTML)"
-    );
-
-    // Bekannte ID: SSRF-Gate passiert (externer Host), Upstream-Connect schlägt fehl
-    // (nicht-auflösbarer Host) → 5xx. Beweist, dass der Handler aufgerufen und die Quelle
-    // gefunden wurde; offline+deterministisch (kein echter Netzwerkaufruf).
-    let res_bekannt = anfrage(&app, "GET", &format!("/api/karte/proxy/{id}/tilejson"), None, None).await;
-    assert!(
-        res_bekannt.status().is_server_error(),
-        "bekannte ID: Handler aufgerufen, Upstream nicht erreichbar → 5xx (war: {})",
-        res_bekannt.status()
-    );
-}

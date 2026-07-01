@@ -244,7 +244,7 @@ async fn hole_offline_karte(pool: &SqlitePool, id: i64) -> Result<OfflineKarte, 
     .await
 }
 
-/// Pfad der aktiven, ausliefer-bereiten Offline-Karte (für `GET /api/karte/tiles.pmtiles`).
+/// Pfad der aktiven, ausliefer-bereiten Offline-Karte (für `GET /api/karte/offline/tiles/{z}/{x}/{y}`).
 pub async fn aktive_offline_karte_pfad(pool: &SqlitePool) -> Result<Option<String>, sqlx::Error> {
     sqlx::query_scalar::<_, String>(
         "SELECT pfad FROM karte_offline_karte \

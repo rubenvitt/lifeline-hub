@@ -356,9 +356,6 @@ pub fn build_router(state: AppState) -> Router {
             "/api/karte/fachebenen/{quelle}",
             get(routes::karte::fachebenen),
         )
-        // PMTiles-Tile-Service: unkonditional gemountet. Der Handler liest die aktive Karte
-        // zur Laufzeit aus der DB und liefert sie per HTTP-Range aus (oder 404, wenn keine).
-        .route("/api/karte/tiles.pmtiles", get(routes::karte::tiles))
         // Offline-Tile-Endpoint (LFH-195, Shortbread/MBTiles): liest die aktive Karte per
         // gecachtem read-only-Reader (mbtiles::reader_fuer) statt sie komplett auszuliefern.
         .route(
@@ -390,10 +387,6 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/api/karte/proxy/{id}/tilejson/{slot}",
             get(routes::karte::proxy_tilejson),
-        )
-        .route(
-            "/api/karte/proxy/{id}/tilejson",
-            get(routes::karte::proxy_tilejson_entry),
         )
         .route(
             "/api/karte/proxy/{id}/sprite/{rest}",
