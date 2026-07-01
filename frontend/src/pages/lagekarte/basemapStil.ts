@@ -90,7 +90,7 @@ export function protomapsLabeledStyle(theme: KartenTheme, tilejsonUrl: string): 
 /** Default-Modus nach Verfügbarkeit: online → offline → blind. */
 export function defaultModus(config: KarteServerConfig | undefined): BasemapModus {
   if (config && config.online_styles.length > 0) return 'online';
-  if (config?.pmtiles_verfuegbar) return 'offline';
+  if (config?.offline_verfuegbar) return 'offline';
   return 'blind';
 }
 
@@ -146,13 +146,13 @@ export function baueBasemapStyle(
     if (onlineStil.typ === 'protomaps') return protomapsLabeledStyle(theme, onlineStil.url);
     return baueOnlineStyle(onlineStil);
   }
-  if (modus === 'offline' && config?.pmtiles_url) return offlineStyle(theme, config.pmtiles_url);
+  if (modus === 'offline' && config?.offline_tiles_url) return offlineStyle(theme, config.offline_tiles_url);
   return blindStyle(theme);
 }
 
 /**
  * Config-autoritative Pflicht-Attribution des aktiven Views. Online: Attribution des Views;
- * Offline: Lizenz der aktiven Offline-Karte (`pmtiles_attribution`, z. B. ODbL — auch ohne Netz
+ * Offline: Lizenz der aktiven Offline-Karte (`offline_attribution`, z. B. ODbL — auch ohne Netz
  * rechtlich sichtbar, LFH-181); blind: keine.
  */
 export function aktuelleAttribution(
@@ -161,6 +161,6 @@ export function aktuelleAttribution(
   config: KarteServerConfig | undefined,
 ): string | null {
   if (modus === 'online' && onlineStil) return onlineStil.attribution;
-  if (modus === 'offline') return config?.pmtiles_attribution ?? null;
+  if (modus === 'offline') return config?.offline_attribution ?? null;
   return null;
 }

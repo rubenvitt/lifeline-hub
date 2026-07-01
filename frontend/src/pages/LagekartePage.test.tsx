@@ -228,9 +228,9 @@ function basisHandler(
   extra: ReturnType<typeof http.get>[] = [],
   config: KarteServerConfig = {
     online_styles: [],
-    pmtiles_verfuegbar: false,
-    pmtiles_url: null,
-    pmtiles_attribution: null,
+    offline_verfuegbar: false,
+    offline_tiles_url: null,
+    offline_attribution: null,
   },
 ) {
   // extra ZUERST: MSW nimmt den ersten Treffer → Tests können einzelne GET-Defaults
@@ -348,9 +348,9 @@ describe('LagekartePage', () => {
   it('Basemap-Umschalter: von Online auf Blind wechseln, Marker bleiben sichtbar', async () => {
     basisHandler([], {
       online_styles: [{ name: 'Online', url: 'https://x/style.json', typ: 'vektor', attribution: '© X' }],
-      pmtiles_verfuegbar: true,
-      pmtiles_url: '/api/karte/tiles.pmtiles',
-      pmtiles_attribution: null,
+      offline_verfuegbar: true,
+      offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
+      offline_attribution: null,
     });
     const user = userEvent.setup();
     renderSeite();
@@ -388,9 +388,9 @@ describe('LagekartePage', () => {
   it('Basemap-Umschalter: bei verfügbarer Config sind passende Buttons aktiv und kein Blind-Hinweis', async () => {
     basisHandler([], {
       online_styles: [{ name: 'Online', url: 'https://x/style.json', typ: 'vektor', attribution: '© X' }],
-      pmtiles_verfuegbar: true,
-      pmtiles_url: '/api/karte/tiles.pmtiles',
-      pmtiles_attribution: null,
+      offline_verfuegbar: true,
+      offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
+      offline_attribution: null,
     });
     renderSeite();
     await screen.findByText('marker-schaden-9');
@@ -403,9 +403,9 @@ describe('LagekartePage', () => {
   it('Basemap-Umschalter: nur Offline konfiguriert → Online disabled, Offline aktiv', async () => {
     basisHandler([], {
       online_styles: [],
-      pmtiles_verfuegbar: true,
-      pmtiles_url: '/api/karte/tiles.pmtiles',
-      pmtiles_attribution: null,
+      offline_verfuegbar: true,
+      offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
+      offline_attribution: null,
     });
     renderSeite();
     await screen.findByText('marker-schaden-9');
@@ -502,9 +502,9 @@ describe('LagekartePage', () => {
         { name: 'Liberty', url: 'https://x/liberty', typ: 'vektor', attribution: '© Liberty' },
         { name: 'TopPlus', url: 'https://x/{z}/{y}/{x}.png', typ: 'raster', attribution: '© BKG' },
       ],
-      pmtiles_verfuegbar: false,
-      pmtiles_url: null,
-      pmtiles_attribution: null,
+      offline_verfuegbar: false,
+      offline_tiles_url: null,
+      offline_attribution: null,
     });
     const user = userEvent.setup();
     renderSeite();
