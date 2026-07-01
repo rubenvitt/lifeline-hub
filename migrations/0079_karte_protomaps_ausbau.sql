@@ -11,6 +11,11 @@
 
 PRAGMA foreign_keys = OFF;
 
+-- Verwaiste Kind-Slots zuerst explizit löschen: ON DELETE CASCADE feuert bei
+-- PRAGMA foreign_keys = OFF nicht (Enforcement ist in SQLite PRAGMA-abhängig), sonst
+-- überleben karte_proxy_asset-Zeilen mit ins Leere zeigender quelle_id und könnten sich
+-- bei rowid-Wiederverwendung still an eine künftige, fremde Quelle hängen.
+DELETE FROM karte_proxy_asset WHERE quelle_id IN (SELECT id FROM karte_online_quelle WHERE typ = 'protomaps');
 DELETE FROM karte_online_quelle WHERE typ = 'protomaps';
 
 CREATE TABLE karte_online_quelle_new (

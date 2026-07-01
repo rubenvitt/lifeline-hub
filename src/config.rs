@@ -99,7 +99,7 @@ pub struct OfflineKatalogEintrag {
     pub groesse: i64,
     pub lizenz: String,
     pub kachel_schema: String,
-    /// Provenienz-Hinweis fürs UI (Quelle ist ein Community-Repo, kein eigener Mirror).
+    /// Provenienz-Hinweis fürs UI (Eigenbau via karten-build/Planetiler, kein Community-Repo mehr).
     pub quelle: String,
     /// Optionaler SHA256-Pin (hex, lowercase). Gesetzt beim Eigen-Mirror: der Download
     /// verifiziert den berechneten gegen diesen Hash. `None` = kein Pin (vor erstem Release-Pin).
