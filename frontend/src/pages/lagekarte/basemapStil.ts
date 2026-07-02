@@ -46,9 +46,13 @@ export function offlineStyle(theme: KartenTheme, tilesUrl: string): StyleSpecifi
     sources: {
       basemap: { type: 'vector', tiles: [tilesUrl], minzoom: 0, maxzoom: 14, attribution: '© OpenStreetMap contributors' },
     },
+    // source-layer-Namen gegen das reale Shortbread-Schema verifiziert (karten-build Bremen,
+      // 2026-07-02): land/water_polygons/buildings/streets/street_labels/place_labels existieren;
+      // ein 'landuse'-Layer gibt es in Shortbread NICHT (das war Protomaps) → 'land'. Feinere
+      // Layer-Auswahl + Optik-Tuning ist die spätere Live-Demo-Entscheidung (LFH-197).
     layers: [
       { id: 'hintergrund', type: 'background', paint: { 'background-color': f.erde } },
-      { id: 'landuse', source: 'basemap', 'source-layer': 'landuse', type: 'fill', paint: { 'fill-color': f.landuse } },
+      { id: 'land', source: 'basemap', 'source-layer': 'land', type: 'fill', paint: { 'fill-color': f.landuse } },
       { id: 'wasser', source: 'basemap', 'source-layer': 'water_polygons', type: 'fill', paint: { 'fill-color': f.wasser } },
       { id: 'gebaeude', source: 'basemap', 'source-layer': 'buildings', type: 'fill', paint: { 'fill-color': f.gebaeude } },
       { id: 'strassen', source: 'basemap', 'source-layer': 'streets', type: 'line', paint: { 'line-color': f.strasse, 'line-width': 1.2 } },

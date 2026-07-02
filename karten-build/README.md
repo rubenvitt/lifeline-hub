@@ -10,19 +10,21 @@ Profil) direkt — kein Custom-Dockerfile. Voraussetzung: Docker.
     make validate                  # tiles-Anzahl + metadata (inkl. vector_layers) prüfen
 
 `AREA` ist ein Geofabrik-Gebietsname (gegen den Geofabrik-Index gematcht — z. B. `germany`,
-`bremen`, `berlin`), NICHT die Pfadnotation `europe/germany/bremen`. Output landet in `out/` als
-`osm*.mbtiles` (gzip, für uns) + `.sha256` (via `--checksum`); zusätzlich entsteht `osm*.versatiles`
-(Brotli, ungenutzt). Zoom = Shortbread-Default (z0–14). `out/` ist gitignored.
+`bremen`, `berlin`), NICHT die Pfadnotation `europe/germany/bremen`. Die fertige Datei landet in
+**`out/result/osm*.mbtiles`** (gzip, für uns) + `.sha256` (via `--checksum`); daneben `.versatiles`
+(Brotli, ungenutzt). Der Rest von `out/` (Quelldaten wie das Wasser-Polygon-ZIP ~880 MB, `tmp/`,
+`sources/`) ist Arbeitsdaten und kann nach dem Bau gelöscht werden. Zoom = Shortbread-Default
+(z2–14, `name=Shortbread`). `out/` ist gitignored.
 
 Die zugrundeliegende CLI ist `generate_tiles --area <name> --format mbtiles --checksum` (Default-
 Format wäre `versatiles`, deshalb `--format mbtiles` explizit). `docker run` ohne Args startet einen
 interaktiven Wizard.
 
 ## Publizieren
-Die erzeugte `out/osm*.mbtiles` an eine stabile HTTPS-URL / als GitHub-Release laden, dann in
-`src/config.rs::default_offline_katalog()` den Platzhalter-Eintrag ersetzen:
-`url` (die Host-URL), `groesse` (Bytes), `sha256` (aus der mitgelieferten `out/osm*.mbtiles.sha256`).
-`kachel_schema` bleibt `"shortbread"`.
+Die erzeugte `out/result/osm*.mbtiles` an eine stabile HTTPS-URL / als GitHub-Release laden, dann
+in `src/config.rs::default_offline_katalog()` den Platzhalter-Eintrag ersetzen: `url` (die
+Host-URL), `groesse` (Bytes), `sha256` (aus `out/result/osm*.mbtiles.sha256`). `kachel_schema`
+bleibt `"shortbread"`.
 
 ## Reproduzierbarkeit
 Image-Digest (`docker inspect versatiles/versatiles-planetiler:latest`) + Geofabrik-Extract-Datum
