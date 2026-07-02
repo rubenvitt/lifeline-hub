@@ -1,20 +1,21 @@
-# karten-build/Makefile
-AREA ?= germany
-MAXZOOM ?= 14
-OUT ?= out
-IMAGE := lifeline-karten-build
+# karten-build/Makefile — Shortbread-MBTiles bau-zeitig erzeugen (VersaTiles-Planetiler).
+# Läuft NUR beim Bau, nie in der App. Nutzt das fertige Upstream-Image direkt (kein Custom-Build).
+#
+# AREA in Geofabrik-Notation: "germany" bzw. Unterregion wie "europe/germany/bremen".
+AREA  ?= germany
+OUT   ?= out
+IMAGE := versatiles/versatiles-planetiler:latest
 
-.PHONY: image tiles validate
-image:
-	docker build -t $(IMAGE) .
-
-tiles: image
+.PHONY: tiles validate
+tiles:
 	mkdir -p $(OUT)
-	docker run --rm -v "$(PWD)/$(OUT):/data" $(IMAGE) \
-	  --download --area=$(AREA) --maxzoom=$(MAXZOOM) \
-	  --output=/data/$(AREA).shortbread.mbtiles
-	@echo "Fertig: $(OUT)/$(AREA).shortbread.mbtiles"
+	docker run --rm -v "$(PWD)/$(OUT):/app/data" $(IMAGE) -a geofabrik:$(AREA)
+	@echo "Fertig. Output (osm-*.mbtiles + osm-*.versatiles) in $(OUT)/."
+	@echo "Die .mbtiles hosten und URL + Groesse + SHA256 in src/config.rs::default_offline_katalog() pinnen."
 
 validate:
-	sqlite3 $(OUT)/$(AREA).shortbread.mbtiles \
-	  "SELECT 'tiles=' || count(*) FROM tiles; SELECT name||'='||value FROM metadata;"
+	@f=$$(ls $(OUT)/osm-*.mbtiles 2>/dev/null | head -1); \
+	if [ -z "$$f" ]; then echo "keine osm-*.mbtiles in $(OUT)/ — erst 'make tiles'"; exit 1; fi; \
+	echo "Datei: $$f"; \
+	sqlite3 "$$f" "SELECT 'tiles=' || count(*) FROM tiles;"; \
+	sqlite3 "$$f" "SELECT name||'='||substr(value,1,120) FROM metadata WHERE name IN ('format','minzoom','maxzoom','json');"
