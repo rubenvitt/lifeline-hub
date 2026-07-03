@@ -522,6 +522,13 @@ pub struct OfflineKarteAntwort {
     pub katalog_sha256: Option<String>,
 }
 
+/// Extrahiert `(geladen, gesamt)`-Bytes aus einem Download-Fortschritt für die Liste. `gesamt` ist
+/// `None`, wenn die Quelle keine Content-Length lieferte (`0` = unbekannt).
+fn fortschritt_werte(f: &Fortschritt) -> (i64, Option<i64>) {
+    let g = f.gesamt.load(Ordering::Relaxed);
+    (f.geladen.load(Ordering::Relaxed) as i64, (g > 0).then_some(g as i64))
+}
+
 /// GET /api/karte/offline-karten — alle Offline-Karten. Lesen: admin ODER Führungskraft (read-only).
 pub async fn offline_liste(
     State(state): State<AppState>,
@@ -538,19 +545,15 @@ pub async fn offline_liste(
     let antwort: Vec<OfflineKarteAntwort> = rows
         .into_iter()
         .map(|k| {
-            let (geladen, gesamt) = if k.status == "laedt" {
-                match map.get(&k.id) {
-                    Some(f) => {
-                        let g = f.gesamt.load(Ordering::Relaxed);
-                        (
-                            Some(f.geladen.load(Ordering::Relaxed) as i64),
-                            (g > 0).then_some(g as i64),
-                        )
-                    }
-                    None => (None, None),
+            // Fortschritt für JEDE Zeile mit laufendem Download-Eintrag zeigen — nicht nur
+            // status='laedt' (Neu-Zeile-Download), sondern auch den In-Place-Reload (B3), der die
+            // Zeile bewusst 'bereit'+aktiv lässt, damit die alte Datei bis zum Swap weiterserviert.
+            let (geladen, gesamt) = match map.get(&k.id) {
+                Some(f) => {
+                    let (g, ge) = fortschritt_werte(f);
+                    (Some(g), ge)
                 }
-            } else {
-                (None, None)
+                None => (None, None),
             };
             // Update-Erkennung: gleicher Karten-Name, aber der Katalog führt eine andere URL als
             // die installierte Quelle (= neuerer Build). Karten ohne quell_url / ohne Katalog-Treffer
@@ -736,12 +739,148 @@ async fn finalisiere_erfolgreichen_download(
     }
 }
 
+/// Finalisiert einen In-Place-Hot-Swap (B3, LFH-187): benennt die fertige `.part`-Datei atomar über
+/// die weiterhin aktive Datei `karte-{id}.mbtiles`, aktualisiert die Metadaten DERSELBEN Zeile
+/// (Größe/sha256/geaendert_at → neuer Cache-Bust-Token) und verwirft den Reader-Cache. Die Zeile
+/// bleibt durchgehend `bereit`+aktiv → die Live-Karte serviert bis zum atomaren Swap die alte
+/// Datei, danach die neue. Fehler werden zurückgegeben; die `.part` räumt der Aufrufer auf.
+async fn finalisiere_in_place_download(
+    pool: &sqlx::SqlitePool,
+    karten_dir: &FsPath,
+    id: i64,
+    groesse: i64,
+    sha256: &str,
+) -> Result<(), String> {
+    let dateiname = format!("karte-{id}.mbtiles");
+    let part = karten_dir.join(format!("{dateiname}.part"));
+    let ziel = karten_dir.join(&dateiname);
+    // Atomarer Swap: POSIX-rename ersetzt die Zieldatei in-place; die alte Inode bleibt für bereits
+    // geöffnete Reader gültig, bis invalidate_reader() den gecachten Pool verwirft.
+    tokio::fs::rename(&part, &ziel).await.map_err(|e| format!("Rename: {e}"))?;
+    // Reader-Cache VOR dem DB-Update verwerfen: die Datei hat eine neue Inode, der gecachte Pool
+    // (per Pfad gekeyt) hält sonst das alte Handle → würde die alte Datei weiterservieren.
+    crate::karte::mbtiles::invalidate_reader().await;
+    repo::markiere_bereit(pool, id, &dateiname, groesse, sha256)
+        .await
+        .map_err(|e| format!("markiere_bereit: {e}"))?;
+    Ok(())
+}
+
+/// Request-Body für den In-Place-Reload (B3): neue Quell-URL + optionale Größe/Pin. Lizenz/Name
+/// bleiben die der bestehenden Karte (ein Update, kein neuer Eintrag).
+#[derive(Debug, Deserialize)]
+pub struct OfflineNeuLadenBody {
+    pub url: String,
+    #[serde(default)]
+    pub groesse_erwartet: Option<i64>,
+    #[serde(default)]
+    pub sha256_erwartet: Option<String>,
+}
+
+/// POST /api/karte/offline-karten/{id}/neu-laden — In-Place-Hot-Swap (B3, LFH-187).
+///
+/// Lädt ein Update der bestehenden GEMANAGTEN Karte in DIESELBE Zeile/Datei. Anders als
+/// `offline_download` (neue Zeile) wird KEINE neue Zeile angelegt: die alte Datei bleibt während
+/// des Downloads `bereit`+aktiv und wird ausgeliefert; erst nach vollständigem Download erfolgt der
+/// atomare Swap + Cache-Bust. Bei Download-Fehler bleibt die alte Karte unangetastet aktiv (KEIN
+/// Status-Downgrade). `404` unbekannt; `422` bei extern registrierter Karte oder laufendem Download.
+pub async fn offline_neu_laden(
+    State(state): State<AppState>,
+    _admin: AdminUser,
+    Path(id): Path<i64>,
+    Json(body): Json<OfflineNeuLadenBody>,
+) -> Result<(StatusCode, Json<OfflineKarte>), AppError> {
+    let karte = repo::finde_offline_karte(&state.pool, id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    // Nur unsere gemanagten Downloads (`karte-{id}.mbtiles`) dürfen in-place ersetzt werden —
+    // extern registrierte Karten (beliebiger admin-gelieferter Pfad) verwalten wir nicht.
+    if karte.pfad != format!("karte-{id}.mbtiles") {
+        return Err(AppError::UnprocessableEntity(
+            "In-Place-Neu-Laden nur für heruntergeladene Karten (nicht extern registrierte)".into(),
+        ));
+    }
+    // Kein paralleler Download/Reload auf dieselbe id.
+    if state.download_fortschritt.read().unwrap().contains_key(&id) {
+        return Err(AppError::UnprocessableEntity(
+            "Für diese Karte läuft bereits ein Download".into(),
+        ));
+    }
+    let url = download::validiere_download_url(&body.url).map_err(AppError::Validation)?;
+    // Sofortiger Plattenplatz-Check bei bekannter Größe (der Per-URL-Content-Length-Check in
+    // lade_datei bleibt der Backstop).
+    if let Some(erwartet) = body.groesse_erwartet.filter(|g| *g > 0) {
+        if let Ok(frei) = fs4::available_space(&state.karten_dir) {
+            if !download::genug_platz(frei, erwartet as u64) {
+                let benoetigt = (erwartet as u64).saturating_add(erwartet as u64 / 10);
+                return Err(AppError::UnprocessableEntity(format!(
+                    "Nicht genug Speicherplatz im Kartenverzeichnis: {frei} Bytes frei, \
+                     ~{benoetigt} Bytes benötigt"
+                )));
+            }
+        }
+    }
+
+    let fortschritt = Arc::new(Fortschritt::default());
+    state
+        .download_fortschritt
+        .write()
+        .unwrap()
+        .insert(id, fortschritt.clone());
+
+    let pool = state.pool.clone();
+    let client = state.download_client.clone();
+    let karten_dir = state.karten_dir.clone();
+    let fortschritt_map = state.download_fortschritt.clone();
+    let sha256_erwartet = body.sha256_erwartet.clone();
+    tokio::spawn(async move {
+        let part = karten_dir.join(format!("karte-{id}.mbtiles.part"));
+        tracing::info!("Offline-Karte {id}: In-Place-Reload startet von {url}");
+        let ergebnis = download::lade_datei(
+            &client,
+            url,
+            &part,
+            &fortschritt,
+            sha256_erwartet.as_deref(),
+            download::MAX_DOWNLOAD_BYTES,
+        )
+        .await;
+        match ergebnis {
+            Ok(erg) => {
+                match finalisiere_in_place_download(&pool, &karten_dir, id, erg.groesse, &erg.sha256)
+                    .await
+                {
+                    Ok(()) => tracing::info!(
+                        "Offline-Karte {id}: In-Place-Reload fertig ({} Bytes)",
+                        erg.groesse
+                    ),
+                    Err(e) => {
+                        tracing::error!("In-Place-Swap {id} fehlgeschlagen: {e}");
+                        // .part aufräumen (bei erfolgtem Rename ein No-op); alte Karte bleibt aktiv.
+                        let _ = tokio::fs::remove_file(&part).await;
+                    }
+                }
+            }
+            Err(fehler) => {
+                // WICHTIG: KEIN setze_status('fehler') — die alte Datei ist intakt und aktiv, ein
+                // Downgrade würde die Live-Karte grundlos abschalten. Nur die .part aufräumen.
+                tracing::warn!("In-Place-Reload der Karte {id} fehlgeschlagen: {fehler}");
+                let _ = tokio::fs::remove_file(&part).await;
+            }
+        }
+        fortschritt_map.write().unwrap().remove(&id);
+    });
+
+    Ok((StatusCode::ACCEPTED, Json(karte)))
+}
+
 /// POST /api/karte/offline-karten/download — startet einen Hintergrund-Download (Admin).
 ///
 /// Legt IMMER eine NEUE Zeile an (kein Re-Download in eine aktive Karte) — die Live-Lagekarte
 /// bleibt während des Mehr-GB-Downloads verfügbar, bis der Admin die neue Karte aktiviert.
 /// Antwortet sofort `202` mit der Zeile (Status `laedt`); das Frontend pollt die Liste.
-/// „Aktualisieren" = neue Karte laden + aktivieren + alte löschen (In-Place-Hot-Swap ist v1.x).
+/// „Aktualisieren" = neue Karte laden + aktivieren + alte löschen; „Neu laden" (B3) = In-Place-Swap
+/// derselben Zeile (siehe `offline_neu_laden`).
 pub async fn offline_download(
     State(state): State<AppState>,
     _admin: AdminUser,
@@ -1119,5 +1258,42 @@ mod finalisierung_tests {
             liste.iter().find(|k| k.id == m).unwrap().aktiv_basemap,
             "erste bereite Karte automatisch aktiviert"
         );
+    }
+
+    // B3 (LFH-187): In-Place-Hot-Swap. Die aktive Zeile bleibt aktiv, ihre Datei wird atomar
+    // getauscht und der Cache-Bust-Token (Version = sha256) wechselt.
+    #[tokio::test]
+    async fn in_place_swap_erhaelt_aktiv_bumpt_version_und_tauscht_datei() {
+        let pool = crate::db::test_pool().await;
+        let tmp = tempfile::tempdir().unwrap();
+        let id = bereite_karte(&pool, "DE").await; // markiere_bereit(sha256="h")
+        repo::aktiviere_offline_karte(&pool, id).await.unwrap();
+        let vorher = repo::aktive_offline_karte(&pool).await.unwrap().unwrap();
+        let ziel = tmp.path().join(format!("karte-{id}.mbtiles"));
+        std::fs::write(&ziel, b"ALT").unwrap();
+        std::fs::write(tmp.path().join(format!("karte-{id}.mbtiles.part")), b"NEU").unwrap();
+
+        finalisiere_in_place_download(&pool, tmp.path(), id, 3, "neuersha256")
+            .await
+            .expect("Swap ok");
+
+        assert_eq!(std::fs::read(&ziel).unwrap(), b"NEU", "Datei atomar getauscht");
+        assert!(
+            !tmp.path().join(format!("karte-{id}.mbtiles.part")).exists(),
+            ".part wurde umbenannt (kein Rest)"
+        );
+        let nachher = repo::aktive_offline_karte(&pool).await.unwrap().expect("weiter aktiv");
+        assert_eq!(nachher.version, "neuersha256");
+        assert_ne!(nachher.version, vorher.version, "Cache-Bust-Token gewechselt");
+    }
+
+    // B3: `fortschritt_werte` — gesamt=None ohne Content-Length (0), sonst Some.
+    #[test]
+    fn fortschritt_werte_gesamt_none_wenn_null() {
+        let f = Fortschritt::default();
+        f.geladen.store(500, Ordering::Relaxed);
+        assert_eq!(fortschritt_werte(&f), (500, None), "ohne Content-Length gesamt=None");
+        f.gesamt.store(1000, Ordering::Relaxed);
+        assert_eq!(fortschritt_werte(&f), (500, Some(1000)));
     }
 }

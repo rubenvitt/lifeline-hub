@@ -427,6 +427,10 @@ pub fn build_router(state: AppState) -> Router {
             post(routes::karte::offline_aktivieren),
         )
         .route(
+            "/api/karte/offline-karten/{id}/neu-laden",
+            post(routes::karte::offline_neu_laden),
+        )
+        .route(
             "/api/karte/offline-karten/{id}/abbrechen",
             post(routes::karte::offline_abbrechen),
         )
