@@ -213,6 +213,12 @@ pub struct OfflineKarte {
     pub pfad: String,
     pub quell_url: Option<String>,
     pub lizenz: Option<String>,
+    /// Kachel-Schema der Datei (z.B. `'shortbread'`). **Aktuell inertes Metadatenfeld** (LFH-198):
+    /// im Tile-Serving nicht konsumiert (MBTiles wird schema-blind gelesen), und alle Insert-Pfade
+    /// setzen den Wert explizit — der DB-DEFAULT `'protomaps'` in Migration 0076 greift also nie.
+    /// Bewusst behalten (statt teurem Table-Rebuild nur zum Default-Umlegen) für eine mögliche
+    /// künftige Schema-Unterscheidung (z.B. Raster vs. Vektor, LFH-185); deren Nutzen hängt nicht
+    /// am Default-Wert.
     pub kachel_schema: String,
     pub groesse: Option<i64>,
     pub sha256: Option<String>,
