@@ -223,7 +223,11 @@ export default function OfflineKartenVerwaltung() {
                     // Aktive Karte → In-Place-„Neu laden" (downtime-frei, stabile id); inaktive →
                     // „Aktualisieren" (neue Zeile + Auto-Aktivieren + Alt-Löschung).
                     (k.aktiv_basemap ? (
-                      <Button size="small" onClick={() => neuLadenMutation.mutate(k)}>
+                      <Button
+                        size="small"
+                        loading={neuLadenMutation.isPending}
+                        onClick={() => neuLadenMutation.mutate(k)}
+                      >
                         Neu laden
                       </Button>
                     ) : (

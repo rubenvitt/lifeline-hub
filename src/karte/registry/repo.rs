@@ -472,6 +472,25 @@ pub async fn markiere_bereit(
     hole_offline_karte(pool, id).await.map(Some)
 }
 
+/// Setzt die `quell_url` einer Karte neu (In-Place-Reload B3: nach dem Swap auf die neue Katalog-URL
+/// aktualisieren, sonst bliebe die Update-Erkennung `quell_url != katalog.url` dauerhaft „Update
+/// verfügbar" und der „Stand" veraltet). `markiere_bereit` fasst `quell_url` bewusst nicht an
+/// (es teilt sich den Neu-Zeile-Pfad, dort ist die URL schon korrekt gesetzt).
+pub async fn aktualisiere_quell_url(
+    pool: &SqlitePool,
+    id: i64,
+    quell_url: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE karte_offline_karte SET quell_url = ?, geaendert_at = datetime('now') WHERE id = ?",
+    )
+    .bind(quell_url)
+    .bind(id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 /// Aktiviert die `bereit`e Karte `id` als Basemap, ABER nur solange noch KEINE andere Karte aktiv
 /// ist — die erste fertig heruntergeladene Karte wird automatisch ausgeliefert (sonst bliebe der
 /// Offline-Schalter trotz Download „nicht konfiguriert"). Eine bereits aktive Karte wird bewusst

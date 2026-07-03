@@ -207,15 +207,22 @@ describe('OfflineKartenVerwaltung', () => {
     });
   });
 
-  it('In-Place-Reload: aktive „bereit"-Zeile mit Fortschritt zeigt Balken + „aktualisiert"', async () => {
+  it('In-Place-Reload: aktive „bereit"-Zeile zeigt Balken + „aktualisiert", nur Abbrechen (laeuft-Guard)', async () => {
     mockBasis(admin, [{
       ...karte, aktiv_basemap: true, status: 'bereit', geladen: 22020096, gesamt: 44040192,
+      // update_verfuegbar+katalog_url gesetzt, damit die Abwesenheit von „Neu laden" den laeuft-Guard
+      // der Aktionen-Spalte prüft (nicht bloß fehlende Update-Felder → sonst wäre die Assertion vakuum).
+      update_verfuegbar: true, katalog_url: 'https://example.test/de_bremen_20260320.mbtiles',
     }]);
     render();
     await screen.findByText('Deutschland – Bremen');
     // Zeile bleibt „bereit"+aktiv, zeigt aber Reload-Fortschritt (50 %) + Label „aktualisiert".
     expect(await screen.findByText('50%')).toBeInTheDocument();
     expect(screen.getByText('aktualisiert')).toBeInTheDocument();
+    // Während des Reloads: nur Abbrechen — kein Neu laden/Löschen/Aktivieren (laeuft-Guard).
+    expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Neu laden' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
   });
 
   it('Abbrechen ruft den Abbrechen-Endpunkt', async () => {

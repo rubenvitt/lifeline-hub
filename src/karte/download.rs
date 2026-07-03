@@ -31,6 +31,21 @@ pub fn neue_fortschritt_map() -> FortschrittMap {
     Arc::new(RwLock::new(HashMap::new()))
 }
 
+/// Atomare Slot-Reservierung: fügt `f` unter `id` ein und liefert `true`, wenn der Slot frei war;
+/// `false`, wenn bereits ein Download/Reload für `id` läuft. Check UND Insert unter EINEM
+/// write-Lock — verhindert das TOCTOU des id-wiederverwendenden In-Place-Reload-Pffads (getrennter
+/// read-Check + späteres write-Insert liessen zwei parallele Requests denselben `.part`-Pfad
+/// truncaten/interleaven → korrupte Live-Karte). `offline_download` (frische id je Zeile) braucht
+/// das nicht, teilt aber denselben Helfer.
+pub fn reserviere_fortschritt(map: &FortschrittMap, id: i64, f: Arc<Fortschritt>) -> bool {
+    let mut m = map.write().unwrap();
+    if m.contains_key(&id) {
+        return false;
+    }
+    m.insert(id, f);
+    true
+}
+
 /// Ergebnis eines erfolgreichen Downloads.
 #[derive(Debug)]
 pub struct DownloadErgebnis {
@@ -390,6 +405,28 @@ mod tests {
         hex(&Sha256::digest(body))
     }
 
+    /// Fixture, die `chunks` Chunks à `chunk_len` Bytes OHNE Content-Length streamt (chunked
+    /// transfer via `Body::from_stream`) — so greift der Content-Length-Vorabcheck NICHT und der
+    /// Streaming-Backstop im Loop kann getroffen werden.
+    async fn spawn_streaming_fixture(chunks: usize, chunk_len: usize) -> String {
+        use axum::{body::Body, routing::get, Router};
+        let app = Router::new().route(
+            "/f.pmtiles",
+            get(move || async move {
+                let s = futures::stream::iter(
+                    (0..chunks).map(move |_| Ok::<_, std::io::Error>(vec![7u8; chunk_len])),
+                );
+                Body::from_stream(s)
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        format!("http://127.0.0.1:{}/f.pmtiles", addr.port())
+    }
+
     #[tokio::test]
     async fn lade_datei_schreibt_bytes_und_korrekten_sha256() {
         let body = b"PMTiles\x03-fixture-inhalt-fuer-den-download-test".repeat(50);
@@ -414,6 +451,25 @@ mod tests {
             fortschritt.gesamt.load(Ordering::Relaxed),
             body.len() as u64,
             "Content-Length übernommen"
+        );
+    }
+
+    // TOCTOU-Fix (LFH-187/B3): atomare Slot-Reservierung — zweite Reservierung derselben id wird
+    // abgelehnt, andere id ist frei.
+    #[test]
+    fn reserviere_fortschritt_ist_atomar_ein_slot_pro_id() {
+        let map = neue_fortschritt_map();
+        assert!(
+            reserviere_fortschritt(&map, 5, std::sync::Arc::new(Fortschritt::default())),
+            "erste Reservierung frei"
+        );
+        assert!(
+            !reserviere_fortschritt(&map, 5, std::sync::Arc::new(Fortschritt::default())),
+            "zweite Reservierung derselben id abgelehnt"
+        );
+        assert!(
+            reserviere_fortschritt(&map, 6, std::sync::Arc::new(Fortschritt::default())),
+            "andere id frei"
         );
     }
 
@@ -448,6 +504,36 @@ mod tests {
         .unwrap_err();
         assert!(matches!(err, DownloadFehler::ZuGross { .. }), "war {err:?}");
         assert!(!tmp.path().join("big.part").exists(), "keine Teil-Datei bei Vorab-Ablehnung");
+    }
+
+    // B2: OHNE Content-Length (chunked) greift der Vorab-Check nicht — der Streaming-Backstop im
+    // Loop muss den Download beim Überschreiten von max_bytes abbrechen (Schutz gegen unsized/
+    // lügende Quellen). Der einzige Disk-Exhaustion-Schutz für Streams ohne Content-Length.
+    #[tokio::test]
+    async fn lade_datei_streaming_backstop_ohne_content_length() {
+        let url_str = spawn_streaming_fixture(20, 500).await; // 20×500 = 10 000 Bytes, chunked
+        let tmp = tempfile::tempdir().unwrap();
+        let client = download_client();
+        let f = Fortschritt::default();
+        let err = lade_datei(
+            &client,
+            Url::parse(&url_str).unwrap(),
+            &tmp.path().join("s.part"),
+            &f,
+            None,
+            1500, // max_bytes < Gesamtstrom
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            f.gesamt.load(Ordering::Relaxed),
+            0,
+            "keine Content-Length → Vorab-Check greift nicht (Fast-Path aus)"
+        );
+        assert!(
+            matches!(err, DownloadFehler::ZuGross { .. }),
+            "Streaming-Backstop muss abbrechen, war {err:?}"
+        );
     }
 
     // B1 (LFH-187): der Download-Client pinnt DNS (nur_public-Resolver). Ein HOSTNAME, der auf

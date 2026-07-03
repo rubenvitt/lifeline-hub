@@ -750,6 +750,7 @@ async fn finalisiere_in_place_download(
     id: i64,
     groesse: i64,
     sha256: &str,
+    neue_quell_url: &str,
 ) -> Result<(), String> {
     let dateiname = format!("karte-{id}.mbtiles");
     let part = karten_dir.join(format!("{dateiname}.part"));
@@ -763,7 +764,51 @@ async fn finalisiere_in_place_download(
     repo::markiere_bereit(pool, id, &dateiname, groesse, sha256)
         .await
         .map_err(|e| format!("markiere_bereit: {e}"))?;
+    // quell_url auf die neue (Katalog-)URL setzen — sonst bliebe die Update-Erkennung
+    // (quell_url != katalog.url) dauerhaft „Update verfügbar" und das „Stand"-Datum veraltet.
+    repo::aktualisiere_quell_url(pool, id, neue_quell_url)
+        .await
+        .map_err(|e| format!("quell_url: {e}"))?;
     Ok(())
+}
+
+/// Verarbeitet das Download-Ergebnis eines In-Place-Reloads (B3): bei Erfolg atomarer Swap +
+/// Metadaten-Update; bei Fehler NUR `.part`-Cleanup — bewusst KEIN `status='fehler'`, denn die alte
+/// Datei ist intakt und bleibt aktiv+ausgeliefert (ein Downgrade würde die Live-Karte grundlos
+/// abschalten). In den Handler-Task ausgelagert, damit der Fehlerpfad ohne AppState testbar ist.
+async fn verarbeite_in_place_ergebnis(
+    pool: &sqlx::SqlitePool,
+    karten_dir: &FsPath,
+    id: i64,
+    neue_quell_url: &str,
+    ergebnis: Result<download::DownloadErgebnis, download::DownloadFehler>,
+) {
+    let part = karten_dir.join(format!("karte-{id}.mbtiles.part"));
+    match ergebnis {
+        Ok(erg) => match finalisiere_in_place_download(
+            pool,
+            karten_dir,
+            id,
+            erg.groesse,
+            &erg.sha256,
+            neue_quell_url,
+        )
+        .await
+        {
+            Ok(()) => {
+                tracing::info!("Offline-Karte {id}: In-Place-Reload fertig ({} Bytes)", erg.groesse)
+            }
+            Err(e) => {
+                tracing::error!("In-Place-Swap {id} fehlgeschlagen: {e}");
+                // .part aufräumen (bei erfolgtem Rename ein No-op); alte Karte bleibt aktiv.
+                let _ = tokio::fs::remove_file(&part).await;
+            }
+        },
+        Err(fehler) => {
+            tracing::warn!("In-Place-Reload der Karte {id} fehlgeschlagen: {fehler}");
+            let _ = tokio::fs::remove_file(&part).await;
+        }
+    }
 }
 
 /// Request-Body für den In-Place-Reload (B3): neue Quell-URL + optionale Größe/Pin. Lizenz/Name
@@ -800,12 +845,6 @@ pub async fn offline_neu_laden(
             "In-Place-Neu-Laden nur für heruntergeladene Karten (nicht extern registrierte)".into(),
         ));
     }
-    // Kein paralleler Download/Reload auf dieselbe id.
-    if state.download_fortschritt.read().unwrap().contains_key(&id) {
-        return Err(AppError::UnprocessableEntity(
-            "Für diese Karte läuft bereits ein Download".into(),
-        ));
-    }
     let url = download::validiere_download_url(&body.url).map_err(AppError::Validation)?;
     // Sofortiger Plattenplatz-Check bei bekannter Größe (der Per-URL-Content-Length-Check in
     // lade_datei bleibt der Backstop).
@@ -821,18 +860,23 @@ pub async fn offline_neu_laden(
         }
     }
 
+    // Atomare Slot-Reservierung (Check+Insert unter EINEM write-Lock) — verhindert das TOCTOU zweier
+    // paralleler In-Place-Reloads auf dieselbe id, die sonst denselben `.part` truncaten/interleaven
+    // und eine korrupte Datei über die Live-Karte swappen würden (der sha256-Pin fängt das NICHT,
+    // da lade_datei den eigenen Stream hasht, nicht die Datei auf Platte).
     let fortschritt = Arc::new(Fortschritt::default());
-    state
-        .download_fortschritt
-        .write()
-        .unwrap()
-        .insert(id, fortschritt.clone());
+    if !download::reserviere_fortschritt(&state.download_fortschritt, id, fortschritt.clone()) {
+        return Err(AppError::UnprocessableEntity(
+            "Für diese Karte läuft bereits ein Download".into(),
+        ));
+    }
 
     let pool = state.pool.clone();
     let client = state.download_client.clone();
     let karten_dir = state.karten_dir.clone();
     let fortschritt_map = state.download_fortschritt.clone();
     let sha256_erwartet = body.sha256_erwartet.clone();
+    let neue_quell_url = url.to_string();
     tokio::spawn(async move {
         let part = karten_dir.join(format!("karte-{id}.mbtiles.part"));
         tracing::info!("Offline-Karte {id}: In-Place-Reload startet von {url}");
@@ -845,29 +889,7 @@ pub async fn offline_neu_laden(
             download::MAX_DOWNLOAD_BYTES,
         )
         .await;
-        match ergebnis {
-            Ok(erg) => {
-                match finalisiere_in_place_download(&pool, &karten_dir, id, erg.groesse, &erg.sha256)
-                    .await
-                {
-                    Ok(()) => tracing::info!(
-                        "Offline-Karte {id}: In-Place-Reload fertig ({} Bytes)",
-                        erg.groesse
-                    ),
-                    Err(e) => {
-                        tracing::error!("In-Place-Swap {id} fehlgeschlagen: {e}");
-                        // .part aufräumen (bei erfolgtem Rename ein No-op); alte Karte bleibt aktiv.
-                        let _ = tokio::fs::remove_file(&part).await;
-                    }
-                }
-            }
-            Err(fehler) => {
-                // WICHTIG: KEIN setze_status('fehler') — die alte Datei ist intakt und aktiv, ein
-                // Downgrade würde die Live-Karte grundlos abschalten. Nur die .part aufräumen.
-                tracing::warn!("In-Place-Reload der Karte {id} fehlgeschlagen: {fehler}");
-                let _ = tokio::fs::remove_file(&part).await;
-            }
-        }
+        verarbeite_in_place_ergebnis(&pool, &karten_dir, id, &neue_quell_url, ergebnis).await;
         fortschritt_map.write().unwrap().remove(&id);
     });
 
@@ -999,9 +1021,11 @@ pub async fn offline_download(
     Ok((StatusCode::ACCEPTED, Json(karte)))
 }
 
-/// POST /api/karte/offline-karten/{id}/abbrechen — laufenden Download abbrechen (Admin).
-/// Setzt das Abbruch-Flag; der Task bricht beim nächsten Chunk ab, räumt die `.part`-Datei auf
-/// und setzt den Status auf `fehler`. `404`, wenn für die `id` kein Download läuft.
+/// POST /api/karte/offline-karten/{id}/abbrechen — laufenden Download ODER In-Place-Reload
+/// abbrechen (Admin). Setzt das Abbruch-Flag; der Task bricht beim nächsten Chunk ab und räumt die
+/// `.part`-Datei auf. Ein Neu-Zeile-Download (`offline_download`) geht danach auf Status `fehler`;
+/// ein In-Place-Reload (`offline_neu_laden`) lässt die alte Karte bewusst UNANGETASTET bereit+aktiv
+/// (kein Downgrade). `404`, wenn für die `id` kein Download/Reload läuft.
 pub async fn offline_abbrechen(
     State(state): State<AppState>,
     _admin: AdminUser,
@@ -1273,9 +1297,16 @@ mod finalisierung_tests {
         std::fs::write(&ziel, b"ALT").unwrap();
         std::fs::write(tmp.path().join(format!("karte-{id}.mbtiles.part")), b"NEU").unwrap();
 
-        finalisiere_in_place_download(&pool, tmp.path(), id, 3, "neuersha256")
-            .await
-            .expect("Swap ok");
+        finalisiere_in_place_download(
+            &pool,
+            tmp.path(),
+            id,
+            3,
+            "neuersha256",
+            "https://example.test/de_neu_20260401.mbtiles",
+        )
+        .await
+        .expect("Swap ok");
 
         assert_eq!(std::fs::read(&ziel).unwrap(), b"NEU", "Datei atomar getauscht");
         assert!(
@@ -1285,6 +1316,45 @@ mod finalisierung_tests {
         let nachher = repo::aktive_offline_karte(&pool).await.unwrap().expect("weiter aktiv");
         assert_eq!(nachher.version, "neuersha256");
         assert_ne!(nachher.version, vorher.version, "Cache-Bust-Token gewechselt");
+        // quell_url auf die neue URL gesetzt → „Update verfügbar" verschwindet.
+        let zeile = repo::finde_offline_karte(&pool, id).await.unwrap().unwrap();
+        assert_eq!(
+            zeile.quell_url.as_deref(),
+            Some("https://example.test/de_neu_20260401.mbtiles"),
+            "quell_url auf neue Katalog-URL aktualisiert"
+        );
+    }
+
+    // B3-Fehlerpfad: schlägt der Reload-Download fehl, bleibt die alte Karte UNANGETASTET aktiv
+    // (kein status='fehler'-Downgrade) und die .part wird aufgeräumt.
+    #[tokio::test]
+    async fn in_place_fehler_laesst_aktive_karte_unangetastet() {
+        let pool = crate::db::test_pool().await;
+        let tmp = tempfile::tempdir().unwrap();
+        let id = bereite_karte(&pool, "DE").await;
+        repo::aktiviere_offline_karte(&pool, id).await.unwrap();
+        let vorher = repo::finde_offline_karte(&pool, id).await.unwrap().unwrap();
+        // .part-Rest, den der Cleanup entfernen muss.
+        std::fs::write(tmp.path().join(format!("karte-{id}.mbtiles.part")), b"halb").unwrap();
+
+        verarbeite_in_place_ergebnis(
+            &pool,
+            tmp.path(),
+            id,
+            "https://example.test/neu.mbtiles",
+            Err(download::DownloadFehler::Abgebrochen),
+        )
+        .await;
+
+        let nachher = repo::finde_offline_karte(&pool, id).await.unwrap().unwrap();
+        assert_eq!(nachher.status, "bereit", "kein Status-Downgrade bei Fehler");
+        assert!(nachher.aktiv_basemap, "alte Karte bleibt aktiv");
+        assert_eq!(nachher.sha256, vorher.sha256, "Version/Datei-Metadaten unverändert");
+        assert_eq!(nachher.quell_url, vorher.quell_url, "quell_url unverändert bei Fehler");
+        assert!(
+            !tmp.path().join(format!("karte-{id}.mbtiles.part")).exists(),
+            ".part aufgeräumt"
+        );
     }
 
     // B3: `fortschritt_werte` — gesamt=None ohne Content-Length (0), sonst Some.
