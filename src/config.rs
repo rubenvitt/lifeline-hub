@@ -111,8 +111,11 @@ pub struct OfflineKatalogEintrag {
 /// Shortbread, z0–14, ODbL): ein gesamtdeutscher Shortbread-MBTiles-Eintrag, als GitHub-Release
 /// des eigenen Build-Projekts gehostet (LFH-195: Community-Katalog vorheriger Bauart entfällt).
 pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {
-    // URL + SHA256 werden mit dem ersten karten-build-Release gesetzt (README karten-build);
-    // bis dahin ein klar erkennbarer, aber gültiger https-Platzhalter.
+    // >>> OPERATOR-PIN (LFH-197) <<< — beim ersten karten-build-Release genau diese drei Felder
+    // ersetzen (README karten-build): `url` (Host-URL des Releases), `groesse` (gemessene Bytes),
+    // `sha256` (aus out/result/osm*.mbtiles.sha256, lowercase-hex). Bis dahin ein klar
+    // erkennbarer, aber gültiger https-Platzhalter. Der Pin ist eine reine Config-Änderung —
+    // die Test-Konsistenzprüfung (katalog_eintrag_sha256_pin_konsistent) trägt beide Zustände.
     vec![OfflineKatalogEintrag {
         name: "Deutschland (Shortbread)".into(),
         url: "https://TODO-karten-build-release/germany.shortbread.mbtiles".into(),
@@ -223,10 +226,29 @@ mod tests {
     }
 
     #[test]
-    fn katalog_eintrag_sha256_optional_und_serialisiert() {
-        // Default: noch kein Pin (Hash kommt mit dem ersten karten-build-Release).
+    fn katalog_eintrag_sha256_pin_konsistent_und_serialisiert() {
+        // Pin-Konsistenz (LFH-197): jeder Katalog-Eintrag ist ENTWEDER ein noch ungepinnter
+        // Platzhalter (sha256 None) ODER vollständig gepinnt (64-stelliger lowercase-hex-Hash +
+        // echte, nicht-TODO-URL). So bleibt der Test grün, wenn der Operator beim ersten
+        // karten-build-Release pinnt — ohne halb-gepinnte Zwischenzustände durchzulassen.
         for e in default_offline_katalog() {
-            assert!(e.sha256.is_none(), "noch kein Pin: {}", e.name);
+            // Bikonditional: ein Eintrag ist GENAU DANN gepinnt (sha256 gesetzt), wenn seine URL
+            // kein TODO-Platzhalter mehr ist. Fängt beide Halb-Pin-Richtungen: echte URL ohne Hash
+            // (download.rs lädt dann ungeprüft, erwartet_sha256=None) und Hash bei Platzhalter-URL.
+            assert_eq!(
+                e.sha256.is_some(),
+                !e.url.contains("TODO"),
+                "URL/Pin-Zustand inkonsistent (echte URL braucht sha256 und umgekehrt): {}",
+                e.name
+            );
+            if let Some(h) = &e.sha256 {
+                assert_eq!(h.len(), 64, "sha256 muss 64 hex sein: {}", e.name);
+                assert!(
+                    h.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()),
+                    "sha256 lowercase-hex: {}",
+                    e.name
+                );
+            }
         }
         // Mit gesetztem Pin landet der Hash im JSON (Frontend-Kontrakt).
         let mit_pin = OfflineKatalogEintrag {

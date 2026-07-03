@@ -1,1 +1,1 @@
-Placeholder — echte Glyphs/Sprite erzeugt das karten-build-Projekt (Planetiler-Shortbread + OFL-Fonts/CC0-Sprite). Nicht händisch pflegen.
+Echte Offline-Style-Assets, erzeugt von `karten-build/gen-assets.sh` aus gepinnten Upstream-Releases (versatiles-fonts OFL-Glyphs „Noto Sans Regular", kuratierte Latein-Ranges; versatiles-style CC0-Sprite `basics` → `basemap`). Nicht händisch pflegen — bei Update das Skript neu laufen lassen.

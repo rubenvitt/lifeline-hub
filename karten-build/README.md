@@ -30,9 +30,11 @@ bleibt `"shortbread"`.
 Image-Digest (`docker inspect versatiles/versatiles-planetiler:latest`) + Geofabrik-Extract-Datum
 im Release-Text festhalten. Update = erneut `make tiles`, neues Release, Katalog-URL/-SHA anheben.
 
-## Assets (Glyphs/Sprite) — noch zu finalisieren (LFH-197)
+## Assets (Glyphs/Sprite)
 Der Offline-Style braucht lokal gebündelte **Glyphs (OFL)** + **Sprite (CC0)** unter
-`../assets/karten/{fonts,sprites}` (aktuell **Placeholder**). Quelle: VersaTiles-Fonts- und
-`versatiles-style`-Sprite-Release-Artefakte (Shortbread-passend). `gen-assets.sh` ist ein
-**Entwurf** — die exakten Bezugs-URLs/Tools sind auf dem Build-Host zu verifizieren (die dortigen
-`docker run`-Referenzen sind noch ungeprüft).
+`../assets/karten/{fonts,sprites}`. `gen-assets.sh` bezieht sie aus gepinnten Release-Artefakten
+(versatiles-fonts `v2.2.0` → „Noto Sans Regular", nur DE/europäisch-latein-relevante Ranges;
+versatiles-style `v5.13.0` → CC0-Sprite `basics` als `basemap`, +@2x). Ausführen: `bash
+gen-assets.sh`; danach die erzeugten Dateien einchecken und das Backend neu bauen (rust-embed
+bettet sie zur Compile-Zeit ein). Update = Tags im Skript anheben, neu laufen lassen, Provenienz
+(vom Skript ausgegeben) im Commit festhalten.
