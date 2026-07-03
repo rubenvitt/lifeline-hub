@@ -12,6 +12,7 @@ import {
   brecheOfflineDownloadAb,
   listeOfflineKarten,
   loescheOfflineKarte,
+  neuLadeOfflineKarte,
   starteOfflineDownload,
   type OfflineKarte,
   type OfflineKarteStatus,
@@ -50,9 +51,10 @@ export default function OfflineKartenVerwaltung() {
   const kartenQuery = useQuery({
     queryKey: ['admin-karte', 'offline-karten'],
     queryFn: listeOfflineKarten,
-    // Polling: solange irgendeine Karte lädt, alle 2 s neu laden — sonst aus.
+    // Polling: solange irgendeine Karte lädt ODER in-place aktualisiert (Zeile bleibt 'bereit', hat
+    // aber laufenden Fortschritt), alle 2 s neu laden — sonst aus.
     refetchInterval: (query) =>
-      query.state.data?.some((k) => k.status === 'laedt') ? 2000 : false,
+      query.state.data?.some((k) => k.status === 'laedt' || k.geladen != null) ? 2000 : false,
   });
   const karten = useMemo(() => kartenQuery.data ?? [], [kartenQuery.data]);
   const vorhandeneUrls = useMemo(
@@ -96,6 +98,23 @@ export default function OfflineKartenVerwaltung() {
     },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Aktualisieren fehlgeschlagen'),
   });
+  // „Neu laden" = In-Place-Hot-Swap (B3) der AKTIVEN Karte: Update in DIESELBE Zeile/Datei. Die
+  // alte Datei bleibt bis zum atomaren Swap aktiv+ausgeliefert (downtime-frei, stabile id). Nur für
+  // die aktive Karte angeboten; inaktive nutzen weiter „Aktualisieren" (neue Zeile + Auto-Aktivieren).
+  const neuLadenMutation = useMutation({
+    mutationFn: (k: OfflineKarte) =>
+      neuLadeOfflineKarte(k.id, {
+        url: k.katalog_url!,
+        sha256_erwartet: k.katalog_sha256 ?? undefined,
+        // .part + alte Datei koexistieren während des Downloads → ~2× Peak.
+        groesse_erwartet: k.groesse ?? undefined,
+      }),
+    onSuccess: () => {
+      invalidiereKarte(qc);
+      message.success('Aktualisierung lädt — die Karte bleibt aktiv und wird nach Abschluss getauscht');
+    },
+    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Neu laden fehlgeschlagen'),
+  });
 
   const spalten: TableColumnsType<OfflineKarte> = [
     {
@@ -130,7 +149,10 @@ export default function OfflineKartenVerwaltung() {
       dataIndex: 'status',
       key: 'status',
       render: (s: OfflineKarteStatus, k: OfflineKarte) => {
-        if (s !== 'laedt') {
+        // Ein Download läuft, wenn status='laedt' (Neu-Zeile) ODER ein In-Place-Reload aktiv ist
+        // (die Zeile bleibt 'bereit', trägt aber Live-Fortschritt).
+        const laeuft = s === 'laedt' || k.geladen != null;
+        if (!laeuft) {
           const t = STATUS_TAG[s];
           return <Tag color={t.color}>{t.label}</Tag>;
         }
@@ -138,10 +160,12 @@ export default function OfflineKartenVerwaltung() {
         // → geladene Bytes statt Prozent.
         const prozent =
           k.geladen != null && k.gesamt ? Math.floor((k.geladen / k.gesamt) * 100) : undefined;
+        // In-Place-Reload einer 'bereit'-Zeile: „aktualisiert" (Karte bleibt aktiv), sonst „lädt".
+        const label = s === 'laedt' ? 'lädt' : 'aktualisiert';
         return (
           <Space size={8}>
             <Tag icon={<LoadingOutlined spin />} color="processing" style={{ marginInlineEnd: 0 }}>
-              lädt
+              {label}
             </Tag>
             {prozent != null ? (
               <Progress percent={prozent} size="small" style={{ width: 120, marginBottom: 0 }} />
@@ -177,41 +201,56 @@ export default function OfflineKartenVerwaltung() {
           {
             title: 'Aktionen',
             key: 'aktionen',
-            render: (_, k: OfflineKarte) => (
-              <Space>
-                {k.status === 'bereit' && !k.aktiv_basemap && (
-                  <Button
-                    size="small"
-                    type="primary"
-                    onClick={() => aktivierenMutation.mutate(k.id)}
-                  >
-                    Aktivieren
-                  </Button>
-                )}
-                {k.status === 'bereit' && k.update_verfuegbar && k.katalog_url && (
-                  <Button size="small" onClick={() => aktualisierenMutation.mutate(k)}>
-                    Aktualisieren
-                  </Button>
-                )}
-                {k.status === 'laedt' && (
-                  <Button size="small" onClick={() => abbrechenMutation.mutate(k.id)}>
-                    Abbrechen
-                  </Button>
-                )}
-                {k.status !== 'laedt' && (
-                  <Popconfirm
-                    title="Offline-Karte löschen?"
-                    okText="Löschen"
-                    okButtonProps={{ danger: true }}
-                    onConfirm={() => loeschenMutation.mutate(k.id)}
-                  >
-                    <Button size="small" danger>
-                      Löschen
+            render: (_, k: OfflineKarte) => {
+              // Läuft ein Download (Neu-Zeile 'laedt' ODER In-Place-Reload einer 'bereit'-Zeile)?
+              // Dann nur Abbrechen anbieten, keine Aktivieren/Update/Löschen-Aktionen.
+              const laeuft = k.status === 'laedt' || k.geladen != null;
+              return (
+                <Space>
+                  {k.status === 'bereit' && !k.aktiv_basemap && !laeuft && (
+                    <Button
+                      size="small"
+                      type="primary"
+                      onClick={() => aktivierenMutation.mutate(k.id)}
+                    >
+                      Aktivieren
                     </Button>
-                  </Popconfirm>
-                )}
-              </Space>
-            ),
+                  )}
+                  {k.status === 'bereit' &&
+                    k.update_verfuegbar &&
+                    k.katalog_url &&
+                    !laeuft &&
+                    // Aktive Karte → In-Place-„Neu laden" (downtime-frei, stabile id); inaktive →
+                    // „Aktualisieren" (neue Zeile + Auto-Aktivieren + Alt-Löschung).
+                    (k.aktiv_basemap ? (
+                      <Button size="small" onClick={() => neuLadenMutation.mutate(k)}>
+                        Neu laden
+                      </Button>
+                    ) : (
+                      <Button size="small" onClick={() => aktualisierenMutation.mutate(k)}>
+                        Aktualisieren
+                      </Button>
+                    ))}
+                  {laeuft && (
+                    <Button size="small" onClick={() => abbrechenMutation.mutate(k.id)}>
+                      Abbrechen
+                    </Button>
+                  )}
+                  {!laeuft && (
+                    <Popconfirm
+                      title="Offline-Karte löschen?"
+                      okText="Löschen"
+                      okButtonProps={{ danger: true }}
+                      onConfirm={() => loeschenMutation.mutate(k.id)}
+                    >
+                      <Button size="small" danger>
+                        Löschen
+                      </Button>
+                    </Popconfirm>
+                  )}
+                </Space>
+              );
+            },
           },
         ] as TableColumnsType<OfflineKarte>)
       : []),

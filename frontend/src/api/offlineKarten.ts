@@ -47,6 +47,19 @@ export interface OfflineDownloadBody {
   ersetzt_karte_id?: number;
 }
 
+/**
+ * Body für den In-Place-Reload (B3): lädt ein Update der bestehenden Karte in DIESELBE Zeile/Datei.
+ * Name/Lizenz bleiben die der Karte (kein neuer Eintrag). Anders als `ersetzt_karte_id` (neue Zeile)
+ * bleibt die id stabil und die alte Datei wird bis zum atomaren Swap weiter ausgeliefert.
+ */
+export interface OfflineNeuLadenBody {
+  url: string;
+  /** Erwartete Größe (Bytes) — Plattenplatz-Vorabcheck. */
+  groesse_erwartet?: number;
+  /** Erwarteter SHA256 (hex) aus dem Katalog-Pin — Backend verifiziert beim Download. */
+  sha256_erwartet?: string;
+}
+
 /** Ein kuratierter, herunterladbarer Vorschlag (Server-autoritativ). */
 export interface OfflineKatalogEintrag {
   name: string;
@@ -70,6 +83,11 @@ export function starteOfflineDownload(body: OfflineDownloadBody): Promise<Offlin
 
 export function aktiviereOfflineKarte(id: number): Promise<OfflineKarte> {
   return apiSend<OfflineKarte>(`/api/karte/offline-karten/${id}/aktivieren`, 'POST');
+}
+
+/** In-Place-Hot-Swap (B3): Update der aktiven Karte in dieselbe Zeile — downtime-frei. */
+export function neuLadeOfflineKarte(id: number, body: OfflineNeuLadenBody): Promise<OfflineKarte> {
+  return apiSend<OfflineKarte>(`/api/karte/offline-karten/${id}/neu-laden`, 'POST', body);
 }
 
 export function brecheOfflineDownloadAb(id: number): Promise<void> {

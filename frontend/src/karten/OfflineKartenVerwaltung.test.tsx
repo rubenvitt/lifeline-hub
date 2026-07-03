@@ -179,6 +179,45 @@ describe('OfflineKartenVerwaltung', () => {
     });
   });
 
+  it('aktive Karte mit Update: In-Place „Neu laden" statt „Aktualisieren" (POST /{id}/neu-laden)', async () => {
+    let postBody: unknown = null;
+    mockBasis(admin, [{
+      ...karte,
+      aktiv_basemap: true,
+      quell_url: 'https://example.test/de_bremen_20250101.mbtiles',
+      update_verfuegbar: true,
+      katalog_url: 'https://example.test/de_bremen_20260320.mbtiles',
+      katalog_sha256: 'cafef00d',
+    }]);
+    server.use(
+      http.post('/api/karte/offline-karten/1/neu-laden', async ({ request }) => {
+        postBody = await request.json();
+        return HttpResponse.json({ ...karte, aktiv_basemap: true }, { status: 202 });
+      }),
+    );
+    render();
+    // Aktive Karte → In-Place-„Neu laden", NICHT „Aktualisieren" (neue Zeile).
+    await userEvent.click(await screen.findByRole('button', { name: 'Neu laden' }));
+    expect(screen.queryByRole('button', { name: 'Aktualisieren' })).not.toBeInTheDocument();
+    await waitFor(() => expect(postBody).not.toBeNull());
+    expect(postBody).toEqual({
+      url: 'https://example.test/de_bremen_20260320.mbtiles',
+      sha256_erwartet: 'cafef00d',
+      groesse_erwartet: 44040192,
+    });
+  });
+
+  it('In-Place-Reload: aktive „bereit"-Zeile mit Fortschritt zeigt Balken + „aktualisiert"', async () => {
+    mockBasis(admin, [{
+      ...karte, aktiv_basemap: true, status: 'bereit', geladen: 22020096, gesamt: 44040192,
+    }]);
+    render();
+    await screen.findByText('Deutschland – Bremen');
+    // Zeile bleibt „bereit"+aktiv, zeigt aber Reload-Fortschritt (50 %) + Label „aktualisiert".
+    expect(await screen.findByText('50%')).toBeInTheDocument();
+    expect(screen.getByText('aktualisiert')).toBeInTheDocument();
+  });
+
   it('Abbrechen ruft den Abbrechen-Endpunkt', async () => {
     let abgebrochen = false;
     mockBasis(admin, [karteLaedt]);
