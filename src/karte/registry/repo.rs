@@ -254,17 +254,6 @@ pub async fn aktive_offline_karte_pfad(pool: &SqlitePool) -> Result<Option<Strin
     .await
 }
 
-/// Gibt es eine aktive, ausliefer-bereite Offline-Karte? (für `pmtiles_verfuegbar` in `/config`).
-pub async fn pmtiles_verfuegbar(pool: &SqlitePool) -> Result<bool, sqlx::Error> {
-    let anzahl: i64 = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM karte_offline_karte \
-         WHERE aktiv_basemap = 1 AND status = 'bereit')",
-    )
-    .fetch_one(pool)
-    .await?;
-    Ok(anzahl != 0)
-}
-
 /// Alle Offline-Karten für die Admin-Liste, nach `sortier`, `id`.
 pub async fn liste_offline_karten(pool: &SqlitePool) -> Result<Vec<OfflineKarte>, sqlx::Error> {
     sqlx::query_as::<_, OfflineKarte>(
@@ -819,12 +808,12 @@ mod tests {
     async fn aktive_pfad_und_verfuegbar_nur_wenn_bereit_und_aktiv() {
         let pool = test_pool().await;
         assert!(aktive_offline_karte_pfad(&pool).await.unwrap().is_none());
-        assert!(!pmtiles_verfuegbar(&pool).await.unwrap());
+        assert!(aktive_offline_karte(&pool).await.unwrap().is_none());
         let k = registriere_offline_karte(&pool, &offline_eingabe("A"))
             .await
             .unwrap();
         assert!(
-            !pmtiles_verfuegbar(&pool).await.unwrap(),
+            aktive_offline_karte(&pool).await.unwrap().is_none(),
             "registriert aber nicht aktiv → noch nicht ausgeliefert"
         );
         aktiviere_offline_karte(&pool, k.id).await.unwrap();
@@ -832,7 +821,7 @@ mod tests {
             aktive_offline_karte_pfad(&pool).await.unwrap().as_deref(),
             Some("/karten/A.pmtiles")
         );
-        assert!(pmtiles_verfuegbar(&pool).await.unwrap());
+        assert!(aktive_offline_karte(&pool).await.unwrap().is_some());
     }
 
     #[tokio::test]
@@ -850,7 +839,7 @@ mod tests {
         .await
         .unwrap();
         assert!(
-            !pmtiles_verfuegbar(&pool).await.unwrap(),
+            aktive_offline_karte(&pool).await.unwrap().is_none(),
             "status='laedt' wird nicht ausgeliefert"
         );
         assert!(aktive_offline_karte_pfad(&pool).await.unwrap().is_none());
@@ -950,7 +939,7 @@ mod tests {
         assert_eq!(k.sha256, None);
         assert_eq!(k.download_at, None);
         // Solange nicht 'bereit' → nicht ausgeliefert.
-        assert!(!pmtiles_verfuegbar(&pool).await.unwrap());
+        assert!(aktive_offline_karte(&pool).await.unwrap().is_none());
     }
 
     #[tokio::test]
@@ -1061,7 +1050,7 @@ mod tests {
         assert!(aktiviere_wenn_keine_aktive(&pool, k.id).await.unwrap(), "aktiviert");
         let nach = finde_offline_karte(&pool, k.id).await.unwrap().unwrap();
         assert!(nach.aktiv_basemap);
-        assert!(pmtiles_verfuegbar(&pool).await.unwrap());
+        assert!(aktive_offline_karte(&pool).await.unwrap().is_some());
     }
 
     #[tokio::test]

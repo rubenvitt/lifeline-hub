@@ -14,7 +14,7 @@ use crate::karte::registry::repo::{
 };
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
-use axum::http::{header, StatusCode};
+use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::{Deserialize, Serialize};
@@ -135,23 +135,53 @@ pub async fn offline_tiles(
     }
 }
 
+/// Hex-kodiert die ersten 16 Bytes (128 Bit reichen als ETag) eines Hashes.
+fn hex_kurz(bytes: &[u8]) -> String {
+    bytes.iter().take(16).map(|b| format!("{b:02x}")).collect()
+}
+
 /// Baut die Antwort für ein eingebettetes Offline-Asset (Glyphs/Sprite) oder `404`, wenn es
 /// unter `pfad` nicht in `KartenAssets` liegt.
-fn embedded_antwort(pfad: &str, content_type: &str) -> Response {
-    match crate::karte::assets::KartenAssets::get(pfad) {
-        Some(f) => Response::builder()
-            .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, content_type)
-            .header(header::CACHE_CONTROL, "public, max-age=604800")
-            .body(Body::from(f.data.into_owned()))
-            .unwrap(),
-        None => StatusCode::NOT_FOUND.into_response(),
+///
+/// Cache (LFH-198): die Asset-URLs sind versionslos (`fonts/{stack}/{range}.pbf`,
+/// `sprites/basemap…`). Ein langes `max-age` würde Clients nach einem Placeholder→real-Asset-Swap
+/// (neues Binary, gleiche URL) bis zu einer Woche stale cachen lassen. Stattdessen ein
+/// content-abhängiger, starker `ETag` (rust-embed liefert den sha256 der eingebetteten Datei zur
+/// Compile-Zeit) + `Cache-Control: no-cache`: der Client darf cachen, MUSS aber bei jedem Load
+/// revalidieren → `304`, solange das Asset gleich ist; frische Bytes, sobald es sich ändert.
+fn embedded_antwort(pfad: &str, content_type: &str, if_none_match: Option<&str>) -> Response {
+    let Some(f) = crate::karte::assets::KartenAssets::get(pfad) else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    let etag = format!("\"{}\"", hex_kurz(&f.metadata.sha256_hash()));
+    if if_none_match == Some(etag.as_str()) {
+        return Response::builder()
+            .status(StatusCode::NOT_MODIFIED)
+            .header(header::ETAG, &etag)
+            .header(header::CACHE_CONTROL, "no-cache")
+            .body(Body::empty())
+            .unwrap();
     }
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, content_type)
+        .header(header::CACHE_CONTROL, "no-cache")
+        .header(header::ETAG, &etag)
+        .body(Body::from(f.data.into_owned()))
+        .unwrap()
+}
+
+/// Liest den `If-None-Match`-Header (für die Conditional-Requests der eingebetteten Assets).
+fn if_none_match(headers: &HeaderMap) -> Option<&str> {
+    headers.get(header::IF_NONE_MATCH).and_then(|v| v.to_str().ok())
 }
 
 /// GET /api/karte/offline/fonts/{fontstack}/{datei} — eingebettete SDF-Glyphs (OFL).
 /// `{datei}` = `<range>.pbf` (z. B. `0-255.pbf`), so wie MapLibres glyphs-Template es anfragt.
-pub async fn offline_fonts(Path((fontstack, datei)): Path<(String, String)>) -> Response {
+pub async fn offline_fonts(
+    headers: HeaderMap,
+    Path((fontstack, datei)): Path<(String, String)>,
+) -> Response {
     // `.pbf` abstreifen: validiere_range erwartet `<int>-<int>` OHNE Suffix (src/karte/proxy.rs).
     let Some(range) = datei.strip_suffix(".pbf") else {
         return StatusCode::BAD_REQUEST.into_response();
@@ -160,11 +190,15 @@ pub async fn offline_fonts(Path((fontstack, datei)): Path<(String, String)>) -> 
     if proxy::validiere_fontstack(&fontstack).is_err() || proxy::validiere_range(range).is_err() {
         return StatusCode::BAD_REQUEST.into_response();
     }
-    embedded_antwort(&format!("fonts/{fontstack}/{datei}"), "application/x-protobuf")
+    embedded_antwort(
+        &format!("fonts/{fontstack}/{datei}"),
+        "application/x-protobuf",
+        if_none_match(&headers),
+    )
 }
 
 /// GET /api/karte/offline/sprites/{datei} — eingebettetes Sprite (png/json, +@2x).
-pub async fn offline_sprite(Path(datei): Path<String>) -> Response {
+pub async fn offline_sprite(headers: HeaderMap, Path(datei): Path<String>) -> Response {
     // Nur bekannte Basisnamen zulassen (kein Traversal).
     let ct = if datei.ends_with(".png") {
         "image/png"
@@ -176,7 +210,7 @@ pub async fn offline_sprite(Path(datei): Path<String>) -> Response {
     if datei.contains('/') || datei.contains("..") {
         return StatusCode::BAD_REQUEST.into_response();
     }
-    embedded_antwort(&format!("sprites/{datei}"), ct)
+    embedded_antwort(&format!("sprites/{datei}"), ct, if_none_match(&headers))
 }
 
 #[cfg(test)]
@@ -186,19 +220,96 @@ mod offline_assets_tests {
     #[tokio::test]
     async fn offline_fonts_lehnt_bad_range_ab() {
         // Handler direkt aufrufen (kein Server nötig): Path ist ein Tuple-Wrapper.
-        let r = offline_fonts(axum::extract::Path((
-            "Noto Sans Regular".into(),
-            "boese.pbf".into(),
-        )))
+        let r = offline_fonts(
+            HeaderMap::new(),
+            axum::extract::Path(("Noto Sans Regular".into(), "boese.pbf".into())),
+        )
         .await;
         assert_eq!(r.status(), StatusCode::BAD_REQUEST);
         // Ohne .pbf-Suffix ebenfalls ablehnen.
-        let r2 = offline_fonts(axum::extract::Path((
-            "Noto Sans Regular".into(),
-            "0-255".into(),
-        )))
+        let r2 = offline_fonts(
+            HeaderMap::new(),
+            axum::extract::Path(("Noto Sans Regular".into(), "0-255".into())),
+        )
         .await;
         assert_eq!(r2.status(), StatusCode::BAD_REQUEST);
+    }
+
+    // Positivpfad Glyphs: gültiger Fontstack (mit Leerzeichen) + Range → eingebettetes .pbf als
+    // application/x-protobuf. Cache-Header bewusst nicht geprüft (siehe embedded_antwort-Tests).
+    #[tokio::test]
+    async fn offline_fonts_liefert_eingebettetes_pbf() {
+        let r = offline_fonts(
+            HeaderMap::new(),
+            axum::extract::Path(("Noto Sans Regular".into(), "0-255.pbf".into())),
+        )
+        .await;
+        assert_eq!(r.status(), StatusCode::OK);
+        assert_eq!(
+            r.headers().get(header::CONTENT_TYPE).unwrap(),
+            "application/x-protobuf"
+        );
+    }
+
+    // Positivpfad Sprite: .json → application/json, .png → image/png.
+    #[tokio::test]
+    async fn offline_sprite_liefert_json_und_png() {
+        let j = offline_sprite(HeaderMap::new(), axum::extract::Path("basemap.json".into())).await;
+        assert_eq!(j.status(), StatusCode::OK);
+        assert_eq!(j.headers().get(header::CONTENT_TYPE).unwrap(), "application/json");
+        let p = offline_sprite(HeaderMap::new(), axum::extract::Path("basemap.png".into())).await;
+        assert_eq!(p.status(), StatusCode::OK);
+        assert_eq!(p.headers().get(header::CONTENT_TYPE).unwrap(), "image/png");
+    }
+
+    // Sprite-Guards: unbekannte Endung → 400, Traversal → 400.
+    #[tokio::test]
+    async fn offline_sprite_lehnt_fremde_endung_und_traversal_ab() {
+        assert_eq!(
+            offline_sprite(HeaderMap::new(), axum::extract::Path("basemap.txt".into()))
+                .await
+                .status(),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            offline_sprite(HeaderMap::new(), axum::extract::Path("../geheim.png".into()))
+                .await
+                .status(),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    // A2 (LFH-198): eingebettete Assets tragen versionslose URLs. Statt 1-Woche-max-age (der beim
+    // Placeholder→real-Asset-Swap bis 7 Tage stale cachen würde) → content-abhängiger ETag +
+    // `no-cache` (Client cacht, revalidiert aber). Kein Staleness nach einem Binary-Update.
+    #[test]
+    fn embedded_antwort_setzt_etag_und_no_cache() {
+        let r = embedded_antwort("sprites/basemap.json", "application/json", None);
+        assert_eq!(r.status(), StatusCode::OK);
+        assert_eq!(r.headers().get(header::CACHE_CONTROL).unwrap(), "no-cache");
+        assert!(r.headers().get(header::ETAG).is_some(), "ETag gesetzt");
+    }
+
+    // Passendes If-None-Match → 304 (kein Body neu übertragen), ETag weiterhin gesetzt.
+    #[test]
+    fn embedded_antwort_304_bei_passendem_if_none_match() {
+        let etag = embedded_antwort("sprites/basemap.json", "application/json", None)
+            .headers()
+            .get(header::ETAG)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+        let r = embedded_antwort("sprites/basemap.json", "application/json", Some(&etag));
+        assert_eq!(r.status(), StatusCode::NOT_MODIFIED);
+        assert_eq!(r.headers().get(header::ETAG).unwrap(), &etag);
+    }
+
+    // Nicht-passender ETag → normale 200-Auslieferung.
+    #[test]
+    fn embedded_antwort_200_bei_fremdem_if_none_match() {
+        let r = embedded_antwort("sprites/basemap.json", "application/json", Some("\"veraltet\""));
+        assert_eq!(r.status(), StatusCode::OK);
     }
 }
 
