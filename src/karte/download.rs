@@ -51,6 +51,10 @@ pub enum DownloadFehler {
     Io(String),
     /// Heruntergeladene Datei stimmt nicht mit dem erwarteten SHA256-Pin überein (Supply-Chain).
     HashMismatch { erwartet: String, ist: String },
+    /// Download überschreitet die erlaubte Maximalgröße (Content-Length oder gestreamt erkannt).
+    ZuGross { grenze: u64 },
+    /// Nicht genug freier Plattenplatz für die (server-gemeldete) Download-Größe.
+    KeinPlatz { frei: u64, benoetigt: u64 },
 }
 
 impl std::fmt::Display for DownloadFehler {
@@ -62,6 +66,12 @@ impl std::fmt::Display for DownloadFehler {
             DownloadFehler::Io(e) => write!(f, "Schreibfehler: {e}"),
             DownloadFehler::HashMismatch { erwartet, ist } => {
                 write!(f, "SHA256 stimmt nicht: erwartet {erwartet}, war {ist}")
+            }
+            DownloadFehler::ZuGross { grenze } => {
+                write!(f, "Download überschreitet die Maximalgröße von {grenze} Bytes")
+            }
+            DownloadFehler::KeinPlatz { frei, benoetigt } => {
+                write!(f, "Nicht genug Speicherplatz: {frei} Bytes frei, ~{benoetigt} Bytes benötigt")
             }
         }
     }
@@ -175,15 +185,18 @@ pub fn ssrf_redirect_policy() -> reqwest::redirect::Policy {
     })
 }
 
-/// Dedizierter Download-Client (siehe Modul-Doku). Nutzt die geteilte SSRF-Redirect-Policy.
-/// HINWEIS: bewusst OHNE pinnenden DNS-Resolver (anders als `proxy::proxy_client`) — der
-/// Download-Pfad ist admin-only (admin-vetted Katalog-/URL), das DNS-Rebinding-Risiko sekundär.
+/// Dedizierter Download-Client (siehe Modul-Doku). Nutzt die geteilte SSRF-Redirect-Policy UND
+/// den pinnenden DNS-Resolver (`proxy::SichererResolver`, LFH-187/B1): der Host wird vor dem
+/// Connect selbst aufgelöst und über `nur_public` gefiltert — reqwest connectet exakt auf public
+/// IPs, es gibt kein Re-Resolve-/Rebind-Fenster. Schließt DNS-Rebinding auch für den (admin-only)
+/// Download-Pfad, nicht nur für den Proxy. `url_ist_sicher` (Schema/Literal-IP) bleibt Pre-Check.
 pub fn download_client() -> reqwest::Client {
     reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(20))
         .read_timeout(Duration::from_secs(READ_TIMEOUT_SEKUNDEN))
         .user_agent("LifelineHub-Kartendownload/1.0 (+https://github.com/)")
         .redirect(ssrf_redirect_policy())
+        .dns_resolver(std::sync::Arc::new(crate::karte::proxy::SichererResolver))
         .build()
         .expect("Download-Client baubar")
 }
@@ -205,6 +218,19 @@ fn hex(bytes: &[u8]) -> String {
     s
 }
 
+/// Harte Obergrenze für einen einzelnen Karten-Download (LFH-187/B2): Backstop gegen
+/// Platten-Erschöpfung durch eine bösartige/fehlkonfigurierte Quelle ohne Größen-Pin (z.B. der
+/// „Per-URL"-Pfad, der keine `groesse_erwartet` sendet). Großzügig: regionale Vektor-MBTiles liegen
+/// bei einigen GB; 64 GiB deckt auch Länder-Ausschnitte, kappt aber Absurdes/Endlos-Streams.
+pub const MAX_DOWNLOAD_BYTES: u64 = 64 * 1024 * 1024 * 1024;
+
+/// True, wenn `frei` Bytes für einen Download von `groesse` reichen (inkl. 10 % Reserve).
+/// Saturating gegen Overflow bei sehr großen `groesse`. Geteilt von Handler-Vorabcheck und
+/// Streaming-Core, damit die Reserve-Regel eine einzige Quelle der Wahrheit hat.
+pub fn genug_platz(frei: u64, groesse: u64) -> bool {
+    frei >= groesse.saturating_add(groesse / 10)
+}
+
 /// Lädt `url` chunked nach `ziel_part`, rechnet inkrementell sha256 mit und meldet Fortschritt.
 /// Prüft vor jedem Chunk `fortschritt.abbruch`. KEIN Range-Resume (v1: einmaliger Prep-Download).
 /// Validiert die URL NICHT selbst — der Aufruf-Pfad (Endpunkt) hat sie bereits geprüft, der
@@ -215,6 +241,7 @@ pub async fn lade_datei(
     ziel_part: &Path,
     fortschritt: &Fortschritt,
     erwartet_sha256: Option<&str>,
+    max_bytes: u64,
 ) -> Result<DownloadErgebnis, DownloadFehler> {
     let resp = client
         .get(url)
@@ -224,8 +251,24 @@ pub async fn lade_datei(
     if !resp.status().is_success() {
         return Err(DownloadFehler::Status(resp.status().as_u16()));
     }
+    // Vorab-Guards anhand der server-gemeldeten Content-Length (deckt BEIDE Pfade — auch den
+    // Per-URL-Pfad ohne Katalog-`groesse_erwartet`). VOR dem Anlegen der `.part`-Datei, damit ein
+    // zu großer/nicht passender Download keine leere Teil-Datei hinterlässt.
     if let Some(len) = resp.content_length() {
         fortschritt.gesamt.store(len, Ordering::Relaxed);
+        if len > max_bytes {
+            return Err(DownloadFehler::ZuGross { grenze: max_bytes });
+        }
+        if let Some(dir) = ziel_part.parent() {
+            if let Ok(frei) = fs4::available_space(dir) {
+                if !genug_platz(frei, len) {
+                    return Err(DownloadFehler::KeinPlatz {
+                        frei,
+                        benoetigt: len.saturating_add(len / 10),
+                    });
+                }
+            }
+        }
     }
 
     let mut datei = tokio::fs::File::create(ziel_part)
@@ -243,12 +286,17 @@ pub async fn lade_datei(
             Some(c) => c,
             None => break,
         };
+        geladen += chunk.len() as u64;
+        // Streaming-Backstop: fängt fehlende/gelogene Content-Length ab (der Vorab-Check greift
+        // nur bei bekannter Länge). Vor dem Schreiben prüfen → kein Byte über der Grenze auf Platte.
+        if geladen > max_bytes {
+            return Err(DownloadFehler::ZuGross { grenze: max_bytes });
+        }
         hasher.update(&chunk);
         datei
             .write_all(&chunk)
             .await
             .map_err(|e| DownloadFehler::Io(e.to_string()))?;
-        geladen += chunk.len() as u64;
         fortschritt.geladen.store(geladen, Ordering::Relaxed);
     }
 
@@ -354,7 +402,9 @@ mod tests {
         let fortschritt = Fortschritt::default();
         let url = Url::parse(&url_str).unwrap();
 
-        let erg = lade_datei(&client, url, &ziel, &fortschritt, None).await.unwrap();
+        let erg = lade_datei(&client, url, &ziel, &fortschritt, None, MAX_DOWNLOAD_BYTES)
+            .await
+            .unwrap();
 
         assert_eq!(erg.groesse, body.len() as i64);
         assert_eq!(erg.sha256, erwarteter_hash(&body));
@@ -364,6 +414,64 @@ mod tests {
             fortschritt.gesamt.load(Ordering::Relaxed),
             body.len() as u64,
             "Content-Length übernommen"
+        );
+    }
+
+    // B2 (LFH-187): Plattenplatz-Prädikat mit 10 % Reserve — pure, deshalb direkt testbar.
+    #[test]
+    fn genug_platz_beachtet_zehn_prozent_reserve() {
+        assert!(genug_platz(1100, 1000), "exakt Größe + 10 % passt");
+        assert!(!genug_platz(1099, 1000), "1 Byte unter Größe + 10 % reicht nicht");
+        assert!(genug_platz(50, 0), "Nullgröße passt immer");
+        // Saturating: eine riesige Größe (Reserve würde overflowen) panickt nicht und passt nicht
+        // in wenig freien Platz.
+        assert!(!genug_platz(1000, u64::MAX), "u64::MAX-Größe passt nicht in 1000 Bytes frei");
+    }
+
+    // B2: ein Download über der Max-Größe wird abgebrochen (hier via Content-Length erkannt).
+    #[tokio::test]
+    async fn lade_datei_lehnt_download_ueber_max_ab() {
+        let body = b"y".repeat(2000);
+        let url_str = spawn_fixture(body).await;
+        let tmp = tempfile::tempdir().unwrap();
+        let client = download_client();
+        let f = Fortschritt::default();
+        let err = lade_datei(
+            &client,
+            Url::parse(&url_str).unwrap(),
+            &tmp.path().join("big.part"),
+            &f,
+            None,
+            1000, // max_bytes < Body
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(err, DownloadFehler::ZuGross { .. }), "war {err:?}");
+        assert!(!tmp.path().join("big.part").exists(), "keine Teil-Datei bei Vorab-Ablehnung");
+    }
+
+    // B1 (LFH-187): der Download-Client pinnt DNS (nur_public-Resolver). Ein HOSTNAME, der auf
+    // Loopback auflöst (`localhost` → 127.0.0.1/::1), wird geblockt — schließt DNS-Rebinding auf
+    // interne Ziele. (IP-Literale wie 127.0.0.1 umgehen den Resolver; deshalb ein Hostname.)
+    #[tokio::test]
+    async fn download_client_blockt_hostnamen_die_auf_loopback_aufloesen() {
+        let url_str = spawn_fixture(b"x".repeat(100)).await.replace("127.0.0.1", "localhost");
+        let tmp = tempfile::tempdir().unwrap();
+        let client = download_client();
+        let f = Fortschritt::default();
+        let err = lade_datei(
+            &client,
+            Url::parse(&url_str).unwrap(),
+            &tmp.path().join("x.part"),
+            &f,
+            None,
+            MAX_DOWNLOAD_BYTES,
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(err, DownloadFehler::Http(_)),
+            "loopback-Hostname darf nicht connecten (war {err:?})"
         );
     }
 
@@ -377,9 +485,16 @@ mod tests {
         let fortschritt = Fortschritt::default();
         fortschritt.abbruch.store(true, Ordering::Relaxed); // vor dem ersten Chunk
 
-        let err = lade_datei(&client, Url::parse(&url_str).unwrap(), &ziel, &fortschritt, None)
-            .await
-            .unwrap_err();
+        let err = lade_datei(
+            &client,
+            Url::parse(&url_str).unwrap(),
+            &ziel,
+            &fortschritt,
+            None,
+            MAX_DOWNLOAD_BYTES,
+        )
+        .await
+        .unwrap_err();
         assert!(matches!(err, DownloadFehler::Abgebrochen));
     }
 
@@ -398,6 +513,7 @@ mod tests {
             &tmp.path().join("ok.part"),
             &f1,
             Some(&erwarteter_hash(&body)),
+            MAX_DOWNLOAD_BYTES,
         )
         .await
         .unwrap();
@@ -411,6 +527,7 @@ mod tests {
             &tmp.path().join("bad.part"),
             &f2,
             Some("deadbeef"),
+            MAX_DOWNLOAD_BYTES,
         )
         .await
         .unwrap_err();

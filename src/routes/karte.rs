@@ -768,11 +768,13 @@ pub async fn offline_download(
         .unwrap_or("shortbread")
         .to_string();
 
-    // Plattenplatz-Check vorab gegen die erwartete (Katalog-)Größe, mit 10 % Reserve.
+    // Plattenplatz-Check vorab gegen die erwartete (Katalog-)Größe, mit 10 % Reserve — für den
+    // sofortigen 422 im Katalog-Pfad. Der Per-URL-Pfad (ohne groesse_erwartet) wird zusätzlich in
+    // lade_datei anhand der Content-Length geprüft (LFH-187/B2).
     if let Some(erwartet) = body.groesse_erwartet.filter(|g| *g > 0) {
         if let Ok(frei) = fs4::available_space(&state.karten_dir) {
-            let benoetigt = (erwartet as u64).saturating_add(erwartet as u64 / 10);
-            if frei < benoetigt {
+            if !download::genug_platz(frei, erwartet as u64) {
+                let benoetigt = (erwartet as u64).saturating_add(erwartet as u64 / 10);
                 return Err(AppError::UnprocessableEntity(format!(
                     "Nicht genug Speicherplatz im Kartenverzeichnis: {frei} Bytes frei, \
                      ~{benoetigt} Bytes benötigt"
@@ -812,8 +814,15 @@ pub async fn offline_download(
         let dateiname = format!("karte-{id}.mbtiles");
         let part = karten_dir.join(format!("{dateiname}.part"));
         tracing::info!("Offline-Karte {id}: Download startet von {url}");
-        let ergebnis =
-            download::lade_datei(&client, url, &part, &fortschritt, sha256_erwartet.as_deref()).await;
+        let ergebnis = download::lade_datei(
+            &client,
+            url,
+            &part,
+            &fortschritt,
+            sha256_erwartet.as_deref(),
+            download::MAX_DOWNLOAD_BYTES,
+        )
+        .await;
         match ergebnis {
             Ok(erg) => {
                 // Atomarer Swap: erst nach vollständigem Download .part → finalen Pfad.
