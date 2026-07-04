@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
-import type { OfflineKarte } from '../api/offlineKarten';
+import type { OfflineKarte, OfflineKatalogEintrag } from '../api/offlineKarten';
 import OfflineKartenVerwaltung from './OfflineKartenVerwaltung';
 
 const admin = {
@@ -34,7 +34,11 @@ const katalogEintrag = {
   quelle: 'Project N.O.M.A.D.', sha256: 'cafef00d',
 };
 
-function mockBasis(benutzer: typeof admin, karten: OfflineKarte[] = [karte], katalog = [katalogEintrag]) {
+function mockBasis(
+  benutzer: typeof admin,
+  karten: OfflineKarte[] = [karte],
+  katalog: OfflineKatalogEintrag[] = [katalogEintrag],
+) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
     http.get('/api/karte/offline-karten', () => HttpResponse.json(karten)),
@@ -64,18 +68,41 @@ describe('OfflineKartenVerwaltung', () => {
     mockBasis(admin);
     render();
     await screen.findByText('Deutschland – Bremen');
-    expect(screen.getByRole('button', { name: 'Aus Katalog herunterladen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Region aufs Gerät bringen' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Per URL herunterladen' })).toBeInTheDocument();
     // bereit + nicht aktiv → Aktivieren angeboten.
     expect(screen.getByRole('button', { name: 'Aktivieren' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Löschen' })).toBeInTheDocument();
   });
 
+  it('Katalog-Modal gruppiert Regionen und startet den Download', async () => {
+    let downloadName: string | undefined;
+    const katalog = [
+      { name: 'Deutschland (Shortbread)', url: 'https://m/de.mbtiles', region: 'DE', groesse: 3e9, lizenz: 'ODbL', kachel_schema: 'shortbread', quelle: 'q', sha256: null, gruppe: 'Deutschland' },
+      { name: 'Bayern', url: 'https://m/by.mbtiles', region: 'DE-BY', groesse: 1e9, lizenz: 'ODbL', kachel_schema: 'shortbread', quelle: 'q', sha256: null, gruppe: 'Bundesländer' },
+    ];
+    mockBasis(admin, [], katalog);
+    server.use(
+      http.post('/api/karte/offline-karten/download', async ({ request }) => {
+        downloadName = ((await request.json()) as { name: string }).name;
+        return HttpResponse.json({ ...karte, id: 9, name: downloadName });
+      }),
+    );
+    render();
+    await userEvent.click(await screen.findByRole('button', { name: 'Region aufs Gerät bringen' }));
+    // Geführte Auswahl: die Einträge sind nach Gruppe überschrieben.
+    expect(await screen.findByRole('heading', { name: 'Bundesländer' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Deutschland' })).toBeInTheDocument();
+    // Erster „Herunterladen" (Gruppe Deutschland) startet den Download mit dem richtigen Eintrag.
+    await userEvent.click(screen.getAllByRole('button', { name: 'Herunterladen' })[0]);
+    await waitFor(() => expect(downloadName).toBe('Deutschland (Shortbread)'));
+  });
+
   it('Führungskraft sieht keine Schreibaktionen (read-only)', async () => {
     mockBasis(fuehrungskraft);
     render();
     await screen.findByText('Deutschland – Bremen');
-    expect(screen.queryByRole('button', { name: 'Aus Katalog herunterladen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Region aufs Gerät bringen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Aktivieren' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
   });
@@ -104,7 +131,7 @@ describe('OfflineKartenVerwaltung', () => {
       }),
     );
     render();
-    await userEvent.click(await screen.findByRole('button', { name: 'Aus Katalog herunterladen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Region aufs Gerät bringen' }));
     const dialog = await screen.findByRole('dialog');
     expect(await within(dialog).findByText('Deutschland – Bremen')).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Herunterladen' }));

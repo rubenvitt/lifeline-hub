@@ -265,7 +265,7 @@ export default function OfflineKartenVerwaltung() {
       {istAdmin && (
         <Space style={{ marginBottom: 12 }}>
           <Button type="primary" onClick={() => setKatalogOffen(true)}>
-            Aus Katalog herunterladen
+            Region aufs Gerät bringen
           </Button>
           <Button onClick={() => setUrlOffen(true)}>Per URL herunterladen</Button>
         </Space>

@@ -71,6 +71,8 @@ export interface OfflineKatalogEintrag {
   quelle: string;
   /** Optionaler SHA256-Pin (hex); null/undefined = kein Pin. */
   sha256?: string | null;
+  /** Optionale UX-Gruppe für die geführte Auswahl (z. B. „Deutschland", „Bundesländer"). */
+  gruppe?: string | null;
 }
 
 export function listeOfflineKarten(): Promise<OfflineKarte[]> {
