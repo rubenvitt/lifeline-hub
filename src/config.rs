@@ -114,22 +114,36 @@ pub struct OfflineKatalogEintrag {
 /// Shortbread, z0–14, ODbL): ein gesamtdeutscher Shortbread-MBTiles-Eintrag, als GitHub-Release
 /// des eigenen Build-Projekts gehostet (LFH-195: Community-Katalog vorheriger Bauart entfällt).
 pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {
-    // >>> OPERATOR-PIN (LFH-197) <<< — beim ersten karten-build-Release genau diese drei Felder
-    // ersetzen (README karten-build): `url` (Host-URL des Releases), `groesse` (gemessene Bytes),
-    // `sha256` (aus out/result/osm*.mbtiles.sha256, lowercase-hex). Bis dahin ein klar
-    // erkennbarer, aber gültiger https-Platzhalter. Der Pin ist eine reine Config-Änderung —
-    // die Test-Konsistenzprüfung (katalog_eintrag_sha256_pin_konsistent) trägt beide Zustände.
-    vec![OfflineKatalogEintrag {
-        name: "Deutschland (Shortbread)".into(),
-        url: "https://TODO-karten-build-release/germany.shortbread.mbtiles".into(),
-        region: "DE".into(),
-        groesse: 3 * 1024 * 1024 * 1024, // grobe Schätzung, nach erstem Build durch Messung ersetzen
-        lizenz: "© OpenStreetMap contributors (ODbL)".into(),
-        kachel_schema: "shortbread".into(),
-        quelle: "Eigenbau (karten-build, Planetiler-Shortbread)".into(),
-        sha256: None, // nach erstem Build gepinnt
-        gruppe: Some("Deutschland".into()),
-    }]
+    // >>> OPERATOR-PIN (LFH-197/199) <<< — je Eintrag beim karten-build-Release genau drei Felder
+    // ersetzen (README karten-build): `url` (Host-URL), `groesse` (gemessene Bytes), `sha256` (aus
+    // out/result/osm*.mbtiles.sha256, lowercase-hex). Bis dahin klar erkennbare, aber gültige
+    // https-Platzhalter. Der Pin ist eine reine Config-Änderung; die Konsistenzprüfung
+    // (katalog_eintrag_sha256_pin_konsistent) trägt Platzhalter wie echten Pin. Alternativ füllt
+    // das Remote-Manifest (LFH-199) die echten Einträge ohne App-Release.
+    //
+    // Kuratierte Regionen (~5–20, grob): DE gesamt, DACH, einzelne Bundesländer. `gruppe` steuert
+    // die geführte UX-Auswahl. Neue Region = Zeile ergänzen (Slug = karten-build-Dateiname).
+    fn platzhalter(name: &str, region: &str, gruppe: &str, slug: &str, ca_gb: i64) -> OfflineKatalogEintrag {
+        OfflineKatalogEintrag {
+            name: name.into(),
+            url: format!("https://TODO-karten-build-release/{slug}.shortbread.mbtiles"),
+            region: region.into(),
+            groesse: ca_gb * 1024 * 1024 * 1024, // grobe Schätzung, nach Bau durch Messung ersetzen
+            lizenz: "© OpenStreetMap contributors (ODbL)".into(),
+            kachel_schema: "shortbread".into(),
+            quelle: "Eigenbau (karten-build, Planetiler-Shortbread)".into(),
+            sha256: None,
+            gruppe: Some(gruppe.into()),
+        }
+    }
+    vec![
+        platzhalter("Deutschland (Shortbread)", "DE", "Deutschland", "germany", 3),
+        platzhalter("DACH (DE/AT/CH)", "DACH", "DACH", "dach", 5),
+        platzhalter("Bayern", "DE-BY", "Bundesländer", "bayern", 1),
+        platzhalter("Baden-Württemberg", "DE-BW", "Bundesländer", "baden-wuerttemberg", 1),
+        platzhalter("Nordrhein-Westfalen", "DE-NW", "Bundesländer", "nordrhein-westfalen", 1),
+        platzhalter("Niedersachsen", "DE-NI", "Bundesländer", "niedersachsen", 1),
+    ]
 }
 
 /// Merged den kompilierten Default-Katalog mit einem optionalen Remote-Manifest (Hybrid, LFH-199).
@@ -350,6 +364,14 @@ mod tests {
     fn merge_katalog_ohne_remote_ist_identisch() {
         let compiled = vec![eintrag("Bayern", "https://TODO-x/by.mbtiles", None)];
         assert_eq!(merge_offline_katalog(compiled.clone(), None).len(), compiled.len());
+    }
+
+    #[test]
+    fn offline_katalog_ist_kuratiert_und_gruppiert() {
+        let k = default_offline_katalog();
+        assert!(k.len() >= 3, "kuratierter Katalog mit mehreren Regionen: {}", k.len());
+        assert!(k.iter().all(|e| e.gruppe.is_some()), "jeder Eintrag hat eine UX-Gruppe");
+        assert!(k.iter().any(|e| e.region == "DE" && e.name.contains("Deutschland")));
     }
 
     #[test]
