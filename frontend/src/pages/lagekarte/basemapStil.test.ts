@@ -93,6 +93,21 @@ describe('basemapStil', () => {
     expect((s as { layers: unknown[] }).layers).toHaveLength(1);
   });
 
+  it('offline-Modus: Vektor-Format → Shortbread-Vektor-Style, Raster-Format → Raster-Style (LFH-185)', () => {
+    // Ohne offline_format (Default) → beschrifteter Shortbread-Style mit Vektor-Source.
+    const vektor = baueBasemapStyle('offline', 'light', nurOffline, undefined) as {
+      sources: Record<string, { type: string }>;
+    };
+    expect(vektor.sources.basemap.type).toBe('vector');
+    // offline_format='raster' → Raster-Style mit dem Offline-Tiles-Template VERBATIM.
+    const rasterConfig: KarteServerConfig = { ...nurOffline, offline_format: 'raster' };
+    const raster = baueBasemapStyle('offline', 'light', rasterConfig, undefined) as {
+      sources: Record<string, { type: string; tiles: string[] }>;
+    };
+    expect(raster.sources.raster.type).toBe('raster');
+    expect(raster.sources.raster.tiles).toEqual(['/api/karte/offline/tiles/{z}/{x}/{y}?v=abc']);
+  });
+
   it('defaultModus: online (Liste nicht leer) vor offline vor blind', () => {
     expect(defaultModus(beides)).toBe('online');
     expect(defaultModus(nurOffline)).toBe('offline');

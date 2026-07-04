@@ -18,6 +18,9 @@ export interface KarteServerConfig {
   offline_tiles_url: string | null;
   /** Pflicht-Attribution der aktiven Offline-Karte (offline sichtbar, z. B. ODbL). */
   offline_attribution: string | null;
+  /** Grober Kachel-Typ der aktiven Offline-Karte (LFH-185): `'raster'` → Raster-Style, sonst
+   * (undefined/null/`'vektor'`) der Shortbread-Vektor-Style. */
+  offline_format?: OnlineStyleTyp | null;
 }
 
 export function ladeKarteConfig(): Promise<KarteServerConfig> {

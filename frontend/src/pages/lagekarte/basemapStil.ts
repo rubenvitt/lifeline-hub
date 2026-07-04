@@ -77,14 +77,15 @@ export function defaultModus(config: KarteServerConfig | undefined): BasemapModu
   return 'blind';
 }
 
-/** Verpackt ein Raster-Tile-Template (`{z}/{y}/{x}`) in einen MapLibre-Raster-Style.
- *  URL wird VERBATIM durchgereicht; Attribution läuft NICHT über die Source,
- *  sondern config-autoritativ über `customAttribution` (siehe aktuelleAttribution). */
-function rasterStyle(stil: OnlineStyle): StyleSpecification {
+/** Verpackt ein Raster-Tile-Template (`{z}/{x}/{y}`) in einen MapLibre-Raster-Style. Dient online
+ *  (proxied Upstream) wie offline (LFH-185: aktive Raster-MBTiles). Die URL wird VERBATIM
+ *  durchgereicht (offline root-relativ mit literalen {z}/{x}/{y} → transformRequest absolutiert im
+ *  Worker); Attribution läuft NICHT über die Source, sondern config-autoritativ (aktuelleAttribution). */
+function rasterStyle(tilesUrl: string, tileSize = 256): StyleSpecification {
   return {
     version: 8,
     sources: {
-      raster: { type: 'raster', tiles: [stil.url], tileSize: 256 },
+      raster: { type: 'raster', tiles: [tilesUrl], tileSize },
     },
     layers: [{ id: 'raster', type: 'raster', source: 'raster' }],
   } as StyleSpecification;
@@ -108,7 +109,7 @@ export function absolutiereProxyAnfrage(url: string): { url: string } {
 
 /** Style für einen Online-View: Vektor → URL-String, Raster → verpackter Raster-Style. */
 export function baueOnlineStyle(stil: OnlineStyle): StyleSpecification | string {
-  if (stil.typ === 'raster') return rasterStyle(stil);
+  if (stil.typ === 'raster') return rasterStyle(stil.url);
   // Vektor: Style-JSON-URL. Relative Proxy-URLs (/api/karte/proxy/{id}/style.json, LFH-182) gegen
   // die Origin absolutieren (idempotent für bereits absolute URLs), damit MapLibre die
   // setStyle-URL zuverlässig auflöst.
@@ -126,7 +127,12 @@ export function baueBasemapStyle(
   onlineStil: OnlineStyle | undefined,
 ): StyleSpecification | string {
   if (modus === 'online' && onlineStil) return baueOnlineStyle(onlineStil);
-  if (modus === 'offline' && config?.offline_tiles_url) return offlineStyle(theme, config.offline_tiles_url);
+  if (modus === 'offline' && config?.offline_tiles_url) {
+    // Raster-Offline-Karte (LFH-185) → Raster-Style; sonst der beschriftete Shortbread-Vektor-Style.
+    return config.offline_format === 'raster'
+      ? rasterStyle(config.offline_tiles_url)
+      : offlineStyle(theme, config.offline_tiles_url);
+  }
   return blindStyle(theme);
 }
 

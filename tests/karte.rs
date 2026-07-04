@@ -121,7 +121,7 @@ async fn schreibe_fixture_mbtiles(pfad: &std::path::Path, daten: &[u8]) {
 /// Registriert + aktiviert eine Offline-Karte mit `pfad` (relativ zum `karten_dir`), sodass
 /// `repo::aktive_offline_karte_pfad` sie liefert (Status wird von `registriere_offline_karte`
 /// bereits als `bereit` angelegt).
-async fn registriere_und_aktiviere(pool: &sqlx::SqlitePool, pfad: &str) -> i64 {
+async fn registriere_und_aktiviere(pool: &sqlx::SqlitePool, pfad: &str, format: &str) -> i64 {
     use lifeline_hub::karte::registry::repo;
     let karte = repo::registriere_offline_karte(
         pool,
@@ -131,6 +131,7 @@ async fn registriere_und_aktiviere(pool: &sqlx::SqlitePool, pfad: &str) -> i64 {
             quell_url: None,
             lizenz: Some("© Test".into()),
             kachel_schema: "shortbread".into(),
+            format: format.into(),
             sortier: 0,
         },
     )
@@ -146,7 +147,7 @@ async fn offline_tiles_liefert_gzip_mvt_mit_tms_flip() {
     let dir = tempfile::tempdir().unwrap();
     let dateiname = "karte-1.mbtiles";
     schreibe_fixture_mbtiles(&dir.path().join(dateiname), &[0xAB, 0xCD]).await;
-    registriere_und_aktiviere(&pool, dateiname).await;
+    registriere_und_aktiviere(&pool, dateiname, "pbf").await;
 
     let app = build_router(AppState {
         pool,
@@ -182,6 +183,53 @@ async fn offline_tiles_liefert_gzip_mvt_mit_tms_flip() {
 }
 
 #[tokio::test]
+async fn offline_tiles_raster_liefert_png_ohne_gzip_und_config_meldet_raster() {
+    // LFH-185: eine aktive Raster-Karte (format='png') wird als image/png OHNE Content-Encoding
+    // serviert, und /config gröbert das Format zu 'raster' (Frontend-Style-Wahl).
+    let pool = pool().await;
+    let dir = tempfile::tempdir().unwrap();
+    let dateiname = "karte-1.mbtiles";
+    // Blob mit PNG-Signatur — der Inhalt ist für die Header-Logik irrelevant (die kommt aus der
+    // DB-format-Spalte), die Signatur hält es aber ehrlich.
+    let png: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x01];
+    schreibe_fixture_mbtiles(&dir.path().join(dateiname), png).await;
+    registriere_und_aktiviere(&pool, dateiname, "png").await;
+
+    let app = build_router(AppState {
+        pool,
+        live: LiveHub::new(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_dir: dir.path().to_path_buf(),
+    });
+
+    // Raster-Kachel: image/png, KEIN gzip, Blob round-trippt.
+    let req = Request::builder()
+        .uri("/api/karte/offline/tiles/1/0/0")
+        .body(Body::empty())
+        .unwrap();
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(res.headers().get(header::CONTENT_TYPE).unwrap(), "image/png");
+    assert!(
+        res.headers().get(header::CONTENT_ENCODING).is_none(),
+        "Raster-Blob trägt KEIN Content-Encoding (nicht gzip)"
+    );
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    assert_eq!(&bytes[..], png);
+
+    // /config meldet offline_format='raster'.
+    let req = Request::builder()
+        .uri("/api/karte/config")
+        .body(Body::empty())
+        .unwrap();
+    let cfg = app.oneshot(req).await.unwrap();
+    let v = json(cfg).await;
+    assert_eq!(v["offline_format"].as_str(), Some("raster"));
+}
+
+#[tokio::test]
 async fn offline_tiles_ohne_aktive_karte_liefert_204() {
     let pool = pool().await; // leere offline-Tabelle
     let app = app_mit_pool(pool);
@@ -203,7 +251,7 @@ async fn offline_tiles_ungueltiges_z_liefert_204_ohne_panic() {
     let dir = tempfile::tempdir().unwrap();
     let dateiname = "karte-1.mbtiles";
     schreibe_fixture_mbtiles(&dir.path().join(dateiname), &[0xAB, 0xCD]).await;
-    registriere_und_aktiviere(&pool, dateiname).await;
+    registriere_und_aktiviere(&pool, dateiname, "pbf").await;
 
     let app = build_router(AppState {
         pool,

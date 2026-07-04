@@ -220,6 +220,9 @@ pub struct OfflineKarte {
     /// künftige Schema-Unterscheidung (z.B. Raster vs. Vektor, LFH-185); deren Nutzen hängt nicht
     /// am Default-Wert.
     pub kachel_schema: String,
+    /// Kachel-Blob-Format (LFH-185): `pbf` (Vektor, gzip) oder `png`/`jpg`/`webp` (Raster). Steuert
+    /// Content-Type + Encoding im Tile-Serving; orthogonal zu `kachel_schema` (Vektor-Layermenge).
+    pub format: String,
     pub groesse: Option<i64>,
     pub sha256: Option<String>,
     pub download_at: Option<String>,
@@ -235,13 +238,14 @@ pub struct OfflineKarteEingabe {
     pub quell_url: Option<String>,
     pub lizenz: Option<String>,
     pub kachel_schema: String,
+    pub format: String,
     pub sortier: i64,
 }
 
 /// Eine Offline-Karte per `id` lesen (interner Helfer).
 async fn hole_offline_karte(pool: &SqlitePool, id: i64) -> Result<OfflineKarte, sqlx::Error> {
     sqlx::query_as::<_, OfflineKarte>(
-        "SELECT id, name, pfad, quell_url, lizenz, kachel_schema, groesse, sha256, download_at, \
+        "SELECT id, name, pfad, quell_url, lizenz, kachel_schema, format, groesse, sha256, download_at, \
                 status, aktiv_basemap, sortier \
          FROM karte_offline_karte WHERE id = ?",
     )
@@ -250,10 +254,13 @@ async fn hole_offline_karte(pool: &SqlitePool, id: i64) -> Result<OfflineKarte, 
     .await
 }
 
-/// Pfad der aktiven, ausliefer-bereiten Offline-Karte (für `GET /api/karte/offline/tiles/{z}/{x}/{y}`).
-pub async fn aktive_offline_karte_pfad(pool: &SqlitePool) -> Result<Option<String>, sqlx::Error> {
-    sqlx::query_scalar::<_, String>(
-        "SELECT pfad FROM karte_offline_karte \
+/// Pfad + Kachel-Format der aktiven, ausliefer-bereiten Offline-Karte (für `GET
+/// /api/karte/offline/tiles/{z}/{x}/{y}` — der Handler braucht das Format für Content-Type/Encoding).
+pub async fn aktive_offline_karte_pfad_und_format(
+    pool: &SqlitePool,
+) -> Result<Option<(String, String)>, sqlx::Error> {
+    sqlx::query_as::<_, (String, String)>(
+        "SELECT pfad, format FROM karte_offline_karte \
          WHERE aktiv_basemap = 1 AND status = 'bereit' LIMIT 1",
     )
     .fetch_optional(pool)
@@ -263,7 +270,7 @@ pub async fn aktive_offline_karte_pfad(pool: &SqlitePool) -> Result<Option<Strin
 /// Alle Offline-Karten für die Admin-Liste, nach `sortier`, `id`.
 pub async fn liste_offline_karten(pool: &SqlitePool) -> Result<Vec<OfflineKarte>, sqlx::Error> {
     sqlx::query_as::<_, OfflineKarte>(
-        "SELECT id, name, pfad, quell_url, lizenz, kachel_schema, groesse, sha256, download_at, \
+        "SELECT id, name, pfad, quell_url, lizenz, kachel_schema, format, groesse, sha256, download_at, \
                 status, aktiv_basemap, sortier \
          FROM karte_offline_karte ORDER BY sortier, id",
     )
@@ -278,14 +285,15 @@ pub async fn registriere_offline_karte(
 ) -> Result<OfflineKarte, sqlx::Error> {
     let id = sqlx::query(
         "INSERT INTO karte_offline_karte \
-             (name, pfad, quell_url, lizenz, kachel_schema, sortier, status, aktiv_basemap) \
-         VALUES (?, ?, ?, ?, ?, ?, 'bereit', 0)",
+             (name, pfad, quell_url, lizenz, kachel_schema, format, sortier, status, aktiv_basemap) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'bereit', 0)",
     )
     .bind(&eingabe.name)
     .bind(&eingabe.pfad)
     .bind(&eingabe.quell_url)
     .bind(&eingabe.lizenz)
     .bind(&eingabe.kachel_schema)
+    .bind(&eingabe.format)
     .bind(eingabe.sortier)
     .execute(pool)
     .await?
@@ -405,6 +413,7 @@ pub struct OfflineDownloadEingabe {
     pub quell_url: String,
     pub lizenz: String,
     pub kachel_schema: String,
+    pub format: String,
     pub sortier: i64,
 }
 
@@ -416,13 +425,14 @@ pub async fn neue_download_karte(
 ) -> Result<OfflineKarte, sqlx::Error> {
     let id = sqlx::query(
         "INSERT INTO karte_offline_karte \
-             (name, pfad, quell_url, lizenz, kachel_schema, sortier, status, aktiv_basemap) \
-         VALUES (?, '', ?, ?, ?, ?, 'laedt', 0)",
+             (name, pfad, quell_url, lizenz, kachel_schema, format, sortier, status, aktiv_basemap) \
+         VALUES (?, '', ?, ?, ?, ?, ?, 'laedt', 0)",
     )
     .bind(&eingabe.name)
     .bind(&eingabe.quell_url)
     .bind(&eingabe.lizenz)
     .bind(&eingabe.kachel_schema)
+    .bind(&eingabe.format)
     .bind(eingabe.sortier)
     .execute(pool)
     .await?
@@ -538,7 +548,7 @@ pub async fn finde_offline_karte(
     id: i64,
 ) -> Result<Option<OfflineKarte>, sqlx::Error> {
     sqlx::query_as::<_, OfflineKarte>(
-        "SELECT id, name, pfad, quell_url, lizenz, kachel_schema, groesse, sha256, download_at, \
+        "SELECT id, name, pfad, quell_url, lizenz, kachel_schema, format, groesse, sha256, download_at, \
                 status, aktiv_basemap, sortier \
          FROM karte_offline_karte WHERE id = ?",
     )
@@ -555,6 +565,9 @@ pub struct AktiveOfflineKarte {
     pub version: String,
     /// Lizenz/Attribution der aktiven Karte (offline sichtbar zu machen).
     pub lizenz: Option<String>,
+    /// Kachel-Format (`pbf`/`png`/`jpg`/`webp`) — `/config` gröbert es zu vektor/raster für die
+    /// Frontend-Style-Wahl (LFH-185).
+    pub format: String,
 }
 
 /// Die aktive, ausliefer-bereite Offline-Karte mit Cache-Bust-Token + Lizenz, oder `None`.
@@ -567,9 +580,10 @@ pub async fn aktive_offline_karte(
         sha256: Option<String>,
         geaendert_at: String,
         lizenz: Option<String>,
+        format: String,
     }
     let row = sqlx::query_as::<_, Row>(
-        "SELECT pfad, sha256, geaendert_at, lizenz FROM karte_offline_karte \
+        "SELECT pfad, sha256, geaendert_at, lizenz, format FROM karte_offline_karte \
          WHERE aktiv_basemap = 1 AND status = 'bereit' LIMIT 1",
     )
     .fetch_optional(pool)
@@ -578,6 +592,7 @@ pub async fn aktive_offline_karte(
         pfad: r.pfad,
         version: r.sha256.unwrap_or(r.geaendert_at),
         lizenz: r.lizenz,
+        format: r.format,
     }))
 }
 
@@ -785,6 +800,7 @@ mod tests {
             quell_url: Some("https://quelle".into()),
             lizenz: Some("CC0".into()),
             kachel_schema: "shortbread".into(),
+            format: "pbf".into(),
             sortier: 0,
         }
     }
@@ -832,7 +848,7 @@ mod tests {
     #[tokio::test]
     async fn aktive_pfad_und_verfuegbar_nur_wenn_bereit_und_aktiv() {
         let pool = test_pool().await;
-        assert!(aktive_offline_karte_pfad(&pool).await.unwrap().is_none());
+        assert!(aktive_offline_karte_pfad_und_format(&pool).await.unwrap().is_none());
         assert!(aktive_offline_karte(&pool).await.unwrap().is_none());
         let k = registriere_offline_karte(&pool, &offline_eingabe("A"))
             .await
@@ -843,10 +859,41 @@ mod tests {
         );
         aktiviere_offline_karte(&pool, k.id).await.unwrap();
         assert_eq!(
-            aktive_offline_karte_pfad(&pool).await.unwrap().as_deref(),
-            Some("/karten/A.pmtiles")
+            aktive_offline_karte_pfad_und_format(&pool).await.unwrap(),
+            Some(("/karten/A.pmtiles".to_string(), "pbf".to_string())),
+            "Pfad + Default-Format der aktiven Karte"
         );
         assert!(aktive_offline_karte(&pool).await.unwrap().is_some());
+    }
+
+    #[tokio::test]
+    async fn format_round_trippt_und_defaultet_pbf() {
+        // LFH-185: format über Registrierung round-trippt; Roh-INSERT ohne format → DEFAULT 'pbf'.
+        let pool = test_pool().await;
+        let mut e = offline_eingabe("Raster");
+        e.format = "png".into();
+        let k = registriere_offline_karte(&pool, &e).await.unwrap();
+        assert_eq!(k.format, "png", "format round-trippt beim Registrieren");
+        aktiviere_offline_karte(&pool, k.id).await.unwrap();
+        assert_eq!(
+            aktive_offline_karte_pfad_und_format(&pool).await.unwrap(),
+            Some((k.pfad.clone(), "png".to_string())),
+            "aktive Karte trägt das Raster-Format"
+        );
+        assert_eq!(aktive_offline_karte(&pool).await.unwrap().unwrap().format, "png");
+
+        // Roh-INSERT ohne format-Spalte → DB-DEFAULT 'pbf' (Bestandsverhalten).
+        sqlx::query("INSERT INTO karte_offline_karte (name, pfad, status) VALUES ('Alt', '/k/alt.mbtiles', 'bereit')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let alt = liste_offline_karten(&pool)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|k| k.name == "Alt")
+            .unwrap();
+        assert_eq!(alt.format, "pbf", "Roh-INSERT ohne format → DEFAULT pbf");
     }
 
     #[tokio::test]
@@ -867,7 +914,7 @@ mod tests {
             aktive_offline_karte(&pool).await.unwrap().is_none(),
             "status='laedt' wird nicht ausgeliefert"
         );
-        assert!(aktive_offline_karte_pfad(&pool).await.unwrap().is_none());
+        assert!(aktive_offline_karte_pfad_und_format(&pool).await.unwrap().is_none());
     }
 
     #[tokio::test]
@@ -948,6 +995,7 @@ mod tests {
             quell_url: format!("https://example.test/{name}.pmtiles"),
             lizenz: "© OpenStreetMap contributors (ODbL)".into(),
             kachel_schema: "shortbread".into(),
+            format: "pbf".into(),
             sortier: 0,
         }
     }

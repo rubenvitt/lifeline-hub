@@ -34,6 +34,9 @@ pub struct KarteConfigAntwort {
     /// Pflicht-Attribution der aktiven Offline-Karte (offline sichtbar, z.B. ODbL). `None`,
     /// wenn keine aktive Karte oder keine Lizenz hinterlegt ist.
     pub offline_attribution: Option<String>,
+    /// Grober Kachel-Typ der aktiven Offline-Karte (LFH-185): `"vektor"` (pbf) oder `"raster"`
+    /// (png/jpg/webp) — steuert die Style-Wahl im Frontend. `None`, wenn keine aktive Karte.
+    pub offline_format: Option<String>,
 }
 
 /// GET /api/karte/config — Basemap-Verfügbarkeit fürs Frontend, frisch aus der DB-Registry.
@@ -74,16 +77,28 @@ pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAnt
         }
         None => (None, None),
     };
+    // Format gröbern (kein Datei-Open — der Wert ist operator-deklariert in der DB, LFH-185): eine
+    // grobe Routing-Entscheidung darf nicht an Datei-Lesbarkeit hängen.
+    let offline_format = aktiv.as_ref().map(|k| {
+        match k.format.as_str() {
+            "png" | "jpg" | "webp" => "raster",
+            _ => "vektor",
+        }
+        .to_string()
+    });
     Ok(Json(KarteConfigAntwort {
         online_styles,
         offline_verfuegbar: aktiv.is_some(),
         offline_tiles_url,
         offline_attribution,
+        offline_format,
     }))
 }
 
-/// GET /api/karte/offline/tiles/{z}/{x}/{y} — Vektor-Kachel der aktiven Offline-MBTiles.
-/// Öffnet die aktive Datei read-only (gecacht per Pfad in mbtiles::reader_fuer), Y-Flip + gzip in mbtiles.rs.
+/// GET /api/karte/offline/tiles/{z}/{x}/{y} — Kachel der aktiven Offline-MBTiles. Vektor (`pbf`)
+/// wird als gzip-MVT ausgeliefert, Raster (`png`/`jpg`/`webp`) als Bild ohne Content-Encoding
+/// (LFH-185). Öffnet die aktive Datei read-only (gecacht per Pfad in mbtiles::reader_fuer),
+/// Y-Flip in mbtiles.rs; der Blob wird formatunabhängig durchgereicht.
 pub async fn offline_tiles(
     State(state): State<AppState>,
     Path((z, x, y)): Path<(i64, i64, i64)>,
@@ -96,7 +111,8 @@ pub async fn offline_tiles(
     if !(0..=24).contains(&z) || x < 0 || y < 0 {
         return Ok(StatusCode::NO_CONTENT.into_response());
     }
-    let Some(pfad_rel) = repo::aktive_offline_karte_pfad(&state.pool).await? else {
+    let Some((pfad_rel, format)) = repo::aktive_offline_karte_pfad_und_format(&state.pool).await?
+    else {
         return Ok(StatusCode::NO_CONTENT.into_response());
     };
     // Pfad-Guard analog zum bisherigen tiles-Handler (relativ, kein Traversal).
@@ -120,16 +136,47 @@ pub async fn offline_tiles(
         .await
         .map_err(|e| AppError::Internal(format!("MBTiles öffnen: {e}")))?;
     match mbtiles::lies_tile(&pool, z, x, y).await {
-        Ok(Some(daten)) => Ok(Response::builder()
-            .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, "application/x-protobuf")
-            .header(header::CONTENT_ENCODING, "gzip")
-            .header(header::CACHE_CONTROL, "public, max-age=86400")
-            .body(Body::from(daten))
-            .unwrap()),
+        Ok(Some(daten)) => {
+            let (content_type, encoding) = format_mime_encoding(&format);
+            let mut builder = Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, content_type)
+                .header(header::CACHE_CONTROL, "public, max-age=86400");
+            // Content-Encoding NUR bei gzip-MVT (pbf); Raster-Blobs sind unkomprimiert.
+            if let Some(enc) = encoding {
+                builder = builder.header(header::CONTENT_ENCODING, enc);
+            }
+            Ok(builder.body(Body::from(daten)).unwrap())
+        }
         Ok(None) => Ok(StatusCode::NO_CONTENT.into_response()),
         Err(e) => Err(AppError::Internal(format!("Tile lesen: {e}"))),
     }
+}
+
+/// Content-Type + optionales Content-Encoding je Kachel-Blob-Format (LFH-185). Nur Vektor (`pbf`)
+/// ist gzip-komprimiert (Shortbread-MVT); Raster-Blobs (png/jpg/webp) tragen KEIN Content-Encoding.
+fn format_mime_encoding(format: &str) -> (&'static str, Option<&'static str>) {
+    match format {
+        "png" => ("image/png", None),
+        "jpg" => ("image/jpeg", None),
+        "webp" => ("image/webp", None),
+        _ => ("application/x-protobuf", Some("gzip")), // pbf (Vektor, Default)
+    }
+}
+
+/// Validiert das optionale Kachel-Format aus einem Request-Body (Default `pbf`, LFH-185); liefert
+/// 422 statt eines DB-CHECK-500 bei ungültigem Wert.
+fn validiere_format(format: Option<&str>) -> Result<String, AppError> {
+    let f = format
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("pbf");
+    if !matches!(f, "pbf" | "png" | "jpg" | "webp") {
+        return Err(AppError::Validation(format!(
+            "Ungültiges Kachel-Format (pbf/png/jpg/webp): {f}"
+        )));
+    }
+    Ok(f.to_string())
 }
 
 /// Hex-kodiert die ersten 16 Bytes (128 Bit reichen als ETag) eines Hashes.
@@ -386,6 +433,8 @@ pub struct OfflineKarteBody {
     pub quell_url: Option<String>,
     pub lizenz: Option<String>,
     pub kachel_schema: Option<String>,
+    /// Kachel-Format (LFH-185): `pbf` (Default, Vektor) oder `png`/`jpg`/`webp` (Raster).
+    pub format: Option<String>,
     #[serde(default)]
     pub sortier: i64,
 }
@@ -638,12 +687,14 @@ pub async fn offline_registrieren(
         .filter(|s| !s.is_empty())
         .unwrap_or("shortbread")
         .to_string();
+    let format = validiere_format(body.format.as_deref())?;
     let eingabe = OfflineKarteEingabe {
         name: name.to_string(),
         pfad: pfad.to_string(),
         quell_url: body.quell_url,
         lizenz: Some(lizenz),
         kachel_schema,
+        format,
         sortier: body.sortier,
     };
     let karte = repo::registriere_offline_karte(&state.pool, &eingabe).await?;
@@ -768,6 +819,9 @@ pub struct OfflineDownloadBody {
     pub url: String,
     pub lizenz: String,
     pub kachel_schema: Option<String>,
+    /// Kachel-Format (LFH-185): `pbf` (Default, Vektor) oder `png`/`jpg`/`webp` (Raster).
+    #[serde(default)]
+    pub format: Option<String>,
     /// Erwartete Größe (Bytes) aus dem Katalog — für den Plattenplatz-Check vorab.
     #[serde(default)]
     pub groesse_erwartet: Option<i64>,
@@ -1020,6 +1074,7 @@ pub async fn offline_download(
         }
     }
 
+    let format = validiere_format(body.format.as_deref())?;
     let karte = repo::neue_download_karte(
         &state.pool,
         &repo::OfflineDownloadEingabe {
@@ -1027,6 +1082,7 @@ pub async fn offline_download(
             quell_url: url.to_string(),
             lizenz: lizenz.to_string(),
             kachel_schema,
+            format,
             sortier: 0,
         },
     )
@@ -1313,6 +1369,7 @@ mod finalisierung_tests {
             quell_url: format!("https://example.test/{name}.pmtiles"),
             lizenz: "© OpenStreetMap contributors (ODbL)".into(),
             kachel_schema: "shortbread".into(),
+            format: "pbf".into(),
             sortier: 0,
         }
     }
