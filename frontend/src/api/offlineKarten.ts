@@ -104,3 +104,27 @@ export function loescheOfflineKarte(id: number): Promise<void> {
 export function ladeOfflineKatalog(): Promise<OfflineKatalogEintrag[]> {
   return apiGet<OfflineKatalogEintrag[]>('/api/karte/offline-karten/katalog');
 }
+
+/** Eine im karten_dir vorhandene, noch nicht registrierte MBTiles-Datei (lokaler Import, LFH-199). */
+export interface VorhandeneKarte {
+  dateiname: string;
+  groesse: number;
+}
+
+/** Body zum Registrieren einer bereits im karten_dir liegenden Karte (lokaler Import). */
+export interface RegistriereBody {
+  name: string;
+  pfad: string;
+  lizenz: string;
+  kachel_schema?: string;
+}
+
+/** Listet gebaute/vorhandene Region-Packs im karten_dir, die noch nicht registriert sind. */
+export function listeVorhandeneKarten(): Promise<VorhandeneKarte[]> {
+  return apiGet<VorhandeneKarte[]>('/api/karte/offline-karten/vorhandene');
+}
+
+/** Registriert eine bereits vorhandene Datei als Offline-Karte (ohne Download/Hosting). */
+export function registriereOfflineKarte(body: RegistriereBody): Promise<OfflineKarte> {
+  return apiSend<OfflineKarte>('/api/karte/offline-karten', 'POST', body);
+}

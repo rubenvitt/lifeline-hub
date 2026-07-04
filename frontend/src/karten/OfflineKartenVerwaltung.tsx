@@ -21,6 +21,7 @@ import { invalidiereKarte } from './invalidiereKarte';
 import { formatGroesse } from './formatGroesse';
 import OfflineDownloadKatalogModal from './OfflineDownloadKatalogModal';
 import OfflineDownloadUrlModal from './OfflineDownloadUrlModal';
+import OfflineVorhandeneModal from './OfflineVorhandeneModal';
 
 const STATUS_TAG: Record<OfflineKarteStatus, { color: string; label: string }> = {
   registriert: { color: 'default', label: 'registriert' },
@@ -47,6 +48,7 @@ export default function OfflineKartenVerwaltung() {
   const { message } = App.useApp();
   const [katalogOffen, setKatalogOffen] = useState(false);
   const [urlOffen, setUrlOffen] = useState(false);
+  const [vorhandenOffen, setVorhandenOffen] = useState(false);
 
   const kartenQuery = useQuery({
     queryKey: ['admin-karte', 'offline-karten'],
@@ -268,6 +270,7 @@ export default function OfflineKartenVerwaltung() {
             Region aufs Gerät bringen
           </Button>
           <Button onClick={() => setUrlOffen(true)}>Per URL herunterladen</Button>
+          <Button onClick={() => setVorhandenOffen(true)}>Gebaute Region übernehmen</Button>
         </Space>
       )}
       {kartenQuery.isError ? (
@@ -293,6 +296,7 @@ export default function OfflineKartenVerwaltung() {
         onClose={() => setKatalogOffen(false)}
       />
       <OfflineDownloadUrlModal offen={urlOffen} onClose={() => setUrlOffen(false)} />
+      <OfflineVorhandeneModal offen={vorhandenOffen} onClose={() => setVorhandenOffen(false)} />
     </>
   );
 }

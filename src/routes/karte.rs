@@ -15,7 +15,7 @@ use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Component, Path as FsPath};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -213,6 +213,24 @@ pub async fn offline_sprite(headers: HeaderMap, Path(datei): Path<String>) -> Re
 #[cfg(test)]
 mod offline_assets_tests {
     use super::*;
+
+    #[test]
+    fn finde_nicht_registrierte_filtert_registrierte_und_part() {
+        // Lokaler Region-Import (LFH-199): nur vorhandene, unregistrierte .mbtiles listen.
+        let dir = std::env::temp_dir().join("lfh199-vorhandene-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("bremen.mbtiles"), b"x").unwrap(); // vorhanden, unregistriert
+        std::fs::write(dir.join("karte-1.mbtiles"), b"xx").unwrap(); // registriert → raus
+        std::fs::write(dir.join("download.mbtiles.part"), b"xxx").unwrap(); // .part → raus
+        std::fs::write(dir.join("notes.txt"), b"y").unwrap(); // kein mbtiles → raus
+        let registrierte: HashSet<String> = ["karte-1.mbtiles".to_string()].into_iter().collect();
+        let out = finde_nicht_registrierte(&dir, &registrierte);
+        assert_eq!(out.len(), 1, "nur die unregistrierte .mbtiles: {out:?}");
+        assert_eq!(out[0].dateiname, "bremen.mbtiles");
+        assert_eq!(out[0].groesse, 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[tokio::test]
     async fn offline_fonts_lehnt_bad_range_ab() {
@@ -677,6 +695,57 @@ pub async fn offline_loeschen(
 }
 
 // ===== Offline-Karten-Download-Manager (LFH-181) =====
+
+/// Eine im karten_dir vorhandene, aber noch nicht registrierte MBTiles-Datei — Kandidat für den
+/// lokalen Import gebauter Region-Packs (LFH-199, ohne Download/Hosting).
+#[derive(Debug, Serialize, PartialEq)]
+pub struct VorhandeneKarte {
+    pub dateiname: String,
+    pub groesse: i64,
+}
+
+/// Scannt `karten_dir` nach `*.mbtiles`-Dateien, die in `registrierte` (Registry-Pfade) NICHT
+/// vorkommen. `.part` (laufende Downloads) und Nicht-mbtiles werden übersprungen. Best-effort:
+/// Lesefehler → leere Liste. Ergebnis nach Dateiname sortiert (stabile UI-Reihenfolge).
+fn finde_nicht_registrierte(
+    karten_dir: &FsPath,
+    registrierte: &HashSet<String>,
+) -> Vec<VorhandeneKarte> {
+    let Ok(eintraege) = std::fs::read_dir(karten_dir) else {
+        return Vec::new();
+    };
+    let mut out: Vec<VorhandeneKarte> = eintraege
+        .flatten()
+        .filter_map(|e| {
+            let name = e.file_name().to_str()?.to_string();
+            // Nur echte .mbtiles (`.mbtiles.part` endet auf `.part` → raus), nicht bereits registriert.
+            if !name.ends_with(".mbtiles") || registrierte.contains(&name) {
+                return None;
+            }
+            let groesse = e.metadata().ok()?.len() as i64;
+            Some(VorhandeneKarte {
+                dateiname: name,
+                groesse,
+            })
+        })
+        .collect();
+    out.sort_by(|a, b| a.dateiname.cmp(&b.dateiname));
+    out
+}
+
+/// GET /api/karte/offline-karten/vorhandene — im karten_dir liegende, noch nicht registrierte
+/// MBTiles (lokaler Import gebauter Region-Packs, LFH-199). Admin only.
+pub async fn offline_vorhandene(
+    State(state): State<AppState>,
+    _admin: AdminUser,
+) -> Result<Json<Vec<VorhandeneKarte>>, AppError> {
+    let registrierte: HashSet<String> = repo::liste_offline_karten(&state.pool)
+        .await?
+        .into_iter()
+        .map(|k| k.pfad)
+        .collect();
+    Ok(Json(finde_nicht_registrierte(&state.karten_dir, &registrierte)))
+}
 
 /// GET /api/karte/offline-karten/katalog — kuratierter Download-Vorschlagskatalog (Admin).
 /// Hybrid (LFH-199): compiled-in Default ∪ best-effort geholtes Remote-Manifest (füllt den Cache,

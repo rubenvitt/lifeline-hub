@@ -98,6 +98,29 @@ describe('OfflineKartenVerwaltung', () => {
     await waitFor(() => expect(downloadName).toBe('Deutschland (Shortbread)'));
   });
 
+  it('Gebaute Region übernehmen: listet vorhandene Datei und registriert sie lokal', async () => {
+    let regBody: { name: string; pfad: string } | undefined;
+    mockBasis(admin, []);
+    server.use(
+      http.get('/api/karte/offline-karten/vorhandene', () =>
+        HttpResponse.json([{ dateiname: 'osm.bremen.2026-07-02.mbtiles', groesse: 11_600_000 }]),
+      ),
+      http.post('/api/karte/offline-karten', async ({ request }) => {
+        regBody = (await request.json()) as { name: string; pfad: string };
+        return HttpResponse.json({ ...karte, id: 5, name: regBody.name }, { status: 201 });
+      }),
+    );
+    render();
+    await userEvent.click(await screen.findByRole('button', { name: 'Gebaute Region übernehmen' }));
+    // Default-Name aus dem Dateinamen abgeleitet (osm.-Präfix + Datum entfernt).
+    expect(await screen.findByDisplayValue('bremen')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
+    await waitFor(() => {
+      expect(regBody?.pfad).toBe('osm.bremen.2026-07-02.mbtiles');
+      expect(regBody?.name).toBe('bremen');
+    });
+  });
+
   it('Führungskraft sieht keine Schreibaktionen (read-only)', async () => {
     mockBasis(fuehrungskraft);
     render();

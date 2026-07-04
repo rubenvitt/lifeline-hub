@@ -419,6 +419,10 @@ pub fn build_router(state: AppState) -> Router {
             get(routes::karte::offline_katalog),
         )
         .route(
+            "/api/karte/offline-karten/vorhandene",
+            get(routes::karte::offline_vorhandene),
+        )
+        .route(
             "/api/karte/offline-karten/download",
             post(routes::karte::offline_download),
         )
