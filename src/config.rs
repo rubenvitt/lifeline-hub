@@ -104,6 +104,9 @@ pub struct OfflineKatalogEintrag {
     /// Optionaler SHA256-Pin (hex, lowercase). Gesetzt beim Eigen-Mirror: der Download
     /// verifiziert den berechneten gegen diesen Hash. `None` = kein Pin (vor erstem Release-Pin).
     pub sha256: Option<String>,
+    /// Optionale UX-Gruppe für die geführte Auswahl (z. B. „Deutschland", „DACH",
+    /// „Bundesländer"). Rein für die Frontend-Gruppierung; `None` = ungruppiert (LFH-199).
+    pub gruppe: Option<String>,
 }
 
 /// Kuratierter Offline-Karten-Katalog (`GET /api/karte/offline-karten/katalog`) — analog zum
@@ -125,7 +128,43 @@ pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {
         kachel_schema: "shortbread".into(),
         quelle: "Eigenbau (karten-build, Planetiler-Shortbread)".into(),
         sha256: None, // nach erstem Build gepinnt
+        gruppe: Some("Deutschland".into()),
     }]
+}
+
+/// Merged den kompilierten Default-Katalog mit einem optionalen Remote-Manifest (Hybrid, LFH-199).
+/// Override per `name`: ein gültiger Remote-Eintrag mit gleichem Namen ersetzt den compiled-in
+/// Eintrag; neue Namen werden angehängt. Der compiled-in Katalog ist immer die Baseline
+/// (Offline-Fallback); `remote == None` (Fetch fehlgeschlagen/offline) → unveränderter Default.
+pub fn merge_offline_katalog(
+    compiled: Vec<OfflineKatalogEintrag>,
+    remote: Option<Vec<OfflineKatalogEintrag>>,
+) -> Vec<OfflineKatalogEintrag> {
+    let Some(remote) = remote else { return compiled };
+    let mut out = compiled;
+    for e in remote {
+        // Remote-Einträge müssen vollständig gepinnt sein — sonst käme ein Eintrag ohne
+        // Integritätsprüfung/echte URL ins UI. Halb-gepinnte/Platzhalter-Remote-Einträge verwerfen.
+        if !remote_eintrag_ist_gueltig(&e) {
+            continue;
+        }
+        match out.iter_mut().find(|c| c.name == e.name) {
+            Some(slot) => *slot = e, // Override per name
+            None => out.push(e),     // neuer Eintrag ergänzt
+        }
+    }
+    out
+}
+
+/// Ein Remote-Katalog-Eintrag ist nur auslieferbar, wenn vollständig gepinnt: 64-stelliger
+/// lowercase-hex-sha256, echte https-URL (kein TODO-Platzhalter), Größe > 0, Lizenz gesetzt.
+fn remote_eintrag_ist_gueltig(e: &OfflineKatalogEintrag) -> bool {
+    matches!(&e.sha256, Some(h)
+        if h.len() == 64 && h.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()))
+        && e.url.starts_with("https://")
+        && !e.url.contains("TODO")
+        && e.groesse > 0
+        && !e.lizenz.is_empty()
 }
 
 /// Lokales Daten-Verzeichnis für Offline-Karten, abgeleitet aus dem DB-Pfad
@@ -260,9 +299,57 @@ mod tests {
             kachel_schema: "shortbread".into(),
             quelle: "q".into(),
             sha256: Some("abc123".into()),
+            gruppe: None,
         };
         let j = serde_json::to_string(&mit_pin).unwrap();
         assert!(j.contains("\"sha256\":\"abc123\""), "sha256 im JSON: {j}");
+    }
+
+    // Test-Helfer für die Merge-Tests (LFH-199).
+    fn eintrag(name: &str, url: &str, sha256: Option<String>) -> OfflineKatalogEintrag {
+        OfflineKatalogEintrag {
+            name: name.into(),
+            url: url.into(),
+            region: "DE".into(),
+            groesse: 1_000,
+            lizenz: "© OSM (ODbL)".into(),
+            kachel_schema: "shortbread".into(),
+            quelle: "test".into(),
+            sha256,
+            gruppe: None,
+        }
+    }
+
+    #[test]
+    fn merge_katalog_override_ergaenzt_und_verwirft_ungueltige() {
+        let compiled = vec![
+            eintrag("Deutschland (Shortbread)", "https://TODO-x/de.mbtiles", None),
+            eintrag("Bayern", "https://TODO-x/by.mbtiles", None),
+        ];
+        let remote = vec![
+            // Override „Deutschland": echter Pin ersetzt den Platzhalter.
+            eintrag(
+                "Deutschland (Shortbread)",
+                "https://mirror.example/de.mbtiles",
+                Some("a".repeat(64)),
+            ),
+            // Neuer Eintrag: wird angehängt.
+            eintrag("DACH", "https://mirror.example/dach.mbtiles", Some("b".repeat(64))),
+            // Ungültig (halb-gepinnt: echte URL ohne sha256) → verworfen.
+            eintrag("Sachsen", "https://mirror.example/sn.mbtiles", None),
+        ];
+        let out = merge_offline_katalog(compiled, Some(remote));
+        let de = out.iter().find(|e| e.name == "Deutschland (Shortbread)").unwrap();
+        assert_eq!(de.url, "https://mirror.example/de.mbtiles", "Remote-Pin überschreibt Platzhalter");
+        assert!(out.iter().any(|e| e.name == "DACH"), "neuer Remote-Eintrag ergänzt");
+        assert!(out.iter().any(|e| e.name == "Bayern"), "compiled-in bleibt erhalten");
+        assert!(!out.iter().any(|e| e.name == "Sachsen"), "halb-gepinnter Remote-Eintrag verworfen");
+    }
+
+    #[test]
+    fn merge_katalog_ohne_remote_ist_identisch() {
+        let compiled = vec![eintrag("Bayern", "https://TODO-x/by.mbtiles", None)];
+        assert_eq!(merge_offline_katalog(compiled.clone(), None).len(), compiled.len());
     }
 
     #[test]
