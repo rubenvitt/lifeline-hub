@@ -685,8 +685,10 @@ pub async fn offline_katalog(
     State(state): State<AppState>,
     _admin: AdminUser,
 ) -> Result<Json<Vec<OfflineKatalogEintrag>>, AppError> {
+    // Kurz getimeboxter Client (fachebenen: 8 s), NICHT der GB-download_client (kein Globaltimeout) —
+    // der Manifest-Abruf ist ein kleiner JSON-Request und darf den Handler nicht lange blockieren.
     Ok(Json(
-        crate::karte::katalog::effektiver_katalog(&state.download_client).await,
+        crate::karte::katalog::effektiver_katalog(&state.fachebenen.client).await,
     ))
 }
 
