@@ -165,7 +165,8 @@ fn format_mime_encoding(format: &str) -> (&'static str, Option<&'static str>) {
 }
 
 /// Validiert das optionale Kachel-Format aus einem Request-Body (Default `pbf`, LFH-185); liefert
-/// 422 statt eines DB-CHECK-500 bei ungültigem Wert.
+/// bei ungültigem Wert eine 400-Validation (`AppError::Validation`) statt eines DB-CHECK-500 —
+/// konsistent zum typ-Check in `validiere_online`.
 fn validiere_format(format: Option<&str>) -> Result<String, AppError> {
     let f = format
         .map(str::trim)

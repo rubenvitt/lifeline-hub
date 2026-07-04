@@ -689,6 +689,21 @@ async fn offline_download_ohne_lizenz_ist_400() {
 }
 
 #[tokio::test]
+async fn offline_registrieren_ungueltiges_format_ist_400() {
+    // LFH-185: nur pbf/png/jpg/webp; ein anderer Wert wird als 400 abgelehnt (nicht DB-CHECK-500).
+    let (app, cookie) = admin_app().await;
+    let res = anfrage(
+        &app,
+        "POST",
+        "/api/karte/offline-karten",
+        Some(&cookie),
+        Some(r#"{"name":"X","pfad":"x.mbtiles","lizenz":"© Test","format":"gif"}"#),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST, "ungültiges Format → 400, kein DB-500");
+}
+
+#[tokio::test]
 async fn offline_download_interne_url_ist_400_ssrf() {
     let (app, cookie) = admin_app().await;
     // SSRF-Guard: interne IP / http müssen abgelehnt werden (kein Server-seitiger Fetch darauf).
