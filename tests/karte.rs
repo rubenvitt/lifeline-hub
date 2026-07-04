@@ -604,11 +604,19 @@ async fn offline_katalog_liefert_kuratierte_liste() {
     assert_eq!(res.status(), StatusCode::OK);
     let v = json(res).await;
     let liste = v.as_array().expect("Array");
-    assert_eq!(liste.len(), 1, "ein Shortbread-DE-Eintrag (LFH-195)");
+    // Kuratierte Regions-Liste (LFH-199): mehrere gruppierte Einträge. Der Remote-Manifest-Fetch
+    // (Platzhalter-URL) schlägt im Test fehl → compiled-in Fallback.
+    assert!(liste.len() >= 3, "kuratierte Regions-Liste (LFH-199): {}", liste.len());
     // Statische /katalog-Route gewinnt gegen /{id} (matchit-Priorität).
-    assert!(liste[0]["url"].as_str().unwrap().starts_with("https://"));
-    assert!(!liste[0]["lizenz"].as_str().unwrap().is_empty());
-    assert_eq!(liste[0]["kachel_schema"].as_str(), Some("shortbread"));
+    assert!(liste.iter().all(|e| e["url"].as_str().unwrap().starts_with("https://")));
+    assert!(liste.iter().all(|e| e["kachel_schema"].as_str() == Some("shortbread")));
+    assert!(liste.iter().all(|e| !e["lizenz"].as_str().unwrap().is_empty()));
+    assert!(
+        liste
+            .iter()
+            .any(|e| e["region"].as_str() == Some("DE") && e["gruppe"].as_str() == Some("Deutschland")),
+        "DE-Eintrag mit Gruppe vorhanden"
+    );
 }
 
 #[tokio::test]

@@ -91,7 +91,7 @@ pub fn default_online_styles() -> Vec<OnlineStyle> {
 /// UNGEFÄHRE Dateigröße in Bytes (für den Plattenplatz-Check vorab; die exakte Größe liefert
 /// die Content-Length bzw. der fertige Download). Einträge sind Shortbread-MBTiles (LFH-195)
 /// und rendern mit dem beschrifteten Offline-Style (Shortbread-Layer + eingebettete Glyphs/Sprite).
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OfflineKatalogEintrag {
     pub name: String,
     pub url: String,

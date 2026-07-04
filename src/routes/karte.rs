@@ -1,9 +1,6 @@
 use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
-use crate::config::{
-    default_offline_katalog, default_online_styles, OfflineKatalogEintrag, OnlineStyle,
-    OnlineStyleTyp,
-};
+use crate::config::{default_online_styles, OfflineKatalogEintrag, OnlineStyle, OnlineStyleTyp};
 use crate::error::AppError;
 use crate::karte::download::{self, Fortschritt};
 use crate::karte::proxy;
@@ -538,7 +535,10 @@ pub async fn offline_liste(
         return Err(AppError::Forbidden);
     }
     let rows = repo::liste_offline_karten(&state.pool).await?;
-    let katalog = default_offline_katalog();
+    // Hybrid-Katalog aus dem prozessweiten Cache (LFH-199) — kein Netz-Call in der Liste; den Fetch
+    // macht der `offline_katalog`-Handler und füllt den Cache, den wir hier für den Update-Check
+    // mitnutzen.
+    let katalog = crate::karte::katalog::katalog_aus_cache();
     // Ladende Karten mit Live-Bytes aus dem In-Memory-Fortschritt anreichern (kein await unter
     // dem Lock).
     let map = state.download_fortschritt.read().unwrap();
@@ -679,10 +679,15 @@ pub async fn offline_loeschen(
 // ===== Offline-Karten-Download-Manager (LFH-181) =====
 
 /// GET /api/karte/offline-karten/katalog — kuratierter Download-Vorschlagskatalog (Admin).
+/// Hybrid (LFH-199): compiled-in Default ∪ best-effort geholtes Remote-Manifest (füllt den Cache,
+/// den `offline_liste` mitnutzt). Fetch-Fehler → nur compiled-in.
 pub async fn offline_katalog(
+    State(state): State<AppState>,
     _admin: AdminUser,
 ) -> Result<Json<Vec<OfflineKatalogEintrag>>, AppError> {
-    Ok(Json(default_offline_katalog()))
+    Ok(Json(
+        crate::karte::katalog::effektiver_katalog(&state.download_client).await,
+    ))
 }
 
 /// Request-Body zum Starten eines Offline-Karten-Downloads (aus Katalog oder eigener URL).
