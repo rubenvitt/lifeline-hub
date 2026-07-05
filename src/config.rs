@@ -176,9 +176,10 @@ pub struct Config {
     pub karten_service_url: Option<String>,
 
     /// Bearer-Token für den karten-service. Bleibt server-side (nie im Browser); ohne Token ist
-    /// der Region-Bau deaktiviert.
+    /// der Region-Bau deaktiviert. `GeheimesPasswort` maskiert es im `Debug` (wie `admin_password`),
+    /// damit es nicht versehentlich via `{config:?}` ins Log gelangt.
     #[arg(long, env = "LIFELINE_KARTEN_SERVICE_TOKEN")]
-    pub karten_service_token: Option<String>,
+    pub karten_service_token: Option<GeheimesPasswort>,
 }
 
 /// Subkommandos der lifeline-hub-Binary (neben dem Server-Standardlauf).
@@ -361,6 +362,21 @@ mod tests {
         assert!(
             !ausgabe.contains("geheim123"),
             "Passwort darf nicht im Debug stehen"
+        );
+        assert!(ausgabe.contains("***"));
+    }
+
+    #[test]
+    fn karten_service_token_wird_im_debug_maskiert() {
+        let config = Config::parse_from([
+            "lifeline-hub",
+            "--karten-service-token",
+            "svc-token-geheim",
+        ]);
+        let ausgabe = format!("{config:?}");
+        assert!(
+            !ausgabe.contains("svc-token-geheim"),
+            "Service-Token darf nicht im Debug stehen"
         );
         assert!(ausgabe.contains("***"));
     }

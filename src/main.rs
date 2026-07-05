@@ -95,7 +95,10 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         download_client: lifeline_hub::karte::download::download_client(),
         download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
         karten_service_url: config.karten_service_url.clone(),
-        karten_service_token: config.karten_service_token.clone(),
+        karten_service_token: config
+            .karten_service_token
+            .as_ref()
+            .map(|t| t.als_str().to_string()),
     });
 
     let listener = tokio::net::TcpListener::bind(&config.bind).await?;
