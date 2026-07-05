@@ -103,8 +103,10 @@ pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {
     // (katalog_eintrag_sha256_pin_konsistent) trägt Platzhalter wie echten Pin. Alternativ füllt
     // das Remote-Manifest (LFH-199) die echten Einträge ohne App-Release.
     //
-    // Kuratierte Regionen (~5–20, grob): DE gesamt, DACH, einzelne Bundesländer. `gruppe` steuert
-    // die geführte UX-Auswahl. Neue Region = Zeile ergänzen (Slug = karten-build-Dateiname).
+    // Kuratierte Regionen (~5–20, grob): DE gesamt, einzelne Bundesländer. DACH ist kein
+    // einzelner Geofabrik-Extrakt (v1) und wird nicht kompiliert; Regionen kommen ggf. dynamisch
+    // übers Remote-Manifest (LFH-199). `gruppe` steuert die geführte UX-Auswahl. Neue Region =
+    // Zeile ergänzen (Slug = karten-build-Dateiname).
     fn platzhalter(name: &str, region: &str, gruppe: &str, slug: &str, ca_gb: i64) -> OfflineKatalogEintrag {
         OfflineKatalogEintrag {
             name: name.into(),
@@ -120,7 +122,6 @@ pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {
     }
     vec![
         platzhalter("Deutschland (Shortbread)", "DE", "Deutschland", "germany", 3),
-        platzhalter("DACH (DE/AT/CH)", "DACH", "DACH", "dach", 5),
         platzhalter("Bayern", "DE-BY", "Bundesländer", "bayern", 1),
         platzhalter("Baden-Württemberg", "DE-BW", "Bundesländer", "baden-wuerttemberg", 1),
         platzhalter("Nordrhein-Westfalen", "DE-NW", "Bundesländer", "nordrhein-westfalen", 1),
@@ -234,6 +235,13 @@ mod tests {
             assert!(e.groesse > 0, "Größe für Plattenplatz-Check: {}", e.name);
         }
         assert!(katalog.iter().any(|e| e.region.starts_with("DE")));
+    }
+
+    #[test]
+    fn katalog_ohne_unbaubares_dach() {
+        let k = default_offline_katalog();
+        assert!(!k.iter().any(|e| e.url.contains("dach")), "DACH ist kein einzelner Extrakt (v1)");
+        assert!(!k.iter().any(|e| e.region == "DACH" || e.gruppe.as_deref() == Some("DACH")));
     }
 
     #[test]
