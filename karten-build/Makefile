@@ -11,6 +11,12 @@ IMAGE  := versatiles/versatiles-planetiler:latest
 .PHONY: tiles validate
 tiles:
 	mkdir -p "$(CURDIR)/$(OUT)"
+	# LFH-200: Der geteilte sources-Cache (`out/sources/`) darf pro Build nur die AKTUELLE Region als
+	# *.osm.pbf enthalten. Der Renumber-Schritt im Image nimmt `find … ! -name renumbered.osm.pbf |
+	# head -1` — bei mehreren Region-PBFs immer dieselbe (erste) Datei, sodass `--area` ignoriert wird
+	# und JEDER Build dieselbe Region liefert. Also die Region-PBFs (klein, werden neu geladen) +
+	# renumbered.osm.pbf vor dem Build entfernen; Wasser-Polygone/Countries/tile_weights bleiben gecacht.
+	rm -f "$(CURDIR)/$(OUT)/sources/"*.osm.pbf "$(CURDIR)/$(OUT)/sources/renumbered.osm.pbf"
 	docker run --rm -v "$(CURDIR)/$(OUT):/app/data" $(IMAGE) \
 	  --area $(AREA) --format $(FORMAT) --checksum
 	@echo "Fertig. Fertige Datei liegt in $(CURDIR)/$(OUT)/result/osm*.$(FORMAT) (+ .sha256)."

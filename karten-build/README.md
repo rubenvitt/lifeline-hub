@@ -16,6 +16,13 @@ Profil) direkt — kein Custom-Dockerfile. Voraussetzung: Docker.
 `sources/`) ist Arbeitsdaten und kann nach dem Bau gelöscht werden. Zoom = Shortbread-Default
 (z2–14, `name=Shortbread`). `out/` ist gitignored.
 
+**Wichtig (LFH-200):** Das `tiles`-Target löscht vor jedem Build die Region-`*.osm.pbf` (+
+`renumbered.osm.pbf`) aus `out/sources/`. Grund: der Renumber-Schritt im Upstream-Image wählt die
+Eingabe per `find … | head -1` — liegen mehrere Region-Extrakte im geteilten Cache, wird `--area`
+ignoriert und **jeder Build liefert dieselbe (erste) Region**. Der Region-Extrakt ist klein und wird
+neu geladen; die teuren Wasser-Polygone bleiben gecacht. Nach einem Build immer `make validate` +
+die `bounds` in der `metadata` gegen die erwartete Region prüfen.
+
 Die zugrundeliegende CLI ist `generate_tiles --area <name> --format mbtiles --checksum` (Default-
 Format wäre `versatiles`, deshalb `--format mbtiles` explizit). `docker run` ohne Args startet einen
 interaktiven Wizard.
