@@ -1247,6 +1247,54 @@ pub async fn offline_bauen(
     Ok((StatusCode::ACCEPTED, Json(antwort)))
 }
 
+// ===== Region-Bau-Status-Proxies (LFH-203, Komponente B3) =====
+
+/// Gemeinsamer Helfer für die beiden reinen Lese-Proxies unten: `GET {url}{pfad}` mit Bearer-Token
+/// über den dedizierten `KARTEN_SERVICE_CLIENT` (s.o., NICHT `download_client`). Fehlt die
+/// Service-Konfiguration (URL/Token), ist das Feature schlicht aus — anders als bei `offline_bauen`
+/// (dort `501`, weil ein Trigger ohne Ziel ein Fehler ist) antworten die Listen-Endpunkte hier mit
+/// einer leeren Liste (`200`), damit das Admin-UI ohne konfigurierten Service einfach nichts
+/// anzeigt statt einen Fehlerzustand rendern zu müssen. Die Service-Antwort wird roh
+/// durchgereicht (kein Reshape) — Format ist Vertragssache des karten-service.
+async fn service_get(st: &AppState, pfad: &str) -> Result<serde_json::Value, AppError> {
+    let (Some(url), Some(token)) =
+        (st.karten_service_url.as_deref(), st.karten_service_token.as_deref())
+    else {
+        return Ok(serde_json::json!([]));
+    };
+    let resp = KARTEN_SERVICE_CLIENT
+        .get(format!("{}{}", url.trim_end_matches('/'), pfad))
+        .bearer_auth(token)
+        .send()
+        .await
+        .map_err(|e| AppError::BadGateway(format!("karten-service unerreichbar: {e}")))?;
+    if !resp.status().is_success() {
+        return Err(AppError::BadGateway(format!("karten-service {}", resp.status())));
+    }
+    resp.json()
+        .await
+        .map_err(|e| AppError::BadGateway(format!("karten-service-Antwort: {e}")))
+}
+
+/// GET /api/karte/offline-karten/baubare-regionen — forwarded `GET {url}/regions` des zentralen
+/// karten-service (Admin, LFH-203). Liefert die vom Service baubaren Regionen für die Admin-UI-Liste.
+pub async fn offline_baubare_regionen(
+    State(st): State<AppState>,
+    _admin: AdminUser,
+) -> Result<Json<serde_json::Value>, AppError> {
+    Ok(Json(service_get(&st, "/regions").await?))
+}
+
+/// GET /api/karte/offline-karten/bau-status — forwarded `GET {url}/builds` des zentralen
+/// karten-service (Admin, LFH-203). Liefert den Build-Status (u.a. laufende/abgeschlossene Jobs)
+/// zum Polling im Admin-UI.
+pub async fn offline_bau_status(
+    State(st): State<AppState>,
+    _admin: AdminUser,
+) -> Result<Json<serde_json::Value>, AppError> {
+    Ok(Json(service_get(&st, "/builds").await?))
+}
+
 // ===== Style-/Tile-Proxy (LFH-182, öffentlich — wie /config & /tiles) =====
 //
 // Alle Endpunkte: Quelle muss existieren + proxy=1 + aktiv=1 (sonst 404). Jede Upstream-URL läuft

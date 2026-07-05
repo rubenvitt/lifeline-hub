@@ -1253,3 +1253,110 @@ async fn offline_bauen_lehnt_leeren_slug_ab() {
     assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 }
 
+// ===== GET /api/karte/offline-karten/baubare-regionen + /bau-status (Read-Proxies, LFH-203/B3) =====
+
+#[tokio::test]
+async fn baubare_regionen_ohne_service_config_liefert_leere_liste() {
+    // Standard-Helfer: karten_service_url/-token beide None → Feature aus, aber lesend (kein 501
+    // wie bei `bauen` — die Admin-UI-Liste soll einfach leer bleiben, kein Fehlerzustand).
+    let (app, cookie) = admin_app().await;
+    let res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/offline-karten/baubare-regionen",
+        Some(&cookie),
+        None,
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let v = json(res).await;
+    assert!(v.as_array().unwrap().is_empty(), "leere Liste ohne Service-Konfiguration: {v:?}");
+}
+
+#[tokio::test]
+async fn bau_status_ohne_service_config_liefert_leere_liste() {
+    let (app, cookie) = admin_app().await;
+    let res = anfrage(&app, "GET", "/api/karte/offline-karten/bau-status", Some(&cookie), None).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let v = json(res).await;
+    assert!(v.as_array().unwrap().is_empty(), "leere Liste ohne Service-Konfiguration: {v:?}");
+}
+
+/// Mini-Mock des zentralen karten-service für die beiden Read-Proxies (Muster:
+/// `spawn_karten_service_mock` oben, hier aber `GET /regions` + `GET /builds`). Prüft das
+/// weitergereichte Bearer-Token und liefert realistische Service-Antworten — `/builds` insbesondere
+/// mit VERSCHACHTELTEM `status`-Objekt (mirrort die reale karten-service-Serialisierung), damit der
+/// Test echte Raw-Passthrough-Treue prüft statt eines geflachten Test-Fixtures.
+async fn spawn_regionen_und_builds_mock(erwartetes_token: &'static str) -> String {
+    use axum::routing::get;
+    use axum::Router;
+
+    fn pruefe_bearer(headers: &axum::http::HeaderMap, erwartetes_token: &str) {
+        let auth = headers
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default();
+        assert_eq!(auth, format!("Bearer {erwartetes_token}"), "Bearer-Token weitergereicht");
+    }
+
+    let mock = Router::new()
+        .route(
+            "/regions",
+            get(move |headers: axum::http::HeaderMap| async move {
+                pruefe_bearer(&headers, erwartetes_token);
+                axum::Json(serde_json::json!([
+                    {"slug": "bayern", "name": "Bayern", "region": "DE-BY", "gruppe": "Bundesländer"}
+                ]))
+            }),
+        )
+        .route(
+            "/builds",
+            get(move |headers: axum::http::HeaderMap| async move {
+                pruefe_bearer(&headers, erwartetes_token);
+                axum::Json(serde_json::json!([
+                    {
+                        "id": 1,
+                        "slug": "bayern",
+                        "status": { "status": "building" },
+                        "gestartet": "2026-01-01T00:00:00Z",
+                        "beendet": null
+                    }
+                ]))
+            }),
+        );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(listener, mock).await.unwrap();
+    });
+    format!("http://127.0.0.1:{}", addr.port())
+}
+
+#[tokio::test]
+async fn baubare_regionen_und_bau_status_forwarden_service_antwort_roh() {
+    let mock_url = spawn_regionen_und_builds_mock("t").await;
+    let (app, cookie) = admin_app_mit_karten_service(&mock_url, "t").await;
+
+    let regionen_res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/offline-karten/baubare-regionen",
+        Some(&cookie),
+        None,
+    )
+    .await;
+    assert_eq!(regionen_res.status(), StatusCode::OK);
+    let regionen = json(regionen_res).await;
+    assert_eq!(regionen[0]["slug"], "bayern", "Region unverändert durchgereicht: {regionen:?}");
+
+    let status_res =
+        anfrage(&app, "GET", "/api/karte/offline-karten/bau-status", Some(&cookie), None).await;
+    assert_eq!(status_res.status(), StatusCode::OK);
+    let status = json(status_res).await;
+    // Verschachteltes status.status statt geflacht — Raw-Passthrough-Beweis (kein Reshape).
+    assert_eq!(
+        status[0]["status"]["status"], "building",
+        "verschachtelter Build-Status unverändert durchgereicht: {status:?}"
+    );
+}
+
