@@ -1183,6 +1183,70 @@ pub async fn offline_abbrechen(
     }
 }
 
+// ===== Region-Bau-Trigger (LFH-203, Komponente B2) =====
+
+/// Request-Body für den Region-Bau-Trigger: nur der Region-Slug, den der zentrale
+/// karten-service zum Bauen braucht.
+#[derive(Debug, Deserialize)]
+pub struct OfflineBauBody {
+    pub slug: String,
+}
+
+/// Dedizierter, schlichter Client für den Call an den zentralen karten-service (LFH-203) —
+/// bewusst NICHT `state.download_client`: dessen `SichererResolver` (SSRF-Schutz, s.o.) blockt
+/// Loopback/interne Adressen, weil Download-URLs dort UNVERTRAUTE, admin-eingegebene Ziele sind.
+/// Der karten-service ist dagegen ein vom Betreiber KONFIGURIERTER, vertrauenswürdiger Endpunkt —
+/// der SSRF-Block würde sowohl den 127.0.0.1-Mock in Tests als auch legitime LAN-/Nicht-Internet-
+/// Deployments verhindern, in denen der Service ohne öffentliche Internet-Route erreichbar ist.
+/// Prozessweit mit kurzem Timeout (der Aufruf startet nur einen Build, wartet nicht auf ihn).
+static KARTEN_SERVICE_CLIENT: std::sync::LazyLock<reqwest::Client> =
+    std::sync::LazyLock::new(|| {
+        reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .expect("karten-service-Client baubar")
+    });
+
+/// POST /api/karte/offline-karten/bauen — stößt einen Region-Build beim zentralen karten-service
+/// an (Admin, LFH-203). Das Bearer-Token bleibt server-side: der Browser ruft NUR lifeline-hub,
+/// lifeline-hub reicht den Trigger mit Token an `POST {url}/builds` weiter und gibt die
+/// Service-Antwort (`{job_id}`) unverändert durch. `501`, wenn der Service nicht konfiguriert ist
+/// (URL+Token beide Pflicht); `502`, wenn der Service unerreichbar ist oder nicht erfolgreich
+/// antwortet.
+pub async fn offline_bauen(
+    State(state): State<AppState>,
+    _admin: AdminUser,
+    Json(body): Json<OfflineBauBody>,
+) -> Result<(StatusCode, Json<serde_json::Value>), AppError> {
+    let slug = body.slug.trim();
+    if slug.is_empty() {
+        return Err(AppError::Validation("slug darf nicht leer sein".into()));
+    }
+    let (Some(url), Some(token)) = (
+        state.karten_service_url.as_deref(),
+        state.karten_service_token.as_deref(),
+    ) else {
+        return Err(AppError::NotImplemented(
+            "karten-service nicht konfiguriert".into(),
+        ));
+    };
+    let resp = KARTEN_SERVICE_CLIENT
+        .post(format!("{}/builds", url.trim_end_matches('/')))
+        .bearer_auth(token)
+        .json(&serde_json::json!({ "slug": slug }))
+        .send()
+        .await
+        .map_err(|e| AppError::BadGateway(format!("karten-service unerreichbar: {e}")))?;
+    let status = resp.status();
+    let antwort: serde_json::Value = resp.json().await.unwrap_or(serde_json::json!({}));
+    if !status.is_success() {
+        return Err(AppError::BadGateway(format!(
+            "karten-service {status}: {antwort}"
+        )));
+    }
+    Ok((StatusCode::ACCEPTED, Json(antwort)))
+}
+
 // ===== Style-/Tile-Proxy (LFH-182, öffentlich — wie /config & /tiles) =====
 //
 // Alle Endpunkte: Quelle muss existieren + proxy=1 + aktiv=1 (sonst 404). Jede Upstream-URL läuft

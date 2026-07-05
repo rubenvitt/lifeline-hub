@@ -432,6 +432,10 @@ pub fn build_router(state: AppState) -> Router {
             post(routes::karte::offline_download),
         )
         .route(
+            "/api/karte/offline-karten/bauen",
+            post(routes::karte::offline_bauen),
+        )
+        .route(
             "/api/karte/offline-karten/{id}/aktivieren",
             post(routes::karte::offline_aktivieren),
         )

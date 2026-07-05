@@ -1151,3 +1151,105 @@ async fn proxy_tile_slot_auf_interne_adresse_ist_fehler_ssrf() {
     assert!(res.status().is_server_error(), "SSRF-Gate blockt internen Slot: {}", res.status());
 }
 
+// ===== POST /api/karte/offline-karten/bauen (Region-Bau-Trigger → karten-service, LFH-203/B2) =====
+
+/// Wie `admin_app`, aber mit konfiguriertem karten-service (`url`+`token`) — für den
+/// Bau-Trigger-Test braucht es EINE konkrete (Mock-)Adresse statt der toten `127.0.0.1:1` aus
+/// `app_mit_pool_und_karten_service`.
+async fn admin_app_mit_karten_service(url: &str, token: &str) -> (axum::Router, String) {
+    let pool = pool().await;
+    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
+        .await
+        .unwrap();
+    let app = build_router(AppState {
+        pool,
+        live: LiveHub::new(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_service_url: Some(url.to_string()),
+        karten_service_token: Some(token.to_string()),
+        karten_dir: std::env::temp_dir(),
+    });
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    (app, cookie)
+}
+
+/// Mini-Mock des zentralen karten-service (Muster: `download.rs::spawn_fixture`, `127.0.0.1:0`).
+/// Beantwortet `POST /builds`, NACHDEM geprüft wurde, dass Bearer-Token und Body (`{"slug":..}`)
+/// wie erwartet ankommen — falsche Werte lassen die Assertion in der Mock-Task panicken, der
+/// Request bricht ab und der Test schlägt (indirekt, über den dadurch nicht-202-Status) fehl.
+async fn spawn_karten_service_mock(erwartetes_token: &'static str, erwarteter_slug: &'static str) -> String {
+    use axum::routing::post;
+    use axum::Router;
+
+    let mock = Router::new().route(
+        "/builds",
+        post(
+            move |headers: axum::http::HeaderMap, axum::Json(body): axum::Json<serde_json::Value>| async move {
+                let auth = headers
+                    .get(axum::http::header::AUTHORIZATION)
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or_default();
+                assert_eq!(auth, format!("Bearer {erwartetes_token}"), "Bearer-Token weitergereicht");
+                assert_eq!(body["slug"], erwarteter_slug, "slug im Body weitergereicht");
+                axum::Json(serde_json::json!({ "job_id": 7 }))
+            },
+        ),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(listener, mock).await.unwrap();
+    });
+    format!("http://127.0.0.1:{}", addr.port())
+}
+
+#[tokio::test]
+async fn offline_bauen_forwardet_an_karten_service_und_liefert_202() {
+    let mock_url = spawn_karten_service_mock("t", "bayern").await;
+    let (app, cookie) = admin_app_mit_karten_service(&mock_url, "t").await;
+    let res = anfrage(
+        &app,
+        "POST",
+        "/api/karte/offline-karten/bauen",
+        Some(&cookie),
+        Some(r#"{"slug":"bayern"}"#),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::ACCEPTED);
+    let v = json(res).await;
+    assert_eq!(v["job_id"], 7);
+}
+
+#[tokio::test]
+async fn offline_bauen_ohne_service_config_ist_501() {
+    // Standard-Helfer: karten_service_url/-token beide None → Feature aus.
+    let (app, cookie) = admin_app().await;
+    let res = anfrage(
+        &app,
+        "POST",
+        "/api/karte/offline-karten/bauen",
+        Some(&cookie),
+        Some(r#"{"slug":"bayern"}"#),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::NOT_IMPLEMENTED);
+}
+
+#[tokio::test]
+async fn offline_bauen_lehnt_leeren_slug_ab() {
+    // Service ist konfiguriert (URL zeigt absichtlich ins Leere) — die Validierung muss VOR dem
+    // Netzwerk-Call greifen, sonst würde dieser Test einen echten (scheiternden) Call auslösen.
+    let (app, cookie) = admin_app_mit_karten_service("http://127.0.0.1:1", "t").await;
+    let res = anfrage(
+        &app,
+        "POST",
+        "/api/karte/offline-karten/bauen",
+        Some(&cookie),
+        Some(r#"{"slug":""}"#),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+}
+

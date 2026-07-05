@@ -24,6 +24,10 @@ pub enum AppError {
     Database(sqlx::Error),
     /// Sonstiger interner Fehler (500).
     Internal(String),
+    /// Feature ist nicht konfiguriert/verfügbar (501), z.B. ein nicht eingerichteter Upstream-Service.
+    NotImplemented(String),
+    /// Ein angesprochener Upstream-Dienst ist fehlgeschlagen/unerreichbar (502).
+    BadGateway(String),
 }
 
 impl std::fmt::Display for AppError {
@@ -37,6 +41,8 @@ impl std::fmt::Display for AppError {
             AppError::UnprocessableEntity(m) => write!(f, "{m}"),
             AppError::Database(e) => write!(f, "Datenbankfehler: {e}"),
             AppError::Internal(m) => write!(f, "{m}"),
+            AppError::NotImplemented(m) => write!(f, "{m}"),
+            AppError::BadGateway(m) => write!(f, "{m}"),
         }
     }
 }
@@ -60,6 +66,8 @@ impl AppError {
             AppError::Conflict(_) => StatusCode::CONFLICT,
             AppError::UnprocessableEntity(_) => StatusCode::UNPROCESSABLE_ENTITY,
             AppError::Database(_) | AppError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            AppError::NotImplemented(_) => StatusCode::NOT_IMPLEMENTED,
+            AppError::BadGateway(_) => StatusCode::BAD_GATEWAY,
         }
     }
 }
