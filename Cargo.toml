@@ -40,7 +40,6 @@ karten-katalog = { path = "crates/karten-katalog" }
 dev-seeds = []
 
 # LFH-201: Workspace-Umstellung — geteilter Typ wandert in ein eigenes Crate (Grundstein für den
-# späteren karten-service). `karten-service` kommt erst in einem Folge-Task dazu (Verzeichnis
-# existiert noch nicht; cargo bricht sonst mit einem fehlenden Member ab).
+# späteren karten-service). `karten-service` ist jetzt Teil des Workspace (Skelett, LFH-201 Task 2).
 [workspace]
-members = [".", "crates/karten-katalog"]
+members = [".", "crates/karten-katalog", "karten-service"]
