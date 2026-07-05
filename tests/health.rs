@@ -12,6 +12,8 @@ async fn health_endpoint_returns_ok() {
         pool,
         live: LiveHub::new(),
         karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu(), download_client: lifeline_hub::karte::download::download_client(), download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_service_url: None,
+        karten_service_token: None,
     });
 
     let response = app
@@ -44,6 +46,8 @@ async fn health_endpoint_reports_degraded_when_db_down() {
         pool,
         live: LiveHub::new(),
         karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu(), download_client: lifeline_hub::karte::download::download_client(), download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_service_url: None,
+        karten_service_token: None,
     });
 
     let response = app

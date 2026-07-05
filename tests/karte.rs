@@ -20,6 +20,8 @@ fn app_mit_pool(pool: sqlx::SqlitePool) -> axum::Router {
         pool,
         live: LiveHub::new(),
         fachebenen: lifeline_hub::karte::FachebenenState::neu(), download_client: lifeline_hub::karte::download::download_client(), download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_service_url: None,
+        karten_service_token: None,
         karten_dir: std::env::temp_dir(),
     })
 }
@@ -155,6 +157,8 @@ async fn offline_tiles_liefert_gzip_mvt_mit_tms_flip() {
         fachebenen: lifeline_hub::karte::FachebenenState::neu(),
         download_client: lifeline_hub::karte::download::download_client(),
         download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_service_url: None,
+        karten_service_token: None,
         karten_dir: dir.path().to_path_buf(),
     });
 
@@ -201,6 +205,8 @@ async fn offline_tiles_raster_liefert_png_ohne_gzip_und_config_meldet_raster() {
         fachebenen: lifeline_hub::karte::FachebenenState::neu(),
         download_client: lifeline_hub::karte::download::download_client(),
         download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_service_url: None,
+        karten_service_token: None,
         karten_dir: dir.path().to_path_buf(),
     });
 
@@ -259,6 +265,8 @@ async fn offline_tiles_ungueltiges_z_liefert_204_ohne_panic() {
         fachebenen: lifeline_hub::karte::FachebenenState::neu(),
         download_client: lifeline_hub::karte::download::download_client(),
         download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_service_url: None,
+        karten_service_token: None,
         karten_dir: dir.path().to_path_buf(),
     });
     let req = Request::builder()
@@ -319,6 +327,44 @@ async fn config_endpoint_blind_modus_ohne_konfiguration() {
     assert_eq!(v["offline_verfuegbar"].as_bool(), Some(false));
     assert!(v["offline_tiles_url"].is_null());
     assert!(v["online_styles"].as_array().unwrap().is_empty());
+}
+
+/// Wie `app_mit_pool`, aber mit konfiguriertem karten-service (URL+Token) — für den
+/// `karten_bau_verfuegbar`-Test (LFH-203). Die URL zeigt absichtlich ins Leere (127.0.0.1:1):
+/// der Config-Handler prüft nur Anwesenheit, ruft den Service NICHT auf.
+fn app_mit_pool_und_karten_service(pool: sqlx::SqlitePool) -> axum::Router {
+    build_router(AppState {
+        pool,
+        live: LiveHub::new(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_service_url: Some("http://127.0.0.1:1".into()),
+        karten_service_token: Some("t".into()),
+        karten_dir: std::env::temp_dir(),
+    })
+}
+
+#[tokio::test]
+async fn config_endpoint_meldet_karten_bau_verfuegbar_mit_service_konfiguration() {
+    let pool = pool().await;
+    let app = app_mit_pool_und_karten_service(pool);
+    let req = Request::builder().uri("/api/karte/config").body(Body::empty()).unwrap();
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let v = json(res).await;
+    assert_eq!(v["karten_bau_verfuegbar"].as_bool(), Some(true));
+}
+
+#[tokio::test]
+async fn config_endpoint_meldet_karten_bau_nicht_verfuegbar_ohne_service_konfiguration() {
+    let pool = pool().await;
+    let app = app_mit_pool(pool); // Standard-Helfer: karten_service_url/-token beide None
+    let req = Request::builder().uri("/api/karte/config").body(Body::empty()).unwrap();
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let v = json(res).await;
+    assert_eq!(v["karten_bau_verfuegbar"].as_bool(), Some(false));
 }
 
 #[tokio::test]

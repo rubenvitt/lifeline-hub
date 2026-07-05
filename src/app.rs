@@ -25,6 +25,11 @@ pub struct AppState {
     pub download_client: reqwest::Client,
     /// Transienter Download-Fortschritt je Karte-`id` (in-memory, keine DB-Spalte).
     pub download_fortschritt: crate::karte::download::FortschrittMap,
+    /// Basis-URL des zentralen karten-service (LFH-203, Komponente A) für den Region-Bau-Trigger.
+    /// Operator-konfiguriert (ENV LIFELINE_KARTEN_SERVICE_URL); `None` = Bau-Feature aus.
+    pub karten_service_url: Option<String>,
+    /// Bearer-Token für den karten-service. Bleibt server-side (nie im Browser). `None` = Feature aus.
+    pub karten_service_token: Option<String>,
 }
 
 /// Baut den Axum-Router mit allen Routen und dem geteilten Zustand. Die Kartenkonfig kommt

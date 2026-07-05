@@ -231,6 +231,7 @@ function basisHandler(
     offline_verfuegbar: false,
     offline_tiles_url: null,
     offline_attribution: null,
+    karten_bau_verfuegbar: false,
   },
 ) {
   // extra ZUERST: MSW nimmt den ersten Treffer → Tests können einzelne GET-Defaults
@@ -351,6 +352,7 @@ describe('LagekartePage', () => {
       offline_verfuegbar: true,
       offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
       offline_attribution: null,
+      karten_bau_verfuegbar: false,
     });
     const user = userEvent.setup();
     renderSeite();
@@ -391,6 +393,7 @@ describe('LagekartePage', () => {
       offline_verfuegbar: true,
       offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
       offline_attribution: null,
+      karten_bau_verfuegbar: false,
     });
     renderSeite();
     await screen.findByText('marker-schaden-9');
@@ -406,6 +409,7 @@ describe('LagekartePage', () => {
       offline_verfuegbar: true,
       offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
       offline_attribution: null,
+      karten_bau_verfuegbar: false,
     });
     renderSeite();
     await screen.findByText('marker-schaden-9');
@@ -505,6 +509,7 @@ describe('LagekartePage', () => {
       offline_verfuegbar: false,
       offline_tiles_url: null,
       offline_attribution: null,
+      karten_bau_verfuegbar: false,
     });
     const user = userEvent.setup();
     renderSeite();

@@ -22,13 +22,15 @@ const beides: KarteServerConfig = {
   offline_verfuegbar: true,
   offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
   offline_attribution: null,
+  karten_bau_verfuegbar: false,
 };
 const nurOffline: KarteServerConfig = {
   online_styles: [], offline_verfuegbar: true, offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
-  offline_attribution: '© OpenStreetMap contributors (ODbL)',
+  offline_attribution: '© OpenStreetMap contributors (ODbL)', karten_bau_verfuegbar: false,
 };
 const leer: KarteServerConfig = {
   online_styles: [], offline_verfuegbar: false, offline_tiles_url: null, offline_attribution: null,
+  karten_bau_verfuegbar: false,
 };
 
 describe('basemapStil', () => {

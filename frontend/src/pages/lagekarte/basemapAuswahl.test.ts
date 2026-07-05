@@ -17,6 +17,7 @@ function config(over: Partial<KarteServerConfig> = {}): KarteServerConfig {
     offline_verfuegbar: false,
     offline_tiles_url: null,
     offline_attribution: null,
+    karten_bau_verfuegbar: false,
     ...over,
   };
 }

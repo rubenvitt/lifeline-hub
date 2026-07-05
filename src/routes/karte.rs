@@ -37,6 +37,9 @@ pub struct KarteConfigAntwort {
     /// Grober Kachel-Typ der aktiven Offline-Karte (LFH-185): `"vektor"` (pbf) oder `"raster"`
     /// (png/jpg/webp) — steuert die Style-Wahl im Frontend. `None`, wenn keine aktive Karte.
     pub offline_format: Option<String>,
+    /// True, wenn der zentrale karten-service konfiguriert ist (URL+Token) → Admin darf Region-Builds
+    /// anstoßen. Steuert die Sichtbarkeit der Bau-UI (LFH-203). Reine Verfügbarkeit, kein Secret.
+    pub karten_bau_verfuegbar: bool,
 }
 
 /// GET /api/karte/config — Basemap-Verfügbarkeit fürs Frontend, frisch aus der DB-Registry.
@@ -86,12 +89,18 @@ pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAnt
         }
         .to_string()
     });
+    // Bau-UI-Verfügbarkeit (LFH-203): reine Konfigurations-Prüfung, kein Netzwerk-Call zum
+    // karten-service. Beide Werte müssen gesetzt sein — Token ohne URL (oder umgekehrt) ist keine
+    // funktionsfähige Konfiguration.
+    let karten_bau_verfuegbar =
+        state.karten_service_url.is_some() && state.karten_service_token.is_some();
     Ok(Json(KarteConfigAntwort {
         online_styles,
         offline_verfuegbar: aktiv.is_some(),
         offline_tiles_url,
         offline_attribution,
         offline_format,
+        karten_bau_verfuegbar,
     }))
 }
 

@@ -167,6 +167,17 @@ pub struct Config {
     /// Optionales Subkommando. Ohne Subkommando wird der Server gestartet.
     #[command(subcommand)]
     pub command: Option<Command>,
+
+    /// Basis-URL des zentralen karten-service (LFH-203). Fehlt sie, ist der Region-Bau
+    /// (Admin-Trigger für Kartenbau) deaktiviert — `KarteConfigAntwort.karten_bau_verfuegbar`
+    /// meldet dann `false`.
+    #[arg(long, env = "LIFELINE_KARTEN_SERVICE_URL")]
+    pub karten_service_url: Option<String>,
+
+    /// Bearer-Token für den karten-service. Bleibt server-side (nie im Browser); ohne Token ist
+    /// der Region-Bau deaktiviert.
+    #[arg(long, env = "LIFELINE_KARTEN_SERVICE_TOKEN")]
+    pub karten_service_token: Option<String>,
 }
 
 /// Subkommandos der lifeline-hub-Binary (neben dem Server-Standardlauf).

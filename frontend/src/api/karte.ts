@@ -21,6 +21,9 @@ export interface KarteServerConfig {
   /** Grober Kachel-Typ der aktiven Offline-Karte (LFH-185): `'raster'` → Raster-Style, sonst
    * (undefined/null/`'vektor'`) der Shortbread-Vektor-Style. */
   offline_format?: OnlineStyleTyp | null;
+  /** True, wenn der zentrale karten-service konfiguriert ist → Admin darf Region-Builds anstoßen
+   * (LFH-203). Steuert nur die Sichtbarkeit der Bau-UI, kein Secret. */
+  karten_bau_verfuegbar: boolean;
 }
 
 export function ladeKarteConfig(): Promise<KarteServerConfig> {

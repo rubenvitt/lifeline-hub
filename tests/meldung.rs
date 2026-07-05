@@ -19,6 +19,8 @@ async fn setup() -> axum::Router {
         pool,
         live: LiveHub::new(),
         karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu(), download_client: lifeline_hub::karte::download::download_client(), download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_service_url: None,
+        karten_service_token: None,
     })
 }
 
