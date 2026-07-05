@@ -1,6 +1,6 @@
 use super::Storage;
 use async_trait::async_trait;
-use object_store::{aws::AmazonS3Builder, path::Path as ObjPath, ObjectStore};
+use object_store::{aws::AmazonS3Builder, path::Path as ObjPath, ObjectStore, WriteMultipart};
 use std::path::Path;
 use tokio::io::AsyncReadExt;
 
@@ -25,19 +25,38 @@ impl S3Storage {
 #[async_trait]
 impl Storage for S3Storage {
     async fn put_datei(&self, key: &str, pfad: &Path) -> anyhow::Result<()> {
-        let mut upload = self.store.put_multipart(&ObjPath::from(key)).await?;
+        // Erst die Datei öffnen, dann den Multipart-Upload starten: schlägt das Öffnen
+        // fehl, existiert noch kein Upload-Handle, das aufgeräumt werden müsste.
         let mut f = tokio::fs::File::open(pfad).await?;
+        let upload = self.store.put_multipart(&ObjPath::from(key)).await?;
+        // WriteMultipart puffert intern auf korrekte Blockgrößen (≥5 MiB) — ein
+        // Short-Read auf unserem Lesepuffer erzeugt so nie einen zu kleinen Part
+        // (den S3/R2 zur Laufzeit ablehnen würden).
+        let mut write = WriteMultipart::new(upload);
         let mut buf = vec![0u8; 8 * 1024 * 1024];
         loop {
-            let n = f.read(&mut buf).await?;
+            let n = match f.read(&mut buf).await {
+                Ok(n) => n,
+                Err(e) => {
+                    // Best effort: verwaiste Parts abräumen, bevor der Lesefehler propagiert wird.
+                    let _ = write.abort().await;
+                    return Err(e.into());
+                }
+            };
             if n == 0 {
                 break;
             }
-            upload
-                .put_part(bytes::Bytes::copy_from_slice(&buf[..n]).into())
-                .await?;
+            write.write(&buf[..n]);
+            // Backpressure: ohne Deckel puffert WriteMultipart beliebig viele
+            // In-Flight-Parts (Speicher wüchse mit der Dateigröße, wenn Lesen
+            // schneller ist als Hochladen). Zusätzlich surfacen Part-Fehler so
+            // schon hier, wo das Upload-Handle noch für abort() erreichbar ist.
+            if let Err(e) = write.wait_for_capacity(4).await {
+                let _ = write.abort().await;
+                return Err(e.into());
+            }
         }
-        upload.complete().await?;
+        write.finish().await?;
         Ok(())
     }
 
