@@ -12,6 +12,8 @@ build/
 # Embed-Ordner muss für die Compile-Zeit existieren (rust-embed):
 !frontend/dist/
 !frontend/dist/.gitkeep
+# Rust-Quellmodul, kein Build-Artefakt (karten-service, LFH-201):
+!karten-service/src/build/
 
 # OS / Editor
 .DS_Store

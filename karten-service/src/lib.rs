@@ -1,4 +1,5 @@
 pub mod api;
+pub mod build;
 pub mod config;
 pub mod jobs;
 pub mod manifest;
