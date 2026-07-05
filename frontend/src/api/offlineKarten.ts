@@ -128,3 +128,46 @@ export function listeVorhandeneKarten(): Promise<VorhandeneKarte[]> {
 export function registriereOfflineKarte(body: RegistriereBody): Promise<OfflineKarte> {
   return apiSend<OfflineKarte>('/api/karte/offline-karten', 'POST', body);
 }
+
+// ===== Region-Bau (zentraler karten-service, LFH-203) =====
+
+export type BauStatus = 'queued' | 'building' | 'uploading' | 'publishing' | 'done' | 'failed';
+
+/** karten-service serialisiert `status` als verschachteltes Objekt ({status, fehler?}), NICHT flach —
+ *  der Proxy reicht es roh durch. */
+export interface BauJobStatus {
+  status: BauStatus;
+  fehler?: string;
+}
+
+/** Ein Build-Job des zentralen karten-service (über `/bau-status` roh durchgereicht). */
+export interface BauJob {
+  id: number;
+  slug: string;
+  status: BauJobStatus;
+  gestartet: string;
+  beendet?: string | null;
+}
+
+/** Eine vom zentralen karten-service baubare Region (über `/baubare-regionen` roh durchgereicht). */
+export interface BaubareRegion {
+  slug: string;
+  name: string;
+  region: string;
+  gruppe: string;
+}
+
+/** Stößt einen Region-Build beim zentralen karten-service an (Admin). */
+export function starteRegionBau(slug: string): Promise<{ job_id: number }> {
+  return apiSend<{ job_id: number }>('/api/karte/offline-karten/bauen', 'POST', { slug });
+}
+
+/** Listet die vom zentralen karten-service baubaren Regionen. */
+export function ladeBaubareRegionen(): Promise<BaubareRegion[]> {
+  return apiGet<BaubareRegion[]>('/api/karte/offline-karten/baubare-regionen');
+}
+
+/** Lädt den Build-Status (u.a. laufende/abgeschlossene Jobs) zum Polling im Admin-UI. */
+export function ladeBauStatus(): Promise<BauJob[]> {
+  return apiGet<BauJob[]>('/api/karte/offline-karten/bau-status');
+}
