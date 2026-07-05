@@ -1,11 +1,14 @@
 pub mod make_runner;
 pub mod validate;
-use crate::manifest::{datei_key, PublishedVersion};
+use crate::jobs::{JobStatus, Registry};
+use crate::manifest::{baue_manifest, datei_key, published_aus_eintrag, PublishedVersion};
 use crate::regions::Region;
 use crate::storage::Storage;
 use async_trait::async_trait;
 use chrono::NaiveDate;
+use karten_katalog::OfflineKatalogEintrag;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 pub struct BuildArtefakt { pub datei: PathBuf, pub sha256: String, pub bounds: Option<(f64,f64,f64,f64)> }
 
@@ -30,6 +33,40 @@ pub async fn build_region(
     let mut out: Vec<PublishedVersion> = bestand.iter().filter(|v| v.slug != reg.slug).cloned().collect();
     out.push(PublishedVersion { slug: reg.slug.into(), url: storage.public_url(&key), groesse, sha256: art.sha256 });
     Ok(out)
+}
+
+/// Fährt einen kompletten Build-Job: Status-FSM Building→Publishing→Done/Failed. Der geteilte
+/// `bestand` (alle publizierten Regionen) wird erst NACH erfolgreichem Manifest-Upload
+/// aktualisiert — bei jedem Fehlerzweig bleibt der Vorbestand unangetastet (atomarer Publish).
+pub async fn fahre_build(
+    reg: &Region, job_id: u64, registry: &Registry,
+    runner: Arc<dyn BuildRunner>, storage: Arc<dyn Storage>,
+    bestand: Arc<Mutex<Vec<PublishedVersion>>>,
+) {
+    registry.set_status(job_id, JobStatus::Building);
+    let heute = chrono::Utc::now().date_naive();
+    let snapshot = bestand.lock().unwrap().clone();
+    match build_region(reg, heute, runner.as_ref(), storage.as_ref(), &snapshot).await {
+        Ok(neu) => {
+            registry.set_status(job_id, JobStatus::Publishing);
+            match serde_json::to_vec(&baue_manifest(&neu)) {
+                Ok(js) => match storage.put_bytes("offline-katalog-manifest.json", js).await {
+                    Ok(()) => { *bestand.lock().unwrap() = neu; registry.set_status(job_id, JobStatus::Done); }
+                    Err(e) => registry.set_status(job_id, JobStatus::Failed(format!("Manifest-Upload: {e}"))),
+                },
+                Err(e) => registry.set_status(job_id, JobStatus::Failed(format!("Manifest-Serialisierung: {e}"))),
+            }
+        }
+        Err(e) => registry.set_status(job_id, JobStatus::Failed(e.to_string())),
+    }
+}
+
+/// Beim Start: den aktuellen Manifest-Stand aus dem Storage laden, damit ein einzelner Rebuild
+/// nicht die anderen Regionen aus dem Manifest wirft. Best-effort: Fehler → leerer Bestand.
+pub async fn seed_bestand(storage: &dyn Storage) -> Vec<PublishedVersion> {
+    let Ok(Some(js)) = storage.get_bytes("offline-katalog-manifest.json").await else { return vec![] };
+    let Ok(eintraege) = serde_json::from_slice::<Vec<OfflineKatalogEintrag>>(&js) else { return vec![] };
+    eintraege.iter().filter_map(published_aus_eintrag).collect()
 }
 
 #[cfg(test)]
@@ -80,5 +117,41 @@ mod tests {
         let by = regions::finde("bayern").unwrap();
         assert!(build_region(by, d, &FalschRunner(f.path().into()), &s, &[]).await.is_err());
         assert!(s.inhalt("bayern.20260705.shortbread.mbtiles").is_none());
+    }
+}
+
+#[cfg(test)]
+mod fahrt_tests {
+    use super::*;
+    use crate::{jobs::Registry, storage::FakeStorage, manifest::PublishedVersion, regions};
+    use std::sync::{Arc, Mutex};
+    use std::io::Write;
+    struct OkRunner(std::path::PathBuf);
+    #[async_trait::async_trait]
+    impl BuildRunner for OkRunner {
+        async fn baue(&self, _a:&str) -> anyhow::Result<BuildArtefakt> {
+            Ok(BuildArtefakt { datei:self.0.clone(), sha256:"c".repeat(64), bounds:Some((8.9,47.2,13.9,50.6)) })
+        }
+    }
+    #[tokio::test]
+    async fn fahrt_done_und_seed_bewahrt_andere_regionen() {
+        let mut f = tempfile::NamedTempFile::new().unwrap(); f.write_all(&[7;5]).unwrap();
+        let s = Arc::new(FakeStorage::neu("https://cdn.example/maps"));
+        // Vorbestand: germany bereits publiziert
+        let bestand = Arc::new(Mutex::new(vec![PublishedVersion {
+            slug:"germany".into(), url:"https://cdn.example/maps/germany.20260101.shortbread.mbtiles".into(),
+            groesse:3, sha256:"d".repeat(64) }]));
+        let id = { let r = Registry::neu(4); let id = r.enqueue("bayern").unwrap();
+            fahre_build(regions::finde("bayern").unwrap(), id, &r, Arc::new(OkRunner(f.path().into())),
+                        s.clone(), bestand.clone()).await;
+            assert!(matches!(r.get(id).unwrap().status, crate::jobs::JobStatus::Done)); id };
+        let _ = id;
+        // Manifest enthält BEIDE Regionen (germany bewahrt + bayern neu)
+        let m: Vec<karten_katalog::OfflineKatalogEintrag> =
+            serde_json::from_slice(&s.inhalt("offline-katalog-manifest.json").unwrap()).unwrap();
+        assert!(m.iter().any(|e| e.name=="Deutschland (Shortbread)"));
+        assert!(m.iter().any(|e| e.name=="Bayern"));
+        // seed_bestand liest das Manifest zurück (2 Einträge)
+        assert_eq!(seed_bestand(s.as_ref()).await.len(), 2);
     }
 }
