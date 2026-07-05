@@ -17,7 +17,11 @@ where
     let job = Job::new_async(cron, move |_id, _lock| {
         let enqueue_all = enqueue_all.clone();
         Box::pin(async move {
-            (enqueue_all.lock().unwrap())();
+            // Poisoning-Fix (Task-11-Finding): ein einmaliger Panic in `enqueue_all` soll den
+            // Scheduler nicht dauerhaft lahmlegen — `.unwrap()` würde bei vergiftetem Mutex
+            // selbst erneut panicken. `unwrap_or_else(|e| e.into_inner())` holt den Guard auch
+            // nach einem Panic im Tick heraus; künftige Ticks bleiben funktionsfähig.
+            (enqueue_all.lock().unwrap_or_else(|e| e.into_inner()))();
         })
     })?;
     sched.add(job).await?;

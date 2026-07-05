@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 #[derive(Parser, Debug, Clone)]
@@ -18,4 +18,24 @@ pub struct ServiceConfig {
     pub schedule: String,
     #[arg(long, env = "KS_STORAGE_BUCKET", default_value = "")]
     pub storage_bucket: String,
+
+    /// Subkommando: `serve` (Dauerbetrieb) oder `build` (einmaliger lokaler Bau ohne HTTP).
+    #[command(subcommand)]
+    pub command: Command,
+}
+
+/// Subkommandos der karten-service-Binary.
+#[derive(Subcommand, Debug, Clone)]
+pub enum Command {
+    /// Seedet den Bestand aus dem Manifest, startet Worker + Cron-Scheduler + HTTP-API.
+    Serve,
+    /// Baut eine einzelne Region (`--slug`) oder alle Regionen (`--all`) lokal, ohne HTTP-Server.
+    Build {
+        /// Slug einer einzelnen Region (siehe `regions::alle()`). Schließt `--all` aus.
+        #[arg(long, conflicts_with = "all")]
+        slug: Option<String>,
+        /// Alle Regionen nacheinander bauen.
+        #[arg(long)]
+        all: bool,
+    },
 }
