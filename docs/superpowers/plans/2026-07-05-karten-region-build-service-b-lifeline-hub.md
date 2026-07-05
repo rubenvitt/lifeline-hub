@@ -17,6 +17,19 @@ Frontend React + antd + react-query + msw (Bestand). Konventionen: CLAUDE.md (UI
 
 ## Global Constraints
 
+- **Severability:** Der volle Auto-Update-Wert („Karten aktuell halten + Clients sehen neue Versionen")
+  entsteht schon aus **Plan A (Cron) + dem Manifest-URL-Pin (Task B6)** — der bestehende LFH-199-
+  Fetch/Merge/Update-Check ist die Client-Seite. Plan B fügt **nur** den on-demand-„jetzt bauen"-Button
+  hinzu. B ist damit ein sauber nachziehbarer Follow-on; niemand wartet auf B für Auto-Update.
+- **Vertrauenswürdiger Service-Call ≠ Download-SSRF-Pfad:** die Service-URL ist operator-konfiguriert
+  (trusted). **NICHT** `download_client` wiederverwenden — dessen `SichererResolver` (DNS-Loopback/
+  intern-Blockade) würde LAN/lokale Tests + Nicht-Internet-Deployments grundlos blocken. Einen
+  **dedizierten schlichten reqwest-Client** nutzen (prozessweiter `LazyLock`, mit Timeout). Folge:
+  der Forward ist **unit-testbar** gegen einen lokalen Mock-Server (kein Loopback-Block).
+- **Manifest-TTL-Seam:** `katalog.rs` cached das Manifest ~5 min. Eine gerade fertig gebaute Region
+  erscheint im Client-Katalog erst nach Ablauf der TTL. Für den on-demand-Button (B5): nach „done"
+  entweder client-seitig einen Katalog-Refresh anstoßen (Cache-Bust) oder die Verzögerung im UI
+  kommunizieren.
 - **Manifest-URL bleibt kompiliert-gepinnt** (`katalog::OFFLINE_KATALOG_MANIFEST_URL`) → LFH-199-Trust.
   Neu operator-konfigurierbar sind **nur** Service-URL + Token (kein admin-UI-editierbares URL-Feld).
 - **Token nie im Browser:** der Trigger läuft Browser → lifeline-hub (`_admin`) → Service.
@@ -106,9 +119,10 @@ git commit -m "feat(lfh-201): GET /regions am karten-service (baubare Regionen f
 
 **Interfaces:**
 - Produces: `Config.karten_service_url: Option<String>`, `Config.karten_service_token: Option<String>`
-  (clap, env `LIFELINE_KARTEN_SERVICE_URL`/`_TOKEN`); `AppState.karten_service_url/-token`; im
-  Karten-Config-Response (Frontend-Query `['karte-config']`) das Feld `karten_bau_verfuegbar: bool`
-  (= beide gesetzt).
+  (clap, env `LIFELINE_KARTEN_SERVICE_URL`/`_TOKEN`); `AppState.karten_service_url/-token`; das Feld
+  `karten_bau_verfuegbar: bool` in `routes::karte::KarteConfigAntwort` (Handler `routes::karte::config`,
+  `GET /api/karte/config`) + im Frontend-Typ `KarteServerConfig` (`frontend/src/api/karte.ts`,
+  Query-Key `['karte-config']`).
 
 - [ ] **Step 1: Failing test** — der Karten-Config-Handler meldet das Flag. (Den Handler lokalisieren,
   der `['karte-config']` bedient — vermutlich `GET /api/karte/config`.) Test: mit gesetzter
@@ -187,22 +201,32 @@ pub async fn offline_bauen(State(st):State<AppState>, _admin:AdminUser, Json(bod
     if slug.is_empty() { return Err(AppError::Validation("slug darf nicht leer sein".into())); }
     let (Some(url), Some(token)) = (st.karten_service_url.as_deref(), st.karten_service_token.as_deref())
         else { return Err(AppError::NotImplemented("karten-service nicht konfiguriert".into())); };
-    let resp = st.download_client.post(format!("{}/builds", url.trim_end_matches('/')))
-        .bearer_auth(token).json(&serde_json::json!({"slug": slug}))
-        .timeout(std::time::Duration::from_secs(10)).send().await
+    let resp = karten_service_client().post(format!("{}/builds", url.trim_end_matches('/')))
+        .bearer_auth(token).json(&serde_json::json!({"slug": slug})).send().await
         .map_err(|e| AppError::BadGateway(format!("karten-service unerreichbar: {e}")))?;
     let status = resp.status();
     let body: serde_json::Value = resp.json().await.unwrap_or(serde_json::json!({}));
     if !status.is_success() { return Err(AppError::BadGateway(format!("karten-service {status}: {body}"))); }
     Ok((StatusCode::ACCEPTED, Json(body)))
 }
+
+/// Dedizierter, schlichter Client für den VERTRAUENSWÜRDIGEN Service-Call — NICHT `download_client`
+/// (dessen SichererResolver blockt Loopback/intern und würde LAN/lokale Tests + Nicht-Internet-
+/// Deployments grundlos verhindern). Prozessweit, mit Timeout.
+fn karten_service_client() -> &'static reqwest::Client {
+    static C: std::sync::LazyLock<reqwest::Client> = std::sync::LazyLock::new(|| {
+        reqwest::Client::builder().timeout(std::time::Duration::from_secs(10)).build().unwrap()
+    });
+    &C
+}
 ```
 
 (Die exakten `AppError`-Varianten — `NotImplemented`/`BadGateway` — an die im Repo vorhandenen
 anpassen; falls es keine gibt, den nächstliegenden 5xx/501-Arm nutzen oder ergänzen.) Route in
 `app.rs` im Admin-Karten-Block: `.route("/api/karte/offline-karten/bauen", post(offline_bauen))`.
-**Happy-Path-Forward ist Integrations-getestet** (der SSRF-Guard blockt Loopback-Fixtures — wie bei
-LFH-183; hier werden die not-configured-/Validierungs-Arme unit-getestet).
+**Der Happy-Path-Forward ist unit-testbar** (kein SSRF-Loopback-Block): in einem Test einen kleinen
+axum-Mock auf `127.0.0.1:0` spawnen, `karten_service_url` darauf zeigen, `POST /builds` → `{job_id}`
+prüfen. Zusätzlich die not-configured-(501)/leerer-slug-(400)-Arme wie in Step 1.
 
 - [ ] **Step 4: Run → pass** — `cargo test -p lifeline-hub bauen_` → PASS.
 
@@ -246,8 +270,9 @@ async fn baubare_ohne_config_leer() {
 async fn service_get(st:&AppState, pfad:&str) -> Result<serde_json::Value, AppError> {
     let (Some(url), Some(token)) = (st.karten_service_url.as_deref(), st.karten_service_token.as_deref())
         else { return Ok(serde_json::json!([])); };
-    let resp = st.download_client.get(format!("{}{}", url.trim_end_matches('/'), pfad))
-        .bearer_auth(token).timeout(std::time::Duration::from_secs(10)).send().await
+    // dedizierter Client (nicht download_client — s. B2/Global Constraints)
+    let resp = karten_service_client().get(format!("{}{}", url.trim_end_matches('/'), pfad))
+        .bearer_auth(token).send().await
         .map_err(|e| AppError::BadGateway(format!("karten-service unerreichbar: {e}")))?;
     if !resp.status().is_success() { return Err(AppError::BadGateway(format!("karten-service {}", resp.status()))); }
     resp.json().await.map_err(|e| AppError::BadGateway(format!("karten-service-Antwort: {e}")))
@@ -353,6 +378,11 @@ it('zeigt Bauen-Button nur wenn verfügbar und triggert mit slug', async () => {
     { refetchInterval: aktiveBauten ? 2000 : false })`; die aktiven `BauJob`s als kompakte Zeile/Tags
     über der Tabelle (Status + Slug). Kein neues Poll-Framework — dasselbe 2s-Muster wie der Download.
   - Deep-Link/UI-Form: Modal (bounded Auswahl, kurze Aktion) — konform CLAUDE.md-UI-Leitlinie.
+  - **Manifest-TTL-Seam** (Global Constraints): eine gerade fertige Region erscheint im Katalog erst
+    nach der ~5-min-Server-Cache-TTL (`katalog.rs`). v1: das im UI **kommunizieren** („neue Version in
+    wenigen Minuten verfügbar") — ein client-seitiges `invalidiereKarte(qc)` bustet nur den
+    React-Query-Cache, nicht den Server-`KATALOG_CACHE`. Optional (Folge-Schritt): ein Admin-Endpunkt,
+    der den Server-Manifest-Cache force-refresht, für sofortiges Erscheinen.
 
 - [ ] **Step 4: Run → pass** — Vitest PASS; `pnpm lint` (0 Warnings); `tsc --noEmit`; `pnpm build`.
 
@@ -417,8 +447,8 @@ feature-gated, Picker, `baut`-Status) → Task B5; §B.4 Reuse (Download/Registe
 **Placeholder-Scan:** Die Test-Skizzen mit `/* AppState … */` und `admin_stub()` sind bewusst
 Repo-spezifisch (die genaue AppState-Test-Konstruktion + der `AdminUser`-Test-Stub existieren im
 Repo bzw. werden in Task B1 als Helfer eingeführt) — der Umsetzer nutzt das im Repo übliche Muster.
-Der Happy-Path-Forward (B2/B3) ist als integrations-getestet markiert (SSRF-Guard blockt
-Loopback-Fixtures, wie LFH-183).
+Der Happy-Path-Forward (B2/B3) ist **unit-testbar** über einen lokalen axum-Mock (der dedizierte
+Service-Client hat keinen SSRF-Loopback-Block — anders als `download_client`).
 
 **Typ-Konsistenz:** `karten_service_url/-token: Option<String>` (B1) in B2/B3; `OfflineBauBody{slug}`
 (B2); `service_get(&AppState, &str)` (B3); Frontend `BaubareRegion{slug,name,region,gruppe}` (=

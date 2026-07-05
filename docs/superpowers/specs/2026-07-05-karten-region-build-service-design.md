@@ -214,6 +214,18 @@ Update-Check bleiben **wie sie sind**. Die Erweiterung ist additiv.
   editierbar), server-side gehalten, Outbound-SSRF-geguardet. Das ist die einzige neue
   Vertrauens-/Angriffsfläche und ist minimal gehalten.
 
+## Severability & Fallback
+
+- **Voller Auto-Update-Wert ohne Komponente B:** „Karten aktuell halten + Clients sehen neue
+  Versionen" entsteht schon aus dem **Cron-Bau (A) + dem Manifest-URL-Pin** — der bestehende
+  LFH-199-Fetch/Merge/Update-Check ist die Client-Seite. Komponente B (Proxy-Trigger + Admin-UI)
+  fügt **nur** den on-demand-„jetzt bauen"-Button hinzu und ist ein sauber nachziehbarer Follow-on.
+- **Strict-Subset-Fallback, falls der Always-on-Dienst zu schwer ist:** Der HTTP-Dauerbetrieb (A's
+  `serve`/Worker + ganz B) existiert nur für on-demand. Der Cron-Kern ist bloß
+  `karten-service build --all` unter System-Cron → Object-Storage; ohne 24/7-Prozess. Diese
+  Subkommando-Variante (A Task 13) hält die Karten weiterhin automatisch aktuell und ist der
+  jederzeit wählbare Rückfall für einen Einzel-Maintainer-Betrieb.
+
 ## Testing
 
 - **Service:** Build-Runner-Integrations-Smoke gegen eine **kleine** Region (Bremen) inkl.
