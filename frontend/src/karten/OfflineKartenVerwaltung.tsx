@@ -7,13 +7,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
+import { ladeKarteConfig } from '../api/karte';
 import {
   aktiviereOfflineKarte,
   brecheOfflineDownloadAb,
+  ladeBauStatus,
   listeOfflineKarten,
   loescheOfflineKarte,
   neuLadeOfflineKarte,
   starteOfflineDownload,
+  type BauJob,
+  type BauStatus,
   type OfflineKarte,
   type OfflineKarteStatus,
 } from '../api/offlineKarten';
@@ -21,7 +25,20 @@ import { invalidiereKarte } from './invalidiereKarte';
 import { formatGroesse } from './formatGroesse';
 import OfflineDownloadKatalogModal from './OfflineDownloadKatalogModal';
 import OfflineDownloadUrlModal from './OfflineDownloadUrlModal';
+import OfflineRegionBauenModal from './OfflineRegionBauenModal';
 import OfflineVorhandeneModal from './OfflineVorhandeneModal';
+
+/** Bau-Status-Werte, während derer die Bau-Status-Zeile pollt (2 s) — analog Download-Polling. */
+const AKTIVE_BAU_STATUS: BauStatus[] = ['queued', 'building', 'uploading', 'publishing'];
+
+const BAU_STATUS_TAG: Record<BauStatus, { color: string; label: string }> = {
+  queued: { color: 'default', label: 'wartet' },
+  building: { color: 'processing', label: 'baut' },
+  uploading: { color: 'processing', label: 'lädt hoch' },
+  publishing: { color: 'processing', label: 'veröffentlicht' },
+  done: { color: 'green', label: 'fertig' },
+  failed: { color: 'red', label: 'Fehler' },
+};
 
 const STATUS_TAG: Record<OfflineKarteStatus, { color: string; label: string }> = {
   registriert: { color: 'default', label: 'registriert' },
@@ -49,6 +66,25 @@ export default function OfflineKartenVerwaltung() {
   const [katalogOffen, setKatalogOffen] = useState(false);
   const [urlOffen, setUrlOffen] = useState(false);
   const [vorhandenOffen, setVorhandenOffen] = useState(false);
+  const [regionBauenOffen, setRegionBauenOffen] = useState(false);
+
+  // Geteilter Config-Key mit der LagekartePage (`ladeKarteConfig`) — Feature-Flag für die
+  // Bau-UI (LFH-203, B1: `karten_bau_verfuegbar`). `invalidiereKarte` invalidiert diesen Key mit.
+  const configQuery = useQuery({ queryKey: ['karte-config'], queryFn: ladeKarteConfig });
+  const bauVerfuegbar = configQuery.data?.karten_bau_verfuegbar ?? false;
+
+  const bauStatusQuery = useQuery({
+    queryKey: ['admin-karte', 'bau-status'],
+    queryFn: ladeBauStatus,
+    enabled: istAdmin && bauVerfuegbar,
+    // Verschachtelter Status (`j.status.status`) — der karten-service reicht ihn roh durch.
+    refetchInterval: (query) =>
+      query.state.data?.some((j) => AKTIVE_BAU_STATUS.includes(j.status.status)) ? 2000 : false,
+  });
+  const aktiveBauten = useMemo(
+    () => (bauStatusQuery.data ?? []).filter((j: BauJob) => AKTIVE_BAU_STATUS.includes(j.status.status)),
+    [bauStatusQuery.data],
+  );
 
   const kartenQuery = useQuery({
     queryKey: ['admin-karte', 'offline-karten'],
@@ -271,6 +307,18 @@ export default function OfflineKartenVerwaltung() {
           </Button>
           <Button onClick={() => setUrlOffen(true)}>Per URL herunterladen</Button>
           <Button onClick={() => setVorhandenOffen(true)}>Gebaute Region übernehmen</Button>
+          {bauVerfuegbar && (
+            <Button onClick={() => setRegionBauenOffen(true)}>Region neu bauen</Button>
+          )}
+        </Space>
+      )}
+      {istAdmin && bauVerfuegbar && aktiveBauten.length > 0 && (
+        <Space size={6} wrap style={{ marginBottom: 12 }}>
+          {aktiveBauten.map((j) => (
+            <Tag key={j.id} color={BAU_STATUS_TAG[j.status.status].color}>
+              {j.slug}: {BAU_STATUS_TAG[j.status.status].label}
+            </Tag>
+          ))}
         </Space>
       )}
       {kartenQuery.isError ? (
@@ -297,6 +345,7 @@ export default function OfflineKartenVerwaltung() {
       />
       <OfflineDownloadUrlModal offen={urlOffen} onClose={() => setUrlOffen(false)} />
       <OfflineVorhandeneModal offen={vorhandenOffen} onClose={() => setVorhandenOffen(false)} />
+      <OfflineRegionBauenModal offen={regionBauenOffen} onClose={() => setRegionBauenOffen(false)} />
     </>
   );
 }

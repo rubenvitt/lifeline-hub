@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
-import type { OfflineKarte, OfflineKatalogEintrag } from '../api/offlineKarten';
+import type { BauJob, OfflineKarte, OfflineKatalogEintrag } from '../api/offlineKarten';
 import OfflineKartenVerwaltung from './OfflineKartenVerwaltung';
 
 const admin = {
@@ -38,11 +38,26 @@ function mockBasis(
   benutzer: typeof admin,
   karten: OfflineKarte[] = [karte],
   katalog: OfflineKatalogEintrag[] = [katalogEintrag],
+  optionen: { bauVerfuegbar?: boolean; bauJobs?: BauJob[] } = {},
 ) {
+  const { bauVerfuegbar = false, bauJobs = [] } = optionen;
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
     http.get('/api/karte/offline-karten', () => HttpResponse.json(karten)),
     http.get('/api/karte/offline-karten/katalog', () => HttpResponse.json(katalog)),
+    // Feature-Gate + Bau-UI-Endpunkte (LFH-203, B5) — standardmäßig aus, damit alle
+    // Bestandstests unverändert grün bleiben (die Config-Query feuert jetzt bei jedem Mount).
+    http.get('/api/karte/config', () =>
+      HttpResponse.json({
+        online_styles: [],
+        offline_verfuegbar: false,
+        offline_tiles_url: null,
+        offline_attribution: null,
+        karten_bau_verfuegbar: bauVerfuegbar,
+      }),
+    ),
+    http.get('/api/karte/offline-karten/baubare-regionen', () => HttpResponse.json([])),
+    http.get('/api/karte/offline-karten/bau-status', () => HttpResponse.json(bauJobs)),
   );
 }
 
@@ -313,5 +328,47 @@ describe('OfflineKartenVerwaltung', () => {
       lizenz: '© OSM',
       kachel_schema: 'shortbread',
     });
+  });
+
+  it('Region neu bauen: Button erscheint bei karten_bau_verfuegbar, Picker startet Bau mit Slug', async () => {
+    let bauBody: unknown = null;
+    mockBasis(admin, [], [], { bauVerfuegbar: true });
+    server.use(
+      http.get('/api/karte/offline-karten/baubare-regionen', () =>
+        HttpResponse.json([{ slug: 'bayern', name: 'Bayern', region: 'DE-BY', gruppe: 'Bundesländer' }]),
+      ),
+      http.post('/api/karte/offline-karten/bauen', async ({ request }) => {
+        bauBody = await request.json();
+        return HttpResponse.json({ job_id: 1 });
+      }),
+    );
+    render();
+    await userEvent.click(await screen.findByRole('button', { name: /Region neu bauen/i }));
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText('Bayern')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: /Bauen/i }));
+
+    await waitFor(() => expect(bauBody).toEqual({ slug: 'bayern' }));
+    expect(await screen.findByText(/Bau gestartet/i)).toBeInTheDocument();
+  });
+
+  it('Region neu bauen: Button fehlt, wenn karten_bau_verfuegbar false ist', async () => {
+    mockBasis(admin, [karte], [katalogEintrag], { bauVerfuegbar: false });
+    render();
+    await screen.findByText('Deutschland – Bremen');
+    expect(screen.queryByRole('button', { name: /Region neu bauen/i })).not.toBeInTheDocument();
+  });
+
+  it('Bau-Status-Zeile: zeigt aktive Bau-Jobs (verschachtelter status.status) über der Tabelle', async () => {
+    const bauJob: BauJob = {
+      id: 7,
+      slug: 'bayern',
+      status: { status: 'building' },
+      gestartet: '2026-07-05 10:00:00',
+    };
+    mockBasis(admin, [karte], [katalogEintrag], { bauVerfuegbar: true, bauJobs: [bauJob] });
+    render();
+    await screen.findByText('Deutschland – Bremen');
+    expect(await screen.findByText('bayern: baut')).toBeInTheDocument();
   });
 });
