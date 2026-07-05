@@ -21,6 +21,7 @@ fn auth(h:&HeaderMap, token:&str) -> bool {
 pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/healthz", get(|| async { "ok" }))
+        .route("/regions", get(regions_liste))
         .route("/builds", post(trigger).get(liste))
         .route("/builds/{id}", get(einzeln))
         .with_state(state)
@@ -42,6 +43,10 @@ async fn liste(State(st):State<AppState>, headers:HeaderMap) -> Result<Json<Vec<
 async fn einzeln(State(st):State<AppState>, headers:HeaderMap, Path(id):Path<u64>) -> Result<Json<BuildJob>, StatusCode> {
     if !auth(&headers, &st.token) { return Err(StatusCode::UNAUTHORIZED); }
     st.registry.get(id).map(Json).ok_or(StatusCode::NOT_FOUND)
+}
+async fn regions_liste(State(st):State<AppState>, headers:HeaderMap) -> Result<Json<Vec<regions::RegionDto>>, StatusCode> {
+    if !auth(&headers, &st.token) { return Err(StatusCode::UNAUTHORIZED); }
+    Ok(Json(regions::dtos()))
 }
 
 #[cfg(test)]
@@ -102,6 +107,19 @@ mod tests {
             let app = super::super::router(super::super::test_state());
             let r = app.oneshot(post("/builds", Some("t"), r#"{"slug":"bayern"}"#)).await.unwrap();
             assert_eq!(r.status(), StatusCode::ACCEPTED);
+        }
+        #[tokio::test]
+        async fn regions_listet_baubare() {
+            use axum::{body::Body, http::{Request, StatusCode}};
+            use tower::ServiceExt;
+            let app = super::super::router(super::super::test_state());
+            let req = Request::builder().method("GET").uri("/regions")
+                .header("authorization","Bearer t").body(Body::empty()).unwrap();
+            let r = app.oneshot(req).await.unwrap();
+            assert_eq!(r.status(), StatusCode::OK);
+            let bytes = axum::body::to_bytes(r.into_body(), 1<<20).await.unwrap();
+            let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+            assert!(v.as_array().unwrap().iter().any(|e| e["slug"]=="germany"));
         }
     }
 }

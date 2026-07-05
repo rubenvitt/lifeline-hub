@@ -15,6 +15,23 @@ static REGIONS: &[Region] = &[
 pub fn alle() -> &'static [Region] { REGIONS }
 pub fn finde(slug: &str) -> Option<&'static Region> { REGIONS.iter().find(|r| r.slug == slug) }
 
+#[derive(serde::Serialize)]
+pub struct RegionDto {
+    pub slug: &'static str,
+    pub name: &'static str,
+    pub region: &'static str,
+    pub gruppe: &'static str,
+}
+
+pub fn dtos() -> Vec<RegionDto> {
+    alle().iter().map(|r| RegionDto {
+        slug: r.slug,
+        name: r.name,
+        region: r.region,
+        gruppe: r.gruppe,
+    }).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
