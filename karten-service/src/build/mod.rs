@@ -62,11 +62,20 @@ pub async fn fahre_build(
 }
 
 /// Beim Start: den aktuellen Manifest-Stand aus dem Storage laden, damit ein einzelner Rebuild
-/// nicht die anderen Regionen aus dem Manifest wirft. Best-effort: Fehler → leerer Bestand.
-pub async fn seed_bestand(storage: &dyn Storage) -> Vec<PublishedVersion> {
-    let Ok(Some(js)) = storage.get_bytes("offline-katalog-manifest.json").await else { return vec![] };
-    let Ok(eintraege) = serde_json::from_slice::<Vec<OfflineKatalogEintrag>>(&js) else { return vec![] };
-    eintraege.iter().filter_map(published_aus_eintrag).collect()
+/// nicht die anderen Regionen aus dem Manifest wirft. Nur ein fehlendes Objekt (`Ok(None)`,
+/// legitimer Erststart ohne Manifest) liefert einen leeren Bestand — ein Storage-Lesefehler
+/// oder ein korruptes Manifest wird propagiert statt still als "kein Manifest" behandelt zu
+/// werden, sonst würde ein transienter Lesefehler den nächsten Build dazu bringen, alle
+/// anderen Regionen aus dem publizierten Manifest zu werfen.
+pub async fn seed_bestand(storage: &dyn Storage) -> anyhow::Result<Vec<PublishedVersion>> {
+    let js = match storage.get_bytes("offline-katalog-manifest.json").await {
+        Ok(Some(js)) => js,
+        Ok(None) => return Ok(vec![]),
+        Err(e) => return Err(e.context("Manifest-Lesefehler beim Seed des Bestands")),
+    };
+    let eintraege: Vec<OfflineKatalogEintrag> = serde_json::from_slice(&js)
+        .map_err(|e| anyhow::anyhow!("Manifest-Parse-Fehler beim Seed des Bestands: {e}"))?;
+    Ok(eintraege.iter().filter_map(published_aus_eintrag).collect())
 }
 
 #[cfg(test)]
@@ -152,6 +161,24 @@ mod fahrt_tests {
         assert!(m.iter().any(|e| e.name=="Deutschland (Shortbread)"));
         assert!(m.iter().any(|e| e.name=="Bayern"));
         // seed_bestand liest das Manifest zurück (2 Einträge)
-        assert_eq!(seed_bestand(s.as_ref()).await.len(), 2);
+        assert_eq!(seed_bestand(s.as_ref()).await.unwrap().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn seed_bestand_ohne_manifest_liefert_leeren_bestand_kein_fehler() {
+        // Erststart: Storage kennt "offline-katalog-manifest.json" nicht (Ok(None)) — das ist
+        // ein legitimer Zustand, kein Fehler, also Ok(vec![]) statt Err.
+        let s = FakeStorage::neu("https://cdn.example/maps");
+        assert!(seed_bestand(&s).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn seed_bestand_bei_korruptem_manifest_scheitert_statt_leer_zu_wipen() {
+        // Vorhandenes, aber kaputtes Manifest (z.B. durch einen halb geschriebenen Upload)
+        // darf NICHT wie "kein Manifest" behandelt werden — sonst würde ein Folge-Build den
+        // publizierten Katalog auf die eine neu gebaute Region reduzieren.
+        let s = FakeStorage::neu("https://cdn.example/maps");
+        s.put_bytes("offline-katalog-manifest.json", b"{ not json".to_vec()).await.unwrap();
+        assert!(seed_bestand(&s).await.is_err());
     }
 }

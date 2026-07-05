@@ -25,7 +25,9 @@ async fn main() -> anyhow::Result<()> {
     let registry = Registry::neu(regions::alle().len());
     // Seed gilt für BEIDE Modi (serve UND build) — ein einzelner `build --slug` darf den
     // Vorbestand der übrigen Regionen im Manifest nicht durch einen leeren Bestand ersetzen.
-    let bestand = Arc::new(Mutex::new(build::seed_bestand(storage.as_ref()).await));
+    // Ein Storage-Lesefehler oder korruptes Manifest propagiert per `?` und bricht ab, statt
+    // (durch einen fälschlich leeren Bestand) den Katalog beim nächsten Build zu wipen.
+    let bestand = Arc::new(Mutex::new(build::seed_bestand(storage.as_ref()).await?));
 
     match cfg.command.clone() {
         Command::Serve => {
