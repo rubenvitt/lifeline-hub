@@ -67,8 +67,23 @@ fn fetch_faellig() -> bool {
     }
 }
 
+/// Effektive Manifest-URL: `LIFELINE_OFFLINE_KATALOG_MANIFEST_URL` (Ops-/Dev-Override) falls gesetzt
+/// und nicht leer, sonst der compiled-in Pin (LFH-199-Trust). Nimmt Ops/lokalem Dev die Rebuild-
+/// Reibung — Manifest-URL per Env setzen statt den const ändern + Backend neu bauen (LFH-204-Gap).
+fn manifest_url() -> String {
+    resolve_manifest_url(std::env::var("LIFELINE_OFFLINE_KATALOG_MANIFEST_URL").ok())
+}
+
+/// Reine Auswahl-Logik (env-frei testbar): ein nicht-leerer Override gewinnt, sonst der const-Default.
+fn resolve_manifest_url(override_env: Option<String>) -> String {
+    match override_env {
+        Some(u) if !u.trim().is_empty() => u,
+        _ => OFFLINE_KATALOG_MANIFEST_URL.to_string(),
+    }
+}
+
 async fn hole_manifest(client: &reqwest::Client) -> Option<Vec<OfflineKatalogEintrag>> {
-    let resp = client.get(OFFLINE_KATALOG_MANIFEST_URL).send().await.ok()?;
+    let resp = client.get(manifest_url()).send().await.ok()?;
     if !resp.status().is_success() {
         return None;
     }
@@ -88,6 +103,21 @@ mod tests {
     fn merge_ohne_cache_ist_compiled_in() {
         let cache: KatalogCache = Default::default();
         assert_eq!(merge_mit_cache(&cache).len(), default_offline_katalog().len());
+    }
+
+    #[test]
+    fn manifest_url_override_gewinnt_wenn_gesetzt() {
+        assert_eq!(
+            resolve_manifest_url(Some("https://cdn.example/maps/offline-katalog-manifest.json".into())),
+            "https://cdn.example/maps/offline-katalog-manifest.json"
+        );
+    }
+
+    #[test]
+    fn manifest_url_faellt_auf_const_zurueck() {
+        assert_eq!(resolve_manifest_url(None), OFFLINE_KATALOG_MANIFEST_URL);
+        // leerer/whitespace-Override zählt nicht als gesetzt → const-Default.
+        assert_eq!(resolve_manifest_url(Some("   ".into())), OFFLINE_KATALOG_MANIFEST_URL);
     }
 
     #[test]
