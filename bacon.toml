@@ -3,8 +3,9 @@
 # Bei jeder Änderung an src/, migrations/ oder Cargo.toml baut bacon das Backend
 # neu und startet den laufenden Server neu (kill_then_restart).
 #
-#   bacon            # nutzt default_job „serve"
-#   bacon serve      # explizit
+#   bacon                  # nutzt default_job „serve" (lifeline-hub-Backend)
+#   bacon serve            # explizit
+#   bacon karten-service   # karten-service (Komponente A, LFH-201) mit Auto-Reload
 #
 # Das Frontend braucht das NICHT — Vite (`cd frontend && pnpm dev`) hat eigenes HMR.
 # Installation einmalig: cargo install bacon --locked
@@ -22,4 +23,19 @@ background = false
 on_change_strategy = "kill_then_restart"
 # pkill -TERM -P <cargo-pid>: terminiert das eigentliche Server-Binary (Kind von cargo),
 # bevor der Neustart läuft. bacon hängt die cargo-PID an.
+kill = ["pkill", "-TERM", "-P"]
+
+# karten-service (Komponente A, LFH-201) mit Auto-Reload — analog zu `serve`.
+# Start: `bacon karten-service` bzw. `mise run karten-service`. Braucht die KS_*/AWS_*-Envs
+# (kommen aus der .env via mise) und ein laufendes MinIO (`mise run minio`).
+[jobs.karten-service]
+command = ["cargo", "run", "-p", "karten-service", "--", "serve"]
+# Nur das Service-Crate beobachten (nicht das Backend-src) — sonst würde jede Backend-Änderung
+# den Service unnötig neu starten.
+default_watch = false
+watch = ["karten-service/src", "karten-service/Cargo.toml"]
+need_stdout = true
+allow_warnings = true
+background = false
+on_change_strategy = "kill_then_restart"
 kill = ["pkill", "-TERM", "-P"]
