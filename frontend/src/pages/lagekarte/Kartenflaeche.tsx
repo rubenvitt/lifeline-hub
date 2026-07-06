@@ -95,6 +95,10 @@ export interface KartenHandle {
   initialeEckenFuerBild(ar: number): Ecken | null;
   /** Karte auf die Bild-Ecken einpassen (fitBounds). */
   zentriereAufEcken(ecken: Ecken): void;
+  /** Aktives Zonen-Zeichnen abschließen (native Finish-Geste). No-op, wenn nicht aktiv. */
+  zoneAbschliessen(): void;
+  /** Aktives Abschnitt-Zeichnen abschließen. No-op, wenn nicht aktiv. */
+  abschnittAbschliessen(): void;
 }
 
 const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kartenflaeche({
@@ -174,6 +178,12 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       const b = new maplibregl.LngLatBounds();
       for (const e of ecken) b.extend(e as [number, number]);
       map.fitBounds(b, { padding: 60, maxZoom: 18, duration: 600 });
+    },
+    zoneAbschliessen() {
+      zoneDrawRef.current?.abschliessen();
+    },
+    abschnittAbschliessen() {
+      drawRef.current?.abschliessen();
     },
   }), []);
 
