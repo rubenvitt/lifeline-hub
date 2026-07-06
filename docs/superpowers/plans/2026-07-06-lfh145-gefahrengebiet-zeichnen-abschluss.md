@@ -273,6 +273,13 @@ Das `return { … }`-Objekt in `createZeichnung` ersetzen durch:
   return {
     starten: (modus) => {
       if (!draw.enabled) draw.start();
+      // Beim Re-Aktivieren/Moduswechsel einen evtl. noch offenen oder abgeschlossen-aber-
+      // unbestätigten Entwurf verwerfen (Cleanup ist bewusst bis hierher aufgeschoben).
+      // Nötig, weil ein Zone→Zone-Wechsel `zoneZeichnen` non-null→non-null ändert und der
+      // Effekt dann `starten` OHNE vorheriges `stoppen()` aufruft (React batcht ein „erst
+      // null" weg). terra-draws `setMode` räumt nur die in-progress-Zeichnung, nicht ein
+      // abgeschlossenes Feature.
+      else draw.clear();
       draw.setMode(MODUS_NAME[modus]);
     },
     stoppen: () => {
@@ -557,6 +564,7 @@ mise exec pnpm@11.10.0 -- pnpm -C <abs>/frontend build
   - Wiederholen, „Verwerfen" → kein POST, Entwurf verschwindet.
   - Wiederholen, nativer Abschluss per **Doppelklick** → ebenfalls Bestätigungs-Phase.
   - „Abbrechen" in Zeichnen-Phase → Entwurf verworfen, kein POST.
+  - **Waisen-Entwurf-Fall (aus Task-2-Review):** Polygon abschließen (Bestätigungs-Phase), dann OHNE Speichern/Verwerfen direkt einen anderen Zonentyp („Absperrgrenze zeichnen") starten → der vorige, unbestätigte Entwurf verschwindet (kein Waisen-Overlay), neuer Zeichenmodus sauber.
   - Absperrgrenze (Linie) zeichnen → analog (Linie).
   - Regression: eine **gespeicherte** Zone bleibt bei neuem Zeichnen unverändert (Repro-Kernaussage).
 
