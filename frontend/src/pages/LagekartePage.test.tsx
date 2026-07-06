@@ -530,7 +530,9 @@ describe('LagekartePage', () => {
 
   // --- L‑3: Gefahren- & Absperrzonen ----------------------------------------
 
-  it('zeichnet eine Polygon-Zone: Typ Gefahrengebiet → zeichnen → POST mit geometrie_typ Polygon', async () => {
+  it('zeichnet eine Polygon-Zone: Typ Gefahrengebiet → zeichnen → bestätigen → POST mit geometrie_typ Polygon', async () => {
+    // LFH-145: onZoneGezeichnet persistiert nicht mehr direkt — erst „Speichern" in der
+    // Bestätigungs-Phase löst den POST aus.
     let body: { typ?: string; geometrie_typ?: string; geometrie?: string } | null = null;
     basisHandler([
       http.post('/api/einsaetze/1/zonen', async ({ request }) => {
@@ -542,13 +544,14 @@ describe('LagekartePage', () => {
     renderSeite();
     await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
     await user.click(await screen.findByText('zone-fertig'));
+    await user.click(await screen.findByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(body).not.toBeNull());
     expect(body!.typ).toBe('gefahrengebiet');
     expect(body!.geometrie_typ).toBe('Polygon');
     expect(JSON.parse(body!.geometrie as string).type).toBe('Polygon');
   });
 
-  it('zeichnet eine Linien-Zone: Absperrgrenze → zeichnen → POST mit geometrie_typ LineString', async () => {
+  it('zeichnet eine Linien-Zone: Absperrgrenze → zeichnen → bestätigen → POST mit geometrie_typ LineString', async () => {
     let body: { typ?: string; geometrie_typ?: string } | null = null;
     basisHandler([
       http.post('/api/einsaetze/1/zonen', async ({ request }) => {
@@ -560,6 +563,7 @@ describe('LagekartePage', () => {
     renderSeite();
     await user.click(await screen.findByRole('button', { name: 'Absperrgrenze zeichnen' }));
     await user.click(await screen.findByText('zone-fertig'));
+    await user.click(await screen.findByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(body).not.toBeNull());
     expect(body!.typ).toBe('absperrgrenze');
     expect(body!.geometrie_typ).toBe('LineString');
@@ -717,5 +721,103 @@ describe('LagekartePage', () => {
     expect(wurdeRevoked('blob:url-2')).toBe(false);
     unmount();
     expect(wurdeRevoked('blob:url-2')).toBe(true);
+  });
+});
+
+// --- LFH-145: Zwei-Phasen-Zeichnen (Overlay + Speicher-Bestätigung) ----------
+
+/** msw-POST-Handler für /zonen, der Aufrufe zählt und den letzten Body aufzeichnet
+ * (Ersatz für den Platzhalter `spyLegeZoneAn` aus dem Task-Brief). */
+function erstelleZonenPostSpy() {
+  let anzahl = 0;
+  let letzterBody: { typ?: string; geometrie_typ?: string; geometrie?: string } | null = null;
+  const handler = http.post('/api/einsaetze/1/zonen', async ({ request }) => {
+    anzahl += 1;
+    letzterBody = (await request.json()) as typeof letzterBody;
+    return HttpResponse.json({
+      id: 5, einsatz_id: 1, typ: letzterBody!.typ, geometrie_typ: letzterBody!.geometrie_typ,
+      geometrie: letzterBody!.geometrie, label: null, farbe: null, notiz: null,
+      erstellt_von: 1, erstellt_at: '', geaendert_at: '',
+    });
+  });
+  return { handler, count: () => anzahl, lastBody: () => letzterBody! };
+}
+
+describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
+  it('Zone zeichnen → Overlay „zeichnen" sichtbar', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    expect(await screen.findByText('Gefahrengebiet · Fläche')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abschließen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeInTheDocument();
+  });
+
+  it('nach Abschluss (Stub) → Phase „bestaetigen", noch NICHT persistiert', async () => {
+    const spy = erstelleZonenPostSpy();
+    basisHandler([spy.handler]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await screen.findByText('zone-fertig'));
+    expect(await screen.findByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Verwerfen' })).toBeInTheDocument();
+    expect(spy.count()).toBe(0);
+  });
+
+  it('Speichern → POST /zonen mit der Geometrie', async () => {
+    const spy = erstelleZonenPostSpy();
+    basisHandler([spy.handler]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await screen.findByText('zone-fertig'));
+    await user.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(spy.count()).toBe(1));
+    expect(spy.lastBody().typ).toBe('gefahrengebiet');
+  });
+
+  it('Verwerfen → kein POST, Overlay weg', async () => {
+    const spy = erstelleZonenPostSpy();
+    basisHandler([spy.handler]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await screen.findByText('zone-fertig'));
+    await user.click(await screen.findByRole('button', { name: 'Verwerfen' }));
+    expect(spy.count()).toBe(0);
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument());
+  });
+
+  it('Abbrechen in Phase zeichnen → kein POST, Overlay weg', async () => {
+    const spy = erstelleZonenPostSpy();
+    basisHandler([spy.handler]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await screen.findByRole('button', { name: 'Abbrechen' }));
+    expect(spy.count()).toBe(0);
+    await waitFor(() => expect(screen.queryByText('Gefahrengebiet · Fläche')).not.toBeInTheDocument());
+  });
+
+  it('neuer Zeichenstart während offener Bestätigung räumt die alte Bestätigung weg (kein hängendes Overlay)', async () => {
+    // Regression Step 3f: Gefahrengebiet fertigzeichnen (→ Bestätigung), dann OHNE zu
+    // speichern/verwerfen einen anderen Zone-Typ starten. Die alte Bestätigung (Speichern/
+    // Verwerfen für die Gefahrengebiet-Geometrie) darf nicht hängen bleiben.
+    const spy = erstelleZonenPostSpy();
+    basisHandler([spy.handler]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await user.click(await screen.findByText('zone-fertig'));
+    expect(await screen.findByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+
+    await user.click(await screen.findByRole('button', { name: 'Absperrgrenze zeichnen' }));
+    // Zurück in Phase „zeichnen" für den NEUEN Entwurf, keine hängende Bestätigung mehr.
+    expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument();
+    expect(await screen.findByText('Absperrgrenze · Linie')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abschließen' })).toBeInTheDocument();
+    expect(spy.count()).toBe(0);
   });
 });

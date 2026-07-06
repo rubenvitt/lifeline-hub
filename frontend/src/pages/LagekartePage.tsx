@@ -23,7 +23,7 @@ import { ladeOrganisation } from '../api/organisation';
 import type { EinsatzAnzeige, Warnstufe, ZoneTyp } from '../api/types';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import { baueMarker, baueTaktischeMarker, baueLageMeldungMarker, type KarteMarker } from './lagekarte/marker';
-import { parsePolygon, parseGeometry, polygonZentroid } from './lagekarte/geo';
+import { parsePolygon, parseGeometry, polygonZentroid, type GeoJsonGeometry } from './lagekarte/geo';
 import { baueTzProps } from './lagekarte/taktischesZeichen';
 import {
   baueBasemapStyle, aktuelleAttribution, loeseKartenTheme,
@@ -35,7 +35,8 @@ import Sidebar, { type LayerSichtbar, type PlatzierenPunktTyp } from './lagekart
 import Inspector from './lagekarte/Inspector';
 import ZonenInspector from './lagekarte/ZonenInspector';
 import FachebenenInspector from './lagekarte/FachebenenInspector';
-import { zoneStil, gefahrengebietStil } from './lagekarte/zonenStil';
+import ZeichnenSteuerung from './lagekarte/ZeichnenSteuerung';
+import { zoneStil, gefahrengebietStil, ZONE_TYPEN } from './lagekarte/zonenStil';
 import type { ZeichenModus } from './lagekarte/zeichnen';
 import { ladeFachebene, type FachebeneQuelle, type FachebeneStatus, type FeatureCollection } from '../api/fachebenen';
 import { FACHEBENEN, fachebeneKeys, KRITIS_MIN_ZOOM, rasterBbox, mergeFeatures } from './lagekarte/fachebenen';
@@ -89,6 +90,11 @@ export default function LagekartePage() {
   const [zeichneAbschnittId, setZeichneAbschnittId] = useState<number | null>(null);
   const [zoneEntwurf, setZoneEntwurf] =
     useState<{ typ: ZoneTyp; modus: ZeichenModus; farbe?: string } | null>(null);
+  // Bestätigungs-Phase (LFH-145): gezeichnete Geometrie wird hier zwischengehalten,
+  // bevor sie erst nach explizitem „Speichern" persistiert wird (nicht sofort bei Fertig).
+  const [zoneBestaetigung, setZoneBestaetigung] =
+    useState<{ typ: ZoneTyp; modus: ZeichenModus; farbe?: string; geometrie: GeoJsonGeometry } | null>(null);
+  const [zoneSpeichern, setZoneSpeichern] = useState(false);
   const [zoneAuswahl, setZoneAuswahl] = useState<number | null>(null);
   const [auswahl, setAuswahl] = useState<string | null>(null);
   const [basemap, setBasemap] = useState<BasemapModus | null>(null);
@@ -633,6 +639,29 @@ export default function LagekartePage() {
     }
   }
 
+  // Bestätigungs-Phase persistieren (LFH-145): erst hier, nicht schon bei onZoneGezeichnet.
+  const bestaetigungSpeichern = () => {
+    if (!zoneBestaetigung) return;
+    setZoneSpeichern(true);
+    legeZoneAn(einsatzId, {
+      typ: zoneBestaetigung.typ,
+      geometrie_typ: zoneBestaetigung.geometrie.type,
+      geometrie: JSON.stringify(zoneBestaetigung.geometrie),
+      farbe: zoneBestaetigung.typ === 'freie_skizze' ? zoneBestaetigung.farbe ?? null : null,
+    })
+      .then(() => qc.invalidateQueries({ queryKey: ['einsatz-zonen', einsatzId] }))
+      .catch(fehler)
+      .finally(() => {
+        setZoneSpeichern(false);
+        setZoneBestaetigung(null);
+        setZoneEntwurf(null); // beendet Zeichnen → Kartenflaeche-Effekt ruft stoppen() → clear()
+      });
+  };
+  const bestaetigungVerwerfen = () => {
+    setZoneBestaetigung(null);
+    setZoneEntwurf(null); // verwirft den Entwurf (stoppen() → clear())
+  };
+
   if (einsatzQuery.isLoading || configQuery.isLoading) {
     return <Spin style={{ marginTop: 64 }} />;
   }
@@ -648,17 +677,20 @@ export default function LagekartePage() {
         onPlatzierenStart={(z) => {
           setPlatzierungZiel(z);
           setZoneEntwurf(null);
+          setZoneBestaetigung(null);
           setAuswahl(null);
         }}
         onPlatzierenAbbrechen={() => setPlatzierungZiel(null)}
         onAbschnittZeichnenStart={(id) => {
           setZeichneAbschnittId(id);
           setZoneEntwurf(null);
+          setZoneBestaetigung(null);
           setPlatzierungZiel(null);
           setAuswahl(null);
         }}
         onZoneZeichnenStart={(entwurf) => {
           setZoneEntwurf(entwurf);
+          setZoneBestaetigung(null); // neuer Entwurf beendet eine evtl. hängende Bestätigung
           setZoneAuswahl(null);
           setZeichneAbschnittId(null);
           setPlatzierungZiel(null);
@@ -670,6 +702,8 @@ export default function LagekartePage() {
         einsatzortVerortet={verortet.some((m) => m.typ === 'einsatzort')}
         onEinsatzortPlatzieren={() => {
           setPlatzierungZiel({ typ: 'einsatzort', id: 0 });
+          setZoneEntwurf(null);
+          setZoneBestaetigung(null);
           setAuswahl(null);
         }}
         layer={layer}
@@ -698,6 +732,7 @@ export default function LagekartePage() {
         onBildPlatzieren={(id) => {
           setBildPlatzierenId(id);
           setZoneEntwurf(null);
+          setZoneBestaetigung(null);
           setZeichneAbschnittId(null);
           setPlatzierungZiel(null);
           setAuswahl(null);
@@ -743,15 +778,8 @@ export default function LagekartePage() {
           }}
           onZoneGezeichnet={(g) => {
             if (!zoneEntwurf) return;
-            legeZoneAn(einsatzId, {
-              typ: zoneEntwurf.typ,
-              geometrie_typ: g.type,
-              geometrie: JSON.stringify(g),
-              farbe: zoneEntwurf.typ === 'freie_skizze' ? zoneEntwurf.farbe ?? null : null,
-            })
-              .then(() => qc.invalidateQueries({ queryKey: ['einsatz-zonen', einsatzId] }))
-              .catch(fehler)
-              .finally(() => setZoneEntwurf(null));
+            // Nicht sofort persistieren: erst Bestätigung (Entwurf bleibt sichtbar). LFH-145.
+            setZoneBestaetigung({ ...zoneEntwurf, geometrie: g });
           }}
           fachebenen={aktiveFachebenen}
           onBboxAenderung={fachebenenSichtbar.kritis ? (b) => setKritisBbox(rasterBbox(b)) : undefined}
@@ -765,6 +793,29 @@ export default function LagekartePage() {
           bilder={bildOverlays}
           platzierBild={aktivesPlatzierBild}
           onPlatzierGeometrie={onPlatzierGeometrie}
+        />
+        <ZeichnenSteuerung
+          aktiv={zoneEntwurf != null || zoneBestaetigung != null || zeichneAbschnittId != null}
+          titel={
+            zeichneAbschnittId != null
+              ? 'Abschnitt'
+              : `${ZONE_TYPEN.find((t) => t.typ === (zoneBestaetigung?.typ ?? zoneEntwurf?.typ))?.label ?? 'Zone'} · ${
+                  (zoneBestaetigung?.modus ?? zoneEntwurf?.modus) === 'linie' ? 'Linie' : 'Fläche'
+                }`
+          }
+          phase={zoneBestaetigung != null ? 'bestaetigen' : 'zeichnen'}
+          speichernLaeuft={zoneSpeichern}
+          onAbschliessen={() =>
+            zeichneAbschnittId != null
+              ? kartenRef.current?.abschnittAbschliessen()
+              : kartenRef.current?.zoneAbschliessen()
+          }
+          onAbbrechen={() => {
+            setZoneEntwurf(null);
+            setZeichneAbschnittId(null);
+          }}
+          onSpeichern={bestaetigungSpeichern}
+          onVerwerfen={bestaetigungVerwerfen}
         />
         {aktiverMarker && (
           <Inspector
