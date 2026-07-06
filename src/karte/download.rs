@@ -150,6 +150,39 @@ pub(crate) fn ip_ist_intern(ip: &IpAddr) -> bool {
 /// `localhost`, keine internen IP-Literale. Domains, die per DNS auf interne IPs zeigen,
 /// werden hier (Admin-only, v1) bewusst nicht aufgelöst — Defense-in-Depth, kein Vollschutz.
 pub fn url_ist_sicher(url: &Url) -> Result<(), String> {
+    url_ist_sicher_mit(url, dev_loopback_download_erlaubt())
+}
+
+/// Opt-in Dev-Flag `LIFELINE_DOWNLOAD_ALLOW_LOOPBACK`: erlaubt Downloads von Loopback-Adressen
+/// (lokaler MinIO-Object-Store, auch http). Default AUS → Produktion bleibt streng (https +
+/// kein-intern). Nur lokal in der `.env` setzen.
+fn dev_loopback_download_erlaubt() -> bool {
+    matches!(
+        std::env::var("LIFELINE_DOWNLOAD_ALLOW_LOOPBACK").ok().as_deref(),
+        Some("1") | Some("true")
+    )
+}
+
+/// Ist der von `url` bereits geparste Host ein Loopback (127.0.0.0/8, ::1, „localhost")? Nutzt
+/// `host_str()` — Userinfo/Spoofing ist dort aufgelöst (`localhost@evil.com` → Host evil.com).
+fn host_ist_loopback(url: &Url) -> bool {
+    let Some(host) = url.host_str() else {
+        return false;
+    };
+    if host.eq_ignore_ascii_case("localhost") {
+        return true;
+    }
+    let host_clean = host.trim_start_matches('[').trim_end_matches(']');
+    matches!(host_clean.parse::<IpAddr>(), Ok(ip) if ip.is_loopback())
+}
+
+/// Testbarer Kern: `dev_loopback` explizit statt aus dem Env gelesen (keine Parallel-Test-Races).
+fn url_ist_sicher_mit(url: &Url, dev_loopback: bool) -> Result<(), String> {
+    // Opt-in Dev-Escape: lokaler Object-Store via Loopback (auch http). Sonst greift der strikte
+    // SSRF-Guard (dies ist der untrusted Download-Pfad, u. a. für „Per URL"-Eingaben).
+    if dev_loopback && host_ist_loopback(url) {
+        return Ok(());
+    }
     if url.scheme() != "https" {
         return Err(format!("nur https erlaubt (war '{}')", url.scheme()));
     }
@@ -368,6 +401,25 @@ mod tests {
         .expect("öffentliches https erlaubt");
         assert_eq!(url.scheme(), "https");
         assert!(validiere_download_url("https://8.8.8.8/a.pmtiles").is_ok());
+    }
+
+    #[test]
+    fn dev_loopback_flag_erlaubt_nur_loopback() {
+        let u = |s: &str| Url::parse(s).unwrap();
+        // Dev-Flag AN: loopback-http (lokaler MinIO-Object-Store) erlaubt.
+        assert!(url_ist_sicher_mit(&u("http://127.0.0.1:9000/maps/x.mbtiles"), true).is_ok());
+        assert!(url_ist_sicher_mit(&u("http://localhost:9000/maps/x.mbtiles"), true).is_ok());
+        assert!(url_ist_sicher_mit(&u("http://[::1]:9000/maps/x.mbtiles"), true).is_ok());
+        // Default (Flag AUS) bleibt streng: loopback-http verboten.
+        assert!(url_ist_sicher_mit(&u("http://127.0.0.1:9000/maps/x.mbtiles"), false).is_err());
+        // Das Flag hilft NUR Loopback — externe/private Nicht-Loopback-Ziele bleiben blockiert.
+        assert!(url_ist_sicher_mit(&u("http://example.com/x.mbtiles"), true).is_err());
+        assert!(url_ist_sicher_mit(&u("http://192.168.1.1/x.mbtiles"), true).is_err());
+        // Kein Spoofing: echter Host ist evil.com, nicht loopback.
+        assert!(url_ist_sicher_mit(&u("http://localhost@evil.com/x.mbtiles"), true).is_err());
+        assert!(url_ist_sicher_mit(&u("http://127.0.0.1.evil.com/x.mbtiles"), true).is_err());
+        // Öffentliches https bleibt unabhängig vom Flag erlaubt.
+        assert!(url_ist_sicher_mit(&u("https://8.8.8.8/x.mbtiles"), true).is_ok());
     }
 
     #[test]
