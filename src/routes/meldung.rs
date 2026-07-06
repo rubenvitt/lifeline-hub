@@ -370,14 +370,14 @@ pub async fn auftrag_erteilen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
-    Json(req): Json<crate::routes::auftrag::NeuerAuftrag>,
+    Json(req): Json<crate::auftrag::NeuerAuftrag>,
 ) -> Result<(StatusCode, Json<MeldungAnzeige>), AppError> {
     fordere_bearbeitbar(&state, &benutzer, einsatz_id, meldung_id).await?;
 
     // Gleiche Validierung wie POST /auftraege (geteilt) → kein zweiter, ungeprüfter Pfad.
     let now = jetzt();
     let validiert =
-        crate::routes::auftrag::validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now, None).await?;
+        crate::auftrag::validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now, None).await?;
     let auftrag_id = repo::erteile_auftrag_tx(
         &state.pool, einsatz_id, meldung_id, benutzer.id, validiert.daten(),
     )

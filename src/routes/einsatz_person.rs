@@ -5,7 +5,6 @@ use crate::einsatz::repo as einsatz_repo;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "personen";
-use crate::routes::einsatz_uhs;
 use crate::error::AppError;
 use crate::etb::{self, repo as etb_repo};
 use crate::person::{darf_uebergehen, registrier_anzeige, repo, Geschlecht, PersonAnzeige, PersonStatus, Sichtungskategorie, VerbleibArt};
@@ -69,6 +68,26 @@ async fn etb_system(state: &AppState, einsatz_id: i64, benutzer_id: i64, inhalt:
 fn sse_person(state: &AppState, einsatz_id: i64, person_id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "person_id": person_id }).to_string();
     state.live.publiziere_event(einsatz_id, "person", data);
+}
+
+/// Emittiert die SSE-Events eines UHS-Auto-Austritts (LFH-124): der pool-basierte
+/// `uhs::auto_austritt` erledigt die DB-Writes, der Transport (ETB-Live-Eintrag +
+/// uhs/person-Board) bleibt hier im Route-Handler. Nur bei tatsächlichem Austritt
+/// (`Some(effekt)`) aufrufen.
+fn sse_auto_austritt(state: &AppState, einsatz_id: i64, effekt: &crate::uhs::AutoAustrittEffekt) {
+    if let Ok(json) = serde_json::to_string(&effekt.etb_eintrag) {
+        state.live.publiziere(einsatz_id, json);
+    }
+    state.live.publiziere_event(
+        einsatz_id,
+        "uhs",
+        serde_json::json!({ "einsatz_id": einsatz_id, "uhs_id": effekt.uhs_id }).to_string(),
+    );
+    state.live.publiziere_event(
+        einsatz_id,
+        "person",
+        serde_json::json!({ "einsatz_id": einsatz_id, "person_id": effekt.person_id }).to_string(),
+    );
 }
 
 fn trimme(s: Option<String>) -> Option<String> {
@@ -289,7 +308,11 @@ pub async fn status_wechsel(
     // E‑3: bei verstorben/abgemeldet → UHS-Auto-Austritt (sequenziell, eigene ETB-Spur).
     if matches!(body.status.as_str(), "verstorben" | "abgemeldet") {
         let anlass = format!("durch Status-Wechsel zu {}", body.status);
-        einsatz_uhs::auto_austritt(&state, einsatz_id, person_id, &anlass, benutzer.id).await?;
+        if let Some(effekt) =
+            crate::uhs::auto_austritt(&state.pool, einsatz_id, person_id, &anlass, benutzer.id).await?
+        {
+            sse_auto_austritt(&state, einsatz_id, &effekt);
+        }
     }
 
     etb_system(
@@ -322,7 +345,12 @@ pub async fn stornieren(
     }
     repo::storniere(&state.pool, einsatz_id, person_id, benutzer.id).await?;
     // E‑3: Storno → UHS-Auto-Austritt + Reservierungs-Cleanup (Repo schreibt nur ETB, wenn Austritt nötig).
-    einsatz_uhs::auto_austritt(&state, einsatz_id, person_id, "durch Storno der Person", benutzer.id).await?;
+    if let Some(effekt) =
+        crate::uhs::auto_austritt(&state.pool, einsatz_id, person_id, "durch Storno der Person", benutzer.id)
+            .await?
+    {
+        sse_auto_austritt(&state, einsatz_id, &effekt);
+    }
     etb_system(
         &state, einsatz_id, benutzer.id,
         &format!("Person {} storniert", registrier_anzeige(person.registrier_nr)),
@@ -525,7 +553,11 @@ pub async fn verbleib(
     // E‑3: bei transport/entlassung → UHS-Auto-Austritt (eigene ETB-Spur).
     if matches!(art, VerbleibArt::Transport | VerbleibArt::Entlassung) {
         let anlass = format!("durch Verbleib {}", art.as_str());
-        einsatz_uhs::auto_austritt(&state, einsatz_id, person_id, &anlass, benutzer.id).await?;
+        if let Some(effekt) =
+            crate::uhs::auto_austritt(&state.pool, einsatz_id, person_id, &anlass, benutzer.id).await?
+        {
+            sse_auto_austritt(&state, einsatz_id, &effekt);
+        }
     }
 
     etb_system(

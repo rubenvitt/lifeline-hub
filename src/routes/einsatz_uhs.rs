@@ -10,7 +10,7 @@ use crate::etb::{self, repo as etb_repo};
 use crate::material::disposition_repo as material_repo;
 use crate::material::EinsatzMaterialAnzeige;
 use crate::person::{registrier_anzeige, repo as person_repo};
-use crate::uhs::belegung_repo::{self, AustrittInfo};
+use crate::uhs::belegung_repo;
 use crate::uhs::platz_repo::{self, NeuerPlatz, PatchPlatz};
 use crate::uhs::repo::{self as uhs_repo, NeueDaten, PatchDaten};
 use crate::uhs::{
@@ -741,42 +741,6 @@ async fn formatiere_belegungs_etb(
         }
     };
     Ok(Some(text))
-}
-
-// ============================== Cross-Modul-Wrapper ==============================
-
-/// Auto-Austritt-Wrapper für Cross-Modul-Hooks (E‑1-Status/E‑2-Verbleib/E‑1-Storno).
-/// Ruft `belegung_repo::austritt_intern` und schreibt — falls ein Austritt-Event
-/// passiert ist — den pseudonymen ETB-Eintrag mit Anlass-Notiz, plus SSE-Events.
-/// Liefert `Ok(())` auch dann, wenn nichts zu tun war (Person nicht belegt + keine
-/// Reservierung). **Wird sequentiell nach dem auslösenden Repo-Update gerufen
-/// (Codebase-Konvention für Cross-Modul-Wirkung; akzeptiertes Risiko-Fenster).**
-pub async fn auto_austritt(
-    state: &AppState,
-    einsatz_id: i64,
-    person_id: i64,
-    anlass: &str,
-    benutzer_id: i64,
-) -> Result<(), AppError> {
-    let info: Option<AustrittInfo> = belegung_repo::austritt_intern(
-        &state.pool,
-        einsatz_id,
-        person_id,
-        Some(anlass),
-        benutzer_id,
-    )
-    .await?;
-    let Some(info) = info else {
-        return Ok(()); // Person war nicht belegt — Reservierungs-Cleanup ist trotzdem gelaufen.
-    };
-    let person = person_repo::laden(&state.pool, einsatz_id, person_id).await?;
-    let uhs = uhs_repo::laden(&state.pool, einsatz_id, info.uhs_id).await?;
-    let r = registrier_anzeige(person.registrier_nr);
-    let text = format!("Person {r}: verlässt {} ({anlass})", uhs.bezeichnung);
-    etb_system(state, einsatz_id, benutzer_id, &text).await?;
-    sse_uhs(state, einsatz_id, info.uhs_id);
-    sse_person(state, einsatz_id, person_id);
-    Ok(())
 }
 
 /// GET /api/einsaetze/{id}/uhs/stream — SSE-Stream. Nur Lesezugriff.

@@ -150,7 +150,7 @@ pub async fn auftrag_erteilen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, eintrag_id)): Path<(i64, i64)>,
-    Json(req): Json<crate::routes::auftrag::NeuerAuftrag>,
+    Json(req): Json<crate::auftrag::NeuerAuftrag>,
 ) -> Result<(StatusCode, Json<crate::auftrag::AuftragDetail>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -165,7 +165,7 @@ pub async fn auftrag_erteilen(
     // Gleiche Validierung wie POST /auftraege (geteilt) → kein zweiter, ungeprüfter Pfad.
     let now = jetzt();
     let validiert =
-        crate::routes::auftrag::validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now, None).await?;
+        crate::auftrag::validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now, None).await?;
     let auftrag_id = crate::auftrag::repo::erteile_aus_etb_tx(
         &state.pool, einsatz_id, eintrag_id, benutzer.id, validiert.daten(),
     )

@@ -2,7 +2,10 @@
 //! (Befehlsgebung → Vollzug → Kontrolle). Quittung liegt pro Empfänger
 //! (`auftrag_empfaenger`), Vollzug pro Auftrag über den geteilten
 //! Kommunikations-Unterbau (`kommunikation_status`, LFH-84).
+pub mod eingabe;
 pub mod repo;
+
+pub use eingabe::{validiere_neuen_auftrag, EmpfaengerEingabeReq, NeuerAuftrag, ValidierterAuftrag};
 
 use serde::Serialize;
 

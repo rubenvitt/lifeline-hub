@@ -336,7 +336,7 @@ pub async fn heraufstufen_auftrag(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, nachricht_id)): Path<(i64, i64)>,
-    Json(req): Json<crate::routes::auftrag::NeuerAuftrag>,
+    Json(req): Json<crate::auftrag::NeuerAuftrag>,
 ) -> Result<(StatusCode, Json<ChatNachrichtAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -351,7 +351,7 @@ pub async fn heraufstufen_auftrag(
     // Gleiche Validierung wie POST /auftraege (geteilt) → kein zweiter, ungeprüfter Pfad.
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let validiert =
-        crate::routes::auftrag::validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now, None).await?;
+        crate::auftrag::validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now, None).await?;
     let auftrag_id = repo::heraufstufen_zu_auftrag(
         &state.pool, einsatz_id, nachricht_id, benutzer.id, validiert.daten(),
     )

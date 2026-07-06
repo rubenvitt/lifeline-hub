@@ -1,6 +1,9 @@
 pub mod belegung_repo;
+pub mod hooks;
 pub mod platz_repo;
 pub mod repo;
+
+pub use hooks::{auto_austritt, AutoAustrittEffekt};
 
 use serde::Serialize;
 
