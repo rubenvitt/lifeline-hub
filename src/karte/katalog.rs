@@ -51,7 +51,21 @@ pub fn katalog_aus_cache() -> Vec<OfflineKatalogEintrag> {
 /// Client sein (kleiner JSON-Abruf, kein GB-Download) — sonst kann ein langsamer Mirror den Handler
 /// blockieren.
 pub async fn effektiver_katalog(client: &reqwest::Client) -> Vec<OfflineKatalogEintrag> {
-    if fetch_faellig() {
+    effektiver_katalog_intern(client, false).await
+}
+
+/// Wie `effektiver_katalog`, aber erzwingt einen Manifest-Fetch (umgeht das TTL-Gate). Für den
+/// „Bauen & laden"-Fluss (LFH-206): direkt nach einem fertigen Region-Bau muss der frisch
+/// publizierte Katalog-Eintrag sofort sichtbar sein, ohne die ~5-min-Cache-TTL abzuwarten.
+pub async fn effektiver_katalog_frisch(client: &reqwest::Client) -> Vec<OfflineKatalogEintrag> {
+    effektiver_katalog_intern(client, true).await
+}
+
+async fn effektiver_katalog_intern(
+    client: &reqwest::Client,
+    frisch: bool,
+) -> Vec<OfflineKatalogEintrag> {
+    if frisch || fetch_faellig() {
         if let Some(remote) = hole_manifest(client).await {
             *KATALOG_CACHE.write().unwrap() = Some(remote);
         }

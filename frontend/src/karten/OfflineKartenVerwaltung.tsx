@@ -1,8 +1,8 @@
 import {
-  Alert, App, Button, Popconfirm, Progress, Space, Table, Tag, Typography,
+  Alert, App, Button, Dropdown, Popconfirm, Progress, Space, Table, Tag, Typography,
   type TableColumnsType,
 } from 'antd';
-import { LoadingOutlined } from '@ant-design/icons';
+import { DownOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
@@ -22,9 +22,8 @@ import {
 } from '../api/offlineKarten';
 import { invalidiereKarte } from './invalidiereKarte';
 import { formatGroesse } from './formatGroesse';
-import OfflineDownloadKatalogModal from './OfflineDownloadKatalogModal';
 import OfflineDownloadUrlModal from './OfflineDownloadUrlModal';
-import OfflineRegionBauenModal from './OfflineRegionBauenModal';
+import OfflineRegionPicker from './OfflineRegionPicker';
 import OfflineVorhandeneModal from './OfflineVorhandeneModal';
 
 /** Bau-Status-Werte, während derer die Bau-Status-Zeile pollt (2 s) — analog Download-Polling. */
@@ -62,10 +61,9 @@ export default function OfflineKartenVerwaltung() {
   const istAdmin = benutzer?.system_rolle === 'admin';
   const qc = useQueryClient();
   const { message } = App.useApp();
-  const [katalogOffen, setKatalogOffen] = useState(false);
+  const [pickerOffen, setPickerOffen] = useState(false);
   const [urlOffen, setUrlOffen] = useState(false);
   const [vorhandenOffen, setVorhandenOffen] = useState(false);
-  const [regionBauenOffen, setRegionBauenOffen] = useState(false);
 
   // Geteilter Config-Key mit der LagekartePage (`ladeKarteConfig`) — Feature-Flag für die
   // Bau-UI (LFH-203, B1: `karten_bau_verfuegbar`). `invalidiereKarte` invalidiert diesen Key mit.
@@ -94,10 +92,6 @@ export default function OfflineKartenVerwaltung() {
       query.state.data?.some((k) => k.status === 'laedt' || k.geladen != null) ? 2000 : false,
   });
   const karten = useMemo(() => kartenQuery.data ?? [], [kartenQuery.data]);
-  const vorhandeneUrls = useMemo(
-    () => new Set(karten.map((k) => k.quell_url).filter((u): u is string => u != null)),
-    [karten],
-  );
 
   const abbrechenMutation = useMutation({
     mutationFn: (id: number) => brecheOfflineDownloadAb(id),
@@ -298,14 +292,23 @@ export default function OfflineKartenVerwaltung() {
     <>
       {istAdmin && (
         <Space style={{ marginBottom: 12 }}>
-          <Button type="primary" onClick={() => setKatalogOffen(true)}>
+          {/* Ein Weg für den Regelfall: bauen (falls nötig) + laden hinter einem Button (LFH-206). */}
+          <Button type="primary" onClick={() => setPickerOffen(true)}>
             Region aufs Gerät bringen
           </Button>
-          <Button onClick={() => setUrlOffen(true)}>Per URL herunterladen</Button>
-          <Button onClick={() => setVorhandenOffen(true)}>Gebaute Region übernehmen</Button>
-          {bauVerfuegbar && (
-            <Button onClick={() => setRegionBauenOffen(true)}>Region neu bauen</Button>
-          )}
+          {/* Spezialfälle (eigene URL, lokal gebaute Datei) demoted unter „Erweitert". */}
+          <Dropdown
+            menu={{
+              items: [
+                { key: 'url', label: 'Per URL herunterladen', onClick: () => setUrlOffen(true) },
+                { key: 'lokal', label: 'Gebaute Region übernehmen', onClick: () => setVorhandenOffen(true) },
+              ],
+            }}
+          >
+            <Button>
+              Erweitert <DownOutlined />
+            </Button>
+          </Dropdown>
         </Space>
       )}
       {istAdmin && bauVerfuegbar && aktiveBauten.length > 0 && (
@@ -334,14 +337,9 @@ export default function OfflineKartenVerwaltung() {
           pagination={false}
         />
       )}
-      <OfflineDownloadKatalogModal
-        offen={katalogOffen}
-        vorhandeneUrls={vorhandeneUrls}
-        onClose={() => setKatalogOffen(false)}
-      />
+      <OfflineRegionPicker offen={pickerOffen} onClose={() => setPickerOffen(false)} />
       <OfflineDownloadUrlModal offen={urlOffen} onClose={() => setUrlOffen(false)} />
       <OfflineVorhandeneModal offen={vorhandenOffen} onClose={() => setVorhandenOffen(false)} />
-      <OfflineRegionBauenModal offen={regionBauenOffen} onClose={() => setRegionBauenOffen(false)} />
     </>
   );
 }

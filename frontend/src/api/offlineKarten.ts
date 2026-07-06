@@ -102,9 +102,12 @@ export function loescheOfflineKarte(id: number): Promise<void> {
   return apiSend<void>(`/api/karte/offline-karten/${id}`, 'DELETE');
 }
 
-/** Server-autoritativer Download-Vorschlagskatalog (kuratierte MBTiles-Quellen). */
-export function ladeOfflineKatalog(): Promise<OfflineKatalogEintrag[]> {
-  return apiGet<OfflineKatalogEintrag[]>('/api/karte/offline-karten/katalog');
+/** Server-autoritativer Download-Vorschlagskatalog (kuratierte MBTiles-Quellen). `frisch` umgeht die
+ *  Manifest-Cache-TTL (LFH-206, „Bauen & laden"): direkt nach einem Bau den neuen Eintrag sofort sehen. */
+export function ladeOfflineKatalog(frisch = false): Promise<OfflineKatalogEintrag[]> {
+  return apiGet<OfflineKatalogEintrag[]>(
+    `/api/karte/offline-karten/katalog${frisch ? '?frisch=1' : ''}`,
+  );
 }
 
 /** Eine im karten_dir vorhandene, noch nicht registrierte MBTiles-Datei (lokaler Import, LFH-199). */

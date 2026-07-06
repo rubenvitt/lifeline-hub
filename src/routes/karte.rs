@@ -868,15 +868,22 @@ pub async fn offline_vorhandene(
 /// GET /api/karte/offline-karten/katalog — kuratierter Download-Vorschlagskatalog (Admin).
 /// Hybrid (LFH-199): compiled-in Default ∪ best-effort geholtes Remote-Manifest (füllt den Cache,
 /// den `offline_liste` mitnutzt). Fetch-Fehler → nur compiled-in.
+/// `?frisch=1` umgeht die Manifest-Cache-TTL (LFH-206, „Bauen & laden"): direkt nach einem fertigen
+/// Region-Bau soll der neue Eintrag sofort erscheinen, nicht erst nach der ~5-min-TTL.
 pub async fn offline_katalog(
     State(state): State<AppState>,
     _admin: AdminUser,
+    Query(params): Query<HashMap<String, String>>,
 ) -> Result<Json<Vec<OfflineKatalogEintrag>>, AppError> {
     // Kurz getimeboxter Client (fachebenen: 8 s), NICHT der GB-download_client (kein Globaltimeout) —
     // der Manifest-Abruf ist ein kleiner JSON-Request und darf den Handler nicht lange blockieren.
-    Ok(Json(
-        crate::karte::katalog::effektiver_katalog(&state.fachebenen.client).await,
-    ))
+    let client = &state.fachebenen.client;
+    let katalog = if params.get("frisch").is_some_and(|v| v == "1" || v == "true") {
+        crate::karte::katalog::effektiver_katalog_frisch(client).await
+    } else {
+        crate::karte::katalog::effektiver_katalog(client).await
+    };
+    Ok(Json(katalog))
 }
 
 /// Request-Body zum Starten eines Offline-Karten-Downloads (aus Katalog oder eigener URL).

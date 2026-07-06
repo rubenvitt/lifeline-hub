@@ -84,36 +84,14 @@ describe('OfflineKartenVerwaltung', () => {
     render();
     await screen.findByText('Deutschland – Bremen');
     expect(screen.getByRole('button', { name: 'Region aufs Gerät bringen' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Per URL herunterladen' })).toBeInTheDocument();
+    // Spezialfälle (Per-URL / lokale Datei) sind unter „Erweitert" demoted (LFH-206).
+    expect(screen.getByRole('button', { name: /Erweitert/ })).toBeInTheDocument();
     // bereit → wird gemeinsam angezeigt (LFH-188, kein manuelles Aktivieren mehr).
     expect(screen.getByText('wird angezeigt')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Löschen' })).toBeInTheDocument();
   });
 
-  it('Katalog-Modal gruppiert Regionen und startet den Download', async () => {
-    let downloadName: string | undefined;
-    const katalog = [
-      { name: 'Deutschland (Shortbread)', url: 'https://m/de.mbtiles', region: 'DE', groesse: 3e9, lizenz: 'ODbL', kachel_schema: 'shortbread', quelle: 'q', sha256: null, gruppe: 'Deutschland' },
-      { name: 'Bayern', url: 'https://m/by.mbtiles', region: 'DE-BY', groesse: 1e9, lizenz: 'ODbL', kachel_schema: 'shortbread', quelle: 'q', sha256: null, gruppe: 'Bundesländer' },
-    ];
-    mockBasis(admin, [], katalog);
-    server.use(
-      http.post('/api/karte/offline-karten/download', async ({ request }) => {
-        downloadName = ((await request.json()) as { name: string }).name;
-        return HttpResponse.json({ ...karte, id: 9, name: downloadName });
-      }),
-    );
-    render();
-    await userEvent.click(await screen.findByRole('button', { name: 'Region aufs Gerät bringen' }));
-    // Geführte Auswahl: die Einträge sind nach Gruppe überschrieben.
-    expect(await screen.findByRole('heading', { name: 'Bundesländer' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Deutschland' })).toBeInTheDocument();
-    // Erster „Herunterladen" (Gruppe Deutschland) startet den Download mit dem richtigen Eintrag.
-    await userEvent.click(screen.getAllByRole('button', { name: 'Herunterladen' })[0]);
-    await waitFor(() => expect(downloadName).toBe('Deutschland (Shortbread)'));
-  });
-
-  it('Gebaute Region übernehmen: listet vorhandene Datei und registriert sie lokal', async () => {
+  it('Gebaute Region übernehmen (unter „Erweitert"): listet vorhandene Datei und registriert sie lokal', async () => {
     let regBody: { name: string; pfad: string } | undefined;
     mockBasis(admin, []);
     server.use(
@@ -126,7 +104,8 @@ describe('OfflineKartenVerwaltung', () => {
       }),
     );
     render();
-    await userEvent.click(await screen.findByRole('button', { name: 'Gebaute Region übernehmen' }));
+    await userEvent.click(await screen.findByRole('button', { name: /Erweitert/ }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Gebaute Region übernehmen' }));
     // Default-Name aus dem Dateinamen abgeleitet (osm.-Präfix + Datum entfernt).
     expect(await screen.findByDisplayValue('bremen')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
@@ -143,32 +122,6 @@ describe('OfflineKartenVerwaltung', () => {
     expect(screen.queryByRole('button', { name: 'Region aufs Gerät bringen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Aktivieren' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
-  });
-
-  it('Katalog-Flow: Herunterladen → POST /download mit korrektem Body', async () => {
-    let postBody: unknown = null;
-    mockBasis(admin, []); // leere Liste → Katalog-Eintrag nicht „vorhanden"
-    server.use(
-      http.post('/api/karte/offline-karten/download', async ({ request }) => {
-        postBody = await request.json();
-        return HttpResponse.json({ ...karte, status: 'laedt' }, { status: 202 });
-      }),
-    );
-    render();
-    await userEvent.click(await screen.findByRole('button', { name: 'Region aufs Gerät bringen' }));
-    const dialog = await screen.findByRole('dialog');
-    expect(await within(dialog).findByText('Deutschland – Bremen')).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Herunterladen' }));
-
-    await waitFor(() => expect(postBody).not.toBeNull());
-    expect(postBody).toEqual({
-      name: 'Deutschland – Bremen',
-      url: 'https://example.test/de_bremen.mbtiles',
-      lizenz: '© OpenStreetMap contributors (ODbL)',
-      kachel_schema: 'shortbread',
-      groesse_erwartet: 44040192,
-      sha256_erwartet: 'cafef00d',
-    });
   });
 
   it('lädt-Zustand: zeigt Abbrechen, kein Aktivieren/Löschen', async () => {
@@ -300,7 +253,8 @@ describe('OfflineKartenVerwaltung', () => {
       }),
     );
     render();
-    await userEvent.click(await screen.findByRole('button', { name: 'Per URL herunterladen' }));
+    await userEvent.click(await screen.findByRole('button', { name: /Erweitert/ }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Per URL herunterladen' }));
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(within(dialog).getByLabelText('Name'), 'Eigener Extrakt');
     await userEvent.type(within(dialog).getByLabelText('URL'), 'https://example.test/de.mbtiles');
@@ -314,35 +268,6 @@ describe('OfflineKartenVerwaltung', () => {
       lizenz: '© OSM',
       kachel_schema: 'shortbread',
     });
-  });
-
-  it('Region neu bauen: Button erscheint bei karten_bau_verfuegbar, Picker startet Bau mit Slug', async () => {
-    let bauBody: unknown = null;
-    mockBasis(admin, [], [], { bauVerfuegbar: true });
-    server.use(
-      http.get('/api/karte/offline-karten/baubare-regionen', () =>
-        HttpResponse.json([{ slug: 'bayern', name: 'Bayern', region: 'DE-BY', gruppe: 'Bundesländer' }]),
-      ),
-      http.post('/api/karte/offline-karten/bauen', async ({ request }) => {
-        bauBody = await request.json();
-        return HttpResponse.json({ job_id: 1 });
-      }),
-    );
-    render();
-    await userEvent.click(await screen.findByRole('button', { name: /Region neu bauen/i }));
-    const dialog = await screen.findByRole('dialog');
-    expect(await within(dialog).findByText('Bayern')).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole('button', { name: /Bauen/i }));
-
-    await waitFor(() => expect(bauBody).toEqual({ slug: 'bayern' }));
-    expect(await screen.findByText(/Bau gestartet/i)).toBeInTheDocument();
-  });
-
-  it('Region neu bauen: Button fehlt, wenn karten_bau_verfuegbar false ist', async () => {
-    mockBasis(admin, [karte], [katalogEintrag], { bauVerfuegbar: false });
-    render();
-    await screen.findByText('Deutschland – Bremen');
-    expect(screen.queryByRole('button', { name: /Region neu bauen/i })).not.toBeInTheDocument();
   });
 
   it('Bau-Status-Zeile: zeigt aktive Bau-Jobs (verschachtelter status.status) über der Tabelle', async () => {
