@@ -78,6 +78,14 @@ fn url_ist_loopback_http(url_str: &str) -> bool {
     }
 }
 
+/// Ist ein Katalog-Eintrag tatsächlich auslieferbar/herunterladbar? Gleiche Kriterien wie die
+/// Remote-Merge-Gültigkeit (Pin + echte, sichere URL) — auch auf compiled-in Platzhalter
+/// (TODO-URL, kein Pin) angewandt, damit der Download-Katalog nur wirklich ladbare Regionen zeigt
+/// (ungebaute erscheinen nicht; gebaut wird über „Region neu bauen").
+pub fn eintrag_ist_lieferbar(e: &OfflineKatalogEintrag) -> bool {
+    remote_eintrag_ist_gueltig(e)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

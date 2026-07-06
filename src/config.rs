@@ -89,7 +89,9 @@ pub fn default_online_styles() -> Vec<OnlineStyle> {
 
 /// Geteilter Offline-Katalog-Typ + Merge-/Validierungslogik — ausgelagert ins eigene
 /// Workspace-Crate `karten-katalog` (LFH-201, Grundstein für den späteren karten-service).
-pub use karten_katalog::{merge_offline_katalog, remote_eintrag_ist_gueltig, OfflineKatalogEintrag};
+pub use karten_katalog::{
+    eintrag_ist_lieferbar, merge_offline_katalog, remote_eintrag_ist_gueltig, OfflineKatalogEintrag,
+};
 
 /// Kuratierter Offline-Karten-Katalog (`GET /api/karte/offline-karten/katalog`) — analog zum
 /// Online-Vorschlagskatalog `default_online_styles`. Eigenbau (`karten-build`, Planetiler-

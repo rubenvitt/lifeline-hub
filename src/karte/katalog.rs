@@ -5,7 +5,9 @@
 //! Der Cache ist prozessweit (ein Katalog pro App, kein Request-/Einsatz-Bezug) — analog zum
 //! prozessweiten Reader-Cache in `mbtiles`. Bewusst KEIN AppState-Feld (spart das Durchreichen
 //! durch alle Handler/Test-Konstruktionen).
-use crate::config::{default_offline_katalog, merge_offline_katalog, OfflineKatalogEintrag};
+use crate::config::{
+    default_offline_katalog, eintrag_ist_lieferbar, merge_offline_katalog, OfflineKatalogEintrag,
+};
 use std::sync::{Arc, LazyLock, RwLock};
 use std::time::{Duration, Instant};
 
@@ -56,7 +58,17 @@ pub async fn effektiver_katalog(client: &reqwest::Client) -> Vec<OfflineKatalogE
         // Auch bei Fehlschlag den Zeitstempel setzen → toten Mirror nicht bei jedem Request pingen.
         *LETZTER_FETCH.write().unwrap() = Some(Instant::now());
     }
-    katalog_aus_cache()
+    // Download-Katalog: nur tatsächlich LIEFERBARE Einträge (Pin + echte URL). Ungebaute compiled-in
+    // Platzhalter (TODO-URL, kein Pin) erscheinen NICHT als ladbar — gebaut wird über „Region neu
+    // bauen", danach taucht die Region übers Manifest auf. Der Update-Check (`katalog_aus_cache`)
+    // nutzt bewusst weiter den vollen Katalog.
+    nur_lieferbare(katalog_aus_cache())
+}
+
+/// Filtert einen Katalog auf tatsächlich lieferbare Einträge (Pin + echte URL) — für den
+/// Download-Katalog, damit ungebaute Platzhalter nicht als ladbar angeboten werden.
+fn nur_lieferbare(katalog: Vec<OfflineKatalogEintrag>) -> Vec<OfflineKatalogEintrag> {
+    katalog.into_iter().filter(eintrag_ist_lieferbar).collect()
 }
 
 /// Ist ein (erneuter) Fetch fällig? Ja, wenn noch nie geholt oder der letzte Versuch älter als TTL.
@@ -103,6 +115,29 @@ mod tests {
     fn merge_ohne_cache_ist_compiled_in() {
         let cache: KatalogCache = Default::default();
         assert_eq!(merge_mit_cache(&cache).len(), default_offline_katalog().len());
+    }
+
+    #[test]
+    fn nur_lieferbare_filtert_ungebaute_platzhalter() {
+        // compiled-in sind unlieferbare TODO-Platzhalter (kein Pin) → aus dem Download-Katalog gefiltert.
+        assert!(nur_lieferbare(default_offline_katalog()).is_empty());
+        // Ein gebauter/gepinnter Eintrag (echte URL + sha256) bleibt.
+        let gebaut = OfflineKatalogEintrag {
+            name: "Nordrhein-Westfalen".into(),
+            url: "https://cdn.example/maps/nrw.mbtiles".into(),
+            region: "DE-NW".into(),
+            groesse: 500_000_000,
+            lizenz: "© OSM (ODbL)".into(),
+            kachel_schema: "shortbread".into(),
+            quelle: "Eigen-Service".into(),
+            sha256: Some("a".repeat(64)),
+            gruppe: Some("Bundesländer".into()),
+        };
+        let mut mix = default_offline_katalog();
+        mix.push(gebaut);
+        let out = nur_lieferbare(mix);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].name, "Nordrhein-Westfalen");
     }
 
     #[test]

@@ -685,7 +685,7 @@ async fn offline_loeschen_unbekannt_ist_404() {
 // ===== Offline-Download-Manager (LFH-181) =====
 
 #[tokio::test]
-async fn offline_katalog_liefert_kuratierte_liste() {
+async fn offline_katalog_zeigt_nur_lieferbare() {
     let (app, cookie) = admin_app().await;
     let res = anfrage(
         &app,
@@ -695,22 +695,18 @@ async fn offline_katalog_liefert_kuratierte_liste() {
         None,
     )
     .await;
+    // Statische /katalog-Route gewinnt gegen /{id} (matchit-Priorität).
     assert_eq!(res.status(), StatusCode::OK);
     let v = json(res).await;
     let liste = v.as_array().expect("Array");
-    // Kuratierte Regions-Liste (LFH-199): mehrere gruppierte Einträge. Der Remote-Manifest-Fetch
-    // (Platzhalter-URL) schlägt im Test fehl → compiled-in Fallback.
-    assert!(liste.len() >= 3, "kuratierte Regions-Liste (LFH-199): {}", liste.len());
-    // Statische /katalog-Route gewinnt gegen /{id} (matchit-Priorität).
-    assert!(liste.iter().all(|e| e["url"].as_str().unwrap().starts_with("https://")));
-    assert!(liste.iter().all(|e| e["kachel_schema"].as_str() == Some("shortbread")));
-    assert!(liste.iter().all(|e| !e["lizenz"].as_str().unwrap().is_empty()));
+    // LFH-201: der Download-Katalog zeigt NUR tatsächlich lieferbare Regionen (Pin + echte URL).
+    // Im Test fehlt das Manifest (Fetch der TODO-Platzhalter-URL scheitert) → alle compiled-in
+    // Platzhalter sind gefiltert → leer. Ungebaute Platzhalter dürfen nie als ladbar erscheinen.
     assert!(
-        liste
-            .iter()
-            .any(|e| e["region"].as_str() == Some("DE") && e["gruppe"].as_str() == Some("Deutschland")),
-        "DE-Eintrag mit Gruppe vorhanden"
+        liste.iter().all(|e| !e["url"].as_str().unwrap().contains("TODO")),
+        "keine ungebauten TODO-Platzhalter im Download-Katalog"
     );
+    assert!(liste.iter().all(|e| e["sha256"].as_str().is_some()), "nur gepinnte Einträge");
 }
 
 #[tokio::test]
