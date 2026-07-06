@@ -482,6 +482,7 @@ export default function Sidebar(props: SidebarProps) {
           onChange={(e) => props.onBasemapWechsel(e.target.value as BasemapModus)}
           optionType="button"
           size="small"
+          name="lagekarte-basemap"
         >
           <Tooltip title={props.onlineVerfuegbar ? '' : 'nicht konfiguriert'}>
             <Radio.Button value="online" disabled={!props.onlineVerfuegbar}>
@@ -516,6 +517,7 @@ export default function Sidebar(props: SidebarProps) {
               optionType="button"
               size="small"
               aria-label="Karten-Design"
+              name="lagekarte-karten-design"
             >
               <Tooltip title="folgt dem App-Design">
                 <Radio.Button value="auto">Auto</Radio.Button>
