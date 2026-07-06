@@ -44,6 +44,9 @@ export function createZeichnung(
   return {
     starten: (modus) => {
       if (!draw.enabled) draw.start();
+      // Beim Re-Aktivieren/Moduswechsel einen evtl. noch offenen oder abgeschlossen-aber-
+      // unbestätigten Entwurf verwerfen (das Cleanup ist bewusst bis hierher aufgeschoben).
+      else draw.clear();
       draw.setMode(MODUS_NAME[modus]);
     },
     stoppen: () => {
