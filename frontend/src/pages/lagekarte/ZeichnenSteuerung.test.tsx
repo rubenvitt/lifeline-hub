@@ -55,6 +55,6 @@ describe('ZeichnenSteuerung', () => {
   it('Phase bestaetigen mit speichernLaeuft: Speichern zeigt Loading', () => {
     setup({ phase: 'bestaetigen', speichernLaeuft: true });
     // antd Button loading rendert eine Spinner-Struktur; Button bleibt im DOM.
-    expect(screen.getByRole('button', { name: /Speichern/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Speichern/ })).toHaveClass('ant-btn-loading');
   });
 });
