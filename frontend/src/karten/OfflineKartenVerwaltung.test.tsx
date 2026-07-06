@@ -19,7 +19,7 @@ const fuehrungskraft = {
 const karte: OfflineKarte = {
   id: 1, name: 'Deutschland – Bremen', pfad: 'karte-1.mbtiles',
   quell_url: 'https://example.test/de_bremen.mbtiles', lizenz: '© OpenStreetMap contributors (ODbL)',
-  kachel_schema: 'shortbread', groesse: 44040192, sha256: 'abc', download_at: '2026-06-26 11:00:00',
+  kachel_schema: 'shortbread', format: 'pbf', groesse: 44040192, sha256: 'abc', download_at: '2026-06-26 11:00:00',
   status: 'bereit', aktiv_basemap: false, sortier: 0,
 };
 
@@ -85,8 +85,8 @@ describe('OfflineKartenVerwaltung', () => {
     await screen.findByText('Deutschland – Bremen');
     expect(screen.getByRole('button', { name: 'Region aufs Gerät bringen' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Per URL herunterladen' })).toBeInTheDocument();
-    // bereit + nicht aktiv → Aktivieren angeboten.
-    expect(screen.getByRole('button', { name: 'Aktivieren' })).toBeInTheDocument();
+    // bereit → wird gemeinsam angezeigt (LFH-188, kein manuelles Aktivieren mehr).
+    expect(screen.getByText('wird angezeigt')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Löschen' })).toBeInTheDocument();
   });
 
@@ -143,20 +143,6 @@ describe('OfflineKartenVerwaltung', () => {
     expect(screen.queryByRole('button', { name: 'Region aufs Gerät bringen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Aktivieren' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
-  });
-
-  it('Aktivieren ruft den Aktivieren-Endpunkt', async () => {
-    let aktiviert = false;
-    mockBasis(admin);
-    server.use(
-      http.post('/api/karte/offline-karten/1/aktivieren', () => {
-        aktiviert = true;
-        return HttpResponse.json({ ...karte, aktiv_basemap: true });
-      }),
-    );
-    render();
-    await userEvent.click(await screen.findByRole('button', { name: 'Aktivieren' }));
-    await waitFor(() => expect(aktiviert).toBe(true));
   });
 
   it('Katalog-Flow: Herunterladen → POST /download mit korrektem Body', async () => {

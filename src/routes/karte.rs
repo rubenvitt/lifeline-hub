@@ -27,19 +27,36 @@ use std::sync::Arc;
 pub struct KarteConfigAntwort {
     pub online_styles: Vec<OnlineStyle>,
     pub offline_verfuegbar: bool,
-    /// Tile-Endpoint-Template der aktiven Offline-Karte inkl. Cache-Bust `?v=<token>`.
-    /// Der Token wechselt bei Karten-Swap, sonst cacht MapLibre den alten Tile-Aufbau unter
-    /// gleicher URL → korrupte Tiles.
+    /// Tile-Endpoint-Template der ERSTEN sichtbaren Offline-Region inkl. Cache-Bust `?v=<token>`.
+    /// **Kompat-Feld** (LFH-188): die eigentliche Quelle der Wahrheit ist `offline_regionen`; alte
+    /// Clients ohne Multi-Region-Support degradieren auf diese eine Region. Der Token wechselt bei
+    /// Karten-Swap, sonst cacht MapLibre den alten Tile-Aufbau unter gleicher URL → korrupte Tiles.
     pub offline_tiles_url: Option<String>,
-    /// Pflicht-Attribution der aktiven Offline-Karte (offline sichtbar, z.B. ODbL). `None`,
-    /// wenn keine aktive Karte oder keine Lizenz hinterlegt ist.
+    /// Pflicht-Attribution der ersten sichtbaren Region (Kompat). `None`, wenn keine Region bereit.
     pub offline_attribution: Option<String>,
-    /// Grober Kachel-Typ der aktiven Offline-Karte (LFH-185): `"vektor"` (pbf) oder `"raster"`
-    /// (png/jpg/webp) — steuert die Style-Wahl im Frontend. `None`, wenn keine aktive Karte.
+    /// Grober Kachel-Typ der ersten sichtbaren Region (LFH-185): `"vektor"` (pbf) oder `"raster"`
+    /// (png/jpg/webp) — Kompat. `None`, wenn keine Region bereit.
     pub offline_format: Option<String>,
+    /// Alle gemeinsam anzuzeigenden Offline-Regionen (LFH-188): die Offline-Karte ist die
+    /// VEREINIGUNG aller bereiten Regionen, je Region eine eigene Vector-Source. Leere Liste =
+    /// keine Region bereit (= `offline_verfuegbar = false`).
+    pub offline_regionen: Vec<OfflineRegionConfig>,
     /// True, wenn der zentrale karten-service konfiguriert ist (URL+Token) → Admin darf Region-Builds
     /// anstoßen. Steuert die Sichtbarkeit der Bau-UI (LFH-203). Reine Verfügbarkeit, kein Secret.
     pub karten_bau_verfuegbar: bool,
+}
+
+/// Eine gemeinsam angezeigte Offline-Region im Config-Vertrag (LFH-188). `tiles_url` ist
+/// region-adressiert (`/api/karte/offline/{karte_id}/tiles/{z}/{x}/{y}?v=<token>`), sodass das
+/// Frontend je Region eine eigene Vector-Source mit eigenem Cache-Bust bindet.
+#[derive(Debug, Serialize)]
+pub struct OfflineRegionConfig {
+    pub karte_id: i64,
+    pub name: String,
+    pub tiles_url: String,
+    pub attribution: Option<String>,
+    /// `"vektor"` (pbf) oder `"raster"` (png/jpg/webp) — steuert die Style-Wahl je Region.
+    pub format: String,
 }
 
 /// GET /api/karte/config — Basemap-Verfügbarkeit fürs Frontend, frisch aus der DB-Registry.
@@ -68,27 +85,29 @@ pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAnt
             }
         })
         .collect();
-    let aktiv = repo::aktive_offline_karte(&state.pool).await?;
-    let (offline_tiles_url, offline_attribution) = match &aktiv {
-        Some(k) => {
+    // Multi-Region (LFH-188): die Offline-Karte ist die Vereinigung ALLER bereiten Regionen. Je
+    // Region ein region-adressierter Tile-Endpoint mit eigenem Cache-Bust-Token; das Frontend bindet
+    // je Region eine eigene Vector-Source. Kein Datei-Open — Werte sind operator-deklariert (LFH-185).
+    let offline_regionen: Vec<OfflineRegionConfig> = repo::sichtbare_offline_karten(&state.pool)
+        .await?
+        .into_iter()
+        .map(|r| {
             // Cache-Bust-Token URL-safe halten (geaendert_at enthält Leerzeichen/Doppelpunkte).
-            let v: String = k.version.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
-            (
-                Some(format!("/api/karte/offline/tiles/{{z}}/{{x}}/{{y}}?v={v}")),
-                k.lizenz.clone(),
-            )
-        }
-        None => (None, None),
-    };
-    // Format gröbern (kein Datei-Open — der Wert ist operator-deklariert in der DB, LFH-185): eine
-    // grobe Routing-Entscheidung darf nicht an Datei-Lesbarkeit hängen.
-    let offline_format = aktiv.as_ref().map(|k| {
-        match k.format.as_str() {
-            "png" | "jpg" | "webp" => "raster",
-            _ => "vektor",
-        }
-        .to_string()
-    });
+            let v: String = r.version.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+            OfflineRegionConfig {
+                tiles_url: format!("/api/karte/offline/{}/tiles/{{z}}/{{x}}/{{y}}?v={v}", r.id),
+                karte_id: r.id,
+                name: r.name,
+                attribution: r.lizenz,
+                format: grob_format(&r.format).to_string(),
+            }
+        })
+        .collect();
+    // Kompat-Felder (LFH-188): erste sichtbare Region, damit alte Clients degradieren.
+    let erste = offline_regionen.first();
+    let offline_tiles_url = erste.map(|r| r.tiles_url.clone());
+    let offline_attribution = erste.and_then(|r| r.attribution.clone());
+    let offline_format = erste.map(|r| r.format.clone());
     // Bau-UI-Verfügbarkeit (LFH-203): reine Konfigurations-Prüfung, kein Netzwerk-Call zum
     // karten-service. Beide Werte müssen gesetzt sein — Token ohne URL (oder umgekehrt) ist keine
     // funktionsfähige Konfiguration.
@@ -96,36 +115,74 @@ pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAnt
         state.karten_service_url.is_some() && state.karten_service_token.is_some();
     Ok(Json(KarteConfigAntwort {
         online_styles,
-        offline_verfuegbar: aktiv.is_some(),
+        offline_verfuegbar: !offline_regionen.is_empty(),
         offline_tiles_url,
         offline_attribution,
         offline_format,
+        offline_regionen,
         karten_bau_verfuegbar,
     }))
 }
 
-/// GET /api/karte/offline/tiles/{z}/{x}/{y} — Kachel der aktiven Offline-MBTiles. Vektor (`pbf`)
-/// wird als gzip-MVT ausgeliefert, Raster (`png`/`jpg`/`webp`) als Bild ohne Content-Encoding
-/// (LFH-185). Öffnet die aktive Datei read-only (gecacht per Pfad in mbtiles::reader_fuer),
-/// Y-Flip in mbtiles.rs; der Blob wird formatunabhängig durchgereicht.
+/// Grober Kachel-Typ je Blob-Format (LFH-185): `"vektor"` (pbf) oder `"raster"` (png/jpg/webp) —
+/// steuert die Frontend-Style-Wahl. Kein Datei-Open (operator-deklariert in der DB).
+fn grob_format(format: &str) -> &'static str {
+    match format {
+        "png" | "jpg" | "webp" => "raster",
+        _ => "vektor",
+    }
+}
+
+/// GET /api/karte/offline/tiles/{z}/{x}/{y} — **Kompat-Endpoint** (LFH-188): Kachel der ERSTEN
+/// sichtbaren Offline-Region (via `aktive_offline_karte_pfad_und_format`, LIMIT 1). Für alte
+/// Clients ohne Multi-Region-Support; neue Clients nutzen den region-adressierten Endpoint.
 pub async fn offline_tiles(
     State(state): State<AppState>,
     Path((z, x, y)): Path<(i64, i64, i64)>,
 ) -> Result<Response, AppError> {
-    use crate::karte::mbtiles;
-    // Range-Guard VOR jedem Datei-/DB-Zugriff: z/x/y kommen roh (netzwerk-kontrolliert) aus der
-    // URL. `lies_tile` shiftet `1i64 << z` für den TMS-Y-Flip — ein absurdes z (negativ oder
-    // > 24) würde im Debug-Build panicken bzw. im Release-Build maskiert überlaufen. Kein valider
-    // XYZ-Zoom liegt außerhalb von 0..=24.
-    if !(0..=24).contains(&z) || x < 0 || y < 0 {
-        return Ok(StatusCode::NO_CONTENT.into_response());
-    }
     let Some((pfad_rel, format)) = repo::aktive_offline_karte_pfad_und_format(&state.pool).await?
     else {
         return Ok(StatusCode::NO_CONTENT.into_response());
     };
+    serve_offline_tile(&state, &pfad_rel, &format, z, x, y).await
+}
+
+/// GET /api/karte/offline/{karte_id}/tiles/{z}/{x}/{y} — region-adressierte Kachel EINER bereiten
+/// Offline-Region (LFH-188, Multi-Region). Das Frontend bindet je sichtbarer Region eine eigene
+/// Vector-Source auf diesen Endpoint. `204`, wenn die Region unbekannt/nicht bereit ist.
+pub async fn offline_tiles_region(
+    State(state): State<AppState>,
+    Path((karte_id, z, x, y)): Path<(i64, i64, i64, i64)>,
+) -> Result<Response, AppError> {
+    let Some((pfad_rel, format)) = repo::offline_karte_pfad_und_format(&state.pool, karte_id).await?
+    else {
+        return Ok(StatusCode::NO_CONTENT.into_response());
+    };
+    serve_offline_tile(&state, &pfad_rel, &format, z, x, y).await
+}
+
+/// Liest eine Kachel aus einer relativen MBTiles-Datei unter `karten_dir` und baut die Antwort.
+/// Geteilt von `offline_tiles` (aktive/erste Region) und `offline_tiles_region` (per id). Vektor
+/// (`pbf`) → gzip-MVT, Raster (`png`/`jpg`/`webp`) → Bild ohne Content-Encoding (LFH-185). Öffnet
+/// die Datei read-only (gecacht per Pfad in `mbtiles::reader_fuer`), Y-Flip in mbtiles.rs.
+async fn serve_offline_tile(
+    state: &AppState,
+    pfad_rel: &str,
+    format: &str,
+    z: i64,
+    x: i64,
+    y: i64,
+) -> Result<Response, AppError> {
+    use crate::karte::mbtiles;
+    // Range-Guard VOR `lies_tile`: z/x/y kommen roh (netzwerk-kontrolliert) aus der URL. `lies_tile`
+    // shiftet `1i64 << z` für den TMS-Y-Flip — ein absurdes z (negativ oder > 24) würde im
+    // Debug-Build panicken bzw. im Release-Build maskiert überlaufen. Kein valider XYZ-Zoom liegt
+    // außerhalb von 0..=24.
+    if !(0..=24).contains(&z) || x < 0 || y < 0 {
+        return Ok(StatusCode::NO_CONTENT.into_response());
+    }
     // Pfad-Guard analog zum bisherigen tiles-Handler (relativ, kein Traversal).
-    let p = FsPath::new(&pfad_rel);
+    let p = FsPath::new(pfad_rel);
     if p.is_absolute() || p.components().any(|c| matches!(c, Component::ParentDir)) {
         return Ok(StatusCode::NO_CONTENT.into_response());
     }
@@ -146,7 +203,7 @@ pub async fn offline_tiles(
         .map_err(|e| AppError::Internal(format!("MBTiles öffnen: {e}")))?;
     match mbtiles::lies_tile(&pool, z, x, y).await {
         Ok(Some(daten)) => {
-            let (content_type, encoding) = format_mime_encoding(&format);
+            let (content_type, encoding) = format_mime_encoding(format);
             let mut builder = Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, content_type)

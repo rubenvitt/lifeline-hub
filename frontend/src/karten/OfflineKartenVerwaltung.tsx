@@ -9,7 +9,6 @@ import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import { ladeKarteConfig } from '../api/karte';
 import {
-  aktiviereOfflineKarte,
   brecheOfflineDownloadAb,
   ladeBauStatus,
   listeOfflineKarten,
@@ -100,11 +99,6 @@ export default function OfflineKartenVerwaltung() {
     [karten],
   );
 
-  const aktivierenMutation = useMutation({
-    mutationFn: (id: number) => aktiviereOfflineKarte(id),
-    onSuccess: () => invalidiereKarte(qc),
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Aktivieren fehlgeschlagen'),
-  });
   const abbrechenMutation = useMutation({
     mutationFn: (id: number) => brecheOfflineDownloadAb(id),
     onSuccess: () => invalidiereKarte(qc),
@@ -223,10 +217,21 @@ export default function OfflineKartenVerwaltung() {
       render: (g: number | null) => formatGroesse(g),
     },
     {
-      title: 'Basemap',
-      dataIndex: 'aktiv_basemap',
-      key: 'aktiv_basemap',
-      render: (a: boolean) => (a ? <Tag color="green">aktiv</Tag> : <Tag>—</Tag>),
+      // Multi-Region (LFH-188): alle bereiten Vektor-Regionen werden gemeinsam angezeigt (kein
+      // manuelles Aktivieren mehr). Raster-Offline-Karten (selten/legacy) laufen NICHT über den
+      // Multi-Vektor-Style → sie sind „bereit", aber nicht Teil der gemeinsamen Anzeige; das Tag
+      // verspricht dann kein „wird angezeigt".
+      title: 'Anzeige',
+      key: 'anzeige',
+      render: (_: unknown, k: OfflineKarte) => {
+        if (k.status !== 'bereit') return <Tag>—</Tag>;
+        const istRaster = k.format === 'png' || k.format === 'jpg' || k.format === 'webp';
+        return istRaster ? (
+          <Tag color="green">bereit</Tag>
+        ) : (
+          <Tag color="green">wird angezeigt</Tag>
+        );
+      },
     },
     {
       title: 'Attribution',
@@ -245,15 +250,6 @@ export default function OfflineKartenVerwaltung() {
               const laeuft = k.status === 'laedt' || k.geladen != null;
               return (
                 <Space>
-                  {k.status === 'bereit' && !k.aktiv_basemap && !laeuft && (
-                    <Button
-                      size="small"
-                      type="primary"
-                      onClick={() => aktivierenMutation.mutate(k.id)}
-                    >
-                      Aktivieren
-                    </Button>
-                  )}
                   {k.status === 'bereit' &&
                     k.update_verfuegbar &&
                     k.katalog_url &&

@@ -596,6 +596,67 @@ pub async fn aktive_offline_karte(
     }))
 }
 
+/// Eine sichtbare Offline-Region für `GET /api/karte/config` (Multi-Region, LFH-188). Trägt die
+/// `id` für den region-adressierten Tile-Endpoint, `version` als Cache-Bust-Token.
+pub struct SichtbareOfflineKarte {
+    pub id: i64,
+    pub name: String,
+    /// Cache-Bust-Token (`?v=…`): `sha256`, sonst `geaendert_at` (wie `AktiveOfflineKarte`).
+    pub version: String,
+    pub lizenz: Option<String>,
+    pub format: String,
+}
+
+/// Alle gemeinsam anzuzeigenden Offline-Regionen: die Offline-Karte ist die VEREINIGUNG aller
+/// bereiten Regionen (LFH-188, „alle automatisch gemeinsam"). Bewusst nur an `status = 'bereit'`
+/// gekoppelt — NICHT an `aktiv_basemap` (das bleibt Legacy-/Kompat-Marker der alten Single-Route).
+/// Reihenfolge `sortier, id` (stabile, deterministische Layer-/Attribution-Reihenfolge).
+pub async fn sichtbare_offline_karten(
+    pool: &SqlitePool,
+) -> Result<Vec<SichtbareOfflineKarte>, sqlx::Error> {
+    #[derive(sqlx::FromRow)]
+    struct Row {
+        id: i64,
+        name: String,
+        sha256: Option<String>,
+        geaendert_at: String,
+        lizenz: Option<String>,
+        format: String,
+    }
+    let rows = sqlx::query_as::<_, Row>(
+        "SELECT id, name, sha256, geaendert_at, lizenz, format FROM karte_offline_karte \
+         WHERE status = 'bereit' ORDER BY sortier, id",
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|r| SichtbareOfflineKarte {
+            id: r.id,
+            name: r.name,
+            version: r.sha256.unwrap_or(r.geaendert_at),
+            lizenz: r.lizenz,
+            format: r.format,
+        })
+        .collect())
+}
+
+/// Pfad + Kachel-Format einer bereiten Offline-Karte per `id` — für den region-adressierten
+/// Endpoint `GET /api/karte/offline/{karte_id}/tiles/{z}/{x}/{y}` (LFH-188). `None`, wenn die
+/// Region unbekannt oder (noch) nicht `bereit` ist → der Handler antwortet dann `204`.
+pub async fn offline_karte_pfad_und_format(
+    pool: &SqlitePool,
+    id: i64,
+) -> Result<Option<(String, String)>, sqlx::Error> {
+    sqlx::query_as::<_, (String, String)>(
+        "SELECT pfad, format FROM karte_offline_karte \
+         WHERE id = ? AND status = 'bereit' LIMIT 1",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1159,5 +1220,56 @@ mod tests {
             "nicht bereit → nicht aktivierbar"
         );
         assert!(!finde_offline_karte(&pool, k.id).await.unwrap().unwrap().aktiv_basemap);
+    }
+
+    // --- Multi-Region-Anzeige (LFH-188, „alle automatisch gemeinsam") ---
+
+    #[tokio::test]
+    async fn sichtbare_offline_karten_listet_alle_bereiten_unabhaengig_von_aktiv() {
+        let pool = test_pool().await;
+        // Zwei bereite Regionen (eine aktiv, eine NICHT aktiv) + eine ladende.
+        let a = registriere_offline_karte(&pool, &offline_eingabe("A")).await.unwrap();
+        let b = registriere_offline_karte(&pool, &offline_eingabe("B")).await.unwrap();
+        aktiviere_offline_karte(&pool, a.id).await.unwrap(); // a aktiv, b nicht
+        let laedt = neue_download_karte(&pool, &download_eingabe("C")).await.unwrap();
+
+        let sichtbar = sichtbare_offline_karten(&pool).await.unwrap();
+        let ids: Vec<i64> = sichtbar.iter().map(|r| r.id).collect();
+        assert_eq!(ids, vec![a.id, b.id], "beide bereiten Regionen, sortier,id; ladende nicht");
+        assert!(!ids.contains(&laedt.id), "ladende Region wird nicht ausgeliefert");
+    }
+
+    #[tokio::test]
+    async fn sichtbare_offline_karten_version_aus_sha256_sonst_geaendert_at() {
+        let pool = test_pool().await;
+        // Heruntergeladene Karte trägt sha256 → Token = sha256.
+        let d = neue_download_karte(&pool, &download_eingabe("D")).await.unwrap();
+        markiere_bereit(&pool, d.id, "karte-1.mbtiles", 10, "cafef00d").await.unwrap();
+        // Registrierte Karte (kein sha256) → Token = geaendert_at (nicht leer).
+        let r = registriere_offline_karte(&pool, &offline_eingabe("R")).await.unwrap();
+
+        let sichtbar = sichtbare_offline_karten(&pool).await.unwrap();
+        let sd = sichtbar.iter().find(|s| s.id == d.id).unwrap();
+        assert_eq!(sd.version, "cafef00d", "sha256 als Cache-Bust-Token");
+        let sr = sichtbar.iter().find(|s| s.id == r.id).unwrap();
+        assert!(!sr.version.is_empty(), "geaendert_at-Fallback ohne sha256");
+    }
+
+    #[tokio::test]
+    async fn offline_karte_pfad_und_format_nur_bereit_per_id() {
+        let pool = test_pool().await;
+        let mut e = offline_eingabe("Raster");
+        e.format = "png".into();
+        let k = registriere_offline_karte(&pool, &e).await.unwrap();
+        assert_eq!(
+            offline_karte_pfad_und_format(&pool, k.id).await.unwrap(),
+            Some((k.pfad.clone(), "png".to_string())),
+            "bereite Region per id auflösbar (Pfad + Format)"
+        );
+        // Ladende Region → None (204).
+        let laedt = neue_download_karte(&pool, &download_eingabe("L")).await.unwrap();
+        assert!(offline_karte_pfad_und_format(&pool, laedt.id).await.unwrap().is_none());
+        // Unbekannte id → None.
+        assert!(offline_karte_pfad_und_format(&pool, 999).await.unwrap().is_none());
     }
 }

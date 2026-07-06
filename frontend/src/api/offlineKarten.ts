@@ -16,6 +16,8 @@ export interface OfflineKarte {
   quell_url: string | null;
   lizenz: string | null;
   kachel_schema: string;
+  /** Kachel-Blob-Format (LFH-185): `'pbf'` (Vektor) oder `'png'`/`'jpg'`/`'webp'` (Raster). */
+  format: string;
   groesse: number | null;
   sha256: string | null;
   download_at: string | null;

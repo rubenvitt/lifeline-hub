@@ -363,9 +363,16 @@ pub fn build_router(state: AppState) -> Router {
         )
         // Offline-Tile-Endpoint (LFH-195, Shortbread/MBTiles): liest die aktive Karte per
         // gecachtem read-only-Reader (mbtiles::reader_fuer) statt sie komplett auszuliefern.
+        // Kompat-Route (erste sichtbare Region); neue Clients nutzen die region-adressierte Route.
         .route(
             "/api/karte/offline/tiles/{z}/{x}/{y}",
             get(routes::karte::offline_tiles),
+        )
+        // Region-adressierter Tile-Endpoint (LFH-188, Multi-Region): je sichtbarer Region eine
+        // eigene Vector-Source; N Regionen werden gemeinsam gezeichnet.
+        .route(
+            "/api/karte/offline/{karte_id}/tiles/{z}/{x}/{y}",
+            get(routes::karte::offline_tiles_region),
         )
         // Eingebettete Offline-Glyphs/Sprite (LFH-195, Task 2.4): rust-embed statt Proxy/Fetch.
         .route(

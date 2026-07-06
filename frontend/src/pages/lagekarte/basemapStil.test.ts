@@ -9,7 +9,7 @@ import {
   loeseKartenTheme,
   offlineStyle,
 } from './basemapStil';
-import type { KarteServerConfig, OnlineStyle } from '../../api/karte';
+import type { KarteServerConfig, OfflineRegion, OnlineStyle } from '../../api/karte';
 
 const vektorView: OnlineStyle = {
   name: 'A', url: 'https://tiles.example/style.json', typ: 'vektor', attribution: '© A',
@@ -18,20 +18,32 @@ const rasterView: OnlineStyle = {
   name: 'Top', url: 'https://x/{z}/{y}/{x}.png', typ: 'raster', attribution: '© BKG',
 };
 
+const ODBL = '© OpenStreetMap contributors (ODbL)';
+/** Eine Offline-Region im Config-Vertrag (LFH-188), region-adressiert. */
+function region(karte_id: number, format: OnlineStyle['typ'] = 'vektor'): OfflineRegion {
+  return {
+    karte_id, name: `R${karte_id}`,
+    tiles_url: `/api/karte/offline/${karte_id}/tiles/{z}/{x}/{y}?v=abc`,
+    attribution: ODBL, format,
+  };
+}
+
 const beides: KarteServerConfig = {
   online_styles: [vektorView],
   offline_verfuegbar: true,
-  offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
-  offline_attribution: null,
+  offline_tiles_url: '/api/karte/offline/1/tiles/{z}/{x}/{y}?v=abc',
+  offline_attribution: ODBL,
+  offline_regionen: [region(1)],
   karten_bau_verfuegbar: false,
 };
 const nurOffline: KarteServerConfig = {
-  online_styles: [], offline_verfuegbar: true, offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
-  offline_attribution: '© OpenStreetMap contributors (ODbL)', karten_bau_verfuegbar: false,
+  online_styles: [], offline_verfuegbar: true,
+  offline_tiles_url: '/api/karte/offline/5/tiles/{z}/{x}/{y}?v=abc',
+  offline_attribution: ODBL, offline_regionen: [region(5)], karten_bau_verfuegbar: false,
 };
 const leer: KarteServerConfig = {
   online_styles: [], offline_verfuegbar: false, offline_tiles_url: null, offline_attribution: null,
-  karten_bau_verfuegbar: false,
+  offline_regionen: [], karten_bau_verfuegbar: false,
 };
 
 describe('basemapStil', () => {
@@ -96,19 +108,52 @@ describe('basemapStil', () => {
     expect((s as { layers: unknown[] }).layers).toHaveLength(1);
   });
 
-  it('offline-Modus: Vektor-Format → Shortbread-Vektor-Style, Raster-Format → Raster-Style (LFH-185)', () => {
-    // Ohne offline_format (Default) → beschrifteter Shortbread-Style mit Vektor-Source.
+  it('offline-Modus: Vektor-Regionen → Multi-Source-Shortbread-Style, Raster → Raster-Style (LFH-185/188)', () => {
+    // Vektor-Region → beschrifteter Shortbread-Style mit region-adressierter Source basemap-{id}.
     const vektor = baueBasemapStyle('offline', 'light', nurOffline, undefined) as {
       sources: Record<string, { type: string }>;
     };
-    expect(vektor.sources.basemap.type).toBe('vector');
-    // offline_format='raster' → Raster-Style mit dem Offline-Tiles-Template VERBATIM.
-    const rasterConfig: KarteServerConfig = { ...nurOffline, offline_format: 'raster' };
+    expect(vektor.sources['basemap-5'].type).toBe('vector');
+    // Raster-Region (selten/legacy) → über den Kompat-Pfad ein Raster-Style mit dem Template VERBATIM.
+    const rasterConfig: KarteServerConfig = {
+      ...nurOffline, offline_format: 'raster', offline_regionen: [region(5, 'raster')],
+    };
     const raster = baueBasemapStyle('offline', 'light', rasterConfig, undefined) as {
       sources: Record<string, { type: string; tiles: string[] }>;
     };
     expect(raster.sources.raster.type).toBe('raster');
-    expect(raster.sources.raster.tiles).toEqual(['/api/karte/offline/tiles/{z}/{x}/{y}?v=abc']);
+    expect(raster.sources.raster.tiles).toEqual(['/api/karte/offline/5/tiles/{z}/{x}/{y}?v=abc']);
+  });
+
+  it('offline-Modus: mehrere Regionen → je eine Vector-Source basemap-{id} (LFH-188)', () => {
+    const multi: KarteServerConfig = { ...nurOffline, offline_regionen: [region(5), region(8)] };
+    const s = baueBasemapStyle('offline', 'light', multi, undefined) as {
+      sources: Record<string, { type: string; tiles: string[] }>;
+      layers: Array<{ id: string }>;
+    };
+    expect(s.sources['basemap-5'].type).toBe('vector');
+    expect(s.sources['basemap-8'].type).toBe('vector');
+    expect(s.sources['basemap-5'].tiles[0]).toContain('/api/karte/offline/5/tiles/');
+    expect(s.sources['basemap-8'].tiles[0]).toContain('/api/karte/offline/8/tiles/');
+    // Beide Regionen tragen die suffixierten Orts-Labels; Layer-IDs bleiben eindeutig.
+    const ids = s.layers.map((l) => l.id);
+    expect(ids).toContain('orte-5');
+    expect(ids).toContain('orte-8');
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('offline-Modus: Config ohne offline_regionen (alter Backend-Kompat) → Fallback über offline_tiles_url', () => {
+    const alt: KarteServerConfig = {
+      online_styles: [], offline_verfuegbar: true,
+      offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
+      offline_attribution: ODBL, karten_bau_verfuegbar: false,
+    };
+    const s = baueBasemapStyle('offline', 'light', alt, undefined) as {
+      sources: Record<string, { type: string; tiles: string[] }>;
+    };
+    // Kompat: eine Region mit karte_id 0 aus offline_tiles_url.
+    expect(s.sources['basemap-0'].type).toBe('vector');
+    expect(s.sources['basemap-0'].tiles[0]).toBe('/api/karte/offline/tiles/{z}/{x}/{y}?v=abc');
   });
 
   it('loeseKartenTheme: auto folgt dem App-Theme, explizite Wahl überschreibt', () => {
@@ -136,10 +181,23 @@ describe('basemapStil', () => {
     expect(aktuelleAttribution('blind', rasterView, beides)).toBeNull();
   });
 
+  it('aktuelleAttribution: mehrere Regionen dedupliziert (nicht N-fach, LFH-188)', () => {
+    // Zwei Regionen mit identischer ODbL-Attribution → genau eine Anzeige.
+    const zweiGleich: KarteServerConfig = { ...nurOffline, offline_regionen: [region(1), region(2)] };
+    expect(aktuelleAttribution('offline', undefined, zweiGleich)).toBe(ODBL);
+    // Unterschiedliche Attributionen → beide, mit Trenner.
+    const zweiVerschieden: KarteServerConfig = {
+      ...nurOffline,
+      offline_regionen: [region(1), { ...region(2), attribution: '© Andere Quelle' }],
+    };
+    expect(aktuelleAttribution('offline', undefined, zweiVerschieden)).toBe(`${ODBL} · © Andere Quelle`);
+  });
+
 });
 
-describe('offlineStyle (Shortbread)', () => {
-  const style = offlineStyle('light', '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc') as {
+describe('offlineStyle (Shortbread, Multi-Region)', () => {
+  // Eine Region mit karte_id 7 → Source basemap-7, Layer-IDs mit -7 suffixiert.
+  const style = offlineStyle('light', [region(7)]) as {
     glyphs: string;
     sprite: string;
     sources: Record<string, { type: string; tiles: string[] }>;
@@ -149,16 +207,21 @@ describe('offlineStyle (Shortbread)', () => {
     expect(style.glyphs).toBe('/api/karte/offline/fonts/{fontstack}/{range}.pbf');
     expect(style.sprite).toBe('/api/karte/offline/sprites/basemap');
   });
-  it('bindet eine Vektor-Source mit dem Tile-Template', () => {
-    const src = style.sources.basemap;
+  it('bindet je Region eine region-adressierte Vektor-Source basemap-{id}', () => {
+    const src = style.sources['basemap-7'];
     expect(src.type).toBe('vector');
-    expect(src.tiles[0]).toContain('/api/karte/offline/tiles/{z}/{x}/{y}');
+    expect(src.tiles[0]).toContain('/api/karte/offline/7/tiles/{z}/{x}/{y}');
   });
-  it('rendert Shortbread-Layer inkl. Ortslabels mit name_de', () => {
+  it('genau ein gemeinsamer Hintergrund-Layer (nicht je Region)', () => {
+    const bg = style.layers.filter((l) => l.type === 'background');
+    expect(bg).toHaveLength(1);
+    expect(bg[0].id).toBe('hintergrund');
+  });
+  it('rendert Shortbread-Layer (region-suffixiert) inkl. Ortslabels mit name_de', () => {
     const ids = style.layers.map((l) => l.id);
-    expect(ids).toContain('wasser');
-    expect(ids).toContain('strassen_haupt');
-    const orte = style.layers.find((l) => l.id === 'orte');
+    expect(ids).toContain('wasser-7');
+    expect(ids).toContain('strassen_haupt-7');
+    const orte = style.layers.find((l) => l.id === 'orte-7');
     expect(orte?.['source-layer']).toBe('place_labels');
     expect(orte?.layout?.['text-field']).toEqual(['coalesce', ['get', 'name_de'], ['get', 'name']]);
   });
@@ -168,7 +231,7 @@ describe('offlineStyle (Shortbread)', () => {
     const wasserLinien = style.layers.find((l) => l['source-layer'] === 'water_lines');
     expect(wasserLinien?.type).toBe('line');
     // Flächen-Wasser bleibt ein Fill.
-    const wasserFlaeche = style.layers.find((l) => l.id === 'wasser');
+    const wasserFlaeche = style.layers.find((l) => l.id === 'wasser-7');
     expect(wasserFlaeche?.['source-layer']).toBe('water_polygons');
     expect(wasserFlaeche?.type).toBe('fill');
   });
@@ -189,5 +252,10 @@ describe('offlineStyle (Shortbread)', () => {
     ]) {
       expect(sourceLayers.has(erwartet)).toBe(true);
     }
+  });
+  it('alle Layer verweisen auf ihre region-adressierte Source (basemap-7)', () => {
+    const geo = style.layers.filter((l) => l.type !== 'background') as Array<{ source?: string }>;
+    expect(geo.length).toBeGreaterThan(0);
+    expect(geo.every((l) => l.source === 'basemap-7')).toBe(true);
   });
 });

@@ -122,12 +122,41 @@ pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {
             gruppe: Some(gruppe.into()),
         }
     }
+    // Deckungsgleich mit dem karten-service-Regionssatz (karten-service/src/regions.rs): DE, alle
+    // 16 Bundesländer, alle 9 Nachbarländer. Rein Offline-Erststart-Baseline — live kommt der Katalog
+    // übers Remote-Manifest (jeder echte Pin überschreibt hier per `name`). `ca_gb` ist eine grobe
+    // Schätzung, nach dem Bau durch die gemessene Größe ersetzt.
     vec![
         platzhalter("Deutschland (Shortbread)", "DE", "Deutschland", "germany", 3),
-        platzhalter("Bayern", "DE-BY", "Bundesländer", "bayern", 1),
+        // Bundesländer (ISO 3166-2:DE)
         platzhalter("Baden-Württemberg", "DE-BW", "Bundesländer", "baden-wuerttemberg", 1),
-        platzhalter("Nordrhein-Westfalen", "DE-NW", "Bundesländer", "nordrhein-westfalen", 1),
+        platzhalter("Bayern", "DE-BY", "Bundesländer", "bayern", 2),
+        platzhalter("Berlin", "DE-BE", "Bundesländer", "berlin", 1),
+        platzhalter("Brandenburg", "DE-BB", "Bundesländer", "brandenburg", 1),
+        platzhalter("Bremen", "DE-HB", "Bundesländer", "bremen", 1),
+        platzhalter("Hamburg", "DE-HH", "Bundesländer", "hamburg", 1),
+        platzhalter("Hessen", "DE-HE", "Bundesländer", "hessen", 1),
+        platzhalter("Mecklenburg-Vorpommern", "DE-MV", "Bundesländer", "mecklenburg-vorpommern", 1),
         platzhalter("Niedersachsen", "DE-NI", "Bundesländer", "niedersachsen", 1),
+        platzhalter("Nordrhein-Westfalen", "DE-NW", "Bundesländer", "nordrhein-westfalen", 2),
+        platzhalter("Rheinland-Pfalz", "DE-RP", "Bundesländer", "rheinland-pfalz", 1),
+        platzhalter("Saarland", "DE-SL", "Bundesländer", "saarland", 1),
+        platzhalter("Sachsen", "DE-SN", "Bundesländer", "sachsen", 1),
+        platzhalter("Sachsen-Anhalt", "DE-ST", "Bundesländer", "sachsen-anhalt", 1),
+        platzhalter("Schleswig-Holstein", "DE-SH", "Bundesländer", "schleswig-holstein", 1),
+        platzhalter("Thüringen", "DE-TH", "Bundesländer", "thueringen", 1),
+        // Nachbarländer Deutschlands
+        platzhalter("Österreich", "AT", "Nachbarländer", "austria", 1),
+        platzhalter("Belgien", "BE", "Nachbarländer", "belgium", 1),
+        platzhalter("Tschechien", "CZ", "Nachbarländer", "czech-republic", 1),
+        platzhalter("Dänemark", "DK", "Nachbarländer", "denmark", 1),
+        platzhalter("Frankreich", "FR", "Nachbarländer", "france", 4),
+        platzhalter("Luxemburg", "LU", "Nachbarländer", "luxembourg", 1),
+        platzhalter("Niederlande", "NL", "Nachbarländer", "netherlands", 1),
+        platzhalter("Polen", "PL", "Nachbarländer", "poland", 2),
+        platzhalter("Schweiz", "CH", "Nachbarländer", "switzerland", 1),
+        // Ganze Welt, Voll-Detail — wählbare Option, sehr groß.
+        platzhalter("Ganze Welt (Voll-Detail)", "WORLD", "Welt", "planet", 80),
     ]
 }
 
