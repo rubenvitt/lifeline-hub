@@ -697,6 +697,79 @@ fn fortschritt_werte(f: &Fortschritt) -> (i64, Option<i64>) {
 }
 
 /// GET /api/karte/offline-karten — alle Offline-Karten. Lesen: admin ODER Führungskraft (read-only).
+/// Ein passender Katalog-Eintrag für ein Update: gleicher `name`, andere (neuere) `url` — und
+/// **vollständig gepinnt/lieferbar** (echte URL + sha256). Ein ungebauter Platzhalter (TODO-URL)
+/// wird NIE als Update angeboten, sonst liefe „Aktualisieren" auf eine nicht-ladbare URL
+/// (LFH-206-Bugfix). Karten ohne `quell_url` (z. B. per eigener URL registriert) gelten als aktuell.
+fn finde_update_eintrag<'a>(
+    name: &str,
+    quell_url: Option<&str>,
+    katalog: &'a [OfflineKatalogEintrag],
+) -> Option<&'a OfflineKatalogEintrag> {
+    let qu = quell_url?;
+    katalog
+        .iter()
+        .find(|e| e.name == name && e.url != qu && crate::config::eintrag_ist_lieferbar(e))
+}
+
+#[cfg(test)]
+mod update_check_tests {
+    use super::*;
+
+    fn eintrag(name: &str, url: &str, sha256: Option<String>) -> OfflineKatalogEintrag {
+        OfflineKatalogEintrag {
+            name: name.into(), url: url.into(), region: "X".into(), groesse: 1_000,
+            lizenz: "© OSM (ODbL)".into(), kachel_schema: "shortbread".into(), quelle: "t".into(),
+            sha256, gruppe: None,
+        }
+    }
+
+    #[test]
+    fn kein_update_auf_ungebauten_platzhalter() {
+        // LFH-206: ein ungebauter TODO-Platzhalter (nicht lieferbar) darf NIE als Update erscheinen —
+        // sonst lädt „Aktualisieren" eine nicht-ladbare URL (der Bug, den Schweiz/NRW auslösten).
+        let katalog = vec![eintrag(
+            "Schweiz",
+            "https://TODO-karten-build-release/switzerland.shortbread.mbtiles",
+            None,
+        )];
+        assert!(finde_update_eintrag(
+            "Schweiz",
+            Some("https://mirror.example/switzerland.20260701.mbtiles"),
+            &katalog,
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn update_auf_lieferbaren_neueren_eintrag() {
+        let katalog = vec![eintrag(
+            "Schweiz",
+            "https://mirror.example/switzerland.20260706.mbtiles",
+            Some("a".repeat(64)),
+        )];
+        let hit = finde_update_eintrag(
+            "Schweiz",
+            Some("https://mirror.example/switzerland.20260701.mbtiles"),
+            &katalog,
+        );
+        assert_eq!(hit.map(|e| e.url.as_str()), Some("https://mirror.example/switzerland.20260706.mbtiles"));
+    }
+
+    #[test]
+    fn kein_update_bei_gleicher_url_oder_ohne_quelle() {
+        let katalog = vec![eintrag(
+            "Schweiz",
+            "https://mirror.example/switzerland.20260706.mbtiles",
+            Some("a".repeat(64)),
+        )];
+        // Gleiche URL → aktuell, kein Update.
+        assert!(finde_update_eintrag("Schweiz", Some("https://mirror.example/switzerland.20260706.mbtiles"), &katalog).is_none());
+        // Keine quell_url (eigene URL registriert) → gilt als aktuell.
+        assert!(finde_update_eintrag("Schweiz", None, &katalog).is_none());
+    }
+}
+
 pub async fn offline_liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -725,13 +798,12 @@ pub async fn offline_liste(
                 }
                 None => (None, None),
             };
-            // Update-Erkennung: gleicher Karten-Name, aber der Katalog führt eine andere URL als
-            // die installierte Quelle (= neuerer Build). Karten ohne quell_url / ohne Katalog-Treffer
-            // (z.B. eigene URL) gelten als aktuell.
-            let neuere = k
-                .quell_url
-                .as_ref()
-                .and_then(|qu| katalog.iter().find(|e| e.name == k.name && &e.url != qu));
+            // Update-Erkennung: gleicher Name, andere (neuere) URL — aber NUR gegen einen
+            // LIEFERBAREN Katalog-Eintrag (gepinnt, echte URL). Sonst böte ein ungebauter
+            // compiled-in Platzhalter (TODO-URL) sich als „Update" an und „Aktualisieren" liefe
+            // auf eine nicht-ladbare URL (LFH-206-Bugfix; tritt v.a. mit leerem Katalog-Cache nach
+            // Neustart auf, wo nur die compiled-in Platzhalter greifen).
+            let neuere = finde_update_eintrag(&k.name, k.quell_url.as_deref(), &katalog);
             OfflineKarteAntwort {
                 karte: k,
                 geladen,

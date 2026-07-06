@@ -806,10 +806,15 @@ async fn offline_abbrechen_ohne_laufenden_download_ist_404() {
 }
 
 #[tokio::test]
-async fn offline_liste_meldet_update_wenn_katalog_neuere_quelle_fuehrt() {
+async fn offline_liste_bietet_kein_update_auf_ungebauten_platzhalter() {
+    // LFH-206-Bugfix: eine real installierte Region, deren einziger Katalog-Treffer ein UNGEBAUTER
+    // TODO-Platzhalter ist (leerer Katalog-Cache → nur compiled-in), darf NICHT „Update verfügbar"
+    // melden — sonst lädt „Aktualisieren" eine nicht-ladbare URL (`https://TODO-karten-build-release/…`).
+    // Genau das trat auf: Schweiz/NRW im compiled-in-Katalog boten sich nach Neustart als Platzhalter-
+    // Update an. Die eigentliche Filterlogik (nur lieferbare Einträge) ist in `update_check_tests`
+    // unit-getestet; dieser Handler-Test ist clean-env-deterministisch (in einer Dev-Env mit
+    // erreichbarem Manifest kann ein echter Eintrag ein legitimes Update liefern — env-abhängig).
     let (app, cookie) = admin_app().await;
-    // Installiert mit ALTER Quell-URL, Name = Katalog-Name (Shortbread-DE-Eintrag, LFH-195) →
-    // Katalog führt eine andere URL als die installierte → Update erkannt.
     let res = anfrage(
         &app,
         "POST",
@@ -825,12 +830,8 @@ async fn offline_liste_meldet_update_wenn_katalog_neuere_quelle_fuehrt() {
 
     let liste = json(anfrage(&app, "GET", "/api/karte/offline-karten", Some(&cookie), None).await).await;
     let eintrag = &liste.as_array().unwrap()[0];
-    assert_eq!(eintrag["update_verfuegbar"], true);
-    assert_eq!(
-        eintrag["katalog_url"].as_str().unwrap(),
-        default_offline_katalog()[0].url,
-        "Katalog-URL zeigt auf den aktuellen Katalog-Eintrag"
-    );
+    assert_eq!(eintrag["update_verfuegbar"], false, "kein Update auf einen ungebauten Platzhalter");
+    assert!(eintrag["katalog_url"].is_null());
 }
 
 #[tokio::test]

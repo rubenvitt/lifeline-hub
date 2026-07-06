@@ -74,8 +74,9 @@ async fn effektiver_katalog_intern(
     }
     // Download-Katalog: nur tatsächlich LIEFERBARE Einträge (Pin + echte URL). Ungebaute compiled-in
     // Platzhalter (TODO-URL, kein Pin) erscheinen NICHT als ladbar — gebaut wird über „Region neu
-    // bauen", danach taucht die Region übers Manifest auf. Der Update-Check (`katalog_aus_cache`)
-    // nutzt bewusst weiter den vollen Katalog.
+    // bauen", danach taucht die Region übers Manifest auf. Der Update-Check (`offline_liste`) filtert
+    // EBENFALLS auf lieferbare Einträge (`finde_update_eintrag`), damit kein Platzhalter als „Update"
+    // angeboten wird und „Aktualisieren" nicht auf eine nicht-ladbare TODO-URL läuft (LFH-206).
     nur_lieferbare(katalog_aus_cache())
 }
 
