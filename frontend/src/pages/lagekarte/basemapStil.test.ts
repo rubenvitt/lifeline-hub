@@ -6,6 +6,7 @@ import {
   baueOnlineStyle,
   blindStyle,
   defaultModus,
+  loeseKartenTheme,
   offlineStyle,
 } from './basemapStil';
 import type { KarteServerConfig, OnlineStyle } from '../../api/karte';
@@ -110,6 +111,13 @@ describe('basemapStil', () => {
     expect(raster.sources.raster.tiles).toEqual(['/api/karte/offline/tiles/{z}/{x}/{y}?v=abc']);
   });
 
+  it('loeseKartenTheme: auto folgt dem App-Theme, explizite Wahl überschreibt', () => {
+    expect(loeseKartenTheme('auto', 'light')).toBe('light');
+    expect(loeseKartenTheme('auto', 'dark')).toBe('dark');
+    expect(loeseKartenTheme('dark', 'light')).toBe('dark'); // überschreibt hell → dunkel
+    expect(loeseKartenTheme('light', 'dark')).toBe('light'); // überschreibt dunkel → hell
+  });
+
   it('defaultModus: online (Liste nicht leer) vor offline vor blind', () => {
     expect(defaultModus(beides)).toBe('online');
     expect(defaultModus(nurOffline)).toBe('offline');
@@ -149,9 +157,37 @@ describe('offlineStyle (Shortbread)', () => {
   it('rendert Shortbread-Layer inkl. Ortslabels mit name_de', () => {
     const ids = style.layers.map((l) => l.id);
     expect(ids).toContain('wasser');
-    expect(ids).toContain('strassen');
+    expect(ids).toContain('strassen_haupt');
     const orte = style.layers.find((l) => l.id === 'orte');
     expect(orte?.['source-layer']).toBe('place_labels');
     expect(orte?.layout?.['text-field']).toEqual(['coalesce', ['get', 'name_de'], ['get', 'name']]);
+  });
+  it('rendert Linien-Gewässer (water_lines) als eigenen Line-Layer (LFH-197-Regression)', () => {
+    // Vorher fehlte water_lines komplett → Bäche/Flüsse/Gräben (Linien) blieben unsichtbar,
+    // nur breite water_polygons-Flächen kamen an.
+    const wasserLinien = style.layers.find((l) => l['source-layer'] === 'water_lines');
+    expect(wasserLinien?.type).toBe('line');
+    // Flächen-Wasser bleibt ein Fill.
+    const wasserFlaeche = style.layers.find((l) => l.id === 'wasser');
+    expect(wasserFlaeche?.['source-layer']).toBe('water_polygons');
+    expect(wasserFlaeche?.type).toBe('fill');
+  });
+  it('rendert das Meer (ocean) als Wasser-Fill (LFH-197-Regression)', () => {
+    // Vorher fehlte 'ocean' → Meere zeigten die Land-Hintergrundfarbe.
+    const ozean = style.layers.find((l) => l['source-layer'] === 'ocean');
+    expect(ozean?.type).toBe('fill');
+  });
+  it('deckt die Shortbread-Geometrie-Layer vollständig ab (keine stille Lücke mehr)', () => {
+    // Checkliste gegen die versatiles-Referenz: alle sichtbaren Geometrie-Layer müssen gestylt sein.
+    const sourceLayers = new Set(
+      style.layers.map((l) => l['source-layer']).filter((s): s is string => !!s),
+    );
+    for (const erwartet of [
+      'ocean', 'land', 'water_polygons', 'water_lines', 'buildings', 'streets',
+      'bridges', 'sites', 'boundaries', 'dam_polygons', 'dam_lines',
+      'pier_polygons', 'pier_lines', 'ferries', 'street_polygons',
+    ]) {
+      expect(sourceLayers.has(erwartet)).toBe(true);
+    }
   });
 });

@@ -25,7 +25,10 @@ import { useThemeMode } from '../theme/ThemeModeProvider';
 import { baueMarker, baueTaktischeMarker, baueLageMeldungMarker, type KarteMarker } from './lagekarte/marker';
 import { parsePolygon, parseGeometry, polygonZentroid } from './lagekarte/geo';
 import { baueTzProps } from './lagekarte/taktischesZeichen';
-import { baueBasemapStyle, aktuelleAttribution, type BasemapModus } from './lagekarte/basemapStil';
+import {
+  baueBasemapStyle, aktuelleAttribution, loeseKartenTheme,
+  type BasemapModus, type KartenThemeWahl,
+} from './lagekarte/basemapStil';
 import { waehleInitialeBasemap, liesLetzteBasemap, merkeLetzteBasemap } from './lagekarte/basemapAuswahl';
 import Kartenflaeche, { type ZoneFeature, type KartenHandle } from './lagekarte/Kartenflaeche';
 import Sidebar, { type LayerSichtbar, type PlatzierenPunktTyp } from './lagekarte/Sidebar';
@@ -90,6 +93,8 @@ export default function LagekartePage() {
   const [auswahl, setAuswahl] = useState<string | null>(null);
   const [basemap, setBasemap] = useState<BasemapModus | null>(null);
   const [onlineStilName, setOnlineStilName] = useState<string | null>(null);
+  // Karten-lokale Theme-Wahl (LFH-197): 'auto' folgt dem App-Theme, 'light'/'dark' überschreiben.
+  const [kartenTheme, setKartenTheme] = useState<KartenThemeWahl>('auto');
   const [flyToZiel, setFlyToZiel] = useState<{ lng: number; lat: number } | null>(null);
   const [layer, setLayer] = useState<LayerSichtbar>({
     einsatzort: true, uhs: true, schaden: true, einheit: true, fahrzeug: true, fuehrung: true, abschnitt: true, zone: true, lagemeldung: true,
@@ -208,21 +213,22 @@ export default function LagekartePage() {
   useEffect(() => {
     if (basemapInitiiertRef.current || !configQuery.data || einstellungenQuery.isLoading) return;
     basemapInitiiertRef.current = true;
-    const { modus, onlineView } = waehleInitialeBasemap(
+    const { modus, onlineView, kartenTheme: gemerktesTheme } = waehleInitialeBasemap(
       configQuery.data,
       liesLetzteBasemap(einsatzId),
       einstellungenQuery.data?.basemap_modus ?? null,
     );
     setBasemap(modus);
     setOnlineStilName(onlineView);
+    setKartenTheme(gemerktesTheme);
   }, [configQuery.data, einsatzId, einstellungenQuery.isLoading, einstellungenQuery.data]);
 
   // Jede Änderung der Kartenwahl pro Einsatz merken (erst nach der Initialisierung,
   // damit der gemerkte Wert nicht durch den transienten Default überschrieben wird).
   useEffect(() => {
     if (!basemapInitiiertRef.current || basemap == null) return;
-    merkeLetzteBasemap(einsatzId, { modus: basemap, onlineView: onlineStilName });
-  }, [basemap, onlineStilName, einsatzId]);
+    merkeLetzteBasemap(einsatzId, { modus: basemap, onlineView: onlineStilName, kartenTheme });
+  }, [basemap, onlineStilName, kartenTheme, einsatzId]);
 
   // Blob-URLs für Kartenbilder laden (und bei entfernten Bildern inkrementell revoken).
   // blobUrls bewusst NICHT in den deps: das Map-Objekt würde den Effekt endlos neu auslösen.
@@ -386,9 +392,11 @@ export default function LagekartePage() {
     return liste.find((s) => s.name === onlineStilName) ?? liste[0];
   }, [configQuery.data, onlineStilName]);
 
+  // Karten-lokale Wahl gegen das App-Theme auflösen ('auto' → App-Theme).
+  const kartenThemeEffektiv = loeseKartenTheme(kartenTheme, effektiv);
   const style = useMemo(
-    () => baueBasemapStyle(basemap ?? 'blind', effektiv, configQuery.data, onlineStil),
-    [basemap, effektiv, configQuery.data, onlineStil],
+    () => baueBasemapStyle(basemap ?? 'blind', kartenThemeEffektiv, configQuery.data, onlineStil),
+    [basemap, kartenThemeEffektiv, configQuery.data, onlineStil],
   );
 
   const fachebenenQueries: Record<FachebeneQuelle, typeof ninaQuery> = {
@@ -674,6 +682,8 @@ export default function LagekartePage() {
         onlineStyles={configQuery.data?.online_styles ?? []}
         onlineStilName={onlineStilName}
         onOnlineStilWechsel={setOnlineStilName}
+        kartenTheme={kartenTheme}
+        onKartenThemeWechsel={setKartenTheme}
         fachebenenSichtbar={fachebenenSichtbar}
         fachebenenStatus={fachebenenStatus}
         onFachebeneToggle={(k, an) => setFachebenenSichtbar((s) => ({ ...s, [k]: an }))}

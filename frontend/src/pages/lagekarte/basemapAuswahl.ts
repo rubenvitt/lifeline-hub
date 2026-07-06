@@ -1,12 +1,17 @@
 import type { KarteServerConfig } from '../../api/karte';
-import { defaultModus, type BasemapModus } from './basemapStil';
+import { defaultModus, type BasemapModus, type KartenThemeWahl } from './basemapStil';
 
-/** Pro Einsatz gemerkte Kartenwahl (Modus + Online-View). */
+/** Pro Einsatz gemerkte Kartenwahl (Modus + Online-View + Karten-Theme). */
 export interface GespeicherteBasemap {
   modus: BasemapModus;
   /** Name des Online-Views; nur für `modus === 'online'` relevant, sonst null. */
   onlineView: string | null;
+  /** Karten-lokale Theme-Wahl; 'auto' folgt dem App-Theme (LFH-197). */
+  kartenTheme: KartenThemeWahl;
 }
+
+const kartenThemeGueltig = (w: unknown): w is KartenThemeWahl =>
+  w === 'auto' || w === 'light' || w === 'dark';
 
 /**
  * Wählt die initiale Kartenwahl für den Einstieg in die Lagekarte.
@@ -43,7 +48,9 @@ export function waehleInitialeBasemap(
       ? config.online_styles[0].name
       : null;
 
-  return { modus, onlineView };
+  const kartenTheme = kartenThemeGueltig(gespeichert?.kartenTheme) ? gespeichert.kartenTheme : 'auto';
+
+  return { modus, onlineView, kartenTheme };
 }
 
 const schluessel = (einsatzId: number) => `basemap:letzteAuswahl:${einsatzId}`;
@@ -64,7 +71,11 @@ export function liesLetzteBasemap(einsatzId: number): GespeicherteBasemap | null
     if (!roh) return null;
     const wert = JSON.parse(roh) as Partial<GespeicherteBasemap>;
     if (wert.modus !== 'online' && wert.modus !== 'offline' && wert.modus !== 'blind') return null;
-    return { modus: wert.modus, onlineView: typeof wert.onlineView === 'string' ? wert.onlineView : null };
+    return {
+      modus: wert.modus,
+      onlineView: typeof wert.onlineView === 'string' ? wert.onlineView : null,
+      kartenTheme: kartenThemeGueltig(wert.kartenTheme) ? wert.kartenTheme : 'auto',
+    };
   } catch {
     return null;
   }

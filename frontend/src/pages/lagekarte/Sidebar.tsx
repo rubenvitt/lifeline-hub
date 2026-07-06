@@ -2,7 +2,7 @@ import { Badge, Button, Card, Empty, List, Popconfirm, Radio, Select, Slider, Sp
 import { AimOutlined, DeleteOutlined, FullscreenOutlined, UploadOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import type { KarteMarker, NichtVerortet } from './marker';
-import type { BasemapModus } from './basemapStil';
+import type { BasemapModus, KartenThemeWahl } from './basemapStil';
 import type { OnlineStyle } from '../../api/karte';
 import type { ZoneTyp } from '../../api/types';
 import type { ZeichenModus } from './zeichnen';
@@ -73,6 +73,9 @@ export interface SidebarProps {
   onlineStyles: OnlineStyle[];
   onlineStilName: string | null;
   onOnlineStilWechsel: (name: string) => void;
+  /** Karten-lokale Theme-Wahl (Offline-Basemap): 'auto' folgt dem App-Theme. */
+  kartenTheme: KartenThemeWahl;
+  onKartenThemeWechsel: (wahl: KartenThemeWahl) => void;
   fachebenenSichtbar: import('./fachebenenAuswahl').FachebenenSichtbar;
   onFachebeneToggle: (key: import('../../api/fachebenen').FachebeneQuelle, an: boolean) => void;
   /** Status je Fachebene für Ausgrau-/Offline-Hinweis. */
@@ -501,6 +504,26 @@ export default function Sidebar(props: SidebarProps) {
             onChange={(name) => props.onOnlineStilWechsel(name)}
             options={props.onlineStyles.map((s) => ({ label: s.name, value: s.name }))}
           />
+        )}
+        {props.basemap === 'offline' && (
+          <div style={{ marginTop: 8 }}>
+            <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>
+              Karten-Design
+            </Typography.Text>
+            <Radio.Group
+              value={props.kartenTheme}
+              onChange={(e) => props.onKartenThemeWechsel(e.target.value as KartenThemeWahl)}
+              optionType="button"
+              size="small"
+              aria-label="Karten-Design"
+            >
+              <Tooltip title="folgt dem App-Design">
+                <Radio.Button value="auto">Auto</Radio.Button>
+              </Tooltip>
+              <Radio.Button value="light">Hell</Radio.Button>
+              <Radio.Button value="dark">Dunkel</Radio.Button>
+            </Radio.Group>
+          </div>
         )}
         {props.basemap === 'blind' && (
           <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0, fontSize: 12 }}>

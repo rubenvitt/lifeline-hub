@@ -37,6 +37,8 @@ const basisProps: SidebarProps = {
   onlineStyles: [],
   onlineStilName: null,
   onOnlineStilWechsel: vi.fn(),
+  kartenTheme: 'auto',
+  onKartenThemeWechsel: vi.fn(),
   fachebenenSichtbar: { nina: false, dwd: false, pegelonline: false, kritis: false },
   onFachebeneToggle: vi.fn(),
   fachebenenStatus: {},
@@ -144,6 +146,21 @@ describe('Sidebar Bild-Hintergründe', () => {
     expect(screen.getByRole('button', { name: /Mittelpunkt setzen/i })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: /^Fertig$/i }));
     expect(onBildPlatzierenFertig).toHaveBeenCalled();
+  });
+
+  it('zeigt den Karten-Design-Umschalter nur im Offline-Modus und meldet die Wahl', () => {
+    const onKartenThemeWechsel = vi.fn();
+    const { rerender } = renderMitProviders(
+      <Sidebar {...basisProps} basemap="online" onlineVerfuegbar onKartenThemeWechsel={onKartenThemeWechsel} />,
+    );
+    // Online: kein Karten-Design-Umschalter.
+    expect(screen.queryByRole('radiogroup', { name: /Karten-Design/i })).not.toBeInTheDocument();
+    // Offline: Umschalter da, Klick auf „Dunkel" meldet 'dark'.
+    rerender(
+      <Sidebar {...basisProps} basemap="offline" offlineVerfuegbar kartenTheme="auto" onKartenThemeWechsel={onKartenThemeWechsel} />,
+    );
+    fireEvent.click(screen.getByRole('radio', { name: /Dunkel/i }));
+    expect(onKartenThemeWechsel).toHaveBeenCalledWith('dark');
   });
 
   it('benennt ein Bild über die Inline-Bearbeitung um', () => {
