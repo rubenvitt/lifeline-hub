@@ -12,11 +12,13 @@ export interface Zeichnung {
   starten: (modus: ZeichenModus) => void;
   stoppen: () => void;
   zerstoeren: () => void;
+  /** Native terra-draw-Finish-Geste (Enter) auslösen. terra-draw ignoriert zu wenige Punkte selbst. */
+  abschliessen: () => void;
 }
 
 /**
  * Aktiviert Polygon- oder Linien-Zeichnen; ruft `onFertig` mit der gezeichneten Geometry auf.
- * Persistenz übernimmt die App; das Roh-Feature wird nach `finish` entfernt.
+ * Persistenz übernimmt die App; das Roh-Feature bleibt sichtbar, bis `stoppen()` es räumt.
  */
 export function createZeichnung(
   map: maplibregl.Map,
@@ -35,13 +37,9 @@ export function createZeichnung(
     } else if (f && f.geometry.type === 'LineString') {
       onFertig({ type: 'LineString', coordinates: f.geometry.coordinates as number[][] });
     }
-    // Roh-Feature aufräumen; Persistenz übernimmt die App.
-    draw.removeFeatures(
-      draw
-        .getSnapshot()
-        .map((x) => x.id)
-        .filter((i): i is NonNullable<typeof i> => i != null),
-    );
+    // Kein sofortiges removeFeatures mehr: der abgeschlossene Entwurf bleibt sichtbar, bis
+    // die App das Zeichnen beendet (`stoppen()` räumt via `draw.clear()` auf) — nötig, damit
+    // die Speicher-Bestätigung die Geometrie zeigt (LFH-145).
   });
   return {
     starten: (modus) => {
@@ -49,10 +47,23 @@ export function createZeichnung(
       draw.setMode(MODUS_NAME[modus]);
     },
     stoppen: () => {
-      if (draw.enabled) draw.stop();
+      if (draw.enabled) {
+        // Entwurf (in-progress ODER abgeschlossen-aber-unbestätigt) verwerfen, dann stoppen.
+        draw.clear();
+        draw.stop();
+      }
     },
     zerstoeren: () => {
       if (draw.enabled) draw.stop();
+    },
+    abschliessen: () => {
+      // terra-draw hat keine öffentliche finish()-API. Der native Abschluss läuft über die
+      // Finish-Taste (default 'Enter'); terra-draw registriert seine Key-Listener auf
+      // map.getCanvas(). Wir feuern die Geste synthetisch. Zu wenige Punkte ignoriert
+      // terra-draw selbst (kein finish-Event) — dann bleibt der Nutzer im Zeichnen-Modus.
+      const el = map.getCanvas();
+      el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      el.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true }));
     },
   };
 }
