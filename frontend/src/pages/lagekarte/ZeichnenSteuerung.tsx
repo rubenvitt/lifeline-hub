@@ -50,7 +50,7 @@ export default function ZeichnenSteuerung(props: ZeichnenSteuerungProps) {
               <Button type="primary" loading={props.speichernLaeuft} onClick={props.onSpeichern}>
                 Speichern
               </Button>
-              <Button onClick={props.onVerwerfen}>Verwerfen</Button>
+              <Button disabled={props.speichernLaeuft} onClick={props.onVerwerfen}>Verwerfen</Button>
             </Space>
           </>
         ) : (

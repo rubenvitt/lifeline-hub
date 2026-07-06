@@ -46,15 +46,18 @@ describe('ZeichnenSteuerung', () => {
 
   it('Phase bestaetigen: zeigt Speichern/Verwerfen', async () => {
     const p = setup({ phase: 'bestaetigen' });
+    expect(screen.getByRole('button', { name: 'Verwerfen' })).toBeEnabled();
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(p.onSpeichern).toHaveBeenCalledTimes(1);
     await userEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
     expect(p.onVerwerfen).toHaveBeenCalledTimes(1);
   });
 
-  it('Phase bestaetigen mit speichernLaeuft: Speichern zeigt Loading', () => {
+  it('Phase bestaetigen mit speichernLaeuft: Speichern zeigt Loading, Verwerfen ist deaktiviert', () => {
     setup({ phase: 'bestaetigen', speichernLaeuft: true });
     // antd Button loading rendert eine Spinner-Struktur; Button bleibt im DOM.
     expect(screen.getByRole('button', { name: /Speichern/ })).toHaveClass('ant-btn-loading');
+    // M-B (Review-Fix): Verwerfen darf während des Speicherns nicht klickbar sein.
+    expect(screen.getByRole('button', { name: 'Verwerfen' })).toBeDisabled();
   });
 });

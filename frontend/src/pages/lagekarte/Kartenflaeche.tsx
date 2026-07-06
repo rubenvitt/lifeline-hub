@@ -68,6 +68,10 @@ export interface KartenflaecheProps {
   zonen?: ZoneFeature[];
   /** Zonen-Zeichenmodus (Polygon/Linie) aktiv. */
   zoneZeichnen?: ZeichenModus | null;
+  /** Monoton steigend bei jedem Zonen-Zeichnen-Start; erzwingt ein Re-Fire des Effekts auch bei
+   *  gleich bleibendem Modus (Zone→Zone mit gleichem Polygon-Modus), damit starten() einen
+   *  offenen Entwurf verwirft. */
+  zoneZeichnenNonce?: number;
   /** Callback nach abgeschlossenem Zeichnen einer Zone. */
   onZoneGezeichnet?: (geometrie: GeoJsonGeometry) => void;
   /** Klick auf eine Zone → Inspector. */
@@ -104,7 +108,7 @@ export interface KartenHandle {
 const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kartenflaeche({
   style, markers, onKarteKlick, onMarkerKlick, flyToZiel, onStyleFehler, attribution,
   flaechen, zeichnen, onFlaecheGezeichnet, onFlaecheKlick,
-  zonen, zoneZeichnen, onZoneGezeichnet, onZoneKlick,
+  zonen, zoneZeichnen, zoneZeichnenNonce, onZoneGezeichnet, onZoneKlick,
   fachebenen, onBboxAenderung, onZoomAenderung, onFachebeneKlick,
   bilder, platzierBild, onPlatzierGeometrie,
 }, ref) {
@@ -681,7 +685,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     } else if (zoneDrawRef.current) {
       zoneDrawRef.current.stoppen();
     }
-  }, [zoneZeichnen]);
+    // zoneZeichnenNonce wird hier nicht gelesen — sie erzwingt bewusst ein Re-Fire bei
+    // gleich bleibendem Modus (Zone→Zone-Wechsel), damit starten() einen offenen Entwurf verwirft.
+  }, [zoneZeichnen, zoneZeichnenNonce]);
 
   // Controller bei Unmount sauber zerstören.
   useEffect(() => () => {

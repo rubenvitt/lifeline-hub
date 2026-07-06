@@ -95,6 +95,11 @@ export default function LagekartePage() {
   const [zoneBestaetigung, setZoneBestaetigung] =
     useState<{ typ: ZoneTyp; modus: ZeichenModus; farbe?: string; geometrie: GeoJsonGeometry } | null>(null);
   const [zoneSpeichern, setZoneSpeichern] = useState(false);
+  // Monoton steigend bei jedem Zonen-Zeichnen-Start (LFH-145 M-A): erzwingt ein Re-Fire
+  // des Kartenflaeche-Zonen-Effekts auch bei gleich bleibendem Modus (z. B. Zone→Zone mit
+  // Gefahrengebiet→Absperrbereich, beides Polygon), damit starten() einen offenen,
+  // unbestätigten Entwurf verwirft statt ihn beim nächsten Zeichnen als Orphan liegen zu lassen.
+  const [zoneZeichnenNonce, setZoneZeichnenNonce] = useState(0);
   const [zoneAuswahl, setZoneAuswahl] = useState<number | null>(null);
   const [auswahl, setAuswahl] = useState<string | null>(null);
   const [basemap, setBasemap] = useState<BasemapModus | null>(null);
@@ -691,6 +696,7 @@ export default function LagekartePage() {
         onZoneZeichnenStart={(entwurf) => {
           setZoneEntwurf(entwurf);
           setZoneBestaetigung(null); // neuer Entwurf beendet eine evtl. hängende Bestätigung
+          setZoneZeichnenNonce((n) => n + 1);
           setZoneAuswahl(null);
           setZeichneAbschnittId(null);
           setPlatzierungZiel(null);
@@ -771,6 +777,7 @@ export default function LagekartePage() {
           }}
           zonen={zonenFeatures}
           zoneZeichnen={zoneEntwurf ? zoneEntwurf.modus : null}
+          zoneZeichnenNonce={zoneZeichnenNonce}
           onZoneKlick={(id) => {
             setZoneAuswahl(id);
             setAuswahl(null);
