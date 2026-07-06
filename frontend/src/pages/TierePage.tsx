@@ -6,7 +6,6 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { legeTierAn, listeTiere, tierRegistrierAnzeige, type TierEingabe } from '../api/einsatzTier';
 import { ApiError } from '../api/client';
 import { tiereDetailPfad } from '../routing/deeplinks';
-import { useTiereStream } from '../etb/useTiereStream';
 import type { Spezies, Tier, TierStatus } from '../api/types';
 
 const STATUS_META: Record<TierStatus, { label: string; color: string }> = {
@@ -49,8 +48,8 @@ export default function TierePage() {
   const [sicht, setSicht] = useState<Sicht>('aktiv');
   const [speziesFilter, setSpeziesFilter] = useState<Spezies | undefined>(undefined);
 
-  useTiereStream(einsatzId);
-
+  // Tier-Liste wird über den konsolidierten Einsatz-Live-Stream (useEinsatzLiveStream
+  // im EinsatzLayout, `tier`-Event → 'einsatz-tiere') live gehalten — LFH-75.
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const tiereQuery = useQuery({ queryKey: ['einsatz-tiere', einsatzId], queryFn: () => listeTiere(einsatzId) });
 

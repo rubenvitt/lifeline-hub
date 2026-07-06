@@ -448,10 +448,11 @@ git commit -m "feat(fe): neuesterLagebericht für Lage-Dashboard (LFH-47)"
 
 ## Task 5: `verdichteTiere`, `verdichteUhs`, `verdichteSchaeden`
 
-> **Hinweis Tiere nicht live:** `useEinsatzLiveStream` kennt kein `tier`-Event und invalidiert
-> `einsatz-tiere` nicht (Backend-Lücke). Die Tiere-Kachel aktualisiert sich nur bei Mount/Refetch,
-> nicht in Echtzeit. Das ist bewusst nicht Teil dieses Tasks (bräuchte ein Backend-`tier`-Event).
-> Alle übrigen Kacheln sind live.
+> **Hinweis Tiere nicht live (erledigt via LFH-75):** War ursprünglich nicht Teil dieses Tasks —
+> `useEinsatzLiveStream` kannte kein `tier`-Event, die Tiere-Kachel aktualisierte sich nur bei
+> Mount/Refetch. Mit LFH-75 lauscht `useEinsatzLiveStream` nun auf `tier` und invalidiert
+> `einsatz-tiere` (das Backend publizierte das `tier`-Event bereits); die Tiere-Kachel ist jetzt
+> live wie alle übrigen.
 
 **Files:**
 - Modify: `frontend/src/pages/lage-dashboard/lageVerdichtung.ts`

@@ -8,7 +8,6 @@ import { listeTiere, tierRegistrierAnzeige } from '../api/einsatzTier';
 import { listeSchaeden, schadenRegistrierAnzeige } from '../api/einsatzSchaden';
 import { ApiError } from '../api/client';
 import { SK_META, STATUS_META } from '../personen/personMeta';
-import { useTiereStream } from '../etb/useTiereStream';
 import { useSchaedenStream } from '../etb/useSchaedenStream';
 import type { PersonDetail, PersonStatus, PersonZugriff, Schaden, Sichtungskategorie, Spezies, Tier, Verbleib, VerbleibArt } from '../api/types';
 import { parseRouteId, personenPfad, schadenDetailPfad, tiereDetailPfad } from '../routing/deeplinks';
@@ -143,7 +142,10 @@ export default function PersonenDetailPage() {
     onSuccess: invalidateDetail, onError: fehler,
   });
 
-  useTiereStream(einsatzId);
+  // Der „Zugeordnete Tiere"-Block wird über den konsolidierten Einsatz-Live-Stream
+  // (useEinsatzLiveStream im EinsatzLayout, `tier`-Event → 'einsatz-tiere') live
+  // gehalten; der Prefix-Match deckt den ['einsatz-tiere', einsatzId, 'halter', …]-Key
+  // mit ab — LFH-75.
   useSchaedenStream(einsatzId);
 
   // Deeplink-Robustheit (LFH-25): strukturell ungültige Personen-ID → zurück zur Liste,

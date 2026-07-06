@@ -79,7 +79,7 @@ Aggregation** vorhandener Queries. Query-Keys **müssen identisch** zu denen in
 | SK-Split | `einsatz-personen` | Zählung je `aktuelle_sichtung`; `tot`/`unverletzt` separat |
 | **Vermisst** (Leitzahl) | `einsatz-personen` | `status === 'vermisst'` |
 | Personen-Status | `einsatz-personen` | Zählung je `status` |
-| Tiere | `einsatz-tiere` | Zählung je `status` (aktiv/vermisst/abgeschlossen). **Nicht live** (s. u.) |
+| Tiere | `einsatz-tiere` | Zählung je `status` (aktiv/vermisst/abgeschlossen). Live seit LFH-75 |
 | UHS (Anzahl + Status) | `einsatz-uhs` | Zählung gesamt + je Status. **Keine Platz-Belegung** (vermeidet N+1) |
 | Schäden | `einsatz-schaeden` | Zählung je Status (offen/uebergeben/abgeschlossen); `offen` als Leitzahl |
 | **Höchste Warnstufe** (Leitzahl) | `gefahrenmatrix` | Maximum ordinal `keine<niedrig<mittel<hoch<akut` |
@@ -108,10 +108,10 @@ Aggregation** vorhandener Queries. Query-Keys **müssen identisch** zu denen in
   „Stand HH:MM"-Indikator.
 - **Eine SSE-Verbindung pro Einsatz** (Pflicht, HTTP/1.1-6-Limit) — `useEinsatzLiveStream` deckt
   das ab; keine zusätzlichen EventSource-Streams öffnen.
-- **Tiere nicht live**: `useEinsatzLiveStream` kennt kein `tier`-Event und invalidiert
-  `einsatz-tiere` nicht (Backend-Lücke). Die Tiere-Zahl aktualisiert sich daher nur bei
-  Mount/Refetch, nicht in Echtzeit. Bewusst nicht im Scope dieses Tasks — bräuchte ein
-  Backend-`tier`-Event; bis dahin ist das Cockpit für alle übrigen Kacheln live, für Tiere nicht.
+- **Tiere live (seit LFH-75)**: Ursprünglich nicht im Scope dieses Tasks — `useEinsatzLiveStream`
+  kannte kein `tier`-Event, die Tiere-Zahl aktualisierte sich nur bei Mount/Refetch. Mit LFH-75
+  lauscht der Hook auf `tier` und invalidiert `einsatz-tiere` (das Backend publizierte das
+  `tier`-Event bereits); das Cockpit ist nun für alle Kacheln inkl. Tiere live.
 - **Leerzustand** (neuer Einsatz, null Daten): Nullzahlen bzw. „—" dezent, **kein Sonder-Layout**.
   Wirkt wie ein sauberes leeres Cockpit, nicht kaputt.
 - **Fehler-Resilienz**: Einsatz-Stammdaten sind der Anker — schlägt diese Query fehl,

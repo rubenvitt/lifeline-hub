@@ -40,8 +40,6 @@ export default function LageDashboardPage() {
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   // Query-Keys IDENTISCH zu den vom Live-Hook (useEinsatzLiveStream) invalidierten Keys.
   const personenQuery = useQuery({ queryKey: ['einsatz-personen', einsatzId], queryFn: () => listePersonen(einsatzId) });
-  // Hinweis: useEinsatzLiveStream kennt KEIN 'tier'-Event → 'einsatz-tiere' wird nicht live
-  // invalidiert (Backend-Lücke). Die Tiere-Zahl aktualisiert sich nur bei Mount/Refetch.
   const tiereQuery = useQuery({ queryKey: ['einsatz-tiere', einsatzId], queryFn: () => listeTiere(einsatzId) });
   const uhsQuery = useQuery({ queryKey: ['einsatz-uhs', einsatzId], queryFn: () => listeUhs(einsatzId) });
   const schaedenQuery = useQuery({ queryKey: ['einsatz-schaeden', einsatzId], queryFn: () => listeSchaeden(einsatzId) });
