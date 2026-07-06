@@ -304,16 +304,39 @@ async fn config_endpoint_meldet_verfuegbarkeit() {
     assert_eq!(res.status(), StatusCode::OK);
     let v = json(res).await;
     assert_eq!(v["offline_verfuegbar"].as_bool(), Some(true));
-    // offline_tiles_url trägt jetzt einen Cache-Bust-Token (?v=<sha256|geaendert_at>), damit
-    // MapLibre bei Karten-Wechsel nicht den alten Tile-Aufbau unter gleicher URL cacht
-    // (LFH-181). Token ist dynamisch → Präfix prüfen.
+    // offline_tiles_url ist jetzt REGION-ADRESSIERT (LFH-188, Kompat = erste sichtbare Region):
+    // /api/karte/offline/{id}/tiles/{z}/{x}/{y}?v=<Token> — Token dynamisch, id dynamisch.
     let offline_tiles_url = v["offline_tiles_url"].as_str().unwrap();
     assert!(
-        offline_tiles_url.starts_with("/api/karte/offline/tiles/{z}/{x}/{y}?v="),
-        "offline_tiles_url mit Cache-Bust-Token erwartet, war: {offline_tiles_url}"
+        offline_tiles_url.starts_with("/api/karte/offline/")
+            && offline_tiles_url.contains("/tiles/{z}/{x}/{y}?v="),
+        "region-adressierte offline_tiles_url mit Cache-Bust-Token erwartet, war: {offline_tiles_url}"
     );
+    // offline_regionen ist die Quelle der Wahrheit (LFH-188): genau die eine bereite Region, maxzoom 14.
+    let regionen = v["offline_regionen"].as_array().unwrap();
+    assert_eq!(regionen.len(), 1, "genau die eine bereite Region");
+    assert_eq!(regionen[0]["maxzoom"].as_u64(), Some(14), "Regional-Pack maxzoom 14");
+    assert!(regionen[0]["tiles_url"].as_str().unwrap().contains("/tiles/{z}/{x}/{y}?v="));
     assert_eq!(v["online_styles"][0]["url"].as_str(), Some("https://tiles.example/style.json"));
     assert_eq!(v["online_styles"][0]["typ"].as_str(), Some("vektor"));
+}
+
+/// Der statische `welt`-Tile-Pfad muss VOR der dynamischen `{karte_id}`-Route greifen (LFH-207) —
+/// sonst würde „welt" am i64-Extractor scheitern (422) und die eingebettete Welt-Übersicht nie laden.
+/// Ohne eingebettetes/extrahiertes Asset liefert der Handler `204` (Datei fehlt), NICHT `422`.
+#[tokio::test]
+async fn welt_tiles_route_greift_und_ist_204_ohne_asset() {
+    let app = app_mit_pool(pool().await);
+    let req = Request::builder()
+        .uri("/api/karte/offline/welt/tiles/2/1/1")
+        .body(Body::empty())
+        .unwrap();
+    let res = app.oneshot(req).await.unwrap();
+    assert_eq!(
+        res.status(),
+        StatusCode::NO_CONTENT,
+        "welt-Route muss greifen (204 ohne Asset), nicht 422 am karte_id-Extractor"
+    );
 }
 
 #[tokio::test]
