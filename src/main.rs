@@ -69,6 +69,9 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     // und beim Start anlegen — die Tile-Auslieferung löst relative Pfade dagegen auf.
     let karten_dir = lifeline_hub::config::default_karten_dir(&config.db_path);
     std::fs::create_dir_all(&karten_dir)?;
+    // Optionale eingebettete Welt-Übersicht (LFH-207) einmalig nach karten_dir extrahieren, BEVOR
+    // Tiles ausgeliefert werden. Graceful: ohne eingebettetes Asset ein No-op.
+    lifeline_hub::karte::assets::extrahiere_welt_uebersicht(&karten_dir);
 
     // Crash-Recovery (LFH-181): hängende 'laedt'-Downloads auf 'fehler' setzen und verwaiste
     // .part-Dateien löschen — gespawnte Download-Tasks überleben keinen Neustart.

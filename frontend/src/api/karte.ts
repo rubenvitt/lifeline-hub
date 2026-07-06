@@ -20,6 +20,8 @@ export interface OfflineRegion {
   attribution: string | null;
   /** `'raster'` (png/jpg/webp) oder sonst Shortbread-Vektor. */
   format: OnlineStyleTyp;
+  /** Maximaler Zoom der Vector-Source: Regional-Packs 14, die Welt-Übersicht 6 (LFH-207). */
+  maxzoom?: number;
 }
 
 /** Was die Karte zur Laufzeit über die Basemap-Verfügbarkeit wissen muss. */

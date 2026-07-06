@@ -57,7 +57,15 @@ pub struct OfflineRegionConfig {
     pub attribution: Option<String>,
     /// `"vektor"` (pbf) oder `"raster"` (png/jpg/webp) — steuert die Style-Wahl je Region.
     pub format: String,
+    /// Maximaler Zoom der Vector-Source: Regional-Packs `14` (Shortbread-Voll-Detail), die
+    /// Welt-Übersicht `6` (Low-Zoom-Basis, LFH-207) → MapLibre überzoomt sie darüber als Kontext.
+    pub maxzoom: u32,
 }
+
+/// Voll-Detail-Maxzoom der Regional-Packs (Shortbread z2–14).
+const REGION_MAXZOOM: u32 = 14;
+/// Maxzoom der Welt-Übersicht (Low-Zoom-Basis) — darüber überzoomt MapLibre sie als groben Kontext.
+const WELT_MAXZOOM: u32 = 6;
 
 /// GET /api/karte/config — Basemap-Verfügbarkeit fürs Frontend, frisch aus der DB-Registry.
 pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAntwort>, AppError> {
@@ -88,7 +96,7 @@ pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAnt
     // Multi-Region (LFH-188): die Offline-Karte ist die Vereinigung ALLER bereiten Regionen. Je
     // Region ein region-adressierter Tile-Endpoint mit eigenem Cache-Bust-Token; das Frontend bindet
     // je Region eine eigene Vector-Source. Kein Datei-Open — Werte sind operator-deklariert (LFH-185).
-    let offline_regionen: Vec<OfflineRegionConfig> = repo::sichtbare_offline_karten(&state.pool)
+    let mut offline_regionen: Vec<OfflineRegionConfig> = repo::sichtbare_offline_karten(&state.pool)
         .await?
         .into_iter()
         .map(|r| {
@@ -100,9 +108,26 @@ pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAnt
                 name: r.name,
                 attribution: r.lizenz,
                 format: grob_format(&r.format).to_string(),
+                maxzoom: REGION_MAXZOOM,
             }
         })
         .collect();
+    // Welt-Übersicht (LFH-207): falls eingebettet, IMMER als unterste Basis-Ebene voranstellen
+    // (Low-Zoom z2–6). Damit ist die Karte global nie leer; die Regional-Packs (maxzoom 14) zeichnen
+    // sich mit Straßendetail darüber. `karte_id: 0` ist synthetisch (DB-ids ≥ 1 → kollisionsfrei).
+    if let Some(version) = crate::karte::assets::welt_uebersicht_version() {
+        offline_regionen.insert(
+            0,
+            OfflineRegionConfig {
+                karte_id: 0,
+                name: "Welt-Übersicht".into(),
+                tiles_url: format!("/api/karte/offline/welt/tiles/{{z}}/{{x}}/{{y}}?v={version}"),
+                attribution: Some("© OpenStreetMap contributors (ODbL)".into()),
+                format: "vektor".into(),
+                maxzoom: WELT_MAXZOOM,
+            },
+        );
+    }
     // Kompat-Felder (LFH-188): erste sichtbare Region, damit alte Clients degradieren.
     let erste = offline_regionen.first();
     let offline_tiles_url = erste.map(|r| r.tiles_url.clone());
@@ -159,6 +184,17 @@ pub async fn offline_tiles_region(
         return Ok(StatusCode::NO_CONTENT.into_response());
     };
     serve_offline_tile(&state, &pfad_rel, &format, z, x, y).await
+}
+
+/// GET /api/karte/offline/welt/tiles/{z}/{x}/{y} — Kachel der eingebetteten Welt-Übersicht
+/// (Low-Zoom-Basis, LFH-207), beim Start nach `karten_dir/welt-uebersicht.mbtiles` extrahiert.
+/// `204`, wenn keine Welt-Übersicht eingebettet/extrahiert ist (dann fehlt die Datei → serve_offline_tile
+/// liefert über den Containment-Check ohnehin 204). Immer Vektor (`pbf`, Shortbread).
+pub async fn offline_welt_tiles(
+    State(state): State<AppState>,
+    Path((z, x, y)): Path<(i64, i64, i64)>,
+) -> Result<Response, AppError> {
+    serve_offline_tile(&state, crate::karte::assets::WELT_UEBERSICHT_DATEI, "pbf", z, x, y).await
 }
 
 /// Liest eine Kachel aus einer relativen MBTiles-Datei unter `karten_dir` und baut die Antwort.

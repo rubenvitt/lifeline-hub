@@ -7,6 +7,47 @@
 #[folder = "assets/karten/"]
 pub struct KartenAssets;
 
+// --- Optionale eingebettete Welt-Übersicht (Low-Zoom-Basis, LFH-207) ---
+// Eine kleine, grob aufgelöste Welt (z2–6, Shortbread-MBTiles) wird — falls eingebettet — IMMER
+// offline als unterste Basis-Ebene mitgezeichnet, sodass die Lagekarte nie leer ist und Regional-
+// Packs sich mit Straßendetail darüberlegen. Der Operator erzeugt sie via
+// `karten-build/gen-world-overview.sh` und checkt sie unter `assets/karten/welt/` ein; fehlt sie
+// (Standard), ist die App voll funktionsfähig — nur ohne globale Basis-Ebene.
+
+/// Dateiname der extrahierten Welt-Übersicht unter `karten_dir`.
+pub const WELT_UEBERSICHT_DATEI: &str = "welt-uebersicht.mbtiles";
+/// Embed-Pfad der optionalen Welt-Übersicht.
+const WELT_EMBED_PFAD: &str = "welt/welt-uebersicht.mbtiles";
+
+/// Ist eine Welt-Übersicht eingebettet? Dann wird sie immer offline als unterste Basis gezeichnet.
+pub fn welt_uebersicht_eingebettet() -> bool {
+    KartenAssets::get(WELT_EMBED_PFAD).is_some()
+}
+
+/// Cache-Bust-Token der Welt-Übersicht (Hex-Präfix des Embed-sha256), oder `None` wenn nicht eingebettet.
+/// Wechselt bei einer neuen Welt-Version → MapLibre lädt die Kacheln frisch (kein Stale-Cache).
+pub fn welt_uebersicht_version() -> Option<String> {
+    KartenAssets::get(WELT_EMBED_PFAD)
+        .map(|f| f.metadata.sha256_hash().iter().take(8).map(|b| format!("{b:02x}")).collect())
+}
+
+/// Extrahiert die eingebettete Welt-Übersicht (falls vorhanden) nach
+/// `<karten_dir>/welt-uebersicht.mbtiles`. Graceful (kein Asset → no-op) und idempotent (schreibt
+/// nur, wenn die Zieldatei fehlt oder die Größe abweicht). Beim Serverstart aufgerufen, BEVOR Tiles
+/// ausgeliefert werden → kein Reader-Cache-Bruch (der Reader-Cache ist zu diesem Zeitpunkt leer).
+pub fn extrahiere_welt_uebersicht(karten_dir: &std::path::Path) {
+    let Some(embedded) = KartenAssets::get(WELT_EMBED_PFAD) else {
+        return;
+    };
+    let ziel = karten_dir.join(WELT_UEBERSICHT_DATEI);
+    if std::fs::metadata(&ziel).map(|m| m.len()).ok() == Some(embedded.data.len() as u64) {
+        return; // schon aktuell
+    }
+    if let Err(e) = std::fs::write(&ziel, &embedded.data) {
+        tracing::warn!("Welt-Übersicht konnte nicht extrahiert werden: {e}");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -49,5 +90,18 @@ mod tests {
             "basemap.png wirkt wie 1×1-Placeholder ({} Bytes) — echtes CC0-Sprite via gen-assets.sh",
             f.data.len()
         );
+    }
+
+    #[test]
+    fn welt_uebersicht_extraktion_graceful_und_idempotent() {
+        // Ohne „nie eingebettet" hart zu verdrahten (bricht sonst, sobald der Operator das Asset
+        // einspielt): geprüft wird die Invariante „Datei genau dann, wenn eingebettet" + Idempotenz.
+        let tmp = tempfile::tempdir().unwrap();
+        extrahiere_welt_uebersicht(tmp.path());
+        let existiert = tmp.path().join(WELT_UEBERSICHT_DATEI).exists();
+        assert_eq!(existiert, welt_uebersicht_eingebettet(), "Datei genau dann, wenn eingebettet");
+        assert_eq!(welt_uebersicht_version().is_some(), welt_uebersicht_eingebettet());
+        // Zweiter Aufruf panickt nicht (idempotent).
+        extrahiere_welt_uebersicht(tmp.path());
     }
 }

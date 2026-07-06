@@ -368,6 +368,12 @@ pub fn build_router(state: AppState) -> Router {
             "/api/karte/offline/tiles/{z}/{x}/{y}",
             get(routes::karte::offline_tiles),
         )
+        // Eingebettete Welt-Übersicht (LFH-207, Low-Zoom-Basis): statischer „welt"-Pfad VOR der
+        // dynamischen {karte_id}-Route (axum priorisiert statisch, hier zusätzlich explizit voran).
+        .route(
+            "/api/karte/offline/welt/tiles/{z}/{x}/{y}",
+            get(routes::karte::offline_welt_tiles),
+        )
         // Region-adressierter Tile-Endpoint (LFH-188, Multi-Region): je sichtbarer Region eine
         // eigene Vector-Source; N Regionen werden gemeinsam gezeichnet.
         .route(

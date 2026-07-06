@@ -69,7 +69,9 @@ export function offlineStyle(theme: KartenTheme, regionen: OfflineRegion[]): Sty
     // 0 Tiles. (Siehe absolutiereProxyAnfrage + Memory [[maplibre-rootrelative-url-worker]].) Der
     // global verdrahtete transformRequest (absolutiereProxyAnfrage, Kartenflaeche.tsx) absolutiert
     // die substituierte Kachel-/Glyph-/Sprite-URL im Worker gegen die Origin.
-    sources[src] = { type: 'vector', tiles: [r.tiles_url], minzoom: 0, maxzoom: 14, attribution: '© OpenStreetMap contributors' };
+    // maxzoom je Region: Regional-Packs 14, die Welt-Übersicht 6 (LFH-207) — darüber überzoomt
+    // MapLibre die grobe Welt als Kontext, während Regional-Packs oben scharfes Detail liefern.
+    sources[src] = { type: 'vector', tiles: [r.tiles_url], minzoom: 0, maxzoom: r.maxzoom ?? 14, attribution: '© OpenStreetMap contributors' };
     layers.push(...regionLayers(f, src, `-${r.karte_id}`));
   }
   return {

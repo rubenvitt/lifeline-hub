@@ -258,4 +258,12 @@ describe('offlineStyle (Shortbread, Multi-Region)', () => {
     expect(geo.length).toBeGreaterThan(0);
     expect(geo.every((l) => l.source === 'basemap-7')).toBe(true);
   });
+  it('per-Region maxzoom: Welt-Übersicht 6, Regional-Pack Default 14 (LFH-207)', () => {
+    const s = offlineStyle('light', [
+      { karte_id: 0, name: 'Welt-Übersicht', tiles_url: '/api/karte/offline/welt/tiles/{z}/{x}/{y}?v=w', attribution: 'ODbL', format: 'vektor', maxzoom: 6 },
+      region(7),
+    ]) as { sources: Record<string, { maxzoom: number }> };
+    expect(s.sources['basemap-0'].maxzoom).toBe(6);
+    expect(s.sources['basemap-7'].maxzoom).toBe(14); // ohne maxzoom → Default 14
+  });
 });

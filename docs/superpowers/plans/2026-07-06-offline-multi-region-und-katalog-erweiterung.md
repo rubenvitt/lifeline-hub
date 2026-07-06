@@ -54,15 +54,23 @@ risikoärmerer Schnitt, erfüllt „alle automatisch gemeinsam" vollständig. Ei
 
 ## Stufe 2 — Welt
 
-- **Übersicht** = Region `gruppe:"Welt"`, Low-Zoom (z2–6), Flag `basis:true` ⇒ Client lädt sie
-  automatisch beim ersten Online-Kontakt (analog `aktiviere_wenn_keine_aktive`) + zeichnet sie
-  immer mit.
-- **Welt-Build-Spike (offen):** Das versatiles-planetiler-Image (archiviert 2026-06-20)
-  exponiert nur `--area`, KEINEN Maxzoom/Bbox. Empfehlung: z2–6 aus einem fertigen
-  versatiles-Planet-Download extrahieren (`DELETE FROM tiles WHERE zoom_level>6` + re-checksum)
-  statt 300 GB selbst zu prozessieren; Alternative = rohes Planetiler `--maxzoom 6`.
-- **Voll-Detail-Planet** = `regions.rs`-Zeile (`geofabrik_area:"planet"`) + degenerierte
+- **Voll-Detail-Planet (erledigt)** = `regions.rs`-Zeile (`geofabrik_area:"planet"`) + degenerierte
   Validate-Box, im Katalog als „sehr groß" markiert. Bauen = Ops (300 GB / ~70–80 GB Download).
+- **Welt-Übersicht — EINGEBETTET (LFH-207, Nutzer-Wahl „in die App eingebettet"):** eine kleine
+  z2–6-Shortbread-Welt liegt (falls vorhanden) unter `assets/karten/welt/welt-uebersicht.mbtiles`
+  und wird via bestehendes `KartenAssets`-rust-embed ins Binary eingebettet — **graceful-optional**
+  (fehlt sie, ist die App voll funktionsfähig). Umgesetzt:
+  - `src/karte/assets.rs`: `extrahiere_welt_uebersicht` (Startup, `main.rs`, idempotent),
+    `welt_uebersicht_eingebettet` / `welt_uebersicht_version` (Cache-Bust aus Embed-sha256).
+  - `src/routes/karte.rs`: Config **prependet** die synthetische Welt-Region (`karte_id:0`,
+    `maxzoom:6`) als unterste Basis, wenn eingebettet; `offline_welt_tiles`-Endpoint serviert die
+    extrahierte Datei über `serve_offline_tile`. `OfflineRegionConfig.maxzoom` (Regional=14, Welt=6).
+  - Frontend: `OfflineRegion.maxzoom` → `offlineStyle` setzt die Source-Maxzoom je Region (MapLibre
+    überzoomt die Welt darüber als Kontext).
+- **Verbleibender Operator-Schritt:** das z2–6-Welt-Asset EINMAL erzeugen via
+  `karten-build/gen-world-overview.sh` (strippt hohe Zoomstufen aus einer Planet-Shortbread-MBTiles
+  — das archivierte Image kann keinen Maxzoom, Voll-Selbstbau wäre 300 GB) + einchecken + Backend
+  neu bauen. Danach ist die Welt-Übersicht automatisch immer offline präsent.
 
 ## Gates
 - Rust: `cargo test -p <crate>` (Repo ist NICHT rustfmt-clean, clippy -D warnings vorbestehend
