@@ -8,7 +8,6 @@ import { listeTiere, tierRegistrierAnzeige } from '../api/einsatzTier';
 import { listeSchaeden, schadenRegistrierAnzeige } from '../api/einsatzSchaden';
 import { ApiError } from '../api/client';
 import { SK_META, STATUS_META } from '../personen/personMeta';
-import { useSchaedenStream } from '../etb/useSchaedenStream';
 import type { PersonDetail, PersonStatus, PersonZugriff, Schaden, Sichtungskategorie, Spezies, Tier, Verbleib, VerbleibArt } from '../api/types';
 import { parseRouteId, personenPfad, schadenDetailPfad, tiereDetailPfad } from '../routing/deeplinks';
 
@@ -142,11 +141,11 @@ export default function PersonenDetailPage() {
     onSuccess: invalidateDetail, onError: fehler,
   });
 
-  // Der „Zugeordnete Tiere"-Block wird über den konsolidierten Einsatz-Live-Stream
-  // (useEinsatzLiveStream im EinsatzLayout, `tier`-Event → 'einsatz-tiere') live
-  // gehalten; der Prefix-Match deckt den ['einsatz-tiere', einsatzId, 'halter', …]-Key
-  // mit ab — LFH-75.
-  useSchaedenStream(einsatzId);
+  // Die „Zugeordnete Tiere/Schäden"-Blöcke werden über den konsolidierten Einsatz-Live-
+  // Stream (useEinsatzLiveStream im EinsatzLayout) live gehalten: `tier`→'einsatz-tiere'
+  // (LFH-75), `schaden`→'einsatz-schaeden' (LFH-206). Der Prefix-Match deckt die
+  // Drawer-Keys ['einsatz-tiere', …, 'halter', personId] bzw.
+  // ['einsatz-schaeden', …, 'geschaedigt', personId] mit ab.
 
   // Deeplink-Robustheit (LFH-25): strukturell ungültige Personen-ID → zurück zur Liste,
   // statt mit NaN aussichtslos zu laden. Steht nach allen Hooks (Rules-of-Hooks).

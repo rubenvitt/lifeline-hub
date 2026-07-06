@@ -25,7 +25,6 @@ import {
   type SchadenEingabe,
 } from '../api/einsatzSchaden';
 import type { Ausmass, Schaden, SchadenStatus, SchadenTyp } from '../api/types';
-import { useSchaedenStream } from '../etb/useSchaedenStream';
 import GeschaedigtPicker, { type GeschaedigtWert } from './schaeden/GeschaedigtPicker';
 import { AUSMASS_META, STATUS_META, TYP_LABEL, geschaedigtAnzeige, geschaedigtFelder } from './schaeden/schadenHelfer';
 
@@ -55,8 +54,8 @@ export default function SchaedenPage() {
   // Geschädigt ist ein strukturierter Wert → lokaler State (kein Form.Item).
   const [erfassGeschaedigt, setErfassGeschaedigt] = useState<GeschaedigtWert>(null);
 
-  useSchaedenStream(einsatzId);
-
+  // Schaden-Liste wird über den konsolidierten Einsatz-Live-Stream (useEinsatzLiveStream
+  // im EinsatzLayout, `schaden`-Event → 'einsatz-schaeden') live gehalten — LFH-206.
   const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
   const schaedenQuery = useQuery({
     queryKey: ['einsatz-schaeden', einsatzId],

@@ -154,7 +154,7 @@ describe('useEinsatzLiveStream', () => {
     });
   });
 
-  it('invalidiert einsatz-tiere auch im lagged-Fallback (LFH-75)', async () => {
+  it('invalidiert einsatz-tiere und einsatz-schaeden im lagged-Fallback (LFH-75/206)', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();
     const spy = vi.spyOn(client, 'invalidateQueries');
@@ -166,7 +166,28 @@ describe('useEinsatzLiveStream', () => {
     FakeEventSource.letzte?.emit('lagged');
     await waitFor(() => {
       const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+      // Reconnect/Overflow ist die einzige verbleibende Absicherung, seit die dedizierten
+      // useTiereStream (LFH-75) / useSchaedenStream (LFH-206) entfernt wurden.
       expect(calls).toContainEqual(['einsatz-tiere', 3]);
+      expect(calls).toContainEqual(['einsatz-schaeden', 3]);
+    });
+  });
+
+  // LFH-206: pinnt, dass der konsolidierte Stream `einsatz-schaeden` live hält —
+  // Voraussetzung dafür, den dedizierten useSchaedenStream (2. EventSource) zu entfernen.
+  it('invalidiert einsatz-schaeden bei schaden-Event (LFH-206)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={3} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit('schaden');
+    await waitFor(() => {
+      const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+      expect(calls).toContainEqual(['einsatz-schaeden', 3]);
     });
   });
 });
