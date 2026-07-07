@@ -99,7 +99,6 @@ export default function HalterPicker({ einsatzId, value = null, onChange }: Prop
 
   return (
     <Select
-      showSearch
       allowClear
       placeholder="Betroffene Person (R-Nr.) oder externer Kontakt …"
       style={{ width: '100%' }}
@@ -107,8 +106,7 @@ export default function HalterPicker({ einsatzId, value = null, onChange }: Prop
       // Anzeige-Label aus dem Wert ableiten (extern hat keine bleibende Option nach Such-Reset).
       labelRender={() => aktuellesLabel ?? ''}
       // Eigene Filterung (useMemo) — antd-Filter würde die synthetische Freitext-Option verstecken.
-      filterOption={false}
-      onSearch={setSuche}
+      showSearch={{ filterOption: false, onSearch: setSuche }}
       options={optionen}
       loading={personenQuery.isLoading}
       onChange={(_val, option) => {

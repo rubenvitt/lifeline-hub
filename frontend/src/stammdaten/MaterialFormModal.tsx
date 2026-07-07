@@ -93,9 +93,10 @@ export default function MaterialFormModal({
             options={kategorien.map((k) => ({ value: k }))}
             allowClear
             placeholder="z. B. Betreuung, Sanität, Hochwasser"
-            filterOption={(input, option) =>
-              (option?.value ?? '').toLowerCase().includes(input.toLowerCase())
-            }
+            showSearch={{
+              filterOption: (input, option) =>
+                (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
+            }}
           />
         </Form.Item>
         <Form.Item label="Bestandsnummer" name="bestandsnummer">

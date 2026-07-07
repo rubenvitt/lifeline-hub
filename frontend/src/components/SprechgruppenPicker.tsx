@@ -74,7 +74,7 @@ export default function SprechgruppenPicker({ einsatzId, value = [], onChange }:
         options={gruppen}
         placeholder="Sprechgruppen auswählen"
         style={{ width: '100%' }}
-        optionFilterProp="label"
+        showSearch={{ optionFilterProp: 'label' }}
         allowClear
       />
 

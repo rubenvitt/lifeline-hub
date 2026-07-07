@@ -118,7 +118,7 @@ export default function PersonalFormModal({
             options={vorschlaege.traegerorganisation.map((t) => ({ value: t }))}
             allowClear
             placeholder="z. B. DRK Musterstadt"
-            filterOption={(input, option) => (option?.value ?? '').toLowerCase().includes(input.toLowerCase())}
+            showSearch={{ filterOption: (input, option) => (option?.value ?? '').toLowerCase().includes(input.toLowerCase()) }}
           />
         </Form.Item>
         <Form.Item label="Telefon" name="telefon"><Input /></Form.Item>
@@ -126,10 +126,10 @@ export default function PersonalFormModal({
           <Select allowClear placeholder="optional" options={POSITION_OPTIONEN} />
         </Form.Item>
         <Form.Item label="Qualifikationen" name="qualifikation_ids">
-          <Select mode="multiple" allowClear options={qualOptionen} optionFilterProp="label" placeholder="Qualifikationen wählen" />
+          <Select mode="multiple" allowClear options={qualOptionen} showSearch={{ optionFilterProp: 'label' }} placeholder="Qualifikationen wählen" />
         </Form.Item>
         <Form.Item label="Benutzer-Konto (optional)" name="benutzer_id">
-          <Select allowClear showSearch options={benutzerOptionen} optionFilterProp="label" placeholder="kein Konto verknüpft" />
+          <Select allowClear showSearch={{ optionFilterProp: 'label' }} options={benutzerOptionen} placeholder="kein Konto verknüpft" />
         </Form.Item>
         <Form.Item label="Bemerkung" name="bemerkung"><Input.TextArea rows={2} /></Form.Item>
       </Form>

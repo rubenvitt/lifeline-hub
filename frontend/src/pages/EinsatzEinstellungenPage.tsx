@@ -330,9 +330,10 @@ export default function EinsatzEinstellungenPage() {
             allowClear
             options={ZEITZONEN_OPTIONEN}
             placeholder="Europe/Berlin (Standard)"
-            filterOption={(eingabe, option) =>
-              (option?.value ?? '').toLowerCase().includes(eingabe.toLowerCase())
-            }
+            showSearch={{
+              filterOption: (eingabe, option) =>
+                (option?.value ?? '').toLowerCase().includes(eingabe.toLowerCase()),
+            }}
           />
         </Form.Item>
         <Form.Item

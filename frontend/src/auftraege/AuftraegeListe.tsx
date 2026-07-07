@@ -208,7 +208,6 @@ export default function AuftraegeListe({ einsatzId, darfSchreiben }: {
           value={empfFilter}
           onChange={(v) => setEmpfFilter(v ?? undefined)}
           options={empfaengerOptionen}
-          optionFilterProp="label"
         />
       </div>
       {ansicht === 'offen' ? (

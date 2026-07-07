@@ -193,7 +193,7 @@ export default function EinsatzabschnittePage() {
                   <TreeSelect allowClear placeholder="Übergeordneter Abschnitt" treeData={parentOptionen} />
                 </Form.Item>
                 <Form.Item label="Abschnittsleiter" name="leiter_id">
-                  <Select allowClear showSearch optionFilterProp="label" placeholder="Disponierte Person" options={personalOptionen} />
+                  <Select allowClear showSearch={{ optionFilterProp: 'label' }} placeholder="Disponierte Person" options={personalOptionen} />
                 </Form.Item>
                 <Form.Item label="Sprechgruppen" name="sprechgruppe_ids">
                   <SprechgruppenPicker einsatzId={einsatzId} />

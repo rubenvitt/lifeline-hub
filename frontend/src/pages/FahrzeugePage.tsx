@@ -118,11 +118,10 @@ function BesatzungsBlock({
       )}
       {darfSchreiben && (
         <Select
-          showSearch
           style={{ width: '100%', maxWidth: 420, marginTop: 8 }}
           placeholder="Kraft zur Besatzung …"
           value={null}
-          optionFilterProp="label"
+          showSearch={{ optionFilterProp: 'label' }}
           notFoundContent="Keine freien Kräfte"
           options={frei.map((p) => ({ value: p.id, label: p.name }))}
           onSelect={(epId) => onZuordnen(Number(epId))}
@@ -310,12 +309,11 @@ export default function FahrzeugePage() {
         {darfSchreiben && (
           <Space>
             <Select
-              showSearch
               style={{ minWidth: 260 }}
               placeholder="Stamm-Fahrzeug disponieren …"
               value={null}
               options={poolOptionen}
-              optionFilterProp="label"
+              showSearch={{ optionFilterProp: 'label' }}
               notFoundContent="Keine freien Fahrzeuge"
               onSelect={(fahrzeugId) => { if (fahrzeugId != null) disponiereMutation.mutate(fahrzeugId); }}
             />

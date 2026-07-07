@@ -95,12 +95,11 @@ export default function MitgliederPanel({ einsatzId, istAktiv, offen, onClose }:
       {istAktiv && (
         <Space style={{ marginBottom: 16 }} wrap>
           <Select
-            showSearch
             placeholder="Benutzer …"
             style={{ width: 200 }}
             value={neuerBenutzer}
             options={verfuegbar.map((b) => ({ value: b.id, label: b.anzeigename }))}
-            optionFilterProp="label"
+            showSearch={{ optionFilterProp: 'label' }}
             onChange={(v) => setNeuerBenutzer(v)}
             notFoundContent={
               benutzerQuery.error instanceof ApiError && benutzerQuery.error.status === 403

@@ -187,7 +187,6 @@ export default function MeldungKarte({
             value={m.bearbeiter_id ?? undefined}
             onChange={(v) => onZuweisen(m.id, v ?? null)}
             options={(mitglieder ?? []).map((mi) => ({ value: mi.benutzer_id, label: mi.anzeigename }))}
-            optionFilterProp="label"
             aria-label={`Bearbeiter für Meldung ${m.lfd_nr}`}
           />
         ) : (

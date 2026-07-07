@@ -180,9 +180,10 @@ export default function GlobalEinstellungenPage() {
             allowClear
             options={ZEITZONEN_OPTIONEN}
             placeholder="Europe/Berlin (Fallback)"
-            filterOption={(eingabe, option) =>
-              (option?.value ?? '').toLowerCase().includes(eingabe.toLowerCase())
-            }
+            showSearch={{
+              filterOption: (eingabe, option) =>
+                (option?.value ?? '').toLowerCase().includes(eingabe.toLowerCase()),
+            }}
           />
         </Form.Item>
         <Form.Item label="Zeitformat" name="zeitformat">

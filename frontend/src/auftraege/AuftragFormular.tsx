@@ -139,7 +139,7 @@ export default function AuftragFormular({ senden, abschnitte, einheiten, onAnleg
               mode="multiple"
               options={zielOptionen}
               placeholder="Abschnitte / Einheiten wählen"
-              optionFilterProp="label"
+              showSearch={{ optionFilterProp: 'label' }}
               allowClear
             />
           </Form.Item>

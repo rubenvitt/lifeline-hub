@@ -114,9 +114,10 @@ export default function FahrzeugFormModal({
             options={vorschlaege.fahrzeugtyp.map((t) => ({ value: t }))}
             allowClear
             placeholder="z. B. LF 20, RTW"
-            filterOption={(input, option) =>
-              (option?.value ?? '').toLowerCase().includes(input.toLowerCase())
-            }
+            showSearch={{
+              filterOption: (input, option) =>
+                (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
+            }}
           />
         </Form.Item>
         <Form.Item label="Trägerorganisation" name="traegerorganisation">
@@ -124,9 +125,10 @@ export default function FahrzeugFormModal({
             options={vorschlaege.traegerorganisation.map((t) => ({ value: t }))}
             allowClear
             placeholder="z. B. Feuerwehr Musterstadt"
-            filterOption={(input, option) =>
-              (option?.value ?? '').toLowerCase().includes(input.toLowerCase())
-            }
+            showSearch={{
+              filterOption: (input, option) =>
+                (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
+            }}
           />
         </Form.Item>
         <Form.Item label="Kennzeichen" name="kennzeichen"><Input /></Form.Item>
@@ -136,9 +138,10 @@ export default function FahrzeugFormModal({
             options={vorschlaege.standort.map((t) => ({ value: t }))}
             allowClear
             placeholder="z. B. Wache Mitte"
-            filterOption={(input, option) =>
-              (option?.value ?? '').toLowerCase().includes(input.toLowerCase())
-            }
+            showSearch={{
+              filterOption: (input, option) =>
+                (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
+            }}
           />
         </Form.Item>
         <Form.Item label="FMS-ISSI" name="fms_issi"><Input /></Form.Item>

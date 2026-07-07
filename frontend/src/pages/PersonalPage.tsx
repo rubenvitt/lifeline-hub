@@ -204,12 +204,11 @@ export default function PersonalPage() {
         {darfSchreiben && (
           <Space>
             <Select
-              showSearch
               style={{ minWidth: 260 }}
               placeholder="Person aus Pool disponieren …"
               value={null}
               options={poolOptionen}
-              optionFilterProp="label"
+              showSearch={{ optionFilterProp: 'label' }}
               notFoundContent="Keine freien Personen"
               onSelect={(personalId) => { if (personalId != null) disponiereMutation.mutate(personalId); }}
             />

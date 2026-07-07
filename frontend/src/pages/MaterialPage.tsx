@@ -196,12 +196,11 @@ export default function MaterialPage() {
         {darfSchreiben && (
           <Space>
             <Select
-              showSearch
               style={{ minWidth: 260 }}
               placeholder="Stamm-Material wählen …"
               value={poolAuswahl}
               options={poolOptionen}
-              optionFilterProp="label"
+              showSearch={{ optionFilterProp: 'label' }}
               notFoundContent="Kein Material im Dienst"
               onChange={(v) => setPoolAuswahl(v ?? null)}
             />

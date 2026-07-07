@@ -66,8 +66,7 @@ export default function BezugDialog({
           <Select
             options={objektOptionen}
             disabled={!typ}
-            showSearch
-            optionFilterProp="label"
+            showSearch={{ optionFilterProp: 'label' }}
             notFoundContent={typ ? 'Keine Objekte' : 'Zuerst Typ wählen'}
           />
         </Form.Item>

@@ -149,7 +149,6 @@ export default function GeschaedigtPicker({ einsatzId, orgName, value = null, on
 
   return (
     <Select
-      showSearch
       allowClear
       placeholder="Person, Einsatzkraft, eigene Organisation oder Freitext …"
       style={{ width: '100%' }}
@@ -157,8 +156,7 @@ export default function GeschaedigtPicker({ einsatzId, orgName, value = null, on
       // Anzeige-Label aus dem Wert ableiten (extern hat keine Option im value-Key-Sinn).
       labelRender={() => aktuellesLabel ?? ''}
       // Eigene Filterung (useMemo) — antd-Filter würde die synthetische Freitext-Option verstecken.
-      filterOption={false}
-      onSearch={setSuche}
+      showSearch={{ filterOption: false, onSearch: setSuche }}
       options={optionen}
       loading={personenQuery.isLoading || personalQuery.isLoading}
       onChange={(_val, option) => {

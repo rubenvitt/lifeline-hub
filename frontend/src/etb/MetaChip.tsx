@@ -49,9 +49,10 @@ export default function MetaChip({ feld, editing, wert, optionen, onCommit, onCa
             // Klick auf Vorschlag feuert nur onChange → onSelect committet sofort.
             onSelect={(v) => onCommit(feld, v)}
             options={optionen.map((o) => ({ value: o }))}
-            filterOption={(input, option) =>
-              (option?.value ?? '').toLowerCase().includes(input.toLowerCase())
-            }
+            showSearch={{
+              filterOption: (input, option) =>
+                (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') { if (text.trim()) onCommit(feld, text.trim()); else onCancel(feld); }
               if (e.key === 'Escape') onCancel(feld);
