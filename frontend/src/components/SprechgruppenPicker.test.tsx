@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import SprechgruppenPicker from './SprechgruppenPicker';
@@ -37,6 +37,22 @@ describe('SprechgruppenPicker', () => {
     // Optionen erscheinen erst beim Öffnen; '412' anklicken → ids = [1]
     await userEvent.click(await screen.findByText('412'));
     expect(onChange).toHaveBeenCalledWith([1]);
+  });
+
+  it('filtert die Optionen beim Tippen nach Label (optionFilterProp im showSearch-Objekt, LFH-169)', async () => {
+    vi.mocked(listeEinsatzSprechgruppen).mockResolvedValue(MOCK_LISTE);
+    renderMitProviders(<SprechgruppenPicker einsatzId={5} value={[]} onChange={vi.fn()} />);
+
+    const select = screen.getByRole('combobox');
+    await userEvent.click(select);
+    // Vor dem Tippen sind beide Sprechgruppen als Option sichtbar.
+    expect(await screen.findByText('412')).toBeInTheDocument();
+    expect(screen.getByText('DMO 31')).toBeInTheDocument();
+
+    // Tippen filtert per Label: '412' matcht nur die eine Option, 'DMO 31' verschwindet.
+    await userEvent.type(select, '412');
+    expect(await screen.findByText('412')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('DMO 31')).not.toBeInTheDocument());
   });
 
   it('legt eine einsatz-lokale Sprechgruppe an und hakt sie an (ohne Form-Submit/Reload)', async () => {
