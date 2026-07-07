@@ -25,8 +25,13 @@ export function useQueryParamSelektion(
     if (!bereit) return;
     const id = parseRouteId(searchParams.get(key) ?? undefined);
     if (id != null) anwenden(id);
-    searchParams.delete(key);
-    setSearchParams(searchParams, { replace: true });
+    // searchParams NICHT in-place mutieren, sondern klonen: die vom Router gelieferte
+    // Instanz ist über Render/Effekt hinweg geteilt — ein in-place delete ließe einen
+    // konkurrierenden Default-Effekt den Param bereits geräumt sehen und das Deeplink-Ziel
+    // wegdefaulten (Root-Cause aus LFH-150, Präzedenz-Fix in GefahrenPage.tsx). LFH-156.
+    const geraeumt = new URLSearchParams(searchParams);
+    geraeumt.delete(key);
+    setSearchParams(geraeumt, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, setSearchParams, key, bereit]);
 }
