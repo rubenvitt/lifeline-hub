@@ -1048,16 +1048,17 @@ mod tests {
     // ein No-op → `DROP TABLE uhs` würde eingehende FKs (uhs_platz ON DELETE CASCADE,
     // person_uhs_belegung NOT NULL) gefährden (stille Daten-Vernichtung oder Deploy-Blockade).
     //
-    // Dieser Test verifiziert, dass nach allen Migrationen (test_pool() spielt 0001–0062
-    // ein) die `uhs`-Tabelle mit ihren eingehenden FKs korrekt nutzbar ist: Einfügen
+    // Dieser Test verifiziert, dass nach allen Migrationen (test_pool() spielt die volle
+    // Kette bis zur neuesten Migration ein, inkl. des 0082-Rebuilds) die `uhs`-Tabelle mit
+    // ihren eingehenden FKs korrekt nutzbar ist: Einfügen
     // von uhs + uhs_platz + person_uhs_belegung und Lesen aller drei Zeilen beweist, dass
     // das Schema FK-konsistent ist.
     //
-    // HINWEIS: Der DB-CHECK erlaubt 'bereitstellungsraum' weiterhin (CHECK-Nachzug
-    // zurückgestellt); das Verbot ist in UhsTyp::parse() auf Applikationsebene durchgesetzt.
-    // Dieser Test prüft die CHECK-Ablehnung daher NICHT — das würde fälschlicherweise
-    // fehlschlagen. Regression-Absicherung des CHECK-Nachzugs muss nach dem sqlx-Upgrade
-    // ergänzt werden.
+    // HINWEIS: Zum Zeitpunkt von 0062 erlaubte der DB-CHECK 'bereitstellungsraum' noch
+    // (Verbot nur in UhsTyp::parse() auf Applikationsebene); dieser Test prüft daher NUR
+    // die FK-Integrität, nicht die CHECK-Ablehnung. Der CHECK-Nachzug erfolgt in Migration
+    // 0082 (sqlx 0.9 honoriert `-- no-transaction`); dessen Regression steht in
+    // migration_0082_uhs_typ_check_ohne_bereitstellungsraum.
     #[tokio::test]
     async fn migration_0062_uhs_fk_integritaet_nach_datenbereinigung() {
         let pool = test_pool().await;
@@ -1127,5 +1128,221 @@ mod tests {
             sqlx::query_scalar("SELECT COUNT(*) FROM person_uhs_belegung WHERE uhs_id = ?")
                 .bind(uhs_id).fetch_one(&pool).await.unwrap();
         assert_eq!(belegung_count, 1, "person_uhs_belegung-Zeile muss FK auf uhs tragen");
+    }
+
+    // --- Migration 0082: uhs-typ-CHECK ohne 'bereitstellungsraum' (LFH-119 / LFH-174) ---
+    //
+    // Nachzug zu 0062: der FK-sichere no-tx-Rebuild (sqlx 0.9 honoriert `-- no-transaction`)
+    // zieht den DB-CHECK eng nach, sodass 'bereitstellungsraum' auch auf DB-Ebene abgelehnt
+    // wird (Defense-in-Depth zusätzlich zu UhsTyp::parse). Der Test verifiziert zugleich, dass
+    // der Rebuild die eingehenden FKs (uhs_platz, person_uhs_belegung), die Zusatzspalten
+    // (lat/lon aus 0034) und die beiden Indizes erhält.
+    #[tokio::test]
+    async fn migration_0082_uhs_typ_check_ohne_bereitstellungsraum() {
+        let pool = test_pool().await;
+
+        // Minimale Stammdaten (alle NOT-NULL-FKs von uhs).
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Test-Orga')")
+            .execute(&pool).await.unwrap();
+        let benutzer_id: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'Leiter', 'leiter', 'hash') RETURNING id",
+        )
+        .fetch_one(&pool).await.unwrap();
+        let einsatz_id: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Testlage') RETURNING id",
+        )
+        .fetch_one(&pool).await.unwrap();
+
+        // 1) Alle vier gültigen Typen werden akzeptiert.
+        for (i, typ) in ["patientenablage", "behandlungsplatz", "verletztensammelstelle", "sonstige"]
+            .iter()
+            .enumerate()
+        {
+            sqlx::query(
+                "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
+                 VALUES (?, ?, ?, ?, ?)",
+            )
+            .bind(einsatz_id)
+            .bind(typ)
+            .bind(format!("UHS {i}"))
+            .bind(benutzer_id)
+            .bind(benutzer_id)
+            .execute(&pool)
+            .await
+            .unwrap_or_else(|e| panic!("gültiger typ '{typ}' muss akzeptiert werden: {e}"));
+        }
+
+        // 2) Kern von LFH-119: Der CHECK lehnt 'bereitstellungsraum' jetzt auf DB-Ebene ab.
+        let bad = sqlx::query(
+            "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
+             VALUES (?, 'bereitstellungsraum', 'BR 1', ?, ?)",
+        )
+        .bind(einsatz_id)
+        .bind(benutzer_id)
+        .bind(benutzer_id)
+        .execute(&pool)
+        .await;
+        assert!(bad.is_err(), "typ='bereitstellungsraum' muss der DB-CHECK jetzt ablehnen");
+
+        // 3) lat/lon (Zusatzspalten aus 0034) überleben den Rebuild inhaltlich.
+        let uhs_id: i64 = sqlx::query_scalar(
+            "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von, lat, lon) \
+             VALUES (?, 'behandlungsplatz', 'BHP Geo', ?, ?, 52.5, 13.4) RETURNING id",
+        )
+        .bind(einsatz_id)
+        .bind(benutzer_id)
+        .bind(benutzer_id)
+        .fetch_one(&pool)
+        .await
+        .expect("lat/lon-Spalten müssen nach dem Rebuild existieren");
+        let (lat, lon): (Option<f64>, Option<f64>) =
+            sqlx::query_as("SELECT lat, lon FROM uhs WHERE id = ?")
+                .bind(uhs_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!((lat, lon), (Some(52.5), Some(13.4)), "lat/lon müssen erhalten bleiben");
+
+        // 4) Eingehende FKs bleiben intakt: uhs_platz + person_uhs_belegung nutzbar.
+        let platz_id: i64 = sqlx::query_scalar(
+            "INSERT INTO uhs_platz (uhs_id, typ, bezeichnung) VALUES (?, 'bett', 'Bett 1') RETURNING id",
+        )
+        .bind(uhs_id)
+        .fetch_one(&pool)
+        .await
+        .expect("uhs_platz-FK auf das rebuildete uhs muss greifen");
+        let ep_id: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, status, erfasst_von, geaendert_von) \
+             VALUES (?, 1, 'betroffen', ?, ?) RETURNING id",
+        )
+        .bind(einsatz_id)
+        .bind(benutzer_id)
+        .bind(benutzer_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO person_uhs_belegung (einsatz_id, person_id, uhs_id, platz_id, art, erfasst_von) \
+             VALUES (?, ?, ?, ?, 'eintritt', ?)",
+        )
+        .bind(einsatz_id)
+        .bind(ep_id)
+        .bind(uhs_id)
+        .bind(platz_id)
+        .bind(benutzer_id)
+        .execute(&pool)
+        .await
+        .expect("person_uhs_belegung-FK auf das rebuildete uhs muss greifen");
+
+        // 5) Beide Indizes wurden nach dem Table-Rebuild neu angelegt.
+        let indizes: Vec<String> = sqlx::query_scalar(
+            "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'uhs' \
+             AND name IN ('idx_uhs_einsatz', 'idx_uhs_abschnitt') ORDER BY name",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            indizes,
+            vec!["idx_uhs_abschnitt".to_string(), "idx_uhs_einsatz".to_string()],
+            "beide uhs-Indizes müssen nach dem Rebuild existieren"
+        );
+
+        // 6) FK-Konsistenz gesamthaft: kein dangling FK nach dem Rebuild.
+        let fk_verletzungen: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM pragma_foreign_key_check()")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(fk_verletzungen, 0, "PRAGMA foreign_key_check muss nach dem Rebuild leer sein");
+    }
+
+    // Deckt den Sicherheitsnetz-Zweig von 0082 ab (UPDATE 'bereitstellungsraum' → 'sonstige'
+    // VOR dem Copy). Auf der leeren test_pool()-DB ist uhs bei 0082 leer, der Zweig greift
+    // dort nie — würde man ihn entfernen, bliebe die Suite grün, während eine reale DB mit
+    // einer verbliebenen 'bereitstellungsraum'-Zeile beim `INSERT … SELECT` am neuen CHECK
+    // bräche (Deploy-Blockade). Hier bilden wir genau diese Alt-DB nach und wenden die ECHTE
+    // Migration (include_str!) an: fehlt das Sicherheitsnetz, wird dieser Test rot.
+    #[tokio::test]
+    async fn migration_0082_sicherheitsnetz_bereinigt_altzeile_vor_rebuild() {
+        // Isolierter Pool ohne FK-Zwang: die 0082-uhs_new-FKs zeigen auf einsatz/benutzer,
+        // die hier nicht existieren — der Rebuild läuft (PRAGMA foreign_keys=OFF), und nach
+        // der Migration triggern nur FK-freie SELECTs.
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .foreign_keys(false),
+            )
+            .await
+            .expect("In-Memory-Pool");
+
+        // uhs im ALTEN Stand: 0027-CHECK erlaubt noch 'bereitstellungsraum', + lat/lon (0034),
+        // ohne FK-Klauseln (für diesen Zweig irrelevant). Spaltenmenge = 0082-Copy-Liste.
+        sqlx::query(
+            "CREATE TABLE uhs ( \
+                id            INTEGER PRIMARY KEY AUTOINCREMENT, \
+                einsatz_id    INTEGER NOT NULL, \
+                abschnitt_id  INTEGER, \
+                typ           TEXT    NOT NULL \
+                              CHECK (typ IN ('patientenablage','behandlungsplatz', \
+                                             'verletztensammelstelle','bereitstellungsraum','sonstige')), \
+                bezeichnung   TEXT    NOT NULL, \
+                standort      TEXT, \
+                notiz         TEXT, \
+                status        TEXT    NOT NULL DEFAULT 'geplant' \
+                              CHECK (status IN ('geplant','aktiv','aufgeloest')), \
+                erfasst_at    TEXT    NOT NULL DEFAULT '', \
+                erfasst_von   INTEGER NOT NULL, \
+                geaendert_at  TEXT    NOT NULL DEFAULT '', \
+                geaendert_von INTEGER NOT NULL, \
+                storniert_at  TEXT, \
+                lat           REAL, \
+                lon           REAL, \
+                UNIQUE (einsatz_id, bezeichnung) \
+            )",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Alt-Zeile mit dem inzwischen verbotenen Wert + Geo (muss den Rebuild überleben).
+        sqlx::query(
+            "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von, lat, lon) \
+             VALUES (1, 'bereitstellungsraum', 'BR alt', 1, 1, 48.1, 11.5)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Die ECHTE Migration 0082 anwenden (Multi-Statement inkl. PRAGMA-Toggle + Rebuild).
+        let migration =
+            include_str!("../migrations/0082_uhs_typ_check_ohne_bereitstellungsraum.sql");
+        sqlx::raw_sql(migration)
+            .execute(&pool)
+            .await
+            .expect("0082 muss auf einer DB mit Alt-Zeile durchlaufen (Sicherheitsnetz greift)");
+
+        // Zeile erhalten, auf 'sonstige' migriert, Geo intakt.
+        let (typ, lat, lon): (String, Option<f64>, Option<f64>) =
+            sqlx::query_as("SELECT typ, lat, lon FROM uhs WHERE bezeichnung = 'BR alt'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(typ, "sonstige", "Alt-Zeile muss auf 'sonstige' migriert sein");
+        assert_eq!(
+            (lat, lon),
+            (Some(48.1), Some(11.5)),
+            "lat/lon der Alt-Zeile müssen den Rebuild überleben"
+        );
+
+        // Kein Rest mehr mit dem verbotenen Wert.
+        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM uhs WHERE typ = 'bereitstellungsraum'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(rest, 0, "nach 0082 darf keine 'bereitstellungsraum'-Zeile verbleiben");
     }
 }
