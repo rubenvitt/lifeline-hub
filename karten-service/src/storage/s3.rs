@@ -1,6 +1,6 @@
 use super::Storage;
 use async_trait::async_trait;
-use object_store::{aws::AmazonS3Builder, path::Path as ObjPath, ObjectStore, WriteMultipart};
+use object_store::{aws::AmazonS3Builder, path::Path as ObjPath, ObjectStoreExt, WriteMultipart};
 use std::path::Path;
 use tokio::io::AsyncReadExt;
 

@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 use tokio_cron_scheduler::{Job, JobScheduler};
 
 /// Startet einen Cron-Scheduler, der `enqueue_all` nach dem `cron`-Ausdruck (6 Felder inkl.
-/// Sekunden) auslöst. Abweichung von der Skizze im Brief: die reale 0.13-API verlangt für
+/// Sekunden) auslöst. Abweichung von der Skizze im Brief: die reale 0.15-API verlangt für
 /// `Job::new_async` einen `FnMut(Uuid, JobsSchedulerLocked) -> Pin<Box<dyn Future<...> + Send>>
 /// + Send + Sync + 'static` — `Sync` ist mit einem bloß `Send`-`FnMut` (wie hier via `impl FnMut()
 /// + Send + 'static` gefordert) nicht automatisch erfüllt, weil eine Closure nur dann `Sync` ist,
