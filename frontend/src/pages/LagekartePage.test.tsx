@@ -449,7 +449,7 @@ describe('LagekartePage', () => {
     renderSeite();
     // Mehrere "Platzieren"-Buttons (UHS BHP 50 + Einheit Zug 1) → über das List-Item
     // der Einheit eindeutig treffen.
-    const item = (await screen.findByText('Einheit: Zug 1')).closest('.ant-list-item') as HTMLElement;
+    const item = (await screen.findByText('Einheit: Zug 1')).closest('.listen-eintrag') as HTMLElement;
     await user.click(within(item).getByRole('button', { name: 'Platzieren' }));
     await user.click(await screen.findByText('karte-klick'));
     await waitFor(() => expect(body).toMatchObject({ lat: 50.1, lon: 8.6 }));

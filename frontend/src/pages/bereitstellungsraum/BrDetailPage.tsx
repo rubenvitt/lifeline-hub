@@ -1,4 +1,5 @@
-import { Alert, App, Breadcrumb, Button, Descriptions, List, Popconfirm, Space, Spin, Tag } from 'antd';
+import { Alert, App, Breadcrumb, Button, Descriptions, Popconfirm, Space, Spin, Tag } from 'antd';
+import { Liste, ListenEintrag } from '../../components/Liste';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../../api/einsaetze';
@@ -159,13 +160,13 @@ export default function BrDetailPage() {
         {/* Hauptbereich: bereitgestellte Kräfte */}
         <div style={{ flex: 1 }}>
           <strong>Bereitgestellte Einheiten</strong>
-          <List
+          <Liste
             size="small"
             style={{ marginTop: 8, marginBottom: 16 }}
             dataSource={br.einheiten}
-            locale={{ emptyText: 'Keine Einheiten bereitgestellt' }}
+            emptyText="Keine Einheiten bereitgestellt"
             renderItem={(e) => (
-              <List.Item
+              <ListenEintrag
                 actions={
                   !schreibgeschuetzt
                     ? [
@@ -183,18 +184,18 @@ export default function BrDetailPage() {
                 }
               >
                 {e.name}
-              </List.Item>
+              </ListenEintrag>
             )}
           />
 
           <strong>Bereitgestellte Fahrzeuge</strong>
-          <List
+          <Liste
             size="small"
             style={{ marginTop: 8 }}
             dataSource={br.fahrzeuge}
-            locale={{ emptyText: 'Keine Fahrzeuge bereitgestellt' }}
+            emptyText="Keine Fahrzeuge bereitgestellt"
             renderItem={(f) => (
-              <List.Item
+              <ListenEintrag
                 actions={
                   !schreibgeschuetzt
                     ? [
@@ -212,7 +213,7 @@ export default function BrDetailPage() {
                 }
               >
                 {f.funkrufname}
-              </List.Item>
+              </ListenEintrag>
             )}
           />
         </div>

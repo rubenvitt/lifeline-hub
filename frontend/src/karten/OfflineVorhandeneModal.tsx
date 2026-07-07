@@ -1,4 +1,5 @@
-import { App, Button, Input, List, Modal, Spin, Tag, Typography } from 'antd';
+import { App, Button, Input, Modal, Spin, Tag, Typography } from 'antd';
+import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
@@ -69,11 +70,11 @@ export default function OfflineVorhandeneModal({
           <Spin />
         </div>
       ) : (
-        <List
+        <Liste
           dataSource={vorhandeneQuery.data ?? []}
-          locale={{ emptyText: 'Keine neuen Dateien im Karten-Verzeichnis' }}
+          emptyText="Keine neuen Dateien im Karten-Verzeichnis"
           renderItem={(v) => (
-            <List.Item
+            <ListenEintrag
               actions={[
                 <Button
                   key="imp"
@@ -85,7 +86,7 @@ export default function OfflineVorhandeneModal({
                 </Button>,
               ]}
             >
-              <List.Item.Meta
+              <ListenEintragMeta
                 title={
                   <Input
                     size="small"
@@ -101,7 +102,7 @@ export default function OfflineVorhandeneModal({
                   </Typography.Text>
                 }
               />
-            </List.Item>
+            </ListenEintrag>
           )}
         />
       )}

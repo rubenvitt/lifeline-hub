@@ -1,6 +1,7 @@
-import { Button, Form, Input, List, Modal, Typography } from 'antd';
+import { Button, Form, Input, Modal, Typography } from 'antd';
 import { useState } from 'react';
 import type { ChatKanal } from '../api/types';
+import { Liste, ListenEintrag } from '../components/Liste';
 
 interface Props {
   kanaele: ChatKanal[];
@@ -29,11 +30,11 @@ export default function KanalListe({
           <Button size="small" onClick={() => setOffen(true)}>Kanal</Button>
         )}
       </div>
-      <List<ChatKanal>
+      <Liste<ChatKanal>
         size="small"
         dataSource={kanaele}
         renderItem={(k) => (
-          <List.Item
+          <ListenEintrag
             onClick={() => onWechsel(k.id)}
             style={{
               cursor: 'pointer',
@@ -41,7 +42,7 @@ export default function KanalListe({
             }}
           >
             {k.name}
-          </List.Item>
+          </ListenEintrag>
         )}
       />
       <Modal

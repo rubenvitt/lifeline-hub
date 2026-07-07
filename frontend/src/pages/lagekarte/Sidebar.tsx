@@ -1,4 +1,5 @@
-import { Badge, Button, Card, Empty, List, Popconfirm, Radio, Select, Slider, Space, Spin, Switch, Tooltip, Typography, Upload } from 'antd';
+import { Badge, Button, Card, Empty, Popconfirm, Radio, Select, Slider, Space, Spin, Switch, Tooltip, Typography, Upload } from 'antd';
+import { Liste, ListenEintrag } from '../../components/Liste';
 import { AimOutlined, DeleteOutlined, FullscreenOutlined, UploadOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import type { KarteMarker, NichtVerortet } from './marker';
@@ -126,9 +127,10 @@ export default function Sidebar(props: SidebarProps) {
         {nichtVerortet.length === 0 ? (
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Alles verortet" />
         ) : (
-          <List
+          <Liste
             size="small"
             dataSource={nichtVerortet}
+            rowKey={(o) => `${o.typ}-${o.id}`}
             renderItem={(o) => {
               const aktiv = platzierungZiel?.typ === o.typ && platzierungZiel?.id === o.id;
               let action: React.ReactNode = null;
@@ -160,11 +162,11 @@ export default function Sidebar(props: SidebarProps) {
                 }
               }
               return (
-                <List.Item key={`${o.typ}-${o.id}`} actions={action ? [action] : []}>
+                <ListenEintrag actions={action ? [action] : []}>
                   <Typography.Text>
                     {NICHT_VERORTET_LABEL[o.typ]}: {o.label}
                   </Typography.Text>
-                </List.Item>
+                </ListenEintrag>
               );
             }}
           />
@@ -225,23 +227,25 @@ export default function Sidebar(props: SidebarProps) {
 
       <Card size="small" title="Verortet" style={{ marginBottom: 12 }}>
         <Typography.Text type="secondary">UHS ({uhsVerortet.length})</Typography.Text>
-        <List
+        <Liste
           size="small"
           dataSource={uhsVerortet}
+          rowKey={(m) => m.schluessel}
           renderItem={(m) => (
-            <List.Item key={m.schluessel} style={{ cursor: 'pointer' }} onClick={() => props.onMarkerWaehlen(m.schluessel)}>
+            <ListenEintrag style={{ cursor: 'pointer' }} onClick={() => props.onMarkerWaehlen(m.schluessel)}>
               {m.label}
-            </List.Item>
+            </ListenEintrag>
           )}
         />
         <Typography.Text type="secondary">Schäden ({schadenVerortet.length})</Typography.Text>
-        <List
+        <Liste
           size="small"
           dataSource={schadenVerortet}
+          rowKey={(m) => m.schluessel}
           renderItem={(m) => (
-            <List.Item key={m.schluessel} style={{ cursor: 'pointer' }} onClick={() => props.onMarkerWaehlen(m.schluessel)}>
+            <ListenEintrag style={{ cursor: 'pointer' }} onClick={() => props.onMarkerWaehlen(m.schluessel)}>
               {m.label}
-            </List.Item>
+            </ListenEintrag>
           )}
         />
       </Card>

@@ -1,4 +1,5 @@
-import { App, Button, List, Modal, Spin, Tag, Tooltip, Typography } from 'antd';
+import { App, Button, Modal, Spin, Tag, Tooltip, Typography } from 'antd';
+import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError } from '../api/client';
@@ -261,17 +262,17 @@ export default function OfflineRegionPicker({
         Object.entries(gruppen).map(([gruppe, items]) => (
           <div key={gruppe} style={{ marginBottom: 8 }}>
             <Typography.Title level={5} style={{ marginBottom: 4 }}>{gruppe}</Typography.Title>
-            <List
+            <Liste
               dataSource={items}
               renderItem={(z) => (
-                <List.Item actions={[<span key="a">{aktion(z)}</span>]}>
-                  <List.Item.Meta
+                <ListenEintrag actions={[<span key="a">{aktion(z)}</span>]}>
+                  <ListenEintragMeta
                     title={z.name}
                     description={
                       <Typography.Text type="secondary" style={{ fontSize: 12 }}>{z.region}</Typography.Text>
                     }
                   />
-                </List.Item>
+                </ListenEintrag>
               )}
             />
           </div>

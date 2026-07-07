@@ -1,4 +1,5 @@
-import { App, Button, Form, Input, List, Modal, Popconfirm, Select, Space, Tag, Typography } from 'antd';
+import { App, Button, Form, Input, Modal, Popconfirm, Select, Space, Tag, Typography } from 'antd';
+import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate } from 'react-router-dom';
@@ -59,13 +60,13 @@ export default function BenutzerPage() {
         </Button>
       </Space>
 
-      <List
+      <Liste
         loading={isLoading}
         bordered
-        rowKey="id"
+        rowKey={(b) => b.id}
         dataSource={benutzerListe}
         renderItem={(b: BenutzerAnzeige) => (
-          <List.Item
+          <ListenEintrag
             actions={
               b.aktiv
                 ? [
@@ -84,7 +85,7 @@ export default function BenutzerPage() {
                 : []
             }
           >
-            <List.Item.Meta
+            <ListenEintragMeta
               title={b.anzeigename}
               description={
                 <Space>
@@ -95,7 +96,7 @@ export default function BenutzerPage() {
                 </Space>
               }
             />
-          </List.Item>
+          </ListenEintrag>
         )}
       />
 

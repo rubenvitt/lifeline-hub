@@ -1,9 +1,10 @@
-import { Alert, Breadcrumb, Empty, List, Space, Spin, Tag, Typography } from 'antd';
+import { Alert, Breadcrumb, Empty, Space, Spin, Tag, Typography } from 'antd';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeLageMeldungen } from '../api/meldungen';
 import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
+import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 
 export default function LagemeldungenPage() {
   const { id } = useParams();
@@ -38,11 +39,11 @@ export default function LagemeldungenPage() {
       {eintraege.length === 0 ? (
         <Empty description="Noch keine lagerelevanten Meldungen übergeben" />
       ) : (
-        <List
+        <Liste
           dataSource={eintraege}
           renderItem={(l) => (
-            <List.Item>
-              <List.Item.Meta
+            <ListenEintrag>
+              <ListenEintragMeta
                 title={<Typography.Text strong>{l.text}</Typography.Text>}
                 description={
                   <Space wrap>
@@ -56,7 +57,7 @@ export default function LagemeldungenPage() {
                   </Space>
                 }
               />
-            </List.Item>
+            </ListenEintrag>
           )}
         />
       )}

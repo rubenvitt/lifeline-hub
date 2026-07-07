@@ -1,5 +1,5 @@
 import {
-  Alert, App, Breadcrumb, Button, Card, Empty, Form, Input, List, Popconfirm, Select, Space, Spin,
+  Alert, App, Breadcrumb, Button, Card, Empty, Form, Input, Popconfirm, Select, Space, Spin,
   Tag, Tree, TreeSelect, Typography, type TreeDataNode,
 } from 'antd';
 import { Link, useParams } from 'react-router-dom';
@@ -14,6 +14,7 @@ import {
 import { ApiError } from '../api/client';
 import type { Einsatzabschnitt } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
+import { Liste, ListenEintrag } from '../components/Liste';
 import SprechgruppenPicker from '../components/SprechgruppenPicker';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 
@@ -240,18 +241,18 @@ export default function EinsatzabschnittePage() {
               )}
 
               <Typography.Title level={5} style={{ marginTop: 16 }}>Zugeordnete Einheiten</Typography.Title>
-              <List
+              <Liste
                 size="small"
-                locale={{ emptyText: 'Keine Einheiten zugeordnet' }}
+                emptyText="Keine Einheiten zugeordnet"
                 dataSource={zugeordneteEinheiten}
                 renderItem={(e) => (
-                  <List.Item>
+                  <ListenEintrag>
                     <Space>
                       <span>{e.name}</span>
                       {e.typ_label && <Tag>{e.typ_label}</Tag>}
                       <Tag color="blue">kumuliert <StaerkeAnzeige wert={e.ist_kumuliert} /></Tag>
                     </Space>
-                  </List.Item>
+                  </ListenEintrag>
                 )}
               />
               <Typography.Text type="secondary">

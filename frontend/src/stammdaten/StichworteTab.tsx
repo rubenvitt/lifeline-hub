@@ -1,4 +1,4 @@
-import { App, Button, Input, List, Space, Typography } from 'antd';
+import { App, Button, Input, Space, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
@@ -8,6 +8,7 @@ import {
   listeStichwortVorschlaege,
   loescheStichwortVorschlag,
 } from '../api/stichwortVorschlaege';
+import { Liste, ListenEintrag } from '../components/Liste';
 
 export default function StichworteTab() {
   const { benutzer } = useAuth();
@@ -50,12 +51,12 @@ export default function StichworteTab() {
         Einsatz unabhängig davon möglich.
       </Typography.Paragraph>
 
-      <List
+      <Liste
         bordered
         dataSource={vorschlaege}
-        locale={{ emptyText: 'Noch keine Stichworte' }}
+        emptyText="Noch keine Stichworte"
         renderItem={(v) => (
-          <List.Item
+          <ListenEintrag
             actions={
               istAdmin
                 ? [
@@ -73,7 +74,7 @@ export default function StichworteTab() {
             }
           >
             {v.text}
-          </List.Item>
+          </ListenEintrag>
         )}
       />
 

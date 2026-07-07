@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, App, Empty, List, Space, Spin, Tag, Typography } from 'antd';
+import { Alert, App, Empty, Space, Spin, Tag, Typography } from 'antd';
 import type { BewertungEingabe } from '../../api/gefahren';
 import { ApiError } from '../../api/client';
 import { benenneGefahrengebiet, gefahrengebietName, ladeGefahrengebiete, ladeMatrix, setzeBewertung } from '../../api/gefahren';
@@ -9,6 +9,7 @@ import { ladeEinsatz } from '../../api/einsaetze';
 import { parseRouteId } from '../../routing/deeplinks';
 import { warnstufeFarbe } from './gefahrenSchema';
 import GefahrenMatrix from './GefahrenMatrix';
+import { Liste, ListenEintrag } from '../../components/Liste';
 
 export default function GefahrenPage() {
   const { id } = useParams();
@@ -82,14 +83,14 @@ export default function GefahrenPage() {
 
   return (
     <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-      <List
+      <Liste
         style={{ width: 240, flexShrink: 0 }}
         size="small"
         bordered
         header={<Typography.Text strong>Gefahrengebiete</Typography.Text>}
         dataSource={gebiete}
         renderItem={(g) => (
-          <List.Item
+          <ListenEintrag
             onClick={() => setGewaehlt(g.id)}
             style={{ cursor: 'pointer', background: g.id === gewaehlt ? 'rgba(22,119,255,0.08)' : undefined }}
           >
@@ -100,7 +101,7 @@ export default function GefahrenPage() {
               <span>{gefahrengebietName(g.label, g.id)}</span>
               <Typography.Text type="secondary">({g.zonen_ids.length})</Typography.Text>
             </Space>
-          </List.Item>
+          </ListenEintrag>
         )}
       />
       <div style={{ flex: 1, minWidth: 0 }}>

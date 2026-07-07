@@ -1,8 +1,9 @@
 import { MoreOutlined, PaperClipOutlined } from '@ant-design/icons';
-import { Button, Dropdown, List, Popconfirm, Popover, Space, Tag, Tooltip, Typography } from 'antd';
+import { Button, Dropdown, Popconfirm, Popover, Space, Tag, Tooltip, Typography } from 'antd';
 import type { MenuProps } from 'antd';
 import type { BezugTyp, ChatNachricht } from '../api/types';
 import { formatZeit, formatZeitKurz } from '../kommunikation';
+import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import type { BezugKurzinfo } from './bezug';
 
 /** Menschlich lesbare Dateigröße. */
@@ -36,9 +37,9 @@ export default function NachrichtenStrom({
   onBezugSetzen, onBezugLoeschen, bezugLabel, bezugInfo,
 }: Props) {
   return (
-    <List<ChatNachricht>
+    <Liste<ChatNachricht>
       dataSource={nachrichten}
-      locale={{ emptyText: 'Noch keine Nachrichten' }}
+      emptyText="Noch keine Nachrichten"
       renderItem={(n) => {
         const geloescht = n.geloescht_at !== null;
         const eigene = eigeneBenutzerId !== null && n.autor_id === eigeneBenutzerId;
@@ -83,7 +84,7 @@ export default function NachrichtenStrom({
                 : []),
             ];
         return (
-          <List.Item
+          <ListenEintrag
             actions={
               menuItems && menuItems.length > 0
                 ? [
@@ -94,7 +95,7 @@ export default function NachrichtenStrom({
                 : []
             }
           >
-            <List.Item.Meta
+            <ListenEintragMeta
               title={
                 <Space size="small">
                   <Typography.Text strong>{n.autor_name}</Typography.Text>
@@ -167,7 +168,7 @@ export default function NachrichtenStrom({
                 )
               }
             />
-          </List.Item>
+          </ListenEintrag>
         );
       }}
     />

@@ -1,4 +1,5 @@
-import { App, Button, List, Modal, Spin, Tag, Typography } from 'antd';
+import { App, Button, Modal, Spin, Tag, Typography } from 'antd';
+import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
 import type { OnlineStyle } from '../api/karte';
@@ -66,13 +67,13 @@ export default function AusKatalogModal({
           <Spin />
         </div>
       ) : (
-        <List
+        <Liste
           dataSource={katalogQuery.data ?? []}
-          locale={{ emptyText: 'Katalog ist leer' }}
+          emptyText="Katalog ist leer"
           renderItem={(eintrag) => {
             const vorhanden = vorhandeneUrls.has(eintrag.url);
             return (
-              <List.Item
+              <ListenEintrag
                 actions={[
                   <Button
                     key="add"
@@ -84,7 +85,7 @@ export default function AusKatalogModal({
                   </Button>,
                 ]}
               >
-                <List.Item.Meta
+                <ListenEintragMeta
                   title={
                     <span>
                       {eintrag.name} <Tag>{eintrag.typ}</Tag>
@@ -96,7 +97,7 @@ export default function AusKatalogModal({
                     </Typography.Text>
                   }
                 />
-              </List.Item>
+              </ListenEintrag>
             );
           }}
         />
