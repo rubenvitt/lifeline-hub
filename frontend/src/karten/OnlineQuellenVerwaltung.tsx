@@ -103,7 +103,7 @@ export default function OnlineQuellenVerwaltung() {
         <Alert
           type="error"
           showIcon
-          message="Online-Quellen konnten nicht geladen werden"
+          title="Online-Quellen konnten nicht geladen werden"
           description={quellenQuery.error instanceof ApiError ? quellenQuery.error.message : undefined}
         />
       ) : (

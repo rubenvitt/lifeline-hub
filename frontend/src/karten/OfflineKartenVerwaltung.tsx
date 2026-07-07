@@ -324,7 +324,7 @@ export default function OfflineKartenVerwaltung() {
         <Alert
           type="error"
           showIcon
-          message="Offline-Karten konnten nicht geladen werden"
+          title="Offline-Karten konnten nicht geladen werden"
           description={kartenQuery.error instanceof ApiError ? kartenQuery.error.message : undefined}
         />
       ) : (
