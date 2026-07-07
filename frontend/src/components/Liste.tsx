@@ -67,27 +67,36 @@ export function Liste<T>({
 
   // antd `List`: bei gesetztem `emptyText` nur den Text zeigen (`.ant-list-empty-text`), sonst
   // das Standard-`<Empty>` (simple image) als Fallback — beides in derselben zentrierten Box.
+  // Während `loading` wird der Leer-Zustand unterdrückt (wie antd), damit kein Empty hinter
+  // dem Spinner aufblitzt, solange noch keine Daten da sind.
+  const leer = loading ? null : (
+    <div
+      style={{
+        padding: token.padding,
+        color: token.colorTextDisabled,
+        fontSize: token.fontSize,
+        textAlign: 'center',
+      }}
+    >
+      {emptyText != null ? emptyText : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ margin: 0 }} />}
+    </div>
+  );
+
+  // Items als `<ul>/<li>` (list/listitem-Rolle wie antds `List` — Screenreader-Semantik erhalten).
   const inhalt =
     dataSource.length === 0 ? (
-      <div
-        style={{
-          padding: token.padding,
-          color: token.colorTextDisabled,
-          fontSize: token.fontSize,
-          textAlign: 'center',
-        }}
-      >
-        {emptyText != null ? emptyText : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} style={{ margin: 0 }} />}
-      </div>
+      leer
     ) : (
-      dataSource.map((item, index) => (
-        <div
-          key={rowKey(item, index)}
-          style={index > 0 ? { borderBlockStart: `1px solid ${token.colorSplit}` } : undefined}
-        >
-          {renderItem(item, index)}
-        </div>
-      ))
+      <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+        {dataSource.map((item, index) => (
+          <li
+            key={rowKey(item, index)}
+            style={index > 0 ? { borderBlockStart: `1px solid ${token.colorSplit}` } : undefined}
+          >
+            {renderItem(item, index)}
+          </li>
+        ))}
+      </ul>
     );
 
   return (
@@ -154,6 +163,8 @@ export function ListenEintrag({ children, actions, onClick, style, className }: 
           {actions.map((aktion, i) => (
             <li
               key={i}
+              // Farbe wie antds `.ant-list-item-action > li` (Buttons/Links überschreiben selbst;
+              // greift nur für Text-/<span>-Aktionen).
               style={
                 i > 0
                   ? {
@@ -161,8 +172,9 @@ export function ListenEintrag({ children, actions, onClick, style, className }: 
                       paddingInlineStart: token.marginSM,
                       borderInlineStart: `1px solid ${token.colorSplit}`,
                       lineHeight: 1,
+                      color: token.colorTextDescription,
                     }
-                  : { lineHeight: 1 }
+                  : { lineHeight: 1, color: token.colorTextDescription }
               }
             >
               {aktion}

@@ -55,6 +55,40 @@ describe('Liste', () => {
     expect(onAktion).toHaveBeenCalledTimes(1);
   });
 
+  it('rendert Einträge als list/listitem (Screenreader-Semantik wie antds List)', () => {
+    renderMitProviders(
+      <Liste
+        dataSource={['A', 'B']}
+        renderItem={(t) => <ListenEintrag>{t}</ListenEintrag>}
+      />,
+    );
+    expect(screen.getByRole('list')).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+  });
+
+  it('unterdrückt den Leer-Zustand während loading (kein Empty-Aufblitzen)', () => {
+    const { rerender } = renderMitProviders(
+      <Liste
+        dataSource={[]}
+        loading
+        emptyText="Noch nichts da"
+        renderItem={(t: string) => <ListenEintrag>{t}</ListenEintrag>}
+      />,
+    );
+    // Während loading: kein Leer-Text.
+    expect(screen.queryByText('Noch nichts da')).not.toBeInTheDocument();
+    // Nach loading (weiterhin leer): Leer-Text erscheint.
+    rerender(
+      <Liste
+        dataSource={[]}
+        loading={false}
+        emptyText="Noch nichts da"
+        renderItem={(t: string) => <ListenEintrag>{t}</ListenEintrag>}
+      />,
+    );
+    expect(screen.getByText('Noch nichts da')).toBeInTheDocument();
+  });
+
   it('stellt Titel und Beschreibung über ListenEintragMeta dar', () => {
     renderMitProviders(
       <Liste
