@@ -226,6 +226,16 @@ fn orphan_enums_wire() {
     use lifeline_hub::meldung::{Meldungsart, MeldungStatus};
     use lifeline_hub::nachforderung::NachforderungStatus;
     use lifeline_hub::person::{AbgleichStatus, VerbleibStatus};
+    use lifeline_hub::person::audit_repo::ZugriffArt;
+    use lifeline_hub::erinnerung::ErinnerungStatus;
+
+    // review-nachzug (LFH-120): inline-Unions, die der Orphan-Sweep übersah
+    wire_is!(ZugriffArt::Detail => "detail", ZugriffArt::Export => "export");
+    wire_is!(
+        ErinnerungStatus::Offen => "offen",
+        ErinnerungStatus::Erledigt => "erledigt",
+        ErinnerungStatus::Quittiert => "quittiert",
+    );
 
     // auth
     wire_is!(SystemRolle::Admin => "admin", SystemRolle::Keiner => "keiner");

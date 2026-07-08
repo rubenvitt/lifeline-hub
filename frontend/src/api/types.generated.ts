@@ -769,13 +769,18 @@ export interface components {
             quittiert_at?: string | null;
             /** Format: int64 */
             quittiert_von_id?: number | null;
-            status: string;
+            status: components["schemas"]["ErinnerungStatus"];
             titel: string;
             vollzogen_at?: string | null;
             /** Format: int64 */
             vollzogen_von_id?: number | null;
             vollzug_status: string;
         };
+        /**
+         * @description LFH-120: Schema-Anker für die `status`-Union (geschlossenes Code-Vokabular, s. STATUS_*).
+         * @enum {string}
+         */
+        ErinnerungStatus: "offen" | "erledigt" | "quittiert";
         /**
          * @description Öffentliche Sicht eines ETB-Baustein-Katalogeintrags. Die DB-Spalten `aktiv`,
          *     `erstellt_at` und `aktualisiert_at` werden bewusst nicht serialisiert.
@@ -1863,7 +1868,7 @@ export interface components {
         Zeitformat: "24h" | "12h";
         /** @description Ein Audit-Eintrag mit aufgelöstem Benutzernamen (für die Audit-Einsicht). */
         ZugriffAnzeige: {
-            art: string;
+            art: components["schemas"]["ZugriffArt"];
             /** Format: int64 */
             benutzer_id: number;
             benutzer_name: string;
@@ -1873,6 +1878,12 @@ export interface components {
             person_id?: number | null;
             zugriff_at: string;
         };
+        /**
+         * @description LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK
+         *     `art IN ('detail','export')` (migrations/0021_person_zugriff_audit.sql).
+         * @enum {string}
+         */
+        ZugriffArt: "detail" | "export";
     };
     responses: never;
     parameters: never;

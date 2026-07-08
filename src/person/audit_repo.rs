@@ -3,6 +3,15 @@ use serde::Serialize;
 use sqlx::SqlitePool;
 use utoipa::ToSchema;
 
+/// LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK
+/// `art IN ('detail','export')` (migrations/0021_person_zugriff_audit.sql).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ZugriffArt {
+    Detail,
+    Export,
+}
+
 /// Ein Audit-Eintrag mit aufgelöstem Benutzernamen (für die Audit-Einsicht).
 #[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct ZugriffAnzeige {
@@ -10,6 +19,7 @@ pub struct ZugriffAnzeige {
     pub person_id: Option<i64>,
     pub benutzer_id: i64,
     pub benutzer_name: String,
+    #[schema(value_type = ZugriffArt)]
     pub art: String,
     pub zugriff_at: String,
 }

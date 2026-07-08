@@ -20,6 +20,7 @@ pub struct ErinnerungAnzeige {
     pub bezug_typ: Option<String>,
     pub bezug_id: Option<i64>,
     pub quelle: String,
+    #[schema(value_type = ErinnerungStatus)]
     pub status: String,
     pub erledigt_at: Option<String>,
     pub erstellt_von_id: i64,
@@ -38,5 +39,14 @@ pub struct ErinnerungAnzeige {
 pub const STATUS_OFFEN: &str = "offen";
 pub const STATUS_ERLEDIGT: &str = "erledigt";
 pub const STATUS_QUITTIERT: &str = "quittiert";
+
+/// LFH-120: Schema-Anker für die `status`-Union (geschlossenes Code-Vokabular, s. STATUS_*).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ErinnerungStatus {
+    Offen,
+    Erledigt,
+    Quittiert,
+}
 pub const QUELLE_MANUELL: &str = "manuell";
 pub const QUELLE_AUTO_FRIST: &str = "auto_frist";

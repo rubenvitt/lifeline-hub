@@ -2301,7 +2301,7 @@
             "format": "int64"
           },
           "status": {
-            "type": "string"
+            "$ref": "#/components/schemas/ErinnerungStatus"
           },
           "titel": {
             "type": "string"
@@ -2323,6 +2323,15 @@
             "type": "string"
           }
         }
+      },
+      "ErinnerungStatus": {
+        "type": "string",
+        "description": "LFH-120: Schema-Anker für die `status`-Union (geschlossenes Code-Vokabular, s. STATUS_*).",
+        "enum": [
+          "offen",
+          "erledigt",
+          "quittiert"
+        ]
       },
       "EtbBaustein": {
         "type": "object",
@@ -5499,7 +5508,7 @@
         ],
         "properties": {
           "art": {
-            "type": "string"
+            "$ref": "#/components/schemas/ZugriffArt"
           },
           "benutzer_id": {
             "type": "integer",
@@ -5523,6 +5532,14 @@
             "type": "string"
           }
         }
+      },
+      "ZugriffArt": {
+        "type": "string",
+        "description": "LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK\n`art IN ('detail','export')` (migrations/0021_person_zugriff_audit.sql).",
+        "enum": [
+          "detail",
+          "export"
+        ]
       }
     }
   }
