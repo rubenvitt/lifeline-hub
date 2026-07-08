@@ -50,7 +50,7 @@ export function verdichtePersonen(personen: Person[]): BetroffeneVerdichtung {
     erfasst: 0, vermisst: 0, betroffen: 0, verstorben: 0, abgemeldet: 0,
   };
   for (const p of personen) {
-    if (p.aktuelle_sichtung === null) sk.ohne += 1;
+    if (p.aktuelle_sichtung == null) sk.ohne += 1;
     else sk[p.aktuelle_sichtung] += 1;
     status[p.status] += 1;
   }

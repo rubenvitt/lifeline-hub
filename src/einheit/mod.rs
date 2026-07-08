@@ -37,7 +37,7 @@ pub struct EinheitMitgliedPerson {
     pub ep_id: i64,
     pub name: String,
     pub funktion: Option<String>,
-    #[schema(value_type = crate::staerke::StaerkePosition)]
+    #[schema(value_type = Option<crate::staerke::StaerkePosition>)]
     pub staerke_position: Option<String>,
     /// `true`, wenn diese Person als Führer der Einheit eingetragen ist.
     pub ist_fuehrer: bool,

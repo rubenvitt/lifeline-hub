@@ -36,6 +36,7 @@ const VERHALTEN_DEFAULTS = {
   etb_nummer_eingefroren: false, meldung_nummer_eingefroren: false, auftrag_nummer_eingefroren: false,
   // Aufbewahrung & Archiv (LFH-135).
   retention_dauer_tage: null,
+  org_defaults: { org_id: 1 },
 };
 
 function rendern() {
@@ -342,9 +343,7 @@ describe('EinsatzEinstellungenPage', () => {
         meldung_bestaetigung_frist_min: 30,
         auftrag_quittierung_frist_min: 60,
         auto_etb_eintraege: 1,
-        geocoder_url: null,
-        geaendert_at: null,
-        geaendert_von: null,
+        org_id: 1,
       },
     });
 
@@ -389,9 +388,7 @@ describe('EinsatzEinstellungenPage', () => {
         meldung_bestaetigung_frist_min: 30,
         auftrag_quittierung_frist_min: 60,
         auto_etb_eintraege: 1,
-        geocoder_url: null,
-        geaendert_at: null,
-        geaendert_von: null,
+        org_id: 1,
       },
     });
     vi.mocked(speichereEinstellungen).mockResolvedValue({} as never);
@@ -433,8 +430,7 @@ describe('EinsatzEinstellungenPage', () => {
         meldung_bestaetigung_frist_min: null, auftrag_quittierung_frist_min: null,
         // Org-Default: 0 = Aus.
         auto_etb_eintraege: 0,
-        geocoder_url: null,
-        geaendert_at: null, geaendert_von: null,
+        org_id: 1,
       },
     });
     vi.mocked(speichereEinstellungen).mockResolvedValue({} as never);

@@ -28,7 +28,7 @@ interface GeschaedigtGroup {
 }
 
 /** Label einer betroffenen Person: R-nnn + ggf. Name. */
-function personLabel(registrierNr: number, name: string | null, vorname: string | null): string {
+function personLabel(registrierNr: number, name: string | null | undefined, vorname: string | null | undefined): string {
   const reg = registrierAnzeige(registrierNr);
   const voll = [vorname, name].filter(Boolean).join(' ').trim();
   return voll ? `${reg} · ${voll}` : reg;

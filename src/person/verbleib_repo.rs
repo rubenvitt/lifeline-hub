@@ -13,7 +13,7 @@ pub struct VerbleibAnzeige {
     pub art: String,
     pub transportmittel: Option<String>,
     pub ziel: Option<String>,
-    #[schema(value_type = crate::person::VerbleibStatus)]
+    #[schema(value_type = Option<crate::person::VerbleibStatus>)]
     pub status: Option<String>,
     pub notiz: Option<String>,
     pub zeitpunkt_at: String,

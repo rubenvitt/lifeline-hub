@@ -142,7 +142,7 @@ pub struct AuftragEmpfaengerAnzeige {
     pub fahrzeug_id: Option<i64>,
     pub funktion_text: Option<String>,
     /// Externer Adressat (LFH-87): Kategorie + Bezeichnung (nur bei empfaenger_typ='extern').
-    #[schema(value_type = crate::kommunikation::AdressatKategorie)]
+    #[schema(value_type = Option<crate::kommunikation::AdressatKategorie>)]
     pub extern_kategorie: Option<String>,
     pub extern_bezeichnung: Option<String>,
     pub snap_anzeige: String,

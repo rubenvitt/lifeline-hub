@@ -44,7 +44,7 @@ pub struct EtbBaustein {
     #[schema(value_type = EtbTyp)]
     pub typ: String,
     pub inhalt: String,
-    #[schema(value_type = crate::etb::MeldeWeg)]
+    #[schema(value_type = Option<crate::etb::MeldeWeg>)]
     pub meldeweg: Option<String>,
     pub veranlassung: Option<String>,
     pub sortier: i64,

@@ -11,6 +11,8 @@ export default tseslint.config(
       'vite.config.js',
       'vite.config.d.ts',
       '*.tsbuildinfo',
+      // LFH-120: aus Rust generiert (openapi-typescript), nicht von Hand gepflegt.
+      'src/api/types.generated.ts',
     ],
   },
   js.configs.recommended,

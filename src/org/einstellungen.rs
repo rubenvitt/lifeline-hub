@@ -105,11 +105,11 @@ impl OrgEinstellungen {
 pub struct OrgEinstellungenAnzeige {
     pub org_id: i64,
     pub zeitzone: Option<String>,
-    #[schema(value_type = crate::einsatz::einstellungen::Zeitformat)]
+    #[schema(value_type = Option<crate::einsatz::einstellungen::Zeitformat>)]
     pub zeitformat: Option<String>,
-    #[schema(value_type = crate::einsatz::einstellungen::EinheitenSystem)]
+    #[schema(value_type = Option<crate::einsatz::einstellungen::EinheitenSystem>)]
     pub einheiten: Option<String>,
-    #[schema(value_type = crate::einsatz::einstellungen::Koordinatenformat)]
+    #[schema(value_type = Option<crate::einsatz::einstellungen::Koordinatenformat>)]
     pub koordinatenformat: Option<String>,
     pub retention_dauer_tage: Option<i64>,
     pub etb_nummer_praefix: Option<String>,
@@ -129,11 +129,11 @@ pub struct OrgEinstellungenAnzeige {
 pub struct OrgEinstellungenHinweis {
     pub org_id: i64,
     pub zeitzone: Option<String>,
-    #[schema(value_type = crate::einsatz::einstellungen::Zeitformat)]
+    #[schema(value_type = Option<crate::einsatz::einstellungen::Zeitformat>)]
     pub zeitformat: Option<String>,
-    #[schema(value_type = crate::einsatz::einstellungen::EinheitenSystem)]
+    #[schema(value_type = Option<crate::einsatz::einstellungen::EinheitenSystem>)]
     pub einheiten: Option<String>,
-    #[schema(value_type = crate::einsatz::einstellungen::Koordinatenformat)]
+    #[schema(value_type = Option<crate::einsatz::einstellungen::Koordinatenformat>)]
     pub koordinatenformat: Option<String>,
     pub retention_dauer_tage: Option<i64>,
     pub etb_nummer_praefix: Option<String>,

@@ -26,7 +26,7 @@ import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 function baueBaum(einheiten: Einheit[]): TreeDataNode[] {
   const kinder = new Map<number | null, Einheit[]>();
   for (const e of einheiten) {
-    const key = e.ueber_einheit_id;
+    const key = e.ueber_einheit_id ?? null;
     if (!kinder.has(key)) kinder.set(key, []);
     kinder.get(key)!.push(e);
   }

@@ -188,7 +188,7 @@ pub struct SchadenAnzeige {
     pub geschaedigt_organisation_id: Option<i64>,
     pub uebergeben_an: Option<String>,
     pub uebergeben_at: Option<String>,
-    #[schema(value_type = AbschlussGrund)]
+    #[schema(value_type = Option<AbschlussGrund>)]
     pub abschluss_grund: Option<String>,
     pub abschluss_at: Option<String>,
     pub erfasst_at: String,

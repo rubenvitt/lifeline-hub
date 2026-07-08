@@ -56,6 +56,7 @@ function einheit(over: Partial<Einheit> = {}): Einheit {
     personal_mitglieder: [], fahrzeug_mitglieder: [], material_mitglieder: [],
     lat: null, lon: null, tz_fachaufgabe: null, tz_organisation: null,
     aktueller_br_id: null,
+    sprechgruppen: [],
     ...over,
   };
 }

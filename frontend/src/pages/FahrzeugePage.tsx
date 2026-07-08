@@ -97,7 +97,7 @@ function BesatzungsBlock({
     <div style={{ paddingLeft: 8 }}>
       <Space size={8} style={{ marginBottom: 8 }}>
         <Typography.Text type="secondary">Besatzung</Typography.Text>
-        <BesatzungsStaerkeBadge ist={ist} soll={ef.soll_besatzung} />
+        <BesatzungsStaerkeBadge ist={ist} soll={ef.soll_besatzung ?? null} />
       </Space>
       {crew.length === 0 ? (
         <div><Typography.Text type="secondary">Keine Besatzung zugeordnet</Typography.Text></div>
@@ -262,7 +262,7 @@ export default function FahrzeugePage() {
       render: (_, ef) => (
         <BesatzungsStaerkeBadge
           ist={istBesatzungsStaerke(personal.filter((p) => p.fahrzeug_id === ef.id))}
-          soll={ef.soll_besatzung}
+          soll={ef.soll_besatzung ?? null}
         />
       ),
     },

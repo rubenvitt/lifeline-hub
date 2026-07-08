@@ -242,7 +242,7 @@ pub struct PersonAnzeige {
     pub status: String,
     pub name: Option<String>,
     pub vorname: Option<String>,
-    #[schema(value_type = Geschlecht)]
+    #[schema(value_type = Option<Geschlecht>)]
     pub geschlecht: Option<String>,
     pub geburtsdatum: Option<String>,
     pub alter_geschaetzt: Option<i64>,
@@ -256,7 +256,7 @@ pub struct PersonAnzeige {
     pub geaendert_von: i64,
     pub storniert_at: Option<String>,
     // E‑2: denormalisierter medizinischer Cache (NULL = ungesichtet / vor Ort).
-    #[schema(value_type = Sichtungskategorie)]
+    #[schema(value_type = Option<Sichtungskategorie>)]
     pub aktuelle_sichtung: Option<String>,
     pub aktuelle_sichtung_at: Option<String>,
     pub aktueller_verbleib: Option<String>,

@@ -197,7 +197,7 @@ pub struct EinsatzAnzeige {
     pub anzahl_betroffene_initial: Option<i64>,
     /// Aufbewahrungsfrist (LFH-130); `None` = keine Frist gesetzt.
     pub retention_bis: Option<String>,
-    #[schema(value_type = EinsatzRolle)]
+    #[schema(value_type = Option<EinsatzRolle>)]
     pub meine_rolle: Option<String>,
 }
 

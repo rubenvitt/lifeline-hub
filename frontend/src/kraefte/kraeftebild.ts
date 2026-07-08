@@ -81,7 +81,7 @@ const leereVert = (): StatusVerteilung => ({
   ohne: 0,
 });
 
-function addPosition(s: StaerkeSumme, pos: StaerkePosition | null): void {
+function addPosition(s: StaerkeSumme, pos: StaerkePosition | null | undefined): void {
   const k = pos ?? POS_NULL_FALLBACK;
   s[k] += 1;
   s.gesamt += 1;
@@ -94,7 +94,7 @@ function addStaerke(z: StaerkeSumme, q: StaerkeSumme): void {
   z.gesamt += q.gesamt;
 }
 
-function addKategorie(v: StatusVerteilung, k: StatusKategorie | null): void {
+function addKategorie(v: StatusVerteilung, k: StatusKategorie | null | undefined): void {
   if (k === 'verfuegbar') v.verfuegbar++;
   else if (k === 'gebunden') v.gebunden++;
   else if (k === 'nicht_verfuegbar') v.nicht_verfuegbar++;
@@ -170,8 +170,8 @@ function baueEinheitZeile(
       detail,
       staerke: ps,
       soll: null,
-      statusKategorie: ep.status_kategorie,
-      statusLabel: ep.status_label,
+      statusKategorie: ep.status_kategorie ?? null,
+      statusLabel: ep.status_label ?? null,
       menge: null,
       personalVerteilung: null,
       fahrzeugVerteilung: null,
@@ -190,8 +190,8 @@ function baueEinheitZeile(
       detail: ef.fahrzeugtyp ?? null,
       staerke: leereStaerke(),
       soll: null,
-      statusKategorie: ef.status_kategorie,
-      statusLabel: ef.status_label,
+      statusKategorie: ef.status_kategorie ?? null,
+      statusLabel: ef.status_label ?? null,
       menge: null,
       personalVerteilung: null,
       fahrzeugVerteilung: null,
@@ -239,7 +239,7 @@ function baueEinheitZeile(
   }
 
   // Soll for this unit
-  const eigenesSoll = einheit.soll !== null ? staerkeAusBackend(einheit.soll) : null;
+  const eigenesSoll = einheit.soll != null ? staerkeAusBackend(einheit.soll) : null;
   if (eigenesSoll !== null) {
     gesammeltesSoll = addSoll(gesammeltesSoll, eigenesSoll);
   }
@@ -367,16 +367,16 @@ export interface FilterWerte {
 
 export function filtereKraefte(roh: Rohdaten, f: FilterWerte): Rohdaten {
   const s = f.suche.trim().toLowerCase();
-  const treffer = (txt: (string | null)[]) => !s || txt.some((t) => t?.toLowerCase().includes(s));
+  const treffer = (txt: (string | null | undefined)[]) => !s || txt.some((t) => t?.toLowerCase().includes(s));
   // v1-Annahme: Untereinheiten tragen die `abschnitt_id` ihrer Elterneinheit. Sonst würden
   // Kräfte einer Untereinheit ohne eigene `abschnitt_id` beim Abschnitts-Filter herausfallen
   // (echtes Sub-Section-roll-in ist v2).
   const einheitErlaubt = (e: Einheit) => f.abschnittId == null || e.abschnitt_id === f.abschnittId;
   const erlaubteEinheiten = new Set(roh.einheiten.filter(einheitErlaubt).map((e) => e.id));
-  const abschnittOk = (einheit_id: number | null) =>
+  const abschnittOk = (einheit_id: number | null | undefined) =>
     f.abschnittId == null || (einheit_id != null && erlaubteEinheiten.has(einheit_id));
-  const traegerOk = (traeger: string | null) => !f.traeger || traeger === f.traeger;
-  const passt = (einheit_id: number | null, traeger: string | null, kat: StatusKategorie | null, txt: (string | null)[]) =>
+  const traegerOk = (traeger: string | null | undefined) => !f.traeger || traeger === f.traeger;
+  const passt = (einheit_id: number | null | undefined, traeger: string | null | undefined, kat: StatusKategorie | null | undefined, txt: (string | null | undefined)[]) =>
     abschnittOk(einheit_id) && traegerOk(traeger) && (!f.kategorie || kat === f.kategorie) && treffer(txt);
   return {
     abschnitte: f.abschnittId == null ? roh.abschnitte : roh.abschnitte.filter((a) => a.id === f.abschnittId),
@@ -491,21 +491,21 @@ export function baueKraeftebild(
   // ── Index: group by einheit_id ──────────────────────────────────────────
   const personalByEinheit = new Map<number | null, EinsatzPersonal[]>();
   for (const ep of personal) {
-    const key = ep.einheit_id;
+    const key = ep.einheit_id ?? null;
     if (!personalByEinheit.has(key)) personalByEinheit.set(key, []);
     personalByEinheit.get(key)!.push(ep);
   }
 
   const fahrzeugeByEinheit = new Map<number | null, EinsatzFahrzeug[]>();
   for (const ef of fahrzeuge) {
-    const key = ef.einheit_id;
+    const key = ef.einheit_id ?? null;
     if (!fahrzeugeByEinheit.has(key)) fahrzeugeByEinheit.set(key, []);
     fahrzeugeByEinheit.get(key)!.push(ef);
   }
 
   const materialByEinheit = new Map<number | null, EinsatzMaterial[]>();
   for (const em of material) {
-    const key = em.einheit_id;
+    const key = em.einheit_id ?? null;
     if (!materialByEinheit.has(key)) materialByEinheit.set(key, []);
     materialByEinheit.get(key)!.push(em);
   }
@@ -517,13 +517,13 @@ export function baueKraeftebild(
   const topEinheitenByAbschnitt = new Map<number | null, Einheit[]>();
 
   for (const e of einheiten) {
-    if (e.ueber_einheit_id !== null) {
+    if (e.ueber_einheit_id != null) {
       // child of another Einheit
       if (!childrenByEinheit.has(e.ueber_einheit_id)) childrenByEinheit.set(e.ueber_einheit_id, []);
       childrenByEinheit.get(e.ueber_einheit_id)!.push(e);
     } else {
       // top-level: belongs to an Abschnitt (or null → "Ohne Abschnitt")
-      const key = e.abschnitt_id;
+      const key = e.abschnitt_id ?? null;
       if (!topEinheitenByAbschnitt.has(key)) topEinheitenByAbschnitt.set(key, []);
       topEinheitenByAbschnitt.get(key)!.push(e);
     }
@@ -541,7 +541,7 @@ export function baueKraeftebild(
   const topAbschnitte: Einsatzabschnitt[] = [];
 
   for (const a of abschnitte) {
-    if (a.ueber_abschnitt_id !== null && abschnittIdSet.has(a.ueber_abschnitt_id)) {
+    if (a.ueber_abschnitt_id != null && abschnittIdSet.has(a.ueber_abschnitt_id)) {
       if (!abschnittKinderMap.has(a.ueber_abschnitt_id))
         abschnittKinderMap.set(a.ueber_abschnitt_id, []);
       abschnittKinderMap.get(a.ueber_abschnitt_id)!.push(a);
@@ -636,8 +636,8 @@ export function baueKraeftebild(
           detail: ep.funktion ?? null,
           staerke: ps,
           soll: null,
-          statusKategorie: ep.status_kategorie,
-          statusLabel: ep.status_label,
+          statusKategorie: ep.status_kategorie ?? null,
+          statusLabel: ep.status_label ?? null,
           menge: null,
           personalVerteilung: null,
           fahrzeugVerteilung: null,
@@ -654,8 +654,8 @@ export function baueKraeftebild(
           detail: ef.fahrzeugtyp ?? null,
           staerke: leereStaerke(),
           soll: null,
-          statusKategorie: ef.status_kategorie,
-          statusLabel: ef.status_label,
+          statusKategorie: ef.status_kategorie ?? null,
+          statusLabel: ef.status_label ?? null,
           menge: null,
           personalVerteilung: null,
           fahrzeugVerteilung: null,

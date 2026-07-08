@@ -27,7 +27,7 @@ const KOMMUNIKATIONSMITTEL_LABEL: Record<string, string> = {
 function baueBaum(abschnitte: Einsatzabschnitt[]): TreeDataNode[] {
   const kinder = new Map<number | null, Einsatzabschnitt[]>();
   for (const a of abschnitte) {
-    const key = a.ueber_abschnitt_id;
+    const key = a.ueber_abschnitt_id ?? null;
     if (!kinder.has(key)) kinder.set(key, []);
     kinder.get(key)!.push(a);
   }

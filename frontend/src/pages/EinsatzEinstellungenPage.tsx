@@ -169,7 +169,9 @@ export default function EinsatzEinstellungenPage() {
     .filter((m) => m.status === 'fertig')
     .map((m) => ({ value: m.key, label: m.label }));
 
-  const aktiveFachebenen = einstellungen.fachebenen_sichtbar;
+  // LFH-120: Backend serialisiert `fachebenen_sichtbar` als untypisiertes JSON (Rust
+  // `Option<serde_json::Value>` → generiert `unknown`); FE kennt die Form via FachebenenSichtbar.
+  const aktiveFachebenen = einstellungen.fachebenen_sichtbar as FachebenenSichtbar | null;
   const initialWerte: FormWerte = {
     standard_modul: einstellungen.standard_modul ?? undefined,
     basemap_modus: einstellungen.basemap_modus ?? undefined,
@@ -242,7 +244,7 @@ export default function EinsatzEinstellungenPage() {
       basemap_modus: werte.basemap_modus ?? null,
       // Start-Zoom wird hier (noch) nicht erhoben — Anwendung im Karten-Kern folgt im
       // Anzeige-Konventionen-Folge-Subtask; Spalte bleibt als Fundament erhalten.
-      karten_zoom_start: einstellungen.karten_zoom_start,
+      karten_zoom_start: einstellungen.karten_zoom_start ?? null,
       fachebenen_sichtbar,
       // Anzeige-Konventionen (LFH-136); leer = projektweiter Default (null).
       zeitzone: werte.zeitzone?.trim() || null,
@@ -487,7 +489,9 @@ export default function EinsatzEinstellungenPage() {
                   onChange={(checked) =>
                     overrideMutation.mutate({
                       modulKey: m.key,
-                      update: { sichtbar: checked, benoetigte_rolle: rolle },
+                      // LFH-120: Backend typisiert benoetigte_rolle als freien Option<String>
+                      // (generiert `string | null`); FE verengt auf die gültigen Rollen-Codes.
+                      update: { sichtbar: checked, benoetigte_rolle: rolle as ModulOverrideUpdate['benoetigte_rolle'] },
                     })
                   }
                 />

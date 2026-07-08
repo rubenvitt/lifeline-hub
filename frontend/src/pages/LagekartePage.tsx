@@ -64,16 +64,16 @@ function leseBildSeitenverhaeltnis(datei: File): Promise<number> {
 function kopfMitKoordinate(e: EinsatzAnzeige, lat: number | null, lon: number | null): KopfdatenUpdate {
   return {
     bezeichnung: e.bezeichnung,
-    stichwort: e.stichwort,
+    stichwort: e.stichwort ?? null,
     einsatzart: e.einsatzart,
-    einsatznummer_intern: e.einsatznummer_intern,
-    leitstellen_nr: e.leitstellen_nr,
-    einsatzort: e.einsatzort,
+    einsatznummer_intern: e.einsatznummer_intern ?? null,
+    leitstellen_nr: e.leitstellen_nr ?? null,
+    einsatzort: e.einsatzort ?? null,
     einsatzort_lat: lat,
     einsatzort_lon: lon,
-    meldende_stelle: e.meldende_stelle,
-    sachverhalt: e.sachverhalt,
-    anzahl_betroffene_initial: e.anzahl_betroffene_initial,
+    meldende_stelle: e.meldende_stelle ?? null,
+    sachverhalt: e.sachverhalt ?? null,
+    anzahl_betroffene_initial: e.anzahl_betroffene_initial ?? null,
     begonnen_at: e.begonnen_at,
   };
 }
@@ -184,7 +184,9 @@ export default function LagekartePage() {
     fachebenenInitRef.current = true;
     // Priorität: gemerkte (localStorage) Auswahl → Einsatz-Default → alles aus.
     const gespeichert = liesFachebenenSichtbar(einsatzId);
-    const einsatzDefault = einstellungenQuery.data?.fachebenen_sichtbar ?? null;
+    // LFH-120: `fachebenen_sichtbar` ist backendseitig untypisiertes JSON (generiert `unknown`);
+    // die Form entspricht FachebenenSichtbar (Karten-Default).
+    const einsatzDefault = (einstellungenQuery.data?.fachebenen_sichtbar ?? null) as FachebenenSichtbar | null;
     if (gespeichert) setFachebenenSichtbar(gespeichert);
     else if (einsatzDefault) setFachebenenSichtbar(einsatzDefault);
   }, [einsatzId, einstellungenQuery.isLoading, einstellungenQuery.data]);
@@ -364,7 +366,7 @@ export default function LagekartePage() {
           z.typ === 'gefahrengebiet' && z.gefahrengebiet_id != null
             ? gefahrengebietStil(gebietWarnstufe.get(z.gefahrengebiet_id) ?? 'keine')
             : zoneStil(z.typ, z.farbe);
-        return [{ id: z.id, geometrie: g, label: z.label, stil }];
+        return [{ id: z.id, geometrie: g, label: z.label ?? null, stil }];
       }),
     [zonenQuery.data, layer.zone, gebietWarnstufe],
   );

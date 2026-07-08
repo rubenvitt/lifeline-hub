@@ -195,7 +195,7 @@ pub struct TierAnzeige {
     pub spezies: String,
     pub rasse_beschreibung: Option<String>,
     pub rufname: Option<String>,
-    #[schema(value_type = TierGeschlecht)]
+    #[schema(value_type = Option<TierGeschlecht>)]
     pub geschlecht: Option<String>,
     pub alter_geschaetzt: Option<i64>,
     pub farbe_beschreibung: Option<String>,
@@ -205,7 +205,7 @@ pub struct TierAnzeige {
     pub halter_kontakt: Option<String>,
     pub antreff_ort: Option<String>,
     pub notiz: Option<String>,
-    #[schema(value_type = AbschlussGrund)]
+    #[schema(value_type = Option<AbschlussGrund>)]
     pub abschluss_grund: Option<String>,
     pub abschluss_ziel: Option<String>,
     pub erfasst_at: String,

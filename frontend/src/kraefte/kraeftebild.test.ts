@@ -5,14 +5,14 @@ import type { Einheit, EinsatzPersonal, EinsatzFahrzeug, EinsatzMaterial, Einsat
 const ab = (id: number, ueber: number | null = null, name = `A${id}`): Einsatzabschnitt =>
   ({ id, einsatz_id: 1, ueber_abschnitt_id: ueber, name, leiter_id: null, leiter_name: null,
      bemerkung: null, sortier: id, flaeche_geojson: null, tz_fachaufgabe: null, tz_organisation: null,
-     sprechgruppe_tmo: null, sprechgruppe_dmo: null, kommunikationsmittel: null, erreichbarkeit: null });
+     sprechgruppe_tmo: null, sprechgruppe_dmo: null, kommunikationsmittel: null, erreichbarkeit: null, sprechgruppen: [] });
 const eh = (id: number, abschnitt_id: number | null, ueber_einheit_id: number | null = null): Einheit =>
   ({ id, einsatz_id: 1, abschnitt_id, abschnitt_name: null, ueber_einheit_id, typ_id: null,
      typ_label: 'Gruppe', name: `E${id}`, fuehrer_id: null, fuehrer_name: null, bemerkung: null,
      sortier: id, soll: null, ist: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
      ist_kumuliert: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
      personal_mitglieder: [], fahrzeug_mitglieder: [], material_mitglieder: [],
-     lat: null, lon: null, tz_fachaufgabe: null, tz_organisation: null, aktueller_br_id: null });
+     lat: null, lon: null, tz_fachaufgabe: null, tz_organisation: null, aktueller_br_id: null, sprechgruppen: [] });
 const p = (id: number, einheit_id: number | null, pos: EinsatzPersonal['staerke_position'],
            kat: EinsatzPersonal['status_kategorie'] = 'gebunden'): EinsatzPersonal =>
   ({ id, einsatz_id: 1, personal_id: null, einheit_id, fahrzeug_id: null, ist_adhoc: false, name: `P${id}`,

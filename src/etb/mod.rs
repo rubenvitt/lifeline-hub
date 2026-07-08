@@ -132,7 +132,7 @@ pub struct EtbEintragAnzeige {
     pub inhalt: String,
     pub von: Option<String>,
     pub an: Option<String>,
-    #[schema(value_type = MeldeWeg)]
+    #[schema(value_type = Option<MeldeWeg>)]
     pub meldeweg: Option<String>,
     pub veranlassung: Option<String>,
     pub erfasser_id: i64,

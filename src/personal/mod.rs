@@ -66,7 +66,7 @@ pub struct PersonalAnzeige {
     pub personalnummer: Option<String>,
     pub traegerorganisation: Option<String>,
     pub telefon: Option<String>,
-    #[schema(value_type = crate::staerke::StaerkePosition)]
+    #[schema(value_type = Option<crate::staerke::StaerkePosition>)]
     pub staerke_position: Option<String>,
     pub bemerkung: Option<String>,
     #[schema(value_type = crate::katalog::Dienststatus)]
@@ -121,11 +121,11 @@ pub struct EinsatzPersonalAnzeige {
     /// Qualifikationen/Funktion als flacher Text (Live recomposed oder Snapshot).
     pub funktion: Option<String>,
     pub traegerorganisation: Option<String>,
-    #[schema(value_type = crate::staerke::StaerkePosition)]
+    #[schema(value_type = Option<crate::staerke::StaerkePosition>)]
     pub staerke_position: Option<String>,
     pub status_id: Option<i64>,
     pub status_label: Option<String>,
-    #[schema(value_type = crate::katalog::StatusKategorie)]
+    #[schema(value_type = Option<crate::katalog::StatusKategorie>)]
     pub status_kategorie: Option<String>,
     pub status_farbe: Option<String>,
     pub bemerkung: Option<String>,

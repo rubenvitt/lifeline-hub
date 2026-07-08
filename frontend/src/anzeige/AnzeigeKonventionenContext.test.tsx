@@ -33,6 +33,7 @@ function einstellungenMock(partial: Partial<EinsatzEinstellungen> = {}): Einsatz
     auto_etb_eintraege: null, retention_dauer_tage: null,
     etb_nummer_eingefroren: false, meldung_nummer_eingefroren: false, auftrag_nummer_eingefroren: false,
     geaendert_at: null, geaendert_von: null,
+    org_defaults: orgDefaultsMock(),
     ...partial,
   };
 }
@@ -40,6 +41,7 @@ function einstellungenMock(partial: Partial<EinsatzEinstellungen> = {}): Einsatz
 /** Vollständiges OrgEinstellungen-Mock für das eingebettete `org_defaults`-Feld. */
 function orgDefaultsMock(partial: Partial<OrgEinstellungen> = {}): OrgEinstellungen {
   return {
+    org_id: 1,
     zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
     retention_dauer_tage: null, etb_nummer_praefix: null, meldung_nummer_praefix: null,
     auftrag_nummer_praefix: null, meldung_bestaetigung_frist_min: null,
@@ -65,6 +67,7 @@ describe('useAnzeigeKonventionen', () => {
       fachebenen_sichtbar: null,
       zeitzone: 'Europe/Berlin', zeitformat: '12h', einheiten: 'metrisch', koordinatenformat: 'mgrs',
       etb_nummer_praefix: null, etb_nummer_start: null, meldung_nummer_praefix: null, meldung_nummer_start: null, auftrag_nummer_praefix: null, auftrag_nummer_start: null, meldung_bestaetigung_frist_min: null, auftrag_quittierung_frist_min: null, auto_etb_eintraege: null, etb_nummer_eingefroren: false, meldung_nummer_eingefroren: false, auftrag_nummer_eingefroren: false, retention_dauer_tage: null, geaendert_at: null, geaendert_von: null,
+      org_defaults: { org_id: 1 },
     });
 
     renderMitProviders(
@@ -87,6 +90,7 @@ describe('useAnzeigeKonventionen', () => {
       fachebenen_sichtbar: null,
       zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
       etb_nummer_praefix: null, etb_nummer_start: null, meldung_nummer_praefix: null, meldung_nummer_start: null, auftrag_nummer_praefix: null, auftrag_nummer_start: null, meldung_bestaetigung_frist_min: null, auftrag_quittierung_frist_min: null, auto_etb_eintraege: null, etb_nummer_eingefroren: false, meldung_nummer_eingefroren: false, auftrag_nummer_eingefroren: false, retention_dauer_tage: null, geaendert_at: null, geaendert_von: null,
+      org_defaults: { org_id: 1 },
     });
 
     renderMitProviders(
@@ -106,6 +110,7 @@ describe('useAnzeigeKonventionen', () => {
       fachebenen_sichtbar: null,
       zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: 'wgs84',
       etb_nummer_praefix: null, etb_nummer_start: null, meldung_nummer_praefix: null, meldung_nummer_start: null, auftrag_nummer_praefix: null, auftrag_nummer_start: null, meldung_bestaetigung_frist_min: null, auftrag_quittierung_frist_min: null, auto_etb_eintraege: null, etb_nummer_eingefroren: false, meldung_nummer_eingefroren: false, auftrag_nummer_eingefroren: false, retention_dauer_tage: null, geaendert_at: null, geaendert_von: null,
+      org_defaults: { org_id: 1 },
     });
 
     renderMitProviders(

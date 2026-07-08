@@ -26,6 +26,6 @@ export function benenneGefahrengebiet(einsatzId: number, gefahrengebietId: numbe
 }
 
 /** Anzeigename eines Gefahrengebiets: Label, sonst Fallback „Gefahrengebiet #<id>". */
-export function gefahrengebietName(label: string | null, id: number): string {
+export function gefahrengebietName(label: string | null | undefined, id: number): string {
   return label?.trim() ? label : `Gefahrengebiet #${id}`;
 }

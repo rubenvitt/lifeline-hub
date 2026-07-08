@@ -80,7 +80,7 @@ pub struct ChatNachrichtAnzeige {
     /// Polymorpher Sachbezug (LFH-103): Verweis auf ein bestehendes Domänenobjekt.
     /// `None`/`None`, wenn kein Bezug gesetzt ist (both-or-neither). `bezug_typ` ist
     /// ein [`BezugTyp`]-Code, `bezug_id` die Objekt-ID im selben Einsatz.
-    #[schema(value_type = BezugTyp)]
+    #[schema(value_type = Option<BezugTyp>)]
     pub bezug_typ: Option<String>,
     pub bezug_id: Option<i64>,
     /// Angehängte Dateien (Metadaten, ohne Bytes). Wird nicht aus der

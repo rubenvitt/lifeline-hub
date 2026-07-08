@@ -28,6 +28,7 @@ import {
 // --- Hilfsfunktionen ---
 
 const LEERE_EINSTELLUNGEN = {
+  org_id: 1,
   zeitzone: null,
   zeitformat: null,
   einheiten: null,
@@ -77,6 +78,7 @@ describe('GlobalEinstellungenPage', () => {
 
   it('sendet beim Submit alle Felder exakt im richtigen Format (Feldabdeckung)', async () => {
     vi.mocked(ladeOrgEinstellungen).mockResolvedValue({
+      org_id: 1,
       zeitzone: 'Europe/Berlin',
       zeitformat: '12h',
       einheiten: 'imperial',

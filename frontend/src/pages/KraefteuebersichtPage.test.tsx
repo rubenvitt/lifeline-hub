@@ -44,6 +44,7 @@ const ABSCHNITT_A1 = {
   leiter_id: null, leiter_name: null, bemerkung: null, sortier: 1,
   flaeche_geojson: null, tz_fachaufgabe: null, tz_organisation: null,
   sprechgruppe_tmo: null, sprechgruppe_dmo: null, kommunikationsmittel: null, erreichbarkeit: null,
+  sprechgruppen: [],
 };
 
 const EINHEIT_E10 = {
@@ -57,6 +58,7 @@ const EINHEIT_E10 = {
   personal_mitglieder: [], fahrzeug_mitglieder: [], material_mitglieder: [],
   lat: null, lon: null, tz_fachaufgabe: null, tz_organisation: null,
   aktueller_br_id: null,
+  sprechgruppen: [],
 };
 
 const FAHRZEUG_F1 = {

@@ -350,7 +350,6 @@
           "id",
           "auftrag_id",
           "empfaenger_typ",
-          "extern_kategorie",
           "snap_anzeige"
         ],
         "properties": {
@@ -382,8 +381,15 @@
             ]
           },
           "extern_kategorie": {
-            "$ref": "#/components/schemas/AdressatKategorie",
-            "description": "Externer Adressat (LFH-87): Kategorie + Bezeichnung (nur bei empfaenger_typ='extern')."
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AdressatKategorie",
+                "description": "Externer Adressat (LFH-87): Kategorie + Bezeichnung (nur bei empfaenger_typ='extern')."
+              }
+            ]
           },
           "fahrzeug_id": {
             "type": [
@@ -949,7 +955,6 @@
           "autor_id",
           "autor_name",
           "erstellt_at",
-          "bezug_typ",
           "anhaenge"
         ],
         "properties": {
@@ -988,8 +993,15 @@
             "format": "int64"
           },
           "bezug_typ": {
-            "$ref": "#/components/schemas/BezugTyp",
-            "description": "Polymorpher Sachbezug (LFH-103): Verweis auf ein bestehendes Domänenobjekt.\n`None`/`None`, wenn kein Bezug gesetzt ist (both-or-neither). `bezug_typ` ist\nein [`BezugTyp`]-Code, `bezug_id` die Objekt-ID im selben Einsatz."
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BezugTyp",
+                "description": "Polymorpher Sachbezug (LFH-103): Verweis auf ein bestehendes Domänenobjekt.\n`None`/`None`, wenn kein Bezug gesetzt ist (both-or-neither). `bezug_typ` ist\nein [`BezugTyp`]-Code, `bezug_id` die Objekt-ID im selben Einsatz."
+              }
+            ]
           },
           "einsatz_id": {
             "type": "integer",
@@ -1252,7 +1264,6 @@
         "required": [
           "ep_id",
           "name",
-          "staerke_position",
           "ist_fuehrer"
         ],
         "properties": {
@@ -1275,7 +1286,14 @@
             "type": "string"
           },
           "staerke_position": {
-            "$ref": "#/components/schemas/StaerkePosition"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/StaerkePosition"
+              }
+            ]
           }
         }
       },
@@ -1331,8 +1349,7 @@
           "status",
           "begonnen_at",
           "einsatzart",
-          "angelegt_at",
-          "meine_rolle"
+          "angelegt_at"
         ],
         "properties": {
           "abgeschlossen_at": {
@@ -1404,7 +1421,14 @@
             ]
           },
           "meine_rolle": {
-            "$ref": "#/components/schemas/EinsatzRolle"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EinsatzRolle"
+              }
+            ]
           },
           "meldende_stelle": {
             "type": [
@@ -1451,7 +1475,6 @@
           "einsatz_id",
           "ist_adhoc",
           "funkrufname",
-          "status_kategorie",
           "disponiert_at"
         ],
         "properties": {
@@ -1566,7 +1589,14 @@
             "format": "int64"
           },
           "status_kategorie": {
-            "$ref": "#/components/schemas/StatusKategorie"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/StatusKategorie"
+              }
+            ]
           },
           "status_label": {
             "type": [
@@ -1736,8 +1766,6 @@
           "einsatz_id",
           "ist_adhoc",
           "name",
-          "staerke_position",
-          "status_kategorie",
           "disponiert_at"
         ],
         "properties": {
@@ -1803,7 +1831,14 @@
             "description": "`None` = Ad-hoc-externe Person (kein Stamm-Bezug)."
           },
           "staerke_position": {
-            "$ref": "#/components/schemas/StaerkePosition"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/StaerkePosition"
+              }
+            ]
           },
           "status_farbe": {
             "type": [
@@ -1819,7 +1854,14 @@
             "format": "int64"
           },
           "status_kategorie": {
-            "$ref": "#/components/schemas/StatusKategorie"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/StatusKategorie"
+              }
+            ]
           },
           "status_label": {
             "type": [
@@ -1973,10 +2015,6 @@
         "description": "API-Darstellung der Einstellungen (`fachebenen_sichtbar` als Objekt).",
         "required": [
           "einsatz_id",
-          "basemap_modus",
-          "zeitformat",
-          "einheiten",
-          "koordinatenformat",
           "etb_nummer_eingefroren",
           "meldung_nummer_eingefroren",
           "auftrag_nummer_eingefroren"
@@ -2013,10 +2051,24 @@
             "format": "int64"
           },
           "basemap_modus": {
-            "$ref": "#/components/schemas/BasemapModus"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BasemapModus"
+              }
+            ]
           },
           "einheiten": {
-            "$ref": "#/components/schemas/EinheitenSystem"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EinheitenSystem"
+              }
+            ]
           },
           "einsatz_id": {
             "type": "integer",
@@ -2061,7 +2113,14 @@
             "format": "double"
           },
           "koordinatenformat": {
-            "$ref": "#/components/schemas/Koordinatenformat"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Koordinatenformat"
+              }
+            ]
           },
           "meldung_bestaetigung_frist_min": {
             "type": [
@@ -2101,7 +2160,14 @@
             ]
           },
           "zeitformat": {
-            "$ref": "#/components/schemas/Zeitformat"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Zeitformat"
+              }
+            ]
           },
           "zeitzone": {
             "type": [
@@ -2266,7 +2332,6 @@
           "label",
           "typ",
           "inhalt",
-          "meldeweg",
           "sortier"
         ],
         "properties": {
@@ -2281,7 +2346,14 @@
             "type": "string"
           },
           "meldeweg": {
-            "$ref": "#/components/schemas/MeldeWeg"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MeldeWeg"
+              }
+            ]
           },
           "sortier": {
             "type": "integer",
@@ -2306,7 +2378,6 @@
           "lfd_nr",
           "typ",
           "inhalt",
-          "meldeweg",
           "erfasser_id",
           "erfasser_name",
           "ereigniszeit",
@@ -2378,7 +2449,14 @@
             "format": "int64"
           },
           "meldeweg": {
-            "$ref": "#/components/schemas/MeldeWeg"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MeldeWeg"
+              }
+            ]
           },
           "received_at": {
             "type": "string"
@@ -3851,10 +3929,7 @@
         "type": "object",
         "description": "API-Darstellung der Org-Einstellungen (flach, alle Felder serialisiert).",
         "required": [
-          "org_id",
-          "zeitformat",
-          "einheiten",
-          "koordinatenformat"
+          "org_id"
         ],
         "properties": {
           "auftrag_nummer_praefix": {
@@ -3878,7 +3953,14 @@
             "format": "int64"
           },
           "einheiten": {
-            "$ref": "#/components/schemas/EinheitenSystem"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EinheitenSystem"
+              }
+            ]
           },
           "etb_nummer_praefix": {
             "type": [
@@ -3906,7 +3988,14 @@
             ]
           },
           "koordinatenformat": {
-            "$ref": "#/components/schemas/Koordinatenformat"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Koordinatenformat"
+              }
+            ]
           },
           "meldung_bestaetigung_frist_min": {
             "type": [
@@ -3933,7 +4022,14 @@
             "format": "int64"
           },
           "zeitformat": {
-            "$ref": "#/components/schemas/Zeitformat"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Zeitformat"
+              }
+            ]
           },
           "zeitzone": {
             "type": [
@@ -3947,10 +4043,7 @@
         "type": "object",
         "description": "Schlanke API-Darstellung für den Einsatz-Endpoint: nur Konventions-Felder,\nKEIN `geaendert_at`, KEIN `geaendert_von` — Audit-Schutz für Non-Admin-Mitglieder.",
         "required": [
-          "org_id",
-          "zeitformat",
-          "einheiten",
-          "koordinatenformat"
+          "org_id"
         ],
         "properties": {
           "auftrag_nummer_praefix": {
@@ -3974,7 +4067,14 @@
             "format": "int64"
           },
           "einheiten": {
-            "$ref": "#/components/schemas/EinheitenSystem"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EinheitenSystem"
+              }
+            ]
           },
           "etb_nummer_praefix": {
             "type": [
@@ -3983,7 +4083,14 @@
             ]
           },
           "koordinatenformat": {
-            "$ref": "#/components/schemas/Koordinatenformat"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Koordinatenformat"
+              }
+            ]
           },
           "meldung_bestaetigung_frist_min": {
             "type": [
@@ -4010,7 +4117,14 @@
             "format": "int64"
           },
           "zeitformat": {
-            "$ref": "#/components/schemas/Zeitformat"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Zeitformat"
+              }
+            ]
           },
           "zeitzone": {
             "type": [
@@ -4100,16 +4214,21 @@
           "einsatz_id",
           "registrier_nr",
           "status",
-          "geschlecht",
           "erfasst_at",
           "erfasst_von",
           "geaendert_at",
-          "geaendert_von",
-          "aktuelle_sichtung"
+          "geaendert_von"
         ],
         "properties": {
           "aktuelle_sichtung": {
-            "$ref": "#/components/schemas/Sichtungskategorie"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Sichtungskategorie"
+              }
+            ]
           },
           "aktuelle_sichtung_at": {
             "type": [
@@ -4175,7 +4294,14 @@
             ]
           },
           "geschlecht": {
-            "$ref": "#/components/schemas/Geschlecht"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Geschlecht"
+              }
+            ]
           },
           "herkunft_adresse": {
             "type": [
@@ -4286,7 +4412,6 @@
         "required": [
           "id",
           "name",
-          "staerke_position",
           "dienststatus",
           "angelegt_at",
           "qualifikationen"
@@ -4331,7 +4456,14 @@
             }
           },
           "staerke_position": {
-            "$ref": "#/components/schemas/StaerkePosition"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/StaerkePosition"
+              }
+            ]
           },
           "telefon": {
             "type": [
@@ -4539,7 +4671,6 @@
           "ausmass",
           "ort",
           "beschreibung",
-          "abschluss_grund",
           "erfasst_at",
           "erfasst_von",
           "geaendert_at",
@@ -4553,7 +4684,14 @@
             ]
           },
           "abschluss_grund": {
-            "$ref": "#/components/schemas/SchadenAbschlussGrund"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SchadenAbschlussGrund"
+              }
+            ]
           },
           "ausmass": {
             "$ref": "#/components/schemas/Ausmass"
@@ -4912,8 +5050,6 @@
           "registrier_nr",
           "status",
           "spezies",
-          "geschlecht",
-          "abschluss_grund",
           "erfasst_at",
           "erfasst_von",
           "geaendert_at",
@@ -4921,7 +5057,14 @@
         ],
         "properties": {
           "abschluss_grund": {
-            "$ref": "#/components/schemas/AbschlussGrund"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AbschlussGrund"
+              }
+            ]
           },
           "abschluss_ziel": {
             "type": [
@@ -4967,7 +5110,14 @@
             "format": "int64"
           },
           "geschlecht": {
-            "$ref": "#/components/schemas/TierGeschlecht"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TierGeschlecht"
+              }
+            ]
           },
           "groesse_gewicht": {
             "type": [
@@ -5216,7 +5366,6 @@
           "einsatz_id",
           "person_id",
           "art",
-          "status",
           "zeitpunkt_at",
           "erfasst_von"
         ],
@@ -5247,7 +5396,14 @@
             "format": "int64"
           },
           "status": {
-            "$ref": "#/components/schemas/VerbleibStatus"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/VerbleibStatus"
+              }
+            ]
           },
           "transportmittel": {
             "type": [

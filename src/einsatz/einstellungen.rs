@@ -254,16 +254,16 @@ impl EinsatzEinstellungen {
 pub struct EinstellungenAnzeige {
     pub einsatz_id: i64,
     pub standard_modul: Option<String>,
-    #[schema(value_type = BasemapModus)]
+    #[schema(value_type = Option<BasemapModus>)]
     pub basemap_modus: Option<String>,
     pub karten_zoom_start: Option<f64>,
     pub fachebenen_sichtbar: Option<serde_json::Value>,
     pub zeitzone: Option<String>,
-    #[schema(value_type = Zeitformat)]
+    #[schema(value_type = Option<Zeitformat>)]
     pub zeitformat: Option<String>,
-    #[schema(value_type = EinheitenSystem)]
+    #[schema(value_type = Option<EinheitenSystem>)]
     pub einheiten: Option<String>,
-    #[schema(value_type = Koordinatenformat)]
+    #[schema(value_type = Option<Koordinatenformat>)]
     pub koordinatenformat: Option<String>,
     // Verhalten & Automatik (LFH-133).
     pub etb_nummer_praefix: Option<String>,

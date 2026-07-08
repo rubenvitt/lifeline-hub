@@ -144,7 +144,7 @@ pub struct EinsatzFahrzeugAnzeige {
     pub traegerorganisation: Option<String>,
     pub status_id: Option<i64>,
     pub status_label: Option<String>,
-    #[schema(value_type = crate::katalog::StatusKategorie)]
+    #[schema(value_type = Option<crate::katalog::StatusKategorie>)]
     pub status_kategorie: Option<String>,
     pub status_farbe: Option<String>,
     pub bemerkung: Option<String>,

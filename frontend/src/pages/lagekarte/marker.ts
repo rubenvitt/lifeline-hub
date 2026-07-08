@@ -133,7 +133,7 @@ export function baueTaktischeMarker(
   const nichtVerortet: NichtVerortet[] = [];
   const add = (
     typ: 'einheit' | 'fahrzeug' | 'fuehrung', id: number, label: string,
-    lat: number | null, lon: number | null, tz: TzProps, statusFarbe?: string | null,
+    lat: number | null | undefined, lon: number | null | undefined, tz: TzProps, statusFarbe?: string | null,
   ) => {
     if (lat != null && lon != null) {
       verortet.push({ schluessel: `${typ}-${id}`, typ, id, lat, lon, label, farbe: '#555', tz, statusFarbe });
