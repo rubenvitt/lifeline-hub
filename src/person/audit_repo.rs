@@ -1,9 +1,10 @@
 use crate::error::AppError;
 use serde::Serialize;
 use sqlx::SqlitePool;
+use utoipa::ToSchema;
 
 /// Ein Audit-Eintrag mit aufgelöstem Benutzernamen (für die Audit-Einsicht).
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct ZugriffAnzeige {
     pub id: i64,
     pub person_id: Option<i64>,

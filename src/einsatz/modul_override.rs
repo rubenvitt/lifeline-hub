@@ -9,10 +9,11 @@ use crate::error::AppError;
 use serde::Serialize;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
+use utoipa::ToSchema;
 
 /// Override-Zeile wie in der DB abgelegt. `sichtbar` aus INTEGER (0/1) dekodiert;
 /// `benoetigte_rolle` ist `None` (= frei) oder ein gültiger Rollen-String.
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct EinsatzModulOverride {
     pub einsatz_id: i64,
     pub modul_key: String,

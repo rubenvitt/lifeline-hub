@@ -24,7 +24,6 @@ pub struct FachebeneAntwort {
     pub attribution: String,
     pub stand: Option<String>,
     /// GeoJSON FeatureCollection.
-    #[schema(value_type = Object)]
     pub features: Value,
 }
 

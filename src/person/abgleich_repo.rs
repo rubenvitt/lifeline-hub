@@ -1,14 +1,16 @@
 use crate::error::AppError;
 use serde::Serialize;
 use sqlx::SqlitePool;
+use utoipa::ToSchema;
 
 /// Ein Vermisstenabgleich (1:1 zu `person_abgleich`).
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct AbgleichAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
     pub vermisst_person_id: i64,
     pub gefunden_person_id: i64,
+    #[schema(value_type = crate::person::AbgleichStatus)]
     pub status: String,
     pub erstellt_at: String,
     pub erstellt_von: i64,

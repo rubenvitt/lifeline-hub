@@ -69,12 +69,15 @@ pub enum Warnstufe {
 
 /// Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält nur Zellen mit
 /// `warnstufe != 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct GefahrBewertungAnzeige {
     pub id: i64,
     pub gefahrengebiet_id: i64,
+    #[schema(value_type = Gefahrentyp)]
     pub gefahrentyp: String,
+    #[schema(value_type = Schutzobjekt)]
     pub schutzobjekt: String,
+    #[schema(value_type = Warnstufe)]
     pub warnstufe: String,
     pub beschreibung: Option<String>,
     pub gemeldet_von: Option<String>,
@@ -86,12 +89,13 @@ pub struct GefahrBewertungAnzeige {
 /// Ein Gefahrengebiet (Gruppe aus 1..n gefahrengebiet-Zonen), trägt eine Matrix.
 /// `zonen_ids`: zugehörige lage_zone-IDs. `hoechste_warnstufe`: stärkste gesetzte
 /// Zelle der Matrix (Severity-Maximum), `keine` wenn nichts gesetzt.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct GefahrengebietAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
     pub label: Option<String>,
     pub zonen_ids: Vec<i64>,
+    #[schema(value_type = Warnstufe)]
     pub hoechste_warnstufe: String,
 }
 

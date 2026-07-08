@@ -2,6 +2,7 @@ pub mod repo;
 
 use crate::etb::EtbTyp;
 use serde::Serialize;
+use utoipa::ToSchema;
 
 /// Default-Bausteine, die beim Anlegen einer neuen Organisation geseedet werden.
 /// (label, typ, inhalt, sortier) — muss inhaltlich zum CROSS-JOIN-Seed in
@@ -36,12 +37,14 @@ pub fn ist_baustein_typ(typ: EtbTyp) -> bool {
 
 /// Öffentliche Sicht eines ETB-Baustein-Katalogeintrags. Die DB-Spalten `aktiv`,
 /// `erstellt_at` und `aktualisiert_at` werden bewusst nicht serialisiert.
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct EtbBaustein {
     pub id: i64,
     pub label: String,
+    #[schema(value_type = EtbTyp)]
     pub typ: String,
     pub inhalt: String,
+    #[schema(value_type = crate::etb::MeldeWeg)]
     pub meldeweg: Option<String>,
     pub veranlassung: Option<String>,
     pub sortier: i64,

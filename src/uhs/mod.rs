@@ -249,10 +249,12 @@ pub struct UhsAnzeige {
 pub struct PlatzAnzeige {
     pub id: i64,
     pub uhs_id: i64,
+    #[schema(value_type = PlatzTyp)]
     pub typ: String,
     pub bezeichnung: String,
     pub pos_x: Option<f64>,
     pub pos_y: Option<f64>,
+    #[schema(value_type = Verfuegbarkeit)]
     pub verfuegbarkeit: String,
     pub reserviert_fuer_person_id: Option<i64>,
     pub storniert_at: Option<String>,
@@ -266,6 +268,7 @@ pub struct BelegungAnzeige {
     pub person_id: i64,
     pub uhs_id: i64,
     pub platz_id: Option<i64>,
+    #[schema(value_type = BelegungsArt)]
     pub art: String,
     pub notiz: Option<String>,
     pub zeitpunkt_at: String,

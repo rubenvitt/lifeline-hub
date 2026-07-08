@@ -51,7 +51,7 @@ impl BezugTyp {
 }
 
 /// Öffentliche Darstellung eines Chat-Kanals.
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct ChatKanalAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
@@ -64,7 +64,7 @@ pub struct ChatKanalAnzeige {
 
 /// Öffentliche Darstellung einer Chat-Nachricht. `inhalt` ist `None`, wenn die
 /// Nachricht gelöscht wurde (Tombstone) — der Text wird dann nicht ausgeliefert.
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct ChatNachrichtAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
@@ -80,6 +80,7 @@ pub struct ChatNachrichtAnzeige {
     /// Polymorpher Sachbezug (LFH-103): Verweis auf ein bestehendes Domänenobjekt.
     /// `None`/`None`, wenn kein Bezug gesetzt ist (both-or-neither). `bezug_typ` ist
     /// ein [`BezugTyp`]-Code, `bezug_id` die Objekt-ID im selben Einsatz.
+    #[schema(value_type = BezugTyp)]
     pub bezug_typ: Option<String>,
     pub bezug_id: Option<i64>,
     /// Angehängte Dateien (Metadaten, ohne Bytes). Wird nicht aus der

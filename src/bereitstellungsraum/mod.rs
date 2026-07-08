@@ -108,7 +108,7 @@ impl BrBelegungsArt {
 }
 
 /// Serialisierbare BR-Anzeige (1:1 zur Tabelle `bereitstellungsraum`).
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct BrAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
@@ -116,6 +116,7 @@ pub struct BrAnzeige {
     pub bezeichnung: String,
     pub standort: Option<String>,
     pub notiz: Option<String>,
+    #[schema(value_type = BrStatus)]
     pub status: String,
     pub erfasst_at: String,
     pub erfasst_von: i64,
@@ -125,13 +126,15 @@ pub struct BrAnzeige {
 }
 
 /// Belegungs-Verlaufseintrag (1:1 zu `br_belegung`).
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct BrBelegungAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
     pub br_id: i64,
+    #[schema(value_type = ObjektTyp)]
     pub objekt_typ: String,
     pub objekt_id: i64,
+    #[schema(value_type = BrBelegungsArt)]
     pub art: String,
     pub notiz: Option<String>,
     pub zeitpunkt_at: String,

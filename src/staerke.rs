@@ -4,7 +4,7 @@ use utoipa::ToSchema;
 /// Taktische Stärke (FwDV 3 / DV 100): Führer / Unterführer / Mannschaft.
 /// `gesamt` wird berechnet, nicht gespeichert. `u16`, damit auch ein Verband/Stab
 /// über 255 nicht anstößt. Wiederverwendbar für Personal/Einheiten (K&M‑2/3).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 pub struct Staerke {
     pub fuehrer: u16,
     pub unterfuehrer: u16,

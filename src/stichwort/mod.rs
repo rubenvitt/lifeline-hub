@@ -1,9 +1,10 @@
 use crate::error::AppError;
 use serde::Serialize;
 use sqlx::SqlitePool;
+use utoipa::ToSchema;
 
 /// Org-weiter Einsatzstichwort-Vorschlag für die Combobox.
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct StichwortVorschlag {
     pub id: i64,
     pub text: String,

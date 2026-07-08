@@ -5,6 +5,7 @@ pub mod typ_repo;
 use crate::sprechgruppe::SprechgruppeAnzeige;
 use crate::staerke::Staerke;
 use serde::Serialize;
+use utoipa::ToSchema;
 
 /// Default-Einheitstyp-Katalog je neu angelegter Organisation
 /// (label, soll_fuehrer, soll_unterfuehrer, soll_mannschaft, sortier).
@@ -20,7 +21,7 @@ pub const EINHEIT_TYP_STARTLISTE: [(&str, Option<i64>, Option<i64>, Option<i64>,
 
 /// Einheitstyp-Katalog-Eintrag (org-weit), inkl. aufgelöster optionaler Soll-Stärke.
 /// `aktiv` wird nicht serialisiert (Listen-Endpunkt liefert ohnehin nur aktive).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct EinheitTyp {
     pub id: i64,
     pub label: String,
@@ -30,19 +31,20 @@ pub struct EinheitTyp {
 }
 
 /// Personal-Mitglied einer Einheit (leichtgewichtig für die Einheiten-Anzeige).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct EinheitMitgliedPerson {
     /// `einsatz_personal.id` der Dispozeile.
     pub ep_id: i64,
     pub name: String,
     pub funktion: Option<String>,
+    #[schema(value_type = crate::staerke::StaerkePosition)]
     pub staerke_position: Option<String>,
     /// `true`, wenn diese Person als Führer der Einheit eingetragen ist.
     pub ist_fuehrer: bool,
 }
 
 /// Fahrzeug-Mitglied einer Einheit (leichtgewichtig).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct EinheitMitgliedFahrzeug {
     /// `einsatz_fahrzeug.id` der Dispozeile.
     pub ef_id: i64,
@@ -51,20 +53,21 @@ pub struct EinheitMitgliedFahrzeug {
 }
 
 /// Material-Mitglied einer Einheit (leichtgewichtig).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct EinheitMitgliedMaterial {
     /// `einsatz_material.id` der Dispozeile.
     pub em_id: i64,
     pub bezeichnung: String,
     pub menge: i64,
     /// Festes Status-Enum als String (z. B. "einsatzbereit").
+    #[schema(value_type = crate::material::MaterialStatus)]
     pub status: String,
 }
 
 /// Aufgelöste Einheiten-Anzeige inkl. Typ/Abschnitt-Labels, Führer-Identität,
 /// Mitgliedern und berechneter Stärke. `soll` ist optional (Override → Typ-Default →
 /// `None`); `ist`/`ist_kumuliert` sind immer gesetzt.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct EinheitAnzeige {
     pub id: i64,
     pub einsatz_id: i64,

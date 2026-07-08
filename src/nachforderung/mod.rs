@@ -64,17 +64,20 @@ pub fn uebergang_erlaubt(von: &str, nach: &str) -> bool {
 
 /// Anzeige einer Nachforderung inkl. Ersteller-Name (JOIN) und abgeleitetem `ist_offen`
 /// (noch nicht eingetroffen/abgelehnt). Reihenfolge der Felder = SELECT-Projektion.
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct NachforderungAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
     pub art: String,
     pub bezeichnung: String,
     pub anzahl: Option<i64>,
+    #[schema(value_type = crate::kommunikation::AdressatKategorie)]
     pub adressat_kategorie: String,
     pub adressat_bezeichnung: Option<String>,
     pub begruendung: Option<String>,
+    #[schema(value_type = crate::kommunikation::Prioritaet)]
     pub prioritaet: String,
+    #[schema(value_type = NachforderungStatus)]
     pub status: String,
     pub zugesagt_at: Option<String>,
     pub unterwegs_at: Option<String>,

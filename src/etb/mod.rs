@@ -123,14 +123,16 @@ pub fn normalisiere_zeit(eingabe: &str) -> Result<String, AppError> {
 
 /// Öffentliche Darstellung eines ETB-Eintrags für API-Antworten und SSE.
 /// `erfasser_name` ist der Anzeigename des Erfassers (per JOIN ermittelt).
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct EtbEintragAnzeige {
     pub id: i64,
     pub lfd_nr: i64,
+    #[schema(value_type = EtbTyp)]
     pub typ: String,
     pub inhalt: String,
     pub von: Option<String>,
     pub an: Option<String>,
+    #[schema(value_type = MeldeWeg)]
     pub meldeweg: Option<String>,
     pub veranlassung: Option<String>,
     pub erfasser_id: i64,

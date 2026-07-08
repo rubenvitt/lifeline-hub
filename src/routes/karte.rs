@@ -15,6 +15,7 @@ use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use std::collections::{HashMap, HashSet};
 use std::path::{Component, Path as FsPath};
 use std::sync::atomic::Ordering;
@@ -23,7 +24,7 @@ use std::sync::Arc;
 /// Antwort von `GET /api/karte/config`. Liefert NUR, was die Karte zur Laufzeit braucht —
 /// NICHT den Server-Dateipfad der Offline-Kartendatei. Shape ist eingefroren (Frontend-Vertrag,
 /// `frontend/src/api/karte.ts`); nur die Datenquelle wechselte von ENV/Extension auf die DB.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct KarteConfigAntwort {
     pub online_styles: Vec<OnlineStyle>,
     pub offline_verfuegbar: bool,
@@ -49,7 +50,7 @@ pub struct KarteConfigAntwort {
 /// Eine gemeinsam angezeigte Offline-Region im Config-Vertrag (LFH-188). `tiles_url` ist
 /// region-adressiert (`/api/karte/offline/{karte_id}/tiles/{z}/{x}/{y}?v=<token>`), sodass das
 /// Frontend je Region eine eigene Vector-Source mit eigenem Cache-Bust bindet.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct OfflineRegionConfig {
     pub karte_id: i64,
     pub name: String,
@@ -672,7 +673,7 @@ pub async fn online_loeschen(
 /// für `status='laedt'` aus dem transienten In-Memory-State (keine DB-Spalte); `gesamt` ist
 /// `null`, wenn die Quelle keine Content-Length lieferte. Das Frontend rendert daraus den
 /// Fortschrittsbalken.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct OfflineKarteAntwort {
     #[serde(flatten)]
     pub karte: OfflineKarte,
@@ -924,7 +925,7 @@ pub async fn offline_loeschen(
 
 /// Eine im karten_dir vorhandene, aber noch nicht registrierte MBTiles-Datei — Kandidat für den
 /// lokalen Import gebauter Region-Packs (LFH-199, ohne Download/Hosting).
-#[derive(Debug, Serialize, PartialEq)]
+#[derive(Debug, Serialize, PartialEq, ToSchema)]
 pub struct VorhandeneKarte {
     pub dateiname: String,
     pub groesse: i64,

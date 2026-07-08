@@ -15,6 +15,7 @@ use crate::person::sichtung_repo::SichtungAnzeige;
 use crate::person::verbleib_repo::VerbleibAnzeige;
 use crate::person::verlaufsnotiz_repo::NotizAnzeige;
 use serde::Serialize;
+use utoipa::ToSchema;
 use axum::response::{IntoResponse, Response};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -27,7 +28,7 @@ use tokio_stream::{Stream, StreamExt};
 
 /// Detail-Antwort: E‑1-Personenfelder (flatten) + E‑2-Verlauf-Arrays. Genau eine
 /// Antwort, genau ein `detail`-Audit (Spec-Annahme „Lesen / Lese-Audit").
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct PersonDetail {
     #[serde(flatten)]
     pub person: PersonAnzeige,

@@ -96,12 +96,14 @@ impl Benutzer {
 }
 
 /// Öffentliche Benutzerdarstellung (ohne Passwort-Hash) für API-Antworten.
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct BenutzerAnzeige {
     pub id: i64,
     pub anzeigename: String,
     pub benutzername: String,
+    #[schema(value_type = SystemRolle)]
     pub system_rolle: String,
+    #[schema(value_type = OrgRolle)]
     pub org_rolle: String,
     pub aktiv: bool,
     pub erstellt_at: String,

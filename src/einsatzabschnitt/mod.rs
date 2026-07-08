@@ -2,10 +2,11 @@ pub mod repo;
 
 use crate::sprechgruppe::SprechgruppeAnzeige;
 use serde::Serialize;
+use utoipa::ToSchema;
 
 /// Aufgelöste Abschnitts-Anzeige (flach; der Baum wird im FE über
 /// `ueber_abschnitt_id` gebaut), inkl. aufgelöstem Leiter-Namen.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct EinsatzabschnittAnzeige {
     pub id: i64,
     pub einsatz_id: i64,

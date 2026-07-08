@@ -40,7 +40,7 @@ impl Material {
 }
 
 /// Öffentliche Material-Darstellung (ohne `org_id`).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct MaterialAnzeige {
     pub id: i64,
     pub bezeichnung: String,
@@ -49,6 +49,7 @@ pub struct MaterialAnzeige {
     pub traegerorganisation: Option<String>,
     pub standort: Option<String>,
     pub bemerkung: Option<String>,
+    #[schema(value_type = crate::katalog::Dienststatus)]
     pub dienststatus: String,
     pub angelegt_at: String,
 }
@@ -110,6 +111,7 @@ pub struct EinsatzMaterialAnzeige {
     pub bestandsnummer: Option<String>,
     pub traegerorganisation: Option<String>,
     pub menge: i64,
+    #[schema(value_type = MaterialStatus)]
     pub status: String,
     pub bemerkung: Option<String>,
     pub disponiert_at: String,

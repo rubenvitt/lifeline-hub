@@ -84,19 +84,24 @@ pub fn richtung_gueltig(r: &str) -> bool {
 
 /// Anzeige einer Meldung inkl. abgeleiteter Felder (Bearbeitername per JOIN,
 /// `lage_meldung_id` als Herkunfts-Rückverweis, `ist_offen` für Posteingang-Filter).
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct MeldungAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
     pub lfd_nr: i64,
     pub absender: String,
     pub empfaenger: Option<String>,
+    #[schema(value_type = crate::etb::MeldeWeg)]
     pub meldeweg: String,
     pub inhalt: String,
+    #[schema(value_type = Meldungsart)]
     pub meldungsart: String,
+    #[schema(value_type = crate::kommunikation::Prioritaet)]
     pub prioritaet: String,
     /// Richtung intern/extern (LFH-87).
+    #[schema(value_type = crate::kommunikation::Richtung)]
     pub richtung: String,
+    #[schema(value_type = MeldungStatus)]
     pub status: String,
     pub bearbeiter_id: Option<i64>,
     pub bearbeiter_name: Option<String>,
@@ -134,7 +139,7 @@ pub struct MeldungAnzeige {
 
 /// Lageobjekt aus lagerelevanter Meldung (LFH-95). Herkunfts-Felder (meldung_*)
 /// per JOIN — am Lageobjekt bleibt die Quell-Meldung nachvollziehbar.
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct LageMeldungAnzeige {
     pub id: i64,
     pub einsatz_id: i64,

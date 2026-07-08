@@ -3,11 +3,12 @@ pub mod repo;
 pub mod scheduler;
 
 use serde::Serialize;
+use utoipa::ToSchema;
 
 /// Öffentliche Darstellung einer Erinnerung. `ist_faellig` wird pro Read aus
 /// `faellig_at <= jetzt` berechnet (nicht persistiert) — die Fälligkeit ist
 /// damit unabhängig davon korrekt, ob/wann der Scheduler-Tick lief.
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct ErinnerungAnzeige {
     pub id: i64,
     pub einsatz_id: i64,

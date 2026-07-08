@@ -172,17 +172,19 @@ impl Einsatz {
 
 /// Öffentliche Einsatz-Darstellung für API-Antworten,
 /// inklusive Org-Angaben und der Rolle des abfragenden Benutzers.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct EinsatzAnzeige {
     pub id: i64,
     pub org_id: i64,
     pub org_name: String,
     pub bezeichnung: String,
     pub stichwort: Option<String>,
+    #[schema(value_type = EinsatzStatus)]
     pub status: String,
     pub begonnen_at: String,
     pub abgeschlossen_at: Option<String>,
     pub abgeschlossen_von: Option<i64>,
+    #[schema(value_type = Einsatzart)]
     pub einsatzart: String,
     pub einsatznummer_intern: Option<String>,
     pub angelegt_at: String,
@@ -195,15 +197,17 @@ pub struct EinsatzAnzeige {
     pub anzahl_betroffene_initial: Option<i64>,
     /// Aufbewahrungsfrist (LFH-130); `None` = keine Frist gesetzt.
     pub retention_bis: Option<String>,
+    #[schema(value_type = EinsatzRolle)]
     pub meine_rolle: Option<String>,
 }
 
 /// Mitglied eines Einsatzes für API-Antworten (mit Benutzer-Klartext, ohne Hash).
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct MitgliedAnzeige {
     pub benutzer_id: i64,
     pub anzeigename: String,
     pub benutzername: String,
+    #[schema(value_type = EinsatzRolle)]
     pub einsatz_rolle: String,
     pub zugewiesen_at: String,
 }

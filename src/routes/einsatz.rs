@@ -14,6 +14,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use utoipa::ToSchema;
 
 #[derive(Debug, Deserialize)]
 pub struct NeuerEinsatz {
@@ -205,7 +206,7 @@ pub async fn einstellungen_laden(
 
 /// Antwort-Shape von `einstellungen_laden`: rohe Einsatz-Override-Werte (geflacht)
 /// plus org-weite Defaults als eingebettetes Objekt (ohne Audit-Felder).
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct EinstellungenMitOrgDefaults {
     #[serde(flatten)]
     einstellungen: einstellungen::EinstellungenAnzeige,

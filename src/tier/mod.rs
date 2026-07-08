@@ -184,15 +184,18 @@ pub fn registrier_anzeige(nr: i64) -> String {
 /// `halter_*`-Felder kommen aus einem LEFT JOIN auf `einsatz_person` und sind
 /// read-only (NULL bei Freitext-Halter oder unbekannt) — die UI zeigt damit
 /// `R-nnn` bzw. "Halter (storniert): R-nnn" ohne Zweit-Request.
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct TierAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
     pub registrier_nr: i64,
+    #[schema(value_type = TierStatus)]
     pub status: String,
+    #[schema(value_type = Spezies)]
     pub spezies: String,
     pub rasse_beschreibung: Option<String>,
     pub rufname: Option<String>,
+    #[schema(value_type = TierGeschlecht)]
     pub geschlecht: Option<String>,
     pub alter_geschaetzt: Option<i64>,
     pub farbe_beschreibung: Option<String>,
@@ -202,6 +205,7 @@ pub struct TierAnzeige {
     pub halter_kontakt: Option<String>,
     pub antreff_ort: Option<String>,
     pub notiz: Option<String>,
+    #[schema(value_type = AbschlussGrund)]
     pub abschluss_grund: Option<String>,
     pub abschluss_ziel: Option<String>,
     pub erfasst_at: String,

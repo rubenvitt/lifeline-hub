@@ -15,6 +15,7 @@ use crate::org::einstellungen as org_einst;
 use axum::extract::{Path, Query, State};
 use axum::Json;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 #[derive(Debug, Deserialize)]
 pub struct OrtVorschauParams {
@@ -24,14 +25,14 @@ pub struct OrtVorschauParams {
     pub exclude: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct PeilungAntwort {
     pub distanz_m: f64,
     pub richtung: String,
     pub bezug_label: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct OrtVorschauAntwort {
     pub peilung: Option<PeilungAntwort>,
     pub ortsname: Option<String>,

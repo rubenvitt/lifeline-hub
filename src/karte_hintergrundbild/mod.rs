@@ -2,12 +2,13 @@ pub mod repo;
 
 use crate::error::AppError;
 use serde::Serialize;
+use utoipa::ToSchema;
 
 /// Max. Upload-Größe (wie anhang). Body-Limit der Route liegt knapp darüber.
 pub const MAX_GROESSE: usize = 25 * 1024 * 1024;
 
 /// Anzeige-DTO (ohne BLOB-Bytes). `sichtbar` als bool für saubere JSON-Ausgabe.
-#[derive(Debug, Clone, PartialEq, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, PartialEq, Serialize, sqlx::FromRow, ToSchema)]
 pub struct HintergrundbildAnzeige {
     pub id: i64,
     pub einsatz_id: i64,

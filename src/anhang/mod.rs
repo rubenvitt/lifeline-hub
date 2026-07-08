@@ -13,6 +13,7 @@ pub mod repo;
 
 use crate::error::AppError;
 use serde::Serialize;
+use utoipa::ToSchema;
 
 /// Maximale Upload-Größe pro Datei (25 MiB). Muss mit dem Body-Limit der
 /// Upload-Route (`DefaultBodyLimit`) zusammenpassen und ist bewusst am späteren
@@ -39,7 +40,7 @@ pub const ERLAUBTE_MIME: &[&str] = &[
 
 /// Öffentliche Darstellung eines Anhangs — ohne die Bytes (`daten`), die nur
 /// über den Download-Endpoint ausgeliefert werden.
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct AnhangAnzeige {
     pub id: i64,
     pub einsatz_id: i64,

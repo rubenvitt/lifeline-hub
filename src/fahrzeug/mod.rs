@@ -5,6 +5,7 @@ pub mod status_repo;
 
 use crate::staerke::Staerke;
 use serde::Serialize;
+use utoipa::ToSchema;
 
 // Geteilte Konstanten/Validierung leben jetzt neutral in `crate::katalog` und werden
 // hier re-exportiert, damit Bestandscode (crate::fahrzeug::KATEGORIE_*, super::*) gilt.
@@ -83,7 +84,7 @@ impl Fahrzeug {
 }
 
 /// Öffentliche Fahrzeug-Darstellung (ohne `org_id`).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct FahrzeugAnzeige {
     pub id: i64,
     pub funkrufname: String,
@@ -97,13 +98,14 @@ pub struct FahrzeugAnzeige {
     pub tragenkapazitaet: Option<i64>,
     pub staerke: Option<Staerke>,
     pub bemerkung: Option<String>,
+    #[schema(value_type = crate::katalog::Dienststatus)]
     pub dienststatus: String,
     pub angelegt_at: String,
 }
 
 /// Abgeleitete AutoComplete-Vorschläge für die Stamm-Felder (DISTINCT, org-weit).
 /// Speist die Comboboxen im Fahrzeug-Formular mit bereits verwendeten Werten.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct FahrzeugVorschlaege {
     pub fahrzeugtyp: Vec<String>,
     pub traegerorganisation: Vec<String>,
@@ -112,10 +114,11 @@ pub struct FahrzeugVorschlaege {
 
 /// Status-Katalog-Eintrag (org-weit). `aktiv` wird nicht serialisiert
 /// (Listen-Endpunkt liefert ohnehin nur aktive).
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct FahrzeugStatus {
     pub id: i64,
     pub label: String,
+    #[schema(value_type = crate::katalog::StatusKategorie)]
     pub kategorie: String,
     pub farbe: Option<String>,
     pub fms_anker: Option<i64>,
@@ -125,7 +128,7 @@ pub struct FahrzeugStatus {
 /// Aufgelöste Dispositions-Anzeige: Identität nach der Auflösungsregel
 /// (Live aus dem Stamm bei aktivem Einsatz + Fahrzeug in Dienst, sonst Snapshot)
 /// plus aufgelöster Status.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct EinsatzFahrzeugAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
@@ -141,6 +144,7 @@ pub struct EinsatzFahrzeugAnzeige {
     pub traegerorganisation: Option<String>,
     pub status_id: Option<i64>,
     pub status_label: Option<String>,
+    #[schema(value_type = crate::katalog::StatusKategorie)]
     pub status_kategorie: Option<String>,
     pub status_farbe: Option<String>,
     pub bemerkung: Option<String>,

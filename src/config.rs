@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// Passwort-Wert, dessen `Debug`-Ausgabe maskiert ist, damit das Klartext-
 /// Passwort nicht versehentlich (z.B. via `{config:?}`) ins Log gelangt.
@@ -28,7 +29,7 @@ impl GeheimesPasswort {
 
 /// Typ eines Online-Views: Vektor-Style-JSON (URL direkt an MapLibre) oder
 /// Raster-Tile-Template (`{z}/{y}/{x}`, das das Frontend in einen Raster-Style verpackt).
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum OnlineStyleTyp {
     #[default]
@@ -38,7 +39,7 @@ pub enum OnlineStyleTyp {
 
 /// Ein benannter Online-Basemap-View. `attribution` ist die config-autoritative
 /// Pflicht-Attribution, die das Frontend per `customAttribution` anzeigt.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 pub struct OnlineStyle {
     pub name: String,
     pub url: String,

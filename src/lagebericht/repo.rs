@@ -3,15 +3,18 @@ use crate::etb::{self, repo as etb_repo};
 use crate::error::AppError;
 use serde::Serialize;
 use sqlx::SqlitePool;
+use utoipa::ToSchema;
 
 /// Öffentliche Anzeige eines Lageberichts (Abschnitte aus JSON geparst, Namen aufgelöst).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct LageberichtAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
+    #[schema(value_type = crate::lagebericht::LageberichtVorlage)]
     pub vorlage: String,
     pub titel: String,
     pub zeitstand: String,
+    #[schema(value_type = crate::lagebericht::LageberichtStatus)]
     pub status: String,
     pub abschnitte: Vec<Abschnitt>,
     pub version: i64,

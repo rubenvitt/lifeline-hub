@@ -233,14 +233,16 @@ pub fn registrier_anzeige(nr: i64) -> String {
 /// Serialisierbarer Personen-Datensatz (1:1 zur Tabelle `einsatz_person`; kein
 /// `org_id`, da einsatz-scoped). Direkt aus der Zeile lesbar — kein Stamm-Join,
 /// kein Snapshot wie bei Material.
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct PersonAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
     pub registrier_nr: i64,
+    #[schema(value_type = PersonStatus)]
     pub status: String,
     pub name: Option<String>,
     pub vorname: Option<String>,
+    #[schema(value_type = Geschlecht)]
     pub geschlecht: Option<String>,
     pub geburtsdatum: Option<String>,
     pub alter_geschaetzt: Option<i64>,
@@ -254,6 +256,7 @@ pub struct PersonAnzeige {
     pub geaendert_von: i64,
     pub storniert_at: Option<String>,
     // E‑2: denormalisierter medizinischer Cache (NULL = ungesichtet / vor Ort).
+    #[schema(value_type = Sichtungskategorie)]
     pub aktuelle_sichtung: Option<String>,
     pub aktuelle_sichtung_at: Option<String>,
     pub aktueller_verbleib: Option<String>,

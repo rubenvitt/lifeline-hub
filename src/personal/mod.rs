@@ -5,6 +5,7 @@ pub mod status_repo;
 
 use crate::katalog::{KATEGORIE_GEBUNDEN, KATEGORIE_NICHT_VERFUEGBAR, KATEGORIE_VERFUEGBAR};
 use serde::Serialize;
+use utoipa::ToSchema;
 
 /// Default-Qualifikations-Katalog je neu angelegter Organisation (label, sortier).
 /// **Muss mit dem Seed in `migrations/0011_qualifikation.sql` übereinstimmen.**
@@ -50,14 +51,14 @@ pub struct Personal {
 
 /// Aufgelöste Qualifikation einer Person (id + label), inkl. deaktivierter
 /// Zuordnungen (deaktivierte Qualifikation bleibt in der Anzeige sichtbar).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct QualifikationRef {
     pub id: i64,
     pub label: String,
 }
 
 /// Öffentliche Personal-Darstellung (ohne `org_id`), inkl. aufgelöster Qualifikationen.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct PersonalAnzeige {
     pub id: i64,
     pub benutzer_id: Option<i64>,
@@ -65,8 +66,10 @@ pub struct PersonalAnzeige {
     pub personalnummer: Option<String>,
     pub traegerorganisation: Option<String>,
     pub telefon: Option<String>,
+    #[schema(value_type = crate::staerke::StaerkePosition)]
     pub staerke_position: Option<String>,
     pub bemerkung: Option<String>,
+    #[schema(value_type = crate::katalog::Dienststatus)]
     pub dienststatus: String,
     pub angelegt_at: String,
     pub qualifikationen: Vec<QualifikationRef>,
@@ -74,14 +77,14 @@ pub struct PersonalAnzeige {
 
 /// Abgeleitete AutoComplete-Vorschläge für die Trägerorganisation (DISTINCT, org-weit).
 /// Bewusst nur ein Feld (anders als FahrzeugVorschlaege mit drei Feldern).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct PersonalVorschlaege {
     pub traegerorganisation: Vec<String>,
 }
 
 /// Qualifikations-Katalog-Eintrag (org-weit). `aktiv` wird nicht serialisiert
 /// (Listen-Endpunkt liefert ohnehin nur aktive).
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct Qualifikation {
     pub id: i64,
     pub label: String,
@@ -89,10 +92,11 @@ pub struct Qualifikation {
 }
 
 /// Personal-Status-Katalog-Eintrag (org-weit). Schema wie `FahrzeugStatus` minus `fms_anker`.
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct PersonalStatus {
     pub id: i64,
     pub label: String,
+    #[schema(value_type = crate::katalog::StatusKategorie)]
     pub kategorie: String,
     pub farbe: Option<String>,
     pub sortier: i64,
@@ -101,7 +105,7 @@ pub struct PersonalStatus {
 /// Aufgelöste Dispositions-Anzeige: Identität nach der Auflösungsregel (Live aus dem
 /// Stamm bei aktivem Einsatz + Person in Dienst, sonst Snapshot), aufgelöste
 /// Stärke-Position (Dispo-Override vor Stamm-Default) und aufgelöster Status.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct EinsatzPersonalAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
@@ -117,9 +121,11 @@ pub struct EinsatzPersonalAnzeige {
     /// Qualifikationen/Funktion als flacher Text (Live recomposed oder Snapshot).
     pub funktion: Option<String>,
     pub traegerorganisation: Option<String>,
+    #[schema(value_type = crate::staerke::StaerkePosition)]
     pub staerke_position: Option<String>,
     pub status_id: Option<i64>,
     pub status_label: Option<String>,
+    #[schema(value_type = crate::katalog::StatusKategorie)]
     pub status_kategorie: Option<String>,
     pub status_farbe: Option<String>,
     pub bemerkung: Option<String>,
@@ -128,7 +134,7 @@ pub struct EinsatzPersonalAnzeige {
 }
 
 /// Schlanke Karten-Sicht einer Führungskraft (Einheits- oder Abschnittsführung).
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct FuehrungskraftKarte {
     pub id: i64,            // einsatz_personal.id
     pub einsatz_id: i64,

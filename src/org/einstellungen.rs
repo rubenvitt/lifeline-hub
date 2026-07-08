@@ -9,6 +9,7 @@
 use crate::error::AppError;
 use serde::Serialize;
 use sqlx::SqlitePool;
+use utoipa::ToSchema;
 
 /// Org-Einstellungen wie in der DB abgelegt (1:1 per Organisation). Alle Felder
 /// optional — `None` = kein Org-Default (hartkodierter Fallback greift im Resolver).
@@ -100,12 +101,15 @@ impl OrgEinstellungen {
 }
 
 /// API-Darstellung der Org-Einstellungen (flach, alle Felder serialisiert).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct OrgEinstellungenAnzeige {
     pub org_id: i64,
     pub zeitzone: Option<String>,
+    #[schema(value_type = crate::einsatz::einstellungen::Zeitformat)]
     pub zeitformat: Option<String>,
+    #[schema(value_type = crate::einsatz::einstellungen::EinheitenSystem)]
     pub einheiten: Option<String>,
+    #[schema(value_type = crate::einsatz::einstellungen::Koordinatenformat)]
     pub koordinatenformat: Option<String>,
     pub retention_dauer_tage: Option<i64>,
     pub etb_nummer_praefix: Option<String>,
@@ -121,12 +125,15 @@ pub struct OrgEinstellungenAnzeige {
 
 /// Schlanke API-Darstellung für den Einsatz-Endpoint: nur Konventions-Felder,
 /// KEIN `geaendert_at`, KEIN `geaendert_von` — Audit-Schutz für Non-Admin-Mitglieder.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct OrgEinstellungenHinweis {
     pub org_id: i64,
     pub zeitzone: Option<String>,
+    #[schema(value_type = crate::einsatz::einstellungen::Zeitformat)]
     pub zeitformat: Option<String>,
+    #[schema(value_type = crate::einsatz::einstellungen::EinheitenSystem)]
     pub einheiten: Option<String>,
+    #[schema(value_type = crate::einsatz::einstellungen::Koordinatenformat)]
     pub koordinatenformat: Option<String>,
     pub retention_dauer_tage: Option<i64>,
     pub etb_nummer_praefix: Option<String>,

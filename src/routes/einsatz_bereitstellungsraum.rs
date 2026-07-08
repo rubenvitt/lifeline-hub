@@ -14,9 +14,10 @@ use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// Detail-Antwort: BR-Stamm + aktuell bereitgestellte Einheiten + Fahrzeuge.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct BrDetail {
     #[serde(flatten)]
     pub br: BrAnzeige,
@@ -25,14 +26,14 @@ pub struct BrDetail {
 }
 
 /// Schlanke Einheiten-Info für den Detail-Response.
-#[derive(Debug, Serialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
 pub struct BrEinheitKurz {
     pub id: i64,
     pub name: String,
 }
 
 /// Schlanke Fahrzeug-Info für den Detail-Response.
-#[derive(Debug, Serialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
 pub struct BrFahrzeugKurz {
     pub id: i64,
     pub funkrufname: String,

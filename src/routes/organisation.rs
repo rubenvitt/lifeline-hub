@@ -4,9 +4,10 @@ use crate::error::AppError;
 use axum::extract::State;
 use axum::Json;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// Org-Stammdaten inkl. DV-102-Org-Default (`tz_organisation`).
-#[derive(Debug, Serialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
 pub struct OrganisationAnzeige {
     pub id: i64,
     pub name: String,

@@ -1,13 +1,15 @@
 use crate::error::AppError;
 use serde::Serialize;
 use sqlx::SqlitePool;
+use utoipa::ToSchema;
 
 /// Ein Sichtungs-Verlaufseintrag (1:1 zu `person_sichtung`).
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct SichtungAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
     pub person_id: i64,
+    #[schema(value_type = crate::person::Sichtungskategorie)]
     pub kategorie: String,
     pub notiz: Option<String>,
     pub gesichtet_at: String,

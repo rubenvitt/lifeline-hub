@@ -83,7 +83,7 @@ pub fn empfaenger_typ_gueltig(t: &str) -> bool {
 /// Anzeige eines Auftrags inkl. abgeleiteter Felder und der Vollzugs-Achse aus
 /// dem geteilten `kommunikation_status` (per LEFT JOIN). Quittungs-Aggregate
 /// (`empfaenger_anzahl`, `quittiert_anzahl`) stammen aus `auftrag_empfaenger`.
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct AuftragAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
@@ -98,8 +98,10 @@ pub struct AuftragAnzeige {
     pub mittel: Option<String>,
     pub verbindung: Option<String>,
     pub sicherheit: Option<String>,
+    #[schema(value_type = crate::kommunikation::Prioritaet)]
     pub prioritaet: String,
     /// Richtung intern/extern (LFH-87).
+    #[schema(value_type = crate::kommunikation::Richtung)]
     pub richtung: String,
     pub frist_at: Option<String>,
     pub erteilt_at: String,
@@ -123,14 +125,16 @@ pub struct AuftragAnzeige {
     // Abgeleitet: Frist überschritten UND noch nicht alle Empfänger quittiert.
     pub ist_ueberfaellig: bool,
     // Abgeleitet: 'abgenommen' wenn abgenommen_at gesetzt, sonst vollzug_status.
+    #[schema(value_type = AuftragBearbeitungsstatus)]
     pub bearbeitungsstatus: String,
 }
 
 /// Anzeige einer Empfänger-Zeile inkl. Quittung (Achse 1, pro Empfänger).
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct AuftragEmpfaengerAnzeige {
     pub id: i64,
     pub auftrag_id: i64,
+    #[schema(value_type = EmpfaengerTyp)]
     pub empfaenger_typ: String,
     pub abschnitt_id: Option<i64>,
     pub einheit_id: Option<i64>,
@@ -138,6 +142,7 @@ pub struct AuftragEmpfaengerAnzeige {
     pub fahrzeug_id: Option<i64>,
     pub funktion_text: Option<String>,
     /// Externer Adressat (LFH-87): Kategorie + Bezeichnung (nur bei empfaenger_typ='extern').
+    #[schema(value_type = crate::kommunikation::AdressatKategorie)]
     pub extern_kategorie: Option<String>,
     pub extern_bezeichnung: Option<String>,
     pub snap_anzeige: String,
@@ -146,7 +151,7 @@ pub struct AuftragEmpfaengerAnzeige {
 }
 
 /// Auftrag + seine Empfänger (Detail-/Anlege-/Mutations-Antwort).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct AuftragDetail {
     #[serde(flatten)]
     pub auftrag: AuftragAnzeige,

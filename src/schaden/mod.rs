@@ -166,13 +166,16 @@ pub fn ort_kurz(ort: &str) -> String {
 
 // ---------- Anzeige-DTO ----------
 
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct SchadenAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
     pub registrier_nr: i64,
+    #[schema(value_type = SchadenStatus)]
     pub status: String,
+    #[schema(value_type = SchadenTyp)]
     pub typ: String,
+    #[schema(value_type = Ausmass)]
     pub ausmass: String,
     pub ort: String,
     pub lat: Option<f64>,
@@ -184,6 +187,7 @@ pub struct SchadenAnzeige {
     pub geschaedigt_organisation_id: Option<i64>,
     pub uebergeben_an: Option<String>,
     pub uebergeben_at: Option<String>,
+    #[schema(value_type = AbschlussGrund)]
     pub abschluss_grund: Option<String>,
     pub abschluss_at: Option<String>,
     pub erfasst_at: String,

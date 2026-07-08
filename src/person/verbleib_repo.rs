@@ -1,16 +1,19 @@
 use crate::error::AppError;
 use serde::Serialize;
 use sqlx::SqlitePool;
+use utoipa::ToSchema;
 
 /// Ein Verbleib-Ereignis (1:1 zu `person_verbleib`).
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct VerbleibAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
     pub person_id: i64,
+    #[schema(value_type = crate::person::VerbleibArt)]
     pub art: String,
     pub transportmittel: Option<String>,
     pub ziel: Option<String>,
+    #[schema(value_type = crate::person::VerbleibStatus)]
     pub status: Option<String>,
     pub notiz: Option<String>,
     pub zeitpunkt_at: String,

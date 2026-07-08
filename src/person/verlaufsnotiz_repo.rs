@@ -1,9 +1,10 @@
 use crate::error::AppError;
 use serde::Serialize;
 use sqlx::SqlitePool;
+use utoipa::ToSchema;
 
 /// Eine medizinische Verlaufsnotiz (1:1 zu `person_verlaufsnotiz`).
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct NotizAnzeige {
     pub id: i64,
     pub einsatz_id: i64,

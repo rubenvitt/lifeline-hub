@@ -27,10 +27,11 @@ pub enum LageZoneTyp {
 }
 
 /// Eine freie Lage-Zone (Gefahren-/Absperrzone). Eigenständige Entität — kein Fachobjekt.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct LageZoneAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
+    #[schema(value_type = LageZoneTyp)]
     pub typ: String,
     pub geometrie_typ: String,
     pub geometrie: String,

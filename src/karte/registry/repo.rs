@@ -2,6 +2,7 @@
 
 use serde::Serialize;
 use sqlx::SqlitePool;
+use utoipa::ToSchema;
 
 /// Eine Online-Quelle als DB-Zeile (Admin-CRUD; trägt `id`/`sortier`/`aktiv`, anders als das
 /// schlanke Laufzeit-`OnlineStyle`). `typ` bleibt String ('vektor'|'raster') — serialisiert
@@ -206,7 +207,7 @@ pub async fn loesche_online_quelle(pool: &SqlitePool, id: i64) -> Result<bool, s
 
 /// Eine Offline-Karte als DB-Zeile (Admin-CRUD). `aktiv_basemap` = die von `/tiles` ausgelieferte
 /// Karte; `status` und die Download-Felder (groesse/sha256/download_at) pflegt LFH-181.
-#[derive(Debug, Serialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
 pub struct OfflineKarte {
     pub id: i64,
     pub name: String,

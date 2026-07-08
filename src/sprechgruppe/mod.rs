@@ -1,6 +1,7 @@
 pub mod repo;
 
 use serde::Serialize;
+use utoipa::ToSchema;
 
 /// Interner Sprechgruppen-Datensatz (alle Spalten von `sprechgruppe`).
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -33,13 +34,14 @@ impl Sprechgruppe {
 }
 
 /// Öffentliche Sprechgruppen-Darstellung (ohne `org_id`, mit `einsatz_lokal`-Flag).
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, ToSchema)]
 pub struct SprechgruppeAnzeige {
     pub id: i64,
     pub einsatz_id: Option<i64>,
     /// `true` wenn die Sprechgruppe einsatzlokal ist (d.h. `einsatz_id` gesetzt).
     pub einsatz_lokal: bool,
     pub bezeichnung: String,
+    #[schema(value_type = crate::katalog::Betriebsart)]
     pub betriebsart: String,
     pub hinweis: Option<String>,
     pub aktiv: bool,

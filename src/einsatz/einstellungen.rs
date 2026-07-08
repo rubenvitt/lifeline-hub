@@ -250,16 +250,20 @@ impl EinsatzEinstellungen {
 }
 
 /// API-Darstellung der Einstellungen (`fachebenen_sichtbar` als Objekt).
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct EinstellungenAnzeige {
     pub einsatz_id: i64,
     pub standard_modul: Option<String>,
+    #[schema(value_type = BasemapModus)]
     pub basemap_modus: Option<String>,
     pub karten_zoom_start: Option<f64>,
     pub fachebenen_sichtbar: Option<serde_json::Value>,
     pub zeitzone: Option<String>,
+    #[schema(value_type = Zeitformat)]
     pub zeitformat: Option<String>,
+    #[schema(value_type = EinheitenSystem)]
     pub einheiten: Option<String>,
+    #[schema(value_type = Koordinatenformat)]
     pub koordinatenformat: Option<String>,
     // Verhalten & Automatik (LFH-133).
     pub etb_nummer_praefix: Option<String>,
