@@ -60,3 +60,24 @@ Errors (LFH-168). Sie werden **behoben, nicht ignoriert** — und zwar an der Wu
   exhaustive-deps-Warnung sitzt auf der Deps-Array-Zeile, nicht auf dem `useEffect(` — und
   **mit Kommentar, warum**. Keine pauschalen Datei-/Block-Disables, keine toten Direktiven
   (eslint meldet ungenutzte Disables selbst). Referenz: `LagekartePage` Blob-URL-Effekt (LFH-166).
+
+## Backend↔Frontend — Typ-Codegen (LFH-120)
+
+Die Frontend-Response-Typen werden **aus dem Rust-Backend generiert**, nicht mehr von Hand
+gepflegt. Wahrheitsquelle: die `#[derive(ToSchema)]`-Response-Structs + Domänen-Enums →
+`src/api_doc.rs` (utoipa `ApiDoc`) → `frontend/src/api/openapi.json` → `openapi-typescript`
+→ `frontend/src/api/types.generated.ts`. `frontend/src/api/types.ts` ist nur noch ein
+**Re-Export-Barrel** über die generierten Schemas (Namens-Mapping Rust `XxxAnzeige` ↔ FE `Xxx`).
+
+- **Nach einer Backend-Typänderung** (Struct-/Enum-/Feld-Änderung an einem Response-DTO):
+  `scripts/check-typ-codegen.sh` laufen lassen und die regenerierten `openapi.json` +
+  `types.generated.ts` **mitcommitten**. Das Skript ist das Drift-Gate (kein CI): es emittiert
+  die Spec, regeneriert die TS, bricht per `git diff --exit-code`, wenn etwas nicht committet
+  ist, und fährt `tsc`. Ein Feld-Rename bricht damit Build/Test statt still zur Laufzeit.
+- **Enum-Werte:** Domänen-Enums tragen wire-korrektes `#[serde(rename…)]`; `String`-Felder,
+  die eine Union tragen, bekommen `#[schema(value_type = Enum)]` (bei `Option<String>`:
+  `value_type = Option<Enum>` — sonst verliert utoipa die Nullability). Neue/geänderte
+  Enum-Varianten müssen im Guard `tests/enum_wire_kontrakt.rs` gegen ihren Wire-String stehen.
+- **Noch handgepflegt** (bewusst, FE-lokal in `types.ts`): Request-/Input-DTOs (`NeuerX`/`PatchX`,
+  PATCH-null-vs-absent-Semantik) und die 2 `Record<>`-Maps. Der Pfad-/Operations-Contract
+  (`#[utoipa::path]`) ist additiv nachrüstbar, in v1 nicht enthalten.
