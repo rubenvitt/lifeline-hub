@@ -93,6 +93,7 @@ pub fn vorlage(schluessel: &str) -> Option<&'static VorlageDef> {
 
 /// Ein gefüllter Abschnitt (so persistiert als JSON-Array-Element).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[schema(as = BefehlAbschnitt)]
 pub struct Abschnitt {
     pub schluessel: String,
     pub text: String,

@@ -1,0 +1,5373 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "lifeline-hub",
+    "description": "",
+    "license": {
+      "name": ""
+    },
+    "version": "0.1.0"
+  },
+  "paths": {},
+  "components": {
+    "schemas": {
+      "AbgleichAnzeige": {
+        "type": "object",
+        "description": "Ein Vermisstenabgleich (1:1 zu `person_abgleich`).",
+        "required": [
+          "id",
+          "einsatz_id",
+          "vermisst_person_id",
+          "gefunden_person_id",
+          "status",
+          "erstellt_at",
+          "erstellt_von"
+        ],
+        "properties": {
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "entschieden_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "entschieden_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "erstellt_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "gefunden_person_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AbgleichStatus"
+          },
+          "vermisst_person_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "AbgleichStatus": {
+        "type": "string",
+        "description": "Abgleich-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.",
+        "enum": [
+          "verdacht",
+          "bestaetigt",
+          "verworfen"
+        ]
+      },
+      "AbschlussGrund": {
+        "type": "string",
+        "description": "Abschlussgrund beim Übergang `→ abgeschlossen`. String = CHECK-Constraint.\n`etb_label` erscheint in Klammern in der ETB-Spur (Spec: \"abgeschlossen\n(uebergabe_tierarzt)\") — daher identisch zum DB-String.",
+        "enum": [
+          "uebergabe_halter",
+          "uebergabe_tierarzt",
+          "uebergabe_tierheim",
+          "verstorben",
+          "freilauf",
+          "sonstiges"
+        ]
+      },
+      "AdressatKategorie": {
+        "type": "string",
+        "description": "Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag\n(`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).",
+        "enum": [
+          "leitstelle",
+          "nachbar_ea",
+          "uebergeordnet",
+          "andere_bos"
+        ]
+      },
+      "AnhangAnzeige": {
+        "type": "object",
+        "description": "Öffentliche Darstellung eines Anhangs — ohne die Bytes (`daten`), die nur\nüber den Download-Endpoint ausgeliefert werden.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "dateiname",
+          "mime",
+          "groesse",
+          "hochgeladen_von",
+          "erstellt_at"
+        ],
+        "properties": {
+          "dateiname": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "groesse": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "hochgeladen_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mime": {
+            "type": "string"
+          }
+        }
+      },
+      "AuftragAnzeige": {
+        "type": "object",
+        "description": "Anzeige eines Auftrags inkl. abgeleiteter Felder und der Vollzugs-Achse aus\ndem geteilten `kommunikation_status` (per LEFT JOIN). Quittungs-Aggregate\n(`empfaenger_anzahl`, `quittiert_anzahl`) stammen aus `auftrag_empfaenger`.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "auftrag_text",
+          "prioritaet",
+          "richtung",
+          "erteilt_at",
+          "erstellt_von_id",
+          "erstellt_at",
+          "vollzug_status",
+          "empfaenger_anzahl",
+          "quittiert_anzahl",
+          "ist_ueberfaellig",
+          "bearbeitungsstatus"
+        ],
+        "properties": {
+          "abgenommen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "abgenommen_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "absicht": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "auftrag_text": {
+            "type": "string"
+          },
+          "bearbeitungsstatus": {
+            "$ref": "#/components/schemas/AuftragBearbeitungsstatus"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "empfaenger_anzahl": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "erstellt_von_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erteilt_at": {
+            "type": "string"
+          },
+          "etb_anordnung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "frist_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "in_arbeit_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ist_ueberfaellig": {
+            "type": "boolean"
+          },
+          "lage": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lfd_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Laufende Nummer je Einsatz (LFH-133). Nullable, weil per ADD COLUMN eingeführt;\nalle ab LFH-133 angelegten Aufträge tragen einen Wert."
+          },
+          "mittel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "prioritaet": {
+            "$ref": "#/components/schemas/Prioritaet"
+          },
+          "quell_etb_eintrag_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Quell-ETB-Eintrag, AUS DEM dieser Auftrag erteilt wurde (LFH-112). Klar getrennt\nvon `etb_anordnung_id` (= der vom Auftrag SELBST erzeugte Anordnungs-Eintrag)."
+          },
+          "quittiert_anzahl": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "richtung": {
+            "$ref": "#/components/schemas/Richtung",
+            "description": "Richtung intern/extern (LFH-87)."
+          },
+          "sicherheit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "verbindung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "vollzogen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "vollzogen_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "vollzug_status": {
+            "type": "string"
+          },
+          "vollzugsmeldung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zeit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AuftragBearbeitungsstatus": {
+        "type": "string",
+        "description": "Bearbeitungsstatus eines Auftrags (Schema-Anker für die OpenAPI-Union, LFH-120).\nWire == `bearbeitungsstatus`.",
+        "enum": [
+          "offen",
+          "in_arbeit",
+          "vollzogen",
+          "abgenommen"
+        ]
+      },
+      "AuftragDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AuftragAnzeige"
+          },
+          {
+            "type": "object",
+            "required": [
+              "empfaenger"
+            ],
+            "properties": {
+              "empfaenger": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AuftragEmpfaengerAnzeige"
+                }
+              }
+            }
+          }
+        ],
+        "description": "Auftrag + seine Empfänger (Detail-/Anlege-/Mutations-Antwort)."
+      },
+      "AuftragEmpfaengerAnzeige": {
+        "type": "object",
+        "description": "Anzeige einer Empfänger-Zeile inkl. Quittung (Achse 1, pro Empfänger).",
+        "required": [
+          "id",
+          "auftrag_id",
+          "empfaenger_typ",
+          "extern_kategorie",
+          "snap_anzeige"
+        ],
+        "properties": {
+          "abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "auftrag_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "empfaenger_typ": {
+            "$ref": "#/components/schemas/EmpfaengerTyp"
+          },
+          "extern_bezeichnung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "extern_kategorie": {
+            "$ref": "#/components/schemas/AdressatKategorie",
+            "description": "Externer Adressat (LFH-87): Kategorie + Bezeichnung (nur bei empfaenger_typ='extern')."
+          },
+          "fahrzeug_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "funktion_text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "person_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "quittiert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quittiert_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "snap_anzeige": {
+            "type": "string"
+          }
+        }
+      },
+      "Ausmass": {
+        "type": "string",
+        "enum": [
+          "gering",
+          "mittel",
+          "gross",
+          "katastrophal"
+        ]
+      },
+      "BasemapModus": {
+        "type": "string",
+        "description": "Basemap-Modus (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `basemap_modus`.",
+        "enum": [
+          "online",
+          "offline",
+          "blind"
+        ]
+      },
+      "BefehlAbschnitt": {
+        "type": "object",
+        "description": "Ein gefüllter Abschnitt (so persistiert als JSON-Array-Element).",
+        "required": [
+          "schluessel",
+          "text"
+        ],
+        "properties": {
+          "schluessel": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "BefehlAnzeige": {
+        "type": "object",
+        "description": "Öffentliche Anzeige eines Befehls (Abschnitte aus JSON geparst, Namen aufgelöst).",
+        "required": [
+          "id",
+          "einsatz_id",
+          "vorlage",
+          "titel",
+          "zeitstand",
+          "status",
+          "abschnitte",
+          "version",
+          "ersteller_id",
+          "ersteller_name",
+          "erstellt_at",
+          "aktualisiert_at"
+        ],
+        "properties": {
+          "abschnitte": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BefehlAbschnitt"
+            }
+          },
+          "aktualisiert_at": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ersteller_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ersteller_name": {
+            "type": "string"
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "etb_eintrag_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "freigegeben_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "freigegeben_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "freigegeben_von_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BefehlStatus"
+          },
+          "titel": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "vorgaenger_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "vorlage": {
+            "$ref": "#/components/schemas/BefehlVorlage"
+          },
+          "zeitstand": {
+            "type": "string"
+          }
+        }
+      },
+      "BefehlStatus": {
+        "type": "string",
+        "description": "Befehls-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.",
+        "enum": [
+          "entwurf",
+          "freigegeben"
+        ]
+      },
+      "BefehlVorlage": {
+        "type": "string",
+        "description": "Befehls-Vorlage (Schema-Anker für die OpenAPI-Union, LFH-120; TS: `BefehlVorlageKey`).\nWire == `vorlage`.",
+        "enum": [
+          "befehl_lad",
+          "befehl_ladef",
+          "befehl_schnee",
+          "befehl_ea_zmw"
+        ]
+      },
+      "BelegungAnzeige": {
+        "type": "object",
+        "description": "Belegungs-Verlaufseintrag (1:1 zu `person_uhs_belegung`).",
+        "required": [
+          "id",
+          "einsatz_id",
+          "person_id",
+          "uhs_id",
+          "art",
+          "zeitpunkt_at",
+          "erfasst_von"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/BelegungsArt"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erfasst_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "notiz": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "person_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "platz_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "uhs_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "zeitpunkt_at": {
+            "type": "string"
+          }
+        }
+      },
+      "BelegungsArt": {
+        "type": "string",
+        "description": "Art eines Belegungs-Events. String = CHECK in\n`migrations/0029_person_uhs_belegung.sql`. Append-only.",
+        "enum": [
+          "eintritt",
+          "wechsel",
+          "austritt"
+        ]
+      },
+      "BenutzerAnzeige": {
+        "type": "object",
+        "description": "Öffentliche Benutzerdarstellung (ohne Passwort-Hash) für API-Antworten.",
+        "required": [
+          "id",
+          "anzeigename",
+          "benutzername",
+          "system_rolle",
+          "org_rolle",
+          "aktiv",
+          "erstellt_at"
+        ],
+        "properties": {
+          "aktiv": {
+            "type": "boolean"
+          },
+          "anzeigename": {
+            "type": "string"
+          },
+          "benutzername": {
+            "type": "string"
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "org_rolle": {
+            "$ref": "#/components/schemas/OrgRolle"
+          },
+          "system_rolle": {
+            "$ref": "#/components/schemas/SystemRolle"
+          }
+        }
+      },
+      "Betriebsart": {
+        "type": "string",
+        "description": "Betriebsart einer TETRA-Sprechgruppe (Schema-Anker für die OpenAPI-Union, LFH-120).\nWire == `betriebsart` (per-Variante, Großbuchstaben — `rename_all` trifft nicht).",
+        "enum": [
+          "TMO",
+          "DMO"
+        ]
+      },
+      "BezugTyp": {
+        "type": "string",
+        "description": "Typ des polymorphen Sachbezugs einer Nachricht (LFH-103). Code-validiert (kein\nDB-CHECK, analog `auftrag.prioritaet`/`meldung.status`); die Codes sind die\nModulnamen der referenzierbaren Domänenobjekte. Bewusst getrennt von der\nHeraufstufung (`etb_eintrag_id`/`auftrag_id`): ein Bezug verweist auf ein\nbestehendes Objekt, eine Heraufstufung erzeugt eines.",
+        "enum": [
+          "schaden",
+          "uhs",
+          "person",
+          "lagebericht",
+          "meldung",
+          "auftrag"
+        ]
+      },
+      "BrAnzeige": {
+        "type": "object",
+        "description": "Serialisierbare BR-Anzeige (1:1 zur Tabelle `bereitstellungsraum`).",
+        "required": [
+          "id",
+          "einsatz_id",
+          "bezeichnung",
+          "status",
+          "erfasst_at",
+          "erfasst_von",
+          "geaendert_at",
+          "geaendert_von"
+        ],
+        "properties": {
+          "abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erfasst_at": {
+            "type": "string"
+          },
+          "erfasst_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "geaendert_at": {
+            "type": "string"
+          },
+          "geaendert_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "notiz": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "standort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/BrStatus"
+          },
+          "storniert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "BrBelegungAnzeige": {
+        "type": "object",
+        "description": "Belegungs-Verlaufseintrag (1:1 zu `br_belegung`).",
+        "required": [
+          "id",
+          "einsatz_id",
+          "br_id",
+          "objekt_typ",
+          "objekt_id",
+          "art",
+          "zeitpunkt_at",
+          "erfasst_von"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/BrBelegungsArt"
+          },
+          "br_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erfasst_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "notiz": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "objekt_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "objekt_typ": {
+            "$ref": "#/components/schemas/ObjektTyp"
+          },
+          "zeitpunkt_at": {
+            "type": "string"
+          }
+        }
+      },
+      "BrBelegungsArt": {
+        "type": "string",
+        "description": "Art eines BR-Belegungs-Events. String = CHECK-Constraint in\n`migrations/0061_br_belegung.sql`. Append-only.",
+        "enum": [
+          "eintritt",
+          "wechsel",
+          "austritt"
+        ]
+      },
+      "BrDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BrAnzeige"
+          },
+          {
+            "type": "object",
+            "required": [
+              "einheiten",
+              "fahrzeuge"
+            ],
+            "properties": {
+              "einheiten": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/BrEinheitKurz"
+                }
+              },
+              "fahrzeuge": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/BrFahrzeugKurz"
+                }
+              }
+            }
+          }
+        ],
+        "description": "Detail-Antwort: BR-Stamm + aktuell bereitgestellte Einheiten + Fahrzeuge."
+      },
+      "BrEinheitKurz": {
+        "type": "object",
+        "description": "Schlanke Einheiten-Info für den Detail-Response.",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "BrFahrzeugKurz": {
+        "type": "object",
+        "description": "Schlanke Fahrzeug-Info für den Detail-Response.",
+        "required": [
+          "id",
+          "funkrufname"
+        ],
+        "properties": {
+          "funkrufname": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "BrStatus": {
+        "type": "string",
+        "description": "Status eines Bereitstellungsraums. String = CHECK-Constraint in\n`migrations/0060_bereitstellungsraum.sql`. `aufgeloest` ist terminal.",
+        "enum": [
+          "geplant",
+          "aktiv",
+          "aufgeloest"
+        ]
+      },
+      "ChatKanalAnzeige": {
+        "type": "object",
+        "description": "Öffentliche Darstellung eines Chat-Kanals.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "name",
+          "erstellt_von_id",
+          "erstellt_at"
+        ],
+        "properties": {
+          "archiviert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "beschreibung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "erstellt_von_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "ChatNachrichtAnzeige": {
+        "type": "object",
+        "description": "Öffentliche Darstellung einer Chat-Nachricht. `inhalt` ist `None`, wenn die\nNachricht gelöscht wurde (Tombstone) — der Text wird dann nicht ausgeliefert.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "kanal_id",
+          "autor_id",
+          "autor_name",
+          "erstellt_at",
+          "bezug_typ",
+          "anhaenge"
+        ],
+        "properties": {
+          "anhaenge": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnhangAnzeige"
+            },
+            "description": "Angehängte Dateien (Metadaten, ohne Bytes). Wird nicht aus der\nNachrichten-Zeile gelesen (`sqlx(skip)`), sondern vom Repo nachgeladen."
+          },
+          "auftrag_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "autor_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "autor_name": {
+            "type": "string"
+          },
+          "bearbeitet_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bezug_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "bezug_typ": {
+            "$ref": "#/components/schemas/BezugTyp",
+            "description": "Polymorpher Sachbezug (LFH-103): Verweis auf ein bestehendes Domänenobjekt.\n`None`/`None`, wenn kein Bezug gesetzt ist (both-or-neither). `bezug_typ` ist\nein [`BezugTyp`]-Code, `bezug_id` die Objekt-ID im selben Einsatz."
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "etb_eintrag_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "geloescht_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "inhalt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kanal_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "Dienststatus": {
+        "type": "string",
+        "description": "Dienststatus im Stamm (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `dienststatus`.",
+        "enum": [
+          "in_dienst",
+          "ausser_dienst"
+        ]
+      },
+      "EinheitAnzeige": {
+        "type": "object",
+        "description": "Aufgelöste Einheiten-Anzeige inkl. Typ/Abschnitt-Labels, Führer-Identität,\nMitgliedern und berechneter Stärke. `soll` ist optional (Override → Typ-Default →\n`None`); `ist`/`ist_kumuliert` sind immer gesetzt.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "name",
+          "sortier",
+          "ist",
+          "ist_kumuliert",
+          "personal_mitglieder",
+          "fahrzeug_mitglieder",
+          "material_mitglieder",
+          "sprechgruppen"
+        ],
+        "properties": {
+          "abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "abschnitt_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "aktueller_br_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "BR‑1: aktuell bereitgestellter Bereitstellungsraum (NULL = in keinem BR)."
+          },
+          "bemerkung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fahrzeug_mitglieder": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EinheitMitgliedFahrzeug"
+            }
+          },
+          "fuehrer_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "fuehrer_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ist": {
+            "$ref": "#/components/schemas/Staerke"
+          },
+          "ist_kumuliert": {
+            "$ref": "#/components/schemas/Staerke"
+          },
+          "lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "material_mitglieder": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EinheitMitgliedMaterial"
+            }
+          },
+          "name": {
+            "type": "string"
+          },
+          "personal_mitglieder": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EinheitMitgliedPerson"
+            }
+          },
+          "soll": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Staerke"
+              }
+            ]
+          },
+          "sortier": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sprechgruppen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SprechgruppeAnzeige"
+            }
+          },
+          "typ_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "typ_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tz_fachaufgabe": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tz_organisation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ueber_einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "EinheitMitgliedFahrzeug": {
+        "type": "object",
+        "description": "Fahrzeug-Mitglied einer Einheit (leichtgewichtig).",
+        "required": [
+          "ef_id",
+          "funkrufname"
+        ],
+        "properties": {
+          "ef_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "`einsatz_fahrzeug.id` der Dispozeile."
+          },
+          "fahrzeugtyp": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "funkrufname": {
+            "type": "string"
+          }
+        }
+      },
+      "EinheitMitgliedMaterial": {
+        "type": "object",
+        "description": "Material-Mitglied einer Einheit (leichtgewichtig).",
+        "required": [
+          "em_id",
+          "bezeichnung",
+          "menge",
+          "status"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": "string"
+          },
+          "em_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "`einsatz_material.id` der Dispozeile."
+          },
+          "menge": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MaterialStatus",
+            "description": "Festes Status-Enum als String (z. B. \"einsatzbereit\")."
+          }
+        }
+      },
+      "EinheitMitgliedPerson": {
+        "type": "object",
+        "description": "Personal-Mitglied einer Einheit (leichtgewichtig für die Einheiten-Anzeige).",
+        "required": [
+          "ep_id",
+          "name",
+          "staerke_position",
+          "ist_fuehrer"
+        ],
+        "properties": {
+          "ep_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "`einsatz_personal.id` der Dispozeile."
+          },
+          "funktion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ist_fuehrer": {
+            "type": "boolean",
+            "description": "`true`, wenn diese Person als Führer der Einheit eingetragen ist."
+          },
+          "name": {
+            "type": "string"
+          },
+          "staerke_position": {
+            "$ref": "#/components/schemas/StaerkePosition"
+          }
+        }
+      },
+      "EinheitTyp": {
+        "type": "object",
+        "description": "Einheitstyp-Katalog-Eintrag (org-weit), inkl. aufgelöster optionaler Soll-Stärke.\n`aktiv` wird nicht serialisiert (Listen-Endpunkt liefert ohnehin nur aktive).",
+        "required": [
+          "id",
+          "label",
+          "sortier"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "label": {
+            "type": "string"
+          },
+          "soll": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Staerke",
+                "description": "Standard-Soll-Stärke; `None`, wenn der Typ keine Soll-Stärke definiert."
+              }
+            ]
+          },
+          "sortier": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "EinheitenSystem": {
+        "type": "string",
+        "description": "Einheiten-System (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `einheiten_system`.",
+        "enum": [
+          "metrisch",
+          "imperial"
+        ]
+      },
+      "EinsatzAnzeige": {
+        "type": "object",
+        "description": "Öffentliche Einsatz-Darstellung für API-Antworten,\ninklusive Org-Angaben und der Rolle des abfragenden Benutzers.",
+        "required": [
+          "id",
+          "org_id",
+          "org_name",
+          "bezeichnung",
+          "status",
+          "begonnen_at",
+          "einsatzart",
+          "angelegt_at",
+          "meine_rolle"
+        ],
+        "properties": {
+          "abgeschlossen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "abgeschlossen_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "angelegt_at": {
+            "type": "string"
+          },
+          "anzahl_betroffene_initial": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "begonnen_at": {
+            "type": "string"
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "einsatzart": {
+            "$ref": "#/components/schemas/Einsatzart"
+          },
+          "einsatznummer_intern": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "einsatzort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "einsatzort_lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "einsatzort_lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "leitstellen_nr": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "meine_rolle": {
+            "$ref": "#/components/schemas/EinsatzRolle"
+          },
+          "meldende_stelle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "org_name": {
+            "type": "string"
+          },
+          "retention_bis": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Aufbewahrungsfrist (LFH-130); `None` = keine Frist gesetzt."
+          },
+          "sachverhalt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/EinsatzStatus"
+          },
+          "stichwort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "EinsatzFahrzeugAnzeige": {
+        "type": "object",
+        "description": "Aufgelöste Dispositions-Anzeige: Identität nach der Auflösungsregel\n(Live aus dem Stamm bei aktivem Einsatz + Fahrzeug in Dienst, sonst Snapshot)\nplus aufgelöster Status.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "ist_adhoc",
+          "funkrufname",
+          "status_kategorie",
+          "disponiert_at"
+        ],
+        "properties": {
+          "aktueller_br_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "BR‑1: aktuell bereitgestellter Bereitstellungsraum (NULL = in keinem BR)."
+          },
+          "bemerkung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "disponiert_at": {
+            "type": "string"
+          },
+          "disponiert_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Zugeordnete Einheit (K&M‑3); `None` = freie, nicht zugeordnete Kraft."
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fahrzeug_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "`None` = Ad-hoc-externes Fahrzeug (kein Stamm-Bezug)."
+          },
+          "fahrzeugtyp": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "funkrufname": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ist_adhoc": {
+            "type": "boolean"
+          },
+          "kennzeichen": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "opta": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "soll_besatzung": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Staerke",
+                "description": "Soll-Besatzung (taktische Soll-Stärke) aus dem Stamm-Fahrzeug (LFH-9); `None` für\nAd-hoc-Fahrzeuge oder unvollständig gepflegte Soll-Stärke. Das Ist berechnet das\nFrontend aus den Besatzungs-Positionen (orthogonal, keine Backend-Aggregation)."
+              }
+            ]
+          },
+          "status_farbe": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "status_kategorie": {
+            "$ref": "#/components/schemas/StatusKategorie"
+          },
+          "status_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "traegerorganisation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tz_fachaufgabe": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tz_organisation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "EinsatzMaterialAnzeige": {
+        "type": "object",
+        "description": "Aufgelöste Material-Dispositionszeile: Identität nach der Auflösungsregel\n(Live aus dem Stamm bei aktivem Einsatz + Material in Dienst, sonst Snapshot);\n`menge` und `status` kommen **immer** aus der Dispositionszeile.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "ist_adhoc",
+          "bezeichnung",
+          "menge",
+          "status",
+          "disponiert_at"
+        ],
+        "properties": {
+          "bemerkung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bestandsnummer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "disponiert_at": {
+            "type": "string"
+          },
+          "disponiert_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Zugeordnete Einheit; `None` = freie, nicht zugeordnete Position."
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ist_adhoc": {
+            "type": "boolean"
+          },
+          "kategorie": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "material_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "`None` = Ad-hoc-externes Material (kein Stamm-Bezug)."
+          },
+          "menge": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MaterialStatus"
+          },
+          "traegerorganisation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "uhs_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Zugeordnete Unfallhilfsstelle; `None` = nicht einer UHS zugeordnet."
+          }
+        }
+      },
+      "EinsatzModulOverride": {
+        "type": "object",
+        "description": "Override-Zeile wie in der DB abgelegt. `sichtbar` aus INTEGER (0/1) dekodiert;\n`benoetigte_rolle` ist `None` (= frei) oder ein gültiger Rollen-String.",
+        "required": [
+          "einsatz_id",
+          "modul_key",
+          "sichtbar"
+        ],
+        "properties": {
+          "benoetigte_rolle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "geaendert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "geaendert_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "modul_key": {
+            "type": "string"
+          },
+          "sichtbar": {
+            "type": "boolean"
+          }
+        }
+      },
+      "EinsatzPersonalAnzeige": {
+        "type": "object",
+        "description": "Aufgelöste Dispositions-Anzeige: Identität nach der Auflösungsregel (Live aus dem\nStamm bei aktivem Einsatz + Person in Dienst, sonst Snapshot), aufgelöste\nStärke-Position (Dispo-Override vor Stamm-Default) und aufgelöster Status.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "ist_adhoc",
+          "name",
+          "staerke_position",
+          "status_kategorie",
+          "disponiert_at"
+        ],
+        "properties": {
+          "bemerkung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "disponiert_at": {
+            "type": "string"
+          },
+          "disponiert_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "einheit_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Zugeordnete Einheit (K&M‑3); `None` = freie, nicht zugeordnete Kraft."
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fahrzeug_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Fahrzeug, dessen Besatzung die Kraft ist (LFH-9); `None` = keinem Fahrzeug zugeteilt.\nUnabhängig von `einheit_id` (orthogonale Zuordnung)."
+          },
+          "funktion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Qualifikationen/Funktion als flacher Text (Live recomposed oder Snapshot)."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ist_adhoc": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "personal_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "`None` = Ad-hoc-externe Person (kein Stamm-Bezug)."
+          },
+          "staerke_position": {
+            "$ref": "#/components/schemas/StaerkePosition"
+          },
+          "status_farbe": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "status_kategorie": {
+            "$ref": "#/components/schemas/StatusKategorie"
+          },
+          "status_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "traegerorganisation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "EinsatzRolle": {
+        "type": "string",
+        "description": "Rolle einer Person innerhalb eines konkreten Einsatzes.\nWird als TEXT in der DB gespeichert und manuell konvertiert (kein sqlx-Enum-Decode).",
+        "enum": [
+          "einsatzleitung",
+          "fuehrungspersonal",
+          "beobachter"
+        ]
+      },
+      "EinsatzStatus": {
+        "type": "string",
+        "description": "Einsatz-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.",
+        "enum": [
+          "aktiv",
+          "abgeschlossen"
+        ]
+      },
+      "EinsatzabschnittAnzeige": {
+        "type": "object",
+        "description": "Aufgelöste Abschnitts-Anzeige (flach; der Baum wird im FE über\n`ueber_abschnitt_id` gebaut), inkl. aufgelöstem Leiter-Namen.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "name",
+          "sortier",
+          "sprechgruppen"
+        ],
+        "properties": {
+          "bemerkung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erreichbarkeit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "flaeche_geojson": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kommunikationsmittel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "leiter_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "leiter_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name der disponierten Leiter-Person (aufgelöst), falls gesetzt."
+          },
+          "name": {
+            "type": "string"
+          },
+          "sortier": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sprechgruppe_dmo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Historischer Freitext-Wert (eingefroren; nicht mehr schreibbar)."
+          },
+          "sprechgruppe_tmo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Historischer Freitext-Wert (eingefroren; nicht mehr schreibbar)."
+          },
+          "sprechgruppen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SprechgruppeAnzeige"
+            },
+            "description": "Zugeordnete Sprechgruppen (aus Katalogeintrag oder einsatz-lokal)."
+          },
+          "tz_fachaufgabe": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tz_organisation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ueber_abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "Einsatzart": {
+        "type": "string",
+        "description": "Einsatzart (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `einsatzart`.",
+        "enum": [
+          "realeinsatz",
+          "uebung",
+          "sanitaetsdienst",
+          "bereitstellung"
+        ]
+      },
+      "EinstellungenAnzeige": {
+        "type": "object",
+        "description": "API-Darstellung der Einstellungen (`fachebenen_sichtbar` als Objekt).",
+        "required": [
+          "einsatz_id",
+          "basemap_modus",
+          "zeitformat",
+          "einheiten",
+          "koordinatenformat",
+          "etb_nummer_eingefroren",
+          "meldung_nummer_eingefroren",
+          "auftrag_nummer_eingefroren"
+        ],
+        "properties": {
+          "auftrag_nummer_eingefroren": {
+            "type": "boolean"
+          },
+          "auftrag_nummer_praefix": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "auftrag_nummer_start": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "auftrag_quittierung_frist_min": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "auto_etb_eintraege": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "basemap_modus": {
+            "$ref": "#/components/schemas/BasemapModus"
+          },
+          "einheiten": {
+            "$ref": "#/components/schemas/EinheitenSystem"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "etb_nummer_eingefroren": {
+            "type": "boolean",
+            "description": "Freeze pro Nummernkreis (LFH-133): true, sobald die erste Nummer vergeben ist\n(Präfix + Startwert dann read-only). Aus Daten-Existenz abgeleitet, nicht gespeichert."
+          },
+          "etb_nummer_praefix": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "etb_nummer_start": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "fachebenen_sichtbar": {},
+          "geaendert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "geaendert_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "karten_zoom_start": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "koordinatenformat": {
+            "$ref": "#/components/schemas/Koordinatenformat"
+          },
+          "meldung_bestaetigung_frist_min": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "meldung_nummer_eingefroren": {
+            "type": "boolean"
+          },
+          "meldung_nummer_praefix": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "meldung_nummer_start": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "retention_dauer_tage": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Aufbewahrungs-Dauer-Politik in Tagen (LFH-135); `None` = keine Auto-Frist."
+          },
+          "standard_modul": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zeitformat": {
+            "$ref": "#/components/schemas/Zeitformat"
+          },
+          "zeitzone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "EinstellungenMitOrgDefaults": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/EinstellungenAnzeige"
+          },
+          {
+            "type": "object",
+            "required": [
+              "org_defaults"
+            ],
+            "properties": {
+              "org_defaults": {
+                "$ref": "#/components/schemas/OrgEinstellungenHinweis"
+              }
+            }
+          }
+        ],
+        "description": "Antwort-Shape von `einstellungen_laden`: rohe Einsatz-Override-Werte (geflacht)\nplus org-weite Defaults als eingebettetes Objekt (ohne Audit-Felder)."
+      },
+      "EmpfaengerTyp": {
+        "type": "string",
+        "description": "Empfänger-Diskriminator eines Auftrags (Schema-Anker für die OpenAPI-Union, LFH-120).\nWire == `empfaenger_typ`.",
+        "enum": [
+          "abschnitt",
+          "einheit",
+          "funktion",
+          "person",
+          "fahrzeug",
+          "extern"
+        ]
+      },
+      "ErinnerungAnzeige": {
+        "type": "object",
+        "description": "Öffentliche Darstellung einer Erinnerung. `ist_faellig` wird pro Read aus\n`faellig_at <= jetzt` berechnet (nicht persistiert) — die Fälligkeit ist\ndamit unabhängig davon korrekt, ob/wann der Scheduler-Tick lief.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "titel",
+          "faellig_at",
+          "quelle",
+          "status",
+          "erstellt_von_id",
+          "erstellt_at",
+          "ist_faellig",
+          "vollzug_status"
+        ],
+        "properties": {
+          "beschreibung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bezug_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "bezug_typ": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "empfaenger_funktion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "erledigt_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "erstellt_von_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "faellig_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "intervall_minuten": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "ist_faellig": {
+            "type": "boolean",
+            "description": "Abgeleitet: `faellig_at <= jetzt` zum Zeitpunkt der Abfrage."
+          },
+          "quelle": {
+            "type": "string"
+          },
+          "quittiert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quittiert_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "status": {
+            "type": "string"
+          },
+          "titel": {
+            "type": "string"
+          },
+          "vollzogen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "vollzogen_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "vollzug_status": {
+            "type": "string"
+          }
+        }
+      },
+      "EtbBaustein": {
+        "type": "object",
+        "description": "Öffentliche Sicht eines ETB-Baustein-Katalogeintrags. Die DB-Spalten `aktiv`,\n`erstellt_at` und `aktualisiert_at` werden bewusst nicht serialisiert.",
+        "required": [
+          "id",
+          "label",
+          "typ",
+          "inhalt",
+          "meldeweg",
+          "sortier"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "inhalt": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "meldeweg": {
+            "$ref": "#/components/schemas/MeldeWeg"
+          },
+          "sortier": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "typ": {
+            "$ref": "#/components/schemas/EtbTyp"
+          },
+          "veranlassung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "EtbEintragAnzeige": {
+        "type": "object",
+        "description": "Öffentliche Darstellung eines ETB-Eintrags für API-Antworten und SSE.\n`erfasser_name` ist der Anzeigename des Erfassers (per JOIN ermittelt).",
+        "required": [
+          "id",
+          "lfd_nr",
+          "typ",
+          "inhalt",
+          "meldeweg",
+          "erfasser_id",
+          "erfasser_name",
+          "ereigniszeit",
+          "received_at"
+        ],
+        "properties": {
+          "an": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "auftrag_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Rückverweis auf den auslösenden Auftrag (LFH-52), falls aus Auftrag/Vollzug erzeugt."
+          },
+          "befehl_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Gesetzt, wenn dieser Eintrag der Freigabe-Snapshot eines Befehls ist (LFH-64). Sonst `None`."
+          },
+          "berichtigt_eintrag_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "ereigniszeit": {
+            "type": "string"
+          },
+          "erfasser_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erfasser_name": {
+            "type": "string"
+          },
+          "erfasst_lokal_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "inhalt": {
+            "type": "string"
+          },
+          "lagebericht_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Gesetzt, wenn dieser Eintrag der Freigabe-Snapshot eines Lageberichts ist\n(Timeline-Badge + Rückverlinkung). Sonst `None`."
+          },
+          "lfd_nr": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "meldeweg": {
+            "$ref": "#/components/schemas/MeldeWeg"
+          },
+          "received_at": {
+            "type": "string"
+          },
+          "typ": {
+            "$ref": "#/components/schemas/EtbTyp"
+          },
+          "veranlassung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "von": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "EtbTyp": {
+        "type": "string",
+        "description": "Eintragstyp eines ETB-Eintrags. Wird als TEXT in der DB gespeichert.",
+        "enum": [
+          "meldung",
+          "anordnung",
+          "lage",
+          "entscheidung",
+          "system",
+          "berichtigung"
+        ]
+      },
+      "FachebeneAntwort": {
+        "type": "object",
+        "description": "Einheitlicher Umschlag für jede Fachebene.",
+        "required": [
+          "quelle",
+          "status",
+          "attribution",
+          "features"
+        ],
+        "properties": {
+          "attribution": {
+            "type": "string"
+          },
+          "features": {
+            "description": "GeoJSON FeatureCollection."
+          },
+          "quelle": {
+            "type": "string"
+          },
+          "stand": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/FachebeneStatus"
+          }
+        }
+      },
+      "FachebeneStatus": {
+        "type": "string",
+        "description": "Status einer Fachebenen-Antwort.",
+        "enum": [
+          "ok",
+          "leer",
+          "offline"
+        ]
+      },
+      "FahrzeugAnzeige": {
+        "type": "object",
+        "description": "Öffentliche Fahrzeug-Darstellung (ohne `org_id`).",
+        "required": [
+          "id",
+          "funkrufname",
+          "sondersignal",
+          "dienststatus",
+          "angelegt_at"
+        ],
+        "properties": {
+          "angelegt_at": {
+            "type": "string"
+          },
+          "bemerkung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dienststatus": {
+            "$ref": "#/components/schemas/Dienststatus"
+          },
+          "fahrzeugtyp": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fms_issi": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "funkrufname": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kennzeichen": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "opta": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sondersignal": {
+            "type": "boolean"
+          },
+          "staerke": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Staerke"
+              }
+            ]
+          },
+          "standort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "traegerorganisation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tragenkapazitaet": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "FahrzeugStatus": {
+        "type": "object",
+        "description": "Status-Katalog-Eintrag (org-weit). `aktiv` wird nicht serialisiert\n(Listen-Endpunkt liefert ohnehin nur aktive).",
+        "required": [
+          "id",
+          "label",
+          "kategorie",
+          "sortier"
+        ],
+        "properties": {
+          "farbe": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fms_anker": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kategorie": {
+            "$ref": "#/components/schemas/StatusKategorie"
+          },
+          "label": {
+            "type": "string"
+          },
+          "sortier": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "FahrzeugVorschlaege": {
+        "type": "object",
+        "description": "Abgeleitete AutoComplete-Vorschläge für die Stamm-Felder (DISTINCT, org-weit).\nSpeist die Comboboxen im Fahrzeug-Formular mit bereits verwendeten Werten.",
+        "required": [
+          "fahrzeugtyp",
+          "traegerorganisation",
+          "standort"
+        ],
+        "properties": {
+          "fahrzeugtyp": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "standort": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "traegerorganisation": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "FuehrungskraftKarte": {
+        "type": "object",
+        "description": "Schlanke Karten-Sicht einer Führungskraft (Einheits- oder Abschnittsführung).",
+        "required": [
+          "id",
+          "einsatz_id",
+          "name",
+          "ist_einheitsfuehrer",
+          "ist_abschnittsleiter"
+        ],
+        "properties": {
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ist_abschnittsleiter": {
+            "type": "boolean"
+          },
+          "ist_einheitsfuehrer": {
+            "type": "boolean"
+          },
+          "lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "name": {
+            "type": "string"
+          },
+          "tz_fachaufgabe": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tz_organisation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "GefahrBewertungAnzeige": {
+        "type": "object",
+        "description": "Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält nur Zellen mit\n`warnstufe != 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen.",
+        "required": [
+          "id",
+          "gefahrengebiet_id",
+          "gefahrentyp",
+          "schutzobjekt",
+          "warnstufe",
+          "aktualisiert_von",
+          "erstellt_at",
+          "geaendert_at"
+        ],
+        "properties": {
+          "aktualisiert_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "beschreibung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "geaendert_at": {
+            "type": "string"
+          },
+          "gefahrengebiet_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "gefahrentyp": {
+            "$ref": "#/components/schemas/Gefahrentyp"
+          },
+          "gemeldet_von": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "schutzobjekt": {
+            "$ref": "#/components/schemas/Schutzobjekt"
+          },
+          "warnstufe": {
+            "$ref": "#/components/schemas/Warnstufe"
+          }
+        }
+      },
+      "GefahrengebietAnzeige": {
+        "type": "object",
+        "description": "Ein Gefahrengebiet (Gruppe aus 1..n gefahrengebiet-Zonen), trägt eine Matrix.\n`zonen_ids`: zugehörige lage_zone-IDs. `hoechste_warnstufe`: stärkste gesetzte\nZelle der Matrix (Severity-Maximum), `keine` wenn nichts gesetzt.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "zonen_ids",
+          "hoechste_warnstufe"
+        ],
+        "properties": {
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "hoechste_warnstufe": {
+            "$ref": "#/components/schemas/Warnstufe"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zonen_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        }
+      },
+      "Gefahrentyp": {
+        "type": "string",
+        "description": "Gefahrentyp (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `gefahrentyp`.",
+        "enum": [
+          "atemgifte",
+          "angstreaktion",
+          "ausbreitung",
+          "atomare_strahlung",
+          "chemische_stoffe",
+          "erkrankung_verletzung",
+          "explosion",
+          "elektrizitaet",
+          "einsturz",
+          "absturz",
+          "brand",
+          "durchbruch",
+          "ertrinken"
+        ]
+      },
+      "Geschlecht": {
+        "type": "string",
+        "description": "Optionale Geschlechtsangabe. `unbekannt` ist ein erstklassiger Wert.",
+        "enum": [
+          "maennlich",
+          "weiblich",
+          "divers",
+          "unbekannt"
+        ]
+      },
+      "HintergrundbildAnzeige": {
+        "type": "object",
+        "description": "Anzeige-DTO (ohne BLOB-Bytes). `sichtbar` als bool für saubere JSON-Ausgabe.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "name",
+          "mime",
+          "groesse",
+          "ecken_json",
+          "opazitaet",
+          "sichtbar",
+          "reihenfolge",
+          "hochgeladen_von",
+          "erstellt_at",
+          "geaendert_at"
+        ],
+        "properties": {
+          "ecken_json": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "geaendert_at": {
+            "type": "string"
+          },
+          "groesse": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "hochgeladen_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mime": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "opazitaet": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reihenfolge": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sichtbar": {
+            "type": "boolean"
+          }
+        }
+      },
+      "KarteConfigAntwort": {
+        "type": "object",
+        "description": "Antwort von `GET /api/karte/config`. Liefert NUR, was die Karte zur Laufzeit braucht —\nNICHT den Server-Dateipfad der Offline-Kartendatei. Shape ist eingefroren (Frontend-Vertrag,\n`frontend/src/api/karte.ts`); nur die Datenquelle wechselte von ENV/Extension auf die DB.",
+        "required": [
+          "online_styles",
+          "offline_verfuegbar",
+          "offline_regionen",
+          "karten_bau_verfuegbar"
+        ],
+        "properties": {
+          "karten_bau_verfuegbar": {
+            "type": "boolean",
+            "description": "True, wenn der zentrale karten-service konfiguriert ist (URL+Token) → Admin darf Region-Builds\nanstoßen. Steuert die Sichtbarkeit der Bau-UI (LFH-203). Reine Verfügbarkeit, kein Secret."
+          },
+          "offline_attribution": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pflicht-Attribution der ersten sichtbaren Region (Kompat). `None`, wenn keine Region bereit."
+          },
+          "offline_format": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Grober Kachel-Typ der ersten sichtbaren Region (LFH-185): `\"vektor\"` (pbf) oder `\"raster\"`\n(png/jpg/webp) — Kompat. `None`, wenn keine Region bereit."
+          },
+          "offline_regionen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OfflineRegionConfig"
+            },
+            "description": "Alle gemeinsam anzuzeigenden Offline-Regionen (LFH-188): die Offline-Karte ist die\nVEREINIGUNG aller bereiten Regionen, je Region eine eigene Vector-Source. Leere Liste =\nkeine Region bereit (= `offline_verfuegbar = false`)."
+          },
+          "offline_tiles_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Tile-Endpoint-Template der ERSTEN sichtbaren Offline-Region inkl. Cache-Bust `?v=<token>`.\n**Kompat-Feld** (LFH-188): die eigentliche Quelle der Wahrheit ist `offline_regionen`; alte\nClients ohne Multi-Region-Support degradieren auf diese eine Region. Der Token wechselt bei\nKarten-Swap, sonst cacht MapLibre den alten Tile-Aufbau unter gleicher URL → korrupte Tiles."
+          },
+          "offline_verfuegbar": {
+            "type": "boolean"
+          },
+          "online_styles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OnlineStyle"
+            }
+          }
+        }
+      },
+      "Koordinatenformat": {
+        "type": "string",
+        "description": "Koordinatenformat (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `koordinatenformat`.",
+        "enum": [
+          "wgs84",
+          "dms",
+          "utm",
+          "mgrs",
+          "gk"
+        ]
+      },
+      "LageMeldungAnzeige": {
+        "type": "object",
+        "description": "Lageobjekt aus lagerelevanter Meldung (LFH-95). Herkunfts-Felder (meldung_*)\nper JOIN — am Lageobjekt bleibt die Quell-Meldung nachvollziehbar.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "meldung_id",
+          "text",
+          "erstellt_von_id",
+          "erstellt_at",
+          "meldung_lfd_nr",
+          "meldung_absender"
+        ],
+        "properties": {
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "erstellt_von_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "meldung_absender": {
+            "type": "string"
+          },
+          "meldung_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "meldung_lfd_nr": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "LageZoneAnzeige": {
+        "type": "object",
+        "description": "Eine freie Lage-Zone (Gefahren-/Absperrzone). Eigenständige Entität — kein Fachobjekt.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "typ",
+          "geometrie_typ",
+          "geometrie",
+          "erstellt_von",
+          "erstellt_at",
+          "geaendert_at"
+        ],
+        "properties": {
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "erstellt_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "farbe": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "geaendert_at": {
+            "type": "string"
+          },
+          "gefahrengebiet_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "geometrie": {
+            "type": "string"
+          },
+          "geometrie_typ": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notiz": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "typ": {
+            "$ref": "#/components/schemas/LageZoneTyp"
+          }
+        }
+      },
+      "LageZoneTyp": {
+        "type": "string",
+        "description": "Zonen-Typ (Schema-Anker für die OpenAPI-Union, LFH-120; TS: `ZoneTyp`). Wire == `typ`.",
+        "enum": [
+          "gefahrengebiet",
+          "absperrbereich",
+          "absperrgrenze",
+          "sperrgebiet",
+          "freie_skizze"
+        ]
+      },
+      "LageberichtAbschnitt": {
+        "type": "object",
+        "description": "Ein gefüllter Abschnitt (so persistiert als JSON-Array-Element).",
+        "required": [
+          "schluessel",
+          "text"
+        ],
+        "properties": {
+          "schluessel": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "LageberichtAnzeige": {
+        "type": "object",
+        "description": "Öffentliche Anzeige eines Lageberichts (Abschnitte aus JSON geparst, Namen aufgelöst).",
+        "required": [
+          "id",
+          "einsatz_id",
+          "vorlage",
+          "titel",
+          "zeitstand",
+          "status",
+          "abschnitte",
+          "version",
+          "ersteller_id",
+          "ersteller_name",
+          "erstellt_at",
+          "aktualisiert_at"
+        ],
+        "properties": {
+          "abschnitte": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LageberichtAbschnitt"
+            }
+          },
+          "aktualisiert_at": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ersteller_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ersteller_name": {
+            "type": "string"
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "etb_eintrag_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "freigegeben_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "freigegeben_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "freigegeben_von_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/LageberichtStatus"
+          },
+          "titel": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "vorgaenger_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "vorlage": {
+            "$ref": "#/components/schemas/LageberichtVorlage"
+          },
+          "zeitstand": {
+            "type": "string"
+          }
+        }
+      },
+      "LageberichtStatus": {
+        "type": "string",
+        "description": "Lagebericht-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.",
+        "enum": [
+          "entwurf",
+          "freigegeben"
+        ]
+      },
+      "LageberichtVorlage": {
+        "type": "string",
+        "description": "Lagebericht-Vorlage (Schema-Anker für die OpenAPI-Union, LFH-120; TS: `LageberichtVorlageKey`).\nWire == `vorlage`.",
+        "enum": [
+          "lagebericht",
+          "lagebeurteilung",
+          "freitext"
+        ]
+      },
+      "MaterialAnzeige": {
+        "type": "object",
+        "description": "Öffentliche Material-Darstellung (ohne `org_id`).",
+        "required": [
+          "id",
+          "bezeichnung",
+          "dienststatus",
+          "angelegt_at"
+        ],
+        "properties": {
+          "angelegt_at": {
+            "type": "string"
+          },
+          "bemerkung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bestandsnummer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "dienststatus": {
+            "$ref": "#/components/schemas/Dienststatus"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kategorie": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "standort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "traegerorganisation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "MaterialStatus": {
+        "type": "string",
+        "description": "Fester Status einer Material-Dispositionszeile (kein admin-pflegbarer Katalog).\nAls TEXT in der DB gespeichert; manuell konvertiert (analog `StaerkePosition`).",
+        "enum": [
+          "einsatzbereit",
+          "im_einsatz",
+          "defekt",
+          "verbraucht",
+          "desinfektion_noetig"
+        ]
+      },
+      "MeldeWeg": {
+        "type": "string",
+        "description": "Meldeweg eines Eintrags (optional).",
+        "enum": [
+          "funk",
+          "telefon",
+          "persoenlich",
+          "sonstige"
+        ]
+      },
+      "MeldungAnzeige": {
+        "type": "object",
+        "description": "Anzeige einer Meldung inkl. abgeleiteter Felder (Bearbeitername per JOIN,\n`lage_meldung_id` als Herkunfts-Rückverweis, `ist_offen` für Posteingang-Filter).",
+        "required": [
+          "id",
+          "einsatz_id",
+          "lfd_nr",
+          "absender",
+          "meldeweg",
+          "inhalt",
+          "meldungsart",
+          "prioritaet",
+          "richtung",
+          "status",
+          "lagerelevant",
+          "ereigniszeit",
+          "eingang_at",
+          "erfasst_von_id",
+          "erstellt_at",
+          "ist_offen",
+          "bestaetigung_pflicht",
+          "eskaliert",
+          "ist_bestaetigt",
+          "ist_ueberfaellig"
+        ],
+        "properties": {
+          "absender": {
+            "type": "string"
+          },
+          "auftrag_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "bearbeiter_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "bearbeiter_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bestaetigt_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Abgeleitet (kommunikation_status, Quittungs-Achse): Bestätigt-um."
+          },
+          "bestaetigt_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Abgeleitet: Bestätigt-von (Benutzer-id)."
+          },
+          "bestaetigt_von_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Abgeleitet: Bestätigt-von (Anzeigename, JOIN benutzer)."
+          },
+          "bestaetigung_frist_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Absolute Bestätigungsfrist (UTC), NULL wenn keine Pflicht."
+          },
+          "bestaetigung_pflicht": {
+            "type": "boolean",
+            "description": "Sofortmeldung & Eskalation (LFH-85/97): aktive Bestätigungspflicht."
+          },
+          "eingang_at": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "empfaenger": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ereigniszeit": {
+            "type": "string"
+          },
+          "erfasst_von_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erledigt_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Erledigt-Zeitpunkt (UTC), first-write-wins beim Übergang nach 'erledigt' (LFH-113);\nNULL solange nie erledigt. Bleibt erhalten, falls der Status später zurückgesetzt wird."
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "eskaliert": {
+            "type": "boolean",
+            "description": "Frist überschritten + unbestätigt (vom Erinnerungs-Tick gesetzt, Re-Highlight)."
+          },
+          "etb_meldung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "inhalt": {
+            "type": "string"
+          },
+          "ist_bestaetigt": {
+            "type": "boolean",
+            "description": "Abgeleitet: quittiert_at IS NOT NULL."
+          },
+          "ist_offen": {
+            "type": "boolean",
+            "description": "Abgeleitet: status != 'erledigt' (Posteingang = offene Meldungen)."
+          },
+          "ist_ueberfaellig": {
+            "type": "boolean",
+            "description": "Abgeleitet: pflichtig, unbestätigt und Frist <= jetzt."
+          },
+          "lage_meldung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Abgeleitet: id des erzeugten Lageobjekts (LFH-95), falls übergeben."
+          },
+          "lagerelevant": {
+            "type": "boolean"
+          },
+          "lfd_nr": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "meldeweg": {
+            "$ref": "#/components/schemas/MeldeWeg"
+          },
+          "meldungsart": {
+            "$ref": "#/components/schemas/Meldungsart"
+          },
+          "prioritaet": {
+            "$ref": "#/components/schemas/Prioritaet"
+          },
+          "richtung": {
+            "$ref": "#/components/schemas/Richtung",
+            "description": "Richtung intern/extern (LFH-87)."
+          },
+          "status": {
+            "$ref": "#/components/schemas/MeldungStatus"
+          }
+        }
+      },
+      "MeldungStatus": {
+        "type": "string",
+        "description": "Triage-Status einer Meldung (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.",
+        "enum": [
+          "neu",
+          "gesichtet",
+          "in_bearbeitung",
+          "erledigt"
+        ]
+      },
+      "Meldungsart": {
+        "type": "string",
+        "description": "Meldungsart (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `meldungsart`.",
+        "enum": [
+          "lagemeldung",
+          "sofortmeldung",
+          "rueckmeldung",
+          "vollzugsmeldung",
+          "anfrage",
+          "sonstige"
+        ]
+      },
+      "MitgliedAnzeige": {
+        "type": "object",
+        "description": "Mitglied eines Einsatzes für API-Antworten (mit Benutzer-Klartext, ohne Hash).",
+        "required": [
+          "benutzer_id",
+          "anzeigename",
+          "benutzername",
+          "einsatz_rolle",
+          "zugewiesen_at"
+        ],
+        "properties": {
+          "anzeigename": {
+            "type": "string"
+          },
+          "benutzer_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "benutzername": {
+            "type": "string"
+          },
+          "einsatz_rolle": {
+            "$ref": "#/components/schemas/EinsatzRolle"
+          },
+          "zugewiesen_at": {
+            "type": "string"
+          }
+        }
+      },
+      "NachforderungAnzeige": {
+        "type": "object",
+        "description": "Anzeige einer Nachforderung inkl. Ersteller-Name (JOIN) und abgeleitetem `ist_offen`\n(noch nicht eingetroffen/abgelehnt). Reihenfolge der Felder = SELECT-Projektion.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "art",
+          "bezeichnung",
+          "adressat_kategorie",
+          "prioritaet",
+          "status",
+          "angefordert_at",
+          "erstellt_von_id",
+          "erstellt_at",
+          "ist_offen"
+        ],
+        "properties": {
+          "abgelehnt_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "abgelehnt_grund": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "adressat_bezeichnung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "adressat_kategorie": {
+            "$ref": "#/components/schemas/AdressatKategorie"
+          },
+          "angefordert_at": {
+            "type": "string"
+          },
+          "anzahl": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "art": {
+            "type": "string"
+          },
+          "begruendung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "eingetroffen_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "erstellt_von_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erstellt_von_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Abgeleitet: Ersteller-Anzeigename (LEFT JOIN benutzer)."
+          },
+          "etb_nachforderung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ist_offen": {
+            "type": "boolean",
+            "description": "Abgeleitet: status NOT IN ('eingetroffen','abgelehnt')."
+          },
+          "prioritaet": {
+            "$ref": "#/components/schemas/Prioritaet"
+          },
+          "status": {
+            "$ref": "#/components/schemas/NachforderungStatus"
+          },
+          "unterwegs_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zugesagt_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "NachforderungStatus": {
+        "type": "string",
+        "description": "Bedarfs-Status einer Nachforderung (Schema-Anker für die OpenAPI-Union, LFH-120).\nWire == `status`.",
+        "enum": [
+          "angefordert",
+          "zugesagt",
+          "unterwegs",
+          "eingetroffen",
+          "abgelehnt"
+        ]
+      },
+      "NotizAnzeige": {
+        "type": "object",
+        "description": "Eine medizinische Verlaufsnotiz (1:1 zu `person_verlaufsnotiz`).",
+        "required": [
+          "id",
+          "einsatz_id",
+          "person_id",
+          "text",
+          "erfasst_at",
+          "erfasst_von"
+        ],
+        "properties": {
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erfasst_at": {
+            "type": "string"
+          },
+          "erfasst_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "person_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "ObjektTyp": {
+        "type": "string",
+        "description": "Typ des belegenden Objekts. String = CHECK-Constraint in\n`migrations/0061_br_belegung.sql`.",
+        "enum": [
+          "einheit",
+          "fahrzeug"
+        ]
+      },
+      "OfflineKarte": {
+        "type": "object",
+        "description": "Eine Offline-Karte als DB-Zeile (Admin-CRUD). `aktiv_basemap` = die von `/tiles` ausgelieferte\nKarte; `status` und die Download-Felder (groesse/sha256/download_at) pflegt LFH-181.",
+        "required": [
+          "id",
+          "name",
+          "pfad",
+          "kachel_schema",
+          "format",
+          "status",
+          "aktiv_basemap",
+          "sortier"
+        ],
+        "properties": {
+          "aktiv_basemap": {
+            "type": "boolean"
+          },
+          "download_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "format": {
+            "type": "string",
+            "description": "Kachel-Blob-Format (LFH-185): `pbf` (Vektor, gzip) oder `png`/`jpg`/`webp` (Raster). Steuert\nContent-Type + Encoding im Tile-Serving; orthogonal zu `kachel_schema` (Vektor-Layermenge)."
+          },
+          "groesse": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kachel_schema": {
+            "type": "string",
+            "description": "Kachel-Schema der Datei (z.B. `'shortbread'`). **Aktuell inertes Metadatenfeld** (LFH-198):\nim Tile-Serving nicht konsumiert (MBTiles wird schema-blind gelesen), und alle Insert-Pfade\nsetzen den Wert explizit — der DB-DEFAULT `'protomaps'` in Migration 0076 greift also nie.\nBewusst behalten (statt teurem Table-Rebuild nur zum Default-Umlegen) für eine mögliche\nkünftige Schema-Unterscheidung (z.B. Raster vs. Vektor, LFH-185); deren Nutzen hängt nicht\nam Default-Wert."
+          },
+          "lizenz": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "pfad": {
+            "type": "string"
+          },
+          "quell_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sortier": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "OfflineKarteAntwort": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/OfflineKarte"
+          },
+          {
+            "type": "object",
+            "required": [
+              "update_verfuegbar"
+            ],
+            "properties": {
+              "geladen": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int64"
+              },
+              "gesamt": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "int64"
+              },
+              "katalog_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "SHA256-Pin der aktuellen Katalog-URL (für den verifizierten Re-Download beim Update)."
+              },
+              "katalog_url": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Aktuelle Katalog-URL dieser Karte, wenn ein Update verfügbar ist (für den Re-Download)."
+              },
+              "update_verfuegbar": {
+                "type": "boolean",
+                "description": "True, wenn der Katalog für DIESELBE Karte (über den Namen) inzwischen eine ANDERE (neuere)\nQuell-URL führt als die installierte `quell_url` → im UI „Update verfügbar\". Offline-Check\n(rein gegen den eingebauten Katalog, kein Netz). Lädt der Katalog/Mirror einen neueren\nStand (anderes Datum in der URL), wird das hier automatisch sichtbar."
+              }
+            }
+          }
+        ],
+        "description": "GET /api/karte/offline-karten — alle Offline-Karten. Lesen: admin ODER Führungskraft (read-only).\nListen-Antwort = DB-Zeile + Live-Download-Fortschritt. `geladen`/`gesamt` (Bytes) kommen nur\nfür `status='laedt'` aus dem transienten In-Memory-State (keine DB-Spalte); `gesamt` ist\n`null`, wenn die Quelle keine Content-Length lieferte. Das Frontend rendert daraus den\nFortschrittsbalken."
+      },
+      "OfflineRegionConfig": {
+        "type": "object",
+        "description": "Eine gemeinsam angezeigte Offline-Region im Config-Vertrag (LFH-188). `tiles_url` ist\nregion-adressiert (`/api/karte/offline/{karte_id}/tiles/{z}/{x}/{y}?v=<token>`), sodass das\nFrontend je Region eine eigene Vector-Source mit eigenem Cache-Bust bindet.",
+        "required": [
+          "karte_id",
+          "name",
+          "tiles_url",
+          "format",
+          "maxzoom"
+        ],
+        "properties": {
+          "attribution": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "format": {
+            "type": "string",
+            "description": "`\"vektor\"` (pbf) oder `\"raster\"` (png/jpg/webp) — steuert die Style-Wahl je Region."
+          },
+          "karte_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "maxzoom": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Maximaler Zoom der Vector-Source: Regional-Packs `14` (Shortbread-Voll-Detail), die\nWelt-Übersicht `6` (Low-Zoom-Basis, LFH-207) → MapLibre überzoomt sie darüber als Kontext.",
+            "minimum": 0
+          },
+          "name": {
+            "type": "string"
+          },
+          "tiles_url": {
+            "type": "string"
+          }
+        }
+      },
+      "OnlineStyle": {
+        "type": "object",
+        "description": "Ein benannter Online-Basemap-View. `attribution` ist die config-autoritative\nPflicht-Attribution, die das Frontend per `customAttribution` anzeigt.",
+        "required": [
+          "name",
+          "url"
+        ],
+        "properties": {
+          "attribution": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "typ": {
+            "$ref": "#/components/schemas/OnlineStyleTyp"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "OnlineStyleTyp": {
+        "type": "string",
+        "description": "Typ eines Online-Views: Vektor-Style-JSON (URL direkt an MapLibre) oder\nRaster-Tile-Template (`{z}/{y}/{x}`, das das Frontend in einen Raster-Style verpackt).",
+        "enum": [
+          "vektor",
+          "raster"
+        ]
+      },
+      "OrgEinstellungenAnzeige": {
+        "type": "object",
+        "description": "API-Darstellung der Org-Einstellungen (flach, alle Felder serialisiert).",
+        "required": [
+          "org_id",
+          "zeitformat",
+          "einheiten",
+          "koordinatenformat"
+        ],
+        "properties": {
+          "auftrag_nummer_praefix": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "auftrag_quittierung_frist_min": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "auto_etb_eintraege": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "einheiten": {
+            "$ref": "#/components/schemas/EinheitenSystem"
+          },
+          "etb_nummer_praefix": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "geaendert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "geaendert_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "geocoder_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "koordinatenformat": {
+            "$ref": "#/components/schemas/Koordinatenformat"
+          },
+          "meldung_bestaetigung_frist_min": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "meldung_nummer_praefix": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "retention_dauer_tage": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "zeitformat": {
+            "$ref": "#/components/schemas/Zeitformat"
+          },
+          "zeitzone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "OrgEinstellungenHinweis": {
+        "type": "object",
+        "description": "Schlanke API-Darstellung für den Einsatz-Endpoint: nur Konventions-Felder,\nKEIN `geaendert_at`, KEIN `geaendert_von` — Audit-Schutz für Non-Admin-Mitglieder.",
+        "required": [
+          "org_id",
+          "zeitformat",
+          "einheiten",
+          "koordinatenformat"
+        ],
+        "properties": {
+          "auftrag_nummer_praefix": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "auftrag_quittierung_frist_min": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "auto_etb_eintraege": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "einheiten": {
+            "$ref": "#/components/schemas/EinheitenSystem"
+          },
+          "etb_nummer_praefix": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "koordinatenformat": {
+            "$ref": "#/components/schemas/Koordinatenformat"
+          },
+          "meldung_bestaetigung_frist_min": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "meldung_nummer_praefix": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "retention_dauer_tage": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "zeitformat": {
+            "$ref": "#/components/schemas/Zeitformat"
+          },
+          "zeitzone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "OrgRolle": {
+        "type": "string",
+        "description": "Org-weite Rolle (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `org_rolle`.",
+        "enum": [
+          "fuehrungskraft",
+          "keine"
+        ]
+      },
+      "OrganisationAnzeige": {
+        "type": "object",
+        "description": "Org-Stammdaten inkl. DV-102-Org-Default (`tz_organisation`).",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "tz_organisation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "OrtVorschauAntwort": {
+        "type": "object",
+        "properties": {
+          "ortsname": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "peilung": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PeilungAntwort"
+              }
+            ]
+          }
+        }
+      },
+      "PeilungAntwort": {
+        "type": "object",
+        "required": [
+          "distanz_m",
+          "richtung",
+          "bezug_label"
+        ],
+        "properties": {
+          "bezug_label": {
+            "type": "string"
+          },
+          "distanz_m": {
+            "type": "number",
+            "format": "double"
+          },
+          "richtung": {
+            "type": "string"
+          }
+        }
+      },
+      "PersonAnzeige": {
+        "type": "object",
+        "description": "Serialisierbarer Personen-Datensatz (1:1 zur Tabelle `einsatz_person`; kein\n`org_id`, da einsatz-scoped). Direkt aus der Zeile lesbar — kein Stamm-Join,\nkein Snapshot wie bei Material.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "registrier_nr",
+          "status",
+          "geschlecht",
+          "erfasst_at",
+          "erfasst_von",
+          "geaendert_at",
+          "geaendert_von",
+          "aktuelle_sichtung"
+        ],
+        "properties": {
+          "aktuelle_sichtung": {
+            "$ref": "#/components/schemas/Sichtungskategorie"
+          },
+          "aktuelle_sichtung_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "aktuelle_uhs_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "aktueller_platz_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "aktueller_verbleib": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "alter_geschaetzt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "antreff_ort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erfasst_at": {
+            "type": "string"
+          },
+          "erfasst_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "geaendert_at": {
+            "type": "string"
+          },
+          "geaendert_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "geburtsdatum": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "geschlecht": {
+            "$ref": "#/components/schemas/Geschlecht"
+          },
+          "herkunft_adresse": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "melder_kontakt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notiz": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "registrier_nr": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PersonStatus"
+          },
+          "storniert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "vorname": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "PersonDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PersonAnzeige"
+          },
+          {
+            "type": "object",
+            "required": [
+              "sichtungen",
+              "notizen",
+              "verbleib",
+              "abgleiche"
+            ],
+            "properties": {
+              "abgleiche": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/AbgleichAnzeige"
+                }
+              },
+              "notizen": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/NotizAnzeige"
+                }
+              },
+              "sichtungen": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SichtungAnzeige"
+                }
+              },
+              "verbleib": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/VerbleibAnzeige"
+                }
+              }
+            }
+          }
+        ],
+        "description": "Detail-Antwort: E‑1-Personenfelder (flatten) + E‑2-Verlauf-Arrays. Genau eine\nAntwort, genau ein `detail`-Audit (Spec-Annahme „Lesen / Lese-Audit\")."
+      },
+      "PersonStatus": {
+        "type": "string",
+        "description": "Administrative Status-Maschine einer Person (E‑1). E‑2 ergänzt die\nmedizinische Sichtungskategorie SK I–IV als separates Attribut auf\n`betroffen` — diese Maschine bleibt unangetastet.",
+        "enum": [
+          "erfasst",
+          "vermisst",
+          "betroffen",
+          "verstorben",
+          "abgemeldet"
+        ]
+      },
+      "PersonalAnzeige": {
+        "type": "object",
+        "description": "Öffentliche Personal-Darstellung (ohne `org_id`), inkl. aufgelöster Qualifikationen.",
+        "required": [
+          "id",
+          "name",
+          "staerke_position",
+          "dienststatus",
+          "angelegt_at",
+          "qualifikationen"
+        ],
+        "properties": {
+          "angelegt_at": {
+            "type": "string"
+          },
+          "bemerkung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "benutzer_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "dienststatus": {
+            "$ref": "#/components/schemas/Dienststatus"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "personalnummer": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "qualifikationen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QualifikationRef"
+            }
+          },
+          "staerke_position": {
+            "$ref": "#/components/schemas/StaerkePosition"
+          },
+          "telefon": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "traegerorganisation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "PersonalStatus": {
+        "type": "object",
+        "description": "Personal-Status-Katalog-Eintrag (org-weit). Schema wie `FahrzeugStatus` minus `fms_anker`.",
+        "required": [
+          "id",
+          "label",
+          "kategorie",
+          "sortier"
+        ],
+        "properties": {
+          "farbe": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kategorie": {
+            "$ref": "#/components/schemas/StatusKategorie"
+          },
+          "label": {
+            "type": "string"
+          },
+          "sortier": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "PersonalVorschlaege": {
+        "type": "object",
+        "description": "Abgeleitete AutoComplete-Vorschläge für die Trägerorganisation (DISTINCT, org-weit).\nBewusst nur ein Feld (anders als FahrzeugVorschlaege mit drei Feldern).",
+        "required": [
+          "traegerorganisation"
+        ],
+        "properties": {
+          "traegerorganisation": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "PlatzAnzeige": {
+        "type": "object",
+        "description": "Serialisierbare Platz-Anzeige (1:1 zur Tabelle).",
+        "required": [
+          "id",
+          "uhs_id",
+          "typ",
+          "bezeichnung",
+          "verfuegbarkeit"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "pos_x": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "pos_y": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "reserviert_fuer_person_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "storniert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "typ": {
+            "$ref": "#/components/schemas/PlatzTyp"
+          },
+          "uhs_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "verfuegbarkeit": {
+            "$ref": "#/components/schemas/Verfuegbarkeit"
+          }
+        }
+      },
+      "PlatzTyp": {
+        "type": "string",
+        "description": "Typ eines Platzes innerhalb einer UHS. String = CHECK-Constraint in\n`migrations/0028_uhs_platz.sql`. „Eingang\"/„Inbox\" ist KEIN Typ — die\nInbox ist implizit über `platz_id = NULL` in der Belegung modelliert.",
+        "enum": [
+          "wartebereich",
+          "behandlungsplatz",
+          "bett",
+          "intensivplatz",
+          "trage",
+          "transport_bereitstellung",
+          "sonstige"
+        ]
+      },
+      "Prioritaet": {
+        "type": "string",
+        "description": "Geteilte Priorität für Auftrag/Meldung/Nachforderung (Schema-Anker für die OpenAPI-Union,\nLFH-120; TS: `AuftragPrioritaet`/`MeldungPrioritaet`/`NachforderungPrioritaet`). Wire == `prioritaet`.",
+        "enum": [
+          "sofort",
+          "dringend",
+          "normal"
+        ]
+      },
+      "Qualifikation": {
+        "type": "object",
+        "description": "Qualifikations-Katalog-Eintrag (org-weit). `aktiv` wird nicht serialisiert\n(Listen-Endpunkt liefert ohnehin nur aktive).",
+        "required": [
+          "id",
+          "label",
+          "sortier"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "label": {
+            "type": "string"
+          },
+          "sortier": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "QualifikationRef": {
+        "type": "object",
+        "description": "Aufgelöste Qualifikation einer Person (id + label), inkl. deaktivierter\nZuordnungen (deaktivierte Qualifikation bleibt in der Anzeige sichtbar).",
+        "required": [
+          "id",
+          "label"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "Richtung": {
+        "type": "string",
+        "description": "Geteilte Richtung für Auftrag/Meldung (Schema-Anker für die OpenAPI-Union, LFH-120).\nWire == `richtung`.",
+        "enum": [
+          "intern",
+          "extern"
+        ]
+      },
+      "SchadenAbschlussGrund": {
+        "type": "string",
+        "enum": [
+          "behoben",
+          "kein_handlungsbedarf",
+          "abgewiesen"
+        ]
+      },
+      "SchadenAnzeige": {
+        "type": "object",
+        "required": [
+          "id",
+          "einsatz_id",
+          "registrier_nr",
+          "status",
+          "typ",
+          "ausmass",
+          "ort",
+          "beschreibung",
+          "abschluss_grund",
+          "erfasst_at",
+          "erfasst_von",
+          "geaendert_at",
+          "geaendert_von"
+        ],
+        "properties": {
+          "abschluss_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "abschluss_grund": {
+            "$ref": "#/components/schemas/SchadenAbschlussGrund"
+          },
+          "ausmass": {
+            "$ref": "#/components/schemas/Ausmass"
+          },
+          "beschreibung": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erfasst_at": {
+            "type": "string"
+          },
+          "erfasst_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "geaendert_at": {
+            "type": "string"
+          },
+          "geaendert_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "geschaedigt_kontakt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "geschaedigt_organisation_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "geschaedigt_organisation_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "geschaedigt_person_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "geschaedigt_personal_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "geschaedigt_personal_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "geschaedigt_registrier_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "geschaedigt_storniert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "ort": {
+            "type": "string"
+          },
+          "registrier_nr": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SchadenStatus"
+          },
+          "storniert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "storniert_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "typ": {
+            "$ref": "#/components/schemas/SchadenTyp"
+          },
+          "uebergeben_an": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "uebergeben_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "SchadenStatus": {
+        "type": "string",
+        "enum": [
+          "offen",
+          "uebergeben",
+          "abgeschlossen"
+        ]
+      },
+      "SchadenTyp": {
+        "type": "string",
+        "enum": [
+          "sachschaden",
+          "verkehrshindernis",
+          "infrastruktur",
+          "umweltschaden",
+          "tierkadaver",
+          "sonstige"
+        ]
+      },
+      "Schutzobjekt": {
+        "type": "string",
+        "description": "Schutzobjekt (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `schutzobjekt`.",
+        "enum": [
+          "menschen",
+          "tiere",
+          "umwelt",
+          "sachwerte",
+          "einsatzkraefte"
+        ]
+      },
+      "SichtungAnzeige": {
+        "type": "object",
+        "description": "Ein Sichtungs-Verlaufseintrag (1:1 zu `person_sichtung`).",
+        "required": [
+          "id",
+          "einsatz_id",
+          "person_id",
+          "kategorie",
+          "gesichtet_at",
+          "gesichtet_von"
+        ],
+        "properties": {
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "gesichtet_at": {
+            "type": "string"
+          },
+          "gesichtet_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kategorie": {
+            "$ref": "#/components/schemas/Sichtungskategorie"
+          },
+          "notiz": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "person_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "Sichtungskategorie": {
+        "type": "string",
+        "description": "Medizinische Sichtungskategorie (Triage). String = CHECK-Constraint in\n`migrations/0023_person_sichtung.sql`. **`Tot` ist ein medizinisches Urteil\nund ändert den Admin-`PersonStatus` NICHT** (Annahme 4).",
+        "enum": [
+          "sk1",
+          "sk2",
+          "sk3",
+          "sk4",
+          "tot",
+          "unverletzt"
+        ]
+      },
+      "Spezies": {
+        "type": "string",
+        "description": "Spezies-Enum. String = CHECK-Constraint. `etb_label` ist die pseudonyme\nAnzeige in der ETB-Spur (z. B. \"Hund\").",
+        "enum": [
+          "hund",
+          "katze",
+          "grosstier",
+          "nutzgefluegel",
+          "kleintier",
+          "wildtier",
+          "sonstige"
+        ]
+      },
+      "SprechgruppeAnzeige": {
+        "type": "object",
+        "description": "Öffentliche Sprechgruppen-Darstellung (ohne `org_id`, mit `einsatz_lokal`-Flag).",
+        "required": [
+          "id",
+          "einsatz_lokal",
+          "bezeichnung",
+          "betriebsart",
+          "aktiv",
+          "sortier"
+        ],
+        "properties": {
+          "aktiv": {
+            "type": "boolean"
+          },
+          "betriebsart": {
+            "$ref": "#/components/schemas/Betriebsart"
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "einsatz_lokal": {
+            "type": "boolean",
+            "description": "`true` wenn die Sprechgruppe einsatzlokal ist (d.h. `einsatz_id` gesetzt)."
+          },
+          "hinweis": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sortier": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "Staerke": {
+        "type": "object",
+        "description": "Taktische Stärke (FwDV 3 / DV 100): Führer / Unterführer / Mannschaft.\n`gesamt` wird berechnet, nicht gespeichert. `u16`, damit auch ein Verband/Stab\nüber 255 nicht anstößt. Wiederverwendbar für Personal/Einheiten (K&M‑2/3).",
+        "required": [
+          "fuehrer",
+          "unterfuehrer",
+          "mannschaft"
+        ],
+        "properties": {
+          "fuehrer": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "mannschaft": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "unterfuehrer": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "StaerkePosition": {
+        "type": "string",
+        "description": "Taktische Stärke-Position einer einzelnen Person (genau einer von drei Töpfen).\nWird als TEXT in der DB gespeichert (kein sqlx-Enum-Decode → manuell konvertiert).",
+        "enum": [
+          "fuehrer",
+          "unterfuehrer",
+          "mannschaft"
+        ]
+      },
+      "StatusKategorie": {
+        "type": "string",
+        "description": "Status-Kategorie eines Katalog-Eintrags (Schema-Anker für die OpenAPI-Union, LFH-120).\nWire == `status_kategorie`.",
+        "enum": [
+          "verfuegbar",
+          "gebunden",
+          "nicht_verfuegbar"
+        ]
+      },
+      "StichwortVorschlag": {
+        "type": "object",
+        "description": "Org-weiter Einsatzstichwort-Vorschlag für die Combobox.",
+        "required": [
+          "id",
+          "text"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "SystemRolle": {
+        "type": "string",
+        "description": "System-Rolle (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `system_rolle`.",
+        "enum": [
+          "admin",
+          "keiner"
+        ]
+      },
+      "TierAnzeige": {
+        "type": "object",
+        "description": "Serialisierbarer Tier-Datensatz (1:1 zur Tabelle `einsatz_tier`). Die beiden\n`halter_*`-Felder kommen aus einem LEFT JOIN auf `einsatz_person` und sind\nread-only (NULL bei Freitext-Halter oder unbekannt) — die UI zeigt damit\n`R-nnn` bzw. \"Halter (storniert): R-nnn\" ohne Zweit-Request.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "registrier_nr",
+          "status",
+          "spezies",
+          "geschlecht",
+          "abschluss_grund",
+          "erfasst_at",
+          "erfasst_von",
+          "geaendert_at",
+          "geaendert_von"
+        ],
+        "properties": {
+          "abschluss_grund": {
+            "$ref": "#/components/schemas/AbschlussGrund"
+          },
+          "abschluss_ziel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "alter_geschaetzt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "antreff_ort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erfasst_at": {
+            "type": "string"
+          },
+          "erfasst_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "farbe_beschreibung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "geaendert_at": {
+            "type": "string"
+          },
+          "geaendert_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "geschlecht": {
+            "$ref": "#/components/schemas/TierGeschlecht"
+          },
+          "groesse_gewicht": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "halter_kontakt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "halter_person_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "halter_registrier_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "halter_storniert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kennzeichnung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notiz": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rasse_beschreibung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "registrier_nr": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rufname": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "spezies": {
+            "$ref": "#/components/schemas/Spezies"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TierStatus"
+          },
+          "storniert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "TierGeschlecht": {
+        "type": "string",
+        "description": "Optionale Geschlechtsangabe des Tiers (kein `divers`, anders als bei Personen).",
+        "enum": [
+          "maennlich",
+          "weiblich",
+          "unbekannt"
+        ]
+      },
+      "TierStatus": {
+        "type": "string",
+        "description": "Status-Maschine eines Tiers (E‑4). Bewusst schlank — keine Sichtungskette wie\nbei Personen. String = CHECK-Constraint in `migrations/0031_einsatz_tier.sql`.",
+        "enum": [
+          "aktiv",
+          "vermisst",
+          "abgeschlossen"
+        ]
+      },
+      "UhsAnzeige": {
+        "type": "object",
+        "description": "Serialisierbare UHS-Anzeige (1:1 zur Tabelle, ohne abgeleitete Felder).",
+        "required": [
+          "id",
+          "einsatz_id",
+          "typ",
+          "bezeichnung",
+          "status",
+          "erfasst_at",
+          "erfasst_von",
+          "geaendert_at",
+          "geaendert_von"
+        ],
+        "properties": {
+          "abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erfasst_at": {
+            "type": "string"
+          },
+          "erfasst_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "geaendert_at": {
+            "type": "string"
+          },
+          "geaendert_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "notiz": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "standort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/UhsStatus"
+          },
+          "storniert_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "typ": {
+            "$ref": "#/components/schemas/UhsTyp",
+            "description": "LFH-120: Wire ist `String`; Override zeigt aufs Enum, damit die Union erhalten bleibt."
+          }
+        }
+      },
+      "UhsDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/UhsAnzeige"
+          },
+          {
+            "type": "object",
+            "required": [
+              "plaetze",
+              "belegungen",
+              "material"
+            ],
+            "properties": {
+              "belegungen": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/BelegungAnzeige"
+                }
+              },
+              "material": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/EinsatzMaterialAnzeige"
+                }
+              },
+              "plaetze": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PlatzAnzeige"
+                }
+              }
+            }
+          }
+        ],
+        "description": "Detail-Antwort: UHS-Stamm + Plätze + aktuelle Belegungen + zugeordnetes Material."
+      },
+      "UhsStatus": {
+        "type": "string",
+        "description": "Status einer UHS. String = CHECK-Constraint. `aufgeloest` ist terminal.",
+        "enum": [
+          "geplant",
+          "aktiv",
+          "aufgeloest"
+        ]
+      },
+      "UhsTyp": {
+        "type": "string",
+        "description": "Typ einer Unfallhilfsstelle. String = CHECK-Constraint in\n`migrations/0027_uhs.sql`.\n\nLFH-120: `rename_all` richtet die (bislang ungenutzte) Serde-Serialisierung an\nden `as_str()`-Wire-Werten aus, damit das utoipa-Schema die snake_case-Union trifft.",
+        "enum": [
+          "patientenablage",
+          "behandlungsplatz",
+          "verletztensammelstelle",
+          "sonstige"
+        ]
+      },
+      "VerbleibAnzeige": {
+        "type": "object",
+        "description": "Ein Verbleib-Ereignis (1:1 zu `person_verbleib`).",
+        "required": [
+          "id",
+          "einsatz_id",
+          "person_id",
+          "art",
+          "status",
+          "zeitpunkt_at",
+          "erfasst_von"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/VerbleibArt"
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erfasst_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "notiz": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "person_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/VerbleibStatus"
+          },
+          "transportmittel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zeitpunkt_at": {
+            "type": "string"
+          },
+          "ziel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "VerbleibArt": {
+        "type": "string",
+        "description": "Art eines Verbleib-Ereignisses. String = CHECK-Constraint in\n`migrations/0025_person_verbleib.sql`. `Verstorben` = Verbleib des Leichnams\n(NICHT der Admin-Status).",
+        "enum": [
+          "transport",
+          "entlassung",
+          "vor_ort",
+          "verstorben"
+        ]
+      },
+      "VerbleibStatus": {
+        "type": "string",
+        "description": "Verbleib-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.",
+        "enum": [
+          "angemeldet",
+          "abtransportiert"
+        ]
+      },
+      "Verfuegbarkeit": {
+        "type": "string",
+        "description": "Verfügbarkeit eines Platzes (getrennt von Belegung). String = CHECK in\n`migrations/0028_uhs_platz.sql`. `reserviert` ist im DB-CHECK an\n`reserviert_fuer_person_id IS NOT NULL` gekoppelt.",
+        "enum": [
+          "frei",
+          "defekt",
+          "aufbereitung",
+          "gesperrt",
+          "reserviert"
+        ]
+      },
+      "VorhandeneKarte": {
+        "type": "object",
+        "description": "Eine im karten_dir vorhandene, aber noch nicht registrierte MBTiles-Datei — Kandidat für den\nlokalen Import gebauter Region-Packs (LFH-199, ohne Download/Hosting).",
+        "required": [
+          "dateiname",
+          "groesse"
+        ],
+        "properties": {
+          "dateiname": {
+            "type": "string"
+          },
+          "groesse": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "Warnstufe": {
+        "type": "string",
+        "description": "Warnstufe (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `warnstufe`.",
+        "enum": [
+          "keine",
+          "niedrig",
+          "mittel",
+          "hoch",
+          "akut"
+        ]
+      },
+      "Zeitformat": {
+        "type": "string",
+        "description": "Zeitformat (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `zeitformat`\n(per-Variante, `rename_all` trifft die Ziffern-Kürzel nicht).",
+        "enum": [
+          "24h",
+          "12h"
+        ]
+      },
+      "ZugriffAnzeige": {
+        "type": "object",
+        "description": "Ein Audit-Eintrag mit aufgelöstem Benutzernamen (für die Audit-Einsicht).",
+        "required": [
+          "id",
+          "benutzer_id",
+          "benutzer_name",
+          "art",
+          "zugriff_at"
+        ],
+        "properties": {
+          "art": {
+            "type": "string"
+          },
+          "benutzer_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "benutzer_name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "person_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "zugriff_at": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
