@@ -5,6 +5,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { ApiError } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 import {
   erledigeErinnerung, legeErinnerungAn, listeErinnerungen, quittiereErinnerung,
 } from '../api/erinnerungen';
@@ -31,15 +32,15 @@ export default function ErinnerungenPage() {
   // Inline-Anlegen-Formular (LFH-112): per Kopf-Button auf-/zugeklappt, kein Drawer/Sidebar.
   const [formOffen, setFormOffen] = useState(false);
 
-  const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   // Offen/Abgeschlossen-Trennung erfolgt clientseitig → ALLE Erinnerungen laden.
   const erinnerungenQuery = useQuery({
-    queryKey: ['einsatz-erinnerungen', einsatzId],
+    queryKey: einsatzKeys.erinnerungen(einsatzId),
     queryFn: () => listeErinnerungen(einsatzId, false),
   });
 
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
-  const invalidiere = () => qc.invalidateQueries({ queryKey: ['einsatz-erinnerungen', einsatzId] });
+  const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.erinnerungen(einsatzId) });
 
   const anlegenMutation = useMutation({
     mutationFn: (daten: NeueErinnerung) => legeErinnerungAn(einsatzId, daten),

@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { lageberichtDetailPfad } from '../routing/deeplinks';
 import { ladeEinsatz } from '../api/einsaetze';
 import { ApiError } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 import { legeLageberichtAn, listeLageberichte, type NeuerLagebericht } from '../api/lageberichte';
 import type { LageberichtAnzeige } from '../api/types';
 import { VORLAGEN } from '../lageberichte/vorlagen';
@@ -20,15 +21,15 @@ export default function LageberichtePage() {
 
 
   const einsatzQuery = useQuery({
-    queryKey: ['einsatz', einsatzId],
+    queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
   const berichteQuery = useQuery({
-    queryKey: ['einsatz-lageberichte', einsatzId],
+    queryKey: einsatzKeys.lageberichte(einsatzId),
     queryFn: () => listeLageberichte(einsatzId),
   });
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['einsatz-lageberichte', einsatzId] });
+  const invalidate = () => qc.invalidateQueries({ queryKey: einsatzKeys.lageberichte(einsatzId) });
   const fehler = (e: unknown) =>
     message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 

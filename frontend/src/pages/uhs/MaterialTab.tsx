@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { listeEinsatzMaterial, aktualisiereDisposition } from '../../api/einsatzMaterial';
 import type { EinsatzMaterial, UhsDetail } from '../../api/types';
 import { ApiError } from '../../api/client';
+import { einsatzKeys } from '../../api/queryKeys';
 
 interface Props {
   einsatzId: number;
@@ -18,7 +19,7 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const materialQuery = useQuery({
-    queryKey: ['einsatz-material', einsatzId],
+    queryKey: einsatzKeys.material(einsatzId),
     queryFn: () => listeEinsatzMaterial(einsatzId),
   });
 
@@ -27,8 +28,8 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
   const freiVerortbar = material.filter((em) => em.uhs_id == null);
 
   function invalidate() {
-    qc.invalidateQueries({ queryKey: ['einsatz-material', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['einsatz-uhs-detail', einsatzId, uhs.id] });
+    qc.invalidateQueries({ queryKey: einsatzKeys.material(einsatzId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(einsatzId, uhs.id) });
   }
 
   const fehler = (e: unknown) =>

@@ -7,6 +7,7 @@ import { SEITENGROESSE, erteileAuftragAusEtb, listeEtb, type EtbFilterWerte, typ
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import { ApiError } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 import type { EtbEintragAnzeige, NeuerAuftrag } from '../api/types';
 import { parseRouteId } from '../routing/deeplinks';
 import { useEffect, useState } from 'react';
@@ -27,18 +28,18 @@ export default function EtbPage() {
   const [filter, setFilter] = useState<EtbFilterWerte>({});
 
   const einsatzQuery = useQuery({
-    queryKey: ['einsatz', einsatzId],
+    queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
 
   const bausteineQuery = useQuery({ queryKey: ['etb-bausteine'], queryFn: listeBausteine });
 
   // Auftrags-Ziele für das ETB→Auftrag-Formular (wie AuftraegePage/MeldungenPage).
-  const abschnitteQuery = useQuery({ queryKey: ['einsatz-abschnitte', einsatzId], queryFn: () => listeAbschnitte(einsatzId) });
-  const einheitenQuery = useQuery({ queryKey: ['einsatz-einheiten', einsatzId], queryFn: () => listeEinheiten(einsatzId) });
+  const abschnitteQuery = useQuery({ queryKey: einsatzKeys.abschnitte(einsatzId), queryFn: () => listeAbschnitte(einsatzId) });
+  const einheitenQuery = useQuery({ queryKey: einsatzKeys.einheiten(einsatzId), queryFn: () => listeEinheiten(einsatzId) });
 
   const etbQuery = useInfiniteQuery({
-    queryKey: ['etb', einsatzId, filter],
+    queryKey: einsatzKeys.etbListe(einsatzId, filter),
     queryFn: ({ pageParam }) => listeEtb(einsatzId, { ...filter, before_lfd_nr: pageParam }),
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (letzteSeite) =>
@@ -98,7 +99,7 @@ export default function EtbPage() {
   const abschliessenMutation = useMutation({
     mutationFn: () => schliesseEinsatzAb(einsatzId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['einsatz', einsatzId] });
+      qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
       qc.invalidateQueries({ queryKey: ['einsaetze'] });
       message.success('Einsatz abgeschlossen');
     },
@@ -111,8 +112,8 @@ export default function EtbPage() {
       erteileAuftragAusEtb(einsatzId, eintragId, daten),
     onSuccess: () => {
       // ETB (neue Anordnung) + Auftrags-Board aktualisieren.
-      qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
-      qc.invalidateQueries({ queryKey: ['einsatz-auftraege', einsatzId] });
+      qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+      qc.invalidateQueries({ queryKey: einsatzKeys.auftraege(einsatzId) });
       setAuftragZu(null);
       message.success('Auftrag aus ETB-Eintrag erteilt');
     },

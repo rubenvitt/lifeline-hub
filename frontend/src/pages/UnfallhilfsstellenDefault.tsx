@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { listeUhs } from '../api/einsatzUhs';
+import { einsatzKeys } from '../api/queryKeys';
 import UhsAnlegenDrawer from './uhs/UhsAnlegenDrawer';
 import { liesLetzteUhs, waehleDefaultUhs } from './uhs/uhsAuswahl';
 
@@ -23,7 +24,7 @@ export default function UnfallhilfsstellenDefault() {
   const basis = `/einsaetze/${einsatzId}/unfallhilfsstellen`;
 
   const uhsQuery = useQuery({
-    queryKey: ['einsatz-uhs', einsatzId],
+    queryKey: einsatzKeys.uhs(einsatzId),
     queryFn: () => listeUhs(einsatzId),
   });
 

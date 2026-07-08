@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
 import { legeBefehlAn, listeBefehle, type NeuerBefehl } from '../api/befehle';
+import { einsatzKeys } from '../api/queryKeys';
 import type { BefehlAnzeige } from '../api/types';
 import { VORLAGEN } from '../befehle/vorlagen';
 import { befehlDetailPfad } from '../routing/deeplinks';
@@ -16,10 +17,10 @@ export default function BefehlListe({ einsatzId, darfSchreiben }: { einsatzId: n
   const [form] = Form.useForm<NeuerBefehl>();
 
   const befehleQuery = useQuery({
-    queryKey: ['einsatz-befehle', einsatzId],
+    queryKey: einsatzKeys.befehle(einsatzId),
     queryFn: () => listeBefehle(einsatzId),
   });
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['einsatz-befehle', einsatzId] });
+  const invalidate = () => qc.invalidateQueries({ queryKey: einsatzKeys.befehle(einsatzId) });
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
   const anlegenMutation = useMutation({

@@ -6,6 +6,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
+import { einsatzKeys } from '../api/queryKeys';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinheiten } from '../api/einheiten';
 import {
@@ -82,9 +83,9 @@ export default function EinsatzabschnittePage() {
   const [gewaehlt, setGewaehlt] = useState<number | null>(null);
   const [form] = Form.useForm<AbschnittWerte>();
 
-  const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   const abschnitteQuery = useQuery({ queryKey: ['abschnitte', einsatzId], queryFn: () => listeAbschnitte(einsatzId) });
-  const personalQuery = useQuery({ queryKey: ['einsatz-personal', einsatzId], queryFn: () => listeEinsatzPersonal(einsatzId) });
+  const personalQuery = useQuery({ queryKey: einsatzKeys.personal(einsatzId), queryFn: () => listeEinsatzPersonal(einsatzId) });
   const einheitenQuery = useQuery({ queryKey: ['einheiten', einsatzId], queryFn: () => listeEinheiten(einsatzId) });
 
   // Cross-Modul-Deeplink (LFH-25): ?abschnitt=<id> selektiert den Abschnitt, sofern vorhanden.
@@ -95,7 +96,7 @@ export default function EinsatzabschnittePage() {
   function invalidate() {
     qc.invalidateQueries({ queryKey: ['abschnitte', einsatzId] });
     qc.invalidateQueries({ queryKey: ['einheiten', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
+    qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 

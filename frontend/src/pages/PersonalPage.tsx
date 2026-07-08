@@ -14,6 +14,7 @@ import {
   listeEinsatzPersonal, type AdhocEingabe,
 } from '../api/einsatzPersonal';
 import { ApiError } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzPersonal, StaerkePosition, StatusKategorie } from '../api/types';
 
 const KATEGORIE_FALLBACK: Record<StatusKategorie, string> = {
@@ -37,9 +38,9 @@ export default function PersonalPage() {
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [form] = Form.useForm<AdhocEingabe>();
 
-  const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   const epQuery = useQuery({
-    queryKey: ['einsatz-personal', einsatzId],
+    queryKey: einsatzKeys.personal(einsatzId),
     queryFn: () => listeEinsatzPersonal(einsatzId),
   });
   const statusQuery = useQuery({ queryKey: ['personal-status'], queryFn: listePersonalStatus });
@@ -56,8 +57,8 @@ export default function PersonalPage() {
   }, [highlightId]);
 
   function invalidate() {
-    qc.invalidateQueries({ queryKey: ['einsatz-personal', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
+    qc.invalidateQueries({ queryKey: einsatzKeys.personal(einsatzId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 

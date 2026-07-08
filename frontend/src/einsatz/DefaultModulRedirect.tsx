@@ -2,6 +2,7 @@ import { Navigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Spin } from 'antd';
 import { ladeEinstellungen } from '../api/einsaetze';
+import { einsatzKeys } from '../api/queryKeys';
 import { aufloeseStandardModul, redirectZiel } from './modulRegistry';
 
 /**
@@ -14,7 +15,7 @@ export default function DefaultModulRedirect() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const { data, isLoading } = useQuery({
-    queryKey: ['einsatz-einstellungen', einsatzId],
+    queryKey: einsatzKeys.einstellungen(einsatzId),
     queryFn: () => ladeEinstellungen(einsatzId),
   });
   // Bis die Einstellungen geladen sind: kurzer Spinner statt Fehl-Redirect — sonst

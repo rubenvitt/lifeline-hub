@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { aktualisiereTier, ladeTier, setzeTierStatus, storniereTier, tierRegistrierAnzeige, type TierPatch } from '../api/einsatzTier';
 import { ApiError } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 import { parseRouteId, personDetailPfad, tierePfad } from '../routing/deeplinks';
 import type { AbschlussGrund, Spezies, Tier, TierStatus } from '../api/types';
 import HalterPicker, { type HalterWert } from './HalterPicker';
@@ -64,17 +65,17 @@ export default function TiereDetailPage() {
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
   function invalidate() {
-    qc.invalidateQueries({ queryKey: ['einsatz-tiere', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
+    qc.invalidateQueries({ queryKey: einsatzKeys.tiere(einsatzId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
   function invalidateDetail() {
     invalidate();
-    qc.invalidateQueries({ queryKey: ['einsatz-tier', einsatzId, tierId] });
+    qc.invalidateQueries({ queryKey: einsatzKeys.tier(einsatzId, tierId) });
   }
 
-  const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   const detailQuery = useQuery({
-    queryKey: ['einsatz-tier', einsatzId, tierId],
+    queryKey: einsatzKeys.tier(einsatzId, tierId),
     queryFn: () => ladeTier(einsatzId, tierId),
     enabled: idGueltig,
   });

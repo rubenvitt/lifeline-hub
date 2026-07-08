@@ -17,6 +17,7 @@ import {
 } from 'antd';
 import type { TableColumnsType } from 'antd';
 import { ApiError } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
 import {
   legeSchadenAn,
@@ -56,9 +57,9 @@ export default function SchaedenPage() {
 
   // Schaden-Liste wird über den konsolidierten Einsatz-Live-Stream (useEinsatzLiveStream
   // im EinsatzLayout, `schaden`-Event → 'einsatz-schaeden') live gehalten — LFH-206.
-  const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   const schaedenQuery = useQuery({
-    queryKey: ['einsatz-schaeden', einsatzId],
+    queryKey: einsatzKeys.schaeden(einsatzId),
     queryFn: () => listeSchaeden(einsatzId),
   });
 
@@ -78,8 +79,8 @@ export default function SchaedenPage() {
   }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreiben]);
 
   function invalidate() {
-    qc.invalidateQueries({ queryKey: ['einsatz-schaeden', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
+    qc.invalidateQueries({ queryKey: einsatzKeys.schaeden(einsatzId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 

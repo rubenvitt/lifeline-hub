@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listeEinheiten } from '../api/einheiten';
+import { einsatzKeys } from '../api/queryKeys';
 
 /**
  * Funkrufnamen-Vorschläge für die ETB-Absender/Empfänger-Auswahl: im aktuellen
@@ -10,7 +11,7 @@ import { listeEinheiten } from '../api/einheiten';
  */
 export function useFunkrufnamen(einsatzId: number): string[] {
   const fahrzeuge = useQuery({
-    queryKey: ['einsatz-fahrzeuge', einsatzId],
+    queryKey: einsatzKeys.fahrzeuge(einsatzId),
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
   });
   const einheiten = useQuery({

@@ -5,6 +5,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { ApiError } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 import { legeNachforderungAn, lehneNachforderungAb, listeNachforderungen, setzeNachforderungStatus } from '../api/nachforderungen';
 import type { Nachforderung, NachforderungStatus, NeueNachforderung } from '../api/types';
 import { NACHFORDERUNG_STATUS, istAbgeschlossen, prioRang } from '../kommunikation';
@@ -29,14 +30,14 @@ export default function NachforderungenPage() {
   const [ablehnenId, setAblehnenId] = useState<number | null>(null);
   const [ablehnenGrund, setAblehnenGrund] = useState('');
 
-  const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   // Offen/Abgeschlossen-Trennung erfolgt clientseitig → ALLE Nachforderungen laden.
   const nfQuery = useQuery({
-    queryKey: ['einsatz-nachforderungen', einsatzId],
+    queryKey: einsatzKeys.nachforderungen(einsatzId),
     queryFn: () => listeNachforderungen(einsatzId, {}),
   });
 
-  const invalidiere = () => qc.invalidateQueries({ queryKey: ['einsatz-nachforderungen', einsatzId] });
+  const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.nachforderungen(einsatzId) });
   // Bei Fehler (insb. 422 aus der optimistischen Sperre) zusätzlich invalidieren,
   // damit der ggf. veraltete View den echten Status nachlädt.
   const fehler = (e: unknown) => {

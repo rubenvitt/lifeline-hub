@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
+import { einsatzKeys } from '../api/queryKeys';
 
 /** Abonniert den SSE-Stream eines Einsatzes. Bei jedem `etb`- oder `lagged`-Event
  *  wird die ETB-Query invalidiert → React Query holt die aktuell sichtbaren Seiten
@@ -10,7 +11,7 @@ export function useEtbStream(einsatzId: number): void {
   useEffect(() => {
     if (!Number.isFinite(einsatzId)) return;
     const quelle = new EventSource(`/api/einsaetze/${einsatzId}/etb/stream`);
-    const resync = () => qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
+    const resync = () => qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
     quelle.addEventListener('etb', resync);
     quelle.addEventListener('lagged', resync);
     return () => {

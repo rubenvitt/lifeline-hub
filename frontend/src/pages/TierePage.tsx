@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { legeTierAn, listeTiere, tierRegistrierAnzeige, type TierEingabe } from '../api/einsatzTier';
 import { ApiError } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 import { tiereDetailPfad } from '../routing/deeplinks';
 import type { Spezies, Tier, TierStatus } from '../api/types';
 
@@ -50,8 +51,8 @@ export default function TierePage() {
 
   // Tier-Liste wird über den konsolidierten Einsatz-Live-Stream (useEinsatzLiveStream
   // im EinsatzLayout, `tier`-Event → 'einsatz-tiere') live gehalten — LFH-75.
-  const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
-  const tiereQuery = useQuery({ queryKey: ['einsatz-tiere', einsatzId], queryFn: () => listeTiere(einsatzId) });
+  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
+  const tiereQuery = useQuery({ queryKey: einsatzKeys.tiere(einsatzId), queryFn: () => listeTiere(einsatzId) });
 
   const qc = useQueryClient();
   const { message } = App.useApp();
@@ -59,8 +60,8 @@ export default function TierePage() {
   const [form] = Form.useForm<TierEingabe>();
 
   function invalidate() {
-    qc.invalidateQueries({ queryKey: ['einsatz-tiere', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
+    qc.invalidateQueries({ queryKey: einsatzKeys.tiere(einsatzId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 

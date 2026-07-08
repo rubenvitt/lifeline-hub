@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
+import { einsatzKeys } from '../../api/queryKeys';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { listePersonen } from '../../api/einsatzPerson';
 import { listeTiere } from '../../api/einsatzTier';
@@ -37,22 +38,22 @@ export default function LageDashboardPage() {
   const navigate = useNavigate();
   const gehe = (route: string) => navigate(`/einsaetze/${einsatzId}/${route}`);
 
-  const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   // Query-Keys IDENTISCH zu den vom Live-Hook (useEinsatzLiveStream) invalidierten Keys.
-  const personenQuery = useQuery({ queryKey: ['einsatz-personen', einsatzId], queryFn: () => listePersonen(einsatzId) });
-  const tiereQuery = useQuery({ queryKey: ['einsatz-tiere', einsatzId], queryFn: () => listeTiere(einsatzId) });
-  const uhsQuery = useQuery({ queryKey: ['einsatz-uhs', einsatzId], queryFn: () => listeUhs(einsatzId) });
-  const schaedenQuery = useQuery({ queryKey: ['einsatz-schaeden', einsatzId], queryFn: () => listeSchaeden(einsatzId) });
-  const gefahrenQuery = useQuery({ queryKey: ['gefahrengebiete', einsatzId], queryFn: () => ladeGefahrengebiete(einsatzId) });
-  const zonenQuery = useQuery({ queryKey: ['einsatz-zonen', einsatzId], queryFn: () => listeZonen(einsatzId) });
-  const lageberichteQuery = useQuery({ queryKey: ['einsatz-lageberichte', einsatzId], queryFn: () => listeLageberichte(einsatzId) });
-  const einheitenQuery = useQuery({ queryKey: ['einsatz-einheiten', einsatzId], queryFn: () => listeEinheiten(einsatzId) });
-  const personalQuery = useQuery({ queryKey: ['einsatz-personal', einsatzId], queryFn: () => listeEinsatzPersonal(einsatzId) });
-  const fahrzeugeQuery = useQuery({ queryKey: ['einsatz-fahrzeuge', einsatzId], queryFn: () => listeEinsatzFahrzeuge(einsatzId) });
-  const materialQuery = useQuery({ queryKey: ['einsatz-material', einsatzId], queryFn: () => listeEinsatzMaterial(einsatzId) });
-  const abschnitteQuery = useQuery({ queryKey: ['einsatz-abschnitte', einsatzId], queryFn: () => listeAbschnitte(einsatzId) });
-  const auftraegeQuery = useQuery({ queryKey: ['einsatz-auftraege', einsatzId], queryFn: () => listeAuftraege(einsatzId) });
-  const meldungenQuery = useQuery({ queryKey: ['einsatz-meldungen', einsatzId], queryFn: () => listeMeldungen(einsatzId) });
+  const personenQuery = useQuery({ queryKey: einsatzKeys.personen(einsatzId), queryFn: () => listePersonen(einsatzId) });
+  const tiereQuery = useQuery({ queryKey: einsatzKeys.tiere(einsatzId), queryFn: () => listeTiere(einsatzId) });
+  const uhsQuery = useQuery({ queryKey: einsatzKeys.uhs(einsatzId), queryFn: () => listeUhs(einsatzId) });
+  const schaedenQuery = useQuery({ queryKey: einsatzKeys.schaeden(einsatzId), queryFn: () => listeSchaeden(einsatzId) });
+  const gefahrenQuery = useQuery({ queryKey: einsatzKeys.gefahrengebiete(einsatzId), queryFn: () => ladeGefahrengebiete(einsatzId) });
+  const zonenQuery = useQuery({ queryKey: einsatzKeys.zonen(einsatzId), queryFn: () => listeZonen(einsatzId) });
+  const lageberichteQuery = useQuery({ queryKey: einsatzKeys.lageberichte(einsatzId), queryFn: () => listeLageberichte(einsatzId) });
+  const einheitenQuery = useQuery({ queryKey: einsatzKeys.einheiten(einsatzId), queryFn: () => listeEinheiten(einsatzId) });
+  const personalQuery = useQuery({ queryKey: einsatzKeys.personal(einsatzId), queryFn: () => listeEinsatzPersonal(einsatzId) });
+  const fahrzeugeQuery = useQuery({ queryKey: einsatzKeys.fahrzeuge(einsatzId), queryFn: () => listeEinsatzFahrzeuge(einsatzId) });
+  const materialQuery = useQuery({ queryKey: einsatzKeys.material(einsatzId), queryFn: () => listeEinsatzMaterial(einsatzId) });
+  const abschnitteQuery = useQuery({ queryKey: einsatzKeys.abschnitte(einsatzId), queryFn: () => listeAbschnitte(einsatzId) });
+  const auftraegeQuery = useQuery({ queryKey: einsatzKeys.auftraege(einsatzId), queryFn: () => listeAuftraege(einsatzId) });
+  const meldungenQuery = useQuery({ queryKey: einsatzKeys.meldungen(einsatzId), queryFn: () => listeMeldungen(einsatzId) });
 
   const kraefteFehler = einheitenQuery.isError || personalQuery.isError
     || fahrzeugeQuery.isError || materialQuery.isError || abschnitteQuery.isError;

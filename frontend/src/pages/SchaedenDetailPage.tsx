@@ -13,6 +13,7 @@ import {
   type SchadenPatch,
 } from '../api/einsatzSchaden';
 import { ApiError } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 import { parseRouteId, schaedenPfad } from '../routing/deeplinks';
 import type { Ausmass, SchadenTyp } from '../api/types';
 import GeschaedigtPicker, { type GeschaedigtWert } from './schaeden/GeschaedigtPicker';
@@ -51,17 +52,17 @@ export default function SchaedenDetailPage() {
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
   function invalidate() {
-    qc.invalidateQueries({ queryKey: ['einsatz-schaeden', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
+    qc.invalidateQueries({ queryKey: einsatzKeys.schaeden(einsatzId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
   function invalidateDetail() {
     invalidate();
-    qc.invalidateQueries({ queryKey: ['einsatz-schaden', einsatzId, schadenId] });
+    qc.invalidateQueries({ queryKey: einsatzKeys.schaden(einsatzId, schadenId) });
   }
 
-  const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   const detailQuery = useQuery({
-    queryKey: ['einsatz-schaden', einsatzId, schadenId],
+    queryKey: einsatzKeys.schaden(einsatzId, schadenId),
     queryFn: () => ladeSchaden(einsatzId, schadenId),
     enabled: idGueltig,
   });

@@ -3,6 +3,7 @@ import { Select } from 'antd';
 import type { DefaultOptionType } from 'antd/es/select';
 import { useQuery } from '@tanstack/react-query';
 import { listePersonen, registrierAnzeige } from '../api/einsatzPerson';
+import { einsatzKeys } from '../api/queryKeys';
 
 /**
  * Strukturierter Wert der Halter-Combobox. Genau eine Variante (oder null = unbekannt).
@@ -45,7 +46,7 @@ export default function HalterPicker({ einsatzId, value = null, onChange }: Prop
   const [suche, setSuche] = useState('');
 
   const personenQuery = useQuery({
-    queryKey: ['einsatz-personen', einsatzId],
+    queryKey: einsatzKeys.personen(einsatzId),
     queryFn: () => listePersonen(einsatzId),
     enabled: Number.isFinite(einsatzId),
   });

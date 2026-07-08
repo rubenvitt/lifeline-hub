@@ -7,6 +7,7 @@ import { parseRouteId, unfallhilfsstellenListePfad } from '../../routing/deeplin
 import { ladeUhs, setzeUhsStatus, storniereUhs } from '../../api/einsatzUhs';
 import { useUhsStream } from '../../etb/useUhsStream';
 import { ApiError } from '../../api/client';
+import { einsatzKeys } from '../../api/queryKeys';
 import type { UhsStatus } from '../../api/types';
 import UhsSwitcher from './UhsSwitcher';
 import { merkeLetzteUhs } from './uhsAuswahl';
@@ -31,9 +32,9 @@ export default function UhsDetailPage() {
   const qc = useQueryClient();
   const { message } = App.useApp();
 
-  const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   const detailQuery = useQuery({
-    queryKey: ['einsatz-uhs-detail', einsatzId, uhsId],
+    queryKey: einsatzKeys.uhsDetail(einsatzId, uhsId),
     queryFn: () => ladeUhs(einsatzId, uhsId),
     enabled: idGueltig,
   });
@@ -45,9 +46,9 @@ export default function UhsDetailPage() {
   }, [einsatzId, uhsId, detailQuery.isSuccess]);
 
   function invalidate() {
-    qc.invalidateQueries({ queryKey: ['einsatz-uhs', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['einsatz-uhs-detail', einsatzId, uhsId] });
-    qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
+    qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(einsatzId, uhsId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 

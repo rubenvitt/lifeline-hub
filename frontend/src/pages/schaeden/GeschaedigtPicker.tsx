@@ -4,6 +4,7 @@ import type { DefaultOptionType } from 'antd/es/select';
 import { useQuery } from '@tanstack/react-query';
 import { listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
 import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
+import { einsatzKeys } from '../../api/queryKeys';
 
 /** Strukturierter Wert der Geschädigt-Combobox. Genau eine Variante (oder null = unbekannt/öffentlich). */
 export type GeschaedigtWert =
@@ -48,12 +49,12 @@ export default function GeschaedigtPicker({ einsatzId, orgName, value = null, on
   const [suche, setSuche] = useState('');
 
   const personenQuery = useQuery({
-    queryKey: ['einsatz-personen', einsatzId],
+    queryKey: einsatzKeys.personen(einsatzId),
     queryFn: () => listePersonen(einsatzId),
     enabled: Number.isFinite(einsatzId),
   });
   const personalQuery = useQuery({
-    queryKey: ['einsatz-personal', einsatzId],
+    queryKey: einsatzKeys.personal(einsatzId),
     queryFn: () => listeEinsatzPersonal(einsatzId),
     enabled: Number.isFinite(einsatzId),
   });

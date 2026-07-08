@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
+import { einsatzKeys } from '../api/queryKeys';
 
 /** Abonniert den Einheiten-SSE-Stream und invalidiert bei jedem `einheit`-,
  *  `person`- oder `lagged`-Event die Einheiten- und Führungskräfte-Queries.
@@ -10,8 +11,8 @@ export function useEinheitenStream(einsatzId: number): void {
     if (!Number.isFinite(einsatzId)) return;
     const quelle = new EventSource(`/api/einsaetze/${einsatzId}/einheiten/stream`);
     const resync = () => {
-      qc.invalidateQueries({ queryKey: ['einsatz-einheiten', einsatzId] });
-      qc.invalidateQueries({ queryKey: ['einsatz-fuehrungskraefte', einsatzId] });
+      qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
+      qc.invalidateQueries({ queryKey: einsatzKeys.fuehrungskraefte(einsatzId) });
     };
     quelle.addEventListener('einheit', resync);
     quelle.addEventListener('person', resync); // Führer-Zuordnung ändert Leader-Set

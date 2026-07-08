@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
+import { einsatzKeys } from '../api/queryKeys';
 
 /** Abonniert den Einsatz-SSE-Stream und invalidiert bei jedem `person`- oder
  *  `lagged`-Event NUR die Personen-Listen-Query. Bewusst NICHT die Detail-Query:
@@ -12,7 +13,7 @@ export function usePersonenStream(einsatzId: number): void {
   useEffect(() => {
     if (!Number.isFinite(einsatzId)) return;
     const quelle = new EventSource(`/api/einsaetze/${einsatzId}/personen/stream`);
-    const resync = () => qc.invalidateQueries({ queryKey: ['einsatz-personen', einsatzId] });
+    const resync = () => qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
     quelle.addEventListener('person', resync);
     quelle.addEventListener('lagged', resync);
     return () => {

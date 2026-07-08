@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { parseRouteId, befehlDetailPfad, auftraegePfad, etbPfad } from '../routing/deeplinks';
 import { ApiError } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 import {
   aktualisiereBefehl,
   gibBefehlFrei,
@@ -28,11 +29,11 @@ export default function BefehlDetailPage() {
   const [form] = Form.useForm<Record<string, string>>();
 
   const einsatzQuery = useQuery({
-    queryKey: ['einsatz', einsatzId],
+    queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
   const befehlQuery = useQuery({
-    queryKey: ['einsatz-befehl', einsatzId, befehlId],
+    queryKey: einsatzKeys.befehl(einsatzId, befehlId),
     queryFn: () => ladeBefehl(einsatzId, befehlId),
     enabled: idGueltig,
   });
@@ -46,8 +47,8 @@ export default function BefehlDetailPage() {
   }, [befehlQuery.data, form]);
 
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ['einsatz-befehl', einsatzId, befehlId] });
-    qc.invalidateQueries({ queryKey: ['einsatz-befehle', einsatzId] });
+    qc.invalidateQueries({ queryKey: einsatzKeys.befehl(einsatzId, befehlId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.befehle(einsatzId) });
   };
   const fehler = (e: unknown) =>
     message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
@@ -84,7 +85,7 @@ export default function BefehlDetailPage() {
   const fortschreibenMutation = useMutation({
     mutationFn: () => schreibeBefehlFort(einsatzId, befehlId),
     onSuccess: (neu: BefehlAnzeige) => {
-      qc.invalidateQueries({ queryKey: ['einsatz-befehle', einsatzId] });
+      qc.invalidateQueries({ queryKey: einsatzKeys.befehle(einsatzId) });
       navigate(befehlDetailPfad(einsatzId, neu.id));
     },
     onError: fehler,

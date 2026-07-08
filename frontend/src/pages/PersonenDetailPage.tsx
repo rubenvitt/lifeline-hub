@@ -7,6 +7,7 @@ import { aktualisierePerson, entscheideAbgleich, erfasseSichtung, erfasseVerblei
 import { listeTiere, tierRegistrierAnzeige } from '../api/einsatzTier';
 import { listeSchaeden, schadenRegistrierAnzeige } from '../api/einsatzSchaden';
 import { ApiError } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 import { SK_META, STATUS_META } from '../personen/personMeta';
 import type { PersonDetail, PersonStatus, PersonZugriff, Schaden, Sichtungskategorie, Spezies, Tier, Verbleib, VerbleibArt } from '../api/types';
 import { parseRouteId, personenPfad, schadenDetailPfad, tiereDetailPfad } from '../routing/deeplinks';
@@ -61,32 +62,32 @@ export default function PersonenDetailPage() {
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
   function invalidate() {
-    qc.invalidateQueries({ queryKey: ['einsatz-personen', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
+    qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
   function invalidateDetail() {
     invalidate();
-    qc.invalidateQueries({ queryKey: ['einsatz-person', einsatzId, personId] });
+    qc.invalidateQueries({ queryKey: einsatzKeys.person(einsatzId, personId) });
   }
 
-  const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   const detailQuery = useQuery({
-    queryKey: ['einsatz-person', einsatzId, personId],
+    queryKey: einsatzKeys.person(einsatzId, personId),
     queryFn: () => ladePerson(einsatzId, personId),
     enabled: idGueltig,
   });
   const tiereDerPersonQuery = useQuery({
-    queryKey: ['einsatz-tiere', einsatzId, 'halter', personId],
+    queryKey: einsatzKeys.tiereHalter(einsatzId, personId),
     queryFn: () => listeTiere(einsatzId, { halterPersonId: personId }),
     enabled: idGueltig,
   });
   const schaedenDerPersonQuery = useQuery({
-    queryKey: ['einsatz-schaeden', einsatzId, 'geschaedigt', personId],
+    queryKey: einsatzKeys.schaedenGeschaedigt(einsatzId, personId),
     queryFn: () => listeSchaeden(einsatzId, { geschaedigtPersonId: personId, inklStorniert: false }),
     enabled: idGueltig,
   });
   const auditQuery = useQuery({
-    queryKey: ['einsatz-person-audit', einsatzId, personId],
+    queryKey: einsatzKeys.personAudit(einsatzId, personId),
     queryFn: () => ladePersonAudit(einsatzId, personId),
     enabled: idGueltig && einsatzQuery.data?.meine_rolle === 'einsatzleitung',
   });
