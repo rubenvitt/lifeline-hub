@@ -7,7 +7,6 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { legePersonAn, listePersonen, registrierAnzeige, schlageAbgleichVor, setzePersonStatus, type PersonEingabe } from '../api/einsatzPerson';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
-import { usePersonenStream } from '../etb/usePersonenStream';
 import type { Person, Sichtungskategorie } from '../api/types';
 import { SK_META, STATUS_META } from '../personen/personMeta';
 
@@ -55,7 +54,7 @@ export default function PersonenPage() {
   const navigate = useNavigate();
   const [sicht, setSicht] = useState<Sicht>('erfasst');
 
-  usePersonenStream(einsatzId);
+  // Live-Updates über den konsolidierten useEinsatzLiveStream im EinsatzLayout (LFH-207).
 
   const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   const personenQuery = useQuery({

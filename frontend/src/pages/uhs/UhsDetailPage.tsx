@@ -5,7 +5,6 @@ import { useEffect } from 'react';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { parseRouteId, unfallhilfsstellenListePfad } from '../../routing/deeplinks';
 import { ladeUhs, setzeUhsStatus, storniereUhs } from '../../api/einsatzUhs';
-import { useUhsStream } from '../../etb/useUhsStream';
 import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { UhsStatus } from '../../api/types';
@@ -27,7 +26,7 @@ export default function UhsDetailPage() {
   const uhsId = Number(uhsIdParam);
   const idGueltig = parseRouteId(uhsIdParam) != null;
   const listenPfad = unfallhilfsstellenListePfad(einsatzId);
-  useUhsStream(einsatzId);
+  // Live-Updates über den konsolidierten useEinsatzLiveStream im EinsatzLayout (LFH-207).
 
   const qc = useQueryClient();
   const { message } = App.useApp();

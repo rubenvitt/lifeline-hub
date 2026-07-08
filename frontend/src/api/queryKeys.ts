@@ -38,6 +38,7 @@ export const EINSATZ_KEYS = {
   br: 'einsatz-br',
   brDetail: 'einsatz-br-detail',
   kartenbilder: 'einsatz-kartenbilder',
+  etb: 'etb',
   // Nicht live über SSE getrieben (siehe NICHT_LIVE_KEYS + Guard-Test):
   einsatz: 'einsatz',
   einstellungen: 'einsatz-einstellungen',
@@ -45,7 +46,6 @@ export const EINSATZ_KEYS = {
   sprechgruppen: 'einsatz-sprechgruppen',
   befehle: 'einsatz-befehle',
   befehl: 'einsatz-befehl',
-  etb: 'etb',
   // Singular-Detail-Keys: der SSE-Fan-out invalidiert die Listen-Prefixe, nicht diese
   // (separates erstes Element → kein Prefix-Match). Vorbestehende Silent-Gaps, bewusst
   // NICHT_LIVE (Nachzug als eigener Task).
@@ -102,6 +102,9 @@ export const EINSATZ_STREAM_EVENTS = {
   // Liste + Detail (Prefix-Match: ['einsatz-br-detail', einsatzId] trifft alle brIds).
   bereitstellungsraum: [EINSATZ_KEYS.br, EINSATZ_KEYS.brDetail],
   karte_bild: [EINSATZ_KEYS.kartenbilder],
+  // LFH-207-C: ETB-Zeitachse live halten — ersetzt den dedizierten useEtbStream (2. EventSource
+  // auf denselben /etb/stream-Endpoint). Prefix-Match deckt ['etb', einsatzId, filter] mit ab.
+  etb: [EINSATZ_KEYS.etb],
 } as const satisfies Record<string, readonly EinsatzKey[]>;
 
 export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
@@ -114,7 +117,6 @@ export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
  *
  * - `einsatz`/`einstellungen`/`mitglieder`/`sprechgruppen`: ändern sich selten / kein Live-Event.
  * - `befehle`/`befehl`: (noch) kein `befehl`-Wire-Event im Backend (vorbestehende Gap).
- * - `etb`: bekommt seinen Listener in LFH-207-C; bis dahin hält `useEtbStream` den Key live.
  * - `uhsDetail`/`person`/`personAudit`/`tier`/`schaden`: Singular-Detail-Keys, die der
  *   Listen-Prefix-Match nicht erreicht (vorbestehende Silent-Gaps, Nachzug als eigener Task).
  */
@@ -125,7 +127,6 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.sprechgruppen,
   EINSATZ_KEYS.befehle,
   EINSATZ_KEYS.befehl,
-  EINSATZ_KEYS.etb,
   EINSATZ_KEYS.uhsDetail,
   EINSATZ_KEYS.person,
   EINSATZ_KEYS.personAudit,

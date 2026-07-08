@@ -216,4 +216,70 @@ describe('useEinsatzLiveStream', () => {
     expect(alarm).not.toHaveBeenCalled();
     window.removeEventListener('lfh:sofortmeldung', alarm);
   });
+
+  // LFH-207: pinnt die load-bearing Invalidierungen, bevor die dedizierten Per-Domäne-Hooks
+  // (usePersonenStream/useUhsStream/useEtbStream, jeweils 2. EventSource) entfernt werden.
+  it('invalidiert einsatz-uhs bei uhs-Event (LFH-207: ersetzt useUhsStream)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={8} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit('uhs');
+    await waitFor(() => {
+      const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+      expect(calls).toContainEqual(['einsatz-uhs', 8]);
+    });
+  });
+
+  it('invalidiert einsatz-personen bei person-Event (LFH-207: ersetzt usePersonenStream/useUhsStream)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={8} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit('person');
+    await waitFor(() => {
+      const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+      expect(calls).toContainEqual(['einsatz-personen', 8]);
+    });
+  });
+
+  it('invalidiert etb bei etb-Event (LFH-207-C: ersetzt useEtbStream)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={8} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit('etb');
+    await waitFor(() => {
+      const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+      expect(calls).toContainEqual(['etb', 8]);
+    });
+  });
+
+  it('invalidiert etb auch im lagged-Fallback (LFH-207-C)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={8} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit('lagged');
+    await waitFor(() => {
+      const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+      expect(calls).toContainEqual(['etb', 8]);
+    });
+  });
 });

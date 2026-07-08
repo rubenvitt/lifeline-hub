@@ -18,13 +18,13 @@ import WiedervorlageModal from '../etb/WiedervorlageModal';
 import AuftragAusEtbModal from '../etb/AuftragAusEtbModal';
 import Schnellerfassung from '../etb/Schnellerfassung';
 import EtbEntwurfsTabs from '../etb/entwuerfe/EtbEntwurfsTabs';
-import { useEtbStream } from '../etb/useEtbStream';
 import { useEtbErfassung } from '../offline/useEtbErfassung';
 
 export default function EtbPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  useEtbStream(einsatzId);
+  // Live-Updates über den konsolidierten useEinsatzLiveStream im EinsatzLayout (LFH-207-C):
+  // der etb-Listener dort invalidiert ['etb', einsatzId] (Prefix deckt die gefilterte Liste ab).
   const [filter, setFilter] = useState<EtbFilterWerte>({});
 
   const einsatzQuery = useQuery({
