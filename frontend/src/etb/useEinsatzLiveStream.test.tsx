@@ -190,4 +190,30 @@ describe('useEinsatzLiveStream', () => {
       expect(calls).toContainEqual(['einsatz-schaeden', 3]);
     });
   });
+
+  // LFH-122: Der lagged-Vollabgleich (Reconnect/Overflow) deckt einen breiten Querschnitt
+  // ab (Union aller Event-Keys), löst aber BEWUSST keinen Sofort-Alarm aus — sonst Fehlalarm
+  // ohne neue Sofortmeldung. Pinnt beides vor dem Registry-Refactor.
+  it('invalidiert breit und feuert KEINEN window-Alarm bei lagged-Event (LFH-122)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    const alarm = vi.fn();
+    window.addEventListener('lfh:sofortmeldung', alarm);
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={5} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit('lagged');
+    await waitFor(() => {
+      const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+      expect(calls).toContainEqual(['einsatz-uhs', 5]);
+      expect(calls).toContainEqual(['einsatz-br', 5]);
+      expect(calls).toContainEqual(['einsatz-kartenbilder', 5]);
+      expect(calls).toContainEqual(['einsatz-meldungen', 5]);
+    });
+    expect(alarm).not.toHaveBeenCalled();
+    window.removeEventListener('lfh:sofortmeldung', alarm);
+  });
 });
