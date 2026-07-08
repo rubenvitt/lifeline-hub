@@ -6,10 +6,15 @@ pub mod repo;
 pub use hooks::{auto_austritt, AutoAustrittEffekt};
 
 use serde::Serialize;
+use utoipa::ToSchema;
 
 /// Typ einer Unfallhilfsstelle. String = CHECK-Constraint in
 /// `migrations/0027_uhs.sql`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+///
+/// LFH-120: `rename_all` richtet die (bislang ungenutzte) Serde-Serialisierung an
+/// den `as_str()`-Wire-Werten aus, damit das utoipa-Schema die snake_case-Union trifft.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum UhsTyp {
     Patientenablage,
     Behandlungsplatz,
@@ -49,7 +54,8 @@ impl UhsTyp {
 }
 
 /// Status einer UHS. String = CHECK-Constraint. `aufgeloest` ist terminal.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum UhsStatus {
     Geplant,
     Aktiv,
@@ -97,7 +103,8 @@ pub fn darf_uebergehen(von: &str, nach: &str) -> bool {
 /// Typ eines Platzes innerhalb einer UHS. String = CHECK-Constraint in
 /// `migrations/0028_uhs_platz.sql`. „Eingang"/„Inbox" ist KEIN Typ — die
 /// Inbox ist implizit über `platz_id = NULL` in der Belegung modelliert.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum PlatzTyp {
     Wartebereich,
     Behandlungsplatz,
@@ -152,7 +159,8 @@ impl PlatzTyp {
 /// Verfügbarkeit eines Platzes (getrennt von Belegung). String = CHECK in
 /// `migrations/0028_uhs_platz.sql`. `reserviert` ist im DB-CHECK an
 /// `reserviert_fuer_person_id IS NOT NULL` gekoppelt.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum Verfuegbarkeit {
     Frei,
     Defekt,
@@ -186,7 +194,8 @@ impl Verfuegbarkeit {
 
 /// Art eines Belegungs-Events. String = CHECK in
 /// `migrations/0029_person_uhs_belegung.sql`. Append-only.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum BelegungsArt {
     Eintritt,
     Wechsel,
@@ -213,17 +222,20 @@ impl BelegungsArt {
 }
 
 /// Serialisierbare UHS-Anzeige (1:1 zur Tabelle, ohne abgeleitete Felder).
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct UhsAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
     pub abschnitt_id: Option<i64>,
+    /// LFH-120: Wire ist `String`; Override zeigt aufs Enum, damit die Union erhalten bleibt.
+    #[schema(value_type = UhsTyp)]
     pub typ: String,
     pub bezeichnung: String,
     pub standort: Option<String>,
     pub notiz: Option<String>,
     pub lat: Option<f64>,
     pub lon: Option<f64>,
+    #[schema(value_type = UhsStatus)]
     pub status: String,
     pub erfasst_at: String,
     pub erfasst_von: i64,
@@ -233,7 +245,7 @@ pub struct UhsAnzeige {
 }
 
 /// Serialisierbare Platz-Anzeige (1:1 zur Tabelle).
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct PlatzAnzeige {
     pub id: i64,
     pub uhs_id: i64,
@@ -247,7 +259,7 @@ pub struct PlatzAnzeige {
 }
 
 /// Belegungs-Verlaufseintrag (1:1 zu `person_uhs_belegung`).
-#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct BelegungAnzeige {
     pub id: i64,
     pub einsatz_id: i64,

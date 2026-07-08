@@ -3,6 +3,7 @@ pub mod repo;
 use crate::error::AppError;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::Serialize;
+use utoipa::ToSchema;
 
 /// Eintragstyp: Meldung.
 pub const TYP_MELDUNG: &str = "meldung";
@@ -18,7 +19,8 @@ pub const TYP_SYSTEM: &str = "system";
 pub const TYP_BERICHTIGUNG: &str = "berichtigung";
 
 /// Eintragstyp eines ETB-Eintrags. Wird als TEXT in der DB gespeichert.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum EtbTyp {
     Meldung,
     Anordnung,
@@ -67,7 +69,8 @@ impl EtbTyp {
 }
 
 /// Meldeweg eines Eintrags (optional).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum MeldeWeg {
     Funk,
     Telefon,

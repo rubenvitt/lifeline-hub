@@ -1,10 +1,12 @@
 pub mod repo;
 
 use serde::Serialize;
+use utoipa::ToSchema;
 
 // ---------- Status ----------
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum SchadenStatus {
     Offen,
     Uebergeben,
@@ -32,7 +34,8 @@ impl SchadenStatus {
 
 // ---------- Typ ----------
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum SchadenTyp {
     Sachschaden,
     Verkehrshindernis,
@@ -69,7 +72,8 @@ impl SchadenTyp {
 
 // ---------- Ausmaß ----------
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum Ausmass {
     Gering,
     Mittel,
@@ -100,7 +104,8 @@ impl Ausmass {
 
 // ---------- Abschlussgrund ----------
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum AbschlussGrund {
     Behoben,
     KeinHandlungsbedarf,

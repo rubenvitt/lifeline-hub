@@ -6,11 +6,13 @@ pub mod verbleib_repo;
 pub mod verlaufsnotiz_repo;
 
 use serde::Serialize;
+use utoipa::ToSchema;
 
 /// Administrative Status-Maschine einer Person (E‑1). E‑2 ergänzt die
 /// medizinische Sichtungskategorie SK I–IV als separates Attribut auf
 /// `betroffen` — diese Maschine bleibt unangetastet.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum PersonStatus {
     Erfasst,
     Vermisst,
@@ -45,7 +47,8 @@ impl PersonStatus {
 }
 
 /// Optionale Geschlechtsangabe. `unbekannt` ist ein erstklassiger Wert.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum Geschlecht {
     Maennlich,
     Weiblich,
@@ -77,7 +80,8 @@ impl Geschlecht {
 /// Medizinische Sichtungskategorie (Triage). String = CHECK-Constraint in
 /// `migrations/0023_person_sichtung.sql`. **`Tot` ist ein medizinisches Urteil
 /// und ändert den Admin-`PersonStatus` NICHT** (Annahme 4).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum Sichtungskategorie {
     Sk1,
     Sk2,
@@ -127,7 +131,8 @@ impl Sichtungskategorie {
 /// Art eines Verbleib-Ereignisses. String = CHECK-Constraint in
 /// `migrations/0025_person_verbleib.sql`. `Verstorben` = Verbleib des Leichnams
 /// (NICHT der Admin-Status).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum VerbleibArt {
     Transport,
     Entlassung,

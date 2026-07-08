@@ -2,10 +2,12 @@ pub mod belegung_repo;
 pub mod repo;
 
 use serde::Serialize;
+use utoipa::ToSchema;
 
 /// Status eines Bereitstellungsraums. String = CHECK-Constraint in
 /// `migrations/0060_bereitstellungsraum.sql`. `aufgeloest` ist terminal.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum BrStatus {
     Geplant,
     Aktiv,
@@ -52,7 +54,8 @@ pub fn darf_uebergehen(von: &str, nach: &str) -> bool {
 
 /// Typ des belegenden Objekts. String = CHECK-Constraint in
 /// `migrations/0061_br_belegung.sql`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum ObjektTyp {
     Einheit,
     Fahrzeug,
@@ -77,7 +80,8 @@ impl ObjektTyp {
 
 /// Art eines BR-Belegungs-Events. String = CHECK-Constraint in
 /// `migrations/0061_br_belegung.sql`. Append-only.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum BrBelegungsArt {
     Eintritt,
     Wechsel,

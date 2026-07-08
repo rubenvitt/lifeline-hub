@@ -26,6 +26,8 @@ mime_guess = "2"
 # LFH-182: fontstack-/Pfadsegment-Encoding für den Style-/Tile-Proxy.
 percent-encoding = "2"
 rust-embed = "8"
+# LFH-120: OpenAPI-Codegen als Wahrheitsquelle für die Frontend-Typen (Typ-Drift-Absicherung).
+utoipa = "5"
 tower-http = { version = "0.7", features = ["fs"] }
 # Prod-Abhängigkeit: der PMTiles-Tile-Handler nutzt `tower::ServiceExt::oneshot`,
 # um `ServeFile` per Request laufen zu lassen (siehe routes/karte.rs).

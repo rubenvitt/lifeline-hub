@@ -8,6 +8,7 @@ pub mod repo;
 pub mod retention;
 
 use serde::Serialize;
+use utoipa::ToSchema;
 
 /// Einsatz-Rolle: voller Zugriff + Einsatz-Administration (anlegen/abschließen/Personen).
 pub const EINSATZ_ROLLE_LEITUNG: &str = "einsatzleitung";
@@ -42,7 +43,8 @@ pub fn ist_gueltige_einsatzart(s: &str) -> bool {
 
 /// Rolle einer Person innerhalb eines konkreten Einsatzes.
 /// Wird als TEXT in der DB gespeichert und manuell konvertiert (kein sqlx-Enum-Decode).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum EinsatzRolle {
     Einsatzleitung,
     Fuehrungspersonal,

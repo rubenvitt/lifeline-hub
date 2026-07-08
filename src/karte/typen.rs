@@ -2,9 +2,10 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use utoipa::ToSchema;
 
 /// Status einer Fachebenen-Antwort.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum FachebeneStatus {
     /// Daten vorhanden (frisch oder aus gültigem Cache).
@@ -16,13 +17,14 @@ pub enum FachebeneStatus {
 }
 
 /// Einheitlicher Umschlag für jede Fachebene.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct FachebeneAntwort {
     pub quelle: String,
     pub status: FachebeneStatus,
     pub attribution: String,
     pub stand: Option<String>,
     /// GeoJSON FeatureCollection.
+    #[schema(value_type = Object)]
     pub features: Value,
 }
 

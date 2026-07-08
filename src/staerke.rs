@@ -1,4 +1,5 @@
 use serde::Serialize;
+use utoipa::ToSchema;
 
 /// Taktische Stärke (FwDV 3 / DV 100): Führer / Unterführer / Mannschaft.
 /// `gesamt` wird berechnet, nicht gespeichert. `u16`, damit auch ein Verband/Stab
@@ -57,7 +58,8 @@ impl Staerke {
 
 /// Taktische Stärke-Position einer einzelnen Person (genau einer von drei Töpfen).
 /// Wird als TEXT in der DB gespeichert (kein sqlx-Enum-Decode → manuell konvertiert).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum StaerkePosition {
     Fuehrer,
     Unterfuehrer,

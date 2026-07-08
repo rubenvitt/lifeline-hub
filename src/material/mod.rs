@@ -2,6 +2,7 @@ pub mod disposition_repo;
 pub mod repo;
 
 use serde::Serialize;
+use utoipa::ToSchema;
 
 // Geteilte Dienststatus-Konstanten (wie Fahrzeug/Personal) aus crate::katalog.
 pub use crate::katalog::{DIENSTSTATUS_AUSSER_DIENST, DIENSTSTATUS_IN_DIENST};
@@ -54,7 +55,8 @@ pub struct MaterialAnzeige {
 
 /// Fester Status einer Material-Dispositionszeile (kein admin-pflegbarer Katalog).
 /// Als TEXT in der DB gespeichert; manuell konvertiert (analog `StaerkePosition`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum MaterialStatus {
     Einsatzbereit,
     ImEinsatz,
@@ -92,7 +94,7 @@ impl MaterialStatus {
 /// Aufgelöste Material-Dispositionszeile: Identität nach der Auflösungsregel
 /// (Live aus dem Stamm bei aktivem Einsatz + Material in Dienst, sonst Snapshot);
 /// `menge` und `status` kommen **immer** aus der Dispositionszeile.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct EinsatzMaterialAnzeige {
     pub id: i64,
     pub einsatz_id: i64,

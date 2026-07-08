@@ -2,6 +2,7 @@ pub mod repo;
 
 use crate::anhang::AnhangAnzeige;
 use serde::Serialize;
+use utoipa::ToSchema;
 
 /// Name des Default-Kanals, der pro Einsatz garantiert existiert.
 pub const DEFAULT_KANAL_NAME: &str = "Allgemein";
@@ -11,7 +12,8 @@ pub const DEFAULT_KANAL_NAME: &str = "Allgemein";
 /// Modulnamen der referenzierbaren Domänenobjekte. Bewusst getrennt von der
 /// Heraufstufung (`etb_eintrag_id`/`auftrag_id`): ein Bezug verweist auf ein
 /// bestehendes Objekt, eine Heraufstufung erzeugt eines.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum BezugTyp {
     Schaden,
     Uhs,

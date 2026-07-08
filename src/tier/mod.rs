@@ -1,10 +1,12 @@
 pub mod repo;
 
 use serde::Serialize;
+use utoipa::ToSchema;
 
 /// Status-Maschine eines Tiers (E‑4). Bewusst schlank — keine Sichtungskette wie
 /// bei Personen. String = CHECK-Constraint in `migrations/0031_einsatz_tier.sql`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum TierStatus {
     Aktiv,
     Vermisst,
@@ -32,7 +34,8 @@ impl TierStatus {
 
 /// Spezies-Enum. String = CHECK-Constraint. `etb_label` ist die pseudonyme
 /// Anzeige in der ETB-Spur (z. B. "Hund").
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum Spezies {
     Hund,
     Katze,
@@ -84,7 +87,8 @@ impl Spezies {
 }
 
 /// Optionale Geschlechtsangabe des Tiers (kein `divers`, anders als bei Personen).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum TierGeschlecht {
     Maennlich,
     Weiblich,
@@ -113,7 +117,8 @@ impl TierGeschlecht {
 /// Abschlussgrund beim Übergang `→ abgeschlossen`. String = CHECK-Constraint.
 /// `etb_label` erscheint in Klammern in der ETB-Spur (Spec: "abgeschlossen
 /// (uebergabe_tierarzt)") — daher identisch zum DB-String.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum AbschlussGrund {
     UebergabeHalter,
     UebergabeTierarzt,

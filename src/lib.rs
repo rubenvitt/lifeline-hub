@@ -35,6 +35,8 @@ pub mod personal;
 pub mod person;
 pub mod routes;
 pub mod schaden;
+#[cfg(test)]
+mod spike_codegen;
 pub mod staerke;
 pub mod static_files;
 pub mod stichwort;
