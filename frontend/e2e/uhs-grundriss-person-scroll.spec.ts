@@ -69,7 +69,9 @@ function dropZone(page: Page, titel: string): Locator {
 test('UHS Grundriss: belegte Person in den Transport-Bereich ziehen öffnet den Abschluss-Screen', async ({ page }) => {
   const personName = await setupBelegterPlatz(page);
   await ziehe(page, page.getByText(personName).first(), dropZone(page, 'Auf Transport gebracht'));
-  await expect(page.getByRole('dialog')).toContainText('In Transport bringen');
+  // Der Abschluss-Screen ist der „Verbleib erfassen"-Dialog (Titel enthält den Personennamen,
+  // Art-Auswahl mit Default „Transport"). Früherer Titel „In Transport bringen" existiert nicht mehr.
+  await expect(page.getByRole('dialog')).toContainText('Verbleib erfassen');
 });
 
 // Neu: eine belegte Person in den Wartebereich (links) ziehen → verlässt den Platz,

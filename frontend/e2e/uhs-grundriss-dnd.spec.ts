@@ -11,9 +11,13 @@ async function anmelden(page: Page) {
   await expect(page).toHaveURL(/\/einsaetze/);
 }
 
-// Regression LFH-13: Platz-Karte ließ sich im Browser nicht verschieben, weil
+// Regression LFH-13: Eine Platz-Karte ließ sich im Browser nicht verschieben, weil
 // onDragEnd wegen fehlender Drop-Zone unter der freien Layout-Fläche frühzeitig
-// returnte. Dieser Test deckt den Maus-Drag und den PATCH-Roundtrip ab.
+// returnte. Dieser Test deckt den Maus-Drag einer Platz-Karte und den PATCH-Roundtrip
+// (pos_x/pos_y, genau einmal) ab. Der Flow nutzt die aktuelle kompakte UHS-Navigation
+// (LFH-25): kein „Neu"/„+ Platz"/„OK" mehr, sondern Leerzustand „Erste UHS anlegen" und
+// „Plätze anlegen" (Typ + Menge). Eine frisch angelegte UHS ist `geplant` → der
+// Bearbeiten-Modus (Platz-Karten ziehbar) ist standardmäßig aktiv.
 test('UHS Grundriss: Platz-Karte per Maus verschieben löst genau einen PATCH aus', async ({ page }) => {
   await anmelden(page);
 
@@ -21,43 +25,35 @@ test('UHS Grundriss: Platz-Karte per Maus verschieben löst genau einen PATCH au
   const einsatzName = `E2E UHS DnD ${Date.now()}`;
   await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
   await page.getByLabel('Bezeichnung').fill(einsatzName);
-  await page.getByRole('button', { name: 'Anlegen' }).click();
+  await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await page.waitForURL(/\/einsaetze\/\d+\//);
   const einsatzId = page.url().match(/\/einsaetze\/(\d+)\//)![1];
 
-  // Direkt ins UHS-Modul wechseln.
+  // Direkt ins UHS-Modul; frischer Einsatz → Leerzustand mit „Erste UHS anlegen".
   await page.goto(`/einsaetze/${einsatzId}/unfallhilfsstellen`);
-  await expect(page.getByRole('heading', { name: 'Unfallhilfsstellen' })).toBeVisible();
-
-  // UHS anlegen.
   const uhsName = `BHP DnD ${Date.now()}`;
-  await page.getByRole('button', { name: 'Neu' }).click();
+  await page.getByRole('button', { name: 'Erste UHS anlegen' }).click();
   await page.getByPlaceholder('z. B. BHP 50').fill(uhsName);
-  await page.getByRole('button', { name: 'Anlegen' }).click();
-  await expect(page.getByRole('button', { name: uhsName })).toBeVisible();
+  await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
 
-  // Detail-Drawer öffnen und auf Grundriss-Tab wechseln.
+  // Detail öffnen — der Grundriss wird direkt angezeigt (kein „Grundriss"-Tab mehr).
   await page.getByRole('button', { name: uhsName }).click();
-  await page.getByRole('tab', { name: 'Grundriss' }).click();
 
-  // Platz anlegen.
-  const platzName = `Bett ${Date.now()}`;
-  await page.getByRole('button', { name: '+ Platz' }).click();
-  await page.getByPlaceholder('Bezeichnung (z. B. Bett 3)').fill(platzName);
-  await page.getByRole('button', { name: 'OK' }).click();
+  // Einen Platz anlegen (Default Typ „Bett", Menge 1 → „Bett 1"). Der Server vergibt die
+  // Bezeichnung; es gibt keine manuelle Namenseingabe mehr.
+  await page.getByRole('button', { name: 'Plätze anlegen' }).click();
+  await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
 
-  const karte = page
-    .locator('div')
-    .filter({ has: page.getByText(platzName, { exact: true }) })
-    .filter({ hasText: 'frei' })
-    .first();
+  const karte = page.locator('[data-testid="platz-karte"]', { hasText: 'Bett 1' });
   await expect(karte).toBeVisible();
   const before = await karte.boundingBox();
   expect(before).not.toBeNull();
+  // Nahe der Kartenoberkante (Titel) greifen — nicht die Kartenmitte, damit der Drag nicht
+  // den Aktions-Buttons (onPointerDown stopPropagation) in die Quere kommt.
   const cx = before!.x + before!.width / 2;
-  const cy = before!.y + before!.height / 2;
+  const cy = before!.y + 14;
 
-  // PATCH-Requests an /plaetze/:pid einsammeln — die Mutation darf genau einmal feuern.
+  // PATCH-Requests an /plaetze/:pid einsammeln — die Layout-Mutation darf genau einmal feuern.
   const platzPatchRegex = /\/api\/einsaetze\/\d+\/uhs\/\d+\/plaetze\/\d+(\?.*)?$/;
   const patches: Request[] = [];
   page.on('request', (req) => {
