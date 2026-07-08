@@ -1,6 +1,7 @@
 pub mod repo;
 
 use serde::Serialize;
+use utoipa::ToSchema;
 
 /// 13 Gefahrentypen (verbatim aus bluelight-hub; lowercase-snake wie lage_zone.typ).
 pub const GEFAHRENTYPEN: [&str; 13] = [
@@ -24,6 +25,47 @@ pub const SCHUTZOBJEKTE: [&str; 5] = ["menschen", "tiere", "umwelt", "sachwerte"
 
 /// 5 Warnstufen (`keine` = effektiv keine Bewertung).
 pub const WARNSTUFEN: [&str; 5] = ["keine", "niedrig", "mittel", "hoch", "akut"];
+
+/// Gefahrentyp (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `gefahrentyp`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Gefahrentyp {
+    Atemgifte,
+    Angstreaktion,
+    Ausbreitung,
+    AtomareStrahlung,
+    ChemischeStoffe,
+    ErkrankungVerletzung,
+    Explosion,
+    Elektrizitaet,
+    Einsturz,
+    Absturz,
+    Brand,
+    Durchbruch,
+    Ertrinken,
+}
+
+/// Schutzobjekt (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `schutzobjekt`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Schutzobjekt {
+    Menschen,
+    Tiere,
+    Umwelt,
+    Sachwerte,
+    Einsatzkraefte,
+}
+
+/// Warnstufe (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `warnstufe`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Warnstufe {
+    Keine,
+    Niedrig,
+    Mittel,
+    Hoch,
+    Akut,
+}
 
 /// Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält nur Zellen mit
 /// `warnstufe != 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen.

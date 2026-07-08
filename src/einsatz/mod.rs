@@ -41,6 +41,24 @@ pub fn ist_gueltige_einsatzart(s: &str) -> bool {
     EINSATZARTEN.contains(&s)
 }
 
+/// Einsatz-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EinsatzStatus {
+    Aktiv,
+    Abgeschlossen,
+}
+
+/// Einsatzart (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `einsatzart`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Einsatzart {
+    Realeinsatz,
+    Uebung,
+    Sanitaetsdienst,
+    Bereitstellung,
+}
+
 /// Rolle einer Person innerhalb eines konkreten Einsatzes.
 /// Wird als TEXT in der DB gespeichert und manuell konvertiert (kein sqlx-Enum-Decode).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]

@@ -4,6 +4,7 @@
 pub mod repo;
 
 use serde::Serialize;
+use utoipa::ToSchema;
 
 /// Vokabular-Re-Export: Single Source of Truth bleibt das ETB-Modul. Module
 /// referenzieren `kommunikation::{EtbTyp, MeldeWeg}` statt eigene Vokabulare zu
@@ -21,6 +22,36 @@ pub const OBJEKT_MELDUNG: &str = "meldung";
 pub const VOLLZUG_OFFEN: &str = "offen";
 pub const VOLLZUG_IN_ARBEIT: &str = "in_arbeit";
 pub const VOLLZUG_VOLLZOGEN: &str = "vollzogen";
+
+/// Geteilte Priorität für Auftrag/Meldung/Nachforderung (Schema-Anker für die OpenAPI-Union,
+/// LFH-120; TS: `AuftragPrioritaet`/`MeldungPrioritaet`/`NachforderungPrioritaet`). Wire == `prioritaet`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Prioritaet {
+    Sofort,
+    Dringend,
+    Normal,
+}
+
+/// Geteilte Richtung für Auftrag/Meldung (Schema-Anker für die OpenAPI-Union, LFH-120).
+/// Wire == `richtung`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Richtung {
+    Intern,
+    Extern,
+}
+
+/// Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag
+/// (`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AdressatKategorie {
+    Leitstelle,
+    NachbarEa,
+    Uebergeordnet,
+    AndereBos,
+}
 
 /// Geteilter Status eines Objekts: beide Achsen getrennt. `quittiert_at` ist die
 /// Quittungs-Achse, `vollzug_status`/`vollzogen_at` die Vollzugs-Achse — beide

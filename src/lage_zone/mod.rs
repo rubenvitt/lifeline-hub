@@ -1,6 +1,7 @@
 pub mod repo;
 
 use serde::Serialize;
+use utoipa::ToSchema;
 
 /// Erlaubte Typen (Reihenfolge wie Typ-Katalog der Spec).
 pub const TYPEN: [&str; 5] = [
@@ -13,6 +14,17 @@ pub const TYPEN: [&str; 5] = [
 
 /// Erlaubte Geometrie-Typen (GeoJSON-Geometry-`type`).
 pub const GEOMETRIE_TYPEN: [&str; 2] = ["Polygon", "LineString"];
+
+/// Zonen-Typ (Schema-Anker für die OpenAPI-Union, LFH-120; TS: `ZoneTyp`). Wire == `typ`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LageZoneTyp {
+    Gefahrengebiet,
+    Absperrbereich,
+    Absperrgrenze,
+    Sperrgebiet,
+    FreieSkizze,
+}
 
 /// Eine freie Lage-Zone (Gefahren-/Absperrzone). Eigenständige Entität — kein Fachobjekt.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

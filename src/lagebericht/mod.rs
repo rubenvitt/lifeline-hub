@@ -2,10 +2,29 @@ pub mod repo;
 
 use crate::error::AppError;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// Status-Konstanten.
 pub const STATUS_ENTWURF: &str = "entwurf";
 pub const STATUS_FREIGEGEBEN: &str = "freigegeben";
+
+/// Lagebericht-Vorlage (Schema-Anker für die OpenAPI-Union, LFH-120; TS: `LageberichtVorlageKey`).
+/// Wire == `vorlage`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LageberichtVorlage {
+    Lagebericht,
+    Lagebeurteilung,
+    Freitext,
+}
+
+/// Lagebericht-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LageberichtStatus {
+    Entwurf,
+    Freigegeben,
+}
 
 /// Ein Abschnitt der Vorlagen-Definition (fest im Code).
 pub struct AbschnittDef {

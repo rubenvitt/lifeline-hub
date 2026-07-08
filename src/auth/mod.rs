@@ -3,6 +3,7 @@ pub mod password;
 pub mod session;
 
 use serde::Serialize;
+use utoipa::ToSchema;
 
 /// Wert der System-Rolle für Administratoren (serverweite Verwaltung).
 pub const ROLLE_ADMIN: &str = "admin";
@@ -13,6 +14,22 @@ pub const ROLLE_KEINER: &str = "keiner";
 pub const ORG_ROLLE_FUEHRUNGSKRAFT: &str = "fuehrungskraft";
 /// Org-weite Rolle ohne besondere Befugnisse (Default).
 pub const ORG_ROLLE_KEINE: &str = "keine";
+
+/// System-Rolle (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `system_rolle`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SystemRolle {
+    Admin,
+    Keiner,
+}
+
+/// Org-weite Rolle (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `org_rolle`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum OrgRolle {
+    Fuehrungskraft,
+    Keine,
+}
 
 /// Interner Benutzer-Datensatz inklusive Passwort-Hash.
 /// Wird NICHT direkt serialisiert — für API-Antworten `anzeige()` verwenden.

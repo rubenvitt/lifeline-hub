@@ -6,6 +6,7 @@
 pub mod repo;
 
 use serde::Serialize;
+use utoipa::ToSchema;
 
 /// Priorität (TEXT in der DB, im Code validiert).
 pub const PRIO_SOFORT: &str = "sofort";
@@ -24,6 +25,18 @@ pub const STATUS_ZUGESAGT: &str = "zugesagt";
 pub const STATUS_UNTERWEGS: &str = "unterwegs";
 pub const STATUS_EINGETROFFEN: &str = "eingetroffen";
 pub const STATUS_ABGELEHNT: &str = "abgelehnt";
+
+/// Bedarfs-Status einer Nachforderung (Schema-Anker für die OpenAPI-Union, LFH-120).
+/// Wire == `status`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum NachforderungStatus {
+    Angefordert,
+    Zugesagt,
+    Unterwegs,
+    Eingetroffen,
+    Abgelehnt,
+}
 
 pub fn prioritaet_gueltig(p: &str) -> bool {
     matches!(p, PRIO_SOFORT | PRIO_DRINGEND | PRIO_NORMAL)

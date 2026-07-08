@@ -5,6 +5,7 @@
 pub mod repo;
 
 use serde::Serialize;
+use utoipa::ToSchema;
 
 /// Meldeweg-Vokabular: Single Source of Truth bleibt das ETB-Modul (über den
 /// Kommunikations-Unterbau re-exportiert), keine Eigendefinition.
@@ -26,6 +27,28 @@ pub const ART_RUECKMELDUNG: &str = "rueckmeldung";
 pub const ART_VOLLZUGSMELDUNG: &str = "vollzugsmeldung";
 pub const ART_ANFRAGE: &str = "anfrage";
 pub const ART_SONSTIGE: &str = "sonstige";
+
+/// Triage-Status einer Meldung (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MeldungStatus {
+    Neu,
+    Gesichtet,
+    InBearbeitung,
+    Erledigt,
+}
+
+/// Meldungsart (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `meldungsart`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Meldungsart {
+    Lagemeldung,
+    Sofortmeldung,
+    Rueckmeldung,
+    Vollzugsmeldung,
+    Anfrage,
+    Sonstige,
+}
 
 /// Triage-Status (linearer Workflow). Bewusst KEIN kommunikation_status:
 /// dessen zwei unabhängige Achsen (Quittung / Vollzug-3-Zustände) bilden einen

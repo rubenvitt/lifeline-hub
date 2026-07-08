@@ -8,6 +8,7 @@ pub mod repo;
 pub use eingabe::{validiere_neuen_auftrag, EmpfaengerEingabeReq, NeuerAuftrag, ValidierterAuftrag};
 
 use serde::Serialize;
+use utoipa::ToSchema;
 
 /// Priorität eines Auftrags (TEXT in der DB, im Code validiert).
 pub const PRIO_SOFORT: &str = "sofort";
@@ -28,6 +29,30 @@ pub const EXTERN_LEITSTELLE: &str = "leitstelle";
 pub const EXTERN_NACHBAR_EA: &str = "nachbar_ea";
 pub const EXTERN_UEBERGEORDNET: &str = "uebergeordnet";
 pub const EXTERN_ANDERE_BOS: &str = "andere_bos";
+
+/// Bearbeitungsstatus eines Auftrags (Schema-Anker für die OpenAPI-Union, LFH-120).
+/// Wire == `bearbeitungsstatus`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AuftragBearbeitungsstatus {
+    Offen,
+    InArbeit,
+    Vollzogen,
+    Abgenommen,
+}
+
+/// Empfänger-Diskriminator eines Auftrags (Schema-Anker für die OpenAPI-Union, LFH-120).
+/// Wire == `empfaenger_typ`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EmpfaengerTyp {
+    Abschnitt,
+    Einheit,
+    Funktion,
+    Person,
+    Fahrzeug,
+    Extern,
+}
 
 pub fn extern_kategorie_gueltig(k: &str) -> bool {
     matches!(k, EXTERN_LEITSTELLE | EXTERN_NACHBAR_EA | EXTERN_UEBERGEORDNET | EXTERN_ANDERE_BOS)

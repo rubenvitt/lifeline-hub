@@ -7,6 +7,7 @@
 use crate::error::AppError;
 use serde::Serialize;
 use sqlx::SqlitePool;
+use utoipa::ToSchema;
 
 /// Gültige Basemap-Modi (Validierung in Rust statt DB-CHECK).
 pub const BASEMAP_MODI: [&str; 3] = ["online", "offline", "blind"];
@@ -33,6 +34,44 @@ pub fn ist_gueltiges_zeitformat(s: &str) -> bool {
 /// Ob `s` ein gültiges Einheiten-System ist.
 pub fn ist_gueltiges_einheiten_system(s: &str) -> bool {
     EINHEITEN_SYSTEME.contains(&s)
+}
+
+/// Basemap-Modus (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `basemap_modus`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum BasemapModus {
+    Online,
+    Offline,
+    Blind,
+}
+
+/// Zeitformat (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `zeitformat`
+/// (per-Variante, `rename_all` trifft die Ziffern-Kürzel nicht).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+pub enum Zeitformat {
+    #[serde(rename = "24h")]
+    VierundzwanzigStunden,
+    #[serde(rename = "12h")]
+    ZwoelfStunden,
+}
+
+/// Einheiten-System (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `einheiten_system`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EinheitenSystem {
+    Metrisch,
+    Imperial,
+}
+
+/// Koordinatenformat (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `koordinatenformat`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Koordinatenformat {
+    Wgs84,
+    Dms,
+    Utm,
+    Mgrs,
+    Gk,
 }
 
 /// Ob `s` ein gültiges Koordinatenformat ist.

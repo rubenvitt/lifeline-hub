@@ -187,6 +187,23 @@ impl VerbleibArt {
     }
 }
 
+/// Verbleib-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum VerbleibStatus {
+    Angemeldet,
+    Abtransportiert,
+}
+
+/// Abgleich-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AbgleichStatus {
+    Verdacht,
+    Bestaetigt,
+    Verworfen,
+}
+
 /// Ob ein Status-Übergang `von → nach` erlaubt ist. Unbekannte Werte und
 /// gleichbleibender Status sind nie erlaubt. Übergänge aus terminalen Zuständen
 /// (`verstorben`/`abgemeldet`) zurück in aktive sind erlaubt — als Korrektur
