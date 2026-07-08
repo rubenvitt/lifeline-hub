@@ -635,15 +635,22 @@ export default function LagekartePage() {
     marker: KarteMarker,
     patch: { tz_fachaufgabe?: string | null; tz_organisation?: string | null },
   ) {
-    const inval = (key: string) => qc.invalidateQueries({ queryKey: [key, einsatzId] });
     if (marker.typ === 'einheit') {
-      verorteEinheit(einsatzId, marker.id, patch).then(() => inval('einsatz-einheiten')).catch(fehler);
+      verorteEinheit(einsatzId, marker.id, patch)
+        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) }))
+        .catch(fehler);
     } else if (marker.typ === 'fahrzeug') {
-      verorteFahrzeug(einsatzId, marker.id, patch).then(() => inval('einsatz-fahrzeuge')).catch(fehler);
+      verorteFahrzeug(einsatzId, marker.id, patch)
+        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) }))
+        .catch(fehler);
     } else if (marker.typ === 'fuehrung') {
-      verortePerson(einsatzId, marker.id, patch).then(() => inval('einsatz-fuehrungskraefte')).catch(fehler);
+      verortePerson(einsatzId, marker.id, patch)
+        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.fuehrungskraefte(einsatzId) }))
+        .catch(fehler);
     } else if (marker.typ === 'abschnitt') {
-      zeichneAbschnitt(einsatzId, marker.id, patch).then(() => inval('einsatz-abschnitte')).catch(fehler);
+      zeichneAbschnitt(einsatzId, marker.id, patch)
+        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) }))
+        .catch(fehler);
     }
   }
 
