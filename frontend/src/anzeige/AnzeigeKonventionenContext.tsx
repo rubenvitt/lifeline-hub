@@ -10,6 +10,7 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ladeEinstellungen } from '../api/einsaetze';
+import { einsatzKeys } from '../api/queryKeys';
 import { useKoordinatenSystemOverride } from './koordinatenSystemStore';
 import {
   DEFAULT_KONVENTIONEN,
@@ -57,7 +58,7 @@ export function EinsatzAnzeigeProvider({
 }) {
   // Geteilter queryKey mit Settings-Seite/Layout — keine zweite Query.
   const { data } = useQuery({
-    queryKey: ['einsatz-einstellungen', einsatzId],
+    queryKey: einsatzKeys.einstellungen(einsatzId),
     queryFn: () => ladeEinstellungen(einsatzId),
   });
 

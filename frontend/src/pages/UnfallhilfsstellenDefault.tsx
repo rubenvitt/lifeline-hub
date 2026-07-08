@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { listeUhs } from '../api/einsatzUhs';
+import { einsatzKeys } from '../api/queryKeys';
 import UhsAnlegenDrawer from './uhs/UhsAnlegenDrawer';
 import { liesLetzteUhs, waehleDefaultUhs } from './uhs/uhsAuswahl';
 
@@ -11,10 +12,11 @@ import { liesLetzteUhs, waehleDefaultUhs } from './uhs/uhsAuswahl';
  * Springt direkt in die passende UHS (zuletzt ausgewählte → älteste aktive →
  * zuletzt angelegte) oder zeigt bei 0 UHS einen Leerzustand mit Anlegen-Drawer.
  *
- * Bewusst KEIN useUhsStream: die Entscheidung wird einmalig aus dem ersten
- * geladenen Stand getroffen (siehe `entscheidung`-Ref). So reißt eine live
- * angelegte UHS die Ansicht nicht weg — der Nutzer ist beim Anlegen evtl. gerade
- * im Detail einer anderen UHS, wo diese Index-Route ohnehin nicht gemountet ist.
+ * Bewusst kein Live-Resync der Auswahl: die Entscheidung wird einmalig aus dem ersten
+ * geladenen Stand getroffen (siehe `entscheidung`-Ref). So reißt eine live angelegte UHS
+ * die Ansicht nicht weg — der Nutzer ist beim Anlegen evtl. gerade im Detail einer anderen
+ * UHS, wo diese Index-Route ohnehin nicht gemountet ist. (Der konsolidierte
+ * useEinsatzLiveStream im EinsatzLayout hält die Listen anderswo aktuell.)
  */
 export default function UnfallhilfsstellenDefault() {
   const { id } = useParams();
@@ -23,7 +25,7 @@ export default function UnfallhilfsstellenDefault() {
   const basis = `/einsaetze/${einsatzId}/unfallhilfsstellen`;
 
   const uhsQuery = useQuery({
-    queryKey: ['einsatz-uhs', einsatzId],
+    queryKey: einsatzKeys.uhs(einsatzId),
     queryFn: () => listeUhs(einsatzId),
   });
 

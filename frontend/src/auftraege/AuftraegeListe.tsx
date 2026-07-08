@@ -3,6 +3,7 @@ import { CloseOutlined, PlusOutlined, UpOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { legeAuftragAn, listeAuftraege, nimmAb, quittiereEmpfaenger, setzeVollzug } from '../api/auftraege';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
@@ -30,8 +31,8 @@ export default function AuftraegeListe({ einsatzId, darfSchreiben }: {
   const { message } = App.useApp();
   const qc = useQueryClient();
 
-  const abschnitteQuery = useQuery({ queryKey: ['einsatz-abschnitte', einsatzId], queryFn: () => listeAbschnitte(einsatzId) });
-  const einheitenQuery = useQuery({ queryKey: ['einsatz-einheiten', einsatzId], queryFn: () => listeEinheiten(einsatzId) });
+  const abschnitteQuery = useQuery({ queryKey: einsatzKeys.abschnitte(einsatzId), queryFn: () => listeAbschnitte(einsatzId) });
+  const einheitenQuery = useQuery({ queryKey: einsatzKeys.einheiten(einsatzId), queryFn: () => listeEinheiten(einsatzId) });
 
   // Offen/Abgeschlossen-Trennung erfolgt clientseitig (alle Aufträge laden).
   const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
@@ -43,7 +44,7 @@ export default function AuftraegeListe({ einsatzId, darfSchreiben }: {
   const einheitId = empfTyp === 'einheit' ? Number(empfId) : undefined;
 
   const auftraegeQuery = useQuery({
-    queryKey: ['einsatz-auftraege', einsatzId, richtungFilter ?? 'alle', empfFilter ?? 'alle'],
+    queryKey: einsatzKeys.auftraegeListe(einsatzId, richtungFilter ?? 'alle', empfFilter ?? 'alle'),
     queryFn: () => listeAuftraege(einsatzId, { richtung: richtungFilter, abschnittId, einheitId }),
   });
 
@@ -68,7 +69,7 @@ export default function AuftraegeListe({ einsatzId, darfSchreiben }: {
   const [formOffen, setFormOffen] = useState(false);
 
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
-  const invalidiere = () => qc.invalidateQueries({ queryKey: ['einsatz-auftraege', einsatzId] });
+  const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.auftraege(einsatzId) });
 
   const anlegenMutation = useMutation({
     mutationFn: (d: NeuerAuftrag) => legeAuftragAn(einsatzId, d),

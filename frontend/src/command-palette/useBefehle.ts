@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import { listeEinsaetze, ladeModulOverrides, ladeEinsatz } from '../api/einsaetze';
+import { einsatzKeys } from '../api/queryKeys';
 import { setzeOverride } from '../anzeige/koordinatenSystemStore';
 import { einsatzIdAusPfad } from './einsatzPfad';
 import { baueBefehle } from './befehle';
@@ -25,7 +26,7 @@ export function useBefehle(): Befehl[] {
     enabled: einsatzId != null,
   });
   const { data: aktuellerEinsatz } = useQuery({
-    queryKey: ['einsatz', einsatzId],
+    queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId!),
     enabled: einsatzId != null,
   });

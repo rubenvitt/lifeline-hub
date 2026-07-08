@@ -8,6 +8,7 @@ import { ladeBr, setzeBrStatus, storniereBr, belegeBr } from '../../api/einsatzB
 import { listeEinheiten } from '../../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
 import { ApiError } from '../../api/client';
+import { einsatzKeys } from '../../api/queryKeys';
 import type { BrStatus, Einheit, EinsatzFahrzeug } from '../../api/types';
 import KraefteOhneBrSidebar from './KraefteOhneBrSidebar';
 
@@ -28,29 +29,29 @@ export default function BrDetailPage() {
   const { message } = App.useApp();
 
   const einsatzQuery = useQuery({
-    queryKey: ['einsatz', einsatzId],
+    queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
   const detailQuery = useQuery({
-    queryKey: ['einsatz-br-detail', einsatzId, brId],
+    queryKey: einsatzKeys.brDetail(einsatzId, brId),
     queryFn: () => ladeBr(einsatzId, brId),
     enabled: idGueltig,
   });
   const einheitenQuery = useQuery({
-    queryKey: ['einsatz-einheiten', einsatzId],
+    queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
   });
   const fahrzeugeQuery = useQuery({
-    queryKey: ['einsatz-fahrzeuge', einsatzId],
+    queryKey: einsatzKeys.fahrzeuge(einsatzId),
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
   });
 
   function invalidate() {
-    qc.invalidateQueries({ queryKey: ['einsatz-br', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['einsatz-br-detail', einsatzId, brId] });
-    qc.invalidateQueries({ queryKey: ['einsatz-einheiten', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['einsatz-fahrzeuge', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
+    qc.invalidateQueries({ queryKey: einsatzKeys.br(einsatzId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.brDetail(einsatzId, brId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
 
   const fehler = (e: unknown) =>

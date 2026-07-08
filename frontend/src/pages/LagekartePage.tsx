@@ -20,6 +20,7 @@ import { listeZonen, legeZoneAn, aktualisiereZone, loescheZone } from '../api/la
 import { ladeGefahrengebiete } from '../api/gefahren';
 import { listeLageMeldungen } from '../api/meldungen';
 import { ladeOrganisation } from '../api/organisation';
+import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzAnzeige, Warnstufe, ZoneTyp } from '../api/types';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import { baueMarker, baueTaktischeMarker, baueLageMeldungMarker, type KarteMarker } from './lagekarte/marker';
@@ -126,35 +127,35 @@ export default function LagekartePage() {
   // person). Pro Domäne eine eigene EventSource würde das HTTP/1.1-Limit (6/Origin)
   // sprengen und nachfolgende Requests (z. B. Zonen-POST) endlos hängen lassen.
 
-  const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
-  const uhsQuery = useQuery({ queryKey: ['einsatz-uhs', einsatzId], queryFn: () => listeUhs(einsatzId) });
+  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
+  const uhsQuery = useQuery({ queryKey: einsatzKeys.uhs(einsatzId), queryFn: () => listeUhs(einsatzId) });
   const schaedenQuery = useQuery({
-    queryKey: ['einsatz-schaeden', einsatzId],
+    queryKey: einsatzKeys.schaeden(einsatzId),
     queryFn: () => listeSchaeden(einsatzId),
   });
   const einheitenQuery = useQuery({
-    queryKey: ['einsatz-einheiten', einsatzId],
+    queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
   });
   const fahrzeugeQuery = useQuery({
-    queryKey: ['einsatz-fahrzeuge', einsatzId],
+    queryKey: einsatzKeys.fahrzeuge(einsatzId),
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
   });
   const abschnitteQuery = useQuery({
-    queryKey: ['einsatz-abschnitte', einsatzId],
+    queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
   });
   const zonenQuery = useQuery({
-    queryKey: ['einsatz-zonen', einsatzId],
+    queryKey: einsatzKeys.zonen(einsatzId),
     queryFn: () => listeZonen(einsatzId),
   });
-  const gebieteQuery = useQuery({ queryKey: ['gefahrengebiete', einsatzId], queryFn: () => ladeGefahrengebiete(einsatzId) });
+  const gebieteQuery = useQuery({ queryKey: einsatzKeys.gefahrengebiete(einsatzId), queryFn: () => ladeGefahrengebiete(einsatzId) });
   const lageMeldungenQuery = useQuery({
-    queryKey: ['einsatz-lagemeldungen', einsatzId],
+    queryKey: einsatzKeys.lagemeldungen(einsatzId),
     queryFn: () => listeLageMeldungen(einsatzId),
   });
   const fkQuery = useQuery({
-    queryKey: ['einsatz-fuehrungskraefte', einsatzId],
+    queryKey: einsatzKeys.fuehrungskraefte(einsatzId),
     queryFn: () => listeFuehrungskraefte(einsatzId),
   });
   const orgQuery = useQuery({ queryKey: ['organisation'], queryFn: ladeOrganisation });
@@ -162,11 +163,11 @@ export default function LagekartePage() {
   // Einsatz-Einstellungen als Karten-Defaults (LFH-131): Basemap-Vorwahl + Lage-Layer.
   // Geteilter queryKey mit Einstellungen-Seite/Redirect → i. d. R. bereits gecacht.
   const einstellungenQuery = useQuery({
-    queryKey: ['einsatz-einstellungen', einsatzId],
+    queryKey: einsatzKeys.einstellungen(einsatzId),
     queryFn: () => ladeEinstellungen(einsatzId),
   });
   const bilderQuery = useQuery({
-    queryKey: ['einsatz-kartenbilder', einsatzId],
+    queryKey: einsatzKeys.kartenbilder(einsatzId),
     queryFn: () => listeHintergrundbilder(einsatzId),
   });
 
@@ -482,7 +483,7 @@ export default function LagekartePage() {
 
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
-  const invalidiereBilder = () => qc.invalidateQueries({ queryKey: ['einsatz-kartenbilder', einsatzId] });
+  const invalidiereBilder = () => qc.invalidateQueries({ queryKey: einsatzKeys.kartenbilder(einsatzId) });
 
   // Memoisiert: ohne useMemo entsteht pro Render eine neue Array-Identität (+ JSON.parse),
   // was den bilder-Effekt der Kartenflaeche bei jedem Render unnötig feuert.
@@ -577,12 +578,12 @@ export default function LagekartePage() {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['einsatz', einsatzId] });
-      qc.invalidateQueries({ queryKey: ['einsatz-uhs', einsatzId] });
-      qc.invalidateQueries({ queryKey: ['einsatz-schaeden', einsatzId] });
-      qc.invalidateQueries({ queryKey: ['einsatz-einheiten', einsatzId] });
-      qc.invalidateQueries({ queryKey: ['einsatz-fahrzeuge', einsatzId] });
-      qc.invalidateQueries({ queryKey: ['einsatz-fuehrungskraefte', einsatzId] });
+      qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
+      qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
+      qc.invalidateQueries({ queryKey: einsatzKeys.schaeden(einsatzId) });
+      qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
+      qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) });
+      qc.invalidateQueries({ queryKey: einsatzKeys.fuehrungskraefte(einsatzId) });
       setPlatzierungZiel(null);
     },
     onError: fehler,
@@ -604,27 +605,27 @@ export default function LagekartePage() {
   function loescheVerortung(marker: KarteMarker) {
     if (marker.typ === 'uhs') {
       aktualisiereUhs(einsatzId, marker.id, { lat: null, lon: null })
-        .then(() => qc.invalidateQueries({ queryKey: ['einsatz-uhs', einsatzId] }))
+        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) }))
         .catch(fehler);
     } else if (marker.typ === 'schaden') {
       aktualisiereSchaden(einsatzId, marker.id, { lat: null, lon: null })
-        .then(() => qc.invalidateQueries({ queryKey: ['einsatz-schaeden', einsatzId] }))
+        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.schaeden(einsatzId) }))
         .catch(fehler);
     } else if (marker.typ === 'einheit') {
       verorteEinheit(einsatzId, marker.id, { lat: null, lon: null })
-        .then(() => qc.invalidateQueries({ queryKey: ['einsatz-einheiten', einsatzId] }))
+        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) }))
         .catch(fehler);
     } else if (marker.typ === 'fahrzeug') {
       verorteFahrzeug(einsatzId, marker.id, { lat: null, lon: null })
-        .then(() => qc.invalidateQueries({ queryKey: ['einsatz-fahrzeuge', einsatzId] }))
+        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) }))
         .catch(fehler);
     } else if (marker.typ === 'fuehrung') {
       verortePerson(einsatzId, marker.id, { lat: null, lon: null })
-        .then(() => qc.invalidateQueries({ queryKey: ['einsatz-fuehrungskraefte', einsatzId] }))
+        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.fuehrungskraefte(einsatzId) }))
         .catch(fehler);
     } else if (marker.typ === 'abschnitt') {
       zeichneAbschnitt(einsatzId, marker.id, { flaeche_geojson: null })
-        .then(() => qc.invalidateQueries({ queryKey: ['einsatz-abschnitte', einsatzId] }))
+        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) }))
         .catch(fehler);
     }
     setAuswahl(null);
@@ -634,15 +635,22 @@ export default function LagekartePage() {
     marker: KarteMarker,
     patch: { tz_fachaufgabe?: string | null; tz_organisation?: string | null },
   ) {
-    const inval = (key: string) => qc.invalidateQueries({ queryKey: [key, einsatzId] });
     if (marker.typ === 'einheit') {
-      verorteEinheit(einsatzId, marker.id, patch).then(() => inval('einsatz-einheiten')).catch(fehler);
+      verorteEinheit(einsatzId, marker.id, patch)
+        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) }))
+        .catch(fehler);
     } else if (marker.typ === 'fahrzeug') {
-      verorteFahrzeug(einsatzId, marker.id, patch).then(() => inval('einsatz-fahrzeuge')).catch(fehler);
+      verorteFahrzeug(einsatzId, marker.id, patch)
+        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) }))
+        .catch(fehler);
     } else if (marker.typ === 'fuehrung') {
-      verortePerson(einsatzId, marker.id, patch).then(() => inval('einsatz-fuehrungskraefte')).catch(fehler);
+      verortePerson(einsatzId, marker.id, patch)
+        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.fuehrungskraefte(einsatzId) }))
+        .catch(fehler);
     } else if (marker.typ === 'abschnitt') {
-      zeichneAbschnitt(einsatzId, marker.id, patch).then(() => inval('einsatz-abschnitte')).catch(fehler);
+      zeichneAbschnitt(einsatzId, marker.id, patch)
+        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) }))
+        .catch(fehler);
     }
   }
 
@@ -656,7 +664,7 @@ export default function LagekartePage() {
       geometrie: JSON.stringify(zoneBestaetigung.geometrie),
       farbe: zoneBestaetigung.typ === 'freie_skizze' ? zoneBestaetigung.farbe ?? null : null,
     })
-      .then(() => qc.invalidateQueries({ queryKey: ['einsatz-zonen', einsatzId] }))
+      .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatzId) }))
       .catch(fehler)
       .finally(() => {
         setZoneSpeichern(false);
@@ -769,7 +777,7 @@ export default function LagekartePage() {
           zeichnen={zeichneAbschnittId != null}
           onFlaecheGezeichnet={(poly) => {
             zeichneAbschnitt(einsatzId, zeichneAbschnittId!, { flaeche_geojson: JSON.stringify(poly) })
-              .then(() => qc.invalidateQueries({ queryKey: ['einsatz-abschnitte', einsatzId] }))
+              .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) }))
               .catch(fehler)
               .finally(() => setZeichneAbschnittId(null));
           }}
@@ -852,8 +860,8 @@ export default function LagekartePage() {
             onAendern={(patch) =>
               aktualisiereZone(einsatzId, ausgewaehlteZone.id, patch)
                 .then(() => {
-                  qc.invalidateQueries({ queryKey: ['einsatz-zonen', einsatzId] });
-                  qc.invalidateQueries({ queryKey: ['gefahrengebiete', einsatzId] });
+                  qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatzId) });
+                  qc.invalidateQueries({ queryKey: einsatzKeys.gefahrengebiete(einsatzId) });
                 })
                 .catch(fehler)
             }
@@ -862,8 +870,8 @@ export default function LagekartePage() {
               loescheZone(einsatzId, ausgewaehlteZone.id)
                 .then(() => {
                   setZoneAuswahl(null);
-                  qc.invalidateQueries({ queryKey: ['einsatz-zonen', einsatzId] });
-                  return qc.invalidateQueries({ queryKey: ['gefahrengebiete', einsatzId] });
+                  qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatzId) });
+                  return qc.invalidateQueries({ queryKey: einsatzKeys.gefahrengebiete(einsatzId) });
                 })
                 .catch(fehler)
             }

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { personDetailPfad } from '../routing/deeplinks';
 import { ladePerson, registrierAnzeige } from '../api/einsatzPerson';
 import { ApiError } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 import type { PersonDetail, Sichtungskategorie, Verbleib } from '../api/types';
 import { SK_META, STATUS_META } from './personMeta';
 
@@ -67,7 +68,7 @@ export default function PersonDetailDrawer({
 }: { einsatzId: number; personId: number | null; onClose: () => void }) {
   const navigate = useNavigate();
   const detailQuery = useQuery({
-    queryKey: ['einsatz-person', einsatzId, personId],
+    queryKey: einsatzKeys.person(einsatzId, personId),
     queryFn: () => ladePerson(einsatzId, personId!),
     enabled: personId != null,
   });

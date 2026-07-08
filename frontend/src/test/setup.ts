@@ -96,8 +96,9 @@ afterEach(() => {
 });
 afterAll(() => server.close());
 
-// jsdom kennt keine EventSource — No-op-Stub verhindert ReferenceError in EtbPage-Tests.
-// beforeEach stellt den Stub nach vi.unstubAllGlobals() (z. B. in useEtbStream-Tests) wieder her.
+// jsdom kennt keine EventSource — No-op-Stub verhindert ReferenceError in Seiten-Tests, die
+// useEinsatzLiveStream mounten. beforeEach stellt den Stub nach vi.unstubAllGlobals() (z. B. in
+// den useEinsatzLiveStream-Tests, die eine FakeEventSource stubben) wieder her.
 beforeEach(() => {
   if (typeof globalThis.EventSource === 'undefined') {
     vi.stubGlobal('EventSource', class { addEventListener() {} removeEventListener() {} close() {} });

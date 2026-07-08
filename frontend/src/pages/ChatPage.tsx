@@ -16,6 +16,7 @@ import { listePersonen } from '../api/einsatzPerson';
 import { listeLageberichte } from '../api/lageberichte';
 import { listeMeldungen } from '../api/meldungen';
 import { listeAuftraege } from '../api/auftraege';
+import { einsatzKeys } from '../api/queryKeys';
 import type { BezugTyp, ChatNachricht, EtbTyp, NeuerAuftrag } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import KanalListe from '../chat/KanalListe';
@@ -45,20 +46,20 @@ export default function ChatPage() {
 
 
   const einsatzQuery = useQuery({
-    queryKey: ['einsatz', einsatzId],
+    queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
   const kanaeleQuery = useQuery({
-    queryKey: ['einsatz-chat-kanaele', einsatzId],
+    queryKey: einsatzKeys.chatKanaele(einsatzId),
     queryFn: () => listeKanaele(einsatzId),
   });
   // Empfänger-Optionen für die Auftrag-Heraufstufung (LFH-101).
   const abschnitteQuery = useQuery({
-    queryKey: ['einsatz-abschnitte', einsatzId],
+    queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
   });
   const einheitenQuery = useQuery({
-    queryKey: ['einsatz-einheiten', einsatzId],
+    queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
   });
 
@@ -66,7 +67,7 @@ export default function ChatPage() {
   const kanalId = aktiverKanal ?? kanaele[0]?.id ?? null;
 
   const nachrichtenQuery = useInfiniteQuery({
-    queryKey: ['einsatz-chat-nachrichten', einsatzId, kanalId],
+    queryKey: einsatzKeys.chatNachrichtenKanal(einsatzId, kanalId),
     queryFn: ({ pageParam }) => listeNachrichten(einsatzId, kanalId as number, pageParam),
     initialPageParam: undefined as number | undefined,
     // Backend liefert je Seite id DESC (neueste zuerst); der Cursor für ältere
@@ -89,28 +90,28 @@ export default function ChatPage() {
   const typAktiv = (t: BezugTyp) => bezugDialogOffen || referenzierteTypen.has(t);
 
   const schaedenQuery = useQuery({
-    queryKey: ['einsatz-schaeden', einsatzId], queryFn: () => listeSchaeden(einsatzId), enabled: typAktiv('schaden'),
+    queryKey: einsatzKeys.schaeden(einsatzId), queryFn: () => listeSchaeden(einsatzId), enabled: typAktiv('schaden'),
   });
   const uhsQuery = useQuery({
-    queryKey: ['einsatz-uhs', einsatzId], queryFn: () => listeUhs(einsatzId), enabled: typAktiv('uhs'),
+    queryKey: einsatzKeys.uhs(einsatzId), queryFn: () => listeUhs(einsatzId), enabled: typAktiv('uhs'),
   });
   const personenQuery = useQuery({
-    queryKey: ['einsatz-personen', einsatzId], queryFn: () => listePersonen(einsatzId), enabled: typAktiv('person'),
+    queryKey: einsatzKeys.personen(einsatzId), queryFn: () => listePersonen(einsatzId), enabled: typAktiv('person'),
   });
   const lageberichteQuery = useQuery({
-    queryKey: ['einsatz-lageberichte', einsatzId], queryFn: () => listeLageberichte(einsatzId), enabled: typAktiv('lagebericht'),
+    queryKey: einsatzKeys.lageberichte(einsatzId), queryFn: () => listeLageberichte(einsatzId), enabled: typAktiv('lagebericht'),
   });
   const meldungenQuery = useQuery({
-    queryKey: ['einsatz-meldungen', einsatzId], queryFn: () => listeMeldungen(einsatzId), enabled: typAktiv('meldung'),
+    queryKey: einsatzKeys.meldungen(einsatzId), queryFn: () => listeMeldungen(einsatzId), enabled: typAktiv('meldung'),
   });
   const auftraegeQuery = useQuery({
-    queryKey: ['einsatz-auftraege', einsatzId], queryFn: () => listeAuftraege(einsatzId), enabled: typAktiv('auftrag'),
+    queryKey: einsatzKeys.auftraege(einsatzId), queryFn: () => listeAuftraege(einsatzId), enabled: typAktiv('auftrag'),
   });
 
   const fehler = (e: unknown) =>
     message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
   const invalidiereNachrichten = () =>
-    qc.invalidateQueries({ queryKey: ['einsatz-chat-nachrichten', einsatzId] });
+    qc.invalidateQueries({ queryKey: einsatzKeys.chatNachrichten(einsatzId) });
 
   const sendenMutation = useMutation({
     // Zweistufig: erst Anhänge hochladen (falls vorhanden), dann Nachricht mit den
@@ -137,7 +138,7 @@ export default function ChatPage() {
   });
   const kanalMutation = useMutation({
     mutationFn: (daten: { name: string; beschreibung?: string }) => legeKanalAn(einsatzId, daten),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['einsatz-chat-kanaele', einsatzId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: einsatzKeys.chatKanaele(einsatzId) }),
     onError: fehler,
   });
   const heraufstufenMutation = useMutation({
@@ -155,7 +156,7 @@ export default function ChatPage() {
       heraufstufenZuAuftrag(einsatzId, nid, daten),
     onSuccess: () => {
       invalidiereNachrichten();
-      qc.invalidateQueries({ queryKey: ['einsatz-auftraege', einsatzId] });
+      qc.invalidateQueries({ queryKey: einsatzKeys.auftraege(einsatzId) });
       setHeraufstufenAuftrag(null);
       message.success('Zu Auftrag heraufgestuft');
     },

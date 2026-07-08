@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { uhsDetailPfad } from '../../routing/deeplinks';
 import { listeUhs } from '../../api/einsatzUhs';
+import { einsatzKeys } from '../../api/queryKeys';
 import UhsAnlegenDrawer from './UhsAnlegenDrawer';
 import type { Uhs, UhsStatus } from '../../api/types';
 
@@ -21,7 +22,7 @@ export default function UhsSwitcher({ einsatzId, aktuelleUhs }: { einsatzId: num
   const detailPfad = (uhsId: number) => uhsDetailPfad(einsatzId, uhsId);
 
   const { data: liste = [] } = useQuery({
-    queryKey: ['einsatz-uhs', einsatzId],
+    queryKey: einsatzKeys.uhs(einsatzId),
     queryFn: () => listeUhs(einsatzId),
   });
 

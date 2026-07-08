@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { parseRouteId, lageberichtePfad, lageberichtDetailPfad, etbPfad } from '../routing/deeplinks';
 import { ApiError } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 import {
   aktualisiereLagebericht,
   gibLageberichtFrei,
@@ -29,11 +30,11 @@ export default function LageberichtDetailPage() {
 
 
   const einsatzQuery = useQuery({
-    queryKey: ['einsatz', einsatzId],
+    queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
   const berichtQuery = useQuery({
-    queryKey: ['einsatz-lagebericht', einsatzId, berichtId],
+    queryKey: einsatzKeys.lagebericht(einsatzId, berichtId),
     queryFn: () => ladeLagebericht(einsatzId, berichtId),
     enabled: idGueltig,
   });
@@ -47,8 +48,8 @@ export default function LageberichtDetailPage() {
   }, [berichtQuery.data, form]);
 
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ['einsatz-lagebericht', einsatzId, berichtId] });
-    qc.invalidateQueries({ queryKey: ['einsatz-lageberichte', einsatzId] });
+    qc.invalidateQueries({ queryKey: einsatzKeys.lagebericht(einsatzId, berichtId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.lageberichte(einsatzId) });
   };
   const fehler = (e: unknown) =>
     message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
@@ -85,7 +86,7 @@ export default function LageberichtDetailPage() {
   const fortschreibenMutation = useMutation({
     mutationFn: () => schreibeLageberichtFort(einsatzId, berichtId),
     onSuccess: (neu: LageberichtAnzeige) => {
-      qc.invalidateQueries({ queryKey: ['einsatz-lageberichte', einsatzId] });
+      qc.invalidateQueries({ queryKey: einsatzKeys.lageberichte(einsatzId) });
       navigate(lageberichtDetailPfad(einsatzId, neu.id));
     },
     onError: fehler,

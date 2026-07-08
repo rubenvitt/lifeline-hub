@@ -2,6 +2,7 @@ import { App, Button, Drawer, Form, Input, Select } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { legeUhsAn, type UhsEingabe } from '../../api/einsatzUhs';
 import { ApiError } from '../../api/client';
+import { einsatzKeys } from '../../api/queryKeys';
 import type { Uhs, UhsTyp } from '../../api/types';
 
 const UHS_TYP_LABEL: Record<UhsTyp, string> = {
@@ -29,8 +30,8 @@ export default function UhsAnlegenDrawer({ einsatzId, open, onClose, onAngelegt 
     mutationFn: (daten: UhsEingabe) => legeUhsAn(einsatzId, daten),
     onSuccess: (uhs) => {
       message.success('UHS angelegt');
-      qc.invalidateQueries({ queryKey: ['einsatz-uhs', einsatzId] });
-      qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
+      qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
+      qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
       onClose();
       form.resetFields();
       onAngelegt?.(uhs);

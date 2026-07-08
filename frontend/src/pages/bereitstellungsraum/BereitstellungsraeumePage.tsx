@@ -9,6 +9,7 @@ import { bereitstellungsraumDetailPfad } from '../../routing/deeplinks';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { listeBr, legeBrAn, type BrEingabe } from '../../api/einsatzBereitstellungsraum';
 import { ApiError } from '../../api/client';
+import { einsatzKeys } from '../../api/queryKeys';
 import type { Bereitstellungsraum, BrStatus } from '../../api/types';
 
 const STATUS_META: Record<BrStatus, { label: string; color: string }> = {
@@ -25,11 +26,11 @@ export default function BereitstellungsraeumePage() {
   const { message } = App.useApp();
 
   const einsatzQuery = useQuery({
-    queryKey: ['einsatz', einsatzId],
+    queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
   const brQuery = useQuery({
-    queryKey: ['einsatz-br', einsatzId],
+    queryKey: einsatzKeys.br(einsatzId),
     queryFn: () => listeBr(einsatzId),
   });
 
@@ -44,8 +45,8 @@ export default function BereitstellungsraeumePage() {
     mutationFn: (daten: BrEingabe) => legeBrAn(einsatzId, daten),
     onSuccess: (br) => {
       message.success('Bereitstellungsraum angelegt');
-      qc.invalidateQueries({ queryKey: ['einsatz-br', einsatzId] });
-      qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
+      qc.invalidateQueries({ queryKey: einsatzKeys.br(einsatzId) });
+      qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
       setAnlegen(false);
       form.resetFields();
       navigate(bereitstellungsraumDetailPfad(einsatzId, br.id));

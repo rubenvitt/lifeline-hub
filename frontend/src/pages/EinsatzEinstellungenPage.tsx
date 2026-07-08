@@ -6,6 +6,7 @@ import {
   ladeModulOverrides, setzeModulOverride,
 } from '../api/einsaetze';
 import { ladeOrgModulEinstellungen } from '../api/orgEinstellungen';
+import { einsatzKeys } from '../api/queryKeys';
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { modulRegistry, istModulAusblendbar } from '../einsatz/modulRegistry';
@@ -98,11 +99,11 @@ export default function EinsatzEinstellungenPage() {
   const [form] = Form.useForm<FormWerte>();
 
   const einsatzQuery = useQuery({
-    queryKey: ['einsatz', einsatzId],
+    queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
   const einstellungenQuery = useQuery({
-    queryKey: ['einsatz-einstellungen', einsatzId],
+    queryKey: einsatzKeys.einstellungen(einsatzId),
     queryFn: () => ladeEinstellungen(einsatzId),
   });
   const overridesQuery = useQuery({
@@ -129,7 +130,7 @@ export default function EinsatzEinstellungenPage() {
   const speichernMutation = useMutation({
     mutationFn: (felder: EinstellungenUpdate) => speichereEinstellungen(einsatzId, felder),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['einsatz-einstellungen', einsatzId] });
+      qc.invalidateQueries({ queryKey: einsatzKeys.einstellungen(einsatzId) });
       message.success('Einstellungen gespeichert');
     },
     onError: (e) =>

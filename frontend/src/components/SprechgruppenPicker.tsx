@@ -2,6 +2,7 @@ import { App, Button, Input, Select, Space } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { einsatzKeys } from '../api/queryKeys';
 import { legeEinsatzSprechgruppeAn, listeEinsatzSprechgruppen } from '../api/sprechgruppen';
 import type { Betriebsart, Sprechgruppe } from '../api/types';
 import { ApiError } from '../api/client';
@@ -30,7 +31,7 @@ export default function SprechgruppenPicker({ einsatzId, value = [], onChange }:
   const [neuBetriebsart, setNeuBetriebsart] = useState<Betriebsart | undefined>(undefined);
 
   const { data: sprechgruppen = [] } = useQuery({
-    queryKey: ['einsatz-sprechgruppen', einsatzId],
+    queryKey: einsatzKeys.sprechgruppen(einsatzId),
     queryFn: () => listeEinsatzSprechgruppen(einsatzId),
   });
 
@@ -51,7 +52,7 @@ export default function SprechgruppenPicker({ einsatzId, value = [], onChange }:
         betriebsart: neuBetriebsart as Betriebsart,
       }),
     onSuccess: (neu: Sprechgruppe) => {
-      qc.invalidateQueries({ queryKey: ['einsatz-sprechgruppen', einsatzId] });
+      qc.invalidateQueries({ queryKey: einsatzKeys.sprechgruppen(einsatzId) });
       onChange?.([...value, neu.id]);
       setNeuBezeichnung('');
       setNeuBetriebsart(undefined);

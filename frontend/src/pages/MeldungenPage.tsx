@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz, ladeMitglieder } from '../api/einsaetze';
 import { ApiError } from '../api/client';
 import { bestaetigeMeldung, erteileAuftragAusMeldung, legeMeldungAn, listeMeldungen, markiereLagerelevant, setzeMeldungStatus, weiseBearbeiterZu } from '../api/meldungen';
@@ -45,11 +46,11 @@ export default function MeldungenPage() {
   const { message } = App.useApp();
   const qc = useQueryClient();
 
-  const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
-  const mitgliederQuery = useQuery({ queryKey: ['einsatz-mitglieder', einsatzId], queryFn: () => ladeMitglieder(einsatzId) });
+  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
+  const mitgliederQuery = useQuery({ queryKey: einsatzKeys.mitglieder(einsatzId), queryFn: () => ladeMitglieder(einsatzId) });
   // Auftrags-Ziele für das Meldung→Auftrag-Formular (wie AuftraegePage/ChatPage).
-  const abschnitteQuery = useQuery({ queryKey: ['einsatz-abschnitte', einsatzId], queryFn: () => listeAbschnitte(einsatzId) });
-  const einheitenQuery = useQuery({ queryKey: ['einsatz-einheiten', einsatzId], queryFn: () => listeEinheiten(einsatzId) });
+  const abschnitteQuery = useQuery({ queryKey: einsatzKeys.abschnitte(einsatzId), queryFn: () => listeAbschnitte(einsatzId) });
+  const einheitenQuery = useQuery({ queryKey: einsatzKeys.einheiten(einsatzId), queryFn: () => listeEinheiten(einsatzId) });
 
   // Offen/Abgeschlossen-Trennung erfolgt clientseitig (alle Meldungen laden, Server-Default).
   const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
@@ -60,7 +61,7 @@ export default function MeldungenPage() {
   const [formOffen, setFormOffen] = useState(false);
 
   const meldungenQuery = useQuery({
-    queryKey: ['einsatz-meldungen', einsatzId, richtungFilter ?? 'alle'],
+    queryKey: einsatzKeys.meldungenListe(einsatzId, richtungFilter ?? 'alle'),
     queryFn: () => listeMeldungen(einsatzId, { richtung: richtungFilter }),
   });
 
@@ -81,7 +82,7 @@ export default function MeldungenPage() {
   }, [highlightMeldungId]);
 
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
-  const invalidiere = () => qc.invalidateQueries({ queryKey: ['einsatz-meldungen', einsatzId] });
+  const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.meldungen(einsatzId) });
 
   const anlegenMutation = useMutation({
     mutationFn: (d: NeueMeldung) => legeMeldungAn(einsatzId, d),
@@ -105,7 +106,7 @@ export default function MeldungenPage() {
       markiereLagerelevant(einsatzId, meldungId, daten),
     onSuccess: () => {
       invalidiere();
-      qc.invalidateQueries({ queryKey: ['einsatz-lagemeldungen', einsatzId] });
+      qc.invalidateQueries({ queryKey: einsatzKeys.lagemeldungen(einsatzId) });
       setLageMeldung(null);
       message.success('An die Lage übergeben');
     },
@@ -121,7 +122,7 @@ export default function MeldungenPage() {
       erteileAuftragAusMeldung(einsatzId, meldungId, daten),
     onSuccess: () => {
       invalidiere();
-      qc.invalidateQueries({ queryKey: ['einsatz-auftraege', einsatzId] });
+      qc.invalidateQueries({ queryKey: einsatzKeys.auftraege(einsatzId) });
       setAuftragMeldung(null);
       message.success('Auftrag aus Meldung erteilt');
     },

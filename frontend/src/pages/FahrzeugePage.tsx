@@ -15,6 +15,7 @@ import {
 } from '../api/einsatzFahrzeuge';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { ApiError } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzFahrzeug, EinsatzPersonal, Staerke, StatusKategorie } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 
@@ -140,15 +141,15 @@ export default function FahrzeugePage() {
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [form] = Form.useForm<AdhocEingabe>();
 
-  const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   const efQuery = useQuery({
-    queryKey: ['einsatz-fahrzeuge', einsatzId],
+    queryKey: einsatzKeys.fahrzeuge(einsatzId),
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
   });
   const statusQuery = useQuery({ queryKey: ['fahrzeug-status'], queryFn: listeFahrzeugStatus });
   const poolQuery = useQuery({ queryKey: ['fahrzeuge', 'im-dienst'], queryFn: () => listeFahrzeuge(true) });
   const personalQuery = useQuery({
-    queryKey: ['einsatz-personal', einsatzId],
+    queryKey: einsatzKeys.personal(einsatzId),
     queryFn: () => listeEinsatzPersonal(einsatzId),
   });
 
@@ -162,9 +163,9 @@ export default function FahrzeugePage() {
   }, [highlightId]);
 
   function invalidate() {
-    qc.invalidateQueries({ queryKey: ['einsatz-fahrzeuge', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['einsatz-personal', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
+    qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.personal(einsatzId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 

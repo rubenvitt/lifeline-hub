@@ -8,11 +8,10 @@ import UhsDetailPage from './UhsDetailPage';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { ladeUhs } from '../../api/einsatzUhs';
 
-// Auto-Mocks: für den Robustheits-Guard reichen no-op-API + no-op-Stream — bei ungültiger
-// ID wird ohnehin vor jedem Laden auf die Liste umgeleitet.
+// Auto-Mocks: für den Robustheits-Guard reicht no-op-API — bei ungültiger ID wird ohnehin
+// vor jedem Laden auf die Liste umgeleitet.
 vi.mock('../../api/einsaetze');
 vi.mock('../../api/einsatzUhs');
-vi.mock('../../etb/useUhsStream');
 // Kind-Komponenten stubben: LFH-149 testet die Seiten-Komposition (Tabs statt Drawer),
 // nicht die Datenflüsse von Grundriss/Material/Bewegungen.
 vi.mock('./Grundriss', () => ({ default: () => <div>GRUNDRISS</div> }));

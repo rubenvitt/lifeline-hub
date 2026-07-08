@@ -2,6 +2,7 @@ import { Table, Tag } from 'antd';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
+import { einsatzKeys } from '../../api/queryKeys';
 import { personDetailPfad } from '../../routing/deeplinks';
 import type { UhsBelegung, UhsDetail, BelegungsArt } from '../../api/types';
 
@@ -23,7 +24,7 @@ interface Props {
 
 export default function BewegungenTab({ uhs }: Props) {
   const personenQuery = useQuery({
-    queryKey: ['einsatz-personen', uhs.einsatz_id],
+    queryKey: einsatzKeys.personen(uhs.einsatz_id),
     queryFn: () => listePersonen(uhs.einsatz_id),
   });
 

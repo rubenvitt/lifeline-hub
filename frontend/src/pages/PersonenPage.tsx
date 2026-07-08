@@ -6,7 +6,7 @@ import { personDetailPfad } from '../routing/deeplinks';
 import { ladeEinsatz } from '../api/einsaetze';
 import { legePersonAn, listePersonen, registrierAnzeige, schlageAbgleichVor, setzePersonStatus, type PersonEingabe } from '../api/einsatzPerson';
 import { ApiError } from '../api/client';
-import { usePersonenStream } from '../etb/usePersonenStream';
+import { einsatzKeys } from '../api/queryKeys';
 import type { Person, Sichtungskategorie } from '../api/types';
 import { SK_META, STATUS_META } from '../personen/personMeta';
 
@@ -54,11 +54,11 @@ export default function PersonenPage() {
   const navigate = useNavigate();
   const [sicht, setSicht] = useState<Sicht>('erfasst');
 
-  usePersonenStream(einsatzId);
+  // Live-Updates über den konsolidierten useEinsatzLiveStream im EinsatzLayout (LFH-207).
 
-  const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   const personenQuery = useQuery({
-    queryKey: ['einsatz-personen', einsatzId],
+    queryKey: einsatzKeys.personen(einsatzId),
     queryFn: () => listePersonen(einsatzId),
   });
 
@@ -68,8 +68,8 @@ export default function PersonenPage() {
   const [form] = Form.useForm<PersonEingabe>();
 
   function invalidate() {
-    qc.invalidateQueries({ queryKey: ['einsatz-personen', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
+    qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 

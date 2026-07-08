@@ -5,7 +5,7 @@ import { uhsDetailPfad } from '../routing/deeplinks';
 import { useEffect, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeUhs } from '../api/einsatzUhs';
-import { useUhsStream } from '../etb/useUhsStream';
+import { einsatzKeys } from '../api/queryKeys';
 import UhsAnlegenDrawer from './uhs/UhsAnlegenDrawer';
 import type { Uhs, UhsStatus, UhsTyp } from '../api/types';
 
@@ -25,11 +25,11 @@ const STATUS_META: Record<UhsStatus, { label: string; color: string }> = {
 export default function UnfallhilfsstellenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  useUhsStream(einsatzId);
+  // Live-Updates über den konsolidierten useEinsatzLiveStream im EinsatzLayout (LFH-207).
 
-  const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   const uhsQuery = useQuery({
-    queryKey: ['einsatz-uhs', einsatzId],
+    queryKey: einsatzKeys.uhs(einsatzId),
     queryFn: () => listeUhs(einsatzId),
   });
 

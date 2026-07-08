@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, App, Empty, Space, Spin, Tag, Typography } from 'antd';
 import type { BewertungEingabe } from '../../api/gefahren';
 import { ApiError } from '../../api/client';
+import { einsatzKeys } from '../../api/queryKeys';
 import { benenneGefahrengebiet, gefahrengebietName, ladeGefahrengebiete, ladeMatrix, setzeBewertung } from '../../api/gefahren';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { parseRouteId } from '../../routing/deeplinks';
@@ -19,8 +20,8 @@ export default function GefahrenPage() {
   const [gewaehlt, setGewaehlt] = useState<number | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
-  const gebieteQuery = useQuery({ queryKey: ['gefahrengebiete', einsatzId], queryFn: () => ladeGefahrengebiete(einsatzId) });
+  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
+  const gebieteQuery = useQuery({ queryKey: einsatzKeys.gefahrengebiete(einsatzId), queryFn: () => ladeGefahrengebiete(einsatzId) });
 
   // Stabile Referenz → der Auswahl-Effekt läuft nicht bei jedem Render neu.
   const gebiete = useMemo(() => gebieteQuery.data ?? [], [gebieteQuery.data]);
@@ -46,7 +47,7 @@ export default function GefahrenPage() {
   }, [gebieteQuery.isSuccess, gebiete, gewaehlt, searchParams, setSearchParams]);
 
   const matrixQuery = useQuery({
-    queryKey: ['gefahrenmatrix', einsatzId, gewaehlt],
+    queryKey: einsatzKeys.gefahrenmatrix(einsatzId, gewaehlt),
     queryFn: () => ladeMatrix(einsatzId, gewaehlt as number),
     enabled: gewaehlt != null,
   });
@@ -55,14 +56,14 @@ export default function GefahrenPage() {
   const setzen = useMutation({
     mutationFn: (d: BewertungEingabe) => setzeBewertung(einsatzId, gewaehlt as number, d),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['gefahrenmatrix', einsatzId, gewaehlt] });
-      qc.invalidateQueries({ queryKey: ['gefahrengebiete', einsatzId] });
+      qc.invalidateQueries({ queryKey: einsatzKeys.gefahrenmatrix(einsatzId, gewaehlt) });
+      qc.invalidateQueries({ queryKey: einsatzKeys.gefahrengebiete(einsatzId) });
     },
     onError: fehler,
   });
   const umbenennen = useMutation({
     mutationFn: (label: string) => benenneGefahrengebiet(einsatzId, gewaehlt as number, label),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['gefahrengebiete', einsatzId] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: einsatzKeys.gefahrengebiete(einsatzId) }),
     onError: fehler,
   });
 

@@ -12,6 +12,7 @@ import {
 import { erfasseVerbleib, listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
 import type { Person, PlatzTyp, UhsDetail, UhsPlatz, VerbleibArt, Verfuegbarkeit } from '../../api/types';
 import { ApiError } from '../../api/client';
+import { einsatzKeys } from '../../api/queryKeys';
 import PersonDetailDrawer from '../../personen/PersonDetailDrawer';
 
 // Feste Karten-Höhe. Muss unter dem Raster-Zeilenabstand (raster_position SCHRITT_Y=120
@@ -302,7 +303,7 @@ export default function Grundriss({
   const [detailPersonId, setDetailPersonId] = useState<number | null>(null);
 
   const personenQuery = useQuery({
-    queryKey: ['einsatz-personen', einsatzId],
+    queryKey: einsatzKeys.personen(einsatzId),
     queryFn: () => listePersonen(einsatzId),
   });
   const personen = personenQuery.data ?? [];
@@ -335,10 +336,10 @@ export default function Grundriss({
   const flaecheHoehe = Math.max(420, maxY + 140);
 
   function invalidate() {
-    qc.invalidateQueries({ queryKey: ['einsatz-uhs', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['einsatz-uhs-detail', einsatzId, uhs.id] });
-    qc.invalidateQueries({ queryKey: ['einsatz-personen', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
+    qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(einsatzId, uhs.id) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 

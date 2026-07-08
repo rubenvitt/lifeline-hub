@@ -16,6 +16,7 @@ import {
   loeseEinheitAuf, ordneFahrzeugZu, ordnePersonalZu, type EinheitEingabe,
 } from '../api/einheiten';
 import { ApiError } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 import type { Einheit, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StaerkeEingabe from '../anzeige/StaerkeEingabe';
@@ -84,13 +85,13 @@ export default function EinheitenPage() {
   const [gewaehlt, setGewaehlt] = useState<number | null>(null);
   const [form] = Form.useForm<KopfWerte>();
 
-  const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   const einheitenQuery = useQuery({ queryKey: ['einheiten', einsatzId], queryFn: () => listeEinheiten(einsatzId) });
   const typenQuery = useQuery({ queryKey: ['einheit-typen'], queryFn: listeEinheitTypen });
   const abschnitteQuery = useQuery({ queryKey: ['abschnitte', einsatzId], queryFn: () => listeAbschnitte(einsatzId) });
-  const personalQuery = useQuery({ queryKey: ['einsatz-personal', einsatzId], queryFn: () => listeEinsatzPersonal(einsatzId) });
-  const fahrzeugeQuery = useQuery({ queryKey: ['einsatz-fahrzeuge', einsatzId], queryFn: () => listeEinsatzFahrzeuge(einsatzId) });
-  const materialQuery = useQuery({ queryKey: ['einsatz-material', einsatzId], queryFn: () => listeEinsatzMaterial(einsatzId) });
+  const personalQuery = useQuery({ queryKey: einsatzKeys.personal(einsatzId), queryFn: () => listeEinsatzPersonal(einsatzId) });
+  const fahrzeugeQuery = useQuery({ queryKey: einsatzKeys.fahrzeuge(einsatzId), queryFn: () => listeEinsatzFahrzeuge(einsatzId) });
+  const materialQuery = useQuery({ queryKey: einsatzKeys.material(einsatzId), queryFn: () => listeEinsatzMaterial(einsatzId) });
 
   // Cross-Modul-Deeplink (LFH-25): ?einheit=<id> selektiert die Einheit, sofern vorhanden.
   useQueryParamSelektion('einheit', einheitenQuery.isSuccess, (id) => {
@@ -99,10 +100,10 @@ export default function EinheitenPage() {
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: ['einheiten', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['einsatz-personal', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['einsatz-fahrzeuge', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['einsatz-material', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
+    qc.invalidateQueries({ queryKey: einsatzKeys.personal(einsatzId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.material(einsatzId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 

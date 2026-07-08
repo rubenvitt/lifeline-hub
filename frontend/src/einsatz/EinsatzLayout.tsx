@@ -3,6 +3,7 @@ import { Layout, Space, Spin } from 'antd';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
+import { einsatzKeys } from '../api/queryKeys';
 import { useAuth } from '../auth/AuthContext';
 import {
   kategorien, modulRegistry, moduleNachKategorie, modulZielRoute,
@@ -47,7 +48,7 @@ export default function EinsatzLayout() {
   }, [aktiveKategorie]);
 
   const { data: einsatz, isLoading } = useQuery({
-    queryKey: ['einsatz', einsatzId],
+    queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
 

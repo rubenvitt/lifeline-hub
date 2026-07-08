@@ -3,6 +3,7 @@ import dayjs from 'dayjs';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { legeErinnerungAn } from '../api/erinnerungen';
 import { ApiError } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 import type { EtbEintragAnzeige } from '../api/types';
 
 const { TextArea } = Input;
@@ -45,7 +46,7 @@ export default function WiedervorlageModal({ einsatzId, eintrag, onClose }: {
         bezug_id: eintrag!.id,
       }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['einsatz-erinnerungen', einsatzId] });
+      qc.invalidateQueries({ queryKey: einsatzKeys.erinnerungen(einsatzId) });
       message.success('Wiedervorlage angelegt');
       onClose();
     },

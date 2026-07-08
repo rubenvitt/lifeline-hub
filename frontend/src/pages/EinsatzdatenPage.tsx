@@ -11,6 +11,7 @@ import { useState } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 import { aktualisiereEinsatz, ladeEinsatz, ladeMitglieder, type KopfdatenUpdate } from '../api/einsaetze';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
+import { einsatzKeys } from '../api/queryKeys';
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import type { Einsatzart } from '../api/types';
@@ -53,7 +54,7 @@ export default function EinsatzdatenPage() {
   const [form] = Form.useForm<FormWerte>();
 
   const einsatzQuery = useQuery({
-    queryKey: ['einsatz', einsatzId],
+    queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
   const mitgliederQuery = useQuery({
@@ -68,7 +69,7 @@ export default function EinsatzdatenPage() {
   const speichernMutation = useMutation({
     mutationFn: (felder: KopfdatenUpdate) => aktualisiereEinsatz(einsatzId, felder),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['einsatz', einsatzId] });
+      qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
       qc.invalidateQueries({ queryKey: ['einsaetze'] });
       setBearbeiten(false);
       message.success('Einsatzdaten gespeichert');

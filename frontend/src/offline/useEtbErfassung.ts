@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api/client';
 import { erfasseEtb, type NeuerEintrag } from '../api/etb';
+import { einsatzKeys } from '../api/queryKeys';
 import {
   queueEinreihen,
   queueEntfernen,
@@ -52,7 +53,7 @@ export function useEtbErfassung(einsatzId: number) {
       }
       if (neuAbgelehnt.length > 0) setAbgelehnt((prev) => [...prev, ...neuAbgelehnt]);
       await ladeAusstehend();
-      qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
+      qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
     } finally {
       flushtGerade.current = false;
     }
@@ -73,7 +74,7 @@ export function useEtbErfassung(einsatzId: number) {
     async (eintrag: NeuerEintrag) => {
       try {
         await erfasseEtb(einsatzId, eintrag);
-        qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
+        qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
       } catch (e) {
         if (istNetzwerkfehler(e)) {
           await queueEinreihen(einsatzId, eintrag);

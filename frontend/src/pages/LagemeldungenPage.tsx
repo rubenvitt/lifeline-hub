@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeLageMeldungen } from '../api/meldungen';
+import { einsatzKeys } from '../api/queryKeys';
 import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 
@@ -10,9 +11,9 @@ export default function LagemeldungenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
 
-  const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   const lageQuery = useQuery({
-    queryKey: ['einsatz-lagemeldungen', einsatzId],
+    queryKey: einsatzKeys.lagemeldungen(einsatzId),
     queryFn: () => listeLageMeldungen(einsatzId),
   });
 

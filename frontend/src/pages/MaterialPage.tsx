@@ -12,6 +12,7 @@ import {
   listeEinsatzMaterial, type MaterialAdhocEingabe,
 } from '../api/einsatzMaterial';
 import { ApiError } from '../api/client';
+import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzMaterial, MaterialStatus } from '../api/types';
 
 const STATUS_META: Record<MaterialStatus, { label: string; color: string }> = {
@@ -55,16 +56,16 @@ export default function MaterialPage() {
   const [poolAuswahl, setPoolAuswahl] = useState<number | null>(null);
   const [poolMenge, setPoolMenge] = useState<number>(1);
 
-  const einsatzQuery = useQuery({ queryKey: ['einsatz', einsatzId], queryFn: () => ladeEinsatz(einsatzId) });
+  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   const emQuery = useQuery({
-    queryKey: ['einsatz-material', einsatzId],
+    queryKey: einsatzKeys.material(einsatzId),
     queryFn: () => listeEinsatzMaterial(einsatzId),
   });
   const poolQuery = useQuery({ queryKey: ['material', 'im-dienst'], queryFn: () => listeMaterial(true) });
 
   function invalidate() {
-    qc.invalidateQueries({ queryKey: ['einsatz-material', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['etb', einsatzId] });
+    qc.invalidateQueries({ queryKey: einsatzKeys.material(einsatzId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
 
