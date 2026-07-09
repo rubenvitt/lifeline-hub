@@ -106,7 +106,7 @@ describe('queryKeys-Guard (c): kein bare-Prefix-Schatten managed Keys (LFH-215)'
     }
     expect(
       verstoesse,
-      `Bare-Prefix-Query-Keys gefunden — bitte einsatzKeys.* nutzen (SSE-live + guard-abgedeckt):\n${verstoesse.join('\n')}`,
+      `Bare-Prefix-Query-Keys gefunden — bitte einsatzKeys.* nutzen (managed: guard-abgedeckt + SSE-live, sofern der Key nicht bewusst NICHT_LIVE ist wie mitglieder):\n${verstoesse.join('\n')}`,
     ).toEqual([]);
   });
 });
