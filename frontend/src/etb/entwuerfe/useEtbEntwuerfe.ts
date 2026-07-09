@@ -73,21 +73,27 @@ export function useEtbEntwuerfe(einsatzId: number) {
 
   const entwurfSchliessen = useCallback(async (id: string) => {
     await entwurfEntfernen(id);
+    // leer EINMAL außerhalb der Updater erzeugen (stabile Id): unter React.StrictMode
+    // (Dev-Server / e2e) werden Updater doppelt invoked — eine IM Updater erzeugte
+    // crypto.randomUUID-Id divergierte sonst zwischen entwuerfe und aktiverId, sodass der
+    // neue leere Tab keinen aktiven Inhalt mehr rendert (LFH-214). Beide Setter bleiben
+    // FUNKTIONAL (lesen prev = frisch committeter State) und sind damit immun gegen
+    // Zustandsänderungen während des vorausgehenden await (neuer Tab / paralleles
+    // Schließen) und chainen korrekt — ein Closure-Snapshot überschriebe den aktuellen
+    // State und ließe einen Zombie-Tab zurück.
+    const leer = leererEntwurf(einsatzId);
+    let naechsteListe: EtbEntwurf[] = [];
     setEntwuerfe((prev) => {
       const rest = prev.filter((e) => e.id !== id);
-      if (rest.length === 0) {
-        const leer = leererEntwurf(einsatzId);
-        setAktiverId(leer.id);
-        localStorage.setItem(aktivKey(einsatzId), leer.id);
-        return [leer];
-      }
-      setAktiverId((aktuell) => {
-        if (aktuell !== id) return aktuell;
-        const naechster = rest[rest.length - 1].id;
-        localStorage.setItem(aktivKey(einsatzId), naechster);
-        return naechster;
-      });
-      return rest;
+      naechsteListe = rest.length === 0 ? [leer] : rest;
+      return naechsteListe;
+    });
+    setAktiverId((aktuell) => {
+      if (aktuell !== id) return aktuell; // nicht-aktiven Tab geschlossen → aktiven behalten
+      // aktiven Tab geschlossen → auf den letzten der neuen Liste wechseln.
+      const naechster = naechsteListe[naechsteListe.length - 1].id;
+      localStorage.setItem(aktivKey(einsatzId), naechster);
+      return naechster;
     });
   }, [einsatzId]);
 

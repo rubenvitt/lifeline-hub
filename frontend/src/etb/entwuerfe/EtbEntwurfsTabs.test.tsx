@@ -2,6 +2,7 @@
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NeuerEintrag } from '../../api/etb';
 import type { EinsatzAnzeige, EtbBaustein } from '../../api/types';
@@ -52,6 +53,26 @@ describe('EtbEntwurfsTabs', () => {
     await userEvent.type(await screen.findByPlaceholderText(/Inhalt/), 'Fertig{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     await waitFor(async () => expect(await entwuerfeLaden(7)).toHaveLength(0));
+  });
+
+  it('behält das Erfassungsfeld nach dem Absenden — auch unter StrictMode (LFH-214)', async () => {
+    // Der e2e läuft über den Vite-Dev-Server, also unter React.StrictMode. Dort
+    // desynchronisierte ein impurer setEntwuerfe-Updater in entwurfSchliessen
+    // (setAktiverId/localStorage/leererEntwurf im Updater, doppelt invoked) entwuerfe
+    // und aktiverId, sodass der neue leere Entwurf-Tab keinen aktiven Inhalt mehr
+    // rendert → das Erfassungsfeld verschwand nach dem Absenden.
+    const p = props();
+    renderMitProviders(
+      <StrictMode>
+        <EtbEntwurfsTabs {...p} />
+      </StrictMode>,
+    );
+    await userEvent.type(await screen.findByPlaceholderText(/Inhalt/), 'Fertig');
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    // Neuer leerer Entwurf-Tab: Feld wieder vorhanden und leer.
+    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toBeInTheDocument());
+    expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue('');
   });
 
   it('behält den Entwurf, wenn das Absenden fachlich abgelehnt wird', async () => {

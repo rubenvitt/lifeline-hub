@@ -65,4 +65,23 @@ describe('useEtbEntwuerfe', () => {
     expect(result.current.entwuerfe).toHaveLength(1); // neuer leerer Tab
     expect(result.current.entwuerfe[0].inhalt).toBe('');
   });
+
+  it('schnelles Doppel-Schließen lässt keinen Zombie-Tab zurück (LFH-214-Review)', async () => {
+    // Zwei entwurfSchliessen ohne das erste await abzuwarten: funktionale setEntwuerfe-Updater
+    // müssen chainen (prev = frisch committeter State), damit der zweite Close auf dem Ergebnis
+    // des ersten aufsetzt. Ein Closure-Snapshot / Plain-Value-Setter ließe stattdessen den
+    // zuletzt geschlossenen Tab als In-Memory-Zombie zurück.
+    await entwurfSpeichern(entwurf({ id: 'A', inhalt: 'A' }));
+    await entwurfSpeichern(entwurf({ id: 'B', inhalt: 'B' }));
+    await entwurfSpeichern(entwurf({ id: 'C', inhalt: 'C' }));
+    const { result } = renderHook(() => useEtbEntwuerfe(7));
+    await waitFor(() => expect(result.current.entwuerfe).toHaveLength(3));
+
+    await act(async () => {
+      const p1 = result.current.entwurfSchliessen('B');
+      const p2 = result.current.entwurfSchliessen('C');
+      await Promise.all([p1, p2]);
+    });
+    expect(result.current.entwuerfe.map((e) => e.id)).toEqual(['A']);
+  });
 });
