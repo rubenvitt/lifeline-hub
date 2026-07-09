@@ -73,3 +73,40 @@ describe('queryKeys-Guard (b): jeder managed Key ist live ODER bewusst nicht-liv
     }
   });
 });
+
+/**
+ * Guard (c, LFH-215): kein bare-Prefix-Schatten eines managed einsatz-scoped Keys.
+ *
+ * Einige einsatz-scoped Queries trugen historisch einen bare-Prefix (`['einheiten', …]` statt
+ * `einsatzKeys.einheiten(…)` = `['einsatz-einheiten', …]`). Der bare-Prefix steht NICHT in
+ * EINSATZ_KEYS → Guard (a) sieht ihn nicht, der SSE-Fan-out invalidiert ihn nicht → die Liste
+ * war nicht live und teilte sich den Cache-Namespace nicht mit den `einsatz-*`-Pendants. Dieser
+ * Guard verbietet die bekannten Schatten-Prefixe als Inline-Array-Literal, damit die
+ * Vereinheitlichung nicht still zurückfällt.
+ */
+describe('queryKeys-Guard (c): kein bare-Prefix-Schatten managed Keys (LFH-215)', () => {
+  // Bare-Prefixe, die denselben Datensatz wie ein `einsatz-*`-Key laden (→ einsatzKeys.* nutzen).
+  const SCHATTEN_PREFIXE = new Set(['einheiten', 'abschnitte', 'mitglieder']);
+
+  it('findet keinen bare-Prefix-Query-Key als Inline-String-Literal', () => {
+    const verstoesse: string[] = [];
+    for (const [pfad, inhalt] of Object.entries(dateien)) {
+      if (pfad.endsWith('/api/queryKeys.ts')) continue; // Home des Registry
+      if (/\.test\.tsx?$/.test(pfad)) continue; // Tests pinnen Wire-Strings / nutzen bracket-Zugriff
+      inhalt.split('\n').forEach((zeile, i) => {
+        if (istKommentarzeile(zeile)) return;
+        const treffer = zeile.match(/\[\s*'([^']+)'/g) ?? [];
+        for (const t of treffer) {
+          const prefix = /\[\s*'([^']+)'/.exec(t)?.[1];
+          if (prefix && SCHATTEN_PREFIXE.has(prefix)) {
+            verstoesse.push(`${pfad}:${i + 1}  ${zeile.trim()}`);
+          }
+        }
+      });
+    }
+    expect(
+      verstoesse,
+      `Bare-Prefix-Query-Keys gefunden — bitte einsatzKeys.* nutzen (SSE-live + guard-abgedeckt):\n${verstoesse.join('\n')}`,
+    ).toEqual([]);
+  });
+});

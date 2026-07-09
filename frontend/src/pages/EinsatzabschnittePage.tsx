@@ -84,9 +84,9 @@ export default function EinsatzabschnittePage() {
   const [form] = Form.useForm<AbschnittWerte>();
 
   const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
-  const abschnitteQuery = useQuery({ queryKey: ['abschnitte', einsatzId], queryFn: () => listeAbschnitte(einsatzId) });
+  const abschnitteQuery = useQuery({ queryKey: einsatzKeys.abschnitte(einsatzId), queryFn: () => listeAbschnitte(einsatzId) });
   const personalQuery = useQuery({ queryKey: einsatzKeys.personal(einsatzId), queryFn: () => listeEinsatzPersonal(einsatzId) });
-  const einheitenQuery = useQuery({ queryKey: ['einheiten', einsatzId], queryFn: () => listeEinheiten(einsatzId) });
+  const einheitenQuery = useQuery({ queryKey: einsatzKeys.einheiten(einsatzId), queryFn: () => listeEinheiten(einsatzId) });
 
   // Cross-Modul-Deeplink (LFH-25): ?abschnitt=<id> selektiert den Abschnitt, sofern vorhanden.
   useQueryParamSelektion('abschnitt', abschnitteQuery.isSuccess, (zid) => {
@@ -94,8 +94,8 @@ export default function EinsatzabschnittePage() {
   });
 
   function invalidate() {
-    qc.invalidateQueries({ queryKey: ['abschnitte', einsatzId] });
-    qc.invalidateQueries({ queryKey: ['einheiten', einsatzId] });
+    qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }
   const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');

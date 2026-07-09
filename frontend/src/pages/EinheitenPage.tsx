@@ -86,9 +86,9 @@ export default function EinheitenPage() {
   const [form] = Form.useForm<KopfWerte>();
 
   const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
-  const einheitenQuery = useQuery({ queryKey: ['einheiten', einsatzId], queryFn: () => listeEinheiten(einsatzId) });
+  const einheitenQuery = useQuery({ queryKey: einsatzKeys.einheiten(einsatzId), queryFn: () => listeEinheiten(einsatzId) });
   const typenQuery = useQuery({ queryKey: ['einheit-typen'], queryFn: listeEinheitTypen });
-  const abschnitteQuery = useQuery({ queryKey: ['abschnitte', einsatzId], queryFn: () => listeAbschnitte(einsatzId) });
+  const abschnitteQuery = useQuery({ queryKey: einsatzKeys.abschnitte(einsatzId), queryFn: () => listeAbschnitte(einsatzId) });
   const personalQuery = useQuery({ queryKey: einsatzKeys.personal(einsatzId), queryFn: () => listeEinsatzPersonal(einsatzId) });
   const fahrzeugeQuery = useQuery({ queryKey: einsatzKeys.fahrzeuge(einsatzId), queryFn: () => listeEinsatzFahrzeuge(einsatzId) });
   const materialQuery = useQuery({ queryKey: einsatzKeys.material(einsatzId), queryFn: () => listeEinsatzMaterial(einsatzId) });
@@ -99,7 +99,7 @@ export default function EinheitenPage() {
   });
 
   function invalidate() {
-    qc.invalidateQueries({ queryKey: ['einheiten', einsatzId] });
+    qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.personal(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.material(einsatzId) });

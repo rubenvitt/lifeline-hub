@@ -6,6 +6,7 @@ import type { EinsatzRolle, MitgliedAnzeige } from '../api/types';
 import { ApiError } from '../api/client';
 import { entferneMitglied, ladeMitglieder, setzeMitglied } from '../api/einsaetze';
 import { listeBenutzer } from '../api/benutzer';
+import { einsatzKeys } from '../api/queryKeys';
 
 const ROLLEN: { value: EinsatzRolle; label: string }[] = [
   { value: 'einsatzleitung', label: 'Einsatzleitung' },
@@ -27,7 +28,7 @@ export default function MitgliederPanel({ einsatzId, istAktiv, offen, onClose }:
   const [neueRolle, setNeueRolle] = useState<EinsatzRolle>('fuehrungspersonal');
 
   const mitgliederQuery = useQuery({
-    queryKey: ['mitglieder', einsatzId],
+    queryKey: einsatzKeys.mitglieder(einsatzId),
     queryFn: () => ladeMitglieder(einsatzId),
     enabled: offen,
   });
@@ -41,14 +42,14 @@ export default function MitgliederPanel({ einsatzId, istAktiv, offen, onClose }:
     mutationFn: (v: { benutzerId: number; rolle: EinsatzRolle }) =>
       setzeMitglied(einsatzId, v.benutzerId, v.rolle),
     onSuccess: (liste) => {
-      qc.setQueryData(['mitglieder', einsatzId], liste);
+      qc.setQueryData(einsatzKeys.mitglieder(einsatzId), liste);
       setNeuerBenutzer(undefined);
     },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
   });
   const entfernen = useMutation({
     mutationFn: (benutzerId: number) => entferneMitglied(einsatzId, benutzerId),
-    onSuccess: (liste) => qc.setQueryData(['mitglieder', einsatzId], liste),
+    onSuccess: (liste) => qc.setQueryData(einsatzKeys.mitglieder(einsatzId), liste),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
   });
 

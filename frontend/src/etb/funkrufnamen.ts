@@ -15,7 +15,7 @@ export function useFunkrufnamen(einsatzId: number): string[] {
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
   });
   const einheiten = useQuery({
-    queryKey: ['einheiten', einsatzId],
+    queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
   });
 

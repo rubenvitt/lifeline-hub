@@ -58,7 +58,7 @@ export default function EinsatzdatenPage() {
     queryFn: () => ladeEinsatz(einsatzId),
   });
   const mitgliederQuery = useQuery({
-    queryKey: ['mitglieder', einsatzId],
+    queryKey: einsatzKeys.mitglieder(einsatzId),
     queryFn: () => ladeMitglieder(einsatzId),
   });
   const vorschlaegeQuery = useQuery({
