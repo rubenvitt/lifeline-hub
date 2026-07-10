@@ -8,7 +8,7 @@ use lifeline_hub::etb::{EtbTyp, MeldeWeg};
 use lifeline_hub::gefahr::{Gefahrentyp, Schutzobjekt, Warnstufe};
 use lifeline_hub::lage_zone::LageZoneTyp;
 use lifeline_hub::material::MaterialStatus;
-use lifeline_hub::person::{Geschlecht, PersonStatus, Sichtungskategorie, VerbleibArt};
+use lifeline_hub::person::{AbgleichStatus, Geschlecht, PersonStatus, Sichtungskategorie, VerbleibArt, VerbleibStatus};
 use lifeline_hub::schaden::{Ausmass, SchadenStatus, SchadenTyp};
 use lifeline_hub::staerke::StaerkePosition;
 use lifeline_hub::tier::{Spezies, TierGeschlecht, TierStatus};
@@ -86,6 +86,12 @@ fn serde_wire_gleich_as_str() {
         VerbleibArt::Entlassung,
         VerbleibArt::VorOrt,
         VerbleibArt::Verstorben,
+    );
+    wire_eq!(VerbleibStatus::Angemeldet, VerbleibStatus::Abtransportiert);
+    wire_eq!(
+        AbgleichStatus::Verdacht,
+        AbgleichStatus::Bestaetigt,
+        AbgleichStatus::Verworfen,
     );
 
     // schaden
@@ -275,7 +281,6 @@ fn orphan_enums_wire() {
     use lifeline_hub::lagebericht::{LageberichtStatus, LageberichtVorlage};
     use lifeline_hub::meldung::{Meldungsart, MeldungStatus};
     use lifeline_hub::nachforderung::NachforderungStatus;
-    use lifeline_hub::person::{AbgleichStatus, VerbleibStatus};
     use lifeline_hub::person::audit_repo::ZugriffArt;
     use lifeline_hub::erinnerung::ErinnerungStatus;
 
@@ -314,17 +319,6 @@ fn orphan_enums_wire() {
         StatusKategorie::NichtVerfuegbar => "nicht_verfuegbar",
     );
     wire_is!(Dienststatus::InDienst => "in_dienst", Dienststatus::AusserDienst => "ausser_dienst");
-
-    // person
-    wire_is!(
-        VerbleibStatus::Angemeldet => "angemeldet",
-        VerbleibStatus::Abtransportiert => "abtransportiert",
-    );
-    wire_is!(
-        AbgleichStatus::Verdacht => "verdacht",
-        AbgleichStatus::Bestaetigt => "bestaetigt",
-        AbgleichStatus::Verworfen => "verworfen",
-    );
 
     // lagebericht
     wire_is!(

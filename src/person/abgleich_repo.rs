@@ -1,4 +1,5 @@
 use crate::error::AppError;
+use crate::person::AbgleichStatus;
 use serde::Serialize;
 use sqlx::SqlitePool;
 use utoipa::ToSchema;
@@ -10,8 +11,8 @@ pub struct AbgleichAnzeige {
     pub einsatz_id: i64,
     pub vermisst_person_id: i64,
     pub gefunden_person_id: i64,
-    #[schema(value_type = crate::person::AbgleichStatus)]
-    pub status: String,
+    #[sqlx(try_from = "String")]
+    pub status: AbgleichStatus,
     pub erstellt_at: String,
     pub erstellt_von: i64,
     pub entschieden_at: Option<String>,
@@ -171,7 +172,7 @@ mod tests {
         let pool = test_pool().await;
         let (b, e, v, g, _) = setup(&pool).await;
         let a = anlegen_verdacht(&pool, e, v, g, b).await.unwrap();
-        assert_eq!(a.status, "verdacht");
+        assert_eq!(a.status, AbgleichStatus::Verdacht);
         // Taucht sowohl beim Vermissten als auch bei der gefundenen Person auf:
         assert_eq!(liste_je_person(&pool, e, v).await.unwrap().len(), 1);
         assert_eq!(liste_je_person(&pool, e, g).await.unwrap().len(), 1);
@@ -183,7 +184,7 @@ mod tests {
         let (b, e, v, g, _) = setup(&pool).await;
         let a = anlegen_verdacht(&pool, e, v, g, b).await.unwrap();
         let entschieden = entscheide(&pool, e, a.id, "bestaetigt", b).await.unwrap();
-        assert_eq!(entschieden.status, "bestaetigt");
+        assert_eq!(entschieden.status, AbgleichStatus::Bestaetigt);
         assert!(entschieden.entschieden_at.is_some());
         assert_eq!(status(&pool, v).await, "abgemeldet", "Vermisstmeldung aufgeklärt → abgemeldet");
     }

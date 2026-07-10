@@ -7,7 +7,7 @@ use crate::einsatz::repo as einsatz_repo;
 const MODUL_KEY: &str = "personen";
 use crate::error::AppError;
 use crate::etb::{self, repo as etb_repo};
-use crate::person::{darf_uebergehen, registrier_anzeige, repo, Geschlecht, PersonAnzeige, PersonStatus, Sichtungskategorie, VerbleibArt};
+use crate::person::{darf_uebergehen, registrier_anzeige, repo, AbgleichStatus, Geschlecht, PersonAnzeige, PersonStatus, Sichtungskategorie, VerbleibArt, VerbleibStatus};
 use crate::person::{abgleich_repo, audit_repo, sichtung_repo, verbleib_repo, verlaufsnotiz_repo};
 use crate::person::abgleich_repo::AbgleichAnzeige;
 use crate::person::audit_repo::ZugriffAnzeige;
@@ -520,7 +520,7 @@ pub async fn verbleib(
     let art = VerbleibArt::parse(&body.art)
         .ok_or_else(|| AppError::Validation("Unbekannte Verbleib-Art".into()))?;
     if let Some(s) = &body.status {
-        if !matches!(s.as_str(), "angemeldet" | "abtransportiert") {
+        if VerbleibStatus::parse(s).is_none() {
             return Err(AppError::Validation("Unbekannter Verbleib-Status".into()));
         }
     }
@@ -684,7 +684,10 @@ pub async fn abgleich_entscheiden(
     fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
     fordere_aktiv(&einsatz)?;
 
-    if !matches!(body.entscheidung.as_str(), "bestaetigt" | "verworfen") {
+    if !matches!(
+        AbgleichStatus::parse(&body.entscheidung),
+        Some(AbgleichStatus::Bestaetigt | AbgleichStatus::Verworfen)
+    ) {
         return Err(AppError::Validation(
             "Entscheidung muss 'bestaetigt' oder 'verworfen' sein".into(),
         ));
@@ -694,7 +697,7 @@ pub async fn abgleich_entscheiden(
         // pid-Invariante verletzt: nicht der Pfad zu DIESEM Abgleich.
         return Err(AppError::NotFound);
     }
-    if abgleich.status != "verdacht" {
+    if abgleich.status != AbgleichStatus::Verdacht {
         return Err(AppError::Conflict("Abgleich ist bereits entschieden".into()));
     }
     let entschieden = abgleich_repo::entscheide(

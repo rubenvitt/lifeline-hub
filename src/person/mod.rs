@@ -251,6 +251,69 @@ pub enum VerbleibStatus {
     Abtransportiert,
 }
 
+impl VerbleibStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            VerbleibStatus::Angemeldet => "angemeldet",
+            VerbleibStatus::Abtransportiert => "abtransportiert",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<VerbleibStatus> {
+        match s {
+            "angemeldet" => Some(VerbleibStatus::Angemeldet),
+            "abtransportiert" => Some(VerbleibStatus::Abtransportiert),
+            _ => None,
+        }
+    }
+}
+
+// `status` ist in `VerbleibAnzeige` eine nullable Spalte (`Option<String>`) —
+// gleiches Muster wie `Geschlecht`/`Sichtungskategorie` (s. o.): `Type`/`Decode`
+// direkt auf dem Enum, statt `#[sqlx(try_from = "…")]` (Orphan-Rule auf
+// `Option<Enum>`).
+impl<DB: sqlx::Database> sqlx::Type<DB> for VerbleibStatus
+where
+    str: sqlx::Type<DB>,
+{
+    fn type_info() -> DB::TypeInfo {
+        <str as sqlx::Type<DB>>::type_info()
+    }
+}
+
+impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for VerbleibStatus
+where
+    &'r str: sqlx::Decode<'r, DB>,
+{
+    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
+        VerbleibStatus::parse(s).ok_or_else(|| format!("Ungültiger VerbleibStatus: {s}").into())
+    }
+}
+
+// `art` ist in `VerbleibAnzeige` non-null, aber `VerbleibAnzeige` ist gemischt
+// (status ist nullable) → einheitlicher Decode-Mechanismus über direkte
+// `Type`/`Decode`-Impls für BEIDE Felder, statt `#[sqlx(try_from = "String")]`
+// nur für `art` (vgl. Tier-Cluster in `src/tier/mod.rs`).
+impl<DB: sqlx::Database> sqlx::Type<DB> for VerbleibArt
+where
+    str: sqlx::Type<DB>,
+{
+    fn type_info() -> DB::TypeInfo {
+        <str as sqlx::Type<DB>>::type_info()
+    }
+}
+
+impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for VerbleibArt
+where
+    &'r str: sqlx::Decode<'r, DB>,
+{
+    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
+        VerbleibArt::parse(s).ok_or_else(|| format!("Ungültige VerbleibArt: {s}").into())
+    }
+}
+
 /// Abgleich-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -258,6 +321,33 @@ pub enum AbgleichStatus {
     Verdacht,
     Bestaetigt,
     Verworfen,
+}
+
+impl AbgleichStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AbgleichStatus::Verdacht => "verdacht",
+            AbgleichStatus::Bestaetigt => "bestaetigt",
+            AbgleichStatus::Verworfen => "verworfen",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<AbgleichStatus> {
+        match s {
+            "verdacht" => Some(AbgleichStatus::Verdacht),
+            "bestaetigt" => Some(AbgleichStatus::Bestaetigt),
+            "verworfen" => Some(AbgleichStatus::Verworfen),
+            _ => None,
+        }
+    }
+}
+
+impl TryFrom<String> for AbgleichStatus {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        AbgleichStatus::parse(&s).ok_or_else(|| format!("Ungültiger AbgleichStatus: {s}"))
+    }
 }
 
 /// Ob ein Status-Übergang `von → nach` erlaubt ist. Unbekannte Werte und
@@ -391,5 +481,21 @@ mod tests {
             assert_eq!(VerbleibArt::parse(a).unwrap().as_str(), a);
         }
         assert!(VerbleibArt::parse("teleportation").is_none());
+    }
+
+    #[test]
+    fn verbleib_status_roundtrip() {
+        for s in ["angemeldet", "abtransportiert"] {
+            assert_eq!(VerbleibStatus::parse(s).unwrap().as_str(), s);
+        }
+        assert!(VerbleibStatus::parse("unsinn").is_none());
+    }
+
+    #[test]
+    fn abgleich_status_roundtrip() {
+        for s in ["verdacht", "bestaetigt", "verworfen"] {
+            assert_eq!(AbgleichStatus::parse(s).unwrap().as_str(), s);
+        }
+        assert!(AbgleichStatus::parse("unsinn").is_none());
     }
 }

@@ -1,4 +1,5 @@
 use crate::error::AppError;
+use crate::person::{VerbleibArt, VerbleibStatus};
 use serde::Serialize;
 use sqlx::SqlitePool;
 use utoipa::ToSchema;
@@ -9,12 +10,10 @@ pub struct VerbleibAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
     pub person_id: i64,
-    #[schema(value_type = crate::person::VerbleibArt)]
-    pub art: String,
+    pub art: VerbleibArt,
     pub transportmittel: Option<String>,
     pub ziel: Option<String>,
-    #[schema(value_type = Option<crate::person::VerbleibStatus>)]
-    pub status: Option<String>,
+    pub status: Option<VerbleibStatus>,
     pub notiz: Option<String>,
     pub zeitpunkt_at: String,
     pub erfasst_von: i64,
@@ -136,7 +135,7 @@ mod tests {
         erfassen(&pool, e, p, daten("transport", Some("KH Mitte")), "Transport → KH Mitte", b).await.unwrap();
         let verlauf = liste_je_person(&pool, e, p).await.unwrap();
         assert_eq!(verlauf.len(), 2, "append-only");
-        assert_eq!(verlauf[0].art, "transport", "neueste zuerst");
+        assert_eq!(verlauf[0].art, VerbleibArt::Transport, "neueste zuerst");
         let cache: Option<String> = sqlx::query_scalar(
             "SELECT aktueller_verbleib FROM einsatz_person WHERE id = ?")
             .bind(p).fetch_one(&pool).await.unwrap();
