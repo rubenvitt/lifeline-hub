@@ -229,6 +229,7 @@ fn fts_query(eingabe: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::etb::EtbTyp;
 
     /// Legt Org (id=1), einen Benutzer und einen Einsatz an;
     /// liefert (benutzer_id, einsatz_id).
@@ -368,7 +369,7 @@ mod tests {
         korrektur.berichtigt_eintrag_id = Some(original.id);
         let b = anlegen(&pool, einsatz, benutzer, korrektur).await.unwrap();
 
-        assert_eq!(b.typ, "berichtigung");
+        assert_eq!(b.typ, EtbTyp::Berichtigung);
         assert_eq!(b.berichtigt_eintrag_id, Some(original.id));
         assert_eq!(b.lfd_nr, 2);
     }
@@ -424,7 +425,7 @@ mod tests {
         f.typ = Some("anordnung".into());
         let liste = abfrage(&pool, einsatz, &f).await.unwrap();
         assert_eq!(liste.len(), 1);
-        assert_eq!(liste[0].typ, "anordnung");
+        assert_eq!(liste[0].typ, EtbTyp::Anordnung);
     }
 
     #[tokio::test]
@@ -511,7 +512,7 @@ mod tests {
         f.typ = Some("anordnung".into());
         let treffer = abfrage(&pool, einsatz, &f).await.unwrap();
         assert_eq!(treffer.len(), 1);
-        assert_eq!(treffer[0].typ, "anordnung");
+        assert_eq!(treffer[0].typ, EtbTyp::Anordnung);
     }
 
     #[tokio::test]

@@ -293,6 +293,7 @@ pub async fn fortschreiben(
 mod tests {
     use super::*;
     use crate::befehl::{vorlage, STATUS_ENTWURF};
+    use crate::etb::EtbTyp;
 
     /// Legt Org (id=1), einen Benutzer und einen Einsatz an;
     /// liefert (einsatz_id, ersteller_id).
@@ -409,7 +410,7 @@ mod tests {
         // befehl_id ist auch über die ETB-Anzeige gelesen (nicht write-only):
         let etb = crate::etb::repo::laden(&pool, frei.etb_eintrag_id.unwrap()).await.unwrap();
         assert_eq!(etb.befehl_id, Some(b.id));
-        assert_eq!(etb.typ, "anordnung");
+        assert_eq!(etb.typ, EtbTyp::Anordnung);
 
         // Nochmals freigeben schlägt fehl (nicht mehr im Entwurf) → kein zweiter Eintrag.
         assert!(freigeben(&pool, einsatz, b.id, ersteller, render, "2026-06-02 10:00:00").await.is_err());

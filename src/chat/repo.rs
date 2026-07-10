@@ -532,6 +532,7 @@ pub async fn heraufstufen_zu_auftrag(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::etb::EtbTyp;
 
     async fn kanal(pool: &SqlitePool, einsatz: i64, benutzer: i64) -> i64 {
         kanal_anlegen(pool, einsatz, benutzer, "K", None).await.unwrap().id
@@ -700,7 +701,7 @@ mod tests {
 
         // ETB-Eintrag existiert mit dem Text und der Ereigniszeit der Nachricht (Snapshot).
         let etb = crate::etb::repo::laden(&pool, etb_id).await.unwrap();
-        assert_eq!(etb.typ, "meldung");
+        assert_eq!(etb.typ, EtbTyp::Meldung);
         assert_eq!(etb.inhalt, "Deich instabil");
         assert_eq!(etb.ereigniszeit, m.erstellt_at);
 

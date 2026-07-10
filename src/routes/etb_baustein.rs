@@ -1,9 +1,9 @@
 use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
 use crate::error::AppError;
-use crate::etb::{EtbTyp, MeldeWeg};
+use crate::etb::MeldeWeg;
 use crate::etb_baustein::repo::{self, BausteinDaten};
-use crate::etb_baustein::{ist_baustein_typ, EtbBaustein};
+use crate::etb_baustein::{BausteinTyp, EtbBaustein};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -56,8 +56,7 @@ fn normalisiere(body: BausteinBody) -> Result<Normalisiert, AppError> {
         return Err(AppError::Validation("Inhalt darf nicht leer sein".into()));
     }
     // Typ muss erfassbar (kein 'system') und keine 'berichtigung' sein.
-    let typ = EtbTyp::parse(&body.typ)
-        .filter(|t| ist_baustein_typ(*t))
+    let typ = BausteinTyp::parse(&body.typ)
         .ok_or_else(|| AppError::Validation("Ungültiger Baustein-Typ".into()))?;
 
     let meldeweg = trimme(body.meldeweg);

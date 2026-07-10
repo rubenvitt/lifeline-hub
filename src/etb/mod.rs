@@ -68,6 +68,29 @@ impl EtbTyp {
     }
 }
 
+// `typ` ist in `EtbEintragAnzeige`/`EtbBaustein` non-null, aber für einen
+// einheitlichen Decode-Mechanismus mit `meldeweg` (nullable, s. u.) direkt
+// `Type`/`Decode` auf dem Enum implementieren statt gemischt mit
+// `#[sqlx(try_from = "String")]` (vgl. Tier-Cluster in `src/tier/mod.rs`).
+impl<DB: sqlx::Database> sqlx::Type<DB> for EtbTyp
+where
+    str: sqlx::Type<DB>,
+{
+    fn type_info() -> DB::TypeInfo {
+        <str as sqlx::Type<DB>>::type_info()
+    }
+}
+
+impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for EtbTyp
+where
+    &'r str: sqlx::Decode<'r, DB>,
+{
+    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
+        EtbTyp::parse(s).ok_or_else(|| format!("Ungültiger EtbTyp: {s}").into())
+    }
+}
+
 /// Meldeweg eines Eintrags (optional).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -101,6 +124,28 @@ impl MeldeWeg {
     }
 }
 
+// Nullable Spalte (`meldeweg`) — gleiches Muster wie `EtbTyp` (s. o.): `Type`/
+// `Decode` direkt auf dem Enum, statt `#[sqlx(try_from = …)]` (Orphan-Rule auf
+// `Option<Enum>`); sqlx' Blanket-Impl für `Option<T>` bildet NULL → `None` ab.
+impl<DB: sqlx::Database> sqlx::Type<DB> for MeldeWeg
+where
+    str: sqlx::Type<DB>,
+{
+    fn type_info() -> DB::TypeInfo {
+        <str as sqlx::Type<DB>>::type_info()
+    }
+}
+
+impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for MeldeWeg
+where
+    &'r str: sqlx::Decode<'r, DB>,
+{
+    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
+        MeldeWeg::parse(s).ok_or_else(|| format!("Ungültiger MeldeWeg: {s}").into())
+    }
+}
+
 /// Normalisiert eine vom Client gelieferte Zeitangabe auf das SQLite-Format
 /// `YYYY-MM-DD HH:MM:SS` (UTC). Akzeptiert RFC3339/ISO-8601 (z.B.
 /// `2026-05-23T10:00:00Z`, wie von JS `Date.toISOString()` erzeugt) sowie das
@@ -127,13 +172,11 @@ pub fn normalisiere_zeit(eingabe: &str) -> Result<String, AppError> {
 pub struct EtbEintragAnzeige {
     pub id: i64,
     pub lfd_nr: i64,
-    #[schema(value_type = EtbTyp)]
-    pub typ: String,
+    pub typ: EtbTyp,
     pub inhalt: String,
     pub von: Option<String>,
     pub an: Option<String>,
-    #[schema(value_type = Option<MeldeWeg>)]
-    pub meldeweg: Option<String>,
+    pub meldeweg: Option<MeldeWeg>,
     pub veranlassung: Option<String>,
     pub erfasser_id: i64,
     pub erfasser_name: String,

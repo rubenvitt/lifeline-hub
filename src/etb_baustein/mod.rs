@@ -30,9 +30,35 @@ pub const ETB_BAUSTEIN_STARTLISTE: [(&str, &str, &str, i64); 5] = [
     ),
 ];
 
-/// Ein Baustein-Typ ist erfassbar (kein `system`) und keine `berichtigung`.
-pub fn ist_baustein_typ(typ: EtbTyp) -> bool {
-    typ.darf_client_erfassen() && !typ.ist_berichtigung()
+/// Erfassbarer Baustein-Typ — echtes Subset der 4 zulässigen etb_baustein-Typen
+/// (kein `system`, keine `berichtigung`). Macht die DB-CHECK-Grenze compile-fest.
+/// Bewusst OHNE Serialize/ToSchema: `EtbBaustein.typ` behält den `EtbTyp`-Anker
+/// (No-Op der OpenAPI-Union), BausteinTyp validiert nur den Request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BausteinTyp {
+    Meldung,
+    Anordnung,
+    Lage,
+    Entscheidung,
+}
+impl BausteinTyp {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            BausteinTyp::Meldung => "meldung",
+            BausteinTyp::Anordnung => "anordnung",
+            BausteinTyp::Lage => "lage",
+            BausteinTyp::Entscheidung => "entscheidung",
+        }
+    }
+    pub fn parse(s: &str) -> Option<BausteinTyp> {
+        match s {
+            "meldung" => Some(BausteinTyp::Meldung),
+            "anordnung" => Some(BausteinTyp::Anordnung),
+            "lage" => Some(BausteinTyp::Lage),
+            "entscheidung" => Some(BausteinTyp::Entscheidung),
+            _ => None,
+        }
+    }
 }
 
 /// Öffentliche Sicht eines ETB-Baustein-Katalogeintrags. Die DB-Spalten `aktiv`,
@@ -41,11 +67,9 @@ pub fn ist_baustein_typ(typ: EtbTyp) -> bool {
 pub struct EtbBaustein {
     pub id: i64,
     pub label: String,
-    #[schema(value_type = EtbTyp)]
-    pub typ: String,
+    pub typ: EtbTyp,
     pub inhalt: String,
-    #[schema(value_type = Option<crate::etb::MeldeWeg>)]
-    pub meldeweg: Option<String>,
+    pub meldeweg: Option<crate::etb::MeldeWeg>,
     pub veranlassung: Option<String>,
     pub sortier: i64,
 }
@@ -57,11 +81,13 @@ mod tests {
     #[test]
     fn startliste_konsistent() {
         assert_eq!(ETB_BAUSTEIN_STARTLISTE.len(), 5);
-        // Jeder Seed-Typ ist parsebar und ein gültiger Baustein-Typ (schützt vor
-        // Drift zwischen Konstante, Migration und CHECK-Constraint).
+        // Jeder Seed-Typ ist ein gültiger Baustein-Typ (schützt vor Drift
+        // zwischen Konstante, Migration und CHECK-Constraint).
         for (_, typ, _, _) in ETB_BAUSTEIN_STARTLISTE {
-            let t = EtbTyp::parse(typ).expect("Seed-Typ muss parsebar sein");
-            assert!(ist_baustein_typ(t), "Seed-Typ {typ} ist kein gültiger Baustein-Typ");
+            assert!(
+                BausteinTyp::parse(typ).is_some(),
+                "Seed-Typ {typ} ist kein gültiger Baustein-Typ"
+            );
         }
     }
 }
