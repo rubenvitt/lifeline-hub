@@ -55,7 +55,7 @@ impl NormalisierterKatalog {
 }
 
 /// Trimmt `bezeichnung` (leer → `Validation`), prüft `betriebsart` via
-/// `ist_gueltige_betriebsart` (ungültig → `Validation`), trimmt `hinweis`
+/// `Betriebsart::parse` (ungültig → `Validation`), trimmt `hinweis`
 /// (leer → `None`).
 fn normalisiere_katalog(body: KatalogBody) -> Result<NormalisierterKatalog, AppError> {
     let bezeichnung = body.bezeichnung.trim().to_string();

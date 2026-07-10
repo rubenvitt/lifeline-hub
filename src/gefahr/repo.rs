@@ -254,7 +254,6 @@ pub async fn gebiet_aufraeumen_wenn_leer(pool: &SqlitePool, gid: i64) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::Warnstufe;
 
     /// Org + Benutzer + Einsatz + EIN Gefahrengebiet; liefert (gefahrengebiet_id, benutzer_id).
     async fn setup(pool: &SqlitePool) -> (i64, i64) {
