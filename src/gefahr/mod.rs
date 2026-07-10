@@ -3,29 +3,6 @@ pub mod repo;
 use serde::Serialize;
 use utoipa::ToSchema;
 
-/// 13 Gefahrentypen (verbatim aus bluelight-hub; lowercase-snake wie lage_zone.typ).
-pub const GEFAHRENTYPEN: [&str; 13] = [
-    "atemgifte",
-    "angstreaktion",
-    "ausbreitung",
-    "atomare_strahlung",
-    "chemische_stoffe",
-    "erkrankung_verletzung",
-    "explosion",
-    "elektrizitaet",
-    "einsturz",
-    "absturz",
-    "brand",
-    "durchbruch",
-    "ertrinken",
-];
-
-/// 5 Schutzobjekte.
-pub const SCHUTZOBJEKTE: [&str; 5] = ["menschen", "tiere", "umwelt", "sachwerte", "einsatzkraefte"];
-
-/// 5 Warnstufen (`keine` = effektiv keine Bewertung).
-pub const WARNSTUFEN: [&str; 5] = ["keine", "niedrig", "mittel", "hoch", "akut"];
-
 /// Gefahrentyp (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `gefahrentyp`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -45,6 +22,50 @@ pub enum Gefahrentyp {
     Ertrinken,
 }
 
+impl Gefahrentyp {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Gefahrentyp::Atemgifte => "atemgifte",
+            Gefahrentyp::Angstreaktion => "angstreaktion",
+            Gefahrentyp::Ausbreitung => "ausbreitung",
+            Gefahrentyp::AtomareStrahlung => "atomare_strahlung",
+            Gefahrentyp::ChemischeStoffe => "chemische_stoffe",
+            Gefahrentyp::ErkrankungVerletzung => "erkrankung_verletzung",
+            Gefahrentyp::Explosion => "explosion",
+            Gefahrentyp::Elektrizitaet => "elektrizitaet",
+            Gefahrentyp::Einsturz => "einsturz",
+            Gefahrentyp::Absturz => "absturz",
+            Gefahrentyp::Brand => "brand",
+            Gefahrentyp::Durchbruch => "durchbruch",
+            Gefahrentyp::Ertrinken => "ertrinken",
+        }
+    }
+    pub fn parse(s: &str) -> Option<Gefahrentyp> {
+        match s {
+            "atemgifte" => Some(Gefahrentyp::Atemgifte),
+            "angstreaktion" => Some(Gefahrentyp::Angstreaktion),
+            "ausbreitung" => Some(Gefahrentyp::Ausbreitung),
+            "atomare_strahlung" => Some(Gefahrentyp::AtomareStrahlung),
+            "chemische_stoffe" => Some(Gefahrentyp::ChemischeStoffe),
+            "erkrankung_verletzung" => Some(Gefahrentyp::ErkrankungVerletzung),
+            "explosion" => Some(Gefahrentyp::Explosion),
+            "elektrizitaet" => Some(Gefahrentyp::Elektrizitaet),
+            "einsturz" => Some(Gefahrentyp::Einsturz),
+            "absturz" => Some(Gefahrentyp::Absturz),
+            "brand" => Some(Gefahrentyp::Brand),
+            "durchbruch" => Some(Gefahrentyp::Durchbruch),
+            "ertrinken" => Some(Gefahrentyp::Ertrinken),
+            _ => None,
+        }
+    }
+}
+impl TryFrom<String> for Gefahrentyp {
+    type Error = String;
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        Gefahrentyp::parse(&s).ok_or_else(|| format!("Ungültiger Gefahrentyp: {s}"))
+    }
+}
+
 /// Schutzobjekt (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `schutzobjekt`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -54,6 +75,34 @@ pub enum Schutzobjekt {
     Umwelt,
     Sachwerte,
     Einsatzkraefte,
+}
+
+impl Schutzobjekt {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Schutzobjekt::Menschen => "menschen",
+            Schutzobjekt::Tiere => "tiere",
+            Schutzobjekt::Umwelt => "umwelt",
+            Schutzobjekt::Sachwerte => "sachwerte",
+            Schutzobjekt::Einsatzkraefte => "einsatzkraefte",
+        }
+    }
+    pub fn parse(s: &str) -> Option<Schutzobjekt> {
+        match s {
+            "menschen" => Some(Schutzobjekt::Menschen),
+            "tiere" => Some(Schutzobjekt::Tiere),
+            "umwelt" => Some(Schutzobjekt::Umwelt),
+            "sachwerte" => Some(Schutzobjekt::Sachwerte),
+            "einsatzkraefte" => Some(Schutzobjekt::Einsatzkraefte),
+            _ => None,
+        }
+    }
+}
+impl TryFrom<String> for Schutzobjekt {
+    type Error = String;
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        Schutzobjekt::parse(&s).ok_or_else(|| format!("Ungültiges Schutzobjekt: {s}"))
+    }
 }
 
 /// Warnstufe (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `warnstufe`.
@@ -67,18 +116,43 @@ pub enum Warnstufe {
     Akut,
 }
 
+impl Warnstufe {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Warnstufe::Keine => "keine",
+            Warnstufe::Niedrig => "niedrig",
+            Warnstufe::Mittel => "mittel",
+            Warnstufe::Hoch => "hoch",
+            Warnstufe::Akut => "akut",
+        }
+    }
+    pub fn parse(s: &str) -> Option<Warnstufe> {
+        match s {
+            "keine" => Some(Warnstufe::Keine),
+            "niedrig" => Some(Warnstufe::Niedrig),
+            "mittel" => Some(Warnstufe::Mittel),
+            "hoch" => Some(Warnstufe::Hoch),
+            "akut" => Some(Warnstufe::Akut),
+            _ => None,
+        }
+    }
+}
+impl TryFrom<String> for Warnstufe {
+    type Error = String;
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        Warnstufe::parse(&s).ok_or_else(|| format!("Ungültige Warnstufe: {s}"))
+    }
+}
+
 /// Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält nur Zellen mit
 /// `warnstufe != 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct GefahrBewertungAnzeige {
     pub id: i64,
     pub gefahrengebiet_id: i64,
-    #[schema(value_type = Gefahrentyp)]
-    pub gefahrentyp: String,
-    #[schema(value_type = Schutzobjekt)]
-    pub schutzobjekt: String,
-    #[schema(value_type = Warnstufe)]
-    pub warnstufe: String,
+    pub gefahrentyp: Gefahrentyp,
+    pub schutzobjekt: Schutzobjekt,
+    pub warnstufe: Warnstufe,
     pub beschreibung: Option<String>,
     pub gemeldet_von: Option<String>,
     pub aktualisiert_von: i64,
@@ -95,19 +169,18 @@ pub struct GefahrengebietAnzeige {
     pub einsatz_id: i64,
     pub label: Option<String>,
     pub zonen_ids: Vec<i64>,
-    #[schema(value_type = Warnstufe)]
-    pub hoechste_warnstufe: String,
+    pub hoechste_warnstufe: Warnstufe,
 }
 
 /// Severity-Rang einer Warnstufe (für „höchste Warnstufe je Gebiet"). Lexikalisches
 /// MAX wäre falsch (`akut` < `keine`), daher expliziter Rang.
-pub fn warnstufe_von_rang(rang: i64) -> &'static str {
+pub fn warnstufe_von_rang(rang: i64) -> Warnstufe {
     match rang {
-        4 => "akut",
-        3 => "hoch",
-        2 => "mittel",
-        1 => "niedrig",
-        _ => "keine",
+        4 => Warnstufe::Akut,
+        3 => Warnstufe::Hoch,
+        2 => Warnstufe::Mittel,
+        1 => Warnstufe::Niedrig,
+        _ => Warnstufe::Keine,
     }
 }
 

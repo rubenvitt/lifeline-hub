@@ -1,4 +1,4 @@
-use super::{GefahrBewertungAnzeige, GefahrengebietAnzeige};
+use super::{GefahrBewertungAnzeige, Gefahrentyp, GefahrengebietAnzeige, Schutzobjekt, Warnstufe};
 use crate::error::AppError;
 use sqlx::SqlitePool;
 
@@ -22,9 +22,12 @@ const SELECT_ALLE: &str = "\
 struct Row {
     id: i64,
     gefahrengebiet_id: i64,
-    gefahrentyp: String,
-    schutzobjekt: String,
-    warnstufe: String,
+    #[sqlx(try_from = "String")]
+    gefahrentyp: Gefahrentyp,
+    #[sqlx(try_from = "String")]
+    schutzobjekt: Schutzobjekt,
+    #[sqlx(try_from = "String")]
+    warnstufe: Warnstufe,
     beschreibung: Option<String>,
     gemeldet_von: Option<String>,
     aktualisiert_von: i64,
@@ -192,7 +195,7 @@ pub async fn gebiete_liste(
                 einsatz_id,
                 label,
                 zonen_ids,
-                hoechste_warnstufe: super::warnstufe_von_rang(rang).to_string(),
+                hoechste_warnstufe: super::warnstufe_von_rang(rang),
             }
         })
         .collect())
@@ -251,6 +254,7 @@ pub async fn gebiet_aufraeumen_wenn_leer(pool: &SqlitePool, gid: i64) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::Warnstufe;
 
     /// Org + Benutzer + Einsatz + EIN Gefahrengebiet; liefert (gefahrengebiet_id, benutzer_id).
     async fn setup(pool: &SqlitePool) -> (i64, i64) {
@@ -295,7 +299,7 @@ mod tests {
         let z = upsert_bewertung(&pool, gid, daten("brand", "menschen", "hoch", bid))
             .await
             .unwrap();
-        assert_eq!(z.warnstufe, "hoch");
+        assert_eq!(z.warnstufe, Warnstufe::Hoch);
         assert_eq!(z.gefahrengebiet_id, gid);
         assert_eq!(liste(&pool, gid).await.unwrap().len(), 1);
 
@@ -303,7 +307,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(z2.id, z.id);
-        assert_eq!(z2.warnstufe, "akut");
+        assert_eq!(z2.warnstufe, Warnstufe::Akut);
         assert_eq!(liste(&pool, gid).await.unwrap().len(), 1);
     }
 
@@ -333,7 +337,7 @@ mod tests {
 
         let leer = gebiete_liste(&pool, eid).await.unwrap();
         assert_eq!(leer.len(), 1);
-        assert_eq!(leer[0].hoechste_warnstufe, "keine");
+        assert_eq!(leer[0].hoechste_warnstufe, Warnstufe::Keine);
 
         upsert_bewertung(&pool, gid, daten("brand", "menschen", "mittel", bid))
             .await
@@ -343,7 +347,8 @@ mod tests {
             .unwrap();
         let voll = gebiete_liste(&pool, eid).await.unwrap();
         assert_eq!(
-            voll[0].hoechste_warnstufe, "akut",
+            voll[0].hoechste_warnstufe,
+            Warnstufe::Akut,
             "Severity-Maximum, nicht lexikalisch"
         );
     }

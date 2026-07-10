@@ -108,19 +108,19 @@ pub async fn bewerten(
     fordere_aktiv(&einsatz)?;
     let gebiet = gefahr_repo::gebiet_laden(&state.pool, einsatz_id, gid).await?; // Ownership-Gate
 
-    if !gefahr::GEFAHRENTYPEN.contains(&body.gefahrentyp.as_str()) {
+    if gefahr::Gefahrentyp::parse(&body.gefahrentyp).is_none() {
         return Err(AppError::UnprocessableEntity(format!(
             "Unbekannter Gefahrentyp: {}",
             body.gefahrentyp
         )));
     }
-    if !gefahr::SCHUTZOBJEKTE.contains(&body.schutzobjekt.as_str()) {
+    if gefahr::Schutzobjekt::parse(&body.schutzobjekt).is_none() {
         return Err(AppError::UnprocessableEntity(format!(
             "Unbekanntes Schutzobjekt: {}",
             body.schutzobjekt
         )));
     }
-    if !gefahr::WARNSTUFEN.contains(&body.warnstufe.as_str()) {
+    if gefahr::Warnstufe::parse(&body.warnstufe).is_none() {
         return Err(AppError::UnprocessableEntity(format!(
             "Unbekannte Warnstufe: {}",
             body.warnstufe
@@ -154,19 +154,19 @@ pub async fn bewerten(
     )
     .await?;
 
-    if z.warnstufe != alt {
-        let g = gefahr::gefahrentyp_label(&z.gefahrentyp);
-        let o = gefahr::schutzobjekt_label(&z.schutzobjekt);
+    if z.warnstufe.as_str() != alt {
+        let g = gefahr::gefahrentyp_label(z.gefahrentyp.as_str());
+        let o = gefahr::schutzobjekt_label(z.schutzobjekt.as_str());
         let gname = gebiet
             .label
             .clone()
             .unwrap_or_else(|| format!("Gefahrengebiet #{gid}"));
-        let text = if z.warnstufe == "keine" {
+        let text = if z.warnstufe == gefahr::Warnstufe::Keine {
             format!("Gefahr «{g}» für «{o}» in «{gname}» aufgehoben.")
         } else {
             format!(
                 "Gefahr «{g}» für «{o}» in «{gname}» auf Warnstufe «{}» gesetzt.",
-                z.warnstufe
+                z.warnstufe.as_str()
             )
         };
         etb_system(&state, einsatz_id, benutzer.id, &text).await?;

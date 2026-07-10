@@ -4,6 +4,7 @@ use lifeline_hub::bereitstellungsraum::{BrBelegungsArt, BrStatus, ObjektTyp};
 use lifeline_hub::chat::BezugTyp;
 use lifeline_hub::einsatz::{Einsatzart, EinsatzRolle, EinsatzStatus};
 use lifeline_hub::etb::{EtbTyp, MeldeWeg};
+use lifeline_hub::gefahr::{Gefahrentyp, Schutzobjekt, Warnstufe};
 use lifeline_hub::material::MaterialStatus;
 use lifeline_hub::person::{Geschlecht, PersonStatus, Sichtungskategorie, VerbleibArt};
 use lifeline_hub::schaden::{Ausmass, SchadenStatus, SchadenTyp};
@@ -204,6 +205,37 @@ fn serde_wire_gleich_as_str() {
         StaerkePosition::Unterfuehrer,
         StaerkePosition::Mannschaft,
     );
+
+    // gefahr
+    wire_eq!(
+        Gefahrentyp::Atemgifte,
+        Gefahrentyp::Angstreaktion,
+        Gefahrentyp::Ausbreitung,
+        Gefahrentyp::AtomareStrahlung,
+        Gefahrentyp::ChemischeStoffe,
+        Gefahrentyp::ErkrankungVerletzung,
+        Gefahrentyp::Explosion,
+        Gefahrentyp::Elektrizitaet,
+        Gefahrentyp::Einsturz,
+        Gefahrentyp::Absturz,
+        Gefahrentyp::Brand,
+        Gefahrentyp::Durchbruch,
+        Gefahrentyp::Ertrinken,
+    );
+    wire_eq!(
+        Schutzobjekt::Menschen,
+        Schutzobjekt::Tiere,
+        Schutzobjekt::Umwelt,
+        Schutzobjekt::Sachwerte,
+        Schutzobjekt::Einsatzkraefte,
+    );
+    wire_eq!(
+        Warnstufe::Keine,
+        Warnstufe::Niedrig,
+        Warnstufe::Mittel,
+        Warnstufe::Hoch,
+        Warnstufe::Akut,
+    );
 }
 
 /// LFH-120 (Task 1b): Orphan-Union-Schema-Anker. Diese Enums haben KEIN `as_str()` —
@@ -224,7 +256,6 @@ fn orphan_enums_wire() {
     use lifeline_hub::einsatz::einstellungen::{
         BasemapModus, EinheitenSystem, Koordinatenformat, Zeitformat,
     };
-    use lifeline_hub::gefahr::{Gefahrentyp, Schutzobjekt, Warnstufe};
     use lifeline_hub::katalog::{Betriebsart, Dienststatus, StatusKategorie};
     use lifeline_hub::kommunikation::{AdressatKategorie, Prioritaet, Richtung};
     use lifeline_hub::lage_zone::LageZoneTyp;
@@ -284,37 +315,6 @@ fn orphan_enums_wire() {
         AbgleichStatus::Verdacht => "verdacht",
         AbgleichStatus::Bestaetigt => "bestaetigt",
         AbgleichStatus::Verworfen => "verworfen",
-    );
-
-    // gefahr
-    wire_is!(
-        Gefahrentyp::Atemgifte => "atemgifte",
-        Gefahrentyp::Angstreaktion => "angstreaktion",
-        Gefahrentyp::Ausbreitung => "ausbreitung",
-        Gefahrentyp::AtomareStrahlung => "atomare_strahlung",
-        Gefahrentyp::ChemischeStoffe => "chemische_stoffe",
-        Gefahrentyp::ErkrankungVerletzung => "erkrankung_verletzung",
-        Gefahrentyp::Explosion => "explosion",
-        Gefahrentyp::Elektrizitaet => "elektrizitaet",
-        Gefahrentyp::Einsturz => "einsturz",
-        Gefahrentyp::Absturz => "absturz",
-        Gefahrentyp::Brand => "brand",
-        Gefahrentyp::Durchbruch => "durchbruch",
-        Gefahrentyp::Ertrinken => "ertrinken",
-    );
-    wire_is!(
-        Schutzobjekt::Menschen => "menschen",
-        Schutzobjekt::Tiere => "tiere",
-        Schutzobjekt::Umwelt => "umwelt",
-        Schutzobjekt::Sachwerte => "sachwerte",
-        Schutzobjekt::Einsatzkraefte => "einsatzkraefte",
-    );
-    wire_is!(
-        Warnstufe::Keine => "keine",
-        Warnstufe::Niedrig => "niedrig",
-        Warnstufe::Mittel => "mittel",
-        Warnstufe::Hoch => "hoch",
-        Warnstufe::Akut => "akut",
     );
 
     // lage_zone
