@@ -1,4 +1,4 @@
-use super::LageZoneAnzeige;
+use super::{LageZoneAnzeige, LageZoneTyp};
 use crate::error::AppError;
 use sqlx::SqlitePool;
 
@@ -33,7 +33,8 @@ const SELECT_ALLE: &str = "\
 struct Row {
     id: i64,
     einsatz_id: i64,
-    typ: String,
+    #[sqlx(try_from = "String")]
+    typ: LageZoneTyp,
     geometrie_typ: String,
     geometrie: String,
     label: Option<String>,
@@ -130,7 +131,7 @@ pub async fn aktualisiere(
     daten: ZonePatch<'_>,
 ) -> Result<LageZoneAnzeige, AppError> {
     let vorher = laden(pool, einsatz_id, id).await?;
-    let neuer_typ = daten.typ.unwrap_or(&vorher.typ);
+    let neuer_typ = daten.typ.unwrap_or(vorher.typ.as_str());
     let alt_gebiet = vorher.gefahrengebiet_id;
 
     // Gruppen-INSERT (Split/Neuanlage) und das anschließende UPDATE laufen atomar,

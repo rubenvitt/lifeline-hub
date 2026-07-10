@@ -3,18 +3,6 @@ pub mod repo;
 use serde::Serialize;
 use utoipa::ToSchema;
 
-/// Erlaubte Typen (Reihenfolge wie Typ-Katalog der Spec).
-pub const TYPEN: [&str; 5] = [
-    "gefahrengebiet",
-    "absperrbereich",
-    "absperrgrenze",
-    "sperrgebiet",
-    "freie_skizze",
-];
-
-/// Erlaubte Geometrie-Typen (GeoJSON-Geometry-`type`).
-pub const GEOMETRIE_TYPEN: [&str; 2] = ["Polygon", "LineString"];
-
 /// Zonen-Typ (Schema-Anker für die OpenAPI-Union, LFH-120; TS: `ZoneTyp`). Wire == `typ`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -25,14 +13,64 @@ pub enum LageZoneTyp {
     Sperrgebiet,
     FreieSkizze,
 }
+impl LageZoneTyp {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            LageZoneTyp::Gefahrengebiet => "gefahrengebiet",
+            LageZoneTyp::Absperrbereich => "absperrbereich",
+            LageZoneTyp::Absperrgrenze => "absperrgrenze",
+            LageZoneTyp::Sperrgebiet => "sperrgebiet",
+            LageZoneTyp::FreieSkizze => "freie_skizze",
+        }
+    }
+    pub fn parse(s: &str) -> Option<LageZoneTyp> {
+        match s {
+            "gefahrengebiet" => Some(LageZoneTyp::Gefahrengebiet),
+            "absperrbereich" => Some(LageZoneTyp::Absperrbereich),
+            "absperrgrenze" => Some(LageZoneTyp::Absperrgrenze),
+            "sperrgebiet" => Some(LageZoneTyp::Sperrgebiet),
+            "freie_skizze" => Some(LageZoneTyp::FreieSkizze),
+            _ => None,
+        }
+    }
+}
+impl TryFrom<String> for LageZoneTyp {
+    type Error = String;
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        LageZoneTyp::parse(&s).ok_or_else(|| format!("Ungültiger LageZoneTyp: {s}"))
+    }
+}
+
+/// Geometrie-Typ (GeoJSON-Geometry-`type`) — Validierungs-Enum für den Request-Guard.
+/// Bewusst OHNE Serialize/ToSchema: das DTO-Feld `geometrie_typ` bleibt `String` (kein
+/// OpenAPI-Anker → Typisierung wäre kein Codegen-No-Op).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GeometrieTyp {
+    Polygon,
+    LineString,
+}
+impl GeometrieTyp {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            GeometrieTyp::Polygon => "Polygon",
+            GeometrieTyp::LineString => "LineString",
+        }
+    }
+    pub fn parse(s: &str) -> Option<GeometrieTyp> {
+        match s {
+            "Polygon" => Some(GeometrieTyp::Polygon),
+            "LineString" => Some(GeometrieTyp::LineString),
+            _ => None,
+        }
+    }
+}
 
 /// Eine freie Lage-Zone (Gefahren-/Absperrzone). Eigenständige Entität — kein Fachobjekt.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct LageZoneAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
-    #[schema(value_type = LageZoneTyp)]
-    pub typ: String,
+    pub typ: LageZoneTyp,
     pub geometrie_typ: String,
     pub geometrie: String,
     pub label: Option<String>,

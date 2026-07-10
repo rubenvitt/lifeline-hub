@@ -103,13 +103,13 @@ pub struct ZoneBody {
 /// Validiert typ/geometrie_typ/geometrie und gibt 422 bei Verstoß (statt DB-CHECK→500).
 /// Liefert die zu speichernde Geometrie-String-Form zurück (= der validierte Eingabe-String).
 fn validiere_neu(body: &ZoneBody) -> Result<String, AppError> {
-    if !lage_zone::TYPEN.contains(&body.typ.as_str()) {
+    if lage_zone::LageZoneTyp::parse(&body.typ).is_none() {
         return Err(AppError::UnprocessableEntity(format!(
             "Unbekannter Zonen-Typ: {}",
             body.typ
         )));
     }
-    if !lage_zone::GEOMETRIE_TYPEN.contains(&body.geometrie_typ.as_str()) {
+    if lage_zone::GeometrieTyp::parse(&body.geometrie_typ).is_none() {
         return Err(AppError::UnprocessableEntity(format!(
             "Unbekannter Geometrie-Typ: {}",
             body.geometrie_typ
@@ -175,7 +175,7 @@ pub async fn anlegen(
         &state,
         einsatz_id,
         benutzer.id,
-        &etb_text(&z.typ, z.label.as_deref(), "eingerichtet"),
+        &etb_text(z.typ.as_str(), z.label.as_deref(), "eingerichtet"),
     )
     .await?;
     sse_zone(&state, einsatz_id, z.id);
@@ -214,7 +214,7 @@ pub async fn aktualisieren(
     // Effektiver neuer typ; wenn geändert: gültig + passt zur *gespeicherten* Geometrie.
     let neuer_typ = match &body.typ {
         Some(t) => {
-            if !lage_zone::TYPEN.contains(&t.as_str()) {
+            if lage_zone::LageZoneTyp::parse(t).is_none() {
                 return Err(AppError::UnprocessableEntity(format!(
                     "Unbekannter Zonen-Typ: {t}"
                 )));
@@ -227,7 +227,7 @@ pub async fn aktualisieren(
             }
             t.clone()
         }
-        None => vorher.typ.clone(),
+        None => vorher.typ.as_str().to_string(),
     };
 
     // Effektives label (getrimmt).
@@ -280,14 +280,14 @@ pub async fn aktualisieren(
     .await?;
 
     // Sinntragende Änderung? typ oder label effektiv geändert.
-    let typ_geaendert = neuer_typ != vorher.typ;
+    let typ_geaendert = neuer_typ != vorher.typ.as_str();
     let label_geaendert = neues_label != vorher.label;
     if typ_geaendert || label_geaendert {
         etb_system(
             &state,
             einsatz_id,
             benutzer.id,
-            &etb_text(&z.typ, z.label.as_deref(), "geändert"),
+            &etb_text(z.typ.as_str(), z.label.as_deref(), "geändert"),
         )
         .await?;
     }
@@ -327,7 +327,7 @@ pub async fn aufloesen(
         &state,
         einsatz_id,
         benutzer.id,
-        &etb_text(&vorher.typ, vorher.label.as_deref(), "aufgehoben"),
+        &etb_text(vorher.typ.as_str(), vorher.label.as_deref(), "aufgehoben"),
     )
     .await?;
     sse_zone(&state, einsatz_id, zid);

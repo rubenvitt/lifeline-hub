@@ -5,6 +5,7 @@ use lifeline_hub::chat::BezugTyp;
 use lifeline_hub::einsatz::{Einsatzart, EinsatzRolle, EinsatzStatus};
 use lifeline_hub::etb::{EtbTyp, MeldeWeg};
 use lifeline_hub::gefahr::{Gefahrentyp, Schutzobjekt, Warnstufe};
+use lifeline_hub::lage_zone::LageZoneTyp;
 use lifeline_hub::material::MaterialStatus;
 use lifeline_hub::person::{Geschlecht, PersonStatus, Sichtungskategorie, VerbleibArt};
 use lifeline_hub::schaden::{Ausmass, SchadenStatus, SchadenTyp};
@@ -236,6 +237,15 @@ fn serde_wire_gleich_as_str() {
         Warnstufe::Hoch,
         Warnstufe::Akut,
     );
+
+    // lage_zone
+    wire_eq!(
+        LageZoneTyp::Gefahrengebiet,
+        LageZoneTyp::Absperrbereich,
+        LageZoneTyp::Absperrgrenze,
+        LageZoneTyp::Sperrgebiet,
+        LageZoneTyp::FreieSkizze,
+    );
 }
 
 /// LFH-120 (Task 1b): Orphan-Union-Schema-Anker. Diese Enums haben KEIN `as_str()` —
@@ -258,7 +268,6 @@ fn orphan_enums_wire() {
     };
     use lifeline_hub::katalog::{Betriebsart, Dienststatus, StatusKategorie};
     use lifeline_hub::kommunikation::{AdressatKategorie, Prioritaet, Richtung};
-    use lifeline_hub::lage_zone::LageZoneTyp;
     use lifeline_hub::lagebericht::{LageberichtStatus, LageberichtVorlage};
     use lifeline_hub::meldung::{Meldungsart, MeldungStatus};
     use lifeline_hub::nachforderung::NachforderungStatus;
@@ -315,15 +324,6 @@ fn orphan_enums_wire() {
         AbgleichStatus::Verdacht => "verdacht",
         AbgleichStatus::Bestaetigt => "bestaetigt",
         AbgleichStatus::Verworfen => "verworfen",
-    );
-
-    // lage_zone
-    wire_is!(
-        LageZoneTyp::Gefahrengebiet => "gefahrengebiet",
-        LageZoneTyp::Absperrbereich => "absperrbereich",
-        LageZoneTyp::Absperrgrenze => "absperrgrenze",
-        LageZoneTyp::Sperrgebiet => "sperrgebiet",
-        LageZoneTyp::FreieSkizze => "freie_skizze",
     );
 
     // lagebericht
