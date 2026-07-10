@@ -134,7 +134,7 @@ pub async fn liste(
     let mut out = Vec::with_capacity(auftraege.len());
     for auftrag in auftraege {
         if let Some(s) = status_filter {
-            if auftrag.bearbeitungsstatus != s {
+            if auftrag.bearbeitungsstatus.as_str() != s {
                 continue;
             }
         }
@@ -506,7 +506,8 @@ pub async fn nimm_ab(pool: &SqlitePool, auftrag_id: i64, von_id: i64, jetzt: &st
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::kommunikation::{repo as krepo, OBJEKT_AUFTRAG, VOLLZUG_VOLLZOGEN};
+    use crate::auftrag::{AuftragBearbeitungsstatus, EmpfaengerTyp};
+    use crate::kommunikation::{repo as krepo, AdressatKategorie, Richtung, OBJEKT_AUFTRAG, VOLLZUG_VOLLZOGEN};
 
     async fn setup(pool: &SqlitePool) -> (i64, i64) {
         sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
@@ -670,7 +671,7 @@ mod tests {
         let d = anlegen(&pool, e, b, daten("Deich sichern", None, vec![funktion("Abschnitt Nord")]), "2026-06-11 09:00:00").await.unwrap();
         assert_eq!(d.auftrag.auftrag_text, "Deich sichern");
         assert_eq!(d.auftrag.vollzug_status, "offen");
-        assert_eq!(d.auftrag.bearbeitungsstatus, "offen");
+        assert_eq!(d.auftrag.bearbeitungsstatus, AuftragBearbeitungsstatus::Offen);
         assert_eq!(d.auftrag.empfaenger_anzahl, 1);
         assert_eq!(d.auftrag.quittiert_anzahl, 0);
         assert_eq!(d.empfaenger.len(), 1);
@@ -729,7 +730,7 @@ mod tests {
         krepo::setze_vollzug(&pool, 1, e, OBJEKT_AUFTRAG, d.auftrag.id, VOLLZUG_VOLLZOGEN, b, "2026-06-11 11:00:00").await.unwrap();
         let nach = laden(&pool, d.auftrag.id, "2026-06-11 11:30:00").await.unwrap();
         assert_eq!(nach.auftrag.vollzug_status, "vollzogen");
-        assert_eq!(nach.auftrag.bearbeitungsstatus, "vollzogen");
+        assert_eq!(nach.auftrag.bearbeitungsstatus, AuftragBearbeitungsstatus::Vollzogen);
     }
 
     #[tokio::test]
@@ -744,7 +745,7 @@ mod tests {
         assert_eq!(nach.auftrag.quittiert_anzahl, 1, "ein Empfänger quittiert");
         assert_eq!(nach.auftrag.empfaenger_anzahl, 2);
         assert_eq!(nach.auftrag.vollzug_status, "offen", "Quittung ändert Vollzug nicht");
-        assert_eq!(nach.auftrag.bearbeitungsstatus, "offen");
+        assert_eq!(nach.auftrag.bearbeitungsstatus, AuftragBearbeitungsstatus::Offen);
         let e1 = nach.empfaenger.iter().find(|x| x.id == empf1).unwrap();
         assert_eq!(e1.quittiert_at.as_deref(), Some("2026-06-11 10:00:00"));
         assert_eq!(e1.quittiert_von_id, Some(b));
@@ -766,7 +767,7 @@ mod tests {
         let d = anlegen(&pool, e, b, daten("X", None, vec![funktion("EA1")]), "2026-06-11 09:00:00").await.unwrap();
         setze_in_arbeit(&pool, 1, e, d.auftrag.id, b, "2026-06-11 10:00:00").await.unwrap();
         let nach = laden(&pool, d.auftrag.id, "2026-06-11 10:01:00").await.unwrap();
-        assert_eq!(nach.auftrag.bearbeitungsstatus, "in_arbeit");
+        assert_eq!(nach.auftrag.bearbeitungsstatus, AuftragBearbeitungsstatus::InArbeit);
         assert_eq!(nach.auftrag.in_arbeit_at.as_deref(), Some("2026-06-11 10:00:00"));
     }
 
@@ -777,7 +778,7 @@ mod tests {
         let d = anlegen(&pool, e, b, daten("X", None, vec![funktion("EA1")]), "2026-06-11 09:00:00").await.unwrap();
         let etb_id = melde_vollzug(&pool, 1, e, d.auftrag.id, b, "Deich gehalten", "2026-06-11 11:00:00").await.unwrap();
         let nach = laden(&pool, d.auftrag.id, "2026-06-11 11:01:00").await.unwrap();
-        assert_eq!(nach.auftrag.bearbeitungsstatus, "vollzogen");
+        assert_eq!(nach.auftrag.bearbeitungsstatus, AuftragBearbeitungsstatus::Vollzogen);
         assert_eq!(nach.auftrag.vollzugsmeldung.as_deref(), Some("Deich gehalten"));
         let (typ, backlink): (String, i64) = sqlx::query_as("SELECT typ, auftrag_id FROM etb_eintrag WHERE id = ?")
             .bind(etb_id).fetch_one(&pool).await.unwrap();
@@ -793,7 +794,7 @@ mod tests {
         melde_vollzug(&pool, 1, e, d.auftrag.id, b, "fertig", "2026-06-11 11:00:00").await.unwrap();
         nimm_ab(&pool, d.auftrag.id, b, "2026-06-11 12:00:00").await.unwrap();
         let nach = laden(&pool, d.auftrag.id, "2026-06-11 12:01:00").await.unwrap();
-        assert_eq!(nach.auftrag.bearbeitungsstatus, "abgenommen");
+        assert_eq!(nach.auftrag.bearbeitungsstatus, AuftragBearbeitungsstatus::Abgenommen);
         assert_eq!(nach.auftrag.abgenommen_von_id, Some(b));
     }
 
@@ -837,13 +838,13 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         let d_int = anlegen(&pool, e, b, daten("intern-a", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
-        assert_eq!(d_int.auftrag.richtung, "intern", "Default intern");
+        assert_eq!(d_int.auftrag.richtung, Richtung::Intern, "Default intern");
         let ext = AuftragDaten { richtung: RICHTUNG_EXTERN, ..daten("extern-a", None, vec![funktion("Leitstelle")]) };
         anlegen(&pool, e, b, ext, "2026-06-11 09:00:00").await.unwrap();
 
         let nur_extern = liste(&pool, e, None, Some("extern"), None, "2026-06-11 10:00:00").await.unwrap();
         assert_eq!(nur_extern.len(), 1);
-        assert_eq!(nur_extern[0].auftrag.richtung, "extern");
+        assert_eq!(nur_extern[0].auftrag.richtung, Richtung::Extern);
         assert_eq!(nur_extern[0].auftrag.auftrag_text, "extern-a");
     }
 
@@ -905,8 +906,8 @@ mod tests {
         let d = anlegen(&pool, e, b, daten("an Leitstelle", None, vec![extern_empf("leitstelle", "Leitstelle Nord")]), "2026-06-11 09:00:00").await.unwrap();
         assert_eq!(d.empfaenger.len(), 1);
         let empf = &d.empfaenger[0];
-        assert_eq!(empf.empfaenger_typ, "extern");
-        assert_eq!(empf.extern_kategorie.as_deref(), Some("leitstelle"));
+        assert_eq!(empf.empfaenger_typ, EmpfaengerTyp::Extern);
+        assert_eq!(empf.extern_kategorie, Some(AdressatKategorie::Leitstelle));
         assert_eq!(empf.extern_bezeichnung.as_deref(), Some("Leitstelle Nord"));
         assert_eq!(empf.snap_anzeige, "Leitstelle Nord", "snap aus Bezeichnung");
     }

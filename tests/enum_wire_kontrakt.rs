@@ -1,5 +1,6 @@
 //! LFH-120: Guard — Serde-Wire == as_str() für jede Variante jedes union-relevanten
 //! Domänen-Enums. Schützt die generierten utoipa-Unions vor stiller Fehlgenerierung.
+use lifeline_hub::auftrag::{AuftragBearbeitungsstatus, EmpfaengerTyp};
 use lifeline_hub::auth::{OrgRolle, SystemRolle};
 use lifeline_hub::bereitstellungsraum::{BrBelegungsArt, BrStatus, ObjektTyp};
 use lifeline_hub::chat::BezugTyp;
@@ -7,8 +8,11 @@ use lifeline_hub::einsatz::{Einsatzart, EinsatzRolle, EinsatzStatus};
 use lifeline_hub::etb::{EtbTyp, MeldeWeg};
 use lifeline_hub::gefahr::{Gefahrentyp, Schutzobjekt, Warnstufe};
 use lifeline_hub::katalog::{Betriebsart, StatusKategorie};
+use lifeline_hub::kommunikation::{AdressatKategorie, Prioritaet, Richtung};
 use lifeline_hub::lage_zone::LageZoneTyp;
 use lifeline_hub::material::MaterialStatus;
+use lifeline_hub::meldung::{Meldungsart, MeldungStatus};
+use lifeline_hub::nachforderung::NachforderungStatus;
 use lifeline_hub::person::{AbgleichStatus, Geschlecht, PersonStatus, Sichtungskategorie, VerbleibArt, VerbleibStatus};
 use lifeline_hub::schaden::{Ausmass, SchadenStatus, SchadenTyp};
 use lifeline_hub::staerke::StaerkePosition;
@@ -202,6 +206,57 @@ fn serde_wire_gleich_as_str() {
         BezugTyp::Auftrag,
     );
 
+    // kommunikation (geteilt: Auftrag/Meldung/Nachforderung)
+    wire_eq!(Prioritaet::Sofort, Prioritaet::Dringend, Prioritaet::Normal);
+    wire_eq!(Richtung::Intern, Richtung::Extern);
+    wire_eq!(
+        AdressatKategorie::Leitstelle,
+        AdressatKategorie::NachbarEa,
+        AdressatKategorie::Uebergeordnet,
+        AdressatKategorie::AndereBos,
+    );
+
+    // auftrag
+    wire_eq!(
+        AuftragBearbeitungsstatus::Offen,
+        AuftragBearbeitungsstatus::InArbeit,
+        AuftragBearbeitungsstatus::Vollzogen,
+        AuftragBearbeitungsstatus::Abgenommen,
+    );
+    wire_eq!(
+        EmpfaengerTyp::Abschnitt,
+        EmpfaengerTyp::Einheit,
+        EmpfaengerTyp::Funktion,
+        EmpfaengerTyp::Person,
+        EmpfaengerTyp::Fahrzeug,
+        EmpfaengerTyp::Extern,
+    );
+
+    // meldung
+    wire_eq!(
+        MeldungStatus::Neu,
+        MeldungStatus::Gesichtet,
+        MeldungStatus::InBearbeitung,
+        MeldungStatus::Erledigt,
+    );
+    wire_eq!(
+        Meldungsart::Lagemeldung,
+        Meldungsart::Sofortmeldung,
+        Meldungsart::Rueckmeldung,
+        Meldungsart::Vollzugsmeldung,
+        Meldungsart::Anfrage,
+        Meldungsart::Sonstige,
+    );
+
+    // nachforderung
+    wire_eq!(
+        NachforderungStatus::Angefordert,
+        NachforderungStatus::Zugesagt,
+        NachforderungStatus::Unterwegs,
+        NachforderungStatus::Eingetroffen,
+        NachforderungStatus::Abgelehnt,
+    );
+
     // einsatz
     wire_eq!(
         EinsatzRolle::Einsatzleitung,
@@ -280,16 +335,12 @@ macro_rules! wire_is {
 
 #[test]
 fn orphan_enums_wire() {
-    use lifeline_hub::auftrag::{AuftragBearbeitungsstatus, EmpfaengerTyp};
     use lifeline_hub::befehl::{BefehlStatus, BefehlVorlage};
     use lifeline_hub::einsatz::einstellungen::{
         BasemapModus, EinheitenSystem, Koordinatenformat, Zeitformat,
     };
     use lifeline_hub::katalog::Dienststatus;
-    use lifeline_hub::kommunikation::{AdressatKategorie, Prioritaet, Richtung};
     use lifeline_hub::lagebericht::{LageberichtStatus, LageberichtVorlage};
-    use lifeline_hub::meldung::{Meldungsart, MeldungStatus};
-    use lifeline_hub::nachforderung::NachforderungStatus;
     use lifeline_hub::person::audit_repo::ZugriffArt;
     use lifeline_hub::erinnerung::ErinnerungStatus;
 
@@ -342,59 +393,4 @@ fn orphan_enums_wire() {
         BefehlVorlage::BefehlEaZmw => "befehl_ea_zmw",
     );
     wire_is!(BefehlStatus::Entwurf => "entwurf", BefehlStatus::Freigegeben => "freigegeben");
-
-    // auftrag
-    wire_is!(
-        AuftragBearbeitungsstatus::Offen => "offen",
-        AuftragBearbeitungsstatus::InArbeit => "in_arbeit",
-        AuftragBearbeitungsstatus::Vollzogen => "vollzogen",
-        AuftragBearbeitungsstatus::Abgenommen => "abgenommen",
-    );
-    wire_is!(
-        EmpfaengerTyp::Abschnitt => "abschnitt",
-        EmpfaengerTyp::Einheit => "einheit",
-        EmpfaengerTyp::Funktion => "funktion",
-        EmpfaengerTyp::Person => "person",
-        EmpfaengerTyp::Fahrzeug => "fahrzeug",
-        EmpfaengerTyp::Extern => "extern",
-    );
-
-    // meldung
-    wire_is!(
-        MeldungStatus::Neu => "neu",
-        MeldungStatus::Gesichtet => "gesichtet",
-        MeldungStatus::InBearbeitung => "in_bearbeitung",
-        MeldungStatus::Erledigt => "erledigt",
-    );
-    wire_is!(
-        Meldungsart::Lagemeldung => "lagemeldung",
-        Meldungsart::Sofortmeldung => "sofortmeldung",
-        Meldungsart::Rueckmeldung => "rueckmeldung",
-        Meldungsart::Vollzugsmeldung => "vollzugsmeldung",
-        Meldungsart::Anfrage => "anfrage",
-        Meldungsart::Sonstige => "sonstige",
-    );
-
-    // nachforderung
-    wire_is!(
-        NachforderungStatus::Angefordert => "angefordert",
-        NachforderungStatus::Zugesagt => "zugesagt",
-        NachforderungStatus::Unterwegs => "unterwegs",
-        NachforderungStatus::Eingetroffen => "eingetroffen",
-        NachforderungStatus::Abgelehnt => "abgelehnt",
-    );
-
-    // kommunikation (geteilt)
-    wire_is!(
-        Prioritaet::Sofort => "sofort",
-        Prioritaet::Dringend => "dringend",
-        Prioritaet::Normal => "normal",
-    );
-    wire_is!(Richtung::Intern => "intern", Richtung::Extern => "extern");
-    wire_is!(
-        AdressatKategorie::Leitstelle => "leitstelle",
-        AdressatKategorie::NachbarEa => "nachbar_ea",
-        AdressatKategorie::Uebergeordnet => "uebergeordnet",
-        AdressatKategorie::AndereBos => "andere_bos",
-    );
 }

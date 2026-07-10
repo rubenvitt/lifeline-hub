@@ -417,7 +417,8 @@ pub async fn liste_lage_meldungen(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::meldung::{ART_SOFORTMELDUNG, PRIO_NORMAL};
+    use crate::kommunikation::Richtung;
+    use crate::meldung::{MeldungStatus, ART_SOFORTMELDUNG, PRIO_NORMAL};
 
     async fn setup(pool: &SqlitePool) -> (i64, i64) {
         sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
@@ -455,7 +456,7 @@ mod tests {
         assert_eq!(m.lfd_nr, 1);
         assert_eq!(m.absender, "Florian Nord 1");
         assert_eq!(m.empfaenger.as_deref(), Some("ELW 1"));
-        assert_eq!(m.status, "neu");
+        assert_eq!(m.status, MeldungStatus::Neu);
         assert!(m.ist_offen);
         assert!(!m.lagerelevant);
         assert_eq!(m.ereigniszeit, "2026-06-12 09:00:00");
@@ -583,7 +584,7 @@ mod tests {
         let m = anlegen(&pool, e, b, daten("X", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
         setze_status(&pool, m.id, crate::meldung::STATUS_IN_BEARBEITUNG, "2026-06-12 09:30:00").await.unwrap();
         let nach = laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap();
-        assert_eq!(nach.status, "in_bearbeitung");
+        assert_eq!(nach.status, MeldungStatus::InBearbeitung);
         // ist_offen = status != 'erledigt' → in_bearbeitung bleibt offen.
         assert!(nach.ist_offen);
         // Noch nicht erledigt → kein Erledigt-Stempel.
@@ -613,7 +614,7 @@ mod tests {
         // Reiner Statuswechsel darf den Bearbeiter NICHT clobbern (Regression #2/#3).
         setze_status(&pool, m.id, crate::meldung::STATUS_ERLEDIGT, "2026-06-12 09:30:00").await.unwrap();
         let nach = laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap();
-        assert_eq!(nach.status, "erledigt");
+        assert_eq!(nach.status, MeldungStatus::Erledigt);
         assert_eq!(nach.bearbeiter_id, Some(b), "Zuweisung bleibt über Statuswechsel erhalten");
     }
 
@@ -624,7 +625,7 @@ mod tests {
         let m = anlegen(&pool, e, b, daten("X", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
         setze_status(&pool, m.id, crate::meldung::STATUS_ERLEDIGT, "2026-06-12 09:30:00").await.unwrap();
         let nach = laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap();
-        assert_eq!(nach.status, "erledigt");
+        assert_eq!(nach.status, MeldungStatus::Erledigt);
         assert!(!nach.ist_offen);
         // Übergang nach 'erledigt' setzt den Erledigt-Stempel (LFH-113).
         assert_eq!(nach.erledigt_at.as_deref(), Some("2026-06-12 09:30:00"));
@@ -734,7 +735,7 @@ mod tests {
         assert_eq!(nach.bestaetigt_von_id, Some(b));
         assert_eq!(nach.bestaetigt_von_name.as_deref(), Some("Leit"));
         assert!(!nach.ist_ueberfaellig, "bestätigt → nicht mehr überfällig");
-        assert_eq!(nach.status, "in_bearbeitung", "Triage-Status bleibt unberührt");
+        assert_eq!(nach.status, MeldungStatus::InBearbeitung, "Triage-Status bleibt unberührt");
         assert_eq!(nach.bearbeiter_id, Some(b), "Zuweisung bleibt erhalten");
     }
 
@@ -886,14 +887,14 @@ mod tests {
         let (b, e) = setup(&pool).await;
         // Default 'intern' über den daten()-Helper.
         let m_int = anlegen(&pool, e, b, daten("intern-m", "2026-06-12 09:00:00", "2026-06-12 09:00:00")).await.unwrap();
-        assert_eq!(m_int.richtung, "intern");
+        assert_eq!(m_int.richtung, Richtung::Intern);
         let extern_m = MeldungDaten { richtung: "extern", ..daten("extern-m", "2026-06-12 09:01:00", "2026-06-12 09:01:00") };
         anlegen(&pool, e, b, extern_m).await.unwrap();
 
         assert_eq!(liste(&pool, e, None, None, "2026-06-12 10:00:00").await.unwrap().len(), 2);
         let nur_extern = liste(&pool, e, None, Some("extern"), "2026-06-12 10:00:00").await.unwrap();
         assert_eq!(nur_extern.len(), 1);
-        assert_eq!(nur_extern[0].richtung, "extern");
+        assert_eq!(nur_extern[0].richtung, Richtung::Extern);
         assert_eq!(nur_extern[0].inhalt, "extern-m");
     }
 

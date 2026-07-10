@@ -7,6 +7,7 @@ pub mod repo;
 
 pub use eingabe::{validiere_neuen_auftrag, EmpfaengerEingabeReq, NeuerAuftrag, ValidierterAuftrag};
 
+use crate::kommunikation::{AdressatKategorie, Prioritaet, Richtung};
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -41,6 +42,37 @@ pub enum AuftragBearbeitungsstatus {
     Abgenommen,
 }
 
+impl AuftragBearbeitungsstatus {
+    /// DB-/API-Stringrepräsentation.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AuftragBearbeitungsstatus::Offen => BEARB_OFFEN,
+            AuftragBearbeitungsstatus::InArbeit => BEARB_IN_ARBEIT,
+            AuftragBearbeitungsstatus::Vollzogen => BEARB_VOLLZOGEN,
+            AuftragBearbeitungsstatus::Abgenommen => BEARB_ABGENOMMEN,
+        }
+    }
+
+    /// Parst einen gespeicherten/übergebenen Bearbeitungsstatus; `None` bei ungültigem Wert.
+    pub fn parse(s: &str) -> Option<AuftragBearbeitungsstatus> {
+        match s {
+            BEARB_OFFEN => Some(AuftragBearbeitungsstatus::Offen),
+            BEARB_IN_ARBEIT => Some(AuftragBearbeitungsstatus::InArbeit),
+            BEARB_VOLLZOGEN => Some(AuftragBearbeitungsstatus::Vollzogen),
+            BEARB_ABGENOMMEN => Some(AuftragBearbeitungsstatus::Abgenommen),
+            _ => None,
+        }
+    }
+}
+
+impl TryFrom<String> for AuftragBearbeitungsstatus {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        AuftragBearbeitungsstatus::parse(&s).ok_or_else(|| format!("Ungültiger AuftragBearbeitungsstatus: {s}"))
+    }
+}
+
 /// Empfänger-Diskriminator eines Auftrags (Schema-Anker für die OpenAPI-Union, LFH-120).
 /// Wire == `empfaenger_typ`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -52,6 +84,57 @@ pub enum EmpfaengerTyp {
     Person,
     Fahrzeug,
     Extern,
+}
+
+impl EmpfaengerTyp {
+    /// DB-/API-Stringrepräsentation.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            EmpfaengerTyp::Abschnitt => EMPF_ABSCHNITT,
+            EmpfaengerTyp::Einheit => EMPF_EINHEIT,
+            EmpfaengerTyp::Funktion => EMPF_FUNKTION,
+            EmpfaengerTyp::Person => EMPF_PERSON,
+            EmpfaengerTyp::Fahrzeug => EMPF_FAHRZEUG,
+            EmpfaengerTyp::Extern => EMPF_EXTERN,
+        }
+    }
+
+    /// Parst einen gespeicherten/übergebenen Empfänger-Typ; `None` bei ungültigem Wert.
+    pub fn parse(s: &str) -> Option<EmpfaengerTyp> {
+        match s {
+            EMPF_ABSCHNITT => Some(EmpfaengerTyp::Abschnitt),
+            EMPF_EINHEIT => Some(EmpfaengerTyp::Einheit),
+            EMPF_FUNKTION => Some(EmpfaengerTyp::Funktion),
+            EMPF_PERSON => Some(EmpfaengerTyp::Person),
+            EMPF_FAHRZEUG => Some(EmpfaengerTyp::Fahrzeug),
+            EMPF_EXTERN => Some(EmpfaengerTyp::Extern),
+            _ => None,
+        }
+    }
+}
+
+// `empfaenger_typ` ist in `AuftragEmpfaengerAnzeige` non-null, aber für einen
+// einheitlichen Decode-Mechanismus über beide Enum-Felder dieses GEMISCHTEN DTOs
+// (das nullable `extern_kategorie: Option<AdressatKategorie>` daneben) direkt
+// `Type`/`Decode` implementieren (statt gemischt mit `#[sqlx(try_from = …)]`) —
+// gleiches Muster wie bei `TierAnzeige` (`src/tier/mod.rs`).
+impl<DB: sqlx::Database> sqlx::Type<DB> for EmpfaengerTyp
+where
+    str: sqlx::Type<DB>,
+{
+    fn type_info() -> DB::TypeInfo {
+        <str as sqlx::Type<DB>>::type_info()
+    }
+}
+
+impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for EmpfaengerTyp
+where
+    &'r str: sqlx::Decode<'r, DB>,
+{
+    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
+        EmpfaengerTyp::parse(s).ok_or_else(|| format!("Ungültiger EmpfaengerTyp: {s}").into())
+    }
 }
 
 pub fn extern_kategorie_gueltig(k: &str) -> bool {
@@ -98,11 +181,11 @@ pub struct AuftragAnzeige {
     pub mittel: Option<String>,
     pub verbindung: Option<String>,
     pub sicherheit: Option<String>,
-    #[schema(value_type = crate::kommunikation::Prioritaet)]
-    pub prioritaet: String,
+    #[sqlx(try_from = "String")]
+    pub prioritaet: Prioritaet,
     /// Richtung intern/extern (LFH-87).
-    #[schema(value_type = crate::kommunikation::Richtung)]
-    pub richtung: String,
+    #[sqlx(try_from = "String")]
+    pub richtung: Richtung,
     pub frist_at: Option<String>,
     pub erteilt_at: String,
     pub in_arbeit_at: Option<String>,
@@ -125,8 +208,8 @@ pub struct AuftragAnzeige {
     // Abgeleitet: Frist überschritten UND noch nicht alle Empfänger quittiert.
     pub ist_ueberfaellig: bool,
     // Abgeleitet: 'abgenommen' wenn abgenommen_at gesetzt, sonst vollzug_status.
-    #[schema(value_type = AuftragBearbeitungsstatus)]
-    pub bearbeitungsstatus: String,
+    #[sqlx(try_from = "String")]
+    pub bearbeitungsstatus: AuftragBearbeitungsstatus,
 }
 
 /// Anzeige einer Empfänger-Zeile inkl. Quittung (Achse 1, pro Empfänger).
@@ -134,16 +217,14 @@ pub struct AuftragAnzeige {
 pub struct AuftragEmpfaengerAnzeige {
     pub id: i64,
     pub auftrag_id: i64,
-    #[schema(value_type = EmpfaengerTyp)]
-    pub empfaenger_typ: String,
+    pub empfaenger_typ: EmpfaengerTyp,
     pub abschnitt_id: Option<i64>,
     pub einheit_id: Option<i64>,
     pub person_id: Option<i64>,
     pub fahrzeug_id: Option<i64>,
     pub funktion_text: Option<String>,
     /// Externer Adressat (LFH-87): Kategorie + Bezeichnung (nur bei empfaenger_typ='extern').
-    #[schema(value_type = Option<crate::kommunikation::AdressatKategorie>)]
-    pub extern_kategorie: Option<String>,
+    pub extern_kategorie: Option<AdressatKategorie>,
     pub extern_bezeichnung: Option<String>,
     pub snap_anzeige: String,
     pub quittiert_at: Option<String>,

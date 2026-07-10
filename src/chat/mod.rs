@@ -50,6 +50,29 @@ impl BezugTyp {
     }
 }
 
+// Nullable Spalte (`bezug_typ`) — Type/Decode direkt auf dem Enum, statt
+// `#[sqlx(try_from = …)]` (Orphan-Rule auf `Option<Enum>`), gleiches Muster wie
+// `MeldeWeg` (`src/etb/mod.rs`); sqlx' Blanket-Impl für `Option<T>` bildet NULL →
+// `None` ab.
+impl<DB: sqlx::Database> sqlx::Type<DB> for BezugTyp
+where
+    str: sqlx::Type<DB>,
+{
+    fn type_info() -> DB::TypeInfo {
+        <str as sqlx::Type<DB>>::type_info()
+    }
+}
+
+impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for BezugTyp
+where
+    &'r str: sqlx::Decode<'r, DB>,
+{
+    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
+        BezugTyp::parse(s).ok_or_else(|| format!("Ungültiger BezugTyp: {s}").into())
+    }
+}
+
 /// Öffentliche Darstellung eines Chat-Kanals.
 #[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct ChatKanalAnzeige {
@@ -80,8 +103,7 @@ pub struct ChatNachrichtAnzeige {
     /// Polymorpher Sachbezug (LFH-103): Verweis auf ein bestehendes Domänenobjekt.
     /// `None`/`None`, wenn kein Bezug gesetzt ist (both-or-neither). `bezug_typ` ist
     /// ein [`BezugTyp`]-Code, `bezug_id` die Objekt-ID im selben Einsatz.
-    #[schema(value_type = Option<BezugTyp>)]
-    pub bezug_typ: Option<String>,
+    pub bezug_typ: Option<BezugTyp>,
     pub bezug_id: Option<i64>,
     /// Angehängte Dateien (Metadaten, ohne Bytes). Wird nicht aus der
     /// Nachrichten-Zeile gelesen (`sqlx(skip)`), sondern vom Repo nachgeladen.

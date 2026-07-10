@@ -195,7 +195,11 @@ pub async fn lehne_ab(pool: &SqlitePool, id: i64, grund: Option<&str>, erwartet:
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::nachforderung::{ADRESSAT_LEITSTELLE, PRIO_NORMAL, STATUS_ANGEFORDERT, STATUS_EINGETROFFEN, STATUS_UNTERWEGS, STATUS_ZUGESAGT};
+    use crate::kommunikation::AdressatKategorie;
+    use crate::nachforderung::{
+        NachforderungStatus, ADRESSAT_LEITSTELLE, PRIO_NORMAL, STATUS_ANGEFORDERT, STATUS_EINGETROFFEN,
+        STATUS_UNTERWEGS, STATUS_ZUGESAGT,
+    };
 
     async fn setup(pool: &SqlitePool) -> (i64, i64) {
         sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
@@ -227,10 +231,10 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         let n = anlegen(&pool, e, b, daten("RTW", "2 RTW zur Verstärkung")).await.unwrap();
-        assert_eq!(n.status, "angefordert");
+        assert_eq!(n.status, NachforderungStatus::Angefordert);
         assert!(n.ist_offen);
         assert_eq!(n.anzahl, Some(2));
-        assert_eq!(n.adressat_kategorie, "leitstelle");
+        assert_eq!(n.adressat_kategorie, AdressatKategorie::Leitstelle);
         assert_eq!(n.erstellt_von_name.as_deref(), Some("Leit"));
         let etb_id = n.etb_nachforderung_id.expect("ETB-Eintrag erzeugt");
         let (typ, backlink): (String, i64) =
@@ -263,7 +267,7 @@ mod tests {
         assert!(setze_status(&pool, n.id, STATUS_ZUGESAGT, STATUS_ANGEFORDERT, "2026-06-12 09:05:00").await.unwrap());
         assert!(setze_status(&pool, n.id, STATUS_UNTERWEGS, STATUS_ZUGESAGT, "2026-06-12 09:10:00").await.unwrap());
         let nach = laden(&pool, n.id).await.unwrap();
-        assert_eq!(nach.status, "unterwegs");
+        assert_eq!(nach.status, NachforderungStatus::Unterwegs);
         assert_eq!(nach.zugesagt_at.as_deref(), Some("2026-06-12 09:05:00"));
         assert_eq!(nach.unterwegs_at.as_deref(), Some("2026-06-12 09:10:00"));
         assert!(nach.ist_offen);
@@ -281,7 +285,7 @@ mod tests {
         let n = anlegen(&pool, e, b, daten("RTW", "x")).await.unwrap();
         assert!(lehne_ab(&pool, n.id, Some("keine Reserven"), STATUS_ANGEFORDERT, "2026-06-12 09:05:00").await.unwrap());
         let nach = laden(&pool, n.id).await.unwrap();
-        assert_eq!(nach.status, "abgelehnt");
+        assert_eq!(nach.status, NachforderungStatus::Abgelehnt);
         assert_eq!(nach.abgelehnt_grund.as_deref(), Some("keine Reserven"));
         assert!(!nach.ist_offen);
     }

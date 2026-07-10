@@ -5,6 +5,7 @@
 //! (vgl. Meldungs-Triage).
 pub mod repo;
 
+use crate::kommunikation::{AdressatKategorie, Prioritaet};
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -36,6 +37,39 @@ pub enum NachforderungStatus {
     Unterwegs,
     Eingetroffen,
     Abgelehnt,
+}
+
+impl NachforderungStatus {
+    /// DB-/API-Stringrepräsentation.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            NachforderungStatus::Angefordert => STATUS_ANGEFORDERT,
+            NachforderungStatus::Zugesagt => STATUS_ZUGESAGT,
+            NachforderungStatus::Unterwegs => STATUS_UNTERWEGS,
+            NachforderungStatus::Eingetroffen => STATUS_EINGETROFFEN,
+            NachforderungStatus::Abgelehnt => STATUS_ABGELEHNT,
+        }
+    }
+
+    /// Parst einen gespeicherten/übergebenen Bedarfs-Status; `None` bei ungültigem Wert.
+    pub fn parse(s: &str) -> Option<NachforderungStatus> {
+        match s {
+            STATUS_ANGEFORDERT => Some(NachforderungStatus::Angefordert),
+            STATUS_ZUGESAGT => Some(NachforderungStatus::Zugesagt),
+            STATUS_UNTERWEGS => Some(NachforderungStatus::Unterwegs),
+            STATUS_EINGETROFFEN => Some(NachforderungStatus::Eingetroffen),
+            STATUS_ABGELEHNT => Some(NachforderungStatus::Abgelehnt),
+            _ => None,
+        }
+    }
+}
+
+impl TryFrom<String> for NachforderungStatus {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        NachforderungStatus::parse(&s).ok_or_else(|| format!("Ungültiger NachforderungStatus: {s}"))
+    }
 }
 
 pub fn prioritaet_gueltig(p: &str) -> bool {
@@ -71,14 +105,13 @@ pub struct NachforderungAnzeige {
     pub art: String,
     pub bezeichnung: String,
     pub anzahl: Option<i64>,
-    #[schema(value_type = crate::kommunikation::AdressatKategorie)]
-    pub adressat_kategorie: String,
+    pub adressat_kategorie: AdressatKategorie,
     pub adressat_bezeichnung: Option<String>,
     pub begruendung: Option<String>,
-    #[schema(value_type = crate::kommunikation::Prioritaet)]
-    pub prioritaet: String,
-    #[schema(value_type = NachforderungStatus)]
-    pub status: String,
+    #[sqlx(try_from = "String")]
+    pub prioritaet: Prioritaet,
+    #[sqlx(try_from = "String")]
+    pub status: NachforderungStatus,
     pub zugesagt_at: Option<String>,
     pub unterwegs_at: Option<String>,
     pub eingetroffen_at: Option<String>,

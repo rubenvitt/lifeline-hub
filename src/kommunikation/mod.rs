@@ -33,6 +33,35 @@ pub enum Prioritaet {
     Normal,
 }
 
+impl Prioritaet {
+    /// DB-/API-Stringrepräsentation.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Prioritaet::Sofort => "sofort",
+            Prioritaet::Dringend => "dringend",
+            Prioritaet::Normal => "normal",
+        }
+    }
+
+    /// Parst einen gespeicherten/übergebenen Prioritätswert; `None` bei ungültigem Wert.
+    pub fn parse(s: &str) -> Option<Prioritaet> {
+        match s {
+            "sofort" => Some(Prioritaet::Sofort),
+            "dringend" => Some(Prioritaet::Dringend),
+            "normal" => Some(Prioritaet::Normal),
+            _ => None,
+        }
+    }
+}
+
+impl TryFrom<String> for Prioritaet {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        Prioritaet::parse(&s).ok_or_else(|| format!("Ungültige Prioritaet: {s}"))
+    }
+}
+
 /// Geteilte Richtung für Auftrag/Meldung (Schema-Anker für die OpenAPI-Union, LFH-120).
 /// Wire == `richtung`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -40,6 +69,33 @@ pub enum Prioritaet {
 pub enum Richtung {
     Intern,
     Extern,
+}
+
+impl Richtung {
+    /// DB-/API-Stringrepräsentation.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Richtung::Intern => "intern",
+            Richtung::Extern => "extern",
+        }
+    }
+
+    /// Parst einen gespeicherten/übergebenen Richtungswert; `None` bei ungültigem Wert.
+    pub fn parse(s: &str) -> Option<Richtung> {
+        match s {
+            "intern" => Some(Richtung::Intern),
+            "extern" => Some(Richtung::Extern),
+            _ => None,
+        }
+    }
+}
+
+impl TryFrom<String> for Richtung {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        Richtung::parse(&s).ok_or_else(|| format!("Ungültige Richtung: {s}"))
+    }
 }
 
 /// Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag
@@ -51,6 +107,53 @@ pub enum AdressatKategorie {
     NachbarEa,
     Uebergeordnet,
     AndereBos,
+}
+
+impl AdressatKategorie {
+    /// DB-/API-Stringrepräsentation.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AdressatKategorie::Leitstelle => "leitstelle",
+            AdressatKategorie::NachbarEa => "nachbar_ea",
+            AdressatKategorie::Uebergeordnet => "uebergeordnet",
+            AdressatKategorie::AndereBos => "andere_bos",
+        }
+    }
+
+    /// Parst einen gespeicherten/übergebenen Kategoriewert; `None` bei ungültigem Wert.
+    pub fn parse(s: &str) -> Option<AdressatKategorie> {
+        match s {
+            "leitstelle" => Some(AdressatKategorie::Leitstelle),
+            "nachbar_ea" => Some(AdressatKategorie::NachbarEa),
+            "uebergeordnet" => Some(AdressatKategorie::Uebergeordnet),
+            "andere_bos" => Some(AdressatKategorie::AndereBos),
+            _ => None,
+        }
+    }
+}
+
+// Nullable Spalte in `AuftragEmpfaengerAnzeige.extern_kategorie`, non-null in
+// `NachforderungAnzeige.adressat_kategorie` — einheitlicher Decode-Mechanismus über
+// beide Verwendungen (Type/Decode direkt auf dem Enum, statt gemischt mit
+// `#[sqlx(try_from = …)]`, vgl. `TierStatus` in `src/tier/mod.rs`). sqlx' Blanket-Impl
+// für `Option<T>` bildet NULL → `None` transparent ab.
+impl<DB: sqlx::Database> sqlx::Type<DB> for AdressatKategorie
+where
+    str: sqlx::Type<DB>,
+{
+    fn type_info() -> DB::TypeInfo {
+        <str as sqlx::Type<DB>>::type_info()
+    }
+}
+
+impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for AdressatKategorie
+where
+    &'r str: sqlx::Decode<'r, DB>,
+{
+    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
+        AdressatKategorie::parse(s).ok_or_else(|| format!("Ungültige AdressatKategorie: {s}").into())
+    }
 }
 
 /// Geteilter Status eines Objekts: beide Achsen getrennt. `quittiert_at` ist die

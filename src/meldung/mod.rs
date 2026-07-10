@@ -10,6 +10,7 @@ use utoipa::ToSchema;
 /// Meldeweg-Vokabular: Single Source of Truth bleibt das ETB-Modul (über den
 /// Kommunikations-Unterbau re-exportiert), keine Eigendefinition.
 pub use crate::kommunikation::MeldeWeg;
+use crate::kommunikation::{Prioritaet, Richtung};
 
 /// Priorität/Dringlichkeit (TEXT in der DB, im Code validiert).
 pub const PRIO_SOFORT: &str = "sofort";
@@ -38,6 +39,37 @@ pub enum MeldungStatus {
     Erledigt,
 }
 
+impl MeldungStatus {
+    /// DB-/API-Stringrepräsentation.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            MeldungStatus::Neu => STATUS_NEU,
+            MeldungStatus::Gesichtet => STATUS_GESICHTET,
+            MeldungStatus::InBearbeitung => STATUS_IN_BEARBEITUNG,
+            MeldungStatus::Erledigt => STATUS_ERLEDIGT,
+        }
+    }
+
+    /// Parst einen gespeicherten/übergebenen Triage-Status; `None` bei ungültigem Wert.
+    pub fn parse(s: &str) -> Option<MeldungStatus> {
+        match s {
+            STATUS_NEU => Some(MeldungStatus::Neu),
+            STATUS_GESICHTET => Some(MeldungStatus::Gesichtet),
+            STATUS_IN_BEARBEITUNG => Some(MeldungStatus::InBearbeitung),
+            STATUS_ERLEDIGT => Some(MeldungStatus::Erledigt),
+            _ => None,
+        }
+    }
+}
+
+impl TryFrom<String> for MeldungStatus {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        MeldungStatus::parse(&s).ok_or_else(|| format!("Ungültiger MeldungStatus: {s}"))
+    }
+}
+
 /// Meldungsart (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `meldungsart`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -48,6 +80,41 @@ pub enum Meldungsart {
     Vollzugsmeldung,
     Anfrage,
     Sonstige,
+}
+
+impl Meldungsart {
+    /// DB-/API-Stringrepräsentation.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Meldungsart::Lagemeldung => ART_LAGEMELDUNG,
+            Meldungsart::Sofortmeldung => ART_SOFORTMELDUNG,
+            Meldungsart::Rueckmeldung => ART_RUECKMELDUNG,
+            Meldungsart::Vollzugsmeldung => ART_VOLLZUGSMELDUNG,
+            Meldungsart::Anfrage => ART_ANFRAGE,
+            Meldungsart::Sonstige => ART_SONSTIGE,
+        }
+    }
+
+    /// Parst eine gespeicherte/übergebene Meldungsart; `None` bei ungültigem Wert.
+    pub fn parse(s: &str) -> Option<Meldungsart> {
+        match s {
+            ART_LAGEMELDUNG => Some(Meldungsart::Lagemeldung),
+            ART_SOFORTMELDUNG => Some(Meldungsart::Sofortmeldung),
+            ART_RUECKMELDUNG => Some(Meldungsart::Rueckmeldung),
+            ART_VOLLZUGSMELDUNG => Some(Meldungsart::Vollzugsmeldung),
+            ART_ANFRAGE => Some(Meldungsart::Anfrage),
+            ART_SONSTIGE => Some(Meldungsart::Sonstige),
+            _ => None,
+        }
+    }
+}
+
+impl TryFrom<String> for Meldungsart {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        Meldungsart::parse(&s).ok_or_else(|| format!("Ungültige Meldungsart: {s}"))
+    }
 }
 
 /// Triage-Status (linearer Workflow). Bewusst KEIN kommunikation_status:
@@ -91,18 +158,17 @@ pub struct MeldungAnzeige {
     pub lfd_nr: i64,
     pub absender: String,
     pub empfaenger: Option<String>,
-    #[schema(value_type = crate::etb::MeldeWeg)]
-    pub meldeweg: String,
+    pub meldeweg: MeldeWeg,
     pub inhalt: String,
-    #[schema(value_type = Meldungsart)]
-    pub meldungsart: String,
-    #[schema(value_type = crate::kommunikation::Prioritaet)]
-    pub prioritaet: String,
+    #[sqlx(try_from = "String")]
+    pub meldungsart: Meldungsart,
+    #[sqlx(try_from = "String")]
+    pub prioritaet: Prioritaet,
     /// Richtung intern/extern (LFH-87).
-    #[schema(value_type = crate::kommunikation::Richtung)]
-    pub richtung: String,
-    #[schema(value_type = MeldungStatus)]
-    pub status: String,
+    #[sqlx(try_from = "String")]
+    pub richtung: Richtung,
+    #[sqlx(try_from = "String")]
+    pub status: MeldungStatus,
     pub bearbeiter_id: Option<i64>,
     pub bearbeiter_name: Option<String>,
     pub lagerelevant: bool,
