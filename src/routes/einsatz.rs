@@ -5,8 +5,8 @@ use crate::einsatz::berechtigung::{
     ist_fristverkuerzung,
 };
 use crate::einsatz::{
-    einstellungen, ist_gueltige_einsatzart, modul, modul_override, repo, EinsatzAnzeige,
-    EinsatzRolle, MitgliedAnzeige, EINSATZ_ROLLE_LEITUNG,
+    einstellungen, modul, modul_override, repo, Einsatzart, EinsatzAnzeige, EinsatzRolle,
+    MitgliedAnzeige, EINSATZ_ROLLE_LEITUNG,
 };
 use crate::error::AppError;
 use axum::extract::{Path, State};
@@ -585,9 +585,8 @@ pub async fn aktualisieren(
     if bezeichnung.is_empty() {
         return Err(AppError::Validation("Bezeichnung darf nicht leer sein".into()));
     }
-    if !ist_gueltige_einsatzart(&req.einsatzart) {
-        return Err(AppError::Validation("Ungültige Einsatzart".into()));
-    }
+    Einsatzart::parse(&req.einsatzart)
+        .ok_or_else(|| AppError::Validation("Ungültige Einsatzart".into()))?;
     if let Some(n) = req.anzahl_betroffene_initial {
         if n < 0 {
             return Err(AppError::Validation(

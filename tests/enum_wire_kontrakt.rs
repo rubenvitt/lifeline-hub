@@ -2,7 +2,7 @@
 //! Domänen-Enums. Schützt die generierten utoipa-Unions vor stiller Fehlgenerierung.
 use lifeline_hub::bereitstellungsraum::{BrBelegungsArt, BrStatus, ObjektTyp};
 use lifeline_hub::chat::BezugTyp;
-use lifeline_hub::einsatz::EinsatzRolle;
+use lifeline_hub::einsatz::{Einsatzart, EinsatzRolle, EinsatzStatus};
 use lifeline_hub::etb::{EtbTyp, MeldeWeg};
 use lifeline_hub::material::MaterialStatus;
 use lifeline_hub::person::{Geschlecht, PersonStatus, Sichtungskategorie, VerbleibArt};
@@ -190,6 +190,13 @@ fn serde_wire_gleich_as_str() {
         EinsatzRolle::Fuehrungspersonal,
         EinsatzRolle::Beobachter,
     );
+    wire_eq!(EinsatzStatus::Aktiv, EinsatzStatus::Abgeschlossen);
+    wire_eq!(
+        Einsatzart::Realeinsatz,
+        Einsatzart::Uebung,
+        Einsatzart::Sanitaetsdienst,
+        Einsatzart::Bereitstellung,
+    );
 
     // staerke
     wire_eq!(
@@ -217,7 +224,6 @@ fn orphan_enums_wire() {
     use lifeline_hub::einsatz::einstellungen::{
         BasemapModus, EinheitenSystem, Koordinatenformat, Zeitformat,
     };
-    use lifeline_hub::einsatz::{Einsatzart, EinsatzStatus};
     use lifeline_hub::gefahr::{Gefahrentyp, Schutzobjekt, Warnstufe};
     use lifeline_hub::katalog::{Betriebsart, Dienststatus, StatusKategorie};
     use lifeline_hub::kommunikation::{AdressatKategorie, Prioritaet, Richtung};
@@ -240,15 +246,6 @@ fn orphan_enums_wire() {
     // auth
     wire_is!(SystemRolle::Admin => "admin", SystemRolle::Keiner => "keiner");
     wire_is!(OrgRolle::Fuehrungskraft => "fuehrungskraft", OrgRolle::Keine => "keine");
-
-    // einsatz
-    wire_is!(EinsatzStatus::Aktiv => "aktiv", EinsatzStatus::Abgeschlossen => "abgeschlossen");
-    wire_is!(
-        Einsatzart::Realeinsatz => "realeinsatz",
-        Einsatzart::Uebung => "uebung",
-        Einsatzart::Sanitaetsdienst => "sanitaetsdienst",
-        Einsatzart::Bereitstellung => "bereitstellung",
-    );
 
     // einsatz::einstellungen
     wire_is!(

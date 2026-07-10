@@ -28,25 +28,39 @@ pub const EINSATZART_UEBUNG: &str = "uebung";
 pub const EINSATZART_SANITAETSDIENST: &str = "sanitaetsdienst";
 pub const EINSATZART_BEREITSTELLUNG: &str = "bereitstellung";
 
-/// Alle gültigen Einsatzarten (Reihenfolge = UI-Reihenfolge).
-pub const EINSATZARTEN: [&str; 4] = [
-    EINSATZART_REALEINSATZ,
-    EINSATZART_UEBUNG,
-    EINSATZART_SANITAETSDIENST,
-    EINSATZART_BEREITSTELLUNG,
-];
-
-/// Ob `s` eine gültige Einsatzart ist (für die Eingabe-Validierung).
-pub fn ist_gueltige_einsatzart(s: &str) -> bool {
-    EINSATZARTEN.contains(&s)
-}
-
 /// Einsatz-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum EinsatzStatus {
     Aktiv,
     Abgeschlossen,
+}
+
+impl EinsatzStatus {
+    /// DB-/API-Stringrepräsentation.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            EinsatzStatus::Aktiv => STATUS_AKTIV,
+            EinsatzStatus::Abgeschlossen => STATUS_ABGESCHLOSSEN,
+        }
+    }
+
+    /// Parst einen gespeicherten/übergebenen Statuswert; `None` bei ungültigem Wert.
+    pub fn parse(s: &str) -> Option<EinsatzStatus> {
+        match s {
+            STATUS_AKTIV => Some(EinsatzStatus::Aktiv),
+            STATUS_ABGESCHLOSSEN => Some(EinsatzStatus::Abgeschlossen),
+            _ => None,
+        }
+    }
+}
+
+impl TryFrom<String> for EinsatzStatus {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        EinsatzStatus::parse(&s).ok_or_else(|| format!("Ungültiger EinsatzStatus: {s}"))
+    }
 }
 
 /// Einsatzart (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `einsatzart`.
@@ -57,6 +71,37 @@ pub enum Einsatzart {
     Uebung,
     Sanitaetsdienst,
     Bereitstellung,
+}
+
+impl Einsatzart {
+    /// DB-/API-Stringrepräsentation.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Einsatzart::Realeinsatz => EINSATZART_REALEINSATZ,
+            Einsatzart::Uebung => EINSATZART_UEBUNG,
+            Einsatzart::Sanitaetsdienst => EINSATZART_SANITAETSDIENST,
+            Einsatzart::Bereitstellung => EINSATZART_BEREITSTELLUNG,
+        }
+    }
+
+    /// Parst eine gespeicherte/übergebene Einsatzart; `None` bei ungültigem Wert.
+    pub fn parse(s: &str) -> Option<Einsatzart> {
+        match s {
+            EINSATZART_REALEINSATZ => Some(Einsatzart::Realeinsatz),
+            EINSATZART_UEBUNG => Some(Einsatzart::Uebung),
+            EINSATZART_SANITAETSDIENST => Some(Einsatzart::Sanitaetsdienst),
+            EINSATZART_BEREITSTELLUNG => Some(Einsatzart::Bereitstellung),
+            _ => None,
+        }
+    }
+}
+
+impl TryFrom<String> for Einsatzart {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        Einsatzart::parse(&s).ok_or_else(|| format!("Ungültige Einsatzart: {s}"))
+    }
 }
 
 /// Rolle einer Person innerhalb eines konkreten Einsatzes.
@@ -104,6 +149,14 @@ impl EinsatzRolle {
     }
 }
 
+impl TryFrom<String> for EinsatzRolle {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        EinsatzRolle::parse(&s).ok_or_else(|| format!("Ungültige EinsatzRolle: {s}"))
+    }
+}
+
 /// Interner Einsatz-Datensatz (alle Spalten der Tabelle `einsatz`).
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct Einsatz {
@@ -111,11 +164,13 @@ pub struct Einsatz {
     pub org_id: i64,
     pub bezeichnung: String,
     pub stichwort: Option<String>,
-    pub status: String,
+    #[sqlx(try_from = "String")]
+    pub status: EinsatzStatus,
     pub begonnen_at: String,
     pub abgeschlossen_at: Option<String>,
     pub abgeschlossen_von: Option<i64>,
-    pub einsatzart: String,
+    #[sqlx(try_from = "String")]
+    pub einsatzart: Einsatzart,
     pub einsatznummer_intern: Option<String>,
     pub angelegt_at: String,
     pub leitstellen_nr: Option<String>,
@@ -138,7 +193,7 @@ pub struct Einsatz {
 impl Einsatz {
     /// Ob der Einsatz noch aktiv (beschreibbar) ist.
     pub fn ist_aktiv(&self) -> bool {
-        self.status == STATUS_AKTIV
+        self.status == EinsatzStatus::Aktiv
     }
 
     /// API-Darstellung inkl. der Einsatz-Rolle des abfragenden Benutzers
@@ -179,13 +234,11 @@ pub struct EinsatzAnzeige {
     pub org_name: String,
     pub bezeichnung: String,
     pub stichwort: Option<String>,
-    #[schema(value_type = EinsatzStatus)]
-    pub status: String,
+    pub status: EinsatzStatus,
     pub begonnen_at: String,
     pub abgeschlossen_at: Option<String>,
     pub abgeschlossen_von: Option<i64>,
-    #[schema(value_type = Einsatzart)]
-    pub einsatzart: String,
+    pub einsatzart: Einsatzart,
     pub einsatznummer_intern: Option<String>,
     pub angelegt_at: String,
     pub leitstellen_nr: Option<String>,
@@ -207,8 +260,8 @@ pub struct MitgliedAnzeige {
     pub benutzer_id: i64,
     pub anzeigename: String,
     pub benutzername: String,
-    #[schema(value_type = EinsatzRolle)]
-    pub einsatz_rolle: String,
+    #[sqlx(try_from = "String")]
+    pub einsatz_rolle: EinsatzRolle,
     pub zugewiesen_at: String,
 }
 
@@ -254,11 +307,11 @@ mod tests {
             org_name: "Orga".into(),
             bezeichnung: "Lage".into(),
             stichwort: None,
-            status: STATUS_AKTIV.into(),
+            status: EinsatzStatus::Aktiv,
             begonnen_at: "2026-05-23".into(),
             abgeschlossen_at: None,
             abgeschlossen_von: None,
-            einsatzart: EINSATZART_REALEINSATZ.into(),
+            einsatzart: Einsatzart::Realeinsatz,
             einsatznummer_intern: None,
             angelegt_at: "2026-05-23".into(),
             leitstellen_nr: None,
@@ -272,7 +325,7 @@ mod tests {
             geloescht_at: None,
         };
         assert!(e.ist_aktiv());
-        e.status = STATUS_ABGESCHLOSSEN.into();
+        e.status = EinsatzStatus::Abgeschlossen;
         assert!(!e.ist_aktiv());
     }
 }

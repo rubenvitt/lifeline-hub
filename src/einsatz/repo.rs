@@ -1,7 +1,7 @@
 use super::berechtigung::darf_lesen;
 use super::{
-    Einsatz, EinsatzAnzeige, EinsatzRolle, MitgliedAnzeige, EINSATZ_ROLLE_LEITUNG,
-    STATUS_ABGESCHLOSSEN,
+    Einsatz, EinsatzAnzeige, EinsatzRolle, EinsatzStatus, Einsatzart, MitgliedAnzeige,
+    EINSATZ_ROLLE_LEITUNG, STATUS_ABGESCHLOSSEN,
 };
 use crate::auth::Benutzer;
 use crate::error::AppError;
@@ -115,11 +115,13 @@ pub async fn liste_fuer(
         org_name: String,
         bezeichnung: String,
         stichwort: Option<String>,
-        status: String,
+        #[sqlx(try_from = "String")]
+        status: EinsatzStatus,
         begonnen_at: String,
         abgeschlossen_at: Option<String>,
         abgeschlossen_von: Option<i64>,
-        einsatzart: String,
+        #[sqlx(try_from = "String")]
+        einsatzart: Einsatzart,
         einsatznummer_intern: Option<String>,
         angelegt_at: String,
         leitstellen_nr: Option<String>,
@@ -157,7 +159,7 @@ pub async fn liste_fuer(
         .filter(|r| {
             darf_lesen(
                 benutzer,
-                &r.status,
+                r.status.as_str(),
                 r.abgeschlossen_at.as_deref(),
                 r.retention_bis.as_deref(),
                 r.geloescht_at.as_deref(),
@@ -747,7 +749,6 @@ pub async fn zaehle_einsatzleitung(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::einsatz::STATUS_ABGESCHLOSSEN;
 
     /// Legt Org (id=1) + einen Benutzer an und liefert dessen id.
     async fn benutzer_anlegen(pool: &SqlitePool, name: &str) -> i64 {
@@ -804,7 +805,7 @@ mod tests {
         let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
 
         let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap();
-        assert_eq!(abgeschlossen.status, STATUS_ABGESCHLOSSEN);
+        assert_eq!(abgeschlossen.status, EinsatzStatus::Abgeschlossen);
         assert!(abgeschlossen.abgeschlossen_at.is_some());
         assert_eq!(abgeschlossen.abgeschlossen_von, Some(leit));
         assert!(!abgeschlossen.ist_aktiv());
@@ -1211,7 +1212,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(aktualisiert.bezeichnung, "Neu");
-        assert_eq!(aktualisiert.einsatzart, "uebung");
+        assert_eq!(aktualisiert.einsatzart, Einsatzart::Uebung);
         assert_eq!(aktualisiert.einsatzort.as_deref(), Some("Hauptstraße 1"));
         assert_eq!(aktualisiert.einsatzort_lat, Some(52.5));
         assert_eq!(aktualisiert.anzahl_betroffene_initial, Some(3));

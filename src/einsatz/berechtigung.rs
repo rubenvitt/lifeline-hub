@@ -114,7 +114,7 @@ pub fn fordere_lesezugriff(
 ) -> Result<(), AppError> {
     if darf_lesen(
         benutzer,
-        &einsatz.status,
+        einsatz.status.as_str(),
         einsatz.abgeschlossen_at.as_deref(),
         einsatz.retention_bis.as_deref(),
         einsatz.geloescht_at.as_deref(),
@@ -250,20 +250,20 @@ pub async fn fordere_modul_zugriff_laden(
 mod tests {
     use super::*;
     use crate::auth::{ORG_ROLLE_FUEHRUNGSKRAFT, ORG_ROLLE_KEINE, ROLLE_ADMIN, ROLLE_KEINER};
-    use crate::einsatz::{STATUS_ABGESCHLOSSEN, STATUS_AKTIV};
+    use crate::einsatz::{EinsatzStatus, STATUS_ABGESCHLOSSEN, STATUS_AKTIV};
 
-    fn einsatz_mit_status(status: &str) -> Einsatz {
+    fn einsatz_mit_status(status: EinsatzStatus) -> Einsatz {
         Einsatz {
             id: 1,
             org_id: 1,
             org_name: "Orga".into(),
             bezeichnung: "Lage".into(),
             stichwort: None,
-            status: status.into(),
+            status,
             begonnen_at: "2026-05-23".into(),
             abgeschlossen_at: None,
             abgeschlossen_von: None,
-            einsatzart: crate::einsatz::EINSATZART_REALEINSATZ.into(),
+            einsatzart: crate::einsatz::Einsatzart::Realeinsatz,
             einsatznummer_intern: None,
             angelegt_at: "2026-05-23".into(),
             leitstellen_nr: None,
@@ -611,9 +611,9 @@ mod tests {
 
     #[test]
     fn fordere_aktiv_blockt_abgeschlossene() {
-        assert!(fordere_aktiv(&einsatz_mit_status(STATUS_AKTIV)).is_ok());
+        assert!(fordere_aktiv(&einsatz_mit_status(EinsatzStatus::Aktiv)).is_ok());
         assert!(matches!(
-            fordere_aktiv(&einsatz_mit_status(STATUS_ABGESCHLOSSEN)).unwrap_err(),
+            fordere_aktiv(&einsatz_mit_status(EinsatzStatus::Abgeschlossen)).unwrap_err(),
             AppError::Conflict(_)
         ));
     }
