@@ -237,6 +237,7 @@ pub async fn aktive_belegungen(pool: &SqlitePool, uhs_id: i64) -> Result<i64, Ap
 mod tests {
     use super::*;
     use crate::db::test_pool;
+    use crate::uhs::{UhsStatus, UhsTyp};
     use sqlx::SqlitePool;
 
     /// Org(1) + Benutzer + aktiver Einsatz. Liefert (benutzer_id, einsatz_id).
@@ -266,8 +267,8 @@ mod tests {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
         let u = anlegen(&pool, e, b, daten("behandlungsplatz", "BHP 50")).await.unwrap();
-        assert_eq!(u.status, "geplant");
-        assert_eq!(u.typ, "behandlungsplatz");
+        assert_eq!(u.status, UhsStatus::Geplant);
+        assert_eq!(u.typ, UhsTyp::Behandlungsplatz);
         assert_eq!(u.bezeichnung, "BHP 50");
         assert_eq!(u.erfasst_von, b);
         assert_eq!(u.geaendert_von, b);
@@ -306,7 +307,7 @@ mod tests {
         let (b, e) = setup(&pool).await;
         let u = anlegen(&pool, e, b, daten("behandlungsplatz", "BHP 50")).await.unwrap();
         let nach = setze_status(&pool, e, u.id, "aktiv", b).await.unwrap();
-        assert_eq!(nach.status, "aktiv");
+        assert_eq!(nach.status, UhsStatus::Aktiv);
         assert_eq!(nach.geaendert_von, b);
     }
 

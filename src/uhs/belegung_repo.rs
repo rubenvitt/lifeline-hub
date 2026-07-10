@@ -324,7 +324,7 @@ async fn loese_eigene_reservierung_ein(tx: &mut Transaction<'_, Sqlite>, platz_i
 mod tests {
     use super::*;
     use crate::db::test_pool;
-    use crate::uhs::{platz_repo, repo as uhs_repo};
+    use crate::uhs::{platz_repo, repo as uhs_repo, BelegungsArt};
     use sqlx::SqlitePool;
 
     /// Liefert (benutzer, einsatz, uhs_aktiv, uhs_geplant, platz_a_in_aktiv, platz_b_in_aktiv, person).
@@ -377,7 +377,7 @@ mod tests {
         let pool = test_pool().await;
         let (b, e, u, _, _, _, p) = setup(&pool).await;
         let ev = eintritt(&pool, e, p, u, None, None, b).await.unwrap();
-        assert_eq!(ev.art, "eintritt");
+        assert_eq!(ev.art, BelegungsArt::Eintritt);
         assert!(ev.platz_id.is_none());
         assert_eq!(cache(&pool, p).await, (Some(u), None));
     }
@@ -529,7 +529,7 @@ mod tests {
         wechsel(&pool, e, p, u, Some(pa), None, b).await.unwrap();
         let liste = liste_je_uhs(&pool, u).await.unwrap();
         assert_eq!(liste.len(), 2);
-        assert_eq!(liste[0].art, "wechsel", "neueste zuerst");
+        assert_eq!(liste[0].art, BelegungsArt::Wechsel, "neueste zuerst");
     }
 
     #[tokio::test]

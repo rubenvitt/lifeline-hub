@@ -53,6 +53,14 @@ impl UhsTyp {
     }
 }
 
+impl TryFrom<String> for UhsTyp {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        UhsTyp::parse(&s).ok_or_else(|| format!("Ungültiger UhsTyp: {s}"))
+    }
+}
+
 /// Status einer UHS. String = CHECK-Constraint. `aufgeloest` ist terminal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -78,6 +86,14 @@ impl UhsStatus {
             "aufgeloest" => Some(UhsStatus::Aufgeloest),
             _ => None,
         }
+    }
+}
+
+impl TryFrom<String> for UhsStatus {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        UhsStatus::parse(&s).ok_or_else(|| format!("Ungültiger UhsStatus: {s}"))
     }
 }
 
@@ -156,6 +172,14 @@ impl PlatzTyp {
     }
 }
 
+impl TryFrom<String> for PlatzTyp {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        PlatzTyp::parse(&s).ok_or_else(|| format!("Ungültiger PlatzTyp: {s}"))
+    }
+}
+
 /// Verfügbarkeit eines Platzes (getrennt von Belegung). String = CHECK in
 /// `migrations/0028_uhs_platz.sql`. `reserviert` ist im DB-CHECK an
 /// `reserviert_fuer_person_id IS NOT NULL` gekoppelt.
@@ -192,6 +216,14 @@ impl Verfuegbarkeit {
     }
 }
 
+impl TryFrom<String> for Verfuegbarkeit {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        Verfuegbarkeit::parse(&s).ok_or_else(|| format!("Ungültige Verfügbarkeit: {s}"))
+    }
+}
+
 /// Art eines Belegungs-Events. String = CHECK in
 /// `migrations/0029_person_uhs_belegung.sql`. Append-only.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -221,6 +253,14 @@ impl BelegungsArt {
     }
 }
 
+impl TryFrom<String> for BelegungsArt {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        BelegungsArt::parse(&s).ok_or_else(|| format!("Ungültige BelegungsArt: {s}"))
+    }
+}
+
 /// Serialisierbare UHS-Anzeige (1:1 zur Tabelle, ohne abgeleitete Felder).
 #[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct UhsAnzeige {
@@ -228,15 +268,15 @@ pub struct UhsAnzeige {
     pub einsatz_id: i64,
     pub abschnitt_id: Option<i64>,
     /// LFH-120: Wire ist `String`; Override zeigt aufs Enum, damit die Union erhalten bleibt.
-    #[schema(value_type = UhsTyp)]
-    pub typ: String,
+    #[sqlx(try_from = "String")]
+    pub typ: UhsTyp,
     pub bezeichnung: String,
     pub standort: Option<String>,
     pub notiz: Option<String>,
     pub lat: Option<f64>,
     pub lon: Option<f64>,
-    #[schema(value_type = UhsStatus)]
-    pub status: String,
+    #[sqlx(try_from = "String")]
+    pub status: UhsStatus,
     pub erfasst_at: String,
     pub erfasst_von: i64,
     pub geaendert_at: String,
@@ -249,13 +289,13 @@ pub struct UhsAnzeige {
 pub struct PlatzAnzeige {
     pub id: i64,
     pub uhs_id: i64,
-    #[schema(value_type = PlatzTyp)]
-    pub typ: String,
+    #[sqlx(try_from = "String")]
+    pub typ: PlatzTyp,
     pub bezeichnung: String,
     pub pos_x: Option<f64>,
     pub pos_y: Option<f64>,
-    #[schema(value_type = Verfuegbarkeit)]
-    pub verfuegbarkeit: String,
+    #[sqlx(try_from = "String")]
+    pub verfuegbarkeit: Verfuegbarkeit,
     pub reserviert_fuer_person_id: Option<i64>,
     pub storniert_at: Option<String>,
 }
@@ -268,8 +308,8 @@ pub struct BelegungAnzeige {
     pub person_id: i64,
     pub uhs_id: i64,
     pub platz_id: Option<i64>,
-    #[schema(value_type = BelegungsArt)]
-    pub art: String,
+    #[sqlx(try_from = "String")]
+    pub art: BelegungsArt,
     pub notiz: Option<String>,
     pub zeitpunkt_at: String,
     pub erfasst_von: i64,

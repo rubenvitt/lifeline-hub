@@ -260,6 +260,7 @@ mod tests {
     use super::*;
     use crate::db::test_pool;
     use crate::uhs::repo as uhs_repo;
+    use crate::uhs::Verfuegbarkeit;
     use sqlx::SqlitePool;
 
     /// Liefert (benutzer, einsatz, uhs_id, person_a, person_b).
@@ -303,7 +304,7 @@ mod tests {
         let p = anlegen(&pool, u, NeuerPlatz {
             typ: "bett", bezeichnung: "Bett 3", pos_x: Some(100.0), pos_y: Some(50.0),
         }).await.unwrap();
-        assert_eq!(p.verfuegbarkeit, "frei");
+        assert_eq!(p.verfuegbarkeit, Verfuegbarkeit::Frei);
         assert_eq!(p.pos_x, Some(100.0));
         assert!(p.reserviert_fuer_person_id.is_none());
     }
@@ -353,7 +354,7 @@ mod tests {
         let (_b, _e, u, _, _) = setup(&pool).await;
         let p = anlegen(&pool, u, NeuerPlatz { typ: "bett", bezeichnung: "Bett 3", pos_x: None, pos_y: None }).await.unwrap();
         let nach = setze_verfuegbarkeit(&pool, u, p.id, "defekt", None).await.unwrap();
-        assert_eq!(nach.verfuegbarkeit, "defekt");
+        assert_eq!(nach.verfuegbarkeit, Verfuegbarkeit::Defekt);
     }
 
     #[tokio::test]
@@ -364,7 +365,7 @@ mod tests {
         let err = setze_verfuegbarkeit(&pool, u, p.id, "reserviert", None).await.unwrap_err();
         assert!(matches!(err, AppError::Validation(_)), "Reservieren ohne Person ist Validierung-422");
         let nach = setze_verfuegbarkeit(&pool, u, p.id, "reserviert", Some(pa)).await.unwrap();
-        assert_eq!(nach.verfuegbarkeit, "reserviert");
+        assert_eq!(nach.verfuegbarkeit, Verfuegbarkeit::Reserviert);
         assert_eq!(nach.reserviert_fuer_person_id, Some(pa));
     }
 
@@ -375,7 +376,7 @@ mod tests {
         let p = anlegen(&pool, u, NeuerPlatz { typ: "bett", bezeichnung: "Bett 3", pos_x: None, pos_y: None }).await.unwrap();
         setze_verfuegbarkeit(&pool, u, p.id, "reserviert", Some(pa)).await.unwrap();
         let nach = setze_verfuegbarkeit(&pool, u, p.id, "frei", None).await.unwrap();
-        assert_eq!(nach.verfuegbarkeit, "frei");
+        assert_eq!(nach.verfuegbarkeit, Verfuegbarkeit::Frei);
         assert!(nach.reserviert_fuer_person_id.is_none(), "FK wird beim Verlassen von 'reserviert' geleert");
     }
 

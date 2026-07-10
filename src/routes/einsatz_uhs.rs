@@ -326,18 +326,16 @@ pub async fn status_wechsel(
             "Stornierte UHS kann nicht geändert werden".into(),
         ));
     }
-    if !darf_uebergehen(&vorher.status, &body.status) {
+    if !darf_uebergehen(vorher.status.as_str(), &body.status) {
         return Err(AppError::UnprocessableEntity(format!(
             "Status-Übergang {} → {} ist nicht erlaubt",
-            vorher.status, body.status
+            vorher.status.as_str(), body.status
         )));
     }
     let nachher =
         uhs_repo::setze_status(&state.pool, einsatz_id, uhs_id, &body.status, benutzer.id).await?;
 
-    let typ_label = UhsTyp::parse(&nachher.typ)
-        .map(|t| t.anzeige_label())
-        .unwrap_or("");
+    let typ_label = nachher.typ.anzeige_label();
     let etb_text = match body.status.as_str() {
         "aktiv" => Some(format!(
             "{} ({}) in Betrieb genommen",
