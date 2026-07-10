@@ -10,7 +10,7 @@ use crate::etb::{self, repo as etb_repo};
 use crate::person::repo as person_repo; // Org-Isolation der Geschädigt-FK (404 bei fremder Person)
 use crate::schaden::{
     darf_uebergehen, ort_kurz, registrier_anzeige, repo as schaden_repo, AbschlussGrund, Ausmass,
-    SchadenAnzeige, SchadenTyp,
+    SchadenAnzeige, SchadenStatus, SchadenTyp,
 };
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -88,7 +88,7 @@ pub async fn liste(
     fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
 
     if let Some(s) = &params.status {
-        if crate::schaden::SchadenStatus::parse(s).is_none() {
+        if SchadenStatus::parse(s).is_none() {
             return Err(AppError::UnprocessableEntity("Unbekannter Status im Filter".into()));
         }
     }
@@ -363,14 +363,14 @@ pub async fn aktualisieren(
     };
     let eff_abschluss_grund: Option<String> = match &abschluss_grund_norm {
         Some(opt) => opt.clone(),
-        None => vorher.abschluss_grund.clone(),
+        None => vorher.abschluss_grund.map(|g| g.as_str().to_string()),
     };
-    if vorher.status == "uebergeben" && eff_uebergeben_an.is_none() {
+    if vorher.status == SchadenStatus::Uebergeben && eff_uebergeben_an.is_none() {
         return Err(AppError::UnprocessableEntity(
             "Übergebener Schaden braucht einen Übergabe-Adressaten".into(),
         ));
     }
-    if vorher.status == "abgeschlossen" && eff_abschluss_grund.is_none() {
+    if vorher.status == SchadenStatus::Abgeschlossen && eff_abschluss_grund.is_none() {
         return Err(AppError::UnprocessableEntity(
             "Abgeschlossener Schaden braucht einen Abschlussgrund".into(),
         ));
@@ -438,10 +438,10 @@ pub async fn uebergeben(
     if vorher.storniert_at.is_some() {
         return Err(AppError::Conflict("Stornierter Schaden kann nicht übergeben werden".into()));
     }
-    if !darf_uebergehen(&vorher.status, "uebergeben") {
+    if !darf_uebergehen(vorher.status.as_str(), "uebergeben") {
         return Err(AppError::Conflict(format!(
             "Schaden im Status '{}' kann nicht übergeben werden",
-            vorher.status
+            vorher.status.as_str()
         )));
     }
 
@@ -486,10 +486,10 @@ pub async fn abschliessen(
     if vorher.storniert_at.is_some() {
         return Err(AppError::Conflict("Stornierter Schaden kann nicht abgeschlossen werden".into()));
     }
-    if !darf_uebergehen(&vorher.status, "abgeschlossen") {
+    if !darf_uebergehen(vorher.status.as_str(), "abgeschlossen") {
         return Err(AppError::Conflict(format!(
             "Schaden im Status '{}' kann nicht abgeschlossen werden",
-            vorher.status
+            vorher.status.as_str()
         )));
     }
 

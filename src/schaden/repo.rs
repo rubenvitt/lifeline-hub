@@ -293,6 +293,7 @@ pub async fn personal_im_einsatz(
 mod tests {
     use super::*;
     use crate::db::test_pool;
+    use crate::schaden::{AbschlussGrund, SchadenStatus};
 
     async fn setup(pool: &sqlx::SqlitePool) -> (i64, i64) {
         // Spalten gemäß Migr. 0002/0003: benutzer.org_id, system_rolle ∈ {admin,keiner};
@@ -329,7 +330,7 @@ mod tests {
         let s2 = anlegen(&pool, e, b, minimal()).await.unwrap();
         assert_eq!(s1.registrier_nr, 1);
         assert_eq!(s2.registrier_nr, 2);
-        assert_eq!(s1.status, "offen");
+        assert_eq!(s1.status, SchadenStatus::Offen);
     }
 
     #[tokio::test]
@@ -339,7 +340,7 @@ mod tests {
         let s = anlegen(&pool, e, b, minimal()).await.unwrap();
         uebergebe(&pool, e, s.id, "Stadtwerke", b).await.unwrap();
         let neu = laden(&pool, e, s.id).await.unwrap();
-        assert_eq!(neu.status, "uebergeben");
+        assert_eq!(neu.status, SchadenStatus::Uebergeben);
         assert_eq!(neu.uebergeben_an.as_deref(), Some("Stadtwerke"));
         assert!(neu.uebergeben_at.is_some());
     }
@@ -352,8 +353,8 @@ mod tests {
             .await.unwrap();
         schliesse_ab(&pool, e, s.id, "behoben", Some("vor Ort erledigt"), b).await.unwrap();
         let neu = laden(&pool, e, s.id).await.unwrap();
-        assert_eq!(neu.status, "abgeschlossen");
-        assert_eq!(neu.abschluss_grund.as_deref(), Some("behoben"));
+        assert_eq!(neu.status, SchadenStatus::Abgeschlossen);
+        assert_eq!(neu.abschluss_grund, Some(AbschlussGrund::Behoben));
         assert!(neu.abschluss_at.is_some());
         assert!(neu.beschreibung.contains("Erstbefund"));
         assert!(neu.beschreibung.contains("vor Ort erledigt"), "Notiz angehängt");

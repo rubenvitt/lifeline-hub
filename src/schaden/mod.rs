@@ -32,6 +32,31 @@ impl SchadenStatus {
     }
 }
 
+// `status` ist in `SchadenAnzeige` non-null, aber für einen einheitlichen Decode-
+// Mechanismus über alle vier Schaden-Enums (statt gemischt `Type`/`Decode` +
+// `#[sqlx(try_from = "String")]`) direkt `Type`/`Decode` auf dem Enum
+// implementieren — gleiches Muster wie bei den nullable Feldern unten (vgl.
+// `TierStatus` in `src/tier/mod.rs`). sqlx' Blanket-Impl für `Option<T>` deckt
+// Nullability von `abschluss_grund` transparent ab.
+impl<DB: sqlx::Database> sqlx::Type<DB> for SchadenStatus
+where
+    str: sqlx::Type<DB>,
+{
+    fn type_info() -> DB::TypeInfo {
+        <str as sqlx::Type<DB>>::type_info()
+    }
+}
+
+impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for SchadenStatus
+where
+    &'r str: sqlx::Decode<'r, DB>,
+{
+    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
+        SchadenStatus::parse(s).ok_or_else(|| format!("Ungültiger SchadenStatus: {s}").into())
+    }
+}
+
 // ---------- Typ ----------
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -70,6 +95,27 @@ impl SchadenTyp {
     }
 }
 
+// `typ` ist in `SchadenAnzeige` non-null — gleiches einheitliches `Type`/`Decode`-
+// Muster wie `SchadenStatus` (s. o.).
+impl<DB: sqlx::Database> sqlx::Type<DB> for SchadenTyp
+where
+    str: sqlx::Type<DB>,
+{
+    fn type_info() -> DB::TypeInfo {
+        <str as sqlx::Type<DB>>::type_info()
+    }
+}
+
+impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for SchadenTyp
+where
+    &'r str: sqlx::Decode<'r, DB>,
+{
+    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
+        SchadenTyp::parse(s).ok_or_else(|| format!("Ungültiger SchadenTyp: {s}").into())
+    }
+}
+
 // ---------- Ausmaß ----------
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -102,6 +148,27 @@ impl Ausmass {
     }
 }
 
+// `ausmass` ist in `SchadenAnzeige` non-null — gleiches einheitliches `Type`/
+// `Decode`-Muster wie `SchadenStatus` (s. o.).
+impl<DB: sqlx::Database> sqlx::Type<DB> for Ausmass
+where
+    str: sqlx::Type<DB>,
+{
+    fn type_info() -> DB::TypeInfo {
+        <str as sqlx::Type<DB>>::type_info()
+    }
+}
+
+impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for Ausmass
+where
+    &'r str: sqlx::Decode<'r, DB>,
+{
+    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
+        Ausmass::parse(s).ok_or_else(|| format!("Ungültiges Ausmaß: {s}").into())
+    }
+}
+
 // ---------- Abschlussgrund ----------
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -129,6 +196,28 @@ impl AbschlussGrund {
             "abgewiesen" => Some(AbschlussGrund::Abgewiesen),
             _ => None,
         }
+    }
+}
+
+// Nullable Spalte (`abschluss_grund`) — gleiches Muster wie bei `SchadenStatus`
+// (s. o.): `Type`/`Decode` direkt auf dem Enum, statt `#[sqlx(try_from = …)]`
+// (Orphan-Rule auf `Option<Enum>`).
+impl<DB: sqlx::Database> sqlx::Type<DB> for AbschlussGrund
+where
+    str: sqlx::Type<DB>,
+{
+    fn type_info() -> DB::TypeInfo {
+        <str as sqlx::Type<DB>>::type_info()
+    }
+}
+
+impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for AbschlussGrund
+where
+    &'r str: sqlx::Decode<'r, DB>,
+{
+    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
+        AbschlussGrund::parse(s).ok_or_else(|| format!("Ungültiger Abschlussgrund: {s}").into())
     }
 }
 
@@ -172,12 +261,9 @@ pub struct SchadenAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
     pub registrier_nr: i64,
-    #[schema(value_type = SchadenStatus)]
-    pub status: String,
-    #[schema(value_type = SchadenTyp)]
-    pub typ: String,
-    #[schema(value_type = Ausmass)]
-    pub ausmass: String,
+    pub status: SchadenStatus,
+    pub typ: SchadenTyp,
+    pub ausmass: Ausmass,
     pub ort: String,
     pub lat: Option<f64>,
     pub lon: Option<f64>,
@@ -188,8 +274,7 @@ pub struct SchadenAnzeige {
     pub geschaedigt_organisation_id: Option<i64>,
     pub uebergeben_an: Option<String>,
     pub uebergeben_at: Option<String>,
-    #[schema(value_type = Option<AbschlussGrund>)]
-    pub abschluss_grund: Option<String>,
+    pub abschluss_grund: Option<AbschlussGrund>,
     pub abschluss_at: Option<String>,
     pub erfasst_at: String,
     pub erfasst_von: i64,
