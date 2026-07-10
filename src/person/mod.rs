@@ -46,6 +46,14 @@ impl PersonStatus {
     }
 }
 
+impl TryFrom<String> for PersonStatus {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        PersonStatus::parse(&s).ok_or_else(|| format!("Ungültiger PersonStatus: {s}"))
+    }
+}
+
 /// Optionale Geschlechtsangabe. `unbekannt` ist ein erstklassiger Wert.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -74,6 +82,32 @@ impl Geschlecht {
             "unbekannt" => Some(Geschlecht::Unbekannt),
             _ => None,
         }
+    }
+}
+
+// `geschlecht` ist eine nullable Spalte (`Option<String>`). `#[sqlx(try_from = "…")]`
+// scheitert hier an der Orphan-Rule (`TryFrom<Option<String>> for Option<Geschlecht>`
+// wäre ein fremder Trait auf einem fremden `Option<_>`). Stattdessen `Type`/`Decode`
+// direkt auf `Geschlecht` implementieren (sqlx-Referenzmuster für Custom-Enum-Spalten,
+// vgl. sqlx-Doku zu `Decode`): sqlx' Blanket-Impl für `Option<T>` liefert NULL → `None`
+// automatisch; ein ungültiger Nicht-NULL-Wert wird zum `Decode`-Fehler (→ 500 statt
+// stillem Fallback — Spalte ist DB-CHECK-geschützt, sollte nie ungültig sein).
+impl<DB: sqlx::Database> sqlx::Type<DB> for Geschlecht
+where
+    str: sqlx::Type<DB>,
+{
+    fn type_info() -> DB::TypeInfo {
+        <str as sqlx::Type<DB>>::type_info()
+    }
+}
+
+impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for Geschlecht
+where
+    &'r str: sqlx::Decode<'r, DB>,
+{
+    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
+        Geschlecht::parse(s).ok_or_else(|| format!("Ungültiges Geschlecht: {s}").into())
     }
 }
 
@@ -125,6 +159,28 @@ impl Sichtungskategorie {
             Sichtungskategorie::Tot => "tot",
             Sichtungskategorie::Unverletzt => "unverletzt",
         }
+    }
+}
+
+// Nullable Spalte (`aktuelle_sichtung`) — gleiches Muster wie bei `Geschlecht` (s.o.):
+// `Type`/`Decode` direkt auf dem Enum, statt `#[sqlx(try_from = "Option<String>")]`
+// (Orphan-Rule).
+impl<DB: sqlx::Database> sqlx::Type<DB> for Sichtungskategorie
+where
+    str: sqlx::Type<DB>,
+{
+    fn type_info() -> DB::TypeInfo {
+        <str as sqlx::Type<DB>>::type_info()
+    }
+}
+
+impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for Sichtungskategorie
+where
+    &'r str: sqlx::Decode<'r, DB>,
+{
+    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
+        Sichtungskategorie::parse(s).ok_or_else(|| format!("Ungültige Sichtungskategorie: {s}").into())
     }
 }
 
@@ -238,12 +294,11 @@ pub struct PersonAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
     pub registrier_nr: i64,
-    #[schema(value_type = PersonStatus)]
-    pub status: String,
+    #[sqlx(try_from = "String")]
+    pub status: PersonStatus,
     pub name: Option<String>,
     pub vorname: Option<String>,
-    #[schema(value_type = Option<Geschlecht>)]
-    pub geschlecht: Option<String>,
+    pub geschlecht: Option<Geschlecht>,
     pub geburtsdatum: Option<String>,
     pub alter_geschaetzt: Option<i64>,
     pub herkunft_adresse: Option<String>,
@@ -256,8 +311,7 @@ pub struct PersonAnzeige {
     pub geaendert_von: i64,
     pub storniert_at: Option<String>,
     // E‑2: denormalisierter medizinischer Cache (NULL = ungesichtet / vor Ort).
-    #[schema(value_type = Option<Sichtungskategorie>)]
-    pub aktuelle_sichtung: Option<String>,
+    pub aktuelle_sichtung: Option<Sichtungskategorie>,
     pub aktuelle_sichtung_at: Option<String>,
     pub aktueller_verbleib: Option<String>,
     // E‑3: UHS-Cache (NULL = nicht in einer UHS / nicht auf einem Platz).

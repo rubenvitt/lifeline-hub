@@ -215,6 +215,7 @@ pub async fn storniere(
 mod tests {
     use super::*;
     use crate::db::test_pool;
+    use crate::person::PersonStatus;
     use sqlx::SqlitePool;
 
     /// Minimal-Setup: eine Org, ein Benutzer, ein aktiver Einsatz. Liefert (benutzer_id, einsatz_id).
@@ -246,7 +247,7 @@ mod tests {
         let (b, e) = setup(&pool).await;
         let p1 = anlegen(&pool, e, b, leere_daten()).await.unwrap();
         assert_eq!(p1.registrier_nr, 1);
-        assert_eq!(p1.status, "erfasst");
+        assert_eq!(p1.status, PersonStatus::Erfasst);
         storniere(&pool, e, p1.id, b).await.unwrap();
         let p2 = anlegen(&pool, e, b, leere_daten()).await.unwrap();
         assert_eq!(p2.registrier_nr, 2, "Soft-Delete recycelt keine Nummern");
@@ -273,7 +274,7 @@ mod tests {
         let _p2 = anlegen(&pool, e, b, leere_daten()).await.unwrap();
         let vermisste = liste(&pool, e, Some("vermisst")).await.unwrap();
         assert_eq!(vermisste.len(), 1);
-        assert_eq!(vermisste[0].status, "vermisst");
+        assert_eq!(vermisste[0].status, PersonStatus::Vermisst);
         let erfasste = liste(&pool, e, Some("erfasst")).await.unwrap();
         assert_eq!(erfasste.len(), 1);
     }

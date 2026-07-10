@@ -298,10 +298,10 @@ pub async fn status_wechsel(
     if vorher.storniert_at.is_some() {
         return Err(AppError::Conflict("Stornierte Person kann nicht geändert werden".into()));
     }
-    if !darf_uebergehen(&vorher.status, &body.status) {
+    if !darf_uebergehen(vorher.status.as_str(), &body.status) {
         return Err(AppError::UnprocessableEntity(format!(
             "Status-Übergang {} → {} ist nicht erlaubt",
-            vorher.status, body.status
+            vorher.status.as_str(), body.status
         )));
     }
     repo::setze_status(&state.pool, einsatz_id, person_id, &body.status, benutzer.id).await?;
@@ -320,7 +320,7 @@ pub async fn status_wechsel(
         &state, einsatz_id, benutzer.id,
         &format!(
             "Person {}: {} → {}",
-            registrier_anzeige(vorher.registrier_nr), vorher.status, body.status
+            registrier_anzeige(vorher.registrier_nr), vorher.status.as_str(), body.status
         ),
     ).await?;
     sse_person(&state, einsatz_id, person_id);
@@ -397,7 +397,7 @@ pub async fn sichten(
         _ => {
             return Err(AppError::UnprocessableEntity(format!(
                 "Person ist nicht anwesend (Status {})",
-                person.status
+                person.status.as_str()
             )))
         }
     };
@@ -479,11 +479,11 @@ pub async fn export(
         csv.push_str(&format!(
             "{};{};{};{};{};{};{};{}\n",
             registrier_anzeige(p.registrier_nr),
-            csv_feld(&p.status),
-            csv_feld(p.aktuelle_sichtung.as_deref().unwrap_or("")),
+            csv_feld(p.status.as_str()),
+            csv_feld(p.aktuelle_sichtung.map(|s| s.as_str()).unwrap_or("")),
             csv_feld(p.name.as_deref().unwrap_or("")),
             csv_feld(p.vorname.as_deref().unwrap_or("")),
-            csv_feld(p.geschlecht.as_deref().unwrap_or("")),
+            csv_feld(p.geschlecht.map(|g| g.as_str()).unwrap_or("")),
             alter,
             csv_feld(p.antreff_ort.as_deref().unwrap_or("")),
         ));
@@ -636,7 +636,7 @@ pub async fn abgleich_anlegen(
         ));
     }
     let vermisst = repo::laden(&state.pool, einsatz_id, person_id).await?;
-    if vermisst.storniert_at.is_some() || vermisst.status != "vermisst" {
+    if vermisst.storniert_at.is_some() || vermisst.status != PersonStatus::Vermisst {
         return Err(AppError::UnprocessableEntity(
             "Abgleich nur ausgehend von einer vermissten Person".into(),
         ));
