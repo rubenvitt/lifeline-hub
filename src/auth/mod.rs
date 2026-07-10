@@ -23,12 +23,66 @@ pub enum SystemRolle {
     Keiner,
 }
 
+impl SystemRolle {
+    /// DB-/API-Stringrepräsentation.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SystemRolle::Admin => ROLLE_ADMIN,
+            SystemRolle::Keiner => ROLLE_KEINER,
+        }
+    }
+
+    /// Parst einen gespeicherten/übergebenen Rollenwert; `None` bei ungültigem Wert.
+    pub fn parse(s: &str) -> Option<SystemRolle> {
+        match s {
+            ROLLE_ADMIN => Some(SystemRolle::Admin),
+            ROLLE_KEINER => Some(SystemRolle::Keiner),
+            _ => None,
+        }
+    }
+}
+
+impl TryFrom<String> for SystemRolle {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        SystemRolle::parse(&s).ok_or_else(|| format!("Ungültige SystemRolle: {s}"))
+    }
+}
+
 /// Org-weite Rolle (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `org_rolle`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum OrgRolle {
     Fuehrungskraft,
     Keine,
+}
+
+impl OrgRolle {
+    /// DB-/API-Stringrepräsentation.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            OrgRolle::Fuehrungskraft => ORG_ROLLE_FUEHRUNGSKRAFT,
+            OrgRolle::Keine => ORG_ROLLE_KEINE,
+        }
+    }
+
+    /// Parst einen gespeicherten/übergebenen Rollenwert; `None` bei ungültigem Wert.
+    pub fn parse(s: &str) -> Option<OrgRolle> {
+        match s {
+            ORG_ROLLE_FUEHRUNGSKRAFT => Some(OrgRolle::Fuehrungskraft),
+            ORG_ROLLE_KEINE => Some(OrgRolle::Keine),
+            _ => None,
+        }
+    }
+}
+
+impl TryFrom<String> for OrgRolle {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        OrgRolle::parse(&s).ok_or_else(|| format!("Ungültige OrgRolle: {s}"))
+    }
 }
 
 /// Interner Benutzer-Datensatz inklusive Passwort-Hash.
@@ -40,8 +94,10 @@ pub struct Benutzer {
     pub anzeigename: String,
     pub benutzername: String,
     pub passwort_hash: String,
-    pub system_rolle: String,
-    pub org_rolle: String,
+    #[sqlx(try_from = "String")]
+    pub system_rolle: SystemRolle,
+    #[sqlx(try_from = "String")]
+    pub org_rolle: OrgRolle,
     pub aktiv: bool,
     pub erstellt_at: String,
 }
@@ -49,7 +105,7 @@ pub struct Benutzer {
 impl Benutzer {
     /// Ob dieser Benutzer die System-Rolle Admin hat.
     pub fn ist_admin(&self) -> bool {
-        self.system_rolle == ROLLE_ADMIN
+        self.system_rolle == SystemRolle::Admin
     }
 
     /// Ob dieser Benutzer Einsätze anlegen darf: System-Admin ODER org-weite Führungskraft.
@@ -59,7 +115,7 @@ impl Benutzer {
     /// Konzepte. Würde der erweiterte Lesezugriff künftig auf weitere Rollen ausgedehnt,
     /// soll das nicht automatisch das Anlegerecht aufweichen (und umgekehrt).
     pub fn darf_einsatz_anlegen(&self) -> bool {
-        self.ist_admin() || self.org_rolle == ORG_ROLLE_FUEHRUNGSKRAFT
+        self.ist_admin() || self.org_rolle == OrgRolle::Fuehrungskraft
     }
 
     /// Ob dieser Benutzer den Admin-Bereich sehen darf (Stammdaten + globale
@@ -68,7 +124,7 @@ impl Benutzer {
     /// Bewusst eigenständig — „Admin-Bereich lesen" und „Einsatz anlegen" sind
     /// verschiedene Konzepte, auch wenn das Prädikat heute identisch ist.
     pub fn darf_admin_bereich(&self) -> bool {
-        self.ist_admin() || self.org_rolle == ORG_ROLLE_FUEHRUNGSKRAFT
+        self.ist_admin() || self.org_rolle == OrgRolle::Fuehrungskraft
     }
 
     /// Höhere Berechtigung mit erweitertem Einsatz-Zugriff: System-Admin oder
@@ -78,7 +134,7 @@ impl Benutzer {
     /// Bewusst eigenständig (siehe [`Self::darf_einsatz_anlegen`]); keine Delegation,
     /// damit sich die beiden Berechtigungsmengen unabhängig entwickeln können.
     pub fn ist_hoehere_berechtigung(&self) -> bool {
-        self.ist_admin() || self.org_rolle == ORG_ROLLE_FUEHRUNGSKRAFT
+        self.ist_admin() || self.org_rolle == OrgRolle::Fuehrungskraft
     }
 
     /// Sichere, serialisierbare Darstellung ohne Passwort-Hash.
@@ -87,8 +143,8 @@ impl Benutzer {
             id: self.id,
             anzeigename: self.anzeigename.clone(),
             benutzername: self.benutzername.clone(),
-            system_rolle: self.system_rolle.clone(),
-            org_rolle: self.org_rolle.clone(),
+            system_rolle: self.system_rolle,
+            org_rolle: self.org_rolle,
             aktiv: self.aktiv,
             erstellt_at: self.erstellt_at.clone(),
         }
@@ -101,10 +157,10 @@ pub struct BenutzerAnzeige {
     pub id: i64,
     pub anzeigename: String,
     pub benutzername: String,
-    #[schema(value_type = SystemRolle)]
-    pub system_rolle: String,
-    #[schema(value_type = OrgRolle)]
-    pub org_rolle: String,
+    #[sqlx(try_from = "String")]
+    pub system_rolle: SystemRolle,
+    #[sqlx(try_from = "String")]
+    pub org_rolle: OrgRolle,
     pub aktiv: bool,
     pub erstellt_at: String,
 }
@@ -120,8 +176,8 @@ mod tests {
             anzeigename: "Test".into(),
             benutzername: "test".into(),
             passwort_hash: "h".into(),
-            system_rolle: system_rolle.into(),
-            org_rolle: org_rolle.into(),
+            system_rolle: SystemRolle::parse(system_rolle).unwrap(),
+            org_rolle: OrgRolle::parse(org_rolle).unwrap(),
             aktiv: true,
             erstellt_at: "2026-05-23".into(),
         }

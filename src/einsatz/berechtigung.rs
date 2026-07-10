@@ -249,7 +249,9 @@ pub async fn fordere_modul_zugriff_laden(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::auth::{ORG_ROLLE_FUEHRUNGSKRAFT, ORG_ROLLE_KEINE, ROLLE_ADMIN, ROLLE_KEINER};
+    use crate::auth::{
+        OrgRolle, SystemRolle, ORG_ROLLE_FUEHRUNGSKRAFT, ORG_ROLLE_KEINE, ROLLE_ADMIN, ROLLE_KEINER,
+    };
     use crate::einsatz::{EinsatzStatus, STATUS_ABGESCHLOSSEN, STATUS_AKTIV};
 
     fn einsatz_mit_status(status: EinsatzStatus) -> Einsatz {
@@ -285,8 +287,8 @@ mod tests {
             anzeigename: "Test".into(),
             benutzername: "test".into(),
             passwort_hash: "h".into(),
-            system_rolle: system_rolle.into(),
-            org_rolle: org_rolle.into(),
+            system_rolle: SystemRolle::parse(system_rolle).unwrap(),
+            org_rolle: OrgRolle::parse(org_rolle).unwrap(),
             aktiv: true,
             erstellt_at: "2026-05-23".into(),
         }

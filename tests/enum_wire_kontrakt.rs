@@ -1,5 +1,6 @@
 //! LFH-120: Guard — Serde-Wire == as_str() für jede Variante jedes union-relevanten
 //! Domänen-Enums. Schützt die generierten utoipa-Unions vor stiller Fehlgenerierung.
+use lifeline_hub::auth::{OrgRolle, SystemRolle};
 use lifeline_hub::bereitstellungsraum::{BrBelegungsArt, BrStatus, ObjektTyp};
 use lifeline_hub::chat::BezugTyp;
 use lifeline_hub::einsatz::{Einsatzart, EinsatzRolle, EinsatzStatus};
@@ -246,6 +247,10 @@ fn serde_wire_gleich_as_str() {
         LageZoneTyp::Sperrgebiet,
         LageZoneTyp::FreieSkizze,
     );
+
+    // auth
+    wire_eq!(SystemRolle::Admin, SystemRolle::Keiner);
+    wire_eq!(OrgRolle::Fuehrungskraft, OrgRolle::Keine);
 }
 
 /// LFH-120 (Task 1b): Orphan-Union-Schema-Anker. Diese Enums haben KEIN `as_str()` —
@@ -261,7 +266,6 @@ macro_rules! wire_is {
 #[test]
 fn orphan_enums_wire() {
     use lifeline_hub::auftrag::{AuftragBearbeitungsstatus, EmpfaengerTyp};
-    use lifeline_hub::auth::{OrgRolle, SystemRolle};
     use lifeline_hub::befehl::{BefehlStatus, BefehlVorlage};
     use lifeline_hub::einsatz::einstellungen::{
         BasemapModus, EinheitenSystem, Koordinatenformat, Zeitformat,
@@ -282,10 +286,6 @@ fn orphan_enums_wire() {
         ErinnerungStatus::Erledigt => "erledigt",
         ErinnerungStatus::Quittiert => "quittiert",
     );
-
-    // auth
-    wire_is!(SystemRolle::Admin => "admin", SystemRolle::Keiner => "keiner");
-    wire_is!(OrgRolle::Fuehrungskraft => "fuehrungskraft", OrgRolle::Keine => "keine");
 
     // einsatz::einstellungen
     wire_is!(

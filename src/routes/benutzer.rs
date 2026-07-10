@@ -1,7 +1,7 @@
 use crate::app::AppState;
 use crate::auth::session::AdminUser;
 use crate::auth::{
-    password, BenutzerAnzeige, ORG_ROLLE_FUEHRUNGSKRAFT, ORG_ROLLE_KEINE, ROLLE_ADMIN, ROLLE_KEINER,
+    password, BenutzerAnzeige, OrgRolle, SystemRolle, ORG_ROLLE_KEINE, ROLLE_ADMIN, ROLLE_KEINER,
 };
 use crate::error::AppError;
 use axum::extract::{Path, State};
@@ -55,14 +55,14 @@ pub async fn anlegen(
         )));
     }
     let rolle = req.system_rolle.as_deref().unwrap_or(ROLLE_KEINER);
-    if rolle != ROLLE_ADMIN && rolle != ROLLE_KEINER {
+    if SystemRolle::parse(rolle).is_none() {
         return Err(AppError::Validation(
             "system_rolle muss 'admin' oder 'keiner' sein".into(),
         ));
     }
 
     let org_rolle = req.org_rolle.as_deref().unwrap_or(ORG_ROLLE_KEINE);
-    if org_rolle != ORG_ROLLE_FUEHRUNGSKRAFT && org_rolle != ORG_ROLLE_KEINE {
+    if OrgRolle::parse(org_rolle).is_none() {
         return Err(AppError::Validation(
             "org_rolle muss 'fuehrungskraft' oder 'keine' sein".into(),
         ));
