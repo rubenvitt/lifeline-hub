@@ -32,6 +32,31 @@ impl TierStatus {
     }
 }
 
+// `status` ist in `TierAnzeige` non-null, aber für einen einheitlichen Decode-
+// Mechanismus über alle vier Tier-Enums (statt gemischt `Type`/`Decode` +
+// `#[sqlx(try_from = "String")]`) direkt `Type`/`Decode` auf dem Enum
+// implementieren — gleiches Muster wie bei den nullable Feldern unten (vgl.
+// `Geschlecht`/`Sichtungskategorie` in `src/person/mod.rs`). sqlx' Blanket-Impl
+// für `Option<T>` deckt Nullability der anderen drei Felder transparent ab.
+impl<DB: sqlx::Database> sqlx::Type<DB> for TierStatus
+where
+    str: sqlx::Type<DB>,
+{
+    fn type_info() -> DB::TypeInfo {
+        <str as sqlx::Type<DB>>::type_info()
+    }
+}
+
+impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for TierStatus
+where
+    &'r str: sqlx::Decode<'r, DB>,
+{
+    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
+        TierStatus::parse(s).ok_or_else(|| format!("Ungültiger TierStatus: {s}").into())
+    }
+}
+
 /// Spezies-Enum. String = CHECK-Constraint. `etb_label` ist die pseudonyme
 /// Anzeige in der ETB-Spur (z. B. "Hund").
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -86,6 +111,27 @@ impl Spezies {
     }
 }
 
+// `spezies` ist in `TierAnzeige` non-null — gleiches einheitliches `Type`/
+// `Decode`-Muster wie `TierStatus` (s. o.).
+impl<DB: sqlx::Database> sqlx::Type<DB> for Spezies
+where
+    str: sqlx::Type<DB>,
+{
+    fn type_info() -> DB::TypeInfo {
+        <str as sqlx::Type<DB>>::type_info()
+    }
+}
+
+impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for Spezies
+where
+    &'r str: sqlx::Decode<'r, DB>,
+{
+    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
+        Spezies::parse(s).ok_or_else(|| format!("Ungültige Spezies: {s}").into())
+    }
+}
+
 /// Optionale Geschlechtsangabe des Tiers (kein `divers`, anders als bei Personen).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -111,6 +157,30 @@ impl TierGeschlecht {
             "unbekannt" => Some(TierGeschlecht::Unbekannt),
             _ => None,
         }
+    }
+}
+
+// `geschlecht` ist eine nullable Spalte (`Option<String>`). `#[sqlx(try_from = …)]`
+// scheitert an der Orphan-Rule auf `Option<Enum>` (vgl. `Geschlecht` in
+// `src/person/mod.rs`) — stattdessen `Type`/`Decode` direkt auf dem Enum; sqlx'
+// Blanket-Impl für `Option<T>` liefert NULL → `None` automatisch, ein ungültiger
+// Nicht-NULL-Wert wird zum `Decode`-Fehler (Spalte ist DB-CHECK-geschützt).
+impl<DB: sqlx::Database> sqlx::Type<DB> for TierGeschlecht
+where
+    str: sqlx::Type<DB>,
+{
+    fn type_info() -> DB::TypeInfo {
+        <str as sqlx::Type<DB>>::type_info()
+    }
+}
+
+impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for TierGeschlecht
+where
+    &'r str: sqlx::Decode<'r, DB>,
+{
+    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
+        TierGeschlecht::parse(s).ok_or_else(|| format!("Ungültiges TierGeschlecht: {s}").into())
     }
 }
 
@@ -153,6 +223,28 @@ impl AbschlussGrund {
     }
 }
 
+// Nullable Spalte (`abschluss_grund`) — gleiches Muster wie bei `TierGeschlecht`
+// (s. o.): `Type`/`Decode` direkt auf dem Enum, statt `#[sqlx(try_from = …)]`
+// (Orphan-Rule auf `Option<Enum>`).
+impl<DB: sqlx::Database> sqlx::Type<DB> for AbschlussGrund
+where
+    str: sqlx::Type<DB>,
+{
+    fn type_info() -> DB::TypeInfo {
+        <str as sqlx::Type<DB>>::type_info()
+    }
+}
+
+impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for AbschlussGrund
+where
+    &'r str: sqlx::Decode<'r, DB>,
+{
+    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
+        AbschlussGrund::parse(s).ok_or_else(|| format!("Ungültiger AbschlussGrund: {s}").into())
+    }
+}
+
 /// Ob ein Status-Übergang `von → nach` erlaubt ist. Gleichbleibender Status und
 /// unbekannte Werte sind nie erlaubt. `abgeschlossen` ist terminal; Übergänge
 /// zurück in aktive Zustände sind erlaubt — als Korrektur einer Fehleingabe
@@ -189,14 +281,11 @@ pub struct TierAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
     pub registrier_nr: i64,
-    #[schema(value_type = TierStatus)]
-    pub status: String,
-    #[schema(value_type = Spezies)]
-    pub spezies: String,
+    pub status: TierStatus,
+    pub spezies: Spezies,
     pub rasse_beschreibung: Option<String>,
     pub rufname: Option<String>,
-    #[schema(value_type = Option<TierGeschlecht>)]
-    pub geschlecht: Option<String>,
+    pub geschlecht: Option<TierGeschlecht>,
     pub alter_geschaetzt: Option<i64>,
     pub farbe_beschreibung: Option<String>,
     pub kennzeichnung: Option<String>,
@@ -205,8 +294,7 @@ pub struct TierAnzeige {
     pub halter_kontakt: Option<String>,
     pub antreff_ort: Option<String>,
     pub notiz: Option<String>,
-    #[schema(value_type = Option<AbschlussGrund>)]
-    pub abschluss_grund: Option<String>,
+    pub abschluss_grund: Option<AbschlussGrund>,
     pub abschluss_ziel: Option<String>,
     pub erfasst_at: String,
     pub erfasst_von: i64,

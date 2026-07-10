@@ -218,7 +218,7 @@ pub async fn anlegen(
     .await?;
 
     // Pseudonyme ETB-Spur: nur Reg.-Nr. + Spezies (+ Status bei vermisst).
-    let spezies_label = Spezies::parse(&tier.spezies).map(|s| s.etb_label()).unwrap_or("");
+    let spezies_label = tier.spezies.etb_label();
     let text = if status == "vermisst" {
         format!("Tier {} ({}) als vermisst gemeldet", registrier_anzeige(tier.registrier_nr), spezies_label)
     } else {
@@ -367,10 +367,10 @@ pub async fn status_wechsel(
     if vorher.storniert_at.is_some() {
         return Err(AppError::Conflict("Storniertes Tier kann nicht geändert werden".into()));
     }
-    if !darf_uebergehen(&vorher.status, &body.status) {
+    if !darf_uebergehen(vorher.status.as_str(), &body.status) {
         return Err(AppError::UnprocessableEntity(format!(
             "Status-Übergang {} → {} ist nicht erlaubt",
-            vorher.status, body.status
+            vorher.status.as_str(), body.status
         )));
     }
 
@@ -403,8 +403,8 @@ pub async fn status_wechsel(
     let r = registrier_anzeige(vorher.registrier_nr);
     let text = match body.status.as_str() {
         "abgeschlossen" => format!("Tier {r}: abgeschlossen ({})", grund.as_deref().unwrap_or("")),
-        "aktiv" if vorher.status == "vermisst" => format!("Tier {r}: vermisst → aktiv (aufgefunden)"),
-        _ => format!("Tier {r}: {} → {}", vorher.status, body.status),
+        "aktiv" if vorher.status == TierStatus::Vermisst => format!("Tier {r}: vermisst → aktiv (aufgefunden)"),
+        _ => format!("Tier {r}: {} → {}", vorher.status.as_str(), body.status),
     };
     etb_system(&state, einsatz_id, benutzer.id, &text).await?;
     sse_tier(&state, einsatz_id, tier_id);
@@ -470,11 +470,11 @@ pub async fn export(
         csv.push_str(&format!(
             "{};{};{};{};{};{};{};{}\n",
             registrier_anzeige(t.registrier_nr),
-            csv_feld(&t.status),
-            csv_feld(&t.spezies),
+            csv_feld(t.status.as_str()),
+            csv_feld(t.spezies.as_str()),
             csv_feld(t.rufname.as_deref().unwrap_or("")),
             csv_feld(t.rasse_beschreibung.as_deref().unwrap_or("")),
-            csv_feld(t.geschlecht.as_deref().unwrap_or("")),
+            csv_feld(t.geschlecht.map(|g| g.as_str()).unwrap_or("")),
             alter,
             csv_feld(t.antreff_ort.as_deref().unwrap_or("")),
         ));

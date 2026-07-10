@@ -273,6 +273,7 @@ pub async fn storniere(
 mod tests {
     use super::*;
     use crate::db::test_pool;
+    use crate::tier::{AbschlussGrund, Spezies, TierStatus};
     use sqlx::SqlitePool;
 
     /// Minimal-Setup: eine Org, ein Benutzer, ein aktiver Einsatz. Liefert (benutzer_id, einsatz_id).
@@ -314,11 +315,11 @@ mod tests {
         let (b, e) = setup(&pool).await;
         let t1 = anlegen(&pool, e, b, "aktiv", hund()).await.unwrap();
         assert_eq!(t1.registrier_nr, 1);
-        assert_eq!(t1.status, "aktiv");
+        assert_eq!(t1.status, TierStatus::Aktiv);
         storniere(&pool, e, t1.id, b).await.unwrap();
         let t2 = anlegen(&pool, e, b, "vermisst", hund()).await.unwrap();
         assert_eq!(t2.registrier_nr, 2, "Soft-Delete recycelt keine Nummern");
-        assert_eq!(t2.status, "vermisst");
+        assert_eq!(t2.status, TierStatus::Vermisst);
     }
 
     #[tokio::test]
@@ -346,7 +347,7 @@ mod tests {
         assert_eq!(vermisste.len(), 1);
         let katzen = liste(&pool, e, None, Some("katze"), None).await.unwrap();
         assert_eq!(katzen.len(), 1);
-        assert_eq!(katzen[0].spezies, "katze");
+        assert_eq!(katzen[0].spezies, Spezies::Katze);
     }
 
     #[tokio::test]
@@ -403,15 +404,15 @@ mod tests {
         // Ohne abschluss_grund würde der DB-CHECK verletzt → wir übergeben ihn.
         setze_status(&pool, e, t.id, "abgeschlossen", Some("uebergabe_tierarzt"), Some("Tierarzt Müller"), b).await.unwrap();
         let nachher = laden(&pool, e, t.id).await.unwrap();
-        assert_eq!(nachher.status, "abgeschlossen");
-        assert_eq!(nachher.abschluss_grund.as_deref(), Some("uebergabe_tierarzt"));
+        assert_eq!(nachher.status, TierStatus::Abgeschlossen);
+        assert_eq!(nachher.abschluss_grund, Some(AbschlussGrund::UebergabeTierarzt));
         assert_eq!(nachher.abschluss_ziel.as_deref(), Some("Tierarzt Müller"));
 
         // Korrektur zurück → Status ändert sich, Abschluss-Felder bleiben.
         setze_status(&pool, e, t.id, "aktiv", None, None, b).await.unwrap();
         let korrigiert = laden(&pool, e, t.id).await.unwrap();
-        assert_eq!(korrigiert.status, "aktiv");
-        assert_eq!(korrigiert.abschluss_grund.as_deref(), Some("uebergabe_tierarzt"),
+        assert_eq!(korrigiert.status, TierStatus::Aktiv);
+        assert_eq!(korrigiert.abschluss_grund, Some(AbschlussGrund::UebergabeTierarzt),
             "Abschluss-Grund bleibt als Audit-Spur erhalten");
     }
 
