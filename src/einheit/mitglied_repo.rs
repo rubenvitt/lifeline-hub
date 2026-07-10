@@ -1,5 +1,6 @@
 use super::{EinheitMitgliedFahrzeug, EinheitMitgliedMaterial, EinheitMitgliedPerson};
 use crate::error::AppError;
+use crate::material::MaterialStatus;
 use crate::staerke::{Staerke, StaerkePosition};
 use sqlx::SqlitePool;
 
@@ -97,7 +98,13 @@ pub async fn gib_material_frei(pool: &SqlitePool, einsatz_id: i64, einheit_id: i
 }
 
 #[derive(sqlx::FromRow)]
-struct MaterialRow { em_id: i64, bezeichnung: String, menge: i64, status: String }
+struct MaterialRow {
+    em_id: i64,
+    bezeichnung: String,
+    menge: i64,
+    #[sqlx(try_from = "String")]
+    status: MaterialStatus,
+}
 
 /// Material-Mitglieder einer Einheit (Snapshot-Bezeichnung + Menge + Status).
 pub async fn material_mitglieder(pool: &SqlitePool, einheit_id: i64) -> Result<Vec<EinheitMitgliedMaterial>, AppError> {

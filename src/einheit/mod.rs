@@ -60,8 +60,7 @@ pub struct EinheitMitgliedMaterial {
     pub bezeichnung: String,
     pub menge: i64,
     /// Festes Status-Enum als String (z. B. "einsatzbereit").
-    #[schema(value_type = crate::material::MaterialStatus)]
-    pub status: String,
+    pub status: crate::material::MaterialStatus,
 }
 
 /// Aufgelöste Einheiten-Anzeige inkl. Typ/Abschnitt-Labels, Führer-Identität,

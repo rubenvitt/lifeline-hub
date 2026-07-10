@@ -3,7 +3,7 @@ use crate::auth::session::{AdminUser, CurrentUser};
 use crate::einsatz::berechtigung::{fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
-use crate::katalog::ist_gueltige_betriebsart;
+use crate::katalog::Betriebsart;
 use crate::sprechgruppe::repo as sg_repo;
 use crate::sprechgruppe::{Sprechgruppe, SprechgruppeAnzeige};
 use axum::extract::{Path, Query, State};
@@ -62,7 +62,7 @@ fn normalisiere_katalog(body: KatalogBody) -> Result<NormalisierterKatalog, AppE
     if bezeichnung.is_empty() {
         return Err(AppError::Validation("Bezeichnung darf nicht leer sein".into()));
     }
-    if !ist_gueltige_betriebsart(&body.betriebsart) {
+    if Betriebsart::parse(&body.betriebsart).is_none() {
         return Err(AppError::Validation(format!(
             "Ungültige Betriebsart «{}» — erlaubt: TMO, DMO",
             body.betriebsart
@@ -87,7 +87,7 @@ fn normalisiere_lokal(body: EinsatzLokalBody) -> Result<NormalisierterLokal, App
     if bezeichnung.is_empty() {
         return Err(AppError::Validation("Bezeichnung darf nicht leer sein".into()));
     }
-    if !ist_gueltige_betriebsart(&body.betriebsart) {
+    if Betriebsart::parse(&body.betriebsart).is_none() {
         return Err(AppError::Validation(format!(
             "Ungültige Betriebsart «{}» — erlaubt: TMO, DMO",
             body.betriebsart

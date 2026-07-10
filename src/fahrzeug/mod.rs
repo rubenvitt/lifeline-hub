@@ -10,7 +10,7 @@ use utoipa::ToSchema;
 // Geteilte Konstanten/Validierung leben jetzt neutral in `crate::katalog` und werden
 // hier re-exportiert, damit Bestandscode (crate::fahrzeug::KATEGORIE_*, super::*) gilt.
 pub use crate::katalog::{
-    ist_gueltige_kategorie, DIENSTSTATUS_AUSSER_DIENST, DIENSTSTATUS_IN_DIENST,
+    ist_gueltige_kategorie, StatusKategorie, DIENSTSTATUS_AUSSER_DIENST, DIENSTSTATUS_IN_DIENST,
     KATEGORIE_GEBUNDEN, KATEGORIE_NICHT_VERFUEGBAR, KATEGORIE_VERFUEGBAR,
 };
 
@@ -118,8 +118,7 @@ pub struct FahrzeugVorschlaege {
 pub struct FahrzeugStatus {
     pub id: i64,
     pub label: String,
-    #[schema(value_type = crate::katalog::StatusKategorie)]
-    pub kategorie: String,
+    pub kategorie: StatusKategorie,
     pub farbe: Option<String>,
     pub fms_anker: Option<i64>,
     pub sortier: i64,
@@ -144,8 +143,7 @@ pub struct EinsatzFahrzeugAnzeige {
     pub traegerorganisation: Option<String>,
     pub status_id: Option<i64>,
     pub status_label: Option<String>,
-    #[schema(value_type = Option<crate::katalog::StatusKategorie>)]
-    pub status_kategorie: Option<String>,
+    pub status_kategorie: Option<StatusKategorie>,
     pub status_farbe: Option<String>,
     pub bemerkung: Option<String>,
     pub lat: Option<f64>,

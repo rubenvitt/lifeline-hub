@@ -1,5 +1,6 @@
 pub mod repo;
 
+use crate::katalog::Betriebsart;
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -10,7 +11,8 @@ pub struct Sprechgruppe {
     pub org_id: i64,
     pub einsatz_id: Option<i64>,
     pub bezeichnung: String,
-    pub betriebsart: String,
+    #[sqlx(try_from = "String")]
+    pub betriebsart: Betriebsart,
     pub hinweis: Option<String>,
     pub aktiv: bool,
     pub sortier: i64,
@@ -25,7 +27,7 @@ impl Sprechgruppe {
             einsatz_id: self.einsatz_id,
             einsatz_lokal: self.einsatz_id.is_some(),
             bezeichnung: self.bezeichnung.clone(),
-            betriebsart: self.betriebsart.clone(),
+            betriebsart: self.betriebsart,
             hinweis: self.hinweis.clone(),
             aktiv: self.aktiv,
             sortier: self.sortier,
@@ -41,8 +43,7 @@ pub struct SprechgruppeAnzeige {
     /// `true` wenn die Sprechgruppe einsatzlokal ist (d.h. `einsatz_id` gesetzt).
     pub einsatz_lokal: bool,
     pub bezeichnung: String,
-    #[schema(value_type = crate::katalog::Betriebsart)]
-    pub betriebsart: String,
+    pub betriebsart: Betriebsart,
     pub hinweis: Option<String>,
     pub aktiv: bool,
     pub sortier: i64,
@@ -54,7 +55,7 @@ mod tests {
     fn sg(einsatz_id: Option<i64>) -> Sprechgruppe {
         Sprechgruppe {
             id: 1, org_id: 1, einsatz_id, bezeichnung: "412_F_DRK".into(),
-            betriebsart: "TMO".into(), hinweis: None, aktiv: true, sortier: 0,
+            betriebsart: Betriebsart::Tmo, hinweis: None, aktiv: true, sortier: 0,
             angelegt_at: "2026-06-21 10:00:00".into(),
         }
     }

@@ -2,7 +2,7 @@ use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
 use crate::error::AppError;
 use crate::fahrzeug::status_repo::{self, StatusDaten};
-use crate::fahrzeug::{ist_gueltige_kategorie, FahrzeugStatus};
+use crate::fahrzeug::{FahrzeugStatus, StatusKategorie};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -47,7 +47,7 @@ fn normalisiere(body: StatusBody) -> Result<Normalisiert, AppError> {
     if label.is_empty() {
         return Err(AppError::Validation("Label darf nicht leer sein".into()));
     }
-    if !ist_gueltige_kategorie(&body.kategorie) {
+    if StatusKategorie::parse(&body.kategorie).is_none() {
         return Err(AppError::Validation("Ungültige Kategorie".into()));
     }
     if let Some(f) = body.fms_anker {

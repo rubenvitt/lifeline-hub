@@ -92,6 +92,16 @@ impl MaterialStatus {
     }
 }
 
+// Non-null, manuell gemappt (`disposition_repo::zu_anzeige` aus dem internen `Row`) —
+// TryFrom<String> für `#[sqlx(try_from = "String")]` auf dem internen FromRow-Struct
+// (analog `LageZoneTyp` in `src/lage_zone/repo.rs`).
+impl TryFrom<String> for MaterialStatus {
+    type Error = String;
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        MaterialStatus::parse(&s).ok_or_else(|| format!("Ungültiger MaterialStatus: {s}"))
+    }
+}
+
 /// Aufgelöste Material-Dispositionszeile: Identität nach der Auflösungsregel
 /// (Live aus dem Stamm bei aktivem Einsatz + Material in Dienst, sonst Snapshot);
 /// `menge` und `status` kommen **immer** aus der Dispositionszeile.
@@ -111,8 +121,7 @@ pub struct EinsatzMaterialAnzeige {
     pub bestandsnummer: Option<String>,
     pub traegerorganisation: Option<String>,
     pub menge: i64,
-    #[schema(value_type = MaterialStatus)]
-    pub status: String,
+    pub status: MaterialStatus,
     pub bemerkung: Option<String>,
     pub disponiert_at: String,
     pub disponiert_von: Option<i64>,

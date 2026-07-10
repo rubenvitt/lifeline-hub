@@ -1,4 +1,4 @@
-use super::{EinsatzMaterialAnzeige, DIENSTSTATUS_IN_DIENST};
+use super::{EinsatzMaterialAnzeige, MaterialStatus, DIENSTSTATUS_IN_DIENST};
 use crate::error::AppError;
 use sqlx::SqlitePool;
 
@@ -22,7 +22,8 @@ struct Row {
     einheit_id: Option<i64>,
     uhs_id: Option<i64>,
     menge: i64,
-    status: String,
+    #[sqlx(try_from = "String")]
+    status: MaterialStatus,
     snap_bezeichnung: String,
     snap_kategorie: Option<String>,
     snap_bestandsnummer: Option<String>,
@@ -303,7 +304,7 @@ mod tests {
         let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(a.bezeichnung, "Wolldecke");
         assert_eq!(a.menge, 50);
-        assert_eq!(a.status, "einsatzbereit");
+        assert_eq!(a.status, MaterialStatus::Einsatzbereit);
         assert!(!a.ist_adhoc);
         assert_eq!(a.kategorie.as_deref(), Some("Betreuung"));
     }
@@ -369,14 +370,14 @@ mod tests {
         aktualisiere(&pool, einsatz, em, Some(30), Some(MaterialStatus::Defekt.as_str()), Some("nass"), None).await.unwrap();
         let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(a.menge, 30);
-        assert_eq!(a.status, "defekt");
+        assert_eq!(a.status, MaterialStatus::Defekt);
         assert_eq!(a.bemerkung.as_deref(), Some("nass"));
 
         // Nur Status ändern (menge/bemerkung None -> bleiben).
         aktualisiere(&pool, einsatz, em, None, Some(MaterialStatus::Verbraucht.as_str()), None, None).await.unwrap();
         let b = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(b.menge, 30, "Menge unveraendert");
-        assert_eq!(b.status, "verbraucht");
+        assert_eq!(b.status, MaterialStatus::Verbraucht);
 
         entferne(&pool, einsatz, em).await.unwrap();
         assert!(matches!(laden_anzeige(&pool, einsatz, em, true).await.unwrap_err(), AppError::NotFound));

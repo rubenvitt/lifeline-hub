@@ -216,7 +216,12 @@ pub async fn aktualisieren(
             &state,
             einsatz_id,
             benutzer.id,
-            &format!("Material «{}»: Status «{}» → «{}»", nachher.bezeichnung, vorher.status, nachher.status),
+            &format!(
+                "Material «{}»: Status «{}» → «{}»",
+                nachher.bezeichnung,
+                vorher.status.as_str(),
+                nachher.status.as_str()
+            ),
         )
         .await?;
     }

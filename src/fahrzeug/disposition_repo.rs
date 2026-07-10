@@ -1,4 +1,7 @@
-use super::{status_repo, EinsatzFahrzeugAnzeige, DIENSTSTATUS_IN_DIENST, KATEGORIE_GEBUNDEN};
+use super::{
+    status_repo, EinsatzFahrzeugAnzeige, StatusKategorie, DIENSTSTATUS_IN_DIENST,
+    KATEGORIE_GEBUNDEN,
+};
 use crate::error::AppError;
 use crate::staerke::Staerke;
 use sqlx::SqlitePool;
@@ -52,7 +55,7 @@ struct Row {
     soll_unterfuehrer: Option<i64>,
     soll_mannschaft: Option<i64>,
     status_label: Option<String>,
-    status_kategorie: Option<String>,
+    status_kategorie: Option<StatusKategorie>,
     status_farbe: Option<String>,
 }
 
@@ -344,7 +347,7 @@ mod tests {
     use super::*;
     use crate::fahrzeug::repo::{self as fz_repo, FahrzeugDaten};
     use crate::fahrzeug::status_repo::{self, StatusDaten};
-    use crate::fahrzeug::KATEGORIE_GEBUNDEN;
+    use crate::fahrzeug::{StatusKategorie, KATEGORIE_GEBUNDEN};
 
     /// Org(1) + Benutzer + Einsatz + ein 'gebunden'-Status; liefert (benutzer, einsatz).
     async fn setup(pool: &SqlitePool) -> (i64, i64) {
@@ -405,7 +408,7 @@ mod tests {
         let a = laden_anzeige(&pool, einsatz, ef, true).await.unwrap();
         assert_eq!(a.funkrufname, "Florian 1");
         assert_eq!(a.kennzeichen.as_deref(), Some("XX-AB 1"));
-        assert_eq!(a.status_kategorie.as_deref(), Some("gebunden"));
+        assert_eq!(a.status_kategorie, Some(StatusKategorie::Gebunden));
         assert!(!a.ist_adhoc);
     }
 

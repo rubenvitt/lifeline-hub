@@ -3,7 +3,9 @@ pub mod qualifikation_repo;
 pub mod repo;
 pub mod status_repo;
 
-use crate::katalog::{KATEGORIE_GEBUNDEN, KATEGORIE_NICHT_VERFUEGBAR, KATEGORIE_VERFUEGBAR};
+use crate::katalog::{
+    StatusKategorie, KATEGORIE_GEBUNDEN, KATEGORIE_NICHT_VERFUEGBAR, KATEGORIE_VERFUEGBAR,
+};
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -96,8 +98,7 @@ pub struct Qualifikation {
 pub struct PersonalStatus {
     pub id: i64,
     pub label: String,
-    #[schema(value_type = crate::katalog::StatusKategorie)]
-    pub kategorie: String,
+    pub kategorie: StatusKategorie,
     pub farbe: Option<String>,
     pub sortier: i64,
 }
@@ -125,8 +126,7 @@ pub struct EinsatzPersonalAnzeige {
     pub staerke_position: Option<String>,
     pub status_id: Option<i64>,
     pub status_label: Option<String>,
-    #[schema(value_type = Option<crate::katalog::StatusKategorie>)]
-    pub status_kategorie: Option<String>,
+    pub status_kategorie: Option<StatusKategorie>,
     pub status_farbe: Option<String>,
     pub bemerkung: Option<String>,
     pub disponiert_at: String,

@@ -1,7 +1,7 @@
 use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
 use crate::error::AppError;
-use crate::katalog::ist_gueltige_kategorie;
+use crate::katalog::StatusKategorie;
 use crate::personal::status_repo::{self, StatusDaten};
 use crate::personal::PersonalStatus;
 use axum::extract::{Path, State};
@@ -45,7 +45,7 @@ fn normalisiere(body: StatusBody) -> Result<Normalisiert, AppError> {
     if label.is_empty() {
         return Err(AppError::Validation("Label darf nicht leer sein".into()));
     }
-    if !ist_gueltige_kategorie(&body.kategorie) {
+    if StatusKategorie::parse(&body.kategorie).is_none() {
         return Err(AppError::Validation("Ungültige Kategorie".into()));
     }
     Ok(Normalisiert {

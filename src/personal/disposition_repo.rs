@@ -1,7 +1,7 @@
 use super::qualifikation_repo;
 use super::{status_repo, EinsatzPersonalAnzeige, FuehrungskraftKarte};
 use crate::error::AppError;
-use crate::katalog::{DIENSTSTATUS_IN_DIENST, KATEGORIE_GEBUNDEN};
+use crate::katalog::{StatusKategorie, DIENSTSTATUS_IN_DIENST, KATEGORIE_GEBUNDEN};
 use sqlx::SqlitePool;
 
 /// SELECT mit aufgelöster Live-Identität (LEFT JOIN personal), Live-Funktion (geordnete
@@ -46,7 +46,7 @@ struct Row {
     live_staerke_position: Option<String>,
     live_funktion: Option<String>,
     status_label: Option<String>,
-    status_kategorie: Option<String>,
+    status_kategorie: Option<StatusKategorie>,
     status_farbe: Option<String>,
 }
 
@@ -322,7 +322,7 @@ pub async fn aktualisiere_position(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::katalog::KATEGORIE_GEBUNDEN;
+    use crate::katalog::{StatusKategorie, KATEGORIE_GEBUNDEN};
     use crate::personal::repo::{self as p_repo, PersonalDaten};
     use crate::personal::status_repo::{self, StatusDaten};
     use crate::personal::qualifikation_repo;
@@ -407,7 +407,7 @@ mod tests {
         let a = laden_anzeige(&pool, einsatz, ep, true).await.unwrap();
         assert_eq!(a.name, "Thomas Müller");
         assert_eq!(a.funktion.as_deref(), Some("Sanitäter, Gruppenführer"));
-        assert_eq!(a.status_kategorie.as_deref(), Some("gebunden"));
+        assert_eq!(a.status_kategorie, Some(StatusKategorie::Gebunden));
         assert_eq!(a.staerke_position.as_deref(), Some("fuehrer"), "Stamm-Default greift");
         assert!(!a.ist_adhoc);
     }

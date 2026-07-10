@@ -6,6 +6,7 @@ use lifeline_hub::chat::BezugTyp;
 use lifeline_hub::einsatz::{Einsatzart, EinsatzRolle, EinsatzStatus};
 use lifeline_hub::etb::{EtbTyp, MeldeWeg};
 use lifeline_hub::gefahr::{Gefahrentyp, Schutzobjekt, Warnstufe};
+use lifeline_hub::katalog::{Betriebsart, StatusKategorie};
 use lifeline_hub::lage_zone::LageZoneTyp;
 use lifeline_hub::material::MaterialStatus;
 use lifeline_hub::person::{AbgleichStatus, Geschlecht, PersonStatus, Sichtungskategorie, VerbleibArt, VerbleibStatus};
@@ -158,6 +159,14 @@ fn serde_wire_gleich_as_str() {
         MaterialStatus::DesinfektionNoetig,
     );
 
+    // katalog
+    wire_eq!(Betriebsart::Tmo, Betriebsart::Dmo);
+    wire_eq!(
+        StatusKategorie::Verfuegbar,
+        StatusKategorie::Gebunden,
+        StatusKategorie::NichtVerfuegbar,
+    );
+
     // etb
     wire_eq!(
         EtbTyp::Meldung,
@@ -276,7 +285,7 @@ fn orphan_enums_wire() {
     use lifeline_hub::einsatz::einstellungen::{
         BasemapModus, EinheitenSystem, Koordinatenformat, Zeitformat,
     };
-    use lifeline_hub::katalog::{Betriebsart, Dienststatus, StatusKategorie};
+    use lifeline_hub::katalog::Dienststatus;
     use lifeline_hub::kommunikation::{AdressatKategorie, Prioritaet, Richtung};
     use lifeline_hub::lagebericht::{LageberichtStatus, LageberichtVorlage};
     use lifeline_hub::meldung::{Meldungsart, MeldungStatus};
@@ -311,13 +320,7 @@ fn orphan_enums_wire() {
         Koordinatenformat::Gk => "gk",
     );
 
-    // katalog
-    wire_is!(Betriebsart::Tmo => "TMO", Betriebsart::Dmo => "DMO");
-    wire_is!(
-        StatusKategorie::Verfuegbar => "verfuegbar",
-        StatusKategorie::Gebunden => "gebunden",
-        StatusKategorie::NichtVerfuegbar => "nicht_verfuegbar",
-    );
+    // katalog (Dienststatus bleibt String — kein as_str/parse, daher weiter orphan)
     wire_is!(Dienststatus::InDienst => "in_dienst", Dienststatus::AusserDienst => "ausser_dienst");
 
     // lagebericht
