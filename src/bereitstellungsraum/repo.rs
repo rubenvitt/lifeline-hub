@@ -250,6 +250,7 @@ pub async fn aktive_belegungen(pool: &SqlitePool, br_id: i64) -> Result<i64, App
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bereitstellungsraum::BrStatus;
     use crate::db::test_pool;
     use sqlx::SqlitePool;
 
@@ -305,7 +306,7 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(br.status, "geplant");
+        assert_eq!(br.status, BrStatus::Geplant);
     }
 
     #[tokio::test]
@@ -326,7 +327,7 @@ mod tests {
         .await
         .unwrap();
         let a = setze_status(&pool, e, br.id, "aktiv", b).await.unwrap();
-        assert_eq!(a.status, "aktiv");
+        assert_eq!(a.status, BrStatus::Aktiv);
     }
 
     // --- Erweiterte Tests ---

@@ -33,6 +33,14 @@ impl BrStatus {
     }
 }
 
+impl TryFrom<String> for BrStatus {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        BrStatus::parse(&s).ok_or_else(|| format!("Ungültiger BrStatus: {s}"))
+    }
+}
+
 /// Ob ein BR-Status-Übergang `von → nach` erlaubt ist. Status-Maschine:
 /// `geplant → aktiv → aufgeloest` (terminal); `geplant → aufgeloest` direkt
 /// erlaubt (BR war nie in Betrieb). Die Belegungs-Vorbedingung
@@ -78,6 +86,14 @@ impl ObjektTyp {
     }
 }
 
+impl TryFrom<String> for ObjektTyp {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        ObjektTyp::parse(&s).ok_or_else(|| format!("Ungültiger ObjektTyp: {s}"))
+    }
+}
+
 /// Art eines BR-Belegungs-Events. String = CHECK-Constraint in
 /// `migrations/0061_br_belegung.sql`. Append-only.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -107,6 +123,14 @@ impl BrBelegungsArt {
     }
 }
 
+impl TryFrom<String> for BrBelegungsArt {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        BrBelegungsArt::parse(&s).ok_or_else(|| format!("Ungültige BrBelegungsArt: {s}"))
+    }
+}
+
 /// Serialisierbare BR-Anzeige (1:1 zur Tabelle `bereitstellungsraum`).
 #[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct BrAnzeige {
@@ -116,8 +140,8 @@ pub struct BrAnzeige {
     pub bezeichnung: String,
     pub standort: Option<String>,
     pub notiz: Option<String>,
-    #[schema(value_type = BrStatus)]
-    pub status: String,
+    #[sqlx(try_from = "String")]
+    pub status: BrStatus,
     pub erfasst_at: String,
     pub erfasst_von: i64,
     pub geaendert_at: String,
@@ -131,11 +155,11 @@ pub struct BrBelegungAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
     pub br_id: i64,
-    #[schema(value_type = ObjektTyp)]
-    pub objekt_typ: String,
+    #[sqlx(try_from = "String")]
+    pub objekt_typ: ObjektTyp,
     pub objekt_id: i64,
-    #[schema(value_type = BrBelegungsArt)]
-    pub art: String,
+    #[sqlx(try_from = "String")]
+    pub art: BrBelegungsArt,
     pub notiz: Option<String>,
     pub zeitpunkt_at: String,
     pub erfasst_von: i64,

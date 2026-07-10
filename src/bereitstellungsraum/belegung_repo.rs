@@ -1,4 +1,4 @@
-use super::{repo, BrBelegungAnzeige, BrBelegungsArt, ObjektTyp};
+use super::{repo, BrBelegungAnzeige, BrBelegungsArt, BrStatus, ObjektTyp};
 use crate::error::AppError;
 use sqlx::{Sqlite, SqlitePool, Transaction};
 
@@ -41,10 +41,10 @@ pub async fn belege(
     // `status='aktiv'` (storniere setzt nur storniert_at), daher zusätzlich
     // `storniert_at IS NULL` fordern — analog UHS (`pruefe_uhs_aktiv`).
     let br = repo::laden(pool, einsatz_id, br_id).await?;
-    if br.status != "aktiv" || br.storniert_at.is_some() {
+    if br.status != BrStatus::Aktiv || br.storniert_at.is_some() {
         return Err(AppError::UnprocessableEntity(format!(
             "Bereitstellungsraum hat Status '{}' — Belegung nur bei aktivem BR möglich",
-            br.status
+            br.status.as_str()
         )));
     }
 
@@ -411,8 +411,8 @@ mod tests {
         let ev = belege(&pool, e, br, "einheit", einheit, "eintritt", None, b)
             .await
             .unwrap();
-        assert_eq!(ev.art, "eintritt");
-        assert_eq!(ev.objekt_typ, "einheit");
+        assert_eq!(ev.art, BrBelegungsArt::Eintritt);
+        assert_eq!(ev.objekt_typ, ObjektTyp::Einheit);
         assert_eq!(ev.objekt_id, einheit);
         assert_eq!(ev.br_id, br);
         assert_eq!(cache_einheit(&pool, einheit).await, Some(br));
@@ -434,7 +434,7 @@ mod tests {
         let ev = belege(&pool, e, br2, "einheit", einheit, "wechsel", None, b)
             .await
             .unwrap();
-        assert_eq!(ev.art, "wechsel");
+        assert_eq!(ev.art, BrBelegungsArt::Wechsel);
         assert_eq!(cache_einheit(&pool, einheit).await, Some(br2));
     }
 
@@ -453,7 +453,7 @@ mod tests {
         let ev = belege(&pool, e, br, "einheit", einheit, "austritt", None, b)
             .await
             .unwrap();
-        assert_eq!(ev.art, "austritt");
+        assert_eq!(ev.art, BrBelegungsArt::Austritt);
         assert_eq!(cache_einheit(&pool, einheit).await, None);
 
         // WICHTIG: nach Austritt muss BR auflösbar sein
@@ -537,8 +537,8 @@ mod tests {
         let ev = belege(&pool, e, br, "fahrzeug", fz, "eintritt", None, b)
             .await
             .unwrap();
-        assert_eq!(ev.art, "eintritt");
-        assert_eq!(ev.objekt_typ, "fahrzeug");
+        assert_eq!(ev.art, BrBelegungsArt::Eintritt);
+        assert_eq!(ev.objekt_typ, ObjektTyp::Fahrzeug);
         assert_eq!(cache_fahrzeug(&pool, fz).await, Some(br));
     }
 
@@ -722,11 +722,11 @@ mod tests {
 
         let liste = liste_je_br(&pool, br).await.unwrap();
         assert_eq!(liste.len(), 1, "nur Events für br, nicht br2");
-        assert_eq!(liste[0].art, "eintritt");
+        assert_eq!(liste[0].art, BrBelegungsArt::Eintritt);
 
         let liste2 = liste_je_br(&pool, br2).await.unwrap();
         assert_eq!(liste2.len(), 1);
-        assert_eq!(liste2[0].art, "wechsel");
+        assert_eq!(liste2[0].art, BrBelegungsArt::Wechsel);
     }
 
     #[tokio::test]
