@@ -7,6 +7,9 @@ use lifeline_hub::live::LiveHub;
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
+mod common;
+use common::login_cookie;
+
 // ---------- Harness ----------
 
 async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
@@ -29,32 +32,6 @@ async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
 
 async fn setup() -> axum::Router {
     setup_mit_pool().await.0
-}
-
-async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) -> String {
-    let body = format!(r#"{{"benutzername":"{benutzername}","passwort":"{passwort}"}}"#);
-    let resp = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/auth/login")
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(body))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
-    resp.headers()
-        .get(header::SET_COOKIE)
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .split(';')
-        .next()
-        .unwrap()
-        .to_string()
 }
 
 async fn anfrage(

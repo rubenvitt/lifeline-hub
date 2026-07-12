@@ -6,31 +6,13 @@
 
 use axum::body::{to_bytes, Body};
 use axum::http::{header, Request, StatusCode};
-use lifeline_hub::app::{build_router, AppState};
-use lifeline_hub::auth::bootstrap::bootstrap_admin;
-use lifeline_hub::db;
-use lifeline_hub::live::LiveHub;
 use serde_json::Value;
 use tower::ServiceExt;
 
-// ----------------------------- Test-Harness -----------------------------
+mod common;
+use common::setup;
 
-async fn setup() -> axum::Router {
-    let pool = db::test_pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    build_router(AppState {
-        pool,
-        live: LiveHub::new(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    })
-}
+// ----------------------------- Test-Harness -----------------------------
 
 /// Loggt sich ein und liefert das `name=value`-Cookie-Paar.
 async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) -> String {

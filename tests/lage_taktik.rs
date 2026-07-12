@@ -9,17 +9,17 @@
 //! den `LiveHub`-Klon (teilt denselben inneren Zustand wie der im AppState), damit
 //! der SSE-Test direkt via `live.abonniere(einsatz_id)` mithören kann.
 
-use axum::body::{to_bytes, Body};
-use axum::http::{header, Request, StatusCode};
+use axum::http::StatusCode;
 use lifeline_hub::app::{build_router, AppState};
 use lifeline_hub::auth::bootstrap::bootstrap_admin;
 use lifeline_hub::db;
 use lifeline_hub::live::{LiveHub, LiveNachricht};
-use serde_json::Value;
 use sqlx::SqlitePool;
 use std::time::Duration;
 use tokio::sync::broadcast::Receiver;
-use tower::ServiceExt;
+
+mod common;
+use common::{anfrage, einsatz_anlegen, login_cookie};
 
 // ---------- Harness ----------
 
@@ -43,72 +43,6 @@ async fn setup() -> (axum::Router, LiveHub, SqlitePool) {
         karten_service_token: None,
     });
     (app, live, pool)
-}
-
-async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) -> String {
-    let body = format!(r#"{{"benutzername":"{benutzername}","passwort":"{passwort}"}}"#);
-    let resp = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/auth/login")
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(body))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
-    resp.headers()
-        .get(header::SET_COOKIE)
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .split(';')
-        .next()
-        .unwrap()
-        .to_string()
-}
-
-async fn anfrage(
-    app: &axum::Router,
-    methode: &str,
-    uri: &str,
-    cookie: &str,
-    body: Option<&str>,
-) -> (StatusCode, Value) {
-    let mut req = Request::builder()
-        .method(methode)
-        .uri(uri)
-        .header(header::COOKIE, cookie.to_string());
-    let body = match body {
-        Some(b) => {
-            req = req.header(header::CONTENT_TYPE, "application/json");
-            Body::from(b.to_string())
-        }
-        None => Body::empty(),
-    };
-    let resp = app.clone().oneshot(req.body(body).unwrap()).await.unwrap();
-    let status = resp.status();
-    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    (
-        status,
-        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
-    )
-}
-
-async fn einsatz_anlegen(app: &axum::Router, cookie: &str) -> i64 {
-    let (status, json) = anfrage(
-        app,
-        "POST",
-        "/api/einsaetze",
-        cookie,
-        Some(r#"{"bezeichnung":"Lage"}"#),
-    )
-    .await;
-    assert_eq!(status, StatusCode::CREATED);
-    json["id"].as_i64().unwrap()
 }
 
 async fn einheit_bilden(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {

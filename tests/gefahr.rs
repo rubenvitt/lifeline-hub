@@ -1,5 +1,4 @@
-use axum::body::{to_bytes, Body};
-use axum::http::{header, Request, StatusCode};
+use axum::http::StatusCode;
 use lifeline_hub::app::{build_router, AppState};
 use lifeline_hub::auth::bootstrap::bootstrap_admin;
 use lifeline_hub::db;
@@ -7,7 +6,9 @@ use lifeline_hub::live::{LiveHub, LiveNachricht};
 use serde_json::{json, Value};
 use std::time::Duration;
 use tokio::sync::broadcast::Receiver;
-use tower::ServiceExt;
+
+mod common;
+use common::{anfrage, login_cookie};
 
 async fn setup() -> (axum::Router, LiveHub) {
     let pool = db::test_pool().await;
@@ -28,32 +29,6 @@ async fn setup() -> (axum::Router, LiveHub) {
     (router, live)
 }
 
-async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) -> String {
-    let body = format!(r#"{{"benutzername":"{benutzername}","passwort":"{passwort}"}}"#);
-    let resp = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/auth/login")
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(body))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK);
-    resp.headers()
-        .get(header::SET_COOKIE)
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .split(';')
-        .next()
-        .unwrap()
-        .to_string()
-}
-
 async fn benutzer_anlegen(app: &axum::Router, admin: &str, name: &str, org_rolle: &str) -> i64 {
     let body = format!(
         r#"{{"anzeigename":"{name}","benutzername":"{name}","passwort":"{name}pw1","org_rolle":"{org_rolle}"}}"#
@@ -61,33 +36,6 @@ async fn benutzer_anlegen(app: &axum::Router, admin: &str, name: &str, org_rolle
     let (status, json) = anfrage(app, "POST", "/api/benutzer", admin, Some(&body)).await;
     assert_eq!(status, StatusCode::CREATED, "{json:?}");
     json["id"].as_i64().unwrap()
-}
-
-async fn anfrage(
-    app: &axum::Router,
-    methode: &str,
-    uri: &str,
-    cookie: &str,
-    body: Option<&str>,
-) -> (StatusCode, Value) {
-    let mut req = Request::builder()
-        .method(methode)
-        .uri(uri)
-        .header(header::COOKIE, cookie.to_string());
-    let body = match body {
-        Some(b) => {
-            req = req.header(header::CONTENT_TYPE, "application/json");
-            Body::from(b.to_string())
-        }
-        None => Body::empty(),
-    };
-    let resp = app.clone().oneshot(req.body(body).unwrap()).await.unwrap();
-    let status = resp.status();
-    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    (
-        status,
-        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
-    )
 }
 
 async fn einsatz_anlegen(app: &axum::Router, cookie: &str) -> i64 {
