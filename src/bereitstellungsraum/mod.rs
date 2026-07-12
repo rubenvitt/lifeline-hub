@@ -171,19 +171,25 @@ mod tests {
 
     #[test]
     fn status_roundtrip_und_uebergaenge() {
-        for s in ["geplant","aktiv","aufgeloest"] { assert_eq!(BrStatus::parse(s).unwrap().as_str(), s); }
+        for s in ["geplant", "aktiv", "aufgeloest"] {
+            assert_eq!(BrStatus::parse(s).unwrap().as_str(), s);
+        }
         assert!(BrStatus::parse("quatsch").is_none());
-        assert!(darf_uebergehen("geplant","aktiv"));
-        assert!(darf_uebergehen("geplant","aufgeloest"));
-        assert!(darf_uebergehen("aktiv","aufgeloest"));
-        assert!(!darf_uebergehen("aufgeloest","aktiv"));
-        assert!(!darf_uebergehen("aktiv","aktiv"));
+        assert!(darf_uebergehen("geplant", "aktiv"));
+        assert!(darf_uebergehen("geplant", "aufgeloest"));
+        assert!(darf_uebergehen("aktiv", "aufgeloest"));
+        assert!(!darf_uebergehen("aufgeloest", "aktiv"));
+        assert!(!darf_uebergehen("aktiv", "aktiv"));
     }
 
     #[test]
     fn objekt_typ_und_belegungs_art_roundtrip() {
-        for t in ["einheit","fahrzeug"] { assert_eq!(ObjektTyp::parse(t).unwrap().as_str(), t); }
+        for t in ["einheit", "fahrzeug"] {
+            assert_eq!(ObjektTyp::parse(t).unwrap().as_str(), t);
+        }
         assert!(ObjektTyp::parse("person").is_none());
-        for a in ["eintritt","wechsel","austritt"] { assert_eq!(BrBelegungsArt::parse(a).unwrap().as_str(), a); }
+        for a in ["eintritt", "wechsel", "austritt"] {
+            assert_eq!(BrBelegungsArt::parse(a).unwrap().as_str(), a);
+        }
     }
 }

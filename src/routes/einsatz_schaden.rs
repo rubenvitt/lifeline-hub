@@ -1,6 +1,8 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{fordere_modul_zugriff_laden, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
+use crate::einsatz::berechtigung::{
+    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
+};
 use crate::einsatz::repo as einsatz_repo;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -23,7 +25,12 @@ use tokio_stream::{Stream, StreamExt};
 
 // ---------- ETB-/SSE-Helfer ----------
 
-async fn etb_system(state: &AppState, einsatz_id: i64, benutzer_id: i64, inhalt: &str) -> Result<(), AppError> {
+async fn etb_system(
+    state: &AppState,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    inhalt: &str,
+) -> Result<(), AppError> {
     let anzeige = etb_repo::anlegen(
         &state.pool,
         einsatz_id,
@@ -48,7 +55,8 @@ async fn etb_system(state: &AppState, einsatz_id: i64, benutzer_id: i64, inhalt:
 }
 
 fn sse_schaden(state: &AppState, einsatz_id: i64, schaden_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "schaden_id": schaden_id }).to_string();
+    let data =
+        serde_json::json!({ "einsatz_id": einsatz_id, "schaden_id": schaden_id }).to_string();
     state.live.publiziere_event(einsatz_id, "schaden", data);
 }
 
@@ -85,21 +93,34 @@ pub async fn liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
 
     if let Some(s) = &params.status {
         if SchadenStatus::parse(s).is_none() {
-            return Err(AppError::UnprocessableEntity("Unbekannter Status im Filter".into()));
+            return Err(AppError::UnprocessableEntity(
+                "Unbekannter Status im Filter".into(),
+            ));
         }
     }
     if let Some(t) = &params.typ {
         if SchadenTyp::parse(t).is_none() {
-            return Err(AppError::UnprocessableEntity("Unbekannter Typ im Filter".into()));
+            return Err(AppError::UnprocessableEntity(
+                "Unbekannter Typ im Filter".into(),
+            ));
         }
     }
     if let Some(a) = &params.ausmass {
         if Ausmass::parse(a).is_none() {
-            return Err(AppError::UnprocessableEntity("Unbekanntes Ausmaß im Filter".into()));
+            return Err(AppError::UnprocessableEntity(
+                "Unbekanntes Ausmaß im Filter".into(),
+            ));
         }
     }
     Ok(Json(
@@ -140,7 +161,14 @@ pub async fn anlegen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     if let Some(s) = &body.status {
@@ -152,11 +180,19 @@ pub async fn anlegen(
     }
     let typ = match body.typ.as_deref().and_then(SchadenTyp::parse) {
         Some(t) => t,
-        None => return Err(AppError::UnprocessableEntity("Typ fehlt oder ist ungültig".into())),
+        None => {
+            return Err(AppError::UnprocessableEntity(
+                "Typ fehlt oder ist ungültig".into(),
+            ))
+        }
     };
     let ausmass = match body.ausmass.as_deref().and_then(Ausmass::parse) {
         Some(a) => a,
-        None => return Err(AppError::UnprocessableEntity("Ausmaß fehlt oder ist ungültig".into())),
+        None => {
+            return Err(AppError::UnprocessableEntity(
+                "Ausmaß fehlt oder ist ungültig".into(),
+            ))
+        }
     };
     let ort = match trimme(body.ort.clone()) {
         Some(o) => o,
@@ -167,7 +203,11 @@ pub async fn anlegen(
     // Eigene Organisation: id wird IMMER serverseitig aus einsatz.org_id abgeleitet,
     // der vom Client gesendete Wert wird ignoriert (nie vertrauen).
     let org_gesetzt = body.geschaedigt_organisation_id.is_some();
-    let geschaedigt_org_id = if org_gesetzt { Some(einsatz.org_id) } else { None };
+    let geschaedigt_org_id = if org_gesetzt {
+        Some(einsatz.org_id)
+    } else {
+        None
+    };
 
     // 4‑Wege-Exklusivität: höchstens eine Geschädigt-Quelle.
     let anzahl_quellen = body.geschaedigt_person_id.is_some() as u8
@@ -230,8 +270,17 @@ pub async fn detail(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
-    Ok(Json(schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?))
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
+    Ok(Json(
+        schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?,
+    ))
 }
 
 // ---------- PATCH /schaeden/{sid} (Stammfelder) ----------
@@ -269,17 +318,32 @@ pub async fn aktualisieren(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let vorher = schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?; // 404
     if vorher.storniert_at.is_some() {
-        return Err(AppError::Conflict("Stornierter Schaden kann nicht geändert werden".into()));
+        return Err(AppError::Conflict(
+            "Stornierter Schaden kann nicht geändert werden".into(),
+        ));
     }
 
     // lat/lon als Paar: Effektivzustand nach dem Patch prüfen (422 statt 500).
-    let eff_lat = match body.lat { Some(opt) => opt, None => vorher.lat };
-    let eff_lon = match body.lon { Some(opt) => opt, None => vorher.lon };
+    let eff_lat = match body.lat {
+        Some(opt) => opt,
+        None => vorher.lat,
+    };
+    let eff_lon = match body.lon {
+        Some(opt) => opt,
+        None => vorher.lon,
+    };
     if eff_lat.is_some() != eff_lon.is_some() {
         return Err(AppError::UnprocessableEntity(
             "lat und lon müssen gemeinsam gesetzt oder gemeinsam leer sein".into(),
@@ -287,12 +351,16 @@ pub async fn aktualisieren(
     }
     if let Some(la) = eff_lat {
         if !(-90.0..=90.0).contains(&la) {
-            return Err(AppError::UnprocessableEntity("lat muss zwischen -90 und 90 liegen".into()));
+            return Err(AppError::UnprocessableEntity(
+                "lat muss zwischen -90 und 90 liegen".into(),
+            ));
         }
     }
     if let Some(lo) = eff_lon {
         if !(-180.0..=180.0).contains(&lo) {
-            return Err(AppError::UnprocessableEntity("lon muss zwischen -180 und 180 liegen".into()));
+            return Err(AppError::UnprocessableEntity(
+                "lon muss zwischen -180 und 180 liegen".into(),
+            ));
         }
     }
 
@@ -308,28 +376,36 @@ pub async fn aktualisieren(
     }
     if let Some(Some(g)) = &body.abschluss_grund {
         if AbschlussGrund::parse(g.trim()).is_none() {
-            return Err(AppError::UnprocessableEntity("Ungültiger Abschlussgrund".into()));
+            return Err(AppError::UnprocessableEntity(
+                "Ungültiger Abschlussgrund".into(),
+            ));
         }
     }
     let ort_norm = trimme(body.ort.clone());
     if body.ort.is_some() && ort_norm.is_none() {
-        return Err(AppError::UnprocessableEntity("Ort darf nicht leer sein".into()));
+        return Err(AppError::UnprocessableEntity(
+            "Ort darf nicht leer sein".into(),
+        ));
     }
 
     // Normalisierte Bindungen (müssen den `aktualisiere`-Aufruf überleben → eigene `let`s).
     let beschreibung_norm = trimme(body.beschreibung.clone());
-    let kontakt_norm: Option<Option<String>> =
-        body.geschaedigt_kontakt.map(|o| o.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
-    let uebergeben_an_norm: Option<Option<String>> =
-        body.uebergeben_an.map(|o| o.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
-    let abschluss_grund_norm: Option<Option<String>> =
-        body.abschluss_grund.map(|o| o.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
+    let kontakt_norm: Option<Option<String>> = body
+        .geschaedigt_kontakt
+        .map(|o| o.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
+    let uebergeben_an_norm: Option<Option<String>> = body
+        .uebergeben_an
+        .map(|o| o.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
+    let abschluss_grund_norm: Option<Option<String>> = body
+        .abschluss_grund
+        .map(|o| o.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()));
 
     // Eigene Organisation: der vom Client gesendete id-Wert wird ignoriert. Die Tri-State
     // wird auf die ABGELEITETE Org-id gemappt: Some(Some(_)) → Some(Some(einsatz.org_id)),
     // Some(None) → Some(None) (löschen), None → None (unverändert).
-    let org_delta: Option<Option<i64>> =
-        body.geschaedigt_organisation_id.map(|opt| opt.map(|_| einsatz.org_id));
+    let org_delta: Option<Option<i64>> = body
+        .geschaedigt_organisation_id
+        .map(|opt| opt.map(|_| einsatz.org_id));
 
     // Effektivzustand NACH dem Patch für ALLE VIER Quellen (4‑Wege-CHECK) → 422 statt 500.
     let eff_person: Option<i64> = match body.geschaedigt_person_id {
@@ -427,16 +503,29 @@ pub async fn uebergeben(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let adressat = match trimme(body.uebergeben_an.clone()) {
         Some(a) => a,
-        None => return Err(AppError::UnprocessableEntity("Übergabe-Adressat ist Pflicht".into())),
+        None => {
+            return Err(AppError::UnprocessableEntity(
+                "Übergabe-Adressat ist Pflicht".into(),
+            ))
+        }
     };
     let vorher = schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?; // 404
     if vorher.storniert_at.is_some() {
-        return Err(AppError::Conflict("Stornierter Schaden kann nicht übergeben werden".into()));
+        return Err(AppError::Conflict(
+            "Stornierter Schaden kann nicht übergeben werden".into(),
+        ));
     }
     if !darf_uebergehen(vorher.status.as_str(), "uebergeben") {
         return Err(AppError::Conflict(format!(
@@ -447,10 +536,16 @@ pub async fn uebergeben(
 
     schaden_repo::uebergebe(&state.pool, einsatz_id, schaden_id, &adressat, benutzer.id).await?;
 
-    let text = format!("Schaden {} übergeben an {}", registrier_anzeige(vorher.registrier_nr), adressat);
+    let text = format!(
+        "Schaden {} übergeben an {}",
+        registrier_anzeige(vorher.registrier_nr),
+        adressat
+    );
     etb_system(&state, einsatz_id, benutzer.id, &text).await?;
     sse_schaden(&state, einsatz_id, schaden_id);
-    Ok(Json(schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?))
+    Ok(Json(
+        schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?,
+    ))
 }
 
 // ---------- POST /schaeden/{sid}/abschliessen ----------
@@ -470,10 +565,20 @@ pub async fn abschliessen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
-    let grund = match trimme(body.abschluss_grund.clone()).as_deref().and_then(AbschlussGrund::parse) {
+    let grund = match trimme(body.abschluss_grund.clone())
+        .as_deref()
+        .and_then(AbschlussGrund::parse)
+    {
         Some(g) => g,
         None => {
             return Err(AppError::UnprocessableEntity(
@@ -484,7 +589,9 @@ pub async fn abschliessen(
     let notiz = trimme(body.notiz.clone());
     let vorher = schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?; // 404
     if vorher.storniert_at.is_some() {
-        return Err(AppError::Conflict("Stornierter Schaden kann nicht abgeschlossen werden".into()));
+        return Err(AppError::Conflict(
+            "Stornierter Schaden kann nicht abgeschlossen werden".into(),
+        ));
     }
     if !darf_uebergehen(vorher.status.as_str(), "abgeschlossen") {
         return Err(AppError::Conflict(format!(
@@ -493,13 +600,26 @@ pub async fn abschliessen(
         )));
     }
 
-    schaden_repo::schliesse_ab(&state.pool, einsatz_id, schaden_id, grund.as_str(), notiz.as_deref(), benutzer.id)
-        .await?;
+    schaden_repo::schliesse_ab(
+        &state.pool,
+        einsatz_id,
+        schaden_id,
+        grund.as_str(),
+        notiz.as_deref(),
+        benutzer.id,
+    )
+    .await?;
 
-    let text = format!("Schaden {} abgeschlossen ({})", registrier_anzeige(vorher.registrier_nr), grund.as_str());
+    let text = format!(
+        "Schaden {} abgeschlossen ({})",
+        registrier_anzeige(vorher.registrier_nr),
+        grund.as_str()
+    );
     etb_system(&state, einsatz_id, benutzer.id, &text).await?;
     sse_schaden(&state, einsatz_id, schaden_id);
-    Ok(Json(schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?))
+    Ok(Json(
+        schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?,
+    ))
 }
 
 // ---------- DELETE /schaeden/{sid} (Stornieren) ----------
@@ -512,7 +632,14 @@ pub async fn stornieren(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let vorher = schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?; // 404
@@ -524,7 +651,10 @@ pub async fn stornieren(
         &state,
         einsatz_id,
         benutzer.id,
-        &format!("Schaden {} storniert", registrier_anzeige(vorher.registrier_nr)),
+        &format!(
+            "Schaden {} storniert",
+            registrier_anzeige(vorher.registrier_nr)
+        ),
     )
     .await?;
     sse_schaden(&state, einsatz_id, schaden_id);
@@ -541,7 +671,14 @@ pub async fn stream(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
 
     let rx = state.live.abonniere(einsatz_id);
     let stream = BroadcastStream::new(rx).map(|res| {

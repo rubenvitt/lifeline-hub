@@ -31,7 +31,14 @@ pub async fn liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     Ok(Json(bild_repo::liste(&state.pool, einsatz_id).await?))
 }
 
@@ -46,7 +53,14 @@ pub async fn hochladen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let mut bytes: Option<Vec<u8>> = None;
@@ -63,17 +77,20 @@ pub async fn hochladen(
                 if name.is_none() {
                     name = feld.file_name().map(str::to_string);
                 }
-                let b = feld.bytes().await
-                    .map_err(|e| AppError::Validation(format!("Datei lesen fehlgeschlagen: {e}")))?;
+                let b = feld.bytes().await.map_err(|e| {
+                    AppError::Validation(format!("Datei lesen fehlgeschlagen: {e}"))
+                })?;
                 bytes = Some(b.to_vec());
             }
             Some("ecken") => {
-                ecken = Some(feld.text().await
-                    .map_err(|e| AppError::Validation(format!("Ecken lesen fehlgeschlagen: {e}")))?);
+                ecken = Some(feld.text().await.map_err(|e| {
+                    AppError::Validation(format!("Ecken lesen fehlgeschlagen: {e}"))
+                })?);
             }
             Some("name") => {
-                name = Some(feld.text().await
-                    .map_err(|e| AppError::Validation(format!("Name lesen fehlgeschlagen: {e}")))?);
+                name = Some(feld.text().await.map_err(|e| {
+                    AppError::Validation(format!("Name lesen fehlgeschlagen: {e}"))
+                })?);
             }
             _ => {}
         }
@@ -86,7 +103,16 @@ pub async fn hochladen(
     bild::pruefe_ecken(&ecken)?;
     let name = name.unwrap_or_else(|| "Bild-Hintergrund".into());
 
-    let a = bild_repo::anlegen(&state.pool, einsatz_id, benutzer.id, &name, mime, &bytes, &ecken).await?;
+    let a = bild_repo::anlegen(
+        &state.pool,
+        einsatz_id,
+        benutzer.id,
+        &name,
+        mime,
+        &bytes,
+        &ecken,
+    )
+    .await?;
     sse_bild(&state, einsatz_id);
     Ok((StatusCode::CREATED, Json(a)))
 }
@@ -100,12 +126,20 @@ pub async fn herunterladen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     let (mime, daten) = bild_repo::laden_bytes(&state.pool, einsatz_id, bild_id).await?;
     let mut headers = HeaderMap::new();
     headers.insert(
         header::CONTENT_TYPE,
-        HeaderValue::from_str(&mime).unwrap_or(HeaderValue::from_static("application/octet-stream")),
+        HeaderValue::from_str(&mime)
+            .unwrap_or(HeaderValue::from_static("application/octet-stream")),
     );
     Ok((headers, daten))
 }
@@ -129,7 +163,14 @@ pub async fn aktualisieren(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     if let Some(o) = body.opazitaet {
@@ -139,13 +180,19 @@ pub async fn aktualisieren(
         bild::pruefe_ecken(e)?;
     }
 
-    let a = bild_repo::aktualisiere(&state.pool, einsatz_id, bild_id, BildPatch {
-        name: body.name,
-        ecken_json: body.ecken_json,
-        opazitaet: body.opazitaet,
-        sichtbar: body.sichtbar,
-        reihenfolge: body.reihenfolge,
-    }).await?;
+    let a = bild_repo::aktualisiere(
+        &state.pool,
+        einsatz_id,
+        bild_id,
+        BildPatch {
+            name: body.name,
+            ecken_json: body.ecken_json,
+            opazitaet: body.opazitaet,
+            sichtbar: body.sichtbar,
+            reihenfolge: body.reihenfolge,
+        },
+    )
+    .await?;
     sse_bild(&state, einsatz_id);
     Ok(Json(a))
 }
@@ -159,7 +206,14 @@ pub async fn loeschen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
     bild_repo::loeschen(&state.pool, einsatz_id, bild_id).await?;
     sse_bild(&state, einsatz_id);

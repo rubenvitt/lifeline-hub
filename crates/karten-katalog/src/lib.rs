@@ -30,7 +30,9 @@ pub fn merge_offline_katalog(
     compiled: Vec<OfflineKatalogEintrag>,
     remote: Option<Vec<OfflineKatalogEintrag>>,
 ) -> Vec<OfflineKatalogEintrag> {
-    let Some(remote) = remote else { return compiled };
+    let Some(remote) = remote else {
+        return compiled;
+    };
     let mut out = compiled;
     for e in remote {
         // Remote-Einträge müssen vollständig gepinnt sein — sonst käme ein Eintrag ohne
@@ -91,38 +93,72 @@ mod tests {
     use super::*;
     #[test]
     fn halb_gepinnter_remote_eintrag_ist_ungueltig() {
-        let e = OfflineKatalogEintrag { name:"X".into(), url:"https://TODO/x.mbtiles".into(),
-            region:"X".into(), groesse:1, lizenz:"ODbL".into(), kachel_schema:"shortbread".into(),
-            quelle:"t".into(), sha256:None, gruppe:None };
+        let e = OfflineKatalogEintrag {
+            name: "X".into(),
+            url: "https://TODO/x.mbtiles".into(),
+            region: "X".into(),
+            groesse: 1,
+            lizenz: "ODbL".into(),
+            kachel_schema: "shortbread".into(),
+            quelle: "t".into(),
+            sha256: None,
+            gruppe: None,
+        };
         assert!(!remote_eintrag_ist_gueltig(&e));
     }
 
     fn gepinnt(url: &str) -> OfflineKatalogEintrag {
-        OfflineKatalogEintrag { name:"X".into(), url:url.into(), region:"X".into(), groesse:1,
-            lizenz:"ODbL".into(), kachel_schema:"shortbread".into(), quelle:"t".into(),
-            sha256:Some("a".repeat(64)), gruppe:None }
+        OfflineKatalogEintrag {
+            name: "X".into(),
+            url: url.into(),
+            region: "X".into(),
+            groesse: 1,
+            lizenz: "ODbL".into(),
+            kachel_schema: "shortbread".into(),
+            quelle: "t".into(),
+            sha256: Some("a".repeat(64)),
+            gruppe: None,
+        }
     }
 
     #[test]
     fn https_remote_ist_gueltig() {
-        assert!(remote_eintrag_ist_gueltig(&gepinnt("https://cdn.example/x.mbtiles")));
+        assert!(remote_eintrag_ist_gueltig(&gepinnt(
+            "https://cdn.example/x.mbtiles"
+        )));
     }
 
     #[test]
     fn loopback_http_ist_gueltig() {
-        assert!(remote_eintrag_ist_gueltig(&gepinnt("http://127.0.0.1:9000/maps/x.mbtiles")));
-        assert!(remote_eintrag_ist_gueltig(&gepinnt("http://localhost:9000/maps/x.mbtiles")));
-        assert!(remote_eintrag_ist_gueltig(&gepinnt("http://[::1]:9000/maps/x.mbtiles")));
+        assert!(remote_eintrag_ist_gueltig(&gepinnt(
+            "http://127.0.0.1:9000/maps/x.mbtiles"
+        )));
+        assert!(remote_eintrag_ist_gueltig(&gepinnt(
+            "http://localhost:9000/maps/x.mbtiles"
+        )));
+        assert!(remote_eintrag_ist_gueltig(&gepinnt(
+            "http://[::1]:9000/maps/x.mbtiles"
+        )));
     }
 
     #[test]
     fn nicht_loopback_http_ist_ungueltig() {
-        assert!(!remote_eintrag_ist_gueltig(&gepinnt("http://cdn.example/x.mbtiles")));
+        assert!(!remote_eintrag_ist_gueltig(&gepinnt(
+            "http://cdn.example/x.mbtiles"
+        )));
         // Präfix-Spoofing: Host enthält/beginnt mit Loopback, ist aber eine fremde Domain.
-        assert!(!remote_eintrag_ist_gueltig(&gepinnt("http://127.0.0.1.evil.com/x.mbtiles")));
-        assert!(!remote_eintrag_ist_gueltig(&gepinnt("http://[::1].evil.com/x.mbtiles")));
+        assert!(!remote_eintrag_ist_gueltig(&gepinnt(
+            "http://127.0.0.1.evil.com/x.mbtiles"
+        )));
+        assert!(!remote_eintrag_ist_gueltig(&gepinnt(
+            "http://[::1].evil.com/x.mbtiles"
+        )));
         // Userinfo-Falle: der echte Host ist evil.com, nicht localhost/127.0.0.1.
-        assert!(!remote_eintrag_ist_gueltig(&gepinnt("http://localhost@evil.com/x.mbtiles")));
-        assert!(!remote_eintrag_ist_gueltig(&gepinnt("http://127.0.0.1@evil.com/x.mbtiles")));
+        assert!(!remote_eintrag_ist_gueltig(&gepinnt(
+            "http://localhost@evil.com/x.mbtiles"
+        )));
+        assert!(!remote_eintrag_ist_gueltig(&gepinnt(
+            "http://127.0.0.1@evil.com/x.mbtiles"
+        )));
     }
 }

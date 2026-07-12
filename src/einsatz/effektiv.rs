@@ -10,22 +10,35 @@ use crate::org::einstellungen::OrgEinstellungen;
 
 /// Effektives ETB-Nummernkreis-Präfix: Einsatz ?? Org.
 pub fn effektives_etb_praefix(e: &EinsatzEinstellungen, o: &OrgEinstellungen) -> Option<String> {
-    e.etb_nummer_praefix.clone().or_else(|| o.etb_nummer_praefix.clone())
+    e.etb_nummer_praefix
+        .clone()
+        .or_else(|| o.etb_nummer_praefix.clone())
 }
 
 /// Effektives Meldungs-Nummernkreis-Präfix: Einsatz ?? Org.
-pub fn effektives_meldung_praefix(e: &EinsatzEinstellungen, o: &OrgEinstellungen) -> Option<String> {
-    e.meldung_nummer_praefix.clone().or_else(|| o.meldung_nummer_praefix.clone())
+pub fn effektives_meldung_praefix(
+    e: &EinsatzEinstellungen,
+    o: &OrgEinstellungen,
+) -> Option<String> {
+    e.meldung_nummer_praefix
+        .clone()
+        .or_else(|| o.meldung_nummer_praefix.clone())
 }
 
 /// Effektives Auftrags-Nummernkreis-Präfix: Einsatz ?? Org.
-pub fn effektives_auftrag_praefix(e: &EinsatzEinstellungen, o: &OrgEinstellungen) -> Option<String> {
-    e.auftrag_nummer_praefix.clone().or_else(|| o.auftrag_nummer_praefix.clone())
+pub fn effektives_auftrag_praefix(
+    e: &EinsatzEinstellungen,
+    o: &OrgEinstellungen,
+) -> Option<String> {
+    e.auftrag_nummer_praefix
+        .clone()
+        .or_else(|| o.auftrag_nummer_praefix.clone())
 }
 
 /// Effektive Meldungs-Bestätigungs-Frist in Minuten: Einsatz ?? Org.
 pub fn effektive_meldung_frist_min(e: &EinsatzEinstellungen, o: &OrgEinstellungen) -> Option<i64> {
-    e.meldung_bestaetigung_frist_min.or(o.meldung_bestaetigung_frist_min)
+    e.meldung_bestaetigung_frist_min
+        .or(o.meldung_bestaetigung_frist_min)
 }
 
 /// Effektive Auftrags-Quittierungs-Frist in Minuten: Einsatz ?? Org.
@@ -33,7 +46,8 @@ pub fn effektive_auftrag_quittierung_frist_min(
     e: &EinsatzEinstellungen,
     o: &OrgEinstellungen,
 ) -> Option<i64> {
-    e.auftrag_quittierung_frist_min.or(o.auftrag_quittierung_frist_min)
+    e.auftrag_quittierung_frist_min
+        .or(o.auftrag_quittierung_frist_min)
 }
 
 /// Effektive Aufbewahrungsdauer in Tagen: Einsatz ?? Org.
@@ -74,7 +88,9 @@ pub fn effektive_koordinatenformat(
     e: &EinsatzEinstellungen,
     o: &OrgEinstellungen,
 ) -> Option<String> {
-    e.koordinatenformat.clone().or_else(|| o.koordinatenformat.clone())
+    e.koordinatenformat
+        .clone()
+        .or_else(|| o.koordinatenformat.clone())
 }
 
 /// Effektive Modul-Rolle: Einsatz-Override ?? Org-Default.
@@ -104,14 +120,23 @@ mod tests {
 
     #[test]
     fn etb_praefix_einsatz_schlaegt_org() {
-        let e = EinsatzEinstellungen { etb_nummer_praefix: Some("EB-E".into()), ..e() };
-        let o = OrgEinstellungen { etb_nummer_praefix: Some("EB-O".into()), ..o() };
+        let e = EinsatzEinstellungen {
+            etb_nummer_praefix: Some("EB-E".into()),
+            ..e()
+        };
+        let o = OrgEinstellungen {
+            etb_nummer_praefix: Some("EB-O".into()),
+            ..o()
+        };
         assert_eq!(effektives_etb_praefix(&e, &o).as_deref(), Some("EB-E"));
     }
 
     #[test]
     fn etb_praefix_fallback_auf_org() {
-        let o = OrgEinstellungen { etb_nummer_praefix: Some("EB-O".into()), ..o() };
+        let o = OrgEinstellungen {
+            etb_nummer_praefix: Some("EB-O".into()),
+            ..o()
+        };
         assert_eq!(effektives_etb_praefix(&e(), &o).as_deref(), Some("EB-O"));
     }
 
@@ -124,14 +149,23 @@ mod tests {
 
     #[test]
     fn meldung_praefix_einsatz_schlaegt_org() {
-        let e = EinsatzEinstellungen { meldung_nummer_praefix: Some("M-E".into()), ..e() };
-        let o = OrgEinstellungen { meldung_nummer_praefix: Some("M-O".into()), ..o() };
+        let e = EinsatzEinstellungen {
+            meldung_nummer_praefix: Some("M-E".into()),
+            ..e()
+        };
+        let o = OrgEinstellungen {
+            meldung_nummer_praefix: Some("M-O".into()),
+            ..o()
+        };
         assert_eq!(effektives_meldung_praefix(&e, &o).as_deref(), Some("M-E"));
     }
 
     #[test]
     fn meldung_praefix_fallback_auf_org() {
-        let o = OrgEinstellungen { meldung_nummer_praefix: Some("M-O".into()), ..o() };
+        let o = OrgEinstellungen {
+            meldung_nummer_praefix: Some("M-O".into()),
+            ..o()
+        };
         assert_eq!(effektives_meldung_praefix(&e(), &o).as_deref(), Some("M-O"));
     }
 
@@ -144,14 +178,23 @@ mod tests {
 
     #[test]
     fn auftrag_praefix_einsatz_schlaegt_org() {
-        let e = EinsatzEinstellungen { auftrag_nummer_praefix: Some("A-E".into()), ..e() };
-        let o = OrgEinstellungen { auftrag_nummer_praefix: Some("A-O".into()), ..o() };
+        let e = EinsatzEinstellungen {
+            auftrag_nummer_praefix: Some("A-E".into()),
+            ..e()
+        };
+        let o = OrgEinstellungen {
+            auftrag_nummer_praefix: Some("A-O".into()),
+            ..o()
+        };
         assert_eq!(effektives_auftrag_praefix(&e, &o).as_deref(), Some("A-E"));
     }
 
     #[test]
     fn auftrag_praefix_fallback_auf_org() {
-        let o = OrgEinstellungen { auftrag_nummer_praefix: Some("A-O".into()), ..o() };
+        let o = OrgEinstellungen {
+            auftrag_nummer_praefix: Some("A-O".into()),
+            ..o()
+        };
         assert_eq!(effektives_auftrag_praefix(&e(), &o).as_deref(), Some("A-O"));
     }
 
@@ -164,14 +207,23 @@ mod tests {
 
     #[test]
     fn meldung_frist_einsatz_schlaegt_org() {
-        let e = EinsatzEinstellungen { meldung_bestaetigung_frist_min: Some(10), ..e() };
-        let o = OrgEinstellungen { meldung_bestaetigung_frist_min: Some(30), ..o() };
+        let e = EinsatzEinstellungen {
+            meldung_bestaetigung_frist_min: Some(10),
+            ..e()
+        };
+        let o = OrgEinstellungen {
+            meldung_bestaetigung_frist_min: Some(30),
+            ..o()
+        };
         assert_eq!(effektive_meldung_frist_min(&e, &o), Some(10));
     }
 
     #[test]
     fn meldung_frist_fallback_auf_org() {
-        let o = OrgEinstellungen { meldung_bestaetigung_frist_min: Some(30), ..o() };
+        let o = OrgEinstellungen {
+            meldung_bestaetigung_frist_min: Some(30),
+            ..o()
+        };
         assert_eq!(effektive_meldung_frist_min(&e(), &o), Some(30));
     }
 
@@ -184,14 +236,23 @@ mod tests {
 
     #[test]
     fn auftrag_frist_einsatz_schlaegt_org() {
-        let e = EinsatzEinstellungen { auftrag_quittierung_frist_min: Some(15), ..e() };
-        let o = OrgEinstellungen { auftrag_quittierung_frist_min: Some(45), ..o() };
+        let e = EinsatzEinstellungen {
+            auftrag_quittierung_frist_min: Some(15),
+            ..e()
+        };
+        let o = OrgEinstellungen {
+            auftrag_quittierung_frist_min: Some(45),
+            ..o()
+        };
         assert_eq!(effektive_auftrag_quittierung_frist_min(&e, &o), Some(15));
     }
 
     #[test]
     fn auftrag_frist_fallback_auf_org() {
-        let o = OrgEinstellungen { auftrag_quittierung_frist_min: Some(45), ..o() };
+        let o = OrgEinstellungen {
+            auftrag_quittierung_frist_min: Some(45),
+            ..o()
+        };
         assert_eq!(effektive_auftrag_quittierung_frist_min(&e(), &o), Some(45));
     }
 
@@ -204,14 +265,23 @@ mod tests {
 
     #[test]
     fn retention_einsatz_schlaegt_org() {
-        let e = EinsatzEinstellungen { retention_dauer_tage: Some(90), ..e() };
-        let o = OrgEinstellungen { retention_dauer_tage: Some(365), ..o() };
+        let e = EinsatzEinstellungen {
+            retention_dauer_tage: Some(90),
+            ..e()
+        };
+        let o = OrgEinstellungen {
+            retention_dauer_tage: Some(365),
+            ..o()
+        };
         assert_eq!(effektive_retention_dauer_tage(&e, &o), Some(90));
     }
 
     #[test]
     fn retention_fallback_auf_org() {
-        let o = OrgEinstellungen { retention_dauer_tage: Some(365), ..o() };
+        let o = OrgEinstellungen {
+            retention_dauer_tage: Some(365),
+            ..o()
+        };
         assert_eq!(effektive_retention_dauer_tage(&e(), &o), Some(365));
     }
 
@@ -224,21 +294,36 @@ mod tests {
 
     #[test]
     fn auto_etb_einsatz_an_schlaegt_org_aus() {
-        let e = EinsatzEinstellungen { auto_etb_eintraege: Some(1), ..e() };
-        let o = OrgEinstellungen { auto_etb_eintraege: Some(0), ..o() };
+        let e = EinsatzEinstellungen {
+            auto_etb_eintraege: Some(1),
+            ..e()
+        };
+        let o = OrgEinstellungen {
+            auto_etb_eintraege: Some(0),
+            ..o()
+        };
         assert!(effektiv_auto_etb_aktiv(&e, &o), "Einsatz=1 schlägt Org=0");
     }
 
     #[test]
     fn auto_etb_einsatz_aus_schlaegt_org_an() {
-        let e = EinsatzEinstellungen { auto_etb_eintraege: Some(0), ..e() };
-        let o = OrgEinstellungen { auto_etb_eintraege: Some(1), ..o() };
+        let e = EinsatzEinstellungen {
+            auto_etb_eintraege: Some(0),
+            ..e()
+        };
+        let o = OrgEinstellungen {
+            auto_etb_eintraege: Some(1),
+            ..o()
+        };
         assert!(!effektiv_auto_etb_aktiv(&e, &o), "Einsatz=0 schlägt Org=1");
     }
 
     #[test]
     fn auto_etb_einsatz_none_org_aus() {
-        let o = OrgEinstellungen { auto_etb_eintraege: Some(0), ..o() };
+        let o = OrgEinstellungen {
+            auto_etb_eintraege: Some(0),
+            ..o()
+        };
         assert!(!effektiv_auto_etb_aktiv(&e(), &o), "Org=0 → aus");
     }
 
@@ -254,15 +339,27 @@ mod tests {
 
     #[test]
     fn zeitzone_einsatz_schlaegt_org() {
-        let e = EinsatzEinstellungen { zeitzone: Some("UTC".into()), ..e() };
-        let o = OrgEinstellungen { zeitzone: Some("Europe/Berlin".into()), ..o() };
+        let e = EinsatzEinstellungen {
+            zeitzone: Some("UTC".into()),
+            ..e()
+        };
+        let o = OrgEinstellungen {
+            zeitzone: Some("Europe/Berlin".into()),
+            ..o()
+        };
         assert_eq!(effektive_zeitzone(&e, &o).as_deref(), Some("UTC"));
     }
 
     #[test]
     fn zeitzone_fallback_auf_org() {
-        let o = OrgEinstellungen { zeitzone: Some("Europe/Berlin".into()), ..o() };
-        assert_eq!(effektive_zeitzone(&e(), &o).as_deref(), Some("Europe/Berlin"));
+        let o = OrgEinstellungen {
+            zeitzone: Some("Europe/Berlin".into()),
+            ..o()
+        };
+        assert_eq!(
+            effektive_zeitzone(&e(), &o).as_deref(),
+            Some("Europe/Berlin")
+        );
     }
 
     #[test]
@@ -274,14 +371,23 @@ mod tests {
 
     #[test]
     fn zeitformat_einsatz_schlaegt_org() {
-        let e = EinsatzEinstellungen { zeitformat: Some("12h".into()), ..e() };
-        let o = OrgEinstellungen { zeitformat: Some("24h".into()), ..o() };
+        let e = EinsatzEinstellungen {
+            zeitformat: Some("12h".into()),
+            ..e()
+        };
+        let o = OrgEinstellungen {
+            zeitformat: Some("24h".into()),
+            ..o()
+        };
         assert_eq!(effektive_zeitformat(&e, &o).as_deref(), Some("12h"));
     }
 
     #[test]
     fn zeitformat_fallback_auf_org() {
-        let o = OrgEinstellungen { zeitformat: Some("24h".into()), ..o() };
+        let o = OrgEinstellungen {
+            zeitformat: Some("24h".into()),
+            ..o()
+        };
         assert_eq!(effektive_zeitformat(&e(), &o).as_deref(), Some("24h"));
     }
 
@@ -294,14 +400,23 @@ mod tests {
 
     #[test]
     fn einheiten_einsatz_schlaegt_org() {
-        let e = EinsatzEinstellungen { einheiten: Some("imperial".into()), ..e() };
-        let o = OrgEinstellungen { einheiten: Some("metrisch".into()), ..o() };
+        let e = EinsatzEinstellungen {
+            einheiten: Some("imperial".into()),
+            ..e()
+        };
+        let o = OrgEinstellungen {
+            einheiten: Some("metrisch".into()),
+            ..o()
+        };
         assert_eq!(effektive_einheiten(&e, &o).as_deref(), Some("imperial"));
     }
 
     #[test]
     fn einheiten_fallback_auf_org() {
-        let o = OrgEinstellungen { einheiten: Some("metrisch".into()), ..o() };
+        let o = OrgEinstellungen {
+            einheiten: Some("metrisch".into()),
+            ..o()
+        };
         assert_eq!(effektive_einheiten(&e(), &o).as_deref(), Some("metrisch"));
     }
 
@@ -314,15 +429,27 @@ mod tests {
 
     #[test]
     fn koordinatenformat_einsatz_schlaegt_org() {
-        let e = EinsatzEinstellungen { koordinatenformat: Some("mgrs".into()), ..e() };
-        let o = OrgEinstellungen { koordinatenformat: Some("wgs84".into()), ..o() };
+        let e = EinsatzEinstellungen {
+            koordinatenformat: Some("mgrs".into()),
+            ..e()
+        };
+        let o = OrgEinstellungen {
+            koordinatenformat: Some("wgs84".into()),
+            ..o()
+        };
         assert_eq!(effektive_koordinatenformat(&e, &o).as_deref(), Some("mgrs"));
     }
 
     #[test]
     fn koordinatenformat_fallback_auf_org() {
-        let o = OrgEinstellungen { koordinatenformat: Some("wgs84".into()), ..o() };
-        assert_eq!(effektive_koordinatenformat(&e(), &o).as_deref(), Some("wgs84"));
+        let o = OrgEinstellungen {
+            koordinatenformat: Some("wgs84".into()),
+            ..o()
+        };
+        assert_eq!(
+            effektive_koordinatenformat(&e(), &o).as_deref(),
+            Some("wgs84")
+        );
     }
 
     #[test]

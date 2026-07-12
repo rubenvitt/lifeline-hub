@@ -83,7 +83,11 @@ mod tests {
         let mut sortiert = MODUL_KEYS.to_vec();
         sortiert.sort_unstable();
         sortiert.dedup();
-        assert_eq!(sortiert.len(), MODUL_KEYS.len(), "Modul-Keys müssen eindeutig sein");
+        assert_eq!(
+            sortiert.len(),
+            MODUL_KEYS.len(),
+            "Modul-Keys müssen eindeutig sein"
+        );
     }
 
     #[test]
@@ -105,7 +109,10 @@ mod tests {
     #[test]
     fn nicht_ausblendbare_sind_gueltige_keys() {
         for key in NICHT_AUSBLENDBAR {
-            assert!(ist_gueltiger_modul_key(key), "{key} muss ein gültiger Modul-Key sein");
+            assert!(
+                ist_gueltiger_modul_key(key),
+                "{key} muss ein gültiger Modul-Key sein"
+            );
         }
     }
 

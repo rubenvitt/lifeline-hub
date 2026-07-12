@@ -33,7 +33,17 @@ pub async fn eintritt(
     if let Some(pid) = platz_id {
         pruefe_platz_belegbar(&mut tx, uhs_id, pid, person_id).await?;
     }
-    let id = insert_event(&mut tx, einsatz_id, person_id, uhs_id, platz_id, "eintritt", notiz, erfasst_von).await?;
+    let id = insert_event(
+        &mut tx,
+        einsatz_id,
+        person_id,
+        uhs_id,
+        platz_id,
+        "eintritt",
+        notiz,
+        erfasst_von,
+    )
+    .await?;
     update_cache(&mut tx, einsatz_id, person_id, Some(uhs_id), platz_id).await?;
     if let Some(pid) = platz_id {
         loese_eigene_reservierung_ein(&mut tx, pid, person_id).await?;
@@ -59,17 +69,36 @@ pub async fn wechsel(
     pruefe_uhs_aktiv(&mut tx, einsatz_id, ziel_uhs_id).await?;
     let (ex_uhs, ex_platz) = lade_cache(&mut tx, person_id).await?;
     if ex_uhs.is_none() {
-        return Err(AppError::Conflict("Person hat keine aktive Belegung".into()));
+        return Err(AppError::Conflict(
+            "Person hat keine aktive Belegung".into(),
+        ));
     }
     if let Some(zpid) = ziel_platz_id {
         pruefe_platz_belegbar(&mut tx, ziel_uhs_id, zpid, person_id).await?;
     }
-    let id = insert_event(&mut tx, einsatz_id, person_id, ziel_uhs_id, ziel_platz_id, "wechsel", notiz, erfasst_von).await?;
+    let id = insert_event(
+        &mut tx,
+        einsatz_id,
+        person_id,
+        ziel_uhs_id,
+        ziel_platz_id,
+        "wechsel",
+        notiz,
+        erfasst_von,
+    )
+    .await?;
     // Cache erst nach Aufbereitung umsetzen, sonst greift der Belegungs-Check beim Ex-Platz nicht.
     if let Some(ex_pid) = ex_platz {
         auto_aufbereitung_wenn_frei(&mut tx, ex_pid).await?;
     }
-    update_cache(&mut tx, einsatz_id, person_id, Some(ziel_uhs_id), ziel_platz_id).await?;
+    update_cache(
+        &mut tx,
+        einsatz_id,
+        person_id,
+        Some(ziel_uhs_id),
+        ziel_platz_id,
+    )
+    .await?;
     if let Some(zpid) = ziel_platz_id {
         loese_eigene_reservierung_ein(&mut tx, zpid, person_id).await?;
     }
@@ -88,8 +117,19 @@ pub async fn austritt(
 ) -> Result<BelegungAnzeige, AppError> {
     let mut tx = pool.begin().await?;
     let (ex_uhs, ex_platz) = lade_cache(&mut tx, person_id).await?;
-    let uhs = ex_uhs.ok_or_else(|| AppError::Conflict("Person hat keine aktive Belegung".into()))?;
-    let id = insert_event(&mut tx, einsatz_id, person_id, uhs, None, "austritt", notiz, erfasst_von).await?;
+    let uhs =
+        ex_uhs.ok_or_else(|| AppError::Conflict("Person hat keine aktive Belegung".into()))?;
+    let id = insert_event(
+        &mut tx,
+        einsatz_id,
+        person_id,
+        uhs,
+        None,
+        "austritt",
+        notiz,
+        erfasst_von,
+    )
+    .await?;
     if let Some(ex_pid) = ex_platz {
         auto_aufbereitung_wenn_frei(&mut tx, ex_pid).await?;
     }
@@ -124,12 +164,26 @@ pub async fn austritt_intern(
     .execute(&mut *tx)
     .await?;
     let info = if let Some(uhs) = ex_uhs {
-        let id = insert_event(&mut tx, einsatz_id, person_id, uhs, None, "austritt", notiz, erfasst_von).await?;
+        let id = insert_event(
+            &mut tx,
+            einsatz_id,
+            person_id,
+            uhs,
+            None,
+            "austritt",
+            notiz,
+            erfasst_von,
+        )
+        .await?;
         if let Some(ex_pid) = ex_platz {
             auto_aufbereitung_wenn_frei(&mut tx, ex_pid).await?;
         }
         update_cache(&mut tx, einsatz_id, person_id, None, None).await?;
-        Some(AustrittInfo { uhs_id: uhs, platz_id: ex_platz, event_id: id })
+        Some(AustrittInfo {
+            uhs_id: uhs,
+            platz_id: ex_platz,
+            event_id: id,
+        })
     } else {
         None
     };
@@ -138,39 +192,60 @@ pub async fn austritt_intern(
 }
 
 /// Belegungs-Verlauf einer UHS (neueste zuerst).
-pub async fn liste_je_uhs(pool: &SqlitePool, uhs_id: i64) -> Result<Vec<BelegungAnzeige>, AppError> {
-    Ok(sqlx::query_as::<_, BelegungAnzeige>(sqlx::AssertSqlSafe(format!(
-        "{SELECT_ALLE} WHERE uhs_id = ? ORDER BY zeitpunkt_at DESC, id DESC"
-    )))
-    .bind(uhs_id)
-    .fetch_all(pool)
-    .await?)
+pub async fn liste_je_uhs(
+    pool: &SqlitePool,
+    uhs_id: i64,
+) -> Result<Vec<BelegungAnzeige>, AppError> {
+    Ok(
+        sqlx::query_as::<_, BelegungAnzeige>(sqlx::AssertSqlSafe(format!(
+            "{SELECT_ALLE} WHERE uhs_id = ? ORDER BY zeitpunkt_at DESC, id DESC"
+        )))
+        .bind(uhs_id)
+        .fetch_all(pool)
+        .await?,
+    )
 }
 
 /// Belegungs-Verlauf einer Person (neueste zuerst).
-pub async fn liste_je_person(pool: &SqlitePool, einsatz_id: i64, person_id: i64) -> Result<Vec<BelegungAnzeige>, AppError> {
-    Ok(sqlx::query_as::<_, BelegungAnzeige>(sqlx::AssertSqlSafe(format!(
+pub async fn liste_je_person(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    person_id: i64,
+) -> Result<Vec<BelegungAnzeige>, AppError> {
+    Ok(
+        sqlx::query_as::<_, BelegungAnzeige>(sqlx::AssertSqlSafe(format!(
         "{SELECT_ALLE} WHERE einsatz_id = ? AND person_id = ? ORDER BY zeitpunkt_at DESC, id DESC"
     )))
-    .bind(einsatz_id)
-    .bind(person_id)
-    .fetch_all(pool)
-    .await?)
+        .bind(einsatz_id)
+        .bind(person_id)
+        .fetch_all(pool)
+        .await?,
+    )
 }
 
 /// Lädt ein einzelnes Event; `NotFound` außerhalb des Einsatzes.
-pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<BelegungAnzeige, AppError> {
-    sqlx::query_as::<_, BelegungAnzeige>(sqlx::AssertSqlSafe(format!("{SELECT_ALLE} WHERE id = ? AND einsatz_id = ?")))
-        .bind(id)
-        .bind(einsatz_id)
-        .fetch_optional(pool)
-        .await?
-        .ok_or(AppError::NotFound)
+pub async fn laden(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<BelegungAnzeige, AppError> {
+    sqlx::query_as::<_, BelegungAnzeige>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_ALLE} WHERE id = ? AND einsatz_id = ?"
+    )))
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)
 }
 
 // ---------------------------- private Helpers ----------------------------
 
-async fn pruefe_uhs_aktiv(tx: &mut Transaction<'_, Sqlite>, einsatz_id: i64, uhs_id: i64) -> Result<(), AppError> {
+async fn pruefe_uhs_aktiv(
+    tx: &mut Transaction<'_, Sqlite>,
+    einsatz_id: i64,
+    uhs_id: i64,
+) -> Result<(), AppError> {
     let status: Option<String> = sqlx::query_scalar(
         "SELECT status FROM uhs WHERE id = ? AND einsatz_id = ? AND storniert_at IS NULL",
     )
@@ -187,7 +262,11 @@ async fn pruefe_uhs_aktiv(tx: &mut Transaction<'_, Sqlite>, einsatz_id: i64, uhs
     }
 }
 
-async fn pruefe_person_nicht_belegt(tx: &mut Transaction<'_, Sqlite>, einsatz_id: i64, person_id: i64) -> Result<(), AppError> {
+async fn pruefe_person_nicht_belegt(
+    tx: &mut Transaction<'_, Sqlite>,
+    einsatz_id: i64,
+    person_id: i64,
+) -> Result<(), AppError> {
     let cache: Option<(Option<i64>, Option<String>)> = sqlx::query_as(
         "SELECT aktuelle_uhs_id, storniert_at FROM einsatz_person WHERE id = ? AND einsatz_id = ?",
     )
@@ -207,7 +286,12 @@ async fn pruefe_person_nicht_belegt(tx: &mut Transaction<'_, Sqlite>, einsatz_id
     Ok(())
 }
 
-async fn pruefe_platz_belegbar(tx: &mut Transaction<'_, Sqlite>, uhs_id: i64, platz_id: i64, person_id: i64) -> Result<(), AppError> {
+async fn pruefe_platz_belegbar(
+    tx: &mut Transaction<'_, Sqlite>,
+    uhs_id: i64,
+    platz_id: i64,
+    person_id: i64,
+) -> Result<(), AppError> {
     let row: Option<(i64, String, Option<i64>)> = sqlx::query_as(
         "SELECT uhs_id, verfuegbarkeit, reserviert_fuer_person_id \
          FROM uhs_platz WHERE id = ? AND storniert_at IS NULL",
@@ -217,7 +301,9 @@ async fn pruefe_platz_belegbar(tx: &mut Transaction<'_, Sqlite>, uhs_id: i64, pl
     .await?;
     let (platz_uhs, verf, res_fuer) = row.ok_or(AppError::NotFound)?;
     if platz_uhs != uhs_id {
-        return Err(AppError::Validation("Platz gehört nicht zu dieser UHS".into()));
+        return Err(AppError::Validation(
+            "Platz gehört nicht zu dieser UHS".into(),
+        ));
     }
     match verf.as_str() {
         "frei" => Ok(()),
@@ -228,7 +314,10 @@ async fn pruefe_platz_belegbar(tx: &mut Transaction<'_, Sqlite>, uhs_id: i64, pl
     }
 }
 
-async fn lade_cache(tx: &mut Transaction<'_, Sqlite>, person_id: i64) -> Result<(Option<i64>, Option<i64>), AppError> {
+async fn lade_cache(
+    tx: &mut Transaction<'_, Sqlite>,
+    person_id: i64,
+) -> Result<(Option<i64>, Option<i64>), AppError> {
     sqlx::query_as("SELECT aktuelle_uhs_id, aktueller_platz_id FROM einsatz_person WHERE id = ?")
         .bind(person_id)
         .fetch_optional(&mut **tx)
@@ -297,7 +386,10 @@ async fn update_cache(
     }
 }
 
-async fn auto_aufbereitung_wenn_frei(tx: &mut Transaction<'_, Sqlite>, platz_id: i64) -> Result<(), AppError> {
+async fn auto_aufbereitung_wenn_frei(
+    tx: &mut Transaction<'_, Sqlite>,
+    platz_id: i64,
+) -> Result<(), AppError> {
     sqlx::query(
         "UPDATE uhs_platz SET verfuegbarkeit = 'aufbereitung' \
          WHERE id = ? AND verfuegbarkeit = 'frei'",
@@ -308,7 +400,11 @@ async fn auto_aufbereitung_wenn_frei(tx: &mut Transaction<'_, Sqlite>, platz_id:
     Ok(())
 }
 
-async fn loese_eigene_reservierung_ein(tx: &mut Transaction<'_, Sqlite>, platz_id: i64, person_id: i64) -> Result<(), AppError> {
+async fn loese_eigene_reservierung_ein(
+    tx: &mut Transaction<'_, Sqlite>,
+    platz_id: i64,
+    person_id: i64,
+) -> Result<(), AppError> {
     sqlx::query(
         "UPDATE uhs_platz SET verfuegbarkeit = 'frei', reserviert_fuer_person_id = NULL \
          WHERE id = ? AND verfuegbarkeit = 'reserviert' AND reserviert_fuer_person_id = ?",
@@ -330,31 +426,76 @@ mod tests {
     /// Liefert (benutzer, einsatz, uhs_aktiv, uhs_geplant, platz_a_in_aktiv, platz_b_in_aktiv, person).
     async fn setup(pool: &SqlitePool) -> (i64, i64, i64, i64, i64, i64, i64) {
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Test-Orga')")
-            .execute(pool).await.unwrap();
+            .execute(pool)
+            .await
+            .unwrap();
         let b: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, \
                 system_rolle, org_rolle, aktiv) \
-             VALUES (1, 'A', 'a', 'h', 'keiner', 'keine', 1) RETURNING id")
-            .fetch_one(pool).await.unwrap();
+             VALUES (1, 'A', 'a', 'h', 'keiner', 'keine', 1) RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         let e: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung, status, begonnen_at, einsatzart, angelegt_at) \
              VALUES (1, 'Lage', 'aktiv', '2026-05-28', 'realeinsatz', '2026-05-28') RETURNING id")
             .fetch_one(pool).await.unwrap();
-        let u_aktiv = uhs_repo::anlegen(pool, e, b, uhs_repo::NeueDaten {
-            typ: "behandlungsplatz", bezeichnung: "BHP 50",
-            abschnitt_id: None, standort: None, notiz: None,
-        }).await.unwrap();
-        uhs_repo::setze_status(pool, e, u_aktiv.id, "aktiv", b).await.unwrap();
-        let u_geplant = uhs_repo::anlegen(pool, e, b, uhs_repo::NeueDaten {
-            typ: "patientenablage", bezeichnung: "PA 1",
-            abschnitt_id: None, standort: None, notiz: None,
-        }).await.unwrap();
-        let pa = platz_repo::anlegen(pool, u_aktiv.id, platz_repo::NeuerPlatz {
-            typ: "bett", bezeichnung: "Bett 3", pos_x: None, pos_y: None,
-        }).await.unwrap();
-        let pb = platz_repo::anlegen(pool, u_aktiv.id, platz_repo::NeuerPlatz {
-            typ: "bett", bezeichnung: "Bett 5", pos_x: None, pos_y: None,
-        }).await.unwrap();
+        let u_aktiv = uhs_repo::anlegen(
+            pool,
+            e,
+            b,
+            uhs_repo::NeueDaten {
+                typ: "behandlungsplatz",
+                bezeichnung: "BHP 50",
+                abschnitt_id: None,
+                standort: None,
+                notiz: None,
+            },
+        )
+        .await
+        .unwrap();
+        uhs_repo::setze_status(pool, e, u_aktiv.id, "aktiv", b)
+            .await
+            .unwrap();
+        let u_geplant = uhs_repo::anlegen(
+            pool,
+            e,
+            b,
+            uhs_repo::NeueDaten {
+                typ: "patientenablage",
+                bezeichnung: "PA 1",
+                abschnitt_id: None,
+                standort: None,
+                notiz: None,
+            },
+        )
+        .await
+        .unwrap();
+        let pa = platz_repo::anlegen(
+            pool,
+            u_aktiv.id,
+            platz_repo::NeuerPlatz {
+                typ: "bett",
+                bezeichnung: "Bett 3",
+                pos_x: None,
+                pos_y: None,
+            },
+        )
+        .await
+        .unwrap();
+        let pb = platz_repo::anlegen(
+            pool,
+            u_aktiv.id,
+            platz_repo::NeuerPlatz {
+                typ: "bett",
+                bezeichnung: "Bett 5",
+                pos_x: None,
+                pos_y: None,
+            },
+        )
+        .await
+        .unwrap();
         let person: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz_person (einsatz_id, registrier_nr, status, erfasst_von, geaendert_von) \
              VALUES (?, 1, 'betroffen', ?, ?) RETURNING id")
@@ -363,13 +504,21 @@ mod tests {
     }
 
     async fn cache(pool: &SqlitePool, person: i64) -> (Option<i64>, Option<i64>) {
-        sqlx::query_as("SELECT aktuelle_uhs_id, aktueller_platz_id FROM einsatz_person WHERE id = ?")
-            .bind(person).fetch_one(pool).await.unwrap()
+        sqlx::query_as(
+            "SELECT aktuelle_uhs_id, aktueller_platz_id FROM einsatz_person WHERE id = ?",
+        )
+        .bind(person)
+        .fetch_one(pool)
+        .await
+        .unwrap()
     }
 
     async fn verfuegbarkeit(pool: &SqlitePool, platz: i64) -> String {
         sqlx::query_scalar("SELECT verfuegbarkeit FROM uhs_platz WHERE id = ?")
-            .bind(platz).fetch_one(pool).await.unwrap()
+            .bind(platz)
+            .fetch_one(pool)
+            .await
+            .unwrap()
     }
 
     #[tokio::test]
@@ -393,8 +542,13 @@ mod tests {
             "INSERT INTO einsatz_person (einsatz_id, registrier_nr, status, erfasst_von, geaendert_von) \
              VALUES (?, 2, 'betroffen', ?, ?) RETURNING id")
             .bind(e).bind(b).bind(b).fetch_one(&pool).await.unwrap();
-        let err = eintritt(&pool, e, p2, u, Some(pa), None, b).await.unwrap_err();
-        assert!(matches!(err, AppError::Conflict(_)), "1:1-Belegung erzwungen");
+        let err = eintritt(&pool, e, p2, u, Some(pa), None, b)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, AppError::Conflict(_)),
+            "1:1-Belegung erzwungen"
+        );
     }
 
     #[tokio::test]
@@ -417,8 +571,10 @@ mod tests {
         let pool = test_pool().await;
         let (b, e, _, ug, _, _, p) = setup(&pool).await;
         let err = eintritt(&pool, e, p, ug, None, None, b).await.unwrap_err();
-        assert!(matches!(err, AppError::UnprocessableEntity(_)),
-            "geplante UHS akzeptiert keine Belegung");
+        assert!(
+            matches!(err, AppError::UnprocessableEntity(_)),
+            "geplante UHS akzeptiert keine Belegung"
+        );
     }
 
     #[tokio::test]
@@ -427,15 +583,22 @@ mod tests {
         let (b, e, u, _, _, _, p) = setup(&pool).await;
         eintritt(&pool, e, p, u, None, None, b).await.unwrap();
         let err = eintritt(&pool, e, p, u, None, None, b).await.unwrap_err();
-        assert!(matches!(err, AppError::Conflict(_)), "Eintritt während aktiver Belegung");
+        assert!(
+            matches!(err, AppError::Conflict(_)),
+            "Eintritt während aktiver Belegung"
+        );
     }
 
     #[tokio::test]
     async fn eintritt_auf_defekten_platz_ist_422() {
         let pool = test_pool().await;
         let (b, e, u, _, pa, _, p) = setup(&pool).await;
-        platz_repo::setze_verfuegbarkeit(&pool, u, pa, "defekt", None).await.unwrap();
-        let err = eintritt(&pool, e, p, u, Some(pa), None, b).await.unwrap_err();
+        platz_repo::setze_verfuegbarkeit(&pool, u, pa, "defekt", None)
+            .await
+            .unwrap();
+        let err = eintritt(&pool, e, p, u, Some(pa), None, b)
+            .await
+            .unwrap_err();
         assert!(matches!(err, AppError::UnprocessableEntity(_)));
     }
 
@@ -443,12 +606,21 @@ mod tests {
     async fn eintritt_auf_eigene_reservierung_loest_sie_ein() {
         let pool = test_pool().await;
         let (b, e, u, _, pa, _, p) = setup(&pool).await;
-        platz_repo::setze_verfuegbarkeit(&pool, u, pa, "reserviert", Some(p)).await.unwrap();
+        platz_repo::setze_verfuegbarkeit(&pool, u, pa, "reserviert", Some(p))
+            .await
+            .unwrap();
         eintritt(&pool, e, p, u, Some(pa), None, b).await.unwrap();
-        assert_eq!(verfuegbarkeit(&pool, pa).await, "frei", "Reservierung wird durch Belegung eingelöst");
-        let fk: Option<i64> = sqlx::query_scalar(
-            "SELECT reserviert_fuer_person_id FROM uhs_platz WHERE id = ?")
-            .bind(pa).fetch_one(&pool).await.unwrap();
+        assert_eq!(
+            verfuegbarkeit(&pool, pa).await,
+            "frei",
+            "Reservierung wird durch Belegung eingelöst"
+        );
+        let fk: Option<i64> =
+            sqlx::query_scalar("SELECT reserviert_fuer_person_id FROM uhs_platz WHERE id = ?")
+                .bind(pa)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert!(fk.is_none());
     }
 
@@ -460,8 +632,12 @@ mod tests {
             "INSERT INTO einsatz_person (einsatz_id, registrier_nr, status, erfasst_von, geaendert_von) \
              VALUES (?, 2, 'betroffen', ?, ?) RETURNING id")
             .bind(e).bind(b).bind(b).fetch_one(&pool).await.unwrap();
-        platz_repo::setze_verfuegbarkeit(&pool, u, pa, "reserviert", Some(andere)).await.unwrap();
-        let err = eintritt(&pool, e, p, u, Some(pa), None, b).await.unwrap_err();
+        platz_repo::setze_verfuegbarkeit(&pool, u, pa, "reserviert", Some(andere))
+            .await
+            .unwrap();
+        let err = eintritt(&pool, e, p, u, Some(pa), None, b)
+            .await
+            .unwrap_err();
         assert!(matches!(err, AppError::UnprocessableEntity(_)));
     }
 
@@ -470,7 +646,9 @@ mod tests {
         let pool = test_pool().await;
         let (b, e, u, ug, pa, _, p) = setup(&pool).await;
         // Ziel-UHS aktivieren:
-        uhs_repo::setze_status(&pool, e, ug, "aktiv", b).await.unwrap();
+        uhs_repo::setze_status(&pool, e, ug, "aktiv", b)
+            .await
+            .unwrap();
         let pinbox = u; // Start in Inbox von u
         eintritt(&pool, e, p, pinbox, None, None, b).await.unwrap();
         // Erst Platz a belegen, dann wechseln nach ug-Inbox:
@@ -478,8 +656,11 @@ mod tests {
         assert_eq!(cache(&pool, p).await, (Some(u), Some(pa)));
         wechsel(&pool, e, p, ug, None, None, b).await.unwrap();
         assert_eq!(cache(&pool, p).await, (Some(ug), None));
-        assert_eq!(verfuegbarkeit(&pool, pa).await, "aufbereitung",
-            "Verlassen eines frei-Platzes → Auto-Aufbereitung");
+        assert_eq!(
+            verfuegbarkeit(&pool, pa).await,
+            "aufbereitung",
+            "Verlassen eines frei-Platzes → Auto-Aufbereitung"
+        );
     }
 
     #[tokio::test]
@@ -499,18 +680,29 @@ mod tests {
         eintritt(&pool, e, p, u, Some(pa), None, b).await.unwrap();
         // Während belegt: defekt setzen (informativ, Belegung bleibt unberührt — Spec):
         sqlx::query("UPDATE uhs_platz SET verfuegbarkeit = 'defekt' WHERE id = ?")
-            .bind(pa).execute(&pool).await.unwrap();
+            .bind(pa)
+            .execute(&pool)
+            .await
+            .unwrap();
         austritt(&pool, e, p, None, b).await.unwrap();
-        assert_eq!(verfuegbarkeit(&pool, pa).await, "defekt",
-            "Auto-Aufbereitung greift NUR, wenn vorher frei");
+        assert_eq!(
+            verfuegbarkeit(&pool, pa).await,
+            "defekt",
+            "Auto-Aufbereitung greift NUR, wenn vorher frei"
+        );
     }
 
     #[tokio::test]
     async fn wechsel_ohne_aktive_belegung_ist_konflikt() {
         let pool = test_pool().await;
         let (b, e, u, _, pa, _, p) = setup(&pool).await;
-        let err = wechsel(&pool, e, p, u, Some(pa), None, b).await.unwrap_err();
-        assert!(matches!(err, AppError::Conflict(_)), "wechsel ohne aktive Belegung");
+        let err = wechsel(&pool, e, p, u, Some(pa), None, b)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, AppError::Conflict(_)),
+            "wechsel ohne aktive Belegung"
+        );
     }
 
     #[tokio::test]
@@ -536,8 +728,13 @@ mod tests {
     async fn austritt_intern_fuer_unbelegte_person_ist_noop() {
         let pool = test_pool().await;
         let (b, e, _, _, _, _, p) = setup(&pool).await;
-        let info = austritt_intern(&pool, e, p, Some("durch Storno"), b).await.unwrap();
-        assert!(info.is_none(), "Person war nicht belegt — kein Event, kein Cache-Wechsel");
+        let info = austritt_intern(&pool, e, p, Some("durch Storno"), b)
+            .await
+            .unwrap();
+        assert!(
+            info.is_none(),
+            "Person war nicht belegt — kein Event, kein Cache-Wechsel"
+        );
     }
 
     #[tokio::test]
@@ -545,8 +742,16 @@ mod tests {
         let pool = test_pool().await;
         let (b, e, u, _, pa, _, p) = setup(&pool).await;
         // Person ist NICHT belegt, aber für pa reserviert:
-        platz_repo::setze_verfuegbarkeit(&pool, u, pa, "reserviert", Some(p)).await.unwrap();
-        austritt_intern(&pool, e, p, Some("durch Storno"), b).await.unwrap();
-        assert_eq!(verfuegbarkeit(&pool, pa).await, "frei", "Reservierung der Person wird aufgelöst");
+        platz_repo::setze_verfuegbarkeit(&pool, u, pa, "reserviert", Some(p))
+            .await
+            .unwrap();
+        austritt_intern(&pool, e, p, Some("durch Storno"), b)
+            .await
+            .unwrap();
+        assert_eq!(
+            verfuegbarkeit(&pool, pa).await,
+            "frei",
+            "Reservierung der Person wird aufgelöst"
+        );
     }
 }

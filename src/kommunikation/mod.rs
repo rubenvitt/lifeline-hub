@@ -150,9 +150,12 @@ impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for AdressatKategorie
 where
     &'r str: sqlx::Decode<'r, DB>,
 {
-    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+    fn decode(
+        value: <DB as sqlx::Database>::ValueRef<'r>,
+    ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<DB>>::decode(value)?;
-        AdressatKategorie::parse(s).ok_or_else(|| format!("Ungültige AdressatKategorie: {s}").into())
+        AdressatKategorie::parse(s)
+            .ok_or_else(|| format!("Ungültige AdressatKategorie: {s}").into())
     }
 }
 
@@ -182,7 +185,10 @@ mod tests {
 
     #[test]
     fn vokabular_wird_aus_etb_referenziert() {
-        assert_eq!(EtbTyp::Meldung.as_str(), crate::etb::EtbTyp::Meldung.as_str());
+        assert_eq!(
+            EtbTyp::Meldung.as_str(),
+            crate::etb::EtbTyp::Meldung.as_str()
+        );
         assert_eq!(MeldeWeg::Funk.as_str(), "funk");
     }
 

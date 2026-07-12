@@ -8,8 +8,14 @@ use std::sync::LazyLock;
 /// Leerzeichen im Pfad URI-escaped werden (gleiche API wie der Test-Fixture-Helper).
 pub async fn oeffne_readonly(pfad: &Path) -> Result<sqlx::SqlitePool, sqlx::Error> {
     use sqlx::sqlite::SqliteConnectOptions;
-    let opts = SqliteConnectOptions::new().filename(pfad).read_only(true).immutable(true);
-    sqlx::sqlite::SqlitePoolOptions::new().max_connections(4).connect_with(opts).await
+    let opts = SqliteConnectOptions::new()
+        .filename(pfad)
+        .read_only(true)
+        .immutable(true);
+    sqlx::sqlite::SqlitePoolOptions::new()
+        .max_connections(4)
+        .connect_with(opts)
+        .await
 }
 
 /// Liest die Kachel (z/x/y in XYZ) oder `None`. `tile_row = (2^z − 1) − y` (TMS-Flip).
@@ -65,11 +71,16 @@ mod tests {
 
     // Baut eine In-Memory-MBTiles mit genau einer Kachel bei TMS (z=1, col=0, row=1) = XYZ (z=1,x=0,y=0).
     async fn fixture() -> sqlx::SqlitePool {
-        let pool = SqlitePoolOptions::new().connect("sqlite::memory:").await.unwrap();
+        let pool = SqlitePoolOptions::new()
+            .connect("sqlite::memory:")
+            .await
+            .unwrap();
         sqlx::query("CREATE TABLE tiles (zoom_level INTEGER, tile_column INTEGER, tile_row INTEGER, tile_data BLOB)")
             .execute(&pool).await.unwrap();
         sqlx::query("INSERT INTO tiles VALUES (1, 0, 1, x'ABCD')")
-            .execute(&pool).await.unwrap();
+            .execute(&pool)
+            .await
+            .unwrap();
         pool
     }
 
@@ -92,7 +103,9 @@ mod tests {
     /// nur read-only); die Datei darf noch nicht existieren (`create_if_missing`).
     async fn schreibe_datei_fixture(pfad: &Path, daten: &[u8]) {
         let opts = SqlitePoolOptions::new().connect_with(
-            sqlx::sqlite::SqliteConnectOptions::new().filename(pfad).create_if_missing(true),
+            sqlx::sqlite::SqliteConnectOptions::new()
+                .filename(pfad)
+                .create_if_missing(true),
         );
         let pool = opts.await.unwrap();
         sqlx::query(
@@ -101,7 +114,11 @@ mod tests {
         .execute(&pool)
         .await
         .unwrap();
-        sqlx::query("INSERT INTO tiles VALUES (1, 0, 1, ?1)").bind(daten).execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO tiles VALUES (1, 0, 1, ?1)")
+            .bind(daten)
+            .execute(&pool)
+            .await
+            .unwrap();
         pool.close().await;
     }
 
@@ -125,7 +142,10 @@ mod tests {
 
         // Ohne Invalidierung liefert der gecachte Pool (Pfad unverändert) weiterhin A.
         let pool_noch_a = reader_fuer(&pfad).await.unwrap();
-        assert_eq!(lies_tile(&pool_noch_a, 1, 0, 0).await.unwrap(), Some(vec![0xAA]));
+        assert_eq!(
+            lies_tile(&pool_noch_a, 1, 0, 0).await.unwrap(),
+            Some(vec![0xAA])
+        );
 
         // Nach Invalidierung: frischer Pool, liest B.
         invalidate_reader().await;

@@ -137,7 +137,10 @@ mod tests {
         let map = laden_alle(&pool, eid).await.unwrap();
         assert_eq!(map.len(), 2);
         assert!(!map["chat"].sichtbar);
-        assert_eq!(map["etb"].benoetigte_rolle.as_deref(), Some("fuehrungskraft"));
+        assert_eq!(
+            map["etb"].benoetigte_rolle.as_deref(),
+            Some("fuehrungskraft")
+        );
 
         // Upsert: gleiches (einsatz, modul) überschreibt dieselbe Zeile.
         setzen(&pool, eid, "chat", true, Some("admin"), bid)
@@ -160,7 +163,9 @@ mod tests {
         .await
         .unwrap();
 
-        setzen(&pool, eid_a, "chat", false, None, bid).await.unwrap();
+        setzen(&pool, eid_a, "chat", false, None, bid)
+            .await
+            .unwrap();
 
         // Einsatz B hat keine Overrides — strikt pro einsatz_id geladen.
         assert!(laden_alle(&pool, eid_b).await.unwrap().is_empty());

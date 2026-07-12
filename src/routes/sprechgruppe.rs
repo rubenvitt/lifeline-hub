@@ -60,7 +60,9 @@ impl NormalisierterKatalog {
 fn normalisiere_katalog(body: KatalogBody) -> Result<NormalisierterKatalog, AppError> {
     let bezeichnung = body.bezeichnung.trim().to_string();
     if bezeichnung.is_empty() {
-        return Err(AppError::Validation("Bezeichnung darf nicht leer sein".into()));
+        return Err(AppError::Validation(
+            "Bezeichnung darf nicht leer sein".into(),
+        ));
     }
     if Betriebsart::parse(&body.betriebsart).is_none() {
         return Err(AppError::Validation(format!(
@@ -68,8 +70,16 @@ fn normalisiere_katalog(body: KatalogBody) -> Result<NormalisierterKatalog, AppE
             body.betriebsart
         )));
     }
-    let hinweis = body.hinweis.map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
-    Ok(NormalisierterKatalog { bezeichnung, betriebsart: body.betriebsart, hinweis, sortier: body.sortier })
+    let hinweis = body
+        .hinweis
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    Ok(NormalisierterKatalog {
+        bezeichnung,
+        betriebsart: body.betriebsart,
+        hinweis,
+        sortier: body.sortier,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -85,7 +95,9 @@ struct NormalisierterLokal {
 fn normalisiere_lokal(body: EinsatzLokalBody) -> Result<NormalisierterLokal, AppError> {
     let bezeichnung = body.bezeichnung.trim().to_string();
     if bezeichnung.is_empty() {
-        return Err(AppError::Validation("Bezeichnung darf nicht leer sein".into()));
+        return Err(AppError::Validation(
+            "Bezeichnung darf nicht leer sein".into(),
+        ));
     }
     if Betriebsart::parse(&body.betriebsart).is_none() {
         return Err(AppError::Validation(format!(
@@ -93,8 +105,15 @@ fn normalisiere_lokal(body: EinsatzLokalBody) -> Result<NormalisierterLokal, App
             body.betriebsart
         )));
     }
-    let hinweis = body.hinweis.map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
-    Ok(NormalisierterLokal { bezeichnung, betriebsart: body.betriebsart, hinweis })
+    let hinweis = body
+        .hinweis
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    Ok(NormalisierterLokal {
+        bezeichnung,
+        betriebsart: body.betriebsart,
+        hinweis,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -210,19 +229,40 @@ mod tests {
 
     #[test]
     fn normalisiere_leere_bezeichnung_ist_validation() {
-        let b = KatalogBody { bezeichnung: "  ".into(), betriebsart: "TMO".into(), hinweis: None, sortier: 0 };
-        assert!(matches!(normalisiere_katalog(b).unwrap_err(), AppError::Validation(_)));
+        let b = KatalogBody {
+            bezeichnung: "  ".into(),
+            betriebsart: "TMO".into(),
+            hinweis: None,
+            sortier: 0,
+        };
+        assert!(matches!(
+            normalisiere_katalog(b).unwrap_err(),
+            AppError::Validation(_)
+        ));
     }
 
     #[test]
     fn normalisiere_ungueltige_betriebsart_ist_validation() {
-        let b = KatalogBody { bezeichnung: "412".into(), betriebsart: "XX".into(), hinweis: None, sortier: 0 };
-        assert!(matches!(normalisiere_katalog(b).unwrap_err(), AppError::Validation(_)));
+        let b = KatalogBody {
+            bezeichnung: "412".into(),
+            betriebsart: "XX".into(),
+            hinweis: None,
+            sortier: 0,
+        };
+        assert!(matches!(
+            normalisiere_katalog(b).unwrap_err(),
+            AppError::Validation(_)
+        ));
     }
 
     #[test]
     fn normalisiere_ok_trimmt() {
-        let b = KatalogBody { bezeichnung: " 412 ".into(), betriebsart: "TMO".into(), hinweis: Some("  ".into()), sortier: 0 };
+        let b = KatalogBody {
+            bezeichnung: " 412 ".into(),
+            betriebsart: "TMO".into(),
+            hinweis: Some("  ".into()),
+            sortier: 0,
+        };
         let n = normalisiere_katalog(b).unwrap();
         assert_eq!(n.bezeichnung, "412");
         assert_eq!(n.hinweis, None);

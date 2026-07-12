@@ -1,6 +1,8 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{fordere_modul_zugriff_laden, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
+use crate::einsatz::berechtigung::{
+    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
+};
 use crate::einsatz::repo as einsatz_repo;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -23,9 +25,9 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::Json;
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
-use utoipa::ToSchema;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::{Stream, StreamExt};
+use utoipa::ToSchema;
 
 /// Detail-Antwort: UHS-Stamm + Plätze + aktuelle Belegungen + zugeordnetes Material.
 #[derive(Debug, Serialize, ToSchema)]
@@ -113,11 +115,20 @@ pub async fn liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
 
     if let Some(s) = &params.status {
         if UhsStatus::parse(s).is_none() {
-            return Err(AppError::Validation("Unbekannter UHS-Status im Filter".into()));
+            return Err(AppError::Validation(
+                "Unbekannter UHS-Status im Filter".into(),
+            ));
         }
     }
     Ok(Json(
@@ -151,7 +162,14 @@ pub async fn anlegen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     if UhsTyp::parse(&body.typ).is_none() {
@@ -159,7 +177,9 @@ pub async fn anlegen(
     }
     let bezeichnung = body.bezeichnung.trim().to_string();
     if bezeichnung.is_empty() {
-        return Err(AppError::Validation("Bezeichnung darf nicht leer sein".into()));
+        return Err(AppError::Validation(
+            "Bezeichnung darf nicht leer sein".into(),
+        ));
     }
     let standort = trimme(body.standort);
     let notiz = trimme(body.notiz);
@@ -190,7 +210,14 @@ pub async fn detail(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
 
     let uhs = uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?;
     let plaetze = platz_repo::liste_je_uhs(&state.pool, uhs_id).await?;
@@ -232,7 +259,14 @@ pub async fn aktualisieren(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let vorher = uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?; // 404 falls fremd
@@ -243,8 +277,14 @@ pub async fn aktualisieren(
     }
 
     // lat/lon als Paar: Effektivzustand nach dem Patch prüfen (422 statt 500).
-    let eff_lat = match body.lat { Some(opt) => opt, None => vorher.lat };
-    let eff_lon = match body.lon { Some(opt) => opt, None => vorher.lon };
+    let eff_lat = match body.lat {
+        Some(opt) => opt,
+        None => vorher.lat,
+    };
+    let eff_lon = match body.lon {
+        Some(opt) => opt,
+        None => vorher.lon,
+    };
     if eff_lat.is_some() != eff_lon.is_some() {
         return Err(AppError::UnprocessableEntity(
             "lat und lon müssen gemeinsam gesetzt oder gemeinsam leer sein".into(),
@@ -252,12 +292,16 @@ pub async fn aktualisieren(
     }
     if let Some(la) = eff_lat {
         if !(-90.0..=90.0).contains(&la) {
-            return Err(AppError::UnprocessableEntity("lat muss zwischen -90 und 90 liegen".into()));
+            return Err(AppError::UnprocessableEntity(
+                "lat muss zwischen -90 und 90 liegen".into(),
+            ));
         }
     }
     if let Some(lo) = eff_lon {
         if !(-180.0..=180.0).contains(&lo) {
-            return Err(AppError::UnprocessableEntity("lon muss zwischen -180 und 180 liegen".into()));
+            return Err(AppError::UnprocessableEntity(
+                "lon muss zwischen -180 und 180 liegen".into(),
+            ));
         }
     }
 
@@ -268,7 +312,9 @@ pub async fn aktualisieren(
         .map(str::to_string);
     if let Some(b) = &bezeichnung {
         if b.is_empty() {
-            return Err(AppError::Validation("Bezeichnung darf nicht leer sein".into()));
+            return Err(AppError::Validation(
+                "Bezeichnung darf nicht leer sein".into(),
+            ));
         }
     }
     let standort = body
@@ -314,7 +360,14 @@ pub async fn status_wechsel(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     if UhsStatus::parse(&body.status).is_none() {
@@ -329,7 +382,8 @@ pub async fn status_wechsel(
     if !darf_uebergehen(vorher.status.as_str(), &body.status) {
         return Err(AppError::UnprocessableEntity(format!(
             "Status-Übergang {} → {} ist nicht erlaubt",
-            vorher.status.as_str(), body.status
+            vorher.status.as_str(),
+            body.status
         )));
     }
     let nachher =
@@ -361,7 +415,14 @@ pub async fn stornieren(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     uhs_repo::storniere(&state.pool, einsatz_id, uhs_id, benutzer.id).await?;
@@ -389,7 +450,14 @@ pub async fn platz_anlegen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     if PlatzTyp::parse(&body.typ).is_none() {
@@ -397,7 +465,9 @@ pub async fn platz_anlegen(
     }
     let bezeichnung = body.bezeichnung.trim().to_string();
     if bezeichnung.is_empty() {
-        return Err(AppError::Validation("Bezeichnung darf nicht leer sein".into()));
+        return Err(AppError::Validation(
+            "Bezeichnung darf nicht leer sein".into(),
+        ));
     }
     // Existenz der UHS im Einsatz prüfen (404 sonst):
     uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?;
@@ -436,7 +506,14 @@ pub async fn plaetze_bulk_anlegen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let Some(typ) = PlatzTyp::parse(&body.typ) else {
@@ -482,7 +559,14 @@ pub async fn platz_aktualisieren(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
     uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?;
 
@@ -493,7 +577,9 @@ pub async fn platz_aktualisieren(
         .map(str::to_string);
     if let Some(b) = &bezeichnung {
         if b.is_empty() {
-            return Err(AppError::Validation("Bezeichnung darf nicht leer sein".into()));
+            return Err(AppError::Validation(
+                "Bezeichnung darf nicht leer sein".into(),
+            ));
         }
     }
     let platz = platz_repo::aktualisiere(
@@ -528,7 +614,14 @@ pub async fn platz_verfuegbarkeit(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
     uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?;
 
@@ -564,7 +657,14 @@ pub async fn platz_stornieren(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
     uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?;
 
@@ -577,9 +677,9 @@ pub async fn platz_stornieren(
 
 #[derive(Debug, Deserialize)]
 pub struct BelegungBody {
-    pub art: String,                  // "eintritt" | "wechsel" | "austritt"
-    pub uhs_id: Option<i64>,          // erforderlich bei eintritt/wechsel
-    pub platz_id: Option<i64>,        // optional (NULL = Inbox/Austritt)
+    pub art: String,           // "eintritt" | "wechsel" | "austritt"
+    pub uhs_id: Option<i64>,   // erforderlich bei eintritt/wechsel
+    pub platz_id: Option<i64>, // optional (NULL = Inbox/Austritt)
     pub notiz: Option<String>,
 }
 
@@ -595,7 +695,14 @@ pub async fn belegung(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let art = BelegungsArt::parse(&body.art)
@@ -752,7 +859,14 @@ pub async fn stream(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
 
     let rx = state.live.abonniere(einsatz_id);
     let stream = BroadcastStream::new(rx).map(|res| {

@@ -16,7 +16,9 @@ pub struct StatusDaten<'a> {
 fn label_conflict<T>(e: sqlx::Error) -> Result<T, AppError> {
     if let sqlx::Error::Database(db) = &e {
         if db.is_unique_violation() {
-            return Err(AppError::Conflict("Status-Label ist bereits vorhanden".into()));
+            return Err(AppError::Conflict(
+                "Status-Label ist bereits vorhanden".into(),
+            ));
         }
     }
     Err(e.into())
@@ -103,12 +105,11 @@ pub async fn aktualisiere(
 /// Deaktiviert einen Status (Soft-Delete `aktiv = 0`); referenzierte Dispositionen
 /// bleiben gültig. `NotFound` bei fremder/unbekannter id.
 pub async fn deaktivieren(pool: &SqlitePool, org_id: i64, id: i64) -> Result<(), AppError> {
-    let resultat =
-        sqlx::query("UPDATE personal_status SET aktiv = 0 WHERE id = ? AND org_id = ?")
-            .bind(id)
-            .bind(org_id)
-            .execute(pool)
-            .await?;
+    let resultat = sqlx::query("UPDATE personal_status SET aktiv = 0 WHERE id = ? AND org_id = ?")
+        .bind(id)
+        .bind(org_id)
+        .execute(pool)
+        .await?;
     if resultat.rows_affected() == 0 {
         return Err(AppError::NotFound);
     }
@@ -134,11 +135,7 @@ pub async fn erster_der_kategorie(
 }
 
 /// Ob ein aktiver Status mit dieser id zur Org gehört (PATCH-Disposition-Validierung).
-pub async fn ist_in_org(
-    pool: &SqlitePool,
-    org_id: i64,
-    status_id: i64,
-) -> Result<bool, AppError> {
+pub async fn ist_in_org(pool: &SqlitePool, org_id: i64, status_id: i64) -> Result<bool, AppError> {
     let treffer: Option<i64> = sqlx::query_scalar(
         "SELECT 1 FROM personal_status WHERE id = ? AND org_id = ? AND aktiv = 1",
     )
@@ -163,15 +160,24 @@ mod tests {
     }
 
     fn daten<'a>(label: &'a str, kategorie: &'a str, sortier: i64) -> StatusDaten<'a> {
-        StatusDaten { label, kategorie, farbe: None, sortier }
+        StatusDaten {
+            label,
+            kategorie,
+            farbe: None,
+            sortier,
+        }
     }
 
     #[tokio::test]
     async fn anlegen_liste_sortiert_nur_aktiv() {
         let pool = crate::db::test_pool().await;
         org(&pool, 1).await;
-        anlegen(&pool, 1, daten("alarmiert", KATEGORIE_GEBUNDEN, 20)).await.unwrap();
-        anlegen(&pool, 1, daten("verfügbar", KATEGORIE_VERFUEGBAR, 10)).await.unwrap();
+        anlegen(&pool, 1, daten("alarmiert", KATEGORIE_GEBUNDEN, 20))
+            .await
+            .unwrap();
+        anlegen(&pool, 1, daten("verfügbar", KATEGORIE_VERFUEGBAR, 10))
+            .await
+            .unwrap();
         let l = liste(&pool, 1).await.unwrap();
         assert_eq!(l[0].label, "verfügbar");
         assert_eq!(l[1].label, "alarmiert");
@@ -181,9 +187,13 @@ mod tests {
     async fn dublette_label_ist_conflict() {
         let pool = crate::db::test_pool().await;
         org(&pool, 1).await;
-        anlegen(&pool, 1, daten("alarmiert", KATEGORIE_GEBUNDEN, 20)).await.unwrap();
+        anlegen(&pool, 1, daten("alarmiert", KATEGORIE_GEBUNDEN, 20))
+            .await
+            .unwrap();
         assert!(matches!(
-            anlegen(&pool, 1, daten("alarmiert", KATEGORIE_VERFUEGBAR, 5)).await.unwrap_err(),
+            anlegen(&pool, 1, daten("alarmiert", KATEGORIE_VERFUEGBAR, 5))
+                .await
+                .unwrap_err(),
             AppError::Conflict(_)
         ));
     }
@@ -192,7 +202,9 @@ mod tests {
     async fn deaktivieren_versteckt_bleibt_referenzierbar() {
         let pool = crate::db::test_pool().await;
         org(&pool, 1).await;
-        let s = anlegen(&pool, 1, daten("alt", KATEGORIE_VERFUEGBAR, 10)).await.unwrap();
+        let s = anlegen(&pool, 1, daten("alt", KATEGORIE_VERFUEGBAR, 10))
+            .await
+            .unwrap();
         deaktivieren(&pool, 1, s.id).await.unwrap();
         assert!(liste(&pool, 1).await.unwrap().is_empty());
         assert_eq!(laden(&pool, 1, s.id).await.unwrap().id, s.id);
@@ -202,18 +214,31 @@ mod tests {
     async fn erster_der_kategorie_deterministisch_und_ohne_deaktivierte() {
         let pool = crate::db::test_pool().await;
         org(&pool, 1).await;
-        let frueh = anlegen(&pool, 1, daten("alarmiert", KATEGORIE_GEBUNDEN, 20)).await.unwrap();
-        let anfahrt = anlegen(&pool, 1, daten("anfahrt", KATEGORIE_GEBUNDEN, 30)).await.unwrap();
+        let frueh = anlegen(&pool, 1, daten("alarmiert", KATEGORIE_GEBUNDEN, 20))
+            .await
+            .unwrap();
+        let anfahrt = anlegen(&pool, 1, daten("anfahrt", KATEGORIE_GEBUNDEN, 30))
+            .await
+            .unwrap();
         assert_eq!(
-            erster_der_kategorie(&pool, 1, KATEGORIE_GEBUNDEN).await.unwrap(),
+            erster_der_kategorie(&pool, 1, KATEGORIE_GEBUNDEN)
+                .await
+                .unwrap(),
             Some(frueh.id)
         );
-        assert_eq!(erster_der_kategorie(&pool, 1, KATEGORIE_VERFUEGBAR).await.unwrap(), None);
+        assert_eq!(
+            erster_der_kategorie(&pool, 1, KATEGORIE_VERFUEGBAR)
+                .await
+                .unwrap(),
+            None
+        );
 
         // erster deaktiviert → Fallback auf nächsten nach sortier.
         deaktivieren(&pool, 1, frueh.id).await.unwrap();
         assert_eq!(
-            erster_der_kategorie(&pool, 1, KATEGORIE_GEBUNDEN).await.unwrap(),
+            erster_der_kategorie(&pool, 1, KATEGORIE_GEBUNDEN)
+                .await
+                .unwrap(),
             Some(anfahrt.id)
         );
     }
@@ -223,7 +248,9 @@ mod tests {
         let pool = crate::db::test_pool().await;
         org(&pool, 1).await;
         org(&pool, 2).await;
-        let s = anlegen(&pool, 1, daten("alarmiert", KATEGORIE_GEBUNDEN, 20)).await.unwrap();
+        let s = anlegen(&pool, 1, daten("alarmiert", KATEGORIE_GEBUNDEN, 20))
+            .await
+            .unwrap();
         assert!(ist_in_org(&pool, 1, s.id).await.unwrap());
         assert!(!ist_in_org(&pool, 2, s.id).await.unwrap());
     }
@@ -233,7 +260,12 @@ mod tests {
         let pool = crate::db::test_pool().await;
         org(&pool, 1).await;
         org(&pool, 2).await;
-        let s = anlegen(&pool, 1, daten("alarmiert", KATEGORIE_GEBUNDEN, 20)).await.unwrap();
-        assert!(matches!(laden(&pool, 2, s.id).await.unwrap_err(), AppError::NotFound));
+        let s = anlegen(&pool, 1, daten("alarmiert", KATEGORIE_GEBUNDEN, 20))
+            .await
+            .unwrap();
+        assert!(matches!(
+            laden(&pool, 2, s.id).await.unwrap_err(),
+            AppError::NotFound
+        ));
     }
 }

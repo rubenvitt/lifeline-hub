@@ -321,13 +321,20 @@ mod tests {
 
     #[test]
     fn uhs_typ_roundtrip() {
-        for t in ["patientenablage", "behandlungsplatz", "verletztensammelstelle",
-                  "sonstige"] {
+        for t in [
+            "patientenablage",
+            "behandlungsplatz",
+            "verletztensammelstelle",
+            "sonstige",
+        ] {
             assert_eq!(UhsTyp::parse(t).unwrap().as_str(), t);
         }
         assert!(UhsTyp::parse("zeltkrankenhaus").is_none());
         assert!(UhsTyp::parse("bereitstellungsraum").is_none());
-        assert_eq!(UhsTyp::parse("behandlungsplatz").unwrap().anzeige_label(), "Behandlungsplatz");
+        assert_eq!(
+            UhsTyp::parse("behandlungsplatz").unwrap().anzeige_label(),
+            "Behandlungsplatz"
+        );
     }
 
     #[test]
@@ -340,11 +347,21 @@ mod tests {
 
     #[test]
     fn platz_typ_roundtrip() {
-        for t in ["wartebereich", "behandlungsplatz", "bett", "intensivplatz",
-                  "trage", "transport_bereitstellung", "sonstige"] {
+        for t in [
+            "wartebereich",
+            "behandlungsplatz",
+            "bett",
+            "intensivplatz",
+            "trage",
+            "transport_bereitstellung",
+            "sonstige",
+        ] {
             assert_eq!(PlatzTyp::parse(t).unwrap().as_str(), t);
         }
-        assert!(PlatzTyp::parse("eingang").is_none(), "Eingang ist KEIN Platz-Typ (Inbox ist implizit)");
+        assert!(
+            PlatzTyp::parse("eingang").is_none(),
+            "Eingang ist KEIN Platz-Typ (Inbox ist implizit)"
+        );
     }
 
     #[test]
@@ -352,7 +369,10 @@ mod tests {
         for v in ["frei", "defekt", "aufbereitung", "gesperrt", "reserviert"] {
             assert_eq!(Verfuegbarkeit::parse(v).unwrap().as_str(), v);
         }
-        assert!(Verfuegbarkeit::parse("besetzt").is_none(), "Belegung ist KEINE Verfügbarkeit");
+        assert!(
+            Verfuegbarkeit::parse("besetzt").is_none(),
+            "Belegung ist KEINE Verfügbarkeit"
+        );
     }
 
     #[test]
@@ -372,7 +392,10 @@ mod tests {
         assert!(darf_uebergehen("geplant", "aufgeloest"));
         // Rückwege:
         assert!(!darf_uebergehen("aktiv", "geplant"));
-        assert!(!darf_uebergehen("aufgeloest", "aktiv"), "aufgeloest ist terminal");
+        assert!(
+            !darf_uebergehen("aufgeloest", "aktiv"),
+            "aufgeloest ist terminal"
+        );
         assert!(!darf_uebergehen("aufgeloest", "geplant"));
         // Gleichbleibend nicht erlaubt:
         assert!(!darf_uebergehen("aktiv", "aktiv"));

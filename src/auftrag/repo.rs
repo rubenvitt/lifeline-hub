@@ -80,14 +80,19 @@ const ANZEIGE_SELECT: &str =
 /// Lädt einen Auftrag samt Empfängern. `NotFound`, wenn unbekannt.
 /// Bind-Reihenfolge: zuerst `jetzt` (computed column), dann `id` (WHERE).
 pub async fn laden(pool: &SqlitePool, id: i64, jetzt: &str) -> Result<AuftragDetail, AppError> {
-    let auftrag = sqlx::query_as::<_, AuftragAnzeige>(sqlx::AssertSqlSafe(format!("{ANZEIGE_SELECT} WHERE a.id = ?")))
-        .bind(jetzt)
-        .bind(id)
-        .fetch_optional(pool)
-        .await?
-        .ok_or(AppError::NotFound)?;
+    let auftrag = sqlx::query_as::<_, AuftragAnzeige>(sqlx::AssertSqlSafe(format!(
+        "{ANZEIGE_SELECT} WHERE a.id = ?"
+    )))
+    .bind(jetzt)
+    .bind(id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)?;
     let empfaenger = empfaenger_von(pool, id).await?;
-    Ok(AuftragDetail { auftrag, empfaenger })
+    Ok(AuftragDetail {
+        auftrag,
+        empfaenger,
+    })
 }
 
 /// Lädt die Empfänger-Zeilen eines Auftrags (Quittung pro Empfänger).
@@ -125,7 +130,9 @@ pub async fn liste(
           a.frist_at IS NULL, a.frist_at, a.id",
     );
     // Bind-Reihenfolge: jetzt (computed) → einsatz_id → optional richtung.
-    let mut q = sqlx::query_as::<_, AuftragAnzeige>(sqlx::AssertSqlSafe(&*sql)).bind(jetzt).bind(einsatz_id);
+    let mut q = sqlx::query_as::<_, AuftragAnzeige>(sqlx::AssertSqlSafe(&*sql))
+        .bind(jetzt)
+        .bind(einsatz_id);
     if let Some(r) = richtung_filter {
         q = q.bind(r);
     }
@@ -144,7 +151,10 @@ pub async fn liste(
                 continue;
             }
         }
-        out.push(AuftragDetail { auftrag, empfaenger });
+        out.push(AuftragDetail {
+            auftrag,
+            empfaenger,
+        });
     }
     Ok(out)
 }
@@ -322,7 +332,8 @@ pub async fn anlegen(
         .bind(einsatz_id)
         .fetch_optional(pool)
         .await?;
-    let org_einst = crate::org::einstellungen::laden_oder_default(pool, org_id.unwrap_or(0)).await?;
+    let org_einst =
+        crate::org::einstellungen::laden_oder_default(pool, org_id.unwrap_or(0)).await?;
     let mut tx = pool.begin().await?;
     let auftrag_id = anlegen_tx(
         &mut tx,
@@ -357,7 +368,8 @@ pub async fn erteile_aus_etb_tx(
         .bind(einsatz_id)
         .fetch_optional(pool)
         .await?;
-    let org_einst = crate::org::einstellungen::laden_oder_default(pool, org_id.unwrap_or(0)).await?;
+    let org_einst =
+        crate::org::einstellungen::laden_oder_default(pool, org_id.unwrap_or(0)).await?;
     let mut tx = pool.begin().await?;
     let auftrag_id = anlegen_tx(
         &mut tx,
@@ -385,22 +397,30 @@ async fn snap_anzeige_fuer(
     e: &EmpfaengerEingabe,
 ) -> Result<String, AppError> {
     let name: Option<String> = match e.empfaenger_typ.as_str() {
-        "abschnitt" => sqlx::query_scalar("SELECT name FROM einsatzabschnitt WHERE id = ?")
-            .bind(e.abschnitt_id)
-            .fetch_optional(&mut *tx)
-            .await?,
-        "einheit" => sqlx::query_scalar("SELECT name FROM einsatz_einheit WHERE id = ?")
-            .bind(e.einheit_id)
-            .fetch_optional(&mut *tx)
-            .await?,
-        "person" => sqlx::query_scalar("SELECT snap_name FROM einsatz_personal WHERE id = ?")
-            .bind(e.person_id)
-            .fetch_optional(&mut *tx)
-            .await?,
-        "fahrzeug" => sqlx::query_scalar("SELECT snap_funkrufname FROM einsatz_fahrzeug WHERE id = ?")
-            .bind(e.fahrzeug_id)
-            .fetch_optional(&mut *tx)
-            .await?,
+        "abschnitt" => {
+            sqlx::query_scalar("SELECT name FROM einsatzabschnitt WHERE id = ?")
+                .bind(e.abschnitt_id)
+                .fetch_optional(&mut *tx)
+                .await?
+        }
+        "einheit" => {
+            sqlx::query_scalar("SELECT name FROM einsatz_einheit WHERE id = ?")
+                .bind(e.einheit_id)
+                .fetch_optional(&mut *tx)
+                .await?
+        }
+        "person" => {
+            sqlx::query_scalar("SELECT snap_name FROM einsatz_personal WHERE id = ?")
+                .bind(e.person_id)
+                .fetch_optional(&mut *tx)
+                .await?
+        }
+        "fahrzeug" => {
+            sqlx::query_scalar("SELECT snap_funkrufname FROM einsatz_fahrzeug WHERE id = ?")
+                .bind(e.fahrzeug_id)
+                .fetch_optional(&mut *tx)
+                .await?
+        }
         "extern" => e.extern_bezeichnung.clone(),
         _ => e.funktion_text.clone(),
     };
@@ -431,7 +451,17 @@ pub async fn setze_in_arbeit(
     von_id: i64,
     jetzt: &str,
 ) -> Result<(), AppError> {
-    krepo::setze_vollzug(pool, org_id, einsatz_id, OBJEKT_AUFTRAG, auftrag_id, VOLLZUG_IN_ARBEIT, von_id, jetzt).await?;
+    krepo::setze_vollzug(
+        pool,
+        org_id,
+        einsatz_id,
+        OBJEKT_AUFTRAG,
+        auftrag_id,
+        VOLLZUG_IN_ARBEIT,
+        von_id,
+        jetzt,
+    )
+    .await?;
     sqlx::query("UPDATE auftrag SET in_arbeit_at = COALESCE(in_arbeit_at, ?) WHERE id = ?")
         .bind(jetzt)
         .bind(auftrag_id)
@@ -485,7 +515,17 @@ pub async fn melde_vollzug(
         .await?;
     // Vollzug-Achse im SELBEN Commit wie ETB-Meldung + Rückmeldetext (atomar):
     // ein Teilfehler rollt alles zurück, kein verwaister ETB-Eintrag.
-    krepo::setze_vollzug_tx(&mut tx, org_id, einsatz_id, OBJEKT_AUFTRAG, auftrag_id, VOLLZUG_VOLLZOGEN, von_id, jetzt).await?;
+    krepo::setze_vollzug_tx(
+        &mut tx,
+        org_id,
+        einsatz_id,
+        OBJEKT_AUFTRAG,
+        auftrag_id,
+        VOLLZUG_VOLLZOGEN,
+        von_id,
+        jetzt,
+    )
+    .await?;
     tx.commit().await?;
     Ok(etb_id)
 }
@@ -493,7 +533,12 @@ pub async fn melde_vollzug(
 /// Abnahme durch die Führung (4. Stufe). Setzt abgenommen_at/_von_id am Auftrag.
 /// Idempotent (first-write-wins via `abgenommen_at IS NULL`) — eine bereits
 /// erfolgte Abnahme (Zeitstempel + verantwortliche Person) bleibt unveränderlich.
-pub async fn nimm_ab(pool: &SqlitePool, auftrag_id: i64, von_id: i64, jetzt: &str) -> Result<(), AppError> {
+pub async fn nimm_ab(
+    pool: &SqlitePool,
+    auftrag_id: i64,
+    von_id: i64,
+    jetzt: &str,
+) -> Result<(), AppError> {
     sqlx::query("UPDATE auftrag SET abgenommen_at = ?, abgenommen_von_id = ? WHERE id = ? AND abgenommen_at IS NULL")
         .bind(jetzt)
         .bind(von_id)
@@ -507,7 +552,9 @@ pub async fn nimm_ab(pool: &SqlitePool, auftrag_id: i64, von_id: i64, jetzt: &st
 mod tests {
     use super::*;
     use crate::auftrag::{AuftragBearbeitungsstatus, EmpfaengerTyp};
-    use crate::kommunikation::{repo as krepo, AdressatKategorie, Richtung, OBJEKT_AUFTRAG, VOLLZUG_VOLLZOGEN};
+    use crate::kommunikation::{
+        repo as krepo, AdressatKategorie, Richtung, OBJEKT_AUFTRAG, VOLLZUG_VOLLZOGEN,
+    };
 
     async fn setup(pool: &SqlitePool) -> (i64, i64) {
         sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
@@ -518,8 +565,11 @@ mod tests {
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) VALUES (1,'L','l','h') RETURNING id")
             .fetch_one(pool).await.unwrap();
         let e: i64 = sqlx::query_scalar(
-            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id")
-            .fetch_one(pool).await.unwrap();
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         (b, e)
     }
 
@@ -588,8 +638,24 @@ mod tests {
     async fn lfd_nr_startet_bei_eins_und_zaehlt_hoch() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let a1 = anlegen(&pool, e, b, daten("erster", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
-        let a2 = anlegen(&pool, e, b, daten("zweiter", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+        let a1 = anlegen(
+            &pool,
+            e,
+            b,
+            daten("erster", None, vec![funktion("EA")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        let a2 = anlegen(
+            &pool,
+            e,
+            b,
+            daten("zweiter", None, vec![funktion("EA")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
         assert_eq!(a1.auftrag.lfd_nr, Some(1));
         assert_eq!(a2.auftrag.lfd_nr, Some(2));
     }
@@ -612,13 +678,30 @@ mod tests {
         .await
         .unwrap();
 
-        let a = anlegen(&pool, e, b, daten("Deich sichern", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
-        assert_eq!(a.auftrag.lfd_nr, Some(20), "Auftrags-lfd_nr startet beim Auftrags-Startwert");
+        let a = anlegen(
+            &pool,
+            e,
+            b,
+            daten("Deich sichern", None, vec![funktion("EA")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            a.auftrag.lfd_nr,
+            Some(20),
+            "Auftrags-lfd_nr startet beim Auftrags-Startwert"
+        );
         // Die im selben Commit erzeugte ETB-Anordnung nutzt ihren EIGENEN Startwert (200).
         let etb_lfd: i64 = sqlx::query_scalar("SELECT lfd_nr FROM etb_eintrag WHERE id = ?")
             .bind(a.auftrag.etb_anordnung_id.unwrap())
-            .fetch_one(&pool).await.unwrap();
-        assert_eq!(etb_lfd, 200, "ETB-Anordnung nutzt den ETB-Startwert, nicht den Auftrags-Startwert");
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            etb_lfd, 200,
+            "ETB-Anordnung nutzt den ETB-Startwert, nicht den Auftrags-Startwert"
+        );
     }
 
     #[tokio::test]
@@ -627,18 +710,37 @@ mod tests {
         let (b, e) = setup(&pool).await;
         // Auto-ETB abschalten (Some(0)).
         crate::einsatz::einstellungen::speichern(
-            &pool, e, b,
+            &pool,
+            e,
+            b,
             crate::einsatz::einstellungen::EinstellungenDaten {
                 auto_etb_eintraege: Some(0),
                 ..Default::default()
             },
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
 
-        let d = anlegen(&pool, e, b, daten("ohne ETB", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
-        assert!(d.auftrag.etb_anordnung_id.is_none(), "Auto-ETB aus → keine ETB-Anordnung");
+        let d = anlegen(
+            &pool,
+            e,
+            b,
+            daten("ohne ETB", None, vec![funktion("EA")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        assert!(
+            d.auftrag.etb_anordnung_id.is_none(),
+            "Auto-ETB aus → keine ETB-Anordnung"
+        );
         // Kein ETB-Eintrag im Einsatz.
-        let etb_anzahl: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?")
-            .bind(e).fetch_one(&pool).await.unwrap();
+        let etb_anzahl: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?")
+                .bind(e)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(etb_anzahl, 0);
     }
 
@@ -647,8 +749,19 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         // Ohne Setting (NULL) = Default an → Anordnung wie heute.
-        let d = anlegen(&pool, e, b, daten("mit ETB", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
-        assert!(d.auftrag.etb_anordnung_id.is_some(), "Default an → ETB-Anordnung");
+        let d = anlegen(
+            &pool,
+            e,
+            b,
+            daten("mit ETB", None, vec![funktion("EA")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        assert!(
+            d.auftrag.etb_anordnung_id.is_some(),
+            "Default an → ETB-Anordnung"
+        );
     }
 
     #[tokio::test]
@@ -656,10 +769,29 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e_a) = setup(&pool).await;
         let e_b: i64 = sqlx::query_scalar(
-            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage B') RETURNING id")
-            .fetch_one(&pool).await.unwrap();
-        anlegen(&pool, e_a, b, daten("A1", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
-        let b1 = anlegen(&pool, e_b, b, daten("B1", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage B') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        anlegen(
+            &pool,
+            e_a,
+            b,
+            daten("A1", None, vec![funktion("EA")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        let b1 = anlegen(
+            &pool,
+            e_b,
+            b,
+            daten("B1", None, vec![funktion("EA")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
         // Fremder Einsatz mit Auftrag darf die Nummerierung dieses Einsatzes nicht beeinflussen.
         assert_eq!(b1.auftrag.lfd_nr, Some(1));
     }
@@ -668,26 +800,56 @@ mod tests {
     async fn anlegen_speichert_auftrag_mit_empfaenger_und_default_vollzug() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let d = anlegen(&pool, e, b, daten("Deich sichern", None, vec![funktion("Abschnitt Nord")]), "2026-06-11 09:00:00").await.unwrap();
+        let d = anlegen(
+            &pool,
+            e,
+            b,
+            daten("Deich sichern", None, vec![funktion("Abschnitt Nord")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
         assert_eq!(d.auftrag.auftrag_text, "Deich sichern");
         assert_eq!(d.auftrag.vollzug_status, "offen");
-        assert_eq!(d.auftrag.bearbeitungsstatus, AuftragBearbeitungsstatus::Offen);
+        assert_eq!(
+            d.auftrag.bearbeitungsstatus,
+            AuftragBearbeitungsstatus::Offen
+        );
         assert_eq!(d.auftrag.empfaenger_anzahl, 1);
         assert_eq!(d.auftrag.quittiert_anzahl, 0);
         assert_eq!(d.empfaenger.len(), 1);
         assert_eq!(d.empfaenger[0].snap_anzeige, "Abschnitt Nord");
-        assert!(d.auftrag.etb_anordnung_id.is_some(), "ETB-Anordnung wird erzeugt");
+        assert!(
+            d.auftrag.etb_anordnung_id.is_some(),
+            "ETB-Anordnung wird erzeugt"
+        );
     }
 
     #[tokio::test]
     async fn anlegen_erzeugt_etb_anordnung_mit_backlink() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let d = anlegen(&pool, e, b, daten("Lage erkunden", None, vec![funktion("EA1")]), "2026-06-11 09:00:00").await.unwrap();
+        let d = anlegen(
+            &pool,
+            e,
+            b,
+            daten("Lage erkunden", None, vec![funktion("EA1")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
         let etb_id = d.auftrag.etb_anordnung_id.unwrap();
-        let typ: String = sqlx::query_scalar("SELECT typ FROM etb_eintrag WHERE id = ?").bind(etb_id).fetch_one(&pool).await.unwrap();
+        let typ: String = sqlx::query_scalar("SELECT typ FROM etb_eintrag WHERE id = ?")
+            .bind(etb_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(typ, "anordnung");
-        let backlink: i64 = sqlx::query_scalar("SELECT auftrag_id FROM etb_eintrag WHERE id = ?").bind(etb_id).fetch_one(&pool).await.unwrap();
+        let backlink: i64 = sqlx::query_scalar("SELECT auftrag_id FROM etb_eintrag WHERE id = ?")
+            .bind(etb_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(backlink, d.auftrag.id);
     }
 
@@ -695,9 +857,27 @@ mod tests {
     async fn liste_liefert_auftraege_mit_empfaenger() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        anlegen(&pool, e, b, daten("A", None, vec![funktion("EA1")]), "2026-06-11 09:00:00").await.unwrap();
-        anlegen(&pool, e, b, daten("B", None, vec![funktion("EA2")]), "2026-06-11 09:00:00").await.unwrap();
-        let liste = liste(&pool, e, None, None, None, "2026-06-11 10:00:00").await.unwrap();
+        anlegen(
+            &pool,
+            e,
+            b,
+            daten("A", None, vec![funktion("EA1")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        anlegen(
+            &pool,
+            e,
+            b,
+            daten("B", None, vec![funktion("EA2")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        let liste = liste(&pool, e, None, None, None, "2026-06-11 10:00:00")
+            .await
+            .unwrap();
         assert_eq!(liste.len(), 2);
         assert!(liste.iter().all(|d| d.empfaenger.len() == 1));
     }
@@ -706,18 +886,41 @@ mod tests {
     async fn ueberfaellig_wenn_frist_ueberschritten_und_unquittiert() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let d = anlegen(&pool, e, b, daten("Frist", Some("2026-06-11 10:00:00"), vec![funktion("EA1")]), "2026-06-11 09:00:00").await.unwrap();
-        let vor = laden(&pool, d.auftrag.id, "2026-06-11 09:30:00").await.unwrap();
+        let d = anlegen(
+            &pool,
+            e,
+            b,
+            daten("Frist", Some("2026-06-11 10:00:00"), vec![funktion("EA1")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        let vor = laden(&pool, d.auftrag.id, "2026-06-11 09:30:00")
+            .await
+            .unwrap();
         assert!(!vor.auftrag.ist_ueberfaellig, "vor Frist nicht überfällig");
-        let nach = laden(&pool, d.auftrag.id, "2026-06-11 10:30:00").await.unwrap();
-        assert!(nach.auftrag.ist_ueberfaellig, "nach Frist + unquittiert: überfällig");
+        let nach = laden(&pool, d.auftrag.id, "2026-06-11 10:30:00")
+            .await
+            .unwrap();
+        assert!(
+            nach.auftrag.ist_ueberfaellig,
+            "nach Frist + unquittiert: überfällig"
+        );
     }
 
     #[tokio::test]
     async fn gehoert_zu_einsatz_schuetzt_cross_einsatz() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let d = anlegen(&pool, e, b, daten("X", None, vec![funktion("EA1")]), "2026-06-11 09:00:00").await.unwrap();
+        let d = anlegen(
+            &pool,
+            e,
+            b,
+            daten("X", None, vec![funktion("EA1")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
         assert!(gehoert_zu_einsatz(&pool, d.auftrag.id, e).await.unwrap());
         assert!(!gehoert_zu_einsatz(&pool, d.auftrag.id, 999).await.unwrap());
     }
@@ -726,26 +929,68 @@ mod tests {
     async fn bearbeitungsstatus_spiegelt_vollzug() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let d = anlegen(&pool, e, b, daten("X", None, vec![funktion("EA1")]), "2026-06-11 09:00:00").await.unwrap();
-        krepo::setze_vollzug(&pool, 1, e, OBJEKT_AUFTRAG, d.auftrag.id, VOLLZUG_VOLLZOGEN, b, "2026-06-11 11:00:00").await.unwrap();
-        let nach = laden(&pool, d.auftrag.id, "2026-06-11 11:30:00").await.unwrap();
+        let d = anlegen(
+            &pool,
+            e,
+            b,
+            daten("X", None, vec![funktion("EA1")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        krepo::setze_vollzug(
+            &pool,
+            1,
+            e,
+            OBJEKT_AUFTRAG,
+            d.auftrag.id,
+            VOLLZUG_VOLLZOGEN,
+            b,
+            "2026-06-11 11:00:00",
+        )
+        .await
+        .unwrap();
+        let nach = laden(&pool, d.auftrag.id, "2026-06-11 11:30:00")
+            .await
+            .unwrap();
         assert_eq!(nach.auftrag.vollzug_status, "vollzogen");
-        assert_eq!(nach.auftrag.bearbeitungsstatus, AuftragBearbeitungsstatus::Vollzogen);
+        assert_eq!(
+            nach.auftrag.bearbeitungsstatus,
+            AuftragBearbeitungsstatus::Vollzogen
+        );
     }
 
     #[tokio::test]
     async fn quittieren_setzt_nur_quittung_nicht_vollzug() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let d = anlegen(&pool, e, b, daten("X", None, vec![funktion("EA1"), funktion("EA2")]), "2026-06-11 09:00:00").await.unwrap();
+        let d = anlegen(
+            &pool,
+            e,
+            b,
+            daten("X", None, vec![funktion("EA1"), funktion("EA2")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
         let empf1 = d.empfaenger[0].id;
 
-        quittiere_empfaenger(&pool, empf1, b, "2026-06-11 10:00:00").await.unwrap();
-        let nach = laden(&pool, d.auftrag.id, "2026-06-11 10:01:00").await.unwrap();
+        quittiere_empfaenger(&pool, empf1, b, "2026-06-11 10:00:00")
+            .await
+            .unwrap();
+        let nach = laden(&pool, d.auftrag.id, "2026-06-11 10:01:00")
+            .await
+            .unwrap();
         assert_eq!(nach.auftrag.quittiert_anzahl, 1, "ein Empfänger quittiert");
         assert_eq!(nach.auftrag.empfaenger_anzahl, 2);
-        assert_eq!(nach.auftrag.vollzug_status, "offen", "Quittung ändert Vollzug nicht");
-        assert_eq!(nach.auftrag.bearbeitungsstatus, AuftragBearbeitungsstatus::Offen);
+        assert_eq!(
+            nach.auftrag.vollzug_status, "offen",
+            "Quittung ändert Vollzug nicht"
+        );
+        assert_eq!(
+            nach.auftrag.bearbeitungsstatus,
+            AuftragBearbeitungsstatus::Offen
+        );
         let e1 = nach.empfaenger.iter().find(|x| x.id == empf1).unwrap();
         assert_eq!(e1.quittiert_at.as_deref(), Some("2026-06-11 10:00:00"));
         assert_eq!(e1.quittiert_von_id, Some(b));
@@ -755,33 +1000,97 @@ mod tests {
     async fn empfaenger_gehoert_zu_auftrag_schuetzt() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let d = anlegen(&pool, e, b, daten("X", None, vec![funktion("EA1")]), "2026-06-11 09:00:00").await.unwrap();
-        assert!(empfaenger_gehoert_zu_auftrag(&pool, d.empfaenger[0].id, d.auftrag.id).await.unwrap());
-        assert!(!empfaenger_gehoert_zu_auftrag(&pool, d.empfaenger[0].id, 999).await.unwrap());
+        let d = anlegen(
+            &pool,
+            e,
+            b,
+            daten("X", None, vec![funktion("EA1")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        assert!(
+            empfaenger_gehoert_zu_auftrag(&pool, d.empfaenger[0].id, d.auftrag.id)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !empfaenger_gehoert_zu_auftrag(&pool, d.empfaenger[0].id, 999)
+                .await
+                .unwrap()
+        );
     }
 
     #[tokio::test]
     async fn in_arbeit_setzt_zeitstempel_und_status() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let d = anlegen(&pool, e, b, daten("X", None, vec![funktion("EA1")]), "2026-06-11 09:00:00").await.unwrap();
-        setze_in_arbeit(&pool, 1, e, d.auftrag.id, b, "2026-06-11 10:00:00").await.unwrap();
-        let nach = laden(&pool, d.auftrag.id, "2026-06-11 10:01:00").await.unwrap();
-        assert_eq!(nach.auftrag.bearbeitungsstatus, AuftragBearbeitungsstatus::InArbeit);
-        assert_eq!(nach.auftrag.in_arbeit_at.as_deref(), Some("2026-06-11 10:00:00"));
+        let d = anlegen(
+            &pool,
+            e,
+            b,
+            daten("X", None, vec![funktion("EA1")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        setze_in_arbeit(&pool, 1, e, d.auftrag.id, b, "2026-06-11 10:00:00")
+            .await
+            .unwrap();
+        let nach = laden(&pool, d.auftrag.id, "2026-06-11 10:01:00")
+            .await
+            .unwrap();
+        assert_eq!(
+            nach.auftrag.bearbeitungsstatus,
+            AuftragBearbeitungsstatus::InArbeit
+        );
+        assert_eq!(
+            nach.auftrag.in_arbeit_at.as_deref(),
+            Some("2026-06-11 10:00:00")
+        );
     }
 
     #[tokio::test]
     async fn melde_vollzug_setzt_text_status_und_etb_meldung() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let d = anlegen(&pool, e, b, daten("X", None, vec![funktion("EA1")]), "2026-06-11 09:00:00").await.unwrap();
-        let etb_id = melde_vollzug(&pool, 1, e, d.auftrag.id, b, "Deich gehalten", "2026-06-11 11:00:00").await.unwrap();
-        let nach = laden(&pool, d.auftrag.id, "2026-06-11 11:01:00").await.unwrap();
-        assert_eq!(nach.auftrag.bearbeitungsstatus, AuftragBearbeitungsstatus::Vollzogen);
-        assert_eq!(nach.auftrag.vollzugsmeldung.as_deref(), Some("Deich gehalten"));
-        let (typ, backlink): (String, i64) = sqlx::query_as("SELECT typ, auftrag_id FROM etb_eintrag WHERE id = ?")
-            .bind(etb_id).fetch_one(&pool).await.unwrap();
+        let d = anlegen(
+            &pool,
+            e,
+            b,
+            daten("X", None, vec![funktion("EA1")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        let etb_id = melde_vollzug(
+            &pool,
+            1,
+            e,
+            d.auftrag.id,
+            b,
+            "Deich gehalten",
+            "2026-06-11 11:00:00",
+        )
+        .await
+        .unwrap();
+        let nach = laden(&pool, d.auftrag.id, "2026-06-11 11:01:00")
+            .await
+            .unwrap();
+        assert_eq!(
+            nach.auftrag.bearbeitungsstatus,
+            AuftragBearbeitungsstatus::Vollzogen
+        );
+        assert_eq!(
+            nach.auftrag.vollzugsmeldung.as_deref(),
+            Some("Deich gehalten")
+        );
+        let (typ, backlink): (String, i64) =
+            sqlx::query_as("SELECT typ, auftrag_id FROM etb_eintrag WHERE id = ?")
+                .bind(etb_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(typ, "meldung");
         assert_eq!(backlink, d.auftrag.id);
     }
@@ -790,11 +1099,36 @@ mod tests {
     async fn nimm_ab_setzt_abnahme_nach_vollzug() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let d = anlegen(&pool, e, b, daten("X", None, vec![funktion("EA1")]), "2026-06-11 09:00:00").await.unwrap();
-        melde_vollzug(&pool, 1, e, d.auftrag.id, b, "fertig", "2026-06-11 11:00:00").await.unwrap();
-        nimm_ab(&pool, d.auftrag.id, b, "2026-06-11 12:00:00").await.unwrap();
-        let nach = laden(&pool, d.auftrag.id, "2026-06-11 12:01:00").await.unwrap();
-        assert_eq!(nach.auftrag.bearbeitungsstatus, AuftragBearbeitungsstatus::Abgenommen);
+        let d = anlegen(
+            &pool,
+            e,
+            b,
+            daten("X", None, vec![funktion("EA1")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        melde_vollzug(
+            &pool,
+            1,
+            e,
+            d.auftrag.id,
+            b,
+            "fertig",
+            "2026-06-11 11:00:00",
+        )
+        .await
+        .unwrap();
+        nimm_ab(&pool, d.auftrag.id, b, "2026-06-11 12:00:00")
+            .await
+            .unwrap();
+        let nach = laden(&pool, d.auftrag.id, "2026-06-11 12:01:00")
+            .await
+            .unwrap();
+        assert_eq!(
+            nach.auftrag.bearbeitungsstatus,
+            AuftragBearbeitungsstatus::Abgenommen
+        );
         assert_eq!(nach.auftrag.abgenommen_von_id, Some(b));
     }
 
@@ -806,17 +1140,78 @@ mod tests {
         // In gemischter Reihenfolge anlegen → erzwingt echtes ORDER BY (nicht Insert-Reihenfolge).
         // Erwartete Sortierung: sofort, dringend, dann drei 'normal' nach frist_at
         // (frühere Frist vor späterer, NULL-Frist zuletzt).
-        anlegen(&pool, e, b, daten_prio("normal-spaet", PRIO_NORMAL, Some("2026-06-11 12:00:00"), vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
-        anlegen(&pool, e, b, daten_prio("normal-ohne", PRIO_NORMAL, None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
-        anlegen(&pool, e, b, daten_prio("sofort", PRIO_SOFORT, None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
-        anlegen(&pool, e, b, daten_prio("normal-frueh", PRIO_NORMAL, Some("2026-06-11 10:00:00"), vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
-        anlegen(&pool, e, b, daten_prio("dringend", PRIO_DRINGEND, None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+        anlegen(
+            &pool,
+            e,
+            b,
+            daten_prio(
+                "normal-spaet",
+                PRIO_NORMAL,
+                Some("2026-06-11 12:00:00"),
+                vec![funktion("EA")],
+            ),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        anlegen(
+            &pool,
+            e,
+            b,
+            daten_prio("normal-ohne", PRIO_NORMAL, None, vec![funktion("EA")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        anlegen(
+            &pool,
+            e,
+            b,
+            daten_prio("sofort", PRIO_SOFORT, None, vec![funktion("EA")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        anlegen(
+            &pool,
+            e,
+            b,
+            daten_prio(
+                "normal-frueh",
+                PRIO_NORMAL,
+                Some("2026-06-11 10:00:00"),
+                vec![funktion("EA")],
+            ),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        anlegen(
+            &pool,
+            e,
+            b,
+            daten_prio("dringend", PRIO_DRINGEND, None, vec![funktion("EA")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
 
-        let liste = liste(&pool, e, None, None, None, "2026-06-11 09:30:00").await.unwrap();
-        let reihenfolge: Vec<&str> = liste.iter().map(|d| d.auftrag.auftrag_text.as_str()).collect();
+        let liste = liste(&pool, e, None, None, None, "2026-06-11 09:30:00")
+            .await
+            .unwrap();
+        let reihenfolge: Vec<&str> = liste
+            .iter()
+            .map(|d| d.auftrag.auftrag_text.as_str())
+            .collect();
         assert_eq!(
             reihenfolge,
-            vec!["sofort", "dringend", "normal-frueh", "normal-spaet", "normal-ohne"]
+            vec![
+                "sofort",
+                "dringend",
+                "normal-frueh",
+                "normal-spaet",
+                "normal-ohne"
+            ]
         );
     }
 
@@ -824,12 +1219,27 @@ mod tests {
     async fn ueberfaellig_false_wenn_alle_quittiert() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let d = anlegen(&pool, e, b, daten("Frist", Some("2026-06-11 10:00:00"), vec![funktion("EA1")]), "2026-06-11 09:00:00").await.unwrap();
+        let d = anlegen(
+            &pool,
+            e,
+            b,
+            daten("Frist", Some("2026-06-11 10:00:00"), vec![funktion("EA1")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
         // Einzigen Empfänger quittieren → EXISTS(unquittiert) wird leer.
-        quittiere_empfaenger(&pool, d.empfaenger[0].id, b, "2026-06-11 09:30:00").await.unwrap();
+        quittiere_empfaenger(&pool, d.empfaenger[0].id, b, "2026-06-11 09:30:00")
+            .await
+            .unwrap();
         // Laden NACH der Frist: nicht überfällig, weil alle quittiert.
-        let nach = laden(&pool, d.auftrag.id, "2026-06-11 10:30:00").await.unwrap();
-        assert!(!nach.auftrag.ist_ueberfaellig, "alle quittiert → nicht überfällig trotz überschrittener Frist");
+        let nach = laden(&pool, d.auftrag.id, "2026-06-11 10:30:00")
+            .await
+            .unwrap();
+        assert!(
+            !nach.auftrag.ist_ueberfaellig,
+            "alle quittiert → nicht überfällig trotz überschrittener Frist"
+        );
     }
 
     #[tokio::test]
@@ -837,12 +1247,27 @@ mod tests {
         use super::super::RICHTUNG_EXTERN;
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let d_int = anlegen(&pool, e, b, daten("intern-a", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
+        let d_int = anlegen(
+            &pool,
+            e,
+            b,
+            daten("intern-a", None, vec![funktion("EA")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
         assert_eq!(d_int.auftrag.richtung, Richtung::Intern, "Default intern");
-        let ext = AuftragDaten { richtung: RICHTUNG_EXTERN, ..daten("extern-a", None, vec![funktion("Leitstelle")]) };
-        anlegen(&pool, e, b, ext, "2026-06-11 09:00:00").await.unwrap();
+        let ext = AuftragDaten {
+            richtung: RICHTUNG_EXTERN,
+            ..daten("extern-a", None, vec![funktion("Leitstelle")])
+        };
+        anlegen(&pool, e, b, ext, "2026-06-11 09:00:00")
+            .await
+            .unwrap();
 
-        let nur_extern = liste(&pool, e, None, Some("extern"), None, "2026-06-11 10:00:00").await.unwrap();
+        let nur_extern = liste(&pool, e, None, Some("extern"), None, "2026-06-11 10:00:00")
+            .await
+            .unwrap();
         assert_eq!(nur_extern.len(), 1);
         assert_eq!(nur_extern[0].auftrag.richtung, Richtung::Extern);
         assert_eq!(nur_extern[0].auftrag.auftrag_text, "extern-a");
@@ -854,26 +1279,46 @@ mod tests {
         let (b, e) = setup(&pool).await;
         // Quell-ETB-Eintrag, aus dem der Auftrag erteilt wird.
         let quell_etb = crate::etb::repo::anlegen(
-            &pool, e, b,
+            &pool,
+            e,
+            b,
             crate::etb::repo::EintragDaten {
                 typ: crate::etb::TYP_MELDUNG,
                 inhalt: "Deich instabil — Auftrag nötig",
-                von: None, an: None, meldeweg: None, veranlassung: None,
-                ereigniszeit: None, erfasst_lokal_at: None, berichtigt_eintrag_id: None,
+                von: None,
+                an: None,
+                meldeweg: None,
+                veranlassung: None,
+                ereigniszeit: None,
+                erfasst_lokal_at: None,
+                berichtigt_eintrag_id: None,
             },
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
 
         let auftrag_id = erteile_aus_etb_tx(
-            &pool, e, quell_etb.id, b, daten("Deich sichern", None, vec![funktion("EA1")]),
-        ).await.unwrap();
+            &pool,
+            e,
+            quell_etb.id,
+            b,
+            daten("Deich sichern", None, vec![funktion("EA1")]),
+        )
+        .await
+        .unwrap();
 
-        let detail = laden(&pool, auftrag_id, "2026-06-11 10:00:00").await.unwrap();
+        let detail = laden(&pool, auftrag_id, "2026-06-11 10:00:00")
+            .await
+            .unwrap();
         // Quell-Bezug auf den auslösenden Eintrag gesetzt.
         assert_eq!(detail.auftrag.quell_etb_eintrag_id, Some(quell_etb.id));
         // Eigene Anordnung im selben Commit erzeugt (Pattern B) …
         assert!(detail.auftrag.etb_anordnung_id.is_some());
         // … und VERSCHIEDEN vom Quell-Eintrag (getrennte Spalten, keine Heraufstufung der Quelle).
-        assert_ne!(detail.auftrag.etb_anordnung_id, detail.auftrag.quell_etb_eintrag_id);
+        assert_ne!(
+            detail.auftrag.etb_anordnung_id,
+            detail.auftrag.quell_etb_eintrag_id
+        );
         assert_eq!(detail.auftrag.auftrag_text, "Deich sichern");
     }
 
@@ -882,16 +1327,42 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         let quell_etb = crate::etb::repo::anlegen(
-            &pool, e, b,
+            &pool,
+            e,
+            b,
             crate::etb::repo::EintragDaten {
-                typ: crate::etb::TYP_MELDUNG, inhalt: "Lage", von: None, an: None,
-                meldeweg: None, veranlassung: None, ereigniszeit: None,
-                erfasst_lokal_at: None, berichtigt_eintrag_id: None,
+                typ: crate::etb::TYP_MELDUNG,
+                inhalt: "Lage",
+                von: None,
+                an: None,
+                meldeweg: None,
+                veranlassung: None,
+                ereigniszeit: None,
+                erfasst_lokal_at: None,
+                berichtigt_eintrag_id: None,
             },
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
         // Anders als Meldung→Auftrag: ein ETB-Eintrag darf mehrere Aufträge auslösen (kein Conflict).
-        let a1 = erteile_aus_etb_tx(&pool, e, quell_etb.id, b, daten("erster", None, vec![funktion("EA1")])).await.unwrap();
-        let a2 = erteile_aus_etb_tx(&pool, e, quell_etb.id, b, daten("zweiter", None, vec![funktion("EA2")])).await.unwrap();
+        let a1 = erteile_aus_etb_tx(
+            &pool,
+            e,
+            quell_etb.id,
+            b,
+            daten("erster", None, vec![funktion("EA1")]),
+        )
+        .await
+        .unwrap();
+        let a2 = erteile_aus_etb_tx(
+            &pool,
+            e,
+            quell_etb.id,
+            b,
+            daten("zweiter", None, vec![funktion("EA2")]),
+        )
+        .await
+        .unwrap();
         assert_ne!(a1, a2);
         let d1 = laden(&pool, a1, "2026-06-11 10:00:00").await.unwrap();
         let d2 = laden(&pool, a2, "2026-06-11 10:00:00").await.unwrap();
@@ -903,7 +1374,19 @@ mod tests {
     async fn externer_adressat_wird_gespeichert_und_snap_aus_bezeichnung() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let d = anlegen(&pool, e, b, daten("an Leitstelle", None, vec![extern_empf("leitstelle", "Leitstelle Nord")]), "2026-06-11 09:00:00").await.unwrap();
+        let d = anlegen(
+            &pool,
+            e,
+            b,
+            daten(
+                "an Leitstelle",
+                None,
+                vec![extern_empf("leitstelle", "Leitstelle Nord")],
+            ),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
         assert_eq!(d.empfaenger.len(), 1);
         let empf = &d.empfaenger[0];
         assert_eq!(empf.empfaenger_typ, EmpfaengerTyp::Extern);
@@ -918,15 +1401,30 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         crate::org::einstellungen::speichern(
-            &pool, 1, b,
+            &pool,
+            1,
+            b,
             crate::org::einstellungen::OrgEinstellungenDaten {
                 auto_etb_eintraege: Some(0),
                 ..Default::default()
             },
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
         // Einsatz-Setting bleibt NULL (kein Override)
-        let d = anlegen(&pool, e, b, daten("X", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
-        assert!(d.auftrag.etb_anordnung_id.is_none(), "Einsatz=NULL, Org=0 → kein ETB-Folgeeintrag");
+        let d = anlegen(
+            &pool,
+            e,
+            b,
+            daten("X", None, vec![funktion("EA")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        assert!(
+            d.auftrag.etb_anordnung_id.is_none(),
+            "Einsatz=NULL, Org=0 → kein ETB-Folgeeintrag"
+        );
     }
 
     #[tokio::test]
@@ -935,20 +1433,39 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         crate::org::einstellungen::speichern(
-            &pool, 1, b,
+            &pool,
+            1,
+            b,
             crate::org::einstellungen::OrgEinstellungenDaten {
                 auto_etb_eintraege: Some(0),
                 ..Default::default()
             },
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
         crate::einsatz::einstellungen::speichern(
-            &pool, e, b,
+            &pool,
+            e,
+            b,
             crate::einsatz::einstellungen::EinstellungenDaten {
                 auto_etb_eintraege: Some(1),
                 ..Default::default()
             },
-        ).await.unwrap();
-        let d = anlegen(&pool, e, b, daten("Y", None, vec![funktion("EA")]), "2026-06-11 09:00:00").await.unwrap();
-        assert!(d.auftrag.etb_anordnung_id.is_some(), "Einsatz=1 schlägt Org=0 → ETB-Folgeeintrag erzeugt");
+        )
+        .await
+        .unwrap();
+        let d = anlegen(
+            &pool,
+            e,
+            b,
+            daten("Y", None, vec![funktion("EA")]),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        assert!(
+            d.auftrag.etb_anordnung_id.is_some(),
+            "Einsatz=1 schlägt Org=0 → ETB-Folgeeintrag erzeugt"
+        );
     }
 }

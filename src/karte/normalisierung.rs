@@ -36,7 +36,9 @@ pub fn normalisiere_pegelonline(roh: &Value) -> Value {
             let cm = w.and_then(|ts| ts.get("currentMeasurement"));
             let wert = cm.and_then(|m| m.get("value")).and_then(|v| v.as_f64());
             let zeitpunkt = cm.and_then(|m| m.get("timestamp")).and_then(|v| v.as_str());
-            let zustand = cm.and_then(|m| m.get("stateMnwMhw")).and_then(|v| v.as_str());
+            let zustand = cm
+                .and_then(|m| m.get("stateMnwMhw"))
+                .and_then(|v| v.as_str());
             Some(json!({
                 "type": "Feature",
                 "geometry": { "type": "Point", "coordinates": [lon, lat] },

@@ -52,7 +52,9 @@ fn normalisiere(body: StatusBody) -> Result<Normalisiert, AppError> {
     }
     if let Some(f) = body.fms_anker {
         if !(0..=9).contains(&f) {
-            return Err(AppError::Validation("FMS-Anker muss zwischen 0 und 9 liegen".into()));
+            return Err(AppError::Validation(
+                "FMS-Anker muss zwischen 0 und 9 liegen".into(),
+            ));
         }
     }
     Ok(Normalisiert {
@@ -69,7 +71,9 @@ pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
 ) -> Result<Json<Vec<FahrzeugStatus>>, AppError> {
-    Ok(Json(status_repo::liste(&state.pool, benutzer.org_id).await?))
+    Ok(Json(
+        status_repo::liste(&state.pool, benutzer.org_id).await?,
+    ))
 }
 
 /// POST /api/fahrzeug-status — Admin. Dublette label → Conflict.

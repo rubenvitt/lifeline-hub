@@ -67,7 +67,9 @@ impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for BezugTyp
 where
     &'r str: sqlx::Decode<'r, DB>,
 {
-    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+    fn decode(
+        value: <DB as sqlx::Database>::ValueRef<'r>,
+    ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<DB>>::decode(value)?;
         BezugTyp::parse(s).ok_or_else(|| format!("Ungültiger BezugTyp: {s}").into())
     }

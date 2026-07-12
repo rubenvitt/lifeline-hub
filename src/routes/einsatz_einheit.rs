@@ -1,8 +1,8 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
+use crate::auth::Benutzer;
 use crate::einheit::repo::{self as einheit_repo, EinheitDaten};
 use crate::einheit::{mitglied_repo, EinheitAnzeige};
-use crate::auth::Benutzer;
 use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
@@ -34,7 +34,8 @@ where
 
 /// SSE-Notify (Lage-Karte): Einheit hat sich geändert. Frontend filtert per Event-Name.
 fn sse_einheit(state: &AppState, einsatz_id: i64, einheit_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "einheit_id": einheit_id }).to_string();
+    let data =
+        serde_json::json!({ "einsatz_id": einsatz_id, "einheit_id": einheit_id }).to_string();
     state.live.publiziere_event(einsatz_id, "einheit", data);
 }
 
@@ -60,14 +61,29 @@ fn sse_material(state: &AppState, einsatz_id: i64, em_id: i64) {
     state.live.publiziere_event(einsatz_id, "material", data);
 }
 
-async fn etb_system(state: &AppState, einsatz_id: i64, benutzer_id: i64, inhalt: &str) -> Result<(), AppError> {
+async fn etb_system(
+    state: &AppState,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    inhalt: &str,
+) -> Result<(), AppError> {
     let anzeige = etb_repo::anlegen(
-        &state.pool, einsatz_id, benutzer_id,
+        &state.pool,
+        einsatz_id,
+        benutzer_id,
         etb_repo::EintragDaten {
-            typ: etb::TYP_SYSTEM, inhalt, von: None, an: None, meldeweg: None,
-            veranlassung: None, ereigniszeit: None, erfasst_lokal_at: None, berichtigt_eintrag_id: None,
+            typ: etb::TYP_SYSTEM,
+            inhalt,
+            von: None,
+            an: None,
+            meldeweg: None,
+            veranlassung: None,
+            ereigniszeit: None,
+            erfasst_lokal_at: None,
+            berichtigt_eintrag_id: None,
         },
-    ).await?;
+    )
+    .await?;
     if let Ok(json) = serde_json::to_string(&anzeige) {
         state.live.publiziere(einsatz_id, json);
     }
@@ -79,21 +95,36 @@ fn trimme(s: Option<String>) -> Option<String> {
 }
 
 /// Holt den Einsatz + Rolle und prüft Schreibrecht + aktiv. Liefert den Einsatz.
-async fn schreib_gate(state: &AppState, benutzer: &Benutzer, einsatz_id: i64) -> Result<crate::einsatz::Einsatz, AppError> {
+async fn schreib_gate(
+    state: &AppState,
+    benutzer: &Benutzer,
+    einsatz_id: i64,
+) -> Result<crate::einsatz::Einsatz, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
     Ok(einsatz)
 }
 
 /// Lädt nur den Einheiten-Namen (für ETB-Texte); `NotFound`, falls nicht zum Einsatz.
 async fn einheit_name(state: &AppState, einsatz_id: i64, eid: i64) -> Result<String, AppError> {
-    sqlx::query_scalar::<_, String>("SELECT name FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?")
-        .bind(eid).bind(einsatz_id)
-        .fetch_optional(&state.pool).await?
-        .ok_or(AppError::NotFound)
+    sqlx::query_scalar::<_, String>(
+        "SELECT name FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(eid)
+    .bind(einsatz_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or(AppError::NotFound)
 }
 
 /// GET /api/einsaetze/{id}/einheiten — Liste (aufgelöst). Nur Lesezugriff.
@@ -105,7 +136,14 @@ pub async fn liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     Ok(Json(einheit_repo::liste(&state.pool, einsatz_id).await?))
 }
 
@@ -137,24 +175,49 @@ pub async fn bilden(
     if name.is_empty() {
         return Err(AppError::Validation("Name darf nicht leer sein".into()));
     }
-    Staerke::aus_optionen(body.soll_fuehrer, body.soll_unterfuehrer, body.soll_mannschaft).map_err(AppError::Validation)?;
+    Staerke::aus_optionen(
+        body.soll_fuehrer,
+        body.soll_unterfuehrer,
+        body.soll_mannschaft,
+    )
+    .map_err(AppError::Validation)?;
     let bemerkung = trimme(body.bemerkung);
     let anzeige = einheit_repo::anlegen(
-        &state.pool, einsatz_id, einsatz.org_id,
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
         EinheitDaten {
-            name: &name, abschnitt_id: body.abschnitt_id, ueber_einheit_id: body.ueber_einheit_id,
-            typ_id: body.typ_id, soll_fuehrer: body.soll_fuehrer, soll_unterfuehrer: body.soll_unterfuehrer,
-            soll_mannschaft: body.soll_mannschaft, bemerkung: bemerkung.as_deref(), sortier: body.sortier,
+            name: &name,
+            abschnitt_id: body.abschnitt_id,
+            ueber_einheit_id: body.ueber_einheit_id,
+            typ_id: body.typ_id,
+            soll_fuehrer: body.soll_fuehrer,
+            soll_unterfuehrer: body.soll_unterfuehrer,
+            soll_mannschaft: body.soll_mannschaft,
+            bemerkung: bemerkung.as_deref(),
+            sortier: body.sortier,
         },
         benutzer.id,
-    ).await?;
+    )
+    .await?;
     if let Some(ids) = &body.sprechgruppe_ids {
         crate::sprechgruppe::repo::setze_einheit_sprechgruppen(
-            &state.pool, einsatz.org_id, einsatz_id, anzeige.id, ids,
-        ).await?;
+            &state.pool,
+            einsatz.org_id,
+            einsatz_id,
+            anzeige.id,
+            ids,
+        )
+        .await?;
     }
     let anzeige = einheit_repo::laden(&state.pool, einsatz_id, anzeige.id).await?;
-    etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}» gebildet", anzeige.name)).await?;
+    etb_system(
+        &state,
+        einsatz_id,
+        benutzer.id,
+        &format!("Einheit «{}» gebildet", anzeige.name),
+    )
+    .await?;
     sse_einheit(&state, einsatz_id, anzeige.id);
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
@@ -172,7 +235,12 @@ pub async fn aktualisieren(
     if name.is_empty() {
         return Err(AppError::Validation("Name darf nicht leer sein".into()));
     }
-    Staerke::aus_optionen(body.soll_fuehrer, body.soll_unterfuehrer, body.soll_mannschaft).map_err(AppError::Validation)?;
+    Staerke::aus_optionen(
+        body.soll_fuehrer,
+        body.soll_unterfuehrer,
+        body.soll_mannschaft,
+    )
+    .map_err(AppError::Validation)?;
     let bemerkung = trimme(body.bemerkung);
 
     let vorher = einheit_repo::laden(&state.pool, einsatz_id, eid).await?;
@@ -182,13 +250,23 @@ pub async fn aktualisieren(
         einheit_repo::pruefe_fuehrer(&state.pool, einsatz_id, eid, body.fuehrer_id).await?;
     }
     let nachher = einheit_repo::aktualisiere(
-        &state.pool, einsatz_id, einsatz.org_id, eid,
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        eid,
         EinheitDaten {
-            name: &name, abschnitt_id: body.abschnitt_id, ueber_einheit_id: body.ueber_einheit_id,
-            typ_id: body.typ_id, soll_fuehrer: body.soll_fuehrer, soll_unterfuehrer: body.soll_unterfuehrer,
-            soll_mannschaft: body.soll_mannschaft, bemerkung: bemerkung.as_deref(), sortier: body.sortier,
+            name: &name,
+            abschnitt_id: body.abschnitt_id,
+            ueber_einheit_id: body.ueber_einheit_id,
+            typ_id: body.typ_id,
+            soll_fuehrer: body.soll_fuehrer,
+            soll_unterfuehrer: body.soll_unterfuehrer,
+            soll_mannschaft: body.soll_mannschaft,
+            bemerkung: bemerkung.as_deref(),
+            sortier: body.sortier,
         },
-    ).await?;
+    )
+    .await?;
 
     // Führer authoritativ setzen (Mitgliedschaft bereits geprüft) + ETB bei Änderung.
     if vorher.fuehrer_id != body.fuehrer_id {
@@ -196,17 +274,31 @@ pub async fn aktualisieren(
     }
     if let Some(ids) = &body.sprechgruppe_ids {
         crate::sprechgruppe::repo::setze_einheit_sprechgruppen(
-            &state.pool, einsatz.org_id, einsatz_id, eid, ids,
-        ).await?;
+            &state.pool,
+            einsatz.org_id,
+            einsatz_id,
+            eid,
+            ids,
+        )
+        .await?;
     }
     // Endgültige Anzeige (inkl. neu aufgelöstem Führer-Namen und Sprechgruppen).
     let final_anzeige = einheit_repo::laden(&state.pool, einsatz_id, eid).await?;
 
     if vorher.fuehrer_id != body.fuehrer_id {
         let inhalt = match (&vorher.fuehrer_name, &final_anzeige.fuehrer_name) {
-            (None, Some(neu)) => format!("Einheit «{}»: Einheitsführer «{}» gesetzt", final_anzeige.name, neu),
-            (Some(alt), Some(neu)) => format!("Einheit «{}»: Einheitsführer «{}» → «{}»", final_anzeige.name, alt, neu),
-            (Some(alt), None) => format!("Einheit «{}»: Einheitsführer «{}» entfernt", final_anzeige.name, alt),
+            (None, Some(neu)) => format!(
+                "Einheit «{}»: Einheitsführer «{}» gesetzt",
+                final_anzeige.name, neu
+            ),
+            (Some(alt), Some(neu)) => format!(
+                "Einheit «{}»: Einheitsführer «{}» → «{}»",
+                final_anzeige.name, alt, neu
+            ),
+            (Some(alt), None) => format!(
+                "Einheit «{}»: Einheitsführer «{}» entfernt",
+                final_anzeige.name, alt
+            ),
             (None, None) => String::new(),
         };
         if !inhalt.is_empty() {
@@ -233,7 +325,13 @@ pub async fn aufloesen(
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let name = einheit_name(&state, einsatz_id, eid).await?;
     einheit_repo::loese_auf(&state.pool, einsatz_id, eid).await?;
-    etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}» aufgelöst", name)).await?;
+    etb_system(
+        &state,
+        einsatz_id,
+        benutzer.id,
+        &format!("Einheit «{}» aufgelöst", name),
+    )
+    .await?;
     sse_einheit(&state, einsatz_id, eid);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -247,7 +345,13 @@ pub async fn personal_zuordnen(
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let person = mitglied_repo::ordne_personal_zu(&state.pool, einsatz_id, eid, ep_id).await?;
-    etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: «{}» zugeordnet", einheit, person)).await?;
+    etb_system(
+        &state,
+        einsatz_id,
+        benutzer.id,
+        &format!("Einheit «{}»: «{}» zugeordnet", einheit, person),
+    )
+    .await?;
     sse_einheit(&state, einsatz_id, eid);
     sse_personal(&state, einsatz_id, ep_id);
     Ok(StatusCode::NO_CONTENT)
@@ -262,7 +366,13 @@ pub async fn personal_freigeben(
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let person = mitglied_repo::gib_personal_frei(&state.pool, einsatz_id, eid, ep_id).await?;
-    etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: «{}» freigegeben", einheit, person)).await?;
+    etb_system(
+        &state,
+        einsatz_id,
+        benutzer.id,
+        &format!("Einheit «{}»: «{}» freigegeben", einheit, person),
+    )
+    .await?;
     sse_einheit(&state, einsatz_id, eid);
     sse_personal(&state, einsatz_id, ep_id);
     Ok(StatusCode::NO_CONTENT)
@@ -277,7 +387,13 @@ pub async fn fahrzeug_zuordnen(
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let fz = mitglied_repo::ordne_fahrzeug_zu(&state.pool, einsatz_id, eid, ef_id).await?;
-    etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: Fahrzeug «{}» zugeordnet", einheit, fz)).await?;
+    etb_system(
+        &state,
+        einsatz_id,
+        benutzer.id,
+        &format!("Einheit «{}»: Fahrzeug «{}» zugeordnet", einheit, fz),
+    )
+    .await?;
     sse_einheit(&state, einsatz_id, eid);
     sse_fahrzeug(&state, einsatz_id, ef_id);
     Ok(StatusCode::NO_CONTENT)
@@ -292,7 +408,13 @@ pub async fn fahrzeug_freigeben(
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let fz = mitglied_repo::gib_fahrzeug_frei(&state.pool, einsatz_id, eid, ef_id).await?;
-    etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: Fahrzeug «{}» freigegeben", einheit, fz)).await?;
+    etb_system(
+        &state,
+        einsatz_id,
+        benutzer.id,
+        &format!("Einheit «{}»: Fahrzeug «{}» freigegeben", einheit, fz),
+    )
+    .await?;
     sse_einheit(&state, einsatz_id, eid);
     sse_fahrzeug(&state, einsatz_id, ef_id);
     Ok(StatusCode::NO_CONTENT)
@@ -306,8 +428,18 @@ pub async fn material_zuordnen(
 ) -> Result<StatusCode, AppError> {
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
-    let (bez, menge) = mitglied_repo::ordne_material_zu(&state.pool, einsatz_id, eid, em_id).await?;
-    etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: Material «{}» (×{}) zugeordnet", einheit, bez, menge)).await?;
+    let (bez, menge) =
+        mitglied_repo::ordne_material_zu(&state.pool, einsatz_id, eid, em_id).await?;
+    etb_system(
+        &state,
+        einsatz_id,
+        benutzer.id,
+        &format!(
+            "Einheit «{}»: Material «{}» (×{}) zugeordnet",
+            einheit, bez, menge
+        ),
+    )
+    .await?;
     sse_einheit(&state, einsatz_id, eid);
     sse_material(&state, einsatz_id, em_id);
     Ok(StatusCode::NO_CONTENT)
@@ -321,8 +453,18 @@ pub async fn material_freigeben(
 ) -> Result<StatusCode, AppError> {
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
-    let (bez, menge) = mitglied_repo::gib_material_frei(&state.pool, einsatz_id, eid, em_id).await?;
-    etb_system(&state, einsatz_id, benutzer.id, &format!("Einheit «{}»: Material «{}» (×{}) freigegeben", einheit, bez, menge)).await?;
+    let (bez, menge) =
+        mitglied_repo::gib_material_frei(&state.pool, einsatz_id, eid, em_id).await?;
+    etb_system(
+        &state,
+        einsatz_id,
+        benutzer.id,
+        &format!(
+            "Einheit «{}»: Material «{}» (×{}) freigegeben",
+            einheit, bez, menge
+        ),
+    )
+    .await?;
     sse_einheit(&state, einsatz_id, eid);
     sse_material(&state, einsatz_id, em_id);
     Ok(StatusCode::NO_CONTENT)
@@ -350,12 +492,25 @@ pub async fn position(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let vorher = einheit_repo::laden(&state.pool, einsatz_id, einheit_id).await?; // 404 falls fremd
-    let eff_lat = match body.lat { Some(o) => o, None => vorher.lat };
-    let eff_lon = match body.lon { Some(o) => o, None => vorher.lon };
+    let eff_lat = match body.lat {
+        Some(o) => o,
+        None => vorher.lat,
+    };
+    let eff_lon = match body.lon {
+        Some(o) => o,
+        None => vorher.lon,
+    };
     if eff_lat.is_some() != eff_lon.is_some() {
         return Err(AppError::UnprocessableEntity(
             "lat und lon müssen gemeinsam gesetzt oder gemeinsam leer sein".into(),
@@ -363,12 +518,16 @@ pub async fn position(
     }
     if let Some(la) = eff_lat {
         if !(-90.0..=90.0).contains(&la) {
-            return Err(AppError::UnprocessableEntity("lat muss zwischen -90 und 90 liegen".into()));
+            return Err(AppError::UnprocessableEntity(
+                "lat muss zwischen -90 und 90 liegen".into(),
+            ));
         }
     }
     if let Some(lo) = eff_lon {
         if !(-180.0..=180.0).contains(&lo) {
-            return Err(AppError::UnprocessableEntity("lon muss zwischen -180 und 180 liegen".into()));
+            return Err(AppError::UnprocessableEntity(
+                "lon muss zwischen -180 und 180 liegen".into(),
+            ));
         }
     }
 
@@ -398,7 +557,14 @@ pub async fn stream(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
 
     let rx = state.live.abonniere(einsatz_id);
     let stream = BroadcastStream::new(rx).map(|res| {

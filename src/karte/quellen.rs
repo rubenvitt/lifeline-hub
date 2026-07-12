@@ -136,7 +136,12 @@ async fn erneuere_pegelonline(
 ) -> Option<FachebeneAntwort> {
     match hole_json(&client, PEGEL_URL).await {
         Ok(roh) => {
-            let a = FachebeneAntwort::ok("pegelonline", PEGEL_ATTRIB, None, normalisiere_pegelonline(&roh));
+            let a = FachebeneAntwort::ok(
+                "pegelonline",
+                PEGEL_ATTRIB,
+                None,
+                normalisiere_pegelonline(&roh),
+            );
             cache::setze(&pool, "pegelonline", &a).await;
             Some(a)
         }
@@ -207,7 +212,12 @@ async fn erneuere_nina(client: reqwest::Client, pool: SqlitePool) -> Option<Fach
         .into_iter()
         .flatten()
         .collect();
-    let a = FachebeneAntwort::ok("nina", NINA_ATTRIB, None, kombiniere_nina(&map_data, &geometrien));
+    let a = FachebeneAntwort::ok(
+        "nina",
+        NINA_ATTRIB,
+        None,
+        kombiniere_nina(&map_data, &geometrien),
+    );
     cache::setze(&pool, "nina", &a).await;
     Some(a)
 }

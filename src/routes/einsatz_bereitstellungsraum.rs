@@ -3,7 +3,9 @@ use crate::auth::session::CurrentUser;
 use crate::bereitstellungsraum::belegung_repo;
 use crate::bereitstellungsraum::repo::{self as br_repo, NeueDaten, PatchDaten};
 use crate::bereitstellungsraum::{BrAnzeige, BrBelegungAnzeige, BrStatus};
-use crate::einsatz::berechtigung::{fordere_modul_zugriff_laden, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
+use crate::einsatz::berechtigung::{
+    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
+};
 use crate::einsatz::repo as einsatz_repo;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -72,7 +74,9 @@ async fn etb_system(
 
 fn sse_br(state: &AppState, einsatz_id: i64, br_id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "br_id": br_id }).to_string();
-    state.live.publiziere_event(einsatz_id, "bereitstellungsraum", data);
+    state
+        .live
+        .publiziere_event(einsatz_id, "bereitstellungsraum", data);
 }
 
 fn trimme(s: Option<String>) -> Option<String> {
@@ -89,11 +93,7 @@ where
 
 // ---------- Detail-Helfer ----------
 
-async fn lade_detail(
-    state: &AppState,
-    einsatz_id: i64,
-    br_id: i64,
-) -> Result<BrDetail, AppError> {
+async fn lade_detail(state: &AppState, einsatz_id: i64, br_id: i64) -> Result<BrDetail, AppError> {
     let br = br_repo::laden(&state.pool, einsatz_id, br_id).await?;
     let einheiten = sqlx::query_as::<_, BrEinheitKurz>(
         "SELECT id, name FROM einsatz_einheit WHERE aktueller_br_id = ? AND einsatz_id = ?",
@@ -110,7 +110,11 @@ async fn lade_detail(
     .bind(einsatz_id)
     .fetch_all(&state.pool)
     .await?;
-    Ok(BrDetail { br, einheiten, fahrzeuge })
+    Ok(BrDetail {
+        br,
+        einheiten,
+        fahrzeuge,
+    })
 }
 
 // ============================== Routen ==============================
@@ -131,11 +135,20 @@ pub async fn liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
 
     if let Some(s) = &params.status {
         if BrStatus::parse(s).is_none() {
-            return Err(AppError::Validation("Unbekannter BR-Status im Filter".into()));
+            return Err(AppError::Validation(
+                "Unbekannter BR-Status im Filter".into(),
+            ));
         }
     }
     Ok(Json(
@@ -168,12 +181,21 @@ pub async fn anlegen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let bezeichnung = body.bezeichnung.trim().to_string();
     if bezeichnung.is_empty() {
-        return Err(AppError::Validation("Bezeichnung darf nicht leer sein".into()));
+        return Err(AppError::Validation(
+            "Bezeichnung darf nicht leer sein".into(),
+        ));
     }
     let standort = trimme(body.standort);
     let notiz = trimme(body.notiz);
@@ -203,7 +225,14 @@ pub async fn detail(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
 
     Ok(Json(lade_detail(&state, einsatz_id, br_id).await?))
 }
@@ -230,7 +259,14 @@ pub async fn aktualisieren(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let vorher = br_repo::laden(&state.pool, einsatz_id, br_id).await?;
@@ -247,7 +283,9 @@ pub async fn aktualisieren(
         .map(str::to_string);
     if let Some(b) = &bezeichnung {
         if b.is_empty() {
-            return Err(AppError::Validation("Bezeichnung darf nicht leer sein".into()));
+            return Err(AppError::Validation(
+                "Bezeichnung darf nicht leer sein".into(),
+            ));
         }
     }
     let standort = body
@@ -290,7 +328,14 @@ pub async fn status_wechsel(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     if BrStatus::parse(&body.status).is_none() {
@@ -307,8 +352,14 @@ pub async fn status_wechsel(
         br_repo::setze_status(&state.pool, einsatz_id, br_id, &body.status, benutzer.id).await?;
 
     let etb_text = match body.status.as_str() {
-        "aktiv" => Some(format!("Bereitstellungsraum {} in Betrieb genommen", nachher.bezeichnung)),
-        "aufgeloest" => Some(format!("Bereitstellungsraum {} aufgelöst", nachher.bezeichnung)),
+        "aktiv" => Some(format!(
+            "Bereitstellungsraum {} in Betrieb genommen",
+            nachher.bezeichnung
+        )),
+        "aufgeloest" => Some(format!(
+            "Bereitstellungsraum {} aufgelöst",
+            nachher.bezeichnung
+        )),
         _ => None,
     };
     if let Some(text) = etb_text {
@@ -328,7 +379,14 @@ pub async fn stornieren(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     br_repo::storniere(&state.pool, einsatz_id, br_id, benutzer.id).await?;
@@ -355,7 +413,14 @@ pub async fn belegung(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let notiz = trimme(body.notiz);
@@ -389,8 +454,8 @@ pub async fn belegung(
         _ => None,
     };
     if let Some(ev) = objekt_event {
-        let data =
-            serde_json::json!({ "einsatz_id": einsatz_id, "objekt_id": event.objekt_id }).to_string();
+        let data = serde_json::json!({ "einsatz_id": einsatz_id, "objekt_id": event.objekt_id })
+            .to_string();
         state.live.publiziere_event(einsatz_id, ev, data);
     }
     Ok((StatusCode::CREATED, Json(event)))

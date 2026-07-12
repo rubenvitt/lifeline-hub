@@ -73,20 +73,30 @@ mod tests {
 
     async fn setup(pool: &SqlitePool) -> (i64, i64, i64) {
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Test-Orga')")
-            .execute(pool).await.unwrap();
+            .execute(pool)
+            .await
+            .unwrap();
         let benutzer_id: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, aktiv) \
              VALUES (1, 'A', 'a', 'h', 'keiner', 'keine', 1) RETURNING id")
             .fetch_one(pool).await.unwrap();
         let einsatz_id: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung, status, begonnen_at) \
-             VALUES (1, 'Lage', 'aktiv', '2026-05-27') RETURNING id")
-            .fetch_one(pool).await.unwrap();
+             VALUES (1, 'Lage', 'aktiv', '2026-05-27') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         let person_id: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
-             VALUES (?, 1, ?, ?) RETURNING id")
-            .bind(einsatz_id).bind(benutzer_id).bind(benutzer_id)
-            .fetch_one(pool).await.unwrap();
+             VALUES (?, 1, ?, ?) RETURNING id",
+        )
+        .bind(einsatz_id)
+        .bind(benutzer_id)
+        .bind(benutzer_id)
+        .fetch_one(pool)
+        .await
+        .unwrap();
         (benutzer_id, einsatz_id, person_id)
     }
 
@@ -108,8 +118,12 @@ mod tests {
         let (b, e, _p) = setup(&pool).await;
         anlegen(&pool, e, None, b, "export").await.unwrap();
         let count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM person_zugriff_audit WHERE einsatz_id = ? AND art = 'export'")
-            .bind(e).fetch_one(&pool).await.unwrap();
+            "SELECT COUNT(*) FROM person_zugriff_audit WHERE einsatz_id = ? AND art = 'export'",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         assert_eq!(count, 1);
     }
 }

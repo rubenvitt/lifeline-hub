@@ -24,11 +24,13 @@ pub fn sha256_hex(daten: &[u8]) -> String {
 
 /// Lädt die Anzeige eines Anhangs. `NotFound`, wenn er nicht existiert.
 pub async fn anzeige_laden(pool: &SqlitePool, id: i64) -> Result<AnhangAnzeige, AppError> {
-    sqlx::query_as::<_, AnhangAnzeige>(sqlx::AssertSqlSafe(format!("{ANZEIGE_SELECT} WHERE id = ?")))
-        .bind(id)
-        .fetch_optional(pool)
-        .await?
-        .ok_or(AppError::NotFound)
+    sqlx::query_as::<_, AnhangAnzeige>(sqlx::AssertSqlSafe(format!(
+        "{ANZEIGE_SELECT} WHERE id = ?"
+    )))
+    .bind(id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)
 }
 
 /// Persistiert einen Anhang (Bytes als BLOB) und liefert seine Anzeige.
@@ -96,14 +98,22 @@ mod tests {
 
     async fn setup(pool: &SqlitePool) -> (i64, i64) {
         sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
-            .execute(pool).await.unwrap();
+            .execute(pool)
+            .await
+            .unwrap();
         let benutzer_id: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
              VALUES (1, 'Leitung', 'leit', 'h') RETURNING id",
-        ).fetch_one(pool).await.unwrap();
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         let einsatz_id: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
-        ).fetch_one(pool).await.unwrap();
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         (benutzer_id, einsatz_id)
     }
 
@@ -122,7 +132,16 @@ mod tests {
         let (benutzer, einsatz) = setup(&pool).await;
 
         let bytes = b"PDF-Inhalt";
-        let a = anlegen(&pool, einsatz, benutzer, "lage.pdf", "application/pdf", bytes).await.unwrap();
+        let a = anlegen(
+            &pool,
+            einsatz,
+            benutzer,
+            "lage.pdf",
+            "application/pdf",
+            bytes,
+        )
+        .await
+        .unwrap();
         assert_eq!(a.dateiname, "lage.pdf");
         assert_eq!(a.mime, "application/pdf");
         assert_eq!(a.groesse, bytes.len() as i64);
@@ -137,17 +156,26 @@ mod tests {
     async fn gehoert_anhang_zu_einsatz_prueft_zugehoerigkeit() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        let a = anlegen(&pool, einsatz, benutzer, "f.png", "image/png", b"x").await.unwrap();
+        let a = anlegen(&pool, einsatz, benutzer, "f.png", "image/png", b"x")
+            .await
+            .unwrap();
 
-        assert!(gehoert_anhang_zu_einsatz(&pool, a.id, einsatz).await.unwrap());
+        assert!(gehoert_anhang_zu_einsatz(&pool, a.id, einsatz)
+            .await
+            .unwrap());
         assert!(!gehoert_anhang_zu_einsatz(&pool, a.id, 999).await.unwrap());
-        assert!(!gehoert_anhang_zu_einsatz(&pool, 12345, einsatz).await.unwrap());
+        assert!(!gehoert_anhang_zu_einsatz(&pool, 12345, einsatz)
+            .await
+            .unwrap());
     }
 
     #[tokio::test]
     async fn laden_bytes_unbekannt_ist_notfound() {
         let pool = crate::db::test_pool().await;
         setup(&pool).await;
-        assert!(matches!(laden_bytes(&pool, 999).await.unwrap_err(), AppError::NotFound));
+        assert!(matches!(
+            laden_bytes(&pool, 999).await.unwrap_err(),
+            AppError::NotFound
+        ));
     }
 }

@@ -63,8 +63,15 @@ const SELECT_AUFGELOEST: &str = "\
 /// Setzt die abgeleitete Anzeige aus Row + Mitgliedern + Stärke + Sprechgruppen zusammen.
 /// `soll` ist Override (falls vollständig) sonst Typ-Soll (falls vorhanden) sonst `None`.
 async fn zu_anzeige(pool: &SqlitePool, row: Row) -> Result<EinheitAnzeige, AppError> {
-    let override_soll = Staerke::aus_optionen(row.soll_fuehrer, row.soll_unterfuehrer, row.soll_mannschaft).unwrap_or(None);
-    let typ_soll = Staerke::aus_optionen(row.typ_soll_fuehrer, row.typ_soll_unterfuehrer, row.typ_soll_mannschaft).unwrap_or(None);
+    let override_soll =
+        Staerke::aus_optionen(row.soll_fuehrer, row.soll_unterfuehrer, row.soll_mannschaft)
+            .unwrap_or(None);
+    let typ_soll = Staerke::aus_optionen(
+        row.typ_soll_fuehrer,
+        row.typ_soll_unterfuehrer,
+        row.typ_soll_mannschaft,
+    )
+    .unwrap_or(None);
     let soll = override_soll.or(typ_soll);
 
     let ist = mitglied_repo::ist_staerke(pool, row.id).await?;
@@ -106,10 +113,16 @@ async fn zu_anzeige(pool: &SqlitePool, row: Row) -> Result<EinheitAnzeige, AppEr
 /// Kumulierte Ist-Stärke: eigene + alle unterstellten Einheiten (rekursiv). Cycle-sicher
 /// über ein Visited-Set (schützt vor korrupten Altdaten). Dünner Wrapper über
 /// `mitglied_repo::ist_staerke` — keine neue Stärke-Logik.
-async fn ist_kumuliert(pool: &SqlitePool, einsatz_id: i64, wurzel_id: i64) -> Result<Staerke, AppError> {
-    let kanten: Vec<(i64, Option<i64>)> = sqlx::query_as(
-        "SELECT id, ueber_einheit_id FROM einsatz_einheit WHERE einsatz_id = ?",
-    ).bind(einsatz_id).fetch_all(pool).await?;
+async fn ist_kumuliert(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    wurzel_id: i64,
+) -> Result<Staerke, AppError> {
+    let kanten: Vec<(i64, Option<i64>)> =
+        sqlx::query_as("SELECT id, ueber_einheit_id FROM einsatz_einheit WHERE einsatz_id = ?")
+            .bind(einsatz_id)
+            .fetch_all(pool)
+            .await?;
     let mut kinder: HashMap<i64, Vec<i64>> = HashMap::new();
     for (id, parent) in &kanten {
         if let Some(p) = parent {
@@ -142,7 +155,10 @@ async fn ist_kumuliert(pool: &SqlitePool, einsatz_id: i64, wurzel_id: i64) -> Re
 pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<EinheitAnzeige>, AppError> {
     let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
         "{SELECT_AUFGELOEST} WHERE e.einsatz_id = ? ORDER BY e.sortier, e.id"
-    ))).bind(einsatz_id).fetch_all(pool).await?;
+    )))
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
     let mut out = Vec::with_capacity(rows.len());
     for row in rows {
         out.push(zu_anzeige(pool, row).await?);
@@ -151,29 +167,53 @@ pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<EinheitAnze
 }
 
 /// Lädt eine Einheit (aufgelöst); `NotFound`, falls nicht zum Einsatz.
-pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<EinheitAnzeige, AppError> {
-    let row = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!("{SELECT_AUFGELOEST} WHERE e.id = ? AND e.einsatz_id = ?")))
-        .bind(id).bind(einsatz_id)
-        .fetch_optional(pool).await?
-        .ok_or(AppError::NotFound)?;
+pub async fn laden(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<EinheitAnzeige, AppError> {
+    let row = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_AUFGELOEST} WHERE e.id = ? AND e.einsatz_id = ?"
+    )))
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)?;
     zu_anzeige(pool, row).await
 }
 
 async fn pruefe_parent(pool: &SqlitePool, einsatz_id: i64, parent_id: i64) -> Result<(), AppError> {
-    let t: Option<i64> = sqlx::query_scalar("SELECT 1 FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?")
-        .bind(parent_id).bind(einsatz_id).fetch_optional(pool).await?;
+    let t: Option<i64> =
+        sqlx::query_scalar("SELECT 1 FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?")
+            .bind(parent_id)
+            .bind(einsatz_id)
+            .fetch_optional(pool)
+            .await?;
     t.map(|_| ()).ok_or(AppError::NotFound)
 }
 
-async fn pruefe_abschnitt(pool: &SqlitePool, einsatz_id: i64, abschnitt_id: i64) -> Result<(), AppError> {
-    let t: Option<i64> = sqlx::query_scalar("SELECT 1 FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?")
-        .bind(abschnitt_id).bind(einsatz_id).fetch_optional(pool).await?;
+async fn pruefe_abschnitt(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    abschnitt_id: i64,
+) -> Result<(), AppError> {
+    let t: Option<i64> =
+        sqlx::query_scalar("SELECT 1 FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?")
+            .bind(abschnitt_id)
+            .bind(einsatz_id)
+            .fetch_optional(pool)
+            .await?;
     t.map(|_| ()).ok_or(AppError::NotFound)
 }
 
 /// Zyklus, wenn beim Setzen von `ueber_einheit_id = kandidat` für `start_id` der
 /// Kandidat (oder ein Vorfahr) gleich `start_id` wäre. Läuft von `kandidat` nach oben.
-async fn waere_zyklus(pool: &SqlitePool, start_id: i64, kandidat_parent: i64) -> Result<bool, AppError> {
+async fn waere_zyklus(
+    pool: &SqlitePool,
+    start_id: i64,
+    kandidat_parent: i64,
+) -> Result<bool, AppError> {
     let mut aktuell = Some(kandidat_parent);
     let mut schritte = 0;
     while let Some(id) = aktuell {
@@ -184,15 +224,26 @@ async fn waere_zyklus(pool: &SqlitePool, start_id: i64, kandidat_parent: i64) ->
         if schritte > 10_000 {
             return Ok(true);
         }
-        aktuell = sqlx::query_scalar::<_, Option<i64>>("SELECT ueber_einheit_id FROM einsatz_einheit WHERE id = ?")
-            .bind(id).fetch_optional(pool).await?.flatten();
+        aktuell = sqlx::query_scalar::<_, Option<i64>>(
+            "SELECT ueber_einheit_id FROM einsatz_einheit WHERE id = ?",
+        )
+        .bind(id)
+        .fetch_optional(pool)
+        .await?
+        .flatten();
     }
     Ok(false)
 }
 
 /// Validiert typ (eigene Org, aktiv), abschnitt (selber Einsatz), parent (selber Einsatz,
 /// zyklenfrei). `self_id = None` beim Anlegen.
-async fn validiere(pool: &SqlitePool, einsatz_id: i64, org_id: i64, self_id: Option<i64>, daten: &EinheitDaten<'_>) -> Result<(), AppError> {
+async fn validiere(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    org_id: i64,
+    self_id: Option<i64>,
+    daten: &EinheitDaten<'_>,
+) -> Result<(), AppError> {
     if let Some(typ) = daten.typ_id {
         if !crate::einheit::typ_repo::ist_in_org(pool, org_id, typ).await? {
             return Err(AppError::Validation("Unbekannter Einheitstyp".into()));
@@ -205,7 +256,9 @@ async fn validiere(pool: &SqlitePool, einsatz_id: i64, org_id: i64, self_id: Opt
         pruefe_parent(pool, einsatz_id, parent).await?;
         if let Some(sid) = self_id {
             if waere_zyklus(pool, sid, parent).await? {
-                return Err(AppError::Validation("Einheit darf nicht eigener Vorfahr werden".into()));
+                return Err(AppError::Validation(
+                    "Einheit darf nicht eigener Vorfahr werden".into(),
+                ));
             }
         }
     }
@@ -213,7 +266,13 @@ async fn validiere(pool: &SqlitePool, einsatz_id: i64, org_id: i64, self_id: Opt
 }
 
 /// Legt eine Einheit an (nach Validierung). `org_id` für die Typ-Prüfung.
-pub async fn anlegen(pool: &SqlitePool, einsatz_id: i64, org_id: i64, daten: EinheitDaten<'_>, angelegt_von: i64) -> Result<EinheitAnzeige, AppError> {
+pub async fn anlegen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    org_id: i64,
+    daten: EinheitDaten<'_>,
+    angelegt_von: i64,
+) -> Result<EinheitAnzeige, AppError> {
     validiere(pool, einsatz_id, org_id, None, &daten).await?;
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatz_einheit \
@@ -221,16 +280,31 @@ pub async fn anlegen(pool: &SqlitePool, einsatz_id: i64, org_id: i64, daten: Ein
              soll_fuehrer, soll_unterfuehrer, soll_mannschaft, bemerkung, sortier, angelegt_von) \
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
-    .bind(einsatz_id).bind(daten.abschnitt_id).bind(daten.ueber_einheit_id).bind(daten.typ_id)
-    .bind(daten.name).bind(daten.soll_fuehrer).bind(daten.soll_unterfuehrer).bind(daten.soll_mannschaft)
-    .bind(daten.bemerkung).bind(daten.sortier).bind(angelegt_von)
-    .fetch_one(pool).await?;
+    .bind(einsatz_id)
+    .bind(daten.abschnitt_id)
+    .bind(daten.ueber_einheit_id)
+    .bind(daten.typ_id)
+    .bind(daten.name)
+    .bind(daten.soll_fuehrer)
+    .bind(daten.soll_unterfuehrer)
+    .bind(daten.soll_mannschaft)
+    .bind(daten.bemerkung)
+    .bind(daten.sortier)
+    .bind(angelegt_von)
+    .fetch_one(pool)
+    .await?;
     laden(pool, einsatz_id, id).await
 }
 
 /// Vollersatz der editierbaren Felder (ohne Führer). Parent-Wechsel zyklenfrei. `NotFound`,
 /// falls die Einheit nicht zum Einsatz gehört.
-pub async fn aktualisiere(pool: &SqlitePool, einsatz_id: i64, org_id: i64, id: i64, daten: EinheitDaten<'_>) -> Result<EinheitAnzeige, AppError> {
+pub async fn aktualisiere(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    org_id: i64,
+    id: i64,
+    daten: EinheitDaten<'_>,
+) -> Result<EinheitAnzeige, AppError> {
     laden(pool, einsatz_id, id).await?; // Existenz im Einsatz sichern
     validiere(pool, einsatz_id, org_id, Some(id), &daten).await?;
     let resultat = sqlx::query(
@@ -272,12 +346,19 @@ pub async fn aktualisiere_position(
             tz_organisation = CASE WHEN ? THEN ? ELSE tz_organisation END \
          WHERE id = ? AND einsatz_id = ?",
     )
-    .bind(daten.lat.is_some()).bind(daten.lat.flatten())
-    .bind(daten.lon.is_some()).bind(daten.lon.flatten())
-    .bind(daten.tz_fachaufgabe.is_some()).bind(daten.tz_fachaufgabe.flatten())
-    .bind(daten.tz_organisation.is_some()).bind(daten.tz_organisation.flatten())
-    .bind(einheit_id).bind(einsatz_id)
-    .execute(pool).await?.rows_affected();
+    .bind(daten.lat.is_some())
+    .bind(daten.lat.flatten())
+    .bind(daten.lon.is_some())
+    .bind(daten.lon.flatten())
+    .bind(daten.tz_fachaufgabe.is_some())
+    .bind(daten.tz_fachaufgabe.flatten())
+    .bind(daten.tz_organisation.is_some())
+    .bind(daten.tz_organisation.flatten())
+    .bind(einheit_id)
+    .bind(einsatz_id)
+    .execute(pool)
+    .await?
+    .rows_affected();
     if betroffen == 0 {
         return Err(AppError::NotFound);
     }
@@ -287,16 +368,32 @@ pub async fn aktualisiere_position(
 /// Reine Validierung (kein Write): Einheit gehört zum Einsatz, und bei `Some(ep)` ist die
 /// Person Mitglied *dieser* Einheit. `NotFound`/`Validation`. Wird im Route-Handler **vor**
 /// jeglichem Write aufgerufen, damit ein ungültiger Führer kein Teil-Update hinterlässt.
-pub async fn pruefe_fuehrer(pool: &SqlitePool, einsatz_id: i64, einheit_id: i64, fuehrer_ep_id: Option<i64>) -> Result<(), AppError> {
-    let exists: Option<i64> = sqlx::query_scalar("SELECT 1 FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?")
-        .bind(einheit_id).bind(einsatz_id).fetch_optional(pool).await?;
+pub async fn pruefe_fuehrer(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    einheit_id: i64,
+    fuehrer_ep_id: Option<i64>,
+) -> Result<(), AppError> {
+    let exists: Option<i64> =
+        sqlx::query_scalar("SELECT 1 FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?")
+            .bind(einheit_id)
+            .bind(einsatz_id)
+            .fetch_optional(pool)
+            .await?;
     exists.ok_or(AppError::NotFound)?;
     if let Some(ep) = fuehrer_ep_id {
         let mitglied: Option<i64> = sqlx::query_scalar(
             "SELECT 1 FROM einsatz_personal WHERE id = ? AND einheit_id = ? AND einsatz_id = ?",
-        ).bind(ep).bind(einheit_id).bind(einsatz_id).fetch_optional(pool).await?;
+        )
+        .bind(ep)
+        .bind(einheit_id)
+        .bind(einsatz_id)
+        .fetch_optional(pool)
+        .await?;
         if mitglied.is_none() {
-            return Err(AppError::Validation("Einheitsführer muss Mitglied dieser Einheit sein".into()));
+            return Err(AppError::Validation(
+                "Einheitsführer muss Mitglied dieser Einheit sein".into(),
+            ));
         }
     }
     Ok(())
@@ -304,10 +401,19 @@ pub async fn pruefe_fuehrer(pool: &SqlitePool, einsatz_id: i64, einheit_id: i64,
 
 /// Setzt (oder leert mit `None`) den Führer einer Einheit. Validiert vorab über
 /// `pruefe_fuehrer`. `NotFound`/`Validation` wie dort.
-pub async fn setze_fuehrer(pool: &SqlitePool, einsatz_id: i64, einheit_id: i64, fuehrer_ep_id: Option<i64>) -> Result<(), AppError> {
+pub async fn setze_fuehrer(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    einheit_id: i64,
+    fuehrer_ep_id: Option<i64>,
+) -> Result<(), AppError> {
     pruefe_fuehrer(pool, einsatz_id, einheit_id, fuehrer_ep_id).await?;
     sqlx::query("UPDATE einsatz_einheit SET fuehrer_id = ? WHERE id = ? AND einsatz_id = ?")
-        .bind(fuehrer_ep_id).bind(einheit_id).bind(einsatz_id).execute(pool).await?;
+        .bind(fuehrer_ep_id)
+        .bind(einheit_id)
+        .bind(einsatz_id)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 
@@ -317,15 +423,33 @@ pub async fn setze_fuehrer(pool: &SqlitePool, einsatz_id: i64, einheit_id: i64, 
 pub async fn loese_auf(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
     let parent: Option<i64> = sqlx::query_scalar(
         "SELECT ueber_einheit_id FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
-    ).bind(id).bind(einsatz_id).fetch_optional(pool).await?.ok_or(AppError::NotFound)?;
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)?;
 
     let mut tx = pool.begin().await?;
-    sqlx::query("UPDATE einsatz_personal SET einheit_id = NULL WHERE einheit_id = ?").bind(id).execute(&mut *tx).await?;
-    sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = NULL WHERE einheit_id = ?").bind(id).execute(&mut *tx).await?;
-    sqlx::query("UPDATE einsatz_material SET einheit_id = NULL WHERE einheit_id = ?").bind(id).execute(&mut *tx).await?;
+    sqlx::query("UPDATE einsatz_personal SET einheit_id = NULL WHERE einheit_id = ?")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = NULL WHERE einheit_id = ?")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("UPDATE einsatz_material SET einheit_id = NULL WHERE einheit_id = ?")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
     sqlx::query("UPDATE einsatz_einheit SET ueber_einheit_id = ? WHERE ueber_einheit_id = ? AND einsatz_id = ?")
         .bind(parent).bind(id).bind(einsatz_id).execute(&mut *tx).await?;
-    sqlx::query("DELETE FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?").bind(id).bind(einsatz_id).execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?")
+        .bind(id)
+        .bind(einsatz_id)
+        .execute(&mut *tx)
+        .await?;
     tx.commit().await?;
     Ok(())
 }
@@ -336,19 +460,42 @@ mod tests {
 
     /// Org(1) + Einsatz + ein Benutzer (angelegt_von); liefert (einsatz, benutzer).
     async fn setup(pool: &SqlitePool) -> (i64, i64) {
-        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')").execute(pool).await.unwrap();
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(pool)
+            .await
+            .unwrap();
         let benutzer: i64 = sqlx::query_scalar("INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) VALUES (1, 'U', 'u', 'h') RETURNING id")
             .fetch_one(pool).await.unwrap();
-        let einsatz: i64 = sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id")
-            .fetch_one(pool).await.unwrap();
+        let einsatz: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         (einsatz, benutzer)
     }
 
-    fn daten<'a>(name: &'a str, typ: Option<i64>, abschnitt: Option<i64>, parent: Option<i64>, soll: Option<(i64, i64, i64)>) -> EinheitDaten<'a> {
-        let (f, u, m) = match soll { Some((f, u, m)) => (Some(f), Some(u), Some(m)), None => (None, None, None) };
+    fn daten<'a>(
+        name: &'a str,
+        typ: Option<i64>,
+        abschnitt: Option<i64>,
+        parent: Option<i64>,
+        soll: Option<(i64, i64, i64)>,
+    ) -> EinheitDaten<'a> {
+        let (f, u, m) = match soll {
+            Some((f, u, m)) => (Some(f), Some(u), Some(m)),
+            None => (None, None, None),
+        };
         EinheitDaten {
-            name, abschnitt_id: abschnitt, ueber_einheit_id: parent, typ_id: typ,
-            soll_fuehrer: f, soll_unterfuehrer: u, soll_mannschaft: m, bemerkung: None, sortier: 0,
+            name,
+            abschnitt_id: abschnitt,
+            ueber_einheit_id: parent,
+            typ_id: typ,
+            soll_fuehrer: f,
+            soll_unterfuehrer: u,
+            soll_mannschaft: m,
+            bemerkung: None,
+            sortier: 0,
         }
     }
 
@@ -360,7 +507,9 @@ mod tests {
     /// Einsatz + Org + Benutzer + eine Einheit; liefert (einsatz_id, einheit_id).
     async fn seed_einheit(pool: &SqlitePool) -> (i64, i64) {
         let (einsatz, b) = setup(pool).await;
-        let e = anlegen(pool, einsatz, 1, daten("Trupp", None, None, None, None), b).await.unwrap();
+        let e = anlegen(pool, einsatz, 1, daten("Trupp", None, None, None, None), b)
+            .await
+            .unwrap();
         (einsatz, e.id)
     }
 
@@ -369,17 +518,36 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (einsatz_id, einheit_id) = seed_einheit(&pool).await;
 
-        let a = aktualisiere_position(&pool, einsatz_id, einheit_id, PositionPatch {
-            lat: Some(Some(50.1)), lon: Some(Some(8.6)),
-            tz_fachaufgabe: Some(Some("rettungswesen")), tz_organisation: None,
-        }).await.unwrap();
+        let a = aktualisiere_position(
+            &pool,
+            einsatz_id,
+            einheit_id,
+            PositionPatch {
+                lat: Some(Some(50.1)),
+                lon: Some(Some(8.6)),
+                tz_fachaufgabe: Some(Some("rettungswesen")),
+                tz_organisation: None,
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(a.lat, Some(50.1));
         assert_eq!(a.lon, Some(8.6));
         assert_eq!(a.tz_fachaufgabe.as_deref(), Some("rettungswesen"));
 
-        let b = aktualisiere_position(&pool, einsatz_id, einheit_id, PositionPatch {
-            lat: Some(None), lon: Some(None), tz_fachaufgabe: None, tz_organisation: None,
-        }).await.unwrap();
+        let b = aktualisiere_position(
+            &pool,
+            einsatz_id,
+            einheit_id,
+            PositionPatch {
+                lat: Some(None),
+                lon: Some(None),
+                tz_fachaufgabe: None,
+                tz_organisation: None,
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(b.lat, None);
         assert_eq!(b.lon, None);
         assert_eq!(b.tz_fachaufgabe.as_deref(), Some("rettungswesen")); // unverändert
@@ -391,10 +559,23 @@ mod tests {
         let (einsatz, b) = setup(&pool).await;
         let typ: i64 = sqlx::query_scalar("INSERT INTO einheit_typ (org_id, label, soll_fuehrer, soll_unterfuehrer, soll_mannschaft) VALUES (1, 'Zug', 1, 3, 18) RETURNING id")
             .fetch_one(&pool).await.unwrap();
-        let abschnitt: i64 = sqlx::query_scalar("INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, 'Nord') RETURNING id")
-            .bind(einsatz).fetch_one(&pool).await.unwrap();
+        let abschnitt: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, 'Nord') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
 
-        let e = anlegen(&pool, einsatz, 1, daten("1. Zug", Some(typ), Some(abschnitt), None, None), b).await.unwrap();
+        let e = anlegen(
+            &pool,
+            einsatz,
+            1,
+            daten("1. Zug", Some(typ), Some(abschnitt), None, None),
+            b,
+        )
+        .await
+        .unwrap();
         assert_eq!(e.typ_label.as_deref(), Some("Zug"));
         assert_eq!(e.abschnitt_name.as_deref(), Some("Nord"));
         // Kein Override → Soll kommt aus dem Typ.
@@ -409,10 +590,26 @@ mod tests {
         let typ: i64 = sqlx::query_scalar("INSERT INTO einheit_typ (org_id, label, soll_fuehrer, soll_unterfuehrer, soll_mannschaft) VALUES (1, 'Zug', 1, 3, 18) RETURNING id")
             .fetch_one(&pool).await.unwrap();
         // Override 0/2/10 schlägt Typ-Default.
-        let mit_override = anlegen(&pool, einsatz, 1, daten("Sonderzug", Some(typ), None, None, Some((0, 2, 10))), b).await.unwrap();
+        let mit_override = anlegen(
+            &pool,
+            einsatz,
+            1,
+            daten("Sonderzug", Some(typ), None, None, Some((0, 2, 10))),
+            b,
+        )
+        .await
+        .unwrap();
         assert_eq!(mit_override.soll, Some(Staerke::neu(0, 2, 10)));
         // Kein Typ, kein Override → None.
-        let ohne = anlegen(&pool, einsatz, 1, daten("Freie Einheit", None, None, None, None), b).await.unwrap();
+        let ohne = anlegen(
+            &pool,
+            einsatz,
+            1,
+            daten("Freie Einheit", None, None, None, None),
+            b,
+        )
+        .await
+        .unwrap();
         assert_eq!(ohne.soll, None);
     }
 
@@ -420,11 +617,26 @@ mod tests {
     async fn typ_aus_fremder_org_ist_validation() {
         let pool = crate::db::test_pool().await;
         let (einsatz, b) = setup(&pool).await;
-        sqlx::query("INSERT INTO organisation (id, name) VALUES (2, 'Fremd')").execute(&pool).await.unwrap();
-        let fremd_typ: i64 = sqlx::query_scalar("INSERT INTO einheit_typ (org_id, label) VALUES (2, 'Zug') RETURNING id")
-            .fetch_one(&pool).await.unwrap();
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (2, 'Fremd')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let fremd_typ: i64 = sqlx::query_scalar(
+            "INSERT INTO einheit_typ (org_id, label) VALUES (2, 'Zug') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         assert!(matches!(
-            anlegen(&pool, einsatz, 1, daten("X", Some(fremd_typ), None, None, None), b).await.unwrap_err(),
+            anlegen(
+                &pool,
+                einsatz,
+                1,
+                daten("X", Some(fremd_typ), None, None, None),
+                b
+            )
+            .await
+            .unwrap_err(),
             AppError::Validation(_)
         ));
     }
@@ -434,13 +646,35 @@ mod tests {
         // Entscheidung 4: ein deaktivierter Typ bleibt für bestehende Einheiten gültig.
         let pool = crate::db::test_pool().await;
         let (einsatz, b) = setup(&pool).await;
-        let typ: i64 = sqlx::query_scalar("INSERT INTO einheit_typ (org_id, label) VALUES (1, 'Zug') RETURNING id")
-            .fetch_one(&pool).await.unwrap();
-        let e = anlegen(&pool, einsatz, 1, daten("1. Zug", Some(typ), None, None, None), b).await.unwrap();
+        let typ: i64 = sqlx::query_scalar(
+            "INSERT INTO einheit_typ (org_id, label) VALUES (1, 'Zug') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let e = anlegen(
+            &pool,
+            einsatz,
+            1,
+            daten("1. Zug", Some(typ), None, None, None),
+            b,
+        )
+        .await
+        .unwrap();
         // Typ deaktivieren.
-        crate::einheit::typ_repo::deaktivieren(&pool, 1, typ).await.unwrap();
+        crate::einheit::typ_repo::deaktivieren(&pool, 1, typ)
+            .await
+            .unwrap();
         // PATCH (nur Name) muss trotzdem gelingen, Typ bleibt referenziert.
-        let nachher = aktualisiere(&pool, einsatz, 1, e.id, daten("1. Zug umbenannt", Some(typ), None, None, None)).await.unwrap();
+        let nachher = aktualisiere(
+            &pool,
+            einsatz,
+            1,
+            e.id,
+            daten("1. Zug umbenannt", Some(typ), None, None, None),
+        )
+        .await
+        .unwrap();
         assert_eq!(nachher.name, "1. Zug umbenannt");
         assert_eq!(nachher.typ_id, Some(typ));
     }
@@ -449,10 +683,25 @@ mod tests {
     async fn parent_in_fremdem_einsatz_ist_notfound() {
         let pool = crate::db::test_pool().await;
         let (einsatz, b) = setup(&pool).await;
-        let fremd: i64 = sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Fremd') RETURNING id").fetch_one(&pool).await.unwrap();
-        let fremd_einheit = anlegen(&pool, fremd, 1, daten("F", None, None, None, None), b).await.unwrap();
+        let fremd: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Fremd') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let fremd_einheit = anlegen(&pool, fremd, 1, daten("F", None, None, None, None), b)
+            .await
+            .unwrap();
         assert!(matches!(
-            anlegen(&pool, einsatz, 1, daten("X", None, None, Some(fremd_einheit.id), None), b).await.unwrap_err(),
+            anlegen(
+                &pool,
+                einsatz,
+                1,
+                daten("X", None, None, Some(fremd_einheit.id), None),
+                b
+            )
+            .await
+            .unwrap_err(),
             AppError::NotFound
         ));
     }
@@ -461,12 +710,38 @@ mod tests {
     async fn zyklus_transitiv_ist_validation() {
         let pool = crate::db::test_pool().await;
         let (einsatz, b) = setup(&pool).await;
-        let a = anlegen(&pool, einsatz, 1, daten("A", None, None, None, None), b).await.unwrap();
-        let c = anlegen(&pool, einsatz, 1, daten("B", None, None, Some(a.id), None), b).await.unwrap();
-        let d = anlegen(&pool, einsatz, 1, daten("C", None, None, Some(c.id), None), b).await.unwrap();
+        let a = anlegen(&pool, einsatz, 1, daten("A", None, None, None, None), b)
+            .await
+            .unwrap();
+        let c = anlegen(
+            &pool,
+            einsatz,
+            1,
+            daten("B", None, None, Some(a.id), None),
+            b,
+        )
+        .await
+        .unwrap();
+        let d = anlegen(
+            &pool,
+            einsatz,
+            1,
+            daten("C", None, None, Some(c.id), None),
+            b,
+        )
+        .await
+        .unwrap();
         // A unter C (Nachfahre) → transitiver Zyklus.
         assert!(matches!(
-            aktualisiere(&pool, einsatz, 1, a.id, daten("A", None, None, Some(d.id), None)).await.unwrap_err(),
+            aktualisiere(
+                &pool,
+                einsatz,
+                1,
+                a.id,
+                daten("A", None, None, Some(d.id), None)
+            )
+            .await
+            .unwrap_err(),
             AppError::Validation(_)
         ));
     }
@@ -475,16 +750,37 @@ mod tests {
     async fn fuehrer_muss_mitglied_dieser_einheit_sein() {
         let pool = crate::db::test_pool().await;
         let (einsatz, b) = setup(&pool).await;
-        let e = anlegen(&pool, einsatz, 1, daten("Trupp", None, None, None, None), b).await.unwrap();
+        let e = anlegen(&pool, einsatz, 1, daten("Trupp", None, None, None, None), b)
+            .await
+            .unwrap();
         let chef = ad_hoc_person(&pool, einsatz, "Chef", "fuehrer").await;
         // Noch nicht Mitglied → Validation.
-        assert!(matches!(setze_fuehrer(&pool, einsatz, e.id, Some(chef)).await.unwrap_err(), AppError::Validation(_)));
+        assert!(matches!(
+            setze_fuehrer(&pool, einsatz, e.id, Some(chef))
+                .await
+                .unwrap_err(),
+            AppError::Validation(_)
+        ));
         // Nach Zuordnung erlaubt.
-        mitglied_repo::ordne_personal_zu(&pool, einsatz, e.id, chef).await.unwrap();
-        setze_fuehrer(&pool, einsatz, e.id, Some(chef)).await.unwrap();
-        assert_eq!(laden(&pool, einsatz, e.id).await.unwrap().fuehrer_id, Some(chef));
+        mitglied_repo::ordne_personal_zu(&pool, einsatz, e.id, chef)
+            .await
+            .unwrap();
+        setze_fuehrer(&pool, einsatz, e.id, Some(chef))
+            .await
+            .unwrap();
+        assert_eq!(
+            laden(&pool, einsatz, e.id).await.unwrap().fuehrer_id,
+            Some(chef)
+        );
         // fuehrer_name aufgelöst.
-        assert_eq!(laden(&pool, einsatz, e.id).await.unwrap().fuehrer_name.as_deref(), Some("Chef"));
+        assert_eq!(
+            laden(&pool, einsatz, e.id)
+                .await
+                .unwrap()
+                .fuehrer_name
+                .as_deref(),
+            Some("Chef")
+        );
     }
 
     #[tokio::test]
@@ -492,17 +788,41 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (einsatz, b) = setup(&pool).await;
         // Zug → Gruppe → Trupp (3 Ebenen).
-        let zug = anlegen(&pool, einsatz, 1, daten("Zug", None, None, None, None), b).await.unwrap();
-        let gruppe = anlegen(&pool, einsatz, 1, daten("Gruppe", None, None, Some(zug.id), None), b).await.unwrap();
-        let trupp = anlegen(&pool, einsatz, 1, daten("Trupp", None, None, Some(gruppe.id), None), b).await.unwrap();
+        let zug = anlegen(&pool, einsatz, 1, daten("Zug", None, None, None, None), b)
+            .await
+            .unwrap();
+        let gruppe = anlegen(
+            &pool,
+            einsatz,
+            1,
+            daten("Gruppe", None, None, Some(zug.id), None),
+            b,
+        )
+        .await
+        .unwrap();
+        let trupp = anlegen(
+            &pool,
+            einsatz,
+            1,
+            daten("Trupp", None, None, Some(gruppe.id), None),
+            b,
+        )
+        .await
+        .unwrap();
         // je Ebene ein Mannschafter.
         for (einheit, name) in [(zug.id, "Z"), (gruppe.id, "G"), (trupp.id, "T")] {
             let ep = ad_hoc_person(&pool, einsatz, name, "mannschaft").await;
-            mitglied_repo::ordne_personal_zu(&pool, einsatz, einheit, ep).await.unwrap();
+            mitglied_repo::ordne_personal_zu(&pool, einsatz, einheit, ep)
+                .await
+                .unwrap();
         }
         let zug_geladen = laden(&pool, einsatz, zug.id).await.unwrap();
         assert_eq!(zug_geladen.ist, Staerke::neu(0, 0, 1), "eigene Ist");
-        assert_eq!(zug_geladen.ist_kumuliert, Staerke::neu(0, 0, 3), "eigene + Gruppe + Trupp");
+        assert_eq!(
+            zug_geladen.ist_kumuliert,
+            Staerke::neu(0, 0, 3),
+            "eigene + Gruppe + Trupp"
+        );
         let gruppe_geladen = laden(&pool, einsatz, gruppe.id).await.unwrap();
         assert_eq!(gruppe_geladen.ist_kumuliert, Staerke::neu(0, 0, 2));
     }
@@ -511,40 +831,86 @@ mod tests {
     async fn aufloesen_gibt_mitglieder_frei_und_zieht_unter_einheiten_hoch() {
         let pool = crate::db::test_pool().await;
         let (einsatz, b) = setup(&pool).await;
-        let zug = anlegen(&pool, einsatz, 1, daten("Zug", None, None, None, None), b).await.unwrap();
-        let gruppe = anlegen(&pool, einsatz, 1, daten("Gruppe", None, None, Some(zug.id), None), b).await.unwrap();
-        let trupp = anlegen(&pool, einsatz, 1, daten("Trupp", None, None, Some(gruppe.id), None), b).await.unwrap();
+        let zug = anlegen(&pool, einsatz, 1, daten("Zug", None, None, None, None), b)
+            .await
+            .unwrap();
+        let gruppe = anlegen(
+            &pool,
+            einsatz,
+            1,
+            daten("Gruppe", None, None, Some(zug.id), None),
+            b,
+        )
+        .await
+        .unwrap();
+        let trupp = anlegen(
+            &pool,
+            einsatz,
+            1,
+            daten("Trupp", None, None, Some(gruppe.id), None),
+            b,
+        )
+        .await
+        .unwrap();
         let ep = ad_hoc_person(&pool, einsatz, "Mann", "mannschaft").await;
-        mitglied_repo::ordne_personal_zu(&pool, einsatz, gruppe.id, ep).await.unwrap();
+        mitglied_repo::ordne_personal_zu(&pool, einsatz, gruppe.id, ep)
+            .await
+            .unwrap();
 
         loese_auf(&pool, einsatz, gruppe.id).await.unwrap();
 
         // Mitglied frei.
-        let einheit_id: Option<i64> = sqlx::query_scalar("SELECT einheit_id FROM einsatz_personal WHERE id = ?").bind(ep).fetch_one(&pool).await.unwrap();
+        let einheit_id: Option<i64> =
+            sqlx::query_scalar("SELECT einheit_id FROM einsatz_personal WHERE id = ?")
+                .bind(ep)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(einheit_id, None);
         // Trupp hängt jetzt direkt unter Zug.
-        assert_eq!(laden(&pool, einsatz, trupp.id).await.unwrap().ueber_einheit_id, Some(zug.id));
+        assert_eq!(
+            laden(&pool, einsatz, trupp.id)
+                .await
+                .unwrap()
+                .ueber_einheit_id,
+            Some(zug.id)
+        );
         // Gruppe ist weg.
-        assert!(matches!(laden(&pool, einsatz, gruppe.id).await.unwrap_err(), AppError::NotFound));
+        assert!(matches!(
+            laden(&pool, einsatz, gruppe.id).await.unwrap_err(),
+            AppError::NotFound
+        ));
     }
 
     #[tokio::test]
     async fn einheit_anzeige_enthaelt_zugeordnete_sprechgruppen() {
         let pool = crate::db::test_pool().await;
         let (einsatz, b) = setup(&pool).await;
-        let e = anlegen(&pool, einsatz, 1, daten("Trupp", None, None, None, None), b).await.unwrap();
+        let e = anlegen(&pool, einsatz, 1, daten("Trupp", None, None, None, None), b)
+            .await
+            .unwrap();
         let kat = crate::sprechgruppe::repo::anlegen_katalog(
-            &pool, 1,
+            &pool,
+            1,
             crate::sprechgruppe::repo::KatalogDaten {
-                bezeichnung: "412_F_DRK", betriebsart: "TMO", hinweis: None, sortier: 0,
+                bezeichnung: "412_F_DRK",
+                betriebsart: "TMO",
+                hinweis: None,
+                sortier: 0,
             },
-        ).await.unwrap();
-        crate::sprechgruppe::repo::setze_einheit_sprechgruppen(&pool, 1, einsatz, e.id, &[kat.id]).await.unwrap();
+        )
+        .await
+        .unwrap();
+        crate::sprechgruppe::repo::setze_einheit_sprechgruppen(&pool, 1, einsatz, e.id, &[kat.id])
+            .await
+            .unwrap();
         let geladen = laden(&pool, einsatz, e.id).await.unwrap();
         assert_eq!(geladen.sprechgruppen.len(), 1);
         assert_eq!(geladen.sprechgruppen[0].bezeichnung, "412_F_DRK");
         // Leeren: kein Eintrag mehr.
-        crate::sprechgruppe::repo::setze_einheit_sprechgruppen(&pool, 1, einsatz, e.id, &[]).await.unwrap();
+        crate::sprechgruppe::repo::setze_einheit_sprechgruppen(&pool, 1, einsatz, e.id, &[])
+            .await
+            .unwrap();
         let geleert = laden(&pool, einsatz, e.id).await.unwrap();
         assert_eq!(geleert.sprechgruppen.len(), 0);
     }
@@ -553,14 +919,26 @@ mod tests {
     async fn aufloesen_gibt_material_frei() {
         let pool = crate::db::test_pool().await;
         let (einsatz, b) = setup(&pool).await;
-        let gruppe = anlegen(&pool, einsatz, 1, daten("Gruppe", None, None, None, None), b).await.unwrap();
+        let gruppe = anlegen(
+            &pool,
+            einsatz,
+            1,
+            daten("Gruppe", None, None, None, None),
+            b,
+        )
+        .await
+        .unwrap();
         let em: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz_material (einsatz_id, einheit_id, snap_bezeichnung, menge) VALUES (?, ?, 'Wolldecke', 50) RETURNING id",
         ).bind(einsatz).bind(gruppe.id).fetch_one(&pool).await.unwrap();
 
         loese_auf(&pool, einsatz, gruppe.id).await.unwrap();
-        let einheit_id: Option<i64> = sqlx::query_scalar("SELECT einheit_id FROM einsatz_material WHERE id = ?")
-            .bind(em).fetch_one(&pool).await.unwrap();
+        let einheit_id: Option<i64> =
+            sqlx::query_scalar("SELECT einheit_id FROM einsatz_material WHERE id = ?")
+                .bind(em)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(einheit_id, None, "Material muss beim Auflösen frei werden");
     }
 }

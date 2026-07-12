@@ -50,7 +50,9 @@ impl Normalisiert {
 fn normalisiere(body: MaterialBody) -> Result<Normalisiert, AppError> {
     let bezeichnung = body.bezeichnung.trim().to_string();
     if bezeichnung.is_empty() {
-        return Err(AppError::Validation("Bezeichnung darf nicht leer sein".into()));
+        return Err(AppError::Validation(
+            "Bezeichnung darf nicht leer sein".into(),
+        ));
     }
     Ok(Normalisiert {
         bezeichnung,

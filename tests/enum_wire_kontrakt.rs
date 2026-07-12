@@ -4,16 +4,18 @@ use lifeline_hub::auftrag::{AuftragBearbeitungsstatus, EmpfaengerTyp};
 use lifeline_hub::auth::{OrgRolle, SystemRolle};
 use lifeline_hub::bereitstellungsraum::{BrBelegungsArt, BrStatus, ObjektTyp};
 use lifeline_hub::chat::BezugTyp;
-use lifeline_hub::einsatz::{Einsatzart, EinsatzRolle, EinsatzStatus};
+use lifeline_hub::einsatz::{EinsatzRolle, EinsatzStatus, Einsatzart};
 use lifeline_hub::etb::{EtbTyp, MeldeWeg};
 use lifeline_hub::gefahr::{Gefahrentyp, Schutzobjekt, Warnstufe};
 use lifeline_hub::katalog::{Betriebsart, StatusKategorie};
 use lifeline_hub::kommunikation::{AdressatKategorie, Prioritaet, Richtung};
 use lifeline_hub::lage_zone::LageZoneTyp;
 use lifeline_hub::material::MaterialStatus;
-use lifeline_hub::meldung::{Meldungsart, MeldungStatus};
+use lifeline_hub::meldung::{MeldungStatus, Meldungsart};
 use lifeline_hub::nachforderung::NachforderungStatus;
-use lifeline_hub::person::{AbgleichStatus, Geschlecht, PersonStatus, Sichtungskategorie, VerbleibArt, VerbleibStatus};
+use lifeline_hub::person::{
+    AbgleichStatus, Geschlecht, PersonStatus, Sichtungskategorie, VerbleibArt, VerbleibStatus,
+};
 use lifeline_hub::schaden::{Ausmass, SchadenStatus, SchadenTyp};
 use lifeline_hub::staerke::StaerkePosition;
 use lifeline_hub::tier::{Spezies, TierGeschlecht, TierStatus};
@@ -339,10 +341,10 @@ fn orphan_enums_wire() {
     use lifeline_hub::einsatz::einstellungen::{
         BasemapModus, EinheitenSystem, Koordinatenformat, Zeitformat,
     };
+    use lifeline_hub::erinnerung::ErinnerungStatus;
     use lifeline_hub::katalog::Dienststatus;
     use lifeline_hub::lagebericht::{LageberichtStatus, LageberichtVorlage};
     use lifeline_hub::person::audit_repo::ZugriffArt;
-    use lifeline_hub::erinnerung::ErinnerungStatus;
 
     // review-nachzug (LFH-120): inline-Unions, die der Orphan-Sweep übersah
     wire_is!(ZugriffArt::Detail => "detail", ZugriffArt::Export => "export");

@@ -60,7 +60,11 @@ pub async fn liste(
     geschaedigt_person_id: Option<i64>,
     inkl_storniert: bool,
 ) -> Result<Vec<SchadenAnzeige>, AppError> {
-    let storno_filter = if inkl_storniert { "" } else { " AND s.storniert_at IS NULL" };
+    let storno_filter = if inkl_storniert {
+        ""
+    } else {
+        " AND s.storniert_at IS NULL"
+    };
     let sql = format!(
         "{SELECT_ALLE} WHERE s.einsatz_id = ?1{storno_filter} \
          AND (?2 IS NULL OR s.status = ?2) \
@@ -69,23 +73,31 @@ pub async fn liste(
          AND (?5 IS NULL OR s.geschaedigt_person_id = ?5) \
          ORDER BY s.registrier_nr DESC"
     );
-    Ok(sqlx::query_as::<_, SchadenAnzeige>(sqlx::AssertSqlSafe(&*sql))
-        .bind(einsatz_id)
-        .bind(status)
-        .bind(typ)
-        .bind(ausmass)
-        .bind(geschaedigt_person_id)
-        .fetch_all(pool)
-        .await?)
+    Ok(
+        sqlx::query_as::<_, SchadenAnzeige>(sqlx::AssertSqlSafe(&*sql))
+            .bind(einsatz_id)
+            .bind(status)
+            .bind(typ)
+            .bind(ausmass)
+            .bind(geschaedigt_person_id)
+            .fetch_all(pool)
+            .await?,
+    )
 }
 
-pub async fn laden(pool: &SqlitePool, einsatz_id: i64, schaden_id: i64) -> Result<SchadenAnzeige, AppError> {
-    sqlx::query_as::<_, SchadenAnzeige>(sqlx::AssertSqlSafe(format!("{SELECT_ALLE} WHERE s.id = ? AND s.einsatz_id = ?")))
-        .bind(schaden_id)
-        .bind(einsatz_id)
-        .fetch_optional(pool)
-        .await?
-        .ok_or(AppError::NotFound)
+pub async fn laden(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    schaden_id: i64,
+) -> Result<SchadenAnzeige, AppError> {
+    sqlx::query_as::<_, SchadenAnzeige>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_ALLE} WHERE s.id = ? AND s.einsatz_id = ?"
+    )))
+    .bind(schaden_id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)
 }
 
 pub async fn anlegen(
@@ -298,14 +310,23 @@ mod tests {
     async fn setup(pool: &sqlx::SqlitePool) -> (i64, i64) {
         // Spalten gemäß Migr. 0002/0003: benutzer.org_id, system_rolle ∈ {admin,keiner};
         // einsatz.org_id NOT NULL, KEIN erstellt_von.
-        sqlx::query("INSERT INTO organisation (name) VALUES ('O')").execute(pool).await.unwrap();
+        sqlx::query("INSERT INTO organisation (name) VALUES ('O')")
+            .execute(pool)
+            .await
+            .unwrap();
         let b: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, \
-                system_rolle, org_rolle) VALUES (1,'A','a','x','keiner','keine') RETURNING id")
-            .fetch_one(pool).await.unwrap();
+                system_rolle, org_rolle) VALUES (1,'A','a','x','keiner','keine') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         let e: i64 = sqlx::query_scalar(
-            "INSERT INTO einsatz (org_id, bezeichnung, status) VALUES (1,'L','aktiv') RETURNING id")
-            .fetch_one(pool).await.unwrap();
+            "INSERT INTO einsatz (org_id, bezeichnung, status) VALUES (1,'L','aktiv') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         (b, e)
     }
 
@@ -349,15 +370,29 @@ mod tests {
     async fn schliesse_ab_haengt_notiz_an_beschreibung() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        let s = anlegen(&pool, e, b, NeueDaten { beschreibung: Some("Erstbefund"), ..minimal() })
-            .await.unwrap();
-        schliesse_ab(&pool, e, s.id, "behoben", Some("vor Ort erledigt"), b).await.unwrap();
+        let s = anlegen(
+            &pool,
+            e,
+            b,
+            NeueDaten {
+                beschreibung: Some("Erstbefund"),
+                ..minimal()
+            },
+        )
+        .await
+        .unwrap();
+        schliesse_ab(&pool, e, s.id, "behoben", Some("vor Ort erledigt"), b)
+            .await
+            .unwrap();
         let neu = laden(&pool, e, s.id).await.unwrap();
         assert_eq!(neu.status, SchadenStatus::Abgeschlossen);
         assert_eq!(neu.abschluss_grund, Some(AbschlussGrund::Behoben));
         assert!(neu.abschluss_at.is_some());
         assert!(neu.beschreibung.contains("Erstbefund"));
-        assert!(neu.beschreibung.contains("vor Ort erledigt"), "Notiz angehängt");
+        assert!(
+            neu.beschreibung.contains("vor Ort erledigt"),
+            "Notiz angehängt"
+        );
     }
 
     #[tokio::test]
@@ -377,7 +412,9 @@ mod tests {
         let (b, e) = setup(&pool).await;
         let s = anlegen(&pool, e, b, minimal()).await.unwrap();
         storniere(&pool, e, s.id, b).await.unwrap();
-        let ohne = liste(&pool, e, None, None, None, None, false).await.unwrap();
+        let ohne = liste(&pool, e, None, None, None, None, false)
+            .await
+            .unwrap();
         assert_eq!(ohne.len(), 0, "storniert nicht in Default-Liste");
         let mit = liste(&pool, e, None, None, None, None, true).await.unwrap();
         assert_eq!(mit.len(), 1, "mit inkl_storniert sichtbar");
@@ -387,11 +424,26 @@ mod tests {
     async fn liste_filtert_nach_status_typ_ausmass() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        anlegen(&pool, e, b, NeueDaten { typ: "umweltschaden", ausmass: "gross", ..minimal() }).await.unwrap();
+        anlegen(
+            &pool,
+            e,
+            b,
+            NeueDaten {
+                typ: "umweltschaden",
+                ausmass: "gross",
+                ..minimal()
+            },
+        )
+        .await
+        .unwrap();
         anlegen(&pool, e, b, minimal()).await.unwrap();
-        let nur_umwelt = liste(&pool, e, None, Some("umweltschaden"), None, None, false).await.unwrap();
+        let nur_umwelt = liste(&pool, e, None, Some("umweltschaden"), None, None, false)
+            .await
+            .unwrap();
         assert_eq!(nur_umwelt.len(), 1);
-        let nur_gross = liste(&pool, e, None, None, Some("gross"), None, false).await.unwrap();
+        let nur_gross = liste(&pool, e, None, None, Some("gross"), None, false)
+            .await
+            .unwrap();
         assert_eq!(nur_gross.len(), 1);
     }
 
@@ -408,12 +460,29 @@ mod tests {
     async fn aktualisiere_geschaedigt_toggle() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        let s = anlegen(&pool, e, b, NeueDaten { geschaedigt_kontakt: Some("Herr Meier"), ..minimal() })
-            .await.unwrap();
-        aktualisiere(&pool, e, s.id, b, PatchDaten {
-            geschaedigt_kontakt: Some(None),
-            ..Default::default()
-        }).await.unwrap();
+        let s = anlegen(
+            &pool,
+            e,
+            b,
+            NeueDaten {
+                geschaedigt_kontakt: Some("Herr Meier"),
+                ..minimal()
+            },
+        )
+        .await
+        .unwrap();
+        aktualisiere(
+            &pool,
+            e,
+            s.id,
+            b,
+            PatchDaten {
+                geschaedigt_kontakt: Some(None),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
         let neu = laden(&pool, e, s.id).await.unwrap();
         assert!(neu.geschaedigt_kontakt.is_none());
     }
@@ -429,11 +498,22 @@ mod tests {
         .fetch_one(&pool)
         .await
         .unwrap();
-        let s = anlegen(&pool, e, b, NeueDaten { geschaedigt_personal_id: Some(ep), ..minimal() })
-            .await
-            .unwrap();
+        let s = anlegen(
+            &pool,
+            e,
+            b,
+            NeueDaten {
+                geschaedigt_personal_id: Some(ep),
+                ..minimal()
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(s.geschaedigt_personal_id, Some(ep));
-        assert_eq!(s.geschaedigt_personal_name.as_deref(), Some("Einsatzkraft A"));
+        assert_eq!(
+            s.geschaedigt_personal_name.as_deref(),
+            Some("Einsatzkraft A")
+        );
         assert!(s.geschaedigt_organisation_name.is_none());
     }
 
@@ -450,14 +530,28 @@ mod tests {
         .fetch_one(&pool)
         .await
         .unwrap();
-        let s = anlegen(&pool, e, b, NeueDaten { geschaedigt_kontakt: Some("Stadtwerke"), ..minimal() })
-            .await
-            .unwrap();
-        aktualisiere(&pool, e, s.id, b, PatchDaten {
-            geschaedigt_kontakt: Some(None),
-            geschaedigt_personal_id: Some(Some(ep)),
-            ..Default::default()
-        })
+        let s = anlegen(
+            &pool,
+            e,
+            b,
+            NeueDaten {
+                geschaedigt_kontakt: Some("Stadtwerke"),
+                ..minimal()
+            },
+        )
+        .await
+        .unwrap();
+        aktualisiere(
+            &pool,
+            e,
+            s.id,
+            b,
+            PatchDaten {
+                geschaedigt_kontakt: Some(None),
+                geschaedigt_personal_id: Some(Some(ep)),
+                ..Default::default()
+            },
+        )
         .await
         .unwrap();
         let neu = laden(&pool, e, s.id).await.unwrap();
@@ -471,9 +565,17 @@ mod tests {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
         // setup legt organisation id 1 namens 'O' an.
-        let s = anlegen(&pool, e, b, NeueDaten { geschaedigt_organisation_id: Some(1), ..minimal() })
-            .await
-            .unwrap();
+        let s = anlegen(
+            &pool,
+            e,
+            b,
+            NeueDaten {
+                geschaedigt_organisation_id: Some(1),
+                ..minimal()
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(s.geschaedigt_organisation_id, Some(1));
         assert_eq!(s.geschaedigt_organisation_name.as_deref(), Some("O"));
         assert!(s.geschaedigt_personal_name.is_none());

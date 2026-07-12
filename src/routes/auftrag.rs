@@ -1,9 +1,11 @@
 use crate::app::AppState;
 use crate::auftrag::{repo, validiere_neuen_auftrag, AuftragDetail, NeuerAuftrag};
 use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{fordere_modul_zugriff_laden, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
-use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::berechtigung::{
+    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
+};
 use crate::einsatz::einstellungen;
+use crate::einsatz::repo as einsatz_repo;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "auftraege";
@@ -46,7 +48,14 @@ pub async fn liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
 
     if params.abschnitt_id.is_some() && params.einheit_id.is_some() {
         return Err(AppError::Validation(
@@ -59,7 +68,11 @@ pub async fn liste(
             einheit_id: params.einheit_id,
         },
     );
-    let richtung = params.richtung.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let richtung = params
+        .richtung
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
     if let Some(r) = richtung {
         if !crate::auftrag::richtung_gueltig(r) {
             return Err(AppError::Validation("Ungültige Richtung".into()));
@@ -96,17 +109,33 @@ pub async fn anlegen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let now = jetzt();
     // Default-Quittierfrist (Task 8/LFH-133): Fallback-Kette Einsatz ?? Org ?? None.
     // Nur für die direkte Auftragserfassung; greift, wenn der Client keine frist_at mitschickt.
     let einst = einstellungen::laden_oder_default(&state.pool, einsatz_id).await?;
-    let org_einst = crate::org::einstellungen::laden_oder_default(&state.pool, einsatz.org_id).await?;
+    let org_einst =
+        crate::org::einstellungen::laden_oder_default(&state.pool, einsatz.org_id).await?;
     let default_frist = auftrag_default_quittierung_frist_min(&einst, &org_einst);
-    let validiert = validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now, default_frist).await?;
-    let d = repo::anlegen(&state.pool, einsatz_id, benutzer.id, validiert.daten(), &now).await?;
+    let validiert =
+        validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now, default_frist).await?;
+    let d = repo::anlegen(
+        &state.pool,
+        einsatz_id,
+        benutzer.id,
+        validiert.daten(),
+        &now,
+    )
+    .await?;
 
     // ETB-Anordnung wurde im selben Commit erzeugt → ETB-Live-Event mitschicken.
     if let Some(etb_id) = d.auftrag.etb_anordnung_id {
@@ -131,7 +160,14 @@ async fn fordere_bearbeitbar(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
     if !repo::gehoert_zu_einsatz(&state.pool, auftrag_id, einsatz_id).await? {
         return Err(AppError::NotFound);
@@ -173,7 +209,15 @@ pub async fn vollzug(
     let now = jetzt();
     match req.status.as_str() {
         "in_arbeit" => {
-            repo::setze_in_arbeit(&state.pool, org_id, einsatz_id, auftrag_id, benutzer.id, &now).await?;
+            repo::setze_in_arbeit(
+                &state.pool,
+                org_id,
+                einsatz_id,
+                auftrag_id,
+                benutzer.id,
+                &now,
+            )
+            .await?;
         }
         "vollzogen" => {
             let text = req
@@ -181,12 +225,30 @@ pub async fn vollzug(
                 .as_deref()
                 .map(str::trim)
                 .filter(|s| !s.is_empty())
-                .ok_or_else(|| AppError::Validation("Vollzugsmeldung darf nicht leer sein".into()))?;
+                .ok_or_else(|| {
+                    AppError::Validation("Vollzugsmeldung darf nicht leer sein".into())
+                })?;
             // Doppel-Vollzug verhindern → sonst zweite ETB-Meldung (append-only).
-            if repo::laden(&state.pool, auftrag_id, &now).await?.auftrag.vollzug_status == "vollzogen" {
-                return Err(AppError::UnprocessableEntity("Auftrag ist bereits vollzogen".into()));
+            if repo::laden(&state.pool, auftrag_id, &now)
+                .await?
+                .auftrag
+                .vollzug_status
+                == "vollzogen"
+            {
+                return Err(AppError::UnprocessableEntity(
+                    "Auftrag ist bereits vollzogen".into(),
+                ));
             }
-            let etb_id = repo::melde_vollzug(&state.pool, org_id, einsatz_id, auftrag_id, benutzer.id, text, &now).await?;
+            let etb_id = repo::melde_vollzug(
+                &state.pool,
+                org_id,
+                einsatz_id,
+                auftrag_id,
+                benutzer.id,
+                text,
+                &now,
+            )
+            .await?;
             if let Ok(etb) = crate::etb::repo::laden(&state.pool, etb_id).await {
                 if let Ok(json) = serde_json::to_string(&etb) {
                     state.live.publiziere(einsatz_id, json);
@@ -235,7 +297,10 @@ mod tests {
     /// Kein Einsatz-Override, Org-Frist=45 → 45 (Org-Default greift).
     #[test]
     fn quittierung_frist_aus_org_wenn_einsatz_null() {
-        let o = OrgEinstellungen { auftrag_quittierung_frist_min: Some(45), ..o() };
+        let o = OrgEinstellungen {
+            auftrag_quittierung_frist_min: Some(45),
+            ..o()
+        };
         assert_eq!(auftrag_default_quittierung_frist_min(&e(), &o), Some(45));
     }
 
@@ -248,8 +313,14 @@ mod tests {
     /// Einsatz-Override schlägt Org.
     #[test]
     fn quittierung_einsatz_schlaegt_org() {
-        let e = einstellungen::EinsatzEinstellungen { auftrag_quittierung_frist_min: Some(15), ..e() };
-        let o = OrgEinstellungen { auftrag_quittierung_frist_min: Some(45), ..o() };
+        let e = einstellungen::EinsatzEinstellungen {
+            auftrag_quittierung_frist_min: Some(15),
+            ..e()
+        };
+        let o = OrgEinstellungen {
+            auftrag_quittierung_frist_min: Some(45),
+            ..o()
+        };
         assert_eq!(auftrag_default_quittierung_frist_min(&e, &o), Some(15));
     }
 }

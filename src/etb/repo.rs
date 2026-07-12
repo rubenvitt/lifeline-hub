@@ -307,8 +307,12 @@ mod tests {
         .await
         .unwrap();
 
-        let e1 = anlegen(&pool, einsatz, benutzer, daten("Erste")).await.unwrap();
-        let e2 = anlegen(&pool, einsatz, benutzer, daten("Zweite")).await.unwrap();
+        let e1 = anlegen(&pool, einsatz, benutzer, daten("Erste"))
+            .await
+            .unwrap();
+        let e2 = anlegen(&pool, einsatz, benutzer, daten("Zweite"))
+            .await
+            .unwrap();
         assert_eq!(e1.lfd_nr, 100, "erste Nummer = Startwert");
         assert_eq!(e2.lfd_nr, 101, "danach fortlaufend");
     }
@@ -318,7 +322,9 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         // Keine Einstellungen → Default-Startwert 1 (altes Verhalten unverändert).
-        let e1 = anlegen(&pool, einsatz, benutzer, daten("Erste")).await.unwrap();
+        let e1 = anlegen(&pool, einsatz, benutzer, daten("Erste"))
+            .await
+            .unwrap();
         assert_eq!(e1.lfd_nr, 1);
     }
 
@@ -333,7 +339,9 @@ mod tests {
         .await
         .unwrap();
 
-        anlegen(&pool, einsatz_a, benutzer, daten("A1")).await.unwrap();
+        anlegen(&pool, einsatz_a, benutzer, daten("A1"))
+            .await
+            .unwrap();
         let b1 = anlegen(&pool, einsatz_b, benutzer, daten("B1"))
             .await
             .unwrap();
@@ -389,7 +397,10 @@ mod tests {
     async fn laden_unbekannt_ist_notfound() {
         let pool = crate::db::test_pool().await;
         setup(&pool).await;
-        assert!(matches!(laden(&pool, 999).await.unwrap_err(), AppError::NotFound));
+        assert!(matches!(
+            laden(&pool, 999).await.unwrap_err(),
+            AppError::NotFound
+        ));
     }
 
     fn filter() -> EtbFilter {
@@ -403,8 +414,12 @@ mod tests {
     async fn abfrage_sortiert_neueste_zuerst() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        anlegen(&pool, einsatz, benutzer, daten("erst")).await.unwrap();
-        anlegen(&pool, einsatz, benutzer, daten("dann")).await.unwrap();
+        anlegen(&pool, einsatz, benutzer, daten("erst"))
+            .await
+            .unwrap();
+        anlegen(&pool, einsatz, benutzer, daten("dann"))
+            .await
+            .unwrap();
 
         let liste = abfrage(&pool, einsatz, &filter()).await.unwrap();
         assert_eq!(liste.len(), 2);
@@ -416,7 +431,9 @@ mod tests {
     async fn abfrage_filtert_nach_typ() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        anlegen(&pool, einsatz, benutzer, daten("eine meldung")).await.unwrap();
+        anlegen(&pool, einsatz, benutzer, daten("eine meldung"))
+            .await
+            .unwrap();
         let mut anordnung = daten("eine anordnung");
         anordnung.typ = "anordnung";
         anlegen(&pool, einsatz, benutzer, anordnung).await.unwrap();
@@ -502,7 +519,9 @@ mod tests {
     async fn suche_kombiniert_mit_typ_filter() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        anlegen(&pool, einsatz, benutzer, daten("Hochwasser steigt")).await.unwrap();
+        anlegen(&pool, einsatz, benutzer, daten("Hochwasser steigt"))
+            .await
+            .unwrap();
         let mut anordnung = daten("Hochwasser-Sperre einrichten");
         anordnung.typ = "anordnung";
         anlegen(&pool, einsatz, benutzer, anordnung).await.unwrap();
@@ -527,7 +546,10 @@ mod tests {
         let mut f = filter();
         f.q = Some("Status: \"alles\" AND *".into());
         let ergebnis = abfrage(&pool, einsatz, &f).await;
-        assert!(ergebnis.is_ok(), "Sonderzeichen müssen sicher behandelt werden");
+        assert!(
+            ergebnis.is_ok(),
+            "Sonderzeichen müssen sicher behandelt werden"
+        );
     }
 
     #[tokio::test]
@@ -572,8 +594,12 @@ mod tests {
         .fetch_one(&pool)
         .await
         .unwrap();
-        anlegen(&pool, einsatz, benutzer, daten("von leit")).await.unwrap();
-        anlegen(&pool, einsatz, zweiter, daten("von zwei")).await.unwrap();
+        anlegen(&pool, einsatz, benutzer, daten("von leit"))
+            .await
+            .unwrap();
+        anlegen(&pool, einsatz, zweiter, daten("von zwei"))
+            .await
+            .unwrap();
 
         let mut f = filter();
         f.erfasser_id = Some(zweiter);

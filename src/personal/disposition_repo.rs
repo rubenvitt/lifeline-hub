@@ -60,12 +60,18 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzPersonalAnzeige {
 
     let (name, funktion, traeger) = if live {
         (
-            row.live_name.clone().unwrap_or_else(|| row.snap_name.clone()),
+            row.live_name
+                .clone()
+                .unwrap_or_else(|| row.snap_name.clone()),
             row.live_funktion,
             row.live_traegerorganisation,
         )
     } else {
-        (row.snap_name, row.snap_funktion, row.snap_traegerorganisation)
+        (
+            row.snap_name,
+            row.snap_funktion,
+            row.snap_traegerorganisation,
+        )
     };
 
     EinsatzPersonalAnzeige {
@@ -110,7 +116,10 @@ pub async fn liste(
     .bind(einsatz_id)
     .fetch_all(pool)
     .await?;
-    Ok(rows.into_iter().map(|r| zu_anzeige(r, einsatz_aktiv)).collect())
+    Ok(rows
+        .into_iter()
+        .map(|r| zu_anzeige(r, einsatz_aktiv))
+        .collect())
 }
 
 /// Lädt eine Dispositionszeile (aufgelöst); `NotFound`, falls nicht zum Einsatz.
@@ -266,7 +275,8 @@ pub async fn entferne(pool: &SqlitePool, einsatz_id: i64, ep_id: i64) -> Result<
 /// ODER Abschnittsleiter (`einsatzabschnitt.leiter_id`) sind, mit ihrer Position. Bewusst
 /// getrennt vom allgemeinen `liste`-Pfad (der KEIN lat/lon liefert).
 pub async fn liste_fuehrungskraefte(
-    pool: &SqlitePool, einsatz_id: i64,
+    pool: &SqlitePool,
+    einsatz_id: i64,
 ) -> Result<Vec<FuehrungskraftKarte>, AppError> {
     let rows = sqlx::query_as::<_, FuehrungskraftKarte>(
         "SELECT ep.id, ep.einsatz_id, ep.snap_name AS name, \
@@ -298,7 +308,10 @@ pub struct PositionPatch<'a> {
 /// `PositionPatch`). `NotFound`, falls die Zeile nicht zum Einsatz gehört. Liefert die
 /// frische Karten-Sicht (setzt voraus, dass die Person eine Führungskraft ist).
 pub async fn aktualisiere_position(
-    pool: &SqlitePool, einsatz_id: i64, ep_id: i64, daten: PositionPatch<'_>,
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    ep_id: i64,
+    daten: PositionPatch<'_>,
 ) -> Result<FuehrungskraftKarte, AppError> {
     let betroffen = sqlx::query(
         "UPDATE einsatz_personal SET \
@@ -308,45 +321,80 @@ pub async fn aktualisiere_position(
             tz_organisation = CASE WHEN ? THEN ? ELSE tz_organisation END \
          WHERE id = ? AND einsatz_id = ?",
     )
-    .bind(daten.lat.is_some()).bind(daten.lat.flatten())
-    .bind(daten.lon.is_some()).bind(daten.lon.flatten())
-    .bind(daten.tz_fachaufgabe.is_some()).bind(daten.tz_fachaufgabe.flatten())
-    .bind(daten.tz_organisation.is_some()).bind(daten.tz_organisation.flatten())
-    .bind(ep_id).bind(einsatz_id)
-    .execute(pool).await?.rows_affected();
-    if betroffen == 0 { return Err(AppError::NotFound); }
+    .bind(daten.lat.is_some())
+    .bind(daten.lat.flatten())
+    .bind(daten.lon.is_some())
+    .bind(daten.lon.flatten())
+    .bind(daten.tz_fachaufgabe.is_some())
+    .bind(daten.tz_fachaufgabe.flatten())
+    .bind(daten.tz_organisation.is_some())
+    .bind(daten.tz_organisation.flatten())
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .execute(pool)
+    .await?
+    .rows_affected();
+    if betroffen == 0 {
+        return Err(AppError::NotFound);
+    }
     let liste = liste_fuehrungskraefte(pool, einsatz_id).await?;
-    liste.into_iter().find(|f| f.id == ep_id).ok_or(AppError::NotFound)
+    liste
+        .into_iter()
+        .find(|f| f.id == ep_id)
+        .ok_or(AppError::NotFound)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::katalog::{StatusKategorie, KATEGORIE_GEBUNDEN};
+    use crate::personal::qualifikation_repo;
     use crate::personal::repo::{self as p_repo, PersonalDaten};
     use crate::personal::status_repo::{self, StatusDaten};
-    use crate::personal::qualifikation_repo;
 
     /// Org(1) + Benutzer + Einsatz + ein 'gebunden'-Status; liefert (benutzer, einsatz).
     async fn setup(pool: &SqlitePool) -> (i64, i64) {
-        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')").execute(pool).await.unwrap();
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(pool)
+            .await
+            .unwrap();
         let benutzer: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
              VALUES (1, 'Leit', 'leit', 'h') RETURNING id",
-        ).fetch_one(pool).await.unwrap();
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         let einsatz: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
-        ).fetch_one(pool).await.unwrap();
-        status_repo::anlegen(pool, 1, StatusDaten {
-            label: "alarmiert", kategorie: KATEGORIE_GEBUNDEN, farbe: None, sortier: 20,
-        }).await.unwrap();
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        status_repo::anlegen(
+            pool,
+            1,
+            StatusDaten {
+                label: "alarmiert",
+                kategorie: KATEGORIE_GEBUNDEN,
+                farbe: None,
+                sortier: 20,
+            },
+        )
+        .await
+        .unwrap();
         (benutzer, einsatz)
     }
 
     fn p_daten(name: &str) -> PersonalDaten<'_> {
         PersonalDaten {
-            name, benutzer_id: None, personalnummer: None, traegerorganisation: Some("DRK"),
-            telefon: None, staerke_position: Some("fuehrer"), bemerkung: None,
+            name,
+            benutzer_id: None,
+            personalnummer: None,
+            traegerorganisation: Some("DRK"),
+            telefon: None,
+            staerke_position: Some("fuehrer"),
+            bemerkung: None,
         }
     }
 
@@ -368,8 +416,14 @@ mod tests {
             ids.push(id);
         }
         let (p1, p2, p3) = (ids[0], ids[1], ids[2]);
-        sqlx::query("INSERT INTO einsatz_einheit (einsatz_id, name, fuehrer_id) VALUES (?, 'Trupp', ?)")
-            .bind(einsatz).bind(p1).execute(pool).await.unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_einheit (einsatz_id, name, fuehrer_id) VALUES (?, 'Trupp', ?)",
+        )
+        .bind(einsatz)
+        .bind(p1)
+        .execute(pool)
+        .await
+        .unwrap();
         sqlx::query("INSERT INTO einsatzabschnitt (einsatz_id, name, leiter_id) VALUES (?, 'Abschnitt Nord', ?)")
             .bind(einsatz).bind(p2).execute(pool).await.unwrap();
         (einsatz, p1, p2, p3)
@@ -385,10 +439,19 @@ mod tests {
         assert!(ids.contains(&p1) && ids.contains(&p2));
         assert_eq!(liste.len(), 2); // #3 NICHT enthalten
 
-        aktualisiere_position(&pool, einsatz_id, p1, PositionPatch {
-            lat: Some(Some(50.1)), lon: Some(Some(8.6)),
-            tz_fachaufgabe: Some(Some("fuehrung")), tz_organisation: None,
-        }).await.unwrap();
+        aktualisiere_position(
+            &pool,
+            einsatz_id,
+            p1,
+            PositionPatch {
+                lat: Some(Some(50.1)),
+                lon: Some(Some(8.6)),
+                tz_fachaufgabe: Some(Some("fuehrung")),
+                tz_organisation: None,
+            },
+        )
+        .await
+        .unwrap();
         let liste2 = liste_fuehrungskraefte(&pool, einsatz_id).await.unwrap();
         let f1 = liste2.iter().find(|f| f.id == p1).unwrap();
         assert_eq!(f1.lat, Some(50.1));
@@ -399,16 +462,28 @@ mod tests {
     async fn disponiere_stamm_fuellt_snapshot_status_und_funktion() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        let san = qualifikation_repo::anlegen(&pool, 1, "Sanitäter", 10).await.unwrap();
-        let gf = qualifikation_repo::anlegen(&pool, 1, "Gruppenführer", 60).await.unwrap();
-        let person = p_repo::anlegen(&pool, 1, p_daten("Thomas Müller"), &[san.id, gf.id]).await.unwrap();
+        let san = qualifikation_repo::anlegen(&pool, 1, "Sanitäter", 10)
+            .await
+            .unwrap();
+        let gf = qualifikation_repo::anlegen(&pool, 1, "Gruppenführer", 60)
+            .await
+            .unwrap();
+        let person = p_repo::anlegen(&pool, 1, p_daten("Thomas Müller"), &[san.id, gf.id])
+            .await
+            .unwrap();
 
-        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer).await.unwrap();
+        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer)
+            .await
+            .unwrap();
         let a = laden_anzeige(&pool, einsatz, ep, true).await.unwrap();
         assert_eq!(a.name, "Thomas Müller");
         assert_eq!(a.funktion.as_deref(), Some("Sanitäter, Gruppenführer"));
         assert_eq!(a.status_kategorie, Some(StatusKategorie::Gebunden));
-        assert_eq!(a.staerke_position.as_deref(), Some("fuehrer"), "Stamm-Default greift");
+        assert_eq!(
+            a.staerke_position.as_deref(),
+            Some("fuehrer"),
+            "Stamm-Default greift"
+        );
         assert!(!a.ist_adhoc);
     }
 
@@ -416,20 +491,34 @@ mod tests {
     async fn staerke_position_override_schlaegt_stamm_default() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[]).await.unwrap(); // Stamm = fuehrer
-        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, Some("mannschaft"), benutzer).await.unwrap();
+        let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[])
+            .await
+            .unwrap(); // Stamm = fuehrer
+        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, Some("mannschaft"), benutzer)
+            .await
+            .unwrap();
         let a = laden_anzeige(&pool, einsatz, ep, true).await.unwrap();
-        assert_eq!(a.staerke_position.as_deref(), Some("mannschaft"), "Override schlägt Default");
+        assert_eq!(
+            a.staerke_position.as_deref(),
+            Some("mannschaft"),
+            "Override schlägt Default"
+        );
     }
 
     #[tokio::test]
     async fn doppelte_stamm_disposition_ist_conflict() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[]).await.unwrap();
-        disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer).await.unwrap();
+        let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[])
+            .await
+            .unwrap();
+        disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer)
+            .await
+            .unwrap();
         assert!(matches!(
-            disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer).await.unwrap_err(),
+            disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer)
+                .await
+                .unwrap_err(),
             AppError::Conflict(_)
         ));
     }
@@ -438,10 +527,20 @@ mod tests {
     async fn disponiere_stamm_fremde_org_ist_notfound() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        sqlx::query("INSERT INTO organisation (id, name) VALUES (2, 'Fremd')").execute(&pool).await.unwrap();
-        let fremd: i64 = sqlx::query_scalar("INSERT INTO personal (org_id, name) VALUES (2, 'Fremd') RETURNING id").fetch_one(&pool).await.unwrap();
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (2, 'Fremd')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let fremd: i64 = sqlx::query_scalar(
+            "INSERT INTO personal (org_id, name) VALUES (2, 'Fremd') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         assert!(matches!(
-            disponiere_stamm(&pool, einsatz, 1, fremd, None, benutzer).await.unwrap_err(),
+            disponiere_stamm(&pool, einsatz, 1, fremd, None, benutzer)
+                .await
+                .unwrap_err(),
             AppError::NotFound
         ));
     }
@@ -450,10 +549,16 @@ mod tests {
     async fn disponiere_stamm_ausser_dienst_ist_validation() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[]).await.unwrap();
-        p_repo::setze_dienststatus(&pool, 1, person.id, false).await.unwrap();
+        let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[])
+            .await
+            .unwrap();
+        p_repo::setze_dienststatus(&pool, 1, person.id, false)
+            .await
+            .unwrap();
         assert!(matches!(
-            disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer).await.unwrap_err(),
+            disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer)
+                .await
+                .unwrap_err(),
             AppError::Validation(_)
         ));
     }
@@ -463,10 +568,20 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         for name in ["Notarzt Extern", "Helfer Extern"] {
-            disponiere_adhoc(&pool, einsatz, 1, AdhocDaten {
-                name, funktion: Some("Notarzt"), traegerorganisation: Some("KV"),
-                staerke_position: Some("unterfuehrer"),
-            }, benutzer).await.unwrap();
+            disponiere_adhoc(
+                &pool,
+                einsatz,
+                1,
+                AdhocDaten {
+                    name,
+                    funktion: Some("Notarzt"),
+                    traegerorganisation: Some("KV"),
+                    staerke_position: Some("unterfuehrer"),
+                },
+                benutzer,
+            )
+            .await
+            .unwrap();
         }
         let l = liste(&pool, einsatz, true).await.unwrap();
         assert_eq!(l.len(), 2);
@@ -478,18 +593,35 @@ mod tests {
     async fn snapshot_stabil_live_vs_snapshot() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        let person = p_repo::anlegen(&pool, 1, p_daten("Thomas Müller"), &[]).await.unwrap();
-        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer).await.unwrap();
+        let person = p_repo::anlegen(&pool, 1, p_daten("Thomas Müller"), &[])
+            .await
+            .unwrap();
+        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer)
+            .await
+            .unwrap();
 
         // Stamm nachträglich umbenennen.
-        p_repo::aktualisiere(&pool, 1, person.id, p_daten("Thomas NEU"), &[]).await.unwrap();
+        p_repo::aktualisiere(&pool, 1, person.id, p_daten("Thomas NEU"), &[])
+            .await
+            .unwrap();
         // Aktiver Einsatz → Live (neuer Name).
-        assert_eq!(laden_anzeige(&pool, einsatz, ep, true).await.unwrap().name, "Thomas NEU");
+        assert_eq!(
+            laden_anzeige(&pool, einsatz, ep, true).await.unwrap().name,
+            "Thomas NEU"
+        );
         // Abgeschlossen → Snapshot (alter Name).
-        assert_eq!(laden_anzeige(&pool, einsatz, ep, false).await.unwrap().name, "Thomas Müller");
+        assert_eq!(
+            laden_anzeige(&pool, einsatz, ep, false).await.unwrap().name,
+            "Thomas Müller"
+        );
         // Außer Dienst → auch bei aktivem Einsatz Snapshot.
-        p_repo::setze_dienststatus(&pool, 1, person.id, false).await.unwrap();
-        assert_eq!(laden_anzeige(&pool, einsatz, ep, true).await.unwrap().name, "Thomas Müller");
+        p_repo::setze_dienststatus(&pool, 1, person.id, false)
+            .await
+            .unwrap();
+        assert_eq!(
+            laden_anzeige(&pool, einsatz, ep, true).await.unwrap().name,
+            "Thomas Müller"
+        );
     }
 
     #[tokio::test]
@@ -497,15 +629,36 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         // Stamm-Default = fuehrer (aus p_daten), KEIN Dispo-Override.
-        let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[]).await.unwrap();
-        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer).await.unwrap();
-        assert_eq!(laden_anzeige(&pool, einsatz, ep, true).await.unwrap().staerke_position.as_deref(), Some("fuehrer"));
+        let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[])
+            .await
+            .unwrap();
+        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer)
+            .await
+            .unwrap();
+        assert_eq!(
+            laden_anzeige(&pool, einsatz, ep, true)
+                .await
+                .unwrap()
+                .staerke_position
+                .as_deref(),
+            Some("fuehrer")
+        );
 
         // Stamm-Position nachträglich ändern → live reflektiert (kein Snapshot).
         let mut geaendert = p_daten("Thomas");
         geaendert.staerke_position = Some("mannschaft");
-        p_repo::aktualisiere(&pool, 1, person.id, geaendert, &[]).await.unwrap();
-        assert_eq!(laden_anzeige(&pool, einsatz, ep, true).await.unwrap().staerke_position.as_deref(), Some("mannschaft"), "Position ist immer live, kein Snapshot");
+        p_repo::aktualisiere(&pool, 1, person.id, geaendert, &[])
+            .await
+            .unwrap();
+        assert_eq!(
+            laden_anzeige(&pool, einsatz, ep, true)
+                .await
+                .unwrap()
+                .staerke_position
+                .as_deref(),
+            Some("mannschaft"),
+            "Position ist immer live, kein Snapshot"
+        );
     }
 
     #[tokio::test]
@@ -514,14 +667,30 @@ mod tests {
         // dieselbe Komposition liefern. Pinnt beide Pfade auf dieselbe Ausgabe.
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        let san = qualifikation_repo::anlegen(&pool, 1, "Sanitäter", 10).await.unwrap();
-        let gf = qualifikation_repo::anlegen(&pool, 1, "Gruppenführer", 60).await.unwrap();
-        let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[gf.id, san.id]).await.unwrap();
-        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer).await.unwrap();
+        let san = qualifikation_repo::anlegen(&pool, 1, "Sanitäter", 10)
+            .await
+            .unwrap();
+        let gf = qualifikation_repo::anlegen(&pool, 1, "Gruppenführer", 60)
+            .await
+            .unwrap();
+        let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[gf.id, san.id])
+            .await
+            .unwrap();
+        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer)
+            .await
+            .unwrap();
 
-        let live = laden_anzeige(&pool, einsatz, ep, true).await.unwrap().funktion;
-        let snap = laden_anzeige(&pool, einsatz, ep, false).await.unwrap().funktion;
-        let helper = qualifikation_repo::funktion_text(&pool, person.id).await.unwrap();
+        let live = laden_anzeige(&pool, einsatz, ep, true)
+            .await
+            .unwrap()
+            .funktion;
+        let snap = laden_anzeige(&pool, einsatz, ep, false)
+            .await
+            .unwrap()
+            .funktion;
+        let helper = qualifikation_repo::funktion_text(&pool, person.id)
+            .await
+            .unwrap();
         assert_eq!(live, snap, "Live == Snapshot bei unverändertem Stamm");
         assert_eq!(live, helper, "Anzeige == funktion_text-Helper");
         assert_eq!(live.as_deref(), Some("Sanitäter, Gruppenführer"));
@@ -531,46 +700,101 @@ mod tests {
     async fn einheit_id_wird_in_anzeige_geliefert() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[]).await.unwrap();
-        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer).await.unwrap();
+        let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[])
+            .await
+            .unwrap();
+        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer)
+            .await
+            .unwrap();
 
         // Frisch disponiert → keiner Einheit zugeordnet.
-        assert_eq!(laden_anzeige(&pool, einsatz, ep, true).await.unwrap().einheit_id, None);
+        assert_eq!(
+            laden_anzeige(&pool, einsatz, ep, true)
+                .await
+                .unwrap()
+                .einheit_id,
+            None
+        );
 
         // Direkt einer Einheit zuordnen (Mitglied-Repo kommt später; hier roh).
         let einheit: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Trupp') RETURNING id",
-        ).bind(einsatz).fetch_one(&pool).await.unwrap();
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         sqlx::query("UPDATE einsatz_personal SET einheit_id = ? WHERE id = ?")
-            .bind(einheit).bind(ep).execute(&pool).await.unwrap();
-        assert_eq!(laden_anzeige(&pool, einsatz, ep, true).await.unwrap().einheit_id, Some(einheit));
+            .bind(einheit)
+            .bind(ep)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            laden_anzeige(&pool, einsatz, ep, true)
+                .await
+                .unwrap()
+                .einheit_id,
+            Some(einheit)
+        );
     }
 
     #[tokio::test]
     async fn aktualisiere_status_position_bemerkung_dann_entferne() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[]).await.unwrap();
-        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer).await.unwrap();
-        let neuer = status_repo::anlegen(&pool, 1, StatusDaten {
-            label: "im Einsatz", kategorie: KATEGORIE_GEBUNDEN, farbe: None, sortier: 40,
-        }).await.unwrap();
+        let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[])
+            .await
+            .unwrap();
+        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, None, benutzer)
+            .await
+            .unwrap();
+        let neuer = status_repo::anlegen(
+            &pool,
+            1,
+            StatusDaten {
+                label: "im Einsatz",
+                kategorie: KATEGORIE_GEBUNDEN,
+                farbe: None,
+                sortier: 40,
+            },
+        )
+        .await
+        .unwrap();
 
-        aktualisiere(&pool, einsatz, ep, Some(neuer.id), Some(Some("mannschaft")), Some("vor Ort")).await.unwrap();
+        aktualisiere(
+            &pool,
+            einsatz,
+            ep,
+            Some(neuer.id),
+            Some(Some("mannschaft")),
+            Some("vor Ort"),
+        )
+        .await
+        .unwrap();
         let a = laden_anzeige(&pool, einsatz, ep, true).await.unwrap();
         assert_eq!(a.status_id, Some(neuer.id));
         assert_eq!(a.staerke_position.as_deref(), Some("mannschaft"));
         assert_eq!(a.bemerkung.as_deref(), Some("vor Ort"));
 
         // status_id None → bleibt; position None → bleibt; nur Bemerkung leeren.
-        aktualisiere(&pool, einsatz, ep, None, None, Some("")).await.unwrap();
+        aktualisiere(&pool, einsatz, ep, None, None, Some(""))
+            .await
+            .unwrap();
         let b = laden_anzeige(&pool, einsatz, ep, true).await.unwrap();
         assert_eq!(b.status_id, Some(neuer.id), "Status unverändert");
-        assert_eq!(b.staerke_position.as_deref(), Some("mannschaft"), "Position unverändert");
+        assert_eq!(
+            b.staerke_position.as_deref(),
+            Some("mannschaft"),
+            "Position unverändert"
+        );
         assert_eq!(b.bemerkung.as_deref(), Some(""), "Bemerkung geleert");
 
         entferne(&pool, einsatz, ep).await.unwrap();
-        assert!(matches!(laden_anzeige(&pool, einsatz, ep, true).await.unwrap_err(), AppError::NotFound));
+        assert!(matches!(
+            laden_anzeige(&pool, einsatz, ep, true).await.unwrap_err(),
+            AppError::NotFound
+        ));
     }
 
     /// LFH-4 P1: Drei-Zustands-Semantik von `staerke_position` auf der rohen Override-Spalte
@@ -579,26 +803,51 @@ mod tests {
     async fn aktualisiere_staerke_position_tri_state() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[]).await.unwrap();
-        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, Some("mannschaft"), benutzer).await.unwrap();
+        let person = p_repo::anlegen(&pool, 1, p_daten("Thomas"), &[])
+            .await
+            .unwrap();
+        let ep = disponiere_stamm(&pool, einsatz, 1, person.id, Some("mannschaft"), benutzer)
+            .await
+            .unwrap();
 
         async fn roh(pool: &SqlitePool, ep: i64) -> Option<String> {
             sqlx::query_scalar("SELECT staerke_position FROM einsatz_personal WHERE id = ?")
-                .bind(ep).fetch_one(pool).await.unwrap()
+                .bind(ep)
+                .fetch_one(pool)
+                .await
+                .unwrap()
         }
         assert_eq!(roh(&pool, ep).await.as_deref(), Some("mannschaft"));
 
         // None = unverändert.
-        aktualisiere(&pool, einsatz, ep, None, None, None).await.unwrap();
-        assert_eq!(roh(&pool, ep).await.as_deref(), Some("mannschaft"), "absent lässt Override");
+        aktualisiere(&pool, einsatz, ep, None, None, None)
+            .await
+            .unwrap();
+        assert_eq!(
+            roh(&pool, ep).await.as_deref(),
+            Some("mannschaft"),
+            "absent lässt Override"
+        );
 
         // Some(Some(x)) = setzen.
-        aktualisiere(&pool, einsatz, ep, None, Some(Some("unterfuehrer")), None).await.unwrap();
-        assert_eq!(roh(&pool, ep).await.as_deref(), Some("unterfuehrer"), "Wert setzt Override");
+        aktualisiere(&pool, einsatz, ep, None, Some(Some("unterfuehrer")), None)
+            .await
+            .unwrap();
+        assert_eq!(
+            roh(&pool, ep).await.as_deref(),
+            Some("unterfuehrer"),
+            "Wert setzt Override"
+        );
 
         // Some(None) = explizit auf NULL.
-        aktualisiere(&pool, einsatz, ep, None, Some(None), None).await.unwrap();
-        assert_eq!(roh(&pool, ep).await, None, "explizit null entfernt Override");
+        aktualisiere(&pool, einsatz, ep, None, Some(None), None)
+            .await
+            .unwrap();
+        assert_eq!(
+            roh(&pool, ep).await,
+            None,
+            "explizit null entfernt Override"
+        );
     }
 
     /// LFH-9: Die Besatzungs-FK `fahrzeug_id` wird in die Anzeige serialisiert (sonst zeigt
@@ -607,16 +856,42 @@ mod tests {
     async fn fahrzeug_id_wird_serialisiert() {
         let pool = crate::db::test_pool().await;
         let (_benutzer, einsatz) = setup(&pool).await;
-        let frei: i64 = sqlx::query_scalar("INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Frei') RETURNING id")
-            .bind(einsatz).fetch_one(&pool).await.unwrap();
-        let crew: i64 = sqlx::query_scalar("INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Crew') RETURNING id")
-            .bind(einsatz).fetch_one(&pool).await.unwrap();
+        let frei: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Frei') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let crew: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Crew') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         let ef: i64 = sqlx::query_scalar("INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, 'Florian 1') RETURNING id")
             .bind(einsatz).fetch_one(&pool).await.unwrap();
         sqlx::query("UPDATE einsatz_personal SET fahrzeug_id = ? WHERE id = ?")
-            .bind(ef).bind(crew).execute(&pool).await.unwrap();
+            .bind(ef)
+            .bind(crew)
+            .execute(&pool)
+            .await
+            .unwrap();
 
-        assert_eq!(laden_anzeige(&pool, einsatz, frei, true).await.unwrap().fahrzeug_id, None);
-        assert_eq!(laden_anzeige(&pool, einsatz, crew, true).await.unwrap().fahrzeug_id, Some(ef));
+        assert_eq!(
+            laden_anzeige(&pool, einsatz, frei, true)
+                .await
+                .unwrap()
+                .fahrzeug_id,
+            None
+        );
+        assert_eq!(
+            laden_anzeige(&pool, einsatz, crew, true)
+                .await
+                .unwrap()
+                .fahrzeug_id,
+            Some(ef)
+        );
     }
 }

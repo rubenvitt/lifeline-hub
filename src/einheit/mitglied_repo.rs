@@ -5,28 +5,54 @@ use crate::staerke::{Staerke, StaerkePosition};
 use sqlx::SqlitePool;
 
 /// Prüft, ob eine Einheit zum Einsatz gehört. `NotFound` sonst.
-async fn pruefe_einheit(pool: &SqlitePool, einsatz_id: i64, einheit_id: i64) -> Result<(), AppError> {
-    let t: Option<i64> = sqlx::query_scalar("SELECT 1 FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?")
-        .bind(einheit_id).bind(einsatz_id).fetch_optional(pool).await?;
+async fn pruefe_einheit(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    einheit_id: i64,
+) -> Result<(), AppError> {
+    let t: Option<i64> =
+        sqlx::query_scalar("SELECT 1 FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?")
+            .bind(einheit_id)
+            .bind(einsatz_id)
+            .fetch_optional(pool)
+            .await?;
     t.map(|_| ()).ok_or(AppError::NotFound)
 }
 
 /// Ordnet eine Personal-Dispozeile einer Einheit zu (exklusiv). Eine bereits andernorts
 /// zugeordnete Kraft wechselt; war sie dort Führer, wird dieser Verweis bereinigt.
 /// `NotFound`, falls Dispozeile oder Einheit nicht zum Einsatz gehören. Liefert den Namen.
-pub async fn ordne_personal_zu(pool: &SqlitePool, einsatz_id: i64, einheit_id: i64, ep_id: i64) -> Result<String, AppError> {
+pub async fn ordne_personal_zu(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    einheit_id: i64,
+    ep_id: i64,
+) -> Result<String, AppError> {
     pruefe_einheit(pool, einsatz_id, einheit_id).await?;
     let name: Option<String> = sqlx::query_scalar(
         "SELECT snap_name FROM einsatz_personal WHERE id = ? AND einsatz_id = ?",
-    ).bind(ep_id).bind(einsatz_id).fetch_optional(pool).await?;
+    )
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?;
     let name = name.ok_or(AppError::NotFound)?;
 
     let mut tx = pool.begin().await?;
     // Stale Führer-Verweis bereinigen (Person war evtl. anderswo Führer).
-    sqlx::query("UPDATE einsatz_einheit SET fuehrer_id = NULL WHERE fuehrer_id = ? AND einsatz_id = ?")
-        .bind(ep_id).bind(einsatz_id).execute(&mut *tx).await?;
+    sqlx::query(
+        "UPDATE einsatz_einheit SET fuehrer_id = NULL WHERE fuehrer_id = ? AND einsatz_id = ?",
+    )
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .execute(&mut *tx)
+    .await?;
     sqlx::query("UPDATE einsatz_personal SET einheit_id = ? WHERE id = ? AND einsatz_id = ?")
-        .bind(einheit_id).bind(ep_id).bind(einsatz_id).execute(&mut *tx).await?;
+        .bind(einheit_id)
+        .bind(ep_id)
+        .bind(einsatz_id)
+        .execute(&mut *tx)
+        .await?;
     tx.commit().await?;
     Ok(name)
 }
@@ -34,66 +60,121 @@ pub async fn ordne_personal_zu(pool: &SqlitePool, einsatz_id: i64, einheit_id: i
 /// Gibt eine Personal-Dispozeile aus ihrer Einheit frei (`einheit_id = NULL`). War sie
 /// Führer dieser Einheit, wird `fuehrer_id` geleert. `NotFound`, falls nicht zu dieser
 /// Einheit gehörend. Liefert den Namen.
-pub async fn gib_personal_frei(pool: &SqlitePool, einsatz_id: i64, einheit_id: i64, ep_id: i64) -> Result<String, AppError> {
+pub async fn gib_personal_frei(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    einheit_id: i64,
+    ep_id: i64,
+) -> Result<String, AppError> {
     let name: Option<String> = sqlx::query_scalar(
         "SELECT snap_name FROM einsatz_personal WHERE id = ? AND einsatz_id = ? AND einheit_id = ?",
-    ).bind(ep_id).bind(einsatz_id).bind(einheit_id).fetch_optional(pool).await?;
+    )
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .bind(einheit_id)
+    .fetch_optional(pool)
+    .await?;
     let name = name.ok_or(AppError::NotFound)?;
 
     let mut tx = pool.begin().await?;
     sqlx::query("UPDATE einsatz_einheit SET fuehrer_id = NULL WHERE id = ? AND fuehrer_id = ?")
-        .bind(einheit_id).bind(ep_id).execute(&mut *tx).await?;
+        .bind(einheit_id)
+        .bind(ep_id)
+        .execute(&mut *tx)
+        .await?;
     sqlx::query("UPDATE einsatz_personal SET einheit_id = NULL WHERE id = ?")
-        .bind(ep_id).execute(&mut *tx).await?;
+        .bind(ep_id)
+        .execute(&mut *tx)
+        .await?;
     tx.commit().await?;
     Ok(name)
 }
 
 /// Ordnet ein Fahrzeug einer Einheit zu (exklusiv). `NotFound` analog. Liefert den Funkrufnamen.
-pub async fn ordne_fahrzeug_zu(pool: &SqlitePool, einsatz_id: i64, einheit_id: i64, ef_id: i64) -> Result<String, AppError> {
+pub async fn ordne_fahrzeug_zu(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    einheit_id: i64,
+    ef_id: i64,
+) -> Result<String, AppError> {
     pruefe_einheit(pool, einsatz_id, einheit_id).await?;
     let name: Option<String> = sqlx::query_scalar(
         "SELECT snap_funkrufname FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?",
-    ).bind(ef_id).bind(einsatz_id).fetch_optional(pool).await?;
+    )
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?;
     let name = name.ok_or(AppError::NotFound)?;
     sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = ? WHERE id = ? AND einsatz_id = ?")
-        .bind(einheit_id).bind(ef_id).bind(einsatz_id).execute(pool).await?;
+        .bind(einheit_id)
+        .bind(ef_id)
+        .bind(einsatz_id)
+        .execute(pool)
+        .await?;
     Ok(name)
 }
 
 /// Gibt ein Fahrzeug aus seiner Einheit frei. `NotFound`, falls nicht zu dieser Einheit.
-pub async fn gib_fahrzeug_frei(pool: &SqlitePool, einsatz_id: i64, einheit_id: i64, ef_id: i64) -> Result<String, AppError> {
+pub async fn gib_fahrzeug_frei(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    einheit_id: i64,
+    ef_id: i64,
+) -> Result<String, AppError> {
     let name: Option<String> = sqlx::query_scalar(
         "SELECT snap_funkrufname FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ? AND einheit_id = ?",
     ).bind(ef_id).bind(einsatz_id).bind(einheit_id).fetch_optional(pool).await?;
     let name = name.ok_or(AppError::NotFound)?;
     sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = NULL WHERE id = ?")
-        .bind(ef_id).execute(pool).await?;
+        .bind(ef_id)
+        .execute(pool)
+        .await?;
     Ok(name)
 }
 
 /// Ordnet eine Material-Dispozeile einer Einheit zu (exklusiv; Material kann kein Führer
 /// sein). `NotFound` analog. Liefert (Bezeichnung, Menge) für den ETB-Text.
-pub async fn ordne_material_zu(pool: &SqlitePool, einsatz_id: i64, einheit_id: i64, em_id: i64) -> Result<(String, i64), AppError> {
+pub async fn ordne_material_zu(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    einheit_id: i64,
+    em_id: i64,
+) -> Result<(String, i64), AppError> {
     pruefe_einheit(pool, einsatz_id, einheit_id).await?;
     let row: Option<(String, i64)> = sqlx::query_as(
         "SELECT snap_bezeichnung, menge FROM einsatz_material WHERE id = ? AND einsatz_id = ?",
-    ).bind(em_id).bind(einsatz_id).fetch_optional(pool).await?;
+    )
+    .bind(em_id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?;
     let row = row.ok_or(AppError::NotFound)?;
     sqlx::query("UPDATE einsatz_material SET einheit_id = ? WHERE id = ? AND einsatz_id = ?")
-        .bind(einheit_id).bind(em_id).bind(einsatz_id).execute(pool).await?;
+        .bind(einheit_id)
+        .bind(em_id)
+        .bind(einsatz_id)
+        .execute(pool)
+        .await?;
     Ok(row)
 }
 
 /// Gibt eine Material-Dispozeile aus ihrer Einheit frei. `NotFound`, falls nicht zu dieser
 /// Einheit. Liefert (Bezeichnung, Menge).
-pub async fn gib_material_frei(pool: &SqlitePool, einsatz_id: i64, einheit_id: i64, em_id: i64) -> Result<(String, i64), AppError> {
+pub async fn gib_material_frei(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    einheit_id: i64,
+    em_id: i64,
+) -> Result<(String, i64), AppError> {
     let row: Option<(String, i64)> = sqlx::query_as(
         "SELECT snap_bezeichnung, menge FROM einsatz_material WHERE id = ? AND einsatz_id = ? AND einheit_id = ?",
     ).bind(em_id).bind(einsatz_id).bind(einheit_id).fetch_optional(pool).await?;
     let row = row.ok_or(AppError::NotFound)?;
     sqlx::query("UPDATE einsatz_material SET einheit_id = NULL WHERE id = ?")
-        .bind(em_id).execute(pool).await?;
+        .bind(em_id)
+        .execute(pool)
+        .await?;
     Ok(row)
 }
 
@@ -107,14 +188,26 @@ struct MaterialRow {
 }
 
 /// Material-Mitglieder einer Einheit (Snapshot-Bezeichnung + Menge + Status).
-pub async fn material_mitglieder(pool: &SqlitePool, einheit_id: i64) -> Result<Vec<EinheitMitgliedMaterial>, AppError> {
+pub async fn material_mitglieder(
+    pool: &SqlitePool,
+    einheit_id: i64,
+) -> Result<Vec<EinheitMitgliedMaterial>, AppError> {
     let rows = sqlx::query_as::<_, MaterialRow>(
         "SELECT id AS em_id, snap_bezeichnung AS bezeichnung, menge, status \
          FROM einsatz_material WHERE einheit_id = ? ORDER BY id",
-    ).bind(einheit_id).fetch_all(pool).await?;
-    Ok(rows.into_iter().map(|r| EinheitMitgliedMaterial {
-        em_id: r.em_id, bezeichnung: r.bezeichnung, menge: r.menge, status: r.status,
-    }).collect())
+    )
+    .bind(einheit_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|r| EinheitMitgliedMaterial {
+            em_id: r.em_id,
+            bezeichnung: r.bezeichnung,
+            menge: r.menge,
+            status: r.status,
+        })
+        .collect())
 }
 
 #[derive(sqlx::FromRow)]
@@ -128,7 +221,10 @@ struct PersonRow {
 
 /// Personal-Mitglieder einer Einheit; Position aufgelöst (Dispo-Override vor Stamm-Default),
 /// `ist_fuehrer` markiert die als `fuehrer_id` eingetragene Person.
-pub async fn personal_mitglieder(pool: &SqlitePool, einheit_id: i64) -> Result<Vec<EinheitMitgliedPerson>, AppError> {
+pub async fn personal_mitglieder(
+    pool: &SqlitePool,
+    einheit_id: i64,
+) -> Result<Vec<EinheitMitgliedPerson>, AppError> {
     let rows = sqlx::query_as::<_, PersonRow>(
         "SELECT ep.id AS ep_id, ep.snap_name AS name, ep.snap_funktion AS funktion, \
                 COALESCE(ep.staerke_position, p.staerke_position) AS staerke_position, \
@@ -137,25 +233,49 @@ pub async fn personal_mitglieder(pool: &SqlitePool, einheit_id: i64) -> Result<V
          JOIN einsatz_einheit e ON e.id = ep.einheit_id \
          LEFT JOIN personal p ON p.id = ep.personal_id \
          WHERE ep.einheit_id = ? ORDER BY ep.id",
-    ).bind(einheit_id).fetch_all(pool).await?;
-    Ok(rows.into_iter().map(|r| EinheitMitgliedPerson {
-        ep_id: r.ep_id, name: r.name, funktion: r.funktion,
-        staerke_position: r.staerke_position, ist_fuehrer: r.ist_fuehrer != 0,
-    }).collect())
+    )
+    .bind(einheit_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|r| EinheitMitgliedPerson {
+            ep_id: r.ep_id,
+            name: r.name,
+            funktion: r.funktion,
+            staerke_position: r.staerke_position,
+            ist_fuehrer: r.ist_fuehrer != 0,
+        })
+        .collect())
 }
 
 #[derive(sqlx::FromRow)]
-struct FahrzeugRow { ef_id: i64, funkrufname: String, fahrzeugtyp: Option<String> }
+struct FahrzeugRow {
+    ef_id: i64,
+    funkrufname: String,
+    fahrzeugtyp: Option<String>,
+}
 
 /// Fahrzeug-Mitglieder einer Einheit (Snapshot-Funkrufname/-typ).
-pub async fn fahrzeug_mitglieder(pool: &SqlitePool, einheit_id: i64) -> Result<Vec<EinheitMitgliedFahrzeug>, AppError> {
+pub async fn fahrzeug_mitglieder(
+    pool: &SqlitePool,
+    einheit_id: i64,
+) -> Result<Vec<EinheitMitgliedFahrzeug>, AppError> {
     let rows = sqlx::query_as::<_, FahrzeugRow>(
         "SELECT id AS ef_id, snap_funkrufname AS funkrufname, snap_fahrzeugtyp AS fahrzeugtyp \
          FROM einsatz_fahrzeug WHERE einheit_id = ? ORDER BY id",
-    ).bind(einheit_id).fetch_all(pool).await?;
-    Ok(rows.into_iter().map(|r| EinheitMitgliedFahrzeug {
-        ef_id: r.ef_id, funkrufname: r.funkrufname, fahrzeugtyp: r.fahrzeugtyp,
-    }).collect())
+    )
+    .bind(einheit_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|r| EinheitMitgliedFahrzeug {
+            ef_id: r.ef_id,
+            funkrufname: r.funkrufname,
+            fahrzeugtyp: r.fahrzeugtyp,
+        })
+        .collect())
 }
 
 /// Eigene Ist-Stärke einer Einheit: Aggregation der aufgelösten Personal-Positionen der
@@ -165,8 +285,14 @@ pub async fn ist_staerke(pool: &SqlitePool, einheit_id: i64) -> Result<Staerke, 
         "SELECT COALESCE(ep.staerke_position, p.staerke_position) \
          FROM einsatz_personal ep LEFT JOIN personal p ON p.id = ep.personal_id \
          WHERE ep.einheit_id = ?",
-    ).bind(einheit_id).fetch_all(pool).await?;
-    let iter = positionen.into_iter().flatten().filter_map(|s| StaerkePosition::parse(&s));
+    )
+    .bind(einheit_id)
+    .fetch_all(pool)
+    .await?;
+    let iter = positionen
+        .into_iter()
+        .flatten()
+        .filter_map(|s| StaerkePosition::parse(&s));
     Ok(Staerke::aus_positionen(iter))
 }
 
@@ -176,13 +302,30 @@ mod tests {
 
     /// Org(1) + Einsatz + zwei Einheiten; liefert (einsatz, einheit_a, einheit_b).
     async fn setup(pool: &SqlitePool) -> (i64, i64, i64) {
-        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')").execute(pool).await.unwrap();
-        let einsatz: i64 = sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id")
-            .fetch_one(pool).await.unwrap();
-        let a: i64 = sqlx::query_scalar("INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'A') RETURNING id")
-            .bind(einsatz).fetch_one(pool).await.unwrap();
-        let b: i64 = sqlx::query_scalar("INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'B') RETURNING id")
-            .bind(einsatz).fetch_one(pool).await.unwrap();
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(pool)
+            .await
+            .unwrap();
+        let einsatz: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        let a: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'A') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        let b: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'B') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(pool)
+        .await
+        .unwrap();
         (einsatz, a, b)
     }
 
@@ -194,7 +337,11 @@ mod tests {
     }
 
     async fn einheit_von(pool: &SqlitePool, ep: i64) -> Option<i64> {
-        sqlx::query_scalar("SELECT einheit_id FROM einsatz_personal WHERE id = ?").bind(ep).fetch_one(pool).await.unwrap()
+        sqlx::query_scalar("SELECT einheit_id FROM einsatz_personal WHERE id = ?")
+            .bind(ep)
+            .fetch_one(pool)
+            .await
+            .unwrap()
     }
 
     #[tokio::test]
@@ -203,7 +350,10 @@ mod tests {
         let (einsatz, a, b) = setup(&pool).await;
         let ep = person(&pool, einsatz, "Anna", Some("mannschaft")).await;
 
-        assert_eq!(ordne_personal_zu(&pool, einsatz, a, ep).await.unwrap(), "Anna");
+        assert_eq!(
+            ordne_personal_zu(&pool, einsatz, a, ep).await.unwrap(),
+            "Anna"
+        );
         assert_eq!(einheit_von(&pool, ep).await, Some(a));
 
         // Wechsel zu B: A verliert sie.
@@ -211,7 +361,10 @@ mod tests {
         assert_eq!(einheit_von(&pool, ep).await, Some(b));
 
         // Freigeben.
-        assert_eq!(gib_personal_frei(&pool, einsatz, b, ep).await.unwrap(), "Anna");
+        assert_eq!(
+            gib_personal_frei(&pool, einsatz, b, ep).await.unwrap(),
+            "Anna"
+        );
         assert_eq!(einheit_von(&pool, ep).await, None);
     }
 
@@ -222,7 +375,10 @@ mod tests {
         let ep = person(&pool, einsatz, "Anna", None).await;
         ordne_personal_zu(&pool, einsatz, a, ep).await.unwrap();
         // Freigeben aus B (gehört aber zu A) → NotFound.
-        assert!(matches!(gib_personal_frei(&pool, einsatz, b, ep).await.unwrap_err(), AppError::NotFound));
+        assert!(matches!(
+            gib_personal_frei(&pool, einsatz, b, ep).await.unwrap_err(),
+            AppError::NotFound
+        ));
     }
 
     #[tokio::test]
@@ -231,11 +387,24 @@ mod tests {
         let (einsatz, a, _b) = setup(&pool).await;
         let ep = person(&pool, einsatz, "Chef", Some("fuehrer")).await;
         ordne_personal_zu(&pool, einsatz, a, ep).await.unwrap();
-        sqlx::query("UPDATE einsatz_einheit SET fuehrer_id = ? WHERE id = ?").bind(ep).bind(a).execute(&pool).await.unwrap();
+        sqlx::query("UPDATE einsatz_einheit SET fuehrer_id = ? WHERE id = ?")
+            .bind(ep)
+            .bind(a)
+            .execute(&pool)
+            .await
+            .unwrap();
 
         gib_personal_frei(&pool, einsatz, a, ep).await.unwrap();
-        let fuehrer: Option<i64> = sqlx::query_scalar("SELECT fuehrer_id FROM einsatz_einheit WHERE id = ?").bind(a).fetch_one(&pool).await.unwrap();
-        assert_eq!(fuehrer, None, "Freigeben des Führer-Mitglieds muss fuehrer_id leeren");
+        let fuehrer: Option<i64> =
+            sqlx::query_scalar("SELECT fuehrer_id FROM einsatz_einheit WHERE id = ?")
+                .bind(a)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            fuehrer, None,
+            "Freigeben des Führer-Mitglieds muss fuehrer_id leeren"
+        );
     }
 
     #[tokio::test]
@@ -244,11 +413,21 @@ mod tests {
         let (einsatz, a, b) = setup(&pool).await;
         let ep = person(&pool, einsatz, "Chef", Some("fuehrer")).await;
         ordne_personal_zu(&pool, einsatz, a, ep).await.unwrap();
-        sqlx::query("UPDATE einsatz_einheit SET fuehrer_id = ? WHERE id = ?").bind(ep).bind(a).execute(&pool).await.unwrap();
+        sqlx::query("UPDATE einsatz_einheit SET fuehrer_id = ? WHERE id = ?")
+            .bind(ep)
+            .bind(a)
+            .execute(&pool)
+            .await
+            .unwrap();
 
         // Wechsel nach B → A darf keinen dangling Führer behalten.
         ordne_personal_zu(&pool, einsatz, b, ep).await.unwrap();
-        let fuehrer_a: Option<i64> = sqlx::query_scalar("SELECT fuehrer_id FROM einsatz_einheit WHERE id = ?").bind(a).fetch_one(&pool).await.unwrap();
+        let fuehrer_a: Option<i64> =
+            sqlx::query_scalar("SELECT fuehrer_id FROM einsatz_einheit WHERE id = ?")
+                .bind(a)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(fuehrer_a, None);
     }
 
@@ -256,17 +435,31 @@ mod tests {
     async fn fremde_dispozeile_ist_notfound() {
         let pool = crate::db::test_pool().await;
         let (einsatz, a, _b) = setup(&pool).await;
-        let fremd: i64 = sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Fremd') RETURNING id")
-            .fetch_one(&pool).await.unwrap();
+        let fremd: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Fremd') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         let fremder_ep = person(&pool, fremd, "Fremd", None).await;
-        assert!(matches!(ordne_personal_zu(&pool, einsatz, a, fremder_ep).await.unwrap_err(), AppError::NotFound));
+        assert!(matches!(
+            ordne_personal_zu(&pool, einsatz, a, fremder_ep)
+                .await
+                .unwrap_err(),
+            AppError::NotFound
+        ));
     }
 
     #[tokio::test]
     async fn ist_staerke_aggregiert_positionen_fahrzeuge_zaehlen_nicht() {
         let pool = crate::db::test_pool().await;
         let (einsatz, a, _b) = setup(&pool).await;
-        for (name, pos) in [("F", "fuehrer"), ("UF", "unterfuehrer"), ("M1", "mannschaft"), ("M2", "mannschaft")] {
+        for (name, pos) in [
+            ("F", "fuehrer"),
+            ("UF", "unterfuehrer"),
+            ("M1", "mannschaft"),
+            ("M2", "mannschaft"),
+        ] {
             let ep = person(&pool, einsatz, name, Some(pos)).await;
             ordne_personal_zu(&pool, einsatz, a, ep).await.unwrap();
         }
@@ -289,12 +482,29 @@ mod tests {
         let mann = person(&pool, einsatz, "Mann", Some("mannschaft")).await;
         ordne_personal_zu(&pool, einsatz, a, chef).await.unwrap();
         ordne_personal_zu(&pool, einsatz, a, mann).await.unwrap();
-        sqlx::query("UPDATE einsatz_einheit SET fuehrer_id = ? WHERE id = ?").bind(chef).bind(a).execute(&pool).await.unwrap();
+        sqlx::query("UPDATE einsatz_einheit SET fuehrer_id = ? WHERE id = ?")
+            .bind(chef)
+            .bind(a)
+            .execute(&pool)
+            .await
+            .unwrap();
 
         let mitglieder = personal_mitglieder(&pool, a).await.unwrap();
         assert_eq!(mitglieder.len(), 2);
-        assert!(mitglieder.iter().find(|m| m.ep_id == chef).unwrap().ist_fuehrer);
-        assert!(!mitglieder.iter().find(|m| m.ep_id == mann).unwrap().ist_fuehrer);
+        assert!(
+            mitglieder
+                .iter()
+                .find(|m| m.ep_id == chef)
+                .unwrap()
+                .ist_fuehrer
+        );
+        assert!(
+            !mitglieder
+                .iter()
+                .find(|m| m.ep_id == mann)
+                .unwrap()
+                .ist_fuehrer
+        );
     }
 
     #[tokio::test]
@@ -303,9 +513,15 @@ mod tests {
         let (einsatz, a, _b) = setup(&pool).await;
         let ef: i64 = sqlx::query_scalar("INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, 'Florian 1') RETURNING id")
             .bind(einsatz).fetch_one(&pool).await.unwrap();
-        assert_eq!(ordne_fahrzeug_zu(&pool, einsatz, a, ef).await.unwrap(), "Florian 1");
+        assert_eq!(
+            ordne_fahrzeug_zu(&pool, einsatz, a, ef).await.unwrap(),
+            "Florian 1"
+        );
         assert_eq!(fahrzeug_mitglieder(&pool, a).await.unwrap().len(), 1);
-        assert_eq!(gib_fahrzeug_frei(&pool, einsatz, a, ef).await.unwrap(), "Florian 1");
+        assert_eq!(
+            gib_fahrzeug_frei(&pool, einsatz, a, ef).await.unwrap(),
+            "Florian 1"
+        );
         assert!(fahrzeug_mitglieder(&pool, a).await.unwrap().is_empty());
     }
 
@@ -327,7 +543,10 @@ mod tests {
         assert_eq!(material_mitglieder(&pool, b).await.unwrap().len(), 1);
 
         // Freigeben aus falscher Einheit (a) → NotFound.
-        assert!(matches!(gib_material_frei(&pool, einsatz, a, em).await.unwrap_err(), AppError::NotFound));
+        assert!(matches!(
+            gib_material_frei(&pool, einsatz, a, em).await.unwrap_err(),
+            AppError::NotFound
+        ));
         // Freigeben aus b.
         gib_material_frei(&pool, einsatz, b, em).await.unwrap();
         assert!(material_mitglieder(&pool, b).await.unwrap().is_empty());

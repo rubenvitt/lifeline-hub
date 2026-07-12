@@ -133,7 +133,13 @@ mod tests {
 
     #[test]
     fn status_roundtrip() {
-        for s in ["einsatzbereit", "im_einsatz", "defekt", "verbraucht", "desinfektion_noetig"] {
+        for s in [
+            "einsatzbereit",
+            "im_einsatz",
+            "defekt",
+            "verbraucht",
+            "desinfektion_noetig",
+        ] {
             assert_eq!(MaterialStatus::parse(s).unwrap().as_str(), s);
         }
         assert!(MaterialStatus::parse("unsinn").is_none());

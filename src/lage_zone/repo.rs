@@ -65,10 +65,12 @@ fn zu_anzeige(r: Row) -> LageZoneAnzeige {
 
 /// Alle Zonen eines Einsatzes, älteste zuerst.
 pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<LageZoneAnzeige>, AppError> {
-    let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!("{SELECT_ALLE} WHERE einsatz_id = ? ORDER BY id")))
-        .bind(einsatz_id)
-        .fetch_all(pool)
-        .await?;
+    let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_ALLE} WHERE einsatz_id = ? ORDER BY id"
+    )))
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
     Ok(rows.into_iter().map(zu_anzeige).collect())
 }
 
@@ -78,13 +80,15 @@ pub async fn laden(
     einsatz_id: i64,
     id: i64,
 ) -> Result<LageZoneAnzeige, AppError> {
-    sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!("{SELECT_ALLE} WHERE id = ? AND einsatz_id = ?")))
-        .bind(id)
-        .bind(einsatz_id)
-        .fetch_optional(pool)
-        .await?
-        .map(zu_anzeige)
-        .ok_or(AppError::NotFound)
+    sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_ALLE} WHERE id = ? AND einsatz_id = ?"
+    )))
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?
+    .map(zu_anzeige)
+    .ok_or(AppError::NotFound)
 }
 
 /// Legt eine Zone an (Felder bereits validiert). Liefert die Anzeige.

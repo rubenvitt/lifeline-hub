@@ -61,26 +61,30 @@ pub async fn erfassen(
     .bind(erfasst_von)
     .fetch_one(&mut *tx)
     .await?;
-    sqlx::query(
-        "UPDATE einsatz_person SET aktueller_verbleib = ? WHERE id = ? AND einsatz_id = ?",
-    )
-    .bind(kurzform)
-    .bind(person_id)
-    .bind(einsatz_id)
-    .execute(&mut *tx)
-    .await?;
+    sqlx::query("UPDATE einsatz_person SET aktueller_verbleib = ? WHERE id = ? AND einsatz_id = ?")
+        .bind(kurzform)
+        .bind(person_id)
+        .bind(einsatz_id)
+        .execute(&mut *tx)
+        .await?;
     tx.commit().await?;
     laden(pool, einsatz_id, id).await
 }
 
 /// Lädt ein Verbleib-Ereignis; `NotFound`, falls nicht zum Einsatz.
-pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<VerbleibAnzeige, AppError> {
-    sqlx::query_as::<_, VerbleibAnzeige>(sqlx::AssertSqlSafe(format!("{SELECT_VERBLEIB} WHERE id = ? AND einsatz_id = ?")))
-        .bind(id)
-        .bind(einsatz_id)
-        .fetch_optional(pool)
-        .await?
-        .ok_or(AppError::NotFound)
+pub async fn laden(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<VerbleibAnzeige, AppError> {
+    sqlx::query_as::<_, VerbleibAnzeige>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_VERBLEIB} WHERE id = ? AND einsatz_id = ?"
+    )))
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)
 }
 
 /// Verbleib-Verlauf einer Person (neueste zuerst).
@@ -89,14 +93,16 @@ pub async fn liste_je_person(
     einsatz_id: i64,
     person_id: i64,
 ) -> Result<Vec<VerbleibAnzeige>, AppError> {
-    Ok(sqlx::query_as::<_, VerbleibAnzeige>(sqlx::AssertSqlSafe(format!(
-        "{SELECT_VERBLEIB} WHERE einsatz_id = ? AND person_id = ? \
+    Ok(
+        sqlx::query_as::<_, VerbleibAnzeige>(sqlx::AssertSqlSafe(format!(
+            "{SELECT_VERBLEIB} WHERE einsatz_id = ? AND person_id = ? \
          ORDER BY zeitpunkt_at DESC, id DESC"
-    )))
-    .bind(einsatz_id)
-    .bind(person_id)
-    .fetch_all(pool)
-    .await?)
+        )))
+        .bind(einsatz_id)
+        .bind(person_id)
+        .fetch_all(pool)
+        .await?,
+    )
 }
 
 #[cfg(test)]
@@ -107,7 +113,9 @@ mod tests {
 
     async fn setup(pool: &SqlitePool) -> (i64, i64, i64) {
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Test-Orga')")
-            .execute(pool).await.unwrap();
+            .execute(pool)
+            .await
+            .unwrap();
         let b: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, aktiv) \
              VALUES (1, 'A', 'a', 'h', 'keiner', 'keine', 1) RETURNING id")
@@ -118,27 +126,53 @@ mod tests {
             .fetch_one(pool).await.unwrap();
         let p: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
-             VALUES (?, 1, ?, ?) RETURNING id")
-            .bind(e).bind(b).bind(b).fetch_one(pool).await.unwrap();
+             VALUES (?, 1, ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(pool)
+        .await
+        .unwrap();
         (b, e, p)
     }
 
     fn daten<'a>(art: &'a str, ziel: Option<&'a str>) -> VerbleibDaten<'a> {
-        VerbleibDaten { art, transportmittel: None, ziel, status: None, notiz: None }
+        VerbleibDaten {
+            art,
+            transportmittel: None,
+            ziel,
+            status: None,
+            notiz: None,
+        }
     }
 
     #[tokio::test]
     async fn erfassen_ist_append_only_und_cache_spiegelt_juengsten() {
         let pool = test_pool().await;
         let (b, e, p) = setup(&pool).await;
-        erfassen(&pool, e, p, daten("vor_ort", None), "vor Ort", b).await.unwrap();
-        erfassen(&pool, e, p, daten("transport", Some("KH Mitte")), "Transport → KH Mitte", b).await.unwrap();
+        erfassen(&pool, e, p, daten("vor_ort", None), "vor Ort", b)
+            .await
+            .unwrap();
+        erfassen(
+            &pool,
+            e,
+            p,
+            daten("transport", Some("KH Mitte")),
+            "Transport → KH Mitte",
+            b,
+        )
+        .await
+        .unwrap();
         let verlauf = liste_je_person(&pool, e, p).await.unwrap();
         assert_eq!(verlauf.len(), 2, "append-only");
         assert_eq!(verlauf[0].art, VerbleibArt::Transport, "neueste zuerst");
-        let cache: Option<String> = sqlx::query_scalar(
-            "SELECT aktueller_verbleib FROM einsatz_person WHERE id = ?")
-            .bind(p).fetch_one(&pool).await.unwrap();
+        let cache: Option<String> =
+            sqlx::query_scalar("SELECT aktueller_verbleib FROM einsatz_person WHERE id = ?")
+                .bind(p)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(cache.as_deref(), Some("Transport → KH Mitte"));
     }
 }

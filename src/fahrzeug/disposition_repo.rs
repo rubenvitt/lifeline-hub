@@ -68,7 +68,9 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzFahrzeugAnzeige {
 
     let (funkrufname, kennzeichen, fahrzeugtyp, opta, traeger) = if live {
         (
-            row.live_funkrufname.clone().unwrap_or_else(|| row.snap_funkrufname.clone()),
+            row.live_funkrufname
+                .clone()
+                .unwrap_or_else(|| row.snap_funkrufname.clone()),
             row.live_kennzeichen,
             row.live_fahrzeugtyp,
             row.live_opta,
@@ -138,7 +140,10 @@ pub async fn liste(
     .bind(einsatz_id)
     .fetch_all(pool)
     .await?;
-    Ok(rows.into_iter().map(|r| zu_anzeige(r, einsatz_aktiv)).collect())
+    Ok(rows
+        .into_iter()
+        .map(|r| zu_anzeige(r, einsatz_aktiv))
+        .collect())
 }
 
 /// Lädt eine Dispositionszeile (aufgelöst); `NotFound`, falls nicht zum Einsatz.
@@ -170,7 +175,17 @@ pub async fn disponiere_stamm(
     fahrzeug_id: i64,
     disponiert_von: i64,
 ) -> Result<i64, AppError> {
-    let snap = sqlx::query_as::<_, (String, Option<String>, Option<String>, Option<String>, Option<String>, String)>(
+    let snap = sqlx::query_as::<
+        _,
+        (
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            String,
+        ),
+    >(
         "SELECT funkrufname, kennzeichen, fahrzeugtyp, opta, traegerorganisation, dienststatus \
          FROM fahrzeug WHERE id = ? AND org_id = ?",
     )
@@ -298,12 +313,19 @@ pub async fn aktualisiere_position(
             tz_organisation = CASE WHEN ? THEN ? ELSE tz_organisation END \
          WHERE id = ? AND einsatz_id = ?",
     )
-    .bind(daten.lat.is_some()).bind(daten.lat.flatten())
-    .bind(daten.lon.is_some()).bind(daten.lon.flatten())
-    .bind(daten.tz_fachaufgabe.is_some()).bind(daten.tz_fachaufgabe.flatten())
-    .bind(daten.tz_organisation.is_some()).bind(daten.tz_organisation.flatten())
-    .bind(ef_id).bind(einsatz_id)
-    .execute(pool).await?.rows_affected();
+    .bind(daten.lat.is_some())
+    .bind(daten.lat.flatten())
+    .bind(daten.lon.is_some())
+    .bind(daten.lon.flatten())
+    .bind(daten.tz_fachaufgabe.is_some())
+    .bind(daten.tz_fachaufgabe.flatten())
+    .bind(daten.tz_organisation.is_some())
+    .bind(daten.tz_organisation.flatten())
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .execute(pool)
+    .await?
+    .rows_affected();
     if betroffen == 0 {
         return Err(AppError::NotFound);
     }
@@ -352,33 +374,63 @@ mod tests {
     /// Org(1) + Benutzer + Einsatz + ein 'gebunden'-Status; liefert (benutzer, einsatz).
     async fn setup(pool: &SqlitePool) -> (i64, i64) {
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
-            .execute(pool).await.unwrap();
+            .execute(pool)
+            .await
+            .unwrap();
         let benutzer: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
              VALUES (1, 'Leit', 'leit', 'h') RETURNING id",
-        ).fetch_one(pool).await.unwrap();
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         let einsatz: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
-        ).fetch_one(pool).await.unwrap();
-        status_repo::anlegen(pool, 1, StatusDaten {
-            label: "disponiert", kategorie: KATEGORIE_GEBUNDEN, farbe: None, fms_anker: Some(3), sortier: 20,
-        }).await.unwrap();
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        status_repo::anlegen(
+            pool,
+            1,
+            StatusDaten {
+                label: "disponiert",
+                kategorie: KATEGORIE_GEBUNDEN,
+                farbe: None,
+                fms_anker: Some(3),
+                sortier: 20,
+            },
+        )
+        .await
+        .unwrap();
         (benutzer, einsatz)
     }
 
     fn fz_daten(funkrufname: &str) -> FahrzeugDaten<'_> {
         FahrzeugDaten {
-            funkrufname, fahrzeugtyp: Some("LF 20"), traegerorganisation: None,
-            kennzeichen: Some("XX-AB 1"), opta: None, standort: None, fms_issi: None,
-            sondersignal: false, tragenkapazitaet: None, staerke: None, bemerkung: None,
+            funkrufname,
+            fahrzeugtyp: Some("LF 20"),
+            traegerorganisation: None,
+            kennzeichen: Some("XX-AB 1"),
+            opta: None,
+            standort: None,
+            fms_issi: None,
+            sondersignal: false,
+            tragenkapazitaet: None,
+            staerke: None,
+            bemerkung: None,
         }
     }
 
     /// Org + Einsatz + ein disponiertes Stamm-Fahrzeug; liefert (einsatz_id, ef_id).
     async fn seed_fahrzeug(pool: &SqlitePool) -> (i64, i64) {
         let (benutzer, einsatz) = setup(pool).await;
-        let fz = fz_repo::anlegen(pool, 1, fz_daten("Florian 1")).await.unwrap();
-        let ef = disponiere_stamm(pool, einsatz, 1, fz.id, benutzer).await.unwrap();
+        let fz = fz_repo::anlegen(pool, 1, fz_daten("Florian 1"))
+            .await
+            .unwrap();
+        let ef = disponiere_stamm(pool, einsatz, 1, fz.id, benutzer)
+            .await
+            .unwrap();
         (einsatz, ef)
     }
 
@@ -386,13 +438,34 @@ mod tests {
     async fn fahrzeug_position_partial_merge() {
         let pool = crate::db::test_pool().await;
         let (einsatz_id, ef_id) = seed_fahrzeug(&pool).await;
-        aktualisiere_position(&pool, einsatz_id, ef_id, PositionPatch {
-            lat: Some(Some(50.0)), lon: Some(Some(8.0)),
-            tz_fachaufgabe: Some(Some("transport")), tz_organisation: Some(Some("feuerwehr")),
-        }, true).await.unwrap();
-        let a = aktualisiere_position(&pool, einsatz_id, ef_id, PositionPatch {
-            lat: None, lon: None, tz_fachaufgabe: Some(Some("logistik")), tz_organisation: None,
-        }, true).await.unwrap();
+        aktualisiere_position(
+            &pool,
+            einsatz_id,
+            ef_id,
+            PositionPatch {
+                lat: Some(Some(50.0)),
+                lon: Some(Some(8.0)),
+                tz_fachaufgabe: Some(Some("transport")),
+                tz_organisation: Some(Some("feuerwehr")),
+            },
+            true,
+        )
+        .await
+        .unwrap();
+        let a = aktualisiere_position(
+            &pool,
+            einsatz_id,
+            ef_id,
+            PositionPatch {
+                lat: None,
+                lon: None,
+                tz_fachaufgabe: Some(Some("logistik")),
+                tz_organisation: None,
+            },
+            true,
+        )
+        .await
+        .unwrap();
         assert_eq!(a.lat, Some(50.0));
         assert_eq!(a.tz_fachaufgabe.as_deref(), Some("logistik"));
         assert_eq!(a.tz_organisation.as_deref(), Some("feuerwehr"));
@@ -402,9 +475,13 @@ mod tests {
     async fn disponiere_stamm_fuellt_snapshot_und_gebunden_status() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        let fz = fz_repo::anlegen(&pool, 1, fz_daten("Florian 1")).await.unwrap();
+        let fz = fz_repo::anlegen(&pool, 1, fz_daten("Florian 1"))
+            .await
+            .unwrap();
 
-        let ef = disponiere_stamm(&pool, einsatz, 1, fz.id, benutzer).await.unwrap();
+        let ef = disponiere_stamm(&pool, einsatz, 1, fz.id, benutzer)
+            .await
+            .unwrap();
         let a = laden_anzeige(&pool, einsatz, ef, true).await.unwrap();
         assert_eq!(a.funkrufname, "Florian 1");
         assert_eq!(a.kennzeichen.as_deref(), Some("XX-AB 1"));
@@ -416,10 +493,16 @@ mod tests {
     async fn disponiere_stamm_doppelt_ist_conflict() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        let fz = fz_repo::anlegen(&pool, 1, fz_daten("Florian 1")).await.unwrap();
-        disponiere_stamm(&pool, einsatz, 1, fz.id, benutzer).await.unwrap();
+        let fz = fz_repo::anlegen(&pool, 1, fz_daten("Florian 1"))
+            .await
+            .unwrap();
+        disponiere_stamm(&pool, einsatz, 1, fz.id, benutzer)
+            .await
+            .unwrap();
         assert!(matches!(
-            disponiere_stamm(&pool, einsatz, 1, fz.id, benutzer).await.unwrap_err(),
+            disponiere_stamm(&pool, einsatz, 1, fz.id, benutzer)
+                .await
+                .unwrap_err(),
             AppError::Conflict(_)
         ));
     }
@@ -429,13 +512,20 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         sqlx::query("INSERT INTO organisation (id, name) VALUES (2, 'Fremd')")
-            .execute(&pool).await.unwrap();
+            .execute(&pool)
+            .await
+            .unwrap();
         let fremd_fz: i64 = sqlx::query_scalar(
             "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (2, 'Fremd 1') RETURNING id",
-        ).fetch_one(&pool).await.unwrap();
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         // Org-Isolation: Einsatz gehört Org 1, Fahrzeug Org 2.
         assert!(matches!(
-            disponiere_stamm(&pool, einsatz, 1, fremd_fz, benutzer).await.unwrap_err(),
+            disponiere_stamm(&pool, einsatz, 1, fremd_fz, benutzer)
+                .await
+                .unwrap_err(),
             AppError::NotFound
         ));
     }
@@ -444,10 +534,16 @@ mod tests {
     async fn disponiere_stamm_ausser_dienst_ist_validation() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        let fz = fz_repo::anlegen(&pool, 1, fz_daten("Florian 1")).await.unwrap();
-        fz_repo::setze_dienststatus(&pool, 1, fz.id, false).await.unwrap();
+        let fz = fz_repo::anlegen(&pool, 1, fz_daten("Florian 1"))
+            .await
+            .unwrap();
+        fz_repo::setze_dienststatus(&pool, 1, fz.id, false)
+            .await
+            .unwrap();
         assert!(matches!(
-            disponiere_stamm(&pool, einsatz, 1, fz.id, benutzer).await.unwrap_err(),
+            disponiere_stamm(&pool, einsatz, 1, fz.id, benutzer)
+                .await
+                .unwrap_err(),
             AppError::Validation(_)
         ));
     }
@@ -457,10 +553,21 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         for name in ["FW Extern 1", "FW Extern 2"] {
-            disponiere_adhoc(&pool, einsatz, 1, AdhocDaten {
-                funkrufname: name, fahrzeugtyp: None, kennzeichen: None, opta: None,
-                traegerorganisation: Some("Feuerwehr"),
-            }, benutzer).await.unwrap();
+            disponiere_adhoc(
+                &pool,
+                einsatz,
+                1,
+                AdhocDaten {
+                    funkrufname: name,
+                    fahrzeugtyp: None,
+                    kennzeichen: None,
+                    opta: None,
+                    traegerorganisation: Some("Feuerwehr"),
+                },
+                benutzer,
+            )
+            .await
+            .unwrap();
         }
         let liste = liste(&pool, einsatz, true).await.unwrap();
         assert_eq!(liste.len(), 2);
@@ -471,8 +578,12 @@ mod tests {
     async fn snapshot_stabil_live_vs_snapshot() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        let fz = fz_repo::anlegen(&pool, 1, fz_daten("Florian 1")).await.unwrap();
-        let ef = disponiere_stamm(&pool, einsatz, 1, fz.id, benutzer).await.unwrap();
+        let fz = fz_repo::anlegen(&pool, 1, fz_daten("Florian 1"))
+            .await
+            .unwrap();
+        let ef = disponiere_stamm(&pool, einsatz, 1, fz.id, benutzer)
+            .await
+            .unwrap();
 
         // Stamm nachträglich umbenennen.
         let mut neu = fz_daten("Florian 1 NEU");
@@ -488,34 +599,66 @@ mod tests {
         assert_eq!(snap.funkrufname, "Florian 1");
 
         // Stamm außer Dienst → auch bei aktivem Einsatz Snapshot.
-        fz_repo::setze_dienststatus(&pool, 1, fz.id, false).await.unwrap();
+        fz_repo::setze_dienststatus(&pool, 1, fz.id, false)
+            .await
+            .unwrap();
         let nach_ad = laden_anzeige(&pool, einsatz, ef, true).await.unwrap();
-        assert_eq!(nach_ad.funkrufname, "Florian 1", "außer Dienst → Snapshot trotz aktivem Einsatz");
+        assert_eq!(
+            nach_ad.funkrufname, "Florian 1",
+            "außer Dienst → Snapshot trotz aktivem Einsatz"
+        );
     }
 
     #[tokio::test]
     async fn aktualisiere_status_und_bemerkung_dann_entferne() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        let fz = fz_repo::anlegen(&pool, 1, fz_daten("Florian 1")).await.unwrap();
-        let ef = disponiere_stamm(&pool, einsatz, 1, fz.id, benutzer).await.unwrap();
-        let neuer_status = status_repo::anlegen(&pool, 1, StatusDaten {
-            label: "vor_ort", kategorie: KATEGORIE_GEBUNDEN, farbe: None, fms_anker: Some(4), sortier: 40,
-        }).await.unwrap();
+        let fz = fz_repo::anlegen(&pool, 1, fz_daten("Florian 1"))
+            .await
+            .unwrap();
+        let ef = disponiere_stamm(&pool, einsatz, 1, fz.id, benutzer)
+            .await
+            .unwrap();
+        let neuer_status = status_repo::anlegen(
+            &pool,
+            1,
+            StatusDaten {
+                label: "vor_ort",
+                kategorie: KATEGORIE_GEBUNDEN,
+                farbe: None,
+                fms_anker: Some(4),
+                sortier: 40,
+            },
+        )
+        .await
+        .unwrap();
 
-        aktualisiere(&pool, einsatz, ef, Some(neuer_status.id), Some("am Einsatzort")).await.unwrap();
+        aktualisiere(
+            &pool,
+            einsatz,
+            ef,
+            Some(neuer_status.id),
+            Some("am Einsatzort"),
+        )
+        .await
+        .unwrap();
         let a = laden_anzeige(&pool, einsatz, ef, true).await.unwrap();
         assert_eq!(a.status_id, Some(neuer_status.id));
         assert_eq!(a.bemerkung.as_deref(), Some("am Einsatzort"));
 
         // Nur Bemerkung ändern (status_id None → bleibt).
-        aktualisiere(&pool, einsatz, ef, None, Some("korrigiert")).await.unwrap();
+        aktualisiere(&pool, einsatz, ef, None, Some("korrigiert"))
+            .await
+            .unwrap();
         let b = laden_anzeige(&pool, einsatz, ef, true).await.unwrap();
         assert_eq!(b.status_id, Some(neuer_status.id), "Status unverändert");
         assert_eq!(b.bemerkung.as_deref(), Some("korrigiert"));
 
         entferne(&pool, einsatz, ef).await.unwrap();
-        assert!(matches!(laden_anzeige(&pool, einsatz, ef, true).await.unwrap_err(), AppError::NotFound));
+        assert!(matches!(
+            laden_anzeige(&pool, einsatz, ef, true).await.unwrap_err(),
+            AppError::NotFound
+        ));
     }
 
     /// LFH-9: Soll-Besatzung = Live-Join der Stamm-`staerke_*`. Nur Stamm-Fahrzeuge mit
@@ -529,18 +672,39 @@ mod tests {
         let mut daten = fz_daten("Florian 1");
         daten.staerke = Some(Staerke::neu(0, 1, 8));
         let fz = fz_repo::anlegen(&pool, 1, daten).await.unwrap();
-        let ef = disponiere_stamm(&pool, einsatz, 1, fz.id, benutzer).await.unwrap();
+        let ef = disponiere_stamm(&pool, einsatz, 1, fz.id, benutzer)
+            .await
+            .unwrap();
         assert_eq!(
-            laden_anzeige(&pool, einsatz, ef, true).await.unwrap().soll_besatzung,
+            laden_anzeige(&pool, einsatz, ef, true)
+                .await
+                .unwrap()
+                .soll_besatzung,
             Some(Staerke::neu(0, 1, 8)),
         );
 
-        let adhoc = disponiere_adhoc(&pool, einsatz, 1, AdhocDaten {
-            funkrufname: "Extern 1", fahrzeugtyp: None, kennzeichen: None, opta: None, traegerorganisation: None,
-        }, benutzer).await.unwrap();
+        let adhoc = disponiere_adhoc(
+            &pool,
+            einsatz,
+            1,
+            AdhocDaten {
+                funkrufname: "Extern 1",
+                fahrzeugtyp: None,
+                kennzeichen: None,
+                opta: None,
+                traegerorganisation: None,
+            },
+            benutzer,
+        )
+        .await
+        .unwrap();
         assert_eq!(
-            laden_anzeige(&pool, einsatz, adhoc, true).await.unwrap().soll_besatzung,
-            None, "Ad-hoc-Fahrzeug hat keine Soll-Besatzung",
+            laden_anzeige(&pool, einsatz, adhoc, true)
+                .await
+                .unwrap()
+                .soll_besatzung,
+            None,
+            "Ad-hoc-Fahrzeug hat keine Soll-Besatzung",
         );
     }
 
@@ -558,9 +722,16 @@ mod tests {
         entferne(&pool, einsatz, ef).await.unwrap();
 
         // Fahrzeug weg, Person bleibt als freie Kraft (fahrzeug_id NULL).
-        assert!(matches!(laden_anzeige(&pool, einsatz, ef, true).await.unwrap_err(), AppError::NotFound));
-        let fahrzeug_id: Option<i64> = sqlx::query_scalar("SELECT fahrzeug_id FROM einsatz_personal WHERE id = ?")
-            .bind(ep).fetch_one(&pool).await.unwrap();
+        assert!(matches!(
+            laden_anzeige(&pool, einsatz, ef, true).await.unwrap_err(),
+            AppError::NotFound
+        ));
+        let fahrzeug_id: Option<i64> =
+            sqlx::query_scalar("SELECT fahrzeug_id FROM einsatz_personal WHERE id = ?")
+                .bind(ep)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(fahrzeug_id, None, "Besatzung wird frei, nicht gelöscht");
     }
 }

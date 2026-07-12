@@ -108,7 +108,10 @@ mod tests {
         )
         .execute(&pool)
         .await;
-        assert!(bad_rolle.is_err(), "ungültige system_rolle muss abgelehnt werden");
+        assert!(
+            bad_rolle.is_err(),
+            "ungültige system_rolle muss abgelehnt werden"
+        );
 
         // UNIQUE-Constraint lehnt doppelten Benutzernamen ab.
         let dup = sqlx::query(
@@ -144,10 +147,14 @@ mod tests {
         assert_eq!(org_rolle, "keine");
 
         // org_rolle-CHECK lehnt ungültigen Wert ab.
-        let bad_org = sqlx::query("UPDATE benutzer SET org_rolle = 'chef' WHERE benutzername = 'leit'")
-            .execute(&pool)
-            .await;
-        assert!(bad_org.is_err(), "ungültige org_rolle muss abgelehnt werden");
+        let bad_org =
+            sqlx::query("UPDATE benutzer SET org_rolle = 'chef' WHERE benutzername = 'leit'")
+                .execute(&pool)
+                .await;
+        assert!(
+            bad_org.is_err(),
+            "ungültige org_rolle muss abgelehnt werden"
+        );
 
         // Einsatz anlegen: status-Default ist 'aktiv'.
         let einsatz_id: i64 = sqlx::query_scalar(
@@ -156,12 +163,11 @@ mod tests {
         .fetch_one(&pool)
         .await
         .unwrap();
-        let status: String =
-            sqlx::query_scalar("SELECT status FROM einsatz WHERE id = ?")
-                .bind(einsatz_id)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let status: String = sqlx::query_scalar("SELECT status FROM einsatz WHERE id = ?")
+            .bind(einsatz_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(status, "aktiv");
 
         // status-CHECK lehnt ungültigen Wert ab.
@@ -169,7 +175,10 @@ mod tests {
             .bind(einsatz_id)
             .execute(&pool)
             .await;
-        assert!(bad_status.is_err(), "ungültiger status muss abgelehnt werden");
+        assert!(
+            bad_status.is_err(),
+            "ungültiger status muss abgelehnt werden"
+        );
 
         // Mitgliedschaft anlegen + einsatz_rolle-CHECK.
         let benutzer_id: i64 =
@@ -195,7 +204,10 @@ mod tests {
         .bind(benutzer_id)
         .execute(&pool)
         .await;
-        assert!(bad_rolle.is_err(), "ungültige einsatz_rolle muss abgelehnt werden");
+        assert!(
+            bad_rolle.is_err(),
+            "ungültige einsatz_rolle muss abgelehnt werden"
+        );
 
         // PK (einsatz_id, benutzer_id) verhindert Doppel-Mitgliedschaft.
         let dup = sqlx::query(
@@ -206,7 +218,10 @@ mod tests {
         .bind(benutzer_id)
         .execute(&pool)
         .await;
-        assert!(dup.is_err(), "doppelte Mitgliedschaft muss abgelehnt werden");
+        assert!(
+            dup.is_err(),
+            "doppelte Mitgliedschaft muss abgelehnt werden"
+        );
     }
 
     #[tokio::test]
@@ -234,7 +249,10 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(art, "realeinsatz");
-        assert_eq!(angelegt, "", "neue Zeile: angelegt_at = '' bis repo::anlegen es setzt");
+        assert_eq!(
+            angelegt, "",
+            "neue Zeile: angelegt_at = '' bis repo::anlegen es setzt"
+        );
 
         // einsatzart-CHECK lehnt ungültigen Wert ab.
         let bad = sqlx::query("UPDATE einsatz SET einsatzart = 'quatsch' WHERE id = ?")
@@ -258,7 +276,10 @@ mod tests {
         let dup = sqlx::query("INSERT INTO einsatz (org_id, bezeichnung, einsatznummer_intern) VALUES (1, 'C', '2026-001')")
             .execute(&pool)
             .await;
-        assert!(dup.is_err(), "doppelte Einsatznummer je Org muss abgelehnt werden");
+        assert!(
+            dup.is_err(),
+            "doppelte Einsatznummer je Org muss abgelehnt werden"
+        );
     }
 
     #[tokio::test]
@@ -374,7 +395,10 @@ mod tests {
         .fetch_one(&pool)
         .await
         .unwrap();
-        assert_eq!(treffer, 0, "FTS-Index muss nach Cascade-Delete bereinigt sein");
+        assert_eq!(
+            treffer, 0,
+            "FTS-Index muss nach Cascade-Delete bereinigt sein"
+        );
     }
 
     #[tokio::test]
@@ -391,10 +415,14 @@ mod tests {
             .unwrap();
 
         // UNIQUE(org_id, text): Dublette je Org abgelehnt.
-        let dup = sqlx::query("INSERT INTO einsatz_stichwort_vorschlag (org_id, text) VALUES (1, 'H1')")
-            .execute(&pool)
-            .await;
-        assert!(dup.is_err(), "doppeltes Stichwort je Org muss abgelehnt werden");
+        let dup =
+            sqlx::query("INSERT INTO einsatz_stichwort_vorschlag (org_id, text) VALUES (1, 'H1')")
+                .execute(&pool)
+                .await;
+        assert!(
+            dup.is_err(),
+            "doppeltes Stichwort je Org muss abgelehnt werden"
+        );
 
         // sortier-Default ist 0.
         let sortier: i64 =
@@ -434,13 +462,19 @@ mod tests {
             .bind(id)
             .execute(&pool)
             .await;
-        assert!(bad.is_err(), "ungültiger dienststatus muss abgelehnt werden");
+        assert!(
+            bad.is_err(),
+            "ungültiger dienststatus muss abgelehnt werden"
+        );
 
         // Partieller Unique-Index: doppelter Funkrufname unter aktiven verboten.
         let dup = sqlx::query("INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Florian 1')")
             .execute(&pool)
             .await;
-        assert!(dup.is_err(), "doppelter aktiver Funkrufname je Org muss abgelehnt werden");
+        assert!(
+            dup.is_err(),
+            "doppelter aktiver Funkrufname je Org muss abgelehnt werden"
+        );
 
         // Außer Dienst gestellt → Name wieder frei.
         sqlx::query("UPDATE fahrzeug SET dienststatus = 'ausser_dienst' WHERE id = ?")
@@ -448,10 +482,14 @@ mod tests {
             .execute(&pool)
             .await
             .unwrap();
-        let wieder = sqlx::query("INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Florian 1')")
-            .execute(&pool)
-            .await;
-        assert!(wieder.is_ok(), "Name eines außer Dienst gestellten Fahrzeugs muss frei sein");
+        let wieder =
+            sqlx::query("INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Florian 1')")
+                .execute(&pool)
+                .await;
+        assert!(
+            wieder.is_ok(),
+            "Name eines außer Dienst gestellten Fahrzeugs muss frei sein"
+        );
     }
 
     #[tokio::test]
@@ -470,7 +508,10 @@ mod tests {
         )
         .execute(&pool)
         .await;
-        assert!(bad_kat.is_err(), "ungültige kategorie muss abgelehnt werden");
+        assert!(
+            bad_kat.is_err(),
+            "ungültige kategorie muss abgelehnt werden"
+        );
 
         // fms_anker-CHECK (0..=9).
         let bad_fms = sqlx::query(
@@ -478,26 +519,30 @@ mod tests {
         )
         .execute(&pool)
         .await;
-        assert!(bad_fms.is_err(), "fms_anker außerhalb 0..=9 muss abgelehnt werden");
+        assert!(
+            bad_fms.is_err(),
+            "fms_anker außerhalb 0..=9 muss abgelehnt werden"
+        );
 
         // aktiv-Default ist 1, sortier-Default 0.
         sqlx::query("INSERT INTO fahrzeug_status (org_id, label, kategorie) VALUES (1, 'frei', 'verfuegbar')")
             .execute(&pool)
             .await
             .unwrap();
-        let (aktiv, sortier): (i64, i64) = sqlx::query_as(
-            "SELECT aktiv, sortier FROM fahrzeug_status WHERE label = 'frei'",
-        )
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+        let (aktiv, sortier): (i64, i64) =
+            sqlx::query_as("SELECT aktiv, sortier FROM fahrzeug_status WHERE label = 'frei'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(aktiv, 1);
         assert_eq!(sortier, 0);
 
         // UNIQUE(org_id, label).
-        let dup = sqlx::query("INSERT INTO fahrzeug_status (org_id, label, kategorie) VALUES (1, 'frei', 'gebunden')")
-            .execute(&pool)
-            .await;
+        let dup = sqlx::query(
+            "INSERT INTO fahrzeug_status (org_id, label, kategorie) VALUES (1, 'frei', 'gebunden')",
+        )
+        .execute(&pool)
+        .await;
         assert!(dup.is_err(), "doppeltes label je Org muss abgelehnt werden");
     }
 
@@ -541,19 +586,26 @@ mod tests {
         .bind(fz)
         .execute(&pool)
         .await;
-        assert!(dup.is_err(), "dasselbe Stamm-Fahrzeug doppelt im Einsatz muss abgelehnt werden");
+        assert!(
+            dup.is_err(),
+            "dasselbe Stamm-Fahrzeug doppelt im Einsatz muss abgelehnt werden"
+        );
 
         // Mehrere Ad-hoc (fahrzeug_id NULL) erlaubt — NULL ist in SQLite-UNIQUE verschieden.
-        sqlx::query("INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, 'FW Extern 1')")
-            .bind(einsatz)
-            .execute(&pool)
-            .await
-            .unwrap();
-        sqlx::query("INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, 'FW Extern 2')")
-            .bind(einsatz)
-            .execute(&pool)
-            .await
-            .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, 'FW Extern 1')",
+        )
+        .bind(einsatz)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, 'FW Extern 2')",
+        )
+        .bind(einsatz)
+        .execute(&pool)
+        .await
+        .unwrap();
         let anzahl: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_fahrzeug WHERE einsatz_id = ?")
                 .bind(einsatz)
@@ -579,28 +631,46 @@ mod tests {
     async fn einsatzabschnitt_migration_legt_tabelle_und_cascade_an() {
         let pool = test_pool().await;
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
-            .execute(&pool).await.unwrap();
+            .execute(&pool)
+            .await
+            .unwrap();
         let einsatz: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
-        ).fetch_one(&pool).await.unwrap();
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
 
         // Oberste Ebene + Unterabschnitt.
         let oben: i64 = sqlx::query_scalar(
             "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, 'Nord') RETURNING id",
-        ).bind(einsatz).fetch_one(&pool).await.unwrap();
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         sqlx::query("INSERT INTO einsatzabschnitt (einsatz_id, ueber_abschnitt_id, name) VALUES (?, ?, 'Nord-1')")
             .bind(einsatz).bind(oben).execute(&pool).await.unwrap();
 
         // sortier-Default 0, angelegt_at gesetzt.
-        let (sortier, angelegt): (i64, String) = sqlx::query_as(
-            "SELECT sortier, angelegt_at FROM einsatzabschnitt WHERE name = 'Nord'",
-        ).fetch_one(&pool).await.unwrap();
+        let (sortier, angelegt): (i64, String) =
+            sqlx::query_as("SELECT sortier, angelegt_at FROM einsatzabschnitt WHERE name = 'Nord'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(sortier, 0);
         assert!(!angelegt.is_empty());
 
         // CASCADE: Einsatz löschen entfernt die Abschnitte.
-        sqlx::query("DELETE FROM einsatz WHERE id = ?").bind(einsatz).execute(&pool).await.unwrap();
-        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatzabschnitt").fetch_one(&pool).await.unwrap();
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(einsatz)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatzabschnitt")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(rest, 0, "CASCADE muss Abschnitte entfernen");
     }
 
@@ -609,22 +679,33 @@ mod tests {
         let pool = test_pool().await;
         // Org NACH der Migration → Migrations-Seed greift NICHT (bootstrap seedet neue Orgs).
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
-            .execute(&pool).await.unwrap();
+            .execute(&pool)
+            .await
+            .unwrap();
 
         // Soll vollständig.
         sqlx::query("INSERT INTO einheit_typ (org_id, label, soll_fuehrer, soll_unterfuehrer, soll_mannschaft) VALUES (1, 'Zug', 1, 3, 18)")
             .execute(&pool).await.unwrap();
         // Soll komplett NULL (z. B. Sonstige).
         sqlx::query("INSERT INTO einheit_typ (org_id, label) VALUES (1, 'Sonstige')")
-            .execute(&pool).await.unwrap();
-        let (aktiv, sortier): (i64, i64) = sqlx::query_as(
-            "SELECT aktiv, sortier FROM einheit_typ WHERE label = 'Sonstige'",
-        ).fetch_one(&pool).await.unwrap();
-        assert_eq!((aktiv, sortier), (1, 0), "aktiv-Default 1, sortier-Default 0");
+            .execute(&pool)
+            .await
+            .unwrap();
+        let (aktiv, sortier): (i64, i64) =
+            sqlx::query_as("SELECT aktiv, sortier FROM einheit_typ WHERE label = 'Sonstige'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            (aktiv, sortier),
+            (1, 0),
+            "aktiv-Default 1, sortier-Default 0"
+        );
 
         // UNIQUE(org_id, label).
         let dup = sqlx::query("INSERT INTO einheit_typ (org_id, label) VALUES (1, 'Zug')")
-            .execute(&pool).await;
+            .execute(&pool)
+            .await;
         assert!(dup.is_err(), "doppeltes label je Org muss abgelehnt werden");
     }
 
@@ -632,16 +713,28 @@ mod tests {
     async fn einsatz_einheit_migration_referenzen_und_cascade() {
         let pool = test_pool().await;
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
-            .execute(&pool).await.unwrap();
+            .execute(&pool)
+            .await
+            .unwrap();
         let einsatz: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
-        ).fetch_one(&pool).await.unwrap();
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         let typ: i64 = sqlx::query_scalar(
             "INSERT INTO einheit_typ (org_id, label) VALUES (1, 'Zug') RETURNING id",
-        ).fetch_one(&pool).await.unwrap();
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         let abschnitt: i64 = sqlx::query_scalar(
             "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, 'Nord') RETURNING id",
-        ).bind(einsatz).fetch_one(&pool).await.unwrap();
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
 
         // Einheit mit beiden Referenzen + Selbstreferenz (Unter-Einheit).
         let zug: i64 = sqlx::query_scalar(
@@ -652,13 +745,23 @@ mod tests {
 
         let (sortier, angelegt): (i64, String) = sqlx::query_as(
             "SELECT sortier, angelegt_at FROM einsatz_einheit WHERE name = '1. Zug'",
-        ).fetch_one(&pool).await.unwrap();
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         assert_eq!(sortier, 0);
         assert!(!angelegt.is_empty());
 
         // CASCADE über Einsatz.
-        sqlx::query("DELETE FROM einsatz WHERE id = ?").bind(einsatz).execute(&pool).await.unwrap();
-        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_einheit").fetch_one(&pool).await.unwrap();
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(einsatz)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_einheit")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(rest, 0, "CASCADE muss Einheiten entfernen");
     }
 
@@ -666,36 +769,59 @@ mod tests {
     async fn einheit_mitgliedschaft_migration_fk_spalte_default_null() {
         let pool = test_pool().await;
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
-            .execute(&pool).await.unwrap();
+            .execute(&pool)
+            .await
+            .unwrap();
         let einsatz: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
-        ).fetch_one(&pool).await.unwrap();
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
 
         // Neue Dispozeile: einheit_id ist standardmäßig NULL (freie Kraft).
         let ep: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Extern') RETURNING id",
         ).bind(einsatz).fetch_one(&pool).await.unwrap();
-        let einheit_id: Option<i64> = sqlx::query_scalar(
-            "SELECT einheit_id FROM einsatz_personal WHERE id = ?",
-        ).bind(ep).fetch_one(&pool).await.unwrap();
+        let einheit_id: Option<i64> =
+            sqlx::query_scalar("SELECT einheit_id FROM einsatz_personal WHERE id = ?")
+                .bind(ep)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(einheit_id, None);
 
         // Zuordnen auf eine Einheit funktioniert.
         let einheit: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Trupp') RETURNING id",
-        ).bind(einsatz).fetch_one(&pool).await.unwrap();
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         sqlx::query("UPDATE einsatz_personal SET einheit_id = ? WHERE id = ?")
-            .bind(einheit).bind(ep).execute(&pool).await.unwrap();
+            .bind(einheit)
+            .bind(ep)
+            .execute(&pool)
+            .await
+            .unwrap();
 
         // Auch an einsatz_fahrzeug existiert die Spalte.
         let ef: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, 'Florian 1') RETURNING id",
         ).bind(einsatz).fetch_one(&pool).await.unwrap();
         sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = ? WHERE id = ?")
-            .bind(einheit).bind(ef).execute(&pool).await.unwrap();
-        let zuordnung: Option<i64> = sqlx::query_scalar(
-            "SELECT einheit_id FROM einsatz_fahrzeug WHERE id = ?",
-        ).bind(ef).fetch_one(&pool).await.unwrap();
+            .bind(einheit)
+            .bind(ef)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let zuordnung: Option<i64> =
+            sqlx::query_scalar("SELECT einheit_id FROM einsatz_fahrzeug WHERE id = ?")
+                .bind(ef)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(zuordnung, Some(einheit));
     }
 
@@ -703,9 +829,18 @@ mod tests {
     async fn migration_0010_bis_0013_legen_personal_schema_an() {
         let pool = test_pool().await;
         // Tabellen existieren (leeres SELECT wirft nicht).
-        for tabelle in ["personal", "qualifikation", "personal_qualifikation", "personal_status", "einsatz_personal"] {
+        for tabelle in [
+            "personal",
+            "qualifikation",
+            "personal_qualifikation",
+            "personal_status",
+            "einsatz_personal",
+        ] {
             let sql = format!("SELECT COUNT(*) FROM {tabelle}");
-            let n: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(&*sql)).fetch_one(&pool).await.unwrap();
+            let n: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(&*sql))
+                .fetch_one(&pool)
+                .await
+                .unwrap();
             assert_eq!(n, 0, "{tabelle} startet leer (keine Org auf test_pool)");
         }
     }
@@ -716,13 +851,26 @@ mod tests {
         // Org NACH den Migrationen anlegen → Seed greift NICHT (CROSS JOIN lief auf leerer
         // Org-Menge). Wir prüfen daher den Seed über bootstrap in Task 9; hier nur, dass
         // ein manuell geseedeter Eintrag einfügbar ist (Schema/CHECK korrekt).
-        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')").execute(&pool).await.unwrap();
-        sqlx::query("INSERT INTO qualifikation (org_id, label, sortier) VALUES (1, 'Sanitäter', 10)")
-            .execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO qualifikation (org_id, label, sortier) VALUES (1, 'Sanitäter', 10)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
         sqlx::query("INSERT INTO personal_status (org_id, label, kategorie, sortier) VALUES (1, 'verfügbar', 'verfuegbar', 10)")
             .execute(&pool).await.unwrap();
-        let q: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM qualifikation WHERE org_id = 1").fetch_one(&pool).await.unwrap();
-        let s: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM personal_status WHERE org_id = 1").fetch_one(&pool).await.unwrap();
+        let q: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM qualifikation WHERE org_id = 1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let s: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM personal_status WHERE org_id = 1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!((q, s), (1, 1));
     }
 
@@ -742,10 +890,15 @@ mod tests {
         .fetch_one(&pool)
         .await
         .unwrap();
-        let dup = sqlx::query("INSERT INTO personal (org_id, name, personalnummer) VALUES (1, 'Bert', 'P-100')")
-            .execute(&pool)
-            .await;
-        assert!(dup.is_err(), "doppelte aktive Personalnummer je Org muss abgelehnt werden");
+        let dup = sqlx::query(
+            "INSERT INTO personal (org_id, name, personalnummer) VALUES (1, 'Bert', 'P-100')",
+        )
+        .execute(&pool)
+        .await;
+        assert!(
+            dup.is_err(),
+            "doppelte aktive Personalnummer je Org muss abgelehnt werden"
+        );
 
         // Außer Dienst gestellt → Nummer wieder frei.
         sqlx::query("UPDATE personal SET dienststatus = 'ausser_dienst' WHERE id = ?")
@@ -753,10 +906,15 @@ mod tests {
             .execute(&pool)
             .await
             .unwrap();
-        let wieder = sqlx::query("INSERT INTO personal (org_id, name, personalnummer) VALUES (1, 'Cara', 'P-100')")
-            .execute(&pool)
-            .await;
-        assert!(wieder.is_ok(), "Nummer einer außer Dienst gestellten Person muss frei sein");
+        let wieder = sqlx::query(
+            "INSERT INTO personal (org_id, name, personalnummer) VALUES (1, 'Cara', 'P-100')",
+        )
+        .execute(&pool)
+        .await;
+        assert!(
+            wieder.is_ok(),
+            "Nummer einer außer Dienst gestellten Person muss frei sein"
+        );
 
         // Einsatz als Voraussetzung für einsatz_personal.
         let einsatz: i64 = sqlx::query_scalar(
@@ -790,7 +948,10 @@ mod tests {
         .bind(person)
         .execute(&pool)
         .await;
-        assert!(dup.is_err(), "dieselbe Stamm-Person doppelt im Einsatz muss abgelehnt werden");
+        assert!(
+            dup.is_err(),
+            "dieselbe Stamm-Person doppelt im Einsatz muss abgelehnt werden"
+        );
 
         // Mehrere Ad-hoc (personal_id NULL) erlaubt — NULL ist in SQLite-UNIQUE verschieden.
         sqlx::query("INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Extern 1')")
@@ -830,18 +991,30 @@ mod tests {
 
         // Setup: Org, Benutzer, Einsatz, eine Person (als Halter-FK-Ziel).
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
-            .execute(&pool).await.unwrap();
+            .execute(&pool)
+            .await
+            .unwrap();
         sqlx::query(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
              VALUES (1, 'Leit', 'leit', 'h')",
-        ).execute(&pool).await.unwrap();
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
         let einsatz_id: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
-        ).fetch_one(&pool).await.unwrap();
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         let person_id: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
              VALUES (?, 1, 1, 1) RETURNING id",
-        ).bind(einsatz_id).fetch_one(&pool).await.unwrap();
+        )
+        .bind(einsatz_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
 
         // Gültiges Tier (Status-Default 'aktiv', spezies gesetzt).
         let tier_id: i64 = sqlx::query_scalar(
@@ -849,7 +1022,10 @@ mod tests {
              VALUES (?, 1, 'hund', 1, 1) RETURNING id",
         ).bind(einsatz_id).fetch_one(&pool).await.unwrap();
         let status: String = sqlx::query_scalar("SELECT status FROM einsatz_tier WHERE id = ?")
-            .bind(tier_id).fetch_one(&pool).await.unwrap();
+            .bind(tier_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(status, "aktiv", "Status-Default ist aktiv");
 
         // spezies-CHECK lehnt ungültigen Wert ab.
@@ -857,12 +1033,20 @@ mod tests {
             "INSERT INTO einsatz_tier (einsatz_id, registrier_nr, spezies, erfasst_von, geaendert_von) \
              VALUES (?, 2, 'dinosaurier', 1, 1)",
         ).bind(einsatz_id).execute(&pool).await;
-        assert!(bad_spezies.is_err(), "ungültige spezies muss abgelehnt werden");
+        assert!(
+            bad_spezies.is_err(),
+            "ungültige spezies muss abgelehnt werden"
+        );
 
         // status-CHECK lehnt ungültigen Wert ab.
         let bad_status = sqlx::query("UPDATE einsatz_tier SET status = 'gestohlen' WHERE id = ?")
-            .bind(tier_id).execute(&pool).await;
-        assert!(bad_status.is_err(), "ungültiger status muss abgelehnt werden");
+            .bind(tier_id)
+            .execute(&pool)
+            .await;
+        assert!(
+            bad_status.is_err(),
+            "ungültiger status muss abgelehnt werden"
+        );
 
         // Halter-XOR-CHECK: beide gesetzt → Insert-Fehler.
         let bad_halter = sqlx::query(
@@ -870,13 +1054,21 @@ mod tests {
                 (einsatz_id, registrier_nr, spezies, halter_person_id, halter_kontakt, erfasst_von, geaendert_von) \
              VALUES (?, 3, 'katze', ?, 'Frau Müller', 1, 1)",
         ).bind(einsatz_id).bind(person_id).execute(&pool).await;
-        assert!(bad_halter.is_err(), "halter_person_id UND halter_kontakt gleichzeitig muss abgelehnt werden");
+        assert!(
+            bad_halter.is_err(),
+            "halter_person_id UND halter_kontakt gleichzeitig muss abgelehnt werden"
+        );
 
         // Abschluss-CHECK: status='abgeschlossen' ohne abschluss_grund → Fehler.
-        let bad_abschluss = sqlx::query(
-            "UPDATE einsatz_tier SET status = 'abgeschlossen' WHERE id = ?",
-        ).bind(tier_id).execute(&pool).await;
-        assert!(bad_abschluss.is_err(), "abgeschlossen ohne abschluss_grund muss abgelehnt werden");
+        let bad_abschluss =
+            sqlx::query("UPDATE einsatz_tier SET status = 'abgeschlossen' WHERE id = ?")
+                .bind(tier_id)
+                .execute(&pool)
+                .await;
+        assert!(
+            bad_abschluss.is_err(),
+            "abgeschlossen ohne abschluss_grund muss abgelehnt werden"
+        );
 
         // Mit abschluss_grund erlaubt.
         sqlx::query(
@@ -888,7 +1080,10 @@ mod tests {
             "INSERT INTO einsatz_tier (einsatz_id, registrier_nr, spezies, erfasst_von, geaendert_von) \
              VALUES (?, 1, 'hund', 1, 1)",
         ).bind(einsatz_id).execute(&pool).await;
-        assert!(dup.is_err(), "doppelte registrier_nr je Einsatz muss abgelehnt werden");
+        assert!(
+            dup.is_err(),
+            "doppelte registrier_nr je Einsatz muss abgelehnt werden"
+        );
     }
 
     // --- E-5 Schaden: Constraints ---
@@ -898,21 +1093,33 @@ mod tests {
     /// einsatz.org_id NOT NULL, KEIN erstellt_von.
     async fn schaden_setup(pool: &sqlx::SqlitePool) -> (i64, i64) {
         sqlx::query("INSERT INTO organisation (name) VALUES ('O')")
-            .execute(pool).await.unwrap();
+            .execute(pool)
+            .await
+            .unwrap();
         let benutzer_id: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, \
                 system_rolle, org_rolle) \
-             VALUES (1, 'A', 'a', 'x', 'keiner', 'keine') RETURNING id")
-            .fetch_one(pool).await.unwrap();
+             VALUES (1, 'A', 'a', 'x', 'keiner', 'keine') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         let einsatz_id: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung, status) \
-             VALUES (1, 'L', 'aktiv') RETURNING id")
-            .fetch_one(pool).await.unwrap();
+             VALUES (1, 'L', 'aktiv') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         (benutzer_id, einsatz_id)
     }
 
     async fn schaden_insert_min(
-        pool: &sqlx::SqlitePool, einsatz_id: i64, benutzer_id: i64, extra_spalten: &str, extra_werte: &str,
+        pool: &sqlx::SqlitePool,
+        einsatz_id: i64,
+        benutzer_id: i64,
+        extra_spalten: &str,
+        extra_werte: &str,
     ) -> Result<sqlx::sqlite::SqliteQueryResult, sqlx::Error> {
         let sql = format!(
             "INSERT INTO einsatz_schaden \
@@ -926,7 +1133,9 @@ mod tests {
     async fn schaden_minimal_insert_ok() {
         let pool = test_pool().await;
         let (b, e) = schaden_setup(&pool).await;
-        schaden_insert_min(&pool, e, b, "", "").await.expect("Minimal-Insert muss gehen");
+        schaden_insert_min(&pool, e, b, "", "")
+            .await
+            .expect("Minimal-Insert muss gehen");
     }
 
     #[tokio::test]
@@ -938,9 +1147,17 @@ mod tests {
              VALUES (?, 1, 'betroffen', ?, ?) RETURNING id")
             .bind(e).bind(b).bind(b).fetch_one(&pool).await.unwrap();
         let res = schaden_insert_min(
-            &pool, e, b, ", geschaedigt_person_id, geschaedigt_kontakt",
-            &format!(", {p}, 'Herr Meier'")).await;
-        assert!(res.is_err(), "FK UND Freitext gleichzeitig muss vom CHECK abgelehnt werden");
+            &pool,
+            e,
+            b,
+            ", geschaedigt_person_id, geschaedigt_kontakt",
+            &format!(", {p}, 'Herr Meier'"),
+        )
+        .await;
+        assert!(
+            res.is_err(),
+            "FK UND Freitext gleichzeitig muss vom CHECK abgelehnt werden"
+        );
     }
 
     #[tokio::test]
@@ -948,7 +1165,10 @@ mod tests {
         let pool = test_pool().await;
         let (b, e) = schaden_setup(&pool).await;
         let res = schaden_insert_min(&pool, e, b, ", status", ", 'uebergeben'").await;
-        assert!(res.is_err(), "status='uebergeben' ohne uebergeben_an muss CHECK verletzen");
+        assert!(
+            res.is_err(),
+            "status='uebergeben' ohne uebergeben_an muss CHECK verletzen"
+        );
     }
 
     #[tokio::test]
@@ -956,7 +1176,10 @@ mod tests {
         let pool = test_pool().await;
         let (b, e) = schaden_setup(&pool).await;
         let res = schaden_insert_min(&pool, e, b, ", status", ", 'abgeschlossen'").await;
-        assert!(res.is_err(), "status='abgeschlossen' ohne abschluss_grund muss CHECK verletzen");
+        assert!(
+            res.is_err(),
+            "status='abgeschlossen' ohne abschluss_grund muss CHECK verletzen"
+        );
     }
 
     #[tokio::test]
@@ -965,7 +1188,10 @@ mod tests {
         let (b, e) = schaden_setup(&pool).await;
         schaden_insert_min(&pool, e, b, "", "").await.unwrap();
         let res = schaden_insert_min(&pool, e, b, "", "").await;
-        assert!(res.is_err(), "UNIQUE(einsatz_id, registrier_nr) muss greifen");
+        assert!(
+            res.is_err(),
+            "UNIQUE(einsatz_id, registrier_nr) muss greifen"
+        );
     }
 
     // --- E-5 Schaden: 4‑Wege-Geschädigt-Exklusivität (Migration 0033) ---
@@ -1012,9 +1238,17 @@ mod tests {
             .bind(e).bind(b).bind(b).fetch_one(&pool).await.unwrap();
         let ep = schaden_personal(&pool, e).await;
         let res = schaden_insert_min(
-            &pool, e, b, ", geschaedigt_person_id, geschaedigt_personal_id",
-            &format!(", {p}, {ep}")).await;
-        assert!(res.is_err(), "Person UND Einsatzkraft gleichzeitig muss vom CHECK abgelehnt werden");
+            &pool,
+            e,
+            b,
+            ", geschaedigt_person_id, geschaedigt_personal_id",
+            &format!(", {p}, {ep}"),
+        )
+        .await;
+        assert!(
+            res.is_err(),
+            "Person UND Einsatzkraft gleichzeitig muss vom CHECK abgelehnt werden"
+        );
     }
 
     #[tokio::test]
@@ -1023,9 +1257,17 @@ mod tests {
         let (b, e) = schaden_setup(&pool).await;
         let ep = schaden_personal(&pool, e).await;
         let res = schaden_insert_min(
-            &pool, e, b, ", geschaedigt_personal_id, geschaedigt_organisation_id",
-            &format!(", {ep}, 1")).await;
-        assert!(res.is_err(), "Einsatzkraft UND Organisation gleichzeitig muss vom CHECK abgelehnt werden");
+            &pool,
+            e,
+            b,
+            ", geschaedigt_personal_id, geschaedigt_organisation_id",
+            &format!(", {ep}, 1"),
+        )
+        .await;
+        assert!(
+            res.is_err(),
+            "Einsatzkraft UND Organisation gleichzeitig muss vom CHECK abgelehnt werden"
+        );
     }
 
     #[tokio::test]
@@ -1033,9 +1275,17 @@ mod tests {
         let pool = test_pool().await;
         let (b, e) = schaden_setup(&pool).await;
         let res = schaden_insert_min(
-            &pool, e, b, ", geschaedigt_organisation_id, geschaedigt_kontakt",
-            ", 1, 'Stadtwerke'").await;
-        assert!(res.is_err(), "Organisation UND Freitext gleichzeitig muss vom CHECK abgelehnt werden");
+            &pool,
+            e,
+            b,
+            ", geschaedigt_organisation_id, geschaedigt_kontakt",
+            ", 1, 'Stadtwerke'",
+        )
+        .await;
+        assert!(
+            res.is_err(),
+            "Organisation UND Freitext gleichzeitig muss vom CHECK abgelehnt werden"
+        );
     }
 
     // --- Migration 0062: uhs FK-Integrität nach Daten-Bereinigung ---
@@ -1065,16 +1315,22 @@ mod tests {
 
         // Minimale Stammdaten anlegen (alle NOT-NULL-FKs).
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Test-Orga')")
-            .execute(&pool).await.unwrap();
+            .execute(&pool)
+            .await
+            .unwrap();
         let benutzer_id: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
              VALUES (1, 'Leiter', 'leiter', 'hash') RETURNING id",
         )
-        .fetch_one(&pool).await.unwrap();
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         let einsatz_id: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Testlage') RETURNING id",
         )
-        .fetch_one(&pool).await.unwrap();
+        .fetch_one(&pool)
+        .await
+        .unwrap();
 
         // uhs anlegen.
         let uhs_id: i64 = sqlx::query_scalar(
@@ -1082,8 +1338,11 @@ mod tests {
              (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
              VALUES (?, 'behandlungsplatz', 'BHP 1', ?, ?) RETURNING id",
         )
-        .bind(einsatz_id).bind(benutzer_id).bind(benutzer_id)
-        .fetch_one(&pool).await
+        .bind(einsatz_id)
+        .bind(benutzer_id)
+        .bind(benutzer_id)
+        .fetch_one(&pool)
+        .await
         .expect("uhs-Einfügen muss nach Migration funktionieren");
 
         // uhs_platz anlegen: FK uhs_platz.uhs_id → uhs(id) muss greifen.
@@ -1092,7 +1351,8 @@ mod tests {
              VALUES (?, 'bett', 'Bett 1') RETURNING id",
         )
         .bind(uhs_id)
-        .fetch_one(&pool).await
+        .fetch_one(&pool)
+        .await
         .expect("uhs_platz-Einfügen mit FK auf uhs muss funktionieren");
 
         // einsatz_person anlegen (für person_uhs_belegung.person_id).
@@ -1101,8 +1361,12 @@ mod tests {
              (einsatz_id, registrier_nr, status, erfasst_von, geaendert_von) \
              VALUES (?, 1, 'betroffen', ?, ?) RETURNING id",
         )
-        .bind(einsatz_id).bind(benutzer_id).bind(benutzer_id)
-        .fetch_one(&pool).await.unwrap();
+        .bind(einsatz_id)
+        .bind(benutzer_id)
+        .bind(benutzer_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
 
         // person_uhs_belegung anlegen: FK .uhs_id → uhs(id) NOT NULL muss greifen.
         sqlx::query(
@@ -1110,24 +1374,41 @@ mod tests {
              (einsatz_id, person_id, uhs_id, platz_id, art, erfasst_von) \
              VALUES (?, ?, ?, ?, 'eintritt', ?)",
         )
-        .bind(einsatz_id).bind(ep_id).bind(uhs_id).bind(platz_id).bind(benutzer_id)
-        .execute(&pool).await
+        .bind(einsatz_id)
+        .bind(ep_id)
+        .bind(uhs_id)
+        .bind(platz_id)
+        .bind(benutzer_id)
+        .execute(&pool)
+        .await
         .expect("person_uhs_belegung mit FK auf uhs muss funktionieren");
 
         // Alle drei Zeilen müssen existieren und FK-konsistent sein.
         let uhs_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM uhs WHERE id = ?")
-            .bind(uhs_id).fetch_one(&pool).await.unwrap();
+            .bind(uhs_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(uhs_count, 1, "uhs-Zeile muss nach Migration vorhanden sein");
 
         let platz_count: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM uhs_platz WHERE uhs_id = ?")
-                .bind(uhs_id).fetch_one(&pool).await.unwrap();
+                .bind(uhs_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(platz_count, 1, "uhs_platz-Zeile muss FK auf uhs tragen");
 
         let belegung_count: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM person_uhs_belegung WHERE uhs_id = ?")
-                .bind(uhs_id).fetch_one(&pool).await.unwrap();
-        assert_eq!(belegung_count, 1, "person_uhs_belegung-Zeile muss FK auf uhs tragen");
+                .bind(uhs_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            belegung_count, 1,
+            "person_uhs_belegung-Zeile muss FK auf uhs tragen"
+        );
     }
 
     // --- Migration 0082: uhs-typ-CHECK ohne 'bereitstellungsraum' (LFH-119 / LFH-174) ---
@@ -1143,21 +1424,32 @@ mod tests {
 
         // Minimale Stammdaten (alle NOT-NULL-FKs von uhs).
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Test-Orga')")
-            .execute(&pool).await.unwrap();
+            .execute(&pool)
+            .await
+            .unwrap();
         let benutzer_id: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
              VALUES (1, 'Leiter', 'leiter', 'hash') RETURNING id",
         )
-        .fetch_one(&pool).await.unwrap();
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         let einsatz_id: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Testlage') RETURNING id",
         )
-        .fetch_one(&pool).await.unwrap();
+        .fetch_one(&pool)
+        .await
+        .unwrap();
 
         // 1) Alle vier gültigen Typen werden akzeptiert.
-        for (i, typ) in ["patientenablage", "behandlungsplatz", "verletztensammelstelle", "sonstige"]
-            .iter()
-            .enumerate()
+        for (i, typ) in [
+            "patientenablage",
+            "behandlungsplatz",
+            "verletztensammelstelle",
+            "sonstige",
+        ]
+        .iter()
+        .enumerate()
         {
             sqlx::query(
                 "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
@@ -1183,7 +1475,10 @@ mod tests {
         .bind(benutzer_id)
         .execute(&pool)
         .await;
-        assert!(bad.is_err(), "typ='bereitstellungsraum' muss der DB-CHECK jetzt ablehnen");
+        assert!(
+            bad.is_err(),
+            "typ='bereitstellungsraum' muss der DB-CHECK jetzt ablehnen"
+        );
 
         // 3) lat/lon (Zusatzspalten aus 0034) überleben den Rebuild inhaltlich.
         let uhs_id: i64 = sqlx::query_scalar(
@@ -1202,7 +1497,11 @@ mod tests {
                 .fetch_one(&pool)
                 .await
                 .unwrap();
-        assert_eq!((lat, lon), (Some(52.5), Some(13.4)), "lat/lon müssen erhalten bleiben");
+        assert_eq!(
+            (lat, lon),
+            (Some(52.5), Some(13.4)),
+            "lat/lon müssen erhalten bleiben"
+        );
 
         // 4) Eingehende FKs bleiben intakt: uhs_platz + person_uhs_belegung nutzbar.
         let platz_id: i64 = sqlx::query_scalar(
@@ -1245,7 +1544,10 @@ mod tests {
         .unwrap();
         assert_eq!(
             indizes,
-            vec!["idx_uhs_abschnitt".to_string(), "idx_uhs_einsatz".to_string()],
+            vec![
+                "idx_uhs_abschnitt".to_string(),
+                "idx_uhs_einsatz".to_string()
+            ],
             "beide uhs-Indizes müssen nach dem Rebuild existieren"
         );
 
@@ -1255,7 +1557,10 @@ mod tests {
                 .fetch_one(&pool)
                 .await
                 .unwrap();
-        assert_eq!(fk_verletzungen, 0, "PRAGMA foreign_key_check muss nach dem Rebuild leer sein");
+        assert_eq!(
+            fk_verletzungen, 0,
+            "PRAGMA foreign_key_check muss nach dem Rebuild leer sein"
+        );
     }
 
     // Deckt den Sicherheitsnetz-Zweig von 0082 ab (UPDATE 'bereitstellungsraum' → 'sonstige'
@@ -1331,7 +1636,10 @@ mod tests {
                 .fetch_one(&pool)
                 .await
                 .unwrap();
-        assert_eq!(typ, "sonstige", "Alt-Zeile muss auf 'sonstige' migriert sein");
+        assert_eq!(
+            typ, "sonstige",
+            "Alt-Zeile muss auf 'sonstige' migriert sein"
+        );
         assert_eq!(
             (lat, lon),
             (Some(48.1), Some(11.5)),
@@ -1339,10 +1647,14 @@ mod tests {
         );
 
         // Kein Rest mehr mit dem verbotenen Wert.
-        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM uhs WHERE typ = 'bereitstellungsraum'")
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-        assert_eq!(rest, 0, "nach 0082 darf keine 'bereitstellungsraum'-Zeile verbleiben");
+        let rest: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM uhs WHERE typ = 'bereitstellungsraum'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            rest, 0,
+            "nach 0082 darf keine 'bereitstellungsraum'-Zeile verbleiben"
+        );
     }
 }

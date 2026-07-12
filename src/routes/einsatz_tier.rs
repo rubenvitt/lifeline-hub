@@ -1,6 +1,8 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{fordere_modul_zugriff_laden, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
+use crate::einsatz::berechtigung::{
+    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
+};
 use crate::einsatz::repo as einsatz_repo;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -106,7 +108,14 @@ pub async fn liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
 
     if let Some(s) = &params.status {
         if TierStatus::parse(s).is_none() {
@@ -159,12 +168,21 @@ pub async fn anlegen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     // Spezies (Pflicht) prüfen.
     if Spezies::parse(&body.spezies).is_none() {
-        return Err(AppError::Validation("Unbekannte oder fehlende Spezies".into()));
+        return Err(AppError::Validation(
+            "Unbekannte oder fehlende Spezies".into(),
+        ));
     }
     // Status: Default aktiv; nur aktiv|vermisst erlaubt.
     let status = body.status.as_deref().unwrap_or("aktiv");
@@ -220,9 +238,17 @@ pub async fn anlegen(
     // Pseudonyme ETB-Spur: nur Reg.-Nr. + Spezies (+ Status bei vermisst).
     let spezies_label = tier.spezies.etb_label();
     let text = if status == "vermisst" {
-        format!("Tier {} ({}) als vermisst gemeldet", registrier_anzeige(tier.registrier_nr), spezies_label)
+        format!(
+            "Tier {} ({}) als vermisst gemeldet",
+            registrier_anzeige(tier.registrier_nr),
+            spezies_label
+        )
     } else {
-        format!("Tier {} ({}) erfasst", registrier_anzeige(tier.registrier_nr), spezies_label)
+        format!(
+            "Tier {} ({}) erfasst",
+            registrier_anzeige(tier.registrier_nr),
+            spezies_label
+        )
     };
     etb_system(&state, einsatz_id, benutzer.id, &text).await?;
     sse_tier(&state, einsatz_id, tier.id);
@@ -238,8 +264,17 @@ pub async fn detail(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
-    Ok(Json(tier_repo::laden(&state.pool, einsatz_id, tier_id).await?))
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
+    Ok(Json(
+        tier_repo::laden(&state.pool, einsatz_id, tier_id).await?,
+    ))
 }
 
 #[derive(Debug, Deserialize)]
@@ -272,13 +307,22 @@ pub async fn aktualisieren(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
     pruefe_geschlecht(&body.geschlecht)?;
 
     let vorher = tier_repo::laden(&state.pool, einsatz_id, tier_id).await?;
     if vorher.storniert_at.is_some() {
-        return Err(AppError::Conflict("Storniertes Tier kann nicht geändert werden".into()));
+        return Err(AppError::Conflict(
+            "Storniertes Tier kann nicht geändert werden".into(),
+        ));
     }
 
     let kontakt_norm = body
@@ -289,12 +333,12 @@ pub async fn aktualisieren(
     // Verteidigungslinie zum DB-CHECK): ein Patch, der nur EIN Halter-Feld setzt,
     // während das andere bereits belegt ist, würde sonst beide setzen → DB-CHECK → 500.
     let effektiv_fk: Option<i64> = match body.halter_person_id {
-        Some(opt) => opt,                          // Some(Some(id)) = setzen, Some(None) = leeren
-        None => vorher.halter_person_id,           // unverändert
+        Some(opt) => opt,                // Some(Some(id)) = setzen, Some(None) = leeren
+        None => vorher.halter_person_id, // unverändert
     };
     let effektiv_kontakt: Option<String> = match &kontakt_norm {
-        Some(opt) => opt.clone(),                  // Some(Some(s)) = setzen, Some(None) = leeren
-        None => vorher.halter_kontakt.clone(),     // unverändert
+        Some(opt) => opt.clone(), // Some(Some(s)) = setzen, Some(None) = leeren
+        None => vorher.halter_kontakt.clone(), // unverändert
     };
     if effektiv_fk.is_some() && effektiv_kontakt.is_some() {
         return Err(AppError::UnprocessableEntity(
@@ -357,7 +401,14 @@ pub async fn status_wechsel(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     if TierStatus::parse(&body.status).is_none() {
@@ -365,12 +416,15 @@ pub async fn status_wechsel(
     }
     let vorher = tier_repo::laden(&state.pool, einsatz_id, tier_id).await?;
     if vorher.storniert_at.is_some() {
-        return Err(AppError::Conflict("Storniertes Tier kann nicht geändert werden".into()));
+        return Err(AppError::Conflict(
+            "Storniertes Tier kann nicht geändert werden".into(),
+        ));
     }
     if !darf_uebergehen(vorher.status.as_str(), &body.status) {
         return Err(AppError::UnprocessableEntity(format!(
             "Status-Übergang {} → {} ist nicht erlaubt",
-            vorher.status.as_str(), body.status
+            vorher.status.as_str(),
+            body.status
         )));
     }
 
@@ -402,13 +456,20 @@ pub async fn status_wechsel(
     // Pseudonyme ETB-Spur (Spec-Tabelle): nie Rufname/Kennzeichnung/Halter/Ziel.
     let r = registrier_anzeige(vorher.registrier_nr);
     let text = match body.status.as_str() {
-        "abgeschlossen" => format!("Tier {r}: abgeschlossen ({})", grund.as_deref().unwrap_or("")),
-        "aktiv" if vorher.status == TierStatus::Vermisst => format!("Tier {r}: vermisst → aktiv (aufgefunden)"),
+        "abgeschlossen" => format!(
+            "Tier {r}: abgeschlossen ({})",
+            grund.as_deref().unwrap_or("")
+        ),
+        "aktiv" if vorher.status == TierStatus::Vermisst => {
+            format!("Tier {r}: vermisst → aktiv (aufgefunden)")
+        }
         _ => format!("Tier {r}: {} → {}", vorher.status.as_str(), body.status),
     };
     etb_system(&state, einsatz_id, benutzer.id, &text).await?;
     sse_tier(&state, einsatz_id, tier_id);
-    Ok(Json(tier_repo::laden(&state.pool, einsatz_id, tier_id).await?))
+    Ok(Json(
+        tier_repo::laden(&state.pool, einsatz_id, tier_id).await?,
+    ))
 }
 
 /// DELETE /api/einsaetze/{id}/tiere/{tid} — Stornieren (Soft-Delete).
@@ -421,7 +482,14 @@ pub async fn stornieren(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let tier = tier_repo::laden(&state.pool, einsatz_id, tier_id).await?;
@@ -461,12 +529,23 @@ pub async fn export(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
 
     let tiere = tier_repo::liste(&state.pool, einsatz_id, None, None, None).await?;
-    let mut csv = String::from("registrier_nr;status;spezies;rufname;rasse;geschlecht;alter;antreff_ort\n");
+    let mut csv =
+        String::from("registrier_nr;status;spezies;rufname;rasse;geschlecht;alter;antreff_ort\n");
     for t in &tiere {
-        let alter = t.alter_geschaetzt.map(|a| a.to_string()).unwrap_or_default();
+        let alter = t
+            .alter_geschaetzt
+            .map(|a| a.to_string())
+            .unwrap_or_default();
         csv.push_str(&format!(
             "{};{};{};{};{};{};{};{}\n",
             registrier_anzeige(t.registrier_nr),
@@ -496,7 +575,14 @@ pub async fn stream(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
 
     let rx = state.live.abonniere(einsatz_id);
     let stream = BroadcastStream::new(rx).map(|res| {

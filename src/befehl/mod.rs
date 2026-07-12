@@ -47,41 +47,92 @@ pub const VORLAGEN: &[VorlageDef] = &[
         schluessel: "befehl_lad",
         label: "Befehl LAD (vereinfacht)",
         abschnitte: &[
-            AbschnittDef { schluessel: "lage", label: "Lage" },
-            AbschnittDef { schluessel: "auftrag", label: "Auftrag" },
-            AbschnittDef { schluessel: "durchfuehrung", label: "Durchführung" },
+            AbschnittDef {
+                schluessel: "lage",
+                label: "Lage",
+            },
+            AbschnittDef {
+                schluessel: "auftrag",
+                label: "Auftrag",
+            },
+            AbschnittDef {
+                schluessel: "durchfuehrung",
+                label: "Durchführung",
+            },
         ],
     },
     VorlageDef {
         schluessel: "befehl_ladef",
         label: "Befehl LADEF (erweitert, SKK)",
         abschnitte: &[
-            AbschnittDef { schluessel: "lage", label: "Lage" },
-            AbschnittDef { schluessel: "auftrag", label: "Auftrag" },
-            AbschnittDef { schluessel: "durchfuehrung", label: "Durchführung" },
-            AbschnittDef { schluessel: "einsatzunterstuetzung", label: "Einsatzunterstützung" },
-            AbschnittDef { schluessel: "fuehrung_kommunikation", label: "Führung und Kommunikation" },
+            AbschnittDef {
+                schluessel: "lage",
+                label: "Lage",
+            },
+            AbschnittDef {
+                schluessel: "auftrag",
+                label: "Auftrag",
+            },
+            AbschnittDef {
+                schluessel: "durchfuehrung",
+                label: "Durchführung",
+            },
+            AbschnittDef {
+                schluessel: "einsatzunterstuetzung",
+                label: "Einsatzunterstützung",
+            },
+            AbschnittDef {
+                schluessel: "fuehrung_kommunikation",
+                label: "Führung und Kommunikation",
+            },
         ],
     },
     VorlageDef {
         schluessel: "befehl_schnee",
         label: "Befehl SCHNEE",
         abschnitte: &[
-            AbschnittDef { schluessel: "schadenlage", label: "Schadenlage" },
-            AbschnittDef { schluessel: "nachbarn", label: "Nachbarn" },
-            AbschnittDef { schluessel: "entschluss", label: "Entschluss / Absicht" },
-            AbschnittDef { schluessel: "einzelauftrag", label: "Einzelauftrag" },
-            AbschnittDef { schluessel: "eigener_standort", label: "Eigener Standort" },
+            AbschnittDef {
+                schluessel: "schadenlage",
+                label: "Schadenlage",
+            },
+            AbschnittDef {
+                schluessel: "nachbarn",
+                label: "Nachbarn",
+            },
+            AbschnittDef {
+                schluessel: "entschluss",
+                label: "Entschluss / Absicht",
+            },
+            AbschnittDef {
+                schluessel: "einzelauftrag",
+                label: "Einzelauftrag",
+            },
+            AbschnittDef {
+                schluessel: "eigener_standort",
+                label: "Eigener Standort",
+            },
         ],
     },
     VorlageDef {
         schluessel: "befehl_ea_zmw",
         label: "Einzelauftrag (EA/ZMW)",
         abschnitte: &[
-            AbschnittDef { schluessel: "einheit", label: "Einheit" },
-            AbschnittDef { schluessel: "auftrag_ziel", label: "Auftrag / Ziel" },
-            AbschnittDef { schluessel: "mittel", label: "Mittel" },
-            AbschnittDef { schluessel: "weg", label: "Weg" },
+            AbschnittDef {
+                schluessel: "einheit",
+                label: "Einheit",
+            },
+            AbschnittDef {
+                schluessel: "auftrag_ziel",
+                label: "Auftrag / Ziel",
+            },
+            AbschnittDef {
+                schluessel: "mittel",
+                label: "Mittel",
+            },
+            AbschnittDef {
+                schluessel: "weg",
+                label: "Weg",
+            },
         ],
     },
 ];
@@ -103,13 +154,21 @@ pub struct Abschnitt {
 pub fn leere_abschnitte(v: &VorlageDef) -> Vec<Abschnitt> {
     v.abschnitte
         .iter()
-        .map(|a| Abschnitt { schluessel: a.schluessel.to_string(), text: String::new() })
+        .map(|a| Abschnitt {
+            schluessel: a.schluessel.to_string(),
+            text: String::new(),
+        })
         .collect()
 }
 
 /// Deterministisches Markdown-Rendering des Befehls (Snapshot-Inhalt für das ETB).
 /// Reihenfolge = Vorlage; fehlende Abschnitte werden als leer gerendert.
-pub fn render_snapshot(v: &VorlageDef, titel: &str, zeitstand: &str, abschnitte: &[Abschnitt]) -> String {
+pub fn render_snapshot(
+    v: &VorlageDef,
+    titel: &str,
+    zeitstand: &str,
+    abschnitte: &[Abschnitt],
+) -> String {
     let mut out = String::new();
     out.push_str(&format!("# {titel}\n\n"));
     out.push_str(&format!("_Zeitstand: {zeitstand}_\n"));
@@ -170,7 +229,12 @@ mod tests {
             keys.sort_unstable();
             let vorher = keys.len();
             keys.dedup();
-            assert_eq!(keys.len(), vorher, "Doppelter Abschnitts-Schlüssel in {}", v.schluessel);
+            assert_eq!(
+                keys.len(),
+                vorher,
+                "Doppelter Abschnitts-Schlüssel in {}",
+                v.schluessel
+            );
         }
     }
 
@@ -187,7 +251,10 @@ mod tests {
     #[test]
     fn render_ist_deterministisch_und_in_reihenfolge() {
         let v = vorlage("befehl_lad").unwrap();
-        let abschnitte = vec![Abschnitt { schluessel: "lage".into(), text: "Hochwasser.".into() }];
+        let abschnitte = vec![Abschnitt {
+            schluessel: "lage".into(),
+            text: "Hochwasser.".into(),
+        }];
         let a = render_snapshot(v, "Befehl 1", "2026-06-02 10:00:00", &abschnitte);
         let b = render_snapshot(v, "Befehl 1", "2026-06-02 10:00:00", &abschnitte);
         assert_eq!(a, b);
@@ -202,10 +269,21 @@ mod tests {
     fn validierung_verlangt_alle_abschnitts_schluessel() {
         let v = vorlage("befehl_lad").unwrap();
         assert!(validiere_freigabe(v, &[]).is_err());
-        let teil = vec![Abschnitt { schluessel: "lage".into(), text: "X".into() }];
-        assert!(validiere_freigabe(v, &teil).is_err(), "fehlende Abschnitte → Fehler");
-        let voll = v.abschnitte.iter()
-            .map(|d| Abschnitt { schluessel: d.schluessel.into(), text: "x".into() })
+        let teil = vec![Abschnitt {
+            schluessel: "lage".into(),
+            text: "X".into(),
+        }];
+        assert!(
+            validiere_freigabe(v, &teil).is_err(),
+            "fehlende Abschnitte → Fehler"
+        );
+        let voll = v
+            .abschnitte
+            .iter()
+            .map(|d| Abschnitt {
+                schluessel: d.schluessel.into(),
+                text: "x".into(),
+            })
             .collect::<Vec<_>>();
         assert!(validiere_freigabe(v, &voll).is_ok());
     }

@@ -54,12 +54,14 @@ pub async fn liste(
 /// Lädt eine UHS (auch stornierte) eines Einsatzes; `NotFound`, falls sie nicht
 /// zum Einsatz gehört (Org-Isolation via `einsatz_id`-Prädikat).
 pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<UhsAnzeige, AppError> {
-    sqlx::query_as::<_, UhsAnzeige>(sqlx::AssertSqlSafe(format!("{SELECT_ALLE} WHERE id = ? AND einsatz_id = ?")))
-        .bind(id)
-        .bind(einsatz_id)
-        .fetch_optional(pool)
-        .await?
-        .ok_or(AppError::NotFound)
+    sqlx::query_as::<_, UhsAnzeige>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_ALLE} WHERE id = ? AND einsatz_id = ?"
+    )))
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)
 }
 
 /// Legt eine UHS im Status `geplant` an. UNIQUE(einsatz_id, bezeichnung) →
@@ -206,13 +208,12 @@ pub async fn storniere(
     .await?;
     if ergebnis.rows_affected() == 0 {
         // Entweder nicht zum Einsatz oder bereits storniert. Differenzierung:
-        let existiert: Option<Option<String>> = sqlx::query_scalar(
-            "SELECT storniert_at FROM uhs WHERE id = ? AND einsatz_id = ?",
-        )
-        .bind(id)
-        .bind(einsatz_id)
-        .fetch_optional(pool)
-        .await?;
+        let existiert: Option<Option<String>> =
+            sqlx::query_scalar("SELECT storniert_at FROM uhs WHERE id = ? AND einsatz_id = ?")
+                .bind(id)
+                .bind(einsatz_id)
+                .fetch_optional(pool)
+                .await?;
         return match existiert {
             None => Err(AppError::NotFound),
             Some(_) => Err(AppError::Conflict("UHS ist bereits storniert".into())),
@@ -243,12 +244,17 @@ mod tests {
     /// Org(1) + Benutzer + aktiver Einsatz. Liefert (benutzer_id, einsatz_id).
     async fn setup(pool: &SqlitePool) -> (i64, i64) {
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Test-Orga')")
-            .execute(pool).await.unwrap();
+            .execute(pool)
+            .await
+            .unwrap();
         let b: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, \
                 system_rolle, org_rolle, aktiv) \
-             VALUES (1, 'A', 'a', 'h', 'keiner', 'keine', 1) RETURNING id")
-            .fetch_one(pool).await.unwrap();
+             VALUES (1, 'A', 'a', 'h', 'keiner', 'keine', 1) RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         let e: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung, status, begonnen_at, einsatzart, angelegt_at) \
              VALUES (1, 'Lage', 'aktiv', '2026-05-28', 'realeinsatz', '2026-05-28') RETURNING id")
@@ -258,7 +264,11 @@ mod tests {
 
     fn daten<'a>(typ: &'a str, bez: &'a str) -> NeueDaten<'a> {
         NeueDaten {
-            typ, bezeichnung: bez, abschnitt_id: None, standort: None, notiz: None,
+            typ,
+            bezeichnung: bez,
+            abschnitt_id: None,
+            standort: None,
+            notiz: None,
         }
     }
 
@@ -266,7 +276,9 @@ mod tests {
     async fn anlegen_liefert_status_geplant_und_zeitstempel() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        let u = anlegen(&pool, e, b, daten("behandlungsplatz", "BHP 50")).await.unwrap();
+        let u = anlegen(&pool, e, b, daten("behandlungsplatz", "BHP 50"))
+            .await
+            .unwrap();
         assert_eq!(u.status, UhsStatus::Geplant);
         assert_eq!(u.typ, UhsTyp::Behandlungsplatz);
         assert_eq!(u.bezeichnung, "BHP 50");
@@ -279,17 +291,28 @@ mod tests {
     async fn anlegen_doppelte_bezeichnung_ist_konflikt() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        anlegen(&pool, e, b, daten("behandlungsplatz", "BHP 50")).await.unwrap();
-        let err = anlegen(&pool, e, b, daten("patientenablage", "BHP 50")).await.unwrap_err();
-        assert!(matches!(err, AppError::Conflict(_)), "UNIQUE(einsatz_id, bezeichnung)");
+        anlegen(&pool, e, b, daten("behandlungsplatz", "BHP 50"))
+            .await
+            .unwrap();
+        let err = anlegen(&pool, e, b, daten("patientenablage", "BHP 50"))
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, AppError::Conflict(_)),
+            "UNIQUE(einsatz_id, bezeichnung)"
+        );
     }
 
     #[tokio::test]
     async fn liste_filtert_storno_und_status() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        let u1 = anlegen(&pool, e, b, daten("behandlungsplatz", "BHP 50")).await.unwrap();
-        anlegen(&pool, e, b, daten("patientenablage", "PA 1")).await.unwrap();
+        let u1 = anlegen(&pool, e, b, daten("behandlungsplatz", "BHP 50"))
+            .await
+            .unwrap();
+        anlegen(&pool, e, b, daten("patientenablage", "PA 1"))
+            .await
+            .unwrap();
         // Storno: u1 verschwindet aus der Liste:
         storniere(&pool, e, u1.id, b).await.unwrap();
         let alle = liste(&pool, e, None, None).await.unwrap();
@@ -305,7 +328,9 @@ mod tests {
     async fn status_geplant_zu_aktiv_setzt_geaendert_von() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        let u = anlegen(&pool, e, b, daten("behandlungsplatz", "BHP 50")).await.unwrap();
+        let u = anlegen(&pool, e, b, daten("behandlungsplatz", "BHP 50"))
+            .await
+            .unwrap();
         let nach = setze_status(&pool, e, u.id, "aktiv", b).await.unwrap();
         assert_eq!(nach.status, UhsStatus::Aktiv);
         assert_eq!(nach.geaendert_von, b);
@@ -315,7 +340,9 @@ mod tests {
     async fn aufloesen_blockiert_bei_aktiver_belegung() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        let u = anlegen(&pool, e, b, daten("behandlungsplatz", "BHP 50")).await.unwrap();
+        let u = anlegen(&pool, e, b, daten("behandlungsplatz", "BHP 50"))
+            .await
+            .unwrap();
         setze_status(&pool, e, u.id, "aktiv", b).await.unwrap();
         // Person + Belegung simulieren — direkter SQL-Insert, weil belegung_repo erst in Task 8 kommt:
         let p: i64 = sqlx::query_scalar(
@@ -323,8 +350,13 @@ mod tests {
              VALUES (?, 1, 'betroffen', ?, ?, ?) RETURNING id")
             .bind(e).bind(b).bind(b).bind(u.id)
             .fetch_one(&pool).await.unwrap();
-        let err = setze_status(&pool, e, u.id, "aufgeloest", b).await.unwrap_err();
-        assert!(matches!(err, AppError::Conflict(_)), "Auflösung blockt bei Belegung (409)");
+        let err = setze_status(&pool, e, u.id, "aufgeloest", b)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, AppError::Conflict(_)),
+            "Auflösung blockt bei Belegung (409)"
+        );
         // Storno blockt identisch:
         let err = storniere(&pool, e, u.id, b).await.unwrap_err();
         assert!(matches!(err, AppError::Conflict(_)));
@@ -335,14 +367,23 @@ mod tests {
     async fn aktive_belegungen_zaehlt_korrekt() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        let u = anlegen(&pool, e, b, daten("behandlungsplatz", "BHP 50")).await.unwrap();
+        let u = anlegen(&pool, e, b, daten("behandlungsplatz", "BHP 50"))
+            .await
+            .unwrap();
         // Zwei Personen, eine belegt:
         sqlx::query("INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von, aktuelle_uhs_id) \
                      VALUES (?, 1, ?, ?, ?)")
             .bind(e).bind(b).bind(b).bind(u.id).execute(&pool).await.unwrap();
-        sqlx::query("INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
-                     VALUES (?, 2, ?, ?)")
-            .bind(e).bind(b).bind(b).execute(&pool).await.unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
+                     VALUES (?, 2, ?, ?)",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .execute(&pool)
+        .await
+        .unwrap();
         assert_eq!(aktive_belegungen(&pool, u.id).await.unwrap(), 1);
     }
 }

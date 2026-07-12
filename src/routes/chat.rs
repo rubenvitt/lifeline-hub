@@ -2,7 +2,9 @@ use crate::app::AppState;
 use crate::auth::session::CurrentUser;
 use crate::chat::repo;
 use crate::chat::{BezugTyp, ChatKanalAnzeige, ChatNachrichtAnzeige};
-use crate::einsatz::berechtigung::{fordere_modul_zugriff_laden, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
+use crate::einsatz::berechtigung::{
+    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
+};
 use crate::einsatz::repo as einsatz_repo;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -40,8 +42,17 @@ pub async fn kanaele_liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
-    Ok(Json(repo::liste_kanaele(&state.pool, einsatz_id, benutzer.id).await?))
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
+    Ok(Json(
+        repo::liste_kanaele(&state.pool, einsatz_id, benutzer.id).await?,
+    ))
 }
 
 #[derive(Debug, Deserialize)]
@@ -60,16 +71,30 @@ pub async fn kanal_anlegen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let name = req.name.trim();
     if name.is_empty() {
-        return Err(AppError::Validation("Kanalname darf nicht leer sein".into()));
+        return Err(AppError::Validation(
+            "Kanalname darf nicht leer sein".into(),
+        ));
     }
-    let beschreibung = req.beschreibung.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let beschreibung = req
+        .beschreibung
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
 
-    let kanal = repo::kanal_anlegen(&state.pool, einsatz_id, benutzer.id, name, beschreibung).await?;
+    let kanal =
+        repo::kanal_anlegen(&state.pool, einsatz_id, benutzer.id, name, beschreibung).await?;
     sse_chat(&state, einsatz_id, als_json(&kanal, einsatz_id));
     Ok((StatusCode::CREATED, Json(kanal)))
 }
@@ -93,15 +118,29 @@ pub async fn nachrichten_liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
 
     // Cross-Einsatz-Schutz: Kanal muss zu diesem Einsatz gehören.
     if !repo::gehoert_kanal_zu_einsatz(&state.pool, kanal_id, einsatz_id).await? {
         return Err(AppError::NotFound);
     }
 
-    let limit = params.limit.unwrap_or(repo::STANDARD_LIMIT).clamp(1, repo::MAX_LIMIT);
-    let filter = repo::NachrichtFilter { kanal_id, before_id: params.before_id, limit };
+    let limit = params
+        .limit
+        .unwrap_or(repo::STANDARD_LIMIT)
+        .clamp(1, repo::MAX_LIMIT);
+    let filter = repo::NachrichtFilter {
+        kanal_id,
+        before_id: params.before_id,
+        limit,
+    };
     Ok(Json(repo::abfrage(&state.pool, einsatz_id, &filter).await?))
 }
 
@@ -126,7 +165,14 @@ pub async fn nachricht_erfassen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     if !repo::gehoert_kanal_zu_einsatz(&state.pool, kanal_id, einsatz_id).await? {
@@ -134,7 +180,9 @@ pub async fn nachricht_erfassen(
     }
     let inhalt = req.inhalt.trim();
     if inhalt.is_empty() && req.anhang_ids.is_empty() {
-        return Err(AppError::Validation("Nachricht braucht Text oder einen Anhang".into()));
+        return Err(AppError::Validation(
+            "Nachricht braucht Text oder einen Anhang".into(),
+        ));
     }
 
     // Doppelte IDs deduplizieren: ein Client darf denselben Anhang zweimal nennen,
@@ -146,8 +194,14 @@ pub async fn nachricht_erfassen(
 
     // Nachricht + Anhang-Verknüpfung atomar; fremde/unbekannte Anhänge → Rollback.
     let nachricht = repo::anlegen_mit_anhaengen(
-        &state.pool, einsatz_id, benutzer.id, kanal_id, inhalt, &anhang_ids,
-    ).await?;
+        &state.pool,
+        einsatz_id,
+        benutzer.id,
+        kanal_id,
+        inhalt,
+        &anhang_ids,
+    )
+    .await?;
     sse_chat(&state, einsatz_id, als_json(&nachricht, einsatz_id));
     Ok((StatusCode::CREATED, Json(nachricht)))
 }
@@ -163,7 +217,14 @@ async fn fordere_autor(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     // Cross-Einsatz-Schutz + Existenz.
@@ -188,7 +249,9 @@ pub async fn nachricht_bearbeiten(
     fordere_autor(&state, &benutzer, einsatz_id, nachricht_id).await?;
     let inhalt = req.inhalt.trim();
     if inhalt.is_empty() {
-        return Err(AppError::Validation("Nachricht darf nicht leer sein".into()));
+        return Err(AppError::Validation(
+            "Nachricht darf nicht leer sein".into(),
+        ));
     }
     let nachricht = repo::bearbeiten(&state.pool, nachricht_id, inhalt).await?;
     sse_chat(&state, einsatz_id, als_json(&nachricht, einsatz_id));
@@ -203,8 +266,11 @@ pub async fn nachricht_loeschen(
 ) -> Result<StatusCode, AppError> {
     fordere_autor(&state, &benutzer, einsatz_id, nachricht_id).await?;
     repo::loeschen(&state.pool, nachricht_id).await?;
-    sse_chat(&state, einsatz_id,
-        serde_json::json!({ "einsatz_id": einsatz_id, "nachricht_id": nachricht_id }).to_string());
+    sse_chat(
+        &state,
+        einsatz_id,
+        serde_json::json!({ "einsatz_id": einsatz_id, "nachricht_id": nachricht_id }).to_string(),
+    );
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -228,7 +294,14 @@ pub async fn bezug_setzen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     if !repo::gehoert_nachricht_zu_einsatz(&state.pool, nachricht_id, einsatz_id).await? {
@@ -253,7 +326,14 @@ pub async fn bezug_loeschen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     if !repo::gehoert_nachricht_zu_einsatz(&state.pool, nachricht_id, einsatz_id).await? {
@@ -285,7 +365,14 @@ pub async fn heraufstufen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     if !repo::gehoert_nachricht_zu_einsatz(&state.pool, nachricht_id, einsatz_id).await? {
@@ -294,8 +381,8 @@ pub async fn heraufstufen(
 
     // Server-seitige Typ-Allowlist: kein 'system' (Modul-reserviert) und keine
     // 'berichtigung' (bräuchte berichtigt_eintrag_id; semantisch unzulässig hier).
-    let typ = EtbTyp::parse(&req.typ)
-        .ok_or_else(|| AppError::Validation("Ungültiger ETB-Typ".into()))?;
+    let typ =
+        EtbTyp::parse(&req.typ).ok_or_else(|| AppError::Validation("Ungültiger ETB-Typ".into()))?;
     if !typ.darf_client_erfassen() || typ.ist_berichtigung() {
         return Err(AppError::Validation(
             "Für die Heraufstufung sind nur meldung/anordnung/lage/entscheidung zulässig".into(),
@@ -314,8 +401,15 @@ pub async fn heraufstufen(
         .ok_or_else(|| AppError::Validation("Kein Inhalt zum Heraufstufen".into()))?;
 
     let etb_id = repo::heraufstufen_zu_etb(
-        &state.pool, einsatz_id, nachricht_id, benutzer.id, typ.as_str(), &inhalt, &quelle.erstellt_at,
-    ).await?;
+        &state.pool,
+        einsatz_id,
+        nachricht_id,
+        benutzer.id,
+        typ.as_str(),
+        &inhalt,
+        &quelle.erstellt_at,
+    )
+    .await?;
 
     // Beide Events publizieren (wie lagebericht::freigeben): ETB-Eintrag + Chat-Update.
     if let Ok(etb_anzeige) = crate::etb::repo::laden(&state.pool, etb_id).await {
@@ -341,7 +435,14 @@ pub async fn heraufstufen_auftrag(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     if !repo::gehoert_nachricht_zu_einsatz(&state.pool, nachricht_id, einsatz_id).await? {
@@ -353,7 +454,11 @@ pub async fn heraufstufen_auftrag(
     let validiert =
         crate::auftrag::validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now, None).await?;
     let auftrag_id = repo::heraufstufen_zu_auftrag(
-        &state.pool, einsatz_id, nachricht_id, benutzer.id, validiert.daten(),
+        &state.pool,
+        einsatz_id,
+        nachricht_id,
+        benutzer.id,
+        validiert.daten(),
     )
     .await?;
 
@@ -361,7 +466,9 @@ pub async fn heraufstufen_auftrag(
     if let Ok(detail) = crate::auftrag::repo::laden(&state.pool, auftrag_id, &now).await {
         if let Some(etb_id) = detail.auftrag.etb_anordnung_id {
             if let Ok(etb) = crate::etb::repo::laden(&state.pool, etb_id).await {
-                state.live.publiziere(einsatz_id, als_json(&etb, einsatz_id));
+                state
+                    .live
+                    .publiziere(einsatz_id, als_json(&etb, einsatz_id));
             }
         }
     }

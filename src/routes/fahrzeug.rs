@@ -69,7 +69,9 @@ impl Normalisiert {
 fn normalisiere(body: FahrzeugBody) -> Result<Normalisiert, AppError> {
     let funkrufname = body.funkrufname.trim().to_string();
     if funkrufname.is_empty() {
-        return Err(AppError::Validation("Funkrufname darf nicht leer sein".into()));
+        return Err(AppError::Validation(
+            "Funkrufname darf nicht leer sein".into(),
+        ));
     }
     let staerke = Staerke::aus_optionen(
         body.staerke_fuehrer,

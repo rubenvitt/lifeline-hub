@@ -128,6 +128,9 @@ mod tests {
 
         let err = restore_aus_datei(&kaputt, &ziel).await.unwrap_err();
         assert!(matches!(err, AppError::Validation(_)));
-        assert!(!ziel.exists(), "Ziel darf bei ungültiger Quelle nicht entstehen");
+        assert!(
+            !ziel.exists(),
+            "Ziel darf bei ungültiger Quelle nicht entstehen"
+        );
     }
 }

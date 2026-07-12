@@ -203,11 +203,10 @@ pub async fn abschliessen(
 ) -> Result<Einsatz, AppError> {
     // Dauer-Politik vor der tx laden (eigener Pool-Borrow); steuert die Auto-Befüllung.
     let einstellungen = super::einstellungen::laden_oder_default(pool, einsatz_id).await?;
-    let org_id: Option<i64> =
-        sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
-            .bind(einsatz_id)
-            .fetch_optional(pool)
-            .await?;
+    let org_id: Option<i64> = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+        .bind(einsatz_id)
+        .fetch_optional(pool)
+        .await?;
     let org_einstellungen =
         crate::org::einstellungen::laden_oder_default(pool, org_id.unwrap_or(0)).await?;
 
@@ -230,7 +229,9 @@ pub async fn abschliessen(
     // Abschluss-tx, NICHT über frist_setzen — der Verkürzungs-Gate (None→Some)
     // würde das sonst als bestätigungspflichtige Verkürzung werten (LFH-135).
     if ergebnis.rows_affected() == 1 {
-        if let Some(dauer) = super::effektiv::effektive_retention_dauer_tage(&einstellungen, &org_einstellungen) {
+        if let Some(dauer) =
+            super::effektiv::effektive_retention_dauer_tage(&einstellungen, &org_einstellungen)
+        {
             let (abgeschlossen_at, retention_bis): (Option<String>, Option<String>) =
                 sqlx::query_as("SELECT abgeschlossen_at, retention_bis FROM einsatz WHERE id = ?")
                     .bind(einsatz_id)
@@ -611,7 +612,10 @@ pub async fn schwaerze_einsatz(
     .await?;
 
     tx.commit().await?;
-    tracing::warn!(einsatz_id, "Purge Phase B abgeschlossen: PII geschwärzt (geschwaerzt_at gesetzt)");
+    tracing::warn!(
+        einsatz_id,
+        "Purge Phase B abgeschlossen: PII geschwärzt (geschwaerzt_at gesetzt)"
+    );
     Ok(true)
 }
 
@@ -731,10 +735,7 @@ pub async fn entferne(
 }
 
 /// Anzahl der Einsatzleitungen in einem Einsatz (für den „letzte Leitung"-Schutz).
-pub async fn zaehle_einsatzleitung(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-) -> Result<i64, AppError> {
+pub async fn zaehle_einsatzleitung(pool: &SqlitePool, einsatz_id: i64) -> Result<i64, AppError> {
     sqlx::query_scalar(
         "SELECT COUNT(*) FROM einsatz_mitgliedschaft \
          WHERE einsatz_id = ? AND einsatz_rolle = ?",
@@ -855,7 +856,10 @@ mod tests {
             30,
         )
         .unwrap();
-        assert_eq!(abgeschlossen.retention_bis.as_deref(), Some(erwartet.as_str()));
+        assert_eq!(
+            abgeschlossen.retention_bis.as_deref(),
+            Some(erwartet.as_str())
+        );
 
         // Ein ETB-System-Audit über die Auto-Frist entstanden.
         let anzahl: i64 = sqlx::query_scalar(
@@ -930,9 +934,15 @@ mod tests {
         let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
         setze_dauer(&pool, einsatz.id, leit, 30).await;
         // Manuell gesetzte Frist VOR Abschluss.
-        frist_setzen(&pool, einsatz.id, leit, Some("2099-01-01 00:00:00"), "manuell")
-            .await
-            .unwrap();
+        frist_setzen(
+            &pool,
+            einsatz.id,
+            leit,
+            Some("2099-01-01 00:00:00"),
+            "manuell",
+        )
+        .await
+        .unwrap();
 
         let abgeschlossen = abschliessen(&pool, einsatz.id, leit).await.unwrap();
         // Auto-Fill darf die manuelle Frist nicht überschreiben.
@@ -1024,12 +1034,22 @@ mod tests {
         .await
         .unwrap();
 
-        let ids = faellige_soft_delete(&pool, "2026-06-01 00:00:00").await.unwrap();
-        assert_eq!(ids, vec![faellig], "nur der abgeschlossene, abgelaufene, offene Einsatz");
+        let ids = faellige_soft_delete(&pool, "2026-06-01 00:00:00")
+            .await
+            .unwrap();
+        assert_eq!(
+            ids,
+            vec![faellig],
+            "nur der abgeschlossene, abgelaufene, offene Einsatz"
+        );
 
         // soft_delete_einsatz kippt den Tombstone + ist idempotent (zweiter Aufruf false).
-        assert!(soft_delete_einsatz(&pool, faellig, "2026-06-01 00:00:00").await.unwrap());
-        assert!(!soft_delete_einsatz(&pool, faellig, "2026-06-02 00:00:00").await.unwrap());
+        assert!(soft_delete_einsatz(&pool, faellig, "2026-06-01 00:00:00")
+            .await
+            .unwrap());
+        assert!(!soft_delete_einsatz(&pool, faellig, "2026-06-02 00:00:00")
+            .await
+            .unwrap());
         let g: Option<String> = sqlx::query_scalar("SELECT geloescht_at FROM einsatz WHERE id = ?")
             .bind(faellig)
             .fetch_one(&pool)
@@ -1131,7 +1151,10 @@ mod tests {
         let fuer_leit = liste_fuer(&pool, &leit_benutzer).await.unwrap();
         assert_eq!(fuer_leit.len(), 1);
         assert_eq!(fuer_leit[0].id, einsatz.id);
-        assert_eq!(fuer_leit[0].meine_rolle.as_deref(), Some(EINSATZ_ROLLE_LEITUNG));
+        assert_eq!(
+            fuer_leit[0].meine_rolle.as_deref(),
+            Some(EINSATZ_ROLLE_LEITUNG)
+        );
 
         // Nicht-Mitglied ohne höhere Berechtigung sieht den Einsatz NICHT (DSGVO-Filter).
         let fremd_benutzer = benutzer_laden(&pool, fremd).await;
@@ -1151,8 +1174,14 @@ mod tests {
 
         let a = anlegen(&pool, "Lage A", None, leit).await.unwrap();
         let b = anlegen(&pool, "Lage B", None, leit).await.unwrap();
-        assert_eq!(a.einsatznummer_intern.as_deref(), Some(format!("{jahr}-001").as_str()));
-        assert_eq!(b.einsatznummer_intern.as_deref(), Some(format!("{jahr}-002").as_str()));
+        assert_eq!(
+            a.einsatznummer_intern.as_deref(),
+            Some(format!("{jahr}-001").as_str())
+        );
+        assert_eq!(
+            b.einsatznummer_intern.as_deref(),
+            Some(format!("{jahr}-002").as_str())
+        );
 
         // angelegt_at wurde gesetzt (nicht der '' Default).
         assert!(!a.angelegt_at.is_empty());
@@ -1181,7 +1210,10 @@ mod tests {
 
         // anlegen nutzt Org 1 (ORDER BY id LIMIT 1) → beginnt bei 001.
         let a = anlegen(&pool, "Lage", None, leit).await.unwrap();
-        assert_eq!(a.einsatznummer_intern.as_deref(), Some(format!("{jahr}-001").as_str()));
+        assert_eq!(
+            a.einsatznummer_intern.as_deref(),
+            Some(format!("{jahr}-001").as_str())
+        );
     }
 
     #[tokio::test]

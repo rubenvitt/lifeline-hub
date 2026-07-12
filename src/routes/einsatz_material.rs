@@ -1,6 +1,8 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{fordere_modul_zugriff_laden, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
+use crate::einsatz::berechtigung::{
+    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
+};
 use crate::einsatz::repo as einsatz_repo;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -16,7 +18,12 @@ use serde::Deserialize;
 
 /// Schreibt einen automatischen System-ETB-Eintrag und publiziert ihn live
 /// (identisch zu `routes::einsatz_fahrzeug::etb_system`).
-async fn etb_system(state: &AppState, einsatz_id: i64, benutzer_id: i64, inhalt: &str) -> Result<(), AppError> {
+async fn etb_system(
+    state: &AppState,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    inhalt: &str,
+) -> Result<(), AppError> {
     let anzeige = etb_repo::anlegen(
         &state.pool,
         einsatz_id,
@@ -61,7 +68,14 @@ pub async fn liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     Ok(Json(
         disposition_repo::liste(&state.pool, einsatz_id, einsatz.ist_aktiv()).await?,
     ))
@@ -93,7 +107,14 @@ pub async fn disponieren(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let menge = body.menge.unwrap_or(1);
@@ -104,14 +125,21 @@ pub async fn disponieren(
     let em_id = match (body.material_id, body.adhoc) {
         (Some(material_id), None) => {
             disposition_repo::disponiere_stamm(
-                &state.pool, einsatz_id, einsatz.org_id, material_id, menge, benutzer.id,
+                &state.pool,
+                einsatz_id,
+                einsatz.org_id,
+                material_id,
+                menge,
+                benutzer.id,
             )
             .await?
         }
         (None, Some(adhoc)) => {
             let bezeichnung = adhoc.bezeichnung.trim().to_string();
             if bezeichnung.is_empty() {
-                return Err(AppError::Validation("Bezeichnung darf nicht leer sein".into()));
+                return Err(AppError::Validation(
+                    "Bezeichnung darf nicht leer sein".into(),
+                ));
             }
             let kategorie = trimme(adhoc.kategorie);
             let bestandsnummer = trimme(adhoc.bestandsnummer);
@@ -142,7 +170,10 @@ pub async fn disponieren(
         &state,
         einsatz_id,
         benutzer.id,
-        &format!("Material «{}» (×{}) disponiert", anzeige.bezeichnung, anzeige.menge),
+        &format!(
+            "Material «{}» (×{}) disponiert",
+            anzeige.bezeichnung, anzeige.menge
+        ),
     )
     .await?;
     sse_material(&state, einsatz_id, em_id);
@@ -178,7 +209,14 @@ pub async fn aktualisieren(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     if let Some(menge) = body.menge {
@@ -189,7 +227,8 @@ pub async fn aktualisieren(
     // Status validieren (festes Enum). Ungültig → Validation.
     let status = match &body.status {
         Some(s) => {
-            let parsed = MaterialStatus::parse(s).ok_or_else(|| AppError::Validation("Unbekannter Status".into()))?;
+            let parsed = MaterialStatus::parse(s)
+                .ok_or_else(|| AppError::Validation("Unbekannter Status".into()))?;
             Some(parsed.as_str())
         }
         None => None,
@@ -199,7 +238,16 @@ pub async fn aktualisieren(
     // Bemerkung: im Body gesetzt (auch "") → setzen (leer = löschen); absent/null →
     // unverändert (COALESCE). Daher NICHT über `trimme` zu None kollabieren lassen.
     let bemerkung = body.bemerkung.as_deref().map(str::trim);
-    disposition_repo::aktualisiere(&state.pool, einsatz_id, em_id, body.menge, status, bemerkung, body.uhs_id).await?;
+    disposition_repo::aktualisiere(
+        &state.pool,
+        einsatz_id,
+        em_id,
+        body.menge,
+        status,
+        bemerkung,
+        body.uhs_id,
+    )
+    .await?;
     let nachher = disposition_repo::laden_anzeige(&state.pool, einsatz_id, em_id, true).await?;
 
     if vorher.menge != nachher.menge {
@@ -207,7 +255,10 @@ pub async fn aktualisieren(
             &state,
             einsatz_id,
             benutzer.id,
-            &format!("Material «{}»: Menge {} → {}", nachher.bezeichnung, vorher.menge, nachher.menge),
+            &format!(
+                "Material «{}»: Menge {} → {}",
+                nachher.bezeichnung, vorher.menge, nachher.menge
+            ),
         )
         .await?;
     }
@@ -238,7 +289,14 @@ pub async fn entfernen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let anzeige = disposition_repo::laden_anzeige(&state.pool, einsatz_id, em_id, true).await?;
@@ -247,7 +305,10 @@ pub async fn entfernen(
         &state,
         einsatz_id,
         benutzer.id,
-        &format!("Material «{}» aus dem Einsatz entfernt", anzeige.bezeichnung),
+        &format!(
+            "Material «{}» aus dem Einsatz entfernt",
+            anzeige.bezeichnung
+        ),
     )
     .await?;
     sse_material(&state, einsatz_id, em_id);

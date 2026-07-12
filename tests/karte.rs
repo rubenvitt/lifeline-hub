@@ -19,7 +19,9 @@ fn app_mit_pool(pool: sqlx::SqlitePool) -> axum::Router {
     build_router(AppState {
         pool,
         live: LiveHub::new(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(), download_client: lifeline_hub::karte::download::download_client(), download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
         karten_service_url: None,
         karten_service_token: None,
         karten_dir: std::env::temp_dir(),
@@ -83,7 +85,10 @@ async fn anfrage(
         }
         None => Body::empty(),
     };
-    app.clone().oneshot(builder.body(rumpf).unwrap()).await.unwrap()
+    app.clone()
+        .oneshot(builder.body(rumpf).unwrap())
+        .await
+        .unwrap()
 }
 
 async fn json(res: Response) -> serde_json::Value {
@@ -100,7 +105,9 @@ async fn json(res: Response) -> serde_json::Value {
 /// (die Datei existiert noch nicht) — der Produktionscode liest sie nur read-only.
 async fn schreibe_fixture_mbtiles(pfad: &std::path::Path, daten: &[u8]) {
     use sqlx::sqlite::SqliteConnectOptions;
-    let opts = SqliteConnectOptions::new().filename(pfad).create_if_missing(true);
+    let opts = SqliteConnectOptions::new()
+        .filename(pfad)
+        .create_if_missing(true);
     let pool = sqlx::sqlite::SqlitePoolOptions::new()
         .max_connections(1)
         .connect_with(opts)
@@ -217,7 +224,10 @@ async fn offline_tiles_raster_liefert_png_ohne_gzip_und_config_meldet_raster() {
         .unwrap();
     let res = app.clone().oneshot(req).await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);
-    assert_eq!(res.headers().get(header::CONTENT_TYPE).unwrap(), "image/png");
+    assert_eq!(
+        res.headers().get(header::CONTENT_TYPE).unwrap(),
+        "image/png"
+    );
     assert!(
         res.headers().get(header::CONTENT_ENCODING).is_none(),
         "Raster-Blob trägt KEIN Content-Encoding (nicht gzip)"
@@ -299,7 +309,10 @@ async fn config_endpoint_meldet_verfuegbarkeit() {
     .unwrap();
 
     let app = app_mit_pool(pool);
-    let req = Request::builder().uri("/api/karte/config").body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .uri("/api/karte/config")
+        .body(Body::empty())
+        .unwrap();
     let res = app.oneshot(req).await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);
     let v = json(res).await;
@@ -315,9 +328,19 @@ async fn config_endpoint_meldet_verfuegbarkeit() {
     // offline_regionen ist die Quelle der Wahrheit (LFH-188): genau die eine bereite Region, maxzoom 14.
     let regionen = v["offline_regionen"].as_array().unwrap();
     assert_eq!(regionen.len(), 1, "genau die eine bereite Region");
-    assert_eq!(regionen[0]["maxzoom"].as_u64(), Some(14), "Regional-Pack maxzoom 14");
-    assert!(regionen[0]["tiles_url"].as_str().unwrap().contains("/tiles/{z}/{x}/{y}?v="));
-    assert_eq!(v["online_styles"][0]["url"].as_str(), Some("https://tiles.example/style.json"));
+    assert_eq!(
+        regionen[0]["maxzoom"].as_u64(),
+        Some(14),
+        "Regional-Pack maxzoom 14"
+    );
+    assert!(regionen[0]["tiles_url"]
+        .as_str()
+        .unwrap()
+        .contains("/tiles/{z}/{x}/{y}?v="));
+    assert_eq!(
+        v["online_styles"][0]["url"].as_str(),
+        Some("https://tiles.example/style.json")
+    );
     assert_eq!(v["online_styles"][0]["typ"].as_str(), Some("vektor"));
 }
 
@@ -343,7 +366,10 @@ async fn welt_tiles_route_greift_und_ist_204_ohne_asset() {
 async fn config_endpoint_blind_modus_ohne_konfiguration() {
     let pool = pool().await; // leere Registry → Karte startet blind
     let app = app_mit_pool(pool);
-    let req = Request::builder().uri("/api/karte/config").body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .uri("/api/karte/config")
+        .body(Body::empty())
+        .unwrap();
     let res = app.oneshot(req).await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);
     let v = json(res).await;
@@ -372,7 +398,10 @@ fn app_mit_pool_und_karten_service(pool: sqlx::SqlitePool) -> axum::Router {
 async fn config_endpoint_meldet_karten_bau_verfuegbar_mit_service_konfiguration() {
     let pool = pool().await;
     let app = app_mit_pool_und_karten_service(pool);
-    let req = Request::builder().uri("/api/karte/config").body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .uri("/api/karte/config")
+        .body(Body::empty())
+        .unwrap();
     let res = app.oneshot(req).await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);
     let v = json(res).await;
@@ -383,7 +412,10 @@ async fn config_endpoint_meldet_karten_bau_verfuegbar_mit_service_konfiguration(
 async fn config_endpoint_meldet_karten_bau_nicht_verfuegbar_ohne_service_konfiguration() {
     let pool = pool().await;
     let app = app_mit_pool(pool); // Standard-Helfer: karten_service_url/-token beide None
-    let req = Request::builder().uri("/api/karte/config").body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .uri("/api/karte/config")
+        .body(Body::empty())
+        .unwrap();
     let res = app.oneshot(req).await.unwrap();
     assert_eq!(res.status(), StatusCode::OK);
     let v = json(res).await;
@@ -400,7 +432,14 @@ async fn offline_registrieren_lehnt_absolute_und_traversal_pfade_ab() {
         r#"{"name":"Abs","pfad":"/etc/passwd"}"#,
         r#"{"name":"Trav","pfad":"../geheim.pmtiles"}"#,
     ] {
-        let res = anfrage(&app, "POST", "/api/karte/offline-karten", Some(&cookie), Some(boese)).await;
+        let res = anfrage(
+            &app,
+            "POST",
+            "/api/karte/offline-karten",
+            Some(&cookie),
+            Some(boese),
+        )
+        .await;
         assert_eq!(
             res.status(),
             StatusCode::BAD_REQUEST,
@@ -476,7 +515,14 @@ async fn online_crud_durchlauf() {
     assert_eq!(angelegt["aktiv"], true);
 
     // Liste → 200, enthält die Quelle.
-    let res = anfrage(&app, "GET", "/api/karte/online-quellen", Some(&cookie), None).await;
+    let res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/online-quellen",
+        Some(&cookie),
+        None,
+    )
+    .await;
     assert_eq!(res.status(), StatusCode::OK);
     let liste = json(res).await;
     assert_eq!(liste.as_array().unwrap().len(), 1);
@@ -506,7 +552,14 @@ async fn online_crud_durchlauf() {
     )
     .await;
     assert_eq!(res.status(), StatusCode::NO_CONTENT);
-    let res = anfrage(&app, "GET", "/api/karte/online-quellen", Some(&cookie), None).await;
+    let res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/online-quellen",
+        Some(&cookie),
+        None,
+    )
+    .await;
     assert!(json(res).await.as_array().unwrap().is_empty());
 }
 
@@ -521,7 +574,11 @@ async fn online_anlegen_ohne_attribution_ist_400() {
         Some(r#"{"name":"X","url":"https://x","typ":"vektor"}"#),
     )
     .await;
-    assert_eq!(res.status(), StatusCode::BAD_REQUEST, "Attribution ist Pflicht");
+    assert_eq!(
+        res.status(),
+        StatusCode::BAD_REQUEST,
+        "Attribution ist Pflicht"
+    );
 }
 
 #[tokio::test]
@@ -601,14 +658,28 @@ async fn online_aktualisieren_unbekannt_ist_404() {
 #[tokio::test]
 async fn online_loeschen_unbekannt_ist_404() {
     let (app, cookie) = admin_app().await;
-    let res = anfrage(&app, "DELETE", "/api/karte/online-quellen/999", Some(&cookie), None).await;
+    let res = anfrage(
+        &app,
+        "DELETE",
+        "/api/karte/online-quellen/999",
+        Some(&cookie),
+        None,
+    )
+    .await;
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]
 async fn online_katalog_liefert_eintraege() {
     let (app, cookie) = admin_app().await;
-    let res = anfrage(&app, "GET", "/api/karte/online-quellen/katalog", Some(&cookie), None).await;
+    let res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/online-quellen/katalog",
+        Some(&cookie),
+        None,
+    )
+    .await;
     assert_eq!(res.status(), StatusCode::OK);
     let v = json(res).await;
     let liste = v.as_array().unwrap();
@@ -648,7 +719,14 @@ async fn offline_registrieren_aktivieren_loeschen() {
     assert_eq!(res.status(), StatusCode::OK);
     assert_eq!(json(res).await["aktiv_basemap"], true);
 
-    let res = anfrage(&app, "GET", "/api/karte/offline-karten", Some(&cookie), None).await;
+    let res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/offline-karten",
+        Some(&cookie),
+        None,
+    )
+    .await;
     assert_eq!(json(res).await.as_array().unwrap().len(), 1);
 
     let res = anfrage(
@@ -694,14 +772,28 @@ async fn offline_registrieren_ohne_lizenz_ist_400() {
 #[tokio::test]
 async fn offline_aktivieren_unbekannt_ist_404() {
     let (app, cookie) = admin_app().await;
-    let res = anfrage(&app, "POST", "/api/karte/offline-karten/999/aktivieren", Some(&cookie), None).await;
+    let res = anfrage(
+        &app,
+        "POST",
+        "/api/karte/offline-karten/999/aktivieren",
+        Some(&cookie),
+        None,
+    )
+    .await;
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]
 async fn offline_loeschen_unbekannt_ist_404() {
     let (app, cookie) = admin_app().await;
-    let res = anfrage(&app, "DELETE", "/api/karte/offline-karten/999", Some(&cookie), None).await;
+    let res = anfrage(
+        &app,
+        "DELETE",
+        "/api/karte/offline-karten/999",
+        Some(&cookie),
+        None,
+    )
+    .await;
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
 }
 
@@ -726,10 +818,15 @@ async fn offline_katalog_zeigt_nur_lieferbare() {
     // Im Test fehlt das Manifest (Fetch der TODO-Platzhalter-URL scheitert) → alle compiled-in
     // Platzhalter sind gefiltert → leer. Ungebaute Platzhalter dürfen nie als ladbar erscheinen.
     assert!(
-        liste.iter().all(|e| !e["url"].as_str().unwrap().contains("TODO")),
+        liste
+            .iter()
+            .all(|e| !e["url"].as_str().unwrap().contains("TODO")),
         "keine ungebauten TODO-Platzhalter im Download-Katalog"
     );
-    assert!(liste.iter().all(|e| e["sha256"].as_str().is_some()), "nur gepinnte Einträge");
+    assert!(
+        liste.iter().all(|e| e["sha256"].as_str().is_some()),
+        "nur gepinnte Einträge"
+    );
 }
 
 #[tokio::test]
@@ -750,7 +847,11 @@ async fn offline_download_ohne_lizenz_ist_400() {
         Some(r#"{"name":"DE","url":"https://example.test/de.pmtiles","lizenz":"  "}"#),
     )
     .await;
-    assert_eq!(res.status(), StatusCode::BAD_REQUEST, "Attribution ist Pflicht");
+    assert_eq!(
+        res.status(),
+        StatusCode::BAD_REQUEST,
+        "Attribution ist Pflicht"
+    );
 }
 
 #[tokio::test]
@@ -765,7 +866,11 @@ async fn offline_registrieren_ungueltiges_format_ist_400() {
         Some(r#"{"name":"X","pfad":"x.mbtiles","lizenz":"© Test","format":"gif"}"#),
     )
     .await;
-    assert_eq!(res.status(), StatusCode::BAD_REQUEST, "ungültiges Format → 400, kein DB-500");
+    assert_eq!(
+        res.status(),
+        StatusCode::BAD_REQUEST,
+        "ungültiges Format → 400, kein DB-500"
+    );
 }
 
 #[tokio::test]
@@ -773,10 +878,10 @@ async fn offline_download_interne_url_ist_400_ssrf() {
     let (app, cookie) = admin_app().await;
     // SSRF-Guard: interne IP / http müssen abgelehnt werden (kein Server-seitiger Fetch darauf).
     for url in [
-        "http://example.test/de.pmtiles",       // kein https
-        "https://169.254.169.254/latest/meta",  // Cloud-Metadaten
-        "https://127.0.0.1/de.pmtiles",          // Loopback
-        "https://192.168.1.1/de.pmtiles",        // privates Netz
+        "http://example.test/de.pmtiles",      // kein https
+        "https://169.254.169.254/latest/meta", // Cloud-Metadaten
+        "https://127.0.0.1/de.pmtiles",        // Loopback
+        "https://192.168.1.1/de.pmtiles",      // privates Netz
     ] {
         let body = format!(r#"{{"name":"X","url":"{url}","lizenz":"© OSM"}}"#);
         let res = anfrage(
@@ -828,9 +933,22 @@ async fn offline_liste_bietet_kein_update_auf_ungebauten_platzhalter() {
     .await;
     assert_eq!(res.status(), StatusCode::CREATED);
 
-    let liste = json(anfrage(&app, "GET", "/api/karte/offline-karten", Some(&cookie), None).await).await;
+    let liste = json(
+        anfrage(
+            &app,
+            "GET",
+            "/api/karte/offline-karten",
+            Some(&cookie),
+            None,
+        )
+        .await,
+    )
+    .await;
     let eintrag = &liste.as_array().unwrap()[0];
-    assert_eq!(eintrag["update_verfuegbar"], false, "kein Update auf einen ungebauten Platzhalter");
+    assert_eq!(
+        eintrag["update_verfuegbar"], false,
+        "kein Update auf einen ungebauten Platzhalter"
+    );
     assert!(eintrag["katalog_url"].is_null());
 }
 
@@ -851,7 +969,17 @@ async fn offline_liste_kein_update_bei_aktueller_katalog_quelle() {
     .await;
     assert_eq!(res.status(), StatusCode::CREATED);
 
-    let liste = json(anfrage(&app, "GET", "/api/karte/offline-karten", Some(&cookie), None).await).await;
+    let liste = json(
+        anfrage(
+            &app,
+            "GET",
+            "/api/karte/offline-karten",
+            Some(&cookie),
+            None,
+        )
+        .await,
+    )
+    .await;
     let eintrag = &liste.as_array().unwrap()[0];
     assert_eq!(eintrag["update_verfuegbar"], false);
     assert!(eintrag["katalog_url"].is_null());
@@ -882,8 +1010,19 @@ async fn online_quellen_als_fuehrungskraft_read_only() {
     let frieda = login_cookie(&app, "frieda", "friedapw1").await;
 
     // Lesen erlaubt (read-only-Einblick, Muster GlobalEinstellungen/org_einstellungen).
-    let res = anfrage(&app, "GET", "/api/karte/online-quellen", Some(&frieda), None).await;
-    assert_eq!(res.status(), StatusCode::OK, "Führungskraft darf die Liste lesen");
+    let res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/online-quellen",
+        Some(&frieda),
+        None,
+    )
+    .await;
+    assert_eq!(
+        res.status(),
+        StatusCode::OK,
+        "Führungskraft darf die Liste lesen"
+    );
 
     // Schreiben bleibt verboten (nur system-admin).
     let res = anfrage(
@@ -894,7 +1033,11 @@ async fn online_quellen_als_fuehrungskraft_read_only() {
         Some(r#"{"name":"X","url":"https://x","typ":"vektor","attribution":"© X"}"#),
     )
     .await;
-    assert_eq!(res.status(), StatusCode::FORBIDDEN, "Führungskraft darf nicht schreiben");
+    assert_eq!(
+        res.status(),
+        StatusCode::FORBIDDEN,
+        "Führungskraft darf nicht schreiben"
+    );
 }
 
 // ===== Proxy-Quellen-Validierung (LFH-182) =====
@@ -909,10 +1052,22 @@ async fn online_anlegen_proxy_interne_url_ist_400_ssrf() {
         "https://169.254.169.254/style.json",
         "https://127.0.0.1/style.json",
     ] {
-        let body =
-            format!(r#"{{"name":"P","url":"{url}","typ":"vektor","attribution":"© X","proxy":true}}"#);
-        let res = anfrage(&app, "POST", "/api/karte/online-quellen", Some(&cookie), Some(&body)).await;
-        assert_eq!(res.status(), StatusCode::BAD_REQUEST, "proxy+intern abgelehnt: {url}");
+        let body = format!(
+            r#"{{"name":"P","url":"{url}","typ":"vektor","attribution":"© X","proxy":true}}"#
+        );
+        let res = anfrage(
+            &app,
+            "POST",
+            "/api/karte/online-quellen",
+            Some(&cookie),
+            Some(&body),
+        )
+        .await;
+        assert_eq!(
+            res.status(),
+            StatusCode::BAD_REQUEST,
+            "proxy+intern abgelehnt: {url}"
+        );
     }
 }
 
@@ -945,7 +1100,11 @@ async fn online_anlegen_default_proxy_true() {
     )
     .await;
     assert_eq!(res.status(), StatusCode::CREATED);
-    assert_eq!(json(res).await["proxy"], true, "Default ohne proxy-Feld ⇒ true (LFH-190)");
+    assert_eq!(
+        json(res).await["proxy"],
+        true,
+        "Default ohne proxy-Feld ⇒ true (LFH-190)"
+    );
 }
 
 #[tokio::test]
@@ -989,18 +1148,30 @@ async fn config_proxy_quelle_gibt_relative_url_und_verbirgt_key() {
     let roh = String::from_utf8(bytes.to_vec()).unwrap();
     // Weder Key noch Upstream-Host stehen IRGENDWO im öffentlichen config-Body.
     assert!(!roh.contains("GEHEIM"), "kein Key im config-Body: {roh}");
-    assert!(!roh.contains("api.maptiler.com"), "kein Upstream-Host (vektor)");
-    assert!(!roh.contains("stadiamaps.com"), "kein Upstream-Host (raster)");
+    assert!(
+        !roh.contains("api.maptiler.com"),
+        "kein Upstream-Host (vektor)"
+    );
+    assert!(
+        !roh.contains("stadiamaps.com"),
+        "kein Upstream-Host (raster)"
+    );
 
     let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
     let styles = v["online_styles"].as_array().unwrap();
     assert_eq!(styles.len(), 3);
     // Vektor-proxy → /api/karte/proxy/{id}/style.json, Attribution erhalten.
-    assert!(styles[0]["url"].as_str().unwrap().starts_with("/api/karte/proxy/"));
+    assert!(styles[0]["url"]
+        .as_str()
+        .unwrap()
+        .starts_with("/api/karte/proxy/"));
     assert!(styles[0]["url"].as_str().unwrap().ends_with("/style.json"));
     assert_eq!(styles[0]["attribution"], "© MapTiler");
     // Raster-proxy → /api/karte/proxy/{id}/raster/{z}/{x}/{y}
-    assert!(styles[1]["url"].as_str().unwrap().ends_with("/raster/{z}/{x}/{y}"));
+    assert!(styles[1]["url"]
+        .as_str()
+        .unwrap()
+        .ends_with("/raster/{z}/{x}/{y}"));
     // proxy=0 → unverändert
     assert_eq!(styles[2]["url"], "https://tiles.example/liberty");
 }
@@ -1019,7 +1190,8 @@ async fn online_liste_maskiert_proxy_url_fuer_fuehrungskraft() {
     assert_eq!(res.status(), StatusCode::CREATED);
 
     // Admin sieht die volle url (er hat sie eingegeben und muss sie editieren können).
-    let liste = json(anfrage(&app, "GET", "/api/karte/online-quellen", Some(&admin), None).await).await;
+    let liste =
+        json(anfrage(&app, "GET", "/api/karte/online-quellen", Some(&admin), None).await).await;
     assert!(
         liste[0]["url"].as_str().unwrap().contains("GEHEIM"),
         "Admin sieht den Key voll"
@@ -1036,7 +1208,17 @@ async fn online_liste_maskiert_proxy_url_fuer_fuehrungskraft() {
     .await;
     assert_eq!(res.status(), StatusCode::CREATED);
     let frieda = login_cookie(&app, "frieda", "friedapw1").await;
-    let liste = json(anfrage(&app, "GET", "/api/karte/online-quellen", Some(&frieda), None).await).await;
+    let liste = json(
+        anfrage(
+            &app,
+            "GET",
+            "/api/karte/online-quellen",
+            Some(&frieda),
+            None,
+        )
+        .await,
+    )
+    .await;
     assert_eq!(liste[0]["url"], "***", "Führungskraft sieht maskierte url");
     assert!(
         !liste[0]["url"].as_str().unwrap().contains("GEHEIM"),
@@ -1046,7 +1228,15 @@ async fn online_liste_maskiert_proxy_url_fuer_fuehrungskraft() {
 
 // ===== Proxy-Endpunkte: Ablehnung/Scoping (Happy-Path via Service-Loopback-Tests bewiesen) =====
 
-async fn insert_proxy_quelle(pool: &sqlx::SqlitePool, name: &str, url: &str, typ: &str, aktiv: i64, proxy: i64, sortier: i64) {
+async fn insert_proxy_quelle(
+    pool: &sqlx::SqlitePool,
+    name: &str,
+    url: &str,
+    typ: &str,
+    aktiv: i64,
+    proxy: i64,
+    sortier: i64,
+) {
     sqlx::query("INSERT INTO karte_online_quelle (name,url,typ,attribution,sortier,aktiv,proxy) VALUES (?,?,?,?,?,?,?)")
         .bind(name).bind(url).bind(typ).bind("© X").bind(sortier).bind(aktiv).bind(proxy)
         .execute(pool).await.unwrap();
@@ -1068,11 +1258,31 @@ async fn proxy_style_unbekannte_id_ist_404() {
 async fn proxy_style_proxy0_oder_inaktiv_ist_404() {
     let pool = pool().await;
     insert_proxy_quelle(&pool, "Direkt", "https://x/s.json", "vektor", 1, 0, 0).await; // id 1: proxy=0
-    insert_proxy_quelle(&pool, "Inaktiv", "https://x/s.json?key=K", "vektor", 0, 1, 1).await; // id 2: inaktiv
+    insert_proxy_quelle(
+        &pool,
+        "Inaktiv",
+        "https://x/s.json?key=K",
+        "vektor",
+        0,
+        1,
+        1,
+    )
+    .await; // id 2: inaktiv
     let app = app_mit_pool(pool);
     for id in [1, 2] {
-        let res = anfrage(&app, "GET", &format!("/api/karte/proxy/{id}/style.json"), None, None).await;
-        assert_eq!(res.status(), StatusCode::NOT_FOUND, "id {id} nicht proxybar");
+        let res = anfrage(
+            &app,
+            "GET",
+            &format!("/api/karte/proxy/{id}/style.json"),
+            None,
+            None,
+        )
+        .await;
+        assert_eq!(
+            res.status(),
+            StatusCode::NOT_FOUND,
+            "id {id} nicht proxybar"
+        );
     }
 }
 
@@ -1080,10 +1290,23 @@ async fn proxy_style_proxy0_oder_inaktiv_ist_404() {
 async fn proxy_style_interne_gespeicherte_url_ist_fehler() {
     let pool = pool().await;
     // proxy=1 mit interner url direkt in DB (umgeht validiere_online) → SSRF-Gate im Handler.
-    insert_proxy_quelle(&pool, "Boese", "https://169.254.169.254/style.json", "vektor", 1, 1, 0).await;
+    insert_proxy_quelle(
+        &pool,
+        "Boese",
+        "https://169.254.169.254/style.json",
+        "vektor",
+        1,
+        1,
+        0,
+    )
+    .await;
     let app = app_mit_pool(pool);
     let res = anfrage(&app, "GET", "/api/karte/proxy/1/style.json", None, None).await;
-    assert!(res.status().is_server_error(), "SSRF-Gate vor Connect: {}", res.status());
+    assert!(
+        res.status().is_server_error(),
+        "SSRF-Gate vor Connect: {}",
+        res.status()
+    );
 }
 
 #[tokio::test]
@@ -1091,7 +1314,7 @@ async fn proxy_tile_art_mismatch_und_fremde_quelle_404() {
     let pool = pool().await;
     insert_proxy_quelle(&pool, "Q", "https://x/s.json?key=K", "vektor", 1, 1, 0).await; // id 1
     insert_proxy_quelle(&pool, "Q2", "https://y/s.json?key=K", "vektor", 1, 1, 1).await; // id 2
-    // Sprite-Slot (id 1) für quelle 1.
+                                                                                         // Sprite-Slot (id 1) für quelle 1.
     sqlx::query("INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) VALUES (1, 'https://x/sprite?key=K', 'sprite')")
         .execute(&pool).await.unwrap();
     let app = app_mit_pool(pool);
@@ -1106,10 +1329,23 @@ async fn proxy_tile_art_mismatch_und_fremde_quelle_404() {
 #[tokio::test]
 async fn proxy_raster_nicht_numerisches_z_ist_400() {
     let pool = pool().await;
-    insert_proxy_quelle(&pool, "R", "https://x/{z}/{x}/{y}.png?key=K", "raster", 1, 1, 0).await;
+    insert_proxy_quelle(
+        &pool,
+        "R",
+        "https://x/{z}/{x}/{y}.png?key=K",
+        "raster",
+        1,
+        1,
+        0,
+    )
+    .await;
     let app = app_mit_pool(pool);
     let res = anfrage(&app, "GET", "/api/karte/proxy/1/raster/abc/1/1", None, None).await;
-    assert_eq!(res.status(), StatusCode::BAD_REQUEST, "z nicht-numerisch → Path-Fehler");
+    assert_eq!(
+        res.status(),
+        StatusCode::BAD_REQUEST,
+        "z nicht-numerisch → Path-Fehler"
+    );
 }
 
 #[tokio::test]
@@ -1118,7 +1354,14 @@ async fn proxy_glyphs_ungueltiger_range_ist_400() {
     insert_proxy_quelle(&pool, "G", "https://x/s.json?key=K", "vektor", 1, 1, 0).await;
     let app = app_mit_pool(pool);
     // range ohne Bindestrich → validiere_range schlägt fehl (vor slot_aufloesen) → 400.
-    let res = anfrage(&app, "GET", "/api/karte/proxy/1/glyphs/1/Arial/0_255", None, None).await;
+    let res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/proxy/1/glyphs/1/Arial/0_255",
+        None,
+        None,
+    )
+    .await;
     assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 }
 
@@ -1126,7 +1369,9 @@ async fn proxy_glyphs_ungueltiger_range_ist_400() {
 async fn online_patch_und_delete_purgen_proxy_slots() {
     use lifeline_hub::karte::registry::repo;
     let pool = pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12")).await.unwrap();
+    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
+        .await
+        .unwrap();
     insert_proxy_quelle(&pool, "Q", "https://x/style.json?key=K", "vektor", 1, 1, 0).await; // id 1
     sqlx::query("INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) VALUES (1, 'https://x/sprite?key=K', 'sprite')")
         .execute(&pool).await.unwrap(); // slot 1
@@ -1134,7 +1379,10 @@ async fn online_patch_und_delete_purgen_proxy_slots() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
 
     // Slot existiert vor dem PATCH.
-    assert!(repo::slot_aufloesen(&pool, 1, 1, "sprite").await.unwrap().is_some());
+    assert!(repo::slot_aufloesen(&pool, 1, 1, "sprite")
+        .await
+        .unwrap()
+        .is_some());
     // PATCH mit GEÄNDERTER url → Handler purged die (jetzt stale) Slots.
     let res = anfrage(
         &app, "PATCH", "/api/karte/online-quellen/1", Some(&cookie),
@@ -1142,19 +1390,35 @@ async fn online_patch_und_delete_purgen_proxy_slots() {
     ).await;
     assert_eq!(res.status(), StatusCode::OK);
     assert!(
-        repo::slot_aufloesen(&pool, 1, 1, "sprite").await.unwrap().is_none(),
+        repo::slot_aufloesen(&pool, 1, 1, "sprite")
+            .await
+            .unwrap()
+            .is_none(),
         "PATCH (URL-Wechsel) purged stale Slots"
     );
 
     // Neuen Slot anlegen, dann DELETE → ebenfalls weg (Handler-Purge + CASCADE).
     sqlx::query("INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) VALUES (1, 'https://x/s2?key=K2', 'sprite')")
         .execute(&pool).await.unwrap();
-    let slot2: i64 = sqlx::query_scalar("SELECT id FROM karte_proxy_asset WHERE quelle_id = 1 LIMIT 1")
-        .fetch_one(&pool).await.unwrap();
-    let res = anfrage(&app, "DELETE", "/api/karte/online-quellen/1", Some(&cookie), None).await;
+    let slot2: i64 =
+        sqlx::query_scalar("SELECT id FROM karte_proxy_asset WHERE quelle_id = 1 LIMIT 1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let res = anfrage(
+        &app,
+        "DELETE",
+        "/api/karte/online-quellen/1",
+        Some(&cookie),
+        None,
+    )
+    .await;
     assert_eq!(res.status(), StatusCode::NO_CONTENT);
     assert!(
-        repo::slot_aufloesen(&pool, 1, slot2, "sprite").await.unwrap().is_none(),
+        repo::slot_aufloesen(&pool, 1, slot2, "sprite")
+            .await
+            .unwrap()
+            .is_none(),
         "DELETE entfernt die Slots"
     );
 }
@@ -1168,7 +1432,11 @@ async fn proxy_tile_slot_auf_interne_adresse_ist_fehler_ssrf() {
         .execute(&pool).await.unwrap();
     let app = app_mit_pool(pool);
     let res = anfrage(&app, "GET", "/api/karte/proxy/1/tile/1/1/1/1", None, None).await;
-    assert!(res.status().is_server_error(), "SSRF-Gate blockt internen Slot: {}", res.status());
+    assert!(
+        res.status().is_server_error(),
+        "SSRF-Gate blockt internen Slot: {}",
+        res.status()
+    );
 }
 
 // ===== POST /api/karte/offline-karten/bauen (Region-Bau-Trigger → karten-service, LFH-203/B2) =====
@@ -1199,19 +1467,27 @@ async fn admin_app_mit_karten_service(url: &str, token: &str) -> (axum::Router, 
 /// Beantwortet `POST /builds`, NACHDEM geprüft wurde, dass Bearer-Token und Body (`{"slug":..}`)
 /// wie erwartet ankommen — falsche Werte lassen die Assertion in der Mock-Task panicken, der
 /// Request bricht ab und der Test schlägt (indirekt, über den dadurch nicht-202-Status) fehl.
-async fn spawn_karten_service_mock(erwartetes_token: &'static str, erwarteter_slug: &'static str) -> String {
+async fn spawn_karten_service_mock(
+    erwartetes_token: &'static str,
+    erwarteter_slug: &'static str,
+) -> String {
     use axum::routing::post;
     use axum::Router;
 
     let mock = Router::new().route(
         "/builds",
         post(
-            move |headers: axum::http::HeaderMap, axum::Json(body): axum::Json<serde_json::Value>| async move {
+            move |headers: axum::http::HeaderMap,
+                  axum::Json(body): axum::Json<serde_json::Value>| async move {
                 let auth = headers
                     .get(axum::http::header::AUTHORIZATION)
                     .and_then(|v| v.to_str().ok())
                     .unwrap_or_default();
-                assert_eq!(auth, format!("Bearer {erwartetes_token}"), "Bearer-Token weitergereicht");
+                assert_eq!(
+                    auth,
+                    format!("Bearer {erwartetes_token}"),
+                    "Bearer-Token weitergereicht"
+                );
                 assert_eq!(body["slug"], erwarteter_slug, "slug im Body weitergereicht");
                 axum::Json(serde_json::json!({ "job_id": 7 }))
             },
@@ -1290,16 +1566,29 @@ async fn baubare_regionen_ohne_service_config_liefert_leere_liste() {
     .await;
     assert_eq!(res.status(), StatusCode::OK);
     let v = json(res).await;
-    assert!(v.as_array().unwrap().is_empty(), "leere Liste ohne Service-Konfiguration: {v:?}");
+    assert!(
+        v.as_array().unwrap().is_empty(),
+        "leere Liste ohne Service-Konfiguration: {v:?}"
+    );
 }
 
 #[tokio::test]
 async fn bau_status_ohne_service_config_liefert_leere_liste() {
     let (app, cookie) = admin_app().await;
-    let res = anfrage(&app, "GET", "/api/karte/offline-karten/bau-status", Some(&cookie), None).await;
+    let res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/offline-karten/bau-status",
+        Some(&cookie),
+        None,
+    )
+    .await;
     assert_eq!(res.status(), StatusCode::OK);
     let v = json(res).await;
-    assert!(v.as_array().unwrap().is_empty(), "leere Liste ohne Service-Konfiguration: {v:?}");
+    assert!(
+        v.as_array().unwrap().is_empty(),
+        "leere Liste ohne Service-Konfiguration: {v:?}"
+    );
 }
 
 /// Mini-Mock des zentralen karten-service für die beiden Read-Proxies (Muster:
@@ -1316,7 +1605,11 @@ async fn spawn_regionen_und_builds_mock(erwartetes_token: &'static str) -> Strin
             .get(axum::http::header::AUTHORIZATION)
             .and_then(|v| v.to_str().ok())
             .unwrap_or_default();
-        assert_eq!(auth, format!("Bearer {erwartetes_token}"), "Bearer-Token weitergereicht");
+        assert_eq!(
+            auth,
+            format!("Bearer {erwartetes_token}"),
+            "Bearer-Token weitergereicht"
+        );
     }
 
     let mock = Router::new()
@@ -1367,10 +1660,19 @@ async fn baubare_regionen_und_bau_status_forwarden_service_antwort_roh() {
     .await;
     assert_eq!(regionen_res.status(), StatusCode::OK);
     let regionen = json(regionen_res).await;
-    assert_eq!(regionen[0]["slug"], "bayern", "Region unverändert durchgereicht: {regionen:?}");
+    assert_eq!(
+        regionen[0]["slug"], "bayern",
+        "Region unverändert durchgereicht: {regionen:?}"
+    );
 
-    let status_res =
-        anfrage(&app, "GET", "/api/karte/offline-karten/bau-status", Some(&cookie), None).await;
+    let status_res = anfrage(
+        &app,
+        "GET",
+        "/api/karte/offline-karten/bau-status",
+        Some(&cookie),
+        None,
+    )
+    .await;
     assert_eq!(status_res.status(), StatusCode::OK);
     let status = json(status_res).await;
     // Verschachteltes status.status statt geflacht — Raw-Passthrough-Beweis (kein Reshape).
@@ -1379,4 +1681,3 @@ async fn baubare_regionen_und_bau_status_forwarden_service_antwort_roh() {
         "verschachtelter Build-Status unverändert durchgereicht: {status:?}"
     );
 }
-

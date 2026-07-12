@@ -4,7 +4,9 @@
 #[ignore]
 async fn baut_bremen_und_bounds_passen() {
     use karten_service::build::{make_runner::MakeRunner, validate, BuildRunner};
-    let runner = MakeRunner { karten_build_dir: "karten-build".into() };
+    let runner = MakeRunner {
+        karten_build_dir: "karten-build".into(),
+    };
     let art = runner.baue("bremen").await.expect("Bremen-Bau");
     assert_eq!(art.sha256.len(), 64);
     assert!(art.datei.exists());

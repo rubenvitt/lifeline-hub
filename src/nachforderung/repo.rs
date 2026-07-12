@@ -30,11 +30,13 @@ const ANZEIGE_SELECT: &str =
 
 /// Lädt eine Nachforderung als Anzeige. `NotFound`, wenn unbekannt.
 pub async fn laden(pool: &SqlitePool, id: i64) -> Result<NachforderungAnzeige, AppError> {
-    sqlx::query_as::<_, NachforderungAnzeige>(sqlx::AssertSqlSafe(format!("{ANZEIGE_SELECT} WHERE n.id = ?")))
-        .bind(id)
-        .fetch_optional(pool)
-        .await?
-        .ok_or(AppError::NotFound)
+    sqlx::query_as::<_, NachforderungAnzeige>(sqlx::AssertSqlSafe(format!(
+        "{ANZEIGE_SELECT} WHERE n.id = ?"
+    )))
+    .bind(id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)
 }
 
 /// Legt eine Nachforderung an und erzeugt im selben Commit den ETB-Eintrag (typ='meldung':
@@ -71,7 +73,10 @@ pub async fn anlegen_tx(
 
     // ETB-Meldung (Pattern B): die Anforderung erscheint regulär im ETB.
     let menge = daten.anzahl.map(|a| format!("{a}× ")).unwrap_or_default();
-    let inhalt = format!("Nachforderung: {menge}{} — {}", daten.art, daten.bezeichnung);
+    let inhalt = format!(
+        "Nachforderung: {menge}{} — {}",
+        daten.art, daten.bezeichnung
+    );
     let etb_id = crate::etb::repo::anlegen_tx(
         &mut *tx,
         einsatz_id,
@@ -135,7 +140,8 @@ pub async fn liste(
         " ORDER BY CASE n.prioritaet WHEN 'sofort' THEN 0 WHEN 'dringend' THEN 1 ELSE 2 END, \
           n.angefordert_at DESC, n.id DESC",
     );
-    let mut query = sqlx::query_as::<_, NachforderungAnzeige>(sqlx::AssertSqlSafe(&*q)).bind(einsatz_id);
+    let mut query =
+        sqlx::query_as::<_, NachforderungAnzeige>(sqlx::AssertSqlSafe(&*q)).bind(einsatz_id);
     if let Some(s) = status_filter {
         query = query.bind(s);
     }
@@ -143,7 +149,11 @@ pub async fn liste(
 }
 
 /// Cross-Einsatz-Schutz: gehört die Nachforderung zum Einsatz?
-pub async fn gehoert_zu_einsatz(pool: &SqlitePool, id: i64, einsatz_id: i64) -> Result<bool, AppError> {
+pub async fn gehoert_zu_einsatz(
+    pool: &SqlitePool,
+    id: i64,
+    einsatz_id: i64,
+) -> Result<bool, AppError> {
     let treffer: Option<i64> =
         sqlx::query_scalar("SELECT 1 FROM nachforderung WHERE id = ? AND einsatz_id = ?")
             .bind(id)
@@ -159,7 +169,13 @@ pub async fn gehoert_zu_einsatz(pool: &SqlitePool, id: i64, einsatz_id: i64) -> 
 /// die FSM ist back-edge-frei, daher kann der Guard keinen gültigen Übergang fälschlich
 /// abweisen). Liefert `true`, wenn eine Zeile geändert wurde; `false` = Status zwischenzeitlich
 /// geändert. `abgelehnt` läuft über [`lehne_ab`].
-pub async fn setze_status(pool: &SqlitePool, id: i64, neuer_status: &str, erwartet: &str, jetzt: &str) -> Result<bool, AppError> {
+pub async fn setze_status(
+    pool: &SqlitePool,
+    id: i64,
+    neuer_status: &str,
+    erwartet: &str,
+    jetzt: &str,
+) -> Result<bool, AppError> {
     let stempel_spalte = match neuer_status {
         super::STATUS_ZUGESAGT => "zugesagt_at",
         super::STATUS_UNTERWEGS => "unterwegs_at",
@@ -170,14 +186,26 @@ pub async fn setze_status(pool: &SqlitePool, id: i64, neuer_status: &str, erwart
         "UPDATE nachforderung SET status = ?, {stempel_spalte} = COALESCE({stempel_spalte}, ?) \
          WHERE id = ? AND status = ?"
     );
-    let r = sqlx::query(sqlx::AssertSqlSafe(&*sql)).bind(neuer_status).bind(jetzt).bind(id).bind(erwartet).execute(pool).await?;
+    let r = sqlx::query(sqlx::AssertSqlSafe(&*sql))
+        .bind(neuer_status)
+        .bind(jetzt)
+        .bind(id)
+        .bind(erwartet)
+        .execute(pool)
+        .await?;
     Ok(r.rows_affected() > 0)
 }
 
 /// Lehnt eine Nachforderung ab (Abzweig): setzt status='abgelehnt', Zeitstempel und Grund —
 /// nur wenn der Bestandsstatus `erwartet` unverändert ist (optimistische Sperre). Liefert
 /// `true` bei erfolgter Änderung.
-pub async fn lehne_ab(pool: &SqlitePool, id: i64, grund: Option<&str>, erwartet: &str, jetzt: &str) -> Result<bool, AppError> {
+pub async fn lehne_ab(
+    pool: &SqlitePool,
+    id: i64,
+    grund: Option<&str>,
+    erwartet: &str,
+    jetzt: &str,
+) -> Result<bool, AppError> {
     let r = sqlx::query(
         "UPDATE nachforderung SET status = ?, abgelehnt_at = COALESCE(abgelehnt_at, ?), \
          abgelehnt_grund = COALESCE(abgelehnt_grund, ?) WHERE id = ? AND status = ?",
@@ -197,19 +225,24 @@ mod tests {
     use super::*;
     use crate::kommunikation::AdressatKategorie;
     use crate::nachforderung::{
-        NachforderungStatus, ADRESSAT_LEITSTELLE, PRIO_NORMAL, STATUS_ANGEFORDERT, STATUS_EINGETROFFEN,
-        STATUS_UNTERWEGS, STATUS_ZUGESAGT,
+        NachforderungStatus, ADRESSAT_LEITSTELLE, PRIO_NORMAL, STATUS_ANGEFORDERT,
+        STATUS_EINGETROFFEN, STATUS_UNTERWEGS, STATUS_ZUGESAGT,
     };
 
     async fn setup(pool: &SqlitePool) -> (i64, i64) {
         sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
-            .execute(pool).await.unwrap();
+            .execute(pool)
+            .await
+            .unwrap();
         let b: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) VALUES (1,'Leit','leit','h') RETURNING id")
             .fetch_one(pool).await.unwrap();
         let e: i64 = sqlx::query_scalar(
-            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id")
-            .fetch_one(pool).await.unwrap();
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         (b, e)
     }
 
@@ -230,7 +263,9 @@ mod tests {
     async fn anlegen_setzt_default_status_und_erzeugt_etb_mit_backlink() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let n = anlegen(&pool, e, b, daten("RTW", "2 RTW zur Verstärkung")).await.unwrap();
+        let n = anlegen(&pool, e, b, daten("RTW", "2 RTW zur Verstärkung"))
+            .await
+            .unwrap();
         assert_eq!(n.status, NachforderungStatus::Angefordert);
         assert!(n.ist_offen);
         assert_eq!(n.anzahl, Some(2));
@@ -239,7 +274,10 @@ mod tests {
         let etb_id = n.etb_nachforderung_id.expect("ETB-Eintrag erzeugt");
         let (typ, backlink): (String, i64) =
             sqlx::query_as("SELECT typ, nachforderung_id FROM etb_eintrag WHERE id = ?")
-                .bind(etb_id).fetch_one(&pool).await.unwrap();
+                .bind(etb_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(typ, "meldung");
         assert_eq!(backlink, n.id);
     }
@@ -249,14 +287,20 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         anlegen(&pool, e, b, daten("RTW", "normal")).await.unwrap();
-        let sofort = NachforderungDaten { prioritaet: super::super::PRIO_SOFORT, ..daten("SEG", "sofort") };
+        let sofort = NachforderungDaten {
+            prioritaet: super::super::PRIO_SOFORT,
+            ..daten("SEG", "sofort")
+        };
         anlegen(&pool, e, b, sofort).await.unwrap();
         let alle = liste(&pool, e, None).await.unwrap();
         assert_eq!(alle.len(), 2);
         assert_eq!(alle[0].bezeichnung, "sofort", "sofort vor normal");
         let offen = liste(&pool, e, Some("angefordert")).await.unwrap();
         assert_eq!(offen.len(), 2);
-        assert!(liste(&pool, e, Some("eingetroffen")).await.unwrap().is_empty());
+        assert!(liste(&pool, e, Some("eingetroffen"))
+            .await
+            .unwrap()
+            .is_empty());
     }
 
     #[tokio::test]
@@ -264,18 +308,50 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         let n = anlegen(&pool, e, b, daten("RTW", "x")).await.unwrap();
-        assert!(setze_status(&pool, n.id, STATUS_ZUGESAGT, STATUS_ANGEFORDERT, "2026-06-12 09:05:00").await.unwrap());
-        assert!(setze_status(&pool, n.id, STATUS_UNTERWEGS, STATUS_ZUGESAGT, "2026-06-12 09:10:00").await.unwrap());
+        assert!(setze_status(
+            &pool,
+            n.id,
+            STATUS_ZUGESAGT,
+            STATUS_ANGEFORDERT,
+            "2026-06-12 09:05:00"
+        )
+        .await
+        .unwrap());
+        assert!(setze_status(
+            &pool,
+            n.id,
+            STATUS_UNTERWEGS,
+            STATUS_ZUGESAGT,
+            "2026-06-12 09:10:00"
+        )
+        .await
+        .unwrap());
         let nach = laden(&pool, n.id).await.unwrap();
         assert_eq!(nach.status, NachforderungStatus::Unterwegs);
         assert_eq!(nach.zugesagt_at.as_deref(), Some("2026-06-12 09:05:00"));
         assert_eq!(nach.unterwegs_at.as_deref(), Some("2026-06-12 09:10:00"));
         assert!(nach.ist_offen);
         // eingetroffen → terminal, nicht mehr offen.
-        assert!(setze_status(&pool, n.id, STATUS_EINGETROFFEN, STATUS_UNTERWEGS, "2026-06-12 09:30:00").await.unwrap());
+        assert!(setze_status(
+            &pool,
+            n.id,
+            STATUS_EINGETROFFEN,
+            STATUS_UNTERWEGS,
+            "2026-06-12 09:30:00"
+        )
+        .await
+        .unwrap());
         assert!(!laden(&pool, n.id).await.unwrap().ist_offen);
         // Optimistische Sperre: erneuter Übergang mit veraltetem `erwartet` greift nicht.
-        assert!(!setze_status(&pool, n.id, STATUS_ZUGESAGT, STATUS_ANGEFORDERT, "2026-06-12 09:40:00").await.unwrap());
+        assert!(!setze_status(
+            &pool,
+            n.id,
+            STATUS_ZUGESAGT,
+            STATUS_ANGEFORDERT,
+            "2026-06-12 09:40:00"
+        )
+        .await
+        .unwrap());
     }
 
     #[tokio::test]
@@ -283,7 +359,15 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         let n = anlegen(&pool, e, b, daten("RTW", "x")).await.unwrap();
-        assert!(lehne_ab(&pool, n.id, Some("keine Reserven"), STATUS_ANGEFORDERT, "2026-06-12 09:05:00").await.unwrap());
+        assert!(lehne_ab(
+            &pool,
+            n.id,
+            Some("keine Reserven"),
+            STATUS_ANGEFORDERT,
+            "2026-06-12 09:05:00"
+        )
+        .await
+        .unwrap());
         let nach = laden(&pool, n.id).await.unwrap();
         assert_eq!(nach.status, NachforderungStatus::Abgelehnt);
         assert_eq!(nach.abgelehnt_grund.as_deref(), Some("keine Reserven"));

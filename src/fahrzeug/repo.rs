@@ -28,7 +28,11 @@ pub struct FahrzeugDaten<'a> {
 /// Zerlegt eine optionale Stärke in drei `Option<i64>` (DB-Spalten).
 fn zerlege_staerke(s: Option<Staerke>) -> (Option<i64>, Option<i64>, Option<i64>) {
     match s {
-        Some(s) => (Some(s.fuehrer as i64), Some(s.unterfuehrer as i64), Some(s.mannschaft as i64)),
+        Some(s) => (
+            Some(s.fuehrer as i64),
+            Some(s.unterfuehrer as i64),
+            Some(s.mannschaft as i64),
+        ),
         None => (None, None, None),
     }
 }
@@ -79,7 +83,11 @@ pub async fn liste(
 /// DISTINCT-Werte einer Spalte (org-weit, nicht-leer, sortiert) für die AutoComplete.
 /// `spalte` wird in die Query interpoliert und darf daher AUSSCHLIESSLICH mit
 /// festen Literalen aufgerufen werden (keine Nutzereingabe).
-async fn distinct_werte(pool: &SqlitePool, org_id: i64, spalte: &str) -> Result<Vec<String>, AppError> {
+async fn distinct_werte(
+    pool: &SqlitePool,
+    org_id: i64,
+    spalte: &str,
+) -> Result<Vec<String>, AppError> {
     sqlx::query_scalar::<_, String>(sqlx::AssertSqlSafe(format!(
         "SELECT DISTINCT {spalte} FROM fahrzeug \
          WHERE org_id = ? AND {spalte} IS NOT NULL AND {spalte} <> '' \
@@ -192,7 +200,11 @@ pub async fn setze_dienststatus(
     id: i64,
     in_dienst: bool,
 ) -> Result<Fahrzeug, AppError> {
-    let neuer = if in_dienst { DIENSTSTATUS_IN_DIENST } else { DIENSTSTATUS_AUSSER_DIENST };
+    let neuer = if in_dienst {
+        DIENSTSTATUS_IN_DIENST
+    } else {
+        DIENSTSTATUS_AUSSER_DIENST
+    };
     let ergebnis = sqlx::query("UPDATE fahrzeug SET dienststatus = ? WHERE id = ? AND org_id = ?")
         .bind(neuer)
         .bind(id)
@@ -254,7 +266,10 @@ mod tests {
         org(&pool, 1).await;
         org(&pool, 2).await;
         let f = anlegen(&pool, 1, daten("Florian 1")).await.unwrap();
-        assert!(matches!(laden(&pool, 2, f.id).await.unwrap_err(), AppError::NotFound));
+        assert!(matches!(
+            laden(&pool, 2, f.id).await.unwrap_err(),
+            AppError::NotFound
+        ));
     }
 
     #[tokio::test]
@@ -284,9 +299,19 @@ mod tests {
         let f = anlegen(&pool, 1, daten("Florian 1")).await.unwrap();
 
         setze_dienststatus(&pool, 1, f.id, false).await.unwrap();
-        assert!(liste(&pool, 1, true).await.unwrap().is_empty(), "nicht in nur_im_dienst");
-        assert_eq!(liste(&pool, 1, false).await.unwrap().len(), 1, "aber weiter referenzierbar");
-        assert_eq!(laden(&pool, 1, f.id).await.unwrap().dienststatus, "ausser_dienst");
+        assert!(
+            liste(&pool, 1, true).await.unwrap().is_empty(),
+            "nicht in nur_im_dienst"
+        );
+        assert_eq!(
+            liste(&pool, 1, false).await.unwrap().len(),
+            1,
+            "aber weiter referenzierbar"
+        );
+        assert_eq!(
+            laden(&pool, 1, f.id).await.unwrap().dienststatus,
+            "ausser_dienst"
+        );
     }
 
     #[tokio::test]
@@ -299,7 +324,9 @@ mod tests {
         anlegen(&pool, 1, daten("Florian 1")).await.unwrap();
         // Reaktivieren des alten Fahrzeugs kollidiert → Conflict.
         assert!(matches!(
-            setze_dienststatus(&pool, 1, alt.id, true).await.unwrap_err(),
+            setze_dienststatus(&pool, 1, alt.id, true)
+                .await
+                .unwrap_err(),
             AppError::Conflict(_)
         ));
     }
@@ -335,7 +362,14 @@ mod tests {
 
         let v = vorschlaege(&pool, 1).await.unwrap();
         assert_eq!(v.fahrzeugtyp, vec!["LF 20".to_string(), "RTW".to_string()]);
-        assert_eq!(v.traegerorganisation, vec!["DRK".to_string(), "Feuerwehr".to_string()]);
-        assert_eq!(v.standort, vec!["Wache Mitte".to_string()], "DISTINCT je Feld");
+        assert_eq!(
+            v.traegerorganisation,
+            vec!["DRK".to_string(), "Feuerwehr".to_string()]
+        );
+        assert_eq!(
+            v.standort,
+            vec!["Wache Mitte".to_string()],
+            "DISTINCT je Feld"
+        );
     }
 }

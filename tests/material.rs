@@ -14,7 +14,16 @@ async fn setup() -> axum::Router {
     bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
         .await
         .unwrap();
-    build_router(AppState { pool, live: LiveHub::new(), karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu(), download_client: lifeline_hub::karte::download::download_client(), download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(), karten_service_url: None, karten_service_token: None })
+    build_router(AppState {
+        pool,
+        live: LiveHub::new(),
+        karten_dir: std::env::temp_dir(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_service_url: None,
+        karten_service_token: None,
+    })
 }
 
 async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) -> String {
@@ -43,7 +52,12 @@ async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) ->
         .to_string()
 }
 
-async fn benutzer_anlegen(app: &axum::Router, admin_cookie: &str, name: &str, org_rolle: &str) -> i64 {
+async fn benutzer_anlegen(
+    app: &axum::Router,
+    admin_cookie: &str,
+    name: &str,
+    org_rolle: &str,
+) -> i64 {
     let body = format!(
         r#"{{"anzeigename":"{name}","benutzername":"{name}","passwort":"{name}pw1","org_rolle":"{org_rolle}"}}"#
     );
@@ -62,7 +76,9 @@ async fn benutzer_anlegen(app: &axum::Router, admin_cookie: &str, name: &str, or
         .unwrap();
     assert_eq!(resp.status(), StatusCode::CREATED);
     let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    serde_json::from_slice::<Value>(&bytes).unwrap()["id"].as_i64().unwrap()
+    serde_json::from_slice::<Value>(&bytes).unwrap()["id"]
+        .as_i64()
+        .unwrap()
 }
 
 /// Generischer Request-Helfer: liefert (Status, JSON-Body).
@@ -73,7 +89,10 @@ async fn anfrage(
     cookie: &str,
     body: Option<&str>,
 ) -> (StatusCode, Value) {
-    let mut req = Request::builder().method(methode).uri(uri).header(header::COOKIE, cookie.to_string());
+    let mut req = Request::builder()
+        .method(methode)
+        .uri(uri)
+        .header(header::COOKIE, cookie.to_string());
     let body = match body {
         Some(b) => {
             req = req.header(header::CONTENT_TYPE, "application/json");
@@ -84,7 +103,10 @@ async fn anfrage(
     let resp = app.clone().oneshot(req.body(body).unwrap()).await.unwrap();
     let status = resp.status();
     let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
 }
 
 // ---------- Tests ----------
@@ -96,9 +118,13 @@ async fn admin_legt_material_an_alle_lesen_es() {
     benutzer_anlegen(&app, &admin, "erika", "keine").await;
 
     let (status, json) = anfrage(
-        &app, "POST", "/api/material", &admin,
+        &app,
+        "POST",
+        "/api/material",
+        &admin,
         Some(r#"{"bezeichnung":"Wolldecke","kategorie":"Betreuung"}"#),
-    ).await;
+    )
+    .await;
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(json["bezeichnung"], "Wolldecke");
     assert_eq!(json["dienststatus"], "in_dienst");
@@ -116,7 +142,14 @@ async fn nicht_admin_darf_nicht_anlegen() {
     benutzer_anlegen(&app, &admin, "erika", "keine").await;
     let erika = login_cookie(&app, "erika", "erikapw1").await;
 
-    let (status, _) = anfrage(&app, "POST", "/api/material", &erika, Some(r#"{"bezeichnung":"Verboten"}"#)).await;
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        "/api/material",
+        &erika,
+        Some(r#"{"bezeichnung":"Verboten"}"#),
+    )
+    .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 }
 
@@ -125,8 +158,18 @@ async fn bezeichnung_nicht_eindeutig_zwei_wolldecken() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let body = r#"{"bezeichnung":"Wolldecke"}"#;
-    assert_eq!(anfrage(&app, "POST", "/api/material", &admin, Some(body)).await.0, StatusCode::CREATED);
-    assert_eq!(anfrage(&app, "POST", "/api/material", &admin, Some(body)).await.0, StatusCode::CREATED);
+    assert_eq!(
+        anfrage(&app, "POST", "/api/material", &admin, Some(body))
+            .await
+            .0,
+        StatusCode::CREATED
+    );
+    assert_eq!(
+        anfrage(&app, "POST", "/api/material", &admin, Some(body))
+            .await
+            .0,
+        StatusCode::CREATED
+    );
 }
 
 #[tokio::test]
@@ -134,16 +177,33 @@ async fn dublette_bestandsnummer_ist_409() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let body = r#"{"bezeichnung":"Stromerzeuger","bestandsnummer":"INV-1"}"#;
-    assert_eq!(anfrage(&app, "POST", "/api/material", &admin, Some(body)).await.0, StatusCode::CREATED);
+    assert_eq!(
+        anfrage(&app, "POST", "/api/material", &admin, Some(body))
+            .await
+            .0,
+        StatusCode::CREATED
+    );
     let body2 = r#"{"bezeichnung":"Stromerzeuger 2","bestandsnummer":"INV-1"}"#;
-    assert_eq!(anfrage(&app, "POST", "/api/material", &admin, Some(body2)).await.0, StatusCode::CONFLICT);
+    assert_eq!(
+        anfrage(&app, "POST", "/api/material", &admin, Some(body2))
+            .await
+            .0,
+        StatusCode::CONFLICT
+    );
 }
 
 #[tokio::test]
 async fn leere_bezeichnung_ist_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (status, _) = anfrage(&app, "POST", "/api/material", &admin, Some(r#"{"bezeichnung":"   "}"#)).await;
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        "/api/material",
+        &admin,
+        Some(r#"{"bezeichnung":"   "}"#),
+    )
+    .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
@@ -151,14 +211,36 @@ async fn leere_bezeichnung_ist_400() {
 async fn ausser_dienst_versteckt_aus_nur_im_dienst() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (_, json) = anfrage(&app, "POST", "/api/material", &admin, Some(r#"{"bezeichnung":"Wolldecke"}"#)).await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        "/api/material",
+        &admin,
+        Some(r#"{"bezeichnung":"Wolldecke"}"#),
+    )
+    .await;
     let id = json["id"].as_i64().unwrap();
 
     assert_eq!(
-        anfrage(&app, "POST", &format!("/api/material/{id}/ausser-dienst"), &admin, None).await.0,
+        anfrage(
+            &app,
+            "POST",
+            &format!("/api/material/{id}/ausser-dienst"),
+            &admin,
+            None
+        )
+        .await
+        .0,
         StatusCode::OK
     );
-    let (_, im_dienst) = anfrage(&app, "GET", "/api/material?nur_im_dienst=true", &admin, None).await;
+    let (_, im_dienst) = anfrage(
+        &app,
+        "GET",
+        "/api/material?nur_im_dienst=true",
+        &admin,
+        None,
+    )
+    .await;
     assert!(im_dienst.as_array().unwrap().is_empty());
     let (_, alle) = anfrage(&app, "GET", "/api/material", &admin, None).await;
     assert_eq!(alle.as_array().unwrap().len(), 1);
@@ -168,7 +250,14 @@ async fn ausser_dienst_versteckt_aus_nur_im_dienst() {
 async fn kein_delete_endpunkt() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (_, json) = anfrage(&app, "POST", "/api/material", &admin, Some(r#"{"bezeichnung":"Wolldecke"}"#)).await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        "/api/material",
+        &admin,
+        Some(r#"{"bezeichnung":"Wolldecke"}"#),
+    )
+    .await;
     let id = json["id"].as_i64().unwrap();
     let (status, _) = anfrage(&app, "DELETE", &format!("/api/material/{id}"), &admin, None).await;
     assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
@@ -178,7 +267,14 @@ async fn kein_delete_endpunkt() {
 async fn patch_unbekannte_id_ist_404() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (status, _) = anfrage(&app, "PATCH", "/api/material/9999", &admin, Some(r#"{"bezeichnung":"X"}"#)).await;
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        "/api/material/9999",
+        &admin,
+        Some(r#"{"bezeichnung":"X"}"#),
+    )
+    .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
@@ -186,10 +282,35 @@ async fn patch_unbekannte_id_ist_404() {
 async fn kategorien_endpunkt_liefert_distinct() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    anfrage(&app, "POST", "/api/material", &admin, Some(r#"{"bezeichnung":"Decke","kategorie":"Betreuung"}"#)).await;
-    anfrage(&app, "POST", "/api/material", &admin, Some(r#"{"bezeichnung":"Wolldecke","kategorie":"Betreuung"}"#)).await;
-    anfrage(&app, "POST", "/api/material", &admin, Some(r#"{"bezeichnung":"Sandsack","kategorie":"Hochwasser"}"#)).await;
+    anfrage(
+        &app,
+        "POST",
+        "/api/material",
+        &admin,
+        Some(r#"{"bezeichnung":"Decke","kategorie":"Betreuung"}"#),
+    )
+    .await;
+    anfrage(
+        &app,
+        "POST",
+        "/api/material",
+        &admin,
+        Some(r#"{"bezeichnung":"Wolldecke","kategorie":"Betreuung"}"#),
+    )
+    .await;
+    anfrage(
+        &app,
+        "POST",
+        "/api/material",
+        &admin,
+        Some(r#"{"bezeichnung":"Sandsack","kategorie":"Hochwasser"}"#),
+    )
+    .await;
     let (status, json) = anfrage(&app, "GET", "/api/material-kategorien", &admin, None).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(json.as_array().unwrap().len(), 2, "DISTINCT: Betreuung, Hochwasser");
+    assert_eq!(
+        json.as_array().unwrap().len(),
+        2,
+        "DISTINCT: Betreuung, Hochwasser"
+    );
 }

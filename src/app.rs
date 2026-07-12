@@ -86,46 +86,142 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/einsaetze/{id}/etb", post(routes::etb::erfassen))
         .route("/api/einsaetze/{id}/etb", get(routes::etb::liste))
         .route("/api/einsaetze/{id}/etb/stream", get(routes::etb::stream))
-        .route("/api/einsaetze/{id}/etb/{eintrag_id}/auftrag", post(routes::etb::auftrag_erteilen))
-        .route("/api/einsaetze/{id}/chat/kanaele", get(routes::chat::kanaele_liste))
-        .route("/api/einsaetze/{id}/chat/kanaele", post(routes::chat::kanal_anlegen))
-        .route("/api/einsaetze/{id}/chat/kanaele/{kid}/nachrichten", get(routes::chat::nachrichten_liste))
-        .route("/api/einsaetze/{id}/chat/kanaele/{kid}/nachrichten", post(routes::chat::nachricht_erfassen))
-        .route("/api/einsaetze/{id}/chat/nachrichten/{mid}", patch(routes::chat::nachricht_bearbeiten))
-        .route("/api/einsaetze/{id}/chat/nachrichten/{mid}", delete(routes::chat::nachricht_loeschen))
-        .route("/api/einsaetze/{id}/chat/nachrichten/{mid}/heraufstufen-etb", post(routes::chat::heraufstufen))
-        .route("/api/einsaetze/{id}/chat/nachrichten/{mid}/heraufstufen-auftrag", post(routes::chat::heraufstufen_auftrag))
-        .route("/api/einsaetze/{id}/chat/nachrichten/{mid}/bezug", put(routes::chat::bezug_setzen))
-        .route("/api/einsaetze/{id}/chat/nachrichten/{mid}/bezug", delete(routes::chat::bezug_loeschen))
+        .route(
+            "/api/einsaetze/{id}/etb/{eintrag_id}/auftrag",
+            post(routes::etb::auftrag_erteilen),
+        )
+        .route(
+            "/api/einsaetze/{id}/chat/kanaele",
+            get(routes::chat::kanaele_liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/chat/kanaele",
+            post(routes::chat::kanal_anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/chat/kanaele/{kid}/nachrichten",
+            get(routes::chat::nachrichten_liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/chat/kanaele/{kid}/nachrichten",
+            post(routes::chat::nachricht_erfassen),
+        )
+        .route(
+            "/api/einsaetze/{id}/chat/nachrichten/{mid}",
+            patch(routes::chat::nachricht_bearbeiten),
+        )
+        .route(
+            "/api/einsaetze/{id}/chat/nachrichten/{mid}",
+            delete(routes::chat::nachricht_loeschen),
+        )
+        .route(
+            "/api/einsaetze/{id}/chat/nachrichten/{mid}/heraufstufen-etb",
+            post(routes::chat::heraufstufen),
+        )
+        .route(
+            "/api/einsaetze/{id}/chat/nachrichten/{mid}/heraufstufen-auftrag",
+            post(routes::chat::heraufstufen_auftrag),
+        )
+        .route(
+            "/api/einsaetze/{id}/chat/nachrichten/{mid}/bezug",
+            put(routes::chat::bezug_setzen),
+        )
+        .route(
+            "/api/einsaetze/{id}/chat/nachrichten/{mid}/bezug",
+            delete(routes::chat::bezug_loeschen),
+        )
         // Generische Anhänge (LFH-102). Body-Limit etwas über MAX_GROESSE (25 MiB)
         // für Multipart-Overhead; der Default (2 MiB) würde Uploads kappen.
         .route(
             "/api/einsaetze/{id}/anhaenge",
             post(routes::anhang::hochladen).layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
         )
-        .route("/api/einsaetze/{id}/anhaenge/{aid}", get(routes::anhang::herunterladen))
-        .route("/api/einsaetze/{id}/erinnerungen", get(routes::erinnerung::liste))
-        .route("/api/einsaetze/{id}/erinnerungen", post(routes::erinnerung::anlegen))
-        .route("/api/einsaetze/{id}/erinnerungen/{eid}/erledigen", post(routes::erinnerung::erledigen))
-        .route("/api/einsaetze/{id}/erinnerungen/{eid}/quittieren", post(routes::erinnerung::quittieren))
+        .route(
+            "/api/einsaetze/{id}/anhaenge/{aid}",
+            get(routes::anhang::herunterladen),
+        )
+        .route(
+            "/api/einsaetze/{id}/erinnerungen",
+            get(routes::erinnerung::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/erinnerungen",
+            post(routes::erinnerung::anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/erinnerungen/{eid}/erledigen",
+            post(routes::erinnerung::erledigen),
+        )
+        .route(
+            "/api/einsaetze/{id}/erinnerungen/{eid}/quittieren",
+            post(routes::erinnerung::quittieren),
+        )
         .route("/api/einsaetze/{id}/auftraege", get(routes::auftrag::liste))
-        .route("/api/einsaetze/{id}/auftraege", post(routes::auftrag::anlegen))
-        .route("/api/einsaetze/{id}/auftraege/{aid}/empfaenger/{empf}/quittieren", post(routes::auftrag::quittieren))
-        .route("/api/einsaetze/{id}/auftraege/{aid}/vollzug", post(routes::auftrag::vollzug))
-        .route("/api/einsaetze/{id}/auftraege/{aid}/abnehmen", post(routes::auftrag::abnehmen))
+        .route(
+            "/api/einsaetze/{id}/auftraege",
+            post(routes::auftrag::anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/auftraege/{aid}/empfaenger/{empf}/quittieren",
+            post(routes::auftrag::quittieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/auftraege/{aid}/vollzug",
+            post(routes::auftrag::vollzug),
+        )
+        .route(
+            "/api/einsaetze/{id}/auftraege/{aid}/abnehmen",
+            post(routes::auftrag::abnehmen),
+        )
         .route("/api/einsaetze/{id}/meldungen", get(routes::meldung::liste))
-        .route("/api/einsaetze/{id}/meldungen", post(routes::meldung::anlegen))
-        .route("/api/einsaetze/{id}/meldungen/{mid}/status", post(routes::meldung::status))
-        .route("/api/einsaetze/{id}/meldungen/{mid}/zuweisen", post(routes::meldung::zuweisen))
-        .route("/api/einsaetze/{id}/meldungen/{mid}/bestaetigen", post(routes::meldung::bestaetigen))
-        .route("/api/einsaetze/{id}/meldungen/{mid}/lagerelevant", post(routes::meldung::lagerelevant))
-        .route("/api/einsaetze/{id}/meldungen/{mid}/auftrag", post(routes::meldung::auftrag_erteilen))
-        .route("/api/einsaetze/{id}/lage/meldungen", get(routes::meldung::lage_liste))
-        .route("/api/einsaetze/{id}/ort-vorschau", get(routes::ort_vorschau::vorschau))
-        .route("/api/einsaetze/{id}/nachforderungen", get(routes::nachforderung::liste))
-        .route("/api/einsaetze/{id}/nachforderungen", post(routes::nachforderung::anlegen))
-        .route("/api/einsaetze/{id}/nachforderungen/{nid}/status", post(routes::nachforderung::status))
-        .route("/api/einsaetze/{id}/nachforderungen/{nid}/ablehnen", post(routes::nachforderung::ablehnen))
+        .route(
+            "/api/einsaetze/{id}/meldungen",
+            post(routes::meldung::anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/meldungen/{mid}/status",
+            post(routes::meldung::status),
+        )
+        .route(
+            "/api/einsaetze/{id}/meldungen/{mid}/zuweisen",
+            post(routes::meldung::zuweisen),
+        )
+        .route(
+            "/api/einsaetze/{id}/meldungen/{mid}/bestaetigen",
+            post(routes::meldung::bestaetigen),
+        )
+        .route(
+            "/api/einsaetze/{id}/meldungen/{mid}/lagerelevant",
+            post(routes::meldung::lagerelevant),
+        )
+        .route(
+            "/api/einsaetze/{id}/meldungen/{mid}/auftrag",
+            post(routes::meldung::auftrag_erteilen),
+        )
+        .route(
+            "/api/einsaetze/{id}/lage/meldungen",
+            get(routes::meldung::lage_liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/ort-vorschau",
+            get(routes::ort_vorschau::vorschau),
+        )
+        .route(
+            "/api/einsaetze/{id}/nachforderungen",
+            get(routes::nachforderung::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/nachforderungen",
+            post(routes::nachforderung::anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/nachforderungen/{nid}/status",
+            post(routes::nachforderung::status),
+        )
+        .route(
+            "/api/einsaetze/{id}/nachforderungen/{nid}/ablehnen",
+            post(routes::nachforderung::ablehnen),
+        )
         .route(
             "/api/einsaetze/{id}/fahrzeuge",
             get(routes::einsatz_fahrzeug::liste),
@@ -158,106 +254,368 @@ pub fn build_router(state: AppState) -> Router {
             "/api/einsaetze/{id}/fahrzeuge/{ef_id}/besatzung/{ep_id}",
             delete(routes::einsatz_fahrzeug::besatzung_freigeben),
         )
-        .route("/api/einsaetze/{id}/personal", get(routes::einsatz_personal::liste))
-        .route("/api/einsaetze/{id}/personal", post(routes::einsatz_personal::disponieren))
-        .route("/api/einsaetze/{id}/personal/{ep_id}", patch(routes::einsatz_personal::aktualisieren))
-        .route("/api/einsaetze/{id}/personal/{ep_id}", delete(routes::einsatz_personal::entfernen))
-        .route("/api/einsaetze/{id}/personal/{ep_id}/position", patch(routes::einsatz_personal::position))
-        .route("/api/einsaetze/{id}/karte/fuehrungskraefte", get(routes::einsatz_personal::karte_fuehrungskraefte))
-        .route("/api/einsaetze/{id}/material", get(routes::einsatz_material::liste))
-        .route("/api/einsaetze/{id}/material", post(routes::einsatz_material::disponieren))
-        .route("/api/einsaetze/{id}/material/{em_id}", patch(routes::einsatz_material::aktualisieren))
-        .route("/api/einsaetze/{id}/material/{em_id}", delete(routes::einsatz_material::entfernen))
-        .route("/api/einsaetze/{id}/personen", get(routes::einsatz_person::liste))
-        .route("/api/einsaetze/{id}/personen", post(routes::einsatz_person::anlegen))
-        .route("/api/einsaetze/{id}/personen/stream", get(routes::einsatz_person::stream))
-        .route("/api/einsaetze/{id}/personen/export", get(routes::einsatz_person::export))
-        .route("/api/einsaetze/{id}/personen/{pid}", get(routes::einsatz_person::detail))
-        .route("/api/einsaetze/{id}/personen/{pid}", patch(routes::einsatz_person::aktualisieren))
-        .route("/api/einsaetze/{id}/personen/{pid}/status", post(routes::einsatz_person::status_wechsel))
-        .route("/api/einsaetze/{id}/personen/{pid}/sichtung", post(routes::einsatz_person::sichten))
-        .route("/api/einsaetze/{id}/personen/{pid}/verbleib", post(routes::einsatz_person::verbleib))
-        .route("/api/einsaetze/{id}/personen/{pid}/notizen", post(routes::einsatz_person::notiz))
-        .route("/api/einsaetze/{id}/personen/{pid}/abgleich", post(routes::einsatz_person::abgleich_anlegen))
-        .route("/api/einsaetze/{id}/personen/{pid}/abgleich/{aid}/entscheidung",
-               post(routes::einsatz_person::abgleich_entscheiden))
-        .route("/api/einsaetze/{id}/personen/{pid}/audit", get(routes::einsatz_person::audit))
-        .route("/api/einsaetze/{id}/personen/{pid}", delete(routes::einsatz_person::stornieren))
-        .route("/api/einsaetze/{id}/tiere", get(routes::einsatz_tier::liste))
-        .route("/api/einsaetze/{id}/tiere", post(routes::einsatz_tier::anlegen))
-        .route("/api/einsaetze/{id}/tiere/stream", get(routes::einsatz_tier::stream))
-        .route("/api/einsaetze/{id}/tiere/export", get(routes::einsatz_tier::export))
-        .route("/api/einsaetze/{id}/tiere/{tid}", get(routes::einsatz_tier::detail))
-        .route("/api/einsaetze/{id}/tiere/{tid}", patch(routes::einsatz_tier::aktualisieren))
-        .route("/api/einsaetze/{id}/tiere/{tid}/status", post(routes::einsatz_tier::status_wechsel))
-        .route("/api/einsaetze/{id}/tiere/{tid}", delete(routes::einsatz_tier::stornieren))
-        .route("/api/einsaetze/{id}/schaeden", get(routes::einsatz_schaden::liste))
-        .route("/api/einsaetze/{id}/schaeden", post(routes::einsatz_schaden::anlegen))
-        .route("/api/einsaetze/{id}/schaeden/stream", get(routes::einsatz_schaden::stream))
-        .route("/api/einsaetze/{id}/schaeden/{sid}", get(routes::einsatz_schaden::detail))
-        .route("/api/einsaetze/{id}/schaeden/{sid}", patch(routes::einsatz_schaden::aktualisieren))
-        .route("/api/einsaetze/{id}/schaeden/{sid}/uebergeben", post(routes::einsatz_schaden::uebergeben))
-        .route("/api/einsaetze/{id}/schaeden/{sid}/abschliessen", post(routes::einsatz_schaden::abschliessen))
-        .route("/api/einsaetze/{id}/schaeden/{sid}", delete(routes::einsatz_schaden::stornieren))
+        .route(
+            "/api/einsaetze/{id}/personal",
+            get(routes::einsatz_personal::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/personal",
+            post(routes::einsatz_personal::disponieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/personal/{ep_id}",
+            patch(routes::einsatz_personal::aktualisieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/personal/{ep_id}",
+            delete(routes::einsatz_personal::entfernen),
+        )
+        .route(
+            "/api/einsaetze/{id}/personal/{ep_id}/position",
+            patch(routes::einsatz_personal::position),
+        )
+        .route(
+            "/api/einsaetze/{id}/karte/fuehrungskraefte",
+            get(routes::einsatz_personal::karte_fuehrungskraefte),
+        )
+        .route(
+            "/api/einsaetze/{id}/material",
+            get(routes::einsatz_material::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/material",
+            post(routes::einsatz_material::disponieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/material/{em_id}",
+            patch(routes::einsatz_material::aktualisieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/material/{em_id}",
+            delete(routes::einsatz_material::entfernen),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen",
+            get(routes::einsatz_person::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen",
+            post(routes::einsatz_person::anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/stream",
+            get(routes::einsatz_person::stream),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/export",
+            get(routes::einsatz_person::export),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}",
+            get(routes::einsatz_person::detail),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}",
+            patch(routes::einsatz_person::aktualisieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}/status",
+            post(routes::einsatz_person::status_wechsel),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}/sichtung",
+            post(routes::einsatz_person::sichten),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}/verbleib",
+            post(routes::einsatz_person::verbleib),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}/notizen",
+            post(routes::einsatz_person::notiz),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}/abgleich",
+            post(routes::einsatz_person::abgleich_anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}/abgleich/{aid}/entscheidung",
+            post(routes::einsatz_person::abgleich_entscheiden),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}/audit",
+            get(routes::einsatz_person::audit),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}",
+            delete(routes::einsatz_person::stornieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/tiere",
+            get(routes::einsatz_tier::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/tiere",
+            post(routes::einsatz_tier::anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/tiere/stream",
+            get(routes::einsatz_tier::stream),
+        )
+        .route(
+            "/api/einsaetze/{id}/tiere/export",
+            get(routes::einsatz_tier::export),
+        )
+        .route(
+            "/api/einsaetze/{id}/tiere/{tid}",
+            get(routes::einsatz_tier::detail),
+        )
+        .route(
+            "/api/einsaetze/{id}/tiere/{tid}",
+            patch(routes::einsatz_tier::aktualisieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/tiere/{tid}/status",
+            post(routes::einsatz_tier::status_wechsel),
+        )
+        .route(
+            "/api/einsaetze/{id}/tiere/{tid}",
+            delete(routes::einsatz_tier::stornieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/schaeden",
+            get(routes::einsatz_schaden::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/schaeden",
+            post(routes::einsatz_schaden::anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/schaeden/stream",
+            get(routes::einsatz_schaden::stream),
+        )
+        .route(
+            "/api/einsaetze/{id}/schaeden/{sid}",
+            get(routes::einsatz_schaden::detail),
+        )
+        .route(
+            "/api/einsaetze/{id}/schaeden/{sid}",
+            patch(routes::einsatz_schaden::aktualisieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/schaeden/{sid}/uebergeben",
+            post(routes::einsatz_schaden::uebergeben),
+        )
+        .route(
+            "/api/einsaetze/{id}/schaeden/{sid}/abschliessen",
+            post(routes::einsatz_schaden::abschliessen),
+        )
+        .route(
+            "/api/einsaetze/{id}/schaeden/{sid}",
+            delete(routes::einsatz_schaden::stornieren),
+        )
         .route("/api/einsaetze/{id}/uhs", get(routes::einsatz_uhs::liste))
-        .route("/api/einsaetze/{id}/uhs", post(routes::einsatz_uhs::anlegen))
-        .route("/api/einsaetze/{id}/uhs/stream", get(routes::einsatz_uhs::stream))
-        .route("/api/einsaetze/{id}/uhs/{uid}", get(routes::einsatz_uhs::detail))
-        .route("/api/einsaetze/{id}/uhs/{uid}", patch(routes::einsatz_uhs::aktualisieren))
-        .route("/api/einsaetze/{id}/uhs/{uid}/status", post(routes::einsatz_uhs::status_wechsel))
-        .route("/api/einsaetze/{id}/uhs/{uid}", delete(routes::einsatz_uhs::stornieren))
-        .route("/api/einsaetze/{id}/uhs/{uid}/plaetze", post(routes::einsatz_uhs::platz_anlegen))
-        .route("/api/einsaetze/{id}/uhs/{uid}/plaetze/bulk", post(routes::einsatz_uhs::plaetze_bulk_anlegen))
-        .route("/api/einsaetze/{id}/uhs/{uid}/plaetze/{pid}", patch(routes::einsatz_uhs::platz_aktualisieren))
-        .route("/api/einsaetze/{id}/uhs/{uid}/plaetze/{pid}/verfuegbarkeit",
-               post(routes::einsatz_uhs::platz_verfuegbarkeit))
-        .route("/api/einsaetze/{id}/uhs/{uid}/plaetze/{pid}", delete(routes::einsatz_uhs::platz_stornieren))
-        .route("/api/einsaetze/{id}/personen/{pid}/uhs-belegung",
-               post(routes::einsatz_uhs::belegung))
-        .route("/api/einsaetze/{id}/bereitstellungsraeume", get(routes::einsatz_bereitstellungsraum::liste))
-        .route("/api/einsaetze/{id}/bereitstellungsraeume", post(routes::einsatz_bereitstellungsraum::anlegen))
-        .route("/api/einsaetze/{id}/bereitstellungsraeume/{bid}", get(routes::einsatz_bereitstellungsraum::detail))
-        .route("/api/einsaetze/{id}/bereitstellungsraeume/{bid}", patch(routes::einsatz_bereitstellungsraum::aktualisieren))
-        .route("/api/einsaetze/{id}/bereitstellungsraeume/{bid}/status", post(routes::einsatz_bereitstellungsraum::status_wechsel))
-        .route("/api/einsaetze/{id}/bereitstellungsraeume/{bid}", delete(routes::einsatz_bereitstellungsraum::stornieren))
-        .route("/api/einsaetze/{id}/bereitstellungsraeume/{bid}/belegung", post(routes::einsatz_bereitstellungsraum::belegung))
-        .route("/api/einsaetze/{id}/abschnitte", get(routes::einsatzabschnitt::liste))
-        .route("/api/einsaetze/{id}/abschnitte", post(routes::einsatzabschnitt::anlegen))
-        .route("/api/einsaetze/{id}/abschnitte/stream", get(routes::einsatzabschnitt::stream))
-        .route("/api/einsaetze/{id}/abschnitte/{aid}", patch(routes::einsatzabschnitt::aktualisieren))
-        .route("/api/einsaetze/{id}/abschnitte/{aid}/flaeche", patch(routes::einsatzabschnitt::flaeche))
-        .route("/api/einsaetze/{id}/abschnitte/{aid}", delete(routes::einsatzabschnitt::aufloesen))
-        .route("/api/einsaetze/{id}/lageberichte", get(routes::lagebericht::liste))
-        .route("/api/einsaetze/{id}/lageberichte", post(routes::lagebericht::anlegen))
-        .route("/api/einsaetze/{id}/lageberichte/{lid}", get(routes::lagebericht::detail))
-        .route("/api/einsaetze/{id}/lageberichte/{lid}", patch(routes::lagebericht::aktualisieren))
-        .route("/api/einsaetze/{id}/lageberichte/{lid}/freigeben", post(routes::lagebericht::freigeben))
-        .route("/api/einsaetze/{id}/lageberichte/{lid}/fortschreiben", post(routes::lagebericht::fortschreiben))
+        .route(
+            "/api/einsaetze/{id}/uhs",
+            post(routes::einsatz_uhs::anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/uhs/stream",
+            get(routes::einsatz_uhs::stream),
+        )
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}",
+            get(routes::einsatz_uhs::detail),
+        )
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}",
+            patch(routes::einsatz_uhs::aktualisieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}/status",
+            post(routes::einsatz_uhs::status_wechsel),
+        )
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}",
+            delete(routes::einsatz_uhs::stornieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}/plaetze",
+            post(routes::einsatz_uhs::platz_anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}/plaetze/bulk",
+            post(routes::einsatz_uhs::plaetze_bulk_anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}/plaetze/{pid}",
+            patch(routes::einsatz_uhs::platz_aktualisieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}/plaetze/{pid}/verfuegbarkeit",
+            post(routes::einsatz_uhs::platz_verfuegbarkeit),
+        )
+        .route(
+            "/api/einsaetze/{id}/uhs/{uid}/plaetze/{pid}",
+            delete(routes::einsatz_uhs::platz_stornieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}/uhs-belegung",
+            post(routes::einsatz_uhs::belegung),
+        )
+        .route(
+            "/api/einsaetze/{id}/bereitstellungsraeume",
+            get(routes::einsatz_bereitstellungsraum::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/bereitstellungsraeume",
+            post(routes::einsatz_bereitstellungsraum::anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}",
+            get(routes::einsatz_bereitstellungsraum::detail),
+        )
+        .route(
+            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}",
+            patch(routes::einsatz_bereitstellungsraum::aktualisieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/status",
+            post(routes::einsatz_bereitstellungsraum::status_wechsel),
+        )
+        .route(
+            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}",
+            delete(routes::einsatz_bereitstellungsraum::stornieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/belegung",
+            post(routes::einsatz_bereitstellungsraum::belegung),
+        )
+        .route(
+            "/api/einsaetze/{id}/abschnitte",
+            get(routes::einsatzabschnitt::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/abschnitte",
+            post(routes::einsatzabschnitt::anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/abschnitte/stream",
+            get(routes::einsatzabschnitt::stream),
+        )
+        .route(
+            "/api/einsaetze/{id}/abschnitte/{aid}",
+            patch(routes::einsatzabschnitt::aktualisieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/abschnitte/{aid}/flaeche",
+            patch(routes::einsatzabschnitt::flaeche),
+        )
+        .route(
+            "/api/einsaetze/{id}/abschnitte/{aid}",
+            delete(routes::einsatzabschnitt::aufloesen),
+        )
+        .route(
+            "/api/einsaetze/{id}/lageberichte",
+            get(routes::lagebericht::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/lageberichte",
+            post(routes::lagebericht::anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/lageberichte/{lid}",
+            get(routes::lagebericht::detail),
+        )
+        .route(
+            "/api/einsaetze/{id}/lageberichte/{lid}",
+            patch(routes::lagebericht::aktualisieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/lageberichte/{lid}/freigeben",
+            post(routes::lagebericht::freigeben),
+        )
+        .route(
+            "/api/einsaetze/{id}/lageberichte/{lid}/fortschreiben",
+            post(routes::lagebericht::fortschreiben),
+        )
         .route("/api/einsaetze/{id}/befehle", get(routes::befehl::liste))
         .route("/api/einsaetze/{id}/befehle", post(routes::befehl::anlegen))
-        .route("/api/einsaetze/{id}/befehle/{bid}", get(routes::befehl::detail))
-        .route("/api/einsaetze/{id}/befehle/{bid}", patch(routes::befehl::aktualisieren))
-        .route("/api/einsaetze/{id}/befehle/{bid}/freigeben", post(routes::befehl::freigeben))
-        .route("/api/einsaetze/{id}/befehle/{bid}/fortschreiben", post(routes::befehl::fortschreiben))
+        .route(
+            "/api/einsaetze/{id}/befehle/{bid}",
+            get(routes::befehl::detail),
+        )
+        .route(
+            "/api/einsaetze/{id}/befehle/{bid}",
+            patch(routes::befehl::aktualisieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/befehle/{bid}/freigeben",
+            post(routes::befehl::freigeben),
+        )
+        .route(
+            "/api/einsaetze/{id}/befehle/{bid}/fortschreiben",
+            post(routes::befehl::fortschreiben),
+        )
         .route("/api/einsaetze/{id}/zonen", get(routes::lage_zone::liste))
-        .route("/api/einsaetze/{id}/zonen", post(routes::lage_zone::anlegen))
-        .route("/api/einsaetze/{id}/zonen/stream", get(routes::lage_zone::stream))
-        .route("/api/einsaetze/{id}/zonen/{zid}", patch(routes::lage_zone::aktualisieren))
-        .route("/api/einsaetze/{id}/zonen/{zid}", delete(routes::lage_zone::aufloesen))
-        .route("/api/einsaetze/{id}/karte/hintergrundbilder", get(routes::karte_hintergrundbild::liste))
+        .route(
+            "/api/einsaetze/{id}/zonen",
+            post(routes::lage_zone::anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/zonen/stream",
+            get(routes::lage_zone::stream),
+        )
+        .route(
+            "/api/einsaetze/{id}/zonen/{zid}",
+            patch(routes::lage_zone::aktualisieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/zonen/{zid}",
+            delete(routes::lage_zone::aufloesen),
+        )
         .route(
             "/api/einsaetze/{id}/karte/hintergrundbilder",
-            post(routes::karte_hintergrundbild::hochladen).layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+            get(routes::karte_hintergrundbild::liste),
         )
-        .route("/api/einsaetze/{id}/karte/hintergrundbilder/{bildId}/download", get(routes::karte_hintergrundbild::herunterladen))
-        .route("/api/einsaetze/{id}/karte/hintergrundbilder/{bildId}", patch(routes::karte_hintergrundbild::aktualisieren))
-        .route("/api/einsaetze/{id}/karte/hintergrundbilder/{bildId}", delete(routes::karte_hintergrundbild::loeschen))
-        .route("/api/einsaetze/{id}/gefahrengebiete", get(routes::gefahr::gebiete))
-        .route("/api/einsaetze/{id}/gefahrengebiete/{gid}", patch(routes::gefahr::umbenennen))
-        .route("/api/einsaetze/{id}/gefahrengebiete/{gid}/matrix", get(routes::gefahr::matrix))
-        .route("/api/einsaetze/{id}/gefahrengebiete/{gid}/matrix/bewertung", put(routes::gefahr::bewerten))
+        .route(
+            "/api/einsaetze/{id}/karte/hintergrundbilder",
+            post(routes::karte_hintergrundbild::hochladen)
+                .layer(DefaultBodyLimit::max(26 * 1024 * 1024)),
+        )
+        .route(
+            "/api/einsaetze/{id}/karte/hintergrundbilder/{bildId}/download",
+            get(routes::karte_hintergrundbild::herunterladen),
+        )
+        .route(
+            "/api/einsaetze/{id}/karte/hintergrundbilder/{bildId}",
+            patch(routes::karte_hintergrundbild::aktualisieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/karte/hintergrundbilder/{bildId}",
+            delete(routes::karte_hintergrundbild::loeschen),
+        )
+        .route(
+            "/api/einsaetze/{id}/gefahrengebiete",
+            get(routes::gefahr::gebiete),
+        )
+        .route(
+            "/api/einsaetze/{id}/gefahrengebiete/{gid}",
+            patch(routes::gefahr::umbenennen),
+        )
+        .route(
+            "/api/einsaetze/{id}/gefahrengebiete/{gid}/matrix",
+            get(routes::gefahr::matrix),
+        )
+        .route(
+            "/api/einsaetze/{id}/gefahrengebiete/{gid}/matrix/bewertung",
+            put(routes::gefahr::bewerten),
+        )
         .route("/api/organisation", get(routes::organisation::lesen))
-        .route("/api/organisation", patch(routes::organisation::aktualisieren))
+        .route(
+            "/api/organisation",
+            patch(routes::organisation::aktualisieren),
+        )
         .route(
             "/api/org-einstellungen",
             get(routes::org_einstellungen::lesen).put(routes::org_einstellungen::setzen),
@@ -271,15 +629,24 @@ pub fn build_router(state: AppState) -> Router {
             put(routes::org_einstellungen::modul_einstellung_setzen),
         )
         .route("/api/stichwort-vorschlaege", get(routes::stichwort::liste))
-        .route("/api/stichwort-vorschlaege", post(routes::stichwort::anlegen))
+        .route(
+            "/api/stichwort-vorschlaege",
+            post(routes::stichwort::anlegen),
+        )
         .route(
             "/api/stichwort-vorschlaege/{id}",
             delete(routes::stichwort::loeschen),
         )
         .route("/api/fahrzeuge", get(routes::fahrzeug::liste))
         .route("/api/fahrzeuge", post(routes::fahrzeug::anlegen))
-        .route("/api/fahrzeug-vorschlaege", get(routes::fahrzeug::vorschlaege))
-        .route("/api/fahrzeuge/{id}", patch(routes::fahrzeug::aktualisieren))
+        .route(
+            "/api/fahrzeug-vorschlaege",
+            get(routes::fahrzeug::vorschlaege),
+        )
+        .route(
+            "/api/fahrzeuge/{id}",
+            patch(routes::fahrzeug::aktualisieren),
+        )
         .route(
             "/api/fahrzeuge/{id}/ausser-dienst",
             post(routes::fahrzeug::ausser_dienst),
@@ -290,7 +657,10 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/api/material", get(routes::material::liste))
         .route("/api/material", post(routes::material::anlegen))
-        .route("/api/material-kategorien", get(routes::material::kategorien))
+        .route(
+            "/api/material-kategorien",
+            get(routes::material::kategorien),
+        )
         .route("/api/material/{id}", patch(routes::material::aktualisieren))
         .route(
             "/api/material/{id}/ausser-dienst",
@@ -301,7 +671,10 @@ pub fn build_router(state: AppState) -> Router {
             post(routes::material::in_dienst),
         )
         .route("/api/fahrzeug-status", get(routes::fahrzeug_status::liste))
-        .route("/api/fahrzeug-status", post(routes::fahrzeug_status::anlegen))
+        .route(
+            "/api/fahrzeug-status",
+            post(routes::fahrzeug_status::anlegen),
+        )
         .route(
             "/api/fahrzeug-status/{id}",
             patch(routes::fahrzeug_status::aktualisieren),
@@ -312,44 +685,131 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/api/personal", get(routes::personal::liste))
         .route("/api/personal", post(routes::personal::anlegen))
-        .route("/api/personal-vorschlaege", get(routes::personal::vorschlaege))
+        .route(
+            "/api/personal-vorschlaege",
+            get(routes::personal::vorschlaege),
+        )
         .route("/api/personal/{id}", patch(routes::personal::aktualisieren))
-        .route("/api/personal/{id}/ausser-dienst", post(routes::personal::ausser_dienst))
-        .route("/api/personal/{id}/in-dienst", post(routes::personal::in_dienst))
+        .route(
+            "/api/personal/{id}/ausser-dienst",
+            post(routes::personal::ausser_dienst),
+        )
+        .route(
+            "/api/personal/{id}/in-dienst",
+            post(routes::personal::in_dienst),
+        )
         .route("/api/personal-status", get(routes::personal_status::liste))
-        .route("/api/personal-status", post(routes::personal_status::anlegen))
-        .route("/api/personal-status/{id}", patch(routes::personal_status::aktualisieren))
-        .route("/api/personal-status/{id}/deaktivieren", post(routes::personal_status::deaktivieren))
+        .route(
+            "/api/personal-status",
+            post(routes::personal_status::anlegen),
+        )
+        .route(
+            "/api/personal-status/{id}",
+            patch(routes::personal_status::aktualisieren),
+        )
+        .route(
+            "/api/personal-status/{id}/deaktivieren",
+            post(routes::personal_status::deaktivieren),
+        )
         .route("/api/etb-bausteine", get(routes::etb_baustein::liste))
         .route("/api/etb-bausteine", post(routes::etb_baustein::anlegen))
-        .route("/api/etb-bausteine/{id}", patch(routes::etb_baustein::aktualisieren))
-        .route("/api/etb-bausteine/{id}/deaktivieren", post(routes::etb_baustein::deaktivieren))
+        .route(
+            "/api/etb-bausteine/{id}",
+            patch(routes::etb_baustein::aktualisieren),
+        )
+        .route(
+            "/api/etb-bausteine/{id}/deaktivieren",
+            post(routes::etb_baustein::deaktivieren),
+        )
         .route("/api/qualifikationen", get(routes::qualifikation::liste))
         .route("/api/qualifikationen", post(routes::qualifikation::anlegen))
-        .route("/api/qualifikationen/{id}", patch(routes::qualifikation::aktualisieren))
-        .route("/api/qualifikationen/{id}/deaktivieren", post(routes::qualifikation::deaktivieren))
+        .route(
+            "/api/qualifikationen/{id}",
+            patch(routes::qualifikation::aktualisieren),
+        )
+        .route(
+            "/api/qualifikationen/{id}/deaktivieren",
+            post(routes::qualifikation::deaktivieren),
+        )
         .route("/api/einheit-typen", get(routes::einheit_typ::liste))
         .route("/api/einheit-typen", post(routes::einheit_typ::anlegen))
-        .route("/api/einheit-typen/{id}", patch(routes::einheit_typ::aktualisieren))
-        .route("/api/einheit-typen/{id}/deaktivieren", post(routes::einheit_typ::deaktivieren))
-        .route("/api/sprechgruppen", get(routes::sprechgruppe::liste_katalog))
+        .route(
+            "/api/einheit-typen/{id}",
+            patch(routes::einheit_typ::aktualisieren),
+        )
+        .route(
+            "/api/einheit-typen/{id}/deaktivieren",
+            post(routes::einheit_typ::deaktivieren),
+        )
+        .route(
+            "/api/sprechgruppen",
+            get(routes::sprechgruppe::liste_katalog),
+        )
         .route("/api/sprechgruppen", post(routes::sprechgruppe::anlegen))
-        .route("/api/sprechgruppen/{id}", patch(routes::sprechgruppe::aktualisieren))
-        .route("/api/sprechgruppen/{id}/deaktivieren", post(routes::sprechgruppe::deaktivieren))
-        .route("/api/einsaetze/{id}/sprechgruppen", get(routes::sprechgruppe::liste_fuer_einsatz))
-        .route("/api/einsaetze/{id}/sprechgruppen", post(routes::sprechgruppe::anlegen_einsatz_lokal))
-        .route("/api/einsaetze/{id}/einheiten", get(routes::einsatz_einheit::liste))
-        .route("/api/einsaetze/{id}/einheiten", post(routes::einsatz_einheit::bilden))
-        .route("/api/einsaetze/{id}/einheiten/stream", get(routes::einsatz_einheit::stream))
-        .route("/api/einsaetze/{id}/einheiten/{eid}", patch(routes::einsatz_einheit::aktualisieren))
-        .route("/api/einsaetze/{id}/einheiten/{eid}/position", patch(routes::einsatz_einheit::position))
-        .route("/api/einsaetze/{id}/einheiten/{eid}", delete(routes::einsatz_einheit::aufloesen))
-        .route("/api/einsaetze/{id}/einheiten/{eid}/personal/{ep_id}", put(routes::einsatz_einheit::personal_zuordnen))
-        .route("/api/einsaetze/{id}/einheiten/{eid}/personal/{ep_id}", delete(routes::einsatz_einheit::personal_freigeben))
-        .route("/api/einsaetze/{id}/einheiten/{eid}/fahrzeug/{ef_id}", put(routes::einsatz_einheit::fahrzeug_zuordnen))
-        .route("/api/einsaetze/{id}/einheiten/{eid}/fahrzeug/{ef_id}", delete(routes::einsatz_einheit::fahrzeug_freigeben))
-        .route("/api/einsaetze/{id}/einheiten/{eid}/material/{em_id}", put(routes::einsatz_einheit::material_zuordnen))
-        .route("/api/einsaetze/{id}/einheiten/{eid}/material/{em_id}", delete(routes::einsatz_einheit::material_freigeben));
+        .route(
+            "/api/sprechgruppen/{id}",
+            patch(routes::sprechgruppe::aktualisieren),
+        )
+        .route(
+            "/api/sprechgruppen/{id}/deaktivieren",
+            post(routes::sprechgruppe::deaktivieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/sprechgruppen",
+            get(routes::sprechgruppe::liste_fuer_einsatz),
+        )
+        .route(
+            "/api/einsaetze/{id}/sprechgruppen",
+            post(routes::sprechgruppe::anlegen_einsatz_lokal),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten",
+            get(routes::einsatz_einheit::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten",
+            post(routes::einsatz_einheit::bilden),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/stream",
+            get(routes::einsatz_einheit::stream),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}",
+            patch(routes::einsatz_einheit::aktualisieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/position",
+            patch(routes::einsatz_einheit::position),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}",
+            delete(routes::einsatz_einheit::aufloesen),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/personal/{ep_id}",
+            put(routes::einsatz_einheit::personal_zuordnen),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/personal/{ep_id}",
+            delete(routes::einsatz_einheit::personal_freigeben),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/fahrzeug/{ef_id}",
+            put(routes::einsatz_einheit::fahrzeug_zuordnen),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/fahrzeug/{ef_id}",
+            delete(routes::einsatz_einheit::fahrzeug_freigeben),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/material/{em_id}",
+            put(routes::einsatz_einheit::material_zuordnen),
+        )
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/material/{em_id}",
+            delete(routes::einsatz_einheit::material_freigeben),
+        );
 
     // Dev-only: Endpoint existiert physisch nur mit Feature `dev-seeds`.
     #[cfg(feature = "dev-seeds")]

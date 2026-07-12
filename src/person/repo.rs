@@ -53,11 +53,13 @@ pub async fn liste(
         "{SELECT_ALLE} WHERE einsatz_id = ?1 AND storniert_at IS NULL \
          AND (?2 IS NULL OR status = ?2) ORDER BY registrier_nr"
     );
-    Ok(sqlx::query_as::<_, PersonAnzeige>(sqlx::AssertSqlSafe(&*sql))
-        .bind(einsatz_id)
-        .bind(status)
-        .fetch_all(pool)
-        .await?)
+    Ok(
+        sqlx::query_as::<_, PersonAnzeige>(sqlx::AssertSqlSafe(&*sql))
+            .bind(einsatz_id)
+            .bind(status)
+            .fetch_all(pool)
+            .await?,
+    )
 }
 
 /// Lädt eine Person (auch stornierte) eines Einsatzes; `NotFound`, falls sie
@@ -221,23 +223,34 @@ mod tests {
     /// Minimal-Setup: eine Org, ein Benutzer, ein aktiver Einsatz. Liefert (benutzer_id, einsatz_id).
     async fn setup(pool: &SqlitePool) -> (i64, i64) {
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Test-Orga')")
-            .execute(pool).await.unwrap();
+            .execute(pool)
+            .await
+            .unwrap();
         let benutzer_id: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, aktiv) \
              VALUES (1, 'A', 'a', 'h', 'keiner', 'keine', 1) RETURNING id")
             .fetch_one(pool).await.unwrap();
         let einsatz_id: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung, status, begonnen_at) \
-             VALUES (1, 'Lage', 'aktiv', '2026-05-27') RETURNING id")
-            .fetch_one(pool).await.unwrap();
+             VALUES (1, 'Lage', 'aktiv', '2026-05-27') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         (benutzer_id, einsatz_id)
     }
 
     fn leere_daten<'a>() -> NeueDaten<'a> {
         NeueDaten {
-            name: None, vorname: None, geschlecht: None, geburtsdatum: None,
-            alter_geschaetzt: None, herkunft_adresse: None, antreff_ort: None,
-            melder_kontakt: None, notiz: None,
+            name: None,
+            vorname: None,
+            geschlecht: None,
+            geburtsdatum: None,
+            alter_geschaetzt: None,
+            herkunft_adresse: None,
+            antreff_ort: None,
+            melder_kontakt: None,
+            notiz: None,
         }
     }
 
@@ -262,7 +275,10 @@ mod tests {
         let liste = liste(&pool, e, None).await.unwrap();
         assert!(liste.is_empty(), "stornierte Person nicht in der Liste");
         let detail = laden(&pool, e, p1.id).await.unwrap();
-        assert!(detail.storniert_at.is_some(), "Detail liefert stornierte Person mit Zeitstempel");
+        assert!(
+            detail.storniert_at.is_some(),
+            "Detail liefert stornierte Person mit Zeitstempel"
+        );
     }
 
     #[tokio::test]
@@ -283,16 +299,39 @@ mod tests {
     async fn anlegen_und_aktualisieren_setzt_felder() {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
-        let p = anlegen(&pool, e, b, NeueDaten {
-            name: Some("Mustermann"), vorname: Some("Max"), geschlecht: Some("maennlich"),
-            antreff_ort: Some("Brücke"), ..leere_daten()
-        }).await.unwrap();
+        let p = anlegen(
+            &pool,
+            e,
+            b,
+            NeueDaten {
+                name: Some("Mustermann"),
+                vorname: Some("Max"),
+                geschlecht: Some("maennlich"),
+                antreff_ort: Some("Brücke"),
+                ..leere_daten()
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(p.name.as_deref(), Some("Mustermann"));
-        let aktualisiert = aktualisiere(&pool, e, p.id, b, PatchDaten {
-            notiz: Some("blutet"), ..PatchDaten::default()
-        }).await.unwrap();
+        let aktualisiert = aktualisiere(
+            &pool,
+            e,
+            p.id,
+            b,
+            PatchDaten {
+                notiz: Some("blutet"),
+                ..PatchDaten::default()
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(aktualisiert.notiz.as_deref(), Some("blutet"));
-        assert_eq!(aktualisiert.name.as_deref(), Some("Mustermann"), "ungesetzte Felder bleiben");
+        assert_eq!(
+            aktualisiert.name.as_deref(),
+            Some("Mustermann"),
+            "ungesetzte Felder bleiben"
+        );
     }
 
     #[tokio::test]
@@ -312,6 +351,9 @@ mod tests {
         let detail = laden(&pool, e, p.id).await.unwrap();
         assert!(detail.aktuelle_sichtung.is_none(), "ungesichtet = NULL");
         assert!(detail.aktuelle_sichtung_at.is_none());
-        assert!(detail.aktueller_verbleib.is_none(), "kein Verbleib = vor Ort");
+        assert!(
+            detail.aktueller_verbleib.is_none(),
+            "kein Verbleib = vor Ort"
+        );
     }
 }

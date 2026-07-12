@@ -51,7 +51,9 @@ impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for SchadenStatus
 where
     &'r str: sqlx::Decode<'r, DB>,
 {
-    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+    fn decode(
+        value: <DB as sqlx::Database>::ValueRef<'r>,
+    ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<DB>>::decode(value)?;
         SchadenStatus::parse(s).ok_or_else(|| format!("Ungültiger SchadenStatus: {s}").into())
     }
@@ -110,7 +112,9 @@ impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for SchadenTyp
 where
     &'r str: sqlx::Decode<'r, DB>,
 {
-    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+    fn decode(
+        value: <DB as sqlx::Database>::ValueRef<'r>,
+    ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<DB>>::decode(value)?;
         SchadenTyp::parse(s).ok_or_else(|| format!("Ungültiger SchadenTyp: {s}").into())
     }
@@ -163,7 +167,9 @@ impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for Ausmass
 where
     &'r str: sqlx::Decode<'r, DB>,
 {
-    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+    fn decode(
+        value: <DB as sqlx::Database>::ValueRef<'r>,
+    ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<DB>>::decode(value)?;
         Ausmass::parse(s).ok_or_else(|| format!("Ungültiges Ausmaß: {s}").into())
     }
@@ -215,7 +221,9 @@ impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for AbschlussGrund
 where
     &'r str: sqlx::Decode<'r, DB>,
 {
-    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+    fn decode(
+        value: <DB as sqlx::Database>::ValueRef<'r>,
+    ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<DB>>::decode(value)?;
         AbschlussGrund::parse(s).ok_or_else(|| format!("Ungültiger Abschlussgrund: {s}").into())
     }
@@ -286,8 +294,8 @@ pub struct SchadenAnzeige {
     pub geschaedigt_registrier_nr: Option<i64>,
     pub geschaedigt_storniert_at: Option<String>,
     // Read-only Join-Felder (Geschädigt-Auflösung über einsatz_personal / organisation):
-    pub geschaedigt_personal_name: Option<String>,      // einsatz_personal.snap_name
-    pub geschaedigt_organisation_name: Option<String>,  // organisation.name
+    pub geschaedigt_personal_name: Option<String>, // einsatz_personal.snap_name
+    pub geschaedigt_organisation_name: Option<String>, // organisation.name
 }
 
 #[cfg(test)]
@@ -304,7 +312,14 @@ mod tests {
 
     #[test]
     fn typ_und_ausmass_roundtrip() {
-        for s in ["sachschaden", "verkehrshindernis", "infrastruktur", "umweltschaden", "tierkadaver", "sonstige"] {
+        for s in [
+            "sachschaden",
+            "verkehrshindernis",
+            "infrastruktur",
+            "umweltschaden",
+            "tierkadaver",
+            "sonstige",
+        ] {
             assert_eq!(SchadenTyp::parse(s).unwrap().as_str(), s);
         }
         for s in ["gering", "mittel", "gross", "katastrophal"] {

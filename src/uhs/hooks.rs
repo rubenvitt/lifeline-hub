@@ -38,7 +38,8 @@ pub async fn auto_austritt(
     benutzer_id: i64,
 ) -> Result<Option<AutoAustrittEffekt>, AppError> {
     let info: Option<AustrittInfo> =
-        belegung_repo::austritt_intern(pool, einsatz_id, person_id, Some(anlass), benutzer_id).await?;
+        belegung_repo::austritt_intern(pool, einsatz_id, person_id, Some(anlass), benutzer_id)
+            .await?;
     let Some(info) = info else {
         return Ok(None); // Person war nicht belegt — Reservierungs-Cleanup ist trotzdem gelaufen.
     };

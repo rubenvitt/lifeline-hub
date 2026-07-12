@@ -21,7 +21,10 @@ async fn setup() -> axum::Router {
     build_router(AppState {
         pool,
         live: LiveHub::new(),
-        karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu(), download_client: lifeline_hub::karte::download::download_client(), download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_dir: std::env::temp_dir(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
         karten_service_url: None,
         karten_service_token: None,
     })
@@ -53,7 +56,12 @@ async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) ->
         .to_string()
 }
 
-async fn benutzer_anlegen(app: &axum::Router, admin_cookie: &str, name: &str, org_rolle: &str) -> i64 {
+async fn benutzer_anlegen(
+    app: &axum::Router,
+    admin_cookie: &str,
+    name: &str,
+    org_rolle: &str,
+) -> i64 {
     let body = format!(
         r#"{{"anzeigename":"{name}","benutzername":"{name}","passwort":"{name}pw1","org_rolle":"{org_rolle}"}}"#
     );
@@ -70,9 +78,15 @@ async fn benutzer_anlegen(app: &axum::Router, admin_cookie: &str, name: &str, or
         )
         .await
         .unwrap();
-    assert_eq!(resp.status(), StatusCode::CREATED, "Benutzer anlegen muss klappen");
+    assert_eq!(
+        resp.status(),
+        StatusCode::CREATED,
+        "Benutzer anlegen muss klappen"
+    );
     let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    serde_json::from_slice::<Value>(&bytes).unwrap()["id"].as_i64().unwrap()
+    serde_json::from_slice::<Value>(&bytes).unwrap()["id"]
+        .as_i64()
+        .unwrap()
 }
 
 async fn einsatz_anlegen(app: &axum::Router, cookie: &str, bezeichnung: &str) -> i64 {
@@ -92,7 +106,9 @@ async fn einsatz_anlegen(app: &axum::Router, cookie: &str, bezeichnung: &str) ->
         .unwrap();
     assert_eq!(resp.status(), StatusCode::CREATED);
     let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    serde_json::from_slice::<Value>(&bytes).unwrap()["id"].as_i64().unwrap()
+    serde_json::from_slice::<Value>(&bytes).unwrap()["id"]
+        .as_i64()
+        .unwrap()
 }
 
 /// Macht den Benutzer mit `ziel_id` zum Mitglied des Einsatzes mit `einsatz_rolle`.
@@ -117,7 +133,11 @@ async fn mitglied_setzen(
         )
         .await
         .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK, "Mitglied setzen muss klappen");
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "Mitglied setzen muss klappen"
+    );
 }
 
 /// PUT eines Modul-Overrides; liefert nur den Status.
@@ -138,7 +158,9 @@ async fn override_setzen(
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(format!("/api/einsaetze/{einsatz_id}/modul-overrides/{modul_key}"))
+                .uri(format!(
+                    "/api/einsaetze/{einsatz_id}/modul-overrides/{modul_key}"
+                ))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::from(body))
@@ -164,7 +186,10 @@ async fn overrides_laden(app: &axum::Router, cookie: &str, einsatz_id: i64) -> (
         .unwrap();
     let status = resp.status();
     let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
 }
 
 /// GET-Status einer beliebigen Route.
@@ -234,7 +259,8 @@ fn backend_modul_keys_decken_frontend_registry() {
     let be_keys: BTreeSet<String> = MODUL_KEYS.iter().map(|s| s.to_string()).collect();
 
     assert_eq!(
-        be_keys, fe_keys,
+        be_keys,
+        fe_keys,
         "Backend-MODUL_KEYS und Frontend-modulRegistry-Keys müssen synchron sein.\n\
          Nur Backend: {:?}\nNur Frontend: {:?}",
         be_keys.difference(&fe_keys).collect::<Vec<_>>(),
@@ -564,7 +590,11 @@ async fn alle_modul_gruppen_gegated_get_baseline_und_versteckt() {
     // Baseline: alle Pfade für das Mitglied sichtbar → 200.
     for (key, suffix) in MODUL_GET_PFADE {
         let st = get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/{suffix}")).await;
-        assert_eq!(st, StatusCode::OK, "Baseline {key} ({suffix}) muss 200 sein, war {st}");
+        assert_eq!(
+            st,
+            StatusCode::OK,
+            "Baseline {key} ({suffix}) muss 200 sein, war {st}"
+        );
     }
 
     // Alle eindeutigen Keys verstecken.

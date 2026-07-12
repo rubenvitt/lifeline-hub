@@ -21,8 +21,8 @@ use crate::org::einstellungen::{self, OrgEinstellungenAnzeige, OrgEinstellungenD
 use crate::org::modul_einstellung;
 use axum::extract::{Path, State};
 use axum::Json;
-use std::collections::HashMap;
 use serde::Deserialize;
+use std::collections::HashMap;
 
 /// PUT-Body für org-weite Einstellungen. Felder spiegeln `EinstellungenUpdate` (Einsatz)
 /// ohne einsatzspezifische Felder (kein standard_modul, basemap_modus, karten_zoom_start,
@@ -99,7 +99,11 @@ pub async fn setzen(
     let etb_nummer_praefix = bereinige(req.etb_nummer_praefix);
     let meldung_nummer_praefix = bereinige(req.meldung_nummer_praefix);
     let auftrag_nummer_praefix = bereinige(req.auftrag_nummer_praefix);
-    for p in [&etb_nummer_praefix, &meldung_nummer_praefix, &auftrag_nummer_praefix] {
+    for p in [
+        &etb_nummer_praefix,
+        &meldung_nummer_praefix,
+        &auftrag_nummer_praefix,
+    ] {
         if let Some(v) = p.as_deref() {
             if !ist_gueltiges_nummer_praefix(v) {
                 return Err(AppError::Validation(
@@ -111,7 +115,10 @@ pub async fn setzen(
     }
 
     // Default-Fristen validieren (400).
-    for f in [req.meldung_bestaetigung_frist_min, req.auftrag_quittierung_frist_min] {
+    for f in [
+        req.meldung_bestaetigung_frist_min,
+        req.auftrag_quittierung_frist_min,
+    ] {
         if let Some(v) = f {
             if !ist_gueltige_frist_min(v) {
                 return Err(AppError::Validation(
@@ -134,7 +141,9 @@ pub async fn setzen(
     let geocoder_url = bereinige(req.geocoder_url);
     if let Some(u) = geocoder_url.as_deref() {
         if !ist_gueltige_geocoder_url(u) {
-            return Err(AppError::Validation("Ungültige Geocoder-URL (nur http/https)".into()));
+            return Err(AppError::Validation(
+                "Ungültige Geocoder-URL (nur http/https)".into(),
+            ));
         }
     }
 
@@ -216,7 +225,13 @@ pub async fn modul_einstellung_setzen(
         }
     }
 
-    modul_einstellung::setzen(&state.pool, benutzer.org_id, &modul_key, rolle.as_deref(), benutzer.id)
-        .await?;
+    modul_einstellung::setzen(
+        &state.pool,
+        benutzer.org_id,
+        &modul_key,
+        rolle.as_deref(),
+        benutzer.id,
+    )
+    .await?;
     Ok(())
 }

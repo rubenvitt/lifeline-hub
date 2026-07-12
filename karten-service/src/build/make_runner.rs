@@ -4,21 +4,33 @@ use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use tokio::process::Command;
 
-pub struct MakeRunner { pub karten_build_dir: PathBuf }
+pub struct MakeRunner {
+    pub karten_build_dir: PathBuf,
+}
 
 #[async_trait]
 impl BuildRunner for MakeRunner {
     async fn baue(&self, geofabrik_area: &str) -> anyhow::Result<BuildArtefakt> {
         let status = Command::new("make")
-            .arg("-C").arg(&self.karten_build_dir)
-            .arg("tiles").arg(format!("AREA={geofabrik_area}"))
-            .status().await?;
-        anyhow::ensure!(status.success(), "make tiles AREA={geofabrik_area} fehlgeschlagen ({status})");
+            .arg("-C")
+            .arg(&self.karten_build_dir)
+            .arg("tiles")
+            .arg(format!("AREA={geofabrik_area}"))
+            .status()
+            .await?;
+        anyhow::ensure!(
+            status.success(),
+            "make tiles AREA={geofabrik_area} fehlgeschlagen ({status})"
+        );
         let result_dir = self.karten_build_dir.join("out/result");
         let datei = waehle_artefakt(&result_dir, geofabrik_area)?;
         let sha256 = sha256_datei(&datei)?;
         let bounds = lies_bounds(&datei)?;
-        Ok(BuildArtefakt { datei, sha256, bounds })
+        Ok(BuildArtefakt {
+            datei,
+            sha256,
+            bounds,
+        })
     }
 }
 
@@ -52,18 +64,29 @@ fn sha256_datei(p: &Path) -> anyhow::Result<String> {
     let mut buf = [0u8; 65536];
     loop {
         let n = f.read(&mut buf)?;
-        if n == 0 { break; }
+        if n == 0 {
+            break;
+        }
         h.update(&buf[..n]);
     }
     Ok(h.finalize().iter().map(|b| format!("{b:02x}")).collect())
 }
 
-fn lies_bounds(datei: &Path) -> anyhow::Result<Option<(f64,f64,f64,f64)>> {
-    let out = std::process::Command::new("sqlite3").arg(datei)
-        .arg("select value from metadata where name='bounds';").output()?;
+fn lies_bounds(datei: &Path) -> anyhow::Result<Option<(f64, f64, f64, f64)>> {
+    let out = std::process::Command::new("sqlite3")
+        .arg(datei)
+        .arg("select value from metadata where name='bounds';")
+        .output()?;
     let s = String::from_utf8_lossy(&out.stdout);
-    let teile: Vec<f64> = s.trim().split(',').filter_map(|x| x.trim().parse().ok()).collect();
-    Ok(match teile.as_slice() { [w,s,o,n] => Some((*w,*s,*o,*n)), _ => None })
+    let teile: Vec<f64> = s
+        .trim()
+        .split(',')
+        .filter_map(|x| x.trim().parse().ok())
+        .collect();
+    Ok(match teile.as_slice() {
+        [w, s, o, n] => Some((*w, *s, *o, *n)),
+        _ => None,
+    })
 }
 
 #[cfg(test)]
@@ -112,7 +135,10 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(10)); // spätere mtime erzwingen
         lege_an(dir.path(), "osm.germany.2026-07-06.mbtiles");
         let gewaehlt = waehle_artefakt(dir.path(), "germany").unwrap();
-        assert_eq!(gewaehlt.file_name().unwrap().to_str().unwrap(), "osm.germany.2026-07-06.mbtiles");
+        assert_eq!(
+            gewaehlt.file_name().unwrap().to_str().unwrap(),
+            "osm.germany.2026-07-06.mbtiles"
+        );
     }
 
     #[test]

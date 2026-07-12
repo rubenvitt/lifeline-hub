@@ -46,11 +46,16 @@ mod tests {
     /// Minimal-Fixture: Org + Benutzer + Einsatz; liefert (benutzer_id, einsatz_id).
     async fn fixture(pool: &sqlx::SqlitePool) -> (i64, i64) {
         sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
-            .execute(pool).await.unwrap();
+            .execute(pool)
+            .await
+            .unwrap();
         let bid: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
              VALUES (1, 'a', 'a', 'h') RETURNING id",
-        ).fetch_one(pool).await.unwrap();
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         let eid: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung, einsatzort, einsatzort_lat, einsatzort_lon) \
              VALUES (1, 'Lage', 'Rathaus', 51.0, 10.0) RETURNING id",
@@ -72,7 +77,13 @@ mod tests {
         sqlx::query(
             "INSERT INTO uhs (einsatz_id, typ, bezeichnung, status, erfasst_von, geaendert_von) \
              VALUES (?, 'patientenablage', 'PA ohne Geo', 'geplant', ?, ?)",
-        ).bind(eid).bind(bid).bind(bid).execute(&pool).await.unwrap();
+        )
+        .bind(eid)
+        .bind(bid)
+        .bind(bid)
+        .execute(&pool)
+        .await
+        .unwrap();
 
         let marker = lade_marker(&pool, eid).await.unwrap();
         // Einsatzort + 1 verortete UHS = 2; die unverortete UHS fehlt.

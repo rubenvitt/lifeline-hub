@@ -42,8 +42,15 @@ pub async fn hochladen(
             .map_err(|e| AppError::Validation(format!("Datei lesen fehlgeschlagen: {e}")))?;
         anhang::pruefe_groesse(daten.len())?;
         anhang::scan(&daten)?; // AV-ready Seam (LFH-114): scan-vor-persist
-        let a = anhang::repo::anlegen(&state.pool, einsatz_id, benutzer.id, &dateiname, &mime, &daten)
-            .await?;
+        let a = anhang::repo::anlegen(
+            &state.pool,
+            einsatz_id,
+            benutzer.id,
+            &dateiname,
+            &mime,
+            &daten,
+        )
+        .await?;
         angelegt.push(a);
     }
 
@@ -78,7 +85,8 @@ pub async fn herunterladen(
     let mut headers = HeaderMap::new();
     headers.insert(
         header::CONTENT_TYPE,
-        HeaderValue::from_str(&mime).unwrap_or(HeaderValue::from_static("application/octet-stream")),
+        HeaderValue::from_str(&mime)
+            .unwrap_or(HeaderValue::from_static("application/octet-stream")),
     );
     // Content-Disposition mit ASCII-Fallback + RFC-5987 filename* (Umlaute etc.).
     headers.insert(
@@ -95,7 +103,13 @@ pub async fn herunterladen(
 fn content_disposition(dateiname: &str) -> String {
     let ascii: String = dateiname
         .chars()
-        .map(|c| if c.is_ascii_graphic() && c != '"' && c != '\\' { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_graphic() && c != '"' && c != '\\' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     format!(
         "attachment; filename=\"{ascii}\"; filename*=UTF-8''{}",

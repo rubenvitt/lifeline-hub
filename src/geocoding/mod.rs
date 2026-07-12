@@ -12,9 +12,9 @@
 //! Der Cache-Key wird auf ~100 m gerundet (Nachbarpunkte teilen einen Eintrag). Admins können
 //! eine eigene Geocoder-URL hinterlegen. Die Peilung kommt ohne jeden externen Dienst aus.
 
-pub mod peilung;
-pub mod marker;
 pub mod cache;
+pub mod marker;
+pub mod peilung;
 
 use sqlx::SqlitePool;
 use std::collections::HashSet;
@@ -61,7 +61,12 @@ pub struct TokenBucket {
 
 impl TokenBucket {
     pub fn neu(rate_pro_sek: f64, kapazitaet: f64) -> Self {
-        Self { tokens: kapazitaet, kapazitaet, rate_pro_sek, zuletzt: Instant::now() }
+        Self {
+            tokens: kapazitaet,
+            kapazitaet,
+            rate_pro_sek,
+            zuletzt: Instant::now(),
+        }
     }
 
     /// Ein Token nehmen, falls verfügbar; füllt vorher zeitanteilig nach.
@@ -110,7 +115,10 @@ async fn geocode_und_schreibe(
     );
     let name = match client.get(&url).send().await {
         Ok(r) if r.status().is_success() => match r.json::<serde_json::Value>().await {
-            Ok(v) => v.get("display_name").and_then(|n| n.as_str()).map(String::from),
+            Ok(v) => v
+                .get("display_name")
+                .and_then(|n| n.as_str())
+                .map(String::from),
             Err(e) => {
                 tracing::debug!("Geocoder-JSON-Parse: {e}");
                 None
@@ -152,7 +160,10 @@ pub async fn reverse_mit(
         if alter > CACHE_TTL_SEKUNDEN {
             // Stale → alten Wert SOFORT liefern, im Hintergrund auffrischen (1× pro Key).
             let key = format!("{lat_key}:{lon_key}");
-            let claimed = inflight.lock().unwrap_or_else(|e| e.into_inner()).insert(key.clone());
+            let claimed = inflight
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .insert(key.clone());
             if claimed {
                 let (client, bucket, inflight, pool, base) = (
                     client.clone(),
@@ -163,7 +174,10 @@ pub async fn reverse_mit(
                 );
                 tokio::spawn(async move {
                     geocode_und_schreibe(&client, &bucket, &pool, &base, lat, lon).await;
-                    inflight.lock().unwrap_or_else(|e| e.into_inner()).remove(&key);
+                    inflight
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .remove(&key);
                 });
             }
         }
@@ -196,7 +210,9 @@ mod tests {
         );
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
-        let handle = tokio::spawn(async move { axum::serve(listener, app).await.ok(); });
+        let handle = tokio::spawn(async move {
+            axum::serve(listener, app).await.ok();
+        });
         (format!("http://{addr}"), handle)
     }
 
@@ -230,12 +246,25 @@ mod tests {
     #[tokio::test]
     async fn erfolg_liefert_display_name_und_cached() {
         let pool = crate::db::test_pool().await;
-        let (base, _h) = stub(serde_json::json!({ "display_name": "Hauptstr. 5, Musterstadt" })).await;
-        let name = reverse_mit(&test_client(), &arc_bucket(false), &arc_inflight(), &pool, &base, 51.1604, 10.4514).await;
+        let (base, _h) =
+            stub(serde_json::json!({ "display_name": "Hauptstr. 5, Musterstadt" })).await;
+        let name = reverse_mit(
+            &test_client(),
+            &arc_bucket(false),
+            &arc_inflight(),
+            &pool,
+            &base,
+            51.1604,
+            10.4514,
+        )
+        .await;
         assert_eq!(name.as_deref(), Some("Hauptstr. 5, Musterstadt"));
         // In den Cache geschrieben.
         let (la, lo) = cache::schluessel(51.1604, 10.4514);
-        assert_eq!(cache::lese(&pool, la, lo).await.as_deref(), Some("Hauptstr. 5, Musterstadt"));
+        assert_eq!(
+            cache::lese(&pool, la, lo).await.as_deref(),
+            Some("Hauptstr. 5, Musterstadt")
+        );
     }
 
     #[tokio::test]
@@ -244,14 +273,32 @@ mod tests {
         let (la, lo) = cache::schluessel(51.1604, 10.4514);
         cache::schreibe(&pool, la, lo, "Aus Cache").await;
         // Base zeigt auf geschlossenen Port; Bucket leer → trotzdem Treffer aus Cache.
-        let name = reverse_mit(&test_client(), &arc_bucket(true), &arc_inflight(), &pool, &geschlossener_port(), 51.1604, 10.4514).await;
+        let name = reverse_mit(
+            &test_client(),
+            &arc_bucket(true),
+            &arc_inflight(),
+            &pool,
+            &geschlossener_port(),
+            51.1604,
+            10.4514,
+        )
+        .await;
         assert_eq!(name.as_deref(), Some("Aus Cache"));
     }
 
     #[tokio::test]
     async fn offline_liefert_none() {
         let pool = crate::db::test_pool().await;
-        let name = reverse_mit(&test_client(), &arc_bucket(false), &arc_inflight(), &pool, &geschlossener_port(), 51.0, 10.0).await;
+        let name = reverse_mit(
+            &test_client(),
+            &arc_bucket(false),
+            &arc_inflight(),
+            &pool,
+            &geschlossener_port(),
+            51.0,
+            10.0,
+        )
+        .await;
         assert!(name.is_none());
     }
 
@@ -260,7 +307,16 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (base, _h) = stub(serde_json::json!({ "display_name": "X" })).await;
         // Kein Cache-Eintrag, Bucket leer → None (ohne HTTP).
-        let name = reverse_mit(&test_client(), &arc_bucket(true), &arc_inflight(), &pool, &base, 48.0, 11.0).await;
+        let name = reverse_mit(
+            &test_client(),
+            &arc_bucket(true),
+            &arc_inflight(),
+            &pool,
+            &base,
+            48.0,
+            11.0,
+        )
+        .await;
         assert!(name.is_none());
     }
 
@@ -298,9 +354,18 @@ mod tests {
         .unwrap();
         let (base, _h) = stub(serde_json::json!({ "display_name": "Neu" })).await;
         let inflight = arc_inflight();
-        let name = reverse_mit(&test_client(), &arc_bucket(false), &inflight, &pool, &base, 52.0, 13.0).await;
+        let name = reverse_mit(
+            &test_client(),
+            &arc_bucket(false),
+            &inflight,
+            &pool,
+            &base,
+            52.0,
+            13.0,
+        )
+        .await;
         assert_eq!(name.as_deref(), Some("Alt")); // alter Wert SOFORT
-        // Hintergrund-Refresh aktualisiert den Cache auf "Neu" (kurz pollen).
+                                                  // Hintergrund-Refresh aktualisiert den Cache auf "Neu" (kurz pollen).
         let mut aktualisiert = false;
         for _ in 0..50 {
             if cache::lese(&pool, la, lo).await.as_deref() == Some("Neu") {
@@ -309,6 +374,9 @@ mod tests {
             }
             tokio::time::sleep(std::time::Duration::from_millis(20)).await;
         }
-        assert!(aktualisiert, "Hintergrund-Refresh hätte den Cache aktualisieren müssen");
+        assert!(
+            aktualisiert,
+            "Hintergrund-Refresh hätte den Cache aktualisieren müssen"
+        );
     }
 }

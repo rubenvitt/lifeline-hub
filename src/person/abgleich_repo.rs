@@ -49,13 +49,19 @@ pub async fn anlegen_verdacht(
 }
 
 /// Lädt einen Abgleich; `NotFound`, falls nicht zum Einsatz.
-pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<AbgleichAnzeige, AppError> {
-    sqlx::query_as::<_, AbgleichAnzeige>(sqlx::AssertSqlSafe(format!("{SELECT_ABGLEICH} WHERE id = ? AND einsatz_id = ?")))
-        .bind(id)
-        .bind(einsatz_id)
-        .fetch_optional(pool)
-        .await?
-        .ok_or(AppError::NotFound)
+pub async fn laden(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<AbgleichAnzeige, AppError> {
+    sqlx::query_as::<_, AbgleichAnzeige>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_ABGLEICH} WHERE id = ? AND einsatz_id = ?"
+    )))
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)
 }
 
 /// Entscheidet einen Abgleich (`bestaetigt`/`verworfen`). Bei `bestaetigt` wird in
@@ -116,16 +122,18 @@ pub async fn liste_je_person(
     einsatz_id: i64,
     person_id: i64,
 ) -> Result<Vec<AbgleichAnzeige>, AppError> {
-    Ok(sqlx::query_as::<_, AbgleichAnzeige>(sqlx::AssertSqlSafe(format!(
-        "{SELECT_ABGLEICH} WHERE einsatz_id = ? \
+    Ok(
+        sqlx::query_as::<_, AbgleichAnzeige>(sqlx::AssertSqlSafe(format!(
+            "{SELECT_ABGLEICH} WHERE einsatz_id = ? \
          AND (vermisst_person_id = ? OR gefunden_person_id = ?) \
          ORDER BY erstellt_at DESC, id DESC"
-    )))
-    .bind(einsatz_id)
-    .bind(person_id)
-    .bind(person_id)
-    .fetch_all(pool)
-    .await?)
+        )))
+        .bind(einsatz_id)
+        .bind(person_id)
+        .bind(person_id)
+        .fetch_all(pool)
+        .await?,
+    )
 }
 
 #[cfg(test)]
@@ -137,7 +145,9 @@ mod tests {
     /// Liefert (benutzer, einsatz, vermisst_id, gefunden_a, gefunden_b).
     async fn setup(pool: &SqlitePool) -> (i64, i64, i64, i64, i64) {
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Test-Orga')")
-            .execute(pool).await.unwrap();
+            .execute(pool)
+            .await
+            .unwrap();
         let b: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, aktiv) \
              VALUES (1, 'A', 'a', 'h', 'keiner', 'keine', 1) RETURNING id")
@@ -147,7 +157,9 @@ mod tests {
              VALUES (1, 'Lage', 'aktiv', '2026-05-27', 'realeinsatz', '2026-05-27') RETURNING id")
             .fetch_one(pool).await.unwrap();
         let mk = |nr: i64, status: &'static str| {
-            let e = e; let b = b; let pool = pool.clone();
+            let e = e;
+            let b = b;
+            let pool = pool.clone();
             async move {
                 sqlx::query_scalar::<_, i64>(
                     "INSERT INTO einsatz_person (einsatz_id, registrier_nr, status, erfasst_von, geaendert_von) \
@@ -164,7 +176,10 @@ mod tests {
 
     async fn status(pool: &SqlitePool, person_id: i64) -> String {
         sqlx::query_scalar("SELECT status FROM einsatz_person WHERE id = ?")
-            .bind(person_id).fetch_one(pool).await.unwrap()
+            .bind(person_id)
+            .fetch_one(pool)
+            .await
+            .unwrap()
     }
 
     #[tokio::test]
@@ -186,7 +201,11 @@ mod tests {
         let entschieden = entscheide(&pool, e, a.id, "bestaetigt", b).await.unwrap();
         assert_eq!(entschieden.status, AbgleichStatus::Bestaetigt);
         assert!(entschieden.entschieden_at.is_some());
-        assert_eq!(status(&pool, v).await, "abgemeldet", "Vermisstmeldung aufgeklärt → abgemeldet");
+        assert_eq!(
+            status(&pool, v).await,
+            "abgemeldet",
+            "Vermisstmeldung aufgeklärt → abgemeldet"
+        );
     }
 
     #[tokio::test]
@@ -196,8 +215,13 @@ mod tests {
         let a1 = anlegen_verdacht(&pool, e, v, g_a, b).await.unwrap();
         let a2 = anlegen_verdacht(&pool, e, v, g_b, b).await.unwrap();
         entscheide(&pool, e, a1.id, "bestaetigt", b).await.unwrap();
-        let err = entscheide(&pool, e, a2.id, "bestaetigt", b).await.unwrap_err();
-        assert!(matches!(err, AppError::Conflict(_)), "Unique-Index: nur ein bestätigter Abgleich je Vermisstmeldung");
+        let err = entscheide(&pool, e, a2.id, "bestaetigt", b)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, AppError::Conflict(_)),
+            "Unique-Index: nur ein bestätigter Abgleich je Vermisstmeldung"
+        );
     }
 
     #[tokio::test]
@@ -206,7 +230,11 @@ mod tests {
         let (b, e, v, g, _) = setup(&pool).await;
         let a = anlegen_verdacht(&pool, e, v, g, b).await.unwrap();
         entscheide(&pool, e, a.id, "verworfen", b).await.unwrap();
-        assert_eq!(status(&pool, v).await, "vermisst", "verworfen ändert den Status nicht");
+        assert_eq!(
+            status(&pool, v).await,
+            "vermisst",
+            "verworfen ändert den Status nicht"
+        );
     }
 
     #[tokio::test]

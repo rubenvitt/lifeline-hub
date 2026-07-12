@@ -58,7 +58,9 @@ pub fn pruefe_ecken(ecken_json: &str) -> Result<(), AppError> {
     let ecken: Vec<[f64; 2]> = serde_json::from_str(ecken_json)
         .map_err(|_| AppError::Validation("Ecken sind kein gültiges JSON".into()))?;
     if ecken.len() != 4 {
-        return Err(AppError::Validation("Genau 4 Eckpunkte erforderlich".into()));
+        return Err(AppError::Validation(
+            "Genau 4 Eckpunkte erforderlich".into(),
+        ));
     }
     Ok(())
 }

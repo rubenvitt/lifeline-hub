@@ -55,7 +55,10 @@ impl LiveHub {
     /// Nachrichten, die bei leerem Kanal gesendet werden, gehen verloren — neue
     /// Abonnenten erhalten nach ihrem Connect nur nachfolgende Einträge (vgl. §6).
     pub fn publiziere_event(&self, einsatz_id: i64, event: &str, data: String) {
-        let nachricht = LiveNachricht { event: event.to_string(), data };
+        let nachricht = LiveNachricht {
+            event: event.to_string(),
+            data,
+        };
         // Häufiger Fall (Kanal existiert): nur Lese-Lock.
         let keine_empfaenger = {
             let kanaele = self.kanaele.read().expect("LiveHub-Lock");

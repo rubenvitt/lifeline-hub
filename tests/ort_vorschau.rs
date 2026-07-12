@@ -17,7 +17,9 @@ fn geschlossener_geocoder() -> String {
 
 async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
     let pool = db::test_pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12")).await.unwrap();
+    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
+        .await
+        .unwrap();
     // Deterministisch: Org-1-Geocoder auf garantiert verweigerte Adresse setzen,
     // damit ortsname-null-Tests netzunabhängig bleiben (Cache-Treffer umgehen dies).
     sqlx::query(
@@ -31,7 +33,10 @@ async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
     let router = build_router(AppState {
         pool: pool.clone(),
         live: LiveHub::new(),
-        karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu(), download_client: lifeline_hub::karte::download::download_client(), download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_dir: std::env::temp_dir(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
         karten_service_url: None,
         karten_service_token: None,
     });
@@ -40,24 +45,50 @@ async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
 
 async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) -> String {
     let body = format!(r#"{{"benutzername":"{benutzername}","passwort":"{passwort}"}}"#);
-    let resp = app.clone().oneshot(
-        Request::builder().method("POST").uri("/api/auth/login")
-            .header(header::CONTENT_TYPE, "application/json")
-            .body(Body::from(body)).unwrap(),
-    ).await.unwrap();
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/auth/login")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(body))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
-    resp.headers().get(header::SET_COOKIE).unwrap().to_str().unwrap()
-        .split(';').next().unwrap().to_string()
+    resp.headers()
+        .get(header::SET_COOKIE)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap()
+        .to_string()
 }
 
 async fn get(app: &axum::Router, uri: &str, cookie: &str) -> (StatusCode, Value) {
-    let resp = app.clone().oneshot(
-        Request::builder().method("GET").uri(uri)
-            .header(header::COOKIE, cookie).body(Body::empty()).unwrap(),
-    ).await.unwrap();
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(uri)
+                .header(header::COOKIE, cookie)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
     let status = resp.status();
     let bytes = to_bytes(resp.into_body(), 1024 * 1024).await.unwrap();
-    let v = if bytes.is_empty() { Value::Null } else { serde_json::from_slice(&bytes).unwrap_or(Value::Null) };
+    let v = if bytes.is_empty() {
+        Value::Null
+    } else {
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null)
+    };
     (status, v)
 }
 
@@ -66,19 +97,38 @@ async fn einsatz_mit_einsatzort(pool: &sqlx::SqlitePool) -> i64 {
     sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatz (org_id, bezeichnung, einsatzort, einsatzort_lat, einsatzort_lon) \
          VALUES (1, 'Lage', 'Rathaus', 51.0, 10.0) RETURNING id",
-    ).fetch_one(pool).await.unwrap()
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap()
 }
 
-async fn post_json(app: &axum::Router, uri: &str, cookie: &str, body: Value) -> (StatusCode, Value) {
-    let resp = app.clone().oneshot(
-        Request::builder().method("POST").uri(uri)
-            .header(header::COOKIE, cookie)
-            .header(header::CONTENT_TYPE, "application/json")
-            .body(Body::from(body.to_string())).unwrap(),
-    ).await.unwrap();
+async fn post_json(
+    app: &axum::Router,
+    uri: &str,
+    cookie: &str,
+    body: Value,
+) -> (StatusCode, Value) {
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(uri)
+                .header(header::COOKIE, cookie)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
     let status = resp.status();
     let bytes = to_bytes(resp.into_body(), 1024 * 1024).await.unwrap();
-    let v = if bytes.is_empty() { Value::Null } else { serde_json::from_slice(&bytes).unwrap_or(Value::Null) };
+    let v = if bytes.is_empty() {
+        Value::Null
+    } else {
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null)
+    };
     (status, v)
 }
 
@@ -88,7 +138,12 @@ async fn shape_mit_peilung_und_ortsname_null() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_mit_einsatzort(&pool).await;
     // Anfrage 0.1° südlich des Einsatzorts → Peilung Richtung Norden.
-    let (s, v) = get(&app, &format!("/api/einsaetze/{eid}/ort-vorschau?lat=50.9&lon=10.0"), &cookie).await;
+    let (s, v) = get(
+        &app,
+        &format!("/api/einsaetze/{eid}/ort-vorschau?lat=50.9&lon=10.0"),
+        &cookie,
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(v["ortsname"], Value::Null); // Phase 1
     assert_eq!(v["peilung"]["richtung"].as_str(), Some("N"));
@@ -103,8 +158,16 @@ async fn ohne_marker_ist_peilung_null() {
     // Einsatz OHNE einsatzort_lat/lon.
     let eid = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Leer') RETURNING id",
-    ).fetch_one(&pool).await.unwrap();
-    let (s, v) = get(&app, &format!("/api/einsaetze/{eid}/ort-vorschau?lat=50.9&lon=10.0"), &cookie).await;
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let (s, v) = get(
+        &app,
+        &format!("/api/einsaetze/{eid}/ort-vorschau?lat=50.9&lon=10.0"),
+        &cookie,
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(v["peilung"], Value::Null);
     assert_eq!(v["ortsname"], Value::Null);
@@ -116,7 +179,8 @@ async fn exclude_schliesst_einsatzort_aus() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_mit_einsatzort(&pool).await;
     // Einsatzort ausschließen → kein weiterer Marker → peilung null.
-    let uri = format!("/api/einsaetze/{eid}/ort-vorschau?lat=50.9&lon=10.0&exclude=einsatzort:{eid}");
+    let uri =
+        format!("/api/einsaetze/{eid}/ort-vorschau?lat=50.9&lon=10.0&exclude=einsatzort:{eid}");
     let (s, v) = get(&app, &uri, &cookie).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(v["peilung"], Value::Null);
@@ -134,19 +198,35 @@ async fn nicht_mitglied_wird_abgewiesen() {
     })).await;
     assert_eq!(s, StatusCode::CREATED);
     let gast = login_cookie(&app, "gast", "gastpw12").await;
-    let (s, _v) = get(&app, &format!("/api/einsaetze/{eid}/ort-vorschau?lat=50.9&lon=10.0"), &gast).await;
-    assert!(s.is_client_error(), "Nicht-Mitglied darf nicht lesen, war {s}");
+    let (s, _v) = get(
+        &app,
+        &format!("/api/einsaetze/{eid}/ort-vorschau?lat=50.9&lon=10.0"),
+        &gast,
+    )
+    .await;
+    assert!(
+        s.is_client_error(),
+        "Nicht-Mitglied darf nicht lesen, war {s}"
+    );
 }
 
 #[tokio::test]
 async fn ohne_login_ist_401() {
     let (app, pool) = setup_mit_pool().await;
     let eid = einsatz_mit_einsatzort(&pool).await;
-    let resp = app.clone().oneshot(
-        Request::builder().method("GET")
-            .uri(format!("/api/einsaetze/{eid}/ort-vorschau?lat=50.9&lon=10.0"))
-            .body(Body::empty()).unwrap(),
-    ).await.unwrap();
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(format!(
+                    "/api/einsaetze/{eid}/ort-vorschau?lat=50.9&lon=10.0"
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
 }
 
@@ -159,7 +239,12 @@ async fn ortsname_aus_cache_ohne_netz() {
     let (la, lo) = lifeline_hub::geocoding::cache::schluessel(50.9, 10.0);
     lifeline_hub::geocoding::cache::schreibe(&pool, la, lo, "Teststr. 1, Musterstadt").await;
 
-    let (s, v) = get(&app, &format!("/api/einsaetze/{eid}/ort-vorschau?lat=50.9&lon=10.0"), &cookie).await;
+    let (s, v) = get(
+        &app,
+        &format!("/api/einsaetze/{eid}/ort-vorschau?lat=50.9&lon=10.0"),
+        &cookie,
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(v["ortsname"].as_str(), Some("Teststr. 1, Musterstadt"));
     assert_eq!(v["peilung"]["richtung"].as_str(), Some("N")); // Peilung steht weiterhin
@@ -171,6 +256,11 @@ async fn out_of_range_koordinate_ist_400() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_mit_einsatzort(&pool).await;
     // lat=999 liegt außerhalb des gültigen Bereichs (-90..=90) → Handler gibt 400 zurück.
-    let (s, _v) = get(&app, &format!("/api/einsaetze/{eid}/ort-vorschau?lat=999&lon=10.0"), &cookie).await;
+    let (s, _v) = get(
+        &app,
+        &format!("/api/einsaetze/{eid}/ort-vorschau?lat=999&lon=10.0"),
+        &cookie,
+    )
+    .await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
 }

@@ -5,7 +5,9 @@
 pub mod eingabe;
 pub mod repo;
 
-pub use eingabe::{validiere_neuen_auftrag, EmpfaengerEingabeReq, NeuerAuftrag, ValidierterAuftrag};
+pub use eingabe::{
+    validiere_neuen_auftrag, EmpfaengerEingabeReq, NeuerAuftrag, ValidierterAuftrag,
+};
 
 use crate::kommunikation::{AdressatKategorie, Prioritaet, Richtung};
 use serde::Serialize;
@@ -69,7 +71,8 @@ impl TryFrom<String> for AuftragBearbeitungsstatus {
     type Error = String;
 
     fn try_from(s: String) -> Result<Self, Self::Error> {
-        AuftragBearbeitungsstatus::parse(&s).ok_or_else(|| format!("Ungültiger AuftragBearbeitungsstatus: {s}"))
+        AuftragBearbeitungsstatus::parse(&s)
+            .ok_or_else(|| format!("Ungültiger AuftragBearbeitungsstatus: {s}"))
     }
 }
 
@@ -131,14 +134,19 @@ impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for EmpfaengerTyp
 where
     &'r str: sqlx::Decode<'r, DB>,
 {
-    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+    fn decode(
+        value: <DB as sqlx::Database>::ValueRef<'r>,
+    ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<DB>>::decode(value)?;
         EmpfaengerTyp::parse(s).ok_or_else(|| format!("Ungültiger EmpfaengerTyp: {s}").into())
     }
 }
 
 pub fn extern_kategorie_gueltig(k: &str) -> bool {
-    matches!(k, EXTERN_LEITSTELLE | EXTERN_NACHBAR_EA | EXTERN_UEBERGEORDNET | EXTERN_ANDERE_BOS)
+    matches!(
+        k,
+        EXTERN_LEITSTELLE | EXTERN_NACHBAR_EA | EXTERN_UEBERGEORDNET | EXTERN_ANDERE_BOS
+    )
 }
 
 /// Effektiver Bearbeitungsstatus (abgeleitet, fürs Frontend).
@@ -160,7 +168,10 @@ pub fn richtung_gueltig(r: &str) -> bool {
 }
 
 pub fn empfaenger_typ_gueltig(t: &str) -> bool {
-    matches!(t, EMPF_ABSCHNITT | EMPF_EINHEIT | EMPF_FUNKTION | EMPF_PERSON | EMPF_FAHRZEUG | EMPF_EXTERN)
+    matches!(
+        t,
+        EMPF_ABSCHNITT | EMPF_EINHEIT | EMPF_FUNKTION | EMPF_PERSON | EMPF_FAHRZEUG | EMPF_EXTERN
+    )
 }
 
 /// Anzeige eines Auftrags inkl. abgeleiteter Felder und der Vollzugs-Achse aus

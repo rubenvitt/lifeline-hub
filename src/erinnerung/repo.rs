@@ -36,12 +36,14 @@ const ANZEIGE_SELECT: &str =
 /// Lädt eine Erinnerung als Anzeige. `NotFound`, wenn sie nicht existiert.
 /// Bind-Reihenfolge: zuerst `jetzt` (computed column), dann `id` (WHERE).
 pub async fn laden(pool: &SqlitePool, id: i64, jetzt: &str) -> Result<ErinnerungAnzeige, AppError> {
-    sqlx::query_as::<_, ErinnerungAnzeige>(sqlx::AssertSqlSafe(format!("{ANZEIGE_SELECT} WHERE e.id = ?")))
-        .bind(jetzt)
-        .bind(id)
-        .fetch_optional(pool)
-        .await?
-        .ok_or(AppError::NotFound)
+    sqlx::query_as::<_, ErinnerungAnzeige>(sqlx::AssertSqlSafe(format!(
+        "{ANZEIGE_SELECT} WHERE e.id = ?"
+    )))
+    .bind(jetzt)
+    .bind(id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)
 }
 
 /// Listet Erinnerungen eines Einsatzes. `nur_offen` filtert auf `status='offen'`.
@@ -175,12 +177,21 @@ pub async fn markiere_ausgeloest(
 ) -> Result<(), AppError> {
     match neues_faellig_at {
         Some(neu) => {
-            sqlx::query("UPDATE erinnerung SET faellig_at = ?, zuletzt_ausgeloest_at = ? WHERE id = ?")
-                .bind(neu).bind(jetzt).bind(id).execute(pool).await?;
+            sqlx::query(
+                "UPDATE erinnerung SET faellig_at = ?, zuletzt_ausgeloest_at = ? WHERE id = ?",
+            )
+            .bind(neu)
+            .bind(jetzt)
+            .bind(id)
+            .execute(pool)
+            .await?;
         }
         None => {
             sqlx::query("UPDATE erinnerung SET zuletzt_ausgeloest_at = ? WHERE id = ?")
-                .bind(jetzt).bind(id).execute(pool).await?;
+                .bind(jetzt)
+                .bind(id)
+                .execute(pool)
+                .await?;
         }
     }
     Ok(())
@@ -262,19 +273,35 @@ mod tests {
     /// Legt Org (id=1), einen Benutzer und einen Einsatz an; liefert (benutzer_id, einsatz_id).
     async fn setup(pool: &SqlitePool) -> (i64, i64) {
         sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
-            .execute(pool).await.unwrap();
+            .execute(pool)
+            .await
+            .unwrap();
         let benutzer_id: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
              VALUES (1, 'Leitung', 'leit', 'h') RETURNING id",
-        ).fetch_one(pool).await.unwrap();
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         let einsatz_id: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
-        ).fetch_one(pool).await.unwrap();
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         (benutzer_id, einsatz_id)
     }
 
     fn daten<'a>(titel: &'a str, faellig: &'a str, intervall: Option<i64>) -> ErinnerungDaten<'a> {
-        ErinnerungDaten { titel, beschreibung: None, faellig_at: faellig, intervall_minuten: intervall, empfaenger_funktion: None, bezug_typ: None, bezug_id: None }
+        ErinnerungDaten {
+            titel,
+            beschreibung: None,
+            faellig_at: faellig,
+            intervall_minuten: intervall,
+            empfaenger_funktion: None,
+            bezug_typ: None,
+            bezug_id: None,
+        }
     }
 
     #[tokio::test]
@@ -282,7 +309,15 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
 
-        let r = anlegen(&pool, e, b, daten("Lagemeldung", "2026-06-11 10:00:00", Some(30)), "2026-06-11 09:00:00").await.unwrap();
+        let r = anlegen(
+            &pool,
+            e,
+            b,
+            daten("Lagemeldung", "2026-06-11 10:00:00", Some(30)),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
         assert_eq!(r.titel, "Lagemeldung");
         assert_eq!(r.status, STATUS_OFFEN);
         assert_eq!(r.quelle, QUELLE_MANUELL);
@@ -298,24 +333,43 @@ mod tests {
         let (b, e) = setup(&pool).await;
 
         let r = anlegen(
-            &pool, e, b,
+            &pool,
+            e,
+            b,
             ErinnerungDaten {
-                titel: "Wiedervorlage zu ETB #3", beschreibung: None,
-                faellig_at: "2026-06-11 10:00:00", intervall_minuten: None,
-                empfaenger_funktion: None, bezug_typ: Some("etb"), bezug_id: Some(3),
+                titel: "Wiedervorlage zu ETB #3",
+                beschreibung: None,
+                faellig_at: "2026-06-11 10:00:00",
+                intervall_minuten: None,
+                empfaenger_funktion: None,
+                bezug_typ: Some("etb"),
+                bezug_id: Some(3),
             },
             "2026-06-11 09:00:00",
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
         assert_eq!(r.bezug_typ.as_deref(), Some("etb"));
         assert_eq!(r.bezug_id, Some(3));
-        assert_eq!(r.quelle, QUELLE_MANUELL, "manuelle Anlage bleibt Quelle 'manuell'");
+        assert_eq!(
+            r.quelle, QUELLE_MANUELL,
+            "manuelle Anlage bleibt Quelle 'manuell'"
+        );
     }
 
     #[tokio::test]
     async fn ist_faellig_wird_aus_jetzt_abgeleitet() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let r = anlegen(&pool, e, b, daten("X", "2026-06-11 10:00:00", None), "2026-06-11 09:00:00").await.unwrap();
+        let r = anlegen(
+            &pool,
+            e,
+            b,
+            daten("X", "2026-06-11 10:00:00", None),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
 
         let spaeter = laden(&pool, r.id, "2026-06-11 10:30:00").await.unwrap();
         assert!(spaeter.ist_faellig, "10:30 >= 10:00 → fällig");
@@ -325,14 +379,27 @@ mod tests {
     async fn status_setzen_entfernt_aus_offener_liste() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let r = anlegen(&pool, e, b, daten("X", "2026-06-11 10:00:00", None), "2026-06-11 09:00:00").await.unwrap();
+        let r = anlegen(
+            &pool,
+            e,
+            b,
+            daten("X", "2026-06-11 10:00:00", None),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
 
-        let erledigt = status_setzen(&pool, r.id, STATUS_ERLEDIGT, "2026-06-11 11:00:00").await.unwrap();
+        let erledigt = status_setzen(&pool, r.id, STATUS_ERLEDIGT, "2026-06-11 11:00:00")
+            .await
+            .unwrap();
         assert_eq!(erledigt.status, STATUS_ERLEDIGT);
         assert!(erledigt.erledigt_at.is_some());
 
         let offen = liste(&pool, e, true, "2026-06-11 11:00:00").await.unwrap();
-        assert!(offen.is_empty(), "erledigte verschwinden aus der offenen Liste");
+        assert!(
+            offen.is_empty(),
+            "erledigte verschwinden aus der offenen Liste"
+        );
         let alle = liste(&pool, e, false, "2026-06-11 11:00:00").await.unwrap();
         assert_eq!(alle.len(), 1, "bleibt in der Gesamtliste");
     }
@@ -341,15 +408,36 @@ mod tests {
     async fn status_setzen_lehnt_ungueltigen_status_ab() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let r = anlegen(&pool, e, b, daten("X", "2026-06-11 10:00:00", None), "2026-06-11 09:00:00").await.unwrap();
-        assert!(matches!(status_setzen(&pool, r.id, "offen", "2026-06-11 11:00:00").await.unwrap_err(), AppError::Validation(_)));
+        let r = anlegen(
+            &pool,
+            e,
+            b,
+            daten("X", "2026-06-11 10:00:00", None),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        assert!(matches!(
+            status_setzen(&pool, r.id, "offen", "2026-06-11 11:00:00")
+                .await
+                .unwrap_err(),
+            AppError::Validation(_)
+        ));
     }
 
     #[tokio::test]
     async fn gehoert_zu_einsatz_prueft_zugehoerigkeit() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let r = anlegen(&pool, e, b, daten("X", "2026-06-11 10:00:00", None), "2026-06-11 09:00:00").await.unwrap();
+        let r = anlegen(
+            &pool,
+            e,
+            b,
+            daten("X", "2026-06-11 10:00:00", None),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
         assert!(gehoert_zu_einsatz(&pool, r.id, e).await.unwrap());
         assert!(!gehoert_zu_einsatz(&pool, r.id, 999).await.unwrap());
     }
@@ -358,7 +446,15 @@ mod tests {
     async fn anzeige_enthaelt_kommunikation_achsen() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let r = anlegen(&pool, e, b, daten("X", "2026-06-11 10:00:00", None), "2026-06-11 09:00:00").await.unwrap();
+        let r = anlegen(
+            &pool,
+            e,
+            b,
+            daten("X", "2026-06-11 10:00:00", None),
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
 
         // Default ohne kommunikation_status-Zeile: Vollzug 'offen', Quittung NULL.
         let vorher = laden(&pool, r.id, "2026-06-11 09:00:00").await.unwrap();
@@ -367,8 +463,16 @@ mod tests {
 
         // Quittung über das geteilte Repo setzen → Anzeige spiegelt sie.
         crate::kommunikation::repo::quittiere(
-            &pool, 1, e, crate::kommunikation::OBJEKT_ERINNERUNG, r.id, b, "2026-06-11 10:30:00",
-        ).await.unwrap();
+            &pool,
+            1,
+            e,
+            crate::kommunikation::OBJEKT_ERINNERUNG,
+            r.id,
+            b,
+            "2026-06-11 10:30:00",
+        )
+        .await
+        .unwrap();
         let nachher = laden(&pool, r.id, "2026-06-11 10:31:00").await.unwrap();
         assert_eq!(nachher.quittiert_at.as_deref(), Some("2026-06-11 10:30:00"));
         assert_eq!(nachher.vollzug_status, "offen");
@@ -380,13 +484,35 @@ mod tests {
         let (b, e) = setup(&pool).await;
 
         // Test-Double: „Auftrag 42 hat Quittungsfrist überschritten".
-        let erst = anlegen_aus_frist(&pool, e, b, "auftrag", 42, "Nachfass: Auftrag 42 unquittiert", "2026-06-11 10:00:00", "2026-06-11 10:00:00").await.unwrap();
+        let erst = anlegen_aus_frist(
+            &pool,
+            e,
+            b,
+            "auftrag",
+            42,
+            "Nachfass: Auftrag 42 unquittiert",
+            "2026-06-11 10:00:00",
+            "2026-06-11 10:00:00",
+        )
+        .await
+        .unwrap();
         assert_eq!(erst.quelle, crate::erinnerung::QUELLE_AUTO_FRIST);
         assert_eq!(erst.bezug_typ.as_deref(), Some("auftrag"));
         assert_eq!(erst.bezug_id, Some(42));
 
         // Zweiter Aufruf für denselben offenen Bezug → keine Dublette, gleiche ID.
-        let zweit = anlegen_aus_frist(&pool, e, b, "auftrag", 42, "Nachfass: Auftrag 42 unquittiert", "2026-06-11 10:05:00", "2026-06-11 10:05:00").await.unwrap();
+        let zweit = anlegen_aus_frist(
+            &pool,
+            e,
+            b,
+            "auftrag",
+            42,
+            "Nachfass: Auftrag 42 unquittiert",
+            "2026-06-11 10:05:00",
+            "2026-06-11 10:05:00",
+        )
+        .await
+        .unwrap();
         assert_eq!(zweit.id, erst.id);
 
         let alle = liste(&pool, e, false, "2026-06-11 10:05:00").await.unwrap();
@@ -397,15 +523,30 @@ mod tests {
     async fn schliesse_offene_auto_setzt_erledigt_und_ist_idempotent() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        anlegen_aus_frist(&pool, e, b, "meldung", 7, "Nachfass", "2026-06-11 10:00:00", "2026-06-11 10:00:00").await.unwrap();
+        anlegen_aus_frist(
+            &pool,
+            e,
+            b,
+            "meldung",
+            7,
+            "Nachfass",
+            "2026-06-11 10:00:00",
+            "2026-06-11 10:00:00",
+        )
+        .await
+        .unwrap();
 
         // Schließt die offene Auto-Erinnerung des Bezugs.
-        schliesse_offene_auto(&pool, "meldung", 7, "2026-06-11 10:05:00").await.unwrap();
+        schliesse_offene_auto(&pool, "meldung", 7, "2026-06-11 10:05:00")
+            .await
+            .unwrap();
         let offen: Option<i64> = sqlx::query_scalar(
             "SELECT id FROM erinnerung WHERE quelle='auto_frist' AND status='offen' AND bezug_typ='meldung' AND bezug_id=7",
         ).fetch_optional(&pool).await.unwrap();
         assert!(offen.is_none(), "keine offene Auto-Erinnerung mehr");
         // Idempotent: zweiter Aufruf ohne Treffer ist ein No-op.
-        schliesse_offene_auto(&pool, "meldung", 7, "2026-06-11 10:06:00").await.unwrap();
+        schliesse_offene_auto(&pool, "meldung", 7, "2026-06-11 10:06:00")
+            .await
+            .unwrap();
     }
 }

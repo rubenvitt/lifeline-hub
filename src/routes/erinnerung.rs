@@ -1,13 +1,17 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{fordere_modul_zugriff_laden, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
+use crate::einsatz::berechtigung::{
+    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
+};
 use crate::einsatz::repo as einsatz_repo;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "erinnerungen";
 use crate::erinnerung::{repo, ErinnerungAnzeige, STATUS_ERLEDIGT, STATUS_QUITTIERT};
 use crate::error::AppError;
-use crate::kommunikation::{repo as krepo, OBJEKT_AUFTRAG, OBJEKT_ERINNERUNG, OBJEKT_MELDUNG, VOLLZUG_VOLLZOGEN};
+use crate::kommunikation::{
+    repo as krepo, OBJEKT_AUFTRAG, OBJEKT_ERINNERUNG, OBJEKT_MELDUNG, VOLLZUG_VOLLZOGEN,
+};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -44,9 +48,18 @@ pub async fn liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     let nur_offen = params.nur_offen.unwrap_or(false);
-    Ok(Json(repo::liste(&state.pool, einsatz_id, nur_offen, &jetzt()).await?))
+    Ok(Json(
+        repo::liste(&state.pool, einsatz_id, nur_offen, &jetzt()).await?,
+    ))
 }
 
 #[derive(Debug, Deserialize)]
@@ -72,7 +85,9 @@ fn parse_faellig(roh: &str) -> Result<String, AppError> {
             return Ok(n.format("%Y-%m-%d %H:%M:%S").to_string());
         }
     }
-    Err(AppError::Validation("Ungültiger Fälligkeitszeitpunkt".into()))
+    Err(AppError::Validation(
+        "Ungültiger Fälligkeitszeitpunkt".into(),
+    ))
 }
 
 /// POST /api/einsaetze/{id}/erinnerungen — Erinnerung anlegen (Schreibrecht + aktiv).
@@ -85,7 +100,14 @@ pub async fn anlegen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let titel = req.titel.trim();
@@ -98,11 +120,23 @@ pub async fn anlegen(
         }
     }
     let faellig = parse_faellig(&req.faellig_at)?;
-    let beschreibung = req.beschreibung.as_deref().map(str::trim).filter(|s| !s.is_empty());
-    let empfaenger = req.empfaenger_funktion.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let beschreibung = req
+        .beschreibung
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    let empfaenger = req
+        .empfaenger_funktion
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
 
     // Bezug both-or-neither (wie der Chat-Sachbezug): entweder beides oder nichts.
-    let bezug_typ = req.bezug_typ.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let bezug_typ = req
+        .bezug_typ
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
     match (bezug_typ, req.bezug_id) {
         (Some(typ), Some(id)) => {
             // Allowlist + einsatz-gescopter Existenz-Check (analog Chat-Sachbezug,
@@ -124,14 +158,29 @@ pub async fn anlegen(
             }
         }
         (None, None) => {}
-        _ => return Err(AppError::Validation("Bezug erfordert bezug_typ und bezug_id zusammen".into())),
+        _ => {
+            return Err(AppError::Validation(
+                "Bezug erfordert bezug_typ und bezug_id zusammen".into(),
+            ))
+        }
     }
 
-    let r = repo::anlegen(&state.pool, einsatz_id, benutzer.id, repo::ErinnerungDaten {
-        titel, beschreibung, faellig_at: &faellig,
-        intervall_minuten: req.intervall_minuten, empfaenger_funktion: empfaenger,
-        bezug_typ, bezug_id: req.bezug_id,
-    }, &jetzt()).await?;
+    let r = repo::anlegen(
+        &state.pool,
+        einsatz_id,
+        benutzer.id,
+        repo::ErinnerungDaten {
+            titel,
+            beschreibung,
+            faellig_at: &faellig,
+            intervall_minuten: req.intervall_minuten,
+            empfaenger_funktion: empfaenger,
+            bezug_typ,
+            bezug_id: req.bezug_id,
+        },
+        &jetzt(),
+    )
+    .await?;
     sse(&state, einsatz_id);
     Ok((StatusCode::CREATED, Json(r)))
 }
@@ -147,7 +196,14 @@ async fn fordere_bearbeitbar(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
     if !repo::gehoert_zu_einsatz(&state.pool, erinnerung_id, einsatz_id).await? {
         return Err(AppError::NotFound);
@@ -164,7 +220,17 @@ pub async fn erledigen(
     let org_id = fordere_bearbeitbar(&state, &benutzer, einsatz_id, erinnerung_id).await?;
     let now = jetzt();
     repo::status_setzen(&state.pool, erinnerung_id, STATUS_ERLEDIGT, &now).await?;
-    krepo::setze_vollzug(&state.pool, org_id, einsatz_id, OBJEKT_ERINNERUNG, erinnerung_id, VOLLZUG_VOLLZOGEN, benutzer.id, &now).await?;
+    krepo::setze_vollzug(
+        &state.pool,
+        org_id,
+        einsatz_id,
+        OBJEKT_ERINNERUNG,
+        erinnerung_id,
+        VOLLZUG_VOLLZOGEN,
+        benutzer.id,
+        &now,
+    )
+    .await?;
     let r = repo::laden(&state.pool, erinnerung_id, &now).await?;
     sse(&state, einsatz_id);
     Ok(Json(r))
@@ -179,7 +245,16 @@ pub async fn quittieren(
     let org_id = fordere_bearbeitbar(&state, &benutzer, einsatz_id, erinnerung_id).await?;
     let now = jetzt();
     repo::status_setzen(&state.pool, erinnerung_id, STATUS_QUITTIERT, &now).await?;
-    krepo::quittiere(&state.pool, org_id, einsatz_id, OBJEKT_ERINNERUNG, erinnerung_id, benutzer.id, &now).await?;
+    krepo::quittiere(
+        &state.pool,
+        org_id,
+        einsatz_id,
+        OBJEKT_ERINNERUNG,
+        erinnerung_id,
+        benutzer.id,
+        &now,
+    )
+    .await?;
     let r = repo::laden(&state.pool, erinnerung_id, &now).await?;
     sse(&state, einsatz_id);
     Ok(Json(r))
@@ -192,13 +267,18 @@ mod tests {
 
     async fn setup(pool: &SqlitePool) -> (i64, i64) {
         sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
-            .execute(pool).await.unwrap();
+            .execute(pool)
+            .await
+            .unwrap();
         let b: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) VALUES (1,'L','l','h') RETURNING id")
             .fetch_one(pool).await.unwrap();
         let e: i64 = sqlx::query_scalar(
-            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id")
-            .fetch_one(pool).await.unwrap();
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         (b, e)
     }
 
@@ -209,17 +289,54 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         let r = crate::erinnerung::repo::anlegen(
-            &pool, e, b,
-            crate::erinnerung::repo::ErinnerungDaten { titel: "X", beschreibung: None, faellig_at: "2026-06-11 10:00:00", intervall_minuten: None, empfaenger_funktion: None, bezug_typ: None, bezug_id: None },
-            "2026-06-11 09:00:00").await.unwrap();
+            &pool,
+            e,
+            b,
+            crate::erinnerung::repo::ErinnerungDaten {
+                titel: "X",
+                beschreibung: None,
+                faellig_at: "2026-06-11 10:00:00",
+                intervall_minuten: None,
+                empfaenger_funktion: None,
+                bezug_typ: None,
+                bezug_id: None,
+            },
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
 
-        crate::erinnerung::repo::status_setzen(&pool, r.id, crate::erinnerung::STATUS_ERLEDIGT, "2026-06-11 11:00:00").await.unwrap();
-        krepo::setze_vollzug(&pool, 1, e, OBJEKT_ERINNERUNG, r.id, VOLLZUG_VOLLZOGEN, b, "2026-06-11 11:00:00").await.unwrap();
+        crate::erinnerung::repo::status_setzen(
+            &pool,
+            r.id,
+            crate::erinnerung::STATUS_ERLEDIGT,
+            "2026-06-11 11:00:00",
+        )
+        .await
+        .unwrap();
+        krepo::setze_vollzug(
+            &pool,
+            1,
+            e,
+            OBJEKT_ERINNERUNG,
+            r.id,
+            VOLLZUG_VOLLZOGEN,
+            b,
+            "2026-06-11 11:00:00",
+        )
+        .await
+        .unwrap();
 
-        let s = krepo::lade_status(&pool, e, OBJEKT_ERINNERUNG, r.id).await.unwrap().unwrap();
+        let s = krepo::lade_status(&pool, e, OBJEKT_ERINNERUNG, r.id)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(s.vollzug_status, VOLLZUG_VOLLZOGEN);
         let st: String = sqlx::query_scalar("SELECT status FROM erinnerung WHERE id = ?")
-            .bind(r.id).fetch_one(&pool).await.unwrap();
+            .bind(r.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(st, "erledigt", "Scheduler-Treiber bleibt gesetzt");
     }
 }

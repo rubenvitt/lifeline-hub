@@ -132,13 +132,20 @@ pub fn prioritaet_gueltig(p: &str) -> bool {
 pub fn meldungsart_gueltig(a: &str) -> bool {
     matches!(
         a,
-        ART_LAGEMELDUNG | ART_SOFORTMELDUNG | ART_RUECKMELDUNG
-            | ART_VOLLZUGSMELDUNG | ART_ANFRAGE | ART_SONSTIGE
+        ART_LAGEMELDUNG
+            | ART_SOFORTMELDUNG
+            | ART_RUECKMELDUNG
+            | ART_VOLLZUGSMELDUNG
+            | ART_ANFRAGE
+            | ART_SONSTIGE
     )
 }
 
 pub fn status_gueltig(s: &str) -> bool {
-    matches!(s, STATUS_NEU | STATUS_GESICHTET | STATUS_IN_BEARBEITUNG | STATUS_ERLEDIGT)
+    matches!(
+        s,
+        STATUS_NEU | STATUS_GESICHTET | STATUS_IN_BEARBEITUNG | STATUS_ERLEDIGT
+    )
 }
 
 /// Richtungskennzeichnung intern/extern (LFH-87, TEXT in der DB, im Code validiert).

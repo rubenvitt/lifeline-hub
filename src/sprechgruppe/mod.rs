@@ -54,15 +54,24 @@ mod tests {
     use super::*;
     fn sg(einsatz_id: Option<i64>) -> Sprechgruppe {
         Sprechgruppe {
-            id: 1, org_id: 1, einsatz_id, bezeichnung: "412_F_DRK".into(),
-            betriebsart: Betriebsart::Tmo, hinweis: None, aktiv: true, sortier: 0,
+            id: 1,
+            org_id: 1,
+            einsatz_id,
+            bezeichnung: "412_F_DRK".into(),
+            betriebsart: Betriebsart::Tmo,
+            hinweis: None,
+            aktiv: true,
+            sortier: 0,
             angelegt_at: "2026-06-21 10:00:00".into(),
         }
     }
     #[test]
     fn anzeige_markiert_einsatz_lokal() {
         assert!(!sg(None).anzeige().einsatz_lokal, "Katalog ist nicht lokal");
-        assert!(sg(Some(7)).anzeige().einsatz_lokal, "mit einsatz_id = lokal");
+        assert!(
+            sg(Some(7)).anzeige().einsatz_lokal,
+            "mit einsatz_id = lokal"
+        );
         assert_eq!(sg(None).anzeige().bezeichnung, "412_F_DRK");
     }
 }

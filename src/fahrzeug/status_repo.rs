@@ -18,7 +18,9 @@ pub struct StatusDaten<'a> {
 fn label_conflict<T>(e: sqlx::Error) -> Result<T, AppError> {
     if let sqlx::Error::Database(db) = &e {
         if db.is_unique_violation() {
-            return Err(AppError::Conflict("Status-Label ist bereits vorhanden".into()));
+            return Err(AppError::Conflict(
+                "Status-Label ist bereits vorhanden".into(),
+            ));
         }
     }
     Err(e.into())
@@ -162,15 +164,25 @@ mod tests {
     }
 
     fn daten<'a>(label: &'a str, kategorie: &'a str, sortier: i64) -> StatusDaten<'a> {
-        StatusDaten { label, kategorie, farbe: None, fms_anker: None, sortier }
+        StatusDaten {
+            label,
+            kategorie,
+            farbe: None,
+            fms_anker: None,
+            sortier,
+        }
     }
 
     #[tokio::test]
     async fn anlegen_liste_sortiert_nur_aktiv() {
         let pool = crate::db::test_pool().await;
         org(&pool, 1).await;
-        anlegen(&pool, 1, daten("disponiert", KATEGORIE_GEBUNDEN, 20)).await.unwrap();
-        anlegen(&pool, 1, daten("einsatzbereit", KATEGORIE_VERFUEGBAR, 10)).await.unwrap();
+        anlegen(&pool, 1, daten("disponiert", KATEGORIE_GEBUNDEN, 20))
+            .await
+            .unwrap();
+        anlegen(&pool, 1, daten("einsatzbereit", KATEGORIE_VERFUEGBAR, 10))
+            .await
+            .unwrap();
 
         let liste = liste(&pool, 1).await.unwrap();
         assert_eq!(liste.len(), 2);
@@ -182,9 +194,13 @@ mod tests {
     async fn dublette_label_ist_conflict() {
         let pool = crate::db::test_pool().await;
         org(&pool, 1).await;
-        anlegen(&pool, 1, daten("disponiert", KATEGORIE_GEBUNDEN, 20)).await.unwrap();
+        anlegen(&pool, 1, daten("disponiert", KATEGORIE_GEBUNDEN, 20))
+            .await
+            .unwrap();
         assert!(matches!(
-            anlegen(&pool, 1, daten("disponiert", KATEGORIE_VERFUEGBAR, 5)).await.unwrap_err(),
+            anlegen(&pool, 1, daten("disponiert", KATEGORIE_VERFUEGBAR, 5))
+                .await
+                .unwrap_err(),
             AppError::Conflict(_)
         ));
     }
@@ -193,9 +209,14 @@ mod tests {
     async fn deaktivieren_versteckt_und_bleibt_referenzierbar() {
         let pool = crate::db::test_pool().await;
         org(&pool, 1).await;
-        let s = anlegen(&pool, 1, daten("alt", KATEGORIE_VERFUEGBAR, 10)).await.unwrap();
+        let s = anlegen(&pool, 1, daten("alt", KATEGORIE_VERFUEGBAR, 10))
+            .await
+            .unwrap();
         deaktivieren(&pool, 1, s.id).await.unwrap();
-        assert!(liste(&pool, 1).await.unwrap().is_empty(), "nicht mehr in der aktiven Liste");
+        assert!(
+            liste(&pool, 1).await.unwrap().is_empty(),
+            "nicht mehr in der aktiven Liste"
+        );
         // laden ignoriert aktiv-Flag → Referenz bleibt auflösbar.
         assert_eq!(laden(&pool, 1, s.id).await.unwrap().id, s.id);
     }
@@ -204,19 +225,32 @@ mod tests {
     async fn erster_der_kategorie_deterministisch_und_ohne_deaktivierte() {
         let pool = crate::db::test_pool().await;
         org(&pool, 1).await;
-        let frueh = anlegen(&pool, 1, daten("disponiert", KATEGORIE_GEBUNDEN, 20)).await.unwrap();
-        anlegen(&pool, 1, daten("anfahrt", KATEGORIE_GEBUNDEN, 30)).await.unwrap();
+        let frueh = anlegen(&pool, 1, daten("disponiert", KATEGORIE_GEBUNDEN, 20))
+            .await
+            .unwrap();
+        anlegen(&pool, 1, daten("anfahrt", KATEGORIE_GEBUNDEN, 30))
+            .await
+            .unwrap();
 
         assert_eq!(
-            erster_der_kategorie(&pool, 1, KATEGORIE_GEBUNDEN).await.unwrap(),
+            erster_der_kategorie(&pool, 1, KATEGORIE_GEBUNDEN)
+                .await
+                .unwrap(),
             Some(frueh.id)
         );
         // verfuegbar gibt es nicht → None.
-        assert_eq!(erster_der_kategorie(&pool, 1, KATEGORIE_VERFUEGBAR).await.unwrap(), None);
+        assert_eq!(
+            erster_der_kategorie(&pool, 1, KATEGORIE_VERFUEGBAR)
+                .await
+                .unwrap(),
+            None
+        );
 
         // erster deaktiviert → nächster nach sortier.
         deaktivieren(&pool, 1, frueh.id).await.unwrap();
-        let naechster = erster_der_kategorie(&pool, 1, KATEGORIE_GEBUNDEN).await.unwrap();
+        let naechster = erster_der_kategorie(&pool, 1, KATEGORIE_GEBUNDEN)
+            .await
+            .unwrap();
         assert!(naechster.is_some() && naechster != Some(frueh.id));
     }
 
@@ -225,7 +259,9 @@ mod tests {
         let pool = crate::db::test_pool().await;
         org(&pool, 1).await;
         org(&pool, 2).await;
-        let s = anlegen(&pool, 1, daten("disponiert", KATEGORIE_GEBUNDEN, 20)).await.unwrap();
+        let s = anlegen(&pool, 1, daten("disponiert", KATEGORIE_GEBUNDEN, 20))
+            .await
+            .unwrap();
         assert!(ist_in_org(&pool, 1, s.id).await.unwrap());
         assert!(!ist_in_org(&pool, 2, s.id).await.unwrap(), "fremde Org");
     }

@@ -61,7 +61,9 @@ pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
 ) -> Result<Json<Vec<PersonalStatus>>, AppError> {
-    Ok(Json(status_repo::liste(&state.pool, benutzer.org_id).await?))
+    Ok(Json(
+        status_repo::liste(&state.pool, benutzer.org_id).await?,
+    ))
 }
 
 /// POST /api/personal-status — Admin. Dublette label → Conflict.

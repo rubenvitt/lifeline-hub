@@ -56,7 +56,11 @@ pub struct Fahrzeug {
 impl Fahrzeug {
     /// Soll-Stärke als optionaler `Staerke` (alle drei gesetzt → Some, sonst None).
     pub fn staerke(&self) -> Option<Staerke> {
-        match (self.staerke_fuehrer, self.staerke_unterfuehrer, self.staerke_mannschaft) {
+        match (
+            self.staerke_fuehrer,
+            self.staerke_unterfuehrer,
+            self.staerke_mannschaft,
+        ) {
             (Some(f), Some(u), Some(m)) => Some(Staerke::neu(f as u16, u as u16, m as u16)),
             _ => None,
         }
@@ -211,6 +215,8 @@ mod tests {
     #[test]
     fn startliste_deckt_alle_kategorien_ab() {
         assert_eq!(STATUS_STARTLISTE.len(), 10);
-        assert!(STATUS_STARTLISTE.iter().all(|(_, k, _, _)| ist_gueltige_kategorie(k)));
+        assert!(STATUS_STARTLISTE
+            .iter()
+            .all(|(_, k, _, _)| ist_gueltige_kategorie(k)));
     }
 }

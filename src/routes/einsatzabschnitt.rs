@@ -1,6 +1,8 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{fordere_modul_zugriff_laden, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
+use crate::einsatz::berechtigung::{
+    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
+};
 use crate::einsatz::repo as einsatz_repo;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -36,14 +38,29 @@ fn sse_abschnitt(state: &AppState, einsatz_id: i64, aid: i64) {
 
 /// Schreibt einen System-ETB-Eintrag und publiziert ihn live (Muster wie
 /// `routes::einsatz_personal::etb_system`).
-async fn etb_system(state: &AppState, einsatz_id: i64, benutzer_id: i64, inhalt: &str) -> Result<(), AppError> {
+async fn etb_system(
+    state: &AppState,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    inhalt: &str,
+) -> Result<(), AppError> {
     let anzeige = etb_repo::anlegen(
-        &state.pool, einsatz_id, benutzer_id,
+        &state.pool,
+        einsatz_id,
+        benutzer_id,
         etb_repo::EintragDaten {
-            typ: etb::TYP_SYSTEM, inhalt, von: None, an: None, meldeweg: None,
-            veranlassung: None, ereigniszeit: None, erfasst_lokal_at: None, berichtigt_eintrag_id: None,
+            typ: etb::TYP_SYSTEM,
+            inhalt,
+            von: None,
+            an: None,
+            meldeweg: None,
+            veranlassung: None,
+            ereigniszeit: None,
+            erfasst_lokal_at: None,
+            berichtigt_eintrag_id: None,
         },
-    ).await?;
+    )
+    .await?;
     if let Ok(json) = serde_json::to_string(&anzeige) {
         state.live.publiziere(einsatz_id, json);
     }
@@ -63,7 +80,14 @@ pub async fn liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     Ok(Json(abschnitt_repo::liste(&state.pool, einsatz_id).await?))
 }
 
@@ -91,7 +115,14 @@ pub async fn anlegen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let name = body.name.trim().to_string();
@@ -102,21 +133,37 @@ pub async fn anlegen(
     let mittel = trimme(body.kommunikationsmittel);
     let erreichbar = trimme(body.erreichbarkeit);
     let mut anzeige = abschnitt_repo::anlegen(
-        &state.pool, einsatz_id,
+        &state.pool,
+        einsatz_id,
         AbschnittDaten {
-            name: &name, ueber_abschnitt_id: body.ueber_abschnitt_id,
-            leiter_id: body.leiter_id, bemerkung: bemerkung.as_deref(),
-            kommunikationsmittel: mittel.as_deref(), erreichbarkeit: erreichbar.as_deref(),
+            name: &name,
+            ueber_abschnitt_id: body.ueber_abschnitt_id,
+            leiter_id: body.leiter_id,
+            bemerkung: bemerkung.as_deref(),
+            kommunikationsmittel: mittel.as_deref(),
+            erreichbarkeit: erreichbar.as_deref(),
             sortier: body.sortier,
         },
-    ).await?;
+    )
+    .await?;
     if let Some(ids) = body.sprechgruppe_ids {
         crate::sprechgruppe::repo::setze_abschnitt_sprechgruppen(
-            &state.pool, einsatz.org_id, einsatz_id, anzeige.id, &ids,
-        ).await?;
+            &state.pool,
+            einsatz.org_id,
+            einsatz_id,
+            anzeige.id,
+            &ids,
+        )
+        .await?;
         anzeige = abschnitt_repo::laden(&state.pool, einsatz_id, anzeige.id).await?;
     }
-    etb_system(&state, einsatz_id, benutzer.id, &format!("Abschnitt «{}» angelegt", anzeige.name)).await?;
+    etb_system(
+        &state,
+        einsatz_id,
+        benutzer.id,
+        &format!("Abschnitt «{}» angelegt", anzeige.name),
+    )
+    .await?;
     sse_abschnitt(&state, einsatz_id, anzeige.id);
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
@@ -132,7 +179,14 @@ pub async fn aktualisieren(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let name = body.name.trim().to_string();
@@ -143,18 +197,29 @@ pub async fn aktualisieren(
     let mittel = trimme(body.kommunikationsmittel);
     let erreichbar = trimme(body.erreichbarkeit);
     let mut anzeige = abschnitt_repo::aktualisiere(
-        &state.pool, einsatz_id, aid,
+        &state.pool,
+        einsatz_id,
+        aid,
         AbschnittDaten {
-            name: &name, ueber_abschnitt_id: body.ueber_abschnitt_id,
-            leiter_id: body.leiter_id, bemerkung: bemerkung.as_deref(),
-            kommunikationsmittel: mittel.as_deref(), erreichbarkeit: erreichbar.as_deref(),
+            name: &name,
+            ueber_abschnitt_id: body.ueber_abschnitt_id,
+            leiter_id: body.leiter_id,
+            bemerkung: bemerkung.as_deref(),
+            kommunikationsmittel: mittel.as_deref(),
+            erreichbarkeit: erreichbar.as_deref(),
             sortier: body.sortier,
         },
-    ).await?;
+    )
+    .await?;
     if let Some(ids) = body.sprechgruppe_ids {
         crate::sprechgruppe::repo::setze_abschnitt_sprechgruppen(
-            &state.pool, einsatz.org_id, einsatz_id, aid, &ids,
-        ).await?;
+            &state.pool,
+            einsatz.org_id,
+            einsatz_id,
+            aid,
+            &ids,
+        )
+        .await?;
         anzeige = abschnitt_repo::laden(&state.pool, einsatz_id, aid).await?;
     }
     sse_abschnitt(&state, einsatz_id, aid);
@@ -170,12 +235,25 @@ pub async fn aufloesen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let vorher = abschnitt_repo::laden(&state.pool, einsatz_id, aid).await?;
     abschnitt_repo::loese_auf(&state.pool, einsatz_id, aid).await?;
-    etb_system(&state, einsatz_id, benutzer.id, &format!("Abschnitt «{}» aufgelöst", vorher.name)).await?;
+    etb_system(
+        &state,
+        einsatz_id,
+        benutzer.id,
+        &format!("Abschnitt «{}» aufgelöst", vorher.name),
+    )
+    .await?;
     sse_abschnitt(&state, einsatz_id, aid);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -200,12 +278,20 @@ pub async fn flaeche(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     if let Some(Some(gj)) = &body.flaeche_geojson {
-        let v: serde_json::Value = serde_json::from_str(gj)
-            .map_err(|_| AppError::UnprocessableEntity("flaeche_geojson ist kein gültiges JSON".into()))?;
+        let v: serde_json::Value = serde_json::from_str(gj).map_err(|_| {
+            AppError::UnprocessableEntity("flaeche_geojson ist kein gültiges JSON".into())
+        })?;
         if v.get("type").and_then(|t| t.as_str()) != Some("Polygon") {
             return Err(AppError::UnprocessableEntity(
                 "flaeche_geojson muss ein GeoJSON-Polygon sein".into(),
@@ -238,7 +324,14 @@ pub async fn stream(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
 
     let rx = state.live.abonniere(einsatz_id);
     let stream = BroadcastStream::new(rx).map(|res| {

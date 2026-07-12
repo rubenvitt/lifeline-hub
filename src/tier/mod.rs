@@ -51,7 +51,9 @@ impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for TierStatus
 where
     &'r str: sqlx::Decode<'r, DB>,
 {
-    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+    fn decode(
+        value: <DB as sqlx::Database>::ValueRef<'r>,
+    ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<DB>>::decode(value)?;
         TierStatus::parse(s).ok_or_else(|| format!("Ungültiger TierStatus: {s}").into())
     }
@@ -126,7 +128,9 @@ impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for Spezies
 where
     &'r str: sqlx::Decode<'r, DB>,
 {
-    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+    fn decode(
+        value: <DB as sqlx::Database>::ValueRef<'r>,
+    ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<DB>>::decode(value)?;
         Spezies::parse(s).ok_or_else(|| format!("Ungültige Spezies: {s}").into())
     }
@@ -178,7 +182,9 @@ impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for TierGeschlecht
 where
     &'r str: sqlx::Decode<'r, DB>,
 {
-    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+    fn decode(
+        value: <DB as sqlx::Database>::ValueRef<'r>,
+    ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<DB>>::decode(value)?;
         TierGeschlecht::parse(s).ok_or_else(|| format!("Ungültiges TierGeschlecht: {s}").into())
     }
@@ -239,7 +245,9 @@ impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for AbschlussGrund
 where
     &'r str: sqlx::Decode<'r, DB>,
 {
-    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+    fn decode(
+        value: <DB as sqlx::Database>::ValueRef<'r>,
+    ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<DB>>::decode(value)?;
         AbschlussGrund::parse(s).ok_or_else(|| format!("Ungültiger AbschlussGrund: {s}").into())
     }
@@ -320,7 +328,15 @@ mod tests {
 
     #[test]
     fn spezies_roundtrip_und_label() {
-        for s in ["hund", "katze", "grosstier", "nutzgefluegel", "kleintier", "wildtier", "sonstige"] {
+        for s in [
+            "hund",
+            "katze",
+            "grosstier",
+            "nutzgefluegel",
+            "kleintier",
+            "wildtier",
+            "sonstige",
+        ] {
             assert_eq!(Spezies::parse(s).unwrap().as_str(), s);
         }
         assert!(Spezies::parse("dinosaurier").is_none());
@@ -333,12 +349,22 @@ mod tests {
         for g in ["maennlich", "weiblich", "unbekannt"] {
             assert_eq!(TierGeschlecht::parse(g).unwrap().as_str(), g);
         }
-        assert!(TierGeschlecht::parse("divers").is_none(), "Tiere haben kein 'divers'");
+        assert!(
+            TierGeschlecht::parse("divers").is_none(),
+            "Tiere haben kein 'divers'"
+        );
     }
 
     #[test]
     fn abschluss_grund_roundtrip() {
-        for g in ["uebergabe_halter", "uebergabe_tierarzt", "uebergabe_tierheim", "verstorben", "freilauf", "sonstiges"] {
+        for g in [
+            "uebergabe_halter",
+            "uebergabe_tierarzt",
+            "uebergabe_tierheim",
+            "verstorben",
+            "freilauf",
+            "sonstiges",
+        ] {
             assert_eq!(AbschlussGrund::parse(g).unwrap().as_str(), g);
         }
         assert!(AbschlussGrund::parse("vergessen").is_none());

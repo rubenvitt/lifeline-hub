@@ -127,16 +127,18 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let bid = fixture(&pool).await;
 
-        setzen(&pool, 1, "etb", Some("admin"), bid)
-            .await
-            .unwrap();
+        setzen(&pool, 1, "etb", Some("admin"), bid).await.unwrap();
 
         let geaendert_von: Option<i64> =
             sqlx::query_scalar("SELECT geaendert_von FROM org_modul_einstellung WHERE org_id = 1 AND modul_key = 'etb'")
                 .fetch_one(&pool)
                 .await
                 .unwrap();
-        assert_eq!(geaendert_von, Some(bid), "geaendert_von muss die erfasser_id enthalten");
+        assert_eq!(
+            geaendert_von,
+            Some(bid),
+            "geaendert_von muss die erfasser_id enthalten"
+        );
     }
 
     #[tokio::test]

@@ -87,12 +87,14 @@ pub async fn liste_je_br(
     pool: &SqlitePool,
     br_id: i64,
 ) -> Result<Vec<BrBelegungAnzeige>, AppError> {
-    Ok(sqlx::query_as::<_, BrBelegungAnzeige>(sqlx::AssertSqlSafe(format!(
-        "{SELECT_ALLE} WHERE br_id = ? ORDER BY zeitpunkt_at DESC, id DESC"
-    )))
-    .bind(br_id)
-    .fetch_all(pool)
-    .await?)
+    Ok(
+        sqlx::query_as::<_, BrBelegungAnzeige>(sqlx::AssertSqlSafe(format!(
+            "{SELECT_ALLE} WHERE br_id = ? ORDER BY zeitpunkt_at DESC, id DESC"
+        )))
+        .bind(br_id)
+        .fetch_all(pool)
+        .await?,
+    )
 }
 
 /// Lädt ein einzelnes Belegungs-Event; `NotFound` außerhalb des Einsatzes.
@@ -151,14 +153,12 @@ async fn belege_einheit(
 
     // 7b. Cache aktualisieren
     let neuer_br_id = cache_nach_art(&art, br_id);
-    sqlx::query(
-        "UPDATE einsatz_einheit SET aktueller_br_id = ? WHERE id = ? AND einsatz_id = ?",
-    )
-    .bind(neuer_br_id)
-    .bind(objekt_id)
-    .bind(einsatz_id)
-    .execute(&mut **tx)
-    .await?;
+    sqlx::query("UPDATE einsatz_einheit SET aktueller_br_id = ? WHERE id = ? AND einsatz_id = ?")
+        .bind(neuer_br_id)
+        .bind(objekt_id)
+        .bind(einsatz_id)
+        .execute(&mut **tx)
+        .await?;
 
     Ok(event_id)
 }
@@ -209,14 +209,12 @@ async fn belege_fahrzeug(
 
     // 7b. Cache aktualisieren
     let neuer_br_id = cache_nach_art(&art, br_id);
-    sqlx::query(
-        "UPDATE einsatz_fahrzeug SET aktueller_br_id = ? WHERE id = ? AND einsatz_id = ?",
-    )
-    .bind(neuer_br_id)
-    .bind(objekt_id)
-    .bind(einsatz_id)
-    .execute(&mut **tx)
-    .await?;
+    sqlx::query("UPDATE einsatz_fahrzeug SET aktueller_br_id = ? WHERE id = ? AND einsatz_id = ?")
+        .bind(neuer_br_id)
+        .bind(objekt_id)
+        .bind(einsatz_id)
+        .execute(&mut **tx)
+        .await?;
 
     Ok(event_id)
 }

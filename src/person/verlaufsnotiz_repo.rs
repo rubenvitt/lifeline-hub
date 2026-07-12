@@ -49,14 +49,16 @@ pub async fn liste_je_person(
     einsatz_id: i64,
     person_id: i64,
 ) -> Result<Vec<NotizAnzeige>, AppError> {
-    Ok(sqlx::query_as::<_, NotizAnzeige>(sqlx::AssertSqlSafe(format!(
-        "{SELECT_NOTIZ} WHERE einsatz_id = ? AND person_id = ? \
+    Ok(
+        sqlx::query_as::<_, NotizAnzeige>(sqlx::AssertSqlSafe(format!(
+            "{SELECT_NOTIZ} WHERE einsatz_id = ? AND person_id = ? \
          ORDER BY erfasst_at DESC, id DESC"
-    )))
-    .bind(einsatz_id)
-    .bind(person_id)
-    .fetch_all(pool)
-    .await?)
+        )))
+        .bind(einsatz_id)
+        .bind(person_id)
+        .fetch_all(pool)
+        .await?,
+    )
 }
 
 #[cfg(test)]
@@ -67,7 +69,9 @@ mod tests {
 
     async fn setup(pool: &SqlitePool) -> (i64, i64, i64) {
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Test-Orga')")
-            .execute(pool).await.unwrap();
+            .execute(pool)
+            .await
+            .unwrap();
         let b: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, aktiv) \
              VALUES (1, 'A', 'a', 'h', 'keiner', 'keine', 1) RETURNING id")
@@ -78,8 +82,14 @@ mod tests {
             .fetch_one(pool).await.unwrap();
         let p: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
-             VALUES (?, 1, ?, ?) RETURNING id")
-            .bind(e).bind(b).bind(b).fetch_one(pool).await.unwrap();
+             VALUES (?, 1, ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(pool)
+        .await
+        .unwrap();
         (b, e, p)
     }
 
@@ -88,7 +98,9 @@ mod tests {
         let pool = test_pool().await;
         let (b, e, p) = setup(&pool).await;
         anlegen(&pool, e, p, "Platzwunde Stirn", b).await.unwrap();
-        anlegen(&pool, e, p, "stabil, ansprechbar", b).await.unwrap();
+        anlegen(&pool, e, p, "stabil, ansprechbar", b)
+            .await
+            .unwrap();
         let notizen = liste_je_person(&pool, e, p).await.unwrap();
         assert_eq!(notizen.len(), 2);
         assert_eq!(notizen[0].text, "stabil, ansprechbar", "neueste zuerst");

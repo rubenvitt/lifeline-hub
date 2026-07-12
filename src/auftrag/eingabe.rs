@@ -75,7 +75,9 @@ async fn validiere_empfaenger(
     .filter(|b| **b)
     .count();
     if belegt != 1 {
-        return Err(AppError::Validation("Empfänger braucht genau ein Ziel".into()));
+        return Err(AppError::Validation(
+            "Empfänger braucht genau ein Ziel".into(),
+        ));
     }
 
     async fn gehoert(
@@ -95,30 +97,46 @@ async fn validiere_empfaenger(
 
     let typ = match req.empfaenger_typ.as_str() {
         EMPF_ABSCHNITT => {
-            let id = req.abschnitt_id.ok_or_else(|| AppError::Validation("abschnitt_id fehlt".into()))?;
+            let id = req
+                .abschnitt_id
+                .ok_or_else(|| AppError::Validation("abschnitt_id fehlt".into()))?;
             if !gehoert(pool, "einsatzabschnitt", id, einsatz_id).await? {
-                return Err(AppError::Validation("Abschnitt gehört nicht zum Einsatz".into()));
+                return Err(AppError::Validation(
+                    "Abschnitt gehört nicht zum Einsatz".into(),
+                ));
             }
             EMPF_ABSCHNITT
         }
         EMPF_EINHEIT => {
-            let id = req.einheit_id.ok_or_else(|| AppError::Validation("einheit_id fehlt".into()))?;
+            let id = req
+                .einheit_id
+                .ok_or_else(|| AppError::Validation("einheit_id fehlt".into()))?;
             if !gehoert(pool, "einsatz_einheit", id, einsatz_id).await? {
-                return Err(AppError::Validation("Einheit gehört nicht zum Einsatz".into()));
+                return Err(AppError::Validation(
+                    "Einheit gehört nicht zum Einsatz".into(),
+                ));
             }
             EMPF_EINHEIT
         }
         EMPF_PERSON => {
-            let id = req.person_id.ok_or_else(|| AppError::Validation("person_id fehlt".into()))?;
+            let id = req
+                .person_id
+                .ok_or_else(|| AppError::Validation("person_id fehlt".into()))?;
             if !gehoert(pool, "einsatz_personal", id, einsatz_id).await? {
-                return Err(AppError::Validation("Person gehört nicht zum Einsatz".into()));
+                return Err(AppError::Validation(
+                    "Person gehört nicht zum Einsatz".into(),
+                ));
             }
             EMPF_PERSON
         }
         EMPF_FAHRZEUG => {
-            let id = req.fahrzeug_id.ok_or_else(|| AppError::Validation("fahrzeug_id fehlt".into()))?;
+            let id = req
+                .fahrzeug_id
+                .ok_or_else(|| AppError::Validation("fahrzeug_id fehlt".into()))?;
             if !gehoert(pool, "einsatz_fahrzeug", id, einsatz_id).await? {
-                return Err(AppError::Validation("Fahrzeug gehört nicht zum Einsatz".into()));
+                return Err(AppError::Validation(
+                    "Fahrzeug gehört nicht zum Einsatz".into(),
+                ));
             }
             EMPF_FAHRZEUG
         }
@@ -131,7 +149,9 @@ async fn validiere_empfaenger(
         EMPF_EXTERN => {
             let kat = req.extern_kategorie.as_deref().map(str::trim).unwrap_or("");
             if !crate::auftrag::extern_kategorie_gueltig(kat) {
-                return Err(AppError::Validation("Ungültige externe Adressat-Kategorie".into()));
+                return Err(AppError::Validation(
+                    "Ungültige externe Adressat-Kategorie".into(),
+                ));
             }
             if trimme(&req.extern_bezeichnung).is_none() {
                 return Err(AppError::Validation("externe Bezeichnung fehlt".into()));
@@ -150,8 +170,12 @@ async fn validiere_empfaenger(
         fahrzeug_id: req.fahrzeug_id,
         funktion_text: trimme(&req.funktion_text).map(str::to_string),
         // extern_* nur bei externem Adressat übernehmen (sonst verirrte Werte an anderen Typen).
-        extern_kategorie: ist_extern.then(|| trimme(&req.extern_kategorie).map(str::to_string)).flatten(),
-        extern_bezeichnung: ist_extern.then(|| trimme(&req.extern_bezeichnung).map(str::to_string)).flatten(),
+        extern_kategorie: ist_extern
+            .then(|| trimme(&req.extern_kategorie).map(str::to_string))
+            .flatten(),
+        extern_bezeichnung: ist_extern
+            .then(|| trimme(&req.extern_bezeichnung).map(str::to_string))
+            .flatten(),
     })
 }
 
@@ -200,7 +224,11 @@ impl ValidierterAuftrag {
 fn frist_aus_minuten(erteilt: &str, min: i64) -> Option<String> {
     NaiveDateTime::parse_from_str(erteilt, "%Y-%m-%d %H:%M:%S")
         .ok()
-        .map(|n| (n + Duration::minutes(min)).format("%Y-%m-%d %H:%M:%S").to_string())
+        .map(|n| {
+            (n + Duration::minutes(min))
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string()
+        })
 }
 
 /// Validiert + normalisiert eine Auftrags-Eingabe: Auftragstext UND >=1 Empfänger
@@ -218,16 +246,25 @@ pub async fn validiere_neuen_auftrag(
 ) -> Result<ValidierterAuftrag, AppError> {
     let text = req.auftrag_text.trim();
     if text.is_empty() {
-        return Err(AppError::Validation("Auftragstext darf nicht leer sein".into()));
+        return Err(AppError::Validation(
+            "Auftragstext darf nicht leer sein".into(),
+        ));
     }
     if req.empfaenger.is_empty() {
-        return Err(AppError::Validation("Mindestens ein Empfänger ist erforderlich".into()));
+        return Err(AppError::Validation(
+            "Mindestens ein Empfänger ist erforderlich".into(),
+        ));
     }
     let prioritaet = req.prioritaet.as_deref().unwrap_or(PRIO_NORMAL);
     if !crate::auftrag::prioritaet_gueltig(prioritaet) {
         return Err(AppError::Validation("Ungültige Priorität".into()));
     }
-    let richtung = req.richtung.as_deref().map(str::trim).filter(|s| !s.is_empty()).unwrap_or(RICHTUNG_INTERN);
+    let richtung = req
+        .richtung
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or(RICHTUNG_INTERN);
     if !crate::auftrag::richtung_gueltig(richtung) {
         return Err(AppError::Validation("Ungültige Richtung".into()));
     }

@@ -1,5 +1,5 @@
-pub mod repo;
 pub mod mitglied_repo;
+pub mod repo;
 pub mod typ_repo;
 
 use crate::sprechgruppe::SprechgruppeAnzeige;

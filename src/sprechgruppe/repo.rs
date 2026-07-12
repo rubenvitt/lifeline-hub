@@ -3,7 +3,8 @@ use crate::error::AppError;
 use sqlx::SqlitePool;
 
 /// Spaltenliste für `SELECT` in der Reihenfolge von `Sprechgruppe` (FromRow).
-const SPALTEN: &str = "id, org_id, einsatz_id, bezeichnung, betriebsart, hinweis, aktiv, sortier, angelegt_at";
+const SPALTEN: &str =
+    "id, org_id, einsatz_id, bezeichnung, betriebsart, hinweis, aktiv, sortier, angelegt_at";
 
 /// Editierbare Katalog-Felder einer Sprechgruppe.
 #[derive(Debug)]
@@ -327,28 +328,70 @@ mod tests {
     use sqlx::SqlitePool;
     async fn org(pool: &SqlitePool, id: i64) {
         sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (?, 'Orga')")
-            .bind(id).execute(pool).await.unwrap();
+            .bind(id)
+            .execute(pool)
+            .await
+            .unwrap();
     }
     fn daten<'a>(bez: &'a str, ba: &'a str) -> KatalogDaten<'a> {
-        KatalogDaten { bezeichnung: bez, betriebsart: ba, hinweis: None, sortier: 0 }
+        KatalogDaten {
+            bezeichnung: bez,
+            betriebsart: ba,
+            hinweis: None,
+            sortier: 0,
+        }
     }
 
     async fn setup_einsatz_abschnitt(pool: &SqlitePool) -> (i64, i64) {
-        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1,'Orga')").execute(pool).await.unwrap();
-        let e: i64 = sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id").fetch_one(pool).await.unwrap();
-        let a: i64 = sqlx::query_scalar("INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, 'Nord') RETURNING id").bind(e).fetch_one(pool).await.unwrap();
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1,'Orga')")
+            .execute(pool)
+            .await
+            .unwrap();
+        let e: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        let a: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, 'Nord') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(pool)
+        .await
+        .unwrap();
         (e, a)
     }
     #[tokio::test]
     async fn setze_und_lade_abschnitt_sprechgruppen() {
         let pool = crate::db::test_pool().await;
         let (e, a) = setup_einsatz_abschnitt(&pool).await;
-        let kat = anlegen_katalog(&pool, 1, KatalogDaten{bezeichnung:"412_F_DRK",betriebsart:"TMO",hinweis:None,sortier:0}).await.unwrap();
-        let lokal = anlegen_einsatz_lokal(&pool, 1, e, "Sonder 1", "DMO", None).await.unwrap();
-        setze_abschnitt_sprechgruppen(&pool, 1, e, a, &[kat.id, lokal.id]).await.unwrap();
-        assert_eq!(lade_abschnitt_sprechgruppen(&pool, a).await.unwrap().len(), 2);
+        let kat = anlegen_katalog(
+            &pool,
+            1,
+            KatalogDaten {
+                bezeichnung: "412_F_DRK",
+                betriebsart: "TMO",
+                hinweis: None,
+                sortier: 0,
+            },
+        )
+        .await
+        .unwrap();
+        let lokal = anlegen_einsatz_lokal(&pool, 1, e, "Sonder 1", "DMO", None)
+            .await
+            .unwrap();
+        setze_abschnitt_sprechgruppen(&pool, 1, e, a, &[kat.id, lokal.id])
+            .await
+            .unwrap();
+        assert_eq!(
+            lade_abschnitt_sprechgruppen(&pool, a).await.unwrap().len(),
+            2
+        );
         // Ersetzen: nur noch eine.
-        setze_abschnitt_sprechgruppen(&pool, 1, e, a, &[kat.id]).await.unwrap();
+        setze_abschnitt_sprechgruppen(&pool, 1, e, a, &[kat.id])
+            .await
+            .unwrap();
         let nach = lade_abschnitt_sprechgruppen(&pool, a).await.unwrap();
         assert_eq!(nach.len(), 1);
         assert_eq!(nach[0].id, kat.id);
@@ -357,75 +400,195 @@ mod tests {
     async fn fremde_oder_anderer_einsatz_sprechgruppe_ist_unprocessable() {
         let pool = crate::db::test_pool().await;
         let (e, a) = setup_einsatz_abschnitt(&pool).await;
-        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (2,'Fremd')").execute(&pool).await.unwrap();
-        let fremd = anlegen_katalog(&pool, 2, KatalogDaten{bezeichnung:"X",betriebsart:"TMO",hinweis:None,sortier:0}).await.unwrap();
-        let anderer_einsatz: i64 = sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Andere') RETURNING id").fetch_one(&pool).await.unwrap();
-        let lokal_woanders = anlegen_einsatz_lokal(&pool, 1, anderer_einsatz, "Sonder 9", "DMO", None).await.unwrap();
-        assert!(matches!(setze_abschnitt_sprechgruppen(&pool, 1, e, a, &[fremd.id]).await.unwrap_err(), AppError::UnprocessableEntity(_)));
-        assert!(matches!(setze_abschnitt_sprechgruppen(&pool, 1, e, a, &[lokal_woanders.id]).await.unwrap_err(), AppError::UnprocessableEntity(_)));
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (2,'Fremd')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let fremd = anlegen_katalog(
+            &pool,
+            2,
+            KatalogDaten {
+                bezeichnung: "X",
+                betriebsart: "TMO",
+                hinweis: None,
+                sortier: 0,
+            },
+        )
+        .await
+        .unwrap();
+        let anderer_einsatz: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Andere') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let lokal_woanders =
+            anlegen_einsatz_lokal(&pool, 1, anderer_einsatz, "Sonder 9", "DMO", None)
+                .await
+                .unwrap();
+        assert!(matches!(
+            setze_abschnitt_sprechgruppen(&pool, 1, e, a, &[fremd.id])
+                .await
+                .unwrap_err(),
+            AppError::UnprocessableEntity(_)
+        ));
+        assert!(matches!(
+            setze_abschnitt_sprechgruppen(&pool, 1, e, a, &[lokal_woanders.id])
+                .await
+                .unwrap_err(),
+            AppError::UnprocessableEntity(_)
+        ));
     }
     #[tokio::test]
     async fn setze_abschnitt_sprechgruppen_duplikat_in_ids_ignoriert() {
         let pool = crate::db::test_pool().await;
         let (e, a) = setup_einsatz_abschnitt(&pool).await;
-        let kat = anlegen_katalog(&pool, 1, KatalogDaten{bezeichnung:"412_F_DRK",betriebsart:"TMO",hinweis:None,sortier:0}).await.unwrap();
+        let kat = anlegen_katalog(
+            &pool,
+            1,
+            KatalogDaten {
+                bezeichnung: "412_F_DRK",
+                betriebsart: "TMO",
+                hinweis: None,
+                sortier: 0,
+            },
+        )
+        .await
+        .unwrap();
         // Gleiche ID zweimal — darf keinen PK-Fehler auslösen.
-        setze_abschnitt_sprechgruppen(&pool, 1, e, a, &[kat.id, kat.id]).await.unwrap();
+        setze_abschnitt_sprechgruppen(&pool, 1, e, a, &[kat.id, kat.id])
+            .await
+            .unwrap();
         let nach = lade_abschnitt_sprechgruppen(&pool, a).await.unwrap();
         assert_eq!(nach.len(), 1, "Duplikat-ID darf nur einen Eintrag erzeugen");
     }
     #[tokio::test]
     async fn setze_und_lade_einheit_sprechgruppen() {
         let pool = crate::db::test_pool().await;
-        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1,'Orga')").execute(&pool).await.unwrap();
-        let e: i64 = sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id").fetch_one(&pool).await.unwrap();
-        let einheit_id: i64 = sqlx::query_scalar("INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Zug') RETURNING id").bind(e).fetch_one(&pool).await.unwrap();
-        let kat = anlegen_katalog(&pool, 1, KatalogDaten{bezeichnung:"412_F_DRK",betriebsart:"TMO",hinweis:None,sortier:0}).await.unwrap();
-        setze_einheit_sprechgruppen(&pool, 1, e, einheit_id, &[kat.id]).await.unwrap();
-        assert_eq!(lade_einheit_sprechgruppen(&pool, einheit_id).await.unwrap().len(), 1);
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1,'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let e: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let einheit_id: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Zug') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let kat = anlegen_katalog(
+            &pool,
+            1,
+            KatalogDaten {
+                bezeichnung: "412_F_DRK",
+                betriebsart: "TMO",
+                hinweis: None,
+                sortier: 0,
+            },
+        )
+        .await
+        .unwrap();
+        setze_einheit_sprechgruppen(&pool, 1, e, einheit_id, &[kat.id])
+            .await
+            .unwrap();
+        assert_eq!(
+            lade_einheit_sprechgruppen(&pool, einheit_id)
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
         // Ersetzen: leer.
-        setze_einheit_sprechgruppen(&pool, 1, e, einheit_id, &[]).await.unwrap();
-        assert_eq!(lade_einheit_sprechgruppen(&pool, einheit_id).await.unwrap().len(), 0);
+        setze_einheit_sprechgruppen(&pool, 1, e, einheit_id, &[])
+            .await
+            .unwrap();
+        assert_eq!(
+            lade_einheit_sprechgruppen(&pool, einheit_id)
+                .await
+                .unwrap()
+                .len(),
+            0
+        );
     }
     #[tokio::test]
     async fn anlegen_listen_und_laden() {
-        let pool = crate::db::test_pool().await; org(&pool, 1).await;
-        let sg = anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO")).await.unwrap();
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let sg = anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO"))
+            .await
+            .unwrap();
         assert_eq!(sg.einsatz_id, None);
         assert_eq!(liste_katalog(&pool, 1, true).await.unwrap().len(), 1);
-        assert_eq!(laden(&pool, 1, sg.id).await.unwrap().bezeichnung, "412_F_DRK");
+        assert_eq!(
+            laden(&pool, 1, sg.id).await.unwrap().bezeichnung,
+            "412_F_DRK"
+        );
     }
     #[tokio::test]
     async fn dublette_im_katalog_ist_conflict() {
-        let pool = crate::db::test_pool().await; org(&pool, 1).await;
-        anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO")).await.unwrap();
-        assert!(matches!(anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO")).await.unwrap_err(), AppError::Conflict(_)));
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO"))
+            .await
+            .unwrap();
+        assert!(matches!(
+            anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO"))
+                .await
+                .unwrap_err(),
+            AppError::Conflict(_)
+        ));
         // gleiche Bezeichnung, andere Betriebsart → erlaubt
-        assert!(anlegen_katalog(&pool, 1, daten("412_F_DRK", "DMO")).await.is_ok());
+        assert!(anlegen_katalog(&pool, 1, daten("412_F_DRK", "DMO"))
+            .await
+            .is_ok());
     }
     #[tokio::test]
     async fn katalog_je_org_isoliert() {
-        let pool = crate::db::test_pool().await; org(&pool, 1).await; org(&pool, 2).await;
-        let sg = anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO")).await.unwrap();
-        assert!(matches!(laden(&pool, 2, sg.id).await.unwrap_err(), AppError::NotFound));
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        org(&pool, 2).await;
+        let sg = anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO"))
+            .await
+            .unwrap();
+        assert!(matches!(
+            laden(&pool, 2, sg.id).await.unwrap_err(),
+            AppError::NotFound
+        ));
         assert!(liste_katalog(&pool, 2, true).await.unwrap().is_empty());
     }
     #[tokio::test]
     async fn deaktivieren_versteckt_aus_nur_aktive() {
-        let pool = crate::db::test_pool().await; org(&pool, 1).await;
-        let sg = anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO")).await.unwrap();
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let sg = anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO"))
+            .await
+            .unwrap();
         deaktiviere(&pool, 1, sg.id).await.unwrap();
         assert!(liste_katalog(&pool, 1, true).await.unwrap().is_empty());
         assert_eq!(liste_katalog(&pool, 1, false).await.unwrap().len(), 1);
         // Nach Deaktivierung ist die gleiche Bezeichnung neu anlegbar (Partial-Index nur aktiv).
-        assert!(anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO")).await.is_ok());
+        assert!(anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO"))
+            .await
+            .is_ok());
     }
     #[tokio::test]
     async fn aktualisieren_ersetzt_felder() {
-        let pool = crate::db::test_pool().await; org(&pool, 1).await;
-        let sg = anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO")).await.unwrap();
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let sg = anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO"))
+            .await
+            .unwrap();
         let neu = KatalogDaten {
-            bezeichnung: "490_F_DRK", betriebsart: "TMO", hinweis: Some("Marschkanal"), sortier: 5,
+            bezeichnung: "490_F_DRK",
+            betriebsart: "TMO",
+            hinweis: Some("Marschkanal"),
+            sortier: 5,
         };
         let g = aktualisiere_katalog(&pool, 1, sg.id, neu).await.unwrap();
         assert_eq!(g.bezeichnung, "490_F_DRK");
@@ -439,59 +602,138 @@ mod tests {
     }
     #[tokio::test]
     async fn aktualisieren_auf_geschwister_ist_conflict() {
-        let pool = crate::db::test_pool().await; org(&pool, 1).await;
-        anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO")).await.unwrap();
-        let zweite = anlegen_katalog(&pool, 1, daten("490_F_DRK", "TMO")).await.unwrap();
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO"))
+            .await
+            .unwrap();
+        let zweite = anlegen_katalog(&pool, 1, daten("490_F_DRK", "TMO"))
+            .await
+            .unwrap();
         // Umbenennen auf die Bezeichnung des Geschwisters (gleiche Betriebsart) → Conflict.
         assert!(matches!(
-            aktualisiere_katalog(&pool, 1, zweite.id, daten("412_F_DRK", "TMO")).await.unwrap_err(),
+            aktualisiere_katalog(&pool, 1, zweite.id, daten("412_F_DRK", "TMO"))
+                .await
+                .unwrap_err(),
             AppError::Conflict(_)
         ));
     }
     #[tokio::test]
     async fn aktualisieren_fremde_org_ist_notfound() {
-        let pool = crate::db::test_pool().await; org(&pool, 1).await; org(&pool, 2).await;
-        let sg = anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO")).await.unwrap();
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        org(&pool, 2).await;
+        let sg = anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO"))
+            .await
+            .unwrap();
         assert!(matches!(
-            aktualisiere_katalog(&pool, 2, sg.id, daten("490_F_DRK", "TMO")).await.unwrap_err(),
+            aktualisiere_katalog(&pool, 2, sg.id, daten("490_F_DRK", "TMO"))
+                .await
+                .unwrap_err(),
             AppError::NotFound
         ));
     }
     #[tokio::test]
     async fn aktualisieren_trifft_einsatz_lokale_zeile_nicht() {
-        let pool = crate::db::test_pool().await; org(&pool, 1).await;
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
         let einsatz_id: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
-        ).fetch_one(&pool).await.unwrap();
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         let lokal_id: i64 = sqlx::query_scalar(
             "INSERT INTO sprechgruppe (org_id, einsatz_id, bezeichnung, betriebsart) \
              VALUES (1, ?, 'lokal', 'TMO') RETURNING id",
-        ).bind(einsatz_id).fetch_one(&pool).await.unwrap();
+        )
+        .bind(einsatz_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         // Der einsatz_id IS NULL-Guard darf einsatz-lokale Zeilen nicht treffen → NotFound.
         assert!(matches!(
-            aktualisiere_katalog(&pool, 1, lokal_id, daten("umbenannt", "TMO")).await.unwrap_err(),
+            aktualisiere_katalog(&pool, 1, lokal_id, daten("umbenannt", "TMO"))
+                .await
+                .unwrap_err(),
             AppError::NotFound
         ));
     }
     #[tokio::test]
     async fn einsatz_lokal_anlegen_ist_idempotent() {
         let pool = crate::db::test_pool().await;
-        sqlx::query("INSERT INTO organisation (id, name) VALUES (1,'Orga')").execute(&pool).await.unwrap();
-        let e: i64 = sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id").fetch_one(&pool).await.unwrap();
-        let a = anlegen_einsatz_lokal(&pool, 1, e, "Sonder 1", "DMO", None).await.unwrap();
-        let b = anlegen_einsatz_lokal(&pool, 1, e, "Sonder 1", "DMO", None).await.unwrap();
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1,'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let e: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let a = anlegen_einsatz_lokal(&pool, 1, e, "Sonder 1", "DMO", None)
+            .await
+            .unwrap();
+        let b = anlegen_einsatz_lokal(&pool, 1, e, "Sonder 1", "DMO", None)
+            .await
+            .unwrap();
         assert_eq!(a.id, b.id, "kein Duplikat, gleicher Eintrag");
         assert_eq!(a.einsatz_id, Some(e));
     }
     #[tokio::test]
     async fn liste_fuer_einsatz_vereint_katalog_und_lokal() {
         let pool = crate::db::test_pool().await;
-        sqlx::query("INSERT INTO organisation (id, name) VALUES (1,'Orga')").execute(&pool).await.unwrap();
-        let e: i64 = sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id").fetch_one(&pool).await.unwrap();
-        let kat = anlegen_katalog(&pool, 1, KatalogDaten{bezeichnung:"412_F_DRK",betriebsart:"TMO",hinweis:None,sortier:0}).await.unwrap();
-        deaktiviere(&pool, 1, anlegen_katalog(&pool, 1, KatalogDaten{bezeichnung:"alt",betriebsart:"TMO",hinweis:None,sortier:0}).await.unwrap().id).await.unwrap();
-        let lokal = anlegen_einsatz_lokal(&pool, 1, e, "Sonder 1", "DMO", None).await.unwrap();
-        let ids: Vec<i64> = liste_fuer_einsatz(&pool, 1, e).await.unwrap().into_iter().map(|s| s.id).collect();
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1,'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let e: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let kat = anlegen_katalog(
+            &pool,
+            1,
+            KatalogDaten {
+                bezeichnung: "412_F_DRK",
+                betriebsart: "TMO",
+                hinweis: None,
+                sortier: 0,
+            },
+        )
+        .await
+        .unwrap();
+        deaktiviere(
+            &pool,
+            1,
+            anlegen_katalog(
+                &pool,
+                1,
+                KatalogDaten {
+                    bezeichnung: "alt",
+                    betriebsart: "TMO",
+                    hinweis: None,
+                    sortier: 0,
+                },
+            )
+            .await
+            .unwrap()
+            .id,
+        )
+        .await
+        .unwrap();
+        let lokal = anlegen_einsatz_lokal(&pool, 1, e, "Sonder 1", "DMO", None)
+            .await
+            .unwrap();
+        let ids: Vec<i64> = liste_fuer_einsatz(&pool, 1, e)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|s| s.id)
+            .collect();
         assert!(ids.contains(&kat.id) && ids.contains(&lokal.id));
         assert_eq!(ids.len(), 2, "inaktiver Katalogeintrag nicht enthalten");
     }

@@ -548,7 +548,9 @@ mod tests {
     #[tokio::test]
     async fn anzeige_parst_fachebenen_zu_objekt() {
         let e = EinsatzEinstellungen {
-            fachebenen_sichtbar: Some(r#"{"nina":true,"dwd":false,"pegelonline":false,"kritis":false}"#.into()),
+            fachebenen_sichtbar: Some(
+                r#"{"nina":true,"dwd":false,"pegelonline":false,"kritis":false}"#.into(),
+            ),
             ..EinsatzEinstellungen::leer(1)
         };
         let a = e.anzeige();
@@ -683,7 +685,11 @@ mod tests {
             "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) \
              VALUES (?, 1, 'meldung', 'x', ?, '2026-06-19 09:00:00')",
         )
-        .bind(eid).bind(bid).execute(pool).await.unwrap();
+        .bind(eid)
+        .bind(bid)
+        .execute(pool)
+        .await
+        .unwrap();
     }
     async fn meldung_anlegen(pool: &SqlitePool, eid: i64, bid: i64) {
         sqlx::query(
@@ -697,7 +703,11 @@ mod tests {
             "INSERT INTO auftrag (einsatz_id, lfd_nr, auftrag_text, erteilt_at, erstellt_von_id) \
              VALUES (?, 1, 'x', '2026-06-19 09:00:00', ?)",
         )
-        .bind(eid).bind(bid).execute(pool).await.unwrap();
+        .bind(eid)
+        .bind(bid)
+        .execute(pool)
+        .await
+        .unwrap();
     }
 
     #[tokio::test]
@@ -712,7 +722,10 @@ mod tests {
         // Erster ETB-Eintrag friert NUR den ETB-Kreis ein.
         etb_eintrag_anlegen(&pool, eid, bid).await;
         assert!(etb_nummer_vergeben(&pool, eid).await.unwrap());
-        assert!(!meldung_nummer_vergeben(&pool, eid).await.unwrap(), "ETB-Freeze ist unabhängig von Meldung");
+        assert!(
+            !meldung_nummer_vergeben(&pool, eid).await.unwrap(),
+            "ETB-Freeze ist unabhängig von Meldung"
+        );
         assert!(!auftrag_nummer_vergeben(&pool, eid).await.unwrap());
 
         // Erste Meldung friert NUR den Meldungs-Kreis ein (zusätzlich).
@@ -736,7 +749,11 @@ mod tests {
             "INSERT INTO auftrag (einsatz_id, lfd_nr, auftrag_text, erteilt_at, erstellt_von_id) \
              VALUES (?, NULL, 'legacy', '2026-06-19 09:00:00', ?)",
         )
-        .bind(eid).bind(bid).execute(&pool).await.unwrap();
+        .bind(eid)
+        .bind(bid)
+        .execute(&pool)
+        .await
+        .unwrap();
         assert!(
             !auftrag_nummer_vergeben(&pool, eid).await.unwrap(),
             "Auftrag mit lfd_nr=NULL darf den Nummernkreis nicht einfrieren"
@@ -748,7 +765,9 @@ mod tests {
 
     #[test]
     fn geocoder_url_nur_http_s() {
-        assert!(super::ist_gueltige_geocoder_url("https://nominatim.example.org"));
+        assert!(super::ist_gueltige_geocoder_url(
+            "https://nominatim.example.org"
+        ));
         assert!(super::ist_gueltige_geocoder_url("http://10.0.0.5:8080"));
         assert!(!super::ist_gueltige_geocoder_url("ftp://x"));
         assert!(!super::ist_gueltige_geocoder_url("kein-schema"));
@@ -763,7 +782,9 @@ mod tests {
             "INSERT INTO einsatz (org_id, bezeichnung, einsatznummer_intern) \
              VALUES (1, 'Fremd', '2026-002') RETURNING id",
         )
-        .fetch_one(&pool).await.unwrap();
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         // Einträge im FREMDEN Einsatz dürfen den Freeze dieses Einsatzes nicht auslösen.
         etb_eintrag_anlegen(&pool, fremd, bid).await;
         auftrag_anlegen(&pool, fremd, bid).await;

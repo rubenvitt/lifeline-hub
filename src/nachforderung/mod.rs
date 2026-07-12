@@ -77,11 +77,21 @@ pub fn prioritaet_gueltig(p: &str) -> bool {
 }
 
 pub fn adressat_kategorie_gueltig(a: &str) -> bool {
-    matches!(a, ADRESSAT_LEITSTELLE | ADRESSAT_NACHBAR_EA | ADRESSAT_UEBERGEORDNET | ADRESSAT_ANDERE_BOS)
+    matches!(
+        a,
+        ADRESSAT_LEITSTELLE | ADRESSAT_NACHBAR_EA | ADRESSAT_UEBERGEORDNET | ADRESSAT_ANDERE_BOS
+    )
 }
 
 pub fn status_gueltig(s: &str) -> bool {
-    matches!(s, STATUS_ANGEFORDERT | STATUS_ZUGESAGT | STATUS_UNTERWEGS | STATUS_EINGETROFFEN | STATUS_ABGELEHNT)
+    matches!(
+        s,
+        STATUS_ANGEFORDERT
+            | STATUS_ZUGESAGT
+            | STATUS_UNTERWEGS
+            | STATUS_EINGETROFFEN
+            | STATUS_ABGELEHNT
+    )
 }
 
 /// Erlaubter Status-Übergang: linear vorwärts (angefordert→zugesagt→unterwegs→eingetroffen)

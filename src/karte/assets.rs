@@ -27,8 +27,14 @@ pub fn welt_uebersicht_eingebettet() -> bool {
 /// Cache-Bust-Token der Welt-Übersicht (Hex-Präfix des Embed-sha256), oder `None` wenn nicht eingebettet.
 /// Wechselt bei einer neuen Welt-Version → MapLibre lädt die Kacheln frisch (kein Stale-Cache).
 pub fn welt_uebersicht_version() -> Option<String> {
-    KartenAssets::get(WELT_EMBED_PFAD)
-        .map(|f| f.metadata.sha256_hash().iter().take(8).map(|b| format!("{b:02x}")).collect())
+    KartenAssets::get(WELT_EMBED_PFAD).map(|f| {
+        f.metadata
+            .sha256_hash()
+            .iter()
+            .take(8)
+            .map(|b| format!("{b:02x}"))
+            .collect()
+    })
 }
 
 /// Extrahiert die eingebettete Welt-Übersicht (falls vorhanden) nach
@@ -84,7 +90,8 @@ mod tests {
     // aber nicht das reale Icon-Set. Ein echtes Sprite-PNG ist deutlich größer.
     #[test]
     fn sprite_png_ist_echt_kein_placeholder() {
-        let f = KartenAssets::get("sprites/basemap.png").expect("basemap.png muss eingebettet sein");
+        let f =
+            KartenAssets::get("sprites/basemap.png").expect("basemap.png muss eingebettet sein");
         assert!(
             f.data.len() > 1000,
             "basemap.png wirkt wie 1×1-Placeholder ({} Bytes) — echtes CC0-Sprite via gen-assets.sh",
@@ -99,8 +106,15 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         extrahiere_welt_uebersicht(tmp.path());
         let existiert = tmp.path().join(WELT_UEBERSICHT_DATEI).exists();
-        assert_eq!(existiert, welt_uebersicht_eingebettet(), "Datei genau dann, wenn eingebettet");
-        assert_eq!(welt_uebersicht_version().is_some(), welt_uebersicht_eingebettet());
+        assert_eq!(
+            existiert,
+            welt_uebersicht_eingebettet(),
+            "Datei genau dann, wenn eingebettet"
+        );
+        assert_eq!(
+            welt_uebersicht_version().is_some(),
+            welt_uebersicht_eingebettet()
+        );
         // Zweiter Aufruf panickt nicht (idempotent).
         extrahiere_welt_uebersicht(tmp.path());
     }

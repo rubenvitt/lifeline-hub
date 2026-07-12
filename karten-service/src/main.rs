@@ -60,7 +60,9 @@ async fn main() -> anyhow::Result<()> {
             axum::serve(listener, api::router(state)).await?;
             Ok(())
         }
-        Command::Build { slug, all } => build_lokal(slug, all, &registry, runner, storage, bestand).await,
+        Command::Build { slug, all } => {
+            build_lokal(slug, all, &registry, runner, storage, bestand).await
+        }
     }
 }
 
@@ -89,7 +91,15 @@ async fn build_lokal(
         let id = registry
             .enqueue(slug)
             .map_err(|_| anyhow::anyhow!("Queue voll für {slug}"))?;
-        build::fahre_build(reg, id, registry, runner.clone(), storage.clone(), bestand.clone()).await;
+        build::fahre_build(
+            reg,
+            id,
+            registry,
+            runner.clone(),
+            storage.clone(),
+            bestand.clone(),
+        )
+        .await;
         match registry.get(id).map(|j| j.status) {
             Some(JobStatus::Failed(fehler)) => {
                 tracing::error!(slug, fehler, "Build fehlgeschlagen");

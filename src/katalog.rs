@@ -16,7 +16,10 @@ pub const KATEGORIE_NICHT_VERFUEGBAR: &str = "nicht_verfuegbar";
 
 /// Ob `s` eine gültige Status-Kategorie ist (Eingabe-Validierung).
 pub fn ist_gueltige_kategorie(s: &str) -> bool {
-    matches!(s, KATEGORIE_VERFUEGBAR | KATEGORIE_GEBUNDEN | KATEGORIE_NICHT_VERFUEGBAR)
+    matches!(
+        s,
+        KATEGORIE_VERFUEGBAR | KATEGORIE_GEBUNDEN | KATEGORIE_NICHT_VERFUEGBAR
+    )
 }
 
 /// Betriebsart einer TETRA-Sprechgruppe.
@@ -118,7 +121,9 @@ impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for StatusKategorie
 where
     &'r str: sqlx::Decode<'r, DB>,
 {
-    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+    fn decode(
+        value: <DB as sqlx::Database>::ValueRef<'r>,
+    ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<DB>>::decode(value)?;
         StatusKategorie::parse(s).ok_or_else(|| format!("Ungültige StatusKategorie: {s}").into())
     }

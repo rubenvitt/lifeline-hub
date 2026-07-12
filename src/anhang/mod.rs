@@ -74,7 +74,9 @@ pub fn ermittle_mime(dateiname: &str) -> Result<String, AppError> {
         .first_raw()
         .ok_or_else(|| AppError::Validation("Dateityp nicht erkennbar".into()))?;
     if !ERLAUBTE_MIME.contains(&mime) {
-        return Err(AppError::Validation(format!("Dateityp {mime} ist nicht erlaubt")));
+        return Err(AppError::Validation(format!(
+            "Dateityp {mime} ist nicht erlaubt"
+        )));
     }
     Ok(mime.to_string())
 }
@@ -94,7 +96,10 @@ mod tests {
 
     #[test]
     fn pruefe_groesse_lehnt_leer_und_zu_gross_ab() {
-        assert!(matches!(pruefe_groesse(0).unwrap_err(), AppError::Validation(_)));
+        assert!(matches!(
+            pruefe_groesse(0).unwrap_err(),
+            AppError::Validation(_)
+        ));
         assert!(pruefe_groesse(1).is_ok());
         assert!(pruefe_groesse(MAX_GROESSE).is_ok());
         assert!(matches!(
@@ -108,8 +113,14 @@ mod tests {
         assert_eq!(ermittle_mime("lage.pdf").unwrap(), "application/pdf");
         assert_eq!(ermittle_mime("foto.JPG").unwrap(), "image/jpeg");
         // Ausführbares / unbekanntes wird abgelehnt.
-        assert!(matches!(ermittle_mime("schad.exe").unwrap_err(), AppError::Validation(_)));
-        assert!(matches!(ermittle_mime("ohne_endung").unwrap_err(), AppError::Validation(_)));
+        assert!(matches!(
+            ermittle_mime("schad.exe").unwrap_err(),
+            AppError::Validation(_)
+        ));
+        assert!(matches!(
+            ermittle_mime("ohne_endung").unwrap_err(),
+            AppError::Validation(_)
+        ));
     }
 
     #[test]

@@ -166,13 +166,17 @@ async fn anhaenge_anreichern(
 /// Lädt eine einzelne Nachricht als Anzeige (inkl. Anhänge). `NotFound`, wenn sie
 /// nicht existiert.
 pub async fn laden(pool: &SqlitePool, id: i64) -> Result<ChatNachrichtAnzeige, AppError> {
-    let mut nachricht =
-        sqlx::query_as::<_, ChatNachrichtAnzeige>(sqlx::AssertSqlSafe(format!("{NACHRICHT_SELECT} WHERE n.id = ?")))
-            .bind(id)
-            .fetch_optional(pool)
-            .await?
-            .ok_or(AppError::NotFound)?;
-    nachricht.anhaenge = anhaenge_map(pool, &[id]).await?.remove(&id).unwrap_or_default();
+    let mut nachricht = sqlx::query_as::<_, ChatNachrichtAnzeige>(sqlx::AssertSqlSafe(format!(
+        "{NACHRICHT_SELECT} WHERE n.id = ?"
+    )))
+    .bind(id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    nachricht.anhaenge = anhaenge_map(pool, &[id])
+        .await?
+        .remove(&id)
+        .unwrap_or_default();
     Ok(nachricht)
 }
 
@@ -219,7 +223,9 @@ pub async fn anlegen_mit_anhaengen(
                 .fetch_optional(&mut *tx)
                 .await?;
         if treffer.is_none() {
-            return Err(AppError::Validation("Unbekannter oder fremder Anhang".into()));
+            return Err(AppError::Validation(
+                "Unbekannter oder fremder Anhang".into(),
+            ));
         }
     }
 
@@ -343,14 +349,20 @@ async fn ziel_gehoert_zu_einsatz(
         }
     }
     match typ {
-        BezugTyp::Schaden => vorhanden(crate::schaden::repo::laden(pool, einsatz_id, ziel_id).await),
+        BezugTyp::Schaden => {
+            vorhanden(crate::schaden::repo::laden(pool, einsatz_id, ziel_id).await)
+        }
         BezugTyp::Uhs => vorhanden(crate::uhs::repo::laden(pool, einsatz_id, ziel_id).await),
         BezugTyp::Person => vorhanden(crate::person::repo::laden(pool, einsatz_id, ziel_id).await),
         BezugTyp::Lagebericht => {
             vorhanden(crate::lagebericht::repo::laden(pool, einsatz_id, ziel_id).await)
         }
-        BezugTyp::Meldung => crate::meldung::repo::gehoert_zu_einsatz(pool, ziel_id, einsatz_id).await,
-        BezugTyp::Auftrag => crate::auftrag::repo::gehoert_zu_einsatz(pool, ziel_id, einsatz_id).await,
+        BezugTyp::Meldung => {
+            crate::meldung::repo::gehoert_zu_einsatz(pool, ziel_id, einsatz_id).await
+        }
+        BezugTyp::Auftrag => {
+            crate::auftrag::repo::gehoert_zu_einsatz(pool, ziel_id, einsatz_id).await
+        }
     }
 }
 
@@ -429,18 +441,21 @@ pub async fn heraufstufen_zu_etb(
     let mut tx = pool.begin().await?;
 
     // Guard: schon heraufgestuft oder gelöscht? (Sperrt Doppel-Heraufstufung.)
-    let zustand: Option<(Option<i64>, Option<String>)> = sqlx::query_as(
-        "SELECT etb_eintrag_id, geloescht_at FROM chat_nachricht WHERE id = ?",
-    )
-    .bind(nachricht_id)
-    .fetch_optional(&mut *tx)
-    .await?;
+    let zustand: Option<(Option<i64>, Option<String>)> =
+        sqlx::query_as("SELECT etb_eintrag_id, geloescht_at FROM chat_nachricht WHERE id = ?")
+            .bind(nachricht_id)
+            .fetch_optional(&mut *tx)
+            .await?;
     let (etb_vorhanden, geloescht) = zustand.ok_or(AppError::NotFound)?;
     if etb_vorhanden.is_some() {
-        return Err(AppError::Conflict("Nachricht ist bereits heraufgestuft".into()));
+        return Err(AppError::Conflict(
+            "Nachricht ist bereits heraufgestuft".into(),
+        ));
     }
     if geloescht.is_some() {
-        return Err(AppError::Conflict("Gelöschte Nachricht kann nicht heraufgestuft werden".into()));
+        return Err(AppError::Conflict(
+            "Gelöschte Nachricht kann nicht heraufgestuft werden".into(),
+        ));
     }
 
     let etb_id = crate::etb::repo::anlegen_tx(
@@ -491,7 +506,8 @@ pub async fn heraufstufen_zu_auftrag(
         .bind(einsatz_id)
         .fetch_optional(pool)
         .await?;
-    let org_einst = crate::org::einstellungen::laden_oder_default(pool, org_id.unwrap_or(0)).await?;
+    let org_einst =
+        crate::org::einstellungen::laden_oder_default(pool, org_id.unwrap_or(0)).await?;
     let mut tx = pool.begin().await?;
 
     // Guard: schon zu einem Auftrag heraufgestuft oder gelöscht? (Sperrt Doppel-Heraufstufung.)
@@ -502,10 +518,14 @@ pub async fn heraufstufen_zu_auftrag(
             .await?;
     let (auftrag_vorhanden, geloescht) = zustand.ok_or(AppError::NotFound)?;
     if auftrag_vorhanden.is_some() {
-        return Err(AppError::Conflict("Nachricht ist bereits zu einem Auftrag heraufgestuft".into()));
+        return Err(AppError::Conflict(
+            "Nachricht ist bereits zu einem Auftrag heraufgestuft".into(),
+        ));
     }
     if geloescht.is_some() {
-        return Err(AppError::Conflict("Gelöschte Nachricht kann nicht heraufgestuft werden".into()));
+        return Err(AppError::Conflict(
+            "Gelöschte Nachricht kann nicht heraufgestuft werden".into(),
+        ));
     }
 
     let auftrag_id = crate::auftrag::repo::anlegen_tx(
@@ -535,20 +555,31 @@ mod tests {
     use crate::etb::EtbTyp;
 
     async fn kanal(pool: &SqlitePool, einsatz: i64, benutzer: i64) -> i64 {
-        kanal_anlegen(pool, einsatz, benutzer, "K", None).await.unwrap().id
+        kanal_anlegen(pool, einsatz, benutzer, "K", None)
+            .await
+            .unwrap()
+            .id
     }
 
     /// Legt Org (id=1), einen Benutzer und einen Einsatz an; liefert (benutzer_id, einsatz_id).
     async fn setup(pool: &SqlitePool) -> (i64, i64) {
         sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
-            .execute(pool).await.unwrap();
+            .execute(pool)
+            .await
+            .unwrap();
         let benutzer_id: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
              VALUES (1, 'Leitung', 'leit', 'h') RETURNING id",
-        ).fetch_one(pool).await.unwrap();
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         let einsatz_id: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
-        ).fetch_one(pool).await.unwrap();
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         (benutzer_id, einsatz_id)
     }
 
@@ -572,7 +603,9 @@ mod tests {
         let (benutzer, einsatz) = setup(&pool).await;
         liste_kanaele(&pool, einsatz, benutzer).await.unwrap(); // Default sicherstellen
 
-        let kanal = kanal_anlegen(&pool, einsatz, benutzer, "S2/S3", Some("Lagebild")).await.unwrap();
+        let kanal = kanal_anlegen(&pool, einsatz, benutzer, "S2/S3", Some("Lagebild"))
+            .await
+            .unwrap();
         assert_eq!(kanal.name, "S2/S3");
         assert_eq!(kanal.beschreibung.as_deref(), Some("Lagebild"));
 
@@ -584,11 +617,19 @@ mod tests {
     async fn gehoert_kanal_zu_einsatz_prueft_zugehoerigkeit() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        let kanal = kanal_anlegen(&pool, einsatz, benutzer, "K", None).await.unwrap();
+        let kanal = kanal_anlegen(&pool, einsatz, benutzer, "K", None)
+            .await
+            .unwrap();
 
-        assert!(gehoert_kanal_zu_einsatz(&pool, kanal.id, einsatz).await.unwrap());
-        assert!(!gehoert_kanal_zu_einsatz(&pool, kanal.id, 999).await.unwrap());
-        assert!(!gehoert_kanal_zu_einsatz(&pool, 12345, einsatz).await.unwrap());
+        assert!(gehoert_kanal_zu_einsatz(&pool, kanal.id, einsatz)
+            .await
+            .unwrap());
+        assert!(!gehoert_kanal_zu_einsatz(&pool, kanal.id, 999)
+            .await
+            .unwrap());
+        assert!(!gehoert_kanal_zu_einsatz(&pool, 12345, einsatz)
+            .await
+            .unwrap());
     }
 
     #[tokio::test]
@@ -597,13 +638,43 @@ mod tests {
         let (benutzer, einsatz) = setup(&pool).await;
         let kid = kanal(&pool, einsatz, benutzer).await;
 
-        let m1 = anlegen(&pool, einsatz, benutzer, NachrichtDaten { kanal_id: kid, inhalt: "Hallo" }).await.unwrap();
-        anlegen(&pool, einsatz, benutzer, NachrichtDaten { kanal_id: kid, inhalt: "Welt" }).await.unwrap();
+        let m1 = anlegen(
+            &pool,
+            einsatz,
+            benutzer,
+            NachrichtDaten {
+                kanal_id: kid,
+                inhalt: "Hallo",
+            },
+        )
+        .await
+        .unwrap();
+        anlegen(
+            &pool,
+            einsatz,
+            benutzer,
+            NachrichtDaten {
+                kanal_id: kid,
+                inhalt: "Welt",
+            },
+        )
+        .await
+        .unwrap();
 
         assert_eq!(m1.inhalt.as_deref(), Some("Hallo"));
         assert_eq!(m1.autor_name, "Leitung");
 
-        let liste = abfrage(&pool, einsatz, &NachrichtFilter { kanal_id: kid, before_id: None, limit: STANDARD_LIMIT }).await.unwrap();
+        let liste = abfrage(
+            &pool,
+            einsatz,
+            &NachrichtFilter {
+                kanal_id: kid,
+                before_id: None,
+                limit: STANDARD_LIMIT,
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(liste.len(), 2);
         assert_eq!(liste[0].inhalt.as_deref(), Some("Welt"), "neueste zuerst");
     }
@@ -614,14 +685,32 @@ mod tests {
         let (benutzer, einsatz) = setup(&pool).await;
         let kid = kanal(&pool, einsatz, benutzer).await;
         for i in 1..=3 {
-            anlegen(&pool, einsatz, benutzer, NachrichtDaten { kanal_id: kid, inhalt: &format!("m{i}") }).await.unwrap();
+            anlegen(
+                &pool,
+                einsatz,
+                benutzer,
+                NachrichtDaten {
+                    kanal_id: kid,
+                    inhalt: &format!("m{i}"),
+                },
+            )
+            .await
+            .unwrap();
         }
 
-        let f = NachrichtFilter { kanal_id: kid, before_id: None, limit: 1 };
+        let f = NachrichtFilter {
+            kanal_id: kid,
+            before_id: None,
+            limit: 1,
+        };
         let seite1 = abfrage(&pool, einsatz, &f).await.unwrap();
         assert_eq!(seite1[0].inhalt.as_deref(), Some("m3"));
 
-        let f2 = NachrichtFilter { kanal_id: kid, before_id: Some(seite1[0].id), limit: 1 };
+        let f2 = NachrichtFilter {
+            kanal_id: kid,
+            before_id: Some(seite1[0].id),
+            limit: 1,
+        };
         let seite2 = abfrage(&pool, einsatz, &f2).await.unwrap();
         assert_eq!(seite2[0].inhalt.as_deref(), Some("m2"));
     }
@@ -632,10 +721,40 @@ mod tests {
         let (benutzer, einsatz) = setup(&pool).await;
         let k1 = kanal(&pool, einsatz, benutzer).await;
         let k2 = kanal(&pool, einsatz, benutzer).await;
-        anlegen(&pool, einsatz, benutzer, NachrichtDaten { kanal_id: k1, inhalt: "in k1" }).await.unwrap();
-        anlegen(&pool, einsatz, benutzer, NachrichtDaten { kanal_id: k2, inhalt: "in k2" }).await.unwrap();
+        anlegen(
+            &pool,
+            einsatz,
+            benutzer,
+            NachrichtDaten {
+                kanal_id: k1,
+                inhalt: "in k1",
+            },
+        )
+        .await
+        .unwrap();
+        anlegen(
+            &pool,
+            einsatz,
+            benutzer,
+            NachrichtDaten {
+                kanal_id: k2,
+                inhalt: "in k2",
+            },
+        )
+        .await
+        .unwrap();
 
-        let liste = abfrage(&pool, einsatz, &NachrichtFilter { kanal_id: k1, before_id: None, limit: STANDARD_LIMIT }).await.unwrap();
+        let liste = abfrage(
+            &pool,
+            einsatz,
+            &NachrichtFilter {
+                kanal_id: k1,
+                before_id: None,
+                limit: STANDARD_LIMIT,
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(liste.len(), 1);
         assert_eq!(liste[0].inhalt.as_deref(), Some("in k1"));
     }
@@ -645,10 +764,24 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         let kid = kanal(&pool, einsatz, benutzer).await;
-        let m = anlegen(&pool, einsatz, benutzer, NachrichtDaten { kanal_id: kid, inhalt: "x" }).await.unwrap();
+        let m = anlegen(
+            &pool,
+            einsatz,
+            benutzer,
+            NachrichtDaten {
+                kanal_id: kid,
+                inhalt: "x",
+            },
+        )
+        .await
+        .unwrap();
 
-        assert!(gehoert_nachricht_zu_einsatz(&pool, m.id, einsatz).await.unwrap());
-        assert!(!gehoert_nachricht_zu_einsatz(&pool, m.id, 999).await.unwrap());
+        assert!(gehoert_nachricht_zu_einsatz(&pool, m.id, einsatz)
+            .await
+            .unwrap());
+        assert!(!gehoert_nachricht_zu_einsatz(&pool, m.id, 999)
+            .await
+            .unwrap());
     }
 
     #[tokio::test]
@@ -656,7 +789,17 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         let kid = kanal(&pool, einsatz, benutzer).await;
-        let m = anlegen(&pool, einsatz, benutzer, NachrichtDaten { kanal_id: kid, inhalt: "x" }).await.unwrap();
+        let m = anlegen(
+            &pool,
+            einsatz,
+            benutzer,
+            NachrichtDaten {
+                kanal_id: kid,
+                inhalt: "x",
+            },
+        )
+        .await
+        .unwrap();
 
         assert_eq!(autor_von(&pool, m.id).await.unwrap(), Some(benutzer));
         assert_eq!(autor_von(&pool, 999).await.unwrap(), None);
@@ -667,7 +810,17 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         let kid = kanal(&pool, einsatz, benutzer).await;
-        let m = anlegen(&pool, einsatz, benutzer, NachrichtDaten { kanal_id: kid, inhalt: "alt" }).await.unwrap();
+        let m = anlegen(
+            &pool,
+            einsatz,
+            benutzer,
+            NachrichtDaten {
+                kanal_id: kid,
+                inhalt: "alt",
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(m.bearbeitet_at, None);
 
         let bearbeitet = bearbeiten(&pool, m.id, "neu").await.unwrap();
@@ -680,12 +833,25 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         let kid = kanal(&pool, einsatz, benutzer).await;
-        let m = anlegen(&pool, einsatz, benutzer, NachrichtDaten { kanal_id: kid, inhalt: "geheim" }).await.unwrap();
+        let m = anlegen(
+            &pool,
+            einsatz,
+            benutzer,
+            NachrichtDaten {
+                kanal_id: kid,
+                inhalt: "geheim",
+            },
+        )
+        .await
+        .unwrap();
 
         loeschen(&pool, m.id).await.unwrap();
         let nachher = laden(&pool, m.id).await.unwrap();
         assert!(nachher.geloescht_at.is_some());
-        assert_eq!(nachher.inhalt, None, "Inhalt gelöschter Nachrichten wird nicht ausgeliefert");
+        assert_eq!(
+            nachher.inhalt, None,
+            "Inhalt gelöschter Nachrichten wird nicht ausgeliefert"
+        );
     }
 
     #[tokio::test]
@@ -693,11 +859,29 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         let kid = kanal(&pool, einsatz, benutzer).await;
-        let m = anlegen(&pool, einsatz, benutzer, NachrichtDaten { kanal_id: kid, inhalt: "Deich instabil" }).await.unwrap();
+        let m = anlegen(
+            &pool,
+            einsatz,
+            benutzer,
+            NachrichtDaten {
+                kanal_id: kid,
+                inhalt: "Deich instabil",
+            },
+        )
+        .await
+        .unwrap();
 
         let etb_id = heraufstufen_zu_etb(
-            &pool, einsatz, m.id, benutzer, "meldung", "Deich instabil", &m.erstellt_at,
-        ).await.unwrap();
+            &pool,
+            einsatz,
+            m.id,
+            benutzer,
+            "meldung",
+            "Deich instabil",
+            &m.erstellt_at,
+        )
+        .await
+        .unwrap();
 
         // ETB-Eintrag existiert mit dem Text und der Ereigniszeit der Nachricht (Snapshot).
         let etb = crate::etb::repo::laden(&pool, etb_id).await.unwrap();
@@ -715,10 +899,39 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         let kid = kanal(&pool, einsatz, benutzer).await;
-        let m = anlegen(&pool, einsatz, benutzer, NachrichtDaten { kanal_id: kid, inhalt: "x" }).await.unwrap();
-        heraufstufen_zu_etb(&pool, einsatz, m.id, benutzer, "meldung", "x", &m.erstellt_at).await.unwrap();
+        let m = anlegen(
+            &pool,
+            einsatz,
+            benutzer,
+            NachrichtDaten {
+                kanal_id: kid,
+                inhalt: "x",
+            },
+        )
+        .await
+        .unwrap();
+        heraufstufen_zu_etb(
+            &pool,
+            einsatz,
+            m.id,
+            benutzer,
+            "meldung",
+            "x",
+            &m.erstellt_at,
+        )
+        .await
+        .unwrap();
 
-        let zweimal = heraufstufen_zu_etb(&pool, einsatz, m.id, benutzer, "meldung", "x", &m.erstellt_at).await;
+        let zweimal = heraufstufen_zu_etb(
+            &pool,
+            einsatz,
+            m.id,
+            benutzer,
+            "meldung",
+            "x",
+            &m.erstellt_at,
+        )
+        .await;
         assert!(matches!(zweimal.unwrap_err(), AppError::Conflict(_)));
     }
 
@@ -755,16 +968,37 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         let kid = kanal(&pool, einsatz, benutzer).await;
-        let m = anlegen(&pool, einsatz, benutzer, NachrichtDaten { kanal_id: kid, inhalt: "Tank fordern" }).await.unwrap();
+        let m = anlegen(
+            &pool,
+            einsatz,
+            benutzer,
+            NachrichtDaten {
+                kanal_id: kid,
+                inhalt: "Tank fordern",
+            },
+        )
+        .await
+        .unwrap();
 
         let auftrag_id = heraufstufen_zu_auftrag(
-            &pool, einsatz, m.id, benutzer, auftrag_daten("Tank fordern"),
-        ).await.unwrap();
+            &pool,
+            einsatz,
+            m.id,
+            benutzer,
+            auftrag_daten("Tank fordern"),
+        )
+        .await
+        .unwrap();
 
         // Auftrag landet im Auftrag-Modul, ETB-Anordnung entsteht im selben Commit (Pattern B).
-        let detail = crate::auftrag::repo::laden(&pool, auftrag_id, "2026-06-12 10:00:00").await.unwrap();
+        let detail = crate::auftrag::repo::laden(&pool, auftrag_id, "2026-06-12 10:00:00")
+            .await
+            .unwrap();
         assert_eq!(detail.auftrag.auftrag_text, "Tank fordern");
-        assert!(detail.auftrag.etb_anordnung_id.is_some(), "ETB-Anordnung im selben Commit erzeugt");
+        assert!(
+            detail.auftrag.etb_anordnung_id.is_some(),
+            "ETB-Anordnung im selben Commit erzeugt"
+        );
         assert_eq!(detail.empfaenger.len(), 1);
 
         // Rückverweis an der Nachricht ist gesetzt (Markierung „heraufgestuft zu Auftrag").
@@ -777,10 +1011,23 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         let kid = kanal(&pool, einsatz, benutzer).await;
-        let m = anlegen(&pool, einsatz, benutzer, NachrichtDaten { kanal_id: kid, inhalt: "x" }).await.unwrap();
-        heraufstufen_zu_auftrag(&pool, einsatz, m.id, benutzer, auftrag_daten("x")).await.unwrap();
+        let m = anlegen(
+            &pool,
+            einsatz,
+            benutzer,
+            NachrichtDaten {
+                kanal_id: kid,
+                inhalt: "x",
+            },
+        )
+        .await
+        .unwrap();
+        heraufstufen_zu_auftrag(&pool, einsatz, m.id, benutzer, auftrag_daten("x"))
+            .await
+            .unwrap();
 
-        let zweimal = heraufstufen_zu_auftrag(&pool, einsatz, m.id, benutzer, auftrag_daten("x")).await;
+        let zweimal =
+            heraufstufen_zu_auftrag(&pool, einsatz, m.id, benutzer, auftrag_daten("x")).await;
         assert!(matches!(zweimal.unwrap_err(), AppError::Conflict(_)));
     }
 
@@ -789,10 +1036,21 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         let kid = kanal(&pool, einsatz, benutzer).await;
-        let m = anlegen(&pool, einsatz, benutzer, NachrichtDaten { kanal_id: kid, inhalt: "x" }).await.unwrap();
+        let m = anlegen(
+            &pool,
+            einsatz,
+            benutzer,
+            NachrichtDaten {
+                kanal_id: kid,
+                inhalt: "x",
+            },
+        )
+        .await
+        .unwrap();
         loeschen(&pool, m.id).await.unwrap();
 
-        let ergebnis = heraufstufen_zu_auftrag(&pool, einsatz, m.id, benutzer, auftrag_daten("x")).await;
+        let ergebnis =
+            heraufstufen_zu_auftrag(&pool, einsatz, m.id, benutzer, auftrag_daten("x")).await;
         assert!(matches!(ergebnis.unwrap_err(), AppError::Conflict(_)));
     }
 }

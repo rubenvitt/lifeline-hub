@@ -16,19 +16,28 @@ fn hex(bytes: &[u8]) -> String {
     s
 }
 
-pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<HintergrundbildAnzeige>, AppError> {
-    Ok(sqlx::query_as::<_, HintergrundbildAnzeige>(
-        sqlx::AssertSqlSafe(format!("{ANZEIGE_SELECT} WHERE einsatz_id = ? ORDER BY reihenfolge, id")),
+pub async fn liste(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<Vec<HintergrundbildAnzeige>, AppError> {
+    Ok(
+        sqlx::query_as::<_, HintergrundbildAnzeige>(sqlx::AssertSqlSafe(format!(
+            "{ANZEIGE_SELECT} WHERE einsatz_id = ? ORDER BY reihenfolge, id"
+        )))
+        .bind(einsatz_id)
+        .fetch_all(pool)
+        .await?,
     )
-    .bind(einsatz_id)
-    .fetch_all(pool)
-    .await?)
 }
 
-pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<HintergrundbildAnzeige, AppError> {
-    sqlx::query_as::<_, HintergrundbildAnzeige>(
-        sqlx::AssertSqlSafe(format!("{ANZEIGE_SELECT} WHERE id = ? AND einsatz_id = ?")),
-    )
+pub async fn laden(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<HintergrundbildAnzeige, AppError> {
+    sqlx::query_as::<_, HintergrundbildAnzeige>(sqlx::AssertSqlSafe(format!(
+        "{ANZEIGE_SELECT} WHERE id = ? AND einsatz_id = ?"
+    )))
     .bind(id)
     .bind(einsatz_id)
     .fetch_optional(pool)
@@ -36,7 +45,11 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<Hinter
     .ok_or(AppError::NotFound)
 }
 
-pub async fn laden_bytes(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(String, Vec<u8>), AppError> {
+pub async fn laden_bytes(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<(String, Vec<u8>), AppError> {
     sqlx::query_as::<_, (String, Vec<u8>)>(
         "SELECT mime, daten FROM karte_hintergrundbild WHERE id = ? AND einsatz_id = ?",
     )
@@ -100,12 +113,18 @@ pub async fn aktualisiere(
             geaendert_at = datetime('now') \
          WHERE id = ? AND einsatz_id = ?",
     )
-    .bind(daten.name.is_some()).bind(daten.name)
-    .bind(daten.ecken_json.is_some()).bind(daten.ecken_json)
-    .bind(daten.opazitaet.is_some()).bind(daten.opazitaet)
-    .bind(daten.sichtbar.is_some()).bind(daten.sichtbar)
-    .bind(daten.reihenfolge.is_some()).bind(daten.reihenfolge)
-    .bind(id).bind(einsatz_id)
+    .bind(daten.name.is_some())
+    .bind(daten.name)
+    .bind(daten.ecken_json.is_some())
+    .bind(daten.ecken_json)
+    .bind(daten.opazitaet.is_some())
+    .bind(daten.opazitaet)
+    .bind(daten.sichtbar.is_some())
+    .bind(daten.sichtbar)
+    .bind(daten.reihenfolge.is_some())
+    .bind(daten.reihenfolge)
+    .bind(id)
+    .bind(einsatz_id)
     .execute(pool)
     .await?
     .rows_affected();
@@ -116,11 +135,13 @@ pub async fn aktualisiere(
 }
 
 pub async fn loeschen(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
-    let betroffen = sqlx::query("DELETE FROM karte_hintergrundbild WHERE id = ? AND einsatz_id = ?")
-        .bind(id).bind(einsatz_id)
-        .execute(pool)
-        .await?
-        .rows_affected();
+    let betroffen =
+        sqlx::query("DELETE FROM karte_hintergrundbild WHERE id = ? AND einsatz_id = ?")
+            .bind(id)
+            .bind(einsatz_id)
+            .execute(pool)
+            .await?
+            .rows_affected();
     if betroffen == 0 {
         return Err(AppError::NotFound);
     }
@@ -183,9 +204,17 @@ mod tests {
     async fn patch_opazitaet_und_ecken() {
         let pool = crate::db::test_pool().await;
         let (eid, uid) = setup(&pool).await;
-        let a = anlegen(&pool, eid, uid, "p.png", "image/png", &[0x89, b'P'], ecken())
-            .await
-            .unwrap();
+        let a = anlegen(
+            &pool,
+            eid,
+            uid,
+            "p.png",
+            "image/png",
+            &[0x89, b'P'],
+            ecken(),
+        )
+        .await
+        .unwrap();
         let neu = "[[8.0,51.0],[8.2,51.0],[8.2,50.8],[8.0,50.8]]";
         let p = aktualisiere(
             &pool,

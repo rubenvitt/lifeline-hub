@@ -49,8 +49,12 @@ fn normalisiere(body: TypBody) -> Result<Normalisiert, AppError> {
     }
     // Validierung der Vollständigkeit/Bereiche; Rückgabewert verwerfen wir, wir
     // speichern die rohen Optionen (durch aus_optionen als konsistent bestätigt).
-    Staerke::aus_optionen(body.soll_fuehrer, body.soll_unterfuehrer, body.soll_mannschaft)
-        .map_err(AppError::Validation)?;
+    Staerke::aus_optionen(
+        body.soll_fuehrer,
+        body.soll_unterfuehrer,
+        body.soll_mannschaft,
+    )
+    .map_err(AppError::Validation)?;
     Ok(Normalisiert {
         label,
         soll_fuehrer: body.soll_fuehrer,
@@ -111,19 +115,31 @@ mod tests {
             Some((f, u, m)) => (Some(f), Some(u), Some(m)),
             None => (None, None, None),
         };
-        TypBody { label: label.into(), soll_fuehrer: f, soll_unterfuehrer: u, soll_mannschaft: m, sortier: 0 }
+        TypBody {
+            label: label.into(),
+            soll_fuehrer: f,
+            soll_unterfuehrer: u,
+            soll_mannschaft: m,
+            sortier: 0,
+        }
     }
 
     #[test]
     fn normalisiere_leeres_label_ist_validation() {
-        assert!(matches!(normalisiere(body("   ", None)).unwrap_err(), AppError::Validation(_)));
+        assert!(matches!(
+            normalisiere(body("   ", None)).unwrap_err(),
+            AppError::Validation(_)
+        ));
     }
 
     #[test]
     fn normalisiere_teilweise_soll_ist_validation() {
         let mut b = body("Zug", None);
         b.soll_fuehrer = Some(1); // nur einer gesetzt
-        assert!(matches!(normalisiere(b).unwrap_err(), AppError::Validation(_)));
+        assert!(matches!(
+            normalisiere(b).unwrap_err(),
+            AppError::Validation(_)
+        ));
     }
 
     #[test]

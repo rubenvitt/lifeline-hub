@@ -83,10 +83,16 @@ impl std::fmt::Display for DownloadFehler {
                 write!(f, "SHA256 stimmt nicht: erwartet {erwartet}, war {ist}")
             }
             DownloadFehler::ZuGross { grenze } => {
-                write!(f, "Download überschreitet die Maximalgröße von {grenze} Bytes")
+                write!(
+                    f,
+                    "Download überschreitet die Maximalgröße von {grenze} Bytes"
+                )
             }
             DownloadFehler::KeinPlatz { frei, benoetigt } => {
-                write!(f, "Nicht genug Speicherplatz: {frei} Bytes frei, ~{benoetigt} Bytes benötigt")
+                write!(
+                    f,
+                    "Nicht genug Speicherplatz: {frei} Bytes frei, ~{benoetigt} Bytes benötigt"
+                )
             }
         }
     }
@@ -124,9 +130,13 @@ pub(crate) fn ip_ist_intern(ip: &IpAddr) -> bool {
                 }
             }
             // NAT64 64:ff9b::/96 → eingebettete IPv4 in den letzten 32 Bit.
-            if s[0] == 0x0064 && s[1] == 0xff9b && s[2] == 0 && s[3] == 0 && s[4] == 0 && s[5] == 0 {
+            if s[0] == 0x0064 && s[1] == 0xff9b && s[2] == 0 && s[3] == 0 && s[4] == 0 && s[5] == 0
+            {
                 let v4 = std::net::Ipv4Addr::new(
-                    (s[6] >> 8) as u8, (s[6] & 0xff) as u8, (s[7] >> 8) as u8, (s[7] & 0xff) as u8,
+                    (s[6] >> 8) as u8,
+                    (s[6] & 0xff) as u8,
+                    (s[7] >> 8) as u8,
+                    (s[7] & 0xff) as u8,
                 );
                 if ip_ist_intern(&IpAddr::V4(v4)) {
                     return true;
@@ -135,7 +145,10 @@ pub(crate) fn ip_ist_intern(ip: &IpAddr) -> bool {
             // 6to4 2002::/16 → eingebettete IPv4 in den Bits 16..48.
             if s[0] == 0x2002 {
                 let v4 = std::net::Ipv4Addr::new(
-                    (s[1] >> 8) as u8, (s[1] & 0xff) as u8, (s[2] >> 8) as u8, (s[2] & 0xff) as u8,
+                    (s[1] >> 8) as u8,
+                    (s[1] & 0xff) as u8,
+                    (s[2] >> 8) as u8,
+                    (s[2] & 0xff) as u8,
                 );
                 if ip_ist_intern(&IpAddr::V4(v4)) {
                     return true;
@@ -158,7 +171,9 @@ pub fn url_ist_sicher(url: &Url) -> Result<(), String> {
 /// kein-intern). Nur lokal in der `.env` setzen.
 fn dev_loopback_download_erlaubt() -> bool {
     matches!(
-        std::env::var("LIFELINE_DOWNLOAD_ALLOW_LOOPBACK").ok().as_deref(),
+        std::env::var("LIFELINE_DOWNLOAD_ALLOW_LOOPBACK")
+            .ok()
+            .as_deref(),
         Some("1") | Some("true")
     )
 }
@@ -195,7 +210,9 @@ fn url_ist_sicher_mit(url: &Url, dev_loopback: bool) -> Result<(), String> {
     let host_clean = host.trim_start_matches('[').trim_end_matches(']');
     if let Ok(ip) = host_clean.parse::<IpAddr>() {
         if ip_ist_intern(&ip) {
-            return Err(format!("interne/nicht-routbare Adresse {ip} ist nicht erlaubt"));
+            return Err(format!(
+                "interne/nicht-routbare Adresse {ip} ist nicht erlaubt"
+            ));
         }
     }
     Ok(())
@@ -330,7 +347,11 @@ pub async fn lade_datei(
         if fortschritt.abbruch.load(Ordering::Relaxed) {
             return Err(DownloadFehler::Abgebrochen);
         }
-        let chunk = match resp.chunk().await.map_err(|e| DownloadFehler::Http(e.to_string()))? {
+        let chunk = match resp
+            .chunk()
+            .await
+            .map_err(|e| DownloadFehler::Http(e.to_string()))?
+        {
             Some(c) => c,
             None => break,
         };
@@ -427,7 +448,10 @@ mod tests {
         let intern = |s: &str| ip_ist_intern(&s.parse::<IpAddr>().unwrap());
         assert!(intern("64:ff9b::a00:1"), "NAT64 → 10.0.0.1 (privat)");
         assert!(intern("2002:c0a8:0101::1"), "6to4 → 192.168.1.1 (privat)");
-        assert!(intern("::a9fe:1"), "IPv4-compatible → 169.254.0.1 (link-local)");
+        assert!(
+            intern("::a9fe:1"),
+            "IPv4-compatible → 169.254.0.1 (link-local)"
+        );
         assert!(intern("::ffff:10.0.0.5"), "IPv4-mapped privat");
         // Global eingebettet bzw. global IPv6 bleibt erlaubt.
         assert!(!intern("::ffff:8.8.8.8"), "öffentliches IPv4-mapped");
@@ -498,7 +522,10 @@ mod tests {
         assert_eq!(erg.groesse, body.len() as i64);
         assert_eq!(erg.sha256, erwarteter_hash(&body));
         assert_eq!(std::fs::read(&ziel).unwrap(), body, "Datei-Inhalt stimmt");
-        assert_eq!(fortschritt.geladen.load(Ordering::Relaxed), body.len() as u64);
+        assert_eq!(
+            fortschritt.geladen.load(Ordering::Relaxed),
+            body.len() as u64
+        );
         assert_eq!(
             fortschritt.gesamt.load(Ordering::Relaxed),
             body.len() as u64,
@@ -529,11 +556,17 @@ mod tests {
     #[test]
     fn genug_platz_beachtet_zehn_prozent_reserve() {
         assert!(genug_platz(1100, 1000), "exakt Größe + 10 % passt");
-        assert!(!genug_platz(1099, 1000), "1 Byte unter Größe + 10 % reicht nicht");
+        assert!(
+            !genug_platz(1099, 1000),
+            "1 Byte unter Größe + 10 % reicht nicht"
+        );
         assert!(genug_platz(50, 0), "Nullgröße passt immer");
         // Saturating: eine riesige Größe (Reserve würde overflowen) panickt nicht und passt nicht
         // in wenig freien Platz.
-        assert!(!genug_platz(1000, u64::MAX), "u64::MAX-Größe passt nicht in 1000 Bytes frei");
+        assert!(
+            !genug_platz(1000, u64::MAX),
+            "u64::MAX-Größe passt nicht in 1000 Bytes frei"
+        );
     }
 
     // B2: ein Download über der Max-Größe wird abgebrochen (hier via Content-Length erkannt).
@@ -555,7 +588,10 @@ mod tests {
         .await
         .unwrap_err();
         assert!(matches!(err, DownloadFehler::ZuGross { .. }), "war {err:?}");
-        assert!(!tmp.path().join("big.part").exists(), "keine Teil-Datei bei Vorab-Ablehnung");
+        assert!(
+            !tmp.path().join("big.part").exists(),
+            "keine Teil-Datei bei Vorab-Ablehnung"
+        );
     }
 
     // B2: OHNE Content-Length (chunked) greift der Vorab-Check nicht — der Streaming-Backstop im
@@ -593,7 +629,9 @@ mod tests {
     // interne Ziele. (IP-Literale wie 127.0.0.1 umgehen den Resolver; deshalb ein Hostname.)
     #[tokio::test]
     async fn download_client_blockt_hostnamen_die_auf_loopback_aufloesen() {
-        let url_str = spawn_fixture(b"x".repeat(100)).await.replace("127.0.0.1", "localhost");
+        let url_str = spawn_fixture(b"x".repeat(100))
+            .await
+            .replace("127.0.0.1", "localhost");
         let tmp = tempfile::tempdir().unwrap();
         let client = download_client();
         let f = Fortschritt::default();
@@ -689,9 +727,15 @@ mod tests {
 
         entferne_download_dateien(dir, 7).await;
 
-        assert!(!dir.join("karte-7.mbtiles").exists(), "finale Datei entfernt");
+        assert!(
+            !dir.join("karte-7.mbtiles").exists(),
+            "finale Datei entfernt"
+        );
         assert!(!dir.join("karte-7.mbtiles.part").exists(), ".part entfernt");
-        assert!(dir.join("fremd.mbtiles").exists(), "Fremddatei unangetastet");
+        assert!(
+            dir.join("fremd.mbtiles").exists(),
+            "Fremddatei unangetastet"
+        );
         // Idempotent: zweiter Aufruf ohne Dateien ist ein No-Op (kein Panic).
         entferne_download_dateien(dir, 7).await;
     }

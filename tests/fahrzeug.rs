@@ -33,8 +33,13 @@ async fn nicht_admin_darf_nicht_anlegen() {
     let erika = login_cookie(&app, "erika", "erikapw1").await;
 
     let (status, _) = anfrage(
-        &app, "POST", "/api/fahrzeuge", &erika, Some(r#"{"funkrufname":"Verboten 1"}"#),
-    ).await;
+        &app,
+        "POST",
+        "/api/fahrzeuge",
+        &erika,
+        Some(r#"{"funkrufname":"Verboten 1"}"#),
+    )
+    .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 }
 
@@ -43,8 +48,18 @@ async fn dublette_funkrufname_ist_409() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let body = r#"{"funkrufname":"Florian 1"}"#;
-    assert_eq!(anfrage(&app, "POST", "/api/fahrzeuge", &admin, Some(body)).await.0, StatusCode::CREATED);
-    assert_eq!(anfrage(&app, "POST", "/api/fahrzeuge", &admin, Some(body)).await.0, StatusCode::CONFLICT);
+    assert_eq!(
+        anfrage(&app, "POST", "/api/fahrzeuge", &admin, Some(body))
+            .await
+            .0,
+        StatusCode::CREATED
+    );
+    assert_eq!(
+        anfrage(&app, "POST", "/api/fahrzeuge", &admin, Some(body))
+            .await
+            .0,
+        StatusCode::CONFLICT
+    );
 }
 
 #[tokio::test]
@@ -52,9 +67,13 @@ async fn unvollstaendige_staerke_ist_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (status, _) = anfrage(
-        &app, "POST", "/api/fahrzeuge", &admin,
+        &app,
+        "POST",
+        "/api/fahrzeuge",
+        &admin,
         Some(r#"{"funkrufname":"Florian 1","staerke_fuehrer":0,"staerke_mannschaft":8}"#),
-    ).await;
+    )
+    .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
@@ -62,14 +81,36 @@ async fn unvollstaendige_staerke_ist_400() {
 async fn ausser_dienst_versteckt_aus_nur_im_dienst() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (_, json) = anfrage(&app, "POST", "/api/fahrzeuge", &admin, Some(r#"{"funkrufname":"Florian 1"}"#)).await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        "/api/fahrzeuge",
+        &admin,
+        Some(r#"{"funkrufname":"Florian 1"}"#),
+    )
+    .await;
     let id = json["id"].as_i64().unwrap();
 
     assert_eq!(
-        anfrage(&app, "POST", &format!("/api/fahrzeuge/{id}/ausser-dienst"), &admin, None).await.0,
+        anfrage(
+            &app,
+            "POST",
+            &format!("/api/fahrzeuge/{id}/ausser-dienst"),
+            &admin,
+            None
+        )
+        .await
+        .0,
         StatusCode::OK
     );
-    let (_, im_dienst) = anfrage(&app, "GET", "/api/fahrzeuge?nur_im_dienst=true", &admin, None).await;
+    let (_, im_dienst) = anfrage(
+        &app,
+        "GET",
+        "/api/fahrzeuge?nur_im_dienst=true",
+        &admin,
+        None,
+    )
+    .await;
     assert!(im_dienst.as_array().unwrap().is_empty());
     let (_, alle) = anfrage(&app, "GET", "/api/fahrzeuge", &admin, None).await;
     assert_eq!(alle.as_array().unwrap().len(), 1);
@@ -79,7 +120,14 @@ async fn ausser_dienst_versteckt_aus_nur_im_dienst() {
 async fn patch_unbekannte_id_ist_404() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (status, _) = anfrage(&app, "PATCH", "/api/fahrzeuge/9999", &admin, Some(r#"{"funkrufname":"X"}"#)).await;
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        "/api/fahrzeuge/9999",
+        &admin,
+        Some(r#"{"funkrufname":"X"}"#),
+    )
+    .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
@@ -87,9 +135,23 @@ async fn patch_unbekannte_id_ist_404() {
 async fn kein_delete_endpunkt() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (_, json) = anfrage(&app, "POST", "/api/fahrzeuge", &admin, Some(r#"{"funkrufname":"Florian 1"}"#)).await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        "/api/fahrzeuge",
+        &admin,
+        Some(r#"{"funkrufname":"Florian 1"}"#),
+    )
+    .await;
     let id = json["id"].as_i64().unwrap();
     // DELETE existiert nicht → 405 Method Not Allowed (Route ist nur PATCH/POST).
-    let (status, _) = anfrage(&app, "DELETE", &format!("/api/fahrzeuge/{id}"), &admin, None).await;
+    let (status, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/fahrzeuge/{id}"),
+        &admin,
+        None,
+    )
+    .await;
     assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
 }

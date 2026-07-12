@@ -46,18 +46,23 @@ pub fn cache_plan(cache_control: Option<&str>) -> CachePlan {
     };
     let cc = cc.to_ascii_lowercase();
     let direktiven: Vec<&str> = cc.split(',').map(str::trim).collect();
-    if direktiven.iter().any(|d| *d == "no-store" || *d == "private") {
+    if direktiven
+        .iter()
+        .any(|d| *d == "no-store" || *d == "private")
+    {
         return CachePlan::Nicht;
     }
     if direktiven.contains(&"no-cache") {
         return CachePlan::Cachen { ttl: 0 };
     }
-    let s_maxage = direktiven
-        .iter()
-        .find_map(|d| d.strip_prefix("s-maxage=").and_then(|v| v.parse::<i64>().ok()));
-    let max_age = direktiven
-        .iter()
-        .find_map(|d| d.strip_prefix("max-age=").and_then(|v| v.parse::<i64>().ok()));
+    let s_maxage = direktiven.iter().find_map(|d| {
+        d.strip_prefix("s-maxage=")
+            .and_then(|v| v.parse::<i64>().ok())
+    });
+    let max_age = direktiven.iter().find_map(|d| {
+        d.strip_prefix("max-age=")
+            .and_then(|v| v.parse::<i64>().ok())
+    });
     match s_maxage.or(max_age) {
         Some(n) if n > 0 => CachePlan::Cachen { ttl: n },
         Some(_) => CachePlan::Cachen { ttl: 0 }, // max-age=0 → revalidieren
@@ -163,13 +168,15 @@ async fn lade(pool: &SqlitePool, schluessel: &str) -> Option<CacheRow> {
         tracing::warn!("Tile-Cache: Lesefehler: {e}");
         None
     });
-    row.map(|(bytes, content_type, content_encoding, etag, expires_at)| CacheRow {
-        bytes,
-        content_type,
-        content_encoding,
-        etag,
-        expires_at,
-    })
+    row.map(
+        |(bytes, content_type, content_encoding, etag, expires_at)| CacheRow {
+            bytes,
+            content_type,
+            content_encoding,
+            etag,
+            expires_at,
+        },
+    )
 }
 
 async fn speichere(
@@ -254,7 +261,10 @@ async fn evict_falls_noetig(pool: &SqlitePool, cap: i64) -> sqlx::Result<()> {
 
 /// Gedrosselte Eviction: nur jede `EVICT_INTERVALL`-te Schreiboperation prüft den Cap.
 async fn evict_throttled(pool: &SqlitePool, cap: i64) {
-    if EVICT_ZAEHLER.fetch_add(1, Ordering::Relaxed).is_multiple_of(EVICT_INTERVALL) {
+    if EVICT_ZAEHLER
+        .fetch_add(1, Ordering::Relaxed)
+        .is_multiple_of(EVICT_INTERVALL)
+    {
         if let Err(e) = evict_falls_noetig(pool, cap).await {
             tracing::warn!("Tile-Cache: Eviction-Fehler: {e}");
         }
@@ -310,7 +320,8 @@ pub async fn hole_asset_cached(
                         CachePlan::Nicht => 0,
                     };
                     row.expires_at = now + ttl;
-                    let _ = aktualisiere_frische(cache_pool, &schluessel, row.expires_at, now).await;
+                    let _ =
+                        aktualisiere_frische(cache_pool, &schluessel, row.expires_at, now).await;
                     return Ok(aus_cache(row, now));
                 }
                 Ok(Revalidiert::Frisch(a)) => {
@@ -433,10 +444,16 @@ mod tests {
         assert_eq!(cache_plan(Some("")), CachePlan::Nicht);
         assert_eq!(cache_plan(Some("no-store")), CachePlan::Nicht);
         assert_eq!(cache_plan(Some("private, max-age=300")), CachePlan::Nicht);
-        assert_eq!(cache_plan(Some("public, max-age=300")), CachePlan::Cachen { ttl: 300 });
+        assert_eq!(
+            cache_plan(Some("public, max-age=300")),
+            CachePlan::Cachen { ttl: 300 }
+        );
         assert_eq!(cache_plan(Some("no-cache")), CachePlan::Cachen { ttl: 0 });
         assert_eq!(cache_plan(Some("max-age=0")), CachePlan::Cachen { ttl: 0 });
-        assert_eq!(cache_plan(Some("PUBLIC, MAX-AGE=120")), CachePlan::Cachen { ttl: 120 });
+        assert_eq!(
+            cache_plan(Some("PUBLIC, MAX-AGE=120")),
+            CachePlan::Cachen { ttl: 120 }
+        );
         // s-maxage hat Vorrang vor max-age (shared cache).
         assert_eq!(
             cache_plan(Some("public, s-maxage=600, max-age=60")),
@@ -455,16 +472,25 @@ mod tests {
     async fn miss_dann_hit_trifft_upstream_nicht_erneut() {
         let pool = test_cache_pool().await;
         let client = reqwest::Client::new();
-        let (u, hits) = spawn_zaehlend("public, max-age=300", Some("\"v1\""), b"TILE".to_vec()).await;
+        let (u, hits) =
+            spawn_zaehlend("public, max-age=300", Some("\"v1\""), b"TILE".to_vec()).await;
 
-        let a1 = hole_asset_cached(&pool, &client, url(&u), 1 << 20, 1000).await.unwrap();
+        let a1 = hole_asset_cached(&pool, &client, url(&u), 1 << 20, 1000)
+            .await
+            .unwrap();
         assert_eq!(a1.bytes, b"TILE");
         assert_eq!(hits.load(Ordering::SeqCst), 1, "Miss → ein Upstream-Call");
 
         // Innerhalb der TTL → Cache-Hit, KEIN zweiter Upstream-Call (keystone).
-        let a2 = hole_asset_cached(&pool, &client, url(&u), 1 << 20, 1100).await.unwrap();
+        let a2 = hole_asset_cached(&pool, &client, url(&u), 1 << 20, 1100)
+            .await
+            .unwrap();
         assert_eq!(a2.bytes, b"TILE");
-        assert_eq!(hits.load(Ordering::SeqCst), 1, "Hit darf den Upstream NICHT erneut treffen");
+        assert_eq!(
+            hits.load(Ordering::SeqCst),
+            1,
+            "Hit darf den Upstream NICHT erneut treffen"
+        );
     }
 
     #[tokio::test]
@@ -472,9 +498,17 @@ mod tests {
         let pool = test_cache_pool().await;
         let client = reqwest::Client::new();
         let (u, hits) = spawn_zaehlend("no-store", None, b"X".to_vec()).await;
-        hole_asset_cached(&pool, &client, url(&u), 1 << 20, 1000).await.unwrap();
-        hole_asset_cached(&pool, &client, url(&u), 1 << 20, 1001).await.unwrap();
-        assert_eq!(hits.load(Ordering::SeqCst), 2, "no-store → kein Cache, jeder Abruf trifft Upstream");
+        hole_asset_cached(&pool, &client, url(&u), 1 << 20, 1000)
+            .await
+            .unwrap();
+        hole_asset_cached(&pool, &client, url(&u), 1 << 20, 1001)
+            .await
+            .unwrap();
+        assert_eq!(
+            hits.load(Ordering::SeqCst),
+            2,
+            "no-store → kein Cache, jeder Abruf trifft Upstream"
+        );
     }
 
     #[tokio::test]
@@ -484,14 +518,22 @@ mod tests {
         // max-age=0 → sofort stale; ETag vorhanden → bedingte Revalidierung.
         let (u, hits) = spawn_zaehlend("public, max-age=0", Some("\"v1\""), b"BODY".to_vec()).await;
 
-        let a1 = hole_asset_cached(&pool, &client, url(&u), 1 << 20, 1000).await.unwrap();
+        let a1 = hole_asset_cached(&pool, &client, url(&u), 1 << 20, 1000)
+            .await
+            .unwrap();
         assert_eq!(a1.bytes, b"BODY");
         assert_eq!(hits.load(Ordering::SeqCst), 1);
 
         // stale → If-None-Match → 304 (Body leer) → Cache wird serviert.
-        let a2 = hole_asset_cached(&pool, &client, url(&u), 1 << 20, 1001).await.unwrap();
+        let a2 = hole_asset_cached(&pool, &client, url(&u), 1 << 20, 1001)
+            .await
+            .unwrap();
         assert_eq!(a2.bytes, b"BODY", "304 → gecachte Bytes serviert");
-        assert_eq!(hits.load(Ordering::SeqCst), 2, "Revalidierung trifft Upstream (aber nur 304)");
+        assert_eq!(
+            hits.load(Ordering::SeqCst),
+            2,
+            "Revalidierung trifft Upstream (aber nur 304)"
+        );
     }
 
     #[tokio::test]
@@ -532,11 +574,16 @@ mod tests {
         speichere(&pool, "c", &mk(3), 9999, 3).await.unwrap();
 
         evict_falls_noetig(&pool, 250).await.unwrap(); // muss auf ≤250 → ältesten (a) löschen
-        let rest: Vec<String> = sqlx::query_scalar("SELECT schluessel FROM tile_cache ORDER BY schluessel")
-            .fetch_all(&pool)
-            .await
-            .unwrap();
-        assert_eq!(rest, vec!["b", "c"], "ältester (a, niedrigster letzter_zugriff) evictet");
+        let rest: Vec<String> =
+            sqlx::query_scalar("SELECT schluessel FROM tile_cache ORDER BY schluessel")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            rest,
+            vec!["b", "c"],
+            "ältester (a, niedrigster letzter_zugriff) evictet"
+        );
     }
 
     #[tokio::test]
@@ -554,7 +601,14 @@ mod tests {
         let a = hole_asset_via_cache_oder_direkt(&karten_dir, &client, url(&u), 1 << 20, 1000)
             .await
             .unwrap();
-        assert_eq!(a.bytes, b"DIRECT", "Pool-Fehler → Direkt-Fetch liefert die Bytes");
-        assert_eq!(hits.load(Ordering::SeqCst), 1, "genau ein Upstream-Call (Direkt-Fetch)");
+        assert_eq!(
+            a.bytes, b"DIRECT",
+            "Pool-Fehler → Direkt-Fetch liefert die Bytes"
+        );
+        assert_eq!(
+            hits.load(Ordering::SeqCst),
+            1,
+            "genau ein Upstream-Call (Direkt-Fetch)"
+        );
     }
 }

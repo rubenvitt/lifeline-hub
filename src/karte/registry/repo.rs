@@ -672,9 +672,17 @@ mod tests {
         sqlx::query("INSERT INTO karte_online_quelle (name,url,typ,attribution,sortier,aktiv) VALUES (?,?,?,?,?,?)")
             .bind("A").bind("https://a").bind("raster").bind(Some("© X")).bind(1).bind(1)
             .execute(&pool).await.unwrap();
-        sqlx::query("INSERT INTO karte_online_quelle (name,url,typ,sortier,aktiv) VALUES (?,?,?,?,?)")
-            .bind("Inaktiv").bind("https://i").bind("vektor").bind(0).bind(0)
-            .execute(&pool).await.unwrap();
+        sqlx::query(
+            "INSERT INTO karte_online_quelle (name,url,typ,sortier,aktiv) VALUES (?,?,?,?,?)",
+        )
+        .bind("Inaktiv")
+        .bind("https://i")
+        .bind("vektor")
+        .bind(0)
+        .bind(0)
+        .execute(&pool)
+        .await
+        .unwrap();
 
         let q = aktive_online_quellen_fuer_config(&pool).await.unwrap();
         assert_eq!(q.len(), 2, "inaktive Quelle ausgeschlossen");
@@ -699,8 +707,12 @@ mod tests {
     #[tokio::test]
     async fn liste_online_quellen_enthaelt_auch_inaktive_sortiert() {
         let pool = test_pool().await;
-        anlegen_online_quelle(&pool, &eingabe("B", 2, true)).await.unwrap();
-        anlegen_online_quelle(&pool, &eingabe("A", 1, false)).await.unwrap();
+        anlegen_online_quelle(&pool, &eingabe("B", 2, true))
+            .await
+            .unwrap();
+        anlegen_online_quelle(&pool, &eingabe("A", 1, false))
+            .await
+            .unwrap();
         let liste = liste_online_quellen(&pool).await.unwrap();
         assert_eq!(liste.len(), 2, "Admin sieht auch inaktive Quellen");
         assert_eq!(liste[0].name, "A");
@@ -711,7 +723,9 @@ mod tests {
     #[tokio::test]
     async fn anlegen_online_quelle_gibt_zeile_mit_id() {
         let pool = test_pool().await;
-        let q = anlegen_online_quelle(&pool, &eingabe("X", 5, true)).await.unwrap();
+        let q = anlegen_online_quelle(&pool, &eingabe("X", 5, true))
+            .await
+            .unwrap();
         assert!(q.id > 0);
         assert_eq!(q.name, "X");
         assert_eq!(q.url, "https://X");
@@ -723,7 +737,9 @@ mod tests {
     #[tokio::test]
     async fn aktualisiere_online_quelle_aendert_alle_felder() {
         let pool = test_pool().await;
-        let q = anlegen_online_quelle(&pool, &eingabe("X", 1, true)).await.unwrap();
+        let q = anlegen_online_quelle(&pool, &eingabe("X", 1, true))
+            .await
+            .unwrap();
         let neu = OnlineQuelleEingabe {
             name: "Neu".into(),
             url: "https://neu".into(),
@@ -756,7 +772,9 @@ mod tests {
     #[tokio::test]
     async fn loesche_online_quelle_entfernt_und_meldet() {
         let pool = test_pool().await;
-        let q = anlegen_online_quelle(&pool, &eingabe("X", 1, true)).await.unwrap();
+        let q = anlegen_online_quelle(&pool, &eingabe("X", 1, true))
+            .await
+            .unwrap();
         assert!(loesche_online_quelle(&pool, q.id).await.unwrap());
         assert!(
             !loesche_online_quelle(&pool, q.id).await.unwrap(),
@@ -772,13 +790,28 @@ mod tests {
         e.proxy = true;
         let q = anlegen_online_quelle(&pool, &e).await.unwrap();
         assert!(q.proxy, "proxy=true gespeichert+gelesen");
-        let q2 = anlegen_online_quelle(&pool, &eingabe("Y", 2, true)).await.unwrap();
+        let q2 = anlegen_online_quelle(&pool, &eingabe("Y", 2, true))
+            .await
+            .unwrap();
         assert!(!q2.proxy, "Default proxy=false");
         // direkter INSERT ohne proxy-Spalte → Default 0
-        sqlx::query("INSERT INTO karte_online_quelle (name,url,typ,sortier,aktiv) VALUES (?,?,?,?,?)")
-            .bind("Z").bind("https://z").bind("vektor").bind(3).bind(1)
-            .execute(&pool).await.unwrap();
-        let z = liste_online_quellen(&pool).await.unwrap().into_iter().find(|r| r.name == "Z").unwrap();
+        sqlx::query(
+            "INSERT INTO karte_online_quelle (name,url,typ,sortier,aktiv) VALUES (?,?,?,?,?)",
+        )
+        .bind("Z")
+        .bind("https://z")
+        .bind("vektor")
+        .bind(3)
+        .bind(1)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let z = liste_online_quellen(&pool)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|r| r.name == "Z")
+            .unwrap();
         assert!(!z.proxy);
     }
 
@@ -788,7 +821,9 @@ mod tests {
         let mut e = eingabe("P", 1, true);
         e.proxy = true;
         let q = anlegen_online_quelle(&pool, &e).await.unwrap();
-        anlegen_online_quelle(&pool, &eingabe("Inaktiv", 2, false)).await.unwrap();
+        anlegen_online_quelle(&pool, &eingabe("Inaktiv", 2, false))
+            .await
+            .unwrap();
         let liste = aktive_online_quellen_fuer_config(&pool).await.unwrap();
         assert_eq!(liste.len(), 1, "nur aktive");
         let row = &liste[0];
@@ -800,19 +835,48 @@ mod tests {
     #[tokio::test]
     async fn slot_upsert_dedupliziert_und_aufloesen_scoped() {
         let pool = test_pool().await;
-        let q = anlegen_online_quelle(&pool, &eingabe("S", 1, true)).await.unwrap();
-        let s1 = slot_upsert(&pool, q.id, "https://h/a?key=K", "template").await.unwrap();
-        let s1b = slot_upsert(&pool, q.id, "https://h/a?key=K", "template").await.unwrap();
+        let q = anlegen_online_quelle(&pool, &eingabe("S", 1, true))
+            .await
+            .unwrap();
+        let s1 = slot_upsert(&pool, q.id, "https://h/a?key=K", "template")
+            .await
+            .unwrap();
+        let s1b = slot_upsert(&pool, q.id, "https://h/a?key=K", "template")
+            .await
+            .unwrap();
         assert_eq!(s1, s1b, "gleiche url → gleiche id (dedup)");
-        let s2 = slot_upsert(&pool, q.id, "https://h/b", "sprite").await.unwrap();
+        let s2 = slot_upsert(&pool, q.id, "https://h/b", "sprite")
+            .await
+            .unwrap();
         assert_ne!(s1, s2, "andere url → neue id");
         assert_eq!(
-            slot_aufloesen(&pool, q.id, s1, "template").await.unwrap().as_deref(),
+            slot_aufloesen(&pool, q.id, s1, "template")
+                .await
+                .unwrap()
+                .as_deref(),
             Some("https://h/a?key=K")
         );
-        assert!(slot_aufloesen(&pool, q.id, s1, "sprite").await.unwrap().is_none(), "falsche art → None");
-        assert!(slot_aufloesen(&pool, 999, s1, "template").await.unwrap().is_none(), "fremde quelle → None");
-        assert!(slot_aufloesen(&pool, q.id, 99999, "template").await.unwrap().is_none(), "unbekannter slot → None");
+        assert!(
+            slot_aufloesen(&pool, q.id, s1, "sprite")
+                .await
+                .unwrap()
+                .is_none(),
+            "falsche art → None"
+        );
+        assert!(
+            slot_aufloesen(&pool, 999, s1, "template")
+                .await
+                .unwrap()
+                .is_none(),
+            "fremde quelle → None"
+        );
+        assert!(
+            slot_aufloesen(&pool, q.id, 99999, "template")
+                .await
+                .unwrap()
+                .is_none(),
+            "unbekannter slot → None"
+        );
     }
 
     #[tokio::test]
@@ -820,25 +884,63 @@ mod tests {
         // art ist Teil der Identität: dieselbe URL in zwei Rollen bekommt zwei Slots, jeder über
         // seine art auflösbar (sonst würde ON CONFLICT eine Art überschreiben → unauflösbar).
         let pool = test_pool().await;
-        let q = anlegen_online_quelle(&pool, &eingabe("U", 1, true)).await.unwrap();
-        let a = slot_upsert(&pool, q.id, "https://h/x", "sprite").await.unwrap();
-        let b = slot_upsert(&pool, q.id, "https://h/x", "tilejson").await.unwrap();
+        let q = anlegen_online_quelle(&pool, &eingabe("U", 1, true))
+            .await
+            .unwrap();
+        let a = slot_upsert(&pool, q.id, "https://h/x", "sprite")
+            .await
+            .unwrap();
+        let b = slot_upsert(&pool, q.id, "https://h/x", "tilejson")
+            .await
+            .unwrap();
         assert_ne!(a, b, "gleiche URL, andere art → eigener Slot");
-        assert_eq!(slot_aufloesen(&pool, q.id, a, "sprite").await.unwrap().as_deref(), Some("https://h/x"));
-        assert_eq!(slot_aufloesen(&pool, q.id, b, "tilejson").await.unwrap().as_deref(), Some("https://h/x"));
+        assert_eq!(
+            slot_aufloesen(&pool, q.id, a, "sprite")
+                .await
+                .unwrap()
+                .as_deref(),
+            Some("https://h/x")
+        );
+        assert_eq!(
+            slot_aufloesen(&pool, q.id, b, "tilejson")
+                .await
+                .unwrap()
+                .as_deref(),
+            Some("https://h/x")
+        );
     }
 
     #[tokio::test]
     async fn slots_loeschen_nur_eigene() {
         let pool = test_pool().await;
-        let a = anlegen_online_quelle(&pool, &eingabe("A", 1, true)).await.unwrap();
-        let b = anlegen_online_quelle(&pool, &eingabe("B", 2, true)).await.unwrap();
-        let sa = slot_upsert(&pool, a.id, "https://h/a", "static").await.unwrap();
-        let sb = slot_upsert(&pool, b.id, "https://h/b", "static").await.unwrap();
+        let a = anlegen_online_quelle(&pool, &eingabe("A", 1, true))
+            .await
+            .unwrap();
+        let b = anlegen_online_quelle(&pool, &eingabe("B", 2, true))
+            .await
+            .unwrap();
+        let sa = slot_upsert(&pool, a.id, "https://h/a", "static")
+            .await
+            .unwrap();
+        let sb = slot_upsert(&pool, b.id, "https://h/b", "static")
+            .await
+            .unwrap();
         let n = slots_loeschen(&pool, a.id).await.unwrap();
         assert_eq!(n, 1);
-        assert!(slot_aufloesen(&pool, a.id, sa, "static").await.unwrap().is_none(), "A-Slot weg");
-        assert!(slot_aufloesen(&pool, b.id, sb, "static").await.unwrap().is_some(), "B-Slot bleibt");
+        assert!(
+            slot_aufloesen(&pool, a.id, sa, "static")
+                .await
+                .unwrap()
+                .is_none(),
+            "A-Slot weg"
+        );
+        assert!(
+            slot_aufloesen(&pool, b.id, sb, "static")
+                .await
+                .unwrap()
+                .is_some(),
+            "B-Slot bleibt"
+        );
     }
 
     #[tokio::test]
@@ -846,11 +948,18 @@ mod tests {
         // FK ON DELETE CASCADE (test_pool aktiviert PRAGMA foreign_keys): Löschen der Quelle
         // entfernt ihre Slots auch OHNE den expliziten slots_loeschen-Aufruf des Handlers.
         let pool = test_pool().await;
-        let q = anlegen_online_quelle(&pool, &eingabe("C", 1, true)).await.unwrap();
-        let s = slot_upsert(&pool, q.id, "https://h/x", "tilejson").await.unwrap();
+        let q = anlegen_online_quelle(&pool, &eingabe("C", 1, true))
+            .await
+            .unwrap();
+        let s = slot_upsert(&pool, q.id, "https://h/x", "tilejson")
+            .await
+            .unwrap();
         loesche_online_quelle(&pool, q.id).await.unwrap();
         assert!(
-            slot_aufloesen(&pool, q.id, s, "tilejson").await.unwrap().is_none(),
+            slot_aufloesen(&pool, q.id, s, "tilejson")
+                .await
+                .unwrap()
+                .is_none(),
             "CASCADE entfernt Slots ohne expliziten Purge"
         );
     }
@@ -910,7 +1019,10 @@ mod tests {
     #[tokio::test]
     async fn aktive_pfad_und_verfuegbar_nur_wenn_bereit_und_aktiv() {
         let pool = test_pool().await;
-        assert!(aktive_offline_karte_pfad_und_format(&pool).await.unwrap().is_none());
+        assert!(aktive_offline_karte_pfad_und_format(&pool)
+            .await
+            .unwrap()
+            .is_none());
         assert!(aktive_offline_karte(&pool).await.unwrap().is_none());
         let k = registriere_offline_karte(&pool, &offline_eingabe("A"))
             .await
@@ -942,7 +1054,10 @@ mod tests {
             Some((k.pfad.clone(), "png".to_string())),
             "aktive Karte trägt das Raster-Format"
         );
-        assert_eq!(aktive_offline_karte(&pool).await.unwrap().unwrap().format, "png");
+        assert_eq!(
+            aktive_offline_karte(&pool).await.unwrap().unwrap().format,
+            "png"
+        );
 
         // Roh-INSERT ohne format-Spalte → DB-DEFAULT 'pbf' (Bestandsverhalten).
         sqlx::query("INSERT INTO karte_offline_karte (name, pfad, status) VALUES ('Alt', '/k/alt.mbtiles', 'bereit')")
@@ -976,7 +1091,10 @@ mod tests {
             aktive_offline_karte(&pool).await.unwrap().is_none(),
             "status='laedt' wird nicht ausgeliefert"
         );
-        assert!(aktive_offline_karte_pfad_und_format(&pool).await.unwrap().is_none());
+        assert!(aktive_offline_karte_pfad_und_format(&pool)
+            .await
+            .unwrap()
+            .is_none());
     }
 
     #[tokio::test]
@@ -1065,7 +1183,9 @@ mod tests {
     #[tokio::test]
     async fn neue_download_karte_ist_laedt_inaktiv_ohne_datei() {
         let pool = test_pool().await;
-        let k = neue_download_karte(&pool, &download_eingabe("A")).await.unwrap();
+        let k = neue_download_karte(&pool, &download_eingabe("A"))
+            .await
+            .unwrap();
         assert!(k.id > 0);
         assert_eq!(k.status, "laedt");
         assert!(!k.aktiv_basemap);
@@ -1080,7 +1200,9 @@ mod tests {
     #[tokio::test]
     async fn markiere_bereit_setzt_pfad_groesse_sha256_und_status() {
         let pool = test_pool().await;
-        let k = neue_download_karte(&pool, &download_eingabe("A")).await.unwrap();
+        let k = neue_download_karte(&pool, &download_eingabe("A"))
+            .await
+            .unwrap();
         let fertig = markiere_bereit(&pool, k.id, "karte-1.pmtiles", 4242, "deadbeef")
             .await
             .unwrap()
@@ -1104,7 +1226,9 @@ mod tests {
     #[tokio::test]
     async fn setze_status_fehler_aendert_status() {
         let pool = test_pool().await;
-        let k = neue_download_karte(&pool, &download_eingabe("A")).await.unwrap();
+        let k = neue_download_karte(&pool, &download_eingabe("A"))
+            .await
+            .unwrap();
         assert!(setze_status(&pool, k.id, "fehler").await.unwrap());
         let nach = finde_offline_karte(&pool, k.id).await.unwrap().unwrap();
         assert_eq!(nach.status, "fehler");
@@ -1114,18 +1238,40 @@ mod tests {
     #[tokio::test]
     async fn reset_haengende_downloads_setzt_nur_laedt_auf_fehler() {
         let pool = test_pool().await;
-        let a = neue_download_karte(&pool, &download_eingabe("A")).await.unwrap();
-        let b = neue_download_karte(&pool, &download_eingabe("B")).await.unwrap();
+        let a = neue_download_karte(&pool, &download_eingabe("A"))
+            .await
+            .unwrap();
+        let b = neue_download_karte(&pool, &download_eingabe("B"))
+            .await
+            .unwrap();
         let bereit = registriere_offline_karte(&pool, &offline_eingabe("C"))
             .await
             .unwrap();
         let mut ids = reset_haengende_downloads(&pool).await.unwrap();
         ids.sort();
         assert_eq!(ids, vec![a.id, b.id], "nur die laedt-Zeilen");
-        assert_eq!(finde_offline_karte(&pool, a.id).await.unwrap().unwrap().status, "fehler");
-        assert_eq!(finde_offline_karte(&pool, b.id).await.unwrap().unwrap().status, "fehler");
         assert_eq!(
-            finde_offline_karte(&pool, bereit.id).await.unwrap().unwrap().status,
+            finde_offline_karte(&pool, a.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .status,
+            "fehler"
+        );
+        assert_eq!(
+            finde_offline_karte(&pool, b.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .status,
+            "fehler"
+        );
+        assert_eq!(
+            finde_offline_karte(&pool, bereit.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .status,
             "bereit",
             "bereite Karte unangetastet"
         );
@@ -1136,8 +1282,13 @@ mod tests {
     #[tokio::test]
     async fn finde_offline_karte_some_und_none() {
         let pool = test_pool().await;
-        let k = neue_download_karte(&pool, &download_eingabe("A")).await.unwrap();
-        assert_eq!(finde_offline_karte(&pool, k.id).await.unwrap().unwrap().id, k.id);
+        let k = neue_download_karte(&pool, &download_eingabe("A"))
+            .await
+            .unwrap();
+        assert_eq!(
+            finde_offline_karte(&pool, k.id).await.unwrap().unwrap().id,
+            k.id
+        );
         assert!(finde_offline_karte(&pool, 999).await.unwrap().is_none());
     }
 
@@ -1145,7 +1296,9 @@ mod tests {
     async fn aktive_offline_karte_version_aus_sha256_und_lizenz() {
         let pool = test_pool().await;
         assert!(aktive_offline_karte(&pool).await.unwrap().is_none());
-        let k = neue_download_karte(&pool, &download_eingabe("A")).await.unwrap();
+        let k = neue_download_karte(&pool, &download_eingabe("A"))
+            .await
+            .unwrap();
         markiere_bereit(&pool, k.id, "karte-1.pmtiles", 10, "cafef00d")
             .await
             .unwrap();
@@ -1170,19 +1323,27 @@ mod tests {
             .unwrap();
         aktiviere_offline_karte(&pool, k.id).await.unwrap();
         let aktiv = aktive_offline_karte(&pool).await.unwrap().expect("aktiv");
-        assert!(!aktiv.version.is_empty(), "geaendert_at-Fallback nicht leer");
+        assert!(
+            !aktiv.version.is_empty(),
+            "geaendert_at-Fallback nicht leer"
+        );
         assert_ne!(aktiv.version, "", "Token vorhanden trotz fehlendem sha256");
     }
 
     #[tokio::test]
     async fn aktiviere_wenn_keine_aktive_aktiviert_erste_bereite() {
         let pool = test_pool().await;
-        let k = neue_download_karte(&pool, &download_eingabe("A")).await.unwrap();
+        let k = neue_download_karte(&pool, &download_eingabe("A"))
+            .await
+            .unwrap();
         markiere_bereit(&pool, k.id, "karte-1.pmtiles", 10, "cafef00d")
             .await
             .unwrap();
         // Keine aktive Karte → die erste fertige wird automatisch ausgeliefert.
-        assert!(aktiviere_wenn_keine_aktive(&pool, k.id).await.unwrap(), "aktiviert");
+        assert!(
+            aktiviere_wenn_keine_aktive(&pool, k.id).await.unwrap(),
+            "aktiviert"
+        );
         let nach = finde_offline_karte(&pool, k.id).await.unwrap().unwrap();
         assert!(nach.aktiv_basemap);
         assert!(aktive_offline_karte(&pool).await.unwrap().is_some());
@@ -1191,12 +1352,20 @@ mod tests {
     #[tokio::test]
     async fn aktiviere_wenn_keine_aktive_noop_wenn_schon_aktiv() {
         let pool = test_pool().await;
-        let a = neue_download_karte(&pool, &download_eingabe("A")).await.unwrap();
-        markiere_bereit(&pool, a.id, "karte-1.pmtiles", 10, "aaaa").await.unwrap();
+        let a = neue_download_karte(&pool, &download_eingabe("A"))
+            .await
+            .unwrap();
+        markiere_bereit(&pool, a.id, "karte-1.pmtiles", 10, "aaaa")
+            .await
+            .unwrap();
         aktiviere_offline_karte(&pool, a.id).await.unwrap();
         // Zweite Karte fertig, A ist schon aktiv → kein Verdrängen, kein Wechsel.
-        let b = neue_download_karte(&pool, &download_eingabe("B")).await.unwrap();
-        markiere_bereit(&pool, b.id, "karte-2.pmtiles", 20, "bbbb").await.unwrap();
+        let b = neue_download_karte(&pool, &download_eingabe("B"))
+            .await
+            .unwrap();
+        markiere_bereit(&pool, b.id, "karte-2.pmtiles", 20, "bbbb")
+            .await
+            .unwrap();
         assert!(
             !aktiviere_wenn_keine_aktive(&pool, b.id).await.unwrap(),
             "bereits eine aktiv → No-op"
@@ -1215,12 +1384,20 @@ mod tests {
     async fn aktiviere_wenn_keine_aktive_noop_wenn_nicht_bereit() {
         let pool = test_pool().await;
         // Noch im Status 'laedt' (markiere_bereit nicht aufgerufen).
-        let k = neue_download_karte(&pool, &download_eingabe("A")).await.unwrap();
+        let k = neue_download_karte(&pool, &download_eingabe("A"))
+            .await
+            .unwrap();
         assert!(
             !aktiviere_wenn_keine_aktive(&pool, k.id).await.unwrap(),
             "nicht bereit → nicht aktivierbar"
         );
-        assert!(!finde_offline_karte(&pool, k.id).await.unwrap().unwrap().aktiv_basemap);
+        assert!(
+            !finde_offline_karte(&pool, k.id)
+                .await
+                .unwrap()
+                .unwrap()
+                .aktiv_basemap
+        );
     }
 
     // --- Multi-Region-Anzeige (LFH-188, „alle automatisch gemeinsam") ---
@@ -1229,25 +1406,44 @@ mod tests {
     async fn sichtbare_offline_karten_listet_alle_bereiten_unabhaengig_von_aktiv() {
         let pool = test_pool().await;
         // Zwei bereite Regionen (eine aktiv, eine NICHT aktiv) + eine ladende.
-        let a = registriere_offline_karte(&pool, &offline_eingabe("A")).await.unwrap();
-        let b = registriere_offline_karte(&pool, &offline_eingabe("B")).await.unwrap();
+        let a = registriere_offline_karte(&pool, &offline_eingabe("A"))
+            .await
+            .unwrap();
+        let b = registriere_offline_karte(&pool, &offline_eingabe("B"))
+            .await
+            .unwrap();
         aktiviere_offline_karte(&pool, a.id).await.unwrap(); // a aktiv, b nicht
-        let laedt = neue_download_karte(&pool, &download_eingabe("C")).await.unwrap();
+        let laedt = neue_download_karte(&pool, &download_eingabe("C"))
+            .await
+            .unwrap();
 
         let sichtbar = sichtbare_offline_karten(&pool).await.unwrap();
         let ids: Vec<i64> = sichtbar.iter().map(|r| r.id).collect();
-        assert_eq!(ids, vec![a.id, b.id], "beide bereiten Regionen, sortier,id; ladende nicht");
-        assert!(!ids.contains(&laedt.id), "ladende Region wird nicht ausgeliefert");
+        assert_eq!(
+            ids,
+            vec![a.id, b.id],
+            "beide bereiten Regionen, sortier,id; ladende nicht"
+        );
+        assert!(
+            !ids.contains(&laedt.id),
+            "ladende Region wird nicht ausgeliefert"
+        );
     }
 
     #[tokio::test]
     async fn sichtbare_offline_karten_version_aus_sha256_sonst_geaendert_at() {
         let pool = test_pool().await;
         // Heruntergeladene Karte trägt sha256 → Token = sha256.
-        let d = neue_download_karte(&pool, &download_eingabe("D")).await.unwrap();
-        markiere_bereit(&pool, d.id, "karte-1.mbtiles", 10, "cafef00d").await.unwrap();
+        let d = neue_download_karte(&pool, &download_eingabe("D"))
+            .await
+            .unwrap();
+        markiere_bereit(&pool, d.id, "karte-1.mbtiles", 10, "cafef00d")
+            .await
+            .unwrap();
         // Registrierte Karte (kein sha256) → Token = geaendert_at (nicht leer).
-        let r = registriere_offline_karte(&pool, &offline_eingabe("R")).await.unwrap();
+        let r = registriere_offline_karte(&pool, &offline_eingabe("R"))
+            .await
+            .unwrap();
 
         let sichtbar = sichtbare_offline_karten(&pool).await.unwrap();
         let sd = sichtbar.iter().find(|s| s.id == d.id).unwrap();
@@ -1268,9 +1464,17 @@ mod tests {
             "bereite Region per id auflösbar (Pfad + Format)"
         );
         // Ladende Region → None (204).
-        let laedt = neue_download_karte(&pool, &download_eingabe("L")).await.unwrap();
-        assert!(offline_karte_pfad_und_format(&pool, laedt.id).await.unwrap().is_none());
+        let laedt = neue_download_karte(&pool, &download_eingabe("L"))
+            .await
+            .unwrap();
+        assert!(offline_karte_pfad_und_format(&pool, laedt.id)
+            .await
+            .unwrap()
+            .is_none());
         // Unbekannte id → None.
-        assert!(offline_karte_pfad_und_format(&pool, 999).await.unwrap().is_none());
+        assert!(offline_karte_pfad_und_format(&pool, 999)
+            .await
+            .unwrap()
+            .is_none());
     }
 }

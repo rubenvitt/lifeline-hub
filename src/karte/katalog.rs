@@ -115,7 +115,10 @@ async fn hole_manifest(client: &reqwest::Client) -> Option<Vec<OfflineKatalogEin
         return None;
     }
     // Größen-Guard: ein plausibler Katalog ist winzig; ein riesiger Body wäre ein Fehler/Angriff.
-    if resp.content_length().is_some_and(|n| n > MAX_MANIFEST_BYTES) {
+    if resp
+        .content_length()
+        .is_some_and(|n| n > MAX_MANIFEST_BYTES)
+    {
         return None;
     }
     resp.json::<Vec<OfflineKatalogEintrag>>().await.ok()
@@ -129,7 +132,10 @@ mod tests {
     #[test]
     fn merge_ohne_cache_ist_compiled_in() {
         let cache: KatalogCache = Default::default();
-        assert_eq!(merge_mit_cache(&cache).len(), default_offline_katalog().len());
+        assert_eq!(
+            merge_mit_cache(&cache).len(),
+            default_offline_katalog().len()
+        );
     }
 
     #[test]
@@ -158,7 +164,9 @@ mod tests {
     #[test]
     fn manifest_url_override_gewinnt_wenn_gesetzt() {
         assert_eq!(
-            resolve_manifest_url(Some("https://cdn.example/maps/offline-katalog-manifest.json".into())),
+            resolve_manifest_url(Some(
+                "https://cdn.example/maps/offline-katalog-manifest.json".into()
+            )),
             "https://cdn.example/maps/offline-katalog-manifest.json"
         );
     }
@@ -167,7 +175,10 @@ mod tests {
     fn manifest_url_faellt_auf_const_zurueck() {
         assert_eq!(resolve_manifest_url(None), OFFLINE_KATALOG_MANIFEST_URL);
         // leerer/whitespace-Override zählt nicht als gesetzt → const-Default.
-        assert_eq!(resolve_manifest_url(Some("   ".into())), OFFLINE_KATALOG_MANIFEST_URL);
+        assert_eq!(
+            resolve_manifest_url(Some("   ".into())),
+            OFFLINE_KATALOG_MANIFEST_URL
+        );
     }
 
     #[test]
@@ -186,6 +197,9 @@ mod tests {
         }]);
         let out = merge_mit_cache(&cache);
         let dach = out.iter().find(|e| e.name == "DACH (DE/AT/CH)").unwrap();
-        assert_eq!(dach.url, "https://mirror.example/dach.mbtiles", "Cache-Remote gemerged");
+        assert_eq!(
+            dach.url, "https://mirror.example/dach.mbtiles",
+            "Cache-Remote gemerged"
+        );
     }
 }

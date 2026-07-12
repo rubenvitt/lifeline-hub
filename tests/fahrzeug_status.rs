@@ -14,7 +14,16 @@ async fn setup() -> axum::Router {
     bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
         .await
         .unwrap();
-    build_router(AppState { pool, live: LiveHub::new(), karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu(), download_client: lifeline_hub::karte::download::download_client(), download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(), karten_service_url: None, karten_service_token: None })
+    build_router(AppState {
+        pool,
+        live: LiveHub::new(),
+        karten_dir: std::env::temp_dir(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_service_url: None,
+        karten_service_token: None,
+    })
 }
 
 async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) -> String {
@@ -43,7 +52,12 @@ async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) ->
         .to_string()
 }
 
-async fn benutzer_anlegen(app: &axum::Router, admin_cookie: &str, name: &str, org_rolle: &str) -> i64 {
+async fn benutzer_anlegen(
+    app: &axum::Router,
+    admin_cookie: &str,
+    name: &str,
+    org_rolle: &str,
+) -> i64 {
     let body = format!(
         r#"{{"anzeigename":"{name}","benutzername":"{name}","passwort":"{name}pw1","org_rolle":"{org_rolle}"}}"#
     );
@@ -62,7 +76,9 @@ async fn benutzer_anlegen(app: &axum::Router, admin_cookie: &str, name: &str, or
         .unwrap();
     assert_eq!(resp.status(), StatusCode::CREATED);
     let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    serde_json::from_slice::<Value>(&bytes).unwrap()["id"].as_i64().unwrap()
+    serde_json::from_slice::<Value>(&bytes).unwrap()["id"]
+        .as_i64()
+        .unwrap()
 }
 
 /// Generischer Request-Helfer: liefert (Status, JSON-Body).
@@ -73,7 +89,10 @@ async fn anfrage(
     cookie: &str,
     body: Option<&str>,
 ) -> (StatusCode, Value) {
-    let mut req = Request::builder().method(methode).uri(uri).header(header::COOKIE, cookie.to_string());
+    let mut req = Request::builder()
+        .method(methode)
+        .uri(uri)
+        .header(header::COOKIE, cookie.to_string());
     let body = match body {
         Some(b) => {
             req = req.header(header::CONTENT_TYPE, "application/json");
@@ -84,7 +103,10 @@ async fn anfrage(
     let resp = app.clone().oneshot(req.body(body).unwrap()).await.unwrap();
     let status = resp.status();
     let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
 }
 
 // ---------- Tests ----------
@@ -96,7 +118,12 @@ async fn bootstrap_seedet_status_katalog() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (status, json) = anfrage(&app, "GET", "/api/fahrzeug-status", &admin, None).await;
     assert_eq!(status, StatusCode::OK);
-    let labels: Vec<&str> = json.as_array().unwrap().iter().map(|s| s["label"].as_str().unwrap()).collect();
+    let labels: Vec<&str> = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s["label"].as_str().unwrap())
+        .collect();
     assert!(labels.contains(&"1 – Frei auf Funk"));
     assert!(labels.contains(&"3 – Auf Anfahrt"));
     assert_eq!(json.as_array().unwrap().len(), 10);
@@ -110,17 +137,30 @@ async fn alle_lesen_admin_legt_an() {
     let erika = login_cookie(&app, "erika", "erikapw1").await;
 
     // Nicht-Admin liest (für Dropdowns), darf aber nicht anlegen.
-    assert_eq!(anfrage(&app, "GET", "/api/fahrzeug-status", &erika, None).await.0, StatusCode::OK);
+    assert_eq!(
+        anfrage(&app, "GET", "/api/fahrzeug-status", &erika, None)
+            .await
+            .0,
+        StatusCode::OK
+    );
     let (status, _) = anfrage(
-        &app, "POST", "/api/fahrzeug-status", &erika,
+        &app,
+        "POST",
+        "/api/fahrzeug-status",
+        &erika,
         Some(r#"{"label":"X","kategorie":"gebunden"}"#),
-    ).await;
+    )
+    .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 
     let (status, _) = anfrage(
-        &app, "POST", "/api/fahrzeug-status", &admin,
+        &app,
+        "POST",
+        "/api/fahrzeug-status",
+        &admin,
         Some(r#"{"label":"Reserve","kategorie":"verfuegbar","sortier":90}"#),
-    ).await;
+    )
+    .await;
     assert_eq!(status, StatusCode::CREATED);
 }
 
@@ -129,9 +169,13 @@ async fn ungueltige_kategorie_ist_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (status, _) = anfrage(
-        &app, "POST", "/api/fahrzeug-status", &admin,
+        &app,
+        "POST",
+        "/api/fahrzeug-status",
+        &admin,
         Some(r#"{"label":"X","kategorie":"unsinn"}"#),
-    ).await;
+    )
+    .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
@@ -140,9 +184,13 @@ async fn fms_anker_ausserhalb_ist_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (status, _) = anfrage(
-        &app, "POST", "/api/fahrzeug-status", &admin,
+        &app,
+        "POST",
+        "/api/fahrzeug-status",
+        &admin,
         Some(r#"{"label":"X","kategorie":"gebunden","fms_anker":12}"#),
-    ).await;
+    )
+    .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
@@ -152,9 +200,13 @@ async fn dublette_label_ist_409() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     // '3 – Auf Anfahrt' existiert bereits aus dem Seed.
     let (status, _) = anfrage(
-        &app, "POST", "/api/fahrzeug-status", &admin,
+        &app,
+        "POST",
+        "/api/fahrzeug-status",
+        &admin,
         Some(r#"{"label":"3 – Auf Anfahrt","kategorie":"gebunden"}"#),
-    ).await;
+    )
+    .await;
     assert_eq!(status, StatusCode::CONFLICT);
 }
 
@@ -163,16 +215,33 @@ async fn deaktivieren_entfernt_aus_liste() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (_, json) = anfrage(
-        &app, "POST", "/api/fahrzeug-status", &admin,
+        &app,
+        "POST",
+        "/api/fahrzeug-status",
+        &admin,
         Some(r#"{"label":"Reserve","kategorie":"verfuegbar"}"#),
-    ).await;
+    )
+    .await;
     let id = json["id"].as_i64().unwrap();
 
     assert_eq!(
-        anfrage(&app, "POST", &format!("/api/fahrzeug-status/{id}/deaktivieren"), &admin, None).await.0,
+        anfrage(
+            &app,
+            "POST",
+            &format!("/api/fahrzeug-status/{id}/deaktivieren"),
+            &admin,
+            None
+        )
+        .await
+        .0,
         StatusCode::NO_CONTENT
     );
     let (_, liste) = anfrage(&app, "GET", "/api/fahrzeug-status", &admin, None).await;
-    let labels: Vec<&str> = liste.as_array().unwrap().iter().map(|s| s["label"].as_str().unwrap()).collect();
+    let labels: Vec<&str> = liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s["label"].as_str().unwrap())
+        .collect();
     assert!(!labels.contains(&"Reserve"));
 }

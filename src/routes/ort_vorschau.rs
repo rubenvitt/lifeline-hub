@@ -57,7 +57,9 @@ pub async fn vorschau(
 
     // Koordinaten-Plausibilität (400 bei out-of-range).
     if !(-90.0..=90.0).contains(&params.lat) || !(-180.0..=180.0).contains(&params.lon) {
-        return Err(AppError::Validation("lat/lon außerhalb des gültigen Bereichs".into()));
+        return Err(AppError::Validation(
+            "lat/lon außerhalb des gültigen Bereichs".into(),
+        ));
     }
 
     // Peilung: bedingungslos.
@@ -77,7 +79,10 @@ pub async fn vorschau(
 
     // Org-Einstellungen laden (DB-Fehler hier = echter 500; das `?` ist KEIN Geocoder-Fehlerpfad).
     let org = org_einst::laden_oder_default(&state.pool, einsatz.org_id).await?;
-    let base = org.geocoder_url.as_deref().unwrap_or(geocoding::NOMINATIM_DEFAULT);
+    let base = org
+        .geocoder_url
+        .as_deref()
+        .unwrap_or(geocoding::NOMINATIM_DEFAULT);
     // Ortsname best-effort: reverse() liefert bei offline/Timeout/Rate-Limit None — die Peilung
     // steht trotzdem, der Request wird nie wegen eines Geocoder-Fehlers abgebrochen.
     let ortsname = geocoding::reverse(&state.pool, base, params.lat, params.lon).await;

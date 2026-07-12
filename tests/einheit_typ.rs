@@ -14,7 +14,16 @@ async fn setup() -> axum::Router {
     bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
         .await
         .unwrap();
-    build_router(AppState { pool, live: LiveHub::new(), karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu(), download_client: lifeline_hub::karte::download::download_client(), download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(), karten_service_url: None, karten_service_token: None })
+    build_router(AppState {
+        pool,
+        live: LiveHub::new(),
+        karten_dir: std::env::temp_dir(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_service_url: None,
+        karten_service_token: None,
+    })
 }
 
 async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) -> String {
@@ -43,7 +52,12 @@ async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) ->
         .to_string()
 }
 
-async fn benutzer_anlegen(app: &axum::Router, admin_cookie: &str, name: &str, org_rolle: &str) -> i64 {
+async fn benutzer_anlegen(
+    app: &axum::Router,
+    admin_cookie: &str,
+    name: &str,
+    org_rolle: &str,
+) -> i64 {
     let body = format!(
         r#"{{"anzeigename":"{name}","benutzername":"{name}","passwort":"{name}pw1","org_rolle":"{org_rolle}"}}"#
     );
@@ -62,7 +76,9 @@ async fn benutzer_anlegen(app: &axum::Router, admin_cookie: &str, name: &str, or
         .unwrap();
     assert_eq!(resp.status(), StatusCode::CREATED);
     let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    serde_json::from_slice::<Value>(&bytes).unwrap()["id"].as_i64().unwrap()
+    serde_json::from_slice::<Value>(&bytes).unwrap()["id"]
+        .as_i64()
+        .unwrap()
 }
 
 /// Generischer Request-Helfer: liefert (Status, JSON-Body).
@@ -73,7 +89,10 @@ async fn anfrage(
     cookie: &str,
     body: Option<&str>,
 ) -> (StatusCode, Value) {
-    let mut req = Request::builder().method(methode).uri(uri).header(header::COOKIE, cookie.to_string());
+    let mut req = Request::builder()
+        .method(methode)
+        .uri(uri)
+        .header(header::COOKIE, cookie.to_string());
     let body = match body {
         Some(b) => {
             req = req.header(header::CONTENT_TYPE, "application/json");
@@ -84,7 +103,10 @@ async fn anfrage(
     let resp = app.clone().oneshot(req.body(body).unwrap()).await.unwrap();
     let status = resp.status();
     let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
 }
 
 // ---------- Tests ----------
@@ -95,14 +117,29 @@ async fn bootstrap_seedet_einheit_typen() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (status, json) = anfrage(&app, "GET", "/api/einheit-typen", &admin, None).await;
     assert_eq!(status, StatusCode::OK);
-    let labels: Vec<&str> = json.as_array().unwrap().iter().map(|t| t["label"].as_str().unwrap()).collect();
+    let labels: Vec<&str> = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["label"].as_str().unwrap())
+        .collect();
     assert_eq!(labels.len(), 5);
     assert!(labels.contains(&"Zug"));
     // Zug hat Soll 1/3/18; Sonstige hat null.
-    let zug = json.as_array().unwrap().iter().find(|t| t["label"] == "Zug").unwrap();
+    let zug = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["label"] == "Zug")
+        .unwrap();
     assert_eq!(zug["soll"]["fuehrer"], 1);
     assert_eq!(zug["soll"]["mannschaft"], 18);
-    let sonstige = json.as_array().unwrap().iter().find(|t| t["label"] == "Sonstige").unwrap();
+    let sonstige = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["label"] == "Sonstige")
+        .unwrap();
     assert!(sonstige["soll"].is_null());
 }
 
@@ -112,9 +149,22 @@ async fn alle_lesen_nur_admin_legt_an() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     benutzer_anlegen(&app, &admin, "erika", "keine").await;
     let erika = login_cookie(&app, "erika", "erikapw1").await;
-    assert_eq!(anfrage(&app, "GET", "/api/einheit-typen", &erika, None).await.0, StatusCode::OK);
     assert_eq!(
-        anfrage(&app, "POST", "/api/einheit-typen", &erika, Some(r#"{"label":"X"}"#)).await.0,
+        anfrage(&app, "GET", "/api/einheit-typen", &erika, None)
+            .await
+            .0,
+        StatusCode::OK
+    );
+    assert_eq!(
+        anfrage(
+            &app,
+            "POST",
+            "/api/einheit-typen",
+            &erika,
+            Some(r#"{"label":"X"}"#)
+        )
+        .await
+        .0,
         StatusCode::FORBIDDEN
     );
     assert_eq!(
@@ -128,8 +178,14 @@ async fn alle_lesen_nur_admin_legt_an() {
 async fn teilweise_soll_ist_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (status, _) = anfrage(&app, "POST", "/api/einheit-typen", &admin,
-        Some(r#"{"label":"X","soll_fuehrer":1}"#)).await;
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        "/api/einheit-typen",
+        &admin,
+        Some(r#"{"label":"X","soll_fuehrer":1}"#),
+    )
+    .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
@@ -139,7 +195,15 @@ async fn dublette_label_ist_409() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     // 'Zug' existiert aus dem Seed.
     assert_eq!(
-        anfrage(&app, "POST", "/api/einheit-typen", &admin, Some(r#"{"label":"Zug"}"#)).await.0,
+        anfrage(
+            &app,
+            "POST",
+            "/api/einheit-typen",
+            &admin,
+            Some(r#"{"label":"Zug"}"#)
+        )
+        .await
+        .0,
         StatusCode::CONFLICT
     );
 }
@@ -148,13 +212,33 @@ async fn dublette_label_ist_409() {
 async fn deaktivieren_entfernt_aus_liste() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (_, json) = anfrage(&app, "POST", "/api/einheit-typen", &admin, Some(r#"{"label":"Reserve"}"#)).await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        "/api/einheit-typen",
+        &admin,
+        Some(r#"{"label":"Reserve"}"#),
+    )
+    .await;
     let id = json["id"].as_i64().unwrap();
     assert_eq!(
-        anfrage(&app, "POST", &format!("/api/einheit-typen/{id}/deaktivieren"), &admin, None).await.0,
+        anfrage(
+            &app,
+            "POST",
+            &format!("/api/einheit-typen/{id}/deaktivieren"),
+            &admin,
+            None
+        )
+        .await
+        .0,
         StatusCode::NO_CONTENT
     );
     let (_, liste) = anfrage(&app, "GET", "/api/einheit-typen", &admin, None).await;
-    let labels: Vec<&str> = liste.as_array().unwrap().iter().map(|t| t["label"].as_str().unwrap()).collect();
+    let labels: Vec<&str> = liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["label"].as_str().unwrap())
+        .collect();
     assert!(!labels.contains(&"Reserve"));
 }

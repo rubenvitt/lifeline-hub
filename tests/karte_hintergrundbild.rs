@@ -27,7 +27,10 @@ async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
     let router = build_router(AppState {
         pool: pool.clone(),
         live: LiveHub::new(),
-        karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu(), download_client: lifeline_hub::karte::download::download_client(), download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_dir: std::env::temp_dir(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
         karten_service_url: None,
         karten_service_token: None,
     });
@@ -94,12 +97,24 @@ async fn json_anfrage(
 }
 
 async fn einsatz_anlegen(app: &axum::Router, cookie: &str) -> i64 {
-    let (s, v) = json_anfrage(app, "POST", "/api/einsaetze", cookie, Some(r#"{"bezeichnung":"Lage"}"#)).await;
+    let (s, v) = json_anfrage(
+        app,
+        "POST",
+        "/api/einsaetze",
+        cookie,
+        Some(r#"{"bezeichnung":"Lage"}"#),
+    )
+    .await;
     assert_eq!(s, StatusCode::CREATED, "einsatz_anlegen: {v:?}");
     v["id"].as_i64().unwrap()
 }
 
-async fn benutzer_anlegen(app: &axum::Router, admin_cookie: &str, name: &str, org_rolle: &str) -> i64 {
+async fn benutzer_anlegen(
+    app: &axum::Router,
+    admin_cookie: &str,
+    name: &str,
+    org_rolle: &str,
+) -> i64 {
     let body = format!(
         r#"{{"anzeigename":"{name}","benutzername":"{name}","passwort":"{name}pw1","org_rolle":"{org_rolle}"}}"#
     );
@@ -108,7 +123,13 @@ async fn benutzer_anlegen(app: &axum::Router, admin_cookie: &str, name: &str, or
     v["id"].as_i64().unwrap()
 }
 
-async fn rolle_setzen(app: &axum::Router, leit_cookie: &str, einsatz: i64, benutzer_id: i64, rolle: &str) {
+async fn rolle_setzen(
+    app: &axum::Router,
+    leit_cookie: &str,
+    einsatz: i64,
+    benutzer_id: i64,
+    rolle: &str,
+) {
     let body = format!(r#"{{"einsatz_rolle":"{rolle}"}}"#);
     let (s, _) = json_anfrage(
         app,
@@ -142,7 +163,8 @@ fn multipart_bild(
     body.extend_from_slice(b"\r\n");
     // ecken-Feld
     body.extend_from_slice(
-        format!("--{boundary}\r\nContent-Disposition: form-data; name=\"ecken\"\r\n\r\n").as_bytes(),
+        format!("--{boundary}\r\nContent-Disposition: form-data; name=\"ecken\"\r\n\r\n")
+            .as_bytes(),
     );
     body.extend_from_slice(ecken.as_bytes());
     body.extend_from_slice(b"\r\n");
@@ -168,7 +190,9 @@ async fn upload_bild(
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz_id}/karte/hintergrundbilder"))
+                .uri(format!(
+                    "/api/einsaetze/{einsatz_id}/karte/hintergrundbilder"
+                ))
                 .header(header::COOKIE, cookie)
                 .header(
                     header::CONTENT_TYPE,
@@ -181,7 +205,10 @@ async fn upload_bild(
         .unwrap();
     let status = resp.status();
     let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
 }
 
 /// GET Download → (Status, Header, Bytes)
@@ -207,7 +234,10 @@ async fn download_bild(
         .unwrap();
     let status = resp.status();
     let headers = resp.headers().clone();
-    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap().to_vec();
+    let bytes = to_bytes(resp.into_body(), usize::MAX)
+        .await
+        .unwrap()
+        .to_vec();
     (status, headers, bytes)
 }
 
@@ -242,7 +272,8 @@ async fn upload_liste_download_roundtrip() {
     let png = minimal_png();
 
     // Upload
-    let (status, bild) = upload_bild(&app, einsatz, &admin, "plan.png", "image/png", &png, ECKEN).await;
+    let (status, bild) =
+        upload_bild(&app, einsatz, &admin, "plan.png", "image/png", &png, ECKEN).await;
     assert_eq!(status, StatusCode::CREATED, "Upload: {bild:?}");
     let bild_id = bild["id"].as_i64().expect("id im Upload-Response");
     assert_eq!(bild["mime"].as_str(), Some("image/png"));
@@ -289,7 +320,11 @@ async fn beobachter_darf_nicht_hochladen() {
 
     let png = minimal_png();
     let (status, _) = upload_bild(&app, einsatz, &beo, "x.png", "image/png", &png, ECKEN).await;
-    assert_eq!(status, StatusCode::FORBIDDEN, "Beobachter muss 403 erhalten");
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "Beobachter muss 403 erhalten"
+    );
 }
 
 /// (c) Nicht-Bild (GIF-Magic) → 400 (erkenne_bild_mime schlägt an).
@@ -301,7 +336,8 @@ async fn nicht_bild_wird_abgelehnt() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
 
     // GIF-Magic: kein PNG/JPEG → erkenne_bild_mime schlägt fehl
-    let gif = b"GIF89a\x01\x00\x01\x00\x00\xff\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x00\x3b";
+    let gif =
+        b"GIF89a\x01\x00\x01\x00\x00\xff\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x00\x3b";
     let (status, _) = upload_bild(&app, einsatz, &admin, "bild.gif", "image/gif", gif, ECKEN).await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "GIF muss 400 ergeben");
 }

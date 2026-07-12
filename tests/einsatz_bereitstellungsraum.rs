@@ -29,7 +29,10 @@ async fn setup_mit_live() -> (axum::Router, sqlx::SqlitePool, LiveHub) {
     let router = build_router(AppState {
         pool: pool.clone(),
         live: live.clone(),
-        karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu(), download_client: lifeline_hub::karte::download::download_client(), download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_dir: std::env::temp_dir(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
         karten_service_url: None,
         karten_service_token: None,
     });
@@ -208,7 +211,8 @@ async fn status_aktiv_schreibt_etb_in_betrieb_genommen() {
 
     let etb = etb_inhalte(&app, &cookie, eid).await;
     assert!(
-        etb.iter().any(|t| t.contains("BR Süd") && t.contains("Betrieb")),
+        etb.iter()
+            .any(|t| t.contains("BR Süd") && t.contains("Betrieb")),
         "ETB muss BR-Name + 'Betrieb' enthalten: {etb:?}"
     );
 }
@@ -321,7 +325,10 @@ async fn austritt_entfernt_einheit_aus_detail() {
     .await;
     assert_eq!(s, StatusCode::OK);
     let einheiten = v["einheiten"].as_array().unwrap();
-    assert!(einheiten.is_empty(), "Nach Austritt keine Einheit mehr: {v}");
+    assert!(
+        einheiten.is_empty(),
+        "Nach Austritt keine Einheit mehr: {v}"
+    );
 }
 
 /// Auflösen blockt bei aktiver Belegung → 409.
@@ -551,7 +558,9 @@ async fn etb_inbetriebnahme_und_belegung() {
 
     let etb_nach_belegung = etb_inhalte(&app, &cookie, eid).await;
     assert!(
-        etb_nach_belegung.iter().any(|t| t.contains("Alpha-Zug") && t.contains("BR Alpha")),
+        etb_nach_belegung
+            .iter()
+            .any(|t| t.contains("Alpha-Zug") && t.contains("BR Alpha")),
         "ETB-Belegungs-Text fehlt Einheitenname + BR-Name: {etb_nach_belegung:?}"
     );
 }
@@ -577,7 +586,10 @@ async fn patch_stammfelder_kein_etb() {
     let etb = etb_inhalte(&app, &cookie, eid).await;
     // Einziger ETB sollte der Aktivierungs-Eintrag sein, kein PATCH-Eintrag.
     let patch_etb: Vec<_> = etb.iter().filter(|t| t.contains("Patch Neu")).collect();
-    assert!(patch_etb.is_empty(), "PATCH soll keinen ETB schreiben: {etb:?}");
+    assert!(
+        patch_etb.is_empty(),
+        "PATCH soll keinen ETB schreiben: {etb:?}"
+    );
 }
 
 /// Rechte-Matrix: Beobachter kann nicht schreiben → 403.
@@ -666,7 +678,11 @@ async fn abgeschlossener_einsatz_blockt_schreibrouten() {
         Some(&json!({"bezeichnung": "BR Neu"})),
     )
     .await;
-    assert_eq!(s, StatusCode::CONFLICT, "Anlegen bei abgeschlossenem Einsatz");
+    assert_eq!(
+        s,
+        StatusCode::CONFLICT,
+        "Anlegen bei abgeschlossenem Einsatz"
+    );
 
     let (s, _) = json_request(
         &app,
@@ -783,7 +799,10 @@ async fn belegung_einheit_feuert_einheit_sse() {
             sah_einheit = true;
         }
     }
-    assert!(sah_einheit, "Belegung muss ein `einheit`-SSE-Event mit objekt_id feuern");
+    assert!(
+        sah_einheit,
+        "Belegung muss ein `einheit`-SSE-Event mit objekt_id feuern"
+    );
 }
 
 /// Belegung eines Fahrzeugs feuert ein `fahrzeug`-SSE-Event.
@@ -821,7 +840,10 @@ async fn belegung_fahrzeug_feuert_fahrzeug_sse() {
             sah_fahrzeug = true;
         }
     }
-    assert!(sah_fahrzeug, "Belegung muss ein `fahrzeug`-SSE-Event mit objekt_id feuern");
+    assert!(
+        sah_fahrzeug,
+        "Belegung muss ein `fahrzeug`-SSE-Event mit objekt_id feuern"
+    );
 }
 
 /// Belegung mit nicht existierendem objekt_id → 404.

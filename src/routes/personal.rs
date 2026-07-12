@@ -111,7 +111,13 @@ pub async fn anlegen(
     Json(body): Json<PersonalBody>,
 ) -> Result<(StatusCode, Json<PersonalAnzeige>), AppError> {
     let n = normalisiere(body)?;
-    let p = repo::anlegen(&state.pool, benutzer.org_id, n.daten(), &n.qualifikation_ids).await?;
+    let p = repo::anlegen(
+        &state.pool,
+        benutzer.org_id,
+        n.daten(),
+        &n.qualifikation_ids,
+    )
+    .await?;
     let a = repo::laden_anzeige(&state.pool, benutzer.org_id, p.id).await?;
     Ok((StatusCode::CREATED, Json(a)))
 }
@@ -124,7 +130,14 @@ pub async fn aktualisieren(
     Json(body): Json<PersonalBody>,
 ) -> Result<Json<PersonalAnzeige>, AppError> {
     let n = normalisiere(body)?;
-    repo::aktualisiere(&state.pool, benutzer.org_id, id, n.daten(), &n.qualifikation_ids).await?;
+    repo::aktualisiere(
+        &state.pool,
+        benutzer.org_id,
+        id,
+        n.daten(),
+        &n.qualifikation_ids,
+    )
+    .await?;
     let a = repo::laden_anzeige(&state.pool, benutzer.org_id, id).await?;
     Ok(Json(a))
 }
@@ -136,7 +149,9 @@ pub async fn ausser_dienst(
     Path(id): Path<i64>,
 ) -> Result<Json<PersonalAnzeige>, AppError> {
     repo::setze_dienststatus(&state.pool, benutzer.org_id, id, false).await?;
-    Ok(Json(repo::laden_anzeige(&state.pool, benutzer.org_id, id).await?))
+    Ok(Json(
+        repo::laden_anzeige(&state.pool, benutzer.org_id, id).await?,
+    ))
 }
 
 /// POST /api/personal/{id}/in-dienst — Admin (Reaktivierung; Conflict bei Nummernkollision).
@@ -146,5 +161,7 @@ pub async fn in_dienst(
     Path(id): Path<i64>,
 ) -> Result<Json<PersonalAnzeige>, AppError> {
     repo::setze_dienststatus(&state.pool, benutzer.org_id, id, true).await?;
-    Ok(Json(repo::laden_anzeige(&state.pool, benutzer.org_id, id).await?))
+    Ok(Json(
+        repo::laden_anzeige(&state.pool, benutzer.org_id, id).await?,
+    ))
 }

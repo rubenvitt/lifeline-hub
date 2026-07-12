@@ -178,10 +178,10 @@ pub async fn aktualisiere(
     .bind(daten.groesse_gewicht)
     .bind(daten.antreff_ort)
     .bind(daten.notiz)
-    .bind(daten.halter_person_id.is_some())  // Flag: Halter-FK im Patch enthalten?
-    .bind(daten.halter_person_id.flatten())  // Wert (oder NULL bei Some(None))
-    .bind(daten.halter_kontakt.is_some())    // Flag: Halter-Kontakt im Patch enthalten?
-    .bind(daten.halter_kontakt.flatten())    // Wert (oder NULL bei Some(None))
+    .bind(daten.halter_person_id.is_some()) // Flag: Halter-FK im Patch enthalten?
+    .bind(daten.halter_person_id.flatten()) // Wert (oder NULL bei Some(None))
+    .bind(daten.halter_kontakt.is_some()) // Flag: Halter-Kontakt im Patch enthalten?
+    .bind(daten.halter_kontakt.flatten()) // Wert (oder NULL bei Some(None))
     .bind(geaendert_von)
     .bind(tier_id)
     .bind(einsatz_id)
@@ -279,24 +279,37 @@ mod tests {
     /// Minimal-Setup: eine Org, ein Benutzer, ein aktiver Einsatz. Liefert (benutzer_id, einsatz_id).
     async fn setup(pool: &SqlitePool) -> (i64, i64) {
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Test-Orga')")
-            .execute(pool).await.unwrap();
+            .execute(pool)
+            .await
+            .unwrap();
         let benutzer_id: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, aktiv) \
              VALUES (1, 'A', 'a', 'h', 'keiner', 'keine', 1) RETURNING id")
             .fetch_one(pool).await.unwrap();
         let einsatz_id: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung, status, begonnen_at) \
-             VALUES (1, 'Lage', 'aktiv', '2026-05-29') RETURNING id")
-            .fetch_one(pool).await.unwrap();
+             VALUES (1, 'Lage', 'aktiv', '2026-05-29') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         (benutzer_id, einsatz_id)
     }
 
     fn hund<'a>() -> NeueDaten<'a> {
         NeueDaten {
-            spezies: "hund", rasse_beschreibung: None, rufname: None, geschlecht: None,
-            alter_geschaetzt: None, farbe_beschreibung: None, kennzeichnung: None,
-            groesse_gewicht: None, halter_person_id: None, halter_kontakt: None,
-            antreff_ort: None, notiz: None,
+            spezies: "hund",
+            rasse_beschreibung: None,
+            rufname: None,
+            geschlecht: None,
+            alter_geschaetzt: None,
+            farbe_beschreibung: None,
+            kennzeichnung: None,
+            groesse_gewicht: None,
+            halter_person_id: None,
+            halter_kontakt: None,
+            antreff_ort: None,
+            notiz: None,
         }
     }
 
@@ -331,7 +344,10 @@ mod tests {
         let liste = liste(&pool, e, None, None, None).await.unwrap();
         assert!(liste.is_empty(), "storniertes Tier nicht in der Liste");
         let detail = laden(&pool, e, t1.id).await.unwrap();
-        assert!(detail.storniert_at.is_some(), "Detail liefert storniertes Tier");
+        assert!(
+            detail.storniert_at.is_some(),
+            "Detail liefert storniertes Tier"
+        );
     }
 
     #[tokio::test]
@@ -339,9 +355,22 @@ mod tests {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
         anlegen(&pool, e, b, "aktiv", hund()).await.unwrap();
-        anlegen(&pool, e, b, "aktiv", NeueDaten { spezies: "katze", ..hund() }).await.unwrap();
+        anlegen(
+            &pool,
+            e,
+            b,
+            "aktiv",
+            NeueDaten {
+                spezies: "katze",
+                ..hund()
+            },
+        )
+        .await
+        .unwrap();
         let t3 = anlegen(&pool, e, b, "aktiv", hund()).await.unwrap();
-        setze_status(&pool, e, t3.id, "vermisst", None, None, b).await.unwrap();
+        setze_status(&pool, e, t3.id, "vermisst", None, None, b)
+            .await
+            .unwrap();
 
         let vermisste = liste(&pool, e, Some("vermisst"), None, None).await.unwrap();
         assert_eq!(vermisste.len(), 1);
@@ -366,17 +395,42 @@ mod tests {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
         let halter = person_anlegen(&pool, e).await;
-        let t = anlegen(&pool, e, b, "aktiv", NeueDaten { halter_person_id: Some(halter), ..hund() }).await.unwrap();
+        let t = anlegen(
+            &pool,
+            e,
+            b,
+            "aktiv",
+            NeueDaten {
+                halter_person_id: Some(halter),
+                ..hund()
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(t.halter_person_id, Some(halter));
-        assert_eq!(t.halter_registrier_nr, Some(1), "Join löst R-Nr des Halters auf");
+        assert_eq!(
+            t.halter_registrier_nr,
+            Some(1),
+            "Join löst R-Nr des Halters auf"
+        );
         assert!(t.halter_storniert_at.is_none());
 
         // Halter-Person soft-löschen → FK bleibt zulässig, Join löst weiterhin auf.
         sqlx::query("UPDATE einsatz_person SET storniert_at = '2026-05-29 10:00:00' WHERE id = ?")
-            .bind(halter).execute(&pool).await.unwrap();
+            .bind(halter)
+            .execute(&pool)
+            .await
+            .unwrap();
         let nachher = laden(&pool, e, t.id).await.unwrap();
-        assert_eq!(nachher.halter_person_id, Some(halter), "Tier-Datensatz unverändert");
-        assert!(nachher.halter_storniert_at.is_some(), "Join zeigt storniert");
+        assert_eq!(
+            nachher.halter_person_id,
+            Some(halter),
+            "Tier-Datensatz unverändert"
+        );
+        assert!(
+            nachher.halter_storniert_at.is_some(),
+            "Join zeigt storniert"
+        );
     }
 
     #[tokio::test]
@@ -384,16 +438,41 @@ mod tests {
         let pool = test_pool().await;
         let (b, e) = setup(&pool).await;
         let halter = person_anlegen(&pool, e).await;
-        let t = anlegen(&pool, e, b, "aktiv", NeueDaten { halter_person_id: Some(halter), ..hund() }).await.unwrap();
+        let t = anlegen(
+            &pool,
+            e,
+            b,
+            "aktiv",
+            NeueDaten {
+                halter_person_id: Some(halter),
+                ..hund()
+            },
+        )
+        .await
+        .unwrap();
         // FK → Freitext: FK auf NULL, Kontakt setzen.
-        let nachher = aktualisiere(&pool, e, t.id, b, PatchDaten {
-            halter_person_id: Some(None),
-            halter_kontakt: Some(Some("Frau Müller, 0170-123")),
-            ..PatchDaten::default()
-        }).await.unwrap();
+        let nachher = aktualisiere(
+            &pool,
+            e,
+            t.id,
+            b,
+            PatchDaten {
+                halter_person_id: Some(None),
+                halter_kontakt: Some(Some("Frau Müller, 0170-123")),
+                ..PatchDaten::default()
+            },
+        )
+        .await
+        .unwrap();
         assert!(nachher.halter_person_id.is_none());
-        assert_eq!(nachher.halter_kontakt.as_deref(), Some("Frau Müller, 0170-123"));
-        assert!(nachher.halter_registrier_nr.is_none(), "kein FK → kein Join-Ergebnis");
+        assert_eq!(
+            nachher.halter_kontakt.as_deref(),
+            Some("Frau Müller, 0170-123")
+        );
+        assert!(
+            nachher.halter_registrier_nr.is_none(),
+            "kein FK → kein Join-Ergebnis"
+        );
     }
 
     #[tokio::test]
@@ -402,18 +481,36 @@ mod tests {
         let (b, e) = setup(&pool).await;
         let t = anlegen(&pool, e, b, "aktiv", hund()).await.unwrap();
         // Ohne abschluss_grund würde der DB-CHECK verletzt → wir übergeben ihn.
-        setze_status(&pool, e, t.id, "abgeschlossen", Some("uebergabe_tierarzt"), Some("Tierarzt Müller"), b).await.unwrap();
+        setze_status(
+            &pool,
+            e,
+            t.id,
+            "abgeschlossen",
+            Some("uebergabe_tierarzt"),
+            Some("Tierarzt Müller"),
+            b,
+        )
+        .await
+        .unwrap();
         let nachher = laden(&pool, e, t.id).await.unwrap();
         assert_eq!(nachher.status, TierStatus::Abgeschlossen);
-        assert_eq!(nachher.abschluss_grund, Some(AbschlussGrund::UebergabeTierarzt));
+        assert_eq!(
+            nachher.abschluss_grund,
+            Some(AbschlussGrund::UebergabeTierarzt)
+        );
         assert_eq!(nachher.abschluss_ziel.as_deref(), Some("Tierarzt Müller"));
 
         // Korrektur zurück → Status ändert sich, Abschluss-Felder bleiben.
-        setze_status(&pool, e, t.id, "aktiv", None, None, b).await.unwrap();
+        setze_status(&pool, e, t.id, "aktiv", None, None, b)
+            .await
+            .unwrap();
         let korrigiert = laden(&pool, e, t.id).await.unwrap();
         assert_eq!(korrigiert.status, TierStatus::Aktiv);
-        assert_eq!(korrigiert.abschluss_grund, Some(AbschlussGrund::UebergabeTierarzt),
-            "Abschluss-Grund bleibt als Audit-Spur erhalten");
+        assert_eq!(
+            korrigiert.abschluss_grund,
+            Some(AbschlussGrund::UebergabeTierarzt),
+            "Abschluss-Grund bleibt als Audit-Spur erhalten"
+        );
     }
 
     #[tokio::test]

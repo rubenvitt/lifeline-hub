@@ -20,7 +20,9 @@ fn fmt(t: DateTime<Utc>) -> String {
 
 /// Parst einen DB-Zeitstempel; bei Unparsbarkeit `None` (defensiv).
 fn parse(s: &str) -> Option<DateTime<Utc>> {
-    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").ok().map(|n| n.and_utc())
+    NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
+        .ok()
+        .map(|n| n.and_utc())
 }
 
 /// Ein Scheduler-Durchlauf für den Zeitpunkt `jetzt`. Publiziert je fälliger
@@ -102,18 +104,25 @@ mod tests {
     use crate::erinnerung::repo::ErinnerungDaten;
 
     fn t(s: &str) -> DateTime<Utc> {
-        NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").unwrap().and_utc()
+        NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
+            .unwrap()
+            .and_utc()
     }
 
     async fn setup(pool: &SqlitePool) -> (i64, i64) {
         sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
-            .execute(pool).await.unwrap();
+            .execute(pool)
+            .await
+            .unwrap();
         let b: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) VALUES (1,'L','l','h') RETURNING id")
             .fetch_one(pool).await.unwrap();
         let e: i64 = sqlx::query_scalar(
-            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id")
-            .fetch_one(pool).await.unwrap();
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         (b, e)
     }
 
@@ -122,10 +131,23 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         let live = LiveHub::new();
-        repo::anlegen(&pool, e, b, ErinnerungDaten {
-            titel: "Einmal", beschreibung: None, faellig_at: "2026-06-11 10:00:00",
-            intervall_minuten: None, empfaenger_funktion: None, bezug_typ: None, bezug_id: None,
-        }, "2026-06-11 09:00:00").await.unwrap();
+        repo::anlegen(
+            &pool,
+            e,
+            b,
+            ErinnerungDaten {
+                titel: "Einmal",
+                beschreibung: None,
+                faellig_at: "2026-06-11 10:00:00",
+                intervall_minuten: None,
+                empfaenger_funktion: None,
+                bezug_typ: None,
+                bezug_id: None,
+            },
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
 
         // Vor Fälligkeit: nichts.
         assert_eq!(tick_einmal(&pool, &live, t("2026-06-11 09:30:00")).await, 0);
@@ -140,14 +162,29 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         let live = LiveHub::new();
-        let r = repo::anlegen(&pool, e, b, ErinnerungDaten {
-            titel: "Lagemeldung", beschreibung: None, faellig_at: "2026-06-11 10:00:00",
-            intervall_minuten: Some(30), empfaenger_funktion: None, bezug_typ: None, bezug_id: None,
-        }, "2026-06-11 09:00:00").await.unwrap();
+        let r = repo::anlegen(
+            &pool,
+            e,
+            b,
+            ErinnerungDaten {
+                titel: "Lagemeldung",
+                beschreibung: None,
+                faellig_at: "2026-06-11 10:00:00",
+                intervall_minuten: Some(30),
+                empfaenger_funktion: None,
+                bezug_typ: None,
+                bezug_id: None,
+            },
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
 
         // Server „2h weg": jetzt 12:10 → ein Nudge, nächster Slot 12:30 (kein Sturm).
         assert_eq!(tick_einmal(&pool, &live, t("2026-06-11 12:10:00")).await, 1);
-        let nachher = repo::laden(&pool, r.id, "2026-06-11 12:10:00").await.unwrap();
+        let nachher = repo::laden(&pool, r.id, "2026-06-11 12:10:00")
+            .await
+            .unwrap();
         assert_eq!(nachher.faellig_at, "2026-06-11 12:30:00");
         // Sofortiger zweiter Tick: nichts (12:30 > 12:10).
         assert_eq!(tick_einmal(&pool, &live, t("2026-06-11 12:11:00")).await, 0);
@@ -158,11 +195,31 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         let live = LiveHub::new();
-        let r = repo::anlegen(&pool, e, b, ErinnerungDaten {
-            titel: "X", beschreibung: None, faellig_at: "2026-06-11 10:00:00",
-            intervall_minuten: None, empfaenger_funktion: None, bezug_typ: None, bezug_id: None,
-        }, "2026-06-11 09:00:00").await.unwrap();
-        repo::status_setzen(&pool, r.id, crate::erinnerung::STATUS_ERLEDIGT, "2026-06-11 09:30:00").await.unwrap();
+        let r = repo::anlegen(
+            &pool,
+            e,
+            b,
+            ErinnerungDaten {
+                titel: "X",
+                beschreibung: None,
+                faellig_at: "2026-06-11 10:00:00",
+                intervall_minuten: None,
+                empfaenger_funktion: None,
+                bezug_typ: None,
+                bezug_id: None,
+            },
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+        repo::status_setzen(
+            &pool,
+            r.id,
+            crate::erinnerung::STATUS_ERLEDIGT,
+            "2026-06-11 09:30:00",
+        )
+        .await
+        .unwrap();
 
         assert_eq!(tick_einmal(&pool, &live, t("2026-06-11 10:01:00")).await, 0);
     }
@@ -175,10 +232,23 @@ mod tests {
         let (b, e) = setup(&pool).await;
         let live = LiveHub::new();
         let mut rx = live.abonniere(e);
-        repo::anlegen(&pool, e, b, ErinnerungDaten {
-            titel: "Lagemeldung", beschreibung: None, faellig_at: "2026-06-11 10:00:00",
-            intervall_minuten: None, empfaenger_funktion: None, bezug_typ: None, bezug_id: None,
-        }, "2026-06-11 09:00:00").await.unwrap();
+        repo::anlegen(
+            &pool,
+            e,
+            b,
+            ErinnerungDaten {
+                titel: "Lagemeldung",
+                beschreibung: None,
+                faellig_at: "2026-06-11 10:00:00",
+                intervall_minuten: None,
+                empfaenger_funktion: None,
+                bezug_typ: None,
+                bezug_id: None,
+            },
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
 
         assert_eq!(tick_einmal(&pool, &live, t("2026-06-11 10:01:00")).await, 1);
         let nachricht = rx.recv().await.unwrap();
@@ -197,19 +267,51 @@ mod tests {
         let mut rx = live.abonniere(e);
 
         // Bestätigungspflichtige Sofortmeldung + Auto-Frist-Erinnerung mit Bezug.
-        let m = crate::meldung::repo::anlegen(&pool, e, b, crate::meldung::repo::MeldungDaten {
-            absender: "Florian Nord 1", empfaenger: None, meldeweg: "funk", inhalt: "MANV",
-            meldungsart: crate::meldung::ART_SOFORTMELDUNG, prioritaet: crate::meldung::PRIO_SOFORT,
-            richtung: "intern",
-            ereigniszeit: "2026-06-11 09:55:00", eingang_at: "2026-06-11 09:55:00",
-            bestaetigung_pflicht: true, bestaetigung_frist_at: Some("2026-06-11 10:00:00"),
-        }).await.unwrap();
-        repo::anlegen_aus_frist(&pool, e, b, OBJEKT_MELDUNG, m.id, "Nachfass", "2026-06-11 10:00:00", "2026-06-11 09:55:00").await.unwrap();
+        let m = crate::meldung::repo::anlegen(
+            &pool,
+            e,
+            b,
+            crate::meldung::repo::MeldungDaten {
+                absender: "Florian Nord 1",
+                empfaenger: None,
+                meldeweg: "funk",
+                inhalt: "MANV",
+                meldungsart: crate::meldung::ART_SOFORTMELDUNG,
+                prioritaet: crate::meldung::PRIO_SOFORT,
+                richtung: "intern",
+                ereigniszeit: "2026-06-11 09:55:00",
+                eingang_at: "2026-06-11 09:55:00",
+                bestaetigung_pflicht: true,
+                bestaetigung_frist_at: Some("2026-06-11 10:00:00"),
+            },
+        )
+        .await
+        .unwrap();
+        repo::anlegen_aus_frist(
+            &pool,
+            e,
+            b,
+            OBJEKT_MELDUNG,
+            m.id,
+            "Nachfass",
+            "2026-06-11 10:00:00",
+            "2026-06-11 09:55:00",
+        )
+        .await
+        .unwrap();
 
         // Tick nach Frist: ein Auslösen, Meldung eskaliert, und ein 'sofortmeldung'-Event folgt.
         assert_eq!(tick_einmal(&pool, &live, t("2026-06-11 10:01:00")).await, 1);
-        assert!(crate::meldung::repo::laden(&pool, m.id, "2026-06-11 10:01:00").await.unwrap().eskaliert);
-        let mut tags = vec![rx.recv().await.unwrap().event, rx.recv().await.unwrap().event];
+        assert!(
+            crate::meldung::repo::laden(&pool, m.id, "2026-06-11 10:01:00")
+                .await
+                .unwrap()
+                .eskaliert
+        );
+        let mut tags = vec![
+            rx.recv().await.unwrap().event,
+            rx.recv().await.unwrap().event,
+        ];
         tags.sort();
         assert_eq!(tags, vec!["erinnerung", "sofortmeldung"]);
     }
@@ -224,14 +326,38 @@ mod tests {
         let (b, e) = setup(&pool).await;
         let live = LiveHub::new();
         let mut rx = live.abonniere(e);
-        let m = crate::meldung::repo::anlegen(&pool, e, b, crate::meldung::repo::MeldungDaten {
-            absender: "Florian Nord 1", empfaenger: None, meldeweg: "funk", inhalt: "MANV",
-            meldungsart: crate::meldung::ART_SOFORTMELDUNG, prioritaet: crate::meldung::PRIO_SOFORT,
-            richtung: "intern",
-            ereigniszeit: "2026-06-11 09:55:00", eingang_at: "2026-06-11 09:55:00",
-            bestaetigung_pflicht: true, bestaetigung_frist_at: Some("2026-06-11 10:00:00"),
-        }).await.unwrap();
-        repo::anlegen_aus_frist(&pool, e, b, OBJEKT_MELDUNG, m.id, "Nachfass", "2026-06-11 10:00:00", "2026-06-11 09:55:00").await.unwrap();
+        let m = crate::meldung::repo::anlegen(
+            &pool,
+            e,
+            b,
+            crate::meldung::repo::MeldungDaten {
+                absender: "Florian Nord 1",
+                empfaenger: None,
+                meldeweg: "funk",
+                inhalt: "MANV",
+                meldungsart: crate::meldung::ART_SOFORTMELDUNG,
+                prioritaet: crate::meldung::PRIO_SOFORT,
+                richtung: "intern",
+                ereigniszeit: "2026-06-11 09:55:00",
+                eingang_at: "2026-06-11 09:55:00",
+                bestaetigung_pflicht: true,
+                bestaetigung_frist_at: Some("2026-06-11 10:00:00"),
+            },
+        )
+        .await
+        .unwrap();
+        repo::anlegen_aus_frist(
+            &pool,
+            e,
+            b,
+            OBJEKT_MELDUNG,
+            m.id,
+            "Nachfass",
+            "2026-06-11 10:00:00",
+            "2026-06-11 09:55:00",
+        )
+        .await
+        .unwrap();
 
         // Erster Tick: ein Auslösen, zwei Events (erinnerung + sofortmeldung) — drainen.
         assert_eq!(tick_einmal(&pool, &live, t("2026-06-11 10:01:00")).await, 1);
@@ -239,7 +365,10 @@ mod tests {
         rx.recv().await.unwrap();
         // Zweiter Tick: Reminder ist one-shot ausgelöst → kein Nudge, kein erneuter Alarm.
         assert_eq!(tick_einmal(&pool, &live, t("2026-06-11 10:02:00")).await, 0);
-        assert!(rx.try_recv().is_err(), "kein weiteres Event auf dem Folge-Tick");
+        assert!(
+            rx.try_recv().is_err(),
+            "kein weiteres Event auf dem Folge-Tick"
+        );
     }
 
     /// Bereits bestätigt → Tick eskaliert NICHT (Erinnerung wurde geschlossen, Meldung quittiert).
@@ -249,19 +378,50 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         let live = LiveHub::new();
-        let m = crate::meldung::repo::anlegen(&pool, e, b, crate::meldung::repo::MeldungDaten {
-            absender: "Florian Nord 1", empfaenger: None, meldeweg: "funk", inhalt: "MANV",
-            meldungsart: crate::meldung::ART_SOFORTMELDUNG, prioritaet: crate::meldung::PRIO_SOFORT,
-            richtung: "intern",
-            ereigniszeit: "2026-06-11 09:55:00", eingang_at: "2026-06-11 09:55:00",
-            bestaetigung_pflicht: true, bestaetigung_frist_at: Some("2026-06-11 10:00:00"),
-        }).await.unwrap();
-        repo::anlegen_aus_frist(&pool, e, b, OBJEKT_MELDUNG, m.id, "Nachfass", "2026-06-11 10:00:00", "2026-06-11 09:55:00").await.unwrap();
+        let m = crate::meldung::repo::anlegen(
+            &pool,
+            e,
+            b,
+            crate::meldung::repo::MeldungDaten {
+                absender: "Florian Nord 1",
+                empfaenger: None,
+                meldeweg: "funk",
+                inhalt: "MANV",
+                meldungsart: crate::meldung::ART_SOFORTMELDUNG,
+                prioritaet: crate::meldung::PRIO_SOFORT,
+                richtung: "intern",
+                ereigniszeit: "2026-06-11 09:55:00",
+                eingang_at: "2026-06-11 09:55:00",
+                bestaetigung_pflicht: true,
+                bestaetigung_frist_at: Some("2026-06-11 10:00:00"),
+            },
+        )
+        .await
+        .unwrap();
+        repo::anlegen_aus_frist(
+            &pool,
+            e,
+            b,
+            OBJEKT_MELDUNG,
+            m.id,
+            "Nachfass",
+            "2026-06-11 10:00:00",
+            "2026-06-11 09:55:00",
+        )
+        .await
+        .unwrap();
         // Bestätigen schließt die Erinnerung + quittiert die Meldung.
-        crate::meldung::repo::bestaetige(&pool, 1, e, m.id, b, "2026-06-11 09:58:00").await.unwrap();
+        crate::meldung::repo::bestaetige(&pool, 1, e, m.id, b, "2026-06-11 09:58:00")
+            .await
+            .unwrap();
 
         // Kein fälliger Nudge mehr (Erinnerung erledigt), keine Eskalation.
         assert_eq!(tick_einmal(&pool, &live, t("2026-06-11 10:01:00")).await, 0);
-        assert!(!crate::meldung::repo::laden(&pool, m.id, "2026-06-11 10:01:00").await.unwrap().eskaliert);
+        assert!(
+            !crate::meldung::repo::laden(&pool, m.id, "2026-06-11 10:01:00")
+                .await
+                .unwrap()
+                .eskaliert
+        );
     }
 }

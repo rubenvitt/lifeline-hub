@@ -5,21 +5,21 @@ use crate::error::AppError;
 use crate::karte::download::{self, Fortschritt};
 use crate::karte::proxy;
 use crate::karte::quellen;
-use crate::karte::tile_cache;
 use crate::karte::registry::repo::{
     self, OfflineKarte, OfflineKarteEingabe, OnlineQuelle, OnlineQuelleEingabe,
 };
+use crate::karte::tile_cache;
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
 use std::collections::{HashMap, HashSet};
 use std::path::{Component, Path as FsPath};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use utoipa::ToSchema;
 
 /// Antwort von `GET /api/karte/config`. Liefert NUR, was die Karte zur Laufzeit braucht —
 /// NICHT den Server-Dateipfad der Offline-Kartendatei. Shape ist eingefroren (Frontend-Vertrag,
@@ -97,22 +97,27 @@ pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAnt
     // Multi-Region (LFH-188): die Offline-Karte ist die Vereinigung ALLER bereiten Regionen. Je
     // Region ein region-adressierter Tile-Endpoint mit eigenem Cache-Bust-Token; das Frontend bindet
     // je Region eine eigene Vector-Source. Kein Datei-Open — Werte sind operator-deklariert (LFH-185).
-    let mut offline_regionen: Vec<OfflineRegionConfig> = repo::sichtbare_offline_karten(&state.pool)
-        .await?
-        .into_iter()
-        .map(|r| {
-            // Cache-Bust-Token URL-safe halten (geaendert_at enthält Leerzeichen/Doppelpunkte).
-            let v: String = r.version.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
-            OfflineRegionConfig {
-                tiles_url: format!("/api/karte/offline/{}/tiles/{{z}}/{{x}}/{{y}}?v={v}", r.id),
-                karte_id: r.id,
-                name: r.name,
-                attribution: r.lizenz,
-                format: grob_format(&r.format).to_string(),
-                maxzoom: REGION_MAXZOOM,
-            }
-        })
-        .collect();
+    let mut offline_regionen: Vec<OfflineRegionConfig> =
+        repo::sichtbare_offline_karten(&state.pool)
+            .await?
+            .into_iter()
+            .map(|r| {
+                // Cache-Bust-Token URL-safe halten (geaendert_at enthält Leerzeichen/Doppelpunkte).
+                let v: String = r
+                    .version
+                    .chars()
+                    .filter(|c| c.is_ascii_alphanumeric())
+                    .collect();
+                OfflineRegionConfig {
+                    tiles_url: format!("/api/karte/offline/{}/tiles/{{z}}/{{x}}/{{y}}?v={v}", r.id),
+                    karte_id: r.id,
+                    name: r.name,
+                    attribution: r.lizenz,
+                    format: grob_format(&r.format).to_string(),
+                    maxzoom: REGION_MAXZOOM,
+                }
+            })
+            .collect();
     // Welt-Übersicht (LFH-207): falls eingebettet, IMMER als unterste Basis-Ebene voranstellen
     // (Low-Zoom z2–6). Damit ist die Karte global nie leer; die Regional-Packs (maxzoom 14) zeichnen
     // sich mit Straßendetail darüber. `karte_id: 0` ist synthetisch (DB-ids ≥ 1 → kollisionsfrei).
@@ -180,7 +185,8 @@ pub async fn offline_tiles_region(
     State(state): State<AppState>,
     Path((karte_id, z, x, y)): Path<(i64, i64, i64, i64)>,
 ) -> Result<Response, AppError> {
-    let Some((pfad_rel, format)) = repo::offline_karte_pfad_und_format(&state.pool, karte_id).await?
+    let Some((pfad_rel, format)) =
+        repo::offline_karte_pfad_und_format(&state.pool, karte_id).await?
     else {
         return Ok(StatusCode::NO_CONTENT.into_response());
     };
@@ -195,7 +201,15 @@ pub async fn offline_welt_tiles(
     State(state): State<AppState>,
     Path((z, x, y)): Path<(i64, i64, i64)>,
 ) -> Result<Response, AppError> {
-    serve_offline_tile(&state, crate::karte::assets::WELT_UEBERSICHT_DATEI, "pbf", z, x, y).await
+    serve_offline_tile(
+        &state,
+        crate::karte::assets::WELT_UEBERSICHT_DATEI,
+        "pbf",
+        z,
+        x,
+        y,
+    )
+    .await
 }
 
 /// Liest eine Kachel aus einer relativen MBTiles-Datei unter `karten_dir` und baut die Antwort.
@@ -321,7 +335,9 @@ fn embedded_antwort(pfad: &str, content_type: &str, if_none_match: Option<&str>)
 
 /// Liest den `If-None-Match`-Header (für die Conditional-Requests der eingebetteten Assets).
 fn if_none_match(headers: &HeaderMap) -> Option<&str> {
-    headers.get(header::IF_NONE_MATCH).and_then(|v| v.to_str().ok())
+    headers
+        .get(header::IF_NONE_MATCH)
+        .and_then(|v| v.to_str().ok())
 }
 
 /// GET /api/karte/offline/fonts/{fontstack}/{datei} — eingebettete SDF-Glyphs (OFL).
@@ -422,7 +438,10 @@ mod offline_assets_tests {
     async fn offline_sprite_liefert_json_und_png() {
         let j = offline_sprite(HeaderMap::new(), axum::extract::Path("basemap.json".into())).await;
         assert_eq!(j.status(), StatusCode::OK);
-        assert_eq!(j.headers().get(header::CONTENT_TYPE).unwrap(), "application/json");
+        assert_eq!(
+            j.headers().get(header::CONTENT_TYPE).unwrap(),
+            "application/json"
+        );
         let p = offline_sprite(HeaderMap::new(), axum::extract::Path("basemap.png".into())).await;
         assert_eq!(p.status(), StatusCode::OK);
         assert_eq!(p.headers().get(header::CONTENT_TYPE).unwrap(), "image/png");
@@ -438,9 +457,12 @@ mod offline_assets_tests {
             StatusCode::BAD_REQUEST
         );
         assert_eq!(
-            offline_sprite(HeaderMap::new(), axum::extract::Path("../geheim.png".into()))
-                .await
-                .status(),
+            offline_sprite(
+                HeaderMap::new(),
+                axum::extract::Path("../geheim.png".into())
+            )
+            .await
+            .status(),
             StatusCode::BAD_REQUEST
         );
     }
@@ -474,7 +496,11 @@ mod offline_assets_tests {
     // Nicht-passender ETag → normale 200-Auslieferung.
     #[test]
     fn embedded_antwort_200_bei_fremdem_if_none_match() {
-        let r = embedded_antwort("sprites/basemap.json", "application/json", Some("\"veraltet\""));
+        let r = embedded_antwort(
+            "sprites/basemap.json",
+            "application/json",
+            Some("\"veraltet\""),
+        );
         assert_eq!(r.status(), StatusCode::OK);
     }
 }
@@ -564,9 +590,7 @@ fn validiere_online(body: OnlineQuelleBody) -> Result<OnlineQuelleEingabe, AppEr
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .ok_or_else(|| {
-            AppError::Validation("Attribution ist Pflicht (Lizenzauflage)".into())
-        })?
+        .ok_or_else(|| AppError::Validation("Attribution ist Pflicht (Lizenzauflage)".into()))?
         .to_string();
     let proxy_effektiv = body.proxy;
     // Proxied Quellen (key-basiert): URL roh speichern (kein Url-Roundtrip — würde `{}`
@@ -694,7 +718,10 @@ pub struct OfflineKarteAntwort {
 /// `None`, wenn die Quelle keine Content-Length lieferte (`0` = unbekannt).
 fn fortschritt_werte(f: &Fortschritt) -> (i64, Option<i64>) {
     let g = f.gesamt.load(Ordering::Relaxed);
-    (f.geladen.load(Ordering::Relaxed) as i64, (g > 0).then_some(g as i64))
+    (
+        f.geladen.load(Ordering::Relaxed) as i64,
+        (g > 0).then_some(g as i64),
+    )
 }
 
 /// GET /api/karte/offline-karten — alle Offline-Karten. Lesen: admin ODER Führungskraft (read-only).
@@ -719,9 +746,15 @@ mod update_check_tests {
 
     fn eintrag(name: &str, url: &str, sha256: Option<String>) -> OfflineKatalogEintrag {
         OfflineKatalogEintrag {
-            name: name.into(), url: url.into(), region: "X".into(), groesse: 1_000,
-            lizenz: "© OSM (ODbL)".into(), kachel_schema: "shortbread".into(), quelle: "t".into(),
-            sha256, gruppe: None,
+            name: name.into(),
+            url: url.into(),
+            region: "X".into(),
+            groesse: 1_000,
+            lizenz: "© OSM (ODbL)".into(),
+            kachel_schema: "shortbread".into(),
+            quelle: "t".into(),
+            sha256,
+            gruppe: None,
         }
     }
 
@@ -754,7 +787,10 @@ mod update_check_tests {
             Some("https://mirror.example/switzerland.20260701.mbtiles"),
             &katalog,
         );
-        assert_eq!(hit.map(|e| e.url.as_str()), Some("https://mirror.example/switzerland.20260706.mbtiles"));
+        assert_eq!(
+            hit.map(|e| e.url.as_str()),
+            Some("https://mirror.example/switzerland.20260706.mbtiles")
+        );
     }
 
     #[test]
@@ -765,7 +801,12 @@ mod update_check_tests {
             Some("a".repeat(64)),
         )];
         // Gleiche URL → aktuell, kein Update.
-        assert!(finde_update_eintrag("Schweiz", Some("https://mirror.example/switzerland.20260706.mbtiles"), &katalog).is_none());
+        assert!(finde_update_eintrag(
+            "Schweiz",
+            Some("https://mirror.example/switzerland.20260706.mbtiles"),
+            &katalog
+        )
+        .is_none());
         // Keine quell_url (eigene URL registriert) → gilt als aktuell.
         assert!(finde_update_eintrag("Schweiz", None, &katalog).is_none());
     }
@@ -853,7 +894,9 @@ pub async fn offline_registrieren(
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .ok_or_else(|| AppError::Validation("Lizenz/Attribution ist Pflicht (offline sichtbar)".into()))?
+        .ok_or_else(|| {
+            AppError::Validation("Lizenz/Attribution ist Pflicht (offline sichtbar)".into())
+        })?
         .to_string();
     // Kachel-Schema ist erweiterbar; ohne Angabe gilt der Shortbread-Default (Migration-Default).
     let kachel_schema = body
@@ -971,7 +1014,10 @@ pub async fn offline_vorhandene(
         .into_iter()
         .map(|k| k.pfad)
         .collect();
-    Ok(Json(finde_nicht_registrierte(&state.karten_dir, &registrierte)))
+    Ok(Json(finde_nicht_registrierte(
+        &state.karten_dir,
+        &registrierte,
+    )))
 }
 
 /// GET /api/karte/offline-karten/katalog — kuratierter Download-Vorschlagskatalog (Admin).
@@ -987,7 +1033,10 @@ pub async fn offline_katalog(
     // Kurz getimeboxter Client (fachebenen: 8 s), NICHT der GB-download_client (kein Globaltimeout) —
     // der Manifest-Abruf ist ein kleiner JSON-Request und darf den Handler nicht lange blockieren.
     let client = &state.fachebenen.client;
-    let katalog = if params.get("frisch").is_some_and(|v| v == "1" || v == "true") {
+    let katalog = if params
+        .get("frisch")
+        .is_some_and(|v| v == "1" || v == "true")
+    {
         crate::karte::katalog::effektiver_katalog_frisch(client).await
     } else {
         crate::karte::katalog::effektiver_katalog(client).await
@@ -1070,7 +1119,9 @@ async fn finalisiere_in_place_download(
     let ziel = karten_dir.join(&dateiname);
     // Atomarer Swap: POSIX-rename ersetzt die Zieldatei in-place; die alte Inode bleibt für bereits
     // geöffnete Reader gültig, bis invalidate_reader() den gecachten Pool verwirft.
-    tokio::fs::rename(&part, &ziel).await.map_err(|e| format!("Rename: {e}"))?;
+    tokio::fs::rename(&part, &ziel)
+        .await
+        .map_err(|e| format!("Rename: {e}"))?;
     // Reader-Cache VOR dem DB-Update verwerfen: die Datei hat eine neue Inode, der gecachte Pool
     // (per Pfad gekeyt) hält sonst das alte Handle → würde die alte Datei weiterservieren.
     crate::karte::mbtiles::invalidate_reader().await;
@@ -1109,7 +1160,10 @@ async fn verarbeite_in_place_ergebnis(
         .await
         {
             Ok(()) => {
-                tracing::info!("Offline-Karte {id}: In-Place-Reload fertig ({} Bytes)", erg.groesse)
+                tracing::info!(
+                    "Offline-Karte {id}: In-Place-Reload fertig ({} Bytes)",
+                    erg.groesse
+                )
             }
             Err(e) => {
                 tracing::error!("In-Place-Swap {id} fehlgeschlagen: {e}");
@@ -1430,9 +1484,10 @@ pub async fn offline_bauen(
 /// anzeigt statt einen Fehlerzustand rendern zu müssen. Die Service-Antwort wird roh
 /// durchgereicht (kein Reshape) — Format ist Vertragssache des karten-service.
 async fn service_get(st: &AppState, pfad: &str) -> Result<serde_json::Value, AppError> {
-    let (Some(url), Some(token)) =
-        (st.karten_service_url.as_deref(), st.karten_service_token.as_deref())
-    else {
+    let (Some(url), Some(token)) = (
+        st.karten_service_url.as_deref(),
+        st.karten_service_token.as_deref(),
+    ) else {
         return Ok(serde_json::json!([]));
     };
     let resp = KARTEN_SERVICE_CLIENT
@@ -1442,7 +1497,10 @@ async fn service_get(st: &AppState, pfad: &str) -> Result<serde_json::Value, App
         .await
         .map_err(|e| AppError::BadGateway(format!("karten-service unerreichbar: {e}")))?;
     if !resp.status().is_success() {
-        return Err(AppError::BadGateway(format!("karten-service {}", resp.status())));
+        return Err(AppError::BadGateway(format!(
+            "karten-service {}",
+            resp.status()
+        )));
     }
     resp.json()
         .await
@@ -1638,7 +1696,10 @@ mod proxy_antwort_tests {
         let r = asset_antwort(a);
         assert_eq!(r.status(), StatusCode::OK);
         let h = r.headers();
-        assert_eq!(h.get(header::CONTENT_TYPE).unwrap(), "application/x-protobuf");
+        assert_eq!(
+            h.get(header::CONTENT_TYPE).unwrap(),
+            "application/x-protobuf"
+        );
         assert_eq!(h.get(header::X_CONTENT_TYPE_OPTIONS).unwrap(), "nosniff");
         assert_eq!(h.get(header::CONTENT_ENCODING).unwrap(), "gzip");
         assert_eq!(h.get(header::CACHE_CONTROL).unwrap(), "public, max-age=60");
@@ -1649,7 +1710,10 @@ mod proxy_antwort_tests {
     fn json_proxy_antwort_ist_json_no_cache() {
         let r = json_proxy_antwort("{}".into());
         assert_eq!(r.status(), StatusCode::OK);
-        assert_eq!(r.headers().get(header::CONTENT_TYPE).unwrap(), "application/json");
+        assert_eq!(
+            r.headers().get(header::CONTENT_TYPE).unwrap(),
+            "application/json"
+        );
         assert_eq!(r.headers().get(header::CACHE_CONTROL).unwrap(), "no-cache");
     }
 }
@@ -1736,14 +1800,24 @@ mod finalisierung_tests {
         .await
         .expect("Swap ok");
 
-        assert_eq!(std::fs::read(&ziel).unwrap(), b"NEU", "Datei atomar getauscht");
+        assert_eq!(
+            std::fs::read(&ziel).unwrap(),
+            b"NEU",
+            "Datei atomar getauscht"
+        );
         assert!(
             !tmp.path().join(format!("karte-{id}.mbtiles.part")).exists(),
             ".part wurde umbenannt (kein Rest)"
         );
-        let nachher = repo::aktive_offline_karte(&pool).await.unwrap().expect("weiter aktiv");
+        let nachher = repo::aktive_offline_karte(&pool)
+            .await
+            .unwrap()
+            .expect("weiter aktiv");
         assert_eq!(nachher.version, "neuersha256");
-        assert_ne!(nachher.version, vorher.version, "Cache-Bust-Token gewechselt");
+        assert_ne!(
+            nachher.version, vorher.version,
+            "Cache-Bust-Token gewechselt"
+        );
         // quell_url auf die neue URL gesetzt → „Update verfügbar" verschwindet.
         let zeile = repo::finde_offline_karte(&pool, id).await.unwrap().unwrap();
         assert_eq!(
@@ -1777,8 +1851,14 @@ mod finalisierung_tests {
         let nachher = repo::finde_offline_karte(&pool, id).await.unwrap().unwrap();
         assert_eq!(nachher.status, "bereit", "kein Status-Downgrade bei Fehler");
         assert!(nachher.aktiv_basemap, "alte Karte bleibt aktiv");
-        assert_eq!(nachher.sha256, vorher.sha256, "Version/Datei-Metadaten unverändert");
-        assert_eq!(nachher.quell_url, vorher.quell_url, "quell_url unverändert bei Fehler");
+        assert_eq!(
+            nachher.sha256, vorher.sha256,
+            "Version/Datei-Metadaten unverändert"
+        );
+        assert_eq!(
+            nachher.quell_url, vorher.quell_url,
+            "quell_url unverändert bei Fehler"
+        );
         assert!(
             !tmp.path().join(format!("karte-{id}.mbtiles.part")).exists(),
             ".part aufgeräumt"
@@ -1790,7 +1870,11 @@ mod finalisierung_tests {
     fn fortschritt_werte_gesamt_none_wenn_null() {
         let f = Fortschritt::default();
         f.geladen.store(500, Ordering::Relaxed);
-        assert_eq!(fortschritt_werte(&f), (500, None), "ohne Content-Length gesamt=None");
+        assert_eq!(
+            fortschritt_werte(&f),
+            (500, None),
+            "ohne Content-Length gesamt=None"
+        );
         f.gesamt.store(1000, Ordering::Relaxed);
         assert_eq!(fortschritt_werte(&f), (500, Some(1000)));
     }

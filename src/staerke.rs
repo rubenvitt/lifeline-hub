@@ -13,7 +13,11 @@ pub struct Staerke {
 
 impl Staerke {
     pub fn neu(fuehrer: u16, unterfuehrer: u16, mannschaft: u16) -> Self {
-        Staerke { fuehrer, unterfuehrer, mannschaft }
+        Staerke {
+            fuehrer,
+            unterfuehrer,
+            mannschaft,
+        }
     }
 
     /// Gesamtstärke = Summe der drei Werte. `u32`, damit die Summe dreier `u16`
@@ -24,7 +28,13 @@ impl Staerke {
 
     /// 4-stellige Anzeige "F/UF/M//Gesamt" (BOS-Doppelstrich vor der Gesamtstärke), z. B. "1/3/18//22".
     pub fn anzeige(&self) -> String {
-        format!("{}/{}/{}//{}", self.fuehrer, self.unterfuehrer, self.mannschaft, self.gesamt())
+        format!(
+            "{}/{}/{}//{}",
+            self.fuehrer,
+            self.unterfuehrer,
+            self.mannschaft,
+            self.gesamt()
+        )
     }
 
     /// Baut eine optionale Stärke aus drei Eingabe-/DB-Optionen (i64, da SQLite
@@ -150,7 +160,11 @@ mod tests {
 
     #[test]
     fn staerke_position_roundtrip() {
-        for p in [StaerkePosition::Fuehrer, StaerkePosition::Unterfuehrer, StaerkePosition::Mannschaft] {
+        for p in [
+            StaerkePosition::Fuehrer,
+            StaerkePosition::Unterfuehrer,
+            StaerkePosition::Mannschaft,
+        ] {
             assert_eq!(StaerkePosition::parse(p.as_str()), Some(p));
         }
         assert_eq!(StaerkePosition::parse("chef"), None);
@@ -159,13 +173,18 @@ mod tests {
     #[test]
     fn aus_positionen_zaehlt_je_topf() {
         use StaerkePosition::*;
-        let s = Staerke::aus_positionen([Fuehrer, Mannschaft, Mannschaft, Unterfuehrer, Mannschaft].into_iter());
+        let s = Staerke::aus_positionen(
+            [Fuehrer, Mannschaft, Mannschaft, Unterfuehrer, Mannschaft].into_iter(),
+        );
         assert_eq!(s, Staerke::neu(1, 1, 3));
         assert_eq!(s.gesamt(), 5);
     }
 
     #[test]
     fn aus_positionen_leer_ist_null() {
-        assert_eq!(Staerke::aus_positionen(std::iter::empty()), Staerke::neu(0, 0, 0));
+        assert_eq!(
+            Staerke::aus_positionen(std::iter::empty()),
+            Staerke::neu(0, 0, 0)
+        );
     }
 }

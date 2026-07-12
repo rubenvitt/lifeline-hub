@@ -5,7 +5,7 @@ use crate::einsatz::berechtigung::{
     ist_fristverkuerzung,
 };
 use crate::einsatz::{
-    einstellungen, modul, modul_override, repo, Einsatzart, EinsatzAnzeige, EinsatzRolle,
+    einstellungen, modul, modul_override, repo, EinsatzAnzeige, EinsatzRolle, Einsatzart,
     MitgliedAnzeige, EINSATZ_ROLLE_LEITUNG,
 };
 use crate::error::AppError;
@@ -194,10 +194,9 @@ pub async fn einstellungen_laden(
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
     let gespeichert = einstellungen::laden_oder_default(&state.pool, id).await?;
     let (etb_fr, meldung_fr, auftrag_fr) = freeze_flags(&state.pool, id).await?;
-    let org_defaults =
-        crate::org::einstellungen::laden_oder_default(&state.pool, einsatz.org_id)
-            .await?
-            .anzeige_hinweis();
+    let org_defaults = crate::org::einstellungen::laden_oder_default(&state.pool, einsatz.org_id)
+        .await?
+        .anzeige_hinweis();
     Ok(Json(EinstellungenMitOrgDefaults {
         einstellungen: gespeichert.anzeige_mit_freeze(etb_fr, meldung_fr, auftrag_fr),
         org_defaults,
@@ -293,25 +292,39 @@ pub async fn einstellungen_setzen(
     let etb_nummer_praefix = bereinige(req.etb_nummer_praefix);
     let meldung_nummer_praefix = bereinige(req.meldung_nummer_praefix);
     let auftrag_nummer_praefix = bereinige(req.auftrag_nummer_praefix);
-    for p in [&etb_nummer_praefix, &meldung_nummer_praefix, &auftrag_nummer_praefix] {
+    for p in [
+        &etb_nummer_praefix,
+        &meldung_nummer_praefix,
+        &auftrag_nummer_praefix,
+    ] {
         if let Some(v) = p.as_deref() {
             if !einstellungen::ist_gueltiges_nummer_praefix(v) {
                 return Err(AppError::Validation(
-                    "Ungültiges Nummern-Präfix (max. 8 Zeichen, nur A-Z a-z 0-9 - _ / Leerzeichen)".into(),
+                    "Ungültiges Nummern-Präfix (max. 8 Zeichen, nur A-Z a-z 0-9 - _ / Leerzeichen)"
+                        .into(),
                 ));
             }
         }
     }
     // Startwerte validieren (400).
-    for s in [req.etb_nummer_start, req.meldung_nummer_start, req.auftrag_nummer_start] {
+    for s in [
+        req.etb_nummer_start,
+        req.meldung_nummer_start,
+        req.auftrag_nummer_start,
+    ] {
         if let Some(v) = s {
             if !einstellungen::ist_gueltiger_startwert(v) {
-                return Err(AppError::Validation("Startwert muss zwischen 1 und 999999 liegen".into()));
+                return Err(AppError::Validation(
+                    "Startwert muss zwischen 1 und 999999 liegen".into(),
+                ));
             }
         }
     }
     // Default-Fristen validieren (400).
-    for f in [req.meldung_bestaetigung_frist_min, req.auftrag_quittierung_frist_min] {
+    for f in [
+        req.meldung_bestaetigung_frist_min,
+        req.auftrag_quittierung_frist_min,
+    ] {
         if let Some(v) = f {
             if !einstellungen::ist_gueltige_frist_min(v) {
                 return Err(AppError::Validation(
@@ -335,20 +348,42 @@ pub async fn einstellungen_setzen(
     // NICHT selbst aussperren — nur eine tatsächliche Wertänderung wird abgelehnt.
     let bestand = einstellungen::laden_oder_default(&state.pool, id).await?;
     let (etb_fr, meldung_fr, auftrag_fr) = freeze_flags(&state.pool, id).await?;
-    let geaendert = |alt_p: &Option<String>, neu_p: &Option<String>, alt_s: Option<i64>, neu_s: Option<i64>| {
-        alt_p.as_deref() != neu_p.as_deref() || alt_s != neu_s
-    };
-    if etb_fr && geaendert(&bestand.etb_nummer_praefix, &etb_nummer_praefix, bestand.etb_nummer_start, req.etb_nummer_start) {
+    let geaendert =
+        |alt_p: &Option<String>, neu_p: &Option<String>, alt_s: Option<i64>, neu_s: Option<i64>| {
+            alt_p.as_deref() != neu_p.as_deref() || alt_s != neu_s
+        };
+    if etb_fr
+        && geaendert(
+            &bestand.etb_nummer_praefix,
+            &etb_nummer_praefix,
+            bestand.etb_nummer_start,
+            req.etb_nummer_start,
+        )
+    {
         return Err(AppError::Conflict(
             "ETB-Nummernkreis ist eingefroren (erste Nummer bereits vergeben)".into(),
         ));
     }
-    if meldung_fr && geaendert(&bestand.meldung_nummer_praefix, &meldung_nummer_praefix, bestand.meldung_nummer_start, req.meldung_nummer_start) {
+    if meldung_fr
+        && geaendert(
+            &bestand.meldung_nummer_praefix,
+            &meldung_nummer_praefix,
+            bestand.meldung_nummer_start,
+            req.meldung_nummer_start,
+        )
+    {
         return Err(AppError::Conflict(
             "Meldungs-Nummernkreis ist eingefroren (erste Nummer bereits vergeben)".into(),
         ));
     }
-    if auftrag_fr && geaendert(&bestand.auftrag_nummer_praefix, &auftrag_nummer_praefix, bestand.auftrag_nummer_start, req.auftrag_nummer_start) {
+    if auftrag_fr
+        && geaendert(
+            &bestand.auftrag_nummer_praefix,
+            &auftrag_nummer_praefix,
+            bestand.auftrag_nummer_start,
+            req.auftrag_nummer_start,
+        )
+    {
         return Err(AppError::Conflict(
             "Auftrags-Nummernkreis ist eingefroren (erste Nummer bereits vergeben)".into(),
         ));
@@ -382,7 +417,9 @@ pub async fn einstellungen_setzen(
     )
     .await?;
     // Freeze-Flags nach dem Speichern unverändert (Daten-Existenz ändert sich durch ein PUT nicht).
-    Ok(Json(gespeichert.anzeige_mit_freeze(etb_fr, meldung_fr, auftrag_fr)))
+    Ok(Json(
+        gespeichert.anzeige_mit_freeze(etb_fr, meldung_fr, auftrag_fr),
+    ))
 }
 
 /// GET /api/einsaetze/{id}/modul-overrides — alle Modul-Overrides eines Einsatzes
@@ -583,7 +620,9 @@ pub async fn aktualisieren(
 
     let bezeichnung = req.bezeichnung.trim();
     if bezeichnung.is_empty() {
-        return Err(AppError::Validation("Bezeichnung darf nicht leer sein".into()));
+        return Err(AppError::Validation(
+            "Bezeichnung darf nicht leer sein".into(),
+        ));
     }
     Einsatzart::parse(&req.einsatzart)
         .ok_or_else(|| AppError::Validation("Ungültige Einsatzart".into()))?;

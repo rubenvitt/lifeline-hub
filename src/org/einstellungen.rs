@@ -317,7 +317,10 @@ mod tests {
         assert_eq!(g.meldung_bestaetigung_frist_min, Some(30));
         assert_eq!(g.auftrag_quittierung_frist_min, Some(45));
         assert_eq!(g.auto_etb_eintraege, Some(0));
-        assert_eq!(g.geocoder_url.as_deref(), Some("https://nominatim.example.org"));
+        assert_eq!(
+            g.geocoder_url.as_deref(),
+            Some("https://nominatim.example.org")
+        );
         assert!(g.geaendert_at.is_some());
         assert_eq!(g.geaendert_von, Some(bid));
 
@@ -326,7 +329,10 @@ mod tests {
         assert_eq!(a.org_id, 1);
         assert_eq!(a.retention_dauer_tage, Some(365));
         assert_eq!(a.auto_etb_eintraege, Some(0));
-        assert_eq!(a.geocoder_url.as_deref(), Some("https://nominatim.example.org"));
+        assert_eq!(
+            a.geocoder_url.as_deref(),
+            Some("https://nominatim.example.org")
+        );
 
         // Upsert: zweites Speichern überschreibt dieselbe Zeile (Vollersatz).
         let zweite = speichern(

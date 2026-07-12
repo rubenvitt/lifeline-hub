@@ -42,7 +42,10 @@ pub async fn tick_einmal(pool: &SqlitePool, jetzt: DateTime<Utc>) -> usize {
     match repo::faellige_soft_delete(pool, &jetzt_s).await {
         Ok(ids) => {
             for id in ids {
-                tracing::info!(einsatz_id = id, "Purge Phase A: Soft-Delete (Aufbewahrungsfrist abgelaufen)");
+                tracing::info!(
+                    einsatz_id = id,
+                    "Purge Phase A: Soft-Delete (Aufbewahrungsfrist abgelaufen)"
+                );
                 match repo::soft_delete_einsatz(pool, id, &jetzt_s).await {
                     Ok(true) => anzahl += 1,
                     Ok(false) => {} // Race: bereits soft-gelöscht.
@@ -104,10 +107,7 @@ mod tests {
 
     /// Org + Benutzer + ABGESCHLOSSENER Einsatz mit gesetzter, abgelaufener Frist.
     /// Liefert die einsatz_id. `retention_bis` liegt in der Vergangenheit.
-    async fn abgeschlossen_mit_frist(
-        pool: &SqlitePool,
-        retention_bis: &str,
-    ) -> i64 {
+    async fn abgeschlossen_mit_frist(pool: &SqlitePool, retention_bis: &str) -> i64 {
         sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
             .execute(pool)
             .await
@@ -235,29 +235,59 @@ mod tests {
             .bind(e).bind(b).execute(&pool).await.unwrap();
         // Bild-Hintergrund (LFH-35): name kann PII tragen (z.B. „Lageplan Familie Müller.png").
         let bild = crate::karte_hintergrundbild::repo::anlegen(
-            &pool, e, b, "Lageplan Familie Müller.png", "image/png",
-            &[0x89, b'P', b'N', b'G'], "[[9.0,50.0],[9.1,50.0],[9.1,49.9],[9.0,49.9]]",
-        ).await.unwrap();
+            &pool,
+            e,
+            b,
+            "Lageplan Familie Müller.png",
+            "image/png",
+            &[0x89, b'P', b'N', b'G'],
+            "[[9.0,50.0],[9.1,50.0],[9.1,49.9],[9.0,49.9]]",
+        )
+        .await
+        .unwrap();
 
         // Tick nach Ablauf der Karenz → eine Schwärzung.
         assert_eq!(tick_einmal(&pool, t("2026-06-01 12:00:00")).await, 1);
 
         // (a) PII genullt/platzhalter — auch die STORNIERTE Person.
-        let namen: Vec<Option<String>> = sqlx::query_scalar("SELECT name FROM einsatz_person WHERE einsatz_id = ? ORDER BY registrier_nr")
-            .bind(e).fetch_all(&pool).await.unwrap();
-        assert_eq!(namen, vec![None, None], "alle Personen (inkl. stornierte) gescrubbt");
-        let vtext: String = sqlx::query_scalar("SELECT text FROM person_verlaufsnotiz WHERE einsatz_id = ?")
-            .bind(e).fetch_one(&pool).await.unwrap();
+        let namen: Vec<Option<String>> = sqlx::query_scalar(
+            "SELECT name FROM einsatz_person WHERE einsatz_id = ? ORDER BY registrier_nr",
+        )
+        .bind(e)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            namen,
+            vec![None, None],
+            "alle Personen (inkl. stornierte) gescrubbt"
+        );
+        let vtext: String =
+            sqlx::query_scalar("SELECT text FROM person_verlaufsnotiz WHERE einsatz_id = ?")
+                .bind(e)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(vtext, super::repo::SCHWAERZUNG_PLATZHALTER);
-        let (halter, kennzeichnung): (Option<String>, Option<String>) =
-            sqlx::query_as("SELECT halter_kontakt, kennzeichnung FROM einsatz_tier WHERE einsatz_id = ?")
-            .bind(e).fetch_one(&pool).await.unwrap();
+        let (halter, kennzeichnung): (Option<String>, Option<String>) = sqlx::query_as(
+            "SELECT halter_kontakt, kennzeichnung FROM einsatz_tier WHERE einsatz_id = ?",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         assert_eq!(halter, None);
-        assert_eq!(kennzeichnung, None, "Chip-/Tätowierungsnummer (personenverknüpfend) gescrubbt");
+        assert_eq!(
+            kennzeichnung, None,
+            "Chip-/Tätowierungsnummer (personenverknüpfend) gescrubbt"
+        );
         // aktueller_verbleib-Cache (Klinikname „Transport → …") überlebt die Schwärzung nicht.
         let verbleib: Option<String> = sqlx::query_scalar("SELECT aktueller_verbleib FROM einsatz_person WHERE einsatz_id = ? AND registrier_nr = 1")
             .bind(e).fetch_one(&pool).await.unwrap();
-        assert_eq!(verbleib, None, "denormalisierter Verbleib-Cache (PII) gescrubbt");
+        assert_eq!(
+            verbleib, None,
+            "denormalisierter Verbleib-Cache (PII) gescrubbt"
+        );
         // (b) Schaden bei status='uebergeben' brach NICHT (uebergeben_an → Platzhalter).
         let (uebergeben_an, geschaedigt, status): (String, Option<String>, String) =
             sqlx::query_as("SELECT uebergeben_an, geschaedigt_kontakt, status FROM einsatz_schaden WHERE einsatz_id = ?")
@@ -265,33 +295,69 @@ mod tests {
         assert_eq!(uebergeben_an, super::repo::SCHWAERZUNG_PLATZHALTER);
         assert_eq!(geschaedigt, None);
         assert_eq!(status, "uebergeben");
-        let snap: String = sqlx::query_scalar("SELECT snap_name FROM einsatz_personal WHERE einsatz_id = ?")
-            .bind(e).fetch_one(&pool).await.unwrap();
+        let snap: String =
+            sqlx::query_scalar("SELECT snap_name FROM einsatz_personal WHERE einsatz_id = ?")
+                .bind(e)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(snap, super::repo::SCHWAERZUNG_PLATZHALTER);
         // (b2) Bild-Hintergrund: name geschwärzt, BLOB (Kartografie) bleibt erhalten.
-        let nachher = crate::karte_hintergrundbild::repo::liste(&pool, e).await.unwrap();
-        assert_eq!(nachher[0].name, super::repo::SCHWAERZUNG_PLATZHALTER, "Bildname (PII) geschwärzt");
-        let (_, daten) = crate::karte_hintergrundbild::repo::laden_bytes(&pool, e, bild.id).await.unwrap();
+        let nachher = crate::karte_hintergrundbild::repo::liste(&pool, e)
+            .await
+            .unwrap();
+        assert_eq!(
+            nachher[0].name,
+            super::repo::SCHWAERZUNG_PLATZHALTER,
+            "Bildname (PII) geschwärzt"
+        );
+        let (_, daten) = crate::karte_hintergrundbild::repo::laden_bytes(&pool, e, bild.id)
+            .await
+            .unwrap();
         assert!(!daten.is_empty(), "Bild-BLOB (Kartografie) bleibt erhalten");
 
         // (c) Skelett intakt: Einsatz + registrier_nr + ETB-Original erhalten.
-        let person_anzahl: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_person WHERE einsatz_id = ?")
-            .bind(e).fetch_one(&pool).await.unwrap();
-        assert_eq!(person_anzahl, 2, "Personen-Zeilen bleiben (nur Inhalt gescrubbt)");
-        let etb_original: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ? AND inhalt = 'ORIGINAL'")
-            .bind(e).fetch_one(&pool).await.unwrap();
+        let person_anzahl: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_person WHERE einsatz_id = ?")
+                .bind(e)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            person_anzahl, 2,
+            "Personen-Zeilen bleiben (nur Inhalt gescrubbt)"
+        );
+        let etb_original: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ? AND inhalt = 'ORIGINAL'",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         assert_eq!(etb_original, 1, "ETB-Skelett erhalten");
 
         // (d) geschwaerzt_at gesetzt.
-        let s: Option<String> = sqlx::query_scalar("SELECT geschwaerzt_at FROM einsatz WHERE id = ?")
-            .bind(e).fetch_one(&pool).await.unwrap();
+        let s: Option<String> =
+            sqlx::query_scalar("SELECT geschwaerzt_at FROM einsatz WHERE id = ?")
+                .bind(e)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(s.as_deref(), Some("2026-06-01 12:00:00"));
 
         // (e) Zweiter Tick: idempotent, kein Doppel-Scrub.
         assert_eq!(tick_einmal(&pool, t("2026-06-02 12:00:00")).await, 0);
-        let s2: Option<String> = sqlx::query_scalar("SELECT geschwaerzt_at FROM einsatz WHERE id = ?")
-            .bind(e).fetch_one(&pool).await.unwrap();
-        assert_eq!(s2.as_deref(), Some("2026-06-01 12:00:00"), "Tombstone unverändert");
+        let s2: Option<String> =
+            sqlx::query_scalar("SELECT geschwaerzt_at FROM einsatz WHERE id = ?")
+                .bind(e)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            s2.as_deref(),
+            Some("2026-06-01 12:00:00"),
+            "Tombstone unverändert"
+        );
     }
 
     #[tokio::test]
@@ -304,11 +370,12 @@ mod tests {
         assert_eq!(tick_einmal(&pool, t("2026-06-02 12:00:00")).await, 1);
         // Wenige Tage später (< KARENZ_TAGE): noch keine Schwärzung.
         assert_eq!(tick_einmal(&pool, t("2026-06-10 12:00:00")).await, 0);
-        let s: Option<String> = sqlx::query_scalar("SELECT geschwaerzt_at FROM einsatz WHERE id = ?")
-            .bind(id)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+        let s: Option<String> =
+            sqlx::query_scalar("SELECT geschwaerzt_at FROM einsatz WHERE id = ?")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(s, None, "vor Ablauf der Karenz nicht geschwärzt");
     }
 }

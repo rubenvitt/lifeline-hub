@@ -1,6 +1,8 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{fordere_modul_zugriff_laden, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
+use crate::einsatz::berechtigung::{
+    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
+};
 use crate::einsatz::repo as einsatz_repo;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -35,7 +37,12 @@ fn sse_personal(state: &AppState, einsatz_id: i64, ep_id: i64) {
 
 /// Schreibt einen automatischen System-ETB-Eintrag und publiziert ihn live
 /// (wie `routes::einsatz_fahrzeug::etb_system`).
-async fn etb_system(state: &AppState, einsatz_id: i64, benutzer_id: i64, inhalt: &str) -> Result<(), AppError> {
+async fn etb_system(
+    state: &AppState,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    inhalt: &str,
+) -> Result<(), AppError> {
     let anzeige = etb_repo::anlegen(
         &state.pool,
         einsatz_id,
@@ -90,7 +97,14 @@ pub async fn liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     Ok(Json(
         disposition_repo::liste(&state.pool, einsatz_id, einsatz.ist_aktiv()).await?,
     ))
@@ -122,7 +136,14 @@ pub async fn disponieren(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let ep_id = match (body.personal_id, body.adhoc) {
@@ -205,7 +226,14 @@ pub async fn aktualisieren(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     if let Some(sid) = body.status_id {
@@ -258,7 +286,14 @@ pub async fn entfernen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let anzeige = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ep_id, true).await?;
@@ -267,7 +302,10 @@ pub async fn entfernen(
         &state,
         einsatz_id,
         benutzer.id,
-        &format!("Person «{}» aus dem Einsatz entfernt", person_bezeichnung(&anzeige)),
+        &format!(
+            "Person «{}» aus dem Einsatz entfernt",
+            person_bezeichnung(&anzeige)
+        ),
     )
     .await?;
     sse_personal(&state, einsatz_id, ep_id);
@@ -297,20 +335,32 @@ pub async fn position(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     // Effektivzustand für die Paar-Validierung: vorhandene lat/lon (404 falls fremd).
-    let vorher: (Option<f64>, Option<f64>) = sqlx::query_as(
-        "SELECT lat, lon FROM einsatz_personal WHERE id = ? AND einsatz_id = ?",
-    )
-    .bind(ep_id)
-    .bind(einsatz_id)
-    .fetch_optional(&state.pool)
-    .await?
-    .ok_or(AppError::NotFound)?;
-    let eff_lat = match body.lat { Some(o) => o, None => vorher.0 };
-    let eff_lon = match body.lon { Some(o) => o, None => vorher.1 };
+    let vorher: (Option<f64>, Option<f64>) =
+        sqlx::query_as("SELECT lat, lon FROM einsatz_personal WHERE id = ? AND einsatz_id = ?")
+            .bind(ep_id)
+            .bind(einsatz_id)
+            .fetch_optional(&state.pool)
+            .await?
+            .ok_or(AppError::NotFound)?;
+    let eff_lat = match body.lat {
+        Some(o) => o,
+        None => vorher.0,
+    };
+    let eff_lon = match body.lon {
+        Some(o) => o,
+        None => vorher.1,
+    };
     if eff_lat.is_some() != eff_lon.is_some() {
         return Err(AppError::UnprocessableEntity(
             "lat und lon müssen gemeinsam gesetzt oder gemeinsam leer sein".into(),
@@ -318,12 +368,16 @@ pub async fn position(
     }
     if let Some(la) = eff_lat {
         if !(-90.0..=90.0).contains(&la) {
-            return Err(AppError::UnprocessableEntity("lat muss zwischen -90 und 90 liegen".into()));
+            return Err(AppError::UnprocessableEntity(
+                "lat muss zwischen -90 und 90 liegen".into(),
+            ));
         }
     }
     if let Some(lo) = eff_lon {
         if !(-180.0..=180.0).contains(&lo) {
-            return Err(AppError::UnprocessableEntity("lon muss zwischen -180 und 180 liegen".into()));
+            return Err(AppError::UnprocessableEntity(
+                "lon muss zwischen -180 und 180 liegen".into(),
+            ));
         }
     }
 
@@ -352,7 +406,14 @@ pub async fn karte_fuehrungskraefte(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, "lagekarte", &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        "lagekarte",
+        &benutzer,
+    )
+    .await?;
     Ok(Json(
         disposition_repo::liste_fuehrungskraefte(&state.pool, einsatz_id).await?,
     ))

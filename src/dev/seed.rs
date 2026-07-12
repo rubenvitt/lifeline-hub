@@ -1,6 +1,4 @@
-use crate::auth::{
-    password, ORG_ROLLE_FUEHRUNGSKRAFT, ORG_ROLLE_KEINE, ROLLE_ADMIN, ROLLE_KEINER,
-};
+use crate::auth::{password, ORG_ROLLE_FUEHRUNGSKRAFT, ORG_ROLLE_KEINE, ROLLE_ADMIN, ROLLE_KEINER};
 use crate::error::AppError;
 use sqlx::SqlitePool;
 
@@ -97,10 +95,11 @@ async fn organisation_anlegen(pool: &SqlitePool) -> Result<i64, AppError> {
     {
         return Ok(id);
     }
-    let id = sqlx::query_scalar::<_, i64>("INSERT INTO organisation (name) VALUES (?) RETURNING id")
-        .bind(SEED_ORG_NAME)
-        .fetch_one(pool)
-        .await?;
+    let id =
+        sqlx::query_scalar::<_, i64>("INSERT INTO organisation (name) VALUES (?) RETURNING id")
+            .bind(SEED_ORG_NAME)
+            .fetch_one(pool)
+            .await?;
     Ok(id)
 }
 
@@ -158,13 +157,15 @@ async fn einsaetze_seeden(pool: &SqlitePool, org_id: i64) -> Result<(), AppError
         if existiert.is_some() {
             continue;
         }
-        sqlx::query("INSERT INTO einsatz (org_id, bezeichnung, stichwort, status) VALUES (?, ?, ?, ?)")
-            .bind(org_id)
-            .bind(bezeichnung)
-            .bind(stichwort)
-            .bind(status)
-            .execute(pool)
-            .await?;
+        sqlx::query(
+            "INSERT INTO einsatz (org_id, bezeichnung, stichwort, status) VALUES (?, ?, ?, ?)",
+        )
+        .bind(org_id)
+        .bind(bezeichnung)
+        .bind(stichwort)
+        .bind(status)
+        .execute(pool)
+        .await?;
     }
     Ok(())
 }
@@ -317,9 +318,14 @@ mod tests {
         let pool = crate::db::test_pool().await;
         // Reihenfolge wie in main: bootstrap_admin zuerst (Org + Admin + Kataloge,
         // hier mit zufälligem Bootstrap-Passwort), dann dev_seed.
-        crate::auth::bootstrap::bootstrap_admin(&pool, "Org", "admin", Some("zufalls-bootstrap-pw"))
-            .await
-            .unwrap();
+        crate::auth::bootstrap::bootstrap_admin(
+            &pool,
+            "Org",
+            "admin",
+            Some("zufalls-bootstrap-pw"),
+        )
+        .await
+        .unwrap();
         dev_seed(&pool).await.unwrap();
 
         // bootstrap_admin hat den FMS-Default-Katalog geseedet (10 Hauptstatus).
@@ -335,7 +341,10 @@ mod tests {
                 .fetch_one(&pool)
                 .await
                 .unwrap();
-        assert!(password::verifizieren(SEED_PASSWORT, &hash), "Admin nutzt das Dev-Passwort");
+        assert!(
+            password::verifizieren(SEED_PASSWORT, &hash),
+            "Admin nutzt das Dev-Passwort"
+        );
         assert!(
             !password::verifizieren("zufalls-bootstrap-pw", &hash),
             "altes Bootstrap-Passwort gilt nicht mehr"
@@ -362,11 +371,10 @@ mod tests {
         assert_eq!(einsaetze, 3);
 
         // Zwei aktive und ein abgeschlossener Einsatz sind enthalten.
-        let aktiv: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM einsatz WHERE status = 'aktiv'")
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let aktiv: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz WHERE status = 'aktiv'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(aktiv, 2);
         let abgeschlossen: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM einsatz WHERE status = 'abgeschlossen'")
@@ -418,7 +426,10 @@ mod tests {
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(n1, n2, "zweiter Seed-Lauf darf keine ETB-Duplikate erzeugen");
+        assert_eq!(
+            n1, n2,
+            "zweiter Seed-Lauf darf keine ETB-Duplikate erzeugen"
+        );
         assert!(n1 > 0, "es müssen ETB-Einträge angelegt werden");
 
         // lfd_nr lückenlos ab 1 pro Einsatz: COUNT == MAX(lfd_nr).
@@ -430,7 +441,10 @@ mod tests {
         .await
         .unwrap();
         for (einsatz_id, anzahl, maxnr) in gruppen {
-            assert_eq!(anzahl, maxnr, "lfd_nr in Einsatz {einsatz_id} nicht lückenlos");
+            assert_eq!(
+                anzahl, maxnr,
+                "lfd_nr in Einsatz {einsatz_id} nicht lückenlos"
+            );
         }
     }
 

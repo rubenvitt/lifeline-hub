@@ -145,7 +145,11 @@ pub async fn setze_dienststatus(
     id: i64,
     in_dienst: bool,
 ) -> Result<Material, AppError> {
-    let neuer = if in_dienst { DIENSTSTATUS_IN_DIENST } else { DIENSTSTATUS_AUSSER_DIENST };
+    let neuer = if in_dienst {
+        DIENSTSTATUS_IN_DIENST
+    } else {
+        DIENSTSTATUS_AUSSER_DIENST
+    };
     let ergebnis = sqlx::query("UPDATE material SET dienststatus = ? WHERE id = ? AND org_id = ?")
         .bind(neuer)
         .bind(id)
@@ -201,7 +205,10 @@ mod tests {
         let pool = crate::db::test_pool().await;
         org(&pool, 1).await;
         anlegen(&pool, 1, daten("Wolldecke")).await.unwrap();
-        assert!(anlegen(&pool, 1, daten("Wolldecke")).await.is_ok(), "zwei 'Wolldecke' erlaubt");
+        assert!(
+            anlegen(&pool, 1, daten("Wolldecke")).await.is_ok(),
+            "zwei 'Wolldecke' erlaubt"
+        );
     }
 
     #[tokio::test]
@@ -213,7 +220,10 @@ mod tests {
         anlegen(&pool, 1, d).await.unwrap();
         let mut d2 = daten("Stromerzeuger 2");
         d2.bestandsnummer = Some("INV-1");
-        assert!(matches!(anlegen(&pool, 1, d2).await.unwrap_err(), AppError::Conflict(_)));
+        assert!(matches!(
+            anlegen(&pool, 1, d2).await.unwrap_err(),
+            AppError::Conflict(_)
+        ));
     }
 
     #[tokio::test]
@@ -247,8 +257,15 @@ mod tests {
         let m = anlegen(&pool, 1, d).await.unwrap();
 
         setze_dienststatus(&pool, 1, m.id, false).await.unwrap();
-        assert!(liste(&pool, 1, true).await.unwrap().is_empty(), "nicht in nur_im_dienst");
-        assert_eq!(liste(&pool, 1, false).await.unwrap().len(), 1, "aber referenzierbar");
+        assert!(
+            liste(&pool, 1, true).await.unwrap().is_empty(),
+            "nicht in nur_im_dienst"
+        );
+        assert_eq!(
+            liste(&pool, 1, false).await.unwrap().len(),
+            1,
+            "aber referenzierbar"
+        );
         let mut neu = daten("Stromerzeuger neu");
         neu.bestandsnummer = Some("INV-1");
         assert!(anlegen(&pool, 1, neu).await.is_ok());
@@ -258,12 +275,19 @@ mod tests {
     async fn kategorien_distinct_sortiert() {
         let pool = crate::db::test_pool().await;
         org(&pool, 1).await;
-        for (b, k) in [("Decke", "Betreuung"), ("Sandsack", "Hochwasser"), ("Wolldecke", "Betreuung")] {
+        for (b, k) in [
+            ("Decke", "Betreuung"),
+            ("Sandsack", "Hochwasser"),
+            ("Wolldecke", "Betreuung"),
+        ] {
             let mut d = daten(b);
             d.kategorie = Some(k);
             anlegen(&pool, 1, d).await.unwrap();
         }
-        assert_eq!(kategorien(&pool, 1).await.unwrap(), vec!["Betreuung".to_string(), "Hochwasser".to_string()]);
+        assert_eq!(
+            kategorien(&pool, 1).await.unwrap(),
+            vec!["Betreuung".to_string(), "Hochwasser".to_string()]
+        );
     }
 
     #[tokio::test]
@@ -272,7 +296,10 @@ mod tests {
         org(&pool, 1).await;
         org(&pool, 2).await;
         let m = anlegen(&pool, 1, daten("Wolldecke")).await.unwrap();
-        assert!(matches!(laden(&pool, 2, m.id).await.unwrap_err(), AppError::NotFound));
+        assert!(matches!(
+            laden(&pool, 2, m.id).await.unwrap_err(),
+            AppError::NotFound
+        ));
     }
 
     #[tokio::test]
@@ -295,7 +322,10 @@ mod tests {
         org(&pool, 1).await;
         org(&pool, 2).await;
         let m = anlegen(&pool, 1, daten("Wolldecke")).await.unwrap();
-        assert!(matches!(aktualisiere(&pool, 2, m.id, daten("X")).await.unwrap_err(), AppError::NotFound));
+        assert!(matches!(
+            aktualisiere(&pool, 2, m.id, daten("X")).await.unwrap_err(),
+            AppError::NotFound
+        ));
     }
 
     #[tokio::test]
@@ -311,6 +341,11 @@ mod tests {
         neu.bestandsnummer = Some("INV-1");
         anlegen(&pool, 1, neu).await.unwrap();
         // Reaktivieren des alten kollidiert -> Conflict.
-        assert!(matches!(setze_dienststatus(&pool, 1, alt.id, true).await.unwrap_err(), AppError::Conflict(_)));
+        assert!(matches!(
+            setze_dienststatus(&pool, 1, alt.id, true)
+                .await
+                .unwrap_err(),
+            AppError::Conflict(_)
+        ));
     }
 }

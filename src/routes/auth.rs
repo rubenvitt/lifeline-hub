@@ -1,6 +1,6 @@
 use crate::app::AppState;
-use crate::auth::session::{self, CurrentUser, SESSION_COOKIE};
 use crate::auth::password;
+use crate::auth::session::{self, CurrentUser, SESSION_COOKIE};
 use crate::error::AppError;
 use axum::extract::State;
 use axum::http::StatusCode;

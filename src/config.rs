@@ -110,7 +110,13 @@ pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {
     // einzelner Geofabrik-Extrakt (v1) und wird nicht kompiliert; Regionen kommen ggf. dynamisch
     // übers Remote-Manifest (LFH-199). `gruppe` steuert die geführte UX-Auswahl. Neue Region =
     // Zeile ergänzen (Slug = karten-build-Dateiname).
-    fn platzhalter(name: &str, region: &str, gruppe: &str, slug: &str, ca_gb: i64) -> OfflineKatalogEintrag {
+    fn platzhalter(
+        name: &str,
+        region: &str,
+        gruppe: &str,
+        slug: &str,
+        ca_gb: i64,
+    ) -> OfflineKatalogEintrag {
         OfflineKatalogEintrag {
             name: name.into(),
             url: format!("https://TODO-karten-build-release/{slug}.shortbread.mbtiles"),
@@ -128,23 +134,65 @@ pub fn default_offline_katalog() -> Vec<OfflineKatalogEintrag> {
     // übers Remote-Manifest (jeder echte Pin überschreibt hier per `name`). `ca_gb` ist eine grobe
     // Schätzung, nach dem Bau durch die gemessene Größe ersetzt.
     vec![
-        platzhalter("Deutschland (Shortbread)", "DE", "Deutschland", "germany", 3),
+        platzhalter(
+            "Deutschland (Shortbread)",
+            "DE",
+            "Deutschland",
+            "germany",
+            3,
+        ),
         // Bundesländer (ISO 3166-2:DE)
-        platzhalter("Baden-Württemberg", "DE-BW", "Bundesländer", "baden-wuerttemberg", 1),
+        platzhalter(
+            "Baden-Württemberg",
+            "DE-BW",
+            "Bundesländer",
+            "baden-wuerttemberg",
+            1,
+        ),
         platzhalter("Bayern", "DE-BY", "Bundesländer", "bayern", 2),
         platzhalter("Berlin", "DE-BE", "Bundesländer", "berlin", 1),
         platzhalter("Brandenburg", "DE-BB", "Bundesländer", "brandenburg", 1),
         platzhalter("Bremen", "DE-HB", "Bundesländer", "bremen", 1),
         platzhalter("Hamburg", "DE-HH", "Bundesländer", "hamburg", 1),
         platzhalter("Hessen", "DE-HE", "Bundesländer", "hessen", 1),
-        platzhalter("Mecklenburg-Vorpommern", "DE-MV", "Bundesländer", "mecklenburg-vorpommern", 1),
+        platzhalter(
+            "Mecklenburg-Vorpommern",
+            "DE-MV",
+            "Bundesländer",
+            "mecklenburg-vorpommern",
+            1,
+        ),
         platzhalter("Niedersachsen", "DE-NI", "Bundesländer", "niedersachsen", 1),
-        platzhalter("Nordrhein-Westfalen", "DE-NW", "Bundesländer", "nordrhein-westfalen", 2),
-        platzhalter("Rheinland-Pfalz", "DE-RP", "Bundesländer", "rheinland-pfalz", 1),
+        platzhalter(
+            "Nordrhein-Westfalen",
+            "DE-NW",
+            "Bundesländer",
+            "nordrhein-westfalen",
+            2,
+        ),
+        platzhalter(
+            "Rheinland-Pfalz",
+            "DE-RP",
+            "Bundesländer",
+            "rheinland-pfalz",
+            1,
+        ),
         platzhalter("Saarland", "DE-SL", "Bundesländer", "saarland", 1),
         platzhalter("Sachsen", "DE-SN", "Bundesländer", "sachsen", 1),
-        platzhalter("Sachsen-Anhalt", "DE-ST", "Bundesländer", "sachsen-anhalt", 1),
-        platzhalter("Schleswig-Holstein", "DE-SH", "Bundesländer", "schleswig-holstein", 1),
+        platzhalter(
+            "Sachsen-Anhalt",
+            "DE-ST",
+            "Bundesländer",
+            "sachsen-anhalt",
+            1,
+        ),
+        platzhalter(
+            "Schleswig-Holstein",
+            "DE-SH",
+            "Bundesländer",
+            "schleswig-holstein",
+            1,
+        ),
         platzhalter("Thüringen", "DE-TH", "Bundesländer", "thueringen", 1),
         // Nachbarländer Deutschlands
         platzhalter("Österreich", "AT", "Nachbarländer", "austria", 1),
@@ -273,8 +321,13 @@ mod tests {
     #[test]
     fn katalog_ohne_unbaubares_dach() {
         let k = default_offline_katalog();
-        assert!(!k.iter().any(|e| e.url.contains("dach")), "DACH ist kein einzelner Extrakt (v1)");
-        assert!(!k.iter().any(|e| e.region == "DACH" || e.gruppe.as_deref() == Some("DACH")));
+        assert!(
+            !k.iter().any(|e| e.url.contains("dach")),
+            "DACH ist kein einzelner Extrakt (v1)"
+        );
+        assert!(!k
+            .iter()
+            .any(|e| e.region == "DACH" || e.gruppe.as_deref() == Some("DACH")));
     }
 
     #[test]
@@ -296,7 +349,8 @@ mod tests {
             if let Some(h) = &e.sha256 {
                 assert_eq!(h.len(), 64, "sha256 muss 64 hex sein: {}", e.name);
                 assert!(
-                    h.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()),
+                    h.chars()
+                        .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()),
                     "sha256 lowercase-hex: {}",
                     e.name
                 );
@@ -336,7 +390,11 @@ mod tests {
     #[test]
     fn merge_katalog_override_ergaenzt_und_verwirft_ungueltige() {
         let compiled = vec![
-            eintrag("Deutschland (Shortbread)", "https://TODO-x/de.mbtiles", None),
+            eintrag(
+                "Deutschland (Shortbread)",
+                "https://TODO-x/de.mbtiles",
+                None,
+            ),
             eintrag("Bayern", "https://TODO-x/by.mbtiles", None),
         ];
         let remote = vec![
@@ -347,30 +405,61 @@ mod tests {
                 Some("a".repeat(64)),
             ),
             // Neuer Eintrag: wird angehängt.
-            eintrag("DACH", "https://mirror.example/dach.mbtiles", Some("b".repeat(64))),
+            eintrag(
+                "DACH",
+                "https://mirror.example/dach.mbtiles",
+                Some("b".repeat(64)),
+            ),
             // Ungültig (halb-gepinnt: echte URL ohne sha256) → verworfen.
             eintrag("Sachsen", "https://mirror.example/sn.mbtiles", None),
         ];
         let out = merge_offline_katalog(compiled, Some(remote));
-        let de = out.iter().find(|e| e.name == "Deutschland (Shortbread)").unwrap();
-        assert_eq!(de.url, "https://mirror.example/de.mbtiles", "Remote-Pin überschreibt Platzhalter");
-        assert!(out.iter().any(|e| e.name == "DACH"), "neuer Remote-Eintrag ergänzt");
-        assert!(out.iter().any(|e| e.name == "Bayern"), "compiled-in bleibt erhalten");
-        assert!(!out.iter().any(|e| e.name == "Sachsen"), "halb-gepinnter Remote-Eintrag verworfen");
+        let de = out
+            .iter()
+            .find(|e| e.name == "Deutschland (Shortbread)")
+            .unwrap();
+        assert_eq!(
+            de.url, "https://mirror.example/de.mbtiles",
+            "Remote-Pin überschreibt Platzhalter"
+        );
+        assert!(
+            out.iter().any(|e| e.name == "DACH"),
+            "neuer Remote-Eintrag ergänzt"
+        );
+        assert!(
+            out.iter().any(|e| e.name == "Bayern"),
+            "compiled-in bleibt erhalten"
+        );
+        assert!(
+            !out.iter().any(|e| e.name == "Sachsen"),
+            "halb-gepinnter Remote-Eintrag verworfen"
+        );
     }
 
     #[test]
     fn merge_katalog_ohne_remote_ist_identisch() {
         let compiled = vec![eintrag("Bayern", "https://TODO-x/by.mbtiles", None)];
-        assert_eq!(merge_offline_katalog(compiled.clone(), None).len(), compiled.len());
+        assert_eq!(
+            merge_offline_katalog(compiled.clone(), None).len(),
+            compiled.len()
+        );
     }
 
     #[test]
     fn offline_katalog_ist_kuratiert_und_gruppiert() {
         let k = default_offline_katalog();
-        assert!(k.len() >= 3, "kuratierter Katalog mit mehreren Regionen: {}", k.len());
-        assert!(k.iter().all(|e| e.gruppe.is_some()), "jeder Eintrag hat eine UX-Gruppe");
-        assert!(k.iter().any(|e| e.region == "DE" && e.name.contains("Deutschland")));
+        assert!(
+            k.len() >= 3,
+            "kuratierter Katalog mit mehreren Regionen: {}",
+            k.len()
+        );
+        assert!(
+            k.iter().all(|e| e.gruppe.is_some()),
+            "jeder Eintrag hat eine UX-Gruppe"
+        );
+        assert!(k
+            .iter()
+            .any(|e| e.region == "DE" && e.name.contains("Deutschland")));
     }
 
     #[test]
@@ -400,11 +489,8 @@ mod tests {
 
     #[test]
     fn karten_service_token_wird_im_debug_maskiert() {
-        let config = Config::parse_from([
-            "lifeline-hub",
-            "--karten-service-token",
-            "svc-token-geheim",
-        ]);
+        let config =
+            Config::parse_from(["lifeline-hub", "--karten-service-token", "svc-token-geheim"]);
         let ausgabe = format!("{config:?}");
         assert!(
             !ausgabe.contains("svc-token-geheim"),
@@ -430,8 +516,13 @@ mod tests {
 
     #[test]
     fn restore_subkommando_mit_force_wird_geparst() {
-        let config =
-            Config::parse_from(["lifeline-hub", "restore", "--from", "/mnt/usb/b.sqlite", "--force"]);
+        let config = Config::parse_from([
+            "lifeline-hub",
+            "restore",
+            "--from",
+            "/mnt/usb/b.sqlite",
+            "--force",
+        ]);
         match config.command {
             Some(Command::Restore { from, force }) => {
                 assert_eq!(from, "/mnt/usb/b.sqlite");
@@ -444,7 +535,12 @@ mod tests {
     #[test]
     fn server_flags_funktionieren_weiter_mit_subkommando() {
         let config = Config::parse_from([
-            "lifeline-hub", "--db-path", "/tmp/x.db", "backup", "--out", "/tmp/b.sqlite",
+            "lifeline-hub",
+            "--db-path",
+            "/tmp/x.db",
+            "backup",
+            "--out",
+            "/tmp/b.sqlite",
         ]);
         assert_eq!(config.db_path, "/tmp/x.db");
         assert!(matches!(config.command, Some(Command::Backup { .. })));

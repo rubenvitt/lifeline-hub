@@ -26,7 +26,11 @@ pub async fn lese(pool: &SqlitePool, lat_key: i64, lon_key: i64) -> Option<Strin
 }
 
 /// Cache-Treffer samt Alter in Sekunden (für Stale-while-revalidate), sonst None.
-pub async fn lese_mit_alter(pool: &SqlitePool, lat_key: i64, lon_key: i64) -> Option<(String, i64)> {
+pub async fn lese_mit_alter(
+    pool: &SqlitePool,
+    lat_key: i64,
+    lon_key: i64,
+) -> Option<(String, i64)> {
     sqlx::query_as::<_, (String, i64)>(
         "SELECT ortsname, unixepoch() - unixepoch(erstellt_at) \
          FROM geocoding_cache WHERE lat_key = ? AND lon_key = ?",
@@ -66,7 +70,10 @@ mod tests {
     fn schluessel_rundet_auf_drei_nachkommastellen() {
         assert_eq!(schluessel(51.16040, 10.45140), (51160, 10451));
         // Nachbarpunkte innerhalb ~100 m teilen denselben Schlüssel.
-        assert_eq!(schluessel(51.16042, 10.45138), schluessel(51.16040, 10.45140));
+        assert_eq!(
+            schluessel(51.16042, 10.45138),
+            schluessel(51.16040, 10.45140)
+        );
     }
 
     #[tokio::test]
@@ -75,7 +82,10 @@ mod tests {
         let (la, lo) = schluessel(51.1604, 10.4514);
         assert!(lese(&pool, la, lo).await.is_none());
         schreibe(&pool, la, lo, "Hauptstr. 5, Musterstadt").await;
-        assert_eq!(lese(&pool, la, lo).await.as_deref(), Some("Hauptstr. 5, Musterstadt"));
+        assert_eq!(
+            lese(&pool, la, lo).await.as_deref(),
+            Some("Hauptstr. 5, Musterstadt")
+        );
     }
 
     #[tokio::test]
@@ -86,7 +96,9 @@ mod tests {
         schreibe(&pool, la, lo, "Neu").await;
         assert_eq!(lese(&pool, la, lo).await.as_deref(), Some("Neu"));
         let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM geocoding_cache")
-            .fetch_one(&pool).await.unwrap();
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(n, 1);
     }
 }

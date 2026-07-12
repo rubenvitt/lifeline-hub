@@ -53,16 +53,28 @@ async fn pruefe_benutzer_link(
 ) -> Result<(), AppError> {
     let gehoert: Option<i64> =
         sqlx::query_scalar("SELECT 1 FROM benutzer WHERE id = ? AND org_id = ?")
-            .bind(benutzer_id).bind(org_id).fetch_optional(pool).await?;
+            .bind(benutzer_id)
+            .bind(org_id)
+            .fetch_optional(pool)
+            .await?;
     if gehoert.is_none() {
-        return Err(AppError::Validation("Benutzerkonto gehört nicht zur Organisation".into()));
+        return Err(AppError::Validation(
+            "Benutzerkonto gehört nicht zur Organisation".into(),
+        ));
     }
     let belegt: Option<i64> = sqlx::query_scalar(
         "SELECT id FROM personal WHERE benutzer_id = ? AND org_id = ? AND (? IS NULL OR id <> ?)",
     )
-    .bind(benutzer_id).bind(org_id).bind(eigene_id).bind(eigene_id).fetch_optional(pool).await?;
+    .bind(benutzer_id)
+    .bind(org_id)
+    .bind(eigene_id)
+    .bind(eigene_id)
+    .fetch_optional(pool)
+    .await?;
     if belegt.is_some() {
-        return Err(AppError::Conflict("Benutzerkonto ist bereits mit Personal verknüpft".into()));
+        return Err(AppError::Conflict(
+            "Benutzerkonto ist bereits mit Personal verknüpft".into(),
+        ));
     }
     Ok(())
 }
@@ -78,13 +90,19 @@ async fn setze_qualifikationen(
     qualifikation_ids: &[i64],
 ) -> Result<(), AppError> {
     sqlx::query("DELETE FROM personal_qualifikation WHERE personal_id = ?")
-        .bind(personal_id).execute(&mut *tx).await?;
+        .bind(personal_id)
+        .execute(&mut *tx)
+        .await?;
     for &qid in qualifikation_ids {
         sqlx::query(
             "INSERT OR IGNORE INTO personal_qualifikation (personal_id, qualifikation_id) \
              SELECT ?, id FROM qualifikation WHERE id = ? AND org_id = ?",
         )
-        .bind(personal_id).bind(qid).bind(org_id).execute(&mut *tx).await?;
+        .bind(personal_id)
+        .bind(qid)
+        .bind(org_id)
+        .execute(&mut *tx)
+        .await?;
     }
     Ok(())
 }
@@ -94,7 +112,11 @@ pub async fn laden(pool: &SqlitePool, org_id: i64, id: i64) -> Result<Personal, 
     sqlx::query_as::<_, Personal>(sqlx::AssertSqlSafe(format!(
         "SELECT {SPALTEN} FROM personal WHERE id = ? AND org_id = ?"
     )))
-    .bind(id).bind(org_id).fetch_optional(pool).await?.ok_or(AppError::NotFound)
+    .bind(id)
+    .bind(org_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)
 }
 
 /// Qualifikationen einer Person (inkl. deaktivierter Zuordnungen), nach `sortier`.
@@ -107,8 +129,13 @@ async fn qualifikationen_von(
          JOIN qualifikation q ON q.id = pq.qualifikation_id \
          WHERE pq.personal_id = ? ORDER BY q.sortier, q.id",
     )
-    .bind(personal_id).fetch_all(pool).await?;
-    Ok(rows.into_iter().map(|(id, label)| QualifikationRef { id, label }).collect())
+    .bind(personal_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|(id, label)| QualifikationRef { id, label })
+        .collect())
 }
 
 /// Person als Anzeige (inkl. aufgelöster Qualifikationen). `NotFound` bei fremder id.
@@ -152,7 +179,10 @@ pub async fn liste_anzeige(
     } else {
         format!("SELECT {SPALTEN} FROM personal WHERE org_id = ? ORDER BY name")
     };
-    let personen = sqlx::query_as::<_, Personal>(sqlx::AssertSqlSafe(&*sql)).bind(org_id).fetch_all(pool).await?;
+    let personen = sqlx::query_as::<_, Personal>(sqlx::AssertSqlSafe(&*sql))
+        .bind(org_id)
+        .fetch_all(pool)
+        .await?;
 
     // Alle Qualifikations-Zuordnungen der Org in einer Abfrage holen und gruppieren.
     let zuordnungen = sqlx::query_as::<_, (i64, i64, String)>(
@@ -161,7 +191,9 @@ pub async fn liste_anzeige(
          JOIN personal p ON p.id = pq.personal_id \
          WHERE p.org_id = ? ORDER BY q.sortier, q.id",
     )
-    .bind(org_id).fetch_all(pool).await?;
+    .bind(org_id)
+    .fetch_all(pool)
+    .await?;
 
     Ok(personen
         .into_iter()
@@ -169,7 +201,10 @@ pub async fn liste_anzeige(
             let quals = zuordnungen
                 .iter()
                 .filter(|(pid, _, _)| *pid == p.id)
-                .map(|(_, qid, label)| QualifikationRef { id: *qid, label: label.clone() })
+                .map(|(_, qid, label)| QualifikationRef {
+                    id: *qid,
+                    label: label.clone(),
+                })
                 .collect();
             zu_anzeige(p, quals)
         })
@@ -183,8 +218,12 @@ pub async fn vorschlaege(pool: &SqlitePool, org_id: i64) -> Result<PersonalVorsc
          WHERE org_id = ? AND traegerorganisation IS NOT NULL AND traegerorganisation <> '' \
          ORDER BY traegerorganisation",
     )
-    .bind(org_id).fetch_all(pool).await?;
-    Ok(PersonalVorschlaege { traegerorganisation })
+    .bind(org_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(PersonalVorschlaege {
+        traegerorganisation,
+    })
 }
 
 /// Legt eine Person an (mit optionaler Qualifikations-Zuordnung). Validiert den
@@ -275,9 +314,17 @@ pub async fn setze_dienststatus(
     id: i64,
     in_dienst: bool,
 ) -> Result<Personal, AppError> {
-    let neuer = if in_dienst { DIENSTSTATUS_IN_DIENST } else { DIENSTSTATUS_AUSSER_DIENST };
+    let neuer = if in_dienst {
+        DIENSTSTATUS_IN_DIENST
+    } else {
+        DIENSTSTATUS_AUSSER_DIENST
+    };
     let ergebnis = sqlx::query("UPDATE personal SET dienststatus = ? WHERE id = ? AND org_id = ?")
-        .bind(neuer).bind(id).bind(org_id).execute(pool).await;
+        .bind(neuer)
+        .bind(id)
+        .bind(org_id)
+        .execute(pool)
+        .await;
     let resultat = match ergebnis {
         Ok(r) => r,
         Err(e) => return unique_conflict(e),
@@ -294,7 +341,10 @@ mod tests {
 
     async fn org(pool: &SqlitePool, id: i64) {
         sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (?, 'Orga')")
-            .bind(id).execute(pool).await.unwrap();
+            .bind(id)
+            .execute(pool)
+            .await
+            .unwrap();
     }
 
     /// Legt einen Benutzer in einer Org an und liefert dessen id.
@@ -303,7 +353,12 @@ mod tests {
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
              VALUES (?, ?, ?, 'h') RETURNING id",
         )
-        .bind(org_id).bind(name).bind(name).fetch_one(pool).await.unwrap()
+        .bind(org_id)
+        .bind(name)
+        .bind(name)
+        .fetch_one(pool)
+        .await
+        .unwrap()
     }
 
     fn daten(name: &str) -> PersonalDaten<'_> {
@@ -339,11 +394,16 @@ mod tests {
         a.personalnummer = Some("4711");
         anlegen(&pool, 1, a, &[]).await.unwrap();
         // gleicher Name, KEINE Nummer → erlaubt (Namen sind nicht eindeutig).
-        anlegen(&pool, 1, daten("Thomas Müller"), &[]).await.unwrap();
+        anlegen(&pool, 1, daten("Thomas Müller"), &[])
+            .await
+            .unwrap();
         // gleiche Personalnummer (unter aktiven) → Conflict.
         let mut dup = daten("Anders Anders");
         dup.personalnummer = Some("4711");
-        assert!(matches!(anlegen(&pool, 1, dup, &[]).await.unwrap_err(), AppError::Conflict(_)));
+        assert!(matches!(
+            anlegen(&pool, 1, dup, &[]).await.unwrap_err(),
+            AppError::Conflict(_)
+        ));
     }
 
     #[tokio::test]
@@ -356,7 +416,10 @@ mod tests {
         anlegen(&pool, 1, a, &[]).await.unwrap();
         let mut b = daten("B");
         b.personalnummer = Some("1");
-        assert!(anlegen(&pool, 2, b, &[]).await.is_ok(), "andere Org unabhängig");
+        assert!(
+            anlegen(&pool, 2, b, &[]).await.is_ok(),
+            "andere Org unabhängig"
+        );
         // mehrere ohne Nummer in derselben Org erlaubt.
         anlegen(&pool, 1, daten("C"), &[]).await.unwrap();
         anlegen(&pool, 1, daten("D"), &[]).await.unwrap();
@@ -370,7 +433,10 @@ mod tests {
         let fremd = benutzer(&pool, 2, "fremd").await;
         let mut d = daten("X");
         d.benutzer_id = Some(fremd);
-        assert!(matches!(anlegen(&pool, 1, d, &[]).await.unwrap_err(), AppError::Validation(_)));
+        assert!(matches!(
+            anlegen(&pool, 1, d, &[]).await.unwrap_err(),
+            AppError::Validation(_)
+        ));
 
         let eigen = benutzer(&pool, 1, "eigen").await;
         let mut ok = daten("Y");
@@ -379,7 +445,10 @@ mod tests {
         // dasselbe Konto erneut → Conflict.
         let mut zwei = daten("Z");
         zwei.benutzer_id = Some(eigen);
-        assert!(matches!(anlegen(&pool, 1, zwei, &[]).await.unwrap_err(), AppError::Conflict(_)));
+        assert!(matches!(
+            anlegen(&pool, 1, zwei, &[]).await.unwrap_err(),
+            AppError::Conflict(_)
+        ));
     }
 
     #[tokio::test]
@@ -388,9 +457,19 @@ mod tests {
         org(&pool, 1).await;
         let p = anlegen(&pool, 1, daten("Thomas"), &[]).await.unwrap();
         setze_dienststatus(&pool, 1, p.id, false).await.unwrap();
-        assert!(liste_anzeige(&pool, 1, true).await.unwrap().is_empty(), "nicht in nur_im_dienst");
-        assert_eq!(liste_anzeige(&pool, 1, false).await.unwrap().len(), 1, "aber referenzierbar");
-        assert_eq!(laden(&pool, 1, p.id).await.unwrap().dienststatus, "ausser_dienst");
+        assert!(
+            liste_anzeige(&pool, 1, true).await.unwrap().is_empty(),
+            "nicht in nur_im_dienst"
+        );
+        assert_eq!(
+            liste_anzeige(&pool, 1, false).await.unwrap().len(),
+            1,
+            "aber referenzierbar"
+        );
+        assert_eq!(
+            laden(&pool, 1, p.id).await.unwrap().dienststatus,
+            "ausser_dienst"
+        );
     }
 
     #[tokio::test]
@@ -407,7 +486,9 @@ mod tests {
         anlegen(&pool, 1, neu, &[]).await.unwrap();
         // Reaktivieren des alten kollidiert.
         assert!(matches!(
-            setze_dienststatus(&pool, 1, alt.id, true).await.unwrap_err(),
+            setze_dienststatus(&pool, 1, alt.id, true)
+                .await
+                .unwrap_err(),
             AppError::Conflict(_)
         ));
     }
@@ -420,15 +501,30 @@ mod tests {
         let q2: i64 = sqlx::query_scalar("INSERT INTO qualifikation (org_id, label, sortier) VALUES (1, 'Gruppenführer', 20) RETURNING id").fetch_one(&pool).await.unwrap();
         let p = anlegen(&pool, 1, daten("Thomas"), &[q1, q2]).await.unwrap();
         let a = laden_anzeige(&pool, 1, p.id).await.unwrap();
-        assert_eq!(a.qualifikationen.iter().map(|q| q.label.as_str()).collect::<Vec<_>>(), vec!["Sanitäter", "Gruppenführer"]);
+        assert_eq!(
+            a.qualifikationen
+                .iter()
+                .map(|q| q.label.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Sanitäter", "Gruppenführer"]
+        );
 
         // q2 deaktivieren → bleibt in bestehender Zuordnung sichtbar.
-        sqlx::query("UPDATE qualifikation SET aktiv = 0 WHERE id = ?").bind(q2).execute(&pool).await.unwrap();
+        sqlx::query("UPDATE qualifikation SET aktiv = 0 WHERE id = ?")
+            .bind(q2)
+            .execute(&pool)
+            .await
+            .unwrap();
         let a2 = laden_anzeige(&pool, 1, p.id).await.unwrap();
-        assert!(a2.qualifikationen.iter().any(|q| q.id == q2), "deaktivierte Qualifikation bleibt sichtbar");
+        assert!(
+            a2.qualifikationen.iter().any(|q| q.id == q2),
+            "deaktivierte Qualifikation bleibt sichtbar"
+        );
 
         // Vollersatz auf nur q1.
-        aktualisiere(&pool, 1, p.id, daten("Thomas"), &[q1]).await.unwrap();
+        aktualisiere(&pool, 1, p.id, daten("Thomas"), &[q1])
+            .await
+            .unwrap();
         let a3 = laden_anzeige(&pool, 1, p.id).await.unwrap();
         assert_eq!(a3.qualifikationen.len(), 1);
         assert_eq!(a3.qualifikationen[0].id, q1);
@@ -448,6 +544,9 @@ mod tests {
         c.traegerorganisation = Some("THW");
         anlegen(&pool, 1, c, &[]).await.unwrap();
         let v = vorschlaege(&pool, 1).await.unwrap();
-        assert_eq!(v.traegerorganisation, vec!["DRK".to_string(), "THW".to_string()]);
+        assert_eq!(
+            v.traegerorganisation,
+            vec!["DRK".to_string(), "THW".to_string()]
+        );
     }
 }

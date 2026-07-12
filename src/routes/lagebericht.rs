@@ -1,6 +1,8 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{fordere_modul_zugriff_laden, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
+use crate::einsatz::berechtigung::{
+    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
+};
 use crate::einsatz::repo as einsatz_repo;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -34,8 +36,17 @@ pub async fn liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
-    Ok(Json(lagebericht_repo::liste(&state.pool, einsatz_id).await?))
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
+    Ok(Json(
+        lagebericht_repo::liste(&state.pool, einsatz_id).await?,
+    ))
 }
 
 /// GET /api/einsaetze/{id}/lageberichte/{lid} — Detail. Nur Lesezugriff.
@@ -47,8 +58,17 @@ pub async fn detail(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
-    Ok(Json(lagebericht_repo::laden(&state.pool, einsatz_id, lid).await?))
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
+    Ok(Json(
+        lagebericht_repo::laden(&state.pool, einsatz_id, lid).await?,
+    ))
 }
 
 #[derive(Debug, Deserialize)]
@@ -68,7 +88,14 @@ pub async fn anlegen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     if vorlage(&body.vorlage).is_none() {
@@ -83,9 +110,15 @@ pub async fn anlegen(
         None => jetzt(),
     };
 
-    let anzeige =
-        lagebericht_repo::anlegen(&state.pool, einsatz_id, &body.vorlage, &titel, &zeitstand, benutzer.id)
-            .await?;
+    let anzeige = lagebericht_repo::anlegen(
+        &state.pool,
+        einsatz_id,
+        &body.vorlage,
+        &titel,
+        &zeitstand,
+        benutzer.id,
+    )
+    .await?;
     sse_lagebericht(&state, einsatz_id, anzeige.id);
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
@@ -107,7 +140,14 @@ pub async fn aktualisieren(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let vorher = lagebericht_repo::laden(&state.pool, einsatz_id, lid).await?;
@@ -128,7 +168,8 @@ pub async fn aktualisieren(
         None => None,
     };
     if let Some(abs) = &body.abschnitte {
-        let v = vorlage(&vorher.vorlage).ok_or(AppError::Internal("Vorlage verschwunden".into()))?;
+        let v =
+            vorlage(&vorher.vorlage).ok_or(AppError::Internal("Vorlage verschwunden".into()))?;
         for a in abs {
             if !v.abschnitte.iter().any(|d| d.schluessel == a.schluessel) {
                 return Err(AppError::UnprocessableEntity(format!(
@@ -163,20 +204,35 @@ pub async fn freigeben(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let bericht = lagebericht_repo::laden(&state.pool, einsatz_id, lid).await?;
     if bericht.status != lagebericht::STATUS_ENTWURF {
-        return Err(AppError::UnprocessableEntity("Bericht ist bereits freigegeben".into()));
+        return Err(AppError::UnprocessableEntity(
+            "Bericht ist bereits freigegeben".into(),
+        ));
     }
     let v = vorlage(&bericht.vorlage).ok_or(AppError::Internal("Vorlage verschwunden".into()))?;
     validiere_freigabe(v, &bericht.abschnitte)?;
     let render = render_snapshot(v, &bericht.titel, &bericht.zeitstand, &bericht.abschnitte);
 
-    let anzeige =
-        lagebericht_repo::freigeben(&state.pool, einsatz_id, lid, benutzer.id, &render, &bericht.zeitstand)
-            .await?;
+    let anzeige = lagebericht_repo::freigeben(
+        &state.pool,
+        einsatz_id,
+        lid,
+        benutzer.id,
+        &render,
+        &bericht.zeitstand,
+    )
+    .await?;
 
     if let Some(etb_id) = anzeige.etb_eintrag_id {
         if let Ok(etb_anzeige) = crate::etb::repo::laden(&state.pool, etb_id).await {
@@ -204,7 +260,14 @@ pub async fn fortschreiben(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let zeitstand = match body.zeitstand.as_deref() {
@@ -212,7 +275,8 @@ pub async fn fortschreiben(
         None => jetzt(),
     };
     let anzeige =
-        lagebericht_repo::fortschreiben(&state.pool, einsatz_id, lid, benutzer.id, &zeitstand).await?;
+        lagebericht_repo::fortschreiben(&state.pool, einsatz_id, lid, benutzer.id, &zeitstand)
+            .await?;
     sse_lagebericht(&state, einsatz_id, anzeige.id);
     Ok((StatusCode::CREATED, Json(anzeige)))
 }

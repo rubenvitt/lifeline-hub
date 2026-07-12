@@ -1,5 +1,7 @@
 use crate::app::AppState;
-use crate::einsatz::berechtigung::{fordere_modul_zugriff_laden, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
+use crate::einsatz::berechtigung::{
+    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
+};
 use crate::einsatz::repo as einsatz_repo;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -57,8 +59,19 @@ pub async fn liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
-    let status = params.status.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
+    let status = params
+        .status
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
     if let Some(s) = status {
         if !crate::nachforderung::status_gueltig(s) {
             return Err(AppError::Validation("Ungültiger Status-Filter".into()));
@@ -90,7 +103,14 @@ pub async fn anlegen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let art = req.art.trim();
@@ -99,14 +119,21 @@ pub async fn anlegen(
         return Err(AppError::Validation("Art darf nicht leer sein".into()));
     }
     if bezeichnung.is_empty() {
-        return Err(AppError::Validation("Bezeichnung darf nicht leer sein".into()));
+        return Err(AppError::Validation(
+            "Bezeichnung darf nicht leer sein".into(),
+        ));
     }
     if let Some(a) = req.anzahl {
         if a < 1 {
             return Err(AppError::Validation("Anzahl muss mindestens 1 sein".into()));
         }
     }
-    let prioritaet = req.prioritaet.as_deref().map(str::trim).filter(|s| !s.is_empty()).unwrap_or(PRIO_NORMAL);
+    let prioritaet = req
+        .prioritaet
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or(PRIO_NORMAL);
     if !crate::nachforderung::prioritaet_gueltig(prioritaet) {
         return Err(AppError::Validation("Ungültige Priorität".into()));
     }
@@ -158,7 +185,14 @@ async fn fordere_bearbeitbar(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
     if !repo::gehoert_zu_einsatz(&state.pool, nachforderung_id, einsatz_id).await? {
         return Err(AppError::NotFound);
@@ -182,7 +216,9 @@ pub async fn status(
     let neu = req.status.trim();
     // Ablehnung hat einen eigenen Pfad (mit Grund) — hier sauber abweisen statt im Repo auf 400 zu fallen.
     if neu == STATUS_ABGELEHNT {
-        return Err(AppError::UnprocessableEntity("Ablehnung erfolgt über den /ablehnen-Endpoint".into()));
+        return Err(AppError::UnprocessableEntity(
+            "Ablehnung erfolgt über den /ablehnen-Endpoint".into(),
+        ));
     }
     let aktuell = repo::laden(&state.pool, nachforderung_id).await?;
     if !crate::nachforderung::uebergang_erlaubt(aktuell.status.as_str(), neu) {
@@ -192,8 +228,18 @@ pub async fn status(
         )));
     }
     // Optimistische Sperre gegen TOCTOU: UPDATE greift nur bei unverändertem Bestandsstatus.
-    if !repo::setze_status(&state.pool, nachforderung_id, neu, aktuell.status.as_str(), &jetzt()).await? {
-        return Err(AppError::UnprocessableEntity("Status wurde zwischenzeitlich geändert".into()));
+    if !repo::setze_status(
+        &state.pool,
+        nachforderung_id,
+        neu,
+        aktuell.status.as_str(),
+        &jetzt(),
+    )
+    .await?
+    {
+        return Err(AppError::UnprocessableEntity(
+            "Status wurde zwischenzeitlich geändert".into(),
+        ));
     }
     let n = repo::laden(&state.pool, nachforderung_id).await?;
     sse(&state, einsatz_id);
@@ -219,8 +265,18 @@ pub async fn ablehnen(
             "Nachforderung kann in diesem Zustand nicht abgelehnt werden".into(),
         ));
     }
-    if !repo::lehne_ab(&state.pool, nachforderung_id, trimme(&req.grund), aktuell.status.as_str(), &jetzt()).await? {
-        return Err(AppError::UnprocessableEntity("Status wurde zwischenzeitlich geändert".into()));
+    if !repo::lehne_ab(
+        &state.pool,
+        nachforderung_id,
+        trimme(&req.grund),
+        aktuell.status.as_str(),
+        &jetzt(),
+    )
+    .await?
+    {
+        return Err(AppError::UnprocessableEntity(
+            "Status wurde zwischenzeitlich geändert".into(),
+        ));
     }
     let n = repo::laden(&state.pool, nachforderung_id).await?;
     sse(&state, einsatz_id);

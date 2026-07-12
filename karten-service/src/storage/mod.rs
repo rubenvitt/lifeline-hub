@@ -75,7 +75,10 @@ mod tests {
             vec![1, 2, 3]
         );
         s.put_bytes("m.json", b"[]".to_vec()).await.unwrap();
-        assert_eq!(s.get_bytes("m.json").await.unwrap().unwrap(), b"[]".to_vec());
+        assert_eq!(
+            s.get_bytes("m.json").await.unwrap().unwrap(),
+            b"[]".to_vec()
+        );
         assert!(s.get_bytes("fehlt").await.unwrap().is_none());
     }
 }

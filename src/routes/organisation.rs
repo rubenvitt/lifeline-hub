@@ -52,7 +52,9 @@ pub async fn aktualisieren(
     Json(body): Json<OrgPatch>,
 ) -> Result<Json<OrganisationAnzeige>, AppError> {
     if !ERLAUBTE_ORG.contains(&body.tz_organisation.as_str()) {
-        return Err(AppError::UnprocessableEntity("Unbekannte Organisation".into()));
+        return Err(AppError::UnprocessableEntity(
+            "Unbekannte Organisation".into(),
+        ));
     }
     sqlx::query(
         "UPDATE organisation SET tz_organisation = ? \

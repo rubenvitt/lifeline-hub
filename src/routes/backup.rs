@@ -25,7 +25,10 @@ pub async fn download(
     let bytes = std::fs::read(&pfad)
         .map_err(|e| AppError::Internal(format!("Sicherung lesen fehlgeschlagen: {e}")))?;
 
-    let dateiname = format!("lifeline-backup-{}.sqlite", Local::now().format("%Y%m%d-%H%M%S"));
+    let dateiname = format!(
+        "lifeline-backup-{}.sqlite",
+        Local::now().format("%Y%m%d-%H%M%S")
+    );
     let mut headers = HeaderMap::new();
     headers.insert(
         header::CONTENT_TYPE,

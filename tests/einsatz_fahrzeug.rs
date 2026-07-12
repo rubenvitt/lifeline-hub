@@ -6,29 +6,59 @@ use common::*;
 /// Legt ein Stamm-Fahrzeug an (Admin) und liefert dessen id.
 async fn fahrzeug_anlegen(app: &axum::Router, admin: &str, funkrufname: &str) -> i64 {
     let (status, json) = anfrage(
-        app, "POST", "/api/fahrzeuge", admin,
-        Some(&format!(r#"{{"funkrufname":"{funkrufname}","kennzeichen":"XX-AB 1"}}"#)),
-    ).await;
+        app,
+        "POST",
+        "/api/fahrzeuge",
+        admin,
+        Some(&format!(
+            r#"{{"funkrufname":"{funkrufname}","kennzeichen":"XX-AB 1"}}"#
+        )),
+    )
+    .await;
     assert_eq!(status, StatusCode::CREATED);
     json["id"].as_i64().unwrap()
 }
 
 /// Legt eine Stamm-Person an + disponiert sie in den Einsatz → liefert einsatz_personal.id.
 async fn person_anlegen(app: &axum::Router, admin: &str, einsatz: i64, name: &str) -> i64 {
-    let (s1, stamm) = anfrage(app, "POST", "/api/personal", admin, Some(&format!(r#"{{"name":"{name}"}}"#))).await;
+    let (s1, stamm) = anfrage(
+        app,
+        "POST",
+        "/api/personal",
+        admin,
+        Some(&format!(r#"{{"name":"{name}"}}"#)),
+    )
+    .await;
     assert_eq!(s1, StatusCode::CREATED);
     let pid = stamm["id"].as_i64().unwrap();
-    let (s2, dispo) = anfrage(app, "POST", &format!("/api/einsaetze/{einsatz}/personal"), admin,
-        Some(&format!(r#"{{"personal_id":{pid}}}"#))).await;
+    let (s2, dispo) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        admin,
+        Some(&format!(r#"{{"personal_id":{pid}}}"#)),
+    )
+    .await;
     assert_eq!(s2, StatusCode::CREATED);
     dispo["id"].as_i64().unwrap()
 }
 
 /// Disponiert ein Stamm-Fahrzeug in den Einsatz → liefert einsatz_fahrzeug.id.
-async fn fahrzeug_disponieren(app: &axum::Router, admin: &str, einsatz: i64, funkrufname: &str) -> i64 {
+async fn fahrzeug_disponieren(
+    app: &axum::Router,
+    admin: &str,
+    einsatz: i64,
+    funkrufname: &str,
+) -> i64 {
     let fz = fahrzeug_anlegen(app, admin, funkrufname).await;
-    let (s, json) = anfrage(app, "POST", &format!("/api/einsaetze/{einsatz}/fahrzeuge"), admin,
-        Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#))).await;
+    let (s, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        admin,
+        Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
+    )
+    .await;
     assert_eq!(s, StatusCode::CREATED);
     json["id"].as_i64().unwrap()
 }
@@ -44,23 +74,90 @@ async fn besatzung_zuordnen_freigeben_mit_etb() {
     let ep = person_anlegen(&app, &admin, einsatz, "Anna").await;
 
     // Vor Zuordnung: freie Kraft (fahrzeug_id null) → erscheint im Frei-Pool-Picker.
-    let (_, personal) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/personal"), &admin, None).await;
-    assert!(personal.as_array().unwrap().iter().find(|p| p["id"] == ep).unwrap()["fahrzeug_id"].is_null());
+    let (_, personal) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(personal
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == ep)
+        .unwrap()["fahrzeug_id"]
+        .is_null());
 
     let etb_vor = system_etb_anzahl(&app, &admin, einsatz).await;
 
     // Zuordnen → 204, fahrzeug_id gesetzt.
-    assert_eq!(anfrage(&app, "PUT", &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/besatzung/{ep}"), &admin, None).await.0, StatusCode::NO_CONTENT);
-    let (_, personal2) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/personal"), &admin, None).await;
-    assert_eq!(personal2.as_array().unwrap().iter().find(|p| p["id"] == ep).unwrap()["fahrzeug_id"], ef);
+    assert_eq!(
+        anfrage(
+            &app,
+            "PUT",
+            &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/besatzung/{ep}"),
+            &admin,
+            None
+        )
+        .await
+        .0,
+        StatusCode::NO_CONTENT
+    );
+    let (_, personal2) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(
+        personal2
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["id"] == ep)
+            .unwrap()["fahrzeug_id"],
+        ef
+    );
 
     // Freigeben → 204, wieder frei.
-    assert_eq!(anfrage(&app, "DELETE", &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/besatzung/{ep}"), &admin, None).await.0, StatusCode::NO_CONTENT);
-    let (_, personal3) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/personal"), &admin, None).await;
-    assert!(personal3.as_array().unwrap().iter().find(|p| p["id"] == ep).unwrap()["fahrzeug_id"].is_null());
+    assert_eq!(
+        anfrage(
+            &app,
+            "DELETE",
+            &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/besatzung/{ep}"),
+            &admin,
+            None
+        )
+        .await
+        .0,
+        StatusCode::NO_CONTENT
+    );
+    let (_, personal3) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(personal3
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == ep)
+        .unwrap()["fahrzeug_id"]
+        .is_null());
 
     // Zuordnen + Freigeben = je ein append-only System-ETB.
-    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, etb_vor + 2, "Zuordnen + Freigeben = 2 System-ETB");
+    assert_eq!(
+        system_etb_anzahl(&app, &admin, einsatz).await,
+        etb_vor + 2,
+        "Zuordnen + Freigeben = 2 System-ETB"
+    );
 }
 
 #[tokio::test]
@@ -75,7 +172,18 @@ async fn besatzung_beobachter_darf_nicht_zuordnen() {
     rolle_setzen(&app, &admin, einsatz, erika_id, "beobachter").await;
     let erika = login_cookie(&app, "erika", "erikapw1").await;
     // Schreibrecht-Gating (MODUL_KEY=fahrzeuge): Beobachter darf nicht zuordnen.
-    assert_eq!(anfrage(&app, "PUT", &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/besatzung/{ep}"), &erika, None).await.0, StatusCode::FORBIDDEN);
+    assert_eq!(
+        anfrage(
+            &app,
+            "PUT",
+            &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/besatzung/{ep}"),
+            &erika,
+            None
+        )
+        .await
+        .0,
+        StatusCode::FORBIDDEN
+    );
 }
 
 #[tokio::test]
@@ -85,13 +193,50 @@ async fn fahrzeug_entfernen_gibt_besatzung_frei() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let ef = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
     let ep = person_anlegen(&app, &admin, einsatz, "Anna").await;
-    assert_eq!(anfrage(&app, "PUT", &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/besatzung/{ep}"), &admin, None).await.0, StatusCode::NO_CONTENT);
+    assert_eq!(
+        anfrage(
+            &app,
+            "PUT",
+            &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/besatzung/{ep}"),
+            &admin,
+            None
+        )
+        .await
+        .0,
+        StatusCode::NO_CONTENT
+    );
 
     // Fahrzeug entfernen → 204 (kein FK-Fehler trotz Besatzung); Kraft bleibt frei.
-    assert_eq!(anfrage(&app, "DELETE", &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"), &admin, None).await.0, StatusCode::NO_CONTENT);
-    let (_, personal) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/personal"), &admin, None).await;
-    assert!(personal.as_array().unwrap().iter().find(|p| p["id"] == ep).unwrap()["fahrzeug_id"].is_null(),
-        "Besatzung wird beim Fahrzeug-Entfernen frei, nicht gelöscht");
+    assert_eq!(
+        anfrage(
+            &app,
+            "DELETE",
+            &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+            &admin,
+            None
+        )
+        .await
+        .0,
+        StatusCode::NO_CONTENT
+    );
+    let (_, personal) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(
+        personal
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["id"] == ep)
+            .unwrap()["fahrzeug_id"]
+            .is_null(),
+        "Besatzung wird beim Fahrzeug-Entfernen frei, nicht gelöscht"
+    );
 }
 
 // ---------- Tests ----------
@@ -104,15 +249,23 @@ async fn disponieren_stamm_setzt_status_und_schreibt_etb() {
     let fz = fahrzeug_anlegen(&app, &admin, "Florian 1").await;
 
     let (status, json) = anfrage(
-        &app, "POST", &format!("/api/einsaetze/{einsatz}/fahrzeuge"), &admin,
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &admin,
         Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
-    ).await;
+    )
+    .await;
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(json["funkrufname"], "Florian 1");
     assert_eq!(json["status_kategorie"], "gebunden");
     assert_eq!(json["ist_adhoc"], false);
 
-    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, 1, "Disponieren schreibt 1 System-ETB");
+    assert_eq!(
+        system_etb_anzahl(&app, &admin, einsatz).await,
+        1,
+        "Disponieren schreibt 1 System-ETB"
+    );
 }
 
 #[tokio::test]
@@ -122,8 +275,30 @@ async fn doppelte_stamm_disposition_ist_409() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let fz = fahrzeug_anlegen(&app, &admin, "Florian 1").await;
     let body = format!(r#"{{"fahrzeug_id":{fz}}}"#);
-    assert_eq!(anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/fahrzeuge"), &admin, Some(&body)).await.0, StatusCode::CREATED);
-    assert_eq!(anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/fahrzeuge"), &admin, Some(&body)).await.0, StatusCode::CONFLICT);
+    assert_eq!(
+        anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+            &admin,
+            Some(&body)
+        )
+        .await
+        .0,
+        StatusCode::CREATED
+    );
+    assert_eq!(
+        anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+            &admin,
+            Some(&body)
+        )
+        .await
+        .0,
+        StatusCode::CONFLICT
+    );
 }
 
 #[tokio::test]
@@ -133,9 +308,13 @@ async fn adhoc_disposition_ohne_stamm() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
 
     let (status, json) = anfrage(
-        &app, "POST", &format!("/api/einsaetze/{einsatz}/fahrzeuge"), &admin,
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &admin,
         Some(r#"{"adhoc":{"funkrufname":"FW Extern 1","traegerorganisation":"Feuerwehr"}}"#),
-    ).await;
+    )
+    .await;
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(json["ist_adhoc"], true);
     assert!(json["fahrzeug_id"].is_null());
@@ -151,10 +330,28 @@ async fn beobachter_darf_lesen_aber_nicht_disponieren() {
     let erika = login_cookie(&app, "erika", "erikapw1").await;
 
     // Lesen erlaubt.
-    assert_eq!(anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/fahrzeuge"), &erika, None).await.0, StatusCode::OK);
+    assert_eq!(
+        anfrage(
+            &app,
+            "GET",
+            &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+            &erika,
+            None
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
     // Disponieren verboten.
     let fz = fahrzeug_anlegen(&app, &admin, "Florian 1").await;
-    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/fahrzeuge"), &erika, Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#))).await;
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &erika,
+        Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
+    )
+    .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 }
 
@@ -170,14 +367,33 @@ async fn fuehrungspersonal_darf_disponieren_nicht_mitglied_nicht() {
     rolle_setzen(&app, &admin, einsatz, f_id, "fuehrungspersonal").await;
     let fritz = login_cookie(&app, "fritz", "fritzpw1").await;
     assert_eq!(
-        anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/fahrzeuge"), &fritz, Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#))).await.0,
+        anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+            &fritz,
+            Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#))
+        )
+        .await
+        .0,
         StatusCode::CREATED
     );
 
     // Nicht-Mitglied (ohne höhere Berechtigung) darf weder lesen noch schreiben.
     benutzer_anlegen(&app, &admin, "norbert", "keine").await;
     let norbert = login_cookie(&app, "norbert", "norbertpw1").await;
-    assert_eq!(anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/fahrzeuge"), &norbert, None).await.0, StatusCode::FORBIDDEN);
+    assert_eq!(
+        anfrage(
+            &app,
+            "GET",
+            &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+            &norbert,
+            None
+        )
+        .await
+        .0,
+        StatusCode::FORBIDDEN
+    );
 }
 
 #[tokio::test]
@@ -186,9 +402,27 @@ async fn disponieren_auf_abgeschlossenem_einsatz_ist_409() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let fz = fahrzeug_anlegen(&app, &admin, "Florian 1").await;
-    assert_eq!(anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/abschliessen"), &admin, None).await.0, StatusCode::OK);
+    assert_eq!(
+        anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/abschliessen"),
+            &admin,
+            None
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
 
-    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/fahrzeuge"), &admin, Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#))).await;
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &admin,
+        Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
+    )
+    .await;
     assert_eq!(status, StatusCode::CONFLICT);
 }
 
@@ -198,17 +432,45 @@ async fn status_wechsel_und_entfernen_schreiben_etb() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let fz = fahrzeug_anlegen(&app, &admin, "Florian 1").await;
-    let (_, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/fahrzeuge"), &admin, Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#))).await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &admin,
+        Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
+    )
+    .await;
     let ef = json["id"].as_i64().unwrap();
 
     // Anderen 'gebunden'-Status aus dem Seed holen ('4 – Am Einsatzort').
     let (_, stati) = anfrage(&app, "GET", "/api/fahrzeug-status", &admin, None).await;
-    let am_einsatzort = stati.as_array().unwrap().iter().find(|s| s["label"] == "4 – Am Einsatzort").unwrap()["id"].as_i64().unwrap();
+    let am_einsatzort = stati
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["label"] == "4 – Am Einsatzort")
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
 
-    let (status, _) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"), &admin, Some(&format!(r#"{{"status_id":{am_einsatzort}}}"#))).await;
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &admin,
+        Some(&format!(r#"{{"status_id":{am_einsatzort}}}"#)),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
 
-    let (status, _) = anfrage(&app, "DELETE", &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"), &admin, None).await;
+    let (status, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &admin,
+        None,
+    )
+    .await;
     assert_eq!(status, StatusCode::NO_CONTENT);
 
     // Disponieren + Status-Wechsel + Entfernen = 3 System-Einträge.
@@ -221,19 +483,47 @@ async fn bemerkung_setzen_und_leeren() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let fz = fahrzeug_anlegen(&app, &admin, "Florian 1").await;
-    let (_, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/fahrzeuge"), &admin, Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#))).await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &admin,
+        Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
+    )
+    .await;
     let ef = json["id"].as_i64().unwrap();
 
     // Setzen.
-    let (_, gesetzt) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"), &admin, Some(r#"{"bemerkung":"Tank halb"}"#)).await;
+    let (_, gesetzt) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &admin,
+        Some(r#"{"bemerkung":"Tank halb"}"#),
+    )
+    .await;
     assert_eq!(gesetzt["bemerkung"], "Tank halb");
 
     // Leeren: leerer String überschreibt (Wert verschwindet).
-    let (_, geleert) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"), &admin, Some(r#"{"bemerkung":""}"#)).await;
-    assert_eq!(geleert["bemerkung"], "", "leere Bemerkung darf den alten Wert nicht behalten");
+    let (_, geleert) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &admin,
+        Some(r#"{"bemerkung":""}"#),
+    )
+    .await;
+    assert_eq!(
+        geleert["bemerkung"], "",
+        "leere Bemerkung darf den alten Wert nicht behalten"
+    );
 
     // status_id absent → Status bleibt; eine reine Bemerkung-Änderung schreibt KEINEN ETB.
-    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, 1, "nur die Disposition selbst");
+    assert_eq!(
+        system_etb_anzahl(&app, &admin, einsatz).await,
+        1,
+        "nur die Disposition selbst"
+    );
 }
 
 // LFH-4 P2: XOR-Fehlermeldung differenziert both-None vs both-Some.
@@ -243,9 +533,19 @@ async fn disponieren_leerer_body_meldet_entweder_oder() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     // Weder fahrzeug_id noch adhoc → "angeben", NICHT "nicht beides".
-    let (status, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/fahrzeuge"), &admin, Some("{}")).await;
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &admin,
+        Some("{}"),
+    )
+    .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
-    assert_eq!(json["error"], "Entweder fahrzeug_id (Stamm) oder adhoc angeben");
+    assert_eq!(
+        json["error"],
+        "Entweder fahrzeug_id (Stamm) oder adhoc angeben"
+    );
 }
 
 #[tokio::test]
@@ -256,7 +556,17 @@ async fn disponieren_beides_meldet_nicht_beides() {
     let fz = fahrzeug_anlegen(&app, &admin, "Florian 1").await;
     // fahrzeug_id UND adhoc → "nicht beides".
     let body = format!(r#"{{"fahrzeug_id":{fz},"adhoc":{{"funkrufname":"FW Extern"}}}}"#);
-    let (status, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/fahrzeuge"), &admin, Some(&body)).await;
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &admin,
+        Some(&body),
+    )
+    .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
-    assert_eq!(json["error"], "Entweder fahrzeug_id (Stamm) oder adhoc angeben, nicht beides");
+    assert_eq!(
+        json["error"],
+        "Entweder fahrzeug_id (Stamm) oder adhoc angeben, nicht beides"
+    );
 }

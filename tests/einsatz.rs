@@ -23,7 +23,10 @@ async fn setup_with_pool() -> (axum::Router, SqlitePool) {
     let router = build_router(AppState {
         pool: pool.clone(),
         live: LiveHub::new(),
-        karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu(), download_client: lifeline_hub::karte::download::download_client(), download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_dir: std::env::temp_dir(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
         karten_service_url: None,
         karten_service_token: None,
     });
@@ -679,7 +682,10 @@ async fn abgeschlossener_einsatz_nach_frist_nur_fuer_einsatzleitung() {
     assert_eq!(listen_groesse(&app, &beob).await, 0);
 
     // Einsatzleitung (admin) darf den abgeschlossenen Einsatz weiterhin lesen.
-    assert_eq!(detail_status(&app, &admin, einsatz_id).await, StatusCode::OK);
+    assert_eq!(
+        detail_status(&app, &admin, einsatz_id).await,
+        StatusCode::OK
+    );
     assert_eq!(listen_groesse(&app, &admin).await, 1);
 }
 
@@ -922,8 +928,14 @@ async fn anlegen_vergibt_einsatznummer_im_format() {
     let (_, b) = einsatz_anlegen(&app, &admin, "B").await;
     let nr_a = a["einsatznummer_intern"].as_str().unwrap();
     let nr_b = b["einsatznummer_intern"].as_str().unwrap();
-    assert!(nr_a.ends_with("-001"), "erste Nummer endet auf -001: {nr_a}");
-    assert!(nr_b.ends_with("-002"), "zweite Nummer endet auf -002: {nr_b}");
+    assert!(
+        nr_a.ends_with("-001"),
+        "erste Nummer endet auf -001: {nr_a}"
+    );
+    assert!(
+        nr_b.ends_with("-002"),
+        "zweite Nummer endet auf -002: {nr_b}"
+    );
 }
 
 /// PUT /api/einsaetze/{id}/aufbewahrungsfrist mit Cookie + JSON-Body.
@@ -1156,7 +1168,10 @@ async fn einstellungen_get(app: &axum::Router, cookie: &str, id: i64) -> (Status
         .unwrap();
     let status = resp.status();
     let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
 }
 
 /// PUT der Einstellungen.
@@ -1181,7 +1196,10 @@ async fn einstellungen_put(
         .unwrap();
     let status = resp.status();
     let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
 }
 
 #[tokio::test]
@@ -1229,7 +1247,8 @@ async fn einstellungen_put_ungueltiger_modus_ist_400() {
     let id = einsatz["id"].as_i64().unwrap();
 
     // Validation-Fehler → 400 (Hauskonvention, wie bei ungültiger einsatzart).
-    let (status, _) = einstellungen_put(&app, &admin, id, json!({ "basemap_modus": "satellit" })).await;
+    let (status, _) =
+        einstellungen_put(&app, &admin, id, json!({ "basemap_modus": "satellit" })).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
@@ -1260,7 +1279,10 @@ async fn einstellungen_get_org_defaults_ohne_audit() {
     assert_eq!(status, StatusCode::OK);
 
     // org_defaults muss vorhanden sein (auch wenn alle Felder null).
-    assert!(v["org_defaults"].is_object(), "org_defaults fehlt in Antwort");
+    assert!(
+        v["org_defaults"].is_object(),
+        "org_defaults fehlt in Antwort"
+    );
     // Audit-Felder dürfen NICHT im org_defaults-Objekt auftauchen (Sicherheitsanforderung).
     assert!(
         v["org_defaults"].get("geaendert_von").is_none(),
@@ -1338,21 +1360,25 @@ async fn einstellungen_put_retention_dauer_persistiert_validiert_und_hebt_auf() 
     let id = einsatz["id"].as_i64().unwrap();
 
     // Gültige Dauer persistiert.
-    let (status, v) = einstellungen_put(&app, &admin, id, json!({ "retention_dauer_tage": 365 })).await;
+    let (status, v) =
+        einstellungen_put(&app, &admin, id, json!({ "retention_dauer_tage": 365 })).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(v["retention_dauer_tage"], 365);
     let (_, v) = einstellungen_get(&app, &admin, id).await;
     assert_eq!(v["retention_dauer_tage"], 365);
 
     // Ungültige Dauer (0 = Instant-Purge) → 400.
-    let (status, _) = einstellungen_put(&app, &admin, id, json!({ "retention_dauer_tage": 0 })).await;
+    let (status, _) =
+        einstellungen_put(&app, &admin, id, json!({ "retention_dauer_tage": 0 })).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     // Zu groß → 400.
-    let (status, _) = einstellungen_put(&app, &admin, id, json!({ "retention_dauer_tage": 3651 })).await;
+    let (status, _) =
+        einstellungen_put(&app, &admin, id, json!({ "retention_dauer_tage": 3651 })).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 
     // null hebt die Politik auf (Vollersatz-PUT).
-    let (status, v) = einstellungen_put(&app, &admin, id, json!({ "retention_dauer_tage": null })).await;
+    let (status, v) =
+        einstellungen_put(&app, &admin, id, json!({ "retention_dauer_tage": null })).await;
     assert_eq!(status, StatusCode::OK);
     assert!(v["retention_dauer_tage"].is_null());
 }
@@ -1379,7 +1405,8 @@ async fn einstellungen_put_auf_abgeschlossenem_ist_409() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 
-    let (status, _) = einstellungen_put(&app, &admin, id, json!({ "basemap_modus": "online" })).await;
+    let (status, _) =
+        einstellungen_put(&app, &admin, id, json!({ "basemap_modus": "online" })).await;
     assert_eq!(status, StatusCode::CONFLICT);
 }
 
@@ -1423,8 +1450,7 @@ async fn einstellungen_put_ungueltige_konventionen_sind_400() {
 
     let (status, _) = einstellungen_put(&app, &admin, id, json!({ "zeitformat": "48h" })).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
-    let (status, _) =
-        einstellungen_put(&app, &admin, id, json!({ "einheiten": "nautisch" })).await;
+    let (status, _) = einstellungen_put(&app, &admin, id, json!({ "einheiten": "nautisch" })).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     let (status, _) =
         einstellungen_put(&app, &admin, id, json!({ "koordinatenformat": "gauss" })).await;
@@ -1521,15 +1547,33 @@ async fn einstellungen_verhalten_ungueltig_ist_400() {
     let (_, einsatz) = einsatz_anlegen(&app, &admin, "Lage").await;
     let id = einsatz["id"].as_i64().unwrap();
 
-    let (s, _) = einstellungen_put(&app, &admin, id, json!({ "etb_nummer_praefix": "123456789" })).await;
+    let (s, _) = einstellungen_put(
+        &app,
+        &admin,
+        id,
+        json!({ "etb_nummer_praefix": "123456789" }),
+    )
+    .await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "Präfix > 8 Zeichen");
     let (s, _) = einstellungen_put(&app, &admin, id, json!({ "etb_nummer_praefix": "EB#" })).await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "Präfix mit ungültigem Zeichen");
     let (s, _) = einstellungen_put(&app, &admin, id, json!({ "etb_nummer_start": 0 })).await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "Startwert 0");
-    let (s, _) = einstellungen_put(&app, &admin, id, json!({ "meldung_bestaetigung_frist_min": 0 })).await;
+    let (s, _) = einstellungen_put(
+        &app,
+        &admin,
+        id,
+        json!({ "meldung_bestaetigung_frist_min": 0 }),
+    )
+    .await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "Frist 0");
-    let (s, _) = einstellungen_put(&app, &admin, id, json!({ "auftrag_quittierung_frist_min": 99999 })).await;
+    let (s, _) = einstellungen_put(
+        &app,
+        &admin,
+        id,
+        json!({ "auftrag_quittierung_frist_min": 99999 }),
+    )
+    .await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "Frist > 1 Woche");
 }
 
@@ -1549,13 +1593,25 @@ async fn einstellungen_freeze_409_je_nummernkreis_und_xor() {
 
     // Änderung am eingefrorenen ETB-Kreis → 409.
     let (s, _) = einstellungen_put(&app, &admin, id, json!({ "etb_nummer_start": 5 })).await;
-    assert_eq!(s, StatusCode::CONFLICT, "geänderter Startwert bei vergebener Nummer → 409");
+    assert_eq!(
+        s,
+        StatusCode::CONFLICT,
+        "geänderter Startwert bei vergebener Nummer → 409"
+    );
     let (s, _) = einstellungen_put(&app, &admin, id, json!({ "etb_nummer_praefix": "EB-" })).await;
-    assert_eq!(s, StatusCode::CONFLICT, "geändertes Präfix bei vergebener Nummer → 409");
+    assert_eq!(
+        s,
+        StatusCode::CONFLICT,
+        "geändertes Präfix bei vergebener Nummer → 409"
+    );
 
     // Freier Auftrags-Kreis bleibt änderbar (Kreise sind getrennt).
     let (s, _) = einstellungen_put(&app, &admin, id, json!({ "auftrag_nummer_start": 7 })).await;
-    assert_eq!(s, StatusCode::OK, "anderer (freier) Nummernkreis bleibt setzbar");
+    assert_eq!(
+        s,
+        StatusCode::OK,
+        "anderer (freier) Nummernkreis bleibt setzbar"
+    );
 
     // XOR: unveränderter ETB-Wert (weiterhin null) sperrt sich NICHT selbst aus.
     let (s, _) = einstellungen_put(
@@ -1565,7 +1621,11 @@ async fn einstellungen_freeze_409_je_nummernkreis_und_xor() {
         json!({ "etb_nummer_praefix": null, "etb_nummer_start": null, "zeitformat": "12h" }),
     )
     .await;
-    assert_eq!(s, StatusCode::OK, "unveränderter Vollersatz-PUT darf trotz Freeze durch");
+    assert_eq!(
+        s,
+        StatusCode::OK,
+        "unveränderter Vollersatz-PUT darf trotz Freeze durch"
+    );
 }
 
 #[tokio::test]
@@ -1586,7 +1646,11 @@ async fn einstellungen_freeze_ist_org_isoliert() {
     assert_eq!(v["etb_nummer_eingefroren"], false);
     assert_eq!(v["auftrag_nummer_eingefroren"], false);
     let (s, _) = einstellungen_put(&app, &admin, id_a, json!({ "etb_nummer_start": 5 })).await;
-    assert_eq!(s, StatusCode::OK, "fremder Einsatz mit Einträgen darf A nicht einfrieren");
+    assert_eq!(
+        s,
+        StatusCode::OK,
+        "fremder Einsatz mit Einträgen darf A nicht einfrieren"
+    );
 }
 
 #[tokio::test]
@@ -1611,10 +1675,13 @@ async fn einstellungen_get_enthalt_org_defaults() {
     // Einsatz-zeitzone bleibt NULL (kein Override gesetzt).
     let (status, v) = einstellungen_get(&app, &admin, id).await;
     assert_eq!(status, StatusCode::OK);
-    assert!(v["zeitzone"].is_null(), "Einsatz-Override zeitzone muss null sein, war: {:?}", v["zeitzone"]);
+    assert!(
+        v["zeitzone"].is_null(),
+        "Einsatz-Override zeitzone muss null sein, war: {:?}",
+        v["zeitzone"]
+    );
     assert_eq!(
-        v["org_defaults"]["zeitzone"],
-        "Europe/Berlin",
+        v["org_defaults"]["zeitzone"], "Europe/Berlin",
         "Org-Default zeitzone muss unter org_defaults erscheinen"
     );
 }

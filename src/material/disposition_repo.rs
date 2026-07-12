@@ -48,7 +48,9 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzMaterialAnzeige {
 
     let (bezeichnung, kategorie, bestandsnummer, traeger) = if live {
         (
-            row.live_bezeichnung.clone().unwrap_or_else(|| row.snap_bezeichnung.clone()),
+            row.live_bezeichnung
+                .clone()
+                .unwrap_or_else(|| row.snap_bezeichnung.clone()),
             row.live_kategorie,
             row.live_bestandsnummer,
             row.live_traegerorganisation,
@@ -102,7 +104,10 @@ pub async fn liste(
     .bind(einsatz_id)
     .fetch_all(pool)
     .await?;
-    Ok(rows.into_iter().map(|r| zu_anzeige(r, einsatz_aktiv)).collect())
+    Ok(rows
+        .into_iter()
+        .map(|r| zu_anzeige(r, einsatz_aktiv))
+        .collect())
 }
 
 /// Lädt eine Dispositionszeile (aufgelöst); `NotFound`, falls nicht zum Einsatz.
@@ -135,7 +140,16 @@ pub async fn disponiere_stamm(
     menge: i64,
     disponiert_von: i64,
 ) -> Result<i64, AppError> {
-    let snap = sqlx::query_as::<_, (String, Option<String>, Option<String>, Option<String>, String)>(
+    let snap = sqlx::query_as::<
+        _,
+        (
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            String,
+        ),
+    >(
         "SELECT bezeichnung, kategorie, bestandsnummer, traegerorganisation, dienststatus \
          FROM material WHERE id = ? AND org_id = ?",
     )
@@ -223,8 +237,8 @@ pub async fn aktualisiere(
     .bind(menge)
     .bind(status)
     .bind(bemerkung)
-    .bind(uhs_id.map(|_| 1_i64))      // sentinel: Some(_) → 1, None → NULL
-    .bind(uhs_id.and_then(|v| v))     // value: Some(Some(x)) → x, Some(None) → NULL
+    .bind(uhs_id.map(|_| 1_i64)) // sentinel: Some(_) → 1, None → NULL
+    .bind(uhs_id.and_then(|v| v)) // value: Some(Some(x)) → x, Some(None) → NULL
     .bind(em_id)
     .bind(einsatz_id)
     .execute(pool)
@@ -250,7 +264,10 @@ pub async fn liste_je_uhs(
     .bind(uhs_id)
     .fetch_all(pool)
     .await?;
-    Ok(rows.into_iter().map(|r| zu_anzeige(r, einsatz_aktiv)).collect())
+    Ok(rows
+        .into_iter()
+        .map(|r| zu_anzeige(r, einsatz_aktiv))
+        .collect())
 }
 
 /// Entfernt eine Dispositionszeile aus dem Einsatz (der Stamm bleibt). `NotFound`,
@@ -276,21 +293,33 @@ mod tests {
     /// Org(1) + Benutzer + Einsatz; liefert (benutzer, einsatz).
     async fn setup(pool: &SqlitePool) -> (i64, i64) {
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
-            .execute(pool).await.unwrap();
+            .execute(pool)
+            .await
+            .unwrap();
         let benutzer: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
              VALUES (1, 'Leit', 'leit', 'h') RETURNING id",
-        ).fetch_one(pool).await.unwrap();
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         let einsatz: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
-        ).fetch_one(pool).await.unwrap();
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         (benutzer, einsatz)
     }
 
     fn mat_daten(bezeichnung: &str) -> MaterialDaten<'_> {
         MaterialDaten {
-            bezeichnung, kategorie: Some("Betreuung"), bestandsnummer: None,
-            traegerorganisation: None, standort: None, bemerkung: None,
+            bezeichnung,
+            kategorie: Some("Betreuung"),
+            bestandsnummer: None,
+            traegerorganisation: None,
+            standort: None,
+            bemerkung: None,
         }
     }
 
@@ -298,9 +327,13 @@ mod tests {
     async fn disponiere_stamm_fuellt_snapshot_und_default_status() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        let m = mat_repo::anlegen(&pool, 1, mat_daten("Wolldecke")).await.unwrap();
+        let m = mat_repo::anlegen(&pool, 1, mat_daten("Wolldecke"))
+            .await
+            .unwrap();
 
-        let em = disponiere_stamm(&pool, einsatz, 1, m.id, 50, benutzer).await.unwrap();
+        let em = disponiere_stamm(&pool, einsatz, 1, m.id, 50, benutzer)
+            .await
+            .unwrap();
         let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(a.bezeichnung, "Wolldecke");
         assert_eq!(a.menge, 50);
@@ -313,10 +346,20 @@ mod tests {
     async fn disponiere_stamm_mehrfach_erlaubt() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        let m = mat_repo::anlegen(&pool, 1, mat_daten("Wolldecke")).await.unwrap();
-        disponiere_stamm(&pool, einsatz, 1, m.id, 30, benutzer).await.unwrap();
-        disponiere_stamm(&pool, einsatz, 1, m.id, 20, benutzer).await.unwrap();
-        assert_eq!(liste(&pool, einsatz, true).await.unwrap().len(), 2, "kein UNIQUE - Mengen-Splitting");
+        let m = mat_repo::anlegen(&pool, 1, mat_daten("Wolldecke"))
+            .await
+            .unwrap();
+        disponiere_stamm(&pool, einsatz, 1, m.id, 30, benutzer)
+            .await
+            .unwrap();
+        disponiere_stamm(&pool, einsatz, 1, m.id, 20, benutzer)
+            .await
+            .unwrap();
+        assert_eq!(
+            liste(&pool, einsatz, true).await.unwrap().len(),
+            2,
+            "kein UNIQUE - Mengen-Splitting"
+        );
     }
 
     #[tokio::test]
@@ -324,12 +367,19 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
         sqlx::query("INSERT INTO organisation (id, name) VALUES (2, 'Fremd')")
-            .execute(&pool).await.unwrap();
+            .execute(&pool)
+            .await
+            .unwrap();
         let fremd: i64 = sqlx::query_scalar(
             "INSERT INTO material (org_id, bezeichnung) VALUES (2, 'Fremd-Decke') RETURNING id",
-        ).fetch_one(&pool).await.unwrap();
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         assert!(matches!(
-            disponiere_stamm(&pool, einsatz, 1, fremd, 1, benutzer).await.unwrap_err(),
+            disponiere_stamm(&pool, einsatz, 1, fremd, 1, benutzer)
+                .await
+                .unwrap_err(),
             AppError::NotFound
         ));
     }
@@ -338,10 +388,16 @@ mod tests {
     async fn disponiere_stamm_ausser_dienst_ist_validation() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        let m = mat_repo::anlegen(&pool, 1, mat_daten("Wolldecke")).await.unwrap();
-        mat_repo::setze_dienststatus(&pool, 1, m.id, false).await.unwrap();
+        let m = mat_repo::anlegen(&pool, 1, mat_daten("Wolldecke"))
+            .await
+            .unwrap();
+        mat_repo::setze_dienststatus(&pool, 1, m.id, false)
+            .await
+            .unwrap();
         assert!(matches!(
-            disponiere_stamm(&pool, einsatz, 1, m.id, 1, benutzer).await.unwrap_err(),
+            disponiere_stamm(&pool, einsatz, 1, m.id, 1, benutzer)
+                .await
+                .unwrap_err(),
             AppError::Validation(_)
         ));
     }
@@ -350,10 +406,20 @@ mod tests {
     async fn adhoc_ohne_stamm() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        let em = disponiere_adhoc(&pool, einsatz, AdhocDaten {
-            bezeichnung: "Spende-Decken", kategorie: None, bestandsnummer: None,
-            traegerorganisation: Some("THW"),
-        }, 100, benutzer).await.unwrap();
+        let em = disponiere_adhoc(
+            &pool,
+            einsatz,
+            AdhocDaten {
+                bezeichnung: "Spende-Decken",
+                kategorie: None,
+                bestandsnummer: None,
+                traegerorganisation: Some("THW"),
+            },
+            100,
+            benutzer,
+        )
+        .await
+        .unwrap();
         let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert!(a.ist_adhoc && a.material_id.is_none());
         assert_eq!(a.menge, 100);
@@ -364,45 +430,88 @@ mod tests {
     async fn aktualisiere_menge_status_bemerkung_dann_entferne() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        let m = mat_repo::anlegen(&pool, 1, mat_daten("Wolldecke")).await.unwrap();
-        let em = disponiere_stamm(&pool, einsatz, 1, m.id, 50, benutzer).await.unwrap();
+        let m = mat_repo::anlegen(&pool, 1, mat_daten("Wolldecke"))
+            .await
+            .unwrap();
+        let em = disponiere_stamm(&pool, einsatz, 1, m.id, 50, benutzer)
+            .await
+            .unwrap();
 
-        aktualisiere(&pool, einsatz, em, Some(30), Some(MaterialStatus::Defekt.as_str()), Some("nass"), None).await.unwrap();
+        aktualisiere(
+            &pool,
+            einsatz,
+            em,
+            Some(30),
+            Some(MaterialStatus::Defekt.as_str()),
+            Some("nass"),
+            None,
+        )
+        .await
+        .unwrap();
         let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(a.menge, 30);
         assert_eq!(a.status, MaterialStatus::Defekt);
         assert_eq!(a.bemerkung.as_deref(), Some("nass"));
 
         // Nur Status ändern (menge/bemerkung None -> bleiben).
-        aktualisiere(&pool, einsatz, em, None, Some(MaterialStatus::Verbraucht.as_str()), None, None).await.unwrap();
+        aktualisiere(
+            &pool,
+            einsatz,
+            em,
+            None,
+            Some(MaterialStatus::Verbraucht.as_str()),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
         let b = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(b.menge, 30, "Menge unveraendert");
         assert_eq!(b.status, MaterialStatus::Verbraucht);
 
         entferne(&pool, einsatz, em).await.unwrap();
-        assert!(matches!(laden_anzeige(&pool, einsatz, em, true).await.unwrap_err(), AppError::NotFound));
+        assert!(matches!(
+            laden_anzeige(&pool, einsatz, em, true).await.unwrap_err(),
+            AppError::NotFound
+        ));
     }
 
     #[tokio::test]
     async fn aktualisiere_setzt_uhs_id_und_loese() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        let m = mat_repo::anlegen(&pool, 1, mat_daten("Wolldecke")).await.unwrap();
-        let em = disponiere_stamm(&pool, einsatz, 1, m.id, 50, benutzer).await.unwrap();
+        let m = mat_repo::anlegen(&pool, 1, mat_daten("Wolldecke"))
+            .await
+            .unwrap();
+        let em = disponiere_stamm(&pool, einsatz, 1, m.id, 50, benutzer)
+            .await
+            .unwrap();
         let u: i64 = sqlx::query_scalar(
             "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
-             VALUES (?, 'behandlungsplatz', 'BHP 50', ?, ?) RETURNING id")
-            .bind(einsatz).bind(benutzer).bind(benutzer).fetch_one(&pool).await.unwrap();
+             VALUES (?, 'behandlungsplatz', 'BHP 50', ?, ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(benutzer)
+        .bind(benutzer)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         // Zuordnen:
-        aktualisiere(&pool, einsatz, em, None, None, None, Some(Some(u))).await.unwrap();
+        aktualisiere(&pool, einsatz, em, None, None, None, Some(Some(u)))
+            .await
+            .unwrap();
         let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert_eq!(a.uhs_id, Some(u));
         // Lösen (explizit NULL):
-        aktualisiere(&pool, einsatz, em, None, None, None, Some(None)).await.unwrap();
+        aktualisiere(&pool, einsatz, em, None, None, None, Some(None))
+            .await
+            .unwrap();
         let a = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
         assert!(a.uhs_id.is_none());
         // liste_je_uhs:
-        aktualisiere(&pool, einsatz, em, None, None, None, Some(Some(u))).await.unwrap();
+        aktualisiere(&pool, einsatz, em, None, None, None, Some(Some(u)))
+            .await
+            .unwrap();
         let liste = liste_je_uhs(&pool, einsatz, u, true).await.unwrap();
         assert_eq!(liste.len(), 1);
         assert_eq!(liste[0].id, em);
@@ -412,11 +521,17 @@ mod tests {
     async fn snapshot_stabil_live_vs_snapshot() {
         let pool = crate::db::test_pool().await;
         let (benutzer, einsatz) = setup(&pool).await;
-        let m = mat_repo::anlegen(&pool, 1, mat_daten("Wolldecke")).await.unwrap();
-        let em = disponiere_stamm(&pool, einsatz, 1, m.id, 50, benutzer).await.unwrap();
+        let m = mat_repo::anlegen(&pool, 1, mat_daten("Wolldecke"))
+            .await
+            .unwrap();
+        let em = disponiere_stamm(&pool, einsatz, 1, m.id, 50, benutzer)
+            .await
+            .unwrap();
 
         // Stamm nachträglich umbenennen.
-        mat_repo::aktualisiere(&pool, 1, m.id, mat_daten("Wolldecke NEU")).await.unwrap();
+        mat_repo::aktualisiere(&pool, 1, m.id, mat_daten("Wolldecke NEU"))
+            .await
+            .unwrap();
 
         // Aktiver Einsatz + in Dienst -> Live (neuer Name); menge/status aus der Zeile.
         let live = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
@@ -428,8 +543,13 @@ mod tests {
         assert_eq!(snap.bezeichnung, "Wolldecke");
 
         // Stamm außer Dienst -> auch bei aktivem Einsatz Snapshot.
-        mat_repo::setze_dienststatus(&pool, 1, m.id, false).await.unwrap();
+        mat_repo::setze_dienststatus(&pool, 1, m.id, false)
+            .await
+            .unwrap();
         let nach_ad = laden_anzeige(&pool, einsatz, em, true).await.unwrap();
-        assert_eq!(nach_ad.bezeichnung, "Wolldecke", "ausser Dienst -> Snapshot trotz aktivem Einsatz");
+        assert_eq!(
+            nach_ad.bezeichnung, "Wolldecke",
+            "ausser Dienst -> Snapshot trotz aktivem Einsatz"
+        );
     }
 }

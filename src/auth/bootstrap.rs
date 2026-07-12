@@ -10,7 +10,17 @@ use sqlx::SqlitePool;
 /// Start-Stichworte je neu angelegter Organisation (Reihenfolge = sortier).
 /// Combobox erlaubt unabhängig davon Freitext.
 const STICHWORT_STARTLISTE: [&str; 12] = [
-    "B2", "B2Y", "B3", "B3Y", "B4", "B4Y", "MANV", "MANV7", "MANV15", "MANV50", "Sonderlage",
+    "B2",
+    "B2Y",
+    "B3",
+    "B3Y",
+    "B4",
+    "B4Y",
+    "MANV",
+    "MANV7",
+    "MANV15",
+    "MANV50",
+    "Sonderlage",
     "Übung",
 ];
 
@@ -196,7 +206,9 @@ mod tests {
     async fn generiert_passwort_wenn_keines_vorgegeben() {
         let pool = crate::db::test_pool().await;
         let erg = bootstrap_admin(&pool, "Orga", "admin", None).await.unwrap();
-        let pw = erg.generiertes_passwort.expect("Passwort muss generiert sein");
+        let pw = erg
+            .generiertes_passwort
+            .expect("Passwort muss generiert sein");
 
         let hash: String =
             sqlx::query_scalar("SELECT passwort_hash FROM benutzer WHERE benutzername = 'admin'")
@@ -232,14 +244,16 @@ mod tests {
             .await
             .unwrap();
 
-        let labels: Vec<String> = sqlx::query_scalar(
-            "SELECT label FROM fahrzeug_status ORDER BY sortier",
-        )
-        .fetch_all(&pool)
-        .await
-        .unwrap();
+        let labels: Vec<String> =
+            sqlx::query_scalar("SELECT label FROM fahrzeug_status ORDER BY sortier")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
         assert_eq!(labels.len(), 10, "zehn FMS-Default-Status erwartet");
-        assert_eq!(labels.first().map(String::as_str), Some("1 – Frei auf Funk"));
+        assert_eq!(
+            labels.first().map(String::as_str),
+            Some("1 – Frei auf Funk")
+        );
 
         // '3 – Auf Anfahrt' ist als 'gebunden' geseedet (erster Initial-Status der Disposition).
         let kat: String = sqlx::query_scalar(
@@ -254,10 +268,14 @@ mod tests {
     #[tokio::test]
     async fn seedet_qualifikations_startliste_fuer_neue_org() {
         let pool = crate::db::test_pool().await;
-        bootstrap_admin(&pool, "Orga", "admin", Some("startpw12")).await.unwrap();
-        let labels: Vec<String> = sqlx::query_scalar(
-            "SELECT label FROM qualifikation ORDER BY sortier",
-        ).fetch_all(&pool).await.unwrap();
+        bootstrap_admin(&pool, "Orga", "admin", Some("startpw12"))
+            .await
+            .unwrap();
+        let labels: Vec<String> =
+            sqlx::query_scalar("SELECT label FROM qualifikation ORDER BY sortier")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
         assert_eq!(labels.len(), 9, "neun Default-Qualifikationen erwartet");
         assert_eq!(labels.first().map(String::as_str), Some("Sanitäter"));
         assert!(labels.contains(&"Notarzt".to_string()));
@@ -266,25 +284,35 @@ mod tests {
     #[tokio::test]
     async fn seedet_personal_status_startliste_fuer_neue_org() {
         let pool = crate::db::test_pool().await;
-        bootstrap_admin(&pool, "Orga", "admin", Some("startpw12")).await.unwrap();
-        let labels: Vec<String> = sqlx::query_scalar(
-            "SELECT label FROM personal_status ORDER BY sortier",
-        ).fetch_all(&pool).await.unwrap();
+        bootstrap_admin(&pool, "Orga", "admin", Some("startpw12"))
+            .await
+            .unwrap();
+        let labels: Vec<String> =
+            sqlx::query_scalar("SELECT label FROM personal_status ORDER BY sortier")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
         assert_eq!(labels.len(), 6, "sechs Default-Personal-Status erwartet");
         // 'alarmiert' ist als 'gebunden' geseedet (erster Initial-Status der Disposition).
-        let kat: String = sqlx::query_scalar(
-            "SELECT kategorie FROM personal_status WHERE label = 'alarmiert'",
-        ).fetch_one(&pool).await.unwrap();
+        let kat: String =
+            sqlx::query_scalar("SELECT kategorie FROM personal_status WHERE label = 'alarmiert'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(kat, "gebunden");
     }
 
     #[tokio::test]
     async fn seedet_einheit_typ_startliste_fuer_neue_org() {
         let pool = crate::db::test_pool().await;
-        bootstrap_admin(&pool, "Orga", "admin", Some("startpw12")).await.unwrap();
-        let labels: Vec<String> = sqlx::query_scalar(
-            "SELECT label FROM einheit_typ ORDER BY sortier",
-        ).fetch_all(&pool).await.unwrap();
+        bootstrap_admin(&pool, "Orga", "admin", Some("startpw12"))
+            .await
+            .unwrap();
+        let labels: Vec<String> =
+            sqlx::query_scalar("SELECT label FROM einheit_typ ORDER BY sortier")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
         assert_eq!(labels.len(), 5, "fünf Default-Einheitstypen erwartet");
         assert_eq!(labels.first().map(String::as_str), Some("Trupp"));
         assert!(labels.contains(&"Zug".to_string()));
@@ -294,9 +322,11 @@ mod tests {
             "SELECT soll_fuehrer, soll_unterfuehrer, soll_mannschaft FROM einheit_typ WHERE label = 'Zug'",
         ).fetch_one(&pool).await.unwrap();
         assert_eq!((zf, zu, zm), (Some(1), Some(3), Some(18)));
-        let sonstige: (Option<i64>,) = sqlx::query_as(
-            "SELECT soll_fuehrer FROM einheit_typ WHERE label = 'Sonstige'",
-        ).fetch_one(&pool).await.unwrap();
+        let sonstige: (Option<i64>,) =
+            sqlx::query_as("SELECT soll_fuehrer FROM einheit_typ WHERE label = 'Sonstige'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(sonstige.0, None);
     }
 
@@ -318,12 +348,17 @@ mod tests {
     #[tokio::test]
     async fn ist_idempotent_bei_vorhandenen_benutzern() {
         let pool = crate::db::test_pool().await;
-        bootstrap_admin(&pool, "Orga", "admin", Some("pw")).await.unwrap();
+        bootstrap_admin(&pool, "Orga", "admin", Some("pw"))
+            .await
+            .unwrap();
 
         let erg2 = bootstrap_admin(&pool, "Orga", "admin2", Some("pw2"))
             .await
             .unwrap();
-        assert!(!erg2.admin_angelegt, "zweiter Bootstrap darf nichts anlegen");
+        assert!(
+            !erg2.admin_angelegt,
+            "zweiter Bootstrap darf nichts anlegen"
+        );
 
         let anzahl: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM benutzer")
             .fetch_one(&pool)

@@ -40,7 +40,11 @@ pub async fn eintrag(pool: &SqlitePool, schluessel: &str) -> Option<(FachebeneAn
 }
 
 /// Frischen Eintrag (jünger als `ttl_sekunden`) liefern, sonst None.
-pub async fn frisch(pool: &SqlitePool, schluessel: &str, ttl_sekunden: i64) -> Option<FachebeneAntwort> {
+pub async fn frisch(
+    pool: &SqlitePool,
+    schluessel: &str,
+    ttl_sekunden: i64,
+) -> Option<FachebeneAntwort> {
     let json: Option<String> = sqlx::query_scalar(
         "SELECT antwort_json FROM fachebenen_cache \
          WHERE schluessel = ? AND unixepoch() - gespeichert_at < ?",
@@ -157,11 +161,15 @@ mod tests {
         let pool = crate::db::test_pool().await;
         setze(&pool, "dwd", &FachebeneAntwort::offline("dwd", "a")).await;
         setze(&pool, "dwd", &antwort()).await;
-        let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM fachebenen_cache WHERE schluessel='dwd'")
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+        let n: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM fachebenen_cache WHERE schluessel='dwd'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(n, 1);
-        assert_eq!(frisch(&pool, "dwd", 60).await.unwrap().status, FachebeneStatus::Ok);
+        assert_eq!(
+            frisch(&pool, "dwd", 60).await.unwrap().status,
+            FachebeneStatus::Ok
+        );
     }
 }

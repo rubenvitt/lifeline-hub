@@ -1,6 +1,6 @@
 use super::{leere_abschnitte, vorlage, Abschnitt, STATUS_ENTWURF, STATUS_FREIGEGEBEN};
-use crate::etb::{self, repo as etb_repo};
 use crate::error::AppError;
+use crate::etb::{self, repo as etb_repo};
 use serde::Serialize;
 use sqlx::SqlitePool;
 use utoipa::ToSchema;
@@ -94,7 +94,10 @@ fn zu_anzeige(row: Row) -> Result<LageberichtAnzeige, AppError> {
 }
 
 /// Alle Berichte eines Einsatzes, neueste Fortschreibung/Anlage zuerst.
-pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<LageberichtAnzeige>, AppError> {
+pub async fn liste(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<Vec<LageberichtAnzeige>, AppError> {
     let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
         "{SELECT} WHERE l.einsatz_id = ? ORDER BY l.zeitstand DESC, l.id DESC"
     )))
@@ -105,13 +108,19 @@ pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<Lagebericht
 }
 
 /// Lädt einen Bericht (aufgelöst); `NotFound`, wenn nicht zum Einsatz.
-pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<LageberichtAnzeige, AppError> {
-    let row = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!("{SELECT} WHERE l.id = ? AND l.einsatz_id = ?")))
-        .bind(id)
-        .bind(einsatz_id)
-        .fetch_optional(pool)
-        .await?
-        .ok_or(AppError::NotFound)?;
+pub async fn laden(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<LageberichtAnzeige, AppError> {
+    let row = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
+        "{SELECT} WHERE l.id = ? AND l.einsatz_id = ?"
+    )))
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)?;
     zu_anzeige(row)
 }
 
@@ -125,7 +134,8 @@ pub async fn anlegen(
     zeitstand: &str,
     ersteller_id: i64,
 ) -> Result<LageberichtAnzeige, AppError> {
-    let v = vorlage(vorlage_key).ok_or_else(|| AppError::Validation("Unbekannte Vorlage".into()))?;
+    let v =
+        vorlage(vorlage_key).ok_or_else(|| AppError::Validation("Unbekannte Vorlage".into()))?;
     let skelett = serde_json::to_string(&leere_abschnitte(v))
         .map_err(|e| AppError::Internal(e.to_string()))?;
     let id = sqlx::query_scalar::<_, i64>(
@@ -164,10 +174,15 @@ pub async fn aktualisiere(
             aktualisiert_at = datetime('now') \
          WHERE id = ? AND einsatz_id = ? AND status = ?",
     )
-    .bind(patch.titel.is_some()).bind(patch.titel)
-    .bind(patch.zeitstand.is_some()).bind(patch.zeitstand)
-    .bind(abschnitte_json.is_some()).bind(abschnitte_json.as_deref())
-    .bind(id).bind(einsatz_id).bind(STATUS_ENTWURF)
+    .bind(patch.titel.is_some())
+    .bind(patch.titel)
+    .bind(patch.zeitstand.is_some())
+    .bind(patch.zeitstand)
+    .bind(abschnitte_json.is_some())
+    .bind(abschnitte_json.as_deref())
+    .bind(id)
+    .bind(einsatz_id)
+    .bind(STATUS_ENTWURF)
     .execute(pool)
     .await?
     .rows_affected();
@@ -327,12 +342,23 @@ mod tests {
     async fn anlegen_erzeugt_entwurf_mit_skelett() {
         let pool = crate::db::test_pool().await;
         let (einsatz, ersteller) = setup(&pool).await;
-        let lb = anlegen(&pool, einsatz, "lagebericht", "Lage 10:00", "2026-06-02 10:00:00", ersteller)
-            .await.unwrap();
+        let lb = anlegen(
+            &pool,
+            einsatz,
+            "lagebericht",
+            "Lage 10:00",
+            "2026-06-02 10:00:00",
+            ersteller,
+        )
+        .await
+        .unwrap();
         assert_eq!(lb.vorlage, "lagebericht");
         assert_eq!(lb.status, STATUS_ENTWURF);
         assert_eq!(lb.version, 1);
-        assert_eq!(lb.abschnitte.len(), vorlage("lagebericht").unwrap().abschnitte.len());
+        assert_eq!(
+            lb.abschnitte.len(),
+            vorlage("lagebericht").unwrap().abschnitte.len()
+        );
         assert!(lb.abschnitte.iter().all(|a| a.text.is_empty()));
         let geladen = laden(&pool, einsatz, lb.id).await.unwrap();
         assert_eq!(geladen, lb);
@@ -344,19 +370,52 @@ mod tests {
     async fn fremder_einsatz_ist_notfound() {
         let pool = crate::db::test_pool().await;
         let (einsatz, ersteller) = setup(&pool).await;
-        let lb = anlegen(&pool, einsatz, "freitext", "X", "2026-06-02 10:00:00", ersteller).await.unwrap();
-        assert!(matches!(laden(&pool, 999, lb.id).await.unwrap_err(), crate::error::AppError::NotFound));
+        let lb = anlegen(
+            &pool,
+            einsatz,
+            "freitext",
+            "X",
+            "2026-06-02 10:00:00",
+            ersteller,
+        )
+        .await
+        .unwrap();
+        assert!(matches!(
+            laden(&pool, 999, lb.id).await.unwrap_err(),
+            crate::error::AppError::NotFound
+        ));
     }
 
     #[tokio::test]
     async fn aktualisiere_setzt_abschnitte() {
         let pool = crate::db::test_pool().await;
         let (einsatz, ersteller) = setup(&pool).await;
-        let lb = anlegen(&pool, einsatz, "freitext", "X", "2026-06-02 10:00:00", ersteller).await.unwrap();
-        let neu = vec![Abschnitt { schluessel: "text".into(), text: "Inhalt".into() }];
-        let upd = aktualisiere(&pool, einsatz, lb.id, LageberichtPatch {
-            titel: Some("Neu"), zeitstand: None, abschnitte: Some(&neu),
-        }).await.unwrap();
+        let lb = anlegen(
+            &pool,
+            einsatz,
+            "freitext",
+            "X",
+            "2026-06-02 10:00:00",
+            ersteller,
+        )
+        .await
+        .unwrap();
+        let neu = vec![Abschnitt {
+            schluessel: "text".into(),
+            text: "Inhalt".into(),
+        }];
+        let upd = aktualisiere(
+            &pool,
+            einsatz,
+            lb.id,
+            LageberichtPatch {
+                titel: Some("Neu"),
+                zeitstand: None,
+                abschnitte: Some(&neu),
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(upd.titel, "Neu");
         assert_eq!(upd.abschnitte, neu);
     }
@@ -367,15 +426,59 @@ mod tests {
         // freigegebenen Bericht nicht überschreiben (Race-Absicherung).
         let pool = crate::db::test_pool().await;
         let (einsatz, ersteller) = setup(&pool).await;
-        let lb = anlegen(&pool, einsatz, "freitext", "X", "2026-06-02 10:00:00", ersteller).await.unwrap();
-        let gefuellt = vec![Abschnitt { schluessel: "text".into(), text: "Inhalt".into() }];
-        aktualisiere(&pool, einsatz, lb.id, LageberichtPatch { titel: None, zeitstand: None, abschnitte: Some(&gefuellt) }).await.unwrap();
-        freigeben(&pool, einsatz, lb.id, ersteller, "render", "2026-06-02 10:00:00").await.unwrap();
+        let lb = anlegen(
+            &pool,
+            einsatz,
+            "freitext",
+            "X",
+            "2026-06-02 10:00:00",
+            ersteller,
+        )
+        .await
+        .unwrap();
+        let gefuellt = vec![Abschnitt {
+            schluessel: "text".into(),
+            text: "Inhalt".into(),
+        }];
+        aktualisiere(
+            &pool,
+            einsatz,
+            lb.id,
+            LageberichtPatch {
+                titel: None,
+                zeitstand: None,
+                abschnitte: Some(&gefuellt),
+            },
+        )
+        .await
+        .unwrap();
+        freigeben(
+            &pool,
+            einsatz,
+            lb.id,
+            ersteller,
+            "render",
+            "2026-06-02 10:00:00",
+        )
+        .await
+        .unwrap();
 
-        let nachtrag = vec![Abschnitt { schluessel: "text".into(), text: "Manipuliert".into() }];
-        let err = aktualisiere(&pool, einsatz, lb.id, LageberichtPatch {
-            titel: Some("Hack"), zeitstand: None, abschnitte: Some(&nachtrag),
-        }).await.unwrap_err();
+        let nachtrag = vec![Abschnitt {
+            schluessel: "text".into(),
+            text: "Manipuliert".into(),
+        }];
+        let err = aktualisiere(
+            &pool,
+            einsatz,
+            lb.id,
+            LageberichtPatch {
+                titel: Some("Hack"),
+                zeitstand: None,
+                abschnitte: Some(&nachtrag),
+            },
+        )
+        .await
+        .unwrap_err();
         assert!(matches!(err, crate::error::AppError::NotFound));
     }
 
@@ -383,12 +486,45 @@ mod tests {
     async fn freigeben_schreibt_etb_und_macht_immutable() {
         let pool = crate::db::test_pool().await;
         let (einsatz, ersteller) = setup(&pool).await;
-        let lb = anlegen(&pool, einsatz, "freitext", "Lage 10:00", "2026-06-02 10:00:00", ersteller).await.unwrap();
-        let gefuellt = vec![Abschnitt { schluessel: "text".into(), text: "Hochwasser steigt.".into() }];
-        aktualisiere(&pool, einsatz, lb.id, LageberichtPatch { titel: None, zeitstand: None, abschnitte: Some(&gefuellt) }).await.unwrap();
+        let lb = anlegen(
+            &pool,
+            einsatz,
+            "freitext",
+            "Lage 10:00",
+            "2026-06-02 10:00:00",
+            ersteller,
+        )
+        .await
+        .unwrap();
+        let gefuellt = vec![Abschnitt {
+            schluessel: "text".into(),
+            text: "Hochwasser steigt.".into(),
+        }];
+        aktualisiere(
+            &pool,
+            einsatz,
+            lb.id,
+            LageberichtPatch {
+                titel: None,
+                zeitstand: None,
+                abschnitte: Some(&gefuellt),
+            },
+        )
+        .await
+        .unwrap();
 
-        let render = "# Lage 10:00\n\n_Zeitstand: 2026-06-02 10:00:00_\n\n## Bericht\nHochwasser steigt.\n";
-        let frei = freigeben(&pool, einsatz, lb.id, ersteller, render, "2026-06-02 10:00:00").await.unwrap();
+        let render =
+            "# Lage 10:00\n\n_Zeitstand: 2026-06-02 10:00:00_\n\n## Bericht\nHochwasser steigt.\n";
+        let frei = freigeben(
+            &pool,
+            einsatz,
+            lb.id,
+            ersteller,
+            render,
+            "2026-06-02 10:00:00",
+        )
+        .await
+        .unwrap();
         assert_eq!(frei.status, super::STATUS_FREIGEGEBEN);
         assert!(frei.etb_eintrag_id.is_some());
         assert_eq!(frei.freigegeben_von_id, Some(ersteller));
@@ -399,10 +535,23 @@ mod tests {
         assert_eq!(anzahl, 1);
 
         // Nochmals freigeben schlägt fehl (nicht mehr im Entwurf) → kein zweiter Eintrag.
-        assert!(freigeben(&pool, einsatz, lb.id, ersteller, render, "2026-06-02 10:00:00").await.is_err());
+        assert!(freigeben(
+            &pool,
+            einsatz,
+            lb.id,
+            ersteller,
+            render,
+            "2026-06-02 10:00:00"
+        )
+        .await
+        .is_err());
         let anzahl2: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'lage'",
-        ).bind(einsatz).fetch_one(&pool).await.unwrap();
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         assert_eq!(anzahl2, 1);
     }
 
@@ -410,12 +559,46 @@ mod tests {
     async fn fortschreiben_erzeugt_version_2_mit_vorgaenger() {
         let pool = crate::db::test_pool().await;
         let (einsatz, ersteller) = setup(&pool).await;
-        let lb = anlegen(&pool, einsatz, "freitext", "Lage 10:00", "2026-06-02 10:00:00", ersteller).await.unwrap();
-        let gefuellt = vec![Abschnitt { schluessel: "text".into(), text: "A".into() }];
-        aktualisiere(&pool, einsatz, lb.id, LageberichtPatch { titel: None, zeitstand: None, abschnitte: Some(&gefuellt) }).await.unwrap();
-        freigeben(&pool, einsatz, lb.id, ersteller, "render", "2026-06-02 10:00:00").await.unwrap();
+        let lb = anlegen(
+            &pool,
+            einsatz,
+            "freitext",
+            "Lage 10:00",
+            "2026-06-02 10:00:00",
+            ersteller,
+        )
+        .await
+        .unwrap();
+        let gefuellt = vec![Abschnitt {
+            schluessel: "text".into(),
+            text: "A".into(),
+        }];
+        aktualisiere(
+            &pool,
+            einsatz,
+            lb.id,
+            LageberichtPatch {
+                titel: None,
+                zeitstand: None,
+                abschnitte: Some(&gefuellt),
+            },
+        )
+        .await
+        .unwrap();
+        freigeben(
+            &pool,
+            einsatz,
+            lb.id,
+            ersteller,
+            "render",
+            "2026-06-02 10:00:00",
+        )
+        .await
+        .unwrap();
 
-        let fort = fortschreiben(&pool, einsatz, lb.id, ersteller, "2026-06-02 12:00:00").await.unwrap();
+        let fort = fortschreiben(&pool, einsatz, lb.id, ersteller, "2026-06-02 12:00:00")
+            .await
+            .unwrap();
         assert_eq!(fort.version, 2);
         assert_eq!(fort.vorgaenger_id, Some(lb.id));
         assert_eq!(fort.status, STATUS_ENTWURF);
@@ -429,7 +612,20 @@ mod tests {
     async fn fortschreiben_nur_aus_freigegebenem() {
         let pool = crate::db::test_pool().await;
         let (einsatz, ersteller) = setup(&pool).await;
-        let lb = anlegen(&pool, einsatz, "freitext", "X", "2026-06-02 10:00:00", ersteller).await.unwrap();
-        assert!(fortschreiben(&pool, einsatz, lb.id, ersteller, "2026-06-02 12:00:00").await.is_err());
+        let lb = anlegen(
+            &pool,
+            einsatz,
+            "freitext",
+            "X",
+            "2026-06-02 10:00:00",
+            ersteller,
+        )
+        .await
+        .unwrap();
+        assert!(
+            fortschreiben(&pool, einsatz, lb.id, ersteller, "2026-06-02 12:00:00")
+                .await
+                .is_err()
+        );
     }
 }

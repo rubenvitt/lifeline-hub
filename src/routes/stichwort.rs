@@ -30,7 +30,9 @@ pub async fn anlegen(
 ) -> Result<(StatusCode, Json<StichwortVorschlag>), AppError> {
     let text = req.text.trim();
     if text.is_empty() {
-        return Err(AppError::Validation("Stichwort darf nicht leer sein".into()));
+        return Err(AppError::Validation(
+            "Stichwort darf nicht leer sein".into(),
+        ));
     }
     let vorschlag = stichwort::anlegen(&state.pool, benutzer.org_id, text).await?;
     Ok((StatusCode::CREATED, Json(vorschlag)))

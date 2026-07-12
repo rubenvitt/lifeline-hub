@@ -67,12 +67,16 @@ fn zu_anzeige(row: Row) -> EinsatzabschnittAnzeige {
 }
 
 /// Alle Abschnitte eines Einsatzes (flach, aufgelöst), sortiert nach `sortier`, dann `id`.
-pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<EinsatzabschnittAnzeige>, AppError> {
+pub async fn liste(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<Vec<EinsatzabschnittAnzeige>, AppError> {
     let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
         "{SELECT_AUFGELOEST} WHERE a.einsatz_id = ? ORDER BY a.sortier, a.id"
     )))
     .bind(einsatz_id)
-    .fetch_all(pool).await?;
+    .fetch_all(pool)
+    .await?;
     let mut ergebnis = Vec::with_capacity(rows.len());
     for row in rows {
         let id = row.id;
@@ -85,12 +89,20 @@ pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<Einsatzabsc
 }
 
 /// Lädt einen Abschnitt (aufgelöst); `NotFound`, falls nicht zum Einsatz.
-pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<EinsatzabschnittAnzeige, AppError> {
-    let mut anzeige = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!("{SELECT_AUFGELOEST} WHERE a.id = ? AND a.einsatz_id = ?")))
-        .bind(id).bind(einsatz_id)
-        .fetch_optional(pool).await?
-        .map(zu_anzeige)
-        .ok_or(AppError::NotFound)?;
+pub async fn laden(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<EinsatzabschnittAnzeige, AppError> {
+    let mut anzeige = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_AUFGELOEST} WHERE a.id = ? AND a.einsatz_id = ?"
+    )))
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?
+    .map(zu_anzeige)
+    .ok_or(AppError::NotFound)?;
     let sgs = crate::sprechgruppe::repo::lade_abschnitt_sprechgruppen(pool, id).await?;
     anzeige.sprechgruppen = sgs.into_iter().map(|s| s.anzeige()).collect();
     Ok(anzeige)
@@ -98,26 +110,38 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<Einsat
 
 /// Prüft, ob ein Abschnitt zum Einsatz gehört (für Parent-Validierung). `NotFound` sonst.
 async fn pruefe_parent(pool: &SqlitePool, einsatz_id: i64, parent_id: i64) -> Result<(), AppError> {
-    let treffer: Option<i64> = sqlx::query_scalar(
-        "SELECT 1 FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?",
-    ).bind(parent_id).bind(einsatz_id).fetch_optional(pool).await?;
+    let treffer: Option<i64> =
+        sqlx::query_scalar("SELECT 1 FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?")
+            .bind(parent_id)
+            .bind(einsatz_id)
+            .fetch_optional(pool)
+            .await?;
     treffer.map(|_| ()).ok_or(AppError::NotFound)
 }
 
 /// Prüft, ob `leiter_id` eine disponierte Person *desselben* Einsatzes ist.
 async fn pruefe_leiter(pool: &SqlitePool, einsatz_id: i64, leiter_id: i64) -> Result<(), AppError> {
-    let treffer: Option<i64> = sqlx::query_scalar(
-        "SELECT 1 FROM einsatz_personal WHERE id = ? AND einsatz_id = ?",
-    ).bind(leiter_id).bind(einsatz_id).fetch_optional(pool).await?;
-    treffer.map(|_| ()).ok_or_else(|| AppError::Validation(
-        "Abschnittsleiter muss eine disponierte Person des Einsatzes sein".into(),
-    ))
+    let treffer: Option<i64> =
+        sqlx::query_scalar("SELECT 1 FROM einsatz_personal WHERE id = ? AND einsatz_id = ?")
+            .bind(leiter_id)
+            .bind(einsatz_id)
+            .fetch_optional(pool)
+            .await?;
+    treffer.map(|_| ()).ok_or_else(|| {
+        AppError::Validation(
+            "Abschnittsleiter muss eine disponierte Person des Einsatzes sein".into(),
+        )
+    })
 }
 
 /// Ob `kandidat` ein Nachfahre von `start` ist (oder `kandidat == start`): verhindert
 /// Zyklen beim Setzen von `ueber_abschnitt_id = kandidat` für den Knoten `start`.
 /// Läuft von `kandidat` nach oben; trifft er auf `start`, läge ein Zyklus vor.
-async fn waere_zyklus(pool: &SqlitePool, start_id: i64, kandidat_parent: i64) -> Result<bool, AppError> {
+async fn waere_zyklus(
+    pool: &SqlitePool,
+    start_id: i64,
+    kandidat_parent: i64,
+) -> Result<bool, AppError> {
     let mut aktuell = Some(kandidat_parent);
     // Begrenzung gegen korrupte Altdaten: Anzahl Knoten ist endlich.
     let mut schritte = 0;
@@ -131,7 +155,11 @@ async fn waere_zyklus(pool: &SqlitePool, start_id: i64, kandidat_parent: i64) ->
         }
         aktuell = sqlx::query_scalar::<_, Option<i64>>(
             "SELECT ueber_abschnitt_id FROM einsatzabschnitt WHERE id = ?",
-        ).bind(id).fetch_optional(pool).await?.flatten();
+        )
+        .bind(id)
+        .fetch_optional(pool)
+        .await?
+        .flatten();
     }
     Ok(false)
 }
@@ -161,7 +189,11 @@ async fn validiere(
 }
 
 /// Legt einen Abschnitt an (nach Validierung). Liefert die aufgelöste Anzeige.
-pub async fn anlegen(pool: &SqlitePool, einsatz_id: i64, daten: AbschnittDaten<'_>) -> Result<EinsatzabschnittAnzeige, AppError> {
+pub async fn anlegen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    daten: AbschnittDaten<'_>,
+) -> Result<EinsatzabschnittAnzeige, AppError> {
     validiere(pool, einsatz_id, None, &daten).await?;
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatzabschnitt \
@@ -169,17 +201,27 @@ pub async fn anlegen(pool: &SqlitePool, einsatz_id: i64, daten: AbschnittDaten<'
              kommunikationsmittel, erreichbarkeit, sortier) \
          VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
-    .bind(einsatz_id).bind(daten.ueber_abschnitt_id).bind(daten.name)
-    .bind(daten.leiter_id).bind(daten.bemerkung)
-    .bind(daten.kommunikationsmittel).bind(daten.erreichbarkeit)
+    .bind(einsatz_id)
+    .bind(daten.ueber_abschnitt_id)
+    .bind(daten.name)
+    .bind(daten.leiter_id)
+    .bind(daten.bemerkung)
+    .bind(daten.kommunikationsmittel)
+    .bind(daten.erreichbarkeit)
     .bind(daten.sortier)
-    .fetch_one(pool).await?;
+    .fetch_one(pool)
+    .await?;
     laden(pool, einsatz_id, id).await
 }
 
 /// Vollersatz der editierbaren Felder (Parent-Wechsel zyklenfrei). `NotFound`,
 /// falls der Abschnitt nicht zum Einsatz gehört.
-pub async fn aktualisiere(pool: &SqlitePool, einsatz_id: i64, id: i64, daten: AbschnittDaten<'_>) -> Result<EinsatzabschnittAnzeige, AppError> {
+pub async fn aktualisiere(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+    daten: AbschnittDaten<'_>,
+) -> Result<EinsatzabschnittAnzeige, AppError> {
     // Existenz im Einsatz sichern (auch für die self_id-Zyklenprüfung).
     laden(pool, einsatz_id, id).await?;
     validiere(pool, einsatz_id, Some(id), &daten).await?;
@@ -188,11 +230,17 @@ pub async fn aktualisiere(pool: &SqlitePool, einsatz_id: i64, id: i64, daten: Ab
                 bemerkung = ?, kommunikationsmittel = ?, erreichbarkeit = ?, sortier = ? \
          WHERE id = ? AND einsatz_id = ?",
     )
-    .bind(daten.ueber_abschnitt_id).bind(daten.name).bind(daten.leiter_id)
+    .bind(daten.ueber_abschnitt_id)
+    .bind(daten.name)
+    .bind(daten.leiter_id)
     .bind(daten.bemerkung)
-    .bind(daten.kommunikationsmittel).bind(daten.erreichbarkeit)
-    .bind(daten.sortier).bind(id).bind(einsatz_id)
-    .execute(pool).await?;
+    .bind(daten.kommunikationsmittel)
+    .bind(daten.erreichbarkeit)
+    .bind(daten.sortier)
+    .bind(id)
+    .bind(einsatz_id)
+    .execute(pool)
+    .await?;
     if resultat.rows_affected() == 0 {
         return Err(AppError::NotFound);
     }
@@ -221,11 +269,17 @@ pub async fn aktualisiere_flaeche(
             tz_organisation = CASE WHEN ? THEN ? ELSE tz_organisation END \
          WHERE id = ? AND einsatz_id = ?",
     )
-    .bind(daten.flaeche_geojson.is_some()).bind(daten.flaeche_geojson.flatten())
-    .bind(daten.tz_fachaufgabe.is_some()).bind(daten.tz_fachaufgabe.flatten())
-    .bind(daten.tz_organisation.is_some()).bind(daten.tz_organisation.flatten())
-    .bind(aid).bind(einsatz_id)
-    .execute(pool).await?.rows_affected();
+    .bind(daten.flaeche_geojson.is_some())
+    .bind(daten.flaeche_geojson.flatten())
+    .bind(daten.tz_fachaufgabe.is_some())
+    .bind(daten.tz_fachaufgabe.flatten())
+    .bind(daten.tz_organisation.is_some())
+    .bind(daten.tz_organisation.flatten())
+    .bind(aid)
+    .bind(einsatz_id)
+    .execute(pool)
+    .await?
+    .rows_affected();
     if betroffen == 0 {
         return Err(AppError::NotFound);
     }
@@ -239,15 +293,28 @@ pub async fn loese_auf(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<()
     // Parent des aufzulösenden Knotens ermitteln (und Einsatz-Zugehörigkeit sichern).
     let parent: Option<i64> = sqlx::query_scalar(
         "SELECT ueber_abschnitt_id FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?",
-    ).bind(id).bind(einsatz_id).fetch_optional(pool).await?.ok_or(AppError::NotFound)?;
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)?;
 
     let mut tx = pool.begin().await?;
     sqlx::query("UPDATE einsatzabschnitt SET ueber_abschnitt_id = ? WHERE ueber_abschnitt_id = ? AND einsatz_id = ?")
         .bind(parent).bind(id).bind(einsatz_id).execute(&mut *tx).await?;
-    sqlx::query("UPDATE einsatz_einheit SET abschnitt_id = NULL WHERE abschnitt_id = ? AND einsatz_id = ?")
-        .bind(id).bind(einsatz_id).execute(&mut *tx).await?;
+    sqlx::query(
+        "UPDATE einsatz_einheit SET abschnitt_id = NULL WHERE abschnitt_id = ? AND einsatz_id = ?",
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .execute(&mut *tx)
+    .await?;
     sqlx::query("DELETE FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?")
-        .bind(id).bind(einsatz_id).execute(&mut *tx).await?;
+        .bind(id)
+        .bind(einsatz_id)
+        .execute(&mut *tx)
+        .await?;
     tx.commit().await?;
     Ok(())
 }
@@ -258,22 +325,36 @@ mod tests {
 
     /// Org(1) + Einsatz; liefert einsatz_id.
     async fn setup(pool: &SqlitePool) -> i64 {
-        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')").execute(pool).await.unwrap();
-        sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id")
-            .fetch_one(pool).await.unwrap()
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(pool)
+            .await
+            .unwrap();
+        sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap()
     }
 
     fn daten<'a>(name: &'a str, parent: Option<i64>, leiter: Option<i64>) -> AbschnittDaten<'a> {
         AbschnittDaten {
-            name, ueber_abschnitt_id: parent, leiter_id: leiter, bemerkung: None, sortier: 0,
-            kommunikationsmittel: None, erreichbarkeit: None,
+            name,
+            ueber_abschnitt_id: parent,
+            leiter_id: leiter,
+            bemerkung: None,
+            sortier: 0,
+            kommunikationsmittel: None,
+            erreichbarkeit: None,
         }
     }
 
     /// Org + Einsatz + ein Abschnitt; liefert (einsatz_id, abschnitt_id).
     async fn seed_abschnitt(pool: &SqlitePool) -> (i64, i64) {
         let einsatz = setup(pool).await;
-        let a = anlegen(pool, einsatz, daten("Nord", None, None)).await.unwrap();
+        let a = anlegen(pool, einsatz, daten("Nord", None, None))
+            .await
+            .unwrap();
         (einsatz, a.id)
     }
 
@@ -281,14 +362,33 @@ mod tests {
     async fn abschnitt_flaeche_setzen_und_loeschen() {
         let pool = crate::db::test_pool().await;
         let (einsatz_id, aid) = seed_abschnitt(&pool).await;
-        let gj = r#"{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}"#;
-        let a = aktualisiere_flaeche(&pool, einsatz_id, aid, FlaechePatch {
-            flaeche_geojson: Some(Some(gj)), tz_fachaufgabe: Some(Some("fuehrung")), tz_organisation: None,
-        }).await.unwrap();
+        let gj =
+            r#"{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}"#;
+        let a = aktualisiere_flaeche(
+            &pool,
+            einsatz_id,
+            aid,
+            FlaechePatch {
+                flaeche_geojson: Some(Some(gj)),
+                tz_fachaufgabe: Some(Some("fuehrung")),
+                tz_organisation: None,
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(a.flaeche_geojson.as_deref(), Some(gj));
-        let b = aktualisiere_flaeche(&pool, einsatz_id, aid, FlaechePatch {
-            flaeche_geojson: Some(None), tz_fachaufgabe: None, tz_organisation: None,
-        }).await.unwrap();
+        let b = aktualisiere_flaeche(
+            &pool,
+            einsatz_id,
+            aid,
+            FlaechePatch {
+                flaeche_geojson: Some(None),
+                tz_fachaufgabe: None,
+                tz_organisation: None,
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(b.flaeche_geojson, None);
         assert_eq!(b.tz_fachaufgabe.as_deref(), Some("fuehrung")); // unverändert
     }
@@ -298,18 +398,41 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let einsatz = setup(&pool).await;
 
-        let a = anlegen(&pool, einsatz, AbschnittDaten {
-            name: "Nord", ueber_abschnitt_id: None, leiter_id: None, bemerkung: None, sortier: 0,
-            kommunikationsmittel: Some("digitalfunk"), erreichbarkeit: Some("0151 23456"),
-        }).await.unwrap();
+        let a = anlegen(
+            &pool,
+            einsatz,
+            AbschnittDaten {
+                name: "Nord",
+                ueber_abschnitt_id: None,
+                leiter_id: None,
+                bemerkung: None,
+                sortier: 0,
+                kommunikationsmittel: Some("digitalfunk"),
+                erreichbarkeit: Some("0151 23456"),
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(a.kommunikationsmittel.as_deref(), Some("digitalfunk"));
         assert_eq!(a.erreichbarkeit.as_deref(), Some("0151 23456"));
 
         // Voll-Ersatz: kommunikationsmittel geändert, erreichbarkeit geleert (→ None).
-        let b = aktualisiere(&pool, einsatz, a.id, AbschnittDaten {
-            name: "Nord", ueber_abschnitt_id: None, leiter_id: None, bemerkung: None, sortier: 0,
-            kommunikationsmittel: Some("mobil"), erreichbarkeit: None,
-        }).await.unwrap();
+        let b = aktualisiere(
+            &pool,
+            einsatz,
+            a.id,
+            AbschnittDaten {
+                name: "Nord",
+                ueber_abschnitt_id: None,
+                leiter_id: None,
+                bemerkung: None,
+                sortier: 0,
+                kommunikationsmittel: Some("mobil"),
+                erreichbarkeit: None,
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(b.kommunikationsmittel.as_deref(), Some("mobil"));
         assert_eq!(b.erreichbarkeit, None);
     }
@@ -323,8 +446,12 @@ mod tests {
             "INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Abschnittsleiter Nord') RETURNING id",
         ).bind(einsatz).fetch_one(&pool).await.unwrap();
 
-        let oben = anlegen(&pool, einsatz, daten("Nord", None, Some(ep))).await.unwrap();
-        anlegen(&pool, einsatz, daten("Nord-1", Some(oben.id), None)).await.unwrap();
+        let oben = anlegen(&pool, einsatz, daten("Nord", None, Some(ep)))
+            .await
+            .unwrap();
+        anlegen(&pool, einsatz, daten("Nord-1", Some(oben.id), None))
+            .await
+            .unwrap();
 
         let liste = liste(&pool, einsatz).await.unwrap();
         assert_eq!(liste.len(), 2);
@@ -338,11 +465,19 @@ mod tests {
     async fn parent_in_fremdem_einsatz_ist_notfound() {
         let pool = crate::db::test_pool().await;
         let einsatz = setup(&pool).await;
-        let fremd: i64 = sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Fremd') RETURNING id")
-            .fetch_one(&pool).await.unwrap();
-        let fremder_abschnitt = anlegen(&pool, fremd, daten("Fremd-Nord", None, None)).await.unwrap();
+        let fremd: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Fremd') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let fremder_abschnitt = anlegen(&pool, fremd, daten("Fremd-Nord", None, None))
+            .await
+            .unwrap();
         assert!(matches!(
-            anlegen(&pool, einsatz, daten("X", Some(fremder_abschnitt.id), None)).await.unwrap_err(),
+            anlegen(&pool, einsatz, daten("X", Some(fremder_abschnitt.id), None))
+                .await
+                .unwrap_err(),
             AppError::NotFound
         ));
     }
@@ -351,13 +486,23 @@ mod tests {
     async fn leiter_aus_fremdem_einsatz_ist_validation() {
         let pool = crate::db::test_pool().await;
         let einsatz = setup(&pool).await;
-        let fremd: i64 = sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Fremd') RETURNING id")
-            .fetch_one(&pool).await.unwrap();
+        let fremd: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Fremd') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         let fremder_ep: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Fremd') RETURNING id",
-        ).bind(fremd).fetch_one(&pool).await.unwrap();
+        )
+        .bind(fremd)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         assert!(matches!(
-            anlegen(&pool, einsatz, daten("Nord", None, Some(fremder_ep))).await.unwrap_err(),
+            anlegen(&pool, einsatz, daten("Nord", None, Some(fremder_ep)))
+                .await
+                .unwrap_err(),
             AppError::Validation(_)
         ));
     }
@@ -366,18 +511,28 @@ mod tests {
     async fn zyklus_direkt_und_transitiv_ist_validation() {
         let pool = crate::db::test_pool().await;
         let einsatz = setup(&pool).await;
-        let a = anlegen(&pool, einsatz, daten("A", None, None)).await.unwrap();
-        let b = anlegen(&pool, einsatz, daten("B", Some(a.id), None)).await.unwrap();
-        let c = anlegen(&pool, einsatz, daten("C", Some(b.id), None)).await.unwrap();
+        let a = anlegen(&pool, einsatz, daten("A", None, None))
+            .await
+            .unwrap();
+        let b = anlegen(&pool, einsatz, daten("B", Some(a.id), None))
+            .await
+            .unwrap();
+        let c = anlegen(&pool, einsatz, daten("C", Some(b.id), None))
+            .await
+            .unwrap();
 
         // A unter sich selbst.
         assert!(matches!(
-            aktualisiere(&pool, einsatz, a.id, daten("A", Some(a.id), None)).await.unwrap_err(),
+            aktualisiere(&pool, einsatz, a.id, daten("A", Some(a.id), None))
+                .await
+                .unwrap_err(),
             AppError::Validation(_)
         ));
         // A unter C (C ist Nachfahre von A) → transitiver Zyklus.
         assert!(matches!(
-            aktualisiere(&pool, einsatz, a.id, daten("A", Some(c.id), None)).await.unwrap_err(),
+            aktualisiere(&pool, einsatz, a.id, daten("A", Some(c.id), None))
+                .await
+                .unwrap_err(),
             AppError::Validation(_)
         ));
     }
@@ -386,9 +541,15 @@ mod tests {
     async fn aufloesen_zieht_unterabschnitte_hoch_und_loest_einheit_zuordnung() {
         let pool = crate::db::test_pool().await;
         let einsatz = setup(&pool).await;
-        let oben = anlegen(&pool, einsatz, daten("Nord", None, None)).await.unwrap();
-        let mitte = anlegen(&pool, einsatz, daten("Nord-Mitte", Some(oben.id), None)).await.unwrap();
-        let unten = anlegen(&pool, einsatz, daten("Nord-Mitte-1", Some(mitte.id), None)).await.unwrap();
+        let oben = anlegen(&pool, einsatz, daten("Nord", None, None))
+            .await
+            .unwrap();
+        let mitte = anlegen(&pool, einsatz, daten("Nord-Mitte", Some(oben.id), None))
+            .await
+            .unwrap();
+        let unten = anlegen(&pool, einsatz, daten("Nord-Mitte-1", Some(mitte.id), None))
+            .await
+            .unwrap();
 
         // Eine Einheit ist dem mittleren Abschnitt zugeordnet.
         let einheit: i64 = sqlx::query_scalar(
@@ -404,9 +565,12 @@ mod tests {
         // Der aufgelöste Abschnitt ist weg.
         assert!(liste.iter().all(|a| a.id != mitte.id));
         // Die Einheit ist nicht mehr zugeordnet.
-        let abschnitt_id: Option<i64> = sqlx::query_scalar(
-            "SELECT abschnitt_id FROM einsatz_einheit WHERE id = ?",
-        ).bind(einheit).fetch_one(&pool).await.unwrap();
+        let abschnitt_id: Option<i64> =
+            sqlx::query_scalar("SELECT abschnitt_id FROM einsatz_einheit WHERE id = ?")
+                .bind(einheit)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(abschnitt_id, None);
     }
 
@@ -414,22 +578,49 @@ mod tests {
     async fn aktualisiere_fremder_einsatz_ist_notfound() {
         let pool = crate::db::test_pool().await;
         let einsatz = setup(&pool).await;
-        let a = anlegen(&pool, einsatz, daten("A", None, None)).await.unwrap();
+        let a = anlegen(&pool, einsatz, daten("A", None, None))
+            .await
+            .unwrap();
         assert!(matches!(
-            aktualisiere(&pool, 999, a.id, daten("A", None, None)).await.unwrap_err(),
+            aktualisiere(&pool, 999, a.id, daten("A", None, None))
+                .await
+                .unwrap_err(),
             AppError::NotFound
         ));
-        assert!(matches!(loese_auf(&pool, 999, a.id).await.unwrap_err(), AppError::NotFound));
+        assert!(matches!(
+            loese_auf(&pool, 999, a.id).await.unwrap_err(),
+            AppError::NotFound
+        ));
     }
 
     #[tokio::test]
     async fn abschnitt_anzeige_enthaelt_zugeordnete_sprechgruppen() {
         let pool = crate::db::test_pool().await;
         let einsatz = setup(&pool).await;
-        let a = anlegen(&pool, einsatz, daten("Nord", None, None)).await.unwrap();
-        let kat = crate::sprechgruppe::repo::anlegen_katalog(&pool, 1,
-            crate::sprechgruppe::repo::KatalogDaten{bezeichnung:"412_F_DRK",betriebsart:"TMO",hinweis:None,sortier:0}).await.unwrap();
-        crate::sprechgruppe::repo::setze_abschnitt_sprechgruppen(&pool, 1, einsatz, a.id, &[kat.id]).await.unwrap();
+        let a = anlegen(&pool, einsatz, daten("Nord", None, None))
+            .await
+            .unwrap();
+        let kat = crate::sprechgruppe::repo::anlegen_katalog(
+            &pool,
+            1,
+            crate::sprechgruppe::repo::KatalogDaten {
+                bezeichnung: "412_F_DRK",
+                betriebsart: "TMO",
+                hinweis: None,
+                sortier: 0,
+            },
+        )
+        .await
+        .unwrap();
+        crate::sprechgruppe::repo::setze_abschnitt_sprechgruppen(
+            &pool,
+            1,
+            einsatz,
+            a.id,
+            &[kat.id],
+        )
+        .await
+        .unwrap();
         let neu = laden(&pool, einsatz, a.id).await.unwrap();
         assert_eq!(neu.sprechgruppen.len(), 1);
         assert_eq!(neu.sprechgruppen[0].bezeichnung, "412_F_DRK");
@@ -438,9 +629,16 @@ mod tests {
     #[tokio::test]
     async fn datenmigration_freitext_zu_einsatz_lokal_dedupliziert_und_teilt() {
         let pool = crate::db::test_pool().await;
-        sqlx::query("INSERT INTO organisation (id, name) VALUES (1,'Orga')").execute(&pool).await.unwrap();
-        let e: i64 = sqlx::query_scalar("INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id")
-            .fetch_one(&pool).await.unwrap();
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1,'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let e: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         // Zwei Abschnitte mit GLEICHEM Freitext-TMO-Wert.
         for name in ["Nord", "Süd"] {
             sqlx::query("INSERT INTO einsatzabschnitt (einsatz_id, name, sprechgruppe_tmo) VALUES (?, ?, '412_F_DRK')")
@@ -452,19 +650,30 @@ mod tests {
              SELECT DISTINCT e.org_id, ea.einsatz_id, trim(ea.sprechgruppe_tmo), 'TMO' \
              FROM einsatzabschnitt ea JOIN einsatz e ON e.id = ea.einsatz_id \
              WHERE ea.sprechgruppe_tmo IS NOT NULL AND trim(ea.sprechgruppe_tmo) <> ''",
-        ).execute(&pool).await.unwrap();
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
         sqlx::query(
             "INSERT OR IGNORE INTO einsatzabschnitt_sprechgruppe (abschnitt_id, sprechgruppe_id) \
              SELECT ea.id, sg.id FROM einsatzabschnitt ea \
              JOIN sprechgruppe sg ON sg.einsatz_id = ea.einsatz_id AND sg.betriebsart = 'TMO' \
                                  AND sg.bezeichnung = trim(ea.sprechgruppe_tmo) \
              WHERE ea.sprechgruppe_tmo IS NOT NULL AND trim(ea.sprechgruppe_tmo) <> ''",
-        ).execute(&pool).await.unwrap();
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
 
         let sg: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sprechgruppe WHERE einsatz_id = ?")
-            .bind(e).fetch_one(&pool).await.unwrap();
+            .bind(e)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         let joins: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatzabschnitt_sprechgruppe")
-            .fetch_one(&pool).await.unwrap();
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(sg, 1, "ein geteilter einsatz-lokaler Eintrag (Dedup)");
         assert_eq!(joins, 2, "beide Abschnitte verknüpft (Sharing)");
     }

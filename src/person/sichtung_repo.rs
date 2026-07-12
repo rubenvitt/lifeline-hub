@@ -73,13 +73,19 @@ pub async fn erfassen(
 }
 
 /// Lädt eine Sichtung; `NotFound`, falls nicht zum Einsatz.
-pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<SichtungAnzeige, AppError> {
-    sqlx::query_as::<_, SichtungAnzeige>(sqlx::AssertSqlSafe(format!("{SELECT_SICHTUNG} WHERE id = ? AND einsatz_id = ?")))
-        .bind(id)
-        .bind(einsatz_id)
-        .fetch_optional(pool)
-        .await?
-        .ok_or(AppError::NotFound)
+pub async fn laden(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<SichtungAnzeige, AppError> {
+    sqlx::query_as::<_, SichtungAnzeige>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_SICHTUNG} WHERE id = ? AND einsatz_id = ?"
+    )))
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)
 }
 
 /// Sichtungs-Verlauf einer Person (neueste zuerst).
@@ -88,14 +94,16 @@ pub async fn liste_je_person(
     einsatz_id: i64,
     person_id: i64,
 ) -> Result<Vec<SichtungAnzeige>, AppError> {
-    Ok(sqlx::query_as::<_, SichtungAnzeige>(sqlx::AssertSqlSafe(format!(
-        "{SELECT_SICHTUNG} WHERE einsatz_id = ? AND person_id = ? \
+    Ok(
+        sqlx::query_as::<_, SichtungAnzeige>(sqlx::AssertSqlSafe(format!(
+            "{SELECT_SICHTUNG} WHERE einsatz_id = ? AND person_id = ? \
          ORDER BY gesichtet_at DESC, id DESC"
-    )))
-    .bind(einsatz_id)
-    .bind(person_id)
-    .fetch_all(pool)
-    .await?)
+        )))
+        .bind(einsatz_id)
+        .bind(person_id)
+        .fetch_all(pool)
+        .await?,
+    )
 }
 
 #[cfg(test)]
@@ -107,7 +115,9 @@ mod tests {
     /// Org + Benutzer + aktiver Einsatz + eine Person (Status erfasst). Liefert (benutzer_id, einsatz_id, person_id).
     async fn setup(pool: &SqlitePool) -> (i64, i64, i64) {
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Test-Orga')")
-            .execute(pool).await.unwrap();
+            .execute(pool)
+            .await
+            .unwrap();
         let b: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, aktiv) \
              VALUES (1, 'A', 'a', 'h', 'keiner', 'keine', 1) RETURNING id")
@@ -118,14 +128,23 @@ mod tests {
             .fetch_one(pool).await.unwrap();
         let p: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
-             VALUES (?, 1, ?, ?) RETURNING id")
-            .bind(e).bind(b).bind(b).fetch_one(pool).await.unwrap();
+             VALUES (?, 1, ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(pool)
+        .await
+        .unwrap();
         (b, e, p)
     }
 
     async fn status(pool: &SqlitePool, person_id: i64) -> String {
         sqlx::query_scalar("SELECT status FROM einsatz_person WHERE id = ?")
-            .bind(person_id).fetch_one(pool).await.unwrap()
+            .bind(person_id)
+            .fetch_one(pool)
+            .await
+            .unwrap()
     }
 
     #[tokio::test]
@@ -133,16 +152,26 @@ mod tests {
         let pool = test_pool().await;
         let (b, e, p) = setup(&pool).await;
         erfassen(&pool, e, p, "sk2", None, b, false).await.unwrap();
-        erfassen(&pool, e, p, "sk1", Some("verschlechtert"), b, false).await.unwrap();
+        erfassen(&pool, e, p, "sk1", Some("verschlechtert"), b, false)
+            .await
+            .unwrap();
         let verlauf = liste_je_person(&pool, e, p).await.unwrap();
         assert_eq!(verlauf.len(), 2, "beide Sichtungen bleiben (append-only)");
         assert_eq!(verlauf[0].kategorie, "sk1", "neueste zuerst");
         // Cache spiegelt jüngste Sichtung + deren Zeitstempel:
         let (kat, at): (Option<String>, Option<String>) = sqlx::query_as(
-            "SELECT aktuelle_sichtung, aktuelle_sichtung_at FROM einsatz_person WHERE id = ?")
-            .bind(p).fetch_one(&pool).await.unwrap();
+            "SELECT aktuelle_sichtung, aktuelle_sichtung_at FROM einsatz_person WHERE id = ?",
+        )
+        .bind(p)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         assert_eq!(kat.as_deref(), Some("sk1"));
-        assert_eq!(at.as_deref(), Some(verlauf[0].gesichtet_at.as_str()), "Cache-At = jüngstes gesichtet_at");
+        assert_eq!(
+            at.as_deref(),
+            Some(verlauf[0].gesichtet_at.as_str()),
+            "Cache-At = jüngstes gesichtet_at"
+        );
     }
 
     #[tokio::test]
@@ -151,7 +180,11 @@ mod tests {
         let (b, e, p) = setup(&pool).await;
         assert_eq!(status(&pool, p).await, "erfasst");
         erfassen(&pool, e, p, "sk3", None, b, true).await.unwrap();
-        assert_eq!(status(&pool, p).await, "betroffen", "erfasst→betroffen durch Sichtung");
+        assert_eq!(
+            status(&pool, p).await,
+            "betroffen",
+            "erfasst→betroffen durch Sichtung"
+        );
     }
 
     #[tokio::test]
@@ -160,8 +193,15 @@ mod tests {
         let (b, e, p) = setup(&pool).await;
         // Vorbedingung: Person ist betroffen (kein erfasst-Anheben mehr nötig).
         sqlx::query("UPDATE einsatz_person SET status='betroffen' WHERE id=?")
-            .bind(p).execute(&pool).await.unwrap();
+            .bind(p)
+            .execute(&pool)
+            .await
+            .unwrap();
         erfassen(&pool, e, p, "tot", None, b, false).await.unwrap();
-        assert_eq!(status(&pool, p).await, "betroffen", "Sichtung=tot lässt Admin-Status unangetastet");
+        assert_eq!(
+            status(&pool, p).await,
+            "betroffen",
+            "Sichtung=tot lässt Admin-Status unangetastet"
+        );
     }
 }

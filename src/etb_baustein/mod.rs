@@ -9,7 +9,12 @@ use utoipa::ToSchema;
 /// migrations/0037_etb_baustein.sql passen.
 pub const ETB_BAUSTEIN_STARTLISTE: [(&str, &str, &str, i64); 5] = [
     ("Lage unverändert", "lage", "Lage unverändert.", 10),
-    ("Erkundung eingeleitet", "meldung", "Erkundung durch {einheit} eingeleitet.", 20),
+    (
+        "Erkundung eingeleitet",
+        "meldung",
+        "Erkundung durch {einheit} eingeleitet.",
+        20,
+    ),
     (
         "Einheit eingetroffen",
         "meldung",

@@ -37,7 +37,10 @@ async fn liste_vorschlaege(app: &axum::Router, cookie: &str) -> (StatusCode, Val
         .unwrap();
     let status = resp.status();
     let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
 }
 
 #[tokio::test]
@@ -46,7 +49,10 @@ async fn admin_legt_vorschlag_an_und_alle_sehen_ihn() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     benutzer_anlegen(&app, &admin, "erika", "keine").await;
 
-    assert_eq!(post_vorschlag(&app, &admin, "Probealarm").await, StatusCode::CREATED);
+    assert_eq!(
+        post_vorschlag(&app, &admin, "Probealarm").await,
+        StatusCode::CREATED
+    );
 
     let erika = login_cookie(&app, "erika", "erikapw1").await;
     let (status, json) = liste_vorschlaege(&app, &erika).await;
@@ -67,22 +73,34 @@ async fn nicht_admin_darf_keinen_vorschlag_anlegen() {
     benutzer_anlegen(&app, &admin, "erika", "keine").await;
     let erika = login_cookie(&app, "erika", "erikapw1").await;
 
-    assert_eq!(post_vorschlag(&app, &erika, "Verboten").await, StatusCode::FORBIDDEN);
+    assert_eq!(
+        post_vorschlag(&app, &erika, "Verboten").await,
+        StatusCode::FORBIDDEN
+    );
 }
 
 #[tokio::test]
 async fn duplikat_vorschlag_ist_409() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    assert_eq!(post_vorschlag(&app, &admin, "Doppelt").await, StatusCode::CREATED);
-    assert_eq!(post_vorschlag(&app, &admin, "Doppelt").await, StatusCode::CONFLICT);
+    assert_eq!(
+        post_vorschlag(&app, &admin, "Doppelt").await,
+        StatusCode::CREATED
+    );
+    assert_eq!(
+        post_vorschlag(&app, &admin, "Doppelt").await,
+        StatusCode::CONFLICT
+    );
 }
 
 #[tokio::test]
 async fn admin_loescht_vorschlag() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    assert_eq!(post_vorschlag(&app, &admin, "Weg").await, StatusCode::CREATED);
+    assert_eq!(
+        post_vorschlag(&app, &admin, "Weg").await,
+        StatusCode::CREATED
+    );
 
     let (_, json) = liste_vorschlaege(&app, &admin).await;
     let id = json

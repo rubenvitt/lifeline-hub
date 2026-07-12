@@ -1,4 +1,4 @@
-use super::{GefahrBewertungAnzeige, Gefahrentyp, GefahrengebietAnzeige, Schutzobjekt, Warnstufe};
+use super::{GefahrBewertungAnzeige, GefahrengebietAnzeige, Gefahrentyp, Schutzobjekt, Warnstufe};
 use crate::error::AppError;
 use sqlx::SqlitePool;
 

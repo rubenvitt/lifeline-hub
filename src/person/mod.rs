@@ -105,7 +105,9 @@ impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for Geschlecht
 where
     &'r str: sqlx::Decode<'r, DB>,
 {
-    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+    fn decode(
+        value: <DB as sqlx::Database>::ValueRef<'r>,
+    ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<DB>>::decode(value)?;
         Geschlecht::parse(s).ok_or_else(|| format!("Ungültiges Geschlecht: {s}").into())
     }
@@ -178,9 +180,12 @@ impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for Sichtungskategorie
 where
     &'r str: sqlx::Decode<'r, DB>,
 {
-    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+    fn decode(
+        value: <DB as sqlx::Database>::ValueRef<'r>,
+    ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<DB>>::decode(value)?;
-        Sichtungskategorie::parse(s).ok_or_else(|| format!("Ungültige Sichtungskategorie: {s}").into())
+        Sichtungskategorie::parse(s)
+            .ok_or_else(|| format!("Ungültige Sichtungskategorie: {s}").into())
     }
 }
 
@@ -285,7 +290,9 @@ impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for VerbleibStatus
 where
     &'r str: sqlx::Decode<'r, DB>,
 {
-    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+    fn decode(
+        value: <DB as sqlx::Database>::ValueRef<'r>,
+    ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<DB>>::decode(value)?;
         VerbleibStatus::parse(s).ok_or_else(|| format!("Ungültiger VerbleibStatus: {s}").into())
     }
@@ -308,7 +315,9 @@ impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for VerbleibArt
 where
     &'r str: sqlx::Decode<'r, DB>,
 {
-    fn decode(value: <DB as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
+    fn decode(
+        value: <DB as sqlx::Database>::ValueRef<'r>,
+    ) -> Result<Self, sqlx::error::BoxDynError> {
         let s = <&str as sqlx::Decode<DB>>::decode(value)?;
         VerbleibArt::parse(s).ok_or_else(|| format!("Ungültige VerbleibArt: {s}").into())
     }
@@ -415,7 +424,13 @@ mod tests {
 
     #[test]
     fn status_roundtrip() {
-        for s in ["erfasst", "vermisst", "betroffen", "verstorben", "abgemeldet"] {
+        for s in [
+            "erfasst",
+            "vermisst",
+            "betroffen",
+            "verstorben",
+            "abgemeldet",
+        ] {
             assert_eq!(PersonStatus::parse(s).unwrap().as_str(), s);
         }
         assert!(PersonStatus::parse("unsinn").is_none());
@@ -470,9 +485,15 @@ mod tests {
             assert_eq!(Sichtungskategorie::parse(k).unwrap().as_str(), k);
         }
         assert!(Sichtungskategorie::parse("sk5").is_none());
-        assert_eq!(Sichtungskategorie::parse("sk2").unwrap().etb_label(), "SK II");
+        assert_eq!(
+            Sichtungskategorie::parse("sk2").unwrap().etb_label(),
+            "SK II"
+        );
         assert_eq!(Sichtungskategorie::parse("tot").unwrap().etb_label(), "tot");
-        assert_eq!(Sichtungskategorie::parse("unverletzt").unwrap().etb_label(), "unverletzt");
+        assert_eq!(
+            Sichtungskategorie::parse("unverletzt").unwrap().etb_label(),
+            "unverletzt"
+        );
     }
 
     #[test]

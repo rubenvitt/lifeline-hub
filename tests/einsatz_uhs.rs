@@ -26,7 +26,10 @@ async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
     let router = build_router(AppState {
         pool: pool.clone(),
         live: LiveHub::new(),
-        karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu(), download_client: lifeline_hub::karte::download::download_client(), download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_dir: std::env::temp_dir(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
         karten_service_url: None,
         karten_service_token: None,
     });
@@ -150,13 +153,7 @@ async fn uhs_anlegen_und_aktivieren(
 }
 
 /// Legt einen Platz in einer UHS an.
-async fn platz_anlegen(
-    app: &axum::Router,
-    cookie: &str,
-    einsatz: i64,
-    uhs: i64,
-    bez: &str,
-) -> i64 {
+async fn platz_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, uhs: i64, bez: &str) -> i64 {
     let (s, v) = json_request(
         app,
         "POST",
@@ -412,7 +409,10 @@ async fn auto_aufbereitung_und_etb_text_inbox() {
         .fetch_one(&pool)
         .await
         .unwrap();
-    assert_eq!(verf, "aufbereitung", "Platz wechselt nach Austritt automatisch in Aufbereitung");
+    assert_eq!(
+        verf, "aufbereitung",
+        "Platz wechselt nach Austritt automatisch in Aufbereitung"
+    );
     let inhalte = etb_inhalte(&app, &cookie, einsatz).await;
     assert!(
         inhalte
@@ -453,13 +453,17 @@ async fn reservierte_person_belegt_loest_reservierung() {
     )
     .await;
     assert_eq!(s, StatusCode::CREATED);
-    let (v, fk): (String, Option<i64>) =
-        sqlx::query_as("SELECT verfuegbarkeit, reserviert_fuer_person_id FROM uhs_platz WHERE id = ?")
-            .bind(platz)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(v, "frei", "Reservierung wird durch Eintritt der gleichen Person eingelöst");
+    let (v, fk): (String, Option<i64>) = sqlx::query_as(
+        "SELECT verfuegbarkeit, reserviert_fuer_person_id FROM uhs_platz WHERE id = ?",
+    )
+    .bind(platz)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        v, "frei",
+        "Reservierung wird durch Eintritt der gleichen Person eingelöst"
+    );
     assert!(fk.is_none(), "reserviert_fuer_person_id wird zurückgesetzt");
 }
 
@@ -539,8 +543,7 @@ async fn cross_modul_status_verstorben_loest_auto_austritt_aus() {
     assert!(
         inhalte
             .iter()
-            .any(|s| s.contains("verlässt BHP 50")
-                && s.contains("Status-Wechsel zu verstorben")),
+            .any(|s| s.contains("verlässt BHP 50") && s.contains("Status-Wechsel zu verstorben")),
         "Auto-Austritt-ETB mit Anlass erwartet, fand: {inhalte:?}"
     );
 }
@@ -615,13 +618,17 @@ async fn cross_modul_storno_loest_reservierung_auf_auch_ohne_belegung() {
     )
     .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
-    let (v, fk): (String, Option<i64>) =
-        sqlx::query_as("SELECT verfuegbarkeit, reserviert_fuer_person_id FROM uhs_platz WHERE id = ?")
-            .bind(platz)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(v, "frei", "Reservierung wird durch Storno der Person aufgelöst");
+    let (v, fk): (String, Option<i64>) = sqlx::query_as(
+        "SELECT verfuegbarkeit, reserviert_fuer_person_id FROM uhs_platz WHERE id = ?",
+    )
+    .bind(platz)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        v, "frei",
+        "Reservierung wird durch Storno der Person aufgelöst"
+    );
     assert!(fk.is_none(), "reserviert_fuer_person_id wird zurückgesetzt");
 }
 
@@ -790,23 +797,36 @@ async fn verorten_setzt_lat_lon_und_liste_liefert_sie() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
     let (s, v) = json_request(
-        &app, "POST", &format!("/api/einsaetze/{einsatz}/uhs"), &cookie,
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &cookie,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
-    ).await;
+    )
+    .await;
     assert_eq!(s, StatusCode::CREATED);
     let uhs_id = v["id"].as_i64().unwrap();
 
     let (s, v) = json_request(
-        &app, "PATCH", &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"), &cookie,
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
+        &cookie,
         Some(&json!({"lat": 50.1, "lon": 8.6})),
-    ).await;
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(v["lat"].as_f64(), Some(50.1));
     assert_eq!(v["lon"].as_f64(), Some(8.6));
 
     let (s, liste) = json_request(
-        &app, "GET", &format!("/api/einsaetze/{einsatz}/uhs"), &cookie, None,
-    ).await;
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &cookie,
+        None,
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(liste[0]["lat"].as_f64(), Some(50.1));
 }
@@ -817,15 +837,31 @@ async fn verorten_loeschen_setzt_beide_auf_null() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
     let (_s, v) = json_request(
-        &app, "POST", &format!("/api/einsaetze/{einsatz}/uhs"), &cookie,
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &cookie,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
-    ).await;
+    )
+    .await;
     let uhs_id = v["id"].as_i64().unwrap();
-    let (s, _) = json_request(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"), &cookie,
-        Some(&json!({"lat": 50.1, "lon": 8.6}))).await;
+    let (s, _) = json_request(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
+        &cookie,
+        Some(&json!({"lat": 50.1, "lon": 8.6})),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
-    let (s, v) = json_request(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"), &cookie,
-        Some(&json!({"lat": null, "lon": null}))).await;
+    let (s, v) = json_request(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
+        &cookie,
+        Some(&json!({"lat": null, "lon": null})),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert!(v["lat"].is_null());
     assert!(v["lon"].is_null());
@@ -837,19 +873,36 @@ async fn patch_auf_storniertem_uhs_ist_409() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
     let (_s, v) = json_request(
-        &app, "POST", &format!("/api/einsaetze/{einsatz}/uhs"), &cookie,
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &cookie,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
-    ).await;
+    )
+    .await;
     let uhs_id = v["id"].as_i64().unwrap();
     let (s, _) = json_request(
-        &app, "DELETE", &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"), &cookie, None,
-    ).await;
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
+        &cookie,
+        None,
+    )
+    .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     let (s, _) = json_request(
-        &app, "PATCH", &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"), &cookie,
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
+        &cookie,
         Some(&json!({"bezeichnung": "BHP 99"})),
-    ).await;
-    assert_eq!(s, StatusCode::CONFLICT, "PATCH auf stornierte UHS muss 409 sein (Asymmetrie zu Schaden)");
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::CONFLICT,
+        "PATCH auf stornierte UHS muss 409 sein (Asymmetrie zu Schaden)"
+    );
 }
 
 #[tokio::test]
@@ -859,12 +912,20 @@ async fn plaetze_bulk_legt_mehrere_mit_auto_namen_an() {
     let einsatz = einsatz_anlegen(&app, &cookie).await;
     let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
     let (s, v) = json_request(
-        &app, "POST", &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plaetze/bulk"), &cookie,
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plaetze/bulk"),
+        &cookie,
         Some(&json!({"typ": "bett", "menge": 3})),
-    ).await;
+    )
+    .await;
     assert_eq!(s, StatusCode::CREATED);
-    let namen: Vec<String> = v.as_array().unwrap().iter()
-        .map(|p| p["bezeichnung"].as_str().unwrap().to_string()).collect();
+    let namen: Vec<String> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p["bezeichnung"].as_str().unwrap().to_string())
+        .collect();
     assert_eq!(namen, vec!["Bett 1", "Bett 2", "Bett 3"]);
 }
 
@@ -875,10 +936,18 @@ async fn plaetze_bulk_unbekannter_typ_ist_400() {
     let einsatz = einsatz_anlegen(&app, &cookie).await;
     let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
     let (s, _) = json_request(
-        &app, "POST", &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plaetze/bulk"), &cookie,
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plaetze/bulk"),
+        &cookie,
         Some(&json!({"typ": "zeltbett", "menge": 2})),
-    ).await;
-    assert_eq!(s, StatusCode::BAD_REQUEST, "unbekannter Platz-Typ → 400 (Validation)");
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::BAD_REQUEST,
+        "unbekannter Platz-Typ → 400 (Validation)"
+    );
 }
 
 #[tokio::test]
@@ -889,10 +958,18 @@ async fn plaetze_bulk_menge_null_oder_zu_gross_ist_422() {
     let uhs = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "BHP 50").await;
     for menge in [0, 51] {
         let (s, _) = json_request(
-            &app, "POST", &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plaetze/bulk"), &cookie,
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plaetze/bulk"),
+            &cookie,
             Some(&json!({"typ": "bett", "menge": menge})),
-        ).await;
-        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "menge {menge} muss 422 sein");
+        )
+        .await;
+        assert_eq!(
+            s,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "menge {menge} muss 422 sein"
+        );
     }
 }
 
@@ -902,13 +979,27 @@ async fn verorten_nur_lat_ist_422() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
     let (_s, v) = json_request(
-        &app, "POST", &format!("/api/einsaetze/{einsatz}/uhs"), &cookie,
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &cookie,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
-    ).await;
+    )
+    .await;
     let uhs_id = v["id"].as_i64().unwrap();
-    let (s, _) = json_request(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"), &cookie,
-        Some(&json!({"lat": 50.1}))).await;
-    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "darf 422 sein, NICHT 500");
+    let (s, _) = json_request(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
+        &cookie,
+        Some(&json!({"lat": 50.1})),
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "darf 422 sein, NICHT 500"
+    );
 }
 
 #[tokio::test]
@@ -917,13 +1008,27 @@ async fn verorten_nur_lon_ist_422() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
     let (_s, v) = json_request(
-        &app, "POST", &format!("/api/einsaetze/{einsatz}/uhs"), &cookie,
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &cookie,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
-    ).await;
+    )
+    .await;
     let uhs_id = v["id"].as_i64().unwrap();
-    let (s, _) = json_request(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"), &cookie,
-        Some(&json!({"lon": 8.6}))).await;
-    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "darf 422 sein, NICHT 500");
+    let (s, _) = json_request(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
+        &cookie,
+        Some(&json!({"lon": 8.6})),
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "darf 422 sein, NICHT 500"
+    );
 }
 
 #[tokio::test]
@@ -932,12 +1037,22 @@ async fn verorten_ausserhalb_range_ist_422() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
     let (_s, v) = json_request(
-        &app, "POST", &format!("/api/einsaetze/{einsatz}/uhs"), &cookie,
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &cookie,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
-    ).await;
+    )
+    .await;
     let uhs_id = v["id"].as_i64().unwrap();
-    let (s, _) = json_request(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"), &cookie,
-        Some(&json!({"lat": 99.0, "lon": 8.6}))).await;
+    let (s, _) = json_request(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
+        &cookie,
+        Some(&json!({"lat": 99.0, "lon": 8.6})),
+    )
+    .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
 }
 
@@ -947,11 +1062,21 @@ async fn verorten_lon_ausserhalb_range_ist_422() {
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
     let (_s, v) = json_request(
-        &app, "POST", &format!("/api/einsaetze/{einsatz}/uhs"), &cookie,
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &cookie,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
-    ).await;
+    )
+    .await;
     let uhs_id = v["id"].as_i64().unwrap();
-    let (s, _) = json_request(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"), &cookie,
-        Some(&json!({"lat": 50.0, "lon": 200.0}))).await;
+    let (s, _) = json_request(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
+        &cookie,
+        Some(&json!({"lat": 50.0, "lon": 200.0})),
+    )
+    .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
 }

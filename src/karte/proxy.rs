@@ -104,7 +104,9 @@ const FONTSTACK_SET: &AsciiSet = &CONTROLS
 /// Ersetzt `{fontstack}` (percent-kodiert) und `{range}` im rohen Glyphs-Template.
 pub fn subst_glyphs(template: &str, fontstack: &str, range: &str) -> String {
     let fs = utf8_percent_encode(fontstack, FONTSTACK_SET).to_string();
-    template.replace("{fontstack}", &fs).replace("{range}", range)
+    template
+        .replace("{fontstack}", &fs)
+        .replace("{range}", range)
 }
 
 /// Glyphs-`range` muss strikt `\d+-\d+` sein (z.B. `0-255`) — verhindert Pfad-/Query-Injection.
@@ -248,7 +250,8 @@ fn hat_fremdes_schema(referenz: &str) -> bool {
         Some(pos) if pos > 0 => {
             let s = &vor_slash[..pos];
             s.as_bytes()[0].is_ascii_alphabetic()
-                && s.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'-' | b'.'))
+                && s.bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'-' | b'.'))
         }
         _ => false,
     }
@@ -315,24 +318,35 @@ pub fn rewrite_style(
     let mut n = 0usize;
     if let Some(sources) = style.get_mut("sources").and_then(Value::as_object_mut) {
         for src in sources.values_mut() {
-            let Some(obj) = src.as_object_mut() else { continue };
+            let Some(obj) = src.as_object_mut() else {
+                continue;
+            };
             if let Some(tiles) = obj.get_mut("tiles").and_then(Value::as_array_mut) {
                 for t in tiles.iter_mut() {
                     if let Some(s) = t.as_str().filter(|s| ist_proxybar(s)) {
                         if let Some(abs) = absolutiere(basis, s) {
-                            let pu = mint_mit_cap(&mut n, max_slots, mint, &abs, SlotArt::Template)?;
+                            let pu =
+                                mint_mit_cap(&mut n, max_slots, mint, &abs, SlotArt::Template)?;
                             *t = Value::String(pu);
                         }
                     }
                 }
             }
-            if let Some(u) = obj.get("url").and_then(Value::as_str).filter(|u| ist_proxybar(u)) {
+            if let Some(u) = obj
+                .get("url")
+                .and_then(Value::as_str)
+                .filter(|u| ist_proxybar(u))
+            {
                 if let Some(abs) = absolutiere(basis, u) {
                     let pu = mint_mit_cap(&mut n, max_slots, mint, &abs, SlotArt::Tilejson)?;
                     obj.insert("url".into(), Value::String(pu));
                 }
             }
-            if let Some(d) = obj.get("data").and_then(Value::as_str).filter(|d| ist_proxybar(d)) {
+            if let Some(d) = obj
+                .get("data")
+                .and_then(Value::as_str)
+                .filter(|d| ist_proxybar(d))
+            {
                 if let Some(abs) = absolutiere(basis, d) {
                     let pu = mint_mit_cap(&mut n, max_slots, mint, &abs, SlotArt::Static)?;
                     obj.insert("data".into(), Value::String(pu));
@@ -351,20 +365,34 @@ pub fn rewrite_style(
         }
         Some(Value::Array(arr)) => {
             for entry in arr.iter_mut() {
-                if let Some(u) = entry.get("url").and_then(Value::as_str).filter(|u| ist_proxybar(u)) {
+                if let Some(u) = entry
+                    .get("url")
+                    .and_then(Value::as_str)
+                    .filter(|u| ist_proxybar(u))
+                {
                     if let Some(abs) = absolutiere(basis, u) {
                         let pu = mint_mit_cap(&mut n, max_slots, mint, &abs, SlotArt::Sprite)?;
-                        entry.as_object_mut().unwrap().insert("url".into(), Value::String(pu));
+                        entry
+                            .as_object_mut()
+                            .unwrap()
+                            .insert("url".into(), Value::String(pu));
                     }
                 }
             }
         }
         _ => {}
     }
-    if let Some(g) = style.get("glyphs").and_then(Value::as_str).filter(|g| ist_proxybar(g)) {
+    if let Some(g) = style
+        .get("glyphs")
+        .and_then(Value::as_str)
+        .filter(|g| ist_proxybar(g))
+    {
         if let Some(abs) = absolutiere(basis, g) {
             let pu = mint_mit_cap(&mut n, max_slots, mint, &abs, SlotArt::Glyphs)?;
-            style.as_object_mut().unwrap().insert("glyphs".into(), Value::String(pu));
+            style
+                .as_object_mut()
+                .unwrap()
+                .insert("glyphs".into(), Value::String(pu));
         }
     }
     neutralisiere_unbekannte(style);
@@ -431,7 +459,10 @@ use std::time::Duration;
 /// eine Adresse intern/nicht-routbar ist (auch bei gemischtem Ergebnis), kommt nichts zurück —
 /// das schließt DNS-Rebinding (Name→intern) als SSRF-Vektor. Reine Funktion (unit-getestet).
 pub fn nur_public(addrs: Vec<SocketAddr>) -> Vec<SocketAddr> {
-    if addrs.iter().any(|a| crate::karte::download::ip_ist_intern(&a.ip())) {
+    if addrs
+        .iter()
+        .any(|a| crate::karte::download::ip_ist_intern(&a.ip()))
+    {
         Vec::new()
     } else {
         addrs
@@ -518,7 +549,9 @@ impl std::fmt::Display for ProxyFehler {
 }
 
 fn kopf(h: &reqwest::header::HeaderMap, name: reqwest::header::HeaderName) -> Option<String> {
-    h.get(name).and_then(|v| v.to_str().ok()).map(str::to_string)
+    h.get(name)
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string)
 }
 
 /// Verarbeitet eine erfolgreiche Upstream-Antwort: Status-Check, Header-Allowlist (Content-Type
@@ -612,15 +645,21 @@ pub async fn hole_asset_revalidiert(
         let cache_control = kopf(resp.headers(), CACHE_CONTROL);
         return Ok(Revalidiert::NichtVeraendert { cache_control });
     }
-    Ok(Revalidiert::Frisch(verarbeite_antwort(resp, byte_cap).await?))
+    Ok(Revalidiert::Frisch(
+        verarbeite_antwort(resp, byte_cap).await?,
+    ))
 }
 
 /// Obergrenze umgeschriebener URLs/Slots pro Style/TileJSON (DoS-Schutz gegen riesige Dokumente).
 const MAX_SLOTS: usize = 500;
 
 /// Signatur der in-place-Rewrite-Funktionen (`rewrite_style`/`rewrite_tilejson`).
-type Rewriter =
-    fn(&mut Value, &Url, &mut dyn FnMut(&str, SlotArt) -> String, usize) -> Result<(), RewriteFehler>;
+type Rewriter = fn(
+    &mut Value,
+    &Url,
+    &mut dyn FnMut(&str, SlotArt) -> String,
+    usize,
+) -> Result<(), RewriteFehler>;
 
 /// Holt ein JSON-Dokument, schreibt es mit `rewriter` um (Slots via `repo::slot_upsert`) und liefert
 /// den key-freien String. Zweiphasig, damit der Walker rein/synchron bleibt: (1) auf einem Klon die
@@ -635,9 +674,10 @@ async fn hole_und_rewrite(
     rewriter: Rewriter,
 ) -> Result<String, ProxyFehler> {
     let asset = hole_asset(client, url.clone(), ASSET_BYTE_CAP).await?;
-    let text = String::from_utf8(asset.bytes).map_err(|_| ProxyFehler::Http("Antwort nicht UTF-8".into()))?;
-    let mut v: Value =
-        serde_json::from_str(&text).map_err(|e| ProxyFehler::Http(format!("JSON nicht parsebar: {e}")))?;
+    let text = String::from_utf8(asset.bytes)
+        .map_err(|_| ProxyFehler::Http("Antwort nicht UTF-8".into()))?;
+    let mut v: Value = serde_json::from_str(&text)
+        .map_err(|e| ProxyFehler::Http(format!("JSON nicht parsebar: {e}")))?;
     let basis = url.clone();
 
     // (1) Sammeln auf einem Klon (Ergebnis verworfen).
@@ -648,11 +688,13 @@ async fn hole_und_rewrite(
             paare.push((u.to_string(), a));
             String::new()
         };
-        rewriter(&mut klon, &basis, &mut sammeln, MAX_SLOTS).map_err(|e| ProxyFehler::Http(e.to_string()))?;
+        rewriter(&mut klon, &basis, &mut sammeln, MAX_SLOTS)
+            .map_err(|e| ProxyFehler::Http(e.to_string()))?;
     }
 
     // (2) Slots async upserten → Map (url, art) → Proxy-URL.
-    let mut map: std::collections::HashMap<(String, SlotArt), String> = std::collections::HashMap::new();
+    let mut map: std::collections::HashMap<(String, SlotArt), String> =
+        std::collections::HashMap::new();
     for (u, a) in &paare {
         let key = (u.clone(), *a);
         if let std::collections::hash_map::Entry::Vacant(e) = map.entry(key) {
@@ -665,8 +707,10 @@ async fn hole_und_rewrite(
 
     // (3) Anwenden auf dem Original.
     {
-        let mut anwenden = |u: &str, a: SlotArt| map.get(&(u.to_string(), a)).cloned().unwrap_or_default();
-        rewriter(&mut v, &basis, &mut anwenden, MAX_SLOTS).map_err(|e| ProxyFehler::Http(e.to_string()))?;
+        let mut anwenden =
+            |u: &str, a: SlotArt| map.get(&(u.to_string(), a)).cloned().unwrap_or_default();
+        rewriter(&mut v, &basis, &mut anwenden, MAX_SLOTS)
+            .map_err(|e| ProxyFehler::Http(e.to_string()))?;
     }
 
     let s = serde_json::to_string(&v).map_err(|e| ProxyFehler::Http(e.to_string()))?;
@@ -723,12 +767,18 @@ mod tests {
             proxy_url(3, SlotArt::Tilejson, 9),
             "/api/karte/proxy/3/tilejson/9"
         );
-        assert_eq!(proxy_url(3, SlotArt::Sprite, 9), "/api/karte/proxy/3/sprite/9");
+        assert_eq!(
+            proxy_url(3, SlotArt::Sprite, 9),
+            "/api/karte/proxy/3/sprite/9"
+        );
         assert_eq!(
             proxy_url(3, SlotArt::Glyphs, 9),
             "/api/karte/proxy/3/glyphs/9/{fontstack}/{range}"
         );
-        assert_eq!(proxy_url(3, SlotArt::Static, 9), "/api/karte/proxy/3/asset/9");
+        assert_eq!(
+            proxy_url(3, SlotArt::Static, 9),
+            "/api/karte/proxy/3/asset/9"
+        );
     }
 
     #[test]
@@ -753,7 +803,10 @@ mod tests {
             "https://h/3/1/5.pbf?key=K"
         );
         // {-y} TMS: z=3, y=1 → 2^3-1-1 = 6
-        assert_eq!(subst_template("https://h/{z}/{x}/{-y}", 3, 2, 1), "https://h/3/2/6");
+        assert_eq!(
+            subst_template("https://h/{z}/{x}/{-y}", 3, 2, 1),
+            "https://h/3/2/6"
+        );
         // Ohne Platzhalter unverändert.
         assert_eq!(
             subst_template("https://h/static.png", 3, 2, 1),
@@ -764,7 +817,11 @@ mod tests {
     #[test]
     fn subst_glyphs_encodet_fontstack() {
         assert_eq!(
-            subst_glyphs("https://h/fonts/{fontstack}/{range}.pbf?key=K", "Noto Sans,Arial", "0-255"),
+            subst_glyphs(
+                "https://h/fonts/{fontstack}/{range}.pbf?key=K",
+                "Noto Sans,Arial",
+                "0-255"
+            ),
             "https://h/fonts/Noto%20Sans%2CArial/0-255.pbf?key=K"
         );
     }
@@ -791,15 +848,24 @@ mod tests {
             sprite_upstream("https://h/sprite?key=K", "@2x.json"),
             "https://h/sprite@2x.json?key=K"
         );
-        assert_eq!(sprite_upstream("https://h/sprite", ".png"), "https://h/sprite.png");
+        assert_eq!(
+            sprite_upstream("https://h/sprite", ".png"),
+            "https://h/sprite.png"
+        );
     }
 
     #[test]
     fn split_slot_suffix_allowlist() {
         assert_eq!(split_slot_suffix("7.png").unwrap(), (7, ".png".into()));
-        assert_eq!(split_slot_suffix("7@2x.png").unwrap(), (7, "@2x.png".into()));
+        assert_eq!(
+            split_slot_suffix("7@2x.png").unwrap(),
+            (7, "@2x.png".into())
+        );
         assert_eq!(split_slot_suffix("7.json").unwrap(), (7, ".json".into()));
-        assert_eq!(split_slot_suffix("7@2x.json").unwrap(), (7, "@2x.json".into()));
+        assert_eq!(
+            split_slot_suffix("7@2x.json").unwrap(),
+            (7, "@2x.json".into())
+        );
         assert!(split_slot_suffix("7.exe").is_err());
         assert!(split_slot_suffix("7").is_err());
         assert!(split_slot_suffix("abc.png").is_err());
@@ -880,11 +946,15 @@ mod rewrite_tests {
         rewrite_style(&mut style, &basis, &mut m, 500).unwrap();
         drop(m); // Borrow von log freigeben, bevor wir es lesen
         assert!(
-            log.iter().any(|(u, a)| u == "https://h/maps/x/sprite" && *a == SlotArt::Sprite),
+            log.iter()
+                .any(|(u, a)| u == "https://h/maps/x/sprite" && *a == SlotArt::Sprite),
             "relative 'sprite' gegen Basis absolutiert: {log:?}"
         );
         assert!(
-            log.iter().any(|(u, a)| u == "https://h/maps/x/fonts/{fontstack}/{range}.pbf" && *a == SlotArt::Glyphs),
+            log.iter().any(
+                |(u, a)| u == "https://h/maps/x/fonts/{fontstack}/{range}.pbf"
+                    && *a == SlotArt::Glyphs
+            ),
             "relative glyphs absolutiert, braces erhalten: {log:?}"
         );
     }
@@ -898,8 +968,14 @@ mod rewrite_tests {
         rewrite_style(&mut style, &basis, &mut m, 500).unwrap();
         drop(m); // Borrow von log freigeben, bevor wir es lesen
         let s = serde_json::to_string(&style).unwrap();
-        assert!(!s.contains("api.host") && !s.contains("key=K"), "neutralisiert: {s}");
-        assert!(log.is_empty(), "unbekannte Position wird NICHT zum fetchbaren Slot");
+        assert!(
+            !s.contains("api.host") && !s.contains("key=K"),
+            "neutralisiert: {s}"
+        );
+        assert!(
+            log.is_empty(),
+            "unbekannte Position wird NICHT zum fetchbaren Slot"
+        );
     }
 
     #[test]
@@ -913,14 +989,22 @@ mod rewrite_tests {
         rewrite_style(&mut style, &basis, &mut m, 500).unwrap();
         drop(m); // Borrow von log freigeben, bevor wir es lesen
         let s = serde_json::to_string(&style).unwrap();
-        assert!(s.contains("key=KEYTOKEN123456"), "eingebettete URL bleibt (Backstop-Fall): {s}");
-        assert!(contains_secret(&s, &basis), "contains_secret erkennt den Rest-Key");
+        assert!(
+            s.contains("key=KEYTOKEN123456"),
+            "eingebettete URL bleibt (Backstop-Fall): {s}"
+        );
+        assert!(
+            contains_secret(&s, &basis),
+            "contains_secret erkennt den Rest-Key"
+        );
     }
 
     #[test]
     fn rewrite_style_slot_obergrenze() {
         let basis = Url::parse("https://h/s.json").unwrap();
-        let tiles: Vec<String> = (0..10).map(|i| format!("https://h/{i}/{{z}}/{{x}}/{{y}}")).collect();
+        let tiles: Vec<String> = (0..10)
+            .map(|i| format!("https://h/{i}/{{z}}/{{x}}/{{y}}"))
+            .collect();
         let mut style = json!({"version":8,"sources":{"r":{"type":"raster","tiles": tiles}}});
         let mut log = vec![];
         let mut m = fake_mint(&mut log);
@@ -933,12 +1017,22 @@ mod rewrite_tests {
     #[test]
     fn ist_proxybar_gating() {
         for ja in [
-            "https://h/a", "HTTP://h/a", "//h/a", "tiles.json",
-            "fonts/{fontstack}/{range}.pbf", "/abs/path", "sprite",
+            "https://h/a",
+            "HTTP://h/a",
+            "//h/a",
+            "tiles.json",
+            "fonts/{fontstack}/{range}.pbf",
+            "/abs/path",
+            "sprite",
         ] {
             assert!(ist_proxybar(ja), "proxybar: {ja}");
         }
-        for nein in ["mapbox://mapbox.streets", "pmtiles://x.pmtiles", "data:image/png;base64,AAA", "foo:bar"] {
+        for nein in [
+            "mapbox://mapbox.streets",
+            "pmtiles://x.pmtiles",
+            "data:image/png;base64,AAA",
+            "foo:bar",
+        ] {
             assert!(!ist_proxybar(nein), "nicht proxybar: {nein}");
         }
     }
@@ -956,8 +1050,14 @@ mod rewrite_tests {
         drop(m);
         assert!(log.is_empty(), "nicht-http-Schemata werden nicht gemintet");
         let s = serde_json::to_string(&style).unwrap();
-        assert!(s.contains("mapbox://mapbox.streets"), "mapbox: bleibt unangetastet: {s}");
-        assert!(s.contains("pmtiles://"), "pmtiles: bleibt unangetastet: {s}");
+        assert!(
+            s.contains("mapbox://mapbox.streets"),
+            "mapbox: bleibt unangetastet: {s}"
+        );
+        assert!(
+            s.contains("pmtiles://"),
+            "pmtiles: bleibt unangetastet: {s}"
+        );
     }
 
     #[test]
@@ -970,15 +1070,26 @@ mod rewrite_tests {
         drop(m); // Borrow von log freigeben, bevor wir es lesen
         let s = serde_json::to_string(&tj).unwrap();
         assert!(!s.contains("key=K"), "key-frei: {s}");
-        assert_eq!(tj.get("scheme").and_then(Value::as_str), Some("xyz"), "tms→xyz");
+        assert_eq!(
+            tj.get("scheme").and_then(Value::as_str),
+            Some("xyz"),
+            "tms→xyz"
+        );
         // Upstream-Template trägt {-y} (Server flippt), nicht {y}.
-        assert!(log[0].0.contains("{-y}"), "tms-Flip server-seitig: {:?}", log[0].0);
+        assert!(
+            log[0].0.contains("{-y}"),
+            "tms-Flip server-seitig: {:?}",
+            log[0].0
+        );
     }
 
     #[test]
     fn contains_secret_findet_langen_key_ignoriert_kurze_params() {
         let up = Url::parse("https://h/x?key=SECRETTOKEN1234&v=1&language=de").unwrap();
-        assert!(contains_secret("…key=SECRETTOKEN1234…", &up), "langer Key erkannt");
+        assert!(
+            contains_secret("…key=SECRETTOKEN1234…", &up),
+            "langer Key erkannt"
+        );
         assert!(!contains_secret("nichts geheimes", &up));
         // Kurze, benigne Params (v=1, language=de) lösen KEINEN False-Positive-fail-closed aus,
         // auch wenn sie im Style-Body vorkommen.
@@ -995,8 +1106,15 @@ mod rewrite_tests {
         let pub2: SocketAddr = "1.1.1.1:0".parse().unwrap();
         let intern: SocketAddr = "10.0.0.5:0".parse().unwrap();
         let loopback: SocketAddr = "127.0.0.1:0".parse().unwrap();
-        assert_eq!(nur_public(vec![pub1, pub2]), vec![pub1, pub2], "alle public → durch");
-        assert!(nur_public(vec![pub1, intern]).is_empty(), "gemischt → fail-closed leer");
+        assert_eq!(
+            nur_public(vec![pub1, pub2]),
+            vec![pub1, pub2],
+            "alle public → durch"
+        );
+        assert!(
+            nur_public(vec![pub1, intern]).is_empty(),
+            "gemischt → fail-closed leer"
+        );
         assert!(nur_public(vec![loopback]).is_empty(), "loopback raus");
         assert!(nur_public(vec![]).is_empty());
     }
@@ -1057,7 +1175,9 @@ mod service_tests {
             b"TILEBYTES".to_vec(),
         )
         .await;
-        let a = hole_asset(&plain(), Url::parse(&url).unwrap(), 1024).await.unwrap();
+        let a = hole_asset(&plain(), Url::parse(&url).unwrap(), 1024)
+            .await
+            .unwrap();
         assert_eq!(a.bytes, b"TILEBYTES");
         assert_eq!(a.content_type, "application/x-protobuf");
     }
@@ -1070,7 +1190,9 @@ mod service_tests {
             vec![b'x'; 5000],
         )
         .await;
-        let err = hole_asset(&plain(), Url::parse(&url).unwrap(), 1024).await.unwrap_err();
+        let err = hole_asset(&plain(), Url::parse(&url).unwrap(), 1024)
+            .await
+            .unwrap_err();
         assert!(matches!(err, ProxyFehler::ZuGross));
     }
 
@@ -1085,9 +1207,14 @@ mod service_tests {
             b"ROHGZIP".to_vec(),
         )
         .await;
-        let a = hole_asset(&plain(), Url::parse(&url).unwrap(), 1024).await.unwrap();
+        let a = hole_asset(&plain(), Url::parse(&url).unwrap(), 1024)
+            .await
+            .unwrap();
         assert_eq!(a.content_encoding.as_deref(), Some("gzip"));
-        assert_eq!(a.bytes, b"ROHGZIP", "Bytes unverändert (kein serverseitiges Dekomprimieren)");
+        assert_eq!(
+            a.bytes, b"ROHGZIP",
+            "Bytes unverändert (kein serverseitiges Dekomprimieren)"
+        );
     }
 
     #[tokio::test]
@@ -1098,14 +1225,18 @@ mod service_tests {
             b"<script>".to_vec(),
         )
         .await;
-        let a = hole_asset(&plain(), Url::parse(&url).unwrap(), 1024).await.unwrap();
+        let a = hole_asset(&plain(), Url::parse(&url).unwrap(), 1024)
+            .await
+            .unwrap();
         assert_eq!(a.content_type, "application/octet-stream", "Anti-XSS clamp");
     }
 
     #[tokio::test]
     async fn hole_asset_non_2xx_ohne_body() {
         let url = spawn_response(StatusCode::NOT_FOUND, vec![], b"upstream detail".to_vec()).await;
-        let err = hole_asset(&plain(), Url::parse(&url).unwrap(), 1024).await.unwrap_err();
+        let err = hole_asset(&plain(), Url::parse(&url).unwrap(), 1024)
+            .await
+            .unwrap_err();
         assert!(matches!(err, ProxyFehler::Status(404)));
     }
 
@@ -1116,7 +1247,11 @@ mod service_tests {
 
     /// Bindet einen Loopback-Server, der unter `pfad` ein festes JSON liefert (Body kennt den
     /// eigenen Port). Liefert (voll-url-inkl-query, port).
-    async fn spawn_json(pfad: &'static str, baue_body: impl FnOnce(u16) -> String, query: &str) -> (String, u16) {
+    async fn spawn_json(
+        pfad: &'static str,
+        baue_body: impl FnOnce(u16) -> String,
+        query: &str,
+    ) -> (String, u16) {
         use axum::{routing::get, Router};
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
@@ -1179,17 +1314,31 @@ mod service_tests {
         let pool = test_pool().await;
         let qid = proxy_quelle(&pool, &url).await;
 
-        let s = hole_style(&plain(), &pool, qid, Url::parse(&url).unwrap()).await.unwrap();
+        let s = hole_style(&plain(), &pool, qid, Url::parse(&url).unwrap())
+            .await
+            .unwrap();
         assert!(!s.contains("GEHEIMTOKEN12345"), "kein Key im Ergebnis: {s}");
-        assert!(!s.contains(&format!("127.0.0.1:{port}")), "kein Upstream-Host: {s}");
+        assert!(
+            !s.contains(&format!("127.0.0.1:{port}")),
+            "kein Upstream-Host: {s}"
+        );
 
         // Der TileJSON-Slot löst auf die Upstream-URL (mit Key) auf.
         let v: serde_json::Value = serde_json::from_str(&s).unwrap();
         let tj = v["sources"]["v"]["url"].as_str().unwrap();
-        assert!(tj.starts_with(&format!("/api/karte/proxy/{qid}/tilejson/")), "tilejson-Proxy-URL: {tj}");
+        assert!(
+            tj.starts_with(&format!("/api/karte/proxy/{qid}/tilejson/")),
+            "tilejson-Proxy-URL: {tj}"
+        );
         let slot: i64 = tj.rsplit('/').next().unwrap().parse().unwrap();
-        let upstream = repo::slot_aufloesen(&pool, qid, slot, "tilejson").await.unwrap().unwrap();
-        assert!(upstream.contains("tiles.json?key=GEHEIMTOKEN12345"), "Slot → Upstream mit Key: {upstream}");
+        let upstream = repo::slot_aufloesen(&pool, qid, slot, "tilejson")
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            upstream.contains("tiles.json?key=GEHEIMTOKEN12345"),
+            "Slot → Upstream mit Key: {upstream}"
+        );
     }
 
     #[tokio::test]
@@ -1208,8 +1357,13 @@ mod service_tests {
         .await;
         let pool = test_pool().await;
         let qid = proxy_quelle(&pool, &url).await;
-        let err = hole_style(&plain(), &pool, qid, Url::parse(&url).unwrap()).await.unwrap_err();
-        assert!(matches!(err, ProxyFehler::Secret), "fail-closed bei Rest-Key");
+        let err = hole_style(&plain(), &pool, qid, Url::parse(&url).unwrap())
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, ProxyFehler::Secret),
+            "fail-closed bei Rest-Key"
+        );
     }
 
     #[tokio::test]
@@ -1226,15 +1380,23 @@ mod service_tests {
         .await;
         let pool = test_pool().await;
         let qid = proxy_quelle(&pool, &url).await;
-        let s = hole_tilejson(&plain(), &pool, qid, Url::parse(&url).unwrap()).await.unwrap();
+        let s = hole_tilejson(&plain(), &pool, qid, Url::parse(&url).unwrap())
+            .await
+            .unwrap();
         assert!(!s.contains("GEHEIMTOKEN12345"), "key-frei: {s}");
         let v: serde_json::Value = serde_json::from_str(&s).unwrap();
         assert_eq!(v["scheme"].as_str(), Some("xyz"), "tms→xyz");
         // Der Tile-Slot trägt {-y} (Server-Flip). Pfad: /api/karte/proxy/{id}/tile/{slot}/{z}/{x}/{y}
         let tile = v["tiles"][0].as_str().unwrap();
         let slot: i64 = tile.split('/').nth(6).unwrap().parse().unwrap();
-        let upstream = repo::slot_aufloesen(&pool, qid, slot, "template").await.unwrap().unwrap();
-        assert!(upstream.contains("{-y}"), "TMS-Flip im Upstream-Template: {upstream}");
+        let upstream = repo::slot_aufloesen(&pool, qid, slot, "template")
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            upstream.contains("{-y}"),
+            "TMS-Flip im Upstream-Template: {upstream}"
+        );
     }
 
     #[tokio::test]
@@ -1251,6 +1413,9 @@ mod service_tests {
         .await;
         let client = crate::karte::download::download_client();
         let res = client.get(&url).send().await;
-        assert!(res.is_err(), "Redirect auf interne Adresse muss abgebrochen werden");
+        assert!(
+            res.is_err(),
+            "Redirect auf interne Adresse muss abgebrochen werden"
+        );
     }
 }

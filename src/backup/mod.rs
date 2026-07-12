@@ -24,7 +24,9 @@ pub async fn vacuum_into(pool: &SqlitePool, ziel: &Path) -> Result<u64, AppError
         .to_str()
         .ok_or_else(|| AppError::Internal("Sicherungspfad ist kein gültiges UTF-8".into()))?;
     let sql = format!("VACUUM INTO '{}'", escape_sql_string(ziel_str));
-    sqlx::query(sqlx::AssertSqlSafe(&*sql)).execute(pool).await?;
+    sqlx::query(sqlx::AssertSqlSafe(&*sql))
+        .execute(pool)
+        .await?;
 
     let groesse = std::fs::metadata(ziel)
         .map_err(|e| AppError::Internal(format!("Sicherungsdatei nicht lesbar: {e}")))?
@@ -40,9 +42,7 @@ mod tests {
 
     /// Öffnet eine Sicherungsdatei als eigenen Pool und liest sie.
     async fn oeffne_sicherung(pfad: &Path) -> SqlitePool {
-        let options = SqliteConnectOptions::new()
-            .filename(pfad)
-            .read_only(true);
+        let options = SqliteConnectOptions::new().filename(pfad).read_only(true);
         SqlitePool::connect_with(options).await.unwrap()
     }
 

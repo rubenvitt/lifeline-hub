@@ -14,7 +14,16 @@ async fn setup() -> axum::Router {
     bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
         .await
         .unwrap();
-    build_router(AppState { pool, live: LiveHub::new(), karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu(), download_client: lifeline_hub::karte::download::download_client(), download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(), karten_service_url: None, karten_service_token: None })
+    build_router(AppState {
+        pool,
+        live: LiveHub::new(),
+        karten_dir: std::env::temp_dir(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_service_url: None,
+        karten_service_token: None,
+    })
 }
 
 /// Wie `setup`, behält aber ein Handle auf den `LiveHub`, um Live-Events zu abonnieren.
@@ -27,7 +36,10 @@ async fn setup_mit_hub() -> (axum::Router, LiveHub) {
     let router = build_router(AppState {
         pool,
         live: live.clone(),
-        karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu(), download_client: lifeline_hub::karte::download::download_client(), download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_dir: std::env::temp_dir(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
         karten_service_url: None,
         karten_service_token: None,
     });
@@ -60,7 +72,12 @@ async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) ->
         .to_string()
 }
 
-async fn benutzer_anlegen(app: &axum::Router, admin_cookie: &str, name: &str, org_rolle: &str) -> i64 {
+async fn benutzer_anlegen(
+    app: &axum::Router,
+    admin_cookie: &str,
+    name: &str,
+    org_rolle: &str,
+) -> i64 {
     let body = format!(
         r#"{{"anzeigename":"{name}","benutzername":"{name}","passwort":"{name}pw1","org_rolle":"{org_rolle}"}}"#
     );
@@ -79,7 +96,9 @@ async fn benutzer_anlegen(app: &axum::Router, admin_cookie: &str, name: &str, or
         .unwrap();
     assert_eq!(resp.status(), StatusCode::CREATED);
     let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    serde_json::from_slice::<Value>(&bytes).unwrap()["id"].as_i64().unwrap()
+    serde_json::from_slice::<Value>(&bytes).unwrap()["id"]
+        .as_i64()
+        .unwrap()
 }
 
 /// Generischer Request-Helfer: liefert (Status, JSON-Body).
@@ -90,7 +109,10 @@ async fn anfrage(
     cookie: &str,
     body: Option<&str>,
 ) -> (StatusCode, Value) {
-    let mut req = Request::builder().method(methode).uri(uri).header(header::COOKIE, cookie.to_string());
+    let mut req = Request::builder()
+        .method(methode)
+        .uri(uri)
+        .header(header::COOKIE, cookie.to_string());
     let body = match body {
         Some(b) => {
             req = req.header(header::CONTENT_TYPE, "application/json");
@@ -101,38 +123,75 @@ async fn anfrage(
     let resp = app.clone().oneshot(req.body(body).unwrap()).await.unwrap();
     let status = resp.status();
     let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
 }
 
 // ---------- Zusatz-Helfer ----------
 
 async fn einsatz_anlegen(app: &axum::Router, cookie: &str) -> i64 {
-    let (status, json) = anfrage(app, "POST", "/api/einsaetze", cookie, Some(r#"{"bezeichnung":"Lage"}"#)).await;
+    let (status, json) = anfrage(
+        app,
+        "POST",
+        "/api/einsaetze",
+        cookie,
+        Some(r#"{"bezeichnung":"Lage"}"#),
+    )
+    .await;
     assert_eq!(status, StatusCode::CREATED);
     json["id"].as_i64().unwrap()
 }
 
 /// Weist einem Benutzer eine Einsatz-Rolle zu (durch die Einsatzleitung).
-async fn rolle_setzen(app: &axum::Router, leit_cookie: &str, einsatz: i64, benutzer_id: i64, rolle: &str) {
+async fn rolle_setzen(
+    app: &axum::Router,
+    leit_cookie: &str,
+    einsatz: i64,
+    benutzer_id: i64,
+    rolle: &str,
+) {
     let (status, _) = anfrage(
-        app, "PUT", &format!("/api/einsaetze/{einsatz}/mitglieder/{benutzer_id}"), leit_cookie,
+        app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/mitglieder/{benutzer_id}"),
+        leit_cookie,
         Some(&format!(r#"{{"einsatz_rolle":"{rolle}"}}"#)),
-    ).await;
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
 }
 
 /// Zählt ETB-Einträge mit typ='system'.
 async fn system_etb_anzahl(app: &axum::Router, cookie: &str, einsatz: i64) -> usize {
-    let (_, json) = anfrage(app, "GET", &format!("/api/einsaetze/{einsatz}/etb"), cookie, None).await;
-    json.as_array().unwrap().iter().filter(|e| e["typ"] == "system").count()
+    let (_, json) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/etb"),
+        cookie,
+        None,
+    )
+    .await;
+    json.as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| e["typ"] == "system")
+        .count()
 }
 
 /// Legt Stamm-Material an (Admin) und liefert dessen id.
 async fn material_anlegen(app: &axum::Router, admin: &str, bezeichnung: &str) -> i64 {
     let (status, json) = anfrage(
-        app, "POST", "/api/material", admin,
-        Some(&format!(r#"{{"bezeichnung":"{bezeichnung}","kategorie":"Betreuung"}}"#)),
-    ).await;
+        app,
+        "POST",
+        "/api/material",
+        admin,
+        Some(&format!(
+            r#"{{"bezeichnung":"{bezeichnung}","kategorie":"Betreuung"}}"#
+        )),
+    )
+    .await;
     assert_eq!(status, StatusCode::CREATED);
     json["id"].as_i64().unwrap()
 }
@@ -147,16 +206,24 @@ async fn disponieren_stamm_mit_menge_schreibt_etb() {
     let mat = material_anlegen(&app, &admin, "Wolldecke").await;
 
     let (status, json) = anfrage(
-        &app, "POST", &format!("/api/einsaetze/{einsatz}/material"), &admin,
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
         Some(&format!(r#"{{"material_id":{mat},"menge":50}}"#)),
-    ).await;
+    )
+    .await;
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(json["bezeichnung"], "Wolldecke");
     assert_eq!(json["menge"], 50);
     assert_eq!(json["status"], "einsatzbereit");
     assert_eq!(json["ist_adhoc"], false);
 
-    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, 1, "Disponieren schreibt 1 System-ETB");
+    assert_eq!(
+        system_etb_anzahl(&app, &admin, einsatz).await,
+        1,
+        "Disponieren schreibt 1 System-ETB"
+    );
 }
 
 #[tokio::test]
@@ -166,9 +233,39 @@ async fn dasselbe_material_mehrfach_disponierbar() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let mat = material_anlegen(&app, &admin, "Wolldecke").await;
     let body = format!(r#"{{"material_id":{mat},"menge":30}}"#);
-    assert_eq!(anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/material"), &admin, Some(&body)).await.0, StatusCode::CREATED);
-    assert_eq!(anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/material"), &admin, Some(&body)).await.0, StatusCode::CREATED, "kein Conflict");
-    let (_, liste) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/material"), &admin, None).await;
+    assert_eq!(
+        anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/material"),
+            &admin,
+            Some(&body)
+        )
+        .await
+        .0,
+        StatusCode::CREATED
+    );
+    assert_eq!(
+        anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/material"),
+            &admin,
+            Some(&body)
+        )
+        .await
+        .0,
+        StatusCode::CREATED,
+        "kein Conflict"
+    );
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        None,
+    )
+    .await;
     assert_eq!(liste.as_array().unwrap().len(), 2);
 }
 
@@ -179,9 +276,15 @@ async fn adhoc_ohne_stamm_mit_pflicht_bezeichnung() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
 
     let (status, json) = anfrage(
-        &app, "POST", &format!("/api/einsaetze/{einsatz}/material"), &admin,
-        Some(r#"{"adhoc":{"bezeichnung":"Spende-Decken","traegerorganisation":"THW"},"menge":100}"#),
-    ).await;
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        Some(
+            r#"{"adhoc":{"bezeichnung":"Spende-Decken","traegerorganisation":"THW"},"menge":100}"#,
+        ),
+    )
+    .await;
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(json["ist_adhoc"], true);
     assert!(json["material_id"].is_null());
@@ -195,9 +298,13 @@ async fn menge_unter_eins_ist_400() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let mat = material_anlegen(&app, &admin, "Wolldecke").await;
     let (status, _) = anfrage(
-        &app, "POST", &format!("/api/einsaetze/{einsatz}/material"), &admin,
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
         Some(&format!(r#"{{"material_id":{mat},"menge":0}}"#)),
-    ).await;
+    )
+    .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
@@ -210,9 +317,27 @@ async fn beobachter_liest_nicht_disponiert_nicht() {
     rolle_setzen(&app, &admin, einsatz, erika_id, "beobachter").await;
     let erika = login_cookie(&app, "erika", "erikapw1").await;
 
-    assert_eq!(anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/material"), &erika, None).await.0, StatusCode::OK);
+    assert_eq!(
+        anfrage(
+            &app,
+            "GET",
+            &format!("/api/einsaetze/{einsatz}/material"),
+            &erika,
+            None
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
     let mat = material_anlegen(&app, &admin, "Wolldecke").await;
-    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/material"), &erika, Some(&format!(r#"{{"material_id":{mat}}}"#))).await;
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &erika,
+        Some(&format!(r#"{{"material_id":{mat}}}"#)),
+    )
+    .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 }
 
@@ -222,8 +347,26 @@ async fn disponieren_auf_abgeschlossenem_einsatz_ist_409() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let mat = material_anlegen(&app, &admin, "Wolldecke").await;
-    assert_eq!(anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/abschliessen"), &admin, None).await.0, StatusCode::OK);
-    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/material"), &admin, Some(&format!(r#"{{"material_id":{mat}}}"#))).await;
+    assert_eq!(
+        anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/abschliessen"),
+            &admin,
+            None
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        Some(&format!(r#"{{"material_id":{mat}}}"#)),
+    )
+    .await;
     assert_eq!(status, StatusCode::CONFLICT);
 }
 
@@ -233,11 +376,25 @@ async fn menge_und_status_aenderung_schreiben_je_einen_etb() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let mat = material_anlegen(&app, &admin, "Wolldecke").await;
-    let (_, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/material"), &admin, Some(&format!(r#"{{"material_id":{mat},"menge":50}}"#))).await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        Some(&format!(r#"{{"material_id":{mat},"menge":50}}"#)),
+    )
+    .await;
     let em = json["id"].as_i64().unwrap();
 
     // Menge UND Status in einem PATCH → +2 System-ETB.
-    let (status, json) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/material/{em}"), &admin, Some(r#"{"menge":30,"status":"defekt"}"#)).await;
+    let (status, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &admin,
+        Some(r#"{"menge":30,"status":"defekt"}"#),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["menge"], 30);
     assert_eq!(json["status"], "defekt");
@@ -252,9 +409,23 @@ async fn ungueltiger_status_ist_400() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let mat = material_anlegen(&app, &admin, "Wolldecke").await;
-    let (_, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/material"), &admin, Some(&format!(r#"{{"material_id":{mat}}}"#))).await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        Some(&format!(r#"{{"material_id":{mat}}}"#)),
+    )
+    .await;
     let em = json["id"].as_i64().unwrap();
-    let (status, _) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/material/{em}"), &admin, Some(r#"{"status":"kaputtnochmal"}"#)).await;
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &admin,
+        Some(r#"{"status":"kaputtnochmal"}"#),
+    )
+    .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
@@ -264,12 +435,30 @@ async fn reine_bemerkung_schreibt_keinen_etb() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let mat = material_anlegen(&app, &admin, "Wolldecke").await;
-    let (_, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/material"), &admin, Some(&format!(r#"{{"material_id":{mat}}}"#))).await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        Some(&format!(r#"{{"material_id":{mat}}}"#)),
+    )
+    .await;
     let em = json["id"].as_i64().unwrap();
 
-    let (_, gesetzt) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/material/{em}"), &admin, Some(r#"{"bemerkung":"Lagerhalle 2"}"#)).await;
+    let (_, gesetzt) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &admin,
+        Some(r#"{"bemerkung":"Lagerhalle 2"}"#),
+    )
+    .await;
     assert_eq!(gesetzt["bemerkung"], "Lagerhalle 2");
-    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, 1, "nur die Disposition selbst");
+    assert_eq!(
+        system_etb_anzahl(&app, &admin, einsatz).await,
+        1,
+        "nur die Disposition selbst"
+    );
 }
 
 #[tokio::test]
@@ -278,11 +467,29 @@ async fn entfernen_schreibt_etb() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let mat = material_anlegen(&app, &admin, "Wolldecke").await;
-    let (_, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/material"), &admin, Some(&format!(r#"{{"material_id":{mat}}}"#))).await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        Some(&format!(r#"{{"material_id":{mat}}}"#)),
+    )
+    .await;
     let em = json["id"].as_i64().unwrap();
-    let (status, _) = anfrage(&app, "DELETE", &format!("/api/einsaetze/{einsatz}/material/{em}"), &admin, None).await;
+    let (status, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &admin,
+        None,
+    )
+    .await;
     assert_eq!(status, StatusCode::NO_CONTENT);
-    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, 2, "Disponieren + Entfernen");
+    assert_eq!(
+        system_etb_anzahl(&app, &admin, einsatz).await,
+        2,
+        "Disponieren + Entfernen"
+    );
 }
 
 #[tokio::test]
@@ -290,7 +497,14 @@ async fn org_isolation_fremdes_material_nicht_disponierbar() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let (status, _) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/material"), &admin, Some(r#"{"material_id":999999}"#)).await;
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        Some(r#"{"material_id":999999}"#),
+    )
+    .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
@@ -299,9 +513,23 @@ async fn patch_und_delete_unbekannte_em_id_sind_404() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let (status, _) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/material/999999"), &admin, Some(r#"{"menge":5}"#)).await;
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/material/999999"),
+        &admin,
+        Some(r#"{"menge":5}"#),
+    )
+    .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
-    let (status, _) = anfrage(&app, "DELETE", &format!("/api/einsaetze/{einsatz}/material/999999"), &admin, None).await;
+    let (status, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/material/999999"),
+        &admin,
+        None,
+    )
+    .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
@@ -311,15 +539,36 @@ async fn patch_menge_unter_eins_ist_400() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let mat = material_anlegen(&app, &admin, "Wolldecke").await;
-    let (_, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/material"), &admin, Some(&format!(r#"{{"material_id":{mat}}}"#))).await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        Some(&format!(r#"{{"material_id":{mat}}}"#)),
+    )
+    .await;
     let em = json["id"].as_i64().unwrap();
-    let (status, _) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/material/{em}"), &admin, Some(r#"{"menge":0}"#)).await;
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &admin,
+        Some(r#"{"menge":0}"#),
+    )
+    .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
 /// Bildet eine Einheit (Admin) und liefert ihre id.
 async fn einheit_bilden(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
-    let (status, json) = anfrage(app, "POST", &format!("/api/einsaetze/{einsatz}/einheiten"), cookie, Some(&format!(r#"{{"name":"{name}"}}"#))).await;
+    let (status, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        cookie,
+        Some(&format!(r#"{{"name":"{name}"}}"#)),
+    )
+    .await;
     assert_eq!(status, StatusCode::CREATED);
     json["id"].as_i64().unwrap()
 }
@@ -330,37 +579,117 @@ async fn material_einheit_zuordnen_freigeben_und_aufloesen() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let mat = material_anlegen(&app, &admin, "Wolldecke").await;
-    let (_, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/material"), &admin, Some(&format!(r#"{{"material_id":{mat},"menge":50}}"#))).await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        Some(&format!(r#"{{"material_id":{mat},"menge":50}}"#)),
+    )
+    .await;
     let em = json["id"].as_i64().unwrap();
     let eid = einheit_bilden(&app, &admin, einsatz, "Trupp 1").await;
 
     // Zuordnen.
     assert_eq!(
-        anfrage(&app, "PUT", &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/{em}"), &admin, None).await.0,
+        anfrage(
+            &app,
+            "PUT",
+            &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/{em}"),
+            &admin,
+            None
+        )
+        .await
+        .0,
         StatusCode::NO_CONTENT
     );
-    let (_, liste) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/material"), &admin, None).await;
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        None,
+    )
+    .await;
     assert_eq!(liste.as_array().unwrap()[0]["einheit_id"], eid);
 
     // Material-Mitglied erscheint in der Einheit.
-    let (_, einheiten) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/einheiten"), &admin, None).await;
-    let einheit = einheiten.as_array().unwrap().iter().find(|e| e["id"] == eid).unwrap();
+    let (_, einheiten) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &admin,
+        None,
+    )
+    .await;
+    let einheit = einheiten
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"] == eid)
+        .unwrap();
     assert_eq!(einheit["material_mitglieder"].as_array().unwrap().len(), 1);
 
     // Explizit freigeben (HTTP-Route material_freigeben).
     assert_eq!(
-        anfrage(&app, "DELETE", &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/{em}"), &admin, None).await.0,
+        anfrage(
+            &app,
+            "DELETE",
+            &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/{em}"),
+            &admin,
+            None
+        )
+        .await
+        .0,
         StatusCode::NO_CONTENT
     );
-    let (_, liste_frei) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/material"), &admin, None).await;
-    assert!(liste_frei.as_array().unwrap()[0]["einheit_id"].is_null(), "Freigeben löst die Zuordnung");
+    let (_, liste_frei) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(
+        liste_frei.as_array().unwrap()[0]["einheit_id"].is_null(),
+        "Freigeben löst die Zuordnung"
+    );
     // Wieder zuordnen, damit der anschließende Auflösen-Block weiterhin greift.
-    anfrage(&app, "PUT", &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/{em}"), &admin, None).await;
+    anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/{em}"),
+        &admin,
+        None,
+    )
+    .await;
 
     // Auflösen gibt Material frei.
-    assert_eq!(anfrage(&app, "DELETE", &format!("/api/einsaetze/{einsatz}/einheiten/{eid}"), &admin, None).await.0, StatusCode::NO_CONTENT);
-    let (_, liste2) = anfrage(&app, "GET", &format!("/api/einsaetze/{einsatz}/material"), &admin, None).await;
-    assert!(liste2.as_array().unwrap()[0]["einheit_id"].is_null(), "Auflösen gibt Material frei");
+    assert_eq!(
+        anfrage(
+            &app,
+            "DELETE",
+            &format!("/api/einsaetze/{einsatz}/einheiten/{eid}"),
+            &admin,
+            None
+        )
+        .await
+        .0,
+        StatusCode::NO_CONTENT
+    );
+    let (_, liste2) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        None,
+    )
+    .await;
+    assert!(
+        liste2.as_array().unwrap()[0]["einheit_id"].is_null(),
+        "Auflösen gibt Material frei"
+    );
 }
 
 #[tokio::test]
@@ -369,7 +698,14 @@ async fn fremde_em_id_an_einheit_ist_404() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let eid = einheit_bilden(&app, &admin, einsatz, "Trupp 1").await;
-    let (status, _) = anfrage(&app, "PUT", &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/999999"), &admin, None).await;
+    let (status, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/999999"),
+        &admin,
+        None,
+    )
+    .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
@@ -382,16 +718,32 @@ async fn reine_bemerkung_publiziert_material_event() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let mat = material_anlegen(&app, &admin, "Wolldecke").await;
-    let (_, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/material"), &admin, Some(&format!(r#"{{"material_id":{mat}}}"#))).await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        Some(&format!(r#"{{"material_id":{mat}}}"#)),
+    )
+    .await;
     let em = json["id"].as_i64().unwrap();
 
     // Erst NACH dem Disponieren abonnieren → isoliert das Event des folgenden PATCH.
     let mut rx = live.abonniere(einsatz);
-    let (status, _) = anfrage(&app, "PATCH", &format!("/api/einsaetze/{einsatz}/material/{em}"), &admin, Some(r#"{"bemerkung":"Lagerhalle 2"}"#)).await;
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &admin,
+        Some(r#"{"bemerkung":"Lagerhalle 2"}"#),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
 
     // Reine Bemerkung schreibt keinen ETB → das einzige Live-Event muss `material` sein.
-    let nachricht = rx.try_recv().expect("ein Live-Event nach der Material-Mutation erwartet");
+    let nachricht = rx
+        .try_recv()
+        .expect("ein Live-Event nach der Material-Mutation erwartet");
     assert_eq!(nachricht.event, "material");
     let data: Value = serde_json::from_str(&nachricht.data).unwrap();
     assert_eq!(data["einsatz_id"], einsatz);
@@ -407,14 +759,29 @@ async fn material_an_einheit_zuordnen_publiziert_material_event() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let mat = material_anlegen(&app, &admin, "Wolldecke").await;
-    let (_, json) = anfrage(&app, "POST", &format!("/api/einsaetze/{einsatz}/material"), &admin, Some(&format!(r#"{{"material_id":{mat}}}"#))).await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        Some(&format!(r#"{{"material_id":{mat}}}"#)),
+    )
+    .await;
     let em = json["id"].as_i64().unwrap();
     let eid = einheit_bilden(&app, &admin, einsatz, "Trupp 1").await;
 
     // Erst NACH dem Aufbau abonnieren → isoliert die Events der Zuordnung.
     let mut rx = live.abonniere(einsatz);
     assert_eq!(
-        anfrage(&app, "PUT", &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/{em}"), &admin, None).await.0,
+        anfrage(
+            &app,
+            "PUT",
+            &format!("/api/einsaetze/{einsatz}/einheiten/{eid}/material/{em}"),
+            &admin,
+            None
+        )
+        .await
+        .0,
         StatusCode::NO_CONTENT
     );
 
@@ -423,5 +790,8 @@ async fn material_an_einheit_zuordnen_publiziert_material_event() {
     while let Ok(n) = rx.try_recv() {
         events.push(n.event);
     }
-    assert!(events.iter().any(|e| e == "material"), "erwartete ein material-Event, bekam: {events:?}");
+    assert!(
+        events.iter().any(|e| e == "material"),
+        "erwartete ein material-Event, bekam: {events:?}"
+    );
 }

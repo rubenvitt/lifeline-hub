@@ -214,7 +214,9 @@ pub fn fordere_modul_zugriff(
     let einsatz_override_rolle = ueberschreibung.and_then(|o| o.benoetigte_rolle.as_deref());
     let org_default = org_defaults.get(modul_key).and_then(|r| r.as_deref());
     let effektiv = effektive_modul_rolle(einsatz_override_rolle, org_default);
-    let benoetigte = effektiv.as_deref().or_else(|| registry_benoetigte_rolle(modul_key));
+    let benoetigte = effektiv
+        .as_deref()
+        .or_else(|| registry_benoetigte_rolle(modul_key));
     match benoetigte {
         Some("admin") => Err(AppError::Forbidden), // System-Admin ist oben bereits durch.
         Some("fuehrungskraft") => {
@@ -340,7 +342,15 @@ mod tests {
     #[test]
     fn darf_lesen_aktiv_nicht_mitglied_normal_ist_false() {
         let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
-        assert!(!darf_lesen(&b, STATUS_AKTIV, None, None, None, None, jetzt()));
+        assert!(!darf_lesen(
+            &b,
+            STATUS_AKTIV,
+            None,
+            None,
+            None,
+            None,
+            jetzt()
+        ));
     }
 
     #[test]
@@ -629,8 +639,12 @@ mod tests {
     #[test]
     fn schreibrecht_oder_admin_erlaubt_schreibberechtigte_rollen() {
         let normal = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
-        assert!(fordere_schreibrecht_oder_admin(&normal, Some(EinsatzRolle::Einsatzleitung)).is_ok());
-        assert!(fordere_schreibrecht_oder_admin(&normal, Some(EinsatzRolle::Fuehrungspersonal)).is_ok());
+        assert!(
+            fordere_schreibrecht_oder_admin(&normal, Some(EinsatzRolle::Einsatzleitung)).is_ok()
+        );
+        assert!(
+            fordere_schreibrecht_oder_admin(&normal, Some(EinsatzRolle::Fuehrungspersonal)).is_ok()
+        );
     }
 
     #[test]
@@ -670,7 +684,10 @@ mod tests {
     }
 
     fn overrides_mit(zeilen: Vec<EinsatzModulOverride>) -> HashMap<String, EinsatzModulOverride> {
-        zeilen.into_iter().map(|o| (o.modul_key.clone(), o)).collect()
+        zeilen
+            .into_iter()
+            .map(|o| (o.modul_key.clone(), o))
+            .collect()
     }
 
     fn leere_org_defaults() -> HashMap<String, Option<String>> {
@@ -755,7 +772,13 @@ mod tests {
             false,
             Some("fuehrungskraft"),
         )]);
-        assert!(fordere_modul_zugriff(&ov, &leere_org_defaults(), "einsatz-einstellungen", &normal).is_ok());
+        assert!(fordere_modul_zugriff(
+            &ov,
+            &leere_org_defaults(),
+            "einsatz-einstellungen",
+            &normal
+        )
+        .is_ok());
     }
 
     // --- Org-Default-Tests (Task 11) ---
@@ -842,7 +865,9 @@ mod tests {
             .unwrap();
 
         // Org-Defaults laden (DB-Integration).
-        let org_defaults = crate::org::modul_einstellung::laden_alle(&pool, 1).await.unwrap();
+        let org_defaults = crate::org::modul_einstellung::laden_alle(&pool, 1)
+            .await
+            .unwrap();
 
         // Leere Einsatz-Override-Map.
         let leer: HashMap<String, EinsatzModulOverride> = HashMap::new();

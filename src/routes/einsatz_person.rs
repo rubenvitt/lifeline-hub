@@ -1,30 +1,36 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{fordere_modul_zugriff_laden, fordere_aktiv, fordere_einsatzleitung, fordere_lesezugriff, fordere_schreibrecht};
+use crate::einsatz::berechtigung::{
+    fordere_aktiv, fordere_einsatzleitung, fordere_lesezugriff, fordere_modul_zugriff_laden,
+    fordere_schreibrecht,
+};
 use crate::einsatz::repo as einsatz_repo;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "personen";
 use crate::error::AppError;
 use crate::etb::{self, repo as etb_repo};
-use crate::person::{darf_uebergehen, registrier_anzeige, repo, AbgleichStatus, Geschlecht, PersonAnzeige, PersonStatus, Sichtungskategorie, VerbleibArt, VerbleibStatus};
-use crate::person::{abgleich_repo, audit_repo, sichtung_repo, verbleib_repo, verlaufsnotiz_repo};
 use crate::person::abgleich_repo::AbgleichAnzeige;
 use crate::person::audit_repo::ZugriffAnzeige;
 use crate::person::sichtung_repo::SichtungAnzeige;
 use crate::person::verbleib_repo::VerbleibAnzeige;
 use crate::person::verlaufsnotiz_repo::NotizAnzeige;
-use serde::Serialize;
-use utoipa::ToSchema;
-use axum::response::{IntoResponse, Response};
+use crate::person::{abgleich_repo, audit_repo, sichtung_repo, verbleib_repo, verlaufsnotiz_repo};
+use crate::person::{
+    darf_uebergehen, registrier_anzeige, repo, AbgleichStatus, Geschlecht, PersonAnzeige,
+    PersonStatus, Sichtungskategorie, VerbleibArt, VerbleibStatus,
+};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::sse::{Event, KeepAlive, Sse};
+use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::Deserialize;
+use serde::Serialize;
 use std::convert::Infallible;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::{Stream, StreamExt};
+use utoipa::ToSchema;
 
 /// Detail-Antwort: E‑1-Personenfelder (flatten) + E‑2-Verlauf-Arrays. Genau eine
 /// Antwort, genau ein `detail`-Audit (Spec-Annahme „Lesen / Lese-Audit").
@@ -40,7 +46,12 @@ pub struct PersonDetail {
 
 /// Schreibt einen pseudonymen System-ETB-Eintrag (nur Registriernummer + Status)
 /// und publiziert ihn als `etb`-SSE-Event.
-async fn etb_system(state: &AppState, einsatz_id: i64, benutzer_id: i64, inhalt: &str) -> Result<(), AppError> {
+async fn etb_system(
+    state: &AppState,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    inhalt: &str,
+) -> Result<(), AppError> {
     let anzeige = etb_repo::anlegen(
         &state.pool,
         einsatz_id,
@@ -120,14 +131,23 @@ pub async fn liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
 
     if let Some(s) = &params.status {
         if PersonStatus::parse(s).is_none() {
             return Err(AppError::Validation("Unbekannter Status im Filter".into()));
         }
     }
-    Ok(Json(repo::liste(&state.pool, einsatz_id, params.status.as_deref()).await?))
+    Ok(Json(
+        repo::liste(&state.pool, einsatz_id, params.status.as_deref()).await?,
+    ))
 }
 
 #[derive(Debug, Deserialize)]
@@ -154,7 +174,14 @@ pub async fn anlegen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
     pruefe_geschlecht(&body.geschlecht)?;
 
@@ -188,7 +215,10 @@ pub async fn anlegen(
         &state,
         einsatz_id,
         benutzer.id,
-        &format!("Person {} erfasst", registrier_anzeige(person.registrier_nr)),
+        &format!(
+            "Person {} erfasst",
+            registrier_anzeige(person.registrier_nr)
+        ),
     )
     .await?;
     sse_person(&state, einsatz_id, person.id);
@@ -207,17 +237,37 @@ pub async fn detail(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
 
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
-    audit_repo::anlegen(&state.pool, einsatz_id, Some(person_id), benutzer.id, "detail").await?;
+    audit_repo::anlegen(
+        &state.pool,
+        einsatz_id,
+        Some(person_id),
+        benutzer.id,
+        "detail",
+    )
+    .await?;
 
     let sichtungen = sichtung_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
     let notizen = verlaufsnotiz_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
     let verbleib = verbleib_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
     let abgleiche = abgleich_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
 
-    Ok(Json(PersonDetail { person, sichtungen, notizen, verbleib, abgleiche }))
+    Ok(Json(PersonDetail {
+        person,
+        sichtungen,
+        notizen,
+        verbleib,
+        abgleiche,
+    }))
 }
 
 #[derive(Debug, Deserialize)]
@@ -245,7 +295,14 @@ pub async fn aktualisieren(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
     pruefe_geschlecht(&body.geschlecht)?;
 
@@ -258,15 +315,23 @@ pub async fn aktualisieren(
     let notiz = trimme(body.notiz);
 
     let person = repo::aktualisiere(
-        &state.pool, einsatz_id, person_id, benutzer.id,
+        &state.pool,
+        einsatz_id,
+        person_id,
+        benutzer.id,
         repo::PatchDaten {
-            name: name.as_deref(), vorname: vorname.as_deref(),
-            geschlecht: body.geschlecht.as_deref(), geburtsdatum: geburtsdatum.as_deref(),
-            alter_geschaetzt: body.alter_geschaetzt, herkunft_adresse: herkunft.as_deref(),
-            antreff_ort: antreff.as_deref(), melder_kontakt: melder.as_deref(),
+            name: name.as_deref(),
+            vorname: vorname.as_deref(),
+            geschlecht: body.geschlecht.as_deref(),
+            geburtsdatum: geburtsdatum.as_deref(),
+            alter_geschaetzt: body.alter_geschaetzt,
+            herkunft_adresse: herkunft.as_deref(),
+            antreff_ort: antreff.as_deref(),
+            melder_kontakt: melder.as_deref(),
             notiz: notiz.as_deref(),
         },
-    ).await?;
+    )
+    .await?;
     sse_person(&state, einsatz_id, person.id);
     Ok(Json(person))
 }
@@ -288,7 +353,14 @@ pub async fn status_wechsel(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     if PersonStatus::parse(&body.status).is_none() {
@@ -296,33 +368,49 @@ pub async fn status_wechsel(
     }
     let vorher = repo::laden(&state.pool, einsatz_id, person_id).await?;
     if vorher.storniert_at.is_some() {
-        return Err(AppError::Conflict("Stornierte Person kann nicht geändert werden".into()));
+        return Err(AppError::Conflict(
+            "Stornierte Person kann nicht geändert werden".into(),
+        ));
     }
     if !darf_uebergehen(vorher.status.as_str(), &body.status) {
         return Err(AppError::UnprocessableEntity(format!(
             "Status-Übergang {} → {} ist nicht erlaubt",
-            vorher.status.as_str(), body.status
+            vorher.status.as_str(),
+            body.status
         )));
     }
-    repo::setze_status(&state.pool, einsatz_id, person_id, &body.status, benutzer.id).await?;
+    repo::setze_status(
+        &state.pool,
+        einsatz_id,
+        person_id,
+        &body.status,
+        benutzer.id,
+    )
+    .await?;
 
     // E‑3: bei verstorben/abgemeldet → UHS-Auto-Austritt (sequenziell, eigene ETB-Spur).
     if matches!(body.status.as_str(), "verstorben" | "abgemeldet") {
         let anlass = format!("durch Status-Wechsel zu {}", body.status);
         if let Some(effekt) =
-            crate::uhs::auto_austritt(&state.pool, einsatz_id, person_id, &anlass, benutzer.id).await?
+            crate::uhs::auto_austritt(&state.pool, einsatz_id, person_id, &anlass, benutzer.id)
+                .await?
         {
             sse_auto_austritt(&state, einsatz_id, &effekt);
         }
     }
 
     etb_system(
-        &state, einsatz_id, benutzer.id,
+        &state,
+        einsatz_id,
+        benutzer.id,
         &format!(
             "Person {}: {} → {}",
-            registrier_anzeige(vorher.registrier_nr), vorher.status.as_str(), body.status
+            registrier_anzeige(vorher.registrier_nr),
+            vorher.status.as_str(),
+            body.status
         ),
-    ).await?;
+    )
+    .await?;
     sse_person(&state, einsatz_id, person_id);
     Ok(Json(repo::laden(&state.pool, einsatz_id, person_id).await?))
 }
@@ -337,7 +425,14 @@ pub async fn stornieren(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
@@ -346,16 +441,27 @@ pub async fn stornieren(
     }
     repo::storniere(&state.pool, einsatz_id, person_id, benutzer.id).await?;
     // E‑3: Storno → UHS-Auto-Austritt + Reservierungs-Cleanup (Repo schreibt nur ETB, wenn Austritt nötig).
-    if let Some(effekt) =
-        crate::uhs::auto_austritt(&state.pool, einsatz_id, person_id, "durch Storno der Person", benutzer.id)
-            .await?
+    if let Some(effekt) = crate::uhs::auto_austritt(
+        &state.pool,
+        einsatz_id,
+        person_id,
+        "durch Storno der Person",
+        benutzer.id,
+    )
+    .await?
     {
         sse_auto_austritt(&state, einsatz_id, &effekt);
     }
     etb_system(
-        &state, einsatz_id, benutzer.id,
-        &format!("Person {} storniert", registrier_anzeige(person.registrier_nr)),
-    ).await?;
+        &state,
+        einsatz_id,
+        benutzer.id,
+        &format!(
+            "Person {} storniert",
+            registrier_anzeige(person.registrier_nr)
+        ),
+    )
+    .await?;
     sse_person(&state, einsatz_id, person_id);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -379,7 +485,14 @@ pub async fn sichten(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let kategorie = Sichtungskategorie::parse(&body.kategorie)
@@ -439,11 +552,20 @@ pub async fn audit(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_einsatzleitung(rolle)?;
     // Existenz der Person sicherstellen (404 statt leerer Liste bei Tippfehler).
     repo::laden(&state.pool, einsatz_id, person_id).await?;
-    Ok(Json(audit_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?))
+    Ok(Json(
+        audit_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?,
+    ))
 }
 
 /// Einfaches CSV-Feld-Quoting (RFC 4180): in Anführungszeichen, innere `"` verdoppelt.
@@ -468,14 +590,25 @@ pub async fn export(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
 
     let personen = repo::liste(&state.pool, einsatz_id, None).await?;
     audit_repo::anlegen(&state.pool, einsatz_id, None, benutzer.id, "export").await?;
 
-    let mut csv = String::from("registrier_nr;status;sichtung;name;vorname;geschlecht;alter;antreff_ort\n");
+    let mut csv =
+        String::from("registrier_nr;status;sichtung;name;vorname;geschlecht;alter;antreff_ort\n");
     for p in &personen {
-        let alter = p.alter_geschaetzt.map(|a| a.to_string()).unwrap_or_default();
+        let alter = p
+            .alter_geschaetzt
+            .map(|a| a.to_string())
+            .unwrap_or_default();
         csv.push_str(&format!(
             "{};{};{};{};{};{};{};{}\n",
             registrier_anzeige(p.registrier_nr),
@@ -491,7 +624,8 @@ pub async fn export(
     Ok((
         [(axum::http::header::CONTENT_TYPE, "text/csv; charset=utf-8")],
         csv,
-    ).into_response())
+    )
+        .into_response())
 }
 
 #[derive(Debug, Deserialize)]
@@ -514,7 +648,14 @@ pub async fn verbleib(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let art = VerbleibArt::parse(&body.art)
@@ -555,7 +696,8 @@ pub async fn verbleib(
     if matches!(art, VerbleibArt::Transport | VerbleibArt::Entlassung) {
         let anlass = format!("durch Verbleib {}", art.as_str());
         if let Some(effekt) =
-            crate::uhs::auto_austritt(&state.pool, einsatz_id, person_id, &anlass, benutzer.id).await?
+            crate::uhs::auto_austritt(&state.pool, einsatz_id, person_id, &anlass, benutzer.id)
+                .await?
         {
             sse_auto_austritt(&state, einsatz_id, &effekt);
         }
@@ -592,12 +734,21 @@ pub async fn notiz(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     let text = body.text.trim();
     if text.is_empty() {
-        return Err(AppError::Validation("Notiztext darf nicht leer sein".into()));
+        return Err(AppError::Validation(
+            "Notiztext darf nicht leer sein".into(),
+        ));
     }
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
     if person.storniert_at.is_some() {
@@ -605,7 +756,8 @@ pub async fn notiz(
             "Stornierte Person kann keine Notiz erhalten".into(),
         ));
     }
-    let notiz = verlaufsnotiz_repo::anlegen(&state.pool, einsatz_id, person_id, text, benutzer.id).await?;
+    let notiz =
+        verlaufsnotiz_repo::anlegen(&state.pool, einsatz_id, person_id, text, benutzer.id).await?;
     // BEWUSST kein etb_system(): besondere Kategorie gehört NICHT in den ETB.
     sse_person(&state, einsatz_id, person_id);
     Ok((StatusCode::CREATED, Json(notiz)))
@@ -627,7 +779,14 @@ pub async fn abgleich_anlegen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     if body.gefunden_person_id == person_id {
@@ -643,7 +802,9 @@ pub async fn abgleich_anlegen(
     }
     // `repo::laden` schützt org-isoliert: NotFound (404), falls in fremdem Einsatz.
     let gefunden = repo::laden(&state.pool, einsatz_id, body.gefunden_person_id).await?;
-    if gefunden.storniert_at.is_some() || !matches!(gefunden.status.as_str(), "betroffen" | "verstorben") {
+    if gefunden.storniert_at.is_some()
+        || !matches!(gefunden.status.as_str(), "betroffen" | "verstorben")
+    {
         return Err(AppError::UnprocessableEntity(
             "Gefundene Person muss Status betroffen/verstorben haben".into(),
         ));
@@ -681,7 +842,14 @@ pub async fn abgleich_entscheiden(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_einsatzleitung(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     if !matches!(
@@ -698,7 +866,9 @@ pub async fn abgleich_entscheiden(
         return Err(AppError::NotFound);
     }
     if abgleich.status != AbgleichStatus::Verdacht {
-        return Err(AppError::Conflict("Abgleich ist bereits entschieden".into()));
+        return Err(AppError::Conflict(
+            "Abgleich ist bereits entschieden".into(),
+        ));
     }
     let entschieden = abgleich_repo::entscheide(
         &state.pool,
@@ -739,7 +909,14 @@ pub async fn stream(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
 
     let rx = state.live.abonniere(einsatz_id);
     let stream = BroadcastStream::new(rx).map(|res| {

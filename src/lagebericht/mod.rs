@@ -46,33 +46,81 @@ pub const VORLAGEN: &[VorlageDef] = &[
         schluessel: "lagebericht",
         label: "Lagevortrag zur Information",
         abschnitte: &[
-            AbschnittDef { schluessel: "auftrag", label: "Auftrag" },
-            AbschnittDef { schluessel: "gefahren_schadenlage", label: "Gefahren-/Schadenlage" },
-            AbschnittDef { schluessel: "eigene_lage", label: "Eigene Lage" },
-            AbschnittDef { schluessel: "lageentwicklung", label: "Lageentwicklung" },
-            AbschnittDef { schluessel: "fuehrungsprobleme", label: "Besondere (Führungs-)Probleme" },
-            AbschnittDef { schluessel: "antraege_vorschlaege", label: "Anträge und Vorschläge" },
-            AbschnittDef { schluessel: "zusammenfassung", label: "Zusammenfassung" },
+            AbschnittDef {
+                schluessel: "auftrag",
+                label: "Auftrag",
+            },
+            AbschnittDef {
+                schluessel: "gefahren_schadenlage",
+                label: "Gefahren-/Schadenlage",
+            },
+            AbschnittDef {
+                schluessel: "eigene_lage",
+                label: "Eigene Lage",
+            },
+            AbschnittDef {
+                schluessel: "lageentwicklung",
+                label: "Lageentwicklung",
+            },
+            AbschnittDef {
+                schluessel: "fuehrungsprobleme",
+                label: "Besondere (Führungs-)Probleme",
+            },
+            AbschnittDef {
+                schluessel: "antraege_vorschlaege",
+                label: "Anträge und Vorschläge",
+            },
+            AbschnittDef {
+                schluessel: "zusammenfassung",
+                label: "Zusammenfassung",
+            },
         ],
     },
     VorlageDef {
         schluessel: "lagebeurteilung",
         label: "Lagevortrag zur Entscheidung",
         abschnitte: &[
-            AbschnittDef { schluessel: "auftrag", label: "Auftrag" },
-            AbschnittDef { schluessel: "anlass", label: "Anlass des Lagevortrags" },
-            AbschnittDef { schluessel: "beurteilung_schadenlage", label: "Beurteilung der Schadenlage" },
-            AbschnittDef { schluessel: "beurteilung_eigene_lage", label: "Beurteilung der eigenen Lage" },
-            AbschnittDef { schluessel: "gemeinsame_elemente", label: "Gemeinsame Elemente aller Möglichkeiten" },
-            AbschnittDef { schluessel: "entschlussvorschlaege", label: "Entschlussvorschläge" },
-            AbschnittDef { schluessel: "abwaegen", label: "Abwägen der Möglichkeiten" },
-            AbschnittDef { schluessel: "vorschlag_beste", label: "Vorschlag der besten Möglichkeit" },
+            AbschnittDef {
+                schluessel: "auftrag",
+                label: "Auftrag",
+            },
+            AbschnittDef {
+                schluessel: "anlass",
+                label: "Anlass des Lagevortrags",
+            },
+            AbschnittDef {
+                schluessel: "beurteilung_schadenlage",
+                label: "Beurteilung der Schadenlage",
+            },
+            AbschnittDef {
+                schluessel: "beurteilung_eigene_lage",
+                label: "Beurteilung der eigenen Lage",
+            },
+            AbschnittDef {
+                schluessel: "gemeinsame_elemente",
+                label: "Gemeinsame Elemente aller Möglichkeiten",
+            },
+            AbschnittDef {
+                schluessel: "entschlussvorschlaege",
+                label: "Entschlussvorschläge",
+            },
+            AbschnittDef {
+                schluessel: "abwaegen",
+                label: "Abwägen der Möglichkeiten",
+            },
+            AbschnittDef {
+                schluessel: "vorschlag_beste",
+                label: "Vorschlag der besten Möglichkeit",
+            },
         ],
     },
     VorlageDef {
         schluessel: "freitext",
         label: "Freier Bericht",
-        abschnitte: &[AbschnittDef { schluessel: "text", label: "Bericht" }],
+        abschnitte: &[AbschnittDef {
+            schluessel: "text",
+            label: "Bericht",
+        }],
     },
 ];
 
@@ -93,13 +141,21 @@ pub struct Abschnitt {
 pub fn leere_abschnitte(v: &VorlageDef) -> Vec<Abschnitt> {
     v.abschnitte
         .iter()
-        .map(|a| Abschnitt { schluessel: a.schluessel.to_string(), text: String::new() })
+        .map(|a| Abschnitt {
+            schluessel: a.schluessel.to_string(),
+            text: String::new(),
+        })
         .collect()
 }
 
 /// Deterministisches Markdown-Rendering des Berichts (Snapshot-Inhalt für das ETB).
 /// Reihenfolge = Vorlage; fehlende Abschnitte werden als leer gerendert.
-pub fn render_snapshot(v: &VorlageDef, titel: &str, zeitstand: &str, abschnitte: &[Abschnitt]) -> String {
+pub fn render_snapshot(
+    v: &VorlageDef,
+    titel: &str,
+    zeitstand: &str,
+    abschnitte: &[Abschnitt],
+) -> String {
     let mut out = String::new();
     out.push_str(&format!("# {titel}\n\n"));
     out.push_str(&format!("_Zeitstand: {zeitstand}_\n"));
@@ -159,7 +215,12 @@ mod tests {
             keys.sort_unstable();
             let vorher = keys.len();
             keys.dedup();
-            assert_eq!(keys.len(), vorher, "Doppelter Abschnitts-Schlüssel in {}", v.schluessel);
+            assert_eq!(
+                keys.len(),
+                vorher,
+                "Doppelter Abschnitts-Schlüssel in {}",
+                v.schluessel
+            );
         }
     }
 
@@ -175,7 +236,10 @@ mod tests {
     #[test]
     fn render_ist_deterministisch_und_in_reihenfolge() {
         let v = vorlage("freitext").unwrap();
-        let abschnitte = vec![Abschnitt { schluessel: "text".into(), text: "Hochwasser steigt.".into() }];
+        let abschnitte = vec![Abschnitt {
+            schluessel: "text".into(),
+            text: "Hochwasser steigt.".into(),
+        }];
         let a = render_snapshot(v, "Lage 10:00", "2026-06-02 10:00:00", &abschnitte);
         let b = render_snapshot(v, "Lage 10:00", "2026-06-02 10:00:00", &abschnitte);
         assert_eq!(a, b);
@@ -190,9 +254,15 @@ mod tests {
         let v = vorlage("freitext").unwrap();
         let leer: Vec<Abschnitt> = vec![];
         assert!(validiere_freigabe(v, &leer).is_err());
-        let leer_text = vec![Abschnitt { schluessel: "text".into(), text: "  ".into() }];
+        let leer_text = vec![Abschnitt {
+            schluessel: "text".into(),
+            text: "  ".into(),
+        }];
         assert!(validiere_freigabe(v, &leer_text).is_err());
-        let ok = vec![Abschnitt { schluessel: "text".into(), text: "Inhalt".into() }];
+        let ok = vec![Abschnitt {
+            schluessel: "text".into(),
+            text: "Inhalt".into(),
+        }];
         assert!(validiere_freigabe(v, &ok).is_ok());
     }
 }

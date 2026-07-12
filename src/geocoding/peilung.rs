@@ -29,8 +29,7 @@ pub fn haversine_m(a: (f64, f64), b: (f64, f64)) -> f64 {
     let (phi1, phi2) = (a.0.to_radians(), b.0.to_radians());
     let dphi = (b.0 - a.0).to_radians();
     let dlambda = (b.1 - a.1).to_radians();
-    let h = (dphi / 2.0).sin().powi(2)
-        + phi1.cos() * phi2.cos() * (dlambda / 2.0).sin().powi(2);
+    let h = (dphi / 2.0).sin().powi(2) + phi1.cos() * phi2.cos() * (dlambda / 2.0).sin().powi(2);
     2.0 * ERDRADIUS_M * h.sqrt().asin()
 }
 
@@ -84,16 +83,25 @@ mod tests {
         assert_eq!(bearing_8((51.0, 10.0), (51.5, 10.0)), "N"); // genau Nord
         assert_eq!(bearing_8((51.0, 10.0), (51.0, 10.5)), "O"); // genau Ost
         assert_eq!(bearing_8((51.0, 10.0), (50.5, 10.0)), "S"); // genau Süd
-        assert_eq!(bearing_8((51.0, 10.0), (51.0, 9.5)), "W");  // genau West
+        assert_eq!(bearing_8((51.0, 10.0), (51.0, 9.5)), "W"); // genau West
     }
 
     fn marker(typ: &str, id: i64, lat: f64, lon: f64) -> Marker {
-        Marker { typ: typ.into(), id, label: format!("{typ}-{id}"), lat, lon }
+        Marker {
+            typ: typ.into(),
+            id,
+            label: format!("{typ}-{id}"),
+            lat,
+            lon,
+        }
     }
 
     #[test]
     fn naechster_waehlt_dichtesten_und_liefert_label() {
-        let m = vec![marker("uhs", 1, 51.5, 10.0), marker("schaden", 2, 51.01, 10.0)];
+        let m = vec![
+            marker("uhs", 1, 51.5, 10.0),
+            marker("schaden", 2, 51.01, 10.0),
+        ];
         let p = naechster(&m, 51.0, 10.0, None).expect("Peilung");
         assert_eq!(p.bezug_label, "schaden-2"); // näher
         assert_eq!(p.richtung, "N");

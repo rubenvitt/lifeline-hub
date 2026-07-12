@@ -27,26 +27,34 @@ pub struct PatchPlatz<'a> {
 
 /// Plätze einer UHS (ohne stornierte), sortiert nach Bezeichnung.
 pub async fn liste_je_uhs(pool: &SqlitePool, uhs_id: i64) -> Result<Vec<PlatzAnzeige>, AppError> {
-    Ok(sqlx::query_as::<_, PlatzAnzeige>(sqlx::AssertSqlSafe(format!(
-        "{SELECT_ALLE} WHERE uhs_id = ? AND storniert_at IS NULL ORDER BY bezeichnung"
-    )))
-    .bind(uhs_id)
-    .fetch_all(pool)
-    .await?)
+    Ok(
+        sqlx::query_as::<_, PlatzAnzeige>(sqlx::AssertSqlSafe(format!(
+            "{SELECT_ALLE} WHERE uhs_id = ? AND storniert_at IS NULL ORDER BY bezeichnung"
+        )))
+        .bind(uhs_id)
+        .fetch_all(pool)
+        .await?,
+    )
 }
 
 /// Lädt einen Platz; `NotFound`, falls nicht zur UHS gehörend.
 pub async fn laden(pool: &SqlitePool, uhs_id: i64, id: i64) -> Result<PlatzAnzeige, AppError> {
-    sqlx::query_as::<_, PlatzAnzeige>(sqlx::AssertSqlSafe(format!("{SELECT_ALLE} WHERE id = ? AND uhs_id = ?")))
-        .bind(id)
-        .bind(uhs_id)
-        .fetch_optional(pool)
-        .await?
-        .ok_or(AppError::NotFound)
+    sqlx::query_as::<_, PlatzAnzeige>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_ALLE} WHERE id = ? AND uhs_id = ?"
+    )))
+    .bind(id)
+    .bind(uhs_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)
 }
 
 /// Legt einen Platz an. UNIQUE(uhs_id, bezeichnung) → `Conflict` (409) bei Duplikat.
-pub async fn anlegen(pool: &SqlitePool, uhs_id: i64, neu: NeuerPlatz<'_>) -> Result<PlatzAnzeige, AppError> {
+pub async fn anlegen(
+    pool: &SqlitePool,
+    uhs_id: i64,
+    neu: NeuerPlatz<'_>,
+) -> Result<PlatzAnzeige, AppError> {
     let ergebnis = sqlx::query_scalar::<_, i64>(
         "INSERT INTO uhs_platz (uhs_id, typ, bezeichnung, pos_x, pos_y) \
          VALUES (?, ?, ?, ?, ?) RETURNING id",
@@ -115,7 +123,12 @@ pub async fn anlegen_bulk(
             anlegen(
                 pool,
                 uhs_id,
-                NeuerPlatz { typ, bezeichnung: &bezeichnung, pos_x: Some(pos_x), pos_y: Some(pos_y) },
+                NeuerPlatz {
+                    typ,
+                    bezeichnung: &bezeichnung,
+                    pos_x: Some(pos_x),
+                    pos_y: Some(pos_y),
+                },
             )
             .await?,
         );
@@ -132,7 +145,10 @@ fn raster_position(n: i64) -> (f64, f64) {
     const RAND: f64 = 10.0;
     let spalte = n.rem_euclid(SPALTEN);
     let zeile = n.div_euclid(SPALTEN);
-    (RAND + spalte as f64 * SCHRITT_X, RAND + zeile as f64 * SCHRITT_Y)
+    (
+        RAND + spalte as f64 * SCHRITT_X,
+        RAND + zeile as f64 * SCHRITT_Y,
+    )
 }
 
 /// Aktualisiert Stamm/Layout eines Platzes (NICHT Verfügbarkeit — eigene Funktion).
@@ -211,7 +227,11 @@ pub async fn setze_verfuegbarkeit(
             ));
         }
     }
-    let neue_person_fk = if verfuegbarkeit == "reserviert" { person_id } else { None };
+    let neue_person_fk = if verfuegbarkeit == "reserviert" {
+        person_id
+    } else {
+        None
+    };
     let ergebnis = sqlx::query(
         "UPDATE uhs_platz SET verfuegbarkeit = ?, reserviert_fuer_person_id = ? \
          WHERE id = ? AND uhs_id = ?",
@@ -230,12 +250,11 @@ pub async fn setze_verfuegbarkeit(
 
 /// Soft-Delete eines Platzes; blockt mit `Conflict`, wenn aktuell belegt.
 pub async fn storniere(pool: &SqlitePool, uhs_id: i64, id: i64) -> Result<(), AppError> {
-    let belegt: Option<i64> = sqlx::query_scalar(
-        "SELECT id FROM einsatz_person WHERE aktueller_platz_id = ? LIMIT 1",
-    )
-    .bind(id)
-    .fetch_optional(pool)
-    .await?;
+    let belegt: Option<i64> =
+        sqlx::query_scalar("SELECT id FROM einsatz_person WHERE aktueller_platz_id = ? LIMIT 1")
+            .bind(id)
+            .fetch_optional(pool)
+            .await?;
     if belegt.is_some() {
         return Err(AppError::Conflict(
             "Platz ist aktuell belegt — Storno nicht möglich".into(),
@@ -266,24 +285,42 @@ mod tests {
     /// Liefert (benutzer, einsatz, uhs_id, person_a, person_b).
     async fn setup(pool: &SqlitePool) -> (i64, i64, i64, i64, i64) {
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Test-Orga')")
-            .execute(pool).await.unwrap();
+            .execute(pool)
+            .await
+            .unwrap();
         let b: i64 = sqlx::query_scalar(
             "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, \
                 system_rolle, org_rolle, aktiv) \
-             VALUES (1, 'A', 'a', 'h', 'keiner', 'keine', 1) RETURNING id")
-            .fetch_one(pool).await.unwrap();
+             VALUES (1, 'A', 'a', 'h', 'keiner', 'keine', 1) RETURNING id",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap();
         let e: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung, status, begonnen_at, einsatzart, angelegt_at) \
              VALUES (1, 'Lage', 'aktiv', '2026-05-28', 'realeinsatz', '2026-05-28') RETURNING id")
             .fetch_one(pool).await.unwrap();
         let u = uhs_repo::anlegen(
-            pool, e, b,
-            uhs_repo::NeueDaten { typ: "behandlungsplatz", bezeichnung: "BHP 50",
-                                  abschnitt_id: None, standort: None, notiz: None },
-        ).await.unwrap();
-        uhs_repo::setze_status(pool, e, u.id, "aktiv", b).await.unwrap();
+            pool,
+            e,
+            b,
+            uhs_repo::NeueDaten {
+                typ: "behandlungsplatz",
+                bezeichnung: "BHP 50",
+                abschnitt_id: None,
+                standort: None,
+                notiz: None,
+            },
+        )
+        .await
+        .unwrap();
+        uhs_repo::setze_status(pool, e, u.id, "aktiv", b)
+            .await
+            .unwrap();
         let mk = |nr: i64| {
-            let e = e; let b = b; let pool = pool.clone();
+            let e = e;
+            let b = b;
+            let pool = pool.clone();
             async move {
                 sqlx::query_scalar::<_, i64>(
                     "INSERT INTO einsatz_person (einsatz_id, registrier_nr, status, erfasst_von, geaendert_von) \
@@ -301,9 +338,18 @@ mod tests {
     async fn anlegen_default_verfuegbarkeit_frei() {
         let pool = test_pool().await;
         let (_b, _e, u, _, _) = setup(&pool).await;
-        let p = anlegen(&pool, u, NeuerPlatz {
-            typ: "bett", bezeichnung: "Bett 3", pos_x: Some(100.0), pos_y: Some(50.0),
-        }).await.unwrap();
+        let p = anlegen(
+            &pool,
+            u,
+            NeuerPlatz {
+                typ: "bett",
+                bezeichnung: "Bett 3",
+                pos_x: Some(100.0),
+                pos_y: Some(50.0),
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(p.verfuegbarkeit, Verfuegbarkeit::Frei);
         assert_eq!(p.pos_x, Some(100.0));
         assert!(p.reserviert_fuer_person_id.is_none());
@@ -317,22 +363,51 @@ mod tests {
         assert_eq!(plaetze.len(), 3);
         // Jeder Platz hat eine Position (sonst Default-Überlagerung im Grundriss) …
         for p in &plaetze {
-            assert!(p.pos_x.is_some() && p.pos_y.is_some(), "Bulk-Plätze brauchen eine Position");
+            assert!(
+                p.pos_x.is_some() && p.pos_y.is_some(),
+                "Bulk-Plätze brauchen eine Position"
+            );
         }
         // … und keine zwei Plätze teilen sich dieselbe Position.
         let eindeutig: std::collections::HashSet<(i64, i64)> = plaetze
             .iter()
             .map(|p| (p.pos_x.unwrap() as i64, p.pos_y.unwrap() as i64))
             .collect();
-        assert_eq!(eindeutig.len(), 3, "alle drei Positionen müssen verschieden sein");
+        assert_eq!(
+            eindeutig.len(),
+            3,
+            "alle drei Positionen müssen verschieden sein"
+        );
     }
 
     #[tokio::test]
     async fn anlegen_doppelte_bezeichnung_ist_konflikt() {
         let pool = test_pool().await;
         let (_b, _e, u, _, _) = setup(&pool).await;
-        anlegen(&pool, u, NeuerPlatz { typ: "bett", bezeichnung: "Bett 3", pos_x: None, pos_y: None }).await.unwrap();
-        let err = anlegen(&pool, u, NeuerPlatz { typ: "bett", bezeichnung: "Bett 3", pos_x: None, pos_y: None }).await.unwrap_err();
+        anlegen(
+            &pool,
+            u,
+            NeuerPlatz {
+                typ: "bett",
+                bezeichnung: "Bett 3",
+                pos_x: None,
+                pos_y: None,
+            },
+        )
+        .await
+        .unwrap();
+        let err = anlegen(
+            &pool,
+            u,
+            NeuerPlatz {
+                typ: "bett",
+                bezeichnung: "Bett 3",
+                pos_x: None,
+                pos_y: None,
+            },
+        )
+        .await
+        .unwrap_err();
         assert!(matches!(err, AppError::Conflict(_)));
     }
 
@@ -340,10 +415,30 @@ mod tests {
     async fn aktualisiere_position() {
         let pool = test_pool().await;
         let (_b, _e, u, _, _) = setup(&pool).await;
-        let p = anlegen(&pool, u, NeuerPlatz { typ: "bett", bezeichnung: "Bett 3", pos_x: None, pos_y: None }).await.unwrap();
-        let nach = aktualisiere(&pool, u, p.id, PatchPlatz {
-            bezeichnung: None, pos_x: Some(Some(42.0)), pos_y: Some(Some(99.0)),
-        }).await.unwrap();
+        let p = anlegen(
+            &pool,
+            u,
+            NeuerPlatz {
+                typ: "bett",
+                bezeichnung: "Bett 3",
+                pos_x: None,
+                pos_y: None,
+            },
+        )
+        .await
+        .unwrap();
+        let nach = aktualisiere(
+            &pool,
+            u,
+            p.id,
+            PatchPlatz {
+                bezeichnung: None,
+                pos_x: Some(Some(42.0)),
+                pos_y: Some(Some(99.0)),
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(nach.pos_x, Some(42.0));
         assert_eq!(nach.pos_y, Some(99.0));
     }
@@ -352,8 +447,21 @@ mod tests {
     async fn setze_verfuegbarkeit_frei_zu_defekt_ohne_person() {
         let pool = test_pool().await;
         let (_b, _e, u, _, _) = setup(&pool).await;
-        let p = anlegen(&pool, u, NeuerPlatz { typ: "bett", bezeichnung: "Bett 3", pos_x: None, pos_y: None }).await.unwrap();
-        let nach = setze_verfuegbarkeit(&pool, u, p.id, "defekt", None).await.unwrap();
+        let p = anlegen(
+            &pool,
+            u,
+            NeuerPlatz {
+                typ: "bett",
+                bezeichnung: "Bett 3",
+                pos_x: None,
+                pos_y: None,
+            },
+        )
+        .await
+        .unwrap();
+        let nach = setze_verfuegbarkeit(&pool, u, p.id, "defekt", None)
+            .await
+            .unwrap();
         assert_eq!(nach.verfuegbarkeit, Verfuegbarkeit::Defekt);
     }
 
@@ -361,10 +469,28 @@ mod tests {
     async fn setze_verfuegbarkeit_reserviert_braucht_person() {
         let pool = test_pool().await;
         let (_b, _e, u, pa, _) = setup(&pool).await;
-        let p = anlegen(&pool, u, NeuerPlatz { typ: "bett", bezeichnung: "Bett 3", pos_x: None, pos_y: None }).await.unwrap();
-        let err = setze_verfuegbarkeit(&pool, u, p.id, "reserviert", None).await.unwrap_err();
-        assert!(matches!(err, AppError::Validation(_)), "Reservieren ohne Person ist Validierung-422");
-        let nach = setze_verfuegbarkeit(&pool, u, p.id, "reserviert", Some(pa)).await.unwrap();
+        let p = anlegen(
+            &pool,
+            u,
+            NeuerPlatz {
+                typ: "bett",
+                bezeichnung: "Bett 3",
+                pos_x: None,
+                pos_y: None,
+            },
+        )
+        .await
+        .unwrap();
+        let err = setze_verfuegbarkeit(&pool, u, p.id, "reserviert", None)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, AppError::Validation(_)),
+            "Reservieren ohne Person ist Validierung-422"
+        );
+        let nach = setze_verfuegbarkeit(&pool, u, p.id, "reserviert", Some(pa))
+            .await
+            .unwrap();
         assert_eq!(nach.verfuegbarkeit, Verfuegbarkeit::Reserviert);
         assert_eq!(nach.reserviert_fuer_person_id, Some(pa));
     }
@@ -373,33 +499,91 @@ mod tests {
     async fn setze_verfuegbarkeit_aufloesen_leert_person_fk() {
         let pool = test_pool().await;
         let (_b, _e, u, pa, _) = setup(&pool).await;
-        let p = anlegen(&pool, u, NeuerPlatz { typ: "bett", bezeichnung: "Bett 3", pos_x: None, pos_y: None }).await.unwrap();
-        setze_verfuegbarkeit(&pool, u, p.id, "reserviert", Some(pa)).await.unwrap();
-        let nach = setze_verfuegbarkeit(&pool, u, p.id, "frei", None).await.unwrap();
+        let p = anlegen(
+            &pool,
+            u,
+            NeuerPlatz {
+                typ: "bett",
+                bezeichnung: "Bett 3",
+                pos_x: None,
+                pos_y: None,
+            },
+        )
+        .await
+        .unwrap();
+        setze_verfuegbarkeit(&pool, u, p.id, "reserviert", Some(pa))
+            .await
+            .unwrap();
+        let nach = setze_verfuegbarkeit(&pool, u, p.id, "frei", None)
+            .await
+            .unwrap();
         assert_eq!(nach.verfuegbarkeit, Verfuegbarkeit::Frei);
-        assert!(nach.reserviert_fuer_person_id.is_none(), "FK wird beim Verlassen von 'reserviert' geleert");
+        assert!(
+            nach.reserviert_fuer_person_id.is_none(),
+            "FK wird beim Verlassen von 'reserviert' geleert"
+        );
     }
 
     #[tokio::test]
     async fn reservierung_auf_belegtem_platz_ist_konflikt() {
         let pool = test_pool().await;
         let (_b, _e, u, pa, pb) = setup(&pool).await;
-        let p = anlegen(&pool, u, NeuerPlatz { typ: "bett", bezeichnung: "Bett 3", pos_x: None, pos_y: None }).await.unwrap();
+        let p = anlegen(
+            &pool,
+            u,
+            NeuerPlatz {
+                typ: "bett",
+                bezeichnung: "Bett 3",
+                pos_x: None,
+                pos_y: None,
+            },
+        )
+        .await
+        .unwrap();
         // pb auf p belegen (direkter Cache-Setz; belegung_repo erst Task 8):
-        sqlx::query("UPDATE einsatz_person SET aktuelle_uhs_id = ?, aktueller_platz_id = ? WHERE id = ?")
-            .bind(u).bind(p.id).bind(pb).execute(&pool).await.unwrap();
-        let err = setze_verfuegbarkeit(&pool, u, p.id, "reserviert", Some(pa)).await.unwrap_err();
-        assert!(matches!(err, AppError::UnprocessableEntity(_)),
-            "Reservieren eines belegten Platzes → 422 (Spec: Verfügbarkeits-Statuswechsel)");
+        sqlx::query(
+            "UPDATE einsatz_person SET aktuelle_uhs_id = ?, aktueller_platz_id = ? WHERE id = ?",
+        )
+        .bind(u)
+        .bind(p.id)
+        .bind(pb)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let err = setze_verfuegbarkeit(&pool, u, p.id, "reserviert", Some(pa))
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, AppError::UnprocessableEntity(_)),
+            "Reservieren eines belegten Platzes → 422 (Spec: Verfügbarkeits-Statuswechsel)"
+        );
     }
 
     #[tokio::test]
     async fn storniere_blockt_bei_belegung() {
         let pool = test_pool().await;
         let (b, _e, u, _, pb) = setup(&pool).await;
-        let p = anlegen(&pool, u, NeuerPlatz { typ: "bett", bezeichnung: "Bett 3", pos_x: None, pos_y: None }).await.unwrap();
-        sqlx::query("UPDATE einsatz_person SET aktuelle_uhs_id = ?, aktueller_platz_id = ? WHERE id = ?")
-            .bind(u).bind(p.id).bind(pb).execute(&pool).await.unwrap();
+        let p = anlegen(
+            &pool,
+            u,
+            NeuerPlatz {
+                typ: "bett",
+                bezeichnung: "Bett 3",
+                pos_x: None,
+                pos_y: None,
+            },
+        )
+        .await
+        .unwrap();
+        sqlx::query(
+            "UPDATE einsatz_person SET aktuelle_uhs_id = ?, aktueller_platz_id = ? WHERE id = ?",
+        )
+        .bind(u)
+        .bind(p.id)
+        .bind(pb)
+        .execute(&pool)
+        .await
+        .unwrap();
         let err = storniere(&pool, u, p.id).await.unwrap_err();
         assert!(matches!(err, AppError::Conflict(_)));
         let _ = b;
@@ -411,7 +595,10 @@ mod tests {
         let (_b, _e, u, _, _) = setup(&pool).await;
         let erste = anlegen_bulk(&pool, u, "bett", "Bett", 2).await.unwrap();
         assert_eq!(
-            erste.iter().map(|p| p.bezeichnung.clone()).collect::<Vec<_>>(),
+            erste
+                .iter()
+                .map(|p| p.bezeichnung.clone())
+                .collect::<Vec<_>>(),
             vec!["Bett 1", "Bett 2"]
         );
         // Bett 1 stornieren — Nummerierung darf die Lücke NICHT wiederverwenden
@@ -419,7 +606,10 @@ mod tests {
         storniere(&pool, u, erste[0].id).await.unwrap();
         let zweite = anlegen_bulk(&pool, u, "bett", "Bett", 2).await.unwrap();
         assert_eq!(
-            zweite.iter().map(|p| p.bezeichnung.clone()).collect::<Vec<_>>(),
+            zweite
+                .iter()
+                .map(|p| p.bezeichnung.clone())
+                .collect::<Vec<_>>(),
             vec!["Bett 3", "Bett 4"]
         );
     }
@@ -429,7 +619,9 @@ mod tests {
         let pool = test_pool().await;
         let (_b, _e, u, _, _) = setup(&pool).await;
         anlegen_bulk(&pool, u, "bett", "Bett", 2).await.unwrap();
-        let intensiv = anlegen_bulk(&pool, u, "intensivplatz", "Intensivplatz", 1).await.unwrap();
+        let intensiv = anlegen_bulk(&pool, u, "intensivplatz", "Intensivplatz", 1)
+            .await
+            .unwrap();
         assert_eq!(intensiv[0].bezeichnung, "Intensivplatz 1");
     }
 
@@ -437,8 +629,30 @@ mod tests {
     async fn liste_je_uhs_filtert_storno() {
         let pool = test_pool().await;
         let (_b, _e, u, _, _) = setup(&pool).await;
-        let p1 = anlegen(&pool, u, NeuerPlatz { typ: "bett", bezeichnung: "Bett 1", pos_x: None, pos_y: None }).await.unwrap();
-        anlegen(&pool, u, NeuerPlatz { typ: "bett", bezeichnung: "Bett 2", pos_x: None, pos_y: None }).await.unwrap();
+        let p1 = anlegen(
+            &pool,
+            u,
+            NeuerPlatz {
+                typ: "bett",
+                bezeichnung: "Bett 1",
+                pos_x: None,
+                pos_y: None,
+            },
+        )
+        .await
+        .unwrap();
+        anlegen(
+            &pool,
+            u,
+            NeuerPlatz {
+                typ: "bett",
+                bezeichnung: "Bett 2",
+                pos_x: None,
+                pos_y: None,
+            },
+        )
+        .await
+        .unwrap();
         storniere(&pool, u, p1.id).await.unwrap();
         assert_eq!(liste_je_uhs(&pool, u).await.unwrap().len(), 1);
     }

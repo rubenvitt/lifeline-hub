@@ -76,7 +76,10 @@ fn baue_antwort(pfad: &str, daten: Vec<u8>) -> Response {
     };
     Response::builder()
         .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, HeaderValue::from_static(content_type(pfad)))
+        .header(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static(content_type(pfad)),
+        )
         .header(header::CACHE_CONTROL, HeaderValue::from_static(cache))
         .body(Body::from(daten))
         .unwrap()
@@ -91,7 +94,10 @@ pub async fn serve(uri: Uri) -> Response {
     if uri.path().starts_with("/api/") {
         return Response::builder()
             .status(StatusCode::NOT_FOUND)
-            .header(header::CONTENT_TYPE, HeaderValue::from_static("application/json"))
+            .header(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/json"),
+            )
             .body(Body::from(r#"{"error":"Nicht gefunden"}"#))
             .unwrap();
     }
@@ -132,7 +138,10 @@ mod tests {
             resp.headers().get(header::CONTENT_TYPE).unwrap(),
             "text/html; charset=utf-8"
         );
-        assert_eq!(resp.headers().get(header::CACHE_CONTROL).unwrap(), "no-cache");
+        assert_eq!(
+            resp.headers().get(header::CACHE_CONTROL).unwrap(),
+            "no-cache"
+        );
     }
 
     #[test]
@@ -144,7 +153,10 @@ mod tests {
             resp.headers().get(header::CONTENT_TYPE).unwrap(),
             "text/javascript; charset=utf-8"
         );
-        assert_eq!(resp.headers().get(header::CACHE_CONTROL).unwrap(), "no-cache");
+        assert_eq!(
+            resp.headers().get(header::CACHE_CONTROL).unwrap(),
+            "no-cache"
+        );
     }
 
     #[test]

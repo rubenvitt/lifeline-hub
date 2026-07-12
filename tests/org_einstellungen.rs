@@ -23,7 +23,10 @@ async fn setup() -> axum::Router {
     build_router(AppState {
         pool,
         live: LiveHub::new(),
-        karten_dir: std::env::temp_dir(), fachebenen: lifeline_hub::karte::FachebenenState::neu(), download_client: lifeline_hub::karte::download::download_client(), download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_dir: std::env::temp_dir(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
         karten_service_url: None,
         karten_service_token: None,
     })
@@ -80,7 +83,11 @@ async fn benutzer_anlegen(
         )
         .await
         .unwrap();
-    assert_eq!(resp.status(), StatusCode::CREATED, "Benutzer anlegen muss klappen");
+    assert_eq!(
+        resp.status(),
+        StatusCode::CREATED,
+        "Benutzer anlegen muss klappen"
+    );
 }
 
 /// GET /api/org-einstellungen mit Cookie; liefert (StatusCode, Body).
@@ -187,7 +194,11 @@ async fn put_als_admin_gueltig_persistiert() {
     });
 
     let (status, resp_body) = put_einstellungen(&app, &admin_cookie, body).await;
-    assert_eq!(status, StatusCode::OK, "PUT muss 200 liefern; body={resp_body}");
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "PUT muss 200 liefern; body={resp_body}"
+    );
 
     // Persistenz: Re-GET liefert dieselben Werte.
     let (get_status, get_body) = get_einstellungen(&app, Some(&admin_cookie)).await;
@@ -306,8 +317,13 @@ async fn modul_put_als_fuehrungskraft_ist_403() {
     benutzer_anlegen(&app, &admin_cookie, "fk3", "fkpw9012", "fuehrungskraft").await;
     let fk_cookie = login_cookie(&app, "fk3", "fkpw9012").await;
 
-    let (status, _body) =
-        put_modul_einstellung(&app, &fk_cookie, "etb", serde_json::json!({"benoetigte_rolle": "fuehrungskraft"})).await;
+    let (status, _body) = put_modul_einstellung(
+        &app,
+        &fk_cookie,
+        "etb",
+        serde_json::json!({"benoetigte_rolle": "fuehrungskraft"}),
+    )
+    .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 }
 
@@ -407,7 +423,11 @@ async fn put_geocoder_url_gueltig_und_ungueltig() {
         serde_json::json!({"geocoder_url": "https://nominatim.example.org"}),
     )
     .await;
-    assert_eq!(status, StatusCode::OK, "PUT mit gültiger geocoder_url muss 200 liefern; body={resp_body}");
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "PUT mit gültiger geocoder_url muss 200 liefern; body={resp_body}"
+    );
 
     let (get_status, get_body) = get_einstellungen(&app, Some(&admin_cookie)).await;
     assert_eq!(get_status, StatusCode::OK);
@@ -420,7 +440,11 @@ async fn put_geocoder_url_gueltig_und_ungueltig() {
         serde_json::json!({"geocoder_url": "ftp://x"}),
     )
     .await;
-    assert_eq!(status_bad, StatusCode::BAD_REQUEST, "PUT mit ftp:// muss 400 liefern");
+    assert_eq!(
+        status_bad,
+        StatusCode::BAD_REQUEST,
+        "PUT mit ftp:// muss 400 liefern"
+    );
 }
 
 /// PUT mit modul_key aus NICHT_AUSBLENDBAR → 200 (Rollen-Default ≠ Sichtbarkeit, kein Sonderfall).

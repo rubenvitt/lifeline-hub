@@ -44,10 +44,14 @@ pub async fn anlegen(
     Json(req): Json<NeuerBenutzer>,
 ) -> Result<(StatusCode, Json<BenutzerAnzeige>), AppError> {
     if req.benutzername.trim().is_empty() {
-        return Err(AppError::Validation("Benutzername darf nicht leer sein".into()));
+        return Err(AppError::Validation(
+            "Benutzername darf nicht leer sein".into(),
+        ));
     }
     if req.anzeigename.trim().is_empty() {
-        return Err(AppError::Validation("Anzeigename darf nicht leer sein".into()));
+        return Err(AppError::Validation(
+            "Anzeigename darf nicht leer sein".into(),
+        ));
     }
     if req.passwort.len() < PASSWORT_MIN_LEN {
         return Err(AppError::Validation(format!(
@@ -90,7 +94,9 @@ pub async fn anlegen(
 
     if let Err(sqlx::Error::Database(db_err)) = &ergebnis {
         if db_err.is_unique_violation() {
-            return Err(AppError::Conflict("Benutzername ist bereits vergeben".into()));
+            return Err(AppError::Conflict(
+                "Benutzername ist bereits vergeben".into(),
+            ));
         }
     }
     let id = ergebnis?.last_insert_rowid();

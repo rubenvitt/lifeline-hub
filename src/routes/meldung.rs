@@ -1,6 +1,8 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{fordere_modul_zugriff_laden, fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
+use crate::einsatz::berechtigung::{
+    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
+};
 use crate::einsatz::repo as einsatz_repo;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -73,20 +75,37 @@ pub async fn liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
-    let status = params.status.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
+    let status = params
+        .status
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
     if let Some(s) = status {
         if !crate::meldung::status_gueltig(s) {
             return Err(AppError::Validation("Ungültiger Status-Filter".into()));
         }
     }
-    let richtung = params.richtung.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let richtung = params
+        .richtung
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
     if let Some(r) = richtung {
         if !crate::meldung::richtung_gueltig(r) {
             return Err(AppError::Validation("Ungültiger Richtungs-Filter".into()));
         }
     }
-    Ok(Json(repo::liste(&state.pool, einsatz_id, status, richtung, &jetzt()).await?))
+    Ok(Json(
+        repo::liste(&state.pool, einsatz_id, status, richtung, &jetzt()).await?,
+    ))
 }
 
 #[derive(Debug, Deserialize)]
@@ -118,7 +137,14 @@ pub async fn anlegen(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
 
     // Mindestfelder: Absender, Inhalt, Meldeweg.
@@ -151,7 +177,12 @@ pub async fn anlegen(
     if !crate::meldung::prioritaet_gueltig(prioritaet) {
         return Err(AppError::Validation("Ungültige Priorität".into()));
     }
-    let richtung = req.richtung.as_deref().map(str::trim).filter(|s| !s.is_empty()).unwrap_or(RICHTUNG_INTERN);
+    let richtung = req
+        .richtung
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or(RICHTUNG_INTERN);
     if !crate::meldung::richtung_gueltig(richtung) {
         return Err(AppError::Validation("Ungültige Richtung".into()));
     }
@@ -166,17 +197,29 @@ pub async fn anlegen(
     // Bestätigungsfrist-Default (Task 8/LFH-133): Fallback-Kette:
     // Request-Override ?? effektive_meldung_frist_min(Einsatz ?? Org) ?? Konstante.
     let einst = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id).await?;
-    let org_einst = crate::org::einstellungen::laden_oder_default(&state.pool, einsatz.org_id).await?;
-    let frist_min = meldung_bestaetigung_frist_min_ableiten(&einst, &org_einst, req.bestaetigung_frist_min, BESTAETIGUNG_FRIST_DEFAULT_MIN);
+    let org_einst =
+        crate::org::einstellungen::laden_oder_default(&state.pool, einsatz.org_id).await?;
+    let frist_min = meldung_bestaetigung_frist_min_ableiten(
+        &einst,
+        &org_einst,
+        req.bestaetigung_frist_min,
+        BESTAETIGUNG_FRIST_DEFAULT_MIN,
+    );
     if pflicht && frist_min <= 0 {
-        return Err(AppError::Validation("Bestätigungsfrist muss positiv sein".into()));
+        return Err(AppError::Validation(
+            "Bestätigungsfrist muss positiv sein".into(),
+        ));
     }
     let frist_at: Option<String> = if pflicht {
         // `eingang` ist im DB-Format; bei (theoretisch unmöglichem) Parse-Fehler defensiv keine
         // Frist statt 500 (vgl. patch-xor: 422/None statt Panik).
         NaiveDateTime::parse_from_str(&eingang, "%Y-%m-%d %H:%M:%S")
             .ok()
-            .map(|n| (n + Duration::minutes(frist_min)).format("%Y-%m-%d %H:%M:%S").to_string())
+            .map(|n| {
+                (n + Duration::minutes(frist_min))
+                    .format("%Y-%m-%d %H:%M:%S")
+                    .to_string()
+            })
     } else {
         None
     };
@@ -248,7 +291,14 @@ async fn fordere_bearbeitbar(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, MODUL_KEY, &benutzer).await?;
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        MODUL_KEY,
+        &benutzer,
+    )
+    .await?;
     fordere_aktiv(&einsatz)?;
     if !repo::gehoert_zu_einsatz(&state.pool, meldung_id, einsatz_id).await? {
         return Err(AppError::NotFound);
@@ -292,8 +342,19 @@ pub async fn bestaetigen(
     let org_id = fordere_bearbeitbar(&state, &benutzer, einsatz_id, meldung_id).await?;
     let now = jetzt();
     // Atomar einmalig (kein read-then-write/TOCTOU): nur die Erst-Bestätigung gewinnt.
-    if !repo::bestaetige(&state.pool, org_id, einsatz_id, meldung_id, benutzer.id, &now).await? {
-        return Err(AppError::UnprocessableEntity("Meldung ist bereits bestätigt".into()));
+    if !repo::bestaetige(
+        &state.pool,
+        org_id,
+        einsatz_id,
+        meldung_id,
+        benutzer.id,
+        &now,
+    )
+    .await?
+    {
+        return Err(AppError::UnprocessableEntity(
+            "Meldung ist bereits bestätigt".into(),
+        ));
     }
     let m = repo::laden(&state.pool, meldung_id, &now).await?;
     sse(&state, einsatz_id);
@@ -316,8 +377,13 @@ pub async fn zuweisen(
     fordere_bearbeitbar(&state, &benutzer, einsatz_id, meldung_id).await?;
     // Bearbeiter (falls gesetzt) muss Einsatz-Mitglied sein (Cross-Einsatz-Schutz).
     if let Some(bid) = req.bearbeiter_id {
-        if einsatz_repo::rolle_von(&state.pool, einsatz_id, bid).await?.is_none() {
-            return Err(AppError::Validation("Bearbeiter ist kein Einsatz-Mitglied".into()));
+        if einsatz_repo::rolle_von(&state.pool, einsatz_id, bid)
+            .await?
+            .is_none()
+        {
+            return Err(AppError::Validation(
+                "Bearbeiter ist kein Einsatz-Mitglied".into(),
+            ));
         }
     }
     repo::weise_bearbeiter(&state.pool, meldung_id, req.bearbeiter_id).await?;
@@ -379,7 +445,11 @@ pub async fn auftrag_erteilen(
     let validiert =
         crate::auftrag::validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now, None).await?;
     let auftrag_id = repo::erteile_auftrag_tx(
-        &state.pool, einsatz_id, meldung_id, benutzer.id, validiert.daten(),
+        &state.pool,
+        einsatz_id,
+        meldung_id,
+        benutzer.id,
+        validiert.daten(),
     )
     .await?;
 
@@ -413,8 +483,17 @@ pub async fn lage_liste(
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(&state.pool, einsatz_id, einsatz.org_id, "lagemeldungen", &benutzer).await?;
-    Ok(Json(repo::liste_lage_meldungen(&state.pool, einsatz_id).await?))
+    fordere_modul_zugriff_laden(
+        &state.pool,
+        einsatz_id,
+        einsatz.org_id,
+        "lagemeldungen",
+        &benutzer,
+    )
+    .await?;
+    Ok(Json(
+        repo::liste_lage_meldungen(&state.pool, einsatz_id).await?,
+    ))
 }
 
 #[cfg(test)]
@@ -434,7 +513,10 @@ mod tests {
     /// Kein Request-Override, Einsatz-Frist NULL, Org-Frist=30 → 30 (Org-Default greift).
     #[test]
     fn frist_aus_org_wenn_einsatz_null() {
-        let o = OrgEinstellungen { meldung_bestaetigung_frist_min: Some(30), ..o() };
+        let o = OrgEinstellungen {
+            meldung_bestaetigung_frist_min: Some(30),
+            ..o()
+        };
         assert_eq!(
             meldung_bestaetigung_frist_min_ableiten(&e(), &o, None, BESTAETIGUNG_FRIST_DEFAULT_MIN),
             30
@@ -445,7 +527,12 @@ mod tests {
     #[test]
     fn frist_aus_konstante_wenn_org_null() {
         assert_eq!(
-            meldung_bestaetigung_frist_min_ableiten(&e(), &o(), None, BESTAETIGUNG_FRIST_DEFAULT_MIN),
+            meldung_bestaetigung_frist_min_ableiten(
+                &e(),
+                &o(),
+                None,
+                BESTAETIGUNG_FRIST_DEFAULT_MIN
+            ),
             BESTAETIGUNG_FRIST_DEFAULT_MIN
         );
     }
@@ -453,9 +540,17 @@ mod tests {
     /// Request-Override schlägt Org-Frist.
     #[test]
     fn request_override_schlaegt_org_und_konstante() {
-        let o = OrgEinstellungen { meldung_bestaetigung_frist_min: Some(30), ..o() };
+        let o = OrgEinstellungen {
+            meldung_bestaetigung_frist_min: Some(30),
+            ..o()
+        };
         assert_eq!(
-            meldung_bestaetigung_frist_min_ableiten(&e(), &o, Some(5), BESTAETIGUNG_FRIST_DEFAULT_MIN),
+            meldung_bestaetigung_frist_min_ableiten(
+                &e(),
+                &o,
+                Some(5),
+                BESTAETIGUNG_FRIST_DEFAULT_MIN
+            ),
             5
         );
     }
@@ -463,8 +558,14 @@ mod tests {
     /// Einsatz-Override schlägt Org-Frist.
     #[test]
     fn einsatz_schlaegt_org() {
-        let e = EinsatzEinstellungen { meldung_bestaetigung_frist_min: Some(10), ..e() };
-        let o = OrgEinstellungen { meldung_bestaetigung_frist_min: Some(30), ..o() };
+        let e = EinsatzEinstellungen {
+            meldung_bestaetigung_frist_min: Some(10),
+            ..e()
+        };
+        let o = OrgEinstellungen {
+            meldung_bestaetigung_frist_min: Some(30),
+            ..o()
+        };
         assert_eq!(
             meldung_bestaetigung_frist_min_ableiten(&e, &o, None, BESTAETIGUNG_FRIST_DEFAULT_MIN),
             10
