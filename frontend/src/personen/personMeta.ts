@@ -1,5 +1,10 @@
 import type { PersonStatus, Sichtungskategorie } from '../api/types';
 
+/** Triage-Reihenfolge der Patienten-Abschnitte (SK I zuerst, tot zuletzt).
+ *  Single Source of Truth dafür, welche Sichtungen einen „Patienten" ausmachen —
+ *  geteilt zwischen Personen-Liste (Patienten-Tab) und Lagebild-Streifen. */
+export const PATIENT_SK: Sichtungskategorie[] = ['sk1', 'sk2', 'sk3', 'sk4', 'tot'];
+
 /** Farbe + Label je Sichtungskategorie (antd-Tag-Farbnamen). Einzige Quelle (DRY). */
 export const SK_META: Record<Sichtungskategorie, { label: string; color: string }> = {
   sk1: { label: 'SK I', color: 'red' },

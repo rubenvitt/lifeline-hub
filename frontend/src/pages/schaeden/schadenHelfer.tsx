@@ -51,6 +51,25 @@ export function pad3(nr: number): string {
   return String(nr).padStart(3, '0');
 }
 
+/** Reine Filterkette der Schäden-Liste: Sicht (Status oder „alle"), Typ, Ausmaß und
+ *  Freitextsuche über Ort/Beschreibung. Testbar ohne Rendern (SchaedenPage verdrahtet die
+ *  UI-Filter-States hierher). */
+export function filterSchaeden(
+  alle: Schaden[],
+  opts: { sicht: SchadenStatus | 'alle'; typ?: SchadenTyp; ausmass?: Ausmass; suche: string },
+): Schaden[] {
+  const { sicht, typ, ausmass, suche } = opts;
+  return alle
+    .filter((s) => sicht === 'alle' || s.status === sicht)
+    .filter((s) => !typ || s.typ === typ)
+    .filter((s) => !ausmass || s.ausmass === ausmass)
+    .filter((s) => {
+      if (!suche.trim()) return true;
+      const q = suche.toLowerCase();
+      return s.ort.toLowerCase().includes(q) || s.beschreibung.toLowerCase().includes(q);
+    });
+}
+
 /** Kompakte Geschädigt-Anzeige inkl. Deeplinks (Person→Detailseite, Einsatzkraft→Personal-Liste). */
 export function geschaedigtAnzeige(s: Schaden, einsatzId: number): React.ReactNode {
   if (s.geschaedigt_registrier_nr != null) {

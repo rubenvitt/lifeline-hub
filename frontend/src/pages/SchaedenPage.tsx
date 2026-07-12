@@ -1,13 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { schadenDetailPfad } from '../routing/deeplinks';
 import {
-  App,
   Button,
-  Form,
   Input,
-  Modal,
   Select,
   Space,
   Table,
@@ -16,18 +13,12 @@ import {
   Typography,
 } from 'antd';
 import type { TableColumnsType } from 'antd';
-import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
-import {
-  legeSchadenAn,
-  listeSchaeden,
-  schadenRegistrierAnzeige,
-  type SchadenEingabe,
-} from '../api/einsatzSchaden';
+import { listeSchaeden, schadenRegistrierAnzeige } from '../api/einsatzSchaden';
 import type { Ausmass, Schaden, SchadenStatus, SchadenTyp } from '../api/types';
-import GeschaedigtPicker, { type GeschaedigtWert } from './schaeden/GeschaedigtPicker';
-import { AUSMASS_META, STATUS_META, TYP_LABEL, geschaedigtAnzeige, geschaedigtFelder } from './schaeden/schadenHelfer';
+import { AUSMASS_META, STATUS_META, TYP_LABEL, filterSchaeden, geschaedigtAnzeige } from './schaeden/schadenHelfer';
+import SchadenErfassenModal from './schaeden/SchadenErfassenModal';
 
 type Sicht = 'offen' | 'uebergeben' | 'abgeschlossen' | 'alle';
 const SICHTEN: { key: Sicht; label: string }[] = [
@@ -42,8 +33,6 @@ export default function SchaedenPage() {
   const einsatzId = Number(id);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { message } = App.useApp();
-  const qc = useQueryClient();
 
   const [sicht, setSicht] = useState<Sicht>('offen');
   const [typFilter, setTypFilter] = useState<SchadenTyp | undefined>(undefined);
@@ -51,9 +40,6 @@ export default function SchaedenPage() {
   const [suche, setSuche] = useState('');
 
   const [erfassenOffen, setErfassenOffen] = useState(false);
-  const [erfassForm] = Form.useForm<SchadenEingabe>();
-  // Geschädigt ist ein strukturierter Wert → lokaler State (kein Form.Item).
-  const [erfassGeschaedigt, setErfassGeschaedigt] = useState<GeschaedigtWert>(null);
 
   // Schaden-Liste wird über den konsolidierten Einsatz-Live-Stream (useEinsatzLiveStream
   // im EinsatzLayout, `schaden`-Event → 'einsatz-schaeden') live gehalten — LFH-206.
@@ -78,33 +64,8 @@ export default function SchaedenPage() {
     setSearchParams(searchParams, { replace: true });
   }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreiben]);
 
-  function invalidate() {
-    qc.invalidateQueries({ queryKey: einsatzKeys.schaeden(einsatzId) });
-    qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
-  }
-  const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
-
-  const anlegenMutation = useMutation({
-    mutationFn: (v: SchadenEingabe) => legeSchadenAn(einsatzId, v),
-    onSuccess: () => {
-      invalidate();
-      setErfassenOffen(false);
-      erfassForm.resetFields();
-      setErfassGeschaedigt(null);
-    },
-    onError: fehler,
-  });
-
   const alle = schaedenQuery.data ?? [];
-  const sichtbar = alle
-    .filter((s) => sicht === 'alle' || s.status === sicht)
-    .filter((s) => !typFilter || s.typ === typFilter)
-    .filter((s) => !ausmassFilter || s.ausmass === ausmassFilter)
-    .filter((s) => {
-      if (!suche.trim()) return true;
-      const q = suche.toLowerCase();
-      return s.ort.toLowerCase().includes(q) || s.beschreibung.toLowerCase().includes(q);
-    });
+  const sichtbar = filterSchaeden(alle, { sicht, typ: typFilter, ausmass: ausmassFilter, suche });
 
   const spalten: TableColumnsType<Schaden> = [
     {
@@ -134,16 +95,6 @@ export default function SchaedenPage() {
 
   const orgId = einsatz?.org_id ?? 0;
 
-  function onErfassen(daten: SchadenEingabe) {
-    anlegenMutation.mutate({
-      typ: daten.typ,
-      ausmass: daten.ausmass,
-      ort: daten.ort,
-      beschreibung: daten.beschreibung ?? null,
-      ...geschaedigtFelder(erfassGeschaedigt, orgId),
-    });
-  }
-
   return (
     <div style={{ padding: 16 }}>
       <Space style={{ marginBottom: 12, justifyContent: 'space-between', width: '100%' }}>
@@ -151,14 +102,7 @@ export default function SchaedenPage() {
           Schäden
         </Typography.Title>
         {darfSchreiben && (
-          <Button
-            type="primary"
-            onClick={() => {
-              setErfassGeschaedigt(null);
-              erfassForm.resetFields();
-              setErfassenOffen(true);
-            }}
-          >
+          <Button type="primary" onClick={() => setErfassenOffen(true)}>
             Schnellerfassung
           </Button>
         )}
@@ -207,39 +151,13 @@ export default function SchaedenPage() {
         })}
       />
 
-      {/* Schnellerfassung */}
-      <Modal
-        title="Schaden erfassen"
+      <SchadenErfassenModal
         open={erfassenOffen}
-        onCancel={() => setErfassenOffen(false)}
-        onOk={() => erfassForm.submit()}
-        okText="Anlegen"
-        confirmLoading={anlegenMutation.isPending}
-        destroyOnHidden
-      >
-        <Form form={erfassForm} layout="vertical" onFinish={onErfassen}>
-          <Form.Item label="Typ" name="typ" rules={[{ required: true, message: 'Typ ist Pflicht' }]}>
-            <Select options={(Object.keys(TYP_LABEL) as SchadenTyp[]).map((t) => ({ value: t, label: TYP_LABEL[t] }))} />
-          </Form.Item>
-          <Form.Item label="Ausmaß" name="ausmass" rules={[{ required: true, message: 'Ausmaß ist Pflicht' }]}>
-            <Select options={(Object.keys(AUSMASS_META) as Ausmass[]).map((a) => ({ value: a, label: AUSMASS_META[a].label }))} />
-          </Form.Item>
-          <Form.Item label="Ort" name="ort" rules={[{ required: true, message: 'Ort ist Pflicht' }]}>
-            <Input placeholder="z. B. Hauptstr. 17 oder L 235 km 12,5" />
-          </Form.Item>
-          <Form.Item label="Beschreibung" name="beschreibung">
-            <Input.TextArea rows={2} />
-          </Form.Item>
-          <Form.Item label="Geschädigt">
-            <GeschaedigtPicker
-              einsatzId={einsatzId}
-              orgName={einsatz?.org_name ?? 'Eigene Organisation'}
-              value={erfassGeschaedigt}
-              onChange={setErfassGeschaedigt}
-            />
-          </Form.Item>
-        </Form>
-      </Modal>
+        onClose={() => setErfassenOffen(false)}
+        einsatzId={einsatzId}
+        orgId={orgId}
+        orgName={einsatz?.org_name ?? 'Eigene Organisation'}
+      />
     </div>
   );
 }
