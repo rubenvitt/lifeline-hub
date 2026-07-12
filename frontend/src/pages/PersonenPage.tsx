@@ -1,34 +1,22 @@
-import { Alert, App, Breadcrumb, Button, Form, Input, InputNumber, Modal, Select, Space, Spin, Table, Tabs, Tag, Typography, type TableColumnsType } from 'antd';
+import { Alert, App, Breadcrumb, Button, Space, Spin, Table, Tabs, Tag, Typography } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { personDetailPfad } from '../routing/deeplinks';
 import { ladeEinsatz } from '../api/einsaetze';
-import { legePersonAn, listePersonen, registrierAnzeige, schlageAbgleichVor, setzePersonStatus, type PersonEingabe } from '../api/einsatzPerson';
+import { legePersonAn, listePersonen, schlageAbgleichVor, setzePersonStatus, type PersonEingabe } from '../api/einsatzPerson';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
-import type { Person, Sichtungskategorie } from '../api/types';
-import { SK_META, STATUS_META } from '../personen/personMeta';
-
-/** Triage-Reihenfolge der Patienten-Abschnitte (SK I zuerst, tot zuletzt).
- *  Single Source of Truth dafür, welche Sichtungen einen „Patienten" ausmachen. */
-const PATIENT_SK: Sichtungskategorie[] = ['sk1', 'sk2', 'sk3', 'sk4', 'tot'];
+import type { Person } from '../api/types';
+import { PATIENT_SK, SK_META } from '../personen/personMeta';
+import { abgleichSpalte, personenSpalten } from '../personen/personenSpalten';
+import PersonErfassungModal, { type ErfassungsModus } from '../personen/PersonErfassungModal';
+import LagebildStreifen from '../personen/LagebildStreifen';
 
 /** Patient = gesichtet mit behandlungsrelevanter Kategorie (SK I–IV oder tot);
  *  unverletzt und ungesichtet zählen nicht (LFH-10, rein medizinische Achse). */
 function istPatient(p: Person): boolean {
   return p.aktuelle_sichtung != null && PATIENT_SK.includes(p.aktuelle_sichtung);
-}
-
-/** Zählt je SK-Kategorie + Gruppen „ungesichtet" und „unverletzt" (Spec-Drei-Teilung). */
-function lagebildZaehlung(alle: Person[]): { sk: Record<Sichtungskategorie, number>; ungesichtet: number } {
-  const sk: Record<Sichtungskategorie, number> = { sk1: 0, sk2: 0, sk3: 0, sk4: 0, tot: 0, unverletzt: 0 };
-  let ungesichtet = 0;
-  for (const p of alle) {
-    if (p.aktuelle_sichtung) sk[p.aktuelle_sichtung]++;
-    else ungesichtet++;
-  }
-  return { sk, ungesichtet };
 }
 
 /** Sicht-Tabs: 'alle' = kein Filter; 'patienten' = SK-Achse; sonst Status-Filter. */
@@ -41,12 +29,6 @@ const SICHTEN: { key: Sicht; label: string }[] = [
   { key: 'verstorben', label: 'Verstorben' },
   { key: 'alle', label: 'Alle' },
 ];
-
-function alterAnzeige(p: Person): string {
-  if (p.geburtsdatum) return p.geburtsdatum;
-  if (p.alter_geschaetzt != null) return `~${p.alter_geschaetzt} J.`;
-  return '—';
-}
 
 export default function PersonenPage() {
   const { id } = useParams();
@@ -64,8 +46,7 @@ export default function PersonenPage() {
 
   const qc = useQueryClient();
   const { message } = App.useApp();
-  const [modus, setModus] = useState<null | 'schnell' | 'vermisst' | 'betroffen'>(null);
-  const [form] = Form.useForm<PersonEingabe>();
+  const [modus, setModus] = useState<ErfassungsModus | null>(null);
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
@@ -79,7 +60,7 @@ export default function PersonenPage() {
       if (v.folgeStatus) await setzePersonStatus(einsatzId, person.id, v.folgeStatus);
       return person;
     },
-    onSuccess: () => { invalidate(); setModus(null); form.resetFields(); },
+    onSuccess: () => { invalidate(); setModus(null); },
     onError: fehler,
   });
 
@@ -128,47 +109,11 @@ export default function PersonenPage() {
     ? alle
     : alle.filter((p) => p.status === sicht);
 
-  const spalten: TableColumnsType<Person> = [
-    {
-      title: 'Reg.-Nr.', key: 'reg', width: 100,
-      render: (_, p) => <Typography.Text strong>{registrierAnzeige(p.registrier_nr)}</Typography.Text>,
-    },
-    {
-      title: 'Status', key: 'status', width: 130,
-      render: (_, p) => <Tag color={STATUS_META[p.status].color}>{STATUS_META[p.status].label}</Tag>,
-    },
-    {
-      title: 'SK', key: 'sk', width: 90,
-      render: (_, p) =>
-        p.aktuelle_sichtung
-          ? <Tag color={SK_META[p.aktuelle_sichtung].color}>{SK_META[p.aktuelle_sichtung].label}</Tag>
-          : <Typography.Text type="secondary">—</Typography.Text>,
-    },
-    {
-      title: 'Name', key: 'name',
-      render: (_, p) =>
-        p.name || p.vorname
-          ? `${p.name ?? ''}${p.vorname ? `, ${p.vorname}` : ''}`
-          : <Typography.Text type="secondary">unbekannt</Typography.Text>,
-    },
-    { title: 'Geschlecht', dataIndex: 'geschlecht', key: 'geschlecht', render: (g) => g ?? '—' },
-    { title: 'Alter', key: 'alter', render: (_, p) => alterAnzeige(p) },
-    { title: 'Antreffort', dataIndex: 'antreff_ort', key: 'antreff_ort', render: (t) => t ?? '—' },
-  ];
-
   const gefundene = alle.filter((p) => ['betroffen', 'verstorben'].includes(p.status) && !p.storniert_at);
 
-  const aktionsSpalte: TableColumnsType<Person> = darfSchreiben && sicht === 'vermisst' ? [{
-    title: 'Abgleich vorschlagen', key: 'abgleich', width: 220,
-    render: (_: unknown, v: Person) => (
-      <Select<number> placeholder="gefundene Person …" size="small" style={{ width: 200 }}
-        onClick={(e) => e.stopPropagation()}
-        onChange={(gid) => abgleichVorschlagMutation.mutate({ vermisstId: v.id, gefundenId: gid })}
-        options={gefundene.map((g) => ({ value: g.id, label: `${registrierAnzeige(g.registrier_nr)} ${g.name ?? 'unbekannt'}` }))}
-        disabled={gefundene.length === 0}
-      />
-    ),
-  }] : [];
+  const aktionsSpalte = darfSchreiben && sicht === 'vermisst'
+    ? abgleichSpalte(gefundene, (vermisstId, gefundenId) => abgleichVorschlagMutation.mutate({ vermisstId, gefundenId }))
+    : [];
 
   return (
     <div>
@@ -200,23 +145,7 @@ export default function PersonenPage() {
         <Alert style={{ marginBottom: 12 }} type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
       )}
 
-      {(() => {
-        const z = lagebildZaehlung(alle);
-        const patientenAnzahl = PATIENT_SK.reduce((summe, k) => summe + z.sk[k], 0);
-        const skTags = (Object.keys(z.sk) as Sichtungskategorie[])
-          .filter((k) => z.sk[k] > 0)
-          .map((k) => (
-            <Tag key={k} color={SK_META[k].color}>{SK_META[k].label}: {z.sk[k]}</Tag>
-          ));
-        return (
-          <Space wrap style={{ marginBottom: 12 }}>
-            <Typography.Text type="secondary">Lagebild:</Typography.Text>
-            <Tag color="geekblue">Patienten: {patientenAnzahl}</Tag>
-            {skTags.length > 0 ? skTags : <Typography.Text type="secondary">noch keine Sichtungen</Typography.Text>}
-            <Tag>ungesichtet: {z.ungesichtet}</Tag>
-          </Space>
-        );
-      })()}
+      <LagebildStreifen alle={alle} />
 
       {sicht === 'patienten' ? (
         <Spin spinning={personenQuery.isLoading}>
@@ -235,7 +164,7 @@ export default function PersonenPage() {
                 <Table
                   rowKey="id"
                   dataSource={gruppe}
-                  columns={spalten}
+                  columns={personenSpalten}
                   pagination={false}
                   onRow={(p) => ({ onClick: () => navigate(personDetailPfad(einsatzId, p.id)), style: { cursor: 'pointer' } })}
                 />
@@ -252,58 +181,24 @@ export default function PersonenPage() {
           rowKey="id"
           loading={personenQuery.isLoading}
           dataSource={personen}
-          columns={[...spalten, ...aktionsSpalte]}
+          columns={[...personenSpalten, ...aktionsSpalte]}
           pagination={false}
           locale={{ emptyText: 'Keine Personen in dieser Sicht' }}
           onRow={(p) => ({ onClick: () => navigate(personDetailPfad(einsatzId, p.id)), style: { cursor: 'pointer' } })}
         />
       )}
 
-      <Modal
-        open={modus !== null}
-        title={modus === 'vermisst' ? 'Vermisst melden' : modus === 'betroffen' ? 'Betroffene/n erfassen' : 'Schnellerfassung'}
-        okText="Erfassen"
-        confirmLoading={anlegenMutation.isPending}
-        onOk={() => form.submit()}
-        onCancel={() => { setModus(null); form.resetFields(); }}
-        destroyOnHidden
-      >
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={(daten) =>
-            anlegenMutation.mutate({
-              daten,
-              folgeStatus: modus === 'vermisst' ? 'vermisst' : modus === 'betroffen' ? 'betroffen' : undefined,
-            })
-          }
-        >
-          <Form.Item label="Geschlecht" name="geschlecht">
-            <Select
-              allowClear
-              placeholder="unbekannt"
-              options={[
-                { value: 'maennlich', label: 'männlich' },
-                { value: 'weiblich', label: 'weiblich' },
-                { value: 'divers', label: 'divers' },
-                { value: 'unbekannt', label: 'unbekannt' },
-              ]}
-            />
-          </Form.Item>
-          <Form.Item label="Geschätztes Alter (Jahre)" name="alter_geschaetzt">
-            <InputNumber min={0} max={120} style={{ width: 140 }} />
-          </Form.Item>
-          <Form.Item label="Antreffort" name="antreff_ort"><Input placeholder="z. B. Brücke, Sammelstelle" /></Form.Item>
-          <Form.Item label="Name" name="name"><Input /></Form.Item>
-          <Form.Item label="Vorname" name="vorname"><Input /></Form.Item>
-          {modus === 'vermisst' && (
-            <Form.Item label="Melder / Kontakt" name="melder_kontakt">
-              <Input placeholder="Angehöriger, Kontaktdaten" />
-            </Form.Item>
-          )}
-          <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
-        </Form>
-      </Modal>
+      <PersonErfassungModal
+        modus={modus}
+        isPending={anlegenMutation.isPending}
+        onCancel={() => setModus(null)}
+        onFinish={(daten) =>
+          anlegenMutation.mutate({
+            daten,
+            folgeStatus: modus === 'vermisst' ? 'vermisst' : modus === 'betroffen' ? 'betroffen' : undefined,
+          })
+        }
+      />
     </div>
   );
 }

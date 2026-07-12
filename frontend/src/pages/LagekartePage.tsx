@@ -1,683 +1,92 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { App, Spin } from 'antd';
-import { listeHintergrundbilder, aktualisiereHintergrundbild, ladeHintergrundbildHoch,
-         loescheHintergrundbild, ladeBildBlobUrl, type Ecken } from '../api/kartenbilder';
-import { eckenAusBounds, zentroid, verschiebeEcken } from './lagekarte/bildGeometrie';
-import type { BildOverlay } from './lagekarte/bildLayer';
-import { gefahrenPfad } from '../routing/deeplinks';
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
-import { aktualisiereEinsatz, ladeEinsatz, ladeEinstellungen, type KopfdatenUpdate } from '../api/einsaetze';
-import { listeUhs, aktualisiereUhs } from '../api/einsatzUhs';
-import { listeSchaeden, aktualisiereSchaden } from '../api/einsatzSchaden';
-import { ladeKarteConfig } from '../api/karte';
-import { listeEinheiten, verorteEinheit } from '../api/einheiten';
-import { listeEinsatzFahrzeuge, verorteFahrzeug } from '../api/einsatzFahrzeuge';
-import { listeFuehrungskraefte, verortePerson } from '../api/einsatzPersonal';
-import { listeAbschnitte, zeichneAbschnitt } from '../api/einsatzabschnitte';
-import { listeZonen, legeZoneAn, aktualisiereZone, loescheZone } from '../api/lagezonen';
-import { ladeGefahrengebiete } from '../api/gefahren';
-import { listeLageMeldungen } from '../api/meldungen';
-import { ladeOrganisation } from '../api/organisation';
-import { einsatzKeys } from '../api/queryKeys';
-import type { EinsatzAnzeige, Warnstufe, ZoneTyp } from '../api/types';
+import { gefahrenPfad } from '../routing/deeplinks';
 import { useThemeMode } from '../theme/ThemeModeProvider';
-import { baueMarker, baueTaktischeMarker, baueLageMeldungMarker, type KarteMarker } from './lagekarte/marker';
-import { parsePolygon, parseGeometry, polygonZentroid, type GeoJsonGeometry } from './lagekarte/geo';
-import { baueTzProps } from './lagekarte/taktischesZeichen';
-import {
-  baueBasemapStyle, aktuelleAttribution, loeseKartenTheme,
-  type BasemapModus, type KartenThemeWahl,
-} from './lagekarte/basemapStil';
-import { waehleInitialeBasemap, liesLetzteBasemap, merkeLetzteBasemap } from './lagekarte/basemapAuswahl';
-import Kartenflaeche, { type ZoneFeature, type KartenHandle } from './lagekarte/Kartenflaeche';
-import Sidebar, { type LayerSichtbar, type PlatzierenPunktTyp } from './lagekarte/Sidebar';
+import { useKartenbilder } from './lagekarte/useKartenbilder';
+import { useBasemap } from './lagekarte/useBasemap';
+import { useLagekarteDaten } from './lagekarte/useLagekarteDaten';
+import { useFachebenen } from './lagekarte/useFachebenen';
+import { useKartenInteraktion } from './lagekarte/useKartenInteraktion';
+import { rasterBbox } from './lagekarte/fachebenen';
+import { ZONE_TYPEN } from './lagekarte/zonenStil';
+import Kartenflaeche, { type KartenHandle } from './lagekarte/Kartenflaeche';
+import Sidebar, { type LayerSichtbar } from './lagekarte/Sidebar';
 import Inspector from './lagekarte/Inspector';
 import ZonenInspector from './lagekarte/ZonenInspector';
 import FachebenenInspector from './lagekarte/FachebenenInspector';
 import ZeichnenSteuerung from './lagekarte/ZeichnenSteuerung';
-import { zoneStil, gefahrengebietStil, ZONE_TYPEN } from './lagekarte/zonenStil';
-import type { ZeichenModus } from './lagekarte/zeichnen';
-import { ladeFachebene, type FachebeneQuelle, type FachebeneStatus, type FeatureCollection } from '../api/fachebenen';
-import { FACHEBENEN, fachebeneKeys, KRITIS_MIN_ZOOM, rasterBbox, mergeFeatures } from './lagekarte/fachebenen';
-import { liesFachebenenSichtbar, merkeFachebenenSichtbar, defaultFachebenenSichtbar, type FachebenenSichtbar } from './lagekarte/fachebenenAuswahl';
-import type { AktiveFachebene } from './lagekarte/kartenLayer';
-
-/** Seitenverhältnis (Breite/Höhe) eines Bilds aus der Datei lesen; Fallback 1 (quadratisch). */
-function leseBildSeitenverhaeltnis(datei: File): Promise<number> {
-  return new Promise((resolve) => {
-    const url = URL.createObjectURL(datei);
-    const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve(img.naturalHeight > 0 ? img.naturalWidth / img.naturalHeight : 1);
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      resolve(1);
-    };
-    img.src = url;
-  });
-}
-
-/** EinsatzAnzeige → KopfdatenUpdate (Vollersatz) mit überschriebener Koordinate. */
-function kopfMitKoordinate(e: EinsatzAnzeige, lat: number | null, lon: number | null): KopfdatenUpdate {
-  return {
-    bezeichnung: e.bezeichnung,
-    stichwort: e.stichwort ?? null,
-    einsatzart: e.einsatzart,
-    einsatznummer_intern: e.einsatznummer_intern ?? null,
-    leitstellen_nr: e.leitstellen_nr ?? null,
-    einsatzort: e.einsatzort ?? null,
-    einsatzort_lat: lat,
-    einsatzort_lon: lon,
-    meldende_stelle: e.meldende_stelle ?? null,
-    sachverhalt: e.sachverhalt ?? null,
-    anzahl_betroffene_initial: e.anzahl_betroffene_initial ?? null,
-    begonnen_at: e.begonnen_at,
-  };
-}
 
 export default function LagekartePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const { message } = App.useApp();
-  const qc = useQueryClient();
   const { effektiv } = useThemeMode();
+  const navigate = useNavigate();
 
-  const [platzierungZiel, setPlatzierungZiel] =
-    useState<{ typ: PlatzierenPunktTyp | 'einsatzort'; id: number } | null>(null);
-  const [zeichneAbschnittId, setZeichneAbschnittId] = useState<number | null>(null);
-  const [zoneEntwurf, setZoneEntwurf] =
-    useState<{ typ: ZoneTyp; modus: ZeichenModus; farbe?: string } | null>(null);
-  // Bestätigungs-Phase (LFH-145): gezeichnete Geometrie wird hier zwischengehalten,
-  // bevor sie erst nach explizitem „Speichern" persistiert wird (nicht sofort bei Fertig).
-  const [zoneBestaetigung, setZoneBestaetigung] =
-    useState<{ typ: ZoneTyp; modus: ZeichenModus; farbe?: string; geometrie: GeoJsonGeometry } | null>(null);
-  const [zoneSpeichern, setZoneSpeichern] = useState(false);
-  // Monoton steigend bei jedem Zonen-Zeichnen-Start (LFH-145 M-A): erzwingt ein Re-Fire
-  // des Kartenflaeche-Zonen-Effekts auch bei gleich bleibendem Modus (z. B. Zone→Zone mit
-  // Gefahrengebiet→Absperrbereich, beides Polygon), damit starten() einen offenen,
-  // unbestätigten Entwurf verwirft statt ihn beim nächsten Zeichnen als Orphan liegen zu lassen.
-  const [zoneZeichnenNonce, setZoneZeichnenNonce] = useState(0);
-  const [zoneAuswahl, setZoneAuswahl] = useState<number | null>(null);
-  const [auswahl, setAuswahl] = useState<string | null>(null);
-  const [basemap, setBasemap] = useState<BasemapModus | null>(null);
-  const [onlineStilName, setOnlineStilName] = useState<string | null>(null);
-  // Karten-lokale Theme-Wahl (LFH-197): 'auto' folgt dem App-Theme, 'light'/'dark' überschreiben.
-  const [kartenTheme, setKartenTheme] = useState<KartenThemeWahl>('auto');
-  const [flyToZiel, setFlyToZiel] = useState<{ lng: number; lat: number } | null>(null);
   const [layer, setLayer] = useState<LayerSichtbar>({
     einsatzort: true, uhs: true, schaden: true, einheit: true, fahrzeug: true, fuehrung: true, abschnitt: true, zone: true, lagemeldung: true,
   });
-  const navigate = useNavigate();
-  // Angeklicktes Fachebenen-Objekt (externe Daten) → Detail-Panel.
-  const [fachebeneAuswahl, setFachebeneAuswahl] =
-    useState<{ quelle: FachebeneQuelle; properties: Record<string, unknown> } | null>(null);
-  const [bildPlatzierenId, setBildPlatzierenId] = useState<number | null>(null);
-  const [blobUrls, setBlobUrls] = useState<Record<number, string>>({});
-  // Spiegelt blobUrls als Ref, damit der Cleanup-Return des Blob-URL-Effekts beim
-  // Unmount alle aktuellen URLs revoken kann (Leak-Schutz) — ohne Stale-Closure.
-  const blobUrlsRef = useRef<Record<number, string>>({});
-  // Imperative Karten-API (Upload-Platzierung in Viewport-Mitte, Auf-Bild-Zentrieren).
+  // Imperative Karten-API (Upload-Platzierung in Viewport-Mitte, Auf-Bild-Zentrieren,
+  // Abschnitt-/Zone-Zeichnen abschließen).
   const kartenRef = useRef<KartenHandle>(null);
 
-  // EINE SSE-Verbindung für alle Domänen (uhs/schaden/einheit/fahrzeug/abschnitt/zone/
-  // person). Pro Domäne eine eigene EventSource würde das HTTP/1.1-Limit (6/Origin)
-  // sprengen und nachfolgende Requests (z. B. Zonen-POST) endlos hängen lassen.
+  // Domänen-Daten + Marker-Ableitungen (SSE-Live liegt im EinsatzLayout, keine eigene
+  // EventSource hier — eine 2. Verbindung/Seite spränge das HTTP/1.1-6-Limit).
+  const {
+    einsatz, darfSchreiben, ladt, config, einstellungen, einstellungenLaedt, gebiete,
+    verortet, flaechen, zonenFeatures, alleVerortet, nichtVerortetAlle, zonen,
+  } = useLagekarteDaten({ einsatzId, zeigeZonen: layer.zone });
 
-  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
-  const uhsQuery = useQuery({ queryKey: einsatzKeys.uhs(einsatzId), queryFn: () => listeUhs(einsatzId) });
-  const schaedenQuery = useQuery({
-    queryKey: einsatzKeys.schaeden(einsatzId),
-    queryFn: () => listeSchaeden(einsatzId),
-  });
-  const einheitenQuery = useQuery({
-    queryKey: einsatzKeys.einheiten(einsatzId),
-    queryFn: () => listeEinheiten(einsatzId),
-  });
-  const fahrzeugeQuery = useQuery({
-    queryKey: einsatzKeys.fahrzeuge(einsatzId),
-    queryFn: () => listeEinsatzFahrzeuge(einsatzId),
-  });
-  const abschnitteQuery = useQuery({
-    queryKey: einsatzKeys.abschnitte(einsatzId),
-    queryFn: () => listeAbschnitte(einsatzId),
-  });
-  const zonenQuery = useQuery({
-    queryKey: einsatzKeys.zonen(einsatzId),
-    queryFn: () => listeZonen(einsatzId),
-  });
-  const gebieteQuery = useQuery({ queryKey: einsatzKeys.gefahrengebiete(einsatzId), queryFn: () => ladeGefahrengebiete(einsatzId) });
-  const lageMeldungenQuery = useQuery({
-    queryKey: einsatzKeys.lagemeldungen(einsatzId),
-    queryFn: () => listeLageMeldungen(einsatzId),
-  });
-  const fkQuery = useQuery({
-    queryKey: einsatzKeys.fuehrungskraefte(einsatzId),
-    queryFn: () => listeFuehrungskraefte(einsatzId),
-  });
-  const orgQuery = useQuery({ queryKey: ['organisation'], queryFn: ladeOrganisation });
-  const configQuery = useQuery({ queryKey: ['karte-config'], queryFn: ladeKarteConfig });
-  // Einsatz-Einstellungen als Karten-Defaults (LFH-131): Basemap-Vorwahl + Lage-Layer.
-  // Geteilter queryKey mit Einstellungen-Seite/Redirect → i. d. R. bereits gecacht.
-  const einstellungenQuery = useQuery({
-    queryKey: einsatzKeys.einstellungen(einsatzId),
-    queryFn: () => ladeEinstellungen(einsatzId),
-  });
-  const bilderQuery = useQuery({
-    queryKey: einsatzKeys.kartenbilder(einsatzId),
-    queryFn: () => listeHintergrundbilder(einsatzId),
-  });
+  const {
+    fachebenenSichtbar, onFachebeneToggle, aktiveFachebenen, fachebenenStatus, fachebenenLaedt,
+    fachebenenAttribution, kritisZoomZuKlein, setKritisBbox, setKartenZoom,
+  } = useFachebenen({ einsatzId, einstellungen, einstellungenLaedt });
 
-  // Fachebenen-Sichtbarkeit: einmal aus localStorage laden (analog basemap-Persistenz).
-  // Muss VOR den Fachebenen-Queries stehen, damit enabled korrekt ist.
-  const [fachebenenSichtbar, setFachebenenSichtbar] = useState<FachebenenSichtbar>(defaultFachebenenSichtbar);
-  const [kritisBbox, setKritisBbox] = useState<string | null>(null);
-  // Aktuelles Karten-Zoom-Level — steuert den „näher heranzoomen"-Hinweis für KRITIS.
-  const [kartenZoom, setKartenZoom] = useState<number | null>(null);
-  const fachebenenInitRef = useRef(false);
-  useEffect(() => {
-    // Erst initialisieren, wenn die Einsatz-Einstellungen geladen (oder fehlgeschlagen)
-    // sind — sonst ginge der Einsatz-Default als Fallback verloren.
-    if (fachebenenInitRef.current || einstellungenQuery.isLoading) return;
-    fachebenenInitRef.current = true;
-    // Priorität: gemerkte (localStorage) Auswahl → Einsatz-Default → alles aus.
-    const gespeichert = liesFachebenenSichtbar(einsatzId);
-    // LFH-120: `fachebenen_sichtbar` ist backendseitig untypisiertes JSON (generiert `unknown`);
-    // die Form entspricht FachebenenSichtbar (Karten-Default).
-    const einsatzDefault = (einstellungenQuery.data?.fachebenen_sichtbar ?? null) as FachebenenSichtbar | null;
-    if (gespeichert) setFachebenenSichtbar(gespeichert);
-    else if (einsatzDefault) setFachebenenSichtbar(einsatzDefault);
-  }, [einsatzId, einstellungenQuery.isLoading, einstellungenQuery.data]);
-  useEffect(() => {
-    if (!fachebenenInitRef.current) return;
-    merkeFachebenenSichtbar(einsatzId, fachebenenSichtbar);
-  }, [fachebenenSichtbar, einsatzId]);
+  const {
+    basemap, setBasemap, onlineStilName, setOnlineStilName, kartenTheme, setKartenTheme,
+    style, basisAttribution, onStyleFehler,
+  } = useBasemap({ einsatzId, config, einstellungen, einstellungenLaedt, effektiv });
 
-  // Fachebenen-Queries (per Default disabled — alle Ebenen aus).
-  const ninaQuery = useQuery({
-    queryKey: ['fachebene', 'nina'], queryFn: () => ladeFachebene('nina'),
-    enabled: fachebenenSichtbar.nina, refetchInterval: FACHEBENEN.nina.pollMs,
-  });
-  const dwdQuery = useQuery({
-    queryKey: ['fachebene', 'dwd'], queryFn: () => ladeFachebene('dwd'),
-    enabled: fachebenenSichtbar.dwd, refetchInterval: FACHEBENEN.dwd.pollMs,
-  });
-  const pegelQuery = useQuery({
-    queryKey: ['fachebene', 'pegelonline'], queryFn: () => ladeFachebene('pegelonline'),
-    enabled: fachebenenSichtbar.pegelonline, refetchInterval: FACHEBENEN.pegelonline.pollMs,
-  });
-  const kritisQuery = useQuery({
-    queryKey: ['fachebene', 'kritis', kritisBbox], queryFn: () => ladeFachebene('kritis', kritisBbox!),
-    enabled: fachebenenSichtbar.kritis && !!kritisBbox,
-    // Beim Wechsel der Raster-bbox die bisherigen KRITIS-Objekte sichtbar lassen (kein
-    // Leer-Blinken). KRITIS ist quasi statisch → lange als frisch behandeln (6 h);
-    // serverseitig wird ohnehin 1 Tag gecacht.
-    placeholderData: keepPreviousData,
-    staleTime: 6 * 60 * 60_000,
-    gcTime: 6 * 60 * 60_000,
-  });
-
-  // Kartenwahl einmal aus der pro-Einsatz gemerkten Auswahl (localStorage) initialisieren,
-  // gegen die aktuelle Config validiert; sonst Verfügbarkeits-Default. Danach persistiert
-  // ein Effekt jede Änderung.
-  const basemapInitiiertRef = useRef(false);
-  useEffect(() => {
-    if (basemapInitiiertRef.current || !configQuery.data || einstellungenQuery.isLoading) return;
-    basemapInitiiertRef.current = true;
-    const { modus, onlineView, kartenTheme: gemerktesTheme } = waehleInitialeBasemap(
-      configQuery.data,
-      liesLetzteBasemap(einsatzId),
-      einstellungenQuery.data?.basemap_modus ?? null,
-    );
-    setBasemap(modus);
-    setOnlineStilName(onlineView);
-    setKartenTheme(gemerktesTheme);
-  }, [configQuery.data, einsatzId, einstellungenQuery.isLoading, einstellungenQuery.data]);
-
-  // Jede Änderung der Kartenwahl pro Einsatz merken (erst nach der Initialisierung,
-  // damit der gemerkte Wert nicht durch den transienten Default überschrieben wird).
-  useEffect(() => {
-    if (!basemapInitiiertRef.current || basemap == null) return;
-    merkeLetzteBasemap(einsatzId, { modus: basemap, onlineView: onlineStilName, kartenTheme });
-  }, [basemap, onlineStilName, kartenTheme, einsatzId]);
-
-  // Blob-URLs für Kartenbilder laden (und bei entfernten Bildern inkrementell revoken).
-  // blobUrls bewusst NICHT in den deps: das Map-Objekt würde den Effekt endlos neu auslösen.
-  // WICHTIG: Hier KEIN pauschales revoke aller URLs im Cleanup — React führt den Cleanup
-  // vor JEDEM Re-Run aus (jedes Refetch der Bilderliste, z. B. via SSE/Upload/Toggle/Move).
-  // Ein pauschales revoke würde bestehende, weiterhin aktive URLs unbrauchbar machen, ohne
-  // den Ref zu leeren → der Guard unten verhindert ein Neuladen → Bilder bleiben blank
-  // (spätestens nach Theme-/Basemap-Wechsel mit Source-Neuaufbau). Der Unmount-Leak-Schutz
-  // liegt deshalb in einem separaten, leeren-deps-Effekt weiter unten.
-  useEffect(() => {
-    const bilder = bilderQuery.data ?? [];
-    let abgebrochen = false;
-    for (const b of bilder) {
-      if (!blobUrlsRef.current[b.id]) {
-        ladeBildBlobUrl(einsatzId, b.id).then((url) => {
-          if (!abgebrochen) {
-            blobUrlsRef.current = { ...blobUrlsRef.current, [b.id]: url };
-            setBlobUrls(blobUrlsRef.current);
-          }
-        }).catch((e) => {
-          // Lade-Fehler sichtbar machen statt lautlos schlucken (maskierte sonst C1).
-          if (!abgebrochen) fehler(e);
-        });
-      }
-    }
-    // Entfernte Bilder (z. B. gelöscht, oder Einsatzwechsel/Listen-Swap) inkrementell
-    // freigeben — das deckt den Leak ab, ohne aktive URLs zu treffen.
-    const aktiveIds = new Set(bilder.map((b) => b.id));
-    for (const idStr of Object.keys(blobUrlsRef.current)) {
-      const id = Number(idStr);
-      if (!aktiveIds.has(id)) {
-        URL.revokeObjectURL(blobUrlsRef.current[id]);
-        const rest = { ...blobUrlsRef.current };
-        delete rest[id];
-        blobUrlsRef.current = rest;
-        setBlobUrls(blobUrlsRef.current);
-      }
-    }
-    return () => {
-      abgebrochen = true;
-    };
-    // `fehler` (stabiler App.useApp-Handler) bewusst nicht in den Deps — soll den Effekt nicht
-    // neu auslösen; Deps absichtlich nur [bilderQuery.data, einsatzId] (s. o.).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bilderQuery.data, einsatzId]);
-
-  // Unmount-only: beim Verlassen der Karte alle dann noch aktuellen Blob-URLs freigeben.
-  // Separater Effekt mit leeren deps → läuft NUR beim Unmount, nicht bei jedem Refetch.
-  useEffect(() => () => {
-    Object.values(blobUrlsRef.current).forEach(URL.revokeObjectURL);
-  }, []);
-
-  const einsatz = einsatzQuery.data;
-  const darfSchreiben =
-    einsatz?.status === 'aktiv' &&
-    (einsatz?.meine_rolle === 'einsatzleitung' || einsatz?.meine_rolle === 'fuehrungspersonal');
-
-  const { verortet, nichtVerortet } = useMemo(
-    () => baueMarker(einsatz, uhsQuery.data ?? [], schaedenQuery.data ?? []),
-    [einsatz, uhsQuery.data, schaedenQuery.data],
+  // Stabiler Fehler-Handler (message aus App.useApp ist stabil) → als ehrliche Dep in Effekten
+  // nutzbar (u. a. Blob-URL-Effekt in useKartenbilder), ohne diese neu auszulösen.
+  const fehler = useCallback(
+    (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
+    [message],
   );
 
-  const orgDefault = orgQuery.data?.tz_organisation ?? null;
+  const {
+    platzierungZiel, zeichneAbschnittId, zoneEntwurf, zoneBestaetigung, zoneSpeichern,
+    zoneZeichnenNonce, zoneAuswahl, auswahl, flyToZiel, fachebeneAuswahl, bildPlatzierenId,
+    setAuswahl, setZoneAuswahl, setFachebeneAuswahl,
+    onKarteKlick, onMarkerWaehlen, loescheVerortung, aendereSymbol,
+    bestaetigungSpeichern, bestaetigungVerwerfen,
+    onPlatzierenStart, onPlatzierenAbbrechen, onAbschnittZeichnenStart, onZoneZeichnenStart,
+    onKoordinateEingeben, onEinsatzortPlatzieren, onBildPlatzieren, onBildPlatzierenFertig,
+    onFlaecheGezeichnet, onFlaecheKlick, onZoneKlick, onZoneGezeichnet, onFachebeneKlick,
+    onZeichnenAbbrechen, zoneAendern, zoneLoeschen,
+  } = useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVerortet, fehler });
 
-  const taktisch = useMemo(
-    () =>
-      baueTaktischeMarker({
-        einheiten: einheitenQuery.data ?? [],
-        fahrzeuge: fahrzeugeQuery.data ?? [],
-        fuehrungskraefte: fkQuery.data ?? [],
-        orgDefault,
-      }),
-    [einheitenQuery.data, fahrzeugeQuery.data, fkQuery.data, orgDefault],
-  );
-
-  const flaechen = useMemo(
-    () =>
-      (abschnitteQuery.data ?? []).flatMap((a) => {
-        const poly = parsePolygon(a.flaeche_geojson);
-        if (!poly) return [];
-        const z = polygonZentroid(poly);
-        if (!z) return [];
-        const tz = baueTzProps({
-          objekttyp: 'abschnitt',
-          fachaufgabe: a.tz_fachaufgabe,
-          organisation: a.tz_organisation,
-          orgDefault,
-        });
-        return [
-          {
-            id: a.id,
-            label: a.name,
-            polygon: poly,
-            tzMarker: {
-              schluessel: `abschnitt-${a.id}`,
-              typ: 'abschnitt' as const,
-              id: a.id,
-              lon: z[0],
-              lat: z[1],
-              label: a.name,
-              farbe: '#722ed1',
-              tz,
-            } satisfies KarteMarker,
-          },
-        ];
-      }),
-    [abschnitteQuery.data, orgDefault],
-  );
-
-  const gebietWarnstufe = useMemo(() => {
-    const m = new Map<number, Warnstufe>();
-    (gebieteQuery.data ?? []).forEach((g) => m.set(g.id, g.hoechste_warnstufe));
-    return m;
-  }, [gebieteQuery.data]);
-
-  const zonenFeatures = useMemo<ZoneFeature[]>(
-    () =>
-      (layer.zone ? zonenQuery.data ?? [] : []).flatMap((z) => {
-        const g = parseGeometry(z.geometrie);
-        if (!g) return [];
-        const stil =
-          z.typ === 'gefahrengebiet' && z.gefahrengebiet_id != null
-            ? gefahrengebietStil(gebietWarnstufe.get(z.gefahrengebiet_id) ?? 'keine')
-            : zoneStil(z.typ, z.farbe);
-        return [{ id: z.id, geometrie: g, label: z.label ?? null, stil }];
-      }),
-    [zonenQuery.data, layer.zone, gebietWarnstufe],
-  );
-
-  const ausgewaehlteZone = useMemo(
-    () => (zonenQuery.data ?? []).find((z) => z.id === zoneAuswahl) ?? null,
-    [zonenQuery.data, zoneAuswahl],
-  );
-
-  const lageMeldungMarker = useMemo(
-    () => baueLageMeldungMarker(lageMeldungenQuery.data ?? []),
-    [lageMeldungenQuery.data],
-  );
-
-  const alleVerortet = useMemo(
-    () => [...verortet, ...taktisch.verortet, ...flaechen.map((f) => f.tzMarker), ...lageMeldungMarker],
-    [verortet, taktisch.verortet, flaechen, lageMeldungMarker],
-  );
-
-  const nichtVerortetAlle = useMemo(
-    () => [
-      ...nichtVerortet,
-      ...taktisch.nichtVerortet,
-      ...(abschnitteQuery.data ?? [])
-        .filter((a) => !a.flaeche_geojson)
-        .map((a) => ({ typ: 'abschnitt' as const, id: a.id, label: a.name })),
-    ],
-    [nichtVerortet, taktisch.nichtVerortet, abschnitteQuery.data],
-  );
+  const {
+    bilder, bildOverlays, aktivesPlatzierBild, bildPlatzierZentrum,
+    onBildUpload, onBildToggle, onBildOpazitaet, onBildLoeschen,
+    onPlatzierGeometrie, onBildZentrieren, onBildUmbenennen, onBildMittelpunkt,
+  } = useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, fehler });
 
   const sichtbareMarker = alleVerortet.filter((m) => layer[m.typ]);
   const aktiverMarker = alleVerortet.find((m) => m.schluessel === auswahl) ?? null;
-
-  const onlineStil = useMemo(() => {
-    const liste = configQuery.data?.online_styles ?? [];
-    return liste.find((s) => s.name === onlineStilName) ?? liste[0];
-  }, [configQuery.data, onlineStilName]);
-
-  // Karten-lokale Wahl gegen das App-Theme auflösen ('auto' → App-Theme).
-  const kartenThemeEffektiv = loeseKartenTheme(kartenTheme, effektiv);
-  const style = useMemo(
-    () => baueBasemapStyle(basemap ?? 'blind', kartenThemeEffektiv, configQuery.data, onlineStil),
-    [basemap, kartenThemeEffektiv, configQuery.data, onlineStil],
+  const ausgewaehlteZone = useMemo(
+    () => zonen.find((z) => z.id === zoneAuswahl) ?? null,
+    [zonen, zoneAuswahl],
   );
-
-  const fachebenenQueries: Record<FachebeneQuelle, typeof ninaQuery> = {
-    nina: ninaQuery, dwd: dwdQuery, pegelonline: pegelQuery, kritis: kritisQuery,
-  };
-
-  // KRITIS akkumulieren: einmal geladene Objekte bleiben sichtbar (auch beim Rauszoomen oder
-  // Wechsel des Gebiets), statt bei jedem Fetch ersetzt zu werden. Dedup über die Koordinate;
-  // Obergrenze gegen unbegrenztes Wachstum (älteste zuerst raus).
-  const KRITIS_MAX = 4000;
-  const kritisSammlungRef = useRef<Map<string, FeatureCollection['features'][number]>>(new Map());
-  const [kritisAkku, setKritisAkku] = useState<FeatureCollection>({ type: 'FeatureCollection', features: [] });
-  useEffect(() => {
-    const fc = kritisQuery.data?.features;
-    if (!fc) return;
-    if (mergeFeatures(kritisSammlungRef.current, fc.features, KRITIS_MAX)) {
-      setKritisAkku({ type: 'FeatureCollection', features: [...kritisSammlungRef.current.values()] });
-    }
-  }, [kritisQuery.data]);
-
-  const leereFc: FeatureCollection = { type: 'FeatureCollection', features: [] };
-  const aktiveFachebenen = useMemo<AktiveFachebene[]>(
-    () => fachebeneKeys()
-      .filter((k) => fachebenenSichtbar[k])
-      .map((k) => {
-        // KRITIS aus der akkumulierten Sammlung; übrige Quellen direkt aus der Query.
-        const daten = k === 'kritis' ? kritisAkku : (fachebenenQueries[k].data?.features ?? leereFc);
-        return { def: FACHEBENEN[k], daten };
-      }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [fachebenenSichtbar, ninaQuery.data, dwdQuery.data, pegelQuery.data, kritisAkku],
-  );
-
-  const fachebenenStatus = useMemo<Partial<Record<FachebeneQuelle, FachebeneStatus>>>(() => {
-    const s: Partial<Record<FachebeneQuelle, FachebeneStatus>> = {};
-    for (const k of fachebeneKeys()) {
-      const q = fachebenenQueries[k];
-      if (!fachebenenSichtbar[k]) continue;
-      s[k] = q.isError ? 'offline' : q.data?.status;
-    }
-    return s;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fachebenenSichtbar, ninaQuery.status, dwdQuery.status, pegelQuery.status, kritisQuery.status, ninaQuery.data, dwdQuery.data, pegelQuery.data, kritisQuery.data]);
-
-  const fachebenenLaedt = useMemo<Partial<Record<FachebeneQuelle, boolean>>>(() => {
-    const m: Partial<Record<FachebeneQuelle, boolean>> = {};
-    for (const k of fachebeneKeys()) {
-      if (!fachebenenSichtbar[k]) continue;
-      m[k] = fachebenenQueries[k].isFetching;
-    }
-    return m;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fachebenenSichtbar, ninaQuery.isFetching, dwdQuery.isFetching, pegelQuery.isFetching, kritisQuery.isFetching]);
-
-  const fachebenenAttribution = useMemo(() => {
-    return fachebeneKeys()
-      .filter((k) => fachebenenSichtbar[k] && fachebenenQueries[k].data && fachebenenQueries[k].data!.status !== 'offline')
-      .map((k) => fachebenenQueries[k].data!.attribution)
-      .filter(Boolean) as string[];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fachebenenSichtbar, ninaQuery.data, dwdQuery.data, pegelQuery.data, kritisQuery.data]);
 
   const attribution = useMemo(() => {
-    const teile = [
-      aktuelleAttribution(basemap ?? 'blind', onlineStil, configQuery.data),
-      ...fachebenenAttribution,
-    ].filter(Boolean) as string[];
+    const teile = [basisAttribution, ...fachebenenAttribution].filter(Boolean) as string[];
     return teile.length ? teile.join(' · ') : null;
-  }, [basemap, onlineStil, configQuery.data, fachebenenAttribution]);
+  }, [basisAttribution, fachebenenAttribution]);
 
-  const fehler = (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen');
-
-  const invalidiereBilder = () => qc.invalidateQueries({ queryKey: einsatzKeys.kartenbilder(einsatzId) });
-
-  // Memoisiert: ohne useMemo entsteht pro Render eine neue Array-Identität (+ JSON.parse),
-  // was den bilder-Effekt der Kartenflaeche bei jedem Render unnötig feuert.
-  const bildOverlays = useMemo<BildOverlay[]>(
-    () => (bilderQuery.data ?? [])
-      .filter((b) => blobUrls[b.id])
-      .map((b) => ({
-        id: b.id,
-        blobUrl: blobUrls[b.id],
-        ecken: JSON.parse(b.ecken_json) as Ecken,
-        opazitaet: b.opazitaet,
-        sichtbar: b.sichtbar,
-      })),
-    [bilderQuery.data, blobUrls],
-  );
-
-  const onBildUpload = async (datei: File) => {
-    // Bild-Seitenverhältnis lesen → mittig im aktuellen Viewport platzieren, unverzerrt.
-    // Fallback (Karte noch nicht bereit): kleines achsenparalleles Rechteck.
-    const ar = await leseBildSeitenverhaeltnis(datei);
-    const ecken: Ecken = kartenRef.current?.initialeEckenFuerBild(ar) ?? eckenAusBounds(9, 49.95, 9.1, 50);
-    await ladeHintergrundbildHoch(einsatzId, datei, ecken, datei.name);
-    invalidiereBilder();
-  };
-  const onBildToggle = async (id: number, sichtbar: boolean) => {
-    await aktualisiereHintergrundbild(einsatzId, id, { sichtbar });
-    invalidiereBilder();
-  };
-  const onBildOpazitaet = async (id: number, opazitaet: number) => {
-    await aktualisiereHintergrundbild(einsatzId, id, { opazitaet });
-    invalidiereBilder();
-  };
-  const onBildLoeschen = async (id: number) => {
-    await loescheHintergrundbild(einsatzId, id);
-    invalidiereBilder();
-  };
-  const onPlatzierGeometrie = async (ecken: Ecken) => {
-    if (bildPlatzierenId == null) return;
-    await aktualisiereHintergrundbild(einsatzId, bildPlatzierenId, { ecken_json: JSON.stringify(ecken) });
-    invalidiereBilder();
-  };
-  const onBildZentrieren = (id: number) => {
-    const b = (bilderQuery.data ?? []).find((x) => x.id === id);
-    if (b) kartenRef.current?.zentriereAufEcken(JSON.parse(b.ecken_json) as Ecken);
-  };
-  const onBildUmbenennen = async (id: number, name: string) => {
-    await aktualisiereHintergrundbild(einsatzId, id, { name });
-    invalidiereBilder();
-  };
-  // Mittelpunkt des Platzier-Bilds numerisch setzen: Ecken um die Differenz verschieben.
-  const onBildMittelpunkt = async (lat: number, lon: number) => {
-    if (bildPlatzierenId == null) return;
-    const b = (bilderQuery.data ?? []).find((x) => x.id === bildPlatzierenId);
-    if (!b) return;
-    const ecken = JSON.parse(b.ecken_json) as Ecken;
-    const [clng, clat] = zentroid(ecken);
-    const neu = verschiebeEcken(ecken, lon - clng, lat - clat);
-    await aktualisiereHintergrundbild(einsatzId, bildPlatzierenId, { ecken_json: JSON.stringify(neu) });
-    invalidiereBilder();
-  };
-
-  const aktivesPlatzierBild = useMemo(() => {
-    if (bildPlatzierenId == null) return null;
-    const b = (bilderQuery.data ?? []).find((x) => x.id === bildPlatzierenId);
-    if (!b) return null;
-    return { id: b.id, ecken: JSON.parse(b.ecken_json) as Ecken };
-  }, [bildPlatzierenId, bilderQuery.data]);
-
-  // Aktueller Mittelpunkt des Platzier-Bilds für die numerische Eingabe in der Sidebar.
-  const bildPlatzierZentrum = useMemo<{ lat: number; lon: number } | null>(() => {
-    if (!aktivesPlatzierBild) return null;
-    const [lng, lat] = zentroid(aktivesPlatzierBild.ecken);
-    return { lat, lon: lng };
-  }, [aktivesPlatzierBild]);
-
-  // Verorten je nach Ziel-Typ (UHS/Schaden live; Einsatzort über Kopf-PATCH, dann invalidieren).
-  const verortenMutation = useMutation({
-    mutationFn: async (p: { lat: number | null; lon: number | null }) => {
-      if (!platzierungZiel) return;
-      if (platzierungZiel.typ === 'uhs') {
-        await aktualisiereUhs(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
-      } else if (platzierungZiel.typ === 'schaden') {
-        await aktualisiereSchaden(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
-      } else if (platzierungZiel.typ === 'einheit') {
-        await verorteEinheit(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
-      } else if (platzierungZiel.typ === 'fahrzeug') {
-        await verorteFahrzeug(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
-      } else if (platzierungZiel.typ === 'fuehrung') {
-        await verortePerson(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
-      } else if (platzierungZiel.typ === 'einsatzort' && einsatz) {
-        await aktualisiereEinsatz(einsatzId, kopfMitKoordinate(einsatz, p.lat, p.lon));
-      }
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
-      qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
-      qc.invalidateQueries({ queryKey: einsatzKeys.schaeden(einsatzId) });
-      qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
-      qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) });
-      qc.invalidateQueries({ queryKey: einsatzKeys.fuehrungskraefte(einsatzId) });
-      setPlatzierungZiel(null);
-    },
-    onError: fehler,
-  });
-
-  function onKarteKlick(lngLat: { lng: number; lat: number }) {
-    if (!platzierungZiel || !darfSchreiben) return;
-    verortenMutation.mutate({ lat: lngLat.lat, lon: lngLat.lng });
-  }
-
-  function onMarkerWaehlen(schluessel: string) {
-    setAuswahl(schluessel);
-    setZoneAuswahl(null);
-    setFachebeneAuswahl(null);
-    const m = alleVerortet.find((x) => x.schluessel === schluessel);
-    if (m) setFlyToZiel({ lng: m.lon, lat: m.lat });
-  }
-
-  function loescheVerortung(marker: KarteMarker) {
-    if (marker.typ === 'uhs') {
-      aktualisiereUhs(einsatzId, marker.id, { lat: null, lon: null })
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) }))
-        .catch(fehler);
-    } else if (marker.typ === 'schaden') {
-      aktualisiereSchaden(einsatzId, marker.id, { lat: null, lon: null })
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.schaeden(einsatzId) }))
-        .catch(fehler);
-    } else if (marker.typ === 'einheit') {
-      verorteEinheit(einsatzId, marker.id, { lat: null, lon: null })
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) }))
-        .catch(fehler);
-    } else if (marker.typ === 'fahrzeug') {
-      verorteFahrzeug(einsatzId, marker.id, { lat: null, lon: null })
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) }))
-        .catch(fehler);
-    } else if (marker.typ === 'fuehrung') {
-      verortePerson(einsatzId, marker.id, { lat: null, lon: null })
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.fuehrungskraefte(einsatzId) }))
-        .catch(fehler);
-    } else if (marker.typ === 'abschnitt') {
-      zeichneAbschnitt(einsatzId, marker.id, { flaeche_geojson: null })
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) }))
-        .catch(fehler);
-    }
-    setAuswahl(null);
-  }
-
-  function aendereSymbol(
-    marker: KarteMarker,
-    patch: { tz_fachaufgabe?: string | null; tz_organisation?: string | null },
-  ) {
-    if (marker.typ === 'einheit') {
-      verorteEinheit(einsatzId, marker.id, patch)
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) }))
-        .catch(fehler);
-    } else if (marker.typ === 'fahrzeug') {
-      verorteFahrzeug(einsatzId, marker.id, patch)
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) }))
-        .catch(fehler);
-    } else if (marker.typ === 'fuehrung') {
-      verortePerson(einsatzId, marker.id, patch)
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.fuehrungskraefte(einsatzId) }))
-        .catch(fehler);
-    } else if (marker.typ === 'abschnitt') {
-      zeichneAbschnitt(einsatzId, marker.id, patch)
-        .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) }))
-        .catch(fehler);
-    }
-  }
-
-  // Bestätigungs-Phase persistieren (LFH-145): erst hier, nicht schon bei onZoneGezeichnet.
-  const bestaetigungSpeichern = () => {
-    if (!zoneBestaetigung) return;
-    setZoneSpeichern(true);
-    legeZoneAn(einsatzId, {
-      typ: zoneBestaetigung.typ,
-      geometrie_typ: zoneBestaetigung.geometrie.type,
-      geometrie: JSON.stringify(zoneBestaetigung.geometrie),
-      farbe: zoneBestaetigung.typ === 'freie_skizze' ? zoneBestaetigung.farbe ?? null : null,
-    })
-      .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatzId) }))
-      .catch(fehler)
-      .finally(() => {
-        setZoneSpeichern(false);
-        setZoneBestaetigung(null);
-        setZoneEntwurf(null); // beendet Zeichnen → Kartenflaeche-Effekt ruft stoppen() → clear()
-      });
-  };
-  const bestaetigungVerwerfen = () => {
-    setZoneBestaetigung(null);
-    setZoneEntwurf(null); // verwirft den Entwurf (stoppen() → clear())
-  };
-
-  if (einsatzQuery.isLoading || configQuery.isLoading) {
+  if (ladt) {
     return <Spin style={{ marginTop: 64 }} />;
   }
 
@@ -689,71 +98,36 @@ export default function LagekartePage() {
         verortet={alleVerortet}
         darfSchreiben={!!darfSchreiben}
         platzierungZiel={platzierungZiel}
-        onPlatzierenStart={(z) => {
-          setPlatzierungZiel(z);
-          setZoneEntwurf(null);
-          setZoneBestaetigung(null);
-          setAuswahl(null);
-        }}
-        onPlatzierenAbbrechen={() => setPlatzierungZiel(null)}
-        onAbschnittZeichnenStart={(id) => {
-          setZeichneAbschnittId(id);
-          setZoneEntwurf(null);
-          setZoneBestaetigung(null);
-          setPlatzierungZiel(null);
-          setAuswahl(null);
-        }}
-        onZoneZeichnenStart={(entwurf) => {
-          setZoneEntwurf(entwurf);
-          setZoneBestaetigung(null); // neuer Entwurf beendet eine evtl. hängende Bestätigung
-          setZoneZeichnenNonce((n) => n + 1);
-          setZoneAuswahl(null);
-          setZeichneAbschnittId(null);
-          setPlatzierungZiel(null);
-          setAuswahl(null);
-        }}
-        onKoordinateEingeben={(lat, lon) => {
-          if (platzierungZiel && darfSchreiben) verortenMutation.mutate({ lat, lon });
-        }}
+        onPlatzierenStart={onPlatzierenStart}
+        onPlatzierenAbbrechen={onPlatzierenAbbrechen}
+        onAbschnittZeichnenStart={onAbschnittZeichnenStart}
+        onZoneZeichnenStart={onZoneZeichnenStart}
+        onKoordinateEingeben={onKoordinateEingeben}
         einsatzortVerortet={verortet.some((m) => m.typ === 'einsatzort')}
-        onEinsatzortPlatzieren={() => {
-          setPlatzierungZiel({ typ: 'einsatzort', id: 0 });
-          setZoneEntwurf(null);
-          setZoneBestaetigung(null);
-          setAuswahl(null);
-        }}
+        onEinsatzortPlatzieren={onEinsatzortPlatzieren}
         layer={layer}
         onLayerToggle={(k, an) => setLayer((l) => ({ ...l, [k]: an }))}
         basemap={basemap ?? 'blind'}
         onBasemapWechsel={setBasemap}
         onMarkerWaehlen={onMarkerWaehlen}
-        onlineVerfuegbar={(configQuery.data?.online_styles.length ?? 0) > 0}
-        offlineVerfuegbar={!!configQuery.data?.offline_verfuegbar}
-        onlineStyles={configQuery.data?.online_styles ?? []}
+        onlineVerfuegbar={(config?.online_styles.length ?? 0) > 0}
+        offlineVerfuegbar={!!config?.offline_verfuegbar}
+        onlineStyles={config?.online_styles ?? []}
         onlineStilName={onlineStilName}
         onOnlineStilWechsel={setOnlineStilName}
         kartenTheme={kartenTheme}
         onKartenThemeWechsel={setKartenTheme}
         fachebenenSichtbar={fachebenenSichtbar}
         fachebenenStatus={fachebenenStatus}
-        onFachebeneToggle={(k, an) => setFachebenenSichtbar((s) => ({ ...s, [k]: an }))}
-        kritisZoomZuKlein={
-          fachebenenSichtbar.kritis && kartenZoom != null && kartenZoom < KRITIS_MIN_ZOOM
-        }
+        onFachebeneToggle={onFachebeneToggle}
+        kritisZoomZuKlein={kritisZoomZuKlein}
         fachebenenLaedt={fachebenenLaedt}
-        bilder={bilderQuery.data ?? []}
+        bilder={bilder}
         onBildUpload={onBildUpload}
         onBildToggle={onBildToggle}
         onBildOpazitaet={onBildOpazitaet}
-        onBildPlatzieren={(id) => {
-          setBildPlatzierenId(id);
-          setZoneEntwurf(null);
-          setZoneBestaetigung(null);
-          setZeichneAbschnittId(null);
-          setPlatzierungZiel(null);
-          setAuswahl(null);
-        }}
-        onBildPlatzierenFertig={() => setBildPlatzierenId(null)}
+        onBildPlatzieren={onBildPlatzieren}
+        onBildPlatzierenFertig={onBildPlatzierenFertig}
         onBildLoeschen={onBildLoeschen}
         onBildZentrieren={onBildZentrieren}
         onBildUmbenennen={onBildUmbenennen}
@@ -770,43 +144,20 @@ export default function LagekartePage() {
           onKarteKlick={onKarteKlick}
           onMarkerKlick={onMarkerWaehlen}
           flyToZiel={flyToZiel}
-          onStyleFehler={() => {
-            setBasemap((m) => (m === 'online' ? 'offline' : m === 'offline' ? 'blind' : 'blind'));
-          }}
+          onStyleFehler={onStyleFehler}
           flaechen={layer.abschnitt ? flaechen.map((f) => ({ id: f.id, label: f.label, polygon: f.polygon })) : []}
           zeichnen={zeichneAbschnittId != null}
-          onFlaecheGezeichnet={(poly) => {
-            zeichneAbschnitt(einsatzId, zeichneAbschnittId!, { flaeche_geojson: JSON.stringify(poly) })
-              .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) }))
-              .catch(fehler)
-              .finally(() => setZeichneAbschnittId(null));
-          }}
-          onFlaecheKlick={(fid) => {
-            setAuswahl(`abschnitt-${fid}`);
-            setFachebeneAuswahl(null);
-          }}
+          onFlaecheGezeichnet={onFlaecheGezeichnet}
+          onFlaecheKlick={onFlaecheKlick}
           zonen={zonenFeatures}
           zoneZeichnen={zoneEntwurf ? zoneEntwurf.modus : null}
           zoneZeichnenNonce={zoneZeichnenNonce}
-          onZoneKlick={(id) => {
-            setZoneAuswahl(id);
-            setAuswahl(null);
-            setFachebeneAuswahl(null);
-          }}
-          onZoneGezeichnet={(g) => {
-            if (!zoneEntwurf) return;
-            // Nicht sofort persistieren: erst Bestätigung (Entwurf bleibt sichtbar). LFH-145.
-            setZoneBestaetigung({ ...zoneEntwurf, geometrie: g });
-          }}
+          onZoneKlick={onZoneKlick}
+          onZoneGezeichnet={onZoneGezeichnet}
           fachebenen={aktiveFachebenen}
           onBboxAenderung={fachebenenSichtbar.kritis ? (b) => setKritisBbox(rasterBbox(b)) : undefined}
           onZoomAenderung={setKartenZoom}
-          onFachebeneKlick={(props, quelle) => {
-            if (platzierungZiel) return; // im Platzier-Modus nicht den Detail-Panel öffnen
-            setFachebeneAuswahl({ quelle, properties: props });
-            setAuswahl(null);
-            setZoneAuswahl(null);
-          }}
+          onFachebeneKlick={onFachebeneKlick}
           bilder={bildOverlays}
           platzierBild={aktivesPlatzierBild}
           onPlatzierGeometrie={onPlatzierGeometrie}
@@ -827,10 +178,7 @@ export default function LagekartePage() {
               ? kartenRef.current?.abschnittAbschliessen()
               : kartenRef.current?.zoneAbschliessen()
           }
-          onAbbrechen={() => {
-            setZoneEntwurf(null);
-            setZeichneAbschnittId(null);
-          }}
+          onAbbrechen={onZeichnenAbbrechen}
           onSpeichern={bestaetigungSpeichern}
           onVerwerfen={bestaetigungVerwerfen}
         />
@@ -854,27 +202,12 @@ export default function LagekartePage() {
         {ausgewaehlteZone && (
           <ZonenInspector
             zone={ausgewaehlteZone}
-            gebiete={gebieteQuery.data ?? []}
+            gebiete={gebiete}
             darfSchreiben={!!darfSchreiben}
             onSchliessen={() => setZoneAuswahl(null)}
-            onAendern={(patch) =>
-              aktualisiereZone(einsatzId, ausgewaehlteZone.id, patch)
-                .then(() => {
-                  qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatzId) });
-                  qc.invalidateQueries({ queryKey: einsatzKeys.gefahrengebiete(einsatzId) });
-                })
-                .catch(fehler)
-            }
+            onAendern={(patch) => zoneAendern(ausgewaehlteZone.id, patch)}
             onMatrixOeffnen={(gid) => navigate(gefahrenPfad(einsatzId, { gefahrengebiet: gid }))}
-            onLoeschen={() =>
-              loescheZone(einsatzId, ausgewaehlteZone.id)
-                .then(() => {
-                  setZoneAuswahl(null);
-                  qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatzId) });
-                  return qc.invalidateQueries({ queryKey: einsatzKeys.gefahrengebiete(einsatzId) });
-                })
-                .catch(fehler)
-            }
+            onLoeschen={() => zoneLoeschen(ausgewaehlteZone.id)}
           />
         )}
       </div>
