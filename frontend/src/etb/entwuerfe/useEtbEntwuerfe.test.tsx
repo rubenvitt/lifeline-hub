@@ -1,6 +1,8 @@
 // frontend/src/etb/entwuerfe/useEtbEntwuerfe.test.tsx
+import { StrictMode } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as entwurfStore from './entwurfStore';
 import { entwuerfeLaden, entwuerfeLeerenFuerTests, entwurfSpeichern } from './entwurfStore';
 import type { EtbEntwurf } from './entwurfModell';
 import { useEtbEntwuerfe } from './useEtbEntwuerfe';
@@ -15,6 +17,10 @@ function entwurf(over: Partial<EtbEntwurf> = {}): EtbEntwurf {
 beforeEach(async () => {
   await entwuerfeLeerenFuerTests();
   localStorage.clear();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('useEtbEntwuerfe', () => {
@@ -64,6 +70,23 @@ describe('useEtbEntwuerfe', () => {
     expect(await entwuerfeLaden(7)).toHaveLength(0);
     expect(result.current.entwuerfe).toHaveLength(1); // neuer leerer Tab
     expect(result.current.entwuerfe[0].inhalt).toBe('');
+  });
+
+  it('persistiert unter StrictMode nur einmal — keine idb-Writes im setEntwuerfe-Updater (LFH-216)', async () => {
+    const speichernSpy = vi.spyOn(entwurfStore, 'entwurfSpeichern');
+    const { result } = renderHook(() => useEtbEntwuerfe(7), { wrapper: StrictMode });
+    await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));
+    const id = result.current.entwuerfe[0].id;
+    speichernSpy.mockClear();
+
+    await act(async () => {
+      result.current.entwurfAktualisieren(id, { inhalt: 'Pumpe', typ: 'meldung', metadaten: {} });
+    });
+    await waitFor(async () => expect(await entwuerfeLaden(7)).toHaveLength(1));
+
+    // Der setEntwuerfe-Updater wird unter StrictMode doppelt invoked; liegt der idb-Write
+    // im Updater, läuft er doppelt. Aus dem Updater gezogen → genau ein Write.
+    expect(speichernSpy).toHaveBeenCalledTimes(1);
   });
 
   it('schnelles Doppel-Schließen lässt keinen Zombie-Tab zurück (LFH-214-Review)', async () => {

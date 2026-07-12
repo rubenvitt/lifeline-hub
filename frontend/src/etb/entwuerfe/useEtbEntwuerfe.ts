@@ -17,6 +17,11 @@ export function useEtbEntwuerfe(einsatzId: number) {
   const [entwuerfe, setEntwuerfe] = useState<EtbEntwurf[]>([]);
   const [aktiverId, setAktiverId] = useState<string | null>(null);
   const initialisiert = useRef(false);
+  // Spiegel des aktuellen State, damit Callbacks den Bestand lesen können, ohne ihn im
+  // setEntwuerfe-Updater zu berechnen (der bliebe sonst seiteneffektbehaftet). Render-Phase-
+  // Zuweisung ist idempotent (StrictMode-Doppelrender unkritisch).
+  const entwuerfeRef = useRef<EtbEntwurf[]>(entwuerfe);
+  entwuerfeRef.current = entwuerfe;
 
   useEffect(() => {
     let abgebrochen = false;
@@ -53,22 +58,19 @@ export function useEtbEntwuerfe(einsatzId: number) {
   const entwurfAktualisieren = useCallback((id: string, werte: EntwurfWerte) => {
     const patch = werteZuPatch(werte);
     const geaendert_at = new Date().toISOString();
-    setEntwuerfe((prev) => {
-      const naechste = prev.map((e) => {
-        if (e.id !== id) return e;
-        return { ...e, ...patch, geaendert_at };
-      });
-      // Persistenz innerhalb des Updaters, damit der gespeicherte Wert sicher bekannt ist.
-      const gespeichert = naechste.find((e) => e.id === id);
-      if (gespeichert) {
-        if (istLeer(werte)) {
-          void entwurfEntfernen(id);
-        } else {
-          void entwurfSpeichern(gespeichert);
-        }
-      }
-      return naechste;
-    });
+    const bestand = entwuerfeRef.current.find((e) => e.id === id);
+    setEntwuerfe((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch, geaendert_at } : e)));
+    // Persistenz NACH dem (jetzt seiteneffektfreien) Updater. Der nächste Zustand des
+    // geänderten Entwurfs wird funktional aus dem Bestand + patch gebildet — er hängt nicht
+    // vom Updater-Ergebnis ab (die nicht-gepatchten Felder id/einsatz_id/erstellt_at sind
+    // über die Lebensdauer konstant). So läuft der Write unter React.StrictMode genau einmal
+    // statt doppelt (LFH-216).
+    if (!bestand) return;
+    if (istLeer(werte)) {
+      void entwurfEntfernen(id);
+    } else {
+      void entwurfSpeichern({ ...bestand, ...patch, geaendert_at });
+    }
   }, []);
 
   const entwurfSchliessen = useCallback(async (id: string) => {
