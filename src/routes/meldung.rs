@@ -1,8 +1,5 @@
 use crate::app::AppState;
-use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{
-    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
-};
+use crate::einsatz::kontext::EinsatzKontext;
 use crate::einsatz::repo as einsatz_repo;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -68,21 +65,12 @@ pub struct ListeParams {
 /// GET /api/einsaetze/{id}/meldungen — Posteingang listen (Lesezugriff, auch Beobachter).
 pub async fn liste(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    ctx: EinsatzKontext,
     Query(params): Query<ListeParams>,
 ) -> Result<Json<Vec<MeldungAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
+    ctx.fordere_lesezugriff()?;
+    ctx.fordere_modul_zugriff(&state.pool, MODUL_KEY).await?;
+    let einsatz_id = ctx.einsatz.id;
     let status = params
         .status
         .as_deref()
@@ -130,22 +118,13 @@ pub struct NeueMeldung {
 /// POST /api/einsaetze/{id}/meldungen — Meldung erfassen (Schreibrecht + aktiv).
 pub async fn anlegen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    ctx: EinsatzKontext,
     Json(req): Json<NeueMeldung>,
 ) -> Result<(StatusCode, Json<MeldungAnzeige>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
+    ctx.fordere_schreibrecht()?;
+    ctx.fordere_modul_zugriff(&state.pool, MODUL_KEY).await?;
+    ctx.fordere_aktiv()?;
+    let einsatz_id = ctx.einsatz.id;
 
     // Mindestfelder: Absender, Inhalt, Meldeweg.
     let absender = req.absender.trim();
@@ -198,7 +177,7 @@ pub async fn anlegen(
     // Request-Override ?? effektive_meldung_frist_min(Einsatz ?? Org) ?? Konstante.
     let einst = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id).await?;
     let org_einst =
-        crate::org::einstellungen::laden_oder_default(&state.pool, einsatz.org_id).await?;
+        crate::org::einstellungen::laden_oder_default(&state.pool, ctx.einsatz.org_id).await?;
     let frist_min = meldung_bestaetigung_frist_min_ableiten(
         &einst,
         &org_einst,
@@ -227,7 +206,7 @@ pub async fn anlegen(
     let m = repo::anlegen(
         &state.pool,
         einsatz_id,
-        benutzer.id,
+        ctx.benutzer.id,
         repo::MeldungDaten {
             absender,
             empfaenger: trimme(&req.empfaenger),
@@ -253,7 +232,7 @@ pub async fn anlegen(
             crate::erinnerung::repo::anlegen_aus_frist(
                 &state.pool,
                 einsatz_id,
-                benutzer.id,
+                ctx.benutzer.id,
                 crate::kommunikation::OBJEKT_MELDUNG,
                 m.id,
                 &titel,
@@ -284,26 +263,16 @@ pub async fn anlegen(
 /// Gibt `org_id` zurück (für kommunikation_status-Schreibpfade).
 async fn fordere_bearbeitbar(
     state: &AppState,
-    benutzer: &crate::auth::Benutzer,
-    einsatz_id: i64,
+    ctx: &EinsatzKontext,
     meldung_id: i64,
 ) -> Result<i64, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-    if !repo::gehoert_zu_einsatz(&state.pool, meldung_id, einsatz_id).await? {
+    ctx.fordere_schreibrecht()?;
+    ctx.fordere_modul_zugriff(&state.pool, MODUL_KEY).await?;
+    ctx.fordere_aktiv()?;
+    if !repo::gehoert_zu_einsatz(&state.pool, meldung_id, ctx.einsatz.id).await? {
         return Err(AppError::NotFound);
     }
-    Ok(einsatz.org_id)
+    Ok(ctx.einsatz.org_id)
 }
 
 #[derive(Debug, Deserialize)]
@@ -315,11 +284,11 @@ pub struct StatusReq {
 /// Die Bearbeiter-Zuweisung läuft über `zuweisen` (getrennte Achse).
 pub async fn status(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
+    ctx: EinsatzKontext,
     Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
     Json(req): Json<StatusReq>,
 ) -> Result<Json<MeldungAnzeige>, AppError> {
-    fordere_bearbeitbar(&state, &benutzer, einsatz_id, meldung_id).await?;
+    fordere_bearbeitbar(&state, &ctx, meldung_id).await?;
     let status = req.status.trim();
     if !crate::meldung::status_gueltig(status) {
         return Err(AppError::Validation("Ungültiger Status".into()));
@@ -336,10 +305,10 @@ pub async fn status(
 /// Erinnerung; der Triage-Status bleibt unberührt. Doppel-Bestätigung → 422.
 pub async fn bestaetigen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
+    ctx: EinsatzKontext,
     Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
 ) -> Result<Json<MeldungAnzeige>, AppError> {
-    let org_id = fordere_bearbeitbar(&state, &benutzer, einsatz_id, meldung_id).await?;
+    let org_id = fordere_bearbeitbar(&state, &ctx, meldung_id).await?;
     let now = jetzt();
     // Atomar einmalig (kein read-then-write/TOCTOU): nur die Erst-Bestätigung gewinnt.
     if !repo::bestaetige(
@@ -347,7 +316,7 @@ pub async fn bestaetigen(
         org_id,
         einsatz_id,
         meldung_id,
-        benutzer.id,
+        ctx.benutzer.id,
         &now,
     )
     .await?
@@ -370,11 +339,11 @@ pub struct ZuweisenReq {
 /// POST /api/einsaetze/{id}/meldungen/{mid}/zuweisen — Bearbeiter zuweisen/freigeben (LFH-94).
 pub async fn zuweisen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
+    ctx: EinsatzKontext,
     Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
     Json(req): Json<ZuweisenReq>,
 ) -> Result<Json<MeldungAnzeige>, AppError> {
-    fordere_bearbeitbar(&state, &benutzer, einsatz_id, meldung_id).await?;
+    fordere_bearbeitbar(&state, &ctx, meldung_id).await?;
     // Bearbeiter (falls gesetzt) muss Einsatz-Mitglied sein (Cross-Einsatz-Schutz).
     if let Some(bid) = req.bearbeiter_id {
         if einsatz_repo::rolle_von(&state.pool, einsatz_id, bid)
@@ -402,11 +371,11 @@ pub struct LagerelevantReq {
 /// POST /api/einsaetze/{id}/meldungen/{mid}/lagerelevant — an die Lage übergeben (LFH-95).
 pub async fn lagerelevant(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
+    ctx: EinsatzKontext,
     Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
     Json(req): Json<LagerelevantReq>,
 ) -> Result<Json<MeldungAnzeige>, AppError> {
-    fordere_bearbeitbar(&state, &benutzer, einsatz_id, meldung_id).await?;
+    fordere_bearbeitbar(&state, &ctx, meldung_id).await?;
     // Default-Text = Meldungsinhalt, falls kein eigener Lage-Text gegeben.
     let aktuell = repo::laden(&state.pool, meldung_id, &jetzt()).await?;
     let text = req
@@ -421,7 +390,15 @@ pub async fn lagerelevant(
         (None, None) => None,
         _ => return Err(AppError::Validation("lat und lon nur gemeinsam".into())),
     };
-    repo::als_lagerelevant(&state.pool, einsatz_id, meldung_id, benutzer.id, &text, geo).await?;
+    repo::als_lagerelevant(
+        &state.pool,
+        einsatz_id,
+        meldung_id,
+        ctx.benutzer.id,
+        &text,
+        geo,
+    )
+    .await?;
     let m = repo::laden(&state.pool, meldung_id, &jetzt()).await?;
     sse(&state, einsatz_id);
     Ok(Json(m))
@@ -434,11 +411,11 @@ pub async fn lagerelevant(
 /// Schreibrecht + aktiv + Cross-Einsatz-Schutz über `fordere_bearbeitbar` (wie die anderen Mutationen).
 pub async fn auftrag_erteilen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
+    ctx: EinsatzKontext,
     Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
     Json(req): Json<crate::auftrag::NeuerAuftrag>,
 ) -> Result<(StatusCode, Json<MeldungAnzeige>), AppError> {
-    fordere_bearbeitbar(&state, &benutzer, einsatz_id, meldung_id).await?;
+    fordere_bearbeitbar(&state, &ctx, meldung_id).await?;
 
     // Gleiche Validierung wie POST /auftraege (geteilt) → kein zweiter, ungeprüfter Pfad.
     let now = jetzt();
@@ -448,7 +425,7 @@ pub async fn auftrag_erteilen(
         &state.pool,
         einsatz_id,
         meldung_id,
-        benutzer.id,
+        ctx.benutzer.id,
         validiert.daten(),
     )
     .await?;
@@ -477,22 +454,13 @@ pub async fn auftrag_erteilen(
 /// GET /api/einsaetze/{id}/lage/meldungen — Lageobjekte aus Meldungen (Lese-Oberfläche, LFH-95).
 pub async fn lage_liste(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    ctx: EinsatzKontext,
 ) -> Result<Json<Vec<crate::meldung::LageMeldungAnzeige>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        "lagemeldungen",
-        &benutzer,
-    )
-    .await?;
+    ctx.fordere_lesezugriff()?;
+    ctx.fordere_modul_zugriff(&state.pool, "lagemeldungen")
+        .await?;
     Ok(Json(
-        repo::liste_lage_meldungen(&state.pool, einsatz_id).await?,
+        repo::liste_lage_meldungen(&state.pool, ctx.einsatz.id).await?,
     ))
 }
 

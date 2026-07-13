@@ -131,6 +131,34 @@ pub fn fordere_lesezugriff(
     }
 }
 
+/// Org-Isolations-Floor (LFH-121): der minimale, un-vergessliche Zugriffs-Boden für
+/// JEDEN einsatz-gebundenen Handler — gedacht, um vom `EinsatzKontext`-Extractor VOR
+/// jedem `/api/einsaetze/{id}/…`-Handler erzwungen zu werden, damit die Cross-Org-Lücke
+/// (LFH-115) strukturell nicht mehr „vergessen" werden kann.
+///
+/// Erlaubt, wenn der Benutzer Mitglied ist (`rolle.is_some()`) ODER den Einsatz als
+/// höhere Berechtigung fremd lesen darf ([`Benutzer::darf_fremdeinsatz_lesen`]:
+/// System-Admin serverweit, org-weite Führungskraft nur in der EIGENEN Org). Sonst
+/// `Forbidden`.
+///
+/// BEWUSST schwächer als [`fordere_lesezugriff`]: dieser Floor erzwingt KEINE
+/// DSGVO-Zeit-Policy (Nachlauffrist/Aufbewahrungsfrist/Tombstone) — die bleibt
+/// handler-lokal über `fordere_lesezugriff`. Nur so kann der Extractor den Floor
+/// pauschal ziehen, ohne den Sonderfall `aufbewahrungsfrist_setzen` auszusperren
+/// (Admin/Einsatzleitung verlängert reaktiv die Frist eines bereits abgelaufenen
+/// Einsatzes — dort sperrt `darf_lesen` hart, auch höhere Berechtigung).
+pub fn fordere_org_zugehoerigkeit(
+    benutzer: &Benutzer,
+    einsatz_org_id: i64,
+    rolle: Option<EinsatzRolle>,
+) -> Result<(), AppError> {
+    if rolle.is_some() || benutzer.darf_fremdeinsatz_lesen(einsatz_org_id) {
+        Ok(())
+    } else {
+        Err(AppError::Forbidden)
+    }
+}
+
 /// Stellt sicher, dass der Benutzer die Einsatzleitung ist.
 /// `Forbidden`, wenn keine Mitgliedschaft oder andere Rolle.
 pub fn fordere_einsatzleitung(rolle: Option<EinsatzRolle>) -> Result<(), AppError> {
@@ -733,6 +761,50 @@ mod tests {
         let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
         assert!(matches!(
             fordere_schreibrecht_oder_admin(&fk, None).unwrap_err(),
+            AppError::Forbidden
+        ));
+    }
+
+    // --- Org-Isolations-Floor (LFH-121) ---
+
+    #[test]
+    fn org_zugehoerigkeit_mitglied_ok() {
+        // Mitgliedschaft (rolle Some) genügt — auch für einen Einsatz einer fremden Org.
+        let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE); // org_id = 1
+        assert!(fordere_org_zugehoerigkeit(&b, 1, Some(EinsatzRolle::Beobachter)).is_ok());
+        assert!(fordere_org_zugehoerigkeit(&b, 2, Some(EinsatzRolle::Beobachter)).is_ok());
+    }
+
+    #[test]
+    fn org_zugehoerigkeit_admin_fremde_org_ok() {
+        // System-Admin: serverweit, ohne Mitgliedschaft, auch org-übergreifend.
+        let admin = benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE);
+        assert!(fordere_org_zugehoerigkeit(&admin, 2, None).is_ok());
+    }
+
+    #[test]
+    fn org_zugehoerigkeit_fuehrungskraft_eigene_org_ok() {
+        let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT); // org_id = 1
+        assert!(fordere_org_zugehoerigkeit(&fk, 1, None).is_ok());
+    }
+
+    #[test]
+    fn org_zugehoerigkeit_fuehrungskraft_fremde_org_forbidden() {
+        // Die Kern-Invariante gegen die Cross-Org-Lücke (LFH-115): org-weite
+        // Führungskraft aus Org 1 hat an einem Einsatz aus Org 2 ohne Mitgliedschaft
+        // nichts verloren.
+        let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
+        assert!(matches!(
+            fordere_org_zugehoerigkeit(&fk, 2, None).unwrap_err(),
+            AppError::Forbidden
+        ));
+    }
+
+    #[test]
+    fn org_zugehoerigkeit_nicht_mitglied_normal_forbidden() {
+        let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
+        assert!(matches!(
+            fordere_org_zugehoerigkeit(&b, 1, None).unwrap_err(),
             AppError::Forbidden
         ));
     }

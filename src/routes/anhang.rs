@@ -1,8 +1,6 @@
 use crate::anhang::{self, AnhangAnzeige};
 use crate::app::AppState;
-use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
-use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::kontext::EinsatzKontext;
 use crate::error::AppError;
 use axum::extract::{Multipart, Path, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
@@ -16,14 +14,12 @@ use axum::Json;
 /// Verknüpfen mit einer Chat-Nachricht passiert separat beim Nachricht-Senden.
 pub async fn hochladen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    ctx: EinsatzKontext,
     mut multipart: Multipart,
 ) -> Result<(StatusCode, Json<Vec<AnhangAnzeige>>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_aktiv(&einsatz)?;
+    ctx.fordere_schreibrecht()?;
+    ctx.fordere_aktiv()?;
+    let einsatz_id = ctx.einsatz.id;
 
     let mut angelegt = Vec::new();
     while let Some(feld) = multipart
@@ -45,7 +41,7 @@ pub async fn hochladen(
         let a = anhang::repo::anlegen(
             &state.pool,
             einsatz_id,
-            benutzer.id,
+            ctx.benutzer.id,
             &dateiname,
             &mime,
             &daten,
@@ -71,12 +67,10 @@ pub async fn hochladen(
 /// die `anhang`-Tabelle; ein zweiter Linker (ETB/Lageobjekte) erfordert eine Aggregation.
 pub async fn herunterladen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
+    ctx: EinsatzKontext,
     Path((einsatz_id, anhang_id)): Path<(i64, i64)>,
 ) -> Result<impl IntoResponse, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
+    ctx.fordere_lesezugriff()?;
 
     if !anhang::repo::gehoert_anhang_zu_einsatz(&state.pool, anhang_id, einsatz_id).await? {
         return Err(AppError::NotFound);

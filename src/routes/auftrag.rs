@@ -1,11 +1,7 @@
 use crate::app::AppState;
 use crate::auftrag::{repo, validiere_neuen_auftrag, AuftragDetail, NeuerAuftrag};
-use crate::auth::session::CurrentUser;
-use crate::einsatz::berechtigung::{
-    fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
-};
 use crate::einsatz::einstellungen;
-use crate::einsatz::repo as einsatz_repo;
+use crate::einsatz::kontext::EinsatzKontext;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "auftraege";
@@ -41,21 +37,12 @@ pub struct ListeParams {
 /// GET /api/einsaetze/{id}/auftraege — Aufträge listen (Lesezugriff, auch Beobachter).
 pub async fn liste(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    ctx: EinsatzKontext,
     Query(params): Query<ListeParams>,
 ) -> Result<Json<Vec<AuftragDetail>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
+    ctx.fordere_lesezugriff()?;
+    ctx.fordere_modul_zugriff(&state.pool, MODUL_KEY).await?;
+    let einsatz_id = ctx.einsatz.id;
 
     if params.abschnitt_id.is_some() && params.einheit_id.is_some() {
         return Err(AppError::Validation(
@@ -102,36 +89,27 @@ fn auftrag_default_quittierung_frist_min(
 /// POST /api/einsaetze/{id}/auftraege — Auftrag anlegen + zustellen (Schreibrecht + aktiv).
 pub async fn anlegen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    ctx: EinsatzKontext,
     Json(req): Json<NeuerAuftrag>,
 ) -> Result<(StatusCode, Json<AuftragDetail>), AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
+    ctx.fordere_schreibrecht()?;
+    ctx.fordere_modul_zugriff(&state.pool, MODUL_KEY).await?;
+    ctx.fordere_aktiv()?;
+    let einsatz_id = ctx.einsatz.id;
 
     let now = jetzt();
     // Default-Quittierfrist (Task 8/LFH-133): Fallback-Kette Einsatz ?? Org ?? None.
     // Nur für die direkte Auftragserfassung; greift, wenn der Client keine frist_at mitschickt.
     let einst = einstellungen::laden_oder_default(&state.pool, einsatz_id).await?;
     let org_einst =
-        crate::org::einstellungen::laden_oder_default(&state.pool, einsatz.org_id).await?;
+        crate::org::einstellungen::laden_oder_default(&state.pool, ctx.einsatz.org_id).await?;
     let default_frist = auftrag_default_quittierung_frist_min(&einst, &org_einst);
     let validiert =
         validiere_neuen_auftrag(&state.pool, einsatz_id, &req, &now, default_frist).await?;
     let d = repo::anlegen(
         &state.pool,
         einsatz_id,
-        benutzer.id,
+        ctx.benutzer.id,
         validiert.daten(),
         &now,
     )
@@ -153,39 +131,29 @@ pub async fn anlegen(
 /// Gibt `org_id` zurück (für kommunikation_status-Schreibpfade).
 async fn fordere_bearbeitbar(
     state: &AppState,
-    benutzer: &crate::auth::Benutzer,
-    einsatz_id: i64,
+    ctx: &EinsatzKontext,
     auftrag_id: i64,
 ) -> Result<i64, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_schreibrecht(rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-    fordere_aktiv(&einsatz)?;
-    if !repo::gehoert_zu_einsatz(&state.pool, auftrag_id, einsatz_id).await? {
+    ctx.fordere_schreibrecht()?;
+    ctx.fordere_modul_zugriff(&state.pool, MODUL_KEY).await?;
+    ctx.fordere_aktiv()?;
+    if !repo::gehoert_zu_einsatz(&state.pool, auftrag_id, ctx.einsatz.id).await? {
         return Err(AppError::NotFound);
     }
-    Ok(einsatz.org_id)
+    Ok(ctx.einsatz.org_id)
 }
 
 /// POST /api/einsaetze/{id}/auftraege/{aid}/empfaenger/{empf}/quittieren — Quittung (Achse 1).
 pub async fn quittieren(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
+    ctx: EinsatzKontext,
     Path((einsatz_id, auftrag_id, empfaenger_id)): Path<(i64, i64, i64)>,
 ) -> Result<Json<AuftragDetail>, AppError> {
-    fordere_bearbeitbar(&state, &benutzer, einsatz_id, auftrag_id).await?;
+    fordere_bearbeitbar(&state, &ctx, auftrag_id).await?;
     if !repo::empfaenger_gehoert_zu_auftrag(&state.pool, empfaenger_id, auftrag_id).await? {
         return Err(AppError::NotFound);
     }
-    repo::quittiere_empfaenger(&state.pool, empfaenger_id, benutzer.id, &jetzt()).await?;
+    repo::quittiere_empfaenger(&state.pool, empfaenger_id, ctx.benutzer.id, &jetzt()).await?;
     let d = repo::laden(&state.pool, auftrag_id, &jetzt()).await?;
     sse(&state, einsatz_id);
     Ok(Json(d))
@@ -201,11 +169,11 @@ pub struct VollzugReq {
 /// POST /api/einsaetze/{id}/auftraege/{aid}/vollzug — Bearbeitungsfortschritt (Achse 2).
 pub async fn vollzug(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
+    ctx: EinsatzKontext,
     Path((einsatz_id, auftrag_id)): Path<(i64, i64)>,
     Json(req): Json<VollzugReq>,
 ) -> Result<Json<AuftragDetail>, AppError> {
-    let org_id = fordere_bearbeitbar(&state, &benutzer, einsatz_id, auftrag_id).await?;
+    let org_id = fordere_bearbeitbar(&state, &ctx, auftrag_id).await?;
     let now = jetzt();
     match req.status.as_str() {
         "in_arbeit" => {
@@ -214,7 +182,7 @@ pub async fn vollzug(
                 org_id,
                 einsatz_id,
                 auftrag_id,
-                benutzer.id,
+                ctx.benutzer.id,
                 &now,
             )
             .await?;
@@ -244,7 +212,7 @@ pub async fn vollzug(
                 org_id,
                 einsatz_id,
                 auftrag_id,
-                benutzer.id,
+                ctx.benutzer.id,
                 text,
                 &now,
             )
@@ -265,10 +233,10 @@ pub async fn vollzug(
 /// POST /api/einsaetze/{id}/auftraege/{aid}/abnehmen — Führung nimmt Vollzug ab.
 pub async fn abnehmen(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
+    ctx: EinsatzKontext,
     Path((einsatz_id, auftrag_id)): Path<(i64, i64)>,
 ) -> Result<Json<AuftragDetail>, AppError> {
-    fordere_bearbeitbar(&state, &benutzer, einsatz_id, auftrag_id).await?;
+    fordere_bearbeitbar(&state, &ctx, auftrag_id).await?;
     let now = jetzt();
     let aktuell = repo::laden(&state.pool, auftrag_id, &now).await?;
     if aktuell.auftrag.vollzug_status != "vollzogen" {
@@ -276,7 +244,7 @@ pub async fn abnehmen(
             "Nur vollzogene Aufträge können abgenommen werden".into(),
         ));
     }
-    repo::nimm_ab(&state.pool, auftrag_id, benutzer.id, &now).await?;
+    repo::nimm_ab(&state.pool, auftrag_id, ctx.benutzer.id, &now).await?;
     let d = repo::laden(&state.pool, auftrag_id, &now).await?;
     sse(&state, einsatz_id);
     Ok(Json(d))
