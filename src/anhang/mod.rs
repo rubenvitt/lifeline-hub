@@ -93,9 +93,12 @@ pub enum ScanErgebnis {
     ScannerNichtErreichbar,
 }
 
+/// Default-Timeout (Sekunden) für den clamd-Scan.
+const DEFAULT_CLAMD_TIMEOUT_SEKUNDEN: u64 = 30;
+
 /// Konfiguration des Upload-AV-Scans (LFH-114), prozessweit einmal via
 /// [`init_scan_config`] beim Serverstart gesetzt (aus der CLI/ENV-`Config`).
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct ScanConfig {
     /// clamd-Adresse: TCP `host:port` oder Unix-Socket `unix:/pfad`. `None` → Scan
     /// deaktiviert (No-op-Seam; der Default-Build ohne clamd bleibt single-binary).
@@ -103,6 +106,21 @@ pub struct ScanConfig {
     /// Verhalten bei nicht erreichbarem clamd: `false` (Default) = fail-closed (Upload
     /// ablehnen, 503), `true` = fail-open (durchlassen — Feld-/Offline-Kompromiss).
     pub fail_open: bool,
+    /// Max. Wartezeit auf clamd; danach gilt der Scan als „nicht erreichbar" (die
+    /// fail-open/closed-Entscheidung greift). Verhindert, dass ein hängender clamd
+    /// (Verbindung angenommen, aber keine Antwort) den Upload-Request unbegrenzt blockiert
+    /// — ein Hänger wäre für fail-closed schlimmer als eine abgelehnte Verbindung.
+    pub timeout: std::time::Duration,
+}
+
+impl Default for ScanConfig {
+    fn default() -> Self {
+        Self {
+            clamd_addr: None,
+            fail_open: false,
+            timeout: std::time::Duration::from_secs(DEFAULT_CLAMD_TIMEOUT_SEKUNDEN),
+        }
+    }
 }
 
 static SCAN_CONFIG: OnceLock<ScanConfig> = OnceLock::new();
@@ -147,7 +165,19 @@ pub async fn scan(cfg: &ScanConfig, daten: &[u8]) -> Result<(), AppError> {
     let Some(addr) = cfg.clamd_addr.as_deref() else {
         return Ok(());
     };
-    entscheide(clamd_scan(addr, daten).await, cfg.fail_open)
+    // Timeout gegen einen hängenden clamd: nach Ablauf gilt der Scanner als nicht
+    // erreichbar, damit die fail-open/closed-Entscheidung greift statt der Request hängt.
+    let ergebnis = match tokio::time::timeout(cfg.timeout, clamd_scan(addr, daten)).await {
+        Ok(e) => e,
+        Err(_zeitueberschritten) => {
+            tracing::warn!(
+                "clamd-Scan-Timeout nach {:?} — als nicht erreichbar behandelt",
+                cfg.timeout
+            );
+            ScanErgebnis::ScannerNichtErreichbar
+        }
+    };
+    entscheide(ergebnis, cfg.fail_open)
 }
 
 #[cfg(not(feature = "clamav"))]
@@ -179,33 +209,35 @@ async fn clamd_scan(addr: &str, daten: &[u8]) -> ScanErgebnis {
         )
         .await
     };
-    let antwort = match antwort {
-        Ok(bytes) => bytes,
+    match antwort {
+        Ok(bytes) => klassifiziere_antwort(&bytes),
         Err(e) => {
             tracing::warn!("clamd nicht erreichbar / Scan fehlgeschlagen: {e}");
-            return ScanErgebnis::ScannerNichtErreichbar;
-        }
-    };
-    match clamav_client::clean(&antwort) {
-        Ok(true) => ScanErgebnis::Sauber,
-        Ok(false) => ScanErgebnis::Fund(signatur_aus_antwort(&antwort)),
-        Err(e) => {
-            tracing::warn!("clamd-Antwort unparsebar: {e}");
             ScanErgebnis::ScannerNichtErreichbar
         }
     }
 }
 
-/// Extrahiert den Signaturnamen aus einer clamd-Fund-Antwort (`stream: <Sig> FOUND`);
-/// best-effort, fällt bei unerwartetem Format auf die getrimmte Rohantwort zurück.
+/// Übersetzt eine clamd-INSTREAM-Antwort in ein [`ScanErgebnis`]. clamd endet mit
+/// `OK` (sauber), `<Sig> FOUND` (Fund) oder `<Meldung> ERROR` (Betriebsfehler, z.B.
+/// `INSTREAM size limit exceeded. ERROR` oder OOM). Ein ERROR / unerwartetes Format wird
+/// bewusst als `ScannerNichtErreichbar` behandelt, damit die fail-open/closed-Politik
+/// greift, statt einen Scanner-BETRIEBSfehler dem Nutzer als Virenfund (422) zu melden.
+/// (`clamav_client::clean` allein wertet JEDES Nicht-`OK` als Fund — daher hier explizit.)
 #[cfg(feature = "clamav")]
-fn signatur_aus_antwort(antwort: &[u8]) -> String {
+fn klassifiziere_antwort(antwort: &[u8]) -> ScanErgebnis {
     let s = String::from_utf8_lossy(antwort);
     let s = s.trim().trim_end_matches('\0').trim();
-    s.strip_suffix(" FOUND")
-        .and_then(|rest| rest.rsplit(':').next())
-        .map(|sig| sig.trim().to_string())
-        .unwrap_or_else(|| s.to_string())
+    if let Some(rest) = s.strip_suffix(" FOUND") {
+        // Format: `stream: <Signatur> FOUND` — Signaturname best-effort extrahieren.
+        let sig = rest.rsplit(':').next().map(str::trim).unwrap_or(rest);
+        ScanErgebnis::Fund(sig.to_string())
+    } else if s.ends_with("OK") {
+        ScanErgebnis::Sauber
+    } else {
+        tracing::warn!("unerwartete/fehlerhafte clamd-Antwort: {s}");
+        ScanErgebnis::ScannerNichtErreichbar
+    }
 }
 
 #[cfg(test)]
@@ -278,6 +310,38 @@ mod tests {
         assert!(entscheide(ScanErgebnis::ScannerNichtErreichbar, true).is_ok());
     }
 
+    // --- clamd-Antwort-Klassifikation (nur mit `clamav`-Feature) ---
+
+    #[cfg(feature = "clamav")]
+    #[test]
+    fn klassifiziere_ok_ist_sauber() {
+        assert_eq!(klassifiziere_antwort(b"stream: OK\0"), ScanErgebnis::Sauber);
+    }
+
+    #[cfg(feature = "clamav")]
+    #[test]
+    fn klassifiziere_found_extrahiert_signatur() {
+        assert_eq!(
+            klassifiziere_antwort(b"stream: Eicar-Test-Signature FOUND\0"),
+            ScanErgebnis::Fund("Eicar-Test-Signature".into())
+        );
+    }
+
+    #[cfg(feature = "clamav")]
+    #[test]
+    fn klassifiziere_error_ist_nicht_erreichbar_nicht_fund() {
+        // clamd-BETRIEBSfehler dürfen NICHT als Virenfund (422) beim Nutzer landen,
+        // sondern als „nicht erreichbar" die fail-open/closed-Politik durchlaufen.
+        assert_eq!(
+            klassifiziere_antwort(b"INSTREAM size limit exceeded. ERROR\0"),
+            ScanErgebnis::ScannerNichtErreichbar
+        );
+        assert_eq!(
+            klassifiziere_antwort(b"Can't allocate memory ERROR"),
+            ScanErgebnis::ScannerNichtErreichbar
+        );
+    }
+
     // --- Echter I/O-Pfad gegen nicht erreichbaren clamd (nur mit `clamav`-Feature) ---
     // Braucht KEINEN laufenden clamd: 127.0.0.1:1 verweigert die Verbindung → der
     // ScannerNichtErreichbar-Zweig + die fail-open/closed-Entscheidung werden real geübt.
@@ -285,9 +349,11 @@ mod tests {
     #[cfg(feature = "clamav")]
     #[tokio::test]
     async fn scan_gegen_toten_clamd_fail_closed_lehnt_ab() {
+        // 127.0.0.1:1 verweigert die Verbindung sofort (ECONNREFUSED).
         let cfg = ScanConfig {
             clamd_addr: Some("127.0.0.1:1".into()),
             fail_open: false,
+            ..ScanConfig::default()
         };
         let err = scan(&cfg, b"beliebige bytes").await.unwrap_err();
         assert!(
@@ -302,6 +368,7 @@ mod tests {
         let cfg = ScanConfig {
             clamd_addr: Some("127.0.0.1:1".into()),
             fail_open: true,
+            ..ScanConfig::default()
         };
         assert!(
             scan(&cfg, b"beliebige bytes").await.is_ok(),
@@ -311,10 +378,38 @@ mod tests {
 
     #[cfg(feature = "clamav")]
     #[tokio::test]
+    async fn scan_gegen_haengenden_clamd_timeout_lehnt_ab() {
+        // Ein clamd, der die Verbindung ANNIMMT aber nie antwortet, darf den Upload nicht
+        // unbegrenzt blockieren: der Scan muss per Timeout abbrechen und fail-closed ablehnen.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap().to_string();
+        tokio::spawn(async move {
+            let mut offen = Vec::new();
+            loop {
+                match listener.accept().await {
+                    Ok((sock, _)) => offen.push(sock), // annehmen + offen halten, nie antworten
+                    Err(_) => break,
+                }
+            }
+        });
+        let cfg = ScanConfig {
+            clamd_addr: Some(addr),
+            fail_open: false,
+            timeout: std::time::Duration::from_millis(200),
+        };
+        let err = scan(&cfg, b"beliebige bytes").await.unwrap_err();
+        assert!(
+            matches!(err, AppError::ServiceUnavailable(_)),
+            "hängender clamd + fail-closed → 503 via Timeout"
+        );
+    }
+
+    #[cfg(feature = "clamav")]
+    #[tokio::test]
     async fn scan_ohne_adresse_ist_noop() {
         let cfg = ScanConfig {
             clamd_addr: None,
-            fail_open: false,
+            ..ScanConfig::default()
         };
         assert!(scan(&cfg, b"x").await.is_ok(), "ohne clamd-Adresse → No-op");
     }

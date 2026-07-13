@@ -103,6 +103,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     lifeline_hub::anhang::init_scan_config(lifeline_hub::anhang::ScanConfig {
         clamd_addr: config.clamav_addr.clone(),
         fail_open: config.clamav_fail_open,
+        timeout: std::time::Duration::from_secs(config.clamav_timeout_secs),
     });
 
     let app = build_router(AppState {

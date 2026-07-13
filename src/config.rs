@@ -273,6 +273,12 @@ pub struct Config {
     /// gesetzter `--clamav-addr` + `clamav`-Feature.
     #[arg(long, env = "LIFELINE_CLAMAV_FAIL_OPEN", default_value_t = false)]
     pub clamav_fail_open: bool,
+
+    /// Timeout (Sekunden) für den clamd-Scan. Nach Ablauf gilt der Scanner als nicht
+    /// erreichbar (fail-open/closed greift), damit ein hängender clamd den Upload-Request
+    /// nicht unbegrenzt blockiert.
+    #[arg(long, env = "LIFELINE_CLAMAV_TIMEOUT_SECS", default_value_t = 30)]
+    pub clamav_timeout_secs: u64,
 }
 
 /// Subkommandos der lifeline-hub-Binary (neben dem Server-Standardlauf).
