@@ -8,6 +8,9 @@ use lifeline_hub::live::LiveHub;
 use std::io::Write;
 use tower::ServiceExt; // oneshot
 
+mod common;
+use common::login_cookie;
+
 async fn pool() -> sqlx::SqlitePool {
     // db::test_pool() liefert einen bereits migrierten Test-Pool (wie alle tests/*.rs).
     lifeline_hub::db::test_pool().await
@@ -37,33 +40,6 @@ async fn admin_app() -> (axum::Router, String) {
     let app = app_mit_pool(pool);
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     (app, cookie)
-}
-
-/// Loggt sich ein und liefert das `name=value`-Cookie-Paar (wie tests/benutzer.rs).
-async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) -> String {
-    let body = format!(r#"{{"benutzername":"{benutzername}","passwort":"{passwort}"}}"#);
-    let resp = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/auth/login")
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(body))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK, "Login im Test muss klappen");
-    resp.headers()
-        .get(header::SET_COOKIE)
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .split(';')
-        .next()
-        .unwrap()
-        .to_string()
 }
 
 /// Schickt eine Anfrage; `cookie`/`body` optional (JSON-Body setzt Content-Type).

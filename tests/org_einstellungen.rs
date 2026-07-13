@@ -10,36 +10,9 @@ use serde_json::Value;
 use tower::ServiceExt;
 
 mod common;
-use common::setup;
+use common::{login_cookie, setup};
 
 // ----------------------------- Test-Harness -----------------------------
-
-/// Loggt sich ein und liefert das `name=value`-Cookie-Paar.
-async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) -> String {
-    let body = format!(r#"{{"benutzername":"{benutzername}","passwort":"{passwort}"}}"#);
-    let resp = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/auth/login")
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(body))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK, "Login muss klappen");
-    resp.headers()
-        .get(header::SET_COOKIE)
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .split(';')
-        .next()
-        .unwrap()
-        .to_string()
-}
 
 /// Legt über die Admin-Benutzerverwaltung einen neuen Benutzer an.
 async fn benutzer_anlegen(

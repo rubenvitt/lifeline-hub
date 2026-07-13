@@ -8,68 +8,9 @@ use std::collections::BTreeSet;
 use tower::ServiceExt;
 
 mod common;
-use common::setup;
+use common::{benutzer_anlegen, login_cookie, rolle_setzen, setup};
 
 // ----------------------------- Test-Harness -----------------------------
-
-async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) -> String {
-    let body = format!(r#"{{"benutzername":"{benutzername}","passwort":"{passwort}"}}"#);
-    let resp = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/auth/login")
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(body))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK, "Login muss klappen");
-    resp.headers()
-        .get(header::SET_COOKIE)
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .split(';')
-        .next()
-        .unwrap()
-        .to_string()
-}
-
-async fn benutzer_anlegen(
-    app: &axum::Router,
-    admin_cookie: &str,
-    name: &str,
-    org_rolle: &str,
-) -> i64 {
-    let body = format!(
-        r#"{{"anzeigename":"{name}","benutzername":"{name}","passwort":"{name}pw1","org_rolle":"{org_rolle}"}}"#
-    );
-    let resp = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/benutzer")
-                .header(header::CONTENT_TYPE, "application/json")
-                .header(header::COOKIE, admin_cookie.to_string())
-                .body(Body::from(body))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(
-        resp.status(),
-        StatusCode::CREATED,
-        "Benutzer anlegen muss klappen"
-    );
-    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    serde_json::from_slice::<Value>(&bytes).unwrap()["id"]
-        .as_i64()
-        .unwrap()
-}
 
 async fn einsatz_anlegen(app: &axum::Router, cookie: &str, bezeichnung: &str) -> i64 {
     let body = format!(r#"{{"bezeichnung":"{bezeichnung}"}}"#);
@@ -91,35 +32,6 @@ async fn einsatz_anlegen(app: &axum::Router, cookie: &str, bezeichnung: &str) ->
     serde_json::from_slice::<Value>(&bytes).unwrap()["id"]
         .as_i64()
         .unwrap()
-}
-
-/// Macht den Benutzer mit `ziel_id` zum Mitglied des Einsatzes mit `einsatz_rolle`.
-async fn mitglied_setzen(
-    app: &axum::Router,
-    leitung_cookie: &str,
-    einsatz_id: i64,
-    ziel_id: i64,
-    einsatz_rolle: &str,
-) {
-    let body = format!(r#"{{"einsatz_rolle":"{einsatz_rolle}"}}"#);
-    let resp = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method("PUT")
-                .uri(format!("/api/einsaetze/{einsatz_id}/mitglieder/{ziel_id}"))
-                .header(header::CONTENT_TYPE, "application/json")
-                .header(header::COOKIE, leitung_cookie.to_string())
-                .body(Body::from(body))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(
-        resp.status(),
-        StatusCode::OK,
-        "Mitglied setzen muss klappen"
-    );
 }
 
 /// PUT eines Modul-Overrides; liefert nur den Status.
@@ -323,7 +235,7 @@ async fn einsatzleitung_sperrt_sich_nicht_aus_einstellungen_aus() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_anlegen(&app, &admin, "Lage").await;
     let lid = benutzer_anlegen(&app, &admin, "lotta", "keine").await;
-    mitglied_setzen(&app, &admin, eid, lid, "einsatzleitung").await;
+    rolle_setzen(&app, &admin, eid, lid, "einsatzleitung").await;
     let lotta = login_cookie(&app, "lotta", "lottapw1").await;
 
     // GET der Einstellungen + Stammdaten bleibt für die Einsatzleitung erreichbar.
@@ -365,7 +277,7 @@ async fn nicht_leitung_kann_keinen_override_setzen() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_anlegen(&app, &admin, "Lage").await;
     let bid = benutzer_anlegen(&app, &admin, "berta", "keine").await;
-    mitglied_setzen(&app, &admin, eid, bid, "beobachter").await;
+    rolle_setzen(&app, &admin, eid, bid, "beobachter").await;
 
     let berta = login_cookie(&app, "berta", "bertapw1").await;
     // Beobachter (kein Admin, keine Leitung) → 403.
@@ -411,7 +323,7 @@ async fn etb_fixture(app: &axum::Router) -> (String, String, i64) {
     let admin = login_cookie(app, "admin", "startpw12").await;
     let eid = einsatz_anlegen(app, &admin, "Lage").await;
     let fid = benutzer_anlegen(app, &admin, "frieda", "keine").await;
-    mitglied_setzen(app, &admin, eid, fid, "fuehrungspersonal").await;
+    rolle_setzen(app, &admin, eid, fid, "fuehrungspersonal").await;
     let frieda = login_cookie(app, "frieda", "friedapw1").await;
     (admin, frieda, eid)
 }
@@ -481,7 +393,7 @@ async fn etb_rollen_schranke_blockt_normales_mitglied() {
 
     // Eine org-weite Führungskraft (Mitglied) darf weiterhin.
     let gid = benutzer_anlegen(&app, &admin, "gustav", "fuehrungskraft").await;
-    mitglied_setzen(&app, &admin, eid, gid, "fuehrungspersonal").await;
+    rolle_setzen(&app, &admin, eid, gid, "fuehrungspersonal").await;
     let gustav = login_cookie(&app, "gustav", "gustavpw1").await;
     assert_eq!(
         get_status(&app, &gustav, &format!("/api/einsaetze/{eid}/etb")).await,
@@ -566,7 +478,7 @@ async fn alle_modul_gruppen_gegated_get_baseline_und_versteckt() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_anlegen(&app, &admin, "Lage").await;
     let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
-    mitglied_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
+    rolle_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
     let frieda = login_cookie(&app, "frieda", "friedapw1").await;
 
     // Baseline: alle Pfade für das Mitglied sichtbar → 200.
@@ -612,7 +524,7 @@ async fn versteckte_module_blocken_stream_routen() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_anlegen(&app, &admin, "Lage").await;
     let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
-    mitglied_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
+    rolle_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
     let frieda = login_cookie(&app, "frieda", "friedapw1").await;
 
     for (key, suffix) in MODUL_STREAM_PFADE {
@@ -669,7 +581,7 @@ async fn org_default_fuehrungskraft_blockt_normales_mitglied_via_route() {
     let eid = einsatz_anlegen(&app, &admin, "Lage").await;
 
     let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
-    mitglied_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
+    rolle_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
     let frieda = login_cookie(&app, "frieda", "friedapw1").await;
 
     // Baseline: kein Override, kein Org-Default → Frieda darf ETB lesen.

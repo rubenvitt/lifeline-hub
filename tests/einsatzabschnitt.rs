@@ -1,28 +1,10 @@
 use axum::http::StatusCode;
 
 mod common;
-use common::{anfrage, einsatz_anlegen, login_cookie, setup, system_etb_anzahl};
-
-async fn benutzer_anlegen(app: &axum::Router, admin: &str, name: &str, org_rolle: &str) -> i64 {
-    let body = format!(
-        r#"{{"anzeigename":"{name}","benutzername":"{name}","passwort":"{name}pw1","org_rolle":"{org_rolle}"}}"#
-    );
-    let (status, json) = anfrage(app, "POST", "/api/benutzer", admin, Some(&body)).await;
-    assert_eq!(status, StatusCode::CREATED);
-    json["id"].as_i64().unwrap()
-}
-
-async fn rolle_setzen(app: &axum::Router, leit: &str, einsatz: i64, benutzer_id: i64, rolle: &str) {
-    let (status, _) = anfrage(
-        app,
-        "PUT",
-        &format!("/api/einsaetze/{einsatz}/mitglieder/{benutzer_id}"),
-        leit,
-        Some(&format!(r#"{{"einsatz_rolle":"{rolle}"}}"#)),
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK);
-}
+use common::{
+    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup,
+    system_etb_anzahl,
+};
 
 async fn person_anlegen(app: &axum::Router, admin: &str, einsatz: i64, name: &str) -> i64 {
     // Stamm anlegen + in den Einsatz disponieren → liefert die einsatz_personal.id.

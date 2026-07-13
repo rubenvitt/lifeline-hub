@@ -8,6 +8,9 @@ use serde_json::{json, Value};
 use sqlx::SqlitePool;
 use tower::ServiceExt;
 
+mod common;
+use common::{benutzer_anlegen, login_cookie};
+
 /// Router + DB mit Bootstrap-Admin (admin / startpw12).
 async fn setup() -> axum::Router {
     setup_with_pool().await.0
@@ -31,66 +34,6 @@ async fn setup_with_pool() -> (axum::Router, SqlitePool) {
         karten_service_token: None,
     });
     (router, pool)
-}
-
-/// Loggt sich ein und liefert das `name=value`-Cookie-Paar.
-async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) -> String {
-    let body = format!(r#"{{"benutzername":"{benutzername}","passwort":"{passwort}"}}"#);
-    let resp = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/auth/login")
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(body))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK, "Login im Test muss klappen");
-    resp.headers()
-        .get(header::SET_COOKIE)
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .split(';')
-        .next()
-        .unwrap()
-        .to_string()
-}
-
-/// Admin legt einen Benutzer an; gibt dessen id zurück. `org_rolle`: z.B. "fuehrungskraft" oder "keine".
-async fn benutzer_anlegen(
-    app: &axum::Router,
-    admin_cookie: &str,
-    benutzername: &str,
-    org_rolle: &str,
-) -> i64 {
-    let body = format!(
-        r#"{{"anzeigename":"{benutzername}","benutzername":"{benutzername}","passwort":"{benutzername}pw1","org_rolle":"{org_rolle}"}}"#
-    );
-    let resp = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/benutzer")
-                .header(header::CONTENT_TYPE, "application/json")
-                .header(header::COOKIE, admin_cookie.to_string())
-                .body(Body::from(body))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(
-        resp.status(),
-        StatusCode::CREATED,
-        "Benutzer anlegen muss klappen"
-    );
-    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    let json: Value = serde_json::from_slice(&bytes).unwrap();
-    json["id"].as_i64().unwrap()
 }
 
 /// Legt als gegebener Cookie-Inhaber einen Einsatz an und liefert (Status, JSON).

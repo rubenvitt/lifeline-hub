@@ -8,6 +8,9 @@ use serde_json::Value;
 use std::time::Duration;
 use tower::ServiceExt;
 
+mod common;
+use common::{benutzer_anlegen, login_cookie, rolle_setzen};
+
 /// Router + Bootstrap-Admin (admin / startpw12); liefert zusätzlich den LiveHub,
 /// damit Tests direkt am Broadcast-Kanal lauschen können.
 async fn setup() -> (axum::Router, LiveHub) {
@@ -27,61 +30,6 @@ async fn setup() -> (axum::Router, LiveHub) {
         karten_service_token: None,
     });
     (router, live)
-}
-
-async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) -> String {
-    let body = format!(r#"{{"benutzername":"{benutzername}","passwort":"{passwort}"}}"#);
-    let resp = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/auth/login")
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(body))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::OK, "Login muss klappen");
-    resp.headers()
-        .get(header::SET_COOKIE)
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .split(';')
-        .next()
-        .unwrap()
-        .to_string()
-}
-
-async fn benutzer_anlegen(
-    app: &axum::Router,
-    admin_cookie: &str,
-    benutzername: &str,
-    org_rolle: &str,
-) -> i64 {
-    let body = format!(
-        r#"{{"anzeigename":"{benutzername}","benutzername":"{benutzername}","passwort":"{benutzername}pw1","org_rolle":"{org_rolle}"}}"#
-    );
-    let resp = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/benutzer")
-                .header(header::CONTENT_TYPE, "application/json")
-                .header(header::COOKIE, admin_cookie.to_string())
-                .body(Body::from(body))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(resp.status(), StatusCode::CREATED);
-    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    serde_json::from_slice::<Value>(&bytes).unwrap()["id"]
-        .as_i64()
-        .unwrap()
 }
 
 async fn einsatz_anlegen(app: &axum::Router, cookie: &str, bezeichnung: &str) -> i64 {
@@ -184,34 +132,6 @@ async fn post_json(app: &axum::Router, cookie: &str, uri: &str, body: &str) -> (
     )
 }
 
-/// Weist `benutzer_id` die Rolle in `einsatz` zu (PUT mitglieder).
-async fn rolle_zuweisen(
-    app: &axum::Router,
-    admin: &str,
-    einsatz: i64,
-    benutzer_id: i64,
-    rolle: &str,
-) {
-    let resp = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method("PUT")
-                .uri(format!("/api/einsaetze/{einsatz}/mitglieder/{benutzer_id}"))
-                .header(header::CONTENT_TYPE, "application/json")
-                .header(header::COOKIE, admin.to_string())
-                .body(Body::from(format!(r#"{{"einsatz_rolle":"{rolle}"}}"#)))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(
-        resp.status(),
-        StatusCode::OK,
-        "Rollenzuweisung muss klappen"
-    );
-}
-
 /// Minimal valider Auftrags-Body (ein Funktions-Empfänger), wie in tests/meldung.rs.
 fn auftrag_body(text: &str) -> String {
     format!(
@@ -234,7 +154,7 @@ async fn etb_auftrag_beobachter_ist_403() {
     let etb_id = etb["id"].as_i64().unwrap();
 
     let beob_id = benutzer_anlegen(&app, &admin, "beobi", "keine").await;
-    rolle_zuweisen(&app, &admin, einsatz, beob_id, "beobachter").await;
+    rolle_setzen(&app, &admin, einsatz, beob_id, "beobachter").await;
     let beob = login_cookie(&app, "beobi", "beobipw1").await;
 
     let (status, _) = post_json(

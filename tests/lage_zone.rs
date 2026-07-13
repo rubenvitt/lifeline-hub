@@ -20,7 +20,7 @@ use std::time::Duration;
 use tokio::sync::broadcast::Receiver;
 
 mod common;
-use common::{anfrage, login_cookie};
+use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie};
 
 const POLY: &str =
     r#"{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}"#;
@@ -45,36 +45,12 @@ async fn setup() -> (axum::Router, LiveHub) {
     (router, live)
 }
 
-/// Legt einen Benutzer in der Bootstrap-Org an (POST /api/benutzer). 1:1 aus
-/// tests/einsatzabschnitt.rs — Passwort-Konvention ist `{name}pw1`.
-async fn benutzer_anlegen(app: &axum::Router, admin: &str, name: &str, org_rolle: &str) -> i64 {
-    let body = format!(
-        r#"{{"anzeigename":"{name}","benutzername":"{name}","passwort":"{name}pw1","org_rolle":"{org_rolle}"}}"#
-    );
-    let (status, json) = anfrage(app, "POST", "/api/benutzer", admin, Some(&body)).await;
-    assert_eq!(status, StatusCode::CREATED);
-    json["id"].as_i64().unwrap()
-}
-
 /// Fremder Nutzer ohne Einsatz-Mitgliedschaft und ohne höhere Berechtigung
 /// (org_rolle="keine") — liefert dessen Login-Cookie. Vorbild: Org-Isolations-Test
 /// in tests/einsatzabschnitt.rs (`fremde_org_kann_abschnitte_nicht_lesen_oder_schreiben`).
 async fn fremder_nutzer(app: &axum::Router, admin: &str) -> String {
     benutzer_anlegen(app, admin, "fremd", "keine").await;
     login_cookie(app, "fremd", "fremdpw1").await
-}
-
-async fn einsatz_anlegen(app: &axum::Router, cookie: &str) -> i64 {
-    let (status, json) = anfrage(
-        app,
-        "POST",
-        "/api/einsaetze",
-        cookie,
-        Some(r#"{"bezeichnung":"Lage"}"#),
-    )
-    .await;
-    assert_eq!(status, StatusCode::CREATED, "Einsatz anlegen: {json:?}");
-    json["id"].as_i64().unwrap()
 }
 
 async fn system_etb_inhalte(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<String> {

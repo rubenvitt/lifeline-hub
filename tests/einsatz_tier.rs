@@ -12,7 +12,7 @@ use serde_json::{json, Value};
 use tower::ServiceExt;
 
 mod common;
-use common::login_cookie;
+use common::{benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen};
 
 // ---------- Harness ----------
 
@@ -68,52 +68,6 @@ async fn anfrage(
 }
 
 // ---------- Domänen-Helfer ----------
-
-async fn einsatz_anlegen(app: &axum::Router, cookie: &str) -> i64 {
-    let (s, v) = anfrage(
-        app,
-        "POST",
-        "/api/einsaetze",
-        cookie,
-        Some(&json!({"bezeichnung":"Lage"})),
-    )
-    .await;
-    assert_eq!(s, StatusCode::CREATED);
-    v["id"].as_i64().unwrap()
-}
-
-/// Legt einen Benutzer an. Passwort = `{name}pw1` — die Server-Policy verlangt
-/// ≥ 8 Zeichen (`PASSWORT_MIN_LEN` in `routes/benutzer.rs`), daher müssen die
-/// `name`-Argumente ≥ 5 Zeichen lang sein (z. B. "beobachter", "fremdnutzer").
-async fn benutzer_anlegen(
-    app: &axum::Router,
-    admin_cookie: &str,
-    name: &str,
-    org_rolle: &str,
-) -> i64 {
-    let (s, v) = anfrage(app, "POST", "/api/benutzer", admin_cookie,
-        Some(&json!({"anzeigename": name, "benutzername": name, "passwort": format!("{name}pw1"), "org_rolle": org_rolle}))).await;
-    assert_eq!(s, StatusCode::CREATED, "benutzer_anlegen: {v:?}");
-    v["id"].as_i64().unwrap()
-}
-
-async fn rolle_setzen(
-    app: &axum::Router,
-    leit_cookie: &str,
-    einsatz: i64,
-    benutzer_id: i64,
-    rolle: &str,
-) {
-    let (s, _) = anfrage(
-        app,
-        "PUT",
-        &format!("/api/einsaetze/{einsatz}/mitglieder/{benutzer_id}"),
-        leit_cookie,
-        Some(&json!({"einsatz_rolle": rolle})),
-    )
-    .await;
-    assert_eq!(s, StatusCode::OK);
-}
 
 async fn person_anlegen(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
     let (s, v) = anfrage(

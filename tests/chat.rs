@@ -2,28 +2,7 @@ use axum::http::StatusCode;
 use serde_json::Value;
 
 mod common;
-use common::{anfrage, einsatz_anlegen, login_cookie, setup};
-
-async fn benutzer_anlegen(app: &axum::Router, admin: &str, name: &str, org_rolle: &str) -> i64 {
-    let body = format!(
-        r#"{{"anzeigename":"{name}","benutzername":"{name}","passwort":"{name}pw1","org_rolle":"{org_rolle}"}}"#
-    );
-    let (status, json) = anfrage(app, "POST", "/api/benutzer", admin, Some(&body)).await;
-    assert_eq!(status, StatusCode::CREATED);
-    json["id"].as_i64().unwrap()
-}
-
-async fn rolle_setzen(app: &axum::Router, leit: &str, einsatz: i64, benutzer_id: i64, rolle: &str) {
-    let (status, _) = anfrage(
-        app,
-        "PUT",
-        &format!("/api/einsaetze/{einsatz}/mitglieder/{benutzer_id}"),
-        leit,
-        Some(&format!(r#"{{"einsatz_rolle":"{rolle}"}}"#)),
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK);
-}
+use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup};
 
 /// GET kanaele legt den Default-Kanal an und gibt ihn zurück.
 async fn default_kanal(app: &axum::Router, einsatz: i64, cookie: &str) -> i64 {

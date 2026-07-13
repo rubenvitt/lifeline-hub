@@ -1,114 +1,13 @@
 use axum::http::StatusCode;
 use chrono::{Duration, NaiveDateTime};
-use lifeline_hub::app::{build_router, AppState};
-use lifeline_hub::live::LiveHub;
 use serde_json::Value;
-use tower::ServiceExt;
+
+mod common;
+use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup};
 
 /// Parst einen DB-Zeitstempel aus einer JSON-Antwort.
 fn zeit(v: &Value) -> NaiveDateTime {
     NaiveDateTime::parse_from_str(v.as_str().unwrap(), "%Y-%m-%d %H:%M:%S").unwrap()
-}
-
-async fn setup() -> axum::Router {
-    let pool = lifeline_hub::db::test_pool().await;
-    lifeline_hub::auth::bootstrap::bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    build_router(AppState {
-        pool,
-        live: LiveHub::new(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    })
-}
-
-async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) -> String {
-    let body =
-        serde_json::json!({ "benutzername": benutzername, "passwort": passwort }).to_string();
-    let res = app
-        .clone()
-        .oneshot(
-            axum::http::Request::builder()
-                .method("POST")
-                .uri("/api/auth/login")
-                .header(axum::http::header::CONTENT_TYPE, "application/json")
-                .body(body)
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    let cookie = res
-        .headers()
-        .get(axum::http::header::SET_COOKIE)
-        .unwrap()
-        .to_str()
-        .unwrap();
-    cookie.split(';').next().unwrap().to_string()
-}
-
-async fn anfrage(
-    app: &axum::Router,
-    methode: &str,
-    uri: &str,
-    cookie: &str,
-    body: Option<&str>,
-) -> (StatusCode, Value) {
-    let mut req = axum::http::Request::builder()
-        .method(methode)
-        .uri(uri)
-        .header(axum::http::header::COOKIE, cookie);
-    if body.is_some() {
-        req = req.header(axum::http::header::CONTENT_TYPE, "application/json");
-    }
-    let res = app
-        .clone()
-        .oneshot(req.body(body.unwrap_or("").to_string()).unwrap())
-        .await
-        .unwrap();
-    let status = res.status();
-    let bytes = axum::body::to_bytes(res.into_body(), usize::MAX)
-        .await
-        .unwrap();
-    let json = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
-    (status, json)
-}
-
-async fn einsatz_anlegen(app: &axum::Router, cookie: &str) -> i64 {
-    let (_, json) = anfrage(
-        app,
-        "POST",
-        "/api/einsaetze",
-        cookie,
-        Some(r#"{"bezeichnung":"Lage"}"#),
-    )
-    .await;
-    json["id"].as_i64().unwrap()
-}
-
-async fn benutzer_anlegen(app: &axum::Router, admin: &str, name: &str, org_rolle: &str) -> i64 {
-    let body = format!(
-        r#"{{"anzeigename":"{name}","benutzername":"{name}","passwort":"{name}pw1","org_rolle":"{org_rolle}"}}"#
-    );
-    let (status, json) = anfrage(app, "POST", "/api/benutzer", admin, Some(&body)).await;
-    assert_eq!(status, StatusCode::CREATED, "{json:?}");
-    json["id"].as_i64().unwrap()
-}
-
-async fn rolle_setzen(app: &axum::Router, leit: &str, einsatz: i64, benutzer_id: i64, rolle: &str) {
-    let (status, _) = anfrage(
-        app,
-        "PUT",
-        &format!("/api/einsaetze/{einsatz}/mitglieder/{benutzer_id}"),
-        leit,
-        Some(&format!(r#"{{"einsatz_rolle":"{rolle}"}}"#)),
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK);
 }
 
 /// Vollständiger, gültiger Meldungs-Body (Pflichtfelder + Default-Vokabular).
