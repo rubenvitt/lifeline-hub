@@ -880,16 +880,24 @@ async fn abgeschlossener_einsatz_ist_read_only() {
     assert_eq!(s_del, StatusCode::CONFLICT);
 }
 
-/// PINNT das aktuelle Cross-Org-Verhalten von `darf_lesen` (mögliche Isolations-Lücke
-/// über `ist_hoehere_berechtigung`). Schlägt der LESE-Teil fehl, hat sich das Gate geändert —
-/// dann Sicherheitslage neu bewerten, NICHT den Test stumpf anpassen.
-/// bootstrap_admin ist nicht ein 2. Mal aufrufbar → zweite Org per rohem SQL; der
-/// bestehende System-Admin (org 1) hat selbst höhere Berechtigung und liest org-übergreifend.
+/// PINNT die Org-Isolation von `darf_lesen` nach LFH-115:
+/// - System-Admin (serverweit) liest org-übergreifend weiter — bewusster Carve-out.
+/// - Org-weite Führungskraft darf FREMDE Orgs NICHT mehr lesen (403) — die geschlossene Lücke.
+/// - Schreiben bleibt für beide 403 (Schreib-Gate kennt keinen Cross-Org-Bypass).
+///
+/// Kippt der Führungskraft-Teil zurück auf 200, ist die Isolations-Lücke wieder offen —
+/// dann Sicherheitslage bewerten, NICHT den Test stumpf anpassen.
+/// bootstrap_admin ist nicht ein 2. Mal aufrufbar → zweite Org per rohem SQL.
 #[tokio::test]
-async fn hoehere_berechtigung_liest_fremde_org_pin_schreiben_403() {
+async fn fremde_org_lesen_fuehrungskraft_403_admin_serverweit() {
     let (app, pool) = setup_mit_pool().await; // "Test-Orga" (org 1) + System-Admin "admin"
     let admin = login_cookie(&app, "admin", "startpw12").await;
 
+    // Org-weite Führungskraft in Org 1 (via admin angelegt → landet in dessen Org).
+    let _chef_id = benutzer_anlegen(&app, &admin, "chefin", "fuehrungskraft").await;
+    let chef = login_cookie(&app, "chefin", "chefinpw1").await;
+
+    // Fremde Org 2 mit Einsatz + Schaden.
     let org2: i64 =
         sqlx::query_scalar("INSERT INTO organisation (name) VALUES ('Fremd-Orga') RETURNING id")
             .fetch_one(&pool)
@@ -911,8 +919,23 @@ async fn hoehere_berechtigung_liest_fremde_org_pin_schreiben_403() {
          VALUES (?, 1, 'sachschaden', 'gering', 'Fremdstr. 1', ?, ?)")
         .bind(e2).bind(u2).bind(u2).execute(&pool).await.unwrap();
 
-    // LESEN: aktuelles Verhalten festhalten (erwartet: 200 wegen ist_hoehere_berechtigung-Bypass).
-    let (s_get, v) = anfrage(
+    // LESEN als Org-Führungskraft (org 1) auf fremde Org 2 → 403 (geschlossene Lücke, LFH-115).
+    let (s_get_fk, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e2}/schaeden"),
+        &chef,
+        None,
+    )
+    .await;
+    assert_eq!(
+        s_get_fk,
+        StatusCode::FORBIDDEN,
+        "Org-Führungskraft darf fremde Org NICHT lesen (LFH-115)"
+    );
+
+    // LESEN als System-Admin → 200 (serverweiter Carve-out bleibt bewusst erhalten).
+    let (s_get_admin, v) = anfrage(
         &app,
         "GET",
         &format!("/api/einsaetze/{e2}/schaeden"),
@@ -921,17 +944,17 @@ async fn hoehere_berechtigung_liest_fremde_org_pin_schreiben_403() {
     )
     .await;
     assert_eq!(
-        s_get,
+        s_get_admin,
         StatusCode::OK,
-        "PIN: höhere Berechtigung liest org-übergreifend (Lücke dokumentiert)"
+        "System-Admin liest serverweit (Carve-out)"
     );
     assert_eq!(
         v.as_array().unwrap().len(),
         1,
-        "Schaden der fremden Org ist sichtbar"
+        "Schaden der fremden Org ist für den Admin sichtbar"
     );
 
-    // SCHREIBEN: muss IMMER 403 sein — Schreib-Gate kennt keinen Bypass (admin ist nicht Mitglied von e2).
+    // SCHREIBEN als Admin: IMMER 403 — Schreib-Gate kennt keinen Bypass (admin ist nicht Mitglied von e2).
     let (s_post, _) = anfrage(
         &app,
         "POST",

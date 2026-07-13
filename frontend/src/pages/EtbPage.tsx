@@ -13,7 +13,6 @@ import { parseRouteId } from '../routing/deeplinks';
 import { useEffect, useState } from 'react';
 import EtbTabelle from '../etb/EtbTabelle';
 import EtbFilterleiste from '../etb/EtbFilterleiste';
-import MitgliederPanel from '../etb/MitgliederPanel';
 import WiedervorlageModal from '../etb/WiedervorlageModal';
 import AuftragAusEtbModal from '../etb/AuftragAusEtbModal';
 import Schnellerfassung from '../etb/Schnellerfassung';
@@ -55,7 +54,6 @@ export default function EtbPage() {
   const [berichtigungZu, setBerichtigungZu] = useState<EtbEintragAnzeige | null>(null);
   const [wiedervorlageZu, setWiedervorlageZu] = useState<EtbEintragAnzeige | null>(null);
   const [auftragZu, setAuftragZu] = useState<EtbEintragAnzeige | null>(null);
-  const [mitgliederOffen, setMitgliederOffen] = useState(false);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const { erfassen, ausstehend, abgelehnt } = useEtbErfassung(einsatzId);
 
@@ -141,7 +139,6 @@ export default function EtbPage() {
   }
   const einsatz = einsatzQuery.data;
 
-  const istEinsatzleitung = einsatz.meine_rolle === 'einsatzleitung';
   const darfAbschliessen = einsatz.status === 'aktiv' && einsatz.meine_rolle === 'einsatzleitung';
 
   const darfSchreiben =
@@ -167,9 +164,6 @@ export default function EtbPage() {
           <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
         </Space>
         <Space>
-          {istEinsatzleitung && (
-            <Button onClick={() => setMitgliederOffen(true)}>Mitglieder</Button>
-          )}
           {darfAbschliessen && (
             <Popconfirm
               title="Einsatz abschließen?"
@@ -269,14 +263,6 @@ export default function EtbPage() {
         </div>
       )}
 
-      {istEinsatzleitung && (
-        <MitgliederPanel
-          einsatzId={einsatzId}
-          istAktiv={einsatz.status === 'aktiv'}
-          offen={mitgliederOffen}
-          onClose={() => setMitgliederOffen(false)}
-        />
-      )}
       {darfSchreiben && (
         <WiedervorlageModal
           einsatzId={einsatzId}

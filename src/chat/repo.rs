@@ -155,7 +155,13 @@ async fn anhaenge_anreichern(
     pool: &SqlitePool,
     nachrichten: &mut [ChatNachrichtAnzeige],
 ) -> Result<(), AppError> {
-    let ids: Vec<i64> = nachrichten.iter().map(|n| n.id).collect();
+    // Soft-gelöschte Nachrichten liefern keine Anhang-Metadaten (Tombstone, LFH-116),
+    // analog zum inhalt-Nullen in NACHRICHT_SELECT — daher gar nicht erst nachladen.
+    let ids: Vec<i64> = nachrichten
+        .iter()
+        .filter(|n| n.geloescht_at.is_none())
+        .map(|n| n.id)
+        .collect();
     let mut map = anhaenge_map(pool, &ids).await?;
     for n in nachrichten.iter_mut() {
         n.anhaenge = map.remove(&n.id).unwrap_or_default();
@@ -173,10 +179,13 @@ pub async fn laden(pool: &SqlitePool, id: i64) -> Result<ChatNachrichtAnzeige, A
     .fetch_optional(pool)
     .await?
     .ok_or(AppError::NotFound)?;
-    nachricht.anhaenge = anhaenge_map(pool, &[id])
-        .await?
-        .remove(&id)
-        .unwrap_or_default();
+    // Soft-gelöschte Nachricht liefert keine Anhang-Metadaten (Tombstone, LFH-116).
+    if nachricht.geloescht_at.is_none() {
+        nachricht.anhaenge = anhaenge_map(pool, &[id])
+            .await?
+            .remove(&id)
+            .unwrap_or_default();
+    }
     Ok(nachricht)
 }
 
@@ -328,6 +337,33 @@ pub async fn loeschen(pool: &SqlitePool, nachricht_id: i64) -> Result<(), AppErr
         .execute(pool)
         .await?;
     Ok(())
+}
+
+/// Ob ein Anhang NUR noch an soft-gelöschten Chat-Nachrichten hängt (LFH-116):
+/// er ist an mindestens EINE Nachricht verknüpft UND alle verknüpfenden Nachrichten
+/// tragen den Tombstone (`geloescht_at`). Dann wird der Byte-Download gesperrt.
+///
+/// n:m-Semantik (chat_nachricht_anhang): Ein verwaister Anhang (an keiner Nachricht
+/// verknüpft, z. B. hochgeladen aber noch nicht gesendet) oder einer, der noch an
+/// mindestens einer LEBENDEN Nachricht hängt, bleibt ladbar (`false`). Bewusst
+/// chat-lokal — heute referenziert nur `chat_nachricht_anhang` die `anhang`-Tabelle;
+/// kommt ein zweiter Linker (ETB/Lageobjekte) hinzu, muss dieser Guard zu einer
+/// Aggregation über alle Linker heraufgezogen werden.
+pub async fn anhang_nur_an_geloeschten_nachrichten(
+    pool: &SqlitePool,
+    anhang_id: i64,
+) -> Result<bool, AppError> {
+    let (gesamt, lebend): (i64, i64) = sqlx::query_as(
+        "SELECT COUNT(*) AS gesamt, \
+                COALESCE(SUM(CASE WHEN n.geloescht_at IS NULL THEN 1 ELSE 0 END), 0) AS lebend \
+         FROM chat_nachricht_anhang cna \
+         JOIN chat_nachricht n ON n.id = cna.nachricht_id \
+         WHERE cna.anhang_id = ?",
+    )
+    .bind(anhang_id)
+    .fetch_one(pool)
+    .await?;
+    Ok(gesamt > 0 && lebend == 0)
 }
 
 /// Prüft, ob das Bezug-Ziel (polymorph, LFH-103) zum Einsatz gehört — FK-Ersatz, da
@@ -1052,5 +1088,151 @@ mod tests {
         let ergebnis =
             heraufstufen_zu_auftrag(&pool, einsatz, m.id, benutzer, auftrag_daten("x")).await;
         assert!(matches!(ergebnis.unwrap_err(), AppError::Conflict(_)));
+    }
+
+    // --- LFH-116: anhang_nur_an_geloeschten_nachrichten (n:m-Semantik) ---
+
+    async fn anhang_anlegen(pool: &SqlitePool, einsatz: i64, benutzer: i64) -> i64 {
+        crate::anhang::repo::anlegen(pool, einsatz, benutzer, "f.pdf", "application/pdf", b"x")
+            .await
+            .unwrap()
+            .id
+    }
+
+    #[tokio::test]
+    async fn anhang_guard_verwaist_ist_false() {
+        // Nie an eine Nachricht verknüpfter Anhang bleibt ladbar (nicht gesperrt).
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let aid = anhang_anlegen(&pool, einsatz, benutzer).await;
+        assert!(!anhang_nur_an_geloeschten_nachrichten(&pool, aid)
+            .await
+            .unwrap());
+    }
+
+    #[tokio::test]
+    async fn anhang_guard_an_lebender_nachricht_ist_false() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let kid = kanal(&pool, einsatz, benutzer).await;
+        let aid = anhang_anlegen(&pool, einsatz, benutzer).await;
+        anlegen_mit_anhaengen(&pool, einsatz, benutzer, kid, "m", &[aid])
+            .await
+            .unwrap();
+        assert!(!anhang_nur_an_geloeschten_nachrichten(&pool, aid)
+            .await
+            .unwrap());
+    }
+
+    #[tokio::test]
+    async fn anhang_guard_an_einziger_geloeschter_nachricht_ist_true() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let kid = kanal(&pool, einsatz, benutzer).await;
+        let aid = anhang_anlegen(&pool, einsatz, benutzer).await;
+        let m = anlegen_mit_anhaengen(&pool, einsatz, benutzer, kid, "m", &[aid])
+            .await
+            .unwrap();
+        loeschen(&pool, m.id).await.unwrap();
+        assert!(anhang_nur_an_geloeschten_nachrichten(&pool, aid)
+            .await
+            .unwrap());
+    }
+
+    #[tokio::test]
+    async fn anhang_guard_eine_geloescht_eine_lebend_ist_false() {
+        // n:m-Kern: solange EINE verknüpfende Nachricht lebt, bleibt der Anhang ladbar.
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let kid = kanal(&pool, einsatz, benutzer).await;
+        let aid = anhang_anlegen(&pool, einsatz, benutzer).await;
+        let m1 = anlegen_mit_anhaengen(&pool, einsatz, benutzer, kid, "m1", &[aid])
+            .await
+            .unwrap();
+        anlegen_mit_anhaengen(&pool, einsatz, benutzer, kid, "m2", &[aid])
+            .await
+            .unwrap();
+        loeschen(&pool, m1.id).await.unwrap();
+        assert!(!anhang_nur_an_geloeschten_nachrichten(&pool, aid)
+            .await
+            .unwrap());
+    }
+
+    #[tokio::test]
+    async fn anhang_guard_alle_verknuepfenden_geloescht_ist_true() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let kid = kanal(&pool, einsatz, benutzer).await;
+        let aid = anhang_anlegen(&pool, einsatz, benutzer).await;
+        let m1 = anlegen_mit_anhaengen(&pool, einsatz, benutzer, kid, "m1", &[aid])
+            .await
+            .unwrap();
+        let m2 = anlegen_mit_anhaengen(&pool, einsatz, benutzer, kid, "m2", &[aid])
+            .await
+            .unwrap();
+        loeschen(&pool, m1.id).await.unwrap();
+        loeschen(&pool, m2.id).await.unwrap();
+        assert!(anhang_nur_an_geloeschten_nachrichten(&pool, aid)
+            .await
+            .unwrap());
+    }
+
+    // --- LFH-116: Metadaten-Unterdrückung für soft-gelöschte Nachrichten ---
+
+    #[tokio::test]
+    async fn geloeschte_nachricht_laden_ohne_anhang_metadaten() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let kid = kanal(&pool, einsatz, benutzer).await;
+        let aid = anhang_anlegen(&pool, einsatz, benutzer).await;
+        let m = anlegen_mit_anhaengen(&pool, einsatz, benutzer, kid, "m", &[aid])
+            .await
+            .unwrap();
+        assert_eq!(
+            laden(&pool, m.id).await.unwrap().anhaenge.len(),
+            1,
+            "vor dem Löschen ist der Anhang sichtbar"
+        );
+
+        loeschen(&pool, m.id).await.unwrap();
+
+        let geladen = laden(&pool, m.id).await.unwrap();
+        assert!(geladen.geloescht_at.is_some());
+        assert!(
+            geladen.anhaenge.is_empty(),
+            "gelöschte Nachricht liefert keine Anhang-Metadaten (laden)"
+        );
+    }
+
+    #[tokio::test]
+    async fn geloeschte_nachricht_abfrage_ohne_anhang_metadaten() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let kid = kanal(&pool, einsatz, benutzer).await;
+        let aid = anhang_anlegen(&pool, einsatz, benutzer).await;
+        let m = anlegen_mit_anhaengen(&pool, einsatz, benutzer, kid, "m", &[aid])
+            .await
+            .unwrap();
+        loeschen(&pool, m.id).await.unwrap();
+
+        let liste = abfrage(
+            &pool,
+            einsatz,
+            &NachrichtFilter {
+                kanal_id: kid,
+                before_id: None,
+                limit: STANDARD_LIMIT,
+            },
+        )
+        .await
+        .unwrap();
+        let n = liste
+            .iter()
+            .find(|n| n.id == m.id)
+            .expect("gelöschte Nachricht erscheint als Tombstone in der Liste");
+        assert!(
+            n.anhaenge.is_empty(),
+            "gelöschte Nachricht liefert keine Anhang-Metadaten (abfrage)"
+        );
     }
 }

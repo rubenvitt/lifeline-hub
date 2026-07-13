@@ -152,6 +152,57 @@ async fn liste_blendet_einsatz_fuer_nicht_mitglied_aus() {
 }
 
 #[tokio::test]
+async fn liste_blendet_fremde_org_fuer_fuehrungskraft_aus() {
+    // LFH-115: Eine Org-Führungskraft sieht in GET /api/einsaetze NUR Einsätze der
+    // eigenen Org (auch ohne Mitgliedschaft) — fremde-Org-Einsätze werden über
+    // liste_fuer → darf_lesen(r.org_id) → darf_fremdeinsatz_lesen ausgeblendet.
+    let (app, pool) = setup_with_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+
+    // Eigener Einsatz (Org 1), den die Führungskraft sehen soll (sie ist NICHT Mitglied).
+    einsatz_anlegen(&app, &admin, "Eigene Lage").await;
+
+    // Fremde Org 2 mit eigenem Einsatz (bootstrap_admin nicht ein 2. Mal → rohes SQL).
+    let org2: i64 =
+        sqlx::query_scalar("INSERT INTO organisation (name) VALUES ('Fremd-Orga') RETURNING id")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    sqlx::query(
+        "INSERT INTO einsatz (org_id, bezeichnung, status) VALUES (?, 'Fremd-Lage', 'aktiv')",
+    )
+    .bind(org2)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Org-Führungskraft in Org 1 (via admin angelegt).
+    benutzer_anlegen(&app, &admin, "frieda", "fuehrungskraft").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/einsaetze")
+                .header(header::COOKIE, frieda)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json: Value = serde_json::from_slice(&bytes).unwrap();
+    let liste = json.as_array().unwrap();
+    assert_eq!(
+        liste.len(),
+        1,
+        "Führungskraft sieht nur die eigene Org, nicht die fremde"
+    );
+    assert_eq!(liste[0]["bezeichnung"], "Eigene Lage");
+}
+
+#[tokio::test]
 async fn detail_fuer_nicht_mitglied_ist_403() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;

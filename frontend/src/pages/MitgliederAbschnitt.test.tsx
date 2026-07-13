@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import MitgliederPanel from './MitgliederPanel';
+import MitgliederAbschnitt from './MitgliederAbschnitt';
 
 function mitglied(over: Partial<Record<string, unknown>> = {}) {
   return {
@@ -17,15 +17,13 @@ function mitglied(over: Partial<Record<string, unknown>> = {}) {
   };
 }
 
-describe('MitgliederPanel', () => {
+describe('MitgliederAbschnitt', () => {
   it('zeigt vorhandene Mitglieder', async () => {
     server.use(
       http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json([mitglied()])),
       http.get('/api/benutzer', () => HttpResponse.json([])),
     );
-    renderMitProviders(
-      <MitgliederPanel einsatzId={7} istAktiv offen onClose={() => {}} />,
-    );
+    renderMitProviders(<MitgliederAbschnitt einsatzId={7} darfVerwalten />);
     expect(await screen.findByText('Eva Einsatz')).toBeInTheDocument();
   });
 
@@ -41,23 +39,19 @@ describe('MitgliederPanel', () => {
         return HttpResponse.json([]);
       }),
     );
-    renderMitProviders(
-      <MitgliederPanel einsatzId={7} istAktiv offen onClose={() => {}} />,
-    );
+    renderMitProviders(<MitgliederAbschnitt einsatzId={7} darfVerwalten />);
     await userEvent.click(await screen.findByRole('button', { name: 'Entfernen' }));
     const popup = await screen.findByRole('tooltip');
     await userEvent.click(within(popup).getByRole('button', { name: 'Ja' }));
     await waitFor(() => expect(screen.queryByText('Eva Einsatz')).not.toBeInTheDocument());
   });
 
-  it('blendet Edit-Aktionen aus, wenn der Einsatz nicht aktiv ist', async () => {
+  it('blendet Edit-Aktionen aus, wenn nicht verwaltet werden darf', async () => {
     server.use(
       http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json([mitglied()])),
       http.get('/api/benutzer', () => HttpResponse.json([])),
     );
-    renderMitProviders(
-      <MitgliederPanel einsatzId={7} istAktiv={false} offen onClose={() => {}} />,
-    );
+    renderMitProviders(<MitgliederAbschnitt einsatzId={7} darfVerwalten={false} />);
     expect(await screen.findByText('Eva Einsatz')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Entfernen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Hinzufügen' })).not.toBeInTheDocument();

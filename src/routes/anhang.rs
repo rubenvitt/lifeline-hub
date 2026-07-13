@@ -64,10 +64,11 @@ pub async fn hochladen(
 /// Lesezugriff (inkl. Beobachter) + Pflicht-Ownership-Guard gegen Cross-Einsatz-
 /// Zugriff (fremder Einsatz → NotFound, kein ID-Raten).
 ///
-/// Hinweis (LFH-102): Der generische Endpoint gatet bewusst NUR auf Einsatz-
-/// Lesezugriff + Anhang-Zugehörigkeit, nicht auf den Zustand einer verknüpfenden
-/// Chat-Nachricht. Ein Anhang einer soft-gelöschten Nachricht bleibt daher
-/// ladbar — bewusste MVP-Abweichung vom Chat-Tombstone (Folge-Task LFH-116).
+/// Gatet zusätzlich (LFH-116) auf den Chat-Tombstone: hängt der Anhang NUR noch an
+/// soft-gelöschten Nachrichten, ist er gesperrt (404) — der Direkt-Deeplink umgeht
+/// sonst die Frontend-Ausblendung. Verwaiste oder an einer lebenden Nachricht hängende
+/// Anhänge bleiben ladbar (n:m-Semantik). Heute referenziert nur `chat_nachricht_anhang`
+/// die `anhang`-Tabelle; ein zweiter Linker (ETB/Lageobjekte) erfordert eine Aggregation.
 pub async fn herunterladen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -78,6 +79,11 @@ pub async fn herunterladen(
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
 
     if !anhang::repo::gehoert_anhang_zu_einsatz(&state.pool, anhang_id, einsatz_id).await? {
+        return Err(AppError::NotFound);
+    }
+    // LFH-116: Sperren, wenn der Anhang nur noch an soft-gelöschten Chat-Nachrichten
+    // hängt (Tombstone) — der Direkt-Deeplink umgeht sonst die Frontend-Ausblendung.
+    if crate::chat::repo::anhang_nur_an_geloeschten_nachrichten(&state.pool, anhang_id).await? {
         return Err(AppError::NotFound);
     }
     let (dateiname, mime, daten) = anhang::repo::laden_bytes(&state.pool, anhang_id).await?;

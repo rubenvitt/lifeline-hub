@@ -389,3 +389,137 @@ async fn zu_grosse_datei_abgelehnt() {
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
 }
+
+/// Sendet eine Nachricht (optional mit Anhängen) im Kanal und liefert deren id.
+async fn nachricht_senden(
+    app: &axum::Router,
+    einsatz: i64,
+    kid: i64,
+    cookie: &str,
+    anhang_ids: &[i64],
+) -> i64 {
+    let ids = anhang_ids
+        .iter()
+        .map(|i| i.to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    let (s, m) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        cookie,
+        Some(&format!(r#"{{"inhalt":"m","anhang_ids":[{ids}]}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "nachricht_senden: {m:?}");
+    m["id"].as_i64().unwrap()
+}
+
+/// Soft-löscht eine Nachricht.
+async fn nachricht_loeschen(app: &axum::Router, einsatz: i64, mid: i64, cookie: &str) {
+    let (s, _) = anfrage(
+        app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}"),
+        cookie,
+        None,
+    )
+    .await;
+    assert!(s.is_success(), "nachricht_loeschen: {s}");
+}
+
+/// LFH-116: Nach Soft-Löschen der einzigen verknüpfenden Nachricht ist der
+/// Anhang-Download gesperrt (404) — auch per Direkt-Deeplink am Frontend vorbei.
+#[tokio::test]
+async fn download_geloeschter_nachricht_gesperrt() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+
+    let (_, up) = upload(
+        &app,
+        einsatz,
+        &admin,
+        "geheim.pdf",
+        "application/pdf",
+        b"streng geheim",
+    )
+    .await;
+    let aid = up.as_array().unwrap()[0]["id"].as_i64().unwrap();
+    let mid = nachricht_senden(&app, einsatz, kid, &admin, &[aid]).await;
+
+    let (s_vor, _, _) = download(&app, einsatz, aid, &admin).await;
+    assert_eq!(s_vor, StatusCode::OK, "vor dem Löschen ladbar");
+
+    nachricht_loeschen(&app, einsatz, mid, &admin).await;
+
+    let (s_nach, _, _) = download(&app, einsatz, aid, &admin).await;
+    assert_eq!(
+        s_nach,
+        StatusCode::NOT_FOUND,
+        "Download gesperrt nach Soft-Löschen (LFH-116)"
+    );
+}
+
+/// LFH-116: Ein verwaister Anhang (nie an eine Nachricht gehängt) bleibt ladbar —
+/// Regressionswächter gegen Falsch-Sperre.
+#[tokio::test]
+async fn download_verwaister_anhang_bleibt_ladbar() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    let (_, up) = upload(
+        &app,
+        einsatz,
+        &admin,
+        "entwurf.pdf",
+        "application/pdf",
+        b"noch nicht gesendet",
+    )
+    .await;
+    let aid = up.as_array().unwrap()[0]["id"].as_i64().unwrap();
+
+    let (s, _, _) = download(&app, einsatz, aid, &admin).await;
+    assert_eq!(s, StatusCode::OK, "verwaister Anhang bleibt ladbar");
+}
+
+/// LFH-116 (n:m): Hängt ein Anhang an zwei Nachrichten, bleibt er ladbar, solange
+/// eine lebt; erst nach Löschen der LETZTEN verknüpfenden Nachricht → 404.
+#[tokio::test]
+async fn download_erst_nach_letzter_loeschung_gesperrt() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+
+    let (_, up) = upload(
+        &app,
+        einsatz,
+        &admin,
+        "geteilt.pdf",
+        "application/pdf",
+        b"an zwei nachrichten",
+    )
+    .await;
+    let aid = up.as_array().unwrap()[0]["id"].as_i64().unwrap();
+    let m1 = nachricht_senden(&app, einsatz, kid, &admin, &[aid]).await;
+    let m2 = nachricht_senden(&app, einsatz, kid, &admin, &[aid]).await;
+
+    nachricht_loeschen(&app, einsatz, m1, &admin).await;
+    let (s_mitte, _, _) = download(&app, einsatz, aid, &admin).await;
+    assert_eq!(
+        s_mitte,
+        StatusCode::OK,
+        "noch eine lebende Nachricht → ladbar"
+    );
+
+    nachricht_loeschen(&app, einsatz, m2, &admin).await;
+    let (s_ende, _, _) = download(&app, einsatz, aid, &admin).await;
+    assert_eq!(
+        s_ende,
+        StatusCode::NOT_FOUND,
+        "letzte verknüpfende Nachricht gelöscht → gesperrt"
+    );
+}
