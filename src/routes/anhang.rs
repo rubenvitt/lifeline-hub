@@ -37,7 +37,9 @@ pub async fn hochladen(
             .await
             .map_err(|e| AppError::Validation(format!("Datei lesen fehlgeschlagen: {e}")))?;
         anhang::pruefe_groesse(daten.len())?;
-        anhang::scan(&daten)?; // AV-ready Seam (LFH-114): scan-vor-persist
+        // AV-Scan (LFH-114): scan-vor-persist gegen clamd (config-getrieben, Default
+        // fail-closed). Ohne konfigurierten clamd ein No-op.
+        anhang::scan(anhang::scan_config(), &daten).await?;
         let a = anhang::repo::anlegen(
             &state.pool,
             einsatz_id,

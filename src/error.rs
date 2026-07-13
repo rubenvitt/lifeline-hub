@@ -28,6 +28,10 @@ pub enum AppError {
     NotImplemented(String),
     /// Ein angesprochener Upstream-Dienst ist fehlgeschlagen/unerreichbar (502).
     BadGateway(String),
+    /// Der Dienst kann die Anfrage vorübergehend nicht bedienen (503), z.B. weil eine
+    /// erforderliche Abhängigkeit (Virenscanner, LFH-114) nicht erreichbar ist und
+    /// fail-closed konfiguriert wurde. Signalisiert dem Client „später erneut versuchen".
+    ServiceUnavailable(String),
 }
 
 impl std::fmt::Display for AppError {
@@ -43,6 +47,7 @@ impl std::fmt::Display for AppError {
             AppError::Internal(m) => write!(f, "{m}"),
             AppError::NotImplemented(m) => write!(f, "{m}"),
             AppError::BadGateway(m) => write!(f, "{m}"),
+            AppError::ServiceUnavailable(m) => write!(f, "{m}"),
         }
     }
 }
@@ -68,6 +73,7 @@ impl AppError {
             AppError::Database(_) | AppError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::NotImplemented(_) => StatusCode::NOT_IMPLEMENTED,
             AppError::BadGateway(_) => StatusCode::BAD_GATEWAY,
+            AppError::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
         }
     }
 }

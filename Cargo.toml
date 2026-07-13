@@ -35,11 +35,18 @@ tower = { version = "0.5", features = ["util"] }
 fs4 = "1.1.0"
 # LFH-201: geteilter Offline-Katalog-Typ (Grundstein für den späteren karten-service).
 karten-katalog = { path = "crates/karten-katalog" }
+# LFH-114: optionaler ClamAV/clamd-Client für den Upload-Virenscan. Hinter dem `clamav`-Feature,
+# damit der Default-Build single-binary bleibt (kein FFI, keine Signatur-DB im Prozess).
+clamav-client = { version = "2.2", optional = true, default-features = false, features = ["tokio"] }
 
 [features]
 # Dev-only: aktiviert Seed-Testdaten und den /api/dev/users-Endpoint.
 # Niemals im Release-Build aktivieren (kein Default-Feature).
 dev-seeds = []
+
+# LFH-114: echter ClamAV/clamd-Upload-Scan. Ohne dieses Feature ist der Scan-Seam ein No-op.
+# Braucht zur Laufzeit einen erreichbaren clamd (Sidecar/systemd) — siehe --clamav-addr.
+clamav = ["dep:clamav-client"]
 
 # LFH-201: Workspace-Umstellung — geteilter Typ wandert in ein eigenes Crate (Grundstein für den
 # späteren karten-service). `karten-service` ist jetzt Teil des Workspace (Skelett, LFH-201 Task 2).

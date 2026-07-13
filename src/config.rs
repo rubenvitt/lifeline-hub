@@ -260,6 +260,19 @@ pub struct Config {
     /// damit es nicht versehentlich via `{config:?}` ins Log gelangt.
     #[arg(long, env = "LIFELINE_KARTEN_SERVICE_TOKEN")]
     pub karten_service_token: Option<GeheimesPasswort>,
+
+    /// clamd-Adresse für den Upload-Virenscan (LFH-114): TCP `host:port` oder Unix-Socket
+    /// `unix:/pfad`. Fehlt sie, sind Uploads UNGESCANNT (No-op-Seam). Der echte Scan ist
+    /// zusätzlich hinter dem Cargo-Feature `clamav` (der Default-Build bleibt single-binary).
+    #[arg(long, env = "LIFELINE_CLAMAV_ADDR")]
+    pub clamav_addr: Option<String>,
+
+    /// Verhalten, wenn clamd nicht erreichbar ist: standardmäßig fail-closed (Upload mit 503
+    /// ablehnen). `--clamav-fail-open` lässt Uploads im Offline-/Feldbetrieb durch, wenn der
+    /// Scanner fehlt (bewusster Verfügbarkeits-vs-Sicherheits-Kompromiss). Greift nur bei
+    /// gesetzter `--clamav-addr` + `clamav`-Feature.
+    #[arg(long, env = "LIFELINE_CLAMAV_FAIL_OPEN", default_value_t = false)]
+    pub clamav_fail_open: bool,
 }
 
 /// Subkommandos der lifeline-hub-Binary (neben dem Server-Standardlauf).
