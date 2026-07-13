@@ -1,4 +1,4 @@
-import { App, Button, Drawer, Popconfirm, Select, Space, Table } from 'antd';
+import { App, Button, Popconfirm, Select, Space, Table, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -16,12 +16,10 @@ const ROLLEN: { value: EinsatzRolle; label: string }[] = [
 
 interface Props {
   einsatzId: number;
-  istAktiv: boolean;
-  offen: boolean;
-  onClose: () => void;
+  darfVerwalten: boolean;
 }
 
-export default function MitgliederPanel({ einsatzId, istAktiv, offen, onClose }: Props) {
+export default function MitgliederAbschnitt({ einsatzId, darfVerwalten }: Props) {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [neuerBenutzer, setNeuerBenutzer] = useState<number | undefined>();
@@ -30,12 +28,11 @@ export default function MitgliederPanel({ einsatzId, istAktiv, offen, onClose }:
   const mitgliederQuery = useQuery({
     queryKey: einsatzKeys.mitglieder(einsatzId),
     queryFn: () => ladeMitglieder(einsatzId),
-    enabled: offen,
   });
   const benutzerQuery = useQuery({
     queryKey: ['benutzer'],
     queryFn: listeBenutzer,
-    enabled: offen && istAktiv,
+    enabled: darfVerwalten,
   });
 
   const setzen = useMutation({
@@ -65,7 +62,7 @@ export default function MitgliederPanel({ einsatzId, istAktiv, offen, onClose }:
       render: (_, m) => (
         <Select
           value={m.einsatz_rolle}
-          disabled={!istAktiv}
+          disabled={!darfVerwalten}
           style={{ width: 170 }}
           options={ROLLEN}
           onChange={(rolle) => setzen.mutate({ benutzerId: m.benutzer_id, rolle })}
@@ -76,7 +73,7 @@ export default function MitgliederPanel({ einsatzId, istAktiv, offen, onClose }:
       title: '',
       key: 'aktion',
       render: (_, m) =>
-        istAktiv ? (
+        darfVerwalten ? (
           <Popconfirm
             title="Mitglied entfernen?"
             okText="Ja"
@@ -92,8 +89,9 @@ export default function MitgliederPanel({ einsatzId, istAktiv, offen, onClose }:
   ];
 
   return (
-    <Drawer title="Mitglieder" open={offen} onClose={onClose} size={480}>
-      {istAktiv && (
+    <section style={{ marginTop: 32 }}>
+      <Typography.Title level={5}>Zugriff</Typography.Title>
+      {darfVerwalten && (
         <Space style={{ marginBottom: 16 }} wrap>
           <Select
             placeholder="Benutzer …"
@@ -131,6 +129,6 @@ export default function MitgliederPanel({ einsatzId, istAktiv, offen, onClose }:
         columns={spalten}
         dataSource={mitglieder}
       />
-    </Drawer>
+    </section>
   );
 }

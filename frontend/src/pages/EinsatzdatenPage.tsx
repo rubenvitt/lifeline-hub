@@ -15,6 +15,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import type { Einsatzart } from '../api/types';
+import MitgliederAbschnitt from './MitgliederAbschnitt';
 
 const EINSATZART_LABELS: Record<Einsatzart, string> = {
   realeinsatz: 'Realeinsatz',
@@ -101,6 +102,9 @@ export default function EinsatzdatenPage() {
     .filter((m) => m.einsatz_rolle === 'einsatzleitung')
     .map((m) => m.anzeigename)
     .join(', ');
+
+  const darfVerwaltenMitglieder =
+    einsatz.meine_rolle === 'einsatzleitung' && einsatz.status === 'aktiv';
 
   const stichwortOptionen = (vorschlaegeQuery.data ?? []).map((v) => ({ value: v.text }));
 
@@ -245,6 +249,8 @@ export default function EinsatzdatenPage() {
           </Descriptions.Item>
         </Descriptions>
       )}
+
+      <MitgliederAbschnitt einsatzId={einsatzId} darfVerwalten={darfVerwaltenMitglieder} />
     </div>
   );
 }

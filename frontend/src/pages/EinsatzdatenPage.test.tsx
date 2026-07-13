@@ -26,6 +26,7 @@ const basisEinsatz: EinsatzAnzeige = {
 
 const mitglieder = [
   { benutzer_id: 1, anzeigename: 'Admin', benutzername: 'admin', einsatz_rolle: 'einsatzleitung', zugewiesen_at: '2026-05-23 09:00:00' },
+  { benutzer_id: 2, anzeigename: 'Frank Führung', benutzername: 'frank', einsatz_rolle: 'fuehrungspersonal', zugewiesen_at: '2026-05-23 09:05:00' },
 ];
 
 const vorschlaege = [{ id: 1, text: 'H1' }, { id: 2, text: 'MANV' }];
@@ -42,6 +43,7 @@ function setup(opts: SetupOpts = {}) {
     http.get('/api/auth/me', () => HttpResponse.json(benutzer)),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json(mitglieder)),
+    http.get('/api/benutzer', () => HttpResponse.json([])),
     http.get('/api/stichwort-vorschlaege', () => HttpResponse.json(vorschlaege)),
     http.get('/api/einsaetze/:id/ort-vorschau', () => HttpResponse.json({ peilung: null, ortsname: null })),
   );
@@ -60,7 +62,8 @@ describe('EinsatzdatenPage', () => {
     setup();
     expect(await screen.findByText('2026-001')).toBeInTheDocument();
     expect(screen.getByText('Realeinsatz')).toBeInTheDocument();
-    expect(screen.getByText('Admin')).toBeInTheDocument();
+    // 'Admin' erscheint als Einsatzleitung in den Kopfdaten und zusätzlich in der Zugriff-Tabelle.
+    expect(screen.getAllByText('Admin').length).toBeGreaterThan(0);
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
   });
 
@@ -130,5 +133,33 @@ describe('EinsatzdatenPage', () => {
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
 
     await waitFor(() => expect(patchAufgerufen).toBe(true));
+  });
+
+  it('zeigt die Zugriff-Namen read-only auch für Beobachter', async () => {
+    setup({ einsatz: { meine_rolle: 'beobachter' }, benutzer: { ...admin, system_rolle: 'keiner' } });
+    expect(await screen.findByText('Frank Führung')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Entfernen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Hinzufügen' })).not.toBeInTheDocument();
+  });
+
+  it('zeigt Verwaltungs-Aktionen für Einsatzleitung im aktiven Einsatz', async () => {
+    setup();
+    expect(await screen.findByText('Frank Führung')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Entfernen' }).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeInTheDocument();
+  });
+
+  it('blendet Verwaltungs-Aktionen für Führungspersonal aus', async () => {
+    setup({ einsatz: { meine_rolle: 'fuehrungspersonal' } });
+    expect(await screen.findByText('Frank Führung')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Entfernen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Hinzufügen' })).not.toBeInTheDocument();
+  });
+
+  it('blendet Verwaltungs-Aktionen bei abgeschlossenem Einsatz aus', async () => {
+    setup({ einsatz: { status: 'abgeschlossen', abgeschlossen_at: '2026-05-24 10:00:00' } });
+    expect(await screen.findByText('Frank Führung')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Entfernen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Hinzufügen' })).not.toBeInTheDocument();
   });
 });
