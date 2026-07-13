@@ -129,12 +129,29 @@ impl Benutzer {
 
     /// Höhere Berechtigung mit erweitertem Einsatz-Zugriff: System-Admin oder
     /// org-weite Führungskraft. Darf u.a. abgeschlossene Einsätze auch nach der
-    /// DSGVO-Schonfrist sowie fremde Einsätze lesen.
+    /// DSGVO-Schonfrist lesen. Der org-übergreifende Lesezugriff auf FREMDE Einsätze
+    /// ist bewusst NICHT mehr an dieses Prädikat gebunden, sondern an
+    /// [`Self::darf_fremdeinsatz_lesen`] (Org-Isolation, LFH-115): serverweit nur der
+    /// System-Admin, die org-weite Führungskraft dagegen nur innerhalb der eigenen Org.
     ///
     /// Bewusst eigenständig (siehe [`Self::darf_einsatz_anlegen`]); keine Delegation,
     /// damit sich die beiden Berechtigungsmengen unabhängig entwickeln können.
     pub fn ist_hoehere_berechtigung(&self) -> bool {
         self.ist_admin() || self.org_rolle == OrgRolle::Fuehrungskraft
+    }
+
+    /// Ob dieser Benutzer einen Einsatz einer (möglicherweise fremden) Organisation
+    /// ohne Mitgliedschaft lesen darf (LFH-115, Org-Isolation):
+    /// - System-Admin (serverweite Verwaltung): IMMER, auch org-übergreifend.
+    /// - Org-weite Führungskraft: NUR wenn der Einsatz zur eigenen Organisation gehört
+    ///   (`self.org_id == einsatz_org_id`).
+    /// - Alle anderen: nie (Zugriff läuft dann über die Mitgliedschaft).
+    ///
+    /// Chokepoint für den Cross-Org-Lesezugriff; wird aus [`crate::einsatz::berechtigung::darf_lesen`]
+    /// heraus aufgerufen, nachdem die DSGVO-Hard-Blocks (Tombstone/Aufbewahrungsfrist) geprüft sind.
+    pub fn darf_fremdeinsatz_lesen(&self, einsatz_org_id: i64) -> bool {
+        self.ist_admin()
+            || (self.org_rolle == OrgRolle::Fuehrungskraft && self.org_id == einsatz_org_id)
     }
 
     /// Sichere, serialisierbare Darstellung ohne Passwort-Hash.
@@ -211,5 +228,31 @@ mod tests {
     #[test]
     fn normaler_benutzer_ist_keine_hoehere_berechtigung() {
         assert!(!benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE).ist_hoehere_berechtigung());
+    }
+
+    // --- darf_fremdeinsatz_lesen: Org-Isolation beim Lesen (LFH-115) ---
+    // benutzer_mit(...) hat org_id = 1; variiert wird der einsatz_org_id-Parameter.
+
+    #[test]
+    fn admin_darf_fremdeinsatz_lesen() {
+        // System-Admin ist serverweit: liest auch Einsätze fremder Organisationen.
+        assert!(benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE).darf_fremdeinsatz_lesen(2));
+    }
+
+    #[test]
+    fn fuehrungskraft_darf_eigenen_org_einsatz_lesen() {
+        // Org-Führungskraft (org_id=1) darf Einsätze der eigenen Org auch ohne Mitgliedschaft lesen.
+        assert!(benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT).darf_fremdeinsatz_lesen(1));
+    }
+
+    #[test]
+    fn fuehrungskraft_darf_fremden_org_einsatz_nicht_lesen() {
+        // Die geschlossene Lücke: Führungskraft aus Org 1 darf Einsatz aus Org 2 NICHT lesen.
+        assert!(!benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT).darf_fremdeinsatz_lesen(2));
+    }
+
+    #[test]
+    fn normaler_benutzer_darf_keinen_fremdeinsatz_lesen() {
+        assert!(!benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE).darf_fremdeinsatz_lesen(1));
     }
 }

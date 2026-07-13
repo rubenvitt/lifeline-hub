@@ -61,9 +61,11 @@ pub fn ist_fristverkuerzung(alt: Option<&str>, neu: Option<&str>) -> bool {
 }
 
 /// Reine Lese-Policy für Einsätze (DSGVO-Lesezugriff):
-/// - Höhere Berechtigung (System-Admin oder Org-Führungskraft) darf jeden
-///   Einsatz lesen, auch ohne Mitgliedschaft.
-/// - Ohne Mitgliedschaft und ohne höhere Berechtigung: kein Zugriff.
+/// - System-Admin (serverweit): darf jeden Einsatz lesen, auch org-übergreifend und
+///   ohne Mitgliedschaft. Org-weite Führungskraft: jeden Einsatz der EIGENEN
+///   Organisation (`einsatz_org_id == benutzer.org_id`) ohne Mitgliedschaft — aber
+///   KEINE fremden Orgs (LFH-115, via [`crate::auth::Benutzer::darf_fremdeinsatz_lesen`]).
+/// - Ohne Mitgliedschaft und ohne diesen Fremdeinsatz-Lesezugriff: kein Zugriff.
 /// - Aktiver Einsatz: jedes Mitglied (jede Rolle).
 /// - Abgeschlossener Einsatz in der Schonfrist: jedes Mitglied.
 /// - Abgeschlossener Einsatz nach der Schonfrist: nur die Einsatzleitung.
@@ -79,6 +81,7 @@ pub fn ist_fristverkuerzung(alt: Option<&str>, neu: Option<&str>) -> bool {
 /// `jetzt` wird injiziert (Testbarkeit).
 pub fn darf_lesen(
     benutzer: &Benutzer,
+    einsatz_org_id: i64,
     status: &str,
     abgeschlossen_at: Option<&str>,
     retention_bis: Option<&str>,
@@ -94,7 +97,7 @@ pub fn darf_lesen(
     if status == STATUS_ABGESCHLOSSEN && retention_abgelaufen(retention_bis, jetzt) {
         return false;
     }
-    if benutzer.ist_hoehere_berechtigung() {
+    if benutzer.darf_fremdeinsatz_lesen(einsatz_org_id) {
         return true;
     }
     let Some(rolle) = rolle else {
@@ -114,6 +117,7 @@ pub fn fordere_lesezugriff(
 ) -> Result<(), AppError> {
     if darf_lesen(
         benutzer,
+        einsatz.org_id,
         einsatz.status.as_str(),
         einsatz.abgeschlossen_at.as_deref(),
         einsatz.retention_bis.as_deref(),
@@ -330,6 +334,7 @@ mod tests {
         let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         assert!(darf_lesen(
             &b,
+            1,
             STATUS_AKTIV,
             None,
             None,
@@ -344,6 +349,7 @@ mod tests {
         let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         assert!(!darf_lesen(
             &b,
+            1,
             STATUS_AKTIV,
             None,
             None,
@@ -358,6 +364,7 @@ mod tests {
         let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         assert!(darf_lesen(
             &b,
+            1,
             STATUS_ABGESCHLOSSEN,
             Some("2026-05-25 11:00:00"),
             None,
@@ -372,6 +379,7 @@ mod tests {
         let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         assert!(!darf_lesen(
             &b,
+            1,
             STATUS_ABGESCHLOSSEN,
             Some("2026-05-24 11:00:00"),
             None,
@@ -386,6 +394,7 @@ mod tests {
         let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         assert!(darf_lesen(
             &b,
+            1,
             STATUS_ABGESCHLOSSEN,
             Some("2026-05-24 11:00:00"),
             None,
@@ -400,6 +409,7 @@ mod tests {
         let b = benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE);
         assert!(darf_lesen(
             &b,
+            1,
             STATUS_ABGESCHLOSSEN,
             Some("2026-05-24 11:00:00"),
             None,
@@ -414,8 +424,61 @@ mod tests {
         let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
         assert!(darf_lesen(
             &b,
+            1,
             STATUS_ABGESCHLOSSEN,
             Some("2026-05-24 11:00:00"),
+            None,
+            None,
+            None,
+            jetzt()
+        ));
+    }
+
+    // --- Org-Isolation beim Lesen (LFH-115) ---
+    // benutzer_mit(...) hat org_id = 1; variiert wird der einsatz_org_id-Parameter (2. Argument).
+
+    #[test]
+    fn darf_lesen_fuehrungskraft_eigene_org_ist_true() {
+        // Org-Führungskraft (org_id=1) darf einen Einsatz der eigenen Org auch ohne Mitgliedschaft lesen.
+        let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
+        assert!(darf_lesen(
+            &fk,
+            1,
+            STATUS_AKTIV,
+            None,
+            None,
+            None,
+            None,
+            jetzt()
+        ));
+    }
+
+    #[test]
+    fn darf_lesen_fuehrungskraft_fremde_org_ohne_mitgliedschaft_ist_false() {
+        // Die geschlossene Org-Isolations-Lücke: Führungskraft aus Org 1 darf einen
+        // Einsatz aus Org 2 ohne Mitgliedschaft NICHT lesen.
+        let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
+        assert!(!darf_lesen(
+            &fk,
+            2,
+            STATUS_AKTIV,
+            None,
+            None,
+            None,
+            None,
+            jetzt()
+        ));
+    }
+
+    #[test]
+    fn darf_lesen_admin_fremde_org_ist_true() {
+        // System-Admin bleibt serverweit: liest auch Einsätze fremder Orgs (Carve-out).
+        let admin = benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE);
+        assert!(darf_lesen(
+            &admin,
+            2,
+            STATUS_AKTIV,
+            None,
             None,
             None,
             None,
@@ -451,6 +514,7 @@ mod tests {
         let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         assert!(!darf_lesen(
             &b,
+            1,
             STATUS_ABGESCHLOSSEN,
             Some("2026-05-25 11:00:00"),
             Some("2026-05-24 12:00:00"),
@@ -466,6 +530,7 @@ mod tests {
         let admin = benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE);
         assert!(!darf_lesen(
             &admin,
+            1,
             STATUS_ABGESCHLOSSEN,
             Some("2026-05-24 11:00:00"),
             Some("2026-05-24 12:00:00"),
@@ -481,6 +546,7 @@ mod tests {
         let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         assert!(darf_lesen(
             &b,
+            1,
             STATUS_AKTIV,
             None,
             Some("2026-05-24 12:00:00"),
@@ -523,6 +589,7 @@ mod tests {
         let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         assert!(darf_lesen(
             &b,
+            1,
             STATUS_ABGESCHLOSSEN,
             Some("2026-05-24 11:00:00"),
             Some("2026-06-24 12:00:00"),
@@ -541,6 +608,7 @@ mod tests {
         let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         assert!(!darf_lesen(
             &b,
+            1,
             STATUS_ABGESCHLOSSEN,
             Some("2026-05-25 11:00:00"),
             Some("2026-06-24 12:00:00"),
@@ -556,6 +624,7 @@ mod tests {
         let admin = benutzer_mit(ROLLE_ADMIN, ORG_ROLLE_KEINE);
         assert!(!darf_lesen(
             &admin,
+            1,
             STATUS_ABGESCHLOSSEN,
             Some("2026-05-25 11:00:00"),
             None,
@@ -570,6 +639,7 @@ mod tests {
         let fk = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_FUEHRUNGSKRAFT);
         assert!(!darf_lesen(
             &fk,
+            1,
             STATUS_ABGESCHLOSSEN,
             Some("2026-05-25 11:00:00"),
             None,
@@ -585,6 +655,7 @@ mod tests {
         let b = benutzer_mit(ROLLE_KEINER, ORG_ROLLE_KEINE);
         assert!(darf_lesen(
             &b,
+            1,
             STATUS_AKTIV,
             None,
             None,
