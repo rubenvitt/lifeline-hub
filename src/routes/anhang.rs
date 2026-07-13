@@ -21,6 +21,12 @@ pub async fn hochladen(
     ctx.fordere_aktiv()?;
     let einsatz_id = ctx.einsatz.id;
 
+    // Best-Effort pro Feld (vorbestehendes LFH-102-Muster, keine umschließende Transaktion):
+    // scheitert ein späteres Feld (MIME/Größe oder AV-Fund, LFH-114), bleiben die bereits
+    // persistierten sauberen BLOBs verwaist zurück. Bewusst toleriert — es landet KEIN
+    // gefundener Schadcode in der DB (scan-vor-persist pro Feld), und verwaiste Anhänge werden
+    // vom selben Einsatz-Lebenszyklus (DSGVO-Schwärzung) eingesammelt wie „hochgeladen-nicht-
+    // gesendet". Atomarität (Tx über alle Felder) wäre ein eigener Task, nicht Teil von LFH-114.
     let mut angelegt = Vec::new();
     while let Some(feld) = multipart
         .next_field()

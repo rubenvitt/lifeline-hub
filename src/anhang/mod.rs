@@ -404,7 +404,7 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "clamav")]
+    // No-op ohne Adresse gilt in BEIDEN Builds → un-gated (läuft im Default-`cargo test`).
     #[tokio::test]
     async fn scan_ohne_adresse_ist_noop() {
         let cfg = ScanConfig {
@@ -412,5 +412,39 @@ mod tests {
             ..ScanConfig::default()
         };
         assert!(scan(&cfg, b"x").await.is_ok(), "ohne clamd-Adresse → No-op");
+    }
+
+    // Fehlkonfig-Pfad des Default-Builds (Feature AUS, aber Adresse gesetzt): der
+    // not-feature clamd_scan liefert ScannerNichtErreichbar → „kein stiller ungescannter
+    // Upload". Läuft im Default-`cargo test` (feature-frei, ohne Netz — der not-feature
+    // clamd_scan ist konstant und kehrt sofort zurück).
+
+    #[cfg(not(feature = "clamav"))]
+    #[tokio::test]
+    async fn scan_adresse_ohne_feature_fail_closed_lehnt_ab() {
+        let cfg = ScanConfig {
+            clamd_addr: Some("127.0.0.1:3310".into()),
+            fail_open: false,
+            ..ScanConfig::default()
+        };
+        let err = scan(&cfg, b"x").await.unwrap_err();
+        assert!(
+            matches!(err, AppError::ServiceUnavailable(_)),
+            "Adresse gesetzt + Feature aus + fail-closed → 503 (kein ungescannter Upload)"
+        );
+    }
+
+    #[cfg(not(feature = "clamav"))]
+    #[tokio::test]
+    async fn scan_adresse_ohne_feature_fail_open_laesst_durch() {
+        let cfg = ScanConfig {
+            clamd_addr: Some("127.0.0.1:3310".into()),
+            fail_open: true,
+            ..ScanConfig::default()
+        };
+        assert!(
+            scan(&cfg, b"x").await.is_ok(),
+            "Adresse gesetzt + Feature aus + fail-open → durchgelassen"
+        );
     }
 }

@@ -144,4 +144,13 @@ mod tests {
             StatusCode::UNPROCESSABLE_ENTITY
         );
     }
+
+    #[test]
+    fn service_unavailable_maps_to_503() {
+        // LFH-114 fail-closed: Virenscanner nicht erreichbar → 503 (später erneut versuchen).
+        assert_eq!(
+            AppError::ServiceUnavailable("clamd weg".into()).status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+    }
 }

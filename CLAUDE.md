@@ -81,3 +81,14 @@ gepflegt. Wahrheitsquelle: die `#[derive(ToSchema)]`-Response-Structs + Domänen
 - **Noch handgepflegt** (bewusst, FE-lokal in `types.ts`): Request-/Input-DTOs (`NeuerX`/`PatchX`,
   PATCH-null-vs-absent-Semantik) und die 2 `Record<>`-Maps. Der Pfad-/Operations-Contract
   (`#[utoipa::path]`) ist additiv nachrüstbar, in v1 nicht enthalten.
+
+## Backend — ClamAV-Upload-Scan hinter Feature-Gate (LFH-114)
+
+Der echte clamd-Virenscan der Uploads (`src/anhang/mod.rs`) liegt hinter dem Cargo-Feature
+`clamav`; der Default-Build ist ein No-op-Seam (single-binary). **Folge fürs Testen:** der
+gesamte `clamav`-Code läuft NICHT im Default-`cargo test` (und es gibt kein CI). Wer
+`src/anhang/mod.rs`/`clamd_scan` anfasst, muss zusätzlich **`cargo test --features clamav`**
+fahren — sonst rottet der Scan-Pfad still. Die reine Entscheidungslogik (`entscheide`,
+`klassifiziere_antwort`) und der Fehlkonfig-Pfad (Adresse gesetzt + Feature aus → fail-closed)
+sind bewusst auch im Default-Gate getestet. Default = **fail-closed** (clamd weg → 503);
+`--clamav-fail-open` ist der bewusste Offline-/Feld-Kompromiss.
