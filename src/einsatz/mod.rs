@@ -1,6 +1,7 @@
 pub mod berechtigung;
 pub mod effektiv;
 pub mod einstellungen;
+pub mod kontext;
 pub mod modul;
 pub mod modul_override;
 pub mod purge_scheduler;
