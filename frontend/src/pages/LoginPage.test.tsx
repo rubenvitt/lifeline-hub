@@ -112,4 +112,26 @@ describe('LoginPage', () => {
     // verschwindet erst, nachdem die Provider-Liste geladen ist.
     await waitFor(() => expect(screen.queryByLabelText('Passwort')).not.toBeInTheDocument());
   });
+
+  it('blendet das Passwort-Feld aus, wenn der Passwort-Provider deaktiviert ist', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+    server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
+    server.use(
+      http.get('/api/auth/providers', () =>
+        HttpResponse.json([
+          { id: 'passwort', typ: 'passwort', anzeigename: 'Passwort', aktiviert: false },
+        ]),
+      ),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <LoginPage />
+      </AuthProvider>,
+    );
+
+    // provider.length === 1 (der Safe-Default-Zweig via leerem Array kann hier nicht greifen):
+    // nur `&& p.aktiviert` verhindert das Rendern. Fiele diese Bedingung weg, bliebe das
+    // Passwort-Feld sichtbar, weil der `typ === 'passwort'`-Filter allein noch träfe.
+    await waitFor(() => expect(screen.queryByLabelText('Passwort')).not.toBeInTheDocument());
+  });
 });
