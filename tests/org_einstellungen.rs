@@ -10,7 +10,7 @@ use serde_json::Value;
 use tower::ServiceExt;
 
 mod common;
-use common::{login_cookie, setup};
+use common::{anfrage, login_cookie, setup};
 
 // ----------------------------- Test-Harness -----------------------------
 
@@ -194,30 +194,6 @@ async fn get_ohne_login_ist_401() {
 
 // ─── Modul-Rollen-Defaults (Task 5) ────────────────────────────────────────
 
-/// GET /api/org-modul-einstellungen mit Cookie; liefert (StatusCode, Body).
-async fn get_modul_einstellungen(app: &axum::Router, cookie: &str) -> (StatusCode, Value) {
-    let resp = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .method("GET")
-                .uri("/api/org-modul-einstellungen")
-                .header(header::COOKIE, cookie)
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    let status = resp.status();
-    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    let body = if bytes.is_empty() {
-        Value::Null
-    } else {
-        serde_json::from_slice(&bytes).unwrap_or(Value::Null)
-    };
-    (status, body)
-}
-
 /// PUT /api/org-modul-einstellungen/:modul_key mit Cookie und Body; liefert (StatusCode, Body).
 async fn put_modul_einstellung(
     app: &axum::Router,
@@ -257,7 +233,14 @@ async fn modul_get_als_fuehrungskraft_liefert_200() {
     benutzer_anlegen(&app, &admin_cookie, "fk2", "fkpw5678", "fuehrungskraft").await;
     let fk_cookie = login_cookie(&app, "fk2", "fkpw5678").await;
 
-    let (status, body) = get_modul_einstellungen(&app, &fk_cookie).await;
+    let (status, body) = anfrage(
+        &app,
+        "GET",
+        "/api/org-modul-einstellungen",
+        &fk_cookie,
+        None,
+    )
+    .await;
     assert_eq!(status, StatusCode::OK, "body={body}");
     // Leere Map, noch kein Default gesetzt.
     assert!(body.is_object(), "Antwort muss ein Objekt sein");
@@ -298,7 +281,14 @@ async fn modul_put_als_admin_gueltig_persistiert() {
     assert_eq!(status, StatusCode::OK, "PUT muss 200 liefern; body={body}");
 
     // Persistenz: Re-GET enthält den Eintrag.
-    let (get_status, get_body) = get_modul_einstellungen(&app, &admin_cookie).await;
+    let (get_status, get_body) = anfrage(
+        &app,
+        "GET",
+        "/api/org-modul-einstellungen",
+        &admin_cookie,
+        None,
+    )
+    .await;
     assert_eq!(get_status, StatusCode::OK);
     assert_eq!(
         get_body["etb"],
@@ -361,7 +351,14 @@ async fn modul_get_als_keine_liefert_403() {
     benutzer_anlegen(&app, &admin_cookie, "kein2", "keinpw12", "keine").await;
     let kein_cookie = login_cookie(&app, "kein2", "keinpw12").await;
 
-    let (status, _body) = get_modul_einstellungen(&app, &kein_cookie).await;
+    let (status, _body) = anfrage(
+        &app,
+        "GET",
+        "/api/org-modul-einstellungen",
+        &kein_cookie,
+        None,
+    )
+    .await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 }
 

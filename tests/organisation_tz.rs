@@ -1,9 +1,9 @@
-use axum::body::{to_bytes, Body};
+use axum::body::Body;
 use axum::http::{header, Request, StatusCode};
 use tower::ServiceExt; // stellt `oneshot` bereit
 
 mod common;
-use common::{login_cookie, setup};
+use common::{anfrage, login_cookie, setup};
 
 /// Legt über die Admin-Benutzerverwaltung einen normalen Nutzer
 /// (`system_rolle = 'keiner'`) an.
@@ -26,30 +26,12 @@ async fn nicht_admin_anlegen(app: &axum::Router, admin_cookie: &str) {
     assert_eq!(resp.status(), StatusCode::CREATED);
 }
 
-async fn get_organisation(app: &axum::Router, cookie: &str) -> (StatusCode, serde_json::Value) {
-    let resp = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .uri("/api/organisation")
-                .header(header::COOKIE, cookie)
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    let status = resp.status();
-    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null);
-    (status, json)
-}
-
 #[tokio::test]
 async fn get_liefert_bootstrap_default_hilfsorganisation() {
     let app = setup().await;
     let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
 
-    let (status, json) = get_organisation(&app, &admin_cookie).await;
+    let (status, json) = anfrage(&app, "GET", "/api/organisation", &admin_cookie, None).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["tz_organisation"], "hilfsorganisation");
     assert_eq!(json["name"], "Test-Orga");
@@ -76,7 +58,7 @@ async fn patch_als_admin_setzt_org_default() {
     assert_eq!(resp.status(), StatusCode::OK);
 
     // Danach liefert GET den neuen Wert.
-    let (status, json) = get_organisation(&app, &admin_cookie).await;
+    let (status, json) = anfrage(&app, "GET", "/api/organisation", &admin_cookie, None).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["tz_organisation"], "feuerwehr");
 }
