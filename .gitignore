@@ -26,6 +26,10 @@ build/
 *.db-wal
 *.db-shm
 
+# TLS-Cert-Cache (LFH-274): rcgen/mkcert erzeugen Cert+Private-Key neben der DB —
+# der Private Key darf niemals ins Repo.
+lifeline-tls-*.pem
+
 # Heruntergeladene Offline-Karten (PMTiles, LFH-181) — Laufzeitdaten, gehören nicht ins Repo
 /karten/
 

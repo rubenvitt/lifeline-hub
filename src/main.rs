@@ -134,10 +134,20 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
             .to_string();
         let mut sans = vec!["localhost".to_string(), "127.0.0.1".to_string()];
         if bind_ip != "127.0.0.1" && bind_ip != "localhost" && !bind_ip.is_empty() {
-            sans.push(bind_ip);
+            sans.push(bind_ip.clone());
         }
         if let Some(h) = &config.tls_hostname {
             sans.push(h.clone());
+        }
+
+        if (bind_ip == "0.0.0.0" || bind_ip == "::" || bind_ip.is_empty())
+            && config.tls_hostname.is_none()
+        {
+            tracing::warn!(
+                "TLS bind ist {} ohne --tls-hostname: das Zertifikat deckt keine erreichbare LAN-Adresse ab. \
+                 Für Zugriff von anderen Geräten --tls-hostname <server-hostname/IP> setzen.",
+                bind_ip
+            );
         }
 
         let (cert_pfad, key_pfad) = lifeline_hub::tls::beschaffe_cert(&config, sans).await?;

@@ -56,7 +56,10 @@ Der HTTP-Pfad löst `--bind` als Hostname auf (`TcpListener::bind`); unter
 daher IP:Port sein, kein Hostname** (z.B. `127.0.0.1:8443` oder
 `0.0.0.0:8443`), sonst bricht der Start mit einem Fehler ab. Der Default
 (`127.0.0.1:8080`) bleibt unverändert; für HTTPS auf dem gebräuchlichen Port
-explizit `--bind 127.0.0.1:8443 --tls` angeben.
+explizit `--bind 127.0.0.1:8443 --tls` angeben. Für Zugriff aus dem LAN
+zusätzlich `--tls-hostname` setzen (oder direkt an eine konkrete LAN-IP
+binden, z.B. `--bind 192.168.1.10:8443`) — sonst deckt das Zertifikat nur
+`localhost`/`127.0.0.1` ab und andere Geräte bekommen eine Zertifikatswarnung.
 
 ## Manueller Smoke-Test
 

@@ -124,6 +124,25 @@ fn mkcert_erzeugen(
     Ok(())
 }
 
+/// Erzeugt ein rcgen-self-signed-Cert, schreibt cert+key in den Cache und
+/// setzt den Key auf 0600 (Unix) — der Private Key darf nicht world-readable sein.
+fn erzeuge_und_cache_rcgen(
+    cache_cert: &Path,
+    cache_key: &Path,
+    sans: &[String],
+) -> Result<(), AppError> {
+    let (c, k) = rcgen_pem(sans)?;
+    std::fs::write(cache_cert, c).map_err(|e| AppError::Internal(e.to_string()))?;
+    std::fs::write(cache_key, &k).map_err(|e| AppError::Internal(e.to_string()))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(cache_key, std::fs::Permissions::from_mode(0o600))
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+    }
+    Ok(())
+}
+
 /// Beschafft ein Cert nach Präzedenz und liefert die zu ladenden PEM-Pfade.
 /// BYO mit fehlender Datei → fail-fast. mkcert-Fehler → Fallback rcgen (Cache).
 pub async fn beschaffe_cert(
@@ -163,18 +182,13 @@ pub async fn beschaffe_cert(
                 Ok(()) => Ok((cache_cert, cache_key)),
                 Err(e) => {
                     tracing::warn!("mkcert fehlgeschlagen ({e}) — Fallback rcgen");
-                    let (c, k) = rcgen_pem(&plan.sans)?;
-                    std::fs::write(&cache_cert, c)
-                        .map_err(|e| AppError::Internal(e.to_string()))?;
-                    std::fs::write(&cache_key, k).map_err(|e| AppError::Internal(e.to_string()))?;
+                    erzeuge_und_cache_rcgen(&cache_cert, &cache_key, &plan.sans)?;
                     Ok((cache_cert, cache_key))
                 }
             }
         }
         CertQuelle::Rcgen => {
-            let (c, k) = rcgen_pem(&plan.sans)?;
-            std::fs::write(&cache_cert, c).map_err(|e| AppError::Internal(e.to_string()))?;
-            std::fs::write(&cache_key, k).map_err(|e| AppError::Internal(e.to_string()))?;
+            erzeuge_und_cache_rcgen(&cache_cert, &cache_key, &plan.sans)?;
             Ok((cache_cert, cache_key))
         }
     }
@@ -283,5 +297,31 @@ mod tests {
         assert!(args.iter().any(|a| a == "/tmp/c.pem"));
         assert!(args.iter().any(|a| a == "elw.local"));
         assert_eq!(args.last().unwrap(), "elw.local");
+    }
+
+    /// Socket-freier Serve-Pfad-Test: rcgen-PEM → Datei-Roundtrip → rustls-Ladbarkeit.
+    /// Deckt zugleich den Rust-0.23-CryptoProvider-Auto-Default ab (GENAU EIN kompiliertes
+    /// Provider-Feature) — ein künftiger Dep-Drift mit zwei Providern würde hier statt erst
+    /// beim echten `--tls`-Serve auffallen. Öffnet keinen Port/Socket.
+    #[tokio::test]
+    async fn rcgen_pem_ist_per_rustls_ladbar() {
+        let (cert_pem, key_pem) = super::rcgen_pem(&["localhost".to_string()]).unwrap();
+        let dir = std::env::temp_dir().join(format!("lfh-tls-serve-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let cert_path = dir.join("cert.pem");
+        let key_path = dir.join("key.pem");
+        std::fs::write(&cert_path, cert_pem).unwrap();
+        std::fs::write(&key_path, key_pem).unwrap();
+
+        let result =
+            axum_server::tls_rustls::RustlsConfig::from_pem_file(&cert_path, &key_path).await;
+
+        std::fs::remove_dir_all(&dir).ok();
+
+        assert!(
+            result.is_ok(),
+            "rustls sollte das rcgen-PEM-Paar laden können: {:?}",
+            result.err()
+        );
     }
 }
