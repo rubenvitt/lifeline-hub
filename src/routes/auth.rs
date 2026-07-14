@@ -96,13 +96,21 @@ pub struct OidcStartQuery {
 /// OIDC-Flow verlässt die SPA per echtem Browser-Redirect, React-Router-State
 /// überlebt das nicht. Nur App-lokale Pfade werden übernommen, sonst der
 /// Default — schützt vor Open-Redirect über `?von=`. Neben `//…` (protokoll-
-/// relativ) wird auch jeder Backslash abgelehnt: Browser normalisieren
-/// `/\evil.com` (WHATWG-URL-Spec) zu einer protokoll-relativen URL, das wäre
-/// sonst ein Open-Redirect-Bypass des `//`-Checks. Pfade dieser App enthalten
-/// nie `\`, daher ist das Verbot diskriminierend, nicht überstreng.
+/// relativ) werden auch Backslashes und Control-Zeichen (u. a. Tab, CR, LF)
+/// abgelehnt: Browser entfernen laut WHATWG-URL-Spec ASCII-Tab/Newline aus der
+/// URL und normalisieren Backslash direkt nach dem führenden Slash zu einem
+/// protokoll-relativen `//…` — beides sonst ein Bypass des reinen `//`-Checks
+/// (z. B. `/\evil.com` oder `/%09/evil.com`). Pfade dieser App enthalten nie
+/// `\` oder Control-Zeichen, daher ist das Verbot diskriminierend, nicht
+/// überstreng.
 fn ziel_pfad_aus_query(von: Option<String>) -> String {
     match von {
-        Some(pfad) if pfad.starts_with('/') && !pfad.starts_with("//") && !pfad.contains('\\') => {
+        Some(pfad)
+            if pfad.starts_with('/')
+                && !pfad.starts_with("//")
+                && !pfad.contains('\\')
+                && !pfad.chars().any(|c| c.is_control()) =>
+        {
             pfad
         }
         _ => "/einsaetze".to_string(),
@@ -195,6 +203,20 @@ mod tests {
             "/einsaetze"
         );
         assert_eq!(ziel_pfad_aus_query(Some("/x\\y".to_string())), "/einsaetze");
+        // Control-Zeichen (Tab/CR/LF): Browser entfernen diese beim URL-Parsen
+        // (WHATWG-URL-Spec) — "/\t/evil.com" würde so zu "//evil.com".
+        assert_eq!(
+            ziel_pfad_aus_query(Some("/\t/evil.com".to_string())),
+            "/einsaetze"
+        );
+        assert_eq!(
+            ziel_pfad_aus_query(Some("/\r/evil.com".to_string())),
+            "/einsaetze"
+        );
+        assert_eq!(
+            ziel_pfad_aus_query(Some("/\n/evil.com".to_string())),
+            "/einsaetze"
+        );
         // Kein führender Slash — absolute fremde URL.
         assert_eq!(
             ziel_pfad_aus_query(Some("https://evil.com".to_string())),
