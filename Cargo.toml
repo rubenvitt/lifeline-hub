@@ -38,6 +38,10 @@ karten-katalog = { path = "crates/karten-katalog" }
 # LFH-114: optionaler ClamAV/clamd-Client für den Upload-Virenscan. Hinter dem `clamav`-Feature,
 # damit der Default-Build single-binary bleibt (kein FFI, keine Signatur-DB im Prozess).
 clamav-client = { version = "2.2", optional = true, default-features = false, features = ["tokio"] }
+# LFH-274: HTTPS/TLS-Transport — axum-server für den rustls-basierten TLS-Bind,
+# rcgen für die selbstsignierte Cert-Generierung (mkcert-/BYO-Fallback).
+axum-server = { version = "0.7", features = ["tls-rustls"] }
+rcgen = "0.14"
 
 [features]
 # Dev-only: aktiviert Seed-Testdaten und den /api/dev/users-Endpoint.
