@@ -279,6 +279,31 @@ pub struct Config {
     /// nicht unbegrenzt blockiert.
     #[arg(long, env = "LIFELINE_CLAMAV_TIMEOUT_SECS", default_value_t = 30)]
     pub clamav_timeout_secs: u64,
+
+    /// HTTPS statt HTTP bedienen. Ohne Flag bleibt der bestehende HTTP-Bind aktiv
+    /// (Dev/localhost). Mit `--tls` wird ein Server-Cert in Präzedenz beschafft
+    /// (BYO → Cache → mkcert → rcgen) und `Secure`-Cookies aktiviert.
+    #[arg(long, env = "LIFELINE_TLS", default_value_t = false)]
+    pub tls: bool,
+
+    /// BYO-Zertifikat (PEM). Nur zusammen mit `--tls-key`. Gesetzt → höchste Präzedenz;
+    /// fehlend/ungültig → fail-fast (kein stiller Fallback bei explizitem BYO).
+    #[arg(long, env = "LIFELINE_TLS_CERT")]
+    pub tls_cert: Option<String>,
+
+    /// BYO-Private-Key (PEM), Partner von `--tls-cert`.
+    #[arg(long, env = "LIFELINE_TLS_KEY")]
+    pub tls_key: Option<String>,
+
+    /// Bei mkcert-Nutzung die lokale CA per `mkcert -install` sicherstellen
+    /// (mutiert den System-/Browser-Trust-Store, ggf. sudo). Default an, abschaltbar.
+    #[arg(long, env = "LIFELINE_TLS_MKCERT_INSTALL", default_value_t = true)]
+    pub tls_mkcert_install: bool,
+
+    /// Optionaler zusätzlicher Hostname als SAN im generierten Cert (mkcert/rcgen),
+    /// z.B. der DNS-/mDNS-Name des ELW-Servers. localhost + Bind-IP sind immer dabei.
+    #[arg(long, env = "LIFELINE_TLS_HOSTNAME")]
+    pub tls_hostname: Option<String>,
 }
 
 /// Subkommandos der lifeline-hub-Binary (neben dem Server-Standardlauf).
@@ -322,6 +347,29 @@ mod tests {
     fn db_path_flag_overrides_default() {
         let config = Config::parse_from(["lifeline-hub", "--db-path", "/tmp/test.db"]);
         assert_eq!(config.db_path, "/tmp/test.db");
+    }
+
+    #[test]
+    fn tls_defaults_und_flags() {
+        let c = Config::parse_from(["lifeline-hub"]);
+        assert!(!c.tls, "TLS ist per Default aus (HTTP-Bestand)");
+        assert!(c.tls_mkcert_install, "mkcert-install Default an");
+        assert!(c.tls_cert.is_none() && c.tls_key.is_none());
+
+        let c = Config::parse_from([
+            "lifeline-hub",
+            "--tls",
+            "--tls-cert",
+            "/c.pem",
+            "--tls-key",
+            "/k.pem",
+            "--tls-hostname",
+            "elw.local",
+        ]);
+        assert!(c.tls);
+        assert_eq!(c.tls_cert.as_deref(), Some("/c.pem"));
+        assert_eq!(c.tls_key.as_deref(), Some("/k.pem"));
+        assert_eq!(c.tls_hostname.as_deref(), Some("elw.local"));
     }
 
     #[test]
