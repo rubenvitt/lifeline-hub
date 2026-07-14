@@ -13,6 +13,8 @@ use utoipa::OpenApi;
     crate::auth::BenutzerAnzeige,
     crate::auth::OrgRolle,
     crate::auth::SystemRolle,
+    crate::auth::provider::AuthProviderAnzeige,
+    crate::auth::provider::AuthProviderTyp,
     crate::befehl::Abschnitt,
     crate::befehl::BefehlStatus,
     crate::befehl::BefehlVorlage,

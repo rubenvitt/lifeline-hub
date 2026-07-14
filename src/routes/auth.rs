@@ -54,3 +54,11 @@ pub async fn logout(
 pub async fn me(CurrentUser(benutzer): CurrentUser) -> Json<crate::auth::BenutzerAnzeige> {
     Json(benutzer.anzeige())
 }
+
+/// GET /api/auth/providers — verfügbare Login-Provider (öffentlich, für die Login-UI).
+pub async fn providers(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<crate::auth::provider::AuthProviderAnzeige>>, AppError> {
+    let liste = crate::auth::provider::registry::liste(&state.pool).await?;
+    Ok(Json(liste))
+}

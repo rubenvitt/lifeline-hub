@@ -151,6 +151,21 @@ export interface components {
         };
         /** @enum {string} */
         Ausmass: "gering" | "mittel" | "gross" | "katastrophal";
+        /** @description Öffentliche Darstellung eines Providers für die Login-UI (`GET /api/auth/providers`). */
+        AuthProviderAnzeige: {
+            aktiviert: boolean;
+            /** @description Menschenlesbarer Anzeigename für Buttons/Labels. */
+            anzeigename: string;
+            /** @description Stabile ID (z.B. "passwort", "dev"). */
+            id: string;
+            typ: components["schemas"]["AuthProviderTyp"];
+        };
+        /**
+         * @description Art eines Auth-Providers — bestimmt, wie das Frontend den Login rendert.
+         *     Wire == snake_case (Enum-Wire-Kontrakt).
+         * @enum {string}
+         */
+        AuthProviderTyp: "passwort" | "dev";
         /**
          * @description Basemap-Modus (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `basemap_modus`.
          * @enum {string}

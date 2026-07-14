@@ -1,6 +1,7 @@
 //! LFH-120: Guard — Serde-Wire == as_str() für jede Variante jedes union-relevanten
 //! Domänen-Enums. Schützt die generierten utoipa-Unions vor stiller Fehlgenerierung.
 use lifeline_hub::auftrag::{AuftragBearbeitungsstatus, EmpfaengerTyp};
+use lifeline_hub::auth::provider::AuthProviderTyp;
 use lifeline_hub::auth::{OrgRolle, SystemRolle};
 use lifeline_hub::bereitstellungsraum::{BrBelegungsArt, BrStatus, ObjektTyp};
 use lifeline_hub::chat::BezugTyp;
@@ -323,6 +324,9 @@ fn serde_wire_gleich_as_str() {
     // auth
     wire_eq!(SystemRolle::Admin, SystemRolle::Keiner);
     wire_eq!(OrgRolle::Fuehrungskraft, OrgRolle::Keine);
+
+    // auth-provider
+    wire_eq!(AuthProviderTyp::Passwort, AuthProviderTyp::Dev);
 }
 
 /// LFH-120 (Task 1b): Orphan-Union-Schema-Anker. Diese Enums haben KEIN `as_str()` —

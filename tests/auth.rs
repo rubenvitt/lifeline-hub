@@ -3,7 +3,7 @@ use axum::http::{header, Request, StatusCode};
 use tower::ServiceExt; // stellt `oneshot` bereit
 
 mod common;
-use common::setup;
+use common::{anfrage, setup};
 
 /// Sendet ein Login und gibt den `Set-Cookie`-Header-Wert zurück.
 async fn login(
@@ -134,4 +134,18 @@ async fn logout_invalidiert_session() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn providers_listet_passwort() {
+    let app = setup().await;
+    let (status, json) = anfrage(&app, "GET", "/api/auth/providers", "", None).await;
+    assert_eq!(status, StatusCode::OK);
+    let ids: Vec<&str> = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p["id"].as_str().unwrap())
+        .collect();
+    assert!(ids.contains(&"passwort"));
 }

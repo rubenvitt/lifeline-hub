@@ -41,6 +41,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/auth/login", post(routes::auth::login))
         .route("/api/auth/logout", post(routes::auth::logout))
         .route("/api/auth/me", get(routes::auth::me))
+        .route("/api/auth/providers", get(routes::auth::providers))
         .route("/api/benutzer", get(routes::benutzer::liste))
         .route("/api/benutzer", post(routes::benutzer::anlegen))
         .route(
