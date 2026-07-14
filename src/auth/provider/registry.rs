@@ -3,14 +3,35 @@
 //!
 //! Die *konfigurierte* Menge lebt im Code (`konfiguriert`); `auth_provider` hält
 //! nur Override-Zustände (fehlt eine Zeile → Default „aktiviert"). Kein Reconcile nötig.
-use super::{AuthProviderAnzeige, AuthProviderTyp, ID_DEV, ID_PASSWORT};
+use super::{AuthProviderAnzeige, AuthProviderTyp, ID_DEV, ID_OIDC, ID_PASSWORT};
 use crate::error::AppError;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
+use std::sync::OnceLock;
 
 /// Ob der Dev-Provider im aktuellen Build überhaupt existiert (Compile-Feature).
 fn dev_verfuegbar() -> bool {
     cfg!(feature = "dev-seeds")
+}
+
+/// Prozessweiter Schalter: ob OIDC konfiguriert ist (Issuer + Client-ID + Client-Secret
+/// gesetzt). OnceLock statt AppState-Feld — bricht keine der vielen Inline-Test-
+/// Konstruktionen (Präzedenz: `COOKIE_SECURE` in `session.rs`, ScanConfig LFH-114).
+/// Default (ungesetzt) = false. Reiner Zustand aus der Config — `konfiguriert()`/`liste()`
+/// lesen nur diesen OnceLock + die DB, nie das Netz (MUST Offline-First: Registry-Listing
+/// berührt kein Netz; Discovery ist Lazy und passiert erst bei erster OIDC-Nutzung).
+static OIDC_KONFIGURIERT: OnceLock<bool> = OnceLock::new();
+
+/// Einmalig beim Serverstart setzen (true, wenn Issuer+Client-ID+Secret gesetzt sind).
+/// Doppelsetzen wird ignoriert (wie `session::set_cookie_secure`).
+pub fn set_oidc_konfiguriert(v: bool) {
+    let _ = OIDC_KONFIGURIERT.set(v);
+}
+
+/// Ob OIDC im aktuellen Prozess konfiguriert ist (Default false → Tests/Non-OIDC-Deploys
+/// unberührt).
+fn oidc_konfiguriert() -> bool {
+    *OIDC_KONFIGURIERT.get().unwrap_or(&false)
 }
 
 /// Im aktuellen Build konfigurierte Provider-IDs (Quelle der Wahrheit).
@@ -19,12 +40,21 @@ fn konfiguriert() -> Vec<&'static str> {
     if dev_verfuegbar() {
         v.push(ID_DEV);
     }
+    if oidc_konfiguriert() {
+        v.push(ID_OIDC);
+    }
     v
 }
 
 /// Menge der Provider, über die sich ein Admin verlässlich anmelden kann.
-/// Wächst mit OIDC/WebAuthn in späteren Increments. Der Dev-Provider zählt
-/// bewusst NICHT dazu (feature-gated, kein Prod-Login-Pfad).
+/// Wächst mit WebAuthn in späteren Increments. Der Dev-Provider zählt bewusst NICHT
+/// dazu (feature-gated, kein Prod-Login-Pfad).
+///
+/// MUST (Lockout-Schutz, LFH-41 Increment 3): „oidc" wird HIER NICHT aufgenommen.
+/// OIDC-Nutzer sind in Increment 3 JIT least-privilege — kein Admin kann sich per OIDC
+/// anmelden. Würde „oidc" admin-tauglich, ließe der Aussperr-Guard `passwort` deaktivieren
+/// → alle Admins ausgesperrt. Admin-Linking + „oidc" in dieser Menge + ein transaktionaler
+/// Guard kommen GEMEINSAM in einem späteren Increment, nicht hier.
 fn ist_admin_tauglich(id: &str) -> bool {
     id == ID_PASSWORT
 }
@@ -33,6 +63,7 @@ fn anzeigename(id: &str) -> &'static str {
     match id {
         ID_PASSWORT => "Passwort",
         ID_DEV => "Dev-Schnellanmeldung",
+        ID_OIDC => "PocketID",
         _ => "Unbekannt",
     }
 }
@@ -40,6 +71,7 @@ fn anzeigename(id: &str) -> &'static str {
 fn typ(id: &str) -> AuthProviderTyp {
     match id {
         ID_DEV => AuthProviderTyp::Dev,
+        ID_OIDC => AuthProviderTyp::Oidc,
         _ => AuthProviderTyp::Passwort,
     }
 }
@@ -175,5 +207,26 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let err = schalten(&pool, "gibtsnicht", false).await.unwrap_err();
         assert!(matches!(err, AppError::NotFound));
+    }
+
+    #[test]
+    fn admin_tauglich_bleibt_nur_passwort() {
+        // MUST (Lockout-Schutz, LFH-41): "oidc" darf NIEMALS admin-tauglich werden,
+        // sonst ließe sich `passwort` deaktivieren und alle Admins wären ausgesperrt.
+        assert!(ist_admin_tauglich(ID_PASSWORT));
+        assert!(!ist_admin_tauglich(ID_OIDC));
+    }
+
+    #[tokio::test]
+    async fn oidc_gelistet_wenn_konfiguriert() {
+        // OnceLock ist prozessweit: einmal true gesetzt, bleibt es für den Rest des
+        // --lib-Testprozesses gesetzt. Kein bestehender Registry-Test behauptet
+        // oidc-ABSENZ — dieser Test ist daher sicher unabhängig von der Laufreihenfolge.
+        set_oidc_konfiguriert(true);
+        let pool = crate::db::test_pool().await;
+        let liste = liste(&pool).await.unwrap();
+        assert!(liste
+            .iter()
+            .any(|p| p.id == "oidc" && p.typ == AuthProviderTyp::Oidc));
     }
 }

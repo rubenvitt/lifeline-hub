@@ -304,6 +304,26 @@ pub struct Config {
     /// z.B. der DNS-/mDNS-Name des ELW-Servers. localhost + Bind-IP sind immer dabei.
     #[arg(long, env = "LIFELINE_TLS_HOSTNAME")]
     pub tls_hostname: Option<String>,
+
+    /// OIDC-Issuer-URL des Identity-Providers (LFH-41, Inc. 3 SSO-Fundament). Discovery
+    /// läuft NICHT beim Serverstart (Lazy, erst bei erster OIDC-Nutzung, dann gecacht) —
+    /// dieses Feld ist reine Config, sein Setzen berührt kein Netz.
+    #[arg(long, env = "LIFELINE_OIDC_ISSUER")]
+    pub oidc_issuer: Option<String>,
+
+    /// OIDC-Client-ID, mit der sich lifeline-hub beim IdP registriert hat (LFH-41).
+    #[arg(long, env = "LIFELINE_OIDC_CLIENT_ID")]
+    pub oidc_client_id: Option<String>,
+
+    /// OIDC-Client-Secret (LFH-41). `GeheimesPasswort` maskiert es im `Debug` (wie
+    /// `admin_password`/`karten_service_token`), damit es nicht versehentlich via
+    /// `{config:?}` ins Log gelangt. Bleibt ausschließlich in der Config (nie in DB/API).
+    #[arg(long, env = "LIFELINE_OIDC_CLIENT_SECRET")]
+    pub oidc_client_secret: Option<GeheimesPasswort>,
+
+    /// OIDC-Redirect-/Callback-URL, die beim IdP als Redirect-URI registriert ist (LFH-41).
+    #[arg(long, env = "LIFELINE_OIDC_REDIRECT_URL")]
+    pub oidc_redirect_url: Option<String>,
 }
 
 /// Subkommandos der lifeline-hub-Binary (neben dem Server-Standardlauf).
@@ -562,6 +582,42 @@ mod tests {
         assert!(
             !ausgabe.contains("svc-token-geheim"),
             "Service-Token darf nicht im Debug stehen"
+        );
+        assert!(ausgabe.contains("***"));
+    }
+
+    #[test]
+    fn oidc_config_defaults_sind_none() {
+        let config = Config::parse_from(["lifeline-hub"]);
+        assert!(config.oidc_issuer.is_none());
+        assert!(config.oidc_client_id.is_none());
+        assert!(config.oidc_client_secret.is_none());
+        assert!(config.oidc_redirect_url.is_none());
+    }
+
+    #[test]
+    fn oidc_client_secret_wird_im_debug_maskiert() {
+        let config = Config::parse_from([
+            "lifeline-hub",
+            "--oidc-issuer",
+            "https://idp.example",
+            "--oidc-client-id",
+            "cid",
+            "--oidc-client-secret",
+            "geheimes-oidc-secret",
+            "--oidc-redirect-url",
+            "https://hub.example/api/auth/oidc/callback",
+        ]);
+        assert_eq!(config.oidc_issuer.as_deref(), Some("https://idp.example"));
+        assert_eq!(config.oidc_client_id.as_deref(), Some("cid"));
+        assert_eq!(
+            config.oidc_redirect_url.as_deref(),
+            Some("https://hub.example/api/auth/oidc/callback")
+        );
+        let ausgabe = format!("{config:?}");
+        assert!(
+            !ausgabe.contains("geheimes-oidc-secret"),
+            "Client-Secret darf nicht im Debug stehen"
         );
         assert!(ausgabe.contains("***"));
     }

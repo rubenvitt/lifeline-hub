@@ -53,6 +53,13 @@ mod tests {
     }
 
     #[test]
+    fn verifizieren_lehnt_sso_only_sentinel_ab() {
+        // LFH-41: der Sentinel ist bewusst kein PHC-String — `verifizieren` muss dagegen
+        // sicher `false` liefern (kein lokaler Passwort-Login für SSO-only-Konten).
+        assert!(!verifizieren("egal", crate::auth::PASSWORT_HASH_SSO_ONLY));
+    }
+
+    #[test]
     fn zwei_hashes_desselben_passworts_unterscheiden_sich() {
         // Unterschiedliche Salts → unterschiedliche Hashes.
         assert_ne!(hash("gleich").unwrap(), hash("gleich").unwrap());

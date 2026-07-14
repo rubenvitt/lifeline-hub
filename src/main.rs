@@ -106,6 +106,16 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         timeout: std::time::Duration::from_secs(config.clamav_timeout_secs),
     });
 
+    // OIDC-Konfiguriertheit (LFH-41, Increment 3 SSO-Fundament) prozessweit setzen —
+    // reine Config-Ableitung, KEIN Netzzugriff (Discovery ist Lazy: erst bei erster
+    // OIDC-Nutzung, dann gecacht). `oidc_redirect_url` ist bewusst NICHT Teil der
+    // Bedingung — der Redirect wird erst im eigentlichen Flow gebraucht.
+    lifeline_hub::auth::provider::registry::set_oidc_konfiguriert(
+        config.oidc_issuer.is_some()
+            && config.oidc_client_id.is_some()
+            && config.oidc_client_secret.is_some(),
+    );
+
     let app = build_router(AppState {
         pool,
         live,

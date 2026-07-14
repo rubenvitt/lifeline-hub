@@ -16,6 +16,13 @@ pub const ORG_ROLLE_FUEHRUNGSKRAFT: &str = "fuehrungskraft";
 /// Org-weite Rolle ohne besondere Befugnisse (Default).
 pub const ORG_ROLLE_KEINE: &str = "keine";
 
+/// Sentinel-`passwort_hash` für SSO-only-Benutzer (JIT-provisioniert via OIDC, LFH-41
+/// Increment 3): bewusst KEIN `$argon2`-PHC-String, damit `password::verifizieren`
+/// dagegen sicher `false` liefert (kein lokaler Passwort-Login für SSO-Konten möglich).
+/// „Sentinel statt Migration": KEINE `passwort_hash`-nullable-Spalte, KEIN `benutzer`-
+/// Tabellen-Rebuild (40 FK-Abhängige) — der bestehende NOT-NULL-Text-Spaltentyp bleibt.
+pub const PASSWORT_HASH_SSO_ONLY: &str = "!sso-kein-lokales-passwort";
+
 /// System-Rolle (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `system_rolle`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]

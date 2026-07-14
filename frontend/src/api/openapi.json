@@ -473,7 +473,8 @@
         "description": "Art eines Auth-Providers — bestimmt, wie das Frontend den Login rendert.\nWire == snake_case (Enum-Wire-Kontrakt).",
         "enum": [
           "passwort",
-          "dev"
+          "dev",
+          "oidc"
         ]
       },
       "BasemapModus": {
