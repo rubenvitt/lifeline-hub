@@ -34,12 +34,12 @@ der Prozess-Config** (Env/CLI-Flag), wird im `Debug`-Output maskiert (wie
 `--admin-password`/`--karten-service-token`) und landet **nie** in der
 Datenbank.
 
-Alle vier Variablen sind für einen funktionierenden Login-Flow nötig. Der
-"Mit PocketID anmelden"-Button erscheint auf der Login-Seite bereits, sobald
-Issuer, Client-ID und Client-Secret gesetzt sind (die Provider-Registry prüft
-diese drei beim Serverstart); fehlt zusätzlich die Redirect-URL, scheitert der
-tatsächliche Login-Versuch beim Klick. In der Praxis daher immer alle vier
-gemeinsam setzen.
+Alle vier Variablen müssen gesetzt sein, damit der OIDC-Provider erscheint/
+aktiv ist: die Provider-Registry prüft beim Serverstart Issuer, Client-ID,
+Client-Secret **und** Redirect-URL gemeinsam. Der "Mit PocketID anmelden"-
+Button auf der Login-Seite erscheint also nur, wenn der Login-Flow auch
+tatsächlich abgeschlossen werden kann — eine unvollständige Konfiguration
+fällt so beim Setup auf (Button fehlt), nicht erst beim Klick.
 
 ## Verhalten: JIT-Provisionierung, least privilege
 
