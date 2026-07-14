@@ -6,9 +6,25 @@ use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 use axum_extra::extract::cookie::CookieJar;
 use sqlx::SqlitePool;
+use std::sync::OnceLock;
 
 /// Name des Session-Cookies.
 pub const SESSION_COOKIE: &str = "lifeline_sid";
+
+/// Prozessweiter `Secure`-Cookie-Schalter (nur bei aktivem HTTPS `true`).
+/// OnceLock statt AppState-Feld: bricht keine der vielen Inline-Test-Konstruktionen
+/// (Präzedenz: clamav-ScanConfig-OnceLock, LFH-114). Default (ungesetzt) = false.
+static COOKIE_SECURE: OnceLock<bool> = OnceLock::new();
+
+/// Einmalig beim Serverstart setzen (true bei HTTPS). Doppelsetzen wird ignoriert.
+pub fn set_cookie_secure(v: bool) {
+    let _ = COOKIE_SECURE.set(v);
+}
+
+/// Ob Session-Cookies `Secure` tragen sollen (Default false → HTTP-Betrieb).
+pub fn cookie_secure() -> bool {
+    *COOKIE_SECURE.get().unwrap_or(&false)
+}
 
 /// Erzeugt einen neuen, kryptografisch zufälligen Session-Token (64 Hex-Zeichen).
 pub fn neuer_token() -> String {
@@ -122,6 +138,11 @@ mod tests {
             .fetch_one(pool)
             .await
             .unwrap()
+    }
+
+    #[test]
+    fn cookie_secure_default_false() {
+        assert!(!cookie_secure());
     }
 
     #[test]

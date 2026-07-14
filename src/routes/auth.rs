@@ -13,12 +13,15 @@ pub struct LoginRequest {
     pub passwort: String,
 }
 
-/// Baut das Session-Cookie. Bewusst OHNE `Secure`, damit der Betrieb über
-/// HTTP im vertrauenswürdigen LAN (ELW) funktioniert (siehe Spec Abschnitt 14).
-fn session_cookie(token: String) -> Cookie<'static> {
+/// Baut das Session-Cookie. `Secure` folgt jetzt dem Transport (HTTPS → an,
+/// HTTP → aus), gesteuert vom Aufrufer (siehe Spec Abschnitt 14). Pur, damit
+/// beide Zweige ohne den prozessweiten OnceLock testbar sind — der Aufrufer
+/// (`login`) liest `cookie_secure()`.
+fn session_cookie(token: String, secure: bool) -> Cookie<'static> {
     Cookie::build((SESSION_COOKIE, token))
         .http_only(true)
         .same_site(SameSite::Lax)
+        .secure(secure)
         .path("/")
         .build()
 }
@@ -34,7 +37,7 @@ pub async fn login(
             .await?;
 
     let token = session::anlegen(&state.pool, benutzer.id).await?;
-    let jar = jar.add(session_cookie(token));
+    let jar = jar.add(session_cookie(token, crate::auth::session::cookie_secure()));
     Ok((jar, Json(benutzer.anzeige())))
 }
 
@@ -78,4 +81,16 @@ pub async fn provider_schalten(
     crate::auth::provider::registry::schalten(&state.pool, &id, req.aktiviert).await?;
     let liste = crate::auth::provider::registry::liste(&state.pool).await?;
     Ok(Json(liste))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn session_cookie_secure_folgt_parameter() {
+        // Diskriminierend: beide Zweige geprüft (kein OnceLock im Test).
+        assert_eq!(session_cookie("t".into(), true).secure(), Some(true));
+        assert_ne!(session_cookie("t".into(), false).secure(), Some(true));
+    }
 }
