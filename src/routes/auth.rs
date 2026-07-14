@@ -62,3 +62,20 @@ pub async fn providers(
     let liste = crate::auth::provider::registry::liste(&state.pool).await?;
     Ok(Json(liste))
 }
+
+#[derive(Debug, Deserialize)]
+pub struct ProviderSchaltenRequest {
+    pub aktiviert: bool,
+}
+
+/// PUT /api/auth/providers/{id} — Provider an/aus. Admin-only. Guard gegen Aussperren.
+pub async fn provider_schalten(
+    State(state): State<AppState>,
+    _admin: crate::auth::session::AdminUser,
+    axum::extract::Path(id): axum::extract::Path<String>,
+    Json(req): Json<ProviderSchaltenRequest>,
+) -> Result<Json<Vec<crate::auth::provider::AuthProviderAnzeige>>, AppError> {
+    crate::auth::provider::registry::schalten(&state.pool, &id, req.aktiviert).await?;
+    let liste = crate::auth::provider::registry::liste(&state.pool).await?;
+    Ok(Json(liste))
+}
