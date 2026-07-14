@@ -2709,6 +2709,13 @@
             "type": "integer",
             "format": "int64"
           },
+          "funktion": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Qualifikationen/Funktion als flacher Text (Snapshot). Quelle für die FE-Ableitung der\nFachaufgabe des Personen-Zeichens (LFH-172); `tz_fachaufgabe` bleibt vorrangig."
+          },
           "id": {
             "type": "integer",
             "format": "int64"

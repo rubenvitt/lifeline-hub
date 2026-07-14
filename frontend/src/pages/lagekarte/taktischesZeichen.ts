@@ -1,5 +1,5 @@
 import type {
-  EinheitId, FachaufgabeId, GrundzeichenId, OrganisationId,
+  EinheitId, FachaufgabeId, FunktionId, GrundzeichenId, OrganisationId,
   TaktischesZeichen as TZSpec,
 } from 'taktische-zeichen-react';
 import type { Ausmass, UhsTyp } from '../../api/types';
@@ -26,24 +26,108 @@ export function groesseAusLabel(label: string | null | undefined): EinheitId | u
 export interface TzEingabe {
   objekttyp: Objekttyp;
   einheitTypLabel?: string | null;
-  fachaufgabe?: string | null;   // tz_fachaufgabe am Objekt
-  organisation?: string | null;  // tz_organisation am Objekt (Override)
+  fachaufgabe?: string | null;   // tz_fachaufgabe am Objekt (manueller Override)
+  organisation?: string | null;  // tz_organisation am Objekt (manueller Override)
   orgDefault?: string | null;    // Org-Default aus /api/organisation
+  // Fahrzeug-Rohfelder für die Ableitung (LFH-171); manuelle tz_*-Overrides bleiben vorrangig.
+  fahrzeugtyp?: string | null;         // Freitext-Typ → spezifischeres Grundzeichen + Fachaufgabe
+  opta?: string | null;                // OPTA → Organisation-Fallback (best effort, unvalidiert)
+  traegerorganisation?: string | null; // Trägerorganisation → Organisation (primär)
+  // Personal-Felder für die Ableitung (LFH-172); manueller tz_fachaufgabe-Override bleibt vorrangig.
+  funktion?: string | null;            // Qualifikations-/Funktionstext → Fachaufgabe
+  istFuehrungskraft?: boolean;         // setzt den DV-102-Funktions-Indikator 'fuehrungskraft'
 }
 
-export type TzProps = Pick<TZSpec, 'grundzeichen' | 'organisation' | 'fachaufgabe' | 'einheit' | 'symbol' | 'farbe'>;
+export type TzProps = Pick<TZSpec, 'grundzeichen' | 'organisation' | 'fachaufgabe' | 'einheit' | 'symbol' | 'farbe' | 'funktion'>;
 
-/** Leitet die DV-102-Spec aus App-Feldern ab (Org-Default + Objekt-Override + Fachaufgabe). */
+// Fahrzeugtyp (Freitext) → spezifischeres DV-102-Grundzeichen. Konservativ: nur eindeutige
+// Fälle; alles andere behält das generische 'kraftfahrzeug-landgebunden'. `kraftrad` ist in
+// der Library deprecated → 'zweirad'. (LFH-171)
+export function grundzeichenAusFahrzeugtyp(fahrzeugtyp: string | null | undefined): GrundzeichenId | undefined {
+  const t = fahrzeugtyp?.trim().toLowerCase();
+  if (!t) return undefined;
+  if (/\b(boot|mzb|rtb)\b|mehrzweckboot|schlauchboot|rettungsboot|wasserfahrzeug/.test(t)) return 'wasserfahrzeug';
+  if (/\b(krad|kraftrad|motorrad)\b/.test(t)) return 'zweirad';
+  if (/\b(anh|anhaenger|fwa)\b|anhänger/.test(t)) return 'anhaenger';
+  if (/\b(heli|hubschrauber|helikopter)\b/.test(t)) return 'hubschrauber';
+  return undefined;
+}
+
+// Freitext (Trägerorganisation bzw. OPTA) → DV-102-OrganisationId per Schlüsselwort. (LFH-171)
+export function organisationAusText(text: string | null | undefined): OrganisationId | undefined {
+  const t = text?.trim().toLowerCase();
+  if (!t) return undefined;
+  if (/feuerwehr|\b(ff|bf|wf|fw)\b/.test(t)) return 'feuerwehr';
+  if (/\bthw\b|technisches hilfswerk/.test(t)) return 'thw';
+  if (/polizei|\bpol\b/.test(t)) return 'polizei';
+  if (/bundeswehr|\bbw\b/.test(t)) return 'bundeswehr';
+  if (/\b(drk|asb|juh|mhd|dlrg)\b|johanniter|malteser|hilfsorganisation|rotes kreuz/.test(t)) return 'hilfsorganisation';
+  return undefined;
+}
+
+// Fahrzeugtyp (Freitext) → Fachaufgabe (kuratierte Whitelist; Reihenfolge = Priorität). Kein
+// Treffer → keine Fachaufgabe (lieber generisch als falsch). (LFH-171)
+export function fachaufgabeAusFahrzeugtyp(fahrzeugtyp: string | null | undefined): FachaufgabeId | undefined {
+  const t = fahrzeugtyp?.trim().toLowerCase();
+  if (!t) return undefined;
+  if (/\b(lf|hlf|tlf|stlf|mlf|klf|tsf|lz|dlk|dl)\b|lösch|loesch/.test(t)) return 'brandbekaempfung';
+  if (/\b(rtw|ktw|nef|naw|rth)\b|rettungsdienst|sanit/.test(t)) return 'rettungswesen';
+  if (/\b(rw|gw-?t)\b|rüst|ruest|hilfeleistung/.test(t)) return 'technische-hilfeleistung';
+  if (/\bgw-?l(og)?\b|logistik/.test(t)) return 'logistik';
+  if (/\b(elw|kdow|kdo|ftz)\b|führung|fuehrung/.test(t)) return 'fuehrung';
+  return undefined;
+}
+
+// Personal-Funktions-/Qualifikationstext (Freitext) → Fachaufgabe (schmale Whitelist;
+// Reihenfolge = Priorität). Kein Treffer → keine Ableitung (bleibt beim fuehrung-Default). (LFH-172)
+export function fachaufgabeAusFunktion(funktion: string | null | undefined): FachaufgabeId | undefined {
+  const t = funktion?.trim().toLowerCase();
+  if (!t) return undefined;
+  if (/notarzt|\barzt\b|ärzt|aerzt/.test(t)) return 'aerztliche-versorgung';
+  if (/sanit|rettungs(dienst|assist|sanit|helf)|\b(nfs|rs)\b/.test(t)) return 'rettungswesen';
+  if (/iuk|funk|fernmelde/.test(t)) return 'iuk';
+  if (/logistik|nachschub/.test(t)) return 'logistik';
+  return undefined;
+}
+
+// accepts-Gating (taktische-zeichen-core): diese Grundzeichen rendern die jeweiligen Overlays
+// NICHT — die Library ignoriert sie still. Wir setzen sie deshalb gar nicht erst, damit der
+// Icon-Dedup-Key (markerIcons.tzIconKey) nicht divergiert und kein Phantom-Overlay entsteht.
+const OHNE_FACHAUFGABE: ReadonlySet<GrundzeichenId> = new Set(['zweirad', 'kraftrad', 'fahrrad', 'hubschrauber', 'flugzeug']);
+const OHNE_ORGANISATION: ReadonlySet<GrundzeichenId> = new Set(['zweirad', 'kraftrad', 'fahrrad']);
+
+/** Leitet die DV-102-Spec aus App-Feldern ab. Priorität je Overlay:
+ *  manueller Objekt-Override (tz_*) ?? aus Fahrzeugtyp/Träger/OPTA abgeleitet ?? Typ-/Org-Default.
+ *  accepts-Gating entfernt Overlays, die das gewählte Grundzeichen nicht rendert. */
 export function baueTzProps(e: TzEingabe): TzProps {
-  const organisation = (e.organisation ?? e.orgDefault ?? undefined) as OrganisationId | undefined;
+  const grundzeichen: GrundzeichenId =
+    e.objekttyp === 'fahrzeug'
+      ? grundzeichenAusFahrzeugtyp(e.fahrzeugtyp) ?? GRUNDZEICHEN.fahrzeug
+      : GRUNDZEICHEN[e.objekttyp];
+
+  const organisation = (e.organisation
+    ?? organisationAusText(e.traegerorganisation)
+    ?? organisationAusText(e.opta)
+    ?? e.orgDefault
+    ?? undefined) as OrganisationId | undefined;
+
   const fachaufgabe = (e.fachaufgabe
+    ?? (e.objekttyp === 'fahrzeug' ? fachaufgabeAusFahrzeugtyp(e.fahrzeugtyp) : undefined)
+    ?? (e.objekttyp === 'fuehrung' ? fachaufgabeAusFunktion(e.funktion) : undefined)
     ?? (e.objekttyp === 'abschnitt' || e.objekttyp === 'fuehrung' ? 'fuehrung' : undefined)) as
     FachaufgabeId | undefined;
+
+  // DV-102-Funktions-Indikator: nur für als Führungskraft markierte Personen (Person-Grundzeichen
+  // akzeptiert 'funktion'). Die Library-Enum kennt nur fuehrungskraft|sonderfunktion.
+  const funktion: FunktionId | undefined =
+    e.objekttyp === 'fuehrung' && e.istFuehrungskraft ? 'fuehrungskraft' : undefined;
+
   return {
-    grundzeichen: GRUNDZEICHEN[e.objekttyp],
-    organisation,
-    fachaufgabe,
+    grundzeichen,
+    organisation: OHNE_ORGANISATION.has(grundzeichen) ? undefined : organisation,
+    fachaufgabe: OHNE_FACHAUFGABE.has(grundzeichen) ? undefined : fachaufgabe,
     einheit: e.objekttyp === 'einheit' ? groesseAusLabel(e.einheitTypLabel) : undefined,
+    funktion,
   };
 }
 

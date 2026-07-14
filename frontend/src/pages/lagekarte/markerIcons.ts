@@ -14,5 +14,6 @@ export function tzIconKey(tz: TzProps): string {
     tz.einheit ?? '',
     tz.symbol ?? '',
     tz.farbe ?? '',
+    tz.funktion ?? '',
   ].join('|');
 }

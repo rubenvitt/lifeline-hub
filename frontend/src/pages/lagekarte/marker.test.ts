@@ -112,4 +112,28 @@ describe('baueTaktischeMarker', () => {
     expect(verortet.find((m) => m.schluessel === 'einheit-1')?.tz?.grundzeichen).toBe('taktische-formation');
     expect(nichtVerortet.some((o) => o.typ === 'einheit' && o.id === 2)).toBe(true);
   });
+
+  it('reicht Fahrzeugtyp/OPTA/Träger an die TZ-Ableitung durch (LFH-171)', () => {
+    const fahrzeuge = [
+      { id: 7, funkrufname: 'Florian 1', lat: 50.2, lon: 8.7, tz_fachaufgabe: null, tz_organisation: null,
+        status_farbe: null, fahrzeugtyp: 'MZB', opta: null, traegerorganisation: 'Feuerwehr' },
+    ] as unknown as TaktischeQuelle['fahrzeuge'];
+    const { verortet } = baueTaktischeMarker(
+      { einheiten: [], fahrzeuge, fuehrungskraefte: [], orgDefault: null });
+    const tz = verortet.find((m) => m.schluessel === 'fahrzeug-7')?.tz;
+    expect(tz?.grundzeichen).toBe('wasserfahrzeug');
+    expect(tz?.organisation).toBe('feuerwehr');
+  });
+
+  it('reicht Funktion + Führungskraft-Flag an die Personen-TZ-Ableitung durch (LFH-172)', () => {
+    const fuehrungskraefte = [
+      { id: 3, name: 'Müller', lat: 50.4, lon: 8.9, tz_fachaufgabe: null, tz_organisation: null,
+        funktion: 'Notfallsanitäter, Gruppenführer', ist_einheitsfuehrer: true, ist_abschnittsleiter: false },
+    ] as unknown as TaktischeQuelle['fuehrungskraefte'];
+    const { verortet } = baueTaktischeMarker(
+      { einheiten: [], fahrzeuge: [], fuehrungskraefte, orgDefault: null });
+    const tz = verortet.find((m) => m.schluessel === 'fuehrung-3')?.tz;
+    expect(tz?.funktion).toBe('fuehrungskraft');
+    expect(tz?.fachaufgabe).toBe('rettungswesen');
+  });
 });

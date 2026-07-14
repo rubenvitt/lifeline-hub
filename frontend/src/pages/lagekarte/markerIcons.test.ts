@@ -23,4 +23,9 @@ describe('tzIconKey', () => {
     expect(tzIconKey({ grundzeichen: 'taktische-formation', einheit: 'zug' }))
       .not.toBe(tzIconKey({ grundzeichen: 'taktische-formation', einheit: 'gruppe' }));
   });
+
+  it('unterscheidet sich bei funktion (LFH-172, sonst Icon-Dedup-Kollision)', () => {
+    expect(tzIconKey({ grundzeichen: 'person', funktion: 'fuehrungskraft' }))
+      .not.toBe(tzIconKey({ grundzeichen: 'person' }));
+  });
 });

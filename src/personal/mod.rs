@@ -143,6 +143,9 @@ pub struct FuehrungskraftKarte {
     pub lon: Option<f64>,
     pub tz_fachaufgabe: Option<String>,
     pub tz_organisation: Option<String>,
+    /// Qualifikationen/Funktion als flacher Text (Snapshot). Quelle für die FE-Ableitung der
+    /// Fachaufgabe des Personen-Zeichens (LFH-172); `tz_fachaufgabe` bleibt vorrangig.
+    pub funktion: Option<String>,
     pub ist_einheitsfuehrer: bool,
     pub ist_abschnittsleiter: bool,
 }

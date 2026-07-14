@@ -148,12 +148,20 @@ export function baueTaktischeMarker(
   }
   for (const f of q.fahrzeuge) {
     add('fahrzeug', f.id, f.funkrufname, f.lat, f.lon,
-      baueTzProps({ objekttyp: 'fahrzeug', fachaufgabe: f.tz_fachaufgabe, organisation: f.tz_organisation, orgDefault: q.orgDefault }),
+      baueTzProps({
+        objekttyp: 'fahrzeug', fachaufgabe: f.tz_fachaufgabe, organisation: f.tz_organisation,
+        orgDefault: q.orgDefault, fahrzeugtyp: f.fahrzeugtyp, opta: f.opta,
+        traegerorganisation: f.traegerorganisation,
+      }),
       f.status_farbe);
   }
   for (const p of q.fuehrungskraefte) {
     add('fuehrung', p.id, p.name, p.lat, p.lon,
-      baueTzProps({ objekttyp: 'fuehrung', fachaufgabe: p.tz_fachaufgabe, organisation: p.tz_organisation, orgDefault: q.orgDefault }));
+      baueTzProps({
+        objekttyp: 'fuehrung', fachaufgabe: p.tz_fachaufgabe, organisation: p.tz_organisation,
+        orgDefault: q.orgDefault, funktion: p.funktion,
+        istFuehrungskraft: p.ist_einheitsfuehrer || p.ist_abschnittsleiter,
+      }));
   }
   return { verortet, nichtVerortet };
 }
