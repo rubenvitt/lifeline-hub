@@ -21,6 +21,7 @@ use openidconnect::{
     ClientId, ClientSecret, EndpointMaybeSet, EndpointNotSet, EndpointSet, HttpRequest,
     HttpResponse, IssuerUrl, RedirectUrl,
 };
+use std::time::Duration;
 use tokio::sync::OnceCell;
 
 /// Konkreter `CoreClient`-Typ nach `from_provider_metadata` + `set_redirect_uri` (v4-Typestate,
@@ -115,12 +116,25 @@ async fn discovery(issuer: &str) -> Result<CoreProviderMetadata, AppError> {
     Ok(metadata.clone())
 }
 
+/// Overall-Timeout für einen Discovery-/Token-Roundtrip: ein verbundener, aber stummer IdP
+/// (TCP-Connect erfolgreich, nie eine Antwort) darf den wartenden OIDC-Handler nicht unbegrenzt
+/// blockieren (Offline-First-MUST „IdP-Ausfall darf den Handler nicht blockieren" des Plans).
+const OIDC_HTTP_TIMEOUT: Duration = Duration::from_secs(15);
+
+/// Connect-Timeout (separat vom Overall-Timeout): fängt tote/nicht antwortende Hosts schon beim
+/// TCP-Handshake ab, statt erst nach dem vollen Overall-Timeout.
+const OIDC_HTTP_CONNECT_TIMEOUT: Duration = Duration::from_secs(8);
+
 /// HTTP-Client für Discovery + Token-Exchange (SSRF-MUST des Plans): keine Redirects folgen
 /// (`redirect::Policy::none()`), sonst Default-Konfiguration — bleibt auf dem Projekt-TLS-Stack
-/// (rustls/`aws-lc-rs`), kein zweiter TLS-Stack im Prozess.
+/// (rustls/`aws-lc-rs`), kein zweiter TLS-Stack im Prozess. Timeout + Connect-Timeout gegen einen
+/// verbundenen, aber stummen IdP (siehe Konstanten oben) — sonst würde ein hängender IdP den
+/// awaitenden Handler unbegrenzt blockieren.
 fn ssrf_http_client() -> Result<reqwest::Client, AppError> {
     reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
+        .timeout(OIDC_HTTP_TIMEOUT)
+        .connect_timeout(OIDC_HTTP_CONNECT_TIMEOUT)
         .build()
         .map_err(|e| {
             AppError::Internal(format!("OIDC-HTTP-Client konnte nicht gebaut werden: {e}"))
@@ -245,7 +259,7 @@ mod tests {
     }
 
     /// Offline-Isolationstest (Plan Task 4, Step 1): `http://127.0.0.1:1` ist ein bewusst
-    /// scheiternder LOKALER Verbindungsversuch (Port 0 nimmt nie Verbindungen an) — KEIN
+    /// scheiternder LOKALER Verbindungsversuch (Port 1 nimmt nie Verbindungen an) — KEIN
     /// externer IdP, kein echtes Netz. Belegt die Offline-First-MUST: ein unerreichbarer IdP
     /// liefert `Err` (Connection-Fehler) statt zu paniken/zu blockieren; der lokale
     /// Passwort-Login bleibt davon unberührt (dieser Test berührt ihn erst gar nicht).
