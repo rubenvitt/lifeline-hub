@@ -148,7 +148,11 @@ export function baueTaktischeMarker(
   }
   for (const f of q.fahrzeuge) {
     add('fahrzeug', f.id, f.funkrufname, f.lat, f.lon,
-      baueTzProps({ objekttyp: 'fahrzeug', fachaufgabe: f.tz_fachaufgabe, organisation: f.tz_organisation, orgDefault: q.orgDefault }),
+      baueTzProps({
+        objekttyp: 'fahrzeug', fachaufgabe: f.tz_fachaufgabe, organisation: f.tz_organisation,
+        orgDefault: q.orgDefault, fahrzeugtyp: f.fahrzeugtyp, opta: f.opta,
+        traegerorganisation: f.traegerorganisation,
+      }),
       f.status_farbe);
   }
   for (const p of q.fuehrungskraefte) {

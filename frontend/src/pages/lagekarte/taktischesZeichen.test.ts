@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { erzeugeTaktischesZeichen } from 'taktische-zeichen-react';
-import { baueTzProps, groesseAusLabel, einsatzortTz, schadenTz, uhsTz } from './taktischesZeichen';
+import {
+  baueTzProps, groesseAusLabel, einsatzortTz, schadenTz, uhsTz,
+  grundzeichenAusFahrzeugtyp, organisationAusText, fachaufgabeAusFahrzeugtyp,
+} from './taktischesZeichen';
 
 describe('taktischesZeichen', () => {
   it('Einheit: Grundzeichen + Größe aus Label + Org-Default', () => {
@@ -29,6 +32,111 @@ describe('taktischesZeichen', () => {
       }).svg.render();
       expect(svg).toContain('<svg');
     }
+  });
+});
+
+describe('LFH-171: Fahrzeug-Zeichen aus Fahrzeugtyp/OPTA ableiten', () => {
+  describe('grundzeichenAusFahrzeugtyp (konservativ; Rest = generisch)', () => {
+    it('Boot/Wasserfahrzeug → wasserfahrzeug', () => {
+      expect(grundzeichenAusFahrzeugtyp('MZB')).toBe('wasserfahrzeug');
+      expect(grundzeichenAusFahrzeugtyp('Mehrzweckboot')).toBe('wasserfahrzeug');
+    });
+    it('Kraftrad → zweirad (nicht das deprecated kraftrad)', () => {
+      expect(grundzeichenAusFahrzeugtyp('Krad')).toBe('zweirad');
+      expect(grundzeichenAusFahrzeugtyp('Motorrad')).toBe('zweirad');
+    });
+    it('Anhänger → anhaenger', () => {
+      expect(grundzeichenAusFahrzeugtyp('FwA')).toBe('anhaenger');
+      expect(grundzeichenAusFahrzeugtyp('Anhänger')).toBe('anhaenger');
+    });
+    it('Hubschrauber → hubschrauber', () => {
+      expect(grundzeichenAusFahrzeugtyp('Hubschrauber')).toBe('hubschrauber');
+    });
+    it('unspezifischer/leerer Fahrzeugtyp → undefined (Fallback bleibt generisch)', () => {
+      expect(grundzeichenAusFahrzeugtyp('LF 20')).toBeUndefined();
+      expect(grundzeichenAusFahrzeugtyp('')).toBeUndefined();
+      expect(grundzeichenAusFahrzeugtyp(null)).toBeUndefined();
+    });
+  });
+
+  describe('organisationAusText (Trägerorganisation/OPTA-Freitext → OrganisationId)', () => {
+    it('erkennt Organisationen an Schlüsselwörtern', () => {
+      expect(organisationAusText('Feuerwehr München')).toBe('feuerwehr');
+      expect(organisationAusText('THW OV Musterstadt')).toBe('thw');
+      expect(organisationAusText('DRK Kreisverband')).toBe('hilfsorganisation');
+      expect(organisationAusText('Polizei')).toBe('polizei');
+      expect(organisationAusText('Bundeswehr')).toBe('bundeswehr');
+    });
+    it('unbekannter Text → undefined', () => {
+      expect(organisationAusText('Stadtwerke')).toBeUndefined();
+      expect(organisationAusText('')).toBeUndefined();
+      expect(organisationAusText(null)).toBeUndefined();
+    });
+  });
+
+  describe('fachaufgabeAusFahrzeugtyp (kuratierte Whitelist)', () => {
+    it('mappt gängige Fahrzeugtypen auf Fachaufgaben', () => {
+      expect(fachaufgabeAusFahrzeugtyp('LF 20')).toBe('brandbekaempfung');
+      expect(fachaufgabeAusFahrzeugtyp('TLF 3000')).toBe('brandbekaempfung');
+      expect(fachaufgabeAusFahrzeugtyp('RTW')).toBe('rettungswesen');
+      expect(fachaufgabeAusFahrzeugtyp('GW-L')).toBe('logistik');
+      expect(fachaufgabeAusFahrzeugtyp('ELW 1')).toBe('fuehrung');
+    });
+    it('unbekannter Fahrzeugtyp → undefined', () => {
+      expect(fachaufgabeAusFahrzeugtyp('PKW')).toBeUndefined();
+      expect(fachaufgabeAusFahrzeugtyp(null)).toBeUndefined();
+    });
+  });
+
+  describe('baueTzProps – Fahrzeug-Ableitung + Override-Vorrang + accepts-Gating', () => {
+    it('leitet Grundzeichen aus dem Fahrzeugtyp ab', () => {
+      expect(baueTzProps({ objekttyp: 'fahrzeug', fahrzeugtyp: 'MZB' }).grundzeichen).toBe('wasserfahrzeug');
+    });
+    it('generischer Fahrzeugtyp behält das Kfz-Grundzeichen, leitet aber Fachaufgabe ab', () => {
+      const p = baueTzProps({ objekttyp: 'fahrzeug', fahrzeugtyp: 'LF 20' });
+      expect(p.grundzeichen).toBe('kraftfahrzeug-landgebunden');
+      expect(p.fachaufgabe).toBe('brandbekaempfung');
+    });
+    it('leitet Organisation aus der Trägerorganisation ab', () => {
+      expect(baueTzProps({ objekttyp: 'fahrzeug', traegerorganisation: 'Feuerwehr' }).organisation).toBe('feuerwehr');
+    });
+    it('OPTA ist Fallback für die Organisation, wenn kein Träger', () => {
+      expect(baueTzProps({ objekttyp: 'fahrzeug', opta: 'THW-12/34' }).organisation).toBe('thw');
+    });
+    it('manueller tz_organisation-Override schlägt Ableitung UND Träger', () => {
+      const p = baueTzProps({ objekttyp: 'fahrzeug', organisation: 'polizei', traegerorganisation: 'Feuerwehr' });
+      expect(p.organisation).toBe('polizei');
+    });
+    it('manueller tz_fachaufgabe-Override schlägt die Fahrzeugtyp-Ableitung', () => {
+      const p = baueTzProps({ objekttyp: 'fahrzeug', fachaufgabe: 'iuk', fahrzeugtyp: 'LF 20' });
+      expect(p.fachaufgabe).toBe('iuk');
+    });
+    it('abgeleitete Organisation schlägt den Org-Default', () => {
+      const p = baueTzProps({ objekttyp: 'fahrzeug', traegerorganisation: 'THW', orgDefault: 'feuerwehr' });
+      expect(p.organisation).toBe('thw');
+    });
+    it('accepts-Gating: zweirad akzeptiert keine Overlays → Organisation/Fachaufgabe entfallen', () => {
+      const p = baueTzProps({ objekttyp: 'fahrzeug', fahrzeugtyp: 'Krad', traegerorganisation: 'Feuerwehr', fachaufgabe: 'brandbekaempfung' });
+      expect(p.grundzeichen).toBe('zweirad');
+      expect(p.organisation).toBeUndefined();
+      expect(p.fachaufgabe).toBeUndefined();
+    });
+    it('accepts-Gating: hubschrauber akzeptiert Organisation, aber keine Fachaufgabe', () => {
+      const p = baueTzProps({ objekttyp: 'fahrzeug', fahrzeugtyp: 'Hubschrauber', traegerorganisation: 'Polizei', fachaufgabe: 'rettungswesen' });
+      expect(p.grundzeichen).toBe('hubschrauber');
+      expect(p.organisation).toBe('polizei');
+      expect(p.fachaufgabe).toBeUndefined();
+    });
+  });
+
+  describe('Render-Integration abgeleiteter Fahrzeug-Props', () => {
+    const render = (p: object) =>
+      erzeugeTaktischesZeichen({ ...p, skipFontRegistration: true }).svg.render();
+    it('erzeugt valides SVG für abgeleitete Fahrzeug-Zeichen', () => {
+      expect(render(baueTzProps({ objekttyp: 'fahrzeug', fahrzeugtyp: 'MZB', traegerorganisation: 'Feuerwehr' }))).toContain('<svg');
+      expect(render(baueTzProps({ objekttyp: 'fahrzeug', fahrzeugtyp: 'Krad' }))).toContain('<svg');
+      expect(render(baueTzProps({ objekttyp: 'fahrzeug', fahrzeugtyp: 'LF 20', traegerorganisation: 'Feuerwehr' }))).toContain('<svg');
+    });
   });
 });
 
