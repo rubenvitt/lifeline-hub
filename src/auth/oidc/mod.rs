@@ -14,15 +14,59 @@
 pub mod provisioning;
 pub mod state;
 
-use crate::config::Config;
+use crate::config::{Config, GeheimesPasswort};
 use crate::error::AppError;
 use openidconnect::core::{CoreClient, CoreProviderMetadata};
 use openidconnect::{
     ClientId, ClientSecret, EndpointMaybeSet, EndpointNotSet, EndpointSet, HttpRequest,
     HttpResponse, IssuerUrl, RedirectUrl,
 };
+use std::sync::OnceLock;
 use std::time::Duration;
 use tokio::sync::OnceCell;
+
+/// Resolved OIDC-Einstellungen (Issuer/Client-ID/Client-Secret/Redirect-URL) — prozessweiter
+/// `OnceLock` statt `AppState`-Feld, analog zu `anhang::ScanConfig` (LFH-114) und
+/// `session::COOKIE_SECURE`: `AppState` bricht sonst dutzende Inline-Test-Konstruktionen
+/// (Memory: appstate-feld-bricht-test-konstruktionen), nur um dieses eine Auth-Feature an die
+/// `Config` zu binden. `oidc_client` nimmt bewusst weiterhin eine EXPLIZITE `&OidcSettings`-
+/// Referenz entgegen (kein Lesen des globalen Zustands intern) — die bestehenden Unit-Tests
+/// unten prüfen unterschiedliche Konfigurationen (leer/unerreichbar) im selben Testprozess;
+/// würde `oidc_client` selbst aus dem `OnceLock` lesen, könnten sich Tests nicht mehr
+/// unterscheiden (ein `OnceLock` lässt sich nach dem ersten `set` nicht mehr ändern). Die
+/// Handler-Schicht (`routes::auth::oidc_start`, Task 5) liefert dafür `oidc_settings()`.
+#[derive(Debug, Clone, Default)]
+pub struct OidcSettings {
+    pub issuer: Option<String>,
+    pub client_id: Option<String>,
+    pub client_secret: Option<GeheimesPasswort>,
+    pub redirect_url: Option<String>,
+}
+
+impl From<&Config> for OidcSettings {
+    fn from(cfg: &Config) -> Self {
+        Self {
+            issuer: cfg.oidc_issuer.clone(),
+            client_id: cfg.oidc_client_id.clone(),
+            client_secret: cfg.oidc_client_secret.clone(),
+            redirect_url: cfg.oidc_redirect_url.clone(),
+        }
+    }
+}
+
+static OIDC_SETTINGS: OnceLock<OidcSettings> = OnceLock::new();
+
+/// Einmalig beim Serverstart setzen (`main::run_server`, direkt nach `Config::parse()`).
+/// Doppelsetzen wird ignoriert (wie `registry::set_oidc_konfiguriert`).
+pub fn init_oidc_settings(cfg: OidcSettings) {
+    let _ = OIDC_SETTINGS.set(cfg);
+}
+
+/// Liefert die prozessweiten OIDC-Einstellungen; ungesetzt (die meisten Tests) → alle Felder
+/// `None`, `oidc_client` degradiert dann korrekt zu `AppError::NotImplemented`.
+pub fn oidc_settings() -> &'static OidcSettings {
+    OIDC_SETTINGS.get_or_init(OidcSettings::default)
+}
 
 /// Konkreter `CoreClient`-Typ nach `from_provider_metadata` + `set_redirect_uri` (v4-Typestate,
 /// Build-Verify-Punkt wie `rcgen`s `signing_key` in Inc. 2): der Authorization-Endpoint ist über
@@ -47,16 +91,16 @@ pub type OidcCoreClient = CoreClient<
 /// discovert erneut statt den Fehler dauerhaft einzufrieren.
 static DISCOVERY: OnceCell<CoreProviderMetadata> = OnceCell::const_new();
 
-/// Baut den OIDC-Client: lazy (gecachte) Discovery + `CoreClient` aus der Config. Fehlt eines der
-/// vier `oidc_*`-Config-Felder oder ist der IdP nicht erreichbar/liefert kaputte Metadaten, wird
-/// ein `AppError` geliefert — NIE ein Panic, NIE ein blockierender Serverstart-Pfad (dieser Pfad
-/// wird erst bei `GET /api/auth/oidc/start`/`callback` betreten, siehe Task 5/6 des Plans).
-pub async fn oidc_client(cfg: &Config) -> Result<OidcCoreClient, AppError> {
-    let issuer = oidc_konfigfeld(&cfg.oidc_issuer, "LIFELINE_OIDC_ISSUER")?;
-    let client_id = oidc_konfigfeld(&cfg.oidc_client_id, "LIFELINE_OIDC_CLIENT_ID")?;
-    let redirect_url = oidc_konfigfeld(&cfg.oidc_redirect_url, "LIFELINE_OIDC_REDIRECT_URL")?;
+/// Baut den OIDC-Client: lazy (gecachte) Discovery + `CoreClient` aus den `OidcSettings`. Fehlt
+/// eines der vier Felder oder ist der IdP nicht erreichbar/liefert kaputte Metadaten, wird ein
+/// `AppError` geliefert — NIE ein Panic, NIE ein blockierender Serverstart-Pfad (dieser Pfad wird
+/// erst bei `GET /api/auth/oidc/start`/`callback` betreten, siehe Task 5/6 des Plans).
+pub async fn oidc_client(cfg: &OidcSettings) -> Result<OidcCoreClient, AppError> {
+    let issuer = oidc_konfigfeld(&cfg.issuer, "LIFELINE_OIDC_ISSUER")?;
+    let client_id = oidc_konfigfeld(&cfg.client_id, "LIFELINE_OIDC_CLIENT_ID")?;
+    let redirect_url = oidc_konfigfeld(&cfg.redirect_url, "LIFELINE_OIDC_REDIRECT_URL")?;
     let client_secret = cfg
-        .oidc_client_secret
+        .client_secret
         .as_ref()
         .map(|s| s.als_str().to_string())
         .filter(|s| !s.is_empty())
@@ -214,20 +258,16 @@ impl From<reqwest::Error> for HttpClientFehler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use clap::Parser;
 
-    fn vollstaendige_config(issuer: &str) -> Config {
-        Config::parse_from([
-            "lifeline-hub",
-            "--oidc-issuer",
-            issuer,
-            "--oidc-client-id",
-            "test-client-id",
-            "--oidc-client-secret",
-            "test-client-secret",
-            "--oidc-redirect-url",
-            "http://localhost:8080/api/auth/oidc/callback",
-        ])
+    /// Baut `OidcSettings` direkt (keine `Config`/`clap`-Umwege mehr nötig, seit `oidc_client`
+    /// die schlanke `OidcSettings`-Struct statt der vollen `Config` entgegennimmt — Task 5).
+    fn vollstaendige_config(issuer: &str) -> OidcSettings {
+        OidcSettings {
+            issuer: Some(issuer.to_string()),
+            client_id: Some("test-client-id".to_string()),
+            client_secret: Some(GeheimesPasswort("test-client-secret".to_string())),
+            redirect_url: Some("http://localhost:8080/api/auth/oidc/callback".to_string()),
+        }
     }
 
     /// Kompilier-Check statt Laufzeit-Test (Futures sind lazy, kein I/O nötig): `oidc_client`s
@@ -239,7 +279,7 @@ mod tests {
     #[test]
     fn oidc_client_future_ist_send() {
         fn ist_send<T: Send>(_: &T) {}
-        let cfg = Config::parse_from(["lifeline-hub"]);
+        let cfg = OidcSettings::default();
         ist_send(&oidc_client(&cfg));
     }
 
@@ -248,7 +288,7 @@ mod tests {
         // Registry-/Provider-Konstruktion ohne Netz ist bereits in Task 1 abgedeckt
         // (oidc_konfiguriert_ohne_netz); hier: der Client-Aufbau selbst degradiert bei
         // fehlender Config sauber statt zu paniken.
-        let cfg = Config::parse_from(["lifeline-hub"]);
+        let cfg = OidcSettings::default();
 
         let ergebnis = oidc_client(&cfg).await;
 

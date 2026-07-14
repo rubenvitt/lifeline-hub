@@ -115,6 +115,12 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
             && config.oidc_client_id.is_some()
             && config.oidc_client_secret.is_some(),
     );
+    // Resolved OIDC-Einstellungen prozessweit ablegen (siehe `auth::oidc::OidcSettings`-Doc):
+    // `oidc_client` bleibt unit-testbar mit einer expliziten `&OidcSettings`-Referenz, der
+    // `oidc_start`-Handler (Task 5) liest sie über `auth::oidc::oidc_settings()`.
+    lifeline_hub::auth::oidc::init_oidc_settings(lifeline_hub::auth::oidc::OidcSettings::from(
+        &config,
+    ));
 
     let app = build_router(AppState {
         pool,

@@ -178,3 +178,17 @@ async fn admin_kann_passwort_nicht_deaktivieren_409() {
     .await;
     assert_eq!(status, StatusCode::CONFLICT);
 }
+
+#[tokio::test]
+async fn oidc_start_ohne_konfigurierten_provider_ist_404() {
+    // Test-Setup konfiguriert OIDC nicht (`set_oidc_konfiguriert` bleibt Default `false` im
+    // Integrationstest-Prozess) — die Registry listet "oidc" daher gar nicht erst, der
+    // Enforcement-Check im Handler greift. Prüft die JSON-Fehler-Antwort (nicht nur den
+    // Statuscode): unterscheidet den echten Enforcement-404 (`AppError::NotFound`, JSON-Body
+    // `{"error": "Nicht gefunden"}`) von einem bloßen Routing-404 (nicht registrierte Route),
+    // das ein leerer Klartext-Body wäre und hier zu `Value::Null` degradieren würde.
+    let app = setup().await;
+    let (status, json) = anfrage(&app, "GET", "/api/auth/oidc/start", "", None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(json["error"], "Nicht gefunden");
+}
