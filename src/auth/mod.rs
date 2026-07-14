@@ -1,4 +1,5 @@
 pub mod bootstrap;
+pub mod oidc;
 pub mod password;
 pub mod provider;
 pub mod session;
