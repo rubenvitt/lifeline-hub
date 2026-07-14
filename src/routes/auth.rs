@@ -1,5 +1,4 @@
 use crate::app::AppState;
-use crate::auth::password;
 use crate::auth::session::{self, CurrentUser, SESSION_COOKIE};
 use crate::error::AppError;
 use axum::extract::State;
@@ -30,23 +29,9 @@ pub async fn login(
     jar: CookieJar,
     Json(req): Json<LoginRequest>,
 ) -> Result<(CookieJar, Json<crate::auth::BenutzerAnzeige>), AppError> {
-    let benutzer = sqlx::query_as::<_, crate::auth::Benutzer>(
-        "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, aktiv, erstellt_at \
-         FROM benutzer WHERE benutzername = ? AND aktiv = 1",
-    )
-    .bind(&req.benutzername)
-    .fetch_optional(&state.pool)
-    .await?;
-
-    let benutzer = match benutzer {
-        Some(b) if password::verifizieren(&req.passwort, &b.passwort_hash) => b,
-        Some(_) => return Err(AppError::Unauthorized),
-        None => {
-            // Wegwerf-Hash, um die Antwortzeit anzugleichen (User-Enumeration-Schutz).
-            let _ = password::hash(&req.passwort);
-            return Err(AppError::Unauthorized);
-        }
-    };
+    let benutzer =
+        crate::auth::provider::password::anmelden(&state.pool, &req.benutzername, &req.passwort)
+            .await?;
 
     let token = session::anlegen(&state.pool, benutzer.id).await?;
     let jar = jar.add(session_cookie(token));
@@ -68,4 +53,29 @@ pub async fn logout(
 /// GET /api/auth/me — liefert den aktuell angemeldeten Benutzer.
 pub async fn me(CurrentUser(benutzer): CurrentUser) -> Json<crate::auth::BenutzerAnzeige> {
     Json(benutzer.anzeige())
+}
+
+/// GET /api/auth/providers — verfügbare Login-Provider (öffentlich, für die Login-UI).
+pub async fn providers(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<crate::auth::provider::AuthProviderAnzeige>>, AppError> {
+    let liste = crate::auth::provider::registry::liste(&state.pool).await?;
+    Ok(Json(liste))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ProviderSchaltenRequest {
+    pub aktiviert: bool,
+}
+
+/// PUT /api/auth/providers/{id} — Provider an/aus. Admin-only. Guard gegen Aussperren.
+pub async fn provider_schalten(
+    State(state): State<AppState>,
+    _admin: crate::auth::session::AdminUser,
+    axum::extract::Path(id): axum::extract::Path<String>,
+    Json(req): Json<ProviderSchaltenRequest>,
+) -> Result<Json<Vec<crate::auth::provider::AuthProviderAnzeige>>, AppError> {
+    crate::auth::provider::registry::schalten(&state.pool, &id, req.aktiviert).await?;
+    let liste = crate::auth::provider::registry::liste(&state.pool).await?;
+    Ok(Json(liste))
 }

@@ -1,5 +1,6 @@
 pub mod bootstrap;
 pub mod password;
+pub mod provider;
 pub mod session;
 
 use serde::Serialize;

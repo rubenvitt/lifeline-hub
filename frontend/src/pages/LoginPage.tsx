@@ -4,6 +4,8 @@ import type { CSSProperties } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import { devBenutzerLaden, type DevBenutzer } from '../api/dev';
+import { providerListe } from '../api/auth';
+import type { AuthProvider } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import loginBg from '../assets/login-bg.webp';
 import loginBgLight from '../assets/login-bg-light.webp';
@@ -22,6 +24,7 @@ export default function LoginPage() {
   const [fehler, setFehler] = useState<string | null>(null);
   const [laedt, setLaedt] = useState(false);
   const [devBenutzer, setDevBenutzer] = useState<DevBenutzer[]>([]);
+  const [provider, setProvider] = useState<AuthProvider[]>([]);
 
   const zielPfad = (location.state as { von?: string } | null)?.von ?? '/einsaetze';
 
@@ -35,6 +38,21 @@ export default function LoginPage() {
         .catch(() => {});
     }
   }, []);
+
+  // Aktive Auth-Provider laden (LFH-57), um das Passwort-Formular bedingt zu rendern.
+  useEffect(() => {
+    providerListe()
+      .then(setProvider)
+      // Fehler → Passwort-Login als sicherer Default annehmen.
+      .catch(() =>
+        setProvider([{ id: 'passwort', typ: 'passwort', anzeigename: 'Passwort', aktiviert: true }]),
+      );
+  }, []);
+
+  // provider.length === 0 hält das Formular sichtbar, solange die Liste lädt
+  // (kein Flackern, kein Aussperren bei Ladefehler).
+  const passwortAktiv =
+    provider.length === 0 || provider.some((p) => p.typ === 'passwort' && p.aktiviert);
 
   async function absenden(werte: FormWerte) {
     setFehler(null);
@@ -86,38 +104,40 @@ export default function LoginPage() {
             </Space>
           </div>
         )}
-        <Form
-          layout="vertical"
-          form={form}
-          onFinish={absenden}
-          disabled={laedt}
-          requiredMark={false}
-        >
-          <Form.Item
-            label="Benutzername"
-            name="benutzername"
-            rules={[{ required: true, message: 'Bitte Benutzername eingeben' }]}
+        {passwortAktiv && (
+          <Form
+            layout="vertical"
+            form={form}
+            onFinish={absenden}
+            disabled={laedt}
+            requiredMark={false}
           >
-            <Input size="large" autoFocus autoComplete="username" />
-          </Form.Item>
-          <Form.Item
-            label="Passwort"
-            name="passwort"
-            rules={[{ required: true, message: 'Bitte Passwort eingeben' }]}
-          >
-            <Input.Password size="large" autoComplete="current-password" />
-          </Form.Item>
-          <Button
-            className="login-absenden"
-            type="primary"
-            htmlType="submit"
-            size="large"
-            block
-            loading={laedt}
-          >
-            Anmelden
-          </Button>
-        </Form>
+            <Form.Item
+              label="Benutzername"
+              name="benutzername"
+              rules={[{ required: true, message: 'Bitte Benutzername eingeben' }]}
+            >
+              <Input size="large" autoFocus autoComplete="username" />
+            </Form.Item>
+            <Form.Item
+              label="Passwort"
+              name="passwort"
+              rules={[{ required: true, message: 'Bitte Passwort eingeben' }]}
+            >
+              <Input.Password size="large" autoComplete="current-password" />
+            </Form.Item>
+            <Button
+              className="login-absenden"
+              type="primary"
+              htmlType="submit"
+              size="large"
+              block
+              loading={laedt}
+            >
+              Anmelden
+            </Button>
+          </Form>
+        )}
       </div>
     </div>
   );

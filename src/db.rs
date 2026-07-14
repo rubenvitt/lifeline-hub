@@ -1657,4 +1657,38 @@ mod tests {
             "nach 0082 darf keine 'bereitstellungsraum'-Zeile verbleiben"
         );
     }
+
+    #[tokio::test]
+    async fn migration_0083_legt_auth_provider_schema_an() {
+        let pool = test_pool().await;
+
+        // auth_provider-Tabelle existiert und ist leer (Override-Tabelle, kein Reconcile).
+        let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM auth_provider")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(n, 0);
+
+        // Neue benutzer-Spalten sind vorhanden (Query würde sonst fehlschlagen).
+        let cols: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM pragma_table_info('benutzer') \
+             WHERE name IN ('oidc_subject','oidc_issuer','totp_secret','totp_aktiviert')",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(cols, 4, "vier neue benutzer-Spalten erwartet");
+
+        // Kind-Tabellen existieren.
+        for tabelle in ["webauthn_credential", "totp_recovery_code"] {
+            let da: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = ?",
+            )
+            .bind(tabelle)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            assert_eq!(da, 1, "Tabelle {tabelle} fehlt");
+        }
+    }
 }

@@ -29,6 +29,7 @@ describe('App-Routing', () => {
   it('leitet ohne Anmeldung zu /login um', async () => {
     server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
     server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
+    server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
     renderApp('/');
     expect(await screen.findByRole('button', { name: 'Anmelden' })).toBeInTheDocument();
   });

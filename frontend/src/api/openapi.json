@@ -442,6 +442,40 @@
           "katastrophal"
         ]
       },
+      "AuthProviderAnzeige": {
+        "type": "object",
+        "description": "Öffentliche Darstellung eines Providers für die Login-UI (`GET /api/auth/providers`).",
+        "required": [
+          "id",
+          "typ",
+          "anzeigename",
+          "aktiviert"
+        ],
+        "properties": {
+          "aktiviert": {
+            "type": "boolean"
+          },
+          "anzeigename": {
+            "type": "string",
+            "description": "Menschenlesbarer Anzeigename für Buttons/Labels."
+          },
+          "id": {
+            "type": "string",
+            "description": "Stabile ID (z.B. \"passwort\", \"dev\")."
+          },
+          "typ": {
+            "$ref": "#/components/schemas/AuthProviderTyp"
+          }
+        }
+      },
+      "AuthProviderTyp": {
+        "type": "string",
+        "description": "Art eines Auth-Providers — bestimmt, wie das Frontend den Login rendert.\nWire == snake_case (Enum-Wire-Kontrakt).",
+        "enum": [
+          "passwort",
+          "dev"
+        ]
+      },
       "BasemapModus": {
         "type": "string",
         "description": "Basemap-Modus (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `basemap_modus`.",
