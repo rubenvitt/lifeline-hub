@@ -2,6 +2,7 @@
 //! Die Auflösung ist rein/testbar; der mkcert-Aufruf liegt hinter `MkcertSeam`.
 
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use crate::error::AppError;
 
@@ -76,6 +77,107 @@ pub fn rcgen_pem(sans: &[String]) -> Result<(String, String), AppError> {
 pub fn cache_gueltig(cert: &Path, key: &Path) -> bool {
     let nichtleer = |p: &Path| std::fs::metadata(p).map(|m| m.len() > 0).unwrap_or(false);
     nichtleer(cert) && nichtleer(key)
+}
+
+/// PATH-basierte mkcert-Verfügbarkeit (Real-Seam).
+pub struct RealMkcert;
+impl MkcertSeam for RealMkcert {
+    fn verfuegbar(&self) -> bool {
+        Command::new("mkcert")
+            .arg("-CAROOT")
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    }
+}
+
+/// Argumentliste für `mkcert -cert-file <c> -key-file <k> <san…>`.
+fn mkcert_args(cert: &Path, key: &Path, sans: &[String]) -> Vec<String> {
+    let mut a = vec![
+        "-cert-file".to_string(),
+        cert.to_string_lossy().into_owned(),
+        "-key-file".to_string(),
+        key.to_string_lossy().into_owned(),
+    ];
+    a.extend(sans.iter().cloned());
+    a
+}
+
+/// Führt mkcert aus (optional vorher `-install`), schreibt cert/key in den Cache.
+fn mkcert_erzeugen(
+    cert: &Path,
+    key: &Path,
+    sans: &[String],
+    install: bool,
+) -> Result<(), AppError> {
+    if install {
+        // Best-effort: CA sicherstellen. Fehler hier NICHT hart (Cert-Gen kann trotzdem klappen).
+        let _ = Command::new("mkcert").arg("-install").status();
+    }
+    let status = Command::new("mkcert")
+        .args(mkcert_args(cert, key, sans))
+        .status()
+        .map_err(|e| AppError::Internal(format!("mkcert exec: {e}")))?;
+    if !status.success() {
+        return Err(AppError::Internal("mkcert schlug fehl".into()));
+    }
+    Ok(())
+}
+
+/// Beschafft ein Cert nach Präzedenz und liefert die zu ladenden PEM-Pfade.
+/// BYO mit fehlender Datei → fail-fast. mkcert-Fehler → Fallback rcgen (Cache).
+pub async fn beschaffe_cert(
+    cfg: &crate::config::Config,
+    sans: Vec<String>,
+) -> Result<(PathBuf, PathBuf), AppError> {
+    // Teil-BYO (nur eine Hälfte gesetzt) ist Fehlkonfiguration → fail-fast.
+    match (cfg.tls_cert.as_deref(), cfg.tls_key.as_deref()) {
+        (Some(_), None) | (None, Some(_)) => {
+            return Err(AppError::Internal(
+                "--tls-cert und --tls-key müssen gemeinsam gesetzt sein".into(),
+            ));
+        }
+        _ => {}
+    }
+    let (cache_cert, cache_key) = cache_pfade(&cfg.db_path);
+    let plan = plane_cert(
+        cfg.tls_cert.as_deref(),
+        cfg.tls_key.as_deref(),
+        cache_gueltig(&cache_cert, &cache_key),
+        &RealMkcert,
+        sans.clone(),
+    );
+    match plan.quelle {
+        CertQuelle::Byo { cert, key } => {
+            let (cp, kp) = (PathBuf::from(&cert), PathBuf::from(&key));
+            if !cache_gueltig(&cp, &kp) {
+                return Err(AppError::Internal(format!(
+                    "BYO-Cert/Key nicht lesbar: {cert} / {key}"
+                )));
+            }
+            Ok((cp, kp))
+        }
+        CertQuelle::Cache => Ok((cache_cert, cache_key)),
+        CertQuelle::Mkcert => {
+            match mkcert_erzeugen(&cache_cert, &cache_key, &plan.sans, cfg.tls_mkcert_install) {
+                Ok(()) => Ok((cache_cert, cache_key)),
+                Err(e) => {
+                    tracing::warn!("mkcert fehlgeschlagen ({e}) — Fallback rcgen");
+                    let (c, k) = rcgen_pem(&plan.sans)?;
+                    std::fs::write(&cache_cert, c)
+                        .map_err(|e| AppError::Internal(e.to_string()))?;
+                    std::fs::write(&cache_key, k).map_err(|e| AppError::Internal(e.to_string()))?;
+                    Ok((cache_cert, cache_key))
+                }
+            }
+        }
+        CertQuelle::Rcgen => {
+            let (c, k) = rcgen_pem(&plan.sans)?;
+            std::fs::write(&cache_cert, c).map_err(|e| AppError::Internal(e.to_string()))?;
+            std::fs::write(&cache_key, k).map_err(|e| AppError::Internal(e.to_string()))?;
+            Ok((cache_cert, cache_key))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -163,5 +265,23 @@ mod tests {
         std::fs::write(&k, "y").unwrap();
         assert!(super::cache_gueltig(&c, &k));
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn mkcert_args_enthalten_alle_sans() {
+        let args = super::mkcert_args(
+            &std::path::PathBuf::from("/tmp/c.pem"),
+            &std::path::PathBuf::from("/tmp/k.pem"),
+            &[
+                "localhost".to_string(),
+                "127.0.0.1".to_string(),
+                "elw.local".to_string(),
+            ],
+        );
+        // -cert-file /tmp/c.pem -key-file /tmp/k.pem localhost 127.0.0.1 elw.local
+        assert!(args.iter().any(|a| a == "-cert-file"));
+        assert!(args.iter().any(|a| a == "/tmp/c.pem"));
+        assert!(args.iter().any(|a| a == "elw.local"));
+        assert_eq!(args.last().unwrap(), "elw.local");
     }
 }
