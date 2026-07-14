@@ -120,12 +120,58 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
             .map(|t| t.als_str().to_string()),
     });
 
-    let listener = tokio::net::TcpListener::bind(&config.bind).await?;
-    tracing::info!("Server lauscht auf {}", config.bind);
+    if config.tls {
+        // CryptoProvider: rustls 0.23 nutzt bei GENAU EINEM kompilierten Provider-Feature dessen
+        // Default automatisch — meist KEIN manueller install_default() nötig. Hier bewusst KEINE
+        // hartkodierte Provider-Zeile (siehe Step 2 „CryptoProvider-Fall" für den Ernstfall).
 
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+        // SANs: localhost + Bind-IP + optionaler Hostname.
+        let bind_ip = config
+            .bind
+            .split(':')
+            .next()
+            .unwrap_or("127.0.0.1")
+            .to_string();
+        let mut sans = vec!["localhost".to_string(), "127.0.0.1".to_string()];
+        if bind_ip != "127.0.0.1" && bind_ip != "localhost" && !bind_ip.is_empty() {
+            sans.push(bind_ip);
+        }
+        if let Some(h) = &config.tls_hostname {
+            sans.push(h.clone());
+        }
+
+        let (cert_pfad, key_pfad) = lifeline_hub::tls::beschaffe_cert(&config, sans).await?;
+        let tls_config =
+            axum_server::tls_rustls::RustlsConfig::from_pem_file(&cert_pfad, &key_pfad).await?;
+
+        lifeline_hub::auth::session::set_cookie_secure(true);
+
+        // Achtung: anders als der HTTP-Pfad (`TcpListener::bind` = ToSocketAddrs, löst Hostnamen)
+        // erwartet axum-server eine `SocketAddr`. `--bind <hostname>:<port>` funktioniert daher NUR
+        // im HTTP-Modus; unter `--tls` muss `--bind` IP:Port sein (Default 127.0.0.1:8080 ist ok).
+        let addr: std::net::SocketAddr = config.bind.parse().map_err(|e| {
+            anyhow::anyhow!("--bind muss unter --tls IP:Port sein (kein Hostname): {e}")
+        })?;
+        tracing::info!("Server (HTTPS) lauscht auf {}", addr);
+
+        let handle = axum_server::Handle::new();
+        let h2 = handle.clone();
+        tokio::spawn(async move {
+            shutdown_signal().await;
+            h2.graceful_shutdown(Some(std::time::Duration::from_secs(10)));
+        });
+        axum_server::bind_rustls(addr, tls_config)
+            .handle(handle)
+            .serve(app.into_make_service())
+            .await?;
+    } else {
+        // Unveränderter HTTP-Bestandspfad.
+        let listener = tokio::net::TcpListener::bind(&config.bind).await?;
+        tracing::info!("Server lauscht auf {}", config.bind);
+        axum::serve(listener, app)
+            .with_graceful_shutdown(shutdown_signal())
+            .await?;
+    }
 
     Ok(())
 }
