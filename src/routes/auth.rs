@@ -1,5 +1,4 @@
 use crate::app::AppState;
-use crate::auth::password;
 use crate::auth::session::{self, CurrentUser, SESSION_COOKIE};
 use crate::error::AppError;
 use axum::extract::State;
@@ -30,23 +29,9 @@ pub async fn login(
     jar: CookieJar,
     Json(req): Json<LoginRequest>,
 ) -> Result<(CookieJar, Json<crate::auth::BenutzerAnzeige>), AppError> {
-    let benutzer = sqlx::query_as::<_, crate::auth::Benutzer>(
-        "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, aktiv, erstellt_at \
-         FROM benutzer WHERE benutzername = ? AND aktiv = 1",
-    )
-    .bind(&req.benutzername)
-    .fetch_optional(&state.pool)
-    .await?;
-
-    let benutzer = match benutzer {
-        Some(b) if password::verifizieren(&req.passwort, &b.passwort_hash) => b,
-        Some(_) => return Err(AppError::Unauthorized),
-        None => {
-            // Wegwerf-Hash, um die Antwortzeit anzugleichen (User-Enumeration-Schutz).
-            let _ = password::hash(&req.passwort);
-            return Err(AppError::Unauthorized);
-        }
-    };
+    let benutzer =
+        crate::auth::provider::password::anmelden(&state.pool, &req.benutzername, &req.passwort)
+            .await?;
 
     let token = session::anlegen(&state.pool, benutzer.id).await?;
     let jar = jar.add(session_cookie(token));
