@@ -45,9 +45,17 @@ pub struct StateEintrag {
 
 /// Speichert `eintrag` unter `state_key` mit einer Ablaufzeit von `TTL` ab
 /// jetzt. Ein evtl. vorhandener Eintrag unter demselben Key wird überschrieben.
+///
+/// Räumt vor dem Einfügen opportunistisch alle bereits abgelaufenen Einträge
+/// auf — verhindert unbegrenztes Wachstum der Map durch abgebrochene
+/// (`/oidc/start` ohne folgenden `/callback`) oder gespammte Start-Flows.
 pub fn speichere(state_key: String, eintrag: StateEintrag) {
-    let ablauf = Instant::now() + TTL;
+    let jetzt = Instant::now();
+    let ablauf = jetzt + TTL;
     let mut store = STORE.lock().unwrap_or_else(|poison| poison.into_inner());
+    // Opportunistisch abgelaufene Einträge aufräumen — verhindert unbegrenztes
+    // Wachstum durch nie abgeholte (abgebrochene/gespammte) /oidc/start-Flows.
+    store.retain(|_, (_, entry_ablauf)| *entry_ablauf > jetzt);
     store.insert(state_key, (eintrag, ablauf));
 }
 
@@ -124,11 +132,32 @@ mod tests {
     #[test]
     fn abgelaufener_eintrag_liefert_none() {
         let key = "state-abgelaufen".to_string();
-        let ablauf_in_der_vergangenheit = Instant::now() - Duration::from_secs(3600);
+        // Bewusst kein `Instant::now() - Duration::from_secs(...)`: `Instant`s
+        // `Sub` panickt bei Unterlauf, was auf einem Host mit <1h Monotonic-
+        // Uptime zuschlagen kann. `entnehme` prüft `jetzt >= ablauf` — ein
+        // `ablauf` von "jetzt" liest sich einen Moment später bereits als
+        // abgelaufen, ganz ohne Subtraktion.
+        let ablauf_in_der_vergangenheit = Instant::now();
         speichere_mit_ablauf(key.clone(), eintrag("/ziel"), ablauf_in_der_vergangenheit);
 
         let entnommen = entnehme(&key);
 
         assert_eq!(entnommen, None);
+    }
+
+    #[test]
+    fn speichere_raeumt_abgelaufene_eintraege_auf() {
+        let alt_key = "state-alt-abgelaufen".to_string();
+        speichere_mit_ablauf(alt_key.clone(), eintrag("/alt"), Instant::now());
+
+        let neu_key = "state-neu".to_string();
+        speichere(neu_key.clone(), eintrag("/neu"));
+
+        let store = STORE.lock().unwrap_or_else(|poison| poison.into_inner());
+        assert!(
+            !store.contains_key(&alt_key),
+            "abgelaufener Eintrag sollte beim naechsten speichere() aufgeraeumt werden"
+        );
+        assert!(store.contains_key(&neu_key));
     }
 }
