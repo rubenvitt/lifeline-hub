@@ -326,7 +326,11 @@ fn serde_wire_gleich_as_str() {
     wire_eq!(OrgRolle::Fuehrungskraft, OrgRolle::Keine);
 
     // auth-provider
-    wire_eq!(AuthProviderTyp::Passwort, AuthProviderTyp::Dev);
+    wire_eq!(
+        AuthProviderTyp::Passwort,
+        AuthProviderTyp::Dev,
+        AuthProviderTyp::Oidc
+    );
 }
 
 /// LFH-120 (Task 1b): Orphan-Union-Schema-Anker. Diese Enums haben KEIN `as_str()` —

@@ -3,7 +3,7 @@ use axum::http::{header, Request, StatusCode};
 use tower::ServiceExt; // stellt `oneshot` bereit
 
 mod common;
-use common::{anfrage, login_cookie, setup};
+use common::{anfrage, login_cookie, setup, setup_mit_pool};
 
 /// Sendet ein Login und gibt den `Set-Cookie`-Header-Wert zurück.
 async fn login(
@@ -137,6 +137,27 @@ async fn logout_invalidiert_session() {
 }
 
 #[tokio::test]
+async fn login_mit_deaktiviertem_passwort_provider_ist_403() {
+    // Enforcement-Seam (LFH-41, defensiv): direkt in `auth_provider` geschrieben, weil der
+    // Aussperr-Guard (`registry::schalten`) den Provider "passwort" NICHT deaktivieren ließe,
+    // solange noch ein aktiver Admin existiert (409, siehe `admin_kann_passwort_nicht_
+    // deaktivieren_409` unten) — der Guard umgeht also den regulären Toggle-Endpunkt. Anders als
+    // beim OIDC-Override (`oidc_deaktiviert_override`) ist hier kein prozessweiter OnceLock im
+    // Spiel: "passwort" ist immer in `konfiguriert()` gelistet, die Override-Zeile greift sofort.
+    let (app, pool) = setup_mit_pool().await;
+    sqlx::query(
+        "INSERT INTO auth_provider (id, aktiviert) VALUES ('passwort', 0) \
+         ON CONFLICT(id) DO UPDATE SET aktiviert = 0",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let (status, _) = login(&app, "admin", "startpw12").await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
 async fn providers_listet_passwort() {
     let app = setup().await;
     let (status, json) = anfrage(&app, "GET", "/api/auth/providers", "", None).await;
@@ -177,4 +198,125 @@ async fn admin_kann_passwort_nicht_deaktivieren_409() {
     )
     .await;
     assert_eq!(status, StatusCode::CONFLICT);
+}
+
+/// Schreibt eine Override-Zeile, die "oidc" explizit deaktiviert — unabhängig davon, ob der
+/// prozessweite `OIDC_KONFIGURIERT`-OnceLock (in `auth::provider::registry`) in diesem
+/// Testbinary-Prozess (`--test auth`) bereits `true` ist oder noch `false`:
+/// - `false` (Default/noch keine andere Test-Funktion hat `set_oidc_konfiguriert(true)`
+///   aufgerufen): "oidc" taucht in `konfiguriert()` gar nicht auf, die Override-Zeile wird von
+///   `liste()` schlicht ignoriert (kein Effekt, aber auch kein Schaden) — 404 wie vorher.
+/// - `true` (irgendeine andere Testfunktion in diesem Prozess hat es bereits gesetzt — der
+///   OnceLock ist prozessweit, `#[tokio::test]`s in einer Datei laufen im selben Prozess,
+///   Reihenfolge ist NICHT garantiert): ohne diese Override-Zeile würde "oidc" plötzlich
+///   `aktiviert=true` gelistet und der Enforcement-Check hier fälschlich durchfallen (404 →
+///   Redirect). Die Zeile macht die Assertion damit reihenfolge-unabhängig.
+async fn oidc_deaktiviert_override(pool: &sqlx::SqlitePool) {
+    sqlx::query(
+        "INSERT INTO auth_provider (id, aktiviert) VALUES ('oidc', 0) \
+         ON CONFLICT(id) DO UPDATE SET aktiviert = 0",
+    )
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn oidc_start_ohne_konfigurierten_provider_ist_404() {
+    // Siehe `oidc_deaktiviert_override`-Doc: macht diesen Test robust gegen die Ausführungs-
+    // reihenfolge mit `oidc_callback_mit_unbekanntem_state_redirect_auf_login_fehler` (setzt in
+    // diesem Prozess `set_oidc_konfiguriert(true)` — prozessweiter OnceLock, kein Zurücksetzen).
+    // Prüft die JSON-Fehler-Antwort (nicht nur den Statuscode): unterscheidet den echten
+    // Enforcement-404 (`AppError::NotFound`, JSON-Body `{"error": "Nicht gefunden"}`) von einem
+    // bloßen Routing-404 (nicht registrierte Route), das ein leerer Klartext-Body wäre und hier
+    // zu `Value::Null` degradieren würde.
+    let (app, pool) = setup_mit_pool().await;
+    oidc_deaktiviert_override(&pool).await;
+    let (status, json) = anfrage(&app, "GET", "/api/auth/oidc/start", "", None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(json["error"], "Nicht gefunden");
+}
+
+#[tokio::test]
+async fn oidc_callback_ohne_konfigurierten_provider_ist_404() {
+    // Dieselbe Enforcement-Prüfung (Registry-Check) wie `oidc_start` — siehe
+    // `oidc_deaktiviert_override`-Doc zur Reihenfolge-Unabhängigkeit.
+    let (app, pool) = setup_mit_pool().await;
+    oidc_deaktiviert_override(&pool).await;
+    let (status, json) = anfrage(
+        &app,
+        "GET",
+        "/api/auth/oidc/callback?code=x&state=unbekannt",
+        "",
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(json["error"], "Nicht gefunden");
+}
+
+#[tokio::test]
+async fn oidc_callback_mit_unbekanntem_state_redirect_auf_login_fehler() {
+    // Aktiviert "oidc" GLOBAL für den Rest dieses Testbinary-Prozesses (`OIDC_KONFIGURIERT`
+    // ist ein `OnceLock`, `set_oidc_konfiguriert` ignoriert jeden weiteren Aufruf) — siehe
+    // `oidc_deaktiviert_override`-Doc für die Kehrseite (macht die beiden 404-Tests oben
+    // reihenfolge-unabhängig).
+    lifeline_hub::auth::provider::registry::set_oidc_konfiguriert(true);
+    let app = setup().await;
+
+    // `state=unbekannt` wurde nie über `/oidc/start` angelegt: `entnehme` liefert `None` — DAS
+    // greift, BEVOR der Handler irgendeinen Netzzugriff (Token-Tausch/Discovery) macht, ist also
+    // ohne echten IdP testbar (kein `set_oidc_konfiguriert`-Discovery-Aufruf nötig, weil der
+    // State-Check zuerst läuft und hier sofort scheitert).
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/auth/oidc/callback?code=x&state=unbekannt")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::SEE_OTHER); // axum::response::Redirect::to = 303
+    let location = resp
+        .headers()
+        .get(header::LOCATION)
+        .expect("Location-Header erwartet")
+        .to_str()
+        .unwrap();
+    assert_eq!(location, "/login?fehler=oidc");
+}
+
+#[tokio::test]
+async fn oidc_callback_mit_idp_error_redirect_ohne_400() {
+    // Derselbe prozessweite OnceLock wie in `oidc_callback_mit_unbekanntem_state_redirect_auf_
+    // login_fehler` — erneutes Setzen ist ein No-op, falls eine andere Testfunktion in diesem
+    // Prozess bereits `true` gesetzt hat (reihenfolge-unabhängig).
+    lifeline_hub::auth::provider::registry::set_oidc_konfiguriert(true);
+    let app = setup().await;
+
+    // IdP-Error-Callback (z. B. abgelehnte Zustimmung): `?error=access_denied&state=...`, KEIN
+    // `code` — ein normaler, spec-konformer Ablauf (RFC 6749 4.1.2.1). Vor Fix B waren `code`/
+    // `state` Pflichtfelder im Query-Extractor, der diesen Fall mit einer rohen 400 abgelehnt
+    // hätte. Erwartet: derselbe generische Redirect wie bei jedem anderen Callback-Fehler,
+    // KEIN 400.
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/auth/oidc/callback?error=access_denied&state=irgendwas")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::SEE_OTHER); // axum::response::Redirect::to = 303
+    let location = resp
+        .headers()
+        .get(header::LOCATION)
+        .expect("Location-Header erwartet")
+        .to_str()
+        .unwrap();
+    assert_eq!(location, "/login?fehler=oidc");
 }

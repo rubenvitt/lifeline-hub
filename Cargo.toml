@@ -42,6 +42,15 @@ clamav-client = { version = "2.2", optional = true, default-features = false, fe
 # rcgen für die selbstsignierte Cert-Generierung (mkcert-/BYO-Fallback).
 axum-server = { version = "0.7", features = ["tls-rustls"] }
 rcgen = "0.14"
+# LFH-41: OIDC/SSO (Increment 3). Task 1 nur die Dependency — Discovery/Token-Exchange/Claims
+# folgen in späteren Increment-3-Tasks (Lazy Discovery, kein Netz beim Start).
+# default-features aus: die Default-Features "reqwest"/"rustls-tls" ziehen oauth2s eigenen
+# reqwest-0.12-Stack (hyper-rustls mit `ring`) hinein — kollidiert mit unserem reqwest 0.13
+# (`aws-lc-rs`) auf demselben rustls-0.23: rustls kann dann den Default-CryptoProvider nicht
+# mehr automatisch bestimmen (bricht tls::tests::rcgen_pem_ist_per_rustls_ladbar). Spätere
+# Tasks liefern den HTTP-Client für `request_async`/`discover_async` selbst (SSRF-Disziplin:
+# `redirect::Policy::none()` verlangt ohnehin einen eigenen Client statt oauth2s Default).
+openidconnect = { version = "4", default-features = false }
 
 [features]
 # Dev-only: aktiviert Seed-Testdaten und den /api/dev/users-Endpoint.

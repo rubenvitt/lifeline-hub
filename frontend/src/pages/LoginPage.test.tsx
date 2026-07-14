@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
@@ -133,5 +133,70 @@ describe('LoginPage', () => {
     // nur `&& p.aktiviert` verhindert das Rendern. Fiele diese Bedingung weg, bliebe das
     // Passwort-Feld sichtbar, weil der `typ === 'passwort'`-Filter allein noch träfe.
     await waitFor(() => expect(screen.queryByLabelText('Passwort')).not.toBeInTheDocument());
+  });
+
+  describe('OIDC-Redirect-Button (LFH-41)', () => {
+    // jsdom erlaubt kein Redefine von `window.location.assign` (nicht konfigurierbar);
+    // stattdessen `location` komplett durch eine Kopie mit gemocktem `assign` ersetzen
+    // und nach dem Test zurückbauen.
+    const ursprünglicheLocation = window.location;
+
+    afterEach(() => {
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: ursprünglicheLocation,
+      });
+    });
+
+    it('rendert einen Redirect-Button für einen aktiven oidc-Provider und leitet bei Klick weiter', async () => {
+      const assignSpion = vi.fn();
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: { ...ursprünglicheLocation, assign: assignSpion },
+      });
+      server.use(
+        http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })),
+      );
+      server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
+      server.use(
+        http.get('/api/auth/providers', () =>
+          HttpResponse.json([
+            { id: 'oidc', typ: 'oidc', anzeigename: 'PocketID', aktiviert: true },
+          ]),
+        ),
+      );
+      renderMitProviders(
+        <AuthProvider>
+          <LoginPage />
+        </AuthProvider>,
+      );
+
+      const knopf = await screen.findByRole('button', { name: 'Mit PocketID anmelden' });
+      await userEvent.click(knopf);
+
+      expect(assignSpion).toHaveBeenCalledWith('/api/auth/oidc/start?von=%2Feinsaetze');
+    });
+
+    it('zeigt keinen Redirect-Button, wenn der oidc-Provider deaktiviert ist', async () => {
+      server.use(
+        http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })),
+      );
+      server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
+      server.use(
+        http.get('/api/auth/providers', () =>
+          HttpResponse.json([
+            { id: 'oidc', typ: 'oidc', anzeigename: 'PocketID', aktiviert: false },
+          ]),
+        ),
+      );
+      renderMitProviders(
+        <AuthProvider>
+          <LoginPage />
+        </AuthProvider>,
+      );
+
+      await screen.findByLabelText('Passwort');
+      expect(screen.queryByRole('button', { name: /PocketID/ })).not.toBeInTheDocument();
+    });
   });
 });

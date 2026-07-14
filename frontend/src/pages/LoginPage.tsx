@@ -1,4 +1,4 @@
-import { Alert, Button, Form, Input, Space, Tag } from 'antd';
+import { Alert, Button, Divider, Form, Input, Space, Tag } from 'antd';
 import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -45,7 +45,9 @@ export default function LoginPage() {
       .then(setProvider)
       // Fehler → Passwort-Login als sicherer Default annehmen.
       .catch(() =>
-        setProvider([{ id: 'passwort', typ: 'passwort', anzeigename: 'Passwort', aktiviert: true }]),
+        setProvider([
+          { id: 'passwort', typ: 'passwort', anzeigename: 'Passwort', aktiviert: true },
+        ]),
       );
   }, []);
 
@@ -53,6 +55,15 @@ export default function LoginPage() {
   // (kein Flackern, kein Aussperren bei Ladefehler).
   const passwortAktiv =
     provider.length === 0 || provider.some((p) => p.typ === 'passwort' && p.aktiviert);
+  // Aktive OIDC-Provider (LFH-41): jeder rendert einen eigenen Redirect-Button.
+  const ssoProvider = provider.filter((p) => p.typ === 'oidc' && p.aktiviert);
+
+  // OIDC ist ein Browser-Redirect-Flow (kein fetch/XHR): der Server leitet auf den
+  // Identity-Provider weiter, daher ein echter Full-Page-Redirect. `von` trägt das
+  // schon berechnete Redirect-Ziel weiter, damit der Callback dorthin zurückführt.
+  function starteOidcAnmeldung() {
+    window.location.assign(`/api/auth/oidc/start?von=${encodeURIComponent(zielPfad)}`);
+  }
 
   async function absenden(werte: FormWerte) {
     setFehler(null);
@@ -104,6 +115,16 @@ export default function LoginPage() {
             </Space>
           </div>
         )}
+        {ssoProvider.length > 0 && (
+          <Space direction="vertical" style={{ width: '100%' }} size={10}>
+            {ssoProvider.map((p) => (
+              <Button key={p.id} size="large" block onClick={starteOidcAnmeldung}>
+                Mit {p.anzeigename} anmelden
+              </Button>
+            ))}
+          </Space>
+        )}
+        {ssoProvider.length > 0 && passwortAktiv && <Divider>oder</Divider>}
         {passwortAktiv && (
           <Form
             layout="vertical"

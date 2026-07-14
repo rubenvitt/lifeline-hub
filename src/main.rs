@@ -106,6 +106,27 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         timeout: std::time::Duration::from_secs(config.clamav_timeout_secs),
     });
 
+    // OIDC-Konfiguriertheit (LFH-41, Increment 3 SSO-Fundament) prozessweit setzen —
+    // reine Config-Ableitung, KEIN Netzzugriff (Discovery ist Lazy: erst bei erster
+    // OIDC-Nutzung, dann gecacht). Alle vier Settings (inkl. `oidc_redirect_url`) sind
+    // Teil der Bedingung — `oidc_client()` (auth::oidc::mod) verlangt `redirect_url`
+    // zwingend; ohne sie würde der Login serverseitig ohnehin fail-closed abbrechen.
+    // Der Provider soll also nur dann gelistet/aktiv sein (und der Login-Button nur
+    // dann erscheinen), wenn ein Login tatsächlich gelingen kann — sonst wäre der
+    // Button ein Footgun, der erst beim Klick als Fehlkonfiguration auffällt.
+    lifeline_hub::auth::provider::registry::set_oidc_konfiguriert(
+        config.oidc_issuer.is_some()
+            && config.oidc_client_id.is_some()
+            && config.oidc_client_secret.is_some()
+            && config.oidc_redirect_url.is_some(),
+    );
+    // Resolved OIDC-Einstellungen prozessweit ablegen (siehe `auth::oidc::OidcSettings`-Doc):
+    // `oidc_client` bleibt unit-testbar mit einer expliziten `&OidcSettings`-Referenz, der
+    // `oidc_start`-Handler (Task 5) liest sie über `auth::oidc::oidc_settings()`.
+    lifeline_hub::auth::oidc::init_oidc_settings(lifeline_hub::auth::oidc::OidcSettings::from(
+        &config,
+    ));
+
     let app = build_router(AppState {
         pool,
         live,

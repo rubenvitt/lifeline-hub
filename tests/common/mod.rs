@@ -10,12 +10,19 @@ use serde_json::Value;
 use tower::ServiceExt;
 
 pub async fn setup() -> axum::Router {
+    setup_mit_pool().await.0
+}
+
+/// Wie `setup()`, liefert zusätzlich den (isolierten) Pool zurück — für Tests, die neben dem
+/// Router auch direkten DB-Zugriff brauchen (z. B. eine `auth_provider`-Override-Zeile schreiben,
+/// siehe `tests/auth.rs`s OIDC-Enforcement-Tests).
+pub async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
     let pool = db::test_pool().await;
     bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
         .await
         .unwrap();
-    build_router(AppState {
-        pool,
+    let router = build_router(AppState {
+        pool: pool.clone(),
         live: LiveHub::new(),
         karten_dir: std::env::temp_dir(),
         fachebenen: lifeline_hub::karte::FachebenenState::neu(),
@@ -23,7 +30,8 @@ pub async fn setup() -> axum::Router {
         download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
         karten_service_url: None,
         karten_service_token: None,
-    })
+    });
+    (router, pool)
 }
 
 pub async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) -> String {
