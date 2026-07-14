@@ -16,10 +16,10 @@ pub mod state;
 
 use crate::config::{Config, GeheimesPasswort};
 use crate::error::AppError;
-use openidconnect::core::{CoreClient, CoreProviderMetadata};
+use openidconnect::core::{CoreClient, CoreProviderMetadata, CoreTokenResponse};
 use openidconnect::{
-    ClientId, ClientSecret, EndpointMaybeSet, EndpointNotSet, EndpointSet, HttpRequest,
-    HttpResponse, IssuerUrl, RedirectUrl,
+    AuthorizationCode, ClientId, ClientSecret, EndpointMaybeSet, EndpointNotSet, EndpointSet,
+    HttpRequest, HttpResponse, IssuerUrl, PkceCodeVerifier, RedirectUrl,
 };
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -125,6 +125,43 @@ pub async fn oidc_client(cfg: &OidcSettings) -> Result<OidcCoreClient, AppError>
     .set_redirect_uri(redirect_url);
 
     Ok(client)
+}
+
+/// Tauscht den Authorization-Code gegen ein Token-Response (Task 6, `GET /api/auth/oidc/callback`):
+/// **muss NACH dem State-Store-Guard-Drop aufgerufen werden** (Aufrufer: `routes::auth::oidc_callback`
+/// ruft `state::entnehme` SYNC und VOR diesem `.await`, Plan-MUST „!Send" — hier selbst ist kein
+/// Guard im Spiel, das ist reine Aufrufer-Disziplin). Baut denselben SSRF-resistenten
+/// HTTP-Client-Adapter wie `discovery()` (kein zweiter TLS-/Redirect-Policy-Stack im Prozess).
+///
+/// `exchange_code` liefert hier ein `Result` (nicht den Request direkt), weil `OidcCoreClient`s
+/// Token-Endpoint-Zustand `EndpointMaybeSet` ist (Discovery setzt ihn nur, wenn der IdP einen
+/// `token_endpoint` meldet — Build-Verify-Punkt, siehe Modul-Doc oben zu `OidcCoreClient`).
+///
+/// Jeder Fehler (fehlender Token-Endpoint, Netzwerk-/IdP-Fehler, vom Server abgelehnter Code)
+/// wird als `AppError` geliefert — der Aufrufer verwirft den Fehlerinhalt und redirected
+/// generisch auf die LoginPage, damit kein IdP-/Token-Detail in der HTTP-Antwort landet
+/// (Security-MUST „kein Detail-Leak" des Plans).
+pub async fn tausche_code_gegen_token(
+    client: &OidcCoreClient,
+    code: String,
+    pkce_verifier: String,
+) -> Result<CoreTokenResponse, AppError> {
+    let token_request = client
+        .exchange_code(AuthorizationCode::new(code))
+        .map_err(|e| AppError::ServiceUnavailable(format!("OIDC-Token-Endpoint fehlt: {e}")))?
+        .set_pkce_verifier(PkceCodeVerifier::new(pkce_verifier));
+
+    let reqwest_client = ssrf_http_client()?;
+    // Closure statt eigener `impl AsyncHttpClient`-Block, siehe Modul-Doc oben (`discovery()`).
+    let http_client = move |request: HttpRequest| {
+        let reqwest_client = reqwest_client.clone();
+        async move { fuehre_http_request_aus(&reqwest_client, request).await }
+    };
+
+    token_request
+        .request_async(&http_client)
+        .await
+        .map_err(|e| AppError::ServiceUnavailable(format!("OIDC-Token-Tausch fehlgeschlagen: {e}")))
 }
 
 /// Liest ein Pflicht-OIDC-Config-Feld; fehlt/ist leer → `AppError::NotImplemented` („nicht

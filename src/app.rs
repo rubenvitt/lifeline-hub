@@ -47,6 +47,7 @@ pub fn build_router(state: AppState) -> Router {
             put(routes::auth::provider_schalten),
         )
         .route("/api/auth/oidc/start", get(routes::auth::oidc_start))
+        .route("/api/auth/oidc/callback", get(routes::auth::oidc_callback))
         .route("/api/benutzer", get(routes::benutzer::liste))
         .route("/api/benutzer", post(routes::benutzer::anlegen))
         .route(

@@ -7,7 +7,7 @@ use axum::response::Redirect;
 use axum::Json;
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use openidconnect::core::CoreAuthenticationFlow;
-use openidconnect::{CsrfToken, Nonce, PkceCodeChallenge, Scope};
+use openidconnect::{CsrfToken, Nonce, PkceCodeChallenge, Scope, TokenResponse};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -137,7 +137,7 @@ pub async fn oidc_start(
 
     let client = match crate::auth::oidc::oidc_client(crate::auth::oidc::oidc_settings()).await {
         Ok(client) => client,
-        Err(_) => return Ok(Redirect::to("/login?fehler=oidc")),
+        Err(_) => return Ok(oidc_fehler_redirect()),
     };
 
     let ziel_pfad = ziel_pfad_aus_query(query.von);
@@ -166,6 +166,118 @@ pub async fn oidc_start(
     );
 
     Ok(Redirect::to(auth_url.as_str()))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct OidcCallbackQuery {
+    code: String,
+    state: String,
+}
+
+/// Generischer Fehler-Redirect für den OIDC-Callback: unbekannter/abgelaufener `state`,
+/// Token-Tausch-/Discovery-Fehler, fehlendes/ungültiges `id_token` ODER ein deaktiviertes
+/// SSO-Konto münden ALLE in denselben Pfad/dieselbe Fehlermeldung — kein IdP-/Validierungs-
+/// detail leakt in die HTTP-Antwort (Security-MUST des Plans). Der lokale Passwort-Login
+/// bleibt von jedem dieser Fehler unberührt.
+fn oidc_fehler_redirect() -> Redirect {
+    Redirect::to("/login?fehler=oidc")
+}
+
+/// GET /api/auth/oidc/callback — Token-Tausch, `id_token`-Validierung, JIT-Provisioning,
+/// Session (LFH-41, Increment 3). **Security-kritisch**, Reihenfolge ist bewusst:
+///
+/// 1. Enforcement wie `oidc_start` (dieselbe Registry-Prüfung) → 404, falls `oidc` nicht
+///    konfiguriert/aktiviert ist.
+/// 2. `state::entnehme(state)` — **SYNC, GANZ ZUERST**: der State-Store-Guard wird darin
+///    bereits vor der Rückgabe freigegeben (Task 3/Modul-Doc `state.rs`). Ab hier darf beliebig
+///    `.await`et werden, ohne einen std-Mutex-Guard über eine Await-Grenze zu halten
+///    (Plan-MUST „!Send"). `None` (unbekannt/abgelaufen/schon verbraucht) → generischer Redirect,
+///    NOCH VOR jedem Netzzugriff (Token-Tausch/Discovery).
+/// 3. Token-Tausch (`tausche_code_gegen_token`) — erst NACH dem Guard-Drop.
+/// 4. `id_token`-Validierung über `openidconnect` (`id_token.claims(&verifier, &nonce)`):
+///    verifiziert Signatur (JWKS), `nonce`, `iss`, `aud`, `exp`.
+/// 5. JIT-Provisioning (`finde_oder_provisioniere`, Match ausschließlich über `(issuer, sub)`).
+/// 6. **[MUST — Task-2-Handoff]** `finde_oder_provisioniere` matcht/legt unabhängig von
+///    `benutzer.aktiv` an — ein deaktiviertes SSO-Konto wird HIER zurückgewiesen, es entsteht
+///    keine Session.
+/// 7. Session anlegen, Cookie setzen, Redirect auf `eintrag.ziel_pfad` (bereits in Task 5
+///    Open-Redirect-geprüft, daher hier sicher ausgebbar).
+///
+/// JEDER Fehler ab Schritt 2 (state/Token/Validierung/Aktiv-Check) mündet in DENSELBEN
+/// generischen Redirect — kein Server-Fehler, kein IdP-/Token-Detail-Leak. Nur Datenbankfehler
+/// (Registry-Lookup, Provisioning, Session) propagieren als `AppError` (generisches 500, wie
+/// überall sonst) — sie enthalten keine IdP-/Token-Details.
+pub async fn oidc_callback(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    Query(query): Query<OidcCallbackQuery>,
+) -> Result<(CookieJar, Redirect), AppError> {
+    let liste = crate::auth::provider::registry::liste(&state.pool).await?;
+    let oidc_aktiv = liste
+        .iter()
+        .any(|p| p.id == crate::auth::provider::ID_OIDC && p.aktiviert);
+    if !oidc_aktiv {
+        return Err(AppError::NotFound);
+    }
+
+    // SYNC, VOR jedem `.await`: siehe Doc-Kommentar oben (Punkt 2) + `state.rs`. Lastragend
+    // (nicht nur !Send-relevant): dieser Aufruf MUSS vor dem Token-Tausch/Discovery unten stehen,
+    // damit ein unbekannter/abgelaufener `state` VOR jedem Netzzugriff zum Fehler-Redirect
+    // kurzschließt (Security-Reihenfolge, kein Test pinnt das — ein Refactor darf diese Zeile
+    // nicht hinter `oidc_client`/`tausche_code_gegen_token` verschieben).
+    let Some(eintrag) = crate::auth::oidc::state::entnehme(&query.state) else {
+        return Ok((jar, oidc_fehler_redirect()));
+    };
+
+    let Ok(client) = crate::auth::oidc::oidc_client(crate::auth::oidc::oidc_settings()).await
+    else {
+        return Ok((jar, oidc_fehler_redirect()));
+    };
+
+    let Ok(token_response) =
+        crate::auth::oidc::tausche_code_gegen_token(&client, query.code, eintrag.pkce_verifier)
+            .await
+    else {
+        return Ok((jar, oidc_fehler_redirect()));
+    };
+
+    let Some(id_token) = token_response.id_token() else {
+        return Ok((jar, oidc_fehler_redirect()));
+    };
+
+    // Verifiziert Signatur (JWKS), `nonce`, `iss`, `aud`, `exp` — siehe Doc-Kommentar Punkt 4.
+    let Ok(claims) = id_token.claims(&client.id_token_verifier(), &Nonce::new(eintrag.nonce))
+    else {
+        return Ok((jar, oidc_fehler_redirect()));
+    };
+
+    // `name` ist ein lokalisierter Claim (Sprachtag → Wert); ohne Sprachpräferenz wird der
+    // Default-Wert genommen, sonst der erste vorhandene.
+    let name = claims.name().and_then(|localized| {
+        localized
+            .get(None)
+            .or_else(|| localized.iter().next().map(|(_, wert)| wert))
+    });
+
+    let oidc_claims = crate::auth::oidc::provisioning::OidcClaims {
+        issuer: claims.issuer().as_str().to_string(),
+        subject: claims.subject().as_str().to_string(),
+        preferred_username: claims.preferred_username().map(|u| u.as_str().to_string()),
+        name: name.map(|n| n.as_str().to_string()),
+    };
+
+    let benutzer =
+        crate::auth::oidc::provisioning::finde_oder_provisioniere(&state.pool, &oidc_claims)
+            .await?;
+
+    // [MUST — Task-2-Handoff] siehe Doc-Kommentar Punkt 6.
+    if !benutzer.aktiv {
+        return Ok((jar, oidc_fehler_redirect()));
+    }
+
+    let token = session::anlegen(&state.pool, benutzer.id).await?;
+    let jar = jar.add(session_cookie(token, crate::auth::session::cookie_secure()));
+    Ok((jar, Redirect::to(&eintrag.ziel_pfad)))
 }
 
 #[cfg(test)]
