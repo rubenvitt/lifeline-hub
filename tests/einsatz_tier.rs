@@ -4,39 +4,13 @@
 
 use axum::body::{to_bytes, Body};
 use axum::http::{header, Request, StatusCode};
-use lifeline_hub::app::{build_router, AppState};
-use lifeline_hub::auth::bootstrap::bootstrap_admin;
-use lifeline_hub::db;
-use lifeline_hub::live::LiveHub;
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
 mod common;
-use common::{benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen};
+use common::{benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup};
 
 // ---------- Harness ----------
-
-async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
-    let pool = db::test_pool().await;
-    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
-        .await
-        .unwrap();
-    let router = build_router(AppState {
-        pool: pool.clone(),
-        live: LiveHub::new(),
-        karten_dir: std::env::temp_dir(),
-        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
-        download_client: lifeline_hub::karte::download::download_client(),
-        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
-        karten_service_url: None,
-        karten_service_token: None,
-    });
-    (router, pool)
-}
-
-async fn setup() -> axum::Router {
-    setup_mit_pool().await.0
-}
 
 async fn anfrage(
     app: &axum::Router,

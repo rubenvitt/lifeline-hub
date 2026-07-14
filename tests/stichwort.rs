@@ -1,6 +1,5 @@
-use axum::body::{to_bytes, Body};
+use axum::body::Body;
 use axum::http::{header, Request, StatusCode};
-use serde_json::Value;
 use tower::ServiceExt;
 
 mod common;
@@ -23,26 +22,6 @@ async fn post_vorschlag(app: &axum::Router, cookie: &str, text: &str) -> StatusC
         .status()
 }
 
-async fn liste_vorschlaege(app: &axum::Router, cookie: &str) -> (StatusCode, Value) {
-    let resp = app
-        .clone()
-        .oneshot(
-            Request::builder()
-                .uri("/api/stichwort-vorschlaege")
-                .header(header::COOKIE, cookie.to_string())
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    let status = resp.status();
-    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-    (
-        status,
-        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
-    )
-}
-
 #[tokio::test]
 async fn admin_legt_vorschlag_an_und_alle_sehen_ihn() {
     let app = setup().await;
@@ -55,7 +34,7 @@ async fn admin_legt_vorschlag_an_und_alle_sehen_ihn() {
     );
 
     let erika = login_cookie(&app, "erika", "erikapw1").await;
-    let (status, json) = liste_vorschlaege(&app, &erika).await;
+    let (status, json) = anfrage(&app, "GET", "/api/stichwort-vorschlaege", &erika, None).await;
     assert_eq!(status, StatusCode::OK);
     let texte: Vec<&str> = json
         .as_array()
@@ -102,7 +81,7 @@ async fn admin_loescht_vorschlag() {
         StatusCode::CREATED
     );
 
-    let (_, json) = liste_vorschlaege(&app, &admin).await;
+    let (_, json) = anfrage(&app, "GET", "/api/stichwort-vorschlaege", &admin, None).await;
     let id = json
         .as_array()
         .unwrap()
@@ -126,7 +105,7 @@ async fn admin_loescht_vorschlag() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::NO_CONTENT);
 
-    let (_, json) = liste_vorschlaege(&app, &admin).await;
+    let (_, json) = anfrage(&app, "GET", "/api/stichwort-vorschlaege", &admin, None).await;
     let texte: Vec<&str> = json
         .as_array()
         .unwrap()
