@@ -124,4 +124,16 @@ describe('baueTaktischeMarker', () => {
     expect(tz?.grundzeichen).toBe('wasserfahrzeug');
     expect(tz?.organisation).toBe('feuerwehr');
   });
+
+  it('reicht Funktion + Führungskraft-Flag an die Personen-TZ-Ableitung durch (LFH-172)', () => {
+    const fuehrungskraefte = [
+      { id: 3, name: 'Müller', lat: 50.4, lon: 8.9, tz_fachaufgabe: null, tz_organisation: null,
+        funktion: 'Notfallsanitäter, Gruppenführer', ist_einheitsfuehrer: true, ist_abschnittsleiter: false },
+    ] as unknown as TaktischeQuelle['fuehrungskraefte'];
+    const { verortet } = baueTaktischeMarker(
+      { einheiten: [], fahrzeuge: [], fuehrungskraefte, orgDefault: null });
+    const tz = verortet.find((m) => m.schluessel === 'fuehrung-3')?.tz;
+    expect(tz?.funktion).toBe('fuehrungskraft');
+    expect(tz?.fachaufgabe).toBe('rettungswesen');
+  });
 });

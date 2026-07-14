@@ -281,6 +281,7 @@ pub async fn liste_fuehrungskraefte(
     let rows = sqlx::query_as::<_, FuehrungskraftKarte>(
         "SELECT ep.id, ep.einsatz_id, ep.snap_name AS name, \
                 ep.lat, ep.lon, ep.tz_fachaufgabe, ep.tz_organisation, \
+                ep.snap_funktion AS funktion, \
                 EXISTS(SELECT 1 FROM einsatz_einheit e \
                        WHERE e.einsatz_id = ep.einsatz_id AND e.fuehrer_id = ep.id) AS ist_einheitsfuehrer, \
                 EXISTS(SELECT 1 FROM einsatzabschnitt a \

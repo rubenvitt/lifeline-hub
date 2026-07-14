@@ -3,6 +3,7 @@ import { erzeugeTaktischesZeichen } from 'taktische-zeichen-react';
 import {
   baueTzProps, groesseAusLabel, einsatzortTz, schadenTz, uhsTz,
   grundzeichenAusFahrzeugtyp, organisationAusText, fachaufgabeAusFahrzeugtyp,
+  fachaufgabeAusFunktion,
 } from './taktischesZeichen';
 
 describe('taktischesZeichen', () => {
@@ -136,6 +137,53 @@ describe('LFH-171: Fahrzeug-Zeichen aus Fahrzeugtyp/OPTA ableiten', () => {
       expect(render(baueTzProps({ objekttyp: 'fahrzeug', fahrzeugtyp: 'MZB', traegerorganisation: 'Feuerwehr' }))).toContain('<svg');
       expect(render(baueTzProps({ objekttyp: 'fahrzeug', fahrzeugtyp: 'Krad' }))).toContain('<svg');
       expect(render(baueTzProps({ objekttyp: 'fahrzeug', fahrzeugtyp: 'LF 20', traegerorganisation: 'Feuerwehr' }))).toContain('<svg');
+    });
+  });
+});
+
+describe('LFH-172: Personal-Zeichen aus Funktion differenzieren', () => {
+  describe('fachaufgabeAusFunktion (Qualifikations-Text → Fachaufgabe, schmale Whitelist)', () => {
+    it('mappt sanitäts-/ärztliche Qualifikationen', () => {
+      expect(fachaufgabeAusFunktion('Notfallsanitäter')).toBe('rettungswesen');
+      expect(fachaufgabeAusFunktion('Sanitäter, Gruppenführer')).toBe('rettungswesen');
+      expect(fachaufgabeAusFunktion('Notarzt')).toBe('aerztliche-versorgung');
+    });
+    it('reine Führungsqualifikation → undefined (bleibt beim fuehrung-Default)', () => {
+      expect(fachaufgabeAusFunktion('Zugführer')).toBeUndefined();
+      expect(fachaufgabeAusFunktion(null)).toBeUndefined();
+    });
+  });
+
+  describe('baueTzProps – Führungskraft-Ableitung', () => {
+    it('Führungskraft erhält den DV-102-Funktions-Indikator + fuehrung-Default', () => {
+      const p = baueTzProps({ objekttyp: 'fuehrung', istFuehrungskraft: true });
+      expect(p.grundzeichen).toBe('person');
+      expect(p.funktion).toBe('fuehrungskraft');
+      expect(p.fachaufgabe).toBe('fuehrung');
+    });
+    it('leitet die Fachaufgabe aus dem Funktions-/Qualifikationstext ab', () => {
+      const p = baueTzProps({ objekttyp: 'fuehrung', istFuehrungskraft: true, funktion: 'Notfallsanitäter, Gruppenführer' });
+      expect(p.fachaufgabe).toBe('rettungswesen');
+      expect(p.funktion).toBe('fuehrungskraft');
+    });
+    it('manueller tz_fachaufgabe-Override schlägt die Funktions-Ableitung', () => {
+      const p = baueTzProps({ objekttyp: 'fuehrung', istFuehrungskraft: true, fachaufgabe: 'iuk', funktion: 'Sanitäter' });
+      expect(p.fachaufgabe).toBe('iuk');
+    });
+    it('ohne Führungskraft-Flag kein Funktions-Indikator (nicht-Führung nicht als Führer markieren)', () => {
+      const p = baueTzProps({ objekttyp: 'fuehrung', istFuehrungskraft: false });
+      expect(p.funktion).toBeUndefined();
+      expect(p.grundzeichen).toBe('person');
+    });
+  });
+
+  describe('Render-Integration', () => {
+    it('erzeugt valides SVG für eine Führungskraft mit Funktion + Fachaufgabe', () => {
+      const svg = erzeugeTaktischesZeichen({
+        ...baueTzProps({ objekttyp: 'fuehrung', istFuehrungskraft: true, funktion: 'Notfallsanitäter' }),
+        skipFontRegistration: true,
+      }).svg.render();
+      expect(svg).toContain('<svg');
     });
   });
 });

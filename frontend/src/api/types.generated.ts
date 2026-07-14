@@ -902,6 +902,11 @@ export interface components {
         FuehrungskraftKarte: {
             /** Format: int64 */
             einsatz_id: number;
+            /**
+             * @description Qualifikationen/Funktion als flacher Text (Snapshot). Quelle für die FE-Ableitung der
+             *     Fachaufgabe des Personen-Zeichens (LFH-172); `tz_fachaufgabe` bleibt vorrangig.
+             */
+            funktion?: string | null;
             /** Format: int64 */
             id: number;
             ist_abschnittsleiter: boolean;

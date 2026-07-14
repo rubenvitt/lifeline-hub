@@ -157,7 +157,11 @@ export function baueTaktischeMarker(
   }
   for (const p of q.fuehrungskraefte) {
     add('fuehrung', p.id, p.name, p.lat, p.lon,
-      baueTzProps({ objekttyp: 'fuehrung', fachaufgabe: p.tz_fachaufgabe, organisation: p.tz_organisation, orgDefault: q.orgDefault }));
+      baueTzProps({
+        objekttyp: 'fuehrung', fachaufgabe: p.tz_fachaufgabe, organisation: p.tz_organisation,
+        orgDefault: q.orgDefault, funktion: p.funktion,
+        istFuehrungskraft: p.ist_einheitsfuehrer || p.ist_abschnittsleiter,
+      }));
   }
   return { verortet, nichtVerortet };
 }
