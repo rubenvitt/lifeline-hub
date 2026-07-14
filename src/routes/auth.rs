@@ -30,11 +30,30 @@ fn session_cookie(token: String, secure: bool) -> Cookie<'static> {
 }
 
 /// POST /api/auth/login — prüft Anmeldedaten, legt Session an, setzt Cookie.
+///
+/// Enforcement-Seam (LFH-41, Increment 3, defensiv/zukunftssicher): vor `password::anmelden`
+/// wird über dieselbe Registry-Prüfung wie bei `oidc_start`/`oidc_callback` geprüft, ob der
+/// `passwort`-Provider aktiviert ist — nicht aktiviert → `403` statt Authentifizierung. Heute
+/// ist dieser Zweig praktisch unerreichbar: der Aussperr-Guard (`registry::schalten` via
+/// `darf_deaktivieren`) hält `passwort` undeaktivierbar, solange noch ein aktiver Admin
+/// existiert (einzig admin-tauglicher Provider in Increment 3, siehe `ist_admin_tauglich`).
+/// Sobald ein späteres Increment einen zweiten admin-tauglichen Provider hinzufügt (z. B.
+/// Admin-Linking für OIDC/WebAuthn), wird `passwort` dadurch legitim deaktivierbar — dieser
+/// Seam stellt sicher, dass ein deaktivierter Passwort-Provider `POST /api/auth/login` dann
+/// serverseitig tatsächlich blockiert, statt nur das Formular im Frontend zu verstecken.
 pub async fn login(
     State(state): State<AppState>,
     jar: CookieJar,
     Json(req): Json<LoginRequest>,
 ) -> Result<(CookieJar, Json<crate::auth::BenutzerAnzeige>), AppError> {
+    let liste = crate::auth::provider::registry::liste(&state.pool).await?;
+    let passwort_aktiv = liste
+        .iter()
+        .any(|p| p.id == crate::auth::provider::ID_PASSWORT && p.aktiviert);
+    if !passwort_aktiv {
+        return Err(AppError::Forbidden);
+    }
+
     let benutzer =
         crate::auth::provider::password::anmelden(&state.pool, &req.benutzername, &req.passwort)
             .await?;

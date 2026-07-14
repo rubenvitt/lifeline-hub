@@ -137,6 +137,27 @@ async fn logout_invalidiert_session() {
 }
 
 #[tokio::test]
+async fn login_mit_deaktiviertem_passwort_provider_ist_403() {
+    // Enforcement-Seam (LFH-41, defensiv): direkt in `auth_provider` geschrieben, weil der
+    // Aussperr-Guard (`registry::schalten`) den Provider "passwort" NICHT deaktivieren ließe,
+    // solange noch ein aktiver Admin existiert (409, siehe `admin_kann_passwort_nicht_
+    // deaktivieren_409` unten) — der Guard umgeht also den regulären Toggle-Endpunkt. Anders als
+    // beim OIDC-Override (`oidc_deaktiviert_override`) ist hier kein prozessweiter OnceLock im
+    // Spiel: "passwort" ist immer in `konfiguriert()` gelistet, die Override-Zeile greift sofort.
+    let (app, pool) = setup_mit_pool().await;
+    sqlx::query(
+        "INSERT INTO auth_provider (id, aktiviert) VALUES ('passwort', 0) \
+         ON CONFLICT(id) DO UPDATE SET aktiviert = 0",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let (status, _) = login(&app, "admin", "startpw12").await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
 async fn providers_listet_passwort() {
     let app = setup().await;
     let (status, json) = anfrage(&app, "GET", "/api/auth/providers", "", None).await;
