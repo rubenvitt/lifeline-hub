@@ -1,4 +1,4 @@
-import type { BenutzerAnzeige } from './types';
+import type { AuthProvider, BenutzerAnzeige } from './types';
 import { apiGet, apiSend } from './client';
 
 export function login(benutzername: string, passwort: string): Promise<BenutzerAnzeige> {
@@ -11,4 +11,9 @@ export function logout(): Promise<void> {
 
 export function me(): Promise<BenutzerAnzeige> {
   return apiGet<BenutzerAnzeige>('/api/auth/me');
+}
+
+/** Lädt die aktiven Auth-Provider für die Login-UI (LFH-57). */
+export function providerListe(): Promise<AuthProvider[]> {
+  return apiGet<AuthProvider[]>('/api/auth/providers');
 }

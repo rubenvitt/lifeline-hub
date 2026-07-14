@@ -6,6 +6,10 @@ import type { components } from './types.generated';
 
 type S = components['schemas'];
 
+// ============================== Auth ==============================
+export type AuthProvider = S['AuthProviderAnzeige'];
+export type AuthProviderTyp = S['AuthProviderTyp'];
+
 // ============================== Benutzer / Einsatz ==============================
 export type SystemRolle = S['SystemRolle'];
 export type OrgRolle = S['OrgRolle'];

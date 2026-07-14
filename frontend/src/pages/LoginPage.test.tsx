@@ -11,6 +11,8 @@ function setup() {
   server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
   // Default: leere Dev-Benutzerliste → kein Picker, bestehender Test unverändert.
   server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
+  // Default: keine Provider-Konfiguration → Passwort-Login bleibt sichtbar (Fallback).
+  server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
   return renderMitProviders(
     <AuthProvider>
       <LoginPage />
@@ -41,6 +43,7 @@ describe('LoginPage', () => {
         ]),
       ),
     );
+    server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
     renderMitProviders(
       <AuthProvider>
         <LoginPage />
@@ -61,6 +64,7 @@ describe('LoginPage', () => {
         HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 }),
       ),
     );
+    server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
     renderMitProviders(
       <AuthProvider>
         <LoginPage />
@@ -69,5 +73,43 @@ describe('LoginPage', () => {
 
     expect(await screen.findByLabelText('Benutzername')).toBeInTheDocument();
     expect(screen.queryByText('Dev-Schnellanmeldung')).not.toBeInTheDocument();
+  });
+
+  it('zeigt das Passwort-Feld, wenn ein aktiver Passwort-Provider konfiguriert ist', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+    server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
+    server.use(
+      http.get('/api/auth/providers', () =>
+        HttpResponse.json([
+          { id: 'passwort', typ: 'passwort', anzeigename: 'Passwort', aktiviert: true },
+        ]),
+      ),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <LoginPage />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByLabelText('Passwort')).toBeInTheDocument();
+  });
+
+  it('blendet das Passwort-Feld aus, wenn kein aktiver Passwort-Provider konfiguriert ist', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+    server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
+    server.use(
+      http.get('/api/auth/providers', () =>
+        HttpResponse.json([{ id: 'dev', typ: 'dev', anzeigename: 'Dev', aktiviert: true }]),
+      ),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <LoginPage />
+      </AuthProvider>,
+    );
+
+    // Formular ist initial sichtbar (provider.length === 0, bevor der Effect greift) und
+    // verschwindet erst, nachdem die Provider-Liste geladen ist.
+    await waitFor(() => expect(screen.queryByLabelText('Passwort')).not.toBeInTheDocument());
   });
 });
