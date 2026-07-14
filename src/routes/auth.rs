@@ -168,10 +168,16 @@ pub async fn oidc_start(
     Ok(Redirect::to(auth_url.as_str()))
 }
 
+/// Alle drei Felder optional: der IdP kann statt `code`/`state` einen `error`-Query-Param
+/// zurückliefern (z. B. `?error=access_denied&state=...` bei abgelehnter Zustimmung — ein
+/// spec-konformer, normaler Ablauf, RFC 6749 Abschnitt 4.1.2.1). Mit `code`/`state` als
+/// Pflichtfeldern hätte axums `Query`-Extractor diesen Fall mit einem rohen 400 abgelehnt, statt
+/// dem Handler die Chance zu geben, sauber auf die LoginPage umzuleiten.
 #[derive(Debug, Deserialize)]
 pub struct OidcCallbackQuery {
-    code: String,
-    state: String,
+    code: Option<String>,
+    state: Option<String>,
+    error: Option<String>,
 }
 
 /// Generischer Fehler-Redirect für den OIDC-Callback: unbekannter/abgelaufener `state`,
@@ -188,25 +194,28 @@ fn oidc_fehler_redirect() -> Redirect {
 ///
 /// 1. Enforcement wie `oidc_start` (dieselbe Registry-Prüfung) → 404, falls `oidc` nicht
 ///    konfiguriert/aktiviert ist.
-/// 2. `state::entnehme(state)` — **SYNC, GANZ ZUERST**: der State-Store-Guard wird darin
-///    bereits vor der Rückgabe freigegeben (Task 3/Modul-Doc `state.rs`). Ab hier darf beliebig
-///    `.await`et werden, ohne einen std-Mutex-Guard über eine Await-Grenze zu halten
+/// 2. IdP-Error-Callback (`?error=...`, ein normaler Ablauf bei abgelehnter Zustimmung) ODER
+///    fehlendes `code`/`state`: ein evtl. vorhandener State-Eintrag wird noch konsumiert, dann
+///    generischer Redirect — NOCH VOR `state::entnehme`s eigentlicher Verwendung unten.
+/// 3. `state::entnehme(state)` — **SYNC, GANZ ZUERST** (nach Schritt 2): der State-Store-Guard
+///    wird darin bereits vor der Rückgabe freigegeben (Task 3/Modul-Doc `state.rs`). Ab hier darf
+///    beliebig `.await`et werden, ohne einen std-Mutex-Guard über eine Await-Grenze zu halten
 ///    (Plan-MUST „!Send"). `None` (unbekannt/abgelaufen/schon verbraucht) → generischer Redirect,
 ///    NOCH VOR jedem Netzzugriff (Token-Tausch/Discovery).
-/// 3. Token-Tausch (`tausche_code_gegen_token`) — erst NACH dem Guard-Drop.
-/// 4. `id_token`-Validierung über `openidconnect` (`id_token.claims(&verifier, &nonce)`):
+/// 4. Token-Tausch (`tausche_code_gegen_token`) — erst NACH dem Guard-Drop.
+/// 5. `id_token`-Validierung über `openidconnect` (`id_token.claims(&verifier, &nonce)`):
 ///    verifiziert Signatur (JWKS), `nonce`, `iss`, `aud`, `exp`.
-/// 5. JIT-Provisioning (`finde_oder_provisioniere`, Match ausschließlich über `(issuer, sub)`).
-/// 6. **[MUST — Task-2-Handoff]** `finde_oder_provisioniere` matcht/legt unabhängig von
+/// 6. JIT-Provisioning (`finde_oder_provisioniere`, Match ausschließlich über `(issuer, sub)`).
+/// 7. **[MUST — Task-2-Handoff]** `finde_oder_provisioniere` matcht/legt unabhängig von
 ///    `benutzer.aktiv` an — ein deaktiviertes SSO-Konto wird HIER zurückgewiesen, es entsteht
 ///    keine Session.
-/// 7. Session anlegen, Cookie setzen, Redirect auf `eintrag.ziel_pfad` (bereits in Task 5
+/// 8. Session anlegen, Cookie setzen, Redirect auf `eintrag.ziel_pfad` (bereits in Task 5
 ///    Open-Redirect-geprüft, daher hier sicher ausgebbar).
 ///
-/// JEDER Fehler ab Schritt 2 (state/Token/Validierung/Aktiv-Check) mündet in DENSELBEN
-/// generischen Redirect — kein Server-Fehler, kein IdP-/Token-Detail-Leak. Nur Datenbankfehler
-/// (Registry-Lookup, Provisioning, Session) propagieren als `AppError` (generisches 500, wie
-/// überall sonst) — sie enthalten keine IdP-/Token-Details.
+/// JEDER Fehler ab Schritt 2 (IdP-Error/fehlende Felder/state/Token/Validierung/Aktiv-Check)
+/// mündet in DENSELBEN generischen Redirect — kein Server-Fehler, kein IdP-/Token-Detail-Leak.
+/// Nur Datenbankfehler (Registry-Lookup, Provisioning, Session) propagieren als `AppError`
+/// (generisches 500, wie überall sonst) — sie enthalten keine IdP-/Token-Details.
 pub async fn oidc_callback(
     State(state): State<AppState>,
     jar: CookieJar,
@@ -220,12 +229,37 @@ pub async fn oidc_callback(
         return Err(AppError::NotFound);
     }
 
+    // IdP-Error-Callback (z. B. `?error=access_denied&state=...` bei abgelehnter Zustimmung —
+    // ein normaler, spec-konformer Ablauf, RFC 6749 4.1.2.1) ODER ein Query-String ohne `code`/
+    // `state` (durch die jetzt optionalen Felder lehnt der `Query`-Extractor das nicht mehr mit
+    // einer rohen 400 ab): kein Token-Tausch, generischer Redirect wie jeder andere Fehler. Ein
+    // evtl. bereits gespeicherter State-Eintrag wird noch KONSUMIERT (nicht nur ignoriert), damit
+    // er nicht bis zum TTL-Ablauf verwaist in der Map hängen bleibt.
+    if query.error.is_some() || query.code.is_none() || query.state.is_none() {
+        if let Some(s) = &query.state {
+            let _ = crate::auth::oidc::state::entnehme(s);
+        }
+        return Ok((jar, oidc_fehler_redirect()));
+    }
+    // Ab hier sind `code`/`state` durch den Guard oben beide garantiert vorhanden.
+    let code = query.code.expect("Guard oben stellt sicher: code ist Some");
+    let state_key = query
+        .state
+        .expect("Guard oben stellt sicher: state ist Some");
+
     // SYNC, VOR jedem `.await`: siehe Doc-Kommentar oben (Punkt 2) + `state.rs`. Lastragend
     // (nicht nur !Send-relevant): dieser Aufruf MUSS vor dem Token-Tausch/Discovery unten stehen,
     // damit ein unbekannter/abgelaufener `state` VOR jedem Netzzugriff zum Fehler-Redirect
     // kurzschließt (Security-Reihenfolge, kein Test pinnt das — ein Refactor darf diese Zeile
     // nicht hinter `oidc_client`/`tausche_code_gegen_token` verschieben).
-    let Some(eintrag) = crate::auth::oidc::state::entnehme(&query.state) else {
+    //
+    // ⚠️ Ab hier (und in der gesamten restlichen Kette bis zum Aktiv-Check) bleiben die
+    // `let Ok(...)/Some(...) = ... else { redirect }`-Arme bewusst DISCARD-NICHT-`?`: jeder
+    // Fehlerinhalt (Token-/IdP-/Claims-Detail) wird verworfen statt propagiert. Ein `?` an einer
+    // dieser Stellen würde den rohen Fehlertext (`AppError::ServiceUnavailable`/`Display`) in die
+    // HTTP-Antwort durchreichen — genau das Detail-Leak, das dieser Handler verhindern soll
+    // (Security-MUST des Plans; siehe auch `tausche_code_gegen_token`s Härtung in `oidc/mod.rs`).
+    let Some(eintrag) = crate::auth::oidc::state::entnehme(&state_key) else {
         return Ok((jar, oidc_fehler_redirect()));
     };
 
@@ -235,8 +269,7 @@ pub async fn oidc_callback(
     };
 
     let Ok(token_response) =
-        crate::auth::oidc::tausche_code_gegen_token(&client, query.code, eintrag.pkce_verifier)
-            .await
+        crate::auth::oidc::tausche_code_gegen_token(&client, code, eintrag.pkce_verifier).await
     else {
         return Ok((jar, oidc_fehler_redirect()));
     };

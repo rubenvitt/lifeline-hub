@@ -146,9 +146,16 @@ pub async fn tausche_code_gegen_token(
     code: String,
     pkce_verifier: String,
 ) -> Result<CoreTokenResponse, AppError> {
+    // Kein `{e}` in der `AppError`-Meldung (Security-Fix, siehe Doc-Kommentar oben): `Service-
+    // Unavailable` rendert seinen `Display` verbatim an den HTTP-Client (anders als `Database`/
+    // `Internal`, die `error.rs` redacted) — das rohe `oauth2`-Fehlerdetail landet daher NICHT in
+    // der Antwort, nur im Server-Log.
     let token_request = client
         .exchange_code(AuthorizationCode::new(code))
-        .map_err(|e| AppError::ServiceUnavailable(format!("OIDC-Token-Endpoint fehlt: {e}")))?
+        .map_err(|e| {
+            tracing::warn!(error = %e, "OIDC-Token-Endpoint fehlt");
+            AppError::ServiceUnavailable("OIDC-Token-Austausch fehlgeschlagen".into())
+        })?
         .set_pkce_verifier(PkceCodeVerifier::new(pkce_verifier));
 
     let reqwest_client = ssrf_http_client()?;
@@ -161,7 +168,10 @@ pub async fn tausche_code_gegen_token(
     token_request
         .request_async(&http_client)
         .await
-        .map_err(|e| AppError::ServiceUnavailable(format!("OIDC-Token-Tausch fehlgeschlagen: {e}")))
+        .map_err(|e| {
+            tracing::warn!(error = %e, "OIDC-Token-Austausch fehlgeschlagen");
+            AppError::ServiceUnavailable("OIDC-Token-Austausch fehlgeschlagen".into())
+        })
 }
 
 /// Liest ein Pflicht-OIDC-Config-Feld; fehlt/ist leer → `AppError::NotImplemented` („nicht
@@ -190,7 +200,11 @@ async fn discovery(issuer: &str) -> Result<CoreProviderMetadata, AppError> {
             CoreProviderMetadata::discover_async(issuer_url, &http_client)
                 .await
                 .map_err(|e| {
-                    AppError::ServiceUnavailable(format!("OIDC-Discovery fehlgeschlagen: {e}"))
+                    // Kein `{e}` im `AppError` (Security-Fix, siehe `tausche_code_gegen_token`-
+                    // Doc-Kommentar): rohes Discovery-/IdP-Fehlerdetail nur ins Server-Log, nicht
+                    // in die client-renderbare `ServiceUnavailable`-Meldung.
+                    tracing::warn!(error = %e, "OIDC-Discovery fehlgeschlagen");
+                    AppError::ServiceUnavailable("OIDC-Discovery fehlgeschlagen".into())
                 })
         })
         .await?;

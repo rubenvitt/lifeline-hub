@@ -266,3 +266,36 @@ async fn oidc_callback_mit_unbekanntem_state_redirect_auf_login_fehler() {
         .unwrap();
     assert_eq!(location, "/login?fehler=oidc");
 }
+
+#[tokio::test]
+async fn oidc_callback_mit_idp_error_redirect_ohne_400() {
+    // Derselbe prozessweite OnceLock wie in `oidc_callback_mit_unbekanntem_state_redirect_auf_
+    // login_fehler` — erneutes Setzen ist ein No-op, falls eine andere Testfunktion in diesem
+    // Prozess bereits `true` gesetzt hat (reihenfolge-unabhängig).
+    lifeline_hub::auth::provider::registry::set_oidc_konfiguriert(true);
+    let app = setup().await;
+
+    // IdP-Error-Callback (z. B. abgelehnte Zustimmung): `?error=access_denied&state=...`, KEIN
+    // `code` — ein normaler, spec-konformer Ablauf (RFC 6749 4.1.2.1). Vor Fix B waren `code`/
+    // `state` Pflichtfelder im Query-Extractor, der diesen Fall mit einer rohen 400 abgelehnt
+    // hätte. Erwartet: derselbe generische Redirect wie bei jedem anderen Callback-Fehler,
+    // KEIN 400.
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/auth/oidc/callback?error=access_denied&state=irgendwas")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::SEE_OTHER); // axum::response::Redirect::to = 303
+    let location = resp
+        .headers()
+        .get(header::LOCATION)
+        .expect("Location-Header erwartet")
+        .to_str()
+        .unwrap();
+    assert_eq!(location, "/login?fehler=oidc");
+}
