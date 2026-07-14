@@ -94,11 +94,17 @@ pub struct OidcStartQuery {
 /// Ziel-Pfad nach erfolgreichem OIDC-Login: mirrort `LoginPage`s `zielPfad`
 /// (Default `/einsaetze`), aber aus einem Query-Param statt Router-State — der
 /// OIDC-Flow verlässt die SPA per echtem Browser-Redirect, React-Router-State
-/// überlebt das nicht. Nur App-lokale Pfade (`/…`, kein `//…`) werden
-/// übernommen, sonst der Default — schützt vor Open-Redirect über `?von=`.
+/// überlebt das nicht. Nur App-lokale Pfade werden übernommen, sonst der
+/// Default — schützt vor Open-Redirect über `?von=`. Neben `//…` (protokoll-
+/// relativ) wird auch jeder Backslash abgelehnt: Browser normalisieren
+/// `/\evil.com` (WHATWG-URL-Spec) zu einer protokoll-relativen URL, das wäre
+/// sonst ein Open-Redirect-Bypass des `//`-Checks. Pfade dieser App enthalten
+/// nie `\`, daher ist das Verbot diskriminierend, nicht überstreng.
 fn ziel_pfad_aus_query(von: Option<String>) -> String {
     match von {
-        Some(pfad) if pfad.starts_with('/') && !pfad.starts_with("//") => pfad,
+        Some(pfad) if pfad.starts_with('/') && !pfad.starts_with("//") && !pfad.contains('\\') => {
+            pfad
+        }
         _ => "/einsaetze".to_string(),
     }
 }
@@ -163,5 +169,38 @@ mod tests {
         // Diskriminierend: beide Zweige geprüft (kein OnceLock im Test).
         assert_eq!(session_cookie("t".into(), true).secure(), Some(true));
         assert_ne!(session_cookie("t".into(), false).secure(), Some(true));
+    }
+
+    #[test]
+    fn ziel_pfad_aus_query_akzeptiert_app_lokale_pfade() {
+        assert_eq!(
+            ziel_pfad_aus_query(Some("/einsaetze".to_string())),
+            "/einsaetze"
+        );
+        assert_eq!(ziel_pfad_aus_query(Some("/uhs/5".to_string())), "/uhs/5");
+        assert_eq!(ziel_pfad_aus_query(Some("/".to_string())), "/");
+    }
+
+    #[test]
+    fn ziel_pfad_aus_query_lehnt_open_redirect_versuche_ab() {
+        // Protokoll-relativ.
+        assert_eq!(
+            ziel_pfad_aus_query(Some("//evil.com".to_string())),
+            "/einsaetze"
+        );
+        // Backslash-Bypass: Browser normalisieren "/\evil.com" (WHATWG-URL-Spec) zu
+        // einer protokoll-relativen URL → ohne Backslash-Check ein Open-Redirect.
+        assert_eq!(
+            ziel_pfad_aus_query(Some("/\\evil.com".to_string())),
+            "/einsaetze"
+        );
+        assert_eq!(ziel_pfad_aus_query(Some("/x\\y".to_string())), "/einsaetze");
+        // Kein führender Slash — absolute fremde URL.
+        assert_eq!(
+            ziel_pfad_aus_query(Some("https://evil.com".to_string())),
+            "/einsaetze"
+        );
+        assert_eq!(ziel_pfad_aus_query(None), "/einsaetze");
+        assert_eq!(ziel_pfad_aus_query(Some(String::new())), "/einsaetze");
     }
 }
