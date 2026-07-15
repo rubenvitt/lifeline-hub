@@ -15,6 +15,7 @@ import { ZONE_TYPEN } from './lagekarte/zonenStil';
 import Kartenflaeche, { type KartenHandle } from './lagekarte/Kartenflaeche';
 import Sidebar, { type LayerSichtbar } from './lagekarte/Sidebar';
 import Inspector from './lagekarte/Inspector';
+import FreiesZeichenInspector from './lagekarte/FreiesZeichenInspector';
 import ZonenInspector from './lagekarte/ZonenInspector';
 import FachebenenInspector from './lagekarte/FachebenenInspector';
 import ZeichnenSteuerung from './lagekarte/ZeichnenSteuerung';
@@ -38,7 +39,7 @@ export default function LagekartePage() {
   // EventSource hier — eine 2. Verbindung/Seite spränge das HTTP/1.1-6-Limit).
   const {
     einsatz, darfSchreiben, ladt, config, einstellungen, einstellungenLaedt, gebiete,
-    verortet, flaechen, zonenFeatures, alleVerortet, nichtVerortetAlle, zonen,
+    verortet, flaechen, zonenFeatures, alleVerortet, nichtVerortetAlle, zonen, freieZeichen,
   } = useLagekarteDaten({ einsatzId, zeigeZonen: layer.zone });
 
   const {
@@ -61,11 +62,12 @@ export default function LagekartePage() {
   const {
     platzierungZiel, zeichneAbschnittId, zoneEntwurf, zoneBestaetigung, zoneSpeichern,
     zoneZeichnenNonce, zoneAuswahl, auswahl, flyToZiel, fachebeneAuswahl, bildPlatzierenId,
-    exklusiverModusAktiv,
+    zeichenPlatzieren, exklusiverModusAktiv,
     setAuswahl, setZoneAuswahl, setFachebeneAuswahl, setFlyToZiel,
     onKarteKlick, onMarkerWaehlen, loescheVerortung, aendereSymbol,
     bestaetigungSpeichern, bestaetigungVerwerfen,
     onPlatzierenStart, onPlatzierenAbbrechen, onAbschnittZeichnenStart, onZoneZeichnenStart,
+    onZeichenPlatzierenStart, onZeichenPlatzierenAbbrechen, zeichenAendern, zeichenLoeschen,
     onKoordinateEingeben, onEinsatzortPlatzieren, onBildPlatzieren, onBildPlatzierenFertig,
     onFlaecheGezeichnet, onFlaecheKlick, onZoneKlick, onZoneGezeichnet, onFachebeneKlick,
     onZeichnenAbbrechen, zoneAendern, zoneLoeschen,
@@ -79,6 +81,9 @@ export default function LagekartePage() {
 
   const sichtbareMarker = alleVerortet.filter((m) => layer[m.typ]);
   const aktiverMarker = alleVerortet.find((m) => m.schluessel === auswahl) ?? null;
+  // Freies taktisches Zeichen zur Marker-Auswahl (LFH-170): der Inspector editiert den ROHEN
+  // Record, nicht die gestrippte Marker-tz (sonst verlöre der Editor gestrippte Overlays).
+  const ausgewaehltesZeichen = freieZeichen.find((z) => `freies_zeichen-${z.id}` === auswahl) ?? null;
   const ausgewaehlteZone = useMemo(
     () => zonen.find((z) => z.id === zoneAuswahl) ?? null,
     [zonen, zoneAuswahl],
@@ -123,6 +128,9 @@ export default function LagekartePage() {
         onPlatzierenAbbrechen={onPlatzierenAbbrechen}
         onAbschnittZeichnenStart={onAbschnittZeichnenStart}
         onZoneZeichnenStart={onZoneZeichnenStart}
+        zeichenPlatzieren={zeichenPlatzieren}
+        onZeichenPlatzierenStart={onZeichenPlatzierenStart}
+        onZeichenPlatzierenAbbrechen={onZeichenPlatzierenAbbrechen}
         onKoordinateEingeben={onKoordinateEingeben}
         einsatzortVerortet={verortet.some((m) => m.typ === 'einsatzort')}
         onEinsatzortPlatzieren={onEinsatzortPlatzieren}
@@ -208,7 +216,7 @@ export default function LagekartePage() {
           onSpeichern={bestaetigungSpeichern}
           onVerwerfen={bestaetigungVerwerfen}
         />
-        {aktiverMarker && (
+        {aktiverMarker && aktiverMarker.typ !== 'freies_zeichen' && (
           <Inspector
             einsatzId={einsatzId}
             marker={aktiverMarker}
@@ -216,6 +224,16 @@ export default function LagekartePage() {
             onSchliessen={() => setAuswahl(null)}
             onVerortungLoeschen={loescheVerortung}
             onSymbolAendern={aendereSymbol}
+          />
+        )}
+        {ausgewaehltesZeichen && (
+          <FreiesZeichenInspector
+            key={ausgewaehltesZeichen.id}
+            zeichen={ausgewaehltesZeichen}
+            darfSchreiben={!!darfSchreiben}
+            onSchliessen={() => setAuswahl(null)}
+            onAendern={(spec) => zeichenAendern(ausgewaehltesZeichen.id, spec)}
+            onLoeschen={() => zeichenLoeschen(ausgewaehltesZeichen.id)}
           />
         )}
         {fachebeneAuswahl && (

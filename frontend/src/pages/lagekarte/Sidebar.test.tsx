@@ -14,6 +14,9 @@ const basisProps: SidebarProps = {
   onPlatzierenAbbrechen: vi.fn(),
   onAbschnittZeichnenStart: vi.fn(),
   onZoneZeichnenStart: vi.fn(),
+  zeichenPlatzieren: null,
+  onZeichenPlatzierenStart: vi.fn(),
+  onZeichenPlatzierenAbbrechen: vi.fn(),
   onKoordinateEingeben: vi.fn(),
   einsatzortVerortet: true,
   onEinsatzortPlatzieren: vi.fn(),
@@ -171,6 +174,34 @@ describe('Sidebar Bild-Hintergründe', () => {
     expect(toggle).toBeTruthy();
     fireEvent.click(toggle as Element);
     expect(onLayerToggle).toHaveBeenCalledWith('freies_zeichen', false);
+  });
+
+  it('öffnet den Zeichen-Picker und startet das Platzieren mit der Entwurfs-Spec (LFH-170)', () => {
+    const onZeichenPlatzierenStart = vi.fn();
+    renderMitProviders(<Sidebar {...basisProps} onZeichenPlatzierenStart={onZeichenPlatzierenStart} />);
+    // Picker ist zunächst geschlossen (kein Dauer-Combobox in der Sidebar).
+    expect(screen.queryByLabelText('Grundzeichen')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Taktisches Zeichen platzieren' }));
+    // Jetzt ist der Picker offen …
+    expect(screen.getAllByLabelText('Grundzeichen').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Platzieren' }));
+    expect(onZeichenPlatzierenStart).toHaveBeenCalledWith(
+      expect.objectContaining({ grundzeichen: 'taktische-formation' }),
+    );
+  });
+
+  it('zeigt im Platzier-Modus den Hinweis und meldet Abbrechen (LFH-170)', () => {
+    const onZeichenPlatzierenAbbrechen = vi.fn();
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        zeichenPlatzieren={{ grundzeichen: 'taktische-formation' }}
+        onZeichenPlatzierenAbbrechen={onZeichenPlatzierenAbbrechen}
+      />,
+    );
+    expect(screen.getByText(/Auf Karte klicken zum Platzieren/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    expect(onZeichenPlatzierenAbbrechen).toHaveBeenCalled();
   });
 
   it('benennt ein Bild über die Inline-Bearbeitung um', () => {

@@ -344,6 +344,24 @@ describe('LagekartePage', () => {
     expect(await screen.findByText('marker-freies_zeichen-42')).toBeInTheDocument();
   });
 
+  it('Marker-Klick auf ein freies Zeichen öffnet den FreiesZeichenInspector (kein Fach-Modul-Link) (LFH-170)', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1/freie-zeichen', () =>
+        HttpResponse.json([{
+          id: 42, einsatz_id: 1, lat: 50.1, lon: 8.6, grundzeichen: 'stelle',
+          organisation: null, fachaufgabe: null, symbol: null, einheit: null, funktion: null,
+          farbe: null, label: 'Sammelplatz', erstellt_von: 1, erstellt_at: '', geaendert_at: '',
+        }]),
+      ),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByText('marker-freies_zeichen-42'));
+    // FreiesZeichenInspector: Picker mit vorbelegtem Grundzeichen; KEIN „Im Fach-Modul öffnen".
+    expect(await screen.findByText('Stelle, Einrichtung')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Im Fach-Modul öffnen/ })).not.toBeInTheDocument();
+  });
+
   it('Marker-Klick während Platzieren öffnet keinen Inspector und lässt den Platzier-Modus intakt (LFH-208)', async () => {
     // Doppel-Panel vermeiden: ein Map-Marker-Klick während aktiver Platzierung darf kein
     // Auswahl-Panel öffnen. Der Platzier-Modus bleibt intakt (nächster Karten-Klick verortet).

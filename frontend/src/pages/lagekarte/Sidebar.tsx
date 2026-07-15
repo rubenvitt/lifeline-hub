@@ -5,9 +5,10 @@ import { useEffect, useState } from 'react';
 import type { KarteMarker, NichtVerortet } from './marker';
 import type { BasemapModus, KartenThemeWahl } from './basemapStil';
 import type { OnlineStyle } from '../../api/karte';
-import type { ZoneTyp } from '../../api/types';
+import type { FreiesZeichenUpdate, ZoneTyp } from '../../api/types';
 import type { ZeichenModus } from './zeichnen';
 import { ZONE_TYPEN } from './zonenStil';
+import FreiesZeichenPicker from './FreiesZeichenPicker';
 import { FACHEBENEN, fachebeneKeys } from './fachebenen';
 import KoordinatenEingabe from '../../anzeige/KoordinatenEingabe';
 import type { LatLon } from '../../anzeige/koordinaten';
@@ -62,6 +63,10 @@ export interface SidebarProps {
   onPlatzierenAbbrechen: () => void;
   onAbschnittZeichnenStart: (id: number) => void;
   onZoneZeichnenStart: (entwurf: { typ: ZoneTyp; modus: ZeichenModus; farbe?: string }) => void;
+  /** Freies taktisches Zeichen (LFH-170): aktive Platzierung + Start/Abbrechen. */
+  zeichenPlatzieren: FreiesZeichenUpdate | null;
+  onZeichenPlatzierenStart: (spec: FreiesZeichenUpdate) => void;
+  onZeichenPlatzierenAbbrechen: () => void;
   onKoordinateEingeben: (lat: number, lon: number) => void;
   einsatzortVerortet: boolean;
   onEinsatzortPlatzieren: () => void;
@@ -106,6 +111,10 @@ export interface SidebarProps {
 export default function Sidebar(props: SidebarProps) {
   const { nichtVerortet, verortet, darfSchreiben, platzierungZiel } = props;
   const [koord, setKoord] = useState<LatLon | null>(null);
+  // Freies-Zeichen-Schnellerfassung (LFH-170): Picker erst auf Klick sichtbar (kein Dauer-
+  // Combobox in der Sidebar), Entwurf bleibt über Platzierungen erhalten.
+  const [zeichenPickerOffen, setZeichenPickerOffen] = useState(false);
+  const [zeichenEntwurf, setZeichenEntwurf] = useState<FreiesZeichenUpdate>({ grundzeichen: 'taktische-formation' });
   // Entwurfswert der numerischen Mittelpunkt-Eingabe im Bild-Platzier-Modus.
   const [bildMitte, setBildMitte] = useState<LatLon | null>(null);
   // Entwurf verwerfen, sobald ein anderes Bild platziert wird oder der Modus endet.
@@ -481,6 +490,42 @@ export default function Sidebar(props: SidebarProps) {
               );
             })}
           </Space>
+        </Card>
+      )}
+
+      {darfSchreiben && (
+        <Card size="small" title="Taktisches Zeichen" style={{ marginBottom: 12 }}>
+          {props.zeichenPlatzieren ? (
+            <Space orientation="vertical" style={{ width: '100%' }}>
+              <Typography.Text type="secondary">Auf Karte klicken zum Platzieren.</Typography.Text>
+              <Button size="small" onClick={props.onZeichenPlatzierenAbbrechen}>
+                Abbrechen
+              </Button>
+            </Space>
+          ) : zeichenPickerOffen ? (
+            <Space orientation="vertical" style={{ width: '100%' }}>
+              <FreiesZeichenPicker wert={zeichenEntwurf} onChange={setZeichenEntwurf} />
+              <Space>
+                <Button
+                  size="small"
+                  type="primary"
+                  onClick={() => {
+                    props.onZeichenPlatzierenStart(zeichenEntwurf);
+                    setZeichenPickerOffen(false);
+                  }}
+                >
+                  Platzieren
+                </Button>
+                <Button size="small" onClick={() => setZeichenPickerOffen(false)}>
+                  Abbrechen
+                </Button>
+              </Space>
+            </Space>
+          ) : (
+            <Button size="small" block onClick={() => setZeichenPickerOffen(true)}>
+              Taktisches Zeichen platzieren
+            </Button>
+          )}
         </Card>
       )}
 

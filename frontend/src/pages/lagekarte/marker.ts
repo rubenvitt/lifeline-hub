@@ -129,7 +129,9 @@ const FREIES_ZEICHEN_FARBE = '#333333';
  *  STRIPPT dabei jedes Overlay, das das gewählte Grundzeichen laut `accepts`-Katalog nicht
  *  rendert (via {@link grundzeichenAkzeptiert}) — sonst divergierte der Icon-Dedup-Key und ein
  *  Phantom-Overlay entstünde. Gilt auch für die Farbe (nur farb-akzeptierende Grundzeichen). */
-export function baueFreiesZeichenTz(z: FreiesZeichen): TzProps {
+export function baueFreiesZeichenTz(
+  z: Pick<FreiesZeichen, 'grundzeichen' | 'organisation' | 'fachaufgabe' | 'symbol' | 'einheit' | 'funktion' | 'farbe'>,
+): TzProps {
   const gz = z.grundzeichen;
   const nimm = (overlay: Parameters<typeof grundzeichenAkzeptiert>[1], wert: string | null | undefined) =>
     wert != null && grundzeichenAkzeptiert(gz, overlay) ? wert : undefined;
