@@ -474,7 +474,8 @@
         "enum": [
           "passwort",
           "dev",
-          "oidc"
+          "oidc",
+          "webauthn"
         ]
       },
       "BasemapModus": {

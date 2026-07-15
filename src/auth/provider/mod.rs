@@ -12,6 +12,11 @@ pub const ID_DEV: &str = "dev";
 /// OIDC/SSO-Provider (LFH-41, Increment 3). JIT-provisionierte Konten sind bewusst NICHT
 /// admin-tauglich (siehe `registry::ist_admin_tauglich`, Lockout-Schutz-MUST).
 pub const ID_OIDC: &str = "oidc";
+/// App-eigener Passkey/WebAuthn-Provider (LFH-275, Increment 4). Enrollment läuft
+/// authentifiziert (bestehendes Konto), Login ist danach passwortlos möglich. Bewusst NICHT
+/// admin-tauglich (siehe `registry::ist_admin_tauglich`) — Passwort bleibt der garantierte
+/// Admin-Weg, bis Admin-Linking/Policy das ändert (LFH-277).
+pub const ID_WEBAUTHN: &str = "webauthn";
 
 /// Art eines Auth-Providers — bestimmt, wie das Frontend den Login rendert.
 /// Wire == snake_case (Enum-Wire-Kontrakt).
@@ -24,6 +29,8 @@ pub enum AuthProviderTyp {
     Dev,
     /// OIDC/SSO-Login gegen einen externen Identity-Provider (LFH-41, Increment 3).
     Oidc,
+    /// App-eigener Passkey/WebAuthn-Login (LFH-275, Increment 4).
+    Webauthn,
 }
 
 impl AuthProviderTyp {
@@ -33,6 +40,7 @@ impl AuthProviderTyp {
             AuthProviderTyp::Passwort => "passwort",
             AuthProviderTyp::Dev => "dev",
             AuthProviderTyp::Oidc => "oidc",
+            AuthProviderTyp::Webauthn => "webauthn",
         }
     }
 }

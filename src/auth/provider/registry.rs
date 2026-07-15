@@ -3,7 +3,7 @@
 //!
 //! Die *konfigurierte* Menge lebt im Code (`konfiguriert`); `auth_provider` hält
 //! nur Override-Zustände (fehlt eine Zeile → Default „aktiviert"). Kein Reconcile nötig.
-use super::{AuthProviderAnzeige, AuthProviderTyp, ID_DEV, ID_OIDC, ID_PASSWORT};
+use super::{AuthProviderAnzeige, AuthProviderTyp, ID_DEV, ID_OIDC, ID_PASSWORT, ID_WEBAUTHN};
 use crate::error::AppError;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
@@ -34,6 +34,23 @@ fn oidc_konfiguriert() -> bool {
     *OIDC_KONFIGURIERT.get().unwrap_or(&false)
 }
 
+/// Prozessweiter Schalter: ob WebAuthn konfiguriert ist (eager Boot-Bau in `main::run_server`
+/// war erfolgreich — `rp_id`/`rp_origin` gesetzt UND `webauthn::baue` lieferte `Ok`). Analog zu
+/// `OIDC_KONFIGURIERT`: OnceLock statt `AppState`-Feld, Default (ungesetzt) = false.
+static WEBAUTHN_KONFIGURIERT: OnceLock<bool> = OnceLock::new();
+
+/// Einmalig beim Serverstart setzen, NACHDEM `webauthn::baue` `Ok` geliefert hat. Doppelsetzen
+/// wird ignoriert (wie `set_oidc_konfiguriert`).
+pub fn set_webauthn_konfiguriert(v: bool) {
+    let _ = WEBAUTHN_KONFIGURIERT.set(v);
+}
+
+/// Ob WebAuthn im aktuellen Prozess konfiguriert ist (Default false → Tests/Non-WebAuthn-
+/// Deploys unberührt).
+fn webauthn_konfiguriert() -> bool {
+    *WEBAUTHN_KONFIGURIERT.get().unwrap_or(&false)
+}
+
 /// Im aktuellen Build konfigurierte Provider-IDs (Quelle der Wahrheit).
 fn konfiguriert() -> Vec<&'static str> {
     let mut v = vec![ID_PASSWORT];
@@ -42,6 +59,9 @@ fn konfiguriert() -> Vec<&'static str> {
     }
     if oidc_konfiguriert() {
         v.push(ID_OIDC);
+    }
+    if webauthn_konfiguriert() {
+        v.push(ID_WEBAUTHN);
     }
     v
 }
@@ -55,6 +75,11 @@ fn konfiguriert() -> Vec<&'static str> {
 /// anmelden. Würde „oidc" admin-tauglich, ließe der Aussperr-Guard `passwort` deaktivieren
 /// → alle Admins ausgesperrt. Admin-Linking + „oidc" in dieser Menge + ein transaktionaler
 /// Guard kommen GEMEINSAM in einem späteren Increment, nicht hier.
+///
+/// MUST (LFH-275, Increment 4): „webauthn" bleibt EBENFALLS außen vor. Passkey-Enrollment
+/// hängt an einem bestehenden Konto, aber solange kein Admin-Linking/Policy existiert (LFH-277),
+/// bleibt Passwort der GARANTIERTE Admin-Weg — sonst könnte ein Admin ohne Passkey sich durch
+/// Deaktivieren von `passwort` selbst aussperren.
 fn ist_admin_tauglich(id: &str) -> bool {
     id == ID_PASSWORT
 }
@@ -64,6 +89,7 @@ fn anzeigename(id: &str) -> &'static str {
         ID_PASSWORT => "Passwort",
         ID_DEV => "Dev-Schnellanmeldung",
         ID_OIDC => "PocketID",
+        ID_WEBAUTHN => "Passkey",
         _ => "Unbekannt",
     }
 }
@@ -72,6 +98,7 @@ fn typ(id: &str) -> AuthProviderTyp {
     match id {
         ID_DEV => AuthProviderTyp::Dev,
         ID_OIDC => AuthProviderTyp::Oidc,
+        ID_WEBAUTHN => AuthProviderTyp::Webauthn,
         _ => AuthProviderTyp::Passwort,
     }
 }
@@ -217,6 +244,13 @@ mod tests {
         assert!(!ist_admin_tauglich(ID_OIDC));
     }
 
+    #[test]
+    fn admin_tauglich_ohne_webauthn() {
+        // MUST (LFH-275, Increment 4): "webauthn" bleibt außerhalb der admin-tauglichen Menge —
+        // `ist_admin_tauglich` bleibt UNVERÄNDERT `{passwort}`.
+        assert!(!ist_admin_tauglich(ID_WEBAUTHN));
+    }
+
     #[tokio::test]
     async fn oidc_gelistet_wenn_konfiguriert() {
         // OnceLock ist prozessweit: einmal true gesetzt, bleibt es für den Rest des
@@ -228,5 +262,17 @@ mod tests {
         assert!(liste
             .iter()
             .any(|p| p.id == "oidc" && p.typ == AuthProviderTyp::Oidc));
+    }
+
+    #[tokio::test]
+    async fn webauthn_gelistet_wenn_konfiguriert() {
+        // Wie `oidc_gelistet_wenn_konfiguriert`: OnceLock ist prozessweit, kein bestehender
+        // Test behauptet webauthn-ABSENZ — unabhängig von der Laufreihenfolge sicher.
+        set_webauthn_konfiguriert(true);
+        let pool = crate::db::test_pool().await;
+        let liste = liste(&pool).await.unwrap();
+        assert!(liste.iter().any(|p| p.id == "webauthn"
+            && p.typ == AuthProviderTyp::Webauthn
+            && p.anzeigename == "Passkey"));
     }
 }

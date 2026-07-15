@@ -51,6 +51,12 @@ rcgen = "0.14"
 # Tasks liefern den HTTP-Client für `request_async`/`discover_async` selbst (SSRF-Disziplin:
 # `redirect::Policy::none()` verlangt ohnehin einen eigenen Client statt oauth2s Default).
 openidconnect = { version = "4", default-features = false }
+# LFH-275: WebAuthn/Passkeys (Increment 4). Default-Features (nur "attestation", reine
+# Zertifikatsketten-Prüfung für Sicherheitsschlüssel-Attestation) ziehen KEINEN eigenen
+# reqwest-/rustls-Stack — kein Kollisions-Risiko wie bei openidconnect (Kanarienvogel-Test
+# `tls::tests::rcgen_pem_ist_per_rustls_ladbar` bleibt grün, siehe dortige Verifikation).
+webauthn-rs = "0.5"
+uuid = { version = "1", features = ["v4", "serde"] }
 
 [features]
 # Dev-only: aktiviert Seed-Testdaten und den /api/dev/users-Endpoint.
