@@ -64,11 +64,24 @@ pub fn build_router(state: AppState) -> Router {
             "/api/auth/webauthn/auth/finish",
             post(routes::auth::webauthn_auth_finish),
         )
+        .route(
+            "/api/auth/totp/enroll/start",
+            post(routes::auth::totp_enroll_start),
+        )
+        .route(
+            "/api/auth/totp/enroll/finish",
+            post(routes::auth::totp_enroll_finish),
+        )
+        .route("/api/auth/totp/finish", post(routes::auth::totp_finish))
         .route("/api/benutzer", get(routes::benutzer::liste))
         .route("/api/benutzer", post(routes::benutzer::anlegen))
         .route(
             "/api/benutzer/{id}/deaktivieren",
             post(routes::benutzer::deaktivieren),
+        )
+        .route(
+            "/api/benutzer/{id}/totp/reset",
+            post(routes::benutzer::totp_reset),
         )
         .route("/api/einsaetze", get(routes::einsatz::liste))
         .route("/api/einsaetze", post(routes::einsatz::anlegen))

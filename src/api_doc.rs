@@ -108,6 +108,8 @@ use utoipa::OpenApi;
     crate::personal::PersonalVorschlaege,
     crate::personal::Qualifikation,
     crate::personal::QualifikationRef,
+    crate::routes::auth::TotpEnrollFinish,
+    crate::routes::auth::TotpEnrollStart,
     crate::routes::einsatz::EinstellungenMitOrgDefaults,
     crate::routes::einsatz_bereitstellungsraum::BrDetail,
     crate::routes::einsatz_bereitstellungsraum::BrEinheitKurz,

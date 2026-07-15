@@ -6,7 +6,7 @@ import type { BenutzerAnzeige, EinsatzAnzeige, ModulOverride, Koordinatenformat 
 
 const fuehrungskraft: BenutzerAnzeige = {
   id: 1, anzeigename: 'EL', benutzername: 'el', system_rolle: 'keiner',
-  org_rolle: 'fuehrungskraft', aktiv: true, erstellt_at: '',
+  org_rolle: 'fuehrungskraft', aktiv: true, erstellt_at: '', totp_aktiviert: false,
 };
 const sichter: BenutzerAnzeige = { ...fuehrungskraft, id: 2, org_rolle: 'keine' };
 const admin: BenutzerAnzeige = { ...fuehrungskraft, id: 3, system_rolle: 'admin' };

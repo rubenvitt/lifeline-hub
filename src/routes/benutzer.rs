@@ -23,13 +23,15 @@ pub struct NeuerBenutzer {
     pub org_rolle: Option<String>,
 }
 
-/// GET /api/benutzer — Liste aller Benutzer (ohne Passwort-Hashes). Admin-only.
+/// GET /api/benutzer — Liste aller Benutzer (ohne Passwort-Hashes). Admin-only. Enthält den
+/// MFA-Status (`totp_aktiviert`, LFH-43 Increment 5 Task 6).
 pub async fn liste(
     State(state): State<AppState>,
     _admin: AdminUser,
 ) -> Result<Json<Vec<BenutzerAnzeige>>, AppError> {
     let benutzer = sqlx::query_as::<_, BenutzerAnzeige>(
-        "SELECT id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, erstellt_at \
+        "SELECT id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, erstellt_at, \
+                totp_aktiviert \
          FROM benutzer ORDER BY id",
     )
     .fetch_all(&state.pool)
@@ -102,7 +104,8 @@ pub async fn anlegen(
     let id = ergebnis?.last_insert_rowid();
 
     let angelegt = sqlx::query_as::<_, BenutzerAnzeige>(
-        "SELECT id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, erstellt_at \
+        "SELECT id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, erstellt_at, \
+                totp_aktiviert \
          FROM benutzer WHERE id = ?",
     )
     .bind(id)
@@ -155,7 +158,52 @@ pub async fn deaktivieren(
     tx.commit().await?;
 
     let aktualisiert = sqlx::query_as::<_, BenutzerAnzeige>(
-        "SELECT id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, erstellt_at \
+        "SELECT id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, erstellt_at, \
+                totp_aktiviert \
+         FROM benutzer WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_one(&state.pool)
+    .await?;
+
+    Ok(Json(aktualisiert))
+}
+
+/// POST /api/benutzer/{id}/totp/reset — Admin-Reset des TOTP-Zweitfaktors eines Nutzers
+/// (LFH-43, Increment 5 Task 6, `AdminUser`-gegated). Setzt `totp_secret = NULL` und
+/// `totp_aktiviert = 0` UND löscht die Recovery-Codes des Nutzers (`storage::loesche_recovery_codes`
+/// — Plan-MUST: keine stale Codes nach einem Reset) sowie dessen Sessions (analog `deaktivieren`
+/// oben — ein laufender zweiter Faktor bzw. eine laufende Session sollen den Reset nicht
+/// überleben). Alle drei Schreiboperationen laufen in EINER Transaktion.
+///
+/// `404`, falls kein Benutzer mit `id` existiert (geprüft VOR der Transaktion, analog
+/// `deaktivieren`s Existenz-Check).
+pub async fn totp_reset(
+    State(state): State<AppState>,
+    _admin: AdminUser,
+    Path(id): Path<i64>,
+) -> Result<Json<BenutzerAnzeige>, AppError> {
+    let existiert: Option<i64> = sqlx::query_scalar("SELECT id FROM benutzer WHERE id = ?")
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await?;
+    existiert.ok_or(AppError::NotFound)?;
+
+    let mut tx = state.pool.begin().await?;
+    sqlx::query("UPDATE benutzer SET totp_secret = NULL, totp_aktiviert = 0 WHERE id = ?")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    crate::auth::totp::storage::loesche_recovery_codes(&mut *tx, id).await?;
+    sqlx::query("DELETE FROM session WHERE benutzer_id = ?")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+
+    let aktualisiert = sqlx::query_as::<_, BenutzerAnzeige>(
+        "SELECT id, anzeigename, benutzername, system_rolle, org_rolle, aktiv, erstellt_at, \
+                totp_aktiviert \
          FROM benutzer WHERE id = ?",
     )
     .bind(id)

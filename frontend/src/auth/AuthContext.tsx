@@ -4,15 +4,23 @@ import type { BenutzerAnzeige } from '../api/types';
 import { ApiError } from '../api/client';
 import * as authApi from '../api/auth';
 
+/** Ergebnis von `login()` (LFH-43, Increment 5): unterscheidet den Sofort-Erfolg (Session
+ *  bereits gesetzt, `benutzer` im Context übernommen) vom TOTP-Zweitfaktor-Fall
+ *  (`mfa_erforderlich`, s. `authApi.login`-Doc) — die aufrufende Seite (`LoginPage`) schaltet im
+ *  letzteren Fall auf die Code-Eingabe um, statt direkt zu navigieren. `benutzer` bleibt in
+ *  diesem Fall bewusst `null`: es gibt noch keine Session. */
+export type LoginErgebnis = { status: 'ok' } | { status: 'mfa_erforderlich' };
+
 interface AuthWert {
   benutzer: BenutzerAnzeige | null;
   laedt: boolean;
-  login: (benutzername: string, passwort: string) => Promise<void>;
+  login: (benutzername: string, passwort: string) => Promise<LoginErgebnis>;
   logout: () => Promise<void>;
   /** Lädt `/api/auth/me` neu und übernimmt den Benutzer in den Context — für Login-Wege,
    *  die (anders als `login()`) die Session ohne einen Aufruf von `authApi.login`
-   *  etablieren, z.B. den WebAuthn-Passkey-Login (LFH-275): `auth/finish` setzt das
-   *  Session-Cookie server­seitig, der Client muss den Benutzer danach selbst nachladen. */
+   *  etablieren, z.B. den WebAuthn-Passkey-Login (LFH-275) oder den zweiten Schritt des
+   *  TOTP-Logins (`totpFinish`, LFH-43): `auth/finish`/`totp/finish` setzen das Session-Cookie
+   *  server­seitig, der Client muss den Benutzer danach selbst nachladen. */
   aktualisiere: () => Promise<void>;
 }
 
@@ -43,10 +51,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const login = useCallback(async (benutzername: string, passwort: string) => {
-    const b = await authApi.login(benutzername, passwort);
-    setBenutzer(b);
-  }, []);
+  const login = useCallback(
+    async (benutzername: string, passwort: string): Promise<LoginErgebnis> => {
+      const antwort = await authApi.login(benutzername, passwort);
+      // Untagged Union (s. `authApi.login`-Doc): der MFA-Zweig ist am `mfa_erforderlich`-Feld
+      // erkennbar, das die bare `BenutzerAnzeige` nie trägt. KEIN `setBenutzer` in diesem Fall —
+      // es gibt noch keine Session.
+      if ('mfa_erforderlich' in antwort) {
+        return { status: 'mfa_erforderlich' };
+      }
+      setBenutzer(antwort);
+      return { status: 'ok' };
+    },
+    [],
+  );
 
   const logout = useCallback(async () => {
     await authApi.logout();

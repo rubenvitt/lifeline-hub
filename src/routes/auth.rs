@@ -9,8 +9,9 @@ use axum::Json;
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use openidconnect::core::CoreAuthenticationFlow;
 use openidconnect::{CsrfToken, Nonce, PkceCodeChallenge, Scope, TokenResponse};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
+use utoipa::ToSchema;
 use webauthn_rs::prelude::{
     CreationChallengeResponse, PublicKeyCredential, RegisterPublicKeyCredential,
     RequestChallengeResponse, WebauthnError,
@@ -35,6 +36,39 @@ fn session_cookie(token: String, secure: bool) -> Cookie<'static> {
         .build()
 }
 
+/// Cookie-Name für den Pending-MFA-State-Key (LFH-43, Increment 5, Task 5). Trägt NUR den
+/// Schlüssel in den kurzlebigen, prozessweiten Store (`auth::totp::state`) — NIE die
+/// `benutzer_id` selbst (analog `WEBAUTHN_REG_COOKIE`/`WEBAUTHN_AUTH_COOKIE`). Path-beschränkt
+/// auf `/api/auth`, damit das Cookie nicht an fachfremde Routen (z. B. `/api/einsaetze/...`)
+/// mitgeschickt wird.
+const MFA_PENDING_COOKIE: &str = "mfa_pending";
+
+/// Baut das Pending-MFA-State-Cookie. Analog `webauthn_reg_cookie`/`webauthn_auth_cookie`
+/// (HttpOnly/SameSite=Lax/`secure` folgt dem Transport), path-beschränkt auf `/api/auth`.
+fn mfa_pending_cookie(key: String, secure: bool) -> Cookie<'static> {
+    Cookie::build((MFA_PENDING_COOKIE, key))
+        .http_only(true)
+        .same_site(SameSite::Lax)
+        .secure(secure)
+        .path("/api/auth")
+        .build()
+}
+
+/// Antwort auf `POST /api/auth/login` (LFH-43, Increment 5, Task 5). **Neutralitäts-MUST des
+/// Plans:** `#[serde(untagged)]` lässt den `Angemeldet`-Zweig BYTE-IDENTISCH als die nackte
+/// `BenutzerAnzeige` serialisieren (kein zusätzliches Wrapper-Feld) — ein `totp_aktiviert = 0`-
+/// Login (der Normalfall) ist damit exakt wie vor diesem Increment. Nur ein `totp_aktiviert = 1`-
+/// Nutzer sieht stattdessen die schmale `{"mfa_erforderlich":"totp"}`-Form (kein Benutzer-Objekt,
+/// kein Session-Cookie — s. `login`-Doc). Bewusst NICHT in `api_doc.rs`/Codegen registriert
+/// (Konvention CLAUDE.md „Backend↔Frontend-Typ-Codegen"): die Nicht-TOTP-Form ist unverändert
+/// `BenutzerAnzeige`, die Frontend-Union wird in Task 7 handgepflegt.
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+pub enum LoginAntwort {
+    Angemeldet(crate::auth::BenutzerAnzeige),
+    MfaErforderlich { mfa_erforderlich: String },
+}
+
 /// POST /api/auth/login — prüft Anmeldedaten, legt Session an, setzt Cookie.
 ///
 /// Enforcement-Seam (LFH-41, Increment 3, defensiv/zukunftssicher): vor `password::anmelden`
@@ -47,11 +81,26 @@ fn session_cookie(token: String, secure: bool) -> Cookie<'static> {
 /// Admin-Linking für OIDC/WebAuthn), wird `passwort` dadurch legitim deaktivierbar — dieser
 /// Seam stellt sicher, dass ein deaktivierter Passwort-Provider `POST /api/auth/login` dann
 /// serverseitig tatsächlich blockiert, statt nur das Formular im Frontend zu verstecken.
+///
+/// **[MUST — der Crux, LFH-43 Increment 5 Task 5] Pending-State→Session-Gating:** nach
+/// erfolgreicher Passwort-Prüfung verzweigt der Handler auf `totp_aktiviert` — **VOR**
+/// `session::anlegen`. Ein `totp_aktiviert`-Nutzer mit korrektem Passwort bekommt KEINE Session
+/// und KEIN Session-Cookie, sondern einen frischen, high-entropy Pending-Key
+/// (`session::neuer_token()`, dieselbe CSPRNG-Quelle wie ein echter Session-Token) im
+/// prozessweiten `auth::totp::state`-Store (`benutzer_id` dahinter) sowie ein HttpOnly-
+/// `mfa_pending`-Cookie, das NUR diesen Key trägt. Die einzige Brücke zur Session ist danach
+/// `/api/auth/totp/finish` (unten) — der EINZIGE Pfad zu `session::anlegen` für einen
+/// `totp_aktiviert`-Nutzer ist ein verifizierter Zweitfaktor. Ein `totp_aktiviert = 0`-Nutzer
+/// (der Normalfall) durchläuft unverändert den bestehenden Sofort-Session-Zweig — s.
+/// `LoginAntwort`-Doc für die Byte-Identität der Response in diesem Fall.
+///
+/// Der `dev-seeds`-Login (`routes::dev::users`) POSTet auf denselben Handler und erbt diesen
+/// Branch — bewusst kein zweiter Passwort→Session-Pfad, der ihn umgehen könnte (Plan-MUST).
 pub async fn login(
     State(state): State<AppState>,
     jar: CookieJar,
     Json(req): Json<LoginRequest>,
-) -> Result<(CookieJar, Json<crate::auth::BenutzerAnzeige>), AppError> {
+) -> Result<(CookieJar, Json<LoginAntwort>), AppError> {
     let liste = crate::auth::provider::registry::liste(&state.pool).await?;
     let passwort_aktiv = liste
         .iter()
@@ -64,9 +113,33 @@ pub async fn login(
         crate::auth::provider::password::anmelden(&state.pool, &req.benutzername, &req.passwort)
             .await?;
 
+    let totp_aktiviert: bool =
+        sqlx::query_scalar("SELECT totp_aktiviert FROM benutzer WHERE id = ?")
+            .bind(benutzer.id)
+            .fetch_one(&state.pool)
+            .await?;
+
+    if totp_aktiviert {
+        // KEINE Session, KEIN Session-Cookie — s. Doc-Kommentar oben (Plan-Crux).
+        let key = session::neuer_token();
+        crate::auth::totp::state::speichere(key.clone(), benutzer.id);
+        let jar = jar.add(mfa_pending_cookie(key, session::cookie_secure()));
+        return Ok((
+            jar,
+            Json(LoginAntwort::MfaErforderlich {
+                mfa_erforderlich: "totp".to_string(),
+            }),
+        ));
+    }
+
     let token = session::anlegen(&state.pool, benutzer.id).await?;
     let jar = jar.add(session_cookie(token, crate::auth::session::cookie_secure()));
-    Ok((jar, Json(benutzer.anzeige())))
+    // An dieser Stelle ist `totp_aktiviert` bereits als `false` erwiesen — der `if`-Zweig oben
+    // ist bei `true` bereits mit `return` verlassen worden.
+    Ok((
+        jar,
+        Json(LoginAntwort::Angemeldet(benutzer.anzeige(totp_aktiviert))),
+    ))
 }
 
 /// POST /api/auth/logout — löscht die Session und entfernt das Cookie.
@@ -81,9 +154,20 @@ pub async fn logout(
     Ok((jar, StatusCode::NO_CONTENT))
 }
 
-/// GET /api/auth/me — liefert den aktuell angemeldeten Benutzer.
-pub async fn me(CurrentUser(benutzer): CurrentUser) -> Json<crate::auth::BenutzerAnzeige> {
-    Json(benutzer.anzeige())
+/// GET /api/auth/me — liefert den aktuell angemeldeten Benutzer (inkl. MFA-Status,
+/// LFH-43 Increment 5 Task 6). Lädt `totp_aktiviert` per gezieltem Zusatz-SELECT nach — der
+/// `CurrentUser`-Extractor liefert einen `Benutzer` OHNE `totp_*`-Spalten (s. `Benutzer::anzeige`-
+/// Doc).
+pub async fn me(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+) -> Result<Json<crate::auth::BenutzerAnzeige>, AppError> {
+    let totp_aktiviert: bool =
+        sqlx::query_scalar("SELECT totp_aktiviert FROM benutzer WHERE id = ?")
+            .bind(benutzer.id)
+            .fetch_one(&state.pool)
+            .await?;
+    Ok(Json(benutzer.anzeige(totp_aktiviert)))
 }
 
 /// GET /api/auth/providers — verfügbare Login-Provider (öffentlich, für die Login-UI).
@@ -699,6 +783,213 @@ pub async fn webauthn_auth_finish(
             .build(),
     );
     Ok((jar, StatusCode::OK))
+}
+
+/// Antwort auf `POST /api/auth/totp/enroll/start` (LFH-43, Task 4): das frisch erzeugte,
+/// noch NICHT aktive TOTP-Secret. `otpauth_url` ist für den QR-Code-Scan gedacht,
+/// `secret_base32` als Klartext-Fallback zum manuellen Eintragen in die Authenticator-App.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TotpEnrollStart {
+    pub otpauth_url: String,
+    pub secret_base32: String,
+}
+
+/// Body von `POST /api/auth/totp/enroll/finish`. Request-DTO, bewusst nicht in
+/// `api_doc.rs`/Codegen (Konvention: Eingabe-Bodies bleiben handgepflegt, s. CLAUDE.md).
+#[derive(Debug, Deserialize)]
+pub struct TotpEnrollFinishRequest {
+    pub code: String,
+}
+
+/// Antwort auf `POST /api/auth/totp/enroll/finish` (LFH-43, Task 4): die frisch erzeugten
+/// Recovery-Codes im KLARTEXT — werden NUR HIER, EINMALIG zurückgegeben. Ab dem nächsten
+/// Request existieren nur noch ihre sha256-Hashes in `totp_recovery_code`
+/// (`totp::storage::speichere_recovery_codes`); ein Verlust dieser Antwort ist nicht
+/// rekonstruierbar (Betriebs-Hinweis: Frontend muss die Codes eindringlich anzeigen).
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TotpEnrollFinish {
+    pub recovery_codes: Vec<String>,
+}
+
+/// Aktueller Unix-Zeitstempel (Sekunden) für die TOTP-Prüfung/-Erzeugung. Kein eingefrorener
+/// Testzeitpunkt nötig: die deterministischen Enroll-Tests erzeugen ihren Vergleichscode über
+/// `totp::generiere_code` mit einem eigenen `SystemTime::now()`-Aufruf — der ±1-Zeitschritt-
+/// Skew von `pruefe_code` deckt die paar Millisekunden zwischen beiden Aufrufen ab.
+fn jetzt_unix() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// POST /api/auth/totp/enroll/start — beginnt (oder erneuert) ein TOTP-Enrollment für den
+/// angemeldeten Nutzer (`CurrentUser`-gegated, LFH-43 Task 4). Erzeugt ein frisches Secret und
+/// speichert es SOFORT, aber NOCH NICHT aktiviert (`totp_aktiviert = 0`) — erst ein bestätigender
+/// Code in `enroll/finish` aktiviert MFA.
+///
+/// **Re-Enroll-Entscheidung (Plan Task 4, bewusst dokumentiert):** ein erneuter `start` — egal ob
+/// ein vorheriges Enrollment nie bestätigt wurde ODER TOTP bereits aktiv war — überschreibt das
+/// Secret und setzt `totp_aktiviert` unbedingt auf 0 zurück. Ein Nutzer, der TOTP bereits aktiv
+/// hat und `start` erneut aufruft (Re-Enroll, z. B. neues Gerät), verliert also SOFORT seinen
+/// aktiven zweiten Faktor, bis er den neuen Code in `enroll/finish` bestätigt — ein
+/// abgebrochener/fehlgeschlagener Re-Enroll lässt den Nutzer währenddessen ohne MFA (nicht mit
+/// dem alten Secret weiter aktiv). Das ist der einfachere, im Plan vorgezeichnete Pfad
+/// gegenüber einem „aktiviert bleibt bis bestätigt"-Zwischenzustand (der ein zusätzliches
+/// „Pending-Secret"-Feld bräuchte) und im Enroll-Kontext (Nutzer handelt selbst, aus dem eigenen
+/// Profil) unkritisch.
+pub async fn totp_enroll_start(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+) -> Result<Json<TotpEnrollStart>, AppError> {
+    let secret = crate::auth::totp::neues_secret();
+
+    sqlx::query("UPDATE benutzer SET totp_secret = ?, totp_aktiviert = 0 WHERE id = ?")
+        .bind(&secret)
+        .bind(benutzer.id)
+        .execute(&state.pool)
+        .await?;
+
+    let otpauth_url = crate::auth::totp::otpauth_url(&secret, &benutzer.benutzername)?;
+    Ok(Json(TotpEnrollStart {
+        otpauth_url,
+        secret_base32: secret,
+    }))
+}
+
+/// POST /api/auth/totp/enroll/finish — schließt ein laufendes Enrollment ab (`CurrentUser`-
+/// gegated, LFH-43 Task 4). Lädt `totp_secret` FRISCH per SELECT statt aus dem
+/// `CurrentUser`-Snapshot: der `Benutzer`-Extractor-Typ trägt die `totp_*`-Spalten (noch) gar
+/// nicht, UND ein `start` in genau demselben Request-Zyklus muss ohnehin sichtbar sein.
+///
+/// Kein `totp_secret` gesetzt (nie `enroll/start` aufgerufen) → `400` „Kein TOTP-Enrollment
+/// gestartet" (Validierungsfehler wie das analoge `webauthn_register_finish`-Cookie-Fehlen).
+/// Ein falscher Code → `422` (Zustandsfehler: ein Enrollment läuft, aber der Bestätigungscode
+/// stimmt nicht) — `totp_aktiviert` bleibt dabei unverändert, MFA wird also NIE ohne einen
+/// gültigen Code aktiviert. Erst ein gültiger Code aktiviert MFA, generiert die zehn
+/// Klartext-Recovery-Codes und ersetzt (via `speichere_recovery_codes`) etwaige alte.
+pub async fn totp_enroll_finish(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Json(req): Json<TotpEnrollFinishRequest>,
+) -> Result<Json<TotpEnrollFinish>, AppError> {
+    let secret: Option<String> =
+        sqlx::query_scalar("SELECT totp_secret FROM benutzer WHERE id = ?")
+            .bind(benutzer.id)
+            .fetch_one(&state.pool)
+            .await?;
+    let secret =
+        secret.ok_or_else(|| AppError::Validation("Kein TOTP-Enrollment gestartet".to_string()))?;
+
+    if !crate::auth::totp::pruefe_code(&secret, &req.code, jetzt_unix()) {
+        return Err(AppError::UnprocessableEntity("Code ungültig".to_string()));
+    }
+
+    sqlx::query("UPDATE benutzer SET totp_aktiviert = 1 WHERE id = ?")
+        .bind(benutzer.id)
+        .execute(&state.pool)
+        .await?;
+
+    let codes = crate::auth::totp::neue_recovery_codes();
+    crate::auth::totp::storage::speichere_recovery_codes(&state.pool, benutzer.id, &codes).await?;
+
+    Ok(Json(TotpEnrollFinish {
+        recovery_codes: codes,
+    }))
+}
+
+/// Body von `POST /api/auth/totp/finish`. Request-DTO, bewusst nicht in `api_doc.rs`/Codegen
+/// (Konvention: Eingabe-Bodies bleiben handgepflegt, s. CLAUDE.md). Trägt WEDER Passwort noch
+/// Benutzername — die Identität kommt ausschließlich aus dem `mfa_pending`-Pending-State (s.
+/// `totp_finish`-Doc, Plan-MUST).
+#[derive(Debug, Deserialize)]
+pub struct TotpFinishRequest {
+    pub code: String,
+}
+
+/// POST /api/auth/totp/finish — schließt den zweiten Schritt des Passwort→TOTP-Logins ab
+/// (öffentlich, PRE-Session, LFH-43 Increment 5 Task 5 — **der Crux, Security-kritisch**).
+/// Nimmt weder Passwort noch Benutzername entgegen: die Identität kommt AUSSCHLIESSLICH aus
+/// dem `mfa_pending`-Pending-State, der im vorherigen `login`-Schritt angelegt wurde.
+///
+/// Reihenfolge ist bewusst:
+///
+/// 1. State-Key aus dem `mfa_pending`-Cookie; `entnehme` (SYNC, Guard sofort freigegeben — s.
+///    `auth::totp::state`-Moduldoc) läuft VOR jedem weiteren `.await` in diesem Handler
+///    (Plan-MUST „!Send" — sonst wäre der Handler nicht `Send`, `cargo build` bricht das ab).
+///    **Single-use**: `entnehme` entfernt den Eintrag beim Zugriff — ein zweiter Versuch mit
+///    demselben Cookie(-Wert) liefert `None`. Fehlendes Cookie ODER unbekannter/abgelaufener/
+///    bereits verbrauchter Key → derselbe generische `401`.
+/// 2. `benutzer` frisch per `id` laden (NICHT aus dem Pending-State/Client übernommen — der
+///    Pending-State trägt nur die `benutzer_id`, keine sonstigen Felder). Ein zwischenzeitlich
+///    deaktiviertes Konto (`!aktiv`) ODER ein fehlendes/gelöschtes `totp_secret` (z. B. durch
+///    einen Admin-Reset zwischen `login` und `finish`) → derselbe generische `401` (analog OIDC-
+///    /WebAuthn-Task-2-Handoff).
+/// 3. Verifikation: `totp::pruefe_code` ODER (nur falls das scheitert, `||` kurzschließt) EIN
+///    `storage::verbrauche_recovery_code`-Aufruf, der einen gültigen Recovery-Code dabei atomar
+///    als verbraucht markiert (single-use, s. `storage.rs`-Moduldoc). Beides `false` → derselbe
+///    generische `401` (keine Unterscheidung „TOTP falsch" vs. „Recovery-Code falsch" — kein
+///    Detail-Leak).
+/// 4. Erst danach `session::anlegen` + Session-Cookie setzen, `mfa_pending`-Cookie entfernen,
+///    `200` mit der `BenutzerAnzeige` — identisch zum bestehenden Sofort-Login-Erfolgspfad.
+pub async fn totp_finish(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    Json(req): Json<TotpFinishRequest>,
+) -> Result<(CookieJar, Json<crate::auth::BenutzerAnzeige>), AppError> {
+    let key = jar
+        .get(MFA_PENDING_COOKIE)
+        .map(|c| c.value().to_string())
+        .ok_or(AppError::Unauthorized)?;
+
+    // SYNC, Guard freigegeben VOR jedem folgenden `.await` — s. Doc-Kommentar oben (Punkt 1).
+    let benutzer_id = crate::auth::totp::state::entnehme(&key).ok_or(AppError::Unauthorized)?;
+
+    let benutzer = sqlx::query_as::<_, Benutzer>(
+        "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, \
+         aktiv, erstellt_at FROM benutzer WHERE id = ?",
+    )
+    .bind(benutzer_id)
+    .fetch_optional(&state.pool)
+    .await?;
+    let Some(benutzer) = benutzer else {
+        return Err(AppError::Unauthorized);
+    };
+    if !benutzer.aktiv {
+        return Err(AppError::Unauthorized);
+    }
+
+    let secret: Option<String> =
+        sqlx::query_scalar("SELECT totp_secret FROM benutzer WHERE id = ?")
+            .bind(benutzer_id)
+            .fetch_one(&state.pool)
+            .await?;
+    let Some(secret) = secret else {
+        return Err(AppError::Unauthorized);
+    };
+
+    // `||` kurzschließt: bei gültigem TOTP-Code wird KEIN Recovery-Code angerührt/verbraucht.
+    let gueltig = crate::auth::totp::pruefe_code(&secret, &req.code, jetzt_unix())
+        || crate::auth::totp::storage::verbrauche_recovery_code(
+            &state.pool,
+            benutzer_id,
+            &req.code,
+        )
+        .await?;
+    if !gueltig {
+        return Err(AppError::Unauthorized);
+    }
+
+    let token = session::anlegen(&state.pool, benutzer.id).await?;
+    let jar = jar.add(session_cookie(token, session::cookie_secure()));
+    let jar = jar.remove(
+        Cookie::build((MFA_PENDING_COOKIE, ""))
+            .path("/api/auth")
+            .build(),
+    );
+    // Dieser Handler ist nur für `totp_aktiviert = true`-Nutzer überhaupt erreichbar (der
+    // Pending-State entsteht ausschließlich im `totp_aktiviert`-Zweig von `login`) — der Status
+    // ist an dieser Stelle unbedingt `true`, kein Zusatz-SELECT nötig.
+    Ok((jar, Json(benutzer.anzeige(true))))
 }
 
 #[cfg(test)]

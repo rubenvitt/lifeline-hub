@@ -364,4 +364,91 @@ describe('LoginPage', () => {
       );
     });
   });
+
+  describe('Zweite Login-Stufe (LFH-43, TOTP)', () => {
+    const adminBody = {
+      id: 1,
+      anzeigename: 'Admin',
+      benutzername: 'admin',
+      system_rolle: 'admin',
+      org_rolle: 'keine',
+      aktiv: true,
+      erstellt_at: '2026-05-23 10:00:00',
+    };
+
+    it('schaltet bei „mfa_erforderlich" auf die TOTP-Code-Eingabe um und schließt über totp/finish + aktualisiere() ab', async () => {
+      const reihenfolge: string[] = [];
+      server.use(
+        http.get('/api/auth/me', () => {
+          reihenfolge.push('me');
+          return HttpResponse.json(adminBody);
+        }),
+      );
+      server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
+      server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
+      server.use(
+        http.post('/api/auth/login', () => {
+          reihenfolge.push('login');
+          // Untagged Union (LFH-43): TOTP-Nutzer bekommt die schmale Form statt eines
+          // Benutzers — KEINE Session an dieser Stelle.
+          return HttpResponse.json({ mfa_erforderlich: 'totp' });
+        }),
+        http.post('/api/auth/totp/finish', () => {
+          reihenfolge.push('totpFinish');
+          return HttpResponse.json(adminBody);
+        }),
+      );
+
+      renderMitProviders(
+        <AuthProvider>
+          <LoginPage />
+        </AuthProvider>,
+      );
+
+      await userEvent.type(await screen.findByLabelText('Benutzername'), 'admin');
+      await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
+      await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+
+      // Erste Stufe (Passwort) weicht der Code-Eingabe — kein Passwortfeld mehr sichtbar.
+      const codeFeld = await screen.findByLabelText('Code aus deiner Authenticator-App');
+      expect(screen.queryByLabelText('Passwort')).not.toBeInTheDocument();
+
+      await userEvent.type(codeFeld, '123456');
+      await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+
+      // Reihenfolge OHNE die 'me'-Aufrufe: login (mfa_erforderlich) → totpFinish. `aktualisiere()`
+      // nach `totpFinish` löst einen weiteren 'me'-Aufruf aus (analog Passkey-Pfad) — die
+      // Herausfilterung hier macht die Assertion robust gegen dessen genaue Anzahl/Timing.
+      await waitFor(() =>
+        expect(reihenfolge.filter((schritt) => schritt !== 'me')).toEqual(['login', 'totpFinish']),
+      );
+      // Erfolgspfad bis zum Ende durchlaufen (kein Absturz in den catch-Zweig) — sonst bliebe
+      // hier die Fehlermeldung stehen.
+      expect(screen.queryByText('Code ungültig')).not.toBeInTheDocument();
+    });
+
+    it('meldet einen normalen (Nicht-MFA) Login unverändert direkt an — keine Code-Eingabe', async () => {
+      server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+      server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
+      server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
+      server.use(http.post('/api/auth/login', () => HttpResponse.json(adminBody)));
+
+      renderMitProviders(
+        <AuthProvider>
+          <LoginPage />
+        </AuthProvider>,
+      );
+
+      await userEvent.type(await screen.findByLabelText('Benutzername'), 'admin');
+      await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
+      await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+
+      await waitFor(() =>
+        expect(
+          screen.queryByLabelText('Code aus deiner Authenticator-App'),
+        ).not.toBeInTheDocument(),
+      );
+      expect(screen.queryByText('Verbindung zum Server fehlgeschlagen')).not.toBeInTheDocument();
+    });
+  });
 });

@@ -248,6 +248,12 @@ export interface components {
             id: number;
             org_rolle: components["schemas"]["OrgRolle"];
             system_rolle: components["schemas"]["SystemRolle"];
+            /**
+             * @description MFA-Status (LFH-43, Increment 5 Task 6): `true`, wenn der Nutzer TOTP als zweiten Faktor
+             *     aktiviert hat. Zeigt sowohl der Admin-Benutzerliste als auch dem eigenen Profil
+             *     (`GET /api/auth/me`) den Status an.
+             */
+            totp_aktiviert: boolean;
         };
         /**
          * @description Betriebsart einer TETRA-Sprechgruppe (Schema-Anker für die OpenAPI-Union, LFH-120).
@@ -1784,6 +1790,25 @@ export interface components {
          * @enum {string}
          */
         TierStatus: "aktiv" | "vermisst" | "abgeschlossen";
+        /**
+         * @description Antwort auf `POST /api/auth/totp/enroll/finish` (LFH-43, Task 4): die frisch erzeugten
+         *     Recovery-Codes im KLARTEXT — werden NUR HIER, EINMALIG zurückgegeben. Ab dem nächsten
+         *     Request existieren nur noch ihre sha256-Hashes in `totp_recovery_code`
+         *     (`totp::storage::speichere_recovery_codes`); ein Verlust dieser Antwort ist nicht
+         *     rekonstruierbar (Betriebs-Hinweis: Frontend muss die Codes eindringlich anzeigen).
+         */
+        TotpEnrollFinish: {
+            recovery_codes: string[];
+        };
+        /**
+         * @description Antwort auf `POST /api/auth/totp/enroll/start` (LFH-43, Task 4): das frisch erzeugte,
+         *     noch NICHT aktive TOTP-Secret. `otpauth_url` ist für den QR-Code-Scan gedacht,
+         *     `secret_base32` als Klartext-Fallback zum manuellen Eintragen in die Authenticator-App.
+         */
+        TotpEnrollStart: {
+            otpauth_url: string;
+            secret_base32: string;
+        };
         /** @description Serialisierbare UHS-Anzeige (1:1 zur Tabelle, ohne abgeleitete Felder). */
         UhsAnzeige: {
             /** Format: int64 */

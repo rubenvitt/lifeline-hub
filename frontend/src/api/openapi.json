@@ -690,7 +690,8 @@
           "system_rolle",
           "org_rolle",
           "aktiv",
-          "erstellt_at"
+          "erstellt_at",
+          "totp_aktiviert"
         ],
         "properties": {
           "aktiv": {
@@ -714,6 +715,10 @@
           },
           "system_rolle": {
             "$ref": "#/components/schemas/SystemRolle"
+          },
+          "totp_aktiviert": {
+            "type": "boolean",
+            "description": "MFA-Status (LFH-43, Increment 5 Task 6): `true`, wenn der Nutzer TOTP als zweiten Faktor\naktiviert hat. Zeigt sowohl der Admin-Benutzerliste als auch dem eigenen Profil\n(`GET /api/auth/me`) den Status an."
           }
         }
       },
@@ -5266,6 +5271,37 @@
           "vermisst",
           "abgeschlossen"
         ]
+      },
+      "TotpEnrollFinish": {
+        "type": "object",
+        "description": "Antwort auf `POST /api/auth/totp/enroll/finish` (LFH-43, Task 4): die frisch erzeugten\nRecovery-Codes im KLARTEXT — werden NUR HIER, EINMALIG zurückgegeben. Ab dem nächsten\nRequest existieren nur noch ihre sha256-Hashes in `totp_recovery_code`\n(`totp::storage::speichere_recovery_codes`); ein Verlust dieser Antwort ist nicht\nrekonstruierbar (Betriebs-Hinweis: Frontend muss die Codes eindringlich anzeigen).",
+        "required": [
+          "recovery_codes"
+        ],
+        "properties": {
+          "recovery_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "TotpEnrollStart": {
+        "type": "object",
+        "description": "Antwort auf `POST /api/auth/totp/enroll/start` (LFH-43, Task 4): das frisch erzeugte,\nnoch NICHT aktive TOTP-Secret. `otpauth_url` ist für den QR-Code-Scan gedacht,\n`secret_base32` als Klartext-Fallback zum manuellen Eintragen in die Authenticator-App.",
+        "required": [
+          "otpauth_url",
+          "secret_base32"
+        ],
+        "properties": {
+          "otpauth_url": {
+            "type": "string"
+          },
+          "secret_base32": {
+            "type": "string"
+          }
+        }
       },
       "UhsAnzeige": {
         "type": "object",
