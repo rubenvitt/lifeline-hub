@@ -328,6 +328,8 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
     setAuswahl,
     setZoneAuswahl,
     setFachebeneAuswahl,
+    setFlyToZiel, // Reverse-Deeplink (LFH-155): Zone anfliegen
+
     // Handler.
     onKarteKlick,
     onMarkerWaehlen,

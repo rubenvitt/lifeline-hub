@@ -147,6 +147,15 @@ export function gefahrenPfad(einsatzId: number, opts: { gefahrengebiet?: number 
   return mitQuery(einsatzModulPfad(einsatzId, 'gefahren'), { gefahrengebiet: opts.gefahrengebiet });
 }
 
+/**
+ * Lagekarte, optional mit vorselektiertem Gefahrengebiet (Reverse-Deeplink von der
+ * GefahrenPage, LFH-155). Query-Param statt Item-Route: die Karte selektiert das Gebiet
+ * und fliegt es an — sie hat keine Vollseiten-Detailansicht je Gefahrengebiet.
+ */
+export function lagekartePfad(einsatzId: number, opts: { gefahrengebiet?: number } = {}): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'lagekarte'), { gefahrengebiet: opts.gefahrengebiet });
+}
+
 // ── Route-Param-Robustheit ───────────────────────────────────────────────────
 
 /**

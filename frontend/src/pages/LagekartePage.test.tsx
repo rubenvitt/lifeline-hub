@@ -612,6 +612,23 @@ describe('LagekartePage', () => {
     expect(patch!.label).toBe('Neu');
   });
 
+  it('Reverse-Deeplink ?gefahrengebiet= selektiert die zugehörige Zone (LFH-155)', async () => {
+    const ZONE_GG = {
+      id: 7, einsatz_id: 1, typ: 'gefahrengebiet', geometrie_typ: 'Polygon',
+      geometrie: '{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}',
+      label: 'GG-Zone', farbe: null, notiz: null, gefahrengebiet_id: 10,
+      erstellt_von: 1, erstellt_at: '', geaendert_at: '',
+    };
+    const GEBIET = { id: 10, einsatz_id: 1, label: 'Nord', zonen_ids: [7], hoechste_warnstufe: 'keine' };
+    basisHandler([
+      http.get('/api/einsaetze/1/zonen', () => HttpResponse.json([ZONE_GG])),
+      http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json([GEBIET])),
+    ]);
+    renderSeite('/einsaetze/1/lagekarte?gefahrengebiet=10');
+    // Der ZonenInspector der zugehörigen Zone öffnet sich (Gefahrengebiet-Gruppen-Select).
+    expect(await screen.findByLabelText('Gehört zu Gefahrengebiet')).toBeInTheDocument();
+  });
+
   it('hebt eine Zone auf (DELETE)', async () => {
     let geloescht = false;
     const ZONE_FREI = { id: 7, einsatz_id: 1, typ: 'freie_skizze', geometrie_typ: 'Polygon',

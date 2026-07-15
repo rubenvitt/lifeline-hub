@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { App, Spin } from 'antd';
 import { ApiError } from '../api/client';
-import { gefahrenPfad } from '../routing/deeplinks';
+import { gefahrenPfad, parseRouteId } from '../routing/deeplinks';
+import { parsePolygon, polygonZentroid } from './lagekarte/geo';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import { useKartenbilder } from './lagekarte/useKartenbilder';
 import { useBasemap } from './lagekarte/useBasemap';
@@ -24,6 +25,7 @@ export default function LagekartePage() {
   const { message } = App.useApp();
   const { effektiv } = useThemeMode();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [layer, setLayer] = useState<LayerSichtbar>({
     einsatzort: true, uhs: true, schaden: true, einheit: true, fahrzeug: true, fuehrung: true, abschnitt: true, zone: true, lagemeldung: true,
@@ -60,7 +62,7 @@ export default function LagekartePage() {
     platzierungZiel, zeichneAbschnittId, zoneEntwurf, zoneBestaetigung, zoneSpeichern,
     zoneZeichnenNonce, zoneAuswahl, auswahl, flyToZiel, fachebeneAuswahl, bildPlatzierenId,
     exklusiverModusAktiv,
-    setAuswahl, setZoneAuswahl, setFachebeneAuswahl,
+    setAuswahl, setZoneAuswahl, setFachebeneAuswahl, setFlyToZiel,
     onKarteKlick, onMarkerWaehlen, loescheVerortung, aendereSymbol,
     bestaetigungSpeichern, bestaetigungVerwerfen,
     onPlatzierenStart, onPlatzierenAbbrechen, onAbschnittZeichnenStart, onZoneZeichnenStart,
@@ -86,6 +88,24 @@ export default function LagekartePage() {
     const teile = [basisAttribution, ...fachebenenAttribution].filter(Boolean) as string[];
     return teile.length ? teile.join(' · ') : null;
   }, [basisAttribution, fachebenenAttribution]);
+
+  // Reverse-Deeplink (LFH-155): ?gefahrengebiet=<id> von der GefahrenPage → die zugehörige
+  // Zone selektieren und anfliegen, dann den Param räumen (apply-then-clean, StrictMode-fest
+  // wie GefahrenPage LFH-150: searchParams NICHT in-place mutieren). Läuft, sobald die Zonen
+  // geladen sind (zonen ist unabhängig vom zone-Layer-Toggle vorhanden).
+  useEffect(() => {
+    const ziel = parseRouteId(searchParams.get('gefahrengebiet') ?? undefined);
+    if (ziel == null) return;
+    const zone = zonen.find((z) => z.gefahrengebiet_id === ziel);
+    if (!zone) return; // Zonen noch nicht geladen / Gebiet ohne Zone → auf spätere Runde warten
+    setZoneAuswahl(zone.id);
+    const poly = parsePolygon(zone.geometrie);
+    const zentroid = poly ? polygonZentroid(poly) : null;
+    if (zentroid) setFlyToZiel({ lng: zentroid[0], lat: zentroid[1] });
+    const naechste = new URLSearchParams(searchParams);
+    naechste.delete('gefahrengebiet');
+    setSearchParams(naechste, { replace: true });
+  }, [zonen, searchParams, setSearchParams, setZoneAuswahl, setFlyToZiel]);
 
   if (ladt) {
     return <Spin style={{ marginTop: 64 }} />;

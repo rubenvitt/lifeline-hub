@@ -46,6 +46,13 @@ describe('GefahrenPage', () => {
     expect(await screen.findByText(/keine Gefahrengebiete/i)).toBeInTheDocument();
   });
 
+  it('bietet „Auf Karte zeigen" mit Reverse-Deeplink auf die Lagekarte (LFH-155)', async () => {
+    server.use(...handlers());
+    renderPage();
+    const link = await screen.findByRole('link', { name: /Auf Karte zeigen/i });
+    expect(link).toHaveAttribute('href', '/einsaetze/1/lagekarte?gefahrengebiet=7');
+  });
+
   it('korrigiert die Auswahl, wenn das gewählte Gebiet aus der Liste verschwindet', async () => {
     const nord = { id: 7, einsatz_id: 1, label: 'Nord', zonen_ids: [9], hoechste_warnstufe: 'hoch' };
     const sued = { id: 8, einsatz_id: 1, label: 'Süd', zonen_ids: [11], hoechste_warnstufe: 'mittel' };

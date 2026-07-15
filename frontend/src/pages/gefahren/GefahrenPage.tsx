@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, App, Empty, Space, Spin, Tag, Typography } from 'antd';
+import { Alert, App, Button, Empty, Space, Spin, Tag, Typography } from 'antd';
 import type { BewertungEingabe } from '../../api/gefahren';
 import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
 import { benenneGefahrengebiet, gefahrengebietName, ladeGefahrengebiete, ladeMatrix, setzeBewertung } from '../../api/gefahren';
 import { ladeEinsatz } from '../../api/einsaetze';
-import { parseRouteId } from '../../routing/deeplinks';
+import { lagekartePfad, parseRouteId } from '../../routing/deeplinks';
 import { warnstufeFarbe } from './gefahrenSchema';
 import GefahrenMatrix from './GefahrenMatrix';
 import { Liste, ListenEintrag } from '../../components/Liste';
@@ -107,13 +107,19 @@ export default function GefahrenPage() {
       />
       <div style={{ flex: 1, minWidth: 0 }}>
         {aktuell && (
-          <Typography.Title
-            level={5}
-            style={{ marginTop: 0 }}
-            editable={darfSchreiben ? { onChange: (v) => { const t = v.trim(); if (t !== (aktuell.label ?? '')) umbenennen.mutate(t); } } : false}
-          >
-            {gefahrengebietName(aktuell.label, aktuell.id)}
-          </Typography.Title>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+            <Typography.Title
+              level={5}
+              style={{ marginTop: 0 }}
+              editable={darfSchreiben ? { onChange: (v) => { const t = v.trim(); if (t !== (aktuell.label ?? '')) umbenennen.mutate(t); } } : false}
+            >
+              {gefahrengebietName(aktuell.label, aktuell.id)}
+            </Typography.Title>
+            {/* Reverse-Deeplink zur Lagekarte (LFH-155): selektiert das Gebiet + fliegt es an. */}
+            <Link to={lagekartePfad(einsatzId, { gefahrengebiet: aktuell.id })}>
+              <Button size="small">Auf Karte zeigen</Button>
+            </Link>
+          </div>
         )}
         {!darfSchreiben && (
           <Alert type="info" showIcon title="Nur Lesezugriff – Bewertungen können nicht geändert werden." style={{ marginBottom: 12 }} />

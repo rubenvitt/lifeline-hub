@@ -22,6 +22,7 @@ import {
   meldungenPfad,
   auftraegePfad,
   gefahrenPfad,
+  lagekartePfad,
   einsatzdatenPfad,
   parseRouteId,
 } from './deeplinks';
@@ -121,6 +122,12 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   });
   it('gefahrenPfad mit ?gefahrengebiet=', () => {
     expect(gefahrenPfad(E, { gefahrengebiet: 4 })).toBe('/einsaetze/5/gefahren?gefahrengebiet=4');
+  });
+  it('lagekartePfad ohne Optionen', () => {
+    expect(lagekartePfad(E)).toBe('/einsaetze/5/lagekarte');
+  });
+  it('lagekartePfad mit ?gefahrengebiet= (Reverse-Deeplink)', () => {
+    expect(lagekartePfad(E, { gefahrengebiet: 4 })).toBe('/einsaetze/5/lagekarte?gefahrengebiet=4');
   });
   it('einsatzdatenPfad', () => {
     expect(einsatzdatenPfad(E)).toBe('/einsaetze/5/einsatzdaten');
