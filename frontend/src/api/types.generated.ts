@@ -165,7 +165,7 @@ export interface components {
          *     Wire == snake_case (Enum-Wire-Kontrakt).
          * @enum {string}
          */
-        AuthProviderTyp: "passwort" | "dev" | "oidc";
+        AuthProviderTyp: "passwort" | "dev" | "oidc" | "webauthn";
         /**
          * @description Basemap-Modus (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `basemap_modus`.
          * @enum {string}

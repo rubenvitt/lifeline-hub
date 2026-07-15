@@ -51,6 +51,40 @@ rcgen = "0.14"
 # Tasks liefern den HTTP-Client für `request_async`/`discover_async` selbst (SSRF-Disziplin:
 # `redirect::Policy::none()` verlangt ohnehin einen eigenen Client statt oauth2s Default).
 openidconnect = { version = "4", default-features = false }
+# LFH-275: WebAuthn/Passkeys (Increment 4). Default-Features (nur "attestation", reine
+# Zertifikatsketten-Prüfung für Sicherheitsschlüssel-Attestation) ziehen KEINEN eigenen
+# reqwest-/rustls-Stack — kein Kollisions-Risiko wie bei openidconnect (Kanarienvogel-Test
+# `tls::tests::rcgen_pem_ist_per_rustls_ladbar` bleibt grün, siehe dortige Verifikation).
+# ACHTUNG (Supply-Chain-Review): `default-features = false` (also OHNE "attestation") entfernt
+# NICHT das system-OpenSSL (`openssl`/`openssl-sys`) — verifiziert per `cargo tree -i openssl-sys`.
+# `webauthn-rs-core`/`webauthn-attestation-ca` deklarieren `openssl`/`openssl-sys` als
+# unconditional, nicht-optionale Dependency in ihrem eigenen Cargo.toml (kein `cfg(feature =
+# "attestation")` davor) — das Feature gated in dieser Version nur Felder/Methoden im
+# `webauthn-rs`-Top-Crate, keine Dependency-Kante. Der openssl-Pull ist damit inhärent zu jeder
+# Nutzung dieser Library-Version, nicht durch Feature-Wahl vermeidbar. `openssl-sys` bindet zudem
+# standardmäßig DYNAMISCH gegen die System-libssl/libcrypto (kein "vendored") — das ist auch eine
+# LAUFZEIT-Abhängigkeit, nicht nur eine Build-Voraussetzung (verifiziert per `otool -L` auf der
+# gebauten Binary). Details/Build-Voraussetzung: `docs/betrieb/packaging.md`.
+webauthn-rs = "0.5"
+uuid = { version = "1", features = ["v4", "serde"] }
+
+[dev-dependencies]
+# LFH-275 Task 3: Passkey-Storage-Tests brauchen echte `Passkey`-Werte, aber eine komplette
+# Registrierungs-Zeremonie braucht einen echten/simulierten Authenticator. Statt einer
+# schweren Softtoken-Ceremony-Crate oder eines versionsfragilen handgetippten JSON-Fixtures
+# nutzen wir den von webauthn-rs SELBST bereitgestellten Escape-Hatch: das Feature
+# "danger-credential-internals" schaltet `From<Credential> for Passkey` frei (interface.rs),
+# damit Tests eine synthetische `Credential` (alle Felder public) zu einem ECHTEN `Passkey`
+# konvertieren können — kein Fake-String, sondern eine Instanz des echten Typs, die den
+# echten serde-Pfad durchläuft. `webauthn-rs-core` wird zusätzlich direkt gebraucht, weil
+# `webauthn_rs::prelude` nicht alle für den Credential-Bau nötigen Typen (u.a.
+# `RegisteredExtensions`, `UserVerificationPolicy`) reexportiert. Nur `[dev-dependencies]`:
+# Cargos Resolver v2 unifiziert Dev-Dep-Features NICHT in den normalen `cargo build`-Graphen
+# (verifiziert: `cargo build` bleibt ohne das Feature, `cargo test` bekommt es), daher bleibt
+# `cargo build`/die Produktions-Binary unberührt — Boot-Verifikation s. `tls::tests::
+# rcgen_pem_ist_per_rustls_ladbar` (Canary, RustCrypto/rustls-CryptoProvider-Kollision).
+webauthn-rs = { version = "0.5", features = ["danger-credential-internals"] }
+webauthn-rs-core = "=0.5.5"
 
 [features]
 # Dev-only: aktiviert Seed-Testdaten und den /api/dev/users-Endpoint.

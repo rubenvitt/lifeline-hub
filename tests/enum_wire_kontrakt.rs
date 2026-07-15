@@ -329,7 +329,8 @@ fn serde_wire_gleich_as_str() {
     wire_eq!(
         AuthProviderTyp::Passwort,
         AuthProviderTyp::Dev,
-        AuthProviderTyp::Oidc
+        AuthProviderTyp::Oidc,
+        AuthProviderTyp::Webauthn
     );
 }
 

@@ -48,6 +48,22 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/api/auth/oidc/start", get(routes::auth::oidc_start))
         .route("/api/auth/oidc/callback", get(routes::auth::oidc_callback))
+        .route(
+            "/api/auth/webauthn/register/start",
+            post(routes::auth::webauthn_register_start),
+        )
+        .route(
+            "/api/auth/webauthn/register/finish",
+            post(routes::auth::webauthn_register_finish),
+        )
+        .route(
+            "/api/auth/webauthn/auth/start",
+            post(routes::auth::webauthn_auth_start),
+        )
+        .route(
+            "/api/auth/webauthn/auth/finish",
+            post(routes::auth::webauthn_auth_finish),
+        )
         .route("/api/benutzer", get(routes::benutzer::liste))
         .route("/api/benutzer", post(routes::benutzer::anlegen))
         .route(

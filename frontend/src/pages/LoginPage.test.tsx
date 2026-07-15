@@ -1,11 +1,14 @@
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
 import LoginPage from './LoginPage';
+
+const { startAuthenticationMock } = vi.hoisted(() => ({ startAuthenticationMock: vi.fn() }));
+vi.mock('@simplewebauthn/browser', () => ({ startAuthentication: startAuthenticationMock }));
 
 function setup() {
   server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
@@ -197,6 +200,168 @@ describe('LoginPage', () => {
 
       await screen.findByLabelText('Passwort');
       expect(screen.queryByRole('button', { name: /PocketID/ })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Passkey-Login (LFH-275)', () => {
+    const webauthnProvider = [
+      { id: 'webauthn', typ: 'webauthn', anzeigename: 'Passkey', aktiviert: true },
+    ];
+
+    /** `window.isSecureContext` ist in jsdom nicht zuverlässig über Node-/jsdom-Versionen
+     *  hinweg (Memory: Vitest-4/jsdom-29 Test-Gotchas) — explizit setzen und per Assertion
+     *  verifizieren, dass es auch wirklich griffen hat. */
+    function setzeSecureContext(wert: boolean) {
+      Object.defineProperty(window, 'isSecureContext', { configurable: true, value: wert });
+      expect(window.isSecureContext).toBe(wert);
+    }
+
+    const urspruenglicheSecureContext = window.isSecureContext;
+
+    afterEach(() => {
+      Object.defineProperty(window, 'isSecureContext', {
+        configurable: true,
+        value: urspruenglicheSecureContext,
+      });
+    });
+
+    beforeEach(() => {
+      startAuthenticationMock.mockReset();
+    });
+
+    it('rendert „Mit Passkey anmelden" bei Secure Context + aktivem webauthn-Provider und durchläuft auth/start → get → auth/finish → aktualisiere()', async () => {
+      setzeSecureContext(true);
+      const reihenfolge: string[] = [];
+      // `/api/auth/me` liefert durchgehend den angemeldeten Benutzer — deckt sowohl den
+      // initialen AuthProvider-Mount-Check als auch den `aktualisiere()`-Aufruf NACH
+      // `auth/finish` ab (LoginPage selbst liest `benutzer` aus dem Context nicht, daher
+      // unschädlich für den initialen Render). Mitgezählt via `reihenfolge.push('me')`, um
+      // unten zu verifizieren, dass `aktualisiere()` (und nicht nur der Mount-Check) wirklich
+      // feuert — sonst würde diese Assertion selbst bei entferntem `aktualisiere()`-Aufruf grün
+      // bleiben.
+      server.use(
+        http.get('/api/auth/me', () => {
+          reihenfolge.push('me');
+          return HttpResponse.json({
+            id: 1,
+            anzeigename: 'Admin',
+            benutzername: 'admin',
+            system_rolle: 'admin',
+            org_rolle: 'keine',
+            aktiv: true,
+            erstellt_at: '2026-05-23 10:00:00',
+          });
+        }),
+      );
+      server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
+      server.use(http.get('/api/auth/providers', () => HttpResponse.json(webauthnProvider)));
+      server.use(
+        http.post('/api/auth/webauthn/auth/start', () => {
+          reihenfolge.push('start');
+          return HttpResponse.json({
+            publicKey: {
+              challenge: 'Y2hhbGxlbmdl',
+              rpId: 'localhost',
+              allowCredentials: [],
+            },
+          });
+        }),
+        http.post('/api/auth/webauthn/auth/finish', () => {
+          reihenfolge.push('finish');
+          return new HttpResponse(null, { status: 200 });
+        }),
+      );
+      startAuthenticationMock.mockImplementation(async () => {
+        reihenfolge.push('get');
+        return {
+          id: 'Y3JlZC1pZA',
+          rawId: 'Y3JlZC1pZA',
+          response: {
+            authenticatorData: 'YXV0aERhdGE',
+            clientDataJSON: 'Y2xpZW50RGF0YQ',
+            signature: 'c2ln',
+          },
+          type: 'public-key',
+          clientExtensionResults: {},
+        };
+      });
+
+      renderMitProviders(
+        <AuthProvider>
+          <LoginPage />
+        </AuthProvider>,
+      );
+
+      await userEvent.type(await screen.findByLabelText('Benutzername'), 'admin');
+      const knopf = screen.getByRole('button', { name: 'Mit Passkey anmelden' });
+      await userEvent.click(knopf);
+
+      // Reihenfolge OHNE die 'me'-Aufrufe: start (auth/start) → get (navigator.credentials.get
+      // via startAuthentication) → finish (auth/finish) — der eigentliche Ceremony-Ablauf.
+      await waitFor(() =>
+        expect(reihenfolge.filter((schritt) => schritt !== 'me')).toEqual([
+          'start',
+          'get',
+          'finish',
+        ]),
+      );
+      expect(startAuthenticationMock).toHaveBeenCalledWith({
+        optionsJSON: expect.objectContaining({ challenge: 'Y2hhbGxlbmdl' }),
+      });
+      // `/api/auth/me` MUSS mindestens zweimal aufgerufen worden sein: einmal beim
+      // AuthProvider-Mount-Check, einmal durch `aktualisiere()` NACH `auth/finish` — sonst
+      // wäre die Session zwar gesetzt, der Context aber nicht nachgezogen (genau der
+      // Unterschied zum Passwort-Pfad, wo `login()` den Benutzer direkt zurückliefert).
+      await waitFor(() =>
+        expect(reihenfolge.filter((schritt) => schritt === 'me').length).toBeGreaterThanOrEqual(2),
+      );
+      // Erfolgspfad bis zum Ende durchlaufen (kein Absturz in den catch-Zweig bei
+      // `aktualisiere()`) — sonst bliebe hier die Fehlermeldung stehen.
+      expect(screen.queryByText('Passkey-Anmeldung fehlgeschlagen')).not.toBeInTheDocument();
+    });
+
+    it('zeigt KEINEN Passkey-Button ohne Secure Context, auch bei aktivem webauthn-Provider', async () => {
+      setzeSecureContext(false);
+      server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+      server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
+      server.use(http.get('/api/auth/providers', () => HttpResponse.json(webauthnProvider)));
+
+      renderMitProviders(
+        <AuthProvider>
+          <LoginPage />
+        </AuthProvider>,
+      );
+
+      await screen.findByLabelText('Benutzername');
+      expect(
+        screen.queryByRole('button', { name: 'Mit Passkey anmelden' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('zeigt KEINEN Passkey-Button ohne aktiven webauthn-Provider (aber Secure Context)', async () => {
+      setzeSecureContext(true);
+      server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+      server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
+      server.use(
+        http.get('/api/auth/providers', () =>
+          HttpResponse.json([
+            { id: 'passwort', typ: 'passwort', anzeigename: 'Passwort', aktiviert: true },
+          ]),
+        ),
+      );
+
+      renderMitProviders(
+        <AuthProvider>
+          <LoginPage />
+        </AuthProvider>,
+      );
+
+      await screen.findByLabelText('Benutzername');
+      await waitFor(() =>
+        expect(
+          screen.queryByRole('button', { name: 'Mit Passkey anmelden' }),
+        ).not.toBeInTheDocument(),
+      );
     });
   });
 });

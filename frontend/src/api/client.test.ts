@@ -39,6 +39,11 @@ describe('apiSend', () => {
     await expect(apiSend('/api/logout', 'POST')).resolves.toBeUndefined();
   });
 
+  it('liefert undefined bei 201 ohne Body (z.B. WebAuthn-Finish-Endpunkte, LFH-275)', async () => {
+    server.use(http.post('/api/ding', () => new HttpResponse(null, { status: 201 })));
+    await expect(apiSend('/api/ding', 'POST', {})).resolves.toBeUndefined();
+  });
+
   it('wirft kein ApiError, sondern den nativen TypeError bei Netzwerkfehler', async () => {
     server.use(http.post('/api/ding', () => HttpResponse.error()));
     const fehler = await apiSend('/api/ding', 'POST', {}).catch((e) => e);

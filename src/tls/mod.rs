@@ -79,6 +79,47 @@ pub fn cache_gueltig(cert: &Path, key: &Path) -> bool {
     nichtleer(cert) && nichtleer(key)
 }
 
+/// Pfad der SAN-Sidecar-Datei neben einem Cache-Cert (gleiches Verzeichnis).
+fn sans_sidecar_pfad(cache_cert: &Path) -> PathBuf {
+    cache_cert
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .join("lifeline-tls-sans.txt")
+}
+
+/// Sortierte, `\n`-getrennte Darstellung eines SAN-Sets (Vergleichsgrundlage).
+fn sans_sortiert(sans: &[String]) -> Vec<String> {
+    let mut v: Vec<String> = sans.to_vec();
+    v.sort();
+    v
+}
+
+/// Schreibt das SAN-Set als Sidecar neben das Cache-Cert (sortiert, `\n`-getrennt).
+fn schreibe_sans_sidecar(cache_cert: &Path, sans: &[String]) -> Result<(), AppError> {
+    let inhalt = sans_sortiert(sans).join("\n");
+    std::fs::write(sans_sidecar_pfad(cache_cert), inhalt)
+        .map_err(|e| AppError::Internal(e.to_string()))
+}
+
+/// Cache ist nur dann PASSEND (und darf ohne Neuerzeugung weiterverwendet werden),
+/// wenn cert+key vorhanden/nicht-leer sind UND die Sidecar-SANs exakt dem aktuell
+/// erwarteten SAN-Set entsprechen. Fehlende Sidecar oder Mismatch → false (konservativ,
+/// erzwingt Neuerzeugung) — schützt davor, ein Cache-Cert ohne einen neu hinzugekommenen
+/// SAN (z.B. `--tls-hostname` für WebAuthn) still weiterzuservieren.
+pub fn cache_passend(cache_cert: &Path, cache_key: &Path, erwartete_sans: &[String]) -> bool {
+    if !cache_gueltig(cache_cert, cache_key) {
+        return false;
+    }
+    let sidecar = sans_sidecar_pfad(cache_cert);
+    match std::fs::read_to_string(&sidecar) {
+        Ok(inhalt) => {
+            let vorhandene: Vec<String> = inhalt.lines().map(str::to_string).collect();
+            vorhandene == sans_sortiert(erwartete_sans)
+        }
+        Err(_) => false,
+    }
+}
+
 /// PATH-basierte mkcert-Verfügbarkeit (Real-Seam).
 pub struct RealMkcert;
 impl MkcertSeam for RealMkcert {
@@ -121,6 +162,7 @@ fn mkcert_erzeugen(
     if !status.success() {
         return Err(AppError::Internal("mkcert schlug fehl".into()));
     }
+    schreibe_sans_sidecar(cert, sans)?;
     Ok(())
 }
 
@@ -140,6 +182,7 @@ fn erzeuge_und_cache_rcgen(
         std::fs::set_permissions(cache_key, std::fs::Permissions::from_mode(0o600))
             .map_err(|e| AppError::Internal(e.to_string()))?;
     }
+    schreibe_sans_sidecar(cache_cert, sans)?;
     Ok(())
 }
 
@@ -159,10 +202,17 @@ pub async fn beschaffe_cert(
         _ => {}
     }
     let (cache_cert, cache_key) = cache_pfade(&cfg.db_path);
+    let cache_ist_passend = cache_passend(&cache_cert, &cache_key, &sans);
+    let ist_byo = cfg.tls_cert.is_some(); // beide gesetzt (s. Fail-Fast oben) → BYO gewinnt, Cache wird nicht angefasst
+    if !ist_byo && cache_gueltig(&cache_cert, &cache_key) && !cache_ist_passend {
+        tracing::warn!(
+            "Cache-Cert SAN-Mismatch — vorhandenes Cache-Cert wird wegen geänderter SANs neu erzeugt"
+        );
+    }
     let plan = plane_cert(
         cfg.tls_cert.as_deref(),
         cfg.tls_key.as_deref(),
-        cache_gueltig(&cache_cert, &cache_key),
+        cache_ist_passend,
         &RealMkcert,
         sans.clone(),
     );
@@ -278,6 +328,60 @@ mod tests {
         assert!(!super::cache_gueltig(&c, &k), "nur cert reicht nicht");
         std::fs::write(&k, "y").unwrap();
         assert!(super::cache_gueltig(&c, &k));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// Legt cert+key (nicht-leer) in ein frisches Temp-Verzeichnis; optional die
+    /// Sidecar mit den gegebenen SANs. Rückgabe: (dir, cert_pfad, key_pfad).
+    fn lege_cache_an(
+        unterscheider: &str,
+        sidecar_sans: Option<&[String]>,
+    ) -> (PathBuf, PathBuf, PathBuf) {
+        let dir = std::env::temp_dir().join(format!(
+            "lfh-tls-passend-{}-{}",
+            unterscheider,
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let cert = dir.join("c.pem");
+        let key = dir.join("k.pem");
+        std::fs::write(&cert, "cert-inhalt").unwrap();
+        std::fs::write(&key, "key-inhalt").unwrap();
+        if let Some(sans) = sidecar_sans {
+            super::schreibe_sans_sidecar(&cert, sans).unwrap();
+        }
+        (dir, cert, key)
+    }
+
+    #[test]
+    fn cache_passend_wenn_sidecar_sans_matchen() {
+        let erwartete = sans();
+        let (dir, cert, key) = lege_cache_an("match", Some(&erwartete));
+        assert!(super::cache_passend(&cert, &key, &erwartete));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn cache_nicht_passend_wenn_san_hinzukommt() {
+        let vorhandene_sans = sans();
+        let (dir, cert, key) = lege_cache_an("mismatch", Some(&vorhandene_sans));
+        let mut erwartete = vorhandene_sans.clone();
+        erwartete.push("elw.local".to_string());
+        assert!(
+            !super::cache_passend(&cert, &key, &erwartete),
+            "zusätzlicher SAN muss Neuerzeugung erzwingen"
+        );
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn cache_nicht_passend_wenn_sidecar_fehlt() {
+        let erwartete = sans();
+        let (dir, cert, key) = lege_cache_an("keine-sidecar", None);
+        assert!(
+            !super::cache_passend(&cert, &key, &erwartete),
+            "fehlende Sidecar muss konservativ als nicht-passend gelten"
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 

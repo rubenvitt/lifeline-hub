@@ -2,11 +2,14 @@
 
 lifeline-hub wird als **eine** ausführbare Datei ausgeliefert. Sie enthält API,
 eingebettetes Frontend und (statisch gebündeltes) SQLite — kein separater
-Webserver, keine Laufzeit-Abhängigkeiten.
+Webserver. **Ausnahme (LFH-275, siehe unten):** WebAuthn/Passkeys bringt eine
+System-OpenSSL-Abhängigkeit mit, die sowohl beim Bauen als auch zur Laufzeit
+gebraucht wird.
 
 ## Bauen
 
-Voraussetzungen: Rust-Toolchain (stable) und Node.js (für den Frontend-Build).
+Voraussetzungen: Rust-Toolchain (stable), Node.js (für den Frontend-Build)
+**und System-OpenSSL** (pkg-config + Dev-Header, siehe nächster Abschnitt).
 
 ```bash
 ./scripts/build-release.sh
@@ -19,6 +22,49 @@ Release-Binary, die `frontend/dist` zur Compile-Zeit einbettet. Ergebnis:
 > **Wichtig:** Das Frontend muss **vor** dem Release-Build gebaut sein, sonst
 > bettet die Binary einen veralteten/leeren Frontend-Stand ein. Das Skript
 > erledigt die Reihenfolge automatisch.
+
+## System-OpenSSL-Abhängigkeit (WebAuthn/Passkeys, LFH-275)
+
+Das Projekt ist sonst durchgehend pure-Rust + rustls (kein System-OpenSSL) —
+`webauthn-rs` (Passkey-Login) durchbricht das. Das ist **kein reiner
+Build-Zeit-Umstand**, sondern qualifiziert das Single-Binary/
+"keine-Laufzeit-Abhängigkeiten"-Versprechen oben:
+
+- **Laufzeit (wichtiger Teil):** `openssl-sys` bindet standardmäßig
+  **dynamisch** gegen die System-`libssl`/`libcrypto` (kein `vendored`-Feature
+  aktiv) — verifiziert per `otool -L target/debug/lifeline-hub` (macOS): die
+  Binary linkt gegen `libssl.3.dylib`/`libcrypto.3.dylib` aus dem lokalen
+  OpenSSL-Install. Auf Linux entsprechend gegen `libssl.so`/`libcrypto.so` in
+  passender Version. **Folge für den ELW/Mini-PC-Betrieb** (Abschnitt oben):
+  "bauen, Datei kopieren, starten" reicht nicht mehr ohne Weiteres — der
+  Ziel-Rechner braucht eine kompatible OpenSSL-Runtime, sonst startet die
+  Binary nicht (fehlende/inkompatible `.so`/`.dylib`). Das reißt außerdem die
+  C-OpenSSL-Angriffsfläche wieder rein, die das Projekt mit rustls bewusst
+  vermieden hatte.
+- **Build-Zeit:** pkg-config + OpenSSL-Dev-Header müssen auf dem Build-Rechner
+  vorhanden sein (z.B. Debian/Ubuntu `libssl-dev`, Fedora/RHEL
+  `openssl-devel`, macOS `brew install openssl@3`), sonst schlägt
+  `cargo build`/`build-release.sh` beim Kompilieren von `openssl-sys` fehl.
+
+**Warum nicht einfach abschalten:** `webauthn-rs`s Default-Feature
+`attestation` (Zertifikatsketten-Prüfung für Sicherheitsschlüssel-Attestation,
+für passwortloses Passkey-Login selbst nicht gebraucht) wurde geprüft und
+**absichtlich beibehalten** — `default-features = false` entfernt
+`openssl-sys` NICHT. `webauthn-rs-core`/`webauthn-attestation-ca` (Pflicht-
+Abhängigkeiten von `webauthn-rs`, unabhängig von dessen Features) deklarieren
+`openssl`/`openssl-sys` selbst als unconditional, nicht-optionale Dependency —
+verifiziert per `cargo tree -i openssl-sys` mit `default-features = false`
+(Ergebnis unverändert). Der openssl-Pull ist damit inhärent zu jeder Nutzung
+dieser Library-Version, nicht durch Feature-Wahl vermeidbar.
+
+**Für spätere musl/cross/Docker-Builds zu evaluieren:** entweder (a)
+OpenSSL-Dev-Header + kompatible Runtime-Lib im Zielimage/Zielsystem
+sicherstellen, oder (b) `openssl = { version = "*", features = ["vendored"] }`
+als eigene direkte Dependency ergänzen — Cargo-Feature-Unification aktiviert
+`vendored` dann quer über den gesamten Abhängigkeitsgraphen (kompiliert
+OpenSSL aus Quelle mit ein, macht die Binary wieder autark), braucht dafür
+aber C-Compiler + Perl am Build-Rechner. Nicht getestet, nur als Option
+notiert — keins von beidem ist in diesem Repo umgesetzt.
 
 ## Starten
 

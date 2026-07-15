@@ -48,8 +48,9 @@ describe('StammdatenPage', () => {
 });
 
 describe('ProfilPage', () => {
-  it('Profil zeigt Titel und Platzhalter', () => {
+  it('Profil zeigt Titel und Platzhalter', async () => {
+    server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
     renderMitProviders(<ProfilPage />);
-    expect(screen.getByText(/Profil/)).toBeInTheDocument();
+    expect(await screen.findByText(/Profil/)).toBeInTheDocument();
   });
 });

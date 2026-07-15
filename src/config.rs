@@ -324,6 +324,19 @@ pub struct Config {
     /// OIDC-Redirect-/Callback-URL, die beim IdP als Redirect-URI registriert ist (LFH-41).
     #[arg(long, env = "LIFELINE_OIDC_REDIRECT_URL")]
     pub oidc_redirect_url: Option<String>,
+
+    /// WebAuthn-Relying-Party-ID (LFH-275, Increment 4): MUSS ein Hostname sein (keine IP) —
+    /// `WebauthnBuilder` verlangt, dass `rp_id` eine effektive Domain von `rp_origin` ist.
+    /// Fehlt sie/ist der Bau fehlerhaft, wird der Provider NICHT gelistet (eager Boot-
+    /// Validierung, `main::run_server`). LAN-Deployment braucht einen Hostnamen (mDNS/DNS) +
+    /// ein Cert, das ihn abdeckt (`--tls-hostname`).
+    #[arg(long, env = "LIFELINE_WEBAUTHN_RP_ID")]
+    pub webauthn_rp_id: Option<String>,
+
+    /// WebAuthn-Relying-Party-Origin (LFH-275), z.B. `https://elw.local:8443`. Partner von
+    /// `--webauthn-rp-id`.
+    #[arg(long, env = "LIFELINE_WEBAUTHN_RP_ORIGIN")]
+    pub webauthn_rp_origin: Option<String>,
 }
 
 /// Subkommandos der lifeline-hub-Binary (neben dem Server-Standardlauf).

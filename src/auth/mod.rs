@@ -3,6 +3,7 @@ pub mod oidc;
 pub mod password;
 pub mod provider;
 pub mod session;
+pub mod webauthn;
 
 use serde::Serialize;
 use utoipa::ToSchema;

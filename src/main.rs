@@ -127,6 +127,30 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         &config,
     ));
 
+    // WebAuthn/Passkeys (LFH-275, Increment 4): EAGER Boot-Bau + Boot-Validierung — anders als
+    // OIDC (reine Config-Ableitung + Lazy Discovery) versucht WebAuthn den vollen
+    // `WebauthnBuilder::new(rp_id, &origin)?.build()?` bereits jetzt. Nur bei `Ok` wird der
+    // Provider gelistet UND das gebaute `Webauthn` prozessweit gehalten (`set_webauthn`) —
+    // spätere Ceremony-Endpoints (Task 5/6) greifen darauf zu. Bei `Err`/fehlender Config bleibt
+    // der Provider ungelistet (kein Fake-Button, der erst beim Klick als Fehlkonfiguration
+    // auffällt — derselbe Footgun-Fix wie beim OIDC-`redirect_url`). Keine Netzwerknutzung: der
+    // Bau ist reine lokale Config-/URL-Validierung.
+    if let (Some(rp_id), Some(rp_origin)) = (&config.webauthn_rp_id, &config.webauthn_rp_origin) {
+        match lifeline_hub::auth::webauthn::baue(rp_id, rp_origin) {
+            Ok(webauthn) => {
+                lifeline_hub::auth::webauthn::set_webauthn(webauthn);
+                lifeline_hub::auth::provider::registry::set_webauthn_konfiguriert(true);
+            }
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    "WebAuthn-Konfiguration ungültig (rp_id muss ein Hostname sein, keine IP) \
+                     — Passkey-Provider wird NICHT gelistet"
+                );
+            }
+        }
+    }
+
     let app = build_router(AppState {
         pool,
         live,
