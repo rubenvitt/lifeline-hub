@@ -1,10 +1,19 @@
 import { describe, it, expect, vi } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { neuerQueryClient } from '../../test/utils';
 import type { GeoJsonGeometry } from './geo';
 import { useKartenInteraktion } from './useKartenInteraktion';
+
+// API-Client der freien Zeichen mocken (LFH-170 Etappe 3): der Hook ruft ihn bei Platzieren/
+// Ändern/Löschen; hier nur die Aufrufe prüfen (kein Netz).
+const freieZeichenApi = vi.hoisted(() => ({
+  legeFreiesZeichenAn: vi.fn(() => Promise.resolve({ id: 42 })),
+  aktualisiereFreiesZeichen: vi.fn(() => Promise.resolve({ id: 42 })),
+  loescheFreiesZeichen: vi.fn(() => Promise.resolve()),
+}));
+vi.mock('../../api/freieZeichen', () => freieZeichenApi);
 
 function wrapper() {
   const client = neuerQueryClient();
@@ -58,6 +67,12 @@ const MODI: { name: string; betreten: (r: HookResult) => void }[] = [
       act(() => r.current.onZoneZeichnenStart({ typ: 'gefahrengebiet', modus: 'polygon' }));
       act(() => r.current.onZoneGezeichnet(POLYGON));
     },
+  },
+  // LFH-170: das Platzieren eines freien Zeichens ist ebenfalls exklusiv → muss das
+  // Selektions-Gate (exklusiverModusAktiv) auslösen.
+  {
+    name: 'zeichen-platzieren',
+    betreten: (r) => act(() => r.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' })),
   },
 ];
 
@@ -115,5 +130,39 @@ describe('useKartenInteraktion — Selektions-Gate während exklusiver Modi (LFH
       act(() => result.current.onFachebeneKlick({ a: 1 }, 'nina'));
       expect(result.current.fachebeneAuswahl).toBeNull();
     });
+  });
+});
+
+describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
+  it('onZeichenPlatzierenStart setzt zeichenPlatzieren und resettet andere Modi', () => {
+    const { result } = rendere();
+    act(() => result.current.onPlatzierenStart({ typ: 'uhs', id: 2 }));
+    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
+    expect(result.current.zeichenPlatzieren).toEqual({ grundzeichen: 'stelle' });
+    expect(result.current.platzierungZiel).toBeNull();
+  });
+
+  it('ein anderer Start-Modus resettet zeichenPlatzieren (Mutual-Exclusion, LFH-145)', () => {
+    const { result } = rendere();
+    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
+    act(() => result.current.onZoneZeichnenStart({ typ: 'gefahrengebiet', modus: 'polygon' }));
+    expect(result.current.zeichenPlatzieren).toBeNull();
+  });
+
+  it('onKarteKlick bei aktivem zeichenPlatzieren legt ein freies Zeichen an (POST mit Klick-Koordinate)', async () => {
+    freieZeichenApi.legeFreiesZeichenAn.mockClear();
+    const { result } = rendere();
+    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle', label: 'X' }));
+    act(() => result.current.onKarteKlick({ lng: 8.6, lat: 50.1 }));
+    await waitFor(() =>
+      expect(freieZeichenApi.legeFreiesZeichenAn).toHaveBeenCalledWith(1, {
+        lat: 50.1,
+        lon: 8.6,
+        grundzeichen: 'stelle',
+        label: 'X',
+      }),
+    );
+    // nach erfolgreichem Anlegen ist der Platzier-Modus beendet
+    await waitFor(() => expect(result.current.zeichenPlatzieren).toBeNull());
   });
 });

@@ -8,8 +8,9 @@ import { verorteFahrzeug } from '../../api/einsatzFahrzeuge';
 import { verortePerson } from '../../api/einsatzPersonal';
 import { zeichneAbschnitt } from '../../api/einsatzabschnitte';
 import { legeZoneAn, aktualisiereZone, loescheZone, type ZonePatch } from '../../api/lagezonen';
+import { legeFreiesZeichenAn, aktualisiereFreiesZeichen, loescheFreiesZeichen } from '../../api/freieZeichen';
 import { einsatzKeys } from '../../api/queryKeys';
-import type { EinsatzAnzeige, ZoneTyp } from '../../api/types';
+import type { EinsatzAnzeige, ZoneTyp, FreiesZeichenUpdate } from '../../api/types';
 import type { FachebeneQuelle } from '../../api/fachebenen';
 import type { KarteMarker } from './marker';
 import type { GeoJsonGeometry, GeoJsonPolygon } from './geo';
@@ -79,19 +80,23 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
     geometrie?: { type: string; coordinates: unknown } | null;
   } | null>(null);
   const [bildPlatzierenId, setBildPlatzierenId] = useState<number | null>(null);
+  // Aktives freies Zeichen zum Platzieren (LFH-170): die per Picker gewählte DV-102-Spec
+  // (ohne lat/lon — die kommt vom Karten-Klick). null = kein Platzier-Modus.
+  const [zeichenPlatzieren, setZeichenPlatzieren] = useState<FreiesZeichenUpdate | null>(null);
 
   // Ein wechselseitig-exklusiver Interaktionsmodus ist aktiv (Platzieren / Bild-Platzieren /
-  // Abschnitt- oder Zonen-Zeichnen / Zonen-Bestätigung). Während dessen darf ein Karten-Klick
-  // auf ein bestehendes Objekt kein Auswahl-Panel öffnen (LFH-208: sonst Doppel-Panel neben der
-  // ZeichnenSteuerung). Billiger abgeleiteter Boolean — bewusst kein useMemo (kein Deps-Churn).
-  // zoneBestaetigung ist heute stets mit truthy zoneEntwurf gepaart, wird aber explizit geführt,
-  // damit ein künftiger Bestätigung-only-State robust bleibt.
+  // Abschnitt- oder Zonen-Zeichnen / Zonen-Bestätigung / freies-Zeichen-Platzieren). Während
+  // dessen darf ein Karten-Klick auf ein bestehendes Objekt kein Auswahl-Panel öffnen (LFH-208:
+  // sonst Doppel-Panel neben der ZeichnenSteuerung). Billiger abgeleiteter Boolean — bewusst
+  // kein useMemo (kein Deps-Churn). zoneBestaetigung ist heute stets mit truthy zoneEntwurf
+  // gepaart, wird aber explizit geführt, damit ein künftiger Bestätigung-only-State robust bleibt.
   const exklusiverModusAktiv =
     platzierungZiel != null ||
     bildPlatzierenId != null ||
     zeichneAbschnittId != null ||
     zoneEntwurf != null ||
-    zoneBestaetigung != null;
+    zoneBestaetigung != null ||
+    zeichenPlatzieren != null;
 
   // Verorten je nach Ziel-Typ (UHS/Schaden live; Einsatzort über Kopf-PATCH, dann invalidieren).
   const verortenMutation = useMutation({
@@ -123,8 +128,27 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
     onError: fehler,
   });
 
+  // Freies Zeichen am Klickpunkt anlegen (LFH-170); Spec kommt aus dem Platzier-Modus.
+  const legeZeichenMutation = useMutation({
+    mutationFn: async (p: { lat: number; lon: number }) => {
+      if (!zeichenPlatzieren) return;
+      await legeFreiesZeichenAn(einsatzId, { lat: p.lat, lon: p.lon, ...zeichenPlatzieren });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) });
+      setZeichenPlatzieren(null);
+    },
+    onError: fehler,
+  });
+
   function onKarteKlick(lngLat: { lng: number; lat: number }) {
-    if (!platzierungZiel || !darfSchreiben) return;
+    if (!darfSchreiben) return;
+    // Platzieren XOR Verorten — beides sind exklusive Modi, nie gleichzeitig aktiv.
+    if (zeichenPlatzieren) {
+      legeZeichenMutation.mutate({ lat: lngLat.lat, lon: lngLat.lng });
+      return;
+    }
+    if (!platzierungZiel) return;
     verortenMutation.mutate({ lat: lngLat.lat, lon: lngLat.lng });
   }
 
@@ -214,6 +238,7 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
   // --- Start-/Reset-Handler (mutually-exclusive Modi) -------------------------
   const onPlatzierenStart = (z: { typ: PlatzierenPunktTyp; id: number }) => {
     setPlatzierungZiel(z);
+    setZeichenPlatzieren(null);
     setZoneEntwurf(null);
     setZoneBestaetigung(null);
     setAuswahl(null);
@@ -221,6 +246,7 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
   const onPlatzierenAbbrechen = () => setPlatzierungZiel(null);
   const onAbschnittZeichnenStart = (id: number) => {
     setZeichneAbschnittId(id);
+    setZeichenPlatzieren(null);
     setZoneEntwurf(null);
     setZoneBestaetigung(null);
     setPlatzierungZiel(null);
@@ -228,6 +254,7 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
   };
   const onZoneZeichnenStart = (entwurf: { typ: ZoneTyp; modus: ZeichenModus; farbe?: string }) => {
     setZoneEntwurf(entwurf);
+    setZeichenPlatzieren(null);
     setZoneBestaetigung(null); // neuer Entwurf beendet eine evtl. hängende Bestätigung
     setZoneZeichnenNonce((n) => n + 1);
     setZoneAuswahl(null);
@@ -240,12 +267,26 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
   };
   const onEinsatzortPlatzieren = () => {
     setPlatzierungZiel({ typ: 'einsatzort', id: 0 });
+    setZeichenPlatzieren(null);
     setZoneEntwurf(null);
     setZoneBestaetigung(null);
     setAuswahl(null);
   };
+  // Freies-Zeichen-Platzieren starten/abbrechen (LFH-170). Start räumt alle anderen exklusiven
+  // Modi (Mutual-Exclusion, LFH-145); jeder andere Start räumt umgekehrt zeichenPlatzieren.
+  const onZeichenPlatzierenStart = (spec: FreiesZeichenUpdate) => {
+    setZeichenPlatzieren(spec);
+    setPlatzierungZiel(null);
+    setBildPlatzierenId(null);
+    setZeichneAbschnittId(null);
+    setZoneEntwurf(null);
+    setZoneBestaetigung(null);
+    setAuswahl(null);
+  };
+  const onZeichenPlatzierenAbbrechen = () => setZeichenPlatzieren(null);
   const onBildPlatzieren = (id: number) => {
     setBildPlatzierenId(id);
+    setZeichenPlatzieren(null);
     setZoneEntwurf(null);
     setZoneBestaetigung(null);
     setZeichneAbschnittId(null);
@@ -310,6 +351,19 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
       })
       .catch(fehler);
 
+  // Freies-Zeichen-Inspector-CRUD (LFH-170). Whole-Spec-Update (lat/lon unverändert).
+  const zeichenAendern = (id: number, spec: FreiesZeichenUpdate) =>
+    aktualisiereFreiesZeichen(einsatzId, id, spec)
+      .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) }))
+      .catch(fehler);
+  const zeichenLoeschen = (id: number) =>
+    loescheFreiesZeichen(einsatzId, id)
+      .then(() => {
+        setAuswahl(null);
+        return qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) });
+      })
+      .catch(fehler);
+
   return {
     // FSM-State (Display/Wiring).
     platzierungZiel,
@@ -323,6 +377,7 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
     flyToZiel,
     fachebeneAuswahl,
     bildPlatzierenId,
+    zeichenPlatzieren,
     exklusiverModusAktiv,
     // Panel-Schließer (onSchliessen der Inspektoren).
     setAuswahl,
@@ -345,6 +400,8 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
     onEinsatzortPlatzieren,
     onBildPlatzieren,
     onBildPlatzierenFertig,
+    onZeichenPlatzierenStart,
+    onZeichenPlatzierenAbbrechen,
     onFlaecheGezeichnet,
     onFlaecheKlick,
     onZoneKlick,
@@ -353,5 +410,7 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
     onZeichnenAbbrechen,
     zoneAendern,
     zoneLoeschen,
+    zeichenAendern,
+    zeichenLoeschen,
   };
 }
