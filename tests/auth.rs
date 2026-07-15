@@ -585,3 +585,151 @@ async fn oidc_callback_mit_idp_error_redirect_ohne_400() {
         .unwrap();
     assert_eq!(location, "/login?fehler=oidc");
 }
+
+// ===== TOTP-Enroll (LFH-43, Increment 5, Task 4) =====
+
+fn jetzt_unix() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+}
+
+#[tokio::test]
+async fn totp_enroll_start_liefert_otpauth_url_und_speichert_secret_inaktiv() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, json) = anfrage(&app, "POST", "/api/auth/totp/enroll/start", &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let otpauth_url = json["otpauth_url"].as_str().expect("otpauth_url erwartet");
+    assert!(
+        otpauth_url.starts_with("otpauth://totp/"),
+        "URL: {otpauth_url}"
+    );
+    let secret = json["secret_base32"]
+        .as_str()
+        .expect("secret_base32 erwartet")
+        .to_string();
+    assert!(!secret.is_empty());
+
+    let (db_secret, db_aktiviert): (Option<String>, i64) = sqlx::query_as(
+        "SELECT totp_secret, totp_aktiviert FROM benutzer WHERE benutzername = 'admin'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        db_secret.as_deref(),
+        Some(secret.as_str()),
+        "DB muss das zurückgegebene Secret gespeichert haben"
+    );
+    assert_eq!(
+        db_aktiviert, 0,
+        "Secret ist gespeichert, MFA ist aber noch NICHT aktiv"
+    );
+}
+
+#[tokio::test]
+async fn totp_enroll_finish_mit_gueltigem_code_aktiviert_mfa_und_liefert_10_recovery_codes() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, json) = anfrage(&app, "POST", "/api/auth/totp/enroll/start", &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    let secret = json["secret_base32"].as_str().unwrap().to_string();
+
+    let now = jetzt_unix();
+    let code = lifeline_hub::auth::totp::generiere_code(&secret, now)
+        .expect("Code-Erzeugung aus dem gerade zurückgegebenen Secret darf nicht scheitern");
+
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/totp/enroll/finish",
+        &admin,
+        Some(&format!(r#"{{"code":"{code}"}}"#)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let recovery_codes = json["recovery_codes"]
+        .as_array()
+        .expect("recovery_codes erwartet");
+    assert_eq!(recovery_codes.len(), 10);
+
+    let benutzer_id: i64 =
+        sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let db_aktiviert: i64 = sqlx::query_scalar("SELECT totp_aktiviert FROM benutzer WHERE id = ?")
+        .bind(benutzer_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(db_aktiviert, 1, "ein gültiger Code muss MFA aktivieren");
+
+    let anzahl: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM totp_recovery_code WHERE benutzer_id = ?")
+            .bind(benutzer_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        anzahl, 10,
+        "für jeden zurückgegebenen Recovery-Code muss genau ein Hash gespeichert sein"
+    );
+}
+
+#[tokio::test]
+async fn totp_enroll_finish_mit_falschem_code_ist_422_und_aktiviert_nicht() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, json) = anfrage(&app, "POST", "/api/auth/totp/enroll/start", &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    let secret = json["secret_base32"].as_str().unwrap().to_string();
+
+    // Deterministisch garantiert falsch (statt eines festen "000000", das zufällig der gültige
+    // Code sein könnte): `pruefe_code` akzeptiert wegen skew=1 GLEICH DREI Codes (Zeitschritt
+    // jetzt-30/jetzt/jetzt+30, s. `auth::totp`-Moduldoc) — alle drei werden berechnet und aus
+    // zehn repetitiven Kandidaten ("000000".."999999") der erste gewählt, der zu KEINEM der
+    // drei passt (mind. 7 der 10 Kandidaten bleiben immer übrig).
+    let now = jetzt_unix();
+    let gueltige_codes: std::collections::HashSet<String> = [now - 30, now, now + 30]
+        .into_iter()
+        .map(|t| lifeline_hub::auth::totp::generiere_code(&secret, t).unwrap())
+        .collect();
+    let falscher_code = (0..10u32)
+        .map(|n| n.to_string().repeat(6))
+        .find(|c| !gueltige_codes.contains(c))
+        .expect("mind. 7 der 10 repetitiven Kandidaten sind ≠ den 3 gültigen Codes");
+
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/totp/enroll/finish",
+        &admin,
+        Some(&format!(r#"{{"code":"{falscher_code}"}}"#)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+
+    let db_aktiviert: i64 =
+        sqlx::query_scalar("SELECT totp_aktiviert FROM benutzer WHERE benutzername = 'admin'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        db_aktiviert, 0,
+        "ein falscher Code darf MFA NICHT aktivieren"
+    );
+}
+
+#[tokio::test]
+async fn totp_enroll_start_ohne_session_ist_401() {
+    let app = setup().await;
+    let (status, _) = anfrage(&app, "POST", "/api/auth/totp/enroll/start", "", None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}

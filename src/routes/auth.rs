@@ -9,8 +9,9 @@ use axum::Json;
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use openidconnect::core::CoreAuthenticationFlow;
 use openidconnect::{CsrfToken, Nonce, PkceCodeChallenge, Scope, TokenResponse};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
+use utoipa::ToSchema;
 use webauthn_rs::prelude::{
     CreationChallengeResponse, PublicKeyCredential, RegisterPublicKeyCredential,
     RequestChallengeResponse, WebauthnError,
@@ -699,6 +700,118 @@ pub async fn webauthn_auth_finish(
             .build(),
     );
     Ok((jar, StatusCode::OK))
+}
+
+/// Antwort auf `POST /api/auth/totp/enroll/start` (LFH-43, Task 4): das frisch erzeugte,
+/// noch NICHT aktive TOTP-Secret. `otpauth_url` ist für den QR-Code-Scan gedacht,
+/// `secret_base32` als Klartext-Fallback zum manuellen Eintragen in die Authenticator-App.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TotpEnrollStart {
+    pub otpauth_url: String,
+    pub secret_base32: String,
+}
+
+/// Body von `POST /api/auth/totp/enroll/finish`. Request-DTO, bewusst nicht in
+/// `api_doc.rs`/Codegen (Konvention: Eingabe-Bodies bleiben handgepflegt, s. CLAUDE.md).
+#[derive(Debug, Deserialize)]
+pub struct TotpEnrollFinishRequest {
+    pub code: String,
+}
+
+/// Antwort auf `POST /api/auth/totp/enroll/finish` (LFH-43, Task 4): die frisch erzeugten
+/// Recovery-Codes im KLARTEXT — werden NUR HIER, EINMALIG zurückgegeben. Ab dem nächsten
+/// Request existieren nur noch ihre sha256-Hashes in `totp_recovery_code`
+/// (`totp::storage::speichere_recovery_codes`); ein Verlust dieser Antwort ist nicht
+/// rekonstruierbar (Betriebs-Hinweis: Frontend muss die Codes eindringlich anzeigen).
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TotpEnrollFinish {
+    pub recovery_codes: Vec<String>,
+}
+
+/// Aktueller Unix-Zeitstempel (Sekunden) für die TOTP-Prüfung/-Erzeugung. Kein eingefrorener
+/// Testzeitpunkt nötig: die deterministischen Enroll-Tests erzeugen ihren Vergleichscode über
+/// `totp::generiere_code` mit einem eigenen `SystemTime::now()`-Aufruf — der ±1-Zeitschritt-
+/// Skew von `pruefe_code` deckt die paar Millisekunden zwischen beiden Aufrufen ab.
+fn jetzt_unix() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// POST /api/auth/totp/enroll/start — beginnt (oder erneuert) ein TOTP-Enrollment für den
+/// angemeldeten Nutzer (`CurrentUser`-gegated, LFH-43 Task 4). Erzeugt ein frisches Secret und
+/// speichert es SOFORT, aber NOCH NICHT aktiviert (`totp_aktiviert = 0`) — erst ein bestätigender
+/// Code in `enroll/finish` aktiviert MFA.
+///
+/// **Re-Enroll-Entscheidung (Plan Task 4, bewusst dokumentiert):** ein erneuter `start` — egal ob
+/// ein vorheriges Enrollment nie bestätigt wurde ODER TOTP bereits aktiv war — überschreibt das
+/// Secret und setzt `totp_aktiviert` unbedingt auf 0 zurück. Ein Nutzer, der TOTP bereits aktiv
+/// hat und `start` erneut aufruft (Re-Enroll, z. B. neues Gerät), verliert also SOFORT seinen
+/// aktiven zweiten Faktor, bis er den neuen Code in `enroll/finish` bestätigt — ein
+/// abgebrochener/fehlgeschlagener Re-Enroll lässt den Nutzer währenddessen ohne MFA (nicht mit
+/// dem alten Secret weiter aktiv). Das ist der einfachere, im Plan vorgezeichnete Pfad
+/// gegenüber einem „aktiviert bleibt bis bestätigt"-Zwischenzustand (der ein zusätzliches
+/// „Pending-Secret"-Feld bräuchte) und im Enroll-Kontext (Nutzer handelt selbst, aus dem eigenen
+/// Profil) unkritisch.
+pub async fn totp_enroll_start(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+) -> Result<Json<TotpEnrollStart>, AppError> {
+    let secret = crate::auth::totp::neues_secret();
+
+    sqlx::query("UPDATE benutzer SET totp_secret = ?, totp_aktiviert = 0 WHERE id = ?")
+        .bind(&secret)
+        .bind(benutzer.id)
+        .execute(&state.pool)
+        .await?;
+
+    let otpauth_url = crate::auth::totp::otpauth_url(&secret, &benutzer.benutzername)?;
+    Ok(Json(TotpEnrollStart {
+        otpauth_url,
+        secret_base32: secret,
+    }))
+}
+
+/// POST /api/auth/totp/enroll/finish — schließt ein laufendes Enrollment ab (`CurrentUser`-
+/// gegated, LFH-43 Task 4). Lädt `totp_secret` FRISCH per SELECT statt aus dem
+/// `CurrentUser`-Snapshot: der `Benutzer`-Extractor-Typ trägt die `totp_*`-Spalten (noch) gar
+/// nicht, UND ein `start` in genau demselben Request-Zyklus muss ohnehin sichtbar sein.
+///
+/// Kein `totp_secret` gesetzt (nie `enroll/start` aufgerufen) → `400` „Kein TOTP-Enrollment
+/// gestartet" (Validierungsfehler wie das analoge `webauthn_register_finish`-Cookie-Fehlen).
+/// Ein falscher Code → `422` (Zustandsfehler: ein Enrollment läuft, aber der Bestätigungscode
+/// stimmt nicht) — `totp_aktiviert` bleibt dabei unverändert, MFA wird also NIE ohne einen
+/// gültigen Code aktiviert. Erst ein gültiger Code aktiviert MFA, generiert die zehn
+/// Klartext-Recovery-Codes und ersetzt (via `speichere_recovery_codes`) etwaige alte.
+pub async fn totp_enroll_finish(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Json(req): Json<TotpEnrollFinishRequest>,
+) -> Result<Json<TotpEnrollFinish>, AppError> {
+    let secret: Option<String> =
+        sqlx::query_scalar("SELECT totp_secret FROM benutzer WHERE id = ?")
+            .bind(benutzer.id)
+            .fetch_one(&state.pool)
+            .await?;
+    let secret =
+        secret.ok_or_else(|| AppError::Validation("Kein TOTP-Enrollment gestartet".to_string()))?;
+
+    if !crate::auth::totp::pruefe_code(&secret, &req.code, jetzt_unix()) {
+        return Err(AppError::UnprocessableEntity("Code ungültig".to_string()));
+    }
+
+    sqlx::query("UPDATE benutzer SET totp_aktiviert = 1 WHERE id = ?")
+        .bind(benutzer.id)
+        .execute(&state.pool)
+        .await?;
+
+    let codes = crate::auth::totp::neue_recovery_codes();
+    crate::auth::totp::storage::speichere_recovery_codes(&state.pool, benutzer.id, &codes).await?;
+
+    Ok(Json(TotpEnrollFinish {
+        recovery_codes: codes,
+    }))
 }
 
 #[cfg(test)]
