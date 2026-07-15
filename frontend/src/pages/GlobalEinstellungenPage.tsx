@@ -1,4 +1,4 @@
-import { Alert, App, AutoComplete, Button, Form, Input, InputNumber, Select, Spin, Switch, Tabs, Tooltip, Typography } from 'antd';
+import { Alert, App, AutoComplete, Button, Form, Input, InputNumber, Select, Spin, Switch, Tooltip } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ladeOrgEinstellungen, speichereOrgEinstellungen,
@@ -6,6 +6,9 @@ import {
 } from '../api/orgEinstellungen';
 import { providerListe, providerSchalten } from '../api/auth';
 import { ApiError } from '../api/client';
+import AdminPage from '../components/AdminPage';
+import SegmentSektionen from '../components/SegmentSektionen';
+import SektionHeader from '../components/SektionHeader';
 import { useAuth } from '../auth/AuthContext';
 import { modulRegistry, istModulAusblendbar } from '../einsatz/modulRegistry';
 import type { EinheitenSystem, Koordinatenformat, OrgEinstellungenUpdate, Zeitformat } from '../api/types';
@@ -172,10 +175,10 @@ export default function GlobalEinstellungenPage() {
   // ── Tab 1: Anzeige-Konventionen ────────────────────────────────
   const anzeigeTab = (
     <>
-      <Typography.Title level={5} style={{ marginTop: 0 }}>Anzeige-Konventionen</Typography.Title>
-      <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
-        Gemeinsame Darstellungs-Defaults (Lagebild). Leer = hartkodierter Fallback.
-      </Typography.Paragraph>
+      <SektionHeader
+        titel="Anzeige-Konventionen"
+        beschreibung="Gemeinsame Darstellungs-Defaults (Lagebild). Leer = hartkodierter Fallback."
+      />
 
       <Form.Item
         label="Zeitzone"
@@ -214,10 +217,10 @@ export default function GlobalEinstellungenPage() {
   // ── Tab 2: Einsatz-Defaults (Aufbewahrung + Verhalten + Modul-Rollen) ──
   const einsatzTab = (
     <>
-      <Typography.Title level={5} style={{ marginTop: 0 }}>Aufbewahrung</Typography.Title>
-      <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
-        Default-Aufbewahrungs-Dauer für neue Einsätze. Leer = keine automatische Frist.
-      </Typography.Paragraph>
+      <SektionHeader
+        titel="Aufbewahrung"
+        beschreibung="Default-Aufbewahrungs-Dauer für neue Einsätze. Leer = keine automatische Frist."
+      />
 
       <Form.Item
         label="Aufbewahrungs-Dauer (Tage)"
@@ -227,11 +230,10 @@ export default function GlobalEinstellungenPage() {
         <InputNumber min={1} max={3650} style={{ width: 200 }} placeholder="keine" />
       </Form.Item>
 
-      <Typography.Title level={5}>Verhalten &amp; Automatik</Typography.Title>
-      <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
-        Nummernkreis-Präfixe und Default-Fristen für neue Einsätze.
-        Präfixe sind reine Anzeige. Leer = kein Default (hartkodierter Fallback).
-      </Typography.Paragraph>
+      <SektionHeader
+        titel="Verhalten & Automatik"
+        beschreibung="Nummernkreis-Präfixe und Default-Fristen für neue Einsätze. Präfixe sind reine Anzeige. Leer = kein Default (hartkodierter Fallback)."
+      />
 
       <Form.Item
         label="Präfix ETB"
@@ -280,13 +282,12 @@ export default function GlobalEinstellungenPage() {
       </Form.Item>
 
       {/* ── Modul-Rollen-Default (Sofort-Speichern, kein Form-Feld) ──────── */}
-      <Typography.Title level={5} style={{ marginTop: 32 }}>
-        Modul-Rollen-Default
-      </Typography.Title>
-      <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-        Org-weiter Default für die benötigte Rolle je Modul. Kann pro Einsatz überschrieben werden.
-        Änderungen werden sofort gespeichert.
-      </Typography.Paragraph>
+      <div style={{ marginTop: 32 }}>
+        <SektionHeader
+          titel="Modul-Rollen-Default"
+          beschreibung="Org-weiter Default für die benötigte Rolle je Modul. Kann pro Einsatz überschrieben werden. Änderungen werden sofort gespeichert."
+        />
+      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div
@@ -327,11 +328,10 @@ export default function GlobalEinstellungenPage() {
   // ── Tab 3: Anmeldeverfahren (Auth-Provider an/aus, LFH-280) ─────────
   const anmeldeverfahrenTab = (
     <>
-      <Typography.Title level={5} style={{ marginTop: 0 }}>Anmeldeverfahren</Typography.Title>
-      <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
-        Verfügbare Login-Wege an- und abschalten. Nur beim Serverstart konfigurierte Verfahren
-        erscheinen hier. Änderungen werden sofort gespeichert.
-      </Typography.Paragraph>
+      <SektionHeader
+        titel="Anmeldeverfahren"
+        beschreibung="Verfügbare Login-Wege an- und abschalten. Nur beim Serverstart konfigurierte Verfahren erscheinen hier. Änderungen werden sofort gespeichert."
+      />
 
       {providerQuery.isLoading ? (
         <Spin />
@@ -368,15 +368,17 @@ export default function GlobalEinstellungenPage() {
   );
 
   return (
-    <div style={{ maxWidth: 860 }}>
-      <Typography.Title level={3} style={{ marginTop: 0 }}>
-        Globale Einstellungen
-      </Typography.Title>
-      <Typography.Paragraph type="secondary">
-        Org-weite Defaults für alle Einsätze. Einsatzspezifische Einstellungen überschreiben
-        diese Werte. Bearbeitung nur für System-Admins.
-      </Typography.Paragraph>
-
+    <AdminPage
+      titel="Globale Einstellungen"
+      beschreibung="Org-weite Defaults für alle Einsätze. Einsatzspezifische Einstellungen überschreiben diese Werte. Bearbeitung nur für System-Admins."
+      aktionen={
+        istAdmin ? (
+          <Button type="primary" onClick={() => form.submit()} loading={speichernMutation.isPending}>
+            Speichern
+          </Button>
+        ) : undefined
+      }
+    >
       <Form<FormWerte>
         form={form}
         layout="vertical"
@@ -384,26 +386,15 @@ export default function GlobalEinstellungenPage() {
         onFinish={speichern}
         disabled={!istAdmin}
       >
-        <Tabs
-          tabPosition="left"
-          items={[
-            { key: 'anzeige', label: 'Anzeige', forceRender: true, children: anzeigeTab },
-            { key: 'einsatz', label: 'Einsatz-Defaults', forceRender: true, children: einsatzTab },
-            { key: 'anmeldung', label: 'Anmeldeverfahren', children: anmeldeverfahrenTab },
+        <SegmentSektionen
+          ariaLabel="Einstellungs-Bereiche"
+          sektionen={[
+            { key: 'anzeige', label: 'Anzeige', inhalt: anzeigeTab },
+            { key: 'einsatz', label: 'Einsatz-Defaults', inhalt: einsatzTab },
+            { key: 'anmeldung', label: 'Anmeldeverfahren', inhalt: anmeldeverfahrenTab },
           ]}
         />
-
-        {istAdmin && (
-          <Button
-            type="primary"
-            htmlType="submit"
-            loading={speichernMutation.isPending}
-            style={{ marginTop: 8 }}
-          >
-            Speichern
-          </Button>
-        )}
       </Form>
-    </div>
+    </AdminPage>
   );
 }

@@ -1,4 +1,5 @@
-import { Tabs, Typography } from 'antd';
+import { Tabs } from 'antd';
+import AdminPage from '../components/AdminPage';
 import StichworteTab from '../stammdaten/StichworteTab';
 import FahrzeugeTab from '../stammdaten/FahrzeugeTab';
 import StatusKatalogTab from '../stammdaten/StatusKatalogTab';
@@ -13,8 +14,7 @@ import SprechgruppenTab from '../stammdaten/SprechgruppenTab';
 
 export default function StammdatenPage() {
   return (
-    <div style={{ maxWidth: 960, margin: '0 auto', paddingTop: 24 }}>
-      <Typography.Title level={3}>Stammdaten</Typography.Title>
+    <AdminPage titel="Stammdaten" beschreibung="Org-weite Kataloge und Ressourcen-Stammdaten.">
       <Tabs
         defaultActiveKey="stichworte"
         items={[
@@ -31,6 +31,6 @@ export default function StammdatenPage() {
           { key: 'sprechgruppen', label: 'Sprechgruppen', children: <SprechgruppenTab /> },
         ]}
       />
-    </div>
+    </AdminPage>
   );
 }
