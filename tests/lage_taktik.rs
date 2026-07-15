@@ -1,7 +1,7 @@
 //! L-2 Lage/Taktik — Backend-Integrationstests.
 //!
 //! Deckt ab: Verorten ohne ETB, Geo-Paar-Semantik (Partial-Merge + unpaariges 422),
-//! Karten-Lesedaten (aufgelöste Einheiten verschwinden, Führungskräfte nur Leader),
+//! Karten-Lesedaten (aufgelöste Einheiten verschwinden, Karten-Personal = alle disponierten),
 //! reguläre Org-Isolation (Fremd-Nutzer ohne Mitgliedschaft) sowie Live-Events bei
 //! Geo-PATCH und K&M-Mutation.
 //!
@@ -202,7 +202,7 @@ async fn geo_paar_partial_merge_und_unpaarig_422() {
 // ---------- Fall 3: Filter Aufgelöstes + Führungskräfte nur Leader ----------
 
 #[tokio::test]
-async fn aufgeloeste_verschwinden_und_karte_zeigt_nur_leader() {
+async fn aufgeloeste_verschwinden_und_karte_zeigt_alle_personen() {
     let (app, _live, _pool) = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
@@ -268,7 +268,7 @@ async fn aufgeloeste_verschwinden_und_karte_zeigt_nur_leader() {
     .await;
     assert_eq!(s, StatusCode::OK);
 
-    // Karten-Führungskräfte enthält nur den Leader (Chef), nicht den normalen Helfer.
+    // Karten-Personal enthält ALLE disponierten Personen (Chef + Helfer); Führung via Flags (LFH-276).
     let (s, fk) = anfrage(
         &app,
         "GET",
@@ -278,21 +278,52 @@ async fn aufgeloeste_verschwinden_und_karte_zeigt_nur_leader() {
     )
     .await;
     assert_eq!(s, StatusCode::OK);
-    let fk_ids: Vec<i64> = fk
-        .as_array()
-        .unwrap()
+    let arr = fk.as_array().unwrap();
+    let fk_ids: Vec<i64> = arr.iter().map(|p| p["id"].as_i64().unwrap()).collect();
+    assert!(
+        fk_ids.contains(&chef) && fk_ids.contains(&normal),
+        "Chef UND Helfer müssen in karte/fuehrungskraefte erscheinen"
+    );
+    assert_eq!(
+        fk_ids.len(),
+        2,
+        "alle disponierten Personen (Chef + Helfer)"
+    );
+    let chef_obj = arr.iter().find(|p| p["id"].as_i64() == Some(chef)).unwrap();
+    let normal_obj = arr
         .iter()
-        .map(|p| p["id"].as_i64().unwrap())
-        .collect();
-    assert!(
-        fk_ids.contains(&chef),
-        "Einheitsführer muss in karte/fuehrungskraefte erscheinen"
+        .find(|p| p["id"].as_i64() == Some(normal))
+        .unwrap();
+    assert_eq!(
+        chef_obj["ist_einheitsfuehrer"].as_bool(),
+        Some(true),
+        "Einheitsführer-Flag bleibt gesetzt"
     );
-    assert!(
-        !fk_ids.contains(&normal),
-        "normales Personal darf NICHT in karte/fuehrungskraefte erscheinen"
-    );
-    assert_eq!(fk_ids.len(), 1, "nur der eine Leader darf gelistet sein");
+    assert_eq!(normal_obj["ist_einheitsfuehrer"].as_bool(), Some(false));
+    assert_eq!(normal_obj["ist_abschnittsleiter"].as_bool(), Some(false));
+}
+
+#[tokio::test]
+async fn personal_ohne_fuehrung_ist_verortbar() {
+    // LFH-276: Der 404 entstand ausschließlich am Re-list-`.find` in aktualisiere_position
+    // (der Filter schloss Nicht-Führung aus der Ergebnisliste aus; das UPDATE lief bereits).
+    // Fix = Filter entfernt → die Position eines beliebigen disponierten Helfers ist setzbar.
+    let (app, _live, _pool) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let helfer = person_anlegen(&app, &admin, einsatz, "Helfer").await;
+
+    let (s, body) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/personal/{helfer}/position"),
+        &admin,
+        Some(r#"{"lat":50.1,"lon":8.6}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "Nicht-Führungskraft muss verortbar sein");
+    assert_eq!(body["lat"].as_f64(), Some(50.1));
+    assert_eq!(body["lon"].as_f64(), Some(8.6));
 }
 
 // ---------- Fall 4: Org-Isolation (regulärer Fremd-Nutzer) ----------

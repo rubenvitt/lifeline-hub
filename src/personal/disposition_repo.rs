@@ -271,9 +271,10 @@ pub async fn entferne(pool: &SqlitePool, einsatz_id: i64, ep_id: i64) -> Result<
     Ok(())
 }
 
-/// Dedizierter Lesepfad: nur Personen, die Einheitsführer (`einsatz_einheit.fuehrer_id`)
-/// ODER Abschnittsleiter (`einsatzabschnitt.leiter_id`) sind, mit ihrer Position. Bewusst
-/// getrennt vom allgemeinen `liste`-Pfad (der KEIN lat/lon liefert).
+/// Dedizierter Lesepfad für die Karte: ALLE disponierten Personen des Einsatzes mit ihrer
+/// Position (LFH-276 — vormals auf Einheitsführer/Abschnittsleiter beschränkt). Führungsrollen
+/// bleiben als Flags (`ist_einheitsfuehrer`/`ist_abschnittsleiter`) kenntlich. Bewusst getrennt
+/// vom allgemeinen `liste`-Pfad (der KEIN lat/lon liefert).
 pub async fn liste_fuehrungskraefte(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -288,8 +289,6 @@ pub async fn liste_fuehrungskraefte(
                        WHERE a.einsatz_id = ep.einsatz_id AND a.leiter_id = ep.id) AS ist_abschnittsleiter \
          FROM einsatz_personal ep \
          WHERE ep.einsatz_id = ?1 \
-           AND ( ep.id IN (SELECT fuehrer_id FROM einsatz_einheit WHERE einsatz_id = ?1 AND fuehrer_id IS NOT NULL) \
-              OR ep.id IN (SELECT leiter_id  FROM einsatzabschnitt WHERE einsatz_id = ?1 AND leiter_id  IS NOT NULL) ) \
          ORDER BY ep.snap_name, ep.id",
     ).bind(einsatz_id).fetch_all(pool).await?;
     Ok(rows)
@@ -307,7 +306,7 @@ pub struct PositionPatch<'a> {
 
 /// Aktualisiert lat/lon/tz_* einer Person des Einsatzes (Drei-Zustands-PATCH; siehe
 /// `PositionPatch`). `NotFound`, falls die Zeile nicht zum Einsatz gehört. Liefert die
-/// frische Karten-Sicht (setzt voraus, dass die Person eine Führungskraft ist).
+/// frische Karten-Sicht der Person (jede disponierte Person ist verortbar, LFH-276).
 pub async fn aktualisiere_position(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -431,32 +430,49 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn nur_fuehrungskraefte_und_position() {
+    async fn alle_disponierten_und_position() {
         let pool = crate::db::test_pool().await;
-        let (einsatz_id, p1, p2, _p3) = seed_personal_mit_fuehrung(&pool).await;
+        let (einsatz_id, p1, p2, p3) = seed_personal_mit_fuehrung(&pool).await;
 
+        // LFH-276: Die Liste liefert ALLE disponierten Personen des Einsatzes (nicht nur
+        // Führung); Führungsrollen bleiben als Flags kenntlich.
         let liste = liste_fuehrungskraefte(&pool, einsatz_id).await.unwrap();
         let ids: Vec<i64> = liste.iter().map(|f| f.id).collect();
-        assert!(ids.contains(&p1) && ids.contains(&p2));
-        assert_eq!(liste.len(), 2); // #3 NICHT enthalten
+        assert_eq!(liste.len(), 3);
+        assert!(ids.contains(&p1) && ids.contains(&p2) && ids.contains(&p3));
+        assert!(
+            liste
+                .iter()
+                .find(|f| f.id == p1)
+                .unwrap()
+                .ist_einheitsfuehrer
+        );
+        assert!(
+            liste
+                .iter()
+                .find(|f| f.id == p2)
+                .unwrap()
+                .ist_abschnittsleiter
+        );
+        let f3 = liste.iter().find(|f| f.id == p3).unwrap();
+        assert!(!f3.ist_einheitsfuehrer && !f3.ist_abschnittsleiter);
 
+        // Nicht-Führungskraft (#3) ist verortbar → früher 404 am Re-list-`.find`, jetzt Ok.
         aktualisiere_position(
             &pool,
             einsatz_id,
-            p1,
+            p3,
             PositionPatch {
                 lat: Some(Some(50.1)),
                 lon: Some(Some(8.6)),
-                tz_fachaufgabe: Some(Some("fuehrung")),
+                tz_fachaufgabe: None,
                 tz_organisation: None,
             },
         )
         .await
         .unwrap();
         let liste2 = liste_fuehrungskraefte(&pool, einsatz_id).await.unwrap();
-        let f1 = liste2.iter().find(|f| f.id == p1).unwrap();
-        assert_eq!(f1.lat, Some(50.1));
-        assert!(f1.ist_einheitsfuehrer);
+        assert_eq!(liste2.iter().find(|f| f.id == p3).unwrap().lat, Some(50.1));
     }
 
     #[tokio::test]

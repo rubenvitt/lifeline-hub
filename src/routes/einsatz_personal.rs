@@ -327,7 +327,7 @@ pub struct PositionBody {
 }
 
 /// PATCH /api/einsaetze/{id}/personal/{ep_id}/position — reine Lage-Pflege, KEIN ETB.
-/// Liefert die Karten-Sicht; Repo 404t Nicht-Führungskräfte (gewollt, Merge-Design).
+/// Liefert die Karten-Sicht; jede disponierte Person des Einsatzes ist verortbar (LFH-276).
 pub async fn position(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -399,7 +399,8 @@ pub async fn position(
     Ok(Json(nachher))
 }
 
-/// GET /api/einsaetze/{id}/karte/fuehrungskraefte — nur Einheits-/Abschnittsführung.
+/// GET /api/einsaetze/{id}/karte/fuehrungskraefte — alle disponierten Personen des Einsatzes
+/// (Führung via `ist_einheitsfuehrer`/`ist_abschnittsleiter`-Flags kenntlich, LFH-276).
 pub async fn karte_fuehrungskraefte(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,

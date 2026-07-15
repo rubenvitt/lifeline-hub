@@ -33,7 +33,7 @@ const NICHT_VERORTET_LABEL: Record<NichtVerortet['typ'], string> = {
   schaden: 'Schaden',
   einheit: 'Einheit',
   fahrzeug: 'Fahrzeug',
-  fuehrung: 'Führung',
+  fuehrung: 'Personal', // LFH-276: beliebiges disponiertes Personal, nicht nur Führung
   abschnitt: 'Abschnitt',
 };
 
@@ -269,7 +269,7 @@ export default function Sidebar(props: SidebarProps) {
             <Switch checked={props.layer.fahrzeug} onChange={(v) => props.onLayerToggle('fahrzeug', v)} /> Fahrzeuge
           </Space>
           <Space>
-            <Switch checked={props.layer.fuehrung} onChange={(v) => props.onLayerToggle('fuehrung', v)} /> Personal-Führung
+            <Switch checked={props.layer.fuehrung} onChange={(v) => props.onLayerToggle('fuehrung', v)} /> Personal
           </Space>
           <Space>
             <Switch checked={props.layer.abschnitt} onChange={(v) => props.onLayerToggle('abschnitt', v)} /> Abschnitte

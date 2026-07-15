@@ -450,7 +450,7 @@ describe('LagekartePage', () => {
     // Layer-Switch-Labels vorhanden (taktische Ebenen).
     expect(await screen.findByText('Einheiten')).toBeInTheDocument();
     expect(screen.getByText('Fahrzeuge')).toBeInTheDocument();
-    expect(screen.getByText('Personal-Führung')).toBeInTheDocument();
+    expect(screen.getByText('Personal')).toBeInTheDocument(); // LFH-276: vormals „Personal-Führung"
     expect(screen.getByText('Abschnitte')).toBeInTheDocument();
     // Nicht-verortete Einheit erscheint mit korrektem Label in der Nicht-verortet-Liste.
     expect(await screen.findByText('Einheit: Zug 1')).toBeInTheDocument();
@@ -496,15 +496,15 @@ describe('LagekartePage', () => {
     expect(Array.isArray(poly.coordinates)).toBe(true);
   });
 
-  it('rendert verortete Führungskräfte als Personal-Zeichen (normales Personal wird nicht geladen)', async () => {
+  it('rendert verortetes Personal als taktische Zeichen (alle über karte/fuehrungskraefte, LFH-276)', async () => {
     basisHandler([
       http.get('/api/einsaetze/1/karte/fuehrungskraefte', () => HttpResponse.json([FUEHRUNGSKRAFT_VERORTET])),
     ]);
     renderSeite();
-    // Verortete Führungskraft erzeugt marker-fuehrung-7.
+    // Verortetes Personal erzeugt marker-fuehrung-<id> (Marker-Typ bleibt 'fuehrung').
     expect(await screen.findByText('marker-fuehrung-7')).toBeInTheDocument();
-    // Es gibt keine /personal-Query auf der Lagekarte → normales Personal taucht
-    // strukturell nicht als Marker auf. Stichprobe: kein generischer Personal-Marker.
+    // Personal (inkl. Nicht-Führung, LFH-276) kommt ausschließlich über karte/fuehrungskraefte —
+    // es gibt keinen separaten 'personal'-Markertyp. Stichprobe: kein marker-personal-*.
     expect(screen.queryByText(/^marker-personal-/)).not.toBeInTheDocument();
   });
 

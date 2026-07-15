@@ -101,3 +101,23 @@ describe('Inspector Kennzahlen (LFH-146)', () => {
     expect(screen.queryByText('Fläche')).not.toBeInTheDocument();
   });
 });
+
+describe('Inspector Typ-Tag (LFH-276)', () => {
+  beforeEach(() => {
+    server.use(
+      http.get('/api/einsaetze/:id/ort-vorschau', () => HttpResponse.json({ peilung: null, ortsname: null })),
+    );
+  });
+
+  it('zeigt für einen Personal-Marker den Typ-Tag „Personal" (nicht „Führungskraft")', () => {
+    const fuehrungMarker = {
+      schluessel: 'fuehrung-7', typ: 'fuehrung', id: 7, lat: 50.2, lon: 8.5, label: 'Zugführer', farbe: '#1677ff',
+    } as KarteMarker;
+    renderMitProviders(
+      <Inspector einsatzId={1} marker={fuehrungMarker} darfSchreiben={false}
+        onSchliessen={() => {}} onVerortungLoeschen={() => {}} />,
+    );
+    expect(screen.getByText('Personal')).toBeInTheDocument();
+    expect(screen.queryByText('Führungskraft')).not.toBeInTheDocument();
+  });
+});

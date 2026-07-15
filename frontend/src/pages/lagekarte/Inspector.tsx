@@ -23,7 +23,7 @@ const TYP_LABEL: Record<MarkerTyp, string> = {
   schaden: 'Schaden',
   einheit: 'Einheit',
   fahrzeug: 'Fahrzeug',
-  fuehrung: 'Führungskraft',
+  fuehrung: 'Personal',
   abschnitt: 'Einsatzabschnitt',
   einsatzort: 'Einsatzort',
   lagemeldung: 'Lagemeldung',
