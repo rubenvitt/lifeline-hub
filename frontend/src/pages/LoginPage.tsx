@@ -6,6 +6,7 @@ import { startAuthentication } from '@simplewebauthn/browser';
 import { ApiError } from '../api/client';
 import { devBenutzerLaden, type DevBenutzer } from '../api/dev';
 import { providerListe } from '../api/auth';
+import { totpFinish } from '../api/totp';
 import { webauthnAnmeldungAbschliessen, webauthnAnmeldungStarten } from '../api/webauthn';
 import type { AuthProvider } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
@@ -18,15 +19,24 @@ interface FormWerte {
   passwort: string;
 }
 
+interface TotpFormWerte {
+  code: string;
+}
+
 export default function LoginPage() {
   const { login, aktualisiere } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [form] = Form.useForm<FormWerte>();
+  const [totpForm] = Form.useForm<TotpFormWerte>();
   const [fehler, setFehler] = useState<string | null>(null);
   const [laedt, setLaedt] = useState(false);
   const [devBenutzer, setDevBenutzer] = useState<DevBenutzer[]>([]);
   const [provider, setProvider] = useState<AuthProvider[]>([]);
+  // Zweite Login-Stufe (LFH-43, TOTP): `login()` meldet „MFA erforderlich" statt eines
+  // Benutzers (s. `AuthContext.LoginErgebnis`) → die erste Stufe (Passwort/OIDC/Passkey) weicht
+  // einer TOTP-Code-Eingabe. Kein Session-Cookie existiert an dieser Stelle noch.
+  const [mfaAktiv, setMfaAktiv] = useState(false);
 
   const zielPfad = (location.state as { von?: string } | null)?.von ?? '/einsaetze';
 
@@ -78,13 +88,43 @@ export default function LoginPage() {
     setFehler(null);
     setLaedt(true);
     try {
-      await login(werte.benutzername, werte.passwort);
+      const ergebnis = await login(werte.benutzername, werte.passwort);
+      if (ergebnis.status === 'mfa_erforderlich') {
+        setMfaAktiv(true);
+        return;
+      }
       navigate(zielPfad, { replace: true });
     } catch (e) {
       setFehler(e instanceof ApiError ? e.message : 'Verbindung zum Server fehlgeschlagen');
     } finally {
       setLaedt(false);
     }
+  }
+
+  // Zweite Login-Stufe (LFH-43): Body ist ein TOTP- ODER Recovery-Code — dasselbe Feld/
+  // Endpoint, `totp/finish` unterscheidet serverseitig nicht zwischen beiden. Anders als beim
+  // ersten Schritt (`AuthContext.login` postet die Anmeldedaten und übernimmt den Benutzer
+  // selbst) steht die Session hier bereits nach `totp/finish` per Cookie — analog dem
+  // Passkey-Pfad muss der Client den Benutzer nur noch per `aktualisiere()` (`/api/auth/me`) in
+  // den Context nachladen.
+  async function totpAbsenden(werte: TotpFormWerte) {
+    setFehler(null);
+    setLaedt(true);
+    try {
+      await totpFinish(werte.code);
+      await aktualisiere();
+      navigate(zielPfad, { replace: true });
+    } catch (e) {
+      setFehler(e instanceof ApiError ? e.message : 'Code ungültig');
+    } finally {
+      setLaedt(false);
+    }
+  }
+
+  function zurueckZumPasswort() {
+    setFehler(null);
+    setMfaAktiv(false);
+    totpForm.resetFields();
   }
 
   // Passkey-Login: liest den Benutzernamen aus demselben Formularfeld wie der Passwort-Login
@@ -132,84 +172,121 @@ export default function LoginPage() {
           <p className="login-marke__untertitel">Einsatzführung &amp; Einsatztagebuch</p>
         </div>
         {fehler && <Alert type="error" title={fehler} style={{ marginBottom: 20 }} showIcon />}
-        {/* Dev-Schnellanmeldung: nur im Dev-Build und nur wenn der Endpoint Benutzer lieferte. */}
-        {import.meta.env.DEV && devBenutzer.length > 0 && (
-          <div className="login-dev">
-            <span className="login-dev__titel">Dev-Schnellanmeldung</span>
-            <Space wrap size={[8, 8]} className="login-dev__knoepfe">
-              {devBenutzer.map((b) => (
-                <Button
-                  key={b.benutzername}
-                  size="small"
-                  onClick={() =>
-                    form.setFieldsValue({ benutzername: b.benutzername, passwort: b.passwort })
-                  }
-                >
-                  {b.anzeigename}
-                  <Tag style={{ marginInlineStart: 6, marginInlineEnd: 0 }}>{b.rolle}</Tag>
-                </Button>
-              ))}
-            </Space>
-          </div>
-        )}
-        {ssoProvider.length > 0 && (
-          <Space direction="vertical" style={{ width: '100%' }} size={10}>
-            {ssoProvider.map((p) => (
-              <Button key={p.id} size="large" block onClick={starteOidcAnmeldung}>
-                Mit {p.anzeigename} anmelden
-              </Button>
-            ))}
-          </Space>
-        )}
-        {ssoProvider.length > 0 && formSichtbar && <Divider>oder</Divider>}
-        {formSichtbar && (
+        {mfaAktiv ? (
           <Form
             layout="vertical"
-            form={form}
-            onFinish={absenden}
+            form={totpForm}
+            onFinish={totpAbsenden}
             disabled={laedt}
             requiredMark={false}
           >
             <Form.Item
-              label="Benutzername"
-              name="benutzername"
-              rules={[{ required: true, message: 'Bitte Benutzername eingeben' }]}
+              label="Code aus deiner Authenticator-App"
+              name="code"
+              rules={[{ required: true, message: 'Bitte Code eingeben' }]}
+              extra="Kein Zugriff aufs Gerät? Ein Recovery-Code verwenden — im selben Feld."
             >
-              <Input size="large" autoFocus autoComplete="username" />
+              <Input size="large" autoFocus autoComplete="one-time-code" />
             </Form.Item>
-            {passwortAktiv && (
-              <Form.Item
-                label="Passwort"
-                name="passwort"
-                rules={[{ required: true, message: 'Bitte Passwort eingeben' }]}
-              >
-                <Input.Password size="large" autoComplete="current-password" />
-              </Form.Item>
-            )}
-            {passwortAktiv && (
-              <Button
-                className="login-absenden"
-                type="primary"
-                htmlType="submit"
-                size="large"
-                block
-                loading={laedt}
-              >
-                Anmelden
-              </Button>
-            )}
-            {passkeyAktiv && (
-              <Button
-                size="large"
-                block
-                style={passwortAktiv ? { marginTop: 12 } : undefined}
-                loading={laedt}
-                onClick={mitPasskeyAnmelden}
-              >
-                Mit Passkey anmelden
-              </Button>
-            )}
+            <Button
+              className="login-absenden"
+              type="primary"
+              htmlType="submit"
+              size="large"
+              block
+              loading={laedt}
+            >
+              Anmelden
+            </Button>
+            <Button type="link" block disabled={laedt} onClick={zurueckZumPasswort}>
+              Zurück
+            </Button>
           </Form>
+        ) : (
+          <>
+            {/* Dev-Schnellanmeldung: nur im Dev-Build und nur wenn der Endpoint Benutzer lieferte. */}
+            {import.meta.env.DEV && devBenutzer.length > 0 && (
+              <div className="login-dev">
+                <span className="login-dev__titel">Dev-Schnellanmeldung</span>
+                <Space wrap size={[8, 8]} className="login-dev__knoepfe">
+                  {devBenutzer.map((b) => (
+                    <Button
+                      key={b.benutzername}
+                      size="small"
+                      onClick={() =>
+                        form.setFieldsValue({
+                          benutzername: b.benutzername,
+                          passwort: b.passwort,
+                        })
+                      }
+                    >
+                      {b.anzeigename}
+                      <Tag style={{ marginInlineStart: 6, marginInlineEnd: 0 }}>{b.rolle}</Tag>
+                    </Button>
+                  ))}
+                </Space>
+              </div>
+            )}
+            {ssoProvider.length > 0 && (
+              <Space direction="vertical" style={{ width: '100%' }} size={10}>
+                {ssoProvider.map((p) => (
+                  <Button key={p.id} size="large" block onClick={starteOidcAnmeldung}>
+                    Mit {p.anzeigename} anmelden
+                  </Button>
+                ))}
+              </Space>
+            )}
+            {ssoProvider.length > 0 && formSichtbar && <Divider>oder</Divider>}
+            {formSichtbar && (
+              <Form
+                layout="vertical"
+                form={form}
+                onFinish={absenden}
+                disabled={laedt}
+                requiredMark={false}
+              >
+                <Form.Item
+                  label="Benutzername"
+                  name="benutzername"
+                  rules={[{ required: true, message: 'Bitte Benutzername eingeben' }]}
+                >
+                  <Input size="large" autoFocus autoComplete="username" />
+                </Form.Item>
+                {passwortAktiv && (
+                  <Form.Item
+                    label="Passwort"
+                    name="passwort"
+                    rules={[{ required: true, message: 'Bitte Passwort eingeben' }]}
+                  >
+                    <Input.Password size="large" autoComplete="current-password" />
+                  </Form.Item>
+                )}
+                {passwortAktiv && (
+                  <Button
+                    className="login-absenden"
+                    type="primary"
+                    htmlType="submit"
+                    size="large"
+                    block
+                    loading={laedt}
+                  >
+                    Anmelden
+                  </Button>
+                )}
+                {passkeyAktiv && (
+                  <Button
+                    size="large"
+                    block
+                    style={passwortAktiv ? { marginTop: 12 } : undefined}
+                    loading={laedt}
+                    onClick={mitPasskeyAnmelden}
+                  >
+                    Mit Passkey anmelden
+                  </Button>
+                )}
+              </Form>
+            )}
+          </>
         )}
       </div>
     </div>

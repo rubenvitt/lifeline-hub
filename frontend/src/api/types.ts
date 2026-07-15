@@ -9,6 +9,9 @@ type S = components['schemas'];
 // ============================== Auth ==============================
 export type AuthProvider = S['AuthProviderAnzeige'];
 export type AuthProviderTyp = S['AuthProviderTyp'];
+// LFH-43 (Increment 5): TOTP-Enroll-DTOs (`/api/auth/totp/enroll/start|finish`).
+export type TotpEnrollStart = S['TotpEnrollStart'];
+export type TotpEnrollFinish = S['TotpEnrollFinish'];
 
 // ============================== Benutzer / Einsatz ==============================
 export type SystemRolle = S['SystemRolle'];

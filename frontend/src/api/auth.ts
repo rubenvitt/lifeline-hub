@@ -1,8 +1,25 @@
 import type { AuthProvider, BenutzerAnzeige } from './types';
 import { apiGet, apiSend } from './client';
 
-export function login(benutzername: string, passwort: string): Promise<BenutzerAnzeige> {
-  return apiSend<BenutzerAnzeige>('/api/auth/login', 'POST', { benutzername, passwort });
+/** Schmale Antwort auf `POST /api/auth/login`, wenn der Nutzer TOTP als zweiten Faktor
+ *  aktiviert hat (LFH-43, Increment 5): KEIN Benutzer, KEINE Session — stattdessen setzt der
+ *  Server ein HttpOnly `mfa_pending`-Cookie, und der Login-Flow wird über `totpFinish()`
+ *  (`api/totp.ts`) fortgesetzt. Serverseitig `#[serde(untagged)]` (`LoginAntwort` in
+ *  `routes/auth.rs`) — bewusst NICHT im Typ-Codegen registriert (Backend-Kommentar: die
+ *  Nicht-TOTP-Form bleibt byte-identisch `BenutzerAnzeige`, diese Union ist Frontend-lokal
+ *  handgepflegt, s. CLAUDE.md „Backend↔Frontend-Typ-Codegen"). */
+export interface MfaErforderlich {
+  mfa_erforderlich: string;
+}
+
+export function login(
+  benutzername: string,
+  passwort: string,
+): Promise<BenutzerAnzeige | MfaErforderlich> {
+  return apiSend<BenutzerAnzeige | MfaErforderlich>('/api/auth/login', 'POST', {
+    benutzername,
+    passwort,
+  });
 }
 
 export function logout(): Promise<void> {
