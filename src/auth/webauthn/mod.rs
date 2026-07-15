@@ -15,6 +15,8 @@ use std::sync::OnceLock;
 use uuid::Uuid;
 use webauthn_rs::prelude::*;
 
+pub mod storage;
+
 /// Prozessweit EINMAL (beim Serverstart, nach erfolgreichem [`baue`]) gesetztes `Webauthn` —
 /// OnceLock statt `AppState`-Feld, analog zu `oidc::OIDC_SETTINGS`/`anhang::ScanConfig` (LFH-114):
 /// bricht keine der vielen inline-`AppState`-Testkonstruktionen (Memory:
