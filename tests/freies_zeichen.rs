@@ -40,6 +40,27 @@ async fn setup() -> (axum::Router, LiveHub) {
     (router, live)
 }
 
+/// Wie `setup()`, liefert aber zusätzlich den Pool-Klon für den Test-Shortcut „Einsatz
+/// abschließen" (direkter DB-UPDATE, umgeht die Abschluss-Route). Vorbild: `setup_mit_pool`
+/// in tests/einsatz_uhs.rs.
+async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
+    let pool = db::test_pool().await;
+    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
+        .await
+        .unwrap();
+    let router = build_router(AppState {
+        pool: pool.clone(),
+        live: LiveHub::new(),
+        karten_dir: std::env::temp_dir(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_service_url: None,
+        karten_service_token: None,
+    });
+    (router, pool)
+}
+
 /// Fremder Nutzer ohne Einsatz-Mitgliedschaft und ohne höhere Berechtigung (org_rolle="keine").
 async fn fremder_nutzer(app: &axum::Router, admin: &str) -> String {
     benutzer_anlegen(app, admin, "fremd", "keine").await;
@@ -368,4 +389,81 @@ async fn sse_feuert_bei_post_patch_delete() {
     )
     .await;
     recv_until_tag(&mut rx, "freies_zeichen", Duration::from_secs(1)).await;
+}
+
+#[tokio::test]
+async fn abgeschlossener_einsatz_blockt_schreibrouten() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    // Zeichen anlegen, solange der Einsatz noch aktiv ist (für den PATCH/DELETE-Pfad).
+    let (_, z) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &admin,
+        Some(&neu_body()),
+    )
+    .await;
+    let zid = z["id"].as_i64().unwrap();
+
+    // Einsatz direkt in DB abschließen (Test-Shortcut, umgeht die Abschluss-Route mit
+    // Nachlauffrist-Effekten — wir wollen nur `fordere_aktiv` prüfen). Muster: tests/einsatz_uhs.rs.
+    sqlx::query(
+        "UPDATE einsatz SET status = 'abgeschlossen', \
+         abgeschlossen_at = strftime('%Y-%m-%d %H:%M:%S','now') WHERE id = ?",
+    )
+    .bind(einsatz)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // `fordere_aktiv` läuft vor der Zeichen-id-Auflösung → POST/PATCH/DELETE liefern alle 409
+    // (kein 404), obwohl der Admin Schreibrecht + Modul-Zugriff hat: der Abschluss ist der
+    // einzige greifende Gate.
+    let post = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &admin,
+        Some(&neu_body()),
+    )
+    .await
+    .0;
+    assert_eq!(
+        post,
+        StatusCode::CONFLICT,
+        "POST auf abgeschlossenem Einsatz → 409"
+    );
+
+    let patch = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &admin,
+        Some(&json!({"grundzeichen": "fahrzeug"}).to_string()),
+    )
+    .await
+    .0;
+    assert_eq!(
+        patch,
+        StatusCode::CONFLICT,
+        "PATCH auf abgeschlossenem Einsatz → 409"
+    );
+
+    let del = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &admin,
+        None,
+    )
+    .await
+    .0;
+    assert_eq!(
+        del,
+        StatusCode::CONFLICT,
+        "DELETE auf abgeschlossenem Einsatz → 409"
+    );
 }

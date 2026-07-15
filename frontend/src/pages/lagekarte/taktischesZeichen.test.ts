@@ -3,7 +3,7 @@ import { erzeugeTaktischesZeichen } from 'taktische-zeichen-react';
 import {
   baueTzProps, groesseAusLabel, einsatzortTz, schadenTz, uhsTz,
   grundzeichenAusFahrzeugtyp, organisationAusText, fachaufgabeAusFahrzeugtyp,
-  fachaufgabeAusFunktion,
+  fachaufgabeAusFunktion, grundzeichenAkzeptiert,
 } from './taktischesZeichen';
 
 describe('taktischesZeichen', () => {
@@ -185,6 +185,17 @@ describe('LFH-172: Personal-Zeichen aus Funktion differenzieren', () => {
       }).svg.render();
       expect(svg).toContain('<svg');
     });
+  });
+});
+
+describe('grundzeichenAkzeptiert', () => {
+  it('bekanntes Grundzeichen rendert das gelistete Overlay → true', () => {
+    // 'stelle' akzeptiert laut DV-102-Katalog eine Fachaufgabe (uhsTz nutzt genau das).
+    expect(grundzeichenAkzeptiert('stelle', 'fachaufgabe')).toBe(true);
+  });
+  it('unbekanntes Grundzeichen → false (?? false-Zweig: kein Phantom-Overlay)', () => {
+    // Das Backend validiert grundzeichen NICHT gegen den Katalog → dieser Pfad ist erreichbar.
+    expect(grundzeichenAkzeptiert('gibt-es-nicht', 'organisation')).toBe(false);
   });
 });
 

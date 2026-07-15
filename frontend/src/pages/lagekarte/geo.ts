@@ -217,6 +217,12 @@ type FeatureCollectionLike = { features: { geometry: LoseGeometrie | null }[] };
  * Volle Geometrie des ersten Features, dessen Polygon/MultiPolygon den Punkt enthält; sonst null.
  * Für LFH-146 (c): die un-geclippte Fachebenen-Geometrie aus der geladenen FeatureCollection
  * beziehen statt des kachel-geclippten Klick-Features.
+ *
+ * Bekannte Limitierung (Review LFH-209): bei mehreren an der Klickstelle ÜBERLAPPENDEN Features
+ * (z. B. gleichzeitige Gewitter- + Dauerregen-Warnung über demselben Gebiet) liefert dies das
+ * erste enthaltende Feature der Collection-Reihenfolge — die im Panel gezeigten Properties stammen
+ * aber vom obersten gerenderten Feature. Dann können Kennzahlen und Text divergieren. Robusterer
+ * Weg (Follow-up): Match über eine stabile Feature-ID des Klick-Features statt First-Point-in-Polygon.
  */
 export function findeGeometrieAn(p: PunktLngLat, collection: FeatureCollectionLike): LoseGeometrie | null {
   for (const f of collection.features) {

@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes, useLocation } from 'react-router-dom';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import type { KarteServerConfig } from '../api/karte';
@@ -259,6 +259,25 @@ function renderSeite(route = '/einsaetze/1/lagekarte') {
     <Routes>
       <Route path="/einsaetze/:id/lagekarte" element={<LagekartePage />} />
     </Routes>,
+    { route },
+  );
+}
+
+// URL-Sonde (LFH-155): spiegelt den aktuellen Query-String in ein data-testid, damit Tests
+// die apply-then-clean-Bereinigung des Reverse-Deeplinks direkt an der URL beobachten können.
+function LocationSonde() {
+  const location = useLocation();
+  return <div data-testid="location-search">{location.search}</div>;
+}
+
+function renderSeiteMitSonde(route: string) {
+  return renderMitProviders(
+    <>
+      <Routes>
+        <Route path="/einsaetze/:id/lagekarte" element={<LagekartePage />} />
+      </Routes>
+      <LocationSonde />
+    </>,
     { route },
   );
 }
@@ -660,6 +679,30 @@ describe('LagekartePage', () => {
     renderSeite('/einsaetze/1/lagekarte?gefahrengebiet=10');
     // Der ZonenInspector der zugehörigen Zone öffnet sich (Gefahrengebiet-Gruppen-Select).
     expect(await screen.findByLabelText('Gehört zu Gefahrengebiet')).toBeInTheDocument();
+  });
+
+  it('Reverse-Deeplink ?gefahrengebiet=: räumt den Param aus der URL (apply-then-clean) und die Selektion bleibt bestehen (LFH-155)', async () => {
+    const ZONE_GG = {
+      id: 7, einsatz_id: 1, typ: 'gefahrengebiet', geometrie_typ: 'Polygon',
+      geometrie: '{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}',
+      label: 'GG-Zone', farbe: null, notiz: null, gefahrengebiet_id: 10,
+      erstellt_von: 1, erstellt_at: '', geaendert_at: '',
+    };
+    const GEBIET = { id: 10, einsatz_id: 1, label: 'Nord', zonen_ids: [7], hoechste_warnstufe: 'keine' };
+    basisHandler([
+      http.get('/api/einsaetze/1/zonen', () => HttpResponse.json([ZONE_GG])),
+      http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json([GEBIET])),
+    ]);
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?gefahrengebiet=10');
+    // Zone selektiert → Inspector offen (Sonde startet mit ?gefahrengebiet=10, siehe unten).
+    expect(await screen.findByLabelText('Gehört zu Gefahrengebiet')).toBeInTheDocument();
+    // apply-then-clean: der Param ist nach dem Anwenden aus der URL geräumt (delete + replace).
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('gefahrengebiet'),
+    );
+    // Idempotenz (StrictMode-fest via new URLSearchParams): der erneute Effekt-Lauf mit
+    // geräumtem Param selektiert NICHT erneut / überschreibt nichts — die Selektion bleibt.
+    expect(screen.getByLabelText('Gehört zu Gefahrengebiet')).toBeInTheDocument();
   });
 
   it('hebt eine Zone auf (DELETE)', async () => {

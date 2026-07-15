@@ -3,6 +3,7 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { neuerQueryClient } from '../../test/utils';
+import type { FreiesZeichenUpdate } from '../../api/types';
 import type { GeoJsonGeometry } from './geo';
 import { useKartenInteraktion } from './useKartenInteraktion';
 
@@ -149,6 +150,34 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
     expect(result.current.zeichenPlatzieren).toBeNull();
   });
 
+  // Restabdeckung Mutual-Exclusion (LFH-170): jeder weitere exklusive Start-Handler räumt
+  // einen offenen zeichenPlatzieren-Modus (onZoneZeichnenStart ist oben schon geprüft).
+  const RAEUMT_ZEICHEN_PLATZIEREN: { name: string; start: (r: HookResult) => void }[] = [
+    { name: 'onAbschnittZeichnenStart', start: (r) => act(() => r.current.onAbschnittZeichnenStart(3)) },
+    { name: 'onEinsatzortPlatzieren', start: (r) => act(() => r.current.onEinsatzortPlatzieren()) },
+    { name: 'onBildPlatzieren', start: (r) => act(() => r.current.onBildPlatzieren(7)) },
+  ];
+  describe.each(RAEUMT_ZEICHEN_PLATZIEREN)('$name räumt zeichenPlatzieren', ({ start }) => {
+    it('setzt einen offenen zeichenPlatzieren-Modus auf null', () => {
+      const { result } = rendere();
+      act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
+      expect(result.current.zeichenPlatzieren).toEqual({ grundzeichen: 'stelle' });
+      start(result);
+      expect(result.current.zeichenPlatzieren).toBeNull();
+    });
+  });
+
+  it('onZeichenPlatzierenStart räumt eine offene zoneBestaetigung (Mutual-Exclusion)', () => {
+    const { result } = rendere();
+    // zoneBestaetigung aufbauen: Zone-Zeichnen starten, dann Geometrie abschließen (vgl. MODI
+    // „zone-bestaetigung"). onZoneGezeichnet setzt zoneBestaetigung, ohne zu persistieren.
+    act(() => result.current.onZoneZeichnenStart({ typ: 'gefahrengebiet', modus: 'polygon' }));
+    act(() => result.current.onZoneGezeichnet(POLYGON));
+    expect(result.current.zoneBestaetigung).not.toBeNull();
+    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
+    expect(result.current.zoneBestaetigung).toBeNull();
+  });
+
   it('onKarteKlick bei aktivem zeichenPlatzieren legt ein freies Zeichen an (POST mit Klick-Koordinate)', async () => {
     freieZeichenApi.legeFreiesZeichenAn.mockClear();
     const { result } = rendere();
@@ -170,7 +199,7 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
     // Mutation pending halten → der zweite Klick trifft den Guard, bevor onSuccess
     // zeichenPlatzieren leert. legeFreiesZeichenAn erzeugt je Aufruf eine NEUE Entität
     // (nicht idempotent), ein zweiter Aufruf würde ein Duplikat anlegen.
-    let aufloesen: (v: unknown) => void = () => {};
+    let aufloesen: (v: { id: number }) => void = () => {};
     freieZeichenApi.legeFreiesZeichenAn.mockReset();
     freieZeichenApi.legeFreiesZeichenAn.mockImplementation(
       () => new Promise((r) => { aufloesen = r; }),
@@ -186,5 +215,33 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
     aufloesen({ id: 1 });
     freieZeichenApi.legeFreiesZeichenAn.mockReset();
     freieZeichenApi.legeFreiesZeichenAn.mockImplementation(() => Promise.resolve({ id: 42 }));
+  });
+
+  it('zeichenAendern(id, spec) ruft aktualisiereFreiesZeichen(einsatzId, id, spec)', async () => {
+    freieZeichenApi.aktualisiereFreiesZeichen.mockClear();
+    const { result } = rendere();
+    const spec: FreiesZeichenUpdate = { grundzeichen: 'stelle', label: 'Neu' };
+    act(() => {
+      result.current.zeichenAendern(42, spec);
+    });
+    await waitFor(() =>
+      expect(freieZeichenApi.aktualisiereFreiesZeichen).toHaveBeenCalledWith(1, 42, spec),
+    );
+  });
+
+  it('zeichenLoeschen(id) ruft loescheFreiesZeichen(einsatzId, id) und setzt auswahl auf null', async () => {
+    freieZeichenApi.loescheFreiesZeichen.mockClear();
+    const { result } = rendere();
+    // Erst das freie Zeichen selektieren → auswahl = 'freies_zeichen-42'.
+    act(() => result.current.onMarkerWaehlen('freies_zeichen-42'));
+    expect(result.current.auswahl).toBe('freies_zeichen-42');
+    act(() => {
+      result.current.zeichenLoeschen(42);
+    });
+    await waitFor(() =>
+      expect(freieZeichenApi.loescheFreiesZeichen).toHaveBeenCalledWith(1, 42),
+    );
+    // setAuswahl(null) läuft im .then nach erfolgreichem DELETE.
+    await waitFor(() => expect(result.current.auswahl).toBeNull());
   });
 });
