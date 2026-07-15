@@ -17,6 +17,11 @@ vi.mock('../api/orgEinstellungen', () => ({
   setzeOrgModulEinstellung: vi.fn(),
 }));
 
+vi.mock('../api/auth', () => ({
+  providerListe: vi.fn(),
+  providerSchalten: vi.fn(),
+}));
+
 import { useAuth } from '../auth/AuthContext';
 import {
   ladeOrgEinstellungen,
@@ -24,6 +29,13 @@ import {
   ladeOrgModulEinstellungen,
   setzeOrgModulEinstellung,
 } from '../api/orgEinstellungen';
+import { providerListe, providerSchalten } from '../api/auth';
+import { ApiError } from '../api/client';
+
+const PROVIDER_LISTE = [
+  { id: 'passwort', typ: 'passwort' as const, anzeigename: 'Passwort', aktiviert: true },
+  { id: 'oidc', typ: 'oidc' as const, anzeigename: 'PocketID', aktiviert: true },
+];
 
 // --- Hilfsfunktionen ---
 
@@ -62,6 +74,11 @@ describe('GlobalEinstellungenPage', () => {
     vi.mocked(speichereOrgEinstellungen).mockResolvedValue({ ...LEERE_EINSTELLUNGEN });
     vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({});
     vi.mocked(setzeOrgModulEinstellung).mockResolvedValue(undefined);
+    vi.mocked(providerListe).mockResolvedValue(PROVIDER_LISTE.map((p) => ({ ...p })));
+    // Default: Umschalten von PocketID → aus (Server-Wahrheit nach PUT).
+    vi.mocked(providerSchalten).mockResolvedValue(
+      PROVIDER_LISTE.map((p) => (p.id === 'oidc' ? { ...p, aktiviert: false } : { ...p })),
+    );
   });
 
   // --- Sektionen sichtbar ---
@@ -200,8 +217,10 @@ describe('GlobalEinstellungenPage', () => {
 
     rendern();
 
-    // Warte auf Laden
+    // Warte auf Laden, dann in den Tab mit den Modul-Rollen wechseln (ByRole blendet
+    // versteckte Tab-Panes aus — die Selects sind erst nach Tab-Wechsel adressierbar).
     await screen.findByText('Modul-Rollen-Default');
+    await userEvent.click(await screen.findByRole('tab', { name: 'Einsatz-Defaults' }));
 
     // Alle Modul-Comboboxen (benoetigte Rolle je Modul) müssen disabled sein
     const selects = screen.getAllByRole('combobox');
@@ -217,6 +236,7 @@ describe('GlobalEinstellungenPage', () => {
     rendern();
 
     await screen.findByText('Modul-Rollen-Default');
+    await userEvent.click(await screen.findByRole('tab', { name: 'Einsatz-Defaults' }));
 
     const einsatzdatenSelect = screen.getByRole('combobox', {
       name: 'Benötigte Rolle: Einsatzdaten',
@@ -258,6 +278,7 @@ describe('GlobalEinstellungenPage', () => {
 
     rendern();
     await screen.findByText('Modul-Rollen-Default');
+    await userEvent.click(await screen.findByRole('tab', { name: 'Einsatz-Defaults' }));
 
     // Wähle 'admin' für ETB-Modul
     // combobox-Rolle: antd Select rendern alle als combobox
@@ -269,5 +290,96 @@ describe('GlobalEinstellungenPage', () => {
     await waitFor(() =>
       expect(setzeOrgModulEinstellung).toHaveBeenCalledWith('etb', 'admin'),
     );
+  });
+});
+
+// --- Anmeldeverfahren (Provider-Verwaltung, LFH-280) ---
+
+describe('GlobalEinstellungenPage — Anmeldeverfahren', () => {
+  beforeEach(() => {
+    vi.mocked(useAuth).mockReturnValue({
+      benutzer: { id: 1, system_rolle: 'admin', org_rolle: 'keine', anzeigename: 'Admin', benutzername: 'admin', aktiv: true, erstellt_at: '', totp_aktiviert: false },
+      laedt: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+      aktualisiere: vi.fn(),
+    });
+    vi.mocked(ladeOrgEinstellungen).mockResolvedValue({ ...LEERE_EINSTELLUNGEN });
+    vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({});
+    vi.mocked(providerListe).mockResolvedValue(PROVIDER_LISTE.map((p) => ({ ...p })));
+    vi.mocked(providerSchalten).mockResolvedValue(
+      PROVIDER_LISTE.map((p) => (p.id === 'oidc' ? { ...p, aktiviert: false } : { ...p })),
+    );
+  });
+
+  async function anmeldeverfahrenOeffnen() {
+    await userEvent.click(await screen.findByRole('tab', { name: 'Anmeldeverfahren' }));
+  }
+
+  it('listet die konfigurierten Auth-Provider', async () => {
+    rendern();
+    await anmeldeverfahrenOeffnen();
+
+    expect(
+      await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('switch', { name: 'Anmeldeverfahren: Passwort' }),
+    ).toBeInTheDocument();
+  });
+
+  it('schaltet einen Provider per PUT um und aktualisiert die Anzeige', async () => {
+    rendern();
+    await anmeldeverfahrenOeffnen();
+
+    const oidc = await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' });
+    expect(oidc).toBeChecked();
+
+    await userEvent.click(oidc);
+
+    await waitFor(() => expect(providerSchalten).toHaveBeenCalledWith('oidc', false));
+    // Server-Rückgabe (oidc aktiviert=false) landet im Cache → Switch aus.
+    await waitFor(() =>
+      expect(
+        screen.getByRole('switch', { name: 'Anmeldeverfahren: PocketID' }),
+      ).not.toBeChecked(),
+    );
+  });
+
+  it('sperrt den passwort-Provider (garantierter Admin-Weg)', async () => {
+    rendern();
+    await anmeldeverfahrenOeffnen();
+
+    const passwort = await screen.findByRole('switch', { name: 'Anmeldeverfahren: Passwort' });
+    expect(passwort).toBeDisabled();
+  });
+
+  it('zeigt eine Fehlermeldung, wenn der Server das Umschalten ablehnt (409)', async () => {
+    const meldung = 'Der letzte admin-taugliche Login-Weg kann nicht deaktiviert werden';
+    vi.mocked(providerSchalten).mockRejectedValue(new ApiError(409, meldung));
+
+    rendern();
+    await anmeldeverfahrenOeffnen();
+
+    const oidc = await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' });
+    await userEvent.click(oidc);
+
+    expect(await screen.findByText(meldung)).toBeInTheDocument();
+  });
+
+  it('ist read-only für Nicht-Admins (fuehrungskraft)', async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      benutzer: { id: 2, system_rolle: 'keiner', org_rolle: 'fuehrungskraft', anzeigename: 'FK', benutzername: 'fk', aktiv: true, erstellt_at: '', totp_aktiviert: false },
+      laedt: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+      aktualisiere: vi.fn(),
+    });
+
+    rendern();
+    await anmeldeverfahrenOeffnen();
+
+    const oidc = await screen.findByRole('switch', { name: 'Anmeldeverfahren: PocketID' });
+    expect(oidc).toBeDisabled();
   });
 });
