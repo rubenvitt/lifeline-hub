@@ -3,6 +3,7 @@ pub mod oidc;
 pub mod password;
 pub mod provider;
 pub mod session;
+pub mod totp;
 pub mod webauthn;
 
 use serde::Serialize;
