@@ -15,8 +15,7 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::Json;
 use serde::Deserialize;
 use std::convert::Infallible;
-use tokio_stream::wrappers::BroadcastStream;
-use tokio_stream::{Stream, StreamExt};
+use tokio_stream::Stream;
 
 #[derive(Debug, Deserialize)]
 pub struct NeuerEintrag {
@@ -317,14 +316,7 @@ pub async fn stream(
     .await?;
 
     let rx = state.live.abonniere(einsatz_id);
-    let stream = BroadcastStream::new(rx).map(|res| {
-        let event = match res {
-            Ok(n) => Event::default().event(n.event).data(n.data),
-            // Empfänger ist hinterhergehinkt: Client zum Resync auffordern.
-            Err(_) => Event::default().event("lagged").data("resync"),
-        };
-        Ok::<Event, Infallible>(event)
-    });
+    let stream = crate::routes::support::sse_event_stream(rx);
 
     Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
 }

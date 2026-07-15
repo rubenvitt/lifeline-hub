@@ -3,6 +3,7 @@ use crate::auth::session::{AdminUser, CurrentUser};
 use crate::error::AppError;
 use crate::material::repo::{self, MaterialDaten};
 use crate::material::MaterialAnzeige;
+use crate::routes::support::trimme;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -17,11 +18,6 @@ pub struct MaterialBody {
     pub traegerorganisation: Option<String>,
     pub standort: Option<String>,
     pub bemerkung: Option<String>,
-}
-
-/// Trimmt einen optionalen String und verwirft ihn, wenn er leer ist.
-fn trimme(s: Option<String>) -> Option<String> {
-    s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
 }
 
 /// Owned, validierte Felder; `MaterialDaten` borgt daraus.

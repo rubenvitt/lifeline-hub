@@ -10,6 +10,7 @@ const MODUL_KEY: &str = "schaeden";
 use crate::error::AppError;
 use crate::etb::{self, repo as etb_repo};
 use crate::person::repo as person_repo; // Org-Isolation der Geschädigt-FK (404 bei fremder Person)
+use crate::routes::support::trimme;
 use crate::schaden::{
     darf_uebergehen, ort_kurz, registrier_anzeige, repo as schaden_repo, AbschlussGrund, Ausmass,
     SchadenAnzeige, SchadenStatus, SchadenTyp,
@@ -20,8 +21,7 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::Json;
 use serde::Deserialize;
 use std::convert::Infallible;
-use tokio_stream::wrappers::BroadcastStream;
-use tokio_stream::{Stream, StreamExt};
+use tokio_stream::Stream;
 
 // ---------- ETB-/SSE-Helfer ----------
 
@@ -58,18 +58,6 @@ fn sse_schaden(state: &AppState, einsatz_id: i64, schaden_id: i64) {
     let data =
         serde_json::json!({ "einsatz_id": einsatz_id, "schaden_id": schaden_id }).to_string();
     state.live.publiziere_event(einsatz_id, "schaden", data);
-}
-
-fn trimme(s: Option<String>) -> Option<String> {
-    s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
-}
-
-fn deserialize_optional_field<'de, T, D>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
-where
-    T: serde::Deserialize<'de>,
-    D: serde::Deserializer<'de>,
-{
-    Option::<T>::deserialize(deserializer).map(Some)
 }
 
 // ---------- GET /schaeden (Liste) ----------
@@ -291,21 +279,45 @@ pub struct PatchBody {
     pub ausmass: Option<String>,
     pub ort: Option<String>,
     pub beschreibung: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub geschaedigt_person_id: Option<Option<i64>>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub geschaedigt_kontakt: Option<Option<String>>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub geschaedigt_personal_id: Option<Option<i64>>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub geschaedigt_organisation_id: Option<Option<i64>>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub uebergeben_an: Option<Option<String>>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub abschluss_grund: Option<Option<String>>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub lat: Option<Option<f64>>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub lon: Option<Option<f64>>,
 }
 
@@ -681,12 +693,6 @@ pub async fn stream(
     .await?;
 
     let rx = state.live.abonniere(einsatz_id);
-    let stream = BroadcastStream::new(rx).map(|res| {
-        let event = match res {
-            Ok(n) => Event::default().event(n.event).data(n.data),
-            Err(_) => Event::default().event("lagged").data("resync"),
-        };
-        Ok::<Event, Infallible>(event)
-    });
+    let stream = crate::routes::support::sse_event_stream(rx);
     Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
 }

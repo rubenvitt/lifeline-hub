@@ -69,12 +69,14 @@ describe('ErinnerungListe', () => {
     expect(screen.getAllByText(/Quittiert/).length).toBeGreaterThan(0);
   });
 
-  it('zeigt einen Deeplink zum Bezugsobjekt (Auftrag)', () => {
+  it('zeigt einen Deeplink zum Bezugsobjekt (Auftrag) mit Objekt-Selektion', () => {
     renderListe(<ErinnerungListe
       erinnerungen={[erinnerung({ bezug_typ: 'auftrag', bezug_id: 42 })]}
       darfSchreiben onErledigen={() => {}} onQuittieren={() => {}}
     />);
     const link = screen.getByRole('link', { name: /Auftrag #42/ });
-    expect(link).toHaveAttribute('href', '/einsaetze/1/auftraege');
+    // F36/LFH-257: Deeplink selektiert das referenzierte Objekt (?auftrag=), statt nur
+    // auf die ungefilterte Liste zu zeigen.
+    expect(link).toHaveAttribute('href', '/einsaetze/1/auftraege?auftrag=42');
   });
 });

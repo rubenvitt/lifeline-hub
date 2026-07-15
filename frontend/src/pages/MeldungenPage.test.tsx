@@ -290,7 +290,8 @@ describe('MeldungenPage', () => {
     renderPage();
     await screen.findByText('Florian Nord 1');
     const backlink = screen.getByRole('link', { name: /Auftrag/ });
-    expect(backlink).toHaveAttribute('href', '/einsaetze/1/auftraege');
+    // F36/LFH-257: Backlink selektiert den ausgelösten Auftrag (?auftrag=) statt nur die Liste.
+    expect(backlink).toHaveAttribute('href', '/einsaetze/1/auftraege?auftrag=42');
     expect(screen.queryByRole('button', { name: 'Auftrag erteilen' })).not.toBeInTheDocument();
   });
 

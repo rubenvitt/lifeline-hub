@@ -3,6 +3,7 @@ import { ClockCircleOutlined } from '@ant-design/icons';
 import type { ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { Erinnerung } from '../api/types';
+import { auftraegePfad, etbPfad, meldungenPfad, parseRouteId } from '../routing/deeplinks';
 import { ERINNERUNG_STATUS, StatusBadge, QuittungIndikator, formatZeit } from '../kommunikation';
 
 const { Text } = Typography;
@@ -11,25 +12,31 @@ const { Text } = Typography;
 const TOOLTIP_QUITTIEREN = 'Quittiert = zur Kenntnis genommen; die Erinnerung erübrigt sich.';
 const TOOLTIP_ERLEDIGT = 'Erledigt = die erinnerte Handlung wurde durchgeführt (Vollzug).';
 
-/** bezug_typ → Modul-Route + Anzeige-Wort. Ohne Treffer: kein Deeplink. */
-const BEZUG_ROUTE: Record<string, { modul: string; wort: string }> = {
-  auftrag: { modul: 'auftraege', wort: 'Auftrag' },
-  meldung: { modul: 'meldungen', wort: 'Meldung' },
-  etb: { modul: 'etb', wort: 'ETB-Eintrag' },
+/**
+ * bezug_typ → zentraler Deeplink-Builder (mit Objekt-Selektion) + Anzeige-Wort. Baut über
+ * routing/deeplinks.ts (Quelle der Wahrheit, LFH-25) statt lokaler Route-Literale, damit der
+ * Deeplink das referenzierte Objekt selektiert (`?auftrag=`/`?meldung=`/`?eintrag=`) statt nur
+ * auf die ungefilterte Liste zu zeigen (F36/LFH-257). Ohne Treffer: kein Deeplink.
+ */
+const BEZUG_LINK: Record<string, { pfad: (einsatzId: number, id: number) => string; wort: string }> = {
+  auftrag: { pfad: (einsatzId, id) => auftraegePfad(einsatzId, { auftrag: id }), wort: 'Auftrag' },
+  meldung: { pfad: (einsatzId, id) => meldungenPfad(einsatzId, { meldung: id }), wort: 'Meldung' },
+  etb: { pfad: (einsatzId, id) => etbPfad(einsatzId, { eintrag: id }), wort: 'ETB-Eintrag' },
 };
 
 /** Deeplink zum Quell-Objekt, sofern bezug_typ/-id gesetzt und Route bekannt. */
 function BezugLink({ e, einsatzId }: { e: Erinnerung; einsatzId: string | undefined }) {
   if (!e.bezug_typ || e.bezug_id == null) return null;
-  const route = BEZUG_ROUTE[e.bezug_typ];
-  const text = `↗ ${route?.wort ?? e.bezug_typ} #${e.bezug_id}`;
-  if (!route || !einsatzId) {
-    // Unbekannter Bezugstyp → reines Tag ohne Link (keine sinnvolle Zielroute bekannt).
+  const bezug = BEZUG_LINK[e.bezug_typ];
+  const text = `↗ ${bezug?.wort ?? e.bezug_typ} #${e.bezug_id}`;
+  const eid = parseRouteId(einsatzId);
+  if (!bezug || eid == null) {
+    // Unbekannter Bezugstyp oder fehlende/ungültige Einsatz-id → reines Tag ohne Link.
     return <Tag color="cyan" style={{ margin: 0 }}>{text}</Tag>;
   }
   return (
     <Tag color="cyan" style={{ margin: 0 }}>
-      <Link to={`/einsaetze/${einsatzId}/${route.modul}`}>{text}</Link>
+      <Link to={bezug.pfad(eid, e.bezug_id)}>{text}</Link>
     </Tag>
   );
 }

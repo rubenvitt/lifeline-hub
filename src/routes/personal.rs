@@ -3,6 +3,7 @@ use crate::auth::session::{AdminUser, CurrentUser};
 use crate::error::AppError;
 use crate::personal::repo::{self, PersonalDaten};
 use crate::personal::{PersonalAnzeige, PersonalVorschlaege};
+use crate::routes::support::trimme;
 use crate::staerke::StaerkePosition;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -21,10 +22,6 @@ pub struct PersonalBody {
     pub bemerkung: Option<String>,
     #[serde(default)]
     pub qualifikation_ids: Vec<i64>,
-}
-
-fn trimme(s: Option<String>) -> Option<String> {
-    s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
 }
 
 /// Owned, validierte Felder; `PersonalDaten` borgt daraus.

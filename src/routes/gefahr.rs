@@ -11,6 +11,7 @@ use crate::error::AppError;
 use crate::etb::{self, repo as etb_repo};
 use crate::gefahr::repo::{self as gefahr_repo, BewertungDaten};
 use crate::gefahr::{self, GefahrBewertungAnzeige, GefahrengebietAnzeige};
+use crate::routes::support::trimme;
 use axum::extract::{Path, State};
 use axum::Json;
 use serde::Deserialize;
@@ -51,10 +52,6 @@ async fn etb_system(
         state.live.publiziere(einsatz_id, json);
     }
     Ok(())
-}
-
-fn trimme(s: Option<String>) -> Option<String> {
-    s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
 }
 
 /// GET /api/einsaetze/{id}/gefahrengebiete — alle Gefahrengebiete (Übersicht/Karten-Styling).

@@ -3,6 +3,7 @@ use crate::auth::session::{AdminUser, CurrentUser};
 use crate::error::AppError;
 use crate::fahrzeug::repo::{self, FahrzeugDaten};
 use crate::fahrzeug::{FahrzeugAnzeige, FahrzeugVorschlaege};
+use crate::routes::support::trimme;
 use crate::staerke::Staerke;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -26,11 +27,6 @@ pub struct FahrzeugBody {
     pub staerke_unterfuehrer: Option<i64>,
     pub staerke_mannschaft: Option<i64>,
     pub bemerkung: Option<String>,
-}
-
-/// Trimmt einen optionalen String und verwirft ihn, wenn er leer ist.
-fn trimme(s: Option<String>) -> Option<String> {
-    s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
 }
 
 /// Owned, validierte Felder; `FahrzeugDaten` borgt daraus.

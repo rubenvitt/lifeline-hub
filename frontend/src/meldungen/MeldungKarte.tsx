@@ -153,7 +153,7 @@ export default function MeldungKarte({
           {m.richtung === 'extern' && <Tag color="purple" style={{ margin: 0 }}>Extern</Tag>}
           {m.lagerelevant && <Tag color="gold" style={{ margin: 0 }}>Lagerelevant ✓</Tag>}
           {m.auftrag_id != null && (
-            <Link to={auftraegePfad(einsatzId)}>↗ Auftrag</Link>
+            <Link to={auftraegePfad(einsatzId, { auftrag: m.auftrag_id })}>↗ Auftrag</Link>
           )}
         </Space>
         <Space size={10} wrap>
