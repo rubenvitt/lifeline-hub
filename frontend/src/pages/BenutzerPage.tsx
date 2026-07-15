@@ -1,5 +1,6 @@
-import { App, Button, Form, Input, Modal, Popconfirm, Select, Space, Tag, Typography } from 'antd';
+import { App, Button, Form, Input, Modal, Popconfirm, Select, Space, Tag } from 'antd';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
+import AdminPage from '../components/AdminPage';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate } from 'react-router-dom';
@@ -50,16 +51,15 @@ export default function BenutzerPage() {
   }
 
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto' }}>
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Typography.Title level={3} style={{ margin: 0 }}>
-          Benutzer
-        </Typography.Title>
+    <AdminPage
+      titel="Benutzer"
+      beschreibung="System- und Org-Rollen der Benutzerkonten verwalten."
+      aktionen={
         <Button type="primary" onClick={() => setOffen(true)}>
           Benutzer anlegen
         </Button>
-      </Space>
-
+      }
+    >
       <Liste
         loading={isLoading}
         bordered
@@ -146,6 +146,6 @@ export default function BenutzerPage() {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </AdminPage>
   );
 }
