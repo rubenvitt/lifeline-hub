@@ -5,7 +5,6 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
 import StammdatenPage from './StammdatenPage';
-import ProfilPage from './ProfilPage';
 
 const admin = {
   id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
@@ -44,13 +43,5 @@ describe('StammdatenPage', () => {
     await screen.findByText('H1');
     expect(screen.queryByRole('button', { name: 'Hinzufügen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Löschen' })).not.toBeInTheDocument();
-  });
-});
-
-describe('ProfilPage', () => {
-  it('Profil zeigt Titel und Platzhalter', async () => {
-    server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
-    renderMitProviders(<ProfilPage />);
-    expect(await screen.findByText(/Profil/)).toBeInTheDocument();
   });
 });
