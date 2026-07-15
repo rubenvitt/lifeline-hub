@@ -2,9 +2,11 @@ import { Alert, Button, Divider, Form, Input, Space, Tag } from 'antd';
 import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { startAuthentication } from '@simplewebauthn/browser';
 import { ApiError } from '../api/client';
 import { devBenutzerLaden, type DevBenutzer } from '../api/dev';
 import { providerListe } from '../api/auth';
+import { webauthnAnmeldungAbschliessen, webauthnAnmeldungStarten } from '../api/webauthn';
 import type { AuthProvider } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import loginBg from '../assets/login-bg.webp';
@@ -17,7 +19,7 @@ interface FormWerte {
 }
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, aktualisiere } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [form] = Form.useForm<FormWerte>();
@@ -57,6 +59,13 @@ export default function LoginPage() {
     provider.length === 0 || provider.some((p) => p.typ === 'passwort' && p.aktiviert);
   // Aktive OIDC-Provider (LFH-41): jeder rendert einen eigenen Redirect-Button.
   const ssoProvider = provider.filter((p) => p.typ === 'oidc' && p.aktiviert);
+  // Passkey-Login (LFH-275): nur bei aktivem webauthn-Provider UND Secure Context — WebAuthn
+  // verlangt https/localhost, der Button wäre sonst ein Fake-Button (analog OIDC-Precedent).
+  const webauthnAktiv = provider.some((p) => p.typ === 'webauthn' && p.aktiviert);
+  const passkeyAktiv = webauthnAktiv && window.isSecureContext;
+  // Benutzername-Feld wird für Passwort- UND Passkey-Login gebraucht → Form bleibt sichtbar,
+  // sobald einer der beiden Wege aktiv ist.
+  const formSichtbar = passwortAktiv || passkeyAktiv;
 
   // OIDC ist ein Browser-Redirect-Flow (kein fetch/XHR): der Server leitet auf den
   // Identity-Provider weiter, daher ein echter Full-Page-Redirect. `von` trägt das
@@ -73,6 +82,34 @@ export default function LoginPage() {
       navigate(zielPfad, { replace: true });
     } catch (e) {
       setFehler(e instanceof ApiError ? e.message : 'Verbindung zum Server fehlgeschlagen');
+    } finally {
+      setLaedt(false);
+    }
+  }
+
+  // Passkey-Login: liest den Benutzernamen aus demselben Formularfeld wie der Passwort-Login
+  // (kein zweites Eingabefeld) → auth/start → navigator.credentials.get (via
+  // `startAuthentication` aus `@simplewebauthn/browser`) → auth/finish. Anders als beim
+  // Passwort-Pfad (`AuthContext.login` postet die Anmeldedaten selbst) steht die Session
+  // hier bereits nach `auth/finish` per Cookie — der Client muss den Benutzer nur noch per
+  // `aktualisiere()` (`/api/auth/me`) in den Context nachladen.
+  async function mitPasskeyAnmelden() {
+    setFehler(null);
+    let werte: FormWerte;
+    try {
+      werte = await form.validateFields(['benutzername']);
+    } catch {
+      return; // Form zeigt die Validierungsmeldung (fehlender Benutzername) selbst an
+    }
+    setLaedt(true);
+    try {
+      const rcr = await webauthnAnmeldungStarten(werte.benutzername);
+      const cred = await startAuthentication({ optionsJSON: rcr.publicKey });
+      await webauthnAnmeldungAbschliessen(cred);
+      await aktualisiere();
+      navigate(zielPfad, { replace: true });
+    } catch (e) {
+      setFehler(e instanceof ApiError ? e.message : 'Passkey-Anmeldung fehlgeschlagen');
     } finally {
       setLaedt(false);
     }
@@ -124,8 +161,8 @@ export default function LoginPage() {
             ))}
           </Space>
         )}
-        {ssoProvider.length > 0 && passwortAktiv && <Divider>oder</Divider>}
-        {passwortAktiv && (
+        {ssoProvider.length > 0 && formSichtbar && <Divider>oder</Divider>}
+        {formSichtbar && (
           <Form
             layout="vertical"
             form={form}
@@ -140,23 +177,38 @@ export default function LoginPage() {
             >
               <Input size="large" autoFocus autoComplete="username" />
             </Form.Item>
-            <Form.Item
-              label="Passwort"
-              name="passwort"
-              rules={[{ required: true, message: 'Bitte Passwort eingeben' }]}
-            >
-              <Input.Password size="large" autoComplete="current-password" />
-            </Form.Item>
-            <Button
-              className="login-absenden"
-              type="primary"
-              htmlType="submit"
-              size="large"
-              block
-              loading={laedt}
-            >
-              Anmelden
-            </Button>
+            {passwortAktiv && (
+              <Form.Item
+                label="Passwort"
+                name="passwort"
+                rules={[{ required: true, message: 'Bitte Passwort eingeben' }]}
+              >
+                <Input.Password size="large" autoComplete="current-password" />
+              </Form.Item>
+            )}
+            {passwortAktiv && (
+              <Button
+                className="login-absenden"
+                type="primary"
+                htmlType="submit"
+                size="large"
+                block
+                loading={laedt}
+              >
+                Anmelden
+              </Button>
+            )}
+            {passkeyAktiv && (
+              <Button
+                size="large"
+                block
+                style={passwortAktiv ? { marginTop: 12 } : undefined}
+                loading={laedt}
+                onClick={mitPasskeyAnmelden}
+              >
+                Mit Passkey anmelden
+              </Button>
+            )}
           </Form>
         )}
       </div>

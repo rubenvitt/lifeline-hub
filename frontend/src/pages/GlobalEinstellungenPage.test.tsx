@@ -56,6 +56,7 @@ describe('GlobalEinstellungenPage', () => {
       laedt: false,
       login: vi.fn(),
       logout: vi.fn(),
+      aktualisiere: vi.fn(),
     });
     vi.mocked(ladeOrgEinstellungen).mockResolvedValue({ ...LEERE_EINSTELLUNGEN });
     vi.mocked(speichereOrgEinstellungen).mockResolvedValue({ ...LEERE_EINSTELLUNGEN });
@@ -170,6 +171,7 @@ describe('GlobalEinstellungenPage', () => {
       laedt: false,
       login: vi.fn(),
       logout: vi.fn(),
+      aktualisiere: vi.fn(),
     });
 
     rendern();
@@ -193,6 +195,7 @@ describe('GlobalEinstellungenPage', () => {
       laedt: false,
       login: vi.fn(),
       logout: vi.fn(),
+      aktualisiere: vi.fn(),
     });
 
     rendern();

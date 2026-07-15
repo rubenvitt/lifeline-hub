@@ -9,6 +9,11 @@ interface AuthWert {
   laedt: boolean;
   login: (benutzername: string, passwort: string) => Promise<void>;
   logout: () => Promise<void>;
+  /** Lädt `/api/auth/me` neu und übernimmt den Benutzer in den Context — für Login-Wege,
+   *  die (anders als `login()`) die Session ohne einen Aufruf von `authApi.login`
+   *  etablieren, z.B. den WebAuthn-Passkey-Login (LFH-275): `auth/finish` setzt das
+   *  Session-Cookie server­seitig, der Client muss den Benutzer danach selbst nachladen. */
+  aktualisiere: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthWert | null>(null);
@@ -48,9 +53,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setBenutzer(null);
   }, []);
 
+  const aktualisiere = useCallback(async () => {
+    const b = await authApi.me();
+    setBenutzer(b);
+  }, []);
+
   const wert = useMemo<AuthWert>(
-    () => ({ benutzer, laedt, login, logout }),
-    [benutzer, laedt, login, logout],
+    () => ({ benutzer, laedt, login, logout, aktualisiere }),
+    [benutzer, laedt, login, logout, aktualisiere],
   );
 
   return <AuthContext.Provider value={wert}>{children}</AuthContext.Provider>;

@@ -51,8 +51,12 @@ export async function apiSend<T>(pfad: string, methode: HttpMethode, body?: unkn
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) return fehlerWerfen(res);
-  // 204 No Content: kein Body. Aufrufer von 204-Endpunkten (z.B. Logout) MÜSSEN
-  // T = void verwenden — der Cast ist nur unter dieser Vertragsannahme sicher.
-  if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  // Leerer Body: nicht nur 204 No Content (z.B. Logout), sondern auch 200/201 ohne
+  // Json-Wrapper (z.B. die WebAuthn-Finish-Endpunkte, die nur `StatusCode` liefern,
+  // LFH-275). Aufrufer solcher Endpunkte MÜSSEN T = void verwenden — der Cast ist nur
+  // unter dieser Vertragsannahme sicher. `res.json()` auf leerem Body würfe sonst einen
+  // kryptischen SyntaxError statt sauber `undefined` zu liefern.
+  const text = await res.text();
+  if (text.length === 0) return undefined as T;
+  return JSON.parse(text) as T;
 }
