@@ -220,7 +220,7 @@ describe('GlobalEinstellungenPage', () => {
     // Warte auf Laden, dann in den Tab mit den Modul-Rollen wechseln (ByRole blendet
     // versteckte Tab-Panes aus — die Selects sind erst nach Tab-Wechsel adressierbar).
     await screen.findByText('Modul-Rollen-Default');
-    await userEvent.click(await screen.findByRole('tab', { name: 'Einsatz-Defaults' }));
+    fireEvent.click(await screen.findByRole('radio', { name: 'Einsatz-Defaults' }));
 
     // Alle Modul-Comboboxen (benoetigte Rolle je Modul) müssen disabled sein
     const selects = screen.getAllByRole('combobox');
@@ -236,7 +236,7 @@ describe('GlobalEinstellungenPage', () => {
     rendern();
 
     await screen.findByText('Modul-Rollen-Default');
-    await userEvent.click(await screen.findByRole('tab', { name: 'Einsatz-Defaults' }));
+    fireEvent.click(await screen.findByRole('radio', { name: 'Einsatz-Defaults' }));
 
     const einsatzdatenSelect = screen.getByRole('combobox', {
       name: 'Benötigte Rolle: Einsatzdaten',
@@ -278,7 +278,7 @@ describe('GlobalEinstellungenPage', () => {
 
     rendern();
     await screen.findByText('Modul-Rollen-Default');
-    await userEvent.click(await screen.findByRole('tab', { name: 'Einsatz-Defaults' }));
+    fireEvent.click(await screen.findByRole('radio', { name: 'Einsatz-Defaults' }));
 
     // Wähle 'admin' für ETB-Modul
     // combobox-Rolle: antd Select rendern alle als combobox
@@ -313,7 +313,7 @@ describe('GlobalEinstellungenPage — Anmeldeverfahren', () => {
   });
 
   async function anmeldeverfahrenOeffnen() {
-    await userEvent.click(await screen.findByRole('tab', { name: 'Anmeldeverfahren' }));
+    fireEvent.click(await screen.findByRole('radio', { name: 'Anmeldeverfahren' }));
   }
 
   it('listet die konfigurierten Auth-Provider', async () => {
