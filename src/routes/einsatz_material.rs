@@ -11,6 +11,7 @@ use crate::error::AppError;
 use crate::etb::{self, repo as etb_repo};
 use crate::material::disposition_repo::{self, AdhocDaten};
 use crate::material::{EinsatzMaterialAnzeige, MaterialStatus};
+use crate::routes::support::trimme;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -53,10 +54,6 @@ async fn etb_system(
 fn sse_material(state: &AppState, einsatz_id: i64, em_id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "material_id": em_id }).to_string();
     state.live.publiziere_event(einsatz_id, "material", data);
-}
-
-fn trimme(s: Option<String>) -> Option<String> {
-    s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
 }
 
 /// GET /api/einsaetze/{id}/material — disponiertes Material (aufgelöst). Nur Lesezugriff.
@@ -180,20 +177,15 @@ pub async fn disponieren(
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
 
-fn deserialize_optional_field<'de, T, D>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
-where
-    T: serde::Deserialize<'de>,
-    D: serde::Deserializer<'de>,
-{
-    Option::<T>::deserialize(deserializer).map(Some)
-}
-
 #[derive(Debug, Deserialize)]
 pub struct DispoPatchBody {
     pub menge: Option<i64>,
     pub status: Option<String>,
     pub bemerkung: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub uhs_id: Option<Option<i64>>,
 }
 

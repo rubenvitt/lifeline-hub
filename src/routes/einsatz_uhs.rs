@@ -12,6 +12,7 @@ use crate::etb::{self, repo as etb_repo};
 use crate::material::disposition_repo as material_repo;
 use crate::material::EinsatzMaterialAnzeige;
 use crate::person::{registrier_anzeige, repo as person_repo};
+use crate::routes::support::trimme;
 use crate::uhs::belegung_repo;
 use crate::uhs::platz_repo::{self, NeuerPlatz, PatchPlatz};
 use crate::uhs::repo::{self as uhs_repo, NeueDaten, PatchDaten};
@@ -25,8 +26,7 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::Json;
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
-use tokio_stream::wrappers::BroadcastStream;
-use tokio_stream::{Stream, StreamExt};
+use tokio_stream::Stream;
 use utoipa::ToSchema;
 
 /// Detail-Antwort: UHS-Stamm + Plätze + aktuelle Belegungen + zugeordnetes Material.
@@ -80,21 +80,6 @@ fn sse_uhs(state: &AppState, einsatz_id: i64, uhs_id: i64) {
 fn sse_person(state: &AppState, einsatz_id: i64, person_id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "person_id": person_id }).to_string();
     state.live.publiziere_event(einsatz_id, "person", data);
-}
-
-fn trimme(s: Option<String>) -> Option<String> {
-    s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
-}
-
-/// Liest ein optional-nullable Feld so, dass JSON-`null` zu `Some(None)` und
-/// fehlendes Feld zu `None` wird. Default-Serde-Verhalten unterscheidet das nicht.
-/// (Wie in `routes::einsatz_material` — kleines Duplikat, kein eigenes Shared-Modul.)
-fn deserialize_optional_field<'de, T, D>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
-where
-    T: serde::Deserialize<'de>,
-    D: serde::Deserializer<'de>,
-{
-    Option::<T>::deserialize(deserializer).map(Some)
 }
 
 // ============================== UHS-Routen ==============================
@@ -236,16 +221,31 @@ pub async fn detail(
 pub struct PatchBody {
     pub bezeichnung: Option<String>,
     /// `Some(null)` = explizit löschen; absent = unverändert. Serde-Default = absent.
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub abschnitt_id: Option<Option<i64>>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub standort: Option<Option<String>>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub notiz: Option<Option<String>>,
     /// lat/lon werden als Paar behandelt (Effektivzustand-Check im Handler). `Some(null)` = löschen.
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub lat: Option<Option<f64>>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub lon: Option<Option<f64>>,
 }
 
@@ -542,9 +542,15 @@ pub async fn plaetze_bulk_anlegen(
 #[derive(Debug, Deserialize)]
 pub struct PlatzPatchBody {
     pub bezeichnung: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub pos_x: Option<Option<f64>>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub pos_y: Option<Option<f64>>,
 }
 
@@ -869,12 +875,6 @@ pub async fn stream(
     .await?;
 
     let rx = state.live.abonniere(einsatz_id);
-    let stream = BroadcastStream::new(rx).map(|res| {
-        let event = match res {
-            Ok(n) => Event::default().event(n.event).data(n.data),
-            Err(_) => Event::default().event("lagged").data("resync"),
-        };
-        Ok::<Event, Infallible>(event)
-    });
+    let stream = crate::routes::support::sse_event_stream(rx);
     Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
 }

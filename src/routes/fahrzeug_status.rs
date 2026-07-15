@@ -3,6 +3,7 @@ use crate::auth::session::{AdminUser, CurrentUser};
 use crate::error::AppError;
 use crate::fahrzeug::status_repo::{self, StatusDaten};
 use crate::fahrzeug::{FahrzeugStatus, StatusKategorie};
+use crate::routes::support::trimme;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -16,10 +17,6 @@ pub struct StatusBody {
     pub fms_anker: Option<i64>,
     #[serde(default)]
     pub sortier: i64,
-}
-
-fn trimme(s: Option<String>) -> Option<String> {
-    s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
 }
 
 struct Normalisiert {

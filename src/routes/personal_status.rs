@@ -4,6 +4,7 @@ use crate::error::AppError;
 use crate::katalog::StatusKategorie;
 use crate::personal::status_repo::{self, StatusDaten};
 use crate::personal::PersonalStatus;
+use crate::routes::support::trimme;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -16,10 +17,6 @@ pub struct StatusBody {
     pub farbe: Option<String>,
     #[serde(default)]
     pub sortier: i64,
-}
-
-fn trimme(s: Option<String>) -> Option<String> {
-    s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
 }
 
 struct Normalisiert {

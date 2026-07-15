@@ -12,21 +12,12 @@ use crate::etb::{self, repo as etb_repo};
 use crate::personal::disposition_repo::{self, AdhocDaten};
 use crate::personal::status_repo;
 use crate::personal::{EinsatzPersonalAnzeige, FuehrungskraftKarte};
+use crate::routes::support::trimme;
 use crate::staerke::StaerkePosition;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
-
-/// Liest ein optional-nullable Feld so, dass JSON-`null` zu `Some(None)` und
-/// fehlendes Feld zu `None` wird (Tri-State, wie in `routes::einsatz_uhs`).
-fn deserialize_optional_field<'de, T, D>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
-where
-    T: serde::Deserialize<'de>,
-    D: serde::Deserializer<'de>,
-{
-    Option::<T>::deserialize(deserializer).map(Some)
-}
 
 /// SSE-Notify (Lage-Karte): Person-Disposition hat sich geändert. Nutzt das bestehende
 /// `person`-Event-Tag (kein neues `personal`-Tag, sonst bricht der Frontend-Filter).
@@ -72,10 +63,6 @@ fn person_bezeichnung(a: &EinsatzPersonalAnzeige) -> String {
         Some(f) if !f.is_empty() => format!("{} ({})", a.name, f),
         _ => a.name.clone(),
     }
-}
-
-fn trimme(s: Option<String>) -> Option<String> {
-    s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
 }
 
 /// Validiert eine optionale Stärke-Position gegen das Enum (leer/None erlaubt).
@@ -210,7 +197,10 @@ pub async fn disponieren(
 pub struct DispoPatchBody {
     pub status_id: Option<i64>,
     /// Tri-State (LFH-4): fehlend = unverändert, `null` = Override entfernen, Wert = setzen.
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub staerke_position: Option<Option<String>>,
     pub bemerkung: Option<String>,
 }
@@ -314,13 +304,25 @@ pub async fn entfernen(
 
 #[derive(Debug, Deserialize)]
 pub struct PositionBody {
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub lat: Option<Option<f64>>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub lon: Option<Option<f64>>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub tz_fachaufgabe: Option<Option<String>>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub tz_organisation: Option<Option<String>>,
 }
 

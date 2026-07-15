@@ -4,6 +4,7 @@ use crate::error::AppError;
 use crate::etb::MeldeWeg;
 use crate::etb_baustein::repo::{self, BausteinDaten};
 use crate::etb_baustein::{BausteinTyp, EtbBaustein};
+use crate::routes::support::trimme;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -18,10 +19,6 @@ pub struct BausteinBody {
     pub veranlassung: Option<String>,
     #[serde(default)]
     pub sortier: i64,
-}
-
-fn trimme(s: Option<String>) -> Option<String> {
-    s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
 }
 
 struct Normalisiert {

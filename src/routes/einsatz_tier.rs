@@ -10,6 +10,7 @@ const MODUL_KEY: &str = "tiere";
 use crate::error::AppError;
 use crate::etb::{self, repo as etb_repo};
 use crate::person::repo as person_repo; // Org-Isolation der Halter-FK (404 bei fremder Person)
+use crate::routes::support::trimme;
 use crate::tier::{
     darf_uebergehen, registrier_anzeige, repo as tier_repo, AbschlussGrund, Spezies, TierAnzeige,
     TierGeschlecht, TierStatus,
@@ -21,8 +22,7 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::Deserialize;
 use std::convert::Infallible;
-use tokio_stream::wrappers::BroadcastStream;
-use tokio_stream::{Stream, StreamExt};
+use tokio_stream::Stream;
 
 // ---------- ETB-/SSE-Helfer (lokales Muster wie in anderen Routen) ----------
 
@@ -62,21 +62,6 @@ async fn etb_system(
 fn sse_tier(state: &AppState, einsatz_id: i64, tier_id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "tier_id": tier_id }).to_string();
     state.live.publiziere_event(einsatz_id, "tier", data);
-}
-
-fn trimme(s: Option<String>) -> Option<String> {
-    s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
-}
-
-/// Liest ein optional-nullable Feld so, dass JSON-`null` → `Some(None)` und
-/// fehlendes Feld → `None` (für den Halter-FK↔Freitext-Toggle). Wie in
-/// `routes::einsatz_uhs`.
-fn deserialize_optional_field<'de, T, D>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
-where
-    T: serde::Deserialize<'de>,
-    D: serde::Deserializer<'de>,
-{
-    Option::<T>::deserialize(deserializer).map(Some)
 }
 
 /// Validiert optionales Tier-Geschlecht; `Validation`, falls gesetzt und unbekannt.
@@ -289,9 +274,15 @@ pub struct PatchBody {
     pub antreff_ort: Option<String>,
     pub notiz: Option<String>,
     /// `Some(null)` = explizit löschen; absent = unverändert.
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub halter_person_id: Option<Option<i64>>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub halter_kontakt: Option<Option<String>>,
 }
 
@@ -585,12 +576,6 @@ pub async fn stream(
     .await?;
 
     let rx = state.live.abonniere(einsatz_id);
-    let stream = BroadcastStream::new(rx).map(|res| {
-        let event = match res {
-            Ok(n) => Event::default().event(n.event).data(n.data),
-            Err(_) => Event::default().event("lagged").data("resync"),
-        };
-        Ok::<Event, Infallible>(event)
-    });
+    let stream = crate::routes::support::sse_event_stream(rx);
     Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
 }

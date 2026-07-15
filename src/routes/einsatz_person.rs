@@ -20,6 +20,7 @@ use crate::person::{
     darf_uebergehen, registrier_anzeige, repo, AbgleichStatus, Geschlecht, PersonAnzeige,
     PersonStatus, Sichtungskategorie, VerbleibArt, VerbleibStatus,
 };
+use crate::routes::support::trimme;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::sse::{Event, KeepAlive, Sse};
@@ -28,8 +29,7 @@ use axum::Json;
 use serde::Deserialize;
 use serde::Serialize;
 use std::convert::Infallible;
-use tokio_stream::wrappers::BroadcastStream;
-use tokio_stream::{Stream, StreamExt};
+use tokio_stream::Stream;
 use utoipa::ToSchema;
 
 /// Detail-Antwort: E‑1-Personenfelder (flatten) + E‑2-Verlauf-Arrays. Genau eine
@@ -100,10 +100,6 @@ fn sse_auto_austritt(state: &AppState, einsatz_id: i64, effekt: &crate::uhs::Aut
         "person",
         serde_json::json!({ "einsatz_id": einsatz_id, "person_id": effekt.person_id }).to_string(),
     );
-}
-
-fn trimme(s: Option<String>) -> Option<String> {
-    s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
 }
 
 /// Validiert ein optionales Geschlecht; `Validation`, falls gesetzt und unbekannt.
@@ -919,12 +915,6 @@ pub async fn stream(
     .await?;
 
     let rx = state.live.abonniere(einsatz_id);
-    let stream = BroadcastStream::new(rx).map(|res| {
-        let event = match res {
-            Ok(n) => Event::default().event(n.event).data(n.data),
-            Err(_) => Event::default().event("lagged").data("resync"),
-        };
-        Ok::<Event, Infallible>(event)
-    });
+    let stream = crate::routes::support::sse_event_stream(rx);
     Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
 }

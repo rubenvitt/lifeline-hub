@@ -12,6 +12,7 @@ use crate::einsatz::repo as einsatz_repo;
 const MODUL_KEY: &str = "bereitstellungsraeume";
 use crate::error::AppError;
 use crate::etb::{self, repo as etb_repo};
+use crate::routes::support::trimme;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -77,18 +78,6 @@ fn sse_br(state: &AppState, einsatz_id: i64, br_id: i64) {
     state
         .live
         .publiziere_event(einsatz_id, "bereitstellungsraum", data);
-}
-
-fn trimme(s: Option<String>) -> Option<String> {
-    s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
-}
-
-fn deserialize_optional_field<'de, T, D>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
-where
-    T: serde::Deserialize<'de>,
-    D: serde::Deserializer<'de>,
-{
-    Option::<T>::deserialize(deserializer).map(Some)
 }
 
 // ---------- Detail-Helfer ----------
@@ -240,11 +229,20 @@ pub async fn detail(
 #[derive(Debug, Deserialize)]
 pub struct PatchBody {
     pub bezeichnung: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub abschnitt_id: Option<Option<i64>>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub standort: Option<Option<String>>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub notiz: Option<Option<String>>,
 }
 

@@ -12,6 +12,7 @@ use crate::error::AppError;
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "einheiten";
 use crate::etb::{self, repo as etb_repo};
+use crate::routes::support::trimme;
 use crate::staerke::Staerke;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -19,18 +20,7 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::Json;
 use serde::Deserialize;
 use std::convert::Infallible;
-use tokio_stream::wrappers::BroadcastStream;
-use tokio_stream::{Stream, StreamExt};
-
-/// Liest ein optional-nullable Feld so, dass JSON-`null` zu `Some(None)` und
-/// fehlendes Feld zu `None` wird (Tri-State, wie in `routes::einsatz_uhs`).
-fn deserialize_optional_field<'de, T, D>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
-where
-    T: serde::Deserialize<'de>,
-    D: serde::Deserializer<'de>,
-{
-    Option::<T>::deserialize(deserializer).map(Some)
-}
+use tokio_stream::Stream;
 
 /// SSE-Notify (Lage-Karte): Einheit hat sich geändert. Frontend filtert per Event-Name.
 fn sse_einheit(state: &AppState, einsatz_id: i64, einheit_id: i64) {
@@ -88,10 +78,6 @@ async fn etb_system(
         state.live.publiziere(einsatz_id, json);
     }
     Ok(())
-}
-
-fn trimme(s: Option<String>) -> Option<String> {
-    s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
 }
 
 /// Holt den Einsatz + Rolle und prüft Schreibrecht + aktiv. Liefert den Einsatz.
@@ -472,13 +458,25 @@ pub async fn material_freigeben(
 
 #[derive(Debug, Deserialize)]
 pub struct PositionBody {
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub lat: Option<Option<f64>>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub lon: Option<Option<f64>>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub tz_fachaufgabe: Option<Option<String>>,
-    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
     pub tz_organisation: Option<Option<String>>,
 }
 
@@ -567,12 +565,6 @@ pub async fn stream(
     .await?;
 
     let rx = state.live.abonniere(einsatz_id);
-    let stream = BroadcastStream::new(rx).map(|res| {
-        let event = match res {
-            Ok(n) => Event::default().event(n.event).data(n.data),
-            Err(_) => Event::default().event("lagged").data("resync"),
-        };
-        Ok::<Event, Infallible>(event)
-    });
+    let stream = crate::routes::support::sse_event_stream(rx);
     Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
 }
