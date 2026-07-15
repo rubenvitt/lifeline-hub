@@ -1,9 +1,9 @@
-import type { Einheit, EinsatzAnzeige, EinsatzFahrzeug, FuehrungskraftKarte, LageMeldung, Schaden, Uhs } from '../../api/types';
-import { baueTzProps, einsatzortTz, schadenTz, uhsTz, type TzProps } from './taktischesZeichen';
+import type { Einheit, EinsatzAnzeige, EinsatzFahrzeug, FreiesZeichen, FuehrungskraftKarte, LageMeldung, Schaden, Uhs } from '../../api/types';
+import { baueTzProps, einsatzortTz, grundzeichenAkzeptiert, schadenTz, uhsTz, type TzProps } from './taktischesZeichen';
 import type { GeoJsonGeometry } from './geo';
 
 export type MarkerTyp =
-  | 'einsatzort' | 'uhs' | 'schaden' | 'einheit' | 'fahrzeug' | 'fuehrung' | 'abschnitt' | 'lagemeldung';
+  | 'einsatzort' | 'uhs' | 'schaden' | 'einheit' | 'fahrzeug' | 'fuehrung' | 'abschnitt' | 'lagemeldung' | 'freies_zeichen';
 
 export interface KarteMarker {
   /** Stabil & eindeutig über alle Typen: 'einsatzort' | 'uhs-<id>' | 'schaden-<id>'. */
@@ -120,6 +120,42 @@ export function baueLageMeldungMarker(lagemeldungen: LageMeldung[]): KarteMarker
     });
   }
   return verortet;
+}
+
+// Neutrale DV-102-Tinte, wenn das freie Zeichen keine eigene Farbe trägt.
+const FREIES_ZEICHEN_FARBE = '#333333';
+
+/** Baut die DV-102-Spec eines freien Zeichens aus grundzeichen + Overlays des Records und
+ *  STRIPPT dabei jedes Overlay, das das gewählte Grundzeichen laut `accepts`-Katalog nicht
+ *  rendert (via {@link grundzeichenAkzeptiert}) — sonst divergierte der Icon-Dedup-Key und ein
+ *  Phantom-Overlay entstünde. Gilt auch für die Farbe (nur farb-akzeptierende Grundzeichen). */
+export function baueFreiesZeichenTz(z: FreiesZeichen): TzProps {
+  const gz = z.grundzeichen;
+  const nimm = (overlay: Parameters<typeof grundzeichenAkzeptiert>[1], wert: string | null | undefined) =>
+    wert != null && grundzeichenAkzeptiert(gz, overlay) ? wert : undefined;
+  return {
+    grundzeichen: gz,
+    organisation: nimm('organisation', z.organisation),
+    fachaufgabe: nimm('fachaufgabe', z.fachaufgabe),
+    symbol: nimm('symbol', z.symbol),
+    einheit: nimm('einheit', z.einheit),
+    funktion: nimm('funktion', z.funktion),
+    farbe: nimm('farbe', z.farbe),
+  } as TzProps;
+}
+
+/** Leitet Karten-Marker für freie taktische Zeichen ab (immer verortet, LFH-170). */
+export function baueFreieZeichenMarker(zeichen: FreiesZeichen[]): KarteMarker[] {
+  return zeichen.map((z) => ({
+    schluessel: `freies_zeichen-${z.id}`,
+    typ: 'freies_zeichen' as const,
+    id: z.id,
+    lat: z.lat,
+    lon: z.lon,
+    label: z.label ?? '(freies Zeichen)',
+    farbe: z.farbe ?? FREIES_ZEICHEN_FARBE,
+    tz: baueFreiesZeichenTz(z),
+  }));
 }
 
 export interface TaktischeQuelle {

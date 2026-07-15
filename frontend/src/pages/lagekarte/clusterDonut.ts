@@ -15,10 +15,11 @@ export const CLUSTER_TYP_FARBE: Record<ClusterTyp, string> = {
   uhs: '#2563eb',        // blau
   schaden: '#ea580c',    // orange
   lagemeldung: '#d48806', // amber
+  freies_zeichen: '#4f46e5', // indigo
 };
 
 // Stabile Segment-Reihenfolge im Donut (Kräfte → Infrastruktur → Meldungen).
-const TYP_REIHENFOLGE: ClusterTyp[] = ['fahrzeug', 'einheit', 'fuehrung', 'abschnitt', 'uhs', 'schaden', 'lagemeldung'];
+const TYP_REIHENFOLGE: ClusterTyp[] = ['fahrzeug', 'einheit', 'fuehrung', 'abschnitt', 'uhs', 'schaden', 'lagemeldung', 'freies_zeichen'];
 
 /**
  * `clusterProperties`-Spec für die GeoJSON-Source: pro Typ eine Summe (Anzahl im Cluster).

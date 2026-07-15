@@ -28,7 +28,7 @@ export default function LagekartePage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [layer, setLayer] = useState<LayerSichtbar>({
-    einsatzort: true, uhs: true, schaden: true, einheit: true, fahrzeug: true, fuehrung: true, abschnitt: true, zone: true, lagemeldung: true,
+    einsatzort: true, uhs: true, schaden: true, einheit: true, fahrzeug: true, fuehrung: true, abschnitt: true, zone: true, lagemeldung: true, freies_zeichen: true,
   });
   // Imperative Karten-API (Upload-Platzierung in Viewport-Mitte, Auf-Bild-Zentrieren,
   // Abschnitt-/Zone-Zeichnen abschließen).

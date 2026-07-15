@@ -2,6 +2,9 @@
 // Backend-Typ-Drift bricht jetzt tsc/Build statt still zur Laufzeit. Nicht von Hand pflegen —
 // Response-Typen ändern sich über die Rust-Structs + `pnpm gen:types` (schreibt types.generated.ts
 // aus src/api/openapi.json). FE-lokale Typen (Eingabe-Bodies, Record-Maps) sind unten markiert.
+import type {
+  EinheitId, FachaufgabeId, FunktionId, GrundzeichenId, OrganisationId, SymbolId,
+} from 'taktische-zeichen-react';
 import type { components } from './types.generated';
 
 type S = components['schemas'];
@@ -219,6 +222,28 @@ export type GefahrBewertung = S['GefahrBewertungAnzeige'];
 export type Gefahrengebiet = S['GefahrengebietAnzeige'];
 export type ZoneTyp = S['LageZoneTyp'];
 export type LageZone = S['LageZoneAnzeige'];
+
+// ============================== LFH-170 Freie taktische Zeichen ==============================
+export type FreiesZeichen = S['FreiesZeichenAnzeige'];
+
+/** POST-Body für ein freies taktisches Zeichen (Punkt-Marker ohne Fachobjekt).
+ *  LFH-120/170: kein Backend-Schema — Eingabe-Body, FE-lokal. Overlays nutzen die
+ *  DV-102-ID-Unions aus `taktische-zeichen-core` für FE-Typsicherheit. */
+export interface NeuesFreiesZeichen {
+  lat: number;
+  lon: number;
+  grundzeichen: GrundzeichenId;
+  organisation?: OrganisationId | null;
+  fachaufgabe?: FachaufgabeId | null;
+  symbol?: SymbolId | null;
+  einheit?: EinheitId | null;
+  funktion?: FunktionId | null;
+  farbe?: string | null;
+  label?: string | null;
+}
+
+/** PATCH-Body (Whole-Spec-Overwrite ohne lat/lon — v1 nicht verschiebbar). LFH-170. */
+export type FreiesZeichenUpdate = Omit<NeuesFreiesZeichen, 'lat' | 'lon'>;
 
 // ============================== LFH-48 Lageberichte ==============================
 export type LageberichtVorlageKey = S['LageberichtVorlage'];

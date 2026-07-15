@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { baueMarker, baueTaktischeMarker, baueLageMeldungMarker, type TaktischeQuelle } from './marker';
-import type { EinsatzAnzeige, LageMeldung, Schaden, Uhs } from '../../api/types';
+import {
+  baueMarker, baueTaktischeMarker, baueLageMeldungMarker,
+  baueFreieZeichenMarker, baueFreiesZeichenTz, type TaktischeQuelle,
+} from './marker';
+import type { EinsatzAnzeige, FreiesZeichen, LageMeldung, Schaden, Uhs } from '../../api/types';
 
 function uhs(partial: Partial<Uhs>): Uhs {
   return {
@@ -135,5 +138,63 @@ describe('baueTaktischeMarker', () => {
     const tz = verortet.find((m) => m.schluessel === 'fuehrung-3')?.tz;
     expect(tz?.funktion).toBe('fuehrungskraft');
     expect(tz?.fachaufgabe).toBe('rettungswesen');
+  });
+});
+
+function freiesZeichen(partial: Partial<FreiesZeichen>): FreiesZeichen {
+  return {
+    id: 1, einsatz_id: 1, lat: 50, lon: 8, grundzeichen: 'taktische-formation',
+    organisation: null, fachaufgabe: null, symbol: null, einheit: null, funktion: null,
+    farbe: null, label: null, erstellt_von: 1, erstellt_at: '', geaendert_at: '', ...partial,
+  };
+}
+
+describe('baueFreiesZeichenTz (accepts-Gating aus taktische-zeichen-core-Katalog)', () => {
+  it('strippt ein Overlay, das das Grundzeichen laut accepts NICHT rendert', () => {
+    // 'anlass' akzeptiert laut Katalog nur 'symbol' → fachaufgabe/organisation entfallen.
+    const tz = baueFreiesZeichenTz(
+      freiesZeichen({ grundzeichen: 'anlass', fachaufgabe: 'brandbekaempfung', organisation: 'feuerwehr', symbol: 'sammeln' }),
+    );
+    expect(tz.grundzeichen).toBe('anlass');
+    expect(tz.fachaufgabe).toBeUndefined();
+    expect(tz.organisation).toBeUndefined();
+    expect(tz.symbol).toBe('sammeln');
+  });
+
+  it('behält akzeptierte Overlays (taktische-formation akzeptiert Fachaufgabe + Organisation)', () => {
+    const tz = baueFreiesZeichenTz(
+      freiesZeichen({ grundzeichen: 'taktische-formation', fachaufgabe: 'rettungswesen', organisation: 'hilfsorganisation', einheit: 'zug' }),
+    );
+    expect(tz.fachaufgabe).toBe('rettungswesen');
+    expect(tz.organisation).toBe('hilfsorganisation');
+    expect(tz.einheit).toBe('zug');
+  });
+
+  it('gated auch die Farbe: nur farb-akzeptierende Grundzeichen tragen tz.farbe', () => {
+    // 'gefahr' akzeptiert 'farbe', 'taktische-formation' nicht.
+    expect(baueFreiesZeichenTz(freiesZeichen({ grundzeichen: 'gefahr', farbe: '#ff0000' })).farbe).toBe('#ff0000');
+    expect(baueFreiesZeichenTz(freiesZeichen({ grundzeichen: 'taktische-formation', farbe: '#ff0000' })).farbe).toBeUndefined();
+  });
+});
+
+describe('baueFreieZeichenMarker', () => {
+  it('baut Karten-Marker mit stabilem Schlüssel, Typ und taktischem Zeichen', () => {
+    const marker = baueFreieZeichenMarker([
+      freiesZeichen({ id: 7, lat: 50.1, lon: 8.1, grundzeichen: 'stelle', label: 'Sammelplatz', farbe: '#123456' }),
+    ]);
+    expect(marker).toHaveLength(1);
+    expect(marker[0].schluessel).toBe('freies_zeichen-7');
+    expect(marker[0].typ).toBe('freies_zeichen');
+    expect(marker[0].id).toBe(7);
+    expect(marker[0].lat).toBe(50.1);
+    expect(marker[0].label).toBe('Sammelplatz');
+    expect(marker[0].farbe).toBe('#123456');
+    expect(marker[0].tz?.grundzeichen).toBe('stelle');
+  });
+
+  it('nutzt sinnvolle Defaults für label und farbe, wenn nicht gesetzt', () => {
+    const marker = baueFreieZeichenMarker([freiesZeichen({ id: 2, label: null, farbe: null })]);
+    expect(marker[0].label).toBe('(freies Zeichen)');
+    expect(marker[0].farbe).toBeTruthy();
   });
 });

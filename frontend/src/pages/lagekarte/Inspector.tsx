@@ -27,6 +27,7 @@ const TYP_LABEL: Record<MarkerTyp, string> = {
   abschnitt: 'Einsatzabschnitt',
   einsatzort: 'Einsatzort',
   lagemeldung: 'Lagemeldung',
+  freies_zeichen: 'Taktisches Zeichen',
 };
 
 const FACHAUFGABE_OPTIONEN = [
@@ -62,6 +63,8 @@ function inspectorExclude(m: KarteMarker, einsatzId: number): string | undefined
     case 'fahrzeug':   return `fahrzeug:${m.id}`;
     case 'fuehrung':   return `personal:${m.id}`;
     case 'lagemeldung': return `lagemeldung:${m.id}`;
+    // Freie Zeichen haben kein Fachobjekt-Backend-Tag → keine Ort-Vorschau-Exklusion.
+    case 'freies_zeichen': return undefined;
     case 'abschnitt':  return undefined;
   }
 }

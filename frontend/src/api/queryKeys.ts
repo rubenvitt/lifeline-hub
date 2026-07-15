@@ -19,6 +19,7 @@ export const EINSATZ_KEYS = {
   material: 'einsatz-material',
   tiere: 'einsatz-tiere',
   zonen: 'einsatz-zonen',
+  freieZeichen: 'einsatz-freie-zeichen',
   gefahrengebiete: 'gefahrengebiete',
   gefahrenmatrix: 'gefahrenmatrix',
   einheiten: 'einsatz-einheiten',
@@ -74,6 +75,7 @@ export const EINSATZ_STREAM_EVENTS = {
   material: [EINSATZ_KEYS.material],
   tier: [EINSATZ_KEYS.tiere],
   lage_zone: [EINSATZ_KEYS.zonen, EINSATZ_KEYS.gefahrengebiete],
+  freies_zeichen: [EINSATZ_KEYS.freieZeichen],
   gefahr: [EINSATZ_KEYS.gefahrenmatrix, EINSATZ_KEYS.gefahrengebiete],
   einheit: [
     EINSATZ_KEYS.einheiten,
@@ -186,6 +188,7 @@ export const einsatzKeys = {
 
   // Lage
   zonen: (einsatzId: number) => [EINSATZ_KEYS.zonen, einsatzId] as const,
+  freieZeichen: (einsatzId: number) => [EINSATZ_KEYS.freieZeichen, einsatzId] as const,
   gefahrengebiete: (einsatzId: number) => [EINSATZ_KEYS.gefahrengebiete, einsatzId] as const,
   gefahrenmatrix: (einsatzId: number, gewaehlt: number | null) =>
     [EINSATZ_KEYS.gefahrenmatrix, einsatzId, gewaehlt] as const,

@@ -23,6 +23,7 @@ export interface LayerSichtbar {
   abschnitt: boolean;
   zone: boolean;
   lagemeldung: boolean;
+  freies_zeichen: boolean;
 }
 
 /** Platzierbare Punkt-Typen (Fläche/Abschnitt läuft über onAbschnittZeichnenStart). */
@@ -279,6 +280,9 @@ export default function Sidebar(props: SidebarProps) {
           </Space>
           <Space>
             <Switch checked={props.layer.lagemeldung} onChange={(v) => props.onLayerToggle('lagemeldung', v)} /> Lagemeldungen
+          </Space>
+          <Space>
+            <Switch checked={props.layer.freies_zeichen} onChange={(v) => props.onLayerToggle('freies_zeichen', v)} /> Taktische Zeichen
           </Space>
         </Space>
       </Card>

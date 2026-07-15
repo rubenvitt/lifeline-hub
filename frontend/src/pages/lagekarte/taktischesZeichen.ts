@@ -1,5 +1,6 @@
+import { grundzeichen as grundzeichenKatalog } from 'taktische-zeichen-react';
 import type {
-  EinheitId, FachaufgabeId, FunktionId, GrundzeichenId, OrganisationId,
+  ComponentType, EinheitId, FachaufgabeId, FunktionId, GrundzeichenId, OrganisationId,
   TaktischesZeichen as TZSpec,
 } from 'taktische-zeichen-react';
 import type { Ausmass, UhsTyp } from '../../api/types';
@@ -90,11 +91,21 @@ export function fachaufgabeAusFunktion(funktion: string | null | undefined): Fac
   return undefined;
 }
 
-// accepts-Gating (taktische-zeichen-core): diese Grundzeichen rendern die jeweiligen Overlays
-// NICHT — die Library ignoriert sie still. Wir setzen sie deshalb gar nicht erst, damit der
+// accepts-Gating (taktische-zeichen-core): manche Grundzeichen rendern bestimmte Overlays NICHT
+// — die Library ignoriert sie still. Wir setzen sie deshalb gar nicht erst, damit der
 // Icon-Dedup-Key (markerIcons.tzIconKey) nicht divergiert und kein Phantom-Overlay entsteht.
-const OHNE_FACHAUFGABE: ReadonlySet<GrundzeichenId> = new Set(['zweirad', 'kraftrad', 'fahrrad', 'hubschrauber', 'flugzeug']);
-const OHNE_ORGANISATION: ReadonlySet<GrundzeichenId> = new Set(['zweirad', 'kraftrad', 'fahrrad']);
+// Wahrheitsquelle ist der `accepts`-Katalog jedes Grundzeichens (KEINE handgepflegten Sets, die
+// gegen den Katalog driften könnten). LFH-170 braucht das für beliebige Grundzeichen der freien
+// Zeichen; baueTzProps nutzt dieselbe Prüfung.
+const AKZEPTIERTE_OVERLAYS: ReadonlyMap<string, ReadonlySet<ComponentType>> = new Map(
+  grundzeichenKatalog.map((g) => [g.id, new Set(g.accepts ?? [])]),
+);
+
+/** Rendert das Grundzeichen das gegebene Overlay laut DV-102-Katalog? Unbekanntes Grundzeichen
+ *  → false (sicher: kein Phantom-Overlay). */
+export function grundzeichenAkzeptiert(grundzeichen: string, overlay: ComponentType): boolean {
+  return AKZEPTIERTE_OVERLAYS.get(grundzeichen)?.has(overlay) ?? false;
+}
 
 /** Leitet die DV-102-Spec aus App-Feldern ab. Priorität je Overlay:
  *  manueller Objekt-Override (tz_*) ?? aus Fahrzeugtyp/Träger/OPTA abgeleitet ?? Typ-/Org-Default.
@@ -124,8 +135,8 @@ export function baueTzProps(e: TzEingabe): TzProps {
 
   return {
     grundzeichen,
-    organisation: OHNE_ORGANISATION.has(grundzeichen) ? undefined : organisation,
-    fachaufgabe: OHNE_FACHAUFGABE.has(grundzeichen) ? undefined : fachaufgabe,
+    organisation: grundzeichenAkzeptiert(grundzeichen, 'organisation') ? organisation : undefined,
+    fachaufgabe: grundzeichenAkzeptiert(grundzeichen, 'fachaufgabe') ? fachaufgabe : undefined,
     einheit: e.objekttyp === 'einheit' ? groesseAusLabel(e.einheitTypLabel) : undefined,
     funktion,
   };

@@ -27,6 +27,7 @@ const basisProps: SidebarProps = {
     abschnitt: true,
     zone: true,
     lagemeldung: true,
+    freies_zeichen: true,
   },
   onLayerToggle: vi.fn(),
   basemap: 'blind',
@@ -161,6 +162,15 @@ describe('Sidebar Bild-Hintergründe', () => {
     );
     fireEvent.click(screen.getByRole('radio', { name: /Dunkel/i }));
     expect(onKartenThemeWechsel).toHaveBeenCalledWith('dark');
+  });
+
+  it('schaltet den „Taktische Zeichen"-Ebenen-Toggle (LFH-170)', () => {
+    const onLayerToggle = vi.fn();
+    renderMitProviders(<Sidebar {...basisProps} onLayerToggle={onLayerToggle} />);
+    const toggle = screen.getByText('Taktische Zeichen').closest('.ant-space')?.querySelector('button[role="switch"]');
+    expect(toggle).toBeTruthy();
+    fireEvent.click(toggle as Element);
+    expect(onLayerToggle).toHaveBeenCalledWith('freies_zeichen', false);
   });
 
   it('benennt ein Bild über die Inline-Bearbeitung um', () => {

@@ -10,11 +10,12 @@ import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
 import { listeFuehrungskraefte } from '../../api/einsatzPersonal';
 import { listeAbschnitte } from '../../api/einsatzabschnitte';
 import { listeZonen } from '../../api/lagezonen';
+import { listeFreieZeichen } from '../../api/freieZeichen';
 import { ladeGefahrengebiete } from '../../api/gefahren';
 import { listeLageMeldungen } from '../../api/meldungen';
 import { ladeOrganisation } from '../../api/organisation';
 import type { Warnstufe } from '../../api/types';
-import { baueMarker, baueTaktischeMarker, baueLageMeldungMarker, type KarteMarker } from './marker';
+import { baueMarker, baueTaktischeMarker, baueLageMeldungMarker, baueFreieZeichenMarker, type KarteMarker } from './marker';
 import { parsePolygon, parseGeometry, polygonZentroid } from './geo';
 import { baueTzProps } from './taktischesZeichen';
 import { zoneStil, gefahrengebietStil } from './zonenStil';
@@ -53,6 +54,10 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen }: LagekarteDatenArgs)
   const zonenQuery = useQuery({
     queryKey: einsatzKeys.zonen(einsatzId),
     queryFn: () => listeZonen(einsatzId),
+  });
+  const freieZeichenQuery = useQuery({
+    queryKey: einsatzKeys.freieZeichen(einsatzId),
+    queryFn: () => listeFreieZeichen(einsatzId),
   });
   const gebieteQuery = useQuery({ queryKey: einsatzKeys.gefahrengebiete(einsatzId), queryFn: () => ladeGefahrengebiete(einsatzId) });
   const lageMeldungenQuery = useQuery({
@@ -155,9 +160,17 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen }: LagekarteDatenArgs)
     [lageMeldungenQuery.data],
   );
 
+  const freieZeichenMarker = useMemo(
+    () => baueFreieZeichenMarker(freieZeichenQuery.data ?? []),
+    [freieZeichenQuery.data],
+  );
+
   const alleVerortet = useMemo(
-    () => [...verortet, ...taktisch.verortet, ...flaechen.map((f) => f.tzMarker), ...lageMeldungMarker],
-    [verortet, taktisch.verortet, flaechen, lageMeldungMarker],
+    () => [
+      ...verortet, ...taktisch.verortet, ...flaechen.map((f) => f.tzMarker),
+      ...lageMeldungMarker, ...freieZeichenMarker,
+    ],
+    [verortet, taktisch.verortet, flaechen, lageMeldungMarker, freieZeichenMarker],
   );
 
   const nichtVerortetAlle = useMemo(
@@ -181,6 +194,8 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen }: LagekarteDatenArgs)
     einstellungenLaedt: einstellungenQuery.isLoading,
     zonen: zonenQuery.data ?? [],
     gebiete: gebieteQuery.data ?? [],
+    // Rohliste der freien Zeichen für den Inspector-Lookup (Etappe 4, LFH-170).
+    freieZeichen: freieZeichenQuery.data ?? [],
     // Abgeleitete Marker/Flächen/Zonen.
     verortet,
     flaechen,

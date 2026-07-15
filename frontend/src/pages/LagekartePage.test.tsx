@@ -245,6 +245,7 @@ function basisHandler(
     http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/zonen', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/freie-zeichen', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/karte/fuehrungskraefte', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/lage/meldungen', () => HttpResponse.json([])),
     http.get('/api/organisation', () => HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null })),
@@ -327,6 +328,20 @@ describe('LagekartePage', () => {
     await user.click(await screen.findByText('marker-schaden-9'));
     const link = await screen.findByRole('link', { name: /Im Fach-Modul öffnen/ });
     expect(link).toHaveAttribute('href', '/einsaetze/1/schaeden/9');
+  });
+
+  it('rendert freie taktische Zeichen als Marker (Datenpfad: Query → alleVerortet → sichtbar) (LFH-170)', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1/freie-zeichen', () =>
+        HttpResponse.json([{
+          id: 42, einsatz_id: 1, lat: 50.1, lon: 8.6, grundzeichen: 'stelle',
+          organisation: null, fachaufgabe: null, symbol: null, einheit: null, funktion: null,
+          farbe: null, label: 'Sammelplatz', erstellt_von: 1, erstellt_at: '', geaendert_at: '',
+        }]),
+      ),
+    ]);
+    renderSeite();
+    expect(await screen.findByText('marker-freies_zeichen-42')).toBeInTheDocument();
   });
 
   it('Marker-Klick während Platzieren öffnet keinen Inspector und lässt den Platzier-Modus intakt (LFH-208)', async () => {
