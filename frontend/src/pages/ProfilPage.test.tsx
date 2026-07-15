@@ -204,4 +204,37 @@ describe('ProfilPage — TOTP-Enroll (LFH-43, Increment 5)', () => {
 
     expect(await screen.findByText('Code ungültig')).toBeInTheDocument();
   });
+
+  it('behält die Recovery-Codes sichtbar, wenn der Status-Refresh nach enrollFinish auf „2FA aktiv" dreht (Regressionsschutz)', async () => {
+    setup(false);
+    server.use(
+      http.post('/api/auth/totp/enroll/start', () =>
+        HttpResponse.json({
+          otpauth_url: 'otpauth://totp/lifeline-hub:admin?secret=JBSWY3DPEHPK3PXP&issuer=lifeline-hub',
+          secret_base32: 'JBSWY3DPEHPK3PXP',
+        }),
+      ),
+      http.post('/api/auth/totp/enroll/finish', () =>
+        HttpResponse.json({ recovery_codes: ['CODE-1111', 'CODE-2222'] }),
+      ),
+    );
+
+    const startKnopf = await screen.findByRole('button', { name: '2FA einrichten' });
+    await userEvent.click(startKnopf);
+
+    expect(await screen.findByText('JBSWY3DPEHPK3PXP')).toBeInTheDocument();
+
+    // Ab hier liefert /api/auth/me totp_aktiviert=true — simuliert den Status-Refresh, den
+    // `totpBestaetigen()` per `aktualisiere()` NACH erfolgreichem enrollFinish auslöst
+    // (ProfilPage.tsx). Die Recovery-Codes liegen dabei in eigenem State (`recoveryCodes`),
+    // entkoppelt von `benutzer.totp_aktiviert` — genau das prüft dieser Test.
+    server.use(http.get('/api/auth/me', () => HttpResponse.json(benutzerBody(true))));
+
+    await userEvent.type(screen.getByLabelText('Code aus deiner Authenticator-App'), '123456');
+    await userEvent.click(screen.getByRole('button', { name: 'Bestätigen' }));
+
+    expect(await screen.findByText('2FA aktiv')).toBeInTheDocument();
+    expect(screen.getByText(/CODE-1111/)).toBeInTheDocument();
+    expect(screen.getByText(/CODE-2222/)).toBeInTheDocument();
+  });
 });
