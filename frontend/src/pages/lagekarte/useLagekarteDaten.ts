@@ -122,6 +122,7 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen }: LagekarteDatenArgs)
               label: a.name,
               farbe: '#722ed1',
               tz,
+              geometrie: poly, // Kennzahlen (Fläche/Umfang) im Inspector, LFH-146
             } satisfies KarteMarker,
           },
         ];

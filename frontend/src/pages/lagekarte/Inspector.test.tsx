@@ -64,3 +64,40 @@ describe('Inspector Koordinatenanzeige', () => {
     expect(screen.getByText('31U ES 77019 61520')).toBeInTheDocument();
   });
 });
+
+describe('Inspector Kennzahlen (LFH-146)', () => {
+  beforeEach(() => {
+    server.use(
+      http.get('/api/einsaetze/:id/ort-vorschau', () => HttpResponse.json({ peilung: null, ortsname: null })),
+    );
+  });
+
+  const abschnittMarker = {
+    schluessel: 'abschnitt-3',
+    typ: 'abschnitt',
+    id: 3,
+    lat: 50.005,
+    lon: 8.005,
+    label: 'EA Nord',
+    farbe: '#722ed1',
+    geometrie: {
+      type: 'Polygon',
+      coordinates: [[[8, 50], [8.02, 50], [8.02, 50.02], [8, 50.02], [8, 50]]],
+    },
+  } as KarteMarker;
+
+  it('zeigt Fläche und Umfang für einen Abschnitt-Marker mit Geometrie', () => {
+    renderMitProviders(
+      <Inspector einsatzId={1} marker={abschnittMarker} darfSchreiben={false}
+        onSchliessen={() => {}} onVerortungLoeschen={() => {}} />,
+    );
+    expect(screen.getByText('Fläche')).toBeInTheDocument();
+    expect(screen.getByText('Umfang')).toBeInTheDocument();
+    expect(screen.getByText(/\d.*(m²|ha|km²)/)).toBeInTheDocument();
+  });
+
+  it('zeigt keine Fläche für einen Punkt-Marker ohne Geometrie', () => {
+    renderMitProviders(inspector()); // uhs-Marker ohne geometrie
+    expect(screen.queryByText('Fläche')).not.toBeInTheDocument();
+  });
+});

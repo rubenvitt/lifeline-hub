@@ -71,9 +71,13 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
   const [zoneAuswahl, setZoneAuswahl] = useState<number | null>(null);
   const [auswahl, setAuswahl] = useState<string | null>(null);
   const [flyToZiel, setFlyToZiel] = useState<{ lng: number; lat: number } | null>(null);
-  // Angeklicktes Fachebenen-Objekt (externe Daten) → Detail-Panel.
-  const [fachebeneAuswahl, setFachebeneAuswahl] =
-    useState<{ quelle: FachebeneQuelle; properties: Record<string, unknown> } | null>(null);
+  // Angeklicktes Fachebenen-Objekt (externe Daten) → Detail-Panel. geometrie = volle,
+  // un-geclippte Geometrie aus der geladenen FeatureCollection (LFH-146, Fläche/Umfang).
+  const [fachebeneAuswahl, setFachebeneAuswahl] = useState<{
+    quelle: FachebeneQuelle;
+    properties: Record<string, unknown>;
+    geometrie?: { type: string; coordinates: unknown } | null;
+  } | null>(null);
   const [bildPlatzierenId, setBildPlatzierenId] = useState<number | null>(null);
 
   // Ein wechselseitig-exklusiver Interaktionsmodus ist aktiv (Platzieren / Bild-Platzieren /
@@ -273,9 +277,13 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
     // Nicht sofort persistieren: erst Bestätigung (Entwurf bleibt sichtbar). LFH-145.
     setZoneBestaetigung({ ...zoneEntwurf, geometrie: g });
   };
-  const onFachebeneKlick = (properties: Record<string, unknown>, quelle: FachebeneQuelle) => {
+  const onFachebeneKlick = (
+    properties: Record<string, unknown>,
+    quelle: FachebeneQuelle,
+    geometrie?: { type: string; coordinates: unknown } | null,
+  ) => {
     if (exklusiverModusAktiv) return; // LFH-208: kein Panel während eines exklusiven Modus (vorher nur Platzieren)
-    setFachebeneAuswahl({ quelle, properties });
+    setFachebeneAuswahl({ quelle, properties, geometrie });
     setAuswahl(null);
     setZoneAuswahl(null);
   };

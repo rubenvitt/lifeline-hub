@@ -2,6 +2,7 @@ import { Button, Descriptions, Select, Space, Tag } from 'antd';
 import { Link } from 'react-router-dom';
 import type { KarteMarker, MarkerTyp } from './marker';
 import { markerToUrl } from './markerToUrl';
+import { geoKennzahlen, formatFlaeche, formatLaenge } from './geo';
 import KartenDetailCard from './KartenDetailCard';
 import KoordinatenAnzeige from '../../anzeige/KoordinatenAnzeige';
 
@@ -70,6 +71,8 @@ export default function Inspector({
   einsatzId, marker, darfSchreiben, onSchliessen, onVerortungLoeschen, onSymbolAendern,
 }: InspectorProps) {
   const modulLink = markerToUrl(marker, einsatzId);
+  // Geometrie-Kennzahlen (z. B. Abschnittsfläche), rein clientseitig (LFH-146).
+  const kennzahlen = marker.geometrie ? geoKennzahlen(marker.geometrie) : null;
 
   const symbolAuswahl = darfSchreiben && onSymbolAendern && TAKTISCHE_TYPEN.includes(marker.typ);
 
@@ -86,6 +89,15 @@ export default function Inspector({
         <Descriptions.Item label="Koordinate">
           <KoordinatenAnzeige lat={marker.lat} lon={marker.lon} einsatzId={einsatzId} exclude={inspectorExclude(marker, einsatzId)} />
         </Descriptions.Item>
+        {kennzahlen?.flaecheM2 != null && (
+          <Descriptions.Item label="Fläche">{formatFlaeche(kennzahlen.flaecheM2)}</Descriptions.Item>
+        )}
+        {kennzahlen?.umfangM != null && (
+          <Descriptions.Item label="Umfang">{formatLaenge(kennzahlen.umfangM)}</Descriptions.Item>
+        )}
+        {kennzahlen?.laengeM != null && (
+          <Descriptions.Item label="Länge">{formatLaenge(kennzahlen.laengeM)}</Descriptions.Item>
+        )}
       </Descriptions>
       {symbolAuswahl && (
         <Space orientation="vertical" size="small" style={{ width: '100%', marginTop: 8 }}>

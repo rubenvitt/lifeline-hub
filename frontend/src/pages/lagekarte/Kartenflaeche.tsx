@@ -13,6 +13,7 @@ import { tzIconKey } from './markerIcons';
 import { baueClusterDonut } from './clusterDonut';
 import type { TzProps } from './taktischesZeichen';
 import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
+import { findeGeometrieAn } from './geo';
 import { createZeichnung, type Zeichnung, type ZeichenModus } from './zeichnen';
 import { wendeKartenDatenAn } from './kartenDaten';
 import { absolutiereProxyAnfrage } from './basemapStil';
@@ -84,8 +85,13 @@ export interface KartenflaecheProps {
   onBboxAenderung?: (bbox: string) => void;
   /** Aktuelles Zoom-Level nach Bewegung — z. B. um „näher heranzoomen"-Hinweise zu steuern. */
   onZoomAenderung?: (zoom: number) => void;
-  /** Klick auf ein Fachebenen-Objekt → liefert dessen Properties + Quelle (für Detail-Panel). */
-  onFachebeneKlick?: (properties: Record<string, unknown>, quelle: FachebeneQuelle) => void;
+  /** Klick auf ein Fachebenen-Objekt → liefert dessen Properties + Quelle + volle Geometrie
+   *  (für Detail-Panel; Geometrie un-geclippt aus der geladenen FeatureCollection, LFH-146). */
+  onFachebeneKlick?: (
+    properties: Record<string, unknown>,
+    quelle: FachebeneQuelle,
+    geometrie?: { type: string; coordinates: unknown } | null,
+  ) => void;
   /** Aktiv zu platzierendes Bild (null = kein Platzier-Modus). Zeigt Mittelpunkt-Drag-Handle. */
   platzierBild?: { id: number; ecken: Ecken } | null;
   /** Callback, wenn Platzier-Geometrie per Drag verändert wurde. */
@@ -639,7 +645,12 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       const quelle = fe.def.key;
       const klick = (e: maplibregl.MapLayerMouseEvent) => {
         const props = (e.features?.[0]?.properties ?? {}) as Record<string, unknown>;
-        onFachebeneKlick?.(props, quelle);
+        // Fläche/Umfang aus der VOLLEN (un-geclippten) Geometrie der geladenen FeatureCollection
+        // beziehen — e.features[0].geometry ist geojson-vt kachel-geclippt und ergäbe für
+        // mehrkachelige NINA/DWD-Warnungen zu kleine Werte (LFH-146). Properties bleiben aus
+        // dem Klick-Feature.
+        const geometrie = findeGeometrieAn({ lng: e.lngLat.lng, lat: e.lngLat.lat }, fe.daten);
+        onFachebeneKlick?.(props, quelle, geometrie);
       };
       const enter = () => { map.getCanvas().style.cursor = 'pointer'; };
       const leave = () => { map.getCanvas().style.cursor = ''; };

@@ -1,11 +1,24 @@
-import { Button, Input, Popconfirm, Select, Space, Typography } from 'antd';
+import { Button, Input, Popconfirm, Select, Space, Tag, Typography } from 'antd';
+import type { ReactNode } from 'react';
 import type { Gefahrengebiet, LageZone, ZoneTyp } from '../../api/types';
 import { gefahrengebietName } from '../../api/gefahren';
 import { ZONE_TYPEN, zoneTypLabel, zoneStil } from './zonenStil';
+import { WARNSTUFEN, warnstufeFarbe } from '../gefahren/gefahrenSchema';
+import { parseGeometry, geoKennzahlen, formatFlaeche, formatLaenge } from './geo';
 import KartenDetailCard from './KartenDetailCard';
 
 /** Sentinel im Dropdown für „in neues Gefahrengebiet abspalten". */
 const NEU = -1;
+
+/** Read-only Label→Wert-Zeile für die Geometrie-Kennzahlen. */
+function KennzahlZeile({ label, wert }: { label: string; wert: ReactNode }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+      <Typography.Text type="secondary">{label}</Typography.Text>
+      <Typography.Text>{wert}</Typography.Text>
+    </div>
+  );
+}
 
 export interface ZonenInspectorProps {
   zone: LageZone;
@@ -23,6 +36,9 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
   const erlaubteTypen = ZONE_TYPEN.filter((t) => t.geometrie === 'beides' || t.geometrie === zone.geometrie_typ);
   const aktuellesGebiet = gebiete.find((g) => g.id === zone.gefahrengebiet_id) ?? null;
   const aktuellHatWarnstufen = (aktuellesGebiet?.hoechste_warnstufe ?? 'keine') !== 'keine';
+  // Geometrie-Kennzahlen rein clientseitig aus der GeoJSON-Geometrie (LFH-146).
+  const kennzahlen = geoKennzahlen(parseGeometry(zone.geometrie));
+  const warnstufeLabel = WARNSTUFEN.find((w) => w.wert === aktuellesGebiet?.hoechste_warnstufe)?.label;
 
   const umhaengen = (ziel: number) => onAendern({ gefahrengebiet_id: ziel === NEU ? null : ziel });
 
@@ -39,6 +55,38 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
             onChange={(v) => onAendern({ typ: v })} />
         ) : (
           <Typography.Text>{zoneTypLabel(zone.typ)}</Typography.Text>
+        )}
+
+        {(kennzahlen || (zone.typ === 'gefahrengebiet' && aktuellesGebiet)) && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {kennzahlen?.flaecheM2 != null && (
+              <KennzahlZeile label="Fläche" wert={formatFlaeche(kennzahlen.flaecheM2)} />
+            )}
+            {kennzahlen?.umfangM != null && (
+              <KennzahlZeile label="Umfang" wert={formatLaenge(kennzahlen.umfangM)} />
+            )}
+            {kennzahlen?.laengeM != null && (
+              <KennzahlZeile label="Länge" wert={formatLaenge(kennzahlen.laengeM)} />
+            )}
+            {zone.typ === 'gefahrengebiet' && aktuellesGebiet && (
+              <>
+                {aktuellHatWarnstufen && (
+                  <KennzahlZeile
+                    label="Höchste Warnstufe"
+                    wert={
+                      <Tag
+                        color={warnstufeFarbe(aktuellesGebiet.hoechste_warnstufe)}
+                        style={{ marginInlineEnd: 0 }}
+                      >
+                        {warnstufeLabel ?? aktuellesGebiet.hoechste_warnstufe}
+                      </Tag>
+                    }
+                  />
+                )}
+                <KennzahlZeile label="Zonen" wert={String(aktuellesGebiet.zonen_ids.length)} />
+              </>
+            )}
+          </div>
         )}
 
         <Input aria-label="Label" placeholder="Bezeichnung" defaultValue={zone.label ?? ''} disabled={!darfSchreiben}

@@ -97,3 +97,44 @@ describe('FachebenenInspector', () => {
     expect(onSchliessen).toHaveBeenCalledOnce();
   });
 });
+
+describe('FachebenenInspector — Fläche (LFH-146)', () => {
+  const box = [[[8, 50], [8.1, 50], [8.1, 50.1], [8, 50.1], [8, 50]]];
+
+  it('Warnung mit Polygon-Geometrie zeigt Fläche und Umfang', () => {
+    render(
+      <FachebenenInspector
+        quelle="nina"
+        properties={{ HEADLINE: 'X' }}
+        geometrie={{ type: 'Polygon', coordinates: box }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('Fläche')).toBeInTheDocument();
+    expect(screen.getByText('Umfang')).toBeInTheDocument();
+    expect(screen.getByText(/\d.*(m²|ha|km²)/)).toBeInTheDocument();
+  });
+
+  it('MultiPolygon-Geometrie zeigt (summierte) Fläche', () => {
+    render(
+      <FachebenenInspector
+        quelle="dwd"
+        properties={{ EVENT: 'STURM' }}
+        geometrie={{ type: 'MultiPolygon', coordinates: [box, box] }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('Fläche')).toBeInTheDocument();
+  });
+
+  it('Punkt-/keine Geometrie zeigt keine Fläche', () => {
+    render(
+      <FachebenenInspector
+        quelle="pegelonline"
+        properties={{ titel: 'X', wert: 100, einheit: 'cm' }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.queryByText('Fläche')).not.toBeInTheDocument();
+  });
+});

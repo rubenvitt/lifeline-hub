@@ -1,5 +1,6 @@
 import type { Einheit, EinsatzAnzeige, EinsatzFahrzeug, FuehrungskraftKarte, LageMeldung, Schaden, Uhs } from '../../api/types';
 import { baueTzProps, einsatzortTz, schadenTz, uhsTz, type TzProps } from './taktischesZeichen';
+import type { GeoJsonGeometry } from './geo';
 
 export type MarkerTyp =
   | 'einsatzort' | 'uhs' | 'schaden' | 'einheit' | 'fahrzeug' | 'fuehrung' | 'abschnitt' | 'lagemeldung';
@@ -16,6 +17,9 @@ export interface KarteMarker {
   farbe: string;
   /** Wenn gesetzt → DV-102-SVG (taktisches Zeichen) statt einfachem Kreis. */
   tz?: TzProps;
+  /** Flächen-/Linien-Geometrie des Markers (z. B. Abschnittsfläche) → Kennzahlen im
+   *  Inspector (Fläche/Umfang/Länge, LFH-146). FE-lokal, nicht Teil des Response-DTO. */
+  geometrie?: GeoJsonGeometry;
   /** FMS-Status-Ring, nur für Fahrzeuge. */
   statusFarbe?: string | null;
   /** Lagemeldungs-Herkunft für den Inspector-Backlink (nur typ='lagemeldung').

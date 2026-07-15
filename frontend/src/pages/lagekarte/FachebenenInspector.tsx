@@ -2,12 +2,28 @@ import { Descriptions, Tag, Typography } from 'antd';
 import type { FachebeneQuelle } from '../../api/fachebenen';
 import { FACHEBENEN } from './fachebenen';
 import { kategorieLabel } from './fachebenenLayer';
+import { geoKennzahlen, formatFlaeche, formatLaenge } from './geo';
 import KartenDetailCard from './KartenDetailCard';
 
 export interface FachebenenInspectorProps {
   quelle: FachebeneQuelle;
   properties: Record<string, unknown>;
+  /** Volle (un-geclippte) Geometrie des angeklickten Features → Fläche/Umfang/Länge (LFH-146). */
+  geometrie?: { type: string; coordinates: unknown } | null;
   onSchliessen: () => void;
+}
+
+/** Read-only Fläche/Umfang/Länge aus einer (auch Multi-*) Geometrie. */
+function GeoKennzahlenBlock({ geometrie }: { geometrie?: { type: string; coordinates: unknown } | null }) {
+  const k = geometrie ? geoKennzahlen(geometrie) : null;
+  if (!k) return null;
+  return (
+    <Descriptions column={1} size="small" style={{ marginTop: 8 }}>
+      {k.flaecheM2 != null && <Descriptions.Item label="Fläche">{formatFlaeche(k.flaecheM2)}</Descriptions.Item>}
+      {k.umfangM != null && <Descriptions.Item label="Umfang">{formatLaenge(k.umfangM)}</Descriptions.Item>}
+      {k.laengeM != null && <Descriptions.Item label="Länge">{formatLaenge(k.laengeM)}</Descriptions.Item>}
+    </Descriptions>
+  );
 }
 
 /** Wert als getrimmter String oder null (akzeptiert auch Zahlen). */
@@ -188,7 +204,7 @@ function KritisInhalt({ p }: { p: Record<string, unknown> }) {
 }
 
 /** Detailpanel für ein angeklicktes Fachebenen-Objekt (read-only externe Daten). */
-export default function FachebenenInspector({ quelle, properties, onSchliessen }: FachebenenInspectorProps) {
+export default function FachebenenInspector({ quelle, properties, geometrie, onSchliessen }: FachebenenInspectorProps) {
   const p = properties;
   const istWarnung = quelle === 'nina' || quelle === 'dwd';
 
@@ -213,6 +229,7 @@ export default function FachebenenInspector({ quelle, properties, onSchliessen }
       ) : (
         <KritisInhalt p={p} />
       )}
+      <GeoKennzahlenBlock geometrie={geometrie} />
     </KartenDetailCard>
   );
 }

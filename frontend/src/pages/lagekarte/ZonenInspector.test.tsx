@@ -114,3 +114,62 @@ describe('ZonenInspector — Gefahrengebiet-Gruppe', () => {
     expect(screen.getByRole('button', { name: /Zone aufheben/i })).toBeInTheDocument();
   });
 });
+
+describe('ZonenInspector — Kennzahlen (LFH-146)', () => {
+  const polygonZone: LageZone = {
+    ...basisZone,
+    typ: 'freie_skizze',
+    geometrie_typ: 'Polygon',
+    geometrie: JSON.stringify({
+      type: 'Polygon',
+      coordinates: [[[8, 50], [8.02, 50], [8.02, 50.02], [8, 50.02], [8, 50]]],
+    }),
+    gefahrengebiet_id: null,
+  };
+  const linienZone: LageZone = {
+    ...basisZone,
+    typ: 'absperrgrenze',
+    geometrie_typ: 'LineString',
+    geometrie: JSON.stringify({ type: 'LineString', coordinates: [[8, 50], [8, 51]] }),
+    gefahrengebiet_id: null,
+  };
+
+  it('zeigt Fläche und Umfang für eine Polygon-Zone', () => {
+    renderInspector({ zone: polygonZone, gebiete: [] });
+    expect(screen.getByText('Fläche')).toBeInTheDocument();
+    expect(screen.getByText('Umfang')).toBeInTheDocument();
+    // ein plausibler, lokalisierter Flächenwert (m²/ha/km²) ist zu sehen
+    expect(screen.getByText(/\d.*(m²|ha|km²)/)).toBeInTheDocument();
+    expect(screen.queryByText('Länge')).not.toBeInTheDocument();
+  });
+
+  it('zeigt Länge (statt Fläche) für eine Linien-Zone', () => {
+    renderInspector({ zone: linienZone, gebiete: [] });
+    expect(screen.getByText('Länge')).toBeInTheDocument();
+    expect(screen.queryByText('Fläche')).not.toBeInTheDocument();
+    expect(screen.getByText(/\bkm\b/)).toBeInTheDocument(); // 1° ≈ 111 km
+  });
+
+  it('zeigt höchste Warnstufe und Zonen-Anzahl für ein Gefahrengebiet', () => {
+    const zone: LageZone = {
+      ...basisZone,
+      geometrie: JSON.stringify({
+        type: 'Polygon',
+        coordinates: [[[8, 50], [8.01, 50], [8.01, 50.01], [8, 50.01], [8, 50]]],
+      }),
+    };
+    const g: Gefahrengebiet = { ...gebiet, hoechste_warnstufe: 'hoch', zonen_ids: [1, 2, 3] };
+    renderInspector({ zone, gebiete: [g] });
+    expect(screen.getByText('Höchste Warnstufe')).toBeInTheDocument();
+    expect(screen.getByText('Hoch')).toBeInTheDocument();
+    expect(screen.getByText('Zonen')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
+  });
+
+  it('rendert keine Kennzahl bei unparsebarer Geometrie (kein Crash)', () => {
+    // basisZone.geometrie === '{}' → parseGeometry liefert null
+    renderInspector({ zone: { ...basisZone, gefahrengebiet_id: null }, gebiete: [] });
+    expect(screen.queryByText('Fläche')).not.toBeInTheDocument();
+    expect(screen.queryByText('Länge')).not.toBeInTheDocument();
+  });
+});

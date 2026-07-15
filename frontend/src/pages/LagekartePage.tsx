@@ -202,6 +202,7 @@ export default function LagekartePage() {
           <FachebenenInspector
             quelle={fachebeneAuswahl.quelle}
             properties={fachebeneAuswahl.properties}
+            geometrie={fachebeneAuswahl.geometrie}
             onSchliessen={() => setFachebeneAuswahl(null)}
           />
         )}

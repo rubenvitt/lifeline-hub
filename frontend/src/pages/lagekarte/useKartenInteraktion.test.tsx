@@ -68,6 +68,12 @@ describe('useKartenInteraktion — Selektions-Gate während exklusiver Modi (LFH
       act(() => result.current.onZoneKlick(5));
       expect(result.current.zoneAuswahl).toBe(5);
     });
+    it('onFachebeneKlick reicht die (un-geclippte) Geometrie an fachebeneAuswahl durch (LFH-146)', () => {
+      const { result } = rendere();
+      const geom = { type: 'Polygon', coordinates: [[[8, 50], [8.1, 50], [8.1, 50.1], [8, 50]]] };
+      act(() => result.current.onFachebeneKlick({ a: 1 }, 'nina', geom));
+      expect(result.current.fachebeneAuswahl?.geometrie).toBe(geom);
+    });
     it('onFlaecheKlick setzt auswahl auf abschnitt-<id>', () => {
       const { result } = rendere();
       act(() => result.current.onFlaecheKlick(3));
