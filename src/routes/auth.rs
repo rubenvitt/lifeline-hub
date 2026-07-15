@@ -9,6 +9,8 @@ use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use openidconnect::core::CoreAuthenticationFlow;
 use openidconnect::{CsrfToken, Nonce, PkceCodeChallenge, Scope, TokenResponse};
 use serde::Deserialize;
+use sqlx::SqlitePool;
+use webauthn_rs::prelude::{CreationChallengeResponse, RegisterPublicKeyCredential};
 
 #[derive(Debug, Deserialize)]
 pub struct LoginRequest {
@@ -330,6 +332,152 @@ pub async fn oidc_callback(
     let token = session::anlegen(&state.pool, benutzer.id).await?;
     let jar = jar.add(session_cookie(token, crate::auth::session::cookie_secure()));
     Ok((jar, Redirect::to(&eintrag.ziel_pfad)))
+}
+
+/// Cookie-Name für den WebAuthn-Registrierungs-State-Key (LFH-275, Task 5). Trägt NUR den
+/// Schlüssel in den kurzlebigen, prozessweiten Ceremony-Store (`auth::webauthn::state`) — NIE
+/// die Ceremony (`PasskeyRegistration`) selbst, die bleibt serverseitig. Kurzlebig/registrations-
+/// scoped über `path("/api/auth/webauthn")`: das Cookie ist außerhalb dieses Endpoint-Zweigs
+/// (z.B. für `/api/auth/login`) irrelevant und wird dem Browser dort auch nicht mitgeschickt.
+const WEBAUTHN_REG_COOKIE: &str = "webauthn_reg";
+
+/// Baut das Registrierungs-State-Cookie. Analog `session_cookie` (HttpOnly/SameSite=Lax/
+/// `secure` folgt dem Transport), aber path-beschränkt auf die WebAuthn-Routen.
+fn webauthn_reg_cookie(key: String, secure: bool) -> Cookie<'static> {
+    Cookie::build((WEBAUTHN_REG_COOKIE, key))
+        .http_only(true)
+        .same_site(SameSite::Lax)
+        .secure(secure)
+        .path("/api/auth/webauthn")
+        .build()
+}
+
+/// Enforcement-Check (LFH-275): ist der `webauthn`-Provider registry-seitig aktiviert
+/// (konfiguriert UND nicht per Override ausgeschaltet)? Geteilt zwischen `register/start` und
+/// `register/finish` — beide liefern `404`, wenn nicht, statt eines Fake-Flows, der erst mitten
+/// in der Ceremony scheitert (dieselbe Enforcement-Idee wie `oidc_start`/`oidc_callback`).
+async fn webauthn_aktiv(pool: &SqlitePool) -> Result<bool, AppError> {
+    let liste = crate::auth::provider::registry::liste(pool).await?;
+    Ok(liste
+        .iter()
+        .any(|p| p.id == crate::auth::provider::ID_WEBAUTHN && p.aktiviert))
+}
+
+/// POST /api/auth/webauthn/register/start — beginnt eine Passkey-Registrierungs-Ceremony für
+/// den angemeldeten Nutzer (`CurrentUser`-gegated, LFH-275 Task 5). Enforcement: `webauthn`-
+/// Provider nicht aktiviert (nicht konfiguriert ODER per Registry ausgeschaltet) → `404`.
+///
+/// `exclude_credentials` wird mit den `credential_id`s der bereits registrierten Passkeys des
+/// Nutzers gefüllt (Plan-MUST) — verhindert, dass derselbe Authenticator zweimal für denselben
+/// Nutzer registriert wird (`finish_passkey_registration`/`speichere_passkey` würde das ohnehin
+/// über die `credential_id`-UNIQUE-Spalte als 409 abweisen, das hier ist die frühere, für den
+/// Client sichtbare Absicherung direkt im Browser-Dialog).
+///
+/// Der Ceremony-State (`PasskeyRegistration`) landet unter einem frischen, zufälligen Schlüssel
+/// im prozessweiten Store (`auth::webauthn::state`, Task 4) — NUR dieser Schlüssel geht als
+/// kurzlebiges HttpOnly-Cookie an den Client (`webauthn_reg`), damit `register/finish` dieselbe
+/// Ceremony wiederfindet. Die eigentliche `CreationChallengeResponse` (die der Browser für
+/// `navigator.credentials.create` braucht) ist reguläres, client-lesbares JSON.
+pub async fn webauthn_register_start(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    jar: CookieJar,
+) -> Result<(CookieJar, Json<CreationChallengeResponse>), AppError> {
+    if !webauthn_aktiv(&state.pool).await? {
+        return Err(AppError::NotFound);
+    }
+    let webauthn = crate::auth::webauthn::webauthn().ok_or(AppError::NotFound)?;
+
+    let handle = crate::auth::webauthn::user_handle(&state.pool, benutzer.id).await?;
+    let vorhandene =
+        crate::auth::webauthn::storage::passkeys_fuer_benutzer(&state.pool, benutzer.id).await?;
+    let exclude: Vec<_> = vorhandene.iter().map(|p| p.cred_id().clone()).collect();
+    let exclude = if exclude.is_empty() {
+        None
+    } else {
+        Some(exclude)
+    };
+
+    // Serverseitiger Konfigurations-/Bibliotheksfehler (nicht clientauslösbar: `handle`/
+    // `benutzername`/`anzeigename` kommen aus der eigenen DB, `exclude` aus eigenen Daten) —
+    // `Internal` redigiert die Detailmeldung gegenüber dem Client (nur geloggt), analog `baue()`.
+    let (ccr, reg) = webauthn
+        .start_passkey_registration(
+            handle,
+            &benutzer.benutzername,
+            &benutzer.anzeigename,
+            exclude,
+        )
+        .map_err(|e| {
+            AppError::Internal(format!("WebAuthn-Registrierung konnte nicht starten: {e}"))
+        })?;
+
+    let key = session::neuer_token();
+    crate::auth::webauthn::state::speichere(
+        key.clone(),
+        crate::auth::webauthn::state::CeremonyZustand::Registrierung(reg),
+    );
+
+    let jar = jar.add(webauthn_reg_cookie(key, session::cookie_secure()));
+    Ok((jar, Json(ccr)))
+}
+
+/// POST /api/auth/webauthn/register/finish — schließt die Passkey-Registrierung ab
+/// (`CurrentUser`-gegated, LFH-275 Task 5). Enforcement wie `register/start` (`404`, falls
+/// `webauthn` nicht aktiviert ist).
+///
+/// Reihenfolge ist bewusst: der State-Key kommt aus dem `webauthn_reg`-Cookie, `entnehme`
+/// (SYNC, Guard sofort freigegeben — siehe `auth::webauthn::state`-Moduldoc) läuft VOR jedem
+/// weiteren `.await` in diesem Handler, damit kein std-Mutex-Guard über eine Await-Grenze
+/// gehalten wird (Plan-MUST „!Send" — sonst wäre der Handler nicht `Send`, `cargo build`
+/// bricht das ab). Ein unbekannter/fremder/bereits verbrauchter Key sowie ein Key, der (State-
+/// Verwechslung) zufällig auf eine Authentifizierungs-Ceremony zeigt, münden in denselben
+/// generischen `400`.
+///
+/// `speichere_passkey` liefert bei einer `credential_id`-UNIQUE-Verletzung bereits
+/// `AppError::Conflict` (409, siehe `storage.rs`) — kein manuelles Mapping hier nötig.
+pub async fn webauthn_register_finish(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    jar: CookieJar,
+    Json(body): Json<RegisterPublicKeyCredential>,
+) -> Result<(CookieJar, StatusCode), AppError> {
+    if !webauthn_aktiv(&state.pool).await? {
+        return Err(AppError::NotFound);
+    }
+    let webauthn = crate::auth::webauthn::webauthn().ok_or(AppError::NotFound)?;
+
+    let key = jar
+        .get(WEBAUTHN_REG_COOKIE)
+        .map(|c| c.value().to_string())
+        .ok_or_else(|| AppError::Validation("Keine laufende Registrierung".to_string()))?;
+
+    // SYNC, Guard freigegeben VOR jedem folgenden `.await` — siehe Doc-Kommentar oben.
+    let reg = match crate::auth::webauthn::state::entnehme(&key) {
+        Some(crate::auth::webauthn::state::CeremonyZustand::Registrierung(reg)) => reg,
+        _ => {
+            return Err(AppError::Validation(
+                "Registrierung abgelaufen oder unbekannt".to_string(),
+            ))
+        }
+    };
+
+    // Fehlschlag hier ist ein echter Ceremony-/Client-Fehler (falsche Challenge, Origin-
+    // Mismatch, kaputte Attestation) — die `webauthn-rs`-Fehlermeldungen sind statische,
+    // PII-freie Protokollmeldungen (kein Secret-/Config-Leak), daher unbedenklich an den
+    // Client durchreichbar (anders als bei OIDC-Token-/IdP-Details).
+    let passkey = webauthn
+        .finish_passkey_registration(&body, &reg)
+        .map_err(|e| AppError::Validation(format!("WebAuthn-Registrierung fehlgeschlagen: {e}")))?;
+
+    crate::auth::webauthn::storage::speichere_passkey(&state.pool, benutzer.id, &passkey).await?;
+
+    let jar = jar.remove(
+        Cookie::build((WEBAUTHN_REG_COOKIE, ""))
+            .path("/api/auth/webauthn")
+            .build(),
+    );
+    Ok((jar, StatusCode::CREATED))
 }
 
 #[cfg(test)]

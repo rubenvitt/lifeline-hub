@@ -288,6 +288,116 @@ async fn oidc_callback_mit_unbekanntem_state_redirect_auf_login_fehler() {
     assert_eq!(location, "/login?fehler=oidc");
 }
 
+/// Schreibt eine Override-Zeile, die "webauthn" explizit deaktiviert — unabhängig davon, ob der
+/// prozessweite `WEBAUTHN_KONFIGURIERT`-OnceLock in diesem Testbinary-Prozess (`--test auth`)
+/// bereits `true` ist (z. B. durch eine künftige Task-6-Testfunktion, die
+/// `set_webauthn_konfiguriert(true)` aufruft). Analog `oidc_deaktiviert_override` — macht die
+/// 404-Tests unten reihenfolge-unabhängig.
+async fn webauthn_deaktiviert_override(pool: &sqlx::SqlitePool) {
+    sqlx::query(
+        "INSERT INTO auth_provider (id, aktiviert) VALUES ('webauthn', 0) \
+         ON CONFLICT(id) DO UPDATE SET aktiviert = 0",
+    )
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn webauthn_register_start_ohne_session_ist_401() {
+    let app = setup().await;
+    let (status, _) = anfrage(&app, "POST", "/api/auth/webauthn/register/start", "", None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn webauthn_register_start_mit_session_aber_ohne_provider_ist_404() {
+    // Default in Tests: "webauthn" ist NICHT konfiguriert (kein Boot-Bau in `setup_mit_pool`) —
+    // die Override-Zeile macht den Test zusätzlich robust gegen die Ausführungsreihenfolge mit
+    // künftigen Tests, die den prozessweiten OnceLock global auf `true` setzen (siehe
+    // `webauthn_deaktiviert_override`-Doc).
+    let (app, pool) = setup_mit_pool().await;
+    webauthn_deaktiviert_override(&pool).await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/webauthn/register/start",
+        &admin,
+        None,
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(json["error"], "Nicht gefunden");
+}
+
+#[tokio::test]
+async fn webauthn_register_finish_ohne_session_ist_401() {
+    // `CurrentUser` wird VOR dem `Json<RegisterPublicKeyCredential>`-Body-Extractor ausgewertet
+    // (Reihenfolge der Handler-Parameter) — ein fehlender/ungültiger Body ist hier irrelevant,
+    // der Request scheitert bereits an der fehlenden Session, bevor der Body je geparst wird.
+    let app = setup().await;
+    let (status, _) = anfrage(&app, "POST", "/api/auth/webauthn/register/finish", "", None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn webauthn_register_start_mit_provider_liefert_ccr_und_setzt_reg_cookie() {
+    // Aktiviert "webauthn" GLOBAL für den Rest dieses Testbinary-Prozesses (OnceLock, wie
+    // `set_oidc_konfiguriert`) UND hält ein ECHTES, lokal gebautes `Webauthn` im prozessweiten
+    // `WEBAUTHN`-OnceLock (`auth::webauthn::set_webauthn`) — `start_passkey_registration` ist
+    // reine Challenge-Generierung (kein Netz, kein Authenticator nötig), nur `finish` bräuchte
+    // ein echtes Gerät (siehe Task-8-Smoke). Macht `webauthn_deaktiviert_override` oben endlich
+    // diskriminierend (ohne die Override-Zeile in den beiden 404-Tests würden sie ab hier
+    // fälschlich durchfallen) und verifiziert die state-key-Cookie-Bindung end-to-end.
+    lifeline_hub::auth::provider::registry::set_webauthn_konfiguriert(true);
+    lifeline_hub::auth::webauthn::set_webauthn(
+        lifeline_hub::auth::webauthn::baue("localhost", "https://localhost").unwrap(),
+    );
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/auth/webauthn/register/start")
+                .header(header::COOKIE, admin)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let cookie = resp
+        .headers()
+        .get(header::SET_COOKIE)
+        .expect("Set-Cookie (webauthn_reg) erwartet")
+        .to_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        cookie.contains("webauthn_reg="),
+        "state-key muss als eigenes Cookie gesetzt werden, nicht im Response-Body"
+    );
+    assert!(cookie.to_lowercase().contains("httponly"));
+    assert!(cookie.contains("/api/auth/webauthn"));
+
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert!(
+        json.get("publicKey").is_some(),
+        "Response muss die CreationChallengeResponse (publicKey) für navigator.credentials.create enthalten"
+    );
+    assert!(
+        json["publicKey"].get("challenge").is_some(),
+        "publicKey muss die Challenge enthalten"
+    );
+}
+
 #[tokio::test]
 async fn oidc_callback_mit_idp_error_redirect_ohne_400() {
     // Derselbe prozessweite OnceLock wie in `oidc_callback_mit_unbekanntem_state_redirect_auf_
