@@ -329,6 +329,26 @@ describe('LagekartePage', () => {
     expect(link).toHaveAttribute('href', '/einsaetze/1/schaeden/9');
   });
 
+  it('Marker-Klick während Platzieren öffnet keinen Inspector und lässt den Platzier-Modus intakt (LFH-208)', async () => {
+    // Doppel-Panel vermeiden: ein Map-Marker-Klick während aktiver Platzierung darf kein
+    // Auswahl-Panel öffnen. Der Platzier-Modus bleibt intakt (nächster Karten-Klick verortet).
+    let patchBody: unknown = null;
+    basisHandler([
+      http.patch('/api/einsaetze/1/uhs/5', async ({ request }) => {
+        patchBody = await request.json();
+        return HttpResponse.json({ ...UHS_NICHT_VERORTET, lat: 50.1, lon: 8.6 });
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Platzieren' }));
+    await user.click(await screen.findByText('marker-schaden-9'));
+    expect(screen.queryByRole('link', { name: /Im Fach-Modul öffnen/ })).not.toBeInTheDocument();
+    // Platzier-Modus intakt: der nächste Karten-Klick verortet weiterhin.
+    await user.click(screen.getByText('karte-klick'));
+    await waitFor(() => expect(patchBody).toEqual({ lat: 50.1, lon: 8.6 }));
+  });
+
   it('rendert verortete Lagemeldungen als Marker; Klick öffnet Inspector mit Backlink zur Quell-Meldung', async () => {
     basisHandler([
       http.get('/api/einsaetze/1/lage/meldungen', () => HttpResponse.json([LAGEMELDUNG_VERORTET])),

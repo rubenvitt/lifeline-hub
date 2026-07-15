@@ -76,6 +76,19 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
     useState<{ quelle: FachebeneQuelle; properties: Record<string, unknown> } | null>(null);
   const [bildPlatzierenId, setBildPlatzierenId] = useState<number | null>(null);
 
+  // Ein wechselseitig-exklusiver Interaktionsmodus ist aktiv (Platzieren / Bild-Platzieren /
+  // Abschnitt- oder Zonen-Zeichnen / Zonen-Bestätigung). Während dessen darf ein Karten-Klick
+  // auf ein bestehendes Objekt kein Auswahl-Panel öffnen (LFH-208: sonst Doppel-Panel neben der
+  // ZeichnenSteuerung). Billiger abgeleiteter Boolean — bewusst kein useMemo (kein Deps-Churn).
+  // zoneBestaetigung ist heute stets mit truthy zoneEntwurf gepaart, wird aber explizit geführt,
+  // damit ein künftiger Bestätigung-only-State robust bleibt.
+  const exklusiverModusAktiv =
+    platzierungZiel != null ||
+    bildPlatzierenId != null ||
+    zeichneAbschnittId != null ||
+    zoneEntwurf != null ||
+    zoneBestaetigung != null;
+
   // Verorten je nach Ziel-Typ (UHS/Schaden live; Einsatzort über Kopf-PATCH, dann invalidieren).
   const verortenMutation = useMutation({
     mutationFn: async (p: { lat: number | null; lon: number | null }) => {
@@ -245,10 +258,12 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
       .finally(() => setZeichneAbschnittId(null));
   };
   const onFlaecheKlick = (fid: number) => {
+    if (exklusiverModusAktiv) return; // LFH-208: kein Panel während eines exklusiven Modus
     setAuswahl(`abschnitt-${fid}`);
     setFachebeneAuswahl(null);
   };
   const onZoneKlick = (id: number) => {
+    if (exklusiverModusAktiv) return; // LFH-208: kein Panel während eines exklusiven Modus
     setZoneAuswahl(id);
     setAuswahl(null);
     setFachebeneAuswahl(null);
@@ -259,7 +274,7 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
     setZoneBestaetigung({ ...zoneEntwurf, geometrie: g });
   };
   const onFachebeneKlick = (properties: Record<string, unknown>, quelle: FachebeneQuelle) => {
-    if (platzierungZiel) return; // im Platzier-Modus nicht den Detail-Panel öffnen
+    if (exklusiverModusAktiv) return; // LFH-208: kein Panel während eines exklusiven Modus (vorher nur Platzieren)
     setFachebeneAuswahl({ quelle, properties });
     setAuswahl(null);
     setZoneAuswahl(null);
@@ -300,6 +315,7 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
     flyToZiel,
     fachebeneAuswahl,
     bildPlatzierenId,
+    exklusiverModusAktiv,
     // Panel-Schließer (onSchliessen der Inspektoren).
     setAuswahl,
     setZoneAuswahl,

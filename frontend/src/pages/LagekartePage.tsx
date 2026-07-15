@@ -59,6 +59,7 @@ export default function LagekartePage() {
   const {
     platzierungZiel, zeichneAbschnittId, zoneEntwurf, zoneBestaetigung, zoneSpeichern,
     zoneZeichnenNonce, zoneAuswahl, auswahl, flyToZiel, fachebeneAuswahl, bildPlatzierenId,
+    exklusiverModusAktiv,
     setAuswahl, setZoneAuswahl, setFachebeneAuswahl,
     onKarteKlick, onMarkerWaehlen, loescheVerortung, aendereSymbol,
     bestaetigungSpeichern, bestaetigungVerwerfen,
@@ -142,7 +143,12 @@ export default function LagekartePage() {
           attribution={attribution}
           markers={sichtbareMarker}
           onKarteKlick={onKarteKlick}
-          onMarkerKlick={onMarkerWaehlen}
+          // LFH-208: Map-Marker-Klick während eines exklusiven Modus (Platzieren/Zeichnen/…)
+          // öffnet kein Panel. Nur der Map-Pfad ist gegatet — die Sidebar-Selektion (onMarkerWaehlen
+          // direkt an die Sidebar, s. o.) bleibt frei.
+          onMarkerKlick={(schluessel) => {
+            if (!exklusiverModusAktiv) onMarkerWaehlen(schluessel);
+          }}
           flyToZiel={flyToZiel}
           onStyleFehler={onStyleFehler}
           flaechen={layer.abschnitt ? flaechen.map((f) => ({ id: f.id, label: f.label, polygon: f.polygon })) : []}
