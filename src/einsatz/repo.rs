@@ -601,6 +601,13 @@ pub async fn schwaerze_einsatz(
         .execute(&mut *tx)
         .await?;
 
+    // Freie taktische Zeichen (LFH-170): label ist Freitext (kann PII tragen) → NULL (nullable);
+    // grundzeichen/organisation/… sind Katalog-IDs (keine PII), lat/lon bleibt operatives Skelett.
+    sqlx::query("UPDATE freies_zeichen SET label = NULL WHERE einsatz_id = ?")
+        .bind(einsatz_id)
+        .execute(&mut *tx)
+        .await?;
+
     system_audit_tx(
         &mut tx,
         einsatz_id,
@@ -826,6 +833,48 @@ mod tests {
         )
         .await
         .unwrap();
+    }
+
+    #[tokio::test]
+    async fn schwaerzung_nullt_freies_zeichen_label_pii() {
+        // LFH-170/Review: freies_zeichen.label ist Freitext (kann PII tragen, z. B. „ELW Fam.
+        // Müller"). Es MUSS von schwaerze_einsatz genullt werden (wie karte_hintergrundbild.name);
+        // die operative Position (lat/lon) bleibt wie das übrige Skelett erhalten.
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        // Retention-Guard erfüllen: soft-gelöscht.
+        sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+            .bind("2026-01-01 00:00:00")
+            .bind(einsatz.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO freies_zeichen (einsatz_id, lat, lon, grundzeichen, label, erstellt_von) \
+             VALUES (?, ?, ?, 'stelle', 'ELW Fam. Müller', ?)",
+        )
+        .bind(einsatz.id)
+        .bind(50.1)
+        .bind(8.6)
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, einsatz.id, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        let (label, lat): (Option<String>, f64) =
+            sqlx::query_as("SELECT label, lat FROM freies_zeichen WHERE einsatz_id = ?")
+                .bind(einsatz.id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(label, None, "Freitext-Label (PII) muss nach Schwärzung NULL sein");
+        assert_eq!(lat, 50.1, "operative Position bleibt erhalten (Skelett)");
     }
 
     /// Setzt die Org-Retention-Dauer direkt in der DB (reiner Repo-Test).

@@ -165,4 +165,26 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
     // nach erfolgreichem Anlegen ist der Platzier-Modus beendet
     await waitFor(() => expect(result.current.zeichenPlatzieren).toBeNull());
   });
+
+  it('Doppelklick legt nur EIN freies Zeichen an (isPending-Guard, kein Duplikat)', async () => {
+    // Mutation pending halten → der zweite Klick trifft den Guard, bevor onSuccess
+    // zeichenPlatzieren leert. legeFreiesZeichenAn erzeugt je Aufruf eine NEUE Entität
+    // (nicht idempotent), ein zweiter Aufruf würde ein Duplikat anlegen.
+    let aufloesen: (v: unknown) => void = () => {};
+    freieZeichenApi.legeFreiesZeichenAn.mockReset();
+    freieZeichenApi.legeFreiesZeichenAn.mockImplementation(
+      () => new Promise((r) => { aufloesen = r; }),
+    );
+    const { result } = rendere();
+    act(() => result.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' }));
+    act(() => result.current.onKarteKlick({ lng: 8.6, lat: 50.1 }));
+    await waitFor(() => expect(freieZeichenApi.legeFreiesZeichenAn).toHaveBeenCalledTimes(1));
+    // zweiter Klick, während die erste Mutation noch pending ist → Guard greift
+    act(() => result.current.onKarteKlick({ lng: 8.7, lat: 50.2 }));
+    await new Promise((r) => setTimeout(r, 15));
+    expect(freieZeichenApi.legeFreiesZeichenAn).toHaveBeenCalledTimes(1);
+    aufloesen({ id: 1 });
+    freieZeichenApi.legeFreiesZeichenAn.mockReset();
+    freieZeichenApi.legeFreiesZeichenAn.mockImplementation(() => Promise.resolve({ id: 42 }));
+  });
 });

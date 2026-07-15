@@ -145,7 +145,10 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
     if (!darfSchreiben) return;
     // Platzieren XOR Verorten — beides sind exklusive Modi, nie gleichzeitig aktiv.
     if (zeichenPlatzieren) {
-      legeZeichenMutation.mutate({ lat: lngLat.lat, lon: lngLat.lng });
+      // isPending-Guard: ein zweiter (Doppel-)Klick während des laufenden POST würde ein
+      // Duplikat anlegen (legeFreiesZeichenAn ist nicht idempotent). zeichenPlatzieren wird
+      // erst in onSuccess geleert, daher hier gegen die pendende Mutation gaten.
+      if (!legeZeichenMutation.isPending) legeZeichenMutation.mutate({ lat: lngLat.lat, lon: lngLat.lng });
       return;
     }
     if (!platzierungZiel) return;
