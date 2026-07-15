@@ -15,6 +15,7 @@ use std::sync::OnceLock;
 use uuid::Uuid;
 use webauthn_rs::prelude::*;
 
+pub mod state;
 pub mod storage;
 
 /// Prozessweit EINMAL (beim Serverstart, nach erfolgreichem [`baue`]) gesetztes `Webauthn` —
