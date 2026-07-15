@@ -79,6 +79,10 @@ pub fn build_router(state: AppState) -> Router {
             "/api/benutzer/{id}/deaktivieren",
             post(routes::benutzer::deaktivieren),
         )
+        .route(
+            "/api/benutzer/{id}/totp/reset",
+            post(routes::benutzer::totp_reset),
+        )
         .route("/api/einsaetze", get(routes::einsatz::liste))
         .route("/api/einsaetze", post(routes::einsatz::anlegen))
         .route("/api/einsaetze/{id}", get(routes::einsatz::detail))

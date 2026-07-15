@@ -52,7 +52,7 @@ function rendern() {
 describe('GlobalEinstellungenPage', () => {
   beforeEach(() => {
     vi.mocked(useAuth).mockReturnValue({
-      benutzer: { id: 1, system_rolle: 'admin', org_rolle: 'keine', anzeigename: 'Admin', benutzername: 'admin', aktiv: true, erstellt_at: '' },
+      benutzer: { id: 1, system_rolle: 'admin', org_rolle: 'keine', anzeigename: 'Admin', benutzername: 'admin', aktiv: true, erstellt_at: '', totp_aktiviert: false },
       laedt: false,
       login: vi.fn(),
       logout: vi.fn(),
@@ -167,7 +167,7 @@ describe('GlobalEinstellungenPage', () => {
 
   it('deaktiviert alle Felder als Nicht-Admin (fuehrungskraft)', async () => {
     vi.mocked(useAuth).mockReturnValue({
-      benutzer: { id: 2, system_rolle: 'keiner', org_rolle: 'fuehrungskraft', anzeigename: 'FK', benutzername: 'fk', aktiv: true, erstellt_at: '' },
+      benutzer: { id: 2, system_rolle: 'keiner', org_rolle: 'fuehrungskraft', anzeigename: 'FK', benutzername: 'fk', aktiv: true, erstellt_at: '', totp_aktiviert: false },
       laedt: false,
       login: vi.fn(),
       logout: vi.fn(),
@@ -191,7 +191,7 @@ describe('GlobalEinstellungenPage', () => {
 
   it('deaktiviert Modul-Rollen-Selects als Nicht-Admin (fuehrungskraft)', async () => {
     vi.mocked(useAuth).mockReturnValue({
-      benutzer: { id: 2, system_rolle: 'keiner', org_rolle: 'fuehrungskraft', anzeigename: 'FK', benutzername: 'fk', aktiv: true, erstellt_at: '' },
+      benutzer: { id: 2, system_rolle: 'keiner', org_rolle: 'fuehrungskraft', anzeigename: 'FK', benutzername: 'fk', aktiv: true, erstellt_at: '', totp_aktiviert: false },
       laedt: false,
       login: vi.fn(),
       logout: vi.fn(),

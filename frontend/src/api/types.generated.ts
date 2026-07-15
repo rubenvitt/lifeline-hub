@@ -248,6 +248,12 @@ export interface components {
             id: number;
             org_rolle: components["schemas"]["OrgRolle"];
             system_rolle: components["schemas"]["SystemRolle"];
+            /**
+             * @description MFA-Status (LFH-43, Increment 5 Task 6): `true`, wenn der Nutzer TOTP als zweiten Faktor
+             *     aktiviert hat. Zeigt sowohl der Admin-Benutzerliste als auch dem eigenen Profil
+             *     (`GET /api/auth/me`) den Status an.
+             */
+            totp_aktiviert: boolean;
         };
         /**
          * @description Betriebsart einer TETRA-Sprechgruppe (Schema-Anker für die OpenAPI-Union, LFH-120).

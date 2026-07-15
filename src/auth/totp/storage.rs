@@ -75,11 +75,18 @@ pub async fn verbrauche_recovery_code(
 }
 
 /// Löscht alle Recovery-Codes von `benutzer_id` (Admin-Reset, Task 6: keine stale Codes nach
-/// einem `totp_secret`-Reset).
-pub async fn loesche_recovery_codes(pool: &SqlitePool, benutzer_id: i64) -> Result<(), AppError> {
+/// einem `totp_secret`-Reset). Executor-generisch (Präzedenz `gefahr::repo::gebiet_anlegen`),
+/// damit der Aufrufer (`routes::benutzer::totp_reset`) sie in DERSELBEN Transaktion wie das
+/// `UPDATE benutzer SET totp_secret = NULL, totp_aktiviert = 0 ...` aufrufen kann (Plan-MUST
+/// „Admin-Reset in einer Transaktion") — mit `&SqlitePool` weiterhin genauso aufrufbar wie
+/// bisher (s. Tests unten).
+pub async fn loesche_recovery_codes(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
+    benutzer_id: i64,
+) -> Result<(), AppError> {
     sqlx::query("DELETE FROM totp_recovery_code WHERE benutzer_id = ?")
         .bind(benutzer_id)
-        .execute(pool)
+        .execute(executor)
         .await?;
     Ok(())
 }

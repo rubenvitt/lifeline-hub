@@ -989,3 +989,32 @@ async fn totp_finish_mit_recovery_code_liefert_session_und_verbraucht_ihn_einmal
     );
     assert!(!cookies2.iter().any(|c| c.starts_with("lifeline_sid=")));
 }
+
+// ===== MFA-Status in `BenutzerAnzeige` (LFH-43, Increment 5, Task 6) =====
+
+#[tokio::test]
+async fn me_liefert_totp_aktiviert_false_fuer_frischen_benutzer() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, json) = anfrage(&app, "GET", "/api/auth/me", &admin_cookie, None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        json["totp_aktiviert"], false,
+        "ein frischer Benutzer hat TOTP noch nicht aktiviert: {json}"
+    );
+}
+
+#[tokio::test]
+async fn me_liefert_totp_aktiviert_true_nach_enroll() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    totp_fuer_admin_aktivieren(&app, &admin_cookie).await;
+
+    let (status, json) = anfrage(&app, "GET", "/api/auth/me", &admin_cookie, None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        json["totp_aktiviert"], true,
+        "nach abgeschlossenem Enrollment muss /me totp_aktiviert=true zeigen: {json}"
+    );
+}

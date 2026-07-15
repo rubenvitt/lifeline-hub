@@ -15,7 +15,7 @@ import type { BenutzerAnzeige, ModulOverrides } from '../api/types';
 
 const admin: BenutzerAnzeige = {
   id: 1, anzeigename: 'A', benutzername: 'a', system_rolle: 'admin',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00',
+  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00', totp_aktiviert: false,
 };
 const ohne: BenutzerAnzeige = { ...admin, system_rolle: 'keiner', org_rolle: 'keine' };
 const fk: BenutzerAnzeige = { ...admin, system_rolle: 'keiner', org_rolle: 'fuehrungskraft' };

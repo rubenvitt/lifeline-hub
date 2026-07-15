@@ -19,7 +19,7 @@ const ueberschreibung = (
 
 const ohne: BenutzerAnzeige = {
   id: 1, anzeigename: 'E', benutzername: 'e', system_rolle: 'keiner',
-  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00',
+  org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00', totp_aktiviert: false,
 };
 
 const basis = (over: Partial<ModulEintrag>): ModulEintrag => ({

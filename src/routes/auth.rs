@@ -134,7 +134,12 @@ pub async fn login(
 
     let token = session::anlegen(&state.pool, benutzer.id).await?;
     let jar = jar.add(session_cookie(token, crate::auth::session::cookie_secure()));
-    Ok((jar, Json(LoginAntwort::Angemeldet(benutzer.anzeige()))))
+    // An dieser Stelle ist `totp_aktiviert` bereits als `false` erwiesen — der `if`-Zweig oben
+    // ist bei `true` bereits mit `return` verlassen worden.
+    Ok((
+        jar,
+        Json(LoginAntwort::Angemeldet(benutzer.anzeige(totp_aktiviert))),
+    ))
 }
 
 /// POST /api/auth/logout — löscht die Session und entfernt das Cookie.
@@ -149,9 +154,20 @@ pub async fn logout(
     Ok((jar, StatusCode::NO_CONTENT))
 }
 
-/// GET /api/auth/me — liefert den aktuell angemeldeten Benutzer.
-pub async fn me(CurrentUser(benutzer): CurrentUser) -> Json<crate::auth::BenutzerAnzeige> {
-    Json(benutzer.anzeige())
+/// GET /api/auth/me — liefert den aktuell angemeldeten Benutzer (inkl. MFA-Status,
+/// LFH-43 Increment 5 Task 6). Lädt `totp_aktiviert` per gezieltem Zusatz-SELECT nach — der
+/// `CurrentUser`-Extractor liefert einen `Benutzer` OHNE `totp_*`-Spalten (s. `Benutzer::anzeige`-
+/// Doc).
+pub async fn me(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+) -> Result<Json<crate::auth::BenutzerAnzeige>, AppError> {
+    let totp_aktiviert: bool =
+        sqlx::query_scalar("SELECT totp_aktiviert FROM benutzer WHERE id = ?")
+            .bind(benutzer.id)
+            .fetch_one(&state.pool)
+            .await?;
+    Ok(Json(benutzer.anzeige(totp_aktiviert)))
 }
 
 /// GET /api/auth/providers — verfügbare Login-Provider (öffentlich, für die Login-UI).
@@ -970,7 +986,10 @@ pub async fn totp_finish(
             .path("/api/auth")
             .build(),
     );
-    Ok((jar, Json(benutzer.anzeige())))
+    // Dieser Handler ist nur für `totp_aktiviert = true`-Nutzer überhaupt erreichbar (der
+    // Pending-State entsteht ausschließlich im `totp_aktiviert`-Zweig von `login`) — der Status
+    // ist an dieser Stelle unbedingt `true`, kein Zusatz-SELECT nötig.
+    Ok((jar, Json(benutzer.anzeige(true))))
 }
 
 #[cfg(test)]

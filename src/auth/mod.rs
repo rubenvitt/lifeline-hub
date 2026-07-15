@@ -166,7 +166,15 @@ impl Benutzer {
     }
 
     /// Sichere, serialisierbare Darstellung ohne Passwort-Hash.
-    pub fn anzeige(&self) -> BenutzerAnzeige {
+    ///
+    /// `totp_aktiviert` kommt bewusst als Parameter vom Aufrufer, NICHT aus `self`:
+    /// `Benutzer`s FromRow-Query-Feldliste ist an mehreren unabhängigen Stellen (Session-
+    /// Auflösung, Passwort-/OIDC-/WebAuthn-Login) dupliziert (Memory:
+    /// sqlx-09-sqlsafestr-query-as) und trägt bewusst KEINE `totp_*`-Spalten — ein neues Feld
+    /// hier hätte alle diese SELECTs anfassen müssen (LFH-43 Task 6). Aufrufer, die den
+    /// MFA-Status bereits kennen (z. B. `login`s Branch-Bool, `totp_finish`s Erfolgsfall) oder
+    /// ihn gezielt nachladen (`me`), reichen ihn hier durch.
+    pub fn anzeige(&self, totp_aktiviert: bool) -> BenutzerAnzeige {
         BenutzerAnzeige {
             id: self.id,
             anzeigename: self.anzeigename.clone(),
@@ -175,6 +183,7 @@ impl Benutzer {
             org_rolle: self.org_rolle,
             aktiv: self.aktiv,
             erstellt_at: self.erstellt_at.clone(),
+            totp_aktiviert,
         }
     }
 }
@@ -191,6 +200,10 @@ pub struct BenutzerAnzeige {
     pub org_rolle: OrgRolle,
     pub aktiv: bool,
     pub erstellt_at: String,
+    /// MFA-Status (LFH-43, Increment 5 Task 6): `true`, wenn der Nutzer TOTP als zweiten Faktor
+    /// aktiviert hat. Zeigt sowohl der Admin-Benutzerliste als auch dem eigenen Profil
+    /// (`GET /api/auth/me`) den Status an.
+    pub totp_aktiviert: bool,
 }
 
 #[cfg(test)]
