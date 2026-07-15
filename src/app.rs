@@ -611,6 +611,22 @@ pub fn build_router(state: AppState) -> Router {
             delete(routes::lage_zone::aufloesen),
         )
         .route(
+            "/api/einsaetze/{id}/freie-zeichen",
+            get(routes::freies_zeichen::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/freie-zeichen",
+            post(routes::freies_zeichen::anlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/freie-zeichen/{zid}",
+            patch(routes::freies_zeichen::aktualisieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/freie-zeichen/{zid}",
+            delete(routes::freies_zeichen::aufloesen),
+        )
+        .route(
             "/api/einsaetze/{id}/karte/hintergrundbilder",
             get(routes::karte_hintergrundbild::liste),
         )

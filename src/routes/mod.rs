@@ -24,6 +24,7 @@ pub mod etb;
 pub mod etb_baustein;
 pub mod fahrzeug;
 pub mod fahrzeug_status;
+pub mod freies_zeichen;
 pub mod gefahr;
 pub mod health;
 pub mod karte;

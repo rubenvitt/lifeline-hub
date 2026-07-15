@@ -2735,6 +2735,93 @@
           }
         }
       },
+      "FreiesZeichenAnzeige": {
+        "type": "object",
+        "description": "Ein freies taktisches Zeichen (Punkt-Marker ohne Fachobjekt, LFH-170).",
+        "required": [
+          "id",
+          "einsatz_id",
+          "lat",
+          "lon",
+          "grundzeichen",
+          "erstellt_von",
+          "erstellt_at",
+          "geaendert_at"
+        ],
+        "properties": {
+          "einheit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "erstellt_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fachaufgabe": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "farbe": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "funktion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "geaendert_at": {
+            "type": "string"
+          },
+          "grundzeichen": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lat": {
+            "type": "number",
+            "format": "double"
+          },
+          "lon": {
+            "type": "number",
+            "format": "double"
+          },
+          "organisation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "symbol": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "FuehrungskraftKarte": {
         "type": "object",
         "description": "Schlanke Karten-Sicht einer Führungskraft (Einheits- oder Abschnittsführung).",

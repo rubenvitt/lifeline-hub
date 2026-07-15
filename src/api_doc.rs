@@ -56,6 +56,7 @@ use utoipa::OpenApi;
     crate::fahrzeug::FahrzeugAnzeige,
     crate::fahrzeug::FahrzeugStatus,
     crate::fahrzeug::FahrzeugVorschlaege,
+    crate::freies_zeichen::FreiesZeichenAnzeige,
     crate::gefahr::GefahrBewertungAnzeige,
     crate::gefahr::GefahrengebietAnzeige,
     crate::gefahr::Gefahrentyp,

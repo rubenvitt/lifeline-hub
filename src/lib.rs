@@ -19,6 +19,7 @@ pub mod error;
 pub mod etb;
 pub mod etb_baustein;
 pub mod fahrzeug;
+pub mod freies_zeichen;
 pub mod gefahr;
 pub mod geocoding;
 pub mod karte;

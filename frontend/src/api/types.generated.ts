@@ -919,6 +919,29 @@ export interface components {
             standort: string[];
             traegerorganisation: string[];
         };
+        /** @description Ein freies taktisches Zeichen (Punkt-Marker ohne Fachobjekt, LFH-170). */
+        FreiesZeichenAnzeige: {
+            einheit?: string | null;
+            /** Format: int64 */
+            einsatz_id: number;
+            erstellt_at: string;
+            /** Format: int64 */
+            erstellt_von: number;
+            fachaufgabe?: string | null;
+            farbe?: string | null;
+            funktion?: string | null;
+            geaendert_at: string;
+            grundzeichen: string;
+            /** Format: int64 */
+            id: number;
+            label?: string | null;
+            /** Format: double */
+            lat: number;
+            /** Format: double */
+            lon: number;
+            organisation?: string | null;
+            symbol?: string | null;
+        };
         /** @description Schlanke Karten-Sicht einer Führungskraft (Einheits- oder Abschnittsführung). */
         FuehrungskraftKarte: {
             /** Format: int64 */
