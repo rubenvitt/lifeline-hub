@@ -36,6 +36,7 @@ const DEFERRED_MODULE: &[&str] = &[
     "befehl",
     "lagebericht",
     "lage_zone",
+    "freies_zeichen",
     "gefahr",
     "einsatzabschnitt",
     "karte_hintergrundbild",
