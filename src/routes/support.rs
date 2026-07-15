@@ -45,3 +45,39 @@ pub fn sse_event_stream(
         Ok::<Event, Infallible>(event)
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::Deserialize;
+
+    #[test]
+    fn trimme_macht_leer_und_whitespace_zu_none() {
+        assert_eq!(trimme(None), None);
+        assert_eq!(trimme(Some(String::new())), None);
+        assert_eq!(trimme(Some("   ".to_string())), None);
+        assert_eq!(
+            trimme(Some("  Wert  ".to_string())),
+            Some("Wert".to_string())
+        );
+    }
+
+    #[derive(Deserialize)]
+    struct Patch {
+        #[serde(default, deserialize_with = "deserialize_optional_field")]
+        feld: Option<Option<i64>>,
+    }
+
+    #[test]
+    fn deserialize_optional_field_unterscheidet_null_von_absent() {
+        // Fehlendes Feld → None (PATCH lässt unverändert).
+        let p: Patch = serde_json::from_str("{}").unwrap();
+        assert_eq!(p.feld, None);
+        // Explizites JSON-null → Some(None) (PATCH setzt auf NULL).
+        let p: Patch = serde_json::from_str(r#"{"feld": null}"#).unwrap();
+        assert_eq!(p.feld, Some(None));
+        // Konkreter Wert → Some(Some(v)).
+        let p: Patch = serde_json::from_str(r#"{"feld": 42}"#).unwrap();
+        assert_eq!(p.feld, Some(Some(42)));
+    }
+}
