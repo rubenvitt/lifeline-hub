@@ -34,3 +34,10 @@ export function me(): Promise<BenutzerAnzeige> {
 export function providerListe(): Promise<AuthProvider[]> {
   return apiGet<AuthProvider[]>('/api/auth/providers');
 }
+
+/** Schaltet einen Auth-Provider an/aus (Admin, LFH-280). Gibt die aktualisierte Server-Liste
+ *  zurück. `404` (unbekannt) und `409` (Lockout — letzter admin-tauglicher Login-Weg) kommen
+ *  als {@link ApiError}; die Fehlermeldung ist serverseitig lesbar formuliert. */
+export function providerSchalten(id: string, aktiviert: boolean): Promise<AuthProvider[]> {
+  return apiSend<AuthProvider[]>(`/api/auth/providers/${id}`, 'PUT', { aktiviert });
+}

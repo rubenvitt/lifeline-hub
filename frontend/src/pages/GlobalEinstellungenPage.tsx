@@ -1,9 +1,10 @@
-import { Alert, App, AutoComplete, Button, Form, Input, InputNumber, Select, Spin, Switch, Typography } from 'antd';
+import { Alert, App, AutoComplete, Button, Form, Input, InputNumber, Select, Spin, Switch, Tabs, Tooltip, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ladeOrgEinstellungen, speichereOrgEinstellungen,
   ladeOrgModulEinstellungen, setzeOrgModulEinstellung,
 } from '../api/orgEinstellungen';
+import { providerListe, providerSchalten } from '../api/auth';
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { modulRegistry, istModulAusblendbar } from '../einsatz/modulRegistry';
@@ -59,6 +60,7 @@ interface FormWerte {
 /**
  * Admin-Seite: org-weite Einstellungs-Defaults unter /admin/einstellungen.
  * Edit-Recht: nur system_rolle=admin; Führungskräfte sehen die Werte read-only.
+ * Gliederung in vertikale Tabs (Anzeige / Einsatz-Defaults / Anmeldeverfahren, LFH-280).
  */
 export default function GlobalEinstellungenPage() {
   const { benutzer } = useAuth();
@@ -99,6 +101,24 @@ export default function GlobalEinstellungenPage() {
       message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
   });
 
+  // Anmeldeverfahren (Auth-Provider an/aus, LFH-280). Eigene Query — die LoginPage lädt die
+  // Liste unabhängig bei jedem Mount, es gibt keinen geteilten Cache zu invalidieren.
+  const providerQuery = useQuery({
+    queryKey: ['auth-provider'],
+    queryFn: providerListe,
+  });
+
+  const schaltenMutation = useMutation({
+    mutationFn: (vars: { id: string; aktiviert: boolean }) =>
+      providerSchalten(vars.id, vars.aktiviert),
+    onSuccess: (liste) => {
+      // Server-Wahrheit (inkl. abgelehntem Zustand) direkt übernehmen.
+      qc.setQueryData(['auth-provider'], liste);
+    },
+    onError: (e) =>
+      message.error(e instanceof ApiError ? e.message : 'Umschalten fehlgeschlagen'),
+  });
+
   if (einstellungenQuery.isLoading || modulQuery.isLoading) {
     return (
       <div style={{ textAlign: 'center', paddingTop: 80 }}>
@@ -113,6 +133,7 @@ export default function GlobalEinstellungenPage() {
 
   const einstellungen = einstellungenQuery.data;
   const orgModul = modulQuery.data ?? {};
+  const provider = providerQuery.data ?? [];
 
   const initialWerte: FormWerte = {
     zeitzone: einstellungen.zeitzone ?? undefined,
@@ -148,136 +169,117 @@ export default function GlobalEinstellungenPage() {
     speichernMutation.mutate(felder);
   }
 
-  return (
-    <div style={{ maxWidth: 640 }}>
-      <Typography.Title level={3} style={{ marginTop: 0 }}>
-        Globale Einstellungen
-      </Typography.Title>
-      <Typography.Paragraph type="secondary">
-        Org-weite Defaults für alle Einsätze. Einsatzspezifische Einstellungen überschreiben
-        diese Werte. Bearbeitung nur für System-Admins.
+  // ── Tab 1: Anzeige-Konventionen ────────────────────────────────
+  const anzeigeTab = (
+    <>
+      <Typography.Title level={5} style={{ marginTop: 0 }}>Anzeige-Konventionen</Typography.Title>
+      <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
+        Gemeinsame Darstellungs-Defaults (Lagebild). Leer = hartkodierter Fallback.
       </Typography.Paragraph>
 
-      <Form<FormWerte>
-        form={form}
-        layout="vertical"
-        initialValues={initialWerte}
-        onFinish={speichern}
-        disabled={!istAdmin}
+      <Form.Item
+        label="Zeitzone"
+        name="zeitzone"
+        tooltip="IANA-Zeitzone (z. B. Europe/Berlin). Leer = lokale Zeit des Geräts."
       >
-        {/* ── Sektion 1: Anzeige-Konventionen ─────────────────────── */}
-        <Typography.Title level={5}>Anzeige-Konventionen</Typography.Title>
-        <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
-          Gemeinsame Darstellungs-Defaults (Lagebild). Leer = hartkodierter Fallback.
-        </Typography.Paragraph>
+        <AutoComplete
+          allowClear
+          options={ZEITZONEN_OPTIONEN}
+          placeholder="Europe/Berlin (Fallback)"
+          showSearch={{
+            filterOption: (eingabe, option) =>
+              (option?.value ?? '').toLowerCase().includes(eingabe.toLowerCase()),
+          }}
+        />
+      </Form.Item>
+      <Form.Item label="Zeitformat" name="zeitformat">
+        <Select allowClear placeholder="24 Stunden (Fallback)" options={ZEITFORMAT_OPTIONEN} />
+      </Form.Item>
+      <Form.Item label="Einheiten" name="einheiten">
+        <Select allowClear placeholder="Metrisch (Fallback)" options={EINHEITEN_OPTIONEN} />
+      </Form.Item>
+      <Form.Item label="Koordinatenformat" name="koordinatenformat">
+        <Select allowClear placeholder="WGS84 dezimal (Fallback)" options={KOORDINATEN_OPTIONEN} />
+      </Form.Item>
+      <Form.Item
+        label="Geocoder-URL"
+        name="geocoder_url"
+        tooltip="Nominatim-kompatible Basis-URL für die Ort-Vorschau (Reverse-Geocoding). Leer = öffentlicher Nominatim. Die Einsatz-Koordinate wird an diesen Dienst gesendet — für Produktivlast/Datenschutz eigenen Geocoder hinterlegen."
+      >
+        <Input placeholder="https://nominatim.openstreetmap.org (Default)" allowClear style={{ width: '100%' }} />
+      </Form.Item>
+    </>
+  );
 
-        <Form.Item
-          label="Zeitzone"
-          name="zeitzone"
-          tooltip="IANA-Zeitzone (z. B. Europe/Berlin). Leer = lokale Zeit des Geräts."
-        >
-          <AutoComplete
-            allowClear
-            options={ZEITZONEN_OPTIONEN}
-            placeholder="Europe/Berlin (Fallback)"
-            showSearch={{
-              filterOption: (eingabe, option) =>
-                (option?.value ?? '').toLowerCase().includes(eingabe.toLowerCase()),
-            }}
-          />
-        </Form.Item>
-        <Form.Item label="Zeitformat" name="zeitformat">
-          <Select allowClear placeholder="24 Stunden (Fallback)" options={ZEITFORMAT_OPTIONEN} />
-        </Form.Item>
-        <Form.Item label="Einheiten" name="einheiten">
-          <Select allowClear placeholder="Metrisch (Fallback)" options={EINHEITEN_OPTIONEN} />
-        </Form.Item>
-        <Form.Item label="Koordinatenformat" name="koordinatenformat">
-          <Select allowClear placeholder="WGS84 dezimal (Fallback)" options={KOORDINATEN_OPTIONEN} />
-        </Form.Item>
-        <Form.Item
-          label="Geocoder-URL"
-          name="geocoder_url"
-          tooltip="Nominatim-kompatible Basis-URL für die Ort-Vorschau (Reverse-Geocoding). Leer = öffentlicher Nominatim. Die Einsatz-Koordinate wird an diesen Dienst gesendet — für Produktivlast/Datenschutz eigenen Geocoder hinterlegen."
-        >
-          <Input placeholder="https://nominatim.openstreetmap.org (Default)" allowClear style={{ width: '100%' }} />
-        </Form.Item>
+  // ── Tab 2: Einsatz-Defaults (Aufbewahrung + Verhalten + Modul-Rollen) ──
+  const einsatzTab = (
+    <>
+      <Typography.Title level={5} style={{ marginTop: 0 }}>Aufbewahrung</Typography.Title>
+      <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
+        Default-Aufbewahrungs-Dauer für neue Einsätze. Leer = keine automatische Frist.
+      </Typography.Paragraph>
 
-        {/* ── Sektion 2: Aufbewahrung ───────────────────────────────── */}
-        <Typography.Title level={5}>Aufbewahrung</Typography.Title>
-        <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
-          Default-Aufbewahrungs-Dauer für neue Einsätze. Leer = keine automatische Frist.
-        </Typography.Paragraph>
+      <Form.Item
+        label="Aufbewahrungs-Dauer (Tage)"
+        name="retention_dauer_tage"
+        tooltip="1 bis 3650 Tage. Leer = keine automatische Aufbewahrungsfrist."
+      >
+        <InputNumber min={1} max={3650} style={{ width: 200 }} placeholder="keine" />
+      </Form.Item>
 
-        <Form.Item
-          label="Aufbewahrungs-Dauer (Tage)"
-          name="retention_dauer_tage"
-          tooltip="1 bis 3650 Tage. Leer = keine automatische Aufbewahrungsfrist."
-        >
-          <InputNumber min={1} max={3650} style={{ width: 200 }} placeholder="keine" />
-        </Form.Item>
+      <Typography.Title level={5}>Verhalten &amp; Automatik</Typography.Title>
+      <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
+        Nummernkreis-Präfixe und Default-Fristen für neue Einsätze.
+        Präfixe sind reine Anzeige. Leer = kein Default (hartkodierter Fallback).
+      </Typography.Paragraph>
 
-        {/* ── Sektion 3: Verhalten & Automatik ─────────────────────── */}
-        <Typography.Title level={5}>Verhalten &amp; Automatik</Typography.Title>
-        <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
-          Nummernkreis-Präfixe und Default-Fristen für neue Einsätze.
-          Präfixe sind reine Anzeige. Leer = kein Default (hartkodierter Fallback).
-        </Typography.Paragraph>
+      <Form.Item
+        label="Präfix ETB"
+        name="etb_nummer_praefix"
+        tooltip="Wird der laufenden ETB-Nummer vorangestellt (z. B. EB-). Max. 8 Zeichen."
+      >
+        <Input maxLength={8} placeholder="z. B. EB-" style={{ width: 200 }} />
+      </Form.Item>
+      <Form.Item
+        label="Präfix Meldungen"
+        name="meldung_nummer_praefix"
+        tooltip="Wird der laufenden Meldungs-Nummer vorangestellt. Max. 8 Zeichen."
+      >
+        <Input maxLength={8} placeholder="z. B. M-" style={{ width: 200 }} />
+      </Form.Item>
+      <Form.Item
+        label="Präfix Aufträge"
+        name="auftrag_nummer_praefix"
+        tooltip="Wird der laufenden Auftrags-Nummer vorangestellt. Max. 8 Zeichen."
+      >
+        <Input maxLength={8} placeholder="z. B. A-" style={{ width: 200 }} />
+      </Form.Item>
 
-        <Form.Item
-          label="Präfix ETB"
-          name="etb_nummer_praefix"
-          tooltip="Wird der laufenden ETB-Nummer vorangestellt (z. B. EB-). Max. 8 Zeichen."
-        >
-          <Input maxLength={8} placeholder="z. B. EB-" style={{ width: 200 }} />
-        </Form.Item>
-        <Form.Item
-          label="Präfix Meldungen"
-          name="meldung_nummer_praefix"
-          tooltip="Wird der laufenden Meldungs-Nummer vorangestellt. Max. 8 Zeichen."
-        >
-          <Input maxLength={8} placeholder="z. B. M-" style={{ width: 200 }} />
-        </Form.Item>
-        <Form.Item
-          label="Präfix Aufträge"
-          name="auftrag_nummer_praefix"
-          tooltip="Wird der laufenden Auftrags-Nummer vorangestellt. Max. 8 Zeichen."
-        >
-          <Input maxLength={8} placeholder="z. B. A-" style={{ width: 200 }} />
-        </Form.Item>
+      <Form.Item
+        label="Default-Bestätigungsfrist Meldungen (Minuten)"
+        name="meldung_bestaetigung_frist_min"
+        tooltip="Frist für die Bestätigung pflichtiger Meldungen. Leer = kein Default."
+      >
+        <InputNumber min={1} max={10080} style={{ width: 200 }} placeholder="kein Default" />
+      </Form.Item>
+      <Form.Item
+        label="Default-Quittierungsfrist Aufträge (Minuten)"
+        name="auftrag_quittierung_frist_min"
+        tooltip="Frist für unquittierte Aufträge ohne explizite Frist. Leer = kein Default."
+      >
+        <InputNumber min={1} max={10080} style={{ width: 200 }} placeholder="kein Default" />
+      </Form.Item>
 
-        <Form.Item
-          label="Default-Bestätigungsfrist Meldungen (Minuten)"
-          name="meldung_bestaetigung_frist_min"
-          tooltip="Frist für die Bestätigung pflichtiger Meldungen. Leer = kein Default."
-        >
-          <InputNumber min={1} max={10080} style={{ width: 200 }} placeholder="kein Default" />
-        </Form.Item>
-        <Form.Item
-          label="Default-Quittierungsfrist Aufträge (Minuten)"
-          name="auftrag_quittierung_frist_min"
-          tooltip="Frist für unquittierte Aufträge ohne explizite Frist. Leer = kein Default."
-        >
-          <InputNumber min={1} max={10080} style={{ width: 200 }} placeholder="kein Default" />
-        </Form.Item>
+      <Form.Item
+        label="Automatische ETB-Einträge"
+        name="auto_etb_eintraege"
+        valuePropName="checked"
+        tooltip="Meldungen und Aufträge erzeugen automatisch einen verknüpften ETB-Eintrag."
+      >
+        <Switch />
+      </Form.Item>
 
-        <Form.Item
-          label="Automatische ETB-Einträge"
-          name="auto_etb_eintraege"
-          valuePropName="checked"
-          tooltip="Meldungen und Aufträge erzeugen automatisch einen verknüpften ETB-Eintrag."
-        >
-          <Switch />
-        </Form.Item>
-
-        {istAdmin && (
-          <Button type="primary" htmlType="submit" loading={speichernMutation.isPending}>
-            Speichern
-          </Button>
-        )}
-      </Form>
-
-      {/* ── Sektion 4: Modul-Rollen-Default ──────────────────────── */}
+      {/* ── Modul-Rollen-Default (Sofort-Speichern, kein Form-Feld) ──────── */}
       <Typography.Title level={5} style={{ marginTop: 32 }}>
         Modul-Rollen-Default
       </Typography.Title>
@@ -319,6 +321,89 @@ export default function GlobalEinstellungenPage() {
           );
         })}
       </div>
+    </>
+  );
+
+  // ── Tab 3: Anmeldeverfahren (Auth-Provider an/aus, LFH-280) ─────────
+  const anmeldeverfahrenTab = (
+    <>
+      <Typography.Title level={5} style={{ marginTop: 0 }}>Anmeldeverfahren</Typography.Title>
+      <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
+        Verfügbare Login-Wege an- und abschalten. Nur beim Serverstart konfigurierte Verfahren
+        erscheinen hier. Änderungen werden sofort gespeichert.
+      </Typography.Paragraph>
+
+      {providerQuery.isLoading ? (
+        <Spin />
+      ) : providerQuery.isError ? (
+        <Alert type="error" title="Anmeldeverfahren nicht ladbar" showIcon />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 360 }}>
+          {provider.map((p) => {
+            const istPasswort = p.id === 'passwort';
+            const schalter = (
+              <Switch
+                aria-label={`Anmeldeverfahren: ${p.anzeigename}`}
+                checked={p.aktiviert}
+                disabled={!istAdmin || istPasswort || schaltenMutation.isPending}
+                onChange={(aktiviert) => schaltenMutation.mutate({ id: p.id, aktiviert })}
+              />
+            );
+            return (
+              <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ flex: 1 }}>{p.anzeigename}</span>
+                {istPasswort ? (
+                  <Tooltip title="Garantierter Admin-Login-Weg — nicht deaktivierbar">
+                    <span>{schalter}</span>
+                  </Tooltip>
+                ) : (
+                  schalter
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+
+  return (
+    <div style={{ maxWidth: 860 }}>
+      <Typography.Title level={3} style={{ marginTop: 0 }}>
+        Globale Einstellungen
+      </Typography.Title>
+      <Typography.Paragraph type="secondary">
+        Org-weite Defaults für alle Einsätze. Einsatzspezifische Einstellungen überschreiben
+        diese Werte. Bearbeitung nur für System-Admins.
+      </Typography.Paragraph>
+
+      <Form<FormWerte>
+        form={form}
+        layout="vertical"
+        initialValues={initialWerte}
+        onFinish={speichern}
+        disabled={!istAdmin}
+      >
+        <Tabs
+          tabPosition="left"
+          items={[
+            { key: 'anzeige', label: 'Anzeige', forceRender: true, children: anzeigeTab },
+            { key: 'einsatz', label: 'Einsatz-Defaults', forceRender: true, children: einsatzTab },
+            { key: 'anmeldung', label: 'Anmeldeverfahren', children: anmeldeverfahrenTab },
+          ]}
+        />
+
+        {istAdmin && (
+          <Button
+            type="primary"
+            htmlType="submit"
+            loading={speichernMutation.isPending}
+            style={{ marginTop: 8 }}
+          >
+            Speichern
+          </Button>
+        )}
+      </Form>
     </div>
   );
 }
