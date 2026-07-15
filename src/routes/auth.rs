@@ -1,5 +1,6 @@
 use crate::app::AppState;
 use crate::auth::session::{self, CurrentUser, SESSION_COOKIE};
+use crate::auth::Benutzer;
 use crate::error::AppError;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -10,7 +11,10 @@ use openidconnect::core::CoreAuthenticationFlow;
 use openidconnect::{CsrfToken, Nonce, PkceCodeChallenge, Scope, TokenResponse};
 use serde::Deserialize;
 use sqlx::SqlitePool;
-use webauthn_rs::prelude::{CreationChallengeResponse, RegisterPublicKeyCredential};
+use webauthn_rs::prelude::{
+    CreationChallengeResponse, PublicKeyCredential, RegisterPublicKeyCredential,
+    RequestChallengeResponse, WebauthnError,
+};
 
 #[derive(Debug, Deserialize)]
 pub struct LoginRequest {
@@ -478,6 +482,223 @@ pub async fn webauthn_register_finish(
             .build(),
     );
     Ok((jar, StatusCode::CREATED))
+}
+
+/// Cookie-Name für den WebAuthn-Authentifizierungs-State-Key (LFH-275, Task 6). Analog
+/// `WEBAUTHN_REG_COOKIE` (Task 5): trägt NUR den Schlüssel in den kurzlebigen, prozessweiten
+/// Ceremony-Store (`auth::webauthn::state`) — NIE die Ceremony (`PasskeyAuthentication`) selbst.
+const WEBAUTHN_AUTH_COOKIE: &str = "webauthn_auth";
+
+/// Baut das Authentifizierungs-State-Cookie. Analog `webauthn_reg_cookie` (HttpOnly/
+/// SameSite=Lax/`secure` folgt dem Transport), path-beschränkt auf die WebAuthn-Routen.
+fn webauthn_auth_cookie(key: String, secure: bool) -> Cookie<'static> {
+    Cookie::build((WEBAUTHN_AUTH_COOKIE, key))
+        .http_only(true)
+        .same_site(SameSite::Lax)
+        .secure(secure)
+        .path("/api/auth/webauthn")
+        .build()
+}
+
+#[derive(Debug, Deserialize)]
+pub struct WebauthnAuthStartRequest {
+    pub benutzername: String,
+}
+
+/// SELECT-Feldliste für `Benutzer`, identisch zu `session.rs`/`password.rs` (sqlx-0.9
+/// `SqlSafeStr` verlangt `&'static str` je Aufrufstelle — Memory: sqlx-09-sqlsafestr-query-as;
+/// die Liste wird bewusst je Query dupliziert statt "zentral" geteilt).
+///
+/// POST /api/auth/webauthn/auth/start — beginnt eine passwortlose Passkey-Authentifizierungs-
+/// Ceremony (öffentlich, PRE-Login, LFH-275 Task 6). Enforcement wie `register/start`/`finish`
+/// (`404`, falls `webauthn` nicht aktiviert ist).
+///
+/// **NO-user-enumeration (MUST):** ein unbekannter/inaktiver Benutzername, ein existierender
+/// Benutzer OHNE registrierten Passkey und jeder weitere Fehler vor dem eigentlichen
+/// Ceremony-Start münden alle in DENSELBEN generischen `401` (`AppError::Unauthorized`,
+/// Meldungstext „Nicht angemeldet") — exakt das Präzedenzmuster aus `password::anmelden` (dort
+/// ebenfalls `Unauthorized` sowohl für „Nutzer existiert nicht" als auch „falsches Passwort").
+///
+/// Dokumentierter Tradeoff (Plan/Task-Brief): WebAuthn selbst gibt über `allowCredentials` in der
+/// zurückgegebenen `RequestChallengeResponse` implizit etwas preis (Anzahl/IDs der Credentials),
+/// sobald ein Nutzer mindestens einen Passkey hat — das ist protokoll-inhärent und ohne
+/// discoverable/usernameless Login (bewusst zurückgestellt, LFH-277) serverseitig nicht
+/// vermeidbar. Was HIER verhindert wird: dass die HTTP-Antwort selbst (Statuscode/Fehlertext)
+/// zwischen „Nutzer existiert nicht" und „Nutzer hat keinen Passkey" unterscheidet.
+pub async fn webauthn_auth_start(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    Json(req): Json<WebauthnAuthStartRequest>,
+) -> Result<(CookieJar, Json<RequestChallengeResponse>), AppError> {
+    if !webauthn_aktiv(&state.pool).await? {
+        return Err(AppError::NotFound);
+    }
+    let webauthn = crate::auth::webauthn::webauthn().ok_or(AppError::NotFound)?;
+
+    let benutzer = sqlx::query_as::<_, Benutzer>(
+        "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, \
+         aktiv, erstellt_at FROM benutzer WHERE benutzername = ? AND aktiv = 1",
+    )
+    .bind(&req.benutzername)
+    .fetch_optional(&state.pool)
+    .await?;
+
+    // Generischer Fehler ab hier für ALLE drei Fälle (NO-Enumeration-MUST, s. Doc oben):
+    // unbekannter/inaktiver Benutzername, existierender Benutzer ohne Passkey, Ceremony-Start-
+    // Fehler der Bibliothek.
+    let Some(benutzer) = benutzer else {
+        return Err(AppError::Unauthorized);
+    };
+
+    let passkeys =
+        crate::auth::webauthn::storage::passkeys_fuer_benutzer(&state.pool, benutzer.id).await?;
+    if passkeys.is_empty() {
+        return Err(AppError::Unauthorized);
+    }
+
+    let (rcr, auth_state) = webauthn
+        .start_passkey_authentication(&passkeys)
+        .map_err(|_| AppError::Unauthorized)?;
+
+    let key = session::neuer_token();
+    crate::auth::webauthn::state::speichere(
+        key.clone(),
+        crate::auth::webauthn::state::CeremonyZustand::Authentifizierung(auth_state),
+    );
+
+    let jar = jar.add(webauthn_auth_cookie(key, session::cookie_secure()));
+    Ok((jar, Json(rcr)))
+}
+
+/// POST /api/auth/webauthn/auth/finish — schließt die passwortlose Passkey-Authentifizierung ab
+/// (öffentlich, PRE-Login, LFH-275 Task 6). **Security-kritisch** — Reihenfolge/Guards bewusst:
+///
+/// 1. Enforcement wie `auth/start` (`404`, falls `webauthn` nicht aktiviert ist).
+/// 2. State-Key aus dem `webauthn_auth`-Cookie; `entnehme` (SYNC, Guard sofort freigegeben — s.
+///    `auth::webauthn::state`-Moduldoc) läuft VOR jedem weiteren `.await` in diesem Handler
+///    (Plan-MUST „!Send" — sonst wäre der Handler nicht `Send`, `cargo build` bricht das ab).
+///    Fehlendes Cookie, unbekannter/verbrauchter Key ODER ein Key, der (State-Verwechslung)
+///    zufällig auf eine Registrierungs- statt Authentifizierungs-Ceremony zeigt → derselbe
+///    generische `401`.
+/// 3. `webauthn.finish_passkey_authentication(&body, &auth_state)` — **der Counter-/Klon-Check
+///    passiert HIER BEREITS INNERHALB der Bibliothek**, s. Abschnitt „Verifizierte Semantik"
+///    unten. Jeder Fehler (inkl. Klon-Signal) → derselbe generische `401`, keine Session.
+/// 4. Counter-Writeback (Plan-MUST): den zur `cred_id` gehörenden gespeicherten Passkey laden,
+///    `passkey.update_credential(&auth_result)` (aktualisiert den lokalen Counter/Backup-Flags),
+///    dann re-serialisiert über `storage::aktualisiere_counter` persistieren.
+/// 5. `benutzer.aktiv` prüfen — ein zwischenzeitlich deaktiviertes Konto bekommt trotz gültiger
+///    Signatur keine Session (analog OIDC Task-2-Handoff).
+/// 6. Session anlegen, Cookie setzen, `webauthn_auth`-Cookie entfernen, `200`.
+///
+/// # Verifizierte webauthn-rs-0.5.5-Semantik (Security-Crux dieses Tasks)
+///
+/// Gegen den Crate-Quelltext geprüft (`webauthn-rs-core-0.5.5/src/core.rs`,
+/// `authenticate_credential`, ca. Zeilen 1139–1175): `WebauthnCore::new_unsafe_experts_only`
+/// (aufgerufen von `WebauthnBuilder::build()`, `webauthn-rs-0.5.5/src/lib.rs`) setzt
+/// `require_valid_counter_value: true` FEST — die sichere `webauthn-rs`-Fassade exponiert dafür
+/// KEINEN Abschalt-Knopf. Mit diesem Flag prüft `authenticate_credential` selbst: ist
+/// `auth_data.counter <= cred.counter` (der Zustand, der beim `auth/start` in die
+/// `PasskeyAuthentication` eingefroren wurde) UND war mindestens einer der beiden Counter > 0, so
+/// liefert die Funktion `Err(WebauthnError::CredentialPossibleCompromise)` — **kein
+/// `AuthenticationResult`**, die Ceremony schlägt fehl, BEVOR unser Handler-Code überhaupt
+/// `update_credential`/`aktualisiere_counter` erreicht. Ein Klon-/Replay-Versuch mit
+/// gleichem-oder-kleinerem Counter wird also bereits von der Bibliothek abgelehnt, nicht erst
+/// nachträglich von uns erkannt — unser Code muss (und darf) diesen Check NICHT selbst
+/// nachbauen, nur den `Err`-Fall generisch behandeln (s. u.) und im Erfolgsfall zurückschreiben.
+///
+/// **Ausnahme (protokoll-inhärent, keine Schwächung unsererseits):** Passkeys mit `counter == 0`
+/// bei JEDER Authentisierung (viele synchronisierte Platform-Passkeys, z. B. iCloud-Keychain-
+/// Passkeys, führen nie einen Hardware-Counter) überspringen den Vergleich komplett (`counter >
+/// 0 || cred.counter > 0` ist dann `false`) — für diese Geräteklasse ist Counter-basierte
+/// Klon-Erkennung laut WebAuthn-Spezifikation selbst nicht verfügbar, das ist keine Lücke dieses
+/// Codes.
+///
+/// Trotzdem MÜSSEN wir `update_credential` + `aktualisiere_counter` aufrufen (Plan-MUST): für
+/// Authenticatoren, die den Counter sehr wohl führen (Hardware-Keys, viele Roaming-
+/// Authenticatoren), ist das Zurückschreiben die einzige Möglichkeit, dass der NÄCHSTE
+/// Auth-Versuch den jetzt validierten (höheren) Counter als neue Vergleichsbasis sieht —
+/// unterbleibt das Schreiben, bliebe der gespeicherte Counter für immer auf dem alten Wert stehen
+/// und der Schutz wäre nutzlos („Clone-Detection ist nur so stark wie der zurückgeschriebene
+/// Counter", `storage.rs`-Moduldoc).
+pub async fn webauthn_auth_finish(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    Json(body): Json<PublicKeyCredential>,
+) -> Result<(CookieJar, StatusCode), AppError> {
+    if !webauthn_aktiv(&state.pool).await? {
+        return Err(AppError::NotFound);
+    }
+    let webauthn = crate::auth::webauthn::webauthn().ok_or(AppError::NotFound)?;
+
+    let key = jar
+        .get(WEBAUTHN_AUTH_COOKIE)
+        .map(|c| c.value().to_string())
+        .ok_or(AppError::Unauthorized)?;
+
+    // SYNC, Guard freigegeben VOR jedem folgenden `.await` — s. Doc-Kommentar oben (Punkt 2).
+    let auth_state = match crate::auth::webauthn::state::entnehme(&key) {
+        Some(crate::auth::webauthn::state::CeremonyZustand::Authentifizierung(auth_state)) => {
+            auth_state
+        }
+        _ => return Err(AppError::Unauthorized),
+    };
+
+    // Counter-/Klon-Check passiert HIER BEREITS in der Bibliothek — s. Doc-Kommentar oben.
+    let auth_result = match webauthn.finish_passkey_authentication(&body, &auth_state) {
+        Ok(r) => r,
+        Err(WebauthnError::CredentialPossibleCompromise) => {
+            // Nur serverseitig geloggt (Ops-Signal für ein mögliches Klon-/Replay-Gerät) — der
+            // Client bekommt denselben generischen 401 wie jeder andere Ceremony-Fehler.
+            tracing::warn!("WebAuthn-Login abgelehnt: möglicher Klon (Counter-Regression) erkannt");
+            return Err(AppError::Unauthorized);
+        }
+        Err(_) => return Err(AppError::Unauthorized),
+    };
+
+    // Counter-Writeback (Plan-MUST) — s. Doc-Kommentar Punkt 4.
+    let gefunden = crate::auth::webauthn::storage::passkey_je_credential_id(
+        &state.pool,
+        auth_result.cred_id().as_ref(),
+    )
+    .await?;
+    let Some((benutzer_id, mut passkey)) = gefunden else {
+        return Err(AppError::Unauthorized);
+    };
+
+    // `update_credential` liefert `None` NUR bei `cred_id`-Mismatch — strukturell unerreichbar,
+    // da `passkey` gerade ÜBER genau diese `cred_id` geladen wurde. Ein internes Invarianten-
+    // Problem (keine Nutzereingabe-Ursache), daher `Internal`/500 statt des generischen Auth-401.
+    if passkey.update_credential(&auth_result).is_none() {
+        return Err(AppError::Internal(
+            "WebAuthn: credential_id-Mismatch beim Counter-Update".to_string(),
+        ));
+    }
+    crate::auth::webauthn::storage::aktualisiere_counter(&state.pool, &passkey).await?;
+
+    let benutzer = sqlx::query_as::<_, Benutzer>(
+        "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, \
+         aktiv, erstellt_at FROM benutzer WHERE id = ?",
+    )
+    .bind(benutzer_id)
+    .fetch_optional(&state.pool)
+    .await?;
+
+    // [MUST] zwischenzeitlich deaktiviertes Konto → keine Session, s. Doc-Kommentar Punkt 5.
+    let Some(benutzer) = benutzer else {
+        return Err(AppError::Unauthorized);
+    };
+    if !benutzer.aktiv {
+        return Err(AppError::Unauthorized);
+    }
+
+    let token = session::anlegen(&state.pool, benutzer.id).await?;
+    let jar = jar.add(session_cookie(token, session::cookie_secure()));
+    let jar = jar.remove(
+        Cookie::build((WEBAUTHN_AUTH_COOKIE, ""))
+            .path("/api/auth/webauthn")
+            .build(),
+    );
+    Ok((jar, StatusCode::OK))
 }
 
 #[cfg(test)]

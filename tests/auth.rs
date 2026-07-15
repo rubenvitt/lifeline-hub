@@ -398,6 +398,161 @@ async fn webauthn_register_start_mit_provider_liefert_ccr_und_setzt_reg_cookie()
     );
 }
 
+/// Aktiviert "webauthn" GLOBAL für den Rest dieses Testbinary-Prozesses (idempotenter OnceLock,
+/// wie im Register-Test oben) — geteilter Helfer für alle `auth/start`/`auth/finish`-Tests
+/// (LFH-275 Task 6), die einen konfigurierten Provider brauchen.
+fn webauthn_aktivieren() {
+    lifeline_hub::auth::provider::registry::set_webauthn_konfiguriert(true);
+    lifeline_hub::auth::webauthn::set_webauthn(
+        lifeline_hub::auth::webauthn::baue("localhost", "https://localhost").unwrap(),
+    );
+}
+
+#[tokio::test]
+async fn webauthn_auth_start_deaktiviert_ist_404() {
+    // Default in Tests bzw. explizit per Override deaktiviert — unabhängig von der
+    // Ausführungsreihenfolge mit `webauthn_aktivieren`-Tests im selben Testbinary-Prozess
+    // (analog `webauthn_register_start_mit_session_aber_ohne_provider_ist_404`).
+    let (app, pool) = setup_mit_pool().await;
+    webauthn_deaktiviert_override(&pool).await;
+
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/webauthn/auth/start",
+        "",
+        Some(r#"{"benutzername":"admin"}"#),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(json["error"], "Nicht gefunden");
+}
+
+#[tokio::test]
+async fn webauthn_auth_start_unbekannter_benutzer_ist_generischer_fehler() {
+    webauthn_aktivieren();
+    let app = setup().await;
+
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/webauthn/auth/start",
+        "",
+        Some(r#"{"benutzername":"existiert-nicht"}"#),
+    )
+    .await;
+
+    // NO-Enumeration-MUST: kein 200, kein Detail wie "Benutzer nicht gefunden" — derselbe
+    // generische 401 wie bei falschem Passwort im normalen Login.
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(json["error"], "Nicht angemeldet");
+}
+
+#[tokio::test]
+async fn webauthn_auth_start_bekannter_benutzer_ohne_passkey_liefert_denselben_fehler() {
+    // Beweist die NO-Enumeration-Eigenschaft diskriminierend: "admin" EXISTIERT (per
+    // `bootstrap_admin` in `setup_mit_pool`/`setup`) und ist aktiv, hat aber in diesem frisch
+    // isolierten Test-Pool garantiert KEINEN registrierten Passkey — Status UND Fehlertext
+    // müssen 1:1 identisch zum Unbekannt-Fall oben sein, sonst leakt die Antwort, ob ein
+    // Benutzername existiert.
+    webauthn_aktivieren();
+    let app = setup().await;
+
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/webauthn/auth/start",
+        "",
+        Some(r#"{"benutzername":"admin"}"#),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(json["error"], "Nicht angemeldet");
+}
+
+/// Ein strukturell valides (aber kryptografisch bedeutungsloses) `PublicKeyCredential`-JSON —
+/// genug, damit der `Json<PublicKeyCredential>`-Body-Extractor VOR der eigentlichen
+/// Handler-Logik erfolgreich deserialisiert (sonst schlägt der Request schon am Extractor mit
+/// `422` fehl, bevor der State-Cookie-Check in `webauthn_auth_finish` je läuft — analog der
+/// dokumentierten Extractor-Reihenfolge bei `webauthn_register_finish_ohne_session_ist_401`).
+///
+/// `extensions` bewusst WEGGELASSEN statt `null`: die tatsächlich kompilierte
+/// `PublicKeyCredential` (re-exportiert aus `webauthn-rs-proto`, s. `webauthn-rs-core`s
+/// `pub mod proto { pub use webauthn_rs_proto::*; }` — die gleichnamigen Typen direkt in
+/// `webauthn-rs-core/src/proto.rs` sind TOTER, nie über `mod proto;` eingebundener Code) trägt
+/// `extensions: AuthenticationExtensionsClientOutputs` (KEIN `Option`!) mit
+/// `#[serde(default, alias = "clientExtensionResults")]` — der Schlüssel darf fehlen (Default),
+/// ein explizites JSON-`null` schlägt dagegen fehl ("invalid type: null, expected struct
+/// AuthenticationExtensionsClientOutputs"), verifiziert per Diagnose-Deserialisierung gegen den
+/// Crate-Quelltext.
+const FINISH_BODY_PLATZHALTER: &str = r#"{
+    "id": "AAAA",
+    "rawId": "AAAA",
+    "response": {
+        "authenticatorData": "AAAA",
+        "clientDataJSON": "AAAA",
+        "signature": "AAAA",
+        "userHandle": null
+    },
+    "type": "public-key"
+}"#;
+
+#[tokio::test]
+async fn webauthn_auth_finish_ohne_state_cookie_ist_generischer_fehler() {
+    webauthn_aktivieren();
+    let app = setup().await;
+
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/webauthn/auth/finish",
+        "",
+        Some(FINISH_BODY_PLATZHALTER),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(json["error"], "Nicht angemeldet");
+}
+
+#[tokio::test]
+async fn webauthn_auth_finish_mit_unbekanntem_state_cookie_ist_generischer_fehler() {
+    webauthn_aktivieren();
+    let app = setup().await;
+
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/webauthn/auth/finish",
+        "webauthn_auth=nie-gespeichert",
+        Some(FINISH_BODY_PLATZHALTER),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(json["error"], "Nicht angemeldet");
+}
+
+#[tokio::test]
+async fn webauthn_auth_finish_deaktiviert_ist_404() {
+    let (app, pool) = setup_mit_pool().await;
+    webauthn_deaktiviert_override(&pool).await;
+
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/webauthn/auth/finish",
+        "",
+        Some(FINISH_BODY_PLATZHALTER),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(json["error"], "Nicht gefunden");
+}
+
 #[tokio::test]
 async fn oidc_callback_mit_idp_error_redirect_ohne_400() {
     // Derselbe prozessweite OnceLock wie in `oidc_callback_mit_unbekanntem_state_redirect_auf_
