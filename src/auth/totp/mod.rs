@@ -3,8 +3,10 @@
 //!
 //! Bewusst frei von DB/HTTP: Secret-Erzeugung, otpauth-URL-Bau und Code-Prüfung sind reine
 //! Funktionen — deterministisch testbar über einen festen Unix-Timestamp (`jetzt_unix`),
-//! ohne Systemzeit-Abhängigkeit. Persistenz der Recovery-Codes (`storage.rs`) und der
-//! Pending-MFA-State (`state.rs`) folgen in späteren Tasks dieses Increments.
+//! ohne Systemzeit-Abhängigkeit. Persistenz der Recovery-Codes ([`storage`]) folgt hier;
+//! der Pending-MFA-State (`state.rs`) folgt in einem späteren Task dieses Increments.
+
+pub mod storage;
 
 use sha2::{Digest, Sha256};
 use totp_rs::{Algorithm, Secret, TOTP};
