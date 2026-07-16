@@ -5,8 +5,8 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { aktualisierePerson, entscheideAbgleich, erfasseSichtung, erfasseVerbleib, ladePerson, ladePersonAudit, legeNotizAn, registrierAnzeige, setzePersonStatus, stornierePerson, type PersonEingabe } from '../api/einsatzPerson';
-import { listeTiere, tierRegistrierAnzeige } from '../api/einsatzTier';
-import { listeSchaeden, schadenRegistrierAnzeige } from '../api/einsatzSchaden';
+import { listeTiere, tierRegistrierAnzeige, aktualisiereTier } from '../api/einsatzTier';
+import { listeSchaeden, schadenRegistrierAnzeige, aktualisiereSchaden } from '../api/einsatzSchaden';
 import { listeUhs, aenderePersonBelegung } from '../api/einsatzUhs';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
@@ -168,6 +168,54 @@ export default function PersonenDetailPage() {
     onError: fehler,
   });
 
+  // LFH-151: Tiere (Halter) / Schäden (Geschädigte) von der Personen-Seite zuweisen + lösen.
+  // Picker-Listen lazy (nur bei offenem Modal) laden; Zuweisen leert die konkurrierenden
+  // XOR-Slots im selben PATCH (sonst 500 durch den Mehrspalten-CHECK — PATCH-XOR).
+  const [tierModalOffen, setTierModalOffen] = useState(false);
+  const [schadenModalOffen, setSchadenModalOffen] = useState(false);
+  const [tierForm] = Form.useForm<{ tier_id: number }>();
+  const [schadenForm] = Form.useForm<{ schaden_id: number }>();
+  function invalidateZuordnung() {
+    invalidateDetail();
+    qc.invalidateQueries({ queryKey: einsatzKeys.tiere(einsatzId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.schaeden(einsatzId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.tiereHalter(einsatzId, personId) });
+    qc.invalidateQueries({ queryKey: einsatzKeys.schaedenGeschaedigt(einsatzId, personId) });
+  }
+  const freieTiereQuery = useQuery({
+    queryKey: einsatzKeys.tiere(einsatzId),
+    queryFn: () => listeTiere(einsatzId),
+    enabled: idGueltig && tierModalOffen,
+  });
+  const freieSchaedenQuery = useQuery({
+    queryKey: einsatzKeys.schaeden(einsatzId),
+    queryFn: () => listeSchaeden(einsatzId, { inklStorniert: false }),
+    enabled: idGueltig && schadenModalOffen,
+  });
+  const tierZuweisenMut = useMutation({
+    mutationFn: (tierId: number) =>
+      aktualisiereTier(einsatzId, tierId, { halter_person_id: personId, halter_kontakt: null }),
+    onSuccess: () => { invalidateZuordnung(); setTierModalOffen(false); tierForm.resetFields(); },
+    onError: fehler,
+  });
+  const tierLoesenMut = useMutation({
+    mutationFn: (tierId: number) => aktualisiereTier(einsatzId, tierId, { halter_person_id: null }),
+    onSuccess: invalidateZuordnung, onError: fehler,
+  });
+  const schadenZuweisenMut = useMutation({
+    mutationFn: (schadenId: number) =>
+      aktualisiereSchaden(einsatzId, schadenId, {
+        geschaedigt_person_id: personId, geschaedigt_personal_id: null,
+        geschaedigt_organisation_id: null, geschaedigt_kontakt: null,
+      }),
+    onSuccess: () => { invalidateZuordnung(); setSchadenModalOffen(false); schadenForm.resetFields(); },
+    onError: fehler,
+  });
+  const schadenLoesenMut = useMutation({
+    mutationFn: (schadenId: number) => aktualisiereSchaden(einsatzId, schadenId, { geschaedigt_person_id: null }),
+    onSuccess: invalidateZuordnung, onError: fehler,
+  });
+
   const abgleichEntscheidenMutation = useMutation({
     mutationFn: (v: { vermisstId: number; abgleichId: number; entscheidung: 'bestaetigt' | 'verworfen' }) =>
       entscheideAbgleich(einsatzId, v.vermisstId, v.abgleichId, v.entscheidung),
@@ -213,6 +261,19 @@ export default function PersonenDetailPage() {
   const darfSchreiben =
     einsatz.status === 'aktiv' &&
     (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
+  const darfZuordnen = darfSchreiben && !p.storniert_at;
+
+  // LFH-151: Picker-Kandidaten = FREIE Ziele (kein Halter/Geschädigter, nicht storniert,
+  // Schaden nicht abgeschlossen). Kein stilles Überschreiben fremder Zuordnungen.
+  const freieTiere = (freieTiereQuery.data ?? []).filter(
+    (t) => t.halter_person_id == null && t.halter_kontakt == null && t.storniert_at == null,
+  );
+  const freieSchaeden = (freieSchaedenQuery.data ?? []).filter(
+    (s) =>
+      s.geschaedigt_person_id == null && s.geschaedigt_personal_id == null &&
+      s.geschaedigt_organisation_id == null && s.geschaedigt_kontakt == null &&
+      s.storniert_at == null && s.status !== 'abgeschlossen',
+  );
 
   const auditSpalten: TableColumnsType<PersonZugriff> = [
     { title: 'Wann', dataIndex: 'zugriff_at', key: 'zugriff_at' },
@@ -364,42 +425,65 @@ export default function PersonenDetailPage() {
         )}
 
         <div>
-          <Typography.Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
-            Zugeordnete Tiere
-          </Typography.Text>
+          <Space wrap>
+            <Typography.Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
+              Zugeordnete Tiere
+            </Typography.Text>
+            {darfZuordnen && (
+              <Button size="small" onClick={() => { tierForm.resetFields(); setTierModalOffen(true); }}>
+                Tier zuweisen
+              </Button>
+            )}
+          </Space>
           {(tiereDerPersonQuery.data?.length ?? 0) === 0 ? (
             <div><Typography.Text type="secondary">keine</Typography.Text></div>
           ) : (
             <Space wrap style={{ marginTop: 4 }}>
               {(tiereDerPersonQuery.data ?? []).map((t: Tier) => (
-                <Tag
-                  key={t.id}
-                  color="cyan"
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => navigate(tiereDetailPfad(einsatzId, t.id))}
-                >
-                  {tierRegistrierAnzeige(t.registrier_nr)} {TIER_SPEZIES_LABEL[t.spezies] ?? t.spezies}
-                  {t.rufname ? ` „${t.rufname}"` : ''}
-                </Tag>
+                <Space key={t.id} size={4}>
+                  <Tag
+                    color="cyan"
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => navigate(tiereDetailPfad(einsatzId, t.id))}
+                  >
+                    {tierRegistrierAnzeige(t.registrier_nr)} {TIER_SPEZIES_LABEL[t.spezies] ?? t.spezies}
+                    {t.rufname ? ` „${t.rufname}"` : ''}
+                  </Tag>
+                  {darfZuordnen && (
+                    <Button size="small" type="text" onClick={() => tierLoesenMut.mutate(t.id)}>lösen</Button>
+                  )}
+                </Space>
               ))}
             </Space>
           )}
         </div>
 
         <div>
-          <Typography.Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
-            Als Geschädigte bei Schäden
-          </Typography.Text>
+          <Space wrap>
+            <Typography.Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
+              Als Geschädigte bei Schäden
+            </Typography.Text>
+            {darfZuordnen && (
+              <Button size="small" onClick={() => { schadenForm.resetFields(); setSchadenModalOffen(true); }}>
+                Schaden zuweisen
+              </Button>
+            )}
+          </Space>
           {(schaedenDerPersonQuery.data?.length ?? 0) === 0 ? (
             <div><Typography.Text type="secondary">keine</Typography.Text></div>
           ) : (
             <Space wrap style={{ marginTop: 4 }}>
               {(schaedenDerPersonQuery.data ?? []).map((sch: Schaden) => (
-                <Link key={sch.id} to={schadenDetailPfad(einsatzId, sch.id)}>
-                  <Tag color="orange" style={{ cursor: 'pointer' }}>
-                    {schadenRegistrierAnzeige(sch.registrier_nr)} {sch.typ} ({sch.ausmass}) — {sch.status}
-                  </Tag>
-                </Link>
+                <Space key={sch.id} size={4}>
+                  <Link to={schadenDetailPfad(einsatzId, sch.id)}>
+                    <Tag color="orange" style={{ cursor: 'pointer' }}>
+                      {schadenRegistrierAnzeige(sch.registrier_nr)} {sch.typ} ({sch.ausmass}) — {sch.status}
+                    </Tag>
+                  </Link>
+                  {darfZuordnen && (
+                    <Button size="small" type="text" onClick={() => schadenLoesenMut.mutate(sch.id)}>lösen</Button>
+                  )}
+                </Space>
               ))}
             </Space>
           )}
@@ -566,6 +650,54 @@ export default function PersonenDetailPage() {
             />
           </Form.Item>
           <Form.Item label="Notiz (optional)" name="notiz"><Input /></Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        open={tierModalOffen}
+        title="Tier als Halter zuweisen"
+        okText="Zuweisen"
+        confirmLoading={tierZuweisenMut.isPending}
+        onOk={() => tierForm.submit()}
+        onCancel={() => { setTierModalOffen(false); tierForm.resetFields(); }}
+        destroyOnHidden
+      >
+        <Form form={tierForm} layout="vertical" onFinish={(v) => tierZuweisenMut.mutate(v.tier_id)}>
+          <Form.Item label="Tier" name="tier_id" rules={[{ required: true, message: 'Bitte Tier wählen' }]}>
+            <Select
+              placeholder="freies Tier wählen"
+              loading={freieTiereQuery.isLoading}
+              notFoundContent={freieTiereQuery.isLoading ? '…' : 'keine freien Tiere'}
+              options={freieTiere.map((t) => ({
+                value: t.id,
+                label: `${tierRegistrierAnzeige(t.registrier_nr)} ${TIER_SPEZIES_LABEL[t.spezies] ?? t.spezies}${t.rufname ? ` „${t.rufname}"` : ''}`,
+              }))}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        open={schadenModalOffen}
+        title="Schaden zuweisen (Geschädigte)"
+        okText="Zuweisen"
+        confirmLoading={schadenZuweisenMut.isPending}
+        onOk={() => schadenForm.submit()}
+        onCancel={() => { setSchadenModalOffen(false); schadenForm.resetFields(); }}
+        destroyOnHidden
+      >
+        <Form form={schadenForm} layout="vertical" onFinish={(v) => schadenZuweisenMut.mutate(v.schaden_id)}>
+          <Form.Item label="Schaden" name="schaden_id" rules={[{ required: true, message: 'Bitte Schaden wählen' }]}>
+            <Select
+              placeholder="freien Schaden wählen"
+              loading={freieSchaedenQuery.isLoading}
+              notFoundContent={freieSchaedenQuery.isLoading ? '…' : 'keine freien Schäden'}
+              options={freieSchaeden.map((s) => ({
+                value: s.id,
+                label: `${schadenRegistrierAnzeige(s.registrier_nr)} ${s.typ} (${s.ausmass})`,
+              }))}
+            />
+          </Form.Item>
         </Form>
       </Modal>
     </div>

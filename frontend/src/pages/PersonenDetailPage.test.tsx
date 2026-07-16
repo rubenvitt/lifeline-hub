@@ -339,3 +339,124 @@ describe('PersonenDetailPage — UHS-Zuweisung (LFH-152)', () => {
     expect(screen.queryByRole('button', { name: 'UHS zuweisen' })).not.toBeInTheDocument();
   });
 });
+
+// LFH-151: Von der Personen-Seite aus Tiere (Halter) / Schäden (Geschädigte) zuweisen + lösen.
+// Der Picker bietet nur FREIE Ziele (kein Halter/Geschädigter, nicht storniert/abgeschlossen);
+// Zuweisen setzt die FK + leert die konkurrierenden XOR-Slots im selben PATCH (PATCH-XOR).
+const freiesTier = {
+  id: 40, einsatz_id: 1, registrier_nr: 8, status: 'aktiv', spezies: 'katze',
+  rasse_beschreibung: null, rufname: 'Minka', geschlecht: null, alter_geschaetzt: null,
+  farbe_beschreibung: null, kennzeichnung: null, groesse_gewicht: null,
+  halter_person_id: null, halter_kontakt: null, antreff_ort: null, notiz: null,
+  erfasst_at: '2026-05-27 09:00:00', erfasst_von: 1, geaendert_at: '2026-05-27 09:00:00',
+  geaendert_von: 1, storniert_at: null, halter_registrier_nr: null, halter_storniert_at: null,
+};
+const zugeordnetesTier = { ...freiesTier, id: 30, registrier_nr: 7, spezies: 'hund', rufname: 'Rex',
+  halter_person_id: 10, halter_registrier_nr: 1 };
+const freierSchaden = {
+  id: 50, einsatz_id: 1, registrier_nr: 9, status: 'offen', typ: 'sachschaden', ausmass: 'gering',
+  ort: 'Weg 2', beschreibung: '', geschaedigt_person_id: null, geschaedigt_personal_id: null,
+  geschaedigt_organisation_id: null, geschaedigt_kontakt: null, uebergeben_an: null, uebergeben_at: null,
+  abschluss_grund: null, abschluss_at: null, erfasst_at: '2026-05-29 10:00:00', erfasst_von: 1,
+  geaendert_at: '2026-05-29 10:00:00', geaendert_von: 1, storniert_at: null, storniert_von: null,
+  geschaedigt_registrier_nr: null, geschaedigt_storniert_at: null,
+};
+const zugeordneterSchaden = { ...freierSchaden, id: 7, registrier_nr: 3, typ: 'umweltschaden',
+  ausmass: 'mittel', geschaedigt_person_id: 10 };
+
+describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
+  it('weist der Person ein freies Tier als Halter zu (XOR-Leerung)', async () => {
+    let patch: Record<string, unknown> | null = null;
+    render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1/tiere', ({ request }) => {
+        const url = new URL(request.url);
+        // Anzeige-Query (Halter dieser Person) leer; Picker-Query (ohne Param) = freie Kandidaten.
+        if (url.searchParams.get('halter_person_id') === '10') return HttpResponse.json([]);
+        return HttpResponse.json([freiesTier]);
+      }),
+      http.patch('/api/einsaetze/1/tiere/40', async ({ request }) => {
+        patch = await request.json() as Record<string, unknown>;
+        return HttpResponse.json({ ...freiesTier, halter_person_id: 10 });
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Tier zuweisen' }));
+    await userEvent.click(await screen.findByRole('combobox', { name: 'Tier' }));
+    await userEvent.click(await screen.findByText(/Minka/));
+    await userEvent.click(screen.getByRole('button', { name: 'Zuweisen' }));
+    await vi.waitFor(() => expect(patch).toMatchObject({ halter_person_id: 10, halter_kontakt: null }));
+  });
+
+  it('löst die Halter-Zuordnung eines zugeordneten Tiers (halter_person_id=null)', async () => {
+    let patch: Record<string, unknown> | null = null;
+    render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1/tiere', ({ request }) => {
+        const url = new URL(request.url);
+        if (url.searchParams.get('halter_person_id') === '10') return HttpResponse.json([zugeordnetesTier]);
+        return HttpResponse.json([]);
+      }),
+      http.patch('/api/einsaetze/1/tiere/30', async ({ request }) => {
+        patch = await request.json() as Record<string, unknown>;
+        return HttpResponse.json({ ...zugeordnetesTier, halter_person_id: null });
+      }),
+    ]);
+    await screen.findByText(/T-007/);
+    await userEvent.click(screen.getByRole('button', { name: 'lösen' }));
+    await vi.waitFor(() => expect(patch).toMatchObject({ halter_person_id: null }));
+  });
+
+  it('weist der Person einen freien Schaden als Geschädigte zu (XOR-Leerung)', async () => {
+    let patch: Record<string, unknown> | null = null;
+    render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1/schaeden', ({ request }) => {
+        const url = new URL(request.url);
+        if (url.searchParams.get('geschaedigt_person_id') === '10') return HttpResponse.json([]);
+        return HttpResponse.json([freierSchaden]);
+      }),
+      http.patch('/api/einsaetze/1/schaeden/50', async ({ request }) => {
+        patch = await request.json() as Record<string, unknown>;
+        return HttpResponse.json({ ...freierSchaden, geschaedigt_person_id: 10 });
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Schaden zuweisen' }));
+    await userEvent.click(await screen.findByRole('combobox', { name: 'Schaden' }));
+    await userEvent.click(await screen.findByText(/S-009/));
+    await userEvent.click(screen.getByRole('button', { name: 'Zuweisen' }));
+    await vi.waitFor(() => expect(patch).toMatchObject({
+      geschaedigt_person_id: 10, geschaedigt_personal_id: null,
+      geschaedigt_organisation_id: null, geschaedigt_kontakt: null,
+    }));
+  });
+
+  it('löst die Geschädigt-Zuordnung eines Schadens (geschaedigt_person_id=null)', async () => {
+    let patch: Record<string, unknown> | null = null;
+    render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1/schaeden', ({ request }) => {
+        const url = new URL(request.url);
+        if (url.searchParams.get('geschaedigt_person_id') === '10') return HttpResponse.json([zugeordneterSchaden]);
+        return HttpResponse.json([]);
+      }),
+      http.patch('/api/einsaetze/1/schaeden/7', async ({ request }) => {
+        patch = await request.json() as Record<string, unknown>;
+        return HttpResponse.json({ ...zugeordneterSchaden, geschaedigt_person_id: null });
+      }),
+    ]);
+    await screen.findByText((t) => t.includes('S-003'));
+    await userEvent.click(screen.getByRole('button', { name: 'lösen' }));
+    await vi.waitFor(() => expect(patch).toMatchObject({ geschaedigt_person_id: null }));
+  });
+
+  it('bietet im Picker nur freie Tiere an (bereits belegte werden ausgeschlossen)', async () => {
+    render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1/tiere', ({ request }) => {
+        const url = new URL(request.url);
+        if (url.searchParams.get('halter_person_id') === '10') return HttpResponse.json([]);
+        // Picker-Rohliste enthält ein freies UND ein bereits belegtes Tier.
+        return HttpResponse.json([freiesTier, { ...zugeordnetesTier, halter_person_id: 99 }]);
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Tier zuweisen' }));
+    await userEvent.click(await screen.findByRole('combobox', { name: 'Tier' }));
+    expect(await screen.findByText(/Minka/)).toBeInTheDocument();
+    expect(screen.queryByText(/Rex/)).not.toBeInTheDocument();
+  });
+});
