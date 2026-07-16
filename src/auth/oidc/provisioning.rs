@@ -142,7 +142,7 @@ pub async fn finde_oder_provisioniere(
 
     let anzeigename = plane_anzeigename(claims);
 
-    let eingefuegt = sqlx::query(
+    let insert_ergebnis = sqlx::query(
         "INSERT INTO benutzer \
          (org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, oidc_issuer, oidc_subject) \
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -156,19 +156,50 @@ pub async fn finde_oder_provisioniere(
     .bind(&claims.issuer)
     .bind(&claims.subject)
     .execute(pool)
-    .await?;
+    .await;
 
-    let id = eingefuegt.last_insert_rowid();
+    match insert_ergebnis {
+        // Normalfall: wir haben das Konto angelegt. Re-SELECT per (issuer, subject) — NICHT per
+        // last_insert_rowid (siehe oben).
+        Ok(_) => select_by_oidc(pool, &claims.issuer, &claims.subject)
+            .await?
+            .ok_or_else(|| {
+                AppError::Internal("Angelegtes SSO-Konto nicht wiederauffindbar".into())
+            }),
+        // Race-Recover: ein paralleler First-Login hat dasselbe (issuer, subject) — oder denselben
+        // benutzernamen — zuerst eingefügt. Bei JEDEM Unique-Fehler den (issuer, subject)-SELECT
+        // wiederholen: findet er die Zeile des Race-Gewinners, ist der Login gültig; sonst war es
+        // eine echte, fremde benutzername-Kollision → Fehler propagieren.
+        Err(err) if ist_unique_verletzung(&err) => {
+            match select_by_oidc(pool, &claims.issuer, &claims.subject).await? {
+                Some(vorhanden) => Ok(vorhanden),
+                None => Err(AppError::from(err)),
+            }
+        }
+        Err(err) => Err(AppError::from(err)),
+    }
+}
 
-    let angelegt = sqlx::query_as::<_, Benutzer>(
+/// Re-SELECT-Helfer für den (issuer, subject)-Schlüssel — nach INSERT (statt last_insert_rowid,
+/// das nach einem geschluckten Konflikt eine fremde rowid liefern würde) und im Race-Recover.
+async fn select_by_oidc(
+    pool: &SqlitePool,
+    issuer: &str,
+    subject: &str,
+) -> Result<Option<Benutzer>, sqlx::Error> {
+    sqlx::query_as::<_, Benutzer>(
         "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, aktiv, erstellt_at \
-         FROM benutzer WHERE id = ?",
+         FROM benutzer WHERE oidc_issuer = ? AND oidc_subject = ?",
     )
-    .bind(id)
-    .fetch_one(pool)
-    .await?;
+    .bind(issuer)
+    .bind(subject)
+    .fetch_optional(pool)
+    .await
+}
 
-    Ok(angelegt)
+/// True, wenn `err` eine SQLite-UNIQUE-Constraint-Verletzung ist (Race-Recover-Trigger).
+fn ist_unique_verletzung(err: &sqlx::Error) -> bool {
+    matches!(err, sqlx::Error::Database(db) if db.is_unique_violation())
 }
 
 #[cfg(test)]
@@ -336,6 +367,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn ist_unique_verletzung_erkennt_doppelten_benutzernamen() {
+        let pool = crate::db::test_pool().await;
+        seed_org(&pool).await;
+        seed_lokalen_benutzer(&pool, "kollision").await;
+        // Zweiter Insert desselben benutzernamens → UNIQUE-Fehler.
+        let err = sqlx::query(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, aktiv) \
+             VALUES (1, 'X', 'kollision', 'h', 1)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap_err();
+        assert!(
+            ist_unique_verletzung(&err),
+            "erwartete Unique-Erkennung, fand {err:?}"
+        );
+    }
+
+    #[tokio::test]
     async fn lokales_konto_mit_gleichem_namen_wird_nicht_verlinkt() {
         let pool = crate::db::test_pool().await;
         seed_org(&pool).await;
@@ -372,5 +422,32 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(anzahl, 2);
+    }
+
+    #[tokio::test]
+    async fn zweiter_erstlogin_desselben_subjects_liefert_bestehendes_konto() {
+        let pool = crate::db::test_pool().await;
+        seed_org(&pool).await;
+        let c = claims("https://idp.example", "sub-race", Some("racer"), None);
+
+        // Simuliert den Race-Gewinner: Konto existiert bereits mit (issuer, subject).
+        sqlx::query(
+            "INSERT INTO benutzer \
+             (org_id, anzeigename, benutzername, passwort_hash, oidc_issuer, oidc_subject) \
+             VALUES (1, 'Racer', 'racer', ?, 'https://idp.example', 'sub-race')",
+        )
+        .bind(PASSWORT_HASH_SSO_ONLY)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let benutzer = finde_oder_provisioniere(&pool, &c).await.unwrap();
+        assert_eq!(benutzer.benutzername, "racer");
+
+        let anzahl: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM benutzer")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(anzahl, 1, "kein Doppel-Insert im Race-Recover");
     }
 }
