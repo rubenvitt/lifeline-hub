@@ -51,56 +51,81 @@ fn webauthn_konfiguriert() -> bool {
     *WEBAUTHN_KONFIGURIERT.get().unwrap_or(&false)
 }
 
-/// Im aktuellen Build konfigurierte Provider-IDs (Quelle der Wahrheit).
-fn konfiguriert() -> Vec<&'static str> {
-    let mut v = vec![ID_PASSWORT];
+/// Interne, exhaustiv gematchte Wahrheitsquelle über alle Provider-Arten. Neue Provider zwingen
+/// den Compiler, `as_str`/`typ`/`anzeigename` UND `ALLE` zu pflegen — kein stiller Default mehr
+/// (früher fiel `typ(&str)` für Unbekanntes auf `Passwort`, was eine unbekannte ID als
+/// Passwort-Login gerendert hätte).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProviderId {
+    Passwort,
+    Dev,
+    Oidc,
+    Webauthn,
+}
+
+impl ProviderId {
+    /// Alle Varianten. Bei einer neuen Variante bricht die Array-Länge den Build → bewusster
+    /// Pflege-Anker (zusammen mit den exhaustiven `match`-Armen unten).
+    const ALLE: [ProviderId; 4] = [
+        ProviderId::Passwort,
+        ProviderId::Dev,
+        ProviderId::Oidc,
+        ProviderId::Webauthn,
+    ];
+
+    fn as_str(self) -> &'static str {
+        match self {
+            ProviderId::Passwort => ID_PASSWORT,
+            ProviderId::Dev => ID_DEV,
+            ProviderId::Oidc => ID_OIDC,
+            ProviderId::Webauthn => ID_WEBAUTHN,
+        }
+    }
+
+    fn typ(self) -> AuthProviderTyp {
+        match self {
+            ProviderId::Passwort => AuthProviderTyp::Passwort,
+            ProviderId::Dev => AuthProviderTyp::Dev,
+            ProviderId::Oidc => AuthProviderTyp::Oidc,
+            ProviderId::Webauthn => AuthProviderTyp::Webauthn,
+        }
+    }
+
+    fn anzeigename(self) -> &'static str {
+        match self {
+            ProviderId::Passwort => "Passwort",
+            ProviderId::Dev => "Dev-Schnellanmeldung",
+            ProviderId::Oidc => "PocketID",
+            ProviderId::Webauthn => "Passkey",
+        }
+    }
+
+    fn parse(id: &str) -> Option<ProviderId> {
+        ProviderId::ALLE.into_iter().find(|p| p.as_str() == id)
+    }
+
+    /// Ob sich ein Admin über diesen Provider verlässlich anmelden kann (Lockout-Schutz-MUST).
+    /// MUST (LFH-41/LFH-275): NUR `passwort`. „oidc"/„webauthn" kommen erst mit Admin-Linking +
+    /// transaktionalem Guard (LFH-277 deferred), sonst könnte sich ein Admin durch Deaktivieren
+    /// von `passwort` aussperren.
+    fn ist_admin_tauglich(self) -> bool {
+        matches!(self, ProviderId::Passwort)
+    }
+}
+
+/// Im aktuellen Build konfigurierte Provider (Quelle der Wahrheit).
+fn konfiguriert() -> Vec<ProviderId> {
+    let mut v = vec![ProviderId::Passwort];
     if dev_verfuegbar() {
-        v.push(ID_DEV);
+        v.push(ProviderId::Dev);
     }
     if oidc_konfiguriert() {
-        v.push(ID_OIDC);
+        v.push(ProviderId::Oidc);
     }
     if webauthn_konfiguriert() {
-        v.push(ID_WEBAUTHN);
+        v.push(ProviderId::Webauthn);
     }
     v
-}
-
-/// Menge der Provider, über die sich ein Admin verlässlich anmelden kann.
-/// Wächst mit WebAuthn in späteren Increments. Der Dev-Provider zählt bewusst NICHT
-/// dazu (feature-gated, kein Prod-Login-Pfad).
-///
-/// MUST (Lockout-Schutz, LFH-41 Increment 3): „oidc" wird HIER NICHT aufgenommen.
-/// OIDC-Nutzer sind in Increment 3 JIT least-privilege — kein Admin kann sich per OIDC
-/// anmelden. Würde „oidc" admin-tauglich, ließe der Aussperr-Guard `passwort` deaktivieren
-/// → alle Admins ausgesperrt. Admin-Linking + „oidc" in dieser Menge + ein transaktionaler
-/// Guard kommen GEMEINSAM in einem späteren Increment, nicht hier.
-///
-/// MUST (LFH-275, Increment 4): „webauthn" bleibt EBENFALLS außen vor. Passkey-Enrollment
-/// hängt an einem bestehenden Konto, aber solange kein Admin-Linking/Policy existiert (LFH-277),
-/// bleibt Passwort der GARANTIERTE Admin-Weg — sonst könnte ein Admin ohne Passkey sich durch
-/// Deaktivieren von `passwort` selbst aussperren.
-fn ist_admin_tauglich(id: &str) -> bool {
-    id == ID_PASSWORT
-}
-
-fn anzeigename(id: &str) -> &'static str {
-    match id {
-        ID_PASSWORT => "Passwort",
-        ID_DEV => "Dev-Schnellanmeldung",
-        ID_OIDC => "PocketID",
-        ID_WEBAUTHN => "Passkey",
-        _ => "Unbekannt",
-    }
-}
-
-fn typ(id: &str) -> AuthProviderTyp {
-    match id {
-        ID_DEV => AuthProviderTyp::Dev,
-        ID_OIDC => AuthProviderTyp::Oidc,
-        ID_WEBAUTHN => AuthProviderTyp::Webauthn,
-        _ => AuthProviderTyp::Passwort,
-    }
 }
 
 /// Konfigurierte Provider inkl. `aktiviert` (Override aus `auth_provider`, sonst Default true).
@@ -111,11 +136,11 @@ pub async fn liste(pool: &SqlitePool) -> Result<Vec<AuthProviderAnzeige>, AppErr
     let override_map: HashMap<String, bool> = rows.into_iter().collect();
     Ok(konfiguriert()
         .into_iter()
-        .map(|id| AuthProviderAnzeige {
-            typ: typ(id),
-            anzeigename: anzeigename(id).to_string(),
-            aktiviert: *override_map.get(id).unwrap_or(&true),
-            id: id.to_string(),
+        .map(|p| AuthProviderAnzeige {
+            typ: p.typ(),
+            anzeigename: p.anzeigename().to_string(),
+            aktiviert: *override_map.get(p.as_str()).unwrap_or(&true),
+            id: p.as_str().to_string(),
         })
         .collect())
 }
@@ -126,7 +151,10 @@ pub async fn liste(pool: &SqlitePool) -> Result<Vec<AuthProviderAnzeige>, AppErr
 /// `ist_admin_tauglich` ist die einzige Quelle der admin-tauglichen Menge — der
 /// Guard wächst automatisch mit, sobald OIDC/WebAuthn dort aufgenommen werden.
 async fn darf_deaktivieren(pool: &SqlitePool, id: &str) -> Result<bool, AppError> {
-    if !ist_admin_tauglich(id) {
+    // Unbekannt/nicht admin-tauglich → immer erlaubt (der NotFound-Fall wird in `schalten`
+    // separat gefangen). `parse` liefert für alles außerhalb der bekannten Provider `None`.
+    let admin_tauglich = ProviderId::parse(id).is_some_and(ProviderId::ist_admin_tauglich);
+    if !admin_tauglich {
         return Ok(true);
     }
     let aktive_admins: i64 =
@@ -139,15 +167,17 @@ async fn darf_deaktivieren(pool: &SqlitePool, id: &str) -> Result<bool, AppError
     }
     // Bliebe nach dem Deaktivieren noch ein anderer aktivierter admin-tauglicher Provider?
     let liste = liste(pool).await?;
-    Ok(liste
-        .iter()
-        .any(|p| p.id != id && p.aktiviert && ist_admin_tauglich(&p.id)))
+    Ok(liste.iter().any(|p| {
+        p.id != id
+            && p.aktiviert
+            && ProviderId::parse(&p.id).is_some_and(ProviderId::ist_admin_tauglich)
+    }))
 }
 
 /// Schaltet einen Provider an/aus (Upsert des Overrides). Verweigert das Aussperren
 /// des letzten admin-tauglichen Login-Wegs (analog "letzter aktiver Admin").
 pub async fn schalten(pool: &SqlitePool, id: &str, aktiviert: bool) -> Result<(), AppError> {
-    if !konfiguriert().contains(&id) {
+    if !konfiguriert().iter().any(|p| p.as_str() == id) {
         return Err(AppError::NotFound);
     }
     if !aktiviert && !darf_deaktivieren(pool, id).await? {
@@ -240,15 +270,32 @@ mod tests {
     fn admin_tauglich_bleibt_nur_passwort() {
         // MUST (Lockout-Schutz, LFH-41): "oidc" darf NIEMALS admin-tauglich werden,
         // sonst ließe sich `passwort` deaktivieren und alle Admins wären ausgesperrt.
-        assert!(ist_admin_tauglich(ID_PASSWORT));
-        assert!(!ist_admin_tauglich(ID_OIDC));
+        assert!(ProviderId::Passwort.ist_admin_tauglich());
+        assert!(!ProviderId::Oidc.ist_admin_tauglich());
     }
 
     #[test]
     fn admin_tauglich_ohne_webauthn() {
         // MUST (LFH-275, Increment 4): "webauthn" bleibt außerhalb der admin-tauglichen Menge —
         // `ist_admin_tauglich` bleibt UNVERÄNDERT `{passwort}`.
-        assert!(!ist_admin_tauglich(ID_WEBAUTHN));
+        assert!(!ProviderId::Webauthn.ist_admin_tauglich());
+    }
+
+    #[test]
+    fn provider_id_parse_roundtrip_und_unbekannt_none() {
+        for p in ProviderId::ALLE {
+            assert_eq!(ProviderId::parse(p.as_str()), Some(p));
+        }
+        assert_eq!(ProviderId::parse("gibtsnicht"), None);
+    }
+
+    #[test]
+    fn provider_id_typ_und_anzeigename_stimmen() {
+        assert_eq!(ProviderId::Oidc.typ(), AuthProviderTyp::Oidc);
+        assert_eq!(ProviderId::Oidc.anzeigename(), "PocketID");
+        assert_eq!(ProviderId::Webauthn.anzeigename(), "Passkey");
+        // Keine unbekannte ID mehr rendert still als Passwort:
+        assert_eq!(ProviderId::parse("gibtsnicht").map(|p| p.typ()), None);
     }
 
     #[tokio::test]
