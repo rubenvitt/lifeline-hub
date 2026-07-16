@@ -98,8 +98,33 @@ describe('EinheitenPage', () => {
     await userEvent.click(await screen.findByText('1. Zug'));
     // Picker-Label ist sichtbar
     expect(await screen.findByText('Sprechgruppen')).toBeInTheDocument();
-    // Die zugeordnete Sprechgruppe erscheint als ausgewähltes Tag im Multi-Select
-    expect(await screen.findByText('412_F_DRK')).toBeInTheDocument();
+    // Die zugeordnete Sprechgruppe erscheint (als Picker-Tag und in der Funk-Zusammenfassung).
+    expect((await screen.findAllByText('412_F_DRK')).length).toBeGreaterThanOrEqual(1);
+  });
+
+  // LFH-108: Funk-/Kommunikationsdaten auch an der Einheit pflegbar + sichtbar.
+  it('zeigt und sendet Kommunikationsmittel + Erreichbarkeit der Einheit', async () => {
+    let patchBody: Record<string, unknown> | null = null;
+    server.use(
+      ...handlers(),
+      http.patch('/api/einsaetze/1/einheiten/10', async ({ request }) => {
+        patchBody = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...einheiten[0], ...patchBody });
+      }),
+    );
+    renderMitProviders(
+      <Routes><Route path="/einsaetze/:id/einheiten" element={<EinheitenPage />} /></Routes>,
+      { route: '/einsaetze/1/einheiten' },
+    );
+    await userEvent.click(await screen.findByText('1. Zug'));
+
+    await userEvent.type(await screen.findByLabelText('Erreichbarkeit / Nummer'), '0151 23456');
+    await userEvent.click(screen.getByLabelText('Kommunikationsmittel'));
+    await userEvent.click(await screen.findByText('Digitalfunk'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(patchBody).not.toBeNull());
+    expect(patchBody).toMatchObject({ kommunikationsmittel: 'digitalfunk', erreichbarkeit: '0151 23456' });
   });
 
   it('sendet sprechgruppe_ids beim Speichern einer Einheit', async () => {

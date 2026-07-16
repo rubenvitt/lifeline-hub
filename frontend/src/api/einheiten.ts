@@ -14,6 +14,10 @@ export interface EinheitEingabe {
   sortier?: number;
   /** LFH-109: IDs der zuzuordnenden Sprechgruppen aus dem Katalog. */
   sprechgruppe_ids?: number[];
+  /** LFH-108: Funk/Kommunikation — Freitext-Schlüssel (digitalfunk/mobil/festnetz). */
+  kommunikationsmittel?: string | null;
+  /** LFH-108: Funk/Kommunikation — Rufnummer/Freitext (PII). */
+  erreichbarkeit?: string | null;
 }
 
 export function listeEinheiten(einsatzId: number): Promise<Einheit[]> {

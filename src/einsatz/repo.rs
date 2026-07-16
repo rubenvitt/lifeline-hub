@@ -554,6 +554,19 @@ pub async fn schwaerze_einsatz(
         .execute(&mut *tx)
         .await?;
 
+    // LFH-108: Funk-Erreichbarkeit (mögliche personenbezogene Rufnummer der Führung) an
+    // Einheit UND Abschnitt scrubben. Die Abschnitt-Spalte (LFH-86) war bisher nicht erfasst
+    // (Lücke) — hier symmetrisch mitgeschlossen. kommunikationsmittel (digitalfunk/mobil/
+    // festnetz) ist kein PII und bleibt; Sprechgruppen sind Katalog-Bezüge, kein PII.
+    sqlx::query("UPDATE einsatz_einheit SET erreichbarkeit = NULL WHERE einsatz_id = ?")
+        .bind(einsatz_id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("UPDATE einsatzabschnitt SET erreichbarkeit = NULL WHERE einsatz_id = ?")
+        .bind(einsatz_id)
+        .execute(&mut *tx)
+        .await?;
+
     // kennzeichnung (Chip-Nr./Tätowierung) ist ein im Haustierregister auf den
     // Halter registrierter, eindeutiger Identifikator → personenverknüpfend, muss
     // mit gescrubbt werden (Review LFH-135). rufname/rasse/farbe/groesse bleiben
@@ -878,6 +891,68 @@ mod tests {
             "Freitext-Label (PII) muss nach Schwärzung NULL sein"
         );
         assert_eq!(lat, 50.1, "operative Position bleibt erhalten (Skelett)");
+    }
+
+    #[tokio::test]
+    async fn schwaerzung_nullt_funk_erreichbarkeit_an_einheit_und_abschnitt() {
+        // LFH-108: erreichbarkeit (mögliche Rufnummer der Führung) ist PII und MUSS an Einheit
+        // UND Abschnitt genullt werden (Abschnitt-Lücke seit LFH-86 symmetrisch geschlossen).
+        // kommunikationsmittel (Schlüssel digitalfunk/mobil/…) ist kein PII und bleibt.
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = anlegen(&pool, "Lage", None, leit).await.unwrap();
+        abschliessen(&pool, einsatz.id, leit).await.unwrap();
+        sqlx::query("UPDATE einsatz SET geloescht_at = ? WHERE id = ?")
+            .bind("2026-01-01 00:00:00")
+            .bind(einsatz.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_einheit (einsatz_id, name, kommunikationsmittel, erreichbarkeit) \
+             VALUES (?, 'Zug 1', 'digitalfunk', '0151 23456')",
+        )
+        .bind(einsatz.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatzabschnitt (einsatz_id, name, kommunikationsmittel, erreichbarkeit) \
+             VALUES (?, 'Nord', 'mobil', '0170 98765')",
+        )
+        .bind(einsatz.id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        assert!(schwaerze_einsatz(&pool, einsatz.id, "2026-02-01 00:00:00")
+            .await
+            .unwrap());
+
+        let (eh_err, eh_komm): (Option<String>, Option<String>) = sqlx::query_as(
+            "SELECT erreichbarkeit, kommunikationsmittel FROM einsatz_einheit WHERE einsatz_id = ?",
+        )
+        .bind(einsatz.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(eh_err, None, "Einheit-Erreichbarkeit (PII) muss NULL sein");
+        assert_eq!(
+            eh_komm.as_deref(),
+            Some("digitalfunk"),
+            "Kommunikationsmittel (kein PII) bleibt erhalten"
+        );
+
+        let ab_err: Option<String> =
+            sqlx::query_scalar("SELECT erreichbarkeit FROM einsatzabschnitt WHERE einsatz_id = ?")
+                .bind(einsatz.id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            ab_err, None,
+            "Abschnitt-Erreichbarkeit (PII) muss NULL sein — bestehende Lücke geschlossen"
+        );
     }
 
     /// Setzt die Org-Retention-Dauer direkt in der DB (reiner Repo-Test).

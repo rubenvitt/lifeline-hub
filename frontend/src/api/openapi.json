@@ -1135,6 +1135,13 @@
             "type": "integer",
             "format": "int64"
           },
+          "erreichbarkeit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Funk/Kommunikation (LFH-108): Rufnummer/Freitext (PII → schwaerze_einsatz)."
+          },
           "fahrzeug_mitglieder": {
             "type": "array",
             "items": {
@@ -1163,6 +1170,13 @@
           },
           "ist_kumuliert": {
             "$ref": "#/components/schemas/Staerke"
+          },
+          "kommunikationsmittel": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Funk/Kommunikation (LFH-108): Freitext-Schlüssel (digitalfunk/mobil/festnetz)."
           },
           "lat": {
             "type": [

@@ -402,6 +402,8 @@ export interface components {
             bemerkung?: string | null;
             /** Format: int64 */
             einsatz_id: number;
+            /** @description Funk/Kommunikation (LFH-108): Rufnummer/Freitext (PII → schwaerze_einsatz). */
+            erreichbarkeit?: string | null;
             fahrzeug_mitglieder: components["schemas"]["EinheitMitgliedFahrzeug"][];
             /** Format: int64 */
             fuehrer_id?: number | null;
@@ -410,6 +412,8 @@ export interface components {
             id: number;
             ist: components["schemas"]["Staerke"];
             ist_kumuliert: components["schemas"]["Staerke"];
+            /** @description Funk/Kommunikation (LFH-108): Freitext-Schlüssel (digitalfunk/mobil/festnetz). */
+            kommunikationsmittel?: string | null;
             /** Format: double */
             lat?: number | null;
             /** Format: double */

@@ -19,6 +19,7 @@ import type { Einheit, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StaerkeEingabe from '../anzeige/StaerkeEingabe';
 import SprechgruppenPicker from '../components/SprechgruppenPicker';
+import FunkErreichbarkeit, { KOMMUNIKATIONSMITTEL_OPTIONEN } from '../components/FunkErreichbarkeit';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 
 /** Baut antd-Tree-Daten aus der flachen Einheitenliste (nach ueber_einheit_id). */
@@ -73,6 +74,8 @@ interface KopfWerte {
   soll?: Staerke | null;
   bemerkung?: string;
   sprechgruppe_ids?: number[];
+  kommunikationsmittel?: string;
+  erreichbarkeit?: string;
 }
 
 export default function EinheitenPage() {
@@ -121,6 +124,8 @@ export default function EinheitenPage() {
         soll_mannschaft: werte.soll?.mannschaft ?? null,
         bemerkung: werte.bemerkung?.trim() || null,
         sprechgruppe_ids: werte.sprechgruppe_ids ?? [],
+        kommunikationsmittel: werte.kommunikationsmittel || null,
+        erreichbarkeit: werte.erreichbarkeit?.trim() || null,
       };
       return aktuell ? aktualisiereEinheit(einsatzId, aktuell.id, daten) : bildeEinheit(einsatzId, daten);
     },
@@ -185,6 +190,8 @@ export default function EinheitenPage() {
         ueber_einheit_id: aktuell.ueber_einheit_id ?? undefined, soll: aktuell.soll,
         bemerkung: aktuell.bemerkung ?? undefined,
         sprechgruppe_ids: aktuell.sprechgruppen?.map((s) => s.id) ?? [],
+        kommunikationsmittel: aktuell.kommunikationsmittel ?? undefined,
+        erreichbarkeit: aktuell.erreichbarkeit ?? undefined,
       });
     }
   }, [aktuell, form]);
@@ -265,8 +272,15 @@ export default function EinheitenPage() {
                   </span>
                 </Space>
               </Form.Item>
+              <Typography.Title level={5} style={{ marginTop: 4 }}>Funk / Kommunikation</Typography.Title>
               <Form.Item label="Sprechgruppen" name="sprechgruppe_ids">
                 <SprechgruppenPicker einsatzId={einsatzId} />
+              </Form.Item>
+              <Form.Item label="Kommunikationsmittel" name="kommunikationsmittel">
+                <Select allowClear placeholder="Digitalfunk / Mobil / Festnetz" options={KOMMUNIKATIONSMITTEL_OPTIONEN} />
+              </Form.Item>
+              <Form.Item label="Erreichbarkeit / Nummer" name="erreichbarkeit">
+                <Input placeholder="z. B. 0151 23456" allowClear />
               </Form.Item>
               <Form.Item label="Bemerkung" name="bemerkung"><Input.TextArea rows={2} /></Form.Item>
               {darfSchreiben && (
@@ -282,18 +296,13 @@ export default function EinheitenPage() {
                 </Space>
               )}
 
-              {(aktuell.sprechgruppen?.length ?? 0) > 0 && (
-                <div data-testid="sprechgruppen-tags" style={{ marginTop: 8 }}>
-                  <Space size={[4, 4]} wrap>
-                    {aktuell.sprechgruppen?.filter((s) => s.betriebsart === 'TMO').map((s) => (
-                      <Tag key={s.id} color="blue">TMO: {s.bezeichnung}</Tag>
-                    ))}
-                    {aktuell.sprechgruppen?.filter((s) => s.betriebsart === 'DMO').map((s) => (
-                      <Tag key={s.id} color="geekblue">DMO: {s.bezeichnung}</Tag>
-                    ))}
-                  </Space>
-                </div>
-              )}
+              <div style={{ marginTop: 8 }}>
+                <FunkErreichbarkeit
+                  sprechgruppen={aktuell.sprechgruppen}
+                  kommunikationsmittel={aktuell.kommunikationsmittel}
+                  erreichbarkeit={aktuell.erreichbarkeit}
+                />
+              </div>
 
               <Typography.Title level={5} style={{ marginTop: 16 }}>Personal</Typography.Title>
               {aktuell.personal_mitglieder.map((m) => (

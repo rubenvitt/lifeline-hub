@@ -144,6 +144,10 @@ pub struct EinheitBody {
     pub soll_unterfuehrer: Option<i64>,
     pub soll_mannschaft: Option<i64>,
     pub bemerkung: Option<String>,
+    /// LFH-108: Funk/Kommunikation — Freitext-Schlüssel (digitalfunk/mobil/festnetz).
+    pub kommunikationsmittel: Option<String>,
+    /// LFH-108: Funk/Kommunikation — Rufnummer/Freitext (PII).
+    pub erreichbarkeit: Option<String>,
     #[serde(default)]
     pub sortier: i64,
     pub sprechgruppe_ids: Option<Vec<i64>>,
@@ -168,6 +172,8 @@ pub async fn bilden(
     )
     .map_err(AppError::Validation)?;
     let bemerkung = trimme(body.bemerkung);
+    let kommunikationsmittel = trimme(body.kommunikationsmittel);
+    let erreichbarkeit = trimme(body.erreichbarkeit);
     let anzeige = einheit_repo::anlegen(
         &state.pool,
         einsatz_id,
@@ -181,6 +187,8 @@ pub async fn bilden(
             soll_unterfuehrer: body.soll_unterfuehrer,
             soll_mannschaft: body.soll_mannschaft,
             bemerkung: bemerkung.as_deref(),
+            kommunikationsmittel: kommunikationsmittel.as_deref(),
+            erreichbarkeit: erreichbarkeit.as_deref(),
             sortier: body.sortier,
         },
         benutzer.id,
@@ -228,6 +236,8 @@ pub async fn aktualisieren(
     )
     .map_err(AppError::Validation)?;
     let bemerkung = trimme(body.bemerkung);
+    let kommunikationsmittel = trimme(body.kommunikationsmittel);
+    let erreichbarkeit = trimme(body.erreichbarkeit);
 
     let vorher = einheit_repo::laden(&state.pool, einsatz_id, eid).await?;
     // Führer-Gültigkeit VOR jeglichem Write prüfen, damit ein ungültiger Führer
@@ -249,6 +259,8 @@ pub async fn aktualisieren(
             soll_unterfuehrer: body.soll_unterfuehrer,
             soll_mannschaft: body.soll_mannschaft,
             bemerkung: bemerkung.as_deref(),
+            kommunikationsmittel: kommunikationsmittel.as_deref(),
+            erreichbarkeit: erreichbarkeit.as_deref(),
             sortier: body.sortier,
         },
     )

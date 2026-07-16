@@ -79,6 +79,10 @@ pub struct EinheitAnzeige {
     pub fuehrer_id: Option<i64>,
     pub fuehrer_name: Option<String>,
     pub bemerkung: Option<String>,
+    /// Funk/Kommunikation (LFH-108): Freitext-Schlüssel (digitalfunk/mobil/festnetz).
+    pub kommunikationsmittel: Option<String>,
+    /// Funk/Kommunikation (LFH-108): Rufnummer/Freitext (PII → schwaerze_einsatz).
+    pub erreichbarkeit: Option<String>,
     pub sortier: i64,
     pub lat: Option<f64>,
     pub lon: Option<f64>,

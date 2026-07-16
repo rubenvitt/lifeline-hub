@@ -16,6 +16,8 @@ pub struct EinheitDaten<'a> {
     pub soll_unterfuehrer: Option<i64>,
     pub soll_mannschaft: Option<i64>,
     pub bemerkung: Option<&'a str>,
+    pub kommunikationsmittel: Option<&'a str>,
+    pub erreichbarkeit: Option<&'a str>,
     pub sortier: i64,
 }
 
@@ -32,6 +34,8 @@ struct Row {
     fuehrer_id: Option<i64>,
     fuehrer_name: Option<String>,
     bemerkung: Option<String>,
+    kommunikationsmittel: Option<String>,
+    erreichbarkeit: Option<String>,
     sortier: i64,
     lat: Option<f64>,
     lon: Option<f64>,
@@ -49,7 +53,8 @@ struct Row {
 const SELECT_AUFGELOEST: &str = "\
     SELECT e.id, e.einsatz_id, e.abschnitt_id, ab.name AS abschnitt_name, \
            e.ueber_einheit_id, e.typ_id, t.label AS typ_label, e.name, \
-           e.fuehrer_id, fp.snap_name AS fuehrer_name, e.bemerkung, e.sortier, \
+           e.fuehrer_id, fp.snap_name AS fuehrer_name, e.bemerkung, \
+           e.kommunikationsmittel, e.erreichbarkeit, e.sortier, \
            e.lat, e.lon, e.tz_fachaufgabe, e.tz_organisation, \
            e.aktueller_br_id, \
            e.soll_fuehrer, e.soll_unterfuehrer, e.soll_mannschaft, \
@@ -94,6 +99,8 @@ async fn zu_anzeige(pool: &SqlitePool, row: Row) -> Result<EinheitAnzeige, AppEr
         fuehrer_id: row.fuehrer_id,
         fuehrer_name: row.fuehrer_name,
         bemerkung: row.bemerkung,
+        kommunikationsmittel: row.kommunikationsmittel,
+        erreichbarkeit: row.erreichbarkeit,
         sortier: row.sortier,
         lat: row.lat,
         lon: row.lon,
@@ -277,8 +284,9 @@ pub async fn anlegen(
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatz_einheit \
             (einsatz_id, abschnitt_id, ueber_einheit_id, typ_id, name, \
-             soll_fuehrer, soll_unterfuehrer, soll_mannschaft, bemerkung, sortier, angelegt_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             soll_fuehrer, soll_unterfuehrer, soll_mannschaft, bemerkung, \
+             kommunikationsmittel, erreichbarkeit, sortier, angelegt_von) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(daten.abschnitt_id)
@@ -289,6 +297,8 @@ pub async fn anlegen(
     .bind(daten.soll_unterfuehrer)
     .bind(daten.soll_mannschaft)
     .bind(daten.bemerkung)
+    .bind(daten.kommunikationsmittel)
+    .bind(daten.erreichbarkeit)
     .bind(daten.sortier)
     .bind(angelegt_von)
     .fetch_one(pool)
@@ -309,13 +319,25 @@ pub async fn aktualisiere(
     validiere(pool, einsatz_id, org_id, Some(id), &daten).await?;
     let resultat = sqlx::query(
         "UPDATE einsatz_einheit SET abschnitt_id = ?, ueber_einheit_id = ?, typ_id = ?, name = ?, \
-                soll_fuehrer = ?, soll_unterfuehrer = ?, soll_mannschaft = ?, bemerkung = ?, sortier = ? \
+                soll_fuehrer = ?, soll_unterfuehrer = ?, soll_mannschaft = ?, bemerkung = ?, \
+                kommunikationsmittel = ?, erreichbarkeit = ?, sortier = ? \
          WHERE id = ? AND einsatz_id = ?",
     )
-    .bind(daten.abschnitt_id).bind(daten.ueber_einheit_id).bind(daten.typ_id).bind(daten.name)
-    .bind(daten.soll_fuehrer).bind(daten.soll_unterfuehrer).bind(daten.soll_mannschaft)
-    .bind(daten.bemerkung).bind(daten.sortier).bind(id).bind(einsatz_id)
-    .execute(pool).await?;
+    .bind(daten.abschnitt_id)
+    .bind(daten.ueber_einheit_id)
+    .bind(daten.typ_id)
+    .bind(daten.name)
+    .bind(daten.soll_fuehrer)
+    .bind(daten.soll_unterfuehrer)
+    .bind(daten.soll_mannschaft)
+    .bind(daten.bemerkung)
+    .bind(daten.kommunikationsmittel)
+    .bind(daten.erreichbarkeit)
+    .bind(daten.sortier)
+    .bind(id)
+    .bind(einsatz_id)
+    .execute(pool)
+    .await?;
     if resultat.rows_affected() == 0 {
         return Err(AppError::NotFound);
     }
@@ -495,6 +517,8 @@ mod tests {
             soll_unterfuehrer: u,
             soll_mannschaft: m,
             bemerkung: None,
+            kommunikationsmittel: None,
+            erreichbarkeit: None,
             sortier: 0,
         }
     }
