@@ -743,3 +743,35 @@ async fn download_if_none_match_liefert_304() {
     assert_eq!(s200, StatusCode::OK, "unpassender ETag → 200");
     assert_eq!(body200, b"cache", "voller Body bei 200");
 }
+
+/// G04 (Defense-in-Depth): Der 304-Kurzschluss darf die Zugriffs-Guards NICHT umgehen.
+/// Ein passender ETag über den FREMDEN Einsatz-Pfad muss am Ownership-Guard scheitern
+/// (404), nicht 304 liefern — pinnt die Reihenfolge „Guard vor 304" gegen ein künftiges
+/// Umsortieren (der Meta-/ETag-Read + 304 sitzen bewusst HINTER Ownership-/Tombstone-Guard).
+#[tokio::test]
+async fn download_304_umgeht_ownership_guard_nicht() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz_a = einsatz_anlegen(&app, &admin).await;
+    let einsatz_b = einsatz_anlegen(&app, &admin).await;
+
+    let (_, up) = upload(&app, einsatz_b, &admin, "b.pdf", "application/pdf", b"B").await;
+    let aid_b = up[0]["id"].as_i64().unwrap();
+
+    // Gültigen ETag über den KORREKTEN Pfad holen.
+    let (_, headers, _) = download(&app, einsatz_b, aid_b, &admin).await;
+    let etag = headers
+        .get(header::ETAG)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    // Passender ETag, aber über den fremden Einsatz-Pfad → 404 (Guard), NICHT 304.
+    let (s, _, _) = download_inm(&app, einsatz_a, aid_b, &admin, Some(&etag)).await;
+    assert_eq!(
+        s,
+        StatusCode::NOT_FOUND,
+        "Ownership-Guard vor 304 — kein 304-Bypass des Zugriffsschutzes"
+    );
+}

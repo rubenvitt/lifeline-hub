@@ -13,7 +13,7 @@ use lifeline_hub::anhang::{init_scan_config, ScanConfig};
 use tower::ServiceExt;
 
 mod common;
-use common::{einsatz_anlegen, login_cookie, setup};
+use common::{anfrage, einsatz_anlegen, login_cookie, setup};
 
 const ECKEN: &str = "[[9.0,50.0],[9.1,50.0],[9.1,49.9],[9.0,49.9]]";
 
@@ -67,11 +67,12 @@ async fn upload_ohne_erreichbaren_scanner_wird_fail_closed_abgelehnt() {
     let boundary = "LFHSCANBND";
     let body = multipart_bild(boundary, &minimal_png());
     let resp = app
+        .clone()
         .oneshot(
             Request::builder()
                 .method("POST")
                 .uri(format!("/api/einsaetze/{einsatz}/karte/hintergrundbilder"))
-                .header(header::COOKIE, admin)
+                .header(header::COOKIE, admin.as_str())
                 .header(
                     header::CONTENT_TYPE,
                     format!("multipart/form-data; boundary={boundary}"),
@@ -87,5 +88,20 @@ async fn upload_ohne_erreichbaren_scanner_wird_fail_closed_abgelehnt() {
         status,
         StatusCode::SERVICE_UNAVAILABLE,
         "fail-closed + unerreichbarer clamd → 503 (Scan-Seam muss durchlaufen werden)"
+    );
+
+    // Kern-Garantie von G05 (scan-vor-persist): der abgelehnte Upload hinterlässt NICHTS.
+    let (sl, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/karte/hintergrundbilder"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(sl, StatusCode::OK);
+    assert!(
+        liste.as_array().unwrap().is_empty(),
+        "abgelehnter Upload darf nichts persistieren"
     );
 }
