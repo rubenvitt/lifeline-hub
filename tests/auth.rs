@@ -172,6 +172,54 @@ async fn providers_listet_passwort() {
 }
 
 #[tokio::test]
+async fn providers_admin_ohne_session_ist_401() {
+    let app = setup().await;
+    let (status, _) = anfrage(&app, "GET", "/api/auth/providers/admin", "", None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+/// Router-Ebene (nicht nur die reine `public_provider_projektion`-Funktion, s.
+/// `routes::auth::tests`): `/api/auth/providers` filtert deaktivierte, `/api/auth/providers/admin`
+/// (hinter `AdminUser`) zeigt sie (LFH-277). Aktiviert "oidc" GLOBAL für den Rest dieses
+/// Testbinary-Prozesses (`OIDC_KONFIGURIERT`-OnceLock, s. `oidc_callback_mit_unbekanntem_state_
+/// redirect_auf_login_fehler`-Doc) — unschädlich für die 404-Tests oben, die per
+/// `oidc_deaktiviert_override` reihenfolge-unabhängig gemacht sind.
+#[tokio::test]
+async fn providers_admin_zeigt_deaktivierte_public_verbirgt_sie() {
+    lifeline_hub::auth::provider::registry::set_oidc_konfiguriert(true);
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+
+    // oidc regulär deaktivieren (kein Lockout-Risiko: passwort bleibt aktiv).
+    let (status, _) = anfrage(
+        &app,
+        "PUT",
+        "/api/auth/providers/oidc",
+        &admin,
+        Some(r#"{"aktiviert":false}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, json) = anfrage(&app, "GET", "/api/auth/providers", "", None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        !json.as_array().unwrap().iter().any(|p| p["id"] == "oidc"),
+        "public: deaktiviertes oidc nicht sichtbar"
+    );
+
+    let (status, json) = anfrage(&app, "GET", "/api/auth/providers/admin", &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    let oidc = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == "oidc")
+        .expect("admin: oidc sichtbar");
+    assert_eq!(oidc["aktiviert"], false);
+}
+
+#[tokio::test]
 async fn toggle_ohne_admin_session_ist_401() {
     let app = setup().await;
     let (status, _) = anfrage(
@@ -584,6 +632,85 @@ async fn oidc_callback_mit_idp_error_redirect_ohne_400() {
         .to_str()
         .unwrap();
     assert_eq!(location, "/login?fehler=oidc");
+}
+
+#[tokio::test]
+async fn oidc_callback_mit_falschem_state_cookie_redirect_ohne_session() {
+    // Derselbe prozessweite OnceLock wie in den anderen OIDC-Tests (reihenfolge-unabhängig).
+    lifeline_hub::auth::provider::registry::set_oidc_konfiguriert(true);
+    let app = setup().await;
+
+    // Seedet DIREKT einen echten, gültigen State-Store-Eintrag (bypasst `/oidc/start`, das einen
+    // echten IdP für Discovery bräuchte) — das `state`-Query im Callback unten ist damit KEIN
+    // unbekannter/abgelaufener Key (anders als in
+    // `oidc_callback_mit_unbekanntem_state_redirect_auf_login_fehler`): der State-Store-Lookup
+    // allein würde hier also DURCHGEHEN. Diskriminierend prüft dieser Test daher, dass der
+    // Binding-Check (LFH-277) trotzdem VORHER abbricht, wenn der `oidc_state`-Cookie fehlt/nicht
+    // passt.
+    let state_key = "echter-state-aber-falsches-cookie".to_string();
+    lifeline_hub::auth::oidc::state::speichere(
+        state_key.clone(),
+        lifeline_hub::auth::oidc::state::StateEintrag {
+            nonce: "n".to_string(),
+            pkce_verifier: "v".to_string(),
+            ziel_pfad: "/einsaetze".to_string(),
+        },
+    );
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/auth/oidc/callback?code=x&state={state_key}"))
+                .header(header::COOKIE, "oidc_state=ein-anderer-wert")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::SEE_OTHER); // axum::response::Redirect::to = 303
+    let location = resp
+        .headers()
+        .get(header::LOCATION)
+        .expect("Location-Header erwartet")
+        .to_str()
+        .unwrap();
+    assert_eq!(location, "/login?fehler=oidc");
+
+    // Binding-Cookie wird auch auf diesem Fehlerpfad geräumt — kein Wert, der über den Flow
+    // hinaus im Browser überlebt.
+    let set_cookie = resp
+        .headers()
+        .get(header::SET_COOKIE)
+        .expect("Set-Cookie (Räumung von oidc_state) erwartet")
+        .to_str()
+        .unwrap();
+    assert!(set_cookie.contains("oidc_state="));
+    // Diskriminierend (T3-Regressionsschutz): eine ECHTE Löschung (`jar.remove`) rendert
+    // `Max-Age=0` (`cookie`-Crate `make_removal`) — ein bloßes Überschreiben auf leer (`jar.add`)
+    // täte das NICHT und würde nur `oidc_state=` ohne `Max-Age=0` senden. Ohne diese Zeile würde
+    // dieser Test auch bestehen, wenn `oidc_callback` versehentlich wieder auf `jar.add(...)`
+    // zurückfiele (nur überschreiben statt löschen).
+    assert!(
+        set_cookie.contains("Max-Age=0"),
+        "Set-Cookie muss eine echte Löschung sein (Max-Age=0), kein bloßes Leer-Überschreiben: {set_cookie}"
+    );
+    assert!(
+        !set_cookie.contains("lifeline_sid="),
+        "keine Session darf bei fehlgeschlagener state-Bindung entstehen"
+    );
+
+    // Diskriminierend (sonst würde dieser Test auch bestehen, wenn der Binding-Check GAR NICHT
+    // existierte oder invertiert wäre — der seedete Eintrag würde dann in `oidc_client(...)` ohne
+    // echten IdP ebenfalls scheitern und denselben Redirect/dieselbe Cookie-Lage produzieren):
+    // ein Binding-Fehlschlag bricht VOR `state::entnehme` ab (s. Doc-Kommentar Punkt 3 in
+    // `oidc_callback`) — der Store-Eintrag muss also UNVERBRAUCHT überlebt haben. `entnehme`
+    // selbst ist einmalig/entfernend, dieser Aufruf hier räumt den Eintrag also gleich mit auf.
+    assert!(
+        lifeline_hub::auth::oidc::state::entnehme(&state_key).is_some(),
+        "Binding-Check muss VOR state::entnehme greifen; der Store-Eintrag darf durch einen \
+         Binding-Fehlschlag nicht konsumiert werden (sonst wäre der legitime Opfer-Flow tot)"
+    );
 }
 
 // ===== TOTP-Enroll (LFH-43, Increment 5, Task 4) =====

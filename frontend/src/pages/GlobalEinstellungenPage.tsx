@@ -5,7 +5,7 @@ import {
   ladeOrgEinstellungen, speichereOrgEinstellungen,
   ladeOrgModulEinstellungen, setzeOrgModulEinstellung,
 } from '../api/orgEinstellungen';
-import { providerListe, providerSchalten } from '../api/auth';
+import { providerListeAdmin, providerSchalten } from '../api/auth';
 import { ApiError } from '../api/client';
 import AdminPage from '../components/AdminPage';
 import SegmentSektionen from '../components/SegmentSektionen';
@@ -107,9 +107,12 @@ export default function GlobalEinstellungenPage() {
 
   // Anmeldeverfahren (Auth-Provider an/aus, LFH-280). Eigene Query — die LoginPage lädt die
   // Liste unabhängig bei jedem Mount, es gibt keinen geteilten Cache zu invalidieren.
+  // Admin-Endpoint (LFH-277): liefert die VOLLE Liste inkl. deaktivierter Provider — nur so
+  // kann diese Seite Toggles für deaktivierte Verfahren überhaupt rendern (die öffentliche
+  // `providerListe()` zeigt seit LFH-277 nur noch aktivierte, für die Login-UI).
   const providerQuery = useQuery({
     queryKey: ['auth-provider'],
-    queryFn: providerListe,
+    queryFn: providerListeAdmin,
   });
 
   const schaltenMutation = useMutation({

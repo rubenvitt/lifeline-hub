@@ -22,8 +22,8 @@ use openidconnect::{
     HttpRequest, HttpResponse, IssuerUrl, PkceCodeVerifier, RedirectUrl,
 };
 use std::sync::OnceLock;
-use std::time::Duration;
-use tokio::sync::OnceCell;
+use std::time::{Duration, Instant};
+use tokio::sync::RwLock;
 
 /// Resolved OIDC-Einstellungen (Issuer/Client-ID/Client-Secret/Redirect-URL) — prozessweiter
 /// `OnceLock` statt `AppState`-Feld, analog zu `anhang::ScanConfig` (LFH-114) und
@@ -83,13 +83,32 @@ pub type OidcCoreClient = CoreClient<
     EndpointMaybeSet,
 >;
 
-/// Prozessweiter Discovery-Cache — lazy befüllt beim ERSTEN erfolgreichen `oidc_client`-Aufruf,
-/// NICHT beim Serverstart (Global Constraint „Offline-First / Lazy Discovery" im Plan
-/// `2026-07-14-auth-provider-increment-3-oidc-sso.md`). Nur ein Issuer pro Prozess (`Config`
-/// ändert sich zur Laufzeit nicht) — ein Issuer-Wechsel braucht einen Neustart. `get_or_try_init`
-/// befüllt den Cache NUR bei Erfolg: ein IdP-Ausfall bleibt transient, der nächste Versuch
-/// discovert erneut statt den Fehler dauerhaft einzufrieren.
-static DISCOVERY: OnceCell<CoreProviderMetadata> = OnceCell::const_new();
+/// Lebensdauer eines Discovery-Cache-Eintrags. Nach Ablauf wird beim nächsten `oidc_client`-Aufruf
+/// neu discovert — fängt IdP-JWKS-Key-Rotation ohne Server-Neustart ab (LFH-277). Bewusst TTL statt
+/// Refresh-on-verify-failure: kein Angreifer-getriggerter JWKS-Refetch (Amplification), voll in
+/// diesem Modul gekapselt.
+const DISCOVERY_TTL: Duration = Duration::from_secs(60 * 60);
+
+/// Prozessweiter Discovery-Cache mit TTL — lazy befüllt beim ERSTEN erfolgreichen
+/// `oidc_client`-Aufruf, NICHT beim Serverstart (Global Constraint „Offline-First / Lazy
+/// Discovery" im Plan `2026-07-14-auth-provider-increment-3-oidc-sso.md`). Nur ein Issuer pro
+/// Prozess (`Config` ändert sich zur Laufzeit nicht) — ein Issuer-Wechsel braucht einen Neustart.
+/// `None` bedeutet „noch nie discovert" ODER „letzter Refetch-Versuch scheiterte" (kein
+/// Fehler-Einfrieren: ein IdP-Ausfall bleibt transient, der nächste Aufruf discovert erneut). Nach
+/// Ablauf der TTL wird der Eintrag beim nächsten `discovery()`-Aufruf verworfen und neu geholt —
+/// fängt IdP-JWKS-Key-Rotation ab, ohne dass der Server neu gestartet werden muss.
+///
+/// `tokio::sync::RwLock` (NICHT `std::sync::RwLock`): der Schreib-Guard in `discovery()` wird über
+/// den Discovery-`.await` gehalten — ein `std`-Guard über einem `.await` machte den aufrufenden
+/// axum-Handler `!Send` (Modul-Falle, siehe Test `oidc_client_future_ist_send` unten sowie Memory
+/// „Mutex-Guard über await → !Send").
+static DISCOVERY: RwLock<Option<(CoreProviderMetadata, Instant)>> = RwLock::const_new(None);
+
+/// True, wenn ein Cache-Eintrag von `gespeichert` gegenüber `jetzt` noch innerhalb der
+/// [`DISCOVERY_TTL`] liegt.
+fn cache_ist_frisch(gespeichert: Instant, jetzt: Instant) -> bool {
+    jetzt.duration_since(gespeichert) < DISCOVERY_TTL
+}
 
 /// Baut den OIDC-Client: lazy (gecachte) Discovery + `CoreClient` aus den `OidcSettings`. Fehlt
 /// eines der vier Felder oder ist der IdP nicht erreichbar/liefert kaputte Metadaten, wird ein
@@ -183,32 +202,56 @@ fn oidc_konfigfeld(feld: &Option<String>, env_name: &str) -> Result<String, AppE
     })
 }
 
-/// Lazy, gecachte Discovery: der erste Aufruf holt `.well-known/openid-configuration` + JWKS vom
-/// Issuer, jeder weitere liefert den gecachten Wert ohne erneutes Netz.
+/// Discovery mit TTL-gecachtem Ergebnis: der erste (bzw. erste nach TTL-Ablauf) Aufruf holt
+/// `.well-known/openid-configuration` + JWKS vom Issuer, jeder weitere innerhalb der TTL liefert
+/// den gecachten Wert ohne erneutes Netz.
 async fn discovery(issuer: &str) -> Result<CoreProviderMetadata, AppError> {
-    let metadata = DISCOVERY
-        .get_or_try_init(|| async {
-            let issuer_url = IssuerUrl::new(issuer.to_string())
-                .map_err(|e| AppError::Internal(format!("OIDC-Issuer-URL ungültig: {e}")))?;
-            let client = ssrf_http_client()?;
-            // Closure statt eigener `impl AsyncHttpClient`-Block: `oauth2` implementiert den
-            // Trait blanket für `Fn(HttpRequest) -> F`, siehe Modul-Doc oben.
-            let http_client = move |request: HttpRequest| {
-                let client = client.clone();
-                async move { fuehre_http_request_aus(&client, request).await }
-            };
-            CoreProviderMetadata::discover_async(issuer_url, &http_client)
-                .await
-                .map_err(|e| {
-                    // Kein `{e}` im `AppError` (Security-Fix, siehe `tausche_code_gegen_token`-
-                    // Doc-Kommentar): rohes Discovery-/IdP-Fehlerdetail nur ins Server-Log, nicht
-                    // in die client-renderbare `ServiceUnavailable`-Meldung.
-                    tracing::warn!(error = %e, "OIDC-Discovery fehlgeschlagen");
-                    AppError::ServiceUnavailable("OIDC-Discovery fehlgeschlagen".into())
-                })
-        })
-        .await?;
-    Ok(metadata.clone())
+    let jetzt = Instant::now();
+
+    // Fast-Path: frischen Eintrag unter Read-Lock klonen und Lock SOFORT freigeben (kein Guard
+    // über den return hinaus — hier ohnehin kein await danach).
+    {
+        let read = DISCOVERY.read().await;
+        if let Some((metadata, gespeichert)) = read.as_ref() {
+            if cache_ist_frisch(*gespeichert, jetzt) {
+                return Ok(metadata.clone());
+            }
+        }
+    }
+
+    // Slow-Path: Write-Lock, Double-Check (ein paralleler Refetch könnte zwischenzeitlich befüllt
+    // haben), sonst neu discovern. Der Write-Guard wird über den Discovery-`.await` gehalten →
+    // MUST tokio::sync (nicht std), sonst wird der Handler !Send.
+    let mut write = DISCOVERY.write().await;
+    let jetzt = Instant::now();
+    if let Some((metadata, gespeichert)) = write.as_ref() {
+        if cache_ist_frisch(*gespeichert, jetzt) {
+            return Ok(metadata.clone());
+        }
+    }
+
+    let issuer_url = IssuerUrl::new(issuer.to_string())
+        .map_err(|e| AppError::Internal(format!("OIDC-Issuer-URL ungültig: {e}")))?;
+    let client = ssrf_http_client()?;
+    // Closure statt eigener `impl AsyncHttpClient`-Block: `oauth2` implementiert den Trait
+    // blanket für `Fn(HttpRequest) -> F`, siehe Modul-Doc oben.
+    let http_client = move |request: HttpRequest| {
+        let client = client.clone();
+        async move { fuehre_http_request_aus(&client, request).await }
+    };
+    let metadata = CoreProviderMetadata::discover_async(issuer_url, &http_client)
+        .await
+        .map_err(|e| {
+            // Kein `{e}` im `AppError` (Security-Fix, siehe `tausche_code_gegen_token`-
+            // Doc-Kommentar): rohes Discovery-/IdP-Fehlerdetail nur ins Server-Log, nicht in die
+            // client-renderbare `ServiceUnavailable`-Meldung.
+            tracing::warn!(error = %e, "OIDC-Discovery fehlgeschlagen");
+            AppError::ServiceUnavailable("OIDC-Discovery fehlgeschlagen".into())
+        })?;
+
+    // NUR bei Erfolg cachen (Fehlschlag friert nichts ein — nächster Aufruf discovert erneut).
+    *write = Some((metadata.clone(), Instant::now()));
+    Ok(metadata)
 }
 
 /// Overall-Timeout für einen Discovery-/Token-Roundtrip: ein verbundener, aber stummer IdP
@@ -319,6 +362,17 @@ mod tests {
             client_secret: Some(GeheimesPasswort("test-client-secret".to_string())),
             redirect_url: Some("http://localhost:8080/api/auth/oidc/callback".to_string()),
         }
+    }
+
+    #[test]
+    fn cache_frisch_nur_innerhalb_ttl() {
+        let jetzt = Instant::now();
+        // Eintrag „jetzt" gespeichert → frisch.
+        assert!(cache_ist_frisch(jetzt, jetzt));
+        // Eintrag vor >TTL → veraltet. (Kein Instant-Subtraktion-Unterlauf: Referenzzeit
+        // künstlich in die Zukunft schieben statt gespeicherte Zeit in die Vergangenheit.)
+        let spaeter = jetzt + DISCOVERY_TTL + Duration::from_secs(1);
+        assert!(!cache_ist_frisch(jetzt, spaeter));
     }
 
     /// Kompilier-Check statt Laufzeit-Test (Futures sind lazy, kein I/O nötig): `oidc_client`s

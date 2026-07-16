@@ -86,6 +86,20 @@ fn sanitisiere_benutzername(roh: &str) -> String {
     }
 }
 
+/// Leitet den Anzeigenamen aus den Claims ab — **pur**, kein DB-Zugriff. Kandidaten in der
+/// Reihenfolge `name` → `preferred_username` → `subject`; jeder wird getrimmt und nur genommen,
+/// wenn er nach dem Trimmen nicht leer ist (analog zu `plane_benutzername`s `preferred_username`-
+/// Behandlung). `subject` ist immer nicht-leer (OIDC-Pflichtclaim), daher terminiert die Kette.
+pub fn plane_anzeigename(claims: &OidcClaims) -> String {
+    [claims.name.as_deref(), claims.preferred_username.as_deref()]
+        .into_iter()
+        .flatten()
+        .map(str::trim)
+        .find(|s| !s.is_empty())
+        .unwrap_or_else(|| claims.subject.trim())
+        .to_string()
+}
+
 /// Findet den Benutzer zu `(claims.issuer, claims.subject)` oder provisioniert bei
 /// erstem Login ein NEUES least-privilege-Konto (`system_rolle = keiner`,
 /// `org_rolle = keine`, Sentinel-Passworthash `PASSWORT_HASH_SSO_ONLY`). Matching ist
@@ -126,13 +140,9 @@ pub async fn finde_oder_provisioniere(
 
     let benutzername = plane_benutzername(claims, |kandidat| vergebene_namen.contains(kandidat));
 
-    let anzeigename = claims
-        .name
-        .clone()
-        .or_else(|| claims.preferred_username.clone())
-        .unwrap_or_else(|| claims.subject.clone());
+    let anzeigename = plane_anzeigename(claims);
 
-    let eingefuegt = sqlx::query(
+    let insert_ergebnis = sqlx::query(
         "INSERT INTO benutzer \
          (org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, oidc_issuer, oidc_subject) \
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -146,19 +156,50 @@ pub async fn finde_oder_provisioniere(
     .bind(&claims.issuer)
     .bind(&claims.subject)
     .execute(pool)
-    .await?;
+    .await;
 
-    let id = eingefuegt.last_insert_rowid();
+    match insert_ergebnis {
+        // Normalfall: wir haben das Konto angelegt. Re-SELECT per (issuer, subject) — NICHT per
+        // last_insert_rowid (siehe oben).
+        Ok(_) => select_by_oidc(pool, &claims.issuer, &claims.subject)
+            .await?
+            .ok_or_else(|| {
+                AppError::Internal("Angelegtes SSO-Konto nicht wiederauffindbar".into())
+            }),
+        // Race-Recover: ein paralleler First-Login hat dasselbe (issuer, subject) — oder denselben
+        // benutzernamen — zuerst eingefügt. Bei JEDEM Unique-Fehler den (issuer, subject)-SELECT
+        // wiederholen: findet er die Zeile des Race-Gewinners, ist der Login gültig; sonst war es
+        // eine echte, fremde benutzername-Kollision → Fehler propagieren.
+        Err(err) if ist_unique_verletzung(&err) => {
+            match select_by_oidc(pool, &claims.issuer, &claims.subject).await? {
+                Some(vorhanden) => Ok(vorhanden),
+                None => Err(AppError::from(err)),
+            }
+        }
+        Err(err) => Err(AppError::from(err)),
+    }
+}
 
-    let angelegt = sqlx::query_as::<_, Benutzer>(
+/// Re-SELECT-Helfer für den (issuer, subject)-Schlüssel — nach INSERT (statt last_insert_rowid,
+/// das nach einem geschluckten Konflikt eine fremde rowid liefern würde) und im Race-Recover.
+async fn select_by_oidc(
+    pool: &SqlitePool,
+    issuer: &str,
+    subject: &str,
+) -> Result<Option<Benutzer>, sqlx::Error> {
+    sqlx::query_as::<_, Benutzer>(
         "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, aktiv, erstellt_at \
-         FROM benutzer WHERE id = ?",
+         FROM benutzer WHERE oidc_issuer = ? AND oidc_subject = ?",
     )
-    .bind(id)
-    .fetch_one(pool)
-    .await?;
+    .bind(issuer)
+    .bind(subject)
+    .fetch_optional(pool)
+    .await
+}
 
-    Ok(angelegt)
+/// True, wenn `err` eine SQLite-UNIQUE-Constraint-Verletzung ist (Race-Recover-Trigger).
+fn ist_unique_verletzung(err: &sqlx::Error) -> bool {
+    matches!(err, sqlx::Error::Database(db) if db.is_unique_violation())
 }
 
 #[cfg(test)]
@@ -220,6 +261,37 @@ mod tests {
         let c = claims("https://idp.example", "sub-1", Some("max"), None);
         let name = plane_benutzername(&c, |_| false);
         assert_eq!(name, "max");
+    }
+
+    // --- plane_anzeigename (pur, keine DB) ---
+
+    #[test]
+    fn anzeigename_ueberspringt_leere_und_whitespace_claims() {
+        // name = whitespace, preferred_username = leer → Fallback auf subject.
+        let c = claims("https://idp.example", "sub-x", Some(""), Some("   "));
+        assert_eq!(plane_anzeigename(&c), "sub-x");
+    }
+
+    #[test]
+    fn anzeigename_nimmt_name_vor_preferred_username() {
+        let c = claims(
+            "https://idp.example",
+            "sub-x",
+            Some("maxmuster"),
+            Some("Max Mustermann"),
+        );
+        assert_eq!(plane_anzeigename(&c), "Max Mustermann");
+    }
+
+    #[test]
+    fn anzeigename_faellt_auf_preferred_username_wenn_name_leer() {
+        let c = claims(
+            "https://idp.example",
+            "sub-x",
+            Some("maxmuster"),
+            Some("  "),
+        );
+        assert_eq!(plane_anzeigename(&c), "maxmuster");
     }
 
     // --- finde_oder_provisioniere (gegen test_pool) ---
@@ -295,6 +367,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn ist_unique_verletzung_erkennt_doppelten_benutzernamen() {
+        let pool = crate::db::test_pool().await;
+        seed_org(&pool).await;
+        seed_lokalen_benutzer(&pool, "kollision").await;
+        // Zweiter Insert desselben benutzernamens → UNIQUE-Fehler.
+        let err = sqlx::query(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, aktiv) \
+             VALUES (1, 'X', 'kollision', 'h', 1)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap_err();
+        assert!(
+            ist_unique_verletzung(&err),
+            "erwartete Unique-Erkennung, fand {err:?}"
+        );
+    }
+
+    #[tokio::test]
     async fn lokales_konto_mit_gleichem_namen_wird_nicht_verlinkt() {
         let pool = crate::db::test_pool().await;
         seed_org(&pool).await;
@@ -331,5 +422,32 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(anzahl, 2);
+    }
+
+    #[tokio::test]
+    async fn zweiter_erstlogin_desselben_subjects_liefert_bestehendes_konto() {
+        let pool = crate::db::test_pool().await;
+        seed_org(&pool).await;
+        let c = claims("https://idp.example", "sub-race", Some("racer"), None);
+
+        // Simuliert den Race-Gewinner: Konto existiert bereits mit (issuer, subject).
+        sqlx::query(
+            "INSERT INTO benutzer \
+             (org_id, anzeigename, benutzername, passwort_hash, oidc_issuer, oidc_subject) \
+             VALUES (1, 'Racer', 'racer', ?, 'https://idp.example', 'sub-race')",
+        )
+        .bind(PASSWORT_HASH_SSO_ONLY)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let benutzer = finde_oder_provisioniere(&pool, &c).await.unwrap();
+        assert_eq!(benutzer.benutzername, "racer");
+
+        let anzahl: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM benutzer")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(anzahl, 1, "kein Doppel-Insert im Race-Recover");
     }
 }

@@ -30,9 +30,18 @@ export function me(): Promise<BenutzerAnzeige> {
   return apiGet<BenutzerAnzeige>('/api/auth/me');
 }
 
-/** Lädt die aktiven Auth-Provider für die Login-UI (LFH-57). */
+/** Lädt die aktiven Auth-Provider für die Login-UI (LFH-57). Serverseitig auf `aktiviert==true`
+ *  gefiltert (LFH-277) — deaktivierte Provider sind dem unauthentifizierten Login-UI nicht
+ *  sichtbar. Für die Admin-Provider-Verwaltung (volle Liste inkl. deaktivierter) siehe
+ *  {@link providerListeAdmin}. */
 export function providerListe(): Promise<AuthProvider[]> {
   return apiGet<AuthProvider[]>('/api/auth/providers');
+}
+
+/** Lädt die VOLLE Provider-Liste inkl. deaktivierter (Admin-Provider-Verwaltung, LFH-277/LFH-280).
+ *  Serverseitig `AdminUser`-geschützt; `401`/`403` als {@link ApiError}. */
+export function providerListeAdmin(): Promise<AuthProvider[]> {
+  return apiGet<AuthProvider[]>('/api/auth/providers/admin');
 }
 
 /** Schaltet einen Auth-Provider an/aus (Admin, LFH-280). Gibt die aktualisierte Server-Liste

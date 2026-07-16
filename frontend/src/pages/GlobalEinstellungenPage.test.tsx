@@ -18,7 +18,7 @@ vi.mock('../api/orgEinstellungen', () => ({
 }));
 
 vi.mock('../api/auth', () => ({
-  providerListe: vi.fn(),
+  providerListeAdmin: vi.fn(),
   providerSchalten: vi.fn(),
 }));
 
@@ -29,12 +29,16 @@ import {
   ladeOrgModulEinstellungen,
   setzeOrgModulEinstellung,
 } from '../api/orgEinstellungen';
-import { providerListe, providerSchalten } from '../api/auth';
+import { providerListeAdmin, providerSchalten } from '../api/auth';
 import { ApiError } from '../api/client';
 
+// Admin-Endpoint (LFH-277): liefert bewusst auch einen deaktivierten Provider — nur die
+// Admin-Ansicht (`providerListeAdmin`, hinter `/api/auth/providers/admin`) darf ihn sehen; die
+// öffentliche `providerListe()` (LoginPage/ProfilPage) filtert serverseitig auf `aktiviert=true`.
 const PROVIDER_LISTE = [
   { id: 'passwort', typ: 'passwort' as const, anzeigename: 'Passwort', aktiviert: true },
   { id: 'oidc', typ: 'oidc' as const, anzeigename: 'PocketID', aktiviert: true },
+  { id: 'webauthn', typ: 'webauthn' as const, anzeigename: 'Passkey', aktiviert: false },
 ];
 
 // --- Hilfsfunktionen ---
@@ -74,7 +78,7 @@ describe('GlobalEinstellungenPage', () => {
     vi.mocked(speichereOrgEinstellungen).mockResolvedValue({ ...LEERE_EINSTELLUNGEN });
     vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({});
     vi.mocked(setzeOrgModulEinstellung).mockResolvedValue(undefined);
-    vi.mocked(providerListe).mockResolvedValue(PROVIDER_LISTE.map((p) => ({ ...p })));
+    vi.mocked(providerListeAdmin).mockResolvedValue(PROVIDER_LISTE.map((p) => ({ ...p })));
     // Default: Umschalten von PocketID → aus (Server-Wahrheit nach PUT).
     vi.mocked(providerSchalten).mockResolvedValue(
       PROVIDER_LISTE.map((p) => (p.id === 'oidc' ? { ...p, aktiviert: false } : { ...p })),
@@ -306,7 +310,7 @@ describe('GlobalEinstellungenPage — Anmeldeverfahren', () => {
     });
     vi.mocked(ladeOrgEinstellungen).mockResolvedValue({ ...LEERE_EINSTELLUNGEN });
     vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({});
-    vi.mocked(providerListe).mockResolvedValue(PROVIDER_LISTE.map((p) => ({ ...p })));
+    vi.mocked(providerListeAdmin).mockResolvedValue(PROVIDER_LISTE.map((p) => ({ ...p })));
     vi.mocked(providerSchalten).mockResolvedValue(
       PROVIDER_LISTE.map((p) => (p.id === 'oidc' ? { ...p, aktiviert: false } : { ...p })),
     );
@@ -326,6 +330,17 @@ describe('GlobalEinstellungenPage — Anmeldeverfahren', () => {
     expect(
       screen.getByRole('switch', { name: 'Anmeldeverfahren: Passwort' }),
     ).toBeInTheDocument();
+  });
+
+  it('zeigt auch deaktivierte Provider (Admin-Endpoint liefert die volle Liste inkl. deaktivierter, LFH-277)', async () => {
+    rendern();
+    await anmeldeverfahrenOeffnen();
+
+    const passkey = await screen.findByRole('switch', { name: 'Anmeldeverfahren: Passkey' });
+    expect(passkey).toBeInTheDocument();
+    expect(passkey).not.toBeChecked();
+    // Nicht der Lockout-geschützte "passwort"-Provider → für Admins togglebar.
+    expect(passkey).not.toBeDisabled();
   });
 
   it('schaltet einen Provider per PUT um und aktualisiert die Anzeige', async () => {

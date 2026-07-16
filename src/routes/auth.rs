@@ -170,9 +170,28 @@ pub async fn me(
     Ok(Json(benutzer.anzeige(totp_aktiviert)))
 }
 
-/// GET /api/auth/providers — verfügbare Login-Provider (öffentlich, für die Login-UI).
+/// Öffentliche Projektion der Provider-Liste: nur aktivierte. Deaktivierte Provider werden dem
+/// unauthentifizierten Login-UI NICHT offengelegt (LFH-277; Design „aktivierten, verfügbaren").
+/// Bewusst dieselbe DTO wie der Admin-Endpoint — public filtert nur.
+fn public_provider_projektion(
+    liste: Vec<crate::auth::provider::AuthProviderAnzeige>,
+) -> Vec<crate::auth::provider::AuthProviderAnzeige> {
+    liste.into_iter().filter(|p| p.aktiviert).collect()
+}
+
+/// GET /api/auth/providers — öffentlich, NUR aktivierte Provider (Login-UI).
 pub async fn providers(
     State(state): State<AppState>,
+) -> Result<Json<Vec<crate::auth::provider::AuthProviderAnzeige>>, AppError> {
+    let liste = crate::auth::provider::registry::liste(&state.pool).await?;
+    Ok(Json(public_provider_projektion(liste)))
+}
+
+/// GET /api/auth/providers/admin — Admin-only, VOLLE Liste inkl. deaktivierter Provider
+/// (Provider-Verwaltung, LFH-280/LFH-277).
+pub async fn providers_admin(
+    State(state): State<AppState>,
+    _admin: crate::auth::session::AdminUser,
 ) -> Result<Json<Vec<crate::auth::provider::AuthProviderAnzeige>>, AppError> {
     let liste = crate::auth::provider::registry::liste(&state.pool).await?;
     Ok(Json(liste))
@@ -226,16 +245,74 @@ fn ziel_pfad_aus_query(von: Option<String>) -> String {
     }
 }
 
+/// Cookie-Name für das OIDC-`state`-Binding-Cookie (Session-Fixation-Defense, LFH-277). Trägt
+/// NUR den `state`/`csrf`-Wert, den `oidc_start` auch als `state`-Query-Param an den IdP
+/// weitergibt — `oidc_callback` erzwingt zusätzlich zum State-Store-Lookup (`state::entnehme`),
+/// dass dieser Cookie-Wert exakt dem zurückgegebenen `state`-Query entspricht. Ohne diese Bindung
+/// könnte ein Angreifer einen selbst erzeugten `state` (z. B. per `<img>`-Tag oder Redirect) in
+/// den Browser eines Opfers injizieren (Session-Fixation): der State-Store allein bindet den
+/// `state` an KEINEN bestimmten Browser, nur an eine bestimmte Zeitspanne.
+const OIDC_STATE_COOKIE: &str = "oidc_state";
+
+/// Baut das HttpOnly-Binding-Cookie für den OIDC-`state`. Analog `mfa_pending_cookie`/
+/// `webauthn_reg_cookie` (HttpOnly, `secure` als expliziter Parameter statt direktem
+/// `cookie_secure()`-Read — pur testbar ohne den prozessweiten OnceLock), pfadweit (`/`), da der
+/// Callback unter einem anderen Pfad (`/api/auth/oidc/callback`) liegt als `start`
+/// (`/api/auth/oidc/start`) und das Cookie dort ankommen muss.
+///
+/// **SameSite=Lax (MUST, nicht Strict):** der Callback trifft als Cross-Site-Top-Level-Redirect
+/// vom IdP ein — bei `Strict` würde der Browser das Cookie dort NICHT mitsenden, der Binding-
+/// Check in `oidc_callback` schlüge dann IMMER fehl und OIDC-Login wäre kaputt. Bewusst NICHT
+/// blind das Session-Cookie-`SameSite` übernommen (zufällig ebenfalls `Lax`, aber aus einem
+/// anderen Grund — kein Kopiervorlage-Argument).
+///
+/// Kein `max_age`/`Expires`: wie die übrigen State-Cookies in dieser Datei (`mfa_pending`,
+/// `webauthn_reg`, `webauthn_auth`) trägt dieses Cookie keine explizite Lebensdauer — es wird
+/// stattdessen aktiv auf JEDEM `oidc_callback`-Rückgabepfad entfernt (`raeume_oidc_state_cookie`).
+/// Das Backend-`state`-Store-TTL (`auth::oidc::state`, 10 Minuten) begrenzt ohnehin, wie lange
+/// ein nicht abgeschlossener Flow überhaupt noch gültig wäre. (`time::Duration` für `max_age`
+/// steht hier zudem gar nicht zur Verfügung — die `time`-Crate ist nur eine transitive
+/// `cookie`-Abhängigkeit, nicht in `Cargo.toml` direkt deklariert.)
+fn baue_oidc_state_cookie(state: String, secure: bool) -> Cookie<'static> {
+    Cookie::build((OIDC_STATE_COOKIE, state))
+        .http_only(true)
+        .same_site(SameSite::Lax)
+        .secure(secure)
+        .path("/")
+        .build()
+}
+
+/// Removal-Cookie für `OIDC_STATE_COOKIE` — analog den `jar.remove(Cookie::build((NAME, ""))…)`-
+/// Aufrufen in `logout`/`webauthn_register_finish`/`webauthn_auth_finish`/`totp_finish`: leerer
+/// Wert, `path` muss dem Setz-Cookie entsprechen, damit der Browser ihn matcht. Eigene Funktion
+/// (statt Inline wie an den anderen Stellen), weil `oidc_callback` sie auf JEDEM Rückgabepfad
+/// braucht (Erfolg wie jeder Fehlerzweig) — Inline würde sich mehrfach wiederholen.
+fn raeume_oidc_state_cookie() -> Cookie<'static> {
+    Cookie::build((OIDC_STATE_COOKIE, "")).path("/").build()
+}
+
+/// True nur, wenn der Binding-Cookie-Wert exakt dem zurückgegebenen `state`-Query entspricht
+/// (Session-Fixation-Defense, LFH-277). Pur/ohne `CookieJar`, damit die Kernlogik ohne
+/// HTTP-Harness testbar ist.
+fn oidc_state_binding_ok(cookie_state: Option<&str>, state_query: &str) -> bool {
+    cookie_state == Some(state_query)
+}
+
 /// GET /api/auth/oidc/start — Authorization-Redirect zum konfigurierten OIDC-Provider
 /// (PocketID, LFH-41). Enforcement über die Provider-Registry: ist `oidc` nicht gelistet
 /// (nicht konfiguriert) oder deaktiviert, liefert dieser Handler `404` — genau wie ein
 /// unbekannter Provider bei `provider_schalten`. Ein IdP-/Discovery-Fehler (unerreichbarer
 /// Server, kaputte Metadaten) leakt NICHT als 500, sondern leitet zurück auf die Login-Seite
 /// mit einem generischen Fehlerhinweis — der lokale Passwort-Login bleibt davon unberührt.
+///
+/// Setzt (nach `state::speichere`) das HttpOnly-`oidc_state`-Binding-Cookie mit dem `csrf`-Wert
+/// (Session-Fixation-Defense, LFH-277) — `oidc_callback` erzwingt später, dass dieser Cookie-
+/// Wert exakt dem zurückgegebenen `state`-Query entspricht.
 pub async fn oidc_start(
     State(state): State<AppState>,
+    jar: CookieJar,
     Query(query): Query<OidcStartQuery>,
-) -> Result<Redirect, AppError> {
+) -> Result<(CookieJar, Redirect), AppError> {
     let liste = crate::auth::provider::registry::liste(&state.pool).await?;
     let oidc_aktiv = liste
         .iter()
@@ -246,7 +323,9 @@ pub async fn oidc_start(
 
     let client = match crate::auth::oidc::oidc_client(crate::auth::oidc::oidc_settings()).await {
         Ok(client) => client,
-        Err(_) => return Ok(oidc_fehler_redirect()),
+        // Noch kein `state` erzeugt/gespeichert — kein Binding-Cookie zu setzen, `jar` geht
+        // unverändert durch.
+        Err(_) => return Ok((jar, oidc_fehler_redirect())),
     };
 
     let ziel_pfad = ziel_pfad_aus_query(query.von);
@@ -274,7 +353,12 @@ pub async fn oidc_start(
         },
     );
 
-    Ok(Redirect::to(auth_url.as_str()))
+    // Binding-Cookie (Session-Fixation-Defense, LFH-277) — s. `baue_oidc_state_cookie`-Doc.
+    let jar = jar.add(baue_oidc_state_cookie(
+        csrf.secret().clone(),
+        session::cookie_secure(),
+    ));
+    Ok((jar, Redirect::to(auth_url.as_str())))
 }
 
 /// Alle drei Felder optional: der IdP kann statt `code`/`state` einen `error`-Query-Param
@@ -299,32 +383,43 @@ fn oidc_fehler_redirect() -> Redirect {
 }
 
 /// GET /api/auth/oidc/callback — Token-Tausch, `id_token`-Validierung, JIT-Provisioning,
-/// Session (LFH-41, Increment 3). **Security-kritisch**, Reihenfolge ist bewusst:
+/// Session (LFH-41, Increment 3; state-Cookie-Bindung LFH-277). **Security-kritisch**,
+/// Reihenfolge ist bewusst:
 ///
 /// 1. Enforcement wie `oidc_start` (dieselbe Registry-Prüfung) → 404, falls `oidc` nicht
 ///    konfiguriert/aktiviert ist.
 /// 2. IdP-Error-Callback (`?error=...`, ein normaler Ablauf bei abgelehnter Zustimmung) ODER
 ///    fehlendes `code`/`state`: ein evtl. vorhandener State-Eintrag wird noch konsumiert, dann
-///    generischer Redirect — NOCH VOR `state::entnehme`s eigentlicher Verwendung unten.
-/// 3. `state::entnehme(state)` — **SYNC, GANZ ZUERST** (nach Schritt 2): der State-Store-Guard
-///    wird darin bereits vor der Rückgabe freigegeben (Task 3/Modul-Doc `state.rs`). Ab hier darf
-///    beliebig `.await`et werden, ohne einen std-Mutex-Guard über eine Await-Grenze zu halten
-///    (Plan-MUST „!Send"). `None` (unbekannt/abgelaufen/schon verbraucht) → generischer Redirect,
-///    NOCH VOR jedem Netzzugriff (Token-Tausch/Discovery).
-/// 4. Token-Tausch (`tausche_code_gegen_token`) — erst NACH dem Guard-Drop.
-/// 5. `id_token`-Validierung über `openidconnect` (`id_token.claims(&verifier, &nonce)`):
+///    generischer Redirect (MIT geräumtem Binding-Cookie) — NOCH VOR `state::entnehme`s
+///    eigentlicher Verwendung unten.
+/// 3. **[LFH-277] Binding-Check:** der `oidc_state`-Cookie-Wert wird gelesen — **VOR** dem
+///    Räumen (`jar.remove` markiert den Delta-Eintrag für denselben Namen im `jar` als entfernt,
+///    ein Lesen danach sähe nichts mehr). Erst NACH dem Lesen wird das Removal-Cookie per
+///    `jar.remove` aus dem `jar` entfernt (`raeume_oidc_state_cookie`) — ab hier trägt JEDER
+///    weitere Rückgabepfad (Erfolg wie Fehler) das geräumte Cookie. Stimmt der gelesene
+///    Cookie-Wert nicht exakt mit dem `state`-Query überein (`oidc_state_binding_ok`, auch bei
+///    fehlendem Cookie), generischer Redirect — **NOCH VOR** `state::entnehme`: ein
+///    Binding-Fehlschlag konsumiert den State-Store-Eintrag nicht (der legitime, vom
+///    Opfer-Browser gestartete Flow bleibt nutzbar).
+/// 4. `state::entnehme(state)` — **SYNC** (nach Schritt 3): der State-Store-Guard wird darin
+///    bereits vor der Rückgabe freigegeben (Task 3/Modul-Doc `state.rs`). Ab hier darf beliebig
+///    `.await`et werden, ohne einen std-Mutex-Guard über eine Await-Grenze zu halten (Plan-MUST
+///    „!Send"). `None` (unbekannt/abgelaufen/schon verbraucht) → generischer Redirect, NOCH VOR
+///    jedem Netzzugriff (Token-Tausch/Discovery).
+/// 5. Token-Tausch (`tausche_code_gegen_token`) — erst NACH dem Guard-Drop.
+/// 6. `id_token`-Validierung über `openidconnect` (`id_token.claims(&verifier, &nonce)`):
 ///    verifiziert Signatur (JWKS), `nonce`, `iss`, `aud`, `exp`.
-/// 6. JIT-Provisioning (`finde_oder_provisioniere`, Match ausschließlich über `(issuer, sub)`).
-/// 7. **[MUST — Task-2-Handoff]** `finde_oder_provisioniere` matcht/legt unabhängig von
+/// 7. JIT-Provisioning (`finde_oder_provisioniere`, Match ausschließlich über `(issuer, sub)`).
+/// 8. **[MUST — Task-2-Handoff]** `finde_oder_provisioniere` matcht/legt unabhängig von
 ///    `benutzer.aktiv` an — ein deaktiviertes SSO-Konto wird HIER zurückgewiesen, es entsteht
 ///    keine Session.
-/// 8. Session anlegen, Cookie setzen, Redirect auf `eintrag.ziel_pfad` (bereits in Task 5
+/// 9. Session anlegen, Cookie setzen, Redirect auf `eintrag.ziel_pfad` (bereits in Task 5
 ///    Open-Redirect-geprüft, daher hier sicher ausgebbar).
 ///
-/// JEDER Fehler ab Schritt 2 (IdP-Error/fehlende Felder/state/Token/Validierung/Aktiv-Check)
-/// mündet in DENSELBEN generischen Redirect — kein Server-Fehler, kein IdP-/Token-Detail-Leak.
-/// Nur Datenbankfehler (Registry-Lookup, Provisioning, Session) propagieren als `AppError`
-/// (generisches 500, wie überall sonst) — sie enthalten keine IdP-/Token-Details.
+/// JEDER Fehler ab Schritt 2 (IdP-Error/fehlende Felder/Binding/state/Token/Validierung/
+/// Aktiv-Check) mündet in DENSELBEN generischen Redirect — kein Server-Fehler, kein IdP-/
+/// Token-Detail-Leak. Nur Datenbankfehler (Registry-Lookup, Provisioning, Session) propagieren
+/// als `AppError` (generisches 500, wie überall sonst) — sie enthalten keine IdP-/Token-Details.
 pub async fn oidc_callback(
     State(state): State<AppState>,
     jar: CookieJar,
@@ -343,12 +438,16 @@ pub async fn oidc_callback(
     // `state` (durch die jetzt optionalen Felder lehnt der `Query`-Extractor das nicht mehr mit
     // einer rohen 400 ab): kein Token-Tausch, generischer Redirect wie jeder andere Fehler. Ein
     // evtl. bereits gespeicherter State-Eintrag wird noch KONSUMIERT (nicht nur ignoriert), damit
-    // er nicht bis zum TTL-Ablauf verwaist in der Map hängen bleibt.
+    // er nicht bis zum TTL-Ablauf verwaist in der Map hängen bleibt. Binding-Cookie räumen wie
+    // auf jedem anderen Rückgabepfad (LFH-277).
     if query.error.is_some() || query.code.is_none() || query.state.is_none() {
         if let Some(s) = &query.state {
             let _ = crate::auth::oidc::state::entnehme(s);
         }
-        return Ok((jar, oidc_fehler_redirect()));
+        return Ok((
+            jar.remove(raeume_oidc_state_cookie()),
+            oidc_fehler_redirect(),
+        ));
     }
     // Ab hier sind `code`/`state` durch den Guard oben beide garantiert vorhanden.
     let code = query.code.expect("Guard oben stellt sicher: code ist Some");
@@ -356,7 +455,22 @@ pub async fn oidc_callback(
         .state
         .expect("Guard oben stellt sicher: state ist Some");
 
-    // SYNC, VOR jedem `.await`: siehe Doc-Kommentar oben (Punkt 2) + `state.rs`. Lastragend
+    // [LFH-277] Binding-Check — s. Doc-Kommentar oben (Punkt 3). Cookie-Wert VOR dem Räumen
+    // lesen: das Räum-Cookie trägt denselben Namen (`OIDC_STATE_COOKIE`) im `jar` — ein `get`
+    // NACH dem `remove` sähe nichts mehr (der Delta-Eintrag ist als entfernt markiert), jede
+    // Anmeldung würde dann fälschlich am Binding-Check scheitern.
+    let cookie_state = jar.get(OIDC_STATE_COOKIE).map(|c| c.value().to_string());
+    // Ab hier trägt jeder weitere Rückgabepfad (Erfolg wie Fehler) das geräumte Cookie.
+    let jar = jar.remove(raeume_oidc_state_cookie());
+    if !oidc_state_binding_ok(cookie_state.as_deref(), &state_key) {
+        // Bewusst KEIN `state::entnehme` hier: ein Binding-Fehlschlag darf den State-Store-
+        // Eintrag NICHT konsumieren — s. Doc-Kommentar Punkt 3 (der legitime Flow des Opfer-
+        // Browsers bleibt dadurch nutzbar, statt von einem gefälschten Callback-Versuch
+        // "verbrannt" zu werden).
+        return Ok((jar, oidc_fehler_redirect()));
+    }
+
+    // SYNC, VOR jedem `.await`: siehe Doc-Kommentar oben (Punkt 4) + `state.rs`. Lastragend
     // (nicht nur !Send-relevant): dieser Aufruf MUSS vor dem Token-Tausch/Discovery unten stehen,
     // damit ein unbekannter/abgelaufener `state` VOR jedem Netzzugriff zum Fehler-Redirect
     // kurzschließt (Security-Reihenfolge, kein Test pinnt das — ein Refactor darf diese Zeile
@@ -387,7 +501,7 @@ pub async fn oidc_callback(
         return Ok((jar, oidc_fehler_redirect()));
     };
 
-    // Verifiziert Signatur (JWKS), `nonce`, `iss`, `aud`, `exp` — siehe Doc-Kommentar Punkt 4.
+    // Verifiziert Signatur (JWKS), `nonce`, `iss`, `aud`, `exp` — siehe Doc-Kommentar Punkt 6.
     let Ok(claims) = id_token.claims(&client.id_token_verifier(), &Nonce::new(eintrag.nonce))
     else {
         return Ok((jar, oidc_fehler_redirect()));
@@ -412,7 +526,7 @@ pub async fn oidc_callback(
         crate::auth::oidc::provisioning::finde_oder_provisioniere(&state.pool, &oidc_claims)
             .await?;
 
-    // [MUST — Task-2-Handoff] siehe Doc-Kommentar Punkt 6.
+    // [MUST — Task-2-Handoff] siehe Doc-Kommentar Punkt 8.
     if !benutzer.aktiv {
         return Ok((jar, oidc_fehler_redirect()));
     }
@@ -1048,5 +1162,74 @@ mod tests {
         );
         assert_eq!(ziel_pfad_aus_query(None), "/einsaetze");
         assert_eq!(ziel_pfad_aus_query(Some(String::new())), "/einsaetze");
+    }
+
+    // ===== OIDC-state-Cookie-Bindung (Session-Fixation-Defense, LFH-277) =====
+
+    #[test]
+    fn oidc_state_cookie_ist_httponly_lax_und_pfadweit() {
+        let c = baue_oidc_state_cookie("abc123".to_string(), true);
+        assert_eq!(c.name(), OIDC_STATE_COOKIE);
+        assert_eq!(c.value(), "abc123");
+        assert_eq!(c.http_only(), Some(true));
+        // MUST Lax (nicht Strict): Cross-Site-Redirect vom IdP muss das Cookie mitschicken.
+        assert_eq!(c.same_site(), Some(SameSite::Lax));
+        assert_eq!(c.path(), Some("/"));
+        assert_eq!(c.secure(), Some(true));
+    }
+
+    #[test]
+    fn oidc_state_cookie_secure_folgt_parameter() {
+        // Diskriminierend wie `session_cookie_secure_folgt_parameter`: beide Zweige geprüft,
+        // kein prozessweiter OnceLock im Test.
+        assert_eq!(
+            baue_oidc_state_cookie("x".into(), true).secure(),
+            Some(true)
+        );
+        assert_ne!(
+            baue_oidc_state_cookie("x".into(), false).secure(),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn oidc_state_removal_cookie_leert_wert_und_pfad() {
+        let c = raeume_oidc_state_cookie();
+        assert_eq!(c.name(), OIDC_STATE_COOKIE);
+        assert_eq!(c.value(), "");
+        assert_eq!(c.path(), Some("/"));
+    }
+
+    #[test]
+    fn binding_match_nur_bei_gleichem_state() {
+        assert!(oidc_state_binding_ok(Some("s1"), "s1"));
+        assert!(!oidc_state_binding_ok(Some("anders"), "s1"));
+        assert!(!oidc_state_binding_ok(None, "s1"));
+    }
+
+    // ===== Public-vs-Admin-Provider-Projektion (LFH-277) =====
+
+    #[tokio::test]
+    async fn public_providers_verbergen_deaktivierte_admin_zeigt_sie() {
+        crate::auth::provider::registry::set_oidc_konfiguriert(true);
+        let pool = crate::db::test_pool().await;
+        crate::auth::provider::registry::schalten(&pool, crate::auth::provider::ID_OIDC, false)
+            .await
+            .unwrap();
+
+        let public = public_provider_projektion(
+            crate::auth::provider::registry::liste(&pool).await.unwrap(),
+        );
+        assert!(public.iter().all(|p| p.aktiviert), "public: nur aktivierte");
+        assert!(
+            !public.iter().any(|p| p.id == "oidc"),
+            "public: deaktiviertes oidc nicht sichtbar"
+        );
+
+        let admin = crate::auth::provider::registry::liste(&pool).await.unwrap();
+        assert!(
+            admin.iter().any(|p| p.id == "oidc" && !p.aktiviert),
+            "admin: deaktiviertes oidc sichtbar"
+        );
     }
 }
