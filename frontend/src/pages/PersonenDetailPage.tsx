@@ -7,6 +7,7 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { aktualisierePerson, entscheideAbgleich, erfasseSichtung, erfasseVerbleib, ladePerson, ladePersonAudit, legeNotizAn, registrierAnzeige, setzePersonStatus, stornierePerson, type PersonEingabe } from '../api/einsatzPerson';
 import { listeTiere, tierRegistrierAnzeige } from '../api/einsatzTier';
 import { listeSchaeden, schadenRegistrierAnzeige } from '../api/einsatzSchaden';
+import { listeUhs, aenderePersonBelegung } from '../api/einsatzUhs';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { SK_META, STATUS_META } from '../personen/personMeta';
@@ -87,6 +88,12 @@ export default function PersonenDetailPage() {
     queryFn: () => listeSchaeden(einsatzId, { geschaedigtPersonId: personId, inklStorniert: false }),
     enabled: idGueltig,
   });
+  // LFH-152: UHS-Liste für die Klartext-Anzeige der aktuellen Verortung + den Zuweisungs-Picker.
+  const uhsListeQuery = useQuery({
+    queryKey: einsatzKeys.uhs(einsatzId),
+    queryFn: () => listeUhs(einsatzId),
+    enabled: idGueltig,
+  });
   const auditQuery = useQuery({
     queryKey: einsatzKeys.personAudit(einsatzId, personId),
     queryFn: () => ladePersonAudit(einsatzId, personId),
@@ -134,6 +141,30 @@ export default function PersonenDetailPage() {
         status: v.art === 'transport' ? 'abtransportiert' : null, notiz: v.notiz ?? null,
       }),
     onSuccess: () => { invalidateDetail(); setVerbleibOffen(false); verbleibForm.resetFields(); },
+    onError: fehler,
+  });
+
+  // LFH-152: UHS-Zuweisung von der Personen-Seite (Gegenrichtung zum Grundriss). art spiegelt
+  // die belegMut-Logik des Grundrisses: bereits belegt → wechsel, sonst eintritt. Austragen = austritt.
+  const [uhsModalOffen, setUhsModalOffen] = useState(false);
+  const [uhsForm] = Form.useForm<{ uhs_id: number; notiz?: string }>();
+  function invalidateUhs() {
+    invalidateDetail();
+    qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
+  }
+  const belegungMutation = useMutation({
+    mutationFn: (v: { uhs_id: number; notiz?: string }) =>
+      aenderePersonBelegung(einsatzId, personId, {
+        art: detailQuery.data?.aktuelle_uhs_id ? 'wechsel' : 'eintritt',
+        uhs_id: v.uhs_id,
+        notiz: v.notiz ?? null,
+      }),
+    onSuccess: () => { invalidateUhs(); setUhsModalOffen(false); uhsForm.resetFields(); },
+    onError: fehler,
+  });
+  const austrittMutation = useMutation({
+    mutationFn: () => aenderePersonBelegung(einsatzId, personId, { art: 'austritt' }),
+    onSuccess: invalidateUhs,
     onError: fehler,
   });
 
@@ -374,6 +405,39 @@ export default function PersonenDetailPage() {
           )}
         </div>
 
+        <div>
+          <Typography.Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
+            UHS-Verortung
+          </Typography.Text>
+          <div style={{ marginTop: 4 }}>
+            {person.aktuelle_uhs_id != null ? (
+              <Space wrap>
+                <Tag color="blue">
+                  {uhsListeQuery.data?.find((u) => u.id === person.aktuelle_uhs_id)?.bezeichnung
+                    ?? `UHS #${person.aktuelle_uhs_id}`}
+                </Tag>
+                {darfSchreiben && !person.storniert_at && (
+                  <>
+                    <Button size="small" onClick={() => { uhsForm.resetFields(); setUhsModalOffen(true); }}>
+                      UHS ändern
+                    </Button>
+                    <Button size="small" danger onClick={() => austrittMutation.mutate()}>Austragen</Button>
+                  </>
+                )}
+              </Space>
+            ) : (
+              <Space wrap>
+                <Typography.Text type="secondary">keiner UHS zugewiesen</Typography.Text>
+                {darfSchreiben && !person.storniert_at && !person.aktueller_verbleib && (
+                  <Button size="small" onClick={() => { uhsForm.resetFields(); setUhsModalOffen(true); }}>
+                    UHS zuweisen
+                  </Button>
+                )}
+              </Space>
+            )}
+          </div>
+        </div>
+
         {einsatz.meine_rolle === 'einsatzleitung' && (
           <div>
             <Typography.Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
@@ -480,6 +544,28 @@ export default function PersonenDetailPage() {
           <Form.Item label="Ziel (z. B. Krankenhaus, Freitext)" name="ziel"><Input /></Form.Item>
           <Form.Item label="Transportmittel (RTW/KTW …)" name="transportmittel"><Input /></Form.Item>
           <Form.Item label="Notiz" name="notiz"><Input.TextArea rows={2} /></Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        open={uhsModalOffen}
+        title="UHS zuweisen"
+        okText="Zuweisen"
+        confirmLoading={belegungMutation.isPending}
+        onOk={() => uhsForm.submit()}
+        onCancel={() => { setUhsModalOffen(false); uhsForm.resetFields(); }}
+        destroyOnHidden
+      >
+        <Form form={uhsForm} layout="vertical" onFinish={(v) => belegungMutation.mutate(v)}>
+          <Form.Item label="Unfallhilfsstelle" name="uhs_id" rules={[{ required: true, message: 'Bitte UHS wählen' }]}>
+            <Select
+              placeholder="aktive UHS wählen"
+              options={(uhsListeQuery.data ?? [])
+                .filter((u) => u.status === 'aktiv')
+                .map((u) => ({ value: u.id, label: u.bezeichnung }))}
+            />
+          </Form.Item>
+          <Form.Item label="Notiz (optional)" name="notiz"><Input /></Form.Item>
         </Form>
       </Modal>
     </div>

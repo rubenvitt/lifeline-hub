@@ -49,6 +49,7 @@ function render(einsatzObj: typeof einsatzAktiv, person: PersonDetail, extra: Pa
     http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(person)),
     http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/personen/10/audit', () => HttpResponse.json([])),
   );
   // extra-Handler separat prependen, damit sie Vorrang vor den Default-Handlern haben.
@@ -259,5 +260,82 @@ describe('PersonenDetailPage — Robustheit', () => {
     render(einsatzAktiv, unverletzt);
     await screen.findByRole('heading', { name: /Person R-001/ });
     expect(screen.queryByText('Patient')).not.toBeInTheDocument();
+  });
+});
+
+// LFH-152: Gegenrichtung zum UHS-Grundriss — Person von ihrer Detailseite aus einer
+// UHS/einem Platz zuweisen (eintritt/wechsel), austragen (austritt); art spiegelt die
+// belegMut-Logik des Grundrisses (aktuelle_uhs_id ? 'wechsel' : 'eintritt').
+const uhsListe = [
+  { id: 5, einsatz_id: 1, bezeichnung: 'BHP 50', typ: 'behandlungsplatz', status: 'aktiv', abschnitt_id: null, standort: null, notiz: null },
+  { id: 6, einsatz_id: 1, bezeichnung: 'PA 1', typ: 'patientenablage', status: 'aktiv', abschnitt_id: null, standort: null, notiz: null },
+];
+
+describe('PersonenDetailPage — UHS-Zuweisung (LFH-152)', () => {
+  it('zeigt die aktuelle UHS-Verortung im Klartext', async () => {
+    const belegt = { ...detail, aktuelle_uhs_id: 5 } as PersonDetail;
+    render(einsatzAktiv, belegt, [
+      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(uhsListe)),
+    ]);
+    expect(await screen.findByText('BHP 50')).toBeInTheDocument();
+  });
+
+  it('weist eine noch nicht verortete Person einer UHS zu (art=eintritt)', async () => {
+    let gesendet: { art?: string; uhs_id?: number } = {};
+    render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(uhsListe)),
+      http.post('/api/einsaetze/1/personen/10/uhs-belegung', async ({ request }) => {
+        gesendet = await request.json() as { art?: string; uhs_id?: number };
+        return HttpResponse.json({ id: 1, einsatz_id: 1, person_id: 10, uhs_id: 5, platz_id: null,
+          art: 'eintritt', notiz: null, zeitpunkt_at: '2026-05-27 10:00:00', erfasst_von: 1 }, { status: 201 });
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'UHS zuweisen' }));
+    await userEvent.click(await screen.findByRole('combobox', { name: /Unfallhilfsstelle/ }));
+    await userEvent.click(await screen.findByText('BHP 50'));
+    await userEvent.click(screen.getByRole('button', { name: 'Zuweisen' }));
+    await vi.waitFor(() => expect(gesendet).toMatchObject({ art: 'eintritt', uhs_id: 5 }));
+  });
+
+  it('wechselt die UHS einer bereits verorteten Person (art=wechsel)', async () => {
+    let gesendet: { art?: string; uhs_id?: number } = {};
+    const belegt = { ...detail, aktuelle_uhs_id: 5 } as PersonDetail;
+    render(einsatzAktiv, belegt, [
+      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(uhsListe)),
+      http.post('/api/einsaetze/1/personen/10/uhs-belegung', async ({ request }) => {
+        gesendet = await request.json() as { art?: string; uhs_id?: number };
+        return HttpResponse.json({ id: 2, einsatz_id: 1, person_id: 10, uhs_id: 6, platz_id: null,
+          art: 'wechsel', notiz: null, zeitpunkt_at: '2026-05-27 10:00:00', erfasst_von: 1 }, { status: 201 });
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'UHS ändern' }));
+    await userEvent.click(await screen.findByRole('combobox', { name: /Unfallhilfsstelle/ }));
+    await userEvent.click(await screen.findByText('PA 1'));
+    await userEvent.click(screen.getByRole('button', { name: 'Zuweisen' }));
+    await vi.waitFor(() => expect(gesendet).toMatchObject({ art: 'wechsel', uhs_id: 6 }));
+  });
+
+  it('trägt eine verortete Person aus der UHS aus (art=austritt)', async () => {
+    let gesendet: { art?: string } = {};
+    const belegt = { ...detail, aktuelle_uhs_id: 5 } as PersonDetail;
+    render(einsatzAktiv, belegt, [
+      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(uhsListe)),
+      http.post('/api/einsaetze/1/personen/10/uhs-belegung', async ({ request }) => {
+        gesendet = await request.json() as { art?: string };
+        return HttpResponse.json({ id: 3, einsatz_id: 1, person_id: 10, uhs_id: 5, platz_id: null,
+          art: 'austritt', notiz: null, zeitpunkt_at: '2026-05-27 10:00:00', erfasst_von: 1 }, { status: 201 });
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Austragen' }));
+    await vi.waitFor(() => expect(gesendet).toMatchObject({ art: 'austritt' }));
+  });
+
+  it('bietet bei gesetztem Verbleib kein Zuweisen an (Grundriss-Konsistenz)', async () => {
+    const transportiert = { ...detail, aktueller_verbleib: 'transport' } as PersonDetail;
+    render(einsatzAktiv, transportiert, [
+      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(uhsListe)),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(screen.queryByRole('button', { name: 'UHS zuweisen' })).not.toBeInTheDocument();
   });
 });
