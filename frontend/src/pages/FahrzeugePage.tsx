@@ -1,7 +1,5 @@
-import {
-  Alert, App, Breadcrumb, Button, Form, Input, Modal, Popconfirm, Select, Space, Spin,
-  Table, Tag, Typography, type TableColumnsType,
-} from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Popconfirm, Space, Spin, Table, Tag, Typography, type TableColumnsType } from 'antd';
+import { Select } from '../components/Select';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -122,7 +120,6 @@ function BesatzungsBlock({
           style={{ width: '100%', maxWidth: 420, marginTop: 8 }}
           placeholder="Kraft zur Besatzung …"
           value={null}
-          showSearch={{ optionFilterProp: 'label' }}
           notFoundContent="Keine freien Kräfte"
           options={frei.map((p) => ({ value: p.id, label: p.name }))}
           onSelect={(epId) => onZuordnen(Number(epId))}
@@ -314,7 +311,6 @@ export default function FahrzeugePage() {
               placeholder="Stamm-Fahrzeug disponieren …"
               value={null}
               options={poolOptionen}
-              showSearch={{ optionFilterProp: 'label' }}
               notFoundContent="Keine freien Fahrzeuge"
               onSelect={(fahrzeugId) => { if (fahrzeugId != null) disponiereMutation.mutate(fahrzeugId); }}
             />

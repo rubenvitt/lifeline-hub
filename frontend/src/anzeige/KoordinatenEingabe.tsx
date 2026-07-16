@@ -1,4 +1,5 @@
-import { Input, Select, Space, Typography } from 'antd';
+import { Input, Space, Typography } from 'antd';
+import { Select } from '../components/Select';
 import { useEffect, useState } from 'react';
 import type { Koordinatenformat } from '../api/types';
 import { formatiere, parse, type LatLon } from './koordinaten';

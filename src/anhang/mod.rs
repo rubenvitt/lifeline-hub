@@ -82,6 +82,42 @@ pub fn ermittle_mime(dateiname: &str) -> Result<String, AppError> {
     Ok(mime.to_string())
 }
 
+/// Baut einen sicheren `Content-Disposition`-Wert: reiner ASCII-Fallback plus
+/// RFC-5987 `filename*` mit prozent-kodiertem UTF-8, damit Dateinamen mit
+/// Umlauten korrekt ankommen, ohne dass `HeaderValue::from_str` scheitert.
+/// Geteilte Asset-Auslieferungs-Infrastruktur (LFH-238): sowohl der generische
+/// Anhang-Download als auch der Karten-Hintergrundbild-Download nutzen sie, damit
+/// beide Pfade konsistent `attachment` mit korrekt kodiertem Dateinamen liefern.
+pub fn content_disposition(dateiname: &str) -> String {
+    let ascii: String = dateiname
+        .chars()
+        .map(|c| {
+            if c.is_ascii_graphic() && c != '"' && c != '\\' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    format!(
+        "attachment; filename=\"{ascii}\"; filename*=UTF-8''{}",
+        prozent_kodiere(dateiname)
+    )
+}
+
+/// Minimale Prozent-Kodierung (RFC 3986 unreserved bleibt erhalten).
+fn prozent_kodiere(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.as_bytes() {
+        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~') {
+            out.push(*b as char);
+        } else {
+            out.push_str(&format!("%{b:02X}"));
+        }
+    }
+    out
+}
+
 /// Ergebnis eines AV-Scans (LFH-114) — Eingabe für die reine [`entscheide`]-Logik.
 #[derive(Debug, PartialEq, Eq)]
 pub enum ScanErgebnis {
@@ -271,6 +307,18 @@ mod tests {
             ermittle_mime("ohne_endung").unwrap_err(),
             AppError::Validation(_)
         ));
+    }
+
+    #[test]
+    fn content_disposition_kodiert_umlaute_und_bleibt_ascii() {
+        let cd = content_disposition("Lageübersicht \"v2\".pdf");
+        assert!(cd.is_ascii(), "Header-Wert muss reines ASCII sein");
+        assert!(cd.starts_with("attachment"));
+        assert!(cd.contains("filename*=UTF-8''"));
+        // Umlaut prozent-kodiert (ü = C3 BC in UTF-8).
+        assert!(cd.contains("%C3%BC"));
+        // Quotes im ASCII-Fallback ersetzt.
+        assert!(!cd.contains("\"v2\""));
     }
 
     // --- AV-Scan-Entscheidung (LFH-114) ---

@@ -1,4 +1,5 @@
-import { Badge, Button, Card, Empty, Popconfirm, Radio, Select, Slider, Space, Spin, Switch, Tooltip, Typography, Upload } from 'antd';
+import { Badge, Button, Card, Empty, Popconfirm, Radio, Slider, Space, Spin, Switch, Tooltip, Typography, Upload } from 'antd';
+import { Select } from '../../components/Select';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { AimOutlined, DeleteOutlined, FullscreenOutlined, UploadOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';

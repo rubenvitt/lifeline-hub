@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Button, Popconfirm, Select, Space, Table, Modal, App } from 'antd';
+import { Button, Popconfirm, Space, Table, Modal, App } from 'antd';
+import { Select } from '../../components/Select';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { listeEinsatzMaterial, aktualisiereDisposition } from '../../api/einsatzMaterial';
 import type { EinsatzMaterial, UhsDetail } from '../../api/types';

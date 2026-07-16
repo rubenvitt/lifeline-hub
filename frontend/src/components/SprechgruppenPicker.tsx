@@ -1,4 +1,5 @@
-import { App, Button, Input, Select, Space } from 'antd';
+import { App, Button, Input, Space } from 'antd';
+import { Select } from './Select';
 import { PlusOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -75,7 +76,6 @@ export default function SprechgruppenPicker({ einsatzId, value = [], onChange }:
         options={gruppen}
         placeholder="Sprechgruppen auswählen"
         style={{ width: '100%' }}
-        showSearch={{ optionFilterProp: 'label' }}
         allowClear
       />
 

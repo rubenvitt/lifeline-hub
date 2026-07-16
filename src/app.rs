@@ -8,6 +8,13 @@ use axum::{
 };
 use sqlx::SqlitePool;
 use std::path::PathBuf;
+use tower::limit::ConcurrencyLimitLayer;
+
+/// Admission-Control für die BLOB-Asset-Downloads (LFH-258): begrenzt die gleichzeitig
+/// laufenden Voll-BLOB-Reads (bis 25 MiB je Anhang → RAM-Druck). BEWUSST nur auf die
+/// Download-Routen gelegt, NICHT Router-weit — ein globaler Limiter würde die langlebigen
+/// SSE-Streams (eine EventSource je Einsatz, HTTP/1.1-6-Verbindungs-Limit) aushungern.
+const MAX_GLEICHZEITIGE_ASSET_DOWNLOADS: usize = 16;
 
 /// Geteilter Anwendungszustand, der an alle Handler übergeben wird.
 #[derive(Clone)]
@@ -179,7 +186,11 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/anhaenge/{aid}",
-            get(routes::anhang::herunterladen),
+            get(routes::anhang::herunterladen)
+                .delete(routes::anhang::loeschen)
+                .layer(ConcurrencyLimitLayer::new(
+                    MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
+                )),
         )
         .route(
             "/api/einsaetze/{id}/erinnerungen",
@@ -642,7 +653,9 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/karte/hintergrundbilder/{bildId}/download",
-            get(routes::karte_hintergrundbild::herunterladen),
+            get(routes::karte_hintergrundbild::herunterladen).layer(ConcurrencyLimitLayer::new(
+                MAX_GLEICHZEITIGE_ASSET_DOWNLOADS,
+            )),
         )
         .route(
             "/api/einsaetze/{id}/karte/hintergrundbilder/{bildId}",

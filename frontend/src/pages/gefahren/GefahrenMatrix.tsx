@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Button, Input, Popover, Select, Space, Table } from 'antd';
+import { Button, Input, Popover, Space, Table } from 'antd';
+import { Select } from '../../components/Select';
 import { EditOutlined } from '@ant-design/icons';
 import type { TableColumnsType } from 'antd';
 import type { GefahrBewertung, Gefahrentyp, Schutzobjekt, Warnstufe } from '../../api/types';

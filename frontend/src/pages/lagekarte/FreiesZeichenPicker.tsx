@@ -1,4 +1,5 @@
-import { Input, Select, Space } from 'antd';
+import { Input, Space } from 'antd';
+import { Select } from '../../components/Select';
 import TaktischesZeichen, {
   einheiten,
   fachaufgaben,

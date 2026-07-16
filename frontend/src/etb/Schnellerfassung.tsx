@@ -1,4 +1,5 @@
-import { Alert, Button, Card, Select, Space } from 'antd';
+import { Alert, Button, Card, Space } from 'antd';
+import { Select } from '../components/Select';
 import { PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';

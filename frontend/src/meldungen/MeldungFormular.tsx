@@ -1,4 +1,5 @@
-import { Button, Card, Col, DatePicker, Form, Input, InputNumber, Row, Select, Space, Switch } from 'antd';
+import { Button, Card, Col, DatePicker, Form, Input, InputNumber, Row, Space, Switch } from 'antd';
+import { Select } from '../components/Select';
 import { ThunderboltOutlined, SendOutlined } from '@ant-design/icons';
 import { useEffect } from 'react';
 import dayjs from 'dayjs';

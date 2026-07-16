@@ -7,12 +7,39 @@
 //! Event-Name und Payload-Keys).
 
 use crate::live::LiveNachricht;
+use axum::http::{header, HeaderMap};
 use axum::response::sse::Event;
 use serde::Deserialize;
 use std::convert::Infallible;
 use tokio::sync::broadcast::Receiver;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::{Stream, StreamExt};
+
+/// `Cache-Control` für ausgelieferte BLOB-Assets (Anhänge, Karten-Hintergrundbilder,
+/// LFH-258): auth-gated (→ `private`), inhaltsadressiert und je `id` unveränderlich
+/// (→ `immutable` + langes `max-age`). Der ETag (sha256) erlaubt Revalidierung; ein
+/// Byte-Wechsel bekäme ohnehin eine neue `id`. Geteilt, damit beide Asset-Download-Pfade
+/// dieselbe Policy tragen.
+pub const ASSET_CACHE_CONTROL: &str = "private, max-age=31536000, immutable";
+
+/// Starker ETag aus dem sha256-Hex (gequotet).
+pub fn etag_von(sha256: &str) -> String {
+    format!("\"{sha256}\"")
+}
+
+/// Ob der `If-None-Match`-Request-Header den ETag (oder `*`) enthält → 304-Kurzschluss.
+/// Toleriert die kommaseparierte Mehrfach-Liste des Headers.
+pub fn if_none_match_matcht(headers: &HeaderMap, etag: &str) -> bool {
+    headers
+        .get(header::IF_NONE_MATCH)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| {
+            v.split(',').any(|kandidat| {
+                let kandidat = kandidat.trim();
+                kandidat == "*" || kandidat == etag
+            })
+        })
+}
 
 /// Trimmt einen optionalen String und macht ihn bei leerem Ergebnis zu `None`
 /// (leerer/Whitespace-only-Input zählt als „nicht gesetzt").
@@ -79,5 +106,29 @@ mod tests {
         // Konkreter Wert → Some(Some(v)).
         let p: Patch = serde_json::from_str(r#"{"feld": 42}"#).unwrap();
         assert_eq!(p.feld, Some(Some(42)));
+    }
+
+    fn inm(wert: &str) -> HeaderMap {
+        let mut h = HeaderMap::new();
+        h.insert(header::IF_NONE_MATCH, wert.parse().unwrap());
+        h
+    }
+
+    #[test]
+    fn if_none_match_matcht_exakt_stern_und_liste() {
+        let etag = etag_von("a".repeat(64).as_str());
+        // Exakter Treffer.
+        assert!(if_none_match_matcht(&inm(&etag), &etag));
+        // Wildcard.
+        assert!(if_none_match_matcht(&inm("*"), &etag));
+        // Kommaliste mit Treffer.
+        assert!(if_none_match_matcht(
+            &inm(&format!("\"other\", {etag}")),
+            &etag
+        ));
+        // Kein Treffer.
+        assert!(!if_none_match_matcht(&inm("\"deadbeef\""), &etag));
+        // Fehlender Header.
+        assert!(!if_none_match_matcht(&HeaderMap::new(), &etag));
     }
 }

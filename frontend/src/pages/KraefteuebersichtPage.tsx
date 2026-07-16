@@ -1,4 +1,5 @@
-import { Alert, App as AntApp, Breadcrumb, Button, Card, Input, Select, Space, Spin, Statistic, Table, Tag, Typography } from 'antd';
+import { Alert, App as AntApp, Breadcrumb, Button, Card, Input, Space, Spin, Statistic, Table, Tag, Typography } from 'antd';
+import { Select } from '../components/Select';
 import type { ColumnsType } from 'antd/es/table';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import React, { useEffect, useMemo, useState } from 'react';

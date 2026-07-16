@@ -1,4 +1,5 @@
-import { DatePicker, Input, Select, Space } from 'antd';
+import { DatePicker, Input, Space } from 'antd';
+import { Select } from '../components/Select';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 import type { EtbFilterWerte } from '../api/etb';

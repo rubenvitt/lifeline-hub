@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { App, Form, Input, Modal, Select } from 'antd';
+import { App, Form, Input, Modal } from 'antd';
+import { Select } from '../../components/Select';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';

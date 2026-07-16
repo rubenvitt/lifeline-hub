@@ -90,6 +90,15 @@ pub fn starte_purge_scheduler(pool: SqlitePool) {
         loop {
             ticker.tick().await;
             tick_einmal(&pool, Utc::now()).await;
+            // Verwaiste Anhänge (hochgeladen-nicht-gesendet) jenseits der Karenz entfernen
+            // (LFH-250) — gegen monotones BLOB-Wachstum. Fehler nur loggen, nie den Tick killen.
+            match crate::anhang::repo::sweep_verwaiste(&pool, Utc::now()).await {
+                Ok(n) if n > 0 => {
+                    tracing::info!(anzahl = n, "Orphan-Sweep: verwaiste Anhänge gelöscht")
+                }
+                Ok(_) => {}
+                Err(e) => tracing::warn!("Orphan-Sweep fehlgeschlagen: {e}"),
+            }
         }
     });
 }
@@ -311,7 +320,7 @@ mod tests {
             super::repo::SCHWAERZUNG_PLATZHALTER,
             "Bildname (PII) geschwärzt"
         );
-        let (_, daten) = crate::karte_hintergrundbild::repo::laden_bytes(&pool, e, bild.id)
+        let (_, _, daten) = crate::karte_hintergrundbild::repo::laden_bytes(&pool, e, bild.id)
             .await
             .unwrap();
         assert!(!daten.is_empty(), "Bild-BLOB (Kartografie) bleibt erhalten");

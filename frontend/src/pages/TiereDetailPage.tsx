@@ -1,4 +1,5 @@
-import { Alert, App, Breadcrumb, Button, Descriptions, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Spin, Tag, Typography } from 'antd';
+import { Alert, App, Breadcrumb, Button, Descriptions, Form, Input, InputNumber, Modal, Popconfirm, Space, Spin, Tag, Typography } from 'antd';
+import { Select } from '../components/Select';
 import { useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';

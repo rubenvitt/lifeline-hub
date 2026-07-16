@@ -1,4 +1,5 @@
-import { Button, Card, Flex, Popconfirm, Select, Space, Tag, Typography, theme } from 'antd';
+import { Button, Card, Flex, Popconfirm, Space, Tag, Typography, theme } from 'antd';
+import { Select } from '../components/Select';
 import { ClockCircleOutlined } from '@ant-design/icons';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';

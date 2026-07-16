@@ -1,4 +1,5 @@
-import { Alert, App, Button, Card, Flex, Segmented, Select, Typography } from 'antd';
+import { Alert, App, Button, Card, Flex, Segmented, Typography } from 'antd';
+import { Select } from '../components/Select';
 import { CloseOutlined, PlusOutlined, UpOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';

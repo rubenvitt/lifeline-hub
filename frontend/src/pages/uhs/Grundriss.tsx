@@ -1,4 +1,5 @@
-import { App, Button, Card, Dropdown, Form, Input, InputNumber, Modal, Select, Space, Tag, Tooltip, Typography, theme } from 'antd';
+import { App, Button, Card, Dropdown, Form, Input, InputNumber, Modal, Space, Tag, Tooltip, Typography, theme } from 'antd';
+import { Select } from '../../components/Select';
 import {
   CarOutlined, CheckCircleOutlined, DeleteOutlined, LockOutlined, LogoutOutlined,
   SyncOutlined, ToolOutlined,

@@ -45,13 +45,35 @@ pub async fn laden(
     .ok_or(AppError::NotFound)
 }
 
+/// Lädt die Download-Metadaten OHNE die Bytes: `(name, mime, sha256)`. Speist die
+/// Cache-Header (ETag/Content-Type/Content-Disposition) und den `If-None-Match`-304-
+/// Kurzschluss, ohne den (teuren) BLOB zu lesen (LFH-258). `NotFound`, wenn das Bild
+/// nicht (zu diesem Einsatz) existiert.
+pub async fn meta_fuer_download(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<(String, String, String), AppError> {
+    sqlx::query_as::<_, (String, String, String)>(
+        "SELECT name, mime, sha256 FROM karte_hintergrundbild WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)
+}
+
+/// Lädt die Bytes eines Hintergrundbilds für den Download: `(name, mime, daten)`.
+/// `name` speist den `Content-Disposition`-Header (LFH-238). `NotFound`, wenn das
+/// Bild nicht (zu diesem Einsatz) existiert.
 pub async fn laden_bytes(
     pool: &SqlitePool,
     einsatz_id: i64,
     id: i64,
-) -> Result<(String, Vec<u8>), AppError> {
-    sqlx::query_as::<_, (String, Vec<u8>)>(
-        "SELECT mime, daten FROM karte_hintergrundbild WHERE id = ? AND einsatz_id = ?",
+) -> Result<(String, String, Vec<u8>), AppError> {
+    sqlx::query_as::<_, (String, String, Vec<u8>)>(
+        "SELECT name, mime, daten FROM karte_hintergrundbild WHERE id = ? AND einsatz_id = ?",
     )
     .bind(id)
     .bind(einsatz_id)
@@ -192,7 +214,8 @@ mod tests {
         assert_eq!(a.opazitaet, 100);
         assert!(a.sichtbar);
 
-        let (mime, daten) = laden_bytes(&pool, eid, a.id).await.unwrap();
+        let (name, mime, daten) = laden_bytes(&pool, eid, a.id).await.unwrap();
+        assert_eq!(name, "plan.png");
         assert_eq!(mime, "image/png");
         assert_eq!(daten, bytes);
 

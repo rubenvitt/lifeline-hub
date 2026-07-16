@@ -1,7 +1,5 @@
-import {
-  Alert, App, AutoComplete, Breadcrumb, Button, DatePicker, Descriptions,
-  Form, Input, InputNumber, Select, Space, Spin, Tag, Typography,
-} from 'antd';
+import { Alert, App, AutoComplete, Breadcrumb, Button, DatePicker, Descriptions, Form, Input, InputNumber, Space, Spin, Tag, Typography } from 'antd';
+import { Select } from '../components/Select';
 import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
 import KoordinatenEingabe from '../anzeige/KoordinatenEingabe';
 import type { LatLon } from '../anzeige/koordinaten';

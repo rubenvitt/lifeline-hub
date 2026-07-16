@@ -1,7 +1,5 @@
-import {
-  Alert, App, Breadcrumb, Button, Form, Input, Modal, Popconfirm, Select, Space, Spin,
-  Table, Tag, Typography, type TableColumnsType,
-} from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Popconfirm, Space, Spin, Table, Tag, Typography, type TableColumnsType } from 'antd';
+import { Select } from '../components/Select';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -13,6 +11,9 @@ import {
   aktualisiereDisposition, disponiereAdhoc, disponierePerson, entferneDisposition,
   listeEinsatzPersonal, type AdhocEingabe,
 } from '../api/einsatzPersonal';
+import { listeEinheiten } from '../api/einheiten';
+import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
+import { einheitenPfad, fahrzeugePfad } from '../routing/deeplinks';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzPersonal, StaerkePosition, StatusKategorie } from '../api/types';
@@ -45,6 +46,16 @@ export default function PersonalPage() {
   });
   const statusQuery = useQuery({ queryKey: ['personal-status'], queryFn: listePersonalStatus });
   const poolQuery = useQuery({ queryKey: ['personal', 'im-dienst'], queryFn: () => listePersonal(true) });
+  // LFH-139: Struktur-Listen zum Auflösen von einheit_id/fahrzeug_id → Klartext-Label
+  // (Gegenrichtung zur Fahrzeugseite). Reine Anzeige — keine eigene Backend-Erweiterung.
+  const einheitenQuery = useQuery({
+    queryKey: einsatzKeys.einheiten(einsatzId),
+    queryFn: () => listeEinheiten(einsatzId),
+  });
+  const fahrzeugeQuery = useQuery({
+    queryKey: einsatzKeys.fahrzeuge(einsatzId),
+    queryFn: () => listeEinsatzFahrzeuge(einsatzId),
+  });
 
   // Cross-Modul-Deeplink (LFH-25): ?personal=<id> (z. B. Lagekarte-Führungskraft) hebt die
   // Zeile hervor und scrollt sie ins Bild (Scroll best-effort, jsdom-No-op).
@@ -108,6 +119,8 @@ export default function PersonalPage() {
     (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
 
   const eps = epQuery.data ?? [];
+  const einheitById = new Map((einheitenQuery.data ?? []).map((e) => [e.id, e] as const));
+  const fahrzeugById = new Map((fahrzeugeQuery.data ?? []).map((f) => [f.id, f] as const));
   const stati = statusQuery.data ?? [];
   const disponierteIds = new Set(eps.map((e) => e.personal_id).filter((x): x is number => x != null));
   const poolOptionen = (poolQuery.data ?? [])
@@ -127,6 +140,25 @@ export default function PersonalPage() {
     },
     { title: 'Funktion', dataIndex: 'funktion', key: 'funktion', render: (t) => t ?? '—' },
     { title: 'Träger', dataIndex: 'traegerorganisation', key: 'traeger', render: (t) => t ?? '—' },
+    {
+      title: 'Fahrzeug',
+      key: 'fahrzeug',
+      render: (_, ep) => {
+        const f = ep.fahrzeug_id != null ? fahrzeugById.get(ep.fahrzeug_id) : undefined;
+        if (!f) return '—';
+        const label = f.kennzeichen ? `${f.funkrufname} (${f.kennzeichen})` : f.funkrufname;
+        return <Link to={fahrzeugePfad(einsatzId, { fahrzeug: f.id })}>{label}</Link>;
+      },
+    },
+    {
+      title: 'Einheit',
+      key: 'einheit',
+      render: (_, ep) => {
+        const e = ep.einheit_id != null ? einheitById.get(ep.einheit_id) : undefined;
+        if (!e) return '—';
+        return <Link to={einheitenPfad(einsatzId, { einheit: e.id })}>{e.name}</Link>;
+      },
+    },
     {
       title: 'Position',
       key: 'position',
@@ -209,7 +241,6 @@ export default function PersonalPage() {
               placeholder="Person aus Pool disponieren …"
               value={null}
               options={poolOptionen}
-              showSearch={{ optionFilterProp: 'label' }}
               notFoundContent="Keine freien Personen"
               onSelect={(personalId) => { if (personalId != null) disponiereMutation.mutate(personalId); }}
             />

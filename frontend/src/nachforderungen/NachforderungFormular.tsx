@@ -1,4 +1,5 @@
-import { Button, Card, Col, Form, Input, InputNumber, Row, Select } from 'antd';
+import { Button, Card, Col, Form, Input, InputNumber, Row } from 'antd';
+import { Select } from '../components/Select';
 import type { AdressatKategorie, NachforderungPrioritaet, NeueNachforderung } from '../api/types';
 
 const { TextArea } = Input;

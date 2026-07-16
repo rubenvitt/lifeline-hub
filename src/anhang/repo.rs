@@ -1,7 +1,13 @@
 use super::AnhangAnzeige;
 use crate::error::AppError;
+use chrono::{DateTime, Duration, Utc};
 use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
+
+/// Karenz (Stunden), die ein verwaister Anhang „überleben" darf, bevor der Sweep ihn
+/// entfernt — großzügig gewählt, damit ein regulärer Upload→Senden-Ablauf (Anhang wird
+/// beim Nachricht-Senden verknüpft) nie in die Löschung läuft.
+pub const VERWAISTE_KARENZ_STUNDEN: i64 = 24;
 
 /// Projektion der Anzeige-Spalten (ohne `daten`/`sha256`).
 const ANZEIGE_SELECT: &str =
@@ -61,6 +67,23 @@ pub async fn anlegen(
     anzeige_laden(pool, id).await
 }
 
+/// Lädt die Download-Metadaten OHNE die Bytes: `(dateiname, mime, sha256)`. Speist die
+/// Cache-Header (ETag/Content-Type/Content-Disposition) und erlaubt die
+/// `If-None-Match`-304-Kurzschluss-Antwort, ohne den (teuren) BLOB zu lesen (LFH-258).
+/// `NotFound`, wenn der Anhang nicht existiert.
+pub async fn meta_fuer_download(
+    pool: &SqlitePool,
+    id: i64,
+) -> Result<(String, String, String), AppError> {
+    sqlx::query_as::<_, (String, String, String)>(
+        "SELECT dateiname, mime, sha256 FROM anhang WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)
+}
+
 /// Lädt die Bytes eines Anhangs für den Download: `(dateiname, mime, daten)`.
 /// `NotFound`, wenn der Anhang nicht existiert.
 pub async fn laden_bytes(
@@ -90,6 +113,49 @@ pub async fn gehoert_anhang_zu_einsatz(
             .fetch_optional(pool)
             .await?;
     Ok(treffer.is_some())
+}
+
+/// Hard-Delete eines Anhangs, einsatz-gescopt (Ownership: `AND einsatz_id = ?` weist
+/// fremde Anhänge ab). Der `ON DELETE CASCADE`-FK räumt die `chat_nachricht_anhang`-
+/// Verknüpfungen automatisch mit. `NotFound`, wenn keine Zeile getroffen wird
+/// (unbekannter oder fremder Anhang) — Freigabepfad gegen monotones Wachstum (LFH-250).
+pub async fn loeschen(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
+    let betroffen = sqlx::query("DELETE FROM anhang WHERE id = ? AND einsatz_id = ?")
+        .bind(id)
+        .bind(einsatz_id)
+        .execute(pool)
+        .await?
+        .rows_affected();
+    if betroffen == 0 {
+        return Err(AppError::NotFound);
+    }
+    Ok(())
+}
+
+/// Löscht „verwaiste" Anhänge (an KEINE `chat_nachricht_anhang`-Zeile gebunden — z. B.
+/// hochgeladen aber nie gesendet), deren Upload länger als [`VERWAISTE_KARENZ_STUNDEN`]
+/// zurückliegt. Gegen monotones BLOB-Wachstum (LFH-250). Injiziertes `jetzt` =
+/// deterministisch testbar; der `WHERE`-Guard macht wiederholte Läufe idempotent.
+/// Liefert die Anzahl gelöschter Anhänge.
+///
+/// Heute referenziert NUR `chat_nachricht_anhang` die `anhang`-Tabelle. Kommt ein zweiter
+/// Linker (ETB/Lageobjekte) hinzu, MUSS dieses `NOT EXISTS` um ihn erweitert werden — sonst
+/// löscht der Sweep dort gebundene Anhänge (analoger Vorbehalt wie beim Tombstone-Guard).
+pub async fn sweep_verwaiste(pool: &SqlitePool, jetzt: DateTime<Utc>) -> Result<u64, AppError> {
+    let grenze = (jetzt - Duration::hours(VERWAISTE_KARENZ_STUNDEN))
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string();
+    let betroffen = sqlx::query(
+        "DELETE FROM anhang \
+         WHERE erstellt_at < ? \
+           AND NOT EXISTS \
+               (SELECT 1 FROM chat_nachricht_anhang cna WHERE cna.anhang_id = anhang.id)",
+    )
+    .bind(grenze)
+    .execute(pool)
+    .await?
+    .rows_affected();
+    Ok(betroffen)
 }
 
 #[cfg(test)]
@@ -177,5 +243,66 @@ mod tests {
             laden_bytes(&pool, 999).await.unwrap_err(),
             AppError::NotFound
         ));
+    }
+
+    fn t(s: &str) -> DateTime<Utc> {
+        chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
+            .unwrap()
+            .and_utc()
+    }
+
+    /// Verwaisten Anhang mit kontrolliertem `erstellt_at` direkt einfügen (umgeht
+    /// `anlegen`s `datetime('now')`), um die Karenz-Grenze deterministisch zu prüfen.
+    async fn anhang_mit_zeit(
+        pool: &SqlitePool,
+        einsatz_id: i64,
+        von: i64,
+        name: &str,
+        erstellt_at: &str,
+    ) -> i64 {
+        sqlx::query_scalar(
+            "INSERT INTO anhang \
+                (einsatz_id, dateiname, mime, groesse, sha256, daten, hochgeladen_von, erstellt_at) \
+             VALUES (?, ?, 'application/pdf', 3, 'deadbeef', ?, ?, ?) RETURNING id",
+        )
+        .bind(einsatz_id)
+        .bind(name)
+        .bind(b"ABC".as_slice())
+        .bind(von)
+        .bind(erstellt_at)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn sweep_verwaiste_loescht_alte_orphans_haelt_junge() {
+        let pool = crate::db::test_pool().await;
+        let (von, einsatz) = setup(&pool).await;
+
+        // Zwei verwaiste Anhänge (nie an eine Nachricht gehängt), unterschiedlich alt.
+        let alt = anhang_mit_zeit(&pool, einsatz, von, "alt.pdf", "2026-01-01 00:00:00").await;
+        let jung = anhang_mit_zeit(&pool, einsatz, von, "jung.pdf", "2026-06-15 12:00:00").await;
+
+        // jetzt = 2026-06-16 00:00:00 → Karenz-Grenze (24h) = 2026-06-15 00:00:00.
+        let geloescht = sweep_verwaiste(&pool, t("2026-06-16 00:00:00"))
+            .await
+            .unwrap();
+        assert_eq!(geloescht, 1, "nur der alte verwaiste Anhang wird gelöscht");
+
+        assert!(
+            anzeige_laden(&pool, alt).await.is_err(),
+            "alter Orphan ist gelöscht"
+        );
+        assert!(
+            anzeige_laden(&pool, jung).await.is_ok(),
+            "junger Orphan bleibt (innerhalb Karenz)"
+        );
+
+        // Zweiter Lauf ohne neue Fälligkeit ist idempotent (0 gelöscht).
+        let zweiter = sweep_verwaiste(&pool, t("2026-06-16 00:00:00"))
+            .await
+            .unwrap();
+        assert_eq!(zweiter, 0, "idempotent: kein erneutes Löschen");
     }
 }

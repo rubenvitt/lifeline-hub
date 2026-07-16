@@ -1,4 +1,5 @@
-import { Form, Input, Modal, Select } from 'antd';
+import { Form, Input, Modal } from 'antd';
+import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import type { ChatNachricht, EtbTyp } from '../api/types';
 

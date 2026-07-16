@@ -4,9 +4,7 @@
 //!   (a) Upload → Liste → Download-Roundtrip (Bytes identisch, Content-Type image/png)
 //!   (b) Beobachter ohne Schreibrecht → 403 beim Upload
 //!   (c) Nicht-Bild-Datei (GIF) → 400 (erkenne_bild_mime)
-//!
-//! Auslassung: Content-Disposition-Header (karte_hintergrundbild::herunterladen setzt
-//! keinen) — explizit nicht geprüft (kein Bug, Design-Entscheid).
+//!   (d) Download setzt `Content-Disposition: attachment` (LFH-238) — konsistent zu anhang.rs.
 
 use axum::body::{to_bytes, Body};
 use axum::http::{header, HeaderMap, Request, StatusCode};
@@ -280,8 +278,34 @@ async fn upload_liste_download_roundtrip() {
         "image/png",
         "Content-Type image/png"
     );
-    // Hinweis: karte_hintergrundbild::herunterladen setzt kein Content-Disposition-Header —
-    // das ist kein Fehler, nur Unterschied zu anhang.rs.
+    // Content-Disposition wird separat in download_setzt_content_disposition_attachment geprüft.
+}
+
+/// G05 (LFH-238): Der Download setzt jetzt — konsistent zu anhang.rs — einen
+/// `Content-Disposition: attachment`-Header mit dem Bildnamen. Rendering-neutral
+/// (das Frontend lädt per fetch→Blob), aber Defense-in-Depth bei direktem
+/// Browser-Zugriff und beendet die Inkonsistenz zwischen den Upload-Pfaden.
+#[tokio::test]
+async fn download_setzt_content_disposition_attachment() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let png = minimal_png();
+
+    let (status, bild) =
+        upload_bild(&app, einsatz, &admin, "plan.png", "image/png", &png, ECKEN).await;
+    assert_eq!(status, StatusCode::CREATED, "Upload: {bild:?}");
+    let bild_id = bild["id"].as_i64().unwrap();
+
+    let (s, headers, _) = download_bild(&app, einsatz, bild_id, &admin).await;
+    assert_eq!(s, StatusCode::OK);
+    let cd = headers
+        .get(header::CONTENT_DISPOSITION)
+        .expect("Content-Disposition gesetzt")
+        .to_str()
+        .unwrap();
+    assert!(cd.starts_with("attachment"), "attachment-Disposition: {cd}");
+    assert!(cd.contains("plan.png"), "Dateiname im Header: {cd}");
 }
 
 /// (b) Beobachter ohne Schreibrecht → POST Upload → 403.
@@ -317,4 +341,92 @@ async fn nicht_bild_wird_abgelehnt() {
         b"GIF89a\x01\x00\x01\x00\x00\xff\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x00\x3b";
     let (status, _) = upload_bild(&app, einsatz, &admin, "bild.gif", "image/gif", gif, ECKEN).await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "GIF muss 400 ergeben");
+}
+
+/// GET Download mit optionalem `If-None-Match`: (Status, Header, Bytes).
+async fn download_bild_inm(
+    app: &axum::Router,
+    einsatz_id: i64,
+    bild_id: i64,
+    cookie: &str,
+    if_none_match: Option<&str>,
+) -> (StatusCode, HeaderMap, Vec<u8>) {
+    let mut req = Request::builder()
+        .method("GET")
+        .uri(format!(
+            "/api/einsaetze/{einsatz_id}/karte/hintergrundbilder/{bild_id}/download"
+        ))
+        .header(header::COOKIE, cookie);
+    if let Some(etag) = if_none_match {
+        req = req.header(header::IF_NONE_MATCH, etag);
+    }
+    let resp = app
+        .clone()
+        .oneshot(req.body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let status = resp.status();
+    let headers = resp.headers().clone();
+    let bytes = to_bytes(resp.into_body(), usize::MAX)
+        .await
+        .unwrap()
+        .to_vec();
+    (status, headers, bytes)
+}
+
+/// G04 (LFH-258): Der Bild-Download trägt starken ETag (sha256) + Cache-Control (immutable).
+#[tokio::test]
+async fn download_setzt_etag_und_cache_control() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let png = minimal_png();
+    let (_, bild) = upload_bild(&app, einsatz, &admin, "plan.png", "image/png", &png, ECKEN).await;
+    let bild_id = bild["id"].as_i64().unwrap();
+
+    let (s, headers, _) = download_bild(&app, einsatz, bild_id, &admin).await;
+    assert_eq!(s, StatusCode::OK);
+    let etag = headers.get(header::ETAG).expect("ETag").to_str().unwrap();
+    assert_eq!(
+        etag.trim_matches('"').len(),
+        64,
+        "sha256-Hex als ETag: {etag}"
+    );
+    let cc = headers
+        .get(header::CACHE_CONTROL)
+        .expect("Cache-Control")
+        .to_str()
+        .unwrap();
+    assert!(
+        cc.contains("private") && cc.contains("immutable"),
+        "Cache-Control: {cc}"
+    );
+}
+
+/// G04: `If-None-Match` mit passendem ETag → 304 ohne Body; unpassend → 200 mit Body.
+#[tokio::test]
+async fn download_if_none_match_liefert_304() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let png = minimal_png();
+    let (_, bild) = upload_bild(&app, einsatz, &admin, "plan.png", "image/png", &png, ECKEN).await;
+    let bild_id = bild["id"].as_i64().unwrap();
+
+    let (_, headers, _) = download_bild(&app, einsatz, bild_id, &admin).await;
+    let etag = headers
+        .get(header::ETAG)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let (s304, _, body304) = download_bild_inm(&app, einsatz, bild_id, &admin, Some(&etag)).await;
+    assert_eq!(s304, StatusCode::NOT_MODIFIED, "passend → 304");
+    assert!(body304.is_empty(), "304 ohne Body");
+
+    let (s200, _, body200) =
+        download_bild_inm(&app, einsatz, bild_id, &admin, Some("\"deadbeef\"")).await;
+    assert_eq!(s200, StatusCode::OK, "unpassend → 200");
+    assert_eq!(body200, png, "voller Body bei 200");
 }

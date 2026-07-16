@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Select } from 'antd';
+import { Select } from '../../components/Select';
 import type { DefaultOptionType } from 'antd/es/select';
 import { useQuery } from '@tanstack/react-query';
 import { listePersonen, registrierAnzeige } from '../../api/einsatzPerson';

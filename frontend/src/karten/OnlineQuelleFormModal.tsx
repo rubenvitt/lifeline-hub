@@ -1,4 +1,5 @@
-import { Alert, App, Form, Input, InputNumber, Modal, Select, Switch } from 'antd';
+import { Alert, App, Form, Input, InputNumber, Modal, Switch } from 'antd';
+import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
