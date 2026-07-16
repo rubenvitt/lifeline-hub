@@ -528,12 +528,14 @@ pub async fn schwaerze_einsatz(
         etb_startwert,
         "PII-Schwärzung durchgeführt (Aufbewahrungsfrist + Karenz abgelaufen). \
          Direkte Personenidentifikatoren (Namen, Kontakt, Adresse, Meldebild/Einsatzort, \
-         Foto-/Datei-Anhänge, personenbezogene Freitext-Notizen und Lage-Freitexte) wurden \
-         unwiderruflich entfernt. Erhalten bleiben das operative Skelett (Einsatz-Struktur, \
+         Foto-/Datei-Anhänge, personenbezogene Notizen sowie Schadens-/Lage-/Gefahren-Freitexte) \
+         wurden unwiderruflich entfernt. Erhalten bleiben das operative Skelett (Einsatz-Struktur, \
          Zähler/registrier_nr, operative Objekte), die Führungs-Dokumentation (ETB, Meldungen, \
-         Aufträge, Lage-/Befehlsberichte — im ETB rechtsverbindlich gesnapshottet) sowie \
+         Aufträge, Lage-/Befehlsberichte — im ETB rechtsverbindlich gesnapshottet) und \
          anonymisierte Triage-/Statuskategorien (ohne Personenbezug) für die gesetzliche/ \
-         statistische Aufbewahrung.",
+         statistische Aufbewahrung; sowie — bis zum ausstehenden Scrub-Follow-up (LFH-229) — \
+         operative Kommunikations-Freitexte (Chat-Nachrichten, Erinnerungen), die noch \
+         Personenbezug tragen können.",
     )
     .await?;
 

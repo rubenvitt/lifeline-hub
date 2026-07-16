@@ -245,7 +245,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einsatz_id", G_SCOPE),
             retain("person_id", G_FK),
             retain("art", G_TRIAGE),
-            retain("transportmittel", G_TRIAGE),
+            // transportmittel ist Freitext (nullable, "RTW, KTW, …") wie die Schwester-
+            // Freitexte ziel/notiz → gescrubbt (LFH-229 Review; G_TRIAGE galt nur für die
+            // CHECK-Enum-Kategorien art/status, nicht für Freitext).
+            scrub("transportmittel", Strategie::NullSetzen),
             // ziel = Klartext-Verbringungsort (Klinikname/Adresse) → PII.
             scrub("ziel", Strategie::NullSetzen),
             retain("status", G_TRIAGE),
@@ -347,11 +350,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // Schadensort = faktisch Adresse Betroffener → gescrubbt (Nutzer-Entscheidung LFH-229);
             // NOT NULL → Platzhalter. Die Beschreibung bleibt operative Schadens-Doku (RETAIN).
             scrub("ort", Strategie::Platzhalter),
-            retain(
-                "beschreibung",
-                "Operative Schadens-Dokumentation (Beschreibung, NOT NULL); Direkt-PII \
-                 (geschaedigt_kontakt) wird gescrubbt",
-            ),
+            // beschreibung ist unstrukturierter Freitext (NOT NULL) und kann dieselbe PII
+            // (Name/Adresse/Kontakt Betroffener) tragen wie ort → gescrubbt (LFH-229 Review +
+            // Nutzer-Entscheidung); kein Führungs-Doku-Rang.
+            scrub("beschreibung", Strategie::Platzhalter),
             retain("geschaedigt_person_id", G_FK),
             scrub("geschaedigt_kontakt", Strategie::NullSetzen),
             retain("geschaedigt_personal_id", G_FK),
@@ -517,11 +519,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("gefahrentyp", G_ENUM),
             retain("schutzobjekt", G_ENUM),
             retain("warnstufe", G_ENUM),
-            // REVIEW: Gefahren-Beschreibung = operative Lage-Doku (nullable Freitext).
-            retain(
-                "beschreibung",
-                "Operative Gefahren-/Lage-Dokumentation (Freitext) — REVIEW LFH-229",
-            ),
+            // Gefahren-Beschreibung = unstrukturierter Freitext (nullable), kann Betroffenen-
+            // PII tragen → gescrubbt (LFH-229 Review + Nutzer-Entscheidung).
+            scrub("beschreibung", Strategie::NullSetzen),
             // gemeldet_von ist TEXT (Klartext-Name des Melders) — NICHT der benutzer-FK
             // aktualisiert_von. → NULL.
             scrub("gemeldet_von", Strategie::NullSetzen),

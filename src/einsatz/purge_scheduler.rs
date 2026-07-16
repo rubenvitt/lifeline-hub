@@ -237,8 +237,19 @@ mod tests {
             .bind(e).bind(b).bind(b).execute(&pool).await.unwrap();
         sqlx::query("INSERT INTO einsatz_schaden (einsatz_id, registrier_nr, status, typ, ausmass, ort, beschreibung, geschaedigt_kontakt, uebergeben_an, uebergeben_at, erfasst_von, geaendert_von) VALUES (?,1,'uebergeben','sachschaden','gering','Hauptstr','Schaden','Geschäd. Person','Polizist Schmidt','2026-01-02 00:00:00', ?, ?)")
             .bind(e).bind(b).bind(b).execute(&pool).await.unwrap();
+        // Ad-hoc-externe Kraft (personal_id NULL) → snap_* ist einsatz-scoped PII, wird gescrubbt.
         sqlx::query("INSERT INTO einsatz_personal (einsatz_id, personal_id, snap_name, snap_funktion, bemerkung) VALUES (?, NULL, 'Externer Hans', 'Helfer', 'kam spontan')")
             .bind(e).execute(&pool).await.unwrap();
+        // Disponierte Stamm-Kraft (personal_id gesetzt) → snap_* ist ein Stammdaten-Snapshot und
+        // muss die Schwärzung ÜBERLEBEN. Negativtest gegen einen Wegfall des personal_id-Zeilenfilters.
+        let stamm_pid: i64 = sqlx::query_scalar(
+            "INSERT INTO personal (org_id, name) VALUES (1, 'Stamm-Dora') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO einsatz_personal (einsatz_id, personal_id, snap_name, snap_funktion, bemerkung) VALUES (?, ?, 'Stamm-Dora', 'Gruppenführer', 'stamm')")
+            .bind(e).bind(stamm_pid).execute(&pool).await.unwrap();
         // Eine bestehende ETB-Zeile (Skelett, muss erhalten bleiben).
         sqlx::query("INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit) VALUES (?,1,'meldung','ORIGINAL', ?, '2026-01-01 09:00:00')")
             .bind(e).bind(b).execute(&pool).await.unwrap();
@@ -314,19 +325,36 @@ mod tests {
             "Schadensort (faktisch Adresse) gescrubbt"
         );
         assert_eq!(
-            beschreibung, "Schaden",
-            "operative Schadens-Beschreibung bleibt (RETAIN)"
+            beschreibung,
+            super::repo::SCHWAERZUNG_PLATZHALTER,
+            "Schadens-Beschreibung (unstrukturierter Freitext-PII) gescrubbt"
         );
         assert_eq!(uebergeben_an, super::repo::SCHWAERZUNG_PLATZHALTER);
         assert_eq!(geschaedigt, None);
         assert_eq!(status, "uebergeben");
-        let snap: String =
-            sqlx::query_scalar("SELECT snap_name FROM einsatz_personal WHERE einsatz_id = ?")
-                .bind(e)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
-        assert_eq!(snap, super::repo::SCHWAERZUNG_PLATZHALTER);
+        // Ad-hoc-Kraft (personal_id NULL): snap_name gescrubbt (Platzhalter).
+        let snap_extern: String = sqlx::query_scalar(
+            "SELECT snap_name FROM einsatz_personal WHERE einsatz_id = ? AND personal_id IS NULL",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(snap_extern, super::repo::SCHWAERZUNG_PLATZHALTER);
+        // Disponierte Stamm-Kraft (personal_id gesetzt): Snapshot bleibt UNVERÄNDERT (Stammdaten).
+        let (snap_stamm_name, snap_stamm_funktion): (String, Option<String>) = sqlx::query_as(
+            "SELECT snap_name, snap_funktion FROM einsatz_personal \
+             WHERE einsatz_id = ? AND personal_id IS NOT NULL",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            snap_stamm_name, "Stamm-Dora",
+            "Stammdaten-Snapshot einer disponierten Kraft darf NICHT gescrubbt werden"
+        );
+        assert_eq!(snap_stamm_funktion.as_deref(), Some("Gruppenführer"));
         // (b2) Bild-Hintergrund: name geschwärzt, BLOB (Kartografie) bleibt erhalten.
         let nachher = crate::karte_hintergrundbild::repo::liste(&pool, e)
             .await
@@ -555,7 +583,8 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(gg_label, None);
-        // UeberParent-Scoping: gemeldet_von (Melder-Klartext) genullt, beschreibung (Lage) bleibt.
+        // UeberParent-Scoping: gemeldet_von (Melder-Klartext) UND beschreibung (Freitext-PII)
+        // beide genullt.
         let (gb_melder, gb_beschr): (Option<String>, Option<String>) = sqlx::query_as(
             "SELECT gemeldet_von, beschreibung FROM gefahr_bewertung WHERE gefahrengebiet_id = ?",
         )
@@ -568,9 +597,8 @@ mod tests {
             "Melder-Klartext (UeberParent-Scoping) genullt"
         );
         assert_eq!(
-            gb_beschr.as_deref(),
-            Some("Gasgeruch im Treppenhaus"),
-            "operative Gefahren-Beschreibung bleibt"
+            gb_beschr, None,
+            "Gefahren-Beschreibung (unstrukturierter Freitext-PII) gescrubbt"
         );
 
         // (d) lage_meldung.text (NOT NULL) → Platzhalter.
