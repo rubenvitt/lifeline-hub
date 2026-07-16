@@ -101,6 +101,10 @@ pub async fn hochladen(
     bild::pruefe_groesse(bytes.len())?;
     let mime = bild::erkenne_bild_mime(&bytes)?;
     bild::pruefe_ecken(&ecken)?;
+    // AV-Scan (LFH-238): scan-vor-persist über denselben Seam wie der generische
+    // Anhang-Upload (LFH-114) — schließt den bislang umgangenen Scan-Pfad. Ohne
+    // konfigurierten clamd ein No-op; fail-closed bei unerreichbarem Scanner.
+    crate::anhang::scan(crate::anhang::scan_config(), &bytes).await?;
     let name = name.unwrap_or_else(|| "Bild-Hintergrund".into());
 
     let a = bild_repo::anlegen(
@@ -134,12 +138,19 @@ pub async fn herunterladen(
         &benutzer,
     )
     .await?;
-    let (mime, daten) = bild_repo::laden_bytes(&state.pool, einsatz_id, bild_id).await?;
+    let (name, mime, daten) = bild_repo::laden_bytes(&state.pool, einsatz_id, bild_id).await?;
     let mut headers = HeaderMap::new();
     headers.insert(
         header::CONTENT_TYPE,
         HeaderValue::from_str(&mime)
             .unwrap_or(HeaderValue::from_static("application/octet-stream")),
+    );
+    // Content-Disposition wie beim generischen Anhang-Download (LFH-238): geteilte
+    // Infrastruktur, konsistentes `attachment` + korrekt kodierter Dateiname.
+    headers.insert(
+        header::CONTENT_DISPOSITION,
+        HeaderValue::from_str(&crate::anhang::content_disposition(&name))
+            .map_err(|e| AppError::Internal(format!("Ungültiger Header: {e}")))?,
     );
     Ok((headers, daten))
 }

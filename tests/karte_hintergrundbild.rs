@@ -4,9 +4,7 @@
 //!   (a) Upload → Liste → Download-Roundtrip (Bytes identisch, Content-Type image/png)
 //!   (b) Beobachter ohne Schreibrecht → 403 beim Upload
 //!   (c) Nicht-Bild-Datei (GIF) → 400 (erkenne_bild_mime)
-//!
-//! Auslassung: Content-Disposition-Header (karte_hintergrundbild::herunterladen setzt
-//! keinen) — explizit nicht geprüft (kein Bug, Design-Entscheid).
+//!   (d) Download setzt `Content-Disposition: attachment` (LFH-238) — konsistent zu anhang.rs.
 
 use axum::body::{to_bytes, Body};
 use axum::http::{header, HeaderMap, Request, StatusCode};
@@ -280,8 +278,34 @@ async fn upload_liste_download_roundtrip() {
         "image/png",
         "Content-Type image/png"
     );
-    // Hinweis: karte_hintergrundbild::herunterladen setzt kein Content-Disposition-Header —
-    // das ist kein Fehler, nur Unterschied zu anhang.rs.
+    // Content-Disposition wird separat in download_setzt_content_disposition_attachment geprüft.
+}
+
+/// G05 (LFH-238): Der Download setzt jetzt — konsistent zu anhang.rs — einen
+/// `Content-Disposition: attachment`-Header mit dem Bildnamen. Rendering-neutral
+/// (das Frontend lädt per fetch→Blob), aber Defense-in-Depth bei direktem
+/// Browser-Zugriff und beendet die Inkonsistenz zwischen den Upload-Pfaden.
+#[tokio::test]
+async fn download_setzt_content_disposition_attachment() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let png = minimal_png();
+
+    let (status, bild) =
+        upload_bild(&app, einsatz, &admin, "plan.png", "image/png", &png, ECKEN).await;
+    assert_eq!(status, StatusCode::CREATED, "Upload: {bild:?}");
+    let bild_id = bild["id"].as_i64().unwrap();
+
+    let (s, headers, _) = download_bild(&app, einsatz, bild_id, &admin).await;
+    assert_eq!(s, StatusCode::OK);
+    let cd = headers
+        .get(header::CONTENT_DISPOSITION)
+        .expect("Content-Disposition gesetzt")
+        .to_str()
+        .unwrap();
+    assert!(cd.starts_with("attachment"), "attachment-Disposition: {cd}");
+    assert!(cd.contains("plan.png"), "Dateiname im Header: {cd}");
 }
 
 /// (b) Beobachter ohne Schreibrecht → POST Upload → 403.

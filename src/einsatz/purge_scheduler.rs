@@ -311,7 +311,7 @@ mod tests {
             super::repo::SCHWAERZUNG_PLATZHALTER,
             "Bildname (PII) geschwärzt"
         );
-        let (_, daten) = crate::karte_hintergrundbild::repo::laden_bytes(&pool, e, bild.id)
+        let (_, _, daten) = crate::karte_hintergrundbild::repo::laden_bytes(&pool, e, bild.id)
             .await
             .unwrap();
         assert!(!daten.is_empty(), "Bild-BLOB (Kartografie) bleibt erhalten");

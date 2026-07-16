@@ -45,13 +45,16 @@ pub async fn laden(
     .ok_or(AppError::NotFound)
 }
 
+/// Lädt die Bytes eines Hintergrundbilds für den Download: `(name, mime, daten)`.
+/// `name` speist den `Content-Disposition`-Header (LFH-238). `NotFound`, wenn das
+/// Bild nicht (zu diesem Einsatz) existiert.
 pub async fn laden_bytes(
     pool: &SqlitePool,
     einsatz_id: i64,
     id: i64,
-) -> Result<(String, Vec<u8>), AppError> {
-    sqlx::query_as::<_, (String, Vec<u8>)>(
-        "SELECT mime, daten FROM karte_hintergrundbild WHERE id = ? AND einsatz_id = ?",
+) -> Result<(String, String, Vec<u8>), AppError> {
+    sqlx::query_as::<_, (String, String, Vec<u8>)>(
+        "SELECT name, mime, daten FROM karte_hintergrundbild WHERE id = ? AND einsatz_id = ?",
     )
     .bind(id)
     .bind(einsatz_id)
@@ -192,7 +195,8 @@ mod tests {
         assert_eq!(a.opazitaet, 100);
         assert!(a.sichtbar);
 
-        let (mime, daten) = laden_bytes(&pool, eid, a.id).await.unwrap();
+        let (name, mime, daten) = laden_bytes(&pool, eid, a.id).await.unwrap();
+        assert_eq!(name, "plan.png");
         assert_eq!(mime, "image/png");
         assert_eq!(daten, bytes);
 
