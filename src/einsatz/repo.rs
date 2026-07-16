@@ -873,7 +873,10 @@ mod tests {
                 .fetch_one(&pool)
                 .await
                 .unwrap();
-        assert_eq!(label, None, "Freitext-Label (PII) muss nach Schwärzung NULL sein");
+        assert_eq!(
+            label, None,
+            "Freitext-Label (PII) muss nach Schwärzung NULL sein"
+        );
         assert_eq!(lat, 50.1, "operative Position bleibt erhalten (Skelett)");
     }
 
