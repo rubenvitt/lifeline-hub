@@ -393,13 +393,14 @@ fn oidc_fehler_redirect() -> Redirect {
 ///    generischer Redirect (MIT geräumtem Binding-Cookie) — NOCH VOR `state::entnehme`s
 ///    eigentlicher Verwendung unten.
 /// 3. **[LFH-277] Binding-Check:** der `oidc_state`-Cookie-Wert wird gelesen — **VOR** dem
-///    Räumen (das Räum-Cookie überschreibt sonst denselben Namen im `jar`, ein Lesen danach sähe
-///    nur noch den leeren Removal-Wert). Erst NACH dem Lesen wird das Removal-Cookie zum `jar`
-///    hinzugefügt (`raeume_oidc_state_cookie`) — ab hier trägt JEDER weitere Rückgabepfad (Erfolg
-///    wie Fehler) das geräumte Cookie. Stimmt der gelesene Cookie-Wert nicht exakt mit dem
-///    `state`-Query überein (`oidc_state_binding_ok`, auch bei fehlendem Cookie), generischer
-///    Redirect — **NOCH VOR** `state::entnehme`: ein Binding-Fehlschlag konsumiert den
-///    State-Store-Eintrag nicht (der legitime, vom Opfer-Browser gestartete Flow bleibt nutzbar).
+///    Räumen (`jar.remove` markiert den Delta-Eintrag für denselben Namen im `jar` als entfernt,
+///    ein Lesen danach sähe nichts mehr). Erst NACH dem Lesen wird das Removal-Cookie per
+///    `jar.remove` aus dem `jar` entfernt (`raeume_oidc_state_cookie`) — ab hier trägt JEDER
+///    weitere Rückgabepfad (Erfolg wie Fehler) das geräumte Cookie. Stimmt der gelesene
+///    Cookie-Wert nicht exakt mit dem `state`-Query überein (`oidc_state_binding_ok`, auch bei
+///    fehlendem Cookie), generischer Redirect — **NOCH VOR** `state::entnehme`: ein
+///    Binding-Fehlschlag konsumiert den State-Store-Eintrag nicht (der legitime, vom
+///    Opfer-Browser gestartete Flow bleibt nutzbar).
 /// 4. `state::entnehme(state)` — **SYNC** (nach Schritt 3): der State-Store-Guard wird darin
 ///    bereits vor der Rückgabe freigegeben (Task 3/Modul-Doc `state.rs`). Ab hier darf beliebig
 ///    `.await`et werden, ohne einen std-Mutex-Guard über eine Await-Grenze zu halten (Plan-MUST
@@ -443,7 +444,10 @@ pub async fn oidc_callback(
         if let Some(s) = &query.state {
             let _ = crate::auth::oidc::state::entnehme(s);
         }
-        return Ok((jar.add(raeume_oidc_state_cookie()), oidc_fehler_redirect()));
+        return Ok((
+            jar.remove(raeume_oidc_state_cookie()),
+            oidc_fehler_redirect(),
+        ));
     }
     // Ab hier sind `code`/`state` durch den Guard oben beide garantiert vorhanden.
     let code = query.code.expect("Guard oben stellt sicher: code ist Some");
@@ -453,11 +457,11 @@ pub async fn oidc_callback(
 
     // [LFH-277] Binding-Check — s. Doc-Kommentar oben (Punkt 3). Cookie-Wert VOR dem Räumen
     // lesen: das Räum-Cookie trägt denselben Namen (`OIDC_STATE_COOKIE`) im `jar` — ein `get`
-    // NACH dem `add` sähe nur noch den leeren Removal-Wert, jede Anmeldung würde dann fälschlich
-    // am Binding-Check scheitern.
+    // NACH dem `remove` sähe nichts mehr (der Delta-Eintrag ist als entfernt markiert), jede
+    // Anmeldung würde dann fälschlich am Binding-Check scheitern.
     let cookie_state = jar.get(OIDC_STATE_COOKIE).map(|c| c.value().to_string());
     // Ab hier trägt jeder weitere Rückgabepfad (Erfolg wie Fehler) das geräumte Cookie.
-    let jar = jar.add(raeume_oidc_state_cookie());
+    let jar = jar.remove(raeume_oidc_state_cookie());
     if !oidc_state_binding_ok(cookie_state.as_deref(), &state_key) {
         // Bewusst KEIN `state::entnehme` hier: ein Binding-Fehlschlag darf den State-Store-
         // Eintrag NICHT konsumieren — s. Doc-Kommentar Punkt 3 (der legitime Flow des Opfer-

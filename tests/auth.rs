@@ -686,6 +686,15 @@ async fn oidc_callback_mit_falschem_state_cookie_redirect_ohne_session() {
         .to_str()
         .unwrap();
     assert!(set_cookie.contains("oidc_state="));
+    // Diskriminierend (T3-Regressionsschutz): eine ECHTE Löschung (`jar.remove`) rendert
+    // `Max-Age=0` (`cookie`-Crate `make_removal`) — ein bloßes Überschreiben auf leer (`jar.add`)
+    // täte das NICHT und würde nur `oidc_state=` ohne `Max-Age=0` senden. Ohne diese Zeile würde
+    // dieser Test auch bestehen, wenn `oidc_callback` versehentlich wieder auf `jar.add(...)`
+    // zurückfiele (nur überschreiben statt löschen).
+    assert!(
+        set_cookie.contains("Max-Age=0"),
+        "Set-Cookie muss eine echte Löschung sein (Max-Age=0), kein bloßes Leer-Überschreiben: {set_cookie}"
+    );
     assert!(
         !set_cookie.contains("lifeline_sid="),
         "keine Session darf bei fehlgeschlagener state-Bindung entstehen"

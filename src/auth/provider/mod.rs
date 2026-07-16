@@ -10,12 +10,12 @@ use utoipa::ToSchema;
 pub const ID_PASSWORT: &str = "passwort";
 pub const ID_DEV: &str = "dev";
 /// OIDC/SSO-Provider (LFH-41, Increment 3). JIT-provisionierte Konten sind bewusst NICHT
-/// admin-tauglich (siehe `registry::ist_admin_tauglich`, Lockout-Schutz-MUST).
+/// admin-tauglich (siehe `registry`s `ProviderId::ist_admin_tauglich`, Lockout-Schutz-MUST).
 pub const ID_OIDC: &str = "oidc";
 /// App-eigener Passkey/WebAuthn-Provider (LFH-275, Increment 4). Enrollment läuft
 /// authentifiziert (bestehendes Konto), Login ist danach passwortlos möglich. Bewusst NICHT
-/// admin-tauglich (siehe `registry::ist_admin_tauglich`) — Passwort bleibt der garantierte
-/// Admin-Weg, bis Admin-Linking/Policy das ändert (LFH-277).
+/// admin-tauglich (siehe `registry`s `ProviderId::ist_admin_tauglich`) — Passwort bleibt der
+/// garantierte Admin-Weg, bis Admin-Linking/Policy das ändert (LFH-277).
 pub const ID_WEBAUTHN: &str = "webauthn";
 
 /// Art eines Auth-Providers — bestimmt, wie das Frontend den Login rendert.
