@@ -1,7 +1,5 @@
-import {
-  Alert, App, Breadcrumb, Button, Form, Input, InputNumber, Modal, Popconfirm, Select, Space,
-  Spin, Table, Tag, Typography, type TableColumnsType,
-} from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Input, InputNumber, Modal, Popconfirm, Space, Spin, Table, Tag, Typography, type TableColumnsType } from 'antd';
+import { Select } from '../components/Select';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
@@ -201,7 +199,6 @@ export default function MaterialPage() {
               placeholder="Stamm-Material wählen …"
               value={poolAuswahl}
               options={poolOptionen}
-              showSearch={{ optionFilterProp: 'label' }}
               notFoundContent="Kein Material im Dienst"
               onChange={(v) => setPoolAuswahl(v ?? null)}
             />

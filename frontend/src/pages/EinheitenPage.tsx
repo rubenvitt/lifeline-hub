@@ -1,7 +1,5 @@
-import {
-  Alert, App, Breadcrumb, Button, Card, Empty, Form, Input, Popconfirm, Select,
-  Space, Spin, Tag, Tree, TreeSelect, Typography, type TreeDataNode,
-} from 'antd';
+import { Alert, App, Breadcrumb, Button, Card, Empty, Form, Input, Popconfirm, Space, Spin, Tag, Tree, TreeSelect, Typography, type TreeDataNode } from 'antd';
+import { Select } from '../components/Select';
 import { Link, useParams } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -311,7 +309,7 @@ export default function EinheitenPage() {
               ))}
               {darfSchreiben && (
                 <Select style={{ width: '100%', marginTop: 8 }} placeholder="Person zuordnen …" value={null}
-                  showSearch={{ optionFilterProp: 'label' }} notFoundContent="Keine freien Personen"
+                  notFoundContent="Keine freien Personen"
                   options={freiesPersonal.map((p) => ({ value: p.id, label: p.name }))}
                   onSelect={(epId) => personalZu.mutate(Number(epId))} />
               )}
@@ -325,7 +323,7 @@ export default function EinheitenPage() {
               ))}
               {darfSchreiben && (
                 <Select style={{ width: '100%', marginTop: 8 }} placeholder="Fahrzeug zuordnen …" value={null}
-                  showSearch={{ optionFilterProp: 'label' }} notFoundContent="Keine freien Fahrzeuge"
+                  notFoundContent="Keine freien Fahrzeuge"
                   options={freieFahrzeuge.map((f) => ({ value: f.id, label: f.funkrufname }))}
                   onSelect={(efId) => fahrzeugZu.mutate(Number(efId))} />
               )}
@@ -339,7 +337,7 @@ export default function EinheitenPage() {
               ))}
               {darfSchreiben && (
                 <Select style={{ width: '100%', marginTop: 8 }} placeholder="Material zuordnen …" value={null}
-                  showSearch={{ optionFilterProp: 'label' }} notFoundContent="Kein freies Material"
+                  notFoundContent="Kein freies Material"
                   options={freiesMaterial.map((m) => ({ value: m.id, label: `${m.bezeichnung} ×${m.menge}` }))}
                   onSelect={(emId) => materialZu.mutate(Number(emId))} />
               )}

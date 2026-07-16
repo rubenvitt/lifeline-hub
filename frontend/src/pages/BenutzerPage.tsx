@@ -1,4 +1,5 @@
-import { App, Button, Form, Input, Modal, Popconfirm, Select, Space, Tag } from 'antd';
+import { App, Button, Form, Input, Modal, Popconfirm, Space, Tag } from 'antd';
+import { Select } from '../components/Select';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import AdminPage from '../components/AdminPage';
 import { useState } from 'react';

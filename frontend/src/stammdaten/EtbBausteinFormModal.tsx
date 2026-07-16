@@ -1,4 +1,5 @@
-import { App, Form, Input, InputNumber, Modal, Select, Typography } from 'antd';
+import { App, Form, Input, InputNumber, Modal, Typography } from 'antd';
+import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';

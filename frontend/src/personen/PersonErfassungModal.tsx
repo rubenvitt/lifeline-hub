@@ -1,4 +1,5 @@
-import { Form, Input, InputNumber, Modal, Select } from 'antd';
+import { Form, Input, InputNumber, Modal } from 'antd';
+import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import type { PersonEingabe } from '../api/einsatzPerson';
 

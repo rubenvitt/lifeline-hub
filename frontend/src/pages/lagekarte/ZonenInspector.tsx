@@ -1,4 +1,5 @@
-import { Button, Input, Popconfirm, Select, Space, Tag, Typography } from 'antd';
+import { Button, Input, Popconfirm, Space, Tag, Typography } from 'antd';
+import { Select } from '../../components/Select';
 import type { ReactNode } from 'react';
 import type { Gefahrengebiet, LageZone, ZoneTyp } from '../../api/types';
 import { gefahrengebietName } from '../../api/gefahren';

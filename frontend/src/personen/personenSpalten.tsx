@@ -1,4 +1,5 @@
-import { Select, Tag, Typography, type TableColumnsType } from 'antd';
+import { Tag, Typography, type TableColumnsType } from 'antd';
+import { Select } from '../components/Select';
 import { registrierAnzeige } from '../api/einsatzPerson';
 import type { Person } from '../api/types';
 import { SK_META, STATUS_META } from './personMeta';

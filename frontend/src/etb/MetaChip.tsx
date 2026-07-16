@@ -1,5 +1,6 @@
 import { CloseOutlined } from '@ant-design/icons';
-import { AutoComplete, DatePicker, Input, Select, Tag } from 'antd';
+import { AutoComplete, DatePicker, Input, Tag } from 'antd';
+import { Select } from '../components/Select';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 import type { MeldeWeg } from '../api/types';

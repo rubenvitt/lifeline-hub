@@ -1,4 +1,5 @@
-import { App, Button, Drawer, Form, Input, Select } from 'antd';
+import { App, Button, Drawer, Form, Input } from 'antd';
+import { Select } from '../../components/Select';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { legeUhsAn, type UhsEingabe } from '../../api/einsatzUhs';
 import { ApiError } from '../../api/client';

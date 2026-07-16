@@ -1,4 +1,5 @@
-import { Button, Descriptions, Select, Space, Tag } from 'antd';
+import { Button, Descriptions, Space, Tag } from 'antd';
+import { Select } from '../../components/Select';
 import { Link } from 'react-router-dom';
 import type { KarteMarker, MarkerTyp } from './marker';
 import { markerToUrl } from './markerToUrl';

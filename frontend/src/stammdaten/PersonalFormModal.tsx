@@ -1,4 +1,5 @@
-import { App, AutoComplete, Form, Input, Modal, Select } from 'antd';
+import { App, AutoComplete, Form, Input, Modal } from 'antd';
+import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
@@ -126,10 +127,10 @@ export default function PersonalFormModal({
           <Select allowClear placeholder="optional" options={POSITION_OPTIONEN} />
         </Form.Item>
         <Form.Item label="Qualifikationen" name="qualifikation_ids">
-          <Select mode="multiple" allowClear options={qualOptionen} showSearch={{ optionFilterProp: 'label' }} placeholder="Qualifikationen wählen" />
+          <Select mode="multiple" allowClear options={qualOptionen} placeholder="Qualifikationen wählen" />
         </Form.Item>
         <Form.Item label="Benutzer-Konto (optional)" name="benutzer_id">
-          <Select allowClear showSearch={{ optionFilterProp: 'label' }} options={benutzerOptionen} placeholder="kein Konto verknüpft" />
+          <Select allowClear options={benutzerOptionen} placeholder="kein Konto verknüpft" />
         </Form.Item>
         <Form.Item label="Bemerkung" name="bemerkung"><Input.TextArea rows={2} /></Form.Item>
       </Form>

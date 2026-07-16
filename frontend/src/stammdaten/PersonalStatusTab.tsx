@@ -1,7 +1,5 @@
-import {
-  App, Button, Form, Input, InputNumber, Modal, Popconfirm, Select, Space, Table, Tag,
-  type TableColumnsType,
-} from 'antd';
+import { App, Button, Form, Input, InputNumber, Modal, Popconfirm, Space, Table, Tag, type TableColumnsType } from 'antd';
+import { Select } from '../components/Select';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';

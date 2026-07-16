@@ -1,4 +1,5 @@
-import { Alert, App, AutoComplete, Button, Checkbox, Form, Input, InputNumber, Select, Spin, Switch, Typography } from 'antd';
+import { Alert, App, AutoComplete, Button, Checkbox, Form, Input, InputNumber, Spin, Switch, Typography } from 'antd';
+import { Select } from '../components/Select';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {

@@ -1,4 +1,5 @@
-import { App, Button, Popconfirm, Select, Space, Table, Typography } from 'antd';
+import { App, Button, Popconfirm, Space, Table, Typography } from 'antd';
+import { Select } from '../components/Select';
 import type { ColumnsType } from 'antd/es/table';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -98,7 +99,6 @@ export default function MitgliederAbschnitt({ einsatzId, darfVerwalten }: Props)
             style={{ width: 200 }}
             value={neuerBenutzer}
             options={verfuegbar.map((b) => ({ value: b.id, label: b.anzeigename }))}
-            showSearch={{ optionFilterProp: 'label' }}
             onChange={(v) => setNeuerBenutzer(v)}
             notFoundContent={
               benutzerQuery.error instanceof ApiError && benutzerQuery.error.status === 403

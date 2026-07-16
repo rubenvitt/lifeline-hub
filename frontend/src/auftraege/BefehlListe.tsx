@@ -1,4 +1,5 @@
-import { App, Button, Form, Input, Modal, Select, Space, Table, Tag } from 'antd';
+import { App, Button, Form, Input, Modal, Space, Table, Tag } from 'antd';
+import { Select } from '../components/Select';
 import type { TableColumnsType } from 'antd';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';

@@ -27,6 +27,22 @@ export default tseslint.config(
     rules: {
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
+      // LFH-288: `Select` nur über den projektweiten Wrapper (components/Select) importieren,
+      // damit neue Selects automatisch Combobox-Suche (Tippen-zum-Filtern) bekommen. Der Wrapper
+      // selbst darf antd direkt importieren (zeilengenaues eslint-disable dort).
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'antd',
+              importNames: ['Select'],
+              message:
+                "Select über den Wrapper importieren: import { Select } from '…/components/Select' — er schaltet die Combobox-Suche standardmäßig an (LFH-288).",
+            },
+          ],
+        },
+      ],
     },
   },
   {

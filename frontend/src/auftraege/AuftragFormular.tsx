@@ -1,4 +1,5 @@
-import { App, Button, Card, Col, DatePicker, Form, Input, Row, Select } from 'antd';
+import { App, Button, Card, Col, DatePicker, Form, Input, Row } from 'antd';
+import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import dayjs from 'dayjs';
 import type { AdressatKategorie, AuftragPrioritaet, NeuerAuftrag, NeuerEmpfaenger, Richtung } from '../api/types';
@@ -139,7 +140,6 @@ export default function AuftragFormular({ senden, abschnitte, einheiten, onAnleg
               mode="multiple"
               options={zielOptionen}
               placeholder="Abschnitte / Einheiten wählen"
-              showSearch={{ optionFilterProp: 'label' }}
               allowClear
             />
           </Form.Item>

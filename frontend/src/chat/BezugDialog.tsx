@@ -1,4 +1,5 @@
-import { Form, Modal, Select } from 'antd';
+import { Form, Modal } from 'antd';
+import { Select } from '../components/Select';
 import { useEffect } from 'react';
 import type { BezugTyp, ChatNachricht } from '../api/types';
 import { BEZUG_TYP_OPTIONEN, type BezugOptionen } from './bezug';
@@ -66,7 +67,6 @@ export default function BezugDialog({
           <Select
             options={objektOptionen}
             disabled={!typ}
-            showSearch={{ optionFilterProp: 'label' }}
             notFoundContent={typ ? 'Keine Objekte' : 'Zuerst Typ wählen'}
           />
         </Form.Item>

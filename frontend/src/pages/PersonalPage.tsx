@@ -1,7 +1,5 @@
-import {
-  Alert, App, Breadcrumb, Button, Form, Input, Modal, Popconfirm, Select, Space, Spin,
-  Table, Tag, Typography, type TableColumnsType,
-} from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Popconfirm, Space, Spin, Table, Tag, Typography, type TableColumnsType } from 'antd';
+import { Select } from '../components/Select';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -209,7 +207,6 @@ export default function PersonalPage() {
               placeholder="Person aus Pool disponieren …"
               value={null}
               options={poolOptionen}
-              showSearch={{ optionFilterProp: 'label' }}
               notFoundContent="Keine freien Personen"
               onSelect={(personalId) => { if (personalId != null) disponiereMutation.mutate(personalId); }}
             />

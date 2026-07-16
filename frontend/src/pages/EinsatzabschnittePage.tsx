@@ -1,7 +1,5 @@
-import {
-  Alert, App, Breadcrumb, Button, Card, Empty, Form, Input, Popconfirm, Select, Space, Spin,
-  Tag, Tree, TreeSelect, Typography, type TreeDataNode,
-} from 'antd';
+import { Alert, App, Breadcrumb, Button, Card, Empty, Form, Input, Popconfirm, Space, Spin, Tag, Tree, TreeSelect, Typography, type TreeDataNode } from 'antd';
+import { Select } from '../components/Select';
 import { Link, useParams } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -195,7 +193,7 @@ export default function EinsatzabschnittePage() {
                   <TreeSelect allowClear placeholder="Übergeordneter Abschnitt" treeData={parentOptionen} />
                 </Form.Item>
                 <Form.Item label="Abschnittsleiter" name="leiter_id">
-                  <Select allowClear showSearch={{ optionFilterProp: 'label' }} placeholder="Disponierte Person" options={personalOptionen} />
+                  <Select allowClear placeholder="Disponierte Person" options={personalOptionen} />
                 </Form.Item>
                 <Form.Item label="Sprechgruppen" name="sprechgruppe_ids">
                   <SprechgruppenPicker einsatzId={einsatzId} />

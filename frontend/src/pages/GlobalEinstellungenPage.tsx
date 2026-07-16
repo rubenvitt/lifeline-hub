@@ -1,4 +1,5 @@
-import { Alert, App, AutoComplete, Button, Form, Input, InputNumber, Select, Spin, Switch, Tooltip } from 'antd';
+import { Alert, App, AutoComplete, Button, Form, Input, InputNumber, Spin, Switch, Tooltip } from 'antd';
+import { Select } from '../components/Select';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ladeOrgEinstellungen, speichereOrgEinstellungen,
