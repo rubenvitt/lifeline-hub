@@ -338,6 +338,19 @@ describe('PersonenDetailPage — UHS-Zuweisung (LFH-152)', () => {
     await screen.findByRole('heading', { name: /Person R-001/ });
     expect(screen.queryByRole('button', { name: 'UHS zuweisen' })).not.toBeInTheDocument();
   });
+
+  it('bietet im UHS-Picker nur aktive UHS an (geplante ausgeschlossen)', async () => {
+    render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([
+        ...uhsListe,
+        { id: 7, einsatz_id: 1, bezeichnung: 'BHP geplant', typ: 'behandlungsplatz', status: 'geplant', abschnitt_id: null, standort: null, notiz: null },
+      ])),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'UHS zuweisen' }));
+    await userEvent.click(await screen.findByRole('combobox', { name: /Unfallhilfsstelle/ }));
+    expect(await screen.findByText('BHP 50')).toBeInTheDocument();
+    expect(screen.queryByText('BHP geplant')).not.toBeInTheDocument();
+  });
 });
 
 // LFH-151: Von der Personen-Seite aus Tiere (Halter) / Schäden (Geschädigte) zuweisen + lösen.
@@ -458,5 +471,24 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
     await userEvent.click(await screen.findByRole('combobox', { name: 'Tier' }));
     expect(await screen.findByText(/Minka/)).toBeInTheDocument();
     expect(screen.queryByText(/Rex/)).not.toBeInTheDocument();
+  });
+
+  it('bietet im Schaden-Picker nur freie, nicht-abgeschlossene Schäden an', async () => {
+    render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1/schaeden', ({ request }) => {
+        const url = new URL(request.url);
+        if (url.searchParams.get('geschaedigt_person_id') === '10') return HttpResponse.json([]);
+        return HttpResponse.json([
+          freierSchaden, // S-009, frei + offen → im Picker
+          { ...freierSchaden, id: 51, registrier_nr: 10, typ: 'brandschaden', geschaedigt_person_id: 99 }, // belegt → raus
+          { ...freierSchaden, id: 52, registrier_nr: 11, typ: 'wasserschaden', status: 'abgeschlossen' }, // abgeschlossen → raus
+        ]);
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Schaden zuweisen' }));
+    await userEvent.click(await screen.findByRole('combobox', { name: 'Schaden' }));
+    expect(await screen.findByText(/S-009/)).toBeInTheDocument();
+    expect(screen.queryByText(/brandschaden/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/wasserschaden/)).not.toBeInTheDocument();
   });
 });
