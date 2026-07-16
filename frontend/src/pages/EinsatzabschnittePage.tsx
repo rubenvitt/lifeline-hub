@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Card, Empty, Form, Input, Popconfirm, Space, Spin, Tag, Tree, TreeSelect, Typography, type TreeDataNode } from 'antd';
+import { Alert, App, Breadcrumb, Button, Card, Descriptions, Empty, Form, Input, Popconfirm, Space, Spin, Tag, Tree, TreeSelect, Typography, type TreeDataNode } from 'antd';
 import { Select } from '../components/Select';
 import { Link, useParams } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
@@ -11,17 +11,12 @@ import {
   aktualisiereAbschnitt, legeAbschnittAn, listeAbschnitte, loeseAbschnittAuf, type AbschnittEingabe,
 } from '../api/einsatzabschnitte';
 import { ApiError } from '../api/client';
-import type { Einsatzabschnitt } from '../api/types';
+import type { Einsatzabschnitt, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
+import FunkErreichbarkeit, { KOMMUNIKATIONSMITTEL_OPTIONEN } from '../components/FunkErreichbarkeit';
 import { Liste, ListenEintrag } from '../components/Liste';
 import SprechgruppenPicker from '../components/SprechgruppenPicker';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
-
-const KOMMUNIKATIONSMITTEL_LABEL: Record<string, string> = {
-  digitalfunk: 'Digitalfunk',
-  mobil: 'Mobil',
-  festnetz: 'Festnetz',
-};
 
 function baueBaum(abschnitte: Einsatzabschnitt[]): TreeDataNode[] {
   const kinder = new Map<number | null, Einsatzabschnitt[]>();
@@ -37,6 +32,7 @@ function baueBaum(abschnitte: Einsatzabschnitt[]): TreeDataNode[] {
         <Space size={4}>
           <span>{a.name}</span>
           {a.leiter_name && <span style={{ color: '#888' }}>👤 {a.leiter_name}</span>}
+          {a.erreichbarkeit && <span style={{ color: '#888' }}>☎</span>}
         </Space>
       ),
       children: baue(a.id),
@@ -79,6 +75,7 @@ export default function EinsatzabschnittePage() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [gewaehlt, setGewaehlt] = useState<number | null>(null);
+  const [bearbeiten, setBearbeiten] = useState(false);
   const [form] = Form.useForm<AbschnittWerte>();
 
   const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
@@ -114,22 +111,26 @@ export default function EinsatzabschnittePage() {
       };
       return aktuell ? aktualisiereAbschnitt(einsatzId, aktuell.id, daten) : legeAbschnittAn(einsatzId, daten);
     },
-    onSuccess: (a) => { invalidate(); setGewaehlt(a.id); message.success('Gespeichert'); },
+    onSuccess: (a) => { invalidate(); setGewaehlt(a.id); setBearbeiten(false); message.success('Gespeichert'); },
     onError: fehler,
   });
   const anlegen = useMutation({
     mutationFn: () => legeAbschnittAn(einsatzId, { name: 'Neuer Abschnitt' }),
-    onSuccess: (a) => { invalidate(); setGewaehlt(a.id); },
+    onSuccess: (a) => { invalidate(); setGewaehlt(a.id); setBearbeiten(true); },
     onError: fehler,
   });
   const aufloesen = useMutation({
     mutationFn: (aid: number) => loeseAbschnittAuf(einsatzId, aid),
-    onSuccess: () => { invalidate(); setGewaehlt(null); },
+    onSuccess: () => { invalidate(); setGewaehlt(null); setBearbeiten(false); },
     onError: fehler,
   });
 
+  // Beim Wechsel des gewählten Abschnitts zurück in die Lese-Ansicht.
+  useEffect(() => { setBearbeiten(false); }, [gewaehlt]);
+
+  // Formular mit den Werten des aktuellen Abschnitts vorbelegen, sobald der Edit-Modus öffnet.
   useEffect(() => {
-    if (aktuell) {
+    if (aktuell && bearbeiten) {
       form.setFieldsValue({
         name: aktuell.name, ueber_abschnitt_id: aktuell.ueber_abschnitt_id ?? undefined,
         leiter_id: aktuell.leiter_id ?? undefined, bemerkung: aktuell.bemerkung ?? undefined,
@@ -138,13 +139,25 @@ export default function EinsatzabschnittePage() {
         erreichbarkeit: aktuell.erreichbarkeit ?? undefined,
       });
     }
-  }, [aktuell, form]);
+  }, [aktuell, bearbeiten, form]);
 
   const baumDaten = useMemo(() => baueBaum(abschnitte), [abschnitte]);
   const verboten = aktuell ? nachfahrenInkl(abschnitte, aktuell.id) : new Set<number>();
   const parentOptionen = abschnitte.filter((a) => !verboten.has(a.id)).map((a) => ({ value: a.id, title: a.name }));
   const personalOptionen = (personalQuery.data ?? []).map((p) => ({ value: p.id, label: p.name }));
   const zugeordneteEinheiten = (einheitenQuery.data ?? []).filter((e) => e.abschnitt_id === aktuell?.id);
+
+  // Stärke des Abschnitts = Summe der kumulierten Ist-Stärke der direkt zugeordneten Einheiten.
+  const abschnittStaerke: Staerke | null = zugeordneteEinheiten.length === 0
+    ? null
+    : zugeordneteEinheiten.reduce<Staerke>(
+        (acc, e) => ({
+          fuehrer: acc.fuehrer + (e.ist_kumuliert?.fuehrer ?? 0),
+          unterfuehrer: acc.unterfuehrer + (e.ist_kumuliert?.unterfuehrer ?? 0),
+          mannschaft: acc.mannschaft + (e.ist_kumuliert?.mannschaft ?? 0),
+        }),
+        { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
+      );
 
   if (einsatzQuery.isLoading) {
     return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
@@ -156,6 +169,29 @@ export default function EinsatzabschnittePage() {
   const darfSchreiben =
     einsatz.status === 'aktiv' &&
     (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
+
+  const einheitenListe = (
+    <>
+      <Typography.Title level={5} style={{ marginTop: 16 }}>Zugeordnete Einheiten</Typography.Title>
+      <Liste
+        size="small"
+        emptyText="Keine Einheiten zugeordnet"
+        dataSource={zugeordneteEinheiten}
+        renderItem={(e) => (
+          <ListenEintrag>
+            <Space>
+              <span>{e.name}</span>
+              {e.typ_label && <Tag>{e.typ_label}</Tag>}
+              <Tag color="blue">kumuliert <StaerkeAnzeige wert={e.ist_kumuliert} /></Tag>
+            </Space>
+          </ListenEintrag>
+        )}
+      />
+      <Typography.Text type="secondary">
+        Die Abschnitts-Zuordnung einer Einheit wird auf der Einheiten-Seite gesetzt.
+      </Typography.Text>
+    </>
+  );
 
   return (
     <div>
@@ -185,78 +221,66 @@ export default function EinsatzabschnittePage() {
         <Card style={{ flex: 1 }} size="small" title={aktuell ? `Abschnitt: ${aktuell.name}` : 'Kein Abschnitt gewählt'}>
           {!aktuell ? (
             <Empty description="Wähle einen Abschnitt im Baum" />
+          ) : bearbeiten ? (
+            <Form<AbschnittWerte> form={form} layout="vertical" onFinish={(w) => speichern.mutate(w)}>
+              <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}><Input /></Form.Item>
+              <Form.Item label="Über-Abschnitt" name="ueber_abschnitt_id">
+                <TreeSelect allowClear placeholder="Übergeordneter Abschnitt" treeData={parentOptionen} />
+              </Form.Item>
+              <Form.Item label="Abschnittsleiter" name="leiter_id">
+                <Select allowClear placeholder="Disponierte Person" options={personalOptionen} />
+              </Form.Item>
+
+              <Typography.Title level={5} style={{ marginTop: 4 }}>Funk / Kommunikation</Typography.Title>
+              <Form.Item label="Sprechgruppen" name="sprechgruppe_ids">
+                <SprechgruppenPicker einsatzId={einsatzId} />
+              </Form.Item>
+              <Form.Item label="Kommunikationsmittel" name="kommunikationsmittel">
+                <Select allowClear placeholder="Digitalfunk / Mobil / Festnetz" options={KOMMUNIKATIONSMITTEL_OPTIONEN} />
+              </Form.Item>
+              <Form.Item label="Erreichbarkeit / Nummer" name="erreichbarkeit">
+                <Input placeholder="z. B. 0151 23456" allowClear />
+              </Form.Item>
+
+              <Form.Item label="Bemerkung" name="bemerkung"><Input.TextArea rows={2} /></Form.Item>
+              <Space>
+                <Button type="primary" htmlType="submit" loading={speichern.isPending}>Speichern</Button>
+                <Button onClick={() => setBearbeiten(false)}>Abbrechen</Button>
+                <Popconfirm title="Abschnitt auflösen?"
+                  description={'Unter-Abschnitte rücken hoch, zugeordnete Einheiten werden „nicht zugeordnet“.'}
+                  onConfirm={() => aufloesen.mutate(aktuell.id)}>
+                  <Button danger>Auflösen</Button>
+                </Popconfirm>
+              </Space>
+            </Form>
           ) : (
             <>
-              <Form<AbschnittWerte> form={form} layout="vertical" disabled={!darfSchreiben} onFinish={(w) => speichern.mutate(w)}>
-                <Form.Item label="Name" name="name" rules={[{ required: true, whitespace: true }]}><Input /></Form.Item>
-                <Form.Item label="Über-Abschnitt" name="ueber_abschnitt_id">
-                  <TreeSelect allowClear placeholder="Übergeordneter Abschnitt" treeData={parentOptionen} />
-                </Form.Item>
-                <Form.Item label="Abschnittsleiter" name="leiter_id">
-                  <Select allowClear placeholder="Disponierte Person" options={personalOptionen} />
-                </Form.Item>
-                <Form.Item label="Sprechgruppen" name="sprechgruppe_ids">
-                  <SprechgruppenPicker einsatzId={einsatzId} />
-                </Form.Item>
-                <Form.Item label="Kommunikationsmittel" name="kommunikationsmittel">
-                  <Select
-                    allowClear
-                    placeholder="Digitalfunk / Mobil / Festnetz"
-                    options={Object.entries(KOMMUNIKATIONSMITTEL_LABEL).map(([value, label]) => ({ value, label }))}
+              <Descriptions column={1} size="small" bordered>
+                <Descriptions.Item label="Abschnittsleiter">{aktuell.leiter_name ?? '—'}</Descriptions.Item>
+                <Descriptions.Item label="Funk / Erreichbarkeit">
+                  <FunkErreichbarkeit
+                    sprechgruppen={aktuell.sprechgruppen}
+                    kommunikationsmittel={aktuell.kommunikationsmittel}
+                    erreichbarkeit={aktuell.erreichbarkeit}
+                    leerText="keine Funk-Angaben"
                   />
-                </Form.Item>
-                <Form.Item label="Erreichbarkeit / Nummer" name="erreichbarkeit">
-                  <Input placeholder="z. B. 0151 23456" allowClear />
-                </Form.Item>
-                <Form.Item label="Bemerkung" name="bemerkung"><Input.TextArea rows={2} /></Form.Item>
-                {darfSchreiben && (
-                  <Space>
-                    <Button type="primary" htmlType="submit" loading={speichern.isPending}>Speichern</Button>
-                    <Popconfirm title="Abschnitt auflösen?"
-                      description={'Unter-Abschnitte rücken hoch, zugeordnete Einheiten werden „nicht zugeordnet“.'}
-                      onConfirm={() => aufloesen.mutate(aktuell.id)}>
-                      <Button danger>Auflösen</Button>
-                    </Popconfirm>
-                  </Space>
-                )}
-              </Form>
+                </Descriptions.Item>
+                <Descriptions.Item label="Stärke (F/UF/M//Σ)"><StaerkeAnzeige wert={abschnittStaerke} /></Descriptions.Item>
+                {aktuell.bemerkung && <Descriptions.Item label="Bemerkung">{aktuell.bemerkung}</Descriptions.Item>}
+              </Descriptions>
 
-              {((aktuell.sprechgruppen?.length ?? 0) > 0
-                || aktuell.kommunikationsmittel || aktuell.erreichbarkeit) && (
-                <div data-testid="funk-erreichbarkeit" style={{ marginTop: 8 }}>
-                  <Space size={[4, 4]} wrap>
-                    {aktuell.sprechgruppen?.filter((s) => s.betriebsart === 'TMO').map((s) => (
-                      <Tag key={s.id} color="blue">TMO: {s.bezeichnung}</Tag>
-                    ))}
-                    {aktuell.sprechgruppen?.filter((s) => s.betriebsart === 'DMO').map((s) => (
-                      <Tag key={s.id} color="geekblue">DMO: {s.bezeichnung}</Tag>
-                    ))}
-                    {aktuell.kommunikationsmittel && (
-                      <Tag>{KOMMUNIKATIONSMITTEL_LABEL[aktuell.kommunikationsmittel] ?? aktuell.kommunikationsmittel}</Tag>
-                    )}
-                    {aktuell.erreichbarkeit && <Tag>☎ {aktuell.erreichbarkeit}</Tag>}
-                  </Space>
-                </div>
+              {darfSchreiben && (
+                <Space style={{ marginTop: 12 }}>
+                  <Button type="primary" onClick={() => setBearbeiten(true)}>Bearbeiten</Button>
+                  <Popconfirm title="Abschnitt auflösen?"
+                    description={'Unter-Abschnitte rücken hoch, zugeordnete Einheiten werden „nicht zugeordnet“.'}
+                    onConfirm={() => aufloesen.mutate(aktuell.id)}>
+                    <Button danger>Auflösen</Button>
+                  </Popconfirm>
+                </Space>
               )}
 
-              <Typography.Title level={5} style={{ marginTop: 16 }}>Zugeordnete Einheiten</Typography.Title>
-              <Liste
-                size="small"
-                emptyText="Keine Einheiten zugeordnet"
-                dataSource={zugeordneteEinheiten}
-                renderItem={(e) => (
-                  <ListenEintrag>
-                    <Space>
-                      <span>{e.name}</span>
-                      {e.typ_label && <Tag>{e.typ_label}</Tag>}
-                      <Tag color="blue">kumuliert <StaerkeAnzeige wert={e.ist_kumuliert} /></Tag>
-                    </Space>
-                  </ListenEintrag>
-                )}
-              />
-              <Typography.Text type="secondary">
-                Die Abschnitts-Zuordnung einer Einheit wird auf der Einheiten-Seite gesetzt.
-              </Typography.Text>
+              {einheitenListe}
             </>
           )}
         </Card>

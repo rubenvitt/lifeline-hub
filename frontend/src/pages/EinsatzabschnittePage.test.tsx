@@ -108,15 +108,16 @@ describe('EinsatzabschnittePage', () => {
     );
   });
 
-  it('zeigt SprechgruppenPicker im Formular statt Freitext-Inputs', async () => {
+  it('zeigt SprechgruppenPicker im Edit-Formular statt Freitext-Inputs', async () => {
     server.use(...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]));
     renderPage();
     await userEvent.click(await screen.findByText('Nord'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     // Alte Freitext-Inputs sind weg
     expect(screen.queryByLabelText('Sprechgruppe TMO')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Sprechgruppe DMO')).not.toBeInTheDocument();
-    // Erreichbarkeit-Feld ist noch da
-    expect(screen.getByDisplayValue('0151 23456')).toBeInTheDocument();
+    // Erreichbarkeit-Feld ist im Edit-Modus da und vorbelegt
+    expect(await screen.findByDisplayValue('0151 23456')).toBeInTheDocument();
     // Picker-Label ist sichtbar
     expect(await screen.findByText('Sprechgruppen')).toBeInTheDocument();
     // Die zugeordnete Sprechgruppe erscheint als ausgewähltes Tag im Multi-Select
@@ -143,6 +144,7 @@ describe('EinsatzabschnittePage', () => {
     );
     renderPage();
     await userEvent.click(await screen.findByText('Nord'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
 
     // Erreichbarkeit mit Whitespace befüllen (→ null), Kommunikationsmittel via Select
     await userEvent.type(await screen.findByLabelText('Erreichbarkeit / Nummer'), '   ');
@@ -163,5 +165,47 @@ describe('EinsatzabschnittePage', () => {
       kommunikationsmittel: 'mobil',
       erreichbarkeit: null,
     });
+  });
+
+  // LFH-107: „Überblick zuerst" — Detailbereich ist Lese-Ansicht, Bearbeiten ist ein eigener Modus.
+  it('zeigt beim Öffnen die Lese-Ansicht (Kerninfos) ohne Formular-Inputs', async () => {
+    server.use(...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]));
+    renderPage();
+    await userEvent.click(await screen.findByText('Nord'));
+    // Kerninfos als Überblick sichtbar
+    expect(await screen.findByText('Abschnittsleiter')).toBeInTheDocument();
+    expect(await screen.findByTestId('funk-erreichbarkeit')).toBeInTheDocument();
+    // Keine Eingabefelder in der Lese-Ansicht
+    expect(screen.queryByLabelText('Erreichbarkeit / Nummer')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument();
+  });
+
+  it('öffnet die Eingabefelder erst nach Klick auf Bearbeiten', async () => {
+    server.use(...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]));
+    renderPage();
+    await userEvent.click(await screen.findByText('Nord'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    expect(await screen.findByLabelText('Erreichbarkeit / Nummer')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+  });
+
+  it('Nur-Lese-Nutzer sehen weder Bearbeiten-Button noch Inputs, aber die Funk-Zusammenfassung', async () => {
+    server.use(...handlers('beobachter', 'aktiv', [funkAbschnitt]));
+    renderPage();
+    await userEvent.click(await screen.findByText('Nord'));
+    expect(await screen.findByTestId('funk-erreichbarkeit')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Erreichbarkeit / Nummer')).not.toBeInTheDocument();
+  });
+
+  it('zeigt die Funk-Daten nicht doppelt (Zusammenfassung nur in der Lese-Ansicht)', async () => {
+    server.use(...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]));
+    renderPage();
+    await userEvent.click(await screen.findByText('Nord'));
+    // Lese-Ansicht: genau eine Funk-Zusammenfassung
+    expect(screen.getAllByTestId('funk-erreichbarkeit')).toHaveLength(1);
+    // Edit-Modus: keine Zusammenfassung mehr (nur Inputs)
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    expect(screen.queryByTestId('funk-erreichbarkeit')).not.toBeInTheDocument();
   });
 });
