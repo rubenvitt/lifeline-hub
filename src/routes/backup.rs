@@ -20,7 +20,7 @@ pub async fn download(
         .map_err(|e| AppError::Internal(format!("Tempverzeichnis fehlgeschlagen: {e}")))?;
     let pfad = dir.path().join("lifeline-backup.sqlite");
 
-    backup::vacuum_into(&state.pool, &pfad).await?;
+    backup::erzeuge_sicherung(&state.pool, &pfad).await?;
 
     let bytes = std::fs::read(&pfad)
         .map_err(|e| AppError::Internal(format!("Sicherung lesen fehlgeschlagen: {e}")))?;

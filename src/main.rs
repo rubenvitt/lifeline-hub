@@ -241,7 +241,7 @@ async fn cmd_backup(db_path: &str, out: &str) -> anyhow::Result<()> {
         anyhow::bail!("Zieldatei existiert bereits: {out} (VACUUM INTO überschreibt nicht)");
     }
     let pool = db::connect(db_path).await?;
-    let groesse = backup::vacuum_into(&pool, ziel).await?;
+    let groesse = backup::erzeuge_sicherung(&pool, ziel).await?;
     pool.close().await;
     println!("Sicherung erstellt: {out} ({groesse} Bytes)");
     Ok(())
