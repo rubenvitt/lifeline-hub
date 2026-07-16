@@ -19,7 +19,12 @@ fn escape_sql_string(pfad: &str) -> String {
 /// sein — niemals ein direkt vom Client gelieferter Pfad.
 ///
 /// Liefert die Größe der erzeugten Datei in Bytes.
-pub async fn vacuum_into(pool: &SqlitePool, ziel: &Path) -> Result<u64, AppError> {
+///
+/// # Warnung
+/// Liefert eine UN-gescrubbte Vollkopie inkl. der `session`-Tabelle (Bearer-Tokens).
+/// Für JEDEN nach außen gehenden Export `erzeuge_sicherung` nutzen — das scrubbt die
+/// Sessions. `pub(crate)`, damit kein neuer Export-Pfad diese Bereinigung umgeht.
+pub(crate) async fn vacuum_into(pool: &SqlitePool, ziel: &Path) -> Result<u64, AppError> {
     let ziel_str = ziel
         .to_str()
         .ok_or_else(|| AppError::Internal("Sicherungspfad ist kein gültiges UTF-8".into()))?;
@@ -59,7 +64,13 @@ async fn scrub_sessions(ziel: &Path) -> Result<(), AppError> {
 /// Liefert die Größe der bereinigten Datei in Bytes.
 pub async fn erzeuge_sicherung(pool: &SqlitePool, ziel: &Path) -> Result<u64, AppError> {
     vacuum_into(pool, ziel).await?;
-    scrub_sessions(ziel).await?;
+    // Fail-closed: schlägt der Session-Scrub fehl, darf keine un-bereinigte Teildatei
+    // (noch mit session-Zeilen) am Zielpfad zurückbleiben. Der HTTP-Pfad räumt via tempdir
+    // ohnehin auf; der CLI-Pfad schreibt an einen User-Pfad und würde es sonst nicht.
+    if let Err(e) = scrub_sessions(ziel).await {
+        let _ = std::fs::remove_file(ziel);
+        return Err(e);
+    }
 
     let groesse = std::fs::metadata(ziel)
         .map_err(|e| AppError::Internal(format!("Sicherungsdatei nicht lesbar: {e}")))?
