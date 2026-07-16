@@ -4,7 +4,9 @@ use serde_json::Value;
 use tower::ServiceExt;
 
 mod common;
-use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup};
+use common::{
+    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup, setup_mit_pool,
+};
 
 async fn default_kanal(app: &axum::Router, einsatz: i64, cookie: &str) -> i64 {
     let (status, json) = anfrage(
@@ -522,4 +524,129 @@ async fn download_erst_nach_letzter_loeschung_gesperrt() {
         StatusCode::NOT_FOUND,
         "letzte verknüpfende Nachricht gelöscht → gesperrt"
     );
+}
+
+/// Löscht einen Anhang: (Status).
+async fn delete_anhang(app: &axum::Router, einsatz: i64, aid: i64, cookie: &str) -> StatusCode {
+    anfrage(
+        app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/anhaenge/{aid}"),
+        cookie,
+        None,
+    )
+    .await
+    .0
+}
+
+/// G06 (LFH-250): Einzel-Löschung eines Anhangs (Freigabepfad). Nach DELETE (204) ist
+/// der Anhang weg → Download 404.
+#[tokio::test]
+async fn delete_entfernt_anhang() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    let (_, up) = upload(&app, einsatz, &admin, "weg.pdf", "application/pdf", b"weg").await;
+    let aid = up[0]["id"].as_i64().unwrap();
+
+    assert_eq!(
+        delete_anhang(&app, einsatz, aid, &admin).await,
+        StatusCode::NO_CONTENT
+    );
+
+    let (s, _, _) = download(&app, einsatz, aid, &admin).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "nach DELETE nicht mehr ladbar");
+}
+
+/// G06: DELETE über den falschen Einsatz-Pfad trifft nichts (Ownership) → 404; der
+/// Anhang bleibt unter seinem echten Einsatz erhalten.
+#[tokio::test]
+async fn delete_fremder_einsatz_ist_notfound() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz_a = einsatz_anlegen(&app, &admin).await;
+    let einsatz_b = einsatz_anlegen(&app, &admin).await;
+
+    let (_, up) = upload(&app, einsatz_b, &admin, "b.pdf", "application/pdf", b"B").await;
+    let aid_b = up[0]["id"].as_i64().unwrap();
+
+    assert_eq!(
+        delete_anhang(&app, einsatz_a, aid_b, &admin).await,
+        StatusCode::NOT_FOUND,
+        "fremder Einsatz-Pfad trifft den Anhang nicht"
+    );
+    // Unter dem echten Einsatz weiterhin ladbar.
+    let (s, _, _) = download(&app, einsatz_b, aid_b, &admin).await;
+    assert_eq!(s, StatusCode::OK, "Anhang bleibt unter B erhalten");
+}
+
+/// G06: Beobachter (ohne Schreibrecht) darf nicht löschen → 403.
+#[tokio::test]
+async fn beobachter_darf_nicht_loeschen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    let (_, up) = upload(&app, einsatz, &admin, "x.pdf", "application/pdf", b"x").await;
+    let aid = up[0]["id"].as_i64().unwrap();
+
+    let beo = benutzer_anlegen(&app, &admin, "beata", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, beo, "beobachter").await;
+    let bea = login_cookie(&app, "beata", "beatapw1").await;
+
+    assert_eq!(
+        delete_anhang(&app, einsatz, aid, &bea).await,
+        StatusCode::FORBIDDEN,
+        "Beobachter ohne Schreibrecht → 403"
+    );
+}
+
+/// G06: Der Orphan-Sweep (LFH-250) verschont Anhänge, die an eine Nachricht gebunden
+/// sind, und löscht nur die verwaisten (hochgeladen-nicht-gesendet) jenseits der Karenz.
+/// Deckt die `NOT EXISTS`-Spare-Path über den echten Chat-Linker ab.
+#[tokio::test]
+async fn sweep_verschont_gebundene_anhaenge() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kid = default_kanal(&app, einsatz, &admin).await;
+
+    // X wird an eine Nachricht gehängt (gebunden), Y bleibt verwaist.
+    let (_, x) = upload(
+        &app,
+        einsatz,
+        &admin,
+        "gebunden.pdf",
+        "application/pdf",
+        b"X",
+    )
+    .await;
+    let xid = x[0]["id"].as_i64().unwrap();
+    nachricht_senden(&app, einsatz, kid, &admin, &[xid]).await;
+
+    let (_, y) = upload(
+        &app,
+        einsatz,
+        &admin,
+        "verwaist.pdf",
+        "application/pdf",
+        b"Y",
+    )
+    .await;
+    let yid = y[0]["id"].as_i64().unwrap();
+
+    // jetzt weit in der Zukunft → beide älter als die Karenz; nur der verwaiste fällt.
+    let jetzt = chrono::DateTime::parse_from_rfc3339("2099-01-01T00:00:00Z")
+        .unwrap()
+        .with_timezone(&chrono::Utc);
+    let geloescht = lifeline_hub::anhang::repo::sweep_verwaiste(&pool, jetzt)
+        .await
+        .unwrap();
+    assert_eq!(geloescht, 1, "nur der verwaiste Anhang wird gelöscht");
+
+    let (sx, _, _) = download(&app, einsatz, xid, &admin).await;
+    assert_eq!(sx, StatusCode::OK, "gebundener Anhang verschont");
+    let (sy, _, _) = download(&app, einsatz, yid, &admin).await;
+    assert_eq!(sy, StatusCode::NOT_FOUND, "verwaister Anhang gelöscht");
 }

@@ -175,7 +175,7 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/anhaenge/{aid}",
-            get(routes::anhang::herunterladen),
+            get(routes::anhang::herunterladen).delete(routes::anhang::loeschen),
         )
         .route(
             "/api/einsaetze/{id}/erinnerungen",

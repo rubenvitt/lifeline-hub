@@ -105,3 +105,18 @@ pub async fn herunterladen(
     );
     Ok((headers, daten))
 }
+
+/// DELETE /api/einsaetze/{id}/anhaenge/{aid} — Anhang hart löschen (Freigabepfad, LFH-250).
+/// Schreibrecht + aktiver Einsatz; die Ownership erzwingt die einsatz-gescopte Query
+/// (fremder Anhang → NotFound). Der `ON DELETE CASCADE`-FK räumt die
+/// `chat_nachricht_anhang`-Verknüpfungen mit.
+pub async fn loeschen(
+    State(state): State<AppState>,
+    ctx: EinsatzKontext,
+    Path((einsatz_id, anhang_id)): Path<(i64, i64)>,
+) -> Result<StatusCode, AppError> {
+    ctx.fordere_schreibrecht()?;
+    ctx.fordere_aktiv()?;
+    anhang::repo::loeschen(&state.pool, einsatz_id, anhang_id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}

@@ -90,6 +90,15 @@ pub fn starte_purge_scheduler(pool: SqlitePool) {
         loop {
             ticker.tick().await;
             tick_einmal(&pool, Utc::now()).await;
+            // Verwaiste Anhänge (hochgeladen-nicht-gesendet) jenseits der Karenz entfernen
+            // (LFH-250) — gegen monotones BLOB-Wachstum. Fehler nur loggen, nie den Tick killen.
+            match crate::anhang::repo::sweep_verwaiste(&pool, Utc::now()).await {
+                Ok(n) if n > 0 => {
+                    tracing::info!(anzahl = n, "Orphan-Sweep: verwaiste Anhänge gelöscht")
+                }
+                Ok(_) => {}
+                Err(e) => tracing::warn!("Orphan-Sweep fehlgeschlagen: {e}"),
+            }
         }
     });
 }
