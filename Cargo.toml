@@ -31,7 +31,7 @@ utoipa = "5"
 tower-http = { version = "0.7", features = ["fs"] }
 # Prod-Abhängigkeit: der PMTiles-Tile-Handler nutzt `tower::ServiceExt::oneshot`,
 # um `ServeFile` per Request laufen zu lassen (siehe routes/karte.rs).
-tower = { version = "0.5", features = ["util"] }
+tower = { version = "0.5", features = ["util", "limit"] }
 fs4 = "1.1.0"
 # LFH-201: geteilter Offline-Katalog-Typ (Grundstein für den späteren karten-service).
 karten-katalog = { path = "crates/karten-katalog" }

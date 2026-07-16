@@ -4,8 +4,10 @@ use crate::einsatz::kontext::EinsatzKontext;
 use crate::error::AppError;
 use axum::extract::{Multipart, Path, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
-use axum::response::IntoResponse;
+use axum::response::{IntoResponse, Response};
 use axum::Json;
+
+use super::support::{etag_von, if_none_match_matcht, ASSET_CACHE_CONTROL};
 
 /// POST /api/einsaetze/{id}/anhaenge — generischer Datei-Upload (multipart).
 /// Schreibrecht + aktiver Einsatz. Jedes Datei-Feld wird einzeln validiert
@@ -77,7 +79,8 @@ pub async fn herunterladen(
     State(state): State<AppState>,
     ctx: EinsatzKontext,
     Path((einsatz_id, anhang_id)): Path<(i64, i64)>,
-) -> Result<impl IntoResponse, AppError> {
+    req_headers: HeaderMap,
+) -> Result<Response, AppError> {
     ctx.fordere_lesezugriff()?;
 
     if !anhang::repo::gehoert_anhang_zu_einsatz(&state.pool, anhang_id, einsatz_id).await? {
@@ -88,9 +91,28 @@ pub async fn herunterladen(
     if crate::chat::repo::anhang_nur_an_geloeschten_nachrichten(&state.pool, anhang_id).await? {
         return Err(AppError::NotFound);
     }
-    let (dateiname, mime, daten) = anhang::repo::laden_bytes(&state.pool, anhang_id).await?;
+
+    // Cache-Kurzschluss (LFH-258): sha256-Meta OHNE BLOB laden; passt der If-None-Match-
+    // Header, antworten wir 304 und sparen den teuren Voll-BLOB-Read.
+    let (dateiname, mime, sha256) =
+        anhang::repo::meta_fuer_download(&state.pool, anhang_id).await?;
+    let etag = etag_von(&sha256);
 
     let mut headers = HeaderMap::new();
+    headers.insert(
+        header::ETAG,
+        HeaderValue::from_str(&etag)
+            .map_err(|e| AppError::Internal(format!("Ungültiger ETag: {e}")))?,
+    );
+    headers.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static(ASSET_CACHE_CONTROL),
+    );
+
+    if if_none_match_matcht(&req_headers, &etag) {
+        return Ok((StatusCode::NOT_MODIFIED, headers).into_response());
+    }
+
     headers.insert(
         header::CONTENT_TYPE,
         HeaderValue::from_str(&mime)
@@ -103,7 +125,8 @@ pub async fn herunterladen(
         HeaderValue::from_str(&anhang::content_disposition(&dateiname))
             .map_err(|e| AppError::Internal(format!("Ungültiger Header: {e}")))?,
     );
-    Ok((headers, daten))
+    let (_, _, daten) = anhang::repo::laden_bytes(&state.pool, anhang_id).await?;
+    Ok((headers, daten).into_response())
 }
 
 /// DELETE /api/einsaetze/{id}/anhaenge/{aid} — Anhang hart löschen (Freigabepfad, LFH-250).

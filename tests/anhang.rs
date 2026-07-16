@@ -650,3 +650,96 @@ async fn sweep_verschont_gebundene_anhaenge() {
     let (sy, _, _) = download(&app, einsatz, yid, &admin).await;
     assert_eq!(sy, StatusCode::NOT_FOUND, "verwaister Anhang gelöscht");
 }
+
+/// Download mit optionalem `If-None-Match`: (Status, Header, Bytes).
+async fn download_inm(
+    app: &axum::Router,
+    einsatz: i64,
+    aid: i64,
+    cookie: &str,
+    if_none_match: Option<&str>,
+) -> (StatusCode, HeaderMap, Vec<u8>) {
+    let mut req = Request::builder()
+        .method("GET")
+        .uri(format!("/api/einsaetze/{einsatz}/anhaenge/{aid}"))
+        .header(header::COOKIE, cookie);
+    if let Some(etag) = if_none_match {
+        req = req.header(header::IF_NONE_MATCH, etag);
+    }
+    let resp = app
+        .clone()
+        .oneshot(req.body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let status = resp.status();
+    let headers = resp.headers().clone();
+    let bytes = to_bytes(resp.into_body(), usize::MAX)
+        .await
+        .unwrap()
+        .to_vec();
+    (status, headers, bytes)
+}
+
+/// G04 (LFH-258): Der Download trägt einen starken ETag (sha256) und `Cache-Control`
+/// (private, immutable) — inhaltsadressiert, Bytes je id unveränderlich.
+#[tokio::test]
+async fn download_setzt_etag_und_cache_control() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, up) = upload(&app, einsatz, &admin, "c.pdf", "application/pdf", b"cache").await;
+    let aid = up[0]["id"].as_i64().unwrap();
+
+    let (s, headers, _) = download(&app, einsatz, aid, &admin).await;
+    assert_eq!(s, StatusCode::OK);
+    let etag = headers
+        .get(header::ETAG)
+        .expect("ETag gesetzt")
+        .to_str()
+        .unwrap();
+    assert!(
+        etag.starts_with('"') && etag.ends_with('"'),
+        "starker ETag (quoted): {etag}"
+    );
+    assert_eq!(
+        etag.trim_matches('"').len(),
+        64,
+        "sha256-Hex als ETag: {etag}"
+    );
+    let cc = headers
+        .get(header::CACHE_CONTROL)
+        .expect("Cache-Control gesetzt")
+        .to_str()
+        .unwrap();
+    assert!(cc.contains("private"), "private (auth-gated): {cc}");
+    assert!(cc.contains("immutable"), "immutable: {cc}");
+}
+
+/// G04: `If-None-Match` mit passendem ETag → 304 ohne Body (BLOB wird nicht gelesen);
+/// mit unpassendem ETag → 200 mit vollem Body.
+#[tokio::test]
+async fn download_if_none_match_liefert_304() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, up) = upload(&app, einsatz, &admin, "c.pdf", "application/pdf", b"cache").await;
+    let aid = up[0]["id"].as_i64().unwrap();
+
+    let (_, headers, _) = download(&app, einsatz, aid, &admin).await;
+    let etag = headers
+        .get(header::ETAG)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    // Passender ETag → 304, leerer Body.
+    let (s304, _, body304) = download_inm(&app, einsatz, aid, &admin, Some(&etag)).await;
+    assert_eq!(s304, StatusCode::NOT_MODIFIED, "passender ETag → 304");
+    assert!(body304.is_empty(), "304 ohne Body");
+
+    // Unpassender ETag → 200 mit vollem Body.
+    let (s200, _, body200) = download_inm(&app, einsatz, aid, &admin, Some("\"deadbeef\"")).await;
+    assert_eq!(s200, StatusCode::OK, "unpassender ETag → 200");
+    assert_eq!(body200, b"cache", "voller Body bei 200");
+}

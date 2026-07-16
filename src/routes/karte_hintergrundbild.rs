@@ -8,9 +8,10 @@ use crate::error::AppError;
 use crate::karte_hintergrundbild::{
     self as bild, repo as bild_repo, repo::BildPatch, HintergrundbildAnzeige,
 };
+use crate::routes::support::{etag_von, if_none_match_matcht, ASSET_CACHE_CONTROL};
 use axum::extract::{Multipart, Path, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
-use axum::response::IntoResponse;
+use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::Deserialize;
 
@@ -126,7 +127,8 @@ pub async fn herunterladen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, bild_id)): Path<(i64, i64)>,
-) -> Result<impl IntoResponse, AppError> {
+    req_headers: HeaderMap,
+) -> Result<Response, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
@@ -138,8 +140,28 @@ pub async fn herunterladen(
         &benutzer,
     )
     .await?;
-    let (name, mime, daten) = bild_repo::laden_bytes(&state.pool, einsatz_id, bild_id).await?;
+
+    // Cache-Kurzschluss (LFH-258): sha256-Meta OHNE BLOB; passt der If-None-Match-Header,
+    // antworten wir 304 und sparen den teuren Voll-BLOB-Read.
+    let (name, mime, sha256) =
+        bild_repo::meta_fuer_download(&state.pool, einsatz_id, bild_id).await?;
+    let etag = etag_von(&sha256);
+
     let mut headers = HeaderMap::new();
+    headers.insert(
+        header::ETAG,
+        HeaderValue::from_str(&etag)
+            .map_err(|e| AppError::Internal(format!("Ungültiger ETag: {e}")))?,
+    );
+    headers.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static(ASSET_CACHE_CONTROL),
+    );
+
+    if if_none_match_matcht(&req_headers, &etag) {
+        return Ok((StatusCode::NOT_MODIFIED, headers).into_response());
+    }
+
     headers.insert(
         header::CONTENT_TYPE,
         HeaderValue::from_str(&mime)
@@ -152,7 +174,8 @@ pub async fn herunterladen(
         HeaderValue::from_str(&crate::anhang::content_disposition(&name))
             .map_err(|e| AppError::Internal(format!("Ungültiger Header: {e}")))?,
     );
-    Ok((headers, daten))
+    let (_, _, daten) = bild_repo::laden_bytes(&state.pool, einsatz_id, bild_id).await?;
+    Ok((headers, daten).into_response())
 }
 
 #[derive(Debug, Deserialize)]

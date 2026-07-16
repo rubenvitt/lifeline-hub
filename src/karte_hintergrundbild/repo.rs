@@ -45,6 +45,25 @@ pub async fn laden(
     .ok_or(AppError::NotFound)
 }
 
+/// Lädt die Download-Metadaten OHNE die Bytes: `(name, mime, sha256)`. Speist die
+/// Cache-Header (ETag/Content-Type/Content-Disposition) und den `If-None-Match`-304-
+/// Kurzschluss, ohne den (teuren) BLOB zu lesen (LFH-258). `NotFound`, wenn das Bild
+/// nicht (zu diesem Einsatz) existiert.
+pub async fn meta_fuer_download(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<(String, String, String), AppError> {
+    sqlx::query_as::<_, (String, String, String)>(
+        "SELECT name, mime, sha256 FROM karte_hintergrundbild WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)
+}
+
 /// Lädt die Bytes eines Hintergrundbilds für den Download: `(name, mime, daten)`.
 /// `name` speist den `Content-Disposition`-Header (LFH-238). `NotFound`, wenn das
 /// Bild nicht (zu diesem Einsatz) existiert.

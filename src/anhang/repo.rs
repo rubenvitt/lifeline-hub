@@ -67,6 +67,23 @@ pub async fn anlegen(
     anzeige_laden(pool, id).await
 }
 
+/// Lädt die Download-Metadaten OHNE die Bytes: `(dateiname, mime, sha256)`. Speist die
+/// Cache-Header (ETag/Content-Type/Content-Disposition) und erlaubt die
+/// `If-None-Match`-304-Kurzschluss-Antwort, ohne den (teuren) BLOB zu lesen (LFH-258).
+/// `NotFound`, wenn der Anhang nicht existiert.
+pub async fn meta_fuer_download(
+    pool: &SqlitePool,
+    id: i64,
+) -> Result<(String, String, String), AppError> {
+    sqlx::query_as::<_, (String, String, String)>(
+        "SELECT dateiname, mime, sha256 FROM anhang WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)
+}
+
 /// Lädt die Bytes eines Anhangs für den Download: `(dateiname, mime, daten)`.
 /// `NotFound`, wenn der Anhang nicht existiert.
 pub async fn laden_bytes(

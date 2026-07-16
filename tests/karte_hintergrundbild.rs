@@ -342,3 +342,91 @@ async fn nicht_bild_wird_abgelehnt() {
     let (status, _) = upload_bild(&app, einsatz, &admin, "bild.gif", "image/gif", gif, ECKEN).await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "GIF muss 400 ergeben");
 }
+
+/// GET Download mit optionalem `If-None-Match`: (Status, Header, Bytes).
+async fn download_bild_inm(
+    app: &axum::Router,
+    einsatz_id: i64,
+    bild_id: i64,
+    cookie: &str,
+    if_none_match: Option<&str>,
+) -> (StatusCode, HeaderMap, Vec<u8>) {
+    let mut req = Request::builder()
+        .method("GET")
+        .uri(format!(
+            "/api/einsaetze/{einsatz_id}/karte/hintergrundbilder/{bild_id}/download"
+        ))
+        .header(header::COOKIE, cookie);
+    if let Some(etag) = if_none_match {
+        req = req.header(header::IF_NONE_MATCH, etag);
+    }
+    let resp = app
+        .clone()
+        .oneshot(req.body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let status = resp.status();
+    let headers = resp.headers().clone();
+    let bytes = to_bytes(resp.into_body(), usize::MAX)
+        .await
+        .unwrap()
+        .to_vec();
+    (status, headers, bytes)
+}
+
+/// G04 (LFH-258): Der Bild-Download trägt starken ETag (sha256) + Cache-Control (immutable).
+#[tokio::test]
+async fn download_setzt_etag_und_cache_control() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let png = minimal_png();
+    let (_, bild) = upload_bild(&app, einsatz, &admin, "plan.png", "image/png", &png, ECKEN).await;
+    let bild_id = bild["id"].as_i64().unwrap();
+
+    let (s, headers, _) = download_bild(&app, einsatz, bild_id, &admin).await;
+    assert_eq!(s, StatusCode::OK);
+    let etag = headers.get(header::ETAG).expect("ETag").to_str().unwrap();
+    assert_eq!(
+        etag.trim_matches('"').len(),
+        64,
+        "sha256-Hex als ETag: {etag}"
+    );
+    let cc = headers
+        .get(header::CACHE_CONTROL)
+        .expect("Cache-Control")
+        .to_str()
+        .unwrap();
+    assert!(
+        cc.contains("private") && cc.contains("immutable"),
+        "Cache-Control: {cc}"
+    );
+}
+
+/// G04: `If-None-Match` mit passendem ETag → 304 ohne Body; unpassend → 200 mit Body.
+#[tokio::test]
+async fn download_if_none_match_liefert_304() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let png = minimal_png();
+    let (_, bild) = upload_bild(&app, einsatz, &admin, "plan.png", "image/png", &png, ECKEN).await;
+    let bild_id = bild["id"].as_i64().unwrap();
+
+    let (_, headers, _) = download_bild(&app, einsatz, bild_id, &admin).await;
+    let etag = headers
+        .get(header::ETAG)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let (s304, _, body304) = download_bild_inm(&app, einsatz, bild_id, &admin, Some(&etag)).await;
+    assert_eq!(s304, StatusCode::NOT_MODIFIED, "passend → 304");
+    assert!(body304.is_empty(), "304 ohne Body");
+
+    let (s200, _, body200) =
+        download_bild_inm(&app, einsatz, bild_id, &admin, Some("\"deadbeef\"")).await;
+    assert_eq!(s200, StatusCode::OK, "unpassend → 200");
+    assert_eq!(body200, png, "voller Body bei 200");
+}
