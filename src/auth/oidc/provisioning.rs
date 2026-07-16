@@ -86,6 +86,20 @@ fn sanitisiere_benutzername(roh: &str) -> String {
     }
 }
 
+/// Leitet den Anzeigenamen aus den Claims ab — **pur**, kein DB-Zugriff. Kandidaten in der
+/// Reihenfolge `name` → `preferred_username` → `subject`; jeder wird getrimmt und nur genommen,
+/// wenn er nach dem Trimmen nicht leer ist (analog zu `plane_benutzername`s `preferred_username`-
+/// Behandlung). `subject` ist immer nicht-leer (OIDC-Pflichtclaim), daher terminiert die Kette.
+pub fn plane_anzeigename(claims: &OidcClaims) -> String {
+    [claims.name.as_deref(), claims.preferred_username.as_deref()]
+        .into_iter()
+        .flatten()
+        .map(str::trim)
+        .find(|s| !s.is_empty())
+        .unwrap_or_else(|| claims.subject.trim())
+        .to_string()
+}
+
 /// Findet den Benutzer zu `(claims.issuer, claims.subject)` oder provisioniert bei
 /// erstem Login ein NEUES least-privilege-Konto (`system_rolle = keiner`,
 /// `org_rolle = keine`, Sentinel-Passworthash `PASSWORT_HASH_SSO_ONLY`). Matching ist
@@ -126,11 +140,7 @@ pub async fn finde_oder_provisioniere(
 
     let benutzername = plane_benutzername(claims, |kandidat| vergebene_namen.contains(kandidat));
 
-    let anzeigename = claims
-        .name
-        .clone()
-        .or_else(|| claims.preferred_username.clone())
-        .unwrap_or_else(|| claims.subject.clone());
+    let anzeigename = plane_anzeigename(claims);
 
     let eingefuegt = sqlx::query(
         "INSERT INTO benutzer \
@@ -220,6 +230,37 @@ mod tests {
         let c = claims("https://idp.example", "sub-1", Some("max"), None);
         let name = plane_benutzername(&c, |_| false);
         assert_eq!(name, "max");
+    }
+
+    // --- plane_anzeigename (pur, keine DB) ---
+
+    #[test]
+    fn anzeigename_ueberspringt_leere_und_whitespace_claims() {
+        // name = whitespace, preferred_username = leer → Fallback auf subject.
+        let c = claims("https://idp.example", "sub-x", Some(""), Some("   "));
+        assert_eq!(plane_anzeigename(&c), "sub-x");
+    }
+
+    #[test]
+    fn anzeigename_nimmt_name_vor_preferred_username() {
+        let c = claims(
+            "https://idp.example",
+            "sub-x",
+            Some("maxmuster"),
+            Some("Max Mustermann"),
+        );
+        assert_eq!(plane_anzeigename(&c), "Max Mustermann");
+    }
+
+    #[test]
+    fn anzeigename_faellt_auf_preferred_username_wenn_name_leer() {
+        let c = claims(
+            "https://idp.example",
+            "sub-x",
+            Some("maxmuster"),
+            Some("  "),
+        );
+        assert_eq!(plane_anzeigename(&c), "maxmuster");
     }
 
     // --- finde_oder_provisioniere (gegen test_pool) ---
