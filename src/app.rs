@@ -75,6 +75,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/auth/totp/finish", post(routes::auth::totp_finish))
         .route("/api/benutzer", get(routes::benutzer::liste))
         .route("/api/benutzer", post(routes::benutzer::anlegen))
+        .route("/api/benutzer/{id}", patch(routes::benutzer::bearbeiten))
         .route(
             "/api/benutzer/{id}/deaktivieren",
             post(routes::benutzer::deaktivieren),

@@ -4,10 +4,23 @@ import AdminPage from '../components/AdminPage';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate } from 'react-router-dom';
-import type { BenutzerAnzeige } from '../api/types';
+import type { BenutzerAnzeige, OrgRolle, SystemRolle } from '../api/types';
 import { ApiError } from '../api/client';
-import { deaktiviereBenutzer, legeBenutzerAn, listeBenutzer, type NeuerBenutzer } from '../api/benutzer';
+import {
+  bearbeiteBenutzer,
+  deaktiviereBenutzer,
+  legeBenutzerAn,
+  listeBenutzer,
+  type NeuerBenutzer,
+  type PatchBenutzer,
+} from '../api/benutzer';
 import { useAuth } from '../auth/AuthContext';
+
+interface BearbeitenWerte {
+  anzeigename: string;
+  system_rolle: SystemRolle;
+  org_rolle: OrgRolle;
+}
 
 const SYSTEM_ROLLEN = [
   { value: 'keiner', label: 'Benutzer' },
@@ -24,6 +37,8 @@ export default function BenutzerPage() {
   const { message } = App.useApp();
   const [offen, setOffen] = useState(false);
   const [form] = Form.useForm<NeuerBenutzer>();
+  const [zuBearbeiten, setZuBearbeiten] = useState<BenutzerAnzeige | null>(null);
+  const [editForm] = Form.useForm<BearbeitenWerte>();
 
   const { data: benutzerListe = [], isLoading } = useQuery({
     queryKey: ['benutzer'],
@@ -44,6 +59,15 @@ export default function BenutzerPage() {
     mutationFn: (id: number) => deaktiviereBenutzer(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['benutzer'] }),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
+  });
+
+  const bearbeiten = useMutation({
+    mutationFn: ({ id, patch }: { id: number; patch: PatchBenutzer }) => bearbeiteBenutzer(id, patch),
+    onSuccess: () => {
+      setZuBearbeiten(null);
+      qc.invalidateQueries({ queryKey: ['benutzer'] });
+    },
+    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
   });
 
   if (!authLaedt && angemeldeterBenutzer?.system_rolle !== 'admin') {
@@ -67,23 +91,34 @@ export default function BenutzerPage() {
         dataSource={benutzerListe}
         renderItem={(b: BenutzerAnzeige) => (
           <ListenEintrag
-            actions={
-              b.aktiv
-                ? [
-                    <Popconfirm
-                      key="deaktivieren"
-                      title="Benutzer deaktivieren?"
-                      okText="Ja"
-                      cancelText="Abbrechen"
-                      onConfirm={() => deaktivieren.mutate(b.id)}
-                    >
-                      <Button type="link" danger size="small">
-                        Deaktivieren
-                      </Button>
-                    </Popconfirm>,
-                  ]
-                : []
-            }
+            actions={[
+              <Button key="bearbeiten" type="link" size="small" onClick={() => setZuBearbeiten(b)}>
+                Bearbeiten
+              </Button>,
+              b.aktiv ? (
+                <Popconfirm
+                  key="deaktivieren"
+                  title="Benutzer deaktivieren?"
+                  okText="Ja"
+                  cancelText="Abbrechen"
+                  onConfirm={() => deaktivieren.mutate(b.id)}
+                >
+                  <Button type="link" danger size="small">
+                    Deaktivieren
+                  </Button>
+                </Popconfirm>
+              ) : (
+                <Button
+                  key="reaktivieren"
+                  type="link"
+                  size="small"
+                  loading={bearbeiten.isPending && bearbeiten.variables?.id === b.id}
+                  onClick={() => bearbeiten.mutate({ id: b.id, patch: { aktiv: true } })}
+                >
+                  Reaktivieren
+                </Button>
+              ),
+            ]}
           >
             <ListenEintragMeta
               title={b.anzeigename}
@@ -146,6 +181,43 @@ export default function BenutzerPage() {
           </Form.Item>
         </Form>
       </Modal>
+
+      {zuBearbeiten && (
+        <Modal
+          title="Benutzer bearbeiten"
+          open
+          onCancel={() => setZuBearbeiten(null)}
+          onOk={() => editForm.submit()}
+          okText="Speichern"
+          confirmLoading={bearbeiten.isPending && bearbeiten.variables?.id === zuBearbeiten.id}
+        >
+          <Form
+            key={zuBearbeiten.id}
+            form={editForm}
+            layout="vertical"
+            initialValues={{
+              anzeigename: zuBearbeiten.anzeigename,
+              system_rolle: zuBearbeiten.system_rolle,
+              org_rolle: zuBearbeiten.org_rolle,
+            }}
+            onFinish={(w) => bearbeiten.mutate({ id: zuBearbeiten.id, patch: w })}
+          >
+            <Form.Item
+              label="Anzeigename"
+              name="anzeigename"
+              rules={[{ required: true, message: 'Bitte Anzeigename eingeben' }]}
+            >
+              <Input autoFocus />
+            </Form.Item>
+            <Form.Item label="System-Rolle" name="system_rolle">
+              <Select options={SYSTEM_ROLLEN} />
+            </Form.Item>
+            <Form.Item label="Org-Rolle" name="org_rolle">
+              <Select options={ORG_ROLLEN} />
+            </Form.Item>
+          </Form>
+        </Modal>
+      )}
     </AdminPage>
   );
 }

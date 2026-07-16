@@ -448,3 +448,264 @@ async fn admin_totp_reset_unbekannter_benutzer_ist_404() {
     .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
+
+// ===== Benutzer bearbeiten: PATCH /api/benutzer/{id} (LFH-286) =====
+
+#[tokio::test]
+async fn admin_patch_system_rolle_macht_nutzer_zum_admin() {
+    // AC: Ein (z. B. OIDC-provisionierter) least-privilege-Nutzer kann nachträglich Admin werden.
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    let erika_id = benutzer_anlegen(&app, &admin_cookie, "erika", "keine").await;
+
+    let (status, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/benutzer/{erika_id}"),
+        &admin_cookie,
+        Some(r#"{"system_rolle":"admin"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["system_rolle"], "admin");
+}
+
+#[tokio::test]
+async fn admin_patch_org_rolle_und_anzeigename() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    let erika_id = benutzer_anlegen(&app, &admin_cookie, "erika", "keine").await;
+
+    let (status, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/benutzer/{erika_id}"),
+        &admin_cookie,
+        Some(r#"{"org_rolle":"fuehrungskraft","anzeigename":"Erika Neu"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["org_rolle"], "fuehrungskraft");
+    assert_eq!(json["anzeigename"], "Erika Neu");
+    // Nicht mitgeschickte Felder bleiben unverändert.
+    assert_eq!(json["benutzername"], "erika");
+    assert_eq!(json["system_rolle"], "keiner");
+}
+
+#[tokio::test]
+async fn patch_nur_anzeigename_laesst_org_rolle_unveraendert() {
+    // Diskriminiert die partielle PATCH-Semantik: ein naives „alle Felder überschreiben"
+    // würde org_rolle auf den Default zurücksetzen. Erika startet als Führungskraft.
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    let erika_id = benutzer_anlegen(&app, &admin_cookie, "erika", "fuehrungskraft").await;
+
+    let (status, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/benutzer/{erika_id}"),
+        &admin_cookie,
+        Some(r#"{"anzeigename":"Nur Name"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["anzeigename"], "Nur Name");
+    assert_eq!(
+        json["org_rolle"], "fuehrungskraft",
+        "org_rolle darf ohne Mitschicken nicht zurückgesetzt werden"
+    );
+}
+
+#[tokio::test]
+async fn patch_reaktiviert_deaktivierten_benutzer() {
+    // AC: Ein deaktivierter Benutzer kann wieder aktiviert werden und sich danach anmelden.
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    let erika_id = benutzer_anlegen(&app, &admin_cookie, "erika", "keine").await;
+
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/benutzer/{erika_id}/deaktivieren"),
+        &admin_cookie,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/benutzer/{erika_id}"),
+        &admin_cookie,
+        Some(r#"{"aktiv":true}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["aktiv"], true);
+
+    // Login gelingt wieder.
+    let (status, _) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/login",
+        "",
+        Some(r#"{"benutzername":"erika","passwort":"erikapw1"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn patch_letzter_admin_downgrade_ist_409() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    // admin hat id=1 und ist der einzige aktive Admin.
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        "/api/benutzer/1",
+        &admin_cookie,
+        Some(r#"{"system_rolle":"keiner"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+
+    // Rolle bleibt unverändert admin.
+    let (_, json) = anfrage(&app, "GET", "/api/benutzer", &admin_cookie, None).await;
+    let admin = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|b| b["id"] == 1)
+        .unwrap();
+    assert_eq!(admin["system_rolle"], "admin");
+}
+
+#[tokio::test]
+async fn patch_letzter_admin_deaktivieren_ist_409() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        "/api/benutzer/1",
+        &admin_cookie,
+        Some(r#"{"aktiv":false}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn patch_admin_downgrade_erlaubt_wenn_zweiter_admin_existiert() {
+    // Diskriminiert den Lockout-Guard: mit einem zweiten aktiven Admin ist der Downgrade erlaubt.
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    // Zweiten Admin anlegen.
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/benutzer",
+        &admin_cookie,
+        Some(r#"{"anzeigename":"Zwei","benutzername":"zwei","passwort":"zweipw12","system_rolle":"admin"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let zwei_id = json["id"].as_i64().unwrap();
+
+    // Downgrade des zweiten Admins ist jetzt erlaubt (Admin id=1 bleibt).
+    let (status, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/benutzer/{zwei_id}"),
+        &admin_cookie,
+        Some(r#"{"system_rolle":"keiner"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["system_rolle"], "keiner");
+}
+
+#[tokio::test]
+async fn patch_ungueltige_system_rolle_ist_400() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    let erika_id = benutzer_anlegen(&app, &admin_cookie, "erika", "keine").await;
+
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/benutzer/{erika_id}"),
+        &admin_cookie,
+        Some(r#"{"system_rolle":"chef"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn patch_leerer_anzeigename_ist_400() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    let erika_id = benutzer_anlegen(&app, &admin_cookie, "erika", "keine").await;
+
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/benutzer/{erika_id}"),
+        &admin_cookie,
+        Some(r#"{"anzeigename":"   "}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn patch_ohne_admin_ist_403_und_ohne_session_401() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    let erika_id = benutzer_anlegen(&app, &admin_cookie, "erika", "keine").await;
+
+    // Ohne Session.
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/benutzer/{erika_id}"),
+        "",
+        Some(r#"{"anzeigename":"X"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+
+    // Mit Session, aber ohne Admin-Rolle.
+    let erika_cookie = login_cookie(&app, "erika", "erikapw1").await;
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/benutzer/{erika_id}"),
+        &erika_cookie,
+        Some(r#"{"anzeigename":"X"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn patch_unbekannter_benutzer_ist_404() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        "/api/benutzer/999999",
+        &admin_cookie,
+        Some(r#"{"anzeigename":"X"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}

@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
@@ -62,6 +62,140 @@ describe('BenutzerPage', () => {
     await userEvent.type(screen.getByLabelText('Passwort'), 'geheim123');
     await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
     await waitFor(() => expect(screen.getByText('Eva')).toBeInTheDocument());
+  });
+
+  it('bearbeitet den Anzeigenamen eines Benutzers', async () => {
+    let patchBody: Record<string, unknown> | null = null;
+    let bearbeitet = false;
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      http.get('/api/benutzer', () =>
+        HttpResponse.json([
+          benutzer(),
+          benutzer({
+            id: 2,
+            anzeigename: bearbeitet ? 'Eva Neu' : 'Eva',
+            benutzername: 'eva',
+            system_rolle: 'keiner',
+          }),
+        ]),
+      ),
+      http.patch('/api/benutzer/2', async ({ request }) => {
+        patchBody = (await request.json()) as Record<string, unknown>;
+        bearbeitet = true;
+        return HttpResponse.json(
+          benutzer({ id: 2, anzeigename: 'Eva Neu', benutzername: 'eva', system_rolle: 'keiner' }),
+        );
+      }),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/benutzer" element={<BenutzerPage />} />
+          <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/benutzer' },
+    );
+
+    const evaItem = (await screen.findByText('Eva')).closest('li') as HTMLElement;
+    await userEvent.click(within(evaItem).getByRole('button', { name: 'Bearbeiten' }));
+
+    const input = await screen.findByLabelText('Anzeigename');
+    await userEvent.clear(input);
+    await userEvent.type(input, 'Eva Neu');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(patchBody).not.toBeNull());
+    expect(patchBody).toMatchObject({ anzeigename: 'Eva Neu' });
+    await waitFor(() => expect(screen.getByText('Eva Neu')).toBeInTheDocument());
+  });
+
+  it('reaktiviert einen deaktivierten Benutzer', async () => {
+    let patchBody: Record<string, unknown> | null = null;
+    let reaktiviert = false;
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      http.get('/api/benutzer', () =>
+        HttpResponse.json([
+          benutzer(),
+          benutzer({
+            id: 2,
+            anzeigename: 'Eva',
+            benutzername: 'eva',
+            system_rolle: 'keiner',
+            aktiv: reaktiviert,
+          }),
+        ]),
+      ),
+      http.patch('/api/benutzer/2', async ({ request }) => {
+        patchBody = (await request.json()) as Record<string, unknown>;
+        reaktiviert = true;
+        return HttpResponse.json(
+          benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva', system_rolle: 'keiner' }),
+        );
+      }),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/benutzer" element={<BenutzerPage />} />
+          <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/benutzer' },
+    );
+
+    const evaItem = (await screen.findByText('Eva')).closest('li') as HTMLElement;
+    // Deaktivierter Nutzer zeigt keinen Deaktivieren-Button, aber Reaktivieren.
+    await userEvent.click(within(evaItem).getByRole('button', { name: 'Reaktivieren' }));
+
+    await waitFor(() => expect(patchBody).toEqual({ aktiv: true }));
+    await waitFor(() =>
+      expect(within(evaItem).queryByText('deaktiviert')).not.toBeInTheDocument(),
+    );
+  });
+
+  it('sperrt beim Reaktivieren nur die geklickte Zeile, nicht alle', async () => {
+    const patchIds: number[] = [];
+    // Default-No-op: der Executor läuft synchron und ersetzt ihn sofort durch den echten Resolver.
+    let freigeben: () => void = () => {};
+    const blockiert = new Promise<void>((res) => {
+      freigeben = () => res();
+    });
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(benutzer())),
+      http.get('/api/benutzer', () =>
+        HttpResponse.json([
+          benutzer(),
+          benutzer({ id: 2, anzeigename: 'Eva', benutzername: 'eva', system_rolle: 'keiner', aktiv: false }),
+          benutzer({ id: 3, anzeigename: 'Max', benutzername: 'max', system_rolle: 'keiner', aktiv: false }),
+        ]),
+      ),
+      http.patch('/api/benutzer/:id', async ({ params }) => {
+        patchIds.push(Number(params.id));
+        await blockiert; // erste Anfrage bewusst in-flight halten
+        return HttpResponse.json(benutzer({ id: Number(params.id), aktiv: true }));
+      }),
+    );
+    renderMitProviders(
+      <AuthProvider>
+        <Routes>
+          <Route path="/benutzer" element={<BenutzerPage />} />
+          <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
+        </Routes>
+      </AuthProvider>,
+      { route: '/benutzer' },
+    );
+
+    const evaItem = (await screen.findByText('Eva')).closest('li') as HTMLElement;
+    const maxItem = (await screen.findByText('Max')).closest('li') as HTMLElement;
+    await userEvent.click(within(evaItem).getByRole('button', { name: 'Reaktivieren' }));
+    // Trotz laufender erster Reaktivierung muss die zweite Zeile klickbar bleiben.
+    await userEvent.click(within(maxItem).getByRole('button', { name: 'Reaktivieren' }));
+
+    await waitFor(() => expect(patchIds).toEqual([2, 3]));
+    freigeben();
   });
 
   it('leitet Nicht-Admins weg von der Benutzerverwaltung', async () => {

@@ -20,3 +20,15 @@ export function legeBenutzerAn(b: NeuerBenutzer): Promise<BenutzerAnzeige> {
 export function deaktiviereBenutzer(id: number): Promise<BenutzerAnzeige> {
   return apiSend<BenutzerAnzeige>(`/api/benutzer/${id}/deaktivieren`, 'POST');
 }
+
+/** Partielle Änderung eines bestehenden Benutzers (LFH-286). Nur gesetzte Felder ändern sich. */
+export interface PatchBenutzer {
+  anzeigename?: string;
+  system_rolle?: SystemRolle;
+  org_rolle?: OrgRolle;
+  aktiv?: boolean;
+}
+
+export function bearbeiteBenutzer(id: number, patch: PatchBenutzer): Promise<BenutzerAnzeige> {
+  return apiSend<BenutzerAnzeige>(`/api/benutzer/${id}`, 'PATCH', patch);
+}
