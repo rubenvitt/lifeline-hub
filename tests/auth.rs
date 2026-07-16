@@ -172,6 +172,54 @@ async fn providers_listet_passwort() {
 }
 
 #[tokio::test]
+async fn providers_admin_ohne_session_ist_401() {
+    let app = setup().await;
+    let (status, _) = anfrage(&app, "GET", "/api/auth/providers/admin", "", None).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+/// Router-Ebene (nicht nur die reine `public_provider_projektion`-Funktion, s.
+/// `routes::auth::tests`): `/api/auth/providers` filtert deaktivierte, `/api/auth/providers/admin`
+/// (hinter `AdminUser`) zeigt sie (LFH-277). Aktiviert "oidc" GLOBAL für den Rest dieses
+/// Testbinary-Prozesses (`OIDC_KONFIGURIERT`-OnceLock, s. `oidc_callback_mit_unbekanntem_state_
+/// redirect_auf_login_fehler`-Doc) — unschädlich für die 404-Tests oben, die per
+/// `oidc_deaktiviert_override` reihenfolge-unabhängig gemacht sind.
+#[tokio::test]
+async fn providers_admin_zeigt_deaktivierte_public_verbirgt_sie() {
+    lifeline_hub::auth::provider::registry::set_oidc_konfiguriert(true);
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+
+    // oidc regulär deaktivieren (kein Lockout-Risiko: passwort bleibt aktiv).
+    let (status, _) = anfrage(
+        &app,
+        "PUT",
+        "/api/auth/providers/oidc",
+        &admin,
+        Some(r#"{"aktiviert":false}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, json) = anfrage(&app, "GET", "/api/auth/providers", "", None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        !json.as_array().unwrap().iter().any(|p| p["id"] == "oidc"),
+        "public: deaktiviertes oidc nicht sichtbar"
+    );
+
+    let (status, json) = anfrage(&app, "GET", "/api/auth/providers/admin", &admin, None).await;
+    assert_eq!(status, StatusCode::OK);
+    let oidc = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == "oidc")
+        .expect("admin: oidc sichtbar");
+    assert_eq!(oidc["aktiviert"], false);
+}
+
+#[tokio::test]
 async fn toggle_ohne_admin_session_ist_401() {
     let app = setup().await;
     let (status, _) = anfrage(

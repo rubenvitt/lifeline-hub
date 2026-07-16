@@ -43,6 +43,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/auth/me", get(routes::auth::me))
         .route("/api/auth/providers", get(routes::auth::providers))
         .route(
+            "/api/auth/providers/admin",
+            get(routes::auth::providers_admin),
+        )
+        .route(
             "/api/auth/providers/{id}",
             put(routes::auth::provider_schalten),
         )

@@ -170,9 +170,28 @@ pub async fn me(
     Ok(Json(benutzer.anzeige(totp_aktiviert)))
 }
 
-/// GET /api/auth/providers — verfügbare Login-Provider (öffentlich, für die Login-UI).
+/// Öffentliche Projektion der Provider-Liste: nur aktivierte. Deaktivierte Provider werden dem
+/// unauthentifizierten Login-UI NICHT offengelegt (LFH-277; Design „aktivierten, verfügbaren").
+/// Bewusst dieselbe DTO wie der Admin-Endpoint — public filtert nur.
+fn public_provider_projektion(
+    liste: Vec<crate::auth::provider::AuthProviderAnzeige>,
+) -> Vec<crate::auth::provider::AuthProviderAnzeige> {
+    liste.into_iter().filter(|p| p.aktiviert).collect()
+}
+
+/// GET /api/auth/providers — öffentlich, NUR aktivierte Provider (Login-UI).
 pub async fn providers(
     State(state): State<AppState>,
+) -> Result<Json<Vec<crate::auth::provider::AuthProviderAnzeige>>, AppError> {
+    let liste = crate::auth::provider::registry::liste(&state.pool).await?;
+    Ok(Json(public_provider_projektion(liste)))
+}
+
+/// GET /api/auth/providers/admin — Admin-only, VOLLE Liste inkl. deaktivierter Provider
+/// (Provider-Verwaltung, LFH-280/LFH-277).
+pub async fn providers_admin(
+    State(state): State<AppState>,
+    _admin: crate::auth::session::AdminUser,
 ) -> Result<Json<Vec<crate::auth::provider::AuthProviderAnzeige>>, AppError> {
     let liste = crate::auth::provider::registry::liste(&state.pool).await?;
     Ok(Json(liste))
@@ -1182,5 +1201,31 @@ mod tests {
         assert!(oidc_state_binding_ok(Some("s1"), "s1"));
         assert!(!oidc_state_binding_ok(Some("anders"), "s1"));
         assert!(!oidc_state_binding_ok(None, "s1"));
+    }
+
+    // ===== Public-vs-Admin-Provider-Projektion (LFH-277) =====
+
+    #[tokio::test]
+    async fn public_providers_verbergen_deaktivierte_admin_zeigt_sie() {
+        crate::auth::provider::registry::set_oidc_konfiguriert(true);
+        let pool = crate::db::test_pool().await;
+        crate::auth::provider::registry::schalten(&pool, crate::auth::provider::ID_OIDC, false)
+            .await
+            .unwrap();
+
+        let public = public_provider_projektion(
+            crate::auth::provider::registry::liste(&pool).await.unwrap(),
+        );
+        assert!(public.iter().all(|p| p.aktiviert), "public: nur aktivierte");
+        assert!(
+            !public.iter().any(|p| p.id == "oidc"),
+            "public: deaktiviertes oidc nicht sichtbar"
+        );
+
+        let admin = crate::auth::provider::registry::liste(&pool).await.unwrap();
+        assert!(
+            admin.iter().any(|p| p.id == "oidc" && !p.aktiviert),
+            "admin: deaktiviertes oidc sichtbar"
+        );
     }
 }
