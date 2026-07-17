@@ -472,25 +472,21 @@ pub async fn faellige_purge(
 }
 
 /// IRREVERSIBLE PII-Schwärzung eines Einsatzes (Phase B, LFH-135). Scrubbt die
-/// Personendaten in allen einsatz-scoped PII-Tabellen (strikt per `einsatz_id`,
-/// OHNE `storniert_at`-Filter — auch stornierte Zeilen tragen reale PII), setzt den
+/// Personendaten in allen einsatz-scoped PII-Tabellen (strikt einsatz-scoped, OHNE
+/// `storniert_at`-Filter — auch stornierte Zeilen tragen reale PII), setzt den
 /// `geschwaerzt_at`-Tombstone und schreibt einen System-ETB-Audit — alles in EINER
-/// Transaktion (partieller Scrub rollt zurück). Das operative Skelett (Einsatz, ETB,
-/// Zähler/registrier_nr, aggregierte Lage) bleibt erhalten.
+/// Transaktion (partieller Scrub rollt zurück). Das operative Skelett (Einsatz-Struktur,
+/// ETB, Zähler/registrier_nr, Führungs-Doku, anonymisierte Triage) bleibt erhalten.
 ///
 /// Idempotent: der `geschwaerzt_at IS NULL`-Guard liefert `false`, wenn der Einsatz
 /// schon geschwärzt (oder nicht soft-gelöscht/abgeschlossen) ist — kein Doppel-Scrub.
 ///
-/// Gescrubbte Tabellen/Spalten (siehe Commit-Message für die vollständige Begründung):
-/// - einsatz_person: name, vorname, geschlecht, geburtsdatum, alter_geschaetzt,
-///   herkunft_adresse, antreff_ort, melder_kontakt, notiz
-/// - person_sichtung: notiz · person_verlaufsnotiz: text (→ Platzhalter, NOT NULL)
-/// - person_verbleib: ziel, notiz · person_uhs_belegung: notiz
-/// - einsatz_tier: halter_kontakt, antreff_ort, abschluss_ziel, notiz
-/// - einsatz_schaden: geschaedigt_kontakt, uebergeben_an (→ Platzhalter wenn gesetzt,
-///   wegen CHECK status='uebergeben' ⇒ uebergeben_an NOT NULL)
-/// - einsatz_personal (NUR Ad-hoc-extern, personal_id IS NULL): snap_name (→ Platzhalter),
-///   snap_funktion, snap_traegerorganisation, bemerkung
+/// **Welche Spalte gescrubbt oder erhalten wird, entscheidet die zentrale Registry
+/// `super::schwaerzung_registry`** (F02/LFH-229): sie taggt JEDE Spalte JEDER einsatz-
+/// scoped Tabelle, ein Guard-Test erzwingt Vollständigkeit (neue PII-Spalte ⇒ ROT), und
+/// [`super::schwaerzung_registry::scrubbe_aus_registry`] treibt den Scrub data-driven aus
+/// denselben Konstanten (kein Guard↔Scrub-Drift). Der eigentliche Scrub steht dort, nicht
+/// mehr hier als handgepflegte UPDATE-Liste.
 pub async fn schwaerze_einsatz(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -516,119 +512,30 @@ pub async fn schwaerze_einsatz(
         return Ok(false);
     }
 
-    // --- PII-Scrub (strikt per einsatz_id, KEIN storniert_at-Filter) ---
-    // aktueller_verbleib (denormalisierter Cache, Migration 0022) trägt für
-    // Transporte den Klartext "Transport → {ziel}" (Klinikname). Muss mit
-    // gescrubbt werden, sonst überlebt der Verbringungsort die irreversible
-    // Schwärzung, obwohl person_verbleib.ziel genullt wird (Review LFH-135).
-    sqlx::query(
-        "UPDATE einsatz_person SET \
-            name = NULL, vorname = NULL, geschlecht = NULL, geburtsdatum = NULL, \
-            alter_geschaetzt = NULL, herkunft_adresse = NULL, antreff_ort = NULL, \
-            melder_kontakt = NULL, notiz = NULL, aktueller_verbleib = NULL \
-         WHERE einsatz_id = ?",
-    )
-    .bind(einsatz_id)
-    .execute(&mut *tx)
-    .await?;
-
-    sqlx::query("UPDATE person_sichtung SET notiz = NULL WHERE einsatz_id = ?")
-        .bind(einsatz_id)
-        .execute(&mut *tx)
-        .await?;
-
-    // text ist NOT NULL → Platzhalter statt NULL.
-    sqlx::query("UPDATE person_verlaufsnotiz SET text = ? WHERE einsatz_id = ?")
-        .bind(SCHWAERZUNG_PLATZHALTER)
-        .bind(einsatz_id)
-        .execute(&mut *tx)
-        .await?;
-
-    sqlx::query("UPDATE person_verbleib SET ziel = NULL, notiz = NULL WHERE einsatz_id = ?")
-        .bind(einsatz_id)
-        .execute(&mut *tx)
-        .await?;
-
-    sqlx::query("UPDATE person_uhs_belegung SET notiz = NULL WHERE einsatz_id = ?")
-        .bind(einsatz_id)
-        .execute(&mut *tx)
-        .await?;
-
-    // LFH-108: Funk-Erreichbarkeit (mögliche personenbezogene Rufnummer der Führung) an
-    // Einheit UND Abschnitt scrubben. Die Abschnitt-Spalte (LFH-86) war bisher nicht erfasst
-    // (Lücke) — hier symmetrisch mitgeschlossen. kommunikationsmittel (digitalfunk/mobil/
-    // festnetz) ist kein PII und bleibt; Sprechgruppen sind Katalog-Bezüge, kein PII.
-    sqlx::query("UPDATE einsatz_einheit SET erreichbarkeit = NULL WHERE einsatz_id = ?")
-        .bind(einsatz_id)
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query("UPDATE einsatzabschnitt SET erreichbarkeit = NULL WHERE einsatz_id = ?")
-        .bind(einsatz_id)
-        .execute(&mut *tx)
-        .await?;
-
-    // kennzeichnung (Chip-Nr./Tätowierung) ist ein im Haustierregister auf den
-    // Halter registrierter, eindeutiger Identifikator → personenverknüpfend, muss
-    // mit gescrubbt werden (Review LFH-135). rufname/rasse/farbe/groesse bleiben
-    // (reine Tierbeschreibung).
-    sqlx::query(
-        "UPDATE einsatz_tier SET \
-            halter_kontakt = NULL, antreff_ort = NULL, abschluss_ziel = NULL, \
-            notiz = NULL, kennzeichnung = NULL \
-         WHERE einsatz_id = ?",
-    )
-    .bind(einsatz_id)
-    .execute(&mut *tx)
-    .await?;
-
-    // uebergeben_an: NULL bleibt NULL, ein gesetzter Wert → Platzhalter (CHECK
-    // status='uebergeben' ⇒ uebergeben_an IS NOT NULL würde sonst brechen).
-    sqlx::query(
-        "UPDATE einsatz_schaden SET \
-            geschaedigt_kontakt = NULL, \
-            uebergeben_an = CASE WHEN uebergeben_an IS NULL THEN NULL ELSE ? END \
-         WHERE einsatz_id = ?",
-    )
-    .bind(SCHWAERZUNG_PLATZHALTER)
-    .bind(einsatz_id)
-    .execute(&mut *tx)
-    .await?;
-
-    // einsatz_personal: NUR Ad-hoc-externe (personal_id IS NULL) sind einsatz-scoped PII.
-    // Dispositionen echter Stamm-Kräfte (personal_id gesetzt) sind Stammdaten → unberührt.
-    // snap_name ist NOT NULL → Platzhalter.
-    sqlx::query(
-        "UPDATE einsatz_personal SET \
-            snap_name = ?, snap_funktion = NULL, snap_traegerorganisation = NULL, bemerkung = NULL \
-         WHERE einsatz_id = ? AND personal_id IS NULL",
-    )
-    .bind(SCHWAERZUNG_PLATZHALTER)
-    .bind(einsatz_id)
-    .execute(&mut *tx)
-    .await?;
-
-    // Bild-Hintergründe (LFH-35): Dateiname kann PII tragen → Platzhalter; BLOB bleibt (Kartografie).
-    sqlx::query("UPDATE karte_hintergrundbild SET name = ? WHERE einsatz_id = ?")
-        .bind(SCHWAERZUNG_PLATZHALTER)
-        .bind(einsatz_id)
-        .execute(&mut *tx)
-        .await?;
-
-    // Freie taktische Zeichen (LFH-170): label ist Freitext (kann PII tragen) → NULL (nullable);
-    // grundzeichen/organisation/… sind Katalog-IDs (keine PII), lat/lon bleibt operatives Skelett.
-    sqlx::query("UPDATE freies_zeichen SET label = NULL WHERE einsatz_id = ?")
-        .bind(einsatz_id)
-        .execute(&mut *tx)
-        .await?;
+    // --- PII-Scrub: data-driven aus der zentralen Klassifikations-Registry (F02/LFH-229) ---
+    // Kein storniert_at-Filter (auch stornierte Zeilen tragen reale PII). Jede einsatz-
+    // scoped Spalte ist in `schwaerzung_registry::TABELLEN` als Scrub|Retain getaggt; ein
+    // Guard-Test bricht ROT, sobald eine neue Spalte/Tabelle unklassifiziert bleibt. Die
+    // UPDATE/DELETE-Statements entstehen aus denselben Registry-Konstanten → kein Drift
+    // zwischen Guard und tatsächlichem Scrub (siehe schwaerzung_registry). Die LFH-108-
+    // Funk-Erreichbarkeit (einsatz_einheit/einsatzabschnitt.erreichbarkeit) ist dort als
+    // Scrub klassifiziert; die handgepflegten UPDATEs von LFH-108 sind damit obsolet.
+    super::schwaerzung_registry::scrubbe_aus_registry(&mut tx, einsatz_id).await?;
 
     system_audit_tx(
         &mut tx,
         einsatz_id,
         etb_startwert,
         "PII-Schwärzung durchgeführt (Aufbewahrungsfrist + Karenz abgelaufen). \
-         Personenbezogene Daten wurden unwiderruflich entfernt; das operative Skelett \
-         (Einsatz, ETB-Einträge, Zähler) bleibt für die gesetzliche/statistische \
-         Aufbewahrung erhalten.",
+         Direkte Personenidentifikatoren (Namen, Kontakt, Adresse, Meldebild/Einsatzort, \
+         Foto-/Datei-Anhänge, personenbezogene Notizen sowie Schadens-/Lage-/Gefahren-Freitexte) \
+         wurden unwiderruflich entfernt. Erhalten bleiben das operative Skelett (Einsatz-Struktur, \
+         Zähler/registrier_nr, operative Objekte), die Führungs-Dokumentation (ETB, Meldungen, \
+         Aufträge, Lage-/Befehlsberichte — im ETB rechtsverbindlich gesnapshottet) und \
+         anonymisierte Triage-/Statuskategorien (ohne Personenbezug) für die gesetzliche/ \
+         statistische Aufbewahrung; sowie — bis zum ausstehenden Scrub-Follow-up (LFH-229) — \
+         operative Kommunikations-Freitexte (Chat-Nachrichten, Erinnerungen), die noch \
+         Personenbezug tragen können.",
     )
     .await?;
 

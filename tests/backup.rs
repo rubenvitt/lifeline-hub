@@ -80,6 +80,56 @@ async fn admin_kann_backup_herunterladen() {
 }
 
 #[tokio::test]
+async fn backup_download_enthaelt_keine_sessions() {
+    let app = setup().await;
+    // Der Login legt eine echte Session in der DB an — sie darf im Export nicht landen.
+    let cookie = login(&app, "admin", "startpw12").await;
+
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/backup")
+                .header(header::COOKIE, &cookie)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+
+    // Die heruntergeladenen BYTES öffnen (nicht die Server-DB) — fängt auch eine
+    // WAL-gestrandete Bereinigung, die in der Hauptdatei nicht sichtbar wäre.
+    let dir = tempfile::tempdir().unwrap();
+    let pfad = dir.path().join("heruntergeladen.sqlite");
+    std::fs::write(&pfad, &bytes).unwrap();
+    let options = sqlx::sqlite::SqliteConnectOptions::new()
+        .filename(&pfad)
+        .read_only(true);
+    let pool = sqlx::SqlitePool::connect_with(options).await.unwrap();
+
+    let sessions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM session")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        sessions, 0,
+        "Der Backup-Export darf keine Session-Tokens enthalten"
+    );
+    // Fachdaten müssen erhalten bleiben (echter, nicht leerer Export).
+    let admin_da: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM benutzer WHERE benutzername = 'admin'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        admin_da, 1,
+        "Sicherung muss den Admin (Fachdaten) enthalten"
+    );
+}
+
+#[tokio::test]
 async fn backup_ohne_session_ist_401() {
     let app = setup().await;
     let resp = app

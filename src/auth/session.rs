@@ -33,14 +33,26 @@ pub fn neuer_token() -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
+/// SHA-256-Hex-Repräsentant eines Session-Tokens für die At-Rest-Speicherung.
+/// Der Klartext-Token lebt nur im Cookie; in der DB steht ausschließlich dieser Hash,
+/// und der Lookup hasht den Cookie-Wert vor dem Vergleich. Ein 256-Bit-Zufallstoken
+/// braucht kein Salt/Argon2 — ein Preimage-Angriff auf SHA-256 ist nicht praktikabel.
+fn hash_token(token: &str) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(token.as_bytes())
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
 /// Legt eine neue Session für den Benutzer an (TTL 7 Tage) und liefert den Token.
 pub async fn anlegen(pool: &SqlitePool, benutzer_id: i64) -> Result<String, AppError> {
     let token = neuer_token();
     sqlx::query(
-        "INSERT INTO session (token, benutzer_id, expires_at) \
+        "INSERT INTO session (token_hash, benutzer_id, expires_at) \
          VALUES (?, ?, datetime('now', '+7 days'))",
     )
-    .bind(&token)
+    .bind(hash_token(&token))
     .bind(benutzer_id)
     .execute(pool)
     .await?;
@@ -49,8 +61,8 @@ pub async fn anlegen(pool: &SqlitePool, benutzer_id: i64) -> Result<String, AppE
 
 /// Löscht eine Session anhand ihres Tokens (idempotent).
 pub async fn loeschen(pool: &SqlitePool, token: &str) -> Result<(), AppError> {
-    sqlx::query("DELETE FROM session WHERE token = ?")
-        .bind(token)
+    sqlx::query("DELETE FROM session WHERE token_hash = ?")
+        .bind(hash_token(token))
         .execute(pool)
         .await?;
     Ok(())
@@ -63,9 +75,9 @@ async fn benutzer_aus_token(pool: &SqlitePool, token: &str) -> Result<Benutzer, 
                 b.system_rolle, b.org_rolle, b.aktiv, b.erstellt_at \
          FROM session s \
          JOIN benutzer b ON b.id = s.benutzer_id \
-         WHERE s.token = ? AND s.expires_at > datetime('now') AND b.aktiv = 1",
+         WHERE s.token_hash = ? AND s.expires_at > datetime('now') AND b.aktiv = 1",
     )
-    .bind(token)
+    .bind(hash_token(token))
     .fetch_optional(pool)
     .await?;
 
@@ -154,6 +166,56 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn anlegen_speichert_nur_hash_nicht_klartext() {
+        let pool = crate::db::test_pool().await;
+        let id = benutzer_anlegen(&pool, 1).await;
+
+        let token = anlegen(&pool, id).await.unwrap();
+
+        let gespeichert: String = sqlx::query_scalar("SELECT token_hash FROM session")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_ne!(
+            gespeichert, token,
+            "Der Klartext-Token darf nicht in der DB liegen"
+        );
+        assert_eq!(
+            gespeichert,
+            hash_token(&token),
+            "In der DB muss der SHA-256-Hash des Tokens stehen"
+        );
+        // Gegenprobe: der Klartext-Token findet per Gleichheit keine Session.
+        let treffer: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM session WHERE token_hash = ?")
+            .bind(&token)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(treffer, 0, "Klartext-Token darf keine Session matchen");
+    }
+
+    #[tokio::test]
+    async fn hash_aus_db_taugt_nicht_als_cookie() {
+        let pool = crate::db::test_pool().await;
+        let id = benutzer_anlegen(&pool, 1).await;
+
+        let token = anlegen(&pool, id).await.unwrap();
+        // Der Klartext-Token (aus dem Cookie) löst weiterhin auf.
+        assert!(benutzer_aus_token(&pool, &token).await.is_ok());
+
+        // Der in der DB gespeicherte Wert, als Cookie eingesetzt, löst NICHT auf.
+        let gespeichert: String = sqlx::query_scalar("SELECT token_hash FROM session")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let err = benutzer_aus_token(&pool, &gespeichert).await.unwrap_err();
+        assert!(
+            matches!(err, AppError::Unauthorized),
+            "Der DB-Hash darf kein gültiger Login-Schlüssel sein"
+        );
+    }
+
+    #[tokio::test]
     async fn anlegen_und_aufloesen_roundtrip() {
         let pool = crate::db::test_pool().await;
         let id = benutzer_anlegen(&pool, 1).await;
@@ -176,11 +238,13 @@ mod tests {
     async fn abgelaufene_session_ist_unauthorized() {
         let pool = crate::db::test_pool().await;
         let id = benutzer_anlegen(&pool, 1).await;
-        // Session mit Ablauf in der Vergangenheit direkt einfügen.
+        // Session mit Ablauf in der Vergangenheit direkt einfügen (Hash des Tokens "alt",
+        // damit der hashende Lookup die Zeile findet und wirklich am Ablauf scheitert).
         sqlx::query(
-            "INSERT INTO session (token, benutzer_id, expires_at) \
-             VALUES ('alt', ?, datetime('now', '-1 day'))",
+            "INSERT INTO session (token_hash, benutzer_id, expires_at) \
+             VALUES (?, ?, datetime('now', '-1 day'))",
         )
+        .bind(hash_token("alt"))
         .bind(id)
         .execute(&pool)
         .await
