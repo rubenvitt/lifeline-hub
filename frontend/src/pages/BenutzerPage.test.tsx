@@ -24,11 +24,11 @@ describe('BenutzerPage', () => {
     renderMitProviders(
       <AuthProvider>
         <Routes>
-          <Route path="/benutzer" element={<BenutzerPage />} />
+          <Route path="/admin/benutzer" element={<BenutzerPage />} />
           <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
         </Routes>
       </AuthProvider>,
-      { route: '/benutzer' },
+      { route: '/admin/benutzer' },
     );
     expect(await screen.findByRole('heading', { name: 'Admin' })).toBeInTheDocument();
   });
@@ -50,11 +50,11 @@ describe('BenutzerPage', () => {
     renderMitProviders(
       <AuthProvider>
         <Routes>
-          <Route path="/benutzer" element={<BenutzerPage />} />
+          <Route path="/admin/benutzer" element={<BenutzerPage />} />
           <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
         </Routes>
       </AuthProvider>,
-      { route: '/benutzer' },
+      { route: '/admin/benutzer' },
     );
     await userEvent.click(await screen.findByRole('button', { name: 'Benutzer anlegen' }));
     await userEvent.type(screen.getByLabelText('Anzeigename'), 'Eva');
@@ -91,11 +91,11 @@ describe('BenutzerPage', () => {
     renderMitProviders(
       <AuthProvider>
         <Routes>
-          <Route path="/benutzer" element={<BenutzerPage />} />
+          <Route path="/admin/benutzer" element={<BenutzerPage />} />
           <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
         </Routes>
       </AuthProvider>,
-      { route: '/benutzer' },
+      { route: '/admin/benutzer' },
     );
 
     const evaItem = (await screen.findByText('Eva')).closest('li') as HTMLElement;
@@ -139,11 +139,11 @@ describe('BenutzerPage', () => {
     renderMitProviders(
       <AuthProvider>
         <Routes>
-          <Route path="/benutzer" element={<BenutzerPage />} />
+          <Route path="/admin/benutzer" element={<BenutzerPage />} />
           <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
         </Routes>
       </AuthProvider>,
-      { route: '/benutzer' },
+      { route: '/admin/benutzer' },
     );
 
     const evaItem = (await screen.findByText('Eva')).closest('li') as HTMLElement;
@@ -181,11 +181,11 @@ describe('BenutzerPage', () => {
     renderMitProviders(
       <AuthProvider>
         <Routes>
-          <Route path="/benutzer" element={<BenutzerPage />} />
+          <Route path="/admin/benutzer" element={<BenutzerPage />} />
           <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
         </Routes>
       </AuthProvider>,
-      { route: '/benutzer' },
+      { route: '/admin/benutzer' },
     );
 
     const evaItem = (await screen.findByText('Eva')).closest('li') as HTMLElement;
@@ -208,11 +208,11 @@ describe('BenutzerPage', () => {
     renderMitProviders(
       <AuthProvider>
         <Routes>
-          <Route path="/benutzer" element={<BenutzerPage />} />
+          <Route path="/admin/benutzer" element={<BenutzerPage />} />
           <Route path="/einsaetze" element={<div>Einsatz-Liste</div>} />
         </Routes>
       </AuthProvider>,
-      { route: '/benutzer' },
+      { route: '/admin/benutzer' },
     );
     expect(await screen.findByText('Einsatz-Liste')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Benutzer anlegen' })).not.toBeInTheDocument();
