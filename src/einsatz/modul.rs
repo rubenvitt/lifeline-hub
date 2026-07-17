@@ -74,6 +74,46 @@ pub fn registry_benoetigte_rolle(_key: &str) -> Option<&'static str> {
     None
 }
 
+/// Compile-time-Marker (LFH-230): bindet einen Einsatz-Gate-Extractor an einen
+/// Modul-Key — oder an KEIN Modul-Gate ([`OhneModul`]). Der Extractor liest `KEY`
+/// und erzwingt `fordere_modul_zugriff` genau dann, wenn `Some`.
+pub trait ModulMarker {
+    const KEY: Option<&'static str>;
+}
+
+/// Marker für modul-lose Gate-Routen (Einsatz-Kopfdaten, Anhänge): kein Modul-Gate.
+pub struct OhneModul;
+impl ModulMarker for OhneModul {
+    const KEY: Option<&'static str> = None;
+}
+
+/// Erzeugt je Eintrag einen Marker-Typ + dessen `ModulMarker`-Impl und sammelt
+/// alle (Typname, Key)-Paare in `MARKER_KEYS` — die Tabelle, die der Struktur-Guard
+/// (`tests/einsatz_kontext_guard.rs`) liest, um den Marker einer Handler-Signatur
+/// gegen die Pfad→Key-Registry zu prüfen. Neue Module: hier eine Zeile ergänzen.
+macro_rules! modul_marker {
+    ($($typ:ident => $key:literal),+ $(,)?) => {
+        $(
+            #[doc = concat!("Modul-Marker für den Key `", $key, "`.")]
+            pub struct $typ;
+            impl ModulMarker for $typ {
+                const KEY: Option<&'static str> = Some($key);
+            }
+        )+
+        /// (Marker-Typname → Modul-Key), inkl. `OhneModul`. Vom Guard gelesen.
+        pub const MARKER_KEYS: &[(&str, Option<&str>)] = &[
+            ("OhneModul", None),
+            $((stringify!($typ), Some($key)),)+
+        ];
+    };
+}
+
+modul_marker! {
+    Meldungen => "meldungen",
+    Lagemeldungen => "lagemeldungen",
+    Auftraege => "auftraege",
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -122,5 +162,25 @@ mod tests {
         assert!(ist_gueltige_benoetigte_rolle("fuehrungskraft"));
         assert!(!ist_gueltige_benoetigte_rolle("einsatzleitung"));
         assert!(!ist_gueltige_benoetigte_rolle(""));
+    }
+
+    #[test]
+    fn marker_keys_sind_teilmenge_von_modul_keys() {
+        for (typ, key) in MARKER_KEYS {
+            if let Some(k) = key {
+                assert!(
+                    MODUL_KEYS.contains(k),
+                    "Marker {typ} nutzt Key {k}, der nicht in MODUL_KEYS steht"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn marker_key_werte_stimmen() {
+        assert_eq!(Meldungen::KEY, Some("meldungen"));
+        assert_eq!(Lagemeldungen::KEY, Some("lagemeldungen"));
+        assert_eq!(Auftraege::KEY, Some("auftraege"));
+        assert_eq!(OhneModul::KEY, None);
     }
 }
