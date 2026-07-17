@@ -268,6 +268,12 @@ pub fn fordere_modul_zugriff(
 /// Ersetzt in jedem Handler das Muster
 /// `let overrides = modul_override::laden_alle(...); fordere_modul_zugriff(&overrides, ...)`
 /// durch einen einzigen Aufruf.
+///
+/// Bewusst uncached (LFH-230): Autorisierungs-Daten; ein Rechte-Entzug muss sofort
+/// greifen. Override-/Org-Default-Maps sind auf ≤25 indizierte Zeilen gedeckelt
+/// (PK `(einsatz_id, modul_key)` / `(org_id, modul_key)`) — ein Per-Request-Cache
+/// spart nichts (kein Handler zieht das Gate doppelt), ein App-Cache tauschte den
+/// korrektheits-neutralen Read gegen eine Invalidierungs-Angriffsfläche.
 pub async fn fordere_modul_zugriff_laden(
     pool: &SqlitePool,
     einsatz_id: i64,

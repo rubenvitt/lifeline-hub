@@ -1,9 +1,7 @@
 use crate::app::AppState;
-use crate::einsatz::kontext::EinsatzKontext;
+use crate::einsatz::kontext::{EinsatzKontext, EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::modul::{Lagemeldungen, Meldungen};
 use crate::einsatz::repo as einsatz_repo;
-
-/// Modul-Key dieses Route-Moduls (LFH-132).
-const MODUL_KEY: &str = "meldungen";
 use crate::error::AppError;
 use crate::meldung::{
     repo, MeldungAnzeige, ART_SOFORTMELDUNG, ART_SONSTIGE, BESTAETIGUNG_FRIST_DEFAULT_MIN,
@@ -65,11 +63,9 @@ pub struct ListeParams {
 /// GET /api/einsaetze/{id}/meldungen — Posteingang listen (Lesezugriff, auch Beobachter).
 pub async fn liste(
     State(state): State<AppState>,
-    ctx: EinsatzKontext,
+    ctx: EinsatzLesezugriff<Meldungen>,
     Query(params): Query<ListeParams>,
 ) -> Result<Json<Vec<MeldungAnzeige>>, AppError> {
-    ctx.fordere_lesezugriff()?;
-    ctx.fordere_modul_zugriff(&state.pool, MODUL_KEY).await?;
     let einsatz_id = ctx.einsatz.id;
     let status = params
         .status
@@ -118,12 +114,9 @@ pub struct NeueMeldung {
 /// POST /api/einsaetze/{id}/meldungen — Meldung erfassen (Schreibrecht + aktiv).
 pub async fn anlegen(
     State(state): State<AppState>,
-    ctx: EinsatzKontext,
+    ctx: EinsatzSchreibzugriff<Meldungen>,
     Json(req): Json<NeueMeldung>,
 ) -> Result<(StatusCode, Json<MeldungAnzeige>), AppError> {
-    ctx.fordere_schreibrecht()?;
-    ctx.fordere_modul_zugriff(&state.pool, MODUL_KEY).await?;
-    ctx.fordere_aktiv()?;
     let einsatz_id = ctx.einsatz.id;
 
     // Mindestfelder: Absender, Inhalt, Meldeweg.
@@ -259,16 +252,15 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(m)))
 }
 
-/// Gemeinsamer Vorlauf für Meldungs-Aktionen: Gates + Cross-Einsatz-Schutz.
-/// Gibt `org_id` zurück (für kommunikation_status-Schreibpfade).
-async fn fordere_bearbeitbar(
+/// Cross-Einsatz-Schutz für Meldungs-Aktionen: die Meldung muss zu DIESEM Einsatz
+/// gehören (fremde → 404). Gibt `org_id` für die `kommunikation_status`-Schreibpfade
+/// zurück. Die Gates schreibrecht/modul/aktiv erzwingt jetzt der
+/// `EinsatzSchreibzugriff<Meldungen>`-Typ in der Handler-Signatur.
+async fn gehoert_pruefen(
     state: &AppState,
     ctx: &EinsatzKontext,
     meldung_id: i64,
 ) -> Result<i64, AppError> {
-    ctx.fordere_schreibrecht()?;
-    ctx.fordere_modul_zugriff(&state.pool, MODUL_KEY).await?;
-    ctx.fordere_aktiv()?;
     if !repo::gehoert_zu_einsatz(&state.pool, meldung_id, ctx.einsatz.id).await? {
         return Err(AppError::NotFound);
     }
@@ -284,11 +276,11 @@ pub struct StatusReq {
 /// Die Bearbeiter-Zuweisung läuft über `zuweisen` (getrennte Achse).
 pub async fn status(
     State(state): State<AppState>,
-    ctx: EinsatzKontext,
+    ctx: EinsatzSchreibzugriff<Meldungen>,
     Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
     Json(req): Json<StatusReq>,
 ) -> Result<Json<MeldungAnzeige>, AppError> {
-    fordere_bearbeitbar(&state, &ctx, meldung_id).await?;
+    gehoert_pruefen(&state, &ctx, meldung_id).await?;
     let status = req.status.trim();
     if !crate::meldung::status_gueltig(status) {
         return Err(AppError::Validation("Ungültiger Status".into()));
@@ -305,10 +297,10 @@ pub async fn status(
 /// Erinnerung; der Triage-Status bleibt unberührt. Doppel-Bestätigung → 422.
 pub async fn bestaetigen(
     State(state): State<AppState>,
-    ctx: EinsatzKontext,
+    ctx: EinsatzSchreibzugriff<Meldungen>,
     Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
 ) -> Result<Json<MeldungAnzeige>, AppError> {
-    let org_id = fordere_bearbeitbar(&state, &ctx, meldung_id).await?;
+    let org_id = gehoert_pruefen(&state, &ctx, meldung_id).await?;
     let now = jetzt();
     // Atomar einmalig (kein read-then-write/TOCTOU): nur die Erst-Bestätigung gewinnt.
     if !repo::bestaetige(
@@ -339,11 +331,11 @@ pub struct ZuweisenReq {
 /// POST /api/einsaetze/{id}/meldungen/{mid}/zuweisen — Bearbeiter zuweisen/freigeben (LFH-94).
 pub async fn zuweisen(
     State(state): State<AppState>,
-    ctx: EinsatzKontext,
+    ctx: EinsatzSchreibzugriff<Meldungen>,
     Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
     Json(req): Json<ZuweisenReq>,
 ) -> Result<Json<MeldungAnzeige>, AppError> {
-    fordere_bearbeitbar(&state, &ctx, meldung_id).await?;
+    gehoert_pruefen(&state, &ctx, meldung_id).await?;
     // Bearbeiter (falls gesetzt) muss Einsatz-Mitglied sein (Cross-Einsatz-Schutz).
     if let Some(bid) = req.bearbeiter_id {
         if einsatz_repo::rolle_von(&state.pool, einsatz_id, bid)
@@ -371,11 +363,11 @@ pub struct LagerelevantReq {
 /// POST /api/einsaetze/{id}/meldungen/{mid}/lagerelevant — an die Lage übergeben (LFH-95).
 pub async fn lagerelevant(
     State(state): State<AppState>,
-    ctx: EinsatzKontext,
+    ctx: EinsatzSchreibzugriff<Meldungen>,
     Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
     Json(req): Json<LagerelevantReq>,
 ) -> Result<Json<MeldungAnzeige>, AppError> {
-    fordere_bearbeitbar(&state, &ctx, meldung_id).await?;
+    gehoert_pruefen(&state, &ctx, meldung_id).await?;
     // Default-Text = Meldungsinhalt, falls kein eigener Lage-Text gegeben.
     let aktuell = repo::laden(&state.pool, meldung_id, &jetzt()).await?;
     let text = req
@@ -408,14 +400,15 @@ pub async fn lagerelevant(
 /// einen Auftrag/Befehl erteilen (Meldung→Auftrag, LFH-113). Erzeugt einen formalen Auftrag
 /// (inkl. ETB-Anordnung, Pattern B) und setzt den Rückbezug `meldung.auftrag_id` first-write-wins.
 /// Auftragsfelder durchlaufen dieselbe Validierung wie POST /auftraege (geteilt, kein zweiter Pfad).
-/// Schreibrecht + aktiv + Cross-Einsatz-Schutz über `fordere_bearbeitbar` (wie die anderen Mutationen).
+/// Schreibrecht + aktiv über `EinsatzSchreibzugriff<Meldungen>`, Cross-Einsatz-Schutz über
+/// `gehoert_pruefen` (wie die anderen Mutationen).
 pub async fn auftrag_erteilen(
     State(state): State<AppState>,
-    ctx: EinsatzKontext,
+    ctx: EinsatzSchreibzugriff<Meldungen>,
     Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
     Json(req): Json<crate::auftrag::NeuerAuftrag>,
 ) -> Result<(StatusCode, Json<MeldungAnzeige>), AppError> {
-    fordere_bearbeitbar(&state, &ctx, meldung_id).await?;
+    gehoert_pruefen(&state, &ctx, meldung_id).await?;
 
     // Gleiche Validierung wie POST /auftraege (geteilt) → kein zweiter, ungeprüfter Pfad.
     let now = jetzt();
@@ -454,11 +447,8 @@ pub async fn auftrag_erteilen(
 /// GET /api/einsaetze/{id}/lage/meldungen — Lageobjekte aus Meldungen (Lese-Oberfläche, LFH-95).
 pub async fn lage_liste(
     State(state): State<AppState>,
-    ctx: EinsatzKontext,
+    ctx: EinsatzLesezugriff<Lagemeldungen>,
 ) -> Result<Json<Vec<crate::meldung::LageMeldungAnzeige>>, AppError> {
-    ctx.fordere_lesezugriff()?;
-    ctx.fordere_modul_zugriff(&state.pool, "lagemeldungen")
-        .await?;
     Ok(Json(
         repo::liste_lage_meldungen(&state.pool, ctx.einsatz.id).await?,
     ))
