@@ -70,10 +70,48 @@ impl AppError {
             AppError::Validation(_) => StatusCode::BAD_REQUEST,
             AppError::Conflict(_) => StatusCode::CONFLICT,
             AppError::UnprocessableEntity(_) => StatusCode::UNPROCESSABLE_ENTITY,
-            AppError::Database(_) | AppError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            // Sicherheitsnetz (LFH-245): nicht vorab abgefangene Constraint-Verletzungen
+            // bekommen einen fachlichen Statuscode statt eines nackten 500.
+            AppError::Database(_) => self
+                .constraint_violation()
+                .map(|(status, _)| status)
+                .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+            AppError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::NotImplemented(_) => StatusCode::NOT_IMPLEMENTED,
             AppError::BadGateway(_) => StatusCode::BAD_GATEWAY,
             AppError::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
+        }
+    }
+
+    /// Sicherheitsnetz für DB-Constraint-Verletzungen (LFH-245/F07): eine nicht
+    /// explizit vorab abgefangene UNIQUE-/FK-/CHECK-Verletzung wird zu einem
+    /// fachlichen Statuscode + generischer Meldung statt eines undurchsichtigen 500.
+    /// UNIQUE/FK → 409 (Konflikt), CHECK → 422. Der konkrete Constraint wird nur
+    /// geloggt (in `into_response`), nie an den Client ausgegeben.
+    ///
+    /// Per-Handler-Prechecks bleiben für präzise Meldungen zuständig; das Netz fängt
+    /// Vergessenes und Races zwischen Precheck und Commit.
+    fn constraint_violation(&self) -> Option<(StatusCode, &'static str)> {
+        let AppError::Database(sqlx::Error::Database(db)) = self else {
+            return None;
+        };
+        if db.is_unique_violation() {
+            Some((
+                StatusCode::CONFLICT,
+                "Ein Eintrag mit diesen Werten existiert bereits.",
+            ))
+        } else if db.is_foreign_key_violation() {
+            Some((
+                StatusCode::CONFLICT,
+                "Der Vorgang steht in Konflikt mit verknüpften Datensätzen.",
+            ))
+        } else if db.is_check_violation() {
+            Some((
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "Die Eingabe verletzt eine Konsistenzregel.",
+            ))
+        } else {
+            None
         }
     }
 }
@@ -85,8 +123,15 @@ impl IntoResponse for AppError {
         // damit keine internen Details (SQL, Pfade) nach außen gelangen.
         let message = match &self {
             AppError::Database(e) => {
-                tracing::error!("Datenbankfehler: {e}");
-                "Interner Serverfehler".to_string()
+                if let Some((_, generic)) = self.constraint_violation() {
+                    // Constraint-Verletzung: fachlich beantworten, das SQL-Detail
+                    // (Constraint-Name, Werte) bleibt im Log.
+                    tracing::warn!("Constraint-Verletzung (Sicherheitsnetz): {e}");
+                    generic.to_string()
+                } else {
+                    tracing::error!("Datenbankfehler: {e}");
+                    "Interner Serverfehler".to_string()
+                }
             }
             AppError::Internal(m) => {
                 tracing::error!("Interner Fehler: {m}");
@@ -102,6 +147,99 @@ impl IntoResponse for AppError {
 mod tests {
     use super::*;
     use axum::body::to_bytes;
+
+    /// 1-Verbindungs-In-Memory-Pool mit aktivierten Foreign Keys, damit echte
+    /// Constraint-Verletzungen (UNIQUE/FK/CHECK) für das Sicherheitsnetz reproduzierbar sind.
+    async fn mem_pool() -> sqlx::SqlitePool {
+        use std::str::FromStr;
+        let opts = sqlx::sqlite::SqliteConnectOptions::from_str("sqlite::memory:")
+            .unwrap()
+            .foreign_keys(true);
+        sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(opts)
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn unique_violation_maps_to_409() {
+        let pool = mem_pool().await;
+        sqlx::query("CREATE TABLE t (k TEXT UNIQUE)")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO t (k) VALUES ('a')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let err = sqlx::query("INSERT INTO t (k) VALUES ('a')")
+            .execute(&pool)
+            .await
+            .unwrap_err();
+        let app: AppError = err.into();
+        assert_eq!(app.status(), StatusCode::CONFLICT);
+    }
+
+    #[tokio::test]
+    async fn foreign_key_violation_maps_to_409() {
+        let pool = mem_pool().await;
+        sqlx::query("CREATE TABLE parent (id INTEGER PRIMARY KEY)")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("CREATE TABLE child (p INTEGER REFERENCES parent(id))")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let err = sqlx::query("INSERT INTO child (p) VALUES (999)")
+            .execute(&pool)
+            .await
+            .unwrap_err();
+        let app: AppError = err.into();
+        assert_eq!(app.status(), StatusCode::CONFLICT);
+    }
+
+    #[tokio::test]
+    async fn check_violation_maps_to_422() {
+        let pool = mem_pool().await;
+        sqlx::query("CREATE TABLE t (n INTEGER CHECK (n > 0))")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let err = sqlx::query("INSERT INTO t (n) VALUES (-1)")
+            .execute(&pool)
+            .await
+            .unwrap_err();
+        let app: AppError = err.into();
+        assert_eq!(app.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[tokio::test]
+    async fn constraint_violation_response_is_generic_not_internal_error() {
+        let pool = mem_pool().await;
+        sqlx::query("CREATE TABLE t (k TEXT UNIQUE)")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO t (k) VALUES ('a')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let err = sqlx::query("INSERT INTO t (k) VALUES ('a')")
+            .execute(&pool)
+            .await
+            .unwrap_err();
+        let resp = AppError::from(err).into_response();
+        assert_eq!(resp.status(), StatusCode::CONFLICT);
+
+        let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        // Fachlich beantwortet, aber generisch: kein nackter 500-Text und kein SQL-Leak.
+        assert_ne!(json["error"], "Interner Serverfehler");
+        let msg = json["error"].as_str().unwrap();
+        assert!(!msg.contains("UNIQUE"), "Meldung darf kein SQL-Detail leaken: {msg}");
+    }
 
     #[tokio::test]
     async fn unauthorized_maps_to_401() {
