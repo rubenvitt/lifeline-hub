@@ -10,7 +10,7 @@ use crate::error::AppError;
 const MODUL_KEY: &str = "etb";
 use crate::etb::{normalisiere_zeit, repo, EtbEintragAnzeige, EtbTyp, MeldeWeg};
 use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::Json;
 use serde::Deserialize;
@@ -322,6 +322,7 @@ pub async fn stream(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path(einsatz_id): Path<i64>,
+    headers: HeaderMap,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?; // 404, wenn unbekannt
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -335,8 +336,13 @@ pub async fn stream(
     )
     .await?;
 
-    let rx = state.live.abonniere(einsatz_id);
-    let stream = crate::routes::support::sse_event_stream(rx);
+    // Reconnect-Resync (F14/LFH-263): schickt der Browser beim Auto-Reconnect eine
+    // `Last-Event-ID`, liefert der LiveHub die seither verpassten Nachrichten nach
+    // (bzw. ein `lagged` bei Ring-Overflow/Neustart). `/etb/stream` ist der kanonische
+    // Einsatz-Feed, den das Frontend konsumiert.
+    let seit = crate::routes::support::last_event_id(&headers);
+    let (replay, rx) = state.live.abonniere_mit_replay(einsatz_id, seit);
+    let stream = crate::routes::support::sse_stream_mit_replay(replay, rx);
 
     Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
 }
