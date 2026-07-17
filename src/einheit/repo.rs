@@ -965,4 +965,65 @@ mod tests {
                 .unwrap();
         assert_eq!(einheit_id, None, "Material muss beim Auflösen frei werden");
     }
+
+    /// LFH-237/F08: Eine Einheit auflösen, die als Auftrag-Empfänger referenziert wird —
+    /// der Bezug wird per ON DELETE SET NULL (Migration 0088) freigegeben statt zu blockieren.
+    #[tokio::test]
+    async fn aufloesen_setzt_empfaenger_einheit_null() {
+        let pool = crate::db::test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let bn: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'L', 'l', 'h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let einsatz: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, '1. Zug') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let auftrag: i64 = sqlx::query_scalar(
+            "INSERT INTO auftrag (einsatz_id, auftrag_text, erteilt_at, erstellt_von_id) \
+             VALUES (?, 'X', '2026-07-17 10:00:00', ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(bn)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO auftrag_empfaenger (auftrag_id, empfaenger_typ, einheit_id, snap_anzeige) \
+             VALUES (?, 'einheit', ?, '1. Zug')",
+        )
+        .bind(auftrag)
+        .bind(einheit)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        loese_auf(&pool, einsatz, einheit)
+            .await
+            .expect("Einheit auflösen darf nicht am FK scheitern");
+        let emp: Option<i64> = sqlx::query_scalar(
+            "SELECT einheit_id FROM auftrag_empfaenger WHERE auftrag_id = ?",
+        )
+        .bind(auftrag)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(emp, None, "Empfänger.einheit_id muss NULL sein (SET NULL)");
+    }
 }

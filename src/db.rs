@@ -1691,4 +1691,234 @@ mod tests {
             assert_eq!(da, 1, "Tabelle {tabelle} fehlt");
         }
     }
+
+    // --- Migration 0088: auftrag_empfaenger.* FK → ON DELETE SET NULL (LFH-237 / F08) ---
+    //
+    // Die vier Dispositions-FKs (abschnitt_id/einheit_id/person_id/fahrzeug_id) trugen bis 0057
+    // keine ON-DELETE-Aktion → das Hard-Delete einer referenzierten Dispositions-Entität scheiterte
+    // am FK und blockierte Kern-Workflows (Einheit auflösen, Person/Fahrzeug entfernen, Abschnitt
+    // auflösen). 0088 baut auftrag_empfaenger auf ON DELETE SET NULL um; snap_anzeige (NOT NULL)
+    // trägt die historische Anzeige weiter. Dieser Test verifiziert für alle vier Spalten: Löschen
+    // der Ziel-Entität gelingt, die Empfänger-Zeile überlebt, die FK-Spalte ist NULL, snap_anzeige
+    // bleibt, und der Auftrag-Bezug (auftrag_id) ist unberührt.
+    #[tokio::test]
+    async fn migration_0088_auftrag_empfaenger_fk_set_null_bei_dispo_delete() {
+        let pool = test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let bn: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'Leit', 'leit', 'h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let einsatz: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let auftrag: i64 = sqlx::query_scalar(
+            "INSERT INTO auftrag (einsatz_id, auftrag_text, erteilt_at, erstellt_von_id) \
+             VALUES (?, 'Erkunden', '2026-07-17 10:00:00', ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(bn)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        // Je eine Dispositions-Entität + der referenzierende Empfänger.
+        let abschnitt: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, 'Nord') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, '1. Zug') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let person: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_personal (einsatz_id, snap_name) VALUES (?, 'Dora') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let fahrzeug: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, 'Florian 1') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        // (Spalte, Zieltabelle, Ziel-id, empfaenger_typ)
+        let faelle = [
+            ("abschnitt_id", "einsatzabschnitt", abschnitt, "abschnitt"),
+            ("einheit_id", "einsatz_einheit", einheit, "einheit"),
+            ("person_id", "einsatz_personal", person, "person"),
+            ("fahrzeug_id", "einsatz_fahrzeug", fahrzeug, "fahrzeug"),
+        ];
+        for (spalte, _tabelle, ziel, typ) in faelle {
+            let sql = format!(
+                "INSERT INTO auftrag_empfaenger (auftrag_id, empfaenger_typ, {spalte}, snap_anzeige) \
+                 VALUES (?, '{typ}', ?, 'Anzeige {typ}')"
+            );
+            sqlx::query(sqlx::AssertSqlSafe(&*sql))
+                .bind(auftrag)
+                .bind(ziel)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+
+        // Jede Ziel-Entität hart löschen → muss gelingen (kein FK-Block).
+        for (spalte, tabelle, ziel, _typ) in faelle {
+            let del = format!("DELETE FROM {tabelle} WHERE id = ?");
+            sqlx::query(sqlx::AssertSqlSafe(&*del))
+                .bind(ziel)
+                .execute(&pool)
+                .await
+                .unwrap_or_else(|e| panic!("Löschen aus {tabelle} darf nicht am FK scheitern: {e}"));
+
+            // Empfänger-Zeile lebt weiter, FK-Spalte ist NULL, Auftrag-Bezug + snap_anzeige intakt.
+            let check = format!(
+                "SELECT {spalte} IS NULL AND auftrag_id = ? AND snap_anzeige <> '' \
+                 FROM auftrag_empfaenger WHERE snap_anzeige = ?"
+            );
+            let ok: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(&*check))
+                .bind(auftrag)
+                .bind(format!("Anzeige {}", _typ_of(spalte)))
+                .fetch_one(&pool)
+                .await
+                .unwrap_or_else(|e| {
+                    panic!("Empfänger-Zeile für {spalte} muss überleben: {e}")
+                });
+            assert_eq!(ok, 1, "{spalte} muss nach Löschung NULL sein (SET NULL), Zeile bleibt");
+        }
+
+        // Keine dangling FKs nach den Löschungen.
+        let verletzungen: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM pragma_foreign_key_check()")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(verletzungen, 0, "kein dangling FK nach SET-NULL-Löschungen");
+    }
+
+    /// Mappt die FK-Spalte auf den empfaenger_typ (für die snap_anzeige-Wiedererkennung im Test).
+    fn _typ_of(spalte: &str) -> &'static str {
+        match spalte {
+            "abschnitt_id" => "abschnitt",
+            "einheit_id" => "einheit",
+            "person_id" => "person",
+            "fahrzeug_id" => "fahrzeug",
+            _ => unreachable!(),
+        }
+    }
+
+    // Deckt den Copy-Branch des 0088-Rebuilds ab (INSERT … SELECT der 13 Spalten). Auf der
+    // leeren test_pool()-DB ist auftrag_empfaenger bei 0088 leer, der Branch kopiert 0 Zeilen —
+    // ein falscher Spaltenname bliebe dort unbemerkt, während eine reale DID mit Bestandsdaten
+    // still Spalten verlöre. Hier bilden wir eine befüllte Alt-DB (0057-Form) nach und wenden
+    // die ECHTE Migration (include_str!) an: fehlt/verrutscht eine Spalte, wird der Test rot.
+    #[tokio::test]
+    async fn migration_0088_kopiert_bestandsdaten_vollstaendig() {
+        // Isolierter Pool ohne FK-Zwang (die 0088-FKs zeigen auf hier fehlende Tabellen).
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .foreign_keys(false),
+            )
+            .await
+            .expect("In-Memory-Pool");
+
+        // auftrag_empfaenger im 0057-Stand (Live-Form vor 0088), ohne FK-Klauseln.
+        sqlx::query(
+            "CREATE TABLE auftrag_empfaenger ( \
+                id INTEGER PRIMARY KEY, \
+                auftrag_id INTEGER NOT NULL, \
+                empfaenger_typ TEXT NOT NULL, \
+                abschnitt_id INTEGER, einheit_id INTEGER, person_id INTEGER, fahrzeug_id INTEGER, \
+                funktion_text TEXT, extern_kategorie TEXT, extern_bezeichnung TEXT, \
+                snap_anzeige TEXT NOT NULL, quittiert_at TEXT, quittiert_von_id INTEGER \
+            )",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        // Vollständig belegte Bestandszeile (alle Spalten, inkl. extern_* und Quittung).
+        sqlx::query(
+            "INSERT INTO auftrag_empfaenger \
+                (id, auftrag_id, empfaenger_typ, abschnitt_id, einheit_id, person_id, fahrzeug_id, \
+                 funktion_text, extern_kategorie, extern_bezeichnung, snap_anzeige, quittiert_at, quittiert_von_id) \
+             VALUES (7, 42, 'extern', NULL, NULL, NULL, NULL, NULL, 'leitstelle', 'ILS Musterstadt', 'ILS', '2026-07-17 09:00:00', 3)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Die ECHTE Migration 0088 anwenden.
+        let migration =
+            include_str!("../migrations/0088_auftrag_empfaenger_on_delete_set_null.sql");
+        sqlx::raw_sql(migration)
+            .execute(&pool)
+            .await
+            .expect("0088 muss auf einer DB mit Bestandsdaten durchlaufen");
+
+        // Alle Spalten der Bestandszeile müssen den Rebuild verlustfrei überleben.
+        #[allow(clippy::type_complexity)]
+        let (aid, typ, kat, bez, snap, qat, qvon): (
+            i64,
+            String,
+            Option<String>,
+            Option<String>,
+            String,
+            Option<String>,
+            Option<i64>,
+        ) = sqlx::query_as(
+            "SELECT auftrag_id, empfaenger_typ, extern_kategorie, extern_bezeichnung, \
+                    snap_anzeige, quittiert_at, quittiert_von_id \
+             FROM auftrag_empfaenger WHERE id = 7",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            (aid, typ.as_str(), kat.as_deref(), bez.as_deref(), snap.as_str(), qat.as_deref(), qvon),
+            (42, "extern", Some("leitstelle"), Some("ILS Musterstadt"), "ILS", Some("2026-07-17 09:00:00"), Some(3)),
+            "alle 13 Spalten müssen den Rebuild verlustfrei überleben"
+        );
+
+        // Die neue Tabelle trägt jetzt ON DELETE SET NULL auf den vier Dispo-FKs + den Index.
+        let ddl: String = sqlx::query_scalar(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='auftrag_empfaenger'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            ddl.matches("ON DELETE SET NULL").count(),
+            4,
+            "vier Dispo-FKs müssen ON DELETE SET NULL tragen"
+        );
+        let idx: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_auftrag_empfaenger_auftrag'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(idx, 1, "Index muss nach dem Rebuild neu angelegt sein");
+    }
 }

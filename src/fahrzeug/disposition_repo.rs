@@ -734,4 +734,65 @@ mod tests {
                 .unwrap();
         assert_eq!(fahrzeug_id, None, "Besatzung wird frei, nicht gelöscht");
     }
+
+    /// LFH-237/F08: Ein Fahrzeug entfernen, das als Auftrag-Empfänger referenziert wird —
+    /// der Bezug wird per ON DELETE SET NULL (Migration 0088) freigegeben statt zu blockieren.
+    #[tokio::test]
+    async fn entferne_setzt_empfaenger_fahrzeug_null() {
+        let pool = crate::db::test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let bn: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'L', 'l', 'h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let einsatz: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let ef: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, 'Florian 1') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let auftrag: i64 = sqlx::query_scalar(
+            "INSERT INTO auftrag (einsatz_id, auftrag_text, erteilt_at, erstellt_von_id) \
+             VALUES (?, 'X', '2026-07-17 10:00:00', ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(bn)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO auftrag_empfaenger (auftrag_id, empfaenger_typ, fahrzeug_id, snap_anzeige) \
+             VALUES (?, 'fahrzeug', ?, 'Florian 1')",
+        )
+        .bind(auftrag)
+        .bind(ef)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        entferne(&pool, einsatz, ef)
+            .await
+            .expect("Fahrzeug entfernen darf nicht am FK scheitern");
+        let emp: Option<i64> = sqlx::query_scalar(
+            "SELECT fahrzeug_id FROM auftrag_empfaenger WHERE auftrag_id = ?",
+        )
+        .bind(auftrag)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(emp, None, "Empfänger.fahrzeug_id muss NULL sein (SET NULL)");
+    }
 }

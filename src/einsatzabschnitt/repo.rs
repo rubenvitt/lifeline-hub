@@ -310,6 +310,20 @@ pub async fn loese_auf(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<()
     .bind(einsatz_id)
     .execute(&mut *tx)
     .await?;
+    // uhs + Bereitstellungsraum referenzieren den Abschnitt ohne ON-DELETE-Aktion
+    // (LFH-237/F08): vor dem DELETE freigeben, sonst blockiert der FK das Auflösen.
+    sqlx::query("UPDATE uhs SET abschnitt_id = NULL WHERE abschnitt_id = ? AND einsatz_id = ?")
+        .bind(id)
+        .bind(einsatz_id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query(
+        "UPDATE bereitstellungsraum SET abschnitt_id = NULL WHERE abschnitt_id = ? AND einsatz_id = ?",
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .execute(&mut *tx)
+    .await?;
     sqlx::query("DELETE FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?")
         .bind(id)
         .bind(einsatz_id)
@@ -676,5 +690,91 @@ mod tests {
             .unwrap();
         assert_eq!(sg, 1, "ein geteilter einsatz-lokaler Eintrag (Dedup)");
         assert_eq!(joins, 2, "beide Abschnitte verknüpft (Sharing)");
+    }
+
+    /// LFH-237/F08: Einen Abschnitt auflösen, der von uhs, bereitstellungsraum UND einem
+    /// Auftrag-Empfänger referenziert wird. uhs/br werden per Pre-Clean in der Lösch-Tx
+    /// freigegeben; der Empfänger-Bezug per ON DELETE SET NULL (Migration 0088).
+    #[tokio::test]
+    async fn loese_auf_gibt_uhs_br_und_empfaenger_frei() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, aid) = seed_abschnitt(&pool).await;
+        let bn: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'Leit', 'leit', 'h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO uhs (einsatz_id, abschnitt_id, typ, bezeichnung, erfasst_von, geaendert_von) \
+             VALUES (?, ?, 'behandlungsplatz', 'BHP', ?, ?)",
+        )
+        .bind(einsatz)
+        .bind(aid)
+        .bind(bn)
+        .bind(bn)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO bereitstellungsraum (einsatz_id, abschnitt_id, bezeichnung, erfasst_von, geaendert_von) \
+             VALUES (?, ?, 'BR', ?, ?)",
+        )
+        .bind(einsatz)
+        .bind(aid)
+        .bind(bn)
+        .bind(bn)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let auftrag: i64 = sqlx::query_scalar(
+            "INSERT INTO auftrag (einsatz_id, auftrag_text, erteilt_at, erstellt_von_id) \
+             VALUES (?, 'Sichern', '2026-07-17 10:00:00', ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(bn)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO auftrag_empfaenger (auftrag_id, empfaenger_typ, abschnitt_id, snap_anzeige) \
+             VALUES (?, 'abschnitt', ?, 'Nord')",
+        )
+        .bind(auftrag)
+        .bind(aid)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        loese_auf(&pool, einsatz, aid)
+            .await
+            .expect("Abschnitt auflösen darf nicht am FK scheitern");
+
+        let uhs_ref: Option<i64> =
+            sqlx::query_scalar("SELECT abschnitt_id FROM uhs WHERE einsatz_id = ?")
+                .bind(einsatz)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(uhs_ref, None, "uhs.abschnitt_id muss freigegeben (NULL) sein");
+        let br_ref: Option<i64> =
+            sqlx::query_scalar("SELECT abschnitt_id FROM bereitstellungsraum WHERE einsatz_id = ?")
+                .bind(einsatz)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            br_ref, None,
+            "bereitstellungsraum.abschnitt_id muss freigegeben (NULL) sein"
+        );
+        let emp_ref: Option<i64> = sqlx::query_scalar(
+            "SELECT abschnitt_id FROM auftrag_empfaenger WHERE auftrag_id = ?",
+        )
+        .bind(auftrag)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(emp_ref, None, "Empfänger.abschnitt_id muss NULL sein (SET NULL)");
     }
 }

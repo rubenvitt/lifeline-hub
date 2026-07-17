@@ -259,15 +259,32 @@ pub async fn aktualisiere(
 
 /// Entfernt eine Dispositionszeile aus dem Einsatz (der Stamm bleibt). `NotFound`,
 /// falls nicht zum Einsatz gehörend.
+///
+/// Transaktional (LFH-237/F08): vor dem DELETE werden die Führungsrollen der Person
+/// freigegeben (`einsatz_einheit.fuehrer_id` / `einsatzabschnitt.leiter_id` → NULL), sonst
+/// scheitert das DELETE am blockierenden FK. Der Auftrag-Empfänger-Bezug
+/// (`auftrag_empfaenger.person_id`) wird von der DB per ON DELETE SET NULL abgeräumt
+/// (Migration 0088). Schlägt das DELETE auf `NotFound` durch (fremde/unbekannte Person),
+/// rollt die TX die Freigabe zurück.
 pub async fn entferne(pool: &SqlitePool, einsatz_id: i64, ep_id: i64) -> Result<(), AppError> {
+    let mut tx = pool.begin().await?;
+    sqlx::query("UPDATE einsatz_einheit SET fuehrer_id = NULL WHERE fuehrer_id = ?")
+        .bind(ep_id)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("UPDATE einsatzabschnitt SET leiter_id = NULL WHERE leiter_id = ?")
+        .bind(ep_id)
+        .execute(&mut *tx)
+        .await?;
     let resultat = sqlx::query("DELETE FROM einsatz_personal WHERE id = ? AND einsatz_id = ?")
         .bind(ep_id)
         .bind(einsatz_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
     if resultat.rows_affected() == 0 {
         return Err(AppError::NotFound);
     }
+    tx.commit().await?;
     Ok(())
 }
 
@@ -910,5 +927,69 @@ mod tests {
                 .fahrzeug_id,
             Some(ef)
         );
+    }
+
+    /// LFH-237/F08: Eine Person, die Einheitsführer bzw. Abschnittsleiter ist und als
+    /// Auftrag-Empfänger referenziert wird, muss sich entfernen lassen. Die Führungsrollen
+    /// werden per Pre-Clean in der Lösch-Tx freigegeben; der Empfänger-Bezug per ON DELETE
+    /// SET NULL (Migration 0088), snap_anzeige bleibt.
+    #[tokio::test]
+    async fn entferne_gibt_fuehrungsrollen_frei_und_setzt_empfaenger_null() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, p1, p2, _p3) = seed_personal_mit_fuehrung(&pool).await;
+        let bn: i64 = sqlx::query_scalar("SELECT id FROM benutzer LIMIT 1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let auftrag: i64 = sqlx::query_scalar(
+            "INSERT INTO auftrag (einsatz_id, auftrag_text, erteilt_at, erstellt_von_id) \
+             VALUES (?, 'Erkunden', '2026-07-17 10:00:00', ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(bn)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO auftrag_empfaenger (auftrag_id, empfaenger_typ, person_id, snap_anzeige) \
+             VALUES (?, 'person', ?, 'Anton Abel')",
+        )
+        .bind(auftrag)
+        .bind(p1)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // p1 = Einheitsführer + Empfänger → Entfernen darf nicht am FK scheitern.
+        entferne(&pool, einsatz, p1)
+            .await
+            .expect("Führer entfernen darf nicht am FK scheitern");
+        let fuehrer: Option<i64> =
+            sqlx::query_scalar("SELECT fuehrer_id FROM einsatz_einheit WHERE name = 'Trupp'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(fuehrer, None, "fuehrer_id muss freigegeben (NULL) sein");
+        let (person_ref, snap): (Option<i64>, String) = sqlx::query_as(
+            "SELECT person_id, snap_anzeige FROM auftrag_empfaenger WHERE auftrag_id = ?",
+        )
+        .bind(auftrag)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(person_ref, None, "Empfänger.person_id muss NULL sein (SET NULL)");
+        assert_eq!(snap, "Anton Abel", "snap_anzeige bleibt erhalten");
+
+        // p2 = Abschnittsleiter → Entfernen gibt leiter_id frei.
+        entferne(&pool, einsatz, p2)
+            .await
+            .expect("Leiter entfernen darf nicht am FK scheitern");
+        let leiter: Option<i64> = sqlx::query_scalar(
+            "SELECT leiter_id FROM einsatzabschnitt WHERE name = 'Abschnitt Nord'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(leiter, None, "leiter_id muss freigegeben (NULL) sein");
     }
 }
