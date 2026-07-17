@@ -115,6 +115,28 @@ pub async fn anlegen(
     )
     .await?;
 
+    // Nachfass/Eskalation (LFH-118): bei gesetzter Quittierfrist eine Auto-Frist-Erinnerung
+    // anlegen (idempotent, quelle='auto_frist', bezug_typ='auftrag'). Der Scheduler-Tick feuert
+    // bei Fristablauf `erinnerung` mit Diskriminator → In-App-Alarm; Quittieren aller Empfänger
+    // schließt sie wieder (siehe quittieren). Reuse des Meldungs-Pfads (routes/meldung.rs).
+    if let Some(frist) = d.auftrag.frist_at.as_deref() {
+        let titel = match d.auftrag.lfd_nr {
+            Some(nr) => format!("Auftrag #{nr} Quittierfrist"),
+            None => "Auftrag Quittierfrist".to_string(),
+        };
+        crate::erinnerung::repo::anlegen_aus_frist(
+            &state.pool,
+            einsatz_id,
+            ctx.benutzer.id,
+            crate::kommunikation::OBJEKT_AUFTRAG,
+            d.auftrag.id,
+            &titel,
+            frist,
+            &now,
+        )
+        .await?;
+    }
+
     // ETB-Anordnung wurde im selben Commit erzeugt → ETB-Live-Event mitschicken.
     if let Some(etb_id) = d.auftrag.etb_anordnung_id {
         if let Ok(etb) = crate::etb::repo::laden(&state.pool, etb_id).await {
@@ -155,6 +177,21 @@ pub async fn quittieren(
     }
     repo::quittiere_empfaenger(&state.pool, empfaenger_id, ctx.benutzer.id, &jetzt()).await?;
     let d = repo::laden(&state.pool, auftrag_id, &jetzt()).await?;
+
+    // LFH-118: sobald ALLE Empfänger quittiert haben, ist der Auftrag nicht mehr überfällig →
+    // die Auto-Frist-Erinnerung schließen (verstummt den Nachfass). Solange ein Empfänger offen
+    // ist, bleibt sie offen.
+    if d.auftrag.empfaenger_anzahl > 0 && d.auftrag.empfaenger_anzahl == d.auftrag.quittiert_anzahl
+    {
+        crate::erinnerung::repo::schliesse_offene_auto(
+            &state.pool,
+            crate::kommunikation::OBJEKT_AUFTRAG,
+            auftrag_id,
+            &jetzt(),
+        )
+        .await?;
+    }
+
     sse(&state, einsatz_id);
     Ok(Json(d))
 }

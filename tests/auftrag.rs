@@ -1,7 +1,20 @@
 use axum::http::StatusCode;
 
 mod common;
-use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup};
+use common::{
+    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup, setup_mit_pool,
+};
+
+async fn offene_auftrag_frist_erinnerungen(pool: &sqlx::SqlitePool, auftrag_id: i64) -> i64 {
+    sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM erinnerung \
+         WHERE quelle = 'auto_frist' AND status = 'offen' AND bezug_typ = 'auftrag' AND bezug_id = ?",
+    )
+    .bind(auftrag_id)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
 
 fn body_mit_funktion(text: &str, empf: &str) -> String {
     serde_json::json!({
@@ -770,5 +783,97 @@ async fn auto_etb_aus_unterdrueckt_anordnung_am_http_rand() {
     assert!(
         etb.as_array().unwrap().is_empty(),
         "kein ETB-Eintrag bei abgeschaltetem Auto-ETB"
+    );
+}
+
+#[tokio::test]
+async fn anlegen_mit_frist_legt_auftrag_frist_erinnerung_an() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let body = serde_json::json!({
+        "auftrag_text": "Deich sichern",
+        "frist_at": "2099-12-31 00:00:00",
+        "empfaenger": [{ "empfaenger_typ": "funktion", "funktion_text": "Abschnitt Nord" }]
+    })
+    .to_string();
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/auftraege"),
+        &admin,
+        Some(&body),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let auftrag_id = json["id"].as_i64().unwrap();
+    assert_eq!(
+        offene_auftrag_frist_erinnerungen(&pool, auftrag_id).await,
+        1,
+        "Auftrag mit Frist erzeugt genau eine offene Auto-Frist-Erinnerung"
+    );
+}
+
+#[tokio::test]
+async fn quittieren_schliesst_frist_erinnerung_erst_beim_letzten_empfaenger() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let body = serde_json::json!({
+        "auftrag_text": "Deich sichern",
+        "frist_at": "2099-12-31 00:00:00",
+        "empfaenger": [
+            { "empfaenger_typ": "funktion", "funktion_text": "Abschnitt Nord" },
+            { "empfaenger_typ": "funktion", "funktion_text": "Abschnitt Süd" }
+        ]
+    })
+    .to_string();
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/auftraege"),
+        &admin,
+        Some(&body),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let auftrag_id = json["id"].as_i64().unwrap();
+    let empf0 = json["empfaenger"][0]["id"].as_i64().unwrap();
+    let empf1 = json["empfaenger"][1]["id"].as_i64().unwrap();
+    assert_eq!(
+        offene_auftrag_frist_erinnerungen(&pool, auftrag_id).await,
+        1
+    );
+
+    // Ersten Empfänger quittieren → Erinnerung bleibt offen (noch ein Empfänger offen).
+    let (s1, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/auftraege/{auftrag_id}/empfaenger/{empf0}/quittieren"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s1, StatusCode::OK);
+    assert_eq!(
+        offene_auftrag_frist_erinnerungen(&pool, auftrag_id).await,
+        1,
+        "solange ein Empfänger offen ist, bleibt die Frist-Erinnerung offen"
+    );
+
+    // Letzten Empfänger quittieren → Erinnerung geschlossen.
+    let (s2, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/auftraege/{auftrag_id}/empfaenger/{empf1}/quittieren"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s2, StatusCode::OK);
+    assert_eq!(
+        offene_auftrag_frist_erinnerungen(&pool, auftrag_id).await,
+        0,
+        "nach dem letzten Quittieren ist die Frist-Erinnerung erledigt"
     );
 }
