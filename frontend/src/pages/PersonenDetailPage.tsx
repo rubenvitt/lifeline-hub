@@ -1,5 +1,6 @@
 import { Alert, App, Breadcrumb, Button, Col, Descriptions, Form, Input, InputNumber, Modal, Popconfirm, Row, Space, Spin, Table, Tag, Typography, type TableColumnsType } from 'antd';
 import { Select } from '../components/Select';
+import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -276,7 +277,7 @@ export default function PersonenDetailPage() {
   );
 
   const auditSpalten: TableColumnsType<PersonZugriff> = [
-    { title: 'Wann', dataIndex: 'zugriff_at', key: 'zugriff_at' },
+    { title: 'Wann', dataIndex: 'zugriff_at', key: 'zugriff_at', render: (v: string) => <ZeitAnzeige wert={v} format="dtgVoll" /> },
     { title: 'Wer', dataIndex: 'benutzer_name', key: 'benutzer_name' },
     { title: 'Art', dataIndex: 'art', key: 'art' },
   ];
@@ -342,7 +343,7 @@ export default function PersonenDetailPage() {
             : <ul style={{ listStyle: 'none', paddingLeft: 0 }}>
                 {eintraege.map((e) => (
                   <li key={e.key} style={{ padding: '4px 0', borderBottom: '1px solid #f0f0f0' }}>
-                    <Typography.Text type="secondary" style={{ fontSize: 12, marginRight: 8 }}>{e.at}</Typography.Text>
+                    <Typography.Text type="secondary" style={{ fontSize: 12, marginRight: 8 }}><ZeitAnzeige wert={e.at} format="dtgVoll" /></Typography.Text>
                     {e.node}
                   </li>
                 ))}

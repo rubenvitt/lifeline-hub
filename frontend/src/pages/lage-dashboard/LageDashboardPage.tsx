@@ -1,8 +1,8 @@
 import { Alert, Breadcrumb, Col, Row, Space, Spin, Tag, Typography } from 'antd';
+import { formatZeitKurz } from '../../kommunikation/zeit';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import dayjs from 'dayjs';
 import { einsatzKeys } from '../../api/queryKeys';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { listePersonen } from '../../api/einsatzPerson';
@@ -95,7 +95,7 @@ export default function LageDashboardPage() {
         <div>
           <Typography.Title level={3} style={{ margin: 0 }}>{einsatz.bezeichnung}</Typography.Title>
           <Typography.Text type="secondary">
-            {[einsatz.stichwort, `seit ${dayjs(einsatz.begonnen_at).format('DD.MM. HH:mm')}`, einsatz.org_name]
+            {[einsatz.stichwort, `seit ${formatZeitKurz(einsatz.begonnen_at)}`, einsatz.org_name]
               .filter(Boolean).join(' · ')}
           </Typography.Text>
         </div>

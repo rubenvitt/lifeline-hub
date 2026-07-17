@@ -28,7 +28,7 @@ function feldDef(feld: MetaFeld) {
 
 function anzeige(feld: MetaFeld, wert: Wert): string {
   if (wert == null) return '';
-  if (feldDef(feld).editor === 'zeit') return (wert as dayjs.Dayjs).format('HH:mm');
+  if (feldDef(feld).editor === 'zeit') return (wert as dayjs.Dayjs).format('HHmm');
   if (feld === 'meldeweg') return MELDEWEG_OPTIONEN.find((o) => o.value === wert)?.label ?? String(wert);
   return String(wert);
 }

@@ -6,9 +6,10 @@ import { formatZeit, formatZeitKurz, formatZeitMitKonvention } from './zeit';
 dayjs.extend(utc);
 
 describe('formatZeit', () => {
-  it('parst UTC und gibt lokal DD.MM.YYYY HH:mm zurück (TZ-robust)', () => {
+  it('parst UTC und gibt taktische DTG lokal zurück (TZ-robust)', () => {
     const wire = '2026-06-11 09:00:00';
-    const erwartet = dayjs.utc(wire).local().format('DD.MM.YYYY HH:mm');
+    const d = dayjs.utc(wire).local();
+    const erwartet = `${d.format('DDHHmm')}JUN${d.format('YYYY')}`;
     expect(formatZeit(wire)).toBe(erwartet);
   });
 
@@ -20,15 +21,15 @@ describe('formatZeit', () => {
 });
 
 describe('formatZeitKurz', () => {
-  it('zeigt nur HH:mm wenn der Tag heute ist', () => {
+  it('zeigt nur die taktische Uhrzeit (HHmm) wenn der Tag heute ist', () => {
     const heute = dayjs().utc().format('YYYY-MM-DD HH:mm:ss');
-    const erwartet = dayjs.utc(heute).local().format('HH:mm');
+    const erwartet = dayjs.utc(heute).local().format('HHmm');
     expect(formatZeitKurz(heute)).toBe(erwartet);
   });
 
-  it('zeigt DD.MM. HH:mm wenn der Tag nicht heute ist', () => {
+  it('zeigt die kurze DTG (DDHHmm) wenn der Tag nicht heute ist', () => {
     const anderertag = dayjs().utc().subtract(3, 'day').format('YYYY-MM-DD HH:mm:ss');
-    const erwartet = dayjs.utc(anderertag).local().format('DD.MM. HH:mm');
+    const erwartet = dayjs.utc(anderertag).local().format('DDHHmm');
     expect(formatZeitKurz(anderertag)).toBe(erwartet);
   });
 
@@ -39,10 +40,10 @@ describe('formatZeitKurz', () => {
 });
 
 describe('formatZeitMitKonvention', () => {
-  it('wendet Zeitzone + 12h-Format an (LFH-136)', () => {
-    const wire = '2026-06-11 15:00:00';
+  it('wendet die Zeitzone an, ignoriert aber 12h (taktisch immer 24h)', () => {
+    const wire = '2026-06-11 15:00:00'; // 15:00 UTC → 17:00 Berlin
     expect(
       formatZeitMitKonvention(wire, { zeitzone: 'Europe/Berlin', zeitformat: '12h' }),
-    ).toBe('11.06.2026 05:00 PM');
+    ).toBe('111700JUN2026');
   });
 });

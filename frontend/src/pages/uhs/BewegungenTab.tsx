@@ -1,4 +1,5 @@
 import { Table, Tag } from 'antd';
+import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
@@ -37,7 +38,7 @@ export default function BewegungenTab({ uhs }: Props) {
       title: 'Zeit',
       dataIndex: 'zeitpunkt_at',
       key: 'zeitpunkt_at',
-      render: (v: string) => new Date(v).toLocaleString('de-DE'),
+      render: (v: string) => <ZeitAnzeige wert={v} format="dtgVoll" />,
     },
     {
       title: 'Person',

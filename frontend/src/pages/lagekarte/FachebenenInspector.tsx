@@ -1,4 +1,5 @@
 import { Descriptions, Tag, Typography } from 'antd';
+import { taktischeDtgVoll } from '../../anzeige/format';
 import type { FachebeneQuelle } from '../../api/fachebenen';
 import { FACHEBENEN } from './fachebenen';
 import { kategorieLabel } from './fachebenenLayer';
@@ -46,9 +47,7 @@ function pick(p: Record<string, unknown>, ...keys: string[]): string | null {
 function fmtZeit(v: string | null): string | null {
   if (!v) return null;
   const d = new Date(v);
-  return Number.isNaN(d.getTime())
-    ? v
-    : d.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
+  return Number.isNaN(d.getTime()) ? v : taktischeDtgVoll(v);
 }
 
 /** „DAUERREGEN" / „STARKES GEWITTER" → „Dauerregen" / „Starkes Gewitter". */

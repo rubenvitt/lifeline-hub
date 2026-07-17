@@ -52,21 +52,53 @@ function inZone(utcStr: string, konv: AnzeigeKonventionen) {
   }
 }
 
-/** Zeitformat-Maske für Uhrzeit-Teil (12h → `hh:mm A`, sonst `HH:mm`). */
-function uhrzeitMaske(konv: AnzeigeKonventionen): string {
-  return konv.zeitformat === '12h' ? 'hh:mm A' : 'HH:mm';
-}
+/**
+ * Deutsche Monats-Großkürzel für die taktische Datum-Zeit-Gruppe (LFH-141).
+ * dayjs' `MMM`-Token liefert das nicht (de-Locale → "Jan."/"Juli", en → gemischt,
+ * nie großgeschrieben-punktlos), daher ein eigenes Array, indexiert über `.month()` (0–11).
+ */
+const MONATE_DE = ['JAN', 'FEB', 'MÄR', 'APR', 'MAI', 'JUN', 'JUL', 'AUG', 'SEP', 'OKT', 'NOV', 'DEZ'];
 
-/** UTC-Wirestring → `DD.MM.YYYY HH:mm` (bzw. 12h/Zeitzone); leer → ''. */
-export function formatZeit(
+/**
+ * Taktische Uhrzeit als vierstellige Gruppe „1430" (LFH-141). BOS-Konvention ist inhärent
+ * 24h; das 12h/24h-Setting (LFH-136) wird für die taktische Anzeige bewusst ignoriert.
+ */
+export function taktischeUhrzeit(
   utcStr?: string | null,
   konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
 ): string {
   if (!utcStr) return '';
-  return inZone(utcStr, konv).format(`DD.MM.YYYY ${uhrzeitMaske(konv)}`);
+  return inZone(utcStr, konv).format('HHmm');
 }
 
-/** UTC-Wirestring → `HH:mm` wenn heute (in der Konvention-Zeitzone), sonst `DD.MM. HH:mm`. */
+/** Taktische Datum-Zeit-Gruppe kurz „161430" (Tag + Uhrzeit, ohne Monat/Jahr). */
+export function taktischeDtg(
+  utcStr?: string | null,
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+): string {
+  if (!utcStr) return '';
+  return inZone(utcStr, konv).format('DDHHmm');
+}
+
+/** Volle taktische DTG „161430JUL2026" (Tag + Uhrzeit + dt. Monatskürzel + Jahr). */
+export function taktischeDtgVoll(
+  utcStr?: string | null,
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+): string {
+  if (!utcStr) return '';
+  const d = inZone(utcStr, konv);
+  return `${d.format('DDHHmm')}${MONATE_DE[d.month()]}${d.format('YYYY')}`;
+}
+
+/** Volle Zeitangabe → taktische DTG „161430JUL2026" (ersetzt das frühere `DD.MM.YYYY HH:mm`). */
+export function formatZeit(
+  utcStr?: string | null,
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+): string {
+  return taktischeDtgVoll(utcStr, konv);
+}
+
+/** Kurze Zeitangabe → taktische Uhrzeit „1430" wenn heute, sonst kurze DTG „161430". */
 export function formatZeitKurz(
   utcStr?: string | null,
   konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
@@ -75,8 +107,7 @@ export function formatZeitKurz(
   const d = inZone(utcStr, konv);
   // „Heute" muss in derselben Zeitzone bestimmt werden, sonst kippt die Tagesgrenze.
   const jetzt = konv.zeitzone ? dayjs().tz(konv.zeitzone) : dayjs();
-  const maske = uhrzeitMaske(konv);
-  return d.isSame(jetzt, 'day') ? d.format(maske) : d.format(`DD.MM. ${maske}`);
+  return d.isSame(jetzt, 'day') ? d.format('HHmm') : d.format('DDHHmm');
 }
 
 /** WGS84-Koordinate → Anzeige-String je Koordinatenformat (Default: dezimal). */

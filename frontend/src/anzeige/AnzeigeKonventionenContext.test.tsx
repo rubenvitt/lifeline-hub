@@ -80,7 +80,7 @@ describe('useAnzeigeKonventionen', () => {
       expect(screen.getByTestId('koord').textContent).toBe('31U ES 77019 61520'),
     );
     // 09:00 UTC → Berlin 11:00, 12h-Format.
-    expect(screen.getByTestId('zeit').textContent).toBe('11.06.2026 11:00 AM');
+    expect(screen.getByTestId('zeit').textContent).toBe('111100JUN2026');
     expect(screen.getByTestId('format').textContent).toBe('mgrs');
   });
 
@@ -191,11 +191,12 @@ describe('useAnzeigeKonventionen', () => {
       </EinsatzAnzeigeProvider>,
     );
 
-    // 09:00 UTC → Berlin 11:00 im 12h-Format; 5000 m → imperial; beides aus dem Org-Default
-    // (kein Einsatz-Override) — der Cascade greift für alle Anzeige-Konventionen, nicht nur Koordinaten.
+    // 09:00 UTC → Berlin 11:00 taktisch (161430-Schema, 12h wird ignoriert); 5000 m → imperial;
+    // beides aus dem Org-Default. Auf die Distanz warten: sie diskriminiert das Laden zuverlässig
+    // (die taktische Zeit ist 12h-unabhängig und kann zufällig dem Lokalzeit-Default gleichen).
     await waitFor(() =>
-      expect(screen.getByTestId('zeit').textContent).toBe('11.06.2026 11:00 AM'),
+      expect(screen.getByTestId('distanz').textContent).toBe('3.11 mi'),
     );
-    expect(screen.getByTestId('distanz').textContent).toBe('3.11 mi');
+    expect(screen.getByTestId('zeit').textContent).toBe('111100JUN2026');
   });
 });

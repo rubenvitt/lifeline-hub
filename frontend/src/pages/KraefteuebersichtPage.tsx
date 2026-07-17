@@ -1,4 +1,5 @@
 import { Alert, App as AntApp, Breadcrumb, Button, Card, Input, Space, Spin, Statistic, Table, Tag, Typography } from 'antd';
+import { taktischeDtgVoll } from '../anzeige/format';
 import { Select } from '../components/Select';
 import type { ColumnsType } from 'antd/es/table';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -128,7 +129,7 @@ export default function KraefteuebersichtPage() {
 
   const uebernehmen = useMutation({
     mutationFn: async () => {
-      const stand = new Date().toLocaleString('de-DE');
+      const stand = taktischeDtgVoll(new Date().toISOString());
       const md = rendereMeldebildMarkdown(bild, stand);
       const lb = await legeLageberichtAn(einsatzId, { vorlage: 'freitext', titel: `Kräftemeldebild ${stand}` });
       // Hinweis: Schlägt der PATCH fehl, bleibt ein leerer Entwurf zurück (vom EL löschbar).

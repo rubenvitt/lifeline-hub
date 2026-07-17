@@ -1,4 +1,5 @@
 import { Alert, App, AutoComplete, Breadcrumb, Button, DatePicker, Descriptions, Form, Input, InputNumber, Space, Spin, Tag, Typography } from 'antd';
+import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { Select } from '../components/Select';
 import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
 import KoordinatenEingabe from '../anzeige/KoordinatenEingabe';
@@ -228,8 +229,8 @@ export default function EinsatzdatenPage() {
             {einsatz.leitstellen_nr ?? '—'}
           </Descriptions.Item>
           <Descriptions.Item label="Einsatzleitung">{leitung || '—'}</Descriptions.Item>
-          <Descriptions.Item label="Alarmzeit">{einsatz.begonnen_at}</Descriptions.Item>
-          <Descriptions.Item label="Angelegt am (techn.)">{einsatz.angelegt_at}</Descriptions.Item>
+          <Descriptions.Item label="Alarmzeit"><ZeitAnzeige wert={einsatz.begonnen_at} format="dtgVoll" /></Descriptions.Item>
+          <Descriptions.Item label="Angelegt am (techn.)"><ZeitAnzeige wert={einsatz.angelegt_at} format="dtgVoll" /></Descriptions.Item>
           <Descriptions.Item label="Einsatzort">{einsatz.einsatzort ?? '—'}</Descriptions.Item>
           <Descriptions.Item label="Koordinate">
             {einsatz.einsatzort_lat != null && einsatz.einsatzort_lon != null

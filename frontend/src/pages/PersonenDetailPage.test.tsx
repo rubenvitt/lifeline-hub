@@ -125,6 +125,21 @@ describe('PersonenDetailPage — med. Verlauf', () => {
     render(einsatzAktiv, totDetail);
     expect(await screen.findByRole('button', { name: /Status → verstorben/ })).toBeInTheDocument();
   });
+
+  it('zeigt die Chronologie-Zeiten taktisch formatiert (LFH-141), nicht als Rohstring', async () => {
+    const mitSichtung = {
+      ...detail,
+      sichtungen: [{ id: 1, einsatz_id: 1, person_id: 10, kategorie: 'sk2' as Sichtungskategorie,
+        notiz: 'Befund', gesichtet_at: '2026-05-27 10:00:00', gesichtet_von: 1 }],
+    } as PersonDetail;
+    render(einsatzAktiv, mitSichtung);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    // Der Chronologie-Zeitstempel erscheint als taktische DTG (dt. Monatskürzel), nicht roh.
+    expect(
+      await screen.findByText(/^\d{6}(JAN|FEB|MÄR|APR|MAI|JUN|JUL|AUG|SEP|OKT|NOV|DEZ)2026$/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('2026-05-27 10:00:00')).not.toBeInTheDocument();
+  });
 });
 
 describe('PersonenDetailPage — Stammdaten', () => {

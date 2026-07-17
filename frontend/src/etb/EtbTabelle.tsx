@@ -4,6 +4,8 @@ import type { EtbEintragAnzeige } from '../api/types';
 import Markdown from '../components/Markdown';
 import EtbBacklinkBadges from './EtbBacklinkBadges';
 import { TYP_FARBE, TYP_LABEL, istNachgetragen } from './typFarben';
+import ZeitAnzeige from '../anzeige/ZeitAnzeige';
+import { formatZeit } from '../kommunikation/zeit';
 
 interface Props {
   eintraege: EtbEintragAnzeige[];
@@ -41,9 +43,9 @@ export default function EtbTabelle({
       width: 180,
       render: (_, e) => (
         <Space size={4}>
-          <span>{e.ereigniszeit}</span>
+          <span><ZeitAnzeige wert={e.ereigniszeit} format="kurz" /></span>
           {istNachgetragen(e.ereigniszeit, e.received_at) && (
-            <Tooltip title={`Nachgetragen — Server-Empfang: ${e.received_at}`}>
+            <Tooltip title={`Nachgetragen — Server-Empfang: ${formatZeit(e.received_at)}`}>
               <span aria-label="nachgetragen">⧖</span>
             </Tooltip>
           )}
