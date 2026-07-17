@@ -26,9 +26,9 @@ fn parse(s: &str) -> Option<DateTime<Utc>> {
 }
 
 /// Ein Scheduler-Durchlauf für den Zeitpunkt `jetzt`. Publiziert je fälliger
-/// Erinnerung ein SSE-Event `erinnerung` (Payload nur `{einsatz_id}`) und
-/// schreibt wiederkehrende per skip-forward fort. Async + injiziertes `jetzt`
-/// = deterministisch testbar.
+/// Erinnerung ein SSE-Event `erinnerung` (Payload `{einsatz_id, erinnerung_id,
+/// bezug_typ, bezug_id}`) und schreibt wiederkehrende per skip-forward fort.
+/// Async + injiziertes `jetzt` = deterministisch testbar.
 pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>) -> usize {
     let jetzt_s = fmt(jetzt);
     let faellige = match repo::faellige_zum_ausloesen(pool, &jetzt_s).await {
@@ -71,7 +71,13 @@ pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>
         live.publiziere_event(
             f.einsatz_id,
             "erinnerung",
-            serde_json::json!({ "einsatz_id": f.einsatz_id }).to_string(),
+            serde_json::json!({
+                "einsatz_id": f.einsatz_id,
+                "erinnerung_id": f.id,
+                "bezug_typ": f.bezug_typ,
+                "bezug_id": f.bezug_id,
+            })
+            .to_string(),
         );
         // Re-Highlight nur bei frischer Eskalation (ein Event, kein Spam auf Folge-Ticks).
         if let Some(mid) = eskaliert_mid {
@@ -232,7 +238,7 @@ mod tests {
         let (b, e) = setup(&pool).await;
         let live = LiveHub::new();
         let mut rx = live.abonniere(e);
-        repo::anlegen(
+        let r = repo::anlegen(
             &pool,
             e,
             b,
@@ -253,6 +259,11 @@ mod tests {
         assert_eq!(tick_einmal(&pool, &live, t("2026-06-11 10:01:00")).await, 1);
         let nachricht = rx.recv().await.unwrap();
         assert_eq!(nachricht.event, "erinnerung");
+        let v: serde_json::Value = serde_json::from_str(&nachricht.data).unwrap();
+        assert_eq!(v["einsatz_id"], e);
+        assert_eq!(v["erinnerung_id"], r.id);
+        assert_eq!(v["bezug_typ"], serde_json::Value::Null);
+        assert_eq!(v["bezug_id"], serde_json::Value::Null);
     }
 
     /// LFH-97: die Auto-Frist-Erinnerung einer bestätigungspflichtigen Sofortmeldung
@@ -422,6 +433,43 @@ mod tests {
                 .await
                 .unwrap()
                 .eskaliert
+        );
+    }
+
+    /// LFH-118: eine Auto-Frist-Erinnerung mit bezug_typ='auftrag' publiziert `erinnerung` mit
+    /// Diskriminator + IDs im Payload — und KEIN zweites (sofortmeldung-)Event (Nicht-Meldung).
+    #[tokio::test]
+    async fn auftrag_frist_erinnerung_traegt_bezug_typ_und_id_im_payload() {
+        use crate::kommunikation::OBJEKT_AUFTRAG;
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let live = LiveHub::new();
+        let mut rx = live.abonniere(e);
+        // bezug_id ist ein generischer Sachbezug ohne FK (migration 0044) → beliebige ID genügt;
+        // der Scheduler dereferenziert sie nur für bezug_typ='meldung'.
+        let r = repo::anlegen_aus_frist(
+            &pool,
+            e,
+            b,
+            OBJEKT_AUFTRAG,
+            42,
+            "Auftrag #1 Quittierfrist",
+            "2026-06-11 10:00:00",
+            "2026-06-11 09:00:00",
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(tick_einmal(&pool, &live, t("2026-06-11 10:01:00")).await, 1);
+        let n = rx.recv().await.unwrap();
+        assert_eq!(n.event, "erinnerung");
+        let v: serde_json::Value = serde_json::from_str(&n.data).unwrap();
+        assert_eq!(v["erinnerung_id"], r.id);
+        assert_eq!(v["bezug_typ"], "auftrag");
+        assert_eq!(v["bezug_id"], 42);
+        assert!(
+            rx.try_recv().is_err(),
+            "kein sofortmeldung-Event für Nicht-Meldungs-Bezug"
         );
     }
 }
