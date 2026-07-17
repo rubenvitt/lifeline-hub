@@ -1,10 +1,11 @@
 import { CloseOutlined } from '@ant-design/icons';
-import { AutoComplete, DatePicker, Input, Tag } from 'antd';
+import { AutoComplete, DatePicker, Input, Space, Tag } from 'antd';
 import { Select } from '../components/Select';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 import type { MeldeWeg } from '../api/types';
 import { MELDEWEG_OPTIONEN, METADATEN_FELDER, type MetaFeld } from './schnellerfassungModell';
+import BuchstabierHilfe from './BuchstabierHilfe';
 
 type Wert = string | dayjs.Dayjs | MeldeWeg | undefined;
 
@@ -38,30 +39,27 @@ export default function MetaChip({ feld, editing, wert, optionen, onCommit, onCa
 
   if (editing) {
     if (d.editor === 'text') {
-      if (optionen && optionen.length > 0) {
-        return (
-          <AutoComplete
-            size="small"
-            autoFocus
-            aria-label={d.label}
-            style={{ width: 200 }}
-            value={text}
-            onChange={(v) => setText(v)}
-            // Klick auf Vorschlag feuert nur onChange → onSelect committet sofort.
-            onSelect={(v) => onCommit(feld, v)}
-            options={optionen.map((o) => ({ value: o }))}
-            showSearch={{
-              filterOption: (input, option) =>
-                (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') { if (text.trim()) onCommit(feld, text.trim()); else onCancel(feld); }
-              if (e.key === 'Escape') onCancel(feld);
-            }}
-          />
-        );
-      }
-      return (
+      const editor = optionen && optionen.length > 0 ? (
+        <AutoComplete
+          size="small"
+          autoFocus
+          aria-label={d.label}
+          style={{ width: 200 }}
+          value={text}
+          onChange={(v) => setText(v)}
+          // Klick auf Vorschlag feuert nur onChange → onSelect committet sofort.
+          onSelect={(v) => onCommit(feld, v)}
+          options={optionen.map((o) => ({ value: o }))}
+          showSearch={{
+            filterOption: (input, option) =>
+              (option?.value ?? '').toLowerCase().includes(input.toLowerCase()),
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { if (text.trim()) onCommit(feld, text.trim()); else onCancel(feld); }
+            if (e.key === 'Escape') onCancel(feld);
+          }}
+        />
+      ) : (
         <Input
           size="small"
           autoFocus
@@ -73,6 +71,16 @@ export default function MetaChip({ feld, editing, wert, optionen, onCommit, onCa
           onKeyDown={(e) => { if (e.key === 'Escape') onCancel(feld); }}
         />
       );
+      // LFH-110: Buchstabierhilfe additiv am Von/An-Feld (Funkrufname/Absender/Empfänger).
+      if (feld === 'von' || feld === 'an') {
+        return (
+          <Space.Compact block size="small">
+            {editor}
+            <BuchstabierHilfe text={text} />
+          </Space.Compact>
+        );
+      }
+      return editor;
     }
     if (d.editor === 'meldeweg') {
       return (
