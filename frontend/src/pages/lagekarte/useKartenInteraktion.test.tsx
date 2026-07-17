@@ -54,16 +54,21 @@ const POLYGON: GeoJsonGeometry = {
 // Jeder wechselseitig-exklusive Interaktionsmodus samt seiner Start-Sequenz.
 // Während eines dieser Modi darf ein Karten-Klick auf ein bestehendes Objekt kein
 // Auswahl-Panel öffnen (LFH-208: sonst Doppel-Panel neben der ZeichnenSteuerung).
-const MODI: { name: string; betreten: (r: HookResult) => void }[] = [
-  { name: 'platzieren', betreten: (r) => act(() => r.current.onPlatzierenStart({ typ: 'uhs', id: 2 })) },
-  { name: 'bild-platzieren', betreten: (r) => act(() => r.current.onBildPlatzieren(7)) },
-  { name: 'abschnitt-zeichnen', betreten: (r) => act(() => r.current.onAbschnittZeichnenStart(3)) },
+// `familie` = die Modus-Identität: zone-zeichnen und zone-bestaetigung sind zwei Phasen
+// DESSELBEN Modus (der Entwurf bleibt während der Bestätigung stehen) und dürfen daher
+// koexistieren. Zwei verschiedene Familien gleichzeitig sind dagegen immer ein Defekt.
+const MODI: { name: string; familie: string; betreten: (r: HookResult) => void }[] = [
+  { name: 'platzieren', familie: 'platzieren', betreten: (r) => act(() => r.current.onPlatzierenStart({ typ: 'uhs', id: 2 })) },
+  { name: 'bild-platzieren', familie: 'bild', betreten: (r) => act(() => r.current.onBildPlatzieren(7)) },
+  { name: 'abschnitt-zeichnen', familie: 'abschnitt', betreten: (r) => act(() => r.current.onAbschnittZeichnenStart(3)) },
   {
     name: 'zone-zeichnen',
+    familie: 'zone',
     betreten: (r) => act(() => r.current.onZoneZeichnenStart({ typ: 'gefahrengebiet', modus: 'polygon' })),
   },
   {
     name: 'zone-bestaetigung',
+    familie: 'zone',
     betreten: (r) => {
       act(() => r.current.onZoneZeichnenStart({ typ: 'gefahrengebiet', modus: 'polygon' }));
       act(() => r.current.onZoneGezeichnet(POLYGON));
@@ -73,9 +78,88 @@ const MODI: { name: string; betreten: (r: HookResult) => void }[] = [
   // Selektions-Gate (exklusiverModusAktiv) auslösen.
   {
     name: 'zeichen-platzieren',
+    familie: 'zeichen',
     betreten: (r) => act(() => r.current.onZeichenPlatzierenStart({ grundzeichen: 'stelle' })),
   },
 ];
+
+/** Welche Modus-Familien sind gerade scharf? Mehr als eine = verletzte Exklusivität. */
+function aktiveFamilien(r: HookResult): string[] {
+  const f = new Set<string>();
+  if (r.current.platzierungZiel != null) f.add('platzieren');
+  if (r.current.bildPlatzierenId != null) f.add('bild');
+  if (r.current.zeichneAbschnittId != null) f.add('abschnitt');
+  if (r.current.zoneEntwurf != null || r.current.zoneBestaetigung != null) f.add('zone');
+  if (r.current.zeichenPlatzieren != null) f.add('zeichen');
+  return [...f].sort();
+}
+
+// LFH-243/F15: Die Exklusivität der Interaktionsmodi wurde bisher in jedem Start-Handler
+// von Hand durch Reset-Kaskaden erzwungen — mit asymmetrischen Subsets, sodass ein
+// vergessener Reset zwei gleichzeitig scharfe Modi erlaubt (Bug-Klasse LFH-145). Dieses
+// Kreuzprodukt prüft die Invariante erschöpfend statt stichprobenartig.
+describe('useKartenInteraktion — Exklusivität der Interaktionsmodi (LFH-243)', () => {
+  for (const zuerst of MODI) {
+    for (const dann of MODI) {
+      if (zuerst.familie === dann.familie) continue; // gleiche Familie: kein Wechsel
+      it(`${zuerst.name} → ${dann.name}: nur ${dann.familie} bleibt scharf`, () => {
+        const { result } = rendere();
+        zuerst.betreten(result);
+        expect(aktiveFamilien(result)).toEqual([zuerst.familie]);
+
+        dann.betreten(result);
+        expect(aktiveFamilien(result)).toEqual([dann.familie]);
+      });
+    }
+  }
+
+  // onEinsatzortPlatzieren ist ein eigener Start-Handler derselben Familie `platzieren`
+  // (das Kreuzprodukt oben überspringt ihn deshalb), hat aber dieselbe Reset-Lücke.
+  for (const zuerst of MODI.filter((m) => m.familie !== 'platzieren')) {
+    it(`${zuerst.name} → einsatzort-platzieren: nur platzieren bleibt scharf`, () => {
+      const { result } = rendere();
+      zuerst.betreten(result);
+      act(() => result.current.onEinsatzortPlatzieren());
+      expect(aktiveFamilien(result)).toEqual(['platzieren']);
+    });
+  }
+});
+
+// LFH-243/F15: Die drei Auswahl-States (Marker/Abschnitt-`auswahl`, `zoneAuswahl`,
+// `fachebeneAuswahl`) sind ebenfalls wechselseitig exklusiv — nur ein Detail-Panel darf
+// offen sein. Auch hier erzwang jeder Klick-Handler die Exklusivität per Reset-Kaskade,
+// und onFlaecheKlick vergaß zoneAuswahl → zwei Panels gleichzeitig (LagekartePage rendert
+// jeden Inspektor unabhängig, ohne else). Erschöpfend statt stichprobenartig geprüft.
+const SELEKTIONEN: { name: string; feld: 'auswahl' | 'zoneAuswahl' | 'fachebeneAuswahl'; waehlen: (r: HookResult) => void }[] = [
+  { name: 'marker', feld: 'auswahl', waehlen: (r) => act(() => r.current.onMarkerWaehlen('uhs-1')) },
+  { name: 'abschnitt', feld: 'auswahl', waehlen: (r) => act(() => r.current.onFlaecheKlick(3)) },
+  { name: 'zone', feld: 'zoneAuswahl', waehlen: (r) => act(() => r.current.onZoneKlick(5)) },
+  { name: 'fachebene', feld: 'fachebeneAuswahl', waehlen: (r) => act(() => r.current.onFachebeneKlick({ a: 1 }, 'nina')) },
+];
+
+function aktiveSelektionen(r: HookResult): string[] {
+  const f: string[] = [];
+  if (r.current.auswahl != null) f.push('auswahl');
+  if (r.current.zoneAuswahl != null) f.push('zoneAuswahl');
+  if (r.current.fachebeneAuswahl != null) f.push('fachebeneAuswahl');
+  return f.sort();
+}
+
+describe('useKartenInteraktion — Exklusivität der Auswahl-Panels (LFH-243)', () => {
+  for (const zuerst of SELEKTIONEN) {
+    for (const dann of SELEKTIONEN) {
+      if (zuerst.feld === dann.feld) continue;
+      it(`${zuerst.name} → ${dann.name}: nur ${dann.feld} bleibt gesetzt`, () => {
+        const { result } = rendere();
+        zuerst.waehlen(result);
+        expect(aktiveSelektionen(result)).toEqual([zuerst.feld]);
+
+        dann.waehlen(result);
+        expect(aktiveSelektionen(result)).toEqual([dann.feld]);
+      });
+    }
+  }
+});
 
 describe('useKartenInteraktion — Selektions-Gate während exklusiver Modi (LFH-208)', () => {
   describe('Baseline: ohne aktiven Modus selektiert der Klick normal', () => {

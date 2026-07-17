@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useReducer, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { aktualisiereEinsatz, type KopfdatenUpdate } from '../../api/einsaetze';
 import { aktualisiereUhs } from '../../api/einsatzUhs';
@@ -35,6 +35,83 @@ function kopfMitKoordinate(e: EinsatzAnzeige, lat: number | null, lon: number | 
   };
 }
 
+type ZoneEntwurf = { typ: ZoneTyp; modus: ZeichenModus; farbe?: string };
+type ZoneBestaetigung = ZoneEntwurf & { geometrie: GeoJsonGeometry };
+
+/**
+ * Der aktive Interaktionsmodus der Lagekarte (LFH-243/F15). Die wechselseitige
+ * Exklusivität ist hier keine Absprache zwischen Handlern mehr, sondern folgt aus dem
+ * Datentyp: es gibt genau EIN Modus-Feld, ein neuer Modus ersetzt den alten. Zuvor waren
+ * es sechs separate useState, deren Exklusivität jeder Start-Handler von Hand per
+ * Reset-Kaskade erzwingen musste — mit asymmetrischen Subsets, wodurch z. B. ein offenes
+ * Bild-Platzieren neben einem frisch gestarteten Marker-Platzieren scharf blieb
+ * (Bug-Klasse LFH-145).
+ *
+ * `zone` trägt ihre Bestätigungs-Phase als Sub-Zustand: der Entwurf bleibt sichtbar,
+ * bis explizit gespeichert oder verworfen wird (LFH-145).
+ */
+type KartenModus =
+  | { art: 'idle' }
+  | { art: 'platzieren'; ziel: { typ: PlatzierenPunktTyp | 'einsatzort'; id: number } }
+  | { art: 'abschnitt'; id: number }
+  | { art: 'zone'; entwurf: ZoneEntwurf; bestaetigung: ZoneBestaetigung | null; speichern: boolean }
+  | { art: 'bild'; id: number }
+  | { art: 'zeichen'; spec: FreiesZeichenUpdate };
+
+type ModusAktion =
+  | { t: 'platzieren'; ziel: { typ: PlatzierenPunktTyp | 'einsatzort'; id: number } }
+  | { t: 'abschnitt'; id: number }
+  | { t: 'zone'; entwurf: ZoneEntwurf }
+  | { t: 'bild'; id: number }
+  | { t: 'zeichen'; spec: FreiesZeichenUpdate }
+  | { t: 'zoneGezeichnet'; geometrie: GeoJsonGeometry }
+  | { t: 'zoneSpeichernStart' }
+  /** Beenden nur, wenn der laufende Modus einer der genannten ist (sonst No-op). */
+  | { t: 'beenden'; arten: KartenModus['art'][] };
+
+type FachebeneAuswahl = {
+  quelle: FachebeneQuelle;
+  properties: Record<string, unknown>;
+  geometrie?: { type: string; coordinates: unknown } | null;
+};
+
+/**
+ * Die aktive Panel-Selektion der Lagekarte (LFH-243/F15). Wie beim Modus ist die
+ * Exklusivität hier ein Datentyp, kein Handler-Vertrag: LagekartePage rendert jeden
+ * Inspektor unabhängig (kein `else`), sodass zwei gleichzeitig gesetzte Auswahl-States
+ * zwei Panels ergäben — was onFlaecheKlick auslöste, weil es zoneAuswahl nicht räumte.
+ * `objekt` deckt Marker UND Abschnitt (beide über den `auswahl`-String).
+ */
+type KartenSelektion =
+  | { art: 'keine' }
+  | { art: 'objekt'; schluessel: string }
+  | { art: 'zone'; id: number }
+  | { art: 'fachebene'; wert: FachebeneAuswahl };
+
+function modusReducer(state: KartenModus, a: ModusAktion): KartenModus {
+  switch (a.t) {
+    case 'platzieren':
+      return { art: 'platzieren', ziel: a.ziel };
+    case 'abschnitt':
+      return { art: 'abschnitt', id: a.id };
+    case 'bild':
+      return { art: 'bild', id: a.id };
+    case 'zeichen':
+      return { art: 'zeichen', spec: a.spec };
+    case 'zone':
+      return { art: 'zone', entwurf: a.entwurf, bestaetigung: null, speichern: false };
+    case 'zoneGezeichnet':
+      // Nicht sofort persistieren: erst Bestätigung, Entwurf bleibt sichtbar (LFH-145).
+      return state.art === 'zone'
+        ? { ...state, bestaetigung: { ...state.entwurf, geometrie: a.geometrie } }
+        : state;
+    case 'zoneSpeichernStart':
+      return state.art === 'zone' ? { ...state, speichern: true } : state;
+    case 'beenden':
+      return a.arten.includes(state.art) ? { art: 'idle' } : state;
+  }
+}
+
 interface KartenInteraktionArgs {
   einsatzId: number;
   einsatz: EinsatzAnzeige | undefined;
@@ -54,49 +131,54 @@ interface KartenInteraktionArgs {
 export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVerortet, fehler }: KartenInteraktionArgs) {
   const qc = useQueryClient();
 
-  const [platzierungZiel, setPlatzierungZiel] =
-    useState<{ typ: PlatzierenPunktTyp | 'einsatzort'; id: number } | null>(null);
-  const [zeichneAbschnittId, setZeichneAbschnittId] = useState<number | null>(null);
-  const [zoneEntwurf, setZoneEntwurf] =
-    useState<{ typ: ZoneTyp; modus: ZeichenModus; farbe?: string } | null>(null);
-  // Bestätigungs-Phase (LFH-145): gezeichnete Geometrie wird hier zwischengehalten,
-  // bevor sie erst nach explizitem „Speichern" persistiert wird (nicht sofort bei Fertig).
-  const [zoneBestaetigung, setZoneBestaetigung] =
-    useState<{ typ: ZoneTyp; modus: ZeichenModus; farbe?: string; geometrie: GeoJsonGeometry } | null>(null);
-  const [zoneSpeichern, setZoneSpeichern] = useState(false);
+  const [modus, dispatch] = useReducer(modusReducer, { art: 'idle' } as KartenModus);
+
   // Monoton steigend bei jedem Zonen-Zeichnen-Start (LFH-145 M-A): erzwingt ein Re-Fire
   // des Kartenflaeche-Zonen-Effekts auch bei gleich bleibendem Modus (z. B. Zone→Zone mit
   // Gefahrengebiet→Absperrbereich, beides Polygon), damit starten() einen offenen,
   // unbestätigten Entwurf verwirft statt ihn beim nächsten Zeichnen als Orphan liegen zu lassen.
+  // Bewusst NICHT im Modus: der Zähler muss über Modus-Wechsel hinweg monoton bleiben.
   const [zoneZeichnenNonce, setZoneZeichnenNonce] = useState(0);
-  const [zoneAuswahl, setZoneAuswahl] = useState<number | null>(null);
-  const [auswahl, setAuswahl] = useState<string | null>(null);
+  // Panel-Selektion als eine Union (s. KartenSelektion). Die drei bisherigen Setter bleiben
+  // als API erhalten, sind aber Wrapper über EIN Feld: ein Setzen verdrängt jede andere
+  // Selektion, null räumt (das gerade offene Panel ist per Konstruktion das einzige).
+  const [selektion, setSelektion] = useState<KartenSelektion>({ art: 'keine' });
   const [flyToZiel, setFlyToZiel] = useState<{ lng: number; lat: number } | null>(null);
+
+  const auswahl = selektion.art === 'objekt' ? selektion.schluessel : null;
+  const zoneAuswahl = selektion.art === 'zone' ? selektion.id : null;
   // Angeklicktes Fachebenen-Objekt (externe Daten) → Detail-Panel. geometrie = volle,
   // un-geclippte Geometrie aus der geladenen FeatureCollection (LFH-146, Fläche/Umfang).
-  const [fachebeneAuswahl, setFachebeneAuswahl] = useState<{
-    quelle: FachebeneQuelle;
-    properties: Record<string, unknown>;
-    geometrie?: { type: string; coordinates: unknown } | null;
-  } | null>(null);
-  const [bildPlatzierenId, setBildPlatzierenId] = useState<number | null>(null);
-  // Aktives freies Zeichen zum Platzieren (LFH-170): die per Picker gewählte DV-102-Spec
-  // (ohne lat/lon — die kommt vom Karten-Klick). null = kein Platzier-Modus.
-  const [zeichenPlatzieren, setZeichenPlatzieren] = useState<FreiesZeichenUpdate | null>(null);
+  const fachebeneAuswahl = selektion.art === 'fachebene' ? selektion.wert : null;
+  // Stabile Identität (useCallback): diese Setter stehen in Effekt-Deps von LagekartePage
+  // (Reverse-Deeplink LFH-155). setSelektion ist selbst stabil, daher leere Deps.
+  const setAuswahl = useCallback(
+    (s: string | null) => setSelektion(s != null ? { art: 'objekt', schluessel: s } : { art: 'keine' }),
+    [],
+  );
+  const setZoneAuswahl = useCallback(
+    (id: number | null) => setSelektion(id != null ? { art: 'zone', id } : { art: 'keine' }),
+    [],
+  );
+  const setFachebeneAuswahl = useCallback(
+    (w: FachebeneAuswahl | null) => setSelektion(w != null ? { art: 'fachebene', wert: w } : { art: 'keine' }),
+    [],
+  );
 
-  // Ein wechselseitig-exklusiver Interaktionsmodus ist aktiv (Platzieren / Bild-Platzieren /
-  // Abschnitt- oder Zonen-Zeichnen / Zonen-Bestätigung / freies-Zeichen-Platzieren). Während
-  // dessen darf ein Karten-Klick auf ein bestehendes Objekt kein Auswahl-Panel öffnen (LFH-208:
-  // sonst Doppel-Panel neben der ZeichnenSteuerung). Billiger abgeleiteter Boolean — bewusst
-  // kein useMemo (kein Deps-Churn). zoneBestaetigung ist heute stets mit truthy zoneEntwurf
-  // gepaart, wird aber explizit geführt, damit ein künftiger Bestätigung-only-State robust bleibt.
-  const exklusiverModusAktiv =
-    platzierungZiel != null ||
-    bildPlatzierenId != null ||
-    zeichneAbschnittId != null ||
-    zoneEntwurf != null ||
-    zoneBestaetigung != null ||
-    zeichenPlatzieren != null;
+  // Aus dem Modus abgeleitet — die Hook-API bleibt unverändert, aber die Werte können
+  // konstruktionsbedingt nicht mehr gleichzeitig gesetzt sein.
+  const platzierungZiel = modus.art === 'platzieren' ? modus.ziel : null;
+  const zeichneAbschnittId = modus.art === 'abschnitt' ? modus.id : null;
+  const zoneEntwurf = modus.art === 'zone' ? modus.entwurf : null;
+  const zoneBestaetigung = modus.art === 'zone' ? modus.bestaetigung : null;
+  const zoneSpeichern = modus.art === 'zone' ? modus.speichern : false;
+  const bildPlatzierenId = modus.art === 'bild' ? modus.id : null;
+  const zeichenPlatzieren = modus.art === 'zeichen' ? modus.spec : null;
+
+  // Ein wechselseitig-exklusiver Interaktionsmodus ist aktiv. Während dessen darf ein
+  // Karten-Klick auf ein bestehendes Objekt kein Auswahl-Panel öffnen (LFH-208: sonst
+  // Doppel-Panel neben der ZeichnenSteuerung).
+  const exklusiverModusAktiv = modus.art !== 'idle';
 
   // Verorten je nach Ziel-Typ (UHS/Schaden live; Einsatzort über Kopf-PATCH, dann invalidieren).
   const verortenMutation = useMutation({
@@ -123,7 +205,7 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
       qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
       qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) });
       qc.invalidateQueries({ queryKey: einsatzKeys.fuehrungskraefte(einsatzId) });
-      setPlatzierungZiel(null);
+      dispatch({ t: 'beenden', arten: ['platzieren'] });
     },
     onError: fehler,
   });
@@ -136,7 +218,7 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) });
-      setZeichenPlatzieren(null);
+      dispatch({ t: 'beenden', arten: ['zeichen'] });
     },
     onError: fehler,
   });
@@ -156,9 +238,7 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
   }
 
   function onMarkerWaehlen(schluessel: string) {
-    setAuswahl(schluessel);
-    setZoneAuswahl(null);
-    setFachebeneAuswahl(null);
+    setSelektion({ art: 'objekt', schluessel });
     const m = alleVerortet.find((x) => x.schluessel === schluessel);
     if (m) setFlyToZiel({ lng: m.lon, lat: m.lat });
   }
@@ -218,124 +298,85 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
   // Bestätigungs-Phase persistieren (LFH-145): erst hier, nicht schon bei onZoneGezeichnet.
   const bestaetigungSpeichern = () => {
     if (!zoneBestaetigung) return;
-    setZoneSpeichern(true);
+    const zu = zoneBestaetigung;
+    dispatch({ t: 'zoneSpeichernStart' });
     legeZoneAn(einsatzId, {
-      typ: zoneBestaetigung.typ,
-      geometrie_typ: zoneBestaetigung.geometrie.type,
-      geometrie: JSON.stringify(zoneBestaetigung.geometrie),
-      farbe: zoneBestaetigung.typ === 'freie_skizze' ? zoneBestaetigung.farbe ?? null : null,
+      typ: zu.typ,
+      geometrie_typ: zu.geometrie.type,
+      geometrie: JSON.stringify(zu.geometrie),
+      farbe: zu.typ === 'freie_skizze' ? zu.farbe ?? null : null,
     })
       .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatzId) }))
       .catch(fehler)
-      .finally(() => {
-        setZoneSpeichern(false);
-        setZoneBestaetigung(null);
-        setZoneEntwurf(null); // beendet Zeichnen → Kartenflaeche-Effekt ruft stoppen() → clear()
-      });
+      // Beendet Zeichnen → Kartenflaeche-Effekt ruft stoppen() → clear().
+      .finally(() => dispatch({ t: 'beenden', arten: ['zone'] }));
   };
-  const bestaetigungVerwerfen = () => {
-    setZoneBestaetigung(null);
-    setZoneEntwurf(null); // verwirft den Entwurf (stoppen() → clear())
-  };
+  // Verwirft den Entwurf (stoppen() → clear()).
+  const bestaetigungVerwerfen = () => dispatch({ t: 'beenden', arten: ['zone'] });
 
   // --- Start-/Reset-Handler (mutually-exclusive Modi) -------------------------
+  // Ein Start setzt nur noch SEINEN Modus — der Reducer verdrängt jeden anderen. Die
+  // früheren Reset-Kaskaden (je Handler ein anderes, unvollständiges Subset) entfallen.
   const onPlatzierenStart = (z: { typ: PlatzierenPunktTyp; id: number }) => {
-    setPlatzierungZiel(z);
-    setZeichenPlatzieren(null);
-    setZoneEntwurf(null);
-    setZoneBestaetigung(null);
+    dispatch({ t: 'platzieren', ziel: z });
     setAuswahl(null);
   };
-  const onPlatzierenAbbrechen = () => setPlatzierungZiel(null);
+  const onPlatzierenAbbrechen = () => dispatch({ t: 'beenden', arten: ['platzieren'] });
   const onAbschnittZeichnenStart = (id: number) => {
-    setZeichneAbschnittId(id);
-    setZeichenPlatzieren(null);
-    setZoneEntwurf(null);
-    setZoneBestaetigung(null);
-    setPlatzierungZiel(null);
+    dispatch({ t: 'abschnitt', id });
     setAuswahl(null);
   };
-  const onZoneZeichnenStart = (entwurf: { typ: ZoneTyp; modus: ZeichenModus; farbe?: string }) => {
-    setZoneEntwurf(entwurf);
-    setZeichenPlatzieren(null);
-    setZoneBestaetigung(null); // neuer Entwurf beendet eine evtl. hängende Bestätigung
+  const onZoneZeichnenStart = (entwurf: ZoneEntwurf) => {
+    dispatch({ t: 'zone', entwurf });
     setZoneZeichnenNonce((n) => n + 1);
     setZoneAuswahl(null);
-    setZeichneAbschnittId(null);
-    setPlatzierungZiel(null);
     setAuswahl(null);
   };
   const onKoordinateEingeben = (lat: number, lon: number) => {
     if (platzierungZiel && darfSchreiben) verortenMutation.mutate({ lat, lon });
   };
   const onEinsatzortPlatzieren = () => {
-    setPlatzierungZiel({ typ: 'einsatzort', id: 0 });
-    setZeichenPlatzieren(null);
-    setZoneEntwurf(null);
-    setZoneBestaetigung(null);
+    dispatch({ t: 'platzieren', ziel: { typ: 'einsatzort', id: 0 } });
     setAuswahl(null);
   };
-  // Freies-Zeichen-Platzieren starten/abbrechen (LFH-170). Start räumt alle anderen exklusiven
-  // Modi (Mutual-Exclusion, LFH-145); jeder andere Start räumt umgekehrt zeichenPlatzieren.
+  // Freies-Zeichen-Platzieren starten/abbrechen (LFH-170).
   const onZeichenPlatzierenStart = (spec: FreiesZeichenUpdate) => {
-    setZeichenPlatzieren(spec);
-    setPlatzierungZiel(null);
-    setBildPlatzierenId(null);
-    setZeichneAbschnittId(null);
-    setZoneEntwurf(null);
-    setZoneBestaetigung(null);
+    dispatch({ t: 'zeichen', spec });
     setAuswahl(null);
   };
-  const onZeichenPlatzierenAbbrechen = () => setZeichenPlatzieren(null);
+  const onZeichenPlatzierenAbbrechen = () => dispatch({ t: 'beenden', arten: ['zeichen'] });
   const onBildPlatzieren = (id: number) => {
-    setBildPlatzierenId(id);
-    setZeichenPlatzieren(null);
-    setZoneEntwurf(null);
-    setZoneBestaetigung(null);
-    setZeichneAbschnittId(null);
-    setPlatzierungZiel(null);
+    dispatch({ t: 'bild', id });
     setAuswahl(null);
   };
-  const onBildPlatzierenFertig = () => setBildPlatzierenId(null);
+  const onBildPlatzierenFertig = () => dispatch({ t: 'beenden', arten: ['bild'] });
 
   // Abschnittsfläche zeichnen fertig → persistieren, dann Zeichenmodus beenden.
   const onFlaecheGezeichnet = (poly: GeoJsonPolygon) => {
     zeichneAbschnitt(einsatzId, zeichneAbschnittId!, { flaeche_geojson: JSON.stringify(poly) })
       .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.abschnitte(einsatzId) }))
       .catch(fehler)
-      .finally(() => setZeichneAbschnittId(null));
+      .finally(() => dispatch({ t: 'beenden', arten: ['abschnitt'] }));
   };
   const onFlaecheKlick = (fid: number) => {
     if (exklusiverModusAktiv) return; // LFH-208: kein Panel während eines exklusiven Modus
-    setAuswahl(`abschnitt-${fid}`);
-    setFachebeneAuswahl(null);
+    setSelektion({ art: 'objekt', schluessel: `abschnitt-${fid}` });
   };
   const onZoneKlick = (id: number) => {
     if (exklusiverModusAktiv) return; // LFH-208: kein Panel während eines exklusiven Modus
-    setZoneAuswahl(id);
-    setAuswahl(null);
-    setFachebeneAuswahl(null);
+    setSelektion({ art: 'zone', id });
   };
-  const onZoneGezeichnet = (g: GeoJsonGeometry) => {
-    if (!zoneEntwurf) return;
-    // Nicht sofort persistieren: erst Bestätigung (Entwurf bleibt sichtbar). LFH-145.
-    setZoneBestaetigung({ ...zoneEntwurf, geometrie: g });
-  };
+  const onZoneGezeichnet = (g: GeoJsonGeometry) => dispatch({ t: 'zoneGezeichnet', geometrie: g });
   const onFachebeneKlick = (
     properties: Record<string, unknown>,
     quelle: FachebeneQuelle,
     geometrie?: { type: string; coordinates: unknown } | null,
   ) => {
     if (exklusiverModusAktiv) return; // LFH-208: kein Panel während eines exklusiven Modus (vorher nur Platzieren)
-    setFachebeneAuswahl({ quelle, properties, geometrie });
-    setAuswahl(null);
-    setZoneAuswahl(null);
+    setSelektion({ art: 'fachebene', wert: { quelle, properties, geometrie } });
   };
   // ZeichnenSteuerung „Abbrechen" (Phase zeichnen): Entwurf + Abschnitt-Zeichnen verwerfen.
-  const onZeichnenAbbrechen = () => {
-    setZoneEntwurf(null);
-    setZeichneAbschnittId(null);
-  };
+  const onZeichnenAbbrechen = () => dispatch({ t: 'beenden', arten: ['zone', 'abschnitt'] });
 
   // Zonen-Inspector-CRUD.
   const zoneAendern = (zoneId: number, patch: ZonePatch) =>
