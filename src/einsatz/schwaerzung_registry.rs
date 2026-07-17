@@ -103,6 +103,8 @@ const G_ZEIT: &str = "Zeitstempel (Struktur/Audit, kein Personenbezug)";
 const G_ENUM: &str = "Enum/Katalog-Wert (CHECK-validiert, kein Personenbezug)";
 const G_GEO: &str = "Operatives Geo-/Positions-/Layout-Skelett (kein direkter Personenbezug)";
 const G_ZAEHLER: &str = "Laufende Nummer/Zähler/Menge (anonymes Statistik-Skelett)";
+const G_IDEMPOTENZ: &str =
+    "Client-Idempotenzschlüssel (technische UUID zur Offline-Dedup, kein Personenbezug)";
 const G_KONFIG: &str = "Einsatz-Konfiguration (kein Personenbezug)";
 const G_POLY: &str =
     "Polymorpher Bezug (objekt_typ/objekt_id o. Ä.; Struktur, Ziel wird eigenständig gescrubbt)";
@@ -842,6 +844,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("ereigniszeit", G_ZEIT),
             retain("received_at", G_ZEIT),
             retain("erfasst_lokal_at", G_ZEIT),
+            retain("client_id", G_IDEMPOTENZ),
             retain("berichtigt_eintrag_id", G_FK),
             retain("lagebericht_id", G_FK),
             retain("auftrag_id", G_FK),
