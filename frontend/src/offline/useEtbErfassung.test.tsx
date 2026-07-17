@@ -267,6 +267,87 @@ describe('useEtbErfassung', () => {
       setTimeoutSpy.mockRestore();
     }
   });
+
+  it.each([408, 429])('behält %i-Einträge in der Queue (transient, F03)', async (code) => {
+    server.use(http.post('/api/einsaetze/9/etb', () => HttpResponse.error()));
+    const { result } = renderHook(() => useEtbErfassung(9), { wrapper });
+    await act(async () => {
+      await result.current.erfassen(eintrag);
+    });
+    await waitFor(() => expect(result.current.ausstehend).toHaveLength(1));
+
+    server.use(
+      http.post('/api/einsaetze/9/etb', () =>
+        HttpResponse.json({ error: 'transient' }, { status: code }),
+      ),
+    );
+    await act(async () => {
+      await result.current.flush();
+    });
+
+    expect(result.current.ausstehend).toHaveLength(1);
+    expect(result.current.abgelehnt).toHaveLength(0);
+  });
+
+  it('eskaliert den Backoff über die Stufen und resettet nach Erfolg (F03)', async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    try {
+      // Antwort-Umschalter: 999 = Netzfehler (enqueue ohne Backoff), 503 = transient, 201 = ok.
+      let code = 999;
+      server.use(
+        http.post('/api/einsaetze/9/etb', () => {
+          if (code === 999) return HttpResponse.error();
+          if (code === 201) return HttpResponse.json({ id: 1, lfd_nr: 1 }, { status: 201 });
+          return HttpResponse.json({ error: 'busy' }, { status: code });
+        }),
+      );
+      const { result } = renderHook(() => useEtbErfassung(9), { wrapper });
+      await act(async () => {
+        await result.current.erfassen(eintrag); // Netzfehler → enqueue, backoffStufe bleibt 0
+      });
+      await waitFor(() => expect(result.current.ausstehend).toHaveLength(1));
+
+      const stufen = () =>
+        setTimeoutSpy.mock.calls
+          .map((c) => c[1])
+          .filter((d) => [1000, 5000, 15000, 30000].includes(d as number));
+
+      code = 503;
+      setTimeoutSpy.mockClear();
+      await act(async () => {
+        await result.current.flush(); // Stufe 0 → 1000
+      });
+      await act(async () => {
+        await result.current.flush(); // Stufe 1 → 5000
+      });
+      await act(async () => {
+        await result.current.flush(); // Stufe 2 → 15000
+      });
+      expect(stufen()).toEqual([1000, 5000, 15000]);
+
+      // Erfolgreicher Flush → Queue leer + backoffStufe-Reset.
+      code = 201;
+      await act(async () => {
+        await result.current.flush();
+      });
+      await waitFor(() => expect(result.current.ausstehend).toHaveLength(0));
+
+      // Neuer transienter Fehler → wieder bei Stufe 0 (1000).
+      code = 999;
+      await act(async () => {
+        await result.current.erfassen(eintrag);
+      });
+      await waitFor(() => expect(result.current.ausstehend).toHaveLength(1));
+      code = 503;
+      setTimeoutSpy.mockClear();
+      await act(async () => {
+        await result.current.flush();
+      });
+      expect(stufen()).toEqual([1000]);
+    } finally {
+      setTimeoutSpy.mockRestore();
+    }
+  });
 });
 
 afterEach(() => {

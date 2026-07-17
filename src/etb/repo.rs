@@ -428,6 +428,57 @@ mod tests {
         assert_eq!(count, 2, "ohne client_id kein Dedup");
     }
 
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn anlegen_idempotent_ist_exactly_once_unter_nebenlaeufigkeit() {
+        // Zwei Tabs flushen dieselbe client_id parallel. Je nach Interleaving greift der
+        // Schnell-SELECT ODER der UNIQUE-Race-Recovery-Zweig (SELECT-Miss → INSERT-Konflikt
+        // → Re-SELECT); das ERGEBNIS ist in beiden Faellen exactly-once: EIN Eintrag, beide
+        // Aufrufe liefern dieselbe id. WAL + busy_timeout verhindern SQLITE_BUSY-Flakiness.
+        use std::time::Duration;
+        let dir = tempfile::tempdir().unwrap();
+        let pfad = dir.path().join("race.db");
+        let opts = sqlx::sqlite::SqliteConnectOptions::new()
+            .filename(&pfad)
+            .create_if_missing(true)
+            .foreign_keys(true)
+            .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
+            .busy_timeout(Duration::from_secs(5));
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(4)
+            .connect_with(opts)
+            .await
+            .unwrap();
+        crate::db::migrate(&pool).await.unwrap();
+        let (benutzer, einsatz) = setup(&pool).await;
+
+        let p1 = pool.clone();
+        let p2 = pool.clone();
+        let t1 = tokio::spawn(async move {
+            anlegen_idempotent(&p1, einsatz, benutzer, Some("race-1"), daten("A")).await
+        });
+        let t2 = tokio::spawn(async move {
+            anlegen_idempotent(&p2, einsatz, benutzer, Some("race-1"), daten("B")).await
+        });
+        let (r1, r2) = tokio::join!(t1, t2);
+        let (e1, _) = r1.unwrap().expect("Task 1 idempotent OK");
+        let (e2, _) = r2.unwrap().expect("Task 2 idempotent OK");
+        assert_eq!(
+            e1.id, e2.id,
+            "beide parallelen Aufrufe liefern denselben Eintrag"
+        );
+
+        let count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?")
+                .bind(einsatz)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            count, 1,
+            "exactly-once: kein Duplikat trotz Nebenlaeufigkeit"
+        );
+    }
+
     #[tokio::test]
     async fn lfd_nr_startet_bei_eins_und_zaehlt_hoch() {
         let pool = crate::db::test_pool().await;

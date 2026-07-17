@@ -86,14 +86,16 @@ fn bestimme_replay(
     if e != epoch {
         return Replay::Luecke; // fremde Epoch (Neustart)
     }
-    if n + 1 >= naechste_id {
-        // Der Client ist auf dem aktuellen Stand (oder „aus der Zukunft") → nichts Neues.
+    // `saturating_add`, weil `n` aus der client-kontrollierten Last-Event-ID stammt
+    // (parse_id akzeptiert bis u64::MAX) — `n + 1` würde bei u64::MAX im Debug/Test-Build
+    // panicken. Eine „aus der Zukunft" liegende Id fällt so sauber auf „nichts Neues".
+    if n.saturating_add(1) >= naechste_id {
         return Replay::Events(Vec::new());
     }
     // Es gibt Nachrichten mit Id-Nummer > n. Ist die erste davon (n+1) noch im Ring?
     match ring.front().and_then(|m| parse_id(&m.id)).map(|(_, mn)| mn) {
         None => Replay::Events(Vec::new()), // Ring leer → nichts nachzuliefern
-        Some(aeltestes) if n + 1 < aeltestes => Replay::Luecke, // (n+1) bereits evictet
+        Some(aeltestes) if n.saturating_add(1) < aeltestes => Replay::Luecke, // (n+1) bereits evictet
         Some(_) => {
             let verpasst = ring
                 .iter()
@@ -340,6 +342,35 @@ mod tests {
         let fremde_epoch = epoch_von(&n1.id) + 1; // simuliert einen Serverneustart
         let (replay, _rx2) = hub.abonniere_mit_replay(1, Some(format!("{fremde_epoch}-1")));
         assert!(matches!(replay, Replay::Luecke));
+    }
+
+    #[tokio::test]
+    async fn replay_bei_unparsbarer_last_event_id_ist_luecke() {
+        // Der Last-Event-ID-Header ist client-kontrolliert und wird roh durchgereicht.
+        let hub = LiveHub::new();
+        let _rx = hub.abonniere(1);
+        hub.publiziere_event(1, "etb", "eins".into());
+        for seit in ["kaputt", "1-abc", ""] {
+            let (replay, _) = hub.abonniere_mit_replay(1, Some(seit.to_string()));
+            assert!(
+                matches!(replay, Replay::Luecke),
+                "unparsbare Last-Event-ID {seit:?} muss Luecke (Voll-Resync) ergeben"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn replay_bei_u64_max_last_event_id_panickt_nicht() {
+        // Adversariale Id: echte epoch (passiert den Epoch-Guard) + u64::MAX. Ohne
+        // saturating_add wuerde n + 1 im Debug/Test-Build panicken.
+        let hub = LiveHub::new();
+        let mut rx = hub.abonniere(1);
+        hub.publiziere_event(1, "etb", "eins".into());
+        let n1 = rx.recv().await.unwrap();
+        let epoch = epoch_von(&n1.id);
+        let (replay, _) = hub.abonniere_mit_replay(1, Some(format!("{epoch}-{}", u64::MAX)));
+        // „aus der Zukunft" → nichts Neues, kein Panic.
+        assert!(matches!(replay, Replay::Events(v) if v.is_empty()));
     }
 
     #[tokio::test]

@@ -536,6 +536,76 @@ async fn erfassung_mit_client_id_ist_idempotent() {
 }
 
 #[tokio::test]
+async fn leere_client_id_dedupliziert_nicht() {
+    // F03/LFH-261: leere/Whitespace-client_id -> None (bereinige), sonst landeten fachlich
+    // VERSCHIEDENE Eintraege beide mit "" im partiellen UNIQUE-Index und der zweite wuerde
+    // als idempotenter Replay des ersten kurzgeschlossen -> stiller Verlust.
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+
+    let (s1, j1) = eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"typ":"meldung","inhalt":"Erste","client_id":""}"#,
+    )
+    .await;
+    let (s2, j2) = eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        r#"{"typ":"meldung","inhalt":"Zweite","client_id":"   "}"#,
+    )
+    .await;
+    assert_eq!(s1, StatusCode::CREATED);
+    assert_eq!(s2, StatusCode::CREATED);
+    assert_ne!(
+        j1["id"], j2["id"],
+        "leere client_id darf nicht deduplizieren"
+    );
+
+    let (_, liste) = etb_abrufen(&app, &admin, einsatz, "").await;
+    assert_eq!(
+        liste.as_array().unwrap().len(),
+        2,
+        "beide fachlich distinkten Eintraege bleiben erhalten"
+    );
+}
+
+#[tokio::test]
+async fn zu_lange_client_id_wird_abgelehnt() {
+    // F03/LFH-261: Laengenguard (>64 Zeichen -> Validation). 64 ist die Grenze (erlaubt).
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+
+    let lang = "x".repeat(65);
+    let (status, _) = eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        &format!(r#"{{"typ":"meldung","inhalt":"A","client_id":"{lang}"}}"#),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::BAD_REQUEST,
+        "client_id >64 Zeichen muss abgelehnt werden"
+    );
+
+    let grenze = "y".repeat(64);
+    let (s_ok, _) = eintrag_erfassen(
+        &app,
+        &admin,
+        einsatz,
+        &format!(r#"{{"typ":"meldung","inhalt":"B","client_id":"{grenze}"}}"#),
+    )
+    .await;
+    assert_eq!(s_ok, StatusCode::CREATED, "64 Zeichen sind erlaubt");
+}
+
+#[tokio::test]
 async fn liste_zeigt_eintraege_neueste_zuerst() {
     let (app, _live) = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
