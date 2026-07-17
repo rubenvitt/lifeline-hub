@@ -18,6 +18,12 @@ import { EINSATZ_KEYS, EINSATZ_STREAM_EVENTS } from '../api/queryKeys';
  * einer Zone) endlos — die Mutation persistiert nie und die Karte aktualisiert nicht.
  * Diese eine Verbindung hält die Lagekarte sicher unter dem Limit.
  *
+ * Das Limit gilt jedoch pro Origin über ALLE Tabs/Fenster eines Profils, diese
+ * Konsolidierung nur pro Tab (F21/LFH-264). Mitigation für Multi-Fenster-Setups:
+ * `--tls` betreiben → der Browser handelt HTTP/2 aus (Multiplexing hebt das Limit auf,
+ * siehe `docs/betrieb-tls.md`). Für Klartext-HTTP-LAN bleibt Tab-übergreifendes Teilen
+ * EINER EventSource (SharedWorker / Web-Locks-Leader) offen (LFH-264).
+ *
  * LFH-122: Listener, Invalidierung UND der lagged-Vollabgleich werden aus dem zentralen
  * Registry `EINSATZ_STREAM_EVENTS` (siehe `api/queryKeys.ts`) ABGELEITET — statt an drei
  * Stellen (Handler-Definition, add/removeEventListener, lagged-Liste) manuell gepflegt zu
