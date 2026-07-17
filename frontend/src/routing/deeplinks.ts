@@ -91,6 +91,10 @@ export function einsatzdatenPfad(einsatzId: number): string {
   return einsatzModulPfad(einsatzId, 'einsatzdaten');
 }
 
+export function erinnerungenPfad(einsatzId: number): string {
+  return einsatzModulPfad(einsatzId, 'erinnerungen');
+}
+
 // ── Listen mit Query-Selektion / Schnellerfassung ────────────────────────────
 
 export function personenPfad(

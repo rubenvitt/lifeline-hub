@@ -24,6 +24,7 @@ import {
   gefahrenPfad,
   lagekartePfad,
   einsatzdatenPfad,
+  erinnerungenPfad,
   parseRouteId,
 } from './deeplinks';
 
@@ -71,6 +72,9 @@ describe('deeplinks — Listen-Routes (NaN-Redirect-Ziele)', () => {
   });
   it('tierePfad (Liste / NaN-Redirect-Ziel)', () => {
     expect(tierePfad(E)).toBe('/einsaetze/5/tiere');
+  });
+  it('erinnerungenPfad zeigt auf die Erinnerungen-Liste', () => {
+    expect(erinnerungenPfad(7)).toBe('/einsaetze/7/erinnerungen');
   });
 });
 
