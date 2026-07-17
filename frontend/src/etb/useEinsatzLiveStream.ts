@@ -68,10 +68,14 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       let detail: {
         einsatz_id?: number;
         erinnerung_id?: number;
-        bezug_typ?: 'auftrag' | 'meldung' | null;
+        bezug_typ?: 'auftrag' | 'meldung' | 'etb' | null;
         bezug_id?: number | null;
       } = {};
       try { detail = JSON.parse(ev.data); } catch { /* Payload optional */ }
+      // Nur scheduler-gefeuerte Fälligkeit alarmiert: die CRUD-Route (routes/erinnerung.rs) sendet
+      // dasselbe `erinnerung`-Event mit nur {einsatz_id} als Listen-Refresh — ohne erinnerung_id.
+      // Die Registry-Invalidierung von einsatz-erinnerungen (separater Listener) trägt diesen Fall.
+      if (detail.erinnerung_id == null) return;
       if (detail.bezug_typ === 'meldung') return; // Doppel-Alarm-Guard
       if (detail.bezug_typ === 'auftrag') {
         spieleAlarmTon('alarm');

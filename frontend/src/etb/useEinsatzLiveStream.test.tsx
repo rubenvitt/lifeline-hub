@@ -338,4 +338,29 @@ describe('useEinsatzLiveStream', () => {
     expect(alarm).not.toHaveBeenCalled();
     window.removeEventListener('lfh:erinnerung-alarm', alarm);
   });
+
+  it('feuert KEINEN erinnerung-Alarm bei CRUD-Refresh ohne erinnerung_id (routes/erinnerung.rs sse())', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    const alarm = vi.fn();
+    window.addEventListener('lfh:erinnerung-alarm', alarm);
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={9} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit('erinnerung', JSON.stringify({ einsatz_id: 9 }));
+    // Registry-Invalidierung von einsatz-erinnerungen läuft trotzdem (separater Listener).
+    await waitFor(() => {
+      const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+      expect(calls).toContainEqual(['einsatz-erinnerungen', 9]);
+    });
+    expect(alarm).not.toHaveBeenCalled();
+    const auftraegeKeys = spy.mock.calls
+      .map((c) => (c[0] as { queryKey: unknown[] }).queryKey)
+      .filter((k) => k[0] === 'einsatz-auftraege');
+    expect(auftraegeKeys).toHaveLength(0);
+    window.removeEventListener('lfh:erinnerung-alarm', alarm);
+  });
 });

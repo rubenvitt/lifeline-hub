@@ -8,7 +8,7 @@ import { auftraegePfad, erinnerungenPfad, meldungenPfad } from '../routing/deepl
 
 type ErinnerungDetail = {
   erinnerung_id?: number;
-  bezug_typ?: 'auftrag' | 'meldung' | null;
+  bezug_typ?: 'auftrag' | 'meldung' | 'etb' | null;
   bezug_id?: number | null;
 };
 
