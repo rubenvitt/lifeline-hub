@@ -123,6 +123,17 @@ describe('useKartenInteraktion — Exklusivität der Interaktionsmodi (LFH-243)'
       expect(aktiveFamilien(result)).toEqual(['platzieren']);
     });
   }
+
+  // Phasen-Invariante innerhalb der zone-Familie (LFH-145): die Bestätigungs-Phase ist ein
+  // Sub-Zustand des Zeichnens — der sichtbare Entwurf muss bestehen bleiben, solange die
+  // Bestätigung offen ist (das Kreuzprodukt überspringt diesen Intra-Familie-Übergang).
+  it('onZoneGezeichnet öffnet die Bestätigung, OHNE den Entwurf zu verlieren', () => {
+    const { result } = rendere();
+    act(() => result.current.onZoneZeichnenStart({ typ: 'gefahrengebiet', modus: 'polygon' }));
+    act(() => result.current.onZoneGezeichnet(POLYGON));
+    expect(result.current.zoneEntwurf).not.toBeNull();
+    expect(result.current.zoneBestaetigung).not.toBeNull();
+  });
 });
 
 // LFH-243/F15: Die drei Auswahl-States (Marker/Abschnitt-`auswahl`, `zoneAuswahl`,

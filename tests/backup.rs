@@ -63,6 +63,16 @@ async fn admin_kann_backup_herunterladen() {
         bytes.starts_with(b"SQLite format 3\0"),
         "Download muss eine echte SQLite-Datenbank sein"
     );
+    // Der Streaming-Pfad (Body::from_stream, 64-KiB-Chunks) wird nur ab dem zweiten
+    // try_unfold-Durchlauf geübt. Der VACUUM-Snapshot der ~90 Migrationen liegt weit
+    // darüber — diese Assertion macht die Multi-Chunk-Abdeckung explizit, statt sie von
+    // der Snapshot-Größe abhängen zu lassen (fiele die je unter 64 KiB, würde dieser
+    // Test die verschwundene Chunk-Grenzen-Abdeckung melden statt sie still zu verlieren).
+    assert!(
+        bytes.len() > 64 * 1024,
+        "Backup muss den Multi-Chunk-Streaming-Pfad betreten (>64 KiB), war {} Bytes",
+        bytes.len()
+    );
 
     let dir = tempfile::tempdir().unwrap();
     let pfad = dir.path().join("heruntergeladen.sqlite");
