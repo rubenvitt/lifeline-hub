@@ -354,6 +354,68 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn etb_client_id_migration_partieller_unique() {
+        // F03/LFH-261: client_id trägt die Offline-Idempotenz. Der UNIQUE-Index ist
+        // PARTIELL (WHERE client_id IS NOT NULL), damit die vielen NULL-Einträge
+        // (System-/abgeleitete Einträge, Online-Direkterfassung ohne Id) nicht kollidieren.
+        let pool = test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'Leit', 'leit', 'h')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let e1: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'A') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let e2: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'B') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        async fn ins(
+            pool: &SqlitePool,
+            einsatz_id: i64,
+            lfd_nr: i64,
+            client_id: Option<&str>,
+        ) -> Result<(), sqlx::Error> {
+            sqlx::query(
+                "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit, client_id) \
+                 VALUES (?, ?, 'meldung', 'x', 1, '2026-05-23 10:00:00', ?)",
+            )
+            .bind(einsatz_id)
+            .bind(lfd_nr)
+            .bind(client_id)
+            .execute(pool)
+            .await
+            .map(|_| ())
+        }
+
+        // (a) client_id ist speicherbar.
+        ins(&pool, e1, 1, Some("u1")).await.unwrap();
+        // (b) gleiche (einsatz_id, client_id) → UNIQUE-Verletzung (Idempotenz-Backstop).
+        assert!(
+            ins(&pool, e1, 2, Some("u1")).await.is_err(),
+            "doppelte client_id im selben Einsatz muss abgelehnt werden"
+        );
+        // (c) NULL kollidiert nie (partieller Index nimmt NULL aus).
+        ins(&pool, e1, 3, None).await.unwrap();
+        ins(&pool, e1, 4, None).await.unwrap();
+        // (d) dieselbe client_id in einem ANDEREN Einsatz ist erlaubt (per-Einsatz-eindeutig).
+        ins(&pool, e2, 1, Some("u1")).await.unwrap();
+    }
+
+    #[tokio::test]
     async fn etb_fts_wird_bei_cascade_delete_bereinigt() {
         let pool = test_pool().await;
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")

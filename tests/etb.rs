@@ -491,6 +491,51 @@ async fn erfasster_eintrag_wird_live_publiziert() {
 }
 
 #[tokio::test]
+async fn erfassung_mit_client_id_ist_idempotent() {
+    // F03/LFH-261: derselbe Offline-Eintrag (client_id) darf beim Retry / Doppel-Flush
+    // keine Dublette und kein zweites Live-Event erzeugen.
+    let (app, live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin, "Lage").await;
+
+    let mut rx = live.abonniere(einsatz);
+    let body = r#"{"typ":"meldung","inhalt":"Deich instabil","client_id":"offline-uuid-1"}"#;
+
+    // Erster Versand: neuer Eintrag + genau ein Live-Event.
+    let (status1, json1) = eintrag_erfassen(&app, &admin, einsatz, body).await;
+    assert_eq!(status1, StatusCode::CREATED);
+    let ev = tokio::time::timeout(Duration::from_secs(1), rx.recv())
+        .await
+        .expect("erstes Live-Event muss ankommen")
+        .expect("Kanal liefert");
+    assert_eq!(ev.event, "etb");
+
+    // Zweiter Versand derselben client_id (verlorene Antwort / zweiter Tab): idempotenter
+    // Replay → derselbe Eintrag, weiterhin 201.
+    let (status2, json2) = eintrag_erfassen(&app, &admin, einsatz, body).await;
+    assert_eq!(status2, StatusCode::CREATED);
+    assert_eq!(json1["id"], json2["id"], "Replay liefert denselben Eintrag");
+    assert_eq!(json1["lfd_nr"], json2["lfd_nr"], "Replay behält die lfd_nr");
+
+    // KEIN zweites Live-Event beim Replay (sonst doppeltes SSE-Signal).
+    assert!(
+        matches!(
+            rx.try_recv(),
+            Err(tokio::sync::broadcast::error::TryRecvError::Empty)
+        ),
+        "Replay darf kein zweites Live-Event publizieren"
+    );
+
+    // Nur EIN Eintrag in der Liste.
+    let (_, liste) = etb_abrufen(&app, &admin, einsatz, "").await;
+    assert_eq!(
+        liste.as_array().unwrap().len(),
+        1,
+        "kein Duplikat in der ETB-Liste"
+    );
+}
+
+#[tokio::test]
 async fn liste_zeigt_eintraege_neueste_zuerst() {
     let (app, _live) = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;

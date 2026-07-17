@@ -30,6 +30,10 @@ pub struct NeuerEintrag {
     pub erfasst_lokal_at: Option<String>,
     /// Pflicht bei `typ = "berichtigung"`, sonst muss es fehlen.
     pub berichtigt_eintrag_id: Option<i64>,
+    /// Client-generierte Idempotenz-UUID der Offline-/Direkterfassung (F03/LFH-261).
+    /// Ein erneutes Senden desselben Eintrags (Retry nach verlorener Antwort, Doppel-Flush
+    /// aus zwei Tabs) dedupliziert idempotent gegen `UNIQUE(einsatz_id, client_id)`.
+    pub client_id: Option<String>,
 }
 
 /// Trimmt einen optionalen String und verwirft ihn, wenn er leer ist.
@@ -112,10 +116,22 @@ pub async fn erfassen(
     let an = bereinige(req.an);
     let veranlassung = bereinige(req.veranlassung);
 
-    let anzeige = repo::anlegen(
+    // Idempotenzschlüssel normalisieren: leer → None (sonst würde "" im partiellen
+    // UNIQUE-Index unbeteiligte Zeilen deduplizieren); Längenguard gegen Missbrauch.
+    let client_id = bereinige(req.client_id);
+    if let Some(cid) = &client_id {
+        if cid.chars().count() > 64 {
+            return Err(AppError::Validation(
+                "client_id zu lang (max. 64 Zeichen)".into(),
+            ));
+        }
+    }
+
+    let (anzeige, war_neu) = repo::anlegen_idempotent(
         &state.pool,
         einsatz_id,
         benutzer.id,
+        client_id.as_deref(),
         repo::EintragDaten {
             typ: typ.as_str(),
             inhalt,
@@ -130,17 +146,21 @@ pub async fn erfassen(
     )
     .await?;
 
-    // Live an alle SSE-Abonnenten dieses Einsatzes pushen. Eine Serialisierung
-    // dieses Typs kann derzeit nicht fehlschlagen; sollte sie es künftig doch,
-    // wird der Eintrag (bereits persistiert) nicht stillschweigend verschluckt,
-    // sondern protokolliert.
-    match serde_json::to_string(&anzeige) {
-        Ok(json) => state.live.publiziere(einsatz_id, json),
-        Err(e) => tracing::error!(
-            eintrag_id = anzeige.id,
-            %e,
-            "ETB-Eintrag konnte nicht für Live-Publish serialisiert werden"
-        ),
+    // Live an alle SSE-Abonnenten dieses Einsatzes pushen — aber NUR bei einem echt neuen
+    // Eintrag. Ein idempotenter Replay (war_neu=false) hat den Eintrag beim ersten Mal
+    // bereits publiziert; ein zweites Signal würde eine Geister-Aktualisierung auslösen.
+    // Eine Serialisierung dieses Typs kann derzeit nicht fehlschlagen; sollte sie es
+    // künftig doch, wird der (bereits persistierte) Eintrag nicht stillschweigend
+    // verschluckt, sondern protokolliert.
+    if war_neu {
+        match serde_json::to_string(&anzeige) {
+            Ok(json) => state.live.publiziere(einsatz_id, json),
+            Err(e) => tracing::error!(
+                eintrag_id = anzeige.id,
+                %e,
+                "ETB-Eintrag konnte nicht für Live-Publish serialisiert werden"
+            ),
+        }
     }
 
     Ok((StatusCode::CREATED, Json(anzeige)))
