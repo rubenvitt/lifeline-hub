@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { spieleSofortAlarm } from '../einsatz/sofortTon';
+import { spieleAlarmTon } from '../einsatz/alarmTon';
 import { EINSATZ_STREAM_EVENTS } from '../api/queryKeys';
 
 /**
@@ -51,7 +51,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     // Render-State auskommt und EINE EventSource bleibt. NICHT im lagged-Fan-out.
     const onSofort = (ev: MessageEvent) => {
       invalAlle(EINSATZ_STREAM_EVENTS.meldung);
-      spieleSofortAlarm();
+      spieleAlarmTon('alarm');
       let detail: unknown = {};
       try { detail = JSON.parse(ev.data); } catch { /* Payload optional */ }
       window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail }));

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { App as AntApp } from 'antd';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import SofortAlarm from './SofortAlarm';
-import { istSofortGemutet } from './sofortTon';
+import { istAlarmGemutet } from './alarmTon';
 
 function renderAlarm() {
   return render(
@@ -27,11 +27,11 @@ describe('SofortAlarm', () => {
 
   it('Mute-Toggle persistiert in localStorage', async () => {
     renderAlarm();
-    expect(istSofortGemutet()).toBe(false);
+    expect(istAlarmGemutet()).toBe(false);
     await userEvent.click(screen.getByRole('button', { name: 'Sofort-Ton stummschalten' }));
-    expect(istSofortGemutet()).toBe(true);
+    expect(istAlarmGemutet()).toBe(true);
     // Wieder einschalten.
     await userEvent.click(screen.getByRole('button', { name: 'Sofort-Ton einschalten' }));
-    expect(istSofortGemutet()).toBe(false);
+    expect(istAlarmGemutet()).toBe(false);
   });
 });

@@ -2,7 +2,7 @@ import { App, Badge, Button, Tooltip } from 'antd';
 import { BellOutlined, NotificationOutlined } from '@ant-design/icons';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { istSofortGemutet, setzeSofortMute } from './sofortTon';
+import { istAlarmGemutet, setzeAlarmMute } from './alarmTon';
 
 /**
  * Einsatzweiter Sofort-Alarm (LFH-97): lauscht auf das window-CustomEvent
@@ -17,7 +17,7 @@ export default function SofortAlarm() {
   const { notification } = App.useApp();
   const navigate = useNavigate();
   const { id } = useParams();
-  const [gemutet, setGemutet] = useState(istSofortGemutet());
+  const [gemutet, setGemutet] = useState(istAlarmGemutet());
   // Fallback-Zähler für Toast-Keys, falls das Event keine meldung_id trägt (z. B. lagged).
   const zaehler = useRef(0);
 
@@ -52,7 +52,7 @@ export default function SofortAlarm() {
 
   const umschalten = () => {
     const neu = !gemutet;
-    setzeSofortMute(neu);
+    setzeAlarmMute(neu);
     setGemutet(neu);
   };
 
