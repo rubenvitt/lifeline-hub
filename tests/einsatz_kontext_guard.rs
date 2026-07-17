@@ -44,6 +44,11 @@ const DEFERRED_MODULE: &[&str] = &[
     "ort_vorschau",
     "erinnerung",
     "nachforderung",
+    // LFH-230 2a: temporär während der Extractor-Migration — Task 7 entfernt sie
+    // wieder (dann prüft der neue Guard sie auf typisierte Gate-Signaturen).
+    "meldung",
+    "auftrag",
+    "anhang",
 ];
 
 /// Der erste doppelt-gequotete String in einem `.route(`-Segment = der Pfad.

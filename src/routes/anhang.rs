@@ -1,6 +1,6 @@
 use crate::anhang::{self, AnhangAnzeige};
 use crate::app::AppState;
-use crate::einsatz::kontext::EinsatzKontext;
+use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::error::AppError;
 use axum::extract::{Multipart, Path, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
@@ -16,11 +16,10 @@ use super::support::{etag_von, if_none_match_matcht, ASSET_CACHE_CONTROL};
 /// Verknüpfen mit einer Chat-Nachricht passiert separat beim Nachricht-Senden.
 pub async fn hochladen(
     State(state): State<AppState>,
-    ctx: EinsatzKontext,
+    ctx: EinsatzSchreibzugriff,
     mut multipart: Multipart,
 ) -> Result<(StatusCode, Json<Vec<AnhangAnzeige>>), AppError> {
-    ctx.fordere_schreibrecht()?;
-    ctx.fordere_aktiv()?;
+    // fordere_schreibrecht + fordere_aktiv erledigt der Extractor.
     let einsatz_id = ctx.einsatz.id;
 
     // Best-Effort pro Feld (vorbestehendes LFH-102-Muster, keine umschließende Transaktion):
@@ -77,12 +76,11 @@ pub async fn hochladen(
 /// die `anhang`-Tabelle; ein zweiter Linker (ETB/Lageobjekte) erfordert eine Aggregation.
 pub async fn herunterladen(
     State(state): State<AppState>,
-    ctx: EinsatzKontext,
+    _ctx: EinsatzLesezugriff,
     Path((einsatz_id, anhang_id)): Path<(i64, i64)>,
     req_headers: HeaderMap,
 ) -> Result<Response, AppError> {
-    ctx.fordere_lesezugriff()?;
-
+    // fordere_lesezugriff erledigt der Extractor.
     if !anhang::repo::gehoert_anhang_zu_einsatz(&state.pool, anhang_id, einsatz_id).await? {
         return Err(AppError::NotFound);
     }
@@ -135,11 +133,9 @@ pub async fn herunterladen(
 /// `chat_nachricht_anhang`-Verknüpfungen mit.
 pub async fn loeschen(
     State(state): State<AppState>,
-    ctx: EinsatzKontext,
+    _ctx: EinsatzSchreibzugriff,
     Path((einsatz_id, anhang_id)): Path<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
-    ctx.fordere_schreibrecht()?;
-    ctx.fordere_aktiv()?;
     anhang::repo::loeschen(&state.pool, einsatz_id, anhang_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
