@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { App as AntApp } from 'antd';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import AlarmZentrale from './AlarmZentrale';
-import { istAlarmGemutet } from './alarmTon';
+import { istAlarmGemutet } from '../alarm/alarmTon';
 
 function renderAlarm() {
   return render(

@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { spieleAlarmTon } from '../einsatz/alarmTon';
+import { spieleAlarmTon } from '../alarm/alarmTon';
 import { EINSATZ_KEYS, EINSATZ_STREAM_EVENTS } from '../api/queryKeys';
 
 /**

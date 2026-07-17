@@ -9,7 +9,7 @@ import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { parseRouteId, personDetailPfad, tierePfad } from '../routing/deeplinks';
 import type { AbschlussGrund, Spezies, Tier, TierStatus } from '../api/types';
-import HalterPicker, { type HalterWert } from './HalterPicker';
+import HalterPicker, { type HalterWert } from '../personen/HalterPicker';
 
 const STATUS_META: Record<TierStatus, { label: string; color: string }> = {
   aktiv: { label: 'aktiv', color: 'green' },

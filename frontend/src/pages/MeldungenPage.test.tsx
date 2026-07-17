@@ -8,7 +8,7 @@ import MeldungenPage from './MeldungenPage';
 import type { Meldung } from '../api/types';
 import { ladeEinsatz } from '../api/einsaetze';
 
-vi.mock('../etb/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
+vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn().mockResolvedValue({ id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung' }),
   ladeMitglieder: vi.fn().mockResolvedValue([

@@ -2,8 +2,8 @@ import { App, Badge, Button, Tooltip } from 'antd';
 import { BellOutlined, DesktopOutlined, NotificationOutlined } from '@ant-design/icons';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { istAlarmGemutet, setzeAlarmMute } from './alarmTon';
-import { desktopPermission, fordereDesktopPermission, zeigeDesktopAlarm } from './desktopAlarm';
+import { istAlarmGemutet, setzeAlarmMute } from '../alarm/alarmTon';
+import { desktopPermission, fordereDesktopPermission, zeigeDesktopAlarm } from '../alarm/desktopAlarm';
 import { auftraegePfad, erinnerungenPfad, meldungenPfad } from '../routing/deeplinks';
 
 type ErinnerungDetail = {

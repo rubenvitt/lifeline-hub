@@ -15,7 +15,7 @@ import ModulPanel from './ModulPanel';
 import AlarmZentrale from './AlarmZentrale';
 import ThemeToggle from '../components/ThemeToggle';
 import BenutzerMenu from '../components/BenutzerMenu';
-import { useEinsatzLiveStream } from '../etb/useEinsatzLiveStream';
+import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 
 const { Header, Content } = Layout;
