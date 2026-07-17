@@ -38,6 +38,9 @@ export interface NeuerEintrag {
   ereigniszeit?: string;
   erfasst_lokal_at?: string;
   berichtigt_eintrag_id?: number;
+  /** Client-generierte Idempotenz-UUID (F03/LFH-261). Stabil über Online-Direktsenden
+   *  UND Offline-Enqueue+Flush, damit ein Retry keine Dublette erzeugt. */
+  client_id?: string;
 }
 
 export function erfasseEtb(einsatzId: number, eintrag: NeuerEintrag): Promise<EtbEintragAnzeige> {

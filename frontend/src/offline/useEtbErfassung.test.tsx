@@ -2,12 +2,12 @@ import { http, HttpResponse } from 'msw';
 import { renderHook, waitFor } from '@testing-library/react';
 import { act } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import type { NeuerEintrag } from '../api/etb';
-import { queueLeerenFuerTests } from './queue';
+import { queueEinreihen, queueLeerenFuerTests } from './queue';
 import { useEtbErfassung } from './useEtbErfassung';
 
 const eintrag: NeuerEintrag = { typ: 'meldung', inhalt: 'x', erfasst_lokal_at: '2026-05-23T10:00:00Z' };
@@ -84,4 +84,191 @@ describe('useEtbErfassung', () => {
       grund: 'Keine Berechtigung',
     });
   });
+
+  it('sendet online und beim Flush dieselbe client_id (F03: kein Duplikat bei Timeout-nach-Commit)', async () => {
+    const gesehen: (string | undefined)[] = [];
+    let versuch = 0;
+    server.use(
+      http.post('/api/einsaetze/9/etb', async ({ request }) => {
+        const body = (await request.json()) as NeuerEintrag;
+        gesehen.push(body.client_id);
+        versuch += 1;
+        return versuch === 1
+          ? HttpResponse.error()
+          : HttpResponse.json({ id: 1, lfd_nr: 1 }, { status: 201 });
+      }),
+    );
+
+    const { result } = renderHook(() => useEtbErfassung(9), { wrapper });
+    await act(async () => {
+      await result.current.erfassen(eintrag);
+    });
+    await waitFor(() => expect(result.current.ausstehend).toHaveLength(1));
+    await act(async () => {
+      await result.current.flush();
+    });
+    await waitFor(() => expect(result.current.ausstehend).toHaveLength(0));
+
+    expect(gesehen).toHaveLength(2);
+    expect(gesehen[0]).toBeTruthy();
+    expect(gesehen[0]).toBe(gesehen[1]);
+  });
+
+  it('behält 401-Einträge in der Queue und signalisiert Re-Login (F03)', async () => {
+    server.use(http.post('/api/einsaetze/9/etb', () => HttpResponse.error()));
+    const { result } = renderHook(() => useEtbErfassung(9), { wrapper });
+    await act(async () => {
+      await result.current.erfassen(eintrag);
+    });
+    await waitFor(() => expect(result.current.ausstehend).toHaveLength(1));
+
+    server.use(
+      http.post('/api/einsaetze/9/etb', () =>
+        HttpResponse.json({ error: 'Session abgelaufen' }, { status: 401 }),
+      ),
+    );
+    await act(async () => {
+      await result.current.flush();
+    });
+
+    await waitFor(() => expect(result.current.reLoginNoetig).toBe(true));
+    expect(result.current.ausstehend).toHaveLength(1);
+    expect(result.current.abgelehnt).toHaveLength(0);
+  });
+
+  it('behält 5xx-Einträge in der Queue (Serverfehler ist transient, F03)', async () => {
+    server.use(http.post('/api/einsaetze/9/etb', () => HttpResponse.error()));
+    const { result } = renderHook(() => useEtbErfassung(9), { wrapper });
+    await act(async () => {
+      await result.current.erfassen(eintrag);
+    });
+    await waitFor(() => expect(result.current.ausstehend).toHaveLength(1));
+
+    server.use(
+      http.post('/api/einsaetze/9/etb', () =>
+        HttpResponse.json({ error: 'DB busy' }, { status: 503 }),
+      ),
+    );
+    await act(async () => {
+      await result.current.flush();
+    });
+
+    expect(result.current.ausstehend).toHaveLength(1);
+    expect(result.current.abgelehnt).toHaveLength(0);
+  });
+
+  it('verschiebt 422-Ablehnungen persistent nach abgelehnt (überlebt Remount, F03)', async () => {
+    server.use(http.post('/api/einsaetze/9/etb', () => HttpResponse.error()));
+    const { result, unmount } = renderHook(() => useEtbErfassung(9), { wrapper });
+    await act(async () => {
+      await result.current.erfassen(eintrag);
+    });
+    await waitFor(() => expect(result.current.ausstehend).toHaveLength(1));
+
+    server.use(
+      http.post('/api/einsaetze/9/etb', () =>
+        HttpResponse.json({ error: 'Ungültig' }, { status: 422 }),
+      ),
+    );
+    await act(async () => {
+      await result.current.flush();
+    });
+    await waitFor(() => expect(result.current.ausstehend).toHaveLength(0));
+    await waitFor(() => expect(result.current.abgelehnt).toHaveLength(1));
+    expect(result.current.abgelehnt[0]).toMatchObject({ grund: 'Ungültig', eintrag: { inhalt: 'x' } });
+
+    // Reload: neuer Hook-Mount lädt abgelehnt aus IndexedDB (nicht flüchtig).
+    unmount();
+    const { result: result2 } = renderHook(() => useEtbErfassung(9), { wrapper });
+    await waitFor(() => expect(result2.current.abgelehnt).toHaveLength(1));
+  });
+
+  it('verwirft einen abgelehnten Eintrag dauerhaft (Dismiss, F03)', async () => {
+    server.use(http.post('/api/einsaetze/9/etb', () => HttpResponse.error()));
+    const { result } = renderHook(() => useEtbErfassung(9), { wrapper });
+    await act(async () => {
+      await result.current.erfassen(eintrag);
+    });
+    await waitFor(() => expect(result.current.ausstehend).toHaveLength(1));
+
+    server.use(
+      http.post('/api/einsaetze/9/etb', () =>
+        HttpResponse.json({ error: 'Ungültig' }, { status: 422 }),
+      ),
+    );
+    await act(async () => {
+      await result.current.flush();
+    });
+    await waitFor(() => expect(result.current.abgelehnt).toHaveLength(1));
+
+    const id = result.current.abgelehnt[0].id!;
+    await act(async () => {
+      await result.current.abgelehntVerwerfen(id);
+    });
+    await waitFor(() => expect(result.current.abgelehnt).toHaveLength(0));
+  });
+
+  it('serialisiert den Flush über navigator.locks und setzt bei gehaltenem Lock aus (F03)', async () => {
+    const request = vi.fn(
+      async (_name: string, _opts: unknown, cb: (lock: unknown) => unknown) => cb(null),
+    );
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: { request } });
+    try {
+      let posts = 0;
+      server.use(
+        http.post('/api/einsaetze/9/etb', () => {
+          posts += 1;
+          return HttpResponse.json({ id: 1, lfd_nr: 1 }, { status: 201 });
+        }),
+      );
+      await queueEinreihen(9, eintrag);
+      const { result } = renderHook(() => useEtbErfassung(9), { wrapper });
+      await waitFor(() => expect(result.current.ausstehend).toHaveLength(1));
+      await act(async () => {
+        await result.current.flush();
+      });
+
+      expect(request).toHaveBeenCalledWith(
+        'etb-flush-9',
+        expect.objectContaining({ ifAvailable: true }),
+        expect.any(Function),
+      );
+      expect(posts).toBe(0); // Lock von anderem Tab gehalten → kein Sendeversuch
+      expect(result.current.ausstehend).toHaveLength(1);
+    } finally {
+      delete (navigator as { locks?: unknown }).locks;
+    }
+  });
+
+  it('plant nach transientem Fehler einen Backoff-Retry (F03)', async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    try {
+      server.use(http.post('/api/einsaetze/9/etb', () => HttpResponse.error()));
+      const { result } = renderHook(() => useEtbErfassung(9), { wrapper });
+      await act(async () => {
+        await result.current.erfassen(eintrag);
+      });
+      await waitFor(() => expect(result.current.ausstehend).toHaveLength(1));
+
+      setTimeoutSpy.mockClear();
+      server.use(
+        http.post('/api/einsaetze/9/etb', () =>
+          HttpResponse.json({ error: 'busy' }, { status: 503 }),
+        ),
+      );
+      await act(async () => {
+        await result.current.flush();
+      });
+
+      // Transienter 503 → Eintrag bleibt UND ein Backoff-Retry (erste Stufe 1000ms) ist geplant.
+      expect(result.current.ausstehend).toHaveLength(1);
+      expect(setTimeoutSpy.mock.calls.some(([, delay]) => delay === 1000)).toBe(true);
+    } finally {
+      setTimeoutSpy.mockRestore();
+    }
+  });
+});
+
+afterEach(() => {
+  delete (navigator as { locks?: unknown }).locks;
 });
