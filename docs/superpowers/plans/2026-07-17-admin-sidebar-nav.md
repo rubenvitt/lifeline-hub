@@ -58,8 +58,13 @@ vorerst bestehen (wird erst in Task 5 entfernt) — hier entstehen die 3 neuen K
   `SektionHeader`, `useAuth`, `modulRegistry`.
 - Produces: default-exported Komponenten `AnzeigeEinstellungen`, `EinsatzDefaults`,
   `Anmeldeverfahren` (je `() => JSX`, ohne Props). `orgEinstellungenForm.ts` exportiert:
-  `zuUpdate(einstellungen): OrgEinstellungenUpdate` (voll, aus geladenen Daten) und die
-  `initialWerte`-Mapper je Sektion.
+  `zuUpdate(einstellungen): OrgEinstellungenUpdate` (voll, aus geladenen Daten), die
+  `initialWerte`-Mapper je Sektion **und die Feld-Normalizer** je Sektion
+  (`normalisiereAnzeige(formWerte)`, `normalisiereEinsatz(formWerte)`) — sie tragen die
+  **exakte** Alt-Semantik: Strings `?.trim() || null`, Numbers `?? null`, `auto_etb_eintraege`
+  als Bool. Jede Sektion speichert `{ ...zuUpdate(loaded), ...normalisiere<Sektion>(formWerte) }`
+  — **nie** rohe `form.getFieldsValue()` spreaden (sonst geht ein geleertes Feld als `''` statt
+  `null` raus und kippt „leer = Fallback").
 
 **Kernlogik `orgEinstellungenForm.ts` (Vollersatz-sicher):**
 ```ts
@@ -113,7 +118,10 @@ expect(putBody.retention_dauer_tage).toBe(30);
 
 - [ ] **Step 4: Run — verify PASS.**
 
-- [ ] **Step 5: Failing test — EinsatzDefaults-Save merged Anzeige-Werte** (analog: geladene Anzeige-Werte bleiben im PUT-Body erhalten; ein Präfix-Feld wird geändert und landet im Body). Dann **EinsatzDefaults implementieren** (7 Form-Felder + Modul-Rollen-Liste mit Sofort-Save). Run → PASS.
+- [ ] **Step 4b: Failing test — geleertes Feld → `null` (Normalizer)** in `EinsatzDefaults.test.tsx`:
+  GET mockt `etb_nummer_praefix: 'EB-'`; im Einsatz-Defaults-Form das Präfix **leeren**, speichern:
+  `expect(putBody.etb_nummer_praefix).toBeNull();` (nicht `''`). Deckt die trim/leer→null-Semantik ab.
+- [ ] **Step 5: Failing test — EinsatzDefaults-Save merged Anzeige-Werte** (analog: geladene Anzeige-Werte bleiben im PUT-Body erhalten; ein Präfix-Feld wird geändert und landet im Body). Dann **EinsatzDefaults implementieren** (7 Form-Felder + Modul-Rollen-Liste mit Sofort-Save; Normalizer aus `orgEinstellungenForm.ts`). Run → PASS (inkl. Step 4b).
 
 - [ ] **Step 6: Failing test — Anmeldeverfahren** (Provider-Liste gerendert, Toggle ruft `providerSchalten`, Passwort-Provider disabled). **Implementieren** (kein Form/Button). Run → PASS.
 
