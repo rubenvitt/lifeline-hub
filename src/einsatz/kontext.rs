@@ -22,12 +22,15 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
 use crate::auth::Benutzer;
+use crate::einsatz::modul::{ModulMarker, OhneModul};
 use crate::einsatz::{berechtigung, repo as einsatz_repo, Einsatz, EinsatzRolle};
 use crate::error::AppError;
 use axum::extract::{FromRequestParts, Path};
 use axum::http::request::Parts;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
+use std::marker::PhantomData;
+use std::ops::Deref;
 
 /// Der zugriffs-geprüfte Kontext eines einsatz-gebundenen Handlers: der geladene
 /// Einsatz, die Rolle des aufrufenden Benutzers darin (`None` = kein Mitglied) und
@@ -111,5 +114,58 @@ impl EinsatzKontext {
             &self.benutzer,
         )
         .await
+    }
+}
+
+/// Lese-Gate-Extractor (LFH-230): Org-Floor (via [`EinsatzKontext`]) + `fordere_lesezugriff`
+/// (+ Modul-Gate `M`, falls `M::KEY` gesetzt). Der Typ ERZWINGT das Gate — ein Handler
+/// unter dieser Signatur kann die Lese-Prüfung nicht mehr „vergessen". Über `Deref`
+/// bleibt `ctx.einsatz`/`ctx.benutzer`/`ctx.rolle` unverändert erreichbar.
+pub struct EinsatzLesezugriff<M: ModulMarker = OhneModul>(pub EinsatzKontext, PhantomData<M>);
+
+impl<M: ModulMarker> FromRequestParts<AppState> for EinsatzLesezugriff<M> {
+    type Rejection = AppError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, AppError> {
+        let ctx = EinsatzKontext::from_request_parts(parts, state).await?;
+        ctx.fordere_lesezugriff()?;
+        if let Some(key) = M::KEY {
+            ctx.fordere_modul_zugriff(&state.pool, key).await?;
+        }
+        Ok(Self(ctx, PhantomData))
+    }
+}
+
+impl<M: ModulMarker> Deref for EinsatzLesezugriff<M> {
+    type Target = EinsatzKontext;
+    fn deref(&self) -> &EinsatzKontext {
+        &self.0
+    }
+}
+
+/// Schreib-Gate-Extractor (LFH-230): Org-Floor + `fordere_schreibrecht`
+/// (+ Modul-Gate `M`) + `fordere_aktiv` — in genau dieser Reihenfolge (Status-Code-
+/// Präzedenz erhalten). Ownership-/Objekt-Prüfungen (gehört das Kind-Objekt zum
+/// Einsatz?) bleiben bewusst im Handler.
+pub struct EinsatzSchreibzugriff<M: ModulMarker = OhneModul>(pub EinsatzKontext, PhantomData<M>);
+
+impl<M: ModulMarker> FromRequestParts<AppState> for EinsatzSchreibzugriff<M> {
+    type Rejection = AppError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, AppError> {
+        let ctx = EinsatzKontext::from_request_parts(parts, state).await?;
+        ctx.fordere_schreibrecht()?;
+        if let Some(key) = M::KEY {
+            ctx.fordere_modul_zugriff(&state.pool, key).await?;
+        }
+        ctx.fordere_aktiv()?;
+        Ok(Self(ctx, PhantomData))
+    }
+}
+
+impl<M: ModulMarker> Deref for EinsatzSchreibzugriff<M> {
+    type Target = EinsatzKontext;
+    fn deref(&self) -> &EinsatzKontext {
+        &self.0
     }
 }
