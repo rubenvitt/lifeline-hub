@@ -224,8 +224,15 @@ pub async fn anlegen_tx(
     auto_etb: bool,
     daten: &AuftragDaten<'_>,
 ) -> Result<i64, AppError> {
-    debug_assert!(prioritaet_gueltig(daten.prioritaet));
-    debug_assert!(super::richtung_gueltig(daten.richtung));
+    // Enum-Invariante auch im Release durchsetzen (LFH-259/F34): ein debug_assert wäre
+    // wegkompiliert → ein interner Aufrufer (Scheduler/Seed) könnte still ungültige Werte
+    // persistieren. Der Handler validiert bereits, hier ist es das Repo-Sicherheitsnetz.
+    if !prioritaet_gueltig(daten.prioritaet) {
+        return Err(AppError::Validation("Ungültige Priorität".into()));
+    }
+    if !super::richtung_gueltig(daten.richtung) {
+        return Err(AppError::Validation("Ungültige Richtung".into()));
+    }
 
     // lfd_nr atomar je Einsatz (Muster etb/meldung: INSERT … SELECT COALESCE(MAX(lfd_nr)+1, ?)
     // FROM auftrag WHERE einsatz_id = ? — die Vergabe liegt in derselben Transaktion wie der
@@ -1467,5 +1474,21 @@ mod tests {
             d.auftrag.etb_anordnung_id.is_some(),
             "Einsatz=1 schlägt Org=0 → ETB-Folgeeintrag erzeugt"
         );
+    }
+
+    /// LFH-259/F34: Eine ungültige Priorität wird an der Repo-Grenze als Validation-Fehler
+    /// abgewiesen (nicht nur per debug_assert, das im Release wegkompiliert wäre).
+    #[tokio::test]
+    async fn anlegen_ungueltige_prioritaet_ist_validation() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let mut d = daten("Erkunden", None, vec![funktion("Melder")]);
+        d.prioritaet = "quatsch";
+        assert!(matches!(
+            anlegen(&pool, e, b, d, "2026-06-11 09:00:00")
+                .await
+                .unwrap_err(),
+            AppError::Validation(_)
+        ));
     }
 }

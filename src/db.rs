@@ -1921,4 +1921,109 @@ mod tests {
         .unwrap();
         assert_eq!(idx, 1, "Index muss nach dem Rebuild neu angelegt sein");
     }
+
+    // --- Migration 0089: UNIQUE(einsatz_id, lfd_nr) auf meldung + auftrag (LFH-259 / F34) ---
+    //
+    // etb/person/tier/schaden trugen UNIQUE(einsatz_id, nr), meldung/auftrag nicht — die
+    // server-autoritative, lückenlose lfd_nr war dort nur code-seitig gesichert. Ein Bug in
+    // einem internen Schreibpfad könnte still doppelte Nummern persistieren; die Anzeige-Nummer
+    // ist aber das operative Referenzmittel im Sprechfunk. 0089 zieht den UNIQUE-Index nach.
+    #[tokio::test]
+    async fn migration_0089_meldung_lfd_nr_unique_je_einsatz() {
+        let pool = test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let bn: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'L', 'l', 'h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let e1: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'A') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let e2: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'B') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let insert = |einsatz: i64, lfd: i64| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "INSERT INTO meldung (einsatz_id, lfd_nr, absender, meldeweg, inhalt, \
+                        ereigniszeit, eingang_at, erfasst_von_id) \
+                     VALUES (?, ?, 'Nord 1', 'funk', 'x', '2026-07-17 09:00:00', '2026-07-17 09:00:00', ?)",
+                )
+                .bind(einsatz)
+                .bind(lfd)
+                .bind(bn)
+                .execute(&pool)
+                .await
+            }
+        };
+        insert(e1, 1).await.unwrap();
+        // Gleiche lfd_nr im selben Einsatz → UNIQUE-Verletzung.
+        assert!(
+            insert(e1, 1).await.is_err(),
+            "doppelte lfd_nr je Einsatz muss abgelehnt werden"
+        );
+        // Gleiche lfd_nr in einem ANDEREN Einsatz ist erlaubt.
+        insert(e2, 1)
+            .await
+            .expect("lfd_nr je Einsatz unabhängig — anderer Einsatz muss gehen");
+    }
+
+    #[tokio::test]
+    async fn migration_0089_auftrag_lfd_nr_unique_je_einsatz_mit_null_bestand() {
+        let pool = test_pool().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let bn: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'L', 'l', 'h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let e: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'A') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let insert = |lfd: Option<i64>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "INSERT INTO auftrag (einsatz_id, lfd_nr, auftrag_text, erteilt_at, erstellt_von_id) \
+                     VALUES (?, ?, 'x', '2026-07-17 10:00:00', ?)",
+                )
+                .bind(e)
+                .bind(lfd)
+                .bind(bn)
+                .execute(&pool)
+                .await
+            }
+        };
+        insert(Some(1)).await.unwrap();
+        assert!(
+            insert(Some(1)).await.is_err(),
+            "doppelte lfd_nr je Einsatz muss abgelehnt werden"
+        );
+        // Altbestand: mehrere NULL-lfd_nr bleiben erlaubt (SQLite: NULLs im UNIQUE verschieden).
+        insert(None).await.expect("erste NULL-lfd_nr ok");
+        insert(None)
+            .await
+            .expect("mehrere NULL-lfd_nr müssen erlaubt bleiben (Altbestand)");
+    }
 }

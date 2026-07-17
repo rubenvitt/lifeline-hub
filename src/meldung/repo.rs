@@ -68,9 +68,17 @@ pub async fn anlegen(
     erfasser_id: i64,
     daten: MeldungDaten<'_>,
 ) -> Result<MeldungAnzeige, AppError> {
-    debug_assert!(prioritaet_gueltig(daten.prioritaet));
-    debug_assert!(meldungsart_gueltig(daten.meldungsart));
-    debug_assert!(super::richtung_gueltig(daten.richtung));
+    // Enum-Invariante auch im Release durchsetzen (LFH-259/F34): debug_assert wäre
+    // wegkompiliert → ein interner Aufrufer könnte still ungültige Werte persistieren.
+    if !prioritaet_gueltig(daten.prioritaet) {
+        return Err(AppError::Validation("Ungültige Priorität".into()));
+    }
+    if !meldungsart_gueltig(daten.meldungsart) {
+        return Err(AppError::Validation("Ungültige Meldungsart".into()));
+    }
+    if !super::richtung_gueltig(daten.richtung) {
+        return Err(AppError::Validation("Ungültige Richtung".into()));
+    }
     let einst = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id).await?;
     let org_id: Option<i64> = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
         .bind(einsatz_id)
@@ -209,7 +217,9 @@ pub async fn setze_status(
     status: &str,
     jetzt: &str,
 ) -> Result<(), AppError> {
-    debug_assert!(super::status_gueltig(status));
+    if !super::status_gueltig(status) {
+        return Err(AppError::Validation("Ungültiger Status".into()));
+    }
     // Erledigt-Stempel (LFH-113): first-write-wins — nur beim Übergang nach 'erledigt'
     // und nur solange noch NULL (COALESCE). Wird der Status später zurückgesetzt, bleibt
     // erledigt_at erhalten; ein erneutes Erledigen überschreibt den ersten Stempel nicht.
@@ -1403,5 +1413,19 @@ mod tests {
             m.etb_meldung_id.is_some(),
             "Einsatz=1 schlägt Org=0 → ETB-Folgeeintrag erzeugt"
         );
+    }
+
+    /// LFH-259/F34: Eine ungültige Meldungsart wird an der Repo-Grenze als Validation-Fehler
+    /// abgewiesen (nicht nur per debug_assert, das im Release wegkompiliert wäre).
+    #[tokio::test]
+    async fn anlegen_ungueltige_meldungsart_ist_validation() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let mut d = daten("Deich instabil", "2026-06-12 09:00:00", "2026-06-12 09:05:00");
+        d.meldungsart = "quatsch";
+        assert!(matches!(
+            anlegen(&pool, e, b, d).await.unwrap_err(),
+            AppError::Validation(_)
+        ));
     }
 }
