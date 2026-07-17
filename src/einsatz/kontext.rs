@@ -121,6 +121,12 @@ impl EinsatzKontext {
 /// (+ Modul-Gate `M`, falls `M::KEY` gesetzt). Der Typ ERZWINGT das Gate — ein Handler
 /// unter dieser Signatur kann die Lese-Prüfung nicht mehr „vergessen". Über `Deref`
 /// bleibt `ctx.einsatz`/`ctx.benutzer`/`ctx.rolle` unverändert erreichbar.
+///
+/// Präzedenz-Hinweis: Das Gate läuft in `from_request_parts`, also VOR den nachfolgenden
+/// `Query`/`Json`-Extractoren des Handlers (früher lief es im Rumpf, nach dem Body-Parse).
+/// Kein Gate liest den Body → keine Allow/Deny-Änderung; nur ein Request, der GLEICHZEITIG
+/// unberechtigt UND body-/query-kaputt ist, antwortet jetzt 403 statt 400/422 (bewusst:
+/// nicht autorisiert → keine Verarbeitung untrusted Eingaben).
 pub struct EinsatzLesezugriff<M: ModulMarker = OhneModul>(pub EinsatzKontext, PhantomData<M>);
 
 impl<M: ModulMarker> FromRequestParts<AppState> for EinsatzLesezugriff<M> {
@@ -145,8 +151,13 @@ impl<M: ModulMarker> Deref for EinsatzLesezugriff<M> {
 
 /// Schreib-Gate-Extractor (LFH-230): Org-Floor + `fordere_schreibrecht`
 /// (+ Modul-Gate `M`) + `fordere_aktiv` — in genau dieser Reihenfolge (Status-Code-
-/// Präzedenz erhalten). Ownership-/Objekt-Prüfungen (gehört das Kind-Objekt zum
-/// Einsatz?) bleiben bewusst im Handler.
+/// Präzedenz UNTER den Gates erhalten). Ownership-/Objekt-Prüfungen (gehört das Kind-Objekt
+/// zum Einsatz?) bleiben bewusst im Handler.
+///
+/// Präzedenz-Hinweis (wie bei [`EinsatzLesezugriff`]): Die Gates laufen in
+/// `from_request_parts`, also VOR den nachfolgenden `Query`/`Json`-Extractoren. Kein Gate
+/// liest den Body → keine Allow/Deny-Änderung; nur ein Request, der GLEICHZEITIG
+/// unberechtigt/nicht-aktiv UND body-kaputt ist, antwortet jetzt 403/409 statt 400/422.
 pub struct EinsatzSchreibzugriff<M: ModulMarker = OhneModul>(pub EinsatzKontext, PhantomData<M>);
 
 impl<M: ModulMarker> FromRequestParts<AppState> for EinsatzSchreibzugriff<M> {
