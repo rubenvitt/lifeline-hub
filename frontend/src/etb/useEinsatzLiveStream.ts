@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { spieleAlarmTon } from '../einsatz/alarmTon';
-import { EINSATZ_STREAM_EVENTS } from '../api/queryKeys';
+import { EINSATZ_KEYS, EINSATZ_STREAM_EVENTS } from '../api/queryKeys';
 
 /**
  * EINE SSE-Verbindung für den gesamten Einsatz-Live-Feed.
@@ -57,6 +57,31 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       window.dispatchEvent(new CustomEvent('lfh:sofortmeldung', { detail }));
     };
     listeners.push(['sofortmeldung', onSofort as EventListener]);
+
+    // Erinnerung-Side-Effect (LFH-118): NEBEN der Registry-Invalidierung (deckt 'erinnerung'
+    // bereits ab) alarmiert dieser zweite Listener abgestuft und modulübergreifend. bezug_typ
+    // ist der Diskriminator: 'meldung' wird übersprungen (der sofortmeldung-Pfad alarmiert diese
+    // Meldung schon → kein Doppel-Alarm), 'auftrag' → Alarmton + auftraege-Invalidierung, sonst
+    // dezenter Ton. Der Toast wird einsatzweit über ein window-CustomEvent aufgelöst (AlarmZentrale
+    // lauscht) — der Hook bleibt render-state-frei und EINE EventSource.
+    const onErinnerung = (ev: MessageEvent) => {
+      let detail: {
+        einsatz_id?: number;
+        erinnerung_id?: number;
+        bezug_typ?: 'auftrag' | 'meldung' | null;
+        bezug_id?: number | null;
+      } = {};
+      try { detail = JSON.parse(ev.data); } catch { /* Payload optional */ }
+      if (detail.bezug_typ === 'meldung') return; // Doppel-Alarm-Guard
+      if (detail.bezug_typ === 'auftrag') {
+        spieleAlarmTon('alarm');
+        inval(EINSATZ_KEYS.auftraege);
+      } else {
+        spieleAlarmTon('dezent');
+      }
+      window.dispatchEvent(new CustomEvent('lfh:erinnerung-alarm', { detail }));
+    };
+    listeners.push(['erinnerung', onErinnerung as EventListener]);
 
     listeners.forEach(([event, handler]) => quelle.addEventListener(event, handler));
     return () => {

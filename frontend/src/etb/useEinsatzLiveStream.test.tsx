@@ -282,4 +282,60 @@ describe('useEinsatzLiveStream', () => {
       expect(calls).toContainEqual(['etb', 8]);
     });
   });
+
+  it('feuert lfh:erinnerung-alarm bei erinnerung-Event ohne Bezug (reine Erinnerung)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const alarm = vi.fn();
+    window.addEventListener('lfh:erinnerung-alarm', alarm);
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={9} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit('erinnerung', JSON.stringify({ einsatz_id: 9, erinnerung_id: 5, bezug_typ: null, bezug_id: null }));
+    await waitFor(() => expect(alarm).toHaveBeenCalled());
+    window.removeEventListener('lfh:erinnerung-alarm', alarm);
+  });
+
+  it('invalidiert einsatz-auftraege und feuert Alarm bei erinnerung-Event mit bezug_typ=auftrag', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    const alarm = vi.fn();
+    window.addEventListener('lfh:erinnerung-alarm', alarm);
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={9} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit('erinnerung', JSON.stringify({ einsatz_id: 9, erinnerung_id: 6, bezug_typ: 'auftrag', bezug_id: 12 }));
+    await waitFor(() => {
+      const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+      expect(calls).toContainEqual(['einsatz-auftraege', 9]);
+      expect(alarm).toHaveBeenCalled();
+    });
+    window.removeEventListener('lfh:erinnerung-alarm', alarm);
+  });
+
+  it('feuert KEINEN erinnerung-Alarm bei bezug_typ=meldung (Doppel-Alarm-Guard, sofortmeldung trägt)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    const alarm = vi.fn();
+    window.addEventListener('lfh:erinnerung-alarm', alarm);
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={9} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit('erinnerung', JSON.stringify({ einsatz_id: 9, erinnerung_id: 7, bezug_typ: 'meldung', bezug_id: 3 }));
+    // Registry-Invalidierung von einsatz-erinnerungen läuft trotzdem.
+    await waitFor(() => {
+      const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+      expect(calls).toContainEqual(['einsatz-erinnerungen', 9]);
+    });
+    expect(alarm).not.toHaveBeenCalled();
+    window.removeEventListener('lfh:erinnerung-alarm', alarm);
+  });
 });
