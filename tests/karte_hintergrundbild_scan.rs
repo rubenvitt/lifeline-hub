@@ -3,8 +3,9 @@
 //!
 //! Warum ein EIGENES Binary: `init_scan_config` setzt eine prozessglobale OnceLock. Auf
 //! fail-closed + unerreichbaren clamd gestellt, würde das JEDEN Upload im Prozess auf 503
-//! kippen — deshalb isoliert von der übrigen karte_hintergrundbild-Suite. Kein `clamav`-
-//! Feature nötig: der not-feature-Stub liefert bei gesetzter Adresse `ScannerNichtErreichbar`
+//! kippen — deshalb isoliert von der übrigen karte_hintergrundbild-Suite. Läuft in BEIDEN
+//! Builds grün: Default (clamav an) → echter `clamd_scan` gegen `127.0.0.1:1` (ECONNREFUSED)
+//! → `ScannerNichtErreichbar`; `--no-default-features` → not-feature-Stub, identisches Ergebnis
 //! → fail-closed → 503.
 
 use axum::body::{to_bytes, Body};

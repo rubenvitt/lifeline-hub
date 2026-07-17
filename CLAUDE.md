@@ -82,13 +82,18 @@ gepflegt. Wahrheitsquelle: die `#[derive(ToSchema)]`-Response-Structs + Domänen
   PATCH-null-vs-absent-Semantik) und die 2 `Record<>`-Maps. Der Pfad-/Operations-Contract
   (`#[utoipa::path]`) ist additiv nachrüstbar, in v1 nicht enthalten.
 
-## Backend — ClamAV-Upload-Scan hinter Feature-Gate (LFH-114)
+## Backend — ClamAV-Upload-Scan (Default-AN, LFH-114/LFH-224)
 
-Der echte clamd-Virenscan der Uploads (`src/anhang/mod.rs`) liegt hinter dem Cargo-Feature
-`clamav`; der Default-Build ist ein No-op-Seam (single-binary). **Folge fürs Testen:** der
-gesamte `clamav`-Code läuft NICHT im Default-`cargo test` (und es gibt kein CI). Wer
-`src/anhang/mod.rs`/`clamd_scan` anfasst, muss zusätzlich **`cargo test --features clamav`**
-fahren — sonst rottet der Scan-Pfad still. Die reine Entscheidungslogik (`entscheide`,
-`klassifiziere_antwort`) und der Fehlkonfig-Pfad (Adresse gesetzt + Feature aus → fail-closed)
-sind bewusst auch im Default-Gate getestet. Default = **fail-closed** (clamd weg → 503);
-`--clamav-fail-open` ist der bewusste Offline-/Feld-Kompromiss.
+Der clamd-Virenscan der Uploads (`src/anhang/mod.rs`) hängt am Cargo-Feature `clamav`, das
+seit LFH-224 **Default-AN** ist: `clamav-client` ist ein reiner Rust-INSTREAM-Client (nur
+`tokio`, kein FFI/keine Signatur-DB im Prozess) → das Binary bleibt **single-binary**. Der
+echte Scanner `clamd` ist unvermeidlich ein **separater Laufzeit-Daemon** (Sidecar/systemd/apt);
+ohne `--clamav-addr` ist der Seam ein **No-op** → kein zweiter Prozess nötig, kein Compose.
+Verhalten: keine Adresse → No-op; Adresse + erreichbarer clamd → echter Scan (Fund → 422);
+Adresse + clamd weg/Timeout → **fail-closed 503** (Default) bzw. `--clamav-fail-open` → durch.
+
+**Folge fürs Testen:** Der Scan-Pfad läuft jetzt im **Default-`cargo test`** (rottet nicht mehr
+still). Der reine No-op-/Fehlkonfig-Stub (`#[cfg(not(feature = "clamav"))]`) läuft nur unter
+**`cargo test --no-default-features`** — wer `src/anhang/mod.rs`/`clamd_scan` anfasst, sollte
+beide fahren. Der Scan-Wiring-Test (`tests/karte_hintergrundbild_scan.rs`) übt gegen
+`127.0.0.1:1` (ECONNREFUSED) in BEIDEN Builds den fail-closed-503-Pfad. Es gibt kein CI.

@@ -194,8 +194,8 @@ pub fn entscheide(ergebnis: ScanErgebnis, fail_open: bool) -> Result<(), AppErro
 }
 
 /// AV-Scan eines Upload-Puffers (scan-vor-persist, LFH-114). Ohne konfigurierte
-/// `clamd_addr` (oder im Default-Build ohne das `clamav`-Cargo-Feature) ein No-op → `Ok`,
-/// damit der Standard-Build single-binary bleibt. Bei Fund → 422, bei nicht erreichbarem
+/// `clamd_addr` (oder im `--no-default-features`-Build ohne das `clamav`-Cargo-Feature) ein
+/// No-op → `Ok`; das Binary bleibt so oder so single-binary. Bei Fund → 422, bei nicht erreichbarem
 /// clamd → fail-open/closed gemäß [`ScanConfig`].
 pub async fn scan(cfg: &ScanConfig, daten: &[u8]) -> Result<(), AppError> {
     let Some(addr) = cfg.clamd_addr.as_deref() else {
@@ -462,10 +462,10 @@ mod tests {
         assert!(scan(&cfg, b"x").await.is_ok(), "ohne clamd-Adresse → No-op");
     }
 
-    // Fehlkonfig-Pfad des Default-Builds (Feature AUS, aber Adresse gesetzt): der
-    // not-feature clamd_scan liefert ScannerNichtErreichbar → „kein stiller ungescannter
-    // Upload". Läuft im Default-`cargo test` (feature-frei, ohne Netz — der not-feature
-    // clamd_scan ist konstant und kehrt sofort zurück).
+    // Fehlkonfig-Pfad des `--no-default-features`-Builds (Feature AUS, aber Adresse gesetzt):
+    // der not-feature clamd_scan liefert ScannerNichtErreichbar → „kein stiller ungescannter
+    // Upload". Läuft nur unter `cargo test --no-default-features` (ohne Netz — der not-feature
+    // clamd_scan ist konstant und kehrt sofort zurück); im Default-Build greift der echte Pfad.
 
     #[cfg(not(feature = "clamav"))]
     #[tokio::test]

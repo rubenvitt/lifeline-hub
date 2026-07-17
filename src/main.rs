@@ -94,10 +94,10 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     // um die vielen inline AppState-Konstruktionen nicht zu brechen).
     if config.clamav_addr.is_some() && !cfg!(feature = "clamav") {
         tracing::warn!(
-            "LIFELINE_CLAMAV_ADDR ist gesetzt, aber die Binary wurde OHNE das `clamav`-Feature \
-             gebaut — Uploads werden NICHT gescannt und je nach --clamav-fail-open abgelehnt \
-             (fail-closed, Default) oder ungeprüft durchgelassen. Für echtes Scannen mit \
-             `--features clamav` bauen."
+            "LIFELINE_CLAMAV_ADDR ist gesetzt, aber die Binary wurde mit `--no-default-features` \
+             OHNE das (default-aktive) `clamav`-Feature gebaut — Uploads werden NICHT gescannt und \
+             je nach --clamav-fail-open abgelehnt (fail-closed, Default) oder ungeprüft \
+             durchgelassen. Für echtes Scannen den Default-Build verwenden (clamav ist an)."
         );
     }
     lifeline_hub::anhang::init_scan_config(lifeline_hub::anhang::ScanConfig {
