@@ -114,6 +114,28 @@ modul_marker! {
     Auftraege => "auftraege",
 }
 
+/// Pfad-Präfix (app.rs-Route) → erwarteter Modul-Key (LFH-230). `None` = modul-lose
+/// Gate-Route. Der **längste** passende Präfix gewinnt (`…/lage/meldungen` ist ein
+/// eigener Eintrag, kein Kind von `…/meldungen`). Wächst pro migriertem Modul; nur
+/// nicht-DEFERRED-Routen (die der Guard prüft) müssen eingetragen sein. Der Guard
+/// gleicht diese Tabelle gegen die Marker in den Handler-Signaturen ab.
+pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
+    ("/api/einsaetze/{id}/lage/meldungen", Some("lagemeldungen")),
+    ("/api/einsaetze/{id}/meldungen", Some("meldungen")),
+    ("/api/einsaetze/{id}/auftraege", Some("auftraege")),
+    ("/api/einsaetze/{id}/anhaenge", None),
+];
+
+/// Längster-Präfix-Match über [`PFAD_KEY`]. Äußeres `None` = Pfad nicht registriert;
+/// `Some(inner)` = registriert (inner `None` = modul-lose Route).
+pub fn key_fuer_pfad(pfad: &str) -> Option<Option<&'static str>> {
+    PFAD_KEY
+        .iter()
+        .filter(|(prefix, _)| pfad.starts_with(prefix))
+        .max_by_key(|(prefix, _)| prefix.len())
+        .map(|(_, key)| *key)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -182,5 +204,31 @@ mod tests {
         assert_eq!(Lagemeldungen::KEY, Some("lagemeldungen"));
         assert_eq!(Auftraege::KEY, Some("auftraege"));
         assert_eq!(OhneModul::KEY, None);
+    }
+
+    #[test]
+    fn pfad_key_laengster_praefix_gewinnt() {
+        // Kind-Pfade erben den Modul-Key des Präfixes.
+        assert_eq!(
+            key_fuer_pfad("/api/einsaetze/{id}/meldungen"),
+            Some(Some("meldungen"))
+        );
+        assert_eq!(
+            key_fuer_pfad("/api/einsaetze/{id}/meldungen/{mid}/status"),
+            Some(Some("meldungen"))
+        );
+        // Eigenständiger Lage-Pfad → eigener Key, NICHT "meldungen".
+        assert_eq!(
+            key_fuer_pfad("/api/einsaetze/{id}/lage/meldungen"),
+            Some(Some("lagemeldungen"))
+        );
+        // Modul-lose Route: registriert, aber kein Key.
+        assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/anhaenge"), Some(None));
+        assert_eq!(
+            key_fuer_pfad("/api/einsaetze/{id}/anhaenge/{aid}"),
+            Some(None)
+        );
+        // Noch DEFERRED / nicht registriert.
+        assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/personen"), None);
     }
 }
