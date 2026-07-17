@@ -16,6 +16,7 @@ import AlarmZentrale from './AlarmZentrale';
 import ThemeToggle from '../components/ThemeToggle';
 import BenutzerMenu from '../components/BenutzerMenu';
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
+import LiveStatusBanner from '../live/LiveStatusBanner';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 
 const { Header, Content } = Layout;
@@ -24,7 +25,7 @@ const { Header, Content } = Layout;
 export default function EinsatzLayout() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const { benutzer } = useAuth();
+  const { benutzer, logout } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
@@ -32,6 +33,18 @@ export default function EinsatzLayout() {
   // damit die Alarm-Zentrale seitenunabhängig auflöst und das HTTP/1.1-6-Verbindungslimit
   // sicher eingehalten wird (siehe useEinsatzLiveStream-Doku).
   useEinsatzLiveStream(einsatzId);
+
+  // 401-Brücke (F14/LFH-263): Erkennt der Live-Feed beim Reconnect eine abgelaufene Session
+  // (EventSource sieht keinen Status-Code, daher probt der Hook /api/auth/me und meldet
+  // `lfh:live-auth-verloren`), wird sauber ab- und zum Login geleitet — statt still einen
+  // toten Feed als „live" stehen zu lassen.
+  useEffect(() => {
+    const onAuthVerloren = () => {
+      void logout().finally(() => navigate('/login'));
+    };
+    window.addEventListener('lfh:live-auth-verloren', onAuthVerloren);
+    return () => window.removeEventListener('lfh:live-auth-verloren', onAuthVerloren);
+  }, [logout, navigate]);
 
   // Modul-Segment ist der Pfad-Teil direkt nach der Einsatz-ID
   // (…/einsaetze/:id/<route>/…) — nicht das letzte Segment, sonst verliert das
@@ -81,6 +94,7 @@ export default function EinsatzLayout() {
           <BenutzerMenu />
         </Space>
       </Header>
+      <LiveStatusBanner />
       <Layout hasSider>
         <IconRail
           kategorien={kategorien}

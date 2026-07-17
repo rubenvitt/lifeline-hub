@@ -1,17 +1,29 @@
+import { http, HttpResponse } from 'msw';
 import { render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import { useEinsatzLiveStream } from './useEinsatzLiveStream';
 
 class FakeEventSource {
-  static letzte: FakeEventSource | null = null;
+  static CONNECTING = 0;
+  static OPEN = 1;
+  static CLOSED = 2;
+  static instanzen: FakeEventSource[] = [];
+  static get letzte(): FakeEventSource | null {
+    const arr = FakeEventSource.instanzen;
+    return arr.length > 0 ? arr[arr.length - 1] : null;
+  }
   url: string;
   closed = false;
+  readyState = FakeEventSource.OPEN;
+  onopen: (() => void) | null = null;
+  onerror: (() => void) | null = null;
   private listeners: Record<string, ((e: MessageEvent) => void)[]> = {};
   constructor(url: string) {
     this.url = url;
-    FakeEventSource.letzte = this;
+    FakeEventSource.instanzen.push(this);
   }
   addEventListener(typ: string, cb: (e: MessageEvent) => void) {
     (this.listeners[typ] ??= []).push(cb);
@@ -21,13 +33,28 @@ class FakeEventSource {
   }
   close() {
     this.closed = true;
+    this.readyState = FakeEventSource.CLOSED;
   }
   emit(typ: string, data = '') {
+    if (typ === 'open') {
+      this.readyState = FakeEventSource.OPEN;
+      this.onopen?.();
+      return;
+    }
     (this.listeners[typ] ?? []).forEach((cb) => cb(new MessageEvent(typ, { data })));
+  }
+  /** Simuliert einen Verbindungsfehler mit gegebenem readyState (CONNECTING=Auto-Reconnect,
+   *  CLOSED=Browser gibt auf). */
+  emitError(readyState: number) {
+    this.readyState = readyState;
+    this.onerror?.();
   }
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  FakeEventSource.instanzen = [];
+});
 
 function Probe({ id }: { id: number }) {
   useEinsatzLiveStream(id);
@@ -362,5 +389,105 @@ describe('useEinsatzLiveStream', () => {
       .filter((k) => k[0] === 'einsatz-auftraege');
     expect(auftraegeKeys).toHaveLength(0);
     window.removeEventListener('lfh:erinnerung-alarm', alarm);
+  });
+
+  // F14/LFH-263: Reconnect-Resync + sichtbarer Fehlerpfad.
+  it('invalidiert beim ersten open NICHT und meldet Status open (skip-first, F14)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    const status: string[] = [];
+    const onStatus = (e: Event) => status.push((e as CustomEvent<{ status: string }>).detail.status);
+    window.addEventListener('lfh:live-status', onStatus);
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={1} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emit('open');
+    await waitFor(() => expect(status).toContain('open'));
+    expect(spy).not.toHaveBeenCalled(); // erstes open löst KEINEN Voll-Invalidate aus
+    window.removeEventListener('lfh:live-status', onStatus);
+  });
+
+  it('invalidiert beim Re-Open alle Registry-Keys (Reconnect-Resync wie lagged, F14)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={3} />
+      </QueryClientProvider>,
+    );
+    const quelle = FakeEventSource.letzte;
+    quelle?.emit('open'); // erstes open → skip
+    spy.mockClear();
+    quelle?.emit('open'); // Reconnect → Voll-Resync
+    await waitFor(() => {
+      const calls = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown[] }).queryKey);
+      expect(calls).toContainEqual(['einsatz-uhs', 3]);
+      expect(calls).toContainEqual(['etb', 3]);
+    });
+  });
+
+  it('meldet connecting bei transientem Fehler (readyState CONNECTING, F14)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    const client = neuerQueryClient();
+    const status: string[] = [];
+    const onStatus = (e: Event) => status.push((e as CustomEvent<{ status: string }>).detail.status);
+    window.addEventListener('lfh:live-status', onStatus);
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={1} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emitError(FakeEventSource.CONNECTING);
+    await waitFor(() => expect(status).toContain('connecting'));
+    window.removeEventListener('lfh:live-status', onStatus);
+  });
+
+  it('leitet bei CLOSED-Fehler mit 401 in den Login-Flow (F14)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+    const authVerloren = vi.fn();
+    window.addEventListener('lfh:live-auth-verloren', authVerloren);
+    const status: string[] = [];
+    const onStatus = (e: Event) => status.push((e as CustomEvent<{ status: string }>).detail.status);
+    window.addEventListener('lfh:live-status', onStatus);
+    const client = neuerQueryClient();
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={1} />
+      </QueryClientProvider>,
+    );
+    FakeEventSource.letzte?.emitError(FakeEventSource.CLOSED);
+    await waitFor(() => expect(authVerloren).toHaveBeenCalled());
+    expect(status).toContain('lost');
+    window.removeEventListener('lfh:live-auth-verloren', authVerloren);
+    window.removeEventListener('lfh:live-status', onStatus);
+  });
+
+  it('reconnectet nach CLOSED-Fehler bei gültiger Session statt Login (F14)', async () => {
+    vi.stubGlobal('EventSource', FakeEventSource);
+    server.use(http.get('/api/auth/me', () => HttpResponse.json({ id: 1 }, { status: 200 })));
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const authVerloren = vi.fn();
+    window.addEventListener('lfh:live-auth-verloren', authVerloren);
+    const client = neuerQueryClient();
+    render(
+      <QueryClientProvider client={client}>
+        <Probe id={1} />
+      </QueryClientProvider>,
+    );
+    const quelle = FakeEventSource.letzte;
+    setTimeoutSpy.mockClear();
+    quelle?.emitError(FakeEventSource.CLOSED);
+    await waitFor(() =>
+      expect(setTimeoutSpy.mock.calls.some(([, d]) => d === 1000)).toBe(true),
+    );
+    expect(authVerloren).not.toHaveBeenCalled();
+    expect(quelle?.closed).toBe(true); // tote Quelle vor Reconnect geschlossen
+    window.removeEventListener('lfh:live-auth-verloren', authVerloren);
+    setTimeoutSpy.mockRestore();
   });
 });

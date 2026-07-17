@@ -101,6 +101,19 @@ afterAll(() => server.close());
 // den useEinsatzLiveStream-Tests, die eine FakeEventSource stubben) wieder her.
 beforeEach(() => {
   if (typeof globalThis.EventSource === 'undefined') {
-    vi.stubGlobal('EventSource', class { addEventListener() {} removeEventListener() {} close() {} });
+    vi.stubGlobal(
+      'EventSource',
+      class {
+        static CONNECTING = 0;
+        static OPEN = 1;
+        static CLOSED = 2;
+        readyState = 1;
+        onopen: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        addEventListener() {}
+        removeEventListener() {}
+        close() {}
+      },
+    );
   }
 });
