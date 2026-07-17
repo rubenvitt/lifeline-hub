@@ -31,6 +31,23 @@ pub fn neue_fortschritt_map() -> FortschrittMap {
     Arc::new(RwLock::new(HashMap::new()))
 }
 
+/// Poisoning-fester Lese-Zugriff (LFH-260/F35): eine Panik unter dem Write-Lock würde ihn sonst
+/// vergiften und `.read().unwrap()` in allen folgenden Karten-Handlern panicken lassen. Wir
+/// erholen uns per `into_inner` (Muster wie `geocoding/mod.rs`) — der HashMap-Inhalt bleibt
+/// konsistent, weil unter dem Lock nur infallible insert/remove laufen.
+pub fn lies_fortschritt(
+    map: &FortschrittMap,
+) -> std::sync::RwLockReadGuard<'_, HashMap<i64, Arc<Fortschritt>>> {
+    map.read().unwrap_or_else(|e| e.into_inner())
+}
+
+/// Poisoning-fester Schreib-Zugriff (LFH-260/F35), siehe [`lies_fortschritt`].
+pub fn schreibe_fortschritt(
+    map: &FortschrittMap,
+) -> std::sync::RwLockWriteGuard<'_, HashMap<i64, Arc<Fortschritt>>> {
+    map.write().unwrap_or_else(|e| e.into_inner())
+}
+
 /// Atomare Slot-Reservierung: fügt `f` unter `id` ein und liefert `true`, wenn der Slot frei war;
 /// `false`, wenn bereits ein Download/Reload für `id` läuft. Check UND Insert unter EINEM
 /// write-Lock — verhindert das TOCTOU des id-wiederverwendenden In-Place-Reload-Pffads (getrennter
@@ -38,7 +55,7 @@ pub fn neue_fortschritt_map() -> FortschrittMap {
 /// truncaten/interleaven → korrupte Live-Karte). `offline_download` (frische id je Zeile) braucht
 /// das nicht, teilt aber denselben Helfer.
 pub fn reserviere_fortschritt(map: &FortschrittMap, id: i64, f: Arc<Fortschritt>) -> bool {
-    let mut m = map.write().unwrap();
+    let mut m = schreibe_fortschritt(map);
     if m.contains_key(&id) {
         return false;
     }
@@ -738,5 +755,27 @@ mod tests {
         );
         // Idempotent: zweiter Aufruf ohne Dateien ist ein No-Op (kein Panic).
         entferne_download_dateien(dir, 7).await;
+    }
+
+    /// LFH-260/F35: Ein Panic unter dem Write-Lock vergiftet die Fortschritt-Map. Der Zugriff
+    /// muss poisoning-fest sein (unwrap_or_else(into_inner), Muster wie geocoding/mod.rs), sonst
+    /// panicken alle folgenden Karten-Handler.
+    #[test]
+    fn fortschritt_map_ueberlebt_vergifteten_lock() {
+        let map = neue_fortschritt_map();
+        let m2 = map.clone();
+        // Lock unter Panic vergiften.
+        let _ = std::thread::spawn(move || {
+            let _g = m2.write().unwrap();
+            panic!("vergifte den Lock absichtlich");
+        })
+        .join();
+        assert!(map.read().is_err(), "Vorbedingung: Lock ist vergiftet");
+
+        // Poisoning-fest: reserviere_fortschritt darf NICHT panicken.
+        assert!(
+            reserviere_fortschritt(&map, 7, Arc::new(Fortschritt::default())),
+            "muss trotz Vergiftung einfügen können"
+        );
     }
 }

@@ -3,6 +3,7 @@ use crate::live::LiveHub;
 use crate::routes;
 use axum::{
     extract::DefaultBodyLimit,
+    response::IntoResponse,
     routing::{delete, get, patch, post, put},
     Router,
 };
@@ -1005,5 +1006,36 @@ pub fn build_router(state: AppState) -> Router {
 
     router
         .fallback(crate::static_files::serve)
+        // Panik-Abfederung (LFH-260/F35): fängt eine Handler-Panik und antwortet mit 500 +
+        // {error}-JSON, statt die Verbindung ohne Antwort abzureißen — Letzteres klassifiziert
+        // das Frontend als Netzwerkfehler und der Offline-Puffer als „kein Netz".
+        .layer(tower_http::catch_panic::CatchPanicLayer::custom(on_panic))
         .with_state(state)
+}
+
+/// Antwort auf eine im Handler abgefangene Panik (LFH-260/F35): 500 mit demselben
+/// `{error}`-JSON-Envelope wie `AppError`. Der Panik-Grund bleibt im Log (tracing), nicht
+/// in der Antwort.
+fn on_panic(_err: Box<dyn std::any::Any + Send + 'static>) -> axum::response::Response {
+    tracing::error!("Handler-Panik durch CatchPanicLayer abgefangen");
+    (
+        axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+        axum::Json(serde_json::json!({ "error": "Interner Serverfehler" })),
+    )
+        .into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::to_bytes;
+
+    #[tokio::test]
+    async fn on_panic_liefert_500_mit_error_envelope() {
+        let resp = on_panic(Box::new("boom"));
+        assert_eq!(resp.status(), axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+        let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(json["error"], "Interner Serverfehler");
+    }
 }

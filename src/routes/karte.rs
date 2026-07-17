@@ -826,7 +826,7 @@ pub async fn offline_liste(
     let katalog = crate::karte::katalog::katalog_aus_cache();
     // Ladende Karten mit Live-Bytes aus dem In-Memory-Fortschritt anreichern (kein await unter
     // dem Lock).
-    let map = state.download_fortschritt.read().unwrap();
+    let map = download::lies_fortschritt(&state.download_fortschritt);
     let antwort: Vec<OfflineKarteAntwort> = rows
         .into_iter()
         .map(|k| {
@@ -1257,7 +1257,7 @@ pub async fn offline_neu_laden(
         )
         .await;
         verarbeite_in_place_ergebnis(&pool, &karten_dir, id, &neue_quell_url, ergebnis).await;
-        fortschritt_map.write().unwrap().remove(&id);
+        download::schreibe_fortschritt(&fortschritt_map).remove(&id);
     });
 
     Ok((StatusCode::ACCEPTED, Json(karte)))
@@ -1360,14 +1360,22 @@ pub async fn offline_download(
                 if let Err(e) = tokio::fs::rename(&part, &ziel).await {
                     tracing::error!("Rename der Kartendatei {id} fehlgeschlagen: {e}");
                     let _ = tokio::fs::remove_file(&part).await;
-                    let _ = repo::setze_status(&pool, id, "fehler").await;
+                    if let Err(e) = repo::setze_status(&pool, id, "fehler").await {
+                        tracing::error!(
+                            "setze_status('fehler') für Karte {id} fehlgeschlagen: {e}"
+                        );
+                    }
                 } else if let Err(e) =
                     repo::markiere_bereit(&pool, id, &dateiname, erg.groesse, &erg.sha256).await
                 {
                     tracing::error!("markiere_bereit({id}) fehlgeschlagen: {e}");
                     // Bereits umbenannte finale Datei aufräumen, sonst verwaist sie ohne DB-Record.
                     let _ = tokio::fs::remove_file(&ziel).await;
-                    let _ = repo::setze_status(&pool, id, "fehler").await;
+                    if let Err(e) = repo::setze_status(&pool, id, "fehler").await {
+                        tracing::error!(
+                            "setze_status('fehler') für Karte {id} fehlgeschlagen: {e}"
+                        );
+                    }
                 } else {
                     tracing::info!(
                         "Offline-Karte {id}: Download fertig ({} Bytes)",
@@ -1380,11 +1388,13 @@ pub async fn offline_download(
             Err(fehler) => {
                 tracing::warn!("Download der Karte {id} fehlgeschlagen: {fehler}");
                 let _ = tokio::fs::remove_file(&part).await; // Teil-Datei aufräumen
-                let _ = repo::setze_status(&pool, id, "fehler").await;
+                if let Err(e) = repo::setze_status(&pool, id, "fehler").await {
+                    tracing::error!("setze_status('fehler') für Karte {id} fehlgeschlagen: {e}");
+                }
             }
         }
         // Fortschritt-Eintrag in JEDEM Ausgang entfernen (sonst wächst die Map unbegrenzt).
-        fortschritt_map.write().unwrap().remove(&id);
+        download::schreibe_fortschritt(&fortschritt_map).remove(&id);
     });
 
     Ok((StatusCode::ACCEPTED, Json(karte)))
@@ -1400,7 +1410,9 @@ pub async fn offline_abbrechen(
     _admin: AdminUser,
     Path(id): Path<i64>,
 ) -> Result<StatusCode, AppError> {
-    let laufend = state.download_fortschritt.read().unwrap().get(&id).cloned();
+    let laufend = download::lies_fortschritt(&state.download_fortschritt)
+        .get(&id)
+        .cloned();
     match laufend {
         Some(f) => {
             f.abbruch.store(true, Ordering::Relaxed);
