@@ -40,7 +40,6 @@ export default function AppLayout() {
           lifeline-hub
         </Link>
         <GlobalLink to="/admin" label="Verwaltung" gesperrt={!darfAdmin(benutzer)} />
-        <GlobalLink to="/benutzer" label="Benutzer" gesperrt={benutzer?.system_rolle !== 'admin'} />
         <Space style={{ marginLeft: 'auto' }} size="middle">
           <ThemeToggle />
           <BenutzerMenu />

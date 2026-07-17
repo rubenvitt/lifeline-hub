@@ -104,6 +104,18 @@ describe('EinsatzDefaults', () => {
     await waitFor(() => expect(setzeOrgModulEinstellung).toHaveBeenCalledWith('etb', 'admin'));
   });
 
+  it('deaktiviert nicht-ausblendbare Modul-Selects auch als Admin', async () => {
+    // 'einsatzdaten' und 'einsatz-einstellungen' sind NICHT_AUSBLENDBAR — der Rollen-Default-
+    // Select bleibt für Admins deaktiviert; ein ausblendbares Modul (ETB) ist editierbar.
+    renderMitProviders(<EinsatzDefaults />);
+
+    expect(
+      await screen.findByRole('combobox', { name: 'Benötigte Rolle: Einsatzdaten' }),
+    ).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: 'Benötigte Rolle: Einstellungen' })).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: 'Benötigte Rolle: ETB' })).not.toBeDisabled();
+  });
+
   it('ist read-only für Nicht-Admins (fuehrungskraft): kein Speichern-Button, Felder disabled', async () => {
     vi.mocked(useAuth).mockReturnValue({
       benutzer: { id: 2, system_rolle: 'keiner', org_rolle: 'fuehrungskraft', anzeigename: 'FK', benutzername: 'fk', aktiv: true, erstellt_at: '', totp_aktiviert: false },

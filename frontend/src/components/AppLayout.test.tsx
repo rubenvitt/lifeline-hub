@@ -27,11 +27,12 @@ function setup(me: Record<string, unknown>) {
 }
 
 describe('AppLayout (globale Topbar)', () => {
-  it('Admin: Stammdaten und Benutzer sind Links, Profil/Abmelden im Benutzermenü', async () => {
+  it('Admin: Verwaltung ist Link, Profil/Abmelden im Benutzermenü (Benutzer wohnt in der Sidebar)', async () => {
     setup(admin);
     await waitFor(() => expect(screen.getByText('Chef')).toBeInTheDocument());
     expect(screen.getByRole('link', { name: 'Verwaltung' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Benutzer' })).toBeInTheDocument();
+    // Benutzer ist kein Topbar-Link mehr (steht in der Admin-Sidebar).
+    expect(screen.queryByRole('link', { name: 'Benutzer' })).not.toBeInTheDocument();
     expect(screen.getByText('Inhalt')).toBeInTheDocument();
     // Profil und Abmelden liegen jetzt im Benutzermenü (Dropdown).
     await userEvent.click(screen.getByRole('button', { name: 'Benutzermenü' }));
@@ -39,21 +40,19 @@ describe('AppLayout (globale Topbar)', () => {
     expect(screen.getByText('Abmelden')).toBeInTheDocument();
   });
 
-  it('Fuehrungskraft: Verwaltung frei, Benutzer gesperrt (🔒, kein Link)', async () => {
+  it('Fuehrungskraft: Verwaltung frei, kein Benutzer-Topbar-Eintrag', async () => {
     setup({ ...admin, system_rolle: 'keiner', org_rolle: 'fuehrungskraft', anzeigename: 'Eva' });
     await waitFor(() => expect(screen.getByText('Eva')).toBeInTheDocument());
     expect(screen.getByRole('link', { name: 'Verwaltung' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Benutzer' })).not.toBeInTheDocument();
-    expect(screen.getByText('Benutzer 🔒')).toBeInTheDocument();
+    expect(screen.queryByText('Benutzer 🔒')).not.toBeInTheDocument();
   });
 
-  it('Sonstige: Verwaltung und Benutzer gesperrt, kein Admin-Tag', async () => {
+  it('Sonstige: Verwaltung gesperrt (🔒), kein Admin-Tag, kein Benutzer-Eintrag', async () => {
     setup({ ...admin, system_rolle: 'keiner', org_rolle: 'keine', anzeigename: 'Max' });
     await waitFor(() => expect(screen.getByText('Max')).toBeInTheDocument());
     expect(screen.queryByRole('link', { name: 'Verwaltung' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Benutzer' })).not.toBeInTheDocument();
     expect(screen.getByText('Verwaltung 🔒')).toBeInTheDocument();
-    expect(screen.getByText('Benutzer 🔒')).toBeInTheDocument();
+    expect(screen.queryByText('Benutzer 🔒')).not.toBeInTheDocument();
     expect(screen.queryByText('Admin')).not.toBeInTheDocument();
   });
 });
