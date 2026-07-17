@@ -127,11 +127,18 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
 ];
 
 /// Längster-Präfix-Match über [`PFAD_KEY`]. Äußeres `None` = Pfad nicht registriert;
-/// `Some(inner)` = registriert (inner `None` = modul-lose Route).
+/// `Some(inner)` = registriert (inner `None` = modul-lose Route). Segment-grenzen-sicher:
+/// ein Präfix trifft nur bei Gleichheit oder wenn direkt danach `/` folgt — sonst würde
+/// z. B. `…/meldungenarchiv` fälschlich als `…/meldungen`-Kind matchen.
 pub fn key_fuer_pfad(pfad: &str) -> Option<Option<&'static str>> {
     PFAD_KEY
         .iter()
-        .filter(|(prefix, _)| pfad.starts_with(prefix))
+        .filter(|(prefix, _)| {
+            pfad == *prefix
+                || pfad
+                    .strip_prefix(*prefix)
+                    .is_some_and(|rest| rest.starts_with('/'))
+        })
         .max_by_key(|(prefix, _)| prefix.len())
         .map(|(_, key)| *key)
 }
@@ -230,5 +237,12 @@ mod tests {
         );
         // Noch DEFERRED / nicht registriert.
         assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/personen"), None);
+    }
+
+    #[test]
+    fn pfad_key_ignoriert_teil_segment_treffer() {
+        // "meldungenarchiv" verlängert das Präfix "meldungen" als Text, ist aber
+        // ein anderes Segment — darf NICHT als "meldungen"-Kind durchgehen.
+        assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/meldungenarchiv"), None);
     }
 }
