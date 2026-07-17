@@ -47,7 +47,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
 
     // Sofortmeldung (LFH-97): Escape-Hatch mit Seiteneffekten — Meldungs-Listen aktualisieren
     // UND unübersehbar alarmieren (Ton + Toast). Der Toast wird einsatzweit über ein
-    // window-CustomEvent aufgelöst (SofortAlarm im Layout lauscht), damit der Hook ohne
+    // window-CustomEvent aufgelöst (AlarmZentrale im Layout lauscht), damit der Hook ohne
     // Render-State auskommt und EINE EventSource bleibt. NICHT im lagged-Fan-out.
     const onSofort = (ev: MessageEvent) => {
       invalAlle(EINSATZ_STREAM_EVENTS.meldung);
