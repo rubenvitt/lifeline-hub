@@ -125,10 +125,13 @@ Aus der Registry generiert:
   - **Anmeldeverfahren** — **kein** Form/`aktionen`-Button; Provider-Toggles speichern sofort
     (`schaltenMutation`). Passwort-Provider bleibt garantiert nicht-deaktivierbar (Tooltip).
   - Jede Komponente hält ihre eigene(n) `useQuery` (react-query-Cache über die bestehenden
-    Query-Keys geteilt). `speichereOrgEinstellungen` nimmt ein partielles
-    `OrgEinstellungenUpdate` → zwei getrennte Teil-Saves sind wire-korrekt. `istAdmin`-
-    Read-only-Verhalten (Führungskräfte sehen Werte, können nicht editieren) je Sektion
-    erhalten.
+    Query-Keys geteilt). **KRITISCH — PUT ist Vollersatz** (`PUT /api/org-einstellungen`,
+    verifiziert in `src/routes/org_einstellungen.rs`), **kein** PATCH: ein Save ersetzt alle
+    Spalten. Darum baut jede der beiden Form-Sektionen (Anzeige, Einsatz-Defaults) beim
+    Speichern den **vollen** `OrgEinstellungenUpdate` = eigene (editierte) Felder **gemerged
+    mit** den übrigen Feldern aus `einstellungenQuery.data` — sonst würde z. B. ein
+    Anzeige-Save die Einsatz-Default-Spalten auf `null` setzen. `istAdmin`-Read-only-Verhalten
+    (Führungskräfte sehen Werte, können nicht editieren) je Sektion erhalten.
 - **Benutzer:** Route `/admin/benutzer`, in die Sidebar; strengeres `system_rolle==='admin'`-
   Gate bleibt als **früher Return vor** dem `AdminPage`-JSX (Redirect-Verhalten unverändert).
   „Benutzer anlegen" bleibt im `aktionen`-Slot.
