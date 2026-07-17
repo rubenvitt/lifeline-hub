@@ -129,6 +129,44 @@ async fn backup_download_enthaelt_keine_sessions() {
     );
 }
 
+/// Der Download wird gestreamt (kein Voll-in-RAM-Read). Streaming-Bodies sind per
+/// Default chunked und verlieren Content-Length — der Browser zeigt dann keinen
+/// Fortschritt für eine potenziell sehr große Sicherung. Der Header muss bleiben.
+#[tokio::test]
+async fn backup_download_meldet_content_length() {
+    let app = setup().await;
+    let cookie = login(&app, "admin", "startpw12").await;
+
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/backup")
+                .header(header::COOKIE, &cookie)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let gemeldet: usize = resp
+        .headers()
+        .get(header::CONTENT_LENGTH)
+        .expect("Backup-Download muss Content-Length melden (Fortschrittsanzeige)")
+        .to_str()
+        .unwrap()
+        .parse()
+        .unwrap();
+
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    assert_eq!(
+        gemeldet,
+        bytes.len(),
+        "Content-Length muss der tatsächlich gelieferten Downloadgröße entsprechen"
+    );
+}
+
 #[tokio::test]
 async fn backup_ohne_session_ist_401() {
     let app = setup().await;
