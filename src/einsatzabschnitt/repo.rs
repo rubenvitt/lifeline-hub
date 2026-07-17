@@ -757,7 +757,10 @@ mod tests {
                 .fetch_one(&pool)
                 .await
                 .unwrap();
-        assert_eq!(uhs_ref, None, "uhs.abschnitt_id muss freigegeben (NULL) sein");
+        assert_eq!(
+            uhs_ref, None,
+            "uhs.abschnitt_id muss freigegeben (NULL) sein"
+        );
         let br_ref: Option<i64> =
             sqlx::query_scalar("SELECT abschnitt_id FROM bereitstellungsraum WHERE einsatz_id = ?")
                 .bind(einsatz)
@@ -768,13 +771,15 @@ mod tests {
             br_ref, None,
             "bereitstellungsraum.abschnitt_id muss freigegeben (NULL) sein"
         );
-        let emp_ref: Option<i64> = sqlx::query_scalar(
-            "SELECT abschnitt_id FROM auftrag_empfaenger WHERE auftrag_id = ?",
-        )
-        .bind(auftrag)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-        assert_eq!(emp_ref, None, "Empfänger.abschnitt_id muss NULL sein (SET NULL)");
+        let emp_ref: Option<i64> =
+            sqlx::query_scalar("SELECT abschnitt_id FROM auftrag_empfaenger WHERE auftrag_id = ?")
+                .bind(auftrag)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            emp_ref, None,
+            "Empfänger.abschnitt_id muss NULL sein (SET NULL)"
+        );
     }
 }

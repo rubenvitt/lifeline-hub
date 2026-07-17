@@ -1788,7 +1788,9 @@ mod tests {
                 .bind(ziel)
                 .execute(&pool)
                 .await
-                .unwrap_or_else(|e| panic!("Löschen aus {tabelle} darf nicht am FK scheitern: {e}"));
+                .unwrap_or_else(|e| {
+                    panic!("Löschen aus {tabelle} darf nicht am FK scheitern: {e}")
+                });
 
             // Empfänger-Zeile lebt weiter, FK-Spalte ist NULL, Auftrag-Bezug + snap_anzeige intakt.
             let check = format!(
@@ -1800,10 +1802,11 @@ mod tests {
                 .bind(format!("Anzeige {}", _typ_of(spalte)))
                 .fetch_one(&pool)
                 .await
-                .unwrap_or_else(|e| {
-                    panic!("Empfänger-Zeile für {spalte} muss überleben: {e}")
-                });
-            assert_eq!(ok, 1, "{spalte} muss nach Löschung NULL sein (SET NULL), Zeile bleibt");
+                .unwrap_or_else(|e| panic!("Empfänger-Zeile für {spalte} muss überleben: {e}"));
+            assert_eq!(
+                ok, 1,
+                "{spalte} muss nach Löschung NULL sein (SET NULL), Zeile bleibt"
+            );
         }
 
         // Keine dangling FKs nach den Löschungen.
@@ -1896,8 +1899,24 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(
-            (aid, typ.as_str(), kat.as_deref(), bez.as_deref(), snap.as_str(), qat.as_deref(), qvon),
-            (42, "extern", Some("leitstelle"), Some("ILS Musterstadt"), "ILS", Some("2026-07-17 09:00:00"), Some(3)),
+            (
+                aid,
+                typ.as_str(),
+                kat.as_deref(),
+                bez.as_deref(),
+                snap.as_str(),
+                qat.as_deref(),
+                qvon
+            ),
+            (
+                42,
+                "extern",
+                Some("leitstelle"),
+                Some("ILS Musterstadt"),
+                "ILS",
+                Some("2026-07-17 09:00:00"),
+                Some(3)
+            ),
             "alle 13 Spalten müssen den Rebuild verlustfrei überleben"
         );
 

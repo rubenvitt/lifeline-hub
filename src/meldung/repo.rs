@@ -1421,7 +1421,11 @@ mod tests {
     async fn anlegen_ungueltige_meldungsart_ist_validation() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
-        let mut d = daten("Deich instabil", "2026-06-12 09:00:00", "2026-06-12 09:05:00");
+        let mut d = daten(
+            "Deich instabil",
+            "2026-06-12 09:00:00",
+            "2026-06-12 09:05:00",
+        );
         d.meldungsart = "quatsch";
         assert!(matches!(
             anlegen(&pool, e, b, d).await.unwrap_err(),

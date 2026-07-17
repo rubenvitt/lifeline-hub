@@ -238,7 +238,10 @@ mod tests {
         // Fachlich beantwortet, aber generisch: kein nackter 500-Text und kein SQL-Leak.
         assert_ne!(json["error"], "Interner Serverfehler");
         let msg = json["error"].as_str().unwrap();
-        assert!(!msg.contains("UNIQUE"), "Meldung darf kein SQL-Detail leaken: {msg}");
+        assert!(
+            !msg.contains("UNIQUE"),
+            "Meldung darf kein SQL-Detail leaken: {msg}"
+        );
     }
 
     #[tokio::test]

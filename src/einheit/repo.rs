@@ -1017,13 +1017,12 @@ mod tests {
         loese_auf(&pool, einsatz, einheit)
             .await
             .expect("Einheit auflösen darf nicht am FK scheitern");
-        let emp: Option<i64> = sqlx::query_scalar(
-            "SELECT einheit_id FROM auftrag_empfaenger WHERE auftrag_id = ?",
-        )
-        .bind(auftrag)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+        let emp: Option<i64> =
+            sqlx::query_scalar("SELECT einheit_id FROM auftrag_empfaenger WHERE auftrag_id = ?")
+                .bind(auftrag)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(emp, None, "Empfänger.einheit_id muss NULL sein (SET NULL)");
     }
 }

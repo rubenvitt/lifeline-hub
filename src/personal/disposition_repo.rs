@@ -977,7 +977,10 @@ mod tests {
         .fetch_one(&pool)
         .await
         .unwrap();
-        assert_eq!(person_ref, None, "Empfänger.person_id muss NULL sein (SET NULL)");
+        assert_eq!(
+            person_ref, None,
+            "Empfänger.person_id muss NULL sein (SET NULL)"
+        );
         assert_eq!(snap, "Anton Abel", "snap_anzeige bleibt erhalten");
 
         // p2 = Abschnittsleiter → Entfernen gibt leiter_id frei.
