@@ -1,6 +1,6 @@
 use super::BelegungAnzeige;
 use crate::error::AppError;
-use sqlx::{Sqlite, SqlitePool, Transaction};
+use sqlx::{SqliteConnection, SqlitePool};
 
 const SELECT_ALLE: &str = "\
     SELECT id, einsatz_id, person_id, uhs_id, platz_id, art, notiz, zeitpunkt_at, erfasst_von \
@@ -27,28 +27,29 @@ pub async fn eintritt(
     notiz: Option<&str>,
     erfasst_von: i64,
 ) -> Result<BelegungAnzeige, AppError> {
-    let mut tx = pool.begin().await?;
-    pruefe_uhs_aktiv(&mut tx, einsatz_id, uhs_id).await?;
-    pruefe_person_nicht_belegt(&mut tx, einsatz_id, person_id).await?;
-    if let Some(pid) = platz_id {
-        pruefe_platz_belegbar(&mut tx, uhs_id, pid, person_id).await?;
-    }
-    let id = insert_event(
-        &mut tx,
-        einsatz_id,
-        person_id,
-        uhs_id,
-        platz_id,
-        "eintritt",
-        notiz,
-        erfasst_von,
-    )
-    .await?;
-    update_cache(&mut tx, einsatz_id, person_id, Some(uhs_id), platz_id).await?;
-    if let Some(pid) = platz_id {
-        loese_eigene_reservierung_ein(&mut tx, pid, person_id).await?;
-    }
-    tx.commit().await?;
+    let id = crate::write_retry!(pool, |conn| {
+        pruefe_uhs_aktiv(&mut *conn, einsatz_id, uhs_id).await?;
+        pruefe_person_nicht_belegt(&mut *conn, einsatz_id, person_id).await?;
+        if let Some(pid) = platz_id {
+            pruefe_platz_belegbar(&mut *conn, uhs_id, pid, person_id).await?;
+        }
+        let id = insert_event(
+            &mut *conn,
+            einsatz_id,
+            person_id,
+            uhs_id,
+            platz_id,
+            "eintritt",
+            notiz,
+            erfasst_von,
+        )
+        .await?;
+        update_cache(&mut *conn, einsatz_id, person_id, Some(uhs_id), platz_id).await?;
+        if let Some(pid) = platz_id {
+            loese_eigene_reservierung_ein(&mut *conn, pid, person_id).await?;
+        }
+        Ok(id)
+    })?;
     laden(pool, einsatz_id, id).await
 }
 
@@ -65,44 +66,45 @@ pub async fn wechsel(
     notiz: Option<&str>,
     erfasst_von: i64,
 ) -> Result<BelegungAnzeige, AppError> {
-    let mut tx = pool.begin().await?;
-    pruefe_uhs_aktiv(&mut tx, einsatz_id, ziel_uhs_id).await?;
-    let (ex_uhs, ex_platz) = lade_cache(&mut tx, person_id).await?;
-    if ex_uhs.is_none() {
-        return Err(AppError::Conflict(
-            "Person hat keine aktive Belegung".into(),
-        ));
-    }
-    if let Some(zpid) = ziel_platz_id {
-        pruefe_platz_belegbar(&mut tx, ziel_uhs_id, zpid, person_id).await?;
-    }
-    let id = insert_event(
-        &mut tx,
-        einsatz_id,
-        person_id,
-        ziel_uhs_id,
-        ziel_platz_id,
-        "wechsel",
-        notiz,
-        erfasst_von,
-    )
-    .await?;
-    // Cache erst nach Aufbereitung umsetzen, sonst greift der Belegungs-Check beim Ex-Platz nicht.
-    if let Some(ex_pid) = ex_platz {
-        auto_aufbereitung_wenn_frei(&mut tx, ex_pid).await?;
-    }
-    update_cache(
-        &mut tx,
-        einsatz_id,
-        person_id,
-        Some(ziel_uhs_id),
-        ziel_platz_id,
-    )
-    .await?;
-    if let Some(zpid) = ziel_platz_id {
-        loese_eigene_reservierung_ein(&mut tx, zpid, person_id).await?;
-    }
-    tx.commit().await?;
+    let id = crate::write_retry!(pool, |conn| {
+        pruefe_uhs_aktiv(&mut *conn, einsatz_id, ziel_uhs_id).await?;
+        let (ex_uhs, ex_platz) = lade_cache(&mut *conn, person_id).await?;
+        if ex_uhs.is_none() {
+            return Err(AppError::Conflict(
+                "Person hat keine aktive Belegung".into(),
+            ));
+        }
+        if let Some(zpid) = ziel_platz_id {
+            pruefe_platz_belegbar(&mut *conn, ziel_uhs_id, zpid, person_id).await?;
+        }
+        let id = insert_event(
+            &mut *conn,
+            einsatz_id,
+            person_id,
+            ziel_uhs_id,
+            ziel_platz_id,
+            "wechsel",
+            notiz,
+            erfasst_von,
+        )
+        .await?;
+        // Cache erst nach Aufbereitung umsetzen, sonst greift der Belegungs-Check beim Ex-Platz nicht.
+        if let Some(ex_pid) = ex_platz {
+            auto_aufbereitung_wenn_frei(&mut *conn, ex_pid).await?;
+        }
+        update_cache(
+            &mut *conn,
+            einsatz_id,
+            person_id,
+            Some(ziel_uhs_id),
+            ziel_platz_id,
+        )
+        .await?;
+        if let Some(zpid) = ziel_platz_id {
+            loese_eigene_reservierung_ein(&mut *conn, zpid, person_id).await?;
+        }
+        Ok(id)
+    })?;
     laden(pool, einsatz_id, id).await
 }
 
@@ -115,26 +117,27 @@ pub async fn austritt(
     notiz: Option<&str>,
     erfasst_von: i64,
 ) -> Result<BelegungAnzeige, AppError> {
-    let mut tx = pool.begin().await?;
-    let (ex_uhs, ex_platz) = lade_cache(&mut tx, person_id).await?;
-    let uhs =
-        ex_uhs.ok_or_else(|| AppError::Conflict("Person hat keine aktive Belegung".into()))?;
-    let id = insert_event(
-        &mut tx,
-        einsatz_id,
-        person_id,
-        uhs,
-        None,
-        "austritt",
-        notiz,
-        erfasst_von,
-    )
-    .await?;
-    if let Some(ex_pid) = ex_platz {
-        auto_aufbereitung_wenn_frei(&mut tx, ex_pid).await?;
-    }
-    update_cache(&mut tx, einsatz_id, person_id, None, None).await?;
-    tx.commit().await?;
+    let id = crate::write_retry!(pool, |conn| {
+        let (ex_uhs, ex_platz) = lade_cache(&mut *conn, person_id).await?;
+        let uhs =
+            ex_uhs.ok_or_else(|| AppError::Conflict("Person hat keine aktive Belegung".into()))?;
+        let id = insert_event(
+            &mut *conn,
+            einsatz_id,
+            person_id,
+            uhs,
+            None,
+            "austritt",
+            notiz,
+            erfasst_von,
+        )
+        .await?;
+        if let Some(ex_pid) = ex_platz {
+            auto_aufbereitung_wenn_frei(&mut *conn, ex_pid).await?;
+        }
+        update_cache(&mut *conn, einsatz_id, person_id, None, None).await?;
+        Ok(id)
+    })?;
     laden(pool, einsatz_id, id).await
 }
 
@@ -153,42 +156,42 @@ pub async fn austritt_intern(
     notiz: Option<&str>,
     erfasst_von: i64,
 ) -> Result<Option<AustrittInfo>, AppError> {
-    let mut tx = pool.begin().await?;
-    let (ex_uhs, ex_platz) = lade_cache(&mut tx, person_id).await?;
-    // Reservierungs-Cleanup IMMER (Spec: bei Storno / Status verstorben / abgemeldet):
-    sqlx::query(
-        "UPDATE uhs_platz SET verfuegbarkeit = 'frei', reserviert_fuer_person_id = NULL \
-         WHERE reserviert_fuer_person_id = ?",
-    )
-    .bind(person_id)
-    .execute(&mut *tx)
-    .await?;
-    let info = if let Some(uhs) = ex_uhs {
-        let id = insert_event(
-            &mut tx,
-            einsatz_id,
-            person_id,
-            uhs,
-            None,
-            "austritt",
-            notiz,
-            erfasst_von,
+    crate::write_retry!(pool, |conn| {
+        let (ex_uhs, ex_platz) = lade_cache(&mut *conn, person_id).await?;
+        // Reservierungs-Cleanup IMMER (Spec: bei Storno / Status verstorben / abgemeldet):
+        sqlx::query(
+            "UPDATE uhs_platz SET verfuegbarkeit = 'frei', reserviert_fuer_person_id = NULL \
+             WHERE reserviert_fuer_person_id = ?",
         )
+        .bind(person_id)
+        .execute(&mut *conn)
         .await?;
-        if let Some(ex_pid) = ex_platz {
-            auto_aufbereitung_wenn_frei(&mut tx, ex_pid).await?;
-        }
-        update_cache(&mut tx, einsatz_id, person_id, None, None).await?;
-        Some(AustrittInfo {
-            uhs_id: uhs,
-            platz_id: ex_platz,
-            event_id: id,
-        })
-    } else {
-        None
-    };
-    tx.commit().await?;
-    Ok(info)
+        let info = if let Some(uhs) = ex_uhs {
+            let id = insert_event(
+                &mut *conn,
+                einsatz_id,
+                person_id,
+                uhs,
+                None,
+                "austritt",
+                notiz,
+                erfasst_von,
+            )
+            .await?;
+            if let Some(ex_pid) = ex_platz {
+                auto_aufbereitung_wenn_frei(&mut *conn, ex_pid).await?;
+            }
+            update_cache(&mut *conn, einsatz_id, person_id, None, None).await?;
+            Some(AustrittInfo {
+                uhs_id: uhs,
+                platz_id: ex_platz,
+                event_id: id,
+            })
+        } else {
+            None
+        };
+        Ok(info)
+    })
 }
 
 /// Belegungs-Verlauf einer UHS (neueste zuerst).
@@ -242,7 +245,7 @@ pub async fn laden(
 // ---------------------------- private Helpers ----------------------------
 
 async fn pruefe_uhs_aktiv(
-    tx: &mut Transaction<'_, Sqlite>,
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     uhs_id: i64,
 ) -> Result<(), AppError> {
@@ -251,7 +254,7 @@ async fn pruefe_uhs_aktiv(
     )
     .bind(uhs_id)
     .bind(einsatz_id)
-    .fetch_optional(&mut **tx)
+    .fetch_optional(&mut *conn)
     .await?;
     match status.as_deref() {
         Some("aktiv") => Ok(()),
@@ -263,7 +266,7 @@ async fn pruefe_uhs_aktiv(
 }
 
 async fn pruefe_person_nicht_belegt(
-    tx: &mut Transaction<'_, Sqlite>,
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     person_id: i64,
 ) -> Result<(), AppError> {
@@ -272,7 +275,7 @@ async fn pruefe_person_nicht_belegt(
     )
     .bind(person_id)
     .bind(einsatz_id)
-    .fetch_optional(&mut **tx)
+    .fetch_optional(&mut *conn)
     .await?;
     let (uhs, storno) = cache.ok_or(AppError::NotFound)?;
     if storno.is_some() {
@@ -287,7 +290,7 @@ async fn pruefe_person_nicht_belegt(
 }
 
 async fn pruefe_platz_belegbar(
-    tx: &mut Transaction<'_, Sqlite>,
+    conn: &mut SqliteConnection,
     uhs_id: i64,
     platz_id: i64,
     person_id: i64,
@@ -297,7 +300,7 @@ async fn pruefe_platz_belegbar(
          FROM uhs_platz WHERE id = ? AND storniert_at IS NULL",
     )
     .bind(platz_id)
-    .fetch_optional(&mut **tx)
+    .fetch_optional(&mut *conn)
     .await?;
     let (platz_uhs, verf, res_fuer) = row.ok_or(AppError::NotFound)?;
     if platz_uhs != uhs_id {
@@ -315,18 +318,18 @@ async fn pruefe_platz_belegbar(
 }
 
 async fn lade_cache(
-    tx: &mut Transaction<'_, Sqlite>,
+    conn: &mut SqliteConnection,
     person_id: i64,
 ) -> Result<(Option<i64>, Option<i64>), AppError> {
     sqlx::query_as("SELECT aktuelle_uhs_id, aktueller_platz_id FROM einsatz_person WHERE id = ?")
         .bind(person_id)
-        .fetch_optional(&mut **tx)
+        .fetch_optional(&mut *conn)
         .await?
         .ok_or(AppError::NotFound)
 }
 
 async fn insert_event(
-    tx: &mut Transaction<'_, Sqlite>,
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     person_id: i64,
     uhs_id: i64,
@@ -347,7 +350,7 @@ async fn insert_event(
     .bind(art)
     .bind(notiz)
     .bind(erfasst_von)
-    .fetch_one(&mut **tx)
+    .fetch_one(&mut *conn)
     .await;
     match ergebnis {
         Ok(id) => Ok(id),
@@ -359,7 +362,7 @@ async fn insert_event(
 }
 
 async fn update_cache(
-    tx: &mut Transaction<'_, Sqlite>,
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     person_id: i64,
     uhs_id: Option<i64>,
@@ -375,7 +378,7 @@ async fn update_cache(
     .bind(platz_id)
     .bind(person_id)
     .bind(einsatz_id)
-    .execute(&mut **tx)
+    .execute(&mut *conn)
     .await;
     match ergebnis {
         Ok(_) => Ok(()),
@@ -387,7 +390,7 @@ async fn update_cache(
 }
 
 async fn auto_aufbereitung_wenn_frei(
-    tx: &mut Transaction<'_, Sqlite>,
+    conn: &mut SqliteConnection,
     platz_id: i64,
 ) -> Result<(), AppError> {
     sqlx::query(
@@ -395,13 +398,13 @@ async fn auto_aufbereitung_wenn_frei(
          WHERE id = ? AND verfuegbarkeit = 'frei'",
     )
     .bind(platz_id)
-    .execute(&mut **tx)
+    .execute(&mut *conn)
     .await?;
     Ok(())
 }
 
 async fn loese_eigene_reservierung_ein(
-    tx: &mut Transaction<'_, Sqlite>,
+    conn: &mut SqliteConnection,
     platz_id: i64,
     person_id: i64,
 ) -> Result<(), AppError> {
@@ -411,7 +414,7 @@ async fn loese_eigene_reservierung_ein(
     )
     .bind(platz_id)
     .bind(person_id)
-    .execute(&mut **tx)
+    .execute(&mut *conn)
     .await?;
     Ok(())
 }
@@ -529,6 +532,40 @@ mod tests {
         assert_eq!(ev.art, BelegungsArt::Eintritt);
         assert!(ev.platz_id.is_none());
         assert_eq!(cache(&pool, p).await, (Some(u), None));
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn eintritt_unter_konkurrierendem_writer_ist_ok() {
+        // F09/LFH-240 red→green: das echte eintritt (deferred BEGIN → read-then-write)
+        // darf unter einem kurz konkurrierenden Writer NICHT mit SQLITE_BUSY (500)
+        // scheitern. ROT auf dem Ist-Code: der deferred Read-Snapshot macht den ersten
+        // Write zum Lock-Upgrade → sofortiges BUSY. GRÜN nach BEGIN IMMEDIATE (parkt am
+        // BEGIN, wo der busy_timeout warten darf, bis Writer B nach 200ms committet).
+        // Braucht das Datei/WAL-Harness (F28) — mit test_pool() (1 Conn) unsichtbar.
+        let (_dir, pool) = crate::db::test_pool_datei().await;
+        let (b, e, u, _, _, _, p) = setup(&pool).await;
+
+        // Writer B hält den WAL-Write-Lock für ~200ms.
+        let mut tx_b = pool.begin_with("BEGIN IMMEDIATE").await.unwrap();
+        sqlx::query("UPDATE organisation SET name = 'gehalten' WHERE id = 1")
+            .execute(&mut *tx_b)
+            .await
+            .unwrap();
+
+        // A: das echte eintritt nebenläufig starten.
+        let pool_a = pool.clone();
+        let handle = tokio::spawn(async move { eintritt(&pool_a, e, p, u, None, None, b).await });
+
+        // A erreicht (deferred) seine SELECT-Guards und blockt am ersten Write.
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        tx_b.commit().await.unwrap();
+
+        let res = handle.await.unwrap();
+        assert!(
+            res.is_ok(),
+            "eintritt muss unter kurz konkurrierendem Writer gelingen \
+             (BEGIN IMMEDIATE + busy_timeout), war: {res:?}"
+        );
     }
 
     #[tokio::test]

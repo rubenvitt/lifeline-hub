@@ -8,6 +8,11 @@ pub async fn connect(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
         .filename(db_path)
         .create_if_missing(true)
         .journal_mode(SqliteJournalMode::Wal)
+        // busy_timeout explizit (F09/LFH-240): sqlx-sqlite setzt zwar 5s per Default,
+        // aber sichtbar dokumentiert, worauf die Writer-Disziplin (BEGIN IMMEDIATE +
+        // zentraler Busy-Retry, src/tx.rs) aufbaut. Beim Lock-Upgrade greift der Timeout
+        // prinzipbedingt nicht — dafür BEGIN IMMEDIATE.
+        .busy_timeout(std::time::Duration::from_secs(5))
         .foreign_keys(true);
 
     SqlitePoolOptions::new()
