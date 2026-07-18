@@ -268,14 +268,20 @@ pub async fn aktualisiere(
 /// rollt die TX die Freigabe zurück.
 pub async fn entferne(pool: &SqlitePool, einsatz_id: i64, ep_id: i64) -> Result<(), AppError> {
     let mut tx = pool.begin().await?;
-    sqlx::query("UPDATE einsatz_einheit SET fuehrer_id = NULL WHERE fuehrer_id = ?")
-        .bind(ep_id)
-        .execute(&mut *tx)
-        .await?;
-    sqlx::query("UPDATE einsatzabschnitt SET leiter_id = NULL WHERE leiter_id = ?")
-        .bind(ep_id)
-        .execute(&mut *tx)
-        .await?;
+    sqlx::query(
+        "UPDATE einsatz_einheit SET fuehrer_id = NULL WHERE fuehrer_id = ? AND einsatz_id = ?",
+    )
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(
+        "UPDATE einsatzabschnitt SET leiter_id = NULL WHERE leiter_id = ? AND einsatz_id = ?",
+    )
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .execute(&mut *tx)
+    .await?;
     let resultat = sqlx::query("DELETE FROM einsatz_personal WHERE id = ? AND einsatz_id = ?")
         .bind(ep_id)
         .bind(einsatz_id)
