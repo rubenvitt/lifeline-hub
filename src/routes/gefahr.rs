@@ -4,6 +4,7 @@ use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
 use crate::einsatz::repo as einsatz_repo;
+use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "gefahrenzonen";
@@ -21,7 +22,9 @@ fn sse_gefahr(state: &AppState, einsatz_id: i64, gefahrengebiet_id: i64) {
     let data =
         serde_json::json!({ "einsatz_id": einsatz_id, "gefahrengebiet_id": gefahrengebiet_id })
             .to_string();
-    state.live.publiziere_event(einsatz_id, "gefahr", data);
+    state
+        .live
+        .publiziere_event(einsatz_id, LiveEvent::Gefahr, data);
 }
 
 /// Schreibt einen System-ETB-Eintrag und publiziert ihn live (Muster wie lage_zone).

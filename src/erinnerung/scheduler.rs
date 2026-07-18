@@ -5,6 +5,7 @@
 
 use crate::erinnerung::faelligkeit::naechste_faelligkeit;
 use crate::erinnerung::repo;
+use crate::live::LiveEvent;
 use crate::live::LiveHub;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use sqlx::SqlitePool;
@@ -70,7 +71,7 @@ pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>
         }
         live.publiziere_event(
             f.einsatz_id,
-            "erinnerung",
+            LiveEvent::Erinnerung,
             serde_json::json!({
                 "einsatz_id": f.einsatz_id,
                 "erinnerung_id": f.id,
@@ -83,7 +84,7 @@ pub async fn tick_einmal(pool: &SqlitePool, live: &LiveHub, jetzt: DateTime<Utc>
         if let Some(mid) = eskaliert_mid {
             live.publiziere_event(
                 f.einsatz_id,
-                "sofortmeldung",
+                LiveEvent::Sofortmeldung,
                 serde_json::json!({ "einsatz_id": f.einsatz_id, "meldung_id": mid }).to_string(),
             );
         }

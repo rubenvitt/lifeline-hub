@@ -8,6 +8,7 @@ use crate::einsatz::berechtigung::{
 };
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
+use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "einheiten";
@@ -26,7 +27,9 @@ use tokio_stream::Stream;
 fn sse_einheit(state: &AppState, einsatz_id: i64, einheit_id: i64) {
     let data =
         serde_json::json!({ "einsatz_id": einsatz_id, "einheit_id": einheit_id }).to_string();
-    state.live.publiziere_event(einsatz_id, "einheit", data);
+    state
+        .live
+        .publiziere_event(einsatz_id, LiveEvent::Einheit, data);
 }
 
 /// SSE-Notify (Lage-Karte): betroffenes Fahrzeug aktualisieren (z.B. bei Zuordnung/Freigabe).
@@ -34,21 +37,27 @@ fn sse_einheit(state: &AppState, einsatz_id: i64, einheit_id: i64) {
 /// Cross-Modul-Sichtbarkeit zu vermeiden.
 fn sse_fahrzeug(state: &AppState, einsatz_id: i64, ef_id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "fahrzeug_id": ef_id }).to_string();
-    state.live.publiziere_event(einsatz_id, "fahrzeug", data);
+    state
+        .live
+        .publiziere_event(einsatz_id, LiveEvent::Fahrzeug, data);
 }
 
 /// SSE-Notify (Lage-Karte): betroffene Person aktualisieren (z.B. bei Zuordnung/Freigabe).
 /// Lokaler Spiegel von `routes::einsatz_personal::sse_personal` (Tag `person`, gleiche Payload).
 fn sse_personal(state: &AppState, einsatz_id: i64, ep_id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "person_id": ep_id }).to_string();
-    state.live.publiziere_event(einsatz_id, "person", data);
+    state
+        .live
+        .publiziere_event(einsatz_id, LiveEvent::Person, data);
 }
 
 /// SSE-Notify (Meldebild): betroffenes Material aktualisieren (z.B. bei Zuordnung/Freigabe).
 /// Lokaler Spiegel von `routes::einsatz_material::sse_material` (Tag `material`, gleiche Payload).
 fn sse_material(state: &AppState, einsatz_id: i64, em_id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "material_id": em_id }).to_string();
-    state.live.publiziere_event(einsatz_id, "material", data);
+    state
+        .live
+        .publiziere_event(einsatz_id, LiveEvent::Material, data);
 }
 
 async fn etb_system(

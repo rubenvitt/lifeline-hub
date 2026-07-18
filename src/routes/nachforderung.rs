@@ -3,6 +3,7 @@ use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
 use crate::einsatz::repo as einsatz_repo;
+use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "nachforderungen";
@@ -24,7 +25,7 @@ fn jetzt() -> String {
 fn sse(state: &AppState, einsatz_id: i64) {
     state.live.publiziere_event(
         einsatz_id,
-        "nachforderung",
+        LiveEvent::Nachforderung,
         serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
     );
 }

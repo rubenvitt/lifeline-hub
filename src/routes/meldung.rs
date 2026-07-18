@@ -3,6 +3,7 @@ use crate::einsatz::kontext::{EinsatzKontext, EinsatzLesezugriff, EinsatzSchreib
 use crate::einsatz::modul::{Lagemeldungen, Meldungen};
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
+use crate::live::LiveEvent;
 use crate::meldung::{
     repo, MeldungAnzeige, ART_SOFORTMELDUNG, ART_SONSTIGE, BESTAETIGUNG_FRIST_DEFAULT_MIN,
     PRIO_NORMAL, PRIO_SOFORT, RICHTUNG_INTERN,
@@ -22,7 +23,7 @@ fn jetzt() -> String {
 fn sse(state: &AppState, einsatz_id: i64) {
     state.live.publiziere_event(
         einsatz_id,
-        "meldung",
+        LiveEvent::Meldung,
         serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
     );
 }
@@ -32,7 +33,7 @@ fn sse(state: &AppState, einsatz_id: i64) {
 fn sse_sofort(state: &AppState, einsatz_id: i64, meldung_id: i64) {
     state.live.publiziere_event(
         einsatz_id,
-        "sofortmeldung",
+        LiveEvent::Sofortmeldung,
         serde_json::json!({ "einsatz_id": einsatz_id, "meldung_id": meldung_id }).to_string(),
     );
 }
@@ -435,7 +436,7 @@ pub async fn auftrag_erteilen(
     }
     state.live.publiziere_event(
         einsatz_id,
-        "auftrag",
+        LiveEvent::Auftrag,
         serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
     );
     sse(&state, einsatz_id);

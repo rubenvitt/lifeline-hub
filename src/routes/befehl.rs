@@ -4,6 +4,7 @@ use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
 use crate::einsatz::repo as einsatz_repo;
+use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "auftraege";
@@ -24,7 +25,9 @@ fn jetzt() -> String {
 /// SSE-Notify: Befehle des Einsatzes haben sich geändert. Event-Tag `befehl`.
 fn sse_befehl(state: &AppState, einsatz_id: i64, befehl_id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "befehl_id": befehl_id }).to_string();
-    state.live.publiziere_event(einsatz_id, "befehl", data);
+    state
+        .live
+        .publiziere_event(einsatz_id, LiveEvent::Befehl, data);
 }
 
 /// GET /api/einsaetze/{id}/befehle — Liste. Nur Lesezugriff (inkl. Beobachter).

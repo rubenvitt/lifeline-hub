@@ -7,6 +7,7 @@ use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
 use crate::einsatz::repo as einsatz_repo;
+use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "bereitstellungsraeume";
@@ -77,7 +78,7 @@ fn sse_br(state: &AppState, einsatz_id: i64, br_id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "br_id": br_id }).to_string();
     state
         .live
-        .publiziere_event(einsatz_id, "bereitstellungsraum", data);
+        .publiziere_event(einsatz_id, LiveEvent::Bereitstellungsraum, data);
 }
 
 // ---------- Detail-Helfer ----------
@@ -445,10 +446,10 @@ pub async fn belegung(
 
     sse_br(&state, einsatz_id, br_id);
     // Kräfte-Ansichten (Einheiten/Fahrzeuge) live refetchen lassen: zusätzliches
-    // objekt-typ-spezifisches SSE-Event (string-basiert, analog `person` in UHS).
+    // objekt-typ-spezifisches SSE-Event (typisiert via `LiveEvent`, analog `person` in UHS).
     let objekt_event = match event.objekt_typ.as_str() {
-        "einheit" => Some("einheit"),
-        "fahrzeug" => Some("fahrzeug"),
+        "einheit" => Some(LiveEvent::Einheit),
+        "fahrzeug" => Some(LiveEvent::Fahrzeug),
         _ => None,
     };
     if let Some(ev) = objekt_event {

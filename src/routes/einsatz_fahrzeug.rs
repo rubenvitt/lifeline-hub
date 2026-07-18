@@ -4,6 +4,7 @@ use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
 use crate::einsatz::repo as einsatz_repo;
+use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "fahrzeuge";
@@ -25,14 +26,18 @@ use tokio_stream::Stream;
 /// SSE-Notify (Lage-Karte): Fahrzeug-Disposition hat sich geändert.
 fn sse_fahrzeug(state: &AppState, einsatz_id: i64, ef_id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "fahrzeug_id": ef_id }).to_string();
-    state.live.publiziere_event(einsatz_id, "fahrzeug", data);
+    state
+        .live
+        .publiziere_event(einsatz_id, LiveEvent::Fahrzeug, data);
 }
 
 /// SSE-Notify (Lage-Karte): betroffene Person aktualisieren (z.B. bei Besatzungs-Zuordnung/
 /// -Freigabe). Lokaler Spiegel von `routes::einsatz_personal::sse_personal` (Tag `person`).
 fn sse_personal(state: &AppState, einsatz_id: i64, ep_id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "person_id": ep_id }).to_string();
-    state.live.publiziere_event(einsatz_id, "person", data);
+    state
+        .live
+        .publiziere_event(einsatz_id, LiveEvent::Person, data);
 }
 
 /// Schreibt einen automatischen System-ETB-Eintrag für die handelnde Person und

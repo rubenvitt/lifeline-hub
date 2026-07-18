@@ -6,6 +6,7 @@ use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
 use crate::einsatz::repo as einsatz_repo;
+use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "chat";
@@ -21,7 +22,9 @@ use serde::Deserialize;
 /// SSE-Notify: der Chat des Einsatzes hat sich geändert. Event-Tag `chat`.
 /// Das Frontend invalidiert daraufhin Kanal- und Nachrichten-Queries.
 fn sse_chat(state: &AppState, einsatz_id: i64, data: String) {
-    state.live.publiziere_event(einsatz_id, "chat", data);
+    state
+        .live
+        .publiziere_event(einsatz_id, LiveEvent::Chat, data);
 }
 
 /// Serialisiert eine Anzeige für den Live-Push; bei Serialisierungsfehler wird
@@ -474,7 +477,7 @@ pub async fn heraufstufen_auftrag(
     }
     state.live.publiziere_event(
         einsatz_id,
-        "auftrag",
+        LiveEvent::Auftrag,
         serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
     );
     let nachricht = repo::laden(&state.pool, nachricht_id).await?;

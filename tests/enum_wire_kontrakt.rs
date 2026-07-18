@@ -405,3 +405,54 @@ fn orphan_enums_wire() {
     );
     wire_is!(BefehlStatus::Entwurf => "entwurf", BefehlStatus::Freigegeben => "freigegeben");
 }
+
+/// LFH-298: SSE-Wire-Event-Namen als BE↔FE-Kontrakt. `LiveEvent` ist die Wahrheitsquelle der
+/// 23 Wire-Event-Namen — die Emitter routen über `as_str()`, utoipa erzeugt daraus die
+/// FE-Union (`types.generated.ts`). Pinnt jede Variante gegen ihr load-bearing Wire-Literal
+/// (aus der Mapping-Tabelle kopiert, NICHT aus dem Variantennamen abgeleitet — sonst fällt ein
+/// falscher `rename` nicht auf) UND dass `serde` == `as_str()` (sonst driftet die generierte
+/// openapi-Union still vom echten Wire, den das FE exakt filtert).
+#[test]
+fn live_event_wire() {
+    use lifeline_hub::live::LiveEvent;
+    let tabelle: &[(LiveEvent, &str)] = &[
+        (LiveEvent::Uhs, "uhs"),
+        (LiveEvent::Schaden, "schaden"),
+        (LiveEvent::Fahrzeug, "fahrzeug"),
+        (LiveEvent::Material, "material"),
+        (LiveEvent::Tier, "tier"),
+        (LiveEvent::LageZone, "lage_zone"),
+        (LiveEvent::FreiesZeichen, "freies_zeichen"),
+        (LiveEvent::Gefahr, "gefahr"),
+        (LiveEvent::Einheit, "einheit"),
+        (LiveEvent::Abschnitt, "abschnitt"),
+        (LiveEvent::Person, "person"),
+        (LiveEvent::Lagebericht, "lagebericht"),
+        (LiveEvent::Chat, "chat"),
+        (LiveEvent::Erinnerung, "erinnerung"),
+        (LiveEvent::Auftrag, "auftrag"),
+        (LiveEvent::Nachforderung, "nachforderung"),
+        (LiveEvent::Meldung, "meldung"),
+        (LiveEvent::Bereitstellungsraum, "bereitstellungsraum"),
+        (LiveEvent::KarteBild, "karte_bild"),
+        (LiveEvent::Etb, "etb"),
+        (LiveEvent::Befehl, "befehl"),
+        (LiveEvent::Sofortmeldung, "sofortmeldung"),
+        (LiveEvent::Lagged, "lagged"),
+    ];
+    for (ev, wire) in tabelle {
+        assert_eq!(ev.as_str(), *wire, "as_str() falsch für {ev:?}");
+        assert_eq!(
+            serde_json::to_value(ev).unwrap(),
+            serde_json::json!(*wire),
+            "Serde-Wire != as_str() für {ev:?} — utoipa-Union würde still driften",
+        );
+    }
+    // Exhaustiveness: die Tabelle MUSS jede Variante decken — eine neue LiveEvent-Variante
+    // (in ALLE ergänzt) ohne Zeile hier bricht den Test statt still ungepinnt zu bleiben.
+    assert_eq!(
+        tabelle.len(),
+        LiveEvent::ALLE.len(),
+        "live_event_wire deckt nicht alle LiveEvent-Varianten",
+    );
+}

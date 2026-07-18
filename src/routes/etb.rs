@@ -5,6 +5,7 @@ use crate::einsatz::berechtigung::{
 };
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
+use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132); gegen die Override-Map geprüft.
 const MODUL_KEY: &str = "etb";
@@ -219,7 +220,7 @@ pub async fn auftrag_erteilen(
     }
     state.live.publiziere_event(
         einsatz_id,
-        "auftrag",
+        LiveEvent::Auftrag,
         serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
     );
 

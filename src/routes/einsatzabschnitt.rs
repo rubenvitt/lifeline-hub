@@ -4,6 +4,7 @@ use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
 use crate::einsatz::repo as einsatz_repo;
+use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "einsatzabschnitte";
@@ -23,7 +24,9 @@ use tokio_stream::Stream;
 /// SSE-Notify (Lage-Karte): Abschnitt (Fläche/Symbol) hat sich geändert.
 fn sse_abschnitt(state: &AppState, einsatz_id: i64, aid: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "abschnitt_id": aid }).to_string();
-    state.live.publiziere_event(einsatz_id, "abschnitt", data);
+    state
+        .live
+        .publiziere_event(einsatz_id, LiveEvent::Abschnitt, data);
 }
 
 /// Schreibt einen System-ETB-Eintrag und publiziert ihn live (Muster wie

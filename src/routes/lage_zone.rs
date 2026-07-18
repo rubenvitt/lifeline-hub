@@ -4,6 +4,7 @@ use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
 use crate::einsatz::repo as einsatz_repo;
+use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "lagekarte";
@@ -23,7 +24,9 @@ use tokio_stream::Stream;
 /// SSE-Notify (Lage-Karte): eine Zone hat sich geändert. Event-Tag `lage_zone`.
 fn sse_zone(state: &AppState, einsatz_id: i64, zid: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "zone_id": zid }).to_string();
-    state.live.publiziere_event(einsatz_id, "lage_zone", data);
+    state
+        .live
+        .publiziere_event(einsatz_id, LiveEvent::LageZone, data);
 }
 
 /// Schreibt einen System-ETB-Eintrag und publiziert ihn live (Muster wie einsatzabschnitt).
@@ -321,7 +324,7 @@ pub async fn aktualisieren(
         if let Some(gid) = z.gefahrengebiet_id {
             state.live.publiziere_event(
                 einsatz_id,
-                "gefahr",
+                LiveEvent::Gefahr,
                 serde_json::json!({ "einsatz_id": einsatz_id, "gefahrengebiet_id": gid })
                     .to_string(),
             );

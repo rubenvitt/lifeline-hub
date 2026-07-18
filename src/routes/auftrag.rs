@@ -4,6 +4,7 @@ use crate::einsatz::einstellungen;
 use crate::einsatz::kontext::{EinsatzKontext, EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Auftraege;
 use crate::error::AppError;
+use crate::live::LiveEvent;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -19,7 +20,7 @@ fn jetzt() -> String {
 fn sse(state: &AppState, einsatz_id: i64) {
     state.live.publiziere_event(
         einsatz_id,
-        "auftrag",
+        LiveEvent::Auftrag,
         serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
     );
 }

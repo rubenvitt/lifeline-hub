@@ -7,6 +7,7 @@ use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
 use crate::freies_zeichen::repo::{self as zeichen_repo, ZeichenNeu, ZeichenUpdate};
 use crate::freies_zeichen::FreiesZeichenAnzeige;
+use crate::live::LiveEvent;
 use crate::routes::support::trimme;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -22,7 +23,7 @@ fn sse_zeichen(state: &AppState, einsatz_id: i64, id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "zeichen_id": id }).to_string();
     state
         .live
-        .publiziere_event(einsatz_id, "freies_zeichen", data);
+        .publiziere_event(einsatz_id, LiveEvent::FreiesZeichen, data);
 }
 
 /// GET /api/einsaetze/{id}/freie-zeichen — Liste aller freien Zeichen. Nur Lesezugriff.
