@@ -117,14 +117,21 @@ pub async fn anlegen(
 
 /// Aktualisiert Identitäts-/Kontextfelder (COALESCE: nur gesetzte Felder).
 /// Setzt `geaendert_at`/`geaendert_von`. `NotFound`, falls nicht zum Einsatz.
+///
+/// Optimistisches Lock (LFH-241/F10): trägt der Aufrufer `erwartet_geaendert_at` (den beim
+/// Laden gelesenen Stand), schreibt das UPDATE nur, solange `geaendert_at` unverändert ist —
+/// sonst `Conflict` (409) statt eines stillen Last-write-wins-Overwrites. `None` = bewusstes
+/// Overwrite (Escape-Hatch des Konfliktdialogs). Bei 0 betroffenen Zeilen wird 404 (Zeile fehlt)
+/// von 409 (Zeile existiert, Stand veraltet) unterschieden.
 pub async fn aktualisiere(
     pool: &SqlitePool,
     einsatz_id: i64,
     person_id: i64,
     geaendert_von: i64,
+    erwartet_geaendert_at: Option<&str>,
     daten: PatchDaten<'_>,
 ) -> Result<PersonAnzeige, AppError> {
-    let betroffen = sqlx::query(
+    let mut sql = String::from(
         "UPDATE einsatz_person SET \
             name = COALESCE(?, name), \
             vorname = COALESCE(?, vorname), \
@@ -138,23 +145,42 @@ pub async fn aktualisiere(
             geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
             geaendert_von = ? \
          WHERE id = ? AND einsatz_id = ?",
-    )
-    .bind(daten.name)
-    .bind(daten.vorname)
-    .bind(daten.geschlecht)
-    .bind(daten.geburtsdatum)
-    .bind(daten.alter_geschaetzt)
-    .bind(daten.herkunft_adresse)
-    .bind(daten.antreff_ort)
-    .bind(daten.melder_kontakt)
-    .bind(daten.notiz)
-    .bind(geaendert_von)
-    .bind(person_id)
-    .bind(einsatz_id)
-    .execute(pool)
-    .await?
-    .rows_affected();
+    );
+    if erwartet_geaendert_at.is_some() {
+        sql.push_str(" AND geaendert_at = ?");
+    }
+    let mut q = sqlx::query(sqlx::AssertSqlSafe(sql))
+        .bind(daten.name)
+        .bind(daten.vorname)
+        .bind(daten.geschlecht)
+        .bind(daten.geburtsdatum)
+        .bind(daten.alter_geschaetzt)
+        .bind(daten.herkunft_adresse)
+        .bind(daten.antreff_ort)
+        .bind(daten.melder_kontakt)
+        .bind(daten.notiz)
+        .bind(geaendert_von)
+        .bind(person_id)
+        .bind(einsatz_id);
+    if let Some(stand) = erwartet_geaendert_at {
+        q = q.bind(stand);
+    }
+    let betroffen = q.execute(pool).await?.rows_affected();
     if betroffen == 0 {
+        // Mit Guard: existiert die Zeile → veralteter Stand (409), sonst fehlt sie (404).
+        if erwartet_geaendert_at.is_some() {
+            let existiert: Option<i64> =
+                sqlx::query_scalar("SELECT 1 FROM einsatz_person WHERE id = ? AND einsatz_id = ?")
+                    .bind(person_id)
+                    .bind(einsatz_id)
+                    .fetch_optional(pool)
+                    .await?;
+            if existiert.is_some() {
+                return Err(AppError::Conflict(
+                    "Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden.".into(),
+                ));
+            }
+        }
         return Err(AppError::NotFound);
     }
     laden(pool, einsatz_id, person_id).await
@@ -319,6 +345,7 @@ mod tests {
             e,
             p.id,
             b,
+            None,
             PatchDaten {
                 notiz: Some("blutet"),
                 ..PatchDaten::default()
@@ -331,6 +358,86 @@ mod tests {
             aktualisiert.name.as_deref(),
             Some("Mustermann"),
             "ungesetzte Felder bleiben"
+        );
+    }
+
+    /// LFH-241/F10: optimistisches Lock über `geaendert_at`. Deterministische Zeitstempel
+    /// (nicht `now`) vermeiden das 1s-Aliasing im Test.
+    #[tokio::test]
+    async fn aktualisiere_optimistisches_lock_ueber_geaendert_at() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let p = anlegen(&pool, e, b, leere_daten()).await.unwrap();
+        // Bekannten, klar von „jetzt" verschiedenen Stand setzen.
+        sqlx::query("UPDATE einsatz_person SET geaendert_at = '2000-01-01 00:00:00' WHERE id = ?")
+            .bind(p.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let stand = "2000-01-01 00:00:00";
+
+        // Korrekter Stand → Erfolg (und bumpt geaendert_at auf „jetzt").
+        aktualisiere(
+            &pool,
+            e,
+            p.id,
+            b,
+            Some(stand),
+            PatchDaten {
+                notiz: Some("A"),
+                ..PatchDaten::default()
+            },
+        )
+        .await
+        .expect("korrekter Stand muss durchgehen");
+
+        // Derselbe (jetzt veraltete) Stand → Conflict, kein Overwrite.
+        let err = aktualisiere(
+            &pool,
+            e,
+            p.id,
+            b,
+            Some(stand),
+            PatchDaten {
+                notiz: Some("B"),
+                ..PatchDaten::default()
+            },
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(err, AppError::Conflict(_)),
+            "veralteter Stand muss 409 (Conflict) sein, war: {err:?}"
+        );
+        let jetzt = laden(&pool, e, p.id).await.unwrap();
+        assert_eq!(
+            jetzt.notiz.as_deref(),
+            Some("A"),
+            "Konflikt darf den Overwrite nicht durchlassen"
+        );
+
+        // Ohne Stand (None) = bewusstes Overwrite (Escape-Hatch) → Erfolg.
+        aktualisiere(
+            &pool,
+            e,
+            p.id,
+            b,
+            None,
+            PatchDaten {
+                notiz: Some("C"),
+                ..PatchDaten::default()
+            },
+        )
+        .await
+        .expect("None-Stand = Overwrite muss durchgehen");
+
+        // Falsche id trotz Stand → NotFound (nicht Conflict).
+        let err = aktualisiere(&pool, e, 999_999, b, Some(stand), PatchDaten::default())
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, AppError::NotFound),
+            "unbekannte id muss 404 bleiben, war: {err:?}"
         );
     }
 

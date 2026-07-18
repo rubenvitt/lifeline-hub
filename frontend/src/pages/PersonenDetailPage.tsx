@@ -9,7 +9,7 @@ import { aktualisierePerson, entscheideAbgleich, erfasseSichtung, erfasseVerblei
 import { listeTiere, tierRegistrierAnzeige, aktualisiereTier } from '../api/einsatzTier';
 import { listeSchaeden, schadenRegistrierAnzeige, aktualisiereSchaden } from '../api/einsatzSchaden';
 import { listeUhs, aenderePersonBelegung } from '../api/einsatzUhs';
-import { ApiError } from '../api/client';
+import { ApiError, istKonflikt } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { SK_META, STATUS_META } from '../personen/personMeta';
 import type { PersonDetail, PersonStatus, PersonZugriff, Schaden, Sichtungskategorie, Spezies, Tier, Verbleib, VerbleibArt } from '../api/types';
@@ -58,7 +58,7 @@ export default function PersonenDetailPage() {
   const navigate = useNavigate();
 
   const qc = useQueryClient();
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const [bearbeiten, setBearbeiten] = useState(false);
   const [editForm] = Form.useForm<PersonEingabe>();
 
@@ -105,9 +105,28 @@ export default function PersonenDetailPage() {
     mutationFn: (v: { personId: number; status: PersonStatus }) => setzePersonStatus(einsatzId, v.personId, v.status),
     onSuccess: invalidateDetail, onError: fehler,
   });
+  // Optimistisches Lock (LFH-241/F10): `basis` trägt den beim Laden gelesenen geaendert_at-Stand;
+  // ein 409 öffnet den Konfliktdialog (neu laden vs. überschreiben), statt still zu überschreiben.
   const editMutation = useMutation({
-    mutationFn: (daten: PersonEingabe) => aktualisierePerson(einsatzId, personId, daten),
-    onSuccess: () => { invalidateDetail(); setBearbeiten(false); }, onError: fehler,
+    mutationFn: (v: { daten: PersonEingabe; basis?: string; overwrite?: boolean }) =>
+      aktualisierePerson(einsatzId, personId, v.daten, v.overwrite ? undefined : v.basis),
+    onSuccess: () => { invalidateDetail(); setBearbeiten(false); },
+    onError: (e, v) => {
+      if (istKonflikt(e)) {
+        modal.confirm({
+          title: 'Zwischenzeitlich geändert',
+          content:
+            'Diese Person wurde seit dem Öffnen von jemand anderem gespeichert. „Neu laden" verwirft deine Änderungen; „Überschreiben" speichert deine Werte über die des anderen.',
+          okText: 'Überschreiben',
+          okButtonProps: { danger: true },
+          cancelText: 'Neu laden',
+          onOk: () => editMutation.mutate({ daten: v.daten, overwrite: true }),
+          onCancel: () => { detailQuery.refetch(); setBearbeiten(false); },
+        });
+      } else {
+        fehler(e);
+      }
+    },
   });
   const stornoMutation = useMutation({
     mutationFn: (pid: number) => stornierePerson(einsatzId, pid),
@@ -391,7 +410,7 @@ export default function PersonenDetailPage() {
       <Space orientation="vertical" style={{ width: '100%' }} size="large">
         {bearbeiten ? (
           <Form form={editForm} layout="vertical" initialValues={person}
-            onFinish={(daten) => editMutation.mutate(daten)}>
+            onFinish={(daten) => editMutation.mutate({ daten, basis: person.geaendert_at })}>
             <Form.Item label="Name" name="name"><Input /></Form.Item>
             <Form.Item label="Vorname" name="vorname"><Input /></Form.Item>
             <Form.Item label="Geschlecht" name="geschlecht">

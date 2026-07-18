@@ -1,7 +1,19 @@
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import { server } from '../test/server';
-import { ApiError, apiGet, apiSend } from './client';
+import { ApiError, apiGet, apiSend, istKonflikt } from './client';
+
+describe('istKonflikt', () => {
+  it('erkennt einen 409-ApiError als optimistischen Sperrkonflikt', () => {
+    expect(istKonflikt(new ApiError(409, 'geändert'))).toBe(true);
+  });
+  it('ist false für andere Status und Nicht-ApiError', () => {
+    expect(istKonflikt(new ApiError(404, 'weg'))).toBe(false);
+    expect(istKonflikt(new ApiError(422, 'ungültig'))).toBe(false);
+    expect(istKonflikt(new Error('boom'))).toBe(false);
+    expect(istKonflikt(null)).toBe(false);
+  });
+});
 
 describe('apiGet', () => {
   it('liefert geparstes JSON bei 200', async () => {

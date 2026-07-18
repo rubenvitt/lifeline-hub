@@ -33,8 +33,17 @@ export function legePersonAn(einsatzId: number, daten: PersonEingabe): Promise<P
   return apiSend<Person>(`/api/einsaetze/${einsatzId}/personen`, 'POST', daten);
 }
 
-export function aktualisierePerson(einsatzId: number, personId: number, daten: PersonEingabe): Promise<Person> {
-  return apiSend<Person>(`/api/einsaetze/${einsatzId}/personen/${personId}`, 'PATCH', daten);
+/** Bearbeitet die Identitäts-/Kontextfelder. `basisGeaendertAt` (der beim Laden gelesene Stand,
+ *  LFH-241/F10) aktiviert das optimistische Lock: stimmt er serverseitig nicht mehr → 409. Ohne
+ *  ihn (Overwrite aus dem Konfliktdialog) wird bewusst blind überschrieben. */
+export function aktualisierePerson(
+  einsatzId: number,
+  personId: number,
+  daten: PersonEingabe,
+  basisGeaendertAt?: string,
+): Promise<Person> {
+  const body = basisGeaendertAt ? { ...daten, basis_geaendert_at: basisGeaendertAt } : daten;
+  return apiSend<Person>(`/api/einsaetze/${einsatzId}/personen/${personId}`, 'PATCH', body);
 }
 
 export function setzePersonStatus(einsatzId: number, personId: number, status: PersonStatus): Promise<Person> {

@@ -277,6 +277,10 @@ pub struct PatchBody {
     pub antreff_ort: Option<String>,
     pub melder_kontakt: Option<String>,
     pub notiz: Option<String>,
+    /// Optimistisches Lock (LFH-241/F10): der beim Laden gelesene `geaendert_at`-Stand.
+    /// Stimmt er nicht mehr → 409 statt stillem Overwrite. Fehlt er (Overwrite aus dem
+    /// Konfliktdialog), wird bewusst blind geschrieben.
+    pub basis_geaendert_at: Option<String>,
 }
 
 /// PATCH /api/einsaetze/{id}/personen/{pid} — Identitäts-/Kontextfelder bearbeiten.
@@ -315,6 +319,7 @@ pub async fn aktualisieren(
         einsatz_id,
         person_id,
         benutzer.id,
+        body.basis_geaendert_at.as_deref(),
         repo::PatchDaten {
             name: name.as_deref(),
             vorname: vorname.as_deref(),

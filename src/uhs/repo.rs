@@ -102,14 +102,19 @@ pub async fn anlegen(
 
 /// Aktualisiert UHS-Stammfelder (NICHT Status). `Some(None)` setzt ein Feld
 /// explizit auf NULL (z. B. Standort löschen); `None` lässt unverändert.
+///
+/// Optimistisches Lock (LFH-241/F10): `erwartet_geaendert_at` trägt den beim Laden gelesenen
+/// Stand; das UPDATE schreibt nur, solange `geaendert_at` unverändert ist — sonst `Conflict`
+/// (409) statt stillem Overwrite. `None` = bewusstes Overwrite (Escape-Hatch des Dialogs).
 pub async fn aktualisiere(
     pool: &SqlitePool,
     einsatz_id: i64,
     id: i64,
     geaendert_von: i64,
+    erwartet_geaendert_at: Option<&str>,
     daten: PatchDaten<'_>,
 ) -> Result<UhsAnzeige, AppError> {
-    let ergebnis = sqlx::query(
+    let mut sql = String::from(
         "UPDATE uhs \
          SET bezeichnung = COALESCE(?1, bezeichnung), \
              abschnitt_id = CASE WHEN ?2 IS NULL THEN abschnitt_id ELSE ?3 END, \
@@ -120,25 +125,46 @@ pub async fn aktualisiere(
              geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
              geaendert_von = ?12 \
          WHERE id = ?13 AND einsatz_id = ?14",
-    )
-    .bind(daten.bezeichnung)
-    .bind(daten.abschnitt_id.map(|_| 1_i64))
-    .bind(daten.abschnitt_id.and_then(|v| v))
-    .bind(daten.standort.map(|_| 1_i64))
-    .bind(daten.standort.and_then(|v| v))
-    .bind(daten.notiz.map(|_| 1_i64))
-    .bind(daten.notiz.and_then(|v| v))
-    .bind(daten.lat.map(|_| 1_i64))
-    .bind(daten.lat.and_then(|v| v))
-    .bind(daten.lon.map(|_| 1_i64))
-    .bind(daten.lon.and_then(|v| v))
-    .bind(geaendert_von)
-    .bind(id)
-    .bind(einsatz_id)
-    .execute(pool)
-    .await;
-    match ergebnis {
-        Ok(r) if r.rows_affected() == 0 => Err(AppError::NotFound),
+    );
+    if erwartet_geaendert_at.is_some() {
+        sql.push_str(" AND geaendert_at = ?15");
+    }
+    let mut q = sqlx::query(sqlx::AssertSqlSafe(sql))
+        .bind(daten.bezeichnung)
+        .bind(daten.abschnitt_id.map(|_| 1_i64))
+        .bind(daten.abschnitt_id.and_then(|v| v))
+        .bind(daten.standort.map(|_| 1_i64))
+        .bind(daten.standort.and_then(|v| v))
+        .bind(daten.notiz.map(|_| 1_i64))
+        .bind(daten.notiz.and_then(|v| v))
+        .bind(daten.lat.map(|_| 1_i64))
+        .bind(daten.lat.and_then(|v| v))
+        .bind(daten.lon.map(|_| 1_i64))
+        .bind(daten.lon.and_then(|v| v))
+        .bind(geaendert_von)
+        .bind(id)
+        .bind(einsatz_id);
+    if let Some(stand) = erwartet_geaendert_at {
+        q = q.bind(stand);
+    }
+    match q.execute(pool).await {
+        Ok(r) if r.rows_affected() == 0 => {
+            // Mit Guard: existiert die Zeile → veralteter Stand (409), sonst fehlt sie (404).
+            if erwartet_geaendert_at.is_some() {
+                let existiert: Option<i64> =
+                    sqlx::query_scalar("SELECT 1 FROM uhs WHERE id = ? AND einsatz_id = ?")
+                        .bind(id)
+                        .bind(einsatz_id)
+                        .fetch_optional(pool)
+                        .await?;
+                if existiert.is_some() {
+                    return Err(AppError::Conflict(
+                        "Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden.".into(),
+                    ));
+                }
+            }
+            Err(AppError::NotFound)
+        }
         Ok(_) => laden(pool, einsatz_id, id).await,
         Err(sqlx::Error::Database(db)) if db.is_unique_violation() => Err(AppError::Conflict(
             "Eine UHS mit dieser Bezeichnung existiert bereits in diesem Einsatz".into(),
@@ -285,6 +311,77 @@ mod tests {
         assert_eq!(u.erfasst_von, b);
         assert_eq!(u.geaendert_von, b);
         assert!(u.storniert_at.is_none());
+    }
+
+    /// LFH-241/F10: optimistisches Lock über `geaendert_at` für die UHS-Stammfelder.
+    /// Deterministische Zeitstempel vermeiden das 1s-Aliasing im Test.
+    #[tokio::test]
+    async fn aktualisiere_optimistisches_lock_ueber_geaendert_at() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let u = anlegen(&pool, e, b, daten("behandlungsplatz", "BHP 1"))
+            .await
+            .unwrap();
+        sqlx::query("UPDATE uhs SET geaendert_at = '2000-01-01 00:00:00' WHERE id = ?")
+            .bind(u.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let stand = "2000-01-01 00:00:00";
+
+        aktualisiere(
+            &pool,
+            e,
+            u.id,
+            b,
+            Some(stand),
+            PatchDaten {
+                notiz: Some(Some("A")),
+                ..PatchDaten::default()
+            },
+        )
+        .await
+        .expect("korrekter Stand muss durchgehen");
+
+        let err = aktualisiere(
+            &pool,
+            e,
+            u.id,
+            b,
+            Some(stand),
+            PatchDaten {
+                notiz: Some(Some("B")),
+                ..PatchDaten::default()
+            },
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(err, AppError::Conflict(_)),
+            "veralteter Stand muss 409 (Conflict) sein, war: {err:?}"
+        );
+
+        aktualisiere(
+            &pool,
+            e,
+            u.id,
+            b,
+            None,
+            PatchDaten {
+                notiz: Some(Some("C")),
+                ..PatchDaten::default()
+            },
+        )
+        .await
+        .expect("None-Stand = Overwrite muss durchgehen");
+
+        let err = aktualisiere(&pool, e, 999_999, b, Some(stand), PatchDaten::default())
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, AppError::NotFound),
+            "unbekannte id muss 404 bleiben, war: {err:?}"
+        );
     }
 
     #[tokio::test]

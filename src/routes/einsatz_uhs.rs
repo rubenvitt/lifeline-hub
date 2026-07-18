@@ -247,6 +247,10 @@ pub struct PatchBody {
         deserialize_with = "crate::routes::support::deserialize_optional_field"
     )]
     pub lon: Option<Option<f64>>,
+    /// Optimistisches Lock (LFH-241/F10): der beim Laden gelesene `geaendert_at`-Stand.
+    /// Stimmt er nicht mehr → 409 statt stillem Overwrite. Fehlt er (Overwrite aus dem
+    /// Konfliktdialog), wird bewusst blind geschrieben.
+    pub basis_geaendert_at: Option<String>,
 }
 
 /// PATCH /api/einsaetze/{id}/uhs/{uid} — Stammfelder. KEIN ETB-Eintrag.
@@ -329,6 +333,7 @@ pub async fn aktualisieren(
         einsatz_id,
         uhs_id,
         benutzer.id,
+        body.basis_geaendert_at.as_deref(),
         PatchDaten {
             bezeichnung: bezeichnung.as_deref(),
             abschnitt_id: body.abschnitt_id,

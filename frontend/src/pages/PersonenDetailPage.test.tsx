@@ -166,6 +166,28 @@ describe('PersonenDetailPage — Stammdaten', () => {
     await vi.waitFor(() => expect(gesendet).toBe(true));
   });
 
+  it('zeigt bei 409 den Konfliktdialog; „Überschreiben" sendet ohne Baseline (LFH-241/F10)', async () => {
+    const koerper: Array<Record<string, unknown>> = [];
+    render(einsatzAktiv, detail, [
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        koerper.push((await request.json()) as Record<string, unknown>);
+        // Erster Save (mit Baseline) → 409; der Overwrite (ohne Baseline) → Erfolg.
+        if (koerper.length === 1) {
+          return HttpResponse.json({ error: 'Zwischenzeitlich geändert' }, { status: 409 });
+        }
+        return HttpResponse.json({ ...detail });
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    // Konfliktdialog erscheint statt eines stillen Overwrites.
+    await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
+    await vi.waitFor(() => expect(koerper).toHaveLength(2));
+    // Erster Request trug den beim Laden gelesenen Stand; der Overwrite bewusst nicht.
+    expect(koerper[0].basis_geaendert_at).toBe('2026-05-27 09:00:00');
+    expect(koerper[1].basis_geaendert_at).toBeUndefined();
+  });
+
   it('Beobachter sieht keinen Bearbeiten-Button', async () => {
     render(einsatzBeobachter, detail);
     await screen.findByRole('heading', { name: /Person R-001/ });

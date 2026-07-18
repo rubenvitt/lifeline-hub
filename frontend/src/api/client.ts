@@ -13,6 +13,13 @@ export class ApiError extends Error {
   }
 }
 
+/** True, wenn der Fehler ein optimistischer Sperrkonflikt (HTTP 409) ist — der Datensatz
+ *  wurde seit dem Laden von jemand anderem geändert (LFH-241/F10). Der Aufrufer bietet dann
+ *  „neu laden vs. überschreiben" an, statt den Fehler nur generisch zu melden. */
+export function istKonflikt(e: unknown): e is ApiError {
+  return e instanceof ApiError && e.status === 409;
+}
+
 async function fehlerWerfen(res: Response): Promise<never> {
   let message = `Serverfehler (${res.status})`;
   try {
