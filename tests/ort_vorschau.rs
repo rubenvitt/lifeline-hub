@@ -18,7 +18,7 @@ fn geschlossener_geocoder() -> String {
     format!("http://127.0.0.1:{port}")
 }
 
-async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
+async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool, std::path::PathBuf) {
     let pool = db::test_pool().await;
     bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
         .await
@@ -33,17 +33,18 @@ async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
     .execute(&pool)
     .await
     .unwrap();
+    let kd = db::test_karten_dir();
     let router = build_router(AppState {
         pool: pool.clone(),
         live: LiveHub::new(),
-        karten_dir: std::env::temp_dir(),
+        karten_dir: kd.clone(),
         fachebenen: lifeline_hub::karte::FachebenenState::neu(),
         download_client: lifeline_hub::karte::download::download_client(),
         download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
         karten_service_url: None,
         karten_service_token: None,
     });
-    (router, pool)
+    (router, pool, kd)
 }
 
 async fn get(app: &axum::Router, uri: &str, cookie: &str) -> (StatusCode, Value) {
@@ -111,7 +112,7 @@ async fn post_json(
 
 #[tokio::test]
 async fn shape_mit_peilung_und_ortsname_null() {
-    let (app, pool) = setup_mit_pool().await;
+    let (app, pool, _kd) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_mit_einsatzort(&pool).await;
     // Anfrage 0.1° südlich des Einsatzorts → Peilung Richtung Norden.
@@ -130,7 +131,7 @@ async fn shape_mit_peilung_und_ortsname_null() {
 
 #[tokio::test]
 async fn ohne_marker_ist_peilung_null() {
-    let (app, pool) = setup_mit_pool().await;
+    let (app, pool, _kd) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     // Einsatz OHNE einsatzort_lat/lon.
     let eid = sqlx::query_scalar::<_, i64>(
@@ -152,7 +153,7 @@ async fn ohne_marker_ist_peilung_null() {
 
 #[tokio::test]
 async fn exclude_schliesst_einsatzort_aus() {
-    let (app, pool) = setup_mit_pool().await;
+    let (app, pool, _kd) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_mit_einsatzort(&pool).await;
     // Einsatzort ausschließen → kein weiterer Marker → peilung null.
@@ -165,7 +166,7 @@ async fn exclude_schliesst_einsatzort_aus() {
 
 #[tokio::test]
 async fn nicht_mitglied_wird_abgewiesen() {
-    let (app, pool) = setup_mit_pool().await;
+    let (app, pool, _kd) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_mit_einsatzort(&pool).await;
     // Regulärer Benutzer (keine Org-Rolle), KEIN Einsatz-Mitglied → kein Lesezugriff.
@@ -189,7 +190,7 @@ async fn nicht_mitglied_wird_abgewiesen() {
 
 #[tokio::test]
 async fn ohne_login_ist_401() {
-    let (app, pool) = setup_mit_pool().await;
+    let (app, pool, _kd) = setup_mit_pool().await;
     let eid = einsatz_mit_einsatzort(&pool).await;
     let resp = app
         .clone()
@@ -209,12 +210,14 @@ async fn ohne_login_ist_401() {
 
 #[tokio::test]
 async fn ortsname_aus_cache_ohne_netz() {
-    let (app, pool) = setup_mit_pool().await;
+    let (app, pool, kd) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_mit_einsatzort(&pool).await;
-    // Cache vorbefüllen für die Anfrage-Koordinate.
+    // Cache vorbefüllen — in der ausgelagerten Cache-DB (F09/LFH-240), wo der Handler jetzt liest;
+    // per-Pfad memoisiert liefert cache_pool(kd) denselben Pool wie der Handler (state.karten_dir=kd).
     let (la, lo) = lifeline_hub::geocoding::cache::schluessel(50.9, 10.0);
-    lifeline_hub::geocoding::cache::schreibe(&pool, la, lo, "Teststr. 1, Musterstadt").await;
+    let cache = lifeline_hub::cache_db::cache_pool(&kd).await.unwrap();
+    lifeline_hub::geocoding::cache::schreibe(&cache, la, lo, "Teststr. 1, Musterstadt").await;
 
     let (s, v) = get(
         &app,
@@ -229,7 +232,7 @@ async fn ortsname_aus_cache_ohne_netz() {
 
 #[tokio::test]
 async fn out_of_range_koordinate_ist_400() {
-    let (app, pool) = setup_mit_pool().await;
+    let (app, pool, _kd) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_mit_einsatzort(&pool).await;
     // lat=999 liegt außerhalb des gültigen Bereichs (-90..=90) → Handler gibt 400 zurück.

@@ -74,6 +74,20 @@ pub async fn test_pool_datei() -> (tempfile::TempDir, SqlitePool) {
     (dir, pool)
 }
 
+/// Eindeutiges, prozess-lokales Daten-/Karten-Verzeichnis für Integrationstests (F09/LFH-240):
+/// jeder Aufruf liefert einen frischen Pfad, damit per-Pfad memoisierte Cache-DBs
+/// (`cache_db`, `karte::tile_cache`) sich zwischen Tests NICHT kontaminieren. Bewusst ohne
+/// Cleanup (kleines Verzeichnis unter `temp_dir`, vom OS geräumt) — spart Guard-Ripple durch
+/// die Test-Setups.
+pub fn test_karten_dir() -> std::path::PathBuf {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static N: AtomicU64 = AtomicU64::new(0);
+    let n = N.fetch_add(1, Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!("lifeline-test-{}-{n}", std::process::id()));
+    let _ = std::fs::create_dir_all(&dir);
+    dir
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

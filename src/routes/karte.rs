@@ -512,14 +512,18 @@ pub async fn fachebenen(
     Query(params): Query<HashMap<String, String>>,
 ) -> Result<Json<crate::karte::typen::FachebeneAntwort>, AppError> {
     let bbox = params.get("bbox").map(|s| s.as_str());
+    // Fachebenen-Cache liegt in einer eigenen Cache-DB (F09/LFH-240: keine Konkurrenz um den
+    // operativen Writer); Fallback auf den operativen Pool, falls sie nicht anlegbar ist.
+    let cache = crate::cache_db::cache_pool(&state.karten_dir).await;
+    let cache_pool = cache.as_ref().unwrap_or(&state.pool);
     let antwort = match quelle.as_str() {
-        "dwd" => quellen::fetch_dwd(&state.fachebenen, &state.pool).await,
-        "pegelonline" => quellen::fetch_pegelonline(&state.fachebenen, &state.pool).await,
-        "nina" => quellen::fetch_nina(&state.fachebenen, &state.pool).await,
+        "dwd" => quellen::fetch_dwd(&state.fachebenen, cache_pool).await,
+        "pegelonline" => quellen::fetch_pegelonline(&state.fachebenen, cache_pool).await,
+        "nina" => quellen::fetch_nina(&state.fachebenen, cache_pool).await,
         "kritis" => {
             let bbox =
                 bbox.ok_or_else(|| AppError::Validation("bbox-Parameter erforderlich".into()))?;
-            quellen::fetch_kritis(&state.fachebenen, &state.pool, bbox).await?
+            quellen::fetch_kritis(&state.fachebenen, cache_pool, bbox).await?
         }
         _ => return Err(AppError::Validation(format!("Unbekannte Quelle: {quelle}"))),
     };

@@ -6,6 +6,7 @@ pub mod auth;
 pub mod backup;
 pub mod befehl;
 pub mod bereitstellungsraum;
+pub mod cache_db;
 pub mod chat;
 pub mod config;
 pub mod db;

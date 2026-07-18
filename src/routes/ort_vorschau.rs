@@ -85,7 +85,11 @@ pub async fn vorschau(
         .unwrap_or(geocoding::NOMINATIM_DEFAULT);
     // Ortsname best-effort: reverse() liefert bei offline/Timeout/Rate-Limit None — die Peilung
     // steht trotzdem, der Request wird nie wegen eines Geocoder-Fehlers abgebrochen.
-    let ortsname = geocoding::reverse(&state.pool, base, params.lat, params.lon).await;
+    // Der Reverse-Geocoding-Cache liegt in einer eigenen Cache-DB (F09/LFH-240: keine Konkurrenz
+    // um den operativen Writer); Fallback auf den operativen Pool, falls sie nicht anlegbar ist.
+    let cache = crate::cache_db::cache_pool(&state.karten_dir).await;
+    let cache_pool = cache.as_ref().unwrap_or(&state.pool);
+    let ortsname = geocoding::reverse(cache_pool, base, params.lat, params.lon).await;
 
     Ok(Json(OrtVorschauAntwort { peilung, ortsname }))
 }

@@ -27,7 +27,7 @@ fn app_mit_pool(pool: sqlx::SqlitePool) -> axum::Router {
         download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
         karten_service_url: None,
         karten_service_token: None,
-        karten_dir: std::env::temp_dir(),
+        karten_dir: lifeline_hub::db::test_karten_dir(),
     })
 }
 
@@ -366,7 +366,7 @@ fn app_mit_pool_und_karten_service(pool: sqlx::SqlitePool) -> axum::Router {
         download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
         karten_service_url: Some("http://127.0.0.1:1".into()),
         karten_service_token: Some("t".into()),
-        karten_dir: std::env::temp_dir(),
+        karten_dir: lifeline_hub::db::test_karten_dir(),
     })
 }
 
@@ -1433,7 +1433,7 @@ async fn admin_app_mit_karten_service(url: &str, token: &str) -> (axum::Router, 
         download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
         karten_service_url: Some(url.to_string()),
         karten_service_token: Some(token.to_string()),
-        karten_dir: std::env::temp_dir(),
+        karten_dir: lifeline_hub::db::test_karten_dir(),
     });
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     (app, cookie)
