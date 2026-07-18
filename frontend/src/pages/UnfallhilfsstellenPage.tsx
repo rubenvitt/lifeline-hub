@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { uhsDetailPfad } from '../routing/deeplinks';
 import { useEffect, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
+import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { useAuth } from '../auth/AuthContext';
 import { listeUhs } from '../api/einsatzUhs';
 import { einsatzKeys } from '../api/queryKeys';
 import UhsAnlegenDrawer from './uhs/UhsAnlegenDrawer';
@@ -25,6 +27,7 @@ const STATUS_META: Record<UhsStatus, { label: string; color: string }> = {
 export default function UnfallhilfsstellenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const { benutzer } = useAuth();
   // Live-Updates über den konsolidierten useEinsatzLiveStream im EinsatzLayout (LFH-207).
 
   const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
@@ -35,9 +38,7 @@ export default function UnfallhilfsstellenPage() {
 
   const [anlegen, setAnlegen] = useState(false);
 
-  const ist_aktiv = einsatzQuery.data?.status === 'aktiv';
-  const ist_beobachter = einsatzQuery.data?.meine_rolle === 'beobachter';
-  const schreibgeschuetzt = !ist_aktiv || ist_beobachter;
+  const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
 
   const [searchParams, setSearchParams] = useSearchParams();
   // Schnellaktion: ?neu=1 öffnet den Anlegen-Drawer, sobald die Rechte feststehen (LFH-11).

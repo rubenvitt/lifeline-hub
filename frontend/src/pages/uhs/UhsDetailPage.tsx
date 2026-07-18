@@ -3,6 +3,8 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { ladeEinsatz } from '../../api/einsaetze';
+import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
+import { useAuth } from '../../auth/AuthContext';
 import { parseRouteId, unfallhilfsstellenListePfad } from '../../routing/deeplinks';
 import { ladeUhs, setzeUhsStatus, storniereUhs } from '../../api/einsatzUhs';
 import { ApiError } from '../../api/client';
@@ -23,6 +25,7 @@ const STATUS_LABEL: Record<UhsStatus, { label: string; color: string }> = {
 export default function UhsDetailPage() {
   const { id, uhsId: uhsIdParam } = useParams();
   const einsatzId = Number(id);
+  const { benutzer } = useAuth();
   const uhsId = Number(uhsIdParam);
   const idGueltig = parseRouteId(uhsIdParam) != null;
   const listenPfad = unfallhilfsstellenListePfad(einsatzId);
@@ -78,9 +81,7 @@ export default function UhsDetailPage() {
 
   const einsatz = einsatzQuery.data;
   const uhs = detailQuery.data;
-  const ist_aktiv = einsatz.status === 'aktiv';
-  const ist_beobachter = einsatz.meine_rolle === 'beobachter';
-  const schreibgeschuetzt = !ist_aktiv || ist_beobachter;
+  const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatz, benutzer);
 
   const meta = [
     `Typ: ${uhs.typ}`,

@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import MeldungenPage from './MeldungenPage';
+import { AuthProvider } from '../auth/AuthContext';
 import type { Meldung } from '../api/types';
 import { ladeEinsatz } from '../api/einsaetze';
 
@@ -58,10 +59,12 @@ function renderPage(route = '/einsaetze/1/meldungen') {
   return render(
     <QueryClientProvider client={client}>
       <AntApp>
-        <MemoryRouter initialEntries={[route]}>
-          <LocationProbe />
-          <Routes><Route path="/einsaetze/:id/meldungen" element={<MeldungenPage />} /></Routes>
-        </MemoryRouter>
+        <AuthProvider>
+          <MemoryRouter initialEntries={[route]}>
+            <LocationProbe />
+            <Routes><Route path="/einsaetze/:id/meldungen" element={<MeldungenPage />} /></Routes>
+          </MemoryRouter>
+        </AuthProvider>
       </AntApp>
     </QueryClientProvider>,
   );

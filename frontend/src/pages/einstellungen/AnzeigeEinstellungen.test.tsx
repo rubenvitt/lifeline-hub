@@ -4,7 +4,10 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
 import AnzeigeEinstellungen from './AnzeigeEinstellungen';
 
-vi.mock('../../auth/AuthContext', () => ({ useAuth: vi.fn() }));
+vi.mock('../../auth/AuthContext', () => ({
+  useAuth: vi.fn(),
+  AuthProvider: ({ children }: { children?: unknown }) => children,
+}));
 vi.mock('../../api/orgEinstellungen', () => ({
   ladeOrgEinstellungen: vi.fn(),
   speichereOrgEinstellungen: vi.fn(),

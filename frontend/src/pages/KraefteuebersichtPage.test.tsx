@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { App as AntApp } from 'antd';
 import KraefteuebersichtPage from './KraefteuebersichtPage';
+import { AuthProvider } from '../auth/AuthContext';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
@@ -88,9 +89,11 @@ function setup() {
   return render(
     <QueryClientProvider client={qc}>
       <AntApp>
-        <MemoryRouter initialEntries={['/einsaetze/1/kraefteuebersicht']}>
-          <Routes><Route path="/einsaetze/:id/kraefteuebersicht" element={<KraefteuebersichtPage />} /></Routes>
-        </MemoryRouter>
+        <AuthProvider>
+          <MemoryRouter initialEntries={['/einsaetze/1/kraefteuebersicht']}>
+            <Routes><Route path="/einsaetze/:id/kraefteuebersicht" element={<KraefteuebersichtPage />} /></Routes>
+          </MemoryRouter>
+        </AuthProvider>
       </AntApp>
     </QueryClientProvider>,
   );

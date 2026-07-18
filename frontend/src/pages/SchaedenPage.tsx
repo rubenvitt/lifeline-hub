@@ -7,6 +7,8 @@ import { Select } from '../components/Select';
 import type { TableColumnsType } from 'antd';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
+import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { useAuth } from '../auth/AuthContext';
 import { listeSchaeden, schadenRegistrierAnzeige } from '../api/einsatzSchaden';
 import type { Ausmass, Schaden, SchadenStatus, SchadenTyp } from '../api/types';
 import { AUSMASS_META, STATUS_META, TYP_LABEL, filterSchaeden, geschaedigtAnzeige } from './schaeden/schadenHelfer';
@@ -23,6 +25,7 @@ const SICHTEN: { key: Sicht; label: string }[] = [
 export default function SchaedenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const { benutzer } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -42,9 +45,7 @@ export default function SchaedenPage() {
   });
 
   const einsatz = einsatzQuery.data;
-  const darfSchreiben =
-    einsatz?.status === 'aktiv' &&
-    (einsatz?.meine_rolle === 'einsatzleitung' || einsatz?.meine_rolle === 'fuehrungspersonal');
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   // Schnellaktion: ?neu=1 öffnet die Erfassung (Command-Palette, LFH-11).
   // Warten bis der Einsatz geladen ist; Param immer löschen, aber Modal nur bei Schreibrecht öffnen.

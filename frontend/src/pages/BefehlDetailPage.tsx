@@ -3,6 +3,8 @@ import { useEffect } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
+import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { useAuth } from '../auth/AuthContext';
 import { parseRouteId, befehlDetailPfad, auftraegePfad, etbPfad } from '../routing/deeplinks';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
@@ -21,6 +23,7 @@ import './befehlPrint.css';
 export default function BefehlDetailPage() {
   const { id, befehlId: befehlIdParam } = useParams();
   const einsatzId = Number(id);
+  const { benutzer } = useAuth();
   const befehlId = Number(befehlIdParam);
   const idGueltig = parseRouteId(befehlIdParam) != null;
   const { message, modal } = App.useApp();
@@ -109,9 +112,7 @@ export default function BefehlDetailPage() {
   const befehl = befehlQuery.data;
   const v = vorlage(befehl.vorlage);
   const istEntwurf = befehl.status === 'entwurf';
-  const darfSchreiben =
-    einsatz.status === 'aktiv' &&
-    (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   const freigabeBestaetigen = async () => {
     // Pflichtfelder VOR dem Dialog prüfen — sonst landet ein Titel-Fehler hinter dem Modal.

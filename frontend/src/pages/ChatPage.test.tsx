@@ -9,8 +9,10 @@ import { AuthProvider } from '../auth/AuthContext';
 import ChatPage from './ChatPage';
 import type { ChatKanal, ChatNachricht, EinsatzAnzeige } from '../api/types';
 
-const admin = {
-  id: 1, anzeigename: 'A', benutzername: 'a', system_rolle: 'admin',
+// Normaler Benutzer (kein System-Admin): die Rollen-Tests prüfen die EINSATZ-Rolle,
+// nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
+const nutzer = {
+  id: 1, anzeigename: 'A', benutzername: 'a', system_rolle: 'keiner',
   org_rolle: 'keine', aktiv: true, erstellt_at: '2026-06-02 10:00:00',
 };
 
@@ -38,7 +40,7 @@ const nachricht: ChatNachricht = {
 function setup() {
   const nachrichten: ChatNachricht[] = [nachricht];
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
     http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
@@ -77,7 +79,7 @@ describe('ChatPage', () => {
     }));
     let zweiteSeiteAngefragtMit: string | null = null;
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
       http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', ({ request }) => {
@@ -118,7 +120,7 @@ describe('ChatPage', () => {
     const spy = (pfad: string) =>
       http.get(`/api/einsaetze/7/${pfad}`, () => { listenAufgerufen.push(pfad); return HttpResponse.json([]); });
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
       http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json([nachricht])),
@@ -139,7 +141,7 @@ describe('ChatPage', () => {
     let gesetzt: { typ: string; ziel_id: number } | null = null;
     const nachrichten: ChatNachricht[] = [nachricht];
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
       http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
@@ -181,7 +183,7 @@ describe('ChatPage', () => {
     let bearbeitet: { inhalt: string } | null = null;
     const nachrichten: ChatNachricht[] = [nachricht];
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
       http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
@@ -220,7 +222,7 @@ describe('ChatPage', () => {
 
   it('zeigt bei abgeschlossenem Einsatz einen Read-only-Hinweis statt der Eingabe', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
       http.get('/api/einsaetze/7', () => HttpResponse.json({ ...einsatz, status: 'abgeschlossen' })),
       http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
       http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json([nachricht])),
@@ -238,7 +240,7 @@ describe('ChatPage', () => {
 
   it('zeigt ohne Führungsrolle einen Read-only-Hinweis (Einsatz aktiv)', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
       http.get('/api/einsaetze/7', () => HttpResponse.json({ ...einsatz, meine_rolle: 'beobachter' })),
       http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
       http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json([nachricht])),
@@ -258,7 +260,7 @@ describe('ChatPage', () => {
     let gesendet: { inhalt: string; anhang_ids: number[] } | null = null;
     const nachrichten: ChatNachricht[] = [nachricht];
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
       http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),

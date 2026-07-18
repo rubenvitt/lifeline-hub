@@ -13,6 +13,7 @@ import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { einsatzKeys } from '../api/queryKeys';
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { darfImEinsatzSchreiben, darfEinsatzLeiten } from '../einsatz/schreibrecht';
 import type { Einsatzart } from '../api/types';
 import MitgliederAbschnitt from './MitgliederAbschnitt';
 
@@ -90,20 +91,14 @@ export default function EinsatzdatenPage() {
   }
   const einsatz = einsatzQuery.data;
 
-  const istAdmin = benutzer?.system_rolle === 'admin';
-  const darfBearbeiten =
-    einsatz.status === 'aktiv' &&
-    (einsatz.meine_rolle === 'einsatzleitung' ||
-      einsatz.meine_rolle === 'fuehrungspersonal' ||
-      istAdmin);
+  const darfBearbeiten = darfImEinsatzSchreiben(einsatz, benutzer);
 
   const leitung = (mitgliederQuery.data ?? [])
     .filter((m) => m.einsatz_rolle === 'einsatzleitung')
     .map((m) => m.anzeigename)
     .join(', ');
 
-  const darfVerwaltenMitglieder =
-    einsatz.meine_rolle === 'einsatzleitung' && einsatz.status === 'aktiv';
+  const darfVerwaltenMitglieder = darfEinsatzLeiten(einsatz, benutzer);
 
   const stichwortOptionen = (vorschlaegeQuery.data ?? []).map((v) => ({ value: v.text }));
 

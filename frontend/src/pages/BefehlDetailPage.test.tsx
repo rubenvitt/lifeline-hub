@@ -4,6 +4,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
 import BefehlDetailPage from './BefehlDetailPage';
+import { AuthProvider } from '../auth/AuthContext';
 import * as befehleApi from '../api/befehle';
 import * as einsaetzeApi from '../api/einsaetze';
 
@@ -17,12 +18,14 @@ function renderAt(bid: number | string) {
   return render(
     <QueryClientProvider client={qc}>
       <AntApp>
-        <MemoryRouter initialEntries={[`/einsaetze/1/auftraege/befehle/${bid}`]}>
-          <Routes>
-            <Route path="/einsaetze/:id/auftraege" element={<div>AUFTRAEGE-LISTE</div>} />
-            <Route path="/einsaetze/:id/auftraege/befehle/:befehlId" element={<BefehlDetailPage />} />
-          </Routes>
-        </MemoryRouter>
+        <AuthProvider>
+          <MemoryRouter initialEntries={[`/einsaetze/1/auftraege/befehle/${bid}`]}>
+            <Routes>
+              <Route path="/einsaetze/:id/auftraege" element={<div>AUFTRAEGE-LISTE</div>} />
+              <Route path="/einsaetze/:id/auftraege/befehle/:befehlId" element={<BefehlDetailPage />} />
+            </Routes>
+          </MemoryRouter>
+        </AuthProvider>
       </AntApp>
     </QueryClientProvider>,
   );

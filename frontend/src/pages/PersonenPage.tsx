@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { personDetailPfad } from '../routing/deeplinks';
 import { ladeEinsatz } from '../api/einsaetze';
+import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { useAuth } from '../auth/AuthContext';
 import { legePersonAn, listePersonen, schlageAbgleichVor, setzePersonStatus, type PersonEingabe } from '../api/einsatzPerson';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
@@ -33,6 +35,7 @@ const SICHTEN: { key: Sicht; label: string }[] = [
 export default function PersonenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const { benutzer } = useAuth();
   const navigate = useNavigate();
   const [sicht, setSicht] = useState<Sicht>('erfasst');
 
@@ -78,13 +81,11 @@ export default function PersonenPage() {
     if (searchParams.get('neu') !== '1') return;
     if (einsatzQuery.isLoading) return;
     const e = einsatzQuery.data;
-    const darfSchr =
-      e?.status === 'aktiv' &&
-      (e?.meine_rolle === 'einsatzleitung' || e?.meine_rolle === 'fuehrungspersonal');
+    const darfSchr = darfImEinsatzSchreiben(e, benutzer);
     if (darfSchr) setModus('schnell');
     searchParams.delete('neu');
     setSearchParams(searchParams, { replace: true });
-  }, [searchParams, setSearchParams, einsatzQuery.isLoading, einsatzQuery.data]);
+  }, [searchParams, setSearchParams, einsatzQuery.isLoading, einsatzQuery.data, benutzer]);
 
   const abgleichVorschlagMutation = useMutation({
     mutationFn: (v: { vermisstId: number; gefundenId: number }) =>
@@ -100,9 +101,7 @@ export default function PersonenPage() {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben =
-    einsatz.status === 'aktiv' &&
-    (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   const alle = personenQuery.data ?? [];
   const personen = (sicht === 'alle' || sicht === 'patienten')

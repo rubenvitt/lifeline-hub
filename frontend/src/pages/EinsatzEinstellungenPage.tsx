@@ -10,6 +10,7 @@ import { ladeOrgModulEinstellungen } from '../api/orgEinstellungen';
 import { einsatzKeys } from '../api/queryKeys';
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { darfImEinsatzSchreiben, darfEinsatzLeiten } from '../einsatz/schreibrecht';
 import { modulRegistry, istModulAusblendbar } from '../einsatz/modulRegistry';
 import type {
   BasemapModus, EinheitenSystem, EinstellungenUpdate, FachebenenSichtbar,
@@ -153,16 +154,11 @@ export default function EinsatzEinstellungenPage() {
   const orgDefaults = einstellungen.org_defaults;
   const orgModulDefaults: OrgModulEinstellungen = orgModulQuery.data ?? {};
 
-  const istAdmin = benutzer?.system_rolle === 'admin';
   const istAktiv = einsatz.status === 'aktiv';
-  const darfBearbeiten =
-    istAktiv &&
-    (einsatz.meine_rolle === 'einsatzleitung' ||
-      einsatz.meine_rolle === 'fuehrungspersonal' ||
-      istAdmin);
+  const darfBearbeiten = darfImEinsatzSchreiben(einsatz, benutzer);
   // Modul-Overrides darf nur die Einsatzleitung oder ein System-Admin verwalten
   // (deckt das Backend-Gate einsatzleitung|admin ab).
-  const darfModuleVerwalten = istAktiv && (einsatz.meine_rolle === 'einsatzleitung' || istAdmin);
+  const darfModuleVerwalten = darfEinsatzLeiten(einsatz, benutzer);
   const overrides = overridesQuery.data ?? {};
 
   // Nur fertige Module sind als Default-Modul wählbar (Pre-Mortem: kein Sprung

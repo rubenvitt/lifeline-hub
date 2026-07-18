@@ -8,8 +8,10 @@ import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
 import EtbPage from './EtbPage';
 
-const admin = {
-  id: 1, anzeigename: 'Admin', benutzername: 'admin', system_rolle: 'admin',
+// Normaler Benutzer (kein System-Admin): die Rollen-Tests prüfen die EINSATZ-Rolle,
+// nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
+const nutzer = {
+  id: 1, anzeigename: 'Nutzer', benutzername: 'nutzer', system_rolle: 'keiner',
   org_rolle: 'keine', aktiv: true, erstellt_at: '2026-05-23 10:00:00',
 };
 function einsatz(status: string) {
@@ -24,7 +26,7 @@ describe('EtbPage – Abschließen', () => {
   it('schließt einen aktiven Einsatz als Einsatzleitung ab', async () => {
     let abgeschlossen = false;
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
       http.get('/api/einsaetze/7', () =>
         HttpResponse.json(einsatz(abgeschlossen ? 'abgeschlossen' : 'aktiv')),
       ),
@@ -50,7 +52,7 @@ describe('EtbPage – Abschließen', () => {
 
   it('zeigt den Abschließen-Button nicht für Nicht-Einsatzleitung', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
       http.get('/api/einsaetze/7', () =>
         HttpResponse.json({ ...einsatz('aktiv'), meine_rolle: 'fuehrungspersonal' }),
       ),
@@ -70,7 +72,7 @@ describe('EtbPage – Abschließen', () => {
 
   it('zeigt Beobachtern keine Schreib-/Verwaltungsaktionen (read-only)', async () => {
     server.use(
-      http.get('/api/auth/me', () => HttpResponse.json(admin)),
+      http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
       http.get('/api/einsaetze/7', () =>
         HttpResponse.json({ ...einsatz('aktiv'), meine_rolle: 'beobachter' }),
       ),

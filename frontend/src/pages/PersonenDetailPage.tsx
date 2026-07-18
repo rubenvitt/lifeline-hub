@@ -5,6 +5,8 @@ import { useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
+import { darfImEinsatzSchreiben, darfEinsatzLeiten, istEinsatzLeitung } from '../einsatz/schreibrecht';
+import { useAuth } from '../auth/AuthContext';
 import { aktualisierePerson, entscheideAbgleich, erfasseSichtung, erfasseVerbleib, ladePerson, ladePersonAudit, legeNotizAn, registrierAnzeige, setzePersonStatus, stornierePerson, type PersonEingabe } from '../api/einsatzPerson';
 import { listeTiere, tierRegistrierAnzeige, aktualisiereTier } from '../api/einsatzTier';
 import { listeSchaeden, schadenRegistrierAnzeige, aktualisiereSchaden } from '../api/einsatzSchaden';
@@ -56,6 +58,7 @@ export default function PersonenDetailPage() {
   const personId = Number(personIdParam);
   const idGueltig = parseRouteId(personIdParam) != null;
   const navigate = useNavigate();
+  const { benutzer } = useAuth();
 
   const qc = useQueryClient();
   const { message, modal } = App.useApp();
@@ -98,7 +101,7 @@ export default function PersonenDetailPage() {
   const auditQuery = useQuery({
     queryKey: einsatzKeys.personAudit(einsatzId, personId),
     queryFn: () => ladePersonAudit(einsatzId, personId),
-    enabled: idGueltig && einsatzQuery.data?.meine_rolle === 'einsatzleitung',
+    enabled: idGueltig && istEinsatzLeitung(einsatzQuery.data),
   });
 
   const statusMutation = useMutation({
@@ -278,9 +281,7 @@ export default function PersonenDetailPage() {
   }
   const p = detailQuery.data;
 
-  const darfSchreiben =
-    einsatz.status === 'aktiv' &&
-    (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
   const darfZuordnen = darfSchreiben && !p.storniert_at;
 
   // LFH-151: Picker-Kandidaten = FREIE Ziele (kein Halter/Geschädigter, nicht storniert,
@@ -383,13 +384,13 @@ export default function PersonenDetailPage() {
                   {a.status === 'verdacht' && a.vermisst_person_id === person.id && (
                     <Space style={{ marginLeft: 12 }}>
                       <Button size="small" type="primary"
-                        disabled={einsatz.meine_rolle !== 'einsatzleitung'}
+                        disabled={!darfEinsatzLeiten(einsatz, benutzer)}
                         onClick={() => abgleichEntscheidenMutation.mutate({
                           vermisstId: person.id, abgleichId: a.id, entscheidung: 'bestaetigt' })}>
                         Bestätigen
                       </Button>
                       <Button size="small" danger
-                        disabled={einsatz.meine_rolle !== 'einsatzleitung'}
+                        disabled={!darfEinsatzLeiten(einsatz, benutzer)}
                         onClick={() => abgleichEntscheidenMutation.mutate({
                           vermisstId: person.id, abgleichId: a.id, entscheidung: 'verworfen' })}>
                         Verwerfen
@@ -542,7 +543,7 @@ export default function PersonenDetailPage() {
           </div>
         </div>
 
-        {einsatz.meine_rolle === 'einsatzleitung' && (
+        {istEinsatzLeitung(einsatz) && (
           <div>
             <Typography.Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
               Zugriffs-Audit

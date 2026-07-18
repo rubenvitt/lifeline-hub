@@ -4,7 +4,10 @@ import { renderMitProviders } from '../test/utils';
 import KartenOnlineSektion from './KartenOnlineSektion';
 import KartenOfflineSektion from './KartenOfflineSektion';
 
-vi.mock('../auth/AuthContext', () => ({ useAuth: vi.fn() }));
+vi.mock('../auth/AuthContext', () => ({
+  useAuth: vi.fn(),
+  AuthProvider: ({ children }: { children?: unknown }) => children,
+}));
 // Kind-Komponenten haben eigene Tests — hier nur der Sektions-Rahmen.
 vi.mock('./OnlineQuellenVerwaltung', () => ({ default: () => <div>online-kind</div> }));
 vi.mock('./OfflineKartenVerwaltung', () => ({ default: () => <div>offline-kind</div> }));

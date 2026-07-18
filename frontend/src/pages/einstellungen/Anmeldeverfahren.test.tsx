@@ -4,7 +4,10 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
 import Anmeldeverfahren from './Anmeldeverfahren';
 
-vi.mock('../../auth/AuthContext', () => ({ useAuth: vi.fn() }));
+vi.mock('../../auth/AuthContext', () => ({
+  useAuth: vi.fn(),
+  AuthProvider: ({ children }: { children?: unknown }) => children,
+}));
 vi.mock('../../api/auth', () => ({
   providerListeAdmin: vi.fn(),
   providerSchalten: vi.fn(),

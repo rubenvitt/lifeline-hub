@@ -2,6 +2,8 @@ import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Spin, Tag, Typograph
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz, schliesseEinsatzAb } from '../api/einsaetze';
+import { darfEinsatzLeiten, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { useAuth } from '../auth/AuthContext';
 import { listeBausteine } from '../api/etbBaustein';
 import { SEITENGROESSE, erteileAuftragAusEtb, listeEtb, type EtbFilterWerte, type NeuerEintrag } from '../api/etb';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
@@ -22,6 +24,7 @@ import { useEtbErfassung } from '../offline/useEtbErfassung';
 export default function EtbPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const { benutzer } = useAuth();
   // Live-Updates über den konsolidierten useEinsatzLiveStream im EinsatzLayout (LFH-207-C):
   // der etb-Listener dort invalidiert ['etb', einsatzId] (Prefix deckt die gefilterte Liste ab).
   const [filter, setFilter] = useState<EtbFilterWerte>({});
@@ -139,11 +142,9 @@ export default function EtbPage() {
   }
   const einsatz = einsatzQuery.data;
 
-  const darfAbschliessen = einsatz.status === 'aktiv' && einsatz.meine_rolle === 'einsatzleitung';
+  const darfAbschliessen = darfEinsatzLeiten(einsatz, benutzer);
 
-  const darfSchreiben =
-    einsatz.status === 'aktiv' &&
-    (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   return (
     <div>

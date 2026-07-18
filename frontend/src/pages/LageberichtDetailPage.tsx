@@ -3,6 +3,8 @@ import { useEffect } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
+import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { useAuth } from '../auth/AuthContext';
 import { parseRouteId, lageberichtePfad, lageberichtDetailPfad, etbPfad } from '../routing/deeplinks';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
@@ -21,6 +23,7 @@ import './lageberichtPrint.css';
 export default function LageberichtDetailPage() {
   const { id, lbId } = useParams();
   const einsatzId = Number(id);
+  const { benutzer } = useAuth();
   const berichtId = Number(lbId);
   const idGueltig = parseRouteId(lbId) != null;
   const { message, modal } = App.useApp();
@@ -110,9 +113,7 @@ export default function LageberichtDetailPage() {
   const bericht = berichtQuery.data;
   const v = vorlage(bericht.vorlage);
   const istEntwurf = bericht.status === 'entwurf';
-  const darfSchreiben =
-    einsatz.status === 'aktiv' &&
-    (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   const freigabeBestaetigen = async () => {
     // Pflichtfelder VOR dem Dialog prüfen — sonst landet ein Titel-Fehler hinter dem Modal.
