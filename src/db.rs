@@ -1861,12 +1861,15 @@ mod tests {
         .execute(&pool)
         .await
         .unwrap();
-        // Vollständig belegte Bestandszeile (alle Spalten, inkl. extern_* und Quittung).
+        // Vollständig belegte Bestandszeile — inkl. der VIER Dispositions-FKs (der Daseinsgrund
+        // von 0088). foreign_keys(false) erlaubt hier dangling FK-Werte; entscheidend ist, dass
+        // der INSERT…SELECT-Copy diese Spalten durchreicht (eine symmetrische Spalten-Auslassung
+        // aus beiden Migrations-Listen würde sie sonst still auf NULL defaulten).
         sqlx::query(
             "INSERT INTO auftrag_empfaenger \
                 (id, auftrag_id, empfaenger_typ, abschnitt_id, einheit_id, person_id, fahrzeug_id, \
                  funktion_text, extern_kategorie, extern_bezeichnung, snap_anzeige, quittiert_at, quittiert_von_id) \
-             VALUES (7, 42, 'extern', NULL, NULL, NULL, NULL, NULL, 'leitstelle', 'ILS Musterstadt', 'ILS', '2026-07-17 09:00:00', 3)",
+             VALUES (7, 42, 'extern', 6, 7, 5, 8, 'Melder', 'leitstelle', 'ILS Musterstadt', 'ILS', '2026-07-17 09:00:00', 3)",
         )
         .execute(&pool)
         .await
@@ -1917,7 +1920,28 @@ mod tests {
                 Some("2026-07-17 09:00:00"),
                 Some(3)
             ),
-            "alle 13 Spalten müssen den Rebuild verlustfrei überleben"
+            "die Nicht-Dispo-Spalten müssen den Rebuild verlustfrei überleben"
+        );
+
+        // Die VIER Dispositions-FKs + funktion_text — der Daseinsgrund von 0088 — müssen
+        // ebenfalls durchgereicht werden (nicht still auf NULL defaulten).
+        let (ab, ei, pe, fz, fu): (
+            Option<i64>,
+            Option<i64>,
+            Option<i64>,
+            Option<i64>,
+            Option<String>,
+        ) = sqlx::query_as(
+            "SELECT abschnitt_id, einheit_id, person_id, fahrzeug_id, funktion_text \
+                 FROM auftrag_empfaenger WHERE id = 7",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            (ab, ei, pe, fz, fu.as_deref()),
+            (Some(6), Some(7), Some(5), Some(8), Some("Melder")),
+            "die vier Dispositions-FKs + funktion_text müssen den Copy überleben"
         );
 
         // Die neue Tabelle trägt jetzt ON DELETE SET NULL auf den vier Dispo-FKs + den Index.

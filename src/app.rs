@@ -1038,4 +1038,35 @@ mod tests {
         let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(json["error"], "Interner Serverfehler");
     }
+
+    /// LFH-260/F35: verifiziert die Verdrahtung end-to-end — eine ECHTE Handler-Panik muss von
+    /// `CatchPanicLayer::custom(on_panic)` durch die tower-Service-Kette gefangen und als
+    /// 500 + {error}-JSON beantwortet werden (statt die Verbindung ohne Antwort abzureißen).
+    #[tokio::test]
+    async fn catch_panic_layer_faengt_echte_panik_durch_die_service_kette() {
+        use axum::body::Body;
+        use axum::http::Request;
+        use axum::routing::get;
+        use tower::ServiceExt; // oneshot
+
+        let app = Router::new()
+            .route(
+                "/boom",
+                get(|| async {
+                    panic!("absichtliche Test-Panik");
+                    #[allow(unreachable_code)]
+                    axum::http::StatusCode::OK
+                }),
+            )
+            .layer(tower_http::catch_panic::CatchPanicLayer::custom(on_panic));
+
+        let resp = app
+            .oneshot(Request::builder().uri("/boom").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+        let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(json["error"], "Interner Serverfehler");
+    }
 }
