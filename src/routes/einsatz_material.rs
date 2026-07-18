@@ -4,6 +4,7 @@ use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
 use crate::einsatz::repo as einsatz_repo;
+use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "material";
@@ -21,7 +22,9 @@ use serde::Deserialize;
 /// UHS-Zuordnungs-Änderungen, die keinen ETB-Eintrag schreiben (LFH-66).
 fn sse_material(state: &AppState, einsatz_id: i64, em_id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "material_id": em_id }).to_string();
-    state.live.publiziere_event(einsatz_id, "material", data);
+    state
+        .live
+        .publiziere_event(einsatz_id, LiveEvent::Material, data);
 }
 
 /// GET /api/einsaetze/{id}/material — disponiertes Material (aufgelöst). Nur Lesezugriff.

@@ -3,6 +3,8 @@ import { Liste, ListenEintrag } from '../../components/Liste';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../../api/einsaetze';
+import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
+import { useAuth } from '../../auth/AuthContext';
 import { parseRouteId, bereitstellungsraeumePfad } from '../../routing/deeplinks';
 import { ladeBr, setzeBrStatus, storniereBr, belegeBr } from '../../api/einsatzBereitstellungsraum';
 import { listeEinheiten } from '../../api/einheiten';
@@ -21,6 +23,7 @@ const STATUS_LABEL: Record<BrStatus, { label: string; color: string }> = {
 export default function BrDetailPage() {
   const { id, brId: brIdParam } = useParams();
   const einsatzId = Number(id);
+  const { benutzer } = useAuth();
   const brId = Number(brIdParam);
   const idGueltig = parseRouteId(brIdParam) != null;
   const listenPfad = bereitstellungsraeumePfad(einsatzId);
@@ -91,9 +94,7 @@ export default function BrDetailPage() {
 
   const einsatz = einsatzQuery.data;
   const br = detailQuery.data;
-  const ist_aktiv = einsatz.status === 'aktiv';
-  const ist_beobachter = einsatz.meine_rolle === 'beobachter';
-  const schreibgeschuetzt = !ist_aktiv || ist_beobachter || br.status === 'geplant' || br.status === 'aufgeloest';
+  const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatz, benutzer) || br.status === 'geplant' || br.status === 'aufgeloest';
 
   function onZuweisenEinheit(einheit: Einheit) {
     belegungMut.mutate({ objekt_typ: 'einheit', objekt_id: einheit.id, art: 'eintritt' });
@@ -135,7 +136,7 @@ export default function BrDetailPage() {
               <Button danger loading={statusMut.isPending}>Auflösen</Button>
             </Popconfirm>
           )}
-          {!ist_beobachter && ist_aktiv && br.status === 'geplant' && (
+          {darfImEinsatzSchreiben(einsatz, benutzer) && br.status === 'geplant' && (
             <>
               <Button
                 type="primary"

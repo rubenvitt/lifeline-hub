@@ -7,6 +7,8 @@ import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
 import { benenneGefahrengebiet, gefahrengebietName, ladeGefahrengebiete, ladeMatrix, setzeBewertung } from '../../api/gefahren';
 import { ladeEinsatz } from '../../api/einsaetze';
+import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
+import { useAuth } from '../../auth/AuthContext';
 import { lagekartePfad, parseRouteId } from '../../routing/deeplinks';
 import { warnstufeFarbe } from './gefahrenSchema';
 import GefahrenMatrix from './GefahrenMatrix';
@@ -15,6 +17,7 @@ import { Liste, ListenEintrag } from '../../components/Liste';
 export default function GefahrenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const { benutzer } = useAuth();
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [gewaehlt, setGewaehlt] = useState<number | null>(null);
@@ -71,7 +74,7 @@ export default function GefahrenPage() {
   if (einsatzQuery.isError || !einsatzQuery.data) return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
 
   const einsatz = einsatzQuery.data;
-  const darfSchreiben = einsatz.status === 'aktiv' && (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   if (gebieteQuery.isLoading) return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
   if (gebieteQuery.isError) return <Alert type="error" title="Gefahrengebiete konnten nicht geladen werden" showIcon />;

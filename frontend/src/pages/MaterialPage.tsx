@@ -4,6 +4,8 @@ import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
+import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { useAuth } from '../auth/AuthContext';
 import { listeMaterial } from '../api/material';
 import {
   aktualisiereDisposition, disponiereAdhoc, disponiereMaterial, entferneDisposition,
@@ -47,6 +49,7 @@ function MengeZelle({ em, onChange }: { em: EinsatzMaterial; onChange: (menge: n
 export default function MaterialPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const { benutzer } = useAuth();
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [adhocOffen, setAdhocOffen] = useState(false);
@@ -107,9 +110,7 @@ export default function MaterialPage() {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben =
-    einsatz.status === 'aktiv' &&
-    (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   const ems = emQuery.data ?? [];
   // Kein Dedup wie bei Fahrzeugen: dieselbe Material-Art darf mehrfach (als getrennte

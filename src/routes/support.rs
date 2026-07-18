@@ -6,7 +6,7 @@
 //! modul-spezifischen `sse_*`-Notify-Wrapper bleiben bewusst lokal (unterscheiden sich in
 //! Event-Name und Payload-Keys).
 
-use crate::live::{LiveNachricht, Replay};
+use crate::live::{LiveEvent, LiveNachricht, Replay};
 use axum::http::{header, HeaderMap, HeaderName};
 use axum::response::sse::Event;
 use serde::Deserialize;
@@ -69,7 +69,9 @@ pub fn sse_event_stream(
             // `.id(...)` setzt die SSE-`id:`-Zeile → der Browser schickt sie beim
             // Auto-Reconnect als `Last-Event-ID` zurück (F14/LFH-263).
             Ok(n) => Event::default().id(n.id).event(n.event).data(n.data),
-            Err(_) => Event::default().event("lagged").data("resync"),
+            Err(_) => Event::default()
+                .event(LiveEvent::Lagged.as_str())
+                .data("resync"),
         };
         Ok::<Event, Infallible>(event)
     })
@@ -98,7 +100,9 @@ pub fn sse_stream_mit_replay(
             .into_iter()
             .map(|n| Ok(Event::default().id(n.id).event(n.event).data(n.data)))
             .collect(),
-        Replay::Luecke => vec![Ok(Event::default().event("lagged").data("resync"))],
+        Replay::Luecke => vec![Ok(Event::default()
+            .event(LiveEvent::Lagged.as_str())
+            .data("resync"))],
     };
     tokio_stream::iter(prefix).chain(sse_event_stream(rx))
 }

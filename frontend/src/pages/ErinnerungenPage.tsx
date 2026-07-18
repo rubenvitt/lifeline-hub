@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
+import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import {
@@ -25,6 +27,7 @@ function abschlussZeit(e: Erinnerung): string {
 export default function ErinnerungenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const { benutzer } = useAuth();
   const { message } = App.useApp();
   const qc = useQueryClient();
 
@@ -63,9 +66,7 @@ export default function ErinnerungenPage() {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben =
-    einsatz.status === 'aktiv' &&
-    (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
   const alleErinnerungen = erinnerungenQuery.data ?? [];
 
   // Offen/Abgeschlossen clientseitig ueber die gemeinsame Phasen-Semantik trennen.

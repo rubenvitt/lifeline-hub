@@ -4,6 +4,7 @@ use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
 use crate::einsatz::repo as einsatz_repo;
+use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "unfallhilfsstellen";
@@ -42,12 +43,16 @@ pub struct UhsDetail {
 
 fn sse_uhs(state: &AppState, einsatz_id: i64, uhs_id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "uhs_id": uhs_id }).to_string();
-    state.live.publiziere_event(einsatz_id, "uhs", data);
+    state
+        .live
+        .publiziere_event(einsatz_id, LiveEvent::Uhs, data);
 }
 
 fn sse_person(state: &AppState, einsatz_id: i64, person_id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "person_id": person_id }).to_string();
-    state.live.publiziere_event(einsatz_id, "person", data);
+    state
+        .live
+        .publiziere_event(einsatz_id, LiveEvent::Person, data);
 }
 
 // ============================== UHS-Routen ==============================

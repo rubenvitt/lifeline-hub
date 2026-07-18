@@ -4,6 +4,7 @@ use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
 use crate::einsatz::repo as einsatz_repo;
+use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "tiere";
@@ -29,7 +30,9 @@ use tokio_stream::Stream;
 /// Clients refetchen.
 fn sse_tier(state: &AppState, einsatz_id: i64, tier_id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "tier_id": tier_id }).to_string();
-    state.live.publiziere_event(einsatz_id, "tier", data);
+    state
+        .live
+        .publiziere_event(einsatz_id, LiveEvent::Tier, data);
 }
 
 /// Validiert optionales Tier-Geschlecht; `Validation`, falls gesetzt und unbekannt.

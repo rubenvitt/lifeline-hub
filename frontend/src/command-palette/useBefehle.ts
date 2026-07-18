@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
+import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import { listeEinsaetze, ladeModulOverrides, ladeEinsatz } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
@@ -30,8 +31,7 @@ export function useBefehle(): Befehl[] {
     queryFn: () => ladeEinsatz(einsatzId!),
     enabled: einsatzId != null,
   });
-  const darfSchreibenImEinsatz =
-    aktuellerEinsatz?.status === 'aktiv' && aktuellerEinsatz?.meine_rolle !== 'beobachter';
+  const darfSchreibenImEinsatz = darfImEinsatzSchreiben(aktuellerEinsatz, benutzer);
 
   return useMemo(
     () => baueBefehle({

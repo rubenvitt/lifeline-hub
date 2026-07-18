@@ -8,6 +8,7 @@ use crate::error::AppError;
 use crate::karte_hintergrundbild::{
     self as bild, repo as bild_repo, repo::BildPatch, HintergrundbildAnzeige,
 };
+use crate::live::LiveEvent;
 use crate::routes::support::{etag_von, if_none_match_matcht, ASSET_CACHE_CONTROL};
 use axum::extract::{Multipart, Path, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
@@ -20,7 +21,9 @@ const MODUL_KEY: &str = "lagekarte";
 /// SSE-Notify: ein Bild-Hintergrund hat sich geändert. Event-Tag `karte_bild`.
 fn sse_bild(state: &AppState, einsatz_id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id }).to_string();
-    state.live.publiziere_event(einsatz_id, "karte_bild", data);
+    state
+        .live
+        .publiziere_event(einsatz_id, LiveEvent::KarteBild, data);
 }
 
 /// GET Liste (Metadaten ohne BLOB). Nur Lesezugriff.

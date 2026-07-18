@@ -8,6 +8,7 @@ import { server } from '../test/server';
 import UnfallhilfsstellenPage from './UnfallhilfsstellenPage';
 import UhsDetailPage from './uhs/UhsDetailPage';
 import { liesLetzteUhs } from './uhs/uhsAuswahl';
+import { AuthProvider } from '../auth/AuthContext';
 import { App as AntApp } from 'antd';
 
 class FakeEventSource {
@@ -34,12 +35,14 @@ function renderPage(route = '/einsaetze/1/unfallhilfsstellen/liste') {
   return render(
     <QueryClientProvider client={qc}>
       <AntApp>
-        <MemoryRouter initialEntries={[route]}>
-          <Routes>
-            <Route path="/einsaetze/:id/unfallhilfsstellen/liste" element={<UnfallhilfsstellenPage />} />
-            <Route path="/einsaetze/:id/unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />
-          </Routes>
-        </MemoryRouter>
+        <AuthProvider>
+          <MemoryRouter initialEntries={[route]}>
+            <Routes>
+              <Route path="/einsaetze/:id/unfallhilfsstellen/liste" element={<UnfallhilfsstellenPage />} />
+              <Route path="/einsaetze/:id/unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />
+            </Routes>
+          </MemoryRouter>
+        </AuthProvider>
       </AntApp>
     </QueryClientProvider>
   );

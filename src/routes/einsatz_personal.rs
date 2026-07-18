@@ -4,6 +4,7 @@ use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
 use crate::einsatz::repo as einsatz_repo;
+use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "personal";
@@ -22,7 +23,9 @@ use serde::Deserialize;
 /// `person`-Event-Tag (kein neues `personal`-Tag, sonst bricht der Frontend-Filter).
 fn sse_personal(state: &AppState, einsatz_id: i64, ep_id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "person_id": ep_id }).to_string();
-    state.live.publiziere_event(einsatz_id, "person", data);
+    state
+        .live
+        .publiziere_event(einsatz_id, LiveEvent::Person, data);
 }
 
 /// Personen-Bezeichnung für ETB-Texte: Name, optional mit Funktion in Klammern.

@@ -5,6 +5,7 @@ use crate::einsatz::berechtigung::{
     fordere_schreibrecht,
 };
 use crate::einsatz::repo as einsatz_repo;
+use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "personen";
@@ -47,7 +48,9 @@ pub struct PersonDetail {
 /// (nur einsatz_id + person_id); Clients refetchen die Liste.
 fn sse_person(state: &AppState, einsatz_id: i64, person_id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "person_id": person_id }).to_string();
-    state.live.publiziere_event(einsatz_id, "person", data);
+    state
+        .live
+        .publiziere_event(einsatz_id, LiveEvent::Person, data);
 }
 
 /// Emittiert die SSE-Events eines UHS-Auto-Austritts (LFH-124): der pool-basierte
@@ -60,12 +63,12 @@ fn sse_auto_austritt(state: &AppState, einsatz_id: i64, effekt: &crate::uhs::Aut
     }
     state.live.publiziere_event(
         einsatz_id,
-        "uhs",
+        LiveEvent::Uhs,
         serde_json::json!({ "einsatz_id": einsatz_id, "uhs_id": effekt.uhs_id }).to_string(),
     );
     state.live.publiziere_event(
         einsatz_id,
-        "person",
+        LiveEvent::Person,
         serde_json::json!({ "einsatz_id": einsatz_id, "person_id": effekt.person_id }).to_string(),
     );
 }

@@ -6,6 +6,7 @@ import EinsatzEinstellungenPage from './EinsatzEinstellungenPage';
 
 vi.mock('../auth/AuthContext', () => ({
   useAuth: () => ({ benutzer: { id: 1, system_rolle: 'admin' } }),
+  AuthProvider: ({ children }: { children?: unknown }) => children,
 }));
 
 vi.mock('../api/einsaetze', () => ({

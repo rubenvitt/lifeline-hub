@@ -16,7 +16,9 @@ class FakeEventSource {
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
 
-const admin = { id: 1, anzeigename: 'Admin', system_rolle: 'admin', org_rolle: 'fuehrungskraft' };
+// Normaler Benutzer (kein System-Admin): so prüft der Beobachter-Test die EINSATZ-Rolle,
+// nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
+const nutzer = { id: 1, anzeigename: 'Nutzer', system_rolle: 'keiner', org_rolle: 'fuehrungskraft' };
 const einsatzAktiv = {
   id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung',
   org_id: 5, org_name: 'DRK Musterstadt',
@@ -51,7 +53,7 @@ function render(
   route = '/einsaetze/1/schaeden/10',
 ) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/schaeden/10', () => HttpResponse.json(schaden)),
     http.get('/api/einsaetze/1/personen', () => HttpResponse.json([einePerson])),

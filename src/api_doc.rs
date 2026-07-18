@@ -78,6 +78,7 @@ use utoipa::OpenApi;
     crate::lagebericht::LageberichtStatus,
     crate::lagebericht::LageberichtVorlage,
     crate::lagebericht::repo::LageberichtAnzeige,
+    crate::live::LiveEvent,
     crate::material::EinsatzMaterialAnzeige,
     crate::material::MaterialAnzeige,
     crate::material::MaterialStatus,

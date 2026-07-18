@@ -116,6 +116,11 @@ export type MeldeWeg = S['MeldeWeg'];
 export type EtbEintragAnzeige = S['EtbEintragAnzeige'];
 export type EtbBaustein = S['EtbBaustein'];
 
+// ============================== LFH-298 SSE-Live-Feed ==============================
+/** Wire-Event-Namen des Einsatz-Live-Feeds; Kontrakt gegen `EINSATZ_STREAM_EVENTS`
+ *  (queryKeys.ts) via `liveEvent.contract.test.ts`. Wahrheitsquelle: Rust `LiveEvent`. */
+export type LiveEvent = S['LiveEvent'];
+
 // ============================== Fahrzeuge / Material / Personal ==============================
 export type Dienststatus = S['Dienststatus'];
 export type StatusKategorie = S['StatusKategorie'];

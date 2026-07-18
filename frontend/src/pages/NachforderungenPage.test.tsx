@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import NachforderungenPage from './NachforderungenPage';
+import { AuthProvider } from '../auth/AuthContext';
 import type { Nachforderung } from '../api/types';
 
 vi.mock('../api/einsaetze', () => ({
@@ -36,9 +37,11 @@ function renderPage() {
   return render(
     <QueryClientProvider client={client}>
       <AntApp>
-        <MemoryRouter initialEntries={['/einsaetze/1/nachforderungen']}>
-          <Routes><Route path="/einsaetze/:id/nachforderungen" element={<NachforderungenPage />} /></Routes>
-        </MemoryRouter>
+        <AuthProvider>
+          <MemoryRouter initialEntries={['/einsaetze/1/nachforderungen']}>
+            <Routes><Route path="/einsaetze/:id/nachforderungen" element={<NachforderungenPage />} /></Routes>
+          </MemoryRouter>
+        </AuthProvider>
       </AntApp>
     </QueryClientProvider>,
   );

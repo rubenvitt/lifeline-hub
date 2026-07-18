@@ -1,6 +1,99 @@
+use serde::Serialize;
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, RwLock};
 use tokio::sync::broadcast;
+use utoipa::ToSchema;
+
+/// SSE-Wire-Event-Namen als BE↔FE-Kontrakt (LFH-298). Schema-Anker für die OpenAPI-Union;
+/// die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LiveEvent {
+    Uhs,
+    Schaden,
+    Fahrzeug,
+    Material,
+    Tier,
+    LageZone,
+    FreiesZeichen,
+    Gefahr,
+    Einheit,
+    Abschnitt,
+    Person,
+    Lagebericht,
+    Chat,
+    Erinnerung,
+    Auftrag,
+    Nachforderung,
+    Meldung,
+    Bereitstellungsraum,
+    KarteBild,
+    Etb,
+    Befehl,
+    Sofortmeldung,
+    Lagged,
+}
+
+impl LiveEvent {
+    /// Alle Varianten in kanonischer Reihenfolge — Anker für den Wire-Kontrakt-Guard
+    /// (`tests/enum_wire_kontrakt.rs`) und die Exhaustiveness-Prüfung.
+    pub const ALLE: [LiveEvent; 23] = [
+        LiveEvent::Uhs,
+        LiveEvent::Schaden,
+        LiveEvent::Fahrzeug,
+        LiveEvent::Material,
+        LiveEvent::Tier,
+        LiveEvent::LageZone,
+        LiveEvent::FreiesZeichen,
+        LiveEvent::Gefahr,
+        LiveEvent::Einheit,
+        LiveEvent::Abschnitt,
+        LiveEvent::Person,
+        LiveEvent::Lagebericht,
+        LiveEvent::Chat,
+        LiveEvent::Erinnerung,
+        LiveEvent::Auftrag,
+        LiveEvent::Nachforderung,
+        LiveEvent::Meldung,
+        LiveEvent::Bereitstellungsraum,
+        LiveEvent::KarteBild,
+        LiveEvent::Etb,
+        LiveEvent::Befehl,
+        LiveEvent::Sofortmeldung,
+        LiveEvent::Lagged,
+    ];
+
+    /// Der load-bearing SSE-Wire-Tag. Das Frontend filtert exakt auf diesen String
+    /// (`EINSATZ_STREAM_EVENTS` in `queryKeys.ts`); Änderungen bricht der Cross-Language-
+    /// Kontrakttest (`live_event_wire` + FE `liveEvent.contract.test.ts`).
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            LiveEvent::Uhs => "uhs",
+            LiveEvent::Schaden => "schaden",
+            LiveEvent::Fahrzeug => "fahrzeug",
+            LiveEvent::Material => "material",
+            LiveEvent::Tier => "tier",
+            LiveEvent::LageZone => "lage_zone",
+            LiveEvent::FreiesZeichen => "freies_zeichen",
+            LiveEvent::Gefahr => "gefahr",
+            LiveEvent::Einheit => "einheit",
+            LiveEvent::Abschnitt => "abschnitt",
+            LiveEvent::Person => "person",
+            LiveEvent::Lagebericht => "lagebericht",
+            LiveEvent::Chat => "chat",
+            LiveEvent::Erinnerung => "erinnerung",
+            LiveEvent::Auftrag => "auftrag",
+            LiveEvent::Nachforderung => "nachforderung",
+            LiveEvent::Meldung => "meldung",
+            LiveEvent::Bereitstellungsraum => "bereitstellungsraum",
+            LiveEvent::KarteBild => "karte_bild",
+            LiveEvent::Etb => "etb",
+            LiveEvent::Befehl => "befehl",
+            LiveEvent::Sofortmeldung => "sofortmeldung",
+            LiveEvent::Lagged => "lagged",
+        }
+    }
+}
 
 /// Kapazität des Broadcast-Puffers pro Einsatz. Großzügig bemessen für
 /// Erfassungs-Bursts; läuft ein langsamer Client über, erhält er ein
@@ -154,7 +247,7 @@ impl LiveHub {
     /// Sendet einen ETB-Eintrag (JSON) an alle Abonnenten. Bequemer Wrapper für
     /// den häufigsten Fall — entspricht `publiziere_event(id, "etb", json)`.
     pub fn publiziere(&self, einsatz_id: i64, json: String) {
-        self.publiziere_event(einsatz_id, "etb", json);
+        self.publiziere_event(einsatz_id, LiveEvent::Etb, json);
     }
 
     /// Sendet ein getaggtes Event an alle Abonnenten eines Einsatzes.
@@ -164,14 +257,14 @@ impl LiveHub {
     /// Kanal (nie jemand abonniert), geht die Nachricht verloren — neue Abonnenten erhalten
     /// nur nachfolgende Einträge. Ein Kanal, dessen letzter Empfänger weg ist, wird
     /// opportunistisch entfernt, damit der Hub nicht über abgeschlossene Einsätze leakt.
-    pub fn publiziere_event(&self, einsatz_id: i64, event: &str, data: String) {
+    pub fn publiziere_event(&self, einsatz_id: i64, event: LiveEvent, data: String) {
         let mut kanaele = self.kanaele.write().expect("LiveHub-Lock");
         let Some(kanal) = kanaele.get_mut(&einsatz_id) else {
             return; // kein Abonnent → verwerfen
         };
         let nachricht = LiveNachricht {
             id: format!("{}-{}", self.epoch, kanal.naechste_id),
-            event: event.to_string(),
+            event: event.as_str().to_string(),
             data,
         };
         kanal.naechste_id += 1;
@@ -243,7 +336,11 @@ mod tests {
     async fn publiziere_event_traegt_event_typ() {
         let hub = LiveHub::new();
         let mut rx = hub.abonniere(1);
-        hub.publiziere_event(1, "person", r#"{"einsatz_id":1,"person_id":5}"#.into());
+        hub.publiziere_event(
+            1,
+            LiveEvent::Person,
+            r#"{"einsatz_id":1,"person_id":5}"#.into(),
+        );
         let n = rx.recv().await.unwrap();
         assert_eq!(n.event, "person");
         assert_eq!(n.data, r#"{"einsatz_id":1,"person_id":5}"#);
@@ -266,9 +363,9 @@ mod tests {
         let hub = LiveHub::new();
         let mut a = hub.abonniere(1);
         let mut b = hub.abonniere(2);
-        hub.publiziere_event(1, "etb", "a1".into());
-        hub.publiziere_event(1, "etb", "a2".into());
-        hub.publiziere_event(2, "etb", "b1".into());
+        hub.publiziere_event(1, LiveEvent::Etb, "a1".into());
+        hub.publiziere_event(1, LiveEvent::Etb, "a2".into());
+        hub.publiziere_event(2, LiveEvent::Etb, "b1".into());
 
         let a1 = a.recv().await.unwrap();
         let a2 = a.recv().await.unwrap();
@@ -293,8 +390,8 @@ mod tests {
     async fn replay_liefert_nur_verpasste_nachrichten() {
         let hub = LiveHub::new();
         let mut rx = hub.abonniere(1);
-        hub.publiziere_event(1, "etb", "eins".into());
-        hub.publiziere_event(1, "etb", "zwei".into());
+        hub.publiziere_event(1, LiveEvent::Etb, "eins".into());
+        hub.publiziere_event(1, LiveEvent::Etb, "zwei".into());
         let n1 = rx.recv().await.unwrap(); // id …-1
 
         // Client hatte n1 gesehen und verbindet neu → nur "zwei" (id …-2) ist verpasst.
@@ -312,7 +409,7 @@ mod tests {
     async fn replay_auf_aktuellem_stand_ist_leer() {
         let hub = LiveHub::new();
         let mut rx = hub.abonniere(1);
-        hub.publiziere_event(1, "etb", "eins".into());
+        hub.publiziere_event(1, LiveEvent::Etb, "eins".into());
         let n1 = rx.recv().await.unwrap();
         let (replay, _rx2) = hub.abonniere_mit_replay(1, Some(n1.id.clone()));
         assert!(matches!(replay, Replay::Events(v) if v.is_empty()));
@@ -323,10 +420,10 @@ mod tests {
         let hub = LiveHub::new();
         let mut rx = hub.abonniere(1);
         // Erste Nachricht merken, dann den Ring (REPLAY_KAPAZITAET) sicher überlaufen lassen.
-        hub.publiziere_event(1, "etb", "erste".into());
+        hub.publiziere_event(1, LiveEvent::Etb, "erste".into());
         let n1 = rx.recv().await.unwrap();
         for i in 0..(REPLAY_KAPAZITAET as i32 + 5) {
-            hub.publiziere_event(1, "etb", format!("f{i}"));
+            hub.publiziere_event(1, LiveEvent::Etb, format!("f{i}"));
         }
         // n1 ist längst aus dem Ring evictet → Luecke.
         let (replay, _rx2) = hub.abonniere_mit_replay(1, Some(n1.id.clone()));
@@ -337,7 +434,7 @@ mod tests {
     async fn replay_bei_fremder_epoch_ist_luecke() {
         let hub = LiveHub::new();
         let mut rx = hub.abonniere(1);
-        hub.publiziere_event(1, "etb", "eins".into());
+        hub.publiziere_event(1, LiveEvent::Etb, "eins".into());
         let n1 = rx.recv().await.unwrap();
         let fremde_epoch = epoch_von(&n1.id) + 1; // simuliert einen Serverneustart
         let (replay, _rx2) = hub.abonniere_mit_replay(1, Some(format!("{fremde_epoch}-1")));
@@ -349,7 +446,7 @@ mod tests {
         // Der Last-Event-ID-Header ist client-kontrolliert und wird roh durchgereicht.
         let hub = LiveHub::new();
         let _rx = hub.abonniere(1);
-        hub.publiziere_event(1, "etb", "eins".into());
+        hub.publiziere_event(1, LiveEvent::Etb, "eins".into());
         for seit in ["kaputt", "1-abc", ""] {
             let (replay, _) = hub.abonniere_mit_replay(1, Some(seit.to_string()));
             assert!(
@@ -365,7 +462,7 @@ mod tests {
         // saturating_add wuerde n + 1 im Debug/Test-Build panicken.
         let hub = LiveHub::new();
         let mut rx = hub.abonniere(1);
-        hub.publiziere_event(1, "etb", "eins".into());
+        hub.publiziere_event(1, LiveEvent::Etb, "eins".into());
         let n1 = rx.recv().await.unwrap();
         let epoch = epoch_von(&n1.id);
         let (replay, _) = hub.abonniere_mit_replay(1, Some(format!("{epoch}-{}", u64::MAX)));
@@ -380,9 +477,9 @@ mod tests {
         // feuert dann seinen Alarm-Listener genau einmal).
         let hub = LiveHub::new();
         let mut rx = hub.abonniere(1);
-        hub.publiziere_event(1, "etb", "vorher".into());
+        hub.publiziere_event(1, LiveEvent::Etb, "vorher".into());
         let n1 = rx.recv().await.unwrap();
-        hub.publiziere_event(1, "sofortmeldung", r#"{"meldung_id":3}"#.into());
+        hub.publiziere_event(1, LiveEvent::Sofortmeldung, r#"{"meldung_id":3}"#.into());
 
         let (replay, _rx2) = hub.abonniere_mit_replay(1, Some(n1.id.clone()));
         match replay {

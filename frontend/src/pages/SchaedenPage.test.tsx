@@ -16,7 +16,9 @@ class FakeEventSource {
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
 
-const admin = { id: 1, anzeigename: 'Admin', system_rolle: 'admin', org_rolle: 'fuehrungskraft' };
+// Normaler Benutzer (kein System-Admin): so prüft der Beobachter-Test die EINSATZ-Rolle,
+// nicht den admin-globalen Zweig (LFH-234). Admin-global ist in schreibrecht.test.ts abgedeckt.
+const nutzer = { id: 1, anzeigename: 'Nutzer', system_rolle: 'keiner', org_rolle: 'fuehrungskraft' };
 const einsatzAktiv = {
   id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung',
   org_id: 5, org_name: 'DRK Musterstadt',
@@ -49,7 +51,7 @@ function basisSchaden(overrides: Record<string, unknown> = {}) {
 
 function render(einsatzObj: object, schaeden: object[], personen: object[] = [], personal: object[] = []) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json(schaeden)),
     // Quellen der Geschädigt-Combobox (mounten beim Öffnen der Formulare):
@@ -71,7 +73,7 @@ function render(einsatzObj: object, schaeden: object[], personen: object[] = [],
 /** Rendert SchaedenPage mit konfigurierbarer Route (z.B. mit Query-Params). */
 function renderSchaedenPage(route: string) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
     http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
@@ -90,7 +92,7 @@ function renderSchaedenPage(route: string) {
 /** Rendert SchaedenPage mit wählbarem Einsatz-Objekt und Route. */
 function renderSchaedenPageMitEinsatz(einsatzObj: object, route: string) {
   server.use(
-    http.get('/api/auth/me', () => HttpResponse.json(admin)),
+    http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
