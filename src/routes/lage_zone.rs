@@ -128,28 +128,38 @@ pub async fn anlegen(
         None
     };
 
-    let z = zone_repo::anlegen(
-        &state.pool,
-        einsatz_id,
-        ZoneNeu {
-            typ: &body.typ,
-            geometrie_typ: &body.geometrie_typ,
-            geometrie: &geometrie,
-            label: label.as_deref(),
-            farbe: farbe.as_deref(),
-            notiz: notiz.as_deref(),
-            erstellt_von: benutzer.id,
-        },
-    )
-    .await?;
-
-    super::etb_system_degradiert(
-        &state,
-        einsatz_id,
-        benutzer.id,
-        &etb_text(z.typ.as_str(), z.label.as_deref(), "eingerichtet"),
-    )
-    .await?;
+    // F06/LFH-244 Tier-A: Zonen-INSERT (+ ggf. Gruppen-INSERT) + System-ETB-Eintrag atomar
+    // in EINER Tx (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige für
+    // ETB-Text (Typ-Label + Label) UND Response. SSE erst nach dem Commit (Reinheits-Kontrakt).
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    let z = crate::write_retry!(&state.pool, |conn| {
+        let id = zone_repo::anlegen_tx(
+            conn,
+            einsatz_id,
+            ZoneNeu {
+                typ: &body.typ,
+                geometrie_typ: &body.geometrie_typ,
+                geometrie: &geometrie,
+                label: label.as_deref(),
+                farbe: farbe.as_deref(),
+                notiz: notiz.as_deref(),
+                erstellt_von: benutzer.id,
+            },
+        )
+        .await?;
+        let z = zone_repo::laden_tx(conn, einsatz_id, id).await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            benutzer.id,
+            startwert,
+            &etb_text(z.typ.as_str(), z.label.as_deref(), "eingerichtet"),
+        )
+        .await?;
+        Ok(z)
+    })?;
     sse_zone(&state, einsatz_id, z.id);
     Ok((StatusCode::CREATED, Json(z)))
 }
@@ -320,14 +330,23 @@ pub async fn aufloesen(
     fordere_aktiv(&einsatz)?;
 
     let vorher = zone_repo::laden(&state.pool, einsatz_id, zid).await?;
-    zone_repo::loese_auf(&state.pool, einsatz_id, zid).await?;
-    super::etb_system_degradiert(
-        &state,
-        einsatz_id,
-        benutzer.id,
-        &etb_text(vorher.typ.as_str(), vorher.label.as_deref(), "aufgehoben"),
-    )
-    .await?;
+
+    // F06/LFH-244 Tier-A: Zonen-DELETE + System-ETB-Eintrag atomar in EINER Tx. Der ETB-Text
+    // ist aus dem VOR der Tx geladenen `vorher` berechenbar (kein In-Tx-Reload nötig). Das
+    // Aufräumen einer dadurch verwaisten Gefahrengebiet-Gruppe läuft NACH dem Commit auf dem
+    // Pool (zweiter Writer — darf nicht in die BEGIN-IMMEDIATE-Tx). SSE ebenfalls nach dem Commit.
+    let text = etb_text(vorher.typ.as_str(), vorher.label.as_deref(), "aufgehoben");
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    let gebiet_id = crate::write_retry!(&state.pool, |conn| {
+        let gebiet_id = zone_repo::loese_auf_tx(conn, einsatz_id, zid).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        Ok(gebiet_id)
+    })?;
+    if let Some(g) = gebiet_id {
+        crate::gefahr::repo::gebiet_aufraeumen_wenn_leer(&state.pool, g).await?;
+    }
     sse_zone(&state, einsatz_id, zid);
     Ok(StatusCode::NO_CONTENT)
 }

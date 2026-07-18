@@ -157,34 +157,38 @@ pub async fn anlegen(
     let melder = trimme(body.melder_kontakt);
     let notiz = trimme(body.notiz);
 
-    let person = repo::anlegen(
-        &state.pool,
-        einsatz_id,
-        benutzer.id,
-        repo::NeueDaten {
-            name: name.as_deref(),
-            vorname: vorname.as_deref(),
-            geschlecht: body.geschlecht.as_deref(),
-            geburtsdatum: geburtsdatum.as_deref(),
-            alter_geschaetzt: body.alter_geschaetzt,
-            herkunft_adresse: herkunft.as_deref(),
-            antreff_ort: antreff.as_deref(),
-            melder_kontakt: melder.as_deref(),
-            notiz: notiz.as_deref(),
-        },
-    )
-    .await?;
-
-    super::etb_system_degradiert(
-        &state,
-        einsatz_id,
-        benutzer.id,
-        &format!(
+    // F06/LFH-244 Tier-A: Domänen-Write (INSERT) + System-ETB-Eintrag atomar in EINER Tx
+    // (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige für ETB-Text
+    // (Reg.-Nr.) UND Response. SSE erst nach dem Commit.
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    let person = crate::write_retry!(&state.pool, |conn| {
+        let (id, _reg) = repo::anlegen_tx(
+            conn,
+            einsatz_id,
+            benutzer.id,
+            repo::NeueDaten {
+                name: name.as_deref(),
+                vorname: vorname.as_deref(),
+                geschlecht: body.geschlecht.as_deref(),
+                geburtsdatum: geburtsdatum.as_deref(),
+                alter_geschaetzt: body.alter_geschaetzt,
+                herkunft_adresse: herkunft.as_deref(),
+                antreff_ort: antreff.as_deref(),
+                melder_kontakt: melder.as_deref(),
+                notiz: notiz.as_deref(),
+            },
+        )
+        .await?;
+        let person = repo::laden_tx(conn, einsatz_id, id).await?;
+        let text = format!(
             "Person {} erfasst",
             registrier_anzeige(person.registrier_nr)
-        ),
-    )
-    .await?;
+        );
+        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        Ok(person)
+    })?;
     sse_person(&state, einsatz_id, person.id);
     Ok((StatusCode::CREATED, Json(person)))
 }
@@ -485,28 +489,31 @@ pub async fn sichten(
     };
     let notiz = trimme(body.notiz);
 
-    let sichtung = sichtung_repo::erfassen(
-        &state.pool,
-        einsatz_id,
-        person_id,
-        kategorie.as_str(),
-        notiz.as_deref(),
-        benutzer.id,
-        hebe_auf_betroffen,
-    )
-    .await?;
-
-    super::etb_system_degradiert(
-        &state,
-        einsatz_id,
-        benutzer.id,
-        &format!(
-            "Person {}: Sichtung {}",
-            registrier_anzeige(person.registrier_nr),
-            kategorie.etb_label()
-        ),
-    )
-    .await?;
+    // F06/LFH-244 Tier-A: Sichtungs-Erfassung (optionaler Status-Hub + INSERT + Cache-Update)
+    // + System-ETB-Eintrag atomar in EINER Tx (BEGIN IMMEDIATE + Retry). Der ETB-Text ist aus
+    // dem VOR der Tx geladenen `person`-Vorzustand + `kategorie` berechenbar. SSE nach dem Commit.
+    let text = format!(
+        "Person {}: Sichtung {}",
+        registrier_anzeige(person.registrier_nr),
+        kategorie.etb_label()
+    );
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    let sichtung = crate::write_retry!(&state.pool, |conn| {
+        let sichtung = sichtung_repo::erfassen_tx(
+            conn,
+            einsatz_id,
+            person_id,
+            kategorie.as_str(),
+            notiz.as_deref(),
+            benutzer.id,
+            hebe_auf_betroffen,
+        )
+        .await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        Ok(sichtung)
+    })?;
     sse_person(&state, einsatz_id, person_id);
     Ok((StatusCode::CREATED, Json(sichtung)))
 }

@@ -2,7 +2,7 @@ use super::qualifikation_repo;
 use super::{status_repo, EinsatzPersonalAnzeige, FuehrungskraftKarte};
 use crate::error::AppError;
 use crate::katalog::{StatusKategorie, DIENSTSTATUS_IN_DIENST, KATEGORIE_GEBUNDEN};
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 /// SELECT mit aufgelöster Live-Identität (LEFT JOIN personal), Live-Funktion (geordnete
 /// Subquery über aktive Qualifikationen — identisch zu `qualifikation_repo::funktion_text`)
@@ -140,6 +140,26 @@ pub async fn laden_anzeige(
     Ok(zu_anzeige(row, einsatz_aktiv))
 }
 
+/// Wie [`laden_anzeige`], aber auf einer offenen Connection/Transaktion (für den In-Tx-Reload
+/// beim atomaren Status-Update, F06/LFH-244 Tier-A — liefert die frische, aufgelöste Anzeige
+/// für ETB-Text UND Response in EINER Tx).
+pub async fn laden_anzeige_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ep_id: i64,
+    einsatz_aktiv: bool,
+) -> Result<EinsatzPersonalAnzeige, AppError> {
+    let row = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_AUFGELOEST} WHERE ep.id = ? AND ep.einsatz_id = ?"
+    )))
+    .bind(ep_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    Ok(zu_anzeige(row, einsatz_aktiv))
+}
+
 /// Disponiert eine Stamm-Person. Prüft Org-Zugehörigkeit + Dienststatus, friert den
 /// Identitäts-Schnappschuss ein (`snap_funktion` aus den aktiven Qualifikationen) und
 /// setzt den ersten `gebunden`-Status. `staerke_position` ist der optionale Dispo-Override.
@@ -228,8 +248,8 @@ pub async fn disponiere_adhoc(
 /// COALESCE (`None` = unverändert). `staerke_position` ist Drei-Zustands (wie `PositionPatch`):
 /// `None` = unverändert, `Some(None)` = Override explizit auf NULL, `Some(Some(x))` = setzen.
 /// `NotFound`, falls die Zeile nicht zum Einsatz gehört.
-pub async fn aktualisiere(
-    pool: &SqlitePool,
+pub async fn aktualisiere_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     ep_id: i64,
     status_id: Option<i64>,
@@ -249,12 +269,33 @@ pub async fn aktualisiere(
     .bind(bemerkung)
     .bind(ep_id)
     .bind(einsatz_id)
-    .execute(pool)
+    .execute(&mut *conn)
     .await?;
     if resultat.rows_affected() == 0 {
         return Err(AppError::NotFound);
     }
     Ok(())
+}
+
+/// Pool-Wrapper (eigene Tx): delegiert an [`aktualisiere_tx`].
+pub async fn aktualisiere(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    ep_id: i64,
+    status_id: Option<i64>,
+    staerke_position: Option<Option<&str>>,
+    bemerkung: Option<&str>,
+) -> Result<(), AppError> {
+    let mut conn = pool.acquire().await?;
+    aktualisiere_tx(
+        &mut conn,
+        einsatz_id,
+        ep_id,
+        status_id,
+        staerke_position,
+        bemerkung,
+    )
+    .await
 }
 
 /// Entfernt eine Dispositionszeile aus dem Einsatz (der Stamm bleibt). `NotFound`,
@@ -266,30 +307,42 @@ pub async fn aktualisiere(
 /// (`auftrag_empfaenger.person_id`) wird von der DB per ON DELETE SET NULL abgeräumt
 /// (Migration 0088). Schlägt das DELETE auf `NotFound` durch (fremde/unbekannte Person),
 /// rollt die TX die Freigabe zurück.
-pub async fn entferne(pool: &SqlitePool, einsatz_id: i64, ep_id: i64) -> Result<(), AppError> {
-    let mut tx = pool.begin().await?;
+pub async fn entferne_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ep_id: i64,
+) -> Result<(), AppError> {
     sqlx::query(
         "UPDATE einsatz_einheit SET fuehrer_id = NULL WHERE fuehrer_id = ? AND einsatz_id = ?",
     )
     .bind(ep_id)
     .bind(einsatz_id)
-    .execute(&mut *tx)
+    .execute(&mut *conn)
     .await?;
     sqlx::query(
         "UPDATE einsatzabschnitt SET leiter_id = NULL WHERE leiter_id = ? AND einsatz_id = ?",
     )
     .bind(ep_id)
     .bind(einsatz_id)
-    .execute(&mut *tx)
+    .execute(&mut *conn)
     .await?;
     let resultat = sqlx::query("DELETE FROM einsatz_personal WHERE id = ? AND einsatz_id = ?")
         .bind(ep_id)
         .bind(einsatz_id)
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
     if resultat.rows_affected() == 0 {
         return Err(AppError::NotFound);
     }
+    Ok(())
+}
+
+/// Pool-Wrapper: fährt die Pre-Clean-Freigabe + DELETE in EINER (deferred) Tx. Der atomare
+/// Handler-Pfad (F06/LFH-244) nutzt stattdessen [`entferne_tx`] direkt im `write_retry!`-Block,
+/// um zusätzlich den System-ETB-Eintrag in dieselbe Tx zu ziehen.
+pub async fn entferne(pool: &SqlitePool, einsatz_id: i64, ep_id: i64) -> Result<(), AppError> {
+    let mut tx = pool.begin().await?;
+    entferne_tx(&mut tx, einsatz_id, ep_id).await?;
     tx.commit().await?;
     Ok(())
 }

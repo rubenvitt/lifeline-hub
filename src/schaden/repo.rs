@@ -1,6 +1,6 @@
 use super::SchadenAnzeige;
 use crate::error::AppError;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 const SELECT_ALLE: &str = "\
     SELECT s.id, s.einsatz_id, s.registrier_nr, s.status, s.typ, s.ausmass, s.ort, \
@@ -100,13 +100,34 @@ pub async fn laden(
     .ok_or(AppError::NotFound)
 }
 
-pub async fn anlegen(
-    pool: &SqlitePool,
+/// Wie [`laden`], aber auf einer offenen Connection/Transaktion (für den In-Tx-Reload
+/// beim atomaren Anlegen — liefert die frische Anzeige samt geparster Felder für ETB-Text
+/// und Response in EINER Tx).
+pub async fn laden_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    schaden_id: i64,
+) -> Result<SchadenAnzeige, AppError> {
+    sqlx::query_as::<_, SchadenAnzeige>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_ALLE} WHERE s.id = ? AND s.einsatz_id = ?"
+    )))
+    .bind(schaden_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)
+}
+
+/// Legt einen Schaden an INNERHALB einer offenen Transaktion (F06/LFH-244, Tier-A:
+/// atomar mit dem System-ETB-Eintrag). Liefert `(id, registrier_nr)` — die registrier_nr
+/// wird für die ETB-Spur gebraucht und ist erst nach dem INSERT (COALESCE(MAX)+1) bekannt.
+pub async fn anlegen_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     erfasser_id: i64,
     daten: NeueDaten<'_>,
-) -> Result<SchadenAnzeige, AppError> {
-    let id: i64 = sqlx::query_scalar(
+) -> Result<(i64, i64), AppError> {
+    let row: (i64, i64) = sqlx::query_as(
         "INSERT INTO einsatz_schaden \
             (einsatz_id, registrier_nr, status, typ, ausmass, ort, beschreibung, \
              geschaedigt_person_id, geschaedigt_kontakt, geschaedigt_personal_id, \
@@ -114,7 +135,7 @@ pub async fn anlegen(
          SELECT ?1, COALESCE(MAX(registrier_nr), 0) + 1, 'offen', ?2, ?3, ?4, \
                 COALESCE(?5, ''), ?6, ?7, ?9, ?10, ?8, ?8 \
          FROM einsatz_schaden WHERE einsatz_id = ?1 \
-         RETURNING id",
+         RETURNING id, registrier_nr",
     )
     .bind(einsatz_id)
     .bind(daten.typ)
@@ -126,9 +147,22 @@ pub async fn anlegen(
     .bind(erfasser_id)
     .bind(daten.geschaedigt_personal_id)
     .bind(daten.geschaedigt_organisation_id)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
 
+    Ok(row)
+}
+
+/// Pool-Wrapper: legt an (eigene Tx) und lädt die Anzeige.
+pub async fn anlegen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    erfasser_id: i64,
+    daten: NeueDaten<'_>,
+) -> Result<SchadenAnzeige, AppError> {
+    let mut conn = pool.acquire().await?;
+    let (id, _) = anlegen_tx(&mut conn, einsatz_id, erfasser_id, daten).await?;
+    drop(conn);
     laden(pool, einsatz_id, id).await
 }
 
@@ -189,8 +223,10 @@ pub async fn aktualisiere(
     laden(pool, einsatz_id, schaden_id).await
 }
 
-pub async fn uebergebe(
-    pool: &SqlitePool,
+/// Setzt den Status auf `uebergeben` INNERHALB einer offenen Transaktion (F06/LFH-244,
+/// Tier-A: atomar mit dem System-ETB-Eintrag). `NotFound`, falls nicht zum Einsatz.
+pub async fn uebergebe_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     schaden_id: i64,
     uebergeben_an: &str,
@@ -206,7 +242,7 @@ pub async fn uebergebe(
     .bind(geaendert_von)
     .bind(schaden_id)
     .bind(einsatz_id)
-    .execute(pool)
+    .execute(&mut *conn)
     .await?
     .rows_affected();
     if betroffen == 0 {
@@ -215,8 +251,29 @@ pub async fn uebergebe(
     Ok(())
 }
 
-pub async fn schliesse_ab(
+/// Pool-Wrapper (eigene Tx).
+pub async fn uebergebe(
     pool: &SqlitePool,
+    einsatz_id: i64,
+    schaden_id: i64,
+    uebergeben_an: &str,
+    geaendert_von: i64,
+) -> Result<(), AppError> {
+    let mut conn = pool.acquire().await?;
+    uebergebe_tx(
+        &mut conn,
+        einsatz_id,
+        schaden_id,
+        uebergeben_an,
+        geaendert_von,
+    )
+    .await
+}
+
+/// Schließt einen Schaden ab INNERHALB einer offenen Transaktion (F06/LFH-244, Tier-A:
+/// atomar mit dem System-ETB-Eintrag). `NotFound`, falls nicht zum Einsatz.
+pub async fn schliesse_ab_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     schaden_id: i64,
     abschluss_grund: &str,
@@ -237,7 +294,7 @@ pub async fn schliesse_ab(
         .bind(geaendert_von)
         .bind(schaden_id)
         .bind(einsatz_id)
-        .execute(pool)
+        .execute(&mut *conn)
         .await?
         .rows_affected()
     } else {
@@ -251,7 +308,7 @@ pub async fn schliesse_ab(
         .bind(geaendert_von)
         .bind(schaden_id)
         .bind(einsatz_id)
-        .execute(pool)
+        .execute(&mut *conn)
         .await?
         .rows_affected()
     };
@@ -261,8 +318,31 @@ pub async fn schliesse_ab(
     Ok(())
 }
 
-pub async fn storniere(
+/// Pool-Wrapper (eigene Tx).
+pub async fn schliesse_ab(
     pool: &SqlitePool,
+    einsatz_id: i64,
+    schaden_id: i64,
+    abschluss_grund: &str,
+    notiz: Option<&str>,
+    geaendert_von: i64,
+) -> Result<(), AppError> {
+    let mut conn = pool.acquire().await?;
+    schliesse_ab_tx(
+        &mut conn,
+        einsatz_id,
+        schaden_id,
+        abschluss_grund,
+        notiz,
+        geaendert_von,
+    )
+    .await
+}
+
+/// Storniert einen Schaden (Soft-Delete) INNERHALB einer offenen Transaktion (F06/LFH-244,
+/// Tier-A: atomar mit dem System-ETB-Eintrag). `NotFound`, falls nicht zum Einsatz.
+pub async fn storniere_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     schaden_id: i64,
     storniert_von: i64,
@@ -276,13 +356,24 @@ pub async fn storniere(
     .bind(storniert_von)
     .bind(schaden_id)
     .bind(einsatz_id)
-    .execute(pool)
+    .execute(&mut *conn)
     .await?
     .rows_affected();
     if betroffen == 0 {
         return Err(AppError::NotFound);
     }
     Ok(())
+}
+
+/// Pool-Wrapper (eigene Tx).
+pub async fn storniere(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    schaden_id: i64,
+    storniert_von: i64,
+) -> Result<(), AppError> {
+    let mut conn = pool.acquire().await?;
+    storniere_tx(&mut conn, einsatz_id, schaden_id, storniert_von).await
 }
 
 /// Prüft, ob eine Einsatzkraft (einsatz_personal) zu diesem Einsatz gehört

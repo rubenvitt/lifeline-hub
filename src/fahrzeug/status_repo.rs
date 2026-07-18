@@ -121,9 +121,10 @@ pub async fn deaktivieren(pool: &SqlitePool, org_id: i64, id: i64) -> Result<(),
 }
 
 /// `id` des ersten aktiven Status einer Kategorie (deterministisch nach `sortier`,
-/// dann `id`); `None`, wenn die Org keinen solchen aktiven Status hat.
-pub async fn erster_der_kategorie(
-    pool: &SqlitePool,
+/// dann `id`); `None`, wenn die Org keinen solchen aktiven Status hat. Variante auf
+/// offener Connection/Transaktion (F06/LFH-244 Tier-A: atomares Disponieren).
+pub async fn erster_der_kategorie_tx(
+    conn: &mut sqlx::SqliteConnection,
     org_id: i64,
     kategorie: &str,
 ) -> Result<Option<i64>, AppError> {
@@ -133,9 +134,20 @@ pub async fn erster_der_kategorie(
     )
     .bind(org_id)
     .bind(kategorie)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *conn)
     .await
     .map_err(Into::into)
+}
+
+/// `id` des ersten aktiven Status einer Kategorie (deterministisch nach `sortier`,
+/// dann `id`); `None`, wenn die Org keinen solchen aktiven Status hat.
+pub async fn erster_der_kategorie(
+    pool: &SqlitePool,
+    org_id: i64,
+    kategorie: &str,
+) -> Result<Option<i64>, AppError> {
+    let mut conn = pool.acquire().await?;
+    erster_der_kategorie_tx(&mut conn, org_id, kategorie).await
 }
 
 /// Ob ein aktiver Status mit dieser id zur Org gehört (PATCH-Disposition-Validierung).

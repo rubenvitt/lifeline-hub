@@ -359,23 +359,40 @@ pub async fn status_wechsel(
             body.status
         )));
     }
-    let nachher =
-        uhs_repo::setze_status(&state.pool, einsatz_id, uhs_id, &body.status, benutzer.id).await?;
-
-    let typ_label = nachher.typ.anzeige_label();
+    // ETB-Text aus `vorher` (typ/bezeichnung bleiben beim Status-Wechsel unverändert,
+    // also identisch zum Nachzustand). Damit VOR der Tx berechenbar (kein In-Tx-Reload).
+    let typ_label = vorher.typ.anzeige_label();
     let etb_text = match body.status.as_str() {
         "aktiv" => Some(format!(
             "{} ({}) in Betrieb genommen",
-            nachher.bezeichnung, typ_label
+            vorher.bezeichnung, typ_label
         )),
-        "aufgeloest" => Some(format!("{} aufgelöst", nachher.bezeichnung)),
+        "aufgeloest" => Some(format!("{} aufgelöst", vorher.bezeichnung)),
         _ => None,
     };
-    if let Some(text) = etb_text {
-        super::etb_system_degradiert(&state, einsatz_id, benutzer.id, &text).await?;
-    }
+    // F06/LFH-244 Tier-A: Status-UPDATE + (falls lagerelevant) System-ETB-Eintrag atomar
+    // in EINER Tx (BEGIN IMMEDIATE + Retry). Startwert nur laden, wenn ein ETB-Eintrag
+    // entsteht (Übergänge ohne Spur machen keinen Zusatz-Read). SSE erst nach dem Commit.
+    let startwert = if etb_text.is_some() {
+        Some(
+            crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+                .await?
+                .etb_startwert(),
+        )
+    } else {
+        None
+    };
+    crate::write_retry!(&state.pool, |conn| {
+        uhs_repo::setze_status_tx(conn, einsatz_id, uhs_id, &body.status, benutzer.id).await?;
+        if let (Some(text), Some(sw)) = (etb_text.as_deref(), startwert) {
+            crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, sw, text).await?;
+        }
+        Ok(())
+    })?;
     sse_uhs(&state, einsatz_id, uhs_id);
-    Ok(Json(nachher))
+    Ok(Json(
+        uhs_repo::laden(&state.pool, einsatz_id, uhs_id).await?,
+    ))
 }
 
 /// DELETE /api/einsaetze/{id}/uhs/{uid} — Soft-Delete. Blockt mit 409 bei aktiver

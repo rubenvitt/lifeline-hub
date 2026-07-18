@@ -1,6 +1,6 @@
 use super::{LageZoneAnzeige, LageZoneTyp};
 use crate::error::AppError;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 /// Felder zum Anlegen einer Zone (durch den Handler validiert/normalisiert).
 #[derive(Debug)]
@@ -91,19 +91,39 @@ pub async fn laden(
     .ok_or(AppError::NotFound)
 }
 
-/// Legt eine Zone an (Felder bereits validiert). Liefert die Anzeige.
-/// gefahrengebiet-Zonen tragen immer eine Gruppe (Gruppe-von-eins beim Zeichnen);
-/// Gruppen-INSERT + Zonen-INSERT laufen atomar, damit keine Ghost-Gruppe zurückbleibt.
-pub async fn anlegen(
-    pool: &SqlitePool,
+/// Wie [`laden`], aber auf einer offenen Connection/Transaktion (F06/LFH-244 Tier-A):
+/// liefert die frische Anzeige samt geparster Felder für ETB-Text UND Response innerhalb
+/// derselben `write_retry!`-Tx (analog `tier::repo::laden_tx`). `NotFound`, falls fremd.
+pub async fn laden_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<LageZoneAnzeige, AppError> {
+    sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_ALLE} WHERE id = ? AND einsatz_id = ?"
+    )))
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .map(zu_anzeige)
+    .ok_or(AppError::NotFound)
+}
+
+/// Legt eine Zone an (Felder bereits validiert) INNERHALB einer offenen Transaktion
+/// (F06/LFH-244 Tier-A) und liefert die neue `id`. gefahrengebiet-Zonen tragen immer eine
+/// Gruppe (Gruppe-von-eins beim Zeichnen); Gruppen-INSERT + Zonen-INSERT laufen im selben
+/// `conn`, damit keine Ghost-Gruppe zurückbleibt. Beide sind reine INSERTs (retry-sicher:
+/// bei ROLLBACK persistiert nichts).
+pub async fn anlegen_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     daten: ZoneNeu<'_>,
-) -> Result<LageZoneAnzeige, AppError> {
-    let mut tx = pool.begin().await?;
+) -> Result<i64, AppError> {
     let gebiet_id = if daten.typ == "gefahrengebiet" {
         Some(
             crate::gefahr::repo::gebiet_anlegen(
-                &mut *tx,
+                &mut *conn,
                 einsatz_id,
                 daten.label,
                 daten.erstellt_von,
@@ -120,8 +140,19 @@ pub async fn anlegen(
     )
     .bind(einsatz_id).bind(daten.typ).bind(daten.geometrie_typ).bind(daten.geometrie)
     .bind(daten.label).bind(daten.farbe).bind(daten.notiz).bind(gebiet_id).bind(daten.erstellt_von)
-    .fetch_one(&mut *tx).await?;
-    tx.commit().await?;
+    .fetch_one(&mut *conn).await?;
+    Ok(id)
+}
+
+/// Pool-Wrapper: legt an (eigene Tx) und lädt die Anzeige. Delegiert an [`anlegen_tx`].
+pub async fn anlegen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    daten: ZoneNeu<'_>,
+) -> Result<LageZoneAnzeige, AppError> {
+    let mut conn = pool.acquire().await?;
+    let id = anlegen_tx(&mut conn, einsatz_id, daten).await?;
+    drop(conn);
     laden(pool, einsatz_id, id).await
 }
 
@@ -212,15 +243,33 @@ pub async fn aktualisiere(
     laden(pool, einsatz_id, id).await
 }
 
-/// Hard-Delete. `NotFound`, falls nicht zum Einsatz. Verlassene Gruppe aufräumen.
+/// Hard-Delete INNERHALB einer offenen Transaktion (F06/LFH-244 Tier-A). Liefert die
+/// `gefahrengebiet_id` der gelöschten Zone (für das Aufräumen der ggf. verwaisten Gruppe
+/// NACH dem Commit — das läuft auf dem Pool und darf nicht in dieselbe Tx, sonst Deadlock
+/// gegen den eigenen Write-Lock). `NotFound`, falls nichts gelöscht wurde (fremd/inexistent).
+pub async fn loese_auf_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<Option<i64>, AppError> {
+    let gebiet_id = sqlx::query_scalar::<_, Option<i64>>(
+        "DELETE FROM lage_zone WHERE id = ? AND einsatz_id = ? RETURNING gefahrengebiet_id",
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    Ok(gebiet_id)
+}
+
+/// Pool-Wrapper: Hard-Delete (eigene Tx) + Aufräumen der verwaisten Gruppe. `NotFound`,
+/// falls nicht zum Einsatz. Delegiert an [`loese_auf_tx`].
 pub async fn loese_auf(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
-    let z = laden(pool, einsatz_id, id).await?;
-    sqlx::query("DELETE FROM lage_zone WHERE id = ? AND einsatz_id = ?")
-        .bind(id)
-        .bind(einsatz_id)
-        .execute(pool)
-        .await?;
-    if let Some(g) = z.gefahrengebiet_id {
+    let mut conn = pool.acquire().await?;
+    let gebiet_id = loese_auf_tx(&mut conn, einsatz_id, id).await?;
+    drop(conn);
+    if let Some(g) = gebiet_id {
         crate::gefahr::repo::gebiet_aufraeumen_wenn_leer(pool, g).await?;
     }
     Ok(())

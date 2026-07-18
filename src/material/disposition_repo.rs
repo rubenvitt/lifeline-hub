@@ -1,6 +1,6 @@
 use super::{EinsatzMaterialAnzeige, MaterialStatus, DIENSTSTATUS_IN_DIENST};
 use crate::error::AppError;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 /// SELECT mit aufgelöster Live-Identität (LEFT JOIN material). Status ist ein festes
 /// Enum direkt auf der Zeile — kein Katalog-JOIN. Live vs. Snapshot trifft `zu_anzeige`.
@@ -84,7 +84,9 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzMaterialAnzeige {
 }
 
 /// Daten für Ad-hoc-externes Material (kein Stamm-Bezug); bereits getrimmt.
-#[derive(Debug)]
+/// `Copy`, damit ein Dispatch-Enum die Daten im Retry-Loop von [`crate::write_retry!`]
+/// je Versuch kopieren kann (nur `&str`/`Option<&str>`-Felder → trivial kopierbar).
+#[derive(Debug, Clone, Copy)]
 pub struct AdhocDaten<'a> {
     pub bezeichnung: &'a str,
     pub kategorie: Option<&'a str>,
@@ -128,12 +130,32 @@ pub async fn laden_anzeige(
     Ok(zu_anzeige(row, einsatz_aktiv))
 }
 
+/// Wie [`laden_anzeige`], aber auf einer offenen Connection/Transaktion — für den
+/// In-Tx-Reload beim atomaren Disponieren/Aktualisieren (F06/LFH-244, Tier-A): liefert die
+/// frische Anzeige (Bezeichnung/Menge/Status) für ETB-Text UND Response in EINER Tx.
+pub async fn laden_anzeige_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    em_id: i64,
+    einsatz_aktiv: bool,
+) -> Result<EinsatzMaterialAnzeige, AppError> {
+    let row = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_AUFGELOEST} WHERE em.id = ? AND em.einsatz_id = ?"
+    )))
+    .bind(em_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    Ok(zu_anzeige(row, einsatz_aktiv))
+}
+
 /// Disponiert Stamm-Material mit Menge. Prüft Org-Zugehörigkeit + Dienststatus, friert
 /// den Identitäts-Schnappschuss ein. `NotFound` bei fremdem/unbekanntem Material,
 /// `Validation` bei außer Dienst. Mehrfach-Disposition ist erlaubt (kein Conflict).
 /// Liefert die neue `em_id`.
-pub async fn disponiere_stamm(
-    pool: &SqlitePool,
+pub async fn disponiere_stamm_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     org_id: i64,
     material_id: i64,
@@ -155,7 +177,7 @@ pub async fn disponiere_stamm(
     )
     .bind(material_id)
     .bind(org_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *conn)
     .await?
     .ok_or(AppError::NotFound)?;
 
@@ -180,15 +202,37 @@ pub async fn disponiere_stamm(
     .bind(&bestandsnummer)
     .bind(&traeger)
     .bind(disponiert_von)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
     Ok(id)
 }
 
+/// Pool-Wrapper: disponiert Stamm-Material in einer eigenen Connection (delegiert an
+/// [`disponiere_stamm_tx`]).
+pub async fn disponiere_stamm(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    org_id: i64,
+    material_id: i64,
+    menge: i64,
+    disponiert_von: i64,
+) -> Result<i64, AppError> {
+    let mut conn = pool.acquire().await?;
+    disponiere_stamm_tx(
+        &mut conn,
+        einsatz_id,
+        org_id,
+        material_id,
+        menge,
+        disponiert_von,
+    )
+    .await
+}
+
 /// Disponiert Ad-hoc-externes Material (`material_id = NULL`); `snap_*` sind die
 /// eigentlichen Daten. Liefert die neue `em_id`.
-pub async fn disponiere_adhoc(
-    pool: &SqlitePool,
+pub async fn disponiere_adhoc_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     daten: AdhocDaten<'_>,
     menge: i64,
@@ -207,9 +251,22 @@ pub async fn disponiere_adhoc(
     .bind(daten.bestandsnummer)
     .bind(daten.traegerorganisation)
     .bind(disponiert_von)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
     Ok(id)
+}
+
+/// Pool-Wrapper: disponiert Ad-hoc-Material in einer eigenen Connection (delegiert an
+/// [`disponiere_adhoc_tx`]).
+pub async fn disponiere_adhoc(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    daten: AdhocDaten<'_>,
+    menge: i64,
+    disponiert_von: i64,
+) -> Result<i64, AppError> {
+    let mut conn = pool.acquire().await?;
+    disponiere_adhoc_tx(&mut conn, einsatz_id, daten, menge, disponiert_von).await
 }
 
 /// Aktualisiert Menge, Status und/oder Bemerkung (COALESCE: `None` = unverändert).
@@ -217,8 +274,8 @@ pub async fn disponiere_adhoc(
 /// `Some(Some(id))` = neue UHS zuordnen.
 /// `status` muss bereits validiert sein (gültiges Enum). `NotFound`, falls die Zeile
 /// nicht zum Einsatz gehört.
-pub async fn aktualisiere(
-    pool: &SqlitePool,
+pub async fn aktualisiere_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     em_id: i64,
     menge: Option<i64>,
@@ -241,12 +298,30 @@ pub async fn aktualisiere(
     .bind(uhs_id.and_then(|v| v)) // value: Some(Some(x)) → x, Some(None) → NULL
     .bind(em_id)
     .bind(einsatz_id)
-    .execute(pool)
+    .execute(&mut *conn)
     .await?;
     if resultat.rows_affected() == 0 {
         return Err(AppError::NotFound);
     }
     Ok(())
+}
+
+/// Pool-Wrapper: aktualisiert eine Dispositionszeile in einer eigenen Connection
+/// (delegiert an [`aktualisiere_tx`]).
+pub async fn aktualisiere(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    em_id: i64,
+    menge: Option<i64>,
+    status: Option<&str>,
+    bemerkung: Option<&str>,
+    uhs_id: Option<Option<i64>>,
+) -> Result<(), AppError> {
+    let mut conn = pool.acquire().await?;
+    aktualisiere_tx(
+        &mut conn, einsatz_id, em_id, menge, status, bemerkung, uhs_id,
+    )
+    .await
 }
 
 /// Disponiertes Material einer UHS (aufgelöst), sortiert nach Dispo-Zeit.
@@ -272,16 +347,27 @@ pub async fn liste_je_uhs(
 
 /// Entfernt eine Dispositionszeile aus dem Einsatz (der Stamm bleibt). `NotFound`,
 /// falls nicht zum Einsatz gehörend.
-pub async fn entferne(pool: &SqlitePool, einsatz_id: i64, em_id: i64) -> Result<(), AppError> {
+pub async fn entferne_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    em_id: i64,
+) -> Result<(), AppError> {
     let resultat = sqlx::query("DELETE FROM einsatz_material WHERE id = ? AND einsatz_id = ?")
         .bind(em_id)
         .bind(einsatz_id)
-        .execute(pool)
+        .execute(&mut *conn)
         .await?;
     if resultat.rows_affected() == 0 {
         return Err(AppError::NotFound);
     }
     Ok(())
+}
+
+/// Pool-Wrapper: entfernt eine Dispositionszeile in einer eigenen Connection
+/// (delegiert an [`entferne_tx`]).
+pub async fn entferne(pool: &SqlitePool, einsatz_id: i64, em_id: i64) -> Result<(), AppError> {
+    let mut conn = pool.acquire().await?;
+    entferne_tx(&mut conn, einsatz_id, em_id).await
 }
 
 #[cfg(test)]

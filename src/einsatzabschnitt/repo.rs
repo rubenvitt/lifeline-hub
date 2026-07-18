@@ -1,6 +1,6 @@
 use super::EinsatzabschnittAnzeige;
 use crate::error::AppError;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 /// Editierbare Felder eines Abschnitts (bereits getrimmt/validiert durch den Handler,
 /// hier zusätzlich auf Einsatz-Zugehörigkeit von parent/leiter geprüft).
@@ -286,49 +286,66 @@ pub async fn aktualisiere_flaeche(
     laden(pool, einsatz_id, aid).await
 }
 
-/// Löst einen Abschnitt auf (Transaktion): Unter-Abschnitte auf den Parent des
-/// gelöschten hochziehen, zugeordnete Einheiten `abschnitt_id = NULL`, dann löschen.
-/// `NotFound`, falls nicht zum Einsatz.
-pub async fn loese_auf(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
+/// Löst einen Abschnitt auf, auf einer bereits offenen Connection/Transaktion (für den
+/// atomaren Handler-Pfad F06/LFH-244 Tier-A: Auflösen + System-ETB in EINER `write_retry!`-Tx):
+/// Unter-Abschnitte auf den Parent des gelöschten hochziehen, zugeordnete Einheiten
+/// `abschnitt_id = NULL`, uhs/Bereitstellungsraum freigeben, dann löschen. `NotFound`, falls
+/// nicht zum Einsatz. Öffnet KEINE eigene Tx — die Atomarität der Statement-Folge liefert der
+/// Aufrufer (write_retry! bzw. der Pool-Wrapper `loese_auf`).
+pub async fn loese_auf_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<(), AppError> {
     // Parent des aufzulösenden Knotens ermitteln (und Einsatz-Zugehörigkeit sichern).
     let parent: Option<i64> = sqlx::query_scalar(
         "SELECT ueber_abschnitt_id FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?",
     )
     .bind(id)
     .bind(einsatz_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *conn)
     .await?
     .ok_or(AppError::NotFound)?;
 
-    let mut tx = pool.begin().await?;
     sqlx::query("UPDATE einsatzabschnitt SET ueber_abschnitt_id = ? WHERE ueber_abschnitt_id = ? AND einsatz_id = ?")
-        .bind(parent).bind(id).bind(einsatz_id).execute(&mut *tx).await?;
+        .bind(parent).bind(id).bind(einsatz_id).execute(&mut *conn).await?;
     sqlx::query(
         "UPDATE einsatz_einheit SET abschnitt_id = NULL WHERE abschnitt_id = ? AND einsatz_id = ?",
     )
     .bind(id)
     .bind(einsatz_id)
-    .execute(&mut *tx)
+    .execute(&mut *conn)
     .await?;
     // uhs + Bereitstellungsraum referenzieren den Abschnitt ohne ON-DELETE-Aktion
     // (LFH-237/F08): vor dem DELETE freigeben, sonst blockiert der FK das Auflösen.
     sqlx::query("UPDATE uhs SET abschnitt_id = NULL WHERE abschnitt_id = ? AND einsatz_id = ?")
         .bind(id)
         .bind(einsatz_id)
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
     sqlx::query(
         "UPDATE bereitstellungsraum SET abschnitt_id = NULL WHERE abschnitt_id = ? AND einsatz_id = ?",
     )
     .bind(id)
     .bind(einsatz_id)
-    .execute(&mut *tx)
+    .execute(&mut *conn)
     .await?;
     sqlx::query("DELETE FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?")
         .bind(id)
         .bind(einsatz_id)
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
+    Ok(())
+}
+
+/// Löst einen Abschnitt auf (Transaktion): Unter-Abschnitte auf den Parent des
+/// gelöschten hochziehen, zugeordnete Einheiten `abschnitt_id = NULL`, dann löschen.
+/// `NotFound`, falls nicht zum Einsatz. Pool-Wrapper: delegiert an [`loese_auf_tx`] in
+/// einer eigenen Transaktion (die Statement-Folge muss atomar bleiben — daher `begin`/
+/// `commit`, nicht bloß eine Pool-Connection).
+pub async fn loese_auf(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
+    let mut tx = pool.begin().await?;
+    loese_auf_tx(&mut tx, einsatz_id, id).await?;
     tx.commit().await?;
     Ok(())
 }

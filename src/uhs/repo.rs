@@ -1,6 +1,6 @@
 use super::UhsAnzeige;
 use crate::error::AppError;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 const SELECT_ALLE: &str = "\
     SELECT id, einsatz_id, abschnitt_id, typ, bezeichnung, standort, notiz, status, \
@@ -173,18 +173,21 @@ pub async fn aktualisiere(
     }
 }
 
-/// Setzt einen neuen Status. Vorbedingungen prüft der Handler (`darf_uebergehen`),
-/// das Repo prüft NUR die Belegungs-Vorbedingung für `aufgeloest` (Annahme 6):
-/// blockt mit `Conflict`, wenn aktiv belegt. Liefert die aktualisierte Anzeige.
-pub async fn setze_status(
-    pool: &SqlitePool,
+/// Setzt einen neuen Status INNERHALB einer offenen Transaktion (F06/LFH-244 Tier-A:
+/// atomar mit dem System-ETB-Eintrag). Vorbedingungen prüft der Handler
+/// (`darf_uebergehen`); dieses Repo prüft NUR die Belegungs-Vorbedingung für
+/// `aufgeloest` (Annahme 6): blockt mit `Conflict`, wenn aktiv belegt. Der Check
+/// läuft unter `BEGIN IMMEDIATE` im selben Write-Lock wie das UPDATE (kein TOCTOU).
+/// Kein In-Tx-Reload — die Anzeige lädt der Aufrufer NACH dem Commit.
+pub async fn setze_status_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     id: i64,
     neuer_status: &str,
     geaendert_von: i64,
-) -> Result<UhsAnzeige, AppError> {
+) -> Result<(), AppError> {
     if neuer_status == "aufgeloest" {
-        let belegt = aktive_belegungen(pool, id).await?;
+        let belegt = aktive_belegungen_tx(&mut *conn, id).await?;
         if belegt > 0 {
             return Err(AppError::Conflict(format!(
                 "Auflösung nicht möglich — noch {belegt} Person(en) belegt"
@@ -200,11 +203,25 @@ pub async fn setze_status(
     .bind(geaendert_von)
     .bind(id)
     .bind(einsatz_id)
-    .execute(pool)
+    .execute(&mut *conn)
     .await?;
     if ergebnis.rows_affected() == 0 {
         return Err(AppError::NotFound);
     }
+    Ok(())
+}
+
+/// Pool-Wrapper: setzt den Status in eigener Tx und liefert die aktualisierte Anzeige.
+pub async fn setze_status(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+    neuer_status: &str,
+    geaendert_von: i64,
+) -> Result<UhsAnzeige, AppError> {
+    let mut conn = pool.acquire().await?;
+    setze_status_tx(&mut conn, einsatz_id, id, neuer_status, geaendert_von).await?;
+    drop(conn);
     laden(pool, einsatz_id, id).await
 }
 
@@ -248,16 +265,26 @@ pub async fn storniere(
     Ok(())
 }
 
-/// Anzahl aktuell belegter Personen (Inbox + echte Plätze). Über den Cache
-/// `einsatz_person.aktuelle_uhs_id`, daher ein einzelner indizierter Scan.
-pub async fn aktive_belegungen(pool: &SqlitePool, uhs_id: i64) -> Result<i64, AppError> {
+/// Anzahl aktuell belegter Personen (Inbox + echte Plätze) auf einer offenen
+/// Connection/Transaktion. Über den Cache `einsatz_person.aktuelle_uhs_id`, daher ein
+/// einzelner indizierter Scan.
+pub async fn aktive_belegungen_tx(
+    conn: &mut SqliteConnection,
+    uhs_id: i64,
+) -> Result<i64, AppError> {
     Ok(sqlx::query_scalar(
         "SELECT COUNT(*) FROM einsatz_person \
          WHERE aktuelle_uhs_id = ? AND storniert_at IS NULL",
     )
     .bind(uhs_id)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?)
+}
+
+/// Pool-Wrapper (eigene Connection).
+pub async fn aktive_belegungen(pool: &SqlitePool, uhs_id: i64) -> Result<i64, AppError> {
+    let mut conn = pool.acquire().await?;
+    aktive_belegungen_tx(&mut conn, uhs_id).await
 }
 
 #[cfg(test)]

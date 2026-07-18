@@ -1,7 +1,7 @@
 use super::{mitglied_repo, EinheitAnzeige};
 use crate::error::AppError;
 use crate::staerke::Staerke;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 use std::collections::{HashMap, HashSet};
 
 /// Editierbare Felder einer Einheit (Führer wird separat über `setze_fuehrer` gesetzt,
@@ -439,39 +439,50 @@ pub async fn setze_fuehrer(
     Ok(())
 }
 
-/// Löst eine Einheit auf (Transaktion): alle Mitglieder freigeben (`einheit_id = NULL` an
-/// Personal + Fahrzeug + Material), Unter-Einheiten auf den Parent hochziehen, dann löschen.
+/// Löst eine Einheit auf, auf offener Connection/Tx (F06/LFH-244 Tier-A: atomar mit dem
+/// System-ETB-Eintrag): alle Mitglieder freigeben (`einheit_id = NULL` an Personal +
+/// Fahrzeug + Material), Unter-Einheiten auf den Parent hochziehen, dann löschen.
 /// `NotFound`, falls nicht zum Einsatz.
-pub async fn loese_auf(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
+pub async fn loese_auf_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<(), AppError> {
     let parent: Option<i64> = sqlx::query_scalar(
         "SELECT ueber_einheit_id FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
     )
     .bind(id)
     .bind(einsatz_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *conn)
     .await?
     .ok_or(AppError::NotFound)?;
 
-    let mut tx = pool.begin().await?;
     sqlx::query("UPDATE einsatz_personal SET einheit_id = NULL WHERE einheit_id = ?")
         .bind(id)
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
     sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = NULL WHERE einheit_id = ?")
         .bind(id)
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
     sqlx::query("UPDATE einsatz_material SET einheit_id = NULL WHERE einheit_id = ?")
         .bind(id)
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
     sqlx::query("UPDATE einsatz_einheit SET ueber_einheit_id = ? WHERE ueber_einheit_id = ? AND einsatz_id = ?")
-        .bind(parent).bind(id).bind(einsatz_id).execute(&mut *tx).await?;
+        .bind(parent).bind(id).bind(einsatz_id).execute(&mut *conn).await?;
     sqlx::query("DELETE FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?")
         .bind(id)
         .bind(einsatz_id)
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
+    Ok(())
+}
+
+/// Pool-Wrapper (eigene Tx, hält die Freigaben + Hochzug + Löschung atomar).
+pub async fn loese_auf(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<(), AppError> {
+    let mut tx = pool.begin().await?;
+    loese_auf_tx(&mut tx, einsatz_id, id).await?;
     tx.commit().await?;
     Ok(())
 }

@@ -1,6 +1,6 @@
 use super::PersonAnzeige;
 use crate::error::AppError;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 const SELECT_ALLE: &str = "\
     SELECT id, einsatz_id, registrier_nr, status, name, vorname, geschlecht, \
@@ -79,16 +79,37 @@ pub async fn laden(
     .ok_or(AppError::NotFound)
 }
 
-/// Legt eine Person an (Status `erfasst`), vergibt `registrier_nr` atomar als
-/// `COALESCE(MAX(registrier_nr),0)+1` je Einsatz — zählt stornierte mit, damit
-/// keine Nummern recycelt werden. `UNIQUE(einsatz_id, registrier_nr)` sichert ab.
-pub async fn anlegen(
-    pool: &SqlitePool,
+/// Wie [`laden`], aber auf einer offenen Connection/Transaktion (für den In-Tx-Reload
+/// beim atomaren Anlegen — liefert die frische Anzeige samt geparster Felder für ETB-Text
+/// und Response in EINER Tx). Mustergleich zu `tier::repo::laden_tx`.
+pub async fn laden_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    person_id: i64,
+) -> Result<PersonAnzeige, AppError> {
+    sqlx::query_as::<_, PersonAnzeige>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_ALLE} WHERE id = ? AND einsatz_id = ?"
+    )))
+    .bind(person_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)
+}
+
+/// Legt eine Person an (Status `erfasst`) INNERHALB einer offenen Transaktion (F06/LFH-244,
+/// Tier-A: atomar mit dem System-ETB-Eintrag). Vergibt `registrier_nr` atomar als
+/// `COALESCE(MAX(registrier_nr),0)+1` je Einsatz — zählt stornierte mit, damit keine Nummern
+/// recycelt werden. `UNIQUE(einsatz_id, registrier_nr)` sichert ab. Liefert
+/// `(id, registrier_nr)` — die `registrier_nr` wird für die ETB-Spur gebraucht und ist erst
+/// nach dem INSERT bekannt. Mustergleich zu `tier::repo::anlegen_tx`.
+pub async fn anlegen_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     erfasser_id: i64,
     daten: NeueDaten<'_>,
-) -> Result<PersonAnzeige, AppError> {
-    let id: i64 = sqlx::query_scalar(
+) -> Result<(i64, i64), AppError> {
+    let row: (i64, i64) = sqlx::query_as(
         "INSERT INTO einsatz_person \
             (einsatz_id, registrier_nr, status, name, vorname, geschlecht, \
              geburtsdatum, alter_geschaetzt, herkunft_adresse, antreff_ort, \
@@ -96,7 +117,7 @@ pub async fn anlegen(
          SELECT ?1, COALESCE(MAX(registrier_nr), 0) + 1, 'erfasst', ?2, ?3, ?4, \
                 ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11 \
          FROM einsatz_person WHERE einsatz_id = ?1 \
-         RETURNING id",
+         RETURNING id, registrier_nr",
     )
     .bind(einsatz_id)
     .bind(daten.name)
@@ -109,9 +130,21 @@ pub async fn anlegen(
     .bind(daten.melder_kontakt)
     .bind(daten.notiz)
     .bind(erfasser_id)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
+    Ok(row)
+}
 
+/// Pool-Wrapper: legt an (eigene Tx) und lädt die Anzeige. Delegiert an [`anlegen_tx`].
+pub async fn anlegen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    erfasser_id: i64,
+    daten: NeueDaten<'_>,
+) -> Result<PersonAnzeige, AppError> {
+    let mut conn = pool.acquire().await?;
+    let (id, _) = anlegen_tx(&mut conn, einsatz_id, erfasser_id, daten).await?;
+    drop(conn);
     laden(pool, einsatz_id, id).await
 }
 

@@ -2,11 +2,11 @@ use super::{EinheitMitgliedFahrzeug, EinheitMitgliedMaterial, EinheitMitgliedPer
 use crate::error::AppError;
 use crate::material::MaterialStatus;
 use crate::staerke::{Staerke, StaerkePosition};
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
-/// Prüft, ob eine Einheit zum Einsatz gehört. `NotFound` sonst.
-async fn pruefe_einheit(
-    pool: &SqlitePool,
+/// Prüft (auf offener Connection/Tx), ob eine Einheit zum Einsatz gehört. `NotFound` sonst.
+async fn pruefe_einheit_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     einheit_id: i64,
 ) -> Result<(), AppError> {
@@ -14,54 +14,66 @@ async fn pruefe_einheit(
         sqlx::query_scalar("SELECT 1 FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?")
             .bind(einheit_id)
             .bind(einsatz_id)
-            .fetch_optional(pool)
+            .fetch_optional(&mut *conn)
             .await?;
     t.map(|_| ()).ok_or(AppError::NotFound)
 }
 
-/// Ordnet eine Personal-Dispozeile einer Einheit zu (exklusiv). Eine bereits andernorts
+/// Ordnet eine Personal-Dispozeile einer Einheit zu (exklusiv), auf offener Connection/Tx
+/// (F06/LFH-244 Tier-A: atomar mit dem System-ETB-Eintrag). Eine bereits andernorts
 /// zugeordnete Kraft wechselt; war sie dort Führer, wird dieser Verweis bereinigt.
 /// `NotFound`, falls Dispozeile oder Einheit nicht zum Einsatz gehören. Liefert den Namen.
-pub async fn ordne_personal_zu(
-    pool: &SqlitePool,
+pub async fn ordne_personal_zu_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     einheit_id: i64,
     ep_id: i64,
 ) -> Result<String, AppError> {
-    pruefe_einheit(pool, einsatz_id, einheit_id).await?;
+    pruefe_einheit_tx(conn, einsatz_id, einheit_id).await?;
     let name: Option<String> = sqlx::query_scalar(
         "SELECT snap_name FROM einsatz_personal WHERE id = ? AND einsatz_id = ?",
     )
     .bind(ep_id)
     .bind(einsatz_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *conn)
     .await?;
     let name = name.ok_or(AppError::NotFound)?;
 
-    let mut tx = pool.begin().await?;
     // Stale Führer-Verweis bereinigen (Person war evtl. anderswo Führer).
     sqlx::query(
         "UPDATE einsatz_einheit SET fuehrer_id = NULL WHERE fuehrer_id = ? AND einsatz_id = ?",
     )
     .bind(ep_id)
     .bind(einsatz_id)
-    .execute(&mut *tx)
+    .execute(&mut *conn)
     .await?;
     sqlx::query("UPDATE einsatz_personal SET einheit_id = ? WHERE id = ? AND einsatz_id = ?")
         .bind(einheit_id)
         .bind(ep_id)
         .bind(einsatz_id)
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
+    Ok(name)
+}
+
+/// Pool-Wrapper (eigene Tx, hält die beiden UPDATEs atomar).
+pub async fn ordne_personal_zu(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    einheit_id: i64,
+    ep_id: i64,
+) -> Result<String, AppError> {
+    let mut tx = pool.begin().await?;
+    let name = ordne_personal_zu_tx(&mut tx, einsatz_id, einheit_id, ep_id).await?;
     tx.commit().await?;
     Ok(name)
 }
 
-/// Gibt eine Personal-Dispozeile aus ihrer Einheit frei (`einheit_id = NULL`). War sie
-/// Führer dieser Einheit, wird `fuehrer_id` geleert. `NotFound`, falls nicht zu dieser
-/// Einheit gehörend. Liefert den Namen.
-pub async fn gib_personal_frei(
-    pool: &SqlitePool,
+/// Gibt eine Personal-Dispozeile aus ihrer Einheit frei (`einheit_id = NULL`), auf offener
+/// Connection/Tx. War sie Führer dieser Einheit, wird `fuehrer_id` geleert. `NotFound`, falls
+/// nicht zu dieser Einheit gehörend. Liefert den Namen.
+pub async fn gib_personal_frei_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     einheit_id: i64,
     ep_id: i64,
@@ -72,110 +84,168 @@ pub async fn gib_personal_frei(
     .bind(ep_id)
     .bind(einsatz_id)
     .bind(einheit_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *conn)
     .await?;
     let name = name.ok_or(AppError::NotFound)?;
 
-    let mut tx = pool.begin().await?;
     sqlx::query("UPDATE einsatz_einheit SET fuehrer_id = NULL WHERE id = ? AND fuehrer_id = ?")
         .bind(einheit_id)
         .bind(ep_id)
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
     sqlx::query("UPDATE einsatz_personal SET einheit_id = NULL WHERE id = ?")
         .bind(ep_id)
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
+    Ok(name)
+}
+
+/// Pool-Wrapper (eigene Tx, hält die beiden UPDATEs atomar).
+pub async fn gib_personal_frei(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    einheit_id: i64,
+    ep_id: i64,
+) -> Result<String, AppError> {
+    let mut tx = pool.begin().await?;
+    let name = gib_personal_frei_tx(&mut tx, einsatz_id, einheit_id, ep_id).await?;
     tx.commit().await?;
     Ok(name)
 }
 
-/// Ordnet ein Fahrzeug einer Einheit zu (exklusiv). `NotFound` analog. Liefert den Funkrufnamen.
-pub async fn ordne_fahrzeug_zu(
-    pool: &SqlitePool,
+/// Ordnet ein Fahrzeug einer Einheit zu (exklusiv), auf offener Connection/Tx. `NotFound`
+/// analog. Liefert den Funkrufnamen.
+pub async fn ordne_fahrzeug_zu_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     einheit_id: i64,
     ef_id: i64,
 ) -> Result<String, AppError> {
-    pruefe_einheit(pool, einsatz_id, einheit_id).await?;
+    pruefe_einheit_tx(conn, einsatz_id, einheit_id).await?;
     let name: Option<String> = sqlx::query_scalar(
         "SELECT snap_funkrufname FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?",
     )
     .bind(ef_id)
     .bind(einsatz_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *conn)
     .await?;
     let name = name.ok_or(AppError::NotFound)?;
     sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = ? WHERE id = ? AND einsatz_id = ?")
         .bind(einheit_id)
         .bind(ef_id)
         .bind(einsatz_id)
-        .execute(pool)
+        .execute(&mut *conn)
         .await?;
     Ok(name)
 }
 
-/// Gibt ein Fahrzeug aus seiner Einheit frei. `NotFound`, falls nicht zu dieser Einheit.
-pub async fn gib_fahrzeug_frei(
+/// Pool-Wrapper.
+pub async fn ordne_fahrzeug_zu(
     pool: &SqlitePool,
+    einsatz_id: i64,
+    einheit_id: i64,
+    ef_id: i64,
+) -> Result<String, AppError> {
+    let mut conn = pool.acquire().await?;
+    ordne_fahrzeug_zu_tx(&mut conn, einsatz_id, einheit_id, ef_id).await
+}
+
+/// Gibt ein Fahrzeug aus seiner Einheit frei, auf offener Connection/Tx. `NotFound`, falls
+/// nicht zu dieser Einheit.
+pub async fn gib_fahrzeug_frei_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     einheit_id: i64,
     ef_id: i64,
 ) -> Result<String, AppError> {
     let name: Option<String> = sqlx::query_scalar(
         "SELECT snap_funkrufname FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ? AND einheit_id = ?",
-    ).bind(ef_id).bind(einsatz_id).bind(einheit_id).fetch_optional(pool).await?;
+    ).bind(ef_id).bind(einsatz_id).bind(einheit_id).fetch_optional(&mut *conn).await?;
     let name = name.ok_or(AppError::NotFound)?;
     sqlx::query("UPDATE einsatz_fahrzeug SET einheit_id = NULL WHERE id = ?")
         .bind(ef_id)
-        .execute(pool)
+        .execute(&mut *conn)
         .await?;
     Ok(name)
 }
 
-/// Ordnet eine Material-Dispozeile einer Einheit zu (exklusiv; Material kann kein Führer
-/// sein). `NotFound` analog. Liefert (Bezeichnung, Menge) für den ETB-Text.
-pub async fn ordne_material_zu(
+/// Pool-Wrapper.
+pub async fn gib_fahrzeug_frei(
     pool: &SqlitePool,
+    einsatz_id: i64,
+    einheit_id: i64,
+    ef_id: i64,
+) -> Result<String, AppError> {
+    let mut conn = pool.acquire().await?;
+    gib_fahrzeug_frei_tx(&mut conn, einsatz_id, einheit_id, ef_id).await
+}
+
+/// Ordnet eine Material-Dispozeile einer Einheit zu (exklusiv; Material kann kein Führer
+/// sein), auf offener Connection/Tx. `NotFound` analog. Liefert (Bezeichnung, Menge) für
+/// den ETB-Text.
+pub async fn ordne_material_zu_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     einheit_id: i64,
     em_id: i64,
 ) -> Result<(String, i64), AppError> {
-    pruefe_einheit(pool, einsatz_id, einheit_id).await?;
+    pruefe_einheit_tx(conn, einsatz_id, einheit_id).await?;
     let row: Option<(String, i64)> = sqlx::query_as(
         "SELECT snap_bezeichnung, menge FROM einsatz_material WHERE id = ? AND einsatz_id = ?",
     )
     .bind(em_id)
     .bind(einsatz_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *conn)
     .await?;
     let row = row.ok_or(AppError::NotFound)?;
     sqlx::query("UPDATE einsatz_material SET einheit_id = ? WHERE id = ? AND einsatz_id = ?")
         .bind(einheit_id)
         .bind(em_id)
         .bind(einsatz_id)
-        .execute(pool)
+        .execute(&mut *conn)
         .await?;
     Ok(row)
 }
 
-/// Gibt eine Material-Dispozeile aus ihrer Einheit frei. `NotFound`, falls nicht zu dieser
-/// Einheit. Liefert (Bezeichnung, Menge).
-pub async fn gib_material_frei(
+/// Pool-Wrapper.
+pub async fn ordne_material_zu(
     pool: &SqlitePool,
+    einsatz_id: i64,
+    einheit_id: i64,
+    em_id: i64,
+) -> Result<(String, i64), AppError> {
+    let mut conn = pool.acquire().await?;
+    ordne_material_zu_tx(&mut conn, einsatz_id, einheit_id, em_id).await
+}
+
+/// Gibt eine Material-Dispozeile aus ihrer Einheit frei, auf offener Connection/Tx.
+/// `NotFound`, falls nicht zu dieser Einheit. Liefert (Bezeichnung, Menge).
+pub async fn gib_material_frei_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     einheit_id: i64,
     em_id: i64,
 ) -> Result<(String, i64), AppError> {
     let row: Option<(String, i64)> = sqlx::query_as(
         "SELECT snap_bezeichnung, menge FROM einsatz_material WHERE id = ? AND einsatz_id = ? AND einheit_id = ?",
-    ).bind(em_id).bind(einsatz_id).bind(einheit_id).fetch_optional(pool).await?;
+    ).bind(em_id).bind(einsatz_id).bind(einheit_id).fetch_optional(&mut *conn).await?;
     let row = row.ok_or(AppError::NotFound)?;
     sqlx::query("UPDATE einsatz_material SET einheit_id = NULL WHERE id = ?")
         .bind(em_id)
-        .execute(pool)
+        .execute(&mut *conn)
         .await?;
     Ok(row)
+}
+
+/// Pool-Wrapper.
+pub async fn gib_material_frei(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    einheit_id: i64,
+    em_id: i64,
+) -> Result<(String, i64), AppError> {
+    let mut conn = pool.acquire().await?;
+    gib_material_frei_tx(&mut conn, einsatz_id, einheit_id, em_id).await
 }
 
 #[derive(sqlx::FromRow)]

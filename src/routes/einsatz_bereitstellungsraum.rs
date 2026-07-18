@@ -315,24 +315,33 @@ pub async fn status_wechsel(
             "Stornierter BR kann nicht geändert werden".into(),
         ));
     }
-    // darf_uebergehen ist bereits in repo::setze_status geprüft — wir delegieren.
-    let nachher =
-        br_repo::setze_status(&state.pool, einsatz_id, br_id, &body.status, benutzer.id).await?;
-
+    // F06/LFH-244 Tier-A: Status-UPDATE + System-ETB-Eintrag atomar in EINER Tx
+    // (BEGIN IMMEDIATE + Retry). Der ETB-Text ist aus `vorher` berechenbar — die
+    // Bezeichnung ändert sich beim Status-Wechsel nicht, daher kein In-Tx-Reload nötig.
+    // darf_uebergehen/Belegungs-Vorbedingung prüft `setze_status_tx` in der Tx; SSE erst
+    // nach dem Commit (Reinheits-Kontrakt).
     let etb_text = match body.status.as_str() {
         "aktiv" => Some(format!(
             "Bereitstellungsraum {} in Betrieb genommen",
-            nachher.bezeichnung
+            vorher.bezeichnung
         )),
         "aufgeloest" => Some(format!(
             "Bereitstellungsraum {} aufgelöst",
-            nachher.bezeichnung
+            vorher.bezeichnung
         )),
         _ => None,
     };
-    if let Some(text) = etb_text {
-        super::etb_system_degradiert(&state, einsatz_id, benutzer.id, &text).await?;
-    }
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    let nachher = crate::write_retry!(&state.pool, |conn| {
+        let nachher =
+            br_repo::setze_status_tx(conn, einsatz_id, br_id, &body.status, benutzer.id).await?;
+        if let Some(text) = &etb_text {
+            crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, text).await?;
+        }
+        Ok(nachher)
+    })?;
     sse_br(&state, einsatz_id, br_id);
     Ok(Json(nachher))
 }

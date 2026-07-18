@@ -1,6 +1,6 @@
 use super::{GefahrBewertungAnzeige, GefahrengebietAnzeige, Gefahrentyp, Schutzobjekt, Warnstufe};
 use crate::error::AppError;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 /// Eingabedaten für eine Bewertung (durch den Handler validiert/normalisiert).
 #[derive(Debug)]
@@ -84,10 +84,12 @@ pub async fn aktuelle_warnstufe(
     Ok(w)
 }
 
-/// UPSERT einer Bewertung. KEIN Delete-Zweig: `warnstufe='keine'` lässt die Zeile
-/// bestehen, `liste()` filtert sie aus.
-pub async fn upsert_bewertung(
-    pool: &SqlitePool,
+/// UPSERT einer Bewertung INNERHALB einer offenen Transaktion (F06/LFH-244, Tier-A:
+/// atomar mit dem System-ETB-Eintrag). KEIN Delete-Zweig: `warnstufe='keine'` lässt die
+/// Zeile bestehen, `liste()` filtert sie aus. Liefert die frische Anzeige (In-Tx-Reload)
+/// für ETB-Text UND Response in EINER Tx.
+pub async fn upsert_bewertung_tx(
+    conn: &mut SqliteConnection,
     gefahrengebiet_id: i64,
     daten: BewertungDaten<'_>,
 ) -> Result<GefahrBewertungAnzeige, AppError> {
@@ -110,16 +112,30 @@ pub async fn upsert_bewertung(
     .bind(daten.beschreibung)
     .bind(daten.gemeldet_von)
     .bind(daten.aktualisiert_von)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
-    laden(pool, id).await
+    laden_tx(conn, id).await
 }
 
-/// Lädt eine Zelle per id (für die Anzeige nach Upsert).
-async fn laden(pool: &SqlitePool, id: i64) -> Result<GefahrBewertungAnzeige, AppError> {
+/// Pool-Wrapper: UPSERT in eigener Tx und Anzeige laden.
+pub async fn upsert_bewertung(
+    pool: &SqlitePool,
+    gefahrengebiet_id: i64,
+    daten: BewertungDaten<'_>,
+) -> Result<GefahrBewertungAnzeige, AppError> {
+    let mut conn = pool.acquire().await?;
+    upsert_bewertung_tx(&mut conn, gefahrengebiet_id, daten).await
+}
+
+/// Lädt eine Zelle per id auf einer offenen Connection/Transaktion (für die Anzeige
+/// nach Upsert — In-Tx-Reload).
+async fn laden_tx(
+    conn: &mut SqliteConnection,
+    id: i64,
+) -> Result<GefahrBewertungAnzeige, AppError> {
     sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!("{SELECT_ALLE} WHERE id = ?")))
         .bind(id)
-        .fetch_optional(pool)
+        .fetch_optional(&mut *conn)
         .await?
         .map(zu_anzeige)
         .ok_or(AppError::NotFound)

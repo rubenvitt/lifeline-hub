@@ -4,7 +4,7 @@ use super::{
 };
 use crate::error::AppError;
 use crate::staerke::Staerke;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 /// SELECT mit aufgelöster Live-Identität (LEFT JOIN fahrzeug) und Status (LEFT JOIN
 /// fahrzeug_status). Die Wahl Live vs. Snapshot trifft `zu_anzeige` mit `einsatz_aktiv`.
@@ -164,12 +164,32 @@ pub async fn laden_anzeige(
     Ok(zu_anzeige(row, einsatz_aktiv))
 }
 
-/// Disponiert ein Stamm-Fahrzeug. Prüft Org-Zugehörigkeit + Dienststatus, friert
-/// den Identitäts-Schnappschuss ein und setzt den ersten `gebunden`-Status.
-/// `NotFound` bei fremdem/unbekanntem Fahrzeug, `Validation` bei außer Dienst,
-/// `Conflict` bei Doppel-Disposition. Liefert die neue `ef_id`.
-pub async fn disponiere_stamm(
-    pool: &SqlitePool,
+/// Wie [`laden_anzeige`], aber auf einer offenen Connection/Transaktion (für den
+/// In-Tx-Reload beim atomaren Disponieren/Aktualisieren, F06/LFH-244 Tier-A).
+pub async fn laden_anzeige_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ef_id: i64,
+    einsatz_aktiv: bool,
+) -> Result<EinsatzFahrzeugAnzeige, AppError> {
+    let row = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_AUFGELOEST} WHERE ef.id = ? AND ef.einsatz_id = ?"
+    )))
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    Ok(zu_anzeige(row, einsatz_aktiv))
+}
+
+/// Disponiert ein Stamm-Fahrzeug auf einer offenen Connection/Transaktion (F06/LFH-244
+/// Tier-A). Prüft Org-Zugehörigkeit + Dienststatus, friert den Identitäts-Schnappschuss
+/// ein und setzt den ersten `gebunden`-Status. `NotFound` bei fremdem/unbekanntem
+/// Fahrzeug, `Validation` bei außer Dienst, `Conflict` bei Doppel-Disposition.
+/// Liefert die neue `ef_id`.
+pub async fn disponiere_stamm_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     org_id: i64,
     fahrzeug_id: i64,
@@ -191,7 +211,7 @@ pub async fn disponiere_stamm(
     )
     .bind(fahrzeug_id)
     .bind(org_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *conn)
     .await?
     .ok_or(AppError::NotFound)?;
 
@@ -202,7 +222,8 @@ pub async fn disponiere_stamm(
         ));
     }
 
-    let status_id = status_repo::erster_der_kategorie(pool, org_id, KATEGORIE_GEBUNDEN).await?;
+    let status_id =
+        status_repo::erster_der_kategorie_tx(&mut *conn, org_id, KATEGORIE_GEBUNDEN).await?;
 
     let ergebnis = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatz_fahrzeug \
@@ -219,7 +240,7 @@ pub async fn disponiere_stamm(
     .bind(&opta)
     .bind(&traeger)
     .bind(disponiert_von)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await;
 
     match ergebnis {
@@ -231,16 +252,30 @@ pub async fn disponiere_stamm(
     }
 }
 
-/// Disponiert ein Ad-hoc-externes Fahrzeug (`fahrzeug_id = NULL`); `snap_*` sind die
-/// eigentlichen Daten. Initial-Status = erster `gebunden`. Liefert die neue `ef_id`.
-pub async fn disponiere_adhoc(
+/// Pool-Wrapper: disponiert ein Stamm-Fahrzeug in eigener Transaktion.
+pub async fn disponiere_stamm(
     pool: &SqlitePool,
+    einsatz_id: i64,
+    org_id: i64,
+    fahrzeug_id: i64,
+    disponiert_von: i64,
+) -> Result<i64, AppError> {
+    let mut conn = pool.acquire().await?;
+    disponiere_stamm_tx(&mut conn, einsatz_id, org_id, fahrzeug_id, disponiert_von).await
+}
+
+/// Disponiert ein Ad-hoc-externes Fahrzeug (`fahrzeug_id = NULL`) auf einer offenen
+/// Connection/Transaktion (F06/LFH-244 Tier-A); `snap_*` sind die eigentlichen Daten.
+/// Initial-Status = erster `gebunden`. Liefert die neue `ef_id`.
+pub async fn disponiere_adhoc_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     org_id: i64,
     daten: AdhocDaten<'_>,
     disponiert_von: i64,
 ) -> Result<i64, AppError> {
-    let status_id = status_repo::erster_der_kategorie(pool, org_id, KATEGORIE_GEBUNDEN).await?;
+    let status_id =
+        status_repo::erster_der_kategorie_tx(&mut *conn, org_id, KATEGORIE_GEBUNDEN).await?;
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatz_fahrzeug \
             (einsatz_id, fahrzeug_id, status_id, snap_funkrufname, snap_kennzeichen, \
@@ -255,15 +290,28 @@ pub async fn disponiere_adhoc(
     .bind(daten.opta)
     .bind(daten.traegerorganisation)
     .bind(disponiert_von)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
     Ok(id)
 }
 
-/// Aktualisiert Status und/oder Bemerkung einer Dispositionszeile (COALESCE: `None`
-/// = unverändert lassen). `NotFound`, falls die Zeile nicht zum Einsatz gehört.
-pub async fn aktualisiere(
+/// Pool-Wrapper: disponiert ein Ad-hoc-Fahrzeug in eigener Transaktion.
+pub async fn disponiere_adhoc(
     pool: &SqlitePool,
+    einsatz_id: i64,
+    org_id: i64,
+    daten: AdhocDaten<'_>,
+    disponiert_von: i64,
+) -> Result<i64, AppError> {
+    let mut conn = pool.acquire().await?;
+    disponiere_adhoc_tx(&mut conn, einsatz_id, org_id, daten, disponiert_von).await
+}
+
+/// Aktualisiert Status und/oder Bemerkung einer Dispositionszeile auf einer offenen
+/// Connection/Transaktion (F06/LFH-244 Tier-A; COALESCE: `None` = unverändert lassen).
+/// `NotFound`, falls die Zeile nicht zum Einsatz gehört.
+pub async fn aktualisiere_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     ef_id: i64,
     status_id: Option<i64>,
@@ -278,12 +326,24 @@ pub async fn aktualisiere(
     .bind(bemerkung)
     .bind(ef_id)
     .bind(einsatz_id)
-    .execute(pool)
+    .execute(&mut *conn)
     .await?;
     if resultat.rows_affected() == 0 {
         return Err(AppError::NotFound);
     }
     Ok(())
+}
+
+/// Pool-Wrapper: aktualisiert Status/Bemerkung in eigener Transaktion.
+pub async fn aktualisiere(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    ef_id: i64,
+    status_id: Option<i64>,
+    bemerkung: Option<&str>,
+) -> Result<(), AppError> {
+    let mut conn = pool.acquire().await?;
+    aktualisiere_tx(&mut conn, einsatz_id, ef_id, status_id, bemerkung).await
 }
 
 /// Reine Geo-/Symbol-Felder einer Disposition. `Some(None)` = auf NULL, `None` = unverändert.
@@ -346,20 +406,31 @@ pub async fn aktualisiere_position(
 /// (`einsatz_personal.fahrzeug_id = NULL`). Die Kräfte werden frei, nicht gelöscht;
 /// ohne diesen Schritt scheitert das DELETE am FK-Constraint. Schlägt das DELETE auf
 /// `NotFound` durch (fremdes/unbekanntes Fahrzeug), rollt die TX die Freigabe zurück.
-pub async fn entferne(pool: &SqlitePool, einsatz_id: i64, ef_id: i64) -> Result<(), AppError> {
-    let mut tx = pool.begin().await?;
+pub async fn entferne_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ef_id: i64,
+) -> Result<(), AppError> {
     sqlx::query("UPDATE einsatz_personal SET fahrzeug_id = NULL WHERE fahrzeug_id = ?")
         .bind(ef_id)
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
     let resultat = sqlx::query("DELETE FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?")
         .bind(ef_id)
         .bind(einsatz_id)
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
     if resultat.rows_affected() == 0 {
         return Err(AppError::NotFound);
     }
+    Ok(())
+}
+
+/// Pool-Wrapper: entfernt eine Dispositionszeile in eigener Transaktion (Besatzungs-
+/// Freigabe + DELETE atomar; `NotFound` rollt die Freigabe zurück).
+pub async fn entferne(pool: &SqlitePool, einsatz_id: i64, ef_id: i64) -> Result<(), AppError> {
+    let mut tx = pool.begin().await?;
+    entferne_tx(&mut tx, einsatz_id, ef_id).await?;
     tx.commit().await?;
     Ok(())
 }

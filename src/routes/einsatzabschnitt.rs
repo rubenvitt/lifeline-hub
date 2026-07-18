@@ -200,14 +200,18 @@ pub async fn aufloesen(
     fordere_aktiv(&einsatz)?;
 
     let vorher = abschnitt_repo::laden(&state.pool, einsatz_id, aid).await?;
-    abschnitt_repo::loese_auf(&state.pool, einsatz_id, aid).await?;
-    super::etb_system_degradiert(
-        &state,
-        einsatz_id,
-        benutzer.id,
-        &format!("Abschnitt «{}» aufgelöst", vorher.name),
-    )
-    .await?;
+    // F06/LFH-244 Tier-A: Auflösen (Reparenting + Freigaben + DELETE) + System-ETB-Eintrag
+    // atomar in EINER Tx (BEGIN IMMEDIATE + Retry). ETB-Text aus dem VOR der Tx geladenen
+    // `vorher` (Name unverändert). SSE erst nach dem Commit (Reinheits-Kontrakt).
+    let text = format!("Abschnitt «{}» aufgelöst", vorher.name);
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    crate::write_retry!(&state.pool, |conn| {
+        abschnitt_repo::loese_auf_tx(conn, einsatz_id, aid).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        Ok(())
+    })?;
     sse_abschnitt(&state, einsatz_id, aid);
     Ok(StatusCode::NO_CONTENT)
 }

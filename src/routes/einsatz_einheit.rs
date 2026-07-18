@@ -292,14 +292,23 @@ pub async fn aufloesen(
 ) -> Result<StatusCode, AppError> {
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let name = einheit_name(&state, einsatz_id, eid).await?;
-    einheit_repo::loese_auf(&state.pool, einsatz_id, eid).await?;
-    super::etb_system_degradiert(
-        &state,
-        einsatz_id,
-        benutzer.id,
-        &format!("Einheit «{}» aufgelöst", name),
-    )
-    .await?;
+    // F06/LFH-244 Tier-A: Auflösung (Freigaben + Hochzug + Löschung) + System-ETB-Eintrag
+    // atomar in EINER Tx. SSE erst nach dem Commit.
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    crate::write_retry!(&state.pool, |conn| {
+        einheit_repo::loese_auf_tx(conn, einsatz_id, eid).await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            benutzer.id,
+            startwert,
+            &format!("Einheit «{}» aufgelöst", name),
+        )
+        .await?;
+        Ok(())
+    })?;
     sse_einheit(&state, einsatz_id, eid);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -312,14 +321,23 @@ pub async fn personal_zuordnen(
 ) -> Result<StatusCode, AppError> {
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
-    let person = mitglied_repo::ordne_personal_zu(&state.pool, einsatz_id, eid, ep_id).await?;
-    super::etb_system_degradiert(
-        &state,
-        einsatz_id,
-        benutzer.id,
-        &format!("Einheit «{}»: «{}» zugeordnet", einheit, person),
-    )
-    .await?;
+    // F06/LFH-244 Tier-A: Zuordnung (inkl. Stale-Führer-Bereinigung) + System-ETB-Eintrag
+    // atomar in EINER Tx. Der Personalname kommt aus dem Write und speist den ETB-Text.
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    crate::write_retry!(&state.pool, |conn| {
+        let person = mitglied_repo::ordne_personal_zu_tx(conn, einsatz_id, eid, ep_id).await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            benutzer.id,
+            startwert,
+            &format!("Einheit «{}»: «{}» zugeordnet", einheit, person),
+        )
+        .await?;
+        Ok(())
+    })?;
     sse_einheit(&state, einsatz_id, eid);
     sse_personal(&state, einsatz_id, ep_id);
     Ok(StatusCode::NO_CONTENT)
@@ -333,14 +351,22 @@ pub async fn personal_freigeben(
 ) -> Result<StatusCode, AppError> {
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
-    let person = mitglied_repo::gib_personal_frei(&state.pool, einsatz_id, eid, ep_id).await?;
-    super::etb_system_degradiert(
-        &state,
-        einsatz_id,
-        benutzer.id,
-        &format!("Einheit «{}»: «{}» freigegeben", einheit, person),
-    )
-    .await?;
+    // F06/LFH-244 Tier-A: Freigabe (inkl. Führer-Leerung) + System-ETB-Eintrag atomar.
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    crate::write_retry!(&state.pool, |conn| {
+        let person = mitglied_repo::gib_personal_frei_tx(conn, einsatz_id, eid, ep_id).await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            benutzer.id,
+            startwert,
+            &format!("Einheit «{}»: «{}» freigegeben", einheit, person),
+        )
+        .await?;
+        Ok(())
+    })?;
     sse_einheit(&state, einsatz_id, eid);
     sse_personal(&state, einsatz_id, ep_id);
     Ok(StatusCode::NO_CONTENT)
@@ -354,14 +380,22 @@ pub async fn fahrzeug_zuordnen(
 ) -> Result<StatusCode, AppError> {
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
-    let fz = mitglied_repo::ordne_fahrzeug_zu(&state.pool, einsatz_id, eid, ef_id).await?;
-    super::etb_system_degradiert(
-        &state,
-        einsatz_id,
-        benutzer.id,
-        &format!("Einheit «{}»: Fahrzeug «{}» zugeordnet", einheit, fz),
-    )
-    .await?;
+    // F06/LFH-244 Tier-A: Zuordnung + System-ETB-Eintrag atomar.
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    crate::write_retry!(&state.pool, |conn| {
+        let fz = mitglied_repo::ordne_fahrzeug_zu_tx(conn, einsatz_id, eid, ef_id).await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            benutzer.id,
+            startwert,
+            &format!("Einheit «{}»: Fahrzeug «{}» zugeordnet", einheit, fz),
+        )
+        .await?;
+        Ok(())
+    })?;
     sse_einheit(&state, einsatz_id, eid);
     sse_fahrzeug(&state, einsatz_id, ef_id);
     Ok(StatusCode::NO_CONTENT)
@@ -375,14 +409,22 @@ pub async fn fahrzeug_freigeben(
 ) -> Result<StatusCode, AppError> {
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
-    let fz = mitglied_repo::gib_fahrzeug_frei(&state.pool, einsatz_id, eid, ef_id).await?;
-    super::etb_system_degradiert(
-        &state,
-        einsatz_id,
-        benutzer.id,
-        &format!("Einheit «{}»: Fahrzeug «{}» freigegeben", einheit, fz),
-    )
-    .await?;
+    // F06/LFH-244 Tier-A: Freigabe + System-ETB-Eintrag atomar.
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    crate::write_retry!(&state.pool, |conn| {
+        let fz = mitglied_repo::gib_fahrzeug_frei_tx(conn, einsatz_id, eid, ef_id).await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            benutzer.id,
+            startwert,
+            &format!("Einheit «{}»: Fahrzeug «{}» freigegeben", einheit, fz),
+        )
+        .await?;
+        Ok(())
+    })?;
     sse_einheit(&state, einsatz_id, eid);
     sse_fahrzeug(&state, einsatz_id, ef_id);
     Ok(StatusCode::NO_CONTENT)
@@ -396,18 +438,26 @@ pub async fn material_zuordnen(
 ) -> Result<StatusCode, AppError> {
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
-    let (bez, menge) =
-        mitglied_repo::ordne_material_zu(&state.pool, einsatz_id, eid, em_id).await?;
-    super::etb_system_degradiert(
-        &state,
-        einsatz_id,
-        benutzer.id,
-        &format!(
-            "Einheit «{}»: Material «{}» (×{}) zugeordnet",
-            einheit, bez, menge
-        ),
-    )
-    .await?;
+    // F06/LFH-244 Tier-A: Zuordnung + System-ETB-Eintrag atomar.
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    crate::write_retry!(&state.pool, |conn| {
+        let (bez, menge) =
+            mitglied_repo::ordne_material_zu_tx(conn, einsatz_id, eid, em_id).await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            benutzer.id,
+            startwert,
+            &format!(
+                "Einheit «{}»: Material «{}» (×{}) zugeordnet",
+                einheit, bez, menge
+            ),
+        )
+        .await?;
+        Ok(())
+    })?;
     sse_einheit(&state, einsatz_id, eid);
     sse_material(&state, einsatz_id, em_id);
     Ok(StatusCode::NO_CONTENT)
@@ -421,18 +471,26 @@ pub async fn material_freigeben(
 ) -> Result<StatusCode, AppError> {
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
-    let (bez, menge) =
-        mitglied_repo::gib_material_frei(&state.pool, einsatz_id, eid, em_id).await?;
-    super::etb_system_degradiert(
-        &state,
-        einsatz_id,
-        benutzer.id,
-        &format!(
-            "Einheit «{}»: Material «{}» (×{}) freigegeben",
-            einheit, bez, menge
-        ),
-    )
-    .await?;
+    // F06/LFH-244 Tier-A: Freigabe + System-ETB-Eintrag atomar.
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    crate::write_retry!(&state.pool, |conn| {
+        let (bez, menge) =
+            mitglied_repo::gib_material_frei_tx(conn, einsatz_id, eid, em_id).await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            benutzer.id,
+            startwert,
+            &format!(
+                "Einheit «{}»: Material «{}» (×{}) freigegeben",
+                einheit, bez, menge
+            ),
+        )
+        .await?;
+        Ok(())
+    })?;
     sse_einheit(&state, einsatz_id, eid);
     sse_material(&state, einsatz_id, em_id);
     Ok(StatusCode::NO_CONTENT)

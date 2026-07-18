@@ -209,28 +209,39 @@ pub async fn aktualisieren(
     let vorher = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ep_id, true).await?;
     // Bemerkung: gesetzt (auch "") → setzen; absent/null → unverändert (COALESCE).
     let bemerkung = body.bemerkung.as_deref().map(str::trim);
-    disposition_repo::aktualisiere(
-        &state.pool,
-        einsatz_id,
-        ep_id,
-        body.status_id,
-        body.staerke_position.as_ref().map(|o| o.as_deref()),
-        bemerkung,
-    )
-    .await?;
-    let nachher = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ep_id, true).await?;
+    let staerke_position = body.staerke_position.as_ref().map(|o| o.as_deref());
 
-    if vorher.status_id != nachher.status_id {
-        let alt = vorher.status_label.as_deref().unwrap_or("—");
-        let neu = nachher.status_label.as_deref().unwrap_or("—");
-        super::etb_system_degradiert(
-            &state,
+    // F06/LFH-244 Tier-A: Dispo-UPDATE + (nur bei Statuswechsel) System-ETB-Eintrag atomar in
+    // EINER Tx (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische, aufgelöste
+    // Anzeige für den ETB-Text UND die Response; SSE erst nach dem Commit.
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    let nachher = crate::write_retry!(&state.pool, |conn| {
+        disposition_repo::aktualisiere_tx(
+            conn,
             einsatz_id,
-            benutzer.id,
-            &format!("Person «{}»: Status «{}» → «{}»", nachher.name, alt, neu),
+            ep_id,
+            body.status_id,
+            staerke_position,
+            bemerkung,
         )
         .await?;
-    }
+        let nachher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ep_id, true).await?;
+        if vorher.status_id != nachher.status_id {
+            let alt = vorher.status_label.as_deref().unwrap_or("—");
+            let neu = nachher.status_label.as_deref().unwrap_or("—");
+            crate::etb::system_audit_tx(
+                conn,
+                einsatz_id,
+                benutzer.id,
+                startwert,
+                &format!("Person «{}»: Status «{}» → «{}»", nachher.name, alt, neu),
+            )
+            .await?;
+        }
+        Ok(nachher)
+    })?;
     sse_personal(&state, einsatz_id, ep_id);
     Ok(Json(nachher))
 }
@@ -255,17 +266,21 @@ pub async fn entfernen(
     fordere_aktiv(&einsatz)?;
 
     let anzeige = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ep_id, true).await?;
-    disposition_repo::entferne(&state.pool, einsatz_id, ep_id).await?;
-    super::etb_system_degradiert(
-        &state,
-        einsatz_id,
-        benutzer.id,
-        &format!(
-            "Person «{}» aus dem Einsatz entfernt",
-            person_bezeichnung(&anzeige)
-        ),
-    )
-    .await?;
+    // F06/LFH-244 Tier-A: Führungsrollen-Freigabe + DELETE + System-ETB-Eintrag atomar in EINER
+    // Tx (BEGIN IMMEDIATE + Retry). ETB-Text aus der VOR der Tx geladenen Anzeige; SSE erst
+    // nach dem Commit.
+    let text = format!(
+        "Person «{}» aus dem Einsatz entfernt",
+        person_bezeichnung(&anzeige)
+    );
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    crate::write_retry!(&state.pool, |conn| {
+        disposition_repo::entferne_tx(conn, einsatz_id, ep_id).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        Ok(())
+    })?;
     sse_personal(&state, einsatz_id, ep_id);
     Ok(StatusCode::NO_CONTENT)
 }

@@ -1,6 +1,6 @@
 use super::{darf_uebergehen, BrAnzeige};
 use crate::error::AppError;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 const SELECT_ALLE: &str = "\
     SELECT id, einsatz_id, abschnitt_id, bezeichnung, standort, notiz, status, \
@@ -56,6 +56,24 @@ pub async fn laden(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<BrAnze
     .bind(id)
     .bind(einsatz_id)
     .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)
+}
+
+/// Wie [`laden`], aber auf einer offenen Connection/Transaktion (für den In-Tx-Reload
+/// beim atomaren Status-Wechsel — liefert die frische Anzeige für die Response in
+/// derselben Tx). `NotFound`, falls nicht zum Einsatz.
+pub async fn laden_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<BrAnzeige, AppError> {
+    sqlx::query_as::<_, BrAnzeige>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_ALLE} WHERE id = ? AND einsatz_id = ?"
+    )))
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
     .await?
     .ok_or(AppError::NotFound)
 }
@@ -138,11 +156,13 @@ pub async fn aktualisiere(
     }
 }
 
-/// Setzt einen neuen Status. Prüft Transition via `darf_uebergehen` (422 bei
-/// ungültigem Übergang) und die Belegungs-Vorbedingung für `aufgeloest`:
-/// blockt mit `Conflict` (409), wenn aktiv belegt (Einheit oder Fahrzeug).
-pub async fn setze_status(
-    pool: &SqlitePool,
+/// Setzt einen neuen Status INNERHALB einer offenen Transaktion (F06/LFH-244 Tier-A:
+/// atomar mit dem System-ETB-Eintrag). Prüft Transition via `darf_uebergehen` (422 bei
+/// ungültigem Übergang) und die Belegungs-Vorbedingung für `aufgeloest`: blockt mit
+/// `Conflict` (409), wenn aktiv belegt (Einheit oder Fahrzeug). Die read-then-write-Kette
+/// (Status lesen → prüfen → UPDATE) läuft nun in EINER Tx, statt über mehrere Pool-Griffe.
+pub async fn setze_status_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     id: i64,
     neuer_status: &str,
@@ -154,7 +174,7 @@ pub async fn setze_status(
     )
     .bind(id)
     .bind(einsatz_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut *conn)
     .await?
     .ok_or(AppError::NotFound)?;
 
@@ -166,7 +186,7 @@ pub async fn setze_status(
 
     // Für aufgeloest: aktive Belegung blockt.
     if neuer_status == "aufgeloest" {
-        let belegt = aktive_belegungen(pool, id).await?;
+        let belegt = aktive_belegungen_tx(conn, id).await?;
         if belegt > 0 {
             return Err(AppError::Conflict(format!(
                 "Auflösung nicht möglich — noch {belegt} Einheit(en)/Fahrzeug(e) belegt"
@@ -183,10 +203,22 @@ pub async fn setze_status(
     .bind(geaendert_von)
     .bind(id)
     .bind(einsatz_id)
-    .execute(pool)
+    .execute(&mut *conn)
     .await?;
 
-    laden(pool, einsatz_id, id).await
+    laden_tx(conn, einsatz_id, id).await
+}
+
+/// Pool-Wrapper: setzt den Status in einer eigenen Tx (delegiert an [`setze_status_tx`]).
+pub async fn setze_status(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+    neuer_status: &str,
+    geaendert_von: i64,
+) -> Result<BrAnzeige, AppError> {
+    let mut conn = pool.acquire().await?;
+    setze_status_tx(&mut conn, einsatz_id, id, neuer_status, geaendert_von).await
 }
 
 /// Soft-Delete des BR. Blockt mit `Conflict`, wenn aktive Belegung existiert
@@ -232,10 +264,15 @@ pub async fn storniere(
     Ok(())
 }
 
-/// Anzahl aktiv belegter Einheiten + Fahrzeuge über den denormalisierten Cache.
-/// Prüft sowohl `einsatz_einheit.aktueller_br_id` als auch
-/// `einsatz_fahrzeug.aktueller_br_id` (jeweils ein indizierter Scan).
-pub async fn aktive_belegungen(pool: &SqlitePool, br_id: i64) -> Result<i64, AppError> {
+/// Anzahl aktiv belegter Einheiten + Fahrzeuge über den denormalisierten Cache,
+/// auf einer offenen Connection/Transaktion (damit die `aufgeloest`-Vorbedingung
+/// atomar mit dem Status-UPDATE gelesen wird). Prüft sowohl
+/// `einsatz_einheit.aktueller_br_id` als auch `einsatz_fahrzeug.aktueller_br_id`
+/// (jeweils ein indizierter Scan).
+pub async fn aktive_belegungen_tx(
+    conn: &mut SqliteConnection,
+    br_id: i64,
+) -> Result<i64, AppError> {
     Ok(sqlx::query_scalar(
         "SELECT \
             (SELECT COUNT(*) FROM einsatz_einheit  WHERE aktueller_br_id = ?) + \
@@ -243,8 +280,14 @@ pub async fn aktive_belegungen(pool: &SqlitePool, br_id: i64) -> Result<i64, App
     )
     .bind(br_id)
     .bind(br_id)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?)
+}
+
+/// Pool-Wrapper: zählt aktive Belegungen auf einer frischen Connection.
+pub async fn aktive_belegungen(pool: &SqlitePool, br_id: i64) -> Result<i64, AppError> {
+    let mut conn = pool.acquire().await?;
+    aktive_belegungen_tx(&mut conn, br_id).await
 }
 
 #[cfg(test)]

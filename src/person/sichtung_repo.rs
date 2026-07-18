@@ -1,6 +1,6 @@
 use crate::error::AppError;
 use serde::Serialize;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 use utoipa::ToSchema;
 
 /// Ein Sichtungs-Verlaufseintrag (1:1 zu `person_sichtung`).
@@ -20,11 +20,14 @@ const SELECT_SICHTUNG: &str = "\
     SELECT id, einsatz_id, person_id, kategorie, notiz, gesichtet_at, gesichtet_von \
     FROM person_sichtung";
 
-/// Erfasst eine Sichtung append-only und aktualisiert den Cache in DERSELBEN
-/// Transaktion. Bei `hebe_auf_betroffen` wird die Person vorab `erfasst→betroffen`
-/// gehoben (Annahme 5). `kategorie` muss bereits validiert sein (Handler).
-pub async fn erfassen(
-    pool: &SqlitePool,
+/// Erfasst eine Sichtung append-only und aktualisiert den Cache — beides sowie der
+/// optionale `erfasst→betroffen`-Hub laufen auf der übergebenen offenen
+/// Connection/Transaktion (F06/LFH-244, Tier-A: der Aufrufer bündelt das mit dem
+/// System-ETB-Eintrag in EINE `write_retry!`-Tx). `kategorie` muss bereits validiert
+/// sein (Handler). Bei `hebe_auf_betroffen` wird die Person vorab `erfasst→betroffen`
+/// gehoben (Annahme 5). Liefert die frische Anzeige via In-Tx-Reload.
+pub async fn erfassen_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     person_id: i64,
     kategorie: &str,
@@ -32,7 +35,6 @@ pub async fn erfassen(
     gesichtet_von: i64,
     hebe_auf_betroffen: bool,
 ) -> Result<SichtungAnzeige, AppError> {
-    let mut tx = pool.begin().await?;
     if hebe_auf_betroffen {
         sqlx::query(
             "UPDATE einsatz_person SET status = 'betroffen', \
@@ -42,7 +44,7 @@ pub async fn erfassen(
         .bind(gesichtet_von)
         .bind(person_id)
         .bind(einsatz_id)
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
     }
     let id: i64 = sqlx::query_scalar(
@@ -54,7 +56,7 @@ pub async fn erfassen(
     .bind(kategorie)
     .bind(notiz)
     .bind(gesichtet_von)
-    .fetch_one(&mut *tx)
+    .fetch_one(&mut *conn)
     .await?;
     // Cache spiegelt die jüngste Sichtung; das At-Feld übernimmt exakt deren gesichtet_at.
     sqlx::query(
@@ -66,10 +68,36 @@ pub async fn erfassen(
     .bind(id)
     .bind(person_id)
     .bind(einsatz_id)
-    .execute(&mut *tx)
+    .execute(&mut *conn)
+    .await?;
+    laden_tx(conn, einsatz_id, id).await
+}
+
+/// Pool-Wrapper: erfasst eine Sichtung in EINER eigenen Transaktion (bündelt den
+/// optionalen Status-Hub, den INSERT und die Cache-Aktualisierung atomar) und lädt die
+/// Anzeige. Delegiert an [`erfassen_tx`].
+pub async fn erfassen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    person_id: i64,
+    kategorie: &str,
+    notiz: Option<&str>,
+    gesichtet_von: i64,
+    hebe_auf_betroffen: bool,
+) -> Result<SichtungAnzeige, AppError> {
+    let mut tx = pool.begin().await?;
+    let anzeige = erfassen_tx(
+        &mut tx,
+        einsatz_id,
+        person_id,
+        kategorie,
+        notiz,
+        gesichtet_von,
+        hebe_auf_betroffen,
+    )
     .await?;
     tx.commit().await?;
-    laden(pool, einsatz_id, id).await
+    Ok(anzeige)
 }
 
 /// Lädt eine Sichtung; `NotFound`, falls nicht zum Einsatz.
@@ -84,6 +112,23 @@ pub async fn laden(
     .bind(id)
     .bind(einsatz_id)
     .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)
+}
+
+/// Wie [`laden`], aber auf einer offenen Connection/Transaktion (In-Tx-Reload für den
+/// atomaren Erfassungs-Pfad).
+pub async fn laden_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<SichtungAnzeige, AppError> {
+    sqlx::query_as::<_, SichtungAnzeige>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_SICHTUNG} WHERE id = ? AND einsatz_id = ?"
+    )))
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
     .await?
     .ok_or(AppError::NotFound)
 }

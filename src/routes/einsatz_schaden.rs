@@ -189,31 +189,40 @@ pub async fn anlegen(
     }
     let beschreibung = trimme(body.beschreibung.clone());
 
-    let schaden = schaden_repo::anlegen(
-        &state.pool,
-        einsatz_id,
-        benutzer.id,
-        schaden_repo::NeueDaten {
-            typ: typ.as_str(),
-            ausmass: ausmass.as_str(),
-            ort: &ort,
-            beschreibung: beschreibung.as_deref(),
-            geschaedigt_person_id: body.geschaedigt_person_id,
-            geschaedigt_kontakt: kontakt.as_deref(),
-            geschaedigt_personal_id: body.geschaedigt_personal_id,
-            geschaedigt_organisation_id: geschaedigt_org_id,
-        },
-    )
-    .await?;
-
-    let text = format!(
-        "Schaden {} angelegt: {} ({}) — {}",
-        registrier_anzeige(schaden.registrier_nr),
-        typ.as_str(),
-        ausmass.as_str(),
-        ort_kurz(&ort),
-    );
-    super::etb_system_degradiert(&state, einsatz_id, benutzer.id, &text).await?;
+    // F06/LFH-244 Tier-A: Domänen-Write + System-ETB-Eintrag atomar in EINER Tx
+    // (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige für ETB-Text
+    // (Reg.-Nr.) UND Response. SSE erst nach dem Commit.
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    let schaden = crate::write_retry!(&state.pool, |conn| {
+        let (id, _reg) = schaden_repo::anlegen_tx(
+            conn,
+            einsatz_id,
+            benutzer.id,
+            schaden_repo::NeueDaten {
+                typ: typ.as_str(),
+                ausmass: ausmass.as_str(),
+                ort: &ort,
+                beschreibung: beschreibung.as_deref(),
+                geschaedigt_person_id: body.geschaedigt_person_id,
+                geschaedigt_kontakt: kontakt.as_deref(),
+                geschaedigt_personal_id: body.geschaedigt_personal_id,
+                geschaedigt_organisation_id: geschaedigt_org_id,
+            },
+        )
+        .await?;
+        let schaden = schaden_repo::laden_tx(conn, einsatz_id, id).await?;
+        let text = format!(
+            "Schaden {} angelegt: {} ({}) — {}",
+            registrier_anzeige(schaden.registrier_nr),
+            typ.as_str(),
+            ausmass.as_str(),
+            ort_kurz(&ort),
+        );
+        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        Ok(schaden)
+    })?;
     sse_schaden(&state, einsatz_id, schaden.id);
     Ok((StatusCode::CREATED, Json(schaden)))
 }
@@ -516,14 +525,22 @@ pub async fn uebergeben(
         )));
     }
 
-    schaden_repo::uebergebe(&state.pool, einsatz_id, schaden_id, &adressat, benutzer.id).await?;
-
     let text = format!(
         "Schaden {} übergeben an {}",
         registrier_anzeige(vorher.registrier_nr),
         adressat
     );
-    super::etb_system_degradiert(&state, einsatz_id, benutzer.id, &text).await?;
+    // F06/LFH-244 Tier-A: Status-UPDATE + System-ETB-Eintrag atomar in EINER Tx. Der ETB-Text
+    // ist aus `vorher` + `adressat` VOR der Tx berechenbar (kein In-Tx-Reload nötig). SSE +
+    // Response-Reload erst nach dem Commit.
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    crate::write_retry!(&state.pool, |conn| {
+        schaden_repo::uebergebe_tx(conn, einsatz_id, schaden_id, &adressat, benutzer.id).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        Ok(())
+    })?;
     sse_schaden(&state, einsatz_id, schaden_id);
     Ok(Json(
         schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?,
@@ -582,22 +599,29 @@ pub async fn abschliessen(
         )));
     }
 
-    schaden_repo::schliesse_ab(
-        &state.pool,
-        einsatz_id,
-        schaden_id,
-        grund.as_str(),
-        notiz.as_deref(),
-        benutzer.id,
-    )
-    .await?;
-
     let text = format!(
         "Schaden {} abgeschlossen ({})",
         registrier_anzeige(vorher.registrier_nr),
         grund.as_str()
     );
-    super::etb_system_degradiert(&state, einsatz_id, benutzer.id, &text).await?;
+    // F06/LFH-244 Tier-A: Abschluss-UPDATE + System-ETB-Eintrag atomar in EINER Tx. Der ETB-Text
+    // ist aus `vorher` + `grund` VOR der Tx berechenbar. SSE + Response-Reload erst nach Commit.
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    crate::write_retry!(&state.pool, |conn| {
+        schaden_repo::schliesse_ab_tx(
+            conn,
+            einsatz_id,
+            schaden_id,
+            grund.as_str(),
+            notiz.as_deref(),
+            benutzer.id,
+        )
+        .await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        Ok(())
+    })?;
     sse_schaden(&state, einsatz_id, schaden_id);
     Ok(Json(
         schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?,
@@ -628,17 +652,20 @@ pub async fn stornieren(
     if vorher.storniert_at.is_some() {
         return Err(AppError::Conflict("Schaden ist bereits storniert".into()));
     }
-    schaden_repo::storniere(&state.pool, einsatz_id, schaden_id, benutzer.id).await?;
-    super::etb_system_degradiert(
-        &state,
-        einsatz_id,
-        benutzer.id,
-        &format!(
-            "Schaden {} storniert",
-            registrier_anzeige(vorher.registrier_nr)
-        ),
-    )
-    .await?;
+    // F06/LFH-244 Tier-A: Storno-UPDATE + System-ETB-Eintrag atomar in EINER Tx. Der ETB-Text
+    // ist aus `vorher` VOR der Tx berechenbar. SSE erst nach dem Commit.
+    let text = format!(
+        "Schaden {} storniert",
+        registrier_anzeige(vorher.registrier_nr)
+    );
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    crate::write_retry!(&state.pool, |conn| {
+        schaden_repo::storniere_tx(conn, einsatz_id, schaden_id, benutzer.id).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        Ok(())
+    })?;
     sse_schaden(&state, einsatz_id, schaden_id);
     Ok(StatusCode::NO_CONTENT)
 }

@@ -92,17 +92,19 @@ pub async fn disponieren(
     .await?;
     fordere_aktiv(&einsatz)?;
 
-    let ef_id = match (body.fahrzeug_id, body.adhoc) {
-        (Some(fahrzeug_id), None) => {
-            disposition_repo::disponiere_stamm(
-                &state.pool,
-                einsatz_id,
-                einsatz.org_id,
-                fahrzeug_id,
-                benutzer.id,
-            )
-            .await?
-        }
+    // Validierung + Aufbereitung VOR der Tx (Vorladen/Guards bleiben außerhalb des Tx-Bodys).
+    enum Vorbereitet {
+        Stamm(i64),
+        Adhoc {
+            funkrufname: String,
+            fahrzeugtyp: Option<String>,
+            kennzeichen: Option<String>,
+            opta: Option<String>,
+            traegerorganisation: Option<String>,
+        },
+    }
+    let vorbereitet = match (body.fahrzeug_id, body.adhoc) {
+        (Some(fahrzeug_id), None) => Vorbereitet::Stamm(fahrzeug_id),
         (None, Some(adhoc)) => {
             let funkrufname = adhoc.funkrufname.trim().to_string();
             if funkrufname.is_empty() {
@@ -110,24 +112,13 @@ pub async fn disponieren(
                     "Funkrufname darf nicht leer sein".into(),
                 ));
             }
-            let fahrzeugtyp = trimme(adhoc.fahrzeugtyp);
-            let kennzeichen = trimme(adhoc.kennzeichen);
-            let opta = trimme(adhoc.opta);
-            let traeger = trimme(adhoc.traegerorganisation);
-            disposition_repo::disponiere_adhoc(
-                &state.pool,
-                einsatz_id,
-                einsatz.org_id,
-                AdhocDaten {
-                    funkrufname: &funkrufname,
-                    fahrzeugtyp: fahrzeugtyp.as_deref(),
-                    kennzeichen: kennzeichen.as_deref(),
-                    opta: opta.as_deref(),
-                    traegerorganisation: traeger.as_deref(),
-                },
-                benutzer.id,
-            )
-            .await?
+            Vorbereitet::Adhoc {
+                funkrufname,
+                fahrzeugtyp: trimme(adhoc.fahrzeugtyp),
+                kennzeichen: trimme(adhoc.kennzeichen),
+                opta: trimme(adhoc.opta),
+                traegerorganisation: trimme(adhoc.traegerorganisation),
+            }
         }
         (None, None) => {
             return Err(AppError::Validation(
@@ -141,15 +132,59 @@ pub async fn disponieren(
         }
     };
 
-    let anzeige = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ef_id, true).await?;
-    super::etb_system_degradiert(
-        &state,
-        einsatz_id,
-        benutzer.id,
-        &format!("Fahrzeug «{}» disponiert", anzeige.funkrufname),
-    )
-    .await?;
-    sse_fahrzeug(&state, einsatz_id, ef_id);
+    // F06/LFH-244 Tier-A: Domänen-Write (Disposition) + System-ETB atomar in EINER Tx
+    // (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die aufgelöste Anzeige (funkrufname)
+    // für ETB-Text UND Response. SSE erst nach dem Commit (Reinheits-Kontrakt).
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    let anzeige = crate::write_retry!(&state.pool, |conn| {
+        let ef_id = match &vorbereitet {
+            Vorbereitet::Stamm(fahrzeug_id) => {
+                disposition_repo::disponiere_stamm_tx(
+                    conn,
+                    einsatz_id,
+                    einsatz.org_id,
+                    *fahrzeug_id,
+                    benutzer.id,
+                )
+                .await?
+            }
+            Vorbereitet::Adhoc {
+                funkrufname,
+                fahrzeugtyp,
+                kennzeichen,
+                opta,
+                traegerorganisation,
+            } => {
+                disposition_repo::disponiere_adhoc_tx(
+                    conn,
+                    einsatz_id,
+                    einsatz.org_id,
+                    AdhocDaten {
+                        funkrufname: funkrufname.as_str(),
+                        fahrzeugtyp: fahrzeugtyp.as_deref(),
+                        kennzeichen: kennzeichen.as_deref(),
+                        opta: opta.as_deref(),
+                        traegerorganisation: traegerorganisation.as_deref(),
+                    },
+                    benutzer.id,
+                )
+                .await?
+            }
+        };
+        let anzeige = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            benutzer.id,
+            startwert,
+            &format!("Fahrzeug «{}» disponiert", anzeige.funkrufname),
+        )
+        .await?;
+        Ok(anzeige)
+    })?;
+    sse_fahrzeug(&state, einsatz_id, anzeige.id);
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
 
@@ -192,24 +227,36 @@ pub async fn aktualisieren(
     // unverändert lassen (COALESCE im Repo). Daher NICHT über `trimme` zu None kollabieren,
     // sonst ließe sich eine Bemerkung nie löschen.
     let bemerkung = body.bemerkung.as_deref().map(str::trim);
-    disposition_repo::aktualisiere(&state.pool, einsatz_id, ef_id, body.status_id, bemerkung)
-        .await?;
-    let nachher = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ef_id, true).await?;
 
-    if vorher.status_id != nachher.status_id {
-        let alt = vorher.status_label.as_deref().unwrap_or("—");
-        let neu = nachher.status_label.as_deref().unwrap_or("—");
-        super::etb_system_degradiert(
-            &state,
-            einsatz_id,
-            benutzer.id,
-            &format!(
-                "Fahrzeug «{}»: Status «{}» → «{}»",
-                nachher.funkrufname, alt, neu
-            ),
-        )
-        .await?;
-    }
+    // F06/LFH-244 Tier-A: Update + (bedingter) System-ETB atomar in EINER Tx. Der ETB-Text
+    // braucht die frische Anzeige (neues Status-Label) → In-Tx-Reload. Der Vorzustand
+    // (status_id/-label) stammt aus dem Vorlade-`vorher`. SSE erst nach dem Commit.
+    let vorher_status_id = vorher.status_id;
+    let vorher_status_label = vorher.status_label.clone();
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    let nachher = crate::write_retry!(&state.pool, |conn| {
+        disposition_repo::aktualisiere_tx(conn, einsatz_id, ef_id, body.status_id, bemerkung)
+            .await?;
+        let nachher = disposition_repo::laden_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
+        if vorher_status_id != nachher.status_id {
+            let alt = vorher_status_label.as_deref().unwrap_or("—");
+            let neu = nachher.status_label.as_deref().unwrap_or("—");
+            crate::etb::system_audit_tx(
+                conn,
+                einsatz_id,
+                benutzer.id,
+                startwert,
+                &format!(
+                    "Fahrzeug «{}»: Status «{}» → «{}»",
+                    nachher.funkrufname, alt, neu
+                ),
+            )
+            .await?;
+        }
+        Ok(nachher)
+    })?;
     sse_fahrzeug(&state, einsatz_id, ef_id);
     Ok(Json(nachher))
 }
@@ -234,17 +281,20 @@ pub async fn entfernen(
     fordere_aktiv(&einsatz)?;
 
     let anzeige = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ef_id, true).await?;
-    disposition_repo::entferne(&state.pool, einsatz_id, ef_id).await?;
-    super::etb_system_degradiert(
-        &state,
-        einsatz_id,
-        benutzer.id,
-        &format!(
-            "Fahrzeug «{}» aus dem Einsatz entfernt",
-            anzeige.funkrufname
-        ),
-    )
-    .await?;
+    // F06/LFH-244 Tier-A: Besatzungs-Freigabe + DELETE + System-ETB atomar in EINER Tx.
+    // Der ETB-Text ist aus dem Vorlade-`anzeige` (funkrufname) VOR der Tx berechenbar.
+    let text = format!(
+        "Fahrzeug «{}» aus dem Einsatz entfernt",
+        anzeige.funkrufname
+    );
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    crate::write_retry!(&state.pool, |conn| {
+        disposition_repo::entferne_tx(conn, einsatz_id, ef_id).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        Ok(())
+    })?;
     sse_fahrzeug(&state, einsatz_id, ef_id);
     Ok(StatusCode::NO_CONTENT)
 }
@@ -269,20 +319,29 @@ pub async fn besatzung_zuordnen(
     .await?;
     fordere_aktiv(&einsatz)?;
 
-    let person = besatzung_repo::ordne_besatzung_zu(&state.pool, einsatz_id, ef_id, ep_id).await?;
+    // Vorladen: aufgelöste Fahrzeug-Anzeige für den ETB-Text (funkrufname ist über die
+    // Besatzungs-Zuordnung stabil). F06/LFH-244 Tier-A: Zuordnung + System-ETB atomar in EINER Tx.
     let fahrzeug =
         disposition_repo::laden_anzeige(&state.pool, einsatz_id, ef_id, einsatz.ist_aktiv())
             .await?;
-    super::etb_system_degradiert(
-        &state,
-        einsatz_id,
-        benutzer.id,
-        &format!(
-            "Fahrzeug «{}»: «{}» als Besatzung zugeordnet",
-            fahrzeug.funkrufname, person
-        ),
-    )
-    .await?;
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    crate::write_retry!(&state.pool, |conn| {
+        let person = besatzung_repo::ordne_besatzung_zu_tx(conn, einsatz_id, ef_id, ep_id).await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            benutzer.id,
+            startwert,
+            &format!(
+                "Fahrzeug «{}»: «{}» als Besatzung zugeordnet",
+                fahrzeug.funkrufname, person
+            ),
+        )
+        .await?;
+        Ok(())
+    })?;
     sse_fahrzeug(&state, einsatz_id, ef_id);
     sse_personal(&state, einsatz_id, ep_id);
     Ok(StatusCode::NO_CONTENT)
@@ -308,20 +367,29 @@ pub async fn besatzung_freigeben(
     .await?;
     fordere_aktiv(&einsatz)?;
 
-    let person = besatzung_repo::gib_besatzung_frei(&state.pool, einsatz_id, ef_id, ep_id).await?;
+    // Vorladen: aufgelöste Fahrzeug-Anzeige für den ETB-Text (funkrufname ist über die
+    // Besatzungs-Freigabe stabil). F06/LFH-244 Tier-A: Freigabe + System-ETB atomar in EINER Tx.
     let fahrzeug =
         disposition_repo::laden_anzeige(&state.pool, einsatz_id, ef_id, einsatz.ist_aktiv())
             .await?;
-    super::etb_system_degradiert(
-        &state,
-        einsatz_id,
-        benutzer.id,
-        &format!(
-            "Fahrzeug «{}»: «{}» aus der Besatzung freigegeben",
-            fahrzeug.funkrufname, person
-        ),
-    )
-    .await?;
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    crate::write_retry!(&state.pool, |conn| {
+        let person = besatzung_repo::gib_besatzung_frei_tx(conn, einsatz_id, ef_id, ep_id).await?;
+        crate::etb::system_audit_tx(
+            conn,
+            einsatz_id,
+            benutzer.id,
+            startwert,
+            &format!(
+                "Fahrzeug «{}»: «{}» aus der Besatzung freigegeben",
+                fahrzeug.funkrufname, person
+            ),
+        )
+        .await?;
+        Ok(())
+    })?;
     sse_fahrzeug(&state, einsatz_id, ef_id);
     sse_personal(&state, einsatz_id, ep_id);
     Ok(StatusCode::NO_CONTENT)
