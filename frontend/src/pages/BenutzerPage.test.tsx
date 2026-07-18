@@ -30,7 +30,8 @@ describe('BenutzerPage', () => {
       </AuthProvider>,
       { route: '/admin/benutzer' },
     );
-    expect(await screen.findByRole('heading', { name: 'Admin' })).toBeInTheDocument();
+    // Benutzername-Zelle (@admin) ist eindeutig — der Name „Admin" kollidiert sonst mit dem Rollen-Tag.
+    expect(await screen.findByText('@admin')).toBeInTheDocument();
   });
 
   it('legt einen neuen Benutzer an', async () => {
@@ -98,7 +99,7 @@ describe('BenutzerPage', () => {
       { route: '/admin/benutzer' },
     );
 
-    const evaItem = (await screen.findByText('Eva')).closest('li') as HTMLElement;
+    const evaItem = (await screen.findByText('Eva')).closest('tr') as HTMLElement;
     await userEvent.click(within(evaItem).getByRole('button', { name: 'Bearbeiten' }));
 
     const input = await screen.findByLabelText('Anzeigename');
@@ -146,14 +147,16 @@ describe('BenutzerPage', () => {
       { route: '/admin/benutzer' },
     );
 
-    const evaItem = (await screen.findByText('Eva')).closest('li') as HTMLElement;
+    const evaItem = (await screen.findByText('Eva')).closest('tr') as HTMLElement;
     // Deaktivierter Nutzer zeigt keinen Deaktivieren-Button, aber Reaktivieren.
     await userEvent.click(within(evaItem).getByRole('button', { name: 'Reaktivieren' }));
 
     await waitFor(() => expect(patchBody).toEqual({ aktiv: true }));
-    await waitFor(() =>
-      expect(within(evaItem).queryByText('deaktiviert')).not.toBeInTheDocument(),
-    );
+    // Nach dem Refetch rendert die Tabelle neu — Zeile frisch holen statt stale Referenz.
+    await waitFor(() => {
+      const zeile = screen.getByText('Eva').closest('tr') as HTMLElement;
+      expect(within(zeile).queryByText('deaktiviert')).not.toBeInTheDocument();
+    });
   });
 
   it('sperrt beim Reaktivieren nur die geklickte Zeile, nicht alle', async () => {
@@ -188,8 +191,8 @@ describe('BenutzerPage', () => {
       { route: '/admin/benutzer' },
     );
 
-    const evaItem = (await screen.findByText('Eva')).closest('li') as HTMLElement;
-    const maxItem = (await screen.findByText('Max')).closest('li') as HTMLElement;
+    const evaItem = (await screen.findByText('Eva')).closest('tr') as HTMLElement;
+    const maxItem = (await screen.findByText('Max')).closest('tr') as HTMLElement;
     await userEvent.click(within(evaItem).getByRole('button', { name: 'Reaktivieren' }));
     // Trotz laufender erster Reaktivierung muss die zweite Zeile klickbar bleiben.
     await userEvent.click(within(maxItem).getByRole('button', { name: 'Reaktivieren' }));

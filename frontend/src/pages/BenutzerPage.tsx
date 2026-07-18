@@ -1,6 +1,5 @@
-import { App, Button, Form, Input, Modal, Popconfirm, Space, Tag } from 'antd';
+import { App, Button, Form, Input, Modal, Popconfirm, Space, Table, Tag, type TableColumnsType } from 'antd';
 import { Select } from '../components/Select';
-import { Liste, ListenEintrag, ListenEintragMeta } from '../components/Liste';
 import AdminPage from '../components/AdminPage';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -75,6 +74,58 @@ export default function BenutzerPage() {
     return <Navigate to="/einsaetze" replace />;
   }
 
+  const spalten: TableColumnsType<BenutzerAnzeige> = [
+    { title: 'Name', dataIndex: 'anzeigename', key: 'anzeigename' },
+    { title: 'Benutzername', dataIndex: 'benutzername', key: 'benutzername', render: (t) => `@${t}` },
+    {
+      title: 'Rollen',
+      key: 'rollen',
+      render: (_, b) => (
+        <Space size={4}>
+          {b.system_rolle === 'admin' && <Tag color="gold">Admin</Tag>}
+          {b.org_rolle === 'fuehrungskraft' && <Tag color="blue">Führungskraft</Tag>}
+          {b.system_rolle !== 'admin' && b.org_rolle !== 'fuehrungskraft' && <Tag>Benutzer</Tag>}
+        </Space>
+      ),
+    },
+    {
+      title: 'Status',
+      key: 'status',
+      render: (_, b) => (b.aktiv ? <Tag color="green">aktiv</Tag> : <Tag>deaktiviert</Tag>),
+    },
+    {
+      title: 'Aktionen',
+      key: 'aktionen',
+      render: (_, b) => (
+        <Space>
+          <Button size="small" onClick={() => setZuBearbeiten(b)}>
+            Bearbeiten
+          </Button>
+          {b.aktiv ? (
+            <Popconfirm
+              title="Benutzer deaktivieren?"
+              okText="Ja"
+              cancelText="Abbrechen"
+              onConfirm={() => deaktivieren.mutate(b.id)}
+            >
+              <Button size="small" danger>
+                Deaktivieren
+              </Button>
+            </Popconfirm>
+          ) : (
+            <Button
+              size="small"
+              loading={bearbeiten.isPending && bearbeiten.variables?.id === b.id}
+              onClick={() => bearbeiten.mutate({ id: b.id, patch: { aktiv: true } })}
+            >
+              Reaktivieren
+            </Button>
+          )}
+        </Space>
+      ),
+    },
+  ];
+
   return (
     <AdminPage
       titel="Benutzer"
@@ -85,55 +136,13 @@ export default function BenutzerPage() {
         </Button>
       }
     >
-      <Liste
+      <Table
+        rowKey="id"
         loading={isLoading}
-        bordered
-        rowKey={(b) => b.id}
         dataSource={benutzerListe}
-        renderItem={(b: BenutzerAnzeige) => (
-          <ListenEintrag
-            actions={[
-              <Button key="bearbeiten" type="link" size="small" onClick={() => setZuBearbeiten(b)}>
-                Bearbeiten
-              </Button>,
-              b.aktiv ? (
-                <Popconfirm
-                  key="deaktivieren"
-                  title="Benutzer deaktivieren?"
-                  okText="Ja"
-                  cancelText="Abbrechen"
-                  onConfirm={() => deaktivieren.mutate(b.id)}
-                >
-                  <Button type="link" danger size="small">
-                    Deaktivieren
-                  </Button>
-                </Popconfirm>
-              ) : (
-                <Button
-                  key="reaktivieren"
-                  type="link"
-                  size="small"
-                  loading={bearbeiten.isPending && bearbeiten.variables?.id === b.id}
-                  onClick={() => bearbeiten.mutate({ id: b.id, patch: { aktiv: true } })}
-                >
-                  Reaktivieren
-                </Button>
-              ),
-            ]}
-          >
-            <ListenEintragMeta
-              title={b.anzeigename}
-              description={
-                <Space>
-                  <span>@{b.benutzername}</span>
-                  {b.system_rolle === 'admin' && <Tag color="gold">Admin</Tag>}
-                  {b.org_rolle === 'fuehrungskraft' && <Tag color="blue">Führungskraft</Tag>}
-                  {!b.aktiv && <Tag>deaktiviert</Tag>}
-                </Space>
-              }
-            />
-          </ListenEintrag>
-        )}
+        columns={spalten}
+        locale={{ emptyText: 'Noch keine Benutzer' }}
+        pagination={false}
       />
 
       <Modal
