@@ -38,6 +38,37 @@ pub async fn test_pool() -> SqlitePool {
     pool
 }
 
+/// Datei-basierter SQLite-Pool mit Produktions-Parität (WAL, mehrere Verbindungen,
+/// `busy_timeout`) für Nebenläufigkeits-/Locking-Tests (F28/LFH-246). Anders als
+/// [`test_pool`] (`:memory:`, eine Verbindung, kein WAL) macht diese Variante die
+/// Write-Contention-/`SQLITE_BUSY`-Fehlerklasse überhaupt sichtbar.
+///
+/// Gibt den `TempDir`-Guard MIT zurück: fällt er aus dem Scope, verschwinden
+/// `.db` + `-wal` + `-shm`. Der Aufrufer MUSS ihn halten (`let (_dir, pool) = …`,
+/// nicht `let (_, pool)`), sonst reißt Drop die Datei mitten im Test weg.
+///
+/// Bewusst nur für die wenigen nebenläufigkeitskritischen Tests gedacht — die ~250
+/// bestehenden [`test_pool`]-Tests bleiben unangetastet (Datei + `multi_thread` ist teurer).
+pub async fn test_pool_datei() -> (tempfile::TempDir, SqlitePool) {
+    let dir = tempfile::tempdir().expect("Temp-Verzeichnis");
+    let path = dir.path().join("test.db");
+    let options = SqliteConnectOptions::new()
+        .filename(&path)
+        .create_if_missing(true)
+        .journal_mode(SqliteJournalMode::Wal)
+        .busy_timeout(std::time::Duration::from_secs(5))
+        .foreign_keys(true);
+
+    let pool = SqlitePoolOptions::new()
+        .max_connections(5)
+        .connect_with(options)
+        .await
+        .expect("Datei-Pool");
+
+    migrate(&pool).await.expect("Migrationen einspielen");
+    (dir, pool)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -73,6 +104,68 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(value, "1");
+    }
+
+    #[tokio::test]
+    async fn test_pool_datei_ist_wal_und_haelt_mehrere_verbindungen() {
+        // Prod-Parität (F28/LFH-246): WAL an, und >1 Verbindung gleichzeitig haltbar —
+        // genau das, was test_pool() (:memory:, max_connections(1)) NICHT kann und
+        // weshalb die Nebenläufigkeits-Fehlerklasse dort strukturell unsichtbar ist.
+        let (_dir, pool) = test_pool_datei().await;
+
+        let mut conn_a = pool.acquire().await.expect("erste Verbindung");
+        let mut conn_b = pool
+            .acquire()
+            .await
+            .expect("zweite Verbindung gleichzeitig");
+
+        let journal: String = sqlx::query_scalar("PRAGMA journal_mode;")
+            .fetch_one(&mut *conn_a)
+            .await
+            .unwrap();
+        assert_eq!(journal.to_lowercase(), "wal");
+        // Beide Verbindungen sind wirklich gleichzeitig nutzbar (kein max_connections(1)-Block):
+        let eins: i64 = sqlx::query_scalar("SELECT 1")
+            .fetch_one(&mut *conn_b)
+            .await
+            .unwrap();
+        assert_eq!(eins, 1);
+    }
+
+    #[tokio::test]
+    async fn test_pool_datei_deckt_read_then_write_busy_auf() {
+        // Harness-Selbstcheck (F28): auf der Datei-/WAL-Konfiguration wird die
+        // read-then-write-Upgrade-Kollision als SQLITE_BUSY sichtbar — die Klasse, die
+        // F09 (LFH-240) behebt und die test_pool() prinzipbedingt nicht zeigen kann.
+        let (_dir, pool) = test_pool_datei().await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Halter')")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        // Writer B hält den WAL-Write-Lock (BEGIN IMMEDIATE + realer Write).
+        let mut tx_b = pool.begin_with("BEGIN IMMEDIATE").await.unwrap();
+        sqlx::query("UPDATE organisation SET name = 'B' WHERE id = 1")
+            .execute(&mut *tx_b)
+            .await
+            .unwrap();
+
+        // Reader→Writer A: deferred BEGIN, erst SELECT (Read-Snapshot), dann Write →
+        // Upgrade unter gehaltenem Writer ⇒ sofortiges SQLITE_BUSY (der busy_timeout
+        // greift beim Lock-Upgrade prinzipbedingt nicht, sqlx-sqlite options/mod.rs:181).
+        let mut tx_a = pool.begin().await.unwrap();
+        let _: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM organisation")
+            .fetch_one(&mut *tx_a)
+            .await
+            .unwrap();
+        let res = sqlx::query("UPDATE organisation SET name = 'A' WHERE id = 1")
+            .execute(&mut *tx_a)
+            .await;
+
+        assert!(
+            res.is_err(),
+            "read-then-write-Upgrade unter gehaltenem Writer muss BUSY liefern, nicht still gelingen"
+        );
     }
 
     #[tokio::test]
