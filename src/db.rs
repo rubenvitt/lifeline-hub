@@ -1692,17 +1692,17 @@ mod tests {
         }
     }
 
-    // --- Migration 0088: auftrag_empfaenger.* FK → ON DELETE SET NULL (LFH-237 / F08) ---
+    // --- Migration 0089: auftrag_empfaenger.* FK → ON DELETE SET NULL (LFH-237 / F08) ---
     //
     // Die vier Dispositions-FKs (abschnitt_id/einheit_id/person_id/fahrzeug_id) trugen bis 0057
     // keine ON-DELETE-Aktion → das Hard-Delete einer referenzierten Dispositions-Entität scheiterte
     // am FK und blockierte Kern-Workflows (Einheit auflösen, Person/Fahrzeug entfernen, Abschnitt
-    // auflösen). 0088 baut auftrag_empfaenger auf ON DELETE SET NULL um; snap_anzeige (NOT NULL)
+    // auflösen). 0089 baut auftrag_empfaenger auf ON DELETE SET NULL um; snap_anzeige (NOT NULL)
     // trägt die historische Anzeige weiter. Dieser Test verifiziert für alle vier Spalten: Löschen
     // der Ziel-Entität gelingt, die Empfänger-Zeile überlebt, die FK-Spalte ist NULL, snap_anzeige
     // bleibt, und der Auftrag-Bezug (auftrag_id) ist unberührt.
     #[tokio::test]
-    async fn migration_0088_auftrag_empfaenger_fk_set_null_bei_dispo_delete() {
+    async fn migration_0089_auftrag_empfaenger_fk_set_null_bei_dispo_delete() {
         let pool = test_pool().await;
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
             .execute(&pool)
@@ -1829,14 +1829,14 @@ mod tests {
         }
     }
 
-    // Deckt den Copy-Branch des 0088-Rebuilds ab (INSERT … SELECT der 13 Spalten). Auf der
-    // leeren test_pool()-DB ist auftrag_empfaenger bei 0088 leer, der Branch kopiert 0 Zeilen —
+    // Deckt den Copy-Branch des 0089-Rebuilds ab (INSERT … SELECT der 13 Spalten). Auf der
+    // leeren test_pool()-DB ist auftrag_empfaenger bei 0089 leer, der Branch kopiert 0 Zeilen —
     // ein falscher Spaltenname bliebe dort unbemerkt, während eine reale DID mit Bestandsdaten
     // still Spalten verlöre. Hier bilden wir eine befüllte Alt-DB (0057-Form) nach und wenden
     // die ECHTE Migration (include_str!) an: fehlt/verrutscht eine Spalte, wird der Test rot.
     #[tokio::test]
-    async fn migration_0088_kopiert_bestandsdaten_vollstaendig() {
-        // Isolierter Pool ohne FK-Zwang (die 0088-FKs zeigen auf hier fehlende Tabellen).
+    async fn migration_0089_kopiert_bestandsdaten_vollstaendig() {
+        // Isolierter Pool ohne FK-Zwang (die 0089-FKs zeigen auf hier fehlende Tabellen).
         let pool = SqlitePoolOptions::new()
             .max_connections(1)
             .connect_with(
@@ -1847,7 +1847,7 @@ mod tests {
             .await
             .expect("In-Memory-Pool");
 
-        // auftrag_empfaenger im 0057-Stand (Live-Form vor 0088), ohne FK-Klauseln.
+        // auftrag_empfaenger im 0057-Stand (Live-Form vor 0089), ohne FK-Klauseln.
         sqlx::query(
             "CREATE TABLE auftrag_empfaenger ( \
                 id INTEGER PRIMARY KEY, \
@@ -1862,7 +1862,7 @@ mod tests {
         .await
         .unwrap();
         // Vollständig belegte Bestandszeile — inkl. der VIER Dispositions-FKs (der Daseinsgrund
-        // von 0088). foreign_keys(false) erlaubt hier dangling FK-Werte; entscheidend ist, dass
+        // von 0089). foreign_keys(false) erlaubt hier dangling FK-Werte; entscheidend ist, dass
         // der INSERT…SELECT-Copy diese Spalten durchreicht (eine symmetrische Spalten-Auslassung
         // aus beiden Migrations-Listen würde sie sonst still auf NULL defaulten).
         sqlx::query(
@@ -1875,13 +1875,13 @@ mod tests {
         .await
         .unwrap();
 
-        // Die ECHTE Migration 0088 anwenden.
+        // Die ECHTE Migration 0089 anwenden.
         let migration =
-            include_str!("../migrations/0088_auftrag_empfaenger_on_delete_set_null.sql");
+            include_str!("../migrations/0089_auftrag_empfaenger_on_delete_set_null.sql");
         sqlx::raw_sql(migration)
             .execute(&pool)
             .await
-            .expect("0088 muss auf einer DB mit Bestandsdaten durchlaufen");
+            .expect("0089 muss auf einer DB mit Bestandsdaten durchlaufen");
 
         // Alle Spalten der Bestandszeile müssen den Rebuild verlustfrei überleben.
         #[allow(clippy::type_complexity)]
@@ -1923,7 +1923,7 @@ mod tests {
             "die Nicht-Dispo-Spalten müssen den Rebuild verlustfrei überleben"
         );
 
-        // Die VIER Dispositions-FKs + funktion_text — der Daseinsgrund von 0088 — müssen
+        // Die VIER Dispositions-FKs + funktion_text — der Daseinsgrund von 0089 — müssen
         // ebenfalls durchgereicht werden (nicht still auf NULL defaulten).
         let (ab, ei, pe, fz, fu): (
             Option<i64>,
@@ -1965,14 +1965,14 @@ mod tests {
         assert_eq!(idx, 1, "Index muss nach dem Rebuild neu angelegt sein");
     }
 
-    // --- Migration 0089: UNIQUE(einsatz_id, lfd_nr) auf meldung + auftrag (LFH-259 / F34) ---
+    // --- Migration 0090: UNIQUE(einsatz_id, lfd_nr) auf meldung + auftrag (LFH-259 / F34) ---
     //
     // etb/person/tier/schaden trugen UNIQUE(einsatz_id, nr), meldung/auftrag nicht — die
     // server-autoritative, lückenlose lfd_nr war dort nur code-seitig gesichert. Ein Bug in
     // einem internen Schreibpfad könnte still doppelte Nummern persistieren; die Anzeige-Nummer
     // ist aber das operative Referenzmittel im Sprechfunk. 0089 zieht den UNIQUE-Index nach.
     #[tokio::test]
-    async fn migration_0089_meldung_lfd_nr_unique_je_einsatz() {
+    async fn migration_0090_meldung_lfd_nr_unique_je_einsatz() {
         let pool = test_pool().await;
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
             .execute(&pool)
@@ -2025,7 +2025,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn migration_0089_auftrag_lfd_nr_unique_je_einsatz_mit_null_bestand() {
+    async fn migration_0090_auftrag_lfd_nr_unique_je_einsatz_mit_null_bestand() {
         let pool = test_pool().await;
         sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga')")
             .execute(&pool)
