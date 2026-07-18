@@ -1,12 +1,11 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { lazy, Suspense } from 'react';
+import { Fragment, lazy, Suspense } from 'react';
 import type { ReactElement } from 'react';
 import RequireAuth from './routes/RequireAuth';
 import AppLayout from './components/AppLayout';
 import LoginPage from './pages/LoginPage';
 import EinsaetzePage from './pages/EinsaetzePage';
 import BenutzerPage from './pages/BenutzerPage';
-import StammdatenPage from './pages/StammdatenPage';
 import ProfilPage from './pages/ProfilPage';
 import EtbPage from './pages/EtbPage';
 import ChatPage from './pages/ChatPage';
@@ -39,8 +38,7 @@ import UhsDetailPage from './pages/uhs/UhsDetailPage';
 import BereitstellungsraeumePage from './pages/bereitstellungsraum/BereitstellungsraeumePage';
 import BrDetailPage from './pages/bereitstellungsraum/BrDetailPage';
 import AdminLayout from './admin/AdminLayout';
-import GlobalEinstellungenPage from './pages/GlobalEinstellungenPage';
-import KartenVerwaltungPage from './karten/KartenVerwaltungPage';
+import { adminGruppen, adminBenutzerPfad, defaultAdminPfad, ersteSektionPfad } from './admin/adminNav';
 import EinsatzLayout from './einsatz/EinsatzLayout';
 import DefaultModulRedirect from './einsatz/DefaultModulRedirect';
 import ModulRedirect from './einsatz/ModulRedirect';
@@ -99,15 +97,23 @@ export default function App() {
         {/* Ebene 1 — globale Shell */}
         <Route element={<AppLayout />}>
           <Route path="/einsaetze" element={<EinsaetzePage />} />
-          <Route path="/benutzer" element={<BenutzerPage />} />
+          {/* Benutzer-Verwaltung wohnt jetzt in der Admin-Sidebar; Alt-Link bleibt als Redirect. */}
+          <Route path="/benutzer" element={<Navigate to={adminBenutzerPfad()} replace />} />
           {/* Alt-Route bleibt für externe Links / EinsatzSwitcher erhalten */}
           <Route path="/stammdaten" element={<Navigate to="/admin/stammdaten" replace />} />
           <Route path="/profil" element={<ProfilPage />} />
           <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<Navigate to="/admin/stammdaten" replace />} />
-            <Route path="stammdaten" element={<StammdatenPage />} />
-            <Route path="einstellungen" element={<GlobalEinstellungenPage />} />
-            <Route path="karten" element={<KartenVerwaltungPage />} />
+            <Route index element={<Navigate to={defaultAdminPfad()} replace />} />
+            {adminGruppen.map((g) => (
+              <Fragment key={g.key}>
+                {/* Gruppen-Bare-Pfad → erste Sektion (z. B. /admin/stammdaten → …/stichworte). */}
+                <Route path={g.key} element={<Navigate to={ersteSektionPfad(g.key)} replace />} />
+                {g.sektionen.map((s) => (
+                  <Route key={s.key} path={`${g.key}/${s.key}`} element={s.element} />
+                ))}
+              </Fragment>
+            ))}
+            <Route path="benutzer" element={<BenutzerPage />} />
           </Route>
         </Route>
         {/* Ebene 2 — Einsatz-Workspace */}

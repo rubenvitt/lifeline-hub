@@ -74,3 +74,28 @@ bei einem rcgen-self-signed-Cert (nicht nötig, wenn mkcert bzw. dessen Root-CA
 lokal vertrauenswürdig ist). Der automatisierte Test-Doku-Platzhalter dazu
 liegt in `tests/tls_smoke.rs` (`#[ignore]`, da er einen laufenden `--tls`-
 Prozess + Port + Cert braucht und daher nicht Teil der Unit-Suite ist).
+
+## `--tls` hebt das Multi-Tab-Verbindungslimit auf (HTTP/2, F21/LFH-264)
+
+`--tls` handelt per ALPN **HTTP/2** aus. HTTP/2 multiplext alle Requests über
+**eine** TCP-Verbindung — damit entfällt das Browser-Limit von ~6 HTTP/1.1-
+Verbindungen je Origin.
+
+Warum das im Lagezentrum wichtig ist: im Klartext-HTTP-Betrieb (ohne `--tls`)
+spricht der Browser nur HTTP/1.1. Öffnet ein Profil mehrere App-Fenster
+(Lagekarte am Beamer, ETB, Kräfteübersicht, ggf. ein zweiter Einsatz), hält
+jedes Fenster eine langlebige SSE-Verbindung. Ab dem ~6.–7. Fenster sind alle
+Origin-Slots belegt und **jeder weitere Request (Mutation, Refetch, auch der
+von SSE-Events ausgelöste Invalidate-Refetch) hängt** — genau unter Last kippt
+das Live-System in den Totalstau.
+
+**Empfehlung:** Für Setups mit mehreren gleichzeitigen App-Fenstern `--tls`
+betreiben (oder einen Reverse-Proxy mit HTTP/2-Terminierung vorschalten). Dann
+teilen sich beliebig viele Tabs/Fenster dieselbe multiplexte h2-Verbindung.
+
+**Rest-Lücke (offen, LFH-264):** Für reine **Klartext-HTTP-LAN**-Deployments
+ohne TLS greift diese Mitigation nicht. Dort bleibt als Ausbaustufe das
+Tab-übergreifende Teilen EINER `EventSource` (SharedWorker bzw. Leader-Election
+via Web Locks API + BroadcastChannel) offen — siehe `useEinsatzLiveStream`.
+Intra-Tab ist bereits auf genau eine EventSource konsolidiert (LFH-207/122),
+sodass ein einzelnes Fenster nie mehr als eine SSE-Verbindung hält.

@@ -6,8 +6,8 @@
 //! modul-spezifischen `sse_*`-Notify-Wrapper bleiben bewusst lokal (unterscheiden sich in
 //! Event-Name und Payload-Keys).
 
-use crate::live::LiveNachricht;
-use axum::http::{header, HeaderMap};
+use crate::live::{LiveNachricht, Replay};
+use axum::http::{header, HeaderMap, HeaderName};
 use axum::response::sse::Event;
 use serde::Deserialize;
 use std::convert::Infallible;
@@ -66,11 +66,41 @@ pub fn sse_event_stream(
 ) -> impl Stream<Item = Result<Event, Infallible>> {
     BroadcastStream::new(rx).map(|res| {
         let event = match res {
-            Ok(n) => Event::default().event(n.event).data(n.data),
+            // `.id(...)` setzt die SSE-`id:`-Zeile → der Browser schickt sie beim
+            // Auto-Reconnect als `Last-Event-ID` zurück (F14/LFH-263).
+            Ok(n) => Event::default().id(n.id).event(n.event).data(n.data),
             Err(_) => Event::default().event("lagged").data("resync"),
         };
         Ok::<Event, Infallible>(event)
     })
+}
+
+/// Liest den `Last-Event-ID`-Request-Header (roh) für den Replay-Resync (F14/LFH-263).
+/// Der Browser sendet ihn beim EventSource-Auto-Reconnect automatisch mit.
+pub fn last_event_id(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get(HeaderName::from_static("last-event-id"))
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string())
+}
+
+/// Baut den SSE-Ausgabe-Stream mit vorangestelltem Replay (F14/LFH-263): verpasste
+/// Nachrichten (`Replay::Events`) werden VOR dem Live-Kanal ausgeliefert; eine `Luecke`
+/// (Ring-Overflow / Neustart) sendet genau ein `lagged`/`resync`-Signal (Client resynct per
+/// GET); ohne Replay (`Keine`) nur der Live-Kanal.
+pub fn sse_stream_mit_replay(
+    replay: Replay,
+    rx: Receiver<LiveNachricht>,
+) -> impl Stream<Item = Result<Event, Infallible>> {
+    let prefix: Vec<Result<Event, Infallible>> = match replay {
+        Replay::Keine => Vec::new(),
+        Replay::Events(nachrichten) => nachrichten
+            .into_iter()
+            .map(|n| Ok(Event::default().id(n.id).event(n.event).data(n.data)))
+            .collect(),
+        Replay::Luecke => vec![Ok(Event::default().event("lagged").data("resync"))],
+    };
+    tokio_stream::iter(prefix).chain(sse_event_stream(rx))
 }
 
 #[cfg(test)]
@@ -130,5 +160,47 @@ mod tests {
         assert!(!if_none_match_matcht(&inm("\"deadbeef\""), &etag));
         // Fehlender Header.
         assert!(!if_none_match_matcht(&HeaderMap::new(), &etag));
+    }
+
+    #[test]
+    fn last_event_id_liest_header_oder_none() {
+        let mut h = HeaderMap::new();
+        assert_eq!(last_event_id(&h), None);
+        h.insert(
+            HeaderName::from_static("last-event-id"),
+            "42-7".parse().unwrap(),
+        );
+        assert_eq!(last_event_id(&h), Some("42-7".to_string()));
+    }
+
+    #[tokio::test]
+    async fn sse_stream_mit_replay_praefixt_nach_replay_art() {
+        // Sender fallen lassen → der Live-Kanal endet sofort, wir sehen nur das Prefix.
+        fn leerer_rx() -> Receiver<LiveNachricht> {
+            let (tx, rx) = tokio::sync::broadcast::channel::<LiveNachricht>(4);
+            drop(tx);
+            rx
+        }
+        let n = |id: &str| LiveNachricht {
+            id: id.into(),
+            event: "etb".into(),
+            data: "x".into(),
+        };
+
+        let keine: Vec<_> = sse_stream_mit_replay(Replay::Keine, leerer_rx())
+            .collect()
+            .await;
+        assert_eq!(keine.len(), 0, "Keine → kein Prefix");
+
+        let events: Vec<_> =
+            sse_stream_mit_replay(Replay::Events(vec![n("1-1"), n("1-2")]), leerer_rx())
+                .collect()
+                .await;
+        assert_eq!(events.len(), 2, "Events → je verpasste Nachricht ein Event");
+
+        let luecke: Vec<_> = sse_stream_mit_replay(Replay::Luecke, leerer_rx())
+            .collect()
+            .await;
+        assert_eq!(luecke.len(), 1, "Luecke → genau ein lagged/resync-Event");
     }
 }

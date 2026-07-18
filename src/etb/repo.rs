@@ -79,6 +79,106 @@ pub async fn anlegen(
     laden(pool, id).await
 }
 
+/// Legt einen client-erfassten ETB-Eintrag idempotent an (F03/LFH-261).
+///
+/// Trägt der Aufrufer eine `client_id` (client-generierte UUID der Offline-/Direkterfassung),
+/// dedupliziert diese Funktion gegen `UNIQUE(einsatz_id, client_id)`: ein erneutes Senden
+/// desselben Eintrags — Retry nach verlorener Antwort, Doppel-Flush aus zwei Tabs — liefert
+/// die BESTEHENDE Antwort zurück, statt eine Dublette mit neuer `lfd_nr` zu erzeugen. Rückgabe
+/// `(anzeige, war_neu)`; bei `war_neu = false` (idempotenter Replay) unterdrückt der Aufrufer
+/// das Live-Event, damit kein doppeltes SSE-Signal für denselben Eintrag entsteht.
+///
+/// Ohne `client_id` (kein Idempotenzschlüssel) ist es ein normaler Insert (`anlegen`),
+/// immer `war_neu = true`.
+pub async fn anlegen_idempotent(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    erfasser_id: i64,
+    client_id: Option<&str>,
+    daten: EintragDaten<'_>,
+) -> Result<(EtbEintragAnzeige, bool), AppError> {
+    let Some(cid) = client_id else {
+        return Ok((anlegen(pool, einsatz_id, erfasser_id, daten).await?, true));
+    };
+
+    // Schneller Replay-Pfad: Eintrag mit dieser client_id existiert schon.
+    if let Some(id) = bestehende_client_id(pool, einsatz_id, cid).await? {
+        return Ok((laden(pool, id).await?, false));
+    }
+
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    let mut conn = pool.acquire().await?;
+    match insert_mit_client_id(&mut conn, einsatz_id, erfasser_id, startwert, cid, &daten).await {
+        Ok(id) => {
+            drop(conn);
+            Ok((laden(pool, id).await?, true))
+        }
+        // Race: ein konkurrenter Flush hat dieselbe client_id zwischen SELECT und INSERT
+        // eingefügt → exactly-once. Wir liefern den bestehenden Eintrag (war_neu=false).
+        Err(sqlx::Error::Database(db)) if db.is_unique_violation() => {
+            drop(conn);
+            match bestehende_client_id(pool, einsatz_id, cid).await? {
+                Some(id) => Ok((laden(pool, id).await?, false)),
+                None => Err(sqlx::Error::Database(db).into()),
+            }
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// id des Eintrags mit dieser `(einsatz_id, client_id)`, falls vorhanden.
+async fn bestehende_client_id(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    client_id: &str,
+) -> Result<Option<i64>, AppError> {
+    sqlx::query_scalar("SELECT id FROM etb_eintrag WHERE einsatz_id = ? AND client_id = ?")
+        .bind(einsatz_id)
+        .bind(client_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(Into::into)
+}
+
+/// Wie `anlegen_tx`, bindet zusätzlich `client_id`. Liefert den rohen sqlx-Fehler,
+/// damit der Aufrufer die UNIQUE-Verletzung (Race) vom übrigen Fehlerbild trennen kann.
+async fn insert_mit_client_id(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    erfasser_id: i64,
+    startwert: i64,
+    client_id: &str,
+    daten: &EintragDaten<'_>,
+) -> Result<i64, sqlx::Error> {
+    sqlx::query_scalar(
+        "INSERT INTO etb_eintrag \
+            (einsatz_id, lfd_nr, typ, inhalt, von, an, meldeweg, veranlassung, \
+             erfasser_id, ereigniszeit, erfasst_lokal_at, berichtigt_eintrag_id, client_id) \
+         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, \
+                COALESCE(?, datetime('now')), ?, ?, ? \
+         FROM etb_eintrag WHERE einsatz_id = ? \
+         RETURNING id",
+    )
+    .bind(einsatz_id)
+    .bind(startwert)
+    .bind(daten.typ)
+    .bind(daten.inhalt)
+    .bind(daten.von)
+    .bind(daten.an)
+    .bind(daten.meldeweg)
+    .bind(daten.veranlassung)
+    .bind(erfasser_id)
+    .bind(daten.ereigniszeit)
+    .bind(daten.erfasst_lokal_at)
+    .bind(daten.berichtigt_eintrag_id)
+    .bind(client_id)
+    .bind(einsatz_id)
+    .fetch_one(&mut *conn)
+    .await
+}
+
 /// Lädt einen einzelnen Eintrag als Anzeige (inkl. Erfasser-Name).
 /// `NotFound`, wenn der Eintrag nicht existiert.
 pub async fn laden(pool: &SqlitePool, id: i64) -> Result<EtbEintragAnzeige, AppError> {
@@ -271,6 +371,112 @@ mod tests {
             erfasst_lokal_at: None,
             berichtigt_eintrag_id: None,
         }
+    }
+
+    #[tokio::test]
+    async fn anlegen_idempotent_gleiche_client_id_ist_replay_ohne_dublette() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+
+        let (e1, neu1) =
+            anlegen_idempotent(&pool, einsatz, benutzer, Some("uuid-1"), daten("Erste"))
+                .await
+                .unwrap();
+        assert!(neu1, "erster Insert ist neu");
+
+        // Retry mit derselben client_id (verlorene Antwort / Doppel-Flush) → bestehender
+        // Eintrag, KEINE Dublette, war_neu=false.
+        let (e1_wieder, neu2) =
+            anlegen_idempotent(&pool, einsatz, benutzer, Some("uuid-1"), daten("Erste"))
+                .await
+                .unwrap();
+        assert!(!neu2, "Replay derselben client_id ist nicht neu");
+        assert_eq!(e1.id, e1_wieder.id, "Replay liefert dieselbe id");
+        assert_eq!(
+            e1.lfd_nr, e1_wieder.lfd_nr,
+            "Replay liefert dieselbe lfd_nr"
+        );
+
+        let count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?")
+                .bind(einsatz)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(count, 1, "kein doppelter Eintrag trotz zweitem Aufruf");
+    }
+
+    #[tokio::test]
+    async fn anlegen_idempotent_ohne_client_id_immer_neu() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+
+        let (_e1, neu1) = anlegen_idempotent(&pool, einsatz, benutzer, None, daten("A"))
+            .await
+            .unwrap();
+        let (_e2, neu2) = anlegen_idempotent(&pool, einsatz, benutzer, None, daten("B"))
+            .await
+            .unwrap();
+        assert!(neu1 && neu2, "ohne client_id ist jeder Insert neu");
+
+        let count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?")
+                .bind(einsatz)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(count, 2, "ohne client_id kein Dedup");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn anlegen_idempotent_ist_exactly_once_unter_nebenlaeufigkeit() {
+        // Zwei Tabs flushen dieselbe client_id parallel. Je nach Interleaving greift der
+        // Schnell-SELECT ODER der UNIQUE-Race-Recovery-Zweig (SELECT-Miss → INSERT-Konflikt
+        // → Re-SELECT); das ERGEBNIS ist in beiden Faellen exactly-once: EIN Eintrag, beide
+        // Aufrufe liefern dieselbe id. WAL + busy_timeout verhindern SQLITE_BUSY-Flakiness.
+        use std::time::Duration;
+        let dir = tempfile::tempdir().unwrap();
+        let pfad = dir.path().join("race.db");
+        let opts = sqlx::sqlite::SqliteConnectOptions::new()
+            .filename(&pfad)
+            .create_if_missing(true)
+            .foreign_keys(true)
+            .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
+            .busy_timeout(Duration::from_secs(5));
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(4)
+            .connect_with(opts)
+            .await
+            .unwrap();
+        crate::db::migrate(&pool).await.unwrap();
+        let (benutzer, einsatz) = setup(&pool).await;
+
+        let p1 = pool.clone();
+        let p2 = pool.clone();
+        let t1 = tokio::spawn(async move {
+            anlegen_idempotent(&p1, einsatz, benutzer, Some("race-1"), daten("A")).await
+        });
+        let t2 = tokio::spawn(async move {
+            anlegen_idempotent(&p2, einsatz, benutzer, Some("race-1"), daten("B")).await
+        });
+        let (r1, r2) = tokio::join!(t1, t2);
+        let (e1, _) = r1.unwrap().expect("Task 1 idempotent OK");
+        let (e2, _) = r2.unwrap().expect("Task 2 idempotent OK");
+        assert_eq!(
+            e1.id, e2.id,
+            "beide parallelen Aufrufe liefern denselben Eintrag"
+        );
+
+        let count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?")
+                .bind(einsatz)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            count, 1,
+            "exactly-once: kein Duplikat trotz Nebenlaeufigkeit"
+        );
     }
 
     #[tokio::test]

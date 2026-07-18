@@ -18,6 +18,12 @@ import { EINSATZ_KEYS, EINSATZ_STREAM_EVENTS } from '../api/queryKeys';
  * einer Zone) endlos — die Mutation persistiert nie und die Karte aktualisiert nicht.
  * Diese eine Verbindung hält die Lagekarte sicher unter dem Limit.
  *
+ * Das Limit gilt jedoch pro Origin über ALLE Tabs/Fenster eines Profils, diese
+ * Konsolidierung nur pro Tab (F21/LFH-264). Mitigation für Multi-Fenster-Setups:
+ * `--tls` betreiben → der Browser handelt HTTP/2 aus (Multiplexing hebt das Limit auf,
+ * siehe `docs/betrieb-tls.md`). Für Klartext-HTTP-LAN bleibt Tab-übergreifendes Teilen
+ * EINER EventSource (SharedWorker / Web-Locks-Leader) offen (LFH-264).
+ *
  * LFH-122: Listener, Invalidierung UND der lagged-Vollabgleich werden aus dem zentralen
  * Registry `EINSATZ_STREAM_EVENTS` (siehe `api/queryKeys.ts`) ABGELEITET — statt an drei
  * Stellen (Handler-Definition, add/removeEventListener, lagged-Liste) manuell gepflegt zu
@@ -25,13 +31,23 @@ import { EINSATZ_KEYS, EINSATZ_STREAM_EVENTS } from '../api/queryKeys';
  * vergessen kann. Ausnahmen mit Seiteneffekt (`sofortmeldung`) bzw. Sonderlogik (`lagged`)
  * bleiben bewusst als expliziter Code hier.
  */
+/** Verbindungsstatus des Live-Feeds — via window-CustomEvent `lfh:live-status` an einen
+ *  sichtbaren Indikator (LiveStatusBanner im EinsatzLayout) gemeldet, damit der Hook
+ *  render-state-frei und EINE EventSource bleibt. */
+export type LiveVerbindungsStatus = 'open' | 'connecting' | 'lost';
+
+/** Exponentieller Backoff (ms) für den manuellen Reconnect, wenn der Browser aufgibt
+ *  (readyState CLOSED) und die Session noch gültig ist. */
+const RECONNECT_BACKOFF_MS = [1000, 3000, 10000, 30000];
+
 export function useEinsatzLiveStream(einsatzId: number): void {
   const qc = useQueryClient();
   useEffect(() => {
     if (!Number.isFinite(einsatzId)) return;
-    const quelle = new EventSource(`/api/einsaetze/${einsatzId}/etb/stream`);
     const inval = (key: string) => qc.invalidateQueries({ queryKey: [key, einsatzId] });
     const invalAlle = (keys: readonly string[]) => keys.forEach(inval);
+    const meldeStatus = (status: LiveVerbindungsStatus) =>
+      window.dispatchEvent(new CustomEvent('lfh:live-status', { detail: { status } }));
 
     // Aus dem Registry abgeleitet: je Wire-Event ein Handler, der die deklarierten Keys
     // invalidiert.
@@ -87,10 +103,80 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     };
     listeners.push(['erinnerung', onErinnerung as EventListener]);
 
-    listeners.forEach(([event, handler]) => quelle.addEventListener(event, handler));
+    // Reconnect-Resync + sichtbarer Fehlerpfad (F14/LFH-263):
+    // - `ersterOpen` ist EFFEKT-lokal (kein useRef): pro Verbindung/Mount neu, sonst würde ein
+    //   StrictMode-/e2e-Doppelmount den Erst-Open des zweiten Mounts fälschlich als Reconnect
+    //   invalidieren. Erst-Open = frischer GET hat die Lage schon → kein Voll-Invalidate; jeder
+    //   FOLGE-Open (Browser-Auto-Reconnect ODER manueller Reconnect) resynct wie `lagged`.
+    // - `onerror` bei readyState CONNECTING → der Browser reconnectet selbst (nur Status melden);
+    //   bei CLOSED hat der Browser aufgegeben (typisch non-200, z. B. 401) → Auth proben und
+    //   entweder in den Login-Flow (401) oder per Backoff manuell neu verbinden.
+    let ersterOpen = true;
+    let abgebrochen = false;
+    let backoffStufe = 0;
+    let backoffTimer: ReturnType<typeof setTimeout> | null = null;
+    let aktuelle: EventSource | null = null;
+
+    const probeUndReconnect = async (tote: EventSource) => {
+      if (abgebrochen) return;
+      let sessionGueltig = true;
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
+        if (res.status === 401) sessionGueltig = false;
+      } catch {
+        // Netzfehler bei der Probe → Session-Status unbekannt, wie gültig behandeln und
+        // per Backoff weiter versuchen (der nächste Reconnect deckt einen echten 401 auf).
+      }
+      if (abgebrochen) return;
+      if (!sessionGueltig) {
+        // Session abgelaufen → der Browser reconnectet nicht selbst; Login-Flow übernimmt.
+        window.dispatchEvent(new CustomEvent('lfh:live-auth-verloren'));
+        return;
+      }
+      tote.close();
+      const wartezeit = RECONNECT_BACKOFF_MS[Math.min(backoffStufe, RECONNECT_BACKOFF_MS.length - 1)];
+      backoffStufe += 1;
+      backoffTimer = setTimeout(() => {
+        if (!abgebrochen) verbinde();
+      }, wartezeit);
+    };
+
+    const verbinde = () => {
+      const quelle = new EventSource(`/api/einsaetze/${einsatzId}/etb/stream`);
+      aktuelle = quelle;
+      listeners.forEach(([event, handler]) => quelle.addEventListener(event, handler));
+      quelle.onopen = () => {
+        meldeStatus('open');
+        backoffStufe = 0;
+        if (ersterOpen) {
+          ersterOpen = false;
+        } else {
+          // Reconnect (Browser-Auto oder manuell): verpasste Events sind möglich → Voll-Resync
+          // über alle Registry-Keys, wie `lagged` (bewusst ohne Ton).
+          invalAlle(alleKeys);
+        }
+      };
+      quelle.onerror = () => {
+        if (quelle.readyState === EventSource.CONNECTING) {
+          meldeStatus('connecting'); // Browser reconnectet selbst
+        } else if (quelle.readyState === EventSource.CLOSED) {
+          meldeStatus('lost');
+          void probeUndReconnect(quelle);
+        }
+      };
+    };
+
+    verbinde();
+
     return () => {
-      listeners.forEach(([event, handler]) => quelle.removeEventListener(event, handler));
-      quelle.close();
+      abgebrochen = true;
+      if (backoffTimer) clearTimeout(backoffTimer);
+      if (aktuelle) {
+        listeners.forEach(([event, handler]) => aktuelle!.removeEventListener(event, handler));
+        aktuelle.onopen = null;
+        aktuelle.onerror = null;
+        aktuelle.close();
+      }
     };
   }, [einsatzId, qc]);
 }

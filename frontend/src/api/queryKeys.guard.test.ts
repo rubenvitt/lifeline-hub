@@ -110,3 +110,22 @@ describe('queryKeys-Guard (c): kein bare-Prefix-Schatten managed Keys (LFH-215)'
     ).toEqual([]);
   });
 });
+
+/**
+ * Guard (d, LFH-262/F13): das `befehl`-Wire-Event ist live angebunden.
+ *
+ * Das Backend publiziert seit LFH-64 ein `befehl`-Wire-Event (Anlegen/Ändern/Freigeben/
+ * Fortschreiben), das FE hat es aber ignoriert — Befehle (zentrales Führungsartefakt)
+ * aktualisierten im Mehrbenutzerbetrieb nicht live. Dieser Test pinnt die Anbindung.
+ */
+describe('queryKeys-Guard (d): befehl-Wire-Event ist live (LFH-262/F13)', () => {
+  it('befehl-Event invalidiert Befehls-Liste und -Detail', () => {
+    expect(EINSATZ_STREAM_EVENTS).toHaveProperty('befehl');
+    expect(EINSATZ_STREAM_EVENTS.befehl).toEqual([EINSATZ_KEYS.befehle, EINSATZ_KEYS.befehl]);
+  });
+
+  it('befehle/befehl sind nicht mehr NICHT_LIVE', () => {
+    expect(NICHT_LIVE_KEYS as readonly string[]).not.toContain(EINSATZ_KEYS.befehle);
+    expect(NICHT_LIVE_KEYS as readonly string[]).not.toContain(EINSATZ_KEYS.befehl);
+  });
+});

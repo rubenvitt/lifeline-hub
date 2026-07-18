@@ -1,28 +1,30 @@
-import { Spin, Tabs } from 'antd';
+import { Layout, Menu, Spin, theme } from 'antd';
+import type { MenuProps } from 'antd';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import type { BenutzerAnzeige } from '../api/types';
+import { adminBenutzer, adminGruppen } from './adminNav';
+
+const { Sider, Content } = Layout;
 
 /** Darf auf den Admin-Bereich zugreifen: System-Admin oder Führungskraft. */
 export function darfAdmin(b: BenutzerAnzeige | null): boolean {
   return b?.system_rolle === 'admin' || b?.org_rolle === 'fuehrungskraft';
 }
 
-const TAB_ITEMS = [
-  { key: 'stammdaten', label: 'Stammdaten' },
-  { key: 'einstellungen', label: 'Einstellungen' },
-  { key: 'karten', label: 'Karten' },
-];
-
 /**
- * Admin-Shell: Sub-Navigation (Stammdaten / Einstellungen) + Outlet.
- * Sitzt unter <AppLayout> (globale Topbar kommt von dort).
- * Gate: admin oder fuehrungskraft — sonst Redirect zu /einsaetze.
+ * Admin-Shell (LFH-284): eine linke Sidebar (gruppiertes `Menu`) als EINZIGE Nav-Ebene für
+ * `/admin` + `<Outlet>`. Löst die frühere doppelte Nav (Top-Tabs + In-Page-Umschalter) auf.
+ * Menu-Einträge und Routen stammen aus derselben `adminNav`-Registry; die aktive Sektion folgt
+ * der URL (kein eigener Nav-State). Sitzt unter <AppLayout> (globale Topbar kommt von dort).
+ * Gate: admin oder fuehrungskraft — sonst Redirect zu /einsaetze. Benutzer-Eintrag nur für
+ * System-Admins (strengeres Gate der Seite selbst bleibt zusätzlich bestehen).
  */
 export default function AdminLayout() {
   const { benutzer, laedt } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const { token } = theme.useToken();
 
   if (laedt) {
     return (
@@ -36,19 +38,40 @@ export default function AdminLayout() {
     return <Navigate to="/einsaetze" replace />;
   }
 
-  // Explizites Segment-Matching (/admin/<segment>) statt binärer startsWith-Heuristik:
-  // sonst würde /admin/karten fälschlich „Stammdaten" highlighten.
-  const segment = pathname.split('/')[2] ?? '';
-  const activeKey = TAB_ITEMS.some((t) => t.key === segment) ? segment : 'stammdaten';
+  const istSystemAdmin = benutzer?.system_rolle === 'admin';
+  // '/admin/stammdaten/fahrzeuge' → 'stammdaten/fahrzeuge'; '/admin/benutzer' → 'benutzer'.
+  const aktiv = pathname.replace(/^\/admin\/?/, '');
+
+  const items: MenuProps['items'] = [
+    ...adminGruppen.map((g) => ({
+      key: g.key,
+      type: 'group' as const,
+      label: g.label,
+      children: g.sektionen.map((s) => ({ key: `${g.key}/${s.key}`, label: s.label })),
+    })),
+    ...(istSystemAdmin ? [{ key: adminBenutzer.key, label: adminBenutzer.label }] : []),
+  ];
 
   return (
-    <div>
-      <Tabs
-        activeKey={activeKey}
-        items={TAB_ITEMS}
-        onChange={(key) => navigate(`/admin/${key}`)}
-      />
-      <Outlet />
-    </div>
+    <Layout style={{ background: 'transparent' }}>
+      <Sider
+        theme="light"
+        width={220}
+        breakpoint="lg"
+        collapsedWidth={0}
+        style={{ background: 'transparent' }}
+      >
+        <Menu
+          mode="inline"
+          items={items}
+          selectedKeys={[aktiv]}
+          onClick={({ key }) => navigate(`/admin/${key}`)}
+          style={{ background: 'transparent', borderInlineEnd: 'none' }}
+        />
+      </Sider>
+      <Content style={{ paddingInlineStart: token.paddingLG }}>
+        <Outlet />
+      </Content>
+    </Layout>
   );
 }

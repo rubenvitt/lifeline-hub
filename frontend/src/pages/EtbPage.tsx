@@ -55,7 +55,7 @@ export default function EtbPage() {
   const [wiedervorlageZu, setWiedervorlageZu] = useState<EtbEintragAnzeige | null>(null);
   const [auftragZu, setAuftragZu] = useState<EtbEintragAnzeige | null>(null);
   const [highlightId, setHighlightId] = useState<number | null>(null);
-  const { erfassen, ausstehend, abgelehnt } = useEtbErfassung(einsatzId);
+  const { erfassen, ausstehend, abgelehnt, abgelehntVerwerfen } = useEtbErfassung(einsatzId);
 
   const [searchParams, setSearchParams] = useSearchParams();
   // Schnellaktion: ?neu=1 fokussiert die angepinnte Erfassungszeile (Command-Palette, LFH-11).
@@ -224,8 +224,19 @@ export default function EtbPage() {
           title={`${abgelehnt.length} gepufferte(r) Eintrag/Einträge wurde(n) vom Server abgelehnt und NICHT gespeichert`}
           description={
             <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {abgelehnt.map((a, i) => (
-                <li key={i}>{a.eintrag.inhalt} — {a.grund}</li>
+              {abgelehnt.map((a) => (
+                <li key={a.id}>
+                  {a.eintrag.inhalt} — {a.grund}
+                  {a.id != null && (
+                    <Button
+                      type="link"
+                      size="small"
+                      onClick={() => void abgelehntVerwerfen(a.id!)}
+                    >
+                      verwerfen
+                    </Button>
+                  )}
+                </li>
               ))}
             </ul>
           }

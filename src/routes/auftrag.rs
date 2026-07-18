@@ -1,10 +1,8 @@
 use crate::app::AppState;
 use crate::auftrag::{repo, validiere_neuen_auftrag, AuftragDetail, NeuerAuftrag};
 use crate::einsatz::einstellungen;
-use crate::einsatz::kontext::EinsatzKontext;
-
-/// Modul-Key dieses Route-Moduls (LFH-132).
-const MODUL_KEY: &str = "auftraege";
+use crate::einsatz::kontext::{EinsatzKontext, EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::modul::Auftraege;
 use crate::error::AppError;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -37,11 +35,9 @@ pub struct ListeParams {
 /// GET /api/einsaetze/{id}/auftraege — Aufträge listen (Lesezugriff, auch Beobachter).
 pub async fn liste(
     State(state): State<AppState>,
-    ctx: EinsatzKontext,
+    ctx: EinsatzLesezugriff<Auftraege>,
     Query(params): Query<ListeParams>,
 ) -> Result<Json<Vec<AuftragDetail>>, AppError> {
-    ctx.fordere_lesezugriff()?;
-    ctx.fordere_modul_zugriff(&state.pool, MODUL_KEY).await?;
     let einsatz_id = ctx.einsatz.id;
 
     if params.abschnitt_id.is_some() && params.einheit_id.is_some() {
@@ -89,12 +85,9 @@ fn auftrag_default_quittierung_frist_min(
 /// POST /api/einsaetze/{id}/auftraege — Auftrag anlegen + zustellen (Schreibrecht + aktiv).
 pub async fn anlegen(
     State(state): State<AppState>,
-    ctx: EinsatzKontext,
+    ctx: EinsatzSchreibzugriff<Auftraege>,
     Json(req): Json<NeuerAuftrag>,
 ) -> Result<(StatusCode, Json<AuftragDetail>), AppError> {
-    ctx.fordere_schreibrecht()?;
-    ctx.fordere_modul_zugriff(&state.pool, MODUL_KEY).await?;
-    ctx.fordere_aktiv()?;
     let einsatz_id = ctx.einsatz.id;
 
     let now = jetzt();
@@ -149,16 +142,15 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(d)))
 }
 
-/// Gemeinsamer Vorlauf für Auftrags-Aktionen: Gates + Cross-Einsatz-Schutz.
-/// Gibt `org_id` zurück (für kommunikation_status-Schreibpfade).
-async fn fordere_bearbeitbar(
+/// Cross-Einsatz-Schutz für Auftrags-Aktionen: der Auftrag muss zu DIESEM Einsatz
+/// gehören (fremde → 404). Gibt `org_id` für die `kommunikation_status`-Schreibpfade
+/// zurück. Die Gates schreibrecht/modul/aktiv erzwingt jetzt der
+/// `EinsatzSchreibzugriff<Auftraege>`-Typ in der Handler-Signatur.
+async fn gehoert_pruefen(
     state: &AppState,
     ctx: &EinsatzKontext,
     auftrag_id: i64,
 ) -> Result<i64, AppError> {
-    ctx.fordere_schreibrecht()?;
-    ctx.fordere_modul_zugriff(&state.pool, MODUL_KEY).await?;
-    ctx.fordere_aktiv()?;
     if !repo::gehoert_zu_einsatz(&state.pool, auftrag_id, ctx.einsatz.id).await? {
         return Err(AppError::NotFound);
     }
@@ -168,10 +160,10 @@ async fn fordere_bearbeitbar(
 /// POST /api/einsaetze/{id}/auftraege/{aid}/empfaenger/{empf}/quittieren — Quittung (Achse 1).
 pub async fn quittieren(
     State(state): State<AppState>,
-    ctx: EinsatzKontext,
+    ctx: EinsatzSchreibzugriff<Auftraege>,
     Path((einsatz_id, auftrag_id, empfaenger_id)): Path<(i64, i64, i64)>,
 ) -> Result<Json<AuftragDetail>, AppError> {
-    fordere_bearbeitbar(&state, &ctx, auftrag_id).await?;
+    gehoert_pruefen(&state, &ctx, auftrag_id).await?;
     if !repo::empfaenger_gehoert_zu_auftrag(&state.pool, empfaenger_id, auftrag_id).await? {
         return Err(AppError::NotFound);
     }
@@ -206,11 +198,11 @@ pub struct VollzugReq {
 /// POST /api/einsaetze/{id}/auftraege/{aid}/vollzug — Bearbeitungsfortschritt (Achse 2).
 pub async fn vollzug(
     State(state): State<AppState>,
-    ctx: EinsatzKontext,
+    ctx: EinsatzSchreibzugriff<Auftraege>,
     Path((einsatz_id, auftrag_id)): Path<(i64, i64)>,
     Json(req): Json<VollzugReq>,
 ) -> Result<Json<AuftragDetail>, AppError> {
-    let org_id = fordere_bearbeitbar(&state, &ctx, auftrag_id).await?;
+    let org_id = gehoert_pruefen(&state, &ctx, auftrag_id).await?;
     let now = jetzt();
     match req.status.as_str() {
         "in_arbeit" => {
@@ -270,10 +262,10 @@ pub async fn vollzug(
 /// POST /api/einsaetze/{id}/auftraege/{aid}/abnehmen — Führung nimmt Vollzug ab.
 pub async fn abnehmen(
     State(state): State<AppState>,
-    ctx: EinsatzKontext,
+    ctx: EinsatzSchreibzugriff<Auftraege>,
     Path((einsatz_id, auftrag_id)): Path<(i64, i64)>,
 ) -> Result<Json<AuftragDetail>, AppError> {
-    fordere_bearbeitbar(&state, &ctx, auftrag_id).await?;
+    gehoert_pruefen(&state, &ctx, auftrag_id).await?;
     let now = jetzt();
     let aktuell = repo::laden(&state.pool, auftrag_id, &now).await?;
     if aktuell.auftrag.vollzug_status != "vollzogen" {
