@@ -8,7 +8,6 @@ use crate::einsatz::repo as einsatz_repo;
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "material";
 use crate::error::AppError;
-use crate::etb::{self, repo as etb_repo};
 use crate::material::disposition_repo::{self, AdhocDaten};
 use crate::material::{EinsatzMaterialAnzeige, MaterialStatus};
 use crate::routes::support::trimme;
@@ -16,37 +15,6 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
-
-/// Schreibt einen automatischen System-ETB-Eintrag und publiziert ihn live
-/// (identisch zu `routes::einsatz_fahrzeug::etb_system`).
-async fn etb_system(
-    state: &AppState,
-    einsatz_id: i64,
-    benutzer_id: i64,
-    inhalt: &str,
-) -> Result<(), AppError> {
-    let anzeige = etb_repo::anlegen(
-        &state.pool,
-        einsatz_id,
-        benutzer_id,
-        etb_repo::EintragDaten {
-            typ: etb::TYP_SYSTEM,
-            inhalt,
-            von: None,
-            an: None,
-            meldeweg: None,
-            veranlassung: None,
-            ereigniszeit: None,
-            erfasst_lokal_at: None,
-            berichtigt_eintrag_id: None,
-        },
-    )
-    .await?;
-    if let Ok(json) = serde_json::to_string(&anzeige) {
-        state.live.publiziere(einsatz_id, json);
-    }
-    Ok(())
-}
 
 /// SSE-Notify (Lage-Karte/Meldebild): Material-Disposition hat sich geändert.
 /// Wird unbedingt nach jeder Mutation gesendet — auch bei reinen Bemerkungs-/
@@ -163,7 +131,7 @@ pub async fn disponieren(
     };
 
     let anzeige = disposition_repo::laden_anzeige(&state.pool, einsatz_id, em_id, true).await?;
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,
@@ -243,7 +211,7 @@ pub async fn aktualisieren(
     let nachher = disposition_repo::laden_anzeige(&state.pool, einsatz_id, em_id, true).await?;
 
     if vorher.menge != nachher.menge {
-        etb_system(
+        super::etb_system_degradiert(
             &state,
             einsatz_id,
             benutzer.id,
@@ -255,7 +223,7 @@ pub async fn aktualisieren(
         .await?;
     }
     if vorher.status != nachher.status {
-        etb_system(
+        super::etb_system_degradiert(
             &state,
             einsatz_id,
             benutzer.id,
@@ -293,7 +261,7 @@ pub async fn entfernen(
 
     let anzeige = disposition_repo::laden_anzeige(&state.pool, einsatz_id, em_id, true).await?;
     disposition_repo::entferne(&state.pool, einsatz_id, em_id).await?;
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,

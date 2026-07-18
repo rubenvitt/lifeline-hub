@@ -8,7 +8,6 @@ use crate::einsatz::repo as einsatz_repo;
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "tiere";
 use crate::error::AppError;
-use crate::etb::{self, repo as etb_repo};
 use crate::person::repo as person_repo; // Org-Isolation der Halter-FK (404 bei fremder Person)
 use crate::routes::support::trimme;
 use crate::tier::{
@@ -25,37 +24,6 @@ use std::convert::Infallible;
 use tokio_stream::Stream;
 
 // ---------- ETB-/SSE-Helfer (lokales Muster wie in anderen Routen) ----------
-
-/// Schreibt einen pseudonymen System-ETB-Eintrag und publiziert ihn als `etb`-SSE.
-/// Identisch zu `routes::einsatz_person::etb_system`.
-async fn etb_system(
-    state: &AppState,
-    einsatz_id: i64,
-    benutzer_id: i64,
-    inhalt: &str,
-) -> Result<(), AppError> {
-    let anzeige = etb_repo::anlegen(
-        &state.pool,
-        einsatz_id,
-        benutzer_id,
-        etb_repo::EintragDaten {
-            typ: etb::TYP_SYSTEM,
-            inhalt,
-            von: None,
-            an: None,
-            meldeweg: None,
-            veranlassung: None,
-            ereigniszeit: None,
-            erfasst_lokal_at: None,
-            berichtigt_eintrag_id: None,
-        },
-    )
-    .await?;
-    if let Ok(json) = serde_json::to_string(&anzeige) {
-        state.live.publiziere(einsatz_id, json);
-    }
-    Ok(())
-}
 
 /// Dediziertes `tier`-SSE-Event OHNE sensible Payload (nur einsatz_id + tier_id);
 /// Clients refetchen.
@@ -235,7 +203,7 @@ pub async fn anlegen(
             spezies_label
         )
     };
-    etb_system(&state, einsatz_id, benutzer.id, &text).await?;
+    super::etb_system_degradiert(&state, einsatz_id, benutzer.id, &text).await?;
     sse_tier(&state, einsatz_id, tier.id);
     Ok((StatusCode::CREATED, Json(tier)))
 }
@@ -456,7 +424,7 @@ pub async fn status_wechsel(
         }
         _ => format!("Tier {r}: {} → {}", vorher.status.as_str(), body.status),
     };
-    etb_system(&state, einsatz_id, benutzer.id, &text).await?;
+    super::etb_system_degradiert(&state, einsatz_id, benutzer.id, &text).await?;
     sse_tier(&state, einsatz_id, tier_id);
     Ok(Json(
         tier_repo::laden(&state.pool, einsatz_id, tier_id).await?,
@@ -488,7 +456,7 @@ pub async fn stornieren(
         return Err(AppError::Conflict("Tier ist bereits storniert".into()));
     }
     tier_repo::storniere(&state.pool, einsatz_id, tier_id, benutzer.id).await?;
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,

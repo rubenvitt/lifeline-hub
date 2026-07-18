@@ -43,3 +43,39 @@ pub mod qualifikation;
 pub mod sprechgruppe;
 pub mod stichwort;
 pub mod support;
+
+use crate::app::AppState;
+use crate::error::AppError;
+
+/// Legt einen System-ETB-Eintrag DEGRADIERT an (F06/LFH-244, Tier-B): schlägt der ETB-Write
+/// NACH dem bereits committeten Domänen-Write fehl, wird der Fehler NICHT fatal propagiert
+/// (kein falscher 500) — er wird geloggt, die Domänen-Aktion samt ihres SSE-Broadcasts bleibt
+/// bestehen, nur der zusätzliche ETB-SSE entfällt. Ersetzt die 12 modul-lokalen
+/// `etb_system`-Kopien. Wo echte Atomarität gefordert ist, nutzt der Handler stattdessen
+/// [`crate::etb::system_audit_tx`] innerhalb einer `write_retry!`-Transaktion (Tier-A).
+///
+/// Rückgabe ist **immer `Ok(())`** — der ETB-Fehler wird bewusst verschluckt (nicht fatal).
+/// Das `?` an den Bestands-Aufrufstellen ist damit ein bewusster No-op (bleibt kompatibel,
+/// bis Tier-A den jeweiligen Aufruf in eine atomare `write_retry!`-Tx zieht).
+pub(crate) async fn etb_system_degradiert(
+    state: &AppState,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    inhalt: &str,
+) -> Result<(), AppError> {
+    match crate::etb::system_audit(&state.pool, einsatz_id, benutzer_id, inhalt).await {
+        Ok(anzeige) => {
+            if let Ok(json) = serde_json::to_string(&anzeige) {
+                state.live.publiziere(einsatz_id, json);
+            }
+        }
+        Err(e) => {
+            tracing::error!(
+                einsatz_id,
+                fehler = ?e,
+                "System-ETB-Eintrag fehlgeschlagen (degradiert, nicht fatal)"
+            );
+        }
+    }
+    Ok(())
+}

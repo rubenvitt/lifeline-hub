@@ -8,7 +8,6 @@ use crate::einsatz::repo as einsatz_repo;
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "unfallhilfsstellen";
 use crate::error::AppError;
-use crate::etb::{self, repo as etb_repo};
 use crate::material::disposition_repo as material_repo;
 use crate::material::EinsatzMaterialAnzeige;
 use crate::person::{registrier_anzeige, repo as person_repo};
@@ -40,37 +39,6 @@ pub struct UhsDetail {
 }
 
 // ---------- ETB-/SSE-Helfer (lokales Muster wie in anderen Routen) ----------
-
-/// Schreibt einen automatischen System-ETB-Eintrag und publiziert ihn live
-/// (identisch zu `routes::einsatz_material::etb_system`).
-async fn etb_system(
-    state: &AppState,
-    einsatz_id: i64,
-    benutzer_id: i64,
-    inhalt: &str,
-) -> Result<(), AppError> {
-    let anzeige = etb_repo::anlegen(
-        &state.pool,
-        einsatz_id,
-        benutzer_id,
-        etb_repo::EintragDaten {
-            typ: etb::TYP_SYSTEM,
-            inhalt,
-            von: None,
-            an: None,
-            meldeweg: None,
-            veranlassung: None,
-            ereigniszeit: None,
-            erfasst_lokal_at: None,
-            berichtigt_eintrag_id: None,
-        },
-    )
-    .await?;
-    if let Ok(json) = serde_json::to_string(&anzeige) {
-        state.live.publiziere(einsatz_id, json);
-    }
-    Ok(())
-}
 
 fn sse_uhs(state: &AppState, einsatz_id: i64, uhs_id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "uhs_id": uhs_id }).to_string();
@@ -404,7 +372,7 @@ pub async fn status_wechsel(
         _ => None,
     };
     if let Some(text) = etb_text {
-        etb_system(&state, einsatz_id, benutzer.id, &text).await?;
+        super::etb_system_degradiert(&state, einsatz_id, benutzer.id, &text).await?;
     }
     sse_uhs(&state, einsatz_id, uhs_id);
     Ok(Json(nachher))
@@ -779,7 +747,7 @@ pub async fn belegung(
     )
     .await?;
     if let Some(text) = text {
-        etb_system(&state, einsatz_id, benutzer.id, &text).await?;
+        super::etb_system_degradiert(&state, einsatz_id, benutzer.id, &text).await?;
     }
     sse_uhs(&state, einsatz_id, event.uhs_id);
     sse_person(&state, einsatz_id, person_id);

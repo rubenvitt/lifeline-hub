@@ -8,7 +8,6 @@ use crate::einsatz::repo as einsatz_repo;
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "schaeden";
 use crate::error::AppError;
-use crate::etb::{self, repo as etb_repo};
 use crate::person::repo as person_repo; // Org-Isolation der Geschädigt-FK (404 bei fremder Person)
 use crate::routes::support::trimme;
 use crate::schaden::{
@@ -24,35 +23,6 @@ use std::convert::Infallible;
 use tokio_stream::Stream;
 
 // ---------- ETB-/SSE-Helfer ----------
-
-async fn etb_system(
-    state: &AppState,
-    einsatz_id: i64,
-    benutzer_id: i64,
-    inhalt: &str,
-) -> Result<(), AppError> {
-    let anzeige = etb_repo::anlegen(
-        &state.pool,
-        einsatz_id,
-        benutzer_id,
-        etb_repo::EintragDaten {
-            typ: etb::TYP_SYSTEM,
-            inhalt,
-            von: None,
-            an: None,
-            meldeweg: None,
-            veranlassung: None,
-            ereigniszeit: None,
-            erfasst_lokal_at: None,
-            berichtigt_eintrag_id: None,
-        },
-    )
-    .await?;
-    if let Ok(json) = serde_json::to_string(&anzeige) {
-        state.live.publiziere(einsatz_id, json);
-    }
-    Ok(())
-}
 
 fn sse_schaden(state: &AppState, einsatz_id: i64, schaden_id: i64) {
     let data =
@@ -243,7 +213,7 @@ pub async fn anlegen(
         ausmass.as_str(),
         ort_kurz(&ort),
     );
-    etb_system(&state, einsatz_id, benutzer.id, &text).await?;
+    super::etb_system_degradiert(&state, einsatz_id, benutzer.id, &text).await?;
     sse_schaden(&state, einsatz_id, schaden.id);
     Ok((StatusCode::CREATED, Json(schaden)))
 }
@@ -553,7 +523,7 @@ pub async fn uebergeben(
         registrier_anzeige(vorher.registrier_nr),
         adressat
     );
-    etb_system(&state, einsatz_id, benutzer.id, &text).await?;
+    super::etb_system_degradiert(&state, einsatz_id, benutzer.id, &text).await?;
     sse_schaden(&state, einsatz_id, schaden_id);
     Ok(Json(
         schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?,
@@ -627,7 +597,7 @@ pub async fn abschliessen(
         registrier_anzeige(vorher.registrier_nr),
         grund.as_str()
     );
-    etb_system(&state, einsatz_id, benutzer.id, &text).await?;
+    super::etb_system_degradiert(&state, einsatz_id, benutzer.id, &text).await?;
     sse_schaden(&state, einsatz_id, schaden_id);
     Ok(Json(
         schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?,
@@ -659,7 +629,7 @@ pub async fn stornieren(
         return Err(AppError::Conflict("Schaden ist bereits storniert".into()));
     }
     schaden_repo::storniere(&state.pool, einsatz_id, schaden_id, benutzer.id).await?;
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,

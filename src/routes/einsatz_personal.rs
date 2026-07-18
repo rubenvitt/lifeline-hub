@@ -8,7 +8,6 @@ use crate::einsatz::repo as einsatz_repo;
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "personal";
 use crate::error::AppError;
-use crate::etb::{self, repo as etb_repo};
 use crate::personal::disposition_repo::{self, AdhocDaten};
 use crate::personal::status_repo;
 use crate::personal::{EinsatzPersonalAnzeige, FuehrungskraftKarte};
@@ -24,37 +23,6 @@ use serde::Deserialize;
 fn sse_personal(state: &AppState, einsatz_id: i64, ep_id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "person_id": ep_id }).to_string();
     state.live.publiziere_event(einsatz_id, "person", data);
-}
-
-/// Schreibt einen automatischen System-ETB-Eintrag und publiziert ihn live
-/// (wie `routes::einsatz_fahrzeug::etb_system`).
-async fn etb_system(
-    state: &AppState,
-    einsatz_id: i64,
-    benutzer_id: i64,
-    inhalt: &str,
-) -> Result<(), AppError> {
-    let anzeige = etb_repo::anlegen(
-        &state.pool,
-        einsatz_id,
-        benutzer_id,
-        etb_repo::EintragDaten {
-            typ: etb::TYP_SYSTEM,
-            inhalt,
-            von: None,
-            an: None,
-            meldeweg: None,
-            veranlassung: None,
-            ereigniszeit: None,
-            erfasst_lokal_at: None,
-            berichtigt_eintrag_id: None,
-        },
-    )
-    .await?;
-    if let Ok(json) = serde_json::to_string(&anzeige) {
-        state.live.publiziere(einsatz_id, json);
-    }
-    Ok(())
 }
 
 /// Personen-Bezeichnung für ETB-Texte: Name, optional mit Funktion in Klammern.
@@ -182,7 +150,7 @@ pub async fn disponieren(
     };
 
     let anzeige = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ep_id, true).await?;
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,
@@ -255,7 +223,7 @@ pub async fn aktualisieren(
     if vorher.status_id != nachher.status_id {
         let alt = vorher.status_label.as_deref().unwrap_or("—");
         let neu = nachher.status_label.as_deref().unwrap_or("—");
-        etb_system(
+        super::etb_system_degradiert(
             &state,
             einsatz_id,
             benutzer.id,
@@ -288,7 +256,7 @@ pub async fn entfernen(
 
     let anzeige = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ep_id, true).await?;
     disposition_repo::entferne(&state.pool, einsatz_id, ep_id).await?;
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,

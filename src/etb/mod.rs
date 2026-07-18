@@ -3,6 +3,7 @@ pub mod repo;
 use crate::error::AppError;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::Serialize;
+use sqlx::{SqliteConnection, SqlitePool};
 use utoipa::ToSchema;
 
 /// Eintragstyp: Meldung.
@@ -17,6 +18,53 @@ pub const TYP_ENTSCHEIDUNG: &str = "entscheidung";
 pub const TYP_SYSTEM: &str = "system";
 /// Eintragstyp: Berichtigung (verweist auf den berichtigten Eintrag).
 pub const TYP_BERICHTIGUNG: &str = "berichtigung";
+
+/// Baut die `EintragDaten` eines pseudonymen System-ETB-Eintrags (nur `inhalt`, Rest leer).
+fn system_daten(inhalt: &str) -> repo::EintragDaten<'_> {
+    repo::EintragDaten {
+        typ: TYP_SYSTEM,
+        inhalt,
+        von: None,
+        an: None,
+        meldeweg: None,
+        veranlassung: None,
+        ereigniszeit: None,
+        erfasst_lokal_at: None,
+        berichtigt_eintrag_id: None,
+    }
+}
+
+/// Legt einen System-ETB-Eintrag INNERHALB einer offenen Transaktion an (F06/LFH-244,
+/// Tier-A: atomar mit dem auslösenden Domänen-Write). Liefert die neue `id`; SSE macht der
+/// Aufrufer NACH dem Commit. `startwert` reicht der pool-besitzende Aufrufer durch (LFH-133).
+pub async fn system_audit_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    erfasser_id: i64,
+    startwert: i64,
+    inhalt: &str,
+) -> Result<i64, AppError> {
+    repo::anlegen_tx(
+        conn,
+        einsatz_id,
+        erfasser_id,
+        startwert,
+        system_daten(inhalt),
+    )
+    .await
+}
+
+/// Legt einen System-ETB-Eintrag auf einer frischen Pool-Connection an und liefert die
+/// Anzeige (für den SSE-Broadcast). Konvenienz für den nicht-atomaren Degradations-Pfad
+/// (F06/LFH-244, Tier-B) — entspricht `repo::anlegen` spezialisiert auf `TYP_SYSTEM`.
+pub async fn system_audit(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    erfasser_id: i64,
+    inhalt: &str,
+) -> Result<EtbEintragAnzeige, AppError> {
+    repo::anlegen(pool, einsatz_id, erfasser_id, system_daten(inhalt)).await
+}
 
 /// Eintragstyp eines ETB-Eintrags. Wird als TEXT in der DB gespeichert.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]

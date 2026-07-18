@@ -8,7 +8,6 @@ use crate::einsatz::repo as einsatz_repo;
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "lagekarte";
 use crate::error::AppError;
-use crate::etb::{self, repo as etb_repo};
 use crate::lage_zone::repo::{self as zone_repo, ZoneNeu, ZonePatch};
 use crate::lage_zone::{self, LageZoneAnzeige};
 use crate::routes::support::trimme;
@@ -24,36 +23,6 @@ use tokio_stream::Stream;
 fn sse_zone(state: &AppState, einsatz_id: i64, zid: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "zone_id": zid }).to_string();
     state.live.publiziere_event(einsatz_id, "lage_zone", data);
-}
-
-/// Schreibt einen System-ETB-Eintrag und publiziert ihn live (Muster wie einsatzabschnitt).
-async fn etb_system(
-    state: &AppState,
-    einsatz_id: i64,
-    benutzer_id: i64,
-    inhalt: &str,
-) -> Result<(), AppError> {
-    let anzeige = etb_repo::anlegen(
-        &state.pool,
-        einsatz_id,
-        benutzer_id,
-        etb_repo::EintragDaten {
-            typ: etb::TYP_SYSTEM,
-            inhalt,
-            von: None,
-            an: None,
-            meldeweg: None,
-            veranlassung: None,
-            ereigniszeit: None,
-            erfasst_lokal_at: None,
-            berichtigt_eintrag_id: None,
-        },
-    )
-    .await?;
-    if let Ok(json) = serde_json::to_string(&anzeige) {
-        state.live.publiziere(einsatz_id, json);
-    }
-    Ok(())
 }
 
 /// ETB-Wortlaut: «<Typ-Label> «Label» <verb>» bzw. ohne Label «<Typ-Label> <verb>».
@@ -174,7 +143,7 @@ pub async fn anlegen(
     )
     .await?;
 
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,
@@ -305,7 +274,7 @@ pub async fn aktualisieren(
     let typ_geaendert = neuer_typ != vorher.typ.as_str();
     let label_geaendert = neues_label != vorher.label;
     if typ_geaendert || label_geaendert {
-        etb_system(
+        super::etb_system_degradiert(
             &state,
             einsatz_id,
             benutzer.id,
@@ -352,7 +321,7 @@ pub async fn aufloesen(
 
     let vorher = zone_repo::laden(&state.pool, einsatz_id, zid).await?;
     zone_repo::loese_auf(&state.pool, einsatz_id, zid).await?;
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,

@@ -11,7 +11,6 @@ use crate::error::AppError;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "einheiten";
-use crate::etb::{self, repo as etb_repo};
 use crate::routes::support::trimme;
 use crate::staerke::Staerke;
 use axum::extract::{Path, State};
@@ -49,35 +48,6 @@ fn sse_personal(state: &AppState, einsatz_id: i64, ep_id: i64) {
 fn sse_material(state: &AppState, einsatz_id: i64, em_id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "material_id": em_id }).to_string();
     state.live.publiziere_event(einsatz_id, "material", data);
-}
-
-async fn etb_system(
-    state: &AppState,
-    einsatz_id: i64,
-    benutzer_id: i64,
-    inhalt: &str,
-) -> Result<(), AppError> {
-    let anzeige = etb_repo::anlegen(
-        &state.pool,
-        einsatz_id,
-        benutzer_id,
-        etb_repo::EintragDaten {
-            typ: etb::TYP_SYSTEM,
-            inhalt,
-            von: None,
-            an: None,
-            meldeweg: None,
-            veranlassung: None,
-            ereigniszeit: None,
-            erfasst_lokal_at: None,
-            berichtigt_eintrag_id: None,
-        },
-    )
-    .await?;
-    if let Ok(json) = serde_json::to_string(&anzeige) {
-        state.live.publiziere(einsatz_id, json);
-    }
-    Ok(())
 }
 
 /// Holt den Einsatz + Rolle und prüft Schreibrecht + aktiv. Liefert den Einsatz.
@@ -205,7 +175,7 @@ pub async fn bilden(
         .await?;
     }
     let anzeige = einheit_repo::laden(&state.pool, einsatz_id, anzeige.id).await?;
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,
@@ -300,7 +270,7 @@ pub async fn aktualisieren(
             (None, None) => String::new(),
         };
         if !inhalt.is_empty() {
-            etb_system(&state, einsatz_id, benutzer.id, &inhalt).await?;
+            super::etb_system_degradiert(&state, einsatz_id, benutzer.id, &inhalt).await?;
         }
     }
     if vorher.abschnitt_id != nachher.abschnitt_id {
@@ -308,7 +278,7 @@ pub async fn aktualisieren(
             Some(a) => format!("Einheit «{}»: Abschnitt «{}» zugeordnet", nachher.name, a),
             None => format!("Einheit «{}»: Abschnittszuordnung aufgehoben", nachher.name),
         };
-        etb_system(&state, einsatz_id, benutzer.id, &inhalt).await?;
+        super::etb_system_degradiert(&state, einsatz_id, benutzer.id, &inhalt).await?;
     }
     sse_einheit(&state, einsatz_id, eid);
     Ok(Json(final_anzeige))
@@ -323,7 +293,7 @@ pub async fn aufloesen(
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let name = einheit_name(&state, einsatz_id, eid).await?;
     einheit_repo::loese_auf(&state.pool, einsatz_id, eid).await?;
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,
@@ -343,7 +313,7 @@ pub async fn personal_zuordnen(
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let person = mitglied_repo::ordne_personal_zu(&state.pool, einsatz_id, eid, ep_id).await?;
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,
@@ -364,7 +334,7 @@ pub async fn personal_freigeben(
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let person = mitglied_repo::gib_personal_frei(&state.pool, einsatz_id, eid, ep_id).await?;
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,
@@ -385,7 +355,7 @@ pub async fn fahrzeug_zuordnen(
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let fz = mitglied_repo::ordne_fahrzeug_zu(&state.pool, einsatz_id, eid, ef_id).await?;
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,
@@ -406,7 +376,7 @@ pub async fn fahrzeug_freigeben(
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let fz = mitglied_repo::gib_fahrzeug_frei(&state.pool, einsatz_id, eid, ef_id).await?;
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,
@@ -428,7 +398,7 @@ pub async fn material_zuordnen(
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let (bez, menge) =
         mitglied_repo::ordne_material_zu(&state.pool, einsatz_id, eid, em_id).await?;
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,
@@ -453,7 +423,7 @@ pub async fn material_freigeben(
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
     let (bez, menge) =
         mitglied_repo::gib_material_frei(&state.pool, einsatz_id, eid, em_id).await?;
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,

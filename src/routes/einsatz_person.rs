@@ -9,7 +9,6 @@ use crate::einsatz::repo as einsatz_repo;
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "personen";
 use crate::error::AppError;
-use crate::etb::{self, repo as etb_repo};
 use crate::person::abgleich_repo::AbgleichAnzeige;
 use crate::person::audit_repo::ZugriffAnzeige;
 use crate::person::sichtung_repo::SichtungAnzeige;
@@ -42,37 +41,6 @@ pub struct PersonDetail {
     pub notizen: Vec<NotizAnzeige>,
     pub verbleib: Vec<VerbleibAnzeige>,
     pub abgleiche: Vec<AbgleichAnzeige>,
-}
-
-/// Schreibt einen pseudonymen System-ETB-Eintrag (nur Registriernummer + Status)
-/// und publiziert ihn als `etb`-SSE-Event.
-async fn etb_system(
-    state: &AppState,
-    einsatz_id: i64,
-    benutzer_id: i64,
-    inhalt: &str,
-) -> Result<(), AppError> {
-    let anzeige = etb_repo::anlegen(
-        &state.pool,
-        einsatz_id,
-        benutzer_id,
-        etb_repo::EintragDaten {
-            typ: etb::TYP_SYSTEM,
-            inhalt,
-            von: None,
-            an: None,
-            meldeweg: None,
-            veranlassung: None,
-            ereigniszeit: None,
-            erfasst_lokal_at: None,
-            berichtigt_eintrag_id: None,
-        },
-    )
-    .await?;
-    if let Ok(json) = serde_json::to_string(&anzeige) {
-        state.live.publiziere(einsatz_id, json);
-    }
-    Ok(())
 }
 
 /// Broadcastet ein dediziertes `person`-SSE-Event OHNE sensible Payload
@@ -207,7 +175,7 @@ pub async fn anlegen(
     )
     .await?;
 
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,
@@ -400,7 +368,7 @@ pub async fn status_wechsel(
         }
     }
 
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,
@@ -453,7 +421,7 @@ pub async fn stornieren(
     {
         sse_auto_austritt(&state, einsatz_id, &effekt);
     }
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,
@@ -528,7 +496,7 @@ pub async fn sichten(
     )
     .await?;
 
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,
@@ -704,7 +672,7 @@ pub async fn verbleib(
         }
     }
 
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,
@@ -759,7 +727,7 @@ pub async fn notiz(
     }
     let notiz =
         verlaufsnotiz_repo::anlegen(&state.pool, einsatz_id, person_id, text, benutzer.id).await?;
-    // BEWUSST kein etb_system(): besondere Kategorie gehört NICHT in den ETB.
+    // BEWUSST kein super::etb_system_degradiert(): besondere Kategorie gehört NICHT in den ETB.
     sse_person(&state, einsatz_id, person_id);
     Ok((StatusCode::CREATED, Json(notiz)))
 }
@@ -883,7 +851,7 @@ pub async fn abgleich_entscheiden(
     if body.entscheidung == "bestaetigt" {
         let vermisst = repo::laden(&state.pool, einsatz_id, abgleich.vermisst_person_id).await?;
         let gefunden = repo::laden(&state.pool, einsatz_id, abgleich.gefunden_person_id).await?;
-        etb_system(
+        super::etb_system_degradiert(
             &state,
             einsatz_id,
             benutzer.id,

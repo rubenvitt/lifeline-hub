@@ -8,7 +8,6 @@ use crate::einsatz::repo as einsatz_repo;
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "fahrzeuge";
 use crate::error::AppError;
-use crate::etb::{self, repo as etb_repo};
 use crate::fahrzeug::besatzung_repo;
 use crate::fahrzeug::disposition_repo::{self, AdhocDaten};
 use crate::fahrzeug::status_repo;
@@ -33,38 +32,6 @@ fn sse_fahrzeug(state: &AppState, einsatz_id: i64, ef_id: i64) {
 fn sse_personal(state: &AppState, einsatz_id: i64, ep_id: i64) {
     let data = serde_json::json!({ "einsatz_id": einsatz_id, "person_id": ep_id }).to_string();
     state.live.publiziere_event(einsatz_id, "person", data);
-}
-
-/// Schreibt einen automatischen System-ETB-Eintrag für die handelnde Person und
-/// publiziert ihn live (wie `routes::etb::erfassen`). Bewusst sequentiell nach der
-/// Disposition (Entscheidung 4 der Spec: ETB = zusätzliche, append-only Spur).
-async fn etb_system(
-    state: &AppState,
-    einsatz_id: i64,
-    benutzer_id: i64,
-    inhalt: &str,
-) -> Result<(), AppError> {
-    let anzeige = etb_repo::anlegen(
-        &state.pool,
-        einsatz_id,
-        benutzer_id,
-        etb_repo::EintragDaten {
-            typ: etb::TYP_SYSTEM,
-            inhalt,
-            von: None,
-            an: None,
-            meldeweg: None,
-            veranlassung: None,
-            ereigniszeit: None,
-            erfasst_lokal_at: None,
-            berichtigt_eintrag_id: None,
-        },
-    )
-    .await?;
-    if let Ok(json) = serde_json::to_string(&anzeige) {
-        state.live.publiziere(einsatz_id, json);
-    }
-    Ok(())
 }
 
 /// GET /api/einsaetze/{id}/fahrzeuge — disponierte Fahrzeuge (aufgelöst). Nur Mitglieder/höhere Berechtigung.
@@ -175,7 +142,7 @@ pub async fn disponieren(
     };
 
     let anzeige = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ef_id, true).await?;
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,
@@ -232,7 +199,7 @@ pub async fn aktualisieren(
     if vorher.status_id != nachher.status_id {
         let alt = vorher.status_label.as_deref().unwrap_or("—");
         let neu = nachher.status_label.as_deref().unwrap_or("—");
-        etb_system(
+        super::etb_system_degradiert(
             &state,
             einsatz_id,
             benutzer.id,
@@ -268,7 +235,7 @@ pub async fn entfernen(
 
     let anzeige = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ef_id, true).await?;
     disposition_repo::entferne(&state.pool, einsatz_id, ef_id).await?;
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,
@@ -306,7 +273,7 @@ pub async fn besatzung_zuordnen(
     let fahrzeug =
         disposition_repo::laden_anzeige(&state.pool, einsatz_id, ef_id, einsatz.ist_aktiv())
             .await?;
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,
@@ -345,7 +312,7 @@ pub async fn besatzung_freigeben(
     let fahrzeug =
         disposition_repo::laden_anzeige(&state.pool, einsatz_id, ef_id, einsatz.ist_aktiv())
             .await?;
-    etb_system(
+    super::etb_system_degradiert(
         &state,
         einsatz_id,
         benutzer.id,
