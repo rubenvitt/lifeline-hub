@@ -166,44 +166,53 @@ pub async fn anlegen(
     let antreff = trimme(body.antreff_ort);
     let notiz = trimme(body.notiz);
 
-    let tier = tier_repo::anlegen(
-        &state.pool,
-        einsatz_id,
-        benutzer.id,
-        status,
-        tier_repo::NeueDaten {
-            spezies: &body.spezies,
-            rasse_beschreibung: rasse.as_deref(),
-            rufname: rufname.as_deref(),
-            geschlecht: body.geschlecht.as_deref(),
-            alter_geschaetzt: body.alter_geschaetzt,
-            farbe_beschreibung: farbe.as_deref(),
-            kennzeichnung: kennzeichnung.as_deref(),
-            groesse_gewicht: groesse.as_deref(),
-            halter_person_id: body.halter_person_id,
-            halter_kontakt: halter_kontakt.as_deref(),
-            antreff_ort: antreff.as_deref(),
-            notiz: notiz.as_deref(),
-        },
-    )
-    .await?;
-
-    // Pseudonyme ETB-Spur: nur Reg.-Nr. + Spezies (+ Status bei vermisst).
-    let spezies_label = tier.spezies.etb_label();
-    let text = if status == "vermisst" {
-        format!(
-            "Tier {} ({}) als vermisst gemeldet",
-            registrier_anzeige(tier.registrier_nr),
-            spezies_label
+    // F06/LFH-244 Tier-A: Domänen-Write + System-ETB-Eintrag atomar in EINER Tx
+    // (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige für ETB-Text
+    // (Reg.-Nr. + Spezies) UND Response. SSE erst nach dem Commit.
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    let tier = crate::write_retry!(&state.pool, |conn| {
+        let (id, _reg) = tier_repo::anlegen_tx(
+            conn,
+            einsatz_id,
+            benutzer.id,
+            status,
+            tier_repo::NeueDaten {
+                spezies: &body.spezies,
+                rasse_beschreibung: rasse.as_deref(),
+                rufname: rufname.as_deref(),
+                geschlecht: body.geschlecht.as_deref(),
+                alter_geschaetzt: body.alter_geschaetzt,
+                farbe_beschreibung: farbe.as_deref(),
+                kennzeichnung: kennzeichnung.as_deref(),
+                groesse_gewicht: groesse.as_deref(),
+                halter_person_id: body.halter_person_id,
+                halter_kontakt: halter_kontakt.as_deref(),
+                antreff_ort: antreff.as_deref(),
+                notiz: notiz.as_deref(),
+            },
         )
-    } else {
-        format!(
-            "Tier {} ({}) erfasst",
-            registrier_anzeige(tier.registrier_nr),
-            spezies_label
-        )
-    };
-    super::etb_system_degradiert(&state, einsatz_id, benutzer.id, &text).await?;
+        .await?;
+        let tier = tier_repo::laden_tx(conn, einsatz_id, id).await?;
+        // Pseudonyme ETB-Spur: nur Reg.-Nr. + Spezies (+ Status bei vermisst).
+        let spezies_label = tier.spezies.etb_label();
+        let text = if status == "vermisst" {
+            format!(
+                "Tier {} ({}) als vermisst gemeldet",
+                registrier_anzeige(tier.registrier_nr),
+                spezies_label
+            )
+        } else {
+            format!(
+                "Tier {} ({}) erfasst",
+                registrier_anzeige(tier.registrier_nr),
+                spezies_label
+            )
+        };
+        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        Ok(tier)
+    })?;
     sse_tier(&state, einsatz_id, tier.id);
     Ok((StatusCode::CREATED, Json(tier)))
 }
@@ -401,18 +410,8 @@ pub async fn status_wechsel(
         }
     }
 
-    tier_repo::setze_status(
-        &state.pool,
-        einsatz_id,
-        tier_id,
-        &body.status,
-        grund.as_deref(),
-        ziel.as_deref(),
-        benutzer.id,
-    )
-    .await?;
-
-    // Pseudonyme ETB-Spur (Spec-Tabelle): nie Rufname/Kennzeichnung/Halter/Ziel.
+    // Pseudonyme ETB-Spur (Spec-Tabelle): nie Rufname/Kennzeichnung/Halter/Ziel. Aus `vorher`
+    // + `body` VOR der Tx berechenbar (kein In-Tx-Reload nötig).
     let r = registrier_anzeige(vorher.registrier_nr);
     let text = match body.status.as_str() {
         "abgeschlossen" => format!(
@@ -424,7 +423,24 @@ pub async fn status_wechsel(
         }
         _ => format!("Tier {r}: {} → {}", vorher.status.as_str(), body.status),
     };
-    super::etb_system_degradiert(&state, einsatz_id, benutzer.id, &text).await?;
+    // F06/LFH-244 Tier-A: Status-UPDATE + System-ETB-Eintrag atomar in EINER Tx.
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    crate::write_retry!(&state.pool, |conn| {
+        tier_repo::setze_status_tx(
+            conn,
+            einsatz_id,
+            tier_id,
+            &body.status,
+            grund.as_deref(),
+            ziel.as_deref(),
+            benutzer.id,
+        )
+        .await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        Ok(())
+    })?;
     sse_tier(&state, einsatz_id, tier_id);
     Ok(Json(
         tier_repo::laden(&state.pool, einsatz_id, tier_id).await?,
@@ -455,14 +471,16 @@ pub async fn stornieren(
     if tier.storniert_at.is_some() {
         return Err(AppError::Conflict("Tier ist bereits storniert".into()));
     }
-    tier_repo::storniere(&state.pool, einsatz_id, tier_id, benutzer.id).await?;
-    super::etb_system_degradiert(
-        &state,
-        einsatz_id,
-        benutzer.id,
-        &format!("Tier {} storniert", registrier_anzeige(tier.registrier_nr)),
-    )
-    .await?;
+    // F06/LFH-244 Tier-A: Storno-UPDATE + System-ETB-Eintrag atomar in EINER Tx.
+    let text = format!("Tier {} storniert", registrier_anzeige(tier.registrier_nr));
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&state.pool, einsatz_id)
+        .await?
+        .etb_startwert();
+    crate::write_retry!(&state.pool, |conn| {
+        tier_repo::storniere_tx(conn, einsatz_id, tier_id, benutzer.id).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, benutzer.id, startwert, &text).await?;
+        Ok(())
+    })?;
     sse_tier(&state, einsatz_id, tier_id);
     Ok(StatusCode::NO_CONTENT)
 }

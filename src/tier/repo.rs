@@ -1,6 +1,6 @@
 use super::TierAnzeige;
 use crate::error::AppError;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 /// Basis-SELECT inkl. LEFT JOIN auf `einsatz_person` für die read-only
 /// Halter-Auflösung (`halter_registrier_nr`, `halter_storniert_at`).
@@ -97,17 +97,37 @@ pub async fn laden(
     .ok_or(AppError::NotFound)
 }
 
+/// Wie [`laden`], aber auf einer offenen Connection/Transaktion (für den In-Tx-Reload
+/// beim atomaren Anlegen — liefert die frische Anzeige samt geparster Felder für ETB-Text
+/// und Response in EINER Tx).
+pub async fn laden_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    tier_id: i64,
+) -> Result<TierAnzeige, AppError> {
+    sqlx::query_as::<_, TierAnzeige>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_ALLE} WHERE t.id = ? AND t.einsatz_id = ?"
+    )))
+    .bind(tier_id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)
+}
+
 /// Legt ein Tier an, vergibt `registrier_nr` atomar als
 /// `COALESCE(MAX(registrier_nr),0)+1` je Einsatz (zählt stornierte mit — keine
 /// Nummern-Wiederverwendung). `status` ∈ {`aktiv`, `vermisst`} (Route-validiert).
-pub async fn anlegen(
-    pool: &SqlitePool,
+pub async fn anlegen_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     erfasser_id: i64,
     status: &str,
     daten: NeueDaten<'_>,
-) -> Result<TierAnzeige, AppError> {
-    let id: i64 = sqlx::query_scalar(
+) -> Result<(i64, i64), AppError> {
+    // Liefert (id, registrier_nr) — die registrier_nr wird für die ETB-Spur gebraucht
+    // und ist erst nach dem INSERT (COALESCE(MAX)+1) bekannt.
+    let row: (i64, i64) = sqlx::query_as(
         "INSERT INTO einsatz_tier \
             (einsatz_id, registrier_nr, status, spezies, rasse_beschreibung, rufname, \
              geschlecht, alter_geschaetzt, farbe_beschreibung, kennzeichnung, \
@@ -116,7 +136,7 @@ pub async fn anlegen(
          SELECT ?1, COALESCE(MAX(registrier_nr), 0) + 1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, \
                 ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?15 \
          FROM einsatz_tier WHERE einsatz_id = ?1 \
-         RETURNING id",
+         RETURNING id, registrier_nr",
     )
     .bind(einsatz_id)
     .bind(status)
@@ -133,9 +153,22 @@ pub async fn anlegen(
     .bind(daten.antreff_ort)
     .bind(daten.notiz)
     .bind(erfasser_id)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
+    Ok(row)
+}
 
+/// Pool-Wrapper: legt an (eigene Tx) und lädt die Anzeige.
+pub async fn anlegen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    erfasser_id: i64,
+    status: &str,
+    daten: NeueDaten<'_>,
+) -> Result<TierAnzeige, AppError> {
+    let mut conn = pool.acquire().await?;
+    let (id, _) = anlegen_tx(&mut conn, einsatz_id, erfasser_id, status, daten).await?;
+    drop(conn);
     laden(pool, einsatz_id, id).await
 }
 
@@ -200,8 +233,8 @@ pub async fn aktualisiere(
 /// geschrieben — sonst verletzt der DB-CHECK.** Bei jedem anderen Zielzustand
 /// bleiben die Abschluss-Felder unverändert (Audit-Spur des letzten Abschlusses).
 /// `NotFound`, falls nicht zum Einsatz.
-pub async fn setze_status(
-    pool: &SqlitePool,
+pub async fn setze_status_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     tier_id: i64,
     neuer_status: &str,
@@ -221,7 +254,7 @@ pub async fn setze_status(
         .bind(geaendert_von)
         .bind(tier_id)
         .bind(einsatz_id)
-        .execute(pool)
+        .execute(&mut *conn)
         .await?
         .rows_affected()
     } else {
@@ -234,7 +267,7 @@ pub async fn setze_status(
         .bind(geaendert_von)
         .bind(tier_id)
         .bind(einsatz_id)
-        .execute(pool)
+        .execute(&mut *conn)
         .await?
         .rows_affected()
     };
@@ -244,10 +277,33 @@ pub async fn setze_status(
     Ok(())
 }
 
+/// Pool-Wrapper (eigene Tx).
+pub async fn setze_status(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    tier_id: i64,
+    neuer_status: &str,
+    abschluss_grund: Option<&str>,
+    abschluss_ziel: Option<&str>,
+    geaendert_von: i64,
+) -> Result<(), AppError> {
+    let mut conn = pool.acquire().await?;
+    setze_status_tx(
+        &mut conn,
+        einsatz_id,
+        tier_id,
+        neuer_status,
+        abschluss_grund,
+        abschluss_ziel,
+        geaendert_von,
+    )
+    .await
+}
+
 /// Soft-Delete (Fehleingabe): setzt `storniert_at`. Bleibt referenzierbar.
 /// `NotFound`, falls nicht zum Einsatz.
-pub async fn storniere(
-    pool: &SqlitePool,
+pub async fn storniere_tx(
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     tier_id: i64,
     geaendert_von: i64,
@@ -260,13 +316,24 @@ pub async fn storniere(
     .bind(geaendert_von)
     .bind(tier_id)
     .bind(einsatz_id)
-    .execute(pool)
+    .execute(&mut *conn)
     .await?
     .rows_affected();
     if betroffen == 0 {
         return Err(AppError::NotFound);
     }
     Ok(())
+}
+
+/// Pool-Wrapper (eigene Tx).
+pub async fn storniere(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    tier_id: i64,
+    geaendert_von: i64,
+) -> Result<(), AppError> {
+    let mut conn = pool.acquire().await?;
+    storniere_tx(&mut conn, einsatz_id, tier_id, geaendert_von).await
 }
 
 #[cfg(test)]
