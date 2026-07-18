@@ -1,4 +1,4 @@
-import { App, Button, Input, Space, Typography } from 'antd';
+import { App, Button, Input, Space, Table, Typography, type TableColumnsType } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
@@ -8,7 +8,7 @@ import {
   listeStichwortVorschlaege,
   loescheStichwortVorschlag,
 } from '../api/stichwortVorschlaege';
-import { Liste, ListenEintrag } from '../components/Liste';
+import type { StichwortVorschlag } from '../api/types';
 
 export default function StichworteTab() {
   const { benutzer } = useAuth();
@@ -44,6 +44,29 @@ export default function StichworteTab() {
 
   const vorschlaege = vorschlaegeQuery.data ?? [];
 
+  const spalten: TableColumnsType<StichwortVorschlag> = [
+    { title: 'Stichwort', dataIndex: 'text', key: 'text' },
+    ...(istAdmin
+      ? ([
+          {
+            title: 'Aktionen',
+            key: 'aktionen',
+            width: 120,
+            render: (_, v: StichwortVorschlag) => (
+              <Button
+                danger
+                size="small"
+                loading={loeschenMutation.isPending}
+                onClick={() => loeschenMutation.mutate(v.id)}
+              >
+                Löschen
+              </Button>
+            ),
+          },
+        ] as TableColumnsType<StichwortVorschlag>)
+      : []),
+  ];
+
   return (
     <>
       <Typography.Paragraph type="secondary">
@@ -51,31 +74,13 @@ export default function StichworteTab() {
         Einsatz unabhängig davon möglich.
       </Typography.Paragraph>
 
-      <Liste
-        bordered
+      <Table
+        rowKey="id"
+        loading={vorschlaegeQuery.isLoading}
         dataSource={vorschlaege}
-        emptyText="Noch keine Stichworte"
-        renderItem={(v) => (
-          <ListenEintrag
-            actions={
-              istAdmin
-                ? [
-                    <Button
-                      key="del"
-                      danger
-                      size="small"
-                      loading={loeschenMutation.isPending}
-                      onClick={() => loeschenMutation.mutate(v.id)}
-                    >
-                      Löschen
-                    </Button>,
-                  ]
-                : []
-            }
-          >
-            {v.text}
-          </ListenEintrag>
-        )}
+        columns={spalten}
+        locale={{ emptyText: 'Noch keine Stichworte' }}
+        pagination={false}
       />
 
       {istAdmin && (
