@@ -308,7 +308,10 @@ pub async fn aktiviere_offline_karte(
     pool: &SqlitePool,
     id: i64,
 ) -> Result<Option<OfflineKarte>, sqlx::Error> {
-    let mut tx = pool.begin().await?;
+    // BEGIN IMMEDIATE (F09/LFH-240): read-then-write (Existenz-SELECT vor den UPDATEs)
+    // holt den Write-Lock vorab, statt beim ersten Write ein Lock-Upgrade unter fremdem
+    // Writer zu riskieren (sofortiges SQLITE_BUSY). Der busy_timeout wartet am BEGIN.
+    let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
     let existiert: Option<i64> =
         sqlx::query_scalar("SELECT id FROM karte_offline_karte WHERE id = ?")
             .bind(id)
@@ -347,7 +350,10 @@ pub async fn ersetze_aktive_offline_karte(
     neu_id: i64,
     alt_id: i64,
 ) -> Result<Option<OfflineKarte>, sqlx::Error> {
-    let mut tx = pool.begin().await?;
+    // BEGIN IMMEDIATE (F09/LFH-240): read-then-write (Existenz-SELECT vor den UPDATEs)
+    // holt den Write-Lock vorab, statt beim ersten Write ein Lock-Upgrade unter fremdem
+    // Writer zu riskieren (sofortiges SQLITE_BUSY). Der busy_timeout wartet am BEGIN.
+    let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
     let existiert: Option<i64> =
         sqlx::query_scalar("SELECT id FROM karte_offline_karte WHERE id = ?")
             .bind(neu_id)
@@ -506,10 +512,11 @@ pub async fn aktualisiere_quell_url(
 /// ist — die erste fertig heruntergeladene Karte wird automatisch ausgeliefert (sonst bliebe der
 /// Offline-Schalter trotz Download „nicht konfiguriert"). Eine bereits aktive Karte wird bewusst
 /// NICHT verdrängt. `Ok(true)`, wenn aktiviert wurde; `Ok(false)` ist der erwartete No-op
-/// (schon eine aktiv, Karte nicht `bereit` oder unbekannt). Der `NOT EXISTS`-Guard macht das Setzen
-/// race-sicher: SQLite serialisiert Writer, ein zweiter parallel fertig werdender Download sieht
-/// die aktive Zeile und greift nicht — der partielle Unique-Index `idx_offline_eine_aktive`
-/// bleibt der Backstop.
+/// (schon eine aktiv, Karte nicht `bereit` oder unbekannt). Race-sicher NICHT wegen „WAL
+/// serialisiert Writer", sondern weil Guard und Write EIN atomares UPDATE-Statement sind
+/// (`WHERE … AND NOT EXISTS(…)`): ein zweiter parallel fertig werdender Download prüft die
+/// aktive Zeile im selben Statement und greift nicht — der partielle Unique-Index
+/// `idx_offline_eine_aktive` bleibt der Backstop.
 pub async fn aktiviere_wenn_keine_aktive(pool: &SqlitePool, id: i64) -> Result<bool, sqlx::Error> {
     let betroffen = sqlx::query(
         "UPDATE karte_offline_karte SET aktiv_basemap = 1, geaendert_at = datetime('now') \

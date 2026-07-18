@@ -76,9 +76,7 @@ macro_rules! write_retry {
                     continue;
                 }
                 ::std::result::Result::Err(__e) => {
-                    break ::std::result::Result::<_, $crate::error::AppError>::Err(
-                        ::std::convert::From::from(__e),
-                    );
+                    break ::std::result::Result::Err(::std::convert::From::from(__e));
                 }
             };
             let __res: ::std::result::Result<_, $crate::error::AppError> = async {
@@ -99,16 +97,10 @@ macro_rules! write_retry {
                         break ::std::result::Result::Err(::std::convert::From::from(__e));
                     }
                 },
-                ::std::result::Result::Err(__err) => {
-                    if let $crate::error::AppError::Database(ref __dberr) = __err {
-                        if $crate::tx::ist_busy(__dberr) && __versuch < $crate::tx::MAX_VERSUCHE {
-                            drop(__tx); // ROLLBACK, dann die ganze Unit neu
-                            $crate::tx::backoff(__versuch).await;
-                            continue;
-                        }
-                    }
-                    break ::std::result::Result::Err(__err);
-                }
+                // Fehler im Body: unter BEGIN IMMEDIATE hält die Tx den Write-Lock ab BEGIN,
+                // in-Tx-Statements können also nicht BUSYen (BUSY nur an BEGIN/COMMIT, dort
+                // behandelt). Propagieren statt erneut versuchen; __tx fällt aus dem Scope → ROLLBACK.
+                ::std::result::Result::Err(__err) => break ::std::result::Result::Err(__err),
             }
         }
     }};

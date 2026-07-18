@@ -379,40 +379,40 @@ pub async fn erteile_auftrag_tx(
         .await?;
     let org_einst =
         crate::org::einstellungen::laden_oder_default(pool, org_id.unwrap_or(0)).await?;
-    let mut tx = pool.begin().await?;
+    let auftrag_id = crate::write_retry!(pool, |conn| {
+        // Guard: schon mit einem Auftrag verknüpft? (Sperrt Doppel-Verknüpfung; first-write-wins.)
+        // Meldung kennt kein Soft-Delete (nur erledigt_at/status) → nur auftrag_id prüfen.
+        let auftrag_vorhanden: Option<Option<i64>> =
+            sqlx::query_scalar("SELECT auftrag_id FROM meldung WHERE id = ?")
+                .bind(meldung_id)
+                .fetch_optional(&mut *conn)
+                .await?;
+        let auftrag_vorhanden = auftrag_vorhanden.ok_or(AppError::NotFound)?;
+        if auftrag_vorhanden.is_some() {
+            return Err(AppError::Conflict(
+                "Aus dieser Meldung wurde bereits ein Auftrag erteilt".into(),
+            ));
+        }
 
-    // Guard: schon mit einem Auftrag verknüpft? (Sperrt Doppel-Verknüpfung; first-write-wins.)
-    // Meldung kennt kein Soft-Delete (nur erledigt_at/status) → nur auftrag_id prüfen.
-    let auftrag_vorhanden: Option<Option<i64>> =
-        sqlx::query_scalar("SELECT auftrag_id FROM meldung WHERE id = ?")
-            .bind(meldung_id)
-            .fetch_optional(&mut *tx)
-            .await?;
-    let auftrag_vorhanden = auftrag_vorhanden.ok_or(AppError::NotFound)?;
-    if auftrag_vorhanden.is_some() {
-        return Err(AppError::Conflict(
-            "Aus dieser Meldung wurde bereits ein Auftrag erteilt".into(),
-        ));
-    }
-
-    let auftrag_id = crate::auftrag::repo::anlegen_tx(
-        &mut tx,
-        einsatz_id,
-        erteiler_id,
-        einst.auftrag_startwert(),
-        einst.etb_startwert(),
-        crate::einsatz::effektiv::effektiv_auto_etb_aktiv(&einst, &org_einst),
-        &daten,
-    )
-    .await?;
-
-    sqlx::query("UPDATE meldung SET auftrag_id = ? WHERE id = ?")
-        .bind(auftrag_id)
-        .bind(meldung_id)
-        .execute(&mut *tx)
+        let auftrag_id = crate::auftrag::repo::anlegen_tx(
+            &mut *conn,
+            einsatz_id,
+            erteiler_id,
+            einst.auftrag_startwert(),
+            einst.etb_startwert(),
+            crate::einsatz::effektiv::effektiv_auto_etb_aktiv(&einst, &org_einst),
+            &daten,
+        )
         .await?;
 
-    tx.commit().await?;
+        sqlx::query("UPDATE meldung SET auftrag_id = ? WHERE id = ?")
+            .bind(auftrag_id)
+            .bind(meldung_id)
+            .execute(&mut *conn)
+            .await?;
+
+        Ok(auftrag_id)
+    })?;
     Ok(auftrag_id)
 }
 

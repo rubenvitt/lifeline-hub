@@ -21,46 +21,47 @@ pub async fn anlegen(
         .await?
         .ok_or_else(|| AppError::Internal("Keine Organisation vorhanden".into()))?;
 
-    let mut tx = pool.begin().await?;
-
-    // Einsatznummer JJJJ-NNN: NNN je Organisation + Jahr fortlaufend, 3-stellig.
-    // 'JJJJ-' ist 5 Zeichen lang → substr(..., 6) liefert den NNN-Teil.
-    // Race-frei: WAL serialisiert Writer; der Unique-Index sichert zusätzlich ab.
-    let jahr: String = sqlx::query_scalar("SELECT strftime('%Y','now')")
-        .fetch_one(&mut *tx)
+    let einsatz_id = crate::write_retry!(pool, |conn| {
+        // Einsatznummer JJJJ-NNN: NNN je Organisation + Jahr fortlaufend, 3-stellig.
+        // 'JJJJ-' ist 5 Zeichen lang → substr(..., 6) liefert den NNN-Teil.
+        // BEGIN IMMEDIATE (F09) schließt die read-then-write-Lücke zwischen MAX(nr)-Read
+        // und Insert; der Unique-Index sichert zusätzlich ab.
+        let jahr: String = sqlx::query_scalar("SELECT strftime('%Y','now')")
+            .fetch_one(&mut *conn)
+            .await?;
+        let praefix = format!("{jahr}-");
+        let max_nr: Option<i64> = sqlx::query_scalar(
+            "SELECT MAX(CAST(substr(einsatznummer_intern, 6) AS INTEGER)) \
+             FROM einsatz WHERE org_id = ? AND einsatznummer_intern LIKE ?",
+        )
+        .bind(org_id)
+        .bind(format!("{praefix}%"))
+        .fetch_one(&mut *conn)
         .await?;
-    let praefix = format!("{jahr}-");
-    let max_nr: Option<i64> = sqlx::query_scalar(
-        "SELECT MAX(CAST(substr(einsatznummer_intern, 6) AS INTEGER)) \
-         FROM einsatz WHERE org_id = ? AND einsatznummer_intern LIKE ?",
-    )
-    .bind(org_id)
-    .bind(format!("{praefix}%"))
-    .fetch_one(&mut *tx)
-    .await?;
-    let einsatznummer = format!("{praefix}{:03}", max_nr.unwrap_or(0) + 1);
+        let einsatznummer = format!("{praefix}{:03}", max_nr.unwrap_or(0) + 1);
 
-    let einsatz_id: i64 = sqlx::query_scalar(
-        "INSERT INTO einsatz (org_id, bezeichnung, stichwort, einsatznummer_intern, angelegt_at) \
-         VALUES (?, ?, ?, ?, datetime('now')) RETURNING id",
-    )
-    .bind(org_id)
-    .bind(bezeichnung)
-    .bind(stichwort)
-    .bind(&einsatznummer)
-    .fetch_one(&mut *tx)
-    .await?;
+        let einsatz_id: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, stichwort, einsatznummer_intern, angelegt_at) \
+             VALUES (?, ?, ?, ?, datetime('now')) RETURNING id",
+        )
+        .bind(org_id)
+        .bind(bezeichnung)
+        .bind(stichwort)
+        .bind(&einsatznummer)
+        .fetch_one(&mut *conn)
+        .await?;
 
-    sqlx::query(
-        "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
-         VALUES (?, ?, ?)",
-    )
-    .bind(einsatz_id)
-    .bind(ersteller_id)
-    .bind(EINSATZ_ROLLE_LEITUNG)
-    .execute(&mut *tx)
-    .await?;
-    tx.commit().await?;
+        sqlx::query(
+            "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
+             VALUES (?, ?, ?)",
+        )
+        .bind(einsatz_id)
+        .bind(ersteller_id)
+        .bind(EINSATZ_ROLLE_LEITUNG)
+        .execute(&mut *conn)
+        .await?;
+        Ok(einsatz_id)
+    })?;
 
     laden(pool, einsatz_id).await
 }

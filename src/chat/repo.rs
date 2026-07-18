@@ -222,42 +222,44 @@ pub async fn anlegen_mit_anhaengen(
     inhalt: &str,
     anhang_ids: &[i64],
 ) -> Result<ChatNachrichtAnzeige, AppError> {
-    let mut tx = pool.begin().await?;
-
-    for &aid in anhang_ids {
-        let treffer: Option<i64> =
-            sqlx::query_scalar("SELECT 1 FROM anhang WHERE id = ? AND einsatz_id = ?")
-                .bind(aid)
-                .bind(einsatz_id)
-                .fetch_optional(&mut *tx)
-                .await?;
-        if treffer.is_none() {
-            return Err(AppError::Validation(
-                "Unbekannter oder fremder Anhang".into(),
-            ));
+    let id = crate::write_retry!(pool, |conn| {
+        for &aid in anhang_ids {
+            let treffer: Option<i64> =
+                sqlx::query_scalar("SELECT 1 FROM anhang WHERE id = ? AND einsatz_id = ?")
+                    .bind(aid)
+                    .bind(einsatz_id)
+                    .fetch_optional(&mut *conn)
+                    .await?;
+            if treffer.is_none() {
+                return Err(AppError::Validation(
+                    "Unbekannter oder fremder Anhang".into(),
+                ));
+            }
         }
-    }
 
-    let id: i64 = sqlx::query_scalar(
-        "INSERT INTO chat_nachricht (einsatz_id, kanal_id, autor_id, inhalt) \
-         VALUES (?, ?, ?, ?) RETURNING id",
-    )
-    .bind(einsatz_id)
-    .bind(kanal_id)
-    .bind(autor_id)
-    .bind(inhalt)
-    .fetch_one(&mut *tx)
-    .await?;
+        let id: i64 = sqlx::query_scalar(
+            "INSERT INTO chat_nachricht (einsatz_id, kanal_id, autor_id, inhalt) \
+             VALUES (?, ?, ?, ?) RETURNING id",
+        )
+        .bind(einsatz_id)
+        .bind(kanal_id)
+        .bind(autor_id)
+        .bind(inhalt)
+        .fetch_one(&mut *conn)
+        .await?;
 
-    for &aid in anhang_ids {
-        sqlx::query("INSERT INTO chat_nachricht_anhang (nachricht_id, anhang_id) VALUES (?, ?)")
+        for &aid in anhang_ids {
+            sqlx::query(
+                "INSERT INTO chat_nachricht_anhang (nachricht_id, anhang_id) VALUES (?, ?)",
+            )
             .bind(id)
             .bind(aid)
-            .execute(&mut *tx)
+            .execute(&mut *conn)
             .await?;
-    }
+        }
 
-    tx.commit().await?;
+        Ok(id)
+    })?;
     laden(pool, id).await
 }
 
@@ -474,52 +476,52 @@ pub async fn heraufstufen_zu_etb(
     let etb_startwert = crate::einsatz::einstellungen::laden_oder_default(pool, einsatz_id)
         .await?
         .etb_startwert();
-    let mut tx = pool.begin().await?;
+    let etb_id = crate::write_retry!(pool, |conn| {
+        // Guard: schon heraufgestuft oder gelöscht? (Sperrt Doppel-Heraufstufung.)
+        let zustand: Option<(Option<i64>, Option<String>)> =
+            sqlx::query_as("SELECT etb_eintrag_id, geloescht_at FROM chat_nachricht WHERE id = ?")
+                .bind(nachricht_id)
+                .fetch_optional(&mut *conn)
+                .await?;
+        let (etb_vorhanden, geloescht) = zustand.ok_or(AppError::NotFound)?;
+        if etb_vorhanden.is_some() {
+            return Err(AppError::Conflict(
+                "Nachricht ist bereits heraufgestuft".into(),
+            ));
+        }
+        if geloescht.is_some() {
+            return Err(AppError::Conflict(
+                "Gelöschte Nachricht kann nicht heraufgestuft werden".into(),
+            ));
+        }
 
-    // Guard: schon heraufgestuft oder gelöscht? (Sperrt Doppel-Heraufstufung.)
-    let zustand: Option<(Option<i64>, Option<String>)> =
-        sqlx::query_as("SELECT etb_eintrag_id, geloescht_at FROM chat_nachricht WHERE id = ?")
-            .bind(nachricht_id)
-            .fetch_optional(&mut *tx)
-            .await?;
-    let (etb_vorhanden, geloescht) = zustand.ok_or(AppError::NotFound)?;
-    if etb_vorhanden.is_some() {
-        return Err(AppError::Conflict(
-            "Nachricht ist bereits heraufgestuft".into(),
-        ));
-    }
-    if geloescht.is_some() {
-        return Err(AppError::Conflict(
-            "Gelöschte Nachricht kann nicht heraufgestuft werden".into(),
-        ));
-    }
-
-    let etb_id = crate::etb::repo::anlegen_tx(
-        &mut *tx,
-        einsatz_id,
-        heraufstufer_id,
-        etb_startwert,
-        crate::etb::repo::EintragDaten {
-            typ: etb_typ,
-            inhalt,
-            von: None,
-            an: None,
-            meldeweg: None,
-            veranlassung: None,
-            ereigniszeit: Some(ereigniszeit),
-            erfasst_lokal_at: None,
-            berichtigt_eintrag_id: None,
-        },
-    )
-    .await?;
-
-    sqlx::query("UPDATE chat_nachricht SET etb_eintrag_id = ? WHERE id = ?")
-        .bind(etb_id)
-        .bind(nachricht_id)
-        .execute(&mut *tx)
+        let etb_id = crate::etb::repo::anlegen_tx(
+            &mut *conn,
+            einsatz_id,
+            heraufstufer_id,
+            etb_startwert,
+            crate::etb::repo::EintragDaten {
+                typ: etb_typ,
+                inhalt,
+                von: None,
+                an: None,
+                meldeweg: None,
+                veranlassung: None,
+                ereigniszeit: Some(ereigniszeit),
+                erfasst_lokal_at: None,
+                berichtigt_eintrag_id: None,
+            },
+        )
         .await?;
 
-    tx.commit().await?;
+        sqlx::query("UPDATE chat_nachricht SET etb_eintrag_id = ? WHERE id = ?")
+            .bind(etb_id)
+            .bind(nachricht_id)
+            .execute(&mut *conn)
+            .await?;
+
+        Ok(etb_id)
+    })?;
     Ok(etb_id)
 }
 
@@ -544,44 +546,44 @@ pub async fn heraufstufen_zu_auftrag(
         .await?;
     let org_einst =
         crate::org::einstellungen::laden_oder_default(pool, org_id.unwrap_or(0)).await?;
-    let mut tx = pool.begin().await?;
+    let auftrag_id = crate::write_retry!(pool, |conn| {
+        // Guard: schon zu einem Auftrag heraufgestuft oder gelöscht? (Sperrt Doppel-Heraufstufung.)
+        let zustand: Option<(Option<i64>, Option<String>)> =
+            sqlx::query_as("SELECT auftrag_id, geloescht_at FROM chat_nachricht WHERE id = ?")
+                .bind(nachricht_id)
+                .fetch_optional(&mut *conn)
+                .await?;
+        let (auftrag_vorhanden, geloescht) = zustand.ok_or(AppError::NotFound)?;
+        if auftrag_vorhanden.is_some() {
+            return Err(AppError::Conflict(
+                "Nachricht ist bereits zu einem Auftrag heraufgestuft".into(),
+            ));
+        }
+        if geloescht.is_some() {
+            return Err(AppError::Conflict(
+                "Gelöschte Nachricht kann nicht heraufgestuft werden".into(),
+            ));
+        }
 
-    // Guard: schon zu einem Auftrag heraufgestuft oder gelöscht? (Sperrt Doppel-Heraufstufung.)
-    let zustand: Option<(Option<i64>, Option<String>)> =
-        sqlx::query_as("SELECT auftrag_id, geloescht_at FROM chat_nachricht WHERE id = ?")
-            .bind(nachricht_id)
-            .fetch_optional(&mut *tx)
-            .await?;
-    let (auftrag_vorhanden, geloescht) = zustand.ok_or(AppError::NotFound)?;
-    if auftrag_vorhanden.is_some() {
-        return Err(AppError::Conflict(
-            "Nachricht ist bereits zu einem Auftrag heraufgestuft".into(),
-        ));
-    }
-    if geloescht.is_some() {
-        return Err(AppError::Conflict(
-            "Gelöschte Nachricht kann nicht heraufgestuft werden".into(),
-        ));
-    }
-
-    let auftrag_id = crate::auftrag::repo::anlegen_tx(
-        &mut tx,
-        einsatz_id,
-        heraufstufer_id,
-        einst.auftrag_startwert(),
-        einst.etb_startwert(),
-        crate::einsatz::effektiv::effektiv_auto_etb_aktiv(&einst, &org_einst),
-        &daten,
-    )
-    .await?;
-
-    sqlx::query("UPDATE chat_nachricht SET auftrag_id = ? WHERE id = ?")
-        .bind(auftrag_id)
-        .bind(nachricht_id)
-        .execute(&mut *tx)
+        let auftrag_id = crate::auftrag::repo::anlegen_tx(
+            &mut *conn,
+            einsatz_id,
+            heraufstufer_id,
+            einst.auftrag_startwert(),
+            einst.etb_startwert(),
+            crate::einsatz::effektiv::effektiv_auto_etb_aktiv(&einst, &org_einst),
+            &daten,
+        )
         .await?;
 
-    tx.commit().await?;
+        sqlx::query("UPDATE chat_nachricht SET auftrag_id = ? WHERE id = ?")
+            .bind(auftrag_id)
+            .bind(nachricht_id)
+            .execute(&mut *conn)
+            .await?;
+
+        Ok(auftrag_id)
+    })?;
     Ok(auftrag_id)
 }
 

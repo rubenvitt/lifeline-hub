@@ -72,10 +72,17 @@ impl AppError {
             AppError::UnprocessableEntity(_) => StatusCode::UNPROCESSABLE_ENTITY,
             // Sicherheitsnetz (LFH-245): nicht vorab abgefangene Constraint-Verletzungen
             // bekommen einen fachlichen Statuscode statt eines nackten 500.
-            AppError::Database(_) => self
-                .constraint_violation()
-                .map(|(status, _)| status)
-                .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+            AppError::Database(e) => {
+                if crate::tx::ist_busy(e) {
+                    // Erschöpfte Busy-Retries (F09/LFH-240): Writer dauerhaft belegt →
+                    // fachlich „später erneut versuchen" statt undurchsichtigem 500.
+                    StatusCode::SERVICE_UNAVAILABLE
+                } else {
+                    self.constraint_violation()
+                        .map(|(status, _)| status)
+                        .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
+                }
+            }
             AppError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::NotImplemented(_) => StatusCode::NOT_IMPLEMENTED,
             AppError::BadGateway(_) => StatusCode::BAD_GATEWAY,
@@ -123,7 +130,11 @@ impl IntoResponse for AppError {
         // damit keine internen Details (SQL, Pfade) nach außen gelangen.
         let message = match &self {
             AppError::Database(e) => {
-                if let Some((_, generic)) = self.constraint_violation() {
+                if crate::tx::ist_busy(e) {
+                    // Schreibkonflikt nach erschöpften Busy-Retries (F09): 503, nicht 500.
+                    tracing::warn!("Schreibkonflikt nach Busy-Retries (503): {e}");
+                    "Dienst vorübergehend ausgelastet — bitte erneut versuchen.".to_string()
+                } else if let Some((_, generic)) = self.constraint_violation() {
                     // Constraint-Verletzung: fachlich beantworten, das SQL-Detail
                     // (Constraint-Name, Werte) bleibt im Log.
                     tracing::warn!("Constraint-Verletzung (Sicherheitsnetz): {e}");

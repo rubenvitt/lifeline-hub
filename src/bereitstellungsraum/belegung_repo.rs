@@ -1,6 +1,6 @@
 use super::{repo, BrBelegungAnzeige, BrBelegungsArt, BrStatus, ObjektTyp};
 use crate::error::AppError;
-use sqlx::{Sqlite, SqlitePool, Transaction};
+use sqlx::{SqliteConnection, SqlitePool};
 
 const SELECT_ALLE: &str = "\
     SELECT id, einsatz_id, br_id, objekt_typ, objekt_id, art, notiz, zeitpunkt_at, erfasst_von \
@@ -48,37 +48,36 @@ pub async fn belege(
         )));
     }
 
-    // 4-7: read-then-write-Atomizität in einer Transaktion
-    let mut tx = pool.begin().await?;
-
-    let event_id = match typ {
-        ObjektTyp::Einheit => {
-            belege_einheit(
-                &mut tx,
-                einsatz_id,
-                br_id,
-                objekt_id,
-                belegungs_art,
-                notiz,
-                benutzer_id,
-            )
-            .await?
-        }
-        ObjektTyp::Fahrzeug => {
-            belege_fahrzeug(
-                &mut tx,
-                einsatz_id,
-                br_id,
-                objekt_id,
-                belegungs_art,
-                notiz,
-                benutzer_id,
-            )
-            .await?
-        }
-    };
-
-    tx.commit().await?;
+    // 4-7: read-then-write-Atomizität in einer Transaktion (F09: BEGIN IMMEDIATE + Retry)
+    let event_id = crate::write_retry!(pool, |conn| {
+        let event_id = match typ {
+            ObjektTyp::Einheit => {
+                belege_einheit(
+                    &mut *conn,
+                    einsatz_id,
+                    br_id,
+                    objekt_id,
+                    belegungs_art,
+                    notiz,
+                    benutzer_id,
+                )
+                .await?
+            }
+            ObjektTyp::Fahrzeug => {
+                belege_fahrzeug(
+                    &mut *conn,
+                    einsatz_id,
+                    br_id,
+                    objekt_id,
+                    belegungs_art,
+                    notiz,
+                    benutzer_id,
+                )
+                .await?
+            }
+        };
+        Ok(event_id)
+    })?;
     laden(pool, einsatz_id, event_id).await
 }
 
@@ -116,7 +115,7 @@ pub async fn laden(
 // ─── Interne Helpers ────────────────────────────────────────────────────────
 
 async fn belege_einheit(
-    tx: &mut Transaction<'_, Sqlite>,
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     br_id: i64,
     objekt_id: i64,
@@ -130,7 +129,7 @@ async fn belege_einheit(
     )
     .bind(objekt_id)
     .bind(einsatz_id)
-    .fetch_optional(&mut **tx)
+    .fetch_optional(&mut *conn)
     .await?;
 
     let aktueller_br_id = cache.ok_or(AppError::NotFound)?;
@@ -140,7 +139,7 @@ async fn belege_einheit(
 
     // 7a. Event-Insert
     let event_id = insert_event(
-        tx,
+        &mut *conn,
         einsatz_id,
         br_id,
         ObjektTyp::Einheit,
@@ -157,14 +156,14 @@ async fn belege_einheit(
         .bind(neuer_br_id)
         .bind(objekt_id)
         .bind(einsatz_id)
-        .execute(&mut **tx)
+        .execute(&mut *conn)
         .await?;
 
     Ok(event_id)
 }
 
 async fn belege_fahrzeug(
-    tx: &mut Transaction<'_, Sqlite>,
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     br_id: i64,
     objekt_id: i64,
@@ -178,7 +177,7 @@ async fn belege_fahrzeug(
     )
     .bind(objekt_id)
     .bind(einsatz_id)
-    .fetch_optional(&mut **tx)
+    .fetch_optional(&mut *conn)
     .await?;
 
     let (einheit_id, aktueller_br_id) = row.ok_or(AppError::NotFound)?;
@@ -196,7 +195,7 @@ async fn belege_fahrzeug(
 
     // 7a. Event-Insert
     let event_id = insert_event(
-        tx,
+        &mut *conn,
         einsatz_id,
         br_id,
         ObjektTyp::Fahrzeug,
@@ -213,7 +212,7 @@ async fn belege_fahrzeug(
         .bind(neuer_br_id)
         .bind(objekt_id)
         .bind(einsatz_id)
-        .execute(&mut **tx)
+        .execute(&mut *conn)
         .await?;
 
     Ok(event_id)
@@ -259,7 +258,7 @@ fn cache_nach_art(art: &BrBelegungsArt, br_id: i64) -> Option<i64> {
 }
 
 async fn insert_event(
-    tx: &mut Transaction<'_, Sqlite>,
+    conn: &mut SqliteConnection,
     einsatz_id: i64,
     br_id: i64,
     objekt_typ: ObjektTyp,
@@ -280,7 +279,7 @@ async fn insert_event(
     .bind(art.as_str())
     .bind(notiz)
     .bind(erfasst_von)
-    .fetch_one(&mut **tx)
+    .fetch_one(&mut *conn)
     .await?)
 }
 
