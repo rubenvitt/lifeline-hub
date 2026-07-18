@@ -3412,6 +3412,35 @@
           "freitext"
         ]
       },
+      "LiveEvent": {
+        "type": "string",
+        "description": "SSE-Wire-Event-Namen als BE↔FE-Kontrakt (LFH-298). Schema-Anker für die OpenAPI-Union;\ndie Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.",
+        "enum": [
+          "uhs",
+          "schaden",
+          "fahrzeug",
+          "material",
+          "tier",
+          "lage_zone",
+          "freies_zeichen",
+          "gefahr",
+          "einheit",
+          "abschnitt",
+          "person",
+          "lagebericht",
+          "chat",
+          "erinnerung",
+          "auftrag",
+          "nachforderung",
+          "meldung",
+          "bereitstellungsraum",
+          "karte_bild",
+          "etb",
+          "befehl",
+          "sofortmeldung",
+          "lagged"
+        ]
+      },
       "MaterialAnzeige": {
         "type": "object",
         "description": "Öffentliche Material-Darstellung (ohne `org_id`).",

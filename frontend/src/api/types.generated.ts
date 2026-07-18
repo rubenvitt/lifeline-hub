@@ -1160,6 +1160,12 @@ export interface components {
          * @enum {string}
          */
         LageberichtVorlage: "lagebericht" | "lagebeurteilung" | "freitext";
+        /**
+         * @description SSE-Wire-Event-Namen als BE↔FE-Kontrakt (LFH-298). Schema-Anker für die OpenAPI-Union;
+         *     die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
+         * @enum {string}
+         */
+        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "sofortmeldung" | "lagged";
         /** @description Öffentliche Material-Darstellung (ohne `org_id`). */
         MaterialAnzeige: {
             angelegt_at: string;
