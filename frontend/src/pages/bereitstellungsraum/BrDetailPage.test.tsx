@@ -7,6 +7,7 @@ import { server } from '../../test/server';
 import { App as AntApp } from 'antd';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import BrDetailPage from './BrDetailPage';
+import { AuthProvider } from '../../auth/AuthContext';
 import type { BrDetail, EinsatzAnzeige, Einheit, EinsatzFahrzeug } from '../../api/types';
 
 // -------- Fixture-Builder --------
@@ -68,11 +69,13 @@ function renderBrDetail(brId = 1) {
   render(
     <QueryClientProvider client={qc}>
       <AntApp>
-        <MemoryRouter initialEntries={[`/einsaetze/1/bereitstellungsraeume/${brId}`]}>
-          <Routes>
-            <Route path="/einsaetze/:id/bereitstellungsraeume/:brId" element={<BrDetailPage />} />
-          </Routes>
-        </MemoryRouter>
+        <AuthProvider>
+          <MemoryRouter initialEntries={[`/einsaetze/1/bereitstellungsraeume/${brId}`]}>
+            <Routes>
+              <Route path="/einsaetze/:id/bereitstellungsraeume/:brId" element={<BrDetailPage />} />
+            </Routes>
+          </MemoryRouter>
+        </AuthProvider>
       </AntApp>
     </QueryClientProvider>,
   );
@@ -83,12 +86,14 @@ function renderBrBei(route: string) {
   render(
     <QueryClientProvider client={qc}>
       <AntApp>
-        <MemoryRouter initialEntries={[route]}>
-          <Routes>
-            <Route path="/einsaetze/:id/bereitstellungsraeume" element={<div>BR-LISTE</div>} />
-            <Route path="/einsaetze/:id/bereitstellungsraeume/:brId" element={<BrDetailPage />} />
-          </Routes>
-        </MemoryRouter>
+        <AuthProvider>
+          <MemoryRouter initialEntries={[route]}>
+            <Routes>
+              <Route path="/einsaetze/:id/bereitstellungsraeume" element={<div>BR-LISTE</div>} />
+              <Route path="/einsaetze/:id/bereitstellungsraeume/:brId" element={<BrDetailPage />} />
+            </Routes>
+          </MemoryRouter>
+        </AuthProvider>
       </AntApp>
     </QueryClientProvider>,
   );

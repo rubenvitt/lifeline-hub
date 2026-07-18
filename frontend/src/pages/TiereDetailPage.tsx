@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
+import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { useAuth } from '../auth/AuthContext';
 import { aktualisiereTier, ladeTier, setzeTierStatus, storniereTier, tierRegistrierAnzeige, type TierPatch } from '../api/einsatzTier';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
@@ -52,6 +54,7 @@ function halterAnzeige(t: Tier): React.ReactNode {
 export default function TiereDetailPage() {
   const { id, tierId: tierIdParam } = useParams();
   const einsatzId = Number(id);
+  const { benutzer } = useAuth();
   const tierId = Number(tierIdParam);
   const idGueltig = parseRouteId(tierIdParam) != null;
   const navigate = useNavigate();
@@ -130,9 +133,7 @@ export default function TiereDetailPage() {
   }
   const t = detailQuery.data;
 
-  const darfSchreiben =
-    einsatz.status === 'aktiv' &&
-    (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   // Eine Detail-Zelle: im Edit-Modus ein noStyle-Form.Item mit Input, sonst die Read-Anzeige.
   // So bleibt beim Bearbeiten dieselbe Descriptions-Tabelle stehen — nur die Werte werden zu Feldern,

@@ -2,6 +2,8 @@ import { Alert, Breadcrumb, Spin, Tabs } from 'antd';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
+import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { useAuth } from '../auth/AuthContext';
 import { einsatzKeys } from '../api/queryKeys';
 import AuftraegeListe from '../auftraege/AuftraegeListe';
 import BefehlListe from '../auftraege/BefehlListe';
@@ -9,6 +11,7 @@ import BefehlListe from '../auftraege/BefehlListe';
 export default function AuftraegePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const { benutzer } = useAuth();
 
   const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
 
@@ -19,9 +22,7 @@ export default function AuftraegePage() {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben =
-    einsatz.status === 'aktiv' &&
-    (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   return (
     <div style={{ maxWidth: 1040, margin: '0 auto' }}>

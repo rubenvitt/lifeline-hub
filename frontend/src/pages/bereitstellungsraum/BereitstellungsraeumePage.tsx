@@ -7,6 +7,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { bereitstellungsraumDetailPfad } from '../../routing/deeplinks';
 import { ladeEinsatz } from '../../api/einsaetze';
+import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
+import { useAuth } from '../../auth/AuthContext';
 import { listeBr, legeBrAn, type BrEingabe } from '../../api/einsatzBereitstellungsraum';
 import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -21,6 +23,7 @@ const STATUS_META: Record<BrStatus, { label: string; color: string }> = {
 export default function BereitstellungsraeumePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const { benutzer } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { message } = App.useApp();
@@ -37,9 +40,7 @@ export default function BereitstellungsraeumePage() {
   const [anlegen, setAnlegen] = useState(false);
   const [form] = Form.useForm<BrEingabe>();
 
-  const ist_aktiv = einsatzQuery.data?.status === 'aktiv';
-  const ist_beobachter = einsatzQuery.data?.meine_rolle === 'beobachter';
-  const schreibgeschuetzt = !ist_aktiv || ist_beobachter;
+  const schreibgeschuetzt = !darfImEinsatzSchreiben(einsatzQuery.data, benutzer);
 
   const anlegenMut = useMutation({
     mutationFn: (daten: BrEingabe) => legeBrAn(einsatzId, daten),

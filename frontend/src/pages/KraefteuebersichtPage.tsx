@@ -8,6 +8,8 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { lageberichtDetailPfad } from '../routing/deeplinks';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
+import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { useAuth } from '../auth/AuthContext';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
@@ -92,6 +94,7 @@ function alleKeys(zeilen: MeldebildZeile[]): string[] {
 export default function KraefteuebersichtPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const { benutzer } = useAuth();
   const navigate = useNavigate();
   const { message } = AntApp.useApp();
 
@@ -159,7 +162,7 @@ export default function KraefteuebersichtPage() {
   if (einsatzQuery.isError || !einsatzQuery.data) return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   const einsatz = einsatzQuery.data;
   const v = bild.verdichtung;
-  const darfSchreiben = einsatz.status === 'aktiv' && (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   return (
     <div className="kraefte-print-root">

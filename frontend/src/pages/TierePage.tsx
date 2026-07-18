@@ -4,6 +4,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
+import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { useAuth } from '../auth/AuthContext';
 import { legeTierAn, listeTiere, tierRegistrierAnzeige, type TierEingabe } from '../api/einsatzTier';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
@@ -46,6 +48,7 @@ function halterAnzeige(t: Tier): React.ReactNode {
 export default function TierePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const { benutzer } = useAuth();
   const navigate = useNavigate();
   const [sicht, setSicht] = useState<Sicht>('aktiv');
   const [speziesFilter, setSpeziesFilter] = useState<Spezies | undefined>(undefined);
@@ -79,9 +82,7 @@ export default function TierePage() {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben =
-    einsatz.status === 'aktiv' &&
-    (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   const alle = tiereQuery.data ?? [];
   const tiere = alle

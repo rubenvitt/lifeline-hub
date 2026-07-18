@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { einsatzKeys } from '../../api/queryKeys';
 import { ladeEinsatz, ladeEinstellungen } from '../../api/einsaetze';
+import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
+import { useAuth } from '../../auth/AuthContext';
 import { listeUhs } from '../../api/einsatzUhs';
 import { listeSchaeden } from '../../api/einsatzSchaden';
 import { ladeKarteConfig } from '../../api/karte';
@@ -33,6 +35,7 @@ interface LagekarteDatenArgs {
  * hängt bewusst nur an `zeigeZonen` (nicht am ganzen Layer-State), damit die Grenze sauber bleibt.
  */
 export function useLagekarteDaten({ einsatzId, zeigeZonen }: LagekarteDatenArgs) {
+  const { benutzer } = useAuth();
   const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   const uhsQuery = useQuery({ queryKey: einsatzKeys.uhs(einsatzId), queryFn: () => listeUhs(einsatzId) });
   const schaedenQuery = useQuery({
@@ -78,9 +81,7 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen }: LagekarteDatenArgs)
   });
 
   const einsatz = einsatzQuery.data;
-  const darfSchreiben =
-    einsatz?.status === 'aktiv' &&
-    (einsatz?.meine_rolle === 'einsatzleitung' || einsatz?.meine_rolle === 'fuehrungspersonal');
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   const { verortet, nichtVerortet } = useMemo(
     () => baueMarker(einsatz, uhsQuery.data ?? [], schaedenQuery.data ?? []),

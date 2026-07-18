@@ -5,6 +5,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
 import UhsDetailPage from './UhsDetailPage';
+import { AuthProvider } from '../../auth/AuthContext';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { ladeUhs } from '../../api/einsatzUhs';
 
@@ -24,12 +25,14 @@ function renderBei(route: string) {
   return render(
     <QueryClientProvider client={qc}>
       <AntApp>
-        <MemoryRouter initialEntries={[route]}>
-          <Routes>
-            <Route path="/einsaetze/:id/unfallhilfsstellen/liste" element={<div>UHS-LISTE</div>} />
-            <Route path="/einsaetze/:id/unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />
-          </Routes>
-        </MemoryRouter>
+        <AuthProvider>
+          <MemoryRouter initialEntries={[route]}>
+            <Routes>
+              <Route path="/einsaetze/:id/unfallhilfsstellen/liste" element={<div>UHS-LISTE</div>} />
+              <Route path="/einsaetze/:id/unfallhilfsstellen/:uhsId" element={<UhsDetailPage />} />
+            </Routes>
+          </MemoryRouter>
+        </AuthProvider>
       </AntApp>
     </QueryClientProvider>,
   );

@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
+import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { useAuth } from '../auth/AuthContext';
 import {
   aktualisiereSchaden,
   ladeSchaden,
@@ -37,6 +39,7 @@ type EditWerte = SchadenPatch & { geschaedigt?: GeschaedigtWert };
 export default function SchaedenDetailPage() {
   const { id, schadenId: schadenIdParam } = useParams();
   const einsatzId = Number(id);
+  const { benutzer } = useAuth();
   const schadenId = Number(schadenIdParam);
   const idGueltig = parseRouteId(schadenIdParam) != null;
   const navigate = useNavigate();
@@ -115,9 +118,7 @@ export default function SchaedenDetailPage() {
   const s = detailQuery.data;
   const orgId = einsatz.org_id ?? 0;
 
-  const darfSchreiben =
-    einsatz.status === 'aktiv' &&
-    (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   // Eine Detail-Zelle: im Edit-Modus ein noStyle-Form.Item, sonst die Read-Anzeige — so bleibt
   // dieselbe Descriptions-Tabelle stehen, statt die Ansicht gegen ein separates Formular zu tauschen.

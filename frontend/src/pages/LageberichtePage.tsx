@@ -6,6 +6,8 @@ import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { lageberichtDetailPfad } from '../routing/deeplinks';
 import { ladeEinsatz } from '../api/einsaetze';
+import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { legeLageberichtAn, listeLageberichte, type NeuerLagebericht } from '../api/lageberichte';
@@ -15,6 +17,7 @@ import { VORLAGEN } from '../lageberichte/vorlagen';
 export default function LageberichtePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const { benutzer } = useAuth();
   const { message } = App.useApp();
   const qc = useQueryClient();
   const [anlegenOffen, setAnlegenOffen] = useState(false);
@@ -55,9 +58,7 @@ export default function LageberichtePage() {
     return <Typography.Text type="danger">Einsatz nicht gefunden oder kein Zugriff.</Typography.Text>;
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben =
-    einsatz.status === 'aktiv' &&
-    (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   const berichte = berichteQuery.data ?? [];
 

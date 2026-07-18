@@ -4,6 +4,8 @@ import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { ladeEinsatz } from '../api/einsaetze';
+import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { useAuth } from '../auth/AuthContext';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { listeFahrzeuge } from '../api/fahrzeuge';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
@@ -132,6 +134,7 @@ function BesatzungsBlock({
 export default function FahrzeugePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const { benutzer } = useAuth();
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [adhocOffen, setAdhocOffen] = useState(false);
@@ -211,9 +214,7 @@ export default function FahrzeugePage() {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben =
-    einsatz.status === 'aktiv' &&
-    (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   const efs = efQuery.data ?? [];
   const stati = statusQuery.data ?? [];

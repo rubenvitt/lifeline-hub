@@ -4,6 +4,8 @@ import { Link, useParams } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
+import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { useAuth } from '../auth/AuthContext';
 import { listeEinheitTypen } from '../api/einheitTypen';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
@@ -81,6 +83,7 @@ interface KopfWerte {
 export default function EinheitenPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const { benutzer } = useAuth();
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [gewaehlt, setGewaehlt] = useState<number | null>(null);
@@ -215,9 +218,7 @@ export default function EinheitenPage() {
     return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
   }
   const einsatz = einsatzQuery.data;
-  const darfSchreiben =
-    einsatz.status === 'aktiv' &&
-    (einsatz.meine_rolle === 'einsatzleitung' || einsatz.meine_rolle === 'fuehrungspersonal');
+  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   return (
     <div>

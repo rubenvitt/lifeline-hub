@@ -150,7 +150,9 @@ describe('EinsatzdatenPage', () => {
   });
 
   it('blendet Verwaltungs-Aktionen für Führungspersonal aus', async () => {
-    setup({ einsatz: { meine_rolle: 'fuehrungspersonal' } });
+    // benutzer ohne System-Admin: sonst gewährt der admin-globale Zweig (LFH-234) die
+    // Leitungs-/Verwaltungsrechte auch dem Führungspersonal-Konto. Hier zählt die Einsatz-Rolle.
+    setup({ einsatz: { meine_rolle: 'fuehrungspersonal' }, benutzer: { ...admin, system_rolle: 'keiner' } });
     expect(await screen.findByText('Frank Führung')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Entfernen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Hinzufügen' })).not.toBeInTheDocument();
