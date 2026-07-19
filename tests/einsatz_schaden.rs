@@ -300,7 +300,7 @@ async fn uebergeben_ohne_adressat_ist_422() {
 }
 
 #[tokio::test]
-async fn uebergeben_aus_abgeschlossen_ist_409() {
+async fn uebergeben_aus_abgeschlossen_ist_422() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
@@ -321,7 +321,7 @@ async fn uebergeben_aus_abgeschlossen_ist_409() {
         Some(&json!({"uebergeben_an":"Bauhof"})),
     )
     .await;
-    assert_eq!(s, StatusCode::CONFLICT);
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
 }
 
 #[tokio::test]
@@ -378,7 +378,7 @@ async fn abschliessen_ohne_grund_ist_422() {
 }
 
 #[tokio::test]
-async fn abschliessen_aus_abgeschlossen_ist_409() {
+async fn abschliessen_aus_abgeschlossen_ist_422() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
@@ -399,7 +399,7 @@ async fn abschliessen_aus_abgeschlossen_ist_409() {
         Some(&json!({"abschluss_grund":"behoben"})),
     )
     .await;
-    assert_eq!(s, StatusCode::CONFLICT);
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
 }
 
 #[tokio::test]
