@@ -18,11 +18,15 @@ pub struct OrganisationAnzeige {
 /// Jeder eingeloggte Nutzer.
 pub async fn lesen(
     State(state): State<AppState>,
-    CurrentUser(_benutzer): CurrentUser,
+    CurrentUser(benutzer): CurrentUser,
 ) -> Result<Json<OrganisationAnzeige>, AppError> {
+    // Die EIGENE Organisation (F05/LFH-232), nicht `ORDER BY id LIMIT 1`: sonst sähe ein
+    // Nutzer der zweiten Org die Stammdaten der ersten — inkl. `tz_organisation`, das die
+    // taktischen Zeichen der gesamten Oberfläche steuert.
     let org = sqlx::query_as::<_, OrganisationAnzeige>(
-        "SELECT id, name, tz_organisation FROM organisation ORDER BY id LIMIT 1",
+        "SELECT id, name, tz_organisation FROM organisation WHERE id = ?",
     )
+    .bind(benutzer.org_id)
     .fetch_one(&state.pool)
     .await?;
     Ok(Json(org))
@@ -48,7 +52,7 @@ const ERLAUBTE_ORG: &[&str] = &[
 /// PATCH /api/organisation — Org-Default setzen. Nur Admin.
 pub async fn aktualisieren(
     State(state): State<AppState>,
-    _admin: AdminUser,
+    AdminUser(benutzer): AdminUser,
     Json(body): Json<OrgPatch>,
 ) -> Result<Json<OrganisationAnzeige>, AppError> {
     if !ERLAUBTE_ORG.contains(&body.tz_organisation.as_str()) {
@@ -56,16 +60,17 @@ pub async fn aktualisieren(
             "Unbekannte Organisation".into(),
         ));
     }
-    sqlx::query(
-        "UPDATE organisation SET tz_organisation = ? \
-         WHERE id = (SELECT id FROM organisation ORDER BY id LIMIT 1)",
-    )
-    .bind(&body.tz_organisation)
-    .execute(&state.pool)
-    .await?;
+    // Der Admin pflegt seine EIGENE Organisation (F05/LFH-232). Er ist zwar serverweit
+    // berechtigt, aber „welche Org" darf nicht von der Zeilenreihenfolge abhängen.
+    sqlx::query("UPDATE organisation SET tz_organisation = ? WHERE id = ?")
+        .bind(&body.tz_organisation)
+        .bind(benutzer.org_id)
+        .execute(&state.pool)
+        .await?;
     let org = sqlx::query_as::<_, OrganisationAnzeige>(
-        "SELECT id, name, tz_organisation FROM organisation ORDER BY id LIMIT 1",
+        "SELECT id, name, tz_organisation FROM organisation WHERE id = ?",
     )
+    .bind(benutzer.org_id)
     .fetch_one(&state.pool)
     .await?;
     Ok(Json(org))

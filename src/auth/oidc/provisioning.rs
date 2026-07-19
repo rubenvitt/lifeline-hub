@@ -122,12 +122,35 @@ pub async fn finde_oder_provisioniere(
         return Ok(vorhanden);
     }
 
-    // Single-Org (T1): alle Benutzer gehören zur (einzigen) Organisation — wie
-    // `routes/benutzer.rs::anlegen`.
-    let org_id: i64 = sqlx::query_scalar("SELECT id FROM organisation ORDER BY id LIMIT 1")
-        .fetch_optional(pool)
-        .await?
-        .ok_or_else(|| AppError::Internal("Keine Organisation vorhanden".into()))?;
+    // Ziel-Organisation des JIT-Provisionings (F05/LFH-232).
+    //
+    // Dieser Pfad ist der einzige, der ein Konto OHNE Admin-Zutun anlegt: er feuert beim
+    // ersten SSO-Login jedes Nutzers, den der IdP authentifiziert. Vorher stand hier
+    // `ORDER BY id LIMIT 1` — bei zwei Organisationen an einem gemeinsamen IdP (der
+    // Normalfall) wäre jeder Erstlogin still in Org 1 gelandet: der Fremde bekäme ein
+    // legitimes Org-1-Konto (und damit deren Stammdaten-Lesezugriff), während ein echtes
+    // Org-2-Mitglied nie in Org 2 ankäme.
+    //
+    // Die richtige Lösung ist ein Mapping Issuer/Claim → Organisation. Solange es das
+    // nicht gibt, ist die Zuordnung bei mehreren Organisationen schlicht nicht bestimmbar
+    // — dann wird **fail-closed** abgelehnt statt geraten. Bei genau einer Organisation
+    // ist die Zuordnung eindeutig und das Verhalten unverändert.
+    let organisationen: Vec<i64> = sqlx::query_scalar("SELECT id FROM organisation ORDER BY id")
+        .fetch_all(pool)
+        .await?;
+    let org_id = match organisationen.as_slice() {
+        [einzige] => *einzige,
+        [] => return Err(AppError::Internal("Keine Organisation vorhanden".into())),
+        _ => {
+            tracing::error!(
+                issuer = %claims.issuer,
+                organisationen = organisationen.len(),
+                "SSO-JIT-Provisioning abgelehnt: mehrere Organisationen, aber kein \
+                 Issuer→Organisation-Mapping — Zuordnung wäre geraten (F05/LFH-232)"
+            );
+            return Err(AppError::Forbidden);
+        }
+    };
 
     // Kollisions-Grundlage einmalig laden statt pro Kandidat async gegen die DB zu
     // fragen — `plane_benutzername` selbst bleibt dadurch pur/synchron.

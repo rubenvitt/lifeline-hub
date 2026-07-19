@@ -15,11 +15,18 @@ pub async fn anlegen(
     stichwort: Option<&str>,
     ersteller_id: i64,
 ) -> Result<Einsatz, AppError> {
-    // Single-Org in T1: alle Einsätze gehören zur (einzigen) Organisation.
-    let org_id: i64 = sqlx::query_scalar("SELECT id FROM organisation ORDER BY id LIMIT 1")
+    // Ein Einsatz gehört zur Organisation SEINES ERSTELLERS (F05/LFH-232). Vorher stand
+    // hier `SELECT id FROM organisation ORDER BY id LIMIT 1` („Single-Org in T1") — sobald
+    // eine zweite Organisation existiert, wäre jeder ihrer Einsätze in Org 1 gelandet und
+    // der Ersteller sofort ein org-fremdes Mitglied (die Mitgliedschaft unten umgeht
+    // `darf_fremdeinsatz_lesen`, weil `darf_lesen` bei vorhandener Rolle nicht mehr
+    // org-prüft). Der Wert ist damit auch bei genau einer Org identisch — nur eben aus
+    // der richtigen Quelle.
+    let org_id: i64 = sqlx::query_scalar("SELECT org_id FROM benutzer WHERE id = ?")
+        .bind(ersteller_id)
         .fetch_optional(pool)
         .await?
-        .ok_or_else(|| AppError::Internal("Keine Organisation vorhanden".into()))?;
+        .ok_or_else(|| AppError::Internal("Ersteller nicht gefunden".into()))?;
 
     let einsatz_id = crate::write_retry!(pool, |conn| {
         // Einsatznummer JJJJ-NNN: NNN je Organisation + Jahr fortlaufend, 3-stellig.
@@ -636,16 +643,31 @@ pub async fn setze_rolle(
     benutzer_id: i64,
     rolle: EinsatzRolle,
 ) -> Result<(), AppError> {
-    sqlx::query(
+    // Org-Guard IM SQL (F05/LFH-232), nicht im Handler: dies ist einer von nur zwei
+    // produktiven INSERTs in `einsatz_mitgliedschaft` und damit ein Chokepoint der
+    // Mandanten-Grenze. Eine org-fremde Mitgliedschaft würde die Isolation aus LFH-115
+    // vollständig aushebeln — `darf_lesen` prüft bei vorhandener Rolle die Org nicht mehr.
+    // Als `WHERE EXISTS` kann kein künftiger Aufrufer den Check vergessen.
+    let betroffen = sqlx::query(
         "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle) \
-         VALUES (?, ?, ?) \
+         SELECT ?1, ?2, ?3 \
+         WHERE EXISTS (SELECT 1 FROM benutzer b JOIN einsatz e ON e.id = ?1 \
+                       WHERE b.id = ?2 AND b.org_id = e.org_id) \
          ON CONFLICT(einsatz_id, benutzer_id) DO UPDATE SET einsatz_rolle = excluded.einsatz_rolle",
     )
     .bind(einsatz_id)
     .bind(benutzer_id)
     .bind(rolle.as_str())
     .execute(pool)
-    .await?;
+    .await?
+    .rows_affected();
+
+    if betroffen == 0 {
+        // `NotFound` statt `Forbidden`: aus Sicht dieses Einsatzes gibt es den Benutzer
+        // nicht — die Existenz org-fremder Konten bleibt so unbeobachtbar (konsistent mit
+        // dem bestehenden „Ziel-Benutzer unbekannt"-Pfad in `mitglied_setzen`).
+        return Err(AppError::NotFound);
+    }
     Ok(())
 }
 

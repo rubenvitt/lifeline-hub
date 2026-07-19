@@ -527,11 +527,20 @@ pub async fn mitglied_setzen(
     let neue_rolle = EinsatzRolle::parse(&req.einsatz_rolle)
         .ok_or_else(|| AppError::Validation("Ungültige einsatz_rolle".into()))?;
 
-    // Ziel-Benutzer muss existieren und aktiv sein.
-    let ziel_aktiv: Option<bool> = sqlx::query_scalar("SELECT aktiv FROM benutzer WHERE id = ?")
-        .bind(ziel_id)
-        .fetch_optional(&state.pool)
-        .await?;
+    // Ziel-Benutzer muss existieren, zur Organisation DIESES Einsatzes gehören und aktiv
+    // sein. Der Org-Bezug gehört schon hierher (F05/LFH-232): der eigentliche Guard sitzt
+    // zwar in `repo::setze_rolle`, aber diese Vorabprüfung entscheidet den Statuscode
+    // VORHER. Ohne `org_id`-Filter träfe ein org-fremdes, deaktiviertes Konto auf
+    // 409 „deaktiviert", ein unbekanntes auf 404 — eine Einsatzleitung (kein Admin!)
+    // könnte damit den ID-Raum abklopfen und die Existenz fremder Konten feststellen.
+    let ziel_aktiv: Option<bool> = sqlx::query_scalar(
+        "SELECT b.aktiv FROM benutzer b JOIN einsatz e ON e.id = ? \
+         WHERE b.id = ? AND b.org_id = e.org_id",
+    )
+    .bind(id)
+    .bind(ziel_id)
+    .fetch_optional(&state.pool)
+    .await?;
     match ziel_aktiv {
         None => return Err(AppError::NotFound),
         Some(false) => return Err(AppError::Conflict("Benutzer ist deaktiviert".into())),
