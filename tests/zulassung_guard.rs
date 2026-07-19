@@ -117,3 +117,45 @@ fn ausnahmeliste_ist_duplikatfrei() {
         gesehen.push(*eintrag);
     }
 }
+
+/// Die Schutzschichten wirken nur, wenn sie auch montiert sind — und genau diese eine Zeile
+/// je Schicht ist im Merge am leichtesten zu verlieren. Alle Unit-Tests der Module bleiben
+/// dabei grün (sie bauen ihren eigenen Router bzw. Server), während in Produktion jeder
+/// Request wieder unbegrenzt liefe. Der Guard prüft deshalb die Montagestellen im Quelltext.
+#[test]
+fn die_schutzschichten_sind_im_produktionscode_montiert() {
+    let app = fs::read_to_string("src/app.rs").expect("src/app.rs lesbar");
+    let main = fs::read_to_string("src/main.rs").expect("src/main.rs lesbar");
+    let mut fehlt = Vec::new();
+
+    if !app.contains("zulassung::zulassung") {
+        fehlt.push(
+            "src/app.rs montiert die Zulassungssteuerung nicht mehr \
+             (from_fn_with_state(…, zulassung::zulassung)) — Zeitbudget und \
+             Gleichzeitigkeits-Cap sind damit wirkungslos",
+        );
+    }
+
+    // Beide Serve-Pfade (TLS und Klartext) müssen die Verbindungsfristen setzen UND den
+    // Akzeptor hängen — je zweimal, sonst ist einer der Pfade ungeschützt.
+    let fristen = main.matches("zeitschranken_setzen").count();
+    if fristen < 2 {
+        fehlt.push(
+            "src/main.rs ruft zeitschranken_setzen nicht in BEIDEN Serve-Pfaden auf — \
+             ein Pfad läuft ohne Header-/Keep-Alive-Frist",
+        );
+    }
+    let akzeptoren = main.matches("SemaphorAkzeptor").count();
+    if akzeptoren < 2 {
+        fehlt.push(
+            "src/main.rs hängt den SemaphorAkzeptor nicht in BEIDE Serve-Pfade — \
+             ein Pfad läuft ohne Verbindungs-Obergrenze",
+        );
+    }
+
+    assert!(
+        fehlt.is_empty(),
+        "Schutzschichten nicht vollständig montiert:\n{}",
+        fehlt.join("\n")
+    );
+}

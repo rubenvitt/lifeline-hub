@@ -215,7 +215,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         // das Verbindungs-Permit deckt ihn also mit ab.
         let mut server = axum_server::bind_rustls(addr, tls_config)
             .map(|a| a.acceptor(verbindung::SemaphorAkzeptor::default()));
-        verbindung::zeitschranken_setzen(&mut server, verbindung::HEADER_READ_TIMEOUT);
+        verbindung::zeitschranken_setzen(&mut server, verbindung::Fristen::default());
         server.handle(handle).serve(app.into_make_service()).await?;
     } else {
         // LFH-231/G10: `axum::serve` exponiert die hyper-Server-Parameter nicht — es baut den
@@ -230,7 +230,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         let handle = graceful_handle();
         let mut server = axum_server::from_tcp(listener.into_std()?)
             .acceptor(verbindung::SemaphorAkzeptor::default());
-        verbindung::zeitschranken_setzen(&mut server, verbindung::HEADER_READ_TIMEOUT);
+        verbindung::zeitschranken_setzen(&mut server, verbindung::Fristen::default());
         server.handle(handle).serve(app.into_make_service()).await?;
     }
 

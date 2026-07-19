@@ -320,4 +320,26 @@ mod tests {
     fn unbekannter_pfad_ist_nicht_ausgenommen() {
         assert!(!ist_ausgenommen(&Method::GET, "/api/gibt/es/nicht"));
     }
+
+    /// Der Fallback (SPA/Static-Files) trägt KEINE `MatchedPath` — für ihn entscheidet die
+    /// Vorzeichenlogik der Bedingung, nicht die Liste. Ein Umschlagen von `is_some_and` auf
+    /// `is_none_or` würde die gesamte Fallback-Fläche still von Zeitbudget und Cap befreien,
+    /// ohne dass ein Listen-Test das merkt. Dieser Test schickt deshalb echten Verkehr durch
+    /// den Fallback.
+    #[tokio::test]
+    async fn fallback_ohne_matched_path_bleibt_geregelt() {
+        let router = Router::new()
+            .route("/api/einsaetze/{id}/live", get(langsam))
+            .fallback(langsam)
+            .layer(axum::middleware::from_fn_with_state(
+                Zulassung::neu(TEST_BUDGET, MAX_GLEICHZEITIGE_REQUESTS),
+                zulassung,
+            ));
+
+        assert_eq!(
+            status_von(router, "/ein/pfad/den/es/nicht/gibt").await,
+            StatusCode::SERVICE_UNAVAILABLE,
+            "der Fallback muss unter der Zulassungssteuerung bleiben"
+        );
+    }
 }

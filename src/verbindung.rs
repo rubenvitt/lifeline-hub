@@ -54,6 +54,20 @@ pub const HEADER_READ_TIMEOUT: Duration = Duration::from_secs(15);
 /// normalen Requests **dauerhaft** eine SSE-Verbindung hält (eine `EventSource` je Einsatz).
 pub const MAX_VERBINDUNGEN: usize = 1024;
 
+/// Abstand der HTTP/2-PING-Prüfungen auf einer im Leerlauf wirkenden Verbindung.
+///
+/// HTTP/2 kennt **kein** Gegenstück zu `header_read_timeout`: die Header liegen dort in
+/// HEADERS-Frames auf Streams, nicht in einer Lesephase vor dem Routing. Ein h2-Client, der
+/// Frames tröpfelt, liefe also an der h1-Frist vorbei. Die PING-basierte Keep-Alive-Prüfung
+/// ist der Ersatz — sie stellt fest, ob die Gegenstelle überhaupt noch antwortet, und räumt
+/// sie sonst ab.
+pub const HTTP2_KEEP_ALIVE_INTERVAL: Duration = Duration::from_secs(20);
+
+/// Wie lange auf die PING-Antwort gewartet wird, bevor die Verbindung als tot gilt.
+///
+/// Muss deutlich unter dem Intervall liegen, sonst überholen sich die Prüfungen.
+pub const HTTP2_KEEP_ALIVE_TIMEOUT: Duration = Duration::from_secs(10);
+
 /// Akzeptor, der jede Verbindung an ein Semaphore-Permit bindet.
 ///
 /// Das Permit lebt in [`PermitStream`] und fällt zurück, sobald die Verbindung geschlossen
@@ -113,17 +127,49 @@ where
     }
 }
 
-/// Setzt Timer und Header-Lese-Timeout auf dem hyper-Builder des Servers.
+/// Setzt Timer und Fristen auf dem hyper-Builder des Servers — für HTTP/1 **und** HTTP/2.
 ///
 /// Gilt für beide Bind-Arten (`from_tcp` wie `bind_rustls`), weil `http_builder` auf
 /// `impl<A> Server<A>` sitzt. Der Timer ist **nicht optional** — ohne ihn paniked hyper bei
 /// der ersten Verbindung, s. Modul-Doku.
-pub fn zeitschranken_setzen<A>(server: &mut axum_server::Server<A>, header_timeout: Duration) {
-    server
-        .http_builder()
+///
+/// **Beide Protokolle müssen konfiguriert werden.** `hyper_util`s `auto::Builder` hält
+/// getrennte h1-/h2-Konfigurationen und dispatcht nach ausgehandeltem Protokoll. Der
+/// TLS-Pfad bietet per ALPN `["h2", "http/1.1"]` an, und h2 ist über „prior knowledge"
+/// (h2c) auch im Klartext erreichbar — eine reine h1-Konfiguration ließe also ausgerechnet
+/// moderne Clients ungeschützt. Weil HTTP/2 kein `header_read_timeout` kennt, tritt dort die
+/// PING-basierte Keep-Alive-Prüfung an seine Stelle; `.http2()` braucht dafür einen
+/// **eigenen** Timer.
+pub fn zeitschranken_setzen<A>(server: &mut axum_server::Server<A>, fristen: Fristen) {
+    let builder = server.http_builder();
+    builder
         .http1()
         .timer(hyper_util::rt::TokioTimer::new())
-        .header_read_timeout(Some(header_timeout));
+        .header_read_timeout(Some(fristen.header_read));
+    builder
+        .http2()
+        .timer(hyper_util::rt::TokioTimer::new())
+        .keep_alive_interval(Some(fristen.h2_intervall))
+        .keep_alive_timeout(fristen.h2_timeout);
+}
+
+/// Die Verbindungsfristen, gebündelt — damit Tests sie auf Millisekunden stellen können und
+/// die Wirkung dadurch überhaupt beobachtbar wird.
+#[derive(Clone, Copy)]
+pub struct Fristen {
+    pub header_read: Duration,
+    pub h2_intervall: Duration,
+    pub h2_timeout: Duration,
+}
+
+impl Default for Fristen {
+    fn default() -> Self {
+        Self {
+            header_read: HEADER_READ_TIMEOUT,
+            h2_intervall: HTTP2_KEEP_ALIVE_INTERVAL,
+            h2_timeout: HTTP2_KEEP_ALIVE_TIMEOUT,
+        }
+    }
 }
 
 /// Verbindungs-IO, das sein Semaphore-Permit für die eigene Lebensdauer festhält.
@@ -174,7 +220,7 @@ mod tests {
     /// Bewusst ein ECHTER Listener statt `oneshot`: die Timer-Falle schlägt erst beim
     /// Verbindungsaufbau zu (`serve_connection`), nicht beim Bauen des Routers.
     async fn server_starten(
-        header_timeout: Duration,
+        fristen: Fristen,
         max_verbindungen: usize,
     ) -> (std::net::SocketAddr, SemaphorAkzeptor) {
         let app = Router::new().route("/ping", get(|| async { "pong" }));
@@ -185,7 +231,7 @@ mod tests {
 
         let akzeptor = SemaphorAkzeptor::neu(max_verbindungen);
         let mut server = axum_server::from_tcp(listener).acceptor(akzeptor.clone());
-        zeitschranken_setzen(&mut server, header_timeout);
+        zeitschranken_setzen(&mut server, fristen);
 
         tokio::spawn(async move { server.serve(app.into_make_service()).await });
 
@@ -199,7 +245,7 @@ mod tests {
     /// eine Antwort. Nur eine ECHTE Verbindung deckt das auf.
     #[tokio::test]
     async fn echte_anfrage_wird_beantwortet() {
-        let (addr, _) = server_starten(Duration::from_secs(5), 8).await;
+        let (addr, _) = server_starten(Fristen::default(), 8).await;
 
         let mut sock = tokio::net::TcpStream::connect(addr).await.expect("connect");
         sock.write_all(b"GET /ping HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
@@ -217,12 +263,86 @@ mod tests {
         assert!(text.contains("pong"), "Antwort war: {text}");
     }
 
+    /// HTTP/2 im Klartext („prior knowledge", h2c) — der Weg, auf dem ein Client die
+    /// h1-Konfiguration umgeht. Der Test beweist, dass der h2-Zweig konfiguriert ist und
+    /// bedient wird: fehlt `.http2().timer(..)`, paniked hyper beim Setzen der
+    /// Keep-Alive-Frist in der Verbindungs-Task und es kommt nie eine Antwort.
+    #[tokio::test]
+    async fn h2c_verbindung_wird_bedient() {
+        let (addr, _) = server_starten(Fristen::default(), 8).await;
+
+        let mut sock = tokio::net::TcpStream::connect(addr).await.expect("connect");
+        // Connection Preface, dann ein leerer SETTINGS-Frame (Länge 0, Typ 0x4, Stream 0).
+        sock.write_all(b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n")
+            .await
+            .expect("Preface");
+        sock.write_all(&[0, 0, 0, 4, 0, 0, 0, 0, 0])
+            .await
+            .expect("SETTINGS");
+
+        // Der Server muss seinerseits mit einem SETTINGS-Frame antworten.
+        let mut kopf = [0u8; 9];
+        tokio::time::timeout(Duration::from_secs(5), sock.read_exact(&mut kopf))
+            .await
+            .expect("Antwort binnen 5 s — sonst ist die h2-Verbindungs-Task gestorben")
+            .expect("lesen");
+
+        assert_eq!(
+            kopf[3], 0x4,
+            "erster Server-Frame muss SETTINGS sein, war Typ {}",
+            kopf[3]
+        );
+    }
+
+    /// Der eigentliche h2-Schutz: HTTP/2 kennt kein `header_read_timeout`, die Abwehr hängt an
+    /// der PING-basierten Keep-Alive-Prüfung. Ein Client, der die Verbindung offen hält und auf
+    /// PINGs nicht antwortet, muss abgeräumt werden — sonst bindet er seinen Verbindungsplatz
+    /// beliebig lange, genau der Slow-Loris-Fall auf h2.
+    #[tokio::test]
+    async fn stiller_h2_client_wird_abgeraeumt() {
+        // Fristen in Millisekunden, damit die Wirkung im Test überhaupt eintritt.
+        let (addr, _) = server_starten(
+            Fristen {
+                header_read: Duration::from_secs(30),
+                h2_intervall: Duration::from_millis(150),
+                h2_timeout: Duration::from_millis(150),
+            },
+            8,
+        )
+        .await;
+
+        let mut sock = tokio::net::TcpStream::connect(addr).await.expect("connect");
+        sock.write_all(b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n")
+            .await
+            .expect("Preface");
+        sock.write_all(&[0, 0, 0, 4, 0, 0, 0, 0, 0])
+            .await
+            .expect("SETTINGS");
+
+        // Ab jetzt schweigt der Client — insbesondere beantwortet er keine PINGs.
+        let mut muell = Vec::new();
+        let ergebnis =
+            tokio::time::timeout(Duration::from_secs(10), sock.read_to_end(&mut muell)).await;
+
+        assert!(
+            ergebnis.is_ok(),
+            "Server hat die stille h2-Verbindung nicht abgeräumt — Keep-Alive-Prüfung wirkungslos"
+        );
+    }
+
     /// Slow-Loris in klein: Verbindung offen halten, Header nie abschließen. Der Server muss
     /// sie nach der Frist von sich aus abräumen.
     #[tokio::test]
     async fn haengende_header_werden_abgeraeumt() {
         let frist = Duration::from_millis(400);
-        let (addr, _) = server_starten(frist, 8).await;
+        let (addr, _) = server_starten(
+            Fristen {
+                header_read: frist,
+                ..Fristen::default()
+            },
+            8,
+        )
+        .await;
 
         let mut sock = tokio::net::TcpStream::connect(addr).await.expect("connect");
         // Angefangener, nie beendeter Header-Block — genau das Slow-Loris-Muster.
@@ -243,7 +363,7 @@ mod tests {
     /// zu — jede geschlossene Verbindung muss ihren Platz zurückgeben.
     #[tokio::test]
     async fn platz_faellt_nach_der_verbindung_zurueck() {
-        let (addr, akzeptor) = server_starten(Duration::from_secs(5), 4).await;
+        let (addr, akzeptor) = server_starten(Fristen::default(), 4).await;
         assert_eq!(
             akzeptor.freie_plaetze(),
             4,
