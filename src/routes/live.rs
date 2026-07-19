@@ -12,14 +12,13 @@
 //! DB-Read pro Event, der bei Erfassungs-Bursts die Kosten des Live-Kanals vervielfachte.
 
 use crate::app::AppState;
-use crate::auth::session::CurrentUser;
 use crate::auth::Benutzer;
-use crate::einsatz::berechtigung::{fordere_lesezugriff, fordere_modul_zugriff};
+use crate::einsatz::berechtigung::fordere_modul_zugriff;
+use crate::einsatz::kontext::EinsatzLesezugriff;
 use crate::einsatz::modul::MODUL_KEYS;
 use crate::einsatz::modul_override;
-use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
-use axum::extract::{Path, State};
+use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::sse::{Event, KeepAlive, Sse};
 use sqlx::SqlitePool;
@@ -49,21 +48,19 @@ async fn erlaubte_module(
 
 /// GET /api/einsaetze/{id}/live — der Live-Feed des Einsatzes.
 ///
-/// Gatet auf Einsatz-Ebene (`fordere_lesezugriff`, deckt Org-Grenze, Soft-Delete,
-/// Retention und Nachlauffrist ab); die Modul-Ebene wirkt danach als Event-Filter.
-/// Bewusst KEIN `fordere_modul_zugriff` auf die Route selbst: sie gehört keinem Modul,
-/// und ein Modul-Gate hier wäre wieder die Tür, an der alle anderen Module vorbeikämen.
+/// `EinsatzLesezugriff<OhneModul>` (LFH-230) erzwingt strukturell Org-Floor +
+/// Lesezugriff (deckt Org-Grenze, Soft-Delete, Retention und Nachlauffrist ab) und
+/// **kein** Modul-Gate: die Route gehört keinem Modul. Ein Modul-Gate hier wäre wieder
+/// die eine Tür, an der alle anderen Module vorbeikämen — die Modul-Ebene wirkt
+/// stattdessen als Event-Filter weiter unten.
 pub async fn stream(
     State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    ctx: EinsatzLesezugriff,
     headers: HeaderMap,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?; // 404, wenn unbekannt
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-
-    let erlaubt = erlaubte_module(&state.pool, einsatz_id, einsatz.org_id, &benutzer).await?;
+    let einsatz_id = ctx.einsatz.id;
+    let erlaubt =
+        erlaubte_module(&state.pool, einsatz_id, ctx.einsatz.org_id, &ctx.benutzer).await?;
 
     // Reconnect-Resync (F14/LFH-263): schickt der Browser beim Auto-Reconnect eine
     // `Last-Event-ID`, liefert der LiveHub die seither verpassten Nachrichten nach

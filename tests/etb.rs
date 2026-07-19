@@ -486,8 +486,20 @@ async fn erfasster_eintrag_wird_live_publiziert() {
         .expect("Broadcast muss innerhalb 1s ankommen")
         .expect("Broadcast-Kanal liefert Nachricht");
     assert_eq!(nachricht.event.as_str(), "etb");
+    // F01/LFH-227: ID-only. Der Volltext (inhalt/von/an/erfasser_name) ging früher über
+    // den einsatzweiten Broadcast an JEDEN Abonnenten — auch an den, dem ETB entzogen war.
     let value: Value = serde_json::from_str(&nachricht.data).unwrap();
-    assert_eq!(value["inhalt"], "Live-Test");
+    assert_eq!(value["einsatz_id"], einsatz);
+    assert!(value["etb_id"].is_i64(), "etb_id muss die ID tragen");
+    assert!(
+        value.get("inhalt").is_none(),
+        "kein Volltext im Broadcast: {value}"
+    );
+    assert!(
+        !nachricht.data.contains("Live-Test"),
+        "Inhalt darf den Server nicht über den Kanal verlassen: {}",
+        nachricht.data
+    );
 }
 
 #[tokio::test]

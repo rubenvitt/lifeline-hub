@@ -124,6 +124,10 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/meldungen", Some("meldungen")),
     ("/api/einsaetze/{id}/auftraege", Some("auftraege")),
     ("/api/einsaetze/{id}/anhaenge", None),
+    // Live-Feed (F01/LFH-227): modul-lose Gate-Route. Die Modul-Berechtigung wirkt
+    // NICHT als Türsteher, sondern als Post-Filter pro Event im SSE-Builder — ein
+    // Modul-Gate hier würde die anderen Module wieder mit durchlassen.
+    ("/api/einsaetze/{id}/live", None),
 ];
 
 /// Längster-Präfix-Match über [`PFAD_KEY`]. Äußeres `None` = Pfad nicht registriert;
