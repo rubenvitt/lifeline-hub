@@ -264,6 +264,11 @@ pub struct PatchBody {
         deserialize_with = "crate::routes::support::deserialize_optional_field"
     )]
     pub halter_kontakt: Option<Option<String>>,
+    /// Optimistisches Lock (LFH-299/F10): der beim Laden gelesene `geaendert_at`-Stand.
+    /// Stimmt er nicht mehr → 409 statt stillem Overwrite. Fehlt er (Overwrite aus dem
+    /// Konfliktdialog, Halter-Zuordnung aus der Personen-Detailseite), wird bewusst
+    /// blind geschrieben.
+    pub basis_geaendert_at: Option<String>,
 }
 
 /// PATCH /api/einsaetze/{id}/tiere/{tid} — Stammfelder (Identität, Halter,
@@ -334,6 +339,7 @@ pub async fn aktualisieren(
         einsatz_id,
         tier_id,
         benutzer.id,
+        body.basis_geaendert_at.as_deref(),
         tier_repo::PatchDaten {
             rasse_beschreibung: rasse.as_deref(),
             rufname: rufname.as_deref(),

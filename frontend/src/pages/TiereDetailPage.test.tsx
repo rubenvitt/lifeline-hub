@@ -100,6 +100,41 @@ describe('TiereDetailPage — Stammdaten', () => {
     expect(body!.halter_kontakt).toBeNull();
   });
 
+  it('sendet beim Speichern den beim Laden gelesenen Stand als Baseline (LFH-299/F10)', async () => {
+    let body: Record<string, unknown> | null = null;
+    render(einsatzAktiv, tierBasis, [
+      http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...tierBasis });
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await vi.waitFor(() => expect(body).not.toBeNull());
+    expect(body!.basis_geaendert_at).toBe('2026-05-29 09:00:00');
+  });
+
+  it('zeigt bei 409 den Konfliktdialog; „Überschreiben" sendet ohne Baseline (LFH-299/F10)', async () => {
+    const koerper: Array<Record<string, unknown>> = [];
+    render(einsatzAktiv, tierBasis, [
+      http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
+        koerper.push((await request.json()) as Record<string, unknown>);
+        // Erster Save (mit Baseline) → 409; der Overwrite (ohne Baseline) → Erfolg.
+        if (koerper.length === 1) {
+          return HttpResponse.json({ error: 'Zwischenzeitlich geändert' }, { status: 409 });
+        }
+        return HttpResponse.json({ ...tierBasis });
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    // Konfliktdialog erscheint statt eines stillen Overwrites.
+    await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
+    await vi.waitFor(() => expect(koerper).toHaveLength(2));
+    expect(koerper[0].basis_geaendert_at).toBe('2026-05-29 09:00:00');
+    expect(koerper[1].basis_geaendert_at).toBeUndefined();
+  });
+
   it('Beobachter sieht keinen Bearbeiten-Button', async () => {
     render(einsatzBeobachter, tierBasis);
     await screen.findByRole('heading', { name: /Tier T-001/ });

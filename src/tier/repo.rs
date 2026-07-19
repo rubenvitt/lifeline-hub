@@ -175,17 +175,25 @@ pub async fn anlegen(
 /// Aktualisiert Stammfelder. Identitätsfelder via COALESCE (nur gesetzte);
 /// Halter-Felder mit expliziter NULL-Semantik (für den FK↔Freitext-Toggle).
 /// Setzt `geaendert_at`/`geaendert_von`. `NotFound`, falls nicht zum Einsatz.
+///
+/// Optimistisches Lock (LFH-299/F10, Muster aus `person::repo::aktualisiere`): trägt der
+/// Aufrufer `erwartet_geaendert_at` (den beim Laden gelesenen Stand), schreibt das UPDATE nur,
+/// solange `geaendert_at` unverändert ist — sonst `Conflict` (409) statt eines stillen
+/// Last-write-wins-Overwrites. `None` = bewusstes Overwrite (Escape-Hatch des Konfliktdialogs
+/// und der Halter-Zuordnung aus der Personen-Detailseite). Bei 0 betroffenen Zeilen wird 404
+/// (Zeile fehlt) von 409 (Zeile existiert, Stand veraltet) unterschieden.
 pub async fn aktualisiere(
     pool: &SqlitePool,
     einsatz_id: i64,
     tier_id: i64,
     geaendert_von: i64,
+    erwartet_geaendert_at: Option<&str>,
     daten: PatchDaten<'_>,
 ) -> Result<TierAnzeige, AppError> {
     // Nur anonyme `?`-Platzhalter (Codebase-Idiom, wie person/uhs). Reihenfolge der
     // `.bind()`-Aufrufe = Reihenfolge der `?` im SQL. Die Halter-Felder nutzen ein
     // Flag (`is_some`) + Wert (`flatten`)-Paar, damit `Some(None)` → NULL setzt.
-    let betroffen = sqlx::query(
+    let mut sql = String::from(
         "UPDATE einsatz_tier SET \
             rasse_beschreibung = COALESCE(?, rasse_beschreibung), \
             rufname = COALESCE(?, rufname), \
@@ -201,27 +209,46 @@ pub async fn aktualisiere(
             geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
             geaendert_von = ? \
          WHERE id = ? AND einsatz_id = ?",
-    )
-    .bind(daten.rasse_beschreibung)
-    .bind(daten.rufname)
-    .bind(daten.geschlecht)
-    .bind(daten.alter_geschaetzt)
-    .bind(daten.farbe_beschreibung)
-    .bind(daten.kennzeichnung)
-    .bind(daten.groesse_gewicht)
-    .bind(daten.antreff_ort)
-    .bind(daten.notiz)
-    .bind(daten.halter_person_id.is_some()) // Flag: Halter-FK im Patch enthalten?
-    .bind(daten.halter_person_id.flatten()) // Wert (oder NULL bei Some(None))
-    .bind(daten.halter_kontakt.is_some()) // Flag: Halter-Kontakt im Patch enthalten?
-    .bind(daten.halter_kontakt.flatten()) // Wert (oder NULL bei Some(None))
-    .bind(geaendert_von)
-    .bind(tier_id)
-    .bind(einsatz_id)
-    .execute(pool)
-    .await?
-    .rows_affected();
+    );
+    if erwartet_geaendert_at.is_some() {
+        sql.push_str(" AND geaendert_at = ?");
+    }
+    let mut q = sqlx::query(sqlx::AssertSqlSafe(sql))
+        .bind(daten.rasse_beschreibung)
+        .bind(daten.rufname)
+        .bind(daten.geschlecht)
+        .bind(daten.alter_geschaetzt)
+        .bind(daten.farbe_beschreibung)
+        .bind(daten.kennzeichnung)
+        .bind(daten.groesse_gewicht)
+        .bind(daten.antreff_ort)
+        .bind(daten.notiz)
+        .bind(daten.halter_person_id.is_some()) // Flag: Halter-FK im Patch enthalten?
+        .bind(daten.halter_person_id.flatten()) // Wert (oder NULL bei Some(None))
+        .bind(daten.halter_kontakt.is_some()) // Flag: Halter-Kontakt im Patch enthalten?
+        .bind(daten.halter_kontakt.flatten()) // Wert (oder NULL bei Some(None))
+        .bind(geaendert_von)
+        .bind(tier_id)
+        .bind(einsatz_id);
+    if let Some(stand) = erwartet_geaendert_at {
+        q = q.bind(stand);
+    }
+    let betroffen = q.execute(pool).await?.rows_affected();
     if betroffen == 0 {
+        // Mit Guard: existiert die Zeile → veralteter Stand (409), sonst fehlt sie (404).
+        if erwartet_geaendert_at.is_some() {
+            let existiert: Option<i64> =
+                sqlx::query_scalar("SELECT 1 FROM einsatz_tier WHERE id = ? AND einsatz_id = ?")
+                    .bind(tier_id)
+                    .bind(einsatz_id)
+                    .fetch_optional(pool)
+                    .await?;
+            if existiert.is_some() {
+                return Err(AppError::Conflict(
+                    "Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden.".into(),
+                ));
+            }
+        }
         return Err(AppError::NotFound);
     }
     laden(pool, einsatz_id, tier_id).await
@@ -523,6 +550,7 @@ mod tests {
             e,
             t.id,
             b,
+            None,
             PatchDaten {
                 halter_person_id: Some(None),
                 halter_kontakt: Some(Some("Frau Müller, 0170-123")),
@@ -587,5 +615,99 @@ mod tests {
         let t = anlegen(&pool, e, b, "aktiv", hund()).await.unwrap();
         let err = laden(&pool, 999, t.id).await.unwrap_err();
         assert!(matches!(err, AppError::NotFound));
+    }
+
+    /// LFH-299/F10: optimistisches Lock über `geaendert_at`. Deterministische Zeitstempel
+    /// (nicht `now`) vermeiden das 1s-Aliasing im Test.
+    #[tokio::test]
+    async fn aktualisiere_optimistisches_lock_ueber_geaendert_at() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let t = anlegen(&pool, e, b, "aktiv", hund()).await.unwrap();
+        // Bekannten, klar von „jetzt" verschiedenen Stand setzen.
+        sqlx::query("UPDATE einsatz_tier SET geaendert_at = '2000-01-01 00:00:00' WHERE id = ?")
+            .bind(t.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let stand = "2000-01-01 00:00:00";
+
+        // Korrekter Stand → Erfolg (und bumpt geaendert_at auf „jetzt").
+        aktualisiere(
+            &pool,
+            e,
+            t.id,
+            b,
+            Some(stand),
+            PatchDaten {
+                notiz: Some("A"),
+                ..PatchDaten::default()
+            },
+        )
+        .await
+        .expect("korrekter Stand muss durchgehen");
+
+        // Derselbe (jetzt veraltete) Stand → Conflict, kein Overwrite.
+        let err = aktualisiere(
+            &pool,
+            e,
+            t.id,
+            b,
+            Some(stand),
+            PatchDaten {
+                notiz: Some("B"),
+                ..PatchDaten::default()
+            },
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(err, AppError::Conflict(_)),
+            "veralteter Stand muss 409 (Conflict) sein, war: {err:?}"
+        );
+        let jetzt = laden(&pool, e, t.id).await.unwrap();
+        assert_eq!(
+            jetzt.notiz.as_deref(),
+            Some("A"),
+            "Konflikt darf den Overwrite nicht durchlassen"
+        );
+
+        // Ohne Stand (None) = bewusstes Overwrite (Escape-Hatch) → Erfolg.
+        aktualisiere(
+            &pool,
+            e,
+            t.id,
+            b,
+            None,
+            PatchDaten {
+                notiz: Some("C"),
+                ..PatchDaten::default()
+            },
+        )
+        .await
+        .expect("None = bewusstes Overwrite");
+        assert_eq!(
+            laden(&pool, e, t.id).await.unwrap().notiz.as_deref(),
+            Some("C")
+        );
+
+        // Guard gesetzt, Zeile existiert nicht → 404 (nicht 409).
+        let err = aktualisiere(
+            &pool,
+            e,
+            999_999,
+            b,
+            Some(stand),
+            PatchDaten {
+                notiz: Some("D"),
+                ..PatchDaten::default()
+            },
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(err, AppError::NotFound),
+            "fehlende Zeile bleibt 404, war: {err:?}"
+        );
     }
 }

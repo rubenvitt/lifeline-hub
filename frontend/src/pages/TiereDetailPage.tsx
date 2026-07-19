@@ -7,7 +7,7 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import { aktualisiereTier, ladeTier, setzeTierStatus, storniereTier, tierRegistrierAnzeige, type TierPatch } from '../api/einsatzTier';
-import { ApiError } from '../api/client';
+import { ApiError, istKonflikt } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { parseRouteId, personDetailPfad, tierePfad } from '../routing/deeplinks';
 import type { AbschlussGrund, Spezies, Tier, TierStatus } from '../api/types';
@@ -60,7 +60,7 @@ export default function TiereDetailPage() {
   const navigate = useNavigate();
 
   const qc = useQueryClient();
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const [bearbeiten, setBearbeiten] = useState(false);
   const [editForm] = Form.useForm<TierPatch & { halter?: HalterWert }>();
   const [abschlussOffen, setAbschlussOffen] = useState(false);
@@ -84,9 +84,28 @@ export default function TiereDetailPage() {
     enabled: idGueltig,
   });
 
+  // Optimistisches Lock (LFH-299/F10): `basis` trägt den beim Laden gelesenen geaendert_at-Stand;
+  // ein 409 öffnet den Konfliktdialog (neu laden vs. überschreiben), statt still zu überschreiben.
   const editMutation = useMutation({
-    mutationFn: (daten: TierPatch) => aktualisiereTier(einsatzId, tierId, daten),
-    onSuccess: () => { invalidateDetail(); setBearbeiten(false); }, onError: fehler,
+    mutationFn: (v: { daten: TierPatch; basis?: string; overwrite?: boolean }) =>
+      aktualisiereTier(einsatzId, tierId, v.daten, v.overwrite ? undefined : v.basis),
+    onSuccess: () => { invalidateDetail(); setBearbeiten(false); },
+    onError: (e, v) => {
+      if (istKonflikt(e)) {
+        modal.confirm({
+          title: 'Zwischenzeitlich geändert',
+          content:
+            'Dieses Tier wurde seit dem Öffnen von jemand anderem gespeichert. „Neu laden" verwirft deine Änderungen; „Überschreiben" speichert deine Werte über die des anderen.',
+          okText: 'Überschreiben',
+          okButtonProps: { danger: true },
+          cancelText: 'Neu laden',
+          onOk: () => editMutation.mutate({ daten: v.daten, overwrite: true }),
+          onCancel: () => { detailQuery.refetch(); setBearbeiten(false); },
+        });
+      } else {
+        fehler(e);
+      }
+    },
   });
   const statusMutation = useMutation({
     mutationFn: (v: { status: TierStatus }) => setzeTierStatus(einsatzId, tierId, { status: v.status }),
@@ -243,7 +262,7 @@ export default function TiereDetailPage() {
                 halter_person_id: h?.typ === 'person' ? h.refId : null,
                 halter_kontakt: h?.typ === 'extern' ? h.kontakt : null,
               };
-              editMutation.mutate(patch);
+              editMutation.mutate({ daten: patch, basis: t.geaendert_at });
             }}>
             {detailAnsicht}
             <Space style={{ marginTop: 16 }}>

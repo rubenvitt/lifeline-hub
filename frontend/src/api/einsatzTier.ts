@@ -62,8 +62,20 @@ export function legeTierAn(einsatzId: number, daten: TierEingabe): Promise<Tier>
   return apiSend<Tier>(`/api/einsaetze/${einsatzId}/tiere`, 'POST', daten);
 }
 
-export function aktualisiereTier(einsatzId: number, tierId: number, daten: TierPatch): Promise<Tier> {
-  return apiSend<Tier>(`/api/einsaetze/${einsatzId}/tiere/${tierId}`, 'PATCH', daten);
+/**
+ * Optimistisches Lock (LFH-299/F10): `basisGeaendertAt` trägt den beim Laden gelesenen
+ * `geaendert_at`-Stand. Ist er veraltet → 409 statt stillem Overwrite. Ohne Baseline
+ * (Halter-Zuordnung aus der Personen-Detailseite, Konfliktdialog-Overwrite) wird bewusst
+ * blind geschrieben.
+ */
+export function aktualisiereTier(
+  einsatzId: number,
+  tierId: number,
+  daten: TierPatch,
+  basisGeaendertAt?: string,
+): Promise<Tier> {
+  const body = basisGeaendertAt ? { ...daten, basis_geaendert_at: basisGeaendertAt } : daten;
+  return apiSend<Tier>(`/api/einsaetze/${einsatzId}/tiere/${tierId}`, 'PATCH', body);
 }
 
 export function setzeTierStatus(einsatzId: number, tierId: number, daten: TierStatusEingabe): Promise<Tier> {
