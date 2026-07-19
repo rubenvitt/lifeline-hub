@@ -985,6 +985,15 @@ pub fn build_router(state: AppState) -> Router {
         // {error}-JSON, statt die Verbindung ohne Antwort abzureißen — Letzteres klassifiziert
         // das Frontend als Netzwerkfehler und der Offline-Puffer als „kein Netz".
         .layer(tower_http::catch_panic::CatchPanicLayer::custom(on_panic))
+        // Zulassungssteuerung (LFH-226/G08): Zeitbudget + Gleichzeitigkeits-Cap mit Lastabwurf.
+        // Als ÄUSSERSTE Schicht montiert, damit sie eine Handler-Panik nicht als Unwind durch
+        // ihren eigenen Rumpf bekommt, sondern die von `CatchPanicLayer` erzeugte 500-Antwort.
+        // Die Ausnahmeliste greift trotzdem: `MatchedPath` wird beim Routing gesetzt, also
+        // bevor irgendein per `Router::layer` montierter Layer läuft.
+        .layer(axum::middleware::from_fn_with_state(
+            crate::zulassung::Zulassung::default(),
+            crate::zulassung::zulassung,
+        ))
         .with_state(state)
 }
 
