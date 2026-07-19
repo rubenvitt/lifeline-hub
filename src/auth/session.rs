@@ -68,6 +68,21 @@ pub async fn loeschen(pool: &SqlitePool, token: &str) -> Result<(), AppError> {
     Ok(())
 }
 
+/// Benutzer-ID hinter einem Session-Token, ohne die Session zu verändern oder ihre
+/// Gültigkeit zu prüfen.
+///
+/// Für die Audit-Spur beim Logout (LFH-249/F30): wer sich abmeldet, muss VOR dem Löschen
+/// bestimmt werden, danach ist die Zuordnung weg. Bewusst eine eigene Funktion, statt
+/// `hash_token` öffentlich zu machen — die Hash-Logik bleibt in diesem Modul gekapselt.
+pub async fn benutzer_id_zu_token(pool: &SqlitePool, token: &str) -> Option<i64> {
+    sqlx::query_scalar("SELECT benutzer_id FROM session WHERE token_hash = ?")
+        .bind(hash_token(token))
+        .fetch_optional(pool)
+        .await
+        .ok()
+        .flatten()
+}
+
 /// Löst eine gültige (nicht abgelaufene) Session zu einem aktiven Benutzer auf.
 async fn benutzer_aus_token(pool: &SqlitePool, token: &str) -> Result<Benutzer, AppError> {
     let benutzer = sqlx::query_as::<_, Benutzer>(

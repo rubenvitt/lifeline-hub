@@ -1,7 +1,9 @@
+pub mod audit;
 pub mod bootstrap;
 pub mod oidc;
 pub mod password;
 pub mod provider;
+pub mod rate_limit;
 pub mod session;
 pub mod totp;
 pub mod webauthn;

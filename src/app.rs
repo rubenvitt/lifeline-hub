@@ -986,15 +986,56 @@ pub fn build_router(state: AppState) -> Router {
         // das Frontend als Netzwerkfehler und der Offline-Puffer als „kein Netz".
         .layer(tower_http::catch_panic::CatchPanicLayer::custom(on_panic))
         // Zulassungssteuerung (LFH-226/G08): Zeitbudget + Gleichzeitigkeits-Cap mit Lastabwurf.
-        // Als ÄUSSERSTE Schicht montiert, damit sie eine Handler-Panik nicht als Unwind durch
-        // ihren eigenen Rumpf bekommt, sondern die von `CatchPanicLayer` erzeugte 500-Antwort.
-        // Die Ausnahmeliste greift trotzdem: `MatchedPath` wird beim Routing gesetzt, also
-        // bevor irgendein per `Router::layer` montierter Layer läuft.
+        // Muss AUSSERHALB des `CatchPanicLayer` liegen, damit sie eine Handler-Panik nicht als
+        // Unwind durch ihren eigenen Rumpf bekommt, sondern die von `CatchPanicLayer` erzeugte
+        // 500-Antwort. Die Ausnahmeliste greift trotzdem: `MatchedPath` wird beim Routing
+        // gesetzt, also bevor irgendein per `Router::layer` montierter Layer läuft.
         .layer(axum::middleware::from_fn_with_state(
             crate::zulassung::Zulassung::default(),
             crate::zulassung::zulassung,
         ))
+        // Request-Instrumentierung (LFH-249/F30). Reihenfolge ist Absicht: `.layer()` hängt
+        // nach AUSSEN, der Trace-Layer liegt also außerhalb von CatchPanic UND Zulassung.
+        // Er sieht damit beides — die abgefederten Panik-500er und die Lastabwürfe der
+        // Zulassungssteuerung. Ein Lastabwurf, den niemand im Log sieht, wäre im
+        // Einsatzbetrieb genau die Sorte Vorfall, die man hinterher nicht rekonstruieren kann.
+        //
+        // Der eigentliche Gewinn ist, dass `src/error.rs` NICHT angefasst werden muss: sobald
+        // jeder Handler in diesem Span läuft, erben die bestehenden `tracing::error!`-Zeilen
+        // Methode, Pfad und Request-ID von selbst. Vorher war ein „Datenbankfehler" im Log
+        // keinem Endpunkt und keinem Aufrufer zuzuordnen.
+        .layer(tower_http::trace::TraceLayer::new_for_http().make_span_with(MakeSpanMitRequestId))
+        // Request-ID zuerst setzen (ganz außen), damit sie im Span oben schon dasteht, und
+        // in die Antwort spiegeln — so kann ein Nutzer die ID aus dem Fehlerfall melden.
+        .layer(tower_http::request_id::PropagateRequestIdLayer::x_request_id())
+        .layer(tower_http::request_id::SetRequestIdLayer::x_request_id(
+            tower_http::request_id::MakeRequestUuid,
+        ))
         .with_state(state)
+}
+
+/// Baut den `tracing`-Span jedes HTTP-Requests.
+///
+/// Eigene Implementierung statt `DefaultMakeSpan`, weil dieses die Request-ID nicht kennt —
+/// und genau die ist der Faden, an dem im Betrieb ein gemeldeter Fehler zu den zugehörigen
+/// Logzeilen zurückführt.
+#[derive(Clone, Copy)]
+struct MakeSpanMitRequestId;
+
+impl<B> tower_http::trace::MakeSpan<B> for MakeSpanMitRequestId {
+    fn make_span(&mut self, request: &axum::http::Request<B>) -> tracing::Span {
+        let request_id = request
+            .headers()
+            .get("x-request-id")
+            .and_then(|wert| wert.to_str().ok())
+            .unwrap_or("-");
+        tracing::info_span!(
+            "http",
+            methode = %request.method(),
+            pfad = %request.uri().path(),
+            request_id = %request_id,
+        )
+    }
 }
 
 /// Antwort auf einen Methoden-Mismatch (LFH-267/F22): 405 mit demselben `{error}`-JSON-Envelope

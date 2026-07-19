@@ -10,10 +10,43 @@
 //! Content-Type-Prüfung) und ersetzt ausschließlich die Rejection.
 
 use axum::extract::rejection::JsonRejection;
-use axum::extract::{FromRequest, Request};
+use axum::extract::{ConnectInfo, FromRequest, FromRequestParts, Request};
+use axum::http::request::Parts;
 use serde::de::DeserializeOwned;
+use std::convert::Infallible;
+use std::net::{IpAddr, SocketAddr};
 
 use crate::error::AppError;
+
+/// Quell-IP des Aufrufers, sofern ermittelbar (LFH-249/F30).
+///
+/// `ConnectInfo<SocketAddr>` direkt im Handler ginge nicht: die Extension existiert nur,
+/// wenn der Server mit `into_make_service_with_connect_info` läuft — in jedem Router-Test
+/// (`oneshot` gegen den blanken Router) fehlt sie, und der Handler würde dort mit 500
+/// antworten statt zu arbeiten. `Option<ConnectInfo<_>>` ist seit axum 0.8 ebenfalls kein
+/// gültiger Extractor mehr (verlangt `OptionalFromRequestParts`).
+///
+/// Deshalb dieser Extractor: er ist **infallible** und liefert schlicht `None`, wenn die
+/// Adresse nicht bekannt ist. Eine unbekannte Quelle ist kein Fehlerfall — sie ist die
+/// normale Lage in Tests und hinter manchen Setups.
+///
+/// Bewusst NICHT aus `X-Forwarded-For` gelesen: der Header ist ohne vertrauenswürdigen
+/// Reverse-Proxy frei fälschbar, und ein fälschbares Rate-Limit ist keins.
+#[derive(Debug, Clone, Copy)]
+pub struct PeerIp(pub Option<IpAddr>);
+
+impl<S: Send + Sync> FromRequestParts<S> for PeerIp {
+    type Rejection = Infallible;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        Ok(PeerIp(
+            parts
+                .extensions
+                .get::<ConnectInfo<SocketAddr>>()
+                .map(|ConnectInfo(adresse)| adresse.ip()),
+        ))
+    }
+}
 
 /// Json-Body-Extractor mit deutschsprachiger Rejection im `{error}`-Format.
 ///

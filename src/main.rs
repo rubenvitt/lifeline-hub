@@ -239,7 +239,14 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         let mut server = axum_server::bind_rustls(addr, tls_config)
             .map(|a| a.acceptor(verbindung::SemaphorAkzeptor::default()));
         verbindung::zeitschranken_setzen(&mut server, verbindung::Fristen::default());
-        server.handle(handle).serve(app.into_make_service()).await?;
+        // with_connect_info (LFH-249/F30): ohne das ist die Peer-Adresse im Handler nicht
+        // verfügbar — die Auth-Audit-Spur hätte dauerhaft eine leere Quell-IP und das
+        // Rate-Limit könnte gar nicht greifen. Muss auf BEIDEN serve-Pfaden stehen, sonst
+        // hängt das Verhalten daran, ob TLS aktiv ist.
+        server
+            .handle(handle)
+            .serve(app.into_make_service_with_connect_info::<std::net::SocketAddr>())
+            .await?;
     } else {
         // LFH-231/G10: `axum::serve` exponiert die hyper-Server-Parameter nicht — es baut den
         // Builder pro Verbindung intern und gibt keinen Hook darauf. Ohne Header-Lese-Timeout
@@ -254,7 +261,10 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         let mut server = axum_server::from_tcp(listener.into_std()?)
             .acceptor(verbindung::SemaphorAkzeptor::default());
         verbindung::zeitschranken_setzen(&mut server, verbindung::Fristen::default());
-        server.handle(handle).serve(app.into_make_service()).await?;
+        server
+            .handle(handle)
+            .serve(app.into_make_service_with_connect_info::<std::net::SocketAddr>())
+            .await?;
     }
 
     Ok(())

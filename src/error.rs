@@ -32,6 +32,11 @@ pub enum AppError {
     /// erforderliche Abhängigkeit (Virenscanner, LFH-114) nicht erreichbar ist und
     /// fail-closed konfiguriert wurde. Signalisiert dem Client „später erneut versuchen".
     ServiceUnavailable(String),
+    /// Zu viele Anfragen aus derselben Quelle (429), heute nur der Anmelde-Bremse
+    /// (LFH-249/F30). Abgrenzung zu 503: dort kann der Server gerade generell nicht,
+    /// hier darf dieser eine Aufrufer gerade nicht — und zwar vorübergehend und
+    /// selbstheilend, ohne dauerhafte Sperre.
+    TooManyRequests(String),
 }
 
 impl std::fmt::Display for AppError {
@@ -48,6 +53,7 @@ impl std::fmt::Display for AppError {
             AppError::NotImplemented(m) => write!(f, "{m}"),
             AppError::BadGateway(m) => write!(f, "{m}"),
             AppError::ServiceUnavailable(m) => write!(f, "{m}"),
+            AppError::TooManyRequests(m) => write!(f, "{m}"),
         }
     }
 }
@@ -87,6 +93,7 @@ impl AppError {
             AppError::NotImplemented(_) => StatusCode::NOT_IMPLEMENTED,
             AppError::BadGateway(_) => StatusCode::BAD_GATEWAY,
             AppError::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
+            AppError::TooManyRequests(_) => StatusCode::TOO_MANY_REQUESTS,
         }
     }
 

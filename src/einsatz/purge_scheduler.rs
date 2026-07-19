@@ -79,6 +79,24 @@ pub async fn tick_einmal(pool: &SqlitePool, jetzt: DateTime<Utc>) -> usize {
         Err(e) => tracing::warn!("Purge Phase B: Abfrage fehlgeschlagen: {e}"),
     }
 
+    // --- Phase C: abgelaufene Auth-Audit-Einträge (LFH-249/F30) ---
+    // Die Audit-Spur trägt personenbezogene Daten (Benutzername, Quell-IP), hängt aber an
+    // keinem Einsatz und damit an keiner Einsatz-Aufbewahrungsfrist. Ohne eigene Frist
+    // entstünde eine unbegrenzt wachsende Sammlung von Anmeldedaten — deshalb hier mit,
+    // wo der Aufbewahrungs-Purge ohnehin läuft.
+    match crate::auth::audit::purge_abgelaufene(pool).await {
+        Ok(0) => {}
+        Ok(n) => {
+            tracing::info!(
+                anzahl = n,
+                tage = crate::auth::audit::AUFBEWAHRUNG_TAGE,
+                "Purge Phase C: abgelaufene Auth-Audit-Einträge gelöscht"
+            );
+            anzahl += n as usize;
+        }
+        Err(e) => tracing::warn!("Purge Phase C: Auth-Audit-Purge fehlgeschlagen: {e}"),
+    }
+
     anzahl
 }
 
