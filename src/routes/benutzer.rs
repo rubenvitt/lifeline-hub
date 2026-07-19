@@ -76,7 +76,7 @@ pub async fn liste(
 /// POST /api/benutzer — neuen Benutzer anlegen. Admin-only.
 pub async fn anlegen(
     State(state): State<AppState>,
-    _admin: AdminUser,
+    AdminUser(admin): AdminUser,
     Json(req): Json<NeuerBenutzer>,
 ) -> Result<(StatusCode, Json<BenutzerAnzeige>), AppError> {
     if req.benutzername.trim().is_empty() {
@@ -101,11 +101,12 @@ pub async fn anlegen(
     pruefe_org_rolle(org_rolle)?;
 
     let hash = password::hash(&req.passwort)?;
-    // Single-Org in T1: alle Benutzer gehören zur (einzigen) Organisation.
-    let org_id: i64 = sqlx::query_scalar("SELECT id FROM organisation ORDER BY id LIMIT 1")
-        .fetch_optional(&state.pool)
-        .await?
-        .ok_or_else(|| AppError::Internal("Keine Organisation vorhanden".into()))?;
+    // Der neue Benutzer gehört zur Organisation DES ANLEGENDEN ADMINS (F05/LFH-232).
+    // Vorher stand hier `ORDER BY id LIMIT 1` — mit einer zweiten Organisation wäre jedes
+    // angelegte Konto still in Org 1 gelandet, und für Org 2 hätte sich überhaupt kein
+    // Benutzer anlegen lassen. Ein org-fremdes Konto ist genau der Nicht-Admin, der
+    // anschließend fremde Stammdaten liest.
+    let org_id = admin.org_id;
 
     let ergebnis = sqlx::query(
         "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle) \
