@@ -21,6 +21,7 @@ async fn main() -> anyhow::Result<()> {
     match config.command.clone() {
         Some(Command::Backup { out }) => cmd_backup(&config.db_path, &out).await,
         Some(Command::Restore { from, force }) => cmd_restore(&config.db_path, &from, force).await,
+        Some(Command::SqliteVersion) => cmd_sqlite_version().await,
         None => run_server(config).await,
     }
 }
@@ -256,6 +257,20 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         server.handle(handle).serve(app.into_make_service()).await?;
     }
 
+    Ok(())
+}
+
+/// Subkommando `sqlite-version`: die einkompilierte SQLite-Version ausgeben (LFH-233/G02).
+///
+/// Fragt die tatsächlich geladene Bibliothek (In-Memory-DB), statt eine gepflegte Konstante
+/// auszugeben — im Advisory-Fall zählt, was wirklich im Binary steckt. `build-release.sh`
+/// legt die Ausgabe neben den SBOM.
+async fn cmd_sqlite_version() -> anyhow::Result<()> {
+    let pool = sqlx::SqlitePool::connect("sqlite::memory:").await?;
+    let version: String = sqlx::query_scalar("SELECT sqlite_version()")
+        .fetch_one(&pool)
+        .await?;
+    println!("{version}");
     Ok(())
 }
 

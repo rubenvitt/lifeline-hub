@@ -378,6 +378,13 @@ pub enum Command {
         #[arg(long)]
         force: bool,
     },
+    /// Die ins Binary einkompilierte SQLite-Version ausgeben (LFH-233/G02).
+    ///
+    /// SQLite steckt als C-Amalgamation im Binary und wird von keinem System-Update
+    /// erreicht — im Fall einer SQLite-CVE ist das die Zahl, die man braucht, um
+    /// Betroffenheit zu beurteilen. Bewusst ein CLI-Subkommando und nicht `/api/health`:
+    /// die Angabe geht Operatoren etwas an, nicht jeden, der den Port erreicht.
+    SqliteVersion,
 }
 
 #[cfg(test)]

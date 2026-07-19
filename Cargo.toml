@@ -7,6 +7,11 @@ edition = "2021"
 axum = { version = "0.8", features = ["multipart"] }
 tokio = { version = "1", features = ["full"] }
 sqlx = { version = "0.9", features = ["runtime-tokio", "sqlite", "migrate"] }
+# `bundled` kompiliert SQLite als C-Amalgamation ins Binary. Folge: ein SQLite-CVE ist
+# NUR per Crate-Bump + Rebuild + Redeploy zu schließen — kein System-Update erreicht diese
+# Kopie. Welche Version drinsteckt und wie der Patch-Pfad läuft: siehe
+# docs/betrieb/packaging.md („Eingebettetes SQLite"). Bei einem Bump wird
+# tests/sqlite_version.rs rot und erzwingt den Doku-Nachzug (LFH-233/G02).
 libsqlite3-sys = { version = "0.37", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
