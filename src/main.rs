@@ -20,7 +20,11 @@ async fn main() -> anyhow::Result<()> {
 
     match config.command.clone() {
         Some(Command::Backup { out }) => cmd_backup(&config.db_path, &out).await,
-        Some(Command::Restore { from, force }) => cmd_restore(&config.db_path, &from, force).await,
+        Some(Command::Restore {
+            from,
+            force,
+            server_gestoppt,
+        }) => cmd_restore(&config.db_path, &from, force, server_gestoppt).await,
         Some(Command::SqliteVersion) => cmd_sqlite_version().await,
         None => run_server(config).await,
     }
@@ -91,6 +95,18 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     lifeline_hub::erinnerung::scheduler::starte_scheduler(pool.clone(), live.clone());
     // Aufbewahrung & Archiv (LFH-135): Purge-Scheduler (Soft-Delete + PII-Schwärzung).
     lifeline_hub::einsatz::purge_scheduler::starte_purge_scheduler(pool.clone());
+    // Automatische Sicherungen (LFH-251/F31) — No-op ohne --backup-verzeichnis.
+    lifeline_hub::backup::scheduler::starte_backup_scheduler(
+        pool.clone(),
+        lifeline_hub::backup::scheduler::BackupConfig {
+            verzeichnis: config
+                .backup_verzeichnis
+                .as_ref()
+                .map(std::path::PathBuf::from),
+            intervall: std::time::Duration::from_secs(config.backup_intervall_minuten * 60),
+            behalten: config.backup_behalten,
+        },
+    );
 
     // AV-Scan-Konfiguration (LFH-114) prozessweit setzen (bewusst NICHT in AppState,
     // um die vielen inline AppState-Konstruktionen nicht zu brechen).
@@ -301,14 +317,20 @@ async fn cmd_backup(db_path: &str, out: &str) -> anyhow::Result<()> {
 }
 
 /// Subkommando `restore`: Sicherung `from` an Stelle von `db_path` einspielen.
-async fn cmd_restore(db_path: &str, from: &str, force: bool) -> anyhow::Result<()> {
+async fn cmd_restore(
+    db_path: &str,
+    from: &str,
+    force: bool,
+    server_gestoppt: bool,
+) -> anyhow::Result<()> {
     if !force {
         anyhow::bail!(
             "Restore überschreibt die Datenbank {db_path}. Zum Bestätigen --force angeben \
              (Server vorher stoppen!)."
         );
     }
-    backup::restore::restore_aus_datei(Path::new(from), Path::new(db_path)).await?;
+    backup::restore::restore_aus_datei(Path::new(from), Path::new(db_path), server_gestoppt)
+        .await?;
     println!("Sicherung {from} wurde nach {db_path} eingespielt.");
     Ok(())
 }

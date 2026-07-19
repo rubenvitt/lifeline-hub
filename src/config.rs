@@ -294,6 +294,25 @@ pub struct Config {
     )]
     pub download_allow_loopback: bool,
 
+    /// Zielverzeichnis für automatische Sicherungen (LFH-251/F31). **Ohne Angabe findet
+    /// keine automatische Sicherung statt** — dasselbe No-op-Muster wie `--clamav-addr`.
+    ///
+    /// Bewusst opt-in: jede Sicherung schreibt eine Datei in Datenbankgröße (die DB trägt
+    /// Anhänge als BLOBs), was auf einem Einsatz-Notebook Plattenplatz und I/O spürbar
+    /// belastet. Ein separates Medium (USB/Netzlaufwerk) schützt zusätzlich gegen
+    /// Plattendefekt — ein Verzeichnis neben der Datenbank nur gegen Bedienfehler.
+    #[arg(long, env = "LIFELINE_BACKUP_VERZEICHNIS")]
+    pub backup_verzeichnis: Option<String>,
+
+    /// Abstand zwischen automatischen Sicherungen in Minuten. Greift nur mit
+    /// `--backup-verzeichnis`.
+    #[arg(long, env = "LIFELINE_BACKUP_INTERVALL_MINUTEN", default_value_t = 360)]
+    pub backup_intervall_minuten: u64,
+
+    /// Wie viele automatische Sicherungen aufgehoben werden; ältere werden rotiert.
+    #[arg(long, env = "LIFELINE_BACKUP_BEHALTEN", default_value_t = 7)]
+    pub backup_behalten: usize,
+
     /// Ops-/Dev-Override der Trust-Quelle des Offline-Karten-Katalogs. Ohne Angabe gilt
     /// der einkompilierte Pin (LFH-199). Nimmt Ops die Rebuild-Reibung, wenn das Manifest
     /// woanders liegt (LFH-204) — verbiegt aber die Quelle, der das System vertraut,
@@ -377,6 +396,14 @@ pub enum Command {
         /// Ohne Rückfrage überschreiben.
         #[arg(long)]
         force: bool,
+        /// Zusichern, dass kein Server mehr auf der Ziel-Datenbank verbunden ist.
+        ///
+        /// Nötig, wenn `-wal`/`-shm` neben der Ziel-DB liegen. Die sind das einzige
+        /// verlässliche Indiz für eine offene Verbindung — nach einem Serverabsturz
+        /// bleiben sie aber verwaist zurück, und genau dann will man restaurieren.
+        /// Diese Unterscheidung kann nur ein Mensch treffen (LFH-251/F31).
+        #[arg(long)]
+        server_gestoppt: bool,
     },
     /// Die ins Binary einkompilierte SQLite-Version ausgeben (LFH-233/G02).
     ///
@@ -725,9 +752,18 @@ mod tests {
             "--force",
         ]);
         match config.command {
-            Some(Command::Restore { from, force }) => {
+            Some(Command::Restore {
+                from,
+                force,
+                server_gestoppt,
+            }) => {
                 assert_eq!(from, "/mnt/usb/b.sqlite");
                 assert!(force);
+                assert!(
+                    !server_gestoppt,
+                    "--server-gestoppt ist eine bewusste Zusicherung und darf nie \
+                     implizit gelten (LFH-251/F31)"
+                );
             }
             andere => panic!("erwartete Restore, fand {andere:?}"),
         }

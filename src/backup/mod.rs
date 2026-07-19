@@ -1,4 +1,5 @@
 pub mod restore;
+pub mod scheduler;
 
 use crate::error::AppError;
 use sqlx::SqlitePool;

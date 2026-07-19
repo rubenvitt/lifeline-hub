@@ -23,18 +23,65 @@ lifeline-hub --db-path /var/lib/lifeline/lifeline.db backup --out /mnt/usb/lifel
 
 Die Zieldatei darf noch nicht existieren.
 
+**Variante C — automatisch, rotierend (LFH-251/F31):**
+
+Mit einem Zielverzeichnis sichert der Server selbstständig; **ohne die Option passiert
+nichts** (bewusst opt-in — jede Sicherung schreibt eine Datei in Datenbankgröße, und die
+DB trägt Anhänge als BLOBs):
+
+```bash
+lifeline-hub --db-path /var/lib/lifeline/lifeline.db \
+             --backup-verzeichnis /mnt/usb/lifeline-backups \
+             --backup-intervall-minuten 360 \
+             --backup-behalten 7
+```
+
+Es bleiben die jüngsten `--backup-behalten` Dateien (`lifeline-auto-<zeitstempel>.sqlite`)
+liegen, ältere werden rotiert. Dateien ohne dieses Präfix fasst die Rotation nie an — eine
+von Hand abgelegte Sicherung im selben Verzeichnis ist also sicher.
+
+Ein Verzeichnis **auf einem separaten Medium** (USB/Netzlaufwerk) schützt zusätzlich gegen
+Plattendefekt; ein Verzeichnis neben der Datenbank nur gegen Bedienfehler.
+
+> Die automatischen Sicherungen sind wie jeder Export session-bereinigt: sie enthalten
+> keine Anmelde-Tokens.
+
 ## Wiederherstellung
 
 > **Server vorher stoppen.** Restore ersetzt die Datenbankdatei.
 
-**Variante A — per CLI (empfohlen):** validiert die Sicherung und entfernt stale
-`-wal`/`-shm`-Seitendateien automatisch:
+**Variante A — per CLI (empfohlen):** validiert die Sicherung, entfernt stale
+`-wal`/`-shm`-Seitendateien und hängt die neue Datenbank **atomar** ein (Kopie neben das
+Ziel, dann `rename`) — bricht der Vorgang ab, bleibt die alte Datenbank unversehrt:
 
 ```bash
 # Server stoppen, dann:
 lifeline-hub --db-path /var/lib/lifeline/lifeline.db restore --from /mnt/usb/lifeline-backup.sqlite --force
 # Server wieder starten.
 ```
+
+### „Auf der Datenbank ist noch eine Verbindung offen"
+
+Liegen `-wal`/`-shm` neben der Ziel-Datenbank, bricht der Restore ab. Diese Dateien
+existieren, solange eine Verbindung offen ist — ein Restore über eine **laufende**
+Datenbank beschädigt sie.
+
+Nach einem **Absturz** bleiben sie allerdings verwaist liegen, und genau dann will man
+wiederherstellen. Diese beiden Fälle sind von außen nicht unterscheidbar, deshalb
+entscheidet der Mensch:
+
+```bash
+lifeline-hub --db-path … restore --from … --force --server-gestoppt
+```
+
+`--server-gestoppt` ist die Zusicherung, dass wirklich kein Prozess mehr auf der Datenbank
+arbeitet. Vorher sicherstellen, dass der Dienst beendet ist (`systemctl status …`,
+`ps aux | grep lifeline-hub`).
+
+> Warum keine automatische Erkennung? Sie wurde gemessen und verworfen: `flock` interagiert
+> nicht mit SQLites POSIX-Locks, und ein `BEGIN EXCLUSIVE` gelingt bei einer offenen, aber
+> untätigen Verbindung ebenfalls — ein laufender, gerade nicht schreibender Server wäre
+> damit unsichtbar geblieben.
 
 **Variante B — manuell:**
 
