@@ -133,8 +133,11 @@ pub fn build_router(state: AppState) -> Router {
             delete(routes::einsatz::mitglied_entfernen),
         )
         .route("/api/einsaetze/{id}/etb", post(routes::etb::erfassen))
+        // Kanonischer Live-Feed des Einsatzes (F01/LFH-227) — ersetzt die 9
+        // modul-benannten `…/stream`-Routen; die Modul-Berechtigung wirkt als
+        // Post-Filter pro Event statt als Gate der Route.
+        .route("/api/einsaetze/{id}/live", get(routes::live::stream))
         .route("/api/einsaetze/{id}/etb", get(routes::etb::liste))
-        .route("/api/einsaetze/{id}/etb/stream", get(routes::etb::stream))
         .route(
             "/api/einsaetze/{id}/etb/{eintrag_id}/auftrag",
             post(routes::etb::auftrag_erteilen),
@@ -280,10 +283,6 @@ pub fn build_router(state: AppState) -> Router {
             get(routes::einsatz_fahrzeug::liste),
         )
         .route(
-            "/api/einsaetze/{id}/fahrzeuge/stream",
-            get(routes::einsatz_fahrzeug::stream),
-        )
-        .route(
             "/api/einsaetze/{id}/fahrzeuge/{ef_id}/position",
             patch(routes::einsatz_fahrzeug::position),
         )
@@ -356,10 +355,6 @@ pub fn build_router(state: AppState) -> Router {
             post(routes::einsatz_person::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/personen/stream",
-            get(routes::einsatz_person::stream),
-        )
-        .route(
             "/api/einsaetze/{id}/personen/export",
             get(routes::einsatz_person::export),
         )
@@ -412,10 +407,6 @@ pub fn build_router(state: AppState) -> Router {
             post(routes::einsatz_tier::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/tiere/stream",
-            get(routes::einsatz_tier::stream),
-        )
-        .route(
             "/api/einsaetze/{id}/tiere/export",
             get(routes::einsatz_tier::export),
         )
@@ -444,10 +435,6 @@ pub fn build_router(state: AppState) -> Router {
             post(routes::einsatz_schaden::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/schaeden/stream",
-            get(routes::einsatz_schaden::stream),
-        )
-        .route(
             "/api/einsaetze/{id}/schaeden/{sid}",
             get(routes::einsatz_schaden::detail),
         )
@@ -471,10 +458,6 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/api/einsaetze/{id}/uhs",
             post(routes::einsatz_uhs::anlegen),
-        )
-        .route(
-            "/api/einsaetze/{id}/uhs/stream",
-            get(routes::einsatz_uhs::stream),
         )
         .route(
             "/api/einsaetze/{id}/uhs/{uid}",
@@ -553,10 +536,6 @@ pub fn build_router(state: AppState) -> Router {
             post(routes::einsatzabschnitt::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/abschnitte/stream",
-            get(routes::einsatzabschnitt::stream),
-        )
-        .route(
             "/api/einsaetze/{id}/abschnitte/{aid}",
             patch(routes::einsatzabschnitt::aktualisieren),
         )
@@ -614,10 +593,6 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/api/einsaetze/{id}/zonen",
             post(routes::lage_zone::anlegen),
-        )
-        .route(
-            "/api/einsaetze/{id}/zonen/stream",
-            get(routes::lage_zone::stream),
         )
         .route(
             "/api/einsaetze/{id}/zonen/{zid}",
@@ -840,10 +815,6 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/api/einsaetze/{id}/einheiten",
             post(routes::einsatz_einheit::bilden),
-        )
-        .route(
-            "/api/einsaetze/{id}/einheiten/stream",
-            get(routes::einsatz_einheit::stream),
         )
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}",

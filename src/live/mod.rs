@@ -1,5 +1,5 @@
 use serde::Serialize;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, RwLock};
 use tokio::sync::broadcast;
 use utoipa::ToSchema;
@@ -20,6 +20,7 @@ pub enum LiveEvent {
     Einheit,
     Abschnitt,
     Person,
+    Personal,
     Lagebericht,
     Chat,
     Erinnerung,
@@ -37,7 +38,7 @@ pub enum LiveEvent {
 impl LiveEvent {
     /// Alle Varianten in kanonischer Reihenfolge — Anker für den Wire-Kontrakt-Guard
     /// (`tests/enum_wire_kontrakt.rs`) und die Exhaustiveness-Prüfung.
-    pub const ALLE: [LiveEvent; 23] = [
+    pub const ALLE: [LiveEvent; 24] = [
         LiveEvent::Uhs,
         LiveEvent::Schaden,
         LiveEvent::Fahrzeug,
@@ -49,6 +50,7 @@ impl LiveEvent {
         LiveEvent::Einheit,
         LiveEvent::Abschnitt,
         LiveEvent::Person,
+        LiveEvent::Personal,
         LiveEvent::Lagebericht,
         LiveEvent::Chat,
         LiveEvent::Erinnerung,
@@ -79,6 +81,7 @@ impl LiveEvent {
             LiveEvent::Einheit => "einheit",
             LiveEvent::Abschnitt => "abschnitt",
             LiveEvent::Person => "person",
+            LiveEvent::Personal => "personal",
             LiveEvent::Lagebericht => "lagebericht",
             LiveEvent::Chat => "chat",
             LiveEvent::Erinnerung => "erinnerung",
@@ -92,6 +95,62 @@ impl LiveEvent {
             LiveEvent::Sofortmeldung => "sofortmeldung",
             LiveEvent::Lagged => "lagged",
         }
+    }
+
+    /// Die Module, deren Daten dieses Event betrifft — die Gate-Menge des
+    /// Live-Filters (F01/LFH-227). Ein Abonnent erhält das Event, wenn er MINDESTENS
+    /// EINES dieser Module sehen darf; eine leere Menge heißt „bewusst ungated".
+    ///
+    /// **Füll-Regel (sicherheitstragend):** hier steht das Modul, zu dessen Datenobjekt
+    /// das Event gehört — NICHT das Modul der Route, die es ausgelöst hat. Ein
+    /// zweites Modul kommt nur dazu, wenn dessen eigener, re-gegateter GET die Existenz
+    /// desselben Objekts ohnehin offenlegt (sonst wäre die Aufnahme ein Metadaten-Leak).
+    /// Die breitere Cache-Invalidierung des Frontends (`EINSATZ_STREAM_EVENTS`) ist
+    /// bewusst NICHT die Quelle: sie beantwortet „welcher Cache könnte stale sein",
+    /// nicht „wer darf erfahren, dass sich etwas geändert hat".
+    ///
+    /// Der `match` ist exhaustiv — eine neue [`LiveEvent`]-Variante bricht die
+    /// Compilierung, bis sie hier eine Gate-Menge (oder ein bewusstes `&[]`) bekommt.
+    /// Das ersetzt einen Drift-Guard mit statischem Literal-Scan vollständig.
+    pub fn modul_keys(self) -> &'static [&'static str] {
+        match self {
+            LiveEvent::Uhs => &["unfallhilfsstellen"],
+            LiveEvent::Schaden => &["schaeden"],
+            LiveEvent::Fahrzeug => &["fahrzeuge"],
+            LiveEvent::Material => &["material"],
+            LiveEvent::Tier => &["tiere"],
+            LiveEvent::LageZone => &["lagekarte"],
+            LiveEvent::FreiesZeichen => &["lagekarte"],
+            LiveEvent::Gefahr => &["gefahrenzonen"],
+            LiveEvent::Einheit => &["einheiten"],
+            LiveEvent::Abschnitt => &["einsatzabschnitte"],
+            LiveEvent::Person => &["personen"],
+            LiveEvent::Personal => &["personal"],
+            LiveEvent::Lagebericht => &["lageberichte"],
+            LiveEvent::Chat => &["chat"],
+            LiveEvent::Erinnerung => &["erinnerungen"],
+            LiveEvent::Auftrag => &["auftraege"],
+            LiveEvent::Nachforderung => &["nachforderungen"],
+            // Dual: `lage/meldungen` (EinsatzLesezugriff<Lagemeldungen>) liefert die
+            // Lageobjekte derselben Meldungen — die Existenz ist dort ohnehin sichtbar.
+            LiveEvent::Meldung => &["meldungen", "lagemeldungen"],
+            LiveEvent::Bereitstellungsraum => &["bereitstellungsraeume"],
+            LiveEvent::KarteBild => &["lagekarte"],
+            LiveEvent::Etb => &["etb"],
+            // Befehle sind Teil des Auftrags-Moduls (`routes::befehl::MODUL_KEY`).
+            LiveEvent::Befehl => &["auftraege"],
+            LiveEvent::Sofortmeldung => &["meldungen"],
+            // Kontroll-Event ohne Fachbezug: muss JEDEN Abonnenten erreichen, sonst
+            // hängt der Resync nach Ring-Overflow/Neustart.
+            LiveEvent::Lagged => &[],
+        }
+    }
+
+    /// Ob dieses Event an einen Abonnenten gehen darf, der die Module in `erlaubt`
+    /// sehen darf. Ungegatete Kontroll-Events (leere Gate-Menge) passieren immer.
+    pub fn sichtbar_fuer(self, erlaubt: &HashSet<&'static str>) -> bool {
+        let keys = self.modul_keys();
+        keys.is_empty() || keys.iter().any(|k| erlaubt.contains(k))
     }
 }
 
@@ -115,7 +174,10 @@ const REPLAY_KAPAZITAET: usize = 256;
 #[derive(Clone, Debug)]
 pub struct LiveNachricht {
     pub id: String,
-    pub event: String,
+    /// Getypter Wire-Tag (nicht `String`): so ist der Modul-Filter im SSE-Builder ein
+    /// exhaustiver `match` über [`LiveEvent::modul_keys`] statt eines Rück-Parsens mit
+    /// fail-closed-Laufzeitnetz (F01/LFH-227).
+    pub event: LiveEvent,
     pub data: String,
 }
 
@@ -244,10 +306,17 @@ impl LiveHub {
         (replay, rx)
     }
 
-    /// Sendet einen ETB-Eintrag (JSON) an alle Abonnenten. Bequemer Wrapper für
-    /// den häufigsten Fall — entspricht `publiziere_event(id, "etb", json)`.
-    pub fn publiziere(&self, einsatz_id: i64, json: String) {
-        self.publiziere_event(einsatz_id, LiveEvent::Etb, json);
+    /// Meldet einen geänderten ETB-Eintrag an alle Abonnenten — **ID-only**
+    /// (F01/LFH-227). Der Wrapper ist der einzige `etb`-Emitter im Code; ihn auf IDs
+    /// umzustellen entfernt die ETB-Volltexte (inhalt/von/an/erfasser_name) an ~12
+    /// Aufrufstellen auf einen Schlag aus dem Broadcast. Clients refetchen über den
+    /// `etb`-GET, der die Modul-Berechtigung ohnehin prüft.
+    pub fn publiziere(&self, einsatz_id: i64, etb_id: i64) {
+        self.publiziere_event(
+            einsatz_id,
+            LiveEvent::Etb,
+            format!(r#"{{"einsatz_id":{einsatz_id},"etb_id":{etb_id}}}"#),
+        );
     }
 
     /// Sendet ein getaggtes Event an alle Abonnenten eines Einsatzes.
@@ -264,7 +333,7 @@ impl LiveHub {
         };
         let nachricht = LiveNachricht {
             id: format!("{}-{}", self.epoch, kanal.naechste_id),
-            event: event.as_str().to_string(),
+            event,
             data,
         };
         kanal.naechste_id += 1;
@@ -292,8 +361,11 @@ mod tests {
     async fn abonnent_empfaengt_publizierte_nachricht() {
         let hub = LiveHub::new();
         let mut rx = hub.abonniere(1);
-        hub.publiziere(1, "hallo".into());
-        assert_eq!(rx.recv().await.unwrap().data, "hallo");
+        hub.publiziere(1, 7);
+        assert_eq!(
+            rx.recv().await.unwrap().data,
+            r#"{"einsatz_id":1,"etb_id":7}"#
+        );
     }
 
     #[tokio::test]
@@ -301,16 +373,16 @@ mod tests {
         let hub = LiveHub::new();
         let mut rx1 = hub.abonniere(1);
         let mut rx2 = hub.abonniere(2);
-        hub.publiziere(1, "fuer-eins".into());
+        hub.publiziere(1, 7);
 
-        assert_eq!(rx1.recv().await.unwrap().data, "fuer-eins");
+        assert!(rx1.recv().await.unwrap().data.contains(r#""etb_id":7"#));
         assert!(rx2.try_recv().is_err());
     }
 
     #[tokio::test]
     async fn publiziere_ohne_abonnenten_ist_harmlos() {
         let hub = LiveHub::new();
-        hub.publiziere(99, "niemand-hoert".into()); // darf nicht panicken
+        hub.publiziere(99, 1); // darf nicht panicken
     }
 
     #[tokio::test]
@@ -318,7 +390,7 @@ mod tests {
         let hub = LiveHub::new();
         let rx = hub.abonniere(1);
         drop(rx); // letzter Empfänger weg
-        hub.publiziere(1, "ins-leere".into()); // löst Cleanup aus
+        hub.publiziere(1, 1); // löst Cleanup aus
         assert!(hub.kanaele.read().unwrap().get(&1).is_none());
     }
 
@@ -327,9 +399,10 @@ mod tests {
         let hub = LiveHub::new();
         let mut a = hub.abonniere(1);
         let mut b = hub.abonniere(1);
-        hub.publiziere(1, "broadcast".into());
-        assert_eq!(a.recv().await.unwrap().data, "broadcast");
-        assert_eq!(b.recv().await.unwrap().data, "broadcast");
+        hub.publiziere(1, 7);
+        let erwartet = r#"{"einsatz_id":1,"etb_id":7}"#;
+        assert_eq!(a.recv().await.unwrap().data, erwartet);
+        assert_eq!(b.recv().await.unwrap().data, erwartet);
     }
 
     #[tokio::test]
@@ -342,7 +415,7 @@ mod tests {
             r#"{"einsatz_id":1,"person_id":5}"#.into(),
         );
         let n = rx.recv().await.unwrap();
-        assert_eq!(n.event, "person");
+        assert_eq!(n.event, LiveEvent::Person);
         assert_eq!(n.data, r#"{"einsatz_id":1,"person_id":5}"#);
     }
 
@@ -350,10 +423,66 @@ mod tests {
     async fn publiziere_wrapt_als_etb_event() {
         let hub = LiveHub::new();
         let mut rx = hub.abonniere(1);
-        hub.publiziere(1, "hallo".into());
+        hub.publiziere(1, 42);
         let n = rx.recv().await.unwrap();
-        assert_eq!(n.event, "etb");
-        assert_eq!(n.data, "hallo");
+        assert_eq!(n.event, LiveEvent::Etb);
+        // ID-only (F01/LFH-227): KEIN Volltext mehr im Broadcast.
+        assert_eq!(n.data, r#"{"einsatz_id":1,"etb_id":42}"#);
+    }
+
+    // --- F01/LFH-227: Modul-Gate-Registry ---
+
+    /// Guard: jeder Gate-Key muss ein echter Modul-Key sein. Ein Tippfehler hier wäre
+    /// sonst ein stiller fail-closed (das Event erreichte niemanden mehr) — der
+    /// `match` selbst kann das nicht fangen, weil er nur Vollständigkeit erzwingt.
+    #[test]
+    fn gate_keys_sind_echte_modul_keys() {
+        use crate::einsatz::modul::MODUL_KEYS;
+        for ev in LiveEvent::ALLE {
+            for key in ev.modul_keys() {
+                assert!(
+                    MODUL_KEYS.contains(key),
+                    "{}: Gate-Key {key:?} steht nicht in MODUL_KEYS",
+                    ev.as_str()
+                );
+            }
+        }
+    }
+
+    /// Genau die Kontroll-Events sind ungegatet. Rutschte ein Fach-Event versehentlich
+    /// auf `&[]`, liefe es an JEDEM Modul-Gate vorbei — die Lücke, die F01 schließt.
+    #[test]
+    fn nur_kontroll_events_sind_ungegatet() {
+        let ungegatet: Vec<&str> = LiveEvent::ALLE
+            .iter()
+            .filter(|ev| ev.modul_keys().is_empty())
+            .map(|ev| ev.as_str())
+            .collect();
+        assert_eq!(ungegatet, vec!["lagged"]);
+    }
+
+    #[test]
+    fn sichtbar_fuer_prueft_schnittmenge() {
+        let nur_etb: HashSet<&'static str> = HashSet::from(["etb"]);
+        assert!(LiveEvent::Etb.sichtbar_fuer(&nur_etb));
+        assert!(!LiveEvent::Chat.sichtbar_fuer(&nur_etb));
+        // Kontroll-Event passiert auch eine leere Erlaubnis-Menge.
+        assert!(LiveEvent::Lagged.sichtbar_fuer(&HashSet::new()));
+        // Dual gegatetes Event: EIN passendes Modul genügt.
+        let nur_lage: HashSet<&'static str> = HashSet::from(["lagemeldungen"]);
+        assert!(LiveEvent::Meldung.sichtbar_fuer(&nur_lage));
+    }
+
+    /// `person` (betroffene Personen) und `personal` (disponierte Einsatzkräfte) sind
+    /// seit F01/LFH-227 getrennte Tags mit getrennten Gates — vorher trug EIN Tag beide
+    /// ID-Räume, womit ein `personal`-Leser die IDs betroffener Personen mitbekam.
+    #[test]
+    fn person_und_personal_sind_getrennt_gegatet() {
+        assert_eq!(LiveEvent::Person.modul_keys(), &["personen"]);
+        assert_eq!(LiveEvent::Personal.modul_keys(), &["personal"]);
+        let nur_personal: HashSet<&'static str> = HashSet::from(["personal"]);
+        assert!(!LiveEvent::Person.sichtbar_fuer(&nur_personal));
+        assert!(LiveEvent::Personal.sichtbar_fuer(&nur_personal));
     }
 
     // --- F14/LFH-263: monotone Ids + Replay ---
@@ -485,7 +614,7 @@ mod tests {
         match replay {
             Replay::Events(v) => {
                 assert_eq!(v.len(), 1);
-                assert_eq!(v[0].event, "sofortmeldung");
+                assert_eq!(v[0].event, LiveEvent::Sofortmeldung);
             }
             _ => panic!("verpasste sofortmeldung muss als Replay-Event kommen"),
         }

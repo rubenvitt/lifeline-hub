@@ -22,11 +22,8 @@ use crate::uhs::{
 };
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::Json;
 use serde::{Deserialize, Serialize};
-use std::convert::Infallible;
-use tokio_stream::Stream;
 use utoipa::ToSchema;
 
 /// Detail-Antwort: UHS-Stamm + Plätze + aktuelle Belegungen + zugeordnetes Material.
@@ -848,28 +845,4 @@ async fn formatiere_belegungs_etb(
         }
     };
     Ok(Some(text))
-}
-
-/// GET /api/einsaetze/{id}/uhs/stream — SSE-Stream. Nur Lesezugriff.
-/// Der Client filtert clientseitig auf `uhs`- und `person`-Events.
-pub async fn stream(
-    State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
-) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-
-    let rx = state.live.abonniere(einsatz_id);
-    let stream = crate::routes::support::sse_event_stream(rx);
-    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
 }

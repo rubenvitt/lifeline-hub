@@ -86,10 +86,14 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.material,
   ],
   abschnitt: [EINSATZ_KEYS.abschnitte, EINSATZ_KEYS.fuehrungskraefte],
-  // person berührt mehrere Sammlungen: Registrierung, Einheiten-/Abschnittsführung,
-  // sowie disponiertes Personal im Meldebild.
-  person: [
-    EINSATZ_KEYS.personen,
+  // F01/LFH-227: `person` und `personal` sind getrennte Wire-Events. Vorher trug EIN
+  // `person`-Tag beide ID-Räume (betroffene Person vs. einsatz_personal-Disposition),
+  // weshalb hier beide Sammlungen hängen mussten — und weshalb das Backend die zwei
+  // Module nicht getrennt gaten konnte. Jetzt: betroffene Personen (Modul `personen`).
+  person: [EINSATZ_KEYS.personen],
+  // Disponiertes Personal (Modul `personal`) — die Zuordnung wirkt zugleich auf
+  // Einheiten-/Abschnittsführung und die Führungskräfte-Sicht der Lagekarte.
+  personal: [
     EINSATZ_KEYS.personal,
     EINSATZ_KEYS.einheiten,
     EINSATZ_KEYS.abschnitte,
@@ -105,7 +109,7 @@ export const EINSATZ_STREAM_EVENTS = {
   bereitstellungsraum: [EINSATZ_KEYS.br, EINSATZ_KEYS.brDetail],
   karte_bild: [EINSATZ_KEYS.kartenbilder],
   // LFH-207-C: ETB-Zeitachse live halten — ersetzt den dedizierten useEtbStream (2. EventSource
-  // auf denselben /etb/stream-Endpoint). Prefix-Match deckt ['etb', einsatzId, filter] mit ab.
+  // auf denselben Live-Endpoint). Prefix-Match deckt ['etb', einsatzId, filter] mit ab.
   etb: [EINSATZ_KEYS.etb],
   // Befehle live (LFH-262/F13): Backend publiziert seit LFH-64 ein `befehl`-Wire-Event bei
   // Anlegen/Ändern/Freigeben/Fortschreiben. Invalidiert Befehls-Liste UND -Detail

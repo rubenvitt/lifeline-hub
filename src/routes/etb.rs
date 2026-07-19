@@ -11,12 +11,9 @@ use crate::live::LiveEvent;
 const MODUL_KEY: &str = "etb";
 use crate::etb::{normalisiere_zeit, repo, EtbEintragAnzeige, EtbTyp, MeldeWeg};
 use axum::extract::{Path, Query, State};
-use axum::http::{HeaderMap, StatusCode};
-use axum::response::sse::{Event, KeepAlive, Sse};
+use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
-use std::convert::Infallible;
-use tokio_stream::Stream;
 
 #[derive(Debug, Deserialize)]
 pub struct NeuerEintrag {
@@ -150,18 +147,10 @@ pub async fn erfassen(
     // Live an alle SSE-Abonnenten dieses Einsatzes pushen — aber NUR bei einem echt neuen
     // Eintrag. Ein idempotenter Replay (war_neu=false) hat den Eintrag beim ersten Mal
     // bereits publiziert; ein zweites Signal würde eine Geister-Aktualisierung auslösen.
-    // Eine Serialisierung dieses Typs kann derzeit nicht fehlschlagen; sollte sie es
-    // künftig doch, wird der (bereits persistierte) Eintrag nicht stillschweigend
-    // verschluckt, sondern protokolliert.
+    // Seit F01/LFH-227 geht nur die ID über den Kanal — damit entfällt auch der frühere
+    // Serialisierungs-Fehlerpfad (der Volltext wird gar nicht mehr gebaut).
     if war_neu {
-        match serde_json::to_string(&anzeige) {
-            Ok(json) => state.live.publiziere(einsatz_id, json),
-            Err(e) => tracing::error!(
-                eintrag_id = anzeige.id,
-                %e,
-                "ETB-Eintrag konnte nicht für Live-Publish serialisiert werden"
-            ),
-        }
+        state.live.publiziere(einsatz_id, anzeige.id);
     }
 
     Ok((StatusCode::CREATED, Json(anzeige)))
@@ -212,11 +201,7 @@ pub async fn auftrag_erteilen(
     let detail = crate::auftrag::repo::laden(&state.pool, auftrag_id, &now).await?;
     // ETB-Anordnung entstand im selben Commit → ETB-Live-Event + Auftrag-Board-Event (SSE-Parität).
     if let Some(etb_id) = detail.auftrag.etb_anordnung_id {
-        if let Ok(etb) = repo::laden(&state.pool, etb_id).await {
-            if let Ok(json) = serde_json::to_string(&etb) {
-                state.live.publiziere(einsatz_id, json);
-            }
-        }
+        state.live.publiziere(einsatz_id, etb_id);
     }
     state.live.publiziere_event(
         einsatz_id,
@@ -312,38 +297,4 @@ pub async fn liste(
     };
 
     Ok(Json(repo::abfrage(&state.pool, einsatz_id, &filter).await?))
-}
-
-/// GET /api/einsaetze/{id}/etb/stream — Server-Sent-Events-Stream der neuen
-/// ETB-Einträge eines Einsatzes. Nur für Mitglieder (auch Beobachter dürfen
-/// lesen). Es werden nur **neue** Einträge gepusht — der Initial-Bestand wird
-/// per `GET …/etb` geladen. Bei Pufferüberlauf sendet der Server ein
-/// `lagged`-Event; der Client soll dann per GET resynchronisieren.
-pub async fn stream(
-    State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
-    headers: HeaderMap,
-) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?; // 404, wenn unbekannt
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-
-    // Reconnect-Resync (F14/LFH-263): schickt der Browser beim Auto-Reconnect eine
-    // `Last-Event-ID`, liefert der LiveHub die seither verpassten Nachrichten nach
-    // (bzw. ein `lagged` bei Ring-Overflow/Neustart). `/etb/stream` ist der kanonische
-    // Einsatz-Feed, den das Frontend konsumiert.
-    let seit = crate::routes::support::last_event_id(&headers);
-    let (replay, rx) = state.live.abonniere_mit_replay(einsatz_id, seit);
-    let stream = crate::routes::support::sse_stream_mit_replay(replay, rx);
-
-    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
 }

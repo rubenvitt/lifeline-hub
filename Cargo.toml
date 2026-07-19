@@ -90,6 +90,10 @@ totp-rs = { version = "5", features = ["otpauth", "gen_secret"] }
 # rcgen_pem_ist_per_rustls_ladbar` (Canary, RustCrypto/rustls-CryptoProvider-Kollision).
 webauthn-rs = { version = "0.5", features = ["danger-credential-internals"] }
 webauthn-rs-core = "=0.5.5"
+# SSE-Body eines OFFENEN Streams frameweise lesen (F01/LFH-227-Filtertest): `to_bytes`
+# wartet auf das Stream-Ende, das bei einem Live-Feed nie kommt. Kein neuer Fremdcode —
+# axum baut ohnehin darauf auf, der Eintrag macht die Nutzung im Test nur explizit.
+http-body-util = "0.1"
 
 [features]
 # clamav ist Default-AN: der Client ist pure-Rust (nur tokio) → kein Binary-Bloat, das Binary

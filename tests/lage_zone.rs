@@ -80,7 +80,7 @@ async fn recv_until_tag(
             .await
             .unwrap_or_else(|_| panic!("Timeout: kein '{tag}'-Event empfangen"))
             .expect("Broadcast-Kanal geschlossen");
-        if n.event == tag {
+        if n.event.as_str() == tag {
             return n;
         }
     }

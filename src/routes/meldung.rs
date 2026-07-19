@@ -239,11 +239,7 @@ pub async fn anlegen(
 
     // Dual-Publish (wie Auftrag): erzeugte ETB-Meldung in den Live-Feed + meldung-Event.
     if let Some(etb_id) = m.etb_meldung_id {
-        if let Ok(etb) = crate::etb::repo::laden(&state.pool, etb_id).await {
-            if let Ok(json) = serde_json::to_string(&etb) {
-                state.live.publiziere(einsatz_id, json);
-            }
-        }
+        state.live.publiziere(einsatz_id, etb_id);
     }
     sse(&state, einsatz_id);
     // Unübersehbares Sofort-Highlight (AK1): eigener Tag auf derselben Verbindung.
@@ -427,11 +423,7 @@ pub async fn auftrag_erteilen(
     // ETB-Anordnung entstand im selben Commit → ETB-Live-Event + Auftrag-Board + meldung-Tag (SSE-Parität).
     if let Ok(detail) = crate::auftrag::repo::laden(&state.pool, auftrag_id, &now).await {
         if let Some(etb_id) = detail.auftrag.etb_anordnung_id {
-            if let Ok(etb) = crate::etb::repo::laden(&state.pool, etb_id).await {
-                if let Ok(json) = serde_json::to_string(&etb) {
-                    state.live.publiziere(einsatz_id, json);
-                }
-            }
+            state.live.publiziere(einsatz_id, etb_id);
         }
     }
     state.live.publiziere_event(

@@ -19,13 +19,15 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 
-/// SSE-Notify (Lage-Karte): Person-Disposition hat sich geändert. Nutzt das bestehende
-/// `person`-Event-Tag (kein neues `personal`-Tag, sonst bricht der Frontend-Filter).
+/// SSE-Notify: die Disposition einer Einsatzkraft hat sich geändert (Tag `personal`).
+/// Eigenes Tag seit F01/LFH-227: `person` trägt BETROFFENE Personen (Modul `personen`),
+/// hier geht es um disponiertes Personal (Modul `personal`) — die ID-Räume sind disjunkt,
+/// und nur getrennte Tags lassen sich getrennt gaten.
 fn sse_personal(state: &AppState, einsatz_id: i64, ep_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "person_id": ep_id }).to_string();
+    let data = serde_json::json!({ "einsatz_id": einsatz_id, "personal_id": ep_id }).to_string();
     state
         .live
-        .publiziere_event(einsatz_id, LiveEvent::Person, data);
+        .publiziere_event(einsatz_id, LiveEvent::Personal, data);
 }
 
 /// Personen-Bezeichnung für ETB-Texte: Name, optional mit Funktion in Klammern.

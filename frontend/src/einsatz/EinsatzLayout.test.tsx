@@ -100,7 +100,7 @@ describe('EinsatzLayout', () => {
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
     expect(urls).toHaveLength(1);
-    expect(urls[0]).toBe('/api/einsaetze/7/etb/stream');
+    expect(urls[0]).toBe('/api/einsaetze/7/live');
   });
 });
 

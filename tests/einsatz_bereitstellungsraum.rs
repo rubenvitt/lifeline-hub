@@ -772,7 +772,7 @@ async fn belegung_einheit_feuert_einheit_sse() {
     // Alle gepufferten Events drainen und auf `einheit` mit objekt_id prüfen.
     let mut sah_einheit = false;
     while let Ok(n) = rx.try_recv() {
-        if n.event == "einheit" && n.data.contains(&einheit_id.to_string()) {
+        if n.event.as_str() == "einheit" && n.data.contains(&einheit_id.to_string()) {
             sah_einheit = true;
         }
     }
@@ -813,7 +813,7 @@ async fn belegung_fahrzeug_feuert_fahrzeug_sse() {
 
     let mut sah_fahrzeug = false;
     while let Ok(n) = rx.try_recv() {
-        if n.event == "fahrzeug" && n.data.contains(&fz_id.to_string()) {
+        if n.event.as_str() == "fahrzeug" && n.data.contains(&fz_id.to_string()) {
             sah_fahrzeug = true;
         }
     }

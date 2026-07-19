@@ -259,7 +259,7 @@ mod tests {
 
         assert_eq!(tick_einmal(&pool, &live, t("2026-06-11 10:01:00")).await, 1);
         let nachricht = rx.recv().await.unwrap();
-        assert_eq!(nachricht.event, "erinnerung");
+        assert_eq!(nachricht.event.as_str(), "erinnerung");
         let v: serde_json::Value = serde_json::from_str(&nachricht.data).unwrap();
         assert_eq!(v["einsatz_id"], e);
         assert_eq!(v["erinnerung_id"], r.id);
@@ -321,8 +321,8 @@ mod tests {
                 .eskaliert
         );
         let mut tags = vec![
-            rx.recv().await.unwrap().event,
-            rx.recv().await.unwrap().event,
+            rx.recv().await.unwrap().event.as_str(),
+            rx.recv().await.unwrap().event.as_str(),
         ];
         tags.sort();
         assert_eq!(tags, vec!["erinnerung", "sofortmeldung"]);
@@ -463,7 +463,7 @@ mod tests {
 
         assert_eq!(tick_einmal(&pool, &live, t("2026-06-11 10:01:00")).await, 1);
         let n = rx.recv().await.unwrap();
-        assert_eq!(n.event, "erinnerung");
+        assert_eq!(n.event.as_str(), "erinnerung");
         let v: serde_json::Value = serde_json::from_str(&n.data).unwrap();
         assert_eq!(v["erinnerung_id"], r.id);
         assert_eq!(v["bezug_typ"], "auftrag");

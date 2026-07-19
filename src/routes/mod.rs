@@ -31,6 +31,7 @@ pub mod karte;
 pub mod karte_hintergrundbild;
 pub mod lage_zone;
 pub mod lagebericht;
+pub mod live;
 pub mod material;
 pub mod meldung;
 pub mod nachforderung;
@@ -64,11 +65,7 @@ pub(crate) async fn etb_system_degradiert(
     inhalt: &str,
 ) -> Result<(), AppError> {
     match crate::etb::system_audit(&state.pool, einsatz_id, benutzer_id, inhalt).await {
-        Ok(anzeige) => {
-            if let Ok(json) = serde_json::to_string(&anzeige) {
-                state.live.publiziere(einsatz_id, json);
-            }
-        }
+        Ok(anzeige) => state.live.publiziere(einsatz_id, anzeige.id),
         Err(e) => {
             tracing::error!(
                 einsatz_id,
