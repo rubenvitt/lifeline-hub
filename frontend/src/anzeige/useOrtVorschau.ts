@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { LatLon } from './koordinaten';
 import { ladeOrtVorschau, type OrtVorschau } from '../api/ortVorschau';
+import { einsatzKeys } from '../api/queryKeys';
 import { ortKeyVon, holeOrt, setzeOrt } from './ortCache';
 
 /** Auf ~100 m runden (3 Nachkommastellen) — teilt den serverseitigen Cache-Treffer. */
@@ -36,13 +37,12 @@ export function useOrtVorschau(
   }, [lat, lon, debounceMs]);
 
   return useQuery<OrtVorschau>({
-    queryKey: [
-      'ort-vorschau',
+    queryKey: einsatzKeys.ortVorschau(
       einsatzId,
       debounced ? runde(debounced.lat) : null,
       debounced ? runde(debounced.lon) : null,
       exclude ?? null,
-    ],
+    ),
     queryFn: async () => {
       const key = ortKeyVon(debounced!.lat, debounced!.lon);
       try {

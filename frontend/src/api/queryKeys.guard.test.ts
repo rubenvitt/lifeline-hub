@@ -86,7 +86,12 @@ describe('queryKeys-Guard (b): jeder managed Key ist live ODER bewusst nicht-liv
  */
 describe('queryKeys-Guard (c): kein bare-Prefix-Schatten managed Keys (LFH-215)', () => {
   // Bare-Prefixe, die denselben Datensatz wie ein `einsatz-*`-Key laden (→ einsatzKeys.* nutzen).
-  const SCHATTEN_PREFIXE = new Set(['einheiten', 'abschnitte', 'mitglieder']);
+  // `modulOverrides` (F27/LFH-269): camelCase-Voraltschreibweise, ersetzt durch
+  // `einsatzKeys.modulOverrides` mit dem Wert 'einsatz-modul-overrides'. Ohne diesen Eintrag
+  // wäre ein Rückfall auf das alte Literal für Guard (a) unsichtbar — der kennt nur die
+  // Strings, die IN EINSATZ_KEYS stehen, und das tut 'modulOverrides' nach der Umbenennung
+  // gerade nicht mehr.
+  const SCHATTEN_PREFIXE = new Set(['einheiten', 'abschnitte', 'mitglieder', 'modulOverrides']);
 
   it('findet keinen bare-Prefix-Query-Key als Inline-String-Literal', () => {
     const verstoesse: string[] = [];
@@ -127,5 +132,50 @@ describe('queryKeys-Guard (d): befehl-Wire-Event ist live (LFH-262/F13)', () => 
   it('befehle/befehl sind nicht mehr NICHT_LIVE', () => {
     expect(NICHT_LIVE_KEYS as readonly string[]).not.toContain(EINSATZ_KEYS.befehle);
     expect(NICHT_LIVE_KEYS as readonly string[]).not.toContain(EINSATZ_KEYS.befehl);
+  });
+});
+
+/**
+ * Guard (e, F27/LFH-269): org-scoped Keys dürfen nicht in zwei Schreibweisen existieren.
+ *
+ * Anlass ist ein realer Split-Cache-Bug: `ladeOrgModulEinstellungen` hing an
+ * `['orgModulEinstellungen']` (EinsatzEinstellungenPage) UND an `['org-modul-einstellungen']`
+ * (EinsatzDefaults). Zwei Cache-Einträge für denselben Datensatz — die Mutation invalidierte
+ * nur ihre eigene Hälfte, die Einsatz-Einstellungsseite zeigte danach stale Rollen-Defaults.
+ *
+ * Kanonisch ist die kebab-Schreibweise (entspricht dem Endpoint /api/org-modul-einstellungen).
+ *
+ * GRENZE dieses Guards, bewusst: er verbietet EIN bekanntes Literal, nicht die Bug-KLASSE
+ * („derselbe Loader hängt an zwei Keys"). Ein allgemeiner Guard dafür braucht den TS-AST —
+ * ein zeilenbasiertes „queryKey in der Nähe von queryFn"-Heuristik produziert zu viele
+ * Fehlalarme (Probe: 9 von 37 Loadern falsch-positiv, weil benachbarte useQuery-Blöcke
+ * ineinanderlaufen). Der AST-Umbau ist eigener Scope (F27 Arbeitspaket 3).
+ * Org-scoped Keys haben zudem bis heute keine Registry — siehe Folgetask.
+ */
+describe('queryKeys-Guard (e): keine Doppel-Schreibweise org-scoped Keys (F27)', () => {
+  // Verbotenes Literal → kanonische Schreibweise.
+  const VERBOTEN = new Map([['orgModulEinstellungen', 'org-modul-einstellungen']]);
+
+  it('findet keine camelCase-Variante eines org-scoped Query-Keys', () => {
+    const verstoesse: string[] = [];
+    for (const [pfad, inhalt] of Object.entries(dateien)) {
+      if (pfad.endsWith('/api/queryKeys.ts')) continue; // Home des Registry
+      if (/\.test\.tsx?$/.test(pfad)) continue;
+      inhalt.split('\n').forEach((zeile, i) => {
+        if (istKommentarzeile(zeile)) return;
+        const treffer = zeile.match(/\[\s*'([^']+)'/g) ?? [];
+        for (const t of treffer) {
+          const prefix = /\[\s*'([^']+)'/.exec(t)?.[1];
+          const kanonisch = prefix && VERBOTEN.get(prefix);
+          if (kanonisch) {
+            verstoesse.push(`${pfad}:${i + 1}  '${prefix}' → '${kanonisch}'`);
+          }
+        }
+      });
+    }
+    expect(
+      verstoesse,
+      `Doppel-Schreibweise eines org-scoped Query-Keys gefunden (Split-Cache: derselbe Loader landet in zwei Cache-Namespaces, die Invalidierung trifft nur eine Hälfte):\n${verstoesse.join('\n')}`,
+    ).toEqual([]);
   });
 });

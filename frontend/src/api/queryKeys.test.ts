@@ -108,6 +108,9 @@ describe('einsatzKeys (Factory-Output)', () => {
     // null reicht unverändert durch (enabled-Guard-Queries; wie das bisherige Inline-Literal):
     expect(einsatzKeys.person(1, null)).toEqual(['einsatz-person', 1, null]);
     expect(einsatzKeys.einsatz(null)).toEqual(['einsatz', null]);
+    expect(einsatzKeys.modulOverrides(1)).toEqual(['einsatz-modul-overrides', 1]);
+    // null wie bei `einsatz`: das Command-Palette lädt nur im Einsatzkontext (enabled-Guard).
+    expect(einsatzKeys.modulOverrides(null)).toEqual(['einsatz-modul-overrides', null]);
     expect(einsatzKeys.personAudit(1, 2)).toEqual(['einsatz-person-audit', 1, 2]);
     expect(einsatzKeys.uhsDetail(1, 2)).toEqual(['einsatz-uhs-detail', 1, 2]);
     expect(einsatzKeys.schaden(1, 2)).toEqual(['einsatz-schaden', 1, 2]);
@@ -128,6 +131,21 @@ describe('einsatzKeys (Factory-Output)', () => {
     expect(einsatzKeys.tiereHalter(1, 2)).toEqual(['einsatz-tiere', 1, 'halter', 2]);
     expect(einsatzKeys.schaedenGeschaedigt(1, 2)).toEqual(['einsatz-schaeden', 1, 'geschaedigt', 2]);
     expect(einsatzKeys.etbListe(1, { typ: 'x' })).toEqual(['etb', 1, { typ: 'x' }]);
+    // Die gerundeten Koordinaten sind Teil des Keys — Cache-Trefferquote hängt daran.
+    expect(einsatzKeys.ortVorschau(1, 52.123, 13.456, 'uhs:5')).toEqual([
+      'ort-vorschau',
+      1,
+      52.123,
+      13.456,
+      'uhs:5',
+    ]);
+    expect(einsatzKeys.ortVorschau(1, null, null, null)).toEqual([
+      'ort-vorschau',
+      1,
+      null,
+      null,
+      null,
+    ]);
   });
 
   it('deckt jeden EINSATZ_KEYS-Prefix mit mindestens einer Factory-Funktion ab', () => {

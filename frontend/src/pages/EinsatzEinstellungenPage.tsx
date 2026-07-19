@@ -109,12 +109,12 @@ export default function EinsatzEinstellungenPage() {
     queryFn: () => ladeEinstellungen(einsatzId),
   });
   const overridesQuery = useQuery({
-    queryKey: ['modulOverrides', einsatzId],
+    queryKey: einsatzKeys.modulOverrides(einsatzId),
     queryFn: () => ladeModulOverrides(einsatzId),
   });
   // Org-Modul-Rollen-Defaults (optional, nicht-blockierend).
   const orgModulQuery = useQuery({
-    queryKey: ['orgModulEinstellungen'],
+    queryKey: ['org-modul-einstellungen'],
     queryFn: () => ladeOrgModulEinstellungen(),
   });
 
@@ -122,7 +122,7 @@ export default function EinsatzEinstellungenPage() {
     mutationFn: (vars: { modulKey: string; update: ModulOverrideUpdate }) =>
       setzeModulOverride(einsatzId, vars.modulKey, vars.update),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['modulOverrides', einsatzId] });
+      qc.invalidateQueries({ queryKey: einsatzKeys.modulOverrides(einsatzId) });
       message.success('Modul-Einstellung gespeichert');
     },
     onError: (e) =>

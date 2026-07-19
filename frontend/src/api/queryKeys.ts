@@ -47,6 +47,8 @@ export const EINSATZ_KEYS = {
   einstellungen: 'einsatz-einstellungen',
   mitglieder: 'einsatz-mitglieder',
   sprechgruppen: 'einsatz-sprechgruppen',
+  modulOverrides: 'einsatz-modul-overrides',
+  ortVorschau: 'ort-vorschau',
   // Singular-Detail-Keys: der SSE-Fan-out invalidiert die Listen-Prefixe, nicht diese
   // (separates erstes Element → kein Prefix-Match). Vorbestehende Silent-Gaps, bewusst
   // NICHT_LIVE (Nachzug als eigener Task).
@@ -128,12 +130,20 @@ export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
  * - `einsatz`/`einstellungen`/`mitglieder`/`sprechgruppen`: ändern sich selten / kein Live-Event.
  * - `uhsDetail`/`person`/`personAudit`/`tier`/`schaden`: Singular-Detail-Keys, die der
  *   Listen-Prefix-Match nicht erreicht (vorbestehende Silent-Gaps, Nachzug als eigener Task).
+ * - `modulOverrides` (F27/LFH-269): kein LiveEvent im Backend — `src/live/mod.rs`
+ *   (`LiveEvent::ALLE`) kennt keine Modul-Override-Variante. Ein Override eines anderen
+ *   Nutzers propagiert also nicht live; das ist der dokumentierte Ist-Zustand, kein Versehen.
+ * - `ortVorschau` (F27/LFH-269): abgeleiteter Geo-Lookup mit Debounce + Client-Cache, kein
+ *   Einsatz-Datenobjekt. Hier live zu invalidieren wäre schädlich (Nominatim-ToS), nicht bloß
+ *   überflüssig.
  */
 export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.einsatz,
   EINSATZ_KEYS.einstellungen,
   EINSATZ_KEYS.mitglieder,
   EINSATZ_KEYS.sprechgruppen,
+  EINSATZ_KEYS.modulOverrides,
+  EINSATZ_KEYS.ortVorschau,
   EINSATZ_KEYS.uhsDetail,
   EINSATZ_KEYS.person,
   EINSATZ_KEYS.personAudit,
@@ -159,6 +169,9 @@ export const einsatzKeys = {
   einstellungen: (einsatzId: number) => [EINSATZ_KEYS.einstellungen, einsatzId] as const,
   mitglieder: (einsatzId: number) => [EINSATZ_KEYS.mitglieder, einsatzId] as const,
   sprechgruppen: (einsatzId: number) => [EINSATZ_KEYS.sprechgruppen, einsatzId] as const,
+  // einsatzId nullbar aus demselben Grund wie bei `einsatz`: das Command-Palette zieht sie
+  // aus dem Pfad und lädt nur im Einsatzkontext (enabled-Guard).
+  modulOverrides: (einsatzId: number | null) => [EINSATZ_KEYS.modulOverrides, einsatzId] as const,
 
   // Personen / Personal
   personen: (einsatzId: number) => [EINSATZ_KEYS.personen, einsatzId] as const,
@@ -228,4 +241,14 @@ export const einsatzKeys = {
   // ETB
   etb: (einsatzId: number) => [EINSATZ_KEYS.etb, einsatzId] as const,
   etbListe: <F>(einsatzId: number, filter: F) => [EINSATZ_KEYS.etb, einsatzId, filter] as const,
+
+  // Abgeleitetes
+  // Die gerundeten Koordinaten sind Teil des Keys (Cache-Trefferquote + serverseitiger
+  // Cache-Share hängen daran) — die Rundung passiert im Aufrufer, nicht hier.
+  ortVorschau: (
+    einsatzId: number,
+    lat: number | null,
+    lon: number | null,
+    exclude: string | null,
+  ) => [EINSATZ_KEYS.ortVorschau, einsatzId, lat, lon, exclude] as const,
 } as const;

@@ -22,7 +22,7 @@ export function useBefehle(): Befehl[] {
 
   const { data: einsaetze = [] } = useQuery({ queryKey: ['einsaetze'], queryFn: listeEinsaetze });
   const { data: overrides } = useQuery({
-    queryKey: ['modulOverrides', einsatzId],
+    queryKey: einsatzKeys.modulOverrides(einsatzId),
     queryFn: () => ladeModulOverrides(einsatzId!),
     enabled: einsatzId != null,
   });

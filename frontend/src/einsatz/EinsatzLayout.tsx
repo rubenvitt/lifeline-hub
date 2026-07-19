@@ -68,7 +68,7 @@ export default function EinsatzLayout() {
   // Modul-Overrides (LFH-132) für die Nav-Reflexion; geteilter queryKey wie die
   // Einstellungen (Hot-Path, einmal gecacht je Einsatz).
   const { data: modulOverrides } = useQuery({
-    queryKey: ['modulOverrides', einsatzId],
+    queryKey: einsatzKeys.modulOverrides(einsatzId),
     queryFn: () => ladeModulOverrides(einsatzId),
   });
 
