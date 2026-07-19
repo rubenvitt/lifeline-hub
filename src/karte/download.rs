@@ -183,16 +183,16 @@ pub fn url_ist_sicher(url: &Url) -> Result<(), String> {
     url_ist_sicher_mit(url, dev_loopback_download_erlaubt())
 }
 
-/// Opt-in Dev-Flag `LIFELINE_DOWNLOAD_ALLOW_LOOPBACK`: erlaubt Downloads von Loopback-Adressen
-/// (lokaler MinIO-Object-Store, auch http). Default AUS → Produktion bleibt streng (https +
-/// kein-intern). Nur lokal in der `.env` setzen.
+/// Opt-in Dev-Escape `--download-allow-loopback` / `LIFELINE_DOWNLOAD_ALLOW_LOOPBACK`:
+/// erlaubt Downloads von Loopback-Adressen (lokaler MinIO-Object-Store, auch http).
+/// Default AUS → Produktion bleibt streng (https + kein-intern).
+///
+/// Seit LFH-239/F18 aus der beim Start gesetzten [`crate::karte::KarteConfig`] statt bei
+/// jedem Aufruf aus dem Prozess-Env: der Schalter steht damit in `--help`, ein aktiver
+/// Escape wird beim Start protokolliert, und eine ambient gesetzte Variable kann die
+/// Security-Tests nicht mehr kippen (im Testprozess greift der sichere Default).
 fn dev_loopback_download_erlaubt() -> bool {
-    matches!(
-        std::env::var("LIFELINE_DOWNLOAD_ALLOW_LOOPBACK")
-            .ok()
-            .as_deref(),
-        Some("1") | Some("true")
-    )
+    crate::karte::karte_config().download_allow_loopback
 }
 
 /// Ist der von `url` bereits geparste Host ein Loopback (127.0.0.0/8, ::1, „localhost")? Nutzt

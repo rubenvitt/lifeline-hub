@@ -280,6 +280,27 @@ pub struct Config {
     #[arg(long, env = "LIFELINE_CLAMAV_TIMEOUT_SECS", default_value_t = 30)]
     pub clamav_timeout_secs: u64,
 
+    /// **Dev-Escape, schwächt den SSRF-Schutz:** erlaubt Karten-Downloads von
+    /// Loopback-Adressen (lokaler MinIO-Object-Store, auch über http). Default AUS.
+    /// Gilt für den gesamten Download-Pfad einschließlich des öffentlichen Style-/
+    /// Tile-Proxys — nur lokal setzen, niemals in einer erreichbaren Umgebung.
+    /// Ein aktiver Escape wird beim Serverstart mit einer Warnung protokolliert
+    /// (LFH-239/F18: vorher lief der Schalter am Config-System vorbei und war
+    /// weder in `--help` noch im Log sichtbar).
+    #[arg(
+        long,
+        env = "LIFELINE_DOWNLOAD_ALLOW_LOOPBACK",
+        default_value_t = false
+    )]
+    pub download_allow_loopback: bool,
+
+    /// Ops-/Dev-Override der Trust-Quelle des Offline-Karten-Katalogs. Ohne Angabe gilt
+    /// der einkompilierte Pin (LFH-199). Nimmt Ops die Rebuild-Reibung, wenn das Manifest
+    /// woanders liegt (LFH-204) — verbiegt aber die Quelle, der das System vertraut,
+    /// und wird deshalb beim Start protokolliert.
+    #[arg(long, env = "LIFELINE_OFFLINE_KATALOG_MANIFEST_URL")]
+    pub offline_katalog_manifest_url: Option<String>,
+
     /// HTTPS statt HTTP bedienen. Ohne Flag bleibt der bestehende HTTP-Bind aktiv
     /// (Dev/localhost). Mit `--tls` wird ein Server-Cert in Präzedenz beschafft
     /// (BYO → Cache → mkcert → rcgen) und `Secure`-Cookies aktiviert.

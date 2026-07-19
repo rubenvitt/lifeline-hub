@@ -107,6 +107,28 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         timeout: std::time::Duration::from_secs(config.clamav_timeout_secs),
     });
 
+    // Karten-Schalter (LFH-239/F18) prozessweit setzen — beide schwächen bzw. verbiegen
+    // eine Vertrauensgrenze und liefen vorher unsichtbar per std::env::var mit.
+    if config.download_allow_loopback {
+        tracing::warn!(
+            "SSRF-Schutz ist abgeschwächt: --download-allow-loopback \
+             (LIFELINE_DOWNLOAD_ALLOW_LOOPBACK) ist AKTIV — Karten-Downloads zu \
+             Loopback-Adressen sind erlaubt, auch über http und auch auf dem öffentlichen \
+             Style-/Tile-Proxy-Pfad. Das ist ein reiner Dev-Schalter für einen lokalen \
+             Object-Store; in einer erreichbaren Umgebung gehört er ausgeschaltet."
+        );
+    }
+    if let Some(url) = &config.offline_katalog_manifest_url {
+        tracing::warn!(
+            "Offline-Katalog nutzt eine ÜBERSCHRIEBENE Manifest-Quelle: {url} — statt des \
+             einkompilierten Pins. Diese URL bestimmt, welchen Kartendaten das System vertraut."
+        );
+    }
+    lifeline_hub::karte::init_karte_config(lifeline_hub::karte::KarteConfig {
+        download_allow_loopback: config.download_allow_loopback,
+        offline_katalog_manifest_url: config.offline_katalog_manifest_url.clone(),
+    });
+
     // OIDC-Konfiguriertheit (LFH-41, Increment 3 SSO-Fundament) prozessweit setzen —
     // reine Config-Ableitung, KEIN Netzzugriff (Discovery ist Lazy: erst bei erster
     // OIDC-Nutzung, dann gecacht). Alle vier Settings (inkl. `oidc_redirect_url`) sind
