@@ -66,6 +66,33 @@ fn zu_anzeige(row: Row) -> EinsatzabschnittAnzeige {
     }
 }
 
+/// Setzt die Anzeigen für einen Satz Zeilen **desselben** Einsatzes zusammen. Die
+/// Sprechgruppen werden in EINER Abfrage für den ganzen Einsatz nachgeladen statt je
+/// Abschnitt einzeln (LFH-225/F23). `laden()` nutzt dieselbe Funktion mit einem
+/// Ein-Element-Satz, damit es genau EINE Anreicherungslogik gibt.
+async fn zu_anzeige_batch(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    rows: Vec<Row>,
+) -> Result<Vec<EinsatzabschnittAnzeige>, AppError> {
+    // Ohne Zeilen gibt es nichts anzureichern — die Sammelabfrage bleibt aus.
+    if rows.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut sprechgruppen =
+        crate::sprechgruppe::repo::lade_abschnitt_sprechgruppen_map(pool, einsatz_id).await?;
+    Ok(rows
+        .into_iter()
+        .map(|row| {
+            let id = row.id;
+            let mut anzeige = zu_anzeige(row);
+            // Jeder Abschnitt kommt im Satz genau einmal vor → entnehmen statt klonen.
+            anzeige.sprechgruppen = sprechgruppen.remove(&id).unwrap_or_default();
+            anzeige
+        })
+        .collect())
+}
+
 /// Alle Abschnitte eines Einsatzes (flach, aufgelöst), sortiert nach `sortier`, dann `id`.
 pub async fn liste(
     pool: &SqlitePool,
@@ -77,15 +104,7 @@ pub async fn liste(
     .bind(einsatz_id)
     .fetch_all(pool)
     .await?;
-    let mut ergebnis = Vec::with_capacity(rows.len());
-    for row in rows {
-        let id = row.id;
-        let mut anzeige = zu_anzeige(row);
-        let sgs = crate::sprechgruppe::repo::lade_abschnitt_sprechgruppen(pool, id).await?;
-        anzeige.sprechgruppen = sgs.into_iter().map(|s| s.anzeige()).collect();
-        ergebnis.push(anzeige);
-    }
-    Ok(ergebnis)
+    zu_anzeige_batch(pool, einsatz_id, rows).await
 }
 
 /// Lädt einen Abschnitt (aufgelöst); `NotFound`, falls nicht zum Einsatz.
@@ -94,18 +113,18 @@ pub async fn laden(
     einsatz_id: i64,
     id: i64,
 ) -> Result<EinsatzabschnittAnzeige, AppError> {
-    let mut anzeige = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
+    let row = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
         "{SELECT_AUFGELOEST} WHERE a.id = ? AND a.einsatz_id = ?"
     )))
     .bind(id)
     .bind(einsatz_id)
     .fetch_optional(pool)
     .await?
-    .map(zu_anzeige)
     .ok_or(AppError::NotFound)?;
-    let sgs = crate::sprechgruppe::repo::lade_abschnitt_sprechgruppen(pool, id).await?;
-    anzeige.sprechgruppen = sgs.into_iter().map(|s| s.anzeige()).collect();
-    Ok(anzeige)
+    zu_anzeige_batch(pool, einsatz_id, vec![row])
+        .await?
+        .pop()
+        .ok_or(AppError::NotFound)
 }
 
 /// Prüft, ob ein Abschnitt zum Einsatz gehört (für Parent-Validierung). `NotFound` sonst.

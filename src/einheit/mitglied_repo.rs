@@ -3,6 +3,7 @@ use crate::error::AppError;
 use crate::material::MaterialStatus;
 use crate::staerke::{Staerke, StaerkePosition};
 use sqlx::{SqliteConnection, SqlitePool};
+use std::collections::HashMap;
 
 /// Prüft (auf offener Connection/Tx), ob eine Einheit zum Einsatz gehört. `NotFound` sonst.
 async fn pruefe_einheit_tx(
@@ -281,6 +282,47 @@ pub async fn material_mitglieder(
 }
 
 #[derive(sqlx::FromRow)]
+struct MaterialZeileMitEinheit {
+    einheit_id: i64,
+    em_id: i64,
+    bezeichnung: String,
+    menge: i64,
+    #[sqlx(try_from = "String")]
+    status: MaterialStatus,
+}
+
+/// Material-Mitglieder ALLER Einheiten eines Einsatzes in EINER Abfrage (kein N+1,
+/// LFH-225/F23), gruppiert je `einheit_id`. Einheiten ohne Material fehlen in der Map.
+/// Sortierung und Feldauswahl sind identisch zu `material_mitglieder` — das globale
+/// `ORDER BY id` erhält die Reihenfolge innerhalb jeder Gruppe.
+pub async fn material_mitglieder_map(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<HashMap<i64, Vec<EinheitMitgliedMaterial>>, AppError> {
+    let zeilen = sqlx::query_as::<_, MaterialZeileMitEinheit>(
+        "SELECT einheit_id, id AS em_id, snap_bezeichnung AS bezeichnung, menge, status \
+         FROM einsatz_material \
+         WHERE einheit_id IN (SELECT id FROM einsatz_einheit WHERE einsatz_id = ?) \
+         ORDER BY id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    let mut map: HashMap<i64, Vec<EinheitMitgliedMaterial>> = HashMap::new();
+    for z in zeilen {
+        map.entry(z.einheit_id)
+            .or_default()
+            .push(EinheitMitgliedMaterial {
+                em_id: z.em_id,
+                bezeichnung: z.bezeichnung,
+                menge: z.menge,
+                status: z.status,
+            });
+    }
+    Ok(map)
+}
+
+#[derive(sqlx::FromRow)]
 struct PersonRow {
     ep_id: i64,
     name: String,
@@ -320,6 +362,53 @@ pub async fn personal_mitglieder(
 }
 
 #[derive(sqlx::FromRow)]
+struct PersonZeileMitEinheit {
+    einheit_id: i64,
+    ep_id: i64,
+    name: String,
+    funktion: Option<String>,
+    staerke_position: Option<String>,
+    ist_fuehrer: i64,
+}
+
+/// Personal-Mitglieder ALLER Einheiten eines Einsatzes in EINER Abfrage (kein N+1,
+/// LFH-225/F23), gruppiert je `einheit_id`. Auflösung von Position und `ist_fuehrer`
+/// wie in `personal_mitglieder`; der Einsatz-Filter sitzt bewusst auf der bereits
+/// vorhandenen Verknüpfung zur Einheit (`e.einsatz_id`), nicht auf `ep.einsatz_id` —
+/// die Einzelabfrage filtert ebenfalls allein über die Einheit.
+pub async fn personal_mitglieder_map(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<HashMap<i64, Vec<EinheitMitgliedPerson>>, AppError> {
+    let zeilen = sqlx::query_as::<_, PersonZeileMitEinheit>(
+        "SELECT ep.einheit_id AS einheit_id, ep.id AS ep_id, ep.snap_name AS name, \
+                ep.snap_funktion AS funktion, \
+                COALESCE(ep.staerke_position, p.staerke_position) AS staerke_position, \
+                COALESCE(ep.id = e.fuehrer_id, 0) AS ist_fuehrer \
+         FROM einsatz_personal ep \
+         JOIN einsatz_einheit e ON e.id = ep.einheit_id \
+         LEFT JOIN personal p ON p.id = ep.personal_id \
+         WHERE e.einsatz_id = ? ORDER BY ep.id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    let mut map: HashMap<i64, Vec<EinheitMitgliedPerson>> = HashMap::new();
+    for z in zeilen {
+        map.entry(z.einheit_id)
+            .or_default()
+            .push(EinheitMitgliedPerson {
+                ep_id: z.ep_id,
+                name: z.name,
+                funktion: z.funktion,
+                staerke_position: z.staerke_position,
+                ist_fuehrer: z.ist_fuehrer != 0,
+            });
+    }
+    Ok(map)
+}
+
+#[derive(sqlx::FromRow)]
 struct FahrzeugRow {
     ef_id: i64,
     funkrufname: String,
@@ -348,6 +437,43 @@ pub async fn fahrzeug_mitglieder(
         .collect())
 }
 
+#[derive(sqlx::FromRow)]
+struct FahrzeugZeileMitEinheit {
+    einheit_id: i64,
+    ef_id: i64,
+    funkrufname: String,
+    fahrzeugtyp: Option<String>,
+}
+
+/// Fahrzeug-Mitglieder ALLER Einheiten eines Einsatzes in EINER Abfrage (kein N+1,
+/// LFH-225/F23), gruppiert je `einheit_id`. Sortierung wie in `fahrzeug_mitglieder`.
+pub async fn fahrzeug_mitglieder_map(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<HashMap<i64, Vec<EinheitMitgliedFahrzeug>>, AppError> {
+    let zeilen = sqlx::query_as::<_, FahrzeugZeileMitEinheit>(
+        "SELECT einheit_id, id AS ef_id, snap_funkrufname AS funkrufname, \
+                snap_fahrzeugtyp AS fahrzeugtyp \
+         FROM einsatz_fahrzeug \
+         WHERE einheit_id IN (SELECT id FROM einsatz_einheit WHERE einsatz_id = ?) \
+         ORDER BY id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    let mut map: HashMap<i64, Vec<EinheitMitgliedFahrzeug>> = HashMap::new();
+    for z in zeilen {
+        map.entry(z.einheit_id)
+            .or_default()
+            .push(EinheitMitgliedFahrzeug {
+                ef_id: z.ef_id,
+                funkrufname: z.funkrufname,
+                fahrzeugtyp: z.fahrzeugtyp,
+            });
+    }
+    Ok(map)
+}
+
 /// Eigene Ist-Stärke einer Einheit: Aggregation der aufgelösten Personal-Positionen der
 /// Mitglieder. Fahrzeuge zählen nicht in F/UF/M. Positionen ohne Wert werden ignoriert.
 pub async fn ist_staerke(pool: &SqlitePool, einheit_id: i64) -> Result<Staerke, AppError> {
@@ -364,6 +490,34 @@ pub async fn ist_staerke(pool: &SqlitePool, einheit_id: i64) -> Result<Staerke, 
         .flatten()
         .filter_map(|s| StaerkePosition::parse(&s));
     Ok(Staerke::aus_positionen(iter))
+}
+
+/// Eigene Ist-Stärke ALLER Einheiten eines Einsatzes in EINER Abfrage (kein N+1,
+/// LFH-225/F23), gruppiert je `einheit_id`. Gleiche Auflösung/Filterung wie
+/// `ist_staerke`; Einheiten ohne wertbare Kräfte fehlen in der Map — der Aufrufer
+/// setzt dafür `0/0/0`.
+pub async fn ist_staerke_map(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<HashMap<i64, Staerke>, AppError> {
+    let zeilen: Vec<(i64, Option<String>)> = sqlx::query_as(
+        "SELECT ep.einheit_id, COALESCE(ep.staerke_position, p.staerke_position) \
+         FROM einsatz_personal ep LEFT JOIN personal p ON p.id = ep.personal_id \
+         WHERE ep.einheit_id IN (SELECT id FROM einsatz_einheit WHERE einsatz_id = ?)",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    let mut positionen: HashMap<i64, Vec<StaerkePosition>> = HashMap::new();
+    for (einheit_id, position) in zeilen {
+        if let Some(p) = position.as_deref().and_then(StaerkePosition::parse) {
+            positionen.entry(einheit_id).or_default().push(p);
+        }
+    }
+    Ok(positionen
+        .into_iter()
+        .map(|(einheit_id, ps)| (einheit_id, Staerke::aus_positionen(ps.into_iter())))
+        .collect())
 }
 
 #[cfg(test)]
@@ -593,6 +747,109 @@ mod tests {
             "Florian 1"
         );
         assert!(fahrzeug_mitglieder(&pool, a).await.unwrap().is_empty());
+    }
+
+    /// LFH-225/F23: Die Sammelabfragen müssen je Einheit exakt das liefern, was die
+    /// Einzelabfragen liefern — Inhalt UND Reihenfolge. Dieser Test koppelt beide
+    /// Fassungen, damit ihre `ORDER BY`/Feldauswahl nicht auseinanderlaufen kann.
+    #[tokio::test]
+    async fn sammelabfragen_sind_deckungsgleich_mit_den_einzelabfragen() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, a, b) = setup(&pool).await;
+        // Eine dritte Einheit bleibt bewusst leer.
+        let leer: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Leer') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        // Personal auf beide Einheiten, Zuordnung bewusst nicht id-aufsteigend.
+        let mut personen = Vec::new();
+        for (name, pos) in [
+            ("Chef", Some("fuehrer")),
+            ("UF", Some("unterfuehrer")),
+            ("M1", Some("mannschaft")),
+            ("M2", Some("mannschaft")),
+            ("Ohne", None),
+        ] {
+            personen.push(person(&pool, einsatz, name, pos).await);
+        }
+        for (idx, einheit) in [(4, a), (1, a), (3, b), (0, b), (2, a)] {
+            ordne_personal_zu(&pool, einsatz, einheit, personen[idx])
+                .await
+                .unwrap();
+        }
+        // Chef als Führer von b markieren (prüft die ist_fuehrer-Auflösung im Batch).
+        sqlx::query("UPDATE einsatz_einheit SET fuehrer_id = ? WHERE id = ?")
+            .bind(personen[0])
+            .bind(b)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        // Fahrzeuge und Material, ebenfalls verdreht zugeordnet.
+        let mut fahrzeuge = Vec::new();
+        for name in ["Florian 1", "Florian 2", "Florian 3"] {
+            let ef: i64 = sqlx::query_scalar(
+                "INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, ?) RETURNING id",
+            ).bind(einsatz).bind(name).fetch_one(&pool).await.unwrap();
+            fahrzeuge.push(ef);
+        }
+        for (idx, einheit) in [(2, a), (0, a), (1, b)] {
+            ordne_fahrzeug_zu(&pool, einsatz, einheit, fahrzeuge[idx])
+                .await
+                .unwrap();
+        }
+        let mut materialien = Vec::new();
+        for bez in ["Wolldecke", "Absperrband", "Trage"] {
+            let em: i64 = sqlx::query_scalar(
+                "INSERT INTO einsatz_material (einsatz_id, snap_bezeichnung, menge) VALUES (?, ?, 7) RETURNING id",
+            ).bind(einsatz).bind(bez).fetch_one(&pool).await.unwrap();
+            materialien.push(em);
+        }
+        for (idx, einheit) in [(1, a), (2, b), (0, a)] {
+            ordne_material_zu(&pool, einsatz, einheit, materialien[idx])
+                .await
+                .unwrap();
+        }
+
+        let personal_map = personal_mitglieder_map(&pool, einsatz).await.unwrap();
+        let fahrzeug_map = fahrzeug_mitglieder_map(&pool, einsatz).await.unwrap();
+        let material_map = material_mitglieder_map(&pool, einsatz).await.unwrap();
+        let staerke_map = ist_staerke_map(&pool, einsatz).await.unwrap();
+
+        for einheit in [a, b, leer] {
+            assert_eq!(
+                personal_map.get(&einheit).cloned().unwrap_or_default(),
+                personal_mitglieder(&pool, einheit).await.unwrap(),
+                "Personal-Sammelabfrage weicht bei Einheit {einheit} ab"
+            );
+            assert_eq!(
+                fahrzeug_map.get(&einheit).cloned().unwrap_or_default(),
+                fahrzeug_mitglieder(&pool, einheit).await.unwrap(),
+                "Fahrzeug-Sammelabfrage weicht bei Einheit {einheit} ab"
+            );
+            assert_eq!(
+                material_map.get(&einheit).cloned().unwrap_or_default(),
+                material_mitglieder(&pool, einheit).await.unwrap(),
+                "Material-Sammelabfrage weicht bei Einheit {einheit} ab"
+            );
+            assert_eq!(
+                staerke_map
+                    .get(&einheit)
+                    .copied()
+                    .unwrap_or(Staerke::neu(0, 0, 0)),
+                ist_staerke(&pool, einheit).await.unwrap(),
+                "Stärke-Sammelabfrage weicht bei Einheit {einheit} ab"
+            );
+        }
+        // Der Vergleich oben muss etwas zu vergleichen haben.
+        assert_eq!(personal_map[&a].len(), 3);
+        assert_eq!(personal_map[&b].len(), 2);
+        assert!(!personal_map.contains_key(&leer));
+        assert_eq!(staerke_map[&a], Staerke::neu(0, 1, 1));
     }
 
     #[tokio::test]

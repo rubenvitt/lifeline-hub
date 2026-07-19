@@ -196,3 +196,150 @@ async fn fremde_org_kann_abschnitte_nicht_lesen_oder_schreiben() {
         StatusCode::FORBIDDEN | StatusCode::NOT_FOUND
     ));
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LFH-225/F23: Satzbasierte Sprechgruppen-Anreicherung der Abschnittsliste
+//
+// `GET /abschnitte` lädt die Sprechgruppen nicht mehr je Abschnitt einzeln nach.
+// Zuordnung und Sortierung (`ORDER BY betriebsart, sortier, bezeichnung`) müssen
+// dabei je Abschnitt exakt erhalten bleiben.
+// ─────────────────────────────────────────────────────────────────────────────
+
+async fn sprechgruppe_anlegen(
+    app: &axum::Router,
+    cookie: &str,
+    bezeichnung: &str,
+    betriebsart: &str,
+    sortier: i64,
+) -> i64 {
+    let (s, json) = anfrage(
+        app,
+        "POST",
+        "/api/sprechgruppen",
+        cookie,
+        Some(&format!(
+            r#"{{"bezeichnung":"{bezeichnung}","betriebsart":"{betriebsart}","sortier":{sortier}}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "Sprechgruppe {bezeichnung} anlegen");
+    json["id"].as_i64().unwrap()
+}
+
+async fn abschnitt_anlegen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    name: &str,
+    sprechgruppen: &[i64],
+) -> i64 {
+    let ids = sprechgruppen
+        .iter()
+        .map(|i| i.to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    let (s, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        cookie,
+        Some(&format!(
+            r#"{{"name":"{name}","sprechgruppe_ids":[{ids}]}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "Abschnitt {name} anlegen");
+    json["id"].as_i64().unwrap()
+}
+
+fn eintrag(liste: &serde_json::Value, id: i64) -> &serde_json::Value {
+    liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"].as_i64() == Some(id))
+        .unwrap_or_else(|| panic!("Abschnitt {id} fehlt in der Liste"))
+}
+
+fn bezeichnungen(werte: &serde_json::Value) -> Vec<String> {
+    werte
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["bezeichnung"].as_str().unwrap().to_string())
+        .collect()
+}
+
+/// Mehrere Abschnitte × mehrere Sprechgruppen in EINEM Listenabruf: jede
+/// Sprechgruppe landet beim richtigen Abschnitt, sortiert nach
+/// `betriebsart, sortier, bezeichnung`.
+#[tokio::test]
+async fn liste_ordnet_sprechgruppen_je_abschnitt_sortiert_zu() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    // Alle drei Sortierschlüssel diskriminierend belegt: DMO vor TMO, dann
+    // sortier, bei Gleichstand die Bezeichnung.
+    let tmo5 = sprechgruppe_anlegen(&app, &admin, "410_F_DRK", "TMO", 5).await;
+    let dmo9_b = sprechgruppe_anlegen(&app, &admin, "112_D_LEIT", "DMO", 9).await;
+    let tmo1 = sprechgruppe_anlegen(&app, &admin, "999_T_ZUG", "TMO", 1).await;
+    let dmo9_a = sprechgruppe_anlegen(&app, &admin, "111_D_ALPHA", "DMO", 9).await;
+
+    // Zuweisung bewusst in „falscher" Reihenfolge.
+    let nord =
+        abschnitt_anlegen(&app, &admin, einsatz, "Nord", &[tmo5, dmo9_b, tmo1, dmo9_a]).await;
+    let sued = abschnitt_anlegen(&app, &admin, einsatz, "Süd", &[tmo5, dmo9_a]).await;
+    let ost = abschnitt_anlegen(&app, &admin, einsatz, "Ost", &[tmo1]).await;
+    let west = abschnitt_anlegen(&app, &admin, einsatz, "West", &[]).await;
+
+    let (status, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(liste.as_array().unwrap().len(), 4);
+
+    assert_eq!(
+        bezeichnungen(&eintrag(&liste, nord)["sprechgruppen"]),
+        vec!["111_D_ALPHA", "112_D_LEIT", "999_T_ZUG", "410_F_DRK"],
+        "DMO vor TMO; dann sortier; bei Gleichstand die Bezeichnung"
+    );
+    assert_eq!(
+        bezeichnungen(&eintrag(&liste, sued)["sprechgruppen"]),
+        vec!["111_D_ALPHA", "410_F_DRK"]
+    );
+    assert_eq!(
+        bezeichnungen(&eintrag(&liste, ost)["sprechgruppen"]),
+        vec!["999_T_ZUG"]
+    );
+    assert!(
+        eintrag(&liste, west)["sprechgruppen"]
+            .as_array()
+            .unwrap()
+            .is_empty(),
+        "Abschnitt ohne Zuordnung bleibt leer"
+    );
+}
+
+/// Ein Einsatz ohne Abschnitte liefert eine leere Liste (Randfall der Aggregation).
+#[tokio::test]
+async fn liste_ohne_abschnitte_ist_leer() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (status, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(liste.as_array().unwrap().is_empty());
+}
