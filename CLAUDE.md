@@ -61,6 +61,36 @@ Errors (LFH-168). Sie werden **behoben, nicht ignoriert** — und zwar an der Wu
   **mit Kommentar, warum**. Keine pauschalen Datei-/Block-Disables, keine toten Direktiven
   (eslint meldet ungenutzte Disables selbst). Referenz: `LagekartePage` Blob-URL-Effekt (LFH-166).
 
+## Qualitäts-Gates — ein Kommando (LFH-235/F17)
+
+Es gibt weiterhin **kein CI**. Die Durchsetzungsinstanz ist lokal:
+
+```bash
+./scripts/check-all.sh     # alle Gates, vor dem Merge
+```
+
+Reihenfolge (billig → teuer): `check-fmt.sh` → `pnpm lint` → `check-typ-codegen.sh`
+(enthält `tsc`) → `cargo test --workspace` → Vitest → `check-deps.sh`.
+
+- **Env-Hygiene ist Teil des Gates.** `scripts/lib/dev-env.sh` räumt alle
+  `LIFELINE_*`/`KS_*`/`AWS_*`-Variablen aus dem Testlauf. Nicht durch eine handgepflegte
+  `env -u`-Liste ersetzen — genau deren Drift (3 Einträge gegen 13 gesetzte Variablen)
+  hat die Suite unbemerkt rot gefärbt. Wo möglich gehört die Isolation **in den Test**
+  (`config::tests::parse_hermetisch`, `karte::KarteConfig`), nicht in den Wrapper: ein
+  Gate, das nur durch seinen eigenen Wrapper grün ist, verfehlt den Zweck.
+- **Optionaler pre-push-Hook** (nur die schnellen Gates, ~1 min):
+  `git config core.hooksPath .githooks`. Die vollen Suiten bleiben bewusst draußen —
+  ein Hook, der jeden Push minutenlang blockiert, wird per `--no-verify` umgangen.
+- **Bewusst nicht im Gate:** `cargo clippy -D warnings` (Bestand hat ~27 Warnungen — ein
+  rot geborenes Gate wird abgeschaltet) und `pnpm e2e` (Harness ist bis LFH-247/F29 nicht
+  selbsttragend).
+- **Kein `| tail` um Gate-Kommandos** — das maskiert den Exit-Code, und eine rote Suite
+  sieht dann grün aus.
+
+`scripts/check-deps.sh` (LFH-253/G01) prüft Abhängigkeiten gegen RUSTSEC/GHSA. Fehlt
+`cargo-audit`, warnt es laut und exitet 0 statt zu brechen. Bekannte, bewertete Advisories
+stehen mit Begründung in `.cargo/audit.toml` — was dort **nicht** steht, bricht den Build.
+
 ## Backend↔Frontend — Typ-Codegen (LFH-120)
 
 Die Frontend-Response-Typen werden **aus dem Rust-Backend generiert**, nicht mehr von Hand

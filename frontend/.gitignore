@@ -1,5 +1,11 @@
 node_modules/
-dist/
+# Build-Artefakte ignorieren, aber den Ordner selbst behalten: rust-embed
+# (src/static_files.rs) braucht frontend/dist zur Compile-Zeit, sonst bricht
+# jeder frische Clone/Worktree schon beim `cargo build` (LFH-242/F19).
+# Ohne die `dist/*`-Schreibweise überstimmt diese Datei die Whitelist der
+# Root-.gitignore und die Re-Inklusion dort greift nie.
+dist/*
+!dist/.gitkeep
 dist-ssr/
 playwright-report/
 test-results/

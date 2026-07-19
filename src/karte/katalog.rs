@@ -94,11 +94,20 @@ fn fetch_faellig() -> bool {
     }
 }
 
-/// Effektive Manifest-URL: `LIFELINE_OFFLINE_KATALOG_MANIFEST_URL` (Ops-/Dev-Override) falls gesetzt
-/// und nicht leer, sonst der compiled-in Pin (LFH-199-Trust). Nimmt Ops/lokalem Dev die Rebuild-
-/// Reibung — Manifest-URL per Env setzen statt den const ändern + Backend neu bauen (LFH-204-Gap).
+/// Effektive Manifest-URL: der Ops-/Dev-Override `--offline-katalog-manifest-url` /
+/// `LIFELINE_OFFLINE_KATALOG_MANIFEST_URL` falls gesetzt und nicht leer, sonst der
+/// compiled-in Pin (LFH-199-Trust). Nimmt Ops/lokalem Dev die Rebuild-Reibung —
+/// Manifest-URL setzen statt den const ändern + Backend neu bauen (LFH-204-Gap).
+///
+/// Seit LFH-239/F18 aus der beim Start gesetzten [`crate::karte::KarteConfig`] statt bei
+/// jedem Aufruf aus dem Prozess-Env — der Override verbiegt die Quelle, der das System
+/// vertraut, und gehört deshalb sichtbar in `--help` und ins Startup-Log.
 fn manifest_url() -> String {
-    resolve_manifest_url(std::env::var("LIFELINE_OFFLINE_KATALOG_MANIFEST_URL").ok())
+    resolve_manifest_url(
+        crate::karte::karte_config()
+            .offline_katalog_manifest_url
+            .clone(),
+    )
 }
 
 /// Reine Auswahl-Logik (env-frei testbar): ein nicht-leerer Override gewinnt, sonst der const-Default.

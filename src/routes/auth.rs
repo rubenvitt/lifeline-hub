@@ -2,7 +2,7 @@ use crate::app::AppState;
 use crate::auth::session::{self, CurrentUser, SESSION_COOKIE};
 use crate::auth::Benutzer;
 use crate::error::AppError;
-use crate::extract::JsonBody;
+use crate::extract::{JsonBody, PeerIp};
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::response::Redirect;
@@ -99,9 +99,25 @@ pub enum LoginAntwort {
 /// Branch — bewusst kein zweiter Passwort→Session-Pfad, der ihn umgehen könnte (Plan-MUST).
 pub async fn login(
     State(state): State<AppState>,
+    PeerIp(peer_ip): PeerIp,
     jar: CookieJar,
     JsonBody(req): JsonBody<LoginRequest>,
 ) -> Result<(CookieJar, Json<LoginAntwort>), AppError> {
+    // Bremse VOR jeder Passwort-Arbeit: ein gesperrter Aufrufer soll das Hashing gar nicht
+    // erst auslösen können (LFH-249/F30).
+    if let Some(ip) = peer_ip {
+        if crate::auth::rate_limit::ist_gesperrt(ip) {
+            tracing::warn!(
+                peer_ip = %ip,
+                benutzername = %req.benutzername,
+                "Anmeldeversuch abgewiesen: zu viele Fehlversuche aus dieser Quelle"
+            );
+            return Err(AppError::TooManyRequests(
+                "Zu viele fehlgeschlagene Anmeldeversuche. Bitte kurz warten.".to_string(),
+            ));
+        }
+    }
+
     let liste = crate::auth::provider::registry::liste(&state.pool).await?;
     let passwort_aktiv = liste
         .iter()
@@ -110,9 +126,38 @@ pub async fn login(
         return Err(AppError::Forbidden);
     }
 
-    let benutzer =
-        crate::auth::provider::password::anmelden(&state.pool, &req.benutzername, &req.passwort)
-            .await?;
+    let benutzer = match crate::auth::provider::password::anmelden(
+        &state.pool,
+        &req.benutzername,
+        &req.passwort,
+    )
+    .await
+    {
+        Ok(b) => b,
+        Err(e) => {
+            if let Some(ip) = peer_ip {
+                crate::auth::rate_limit::fehlversuch(ip);
+            }
+            tracing::warn!(
+                benutzername = %req.benutzername,
+                peer_ip = ?peer_ip,
+                "Anmeldung fehlgeschlagen"
+            );
+            crate::auth::audit::schreibe(
+                &state.pool,
+                crate::auth::audit::AuditEintrag {
+                    ereignis: crate::auth::audit::Ereignis::LoginFehlgeschlagen,
+                    // Der VERSUCHTE Name — er muss keinem Benutzer entsprechen.
+                    benutzername: Some(&req.benutzername),
+                    benutzer_id: None,
+                    peer_ip: peer_ip.map(|ip| ip.to_string()),
+                    provider: crate::auth::provider::ID_PASSWORT,
+                },
+            )
+            .await;
+            return Err(e);
+        }
+    };
 
     let totp_aktiviert: bool =
         sqlx::query_scalar("SELECT totp_aktiviert FROM benutzer WHERE id = ?")
@@ -120,8 +165,16 @@ pub async fn login(
             .fetch_one(&state.pool)
             .await?;
 
+    // Das Passwort stimmt — die Quelle ist damit nachweislich kein blindes Raten mehr.
+    // Wichtig gegen die NAT-Falle: das gibt auch alle anderen hinter derselben IP frei.
+    if let Some(ip) = peer_ip {
+        crate::auth::rate_limit::erfolg(ip);
+    }
+
     if totp_aktiviert {
         // KEINE Session, KEIN Session-Cookie — s. Doc-Kommentar oben (Plan-Crux).
+        // Bewusst KEIN `login_ok`-Audit: der Zweitfaktor steht noch aus, angemeldet ist
+        // hier niemand. Den Abschluss protokolliert `totp_finish`.
         let key = session::neuer_token();
         crate::auth::totp::state::speichere(key.clone(), benutzer.id);
         let jar = jar.add(mfa_pending_cookie(key, session::cookie_secure()));
@@ -135,6 +188,23 @@ pub async fn login(
 
     let token = session::anlegen(&state.pool, benutzer.id).await?;
     let jar = jar.add(session_cookie(token, crate::auth::session::cookie_secure()));
+    tracing::info!(
+        benutzer_id = benutzer.id,
+        benutzername = %benutzer.benutzername,
+        peer_ip = ?peer_ip,
+        "Anmeldung erfolgreich"
+    );
+    crate::auth::audit::schreibe(
+        &state.pool,
+        crate::auth::audit::AuditEintrag {
+            ereignis: crate::auth::audit::Ereignis::LoginOk,
+            benutzername: Some(&benutzer.benutzername),
+            benutzer_id: Some(benutzer.id),
+            peer_ip: peer_ip.map(|ip| ip.to_string()),
+            provider: crate::auth::provider::ID_PASSWORT,
+        },
+    )
+    .await;
     // An dieser Stelle ist `totp_aktiviert` bereits als `false` erwiesen — der `if`-Zweig oben
     // ist bei `true` bereits mit `return` verlassen worden.
     Ok((
@@ -146,10 +216,27 @@ pub async fn login(
 /// POST /api/auth/logout — löscht die Session und entfernt das Cookie.
 pub async fn logout(
     State(state): State<AppState>,
+    PeerIp(peer_ip): PeerIp,
     jar: CookieJar,
 ) -> Result<(CookieJar, StatusCode), AppError> {
     if let Some(cookie) = jar.get(SESSION_COOKIE) {
+        // Wer sich abmeldet, wird VOR dem Löschen bestimmt — danach ist die Zuordnung weg.
+        let benutzer_id = session::benutzer_id_zu_token(&state.pool, cookie.value()).await;
+
         session::loeschen(&state.pool, cookie.value()).await?;
+
+        tracing::info!(benutzer_id = ?benutzer_id, peer_ip = ?peer_ip, "Abmeldung");
+        crate::auth::audit::schreibe(
+            &state.pool,
+            crate::auth::audit::AuditEintrag {
+                ereignis: crate::auth::audit::Ereignis::Logout,
+                benutzername: None,
+                benutzer_id,
+                peer_ip: peer_ip.map(|ip| ip.to_string()),
+                provider: crate::auth::provider::ID_PASSWORT,
+            },
+        )
+        .await;
     }
     let jar = jar.remove(Cookie::build((SESSION_COOKIE, "")).path("/").build());
     Ok((jar, StatusCode::NO_CONTENT))

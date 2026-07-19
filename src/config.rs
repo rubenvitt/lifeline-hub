@@ -280,6 +280,46 @@ pub struct Config {
     #[arg(long, env = "LIFELINE_CLAMAV_TIMEOUT_SECS", default_value_t = 30)]
     pub clamav_timeout_secs: u64,
 
+    /// **Dev-Escape, schwächt den SSRF-Schutz:** erlaubt Karten-Downloads von
+    /// Loopback-Adressen (lokaler MinIO-Object-Store, auch über http). Default AUS.
+    /// Gilt für den gesamten Download-Pfad einschließlich des öffentlichen Style-/
+    /// Tile-Proxys — nur lokal setzen, niemals in einer erreichbaren Umgebung.
+    /// Ein aktiver Escape wird beim Serverstart mit einer Warnung protokolliert
+    /// (LFH-239/F18: vorher lief der Schalter am Config-System vorbei und war
+    /// weder in `--help` noch im Log sichtbar).
+    #[arg(
+        long,
+        env = "LIFELINE_DOWNLOAD_ALLOW_LOOPBACK",
+        default_value_t = false
+    )]
+    pub download_allow_loopback: bool,
+
+    /// Zielverzeichnis für automatische Sicherungen (LFH-251/F31). **Ohne Angabe findet
+    /// keine automatische Sicherung statt** — dasselbe No-op-Muster wie `--clamav-addr`.
+    ///
+    /// Bewusst opt-in: jede Sicherung schreibt eine Datei in Datenbankgröße (die DB trägt
+    /// Anhänge als BLOBs), was auf einem Einsatz-Notebook Plattenplatz und I/O spürbar
+    /// belastet. Ein separates Medium (USB/Netzlaufwerk) schützt zusätzlich gegen
+    /// Plattendefekt — ein Verzeichnis neben der Datenbank nur gegen Bedienfehler.
+    #[arg(long, env = "LIFELINE_BACKUP_VERZEICHNIS")]
+    pub backup_verzeichnis: Option<String>,
+
+    /// Abstand zwischen automatischen Sicherungen in Minuten. Greift nur mit
+    /// `--backup-verzeichnis`.
+    #[arg(long, env = "LIFELINE_BACKUP_INTERVALL_MINUTEN", default_value_t = 360)]
+    pub backup_intervall_minuten: u64,
+
+    /// Wie viele automatische Sicherungen aufgehoben werden; ältere werden rotiert.
+    #[arg(long, env = "LIFELINE_BACKUP_BEHALTEN", default_value_t = 7)]
+    pub backup_behalten: usize,
+
+    /// Ops-/Dev-Override der Trust-Quelle des Offline-Karten-Katalogs. Ohne Angabe gilt
+    /// der einkompilierte Pin (LFH-199). Nimmt Ops die Rebuild-Reibung, wenn das Manifest
+    /// woanders liegt (LFH-204) — verbiegt aber die Quelle, der das System vertraut,
+    /// und wird deshalb beim Start protokolliert.
+    #[arg(long, env = "LIFELINE_OFFLINE_KATALOG_MANIFEST_URL")]
+    pub offline_katalog_manifest_url: Option<String>,
+
     /// HTTPS statt HTTP bedienen. Ohne Flag bleibt der bestehende HTTP-Bind aktiv
     /// (Dev/localhost). Mit `--tls` wird ein Server-Cert in Präzedenz beschafft
     /// (BYO → Cache → mkcert → rcgen) und `Secure`-Cookies aktiviert.
@@ -356,16 +396,68 @@ pub enum Command {
         /// Ohne Rückfrage überschreiben.
         #[arg(long)]
         force: bool,
+        /// Zusichern, dass kein Server mehr auf der Ziel-Datenbank verbunden ist.
+        ///
+        /// Nötig, wenn `-wal`/`-shm` neben der Ziel-DB liegen. Die sind das einzige
+        /// verlässliche Indiz für eine offene Verbindung — nach einem Serverabsturz
+        /// bleiben sie aber verwaist zurück, und genau dann will man restaurieren.
+        /// Diese Unterscheidung kann nur ein Mensch treffen (LFH-251/F31).
+        #[arg(long)]
+        server_gestoppt: bool,
     },
+    /// Die ins Binary einkompilierte SQLite-Version ausgeben (LFH-233/G02).
+    ///
+    /// SQLite steckt als C-Amalgamation im Binary und wird von keinem System-Update
+    /// erreicht — im Fall einer SQLite-CVE ist das die Zahl, die man braucht, um
+    /// Betroffenheit zu beurteilen. Bewusst ein CLI-Subkommando und nicht `/api/health`:
+    /// die Angabe geht Operatoren etwas an, nicht jeden, der den Port erreicht.
+    SqliteVersion,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// Serialisiert die Env-Manipulation in [`parse_hermetisch`] — `remove_var`/`set_var`
+    /// wirken prozessweit, parallel laufende Tests würden sich sonst die Umgebung
+    /// unter den Füßen wegziehen.
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// Parst die Config so, als stünde **keine** `LIFELINE_*`-Variable in der Umgebung.
+    ///
+    /// Jedes Feld mit `#[arg(env = "…")]` macht einen Default-Test sonst davon abhängig,
+    /// was gerade im Prozess-Env steht — und über `mise.local.toml` + `.env` ist das im
+    /// Entwickler-Alltag eine Menge. Genau daran ist die Suite rot geworden
+    /// (LFH-235/F17): `LIFELINE_OIDC_*` aus der `.env` ließ
+    /// `oidc_config_defaults_sind_none` fallen, obwohl am Code nichts falsch war.
+    /// Der Leak reicht bis in frische Worktrees ohne eigene `.env`, weil mise die
+    /// Elternverzeichnisse mitliest.
+    ///
+    /// Ein `env -u` im Gate würde nur den Gate-Lauf heilen; ein direkter `cargo test`
+    /// bliebe rot. Deshalb ist die Isolation hier im Test statt im Wrapper.
+    fn parse_hermetisch<I, T>(args: I) -> Config
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<std::ffi::OsString> + Clone,
+    {
+        // Ein vergifteter Mutex ist hier harmlos: der Guard schützt nur die Reihenfolge.
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let gesichert: Vec<(String, String)> = std::env::vars()
+            .filter(|(k, _)| k.starts_with("LIFELINE_"))
+            .collect();
+        for (k, _) in &gesichert {
+            std::env::remove_var(k);
+        }
+        let config = Config::parse_from(args);
+        for (k, v) in gesichert {
+            std::env::set_var(k, v);
+        }
+        config
+    }
+
     #[test]
     fn defaults_are_applied() {
-        let config = Config::parse_from(["lifeline-hub"]);
+        let config = parse_hermetisch(["lifeline-hub"]);
         assert_eq!(config.db_path, "lifeline.db");
         assert_eq!(config.bind, "127.0.0.1:8080");
     }
@@ -384,7 +476,7 @@ mod tests {
 
     #[test]
     fn tls_defaults_und_flags() {
-        let c = Config::parse_from(["lifeline-hub"]);
+        let c = parse_hermetisch(["lifeline-hub"]);
         assert!(!c.tls, "TLS ist per Default aus (HTTP-Bestand)");
         assert!(c.tls_mkcert_install, "mkcert-install Default an");
         assert!(c.tls_cert.is_none() && c.tls_key.is_none());
@@ -564,7 +656,7 @@ mod tests {
 
     #[test]
     fn bootstrap_defaults_und_optionales_passwort() {
-        let config = Config::parse_from(["lifeline-hub"]);
+        let config = parse_hermetisch(["lifeline-hub"]);
         assert_eq!(config.org_name, "Meine Organisation");
         assert_eq!(config.admin_user, "admin");
         assert!(config.admin_password.is_none());
@@ -601,7 +693,7 @@ mod tests {
 
     #[test]
     fn oidc_config_defaults_sind_none() {
-        let config = Config::parse_from(["lifeline-hub"]);
+        let config = parse_hermetisch(["lifeline-hub"]);
         assert!(config.oidc_issuer.is_none());
         assert!(config.oidc_client_id.is_none());
         assert!(config.oidc_client_secret.is_none());
@@ -637,7 +729,7 @@ mod tests {
 
     #[test]
     fn ohne_subkommando_ist_kein_command() {
-        let config = Config::parse_from(["lifeline-hub"]);
+        let config = parse_hermetisch(["lifeline-hub"]);
         assert!(config.command.is_none());
     }
 
@@ -660,9 +752,18 @@ mod tests {
             "--force",
         ]);
         match config.command {
-            Some(Command::Restore { from, force }) => {
+            Some(Command::Restore {
+                from,
+                force,
+                server_gestoppt,
+            }) => {
                 assert_eq!(from, "/mnt/usb/b.sqlite");
                 assert!(force);
+                assert!(
+                    !server_gestoppt,
+                    "--server-gestoppt ist eine bewusste Zusicherung und darf nie \
+                     implizit gelten (LFH-251/F31)"
+                );
             }
             andere => panic!("erwartete Restore, fand {andere:?}"),
         }

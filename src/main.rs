@@ -20,7 +20,12 @@ async fn main() -> anyhow::Result<()> {
 
     match config.command.clone() {
         Some(Command::Backup { out }) => cmd_backup(&config.db_path, &out).await,
-        Some(Command::Restore { from, force }) => cmd_restore(&config.db_path, &from, force).await,
+        Some(Command::Restore {
+            from,
+            force,
+            server_gestoppt,
+        }) => cmd_restore(&config.db_path, &from, force, server_gestoppt).await,
+        Some(Command::SqliteVersion) => cmd_sqlite_version().await,
         None => run_server(config).await,
     }
 }
@@ -90,6 +95,18 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     lifeline_hub::erinnerung::scheduler::starte_scheduler(pool.clone(), live.clone());
     // Aufbewahrung & Archiv (LFH-135): Purge-Scheduler (Soft-Delete + PII-Schwärzung).
     lifeline_hub::einsatz::purge_scheduler::starte_purge_scheduler(pool.clone());
+    // Automatische Sicherungen (LFH-251/F31) — No-op ohne --backup-verzeichnis.
+    lifeline_hub::backup::scheduler::starte_backup_scheduler(
+        pool.clone(),
+        lifeline_hub::backup::scheduler::BackupConfig {
+            verzeichnis: config
+                .backup_verzeichnis
+                .as_ref()
+                .map(std::path::PathBuf::from),
+            intervall: std::time::Duration::from_secs(config.backup_intervall_minuten * 60),
+            behalten: config.backup_behalten,
+        },
+    );
 
     // AV-Scan-Konfiguration (LFH-114) prozessweit setzen (bewusst NICHT in AppState,
     // um die vielen inline AppState-Konstruktionen nicht zu brechen).
@@ -105,6 +122,28 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         clamd_addr: config.clamav_addr.clone(),
         fail_open: config.clamav_fail_open,
         timeout: std::time::Duration::from_secs(config.clamav_timeout_secs),
+    });
+
+    // Karten-Schalter (LFH-239/F18) prozessweit setzen — beide schwächen bzw. verbiegen
+    // eine Vertrauensgrenze und liefen vorher unsichtbar per std::env::var mit.
+    if config.download_allow_loopback {
+        tracing::warn!(
+            "SSRF-Schutz ist abgeschwächt: --download-allow-loopback \
+             (LIFELINE_DOWNLOAD_ALLOW_LOOPBACK) ist AKTIV — Karten-Downloads zu \
+             Loopback-Adressen sind erlaubt, auch über http und auch auf dem öffentlichen \
+             Style-/Tile-Proxy-Pfad. Das ist ein reiner Dev-Schalter für einen lokalen \
+             Object-Store; in einer erreichbaren Umgebung gehört er ausgeschaltet."
+        );
+    }
+    if let Some(url) = &config.offline_katalog_manifest_url {
+        tracing::warn!(
+            "Offline-Katalog nutzt eine ÜBERSCHRIEBENE Manifest-Quelle: {url} — statt des \
+             einkompilierten Pins. Diese URL bestimmt, welchen Kartendaten das System vertraut."
+        );
+    }
+    lifeline_hub::karte::init_karte_config(lifeline_hub::karte::KarteConfig {
+        download_allow_loopback: config.download_allow_loopback,
+        offline_katalog_manifest_url: config.offline_katalog_manifest_url.clone(),
     });
 
     // OIDC-Konfiguriertheit (LFH-41, Increment 3 SSO-Fundament) prozessweit setzen —
@@ -216,7 +255,14 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         let mut server = axum_server::bind_rustls(addr, tls_config)
             .map(|a| a.acceptor(verbindung::SemaphorAkzeptor::default()));
         verbindung::zeitschranken_setzen(&mut server, verbindung::Fristen::default());
-        server.handle(handle).serve(app.into_make_service()).await?;
+        // with_connect_info (LFH-249/F30): ohne das ist die Peer-Adresse im Handler nicht
+        // verfügbar — die Auth-Audit-Spur hätte dauerhaft eine leere Quell-IP und das
+        // Rate-Limit könnte gar nicht greifen. Muss auf BEIDEN serve-Pfaden stehen, sonst
+        // hängt das Verhalten daran, ob TLS aktiv ist.
+        server
+            .handle(handle)
+            .serve(app.into_make_service_with_connect_info::<std::net::SocketAddr>())
+            .await?;
     } else {
         // LFH-231/G10: `axum::serve` exponiert die hyper-Server-Parameter nicht — es baut den
         // Builder pro Verbindung intern und gibt keinen Hook darauf. Ohne Header-Lese-Timeout
@@ -231,9 +277,26 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         let mut server = axum_server::from_tcp(listener.into_std()?)
             .acceptor(verbindung::SemaphorAkzeptor::default());
         verbindung::zeitschranken_setzen(&mut server, verbindung::Fristen::default());
-        server.handle(handle).serve(app.into_make_service()).await?;
+        server
+            .handle(handle)
+            .serve(app.into_make_service_with_connect_info::<std::net::SocketAddr>())
+            .await?;
     }
 
+    Ok(())
+}
+
+/// Subkommando `sqlite-version`: die einkompilierte SQLite-Version ausgeben (LFH-233/G02).
+///
+/// Fragt die tatsächlich geladene Bibliothek (In-Memory-DB), statt eine gepflegte Konstante
+/// auszugeben — im Advisory-Fall zählt, was wirklich im Binary steckt. `build-release.sh`
+/// legt die Ausgabe neben den SBOM.
+async fn cmd_sqlite_version() -> anyhow::Result<()> {
+    let pool = sqlx::SqlitePool::connect("sqlite::memory:").await?;
+    let version: String = sqlx::query_scalar("SELECT sqlite_version()")
+        .fetch_one(&pool)
+        .await?;
+    println!("{version}");
     Ok(())
 }
 
@@ -254,14 +317,20 @@ async fn cmd_backup(db_path: &str, out: &str) -> anyhow::Result<()> {
 }
 
 /// Subkommando `restore`: Sicherung `from` an Stelle von `db_path` einspielen.
-async fn cmd_restore(db_path: &str, from: &str, force: bool) -> anyhow::Result<()> {
+async fn cmd_restore(
+    db_path: &str,
+    from: &str,
+    force: bool,
+    server_gestoppt: bool,
+) -> anyhow::Result<()> {
     if !force {
         anyhow::bail!(
             "Restore überschreibt die Datenbank {db_path}. Zum Bestätigen --force angeben \
              (Server vorher stoppen!)."
         );
     }
-    backup::restore::restore_aus_datei(Path::new(from), Path::new(db_path)).await?;
+    backup::restore::restore_aus_datei(Path::new(from), Path::new(db_path), server_gestoppt)
+        .await?;
     println!("Sicherung {from} wurde nach {db_path} eingespielt.");
     Ok(())
 }

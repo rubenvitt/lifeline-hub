@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# LFH-235/F17: pre-push-Hook — die schnellen Gates, bevor etwas das Repo verlässt.
+#
+# Bewusst NUR die Prüfungen, die in ~1 Minute durch sind: Formatierung, Lint, Typ-Drift.
+# Die vollen Suiten (Rust + Vitest, mehrere Minuten) gehören in `scripts/check-all.sh` und
+# werden bewusst aufgerufen — ein Hook, der jeden Push minutenlang blockiert, wird binnen
+# einer Woche per `--no-verify` umgangen und schützt dann gar nichts mehr.
+#
+# Aktivieren (einmalig pro Clone/Worktree):
+#     git config core.hooksPath .githooks
+#
+# Umgehen, wenn es sein muss:
+#     git push --no-verify
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+echo "==> pre-push: schnelle Gates (voll: ./scripts/check-all.sh)"
+
+"$ROOT/scripts/check-fmt.sh"
+mise exec pnpm@11.10.0 -- pnpm -C "$ROOT/frontend" lint
+"$ROOT/scripts/check-typ-codegen.sh"
+
+echo "==> pre-push OK. Die vollen Suiten laufen NICHT in diesem Hook —"
+echo "    vor dem Merge bitte ./scripts/check-all.sh fahren."

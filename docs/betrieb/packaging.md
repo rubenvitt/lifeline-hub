@@ -21,7 +21,14 @@ Release-Binary, die `frontend/dist` zur Compile-Zeit einbettet. Ergebnis:
 
 > **Wichtig:** Das Frontend muss **vor** dem Release-Build gebaut sein, sonst
 > bettet die Binary einen veralteten/leeren Frontend-Stand ein. Das Skript
-> erledigt die Reihenfolge automatisch.
+> erledigt die Reihenfolge automatisch und erzwingt sie seit LFH-242/F19 auch:
+> es räumt `frontend/dist` vorher aus, bricht ab, wenn nach dem Frontend-Build
+> keine `index.html` da ist, und stößt das Embed-Modul per `touch` an — Cargo
+> kennt die Dateien unter `frontend/dist` nämlich nicht als Abhängigkeit und
+> würde nach einer reinen Frontend-Änderung gar nicht neu übersetzen.
+>
+> Ein direkter `cargo build --release` **ohne** das Skript hat diese Garantien
+> nicht.
 
 ## System-OpenSSL-Abhängigkeit (WebAuthn/Passkeys, LFH-275)
 
@@ -65,6 +72,48 @@ als eigene direkte Dependency ergänzen — Cargo-Feature-Unification aktiviert
 OpenSSL aus Quelle mit ein, macht die Binary wieder autark), braucht dafür
 aber C-Compiler + Perl am Build-Rechner. Nicht getestet, nur als Option
 notiert — keins von beidem ist in diesem Repo umgesetzt.
+
+## Eingebettetes SQLite (LFH-233/G02)
+
+SQLite wird als mitgelieferte C-Amalgamation **ins Binary kompiliert**
+(`libsqlite3-sys` mit Feature `bundled`, `Cargo.toml`). Das ist eine bewusste
+Entscheidung — reproduzierbarer Build, exakt bekannte Version, kein System-`libsqlite`
+nötig. Sie hat aber eine Betriebsfolge, die man kennen muss:
+
+**Aktuell eingebacken: SQLite 3.51.3**
+
+Abfragbar am gebauten Binary — das liest die tatsächlich geladene Bibliothek, nicht
+eine gepflegte Konstante:
+
+```bash
+./target/release/lifeline-hub sqlite-version
+```
+
+**Patch-Pfad bei einer SQLite-CVE — ausschließlich Rebuild:**
+
+1. `libsqlite3-sys` in `Cargo.toml` bumpen (`cargo update -p libsqlite3-sys`),
+2. `./scripts/build-release.sh`,
+3. Binary neu ausrollen.
+
+Ein `apt upgrade`/System-Update auf dem Zielrechner erreicht diese SQLite-Kopie
+**nie** — die übliche „Sicherheitsupdates einspielen"-Erwartung greift hier also
+nicht. Das ist der eigentliche Punkt dieses Abschnitts: ohne ihn weiß im Ernstfall
+niemand, dass die Datenbank-Engine nur über einen Rebuild patchbar ist.
+
+Damit diese Angabe nicht unbemerkt veraltet, hält `tests/sqlite_version.rs` die
+Version hart gepinnt: bei jedem `libsqlite3-sys`-Bump wird der Test rot und erzwingt,
+dass dieser Abschnitt nachgezogen wird.
+
+`scripts/build-release.sh` legt die Version zusätzlich neben den SBOM
+(`target/release/sbom/eingebettete-sqlite-version.txt`), damit im Advisory-Fall ohne
+laufendes System beantwortbar ist, welche Version ausgeliefert wurde.
+
+> Anmerkung zur Autarkie: Das Argument „bundled hält die Binary unabhängig vom
+> Zielsystem" ist durch die dynamische OpenSSL-Bindung (Abschnitt oben) ohnehin
+> eingeschränkt — der Zielrechner muss bereits System-Bibliotheken pflegen. Ob für
+> gehärtete Deployments eine per OS gepflegte `libsqlite` sinnvoller wäre (CVE schließt
+> dann per Paketmanager statt per Rebuild), ist eine offene Abwägung und hier bewusst
+> nicht entschieden.
 
 ## Starten
 
