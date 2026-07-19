@@ -308,22 +308,27 @@ pub async fn disponiere_adhoc(
 }
 
 /// Aktualisiert Status und/oder Bemerkung einer Dispositionszeile auf einer offenen
-/// Connection/Transaktion (F06/LFH-244 Tier-A; COALESCE: `None` = unverändert lassen).
+/// Connection/Transaktion (F06/LFH-244 Tier-A). `status_id` nutzt COALESCE (`None` =
+/// unverändert); `bemerkung` ist Drei-Zustands (wie `PositionPatch`): `None` = unverändert,
+/// `Some(None)` = explizit auf NULL, `Some(Some(x))` = setzen. Getrimmt/leer-kollabiert wird
+/// in der Route (F12-c/LFH-266), nicht hier.
 /// `NotFound`, falls die Zeile nicht zum Einsatz gehört.
 pub async fn aktualisiere_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ef_id: i64,
     status_id: Option<i64>,
-    bemerkung: Option<&str>,
+    bemerkung: Option<Option<&str>>,
 ) -> Result<(), AppError> {
     let resultat = sqlx::query(
         "UPDATE einsatz_fahrzeug \
-         SET status_id = COALESCE(?, status_id), bemerkung = COALESCE(?, bemerkung) \
+         SET status_id = COALESCE(?, status_id), \
+             bemerkung = CASE WHEN ? THEN ? ELSE bemerkung END \
          WHERE id = ? AND einsatz_id = ?",
     )
     .bind(status_id)
-    .bind(bemerkung)
+    .bind(bemerkung.is_some())
+    .bind(bemerkung.flatten())
     .bind(ef_id)
     .bind(einsatz_id)
     .execute(&mut *conn)
@@ -340,7 +345,7 @@ pub async fn aktualisiere(
     einsatz_id: i64,
     ef_id: i64,
     status_id: Option<i64>,
-    bemerkung: Option<&str>,
+    bemerkung: Option<Option<&str>>,
 ) -> Result<(), AppError> {
     let mut conn = pool.acquire().await?;
     aktualisiere_tx(&mut conn, einsatz_id, ef_id, status_id, bemerkung).await
@@ -709,7 +714,7 @@ mod tests {
             einsatz,
             ef,
             Some(neuer_status.id),
-            Some("am Einsatzort"),
+            Some(Some("am Einsatzort")),
         )
         .await
         .unwrap();
@@ -718,7 +723,7 @@ mod tests {
         assert_eq!(a.bemerkung.as_deref(), Some("am Einsatzort"));
 
         // Nur Bemerkung ändern (status_id None → bleibt).
-        aktualisiere(&pool, einsatz, ef, None, Some("korrigiert"))
+        aktualisiere(&pool, einsatz, ef, None, Some(Some("korrigiert")))
             .await
             .unwrap();
         let b = laden_anzeige(&pool, einsatz, ef, true).await.unwrap();

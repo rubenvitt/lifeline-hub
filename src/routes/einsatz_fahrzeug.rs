@@ -14,7 +14,7 @@ use crate::fahrzeug::besatzung_repo;
 use crate::fahrzeug::disposition_repo::{self, AdhocDaten};
 use crate::fahrzeug::status_repo;
 use crate::fahrzeug::EinsatzFahrzeugAnzeige;
-use crate::routes::support::trimme;
+use crate::routes::support::{trimme, trimme_tri};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -194,7 +194,12 @@ pub async fn disponieren(
 #[derive(Debug, Deserialize)]
 pub struct DispoPatchBody {
     pub status_id: Option<i64>,
-    pub bemerkung: Option<String>,
+    /// Tri-State (F12-c/LFH-266): fehlend = unverändert, `null`/`""` = leeren, Wert = setzen.
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub bemerkung: Option<Option<String>>,
 }
 
 /// PATCH /api/einsaetze/{id}/fahrzeuge/{ef_id} — Status und/oder Bemerkung.
@@ -226,10 +231,11 @@ pub async fn aktualisieren(
     }
 
     let vorher = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ef_id, true).await?;
-    // Bemerkung im Body gesetzt (auch "") → setzen (leer = löschen); absent/null →
-    // unverändert lassen (COALESCE im Repo). Daher NICHT über `trimme` zu None kollabieren,
-    // sonst ließe sich eine Bemerkung nie löschen.
-    let bemerkung = body.bemerkung.as_deref().map(str::trim);
+    // Bemerkung ist Tri-State (F12-c/LFH-266): absent = unverändert, `null` oder ""/Whitespace
+    // = leeren (Spalte auf NULL), Wert = setzen. Das Trimmen/Leer-Kollabieren passiert hier in
+    // der Route, das Repo bleibt dumm.
+    let bemerkung = trimme_tri(body.bemerkung);
+    let bemerkung = bemerkung.as_ref().map(|o| o.as_deref());
 
     // F06/LFH-244 Tier-A: Update + (bedingter) System-ETB atomar in EINER Tx. Der ETB-Text
     // braucht die frische Anzeige (neues Status-Label) → In-Tx-Reload. Der Vorzustand

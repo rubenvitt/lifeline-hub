@@ -269,9 +269,10 @@ pub async fn disponiere_adhoc(
     disponiere_adhoc_tx(&mut conn, einsatz_id, daten, menge, disponiert_von).await
 }
 
-/// Aktualisiert Menge, Status und/oder Bemerkung (COALESCE: `None` = unverändert).
-/// `uhs_id`: `None` = unverändert; `Some(None)` = explizit auf NULL setzen;
-/// `Some(Some(id))` = neue UHS zuordnen.
+/// Aktualisiert Menge, Status und/oder Bemerkung. `menge`/`status` nutzen COALESCE
+/// (`None` = unverändert). `bemerkung` und `uhs_id` sind Drei-Zustands: `None` = unverändert;
+/// `Some(None)` = explizit auf NULL setzen; `Some(Some(x))` = setzen. Bei `bemerkung` wird
+/// in der Route getrimmt/leer-kollabiert (F12-c/LFH-266), nicht hier.
 /// `status` muss bereits validiert sein (gültiges Enum). `NotFound`, falls die Zeile
 /// nicht zum Einsatz gehört.
 pub async fn aktualisiere_tx(
@@ -280,20 +281,21 @@ pub async fn aktualisiere_tx(
     em_id: i64,
     menge: Option<i64>,
     status: Option<&str>,
-    bemerkung: Option<&str>,
+    bemerkung: Option<Option<&str>>,
     uhs_id: Option<Option<i64>>,
 ) -> Result<(), AppError> {
     let resultat = sqlx::query(
         "UPDATE einsatz_material \
          SET menge = COALESCE(?1, menge), \
              status = COALESCE(?2, status), \
-             bemerkung = COALESCE(?3, bemerkung), \
-             uhs_id = CASE WHEN ?4 IS NULL THEN uhs_id ELSE ?5 END \
-         WHERE id = ?6 AND einsatz_id = ?7",
+             bemerkung = CASE WHEN ?3 IS NULL THEN bemerkung ELSE ?4 END, \
+             uhs_id = CASE WHEN ?5 IS NULL THEN uhs_id ELSE ?6 END \
+         WHERE id = ?7 AND einsatz_id = ?8",
     )
     .bind(menge)
     .bind(status)
-    .bind(bemerkung)
+    .bind(bemerkung.map(|_| 1_i64)) // sentinel: Some(_) → 1, None → NULL
+    .bind(bemerkung.and_then(|v| v)) // value: Some(Some(x)) → x, Some(None) → NULL
     .bind(uhs_id.map(|_| 1_i64)) // sentinel: Some(_) → 1, None → NULL
     .bind(uhs_id.and_then(|v| v)) // value: Some(Some(x)) → x, Some(None) → NULL
     .bind(em_id)
@@ -314,7 +316,7 @@ pub async fn aktualisiere(
     em_id: i64,
     menge: Option<i64>,
     status: Option<&str>,
-    bemerkung: Option<&str>,
+    bemerkung: Option<Option<&str>>,
     uhs_id: Option<Option<i64>>,
 ) -> Result<(), AppError> {
     let mut conn = pool.acquire().await?;
@@ -529,7 +531,7 @@ mod tests {
             em,
             Some(30),
             Some(MaterialStatus::Defekt.as_str()),
-            Some("nass"),
+            Some(Some("nass")),
             None,
         )
         .await

@@ -244,9 +244,10 @@ pub async fn disponiere_adhoc(
     Ok(id)
 }
 
-/// Aktualisiert Status, Stärke-Position und/oder Bemerkung. `status_id`/`bemerkung` nutzen
-/// COALESCE (`None` = unverändert). `staerke_position` ist Drei-Zustands (wie `PositionPatch`):
-/// `None` = unverändert, `Some(None)` = Override explizit auf NULL, `Some(Some(x))` = setzen.
+/// Aktualisiert Status, Stärke-Position und/oder Bemerkung. `status_id` nutzt COALESCE
+/// (`None` = unverändert). `staerke_position` und `bemerkung` sind Drei-Zustands (wie
+/// `PositionPatch`): `None` = unverändert, `Some(None)` = explizit auf NULL, `Some(Some(x))`
+/// = setzen. Getrimmt/leer-kollabiert wird in der Route (F12-c/LFH-266), nicht hier.
 /// `NotFound`, falls die Zeile nicht zum Einsatz gehört.
 pub async fn aktualisiere_tx(
     conn: &mut SqliteConnection,
@@ -254,19 +255,20 @@ pub async fn aktualisiere_tx(
     ep_id: i64,
     status_id: Option<i64>,
     staerke_position: Option<Option<&str>>,
-    bemerkung: Option<&str>,
+    bemerkung: Option<Option<&str>>,
 ) -> Result<(), AppError> {
     let resultat = sqlx::query(
         "UPDATE einsatz_personal \
          SET status_id = COALESCE(?, status_id), \
              staerke_position = CASE WHEN ? THEN ? ELSE staerke_position END, \
-             bemerkung = COALESCE(?, bemerkung) \
+             bemerkung = CASE WHEN ? THEN ? ELSE bemerkung END \
          WHERE id = ? AND einsatz_id = ?",
     )
     .bind(status_id)
     .bind(staerke_position.is_some())
     .bind(staerke_position.flatten())
-    .bind(bemerkung)
+    .bind(bemerkung.is_some())
+    .bind(bemerkung.flatten())
     .bind(ep_id)
     .bind(einsatz_id)
     .execute(&mut *conn)
@@ -284,7 +286,7 @@ pub async fn aktualisiere(
     ep_id: i64,
     status_id: Option<i64>,
     staerke_position: Option<Option<&str>>,
-    bemerkung: Option<&str>,
+    bemerkung: Option<Option<&str>>,
 ) -> Result<(), AppError> {
     let mut conn = pool.acquire().await?;
     aktualisiere_tx(
@@ -861,7 +863,7 @@ mod tests {
             ep,
             Some(neuer.id),
             Some(Some("mannschaft")),
-            Some("vor Ort"),
+            Some(Some("vor Ort")),
         )
         .await
         .unwrap();
@@ -871,7 +873,7 @@ mod tests {
         assert_eq!(a.bemerkung.as_deref(), Some("vor Ort"));
 
         // status_id None → bleibt; position None → bleibt; nur Bemerkung leeren.
-        aktualisiere(&pool, einsatz, ep, None, None, Some(""))
+        aktualisiere(&pool, einsatz, ep, None, None, Some(None))
             .await
             .unwrap();
         let b = laden_anzeige(&pool, einsatz, ep, true).await.unwrap();
@@ -881,7 +883,7 @@ mod tests {
             Some("mannschaft"),
             "Position unverändert"
         );
-        assert_eq!(b.bemerkung.as_deref(), Some(""), "Bemerkung geleert");
+        assert!(b.bemerkung.is_none(), "Bemerkung geleert (Spalte auf NULL)");
 
         entferne(&pool, einsatz, ep).await.unwrap();
         assert!(matches!(

@@ -386,3 +386,129 @@ async fn dispo_position_ungueltiger_wert_ist_400() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(body["error"], "Ungültige Stärke-Position");
 }
+
+// F12-c (LFH-266-Nachzug): `bemerkung` ist nullable und muss per PATCH löschbar sein.
+// Tri-State wie in d167778: absent = unverändert, `null`/`""` = leeren, Wert = setzen.
+// Der Personal-Fall prüft `staerke_position` mit — die beiden Flag/Wert-Paare liegen im
+// SQL direkt nebeneinander, ein verrutschtes Bind fiele sonst nicht auf.
+#[tokio::test]
+async fn patch_null_leert_bemerkung() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let person = person_anlegen(&app, &admin, "Thomas").await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        &admin,
+        Some(&format!(
+            r#"{{"personal_id":{person},"staerke_position":"fuehrer"}}"#
+        )),
+    )
+    .await;
+    let ep = json["id"].as_i64().unwrap();
+
+    let (_, gesetzt) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+        &admin,
+        Some(r#"{"bemerkung":"vor Ort"}"#),
+    )
+    .await;
+    assert_eq!(gesetzt["bemerkung"], "vor Ort");
+
+    let (_, geleert) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+        &admin,
+        Some(r#"{"bemerkung":null}"#),
+    )
+    .await;
+    assert!(
+        geleert["bemerkung"].is_null(),
+        "explizites null muss die Bemerkung löschen"
+    );
+    assert_eq!(
+        geleert["staerke_position"], "fuehrer",
+        "die Nachbarspalte darf dabei nicht mitgelöscht werden"
+    );
+}
+
+#[tokio::test]
+async fn patch_leerstring_leert_bemerkung() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let person = person_anlegen(&app, &admin, "Thomas").await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        &admin,
+        Some(&format!(r#"{{"personal_id":{person}}}"#)),
+    )
+    .await;
+    let ep = json["id"].as_i64().unwrap();
+
+    anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+        &admin,
+        Some(r#"{"bemerkung":"vor Ort"}"#),
+    )
+    .await;
+    let (_, geleert) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+        &admin,
+        Some(r#"{"bemerkung":"   "}"#),
+    )
+    .await;
+    assert!(
+        geleert["bemerkung"].is_null(),
+        "whitespace-only zählt als Leerwunsch (trimme_tri), nicht als Wert"
+    );
+}
+
+#[tokio::test]
+async fn patch_ohne_bemerkung_laesst_sie_stehen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let person = person_anlegen(&app, &admin, "Thomas").await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal"),
+        &admin,
+        Some(&format!(r#"{{"personal_id":{person}}}"#)),
+    )
+    .await;
+    let ep = json["id"].as_i64().unwrap();
+
+    anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+        &admin,
+        Some(r#"{"bemerkung":"vor Ort"}"#),
+    )
+    .await;
+    let (_, unberuehrt) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+        &admin,
+        Some(r#"{"staerke_position":"fuehrer"}"#),
+    )
+    .await;
+    assert_eq!(
+        unberuehrt["bemerkung"], "vor Ort",
+        "absentes Feld lässt die Bemerkung unverändert"
+    );
+}

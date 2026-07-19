@@ -12,7 +12,7 @@ const MODUL_KEY: &str = "material";
 use crate::error::AppError;
 use crate::material::disposition_repo::{self, AdhocDaten};
 use crate::material::{EinsatzMaterialAnzeige, MaterialStatus};
-use crate::routes::support::trimme;
+use crate::routes::support::{trimme, trimme_tri};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -175,7 +175,12 @@ pub async fn disponieren(
 pub struct DispoPatchBody {
     pub menge: Option<i64>,
     pub status: Option<String>,
-    pub bemerkung: Option<String>,
+    /// Tri-State (F12-c/LFH-266): fehlend = unverändert, `null`/`""` = leeren, Wert = setzen.
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub bemerkung: Option<Option<String>>,
     #[serde(
         default,
         deserialize_with = "crate::routes::support::deserialize_optional_field"
@@ -221,9 +226,11 @@ pub async fn aktualisieren(
     };
 
     let vorher = disposition_repo::laden_anzeige(&state.pool, einsatz_id, em_id, true).await?;
-    // Bemerkung: im Body gesetzt (auch "") → setzen (leer = löschen); absent/null →
-    // unverändert (COALESCE). Daher NICHT über `trimme` zu None kollabieren lassen.
-    let bemerkung = body.bemerkung.as_deref().map(str::trim);
+    // Bemerkung ist Tri-State (F12-c/LFH-266): absent = unverändert, `null` oder ""/Whitespace
+    // = leeren (Spalte auf NULL), Wert = setzen. Das Trimmen/Leer-Kollabieren passiert hier in
+    // der Route, das Repo bleibt dumm — wie bei `uhs_id`.
+    let bemerkung = trimme_tri(body.bemerkung);
+    let bemerkung = bemerkung.as_ref().map(|o| o.as_deref());
 
     // F06/LFH-244 Tier-A: Domänen-Update + die (bis zu zwei) System-ETB-Einträge atomar in
     // EINER Tx (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload (`nachher`) liefert die frischen

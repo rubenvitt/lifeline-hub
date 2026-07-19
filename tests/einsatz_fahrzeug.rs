@@ -504,7 +504,7 @@ async fn bemerkung_setzen_und_leeren() {
     .await;
     assert_eq!(gesetzt["bemerkung"], "Tank halb");
 
-    // Leeren: leerer String überschreibt (Wert verschwindet).
+    // Leeren: leerer String ist der Leerwunsch — die Spalte geht auf NULL, nicht auf "".
     let (_, geleert) = anfrage(
         &app,
         "PATCH",
@@ -513,9 +513,9 @@ async fn bemerkung_setzen_und_leeren() {
         Some(r#"{"bemerkung":""}"#),
     )
     .await;
-    assert_eq!(
-        geleert["bemerkung"], "",
-        "leere Bemerkung darf den alten Wert nicht behalten"
+    assert!(
+        geleert["bemerkung"].is_null(),
+        "leerer String leert die Spalte auf NULL, nicht auf \"\""
     );
 
     // status_id absent → Status bleibt; eine reine Bemerkung-Änderung schreibt KEINEN ETB.
@@ -568,5 +568,121 @@ async fn disponieren_beides_meldet_nicht_beides() {
     assert_eq!(
         json["error"],
         "Entweder fahrzeug_id (Stamm) oder adhoc angeben, nicht beides"
+    );
+}
+
+// F12-c (LFH-266-Nachzug): `bemerkung` ist nullable und muss per PATCH löschbar sein.
+// Tri-State wie in d167778: absent = unverändert, `null`/`""` = leeren, Wert = setzen.
+#[tokio::test]
+async fn patch_null_leert_bemerkung() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let fz = fahrzeug_anlegen(&app, &admin, "Florian 1").await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &admin,
+        Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
+    )
+    .await;
+    let ef = json["id"].as_i64().unwrap();
+
+    anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &admin,
+        Some(r#"{"bemerkung":"Tank halb"}"#),
+    )
+    .await;
+    let (_, geleert) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &admin,
+        Some(r#"{"bemerkung":null}"#),
+    )
+    .await;
+    assert!(
+        geleert["bemerkung"].is_null(),
+        "explizites null muss die Bemerkung löschen"
+    );
+}
+
+#[tokio::test]
+async fn patch_leerstring_leert_bemerkung() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let fz = fahrzeug_anlegen(&app, &admin, "Florian 1").await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &admin,
+        Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
+    )
+    .await;
+    let ef = json["id"].as_i64().unwrap();
+
+    anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &admin,
+        Some(r#"{"bemerkung":"Tank halb"}"#),
+    )
+    .await;
+    let (_, geleert) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &admin,
+        Some(r#"{"bemerkung":"   "}"#),
+    )
+    .await;
+    assert!(
+        geleert["bemerkung"].is_null(),
+        "whitespace-only zählt als Leerwunsch (trimme_tri), nicht als Wert"
+    );
+}
+
+#[tokio::test]
+async fn patch_ohne_bemerkung_laesst_sie_stehen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let fz = fahrzeug_anlegen(&app, &admin, "Florian 1").await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &admin,
+        Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
+    )
+    .await;
+    let ef = json["id"].as_i64().unwrap();
+
+    anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &admin,
+        Some(r#"{"bemerkung":"Tank halb"}"#),
+    )
+    .await;
+    let (_, unberuehrt) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &admin,
+        Some(r#"{}"#),
+    )
+    .await;
+    assert_eq!(
+        unberuehrt["bemerkung"], "Tank halb",
+        "absentes Feld lässt die Bemerkung unverändert"
     );
 }

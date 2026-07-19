@@ -650,3 +650,129 @@ async fn material_an_einheit_zuordnen_publiziert_material_event() {
         "erwartete ein material-Event, bekam: {events:?}"
     );
 }
+
+// F12-c (LFH-266-Nachzug): `bemerkung` ist nullable und muss per PATCH löschbar sein.
+// Tri-State wie in d167778: absent = unverändert, `null`/`""` = leeren, Wert = setzen.
+// Der Material-Fall prüft `uhs_id` mit — die Query bindet nummeriert (?1..?8), ein
+// verrutschter Parameter fiele sonst nicht auf.
+#[tokio::test]
+async fn patch_null_leert_bemerkung() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let mat = material_anlegen(&app, &admin, "Wolldecke").await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        Some(&format!(r#"{{"material_id":{mat}}}"#)),
+    )
+    .await;
+    let em = json["id"].as_i64().unwrap();
+
+    let (_, gesetzt) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &admin,
+        Some(r#"{"menge":7,"bemerkung":"Lagerhalle 2"}"#),
+    )
+    .await;
+    assert_eq!(gesetzt["bemerkung"], "Lagerhalle 2");
+    assert_eq!(gesetzt["menge"], 7, "menge liegt vor der Bemerkung im Bind");
+
+    let (_, geleert) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &admin,
+        Some(r#"{"bemerkung":null}"#),
+    )
+    .await;
+    assert!(
+        geleert["bemerkung"].is_null(),
+        "explizites null muss die Bemerkung löschen"
+    );
+    assert_eq!(
+        geleert["menge"], 7,
+        "die Nachbarspalten dürfen dabei nicht mitgeschrieben werden"
+    );
+}
+
+#[tokio::test]
+async fn patch_leerstring_leert_bemerkung() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let mat = material_anlegen(&app, &admin, "Wolldecke").await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        Some(&format!(r#"{{"material_id":{mat}}}"#)),
+    )
+    .await;
+    let em = json["id"].as_i64().unwrap();
+
+    anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &admin,
+        Some(r#"{"bemerkung":"Lagerhalle 2"}"#),
+    )
+    .await;
+    let (_, geleert) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &admin,
+        Some(r#"{"bemerkung":"   "}"#),
+    )
+    .await;
+    assert!(
+        geleert["bemerkung"].is_null(),
+        "whitespace-only zählt als Leerwunsch (trimme_tri), nicht als Wert"
+    );
+}
+
+#[tokio::test]
+async fn patch_ohne_bemerkung_laesst_sie_stehen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let mat = material_anlegen(&app, &admin, "Wolldecke").await;
+    let (_, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material"),
+        &admin,
+        Some(&format!(r#"{{"material_id":{mat}}}"#)),
+    )
+    .await;
+    let em = json["id"].as_i64().unwrap();
+
+    anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &admin,
+        Some(r#"{"bemerkung":"Lagerhalle 2"}"#),
+    )
+    .await;
+    let (_, unberuehrt) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &admin,
+        Some(r#"{"menge":3}"#),
+    )
+    .await;
+    assert_eq!(
+        unberuehrt["bemerkung"], "Lagerhalle 2",
+        "absentes Feld lässt die Bemerkung unverändert"
+    );
+    assert_eq!(unberuehrt["menge"], 3);
+}

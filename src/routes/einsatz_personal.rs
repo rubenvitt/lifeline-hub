@@ -13,7 +13,7 @@ use crate::error::AppError;
 use crate::personal::disposition_repo::{self, AdhocDaten};
 use crate::personal::status_repo;
 use crate::personal::{EinsatzPersonalAnzeige, FuehrungskraftKarte};
-use crate::routes::support::trimme;
+use crate::routes::support::{trimme, trimme_tri};
 use crate::staerke::StaerkePosition;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -176,7 +176,12 @@ pub struct DispoPatchBody {
         deserialize_with = "crate::routes::support::deserialize_optional_field"
     )]
     pub staerke_position: Option<Option<String>>,
-    pub bemerkung: Option<String>,
+    /// Tri-State (F12-c/LFH-266): fehlend = unverändert, `null`/`""` = leeren, Wert = setzen.
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub bemerkung: Option<Option<String>>,
 }
 
 /// PATCH /api/einsaetze/{id}/personal/{ep_id} — Status, Stärke-Position und/oder Bemerkung.
@@ -213,8 +218,11 @@ pub async fn aktualisieren(
     }
 
     let vorher = disposition_repo::laden_anzeige(&state.pool, einsatz_id, ep_id, true).await?;
-    // Bemerkung: gesetzt (auch "") → setzen; absent/null → unverändert (COALESCE).
-    let bemerkung = body.bemerkung.as_deref().map(str::trim);
+    // Bemerkung ist Tri-State (F12-c/LFH-266): absent = unverändert, `null` oder ""/Whitespace
+    // = leeren (Spalte auf NULL), Wert = setzen. Das Trimmen/Leer-Kollabieren passiert hier in
+    // der Route, das Repo bleibt dumm — wie bei `staerke_position`.
+    let bemerkung = trimme_tri(body.bemerkung);
+    let bemerkung = bemerkung.as_ref().map(|o| o.as_deref());
     let staerke_position = body.staerke_position.as_ref().map(|o| o.as_deref());
 
     // F06/LFH-244 Tier-A: Dispo-UPDATE + (nur bei Statuswechsel) System-ETB-Eintrag atomar in
