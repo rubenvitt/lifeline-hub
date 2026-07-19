@@ -28,19 +28,54 @@ Drei Angriffsflächen: **(a)** kein Post-Filter pro Event, **(b)** Volltext-Payl
 
 ```rust
 impl LiveEvent {
-    /// Modul-Key, gegen den dieses Event gegatet wird.
-    /// `None` = bewusst ungated (Kontroll-Event ohne Fachbezug).
-    pub fn modul_key(self) -> Option<&'static str> { match self { … } }
+    /// Die Module, deren Daten dieses Event betrifft. Leere Menge = ungated.
+    pub fn modul_keys(self) -> &'static [&'static str] { match self { … } }
+
+    /// Ein Abonnent bekommt das Event, wenn er MINDESTENS EINES davon sehen darf.
+    pub fn sichtbar_fuer(self, erlaubt: &HashSet<&'static str>) -> bool { … }
 }
 ```
 
-Exhaustiver `match` über alle 23 Varianten. **Eine neue `LiveEvent`-Variante bricht die
-Compilierung**, bis sie einen Modul-Key (oder ein bewusstes `None`) bekommt — das ersetzt
-den ursprünglich geplanten statischen Literal-Scan-Guard vollständig. Als Rest bleibt ein
-Unit-Test „alle Keys ⊆ `MODUL_KEYS`" (iteriert `LiveEvent::ALLE`).
+Slice statt `Option<&str>`, weil ein Event echt mehrere Module betreffen kann (siehe
+Füll-Regel). Exhaustiver `match` über alle 24 Varianten: **eine neue `LiveEvent`-Variante
+bricht die Compilierung**, bis sie eine Gate-Menge (oder ein bewusstes `&[]`) bekommt —
+das ersetzt den ursprünglich geplanten statischen Literal-Scan-Guard vollständig. Als Rest
+bleiben zwei Unit-Tests: „alle Keys ⊆ `MODUL_KEYS`" (fängt Tippfehler, die sonst ein
+stiller fail-closed wären) und „nur Kontroll-Events sind ungegatet".
 
-`LiveEvent::Lagged` → `None`: Kontroll-Events (lagged/resync) tragen keinen Fachbezug und
+`LiveEvent::Lagged` → `&[]`: Kontroll-Events (lagged/resync) tragen keinen Fachbezug und
 müssen jeden Subscriber erreichen, sonst hängt der Resync.
+
+**Füll-Regel (sicherheitstragend).** Der Key gehört zum **Datenobjekt** des Events, nicht
+zur auslösenden Route — `einsatz_uhs::belegung` feuert `person`, und gegatet wird gegen
+`personen`. Ein zweites Modul kommt nur dazu, wenn dessen eigener, re-gegateter GET die
+Existenz desselben Objekts ohnehin offenlegt. Das trifft genau einmal zu: `meldung` →
+`+lagemeldungen` (`lage_liste` ist `EinsatzLesezugriff<Lagemeldungen>` und liefert die
+Lageobjekte derselben Meldungen).
+
+Die breitere FE-Invalidierungsmap (`EINSATZ_STREAM_EVENTS`) ist bewusst **nicht** die
+Quelle: sie beantwortet „welcher Cache könnte stale sein" (Über-Invalidierung ist dort
+billig und gewollt), nicht „wer darf erfahren, dass sich etwas geändert hat". Ein Mapping
+daraus hätte z. B. jedem `lagekarte`-Leser alle `person`-Events gegeben.
+
+Cross-Modul-Staleness entsteht dadurch kaum: die Fan-out-Routen feuern beide Events
+(`personal_zuordnen` → `einheit` UND `personal`), der jeweilige Leser bekommt also seins.
+Wo doch etwas fehlt (z. B. `fuehrungskraefte`-Sicht bei `abschnitt`), ist das der bewusste
+Preis — konsistent mit der schon geshippten Entscheidung `sofortmeldung → meldungen`
+(LFH-118).
+
+### 1a. Der `person`-Tag war mehrdeutig (Fund während der Umsetzung)
+
+`person` trug **zwei disjunkte ID-Räume unter demselben Feldnamen `person_id`**:
+`einsatz_person.rs` meinte eine betroffene Person (Patient/Vermisster, Modul `personen`),
+`einsatz_personal.rs`/`einsatz_einheit.rs`/`einsatz_fahrzeug.rs` eine `ep_id` —
+Einsatzkraft-Disposition (Modul `personal`). Der Code hatte das bewusst so gebaut
+(„kein neues `personal`-Tag, sonst bricht der Frontend-Filter").
+
+Für ein Modul-Gate ist das nicht auflösbar: ein gemeinsamer Key hätte `personal`-Lesern
+die IDs von Patienten und Vermissten gezeigt — genau die PII-Klasse, die F01 schützen
+soll. Deshalb neuer Wire-Tag `personal` (Enum-Variante + FE-Registry-Eintrag +
+Wire-Kontrakttest); die Payload heißt jetzt ehrlich `personal_id`.
 
 ### 2. Post-Filter (`src/routes/support.rs`)
 
