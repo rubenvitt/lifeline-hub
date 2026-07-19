@@ -19,7 +19,7 @@ import { apiGet, apiSend } from './client';
  * vorhandene Keys, damit Partial-Patches (z. B. das Halter-Setzen aus der Personen-Seite)
  * nicht ungefragt weitere Felder mit `null` überschreiben.
  */
-function leereWerteAlsNull<T extends object>(daten: T): T {
+export function leereWerteAlsNull<T extends object>(daten: T): T {
   return Object.fromEntries(
     Object.entries(daten).map(([k, v]) => [
       k,

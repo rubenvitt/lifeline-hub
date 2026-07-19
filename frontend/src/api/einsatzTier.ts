@@ -1,5 +1,6 @@
 import type { Tier, TierStatus, Spezies } from './types';
 import { apiGet, apiSend } from './client';
+import { leereWerteAlsNull } from './einsatzPerson';
 
 /** Felder beim Anlegen (Spezies Pflicht; Rest optional). Halter FK XOR Freitext. */
 export interface TierEingabe {
@@ -18,7 +19,7 @@ export interface TierEingabe {
   notiz?: string | null;
 }
 
-/** Patch-Felder. Halter-Felder akzeptieren `null` = leeren (FK↔Freitext-Toggle). */
+/** Patch-Felder. JEDES Feld akzeptiert `null` = leeren; ein fehlender Key lässt es unverändert. */
 export interface TierPatch {
   rasse_beschreibung?: string | null;
   rufname?: string | null;
@@ -85,12 +86,7 @@ export function aktualisiereTier(
   daten: TierPatch,
   basisGeaendertAt?: string,
 ): Promise<Tier> {
-  const norm = Object.fromEntries(
-    Object.entries(daten).map(([k, v]) => [
-      k,
-      v === undefined || (typeof v === 'string' && v.trim() === '') ? null : v,
-    ]),
-  ) as TierPatch;
+  const norm = leereWerteAlsNull(daten);
   const body = basisGeaendertAt ? { ...norm, basis_geaendert_at: basisGeaendertAt } : norm;
   return apiSend<Tier>(`/api/einsaetze/${einsatzId}/tiere/${tierId}`, 'PATCH', body);
 }

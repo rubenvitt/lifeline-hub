@@ -35,10 +35,13 @@ pub struct NeueDaten<'a> {
     pub notiz: Option<&'a str>,
 }
 
-/// Patch-Daten. Identitäts-/Kontextfelder folgen COALESCE-Semantik (gesetzt =
-/// übernehmen, `None` = unverändert). Die Halter-Felder nutzen die explizite
-/// `Some(None)`-Semantik (= auf NULL setzen) wie in `uhs::repo::PatchDaten`,
-/// damit der FK↔Freitext-Toggle ein Feld leeren kann.
+/// Patch-Daten mit einheitlicher Tri-State-Semantik (LFH-266/F12):
+/// `None` = Feld nicht im Patch → unverändert · `Some(None)` = auf NULL setzen ·
+/// `Some(Some(w))` = auf `w` setzen.
+///
+/// Die Halter-Felder trugen diese Semantik schon vorher (FK↔Freitext-Toggle); die neun
+/// Identitäts-/Kontextfelder folgten bis LFH-266 der COALESCE-Semantik und ließen sich
+/// deshalb über die API nie wieder leeren. Alle betroffenen Spalten sind nullable.
 #[derive(Debug, Default)]
 pub struct PatchDaten<'a> {
     pub rasse_beschreibung: Option<Option<&'a str>>,
@@ -172,8 +175,9 @@ pub async fn anlegen(
     laden(pool, einsatz_id, id).await
 }
 
-/// Aktualisiert Stammfelder. Identitätsfelder via COALESCE (nur gesetzte);
-/// Halter-Felder mit expliziter NULL-Semantik (für den FK↔Freitext-Toggle).
+/// Aktualisiert Stammfelder. Identitäts- UND Halter-Felder tragen seit LFH-266/F12
+/// einheitlich Tri-State-Semantik (siehe [`PatchDaten`]): `None` = unverändert,
+/// `Some(None)` = auf NULL, `Some(Some(w))` = setzen.
 /// Setzt `geaendert_at`/`geaendert_von`. `NotFound`, falls nicht zum Einsatz.
 ///
 /// Optimistisches Lock (LFH-299/F10, Muster aus `person::repo::aktualisiere`): trägt der
@@ -190,9 +194,15 @@ pub async fn aktualisiere(
     erwartet_geaendert_at: Option<&str>,
     daten: PatchDaten<'_>,
 ) -> Result<TierAnzeige, AppError> {
-    // Nur anonyme `?`-Platzhalter (Codebase-Idiom, wie person/uhs). Reihenfolge der
-    // `.bind()`-Aufrufe = Reihenfolge der `?` im SQL. Die Halter-Felder nutzen ein
-    // Flag (`is_some`) + Wert (`flatten`)-Paar, damit `Some(None)` → NULL setzt.
+    // ALLE Spalten nutzen ein Flag/Wert-Paar (`CASE WHEN ?n IS NULL THEN spalte ELSE ?n+1
+    // END`), seit LFH-266/F12 auch die neun Identitätsfelder — nur so lässt sich eine Spalte
+    // über die API wieder auf NULL setzen. Das SQL bleibt statisch, dynamisch ist nur das
+    // CAS-Suffix (sqlx 0.9 nimmt für `query` ohnehin nur `&'static str`).
+    //
+    // Die nummerierten Platzhalter sind hier kein Stil, sondern Absicherung: die neun neuen
+    // Identitäts-Paare liegen direkt VOR den bestehenden Halter-Paaren, eine um eine Position
+    // verschobene Bind-Kette würde ein Identitäts-Flag auf einen Halter-Wert treffen lassen
+    // und den Halter still mitleeren. Abgesichert von `patch_identitaet_laesst_halter_unberuehrt`.
     let mut sql = String::from(
         "UPDATE einsatz_tier SET \
             rasse_beschreibung = CASE WHEN ?1 IS NULL THEN rasse_beschreibung ELSE ?2 END, \
