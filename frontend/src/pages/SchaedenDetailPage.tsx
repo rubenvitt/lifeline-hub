@@ -78,7 +78,12 @@ export default function SchaedenDetailPage() {
       aktualisiereSchaden(einsatzId, schadenId, v.daten, v.overwrite ? undefined : v.basis),
     onSuccess: () => { invalidateDetail(); setBearbeiten(false); },
     onError: (e, v) => {
-      if (istKonflikt(e)) {
+      // Nur der ERSTE 409 (Save MIT Baseline) ist der Sperrkonflikt. Anders als beim
+      // Person-PATCH (Referenz LFH-241) kennt die Schaden-Route einen ZWEITEN 409: den
+      // Storno-Guard, der vor der CAS greift und den `overwrite` nicht umgehen kann.
+      // Ein 409 auf den Overwrite muss deshalb die echte Servermeldung zeigen, statt
+      // denselben Dialog erneut zu öffnen — sonst wäre „Überschreiben" ein toter Button.
+      if (istKonflikt(e) && !v.overwrite) {
         modal.confirm({
           title: 'Zwischenzeitlich geändert',
           content:

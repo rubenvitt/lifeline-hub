@@ -134,6 +134,26 @@ describe('SchaedenDetailPage — Stammdaten', () => {
     expect(koerper[1].basis_geaendert_at).toBeUndefined();
   });
 
+  it('ein zweiter 409 auf den Overwrite zeigt die Servermeldung statt erneut den Dialog', async () => {
+    // Die Schaden-Route kennt einen zweiten 409 (Storno-Guard vor der CAS), den der Overwrite
+    // nicht umgehen kann. Ohne den `!v.overwrite`-Zweig wäre „Überschreiben" ein toter Button.
+    const koerper: Array<Record<string, unknown>> = [];
+    render(einsatzAktiv, basisSchaden(), [
+      http.patch('/api/einsaetze/1/schaeden/10', async ({ request }) => {
+        koerper.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({ error: 'Stornierter Schaden kann nicht geändert werden' }, { status: 409 });
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
+    await vi.waitFor(() => expect(koerper).toHaveLength(2));
+    // Die echte Servermeldung erscheint — das belegt, dass der else-Zweig (`fehler`) lief und
+    // NICHT erneut der Konfliktdialog. Ohne den `!v.overwrite`-Zweig ginge stattdessen ein
+    // zweiter Dialog auf und diese Meldung käme nie.
+    expect(await screen.findByText('Stornierter Schaden kann nicht geändert werden')).toBeInTheDocument();
+  });
+
   it('Beobachter sieht keinen Bearbeiten-Button', async () => {
     render(einsatzBeobachter, basisSchaden());
     await screen.findByRole('heading', { name: /Schaden S-001/ });
