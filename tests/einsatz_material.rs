@@ -653,8 +653,10 @@ async fn material_an_einheit_zuordnen_publiziert_material_event() {
 
 // F12-c (LFH-266-Nachzug): `bemerkung` ist nullable und muss per PATCH löschbar sein.
 // Tri-State wie in d167778: absent = unverändert, `null`/`""` = leeren, Wert = setzen.
-// Der Material-Fall prüft `uhs_id` mit — die Query bindet nummeriert (?1..?8), ein
-// verrutschter Parameter fiele sonst nicht auf.
+// Der Material-Fall prüft `menge` mit — die Query bindet nummeriert (?1..?8) und das neue
+// bemerkung-Paar verschiebt alles danach; ein verrutschter Parameter fiele sonst nicht auf.
+// Für `uhs_id` (das dabei von ?4/?5 auf ?5/?6 wandert) übernehmen das die Unit-Tests im
+// Repo-Modul, src/material/disposition_repo.rs.
 #[tokio::test]
 async fn patch_null_leert_bemerkung() {
     let app = setup().await;

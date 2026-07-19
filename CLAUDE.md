@@ -145,18 +145,26 @@ wäre die saubere Lösung und ist bewusst vertagt.
 
 **Bekannte Abweichungen, NICHT als Norm übernehmen** (Angleichung vertagt → LFH-305):
 
-1. **Unbekannter Enum-Wert → 422 statt 400** an ~19 Stellen, u. a. `einsatz_schaden.rs:66/73/80`
-   (Query-Filter) und `:365/370/375`, `gefahr.rs:105/111/117`, `lage_zone.rs:73/79/220`,
-   `einsatz_uhs.rs:512`, `einsatz_tier.rs:457`, dazu je eine Stelle in `auth.rs`, `befehl.rs`,
-   `lagebericht.rs`, `organisation.rs`.
+1. **Unbekannter Enum-Wert → 422 statt 400**, u. a. `einsatz_schaden.rs:66/73/80`
+   (Query-Filter), `:366/371/376` (PATCH) und `:143/151` (Anlegen — dort zusätzlich mit
+   „fehlt" verschmolzen, siehe 2.), `gefahr.rs:105/111/117`, `lage_zone.rs:73/79/220`,
+   `einsatz_tier.rs:457`, `befehl.rs:177` und `lagebericht.rs:179` („Unbekannter
+   Abschnitts-Schlüssel" — Prüfung gegen die Schlüsselmenge der Vorlage, enum-artig),
+   `organisation.rs:60` (`ERLAUBTE_ORG`-Allowlist).
 2. **Leeres bzw. fehlendes Pflichtfeld → 422 statt 400** in `einsatz_schaden.rs`: `:158` (Ort
    beim Anlegen), `:384` (Ort im PATCH), `:518` (Übergabe-Adressat), `:591` (Abschlussgrund).
-   `:158/:518/:591` kollabieren zusätzlich „fehlend" und „leer" in denselben Code, weil die
-   Felder `Option<String>` sind — das Entwirren gehört mit ins Ticket.
+   `:143/:151/:158/:518/:591` kollabieren zusätzlich „fehlend" und „leer" bzw. „fehlt oder
+   ungültig" in denselben Code, weil die Felder `Option<String>` sind — das Entwirren gehört
+   mit ins Ticket.
 
-**Nicht betroffen, legitimes 422:** `lage_zone.rs:85/92/94` (kaputtes GeoJSON bzw.
-`geometrie.type` ≠ `geometrie_typ` — eine Feld-*Kombination*), `einsatzabschnitt.rs:261`
-(kaputtes GeoJSON), `sprechgruppe/repo.rs:207` (referenzielle Zuordenbarkeit).
+**Nicht betroffen, legitimes 422 — beim Sweep NICHT mitkippen:** `lage_zone.rs:85/92/94`
+(kaputtes GeoJSON bzw. `geometrie.type` ≠ `geometrie_typ` — eine Feld-*Kombination*),
+`einsatzabschnitt.rs:261` (kaputtes GeoJSON), `sprechgruppe/repo.rs:207` (referenzielle
+Zuordenbarkeit), `auth.rs:999` („Code ungültig" — ein TOTP-Einmalcode scheitert am
+kryptographischen Vergleich, nicht an der Form; das ist ein Zustandsfehler),
+`einsatz_uhs.rs:264/270/277/516` (lat/lon-Paar, Koordinaten- und Mengen-Ranges) und
+`einsatz_uhs.rs:359` (Status-Übergang). **`einsatz_uhs.rs` hat keine Enum-Abweichung** —
+alle sieben Enum-Parse-Stellen der Datei nutzen bereits `Validation`.
 
 **Sicherheitsnetz (LFH-245):** nicht vorab abgefangene DB-Constraint-Verletzungen bekommen in
 `AppError::status()` automatisch einen fachlichen Code — UNIQUE/FK → **409**, CHECK → **422**,
