@@ -34,6 +34,51 @@ pub async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
     (router, pool)
 }
 
+/// Legt eine ZWEITE Organisation samt Benutzer an — die Voraussetzung für jeden
+/// Cross-Org-Test (F05/LFH-232).
+///
+/// `bootstrap_admin` ist bewusst einmalig (es bricht ab, sobald ein Benutzer existiert),
+/// deshalb geht die Fremd-Org direkt über SQL. Ohne diesen Helfer ist die Mandanten-Grenze
+/// grundsätzlich unbeweisbar: mit nur einer Organisation ist jeder Org-Check trivial erfüllt,
+/// und genau deshalb konnten die Lücken so lange unbemerkt bleiben.
+///
+/// Liefert `(org_id, benutzer_id)`. `org_rolle` ist z. B. `"fuehrungskraft"` oder `"keine"`,
+/// `system_rolle` `"keiner"` (ein zweiter `admin` wäre serverweit berechtigt und würde
+/// Org-Isolation gerade NICHT testen).
+pub async fn fremde_org_anlegen(
+    pool: &sqlx::SqlitePool,
+    org_name: &str,
+    benutzername: &str,
+    passwort: &str,
+    org_rolle: &str,
+) -> (i64, i64) {
+    let org_id: i64 = sqlx::query_scalar(
+        "INSERT INTO organisation (name, tz_organisation) \
+         VALUES (?, 'hilfsorganisation') RETURNING id",
+    )
+    .bind(org_name)
+    .fetch_one(pool)
+    .await
+    .expect("Fremd-Org anlegen");
+
+    let hash = lifeline_hub::auth::password::hash(passwort).expect("Passwort hashen");
+    let benutzer_id: i64 = sqlx::query_scalar(
+        "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, \
+                               system_rolle, org_rolle) \
+         VALUES (?, ?, ?, ?, 'keiner', ?) RETURNING id",
+    )
+    .bind(org_id)
+    .bind(benutzername)
+    .bind(benutzername)
+    .bind(&hash)
+    .bind(org_rolle)
+    .fetch_one(pool)
+    .await
+    .expect("Fremd-Org-Benutzer anlegen");
+
+    (org_id, benutzer_id)
+}
+
 pub async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str) -> String {
     let body = format!(r#"{{"benutzername":"{benutzername}","passwort":"{passwort}"}}"#);
     let resp = app
