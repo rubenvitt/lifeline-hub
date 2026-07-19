@@ -73,9 +73,9 @@ impl AppError {
             // Sicherheitsnetz (LFH-245): nicht vorab abgefangene Constraint-Verletzungen
             // bekommen einen fachlichen Statuscode statt eines nackten 500.
             AppError::Database(e) => {
-                if crate::tx::ist_busy(e) {
-                    // Erschöpfte Busy-Retries (F09/LFH-240): Writer dauerhaft belegt →
-                    // fachlich „später erneut versuchen" statt undurchsichtigem 500.
+                if Self::ist_ueberlast(e) {
+                    // Überlast, kein Defekt → fachlich „später erneut versuchen" statt
+                    // undurchsichtigem 500. Zwei Quellen, siehe [`AppError::ist_ueberlast`].
                     StatusCode::SERVICE_UNAVAILABLE
                 } else {
                     self.constraint_violation()
@@ -88,6 +88,22 @@ impl AppError {
             AppError::BadGateway(_) => StatusCode::BAD_GATEWAY,
             AppError::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
         }
+    }
+
+    /// `true`, wenn der DB-Fehler eine *transiente Überlast* ist statt eines Defekts —
+    /// die Klasse, die als 503 („später erneut versuchen") beantwortet gehört:
+    ///
+    /// - **Erschöpfte Busy-Retries** (F09/LFH-240): der WAL-Writer ist dauerhaft belegt,
+    ///   `write_retry!` hat nach `MAX_VERSUCHE` aufgegeben.
+    /// - **Pool-Timeout** (G09/LFH-228): alle Pool-Verbindungen sind belegt, der
+    ///   `acquire_timeout` (10 s, `db.rs`) ist abgelaufen. Ohne diesen Zweig fiele
+    ///   `PoolTimedOut` — weder busy noch Constraint-Verletzung — auf 500 „Interner
+    ///   Serverfehler" durch, d.h. Backpressure sähe aus wie ein Serverdefekt.
+    ///
+    /// Bewusst eine exakte Varianten-Prüfung: der Zweig sitzt auf dem zentralen
+    /// `?`-Pfad ALLER Handler und darf keine andere Fehlerklasse mitreißen.
+    fn ist_ueberlast(e: &sqlx::Error) -> bool {
+        crate::tx::ist_busy(e) || matches!(e, sqlx::Error::PoolTimedOut)
     }
 
     /// Sicherheitsnetz für DB-Constraint-Verletzungen (LFH-245/F07): eine nicht
@@ -130,9 +146,17 @@ impl IntoResponse for AppError {
         // damit keine internen Details (SQL, Pfade) nach außen gelangen.
         let message = match &self {
             AppError::Database(e) => {
-                if crate::tx::ist_busy(e) {
-                    // Schreibkonflikt nach erschöpften Busy-Retries (F09): 503, nicht 500.
-                    tracing::warn!("Schreibkonflikt nach Busy-Retries (503): {e}");
+                if Self::ist_ueberlast(e) {
+                    // Transiente Überlast: 503, nicht 500. Dieselbe Klassifikation wie in
+                    // `status()` (via `ist_ueberlast`), damit Statuscode und Meldung nicht
+                    // auseinanderlaufen; nur die Log-Zeile unterscheidet die zwei Quellen,
+                    // weil sie operativ verschiedene Gegenmaßnahmen nahelegen.
+                    if matches!(e, sqlx::Error::PoolTimedOut) {
+                        // G09/LFH-228: alle Pool-Slots belegt, acquire_timeout abgelaufen.
+                        tracing::warn!("Verbindungspool erschöpft (503): {e}");
+                    } else {
+                        tracing::warn!("Schreibkonflikt nach Busy-Retries (503): {e}");
+                    }
                     "Dienst vorübergehend ausgelastet — bitte erneut versuchen.".to_string()
                 } else if let Some((_, generic)) = self.constraint_violation() {
                     // Constraint-Verletzung: fachlich beantworten, das SQL-Detail
@@ -279,6 +303,47 @@ mod tests {
         let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
         let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(json["error"], "Interner Serverfehler");
+    }
+
+    #[tokio::test]
+    async fn pool_timeout_maps_to_503_and_is_generic() {
+        // G09/LFH-228: ein erschöpfter Verbindungspool ist Überlast, kein Defekt.
+        // Vorher fiel `PoolTimedOut` über `From<sqlx::Error>` in `Database(_)` und —
+        // weder busy noch Constraint-Verletzung — auf 500 „Interner Serverfehler"
+        // durch: Backpressure sah aus wie ein Serverdefekt. Jetzt ehrlicher Lastabwurf.
+        let app = AppError::from(sqlx::Error::PoolTimedOut);
+        assert_eq!(app.status(), StatusCode::SERVICE_UNAVAILABLE);
+
+        let resp = app.into_response();
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+
+        let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let msg = json["error"].as_str().unwrap();
+        assert_ne!(
+            msg, "Interner Serverfehler",
+            "Überlast darf nicht als Serverdefekt beantwortet werden"
+        );
+        // Kein Internal-Detail: die sqlx-Meldung lautet „pool timed out while waiting …“.
+        assert!(
+            !msg.to_lowercase().contains("pool"),
+            "Meldung darf kein internes Detail leaken: {msg}"
+        );
+    }
+
+    #[test]
+    fn andere_sqlx_fehler_bleiben_500() {
+        // Abgrenzung zum neuen 503-Zweig (G09/LFH-228): der Arm sitzt auf dem zentralen
+        // `?`-Pfad ALLER Handler — er darf ausschließlich `PoolTimedOut` fangen und keine
+        // andere sqlx-Fehlerklasse mit in den Lastabwurf ziehen.
+        assert_eq!(
+            AppError::from(sqlx::Error::RowNotFound).status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+        assert_eq!(
+            AppError::from(sqlx::Error::PoolClosed).status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
     }
 
     #[test]
