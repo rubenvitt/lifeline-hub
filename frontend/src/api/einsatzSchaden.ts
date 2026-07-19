@@ -57,8 +57,20 @@ export function legeSchadenAn(einsatzId: number, daten: SchadenEingabe): Promise
   return apiSend<Schaden>(`/api/einsaetze/${einsatzId}/schaeden`, 'POST', daten);
 }
 
-export function aktualisiereSchaden(einsatzId: number, schadenId: number, daten: SchadenPatch): Promise<Schaden> {
-  return apiSend<Schaden>(`/api/einsaetze/${einsatzId}/schaeden/${schadenId}`, 'PATCH', daten);
+/**
+ * Optimistisches Lock (LFH-300/F10): `basisGeaendertAt` trägt den beim Laden gelesenen
+ * `geaendert_at`-Stand. Ist er veraltet → 409 statt stillem Overwrite. Ohne Baseline
+ * (Lagekarten-Drag lat/lon, Geschädigt-Zuordnung aus der Personen-Detailseite,
+ * Konfliktdialog-Overwrite) wird bewusst blind geschrieben.
+ */
+export function aktualisiereSchaden(
+  einsatzId: number,
+  schadenId: number,
+  daten: SchadenPatch,
+  basisGeaendertAt?: string,
+): Promise<Schaden> {
+  const body = basisGeaendertAt ? { ...daten, basis_geaendert_at: basisGeaendertAt } : daten;
+  return apiSend<Schaden>(`/api/einsaetze/${einsatzId}/schaeden/${schadenId}`, 'PATCH', body);
 }
 
 export function uebergebeSchaden(einsatzId: number, schadenId: number, uebergeben_an: string): Promise<Schaden> {

@@ -15,7 +15,7 @@ import {
   uebergebeSchaden,
   type SchadenPatch,
 } from '../api/einsatzSchaden';
-import { ApiError } from '../api/client';
+import { ApiError, istKonflikt } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { parseRouteId, schaedenPfad } from '../routing/deeplinks';
 import type { Ausmass, SchadenTyp } from '../api/types';
@@ -45,7 +45,7 @@ export default function SchaedenDetailPage() {
   const navigate = useNavigate();
 
   const qc = useQueryClient();
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const [bearbeiten, setBearbeiten] = useState(false);
   const [editForm] = Form.useForm<EditWerte>();
   const [uebergebenOffen, setUebergebenOffen] = useState(false);
@@ -71,9 +71,28 @@ export default function SchaedenDetailPage() {
     enabled: idGueltig,
   });
 
+  // Optimistisches Lock (LFH-300/F10): `basis` trägt den beim Laden gelesenen geaendert_at-Stand;
+  // ein 409 öffnet den Konfliktdialog (neu laden vs. überschreiben), statt still zu überschreiben.
   const editMutation = useMutation({
-    mutationFn: (daten: SchadenPatch) => aktualisiereSchaden(einsatzId, schadenId, daten),
-    onSuccess: () => { invalidateDetail(); setBearbeiten(false); }, onError: fehler,
+    mutationFn: (v: { daten: SchadenPatch; basis?: string; overwrite?: boolean }) =>
+      aktualisiereSchaden(einsatzId, schadenId, v.daten, v.overwrite ? undefined : v.basis),
+    onSuccess: () => { invalidateDetail(); setBearbeiten(false); },
+    onError: (e, v) => {
+      if (istKonflikt(e)) {
+        modal.confirm({
+          title: 'Zwischenzeitlich geändert',
+          content:
+            'Dieser Schaden wurde seit dem Öffnen von jemand anderem gespeichert. „Neu laden" verwirft deine Änderungen; „Überschreiben" speichert deine Werte über die des anderen.',
+          okText: 'Überschreiben',
+          okButtonProps: { danger: true },
+          cancelText: 'Neu laden',
+          onOk: () => editMutation.mutate({ daten: v.daten, overwrite: true }),
+          onCancel: () => { detailQuery.refetch(); setBearbeiten(false); },
+        });
+      } else {
+        fehler(e);
+      }
+    },
   });
   const uebergebMutation = useMutation({
     mutationFn: (an: string) => uebergebeSchaden(einsatzId, schadenId, an),
@@ -209,7 +228,7 @@ export default function SchaedenDetailPage() {
               // Geschädigt XOR: immer alle vier Felder explizit senden (das nicht gewählte ist null).
               ...geschaedigtFelder(daten.geschaedigt ?? null, orgId),
             };
-            editMutation.mutate(patch);
+            editMutation.mutate({ daten: patch, basis: s.geaendert_at });
           }}>
           {detailAnsicht}
           <Space style={{ marginTop: 16 }}>

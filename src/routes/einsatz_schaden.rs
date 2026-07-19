@@ -301,6 +301,11 @@ pub struct PatchBody {
         deserialize_with = "crate::routes::support::deserialize_optional_field"
     )]
     pub lon: Option<Option<f64>>,
+    /// Optimistisches Lock (LFH-300/F10): der beim Laden gelesene `geaendert_at`-Stand.
+    /// Stimmt er nicht mehr → 409 statt stillem Overwrite. Fehlt er (Overwrite aus dem
+    /// Konfliktdialog, Lagekarten-Drag, Geschädigt-Zuordnung aus der Personen-Detailseite),
+    /// wird bewusst blind geschrieben.
+    pub basis_geaendert_at: Option<String>,
 }
 
 pub async fn aktualisieren(
@@ -460,6 +465,7 @@ pub async fn aktualisieren(
         einsatz_id,
         schaden_id,
         benutzer.id,
+        body.basis_geaendert_at.as_deref(),
         schaden_repo::PatchDaten {
             typ: body.typ.as_deref(),
             ausmass: body.ausmass.as_deref(),
