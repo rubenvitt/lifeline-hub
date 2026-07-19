@@ -1,7 +1,33 @@
 /// <reference types="vitest/config" />
-import { defineConfig, loadEnv } from 'vite';
+import { writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+
+// `frontend/dist` muss zur Compile-Zeit existieren, sonst bricht rust-embed
+// (src/static_files.rs) und damit der komplette Backend-Build — deshalb ist die
+// .gitkeep dort getrackt (LFH-242/F19). Vites emptyOutDir räumt den Ordner bei
+// jedem Build aus und würde sie mitnehmen: der Fix zerfiele beim ersten
+// `pnpm build`, und die Löschung landete früher oder später in einem Commit.
+// Also nach dem Schreiben des Bundles wiederherstellen.
+// Die Datei ist bewusst LEER: der Hook schreibt sie nach jedem Build neu, und nur
+// bei byte-identischem Inhalt bleibt der Arbeitsbaum sauber. Den Zielpfad holen wir
+// aus der aufgelösten Vite-Config statt aus __dirname/cwd — das Paket ist ESM, und
+// der Hook soll auch stimmen, wenn woanders her gebaut wird.
+const gitkeepBewahren = (): Plugin => {
+  let gitkeepPfad = '';
+  return {
+    name: 'lifeline-dist-gitkeep-bewahren',
+    apply: 'build',
+    configResolved(config) {
+      gitkeepPfad = resolve(config.root, config.build.outDir, '.gitkeep');
+    },
+    closeBundle() {
+      writeFileSync(gitkeepPfad, '');
+    },
+  };
+};
 
 // Dev-Server und Proxy-Ziel werden NICHT fest verdrahtet (Workspaces vergeben Ports
 // dynamisch). Quelle: .env.local (vom `pnpm run setup` geschrieben) + Shell-/CI-ENV,
@@ -14,6 +40,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       react(),
+      gitkeepBewahren(),
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['favicon.svg'],

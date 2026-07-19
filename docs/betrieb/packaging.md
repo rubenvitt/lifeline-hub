@@ -21,7 +21,14 @@ Release-Binary, die `frontend/dist` zur Compile-Zeit einbettet. Ergebnis:
 
 > **Wichtig:** Das Frontend muss **vor** dem Release-Build gebaut sein, sonst
 > bettet die Binary einen veralteten/leeren Frontend-Stand ein. Das Skript
-> erledigt die Reihenfolge automatisch.
+> erledigt die Reihenfolge automatisch und erzwingt sie seit LFH-242/F19 auch:
+> es räumt `frontend/dist` vorher aus, bricht ab, wenn nach dem Frontend-Build
+> keine `index.html` da ist, und stößt das Embed-Modul per `touch` an — Cargo
+> kennt die Dateien unter `frontend/dist` nämlich nicht als Abhängigkeit und
+> würde nach einer reinen Frontend-Änderung gar nicht neu übersetzen.
+>
+> Ein direkter `cargo build --release` **ohne** das Skript hat diese Garantien
+> nicht.
 
 ## System-OpenSSL-Abhängigkeit (WebAuthn/Passkeys, LFH-275)
 
