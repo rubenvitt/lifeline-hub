@@ -1927,6 +1927,7 @@ dependencies = [
  "clap",
  "fs4",
  "futures",
+ "http-body-util",
  "karten-katalog",
  "libsqlite3-sys",
  "mime_guess",

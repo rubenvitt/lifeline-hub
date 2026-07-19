@@ -156,7 +156,7 @@ async fn sse_person_event_enthaelt_nur_ids_keinen_befundtext() {
     let mut gefunden = false;
     for _ in 0..10 {
         match tokio::time::timeout(std::time::Duration::from_millis(100), rx.recv()).await {
-            Ok(Ok(n)) if n.event == "person" => {
+            Ok(Ok(n)) if n.event.as_str() == "person" => {
                 assert!(
                     !n.data.contains("GEHEIM_XYZ_BEFUND"),
                     "SSE leakt Befundtext: {}",

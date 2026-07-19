@@ -427,6 +427,7 @@ fn live_event_wire() {
         (LiveEvent::Einheit, "einheit"),
         (LiveEvent::Abschnitt, "abschnitt"),
         (LiveEvent::Person, "person"),
+        (LiveEvent::Personal, "personal"),
         (LiveEvent::Lagebericht, "lagebericht"),
         (LiveEvent::Chat, "chat"),
         (LiveEvent::Erinnerung, "erinnerung"),

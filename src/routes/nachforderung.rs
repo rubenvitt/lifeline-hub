@@ -166,11 +166,7 @@ pub async fn anlegen(
 
     // Erzeugte ETB-Meldung in den Live-Feed (wie Auftrag/Meldung) + nachforderung-Event.
     if let Some(etb_id) = n.etb_nachforderung_id {
-        if let Ok(etb) = crate::etb::repo::laden(&state.pool, etb_id).await {
-            if let Ok(json) = serde_json::to_string(&etb) {
-                state.live.publiziere(einsatz_id, json);
-            }
-        }
+        state.live.publiziere(einsatz_id, etb_id);
     }
     sse(&state, einsatz_id);
     Ok((StatusCode::CREATED, Json(n)))

@@ -485,9 +485,21 @@ async fn erfasster_eintrag_wird_live_publiziert() {
         .await
         .expect("Broadcast muss innerhalb 1s ankommen")
         .expect("Broadcast-Kanal liefert Nachricht");
-    assert_eq!(nachricht.event, "etb");
+    assert_eq!(nachricht.event.as_str(), "etb");
+    // F01/LFH-227: ID-only. Der Volltext (inhalt/von/an/erfasser_name) ging früher über
+    // den einsatzweiten Broadcast an JEDEN Abonnenten — auch an den, dem ETB entzogen war.
     let value: Value = serde_json::from_str(&nachricht.data).unwrap();
-    assert_eq!(value["inhalt"], "Live-Test");
+    assert_eq!(value["einsatz_id"], einsatz);
+    assert!(value["etb_id"].is_i64(), "etb_id muss die ID tragen");
+    assert!(
+        value.get("inhalt").is_none(),
+        "kein Volltext im Broadcast: {value}"
+    );
+    assert!(
+        !nachricht.data.contains("Live-Test"),
+        "Inhalt darf den Server nicht über den Kanal verlassen: {}",
+        nachricht.data
+    );
 }
 
 #[tokio::test]
@@ -508,7 +520,7 @@ async fn erfassung_mit_client_id_ist_idempotent() {
         .await
         .expect("erstes Live-Event muss ankommen")
         .expect("Kanal liefert");
-    assert_eq!(ev.event, "etb");
+    assert_eq!(ev.event.as_str(), "etb");
 
     // Zweiter Versand derselben client_id (verlorene Antwort / zweiter Tab): idempotenter
     // Replay → derselbe Eintrag, weiterhin 201.
@@ -683,7 +695,7 @@ async fn admin_nicht_mitglied_darf_stream_abonnieren() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{einsatz}/etb/stream"))
+                .uri(format!("/api/einsaetze/{einsatz}/live"))
                 .header(header::COOKIE, admin)
                 .body(Body::empty())
                 .unwrap(),
@@ -814,7 +826,7 @@ async fn stream_fuer_mitglied_liefert_event_stream() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{einsatz}/etb/stream"))
+                .uri(format!("/api/einsaetze/{einsatz}/live"))
                 .header(header::COOKIE, admin)
                 .body(Body::empty())
                 .unwrap(),
@@ -861,7 +873,7 @@ async fn stream_fuer_beobachter_ist_200() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{einsatz}/etb/stream"))
+                .uri(format!("/api/einsaetze/{einsatz}/live"))
                 .header(header::COOKIE, beob)
                 .body(Body::empty())
                 .unwrap(),
@@ -886,7 +898,7 @@ async fn stream_fuer_nicht_mitglied_ist_403() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{einsatz}/etb/stream"))
+                .uri(format!("/api/einsaetze/{einsatz}/live"))
                 .header(header::COOKIE, fremd)
                 .body(Body::empty())
                 .unwrap(),
@@ -904,7 +916,7 @@ async fn stream_unbekannter_einsatz_ist_404() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri("/api/einsaetze/999/etb/stream")
+                .uri("/api/einsaetze/999/live")
                 .header(header::COOKIE, admin)
                 .body(Body::empty())
                 .unwrap(),
@@ -923,7 +935,7 @@ async fn stream_ohne_session_ist_401() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{einsatz}/etb/stream"))
+                .uri(format!("/api/einsaetze/{einsatz}/live"))
                 .body(Body::empty())
                 .unwrap(),
         )

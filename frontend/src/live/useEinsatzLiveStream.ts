@@ -8,8 +8,8 @@ import { EINSATZ_KEYS, EINSATZ_STREAM_EVENTS } from '../api/queryKeys';
  *
  * Der Backend-`LiveHub` multiplext ALLE Event-Typen (uhs, person, schaden, einheit,
  * fahrzeug, abschnitt, lage_zone, …) auf EINEN broadcast-Kanal pro Einsatz; jede
- * `…/stream`-Route leitet den kompletten Kanal verbatim weiter. Deshalb genügt EINE
- * Verbindung (`/etb/stream` als kanonischer Einsatz-Feed); client-seitig wird nach
+ * `/live`-Route ist der kanonische Einsatz-Feed (F01/LFH-227; sie ersetzt die 9 alten
+ * modul-benannten `…/stream`-Routen). Deshalb genügt EINE Verbindung; client-seitig wird nach
  * Event-Name auf die betroffenen Query-Keys verteilt.
  *
  * WICHTIG (Grund für die Konsolidierung): Pro Domäne eine eigene `EventSource` zu
@@ -142,7 +142,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     };
 
     const verbinde = () => {
-      const quelle = new EventSource(`/api/einsaetze/${einsatzId}/etb/stream`);
+      const quelle = new EventSource(`/api/einsaetze/${einsatzId}/live`);
       aktuelle = quelle;
       listeners.forEach(([event, handler]) => quelle.addEventListener(event, handler));
       quelle.onopen = () => {

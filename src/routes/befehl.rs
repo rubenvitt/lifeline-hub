@@ -236,11 +236,7 @@ pub async fn freigeben(
     .await?;
 
     if let Some(etb_id) = anzeige.etb_eintrag_id {
-        if let Ok(etb_anzeige) = crate::etb::repo::laden(&state.pool, etb_id).await {
-            if let Ok(json) = serde_json::to_string(&etb_anzeige) {
-                state.live.publiziere(einsatz_id, json);
-            }
-        }
+        state.live.publiziere(einsatz_id, etb_id);
     }
     sse_befehl(&state, einsatz_id, bid);
     Ok(Json(anzeige))

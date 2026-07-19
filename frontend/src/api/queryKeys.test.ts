@@ -17,9 +17,15 @@ describe('EINSATZ_KEYS', () => {
 });
 
 describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
-  it('bildet person auf den ×5-Fan-out in exakter Reihenfolge ab', () => {
-    expect(EINSATZ_STREAM_EVENTS.person).toEqual([
-      EINSATZ_KEYS.personen,
+  // F01/LFH-227: `person` und `personal` sind getrennte Wire-Events. Vorher trug EIN
+  // `person`-Tag beide ID-Räume (betroffene Person vs. einsatz_personal-Disposition) und
+  // musste deshalb ×5 fan-outen; getrennt kann das Backend die Module getrennt gaten.
+  it('bildet person nur auf die Personen-Registrierung ab', () => {
+    expect(EINSATZ_STREAM_EVENTS.person).toEqual([EINSATZ_KEYS.personen]);
+  });
+
+  it('bildet personal auf den Dispositions-Fan-out in exakter Reihenfolge ab', () => {
+    expect(EINSATZ_STREAM_EVENTS.personal).toEqual([
       EINSATZ_KEYS.personal,
       EINSATZ_KEYS.einheiten,
       EINSATZ_KEYS.abschnitte,

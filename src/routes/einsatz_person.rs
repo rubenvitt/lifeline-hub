@@ -23,13 +23,10 @@ use crate::person::{
 use crate::routes::support::trimme;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::Deserialize;
 use serde::Serialize;
-use std::convert::Infallible;
-use tokio_stream::Stream;
 use utoipa::ToSchema;
 
 /// Detail-Antwort: E‑1-Personenfelder (flatten) + E‑2-Verlauf-Arrays. Genau eine
@@ -58,9 +55,7 @@ fn sse_person(state: &AppState, einsatz_id: i64, person_id: i64) {
 /// uhs/person-Board) bleibt hier im Route-Handler. Nur bei tatsächlichem Austritt
 /// (`Some(effekt)`) aufrufen.
 fn sse_auto_austritt(state: &AppState, einsatz_id: i64, effekt: &crate::uhs::AutoAustrittEffekt) {
-    if let Ok(json) = serde_json::to_string(&effekt.etb_eintrag) {
-        state.live.publiziere(einsatz_id, json);
-    }
+    state.live.publiziere(einsatz_id, effekt.etb_eintrag.id);
     state.live.publiziere_event(
         einsatz_id,
         LiveEvent::Uhs,
@@ -876,28 +871,4 @@ pub async fn abgleich_entscheiden(
     sse_person(&state, einsatz_id, abgleich.vermisst_person_id);
     sse_person(&state, einsatz_id, abgleich.gefunden_person_id);
     Ok(Json(entschieden))
-}
-
-/// GET /api/einsaetze/{id}/personen/stream — SSE-Stream des Einsatz-Kanals.
-/// Der Client filtert clientseitig auf `person`-Events. Nur Lesezugriff.
-pub async fn stream(
-    State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
-) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-
-    let rx = state.live.abonniere(einsatz_id);
-    let stream = crate::routes::support::sse_event_stream(rx);
-    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
 }

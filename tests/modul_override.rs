@@ -329,7 +329,7 @@ async fn etb_fixture(app: &axum::Router) -> (String, String, i64) {
 }
 
 #[tokio::test]
-async fn verstecktes_etb_blockt_mitglied_auf_get_stream_und_post() {
+async fn verstecktes_etb_blockt_mitglied_auf_get_und_post() {
     let app = setup().await;
     let (admin, frieda, eid) = etb_fixture(&app).await;
 
@@ -345,13 +345,10 @@ async fn verstecktes_etb_blockt_mitglied_auf_get_stream_und_post() {
         StatusCode::OK
     );
 
-    // GET, Stream und POST des versteckten Moduls → 403 (auch SSE-Bypass dicht).
+    // GET und POST des versteckten Moduls → 403. Der Live-Feed ist kein Gate mehr,
+    // sondern filtert (siehe versteckte_module_werden_aus_dem_live_feed_gefiltert).
     assert_eq!(
         get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/etb")).await,
-        StatusCode::FORBIDDEN
-    );
-    assert_eq!(
-        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/etb/stream")).await,
         StatusCode::FORBIDDEN
     );
     assert_eq!(
@@ -426,18 +423,6 @@ const MODUL_GET_PFADE: &[(&str, &str)] = &[
     ("lagekarte", "zonen"),
     ("lagekarte", "karte/fuehrungskraefte"),
     ("lagemeldungen", "lage/meldungen"),
-];
-
-/// Stream-Routen (SSE-Bypass-Schutz): bei verstecktem Modul → 403.
-const MODUL_STREAM_PFADE: &[(&str, &str)] = &[
-    ("fahrzeuge", "fahrzeuge/stream"),
-    ("personen", "personen/stream"),
-    ("tiere", "tiere/stream"),
-    ("schaeden", "schaeden/stream"),
-    ("unfallhilfsstellen", "uhs/stream"),
-    ("einheiten", "einheiten/stream"),
-    ("einsatzabschnitte", "abschnitte/stream"),
-    ("lagekarte", "zonen/stream"),
 ];
 
 /// Module ohne eigene daten-besitzende Backend-Routen (reine Aggregation/Sicht):
@@ -518,8 +503,31 @@ async fn alle_modul_gruppen_gegated_get_baseline_und_versteckt() {
     }
 }
 
+/// Liest den Anfang eines OFFENEN SSE-Streams: sammelt Frames, bis für `stille_ms`
+/// nichts mehr kommt. `to_bytes` scheidet aus — ein Live-Feed endet nie von selbst.
+async fn sse_anfang_lesen(body: axum::body::Body, stille_ms: u64) -> String {
+    use http_body_util::BodyExt;
+    let mut body = body;
+    let mut gelesen = String::new();
+    while let Ok(Some(Ok(frame))) = tokio::time::timeout(
+        std::time::Duration::from_millis(stille_ms),
+        std::pin::Pin::new(&mut body).frame(),
+    )
+    .await
+    {
+        if let Some(daten) = frame.data_ref() {
+            gelesen.push_str(&String::from_utf8_lossy(daten));
+        }
+    }
+    gelesen
+}
+
+/// **Der Kern von F01/LFH-227.** Früher gatete jede der 9 `…/stream`-Routen nur ihr
+/// eigenes Modul und leitete danach den kompletten Kanal weiter — wer irgendeine öffnen
+/// durfte, las ETB und Chat mit. Jetzt gibt es EINEN `/live`-Feed: die Verbindung steht
+/// (Lesezugriff genügt), aber Events gesperrter Module verlassen den Server nicht.
 #[tokio::test]
-async fn versteckte_module_blocken_stream_routen() {
+async fn versteckte_module_werden_aus_dem_live_feed_gefiltert() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_anlegen(&app, &admin, "Lage").await;
@@ -527,12 +535,283 @@ async fn versteckte_module_blocken_stream_routen() {
     rolle_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
     let frieda = login_cookie(&app, "frieda", "friedapw1").await;
 
-    for (key, suffix) in MODUL_STREAM_PFADE {
-        override_setzen(&app, &admin, eid, key, false, None).await;
-        assert_eq!(
-            get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/{suffix}")).await,
-            StatusCode::FORBIDDEN,
-            "verstecktes {key}: Stream {suffix} muss 403 sein (kein SSE-Bypass)"
+    // Frieda darf alles AUSSER ETB.
+    assert_eq!(
+        override_setzen(&app, &admin, eid, "etb", false, None).await,
+        StatusCode::OK
+    );
+
+    // Die Route selbst ist offen — das Gate wirkt nicht mehr am Verbindungsaufbau.
+    let feed = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/einsaetze/{eid}/live"))
+                .header(header::COOKIE, frieda.clone())
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        feed.status(),
+        StatusCode::OK,
+        "/live gatet auf Einsatz-, nicht auf Modul-Ebene"
+    );
+
+    // Admin erzeugt ein erlaubtes (person) und ein gesperrtes (etb) Event.
+    let person = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/einsaetze/{eid}/personen"))
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, admin.clone())
+                .body(Body::from(r#"{"name":"Muster","vorname":"Max"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(person.status(), StatusCode::CREATED);
+
+    let etb = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/api/einsaetze/{eid}/etb"))
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, admin.clone())
+                .body(Body::from(
+                    r#"{"typ":"meldung","inhalt":"Geheime Lagemeldung"}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(etb.status(), StatusCode::CREATED);
+
+    let gelesen = sse_anfang_lesen(feed.into_body(), 400).await;
+    assert!(
+        gelesen.contains("event: person"),
+        "erlaubtes Modul muss durchkommen, gelesen: {gelesen:?}"
+    );
+    assert!(
+        !gelesen.contains("event: etb"),
+        "gesperrtes ETB darf NICHT im Feed erscheinen, gelesen: {gelesen:?}"
+    );
+    assert!(
+        !gelesen.contains("Geheime Lagemeldung"),
+        "ETB-Volltext gehört nie in den Broadcast, gelesen: {gelesen:?}"
+    );
+}
+
+/// Öffnet `/live` für `cookie` und liefert die Response (Body bleibt offen).
+async fn live_oeffnen(
+    app: &axum::Router,
+    cookie: &str,
+    eid: i64,
+    last_event_id: Option<&str>,
+) -> axum::http::Response<axum::body::Body> {
+    let mut req = Request::builder()
+        .uri(format!("/api/einsaetze/{eid}/live"))
+        .header(header::COOKIE, cookie.to_string());
+    if let Some(id) = last_event_id {
+        req = req.header("last-event-id", id);
+    }
+    app.clone()
+        .oneshot(req.body(Body::empty()).unwrap())
+        .await
+        .unwrap()
+}
+
+/// POST mit Admin-Cookie; prüft nur, dass es geklappt hat.
+async fn admin_post(app: &axum::Router, admin: &str, pfad: &str, body: &str) {
+    let status = post_status(app, admin, pfad, body).await;
+    assert!(
+        status.is_success(),
+        "Vorbedingung fehlgeschlagen: POST {pfad} → {status}"
+    );
+}
+
+/// Die `id:`-Zeilen eines SSE-Ausschnitts (für den Reconnect-Test).
+fn sse_ids(roh: &str) -> Vec<String> {
+    roh.lines()
+        .filter_map(|z| z.strip_prefix("id: "))
+        .map(|s| s.trim().to_string())
+        .collect()
+}
+
+/// Der Modul-Filter muss die **Org-Default-Rollenschranke** genauso beachten wie einen
+/// Einsatz-Override — `erlaubte_module` lädt dieselben zwei Policy-Quellen wie der
+/// GET-Pfad (`fordere_modul_zugriff_laden`). Ohne diesen Test bliebe ein Weglassen der
+/// Org-Defaults (fail-open gegenüber dem GET) unbemerkt.
+#[tokio::test]
+async fn org_modul_default_wirkt_auch_im_live_feed() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+
+    // KEIN Einsatz-Override — nur der Org-Default sperrt ETB für Nicht-Führungskräfte.
+    assert_eq!(
+        org_default_setzen(&app, &admin, "etb", Some("fuehrungskraft")).await,
+        StatusCode::OK
+    );
+    // Gegenprobe: der GET-Pfad sperrt bereits.
+    assert_eq!(
+        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/etb")).await,
+        StatusCode::FORBIDDEN,
+        "Vorbedingung: Org-Default muss den GET sperren"
+    );
+
+    let feed = live_oeffnen(&app, &frieda, eid, None).await;
+    assert_eq!(feed.status(), StatusCode::OK);
+
+    admin_post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{eid}/personen"),
+        r#"{"name":"Muster","vorname":"Max"}"#,
+    )
+    .await;
+    admin_post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{eid}/etb"),
+        r#"{"typ":"meldung","inhalt":"Nur fuer Fuehrungskraefte"}"#,
+    )
+    .await;
+
+    let gelesen = sse_anfang_lesen(feed.into_body(), 400).await;
+    assert!(
+        gelesen.contains("event: person"),
+        "erlaubtes Modul muss durchkommen: {gelesen:?}"
+    );
+    assert!(
+        !gelesen.contains("event: etb"),
+        "Org-Default muss den Live-Feed genauso sperren wie den GET: {gelesen:?}"
+    );
+}
+
+/// Der Reconnect-Pfad (`Last-Event-ID` → Replay-Prefix) muss denselben Filter tragen wie
+/// der Live-Tail — sonst wäre ein simpler Reconnect der Bypass des ganzen Gates.
+#[tokio::test]
+async fn reconnect_replay_wird_ebenfalls_gefiltert() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    assert_eq!(
+        override_setzen(&app, &admin, eid, "etb", false, None).await,
+        StatusCode::OK
+    );
+
+    // Der LiveHub räumt einen Kanal ab, sobald sein LETZTER Empfänger weg ist (inkl.
+    // Replay-Ring). Eine offen gehaltene Admin-Verbindung hält ihn am Leben, damit
+    // Friedas Trennung wirklich nur eine Trennung ist — sonst wäre der Replay leer und
+    // der Test bewiese nichts.
+    let _halter = live_oeffnen(&app, &admin, eid, None).await;
+
+    // Erste Verbindung: ein erlaubtes Event, um eine gültige Event-Id zu bekommen.
+    let erste = live_oeffnen(&app, &frieda, eid, None).await;
+    admin_post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{eid}/personen"),
+        r#"{"name":"Erste","vorname":"Person"}"#,
+    )
+    .await;
+    let anfang = sse_anfang_lesen(erste.into_body(), 400).await;
+    let ids = sse_ids(&anfang);
+    let letzte_id = ids.last().expect("erste Verbindung muss eine id liefern");
+
+    // Während der „Trennung": ein gesperrtes und ein erlaubtes Event.
+    admin_post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{eid}/etb"),
+        r#"{"typ":"meldung","inhalt":"Verpasst und geheim"}"#,
+    )
+    .await;
+    admin_post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{eid}/personen"),
+        r#"{"name":"Zweite","vorname":"Person"}"#,
+    )
+    .await;
+
+    // Reconnect mit Last-Event-ID → Replay der verpassten Nachrichten.
+    let zweite = live_oeffnen(&app, &frieda, eid, Some(letzte_id)).await;
+    assert_eq!(zweite.status(), StatusCode::OK);
+    let nachgeliefert = sse_anfang_lesen(zweite.into_body(), 400).await;
+
+    assert!(
+        nachgeliefert.contains("event: person"),
+        "verpasstes erlaubtes Event muss nachgeliefert werden: {nachgeliefert:?}"
+    );
+    assert!(
+        !nachgeliefert.contains("event: etb"),
+        "Replay-Prefix muss gefiltert sein, sonst ist Reconnect der Bypass: {nachgeliefert:?}"
+    );
+    assert!(
+        !nachgeliefert.contains("Verpasst und geheim"),
+        "kein Volltext im Replay: {nachgeliefert:?}"
+    );
+}
+
+/// Die Payloads sind ID-only — für ETB UND Chat. Der Broadcast geht an jeden Abonnenten
+/// des Einsatzes; Inhalt und Autorname gehören hinter den modul-gegateten GET.
+#[tokio::test]
+async fn live_payloads_tragen_keinen_klartext() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+
+    let feed = live_oeffnen(&app, &admin, eid, None).await;
+    assert_eq!(feed.status(), StatusCode::OK);
+
+    admin_post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{eid}/etb"),
+        r#"{"typ":"meldung","inhalt":"ETB-Klartext-Kanarienvogel","von":"Absender-Kanarienvogel"}"#,
+    )
+    .await;
+    admin_post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{eid}/chat/kanaele"),
+        r#"{"name":"Lagekanal"}"#,
+    )
+    .await;
+    admin_post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{eid}/chat/kanaele/1/nachrichten"),
+        r#"{"inhalt":"Chat-Klartext-Kanarienvogel"}"#,
+    )
+    .await;
+
+    let gelesen = sse_anfang_lesen(feed.into_body(), 500).await;
+    assert!(
+        gelesen.contains("event: etb") && gelesen.contains("event: chat"),
+        "beide Events müssen ankommen (sonst prüft der Test nichts): {gelesen:?}"
+    );
+    for kanarienvogel in [
+        "ETB-Klartext-Kanarienvogel",
+        "Absender-Kanarienvogel",
+        "Chat-Klartext-Kanarienvogel",
+    ] {
+        assert!(
+            !gelesen.contains(kanarienvogel),
+            "{kanarienvogel:?} darf den Server nicht über den Broadcast verlassen: {gelesen:?}"
         );
     }
 }

@@ -96,7 +96,7 @@ describe('useEinsatzLiveStream', () => {
     });
   });
 
-  it('invalidiert einsatz-personal bei person-Event', async () => {
+  it('invalidiert einsatz-personal bei personal-Event (nicht bei person)', async () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const client = neuerQueryClient();
     const spy = vi.spyOn(client, 'invalidateQueries');
@@ -105,11 +105,16 @@ describe('useEinsatzLiveStream', () => {
         <Probe id={1} />
       </QueryClientProvider>,
     );
-    FakeEventSource.letzte?.emit('person');
+    // F01/LFH-227: `personal` (Dispositionen) und `person` (betroffene Personen) sind
+    // getrennte Wire-Events — nur so kann das Backend die zwei Module getrennt gaten.
+    FakeEventSource.letzte?.emit('personal');
     await waitFor(() => {
       const keys = spy.mock.calls.map((c) => (c[0] as { queryKey: string[] }).queryKey[0]);
       expect(keys).toContain('einsatz-personal');
     });
+    expect(
+      spy.mock.calls.map((c) => (c[0] as { queryKey: string[] }).queryKey[0]),
+    ).not.toContain('einsatz-personen');
   });
 
   it('invalidiert gefahrenmatrix bei gefahr-Event', async () => {

@@ -133,11 +133,7 @@ pub async fn anlegen(
 
     // ETB-Anordnung wurde im selben Commit erzeugt → ETB-Live-Event mitschicken.
     if let Some(etb_id) = d.auftrag.etb_anordnung_id {
-        if let Ok(etb) = crate::etb::repo::laden(&state.pool, etb_id).await {
-            if let Ok(json) = serde_json::to_string(&etb) {
-                state.live.publiziere(einsatz_id, json);
-            }
-        }
+        state.live.publiziere(einsatz_id, etb_id);
     }
     sse(&state, einsatz_id);
     Ok((StatusCode::CREATED, Json(d)))
@@ -247,11 +243,7 @@ pub async fn vollzug(
                 &now,
             )
             .await?;
-            if let Ok(etb) = crate::etb::repo::laden(&state.pool, etb_id).await {
-                if let Ok(json) = serde_json::to_string(&etb) {
-                    state.live.publiziere(einsatz_id, json);
-                }
-            }
+            state.live.publiziere(einsatz_id, etb_id);
         }
         _ => return Err(AppError::Validation("Ungültiger Vollzug-Status".into())),
     }

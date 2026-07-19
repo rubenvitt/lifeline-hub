@@ -14,11 +14,8 @@ use crate::lage_zone::{self, LageZoneAnzeige};
 use crate::routes::support::trimme;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::Json;
 use serde::Deserialize;
-use std::convert::Infallible;
-use tokio_stream::Stream;
 
 /// SSE-Notify (Lage-Karte): eine Zone hat sich geändert. Event-Tag `lage_zone`.
 fn sse_zone(state: &AppState, einsatz_id: i64, zid: i64) {
@@ -352,28 +349,4 @@ pub async fn aufloesen(
     }
     sse_zone(&state, einsatz_id, zid);
     Ok(StatusCode::NO_CONTENT)
-}
-
-/// GET /api/einsaetze/{id}/zonen/stream — SSE (ganzer Einsatz-Kanal). Nur Lesezugriff;
-/// das Frontend filtert per Event-Name (`lage_zone`).
-pub async fn stream(
-    State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
-) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-
-    let rx = state.live.abonniere(einsatz_id);
-    let stream = crate::routes::support::sse_event_stream(rx);
-    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
 }

@@ -61,19 +61,26 @@ where
 /// Baut den SSE-Ausgabe-Stream aus einem Live-Kanal-Empfänger: jede `LiveNachricht` wird zu
 /// einem benannten SSE-Event; ein übergelaufener (lagged) Empfänger erhält ein
 /// `lagged`/`resync`-Signal statt eines Stream-Abbruchs — der Client resynct dann per GET.
+///
+/// `erlaubt` ist der per-Abonnent-Modul-Filter (F01/LFH-227): der LiveHub bleibt ein
+/// auth-freier Dumb-Transport, die Modul-Berechtigung wirkt hier — pro Verbindung.
+/// Kontroll-Events (lagged/resync) passieren immer, sonst hinge der Resync.
 pub fn sse_event_stream(
     rx: Receiver<LiveNachricht>,
+    erlaubt: impl Fn(LiveEvent) -> bool,
 ) -> impl Stream<Item = Result<Event, Infallible>> {
-    BroadcastStream::new(rx).map(|res| {
-        let event = match res {
-            // `.id(...)` setzt die SSE-`id:`-Zeile → der Browser schickt sie beim
-            // Auto-Reconnect als `Last-Event-ID` zurück (F14/LFH-263).
-            Ok(n) => Event::default().id(n.id).event(n.event).data(n.data),
-            Err(_) => Event::default()
-                .event(LiveEvent::Lagged.as_str())
-                .data("resync"),
-        };
-        Ok::<Event, Infallible>(event)
+    BroadcastStream::new(rx).filter_map(move |res| match res {
+        // Nicht erlaubtes Modul → die Nachricht verlässt den Server nicht.
+        Ok(n) if !erlaubt(n.event) => None,
+        // `.id(...)` setzt die SSE-`id:`-Zeile → der Browser schickt sie beim
+        // Auto-Reconnect als `Last-Event-ID` zurück (F14/LFH-263).
+        Ok(n) => Some(Ok(Event::default()
+            .id(n.id)
+            .event(n.event.as_str())
+            .data(n.data))),
+        Err(_) => Some(Ok(Event::default()
+            .event(LiveEvent::Lagged.as_str())
+            .data("resync"))),
     })
 }
 
@@ -90,21 +97,30 @@ pub fn last_event_id(headers: &HeaderMap) -> Option<String> {
 /// Nachrichten (`Replay::Events`) werden VOR dem Live-Kanal ausgeliefert; eine `Luecke`
 /// (Ring-Overflow / Neustart) sendet genau ein `lagged`/`resync`-Signal (Client resynct per
 /// GET); ohne Replay (`Keine`) nur der Live-Kanal.
+/// Der Modul-Filter `erlaubt` greift auf BEIDEN Wegen — Replay-Prefix und Live-Tail.
+/// Sonst wäre ein Reconnect mit `Last-Event-ID` ein Bypass des Gates (F01/LFH-227).
 pub fn sse_stream_mit_replay(
     replay: Replay,
     rx: Receiver<LiveNachricht>,
+    erlaubt: impl Fn(LiveEvent) -> bool,
 ) -> impl Stream<Item = Result<Event, Infallible>> {
     let prefix: Vec<Result<Event, Infallible>> = match replay {
         Replay::Keine => Vec::new(),
         Replay::Events(nachrichten) => nachrichten
             .into_iter()
-            .map(|n| Ok(Event::default().id(n.id).event(n.event).data(n.data)))
+            .filter(|n| erlaubt(n.event))
+            .map(|n| {
+                Ok(Event::default()
+                    .id(n.id)
+                    .event(n.event.as_str())
+                    .data(n.data))
+            })
             .collect(),
         Replay::Luecke => vec![Ok(Event::default()
             .event(LiveEvent::Lagged.as_str())
             .data("resync"))],
     };
-    tokio_stream::iter(prefix).chain(sse_event_stream(rx))
+    tokio_stream::iter(prefix).chain(sse_event_stream(rx, erlaubt))
 }
 
 #[cfg(test)]
@@ -177,34 +193,90 @@ mod tests {
         assert_eq!(last_event_id(&h), Some("42-7".to_string()));
     }
 
+    /// Sender fallen lassen → der Live-Kanal endet sofort, wir sehen nur das Prefix.
+    fn leerer_rx() -> Receiver<LiveNachricht> {
+        let (tx, rx) = tokio::sync::broadcast::channel::<LiveNachricht>(4);
+        drop(tx);
+        rx
+    }
+
+    fn nachricht(id: &str, event: LiveEvent) -> LiveNachricht {
+        LiveNachricht {
+            id: id.into(),
+            event,
+            data: "x".into(),
+        }
+    }
+
+    /// Filter, der alles durchlässt (für die Tests der Replay-Mechanik).
+    fn alles(_: LiveEvent) -> bool {
+        true
+    }
+
     #[tokio::test]
     async fn sse_stream_mit_replay_praefixt_nach_replay_art() {
-        // Sender fallen lassen → der Live-Kanal endet sofort, wir sehen nur das Prefix.
-        fn leerer_rx() -> Receiver<LiveNachricht> {
-            let (tx, rx) = tokio::sync::broadcast::channel::<LiveNachricht>(4);
-            drop(tx);
-            rx
-        }
-        let n = |id: &str| LiveNachricht {
-            id: id.into(),
-            event: "etb".into(),
-            data: "x".into(),
-        };
+        let n = |id: &str| nachricht(id, LiveEvent::Etb);
 
-        let keine: Vec<_> = sse_stream_mit_replay(Replay::Keine, leerer_rx())
+        let keine: Vec<_> = sse_stream_mit_replay(Replay::Keine, leerer_rx(), alles)
             .collect()
             .await;
         assert_eq!(keine.len(), 0, "Keine → kein Prefix");
 
         let events: Vec<_> =
-            sse_stream_mit_replay(Replay::Events(vec![n("1-1"), n("1-2")]), leerer_rx())
+            sse_stream_mit_replay(Replay::Events(vec![n("1-1"), n("1-2")]), leerer_rx(), alles)
                 .collect()
                 .await;
         assert_eq!(events.len(), 2, "Events → je verpasste Nachricht ein Event");
 
-        let luecke: Vec<_> = sse_stream_mit_replay(Replay::Luecke, leerer_rx())
+        let luecke: Vec<_> = sse_stream_mit_replay(Replay::Luecke, leerer_rx(), alles)
             .collect()
             .await;
         assert_eq!(luecke.len(), 1, "Luecke → genau ein lagged/resync-Event");
+    }
+
+    /// F01/LFH-227: der Modul-Filter muss den **Replay-Prefix** genauso greifen wie den
+    /// Live-Tail — sonst wäre ein Reconnect mit `Last-Event-ID` der Bypass des Gates.
+    #[tokio::test]
+    async fn replay_prefix_wird_gefiltert() {
+        let verpasst = vec![
+            nachricht("1-1", LiveEvent::Etb),
+            nachricht("1-2", LiveEvent::Chat),
+            nachricht("1-3", LiveEvent::Etb),
+        ];
+        let nur_etb: Vec<_> = sse_stream_mit_replay(Replay::Events(verpasst), leerer_rx(), |ev| {
+            ev == LiveEvent::Etb
+        })
+        .collect()
+        .await;
+        assert_eq!(
+            nur_etb.len(),
+            2,
+            "nur die etb-Nachrichten dürfen im Replay ankommen"
+        );
+    }
+
+    /// Ein `Luecke`-Resync ist ein Kontroll-Event: es passiert auch einen Filter,
+    /// der jedes Fach-Modul verbietet — sonst hinge der Client im Stale-Zustand.
+    #[tokio::test]
+    async fn lagged_kontroll_event_passiert_jeden_filter() {
+        let luecke: Vec<_> = sse_stream_mit_replay(Replay::Luecke, leerer_rx(), |_| false)
+            .collect()
+            .await;
+        assert_eq!(luecke.len(), 1, "lagged/resync muss immer durchgehen");
+    }
+
+    /// Der Live-Tail filtert ebenfalls — hier über den echten Broadcast-Kanal.
+    #[tokio::test]
+    async fn live_tail_wird_gefiltert() {
+        let (tx, rx) = tokio::sync::broadcast::channel::<LiveNachricht>(8);
+        tx.send(nachricht("1-1", LiveEvent::Chat)).unwrap();
+        tx.send(nachricht("1-2", LiveEvent::Etb)).unwrap();
+        tx.send(nachricht("1-3", LiveEvent::Chat)).unwrap();
+        drop(tx);
+
+        let nur_chat: Vec<_> = sse_event_stream(rx, |ev| ev == LiveEvent::Chat)
+            .collect()
+            .await;
+        assert_eq!(nur_chat.len(), 2, "nur die chat-Nachrichten dürfen durch");
     }
 }

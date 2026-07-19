@@ -27,11 +27,22 @@ fn sse_chat(state: &AppState, einsatz_id: i64, data: String) {
         .publiziere_event(einsatz_id, LiveEvent::Chat, data);
 }
 
-/// Serialisiert eine Anzeige für den Live-Push; bei Serialisierungsfehler wird
-/// ein minimales Fallback-Event gesendet (das Frontend invalidiert ohnehin nur).
-fn als_json<T: serde::Serialize>(wert: &T, einsatz_id: i64) -> String {
-    serde_json::to_string(wert)
-        .unwrap_or_else(|_| serde_json::json!({ "einsatz_id": einsatz_id }).to_string())
+/// Live-Payload einer Chat-Nachricht — **ID-only** (F01/LFH-227). Vorher ging die
+/// komplette `ChatNachrichtAnzeige` (inkl. `inhalt` und `autor_name`) über den
+/// einsatzweiten Broadcast; der Inhalt gehört hinter den `chat`-GET, der die
+/// Modul-Berechtigung prüft. Das Frontend invalidiert ohnehin nur.
+fn nachricht_ids(n: &ChatNachrichtAnzeige) -> String {
+    serde_json::json!({
+        "einsatz_id": n.einsatz_id,
+        "kanal_id": n.kanal_id,
+        "nachricht_id": n.id,
+    })
+    .to_string()
+}
+
+/// Live-Payload eines Chat-Kanals — ID-only, siehe [`nachricht_ids`].
+fn kanal_ids(einsatz_id: i64, kanal_id: i64) -> String {
+    serde_json::json!({ "einsatz_id": einsatz_id, "kanal_id": kanal_id }).to_string()
 }
 
 // ---- Kanäle ----
@@ -98,7 +109,7 @@ pub async fn kanal_anlegen(
 
     let kanal =
         repo::kanal_anlegen(&state.pool, einsatz_id, benutzer.id, name, beschreibung).await?;
-    sse_chat(&state, einsatz_id, als_json(&kanal, einsatz_id));
+    sse_chat(&state, einsatz_id, kanal_ids(einsatz_id, kanal.id));
     Ok((StatusCode::CREATED, Json(kanal)))
 }
 
@@ -205,7 +216,7 @@ pub async fn nachricht_erfassen(
         &anhang_ids,
     )
     .await?;
-    sse_chat(&state, einsatz_id, als_json(&nachricht, einsatz_id));
+    sse_chat(&state, einsatz_id, nachricht_ids(&nachricht));
     Ok((StatusCode::CREATED, Json(nachricht)))
 }
 
@@ -257,7 +268,7 @@ pub async fn nachricht_bearbeiten(
         ));
     }
     let nachricht = repo::bearbeiten(&state.pool, nachricht_id, inhalt).await?;
-    sse_chat(&state, einsatz_id, als_json(&nachricht, einsatz_id));
+    sse_chat(&state, einsatz_id, nachricht_ids(&nachricht));
     Ok(Json(nachricht))
 }
 
@@ -315,7 +326,7 @@ pub async fn bezug_setzen(
         .ok_or_else(|| AppError::Validation("Ungültiger Bezug-Typ".into()))?;
     let nachricht =
         repo::bezug_setzen(&state.pool, einsatz_id, nachricht_id, typ, req.ziel_id).await?;
-    sse_chat(&state, einsatz_id, als_json(&nachricht, einsatz_id));
+    sse_chat(&state, einsatz_id, nachricht_ids(&nachricht));
     Ok(Json(nachricht))
 }
 
@@ -344,7 +355,7 @@ pub async fn bezug_loeschen(
     }
 
     let nachricht = repo::bezug_loesen(&state.pool, nachricht_id).await?;
-    sse_chat(&state, einsatz_id, als_json(&nachricht, einsatz_id));
+    sse_chat(&state, einsatz_id, nachricht_ids(&nachricht));
     Ok(Json(nachricht))
 }
 
@@ -415,13 +426,9 @@ pub async fn heraufstufen(
     .await?;
 
     // Beide Events publizieren (wie lagebericht::freigeben): ETB-Eintrag + Chat-Update.
-    if let Ok(etb_anzeige) = crate::etb::repo::laden(&state.pool, etb_id).await {
-        if let Ok(json) = serde_json::to_string(&etb_anzeige) {
-            state.live.publiziere(einsatz_id, json);
-        }
-    }
+    state.live.publiziere(einsatz_id, etb_id);
     let nachricht = repo::laden(&state.pool, nachricht_id).await?;
-    sse_chat(&state, einsatz_id, als_json(&nachricht, einsatz_id));
+    sse_chat(&state, einsatz_id, nachricht_ids(&nachricht));
     Ok(Json(nachricht))
 }
 
@@ -468,11 +475,7 @@ pub async fn heraufstufen_auftrag(
     // ETB-Anordnung entstand im selben Commit → ETB-Live-Event + Auftrag-Board aktualisieren.
     if let Ok(detail) = crate::auftrag::repo::laden(&state.pool, auftrag_id, &now).await {
         if let Some(etb_id) = detail.auftrag.etb_anordnung_id {
-            if let Ok(etb) = crate::etb::repo::laden(&state.pool, etb_id).await {
-                state
-                    .live
-                    .publiziere(einsatz_id, als_json(&etb, einsatz_id));
-            }
+            state.live.publiziere(einsatz_id, etb_id);
         }
     }
     state.live.publiziere_event(
@@ -481,6 +484,6 @@ pub async fn heraufstufen_auftrag(
         serde_json::json!({ "einsatz_id": einsatz_id }).to_string(),
     );
     let nachricht = repo::laden(&state.pool, nachricht_id).await?;
-    sse_chat(&state, einsatz_id, als_json(&nachricht, einsatz_id));
+    sse_chat(&state, einsatz_id, nachricht_ids(&nachricht));
     Ok((StatusCode::CREATED, Json(nachricht)))
 }

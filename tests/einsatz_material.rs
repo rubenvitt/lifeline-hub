@@ -599,7 +599,7 @@ async fn reine_bemerkung_publiziert_material_event() {
     let nachricht = rx
         .try_recv()
         .expect("ein Live-Event nach der Material-Mutation erwartet");
-    assert_eq!(nachricht.event, "material");
+    assert_eq!(nachricht.event.as_str(), "material");
     let data: Value = serde_json::from_str(&nachricht.data).unwrap();
     assert_eq!(data["einsatz_id"], einsatz);
     assert_eq!(data["material_id"], em);
@@ -646,7 +646,7 @@ async fn material_an_einheit_zuordnen_publiziert_material_event() {
         events.push(n.event);
     }
     assert!(
-        events.iter().any(|e| e == "material"),
+        events.iter().any(|e| e.as_str() == "material"),
         "erwartete ein material-Event, bekam: {events:?}"
     );
 }

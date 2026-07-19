@@ -16,11 +16,8 @@ use crate::fahrzeug::EinsatzFahrzeugAnzeige;
 use crate::routes::support::trimme;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::Json;
 use serde::Deserialize;
-use std::convert::Infallible;
-use tokio_stream::Stream;
 
 /// SSE-Notify (Lage-Karte): Fahrzeug-Disposition hat sich geändert.
 fn sse_fahrzeug(state: &AppState, einsatz_id: i64, ef_id: i64) {
@@ -30,13 +27,13 @@ fn sse_fahrzeug(state: &AppState, einsatz_id: i64, ef_id: i64) {
         .publiziere_event(einsatz_id, LiveEvent::Fahrzeug, data);
 }
 
-/// SSE-Notify (Lage-Karte): betroffene Person aktualisieren (z.B. bei Besatzungs-Zuordnung/
-/// -Freigabe). Lokaler Spiegel von `routes::einsatz_personal::sse_personal` (Tag `person`).
+/// SSE-Notify: disponierte Einsatzkraft aktualisieren (z.B. bei Besatzungs-Zuordnung/
+/// -Freigabe). Lokaler Spiegel von `routes::einsatz_personal::sse_personal` (Tag `personal`).
 fn sse_personal(state: &AppState, einsatz_id: i64, ep_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "person_id": ep_id }).to_string();
+    let data = serde_json::json!({ "einsatz_id": einsatz_id, "personal_id": ep_id }).to_string();
     state
         .live
-        .publiziere_event(einsatz_id, LiveEvent::Person, data);
+        .publiziere_event(einsatz_id, LiveEvent::Personal, data);
 }
 
 /// GET /api/einsaetze/{id}/fahrzeuge — disponierte Fahrzeuge (aufgelöst). Nur Mitglieder/höhere Berechtigung.
@@ -495,28 +492,4 @@ pub async fn position(
     .await?;
     sse_fahrzeug(&state, einsatz_id, ef_id);
     Ok(Json(nachher))
-}
-
-/// GET /api/einsaetze/{id}/fahrzeuge/stream — SSE-Stream (ganzer Einsatz-Kanal).
-/// Nur Lesezugriff; das Frontend filtert per Event-Name (`fahrzeug`).
-pub async fn stream(
-    State(state): State<AppState>,
-    CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
-) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, AppError> {
-    let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
-    let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
-    fordere_lesezugriff(&benutzer, &einsatz, rolle)?;
-    fordere_modul_zugriff_laden(
-        &state.pool,
-        einsatz_id,
-        einsatz.org_id,
-        MODUL_KEY,
-        &benutzer,
-    )
-    .await?;
-
-    let rx = state.live.abonniere(einsatz_id);
-    let stream = crate::routes::support::sse_event_stream(rx);
-    Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
 }

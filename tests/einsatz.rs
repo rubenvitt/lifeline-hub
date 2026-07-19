@@ -1323,7 +1323,7 @@ async fn geloescht_at_tombstone_sperrt_detail_export_stream_403() {
     for uri in [
         format!("/api/einsaetze/{id}"),
         format!("/api/einsaetze/{id}/personen/export"),
-        format!("/api/einsaetze/{id}/personen/stream"),
+        format!("/api/einsaetze/{id}/live"),
     ] {
         let resp = app
             .clone()
