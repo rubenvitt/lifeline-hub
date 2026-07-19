@@ -1,6 +1,7 @@
 use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
 use crate::error::AppError;
+use crate::extract::JsonBody;
 use crate::personal::repo::{self, PersonalDaten};
 use crate::personal::{PersonalAnzeige, PersonalVorschlaege};
 use crate::routes::support::trimme;
@@ -105,7 +106,7 @@ pub async fn vorschlaege(
 pub async fn anlegen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
-    Json(body): Json<PersonalBody>,
+    JsonBody(body): JsonBody<PersonalBody>,
 ) -> Result<(StatusCode, Json<PersonalAnzeige>), AppError> {
     let n = normalisiere(body)?;
     let p = repo::anlegen(
@@ -124,7 +125,7 @@ pub async fn aktualisieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
     Path(id): Path<i64>,
-    Json(body): Json<PersonalBody>,
+    JsonBody(body): JsonBody<PersonalBody>,
 ) -> Result<Json<PersonalAnzeige>, AppError> {
     let n = normalisiere(body)?;
     repo::aktualisiere(

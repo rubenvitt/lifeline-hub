@@ -17,6 +17,7 @@ use crate::einsatz::einstellungen::{
 };
 use crate::einsatz::modul::{ist_gueltige_benoetigte_rolle, ist_gueltiger_modul_key};
 use crate::error::AppError;
+use crate::extract::JsonBody;
 use crate::org::einstellungen::{self, OrgEinstellungenAnzeige, OrgEinstellungenDaten};
 use crate::org::modul_einstellung;
 use axum::extract::{Path, State};
@@ -67,7 +68,7 @@ pub async fn lesen(
 pub async fn setzen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
-    Json(req): Json<OrgEinstellungenUpdate>,
+    JsonBody(req): JsonBody<OrgEinstellungenUpdate>,
 ) -> Result<Json<OrgEinstellungenAnzeige>, AppError> {
     // Anzeige-Konventionen: bereinigen + Whitelist (400 bei Fehler).
     let zeitzone = bereinige(req.zeitzone);
@@ -206,7 +207,7 @@ pub async fn modul_einstellung_setzen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
     Path(modul_key): Path<String>,
-    Json(req): Json<ModulRolleUpdate>,
+    JsonBody(req): JsonBody<ModulRolleUpdate>,
 ) -> Result<(), AppError> {
     // Modul-Key validieren (400 bei unbekanntem Key).
     if !ist_gueltiger_modul_key(&modul_key) {

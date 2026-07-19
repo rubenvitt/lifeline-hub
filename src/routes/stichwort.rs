@@ -1,6 +1,7 @@
 use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
 use crate::error::AppError;
+use crate::extract::JsonBody;
 use crate::stichwort::{self, StichwortVorschlag};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -26,7 +27,7 @@ pub struct NeuerVorschlag {
 pub async fn anlegen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
-    Json(req): Json<NeuerVorschlag>,
+    JsonBody(req): JsonBody<NeuerVorschlag>,
 ) -> Result<(StatusCode, Json<StichwortVorschlag>), AppError> {
     let text = req.text.trim();
     if text.is_empty() {

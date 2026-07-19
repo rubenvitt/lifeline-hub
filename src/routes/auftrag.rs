@@ -4,6 +4,7 @@ use crate::einsatz::einstellungen;
 use crate::einsatz::kontext::{EinsatzKontext, EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Auftraege;
 use crate::error::AppError;
+use crate::extract::JsonBody;
 use crate::live::LiveEvent;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -87,7 +88,7 @@ fn auftrag_default_quittierung_frist_min(
 pub async fn anlegen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Auftraege>,
-    Json(req): Json<NeuerAuftrag>,
+    JsonBody(req): JsonBody<NeuerAuftrag>,
 ) -> Result<(StatusCode, Json<AuftragDetail>), AppError> {
     let einsatz_id = ctx.einsatz.id;
 
@@ -197,7 +198,7 @@ pub async fn vollzug(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Auftraege>,
     Path((einsatz_id, auftrag_id)): Path<(i64, i64)>,
-    Json(req): Json<VollzugReq>,
+    JsonBody(req): JsonBody<VollzugReq>,
 ) -> Result<Json<AuftragDetail>, AppError> {
     let org_id = gehoert_pruefen(&state, &ctx, auftrag_id).await?;
     let now = jetzt();

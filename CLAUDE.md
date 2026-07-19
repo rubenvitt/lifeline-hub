@@ -97,3 +97,50 @@ still). Der reine No-op-/Fehlkonfig-Stub (`#[cfg(not(feature = "clamav"))]`) lä
 **`cargo test --no-default-features`** — wer `src/anhang/mod.rs`/`clamd_scan` anfasst, sollte
 beide fahren. Der Scan-Wiring-Test (`tests/karte_hintergrundbild_scan.rs`) übt gegen
 `127.0.0.1:1` (ECONNREFUSED) in BEIDEN Builds den fail-closed-503-Pfad. Es gibt kein CI.
+
+## Backend — Statuscode-Konvention (LFH-267/F22)
+
+Die in `src/error.rs` dokumentierte Konvention ist **verbindlich**. Beim Anfassen einer Route
+gilt sie; ein Sweep über den Bestand läuft separat (F22 Teil B).
+
+| Code | `AppError`-Variante | Wann |
+|---|---|---|
+| **400** | `Validation` | Eingabe ist **formal** ungültig: kaputtes JSON, falscher Feldtyp, **unbekannter Enum-Wert** (Body *und* Query-Filter), strukturell fehlendes Pflichtfeld |
+| **422** | `UnprocessableEntity` | Body ist formal gültig, aber der **Zustand oder die Feld-Kombination** verbietet die Aktion: leeres Pflichtfeld, XOR-verletzende Kombination, **ungültiger Status-Übergang** |
+| **409** | `Conflict` | **Nebenläufigkeit** oder **Lebenszyklus**: CAS-/Sperrkonflikt, storniertes Objekt |
+
+Trennlinie 400 ↔ 422 an einem Beispiel: ein **fehlendes** Pflichtfeld scheitert am Extractor
+(serde, kein `#[serde(default)]`) → **400**; ein **vorhandenes, aber leeres** Feld scheitert an
+der Handler-Validierung → **422**. So macht es der Code seit dem `JsonBody`-Wrapper von selbst —
+es braucht keine Reklassifizierung. Referenz: `tests/freies_zeichen.rs`
+(`fehlendes_grundzeichen_ist_400` vs. `leeres_grundzeichen_ist_422`).
+
+**409 hat ZWEI Quellen, die nicht verschmelzen dürfen** (Ursache des LFH-299/300-Fehlers):
+
+1. **CAS / optimistisches Lock** — `basis_geaendert_at` passt nicht (`schaden/repo.rs`,
+   `tier/repo.rs`). Das Frontend bietet hier einen Überschreiben-Dialog an.
+2. **Lebenszyklus / Storno** — das Objekt ist storniert o. ä. (`einsatz_schaden.rs`).
+   Ein Überschreiben-Dialog ist hier **sinnlos** und führt in eine Endlosschleife.
+
+Die Unterscheidung ist im Frontend heute nur **Heuristik**, kein Vertrag: `istKonflikt`
+(`frontend/src/api/client.ts`) prüft bloß `status === 409`; getrennt wird erst über den
+`!v.overwrite`-Zweig in `SchaedenDetailPage.tsx` / `TiereDetailPage.tsx`. **Wer einen neuen
+409 in einer Route mit CAS-Dialog einführt, muss diesen Zweig mitziehen** — sonst läuft die
+Seite wieder in „Überschreiben?"-Schleifen. Ein maschinenlesbarer Fehler-Code im `{error}`-Body
+wäre die saubere Lösung und ist bewusst vertagt.
+
+**Bekannte Abweichung, NICHT als Norm übernehmen:** `einsatz_schaden.rs` liefert für einen
+ungültigen Status-Übergang (`darf_uebergehen`) **409** statt 422. Die Mehrheit
+(`einsatz_person.rs`, `einsatz_tier.rs`, `nachforderung.rs`) macht es richtig mit 422;
+die Angleichung gehört in F22 Teil B.
+
+**Sicherheitsnetz (LFH-245):** nicht vorab abgefangene DB-Constraint-Verletzungen bekommen in
+`AppError::status()` automatisch einen fachlichen Code — UNIQUE/FK → **409**, CHECK → **422**,
+statt eines nackten 500. Per-Handler-Prechecks bleiben für präzise Meldungen zuständig.
+
+**Extractor-Vertrag:** Handler nehmen Request-Bodies **ausschließlich** über
+`crate::extract::JsonBody` entgegen, nie über `axum::Json` — nur so folgt auch eine
+Deserialisierungs-Rejection dem `{error}`-JSON-Format. `axum::Json` bleibt für **Responses**
+richtig. Erzwungen von `tests/json_extractor_guard.rs`; querschnittliche Fehlerfälle
+(405, unbekannter API-Pfad, kaputter Body) deckt `tests/fehler_vertrag.rs` ab.
+Noch offen (Teil B): `Path`-Rejections antworten weiterhin `text/plain`.

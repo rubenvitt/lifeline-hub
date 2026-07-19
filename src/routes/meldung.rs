@@ -3,6 +3,7 @@ use crate::einsatz::kontext::{EinsatzKontext, EinsatzLesezugriff, EinsatzSchreib
 use crate::einsatz::modul::{Lagemeldungen, Meldungen};
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
+use crate::extract::JsonBody;
 use crate::live::LiveEvent;
 use crate::meldung::{
     repo, MeldungAnzeige, ART_SOFORTMELDUNG, ART_SONSTIGE, BESTAETIGUNG_FRIST_DEFAULT_MIN,
@@ -116,7 +117,7 @@ pub struct NeueMeldung {
 pub async fn anlegen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Meldungen>,
-    Json(req): Json<NeueMeldung>,
+    JsonBody(req): JsonBody<NeueMeldung>,
 ) -> Result<(StatusCode, Json<MeldungAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
 
@@ -275,7 +276,7 @@ pub async fn status(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Meldungen>,
     Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
-    Json(req): Json<StatusReq>,
+    JsonBody(req): JsonBody<StatusReq>,
 ) -> Result<Json<MeldungAnzeige>, AppError> {
     gehoert_pruefen(&state, &ctx, meldung_id).await?;
     let status = req.status.trim();
@@ -330,7 +331,7 @@ pub async fn zuweisen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Meldungen>,
     Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
-    Json(req): Json<ZuweisenReq>,
+    JsonBody(req): JsonBody<ZuweisenReq>,
 ) -> Result<Json<MeldungAnzeige>, AppError> {
     gehoert_pruefen(&state, &ctx, meldung_id).await?;
     // Bearbeiter (falls gesetzt) muss Einsatz-Mitglied sein (Cross-Einsatz-Schutz).
@@ -362,7 +363,7 @@ pub async fn lagerelevant(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Meldungen>,
     Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
-    Json(req): Json<LagerelevantReq>,
+    JsonBody(req): JsonBody<LagerelevantReq>,
 ) -> Result<Json<MeldungAnzeige>, AppError> {
     gehoert_pruefen(&state, &ctx, meldung_id).await?;
     // Default-Text = Meldungsinhalt, falls kein eigener Lage-Text gegeben.
@@ -403,7 +404,7 @@ pub async fn auftrag_erteilen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Meldungen>,
     Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
-    Json(req): Json<crate::auftrag::NeuerAuftrag>,
+    JsonBody(req): JsonBody<crate::auftrag::NeuerAuftrag>,
 ) -> Result<(StatusCode, Json<MeldungAnzeige>), AppError> {
     gehoert_pruefen(&state, &ctx, meldung_id).await?;
 

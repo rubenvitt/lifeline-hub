@@ -3,6 +3,7 @@ use crate::auth::session::{AdminUser, CurrentUser};
 use crate::einheit::typ_repo::{self, TypDaten};
 use crate::einheit::EinheitTyp;
 use crate::error::AppError;
+use crate::extract::JsonBody;
 use crate::staerke::Staerke;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -77,7 +78,7 @@ pub async fn liste(
 pub async fn anlegen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
-    Json(body): Json<TypBody>,
+    JsonBody(body): JsonBody<TypBody>,
 ) -> Result<(StatusCode, Json<EinheitTyp>), AppError> {
     let n = normalisiere(body)?;
     let t = typ_repo::anlegen(&state.pool, benutzer.org_id, n.daten()).await?;
@@ -89,7 +90,7 @@ pub async fn aktualisieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
     Path(id): Path<i64>,
-    Json(body): Json<TypBody>,
+    JsonBody(body): JsonBody<TypBody>,
 ) -> Result<Json<EinheitTyp>, AppError> {
     let n = normalisiere(body)?;
     let t = typ_repo::aktualisiere(&state.pool, benutzer.org_id, id, n.daten()).await?;

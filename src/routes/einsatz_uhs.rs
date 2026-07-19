@@ -4,6 +4,7 @@ use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
 use crate::einsatz::repo as einsatz_repo;
+use crate::extract::JsonBody;
 use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -112,7 +113,7 @@ pub async fn anlegen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path(einsatz_id): Path<i64>,
-    Json(body): Json<AnlegenBody>,
+    JsonBody(body): JsonBody<AnlegenBody>,
 ) -> Result<(StatusCode, Json<UhsAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -228,7 +229,7 @@ pub async fn aktualisieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, uhs_id)): Path<(i64, i64)>,
-    Json(body): Json<PatchBody>,
+    JsonBody(body): JsonBody<PatchBody>,
 ) -> Result<Json<UhsAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -330,7 +331,7 @@ pub async fn status_wechsel(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, uhs_id)): Path<(i64, i64)>,
-    Json(body): Json<StatusBody>,
+    JsonBody(body): JsonBody<StatusBody>,
 ) -> Result<Json<UhsAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -437,7 +438,7 @@ pub async fn platz_anlegen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, uhs_id)): Path<(i64, i64)>,
-    Json(body): Json<PlatzAnlegenBody>,
+    JsonBody(body): JsonBody<PlatzAnlegenBody>,
 ) -> Result<(StatusCode, Json<PlatzAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -493,7 +494,7 @@ pub async fn plaetze_bulk_anlegen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, uhs_id)): Path<(i64, i64)>,
-    Json(body): Json<PlatzBulkBody>,
+    JsonBody(body): JsonBody<PlatzBulkBody>,
 ) -> Result<(StatusCode, Json<Vec<PlatzAnzeige>>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -552,7 +553,7 @@ pub async fn platz_aktualisieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, uhs_id, pid)): Path<(i64, i64, i64)>,
-    Json(body): Json<PlatzPatchBody>,
+    JsonBody(body): JsonBody<PlatzPatchBody>,
 ) -> Result<Json<PlatzAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -607,7 +608,7 @@ pub async fn platz_verfuegbarkeit(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, uhs_id, pid)): Path<(i64, i64, i64)>,
-    Json(body): Json<VerfuegbarkeitBody>,
+    JsonBody(body): JsonBody<VerfuegbarkeitBody>,
 ) -> Result<Json<PlatzAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -688,7 +689,7 @@ pub async fn belegung(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, person_id)): Path<(i64, i64)>,
-    Json(body): Json<BelegungBody>,
+    JsonBody(body): JsonBody<BelegungBody>,
 ) -> Result<(StatusCode, Json<BelegungAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;

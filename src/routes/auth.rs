@@ -2,6 +2,7 @@ use crate::app::AppState;
 use crate::auth::session::{self, CurrentUser, SESSION_COOKIE};
 use crate::auth::Benutzer;
 use crate::error::AppError;
+use crate::extract::JsonBody;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::response::Redirect;
@@ -99,7 +100,7 @@ pub enum LoginAntwort {
 pub async fn login(
     State(state): State<AppState>,
     jar: CookieJar,
-    Json(req): Json<LoginRequest>,
+    JsonBody(req): JsonBody<LoginRequest>,
 ) -> Result<(CookieJar, Json<LoginAntwort>), AppError> {
     let liste = crate::auth::provider::registry::liste(&state.pool).await?;
     let passwort_aktiv = liste
@@ -207,7 +208,7 @@ pub async fn provider_schalten(
     State(state): State<AppState>,
     _admin: crate::auth::session::AdminUser,
     axum::extract::Path(id): axum::extract::Path<String>,
-    Json(req): Json<ProviderSchaltenRequest>,
+    JsonBody(req): JsonBody<ProviderSchaltenRequest>,
 ) -> Result<Json<Vec<crate::auth::provider::AuthProviderAnzeige>>, AppError> {
     crate::auth::provider::registry::schalten(&state.pool, &id, req.aktiviert).await?;
     let liste = crate::auth::provider::registry::liste(&state.pool).await?;
@@ -642,7 +643,7 @@ pub async fn webauthn_register_finish(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     jar: CookieJar,
-    Json(body): Json<RegisterPublicKeyCredential>,
+    JsonBody(body): JsonBody<RegisterPublicKeyCredential>,
 ) -> Result<(CookieJar, StatusCode), AppError> {
     if !webauthn_aktiv(&state.pool).await? {
         return Err(AppError::NotFound);
@@ -726,7 +727,7 @@ pub struct WebauthnAuthStartRequest {
 pub async fn webauthn_auth_start(
     State(state): State<AppState>,
     jar: CookieJar,
-    Json(req): Json<WebauthnAuthStartRequest>,
+    JsonBody(req): JsonBody<WebauthnAuthStartRequest>,
 ) -> Result<(CookieJar, Json<RequestChallengeResponse>), AppError> {
     if !webauthn_aktiv(&state.pool).await? {
         return Err(AppError::NotFound);
@@ -821,7 +822,7 @@ pub async fn webauthn_auth_start(
 pub async fn webauthn_auth_finish(
     State(state): State<AppState>,
     jar: CookieJar,
-    Json(body): Json<PublicKeyCredential>,
+    JsonBody(body): JsonBody<PublicKeyCredential>,
 ) -> Result<(CookieJar, StatusCode), AppError> {
     if !webauthn_aktiv(&state.pool).await? {
         return Err(AppError::NotFound);
@@ -984,7 +985,7 @@ pub async fn totp_enroll_start(
 pub async fn totp_enroll_finish(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Json(req): Json<TotpEnrollFinishRequest>,
+    JsonBody(req): JsonBody<TotpEnrollFinishRequest>,
 ) -> Result<Json<TotpEnrollFinish>, AppError> {
     let secret: Option<String> =
         sqlx::query_scalar("SELECT totp_secret FROM benutzer WHERE id = ?")
@@ -1048,7 +1049,7 @@ pub struct TotpFinishRequest {
 pub async fn totp_finish(
     State(state): State<AppState>,
     jar: CookieJar,
-    Json(req): Json<TotpFinishRequest>,
+    JsonBody(req): JsonBody<TotpFinishRequest>,
 ) -> Result<(CookieJar, Json<crate::auth::BenutzerAnzeige>), AppError> {
     let key = jar
         .get(MFA_PENDING_COOKIE)

@@ -4,6 +4,7 @@ use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
 use crate::einsatz::repo as einsatz_repo;
+use crate::extract::JsonBody;
 use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -91,7 +92,7 @@ pub async fn disponieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path(einsatz_id): Path<i64>,
-    Json(body): Json<DisponierenBody>,
+    JsonBody(body): JsonBody<DisponierenBody>,
 ) -> Result<(StatusCode, Json<EinsatzPersonalAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -184,7 +185,7 @@ pub async fn aktualisieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, ep_id)): Path<(i64, i64)>,
-    Json(body): Json<DispoPatchBody>,
+    JsonBody(body): JsonBody<DispoPatchBody>,
 ) -> Result<Json<EinsatzPersonalAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -320,7 +321,7 @@ pub async fn position(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, ep_id)): Path<(i64, i64)>,
-    Json(body): Json<PositionBody>,
+    JsonBody(body): JsonBody<PositionBody>,
 ) -> Result<Json<FuehrungskraftKarte>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;

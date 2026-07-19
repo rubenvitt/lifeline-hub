@@ -1,6 +1,7 @@
 use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
 use crate::error::AppError;
+use crate::extract::JsonBody;
 use axum::extract::State;
 use axum::Json;
 use serde::{Deserialize, Serialize};
@@ -53,7 +54,7 @@ const ERLAUBTE_ORG: &[&str] = &[
 pub async fn aktualisieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
-    Json(body): Json<OrgPatch>,
+    JsonBody(body): JsonBody<OrgPatch>,
 ) -> Result<Json<OrganisationAnzeige>, AppError> {
     if !ERLAUBTE_ORG.contains(&body.tz_organisation.as_str()) {
         return Err(AppError::UnprocessableEntity(

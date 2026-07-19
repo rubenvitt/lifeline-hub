@@ -2,6 +2,7 @@ use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
 use crate::config::{default_online_styles, OfflineKatalogEintrag, OnlineStyle, OnlineStyleTyp};
 use crate::error::AppError;
+use crate::extract::JsonBody;
 use crate::karte::download::{self, Fortschritt};
 use crate::karte::proxy;
 use crate::karte::quellen;
@@ -652,7 +653,7 @@ pub async fn online_liste(
 pub async fn online_anlegen(
     State(state): State<AppState>,
     _admin: AdminUser,
-    Json(body): Json<OnlineQuelleBody>,
+    JsonBody(body): JsonBody<OnlineQuelleBody>,
 ) -> Result<(StatusCode, Json<OnlineQuelle>), AppError> {
     let eingabe = validiere_online(body)?;
     let quelle = repo::anlegen_online_quelle(&state.pool, &eingabe).await?;
@@ -669,7 +670,7 @@ pub async fn online_aktualisieren(
     State(state): State<AppState>,
     _admin: AdminUser,
     Path(id): Path<i64>,
-    Json(body): Json<OnlineQuelleBody>,
+    JsonBody(body): JsonBody<OnlineQuelleBody>,
 ) -> Result<Json<OnlineQuelle>, AppError> {
     let eingabe = validiere_online(body)?;
     let aktualisiert = repo::aktualisiere_online_quelle(&state.pool, id, &eingabe).await?;
@@ -868,7 +869,7 @@ pub async fn offline_liste(
 pub async fn offline_registrieren(
     State(state): State<AppState>,
     _admin: AdminUser,
-    Json(body): Json<OfflineKarteBody>,
+    JsonBody(body): JsonBody<OfflineKarteBody>,
 ) -> Result<(StatusCode, Json<OfflineKarte>), AppError> {
     let name = body.name.trim();
     if name.is_empty() {
@@ -1204,7 +1205,7 @@ pub async fn offline_neu_laden(
     State(state): State<AppState>,
     _admin: AdminUser,
     Path(id): Path<i64>,
-    Json(body): Json<OfflineNeuLadenBody>,
+    JsonBody(body): JsonBody<OfflineNeuLadenBody>,
 ) -> Result<(StatusCode, Json<OfflineKarte>), AppError> {
     let karte = repo::finde_offline_karte(&state.pool, id)
         .await?
@@ -1277,7 +1278,7 @@ pub async fn offline_neu_laden(
 pub async fn offline_download(
     State(state): State<AppState>,
     _admin: AdminUser,
-    Json(body): Json<OfflineDownloadBody>,
+    JsonBody(body): JsonBody<OfflineDownloadBody>,
 ) -> Result<(StatusCode, Json<OfflineKarte>), AppError> {
     let name = body.name.trim();
     if name.is_empty() {
@@ -1459,7 +1460,7 @@ static KARTEN_SERVICE_CLIENT: std::sync::LazyLock<reqwest::Client> =
 pub async fn offline_bauen(
     State(state): State<AppState>,
     _admin: AdminUser,
-    Json(body): Json<OfflineBauBody>,
+    JsonBody(body): JsonBody<OfflineBauBody>,
 ) -> Result<(StatusCode, Json<serde_json::Value>), AppError> {
     let slug = body.slug.trim();
     if slug.is_empty() {

@@ -19,6 +19,7 @@ pub mod erinnerung;
 pub mod error;
 pub mod etb;
 pub mod etb_baustein;
+pub mod extract;
 pub mod fahrzeug;
 pub mod freies_zeichen;
 pub mod gefahr;

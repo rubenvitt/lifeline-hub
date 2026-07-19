@@ -4,6 +4,7 @@ use crate::error::AppError;
 use crate::etb::MeldeWeg;
 use crate::etb_baustein::repo::{self, BausteinDaten};
 use crate::etb_baustein::{BausteinTyp, EtbBaustein};
+use crate::extract::JsonBody;
 use crate::routes::support::trimme;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -85,7 +86,7 @@ pub async fn liste(
 pub async fn anlegen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
-    Json(body): Json<BausteinBody>,
+    JsonBody(body): JsonBody<BausteinBody>,
 ) -> Result<(StatusCode, Json<EtbBaustein>), AppError> {
     let n = normalisiere(body)?;
     let b = repo::anlegen(&state.pool, benutzer.org_id, n.daten()).await?;
@@ -97,7 +98,7 @@ pub async fn aktualisieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
     Path(id): Path<i64>,
-    Json(body): Json<BausteinBody>,
+    JsonBody(body): JsonBody<BausteinBody>,
 ) -> Result<Json<EtbBaustein>, AppError> {
     let n = normalisiere(body)?;
     let b = repo::aktualisiere(&state.pool, benutzer.org_id, id, n.daten()).await?;

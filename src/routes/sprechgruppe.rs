@@ -3,6 +3,7 @@ use crate::auth::session::{AdminUser, CurrentUser};
 use crate::einsatz::berechtigung::{fordere_aktiv, fordere_lesezugriff, fordere_schreibrecht};
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
+use crate::extract::JsonBody;
 use crate::katalog::Betriebsart;
 use crate::sprechgruppe::repo as sg_repo;
 use crate::sprechgruppe::{Sprechgruppe, SprechgruppeAnzeige};
@@ -145,7 +146,7 @@ pub async fn liste_katalog(
 pub async fn anlegen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
-    Json(body): Json<KatalogBody>,
+    JsonBody(body): JsonBody<KatalogBody>,
 ) -> Result<(StatusCode, Json<SprechgruppeAnzeige>), AppError> {
     let n = normalisiere_katalog(body)?;
     let sg = sg_repo::anlegen_katalog(&state.pool, benutzer.org_id, n.daten()).await?;
@@ -157,7 +158,7 @@ pub async fn aktualisieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
     Path(id): Path<i64>,
-    Json(body): Json<KatalogBody>,
+    JsonBody(body): JsonBody<KatalogBody>,
 ) -> Result<Json<SprechgruppeAnzeige>, AppError> {
     let n = normalisiere_katalog(body)?;
     let sg = sg_repo::aktualisiere_katalog(&state.pool, benutzer.org_id, id, n.daten()).await?;
@@ -199,7 +200,7 @@ pub async fn anlegen_einsatz_lokal(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path(einsatz_id): Path<i64>,
-    Json(body): Json<EinsatzLokalBody>,
+    JsonBody(body): JsonBody<EinsatzLokalBody>,
 ) -> Result<(StatusCode, Json<SprechgruppeAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;

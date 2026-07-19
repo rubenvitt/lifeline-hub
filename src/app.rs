@@ -977,11 +977,29 @@ pub fn build_router(state: AppState) -> Router {
 
     router
         .fallback(crate::static_files::serve)
+        // Methoden-Mismatch (LFH-267/F22): axums Default-405 hat einen LEEREN Body und bricht
+        // damit den {error}-Vertrag. Der Fallback greift nur, wenn der Pfad existiert, die
+        // Methode aber nicht registriert ist.
+        .method_not_allowed_fallback(methode_nicht_erlaubt)
         // Panik-Abfederung (LFH-260/F35): fängt eine Handler-Panik und antwortet mit 500 +
         // {error}-JSON, statt die Verbindung ohne Antwort abzureißen — Letzteres klassifiziert
         // das Frontend als Netzwerkfehler und der Offline-Puffer als „kein Netz".
         .layer(tower_http::catch_panic::CatchPanicLayer::custom(on_panic))
         .with_state(state)
+}
+
+/// Antwort auf einen Methoden-Mismatch (LFH-267/F22): 405 mit demselben `{error}`-JSON-Envelope
+/// wie `AppError`.
+///
+/// Bewusst als rohes Tupel statt über `AppError`: der Fehlertyp trägt keine 405-Variante, und
+/// eine nur für diesen Router-Fallback einzuführen wäre Ballast — der Status kommt hier ohnehin
+/// aus dem `IntoResponse` des Handlers. Vorbild ist [`on_panic`], das denselben Weg geht.
+async fn methode_nicht_erlaubt() -> axum::response::Response {
+    (
+        axum::http::StatusCode::METHOD_NOT_ALLOWED,
+        axum::Json(serde_json::json!({ "error": "Methode für diesen Pfad nicht erlaubt" })),
+    )
+        .into_response()
 }
 
 /// Antwort auf eine im Handler abgefangene Panik (LFH-260/F35): 500 mit demselben

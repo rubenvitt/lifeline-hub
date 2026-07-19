@@ -321,8 +321,8 @@ async fn config_endpoint_meldet_verfuegbarkeit() {
 }
 
 /// Der statische `welt`-Tile-Pfad muss VOR der dynamischen `{karte_id}`-Route greifen (LFH-207) —
-/// sonst würde „welt" am i64-Extractor scheitern (422) und die eingebettete Welt-Übersicht nie laden.
-/// Ohne eingebettetes/extrahiertes Asset liefert der Handler `204` (Datei fehlt), NICHT `422`.
+/// sonst würde „welt" am i64-Extractor scheitern (400) und die eingebettete Welt-Übersicht nie laden.
+/// Ohne eingebettetes/extrahiertes Asset liefert der Handler `204` (Datei fehlt), NICHT `400`.
 #[tokio::test]
 async fn welt_tiles_route_greift_und_ist_204_ohne_asset() {
     let app = app_mit_pool(pool().await);
@@ -334,7 +334,7 @@ async fn welt_tiles_route_greift_und_ist_204_ohne_asset() {
     assert_eq!(
         res.status(),
         StatusCode::NO_CONTENT,
-        "welt-Route muss greifen (204 ohne Asset), nicht 422 am karte_id-Extractor"
+        "welt-Route muss greifen (204 ohne Asset), nicht 400 am karte_id-Extractor"
     );
 }
 

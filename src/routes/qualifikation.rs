@@ -1,6 +1,7 @@
 use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
 use crate::error::AppError;
+use crate::extract::JsonBody;
 use crate::personal::qualifikation_repo as repo;
 use crate::personal::Qualifikation;
 use axum::extract::{Path, State};
@@ -35,7 +36,7 @@ pub async fn liste(
 pub async fn anlegen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
-    Json(body): Json<QualifikationBody>,
+    JsonBody(body): JsonBody<QualifikationBody>,
 ) -> Result<(StatusCode, Json<Qualifikation>), AppError> {
     let label = normalisiere_label(&body.label)?;
     let q = repo::anlegen(&state.pool, benutzer.org_id, &label, body.sortier).await?;
@@ -47,7 +48,7 @@ pub async fn aktualisieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
     Path(id): Path<i64>,
-    Json(body): Json<QualifikationBody>,
+    JsonBody(body): JsonBody<QualifikationBody>,
 ) -> Result<Json<Qualifikation>, AppError> {
     let label = normalisiere_label(&body.label)?;
     let q = repo::aktualisiere(&state.pool, benutzer.org_id, id, &label, body.sortier).await?;

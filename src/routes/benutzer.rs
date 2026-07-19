@@ -4,6 +4,7 @@ use crate::auth::{
     password, BenutzerAnzeige, OrgRolle, SystemRolle, ORG_ROLLE_KEINE, ROLLE_ADMIN, ROLLE_KEINER,
 };
 use crate::error::AppError;
+use crate::extract::JsonBody;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -77,7 +78,7 @@ pub async fn liste(
 pub async fn anlegen(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
-    Json(req): Json<NeuerBenutzer>,
+    JsonBody(req): JsonBody<NeuerBenutzer>,
 ) -> Result<(StatusCode, Json<BenutzerAnzeige>), AppError> {
     if req.benutzername.trim().is_empty() {
         return Err(AppError::Validation(
@@ -239,7 +240,7 @@ pub async fn bearbeiten(
     State(state): State<AppState>,
     _admin: AdminUser,
     Path(id): Path<i64>,
-    Json(req): Json<PatchBenutzer>,
+    JsonBody(req): JsonBody<PatchBenutzer>,
 ) -> Result<Json<BenutzerAnzeige>, AppError> {
     let ziel = sqlx::query_as::<_, crate::auth::Benutzer>(
         "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, aktiv, erstellt_at \

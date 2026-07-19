@@ -1,6 +1,7 @@
 use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
 use crate::error::AppError;
+use crate::extract::JsonBody;
 use crate::material::repo::{self, MaterialDaten};
 use crate::material::MaterialAnzeige;
 use crate::routes::support::trimme;
@@ -88,7 +89,7 @@ pub async fn kategorien(
 pub async fn anlegen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
-    Json(body): Json<MaterialBody>,
+    JsonBody(body): JsonBody<MaterialBody>,
 ) -> Result<(StatusCode, Json<MaterialAnzeige>), AppError> {
     let n = normalisiere(body)?;
     let m = repo::anlegen(&state.pool, benutzer.org_id, n.daten()).await?;
@@ -100,7 +101,7 @@ pub async fn aktualisieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
     Path(id): Path<i64>,
-    Json(body): Json<MaterialBody>,
+    JsonBody(body): JsonBody<MaterialBody>,
 ) -> Result<Json<MaterialAnzeige>, AppError> {
     let n = normalisiere(body)?;
     let m = repo::aktualisiere(&state.pool, benutzer.org_id, id, n.daten()).await?;

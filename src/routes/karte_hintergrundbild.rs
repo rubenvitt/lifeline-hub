@@ -5,6 +5,7 @@ use crate::einsatz::berechtigung::{
 };
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
+use crate::extract::JsonBody;
 use crate::karte_hintergrundbild::{
     self as bild, repo as bild_repo, repo::BildPatch, HintergrundbildAnzeige,
 };
@@ -195,7 +196,7 @@ pub async fn aktualisieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, bild_id)): Path<(i64, i64)>,
-    Json(body): Json<BildPatchBody>,
+    JsonBody(body): JsonBody<BildPatchBody>,
 ) -> Result<Json<HintergrundbildAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;

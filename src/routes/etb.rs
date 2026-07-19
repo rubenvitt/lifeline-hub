@@ -5,6 +5,7 @@ use crate::einsatz::berechtigung::{
 };
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
+use crate::extract::JsonBody;
 use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132); gegen die Override-Map geprüft.
@@ -47,7 +48,7 @@ pub async fn erfassen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path(einsatz_id): Path<i64>,
-    Json(req): Json<NeuerEintrag>,
+    JsonBody(req): JsonBody<NeuerEintrag>,
 ) -> Result<(StatusCode, Json<EtbEintragAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -166,7 +167,7 @@ pub async fn auftrag_erteilen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, eintrag_id)): Path<(i64, i64)>,
-    Json(req): Json<crate::auftrag::NeuerAuftrag>,
+    JsonBody(req): JsonBody<crate::auftrag::NeuerAuftrag>,
 ) -> Result<(StatusCode, Json<crate::auftrag::AuftragDetail>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;

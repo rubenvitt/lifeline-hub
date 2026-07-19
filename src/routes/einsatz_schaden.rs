@@ -4,6 +4,7 @@ use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
 use crate::einsatz::repo as einsatz_repo;
+use crate::extract::JsonBody;
 use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -114,7 +115,7 @@ pub async fn anlegen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path(einsatz_id): Path<i64>,
-    Json(body): Json<AnlegenBody>,
+    JsonBody(body): JsonBody<AnlegenBody>,
 ) -> Result<(StatusCode, Json<SchadenAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -309,7 +310,7 @@ pub async fn aktualisieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, schaden_id)): Path<(i64, i64)>,
-    Json(body): Json<PatchBody>,
+    JsonBody(body): JsonBody<PatchBody>,
 ) -> Result<Json<SchadenAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -495,7 +496,7 @@ pub async fn uebergeben(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, schaden_id)): Path<(i64, i64)>,
-    Json(body): Json<UebergebenBody>,
+    JsonBody(body): JsonBody<UebergebenBody>,
 ) -> Result<Json<SchadenAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -565,7 +566,7 @@ pub async fn abschliessen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, schaden_id)): Path<(i64, i64)>,
-    Json(body): Json<AbschliessenBody>,
+    JsonBody(body): JsonBody<AbschliessenBody>,
 ) -> Result<Json<SchadenAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;

@@ -4,6 +4,7 @@ use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
 use crate::einsatz::repo as einsatz_repo;
+use crate::extract::JsonBody;
 use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -84,7 +85,7 @@ pub async fn bewerten(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, gid)): Path<(i64, i64)>,
-    Json(body): Json<BewertungBody>,
+    JsonBody(body): JsonBody<BewertungBody>,
 ) -> Result<Json<GefahrBewertungAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -188,7 +189,7 @@ pub async fn umbenennen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, gid)): Path<(i64, i64)>,
-    Json(body): Json<UmbenennenBody>,
+    JsonBody(body): JsonBody<UmbenennenBody>,
 ) -> Result<Json<GefahrengebietAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;

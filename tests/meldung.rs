@@ -12,7 +12,7 @@ fn zeit(v: &Value) -> NaiveDateTime {
 
 /// Vollständiger, gültiger Meldungs-Body (Pflichtfelder + Default-Vokabular).
 /// Negative Fälle überschreiben ein einzelnes Feld present-but-invalid, damit der
-/// Schreib-/Validierungs-Guard greift (nicht der Json-Extractor → das wäre 422).
+/// Schreib-/Validierungs-Guard greift (nicht der Json-Extractor → das wäre 400, LFH-267).
 fn meldung_body(absender: &str, meldeweg: &str, inhalt: &str) -> String {
     serde_json::json!({
         "absender": absender,

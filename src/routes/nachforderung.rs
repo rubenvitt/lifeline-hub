@@ -3,6 +3,7 @@ use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
 };
 use crate::einsatz::repo as einsatz_repo;
+use crate::extract::JsonBody;
 use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -99,7 +100,7 @@ pub async fn anlegen(
     State(state): State<AppState>,
     crate::auth::session::CurrentUser(benutzer): crate::auth::session::CurrentUser,
     Path(einsatz_id): Path<i64>,
-    Json(req): Json<NeueNachforderung>,
+    JsonBody(req): JsonBody<NeueNachforderung>,
 ) -> Result<(StatusCode, Json<NachforderungAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -207,7 +208,7 @@ pub async fn status(
     State(state): State<AppState>,
     crate::auth::session::CurrentUser(benutzer): crate::auth::session::CurrentUser,
     Path((einsatz_id, nachforderung_id)): Path<(i64, i64)>,
-    Json(req): Json<StatusReq>,
+    JsonBody(req): JsonBody<StatusReq>,
 ) -> Result<Json<NachforderungAnzeige>, AppError> {
     fordere_bearbeitbar(&state, &benutzer, einsatz_id, nachforderung_id).await?;
     let neu = req.status.trim();
@@ -253,7 +254,7 @@ pub async fn ablehnen(
     State(state): State<AppState>,
     crate::auth::session::CurrentUser(benutzer): crate::auth::session::CurrentUser,
     Path((einsatz_id, nachforderung_id)): Path<(i64, i64)>,
-    Json(req): Json<AblehnenReq>,
+    JsonBody(req): JsonBody<AblehnenReq>,
 ) -> Result<Json<NachforderungAnzeige>, AppError> {
     fordere_bearbeitbar(&state, &benutzer, einsatz_id, nachforderung_id).await?;
     let aktuell = repo::laden(&state.pool, nachforderung_id).await?;

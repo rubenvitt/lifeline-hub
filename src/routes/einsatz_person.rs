@@ -5,6 +5,7 @@ use crate::einsatz::berechtigung::{
     fordere_schreibrecht,
 };
 use crate::einsatz::repo as einsatz_repo;
+use crate::extract::JsonBody;
 use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -131,7 +132,7 @@ pub async fn anlegen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path(einsatz_id): Path<i64>,
-    Json(body): Json<AnlegenBody>,
+    JsonBody(body): JsonBody<AnlegenBody>,
 ) -> Result<(StatusCode, Json<PersonAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -260,7 +261,7 @@ pub async fn aktualisieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, person_id)): Path<(i64, i64)>,
-    Json(body): Json<PatchBody>,
+    JsonBody(body): JsonBody<PatchBody>,
 ) -> Result<Json<PersonAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -319,7 +320,7 @@ pub async fn status_wechsel(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, person_id)): Path<(i64, i64)>,
-    Json(body): Json<StatusBody>,
+    JsonBody(body): JsonBody<StatusBody>,
 ) -> Result<Json<PersonAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -451,7 +452,7 @@ pub async fn sichten(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, person_id)): Path<(i64, i64)>,
-    Json(body): Json<SichtungBody>,
+    JsonBody(body): JsonBody<SichtungBody>,
 ) -> Result<(StatusCode, Json<SichtungAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -617,7 +618,7 @@ pub async fn verbleib(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, person_id)): Path<(i64, i64)>,
-    Json(body): Json<VerbleibBody>,
+    JsonBody(body): JsonBody<VerbleibBody>,
 ) -> Result<(StatusCode, Json<VerbleibAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -703,7 +704,7 @@ pub async fn notiz(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, person_id)): Path<(i64, i64)>,
-    Json(body): Json<NotizBody>,
+    JsonBody(body): JsonBody<NotizBody>,
 ) -> Result<(StatusCode, Json<NotizAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -748,7 +749,7 @@ pub async fn abgleich_anlegen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, person_id)): Path<(i64, i64)>,
-    Json(body): Json<AbgleichBody>,
+    JsonBody(body): JsonBody<AbgleichBody>,
 ) -> Result<(StatusCode, Json<AbgleichAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -811,7 +812,7 @@ pub async fn abgleich_entscheiden(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, person_id, abgleich_id)): Path<(i64, i64, i64)>,
-    Json(body): Json<EntscheidungBody>,
+    JsonBody(body): JsonBody<EntscheidungBody>,
 ) -> Result<Json<AbgleichAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;

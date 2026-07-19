@@ -123,36 +123,51 @@ async fn anlegen_und_liste() {
     assert_eq!(liste.as_array().unwrap().len(), 1);
 }
 
+/// Fehlendes Pflichtfeld ist ein FORMALER Fehler → 400 (LFH-267/F22).
+///
+/// `AnlegenBody.grundzeichen` ist ein `String` ohne `#[serde(default)]`, der Body scheitert
+/// also schon am Extractor — der Handler läuft nie an. Vor LFH-267 lieferte axums
+/// `JsonDataError` dafür 422; seit dem `JsonBody`-Wrapper ist es 400. Die Trennlinie zum
+/// Test darunter ist genau die Konvention: strukturell fehlend = 400, leerer Wert = 422.
 #[tokio::test]
-async fn fehlendes_oder_leeres_grundzeichen_ist_422() {
+async fn fehlendes_grundzeichen_ist_400() {
     let (app, _live) = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
 
-    // Feld fehlt komplett.
-    let b1 = json!({"lat": 50.1, "lon": 8.6}).to_string();
+    let body = json!({"lat": 50.1, "lon": 8.6}).to_string();
     assert_eq!(
         anfrage(
             &app,
             "POST",
             &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
             &admin,
-            Some(&b1)
+            Some(&body)
         )
         .await
         .0,
-        StatusCode::UNPROCESSABLE_ENTITY
+        StatusCode::BAD_REQUEST
     );
+}
 
-    // Leer/Whitespace-only.
-    let b2 = json!({"lat": 50.1, "lon": 8.6, "grundzeichen": "   "}).to_string();
+/// Vorhandenes, aber leeres Pflichtfeld ist ein FACHLICHER Fehler → 422.
+///
+/// Der Body ist strukturell gültig, der Extractor lässt ihn durch; erst die
+/// Handler-Validierung lehnt den Whitespace-only-Wert ab.
+#[tokio::test]
+async fn leeres_grundzeichen_ist_422() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+
+    let body = json!({"lat": 50.1, "lon": 8.6, "grundzeichen": "   "}).to_string();
     assert_eq!(
         anfrage(
             &app,
             "POST",
             &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
             &admin,
-            Some(&b2)
+            Some(&body)
         )
         .await
         .0,

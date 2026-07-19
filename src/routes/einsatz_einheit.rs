@@ -8,6 +8,7 @@ use crate::einsatz::berechtigung::{
 };
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
+use crate::extract::JsonBody;
 use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -134,7 +135,7 @@ pub async fn bilden(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path(einsatz_id): Path<i64>,
-    Json(body): Json<EinheitBody>,
+    JsonBody(body): JsonBody<EinheitBody>,
 ) -> Result<(StatusCode, Json<EinheitAnzeige>), AppError> {
     let einsatz = schreib_gate(&state, &benutzer, einsatz_id).await?;
     let name = body.name.trim().to_string();
@@ -198,7 +199,7 @@ pub async fn aktualisieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, eid)): Path<(i64, i64)>,
-    Json(body): Json<EinheitBody>,
+    JsonBody(body): JsonBody<EinheitBody>,
 ) -> Result<Json<EinheitAnzeige>, AppError> {
     let einsatz = schreib_gate(&state, &benutzer, einsatz_id).await?;
     let name = body.name.trim().to_string();
@@ -531,7 +532,7 @@ pub async fn position(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, einheit_id)): Path<(i64, i64)>,
-    Json(body): Json<PositionBody>,
+    JsonBody(body): JsonBody<PositionBody>,
 ) -> Result<Json<EinheitAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
