@@ -1,0 +1,195 @@
+# mise.toml — versionierte Projekt-Tasks (wird mit dem lokalen, gitignorierten
+# mise.local.toml gemerged; dort liegen die Dev-Server-Tasks backend/frontend/minio/…).
+#
+# Cleanup-Tasks (gestuft): `mise run clean` räumt nur BILLIG regenerierbare
+# Build-Artefakte. Teure/destruktive Ziele (Karten, Dev-DB, Docker, Worktrees) sind
+# bewusst Opt-in und per `confirm` bzw. Dry-Run abgesichert.
+#
+#   mise run clean            # target/, node_modules, dist(→.gitkeep), .pnpm-store, karten-build/out
+#   mise run clean:karten     # heruntergeladene Offline-Karten in karten/ (~7 G, Neu-Download nötig)
+#   mise run clean:db         # lokale SQLite-Dev-DB (lifeline.db*) + TLS-Cert-Cache
+#   mise run clean:docker     # lokales MinIO (Container + Volume + Netz, lfh-*)
+#   mise run clean:all        # alles obige (Build + Karten + DB + Docker) — EIN confirm
+#   mise run clean:worktrees  # merged/verwaiste Worktrees unter .claude|.claire/worktrees (Dry-Run;
+#                             #   FORCE=1 mise run clean:worktrees führt aus)
+#
+# Reihenfolge-Hinweis: mise führt `depends` VOR dem `confirm` aus. Damit die Rückfrage
+# wirklich gated, steckt die Löschlogik in versteckten `_clean:*`-Workern, die per
+# `run = [{ task = … }]` NACH dem confirm laufen (empirisch verifiziert).
+
+# ── Build-Artefakte (sicher, kein confirm — genau dafür ist der Task da) ────────────
+[tasks."clean"]
+description = "Build-Artefakte löschen: target/, node_modules, dist(→.gitkeep), .pnpm-store, karten-build/out"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+echo "→ target/ (Rust-Build, workspace-weit)"
+rm -rf target
+echo "→ node_modules + .pnpm-store"
+rm -rf frontend/node_modules node_modules .pnpm-store
+echo "→ frontend/dist leeren (.gitkeep bleibt — rust-embed braucht den Ordner zur Compile-Zeit)"
+rm -rf frontend/dist
+mkdir -p frontend/dist
+touch frontend/dist/.gitkeep
+echo "→ karten-build/out (Bau-Scratch: Quelldaten/tmp)"
+rm -rf karten-build/out
+echo "✓ Build-Artefakte entfernt (regenerierbar via cargo build / pnpm install / pnpm build)."
+'''
+
+# ── Offline-Karten (teuer: Neu-Download/-Bau) ──────────────────────────────────────
+[tasks."_clean:karten"]
+hide = true
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+rm -f karten/*.pmtiles karten/*.mbtiles karten/tile-cache.db
+echo "✓ Offline-Karten + Tile-Cache entfernt (Ordner karten/ bleibt)."
+'''
+[tasks."clean:karten"]
+description = "Heruntergeladene Offline-Karten löschen (~7 G, Neu-Download/-Bau nötig)"
+confirm = { message = "Löscht heruntergeladene Offline-Karten in karten/ (~7 G, Neu-Download nötig). Fortfahren?", default = "no" }
+run = [{ task = "_clean:karten" }]
+
+# ── Lokale Dev-DB + TLS-Cert-Cache ─────────────────────────────────────────────────
+[tasks."_clean:db"]
+hide = true
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+rm -f lifeline.db lifeline.db-wal lifeline.db-shm lifeline-tls-*.pem
+echo "✓ Dev-DB (lifeline.db*) + TLS-Cert-Cache entfernt (Neustart re-bootstrapt/seedet)."
+'''
+[tasks."clean:db"]
+description = "Lokale SQLite-Dev-DB + TLS-Cert-Cache löschen (Seed-Daten gehen verloren)"
+confirm = { message = "Löscht lifeline.db* (lokale Dev-DB inkl. Seed-Daten) + lifeline-tls-*.pem. Fortfahren?", default = "no" }
+run = [{ task = "_clean:db" }]
+
+# ── Lokales MinIO (Docker) ─────────────────────────────────────────────────────────
+[tasks."_clean:docker"]
+hide = true
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+docker rm -f lfh-minio >/dev/null 2>&1 || true
+docker volume rm lfh-minio-data >/dev/null 2>&1 || true
+docker network rm lfh-dev >/dev/null 2>&1 || true
+echo "✓ MinIO-Container/-Volume/-Netz (lfh-*) entfernt ('mise run minio' baut neu auf)."
+'''
+[tasks."clean:docker"]
+description = "Lokales MinIO entfernen: Container lfh-minio + Volume lfh-minio-data + Netz lfh-dev"
+confirm = { message = "Entfernt MinIO-Container/-Volume/-Netz (lfh-*). Bucket-Uploads gehen verloren. Fortfahren?", default = "no" }
+run = [{ task = "_clean:docker" }]
+
+# ── Voll-Nuke: alles außer Worktrees (die haben eigene Plan-first-Semantik) ─────────
+[tasks."clean:all"]
+description = "Voll-Nuke: Build-Artefakte + Karten + Dev-DB + Docker (EIN confirm). Worktrees NICHT — siehe clean:worktrees"
+confirm = { message = "VOLL-NUKE: target/node_modules, Karten (~7 G), Dev-DB und MinIO werden gelöscht. Alles neu aufzubauen. Fortfahren?", default = "no" }
+run = [
+  { task = "clean" },
+  { task = "_clean:karten" },
+  { task = "_clean:db" },
+  { task = "_clean:docker" },
+]
+
+# ── Worktree-Cleanup (Dry-Run per Default; FORCE=1 führt aus) ───────────────────────
+# Entfernt Worktrees unter .claude/worktrees und .claire/worktrees, die:
+#   1) in main (oder origin/main) gemergt sind UND keine uncommitteten getrackten Änderungen haben, und
+#   2) Orphan-Verzeichnisse ohne git-Referenz (nicht mehr als Worktree registriert).
+# Übersprungen (behalten): nicht gemergte, locked, sowie gemergte-aber-dirty Worktrees.
+[tasks."clean:worktrees"]
+description = "Merged/verwaiste Worktrees unter .claude|.claire/worktrees aufräumen (Dry-Run; FORCE=1 führt aus)"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+FORCE="${FORCE:-0}"
+for a in "$@"; do [ "$a" = "--force" ] && FORCE=1; done
+
+root="$(git rev-parse --show-toplevel)"
+
+# Gemergt = Vorfahre von lokalem main ODER origin/main (konservativ: stale main hält Worktree eher).
+is_merged() {
+  local rev="$1" ref
+  for ref in main origin/main; do
+    git rev-parse --verify --quiet "$ref" >/dev/null 2>&1 || continue
+    git merge-base --is-ancestor "$rev" "$ref" 2>/dev/null && return 0
+  done
+  return 1
+}
+
+echo "→ git worktree prune (verwaiste Admin-Einträge zu bereits gelöschten Verzeichnissen)"
+git worktree prune -v 2>/dev/null || true
+
+remove=""; keep_dirty=""; keep_unmerged=""; keep_locked=""
+wt=""; branch=""; head=""; locked=0
+
+flush() {
+  [ -n "$wt" ] || return 0
+  case "$wt" in
+    "$root"/.claude/worktrees/*|"$root"/.claire/worktrees/*) : ;;
+    *) return 0 ;;   # nie das Haupt-Repo oder fremde Worktrees anfassen
+  esac
+  if [ "$locked" = 1 ]; then keep_locked="${keep_locked}${wt}"$'\n'; return 0; fi
+  local rev="$branch"; [ -n "$rev" ] || rev="$head"   # detached → HEAD-sha ("keine Referenz mehr")
+  if is_merged "$rev"; then
+    if [ -n "$(git -C "$wt" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+      keep_dirty="${keep_dirty}${wt}"$'\n'                     # in main, aber uncommittete Änderungen → behalten
+    else
+      remove="${remove}${wt}	${branch}"$'\n'                 # in main + sauber → entfernen (TAB-getrennt)
+    fi
+  else
+    keep_unmerged="${keep_unmerged}${wt}	${branch}"$'\n'
+  fi
+}
+
+while IFS= read -r line; do
+  case "$line" in
+    "worktree "*) flush; wt="${line#worktree }"; branch=""; head=""; locked=0 ;;
+    "HEAD "*)     head="${line#HEAD }" ;;
+    "branch "*)   branch="${line#branch refs/heads/}" ;;
+    locked*)      locked=1 ;;
+  esac
+done < <(git worktree list --porcelain)
+flush
+
+# Orphan-Verzeichnisse: liegen unter den Worktree-Ordnern, sind aber nicht (mehr) registriert.
+registered="$(git worktree list --porcelain | sed -n 's/^worktree //p')"
+orphans=""
+for base in "$root/.claude/worktrees" "$root/.claire/worktrees"; do
+  [ -d "$base" ] || continue
+  for d in "$base"/*; do
+    [ -d "$d" ] || continue
+    printf '%s\n' "$registered" | grep -qxF "$d" || orphans="${orphans}${d}"$'\n'
+  done
+done
+
+echo
+echo "Worktree-Cleanup — Plan (root: $root)"
+echo "──────────────────────────────────────────────────────────"
+printf '%s' "$remove"        | sed '/^$/d' | while IFS=$'\t' read -r p b; do echo "  🗑  entfernen (in main):                 $p ${b:+[$b]}"; done
+printf '%s' "$orphans"       | sed '/^$/d' | while read -r p;            do echo "  🗑  entfernen (Orphan, keine git-Referenz): $p"; done
+printf '%s' "$keep_dirty"    | sed '/^$/d' | while read -r p;            do echo "  ⏭  behalten  (in main, ABER uncommitted):  $p"; done
+printf '%s' "$keep_unmerged" | sed '/^$/d' | while IFS=$'\t' read -r p b; do echo "  ⏭  behalten  (nicht in main):             $p ${b:+[$b]}"; done
+printf '%s' "$keep_locked"   | sed '/^$/d' | while read -r p;            do echo "  🔒 behalten  (locked):                    $p"; done
+echo
+
+if [ "$FORCE" != 1 ]; then
+  echo "Dry-Run — es wurde NICHTS entfernt."
+  echo "Ausführen mit:  FORCE=1 mise run clean:worktrees"
+  echo "Tipp: vorher 'git fetch' für ein aktuelles origin/main."
+  exit 0
+fi
+
+echo "→ Entferne geplante Worktrees/Branches …"
+printf '%s' "$remove" | sed '/^$/d' | while IFS=$'\t' read -r p b; do
+  git worktree remove --force "$p" && echo "  ✓ entfernt: $p"
+  if [ -n "$b" ] && [ "$b" != main ]; then
+    git branch -D "$b" >/dev/null 2>&1 && echo "    ✓ Branch gelöscht: $b" || true
+  fi
+done
+printf '%s' "$orphans" | sed '/^$/d' | while read -r p; do
+  rm -rf "$p" && echo "  ✓ Orphan entfernt: $p"
+done
+git worktree prune 2>/dev/null || true
+echo "✓ Worktree-Cleanup abgeschlossen."
+'''
