@@ -100,20 +100,34 @@ beide fahren. Der Scan-Wiring-Test (`tests/karte_hintergrundbild_scan.rs`) übt 
 
 ## Backend — Statuscode-Konvention (LFH-267/F22)
 
-Die in `src/error.rs` dokumentierte Konvention ist **verbindlich**. Beim Anfassen einer Route
-gilt sie; ein Sweep über den Bestand läuft separat (F22 Teil B).
+Die in `src/error.rs` dokumentierte Konvention ist **verbindlich**. Sie ist bewusst **am
+Bestand ausgerichtet** (F22 Teil B): wo Doku und Code auseinanderliefen, wurde die Doku
+angepasst, statt ~59 Handler umzuschreiben, die niemand als falsch empfand.
 
 | Code | `AppError`-Variante | Wann |
 |---|---|---|
-| **400** | `Validation` | Eingabe ist **formal** ungültig: kaputtes JSON, falscher Feldtyp, **unbekannter Enum-Wert** (Body *und* Query-Filter), strukturell fehlendes Pflichtfeld |
-| **422** | `UnprocessableEntity` | Body ist formal gültig, aber der **Zustand oder die Feld-Kombination** verbietet die Aktion: leeres Pflichtfeld, XOR-verletzende Kombination, **ungültiger Status-Übergang** |
+| **400** | `Validation` | **Das Feld für sich** ist unbrauchbar: kaputtes JSON, falscher Feldtyp, **unbekannter Enum-Wert** (Body *und* Query-Filter), strukturell fehlendes Pflichtfeld, **vorhandenes aber leeres Pflichtfeld** |
+| **422** | `UnprocessableEntity` | Jedes Feld für sich ist in Ordnung, aber **der Zusammenhang** verbietet die Aktion: XOR-verletzende Feld-Kombination, **ungültiger Status-Übergang**, Zustandsverletzung |
 | **409** | `Conflict` | **Nebenläufigkeit** oder **Lebenszyklus**: CAS-/Sperrkonflikt, storniertes Objekt |
 
-Trennlinie 400 ↔ 422 an einem Beispiel: ein **fehlendes** Pflichtfeld scheitert am Extractor
-(serde, kein `#[serde(default)]`) → **400**; ein **vorhandenes, aber leeres** Feld scheitert an
-der Handler-Validierung → **422**. So macht es der Code seit dem `JsonBody`-Wrapper von selbst —
-es braucht keine Reklassifizierung. Referenz: `tests/freies_zeichen.rs`
-(`fehlendes_grundzeichen_ist_400` vs. `leeres_grundzeichen_ist_422`).
+Trennlinie 400 ↔ 422: **400 bewertet das Feld isoliert** — fehlt es, ist es vom falschen Typ,
+trägt es einen unbekannten Enum-Wert oder ist es leer, dann ist die Eingabe schon für sich
+genommen unbrauchbar. **422 bewertet erst den Zusammenhang** — die *Kombination* mehrerer
+Felder oder der *Zustand des Objekts* verbietet die Aktion.
+
+Ein leeres Pflichtfeld ist deshalb **400**, nicht 422: es scheitert am Feld, nicht am
+Zusammenhang. Das ist auch, was die klare Mehrheit im Bestand tut (`AppError::Validation` mit
+„… darf nicht leer sein" in `einsatz.rs`, `benutzer.rs`, `meldung.rs`, `nachforderung.rs`,
+`etb.rs`, `karte.rs`, `sprechgruppe.rs`, `erinnerung.rs` u. a.). Das Frontend unterscheidet
+400 und 422 nicht (keine Status-400-Prüfung), der Unterschied ist reine API-Hygiene.
+
+Referenz-Testpaare für die Linie:
+
+- **400 auf beiden Wegen** — `tests/freies_zeichen.rs`: `fehlendes_grundzeichen_ist_400`
+  (scheitert am Extractor, `String` ohne `#[serde(default)]`) und `leeres_grundzeichen_ist_400`
+  (scheitert an der Handler-Validierung).
+- **422 aus dem Zusammenhang** — `tests/einsatz_schaden.rs`: `geschaedigt_beide_felder_ist_422`
+  (Feld-Kombination) und `uebergeben_aus_abgeschlossen_ist_422` (Status-Übergang).
 
 **409 hat ZWEI Quellen, die nicht verschmelzen dürfen** (Ursache des LFH-299/300-Fehlers):
 
@@ -129,10 +143,20 @@ Die Unterscheidung ist im Frontend heute nur **Heuristik**, kein Vertrag: `istKo
 Seite wieder in „Überschreiben?"-Schleifen. Ein maschinenlesbarer Fehler-Code im `{error}`-Body
 wäre die saubere Lösung und ist bewusst vertagt.
 
-**Bekannte Abweichung, NICHT als Norm übernehmen:** `einsatz_schaden.rs` liefert für einen
-ungültigen Status-Übergang (`darf_uebergehen`) **409** statt 422. Die Mehrheit
-(`einsatz_person.rs`, `einsatz_tier.rs`, `nachforderung.rs`) macht es richtig mit 422;
-die Angleichung gehört in F22 Teil B.
+**Bekannte Abweichungen, NICHT als Norm übernehmen** (Angleichung vertagt → LFH-305):
+
+1. **Unbekannter Enum-Wert → 422 statt 400** an ~19 Stellen, u. a. `einsatz_schaden.rs:66/73/80`
+   (Query-Filter) und `:365/370/375`, `gefahr.rs:105/111/117`, `lage_zone.rs:73/79/220`,
+   `einsatz_uhs.rs:512`, `einsatz_tier.rs:457`, dazu je eine Stelle in `auth.rs`, `befehl.rs`,
+   `lagebericht.rs`, `organisation.rs`.
+2. **Leeres bzw. fehlendes Pflichtfeld → 422 statt 400** in `einsatz_schaden.rs`: `:158` (Ort
+   beim Anlegen), `:384` (Ort im PATCH), `:518` (Übergabe-Adressat), `:591` (Abschlussgrund).
+   `:158/:518/:591` kollabieren zusätzlich „fehlend" und „leer" in denselben Code, weil die
+   Felder `Option<String>` sind — das Entwirren gehört mit ins Ticket.
+
+**Nicht betroffen, legitimes 422:** `lage_zone.rs:85/92/94` (kaputtes GeoJSON bzw.
+`geometrie.type` ≠ `geometrie_typ` — eine Feld-*Kombination*), `einsatzabschnitt.rs:261`
+(kaputtes GeoJSON), `sprechgruppe/repo.rs:207` (referenzielle Zuordenbarkeit).
 
 **Sicherheitsnetz (LFH-245):** nicht vorab abgefangene DB-Constraint-Verletzungen bekommen in
 `AppError::status()` automatisch einen fachlichen Code — UNIQUE/FK → **409**, CHECK → **422**,
@@ -143,4 +167,4 @@ statt eines nackten 500. Per-Handler-Prechecks bleiben für präzise Meldungen z
 Deserialisierungs-Rejection dem `{error}`-JSON-Format. `axum::Json` bleibt für **Responses**
 richtig. Erzwungen von `tests/json_extractor_guard.rs`; querschnittliche Fehlerfälle
 (405, unbekannter API-Pfad, kaputter Body) deckt `tests/fehler_vertrag.rs` ab.
-Noch offen (Teil B): `Path`-Rejections antworten weiterhin `text/plain`.
+Noch offen (LFH-305): `Path`-Rejections antworten weiterhin `text/plain`.

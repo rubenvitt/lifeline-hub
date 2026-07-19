@@ -1,7 +1,7 @@
 //! LFH-170 Freie taktische Zeichen — Backend-Integrationstests.
 //!
 //! Deckt ab: CRUD (POST→GET→PATCH→DELETE), Whole-Spec-Overwrite (fehlende Overlays →
-//! NULL, lat/lon unverändert), 422 bei fehlendem/leerem grundzeichen, 404 für fremden
+//! NULL, lat/lon unverändert), 400 bei fehlendem/leerem grundzeichen, 404 für fremden
 //! Einsatz bzw. fremde zeichen-id, Gate-Matrix (GET braucht Lesezugriff+Modul; POST/PATCH/
 //! DELETE Schreibrecht+aktiv+Modul; Org-Isolation), SSE-Event `freies_zeichen` (Wire-Tag +
 //! Payload load-bearing für das Frontend).
@@ -127,8 +127,8 @@ async fn anlegen_und_liste() {
 ///
 /// `AnlegenBody.grundzeichen` ist ein `String` ohne `#[serde(default)]`, der Body scheitert
 /// also schon am Extractor — der Handler läuft nie an. Vor LFH-267 lieferte axums
-/// `JsonDataError` dafür 422; seit dem `JsonBody`-Wrapper ist es 400. Die Trennlinie zum
-/// Test darunter ist genau die Konvention: strukturell fehlend = 400, leerer Wert = 422.
+/// `JsonDataError` dafür 422; seit dem `JsonBody`-Wrapper ist es 400. Zusammen mit dem Test
+/// darunter deckt das beide Wege zum selben Code ab: Extractor und Handler-Validierung.
 #[tokio::test]
 async fn fehlendes_grundzeichen_ist_400() {
     let (app, _live) = setup().await;
@@ -150,12 +150,14 @@ async fn fehlendes_grundzeichen_ist_400() {
     );
 }
 
-/// Vorhandenes, aber leeres Pflichtfeld ist ein FACHLICHER Fehler → 422.
+/// Auch ein vorhandenes, aber leeres Pflichtfeld ist ein FORMALER Fehler → 400 (F22-B).
 ///
 /// Der Body ist strukturell gültig, der Extractor lässt ihn durch; erst die
-/// Handler-Validierung lehnt den Whitespace-only-Wert ab.
+/// Handler-Validierung lehnt den Whitespace-only-Wert ab — beide Wege enden bei 400.
+/// 422 bliebe der Fall, in dem erst der ZUSAMMENHANG die Aktion verbietet (Feld-Kombination,
+/// Objekt-Zustand), nicht das Feld für sich.
 #[tokio::test]
-async fn leeres_grundzeichen_ist_422() {
+async fn leeres_grundzeichen_ist_400() {
     let (app, _live) = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
@@ -171,7 +173,7 @@ async fn leeres_grundzeichen_ist_422() {
         )
         .await
         .0,
-        StatusCode::UNPROCESSABLE_ENTITY
+        StatusCode::BAD_REQUEST
     );
 }
 
