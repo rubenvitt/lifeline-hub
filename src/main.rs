@@ -4,6 +4,7 @@ use lifeline_hub::backup;
 use lifeline_hub::config::{Command, Config};
 use lifeline_hub::db;
 use lifeline_hub::live::LiveHub;
+use lifeline_hub::verbindung;
 use std::path::Path;
 use tracing_subscriber::EnvFilter;
 
@@ -209,23 +210,28 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         })?;
         tracing::info!("Server (HTTPS) lauscht auf {}", addr);
 
-        let handle = axum_server::Handle::new();
-        let h2 = handle.clone();
-        tokio::spawn(async move {
-            shutdown_signal().await;
-            h2.graceful_shutdown(Some(std::time::Duration::from_secs(10)));
-        });
-        axum_server::bind_rustls(addr, tls_config)
-            .handle(handle)
-            .serve(app.into_make_service())
-            .await?;
+        let handle = graceful_handle();
+        // LFH-231/G10: Slow-Loris-Schutz. Der innere Akzeptor läuft VOR dem TLS-Handshake,
+        // das Verbindungs-Permit deckt ihn also mit ab.
+        let mut server = axum_server::bind_rustls(addr, tls_config)
+            .map(|a| a.acceptor(verbindung::SemaphorAkzeptor::default()));
+        verbindung::zeitschranken_setzen(&mut server, verbindung::Fristen::default());
+        server.handle(handle).serve(app.into_make_service()).await?;
     } else {
-        // Unveränderter HTTP-Bestandspfad.
+        // LFH-231/G10: `axum::serve` exponiert die hyper-Server-Parameter nicht — es baut den
+        // Builder pro Verbindung intern und gibt keinen Hook darauf. Ohne Header-Lese-Timeout
+        // bliebe der HTTP-Pfad gegen Slow Loris ungeschützt. Deshalb läuft er über denselben
+        // `axum-server` wie der TLS-Pfad; die Hostnamen-Auflösung des Binds bleibt erhalten,
+        // weil weiterhin `tokio::net::TcpListener::bind` (ToSocketAddrs) bindet und der
+        // Listener nur übergeben wird. `set_nonblocking` erledigt axum-server selbst.
         let listener = tokio::net::TcpListener::bind(&config.bind).await?;
         tracing::info!("Server lauscht auf {}", config.bind);
-        axum::serve(listener, app)
-            .with_graceful_shutdown(shutdown_signal())
-            .await?;
+
+        let handle = graceful_handle();
+        let mut server = axum_server::from_tcp(listener.into_std()?)
+            .acceptor(verbindung::SemaphorAkzeptor::default());
+        verbindung::zeitschranken_setzen(&mut server, verbindung::Fristen::default());
+        server.handle(handle).serve(app.into_make_service()).await?;
     }
 
     Ok(())
@@ -258,6 +264,23 @@ async fn cmd_restore(db_path: &str, from: &str, force: bool) -> anyhow::Result<(
     backup::restore::restore_aus_datei(Path::new(from), Path::new(db_path)).await?;
     println!("Sicherung {from} wurde nach {db_path} eingespielt.");
     Ok(())
+}
+
+/// Liefert ein `Handle`, das beim Shutdown-Signal den Graceful Shutdown auslöst.
+///
+/// Seit LFH-231/G10 laufen BEIDE Serve-Pfade über `axum-server` (nur dort ist der
+/// hyper-Builder für das Header-Lese-Timeout erreichbar). Der HTTP-Pfad nutzte vorher
+/// `axum::serve(..).with_graceful_shutdown(..)`, das unbegrenzt auf offene Verbindungen
+/// wartet; hier gilt nun dieselbe 10-Sekunden-Frist wie im TLS-Pfad — sinnvoll, weil eine
+/// SSE-Verbindung sonst den Shutdown beliebig lange offen hielte.
+fn graceful_handle() -> axum_server::Handle {
+    let handle = axum_server::Handle::new();
+    let h2 = handle.clone();
+    tokio::spawn(async move {
+        shutdown_signal().await;
+        h2.graceful_shutdown(Some(std::time::Duration::from_secs(10)));
+    });
+    handle
 }
 
 /// Wartet auf ein Shutdown-Signal (SIGINT/Ctrl+C oder SIGTERM) für einen sauberen Shutdown.

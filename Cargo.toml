@@ -44,6 +44,10 @@ clamav-client = { version = "2.2", optional = true, default-features = false, fe
 # rcgen für die selbstsignierte Cert-Generierung (mkcert-/BYO-Fallback).
 axum-server = { version = "0.7", features = ["tls-rustls"] }
 rcgen = "0.14"
+# LFH-231/G10: ausschließlich für `TokioTimer` — hyper braucht einen Timer, bevor
+# `header_read_timeout` gesetzt werden darf (sonst Panik beim Verbindungsaufbau). Die Crate
+# war ohnehin transitiv im Graph (über axum und axum-server), hier nur direkt benannt.
+hyper-util = { version = "0.1", features = ["tokio"] }
 # LFH-41: OIDC/SSO (Increment 3). Task 1 nur die Dependency — Discovery/Token-Exchange/Claims
 # folgen in späteren Increment-3-Tasks (Lazy Discovery, kein Netz beim Start).
 # default-features aus: die Default-Features "reqwest"/"rustls-tls" ziehen oauth2s eigenen

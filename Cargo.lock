@@ -1928,6 +1928,7 @@ dependencies = [
  "fs4",
  "futures",
  "http-body-util",
+ "hyper-util",
  "karten-katalog",
  "libsqlite3-sys",
  "mime_guess",
