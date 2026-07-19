@@ -23,7 +23,16 @@
 use std::time::Duration;
 
 /// Höchstzahl der Versuche einer schreibenden Transaktion bei `SQLITE_BUSY`.
-pub(crate) const MAX_VERSUCHE: u32 = 8;
+///
+/// Deckelt zugleich die Worst-Case-Latenz (LFH-302): jeder Versuch kann am `BEGIN IMMEDIATE`
+/// bis zum `busy_timeout` (5 s, `db.rs`) warten, bevor er `SQLITE_BUSY` liefert. Hält ein
+/// fremder Writer den WAL-Write-Lock durchgehend länger als das Timeout (anomale
+/// Massen-Operation), hängt ein konkurrierender Handler also bis zu `MAX_VERSUCHE × 5 s`,
+/// bevor er 503 liefert — axum hat kein Default-Request-Timeout, das ihn früher kappen würde.
+/// 4 Versuche halten den Worst Case bei ~20 s und kosten im Normalbetrieb nichts: dort löst
+/// sich Contention im Millisekundenbereich am BEGIN, mehr als ein bis zwei Versuche kommen
+/// praktisch nicht vor.
+pub(crate) const MAX_VERSUCHE: u32 = 4;
 
 /// `true`, wenn der Fehler aus der `SQLITE_BUSY`-Familie stammt (Primärcode 5:
 /// BUSY, BUSY_SNAPSHOT=517, BUSY_RECOVERY=261, BUSY_TIMEOUT=773). sqlx-sqlite liefert
