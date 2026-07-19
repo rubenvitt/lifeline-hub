@@ -1,0 +1,35 @@
+# LFH-253/G01: Konfiguration für `cargo audit` (scripts/check-deps.sh).
+#
+# Hier stehen NUR Advisories, für die es keinen Fix gibt UND deren Nichtbetroffenheit
+# begründet ist. Jeder Eintrag braucht: warum kein Upgrade möglich ist, warum das Risiko
+# in DIESEM Code nicht trägt, und woran man merkt, dass sich das ändert.
+#
+# Der Sinn der Liste ist nicht, das Gate leise zu machen, sondern es NUTZBAR zu halten:
+# ein Gate, das von Tag eins rot ist, wird abgeschaltet statt befolgt. Was hier steht,
+# ist bewertet — was nicht hier steht, bricht den Build.
+
+[advisories]
+ignore = [
+    # RUSTSEC-2023-0071 — „Marvin Attack": Timing-Sidechannel in `rsa` 0.9.x, über den ein
+    # Angreifer mit einem Entschlüsselungs-Orakel den PRIVATEN Schlüssel rekonstruieren
+    # kann. Severity 5.9 (medium).
+    #
+    # Kein Upgrade möglich: die Advisory sagt ausdrücklich „No fixed upgrade is available"
+    # — es gibt bis heute keine gefixte rsa-Version. Der Pfad ist
+    # rsa 0.9.10 ← openidconnect 4.0.1 ← lifeline-hub, also transitiv und nicht abwählbar,
+    # solange OIDC/SSO unterstützt wird.
+    #
+    # Warum das Risiko hier nicht trägt: lifeline-hub ist OIDC-*Client* (Relying Party).
+    # In dieser Rolle wird RSA ausschließlich zum PRÜFEN von Signaturen benutzt — mit dem
+    # ÖFFENTLICHEN Schlüssel des Identity Providers aus dessen JWKS. Wir halten keinen
+    # privaten RSA-Schlüssel und entschlüsseln nichts damit; die Client-Authentisierung
+    # läuft über `client_secret`, nicht über RSA. Der Angriff braucht aber genau ein
+    # Orakel, das mit dem privaten Schlüssel entschlüsselt. Diese Operation existiert in
+    # diesem Programm nicht.
+    #
+    # Neu bewerten, wenn: (a) eine gefixte rsa-Version erscheint (dann Ignore streichen),
+    # (b) das Projekt anfängt, verschlüsselte ID-Tokens (JWE) zu entgegenzunehmen oder
+    # selbst als OIDC-*Provider* aufzutreten — dann kämen private-key-Operationen ins
+    # Spiel und die Begründung oben fiele weg.
+    "RUSTSEC-2023-0071",
+]

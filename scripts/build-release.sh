@@ -27,6 +27,46 @@ touch src/static_files.rs
 cargo build --release
 
 BINARY="target/release/lifeline-hub"
+
+echo "==> SBOM erzeugen (LFH-253/G01)"
+# Wozu: ohne Inventar des ausgelieferten Artefakts lässt sich im Advisory-Fall nicht
+# beantworten, ob und wo man betroffen ist. Deterministisch und offline — deshalb darf
+# das hier am Release hängen, anders als der netzabhängige Advisory-Scan
+# (scripts/check-deps.sh), der bewusst NICHT im Release-Pfad steht.
+SBOM_DIR="target/release/sbom"
+mkdir -p "$SBOM_DIR"
+sbom_fehlend=()
+
+if command -v cargo-cyclonedx >/dev/null 2>&1; then
+  cargo cyclonedx --format json --all >/dev/null
+  # cargo-cyclonedx legt die Dateien neben den Manifesten ab — einsammeln.
+  find . -name 'bom.json' -not -path './target/*' -exec mv {} "$SBOM_DIR"/ \; 2>/dev/null || true
+else
+  sbom_fehlend+=("cargo-cyclonedx  →  cargo install cargo-cyclonedx")
+fi
+
+if mise exec pnpm@11.10.0 -- pnpm -C frontend exec cyclonedx-npm --version >/dev/null 2>&1; then
+  mise exec pnpm@11.10.0 -- pnpm -C frontend exec cyclonedx-npm \
+    --output-file "../$SBOM_DIR/bom-frontend.json"
+else
+  sbom_fehlend+=("@cyclonedx/cyclonedx-npm  →  pnpm -C frontend add -D @cyclonedx/cyclonedx-npm")
+fi
+
+# Die eingebackene SQLite-Version (LFH-233/G02): sie steckt als C-Amalgamation im Binary
+# und wird von KEINEM System-Update erreicht — im Advisory-Fall ist sie die Zahl, die man
+# braucht. Aus dem laufenden Binary gelesen, nicht aus einer gepflegten Konstante.
+if SQLITE_VERSION="$("$BINARY" sqlite-version 2>/dev/null)"; then
+  echo "$SQLITE_VERSION" > "$SBOM_DIR/eingebettete-sqlite-version.txt"
+  echo "    eingebettetes SQLite: $SQLITE_VERSION"
+fi
+
+if [ ${#sbom_fehlend[@]} -gt 0 ]; then
+  echo "    WARNUNG: SBOM unvollständig, folgende Werkzeuge fehlen:" >&2
+  for w in "${sbom_fehlend[@]}"; do echo "      - $w" >&2; done
+else
+  echo "    SBOM: $SBOM_DIR"
+fi
+
 echo "==> Fertig: $BINARY"
 ls -lh "$BINARY"
 echo "Start mit: $BINARY --db-path lifeline.db --bind 0.0.0.0:8080"
