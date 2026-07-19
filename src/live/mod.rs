@@ -119,14 +119,27 @@ impl LiveEvent {
             LiveEvent::Fahrzeug => &["fahrzeuge"],
             LiveEvent::Material => &["material"],
             LiveEvent::Tier => &["tiere"],
-            LiveEvent::LageZone => &["lagekarte"],
+            // Dual: `/gefahrengebiete` (Modul `gefahrenzonen`) listet die `lage_zone`-Zeilen
+            // seiner Gebiete (`gefahr::repo::gebiete_liste`) — Anlage/Auflösung einer Zone
+            // ist dort ohnehin sichtbar. Ohne diesen Key fröre die Gebiets-Übersicht ein,
+            // weil `anlegen`/`aufloesen` NUR `lage_zone` feuern (kein `gefahr`-Event).
+            LiveEvent::LageZone => &["lagekarte", "gefahrenzonen"],
             LiveEvent::FreiesZeichen => &["lagekarte"],
             LiveEvent::Gefahr => &["gefahrenzonen"],
-            LiveEvent::Einheit => &["einheiten"],
-            LiveEvent::Abschnitt => &["einsatzabschnitte"],
+            // Die drei folgenden speisen zusätzlich `/karte/fuehrungskraefte` — eine
+            // explizit auf `lagekarte` gegatete Route, die ALLE disponierten Personen samt
+            // Position und den aus `einsatz_einheit.fuehrer_id` / `einsatzabschnitt.leiter_id`
+            // abgeleiteten Führungsflags liefert. Ein `lagekarte`-Leser sieht diese Daten per
+            // GET vollständig; ohne den Key fröre sein Führungskräfte-Layer ein.
+            LiveEvent::Einheit => &["einheiten", "lagekarte"],
+            LiveEvent::Abschnitt => &["einsatzabschnitte", "lagekarte"],
+            // NICHT `lagekarte`: die Karte zeigt disponiertes Personal, keine betroffenen
+            // Personen. Ein Widen hier wäre der Metadaten-Leak, den F01 gerade schließt.
             LiveEvent::Person => &["personen"],
-            LiveEvent::Personal => &["personal"],
+            LiveEvent::Personal => &["personal", "lagekarte"],
             LiveEvent::Lagebericht => &["lageberichte"],
+            // NUR `chat`: die Lagekarte zeigt keine Chat-Inhalte, ein `lagekarte`-Leser
+            // erführe sonst Kanal-/Nachrichten-Existenz ohne jeden GET-Anspruch darauf.
             LiveEvent::Chat => &["chat"],
             LiveEvent::Erinnerung => &["erinnerungen"],
             LiveEvent::Auftrag => &["auftraege"],
@@ -461,6 +474,55 @@ mod tests {
         assert_eq!(ungegatet, vec!["lagged"]);
     }
 
+    /// Pinnt die Gate-Menge JEDES Events (nicht nur „nicht leer"). Eine Verbreiterung ist
+    /// die gefährliche Richtung — sie öffnet still einen Kanal für Nutzer, die das Modul
+    /// nicht sehen dürfen, und bräche sonst keinen einzigen Test. Jede Änderung hier ist
+    /// eine bewusste Entscheidung entlang der Füll-Regel in [`LiveEvent::modul_keys`]:
+    /// ein zweiter Key nur, wenn der re-gegatete GET jenes Moduls dasselbe Objekt ohnehin
+    /// zeigt (Begründung gehört an die Variante).
+    #[test]
+    fn gate_mengen_sind_gepinnt() {
+        let erwartet: &[(LiveEvent, &[&str])] = &[
+            (LiveEvent::Uhs, &["unfallhilfsstellen"]),
+            (LiveEvent::Schaden, &["schaeden"]),
+            (LiveEvent::Fahrzeug, &["fahrzeuge"]),
+            (LiveEvent::Material, &["material"]),
+            (LiveEvent::Tier, &["tiere"]),
+            (LiveEvent::LageZone, &["lagekarte", "gefahrenzonen"]),
+            (LiveEvent::FreiesZeichen, &["lagekarte"]),
+            (LiveEvent::Gefahr, &["gefahrenzonen"]),
+            (LiveEvent::Einheit, &["einheiten", "lagekarte"]),
+            (LiveEvent::Abschnitt, &["einsatzabschnitte", "lagekarte"]),
+            (LiveEvent::Person, &["personen"]),
+            (LiveEvent::Personal, &["personal", "lagekarte"]),
+            (LiveEvent::Lagebericht, &["lageberichte"]),
+            (LiveEvent::Chat, &["chat"]),
+            (LiveEvent::Erinnerung, &["erinnerungen"]),
+            (LiveEvent::Auftrag, &["auftraege"]),
+            (LiveEvent::Nachforderung, &["nachforderungen"]),
+            (LiveEvent::Meldung, &["meldungen", "lagemeldungen"]),
+            (LiveEvent::Bereitstellungsraum, &["bereitstellungsraeume"]),
+            (LiveEvent::KarteBild, &["lagekarte"]),
+            (LiveEvent::Etb, &["etb"]),
+            (LiveEvent::Befehl, &["auftraege"]),
+            (LiveEvent::Sofortmeldung, &["meldungen"]),
+            (LiveEvent::Lagged, &[]),
+        ];
+        for (ev, keys) in erwartet {
+            assert_eq!(
+                ev.modul_keys(),
+                *keys,
+                "Gate-Menge von {} geändert — Füll-Regel prüfen und hier bewusst nachziehen",
+                ev.as_str()
+            );
+        }
+        assert_eq!(
+            erwartet.len(),
+            LiveEvent::ALLE.len(),
+            "Tabelle deckt nicht alle LiveEvent-Varianten"
+        );
+    }
+
     #[test]
     fn sichtbar_fuer_prueft_schnittmenge() {
         let nur_etb: HashSet<&'static str> = HashSet::from(["etb"]);
@@ -479,7 +541,7 @@ mod tests {
     #[test]
     fn person_und_personal_sind_getrennt_gegatet() {
         assert_eq!(LiveEvent::Person.modul_keys(), &["personen"]);
-        assert_eq!(LiveEvent::Personal.modul_keys(), &["personal"]);
+        assert_eq!(LiveEvent::Personal.modul_keys(), &["personal", "lagekarte"]);
         let nur_personal: HashSet<&'static str> = HashSet::from(["personal"]);
         assert!(!LiveEvent::Person.sichtbar_fuer(&nur_personal));
         assert!(LiveEvent::Personal.sichtbar_fuer(&nur_personal));

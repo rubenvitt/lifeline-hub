@@ -607,6 +607,215 @@ async fn versteckte_module_werden_aus_dem_live_feed_gefiltert() {
     );
 }
 
+/// Öffnet `/live` für `cookie` und liefert die Response (Body bleibt offen).
+async fn live_oeffnen(
+    app: &axum::Router,
+    cookie: &str,
+    eid: i64,
+    last_event_id: Option<&str>,
+) -> axum::http::Response<axum::body::Body> {
+    let mut req = Request::builder()
+        .uri(format!("/api/einsaetze/{eid}/live"))
+        .header(header::COOKIE, cookie.to_string());
+    if let Some(id) = last_event_id {
+        req = req.header("last-event-id", id);
+    }
+    app.clone()
+        .oneshot(req.body(Body::empty()).unwrap())
+        .await
+        .unwrap()
+}
+
+/// POST mit Admin-Cookie; prüft nur, dass es geklappt hat.
+async fn admin_post(app: &axum::Router, admin: &str, pfad: &str, body: &str) {
+    let status = post_status(app, admin, pfad, body).await;
+    assert!(
+        status.is_success(),
+        "Vorbedingung fehlgeschlagen: POST {pfad} → {status}"
+    );
+}
+
+/// Die `id:`-Zeilen eines SSE-Ausschnitts (für den Reconnect-Test).
+fn sse_ids(roh: &str) -> Vec<String> {
+    roh.lines()
+        .filter_map(|z| z.strip_prefix("id: "))
+        .map(|s| s.trim().to_string())
+        .collect()
+}
+
+/// Der Modul-Filter muss die **Org-Default-Rollenschranke** genauso beachten wie einen
+/// Einsatz-Override — `erlaubte_module` lädt dieselben zwei Policy-Quellen wie der
+/// GET-Pfad (`fordere_modul_zugriff_laden`). Ohne diesen Test bliebe ein Weglassen der
+/// Org-Defaults (fail-open gegenüber dem GET) unbemerkt.
+#[tokio::test]
+async fn org_modul_default_wirkt_auch_im_live_feed() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+
+    // KEIN Einsatz-Override — nur der Org-Default sperrt ETB für Nicht-Führungskräfte.
+    assert_eq!(
+        org_default_setzen(&app, &admin, "etb", Some("fuehrungskraft")).await,
+        StatusCode::OK
+    );
+    // Gegenprobe: der GET-Pfad sperrt bereits.
+    assert_eq!(
+        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/etb")).await,
+        StatusCode::FORBIDDEN,
+        "Vorbedingung: Org-Default muss den GET sperren"
+    );
+
+    let feed = live_oeffnen(&app, &frieda, eid, None).await;
+    assert_eq!(feed.status(), StatusCode::OK);
+
+    admin_post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{eid}/personen"),
+        r#"{"name":"Muster","vorname":"Max"}"#,
+    )
+    .await;
+    admin_post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{eid}/etb"),
+        r#"{"typ":"meldung","inhalt":"Nur fuer Fuehrungskraefte"}"#,
+    )
+    .await;
+
+    let gelesen = sse_anfang_lesen(feed.into_body(), 400).await;
+    assert!(
+        gelesen.contains("event: person"),
+        "erlaubtes Modul muss durchkommen: {gelesen:?}"
+    );
+    assert!(
+        !gelesen.contains("event: etb"),
+        "Org-Default muss den Live-Feed genauso sperren wie den GET: {gelesen:?}"
+    );
+}
+
+/// Der Reconnect-Pfad (`Last-Event-ID` → Replay-Prefix) muss denselben Filter tragen wie
+/// der Live-Tail — sonst wäre ein simpler Reconnect der Bypass des ganzen Gates.
+#[tokio::test]
+async fn reconnect_replay_wird_ebenfalls_gefiltert() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+    let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, eid, fid, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    assert_eq!(
+        override_setzen(&app, &admin, eid, "etb", false, None).await,
+        StatusCode::OK
+    );
+
+    // Der LiveHub räumt einen Kanal ab, sobald sein LETZTER Empfänger weg ist (inkl.
+    // Replay-Ring). Eine offen gehaltene Admin-Verbindung hält ihn am Leben, damit
+    // Friedas Trennung wirklich nur eine Trennung ist — sonst wäre der Replay leer und
+    // der Test bewiese nichts.
+    let _halter = live_oeffnen(&app, &admin, eid, None).await;
+
+    // Erste Verbindung: ein erlaubtes Event, um eine gültige Event-Id zu bekommen.
+    let erste = live_oeffnen(&app, &frieda, eid, None).await;
+    admin_post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{eid}/personen"),
+        r#"{"name":"Erste","vorname":"Person"}"#,
+    )
+    .await;
+    let anfang = sse_anfang_lesen(erste.into_body(), 400).await;
+    let ids = sse_ids(&anfang);
+    let letzte_id = ids.last().expect("erste Verbindung muss eine id liefern");
+
+    // Während der „Trennung": ein gesperrtes und ein erlaubtes Event.
+    admin_post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{eid}/etb"),
+        r#"{"typ":"meldung","inhalt":"Verpasst und geheim"}"#,
+    )
+    .await;
+    admin_post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{eid}/personen"),
+        r#"{"name":"Zweite","vorname":"Person"}"#,
+    )
+    .await;
+
+    // Reconnect mit Last-Event-ID → Replay der verpassten Nachrichten.
+    let zweite = live_oeffnen(&app, &frieda, eid, Some(letzte_id)).await;
+    assert_eq!(zweite.status(), StatusCode::OK);
+    let nachgeliefert = sse_anfang_lesen(zweite.into_body(), 400).await;
+
+    assert!(
+        nachgeliefert.contains("event: person"),
+        "verpasstes erlaubtes Event muss nachgeliefert werden: {nachgeliefert:?}"
+    );
+    assert!(
+        !nachgeliefert.contains("event: etb"),
+        "Replay-Prefix muss gefiltert sein, sonst ist Reconnect der Bypass: {nachgeliefert:?}"
+    );
+    assert!(
+        !nachgeliefert.contains("Verpasst und geheim"),
+        "kein Volltext im Replay: {nachgeliefert:?}"
+    );
+}
+
+/// Die Payloads sind ID-only — für ETB UND Chat. Der Broadcast geht an jeden Abonnenten
+/// des Einsatzes; Inhalt und Autorname gehören hinter den modul-gegateten GET.
+#[tokio::test]
+async fn live_payloads_tragen_keinen_klartext() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let eid = einsatz_anlegen(&app, &admin, "Lage").await;
+
+    let feed = live_oeffnen(&app, &admin, eid, None).await;
+    assert_eq!(feed.status(), StatusCode::OK);
+
+    admin_post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{eid}/etb"),
+        r#"{"typ":"meldung","inhalt":"ETB-Klartext-Kanarienvogel","von":"Absender-Kanarienvogel"}"#,
+    )
+    .await;
+    admin_post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{eid}/chat/kanaele"),
+        r#"{"name":"Lagekanal"}"#,
+    )
+    .await;
+    admin_post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{eid}/chat/kanaele/1/nachrichten"),
+        r#"{"inhalt":"Chat-Klartext-Kanarienvogel"}"#,
+    )
+    .await;
+
+    let gelesen = sse_anfang_lesen(feed.into_body(), 500).await;
+    assert!(
+        gelesen.contains("event: etb") && gelesen.contains("event: chat"),
+        "beide Events müssen ankommen (sonst prüft der Test nichts): {gelesen:?}"
+    );
+    for kanarienvogel in [
+        "ETB-Klartext-Kanarienvogel",
+        "Absender-Kanarienvogel",
+        "Chat-Klartext-Kanarienvogel",
+    ] {
+        assert!(
+            !gelesen.contains(kanarienvogel),
+            "{kanarienvogel:?} darf den Server nicht über den Broadcast verlassen: {gelesen:?}"
+        );
+    }
+}
+
 // ----------------------------- Task 11: Org-Modul-Default über HTTP-Route erzwungen -----------------------------
 
 /// PUT /api/org-modul-einstellungen/:modul_key; liefert nur den Status.
