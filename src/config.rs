@@ -363,9 +363,46 @@ pub enum Command {
 mod tests {
     use super::*;
 
+    /// Serialisiert die Env-Manipulation in [`parse_hermetisch`] — `remove_var`/`set_var`
+    /// wirken prozessweit, parallel laufende Tests würden sich sonst die Umgebung
+    /// unter den Füßen wegziehen.
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// Parst die Config so, als stünde **keine** `LIFELINE_*`-Variable in der Umgebung.
+    ///
+    /// Jedes Feld mit `#[arg(env = "…")]` macht einen Default-Test sonst davon abhängig,
+    /// was gerade im Prozess-Env steht — und über `mise.local.toml` + `.env` ist das im
+    /// Entwickler-Alltag eine Menge. Genau daran ist die Suite rot geworden
+    /// (LFH-235/F17): `LIFELINE_OIDC_*` aus der `.env` ließ
+    /// `oidc_config_defaults_sind_none` fallen, obwohl am Code nichts falsch war.
+    /// Der Leak reicht bis in frische Worktrees ohne eigene `.env`, weil mise die
+    /// Elternverzeichnisse mitliest.
+    ///
+    /// Ein `env -u` im Gate würde nur den Gate-Lauf heilen; ein direkter `cargo test`
+    /// bliebe rot. Deshalb ist die Isolation hier im Test statt im Wrapper.
+    fn parse_hermetisch<I, T>(args: I) -> Config
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<std::ffi::OsString> + Clone,
+    {
+        // Ein vergifteter Mutex ist hier harmlos: der Guard schützt nur die Reihenfolge.
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let gesichert: Vec<(String, String)> = std::env::vars()
+            .filter(|(k, _)| k.starts_with("LIFELINE_"))
+            .collect();
+        for (k, _) in &gesichert {
+            std::env::remove_var(k);
+        }
+        let config = Config::parse_from(args);
+        for (k, v) in gesichert {
+            std::env::set_var(k, v);
+        }
+        config
+    }
+
     #[test]
     fn defaults_are_applied() {
-        let config = Config::parse_from(["lifeline-hub"]);
+        let config = parse_hermetisch(["lifeline-hub"]);
         assert_eq!(config.db_path, "lifeline.db");
         assert_eq!(config.bind, "127.0.0.1:8080");
     }
@@ -384,7 +421,7 @@ mod tests {
 
     #[test]
     fn tls_defaults_und_flags() {
-        let c = Config::parse_from(["lifeline-hub"]);
+        let c = parse_hermetisch(["lifeline-hub"]);
         assert!(!c.tls, "TLS ist per Default aus (HTTP-Bestand)");
         assert!(c.tls_mkcert_install, "mkcert-install Default an");
         assert!(c.tls_cert.is_none() && c.tls_key.is_none());
@@ -564,7 +601,7 @@ mod tests {
 
     #[test]
     fn bootstrap_defaults_und_optionales_passwort() {
-        let config = Config::parse_from(["lifeline-hub"]);
+        let config = parse_hermetisch(["lifeline-hub"]);
         assert_eq!(config.org_name, "Meine Organisation");
         assert_eq!(config.admin_user, "admin");
         assert!(config.admin_password.is_none());
@@ -601,7 +638,7 @@ mod tests {
 
     #[test]
     fn oidc_config_defaults_sind_none() {
-        let config = Config::parse_from(["lifeline-hub"]);
+        let config = parse_hermetisch(["lifeline-hub"]);
         assert!(config.oidc_issuer.is_none());
         assert!(config.oidc_client_id.is_none());
         assert!(config.oidc_client_secret.is_none());
@@ -637,7 +674,7 @@ mod tests {
 
     #[test]
     fn ohne_subkommando_ist_kein_command() {
-        let config = Config::parse_from(["lifeline-hub"]);
+        let config = parse_hermetisch(["lifeline-hub"]);
         assert!(config.command.is_none());
     }
 
