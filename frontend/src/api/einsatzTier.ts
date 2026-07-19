@@ -67,6 +67,17 @@ export function legeTierAn(einsatzId: number, daten: TierEingabe): Promise<Tier>
  * `geaendert_at`-Stand. Ist er veraltet → 409 statt stillem Overwrite. Ohne Baseline
  * (Halter-Zuordnung aus der Personen-Detailseite, Konfliktdialog-Overwrite) wird bewusst
  * blind geschrieben.
+ *
+ * PATCH-Semantik (LFH-266/F12): ein gesendetes `null` LEERT das Feld, ein fehlender Key lässt
+ * es unverändert. Geleerte Formularfelder werden dafür zu `null` normalisiert — antds
+ * `Select allowClear` liefert sonst `undefined`, und der Key fiele beim `JSON.stringify`
+ * ganz aus dem Body.
+ *
+ * Die Normalisierung läuft ausschließlich über VORHANDENE Keys. Das ist hier kritisch:
+ * `aktualisiereTier` wird auch aus `PersonenDetailPage` mit Partial-Patches aufgerufen
+ * (nur `halter_person_id`/`halter_kontakt`). Eine Normalisierung über eine feste Feldliste
+ * würde dort die neun Identitätsfelder als `null` injizieren und beim Halter-Entfernen
+ * still den halben Tierdatensatz leeren.
  */
 export function aktualisiereTier(
   einsatzId: number,
@@ -74,7 +85,13 @@ export function aktualisiereTier(
   daten: TierPatch,
   basisGeaendertAt?: string,
 ): Promise<Tier> {
-  const body = basisGeaendertAt ? { ...daten, basis_geaendert_at: basisGeaendertAt } : daten;
+  const norm = Object.fromEntries(
+    Object.entries(daten).map(([k, v]) => [
+      k,
+      v === undefined || (typeof v === 'string' && v.trim() === '') ? null : v,
+    ]),
+  ) as TierPatch;
+  const body = basisGeaendertAt ? { ...norm, basis_geaendert_at: basisGeaendertAt } : norm;
   return apiSend<Tier>(`/api/einsaetze/${einsatzId}/tiere/${tierId}`, 'PATCH', body);
 }
 

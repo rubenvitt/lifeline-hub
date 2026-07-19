@@ -1330,3 +1330,138 @@ async fn entscheidung_nur_einsatzleitung_und_pid_invariante() {
         "verworfen ändert den Status nicht"
     );
 }
+
+// ── LFH-266/F12: PATCH-Tri-State-Semantik am HTTP-Wire ───────────────────────────────
+//
+// Bewusste Wire-Semantik-Änderung: vor dem Fix behielt der Server bei `null` oder `""`
+// still den Altwert und antwortete 200. Ein Client, der heute `""` schickt um NICHTS zu
+// ändern, leert das Feld nach dem Fix. Kein Gate fängt das — nur diese Tests halten die
+// Entscheidung fest.
+
+/// Der eigentliche DSGVO-Defekt (Art. 16 Berichtigung): PII-Felder ließen sich über die
+/// API nicht leeren. `null` muss die Spalte auf NULL setzen.
+#[tokio::test]
+async fn patch_null_leert_feld() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(
+        &app,
+        &admin,
+        e,
+        r#"{"name":"Alt","melder_kontakt":"0170-1234","notiz":"Notiz"}"#,
+    )
+    .await;
+
+    let (status, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/personen/{p}"),
+        &admin,
+        Some(r#"{"melder_kontakt":null}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(json["melder_kontakt"].is_null(), "null leert das Feld");
+    assert_eq!(json["notiz"], "Notiz", "nicht genanntes Feld bleibt");
+    assert_eq!(json["name"], "Alt", "nicht genanntes Feld bleibt");
+}
+
+/// Leerstring wird wie `null` als Leerwunsch behandelt — das Frontend sendet aus einem
+/// geleerten Textfeld `""`, und der Server soll dafür nicht den Altwert konservieren.
+#[tokio::test]
+async fn patch_leerstring_leert_feld() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{"name":"Alt","notiz":"Notiz"}"#).await;
+
+    let (status, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/personen/{p}"),
+        &admin,
+        Some(r#"{"notiz":"   "}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(json["notiz"].is_null(), "Whitespace-only leert das Feld");
+}
+
+/// Gegenprobe zum Leeren: ein leerer Patch darf NICHTS anfassen. Ohne diesen Test könnte
+/// der Umbau ins andere Extrem kippen und ungenannte Felder mitleeren.
+#[tokio::test]
+async fn patch_leeres_objekt_laesst_alles_stehen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(
+        &app,
+        &admin,
+        e,
+        r#"{"name":"Alt","vorname":"Vor","notiz":"Notiz"}"#,
+    )
+    .await;
+
+    let (status, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/personen/{p}"),
+        &admin,
+        Some(r#"{}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["name"], "Alt");
+    assert_eq!(json["vorname"], "Vor");
+    assert_eq!(json["notiz"], "Notiz");
+}
+
+/// `geschlecht` ist der Sonderfall: die Spalte trägt einen CHECK ohne `IS NULL OR`, und der
+/// Wert lief vor dem Fix ungetrimmt in `Geschlecht::parse` — ein geleertes Select lieferte
+/// damit 400 „Unbekanntes Geschlecht" statt zu leeren. Beide Schreibweisen müssen jetzt
+/// leeren, ohne den CHECK zu verletzen (SQLite wertet einen CHECK mit NULL-Ergebnis als erfüllt).
+#[tokio::test]
+async fn patch_geschlecht_leeren_ist_kein_fehler() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+
+    for leerwert in [r#"{"geschlecht":null}"#, r#"{"geschlecht":""}"#] {
+        let p = person_anlegen(&app, &admin, e, r#"{"geschlecht":"divers"}"#).await;
+        let (status, json) = anfrage(
+            &app,
+            "PATCH",
+            &format!("/api/einsaetze/{e}/personen/{p}"),
+            &admin,
+            Some(leerwert),
+        )
+        .await;
+        assert_eq!(
+            status,
+            StatusCode::OK,
+            "Leeren via {leerwert} ist kein Fehler"
+        );
+        assert!(json["geschlecht"].is_null(), "Leeren via {leerwert}");
+    }
+}
+
+/// Ein unbekannter Geschlechtswert bleibt ein Eingabefehler (400) — der Tri-State-Umbau
+/// darf die Validierung nicht aushebeln.
+#[tokio::test]
+async fn patch_unbekanntes_geschlecht_bleibt_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{"name":"Alt"}"#).await;
+
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/personen/{p}"),
+        &admin,
+        Some(r#"{"geschlecht":"tuerkis"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}

@@ -21,7 +21,7 @@ use crate::person::{
     darf_uebergehen, registrier_anzeige, repo, AbgleichStatus, Geschlecht, PersonAnzeige,
     PersonStatus, Sichtungskategorie, VerbleibArt, VerbleibStatus,
 };
-use crate::routes::support::trimme;
+use crate::routes::support::{trimme, trimme_tri};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
@@ -70,7 +70,11 @@ fn sse_auto_austritt(state: &AppState, einsatz_id: i64, effekt: &crate::uhs::Aut
 }
 
 /// Validiert ein optionales Geschlecht; `Validation`, falls gesetzt und unbekannt.
-fn pruefe_geschlecht(g: &Option<String>) -> Result<(), AppError> {
+///
+/// Prüft einen zu SETZENDEN Geschlechtswert. `None` heißt „kein Wert wird gesetzt" und ist
+/// immer zulässig — beim PATCH deckt das sowohl das absente Feld als auch den Leerwunsch
+/// (`null`/`""`) ab. Der Aufrufer flacht das Tri-State entsprechend ab.
+fn pruefe_geschlecht(g: Option<&str>) -> Result<(), AppError> {
     if let Some(g) = g {
         if Geschlecht::parse(g).is_none() {
             return Err(AppError::Validation("Unbekanntes Geschlecht".into()));
@@ -146,7 +150,7 @@ pub async fn anlegen(
     )
     .await?;
     fordere_aktiv(&einsatz)?;
-    pruefe_geschlecht(&body.geschlecht)?;
+    pruefe_geschlecht(body.geschlecht.as_deref())?;
 
     let name = trimme(body.name);
     let vorname = trimme(body.vorname);
@@ -239,15 +243,53 @@ pub async fn detail(
 
 #[derive(Debug, Deserialize)]
 pub struct PatchBody {
-    pub name: Option<String>,
-    pub vorname: Option<String>,
-    pub geschlecht: Option<String>,
-    pub geburtsdatum: Option<String>,
-    pub alter_geschaetzt: Option<i64>,
-    pub herkunft_adresse: Option<String>,
-    pub antreff_ort: Option<String>,
-    pub melder_kontakt: Option<String>,
-    pub notiz: Option<String>,
+    // Tri-State (LFH-266/F12): Feld absent = unverändert, `null` = leeren, Wert = setzen.
+    // Alle neun Spalten sind nullable, das Leeren ist fachlich vorgesehen (DSGVO-Berichtigung).
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub name: Option<Option<String>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub vorname: Option<Option<String>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub geschlecht: Option<Option<String>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub geburtsdatum: Option<Option<String>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub alter_geschaetzt: Option<Option<i64>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub herkunft_adresse: Option<Option<String>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub antreff_ort: Option<Option<String>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub melder_kontakt: Option<Option<String>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub notiz: Option<Option<String>>,
     /// Optimistisches Lock (LFH-241/F10): der beim Laden gelesene `geaendert_at`-Stand.
     /// Stimmt er nicht mehr → 409 statt stillem Overwrite. Fehlt er (Overwrite aus dem
     /// Konfliktdialog), wird bewusst blind geschrieben.
@@ -275,15 +317,24 @@ pub async fn aktualisieren(
     )
     .await?;
     fordere_aktiv(&einsatz)?;
-    pruefe_geschlecht(&body.geschlecht)?;
+    // Bleibt bewusst VOR der Normalisierung und vor allen weiteren Prüfungen — die
+    // Fehler-Präzedenz gegenüber Storno/Zustandsfehlern hängt an dieser Position.
+    // Normalisiert wird deshalb nur für diese eine Prüfung inline; ein leerer Wert ist
+    // ein Leerwunsch, kein „unbekanntes Geschlecht" (das lieferte vorher 400).
+    pruefe_geschlecht(
+        body.geschlecht
+            .as_ref()
+            .and_then(|opt| opt.as_deref().map(str::trim).filter(|s| !s.is_empty())),
+    )?;
 
-    let name = trimme(body.name);
-    let vorname = trimme(body.vorname);
-    let geburtsdatum = trimme(body.geburtsdatum);
-    let herkunft = trimme(body.herkunft_adresse);
-    let antreff = trimme(body.antreff_ort);
-    let melder = trimme(body.melder_kontakt);
-    let notiz = trimme(body.notiz);
+    let name = trimme_tri(body.name);
+    let vorname = trimme_tri(body.vorname);
+    let geschlecht = trimme_tri(body.geschlecht);
+    let geburtsdatum = trimme_tri(body.geburtsdatum);
+    let herkunft = trimme_tri(body.herkunft_adresse);
+    let antreff = trimme_tri(body.antreff_ort);
+    let melder = trimme_tri(body.melder_kontakt);
+    let notiz = trimme_tri(body.notiz);
 
     let person = repo::aktualisiere(
         &state.pool,
@@ -292,15 +343,15 @@ pub async fn aktualisieren(
         benutzer.id,
         body.basis_geaendert_at.as_deref(),
         repo::PatchDaten {
-            name: name.as_deref(),
-            vorname: vorname.as_deref(),
-            geschlecht: body.geschlecht.as_deref(),
-            geburtsdatum: geburtsdatum.as_deref(),
+            name: name.as_ref().map(|o| o.as_deref()),
+            vorname: vorname.as_ref().map(|o| o.as_deref()),
+            geschlecht: geschlecht.as_ref().map(|o| o.as_deref()),
+            geburtsdatum: geburtsdatum.as_ref().map(|o| o.as_deref()),
             alter_geschaetzt: body.alter_geschaetzt,
-            herkunft_adresse: herkunft.as_deref(),
-            antreff_ort: antreff.as_deref(),
-            melder_kontakt: melder.as_deref(),
-            notiz: notiz.as_deref(),
+            herkunft_adresse: herkunft.as_ref().map(|o| o.as_deref()),
+            antreff_ort: antreff.as_ref().map(|o| o.as_deref()),
+            melder_kontakt: melder.as_ref().map(|o| o.as_deref()),
+            notiz: notiz.as_ref().map(|o| o.as_deref()),
         },
     )
     .await?;

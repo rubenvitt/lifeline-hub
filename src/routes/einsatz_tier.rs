@@ -11,7 +11,7 @@ use crate::live::LiveEvent;
 const MODUL_KEY: &str = "tiere";
 use crate::error::AppError;
 use crate::person::repo as person_repo; // Org-Isolation der Halter-FK (404 bei fremder Person)
-use crate::routes::support::trimme;
+use crate::routes::support::{trimme, trimme_tri};
 use crate::tier::{
     darf_uebergehen, registrier_anzeige, repo as tier_repo, AbschlussGrund, Spezies, TierAnzeige,
     TierGeschlecht, TierStatus,
@@ -34,7 +34,10 @@ fn sse_tier(state: &AppState, einsatz_id: i64, tier_id: i64) {
 }
 
 /// Validiert optionales Tier-Geschlecht; `Validation`, falls gesetzt und unbekannt.
-fn pruefe_geschlecht(g: &Option<String>) -> Result<(), AppError> {
+/// Prüft einen zu SETZENDEN Geschlechtswert. `None` heißt „kein Wert wird gesetzt" und ist
+/// immer zulässig — beim PATCH deckt das sowohl das absente Feld als auch den Leerwunsch
+/// (`null`/`""`) ab. Der Aufrufer flacht das Tri-State entsprechend ab.
+fn pruefe_geschlecht(g: Option<&str>) -> Result<(), AppError> {
     if let Some(g) = g {
         if TierGeschlecht::parse(g).is_none() {
             return Err(AppError::Validation("Unbekanntes Geschlecht".into()));
@@ -145,7 +148,7 @@ pub async fn anlegen(
             "Beim Anlegen ist nur Status 'aktiv' oder 'vermisst' erlaubt".into(),
         ));
     }
-    pruefe_geschlecht(&body.geschlecht)?;
+    pruefe_geschlecht(body.geschlecht.as_deref())?;
     // Halter-Exklusivität (zweite Verteidigungslinie zum DB-CHECK).
     if body.halter_person_id.is_some() && trimme(body.halter_kontakt.clone()).is_some() {
         return Err(AppError::UnprocessableEntity(
@@ -242,15 +245,53 @@ pub async fn detail(
 
 #[derive(Debug, Deserialize)]
 pub struct PatchBody {
-    pub rasse_beschreibung: Option<String>,
-    pub rufname: Option<String>,
-    pub geschlecht: Option<String>,
-    pub alter_geschaetzt: Option<i64>,
-    pub farbe_beschreibung: Option<String>,
-    pub kennzeichnung: Option<String>,
-    pub groesse_gewicht: Option<String>,
-    pub antreff_ort: Option<String>,
-    pub notiz: Option<String>,
+    // Tri-State (LFH-266/F12): Feld absent = unverändert, `null` = leeren, Wert = setzen.
+    // Die Halter-Felder weiter unten waren schon vorher tri-state und bleiben unberührt.
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub rasse_beschreibung: Option<Option<String>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub rufname: Option<Option<String>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub geschlecht: Option<Option<String>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub alter_geschaetzt: Option<Option<i64>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub farbe_beschreibung: Option<Option<String>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub kennzeichnung: Option<Option<String>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub groesse_gewicht: Option<Option<String>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub antreff_ort: Option<Option<String>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub notiz: Option<Option<String>>,
     /// `Some(null)` = explizit löschen; absent = unverändert.
     #[serde(
         default,
@@ -290,7 +331,11 @@ pub async fn aktualisieren(
     )
     .await?;
     fordere_aktiv(&einsatz)?;
-    pruefe_geschlecht(&body.geschlecht)?;
+    pruefe_geschlecht(
+        body.geschlecht
+            .as_ref()
+            .and_then(|o| o.as_deref().map(str::trim).filter(|s| !s.is_empty())),
+    )?;
 
     let vorher = tier_repo::laden(&state.pool, einsatz_id, tier_id).await?;
     if vorher.storniert_at.is_some() {
@@ -324,13 +369,14 @@ pub async fn aktualisieren(
         person_repo::laden(&state.pool, einsatz_id, hp).await?;
     }
 
-    let rasse = trimme(body.rasse_beschreibung);
-    let rufname = trimme(body.rufname);
-    let farbe = trimme(body.farbe_beschreibung);
-    let kennzeichnung = trimme(body.kennzeichnung);
-    let groesse = trimme(body.groesse_gewicht);
-    let antreff = trimme(body.antreff_ort);
-    let notiz = trimme(body.notiz);
+    let geschlecht = trimme_tri(body.geschlecht);
+    let rasse = trimme_tri(body.rasse_beschreibung);
+    let rufname = trimme_tri(body.rufname);
+    let farbe = trimme_tri(body.farbe_beschreibung);
+    let kennzeichnung = trimme_tri(body.kennzeichnung);
+    let groesse = trimme_tri(body.groesse_gewicht);
+    let antreff = trimme_tri(body.antreff_ort);
+    let notiz = trimme_tri(body.notiz);
 
     let tier = tier_repo::aktualisiere(
         &state.pool,
@@ -339,15 +385,15 @@ pub async fn aktualisieren(
         benutzer.id,
         body.basis_geaendert_at.as_deref(),
         tier_repo::PatchDaten {
-            rasse_beschreibung: rasse.as_deref(),
-            rufname: rufname.as_deref(),
-            geschlecht: body.geschlecht.as_deref(),
+            rasse_beschreibung: rasse.as_ref().map(|o| o.as_deref()),
+            rufname: rufname.as_ref().map(|o| o.as_deref()),
+            geschlecht: geschlecht.as_ref().map(|o| o.as_deref()),
             alter_geschaetzt: body.alter_geschaetzt,
-            farbe_beschreibung: farbe.as_deref(),
-            kennzeichnung: kennzeichnung.as_deref(),
-            groesse_gewicht: groesse.as_deref(),
-            antreff_ort: antreff.as_deref(),
-            notiz: notiz.as_deref(),
+            farbe_beschreibung: farbe.as_ref().map(|o| o.as_deref()),
+            kennzeichnung: kennzeichnung.as_ref().map(|o| o.as_deref()),
+            groesse_gewicht: groesse.as_ref().map(|o| o.as_deref()),
+            antreff_ort: antreff.as_ref().map(|o| o.as_deref()),
+            notiz: notiz.as_ref().map(|o| o.as_deref()),
             halter_person_id: body.halter_person_id,
             halter_kontakt: kontakt_norm.as_ref().map(|o| o.as_deref()),
         },

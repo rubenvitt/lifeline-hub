@@ -41,15 +41,15 @@ pub struct NeueDaten<'a> {
 /// damit der FK↔Freitext-Toggle ein Feld leeren kann.
 #[derive(Debug, Default)]
 pub struct PatchDaten<'a> {
-    pub rasse_beschreibung: Option<&'a str>,
-    pub rufname: Option<&'a str>,
-    pub geschlecht: Option<&'a str>,
-    pub alter_geschaetzt: Option<i64>,
-    pub farbe_beschreibung: Option<&'a str>,
-    pub kennzeichnung: Option<&'a str>,
-    pub groesse_gewicht: Option<&'a str>,
-    pub antreff_ort: Option<&'a str>,
-    pub notiz: Option<&'a str>,
+    pub rasse_beschreibung: Option<Option<&'a str>>,
+    pub rufname: Option<Option<&'a str>>,
+    pub geschlecht: Option<Option<&'a str>>,
+    pub alter_geschaetzt: Option<Option<i64>>,
+    pub farbe_beschreibung: Option<Option<&'a str>>,
+    pub kennzeichnung: Option<Option<&'a str>>,
+    pub groesse_gewicht: Option<Option<&'a str>>,
+    pub antreff_ort: Option<Option<&'a str>>,
+    pub notiz: Option<Option<&'a str>>,
     /// `Some(Some(id))` = setzen, `Some(None)` = auf NULL, `None` = unverändert.
     pub halter_person_id: Option<Option<i64>>,
     pub halter_kontakt: Option<Option<&'a str>>,
@@ -195,34 +195,43 @@ pub async fn aktualisiere(
     // Flag (`is_some`) + Wert (`flatten`)-Paar, damit `Some(None)` → NULL setzt.
     let mut sql = String::from(
         "UPDATE einsatz_tier SET \
-            rasse_beschreibung = COALESCE(?, rasse_beschreibung), \
-            rufname = COALESCE(?, rufname), \
-            geschlecht = COALESCE(?, geschlecht), \
-            alter_geschaetzt = COALESCE(?, alter_geschaetzt), \
-            farbe_beschreibung = COALESCE(?, farbe_beschreibung), \
-            kennzeichnung = COALESCE(?, kennzeichnung), \
-            groesse_gewicht = COALESCE(?, groesse_gewicht), \
-            antreff_ort = COALESCE(?, antreff_ort), \
-            notiz = COALESCE(?, notiz), \
-            halter_person_id = CASE WHEN ? THEN ? ELSE halter_person_id END, \
-            halter_kontakt   = CASE WHEN ? THEN ? ELSE halter_kontakt END, \
+            rasse_beschreibung = CASE WHEN ?1 IS NULL THEN rasse_beschreibung ELSE ?2 END, \
+            rufname = CASE WHEN ?3 IS NULL THEN rufname ELSE ?4 END, \
+            geschlecht = CASE WHEN ?5 IS NULL THEN geschlecht ELSE ?6 END, \
+            alter_geschaetzt = CASE WHEN ?7 IS NULL THEN alter_geschaetzt ELSE ?8 END, \
+            farbe_beschreibung = CASE WHEN ?9 IS NULL THEN farbe_beschreibung ELSE ?10 END, \
+            kennzeichnung = CASE WHEN ?11 IS NULL THEN kennzeichnung ELSE ?12 END, \
+            groesse_gewicht = CASE WHEN ?13 IS NULL THEN groesse_gewicht ELSE ?14 END, \
+            antreff_ort = CASE WHEN ?15 IS NULL THEN antreff_ort ELSE ?16 END, \
+            notiz = CASE WHEN ?17 IS NULL THEN notiz ELSE ?18 END, \
+            halter_person_id = CASE WHEN ?19 THEN ?20 ELSE halter_person_id END, \
+            halter_kontakt   = CASE WHEN ?21 THEN ?22 ELSE halter_kontakt END, \
             geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
-            geaendert_von = ? \
-         WHERE id = ? AND einsatz_id = ?",
+            geaendert_von = ?23 \
+         WHERE id = ?24 AND einsatz_id = ?25",
     );
     if erwartet_geaendert_at.is_some() {
-        sql.push_str(" AND geaendert_at = ?");
+        sql.push_str(" AND geaendert_at = ?26");
     }
     let mut q = sqlx::query(sqlx::AssertSqlSafe(sql))
-        .bind(daten.rasse_beschreibung)
-        .bind(daten.rufname)
-        .bind(daten.geschlecht)
-        .bind(daten.alter_geschaetzt)
-        .bind(daten.farbe_beschreibung)
-        .bind(daten.kennzeichnung)
-        .bind(daten.groesse_gewicht)
-        .bind(daten.antreff_ort)
-        .bind(daten.notiz)
+        .bind(daten.rasse_beschreibung.map(|_| 1_i64))
+        .bind(daten.rasse_beschreibung.and_then(|v| v))
+        .bind(daten.rufname.map(|_| 1_i64))
+        .bind(daten.rufname.and_then(|v| v))
+        .bind(daten.geschlecht.map(|_| 1_i64))
+        .bind(daten.geschlecht.and_then(|v| v))
+        .bind(daten.alter_geschaetzt.map(|_| 1_i64))
+        .bind(daten.alter_geschaetzt.and_then(|v| v))
+        .bind(daten.farbe_beschreibung.map(|_| 1_i64))
+        .bind(daten.farbe_beschreibung.and_then(|v| v))
+        .bind(daten.kennzeichnung.map(|_| 1_i64))
+        .bind(daten.kennzeichnung.and_then(|v| v))
+        .bind(daten.groesse_gewicht.map(|_| 1_i64))
+        .bind(daten.groesse_gewicht.and_then(|v| v))
+        .bind(daten.antreff_ort.map(|_| 1_i64))
+        .bind(daten.antreff_ort.and_then(|v| v))
+        .bind(daten.notiz.map(|_| 1_i64))
+        .bind(daten.notiz.and_then(|v| v))
         .bind(daten.halter_person_id.is_some()) // Flag: Halter-FK im Patch enthalten?
         .bind(daten.halter_person_id.flatten()) // Wert (oder NULL bei Some(None))
         .bind(daten.halter_kontakt.is_some()) // Flag: Halter-Kontakt im Patch enthalten?
@@ -640,7 +649,7 @@ mod tests {
             b,
             Some(stand),
             PatchDaten {
-                notiz: Some("A"),
+                notiz: Some(Some("A")),
                 ..PatchDaten::default()
             },
         )
@@ -655,7 +664,7 @@ mod tests {
             b,
             Some(stand),
             PatchDaten {
-                notiz: Some("B"),
+                notiz: Some(Some("B")),
                 ..PatchDaten::default()
             },
         )
@@ -680,7 +689,7 @@ mod tests {
             b,
             None,
             PatchDaten {
-                notiz: Some("C"),
+                notiz: Some(Some("C")),
                 ..PatchDaten::default()
             },
         )
@@ -699,7 +708,7 @@ mod tests {
             b,
             Some(stand),
             PatchDaten {
-                notiz: Some("D"),
+                notiz: Some(Some("D")),
                 ..PatchDaten::default()
             },
         )

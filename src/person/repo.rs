@@ -26,20 +26,26 @@ pub struct NeueDaten<'a> {
     pub notiz: Option<&'a str>,
 }
 
-/// Patch-Daten: gesetzte Felder werden übernommen, `None` bleibt unverändert
-/// (COALESCE-Semantik). Das Löschen eines Feldes auf NULL ist in E‑1 nicht
-/// vorgesehen.
+/// Patch-Daten mit Tri-State-Semantik (LFH-266/F12):
+/// `None` = Feld nicht im Patch → unverändert · `Some(None)` = auf NULL setzen ·
+/// `Some(Some(w))` = auf `w` setzen.
+///
+/// Alle neun Spalten sind laut `migrations/0020_einsatz_person.sql` NULLABLE, das Leeren ist
+/// also fachlich vorgesehen. Vorher galt COALESCE-Semantik, unter der ein einmal gesetztes
+/// Feld über die API nie wieder leerbar war — für die PII-Felder einer erfassten Person
+/// (Melder-Kontakt, Herkunftsadresse, Notiz) ein DSGVO-Berichtigungsproblem: der Server
+/// bestätigte 200 und behielt still den Altwert.
 #[derive(Debug, Default)]
 pub struct PatchDaten<'a> {
-    pub name: Option<&'a str>,
-    pub vorname: Option<&'a str>,
-    pub geschlecht: Option<&'a str>,
-    pub geburtsdatum: Option<&'a str>,
-    pub alter_geschaetzt: Option<i64>,
-    pub herkunft_adresse: Option<&'a str>,
-    pub antreff_ort: Option<&'a str>,
-    pub melder_kontakt: Option<&'a str>,
-    pub notiz: Option<&'a str>,
+    pub name: Option<Option<&'a str>>,
+    pub vorname: Option<Option<&'a str>>,
+    pub geschlecht: Option<Option<&'a str>>,
+    pub geburtsdatum: Option<Option<&'a str>>,
+    pub alter_geschaetzt: Option<Option<i64>>,
+    pub herkunft_adresse: Option<Option<&'a str>>,
+    pub antreff_ort: Option<Option<&'a str>>,
+    pub melder_kontakt: Option<Option<&'a str>>,
+    pub notiz: Option<Option<&'a str>>,
 }
 
 /// Personen eines Einsatzes (ohne stornierte), optional nach Status gefiltert.
@@ -148,7 +154,7 @@ pub async fn anlegen(
     laden(pool, einsatz_id, id).await
 }
 
-/// Aktualisiert Identitäts-/Kontextfelder (COALESCE: nur gesetzte Felder).
+/// Aktualisiert Identitäts-/Kontextfelder (Tri-State, siehe [`PatchDaten`]).
 /// Setzt `geaendert_at`/`geaendert_von`. `NotFound`, falls nicht zum Einsatz.
 ///
 /// Optimistisches Lock (LFH-241/F10): trägt der Aufrufer `erwartet_geaendert_at` (den beim
@@ -164,34 +170,52 @@ pub async fn aktualisiere(
     erwartet_geaendert_at: Option<&str>,
     daten: PatchDaten<'_>,
 ) -> Result<PersonAnzeige, AppError> {
+    // Flag/Wert-Paare statt COALESCE (LFH-266/F12): erst so lässt sich eine Spalte über die
+    // API wieder auf NULL setzen. Muster und nummerierte Parameter wie in `uhs/repo.rs` und
+    // `schaden/repo.rs` — das SQL bleibt statisch, dynamisch ist nur das CAS-Suffix
+    // (sqlx 0.9 nimmt für `query` ohnehin nur `&'static str`, format!-SQL bräche den Build).
+    //
+    // Die Nummerierung ist hier kein Stil, sondern Absicherung: bei neun aufeinanderfolgenden
+    // Flag/Wert-Paaren würde eine um eine Position verschobene Bind-Kette gleichtypige
+    // Nachbarspalten (name↔vorname, melder_kontakt↔notiz) STILL vertauschen — ohne Compile-
+    // und ohne Laufzeitfehler. Abgesichert von `aktualisiere_setzt_jede_spalte_an_ihren_platz`.
     let mut sql = String::from(
         "UPDATE einsatz_person SET \
-            name = COALESCE(?, name), \
-            vorname = COALESCE(?, vorname), \
-            geschlecht = COALESCE(?, geschlecht), \
-            geburtsdatum = COALESCE(?, geburtsdatum), \
-            alter_geschaetzt = COALESCE(?, alter_geschaetzt), \
-            herkunft_adresse = COALESCE(?, herkunft_adresse), \
-            antreff_ort = COALESCE(?, antreff_ort), \
-            melder_kontakt = COALESCE(?, melder_kontakt), \
-            notiz = COALESCE(?, notiz), \
+            name = CASE WHEN ?1 IS NULL THEN name ELSE ?2 END, \
+            vorname = CASE WHEN ?3 IS NULL THEN vorname ELSE ?4 END, \
+            geschlecht = CASE WHEN ?5 IS NULL THEN geschlecht ELSE ?6 END, \
+            geburtsdatum = CASE WHEN ?7 IS NULL THEN geburtsdatum ELSE ?8 END, \
+            alter_geschaetzt = CASE WHEN ?9 IS NULL THEN alter_geschaetzt ELSE ?10 END, \
+            herkunft_adresse = CASE WHEN ?11 IS NULL THEN herkunft_adresse ELSE ?12 END, \
+            antreff_ort = CASE WHEN ?13 IS NULL THEN antreff_ort ELSE ?14 END, \
+            melder_kontakt = CASE WHEN ?15 IS NULL THEN melder_kontakt ELSE ?16 END, \
+            notiz = CASE WHEN ?17 IS NULL THEN notiz ELSE ?18 END, \
             geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
-            geaendert_von = ? \
-         WHERE id = ? AND einsatz_id = ?",
+            geaendert_von = ?19 \
+         WHERE id = ?20 AND einsatz_id = ?21",
     );
     if erwartet_geaendert_at.is_some() {
-        sql.push_str(" AND geaendert_at = ?");
+        sql.push_str(" AND geaendert_at = ?22");
     }
     let mut q = sqlx::query(sqlx::AssertSqlSafe(sql))
-        .bind(daten.name)
-        .bind(daten.vorname)
-        .bind(daten.geschlecht)
-        .bind(daten.geburtsdatum)
-        .bind(daten.alter_geschaetzt)
-        .bind(daten.herkunft_adresse)
-        .bind(daten.antreff_ort)
-        .bind(daten.melder_kontakt)
-        .bind(daten.notiz)
+        .bind(daten.name.map(|_| 1_i64))
+        .bind(daten.name.and_then(|v| v))
+        .bind(daten.vorname.map(|_| 1_i64))
+        .bind(daten.vorname.and_then(|v| v))
+        .bind(daten.geschlecht.map(|_| 1_i64))
+        .bind(daten.geschlecht.and_then(|v| v))
+        .bind(daten.geburtsdatum.map(|_| 1_i64))
+        .bind(daten.geburtsdatum.and_then(|v| v))
+        .bind(daten.alter_geschaetzt.map(|_| 1_i64))
+        .bind(daten.alter_geschaetzt.and_then(|v| v))
+        .bind(daten.herkunft_adresse.map(|_| 1_i64))
+        .bind(daten.herkunft_adresse.and_then(|v| v))
+        .bind(daten.antreff_ort.map(|_| 1_i64))
+        .bind(daten.antreff_ort.and_then(|v| v))
+        .bind(daten.melder_kontakt.map(|_| 1_i64))
+        .bind(daten.melder_kontakt.and_then(|v| v))
+        .bind(daten.notiz.map(|_| 1_i64))
+        .bind(daten.notiz.and_then(|v| v))
         .bind(geaendert_von)
         .bind(person_id)
         .bind(einsatz_id);
@@ -380,7 +404,7 @@ mod tests {
             b,
             None,
             PatchDaten {
-                notiz: Some("blutet"),
+                notiz: Some(Some("blutet")),
                 ..PatchDaten::default()
             },
         )
@@ -392,6 +416,147 @@ mod tests {
             Some("Mustermann"),
             "ungesetzte Felder bleiben"
         );
+    }
+
+    /// Jede Spalte landet an ihrem Platz — der einzige Schutz gegen ein STILLES Vertauschen
+    /// gleichtypiger Nachbarspalten (name↔vorname, melder_kontakt↔notiz) durch eine falsche
+    /// Bind-Reihenfolge. Alle neun Felder bekommen distinkte Werte, danach wird jede Spalte
+    /// einzeln geprüft.
+    ///
+    /// Bewusst VOR dem Tri-State-Umbau (LFH-266/F12) geschrieben und gegen das damalige
+    /// COALESCE-UPDATE grün gelaufen: nur so belegt er, dass die Zuordnung schon vorher
+    /// stimmte und der Umbau sie nicht verschoben hat. Ein Test, der nur ein Feld setzt,
+    /// fängt diese Fehlerklasse nie — sie erzeugt weder Compile- noch Laufzeitfehler.
+    #[tokio::test]
+    async fn aktualisiere_setzt_jede_spalte_an_ihren_platz() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let p = anlegen(&pool, e, b, leere_daten()).await.unwrap();
+
+        let a = aktualisiere(
+            &pool,
+            e,
+            p.id,
+            b,
+            None,
+            PatchDaten {
+                name: Some(Some("W-name")),
+                vorname: Some(Some("W-vorname")),
+                geschlecht: Some(Some("weiblich")),
+                geburtsdatum: Some(Some("1990-01-01")),
+                alter_geschaetzt: Some(Some(42)),
+                herkunft_adresse: Some(Some("W-herkunft")),
+                antreff_ort: Some(Some("W-antreff")),
+                melder_kontakt: Some(Some("W-melder")),
+                notiz: Some(Some("W-notiz")),
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(a.name.as_deref(), Some("W-name"));
+        assert_eq!(a.vorname.as_deref(), Some("W-vorname"));
+        assert_eq!(a.geschlecht, Some(crate::person::Geschlecht::Weiblich));
+        assert_eq!(a.geburtsdatum.as_deref(), Some("1990-01-01"));
+        assert_eq!(a.alter_geschaetzt, Some(42));
+        assert_eq!(a.herkunft_adresse.as_deref(), Some("W-herkunft"));
+        assert_eq!(a.antreff_ort.as_deref(), Some("W-antreff"));
+        assert_eq!(a.melder_kontakt.as_deref(), Some("W-melder"));
+        assert_eq!(a.notiz.as_deref(), Some("W-notiz"));
+    }
+
+    /// LFH-266/F12: `Some(None)` leert eine Spalte, `None` lässt sie unverändert.
+    ///
+    /// Vor dem Umbau war das nicht einmal ausdrückbar (`PatchDaten` trug `Option<&str>`) —
+    /// genau das war der Defekt: die PII-Felder einer erfassten Person ließen sich nach einer
+    /// Falscheingabe über die API nie wieder leeren, der Server bestätigte 200 und behielt
+    /// still den Altwert (DSGVO-Berichtigung, Art. 16).
+    #[tokio::test]
+    async fn aktualisiere_leert_felder_bei_some_none() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let p = anlegen(
+            &pool,
+            e,
+            b,
+            NeueDaten {
+                name: Some("Mustermann"),
+                melder_kontakt: Some("0170-1234"),
+                notiz: Some("Notiz"),
+                ..leere_daten()
+            },
+        )
+        .await
+        .unwrap();
+
+        // Explizites Leeren.
+        let a = aktualisiere(
+            &pool,
+            e,
+            p.id,
+            b,
+            None,
+            PatchDaten {
+                melder_kontakt: Some(None),
+                notiz: Some(None),
+                ..PatchDaten::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(a.melder_kontakt, None, "Some(None) leert das Feld");
+        assert_eq!(a.notiz, None, "Some(None) leert das Feld");
+        assert_eq!(
+            a.name.as_deref(),
+            Some("Mustermann"),
+            "nicht genanntes Feld bleibt unverändert"
+        );
+
+        // Gegenprobe: ein leerer Patch darf NICHTS leeren.
+        let b2 = aktualisiere(&pool, e, p.id, b, None, PatchDaten::default())
+            .await
+            .unwrap();
+        assert_eq!(
+            b2.name.as_deref(),
+            Some("Mustermann"),
+            "leerer Patch lässt alle Felder stehen"
+        );
+    }
+
+    /// Der CHECK auf `geschlecht` in migrations/0020 hat kein `IS NULL OR` — trotzdem ist ein
+    /// Reset auf NULL erlaubt, weil SQLite einen CHECK mit NULL-Ergebnis als erfüllt wertet
+    /// (`NULL IN (…)` ist NULL, nicht false). Der Test hält das fest, damit niemand später
+    /// eine überflüssige Migration zum „Reparieren" des CHECKs baut.
+    #[tokio::test]
+    async fn geschlecht_laesst_sich_auf_null_zuruecksetzen() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let p = anlegen(
+            &pool,
+            e,
+            b,
+            NeueDaten {
+                geschlecht: Some("divers"),
+                ..leere_daten()
+            },
+        )
+        .await
+        .unwrap();
+
+        let a = aktualisiere(
+            &pool,
+            e,
+            p.id,
+            b,
+            None,
+            PatchDaten {
+                geschlecht: Some(None),
+                ..PatchDaten::default()
+            },
+        )
+        .await
+        .expect("NULL verletzt den CHECK nicht");
+        assert_eq!(a.geschlecht, None);
     }
 
     /// LFH-241/F10: optimistisches Lock über `geaendert_at`. Deterministische Zeitstempel
@@ -417,7 +582,7 @@ mod tests {
             b,
             Some(stand),
             PatchDaten {
-                notiz: Some("A"),
+                notiz: Some(Some("A")),
                 ..PatchDaten::default()
             },
         )
@@ -432,7 +597,7 @@ mod tests {
             b,
             Some(stand),
             PatchDaten {
-                notiz: Some("B"),
+                notiz: Some(Some("B")),
                 ..PatchDaten::default()
             },
         )
@@ -457,7 +622,7 @@ mod tests {
             b,
             None,
             PatchDaten {
-                notiz: Some("C"),
+                notiz: Some(Some("C")),
                 ..PatchDaten::default()
             },
         )

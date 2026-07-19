@@ -47,6 +47,16 @@ pub fn trimme(s: Option<String>) -> Option<String> {
     s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
 }
 
+/// Wie [`trimme`], aber für Tri-State-PATCH-Felder (LFH-266/F12).
+///
+/// Die äußere `Option` (Feld im Patch enthalten?) bleibt erhalten, nur der Wert wird
+/// getrimmt. Ein vorhandenes, aber leeres/whitespace-only Feld wird zu `Some(None)` — also
+/// zum Leerwunsch, nicht zum Leerstring in der Spalte. Damit akzeptiert der Server sowohl
+/// `null` als auch `""` als „leeren", was die Formulare im Frontend erheblich vereinfacht.
+pub fn trimme_tri(s: Option<Option<String>>) -> Option<Option<String>> {
+    s.map(|opt| opt.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()))
+}
+
 /// Liest ein optional-nullable PATCH-Feld als Tri-State: JSON-`null` → `Some(None)`
 /// (explizit auf NULL setzen), fehlendes Feld → `None` (unverändert lassen). Trägt die
 /// PATCH-null-vs-absent-Vertragssemantik — genau EINMAL definiert statt 10-fach kopiert.

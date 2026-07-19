@@ -719,3 +719,120 @@ async fn export_liefert_csv_ohne_audit() {
     assert!(csv.contains("T-001"));
     assert!(csv.contains("Rex"));
 }
+
+// ── LFH-266/F12: PATCH-Tri-State für die Identitätsfelder ────────────────────────────
+
+/// `null` leert ein Identitätsfeld (vorher: COALESCE behielt still den Altwert und
+/// antwortete 200).
+#[tokio::test]
+async fn patch_null_leert_identitaetsfeld() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let t = tier_anlegen(
+        &app,
+        &admin,
+        e,
+        &json!({"spezies":"hund","rufname":"Rex","notiz":"scheu"}),
+    )
+    .await;
+
+    let (status, v) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/tiere/{t}"),
+        &admin,
+        Some(&json!({"rufname":null})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(v["rufname"].is_null(), "null leert das Feld");
+    assert_eq!(v["spezies"], "hund", "nicht genanntes Feld bleibt");
+    assert_eq!(v["notiz"], "scheu", "nicht genanntes Feld bleibt");
+}
+
+/// Leerstring wird wie `null` behandelt — Symmetrie zu `einsatz_person`.
+#[tokio::test]
+async fn patch_leerstring_leert_identitaetsfeld() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let t = tier_anlegen(
+        &app,
+        &admin,
+        e,
+        &json!({"spezies":"hund","kennzeichnung":"Chip 123"}),
+    )
+    .await;
+
+    let (status, v) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/tiere/{t}"),
+        &admin,
+        Some(&json!({"kennzeichnung":"  "})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(v["kennzeichnung"].is_null());
+}
+
+/// Der schärfste Test des Umbaus: die neun neuen Identitäts-Flag/Wert-Paare liegen im SQL
+/// direkt VOR den bestehenden Halter-Paaren. Eine um eine Position verschobene Bind-Kette
+/// würde ein Identitäts-Flag auf einen Halter-Wert treffen lassen und den Halter still
+/// mitleeren — ohne Compile- und ohne Laufzeitfehler.
+#[tokio::test]
+async fn patch_identitaet_laesst_halter_unberuehrt() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let t = tier_anlegen(
+        &app,
+        &admin,
+        e,
+        &json!({"spezies":"katze","rufname":"Mia","halter_kontakt":"Frau Meier, 0170-9"}),
+    )
+    .await;
+
+    let (status, v) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/tiere/{t}"),
+        &admin,
+        Some(&json!({"rufname":null})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(v["rufname"].is_null(), "das gemeinte Feld wird geleert");
+    assert_eq!(
+        v["halter_kontakt"], "Frau Meier, 0170-9",
+        "der Halter darf NICHT mitgeleert werden (Bind-Verschiebung)"
+    );
+}
+
+/// Gegenprobe: ein leerer Patch fasst nichts an.
+#[tokio::test]
+async fn patch_leeres_objekt_laesst_tier_unveraendert() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let t = tier_anlegen(
+        &app,
+        &admin,
+        e,
+        &json!({"spezies":"hund","rufname":"Rex","notiz":"scheu"}),
+    )
+    .await;
+
+    let (status, v) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/tiere/{t}"),
+        &admin,
+        Some(&json!({})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(v["rufname"], "Rex");
+    assert_eq!(v["notiz"], "scheu");
+}
