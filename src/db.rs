@@ -17,6 +17,23 @@ pub async fn connect(db_path: &str) -> Result<SqlitePool, sqlx::Error> {
 
     SqlitePoolOptions::new()
         .max_connections(5)
+        // acquire_timeout explizit (G09/LFH-228): der sqlx-Default von 30 s lässt
+        // Backpressure als stillen 30-Sekunden-Hänger erscheinen, der am Ende als 500
+        // beantwortet wird. 10 s macht daraus ehrlichen, schnellen Lastabwurf (503).
+        //
+        // Warum nicht kürzer: `write_retry!` (src/tx.rs) startet mit
+        // `begin_with("BEGIN IMMEDIATE")` — es checkt also ERST eine Pool-Verbindung aus
+        // und wartet DANN bis zu `busy_timeout` (5 s, oben) am BEGIN auf den Write-Lock.
+        // Unter Schreib-Contention können dadurch alle 5 Slots völlig legitim in dieser
+        // Wartephase stehen; jeder Wert < 5 s würde nebenläufige LESER mit 503 abweisen,
+        // obwohl der Pool gar nicht erschöpft ist. 10 s liegt über einer vollen legitimen
+        // BEGIN-Wartephase plus Puffer und deutlich unter dem Default.
+        //
+        // Bewusst NICHT abgedeckt: der Worst Case eines Schreibers
+        // (`MAX_VERSUCHE` = 4 × 5 s ≈ 20 s, siehe src/tx.rs) — ein 20-Sekunden-Hänger ist
+        // für einen Leser ohnehin kein akzeptables Verhalten und soll als 503 sichtbar
+        // werden statt zugewartet.
+        .acquire_timeout(std::time::Duration::from_secs(10))
         .connect_with(options)
         .await
 }
@@ -54,6 +71,13 @@ pub async fn test_pool() -> SqlitePool {
 ///
 /// Bewusst nur für die wenigen nebenläufigkeitskritischen Tests gedacht — die ~250
 /// bestehenden [`test_pool`]-Tests bleiben unangetastet (Datei + `multi_thread` ist teurer).
+///
+/// Die Prod-Parität endet bewusst beim `acquire_timeout` (G09/LFH-228): der Nutzer
+/// `tx::tests::nebenlaeufige_read_then_write_ohne_lost_update` fährt 40 parallele Tasks
+/// gegen diese 5 Slots, 35 davon warten also per Definition in der Pool-Queue. Ein
+/// gesetztes `acquire_timeout` würde dort unter Maschinenlast zu sporadischen
+/// `PoolTimedOut`-Fehlschlägen führen — Flakiness ohne Gegenwert, denn die
+/// Timeout-Konfiguration selbst ist in `connect_setzt_acquire_timeout` direkt geprüft.
 pub async fn test_pool_datei() -> (tempfile::TempDir, SqlitePool) {
     let dir = tempfile::tempdir().expect("Temp-Verzeichnis");
     let path = dir.path().join("test.db");
@@ -112,6 +136,23 @@ mod tests {
             .unwrap()
             .get(0);
         assert_eq!(foreign_keys, 1);
+    }
+
+    #[tokio::test]
+    async fn connect_setzt_acquire_timeout() {
+        // G09/LFH-228: Regressionsschutz für die acquire_timeout-Zeile. Ohne sie gilt der
+        // sqlx-Default von 30 s — Backpressure wird dann zum stillen 30-Sekunden-Hänger.
+        // Deterministisch über den PoolOptions-Getter geprüft, statt den Pool wirklich zu
+        // erschöpfen (das würde bei JEDEM cargo test acquire_timeout lang warten).
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test.db");
+        let pool = connect(path.to_str().unwrap()).await.unwrap();
+
+        assert_eq!(
+            pool.options().get_acquire_timeout(),
+            std::time::Duration::from_secs(10),
+            "Produktions-Pool muss acquire_timeout explizit setzen (nicht den 30-s-Default)"
+        );
     }
 
     #[tokio::test]

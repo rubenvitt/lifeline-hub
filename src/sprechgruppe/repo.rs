@@ -1,6 +1,7 @@
-use super::Sprechgruppe;
+use super::{Sprechgruppe, SprechgruppeAnzeige};
 use crate::error::AppError;
 use sqlx::SqlitePool;
+use std::collections::HashMap;
 
 /// Spaltenliste für `SELECT` in der Reihenfolge von `Sprechgruppe` (FromRow).
 const SPALTEN: &str =
@@ -258,6 +259,15 @@ pub async fn lade_abschnitt_sprechgruppen(
     .map_err(Into::into)
 }
 
+/// Zeile der Sprechgruppen-Sammelabfragen: eine Sprechgruppe samt der Einheit bzw.
+/// dem Abschnitt, an der/dem sie hängt.
+#[derive(sqlx::FromRow)]
+struct SprechgruppeMitBezug {
+    bezug_id: i64,
+    #[sqlx(flatten)]
+    sprechgruppe: Sprechgruppe,
+}
+
 /// Ersetzt die Sprechgruppen-Zuordnung einer Einheit vollständig.
 /// Validiert jede ID gegen `org_id`/`einsatz_id` — fremde oder falsche Einsätze → `UnprocessableEntity`.
 pub async fn setze_einheit_sprechgruppen(
@@ -303,6 +313,69 @@ pub async fn lade_einheit_sprechgruppen(
     .fetch_all(pool)
     .await
     .map_err(Into::into)
+}
+
+/// Sprechgruppen ALLER Einheiten eines Einsatzes in EINER Abfrage (kein N+1,
+/// LFH-225/F23), gruppiert je `einheit_id`. Einheiten ohne Zuordnung fehlen in der Map.
+/// Das globale `ORDER BY betriebsart, sortier, bezeichnung` erhält die Sortierung
+/// innerhalb jeder Gruppe exakt so, wie sie `lade_einheit_sprechgruppen` liefert.
+pub async fn lade_einheit_sprechgruppen_map(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<HashMap<i64, Vec<SprechgruppeAnzeige>>, AppError> {
+    let zeilen = sqlx::query_as::<_, SprechgruppeMitBezug>(
+        "SELECT ees.einheit_id AS bezug_id, \
+                sg.id AS id, sg.org_id AS org_id, sg.einsatz_id AS einsatz_id, \
+                sg.bezeichnung AS bezeichnung, sg.betriebsart AS betriebsart, \
+                sg.hinweis AS hinweis, sg.aktiv AS aktiv, sg.sortier AS sortier, \
+                sg.angelegt_at AS angelegt_at \
+         FROM sprechgruppe sg \
+         JOIN einsatz_einheit_sprechgruppe ees ON ees.sprechgruppe_id = sg.id \
+         JOIN einsatz_einheit e ON e.id = ees.einheit_id \
+         WHERE e.einsatz_id = ? \
+         ORDER BY sg.betriebsart, sg.sortier, sg.bezeichnung",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(gruppiere(zeilen))
+}
+
+/// Sprechgruppen ALLER Abschnitte eines Einsatzes in EINER Abfrage (kein N+1,
+/// LFH-225/F23), gruppiert je `abschnitt_id`. Sortierung wie in
+/// `lade_abschnitt_sprechgruppen`.
+pub async fn lade_abschnitt_sprechgruppen_map(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<HashMap<i64, Vec<SprechgruppeAnzeige>>, AppError> {
+    let zeilen = sqlx::query_as::<_, SprechgruppeMitBezug>(
+        "SELECT eas.abschnitt_id AS bezug_id, \
+                sg.id AS id, sg.org_id AS org_id, sg.einsatz_id AS einsatz_id, \
+                sg.bezeichnung AS bezeichnung, sg.betriebsart AS betriebsart, \
+                sg.hinweis AS hinweis, sg.aktiv AS aktiv, sg.sortier AS sortier, \
+                sg.angelegt_at AS angelegt_at \
+         FROM sprechgruppe sg \
+         JOIN einsatzabschnitt_sprechgruppe eas ON eas.sprechgruppe_id = sg.id \
+         JOIN einsatzabschnitt a ON a.id = eas.abschnitt_id \
+         WHERE a.einsatz_id = ? \
+         ORDER BY sg.betriebsart, sg.sortier, sg.bezeichnung",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(gruppiere(zeilen))
+}
+
+/// Gruppiert die Sammelzeilen je Bezug und wandelt in die Anzeige — in Ergebnis-
+/// reihenfolge, damit das `ORDER BY` der Abfrage je Gruppe erhalten bleibt.
+fn gruppiere(zeilen: Vec<SprechgruppeMitBezug>) -> HashMap<i64, Vec<SprechgruppeAnzeige>> {
+    let mut map: HashMap<i64, Vec<SprechgruppeAnzeige>> = HashMap::new();
+    for z in zeilen {
+        map.entry(z.bezug_id)
+            .or_default()
+            .push(z.sprechgruppe.anzeige());
+    }
+    map
 }
 
 /// Deaktiviert eine Katalog-Sprechgruppe (Soft-Delete `aktiv = 0`).
@@ -516,6 +589,128 @@ mod tests {
             0
         );
     }
+    /// LFH-225/F23: Die Sprechgruppen-Sammelabfragen müssen je Einheit/Abschnitt exakt
+    /// das liefern, was die Einzelabfragen liefern — inklusive der Sortierung nach
+    /// `betriebsart, sortier, bezeichnung`. Koppelt beide Fassungen gegen Drift.
+    #[tokio::test]
+    async fn sammelabfragen_sind_deckungsgleich_mit_den_einzelabfragen() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let e: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1,'Lage') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        // Alle drei Sortierschlüssel diskriminierend belegt.
+        let mut katalog = Vec::new();
+        for (bez, art, sortier) in [
+            ("410_F_DRK", "TMO", 5),
+            ("112_D_LEIT", "DMO", 9),
+            ("999_T_ZUG", "TMO", 1),
+            ("111_D_ALPHA", "DMO", 9),
+        ] {
+            katalog.push(
+                anlegen_katalog(
+                    &pool,
+                    1,
+                    KatalogDaten {
+                        bezeichnung: bez,
+                        betriebsart: art,
+                        hinweis: None,
+                        sortier,
+                    },
+                )
+                .await
+                .unwrap()
+                .id,
+            );
+        }
+
+        let mut einheiten = Vec::new();
+        for name in ["Zug 1", "Zug 2", "Ohne"] {
+            einheiten.push(
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, ?) RETURNING id",
+                )
+                .bind(e)
+                .bind(name)
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+            );
+        }
+        let mut abschnitte = Vec::new();
+        for name in ["Nord", "Süd", "Ohne"] {
+            abschnitte.push(
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, ?) RETURNING id",
+                )
+                .bind(e)
+                .bind(name)
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+            );
+        }
+        // Zuweisung bewusst in „falscher" Reihenfolge; je eine Einheit/ein Abschnitt leer.
+        setze_einheit_sprechgruppen(&pool, 1, e, einheiten[0], &katalog)
+            .await
+            .unwrap();
+        setze_einheit_sprechgruppen(&pool, 1, e, einheiten[1], &[katalog[0], katalog[3]])
+            .await
+            .unwrap();
+        setze_abschnitt_sprechgruppen(&pool, 1, e, abschnitte[0], &katalog)
+            .await
+            .unwrap();
+        setze_abschnitt_sprechgruppen(&pool, 1, e, abschnitte[1], &[katalog[2]])
+            .await
+            .unwrap();
+
+        let einheit_map = lade_einheit_sprechgruppen_map(&pool, e).await.unwrap();
+        for einheit in &einheiten {
+            let einzeln: Vec<_> = lade_einheit_sprechgruppen(&pool, *einheit)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|s| s.anzeige())
+                .collect();
+            assert_eq!(
+                einheit_map.get(einheit).cloned().unwrap_or_default(),
+                einzeln,
+                "Einheit-Sammelabfrage weicht bei {einheit} ab"
+            );
+        }
+        let abschnitt_map = lade_abschnitt_sprechgruppen_map(&pool, e).await.unwrap();
+        for abschnitt in &abschnitte {
+            let einzeln: Vec<_> = lade_abschnitt_sprechgruppen(&pool, *abschnitt)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|s| s.anzeige())
+                .collect();
+            assert_eq!(
+                abschnitt_map.get(abschnitt).cloned().unwrap_or_default(),
+                einzeln,
+                "Abschnitt-Sammelabfrage weicht bei {abschnitt} ab"
+            );
+        }
+
+        // Der Vergleich oben muss etwas zu vergleichen haben — und die erwartete
+        // Sortierung explizit festhalten.
+        assert_eq!(
+            einheit_map[&einheiten[0]]
+                .iter()
+                .map(|s| s.bezeichnung.as_str())
+                .collect::<Vec<_>>(),
+            vec!["111_D_ALPHA", "112_D_LEIT", "999_T_ZUG", "410_F_DRK"],
+            "DMO vor TMO; dann sortier; bei Gleichstand die Bezeichnung"
+        );
+        assert!(!einheit_map.contains_key(&einheiten[2]));
+        assert!(!abschnitt_map.contains_key(&abschnitte[2]));
+    }
+
     #[tokio::test]
     async fn anlegen_listen_und_laden() {
         let pool = crate::db::test_pool().await;

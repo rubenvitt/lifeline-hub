@@ -65,97 +65,150 @@ const SELECT_AUFGELOEST: &str = "\
     LEFT JOIN einsatzabschnitt ab ON ab.id = e.abschnitt_id \
     LEFT JOIN einsatz_personal fp ON fp.id = e.fuehrer_id";
 
-/// Setzt die abgeleitete Anzeige aus Row + Mitgliedern + Stärke + Sprechgruppen zusammen.
-/// `soll` ist Override (falls vollständig) sonst Typ-Soll (falls vorhanden) sonst `None`.
-async fn zu_anzeige(pool: &SqlitePool, row: Row) -> Result<EinheitAnzeige, AppError> {
-    let override_soll =
-        Staerke::aus_optionen(row.soll_fuehrer, row.soll_unterfuehrer, row.soll_mannschaft)
-            .unwrap_or(None);
-    let typ_soll = Staerke::aus_optionen(
-        row.typ_soll_fuehrer,
-        row.typ_soll_unterfuehrer,
-        row.typ_soll_mannschaft,
-    )
-    .unwrap_or(None);
-    let soll = override_soll.or(typ_soll);
-
-    let ist = mitglied_repo::ist_staerke(pool, row.id).await?;
-    let ist_kumuliert = ist_kumuliert(pool, row.einsatz_id, row.id).await?;
-    let personal_mitglieder = mitglied_repo::personal_mitglieder(pool, row.id).await?;
-    let fahrzeug_mitglieder = mitglied_repo::fahrzeug_mitglieder(pool, row.id).await?;
-    let material_mitglieder = mitglied_repo::material_mitglieder(pool, row.id).await?;
-    let sgs = crate::sprechgruppe::repo::lade_einheit_sprechgruppen(pool, row.id).await?;
-    let sprechgruppen = sgs.into_iter().map(|s| s.anzeige()).collect();
-
-    Ok(EinheitAnzeige {
-        id: row.id,
-        einsatz_id: row.einsatz_id,
-        abschnitt_id: row.abschnitt_id,
-        abschnitt_name: row.abschnitt_name,
-        ueber_einheit_id: row.ueber_einheit_id,
-        typ_id: row.typ_id,
-        typ_label: row.typ_label,
-        name: row.name,
-        fuehrer_id: row.fuehrer_id,
-        fuehrer_name: row.fuehrer_name,
-        bemerkung: row.bemerkung,
-        kommunikationsmittel: row.kommunikationsmittel,
-        erreichbarkeit: row.erreichbarkeit,
-        sortier: row.sortier,
-        lat: row.lat,
-        lon: row.lon,
-        tz_fachaufgabe: row.tz_fachaufgabe,
-        tz_organisation: row.tz_organisation,
-        aktueller_br_id: row.aktueller_br_id,
-        soll,
-        ist,
-        ist_kumuliert,
-        personal_mitglieder,
-        fahrzeug_mitglieder,
-        material_mitglieder,
-        sprechgruppen,
-    })
+/// Satzweise geladene Anreicherungsdaten EINES Einsatzes (LFH-225/F23): Mitglieder,
+/// eigene Stärke und Sprechgruppen aller Einheiten sowie die Unterstellungskanten —
+/// je eine Abfrage über den ganzen Einsatz statt sechs je Einheit.
+struct Anreicherung {
+    /// Eigene Ist-Stärke je Einheit; fehlender Eintrag = keine wertbaren Kräfte.
+    staerken: HashMap<i64, Staerke>,
+    /// Unmittelbar unterstellte Einheiten je Einheit (Kanten des ganzen Einsatzes).
+    kinder: HashMap<i64, Vec<i64>>,
+    personal: HashMap<i64, Vec<super::EinheitMitgliedPerson>>,
+    fahrzeuge: HashMap<i64, Vec<super::EinheitMitgliedFahrzeug>>,
+    material: HashMap<i64, Vec<super::EinheitMitgliedMaterial>>,
+    sprechgruppen: HashMap<i64, Vec<crate::sprechgruppe::SprechgruppeAnzeige>>,
 }
 
-/// Kumulierte Ist-Stärke: eigene + alle unterstellten Einheiten (rekursiv). Cycle-sicher
-/// über ein Visited-Set (schützt vor korrupten Altdaten). Dünner Wrapper über
-/// `mitglied_repo::ist_staerke` — keine neue Stärke-Logik.
-async fn ist_kumuliert(
-    pool: &SqlitePool,
-    einsatz_id: i64,
-    wurzel_id: i64,
-) -> Result<Staerke, AppError> {
+impl Anreicherung {
+    /// Kumulierte Ist-Stärke: eigene + alle unterstellten Einheiten (rekursiv),
+    /// vollständig im Speicher — ohne weitere Abfrage. Cycle-sicher über ein
+    /// Visited-Set (schützt vor korrupten Altdaten). Bewusst iterativ statt
+    /// `WITH RECURSIVE`: so bleibt der Zyklusschutz ohne eigene Tiefenbegrenzung
+    /// erhalten. Keine neue Stärke-Logik — summiert nur `staerken`.
+    fn ist_kumuliert(&self, wurzel_id: i64) -> Staerke {
+        let mut summe = Staerke::neu(0, 0, 0);
+        let mut stack = vec![wurzel_id];
+        let mut besucht: HashSet<i64> = HashSet::new();
+        while let Some(id) = stack.pop() {
+            if !besucht.insert(id) {
+                continue;
+            }
+            let s = self.eigene(id);
+            summe = Staerke::neu(
+                summe.fuehrer.saturating_add(s.fuehrer),
+                summe.unterfuehrer.saturating_add(s.unterfuehrer),
+                summe.mannschaft.saturating_add(s.mannschaft),
+            );
+            if let Some(cs) = self.kinder.get(&id) {
+                stack.extend(cs.iter().copied());
+            }
+        }
+        summe
+    }
+
+    /// Eigene Ist-Stärke einer Einheit; ohne Kräfte `0/0/0`.
+    fn eigene(&self, einheit_id: i64) -> Staerke {
+        self.staerken
+            .get(&einheit_id)
+            .copied()
+            .unwrap_or(Staerke::neu(0, 0, 0))
+    }
+}
+
+/// Lädt die Anreicherung eines ganzen Einsatzes in konstant vielen Abfragen (6).
+async fn anreicherung_laden(pool: &SqlitePool, einsatz_id: i64) -> Result<Anreicherung, AppError> {
     let kanten: Vec<(i64, Option<i64>)> =
         sqlx::query_as("SELECT id, ueber_einheit_id FROM einsatz_einheit WHERE einsatz_id = ?")
             .bind(einsatz_id)
             .fetch_all(pool)
             .await?;
     let mut kinder: HashMap<i64, Vec<i64>> = HashMap::new();
-    for (id, parent) in &kanten {
-        if let Some(p) = parent {
-            kinder.entry(*p).or_default().push(*id);
+    for (id, vater) in &kanten {
+        if let Some(v) = vater {
+            kinder.entry(*v).or_default().push(*id);
         }
     }
-    let mut summe = Staerke::neu(0, 0, 0);
-    let mut stack = vec![wurzel_id];
-    let mut besucht: HashSet<i64> = HashSet::new();
-    while let Some(id) = stack.pop() {
-        if !besucht.insert(id) {
-            continue;
-        }
-        let s = mitglied_repo::ist_staerke(pool, id).await?;
-        summe = Staerke::neu(
-            summe.fuehrer.saturating_add(s.fuehrer),
-            summe.unterfuehrer.saturating_add(s.unterfuehrer),
-            summe.mannschaft.saturating_add(s.mannschaft),
-        );
-        if let Some(cs) = kinder.get(&id) {
-            for c in cs {
-                stack.push(*c);
-            }
-        }
+    Ok(Anreicherung {
+        staerken: mitglied_repo::ist_staerke_map(pool, einsatz_id).await?,
+        kinder,
+        personal: mitglied_repo::personal_mitglieder_map(pool, einsatz_id).await?,
+        fahrzeuge: mitglied_repo::fahrzeug_mitglieder_map(pool, einsatz_id).await?,
+        material: mitglied_repo::material_mitglieder_map(pool, einsatz_id).await?,
+        sprechgruppen: crate::sprechgruppe::repo::lade_einheit_sprechgruppen_map(pool, einsatz_id)
+            .await?,
+    })
+}
+
+/// Setzt die abgeleiteten Anzeigen für einen Satz Zeilen **desselben** Einsatzes
+/// zusammen. Die Anreicherung wird einmal für den ganzen Einsatz geladen — konstant
+/// viele Abfragen statt sechs je Einheit (LFH-225/F23). `laden()` ruft die Funktion
+/// mit einem Ein-Element-Satz auf, damit es genau EINE Anreicherungslogik gibt.
+/// `soll` ist Override (falls vollständig) sonst Typ-Soll (falls vorhanden) sonst `None`.
+async fn zu_anzeige_batch(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    rows: Vec<Row>,
+) -> Result<Vec<EinheitAnzeige>, AppError> {
+    // Ohne Zeilen gibt es nichts anzureichern — die Sammelabfragen bleiben aus.
+    if rows.is_empty() {
+        return Ok(Vec::new());
     }
-    Ok(summe)
+    let mut anreicherung = anreicherung_laden(pool, einsatz_id).await?;
+
+    let mut out = Vec::with_capacity(rows.len());
+    for row in rows {
+        let override_soll =
+            Staerke::aus_optionen(row.soll_fuehrer, row.soll_unterfuehrer, row.soll_mannschaft)
+                .unwrap_or(None);
+        let typ_soll = Staerke::aus_optionen(
+            row.typ_soll_fuehrer,
+            row.typ_soll_unterfuehrer,
+            row.typ_soll_mannschaft,
+        )
+        .unwrap_or(None);
+        let soll = override_soll.or(typ_soll);
+
+        let ist = anreicherung.eigene(row.id);
+        let ist_kumuliert = anreicherung.ist_kumuliert(row.id);
+        // Jede Einheit kommt im Satz genau einmal vor → entnehmen statt klonen.
+        let personal_mitglieder = anreicherung.personal.remove(&row.id).unwrap_or_default();
+        let fahrzeug_mitglieder = anreicherung.fahrzeuge.remove(&row.id).unwrap_or_default();
+        let material_mitglieder = anreicherung.material.remove(&row.id).unwrap_or_default();
+        let sprechgruppen = anreicherung
+            .sprechgruppen
+            .remove(&row.id)
+            .unwrap_or_default();
+
+        out.push(EinheitAnzeige {
+            id: row.id,
+            einsatz_id: row.einsatz_id,
+            abschnitt_id: row.abschnitt_id,
+            abschnitt_name: row.abschnitt_name,
+            ueber_einheit_id: row.ueber_einheit_id,
+            typ_id: row.typ_id,
+            typ_label: row.typ_label,
+            name: row.name,
+            fuehrer_id: row.fuehrer_id,
+            fuehrer_name: row.fuehrer_name,
+            bemerkung: row.bemerkung,
+            kommunikationsmittel: row.kommunikationsmittel,
+            erreichbarkeit: row.erreichbarkeit,
+            sortier: row.sortier,
+            lat: row.lat,
+            lon: row.lon,
+            tz_fachaufgabe: row.tz_fachaufgabe,
+            tz_organisation: row.tz_organisation,
+            aktueller_br_id: row.aktueller_br_id,
+            soll,
+            ist,
+            ist_kumuliert,
+            personal_mitglieder,
+            fahrzeug_mitglieder,
+            material_mitglieder,
+            sprechgruppen,
+        });
+    }
+    Ok(out)
 }
 
 /// Alle Einheiten eines Einsatzes (flach, aufgelöst inkl. Mitgliedern/Stärke).
@@ -166,11 +219,7 @@ pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<EinheitAnze
     .bind(einsatz_id)
     .fetch_all(pool)
     .await?;
-    let mut out = Vec::with_capacity(rows.len());
-    for row in rows {
-        out.push(zu_anzeige(pool, row).await?);
-    }
-    Ok(out)
+    zu_anzeige_batch(pool, einsatz_id, rows).await
 }
 
 /// Lädt eine Einheit (aufgelöst); `NotFound`, falls nicht zum Einsatz.
@@ -187,13 +236,24 @@ pub async fn laden(
     .fetch_optional(pool)
     .await?
     .ok_or(AppError::NotFound)?;
-    zu_anzeige(pool, row).await
+    zu_anzeige_batch(pool, einsatz_id, vec![row])
+        .await?
+        .pop()
+        .ok_or(AppError::NotFound)
 }
 
-async fn pruefe_parent(pool: &SqlitePool, einsatz_id: i64, parent_id: i64) -> Result<(), AppError> {
+/// `NotFound`, falls die Einheit nicht (mehr) zu diesem Einsatz gehört. Bewusst eine
+/// nackte Existenz-Abfrage: für eine reine Zugehörigkeitsprüfung wäre `laden()` seit
+/// LFH-225/F23 der teuerste denkbare Weg — es zieht die Anreicherung des GANZEN
+/// Einsatzes, um sie sofort wieder zu verwerfen.
+async fn pruefe_gehoert_zum_einsatz(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<(), AppError> {
     let t: Option<i64> =
         sqlx::query_scalar("SELECT 1 FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?")
-            .bind(parent_id)
+            .bind(id)
             .bind(einsatz_id)
             .fetch_optional(pool)
             .await?;
@@ -260,7 +320,7 @@ async fn validiere(
         pruefe_abschnitt(pool, einsatz_id, abschnitt).await?;
     }
     if let Some(parent) = daten.ueber_einheit_id {
-        pruefe_parent(pool, einsatz_id, parent).await?;
+        pruefe_gehoert_zum_einsatz(pool, einsatz_id, parent).await?;
         if let Some(sid) = self_id {
             if waere_zyklus(pool, sid, parent).await? {
                 return Err(AppError::Validation(
@@ -315,7 +375,7 @@ pub async fn aktualisiere(
     id: i64,
     daten: EinheitDaten<'_>,
 ) -> Result<EinheitAnzeige, AppError> {
-    laden(pool, einsatz_id, id).await?; // Existenz im Einsatz sichern
+    pruefe_gehoert_zum_einsatz(pool, einsatz_id, id).await?;
     validiere(pool, einsatz_id, org_id, Some(id), &daten).await?;
     let resultat = sqlx::query(
         "UPDATE einsatz_einheit SET abschnitt_id = ?, ueber_einheit_id = ?, typ_id = ?, name = ?, \
@@ -975,6 +1035,181 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(einheit_id, None, "Material muss beim Auflösen frei werden");
+    }
+
+    // ── LFH-225/F23: Kantenfälle der Satz-Aggregation ────────────────────────────
+    // Die Anreicherung von `liste()`/`laden()` läuft satzbasiert (eine Abfrage je
+    // Mitgliedsart über den ganzen Einsatz). Diese Tests pinnen das Verhalten an den
+    // Rändern fest, an denen eine Sammelabfrage anders reagieren könnte als die alten
+    // Einzelabfragen.
+
+    /// Einsatz ohne Einheiten: leere Liste, keine Panik. (Die Sammelabfragen dürfen
+    /// bei leerer Eingabe gar nicht erst laufen.)
+    #[tokio::test]
+    async fn liste_ohne_einheiten_ist_leer() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, _b) = setup(&pool).await;
+        assert!(liste(&pool, einsatz).await.unwrap().is_empty());
+    }
+
+    /// Einheit ohne jedes Mitglied: leere Mitgliederlisten und Null-Stärke — ein
+    /// fehlender Eintrag in der Sammel-Map darf nicht zu `NotFound` o. Ä. führen.
+    #[tokio::test]
+    async fn einheit_ohne_mitglieder_liefert_leere_listen_und_nullstaerke() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, einheit_id) = seed_einheit(&pool).await;
+        let liste = liste(&pool, einsatz).await.unwrap();
+        assert_eq!(liste.len(), 1);
+        let e = &liste[0];
+        assert_eq!(e.id, einheit_id);
+        assert_eq!(e.ist, Staerke::neu(0, 0, 0));
+        assert_eq!(e.ist_kumuliert, Staerke::neu(0, 0, 0));
+        assert!(e.personal_mitglieder.is_empty());
+        assert!(e.fahrzeug_mitglieder.is_empty());
+        assert!(e.material_mitglieder.is_empty());
+        assert!(e.sprechgruppen.is_empty());
+    }
+
+    /// Regression (Pflicht, LFH-225/F23): korrupte Altdaten mit Zyklus in der
+    /// Unterstellung. Der Zyklusschutz per Visited-Set muss die Baum-Summierung
+    /// terminieren lassen — sonst hängt jeder Listenabruf des Einsatzes.
+    /// Der Zyklus wird per direktem UPDATE gelegt, weil `waere_zyklus` ihn über die
+    /// reguläre Schreib-API verhindert.
+    #[tokio::test]
+    async fn ist_kumuliert_terminiert_bei_korruptem_zyklus() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, b) = setup(&pool).await;
+        // A → B → C, je ein Mannschafter.
+        let a = anlegen(&pool, einsatz, 1, daten("A", None, None, None, None), b)
+            .await
+            .unwrap();
+        let c_ = anlegen(
+            &pool,
+            einsatz,
+            1,
+            daten("B", None, None, Some(a.id), None),
+            b,
+        )
+        .await
+        .unwrap();
+        let d = anlegen(
+            &pool,
+            einsatz,
+            1,
+            daten("C", None, None, Some(c_.id), None),
+            b,
+        )
+        .await
+        .unwrap();
+        for einheit in [a.id, c_.id, d.id] {
+            let ep = ad_hoc_person(&pool, einsatz, "M", "mannschaft").await;
+            mitglied_repo::ordne_personal_zu(&pool, einsatz, einheit, ep)
+                .await
+                .unwrap();
+        }
+        // Korruption: C wird Vater von A → Zyklus A → B → C → A.
+        sqlx::query("UPDATE einsatz_einheit SET ueber_einheit_id = ? WHERE id = ?")
+            .bind(d.id)
+            .bind(a.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        // Darf terminieren und jede Einheit genau EINMAL zählen (Visited-Set).
+        let alle = liste(&pool, einsatz).await.unwrap();
+        assert_eq!(alle.len(), 3);
+        for e in &alle {
+            assert_eq!(
+                e.ist_kumuliert,
+                Staerke::neu(0, 0, 3),
+                "im Zyklus sieht jeder Knoten alle drei — genau einmal"
+            );
+        }
+        // Auch der Einzelabruf terminiert.
+        assert_eq!(
+            laden(&pool, einsatz, a.id).await.unwrap().ist_kumuliert,
+            Staerke::neu(0, 0, 3)
+        );
+    }
+
+    /// `laden()` und der passende Eintrag aus `liste()` müssen Feld für Feld identisch
+    /// sein — beide teilen sich dieselbe Anreicherungslogik.
+    #[tokio::test]
+    async fn laden_ist_identisch_zum_eintrag_aus_liste() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, b) = setup(&pool).await;
+        let zug = anlegen(&pool, einsatz, 1, daten("Zug", None, None, None, None), b)
+            .await
+            .unwrap();
+        let gruppe = anlegen(
+            &pool,
+            einsatz,
+            1,
+            daten("Gruppe", None, None, Some(zug.id), None),
+            b,
+        )
+        .await
+        .unwrap();
+        // Personal (mehrere, für die Reihenfolge), Fahrzeug, Material, Sprechgruppe.
+        for (name, pos) in [
+            ("Chef", "fuehrer"),
+            ("M1", "mannschaft"),
+            ("M2", "mannschaft"),
+        ] {
+            let ep = ad_hoc_person(&pool, einsatz, name, pos).await;
+            mitglied_repo::ordne_personal_zu(&pool, einsatz, zug.id, ep)
+                .await
+                .unwrap();
+        }
+        let ep_gruppe = ad_hoc_person(&pool, einsatz, "G1", "unterfuehrer").await;
+        mitglied_repo::ordne_personal_zu(&pool, einsatz, gruppe.id, ep_gruppe)
+            .await
+            .unwrap();
+        let ef: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) VALUES (?, 'Florian 1') RETURNING id",
+        ).bind(einsatz).fetch_one(&pool).await.unwrap();
+        mitglied_repo::ordne_fahrzeug_zu(&pool, einsatz, zug.id, ef)
+            .await
+            .unwrap();
+        let em: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_material (einsatz_id, snap_bezeichnung, menge) VALUES (?, 'Wolldecke', 50) RETURNING id",
+        ).bind(einsatz).fetch_one(&pool).await.unwrap();
+        mitglied_repo::ordne_material_zu(&pool, einsatz, zug.id, em)
+            .await
+            .unwrap();
+        let kat = crate::sprechgruppe::repo::anlegen_katalog(
+            &pool,
+            1,
+            crate::sprechgruppe::repo::KatalogDaten {
+                bezeichnung: "412_F_DRK",
+                betriebsart: "TMO",
+                hinweis: None,
+                sortier: 0,
+            },
+        )
+        .await
+        .unwrap();
+        crate::sprechgruppe::repo::setze_einheit_sprechgruppen(
+            &pool,
+            1,
+            einsatz,
+            zug.id,
+            &[kat.id],
+        )
+        .await
+        .unwrap();
+
+        let alle = liste(&pool, einsatz).await.unwrap();
+        for erwartet in &alle {
+            let einzeln = laden(&pool, einsatz, erwartet.id).await.unwrap();
+            assert_eq!(
+                &einzeln, erwartet,
+                "laden() muss dem Listeneintrag Feld für Feld entsprechen"
+            );
+        }
+        // Nicht-leer, damit der Vergleich oben etwas prüft.
+        assert_eq!(alle.len(), 2);
+        assert_eq!(alle[0].ist_kumuliert, Staerke::neu(1, 1, 2));
     }
 
     /// LFH-237/F08: Eine Einheit auflösen, die als Auftrag-Empfänger referenziert wird —
