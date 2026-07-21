@@ -8,6 +8,7 @@ import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import type { NeuerEintrag } from '../api/etb';
 import { queueEinreihen, queueLeerenFuerTests } from './queue';
+import { SITZUNG_ABGELAUFEN, sitzungsMeldungZuruecksetzen } from '../auth/sitzungsEvent';
 import { useEtbErfassung } from './useEtbErfassung';
 
 const eintrag: NeuerEintrag = { typ: 'meldung', inhalt: 'x', erfasst_lokal_at: '2026-05-23T10:00:00Z' };
@@ -127,11 +128,18 @@ describe('useEtbErfassung', () => {
         HttpResponse.json({ error: 'Session abgelaufen' }, { status: 401 }),
       ),
     );
+    // Das Signal geht an die zentrale Sitzungswache (LFH-268) — vorher setzte der Hook nur
+    // einen `reLoginNoetig`-State, den kein Aufrufer las: der Nutzer sah nichts, und die
+    // Queue lief in einen 30s-Endlos-Retry.
+    const horcher = vi.fn();
+    window.addEventListener(SITZUNG_ABGELAUFEN, horcher);
     await act(async () => {
       await result.current.flush();
     });
 
-    await waitFor(() => expect(result.current.reLoginNoetig).toBe(true));
+    await waitFor(() => expect(horcher).toHaveBeenCalledTimes(1));
+    window.removeEventListener(SITZUNG_ABGELAUFEN, horcher);
+    // Beweissicherndes Tagebuch: die Einträge bleiben, sie gehen nach dem Anmelden raus.
     expect(result.current.ausstehend).toHaveLength(1);
     expect(result.current.abgelehnt).toHaveLength(0);
   });
@@ -352,4 +360,6 @@ describe('useEtbErfassung', () => {
 
 afterEach(() => {
   delete (navigator as { locks?: unknown }).locks;
+  // Die Melde-Sperre ist modulweit — ohne Reset bliebe ein zweiter 401-Test stumm (LFH-268).
+  sitzungsMeldungZuruecksetzen();
 });

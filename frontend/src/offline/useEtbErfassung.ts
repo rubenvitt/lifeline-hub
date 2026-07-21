@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api/client';
 import { erfasseEtb, type NeuerEintrag } from '../api/etb';
 import { einsatzKeys } from '../api/queryKeys';
+import { meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
 import {
   abgelehntEntfernen,
   abgelehntHinzufuegen,
@@ -38,7 +39,6 @@ export function useEtbErfassung(einsatzId: number) {
   const qc = useQueryClient();
   const [ausstehend, setAusstehend] = useState<AusstehenderEintrag[]>([]);
   const [abgelehnt, setAbgelehnt] = useState<AbgelehnterEintrag[]>([]);
-  const [reLoginNoetig, setReLoginNoetig] = useState(false);
   const flushtGerade = useRef(false);
   const backoffTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const backoffStufe = useRef(0);
@@ -69,8 +69,10 @@ export function useEtbErfassung(einsatzId: number) {
           await queueEntfernen(a.id!);
         } catch (e) {
           if (istTransient(e)) {
-            // 401: Session abgelaufen → Re-Login-Aufforderung, Queue NICHT leeren.
-            if (e instanceof ApiError && e.status === 401) setReLoginNoetig(true);
+            // 401: Session abgelaufen → die zentrale Sitzungswache (LFH-268) übernimmt den
+            // Re-Login. Die Queue wird NICHT geleert: die Einträge sind beweissicherndes
+            // Tagebuch und gehen nach dem Anmelden raus.
+            if (e instanceof ApiError && e.status === 401) meldeSitzungAbgelaufen();
             transientOffen = true;
             break; // Reihenfolge wahren; Rest beim nächsten Durchlauf
           }
@@ -163,7 +165,7 @@ export function useEtbErfassung(einsatzId: number) {
         qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
       } catch (e) {
         if (istTransient(e)) {
-          if (e instanceof ApiError && e.status === 401) setReLoginNoetig(true);
+          if (e instanceof ApiError && e.status === 401) meldeSitzungAbgelaufen();
           await queueEinreihen(einsatzId, mitId);
           await ladeAusstehend();
         } else {
@@ -183,5 +185,5 @@ export function useEtbErfassung(einsatzId: number) {
     [ladeAbgelehnt],
   );
 
-  return { erfassen, ausstehend, flush, abgelehnt, reLoginNoetig, abgelehntVerwerfen };
+  return { erfassen, ausstehend, flush, abgelehnt, abgelehntVerwerfen };
 }
