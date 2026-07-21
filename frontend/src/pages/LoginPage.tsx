@@ -160,6 +160,14 @@ export default function LoginPage() {
   // (`AuthContext.login` postet die Anmeldedaten selbst) steht die Session hier bereits nach
   // `finish` per Cookie — der Client muss den Benutzer nur noch per `aktualisiere()`
   // (`/api/auth/me`) in den Context nachladen.
+  //
+  // TRADEOFF (discoverable-only): Der Konto-Picker bietet NUR discoverable/resident Credentials
+  // an. Passkeys auf Authenticatoren, die non-resident anlegen (typisch: manche Roaming-Security-
+  // Keys — die Registrierung nutzt `require_resident_key(false)`), erscheinen hier NICHT. Auf
+  // Platform-Authenticatoren (Touch ID/iCloud, Windows Hello) sind Passkeys immer discoverable.
+  // Der benutzergebundene Weg (Backend `/auth/{start,finish}`) bleibt als Fallback erhalten, wird
+  // vom FE aber nicht mehr angeboten. Universeller Resident-Key-Zwang bei der Registrierung ist
+  // auf LFH-277 vertagt (bräuchte die schwerere AttestedResidentKey-API).
   async function mitPasskeyAnmelden() {
     setFehler(null);
     setLaedt('passkey');

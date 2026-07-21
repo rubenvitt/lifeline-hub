@@ -313,6 +313,12 @@ describe('LoginPage', () => {
       // KEIN Benutzername: usernameless Login (LFH-313). Der Passkey-Button erscheint erst, wenn
       // die Provider-Liste geladen ist (webauthn aktiv) → `findByRole` wartet darauf.
       const knopf = await screen.findByRole('button', { name: 'Mit Passkey anmelden' });
+      // Kern-UI-Änderung von LFH-313: im reinen Passkey-Setup (nur webauthn aktiv, kein Passwort)
+      // gibt es KEIN Benutzername-Feld mehr (es hängt an `passwortAktiv`). Sichert das
+      // `passwortAktiv &&`-Gate gegen versehentliches Entfernen (sonst bliebe ein leeres,
+      // sinnloses Feld übrig). Erst NACH dem `findByRole` prüfen — dann ist die Provider-Liste
+      // geladen und `passwortAktiv` ist false (davor, während provider=[], wäre das Feld noch da).
+      expect(screen.queryByLabelText('Benutzername')).not.toBeInTheDocument();
       await userEvent.click(knopf);
 
       // Reihenfolge OHNE die 'me'-Aufrufe: start (discoverable/start) → get
