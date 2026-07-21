@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { BenutzerAnzeige } from '../api/types';
 import { ApiError } from '../api/client';
 import * as authApi from '../api/auth';
+import { sitzungsMeldungZuruecksetzen } from './sitzungsEvent';
 
 /** Ergebnis von `login()` (LFH-43, Increment 5): unterscheidet den Sofort-Erfolg (Session
  *  bereits gesetzt, `benutzer` im Context übernommen) vom TOTP-Zweitfaktor-Fall
@@ -61,6 +62,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { status: 'mfa_erforderlich' };
       }
       setBenutzer(antwort);
+      // Neue gültige Sitzung → die Melde-Sperre aus `meldeSitzungAbgelaufen` lösen, damit ein
+      // SPÄTERER Ablauf in derselben Browser-Sitzung wieder gemeldet wird (LFH-268).
+      sitzungsMeldungZuruecksetzen();
       return { status: 'ok' };
     },
     [],
@@ -74,6 +78,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const aktualisiere = useCallback(async () => {
     const b = await authApi.me();
     setBenutzer(b);
+    // Wie in `login`: Passkey- und TOTP-Login etablieren die Sitzung hierüber (LFH-268).
+    sitzungsMeldungZuruecksetzen();
   }, []);
 
   const wert = useMemo<AuthWert>(

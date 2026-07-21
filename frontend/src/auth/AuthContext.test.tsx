@@ -1,10 +1,17 @@
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider, useAuth } from './AuthContext';
+import {
+  SITZUNG_ABGELAUFEN,
+  meldeSitzungAbgelaufen,
+  sitzungsMeldungZuruecksetzen,
+} from './sitzungsEvent';
+
+afterEach(() => sitzungsMeldungZuruecksetzen());
 
 function Anzeige() {
   const { benutzer, laedt, login, logout } = useAuth();
@@ -52,5 +59,30 @@ describe('AuthContext', () => {
     await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('anonym'));
     await userEvent.click(screen.getByText('login'));
     await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('Admin'));
+  });
+
+  it('löst die Melde-Sperre nach erfolgreichem Login (LFH-268)', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })),
+      http.post('/api/auth/login', () => HttpResponse.json(adminBody)),
+    );
+    // Sperre setzen — wie nach einem echten Sitzungsablauf.
+    meldeSitzungAbgelaufen();
+
+    renderMitProviders(
+      <AuthProvider>
+        <Anzeige />
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('anonym'));
+    await userEvent.click(screen.getByText('login'));
+    await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('Admin'));
+
+    // Ohne das Lösen bliebe ein SPÄTERER Ablauf in derselben Browser-Sitzung stumm.
+    const horcher = vi.fn();
+    window.addEventListener(SITZUNG_ABGELAUFEN, horcher);
+    meldeSitzungAbgelaufen();
+    window.removeEventListener(SITZUNG_ABGELAUFEN, horcher);
+    expect(horcher).toHaveBeenCalledTimes(1);
   });
 });
