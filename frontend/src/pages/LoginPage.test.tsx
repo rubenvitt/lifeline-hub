@@ -247,7 +247,7 @@ describe('LoginPage', () => {
       startAuthenticationMock.mockReset();
     });
 
-    it('rendert „Mit Passkey anmelden" bei Secure Context + aktivem webauthn-Provider und durchläuft auth/start → get → auth/finish → aktualisiere()', async () => {
+    it('rendert „Mit Passkey anmelden" bei Secure Context + aktivem webauthn-Provider und durchläuft discoverable/start → get → discoverable/finish → aktualisiere() OHNE Benutzername', async () => {
       setzeSecureContext(true);
       const reihenfolge: string[] = [];
       // `/api/auth/me` liefert durchgehend den angemeldeten Benutzer — deckt sowohl den
@@ -274,7 +274,7 @@ describe('LoginPage', () => {
       server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
       server.use(http.get('/api/auth/providers', () => HttpResponse.json(webauthnProvider)));
       server.use(
-        http.post('/api/auth/webauthn/auth/start', () => {
+        http.post('/api/auth/webauthn/discoverable/start', () => {
           reihenfolge.push('start');
           return HttpResponse.json({
             publicKey: {
@@ -284,7 +284,7 @@ describe('LoginPage', () => {
             },
           });
         }),
-        http.post('/api/auth/webauthn/auth/finish', () => {
+        http.post('/api/auth/webauthn/discoverable/finish', () => {
           reihenfolge.push('finish');
           return new HttpResponse(null, { status: 200 });
         }),
@@ -310,12 +310,13 @@ describe('LoginPage', () => {
         </AuthProvider>,
       );
 
-      await userEvent.type(await screen.findByLabelText('Benutzername'), 'admin');
-      const knopf = screen.getByRole('button', { name: 'Mit Passkey anmelden' });
+      // KEIN Benutzername: usernameless Login (LFH-313). Der Passkey-Button erscheint erst, wenn
+      // die Provider-Liste geladen ist (webauthn aktiv) → `findByRole` wartet darauf.
+      const knopf = await screen.findByRole('button', { name: 'Mit Passkey anmelden' });
       await userEvent.click(knopf);
 
-      // Reihenfolge OHNE die 'me'-Aufrufe: start (auth/start) → get (navigator.credentials.get
-      // via startAuthentication) → finish (auth/finish) — der eigentliche Ceremony-Ablauf.
+      // Reihenfolge OHNE die 'me'-Aufrufe: start (discoverable/start) → get
+      // (navigator.credentials.get via startAuthentication) → finish (discoverable/finish).
       await waitFor(() =>
         expect(reihenfolge.filter((schritt) => schritt !== 'me')).toEqual([
           'start',
@@ -351,7 +352,7 @@ describe('LoginPage', () => {
         ),
       );
       server.use(
-        http.post('/api/auth/webauthn/auth/start', () =>
+        http.post('/api/auth/webauthn/discoverable/start', () =>
           HttpResponse.json({
             publicKey: { challenge: 'Y2hhbGxlbmdl', rpId: 'localhost', allowCredentials: [] },
           }),
@@ -367,8 +368,9 @@ describe('LoginPage', () => {
         </AuthProvider>,
       );
 
-      await userEvent.type(await screen.findByLabelText('Benutzername'), 'admin');
-      const passkeyKnopf = screen.getByRole('button', { name: 'Mit Passkey anmelden' });
+      // usernameless (LFH-313): kein Benutzername nötig. Beide Provider aktiv → „Anmelden"
+      // (Passwort) und Passkey-Button sind da; nur der Passkey-Button darf während der Ceremony laden.
+      const passkeyKnopf = await screen.findByRole('button', { name: 'Mit Passkey anmelden' });
       await userEvent.click(passkeyKnopf);
 
       await waitFor(() => expect(passkeyKnopf).toHaveClass('ant-btn-loading'));

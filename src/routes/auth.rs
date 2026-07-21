@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use utoipa::ToSchema;
 use webauthn_rs::prelude::{
-    CreationChallengeResponse, PublicKeyCredential, RegisterPublicKeyCredential,
+    CreationChallengeResponse, DiscoverableKey, PublicKeyCredential, RegisterPublicKeyCredential,
     RequestChallengeResponse, WebauthnError,
 };
 
@@ -984,6 +984,208 @@ pub async fn webauthn_auth_finish(
             .path("/api/auth/webauthn")
             .build(),
     );
+    Ok((jar, StatusCode::OK))
+}
+
+/// Cookie-Name für den discoverable/usernameless-Authentifizierungs-State-Key (LFH-313). Analog
+/// `WEBAUTHN_AUTH_COOKIE`, aber ein EIGENER Name: so kann ein Key aus einer benutzergebundenen
+/// Ceremony nicht in den discoverable-`finish` passen und umgekehrt — die Variantentrennung in
+/// `entnehme` fängt eine Verwechslung zwar ohnehin generisch als 401 ab, getrennte Cookies machen
+/// die beiden Flows aber schon transportseitig disjunkt.
+const WEBAUTHN_DISC_COOKIE: &str = "webauthn_disc";
+
+/// Baut das discoverable-State-Cookie (analog `webauthn_auth_cookie`).
+fn webauthn_disc_cookie(key: String, secure: bool) -> Cookie<'static> {
+    Cookie::build((WEBAUTHN_DISC_COOKIE, key))
+        .http_only(true)
+        .same_site(SameSite::Lax)
+        .secure(secure)
+        .path("/api/auth/webauthn")
+        .build()
+}
+
+/// POST /api/auth/webauthn/discoverable/start — beginnt eine **usernameless** Passkey-Ceremony
+/// (öffentlich, PRE-Login, LFH-313). Kein Request-Body, KEIN Benutzername: der Authenticator
+/// entdeckt den Benutzer selbst (leere `allowCredentials`). Enforcement wie `auth/start` (`404`,
+/// falls `webauthn` nicht aktiviert ist).
+///
+/// Gegenüber `webauthn_auth_start` (benutzergebunden) entfällt damit auch der dort dokumentierte
+/// `allowCredentials`-Enumeration-Tradeoff komplett — die Antwort verrät nichts über Existenz oder
+/// Anzahl von Konten/Passkeys.
+///
+/// `mediation` wird bewusst auf `None` gesetzt: `start_discoverable_authentication` setzt intern
+/// `Mediation::Conditional` (Autofill-UI), wir wollen hier aber den Button-/Modal-Flow. Das
+/// Frontend leitet ohnehin nur `rcr.publicKey` (ohne das Wrapper-`mediation`) an
+/// `startAuthentication` weiter — das Nullen ist eine explizite Absicherung gegen ein künftiges
+/// Frontend, das den ganzen Wrapper übergäbe.
+pub async fn webauthn_discoverable_start(
+    State(state): State<AppState>,
+    jar: CookieJar,
+) -> Result<(CookieJar, Json<RequestChallengeResponse>), AppError> {
+    if !webauthn_aktiv(&state.pool).await? {
+        return Err(AppError::NotFound);
+    }
+    let webauthn = crate::auth::webauthn::webauthn().ok_or(AppError::NotFound)?;
+
+    // Kein Nutzerbezug → ein Fehler hier ist ein echter Serverfehler (500), keine
+    // Enumeration-Frage wie beim benutzergebundenen `auth/start`.
+    let (mut rcr, disc_state) = webauthn.start_discoverable_authentication().map_err(|e| {
+        AppError::Internal(format!("WebAuthn-Discoverable-Start fehlgeschlagen: {e}"))
+    })?;
+    rcr.mediation = None;
+
+    let key = session::neuer_token();
+    crate::auth::webauthn::state::speichere(
+        key.clone(),
+        crate::auth::webauthn::state::CeremonyZustand::AuthentifizierungDiscoverable(disc_state),
+    );
+
+    let jar = jar.add(webauthn_disc_cookie(key, session::cookie_secure()));
+    Ok((jar, Json(rcr)))
+}
+
+/// POST /api/auth/webauthn/discoverable/finish — schließt den usernameless Passkey-Login ab
+/// (öffentlich, PRE-Login, LFH-313). **Security-kritisch**, Ablauf analog `webauthn_auth_finish`,
+/// mit dem discoverable-spezifischen Unterschied bei der Benutzer-Auflösung:
+///
+/// 1. Enforcement (`404`, falls `webauthn` aus) + State-Key aus dem `webauthn_disc`-Cookie.
+///    `entnehme` (SYNC, Guard vor jedem `.await` freigegeben — !Send-MUST) akzeptiert NUR die
+///    `AuthentifizierungDiscoverable`-Variante; alles andere → generischer `401`.
+/// 2. `identify_discoverable_authentication` extrahiert den User-Handle aus der Assertion (der
+///    Client hat den Benutzer selbst „entdeckt").
+/// 3. Benutzer über `benutzer_je_user_handle` auflösen (aktiv-gefiltert) — unbekannt/inaktiv →
+///    `401`. Dessen Passkeys als `DiscoverableKey`-Kandidaten laden.
+/// 4. `finish_discoverable_authentication` prüft Signatur UND (library-intern, wie beim Passkey-
+///    Flow) den Counter/Klon — `CredentialPossibleCompromise` → warn + `401`, jeder Fehler → `401`.
+/// 5. Counter-Writeback über die tatsächlich genutzte `cred_id`, mit Defense-in-Depth-Cross-Check
+///    (der per cred_id gefundene Benutzer MUSS der per Handle aufgelöste sein).
+/// 6. `aktiv`-Check, Session anlegen, Cookies setzen/entfernen, `LoginOk`-Audit, `200`.
+///
+/// Der `LoginOk`-Audit wird hier bewusst geschrieben (Muster wie der Passwort-Login); der
+/// bestehende `webauthn_auth_finish` schreibt heute noch keinen — diese Alt-Lücke wird hier NICHT
+/// mitgezogen (bleibt außerhalb des LFH-313-Scopes).
+pub async fn webauthn_discoverable_finish(
+    State(state): State<AppState>,
+    PeerIp(peer_ip): PeerIp,
+    jar: CookieJar,
+    JsonBody(body): JsonBody<PublicKeyCredential>,
+) -> Result<(CookieJar, StatusCode), AppError> {
+    if !webauthn_aktiv(&state.pool).await? {
+        return Err(AppError::NotFound);
+    }
+    let webauthn = crate::auth::webauthn::webauthn().ok_or(AppError::NotFound)?;
+
+    let key = jar
+        .get(WEBAUTHN_DISC_COOKIE)
+        .map(|c| c.value().to_string())
+        .ok_or(AppError::Unauthorized)?;
+
+    // SYNC, Guard freigegeben VOR jedem folgenden `.await` — !Send-MUST (s. state-Moduldoc).
+    let disc_state = match crate::auth::webauthn::state::entnehme(&key) {
+        Some(crate::auth::webauthn::state::CeremonyZustand::AuthentifizierungDiscoverable(s)) => s,
+        _ => return Err(AppError::Unauthorized),
+    };
+
+    // Aus der Assertion den User-Handle bestimmen (der Client hat den Benutzer selbst entdeckt).
+    let (handle, _cred_id) = webauthn
+        .identify_discoverable_authentication(&body)
+        .map_err(|_| AppError::Unauthorized)?;
+
+    // Benutzer über den Handle auflösen (aktiv-gefiltert). Unbekannt/inaktiv → generischer 401.
+    let benutzer_id = crate::auth::webauthn::benutzer_je_user_handle(&state.pool, handle)
+        .await?
+        .ok_or(AppError::Unauthorized)?;
+
+    // Kandidaten-Passkeys des Benutzers laden und in `DiscoverableKey` konvertieren — sie werden
+    // von `finish_discoverable_authentication` erst jetzt (nachträglich) als erlaubte Credentials
+    // in den Ceremony-State injiziert.
+    let passkeys =
+        crate::auth::webauthn::storage::passkeys_fuer_benutzer(&state.pool, benutzer_id).await?;
+    if passkeys.is_empty() {
+        return Err(AppError::Unauthorized);
+    }
+    let kandidaten: Vec<DiscoverableKey> = passkeys
+        .iter()
+        .map(|pk| DiscoverableKey::from(pk))
+        .collect();
+
+    // Counter-/Klon-Check passiert HIER in der Bibliothek (identisch zum Passkey-Flow).
+    let auth_result = match webauthn.finish_discoverable_authentication(
+        &body,
+        disc_state,
+        &kandidaten,
+    ) {
+        Ok(r) => r,
+        Err(WebauthnError::CredentialPossibleCompromise) => {
+            tracing::warn!(
+                    "WebAuthn-Discoverable-Login abgelehnt: möglicher Klon (Counter-Regression) erkannt"
+                );
+            return Err(AppError::Unauthorized);
+        }
+        Err(_) => return Err(AppError::Unauthorized),
+    };
+
+    // Counter-Writeback über die tatsächlich genutzte cred_id + Defense-in-Depth-Cross-Check:
+    // der so gefundene Benutzer MUSS der per Handle aufgelöste sein (sonst 401).
+    let gefunden = crate::auth::webauthn::storage::passkey_je_credential_id(
+        &state.pool,
+        auth_result.cred_id().as_ref(),
+    )
+    .await?;
+    let Some((cred_benutzer_id, mut passkey)) = gefunden else {
+        return Err(AppError::Unauthorized);
+    };
+    if cred_benutzer_id != benutzer_id {
+        return Err(AppError::Unauthorized);
+    }
+
+    if passkey.update_credential(&auth_result).is_none() {
+        return Err(AppError::Internal(
+            "WebAuthn: credential_id-Mismatch beim Counter-Update".to_string(),
+        ));
+    }
+    crate::auth::webauthn::storage::aktualisiere_counter(&state.pool, &passkey).await?;
+
+    let benutzer = sqlx::query_as::<_, Benutzer>(
+        "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, \
+         aktiv, erstellt_at FROM benutzer WHERE id = ?",
+    )
+    .bind(benutzer_id)
+    .fetch_optional(&state.pool)
+    .await?;
+    let Some(benutzer) = benutzer else {
+        return Err(AppError::Unauthorized);
+    };
+    if !benutzer.aktiv {
+        return Err(AppError::Unauthorized);
+    }
+
+    let token = session::anlegen(&state.pool, benutzer.id).await?;
+    let jar = jar.add(session_cookie(token, session::cookie_secure()));
+    let jar = jar.remove(
+        Cookie::build((WEBAUTHN_DISC_COOKIE, ""))
+            .path("/api/auth/webauthn")
+            .build(),
+    );
+
+    tracing::info!(
+        benutzer_id = benutzer.id,
+        benutzername = %benutzer.benutzername,
+        peer_ip = ?peer_ip,
+        "WebAuthn-Discoverable-Anmeldung erfolgreich"
+    );
+    crate::auth::audit::schreibe(
+        &state.pool,
+        crate::auth::audit::AuditEintrag {
+            ereignis: crate::auth::audit::Ereignis::LoginOk,
+            benutzername: Some(&benutzer.benutzername),
+            benutzer_id: Some(benutzer.id),
+            peer_ip: peer_ip.map(|ip| ip.to_string()),
+            provider: crate::auth::provider::ID_WEBAUTHN,
+        },
+    )
+    .await;
+
     Ok((jar, StatusCode::OK))
 }
 

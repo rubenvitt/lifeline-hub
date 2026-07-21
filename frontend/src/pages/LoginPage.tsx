@@ -8,7 +8,10 @@ import { ApiError } from '../api/client';
 import { devBenutzerLaden, type DevBenutzer } from '../api/dev';
 import { providerListe } from '../api/auth';
 import { totpFinish } from '../api/totp';
-import { webauthnAnmeldungAbschliessen, webauthnAnmeldungStarten } from '../api/webauthn';
+import {
+  webauthnDiscoverableAnmeldungAbschliessen,
+  webauthnDiscoverableAnmeldungStarten,
+} from '../api/webauthn';
 import type { AuthProvider } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import loginBg from '../assets/login-bg.webp';
@@ -80,8 +83,10 @@ export default function LoginPage() {
   // verlangt https/localhost, der Button wäre sonst ein Fake-Button (analog OIDC-Precedent).
   const webauthnAktiv = provider.some((p) => p.typ === 'webauthn' && p.aktiviert);
   const passkeyAktiv = webauthnAktiv && window.isSecureContext;
-  // Benutzername-Feld wird für Passwort- UND Passkey-Login gebraucht → Form bleibt sichtbar,
-  // sobald einer der beiden Wege aktiv ist.
+  // Der Passkey-Login ist seit LFH-313 usernameless und braucht das Benutzername-Feld NICHT mehr.
+  // Der Formular-Container bleibt sichtbar, sobald Passwort- ODER Passkey-Login aktiv ist — das
+  // Benutzername-/Passwort-Feld selbst hängt aber an `passwortAktiv` (s. unten), damit im reinen
+  // Passkey-Betrieb kein leeres Benutzername-Feld übrig bleibt.
   const formSichtbar = passwortAktiv || passkeyAktiv;
 
   // OIDC ist ein Browser-Redirect-Flow (kein fetch/XHR): der Server leitet auf den
@@ -148,25 +153,20 @@ export default function LoginPage() {
     totpForm.resetFields(['code']);
   }
 
-  // Passkey-Login: liest den Benutzernamen aus demselben Formularfeld wie der Passwort-Login
-  // (kein zweites Eingabefeld) → auth/start → navigator.credentials.get (via
-  // `startAuthentication` aus `@simplewebauthn/browser`) → auth/finish. Anders als beim
-  // Passwort-Pfad (`AuthContext.login` postet die Anmeldedaten selbst) steht die Session
-  // hier bereits nach `auth/finish` per Cookie — der Client muss den Benutzer nur noch per
-  // `aktualisiere()` (`/api/auth/me`) in den Context nachladen.
+  // Passkey-Login (usernameless/discoverable, LFH-313): KEIN Benutzername nötig — der
+  // Authenticator entdeckt den Benutzer selbst. discoverable/start → navigator.credentials.get
+  // (via `startAuthentication` aus `@simplewebauthn/browser`, leere `allowCredentials` → der
+  // Browser zeigt einen Konto-Picker) → discoverable/finish. Anders als beim Passwort-Pfad
+  // (`AuthContext.login` postet die Anmeldedaten selbst) steht die Session hier bereits nach
+  // `finish` per Cookie — der Client muss den Benutzer nur noch per `aktualisiere()`
+  // (`/api/auth/me`) in den Context nachladen.
   async function mitPasskeyAnmelden() {
     setFehler(null);
-    let werte: FormWerte;
-    try {
-      werte = await form.validateFields(['benutzername']);
-    } catch {
-      return; // Form zeigt die Validierungsmeldung (fehlender Benutzername) selbst an
-    }
     setLaedt('passkey');
     try {
-      const rcr = await webauthnAnmeldungStarten(werte.benutzername);
+      const rcr = await webauthnDiscoverableAnmeldungStarten();
       const cred = await startAuthentication({ optionsJSON: rcr.publicKey });
-      await webauthnAnmeldungAbschliessen(cred);
+      await webauthnDiscoverableAnmeldungAbschliessen(cred);
       await aktualisiere();
       navigate(zielPfad, { replace: true });
     } catch (e) {
@@ -300,13 +300,15 @@ export default function LoginPage() {
                 disabled={laedt !== null}
                 requiredMark={false}
               >
-                <Form.Item
-                  label="Benutzername"
-                  name="benutzername"
-                  rules={[{ required: true, message: 'Bitte Benutzername eingeben' }]}
-                >
-                  <Input size="large" autoFocus autoComplete="username" />
-                </Form.Item>
+                {passwortAktiv && (
+                  <Form.Item
+                    label="Benutzername"
+                    name="benutzername"
+                    rules={[{ required: true, message: 'Bitte Benutzername eingeben' }]}
+                  >
+                    <Input size="large" autoFocus autoComplete="username" />
+                  </Form.Item>
+                )}
                 {passwortAktiv && (
                   <Form.Item
                     label="Passwort"

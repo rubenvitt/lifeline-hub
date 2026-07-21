@@ -87,6 +87,27 @@ pub async fn user_handle(pool: &SqlitePool, benutzer_id: i64) -> Result<Uuid, Ap
     Ok(neu)
 }
 
+/// Reverse-Lookup für den usernameless/discoverable Login (LFH-313): findet den **aktiven**
+/// Benutzer zu einem WebAuthn-User-Handle. Der Handle kommt aus
+/// `identify_discoverable_authentication` (dem `userHandle` der Assertion) — der discoverable-
+/// `finish`-Handler löst darüber den Benutzer auf, statt aus einem eingegebenen Benutzernamen.
+///
+/// `AND aktiv = 1`: ein deaktiviertes Konto darf sich nicht anmelden. Die Eindeutigkeit des
+/// Handles garantiert der partielle UNIQUE-Index (Migration 0092) — der Handle ist eine zufällige
+/// `Uuid::new_v4` (s. [`user_handle`]), Kollisionen sind praktisch ausgeschlossen, der Index macht
+/// sie zusätzlich strukturell unmöglich. Liefert `None`, wenn kein aktiver Benutzer passt.
+pub async fn benutzer_je_user_handle(
+    pool: &SqlitePool,
+    handle: Uuid,
+) -> Result<Option<i64>, AppError> {
+    let id: Option<i64> =
+        sqlx::query_scalar("SELECT id FROM benutzer WHERE webauthn_user_handle = ? AND aktiv = 1")
+            .bind(handle.as_bytes().as_slice())
+            .fetch_optional(pool)
+            .await?;
+    Ok(id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -166,6 +187,51 @@ mod tests {
             nach.as_deref(),
             Some(handle.as_bytes().as_slice()),
             "der generierte Handle muss 1:1 in der Spalte landen"
+        );
+    }
+
+    #[tokio::test]
+    async fn benutzer_je_user_handle_findet_aktiven_benutzer() {
+        let pool = pool_mit_org().await;
+        let id = benutzer(&pool, "erika").await;
+        // Handle erzeugen + persistieren, dann rückwärts auflösen.
+        let handle = user_handle(&pool, id).await.unwrap();
+
+        let gefunden = benutzer_je_user_handle(&pool, handle).await.unwrap();
+
+        assert_eq!(gefunden, Some(id));
+    }
+
+    #[tokio::test]
+    async fn benutzer_je_user_handle_liefert_none_bei_unbekanntem_handle() {
+        let pool = pool_mit_org().await;
+        let _ = benutzer(&pool, "erika").await;
+
+        let gefunden = benutzer_je_user_handle(&pool, Uuid::new_v4())
+            .await
+            .unwrap();
+
+        assert!(gefunden.is_none());
+    }
+
+    #[tokio::test]
+    async fn benutzer_je_user_handle_ignoriert_deaktivierten_benutzer() {
+        // Ein zwischenzeitlich deaktiviertes Konto darf sich nicht per Passkey anmelden —
+        // der Reverse-Lookup filtert `aktiv = 1` (spiegelt den `aktiv`-Check im finish-Handler).
+        let pool = pool_mit_org().await;
+        let id = benutzer(&pool, "erika").await;
+        let handle = user_handle(&pool, id).await.unwrap();
+        sqlx::query("UPDATE benutzer SET aktiv = 0 WHERE id = ?")
+            .bind(id)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let gefunden = benutzer_je_user_handle(&pool, handle).await.unwrap();
+
+        assert!(
+            gefunden.is_none(),
+            "deaktivierter Benutzer darf nicht über den Handle auflösbar sein"
         );
     }
 

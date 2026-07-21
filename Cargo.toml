@@ -78,7 +78,15 @@ openidconnect = { version = "4", default-features = false }
 # standardmäßig DYNAMISCH gegen die System-libssl/libcrypto (kein "vendored") — das ist auch eine
 # LAUFZEIT-Abhängigkeit, nicht nur eine Build-Voraussetzung (verifiziert per `otool -L` auf der
 # gebauten Binary). Details/Build-Voraussetzung: `docs/betrieb/packaging.md`.
-webauthn-rs = "0.5"
+#
+# `conditional-ui` (LFH-313): schaltet die discoverable-Authentifizierung frei
+# (`start_/identify_/finish_discoverable_authentication`, `DiscoverableAuthentication`/
+# `DiscoverableKey`) für den usernameless Passkey-Login. Ist ein LEERES Feature-Gate
+# (`conditional-ui = []` in webauthn-rs) → keine transitiven Deps, kein Binary-Impact
+# (nur zuvor `#[cfg]`-ausgeblendete Methoden/Typen werden sichtbar). KEIN
+# `danger-allow-state-serialisation` nötig: der Ceremony-State liegt rein in-memory
+# (`auth::webauthn::state`), wird nie (de)serialisiert.
+webauthn-rs = { version = "0.5", features = ["conditional-ui"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 # LFH-43: TOTP-Zweitfaktor (Increment 5, MFA). "otpauth" für die otpauth://-URL-Erzeugung
 # (QR-Code-Enrollment), "gen_secret" für kryptografisch zufällige Secret-Erzeugung.
