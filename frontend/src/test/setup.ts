@@ -1,12 +1,22 @@
 import '@testing-library/jest-dom/vitest';
 import 'fake-indexeddb/auto';
 import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { server } from './server';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 
 dayjs.extend(utc);
+
+// RTL wartet in findBy*/waitFor per Default nur 1 s — während vite.config.ts dem Test
+// 10 s zugesteht (testTimeout). Diese Schere ist der Grund, aus dem ein bloß langsamer
+// Mount als „Unable to find an element" erscheint statt als Timeout: unter Last (volle
+// Suite mit Datei-Parallelität, parallele cargo-Builds) überschreitet der erste Render
+// einer Seite die Sekunde, und der Test scheitert an der Wartezeit, nicht an der Sache
+// (LFH-308). 5 s bleiben bewusst unter testTimeout, damit ein echter Fehlschlag weiter
+// die lesbare RTL-Meldung mit DOM-Dump liefert und nicht im Vitest-Timeout verschwindet.
+// Der grüne Pfad wird dadurch nicht langsamer — gewartet wird nur, bis das Element da ist.
+configure({ asyncUtilTimeout: 5000 });
 
 // Signalisiert React, dass wir in einer act-fähigen Umgebung testen — entfernt die
 // „not configured to support act(...)"-Warnung und deckt echte act-Verletzungen auf.
