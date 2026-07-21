@@ -601,6 +601,175 @@ async fn webauthn_auth_finish_deaktiviert_ist_404() {
     assert_eq!(json["error"], "Nicht gefunden");
 }
 
+// --- Discoverable / usernameless Passkey-Login (LFH-313) ---
+
+#[tokio::test]
+async fn webauthn_discoverable_start_deaktiviert_ist_404() {
+    let (app, pool) = setup_mit_pool().await;
+    webauthn_deaktiviert_override(&pool).await;
+
+    // Kein Body — der usernameless-Start verlangt keinen Benutzernamen.
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/webauthn/discoverable/start",
+        "",
+        None,
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(json["error"], "Nicht gefunden");
+}
+
+#[tokio::test]
+async fn webauthn_discoverable_start_liefert_challenge_ohne_benutzername_und_setzt_disc_cookie() {
+    // Kern-Akzeptanz von LFH-313: der Start funktioniert OHNE Benutzernamen (leerer Body) und
+    // liefert eine Challenge mit LEERER allowCredentials-Liste (der Client entdeckt den Benutzer
+    // selbst) sowie das eigene `webauthn_disc`-State-Cookie.
+    webauthn_aktivieren();
+    let app = setup().await;
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/auth/webauthn/discoverable/start")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(resp.status(), StatusCode::OK);
+    let cookie = resp
+        .headers()
+        .get(header::SET_COOKIE)
+        .expect("Set-Cookie (webauthn_disc) erwartet")
+        .to_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        cookie.contains("webauthn_disc="),
+        "eigenes discoverable-State-Cookie erwartet (nicht webauthn_auth)"
+    );
+    assert!(cookie.to_lowercase().contains("httponly"));
+    assert!(cookie.contains("/api/auth/webauthn"));
+
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert!(
+        json["publicKey"].get("challenge").is_some(),
+        "Response muss die RequestChallengeResponse (publicKey.challenge) enthalten"
+    );
+    // Discoverable ⇒ keine vorgegebenen Credentials (usernameless). Feld darf fehlen oder leer sein.
+    if let Some(allow) = json["publicKey"].get("allowCredentials") {
+        assert!(
+            allow.as_array().map(|a| a.is_empty()).unwrap_or(true),
+            "allowCredentials muss beim discoverable-Login leer sein, war: {allow}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn webauthn_discoverable_finish_deaktiviert_ist_404() {
+    let (app, pool) = setup_mit_pool().await;
+    webauthn_deaktiviert_override(&pool).await;
+
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/webauthn/discoverable/finish",
+        "",
+        Some(FINISH_BODY_PLATZHALTER),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(json["error"], "Nicht gefunden");
+}
+
+#[tokio::test]
+async fn webauthn_discoverable_finish_ohne_state_cookie_ist_generischer_fehler() {
+    webauthn_aktivieren();
+    let app = setup().await;
+
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/webauthn/discoverable/finish",
+        "",
+        Some(FINISH_BODY_PLATZHALTER),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(json["error"], "Nicht angemeldet");
+}
+
+#[tokio::test]
+async fn webauthn_discoverable_finish_mit_unbekanntem_state_cookie_ist_generischer_fehler() {
+    webauthn_aktivieren();
+    let app = setup().await;
+
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/webauthn/discoverable/finish",
+        "webauthn_disc=nie-gespeichert",
+        Some(FINISH_BODY_PLATZHALTER),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(json["error"], "Nicht angemeldet");
+}
+
+#[tokio::test]
+async fn webauthn_disc_state_cookie_passt_nicht_in_regulaeren_auth_finish() {
+    // Variantentrennung: ein per discoverable/start erzeugter State-Key darf NICHT im
+    // benutzergebundenen auth/finish akzeptiert werden (entnehme matcht die Variante disjunkt).
+    // Beweist, dass die beiden Flows nicht über einen verwechselten State-Key kreuzbar sind.
+    webauthn_aktivieren();
+    let app = setup().await;
+
+    // 1. discoverable/start → liefert ein webauthn_disc-Cookie mit gültigem State-Key.
+    let start = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/auth/webauthn/discoverable/start")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(start.status(), StatusCode::OK);
+    let disc_cookie = start
+        .headers()
+        .get(header::SET_COOKIE)
+        .expect("webauthn_disc-Cookie erwartet")
+        .to_str()
+        .unwrap();
+    let key_paar = disc_cookie.split(';').next().unwrap(); // "webauthn_disc=<key>"
+    let key_wert = key_paar.split('=').nth(1).unwrap().to_string();
+
+    // 2. Denselben Key-Wert unter dem auth-Cookie-Namen in den REGULÄREN auth/finish geben.
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/auth/webauthn/auth/finish",
+        &format!("webauthn_auth={key_wert}"),
+        Some(FINISH_BODY_PLATZHALTER),
+    )
+    .await;
+
+    // Die Ceremony ist eine Discoverable-, keine Authentifizierung-Variante → generischer 401.
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(json["error"], "Nicht angemeldet");
+}
+
 #[tokio::test]
 async fn oidc_callback_mit_idp_error_redirect_ohne_400() {
     // Derselbe prozessweite OnceLock wie in `oidc_callback_mit_unbekanntem_state_redirect_auf_

@@ -22,7 +22,9 @@ use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
-use webauthn_rs::prelude::{PasskeyAuthentication, PasskeyRegistration};
+use webauthn_rs::prelude::{
+    DiscoverableAuthentication, PasskeyAuthentication, PasskeyRegistration,
+};
 
 /// Lebensdauer eines Ceremony-State-Eintrags. Nach Ablauf liefert `entnehme` `None`,
 /// selbst wenn der Eintrag noch physisch in der Map steht (aufgeräumt wird er beim
@@ -35,13 +37,19 @@ const TTL: Duration = Duration::from_secs(5 * 60);
 static STORE: LazyLock<Mutex<HashMap<String, (CeremonyZustand, Instant)>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-/// Der Zwischenzustand EINER laufenden WebAuthn-Zeremonie: entweder eine
-/// Registrierung (`register/start` → `register/finish`, Task 5) oder eine
-/// Authentifizierung (`auth/start` → `auth/finish`, Task 6). Beide inneren Typen
-/// stammen aus `webauthn-rs` und werden hier als reiner In-Memory-Wert gehalten.
+/// Der Zwischenzustand EINER laufenden WebAuthn-Zeremonie: eine Registrierung
+/// (`register/start` → `register/finish`, Task 5), eine benutzergebundene
+/// Authentifizierung (`auth/start` → `auth/finish`, Task 6) oder eine discoverable/
+/// usernameless Authentifizierung (`discoverable/start` → `discoverable/finish`,
+/// LFH-313). Alle inneren Typen stammen aus `webauthn-rs` und werden hier als reiner
+/// In-Memory-Wert gehalten.
 pub enum CeremonyZustand {
     Registrierung(PasskeyRegistration),
     Authentifizierung(PasskeyAuthentication),
+    /// Discoverable/usernameless Login (LFH-313). Der Client entdeckt den Benutzer
+    /// selbst (leere `allowCredentials`); der `finish`-Handler löst ihn über den
+    /// vom Authenticator gelieferten User-Handle auf.
+    AuthentifizierungDiscoverable(DiscoverableAuthentication),
 }
 
 /// Speichert `zustand` unter `key` mit einer Ablaufzeit von `TTL` ab jetzt. Ein
@@ -120,6 +128,15 @@ mod tests {
         test_webauthn().start_passkey_authentication(&[]).unwrap().1
     }
 
+    fn authentifizierung_discoverable() -> DiscoverableAuthentication {
+        // Discoverable-Start nimmt KEINE Credential-Liste — der Client entdeckt den
+        // Benutzer selbst. Reine Challenge-Erzeugung, kein Authenticator nötig.
+        test_webauthn()
+            .start_discoverable_authentication()
+            .unwrap()
+            .1
+    }
+
     #[test]
     fn speichere_dann_entnehme_liefert_registrierung_zurueck() {
         let key = "reg-roundtrip".to_string();
@@ -143,6 +160,22 @@ mod tests {
         assert!(matches!(
             entnommen,
             Some(CeremonyZustand::Authentifizierung(_))
+        ));
+    }
+
+    #[test]
+    fn speichere_dann_entnehme_liefert_discoverable_zurueck() {
+        let key = "disc-roundtrip".to_string();
+        speichere(
+            key.clone(),
+            CeremonyZustand::AuthentifizierungDiscoverable(authentifizierung_discoverable()),
+        );
+
+        let entnommen = entnehme(&key);
+
+        assert!(matches!(
+            entnommen,
+            Some(CeremonyZustand::AuthentifizierungDiscoverable(_))
         ));
     }
 
