@@ -25,7 +25,7 @@ const { Header, Content } = Layout;
 export default function EinsatzLayout() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const { benutzer, logout } = useAuth();
+  const { benutzer } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
@@ -34,17 +34,9 @@ export default function EinsatzLayout() {
   // sicher eingehalten wird (siehe useEinsatzLiveStream-Doku).
   useEinsatzLiveStream(einsatzId);
 
-  // 401-Brücke (F14/LFH-263): Erkennt der Live-Feed beim Reconnect eine abgelaufene Session
-  // (EventSource sieht keinen Status-Code, daher probt der Hook /api/auth/me und meldet
-  // `lfh:live-auth-verloren`), wird sauber ab- und zum Login geleitet — statt still einen
-  // toten Feed als „live" stehen zu lassen.
-  useEffect(() => {
-    const onAuthVerloren = () => {
-      void logout().finally(() => navigate('/login'));
-    };
-    window.addEventListener('lfh:live-auth-verloren', onAuthVerloren);
-    return () => window.removeEventListener('lfh:live-auth-verloren', onAuthVerloren);
-  }, [logout, navigate]);
+  // Die 401-Brücke (F14/LFH-263) saß bis LFH-268 hier und war damit einsatz-lokal: /admin,
+  // /profil, Stammdaten und die Einsatzliste hatten gar keine Behandlung. Sie liegt jetzt als
+  // `useSitzungsWache` in `App` und bedient SSE und HTTP über denselben Kanal.
 
   // Modul-Segment ist der Pfad-Teil direkt nach der Einsatz-ID
   // (…/einsaetze/:id/<route>/…) — nicht das letzte Segment, sonst verliert das

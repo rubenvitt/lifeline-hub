@@ -5,6 +5,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import { useEinsatzLiveStream } from './useEinsatzLiveStream';
+import { SITZUNG_ABGELAUFEN, sitzungsMeldungZuruecksetzen } from '../auth/sitzungsEvent';
 
 class FakeEventSource {
   static CONNECTING = 0;
@@ -54,6 +55,8 @@ class FakeEventSource {
 afterEach(() => {
   vi.unstubAllGlobals();
   FakeEventSource.instanzen = [];
+  // Die Melde-Sperre ist modulweit — ohne Reset bliebe der zweite 401-Test stumm (LFH-268).
+  sitzungsMeldungZuruecksetzen();
 });
 
 function Probe({ id }: { id: number }) {
@@ -455,7 +458,7 @@ describe('useEinsatzLiveStream', () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
     const authVerloren = vi.fn();
-    window.addEventListener('lfh:live-auth-verloren', authVerloren);
+    window.addEventListener(SITZUNG_ABGELAUFEN, authVerloren);
     const status: string[] = [];
     const onStatus = (e: Event) => status.push((e as CustomEvent<{ status: string }>).detail.status);
     window.addEventListener('lfh:live-status', onStatus);
@@ -468,7 +471,7 @@ describe('useEinsatzLiveStream', () => {
     FakeEventSource.letzte?.emitError(FakeEventSource.CLOSED);
     await waitFor(() => expect(authVerloren).toHaveBeenCalled());
     expect(status).toContain('lost');
-    window.removeEventListener('lfh:live-auth-verloren', authVerloren);
+    window.removeEventListener(SITZUNG_ABGELAUFEN, authVerloren);
     window.removeEventListener('lfh:live-status', onStatus);
   });
 
@@ -477,7 +480,7 @@ describe('useEinsatzLiveStream', () => {
     server.use(http.get('/api/auth/me', () => HttpResponse.json({ id: 1 }, { status: 200 })));
     const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
     const authVerloren = vi.fn();
-    window.addEventListener('lfh:live-auth-verloren', authVerloren);
+    window.addEventListener(SITZUNG_ABGELAUFEN, authVerloren);
     const client = neuerQueryClient();
     render(
       <QueryClientProvider client={client}>
@@ -492,7 +495,7 @@ describe('useEinsatzLiveStream', () => {
     );
     expect(authVerloren).not.toHaveBeenCalled();
     expect(quelle?.closed).toBe(true); // tote Quelle vor Reconnect geschlossen
-    window.removeEventListener('lfh:live-auth-verloren', authVerloren);
+    window.removeEventListener(SITZUNG_ABGELAUFEN, authVerloren);
     setTimeoutSpy.mockRestore();
   });
 });

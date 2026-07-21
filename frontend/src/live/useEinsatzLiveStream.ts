@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { spieleAlarmTon } from '../alarm/alarmTon';
 import { EINSATZ_KEYS, EINSATZ_STREAM_EVENTS } from '../api/queryKeys';
+import { meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
 
 /**
  * EINE SSE-Verbindung für den gesamten Einsatz-Live-Feed.
@@ -129,8 +130,9 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       }
       if (abgebrochen) return;
       if (!sessionGueltig) {
-        // Session abgelaufen → der Browser reconnectet nicht selbst; Login-Flow übernimmt.
-        window.dispatchEvent(new CustomEvent('lfh:live-auth-verloren'));
+        // Session abgelaufen → der Browser reconnectet nicht selbst; die Sitzungswache auf
+        // App-Ebene übernimmt (LFH-268: EIN 401-Pfad für SSE und HTTP, mit Rückkehr-URL).
+        meldeSitzungAbgelaufen();
         return;
       }
       tote.close();
