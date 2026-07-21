@@ -42,20 +42,24 @@ export function webauthnRegistrierungAbschliessen(
   return apiSend<void>('/api/auth/webauthn/register/finish', 'POST', cred);
 }
 
-/** POST /api/auth/webauthn/auth/start — beginnt die passwortlose Passkey-Authentifizierung
- *  (öffentlich, PRE-Login). Setzt das kurzlebige, HttpOnly `webauthn_auth`-Cookie. */
-export function webauthnAnmeldungStarten(
-  benutzername: string,
-): Promise<WebauthnRequestChallenge> {
-  return apiSend<WebauthnRequestChallenge>('/api/auth/webauthn/auth/start', 'POST', {
-    benutzername,
-  });
+/** POST /api/auth/webauthn/discoverable/start — beginnt den **usernameless** Passkey-Login
+ *  (öffentlich, PRE-Login, LFH-313). KEIN Body, KEIN Benutzername: der Authenticator entdeckt den
+ *  Benutzer selbst (leere `allowCredentials`). Setzt das kurzlebige, HttpOnly `webauthn_disc`-
+ *  Cookie; der Browser schickt es bei `discoverable/finish` automatisch mit.
+ *
+ *  Der frühere benutzergebundene Weg (`/auth/start` mit `{benutzername}`) bleibt serverseitig als
+ *  Fallback bestehen, wird vom Frontend aber nicht mehr genutzt — der Passkey braucht keinen
+ *  Benutzernamen. */
+export function webauthnDiscoverableAnmeldungStarten(): Promise<WebauthnRequestChallenge> {
+  return apiSend<WebauthnRequestChallenge>('/api/auth/webauthn/discoverable/start', 'POST');
 }
 
-/** POST /api/auth/webauthn/auth/finish — Body ist das Ergebnis von `navigator.credentials.get`
- *  (hier: `startAuthentication()` aus `@simplewebauthn/browser`). Bei `200 OK` ist die
- *  Session bereits per Cookie gesetzt (kein Json-Body, s. `apiSend`) — der Aufrufer muss den
- *  Benutzer danach selbst nachladen (`AuthContext.aktualisiere()`). */
-export function webauthnAnmeldungAbschliessen(cred: AuthenticationResponseJSON): Promise<void> {
-  return apiSend<void>('/api/auth/webauthn/auth/finish', 'POST', cred);
+/** POST /api/auth/webauthn/discoverable/finish — Body ist das Ergebnis von
+ *  `navigator.credentials.get` (hier: `startAuthentication()` aus `@simplewebauthn/browser`). Bei
+ *  `200 OK` ist die Session bereits per Cookie gesetzt (kein Json-Body, s. `apiSend`) — der
+ *  Aufrufer muss den Benutzer danach selbst nachladen (`AuthContext.aktualisiere()`). */
+export function webauthnDiscoverableAnmeldungAbschliessen(
+  cred: AuthenticationResponseJSON,
+): Promise<void> {
+  return apiSend<void>('/api/auth/webauthn/discoverable/finish', 'POST', cred);
 }

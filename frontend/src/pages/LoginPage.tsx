@@ -1,4 +1,5 @@
 import { Alert, Button, Divider, Form, Input, Space, Tag } from 'antd';
+import { KeyOutlined, LoginOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -7,7 +8,10 @@ import { ApiError } from '../api/client';
 import { devBenutzerLaden, type DevBenutzer } from '../api/dev';
 import { providerListe } from '../api/auth';
 import { totpFinish } from '../api/totp';
-import { webauthnAnmeldungAbschliessen, webauthnAnmeldungStarten } from '../api/webauthn';
+import {
+  webauthnDiscoverableAnmeldungAbschliessen,
+  webauthnDiscoverableAnmeldungStarten,
+} from '../api/webauthn';
 import type { AuthProvider } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import loginBg from '../assets/login-bg.webp';
@@ -30,13 +34,19 @@ export default function LoginPage() {
   const [form] = Form.useForm<FormWerte>();
   const [totpForm] = Form.useForm<TotpFormWerte>();
   const [fehler, setFehler] = useState<string | null>(null);
-  const [laedt, setLaedt] = useState(false);
+  // Welche Aktion gerade läuft — steuert den Spinner GEZIELT (nur der geklickte Button lädt),
+  // während `disabled` über das Form weiterhin ALLE Wege sperrt (kein paralleler Doppel-Login).
+  const [laedt, setLaedt] = useState<'passwort' | 'passkey' | 'totp' | null>(null);
   const [devBenutzer, setDevBenutzer] = useState<DevBenutzer[]>([]);
   const [provider, setProvider] = useState<AuthProvider[]>([]);
   // Zweite Login-Stufe (LFH-43, TOTP): `login()` meldet „MFA erforderlich" statt eines
   // Benutzers (s. `AuthContext.LoginErgebnis`) → die erste Stufe (Passwort/OIDC/Passkey) weicht
   // einer TOTP-Code-Eingabe. Kein Session-Cookie existiert an dieser Stelle noch.
   const [mfaAktiv, setMfaAktiv] = useState(false);
+  // In der TOTP-Stufe: Recovery-Code statt Authenticator-Code eingeben. Beide landen im selben
+  // Feld/Endpoint (`totp/finish` unterscheidet serverseitig nicht) — der Umschalter trennt nur
+  // die EINGABE-Ergonomie: 6-stellig-numerisch vs. freies Recovery-Format.
+  const [recoveryModus, setRecoveryModus] = useState(false);
 
   const zielPfad = (location.state as { von?: string } | null)?.von ?? '/einsaetze';
 
@@ -73,8 +83,10 @@ export default function LoginPage() {
   // verlangt https/localhost, der Button wäre sonst ein Fake-Button (analog OIDC-Precedent).
   const webauthnAktiv = provider.some((p) => p.typ === 'webauthn' && p.aktiviert);
   const passkeyAktiv = webauthnAktiv && window.isSecureContext;
-  // Benutzername-Feld wird für Passwort- UND Passkey-Login gebraucht → Form bleibt sichtbar,
-  // sobald einer der beiden Wege aktiv ist.
+  // Der Passkey-Login ist seit LFH-313 usernameless und braucht das Benutzername-Feld NICHT mehr.
+  // Der Formular-Container bleibt sichtbar, sobald Passwort- ODER Passkey-Login aktiv ist — das
+  // Benutzername-/Passwort-Feld selbst hängt aber an `passwortAktiv` (s. unten), damit im reinen
+  // Passkey-Betrieb kein leeres Benutzername-Feld übrig bleibt.
   const formSichtbar = passwortAktiv || passkeyAktiv;
 
   // OIDC ist ein Browser-Redirect-Flow (kein fetch/XHR): der Server leitet auf den
@@ -86,7 +98,7 @@ export default function LoginPage() {
 
   async function absenden(werte: FormWerte) {
     setFehler(null);
-    setLaedt(true);
+    setLaedt('passwort');
     try {
       const ergebnis = await login(werte.benutzername, werte.passwort);
       if (ergebnis.status === 'mfa_erforderlich') {
@@ -95,9 +107,16 @@ export default function LoginPage() {
       }
       navigate(zielPfad, { replace: true });
     } catch (e) {
-      setFehler(e instanceof ApiError ? e.message : 'Verbindung zum Server fehlgeschlagen');
+      if (e instanceof ApiError) {
+        // Der Server antwortet bewusst mit dem generischen 401 „Nicht angemeldet" (NO-user-
+        // enumeration, s. `password::anmelden`) — für die Anzeige bleibt die Meldung genauso
+        // enumeration-sicher, wird aber verständlich formuliert.
+        setFehler(e.status === 401 ? 'Benutzername oder Passwort ist falsch' : e.message);
+      } else {
+        setFehler('Verbindung zum Server fehlgeschlagen');
+      }
     } finally {
-      setLaedt(false);
+      setLaedt(null);
     }
   }
 
@@ -109,7 +128,7 @@ export default function LoginPage() {
   // den Context nachladen.
   async function totpAbsenden(werte: TotpFormWerte) {
     setFehler(null);
-    setLaedt(true);
+    setLaedt('totp');
     try {
       await totpFinish(werte.code);
       await aktualisiere();
@@ -117,41 +136,43 @@ export default function LoginPage() {
     } catch (e) {
       setFehler(e instanceof ApiError ? e.message : 'Code ungültig');
     } finally {
-      setLaedt(false);
+      setLaedt(null);
     }
   }
 
   function zurueckZumPasswort() {
     setFehler(null);
     setMfaAktiv(false);
+    setRecoveryModus(false);
     totpForm.resetFields();
   }
 
-  // Passkey-Login: liest den Benutzernamen aus demselben Formularfeld wie der Passwort-Login
-  // (kein zweites Eingabefeld) → auth/start → navigator.credentials.get (via
-  // `startAuthentication` aus `@simplewebauthn/browser`) → auth/finish. Anders als beim
-  // Passwort-Pfad (`AuthContext.login` postet die Anmeldedaten selbst) steht die Session
-  // hier bereits nach `auth/finish` per Cookie — der Client muss den Benutzer nur noch per
-  // `aktualisiere()` (`/api/auth/me`) in den Context nachladen.
+  function wechsleRecoveryModus() {
+    setFehler(null);
+    setRecoveryModus((r) => !r);
+    totpForm.resetFields(['code']);
+  }
+
+  // Passkey-Login (usernameless/discoverable, LFH-313): KEIN Benutzername nötig — der
+  // Authenticator entdeckt den Benutzer selbst. discoverable/start → navigator.credentials.get
+  // (via `startAuthentication` aus `@simplewebauthn/browser`, leere `allowCredentials` → der
+  // Browser zeigt einen Konto-Picker) → discoverable/finish. Anders als beim Passwort-Pfad
+  // (`AuthContext.login` postet die Anmeldedaten selbst) steht die Session hier bereits nach
+  // `finish` per Cookie — der Client muss den Benutzer nur noch per `aktualisiere()`
+  // (`/api/auth/me`) in den Context nachladen.
   async function mitPasskeyAnmelden() {
     setFehler(null);
-    let werte: FormWerte;
+    setLaedt('passkey');
     try {
-      werte = await form.validateFields(['benutzername']);
-    } catch {
-      return; // Form zeigt die Validierungsmeldung (fehlender Benutzername) selbst an
-    }
-    setLaedt(true);
-    try {
-      const rcr = await webauthnAnmeldungStarten(werte.benutzername);
+      const rcr = await webauthnDiscoverableAnmeldungStarten();
       const cred = await startAuthentication({ optionsJSON: rcr.publicKey });
-      await webauthnAnmeldungAbschliessen(cred);
+      await webauthnDiscoverableAnmeldungAbschliessen(cred);
       await aktualisiere();
       navigate(zielPfad, { replace: true });
     } catch (e) {
       setFehler(e instanceof ApiError ? e.message : 'Passkey-Anmeldung fehlgeschlagen');
     } finally {
-      setLaedt(false);
+      setLaedt(null);
     }
   }
 
@@ -177,28 +198,56 @@ export default function LoginPage() {
             layout="vertical"
             form={totpForm}
             onFinish={totpAbsenden}
-            disabled={laedt}
+            disabled={laedt !== null}
             requiredMark={false}
           >
-            <Form.Item
-              label="Code aus deiner Authenticator-App"
-              name="code"
-              rules={[{ required: true, message: 'Bitte Code eingeben' }]}
-              extra="Kein Zugriff aufs Gerät? Ein Recovery-Code verwenden — im selben Feld."
-            >
-              <Input size="large" autoFocus autoComplete="one-time-code" />
-            </Form.Item>
+            {recoveryModus ? (
+              <Form.Item
+                label="Recovery-Code"
+                name="code"
+                rules={[{ required: true, message: 'Bitte Recovery-Code eingeben' }]}
+              >
+                <Input
+                  size="large"
+                  autoFocus
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="xxxx-xxxx-xxxx-xxxx-xxxx"
+                />
+              </Form.Item>
+            ) : (
+              <Form.Item
+                label="Code aus deiner Authenticator-App"
+                name="code"
+                rules={[{ required: true, message: 'Bitte Code eingeben' }]}
+              >
+                <Input
+                  className="login-otp"
+                  size="large"
+                  autoFocus
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                />
+              </Form.Item>
+            )}
             <Button
               className="login-absenden"
               type="primary"
               htmlType="submit"
               size="large"
               block
-              loading={laedt}
+              loading={laedt === 'totp'}
             >
               Anmelden
             </Button>
-            <Button type="link" block disabled={laedt} onClick={zurueckZumPasswort}>
+            <Button type="link" block onClick={wechsleRecoveryModus}>
+              {recoveryModus
+                ? 'Code aus der Authenticator-App verwenden'
+                : 'Recovery-Code verwenden'}
+            </Button>
+            <Button type="link" block onClick={zurueckZumPasswort}>
               Zurück
             </Button>
           </Form>
@@ -228,9 +277,15 @@ export default function LoginPage() {
               </div>
             )}
             {ssoProvider.length > 0 && (
-              <Space direction="vertical" style={{ width: '100%' }} size={10}>
+              <Space orientation="vertical" style={{ width: '100%' }} size={10}>
                 {ssoProvider.map((p) => (
-                  <Button key={p.id} size="large" block onClick={starteOidcAnmeldung}>
+                  <Button
+                    key={p.id}
+                    size="large"
+                    block
+                    icon={<LoginOutlined aria-hidden />}
+                    onClick={starteOidcAnmeldung}
+                  >
                     Mit {p.anzeigename} anmelden
                   </Button>
                 ))}
@@ -242,16 +297,18 @@ export default function LoginPage() {
                 layout="vertical"
                 form={form}
                 onFinish={absenden}
-                disabled={laedt}
+                disabled={laedt !== null}
                 requiredMark={false}
               >
-                <Form.Item
-                  label="Benutzername"
-                  name="benutzername"
-                  rules={[{ required: true, message: 'Bitte Benutzername eingeben' }]}
-                >
-                  <Input size="large" autoFocus autoComplete="username" />
-                </Form.Item>
+                {passwortAktiv && (
+                  <Form.Item
+                    label="Benutzername"
+                    name="benutzername"
+                    rules={[{ required: true, message: 'Bitte Benutzername eingeben' }]}
+                  >
+                    <Input size="large" autoFocus autoComplete="username" />
+                  </Form.Item>
+                )}
                 {passwortAktiv && (
                   <Form.Item
                     label="Passwort"
@@ -268,7 +325,7 @@ export default function LoginPage() {
                     htmlType="submit"
                     size="large"
                     block
-                    loading={laedt}
+                    loading={laedt === 'passwort'}
                   >
                     Anmelden
                   </Button>
@@ -277,8 +334,9 @@ export default function LoginPage() {
                   <Button
                     size="large"
                     block
+                    icon={<KeyOutlined aria-hidden />}
                     style={passwortAktiv ? { marginTop: 12 } : undefined}
-                    loading={laedt}
+                    loading={laedt === 'passkey'}
                     onClick={mitPasskeyAnmelden}
                   >
                     Mit Passkey anmelden

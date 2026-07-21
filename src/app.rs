@@ -77,6 +77,14 @@ pub fn build_router(state: AppState) -> Router {
             post(routes::auth::webauthn_auth_finish),
         )
         .route(
+            "/api/auth/webauthn/discoverable/start",
+            post(routes::auth::webauthn_discoverable_start),
+        )
+        .route(
+            "/api/auth/webauthn/discoverable/finish",
+            post(routes::auth::webauthn_discoverable_finish),
+        )
+        .route(
             "/api/auth/totp/enroll/start",
             post(routes::auth::totp_enroll_start),
         )
