@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { Fragment, lazy, Suspense } from 'react';
 import type { ReactElement } from 'react';
 import RequireAuth from './routes/RequireAuth';
+import { useSitzungsWache } from './auth/useSitzungsWache';
 import AppLayout from './components/AppLayout';
 import LoginPage from './pages/LoginPage';
 import EinsaetzePage from './pages/EinsaetzePage';
@@ -90,6 +91,11 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
 };
 
 export default function App() {
+  // Zentrale 401-Behandlung (LFH-268/F24): hier und nicht tiefer, weil App die oberste
+  // Komponente innerhalb von AntApp, BrowserRouter und AuthProvider ist — damit greift der
+  // Re-Login-Pfad auch auf /admin, /profil, den Stammdaten und der Einsatzliste.
+  useSitzungsWache();
+
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
