@@ -15,7 +15,10 @@ export default function RequireAuth() {
     );
   }
   if (!benutzer) {
-    return <Navigate to="/login" replace state={{ von: location.pathname }} />;
+    // Vollständige URL: `pathname` allein verliert die Deeplink-Selektion des
+    // Query-Param-Musters (`?einheit=`, `?meldung=`, ETB `?eintrag=` — s. CLAUDE.md).
+    const von = `${location.pathname}${location.search}${location.hash}`;
+    return <Navigate to="/login" replace state={{ von }} />;
   }
   return <Outlet />;
 }
