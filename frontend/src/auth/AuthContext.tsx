@@ -70,9 +70,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  /** Meldet ab und wirft dabei **nie** — die lokale Abmeldung darf nicht am Serverruf hängen.
+   *
+   *  `session::loeschen` propagiert seinen Fehler (`src/routes/auth.rs:226`), ein Netzabriss
+   *  wirft ohnehin. Bliebe `benutzer` in dem Fall gesetzt, wäre der Nutzer sichtbar
+   *  „angemeldet" bei toter Session: `RequireAuth` ließe geschützte Routen passieren, und die
+   *  Sitzungswache (LFH-268) meldete wegen ihrer Wiederhol-Sperre keinen weiteren Ablauf mehr
+   *  — die App stünde still und ohne Re-Login-Angebot da. Serverseitig läuft die Session
+   *  regulär ab; lokal abgemeldet zu sein ist in jedem Fall der sicherere Zustand. */
   const logout = useCallback(async () => {
-    await authApi.logout();
-    setBenutzer(null);
+    try {
+      await authApi.logout();
+    } catch (e) {
+      console.error('Server-Abmeldung fehlgeschlagen — es wird trotzdem lokal abgemeldet', e);
+    } finally {
+      setBenutzer(null);
+    }
   }, []);
 
   const aktualisiere = useCallback(async () => {

@@ -61,6 +61,32 @@ describe('AuthContext', () => {
     await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('Admin'));
   });
 
+  it('meldet lokal ab, auch wenn der Server-Logout scheitert (LFH-268)', async () => {
+    server.use(
+      http.get('/api/auth/me', () => HttpResponse.json(adminBody)),
+      // session::loeschen propagiert seinen AppError (src/routes/auth.rs:226) — ein
+      // SQLITE_BUSY unter Last reicht für einen 5xx.
+      http.post('/api/auth/logout', () =>
+        HttpResponse.json({ error: 'Datenbank belegt' }, { status: 500 }),
+      ),
+    );
+    const konsole = vi.spyOn(console, 'error').mockImplementation(() => {});
+    renderMitProviders(
+      <AuthProvider>
+        <Anzeige />
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('Admin'));
+
+    await userEvent.click(screen.getByText('logout'));
+
+    // Bliebe `benutzer` gesetzt, ließe RequireAuth geschützte Routen weiter passieren —
+    // und die Sitzungswache meldete wegen ihrer Sperre keinen weiteren Ablauf mehr.
+    await waitFor(() => expect(screen.getByTestId('name')).toHaveTextContent('anonym'));
+    expect(konsole).toHaveBeenCalled();
+    konsole.mockRestore();
+  });
+
   it('löst die Melde-Sperre nach erfolgreichem Login (LFH-268)', async () => {
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })),

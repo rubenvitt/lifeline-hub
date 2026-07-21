@@ -50,6 +50,17 @@ describe('useSitzungsWache', () => {
     );
   });
 
+  it('leitet auch dann um, wenn logout() scheitert', async () => {
+    // Netzabriss oder 5xx aus session::loeschen. Die Umleitung darf davon nicht abhängen,
+    // und die durchgereichte Rejection darf nicht unbehandelt bleiben.
+    logout.mockImplementationOnce(() => Promise.reject(new Error('Netz weg')));
+    const { getByTestId } = renderWache('/einsaetze/7/lage-dashboard');
+    window.dispatchEvent(new CustomEvent(SITZUNG_ABGELAUFEN));
+    await waitFor(() =>
+      expect(getByTestId('ort').textContent).toBe('/login|/einsaetze/7/lage-dashboard'),
+    );
+  });
+
   it('leitet auf der Login-Seite nicht erneut um (keine Schleife)', async () => {
     const { getByTestId } = renderWache('/login');
     window.dispatchEvent(new CustomEvent(SITZUNG_ABGELAUFEN));

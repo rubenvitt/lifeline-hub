@@ -21,7 +21,13 @@ export function useSitzungsWache(): void {
       // Vollständige Rückkehr-URL: `pathname` allein verliert die Deeplink-Selektion des
       // Query-Param-Musters (`?einheit=`, `?meldung=`, ETB `?eintrag=` — s. CLAUDE.md).
       const von = `${pathname}${search}${hash}`;
-      void logout().finally(() => navigate('/login', { replace: true, state: { von } }));
+      // `AuthContext.logout` wirft heute nicht mehr (räumt im `finally`). Das `catch` hält
+      // die Umleitung trotzdem unabhängig davon: an einem sicherheitsrelevanten Seam soll
+      // eine gebrochene Zusage keine unbehandelte Rejection und keinen hängenden Nutzer
+      // erzeugen.
+      void logout()
+        .catch(() => {})
+        .finally(() => navigate('/login', { replace: true, state: { von } }));
     };
     window.addEventListener(SITZUNG_ABGELAUFEN, beiAblauf);
     return () => window.removeEventListener(SITZUNG_ABGELAUFEN, beiAblauf);
