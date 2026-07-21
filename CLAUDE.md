@@ -70,7 +70,7 @@ Es gibt weiterhin **kein CI**. Die Durchsetzungsinstanz ist lokal:
 ```
 
 Reihenfolge (billig → teuer): `check-fmt.sh` → `pnpm lint` → `check-typ-codegen.sh`
-(enthält `tsc`) → `cargo test --workspace` → Vitest → `check-deps.sh`.
+(enthält `tsc`) → `cargo test --workspace` → Vitest → `check-deps.sh` → `pnpm e2e`.
 
 - **Env-Hygiene ist Teil des Gates.** `scripts/lib/dev-env.sh` räumt alle
   `LIFELINE_*`/`KS_*`/`AWS_*`-Variablen aus dem Testlauf. Nicht durch eine handgepflegte
@@ -81,9 +81,19 @@ Reihenfolge (billig → teuer): `check-fmt.sh` → `pnpm lint` → `check-typ-co
 - **Optionaler pre-push-Hook** (nur die schnellen Gates, ~1 min):
   `git config core.hooksPath .githooks`. Die vollen Suiten bleiben bewusst draußen —
   ein Hook, der jeden Push minutenlang blockiert, wird per `--no-verify` umgangen.
-- **Bewusst nicht im Gate:** `cargo clippy -D warnings` (Bestand hat ~27 Warnungen — ein
-  rot geborenes Gate wird abgeschaltet) und `pnpm e2e` (Harness ist bis LFH-247/F29 nicht
-  selbsttragend).
+- **Bewusst nicht im Gate:** `cargo clippy -D warnings` — der Bestand hat ~27 Warnungen,
+  ein rot geborenes Gate wird abgeschaltet statt befolgt.
+- **e2e läuft als Schritt 7 mit** (LFH-309): die Playwright-Suite ist selbsttragend —
+  sie startet Backend und Vite selbst auf freien Ports, mit Temp-DB je Lauf, und stört
+  einen parallel laufenden Dev-Stack auf 8080/5173 nicht. **`pnpm e2e` braucht kein
+  separat gestartetes Backend mehr**; der alte Hinweis „Backend muss separat laufen
+  (siehe Step 5)" verwies auf einen Schritt, den es im Repo nie gab, und ist weg.
+  Bauen kann die Suite das Binary nicht, deshalb fährt Schritt 7 nur, wenn
+  `target/debug/lifeline-hub` existiert, und überspringt sonst mit lautem Hinweis statt
+  zu brechen. Praktisch greift dieser Guard im Sammel-Gate nie, weil `cargo test
+  --workspace` (Schritt 4) das bin-Target ohnehin mitbaut — e2e ist hier also faktisch
+  immer dabei (+~30 s). Der Guard schützt die Fälle daneben: verkürzte Läufe, einzeln
+  von Hand aufgerufene Schritte.
 - **Kein `| tail` um Gate-Kommandos** — das maskiert den Exit-Code, und eine rote Suite
   sieht dann grün aus.
 
