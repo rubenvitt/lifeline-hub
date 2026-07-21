@@ -24,7 +24,7 @@ function setup() {
 }
 
 describe('LoginPage', () => {
-  it('zeigt eine Server-Fehlermeldung bei falschen Anmeldedaten', async () => {
+  it('übersetzt den generischen 401 („Nicht angemeldet") in eine verständliche Login-Meldung', async () => {
     server.use(
       http.post('/api/auth/login', () =>
         HttpResponse.json({ error: 'Nicht angemeldet' }, { status: 401 }),
@@ -34,7 +34,25 @@ describe('LoginPage', () => {
     await userEvent.type(screen.getByLabelText('Benutzername'), 'admin');
     await userEvent.type(screen.getByLabelText('Passwort'), 'falsch');
     await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
-    await waitFor(() => expect(screen.getByText('Nicht angemeldet')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText('Benutzername oder Passwort ist falsch')).toBeInTheDocument(),
+    );
+    expect(screen.queryByText('Nicht angemeldet')).not.toBeInTheDocument();
+  });
+
+  it('reicht Nicht-401-Serverfehler unverändert durch (z. B. 503)', async () => {
+    server.use(
+      http.post('/api/auth/login', () =>
+        HttpResponse.json({ error: 'Dienst derzeit nicht verfügbar' }, { status: 503 }),
+      ),
+    );
+    setup();
+    await userEvent.type(screen.getByLabelText('Benutzername'), 'admin');
+    await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
+    await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+    await waitFor(() =>
+      expect(screen.getByText('Dienst derzeit nicht verfügbar')).toBeInTheDocument(),
+    );
   });
 
   it('füllt das Formular bei Auswahl eines Dev-Benutzers', async () => {
@@ -320,6 +338,43 @@ describe('LoginPage', () => {
       expect(screen.queryByText('Passkey-Anmeldung fehlgeschlagen')).not.toBeInTheDocument();
     });
 
+    it('lässt während der Passkey-Ceremony nur den Passkey-Button laden, nicht „Anmelden"', async () => {
+      setzeSecureContext(true);
+      server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+      server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
+      server.use(
+        http.get('/api/auth/providers', () =>
+          HttpResponse.json([
+            { id: 'passwort', typ: 'passwort', anzeigename: 'Passwort', aktiviert: true },
+            { id: 'webauthn', typ: 'webauthn', anzeigename: 'Passkey', aktiviert: true },
+          ]),
+        ),
+      );
+      server.use(
+        http.post('/api/auth/webauthn/auth/start', () =>
+          HttpResponse.json({
+            publicKey: { challenge: 'Y2hhbGxlbmdl', rpId: 'localhost', allowCredentials: [] },
+          }),
+        ),
+      );
+      // Ceremony „hängt" absichtlich (Promise bleibt offen) → der Ladezustand ist stabil
+      // beobachtbar, ohne auf Timing zu wetten.
+      startAuthenticationMock.mockImplementation(() => new Promise(() => {}));
+
+      renderMitProviders(
+        <AuthProvider>
+          <LoginPage />
+        </AuthProvider>,
+      );
+
+      await userEvent.type(await screen.findByLabelText('Benutzername'), 'admin');
+      const passkeyKnopf = screen.getByRole('button', { name: 'Mit Passkey anmelden' });
+      await userEvent.click(passkeyKnopf);
+
+      await waitFor(() => expect(passkeyKnopf).toHaveClass('ant-btn-loading'));
+      expect(screen.getByRole('button', { name: 'Anmelden' })).not.toHaveClass('ant-btn-loading');
+    });
+
     it('zeigt KEINEN Passkey-Button ohne Secure Context, auch bei aktivem webauthn-Provider', async () => {
       setzeSecureContext(false);
       server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
@@ -425,6 +480,91 @@ describe('LoginPage', () => {
       // Erfolgspfad bis zum Ende durchlaufen (kein Absturz in den catch-Zweig) — sonst bliebe
       // hier die Fehlermeldung stehen.
       expect(screen.queryByText('Code ungültig')).not.toBeInTheDocument();
+    });
+
+    it('richtet die Code-Eingabe auf Ziffern aus (inputMode, one-time-code, maxLength)', async () => {
+      server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+      server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
+      server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
+      server.use(http.post('/api/auth/login', () => HttpResponse.json({ mfa_erforderlich: 'totp' })));
+
+      renderMitProviders(
+        <AuthProvider>
+          <LoginPage />
+        </AuthProvider>,
+      );
+
+      await userEvent.type(await screen.findByLabelText('Benutzername'), 'admin');
+      await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
+      await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+
+      const codeFeld = await screen.findByLabelText('Code aus deiner Authenticator-App');
+      expect(codeFeld).toHaveAttribute('inputmode', 'numeric');
+      expect(codeFeld).toHaveAttribute('autocomplete', 'one-time-code');
+      expect(codeFeld).toHaveAttribute('maxlength', '6');
+    });
+
+    it('schaltet per „Recovery-Code verwenden" auf die Recovery-Eingabe um und schickt den Code an totp/finish', async () => {
+      let totpBody: unknown = null;
+      server.use(http.get('/api/auth/me', () => HttpResponse.json(adminBody)));
+      server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
+      server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
+      server.use(
+        http.post('/api/auth/login', () => HttpResponse.json({ mfa_erforderlich: 'totp' })),
+        http.post('/api/auth/totp/finish', async ({ request }) => {
+          totpBody = await request.json();
+          return HttpResponse.json(adminBody);
+        }),
+      );
+
+      renderMitProviders(
+        <AuthProvider>
+          <LoginPage />
+        </AuthProvider>,
+      );
+
+      await userEvent.type(await screen.findByLabelText('Benutzername'), 'admin');
+      await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
+      await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+
+      await screen.findByLabelText('Code aus deiner Authenticator-App');
+      await userEvent.click(screen.getByRole('button', { name: 'Recovery-Code verwenden' }));
+
+      const recoveryFeld = await screen.findByLabelText('Recovery-Code');
+      expect(screen.queryByLabelText('Code aus deiner Authenticator-App')).not.toBeInTheDocument();
+
+      await userEvent.type(recoveryFeld, 'a1b2-c3d4-e5f6-0718-293a');
+      await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+
+      await waitFor(() => expect(totpBody).toEqual({ code: 'a1b2-c3d4-e5f6-0718-293a' }));
+    });
+
+    it('führt aus der Recovery-Eingabe zurück zur Code-Eingabe', async () => {
+      server.use(http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })));
+      server.use(http.get('/api/dev/users', () => HttpResponse.json([])));
+      server.use(http.get('/api/auth/providers', () => HttpResponse.json([])));
+      server.use(http.post('/api/auth/login', () => HttpResponse.json({ mfa_erforderlich: 'totp' })));
+
+      renderMitProviders(
+        <AuthProvider>
+          <LoginPage />
+        </AuthProvider>,
+      );
+
+      await userEvent.type(await screen.findByLabelText('Benutzername'), 'admin');
+      await userEvent.type(screen.getByLabelText('Passwort'), 'geheim');
+      await userEvent.click(screen.getByRole('button', { name: 'Anmelden' }));
+
+      await screen.findByLabelText('Code aus deiner Authenticator-App');
+      await userEvent.click(screen.getByRole('button', { name: 'Recovery-Code verwenden' }));
+      await screen.findByLabelText('Recovery-Code');
+
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Code aus der Authenticator-App verwenden' }),
+      );
+
+      expect(await screen.findByLabelText('Code aus deiner Authenticator-App')).toBeInTheDocument();
+      expect(screen.queryByLabelText('Recovery-Code')).not.toBeInTheDocument();
     });
 
     it('meldet einen normalen (Nicht-MFA) Login unverändert direkt an — keine Code-Eingabe', async () => {

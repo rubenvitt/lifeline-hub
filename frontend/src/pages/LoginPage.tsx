@@ -1,4 +1,5 @@
 import { Alert, Button, Divider, Form, Input, Space, Tag } from 'antd';
+import { KeyOutlined, LoginOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -30,13 +31,19 @@ export default function LoginPage() {
   const [form] = Form.useForm<FormWerte>();
   const [totpForm] = Form.useForm<TotpFormWerte>();
   const [fehler, setFehler] = useState<string | null>(null);
-  const [laedt, setLaedt] = useState(false);
+  // Welche Aktion gerade läuft — steuert den Spinner GEZIELT (nur der geklickte Button lädt),
+  // während `disabled` über das Form weiterhin ALLE Wege sperrt (kein paralleler Doppel-Login).
+  const [laedt, setLaedt] = useState<'passwort' | 'passkey' | 'totp' | null>(null);
   const [devBenutzer, setDevBenutzer] = useState<DevBenutzer[]>([]);
   const [provider, setProvider] = useState<AuthProvider[]>([]);
   // Zweite Login-Stufe (LFH-43, TOTP): `login()` meldet „MFA erforderlich" statt eines
   // Benutzers (s. `AuthContext.LoginErgebnis`) → die erste Stufe (Passwort/OIDC/Passkey) weicht
   // einer TOTP-Code-Eingabe. Kein Session-Cookie existiert an dieser Stelle noch.
   const [mfaAktiv, setMfaAktiv] = useState(false);
+  // In der TOTP-Stufe: Recovery-Code statt Authenticator-Code eingeben. Beide landen im selben
+  // Feld/Endpoint (`totp/finish` unterscheidet serverseitig nicht) — der Umschalter trennt nur
+  // die EINGABE-Ergonomie: 6-stellig-numerisch vs. freies Recovery-Format.
+  const [recoveryModus, setRecoveryModus] = useState(false);
 
   const zielPfad = (location.state as { von?: string } | null)?.von ?? '/einsaetze';
 
@@ -86,7 +93,7 @@ export default function LoginPage() {
 
   async function absenden(werte: FormWerte) {
     setFehler(null);
-    setLaedt(true);
+    setLaedt('passwort');
     try {
       const ergebnis = await login(werte.benutzername, werte.passwort);
       if (ergebnis.status === 'mfa_erforderlich') {
@@ -95,9 +102,16 @@ export default function LoginPage() {
       }
       navigate(zielPfad, { replace: true });
     } catch (e) {
-      setFehler(e instanceof ApiError ? e.message : 'Verbindung zum Server fehlgeschlagen');
+      if (e instanceof ApiError) {
+        // Der Server antwortet bewusst mit dem generischen 401 „Nicht angemeldet" (NO-user-
+        // enumeration, s. `password::anmelden`) — für die Anzeige bleibt die Meldung genauso
+        // enumeration-sicher, wird aber verständlich formuliert.
+        setFehler(e.status === 401 ? 'Benutzername oder Passwort ist falsch' : e.message);
+      } else {
+        setFehler('Verbindung zum Server fehlgeschlagen');
+      }
     } finally {
-      setLaedt(false);
+      setLaedt(null);
     }
   }
 
@@ -109,7 +123,7 @@ export default function LoginPage() {
   // den Context nachladen.
   async function totpAbsenden(werte: TotpFormWerte) {
     setFehler(null);
-    setLaedt(true);
+    setLaedt('totp');
     try {
       await totpFinish(werte.code);
       await aktualisiere();
@@ -117,14 +131,21 @@ export default function LoginPage() {
     } catch (e) {
       setFehler(e instanceof ApiError ? e.message : 'Code ungültig');
     } finally {
-      setLaedt(false);
+      setLaedt(null);
     }
   }
 
   function zurueckZumPasswort() {
     setFehler(null);
     setMfaAktiv(false);
+    setRecoveryModus(false);
     totpForm.resetFields();
+  }
+
+  function wechsleRecoveryModus() {
+    setFehler(null);
+    setRecoveryModus((r) => !r);
+    totpForm.resetFields(['code']);
   }
 
   // Passkey-Login: liest den Benutzernamen aus demselben Formularfeld wie der Passwort-Login
@@ -141,7 +162,7 @@ export default function LoginPage() {
     } catch {
       return; // Form zeigt die Validierungsmeldung (fehlender Benutzername) selbst an
     }
-    setLaedt(true);
+    setLaedt('passkey');
     try {
       const rcr = await webauthnAnmeldungStarten(werte.benutzername);
       const cred = await startAuthentication({ optionsJSON: rcr.publicKey });
@@ -151,7 +172,7 @@ export default function LoginPage() {
     } catch (e) {
       setFehler(e instanceof ApiError ? e.message : 'Passkey-Anmeldung fehlgeschlagen');
     } finally {
-      setLaedt(false);
+      setLaedt(null);
     }
   }
 
@@ -177,28 +198,56 @@ export default function LoginPage() {
             layout="vertical"
             form={totpForm}
             onFinish={totpAbsenden}
-            disabled={laedt}
+            disabled={laedt !== null}
             requiredMark={false}
           >
-            <Form.Item
-              label="Code aus deiner Authenticator-App"
-              name="code"
-              rules={[{ required: true, message: 'Bitte Code eingeben' }]}
-              extra="Kein Zugriff aufs Gerät? Ein Recovery-Code verwenden — im selben Feld."
-            >
-              <Input size="large" autoFocus autoComplete="one-time-code" />
-            </Form.Item>
+            {recoveryModus ? (
+              <Form.Item
+                label="Recovery-Code"
+                name="code"
+                rules={[{ required: true, message: 'Bitte Recovery-Code eingeben' }]}
+              >
+                <Input
+                  size="large"
+                  autoFocus
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="xxxx-xxxx-xxxx-xxxx-xxxx"
+                />
+              </Form.Item>
+            ) : (
+              <Form.Item
+                label="Code aus deiner Authenticator-App"
+                name="code"
+                rules={[{ required: true, message: 'Bitte Code eingeben' }]}
+              >
+                <Input
+                  className="login-otp"
+                  size="large"
+                  autoFocus
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                />
+              </Form.Item>
+            )}
             <Button
               className="login-absenden"
               type="primary"
               htmlType="submit"
               size="large"
               block
-              loading={laedt}
+              loading={laedt === 'totp'}
             >
               Anmelden
             </Button>
-            <Button type="link" block disabled={laedt} onClick={zurueckZumPasswort}>
+            <Button type="link" block onClick={wechsleRecoveryModus}>
+              {recoveryModus
+                ? 'Code aus der Authenticator-App verwenden'
+                : 'Recovery-Code verwenden'}
+            </Button>
+            <Button type="link" block onClick={zurueckZumPasswort}>
               Zurück
             </Button>
           </Form>
@@ -228,9 +277,15 @@ export default function LoginPage() {
               </div>
             )}
             {ssoProvider.length > 0 && (
-              <Space direction="vertical" style={{ width: '100%' }} size={10}>
+              <Space orientation="vertical" style={{ width: '100%' }} size={10}>
                 {ssoProvider.map((p) => (
-                  <Button key={p.id} size="large" block onClick={starteOidcAnmeldung}>
+                  <Button
+                    key={p.id}
+                    size="large"
+                    block
+                    icon={<LoginOutlined aria-hidden />}
+                    onClick={starteOidcAnmeldung}
+                  >
                     Mit {p.anzeigename} anmelden
                   </Button>
                 ))}
@@ -242,7 +297,7 @@ export default function LoginPage() {
                 layout="vertical"
                 form={form}
                 onFinish={absenden}
-                disabled={laedt}
+                disabled={laedt !== null}
                 requiredMark={false}
               >
                 <Form.Item
@@ -268,7 +323,7 @@ export default function LoginPage() {
                     htmlType="submit"
                     size="large"
                     block
-                    loading={laedt}
+                    loading={laedt === 'passwort'}
                   >
                     Anmelden
                   </Button>
@@ -277,8 +332,9 @@ export default function LoginPage() {
                   <Button
                     size="large"
                     block
+                    icon={<KeyOutlined aria-hidden />}
                     style={passwortAktiv ? { marginTop: 12 } : undefined}
-                    loading={laedt}
+                    loading={laedt === 'passkey'}
                     onClick={mitPasskeyAnmelden}
                   >
                     Mit Passkey anmelden

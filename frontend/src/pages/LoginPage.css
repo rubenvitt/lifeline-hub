@@ -126,6 +126,16 @@
   width: 100%;
 }
 
+/* TOTP-Code-Eingabe: mittig, weit gesperrt — liest sich wie ein 6-stelliger Code.
+   `text-indent` gleicht den Letter-Spacing-Überhang hinter der letzten Ziffer aus. */
+.login-otp {
+  text-align: center;
+  letter-spacing: 0.5em;
+  text-indent: 0.5em;
+  font-variant-numeric: tabular-nums;
+  font-size: 20px;
+}
+
 /* Eingangsanimation für die Formularzeilen (gestaffelt). */
 .login-karte .ant-form-item,
 .login-karte .ant-btn {
