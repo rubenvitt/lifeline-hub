@@ -3,7 +3,8 @@ import { expect, test, type Page, type Locator } from '@playwright/test';
 // e2e-Smoke der CMD+K-Command-Palette (LFH-11). Deckt das ab, was jsdom nicht kann:
 // echtes Hotkey-Verhalten, Navigation, und vor allem die Koexistenz des Palette-Modals
 // über einem offenen antd-Drawer (AK6 — nur im echten Browser-Layout prüfbar).
-// Backend separat starten (admin / e2e-admin-pw), Vite startet Playwright selbst.
+// Harness: Backend und Vite startet playwright.config.ts selbst (LFH-309), Login
+// admin / e2e-admin-pw gegen eine Temp-DB je Lauf.
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';

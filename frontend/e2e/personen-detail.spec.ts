@@ -4,9 +4,8 @@ import { expect, test, type Page } from '@playwright/test';
 // (`/einsaetze/:id/personen/:personId`) umgestellt. jsdom rechnet kein Layout, daher
 // wird die Zwei-Spalten-Darstellung + Navigation hier real verifiziert.
 //
-// Harness: Playwright startet den Vite-Dev-Server automatisch (playwright.config.ts);
-// das Backend muss separat auf dem .env.local-Port laufen (siehe README/`pnpm run setup`,
-// Login admin/e2e-admin-pw).
+// Harness: playwright.config.ts startet Backend UND Vite selbst (LFH-309) — auf freien
+// Ports, gegen eine Temp-DB je Lauf, Login admin/e2e-admin-pw.
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';

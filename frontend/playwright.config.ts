@@ -48,15 +48,35 @@ async function freiePorts(anzahl: number): Promise<number[]> {
 // ERR_CONNECTION_REFUSED, jeder Worker auf einer anderen Portnummer). Der Hauptprozess
 // entscheidet einmal und vererbt das Ergebnis über die Umgebung an seine Worker.
 const ENV_SCHLUESSEL = 'LIFELINE_E2E_LAUF';
-const lauf: { backendPort: number; frontendPort: number; datenbank: string } = process.env[
-  ENV_SCHLUESSEL
-]
-  ? JSON.parse(process.env[ENV_SCHLUESSEL]!)
+const vorbelegt = process.env[ENV_SCHLUESSEL];
+
+// Env-Hygiene wie im Sammel-Gate (scripts/lib/dev-env.sh): Playwright merged
+// webServer.env mit process.env, das e2e-Backend erbt also die komplette Dev-Umgebung.
+// Auf der CLI gepinnt sind nur --db-path/--bind/--admin-password; alles andere käme
+// ungefiltert durch, und der Lauf wäre grün oder rot je nach lokaler Env-Belegung statt
+// durch Konstruktion. Konkrete Brecher: LIFELINE_TLS=true (Backend spricht HTTPS, der
+// Health-Check auf http:// wird nie grün), LIFELINE_ADMIN_USER (Bootstrap legt einen
+// anderen Benutzer an → jeder Spec-Login scheitert), LIFELINE_BACKUP_VERZEICHNIS (der
+// Testlauf schreibt ins echte Dev-Backup-Verzeichnis).
+// Bewusst hier statt nur in check-all.sh: der Task fordert ein alleinstehendes
+// `pnpm e2e`, und das läuft nicht durch den Gate-Wrapper.
+for (const schluessel of Object.keys(process.env)) {
+  // Unsere eigene Lauf-Variable trägt zwar das LIFELINE_-Präfix, ist aber KEINE
+  // Dev-Variable, sondern der Kanal zu den Workern — würde sie mitgeräumt, zöge jeder
+  // Worker wieder eigene Ports.
+  if (schluessel !== ENV_SCHLUESSEL && /^(LIFELINE|KS|AWS)_/.test(schluessel)) {
+    delete process.env[schluessel];
+  }
+}
+
+const lauf: { backendPort: number; frontendPort: number; datenbank: string } = vorbelegt
+  ? JSON.parse(vorbelegt)
   : await (async () => {
       const [backendPort, frontendPort] = await freiePorts(2);
-      // Temp-DB je Lauf macht jedes Cleanup obsolet: die Specs dürfen ihre
-      // `Date.now()`-Fixtures behalten, und im Repo-Baum bleibt kein
-      // frontend/lifeline.db zurück.
+      // Temp-DB je Lauf erspart jedes Cleanup im Repo-Baum: die Specs dürfen ihre
+      // `Date.now()`-Fixtures behalten, und es bleibt kein frontend/lifeline.db zurück.
+      // Was bleibt, ist ein Verzeichnis pro Lauf unter $TMPDIR — klein und vom System
+      // periodisch geräumt.
       const datenbank = join(mkdtempSync(join(tmpdir(), 'lifeline-e2e-')), 'lifeline.db');
       const neu = { backendPort, frontendPort, datenbank };
       process.env[ENV_SCHLUESSEL] = JSON.stringify(neu);

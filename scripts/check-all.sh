@@ -66,6 +66,10 @@ BINAER="$ROOT/target/debug/lifeline-hub"
 if [ -x "$BINAER" ]; then
   # Die Suite startet Backend und Vite selbst auf freien Ports — ein parallel laufender
   # Dev-Stack auf 8080/5173 stört sie nicht und wird nicht gekapert.
+  # Env-Hygiene macht hier die Playwright-Config selbst (gleiche Präfixe wie
+  # lib/dev-env.sh): Playwright merged webServer.env mit process.env, das e2e-Backend
+  # erbte sonst die Dev-Umgebung. Bewusst dort statt hier, weil `pnpm e2e` laut LFH-309
+  # auch alleinstehend sauber laufen muss — ohne diesen Wrapper.
   $PNPM -C "$FE" exec playwright test
 else
   echo "    ÜBERSPRUNGEN: $BINAER fehlt." >&2
