@@ -2,7 +2,7 @@ import './index.css';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App as AntApp } from 'antd';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { BrowserRouter } from 'react-router-dom';
 import { registerSW } from 'virtual:pwa-register';
@@ -12,14 +12,13 @@ import App from './App';
 import { ThemeModeProvider } from './theme/ThemeModeProvider';
 import { AuthProvider } from './auth/AuthContext';
 import { CommandPaletteProvider } from './command-palette/CommandPaletteProvider';
+import { erzeugeQueryClient } from './api/queryClient';
 
 dayjs.extend(utc);
 
 registerSW({ immediate: true });
 
-const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: false, staleTime: 10_000 } },
-});
+const queryClient = erzeugeQueryClient({ queries: { retry: false, staleTime: 10_000 } });
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
