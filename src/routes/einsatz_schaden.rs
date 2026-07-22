@@ -61,25 +61,23 @@ pub async fn liste(
     )
     .await?;
 
+    // Unbekannter Enum-Wert im Query-Filter: das Feld ist für sich unbrauchbar → 400
+    // (LFH-305). Ohne diese Prechecks gäbe es hier kein 422, sondern ein 200 mit leerer
+    // Liste — der Filterwert landet nur in einer WHERE-Klausel, es gibt keinen DB-CHECK
+    // dahinter.
     if let Some(s) = &params.status {
         if SchadenStatus::parse(s).is_none() {
-            return Err(AppError::UnprocessableEntity(
-                "Unbekannter Status im Filter".into(),
-            ));
+            return Err(AppError::Validation("Unbekannter Status im Filter".into()));
         }
     }
     if let Some(t) = &params.typ {
         if SchadenTyp::parse(t).is_none() {
-            return Err(AppError::UnprocessableEntity(
-                "Unbekannter Typ im Filter".into(),
-            ));
+            return Err(AppError::Validation("Unbekannter Typ im Filter".into()));
         }
     }
     if let Some(a) = &params.ausmass {
         if Ausmass::parse(a).is_none() {
-            return Err(AppError::UnprocessableEntity(
-                "Unbekanntes Ausmaß im Filter".into(),
-            ));
+            return Err(AppError::Validation("Unbekanntes Ausmaß im Filter".into()));
         }
     }
     Ok(Json(
@@ -361,28 +359,32 @@ pub async fn aktualisieren(
         }
     }
 
+    // Enum-Prechecks: Feld isoliert unbrauchbar → 400 (LFH-305). Diese drei sind zugleich
+    // der einzige Schutz vor einem stillen Durchfall auf die DB — schaden/repo.rs bindet
+    // typ/ausmass/abschluss_grund per COALESCE bzw. CASE als ROHEN String, und die CHECKs
+    // aus migrations/0033 würden über das LFH-245-Sicherheitsnetz wieder als 422
+    // herauskommen. Wer einen dieser Zweige entfernt, bekommt also kein 500, sondern
+    // lautlos den alten Statuscode zurück.
     if let Some(t) = &body.typ {
         if SchadenTyp::parse(t).is_none() {
-            return Err(AppError::UnprocessableEntity("Ungültiger Typ".into()));
+            return Err(AppError::Validation("Ungültiger Typ".into()));
         }
     }
     if let Some(a) = &body.ausmass {
         if Ausmass::parse(a).is_none() {
-            return Err(AppError::UnprocessableEntity("Ungültiges Ausmaß".into()));
+            return Err(AppError::Validation("Ungültiges Ausmaß".into()));
         }
     }
     if let Some(Some(g)) = &body.abschluss_grund {
         if AbschlussGrund::parse(g.trim()).is_none() {
-            return Err(AppError::UnprocessableEntity(
-                "Ungültiger Abschlussgrund".into(),
-            ));
+            return Err(AppError::Validation("Ungültiger Abschlussgrund".into()));
         }
     }
+    // Vorhanden, aber leer: scheitert am Feld selbst → 400. Der Guard trennt „Feld fehlt"
+    // (dann bleibt der Ort unverändert) sauber von „Feld ist da, aber leer".
     let ort_norm = trimme(body.ort.clone());
     if body.ort.is_some() && ort_norm.is_none() {
-        return Err(AppError::UnprocessableEntity(
-            "Ort darf nicht leer sein".into(),
-        ));
+        return Err(AppError::Validation("Ort darf nicht leer sein".into()));
     }
 
     // Normalisierte Bindungen (müssen den `aktualisiere`-Aufruf überleben → eigene `let`s).

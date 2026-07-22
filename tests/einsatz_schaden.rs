@@ -1266,3 +1266,112 @@ async fn schaden_verorten_loeschen_setzt_null() {
     assert!(v["lat"].is_null());
     assert!(v["lon"].is_null());
 }
+
+// ---------- Tests: Statuscode-Konvention Filter + PATCH (LFH-305) ----------
+
+/// Query-Filter mit unbekanntem Enum-Wert: das Feld ist für sich unbrauchbar → 400.
+///
+/// Kein DB-Durchfall-Kandidat: der Filterwert landet nur in einer WHERE-Klausel, es gibt
+/// keinen CHECK dahinter. Fiele der Precheck weg, gäbe es hier ein 200 mit leerer Liste —
+/// deshalb prüft der Test zusätzlich, dass ein gültiger Filter wirklich Treffer liefert.
+#[tokio::test]
+async fn filter_unbekannter_enum_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    schaden_anlegen(&app, &admin, e, &gueltig()).await;
+    let basis = format!("/api/einsaetze/{e}/schaeden");
+
+    for q in ["status=quatsch", "typ=quatsch", "ausmass=quatsch"] {
+        let (s, v) = anfrage(&app, "GET", &format!("{basis}?{q}"), &admin, None).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "Filter «{q}»: {v:?}");
+    }
+
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("{basis}?status=offen&typ=sachschaden&ausmass=gering"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "Positiv-Zweig: {v:?}");
+    assert_eq!(
+        v.as_array().unwrap().len(),
+        1,
+        "gültiger Filter muss den angelegten Schaden finden: {v:?}"
+    );
+}
+
+/// PATCH mit unbekanntem Enum-Wert: Feld isoliert unbrauchbar → 400.
+///
+/// Das ist eine der zwei Stellen des Tickets, an denen ein fehlender Precheck NICHT
+/// auffliegt: schaden/repo.rs bindet typ/ausmass/abschluss_grund als rohen String
+/// (COALESCE bzw. CASE), die CHECKs aus migrations/0033 greifen erst in der DB und kommen
+/// über das LFH-245-Sicherheitsnetz als 422 zurück. Ein Test, der hier 422 erwartet, wäre
+/// also auch ohne jeden Handler-Precheck grün — nur die 400-Erwartung beweist, dass der
+/// Precheck vor der DB greift.
+#[tokio::test]
+async fn patch_unbekannter_enum_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
+    let u = format!("/api/einsaetze/{e}/schaeden/{sid}");
+
+    for body in [
+        json!({"typ": "quatsch"}),
+        json!({"ausmass": "quatsch"}),
+        json!({"abschluss_grund": "quatsch"}),
+    ] {
+        let (s, v) = anfrage(&app, "PATCH", &u, &admin, Some(&body)).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "Body {body}: {v:?}");
+    }
+
+    let (s, v) = anfrage(
+        &app,
+        "PATCH",
+        &u,
+        &admin,
+        Some(&json!({"typ": "umweltschaden", "ausmass": "mittel"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "Positiv-Zweig: {v:?}");
+}
+
+/// Vorhandenes, aber leeres Pflichtfeld scheitert am Feld selbst → 400. Der Guard trennt
+/// „Feld fehlt" (Ort bleibt unverändert) von „Feld ist da, aber leer".
+#[tokio::test]
+async fn patch_leerer_ort_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
+    let u = format!("/api/einsaetze/{e}/schaeden/{sid}");
+
+    let (s, v) = anfrage(&app, "PATCH", &u, &admin, Some(&json!({"ort": "   "}))).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{v:?}");
+
+    let (s, v) = anfrage(
+        &app,
+        "PATCH",
+        &u,
+        &admin,
+        Some(&json!({"ort": "Nebenstr. 2"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "Positiv-Zweig: {v:?}");
+    assert_eq!(v["ort"], "Nebenstr. 2");
+
+    // Feld ganz weglassen lässt den Ort unangetastet — der Gegenfall zum leeren String.
+    let (s, v) = anfrage(
+        &app,
+        "PATCH",
+        &u,
+        &admin,
+        Some(&json!({"ausmass": "gross"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    assert_eq!(v["ort"], "Nebenstr. 2");
+}
