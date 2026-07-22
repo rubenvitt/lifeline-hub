@@ -14,3 +14,13 @@ overrides:
   # Bewusst `^4.3.0` und nicht `>=4.3.0`: letzteres zog js-yaml 5.2.1 herein — einen
   # Major-Sprung mit Breaking Changes in eine Abhängigkeit, die wir gar nicht selbst rufen.
   js-yaml@>=4.0.0 <4.3.0: ^4.3.0
+
+  # GHSA-4c8g-83qw-93j6 + GHSA-v2hh-gcrm-f6hx (beide high): Host-Confusion in der
+  # URI-Zerlegung (fehlgeschlagene IDN-Kanonisierung bzw. literaler Backslash als
+  # Authority-Trenner). Kette: vite-plugin-pwa → workbox-build → ajv (bzw.
+  # @apideck/better-ajv-errors → ajv) → fast-uri; workbox-build pinnt ajv, das
+  # seinerseits fast-uri ^3.0.0 zieht — die Kette gibt den Fix nicht her.
+  # Wieder `^3.1.4` statt `>=3.1.4` (siehe js-yaml oben): kein Major-Sprung in eine
+  # Abhängigkeit, die wir nicht selbst rufen. Reines Build-Zeit-Tooling (PWA-Manifest),
+  # kein Laufzeit-Code im Bundle.
+  fast-uri@>=3.0.0 <3.1.4: ^3.1.4
