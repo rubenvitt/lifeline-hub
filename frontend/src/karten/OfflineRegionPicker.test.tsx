@@ -68,7 +68,8 @@ describe('OfflineRegionPicker', () => {
     const bremenAufGeraet: OfflineKarte = {
       id: 1, name: 'Bremen', pfad: 'karte-1.mbtiles', quell_url: 'https://m/bremen.mbtiles',
       lizenz: 'ODbL', kachel_schema: 'shortbread', format: 'pbf', groesse: 1, sha256: 'x',
-      download_at: 'd', status: 'bereit', aktiv_basemap: false, sortier: 0,
+      // LFH-265: `update_verfuegbar` ist Pflichtfeld im generierten Schema.
+      download_at: 'd', status: 'bereit', aktiv_basemap: false, sortier: 0, update_verfuegbar: false,
     };
     mockPicker({ karten: [bremenAufGeraet], katalog: [bremenEintrag] });
     render();

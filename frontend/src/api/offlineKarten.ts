@@ -1,39 +1,42 @@
 import { apiGet, apiSend } from './client';
+import type { components } from './types.generated';
 
 /**
  * Frontend-Seam für den Offline-Karten-Manager (LFH-181). Verdrahtet die
  * `/api/karte/offline-karten`-Endpunkte (Liste/Download/Aktivieren/Abbrechen/Löschen + Katalog).
  * Einziger API-Berührungspunkt der Offline-Verwaltung — Komponenten importieren nur von hier.
+ *
+ * LFH-265 (Teil A, Frontend): die Response-Typen sind Re-Exporte der generierten Schemas.
+ * Eingabe-Bodies (`Offline*Body`, `RegistriereBody`) bleiben handgepflegt (CLAUDE.md), ebenso
+ * die roh durchgereichten karten-service-Typen ganz unten.
  */
 
-export type OfflineKarteStatus = 'registriert' | 'laedt' | 'bereit' | 'fehler';
+type S = components['schemas'];
 
-/** Eine persistierte Offline-Karte (Server-Antwort inkl. Lebenszyklus-Feldern). */
-export interface OfflineKarte {
-  id: number;
-  name: string;
-  pfad: string;
-  quell_url: string | null;
-  lizenz: string | null;
-  kachel_schema: string;
-  /** Kachel-Blob-Format (LFH-185): `'pbf'` (Vektor) oder `'png'`/`'jpg'`/`'webp'` (Raster). */
-  format: string;
-  groesse: number | null;
-  sha256: string | null;
-  download_at: string | null;
-  status: OfflineKarteStatus;
-  aktiv_basemap: boolean;
-  sortier: number;
-  /** Live-Download-Fortschritt (Bytes), nur für status='laedt'. `gesamt` null ohne Content-Length. */
-  geladen?: number | null;
-  gesamt?: number | null;
-  /** True, wenn der Katalog für dieselbe Karte eine neuere Quelle führt → „Update verfügbar". */
-  update_verfuegbar?: boolean;
-  /** Aktuelle Katalog-URL für den Re-Download, wenn ein Update verfügbar ist. */
-  katalog_url?: string | null;
-  /** SHA256-Pin der aktuellen Katalog-URL — für den verifizierten Re-Download beim Update. */
-  katalog_sha256?: string | null;
-}
+export type OfflineKarteStatus = S['OfflineKarteStatus'];
+
+/**
+ * Eine Offline-Karte, wie die LISTE sie liefert. Rust: `OfflineKarteAntwort` = DB-Zeile
+ * (`OfflineKarte`) + Live-Download-Fortschritt (`geladen`/`gesamt`) + Katalog-Abgleich
+ * (`update_verfuegbar`/`katalog_url`/`katalog_sha256`).
+ *
+ * `update_verfuegbar` ist PFLICHT — das Backend berechnet es für jede Listen-Zeile; die alte
+ * Handrolle führte es fälschlich optional (genau die Drift, die LFH-265 auflöst).
+ */
+export type OfflineKarte = S['OfflineKarteAntwort'];
+
+/**
+ * Die nackte DB-Zeile OHNE Fortschritts- und Katalog-Felder. Rust: `OfflineKarte`.
+ *
+ * WARUM ZWEI TYPEN (LFH-265): nur `GET /offline-karten` antwortet mit `OfflineKarteAntwort`;
+ * die vier schreibenden Endpunkte (`download`/`aktivieren`/`neu-laden`, `POST /offline-karten`)
+ * geben die bare Zeile zurück — verifiziert an den Handler-Signaturen in `src/routes/karte.rs`.
+ * Beide auf den Listen-Typ zu mappen wäre bequem und FALSCH: der Client bekäme ein garantiert
+ * vorhandenes `update_verfuegbar` zugesagt, das auf dem Wire fehlt. Kein Konsument liest die
+ * Mutations-Antwort heute aus (alle invalidieren nur), deshalb ist das reine Typ-Ehrlichkeit —
+ * aber genau die ist der Zweck des Codegens.
+ */
+export type OfflineKarteZeile = S['OfflineKarte'];
 
 /** Body zum Starten eines Downloads (aus Katalog oder eigener URL). `lizenz` ist Pflicht. */
 export interface OfflineDownloadBody {
@@ -63,35 +66,23 @@ export interface OfflineNeuLadenBody {
 }
 
 /** Ein kuratierter, herunterladbarer Vorschlag (Server-autoritativ). */
-export interface OfflineKatalogEintrag {
-  name: string;
-  url: string;
-  region: string;
-  groesse: number;
-  lizenz: string;
-  kachel_schema: string;
-  quelle: string;
-  /** Optionaler SHA256-Pin (hex); null/undefined = kein Pin. */
-  sha256?: string | null;
-  /** Optionale UX-Gruppe für die geführte Auswahl (z. B. „Deutschland", „Bundesländer"). */
-  gruppe?: string | null;
-}
+export type OfflineKatalogEintrag = S['OfflineKatalogEintrag'];
 
 export function listeOfflineKarten(): Promise<OfflineKarte[]> {
   return apiGet<OfflineKarte[]>('/api/karte/offline-karten');
 }
 
-export function starteOfflineDownload(body: OfflineDownloadBody): Promise<OfflineKarte> {
-  return apiSend<OfflineKarte>('/api/karte/offline-karten/download', 'POST', body);
+export function starteOfflineDownload(body: OfflineDownloadBody): Promise<OfflineKarteZeile> {
+  return apiSend<OfflineKarteZeile>('/api/karte/offline-karten/download', 'POST', body);
 }
 
-export function aktiviereOfflineKarte(id: number): Promise<OfflineKarte> {
-  return apiSend<OfflineKarte>(`/api/karte/offline-karten/${id}/aktivieren`, 'POST');
+export function aktiviereOfflineKarte(id: number): Promise<OfflineKarteZeile> {
+  return apiSend<OfflineKarteZeile>(`/api/karte/offline-karten/${id}/aktivieren`, 'POST');
 }
 
 /** In-Place-Hot-Swap (B3): Update der aktiven Karte in dieselbe Zeile — downtime-frei. */
-export function neuLadeOfflineKarte(id: number, body: OfflineNeuLadenBody): Promise<OfflineKarte> {
-  return apiSend<OfflineKarte>(`/api/karte/offline-karten/${id}/neu-laden`, 'POST', body);
+export function neuLadeOfflineKarte(id: number, body: OfflineNeuLadenBody): Promise<OfflineKarteZeile> {
+  return apiSend<OfflineKarteZeile>(`/api/karte/offline-karten/${id}/neu-laden`, 'POST', body);
 }
 
 export function brecheOfflineDownloadAb(id: number): Promise<void> {
@@ -111,10 +102,7 @@ export function ladeOfflineKatalog(frisch = false): Promise<OfflineKatalogEintra
 }
 
 /** Eine im karten_dir vorhandene, noch nicht registrierte MBTiles-Datei (lokaler Import, LFH-199). */
-export interface VorhandeneKarte {
-  dateiname: string;
-  groesse: number;
-}
+export type VorhandeneKarte = S['VorhandeneKarte'];
 
 /** Body zum Registrieren einer bereits im karten_dir liegenden Karte (lokaler Import). */
 export interface RegistriereBody {
@@ -130,11 +118,17 @@ export function listeVorhandeneKarten(): Promise<VorhandeneKarte[]> {
 }
 
 /** Registriert eine bereits vorhandene Datei als Offline-Karte (ohne Download/Hosting). */
-export function registriereOfflineKarte(body: RegistriereBody): Promise<OfflineKarte> {
-  return apiSend<OfflineKarte>('/api/karte/offline-karten', 'POST', body);
+export function registriereOfflineKarte(body: RegistriereBody): Promise<OfflineKarteZeile> {
+  return apiSend<OfflineKarteZeile>('/api/karte/offline-karten', 'POST', body);
 }
 
 // ===== Region-Bau (zentraler karten-service, LFH-203) =====
+//
+// BEWUSST HANDGEPFLEGT (LFH-265, Allowlist-Bucket „karten-service-Durchreiche" in
+// `apiResponseTypen.guard.test.ts`): diese vier Formen beschreiben KEIN Lifeline-Hub-DTO,
+// sondern die Antwort des externen karten-service, die das Backend als `serde_json::Value`
+// roh durchreicht. Es gibt für sie kein `ToSchema`-Struct und damit kein generiertes Schema —
+// ein Re-Export ist hier nicht möglich, nicht bloß unbequem.
 
 export type BauStatus = 'queued' | 'building' | 'uploading' | 'publishing' | 'done' | 'failed';
 

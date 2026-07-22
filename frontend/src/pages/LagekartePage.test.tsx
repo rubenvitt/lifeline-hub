@@ -231,6 +231,8 @@ function basisHandler(
     offline_verfuegbar: false,
     offline_tiles_url: null,
     offline_attribution: null,
+    // LFH-265: Pflichtfeld im generierten Schema — leere Liste = keine Region bereit.
+    offline_regionen: [],
     karten_bau_verfuegbar: false,
   },
 ) {
@@ -424,6 +426,7 @@ describe('LagekartePage', () => {
       offline_verfuegbar: true,
       offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
       offline_attribution: null,
+      offline_regionen: [],
       karten_bau_verfuegbar: false,
     });
     const user = userEvent.setup();
@@ -465,6 +468,7 @@ describe('LagekartePage', () => {
       offline_verfuegbar: true,
       offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
       offline_attribution: null,
+      offline_regionen: [],
       karten_bau_verfuegbar: false,
     });
     renderSeite();
@@ -481,6 +485,7 @@ describe('LagekartePage', () => {
       offline_verfuegbar: true,
       offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
       offline_attribution: null,
+      offline_regionen: [],
       karten_bau_verfuegbar: false,
     });
     renderSeite();
@@ -581,6 +586,7 @@ describe('LagekartePage', () => {
       offline_verfuegbar: false,
       offline_tiles_url: null,
       offline_attribution: null,
+      offline_regionen: [],
       karten_bau_verfuegbar: false,
     });
     const user = userEvent.setup();

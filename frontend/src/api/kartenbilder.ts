@@ -1,22 +1,15 @@
 import { apiGet, apiSend, apiUpload } from './client';
+import type { components } from './types.generated';
+
+// LFH-265 (Teil A, Frontend): `Hintergrundbild` ist ein Re-Export des generierten Schemas;
+// `BildPatch` bleibt als Eingabe-DTO handgepflegt (CLAUDE.md). `Ecke`/`Ecken` sind FE-lokale
+// Tupel-Formen für den `ecken`-Multipart-Teil, kein Response-DTO.
 
 export type Ecke = [number, number]; // [lng, lat]
 export type Ecken = [Ecke, Ecke, Ecke, Ecke];
 
-export interface Hintergrundbild {
-  id: number;
-  einsatz_id: number;
-  name: string;
-  mime: string;
-  groesse: number;
-  ecken_json: string;
-  opazitaet: number;   // 0..100
-  sichtbar: boolean;
-  reihenfolge: number;
-  hochgeladen_von: number;
-  erstellt_at: string;
-  geaendert_at: string;
-}
+/** Rust: `HintergrundbildAnzeige` (Anzeige-DTO ohne BLOB-Bytes). `opazitaet` 0..100. */
+export type Hintergrundbild = components['schemas']['HintergrundbildAnzeige'];
 
 export interface BildPatch {
   name?: string;

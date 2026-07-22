@@ -1,17 +1,16 @@
+// LFH-265 (Teil A, Frontend): Response-Typen sind Re-Exporte der aus Rust generierten Schemas.
 import { apiGet } from './client';
+import type { components } from './types.generated';
 
-/** Peilung zum nächsten bekannten verorteten Punkt des Einsatzes. */
-export interface Peilung {
-  distanz_m: number;
-  richtung: string;
-  bezug_label: string;
-}
+type S = components['schemas'];
 
-/** Antwort von GET /api/einsaetze/:id/ort-vorschau. Beide Felder degradieren zu null. */
-export interface OrtVorschau {
-  peilung: Peilung | null;
-  ortsname: string | null;
-}
+/** Peilung zum nächsten bekannten verorteten Punkt des Einsatzes. Rust: `PeilungAntwort`. */
+export type Peilung = S['PeilungAntwort'];
+
+/** Antwort von GET /api/einsaetze/:id/ort-vorschau. Rust: `OrtVorschauAntwort`.
+ *  Beide Felder degradieren — seit LFH-265 ABSENT statt present-null (gepinnt per `contains_key`
+ *  in `tests/ort_vorschau.rs`). Konsumenten prüfen deshalb truthy, nicht `=== null`. */
+export type OrtVorschau = S['OrtVorschauAntwort'];
 
 /** Lädt die Ort-Vorschau (Peilung + ggf. Ortsname) für eine Koordinate. */
 export function ladeOrtVorschau(

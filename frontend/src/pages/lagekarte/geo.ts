@@ -211,7 +211,11 @@ export function punktInPolygon(p: PunktLngLat, geom: LoseGeometrie): boolean {
   return false;
 }
 
-type FeatureCollectionLike = { features: { geometry: LoseGeometrie | null }[] };
+// `geometry` OPTIONAL, nicht bloß nullable: die generierte `GeoJsonFeature` (LFH-265) führt es als
+// `geometry?: … | null` (NINA liefert Einträge ohne Geometrie). Die Struktur ist hier absichtlich
+// weit gehalten, damit sowohl Fachebenen-Collections als auch FE-eigene FCs passen — der Rumpf
+// unten prüft ohnehin per `f?.geometry` + Truthiness.
+type FeatureCollectionLike = { features: { geometry?: LoseGeometrie | null }[] };
 
 /**
  * Volle Geometrie des ersten Features, dessen Polygon/MultiPolygon den Punkt enthält; sonst null.

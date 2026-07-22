@@ -20,7 +20,8 @@ const karte: OfflineKarte = {
   id: 1, name: 'Deutschland – Bremen', pfad: 'karte-1.mbtiles',
   quell_url: 'https://example.test/de_bremen.mbtiles', lizenz: '© OpenStreetMap contributors (ODbL)',
   kachel_schema: 'shortbread', format: 'pbf', groesse: 44040192, sha256: 'abc', download_at: '2026-06-26 11:00:00',
-  status: 'bereit', aktiv_basemap: false, sortier: 0,
+  // LFH-265: `update_verfuegbar` ist Pflichtfeld — das Backend berechnet es für jede Zeile.
+  status: 'bereit', aktiv_basemap: false, sortier: 0, update_verfuegbar: false,
 };
 
 const karteLaedt: OfflineKarte = {

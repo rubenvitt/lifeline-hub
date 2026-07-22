@@ -19,12 +19,13 @@ const rasterView: OnlineStyle = {
 };
 
 const ODBL = '© OpenStreetMap contributors (ODbL)';
-/** Eine Offline-Region im Config-Vertrag (LFH-188), region-adressiert. */
-function region(karte_id: number, format: OnlineStyle['typ'] = 'vektor'): OfflineRegion {
+/** Eine Offline-Region im Config-Vertrag (LFH-188), region-adressiert.
+ *  `maxzoom` ist seit LFH-265 Pflicht im generierten Schema; 14 = Regional-Pack-Voll-Detail. */
+function region(karte_id: number, format: OnlineStyle['typ'] = 'vektor', maxzoom = 14): OfflineRegion {
   return {
     karte_id, name: `R${karte_id}`,
     tiles_url: `/api/karte/offline/${karte_id}/tiles/{z}/{x}/{y}?v=abc`,
-    attribution: ODBL, format,
+    attribution: ODBL, format, maxzoom,
   };
 }
 
@@ -142,9 +143,12 @@ describe('basemapStil', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('offline-Modus: Config ohne offline_regionen (alter Backend-Kompat) → Fallback über offline_tiles_url', () => {
+  it('offline-Modus: Config mit leeren offline_regionen → Fallback über offline_tiles_url', () => {
+    // LFH-265: `offline_regionen` ist im generierten Schema PFLICHT; „keine Region bereit" ist
+    // die LEERE Liste, nicht das fehlende Feld (so dokumentiert das Backend das Feld auch).
+    // Der geprüfte Code-Pfad ist unverändert derselbe — `vektorRegionen.length === 0` → Kompat.
     const alt: KarteServerConfig = {
-      online_styles: [], offline_verfuegbar: true,
+      online_styles: [], offline_verfuegbar: true, offline_regionen: [],
       offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
       offline_attribution: ODBL, karten_bau_verfuegbar: false,
     };
@@ -258,12 +262,15 @@ describe('offlineStyle (Shortbread, Multi-Region)', () => {
     expect(geo.length).toBeGreaterThan(0);
     expect(geo.every((l) => l.source === 'basemap-7')).toBe(true);
   });
-  it('per-Region maxzoom: Welt-Übersicht 6, Regional-Pack Default 14 (LFH-207)', () => {
+  it('per-Region maxzoom: Welt-Übersicht 6, Regional-Pack 14 (LFH-207)', () => {
+    // Seit LFH-265 liefert das Backend `maxzoom` für JEDE Region (Schema-Pflichtfeld) — der frühere
+    // FE-seitige `?? 14`-Fallback ist entfallen. Geprüft wird jetzt die Durchreichung pro Region:
+    // jede Source bekommt ihren eigenen Wert, nicht einen global gleichen.
     const s = offlineStyle('light', [
       { karte_id: 0, name: 'Welt-Übersicht', tiles_url: '/api/karte/offline/welt/tiles/{z}/{x}/{y}?v=w', attribution: 'ODbL', format: 'vektor', maxzoom: 6 },
       region(7),
     ]) as { sources: Record<string, { maxzoom: number }> };
     expect(s.sources['basemap-0'].maxzoom).toBe(6);
-    expect(s.sources['basemap-7'].maxzoom).toBe(14); // ohne maxzoom → Default 14
+    expect(s.sources['basemap-7'].maxzoom).toBe(14);
   });
 });

@@ -1,26 +1,21 @@
 import { apiGet, apiSend } from './client';
 import type { OnlineStyle, OnlineStyleTyp } from './karte';
+import type { components } from './types.generated';
 
 /**
  * Frontend-Seam für die Online-Basemap-Quellen-Verwaltung (LFH-180).
  * Verdrahtet die LFH-179-Endpunkte unter `/api/karte/online-quellen`.
  * Einziger API-Berührungspunkt der Karten-Verwaltung — Komponenten importieren
  * ausschließlich von hier.
+ *
+ * LFH-265 (Teil A, Frontend): `OnlineQuelle` ist ein Re-Export des generierten Schemas;
+ * `OnlineQuelleBody` bleibt als Eingabe-DTO handgepflegt (CLAUDE.md).
  */
 
-/** Eine persistierte Online-Quelle (Server-Antwort, inkl. id/sortier/aktiv). */
-export interface OnlineQuelle {
-  id: number;
-  name: string;
-  url: string;
-  typ: OnlineStyleTyp;
-  attribution: string | null;
-  sortier: number;
-  aktiv: boolean;
-  /** Serverseitig proxen (key-basierte Anbieter, LFH-182). Bei aktivem Proxy maskiert der Server
-   *  die `url` für Nicht-Admins (`***`); der echte Admin sieht/editiert sie weiter. */
-  proxy: boolean;
-}
+/** Eine persistierte Online-Quelle (Server-Antwort, inkl. id/sortier/aktiv). `proxy` = serverseitig
+ *  proxen (key-basierte Anbieter, LFH-182); bei aktivem Proxy maskiert der Server die `url` für
+ *  Nicht-Admins (`***`), der echte Admin sieht/editiert sie weiter. */
+export type OnlineQuelle = components['schemas']['OnlineQuelle'];
 
 /**
  * Schreib-Body für POST/PATCH (Vollersatz). Der Server erzwingt `attribution`

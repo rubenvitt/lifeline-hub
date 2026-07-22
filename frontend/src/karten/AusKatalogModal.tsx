@@ -39,7 +39,9 @@ export default function AusKatalogModal({
         name: eintrag.name,
         url: eintrag.url,
         typ: eintrag.typ,
-        attribution: eintrag.attribution,
+        // LFH-265: `OnlineStyle.attribution` ist seit der Umstellung auf das generierte Schema
+        // `?: string | null` (absent statt present-null); der Eingabe-Body kennt nur `string | null`.
+        attribution: eintrag.attribution ?? null,
         sortier: naechsteSortier,
         aktiv: true,
         // LFH-190: Katalog-Quellen (OpenFreeMap/basemap.de — alle proxy-freundlich, kein

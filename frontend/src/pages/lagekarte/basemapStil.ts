@@ -71,7 +71,9 @@ export function offlineStyle(theme: KartenTheme, regionen: OfflineRegion[]): Sty
     // die substituierte Kachel-/Glyph-/Sprite-URL im Worker gegen die Origin.
     // maxzoom je Region: Regional-Packs 14, die Welt-Übersicht 6 (LFH-207) — darüber überzoomt
     // MapLibre die grobe Welt als Kontext, während Regional-Packs oben scharfes Detail liefern.
-    sources[src] = { type: 'vector', tiles: [r.tiles_url], minzoom: 0, maxzoom: r.maxzoom ?? 14, attribution: '© OpenStreetMap contributors' };
+    // Kein `?? 14` mehr (LFH-265): `maxzoom` ist im generierten Schema PFLICHT, das Backend liefert
+    // es für jede Region, und der Kompat-Pfad unten setzt es explizit — der Fallback war unerreichbar.
+    sources[src] = { type: 'vector', tiles: [r.tiles_url], minzoom: 0, maxzoom: r.maxzoom, attribution: '© OpenStreetMap contributors' };
     layers.push(...regionLayers(f, src, `-${r.karte_id}`));
   }
   return {
@@ -288,7 +290,9 @@ export function baueBasemapStyle(
       return config.offline_format === 'raster'
         ? rasterStyle(config.offline_tiles_url)
         : offlineStyle(theme, [
-            { karte_id: 0, name: '', tiles_url: config.offline_tiles_url, attribution: config.offline_attribution, format: 'vektor' },
+            // maxzoom seit LFH-265 Pflicht im Schema; hier der Regional-Pack-Default, der vorher
+            // aus dem `r.maxzoom ?? 14` unten kam — der Kompat-Pfad kennt keine Regions-Angabe.
+            { karte_id: 0, name: '', tiles_url: config.offline_tiles_url, attribution: config.offline_attribution, format: 'vektor', maxzoom: 14 },
           ]);
     }
   }
@@ -305,7 +309,8 @@ export function aktuelleAttribution(
   onlineStil: OnlineStyle | undefined,
   config: KarteServerConfig | undefined,
 ): string | null {
-  if (modus === 'online' && onlineStil) return onlineStil.attribution;
+  // `?? null`: `attribution` ist seit LFH-265 absent-statt-null (generiertes Schema `?: string | null`).
+  if (modus === 'online' && onlineStil) return onlineStil.attribution ?? null;
   if (modus === 'offline') {
     // Attribution über alle sichtbaren Regionen dedupliziert (i. d. R. identisch, © OSM/ODbL) —
     // nicht N-fach anzeigen (LFH-188). Fallback: das Kompat-Feld offline_attribution.
