@@ -412,7 +412,9 @@ pub struct StatusBody {
 
 /// POST /api/einsaetze/{id}/tiere/{tid}/status — validierter Status-Wechsel.
 /// Unbekannter Zielstatus → 400; ungültiger Übergang → 422; `→ abgeschlossen`
-/// ohne gültigen `abschluss_grund` → 422; storniert → 409. Pseudonyme ETB-Spur + SSE.
+/// ohne `abschluss_grund` → 422 (Pflicht nur im Zusammenhang mit dem Zielstatus),
+/// mit unbekanntem `abschluss_grund` → 400 (Enum-Wert scheitert am Feld selbst);
+/// storniert → 409. Pseudonyme ETB-Spur + SSE.
 pub async fn status_wechsel(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -449,17 +451,29 @@ pub async fn status_wechsel(
         )));
     }
 
-    // → abgeschlossen erfordert gültigen abschluss_grund (Route + DB-CHECK).
+    // → abgeschlossen erfordert gültigen abschluss_grund (Route + DB-CHECK). Die zwei
+    // Fehlerfälle sind bewusst getrennt (LFH-305): das Feld ist NUR wegen des Zielstatus
+    // Pflicht (Zusammenhang → 422), ein unbekannter Enum-Wert scheitert dagegen am Feld
+    // selbst (→ 400). Der Enum-Check bleibt innerhalb dieses Guards — für andere
+    // Zielstatus schreibt `setze_status_tx` den Grund gar nicht.
+    // Abgrenzung: `einsatz_schaden.rs`/`abschliessen` ist ein DEDIZIERTER Aktions-Endpunkt,
+    // dort ist der Grund unbedingt Pflicht und ein fehlender/leerer Wert deshalb 400.
+    // Hier ist der Endpunkt generisch, die Pflicht entsteht erst aus dem Zielstatus.
     let grund = trimme(body.abschluss_grund.clone());
     let ziel = trimme(body.abschluss_ziel.clone());
     if body.status == "abgeschlossen" {
         match grund.as_deref() {
-            Some(g) if AbschlussGrund::parse(g).is_some() => {}
-            _ => {
+            None => {
                 return Err(AppError::UnprocessableEntity(
-                    "Abschluss erfordert einen gültigen abschluss_grund".into(),
+                    "Abschluss erfordert einen abschluss_grund".into(),
                 ))
             }
+            Some(g) if AbschlussGrund::parse(g).is_none() => {
+                return Err(AppError::Validation(format!(
+                    "Unbekannter Abschlussgrund: {g}"
+                )))
+            }
+            Some(_) => {}
         }
     }
 

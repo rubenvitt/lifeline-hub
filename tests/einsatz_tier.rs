@@ -285,6 +285,53 @@ async fn abschluss_ohne_grund_ist_422_und_mit_grund_ok() {
     assert_eq!(v["abschluss_ziel"], "Tierarzt Müller");
 }
 
+/// Unbekannter Enum-Wert scheitert am Feld selbst → 400 (LFH-305), nicht am Zusammenhang.
+#[tokio::test]
+async fn abschluss_mit_unbekanntem_grund_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let t = tier_anlegen(&app, &admin, e, &json!({"spezies":"hund"})).await;
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/tiere/{t}/status"),
+        &admin,
+        Some(&json!({"status":"abgeschlossen","abschluss_grund":"quatsch"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    assert!(
+        v["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("Unbekannter"),
+        "unerwartete Meldung: {v}"
+    );
+}
+
+/// Abgrenzung zu `einsatz_schaden.rs`/abschliessen, wo DERSELBE Input 400 liefert:
+/// dort ist der Endpunkt dediziert und der Abschlussgrund unbedingtes Pflichtfeld, ein
+/// leerer Wert scheitert also am Feld. Hier ist der Status-Endpunkt generisch — `trimme`
+/// macht den Whitespace-Wert zu `None`, und die Pflicht entsteht erst aus dem Zielstatus
+/// „abgeschlossen". Das ist ein Zusammenhang → 422.
+#[tokio::test]
+async fn abschluss_mit_leerem_grund_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let t = tier_anlegen(&app, &admin, e, &json!({"spezies":"hund"})).await;
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/tiere/{t}/status"),
+        &admin,
+        Some(&json!({"status":"abgeschlossen","abschluss_grund":"   "})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
 // ---------- Tests: Halter-Exklusivität + Soft-Delete ----------
 
 #[tokio::test]
