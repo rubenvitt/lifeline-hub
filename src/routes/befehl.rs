@@ -173,8 +173,10 @@ pub async fn aktualisieren(
         let v =
             vorlage(&vorher.vorlage).ok_or(AppError::Internal("Vorlage verschwunden".into()))?;
         for a in abs {
+            // Enum-artig: der Schlüssel wird gegen die feste Schlüsselmenge der Vorlage
+            // geprüft, scheitert also am Feld selbst → 400 (LFH-305).
             if !v.abschnitte.iter().any(|d| d.schluessel == a.schluessel) {
-                return Err(AppError::UnprocessableEntity(format!(
+                return Err(AppError::Validation(format!(
                     "Unbekannter Abschnitts-Schlüssel «{}»",
                     a.schluessel
                 )));

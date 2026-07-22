@@ -56,10 +56,10 @@ pub async fn aktualisieren(
     AdminUser(benutzer): AdminUser,
     JsonBody(body): JsonBody<OrgPatch>,
 ) -> Result<Json<OrganisationAnzeige>, AppError> {
+    // Allowlist-Prüfung eines Einzelfelds — enum-artig, scheitert am Feld selbst → 400
+    // (LFH-305).
     if !ERLAUBTE_ORG.contains(&body.tz_organisation.as_str()) {
-        return Err(AppError::UnprocessableEntity(
-            "Unbekannte Organisation".into(),
-        ));
+        return Err(AppError::Validation("Unbekannte Organisation".into()));
     }
     // Der Admin pflegt seine EIGENE Organisation (F05/LFH-232). Er ist zwar serverweit
     // berechtigt, aber „welche Org" darf nicht von der Zeilenreihenfolge abhängen.

@@ -128,6 +128,48 @@ async fn freigegebener_bericht_nicht_mehr_patchbar() {
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
 }
 
+/// Der Abschnitts-Schlüssel wird gegen die Schlüsselmenge der Vorlage geprüft und scheitert
+/// für sich genommen → 400 (LFH-305). Abgrenzung zu den 422 dieser Datei
+/// (`freigegebener_bericht_nicht_mehr_patchbar`, `freigabe_leerer_bericht_422`): die
+/// bewerten den Zustand des Objekts, nicht ein einzelnes Feld. Der Positiv-Zweig belegt,
+/// dass der 400 aus der Schlüsselprüfung kommt und nicht aus einem vorgelagerten Gate.
+#[tokio::test]
+async fn patch_unbekannter_abschnitts_schluessel_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, lb) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/lageberichte"),
+        &admin,
+        Some(r#"{"vorlage":"freitext","titel":"X"}"#),
+    )
+    .await;
+    let lid = lb["id"].as_i64().unwrap();
+    let u = format!("/api/einsaetze/{einsatz}/lageberichte/{lid}");
+
+    let (status, antwort) = anfrage(
+        &app,
+        "PATCH",
+        &u,
+        &admin,
+        Some(r#"{"abschnitte":[{"schluessel":"quatsch","text":"x"}]}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{antwort:?}");
+
+    let (status, antwort) = anfrage(
+        &app,
+        "PATCH",
+        &u,
+        &admin,
+        Some(r#"{"abschnitte":[{"schluessel":"text","text":"Lage steigt."}]}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "Positiv-Zweig: {antwort:?}");
+}
+
 #[tokio::test]
 async fn freigabe_leerer_bericht_422() {
     let app = setup().await;

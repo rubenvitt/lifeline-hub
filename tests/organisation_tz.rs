@@ -63,6 +63,36 @@ async fn patch_als_admin_setzt_org_default() {
     assert_eq!(json["tz_organisation"], "feuerwehr");
 }
 
+/// `tz_organisation` wird gegen die ERLAUBTE_ORG-Allowlist geprüft — enum-artig, scheitert
+/// am Feld selbst → 400 (LFH-305). Bis dahin war diese Stelle ungetestet; die Datei hatte
+/// überhaupt keinen Fehlerfall außer 403. Der Positiv-Zweig belegt, dass der 400 aus der
+/// Allowlist kommt und nicht aus der Admin-Prüfung davor.
+#[tokio::test]
+async fn patch_unbekannte_organisation_ist_400() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, antwort) = anfrage(
+        &app,
+        "PATCH",
+        "/api/organisation",
+        &admin_cookie,
+        Some(r#"{"tz_organisation":"quatsch"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{antwort:?}");
+
+    let (status, antwort) = anfrage(
+        &app,
+        "PATCH",
+        "/api/organisation",
+        &admin_cookie,
+        Some(r#"{"tz_organisation":"feuerwehr"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "Positiv-Zweig: {antwort:?}");
+}
+
 #[tokio::test]
 async fn patch_als_nicht_admin_ist_403() {
     let app = setup().await;
