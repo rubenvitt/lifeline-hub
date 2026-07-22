@@ -183,28 +183,43 @@ Die Unterscheidung ist im Frontend heute nur **Heuristik**, kein Vertrag: `istKo
 Seite wieder in „Überschreiben?"-Schleifen. Ein maschinenlesbarer Fehler-Code im `{error}`-Body
 wäre die saubere Lösung und ist bewusst vertagt.
 
-**Bekannte Abweichungen, NICHT als Norm übernehmen** (Angleichung vertagt → LFH-305):
+**Die Konvention gilt in jeder Schicht**, nicht nur in `src/routes/`. Die ~89
+`AppError::Validation`-Stellen in `repo`/`parse`/`config` wurden bewusst **nicht** auditiert
+(kein Sweep über den Bestand) — die Regel ist verbindlich für Neues und für Stellen, die man
+ohnehin anfasst.
 
-1. **Unbekannter Enum-Wert → 422 statt 400**, u. a. `einsatz_schaden.rs:66/73/80`
-   (Query-Filter), `:366/371/376` (PATCH) und `:143/151` (Anlegen — dort zusätzlich mit
-   „fehlt" verschmolzen, siehe 2.), `gefahr.rs:105/111/117`, `lage_zone.rs:73/79/220`,
-   `einsatz_tier.rs:457`, `befehl.rs:177` und `lagebericht.rs:179` („Unbekannter
-   Abschnitts-Schlüssel" — Prüfung gegen die Schlüsselmenge der Vorlage, enum-artig),
-   `organisation.rs:60` (`ERLAUBTE_ORG`-Allowlist).
-2. **Leeres bzw. fehlendes Pflichtfeld → 422 statt 400** in `einsatz_schaden.rs`: `:158` (Ort
-   beim Anlegen), `:384` (Ort im PATCH), `:518` (Übergabe-Adressat), `:591` (Abschlussgrund).
-   `:143/:151/:158/:518/:591` kollabieren zusätzlich „fehlend" und „leer" bzw. „fehlt oder
-   ungültig" in denselben Code, weil die Felder `Option<String>` sind — das Entwirren gehört
-   mit ins Ticket.
+**Angleichung erledigt (LFH-305).** Die früher hier gelisteten Abweichungen sind aufgelöst:
+unbekannte Enum-Werte liefern jetzt 400 in `einsatz_schaden.rs` (Query-Filter, Anlegen,
+PATCH), `gefahr.rs`, `lage_zone.rs`, `befehl.rs`, `lagebericht.rs` und `organisation.rs`;
+die Pflichtfeld-Ausreißer in `einsatz_schaden.rs` (Anlegen, PATCH, Übergabe-Adressat,
+Abschlussgrund) sind entwirrt und unterscheiden „fehlt" / „ist leer" / „ist unbekannt" jetzt
+per eigener Meldung. Wer hier etwas zurückdreht, dreht eine getestete Entscheidung zurück.
 
-**Nicht betroffen, legitimes 422 — beim Sweep NICHT mitkippen:** `lage_zone.rs:85/92/94`
-(kaputtes GeoJSON bzw. `geometrie.type` ≠ `geometrie_typ` — eine Feld-*Kombination*),
-`einsatzabschnitt.rs:261` (kaputtes GeoJSON), `sprechgruppe/repo.rs:207` (referenzielle
-Zuordenbarkeit), `auth.rs:999` („Code ungültig" — ein TOTP-Einmalcode scheitert am
-kryptographischen Vergleich, nicht an der Form; das ist ein Zustandsfehler),
-`einsatz_uhs.rs:264/270/277/516` (lat/lon-Paar, Koordinaten- und Mengen-Ranges) und
-`einsatz_uhs.rs:359` (Status-Übergang). **`einsatz_uhs.rs` hat keine Enum-Abweichung** —
-alle sieben Enum-Parse-Stellen der Datei nutzen bereits `Validation`.
+**Referenz-Testpaar für die feine Linie** — zwei Stellen, die gleich aussehen und es nicht
+sind: `einsatz_schaden.rs`/`abschliessen` ist ein **dedizierter** Aktions-Endpunkt, der
+Abschlussgrund ist dort unbedingt Pflicht → das Feld scheitert isoliert → **400**
+(`abschliessen_ohne_grund_ist_400`). `einsatz_tier.rs`/`status` ist der **generische**
+Status-Endpunkt, der Grund ist dort nur bei Zielstatus `abgeschlossen` Pflicht → das ist ein
+Zusammenhang → **422** (`abschluss_ohne_grund_ist_422_und_mit_grund_ok`), während der
+*unbekannte* Enum-Wert derselben Stelle 400 liefert. Beide Stellen tragen einen Kommentar,
+der auf die jeweils andere verweist — wer sie „harmonisiert", bricht einen gepinnten Test.
+
+**Nicht betroffen, legitimes 422 — beim nächsten Sweep NICHT mitkippen:**
+`lage_zone.rs` (Typ × Geometrie-Klasse, kaputtes GeoJSON, `geometrie.type` ≠ `geometrie_typ`,
+Gefahrengebiet-Zuordnung an eine Nicht-Gefahrengebiet-Zone — alles Feld-*Kombinationen*),
+`gefahr.rs` (Gefahrentyp × Schutzobjekt), `einsatzabschnitt.rs:261` (kaputtes GeoJSON),
+`sprechgruppe/repo.rs:207` (referenzielle Zuordenbarkeit), `auth.rs:1288` („Code ungültig" —
+ein TOTP-Einmalcode scheitert am kryptographischen Vergleich, nicht an der Form; das ist ein
+Zustandsfehler), `einsatz_uhs.rs:264/270/277/516` (lat/lon-Paar, Koordinaten- und
+Mengen-Ranges) und `einsatz_uhs.rs:359` (Status-Übergang). **`einsatz_uhs.rs` hat keine
+Enum-Abweichung** — alle sieben Enum-Parse-Stellen der Datei nutzen bereits `Validation`.
+
+**Vorsicht bei `einsatz_schaden.rs`/PATCH und `einsatz_tier.rs`/Status:** dort binden die
+Repos `typ`/`ausmass`/`abschluss_grund` als **rohen String**, und die CHECKs aus
+`migrations/0033` bzw. `0031` kommen über das Sicherheitsnetz unten wieder als **422**
+heraus. Entfernt man einen Handler-Precheck, antwortet die Route also lautlos wieder mit dem
+alten Code statt mit 500 — ein Test, der 422 erwartet, wäre auch ganz ohne Precheck grün.
+Nur die 400-Erwartung beweist, dass der Precheck vor der DB greift (per Mutationsprobe belegt).
 
 **Sicherheitsnetz (LFH-245):** nicht vorab abgefangene DB-Constraint-Verletzungen bekommen in
 `AppError::status()` automatisch einen fachlichen Code — UNIQUE/FK → **409**, CHECK → **422**,
@@ -215,4 +230,7 @@ statt eines nackten 500. Per-Handler-Prechecks bleiben für präzise Meldungen z
 Deserialisierungs-Rejection dem `{error}`-JSON-Format. `axum::Json` bleibt für **Responses**
 richtig. Erzwungen von `tests/json_extractor_guard.rs`; querschnittliche Fehlerfälle
 (405, unbekannter API-Pfad, kaputter Body) deckt `tests/fehler_vertrag.rs` ab.
-Noch offen (LFH-305): `Path`-Rejections antworten weiterhin `text/plain`.
+Noch offen (LFH-317, abgespalten von LFH-305): `Path`-Rejections antworten weiterhin
+`text/plain`. Bewusst **nach** der LFH-121/230-Kontextmigration einzuplanen — jedes Modul, das
+auf den typisierten `EinsatzKontext`-Extractor wechselt, verliert sein rohes `Path` und damit
+den Swap.
