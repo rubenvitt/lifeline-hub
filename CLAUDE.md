@@ -46,6 +46,52 @@ URL-Builder) — keine inline-Template-Literals für Einsatz-Pfade. `parseRouteI
 validiert Route-IDs (positive Ganzzahl, sonst Redirect auf die Liste).
 Details: `docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-design.md`.
 
+## Frontend — Query-Key-Registry (LFH-122/307/312)
+
+**Quelle der Wahrheit:** `frontend/src/api/queryKeys.ts` — seit LFH-307 mit zwei Hälften:
+
+- **`einsatzKeys`** (Prefixe in `EINSATZ_KEYS`) für alles unter einer `einsatzId`. Hängt am
+  SSE-Fan-out: `EINSATZ_STREAM_EVENTS` mappt Wire-Event → invalidierte Prefixe, und jeder
+  managed Key ist **genau einmal** klassifiziert (live via Event **oder** `NICHT_LIVE_KEYS`).
+- **`globalKeys`** (Prefixe in `GLOBAL_KEYS`) für alles darüber: Mandant/Organisation,
+  Stammdaten-Kataloge, Instanz/Betrieb, externe Quellen. Bewusst **nicht** `ORG_KEYS` —
+  `admin-karte`/`karte-config` sind instanzweit, `fachebene` bezeichnet Fremdquellen.
+
+**Kein Inline-String-Array als Query-Key.** Erzwungen von `queryKeys.guard.test.ts` über einen
+TS-AST-Scanner (`queryKeyScan.ts`), nicht mehr per Regex: mehrzeilige Literale sind sichtbar,
+Kommentare erzeugen strukturell keinen Fehlalarm, der Quote-Stil ist egal, und ein bare-Literal,
+das in einen lokalen Key-Helfer fließt (`inval('einsatz-uhs')`), fliegt ebenfalls auf. Der
+Scanner trennt zwei Radien — **weit** (jedes Array-Literal, für die Denylist-Guards) und **eng**
+(nur echte Query-Key-Kontexte, für den Allowlist-Guard); ohne diese Trennung wären Konstanten
+wie `['KB','MB','GB','TB']` Fehlalarme. Was der Guard **nicht** sieht, steht als Liste in seinem
+Kopfkommentar — die ist Teil des Vertrags, nicht Beiwerk.
+
+**Wire-Strings sind eingefroren und byte-gepinnt** (`globalKeys.test.ts`). Grund: ein geänderter
+Query-Key **bricht nichts** — er trifft still ein anderes Cache-Fach. Kein Fehler, kein roter
+Test, kein auffälliger Request; die Komponente lädt neu und eine Invalidierung anderswo läuft
+ins Leere. Deshalb prüft der Byte-Pin gegen **handgeschriebene Literale**, nie gegen
+`GLOBAL_KEYS.x` — sonst prüfte er die Konstante gegen sich selbst.
+
+**Sub-Key-Konvention:** getyptes String-Union-Token als zweites Element (`Dienstfilter`,
+`AdminKarteBereich`), **kein** Filter-Objekt; der **argumentlose** Accessor ist zugleich der
+Invalidierungs-Prefix (TanStack matcht per Prefix), Filter-Varianten hängen an. Deshalb zwei
+Accessoren (`personal()` **und** `personalListe('alle')`) statt eines optionalen Arguments.
+
+**Zwei gemessene Testfallen** in diesem Bereich:
+
+- Cache-Tests **ohne** mounted Observer dürfen nicht `neuerQueryClient()` nutzen — dessen
+  `gcTime: 0` räumt einen per `setQueryData` gesetzten, unbeobachteten Eintrag beim ersten
+  `await` weg, und `isStale()`-Assertions werden trivial grün. `new QueryClient()` nehmen;
+  Tests **mit** gerenderter Komponente dürfen `neuerQueryClient()`.
+- Charakterisierungstests bauen ihre Keys als **Literale**, nicht über die Factory. Sonst sind
+  beide Seiten aus derselben Quelle gebaut und matchen auch bei kaputter Factory (gemessen:
+  `adminKarte()` verbogen → Literal-Variante rot, Accessor-Variante grün geblieben).
+
+Die org/instanz/extern-Gliederung in `GLOBAL_KEYS` ist **Dokumentation**, nicht maschinell
+erzwungen (gemessen: kein `qc.clear`/`removeQueries`/`resetQueries` im Produktivcode, also kein
+Konsument). Kommt einer dazu, gehört sie in eine XOR-Partition nach dem Muster von
+`NICHT_LIVE_KEYS` gehoben.
+
 ## Frontend — Lint-Disziplin
 
 `pnpm lint` läuft mit `--max-warnings 0`: Warnings brechen das Gate genauso hart wie
@@ -121,6 +167,18 @@ gepflegt. Wahrheitsquelle: die `#[derive(ToSchema)]`-Response-Structs + Domänen
 - **Noch handgepflegt** (bewusst, FE-lokal in `types.ts`): Request-/Input-DTOs (`NeuerX`/`PatchX`,
   PATCH-null-vs-absent-Semantik) und die 2 `Record<>`-Maps. Der Pfad-/Operations-Contract
   (`#[utoipa::path]`) ist additiv nachrüstbar, in v1 nicht enthalten.
+- **Optionalität ehrlich machen (Norm ab LFH-265):** `Option<T>`-Felder von Response-DTOs
+  bekommen `#[serde(skip_serializing_if = "Option::is_none")]` — sonst schickt das Backend
+  `feld: null`, während der generierte Typ `feld?: T | null` sagt, und der Client kann `absent`
+  und `null` nicht auseinanderhalten. Bei Feldern, die **kein** `Option<T>` sind, aber
+  `#[serde(default)]` tragen, ist `skip_serializing_if` **falsch** (es würde den Default-Wert
+  weglassen = echte Wire-Verschlechterung); dort macht `#[schema(required)]` die Spec ehrlich
+  (gemessen: das Feld landet in `required`). **Norm ja, Sweep nein** — verbindlich für neue und
+  ohnehin angefasste Felder, kein Bestands-Sweep.
+  **Testfalle:** `assert_eq!(v["feld"], Value::Null)` unterscheidet einen FEHLENDEN Key nicht
+  von `null` — serde_json liefert beim Index-Zugriff auf ein Object in beiden Fällen `Null`.
+  Presence wird deshalb per `v.as_object().unwrap().contains_key("feld")` geprüft; sonst bleibt
+  der Test nach der Umstellung grün und belegt nichts (`tests/ort_vorschau.rs` ist die Referenz).
 
 ## Backend — ClamAV-Upload-Scan (Default-AN, LFH-114/LFH-224)
 
