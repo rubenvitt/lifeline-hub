@@ -5,6 +5,7 @@ import { ApiError } from '../api/client';
 import { aktualisiereFahrzeug, legeFahrzeugAn, type FahrzeugEingabe } from '../api/fahrzeuge';
 import type { Fahrzeug, FahrzeugVorschlaege, Staerke } from '../api/types';
 import StaerkeEingabe from '../anzeige/StaerkeEingabe';
+import { globalKeys } from '../api/queryKeys';
 
 interface FormWerte {
   funkrufname: string;
@@ -84,8 +85,8 @@ export default function FahrzeugFormModal({
       return fahrzeug ? aktualisiereFahrzeug(fahrzeug.id, daten) : legeFahrzeugAn(daten);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['fahrzeuge'] });
-      qc.invalidateQueries({ queryKey: ['fahrzeug-vorschlaege'] });
+      qc.invalidateQueries({ queryKey: globalKeys.fahrzeuge() });
+      qc.invalidateQueries({ queryKey: globalKeys.fahrzeugVorschlaege() });
       onClose();
     },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),

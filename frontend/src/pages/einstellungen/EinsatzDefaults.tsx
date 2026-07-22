@@ -12,6 +12,7 @@ import AdminPage from '../../components/AdminPage';
 import SektionHeader from '../../components/SektionHeader';
 import { useAuth } from '../../auth/AuthContext';
 import { modulRegistry, istModulAusblendbar } from '../../einsatz/modulRegistry';
+import { globalKeys } from '../../api/queryKeys';
 import {
   type FormWerteEinsatz,
   initialEinsatz,
@@ -40,12 +41,12 @@ export default function EinsatzDefaults() {
   const istAdmin = benutzer?.system_rolle === 'admin';
 
   const einstellungenQuery = useQuery({
-    queryKey: ['org-einstellungen'],
+    queryKey: globalKeys.orgEinstellungen(),
     queryFn: ladeOrgEinstellungen,
   });
 
   const modulQuery = useQuery({
-    queryKey: ['org-modul-einstellungen'],
+    queryKey: globalKeys.orgModulEinstellungen(),
     queryFn: ladeOrgModulEinstellungen,
   });
 
@@ -53,7 +54,7 @@ export default function EinsatzDefaults() {
     mutationFn: (felder: Parameters<typeof speichereOrgEinstellungen>[0]) =>
       speichereOrgEinstellungen(felder),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['org-einstellungen'] });
+      qc.invalidateQueries({ queryKey: globalKeys.orgEinstellungen() });
       message.success('Einstellungen gespeichert');
     },
     onError: (e) =>
@@ -64,7 +65,7 @@ export default function EinsatzDefaults() {
     mutationFn: (vars: { modulKey: string; rolle: 'admin' | 'fuehrungskraft' | null }) =>
       setzeOrgModulEinstellung(vars.modulKey, vars.rolle),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['org-modul-einstellungen'] });
+      qc.invalidateQueries({ queryKey: globalKeys.orgModulEinstellungen() });
       message.success('Modul-Default gespeichert');
     },
     onError: (e) =>

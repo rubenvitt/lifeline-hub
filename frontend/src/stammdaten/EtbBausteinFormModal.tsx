@@ -8,6 +8,7 @@ import type { EtbBaustein, EtbTyp, MeldeWeg } from '../api/types';
 import { ERFASSBARE_TYPEN, TYP_LABEL } from '../etb/typFarben';
 import { AUTO_PLATZHALTER } from '../etb/bausteinEinsetzen';
 import { MELDEWEG_OPTIONEN } from '../etb/schnellerfassungModell';
+import { globalKeys } from '../api/queryKeys';
 
 interface FormWerte {
   label: string;
@@ -66,7 +67,7 @@ export default function EtbBausteinFormModal({
       return baustein ? aktualisiereBaustein(baustein.id, daten) : legeBausteinAn(daten);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['etb-bausteine'] });
+      qc.invalidateQueries({ queryKey: globalKeys.etbBausteine() });
       onClose();
     },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),

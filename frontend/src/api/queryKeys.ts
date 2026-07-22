@@ -1,3 +1,5 @@
+import type { FachebeneQuelle } from './fachebenen';
+
 /**
  * Zentrales Query-Key-Registry für den Einsatz-Live-Feed (LFH-122).
  *
@@ -9,6 +11,11 @@
  * `EINSATZ_KEYS` ist das enumerierte Set der einsatz-scoped Query-Key-Prefixe (erstes
  * Array-Element). Der Guard-Test (`queryKeys.guard.test.ts`, LFH-122) verlangt, dass diese
  * Prefixe nur hier als Literal vorkommen — jede Query nutzt die Factory.
+ *
+ * Seit LFH-307 deckt diese Datei BEIDE Hälften ab: `einsatzKeys` für alles unter einer
+ * `einsatzId` (inkl. SSE-Fan-out über {@link EINSATZ_STREAM_EVENTS}) und `globalKeys` für
+ * alles darüber (Mandant, Stammdaten-Kataloge, Instanz, externe Quellen). Der Guard erlaubt
+ * seither KEIN Inline-String-Array mehr als Query-Key, egal welcher Hälfte es angehört.
  */
 
 /** Query-Key-Prefixe (erstes Element eines `[prefix, einsatzId, …]`-Keys). */
@@ -251,4 +258,136 @@ export const einsatzKeys = {
     lon: number | null,
     exclude: string | null,
   ) => [EINSATZ_KEYS.ortVorschau, einsatzId, lat, lon, exclude] as const,
+} as const;
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+// Nicht-einsatz-scoped Query-Keys (LFH-307)
+// ═══════════════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Query-Key-Prefixe für alles, was NICHT unter einer `einsatzId` hängt.
+ *
+ * Name bewusst `GLOBAL_KEYS` und nicht `ORG_KEYS`: drei der 22 Prefixe sind gar nicht
+ * mandantenbezogen — `admin-karte` und `karte-config` sind instanzweit (eine Kartenkonfiguration
+ * pro Installation), `fachebene` bezeichnet externe Fremdquellen (NINA/DWD/PEGELONLINE/KRITIS).
+ * `ORG_KEYS` wäre dort ein Fehlname, und ein Fehlname in einer Registry, die genau deshalb
+ * existiert, damit man Keys nicht mehr raten muss, ist teuer.
+ *
+ * Die Gliederung unten ist DOKUMENTATION, kein Typ und keine maschinell erzwungene Partition.
+ * Gemessen: es gibt im Produktionscode kein `qc.clear()`, `removeQueries` oder `resetQueries`,
+ * also heute keinen Konsumenten, der „alle Org-Keys" als Menge bräuchte. Käme einer dazu, ist
+ * die Gliederung in eine echte XOR-Partition nach dem Muster von {@link NICHT_LIVE_KEYS} zu
+ * heben — als Kommentar-Überschrift trägt sie das nicht.
+ *
+ * Die Wire-Strings sind EINGEFROREN und byte-gepinnt (`queryKeys.test.ts`): ein geänderter Key
+ * bricht nichts, er trifft still ein anderes Cache-Fach.
+ */
+export const GLOBAL_KEYS = {
+  // Mandant / Organisation
+  einsaetze: 'einsaetze',
+  benutzer: 'benutzer',
+  organisation: 'organisation',
+  orgEinstellungen: 'org-einstellungen',
+  orgModulEinstellungen: 'org-modul-einstellungen',
+  authProvider: 'auth-provider',
+
+  // Stammdaten-Kataloge
+  personal: 'personal',
+  personalStatus: 'personal-status',
+  personalVorschlaege: 'personal-vorschlaege',
+  fahrzeuge: 'fahrzeuge',
+  fahrzeugStatus: 'fahrzeug-status',
+  fahrzeugVorschlaege: 'fahrzeug-vorschlaege',
+  material: 'material',
+  materialKategorien: 'material-kategorien',
+  sprechgruppen: 'sprechgruppen',
+  qualifikationen: 'qualifikationen',
+  einheitTypen: 'einheit-typen',
+  etbBausteine: 'etb-bausteine',
+  stichwortVorschlaege: 'stichwort-vorschlaege',
+
+  // Instanz / Betrieb — NICHT mandantenbezogen
+  adminKarte: 'admin-karte',
+  karteConfig: 'karte-config',
+
+  // Externe Quellen
+  fachebene: 'fachebene',
+} as const;
+
+export type GlobalKey = (typeof GLOBAL_KEYS)[keyof typeof GLOBAL_KEYS];
+
+/**
+ * Dienstfilter der Stammdaten-Listen (`personal` / `fahrzeuge` / `material`).
+ *
+ * String-Union statt boolean, weil der Wert als Key-Element auf der Wire liegt und die beiden
+ * Fächer im Cache getrennt halten muss — `['personal', true]` wäre weder lesbar noch
+ * byte-identisch zum Bestand. Die Konvention ist EINGEFROREN (LFH-307): ein Umbau auf ein
+ * Filter-Objekt wäre sauberer, änderte aber JEDEN Cache-Key dieser drei Listen und damit das
+ * Invalidierungsverhalten der `stammdaten/*`-Mutationen — bei 90 migrierten Call-Sites ist das
+ * zu viel Risiko auf einmal. Eigener Task, wenn überhaupt.
+ */
+export type Dienstfilter = 'alle' | 'im-dienst';
+
+/** Die sieben Bereiche unter dem `admin-karte`-Prefix. */
+export type AdminKarteBereich =
+  | 'katalog'
+  | 'bau-status'
+  | 'offline-karten'
+  | 'baubare-regionen'
+  | 'offline-katalog'
+  | 'offline-vorhandene'
+  | 'online-quellen';
+
+/**
+ * Typisierte Key-Factory für alle nicht-einsatz-scoped Queries (LFH-307).
+ *
+ * Konvention wie bei {@link einsatzKeys}: der ARGUMENTLOSE Accessor ist zugleich der
+ * Invalidierungs-Prefix (TanStack matcht per Prefix), Filter-Varianten hängen ein weiteres
+ * Element an. Deshalb gibt es bei den Filter-Listen bewusst ZWEI Accessoren statt eines
+ * optionalen Arguments — `personal()` invalidiert beide Fächer, `personalListe('alle')`
+ * adressiert genau eines.
+ */
+export const globalKeys = {
+  // Mandant / Organisation — alle einelementig
+  einsaetze: () => [GLOBAL_KEYS.einsaetze] as const,
+  benutzer: () => [GLOBAL_KEYS.benutzer] as const,
+  organisation: () => [GLOBAL_KEYS.organisation] as const,
+  orgEinstellungen: () => [GLOBAL_KEYS.orgEinstellungen] as const,
+  orgModulEinstellungen: () => [GLOBAL_KEYS.orgModulEinstellungen] as const,
+  authProvider: () => [GLOBAL_KEYS.authProvider] as const,
+
+  // Stammdaten-Kataloge ohne Filter
+  qualifikationen: () => [GLOBAL_KEYS.qualifikationen] as const,
+  personalStatus: () => [GLOBAL_KEYS.personalStatus] as const,
+  personalVorschlaege: () => [GLOBAL_KEYS.personalVorschlaege] as const,
+  fahrzeugStatus: () => [GLOBAL_KEYS.fahrzeugStatus] as const,
+  fahrzeugVorschlaege: () => [GLOBAL_KEYS.fahrzeugVorschlaege] as const,
+  materialKategorien: () => [GLOBAL_KEYS.materialKategorien] as const,
+  einheitTypen: () => [GLOBAL_KEYS.einheitTypen] as const,
+  etbBausteine: () => [GLOBAL_KEYS.etbBausteine] as const,
+  stichwortVorschlaege: () => [GLOBAL_KEYS.stichwortVorschlaege] as const,
+
+  // Dienstfilter-Listen: barer Prefix (= Invalidierung beider Fächer) + adressiertes Fach
+  personal: () => [GLOBAL_KEYS.personal] as const,
+  personalListe: (filter: Dienstfilter) => [GLOBAL_KEYS.personal, filter] as const,
+  fahrzeuge: () => [GLOBAL_KEYS.fahrzeuge] as const,
+  fahrzeugeListe: (filter: Dienstfilter) => [GLOBAL_KEYS.fahrzeuge, filter] as const,
+  material: () => [GLOBAL_KEYS.material] as const,
+  materialListe: (filter: Dienstfilter) => [GLOBAL_KEYS.material, filter] as const,
+  // sprechgruppen kennt im Bestand nur den Filterwert 'alle' und KEIN bare-Invalidate —
+  // deshalb bewusst nur dieser eine Accessor (siehe queryKeys.prefixmatch.test.ts).
+  sprechgruppenAlle: () => [GLOBAL_KEYS.sprechgruppen, 'alle'] as const,
+
+  // Karte: barer Prefix (invalidiereKarte trifft per Prefix-Match alle sieben Bereiche)
+  // + adressierter Bereich. Zwei Funktionen statt optionalem Argument.
+  adminKarte: () => [GLOBAL_KEYS.adminKarte] as const,
+  adminKarteBereich: (bereich: AdminKarteBereich) => [GLOBAL_KEYS.adminKarte, bereich] as const,
+  karteConfig: () => [GLOBAL_KEYS.karteConfig] as const,
+
+  // Externe Fachebenen. `kritis` ist ausgenommen, weil es als einziges eine BBox im Key trägt —
+  // der einzige Weg dorthin ist `fachebeneKritis`, sonst entstünden zwei Cache-Fächer für
+  // denselben Zustand. `bbox` ist `string | null` (useFachebenen.ts), NICHT `undefined`.
+  fachebene: (quelle: Exclude<FachebeneQuelle, 'kritis'>) =>
+    [GLOBAL_KEYS.fachebene, quelle] as const,
+  fachebeneKritis: (bbox: string | null) => [GLOBAL_KEYS.fachebene, 'kritis', bbox] as const,
 } as const;

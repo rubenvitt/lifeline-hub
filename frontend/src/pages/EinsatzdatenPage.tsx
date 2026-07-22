@@ -10,7 +10,7 @@ import { useState } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
 import { aktualisiereEinsatz, ladeEinsatz, ladeMitglieder, type KopfdatenUpdate } from '../api/einsaetze';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
-import { einsatzKeys } from '../api/queryKeys';
+import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { darfImEinsatzSchreiben, darfEinsatzLeiten } from '../einsatz/schreibrecht';
@@ -63,7 +63,7 @@ export default function EinsatzdatenPage() {
     queryFn: () => ladeMitglieder(einsatzId),
   });
   const vorschlaegeQuery = useQuery({
-    queryKey: ['stichwort-vorschlaege'],
+    queryKey: globalKeys.stichwortVorschlaege(),
     queryFn: listeStichwortVorschlaege,
   });
 
@@ -71,7 +71,7 @@ export default function EinsatzdatenPage() {
     mutationFn: (felder: KopfdatenUpdate) => aktualisiereEinsatz(einsatzId, felder),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
-      qc.invalidateQueries({ queryKey: ['einsaetze'] });
+      qc.invalidateQueries({ queryKey: globalKeys.einsaetze() });
       setBearbeiten(false);
       message.success('Einsatzdaten gespeichert');
     },

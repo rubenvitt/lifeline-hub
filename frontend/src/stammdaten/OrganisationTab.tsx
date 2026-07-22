@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
 import { ladeOrganisation, setzeOrgDefault } from '../api/organisation';
+import { globalKeys } from '../api/queryKeys';
 
 interface FormWerte {
   tz_organisation: string;
@@ -25,7 +26,7 @@ export default function OrganisationTab() {
   const { message } = App.useApp();
   const [form] = Form.useForm<FormWerte>();
 
-  const orgQuery = useQuery({ queryKey: ['organisation'], queryFn: ladeOrganisation });
+  const orgQuery = useQuery({ queryKey: globalKeys.organisation(), queryFn: ladeOrganisation });
 
   useEffect(() => {
     if (orgQuery.data?.tz_organisation) {
@@ -37,7 +38,7 @@ export default function OrganisationTab() {
     mutationFn: (werte: FormWerte) => setzeOrgDefault(werte.tz_organisation),
     onSuccess: () => {
       message.success('DV-102-Organisation gespeichert');
-      qc.invalidateQueries({ queryKey: ['organisation'] });
+      qc.invalidateQueries({ queryKey: globalKeys.organisation() });
     },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
   });

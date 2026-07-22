@@ -10,6 +10,7 @@ import {
   type FachebenenSichtbar,
 } from './fachebenenAuswahl';
 import type { AktiveFachebene } from './kartenLayer';
+import { globalKeys } from '../../api/queryKeys';
 
 /** KRITIS-Sammlung: Obergrenze gegen unbegrenztes Wachstum (älteste zuerst raus). */
 const KRITIS_MAX = 4000;
@@ -67,19 +68,19 @@ export function useFachebenen({ einsatzId, einstellungen, einstellungenLaedt }: 
   const kombiniert = useQueries({
     queries: [
       {
-        queryKey: ['fachebene', 'nina'], queryFn: () => ladeFachebene('nina'),
+        queryKey: globalKeys.fachebene('nina'), queryFn: () => ladeFachebene('nina'),
         enabled: fachebenenSichtbar.nina, refetchInterval: FACHEBENEN.nina.pollMs,
       },
       {
-        queryKey: ['fachebene', 'dwd'], queryFn: () => ladeFachebene('dwd'),
+        queryKey: globalKeys.fachebene('dwd'), queryFn: () => ladeFachebene('dwd'),
         enabled: fachebenenSichtbar.dwd, refetchInterval: FACHEBENEN.dwd.pollMs,
       },
       {
-        queryKey: ['fachebene', 'pegelonline'], queryFn: () => ladeFachebene('pegelonline'),
+        queryKey: globalKeys.fachebene('pegelonline'), queryFn: () => ladeFachebene('pegelonline'),
         enabled: fachebenenSichtbar.pegelonline, refetchInterval: FACHEBENEN.pegelonline.pollMs,
       },
       {
-        queryKey: ['fachebene', 'kritis', kritisBbox], queryFn: () => ladeFachebene('kritis', kritisBbox!),
+        queryKey: globalKeys.fachebeneKritis(kritisBbox), queryFn: () => ladeFachebene('kritis', kritisBbox!),
         enabled: fachebenenSichtbar.kritis && !!kritisBbox,
         // Beim Wechsel der Raster-bbox die bisherigen KRITIS-Objekte sichtbar lassen (kein
         // Leer-Blinken). KRITIS ist quasi statisch → lange als frisch behandeln (6 h);

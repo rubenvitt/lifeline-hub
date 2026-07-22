@@ -8,6 +8,7 @@ import {
   aktualisiereStatus, deaktiviereStatus, legeStatusAn, listeFahrzeugStatus, type StatusEingabe,
 } from '../api/fahrzeugStatus';
 import type { FahrzeugStatus, StatusKategorie } from '../api/types';
+import { globalKeys } from '../api/queryKeys';
 
 const KATEGORIE_LABELS: Record<StatusKategorie, string> = {
   verfuegbar: 'verfügbar',
@@ -37,7 +38,7 @@ export default function StatusKatalogTab() {
   const [modalOffen, setModalOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<FahrzeugStatus | null>(null);
 
-  const statusQuery = useQuery({ queryKey: ['fahrzeug-status'], queryFn: listeFahrzeugStatus });
+  const statusQuery = useQuery({ queryKey: globalKeys.fahrzeugStatus(), queryFn: listeFahrzeugStatus });
 
   const speichern = useMutation({
     mutationFn: (werte: FormWerte) => {
@@ -51,7 +52,7 @@ export default function StatusKatalogTab() {
       return bearbeite ? aktualisiereStatus(bearbeite.id, daten) : legeStatusAn(daten);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['fahrzeug-status'] });
+      qc.invalidateQueries({ queryKey: globalKeys.fahrzeugStatus() });
       setModalOffen(false);
     },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
@@ -59,7 +60,7 @@ export default function StatusKatalogTab() {
 
   const deaktivieren = useMutation({
     mutationFn: (id: number) => deaktiviereStatus(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['fahrzeug-status'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.fahrzeugStatus() }),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
   });
 

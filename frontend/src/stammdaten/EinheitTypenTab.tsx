@@ -11,6 +11,7 @@ import {
 import type { EinheitTyp, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import StaerkeEingabe from '../anzeige/StaerkeEingabe';
+import { globalKeys } from '../api/queryKeys';
 
 interface FormWerte {
   label: string;
@@ -27,7 +28,7 @@ export default function EinheitTypenTab() {
   const [modalOffen, setModalOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<EinheitTyp | null>(null);
 
-  const typenQuery = useQuery({ queryKey: ['einheit-typen'], queryFn: listeEinheitTypen });
+  const typenQuery = useQuery({ queryKey: globalKeys.einheitTypen(), queryFn: listeEinheitTypen });
 
   const speichern = useMutation({
     mutationFn: (werte: FormWerte) => {
@@ -40,13 +41,13 @@ export default function EinheitTypenTab() {
       };
       return bearbeite ? aktualisiereTyp(bearbeite.id, daten) : legeTypAn(daten);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['einheit-typen'] }); setModalOffen(false); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: globalKeys.einheitTypen() }); setModalOffen(false); },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
   });
 
   const deaktivieren = useMutation({
     mutationFn: (id: number) => deaktiviereTyp(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['einheit-typen'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.einheitTypen() }),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
   });
 

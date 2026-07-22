@@ -7,7 +7,7 @@ import {
   ladeModulOverrides, setzeModulOverride,
 } from '../api/einsaetze';
 import { ladeOrgModulEinstellungen } from '../api/orgEinstellungen';
-import { einsatzKeys } from '../api/queryKeys';
+import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { darfImEinsatzSchreiben, darfEinsatzLeiten } from '../einsatz/schreibrecht';
@@ -114,7 +114,7 @@ export default function EinsatzEinstellungenPage() {
   });
   // Org-Modul-Rollen-Defaults (optional, nicht-blockierend).
   const orgModulQuery = useQuery({
-    queryKey: ['org-modul-einstellungen'],
+    queryKey: globalKeys.orgModulEinstellungen(),
     queryFn: () => ladeOrgModulEinstellungen(),
   });
 

@@ -10,6 +10,7 @@ import {
 } from '../api/offlineKarten';
 import { invalidiereKarte } from './invalidiereKarte';
 import { formatGroesse } from './formatGroesse';
+import { globalKeys } from '../api/queryKeys';
 
 /** Dateiname → lesbarer Default-Name: `.mbtiles` weg, `osm.`-Präfix + `.YYYY-MM-DD`-Datum weg. */
 function nameAusDatei(dateiname: string): string {
@@ -37,7 +38,7 @@ export default function OfflineVorhandeneModal({
   const [namen, setNamen] = useState<Record<string, string>>({});
 
   const vorhandeneQuery = useQuery({
-    queryKey: ['admin-karte', 'offline-vorhandene'],
+    queryKey: globalKeys.adminKarteBereich('offline-vorhandene'),
     queryFn: listeVorhandeneKarten,
     enabled: offen,
   });
@@ -53,7 +54,7 @@ export default function OfflineVorhandeneModal({
       }),
     onSuccess: () => {
       invalidiereKarte(qc);
-      qc.invalidateQueries({ queryKey: ['admin-karte', 'offline-vorhandene'] });
+      qc.invalidateQueries({ queryKey: globalKeys.adminKarteBereich('offline-vorhandene') });
       message.success('Region übernommen');
     },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Übernehmen fehlgeschlagen'),

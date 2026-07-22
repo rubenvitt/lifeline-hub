@@ -6,6 +6,7 @@ import { ApiError } from '../api/client';
 import { ladePersonalVorschlaege, listePersonal, POSITION_LABELS, setzeDienststatus } from '../api/personal';
 import type { Personal, StaerkePosition } from '../api/types';
 import PersonalFormModal from './PersonalFormModal';
+import { globalKeys } from '../api/queryKeys';
 
 export default function PersonalTab() {
   const { benutzer } = useAuth();
@@ -15,12 +16,12 @@ export default function PersonalTab() {
   const [modalOffen, setModalOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<Personal | null>(null);
 
-  const personalQuery = useQuery({ queryKey: ['personal', 'alle'], queryFn: () => listePersonal(false) });
-  const vorschlaegeQuery = useQuery({ queryKey: ['personal-vorschlaege'], queryFn: ladePersonalVorschlaege });
+  const personalQuery = useQuery({ queryKey: globalKeys.personalListe('alle'), queryFn: () => listePersonal(false) });
+  const vorschlaegeQuery = useQuery({ queryKey: globalKeys.personalVorschlaege(), queryFn: ladePersonalVorschlaege });
 
   const dienststatusMutation = useMutation({
     mutationFn: (v: { id: number; inDienst: boolean }) => setzeDienststatus(v.id, v.inDienst),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['personal'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.personal() }),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
   });
 

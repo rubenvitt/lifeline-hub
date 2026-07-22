@@ -9,6 +9,7 @@ import {
   loescheStichwortVorschlag,
 } from '../api/stichwortVorschlaege';
 import type { StichwortVorschlag } from '../api/types';
+import { globalKeys } from '../api/queryKeys';
 
 export default function StichworteTab() {
   const { benutzer } = useAuth();
@@ -18,14 +19,14 @@ export default function StichworteTab() {
   const [neuerText, setNeuerText] = useState('');
 
   const vorschlaegeQuery = useQuery({
-    queryKey: ['stichwort-vorschlaege'],
+    queryKey: globalKeys.stichwortVorschlaege(),
     queryFn: listeStichwortVorschlaege,
   });
 
   const anlegenMutation = useMutation({
     mutationFn: (text: string) => legeStichwortVorschlagAn(text),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['stichwort-vorschlaege'] });
+      qc.invalidateQueries({ queryKey: globalKeys.stichwortVorschlaege() });
       setNeuerText('');
     },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Hinzufügen fehlgeschlagen'),
@@ -33,7 +34,7 @@ export default function StichworteTab() {
 
   const loeschenMutation = useMutation({
     mutationFn: (id: number) => loescheStichwortVorschlag(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['stichwort-vorschlaege'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.stichwortVorschlaege() }),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Löschen fehlgeschlagen'),
   });
 

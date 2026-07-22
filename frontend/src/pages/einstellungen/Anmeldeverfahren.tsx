@@ -4,6 +4,7 @@ import { providerListeAdmin, providerSchalten } from '../../api/auth';
 import { ApiError } from '../../api/client';
 import AdminPage from '../../components/AdminPage';
 import { useAuth } from '../../auth/AuthContext';
+import { globalKeys } from '../../api/queryKeys';
 
 /**
  * Admin-Sektion `/admin/einstellungen/anmeldung` — Auth-Provider an-/abschalten (LFH-280).
@@ -20,7 +21,7 @@ export default function Anmeldeverfahren() {
   // Admin-Endpoint (LFH-277): liefert die VOLLE Liste inkl. deaktivierter Provider — nur so
   // kann diese Seite Toggles für deaktivierte Verfahren rendern.
   const providerQuery = useQuery({
-    queryKey: ['auth-provider'],
+    queryKey: globalKeys.authProvider(),
     queryFn: providerListeAdmin,
   });
 
@@ -29,7 +30,7 @@ export default function Anmeldeverfahren() {
       providerSchalten(vars.id, vars.aktiviert),
     onSuccess: (liste) => {
       // Server-Wahrheit (inkl. abgelehntem Zustand) direkt übernehmen.
-      qc.setQueryData(['auth-provider'], liste);
+      qc.setQueryData(globalKeys.authProvider(), liste);
     },
     onError: (e) =>
       message.error(e instanceof ApiError ? e.message : 'Umschalten fehlgeschlagen'),

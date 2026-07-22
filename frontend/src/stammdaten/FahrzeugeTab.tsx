@@ -6,6 +6,7 @@ import { ApiError } from '../api/client';
 import { ladeFahrzeugVorschlaege, listeFahrzeuge, setzeDienststatus } from '../api/fahrzeuge';
 import type { Fahrzeug } from '../api/types';
 import FahrzeugFormModal from './FahrzeugFormModal';
+import { globalKeys } from '../api/queryKeys';
 
 function staerkeText(f: Fahrzeug): string {
   if (!f.staerke) return '—';
@@ -21,12 +22,12 @@ export default function FahrzeugeTab() {
   const [modalOffen, setModalOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<Fahrzeug | null>(null);
 
-  const fahrzeugeQuery = useQuery({ queryKey: ['fahrzeuge', 'alle'], queryFn: () => listeFahrzeuge(false) });
-  const vorschlaegeQuery = useQuery({ queryKey: ['fahrzeug-vorschlaege'], queryFn: ladeFahrzeugVorschlaege });
+  const fahrzeugeQuery = useQuery({ queryKey: globalKeys.fahrzeugeListe('alle'), queryFn: () => listeFahrzeuge(false) });
+  const vorschlaegeQuery = useQuery({ queryKey: globalKeys.fahrzeugVorschlaege(), queryFn: ladeFahrzeugVorschlaege });
 
   const dienststatusMutation = useMutation({
     mutationFn: (v: { id: number; inDienst: boolean }) => setzeDienststatus(v.id, v.inDienst),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['fahrzeuge'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.fahrzeuge() }),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
   });
 

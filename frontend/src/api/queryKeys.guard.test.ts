@@ -12,7 +12,6 @@ import { ENGE_ARTEN, scanneQueryKeys, type Fund } from './queryKeyScan';
  * (b) Jeder managed Key ist GENAU einmal klassifiziert: entweder live (invalidiert
  *     durch ein Wire-Event in EINSATZ_STREAM_EVENTS) oder bewusst NICHT_LIVE.
  * (d) Das `befehl`-Wire-Event ist live angebunden.
- * (e) Org-scoped Keys existieren nicht in zwei Schreibweisen.
  * (f) Jeder Inline-Query-Key außerhalb des Registry steht auf der Migrations-Allowlist.
  *
  * ERKENNUNG seit LFH-312: TS-AST statt zeilenlokaler Regex (siehe `queryKeyScan.ts`, dort auch
@@ -21,7 +20,12 @@ import { ENGE_ARTEN, scanneQueryKeys, type Fund } from './queryKeyScan';
  * `istKommentarzeile`-Heuristik ist ersatzlos entfallen.
  *
  * VERHALTENSGLEICHHEIT der Umstellung wurde GEMESSEN, nicht behauptet: der weitere AST-Radius
- * findet im Bestand exakt dieselbe (leere) Verstoßmenge für (a) und (e) wie die alte Regex.
+ * fand im Bestand exakt dieselbe (leere) Verstoßmenge wie die alte Regex.
+ *
+ * Guard (c) ist in (a) aufgegangen (LFH-312), Guard (e) in (f) (LFH-307): (e) verbot EIN
+ * bekanntes camelCase-Literal, (f) verbietet generisch jedes nicht registrierte Prefix und
+ * deckt den Fall damit mit ab. Belegt per Mutationsprobe, nicht per Argument — `['orgModul-
+ * Einstellungen']` in einer Produktionsdatei macht (f) rot.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────
  * WAS DIESER GUARD NICHT SIEHT — bewusste Grenzen, damit die nächste Session nicht raten muss:
@@ -34,8 +38,10 @@ import { ENGE_ARTEN, scanneQueryKeys, type Fund } from './queryKeyScan';
  *     Bestand existiert genau EIN Key-Helfer (`live/useEinsatzLiveStream.ts`).
  *  2. LAUFZEIT-KOMPOSITION jenseits von Template-Literalen — `[praefix + '-liste', id]` oder
  *     ein aus einer Map gelesener Prefix. Position 0 ist dann kein String-Literal.
- *  3. DIE BUG-KLASSE hinter Guard (e): „derselbe Loader hängt an zwei Keys". Verboten ist ein
- *     bekanntes Literal, nicht das Muster. Löst erst die ORG_KEYS-Registry (LFH-307) ab.
+ *  3. DIE BUG-KLASSE „derselbe Loader hängt an zwei Keys". Seit LFH-307 kann sie nur noch
+ *     INNERHALB der Registry entstehen (zwei Accessoren, ein Datensatz) — von außen ist sie
+ *     zu, weil jeder Inline-Key auffliegt. Ein Guard dafür bräuchte Wissen über den `queryFn`,
+ *     nicht über den Key.
  *  4. OB EIN KEY FACHLICH RICHTIG IST. Der Guard prüft Herkunft und Schreibweise, nicht, ob
  *     der invalidierte Prefix zum geänderten Datenobjekt passt.
  *
@@ -104,9 +110,23 @@ const zeige = (f: Fund): string => `${f.pfad}:${f.zeile}  '${f.prefix}' [${f.art
  * Durchfall, den dieser Guard verhindern soll.
  */
 describe('queryKeys-Guard: der Scan läuft überhaupt', () => {
-  it('scannt Dateien und findet die erwartete Größenordnung an Query-Keys', () => {
+  it('scannt Dateien und findet Array-Literale', () => {
     expect(Object.keys(dateien).length).toBeGreaterThan(200);
-    expect(ENGE_FUNDE.length).toBeGreaterThan(50);
+    // Untere Schranke auf der WEITEN Menge, NICHT auf der engen. Bis LFH-307 waren hier >50
+    // enge Funde (die 90 Inline-Query-Keys) die Lebendprobe; nach der vollständigen Migration
+    // ist die enge Menge legitim LEER, und dieselbe Schranke wäre dauerhaft rot. Sie ersatzlos
+    // zu streichen hätte aber den Vakuitätsschutz mitgenommen — alle „für jeden Fund gilt …"-
+    // Guards wären über einer leeren Menge trivial wahr, auch bei kaputtem Glob. Die weite
+    // Menge (gewöhnliche String-Arrays im Code) bleibt dauerhaft gut gefüllt und taugt deshalb
+    // als Lebendprobe, während die enge Menge zur Aussage „nichts umgeht die Registry" wird.
+    expect(FUNDE.length).toBeGreaterThan(50);
+  });
+
+  it('findet nach der LFH-307-Migration KEINEN Inline-Query-Key mehr', () => {
+    // Der Zielzustand, positiv formuliert: die enge Menge ist leer. Guard (f) unten sagt
+    // dasselbe über die Allowlist; dieser Test macht den erreichten Endstand explizit, damit
+    // ein Rückfall nicht bloß als „ein Eintrag mehr in einer Liste" durchgeht.
+    expect(ENGE_FUNDE.map(zeige)).toEqual([]);
   });
 });
 
@@ -164,36 +184,6 @@ describe('queryKeys-Guard (d): befehl-Wire-Event ist live (LFH-262/F13)', () => 
 });
 
 /**
- * Guard (e, F27/LFH-269): org-scoped Keys dürfen nicht in zwei Schreibweisen existieren.
- *
- * Anlass ist ein realer Split-Cache-Bug: `ladeOrgModulEinstellungen` hing an
- * `['orgModulEinstellungen']` (EinsatzEinstellungenPage) UND an `['org-modul-einstellungen']`
- * (EinsatzDefaults). Zwei Cache-Einträge für denselben Datensatz — die Mutation invalidierte
- * nur ihre eigene Hälfte, die Einsatz-Einstellungsseite zeigte danach stale Rollen-Defaults.
- *
- * Kanonisch ist die kebab-Schreibweise (entspricht dem Endpoint /api/org-modul-einstellungen).
- *
- * GRENZE dieses Guards, bewusst: er verbietet EIN bekanntes Literal, nicht die Bug-KLASSE
- * („derselbe Loader hängt an zwei Keys"). Der AST-Umbau (LFH-312) hat die ERKENNUNG präzisiert,
- * nicht diese Grenze aufgehoben — sie löst erst die ORG_KEYS-Registry aus LFH-307 ab, die
- * org-scoped Keys überhaupt erst enumerierbar macht.
- */
-describe('queryKeys-Guard (e): keine Doppel-Schreibweise org-scoped Keys (F27)', () => {
-  // Verbotenes Literal → kanonische Schreibweise.
-  const VERBOTEN = new Map([['orgModulEinstellungen', 'org-modul-einstellungen']]);
-
-  it('findet keine camelCase-Variante eines org-scoped Query-Keys', () => {
-    const verstoesse = FUNDE.filter((f) => VERBOTEN.has(f.prefix)).map(
-      (f) => `${f.pfad}:${f.zeile}  '${f.prefix}' → '${VERBOTEN.get(f.prefix)}'`,
-    );
-    expect(
-      verstoesse,
-      `Doppel-Schreibweise eines org-scoped Query-Keys gefunden (Split-Cache: derselbe Loader landet in zwei Cache-Namespaces, die Invalidierung trifft nur eine Hälfte):\n${verstoesse.join('\n')}`,
-    ).toEqual([]);
-  });
-});
-
-/**
  * Guard (f, LFH-312/AP4): Allowlist statt Denylist für Inline-Query-Keys.
  *
  * Die Guards (a)/(c)/(e) waren DENYLISTS — sie verbieten benannte Literale. Ein NEUER
@@ -210,30 +200,7 @@ describe('queryKeys-Guard (e): keine Doppel-Schreibweise org-scoped Keys (F27)',
  * 22 distinkte Prefixe), nicht abgeschrieben. Er ist disjunkt zu MANAGED/SCHATTEN/VERBOTEN —
  * ein managed Key kann hier also nicht versehentlich freigekauft werden (Test unten).
  */
-const QUERY_KEY_ALLOWLIST: readonly string[] = [
-  'admin-karte',
-  'auth-provider',
-  'benutzer',
-  'einheit-typen',
-  'einsaetze',
-  'etb-bausteine',
-  'fachebene',
-  'fahrzeug-status',
-  'fahrzeug-vorschlaege',
-  'fahrzeuge',
-  'karte-config',
-  'material',
-  'material-kategorien',
-  'org-einstellungen',
-  'org-modul-einstellungen',
-  'organisation',
-  'personal',
-  'personal-status',
-  'personal-vorschlaege',
-  'qualifikationen',
-  'sprechgruppen',
-  'stichwort-vorschlaege',
-];
+const QUERY_KEY_ALLOWLIST: readonly string[] = [];
 
 describe('queryKeys-Guard (f): Inline-Query-Keys nur laut Allowlist (LFH-312)', () => {
   const erlaubt = new Set(QUERY_KEY_ALLOWLIST);

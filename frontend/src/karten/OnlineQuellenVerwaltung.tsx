@@ -7,6 +7,7 @@ import { listeOnlineQuellen, loescheOnlineQuelle, type OnlineQuelle } from '../a
 import { invalidiereKarte } from './invalidiereKarte';
 import OnlineQuelleFormModal from './OnlineQuelleFormModal';
 import AusKatalogModal from './AusKatalogModal';
+import { globalKeys } from '../api/queryKeys';
 
 /**
  * Verwaltungstabelle der Online-Basemap-Quellen. Lesen für alle Admin-Bereichs-
@@ -22,7 +23,7 @@ export default function OnlineQuellenVerwaltung() {
   const [katalogOffen, setKatalogOffen] = useState(false);
 
   const quellenQuery = useQuery({
-    queryKey: ['admin-karte', 'online-quellen'],
+    queryKey: globalKeys.adminKarteBereich('online-quellen'),
     queryFn: listeOnlineQuellen,
   });
   // Stabile Identität (react-query liefert data referenz-stabil) → der Set-useMemo unten

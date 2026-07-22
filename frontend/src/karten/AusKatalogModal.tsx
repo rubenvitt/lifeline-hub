@@ -5,6 +5,7 @@ import { ApiError } from '../api/client';
 import type { OnlineStyle } from '../api/karte';
 import { ladeOnlineQuellenKatalog, legeOnlineQuelleAn, type OnlineQuelleBody } from '../api/onlineQuellen';
 import { invalidiereKarte } from './invalidiereKarte';
+import { globalKeys } from '../api/queryKeys';
 
 /**
  * Server-autoritativer Vorschlagskatalog: listet kuratierte Online-Styles, je
@@ -27,7 +28,7 @@ export default function AusKatalogModal({
   const { message } = App.useApp();
 
   const katalogQuery = useQuery({
-    queryKey: ['admin-karte', 'katalog'],
+    queryKey: globalKeys.adminKarteBereich('katalog'),
     queryFn: ladeOnlineQuellenKatalog,
     enabled: offen,
   });

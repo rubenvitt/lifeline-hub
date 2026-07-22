@@ -15,7 +15,7 @@ import {
 } from '../api/einsatzFahrzeuge';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { ApiError } from '../api/client';
-import { einsatzKeys } from '../api/queryKeys';
+import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzFahrzeug, EinsatzPersonal, Staerke, StatusKategorie } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 
@@ -146,8 +146,8 @@ export default function FahrzeugePage() {
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
   });
-  const statusQuery = useQuery({ queryKey: ['fahrzeug-status'], queryFn: listeFahrzeugStatus });
-  const poolQuery = useQuery({ queryKey: ['fahrzeuge', 'im-dienst'], queryFn: () => listeFahrzeuge(true) });
+  const statusQuery = useQuery({ queryKey: globalKeys.fahrzeugStatus(), queryFn: listeFahrzeugStatus });
+  const poolQuery = useQuery({ queryKey: globalKeys.fahrzeugeListe('im-dienst'), queryFn: () => listeFahrzeuge(true) });
   const personalQuery = useQuery({
     queryKey: einsatzKeys.personal(einsatzId),
     queryFn: () => listeEinsatzPersonal(einsatzId),

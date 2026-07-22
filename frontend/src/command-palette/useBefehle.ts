@@ -6,7 +6,7 @@ import { useAuth } from '../auth/AuthContext';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import { listeEinsaetze, ladeModulOverrides, ladeEinsatz } from '../api/einsaetze';
-import { einsatzKeys } from '../api/queryKeys';
+import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { setzeOverride } from '../anzeige/koordinatenSystemStore';
 import { einsatzIdAusPfad } from './einsatzPfad';
 import { baueBefehle } from './befehle';
@@ -20,7 +20,7 @@ export function useBefehle(): Befehl[] {
   const { pathname } = useLocation();
   const einsatzId = einsatzIdAusPfad(pathname);
 
-  const { data: einsaetze = [] } = useQuery({ queryKey: ['einsaetze'], queryFn: listeEinsaetze });
+  const { data: einsaetze = [] } = useQuery({ queryKey: globalKeys.einsaetze(), queryFn: listeEinsaetze });
   const { data: overrides } = useQuery({
     queryKey: einsatzKeys.modulOverrides(einsatzId),
     queryFn: () => ladeModulOverrides(einsatzId!),

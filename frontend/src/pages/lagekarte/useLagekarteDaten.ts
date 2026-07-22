@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { einsatzKeys } from '../../api/queryKeys';
+import { einsatzKeys, globalKeys } from '../../api/queryKeys';
 import { ladeEinsatz, ladeEinstellungen } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
@@ -71,8 +71,8 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen }: LagekarteDatenArgs)
     queryKey: einsatzKeys.fuehrungskraefte(einsatzId),
     queryFn: () => listeFuehrungskraefte(einsatzId),
   });
-  const orgQuery = useQuery({ queryKey: ['organisation'], queryFn: ladeOrganisation });
-  const configQuery = useQuery({ queryKey: ['karte-config'], queryFn: ladeKarteConfig });
+  const orgQuery = useQuery({ queryKey: globalKeys.organisation(), queryFn: ladeOrganisation });
+  const configQuery = useQuery({ queryKey: globalKeys.karteConfig(), queryFn: ladeKarteConfig });
   // Einsatz-Einstellungen als Karten-Defaults (LFH-131): Basemap-Vorwahl + Lage-Layer.
   // Geteilter queryKey mit Einstellungen-Seite/Redirect → i. d. R. bereits gecacht.
   const einstellungenQuery = useQuery({

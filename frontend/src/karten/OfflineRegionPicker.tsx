@@ -19,6 +19,7 @@ import {
 } from '../api/offlineKarten';
 import { invalidiereKarte } from './invalidiereKarte';
 import { formatGroesse } from './formatGroesse';
+import { globalKeys } from '../api/queryKeys';
 
 /** Bau-Status, während derer gepollt wird (2 s). */
 const AKTIVE_BAU_STATUS: BauStatus[] = ['queued', 'building', 'uploading', 'publishing'];
@@ -71,28 +72,28 @@ export default function OfflineRegionPicker({
   // Bereits verarbeitete Bau-Jobs (per id) — verhindert Doppel-Downloads über die Poll-Zyklen.
   const verarbeitet = useRef<Set<number>>(new Set());
 
-  const configQuery = useQuery({ queryKey: ['karte-config'], queryFn: ladeKarteConfig });
+  const configQuery = useQuery({ queryKey: globalKeys.karteConfig(), queryFn: ladeKarteConfig });
   const bauVerfuegbar = configQuery.data?.karten_bau_verfuegbar ?? false;
 
   const regionenQuery = useQuery({
-    queryKey: ['admin-karte', 'baubare-regionen'],
+    queryKey: globalKeys.adminKarteBereich('baubare-regionen'),
     queryFn: ladeBaubareRegionen,
     enabled: offen && bauVerfuegbar,
   });
   const katalogQuery = useQuery({
-    queryKey: ['admin-karte', 'offline-katalog'],
+    queryKey: globalKeys.adminKarteBereich('offline-katalog'),
     queryFn: () => ladeOfflineKatalog(),
     enabled: offen,
   });
   const kartenQuery = useQuery({
-    queryKey: ['admin-karte', 'offline-karten'],
+    queryKey: globalKeys.adminKarteBereich('offline-karten'),
     queryFn: listeOfflineKarten,
     enabled: offen,
     refetchInterval: (query) =>
       query.state.data?.some((k) => k.status === 'laedt' || k.geladen != null) ? 2000 : false,
   });
   const bauStatusQuery = useQuery({
-    queryKey: ['admin-karte', 'bau-status'],
+    queryKey: globalKeys.adminKarteBereich('bau-status'),
     // Auch bei geschlossenem Modal pollen, solange eine Verkettung auf ihren „fertig"-Übergang wartet
     // (der Picker bleibt im Host gemountet → der Bau→Download-Fluss überlebt das Schließen).
     enabled: (offen || verkettung.size > 0) && bauVerfuegbar,
@@ -126,7 +127,7 @@ export default function OfflineRegionPicker({
     mutationFn: ({ slug }: { slug: string; name: string }) => starteRegionBau(slug),
     onSuccess: (_res, { slug, name }) => {
       setVerkettung((prev) => new Map(prev).set(slug, name));
-      qc.invalidateQueries({ queryKey: ['admin-karte', 'bau-status'] });
+      qc.invalidateQueries({ queryKey: globalKeys.adminKarteBereich('bau-status') });
       message.success('Bau gestartet — die Region wird danach automatisch geladen');
     },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Bau konnte nicht gestartet werden'),
@@ -153,7 +154,7 @@ export default function OfflineRegionPicker({
             } else {
               message.warning(`${name}: gebaut, aber noch nicht im Katalog gefunden`);
             }
-            qc.setQueryData(['admin-karte', 'offline-katalog'], frisch);
+            qc.setQueryData(globalKeys.adminKarteBereich('offline-katalog'), frisch);
           })
           .finally(() => entfernen(slug));
       } else if (job.status.status === 'failed') {

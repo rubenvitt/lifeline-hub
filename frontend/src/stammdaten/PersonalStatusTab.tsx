@@ -8,6 +8,7 @@ import {
   aktualisiereStatus, deaktiviereStatus, legeStatusAn, listePersonalStatus, type StatusEingabe,
 } from '../api/personalStatus';
 import type { PersonalStatus, StatusKategorie } from '../api/types';
+import { globalKeys } from '../api/queryKeys';
 
 const KATEGORIE_LABELS: Record<StatusKategorie, string> = {
   verfuegbar: 'verfügbar',
@@ -36,7 +37,7 @@ export default function PersonalStatusTab() {
   const [modalOffen, setModalOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<PersonalStatus | null>(null);
 
-  const statusQuery = useQuery({ queryKey: ['personal-status'], queryFn: listePersonalStatus });
+  const statusQuery = useQuery({ queryKey: globalKeys.personalStatus(), queryFn: listePersonalStatus });
 
   const speichern = useMutation({
     mutationFn: (werte: FormWerte) => {
@@ -48,13 +49,13 @@ export default function PersonalStatusTab() {
       };
       return bearbeite ? aktualisiereStatus(bearbeite.id, daten) : legeStatusAn(daten);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['personal-status'] }); setModalOffen(false); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: globalKeys.personalStatus() }); setModalOffen(false); },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
   });
 
   const deaktivieren = useMutation({
     mutationFn: (id: number) => deaktiviereStatus(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['personal-status'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.personalStatus() }),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
   });
 

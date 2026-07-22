@@ -12,7 +12,7 @@ import {
   listeEinsatzMaterial, type MaterialAdhocEingabe,
 } from '../api/einsatzMaterial';
 import { ApiError } from '../api/client';
-import { einsatzKeys } from '../api/queryKeys';
+import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzMaterial, MaterialStatus } from '../api/types';
 
 const STATUS_META: Record<MaterialStatus, { label: string; color: string }> = {
@@ -62,7 +62,7 @@ export default function MaterialPage() {
     queryKey: einsatzKeys.material(einsatzId),
     queryFn: () => listeEinsatzMaterial(einsatzId),
   });
-  const poolQuery = useQuery({ queryKey: ['material', 'im-dienst'], queryFn: () => listeMaterial(true) });
+  const poolQuery = useQuery({ queryKey: globalKeys.materialListe('im-dienst'), queryFn: () => listeMaterial(true) });
 
   function invalidate() {
     qc.invalidateQueries({ queryKey: einsatzKeys.material(einsatzId) });

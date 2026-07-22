@@ -6,6 +6,7 @@ import { ApiError } from '../api/client';
 import { deaktiviereSprechgruppe, listeSprechgruppen } from '../api/sprechgruppen';
 import type { Sprechgruppe } from '../api/types';
 import SprechgruppeFormModal from './SprechgruppeFormModal';
+import { globalKeys } from '../api/queryKeys';
 
 export default function SprechgruppenTab() {
   const { benutzer } = useAuth();
@@ -16,13 +17,13 @@ export default function SprechgruppenTab() {
   const [bearbeite, setBearbeite] = useState<Sprechgruppe | null>(null);
 
   const sprechgruppenQuery = useQuery({
-    queryKey: ['sprechgruppen', 'alle'],
+    queryKey: globalKeys.sprechgruppenAlle(),
     queryFn: () => listeSprechgruppen(false),
   });
 
   const deaktivierenMutation = useMutation({
     mutationFn: (id: number) => deaktiviereSprechgruppe(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sprechgruppen', 'alle'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.sprechgruppenAlle() }),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
   });
 

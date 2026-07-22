@@ -3,12 +3,13 @@ import { DownOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { listeEinsaetze } from '../api/einsaetze';
+import { globalKeys } from '../api/queryKeys';
 
 /** Switcher im Einsatz-Header: aktive Einsätze + Rückwege. */
 export default function EinsatzSwitcher({ aktuellName }: { aktuellName: string }) {
   const navigate = useNavigate();
   const { data: einsaetze = [] } = useQuery({
-    queryKey: ['einsaetze'],
+    queryKey: globalKeys.einsaetze(),
     queryFn: listeEinsaetze,
   });
 

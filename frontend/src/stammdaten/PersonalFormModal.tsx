@@ -7,6 +7,7 @@ import { aktualisierePerson, legePersonAn, POSITION_OPTIONEN, type PersonalEinga
 import { listeQualifikationen } from '../api/qualifikationen';
 import { listeBenutzer } from '../api/benutzer';
 import type { Personal, PersonalVorschlaege, StaerkePosition } from '../api/types';
+import { globalKeys } from '../api/queryKeys';
 
 interface FormWerte {
   name: string;
@@ -39,8 +40,8 @@ export default function PersonalFormModal({
   const qc = useQueryClient();
   const { message } = App.useApp();
 
-  const qualQuery = useQuery({ queryKey: ['qualifikationen'], queryFn: listeQualifikationen });
-  const benutzerQuery = useQuery({ queryKey: ['benutzer'], queryFn: listeBenutzer });
+  const qualQuery = useQuery({ queryKey: globalKeys.qualifikationen(), queryFn: listeQualifikationen });
+  const benutzerQuery = useQuery({ queryKey: globalKeys.benutzer(), queryFn: listeBenutzer });
 
   useEffect(() => {
     if (!offen) return;
@@ -76,8 +77,8 @@ export default function PersonalFormModal({
       return person ? aktualisierePerson(person.id, daten) : legePersonAn(daten);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['personal'] });
-      qc.invalidateQueries({ queryKey: ['personal-vorschlaege'] });
+      qc.invalidateQueries({ queryKey: globalKeys.personal() });
+      qc.invalidateQueries({ queryKey: globalKeys.personalVorschlaege() });
       onClose();
     },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),

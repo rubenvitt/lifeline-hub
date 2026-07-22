@@ -15,6 +15,7 @@ import {
   type PatchBenutzer,
 } from '../api/benutzer';
 import { useAuth } from '../auth/AuthContext';
+import { globalKeys } from '../api/queryKeys';
 
 interface BearbeitenWerte {
   anzeigename: string;
@@ -41,7 +42,7 @@ export default function BenutzerPage() {
   const [editForm] = Form.useForm<BearbeitenWerte>();
 
   const { data: benutzerListe = [], isLoading } = useQuery({
-    queryKey: ['benutzer'],
+    queryKey: globalKeys.benutzer(),
     queryFn: listeBenutzer,
   });
 
@@ -50,14 +51,14 @@ export default function BenutzerPage() {
     onSuccess: () => {
       setOffen(false);
       form.resetFields();
-      qc.invalidateQueries({ queryKey: ['benutzer'] });
+      qc.invalidateQueries({ queryKey: globalKeys.benutzer() });
     },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Anlegen fehlgeschlagen'),
   });
 
   const deaktivieren = useMutation({
     mutationFn: (id: number) => deaktiviereBenutzer(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['benutzer'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.benutzer() }),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
   });
 
@@ -65,7 +66,7 @@ export default function BenutzerPage() {
     mutationFn: ({ id, patch }: { id: number; patch: PatchBenutzer }) => bearbeiteBenutzer(id, patch),
     onSuccess: () => {
       setZuBearbeiten(null);
-      qc.invalidateQueries({ queryKey: ['benutzer'] });
+      qc.invalidateQueries({ queryKey: globalKeys.benutzer() });
     },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
   });

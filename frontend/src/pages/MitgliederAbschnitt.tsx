@@ -7,7 +7,7 @@ import type { EinsatzRolle, MitgliedAnzeige } from '../api/types';
 import { ApiError } from '../api/client';
 import { entferneMitglied, ladeMitglieder, setzeMitglied } from '../api/einsaetze';
 import { listeBenutzer } from '../api/benutzer';
-import { einsatzKeys } from '../api/queryKeys';
+import { einsatzKeys, globalKeys } from '../api/queryKeys';
 
 const ROLLEN: { value: EinsatzRolle; label: string }[] = [
   { value: 'einsatzleitung', label: 'Einsatzleitung' },
@@ -31,7 +31,7 @@ export default function MitgliederAbschnitt({ einsatzId, darfVerwalten }: Props)
     queryFn: () => ladeMitglieder(einsatzId),
   });
   const benutzerQuery = useQuery({
-    queryKey: ['benutzer'],
+    queryKey: globalKeys.benutzer(),
     queryFn: listeBenutzer,
     enabled: darfVerwalten,
   });

@@ -11,6 +11,7 @@ import {
   listeQualifikationen, type QualifikationEingabe,
 } from '../api/qualifikationen';
 import type { Qualifikation } from '../api/types';
+import { globalKeys } from '../api/queryKeys';
 
 interface FormWerte {
   label: string;
@@ -26,20 +27,20 @@ export default function QualifikationenTab() {
   const [modalOffen, setModalOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<Qualifikation | null>(null);
 
-  const query = useQuery({ queryKey: ['qualifikationen'], queryFn: listeQualifikationen });
+  const query = useQuery({ queryKey: globalKeys.qualifikationen(), queryFn: listeQualifikationen });
 
   const speichern = useMutation({
     mutationFn: (werte: FormWerte) => {
       const daten: QualifikationEingabe = { label: werte.label.trim(), sortier: werte.sortier ?? 0 };
       return bearbeite ? aktualisiereQualifikation(bearbeite.id, daten) : legeQualifikationAn(daten);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['qualifikationen'] }); setModalOffen(false); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: globalKeys.qualifikationen() }); setModalOffen(false); },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),
   });
 
   const deaktivieren = useMutation({
     mutationFn: (id: number) => deaktiviereQualifikation(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['qualifikationen'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.qualifikationen() }),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
   });
 

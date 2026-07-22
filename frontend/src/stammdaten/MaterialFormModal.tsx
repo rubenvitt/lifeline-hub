@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
 import { aktualisiereMaterial, legeMaterialAn, type MaterialEingabe } from '../api/material';
 import type { Material } from '../api/types';
+import { globalKeys } from '../api/queryKeys';
 
 interface FormWerte {
   bezeichnung: string;
@@ -63,8 +64,8 @@ export default function MaterialFormModal({
       return material ? aktualisiereMaterial(material.id, daten) : legeMaterialAn(daten);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['material'] });
-      qc.invalidateQueries({ queryKey: ['material-kategorien'] });
+      qc.invalidateQueries({ queryKey: globalKeys.material() });
+      qc.invalidateQueries({ queryKey: globalKeys.materialKategorien() });
       onClose();
     },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),

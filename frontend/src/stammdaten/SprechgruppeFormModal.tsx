@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
 import { aktualisiereSprechgruppe, legeSprechgruppeAn } from '../api/sprechgruppen';
 import type { Betriebsart, Sprechgruppe } from '../api/types';
+import { globalKeys } from '../api/queryKeys';
 
 interface FormWerte {
   bezeichnung: string;
@@ -55,7 +56,7 @@ export default function SprechgruppeFormModal({
         : legeSprechgruppeAn(eingabe);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['sprechgruppen', 'alle'] });
+      qc.invalidateQueries({ queryKey: globalKeys.sprechgruppenAlle() });
       onClose();
     },
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Speichern fehlgeschlagen'),

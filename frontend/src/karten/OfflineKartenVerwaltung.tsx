@@ -25,6 +25,7 @@ import { formatGroesse } from './formatGroesse';
 import OfflineDownloadUrlModal from './OfflineDownloadUrlModal';
 import OfflineRegionPicker from './OfflineRegionPicker';
 import OfflineVorhandeneModal from './OfflineVorhandeneModal';
+import { globalKeys } from '../api/queryKeys';
 
 /** Bau-Status-Werte, während derer die Bau-Status-Zeile pollt (2 s) — analog Download-Polling. */
 const AKTIVE_BAU_STATUS: BauStatus[] = ['queued', 'building', 'uploading', 'publishing'];
@@ -67,11 +68,11 @@ export default function OfflineKartenVerwaltung() {
 
   // Geteilter Config-Key mit der LagekartePage (`ladeKarteConfig`) — Feature-Flag für die
   // Bau-UI (LFH-203, B1: `karten_bau_verfuegbar`). `invalidiereKarte` invalidiert diesen Key mit.
-  const configQuery = useQuery({ queryKey: ['karte-config'], queryFn: ladeKarteConfig });
+  const configQuery = useQuery({ queryKey: globalKeys.karteConfig(), queryFn: ladeKarteConfig });
   const bauVerfuegbar = configQuery.data?.karten_bau_verfuegbar ?? false;
 
   const bauStatusQuery = useQuery({
-    queryKey: ['admin-karte', 'bau-status'],
+    queryKey: globalKeys.adminKarteBereich('bau-status'),
     queryFn: ladeBauStatus,
     enabled: istAdmin && bauVerfuegbar,
     // Verschachtelter Status (`j.status.status`) — der karten-service reicht ihn roh durch.
@@ -84,7 +85,7 @@ export default function OfflineKartenVerwaltung() {
   );
 
   const kartenQuery = useQuery({
-    queryKey: ['admin-karte', 'offline-karten'],
+    queryKey: globalKeys.adminKarteBereich('offline-karten'),
     queryFn: listeOfflineKarten,
     // Polling: solange irgendeine Karte lädt ODER in-place aktualisiert (Zeile bleibt 'bereit', hat
     // aber laufenden Fortschritt), alle 2 s neu laden — sonst aus.

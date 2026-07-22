@@ -7,6 +7,7 @@ import { deaktiviereBaustein, listeBausteine } from '../api/etbBaustein';
 import type { EtbBaustein } from '../api/types';
 import { TYP_LABEL } from '../etb/typFarben';
 import EtbBausteinFormModal from './EtbBausteinFormModal';
+import { globalKeys } from '../api/queryKeys';
 
 export default function EtbBausteineTab() {
   const { benutzer } = useAuth();
@@ -16,11 +17,11 @@ export default function EtbBausteineTab() {
   const [modalOffen, setModalOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<EtbBaustein | null>(null);
 
-  const query = useQuery({ queryKey: ['etb-bausteine'], queryFn: listeBausteine });
+  const query = useQuery({ queryKey: globalKeys.etbBausteine(), queryFn: listeBausteine });
 
   const deaktivieren = useMutation({
     mutationFn: (id: number) => deaktiviereBaustein(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['etb-bausteine'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.etbBausteine() }),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Deaktivieren fehlgeschlagen'),
   });
 

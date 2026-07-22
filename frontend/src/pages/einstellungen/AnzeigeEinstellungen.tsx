@@ -6,6 +6,7 @@ import { ApiError } from '../../api/client';
 import AdminPage from '../../components/AdminPage';
 import { useAuth } from '../../auth/AuthContext';
 import type { EinheitenSystem, Koordinatenformat, Zeitformat } from '../../api/types';
+import { globalKeys } from '../../api/queryKeys';
 import {
   type FormWerteAnzeige,
   initialAnzeige,
@@ -51,7 +52,7 @@ export default function AnzeigeEinstellungen() {
   const istAdmin = benutzer?.system_rolle === 'admin';
 
   const einstellungenQuery = useQuery({
-    queryKey: ['org-einstellungen'],
+    queryKey: globalKeys.orgEinstellungen(),
     queryFn: ladeOrgEinstellungen,
   });
 
@@ -61,7 +62,7 @@ export default function AnzeigeEinstellungen() {
     mutationFn: (felder: Parameters<typeof speichereOrgEinstellungen>[0]) =>
       speichereOrgEinstellungen(felder),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['org-einstellungen'] });
+      qc.invalidateQueries({ queryKey: globalKeys.orgEinstellungen() });
       message.success('Einstellungen gespeichert');
     },
     onError: (e) =>

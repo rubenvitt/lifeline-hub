@@ -7,6 +7,7 @@ import type { EinsatzAnzeige } from '../api/types';
 import { ApiError } from '../api/client';
 import { legeEinsatzAn, listeEinsaetze } from '../api/einsaetze';
 import { useAuth } from '../auth/AuthContext';
+import { globalKeys } from '../api/queryKeys';
 
 const STATUS_FARBE: Record<string, string> = { aktiv: 'green', abgeschlossen: 'default' };
 
@@ -21,7 +22,7 @@ export default function EinsaetzePage() {
   const darfAnlegen = benutzer?.system_rolle === 'admin' || benutzer?.org_rolle === 'fuehrungskraft';
 
   const { data: einsaetze = [], isLoading } = useQuery({
-    queryKey: ['einsaetze'],
+    queryKey: globalKeys.einsaetze(),
     queryFn: listeEinsaetze,
   });
 
@@ -31,7 +32,7 @@ export default function EinsaetzePage() {
     onSuccess: (neuerEinsatz) => {
       form.resetFields();
       setDialogOffen(false);
-      qc.invalidateQueries({ queryKey: ['einsaetze'] });
+      qc.invalidateQueries({ queryKey: globalKeys.einsaetze() });
       navigate(`/einsaetze/${neuerEinsatz.id}`);
     },
     onError: (e) =>

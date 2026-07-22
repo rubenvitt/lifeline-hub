@@ -6,6 +6,7 @@ import { ApiError } from '../api/client';
 import { listeKategorien, listeMaterial, setzeDienststatus } from '../api/material';
 import type { Material } from '../api/types';
 import MaterialFormModal from './MaterialFormModal';
+import { globalKeys } from '../api/queryKeys';
 
 export default function MaterialTab() {
   const { benutzer } = useAuth();
@@ -15,12 +16,12 @@ export default function MaterialTab() {
   const [modalOffen, setModalOffen] = useState(false);
   const [bearbeite, setBearbeite] = useState<Material | null>(null);
 
-  const materialQuery = useQuery({ queryKey: ['material', 'alle'], queryFn: () => listeMaterial(false) });
-  const kategorienQuery = useQuery({ queryKey: ['material-kategorien'], queryFn: listeKategorien });
+  const materialQuery = useQuery({ queryKey: globalKeys.materialListe('alle'), queryFn: () => listeMaterial(false) });
+  const kategorienQuery = useQuery({ queryKey: globalKeys.materialKategorien(), queryFn: listeKategorien });
 
   const dienststatusMutation = useMutation({
     mutationFn: (v: { id: number; inDienst: boolean }) => setzeDienststatus(v.id, v.inDienst),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['material'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.material() }),
     onError: (e) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
   });
 

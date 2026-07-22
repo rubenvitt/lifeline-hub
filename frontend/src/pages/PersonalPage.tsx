@@ -17,7 +17,7 @@ import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { einheitenPfad, fahrzeugePfad } from '../routing/deeplinks';
 import { ApiError } from '../api/client';
-import { einsatzKeys } from '../api/queryKeys';
+import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzPersonal, StaerkePosition, StatusKategorie } from '../api/types';
 
 const KATEGORIE_FALLBACK: Record<StatusKategorie, string> = {
@@ -47,8 +47,8 @@ export default function PersonalPage() {
     queryKey: einsatzKeys.personal(einsatzId),
     queryFn: () => listeEinsatzPersonal(einsatzId),
   });
-  const statusQuery = useQuery({ queryKey: ['personal-status'], queryFn: listePersonalStatus });
-  const poolQuery = useQuery({ queryKey: ['personal', 'im-dienst'], queryFn: () => listePersonal(true) });
+  const statusQuery = useQuery({ queryKey: globalKeys.personalStatus(), queryFn: listePersonalStatus });
+  const poolQuery = useQuery({ queryKey: globalKeys.personalListe('im-dienst'), queryFn: () => listePersonal(true) });
   // LFH-139: Struktur-Listen zum Auflösen von einheit_id/fahrzeug_id → Klartext-Label
   // (Gegenrichtung zur Fahrzeugseite). Reine Anzeige — keine eigene Backend-Erweiterung.
   const einheitenQuery = useQuery({
