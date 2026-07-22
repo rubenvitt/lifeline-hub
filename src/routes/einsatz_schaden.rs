@@ -135,25 +135,29 @@ pub async fn anlegen(
             ));
         }
     }
-    let typ = match body.typ.as_deref().and_then(SchadenTyp::parse) {
-        Some(t) => t,
-        None => {
-            return Err(AppError::UnprocessableEntity(
-                "Typ fehlt oder ist ungültig".into(),
-            ))
-        }
+    // Pflichtfeld-Prechecks (LFH-305): jeder Fall bewertet das Feld ISOLIERT → 400.
+    // Bewusst je zwei Zweige statt einer verschmolzenen Meldung — „Feld fehlt" und „Feld ist
+    // da, aber unbrauchbar" sind für den Client zwei verschiedene Korrekturen. Die Felder
+    // bleiben `Option<String>`: ein Wechsel auf `String` würde „fehlt" in den Extractor
+    // verschieben und damit die Meldung für bestehende API-Konsumenten ändern.
+    let Some(typ_roh) = body.typ.as_deref() else {
+        return Err(AppError::Validation("Typ ist Pflicht".into()));
     };
-    let ausmass = match body.ausmass.as_deref().and_then(Ausmass::parse) {
-        Some(a) => a,
-        None => {
-            return Err(AppError::UnprocessableEntity(
-                "Ausmaß fehlt oder ist ungültig".into(),
-            ))
-        }
+    let Some(typ) = SchadenTyp::parse(typ_roh) else {
+        return Err(AppError::Validation("Unbekannter Typ".into()));
     };
-    let ort = match trimme(body.ort.clone()) {
-        Some(o) => o,
-        None => return Err(AppError::UnprocessableEntity("Ort ist Pflicht".into())),
+    let Some(ausmass_roh) = body.ausmass.as_deref() else {
+        return Err(AppError::Validation("Ausmaß ist Pflicht".into()));
+    };
+    let Some(ausmass) = Ausmass::parse(ausmass_roh) else {
+        return Err(AppError::Validation("Unbekanntes Ausmaß".into()));
+    };
+    // Gleiches Muster wie im PATCH derselben Datei: fehlend ≠ vorhanden-aber-leer.
+    let Some(ort_roh) = body.ort.clone() else {
+        return Err(AppError::Validation("Ort ist Pflicht".into()));
+    };
+    let Some(ort) = trimme(Some(ort_roh)) else {
+        return Err(AppError::Validation("Ort darf nicht leer sein".into()));
     };
     let kontakt = trimme(body.geschaedigt_kontakt.clone());
 
@@ -513,13 +517,21 @@ pub async fn uebergeben(
     .await?;
     fordere_aktiv(&einsatz)?;
 
-    let adressat = match trimme(body.uebergeben_an.clone()) {
-        Some(a) => a,
-        None => {
-            return Err(AppError::UnprocessableEntity(
-                "Übergabe-Adressat ist Pflicht".into(),
-            ))
-        }
+    // LFH-305: DEDIZIERTER Aktions-Endpunkt — wer hierher POSTet, will übergeben, der
+    // Adressat ist also unbedingt Pflicht. Damit scheitert das Feld ISOLIERT → 400, in zwei
+    // Zweigen (fehlt / vorhanden aber leer).
+    // Abgrenzung zu `src/routes/einsatz_tier.rs`: dort ist `/status` der GENERISCHE
+    // Status-Endpunkt, an dem das Begleitfeld (Abschlussgrund) nur bei EINEM Zielstatus
+    // Pflicht ist — das bewertet den Zusammenhang und bleibt dort 422. Die beiden Stellen
+    // sehen ähnlich aus, sind es aber nicht: wer sie „harmonisiert", bricht einen gepinnten
+    // Test. Siehe auch `abschliessen` weiter unten.
+    let Some(adressat_roh) = body.uebergeben_an.clone() else {
+        return Err(AppError::Validation("Übergabe-Adressat ist Pflicht".into()));
+    };
+    let Some(adressat) = trimme(Some(adressat_roh)) else {
+        return Err(AppError::Validation(
+            "Übergabe-Adressat darf nicht leer sein".into(),
+        ));
     };
     let vorher = schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?; // 404
     if vorher.storniert_at.is_some() {
@@ -585,16 +597,27 @@ pub async fn abschliessen(
     .await?;
     fordere_aktiv(&einsatz)?;
 
-    let grund = match trimme(body.abschluss_grund.clone())
-        .as_deref()
-        .and_then(AbschlussGrund::parse)
-    {
-        Some(g) => g,
-        None => {
-            return Err(AppError::UnprocessableEntity(
-                "Abschlussgrund ist Pflicht und muss gültig sein".into(),
-            ))
-        }
+    // LFH-305: DEDIZIERTER Aktions-Endpunkt — wer hierher POSTet, will abschließen, der
+    // Abschlussgrund ist also unbedingt Pflicht. Damit scheitert das Feld ISOLIERT → 400, in
+    // drei Zweigen (fehlt / vorhanden aber leer / vorhanden aber unbekannt).
+    // Abgrenzung zu `src/routes/einsatz_tier.rs`: dort ist `/status` der GENERISCHE
+    // Status-Endpunkt, und der Grund ist nur bei Zielstatus "abgeschlossen" Pflicht — das
+    // bewertet den Zusammenhang und bleibt dort 422. Die beiden Stellen sehen ähnlich aus,
+    // sind es aber nicht: wer sie „harmonisiert", bricht einen gepinnten Test.
+    //
+    // Die Konvertierung nach `AbschlussGrund` bleibt bewusst VOR dem Repo-Aufruf
+    // (`schliesse_ab_tx` nimmt `&str` aus dem Enum) — ein unbekannter Wert kann die DB damit
+    // gar nicht erreichen.
+    let Some(grund_roh) = body.abschluss_grund.clone() else {
+        return Err(AppError::Validation("Abschlussgrund ist Pflicht".into()));
+    };
+    let Some(grund_norm) = trimme(Some(grund_roh)) else {
+        return Err(AppError::Validation(
+            "Abschlussgrund darf nicht leer sein".into(),
+        ));
+    };
+    let Some(grund) = AbschlussGrund::parse(&grund_norm) else {
+        return Err(AppError::Validation("Unbekannter Abschlussgrund".into()));
     };
     let notiz = trimme(body.notiz.clone());
     let vorher = schaden_repo::laden(&state.pool, einsatz_id, schaden_id).await?; // 404

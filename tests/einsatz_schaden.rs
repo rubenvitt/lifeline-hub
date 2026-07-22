@@ -218,8 +218,9 @@ async fn registriernr_fortlaufend_je_einsatz() {
     assert_eq!(v2["registrier_nr"], 2);
 }
 
+/// Fehlendes Pflichtfeld: das Feld ist für sich unbrauchbar → 400 (LFH-305).
 #[tokio::test]
-async fn anlegen_ohne_pflichtfelder_ist_422() {
+async fn anlegen_ohne_pflichtfelder_ist_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
@@ -228,7 +229,7 @@ async fn anlegen_ohne_pflichtfelder_ist_422() {
         json!({"typ":"sachschaden","ort":"X"}),
         json!({"typ":"sachschaden","ausmass":"gering"}),
     ] {
-        let (s, _) = anfrage(
+        let (s, v) = anfrage(
             &app,
             "POST",
             &format!("/api/einsaetze/{e}/schaeden"),
@@ -238,10 +239,105 @@ async fn anlegen_ohne_pflichtfelder_ist_422() {
         .await;
         assert_eq!(
             s,
-            StatusCode::UNPROCESSABLE_ENTITY,
-            "fehlt Pflichtfeld → 422: {body}"
+            StatusCode::BAD_REQUEST,
+            "fehlt Pflichtfeld → 400: {body} / {v:?}"
         );
     }
+}
+
+/// Vorhandenes, aber leeres Pflichtfeld → 400. Diesen Zweig erreicht
+/// `anlegen_ohne_pflichtfelder_ist_400` NICHT: dort fehlt das Feld ganz.
+///
+/// `"typ":""` landet bewusst im Unbekannt-Zweig (`SchadenTyp::parse` kennt den Leerstring
+/// nicht) — nur `ort` trennt „fehlt" und „ist leer" per eigener Meldung, weil nur dort ein
+/// beliebiger Freitext erlaubt ist.
+#[tokio::test]
+async fn anlegen_mit_leerem_pflichtfeld_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    for body in [
+        json!({"typ":"sachschaden","ausmass":"gering","ort":"   "}),
+        json!({"typ":"","ausmass":"gering","ort":"X"}),
+    ] {
+        let (s, v) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{e}/schaeden"),
+            &admin,
+            Some(&body),
+        )
+        .await;
+        assert_eq!(
+            s,
+            StatusCode::BAD_REQUEST,
+            "leeres Pflichtfeld → 400: {body} / {v:?}"
+        );
+    }
+}
+
+/// Unbekannter Enum-Wert beim Anlegen → 400 (Feld isoliert unbrauchbar).
+#[tokio::test]
+async fn anlegen_mit_unbekanntem_enum_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    for body in [
+        json!({"typ":"quatsch","ausmass":"gering","ort":"X"}),
+        json!({"typ":"sachschaden","ausmass":"quatsch","ort":"X"}),
+    ] {
+        let (s, v) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{e}/schaeden"),
+            &admin,
+            Some(&body),
+        )
+        .await;
+        assert_eq!(
+            s,
+            StatusCode::BAD_REQUEST,
+            "unbekannter Enum-Wert → 400: {body} / {v:?}"
+        );
+    }
+}
+
+/// Der eigentliche Beweis des Entwirrens (LFH-305): FEHLENDER und LEERER `ort` dürfen nicht
+/// dieselbe Meldung tragen. Ein bloßer 422→400-Flip der alten, verschmolzenen Prüfung käme
+/// mit EINER Meldung durch und würde von den Status-Asserts oben nicht bemerkt.
+#[tokio::test]
+async fn anlegen_meldung_trennt_fehlenden_und_leeren_ort() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let u = format!("/api/einsaetze/{e}/schaeden");
+
+    let (s_fehlt, v_fehlt) = anfrage(
+        &app,
+        "POST",
+        &u,
+        &admin,
+        Some(&json!({"typ":"sachschaden","ausmass":"gering"})),
+    )
+    .await;
+    let (s_leer, v_leer) = anfrage(
+        &app,
+        "POST",
+        &u,
+        &admin,
+        Some(&json!({"typ":"sachschaden","ausmass":"gering","ort":"   "})),
+    )
+    .await;
+
+    assert_ne!(
+        v_fehlt["error"], v_leer["error"],
+        "fehlender vs. leerer Ort muss unterschiedliche Meldungen liefern: \
+         {v_fehlt:?} / {v_leer:?}"
+    );
+    assert_eq!(v_fehlt["error"], "Ort ist Pflicht", "{v_fehlt:?}");
+    assert_eq!(v_leer["error"], "Ort darf nicht leer sein", "{v_leer:?}");
+    assert_eq!(s_fehlt, StatusCode::BAD_REQUEST);
+    assert_eq!(s_leer, StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]
@@ -282,13 +378,17 @@ async fn uebergeben_setzt_status_und_adressat() {
     assert!(v["uebergeben_at"].is_string());
 }
 
+/// `/uebergeben` ist ein DEDIZIERTER Aktions-Endpunkt, der Adressat ist dort unbedingt
+/// Pflicht → das Feld scheitert isoliert → 400 (LFH-305). Gegenstück mit bewusst anderem
+/// Code: `einsatz_tier.rs`/`status` (generischer Endpunkt, Grund nur bei Zielstatus
+/// „abgeschlossen" Pflicht → Zusammenhang → 422).
 #[tokio::test]
-async fn uebergeben_ohne_adressat_ist_422() {
+async fn uebergeben_ohne_adressat_ist_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    let (s, _) = anfrage(
+    let (s, v) = anfrage(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden/{sid}/uebergeben"),
@@ -296,7 +396,46 @@ async fn uebergeben_ohne_adressat_ist_422() {
         Some(&json!({})),
     )
     .await;
-    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{v:?}");
+    assert_eq!(v["error"], "Übergabe-Adressat ist Pflicht", "{v:?}");
+}
+
+/// Vorhandener, aber leerer Adressat → 400 mit EIGENER Meldung. Ohne diesen Zweig ginge der
+/// Leerstring durch: `migrations/0033` prüft nur `uebergeben_an IS NOT NULL`, `''` erfüllt
+/// das — die Route antwortete also 200 und nicht etwa 422.
+#[tokio::test]
+async fn uebergeben_mit_leerem_adressat_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
+    let u = format!("/api/einsaetze/{e}/schaeden/{sid}/uebergeben");
+
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &u,
+        &admin,
+        Some(&json!({"uebergeben_an":"   "})),
+    )
+    .await;
+    assert_eq!(
+        v["error"], "Übergabe-Adressat darf nicht leer sein",
+        "{v:?}"
+    );
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{v:?}");
+
+    // Positiv-Zweig: gültiger Adressat wird getrimmt gespeichert.
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &u,
+        &admin,
+        Some(&json!({"uebergeben_an":"  Stadtwerke  "})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    assert_eq!(v["uebergeben_an"], "Stadtwerke");
 }
 
 #[tokio::test]
@@ -360,13 +499,17 @@ async fn abschliessen_aus_offen_und_aus_uebergeben_ok() {
     assert_eq!(a2, StatusCode::OK);
 }
 
+/// `/abschliessen` ist ein DEDIZIERTER Aktions-Endpunkt, der Grund ist dort unbedingt
+/// Pflicht → das Feld scheitert isoliert → 400 (LFH-305). Bewusstes Gegenstück:
+/// `einsatz_tier.rs`/`status` bleibt 422, weil der Grund dort nur bei Zielstatus
+/// „abgeschlossen" Pflicht ist. Wer die beiden Stellen „harmonisiert", bricht einen Test.
 #[tokio::test]
-async fn abschliessen_ohne_grund_ist_422() {
+async fn abschliessen_ohne_grund_ist_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    let (s, _) = anfrage(
+    let (s, v) = anfrage(
         &app,
         "POST",
         &format!("/api/einsaetze/{e}/schaeden/{sid}/abschliessen"),
@@ -374,7 +517,48 @@ async fn abschliessen_ohne_grund_ist_422() {
         Some(&json!({})),
     )
     .await;
-    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{v:?}");
+    assert_eq!(v["error"], "Abschlussgrund ist Pflicht", "{v:?}");
+}
+
+/// Vorhandener, aber leerer Abschlussgrund → 400, eigene Meldung.
+#[tokio::test]
+async fn abschliessen_mit_leerem_grund_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/schaeden/{sid}/abschliessen"),
+        &admin,
+        Some(&json!({"abschluss_grund":"   "})),
+    )
+    .await;
+    assert_eq!(v["error"], "Abschlussgrund darf nicht leer sein", "{v:?}");
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{v:?}");
+}
+
+/// Unbekannter Abschlussgrund → 400, eigene Meldung. Zusammen mit den beiden Tests darüber
+/// sind damit alle drei entwirrten Zweige einzeln festgenagelt — die alte, verschmolzene
+/// Meldung („Abschlussgrund ist Pflicht und muss gültig sein") deckte alle drei ab.
+#[tokio::test]
+async fn abschliessen_mit_unbekanntem_grund_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/schaeden/{sid}/abschliessen"),
+        &admin,
+        Some(&json!({"abschluss_grund":"quatsch"})),
+    )
+    .await;
+    assert_eq!(v["error"], "Unbekannter Abschlussgrund", "{v:?}");
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{v:?}");
 }
 
 #[tokio::test]
