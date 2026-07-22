@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 /// die Content-Length bzw. der fertige Download). Einträge sind Shortbread-MBTiles (LFH-195)
 /// und rendern mit dem beschrifteten Offline-Style (Shortbread-Layer + eingebettete Glyphs/Sprite).
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(utoipa::ToSchema))]
 pub struct OfflineKatalogEintrag {
     pub name: String,
     pub url: String,
@@ -160,5 +161,44 @@ mod tests {
         assert!(!remote_eintrag_ist_gueltig(&gepinnt(
             "http://127.0.0.1@evil.com/x.mbtiles"
         )));
+    }
+}
+
+/// LFH-265: Beleg, dass das `schema`-Feature `ToSchema` wirklich anhängt. Der Test kompiliert
+/// ohne das `cfg_attr`-Derive nicht — das ist seine Unterscheidungskraft. Er läuft NUR mit
+/// aktivem Feature (`cargo test -p karten-katalog --features schema` oder, per
+/// Feature-Unification, in jeder Workspace-Invocation); `cargo test -p karten-katalog` ohne
+/// Feature belegt umgekehrt, dass das Crate weiterhin ohne utoipa baut.
+#[cfg(all(test, feature = "schema"))]
+mod schema_tests {
+    use super::*;
+    use utoipa::openapi::{RefOr, Schema};
+    use utoipa::PartialSchema;
+
+    #[test]
+    fn offline_katalog_eintrag_hat_schema_mit_allen_feldern() {
+        let RefOr::T(Schema::Object(o)) = OfflineKatalogEintrag::schema() else {
+            panic!("OfflineKatalogEintrag muss ein Object-Schema sein");
+        };
+        for feld in [
+            "name",
+            "url",
+            "region",
+            "groesse",
+            "lizenz",
+            "kachel_schema",
+            "quelle",
+            "sha256",
+            "gruppe",
+        ] {
+            assert!(
+                o.properties.contains_key(feld),
+                "Feld {feld} fehlt im Schema"
+            );
+        }
+        // Die beiden Option-Felder dürfen NICHT required sein, alle anderen schon.
+        assert!(!o.required.contains(&"sha256".to_string()));
+        assert!(!o.required.contains(&"gruppe".to_string()));
+        assert!(o.required.contains(&"name".to_string()));
     }
 }

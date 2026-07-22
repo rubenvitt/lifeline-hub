@@ -164,6 +164,24 @@ mod nina_tests {
         let fc = kombiniere_nina(&map_data, &[("x".to_string(), geo)]);
         assert_eq!(fc["features"].as_array().unwrap().len(), 0);
     }
+
+    /// LFH-265: Der Schema-Anker `GeoJsonFeatureCollection` muss die TATSÄCHLICH produzierte
+    /// Form beschreiben — sonst lügt `types.generated.ts` über die Fachebenen-Antwort.
+    /// Beleg per Deserialisierung des echten Normalisierer-Outputs (ein `to_value`-Roundtrip
+    /// über `FachebeneAntwort::ok` prüfte nur den Test-Eigeninput).
+    #[test]
+    fn nina_output_passt_auf_den_geojson_anker() {
+        let map_data = json!([
+            { "id": "abc", "severity": "Severe", "urgency": "Immediate", "type": "Update",
+              "startDate": "2026-06-09T10:00:00+02:00", "i18nTitle": { "de": "Hochwasser" } }
+        ]);
+        let geo = json!({ "type": "FeatureCollection", "features": [
+            { "type": "Feature", "geometry": { "type": "Polygon", "coordinates": [[[0,0],[1,0],[1,1],[0,0]]] } }
+        ]});
+        let fc = kombiniere_nina(&map_data, &[("abc".to_string(), geo)]);
+        serde_json::from_value::<crate::karte::typen::GeoJsonFeatureCollection>(fc)
+            .expect("Anker beschreibt die reale NINA-Form");
+    }
 }
 
 /// Overpass-JSON (`elements` mit `lat`/`lon` bei Nodes bzw. `center` bei Ways/Relations,
@@ -307,6 +325,19 @@ mod overpass_tests {
         assert_eq!(p["telefon"], "0221-1");
         assert_eq!(p["notaufnahme"], "ja");
     }
+
+    /// LFH-265: siehe `nina_output_passt_auf_den_geojson_anker`.
+    #[test]
+    fn overpass_output_passt_auf_den_geojson_anker() {
+        let roh = json!({ "elements": [ { "type": "node", "lon": 6.9, "lat": 50.9, "tags": {
+            "amenity": "hospital", "name": "Klinik", "addr:street": "Hauptstr.", "addr:housenumber": "1",
+            "operator": "Stadt Köln", "emergency": "yes"
+        } } ] });
+        serde_json::from_value::<crate::karte::typen::GeoJsonFeatureCollection>(
+            normalisiere_overpass(&roh),
+        )
+        .expect("Anker beschreibt die reale Overpass-Form");
+    }
 }
 
 #[cfg(test)]
@@ -343,5 +374,33 @@ mod pegelonline_tests {
         let roh = json!([{ "longname": "X" }]);
         let fc = normalisiere_pegelonline(&roh);
         assert_eq!(fc["features"].as_array().unwrap().len(), 0);
+    }
+
+    /// LFH-265: siehe `nina_output_passt_auf_den_geojson_anker`.
+    #[test]
+    fn pegelonline_output_passt_auf_den_geojson_anker() {
+        let roh = json!([
+            {
+                "longname": "KÖLN", "longitude": 6.96, "latitude": 50.94, "km": 688.0,
+                "water": { "longname": "RHEIN" },
+                "timeseries": [
+                    { "shortname": "W", "unit": "cm",
+                      "currentMeasurement": { "value": 320.0, "timestamp": "2026-06-10T10:30:00+02:00", "stateMnwMhw": "hoch" } }
+                ]
+            }
+        ]);
+        serde_json::from_value::<crate::karte::typen::GeoJsonFeatureCollection>(
+            normalisiere_pegelonline(&roh),
+        )
+        .expect("Anker beschreibt die reale PEGELONLINE-Form");
+    }
+
+    /// LFH-265: auch die Leer-Antwort (jede `FachebeneAntwort::offline`) muss auf den Anker passen.
+    #[test]
+    fn leere_collection_passt_auf_den_geojson_anker() {
+        serde_json::from_value::<crate::karte::typen::GeoJsonFeatureCollection>(
+            crate::karte::typen::leere_collection(),
+        )
+        .expect("Anker beschreibt die leere FeatureCollection");
     }
 }

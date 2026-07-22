@@ -32,9 +32,15 @@ pub struct PeilungAntwort {
     pub bezug_label: String,
 }
 
+/// LFH-265: beide Felder werden ABSENT statt present-null serialisiert, damit der generierte
+/// `peilung?`/`ortsname?` ehrlich ist. Wire-Änderung — gepinnt per `contains_key` in
+/// `tests/ort_vorschau.rs` (ein `assert_eq!(v["ortsname"], Value::Null)` unterscheidet
+/// fehlenden Key nicht von null und wäre hier blind).
 #[derive(Debug, Serialize, ToSchema)]
 pub struct OrtVorschauAntwort {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub peilung: Option<PeilungAntwort>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ortsname: Option<String>,
 }
 

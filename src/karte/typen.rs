@@ -16,6 +16,36 @@ pub enum FachebeneStatus {
     Offline,
 }
 
+/// Geometrie eines GeoJSON-Features. Bewusst FLACH gehalten (LFH-265): `typ` bleibt `String`
+/// statt Literal-Enum (spart zwei weitere ToSchema-Enums samt Wire-Pins und bricht keinen
+/// Konsumenten), `coordinates` bleibt `Value` (Punkt/Linie/Polygon haben unterschiedliche Tiefe).
+/// Zweck ist Nicht-Regression: ohne diesen Anker generiert utoipa für `FachebeneAntwort.features`
+/// ein typloses Schema (`unknown` im Frontend).
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct GeoJsonGeometrie {
+    #[serde(rename = "type")]
+    pub typ: String,
+    pub coordinates: Value,
+}
+
+/// Ein GeoJSON-Feature. `geometry` ist optional (NINA liefert Einträge ohne Geometrie),
+/// `properties` sind flache Skalar-Properties (MapLibre stringifiziert Verschachteltes).
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct GeoJsonFeature {
+    #[serde(rename = "type")]
+    pub typ: String,
+    pub geometry: Option<GeoJsonGeometrie>,
+    pub properties: std::collections::HashMap<String, Value>,
+}
+
+/// Eine GeoJSON-FeatureCollection — der Schema-Anker für `FachebeneAntwort.features`.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct GeoJsonFeatureCollection {
+    #[serde(rename = "type")]
+    pub typ: String,
+    pub features: Vec<GeoJsonFeature>,
+}
+
 /// Einheitlicher Umschlag für jede Fachebene.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct FachebeneAntwort {
@@ -23,7 +53,10 @@ pub struct FachebeneAntwort {
     pub status: FachebeneStatus,
     pub attribution: String,
     pub stand: Option<String>,
-    /// GeoJSON FeatureCollection.
+    /// GeoJSON FeatureCollection. Laufzeittyp bleibt `Value` (die Normalisierer bauen sie per
+    /// `json!`); `GeoJsonFeatureCollection` ist der Schema-Anker (LFH-265), belegt durch die
+    /// `from_value`-Tests in `karte::normalisierung`.
+    #[schema(value_type = GeoJsonFeatureCollection)]
     pub features: Value,
 }
 

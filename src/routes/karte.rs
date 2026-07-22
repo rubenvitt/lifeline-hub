@@ -38,6 +38,7 @@ pub struct KarteConfigAntwort {
     pub offline_attribution: Option<String>,
     /// Grober Kachel-Typ der ersten sichtbaren Region (LFH-185): `"vektor"` (pbf) oder `"raster"`
     /// (png/jpg/webp) — Kompat. `None`, wenn keine Region bereit.
+    #[schema(value_type = Option<crate::config::OnlineStyleTyp>)]
     pub offline_format: Option<String>,
     /// Alle gemeinsam anzuzeigenden Offline-Regionen (LFH-188): die Offline-Karte ist die
     /// VEREINIGUNG aller bereiten Regionen, je Region eine eigene Vector-Source. Leere Liste =
@@ -58,6 +59,7 @@ pub struct OfflineRegionConfig {
     pub tiles_url: String,
     pub attribution: Option<String>,
     /// `"vektor"` (pbf) oder `"raster"` (png/jpg/webp) — steuert die Style-Wahl je Region.
+    #[schema(value_type = crate::config::OnlineStyleTyp)]
     pub format: String,
     /// Maximaler Zoom der Vector-Source: Regional-Packs `14` (Shortbread-Voll-Detail), die
     /// Welt-Übersicht `6` (Low-Zoom-Basis, LFH-207) → MapLibre überzoomt sie darüber als Kontext.

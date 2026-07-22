@@ -869,8 +869,12 @@ export interface components {
         /** @description Einheitlicher Umschlag für jede Fachebene. */
         FachebeneAntwort: {
             attribution: string;
-            /** @description GeoJSON FeatureCollection. */
-            features: unknown;
+            /**
+             * @description GeoJSON FeatureCollection. Laufzeittyp bleibt `Value` (die Normalisierer bauen sie per
+             *     `json!`); `GeoJsonFeatureCollection` ist der Schema-Anker (LFH-265), belegt durch die
+             *     `from_value`-Tests in `karte::normalisierung`.
+             */
+            features: components["schemas"]["GeoJsonFeatureCollection"];
             quelle: string;
             stand?: string | null;
             status: components["schemas"]["FachebeneStatus"];
@@ -1006,6 +1010,33 @@ export interface components {
          */
         Gefahrentyp: "atemgifte" | "angstreaktion" | "ausbreitung" | "atomare_strahlung" | "chemische_stoffe" | "erkrankung_verletzung" | "explosion" | "elektrizitaet" | "einsturz" | "absturz" | "brand" | "durchbruch" | "ertrinken";
         /**
+         * @description Ein GeoJSON-Feature. `geometry` ist optional (NINA liefert Einträge ohne Geometrie),
+         *     `properties` sind flache Skalar-Properties (MapLibre stringifiziert Verschachteltes).
+         */
+        GeoJsonFeature: {
+            geometry?: null | components["schemas"]["GeoJsonGeometrie"];
+            properties: {
+                [key: string]: unknown;
+            };
+            type: string;
+        };
+        /** @description Eine GeoJSON-FeatureCollection — der Schema-Anker für `FachebeneAntwort.features`. */
+        GeoJsonFeatureCollection: {
+            features: components["schemas"]["GeoJsonFeature"][];
+            type: string;
+        };
+        /**
+         * @description Geometrie eines GeoJSON-Features. Bewusst FLACH gehalten (LFH-265): `typ` bleibt `String`
+         *     statt Literal-Enum (spart zwei weitere ToSchema-Enums samt Wire-Pins und bricht keinen
+         *     Konsumenten), `coordinates` bleibt `Value` (Punkt/Linie/Polygon haben unterschiedliche Tiefe).
+         *     Zweck ist Nicht-Regression: ohne diesen Anker generiert utoipa für `FachebeneAntwort.features`
+         *     ein typloses Schema (`unknown` im Frontend).
+         */
+        GeoJsonGeometrie: {
+            coordinates: unknown;
+            type: string;
+        };
+        /**
          * @description Optionale Geschlechtsangabe. `unbekannt` ist ein erstklassiger Wert.
          * @enum {string}
          */
@@ -1044,11 +1075,7 @@ export interface components {
             karten_bau_verfuegbar: boolean;
             /** @description Pflicht-Attribution der ersten sichtbaren Region (Kompat). `None`, wenn keine Region bereit. */
             offline_attribution?: string | null;
-            /**
-             * @description Grober Kachel-Typ der ersten sichtbaren Region (LFH-185): `"vektor"` (pbf) oder `"raster"`
-             *     (png/jpg/webp) — Kompat. `None`, wenn keine Region bereit.
-             */
-            offline_format?: string | null;
+            offline_format?: null | components["schemas"]["OnlineStyleTyp"];
             /**
              * @description Alle gemeinsam anzuzeigenden Offline-Regionen (LFH-188): die Offline-Karte ist die
              *     VEREINIGUNG aller bereiten Regionen, je Region eine eigene Vector-Source. Leere Liste =
@@ -1365,7 +1392,7 @@ export interface components {
             sha256?: string | null;
             /** Format: int64 */
             sortier: number;
-            status: string;
+            status: components["schemas"]["OfflineKarteStatus"];
         };
         /**
          * @description GET /api/karte/offline-karten — alle Offline-Karten. Lesen: admin ODER Führungskraft (read-only).
@@ -1392,6 +1419,42 @@ export interface components {
             update_verfuegbar: boolean;
         };
         /**
+         * @description Lebenszyklus-Status einer Offline-Karte. **Reiner Schema-Anker** (LFH-265): der Speichertyp
+         *     bleibt `String` (`OfflineKarte.status` kommt per `sqlx::FromRow` aus der DB, wo der CHECK aus
+         *     `migrations/0076_karte_registry.sql:45-46` die Wertemenge bereits fixiert). Ein echtes Enum
+         *     im FromRow-Pfad würde ~8 `query_as::<_, OfflineKarte>`-Stellen gegen einen von der DB
+         *     garantierten Wert fallibel machen — Kosten/Nutzen kippt eindeutig.
+         * @enum {string}
+         */
+        OfflineKarteStatus: "registriert" | "laedt" | "bereit" | "fehler";
+        /**
+         * @description Ein kuratierter, herunterladbarer Offline-Karten-Vorschlag (LFH-181). `groesse` ist die
+         *     UNGEFÄHRE Dateigröße in Bytes (für den Plattenplatz-Check vorab; die exakte Größe liefert
+         *     die Content-Length bzw. der fertige Download). Einträge sind Shortbread-MBTiles (LFH-195)
+         *     und rendern mit dem beschrifteten Offline-Style (Shortbread-Layer + eingebettete Glyphs/Sprite).
+         */
+        OfflineKatalogEintrag: {
+            /** Format: int64 */
+            groesse: number;
+            /**
+             * @description Optionale UX-Gruppe für die geführte Auswahl (z. B. „Deutschland", „DACH",
+             *     „Bundesländer"). Rein für die Frontend-Gruppierung; `None` = ungruppiert (LFH-199).
+             */
+            gruppe?: string | null;
+            kachel_schema: string;
+            lizenz: string;
+            name: string;
+            /** @description Provenienz-Hinweis fürs UI (Eigenbau via karten-build/Planetiler, kein Community-Repo mehr). */
+            quelle: string;
+            region: string;
+            /**
+             * @description Optionaler SHA256-Pin (hex, lowercase). Gesetzt beim Eigen-Mirror: der Download
+             *     verifiziert den berechneten gegen diesen Hash. `None` = kein Pin (vor erstem Release-Pin).
+             */
+            sha256?: string | null;
+            url: string;
+        };
+        /**
          * @description Eine gemeinsam angezeigte Offline-Region im Config-Vertrag (LFH-188). `tiles_url` ist
          *     region-adressiert (`/api/karte/offline/{karte_id}/tiles/{z}/{x}/{y}?v=<token>`), sodass das
          *     Frontend je Region eine eigene Vector-Source mit eigenem Cache-Bust bindet.
@@ -1399,7 +1462,7 @@ export interface components {
         OfflineRegionConfig: {
             attribution?: string | null;
             /** @description `"vektor"` (pbf) oder `"raster"` (png/jpg/webp) — steuert die Style-Wahl je Region. */
-            format: string;
+            format: components["schemas"]["OnlineStyleTyp"];
             /** Format: int64 */
             karte_id: number;
             /**
@@ -1412,13 +1475,42 @@ export interface components {
             tiles_url: string;
         };
         /**
+         * @description Eine Online-Quelle als DB-Zeile (Admin-CRUD; trägt `id`/`sortier`/`aktiv`, anders als das
+         *     schlanke Laufzeit-`OnlineStyle`). `typ` bleibt als SPEICHERTYP String ('vektor'|'raster') —
+         *     serialisiert lowercase wie im Frontend-Vertrag, im OpenAPI-Schema per `value_type` als
+         *     `OnlineStyleTyp`-Union verankert; Validierung der Werte weiterhin im Handler (LFH-265).
+         */
+        OnlineQuelle: {
+            aktiv: boolean;
+            attribution?: string | null;
+            /** Format: int64 */
+            id: number;
+            name: string;
+            /**
+             * @description Serverseitig proxen (key-basierte Anbieter): `/config` gibt nur relative Proxy-URLs aus,
+             *     die Upstream-`url` (inkl. Key) bleibt server-seitig (LFH-182).
+             */
+            proxy: boolean;
+            /** Format: int64 */
+            sortier: number;
+            typ: components["schemas"]["OnlineStyleTyp"];
+            url: string;
+        };
+        /**
          * @description Ein benannter Online-Basemap-View. `attribution` ist die config-autoritative
          *     Pflicht-Attribution, die das Frontend per `customAttribution` anzeigt.
          */
         OnlineStyle: {
+            /** @description LFH-265: absent statt present-null, damit der generierte `attribution?` ehrlich ist. */
             attribution?: string | null;
             name: string;
-            typ?: components["schemas"]["OnlineStyleTyp"];
+            /**
+             * @description `#[schema(required)]` (LFH-265): `typ` wird IMMER serialisiert — `#[serde(default)]`
+             *     betrifft nur die Eingaberichtung (Katalog-Manifeste ohne `typ`), täuschte utoipa aber
+             *     Optionalität vor. `skip_serializing_if` ist hier NICHT anwendbar (kein `Option<T>`);
+             *     es würde `typ` beim Default `vektor` weglassen — eine echte Wire-Verschlechterung.
+             */
+            typ: components["schemas"]["OnlineStyleTyp"];
             url: string;
         };
         /**
@@ -1486,6 +1578,12 @@ export interface components {
             name: string;
             tz_organisation?: string | null;
         };
+        /**
+         * @description LFH-265: beide Felder werden ABSENT statt present-null serialisiert, damit der generierte
+         *     `peilung?`/`ortsname?` ehrlich ist. Wire-Änderung — gepinnt per `contains_key` in
+         *     `tests/ort_vorschau.rs` (ein `assert_eq!(v["ortsname"], Value::Null)` unterscheidet
+         *     fehlenden Key nicht von null und wäre hier blind).
+         */
         OrtVorschauAntwort: {
             ortsname?: string | null;
             peilung?: null | components["schemas"]["PeilungAntwort"];

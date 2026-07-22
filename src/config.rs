@@ -43,9 +43,15 @@ pub enum OnlineStyleTyp {
 pub struct OnlineStyle {
     pub name: String,
     pub url: String,
+    /// `#[schema(required)]` (LFH-265): `typ` wird IMMER serialisiert — `#[serde(default)]`
+    /// betrifft nur die Eingaberichtung (Katalog-Manifeste ohne `typ`), täuschte utoipa aber
+    /// Optionalität vor. `skip_serializing_if` ist hier NICHT anwendbar (kein `Option<T>`);
+    /// es würde `typ` beim Default `vektor` weglassen — eine echte Wire-Verschlechterung.
     #[serde(default)]
+    #[schema(required)]
     pub typ: OnlineStyleTyp,
-    #[serde(default)]
+    /// LFH-265: absent statt present-null, damit der generierte `attribution?` ehrlich ist.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attribution: Option<String>,
 }
 
@@ -828,5 +834,32 @@ mod tests {
         .unwrap();
         assert_eq!(s.typ, OnlineStyleTyp::Raster);
         assert_eq!(s.attribution.as_deref(), Some("© BKG"));
+    }
+
+    /// LFH-265, Wire-Vertrag der Serialisierungsrichtung. EHRLICHE EINORDNUNG: an der heutigen
+    /// API-Oberfläche ist `attribution: None` UNBEOBACHTBAR — `GET
+    /// /api/karte/online-quellen/katalog` liefert `default_online_styles()` (alle fünf mit
+    /// `Some`), und der DB-Schreibpfad hinter `/api/karte/config` erzwingt Attribution als
+    /// Pflicht (`routes/karte.rs`: „Attribution ist Pflicht (Lizenzauflage)"). Ein
+    /// Endpunkt-Test ist damit unschreibbar; dieser Unit-Test ist der einzig mögliche Beleg.
+    /// `contains_key` statt `v["…"] == Value::Null`: serde_json liefert für einen FEHLENDEN
+    /// Key beim Index-Zugriff ebenfalls `Null` — die naheliegende Assertion wäre blind.
+    #[test]
+    fn online_style_serialisiert_attribution_absent_und_typ_immer() {
+        let v = serde_json::to_value(OnlineStyle {
+            name: "A".into(),
+            url: "https://x/s.json".into(),
+            typ: OnlineStyleTyp::Vektor,
+            attribution: None,
+        })
+        .unwrap();
+        let o = v.as_object().unwrap();
+        assert!(
+            !o.contains_key("attribution"),
+            "attribution muss ABSENT sein, nicht present-null"
+        );
+        // Deckt die `#[schema(required)]`-Behauptung gegen die Realität ab: `typ` wird trotz
+        // `#[serde(default)]` immer serialisiert — auch beim Default-Wert `vektor`.
+        assert_eq!(o.get("typ").and_then(|t| t.as_str()), Some("vektor"));
     }
 }

@@ -1,17 +1,19 @@
 //! CRUD- und Lese-Queries der Karten-Registry (runtime-queries, Muster wie `benutzer.rs`).
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use utoipa::ToSchema;
 
 /// Eine Online-Quelle als DB-Zeile (Admin-CRUD; trägt `id`/`sortier`/`aktiv`, anders als das
-/// schlanke Laufzeit-`OnlineStyle`). `typ` bleibt String ('vektor'|'raster') — serialisiert
-/// lowercase wie im Frontend-Vertrag; Validierung der Werte im Handler.
-#[derive(Debug, Serialize, sqlx::FromRow)]
+/// schlanke Laufzeit-`OnlineStyle`). `typ` bleibt als SPEICHERTYP String ('vektor'|'raster') —
+/// serialisiert lowercase wie im Frontend-Vertrag, im OpenAPI-Schema per `value_type` als
+/// `OnlineStyleTyp`-Union verankert; Validierung der Werte weiterhin im Handler (LFH-265).
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
 pub struct OnlineQuelle {
     pub id: i64,
     pub name: String,
     pub url: String,
+    #[schema(value_type = crate::config::OnlineStyleTyp)]
     pub typ: String,
     pub attribution: Option<String>,
     pub sortier: i64,
@@ -205,6 +207,24 @@ pub async fn loesche_online_quelle(pool: &SqlitePool, id: i64) -> Result<bool, s
 
 // --- Offline-Karten (PMTiles) ---
 
+/// Lebenszyklus-Status einer Offline-Karte. **Reiner Schema-Anker** (LFH-265): der Speichertyp
+/// bleibt `String` (`OfflineKarte.status` kommt per `sqlx::FromRow` aus der DB, wo der CHECK aus
+/// `migrations/0076_karte_registry.sql:45-46` die Wertemenge bereits fixiert). Ein echtes Enum
+/// im FromRow-Pfad würde ~8 `query_as::<_, OfflineKarte>`-Stellen gegen einen von der DB
+/// garantierten Wert fallibel machen — Kosten/Nutzen kippt eindeutig.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum OfflineKarteStatus {
+    /// Zeile existiert, Datei noch nicht (herunterzuladen).
+    Registriert,
+    /// Download läuft.
+    Laedt,
+    /// Datei liegt vor und ist ausliefer-bereit.
+    Bereit,
+    /// Download/Prüfung fehlgeschlagen.
+    Fehler,
+}
+
 /// Eine Offline-Karte als DB-Zeile (Admin-CRUD). `aktiv_basemap` = die von `/tiles` ausgelieferte
 /// Karte; `status` und die Download-Felder (groesse/sha256/download_at) pflegt LFH-181.
 #[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
@@ -227,6 +247,7 @@ pub struct OfflineKarte {
     pub groesse: Option<i64>,
     pub sha256: Option<String>,
     pub download_at: Option<String>,
+    #[schema(value_type = OfflineKarteStatus)]
     pub status: String,
     pub aktiv_basemap: bool,
     pub sortier: i64,

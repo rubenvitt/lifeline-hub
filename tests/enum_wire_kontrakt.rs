@@ -347,10 +347,13 @@ macro_rules! wire_is {
 #[test]
 fn orphan_enums_wire() {
     use lifeline_hub::befehl::{BefehlStatus, BefehlVorlage};
+    use lifeline_hub::config::OnlineStyleTyp;
     use lifeline_hub::einsatz::einstellungen::{
         BasemapModus, EinheitenSystem, Koordinatenformat, Zeitformat,
     };
     use lifeline_hub::erinnerung::ErinnerungStatus;
+    use lifeline_hub::karte::registry::repo::OfflineKarteStatus;
+    use lifeline_hub::karte::typen::FachebeneStatus;
     use lifeline_hub::katalog::Dienststatus;
     use lifeline_hub::lagebericht::{LageberichtStatus, LageberichtVorlage};
     use lifeline_hub::person::audit_repo::ZugriffArt;
@@ -404,6 +407,24 @@ fn orphan_enums_wire() {
         BefehlVorlage::BefehlEaZmw => "befehl_ea_zmw",
     );
     wire_is!(BefehlStatus::Entwurf => "entwurf", BefehlStatus::Freigegeben => "freigegeben");
+
+    // karte (LFH-265): drei Union-Anker der Karten-Domäne, alle ohne `as_str()`.
+    // `OfflineKarteStatus` ist ein reiner Schema-Anker (Speichertyp bleibt String) — dieser
+    // Block ist der einzige harte Beleg seiner Einführung: er kompiliert ohne das Enum nicht.
+    // Für `FachebeneStatus`/`OnlineStyleTyp` ist er ein PIN gegen künftige rename-Drift,
+    // kein Fix (beide tragen `rename_all = "lowercase"` schon länger).
+    wire_is!(
+        FachebeneStatus::Ok => "ok",
+        FachebeneStatus::Leer => "leer",
+        FachebeneStatus::Offline => "offline",
+    );
+    wire_is!(OnlineStyleTyp::Vektor => "vektor", OnlineStyleTyp::Raster => "raster");
+    wire_is!(
+        OfflineKarteStatus::Registriert => "registriert",
+        OfflineKarteStatus::Laedt => "laedt",
+        OfflineKarteStatus::Bereit => "bereit",
+        OfflineKarteStatus::Fehler => "fehler",
+    );
 }
 
 /// LFH-298: SSE-Wire-Event-Namen als BE↔FE-Kontrakt. `LiveEvent` ist die Wahrheitsquelle der

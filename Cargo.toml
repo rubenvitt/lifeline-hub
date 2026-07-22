@@ -41,7 +41,9 @@ tower-http = { version = "0.7", features = ["fs", "catch-panic", "trace", "reque
 tower = { version = "0.5", features = ["util", "limit"] }
 fs4 = "1.1.0"
 # LFH-201: geteilter Offline-Katalog-Typ (Grundstein für den späteren karten-service).
-karten-katalog = { path = "crates/karten-katalog" }
+# `schema` (LFH-265): zieht `ToSchema` für OfflineKatalogEintrag in den Typ-Codegen. Bewusst
+# kein Default-Feature des Crates — karten-service soll utoipa standalone nicht mitziehen.
+karten-katalog = { path = "crates/karten-katalog", features = ["schema"] }
 # LFH-114: ClamAV/clamd-Client für den Upload-Virenscan. Reiner Rust-INSTREAM-Client (nur
 # tokio, kein FFI/keine Signatur-DB im Prozess) → das Binary bleibt single-binary. Hängt am
 # `clamav`-Feature, das Default-AN ist (s. [features]); `optional` bleibt, damit

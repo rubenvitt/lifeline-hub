@@ -7,3 +7,11 @@ edition = "2021"
 serde = { version = "1", features = ["derive"] }
 # Robustes URL-Parsing für die Loopback-Prüfung (schon im Workspace-Lock, transitiv via reqwest).
 url = "2"
+# LFH-265: `ToSchema` für den Typ-Codegen — nur wenn der Konsument es braucht (lifeline-hub).
+# OPTIONAL und NICHT im Default, damit ein standalone `-p karten-service`-Build utoipa nicht
+# mitzieht. Achtung: bei einer Workspace-Invocation (`cargo test --workspace`) vereinheitlicht
+# Cargo die Features der gemeinsamen Abhängigkeit — die Isolation gilt nur standalone.
+utoipa = { version = "5", optional = true }
+
+[features]
+schema = ["dep:utoipa"]

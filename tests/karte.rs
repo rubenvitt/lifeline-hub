@@ -680,6 +680,12 @@ async fn offline_registrieren_aktivieren_loeschen() {
     assert_eq!(res.status(), StatusCode::CREATED);
     let k = json(res).await;
     let id = k["id"].as_i64().unwrap();
+    // LFH-265: Regressionsnetz gegen ein versehentlich mitgezogenes Enum im FromRow-Pfad —
+    // BEWUSST NICHT UNTERSCHEIDEND für den Schema-Anker `#[schema(value_type =
+    // OfflineKarteStatus)]`: der ändert keinen Byte an der Serialisierung (`status` bleibt
+    // `String`, alle Schreibpfade sind SQL-String-Literale). Die Unterscheidungskraft des
+    // Ankers liegt im `wire_is!`-Block in tests/enum_wire_kontrakt.rs (kompiliert ohne das
+    // Enum nicht) und im Typtest-Assert in frontend/src/api/kartenSchema.typetest.ts.
     assert_eq!(k["status"], "bereit");
     assert_eq!(k["aktiv_basemap"], false);
     assert_eq!(k["kachel_schema"], "shortbread"); // Default

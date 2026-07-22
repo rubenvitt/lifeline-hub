@@ -123,7 +123,18 @@ async fn shape_mit_peilung_und_ortsname_null() {
     )
     .await;
     assert_eq!(s, StatusCode::OK);
-    assert_eq!(v["ortsname"], Value::Null); // Phase 1
+    // LFH-265: `ortsname` ist ABSENT, nicht present-null. `assert_eq!(v["ortsname"],
+    // Value::Null)` wäre hier BLIND — serde_json liefert beim Index-Zugriff auf einen
+    // fehlenden Key ebenfalls `Value::Null` und bliebe nach der Wire-Änderung grün.
+    let o = v.as_object().unwrap();
+    assert!(
+        !o.contains_key("ortsname"),
+        "ortsname muss ABSENT sein, nicht present-null"
+    ); // Phase 1
+    assert!(
+        o.contains_key("peilung"),
+        "peilung ist gesetzt und muss da sein"
+    );
     assert_eq!(v["peilung"]["richtung"].as_str(), Some("N"));
     assert_eq!(v["peilung"]["bezug_label"].as_str(), Some("Rathaus"));
     assert!(v["peilung"]["distanz_m"].as_f64().unwrap() > 0.0);
@@ -147,8 +158,11 @@ async fn ohne_marker_ist_peilung_null() {
     )
     .await;
     assert_eq!(s, StatusCode::OK);
-    assert_eq!(v["peilung"], Value::Null);
-    assert_eq!(v["ortsname"], Value::Null);
+    // LFH-265: beide Felder ABSENT (siehe shape_mit_peilung_und_ortsname_null) — der Body ist
+    // hier folglich das leere Objekt.
+    let o = v.as_object().unwrap();
+    assert!(!o.contains_key("peilung"), "peilung muss ABSENT sein");
+    assert!(!o.contains_key("ortsname"), "ortsname muss ABSENT sein");
 }
 
 #[tokio::test]
@@ -161,7 +175,11 @@ async fn exclude_schliesst_einsatzort_aus() {
         format!("/api/einsaetze/{eid}/ort-vorschau?lat=50.9&lon=10.0&exclude=einsatzort:{eid}");
     let (s, v) = get(&app, &uri, &cookie).await;
     assert_eq!(s, StatusCode::OK);
-    assert_eq!(v["peilung"], Value::Null);
+    // LFH-265: ABSENT statt present-null (contains_key, sonst blind — s. o.).
+    assert!(
+        !v.as_object().unwrap().contains_key("peilung"),
+        "peilung muss ABSENT sein"
+    );
 }
 
 #[tokio::test]
