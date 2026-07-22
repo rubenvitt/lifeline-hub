@@ -101,20 +101,22 @@ pub async fn bewerten(
     fordere_aktiv(&einsatz)?;
     let gebiet = gefahr_repo::gebiet_laden(&state.pool, einsatz_id, gid).await?; // Ownership-Gate
 
+    // Unbekannter Enum-Wert = das Feld ist für sich unbrauchbar → 400 (LFH-305).
+    // Die Kombinationsprüfung darunter bewertet erst den Zusammenhang → bleibt 422.
     if gefahr::Gefahrentyp::parse(&body.gefahrentyp).is_none() {
-        return Err(AppError::UnprocessableEntity(format!(
+        return Err(AppError::Validation(format!(
             "Unbekannter Gefahrentyp: {}",
             body.gefahrentyp
         )));
     }
     if gefahr::Schutzobjekt::parse(&body.schutzobjekt).is_none() {
-        return Err(AppError::UnprocessableEntity(format!(
+        return Err(AppError::Validation(format!(
             "Unbekanntes Schutzobjekt: {}",
             body.schutzobjekt
         )));
     }
     if gefahr::Warnstufe::parse(&body.warnstufe).is_none() {
-        return Err(AppError::UnprocessableEntity(format!(
+        return Err(AppError::Validation(format!(
             "Unbekannte Warnstufe: {}",
             body.warnstufe
         )));

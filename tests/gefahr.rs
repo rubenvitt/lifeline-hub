@@ -158,8 +158,12 @@ async fn keine_leert_die_zelle() {
     assert_eq!(liste.as_array().unwrap().len(), 0);
 }
 
+/// Trennlinie der Statuscode-Konvention an einer Stelle: die ersten drei Bodies scheitern
+/// je an EINEM Feld (unbekannter Enum-Wert) → 400; der letzte hat lauter gültige Felder und
+/// scheitert erst an deren Kombination → 422. Beide Hälften stehen bewusst in EINEM Test,
+/// damit niemand die Datei pauschal auf einen der beiden Codes kippt (LFH-305).
 #[tokio::test]
-async fn ungueltiger_enum_und_kombination_sind_422() {
+async fn ungueltiger_enum_ist_400_kombination_bleibt_422() {
     let (app, _live) = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
@@ -175,7 +179,7 @@ async fn ungueltiger_enum_und_kombination_sind_422() {
         )
         .await
         .0,
-        StatusCode::UNPROCESSABLE_ENTITY
+        StatusCode::BAD_REQUEST
     );
     assert_eq!(
         anfrage(
@@ -187,7 +191,7 @@ async fn ungueltiger_enum_und_kombination_sind_422() {
         )
         .await
         .0,
-        StatusCode::UNPROCESSABLE_ENTITY
+        StatusCode::BAD_REQUEST
     );
     assert_eq!(
         anfrage(
@@ -199,7 +203,7 @@ async fn ungueltiger_enum_und_kombination_sind_422() {
         )
         .await
         .0,
-        StatusCode::UNPROCESSABLE_ENTITY
+        StatusCode::BAD_REQUEST
     );
     assert_eq!(
         anfrage(
@@ -211,6 +215,7 @@ async fn ungueltiger_enum_und_kombination_sind_422() {
         )
         .await
         .0,
+        // Alle drei Felder sind gültig — verboten ist erst ihre Kombination. Bleibt 422.
         StatusCode::UNPROCESSABLE_ENTITY
     );
 }

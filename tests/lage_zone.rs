@@ -1,7 +1,7 @@
 //! L-3 Gefahren- & Absperrzonen — Backend-Integrationstests.
 //!
-//! Deckt ab: CRUD + ETB-Wortlaut («eingerichtet/geändert/aufgehoben»), 422 bei
-//! ungültigem typ/geometrie_typ und Geometrie-Klassen-Mismatch (POST und PATCH),
+//! Deckt ab: CRUD + ETB-Wortlaut («eingerichtet/geändert/aufgehoben»), 400 bei unbekanntem
+//! typ/geometrie_typ und 422 beim Geometrie-Klassen-Mismatch (POST und PATCH, LFH-305),
 //! ETB-Regeln (notiz/farbe schreiben KEINEN ETB, label/typ schon), SSE-Event
 //! `lage_zone` bei POST/PATCH/DELETE und reguläre Org-Isolation (Fremd-Nutzer ohne
 //! Mitgliedschaft, org_rolle="keine").
@@ -123,8 +123,13 @@ async fn anlegen_setzt_zone_und_schreibt_etb_eingerichtet() {
     );
 }
 
+/// Trennlinie der Statuscode-Konvention an einer Stelle: b1 scheitert am Feld selbst
+/// (unbekannter Enum-Wert) → 400; b2 und b3 haben lauter gültige Felder und scheitern erst
+/// am Zusammenhang (Typ passt nicht zur Geometrie-Klasse bzw. geometrie.type widerspricht
+/// dem deklarierten geometrie_typ) → 422. Beide Hälften bewusst in EINEM Test, damit die
+/// Datei nicht pauschal auf einen der beiden Codes gekippt wird (LFH-305).
 #[tokio::test]
-async fn ungueltiger_typ_und_geometrie_typ_sind_422() {
+async fn ungueltiger_typ_ist_400_kombination_bleibt_422() {
     let (app, _live) = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
@@ -140,7 +145,7 @@ async fn ungueltiger_typ_und_geometrie_typ_sind_422() {
         )
         .await
         .0,
-        StatusCode::UNPROCESSABLE_ENTITY
+        StatusCode::BAD_REQUEST
     );
 
     let b2 = json!({"typ":"absperrgrenze","geometrie_typ":"Polygon","geometrie":POLY}).to_string();
@@ -170,6 +175,58 @@ async fn ungueltiger_typ_und_geometrie_typ_sind_422() {
         .0,
         StatusCode::UNPROCESSABLE_ENTITY
     );
+}
+
+/// `geometrie_typ` war bis LFH-305 ungetestet — der Wert scheitert für sich (unbekannte
+/// Enum-Variante), also 400. Der Positiv-Zweig sichert ab, dass der 400 wirklich aus der
+/// Enum-Prüfung kommt und nicht aus einem vorgelagerten Gate (Auth/Einsatz-Zugriff).
+#[tokio::test]
+async fn unbekannter_geometrie_typ_ist_400() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let u = format!("/api/einsaetze/{einsatz}/zonen");
+
+    let schlecht =
+        json!({"typ":"gefahrengebiet","geometrie_typ":"Quatsch","geometrie":POLY}).to_string();
+    let (status, body) = anfrage(&app, "POST", &u, &admin, Some(&schlecht)).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{body:?}");
+
+    let gut =
+        json!({"typ":"gefahrengebiet","geometrie_typ":"Polygon","geometrie":POLY}).to_string();
+    let (status, body) = anfrage(&app, "POST", &u, &admin, Some(&gut)).await;
+    assert!(status.is_success(), "Positiv-Zweig: {status} {body:?}");
+}
+
+/// PATCH-Pendant zu `ungueltiger_typ_ist_400_kombination_bleibt_422`, bis LFH-305
+/// ungetestet. Abgrenzung zu `patch_typ_inkompatibel_zur_geometrie_ist_422`: dort ist der
+/// Typ gültig und passt nur nicht zur gespeicherten Geometrie (Zusammenhang → 422), hier
+/// ist der Wert selbst keine bekannte Variante (Feld isoliert → 400).
+#[tokio::test]
+async fn patch_unbekannter_typ_ist_400() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let body =
+        json!({"typ":"gefahrengebiet","geometrie_typ":"Polygon","geometrie":POLY}).to_string();
+    let (_, z) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &admin,
+        Some(&body),
+    )
+    .await;
+    let zid = z["id"].as_i64().unwrap();
+    let u = format!("/api/einsaetze/{einsatz}/zonen/{zid}");
+
+    let (status, antwort) = anfrage(&app, "PATCH", &u, &admin, Some(r#"{"typ":"quatsch"}"#)).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{antwort:?}");
+
+    // Positiv-Zweig: derselbe Aufruf mit gültigem, geometrie-kompatiblem Typ geht durch.
+    let (status, antwort) =
+        anfrage(&app, "PATCH", &u, &admin, Some(r#"{"typ":"freie_skizze"}"#)).await;
+    assert_eq!(status, StatusCode::OK, "Positiv-Zweig: {antwort:?}");
 }
 
 #[tokio::test]

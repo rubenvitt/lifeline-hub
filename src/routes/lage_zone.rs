@@ -66,17 +66,20 @@ pub struct ZoneBody {
     pub notiz: Option<String>,
 }
 
-/// Validiert typ/geometrie_typ/geometrie und gibt 422 bei Verstoß (statt DB-CHECK→500).
+/// Validiert typ/geometrie_typ/geometrie (statt DB-CHECK→500). Statuscodes nach der
+/// Konvention aus CLAUDE.md: ein unbekannter Enum-Wert scheitert am Feld selbst → 400;
+/// unpassende Typ-Geometrie-Kombination und kaputtes/abweichendes GeoJSON bewerten den
+/// Zusammenhang → 422.
 /// Liefert die zu speichernde Geometrie-String-Form zurück (= der validierte Eingabe-String).
 fn validiere_neu(body: &ZoneBody) -> Result<String, AppError> {
     if lage_zone::LageZoneTyp::parse(&body.typ).is_none() {
-        return Err(AppError::UnprocessableEntity(format!(
+        return Err(AppError::Validation(format!(
             "Unbekannter Zonen-Typ: {}",
             body.typ
         )));
     }
     if lage_zone::GeometrieTyp::parse(&body.geometrie_typ).is_none() {
-        return Err(AppError::UnprocessableEntity(format!(
+        return Err(AppError::Validation(format!(
             "Unbekannter Geometrie-Typ: {}",
             body.geometrie_typ
         )));
@@ -216,10 +219,10 @@ pub async fn aktualisieren(
     // Effektiver neuer typ; wenn geändert: gültig + passt zur *gespeicherten* Geometrie.
     let neuer_typ = match &body.typ {
         Some(t) => {
+            // Feld isoliert unbrauchbar → 400; die Passung zur gespeicherten Geometrie
+            // darunter ist ein Zusammenhang → bleibt 422 (LFH-305).
             if lage_zone::LageZoneTyp::parse(t).is_none() {
-                return Err(AppError::UnprocessableEntity(format!(
-                    "Unbekannter Zonen-Typ: {t}"
-                )));
+                return Err(AppError::Validation(format!("Unbekannter Zonen-Typ: {t}")));
             }
             if !lage_zone::geometrie_klasse_passt(t, &vorher.geometrie_typ) {
                 return Err(AppError::UnprocessableEntity(format!(
