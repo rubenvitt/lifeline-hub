@@ -1,6 +1,6 @@
-# Lagekarte: Ansichten & Zeitachse — Design
+# LFH-318: Lagekarte — Ansichten & Zeitachse — Design
 
-**Stand:** 2026-07-22 · Betrifft: `frontend/src/pages/lagekarte/*`, `src/routes/karte*.rs`,
+**Stand:** 2026-07-22 · Tasks: LFH-319 (A), LFH-320 (B), LFH-321 (C), LFH-322 (D) · Betrifft: `frontend/src/pages/lagekarte/*`, `src/routes/karte*.rs`,
 `einsatz_einstellungen` (LFH-55/131), `lage_zone` (0036), `karte_hintergrundbild` (0075),
 `freies_zeichen` (0085)
 
@@ -41,12 +41,12 @@ Stand festzuhalten, weil Verortungen in-place überschrieben werden (keine Posit
 
 Vier Inkremente unter einem Epic; jedes ist für sich lauffähig und liefert Nutzen.
 
-| | Inhalt | Baut auf |
+| Task | Inhalt | Baut auf |
 |---|---|---|
-| **A** | `karten_ansicht` als Entität, eine automatisch angelegte Standardansicht, „Für den Einsatz speichern" auf der Karte, localStorage-Ablösung | — |
-| **B** | Mehrere Ansichten (anlegen/umbenennen/löschen/Standard setzen) + `ansicht_id` an den drei Objekt-Tabellen inkl. Stempel-Pfad beim Anlegen | A |
-| **C** | `lage_snapshot`: Erzeugung, Anzeige eines Standes, Schreibsperre im Historien-Modus | A |
-| **D** | Replay: Zeitleiste mit Slider und Play/Pause über die Snapshot-Folge | C |
+| **A** — LFH-319 | `karten_ansicht` als Entität, eine automatisch angelegte Standardansicht, „Für den Einsatz speichern" auf der Karte, localStorage-Ablösung | — |
+| **B** — LFH-320 | Mehrere Ansichten (anlegen/umbenennen/löschen/Standard setzen) + `ansicht_id` an den drei Objekt-Tabellen inkl. Stempel-Pfad beim Anlegen | A |
+| **C** — LFH-321 | `lage_snapshot`: Erzeugung, Anzeige eines Standes, Schreibsperre im Historien-Modus | A |
+| **D** — LFH-322 | Replay: Zeitleiste mit Slider und Play/Pause über die Snapshot-Folge | C |
 
 ## Architektur
 
