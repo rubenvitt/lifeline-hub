@@ -4,29 +4,7 @@ import type {
   Verlaufsnotiz, Abgleich,
 } from './types';
 import { apiGet, apiSend } from './client';
-
-/**
- * Normalisiert leere Formwerte zu explizitem `null` — nur für Keys, die im übergebenen
- * Objekt tatsächlich vorhanden sind (LFH-266/F12).
- *
- * Hintergrund: antds `Select allowClear` liefert beim Leeren `undefined`, und
- * `JSON.stringify` entfernt undefined-Keys komplett. Das Feld käme also gar nicht erst
- * auf dem Wire an und der Server ließe es — korrekterweise — unverändert. Ohne diesen
- * Schritt bliebe der PATCH-Tri-State im Backend für geleerte Selects wirkungslos.
- *
- * Bewusst NICHT global in `apiSend`: das würde POST-Bodies und rund zwanzig andere
- * Endpunkte mitverändern, bei denen `''` eine andere Bedeutung hat. Und bewusst nur über
- * vorhandene Keys, damit Partial-Patches (z. B. das Halter-Setzen aus der Personen-Seite)
- * nicht ungefragt weitere Felder mit `null` überschreiben.
- */
-export function leereWerteAlsNull<T extends object>(daten: T): T {
-  return Object.fromEntries(
-    Object.entries(daten).map(([k, v]) => [
-      k,
-      v === undefined || (typeof v === 'string' && v.trim() === '') ? null : v,
-    ]),
-  ) as T;
-}
+import { patchBody } from './patchTriState';
 
 /** Felder, die beim Anlegen/Bearbeiten gesetzt werden können (alle optional). */
 export interface PersonEingabe {
@@ -61,7 +39,9 @@ export function legePersonAn(einsatzId: number, daten: PersonEingabe): Promise<P
  *  ihn (Overwrite aus dem Konfliktdialog) wird bewusst blind überschrieben.
  *
  *  PATCH-Semantik (LFH-266/F12): ein gesendetes `null` LEERT das Feld, ein fehlender Key lässt
- *  es unverändert. Geleerte Formularfelder werden dafür zu `null` normalisiert. Beim POST
+ *  es unverändert. Geleerte Formularfelder werden dafür zu `null` normalisiert — die Regeln
+ *  samt der `undefined`-Falle stehen an `api/patchTriState.ts`. `daten` kommt hier aus EINEM
+ *  Formular, deshalb die formular-Lesart (`undefined` = geleert = löschen). Beim POST
  *  (`legePersonAn`) gilt das NICHT — dort heißt `null` schlicht „nicht gesetzt". */
 export function aktualisierePerson(
   einsatzId: number,
@@ -69,10 +49,7 @@ export function aktualisierePerson(
   daten: PersonEingabe,
   basisGeaendertAt?: string,
 ): Promise<Person> {
-  const norm = leereWerteAlsNull(daten);
-  // basis_geaendert_at ist ein Steuerfeld, kein Spaltenwert — es wird nach der
-  // Normalisierung angehängt und darf nie zu null werden (das hieße „bewusstes Overwrite").
-  const body = basisGeaendertAt ? { ...norm, basis_geaendert_at: basisGeaendertAt } : norm;
+  const body = patchBody(daten, basisGeaendertAt);
   return apiSend<Person>(`/api/einsaetze/${einsatzId}/personen/${personId}`, 'PATCH', body);
 }
 

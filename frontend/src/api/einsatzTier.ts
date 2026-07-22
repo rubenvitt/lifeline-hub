@@ -1,6 +1,6 @@
 import type { Tier, TierStatus, Spezies } from './types';
 import { apiGet, apiSend } from './client';
-import { leereWerteAlsNull } from './einsatzPerson';
+import { patchBody } from './patchTriState';
 
 /** Felder beim Anlegen (Spezies Pflicht; Rest optional). Halter FK XOR Freitext. */
 export interface TierEingabe {
@@ -72,13 +72,17 @@ export function legeTierAn(einsatzId: number, daten: TierEingabe): Promise<Tier>
  * PATCH-Semantik (LFH-266/F12): ein gesendetes `null` LEERT das Feld, ein fehlender Key lässt
  * es unverändert. Geleerte Formularfelder werden dafür zu `null` normalisiert — antds
  * `Select allowClear` liefert sonst `undefined`, und der Key fiele beim `JSON.stringify`
- * ganz aus dem Body.
+ * ganz aus dem Body. Die Regeln stehen an `api/patchTriState.ts`.
  *
  * Die Normalisierung läuft ausschließlich über VORHANDENE Keys. Das ist hier kritisch:
  * `aktualisiereTier` wird auch aus `PersonenDetailPage` mit Partial-Patches aufgerufen
  * (nur `halter_person_id`/`halter_kontakt`). Eine Normalisierung über eine feste Feldliste
  * würde dort die neun Identitätsfelder als `null` injizieren und beim Halter-Entfernen
  * still den halben Tierdatensatz leeren.
+ *
+ * ACHTUNG bei hand-gebauten Aufrufen: `daten` wird hier mit der FORMULAR-Lesart normalisiert,
+ * `undefined` heißt also „leeren", nicht „nicht anfassen". Wer aus einem Spread patcht, baut
+ * das Objekt vorher mit `nurGesetzteFelder` (siehe `patchTriState.ts`).
  */
 export function aktualisiereTier(
   einsatzId: number,
@@ -86,8 +90,7 @@ export function aktualisiereTier(
   daten: TierPatch,
   basisGeaendertAt?: string,
 ): Promise<Tier> {
-  const norm = leereWerteAlsNull(daten);
-  const body = basisGeaendertAt ? { ...norm, basis_geaendert_at: basisGeaendertAt } : norm;
+  const body = patchBody(daten, basisGeaendertAt);
   return apiSend<Tier>(`/api/einsaetze/${einsatzId}/tiere/${tierId}`, 'PATCH', body);
 }
 
