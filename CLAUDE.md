@@ -162,8 +162,17 @@ gepflegt. Wahrheitsquelle: die `#[derive(ToSchema)]`-Response-Structs + Domänen
   ist, und fährt `tsc`. Ein Feld-Rename bricht damit Build/Test statt still zur Laufzeit.
 - **Enum-Werte:** Domänen-Enums tragen wire-korrektes `#[serde(rename…)]`; `String`-Felder,
   die eine Union tragen, bekommen `#[schema(value_type = Enum)]` (bei `Option<String>`:
-  `value_type = Option<Enum>` — sonst verliert utoipa die Nullability). Neue/geänderte
-  Enum-Varianten müssen im Guard `tests/enum_wire_kontrakt.rs` gegen ihren Wire-String stehen.
+  `value_type = Option<Enum>` — sonst verliert utoipa die Nullability).
+- **Enum-Wire-Kontrakt ist erzwungen, nicht behauptet (LFH-312/AP5):** `tests/enum_wire_kontrakt.rs`
+  pinnt jedes in `src/api_doc.rs` registrierte Enum über `enum_wire_as_str!` (Wire == `as_str()`)
+  bzw. `enum_wire!` (Orphans ohne `as_str()`, Literal-Pin). Beide Makros erzeugen einen
+  **exhaustiven `match`** — eine neue Variante ohne Nachtrag bricht damit den **Build** (E0004),
+  nicht bloß einen Assert. Ein Inventar-Guard verlangt zusätzlich, dass jedes *neu registrierte*
+  Enum überhaupt einen Block bekommt. Zwei Konsequenzen fürs Anfassen dieser Datei: die
+  Invokationen tragen **voll qualifizierte Pfade** (der Guard schneidet nur die
+  Makro-Argumentbereiche — ein `use`-Block würde ihn blind machen, deshalb gibt es keinen), und
+  bei `LiveEvent::ALLE` stehen `contains`-Prüfung **und** Längenvergleich nebeneinander: `contains`
+  liefert die benannte Diagnose, aber nur die Länge fängt eine *Dublette* in `ALLE`.
 - **Noch handgepflegt** (bewusst, FE-lokal in `types.ts`): Request-/Input-DTOs (`NeuerX`/`PatchX`,
   PATCH-null-vs-absent-Semantik) und die 2 `Record<>`-Maps. Der Pfad-/Operations-Contract
   (`#[utoipa::path]`) ist additiv nachrüstbar, in v1 nicht enthalten.
