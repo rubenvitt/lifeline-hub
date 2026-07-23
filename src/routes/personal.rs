@@ -2,16 +2,19 @@ use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
 use crate::error::AppError;
 use crate::extract::JsonBody;
-use crate::personal::repo::{self, PersonalDaten};
+use crate::personal::repo::{self, PersonalDaten, PersonalPatch};
 use crate::personal::{PersonalAnzeige, PersonalVorschlaege};
-use crate::routes::support::trimme;
+use crate::routes::support::{deserialize_optional_field, trimme, trimme_tri};
 use crate::staerke::StaerkePosition;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 
-/// Body für Anlegen + Vollersatz-PATCH (gleiche editierbaren Felder).
+/// Body für das Anlegen (POST). Bewusst getrennt vom PATCH-Body: der POST muss seine
+/// Pflichtfelder strukturell erzwingen (fehlender `name` → 400 schon im Extractor), und
+/// `qualifikation_ids` darf hier ein `#[serde(default)]` tragen (Default beim Neuanlegen ist
+/// „keine Qualifikationen") — im PATCH wäre genau das die stille Komplettlöschung.
 #[derive(Debug, Deserialize)]
 pub struct PersonalBody {
     pub name: String,
@@ -77,6 +80,94 @@ fn normalisiere(body: PersonalBody) -> Result<Normalisiert, AppError> {
     })
 }
 
+/// PATCH-Body (LFH-306, Tri-State): **jedes** Feld ist optional — absent = unverändert,
+/// `null`/`""` = leeren.
+///
+/// **Kein `#[serde(default)]` an `name`/`qualifikation_ids`** — das ist hier keine
+/// Stilfrage: `qualifikation_ids` trug im alten Vollersatz-Body ein
+/// `#[serde(default)] Vec<i64>`; jeder PATCH ohne das Feld löschte damit **alle**
+/// Qualifikationszuordnungen der Person. Als `Option<Vec<i64>>` heißt absent „Zuordnung
+/// unverändert", `Some(vec)` ersetzt die Menge vollständig, `Some([])` leert sie. Die
+/// Vollersatz-Semantik INNERHALB von `Some` bleibt bewusst erhalten (kein Diff-Protokoll).
+#[derive(Debug, Deserialize)]
+pub struct PatchPersonal {
+    pub name: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub benutzer_id: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub personalnummer: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub traegerorganisation: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub telefon: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub staerke_position: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub bemerkung: Option<Option<String>>,
+    pub qualifikation_ids: Option<Vec<i64>>,
+}
+
+/// Owned, validierte Patch-Felder; `PersonalPatch` borgt daraus.
+struct PatchNormalisiert {
+    name: Option<String>,
+    benutzer_id: Option<Option<i64>>,
+    personalnummer: Option<Option<String>>,
+    traegerorganisation: Option<Option<String>>,
+    telefon: Option<Option<String>>,
+    staerke_position: Option<Option<String>>,
+    bemerkung: Option<Option<String>>,
+    qualifikation_ids: Option<Vec<i64>>,
+}
+
+impl PatchNormalisiert {
+    fn patch(&self) -> PersonalPatch<'_> {
+        PersonalPatch {
+            name: self.name.as_deref(),
+            benutzer_id: self.benutzer_id,
+            personalnummer: self.personalnummer.as_ref().map(|v| v.as_deref()),
+            traegerorganisation: self.traegerorganisation.as_ref().map(|v| v.as_deref()),
+            telefon: self.telefon.as_ref().map(|v| v.as_deref()),
+            staerke_position: self.staerke_position.as_ref().map(|v| v.as_deref()),
+            bemerkung: self.bemerkung.as_ref().map(|v| v.as_deref()),
+        }
+    }
+}
+
+/// Prüft nur die **gesendeten** Felder. Ein vorhandenes, aber leeres Pflichtfeld ist 400,
+/// ein unbekannter Enum-Wert ebenfalls (Statuscode-Konvention LFH-305); ein absentes Feld
+/// ist schlicht kein Wunsch — die Prüfung darf nicht auf den Absent-Zweig durchschlagen,
+/// sonst wäre jeder Teil-Patch abgelehnt.
+fn normalisiere_patch(body: PatchPersonal) -> Result<PatchNormalisiert, AppError> {
+    let name = match body.name {
+        Some(n) => {
+            let n = n.trim().to_string();
+            if n.is_empty() {
+                return Err(AppError::Validation("Name darf nicht leer sein".into()));
+            }
+            Some(n)
+        }
+        None => None,
+    };
+    // `trimme_tri` macht aus `""` bereits den Leerwunsch — geprüft wird nur ein
+    // tatsächlich gesetzter Wert.
+    let staerke_position = trimme_tri(body.staerke_position);
+    if let Some(Some(s)) = &staerke_position {
+        if StaerkePosition::parse(s).is_none() {
+            return Err(AppError::Validation("Ungültige Stärke-Position".into()));
+        }
+    }
+    Ok(PatchNormalisiert {
+        name,
+        benutzer_id: body.benutzer_id,
+        personalnummer: trimme_tri(body.personalnummer),
+        traegerorganisation: trimme_tri(body.traegerorganisation),
+        telefon: trimme_tri(body.telefon),
+        staerke_position,
+        bemerkung: trimme_tri(body.bemerkung),
+        qualifikation_ids: body.qualifikation_ids,
+    })
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ListeParams {
     #[serde(default)]
@@ -120,20 +211,22 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(a)))
 }
 
-/// PATCH /api/personal/{id} — Admin, Vollersatz. NotFound bei fremder/unbek. id.
+/// PATCH /api/personal/{id} — Admin, echter Teil-Patch (LFH-306): Feld absent =
+/// unverändert, `null`/`""` = leeren. Ein absentes `qualifikation_ids` lässt die
+/// Zuordnung unberührt. NotFound bei fremder/unbek. id.
 pub async fn aktualisieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
     Path(id): Path<i64>,
-    JsonBody(body): JsonBody<PersonalBody>,
+    JsonBody(body): JsonBody<PatchPersonal>,
 ) -> Result<Json<PersonalAnzeige>, AppError> {
-    let n = normalisiere(body)?;
-    repo::aktualisiere(
+    let n = normalisiere_patch(body)?;
+    repo::patche(
         &state.pool,
         benutzer.org_id,
         id,
-        n.daten(),
-        &n.qualifikation_ids,
+        n.patch(),
+        n.qualifikation_ids.as_deref(),
     )
     .await?;
     let a = repo::laden_anzeige(&state.pool, benutzer.org_id, id).await?;

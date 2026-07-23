@@ -96,22 +96,68 @@ pub async fn anlegen(
     laden(pool, org_id, id).await
 }
 
-/// Vollersatz der editierbaren Felder (org-scoped). `NotFound`/`Conflict` analog.
-pub async fn aktualisiere(
+/// Teil-Patch der editierbaren Felder (LFH-306, Tri-State): äußere `Option` = „im Patch
+/// enthalten?", innere = Wert (`Some(None)` setzt die Soll-Spalte auf NULL).
+#[derive(Debug, Default)]
+pub struct TypPatch<'a> {
+    pub label: Option<&'a str>,
+    pub soll_fuehrer: Option<Option<i64>>,
+    pub soll_unterfuehrer: Option<Option<i64>>,
+    pub soll_mannschaft: Option<Option<i64>>,
+    pub sortier: Option<i64>,
+}
+
+/// Die drei Soll-Spalten **roh**, ohne die Glättung von [`zu_typ`] — Grundlage der
+/// Effektivzustands-Prüfung beim Teil-PATCH (LFH-306). `zu_typ` bildet ein (theoretisch)
+/// inkonsistentes Trio still auf `None` ab; gegen dieses geglättete Trio darf der Handler
+/// nicht validieren, sonst hinge die Prüfung an einer Annahme statt an der Zeile.
+/// `NotFound` bei fremder/unbekannter id.
+pub async fn soll_roh(
     pool: &SqlitePool,
     org_id: i64,
     id: i64,
-    daten: TypDaten<'_>,
+) -> Result<(Option<i64>, Option<i64>, Option<i64>), AppError> {
+    sqlx::query_as::<_, (Option<i64>, Option<i64>, Option<i64>)>(
+        "SELECT soll_fuehrer, soll_unterfuehrer, soll_mannschaft \
+         FROM einheit_typ WHERE id = ? AND org_id = ?",
+    )
+    .bind(id)
+    .bind(org_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)
+}
+
+/// Teil-Patch der editierbaren Felder (org-scoped). `NotFound`/`Conflict` analog.
+///
+/// Flag/Wert-Paare mit nummerierten Parametern (Vorlage `person/repo.rs`): nur gesendete
+/// Spalten werden angefasst. Geschrieben wird **nur der Patch**, nie das im Handler
+/// gemergte Soll-Trio — sonst wäre es wieder ein Vollersatz.
+pub async fn patche(
+    pool: &SqlitePool,
+    org_id: i64,
+    id: i64,
+    patch: TypPatch<'_>,
 ) -> Result<EinheitTyp, AppError> {
     let ergebnis = sqlx::query(
-        "UPDATE einheit_typ SET label = ?, soll_fuehrer = ?, soll_unterfuehrer = ?, \
-                soll_mannschaft = ?, sortier = ? WHERE id = ? AND org_id = ?",
+        "UPDATE einheit_typ SET \
+            label = CASE WHEN ?1 IS NULL THEN label ELSE ?2 END, \
+            soll_fuehrer = CASE WHEN ?3 IS NULL THEN soll_fuehrer ELSE ?4 END, \
+            soll_unterfuehrer = CASE WHEN ?5 IS NULL THEN soll_unterfuehrer ELSE ?6 END, \
+            soll_mannschaft = CASE WHEN ?7 IS NULL THEN soll_mannschaft ELSE ?8 END, \
+            sortier = CASE WHEN ?9 IS NULL THEN sortier ELSE ?10 END \
+         WHERE id = ?11 AND org_id = ?12",
     )
-    .bind(daten.label)
-    .bind(daten.soll_fuehrer)
-    .bind(daten.soll_unterfuehrer)
-    .bind(daten.soll_mannschaft)
-    .bind(daten.sortier)
+    .bind(patch.label.map(|_| 1_i64))
+    .bind(patch.label)
+    .bind(patch.soll_fuehrer.map(|_| 1_i64))
+    .bind(patch.soll_fuehrer.and_then(|v| v))
+    .bind(patch.soll_unterfuehrer.map(|_| 1_i64))
+    .bind(patch.soll_unterfuehrer.and_then(|v| v))
+    .bind(patch.soll_mannschaft.map(|_| 1_i64))
+    .bind(patch.soll_mannschaft.and_then(|v| v))
+    .bind(patch.sortier.map(|_| 1_i64))
+    .bind(patch.sortier)
     .bind(id)
     .bind(org_id)
     .execute(pool)
@@ -219,19 +265,99 @@ mod tests {
         ));
     }
 
+    /// Migriert aus `aktualisiere_ersetzt_felder` (LFH-306): ein Vollbody verhält sich
+    /// weiterhin wie ein Vollersatz — zusätzlich prüft der Test jetzt jede Spalte
+    /// einzeln (Bind-Reihenfolge der Flag/Wert-Kette).
     #[tokio::test]
-    async fn aktualisiere_ersetzt_felder() {
+    async fn patche_setzt_gesendete_felder() {
         let pool = crate::db::test_pool().await;
         org(&pool, 1).await;
         let t = anlegen(&pool, 1, daten("Zug", Some((1, 3, 18)), 40))
             .await
             .unwrap();
-        let neu = aktualisiere(&pool, 1, t.id, daten("Verstärkter Zug", None, 45))
-            .await
-            .unwrap();
+        let neu = patche(
+            &pool,
+            1,
+            t.id,
+            TypPatch {
+                label: Some("Verstärkter Zug"),
+                soll_fuehrer: Some(None),
+                soll_unterfuehrer: Some(None),
+                soll_mannschaft: Some(None),
+                sortier: Some(45),
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(neu.label, "Verstärkter Zug");
         assert_eq!(neu.soll, None);
         assert_eq!(neu.sortier, 45);
+    }
+
+    /// Der Kern von LFH-306: nicht gesendete Spalten bleiben stehen. Unter dem alten
+    /// Vollersatz fiel hier das Trio auf NULL und `sortier` auf 0.
+    #[tokio::test]
+    async fn patche_laesst_nicht_gesendete_spalten_stehen() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let t = anlegen(&pool, 1, daten("Zug", Some((1, 3, 18)), 40))
+            .await
+            .unwrap();
+        let neu = patche(
+            &pool,
+            1,
+            t.id,
+            TypPatch {
+                label: Some("Umbenannt"),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(neu.label, "Umbenannt");
+        assert_eq!(neu.soll, Some(Staerke::neu(1, 3, 18)), "Trio unberührt");
+        assert_eq!(neu.sortier, 40, "unberührt");
+    }
+
+    /// Einzelnes Soll-Feld setzen, die anderen beiden stehen lassen — das ist der Fall,
+    /// den die Effektivzustands-Prüfung im Handler überhaupt erst erlaubt.
+    #[tokio::test]
+    async fn patche_einzelnes_soll_feld_laesst_die_anderen_stehen() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let t = anlegen(&pool, 1, daten("Zug", Some((1, 3, 18)), 40))
+            .await
+            .unwrap();
+        let neu = patche(
+            &pool,
+            1,
+            t.id,
+            TypPatch {
+                soll_mannschaft: Some(Some(20)),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(neu.soll, Some(Staerke::neu(1, 3, 20)));
+    }
+
+    #[tokio::test]
+    async fn soll_roh_liefert_spalten_und_notfound_bei_fremder_org() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        org(&pool, 2).await;
+        let t = anlegen(&pool, 1, daten("Zug", Some((1, 3, 18)), 40))
+            .await
+            .unwrap();
+        assert_eq!(
+            soll_roh(&pool, 1, t.id).await.unwrap(),
+            (Some(1), Some(3), Some(18))
+        );
+        assert!(matches!(
+            soll_roh(&pool, 2, t.id).await.unwrap_err(),
+            AppError::NotFound
+        ));
     }
 
     #[tokio::test]
@@ -262,9 +388,17 @@ mod tests {
             AppError::NotFound
         ));
         assert!(matches!(
-            aktualisiere(&pool, 2, t.id, daten("X", None, 0))
-                .await
-                .unwrap_err(),
+            patche(
+                &pool,
+                2,
+                t.id,
+                TypPatch {
+                    label: Some("X"),
+                    ..Default::default()
+                }
+            )
+            .await
+            .unwrap_err(),
             AppError::NotFound
         ));
     }

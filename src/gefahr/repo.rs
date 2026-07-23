@@ -231,17 +231,25 @@ pub async fn gebiet_laden(
 }
 
 /// Benennt ein Gefahrengebiet um. `NotFound`, falls nicht zum Einsatz.
+///
+/// Teil-Patch (LFH-306, Tri-State): `gefahrengebiet.label` ist nullable, deshalb trägt der
+/// Parameter zwei `Option`-Schichten — `None` = Feld nicht im Patch (Spalte unverändert),
+/// `Some(None)` = Leerwunsch (Spalte auf NULL), `Some(Some(l))` = setzen. Vorher kollabierte
+/// „nicht gesendet" und „auf NULL setzen" zu ein und derselben Anfrage.
 pub async fn gebiet_umbenennen(
     pool: &SqlitePool,
     einsatz_id: i64,
     gid: i64,
-    label: Option<&str>,
+    label: Option<Option<&str>>,
 ) -> Result<GefahrengebietAnzeige, AppError> {
     let betroffen = sqlx::query(
-        "UPDATE gefahrengebiet SET label = ?, geaendert_at = datetime('now') \
-         WHERE id = ? AND einsatz_id = ?",
+        "UPDATE gefahrengebiet SET \
+            label = CASE WHEN ?1 IS NULL THEN label ELSE ?2 END, \
+            geaendert_at = datetime('now') \
+         WHERE id = ?3 AND einsatz_id = ?4",
     )
-    .bind(label)
+    .bind(label.map(|_| 1_i64))
+    .bind(label.and_then(|v| v))
     .bind(gid)
     .bind(einsatz_id)
     .execute(pool)
@@ -384,5 +392,53 @@ mod tests {
         gebiet_aufraeumen_wenn_leer(&pool, gid).await.unwrap();
         assert!(gebiete_liste(&pool, eid).await.unwrap().is_empty());
         assert!(liste(&pool, gid).await.unwrap().is_empty());
+    }
+
+    /// LFH-306: das Paar, das den Tri-State beweist. `None` (Feld nicht im Patch) lässt das
+    /// Label stehen, `Some(None)` leert es, `Some(Some(l))` setzt es. Vor dem Umbau nahm die
+    /// Funktion ein flaches `Option<&str>` — absent und „auf NULL" waren dieselbe Anfrage.
+    #[tokio::test]
+    async fn gebiet_umbenennen_unterscheidet_absent_von_null() {
+        let pool = crate::db::test_pool().await;
+        let (gid, _bid) = setup(&pool).await;
+        let eid: i64 = sqlx::query_scalar("SELECT einsatz_id FROM gefahrengebiet WHERE id = ?")
+            .bind(gid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+        // Setzen.
+        let g = gebiet_umbenennen(&pool, eid, gid, Some(Some("Süd")))
+            .await
+            .unwrap();
+        assert_eq!(g.label.as_deref(), Some("Süd"));
+
+        // Absent → Label bleibt stehen.
+        let g = gebiet_umbenennen(&pool, eid, gid, None).await.unwrap();
+        assert_eq!(g.label.as_deref(), Some("Süd"), "absent fasst nichts an");
+
+        // Leerwunsch → Label wird NULL.
+        let g = gebiet_umbenennen(&pool, eid, gid, Some(None))
+            .await
+            .unwrap();
+        assert_eq!(g.label, None, "Some(None) leert die Spalte");
+    }
+
+    #[tokio::test]
+    async fn gebiet_umbenennen_fremder_einsatz_ist_notfound() {
+        let pool = crate::db::test_pool().await;
+        let (gid, _bid) = setup(&pool).await;
+        let fremd: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Andere') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(matches!(
+            gebiet_umbenennen(&pool, fremd, gid, Some(Some("X")))
+                .await
+                .unwrap_err(),
+            AppError::NotFound
+        ));
     }
 }

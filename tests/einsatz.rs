@@ -1679,3 +1679,139 @@ async fn einstellungen_get_enthalt_org_defaults() {
         "Org-Default zeitzone muss unter org_defaults erscheinen"
     );
 }
+
+// ---------- LFH-306: Teil-PATCH der Kopfdaten mit Tri-State ----------
+
+/// Setzt alle zwölf Kopffelder auf distinkte Werte; liefert die id.
+async fn einsatz_mit_vollen_kopfdaten(app: &axum::Router, admin: &str) -> i64 {
+    let (_, json) = einsatz_anlegen(app, admin, "Alt").await;
+    let id = json["id"].as_i64().unwrap();
+    let mut body = basis_kopf("Lage Nord");
+    body["stichwort"] = json!("H1");
+    body["einsatzart"] = json!("uebung");
+    body["einsatznummer_intern"] = json!("EN-4711");
+    body["leitstellen_nr"] = json!("LS-42");
+    body["einsatzort"] = json!("Hauptstraße 1");
+    body["einsatzort_lat"] = json!(52.5);
+    body["einsatzort_lon"] = json!(13.4);
+    body["meldende_stelle"] = json!("Leitstelle Mitte");
+    body["sachverhalt"] = json!("Meldebild");
+    body["anzahl_betroffene_initial"] = json!(5);
+    body["begonnen_at"] = json!("2026-05-20 10:00:00");
+    let (status, _) = patch_kopf(app, admin, id, body).await;
+    assert_eq!(status, StatusCode::OK);
+    id
+}
+
+/// **Der unterscheidende Test der Route.** Der Marker-Verschiebe-Aufruf der Lagekarte
+/// sendet nur noch lat/lon — die übrigen zehn Felder müssen unangetastet bleiben.
+/// Unter dem alten Vollersatz war dieser Request gar nicht möglich (fehlende Pflichtfelder
+/// → Deserialisierungsfehler), und der Read-Modify-Write-Ersatz schrieb den veralteten
+/// Kopfstand des Clients zurück — inklusive der PII-Felder `sachverhalt`/`meldende_stelle`.
+#[tokio::test]
+async fn patch_nur_koordinate_laesst_die_uebrigen_felder_stehen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = einsatz_mit_vollen_kopfdaten(&app, &admin).await;
+
+    let (status, a) = patch_kopf(
+        &app,
+        &admin,
+        id,
+        json!({"einsatzort_lat": 48.1, "einsatzort_lon": 11.6}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(a["einsatzort_lat"], 48.1);
+    assert_eq!(a["einsatzort_lon"], 11.6);
+    assert_eq!(a["bezeichnung"], "Lage Nord");
+    assert_eq!(a["stichwort"], "H1");
+    assert_eq!(a["einsatzart"], "uebung");
+    assert_eq!(a["leitstellen_nr"], "LS-42");
+    assert_eq!(a["einsatzort"], "Hauptstraße 1");
+    assert_eq!(a["meldende_stelle"], "Leitstelle Mitte");
+    assert_eq!(a["sachverhalt"], "Meldebild");
+    assert_eq!(a["anzahl_betroffene_initial"], 5);
+    assert_eq!(a["begonnen_at"], "2026-05-20 10:00:00");
+    assert_eq!(a["einsatznummer_intern"], "EN-4711", "Nummer bleibt");
+}
+
+/// Grenzt gegen den vorigen ab: `null` leert genau die gesendeten Felder — und trennt die
+/// drei Ortsfelder voneinander (`einsatzort` weg, Koordinate bleibt).
+#[tokio::test]
+async fn patch_einsatzort_null_loescht_ort_aber_nicht_koordinate() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = einsatz_mit_vollen_kopfdaten(&app, &admin).await;
+
+    let (status, a) = patch_kopf(&app, &admin, id, json!({"einsatzort": null})).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(a["einsatzort"].is_null());
+    assert_eq!(a["einsatzort_lat"], 52.5, "Koordinate unberührt");
+    assert_eq!(a["einsatzort_lon"], 13.4);
+    assert_eq!(a["sachverhalt"], "Meldebild", "PII-Nachbarfeld unberührt");
+}
+
+/// Statuscode-Konvention (LFH-305): vorhandenes-aber-leeres Pflichtfeld → 400, absentes
+/// geht durch. Der Kontrast ist die Aussage.
+#[tokio::test]
+async fn patch_leere_bezeichnung_ist_400_ohne_bezeichnung_bleibt_sie_stehen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = einsatz_mit_vollen_kopfdaten(&app, &admin).await;
+
+    assert_eq!(
+        patch_kopf(&app, &admin, id, json!({"bezeichnung": "   "}))
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    // Unbekannte Einsatzart bleibt 400 — aber nur, wenn das Feld gesendet wurde.
+    assert_eq!(
+        patch_kopf(&app, &admin, id, json!({"einsatzart": "quatsch"}))
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    let (status, a) = patch_kopf(&app, &admin, id, json!({"stichwort": "H2"})).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(a["bezeichnung"], "Lage Nord");
+    assert_eq!(a["einsatzart"], "uebung");
+    assert_eq!(a["stichwort"], "H2");
+}
+
+/// `begonnen_at` war das einzige NOT-NULL-Pflichtfeld ohne Default: ohne das Feld gab es
+/// vorher einen Deserialisierungsfehler. Jetzt ist absent legal — und die Alarmzeit darf
+/// dabei NICHT auf 'now' springen.
+#[tokio::test]
+async fn patch_ohne_begonnen_at_behaelt_die_alarmzeit() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = einsatz_mit_vollen_kopfdaten(&app, &admin).await;
+
+    let (status, a) = patch_kopf(&app, &admin, id, json!({"stichwort": "H2"})).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(a["begonnen_at"], "2026-05-20 10:00:00");
+}
+
+/// Der Vollbody-Weg bleibt unverändert gültig: `EinsatzdatenPage` speichert bewusst alle
+/// Kopffelder atomar, und ein explizites `null` muss dort weiterhin leeren.
+#[tokio::test]
+async fn vollbody_patch_verhaelt_sich_weiter_wie_vollersatz() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let id = einsatz_mit_vollen_kopfdaten(&app, &admin).await;
+
+    let (status, a) = patch_kopf(&app, &admin, id, basis_kopf("Zurückgesetzt")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(a["bezeichnung"], "Zurückgesetzt");
+    assert_eq!(a["einsatzart"], "realeinsatz");
+    assert!(a["stichwort"].is_null());
+    assert!(a["leitstellen_nr"].is_null());
+    assert!(a["einsatzort"].is_null());
+    assert!(a["einsatzort_lat"].is_null());
+    assert!(a["meldende_stelle"].is_null());
+    assert!(a["sachverhalt"].is_null());
+    assert!(a["anzahl_betroffene_initial"].is_null());
+    assert_eq!(a["begonnen_at"], "2026-05-25 08:00:00");
+}

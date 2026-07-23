@@ -24,6 +24,20 @@ fn normalisiere_label(label: &str) -> Result<String, AppError> {
     Ok(l)
 }
 
+/// PATCH-Body (LFH-306): **jedes** Feld ist optional — absent = unverändert. Bewusst
+/// getrennt von [`QualifikationBody`]: der POST muss `label` weiterhin strukturell
+/// erzwingen (fehlendes Feld → 400 schon im Extractor).
+///
+/// Diese Route hat **keine** nullable Spalte, also auch keinen Tri-State. Der ganze Gewinn
+/// steckt im fehlenden `#[serde(default)]` an `sortier`: unter dem alten Vollersatz-Body
+/// setzte ein PATCH ohne `sortier` die NOT-NULL-Spalte still auf 0 und verschob den Eintrag
+/// in der Katalogliste. Belegt von `patch_ohne_sortier_laesst_sortier_stehen`.
+#[derive(Debug, Deserialize)]
+pub struct PatchQualifikation {
+    pub label: Option<String>,
+    pub sortier: Option<i64>,
+}
+
 /// GET /api/qualifikationen — aktive Katalog-Einträge (eigene Org), für die Auswahl.
 pub async fn liste(
     State(state): State<AppState>,
@@ -43,15 +57,30 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(q)))
 }
 
-/// PATCH /api/qualifikationen/{id} — Admin, Vollersatz label/sortier.
+/// PATCH /api/qualifikationen/{id} — Admin, echter Teil-Patch (LFH-306):
+/// Feld absent = unverändert. Ein vorhandenes, aber leeres `label` ist 400.
 pub async fn aktualisieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
     Path(id): Path<i64>,
-    JsonBody(body): JsonBody<QualifikationBody>,
+    JsonBody(body): JsonBody<PatchQualifikation>,
 ) -> Result<Json<Qualifikation>, AppError> {
-    let label = normalisiere_label(&body.label)?;
-    let q = repo::aktualisiere(&state.pool, benutzer.org_id, id, &label, body.sortier).await?;
+    // Nur das gesendete Feld prüfen — die Leer-Prüfung darf nicht auf den Absent-Zweig
+    // durchschlagen, sonst wäre jeder Teil-Patch abgelehnt.
+    let label = match body.label {
+        Some(l) => Some(normalisiere_label(&l)?),
+        None => None,
+    };
+    let q = repo::patche(
+        &state.pool,
+        benutzer.org_id,
+        id,
+        repo::QualifikationPatch {
+            label: label.as_deref(),
+            sortier: body.sortier,
+        },
+    )
+    .await?;
     Ok(Json(q))
 }
 

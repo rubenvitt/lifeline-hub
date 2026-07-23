@@ -3,9 +3,9 @@ use crate::auth::session::{AdminUser, CurrentUser};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::katalog::StatusKategorie;
-use crate::personal::status_repo::{self, StatusDaten};
+use crate::personal::status_repo::{self, StatusDaten, StatusPatch};
 use crate::personal::PersonalStatus;
-use crate::routes::support::trimme;
+use crate::routes::support::{deserialize_optional_field, trimme, trimme_tri};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -54,6 +54,68 @@ fn normalisiere(body: StatusBody) -> Result<Normalisiert, AppError> {
     })
 }
 
+/// PATCH-Body (LFH-306, Tri-State): **jedes** Feld ist optional — absent = unverändert.
+/// Bewusst getrennt von [`StatusBody`]: der POST muss seine Pflichtfelder weiterhin
+/// strukturell erzwingen (fehlendes `label` → 400 schon im Extractor).
+///
+/// **Kein `#[serde(default)]` an `sortier`** — das ist hier kein Stilfrage: ein `default`
+/// auf einem NOT-NULL-Feld macht aus „nicht gesendet" ein „auf 0 setzen" und ist genau der
+/// stille Spalten-Reset, den LFH-306 beseitigt. `Option<T>` deserialisiert absent ohnehin
+/// zu `None`; `default` braucht nur der Tri-State-Deserializer.
+#[derive(Debug, Deserialize)]
+pub struct PatchStatus {
+    pub label: Option<String>,
+    pub kategorie: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub farbe: Option<Option<String>>,
+    pub sortier: Option<i64>,
+}
+
+struct PatchNormalisiert {
+    label: Option<String>,
+    kategorie: Option<String>,
+    farbe: Option<Option<String>>,
+    sortier: Option<i64>,
+}
+
+impl PatchNormalisiert {
+    fn patch(&self) -> StatusPatch<'_> {
+        StatusPatch {
+            label: self.label.as_deref(),
+            kategorie: self.kategorie.as_deref(),
+            farbe: self.farbe.as_ref().map(|v| v.as_deref()),
+            sortier: self.sortier,
+        }
+    }
+}
+
+/// Prüft nur die **gesendeten** Felder. Ein vorhandenes, aber leeres Pflichtfeld ist 400
+/// (Statuscode-Konvention), ein absentes ist schlicht kein Wunsch — die Prüfung darf nicht
+/// auf den Absent-Zweig durchschlagen, sonst wäre jeder Teil-Patch abgelehnt.
+fn normalisiere_patch(body: PatchStatus) -> Result<PatchNormalisiert, AppError> {
+    let label = match body.label {
+        Some(l) => {
+            let l = l.trim().to_string();
+            if l.is_empty() {
+                return Err(AppError::Validation("Label darf nicht leer sein".into()));
+            }
+            Some(l)
+        }
+        None => None,
+    };
+    if let Some(k) = &body.kategorie {
+        if StatusKategorie::parse(k).is_none() {
+            return Err(AppError::Validation("Ungültige Kategorie".into()));
+        }
+    }
+    Ok(PatchNormalisiert {
+        label,
+        kategorie: body.kategorie,
+        farbe: trimme_tri(body.farbe),
+        sortier: body.sortier,
+    })
+}
+
 /// GET /api/personal-status — aktive Katalog-Einträge (eigene Org), für Dropdowns.
 pub async fn liste(
     State(state): State<AppState>,
@@ -75,15 +137,16 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(s)))
 }
 
-/// PATCH /api/personal-status/{id} — Admin, Vollersatz.
+/// PATCH /api/personal-status/{id} — Admin, echter Teil-Patch (LFH-306):
+/// Feld absent = unverändert, `null`/`""` bei `farbe` = leeren.
 pub async fn aktualisieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
     Path(id): Path<i64>,
-    JsonBody(body): JsonBody<StatusBody>,
+    JsonBody(body): JsonBody<PatchStatus>,
 ) -> Result<Json<PersonalStatus>, AppError> {
-    let n = normalisiere(body)?;
-    let s = status_repo::aktualisiere(&state.pool, benutzer.org_id, id, n.daten()).await?;
+    let n = normalisiere_patch(body)?;
+    let s = status_repo::patche(&state.pool, benutzer.org_id, id, n.patch()).await?;
     Ok(Json(s))
 }
 

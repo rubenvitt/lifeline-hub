@@ -555,53 +555,83 @@ pub async fn schwaerze_einsatz(
     Ok(true)
 }
 
-/// Editierbare Kopffelder für `aktualisiere_kopf`. Optional-Strings sind bereits
-/// vom Handler getrimmt; leere Werte werden als `None` übergeben (→ NULL).
-#[derive(Debug)]
-pub struct KopfDaten<'a> {
-    pub bezeichnung: &'a str,
-    pub stichwort: Option<&'a str>,
-    pub einsatzart: &'a str,
-    pub einsatznummer_intern: Option<&'a str>,
-    pub leitstellen_nr: Option<&'a str>,
-    pub einsatzort: Option<&'a str>,
-    pub einsatzort_lat: Option<f64>,
-    pub einsatzort_lon: Option<f64>,
-    pub meldende_stelle: Option<&'a str>,
-    pub sachverhalt: Option<&'a str>,
-    pub anzahl_betroffene_initial: Option<i64>,
+/// Teil-Patch der editierbaren Kopf-Spalten (LFH-306, Tri-State): äußere `Option` = „im
+/// Patch enthalten?", innere = Wert (`Some(None)` setzt die Spalte auf NULL). Die drei
+/// NOT-NULL-Spalten (`bezeichnung`, `einsatzart`, `begonnen_at`) tragen nur die äußere
+/// `Option` — sie lassen sich nicht leeren, nur setzen oder unberührt lassen.
+#[derive(Debug, Default)]
+pub struct KopfPatch<'a> {
+    pub bezeichnung: Option<&'a str>,
+    pub stichwort: Option<Option<&'a str>>,
+    pub einsatzart: Option<&'a str>,
+    pub einsatznummer_intern: Option<Option<&'a str>>,
+    pub leitstellen_nr: Option<Option<&'a str>>,
+    pub einsatzort: Option<Option<&'a str>>,
+    pub einsatzort_lat: Option<Option<f64>>,
+    pub einsatzort_lon: Option<Option<f64>>,
+    pub meldende_stelle: Option<Option<&'a str>>,
+    pub sachverhalt: Option<Option<&'a str>>,
+    pub anzahl_betroffene_initial: Option<Option<i64>>,
     /// Bereits ins DB-Format normalisierte Alarmzeit.
-    pub begonnen_at: &'a str,
+    pub begonnen_at: Option<&'a str>,
 }
 
-/// Vollersatz der editierbaren Kopf-Spalten (ein atomares Speichern).
-/// Nicht-editierbare Spalten (status, abgeschlossen_*, angelegt_at, org_id, id)
-/// bleiben unberührt. Ein Verstoß gegen den Einsatznummer-Unique-Index ergibt
-/// `Conflict` (409).
-pub async fn aktualisiere_kopf(
+/// Teil-Patch der editierbaren Kopf-Spalten. Nicht-editierbare Spalten (status,
+/// abgeschlossen_*, angelegt_at, org_id, id) bleiben unberührt. Ein Verstoß gegen den
+/// Einsatznummer-Unique-Index ergibt `Conflict` (409).
+///
+/// Flag/Wert-Paare mit **nummerierten** Parametern (LFH-266/F12, Vorlage `person/repo.rs`).
+/// Bei ZWÖLF gleichtypigen Paaren ist die Nummerierung die eigentliche Absicherung: eine um
+/// eine Position verschobene Bind-Kette vertauschte Nachbarspalten
+/// (`meldende_stelle`↔`sachverhalt`, `einsatzort_lat`↔`einsatzort_lon`) STILL — ohne
+/// Compile- und ohne Laufzeitfehler. Abgesichert von
+/// `patche_kopf_setzt_jede_spalte_an_ihren_platz`.
+pub async fn patche_kopf(
     pool: &SqlitePool,
     einsatz_id: i64,
-    daten: KopfDaten<'_>,
+    patch: KopfPatch<'_>,
 ) -> Result<Einsatz, AppError> {
     let ergebnis = sqlx::query(
         "UPDATE einsatz SET \
-            bezeichnung = ?, stichwort = ?, einsatzart = ?, einsatznummer_intern = ?, \
-            leitstellen_nr = ?, einsatzort = ?, einsatzort_lat = ?, einsatzort_lon = ?, \
-            meldende_stelle = ?, sachverhalt = ?, anzahl_betroffene_initial = ?, begonnen_at = ? \
-         WHERE id = ?",
+            bezeichnung = CASE WHEN ?1 IS NULL THEN bezeichnung ELSE ?2 END, \
+            stichwort = CASE WHEN ?3 IS NULL THEN stichwort ELSE ?4 END, \
+            einsatzart = CASE WHEN ?5 IS NULL THEN einsatzart ELSE ?6 END, \
+            einsatznummer_intern = CASE WHEN ?7 IS NULL THEN einsatznummer_intern ELSE ?8 END, \
+            leitstellen_nr = CASE WHEN ?9 IS NULL THEN leitstellen_nr ELSE ?10 END, \
+            einsatzort = CASE WHEN ?11 IS NULL THEN einsatzort ELSE ?12 END, \
+            einsatzort_lat = CASE WHEN ?13 IS NULL THEN einsatzort_lat ELSE ?14 END, \
+            einsatzort_lon = CASE WHEN ?15 IS NULL THEN einsatzort_lon ELSE ?16 END, \
+            meldende_stelle = CASE WHEN ?17 IS NULL THEN meldende_stelle ELSE ?18 END, \
+            sachverhalt = CASE WHEN ?19 IS NULL THEN sachverhalt ELSE ?20 END, \
+            anzahl_betroffene_initial = \
+                CASE WHEN ?21 IS NULL THEN anzahl_betroffene_initial ELSE ?22 END, \
+            begonnen_at = CASE WHEN ?23 IS NULL THEN begonnen_at ELSE ?24 END \
+         WHERE id = ?25",
     )
-    .bind(daten.bezeichnung)
-    .bind(daten.stichwort)
-    .bind(daten.einsatzart)
-    .bind(daten.einsatznummer_intern)
-    .bind(daten.leitstellen_nr)
-    .bind(daten.einsatzort)
-    .bind(daten.einsatzort_lat)
-    .bind(daten.einsatzort_lon)
-    .bind(daten.meldende_stelle)
-    .bind(daten.sachverhalt)
-    .bind(daten.anzahl_betroffene_initial)
-    .bind(daten.begonnen_at)
+    .bind(patch.bezeichnung.map(|_| 1_i64))
+    .bind(patch.bezeichnung)
+    .bind(patch.stichwort.map(|_| 1_i64))
+    .bind(patch.stichwort.and_then(|v| v))
+    .bind(patch.einsatzart.map(|_| 1_i64))
+    .bind(patch.einsatzart)
+    .bind(patch.einsatznummer_intern.map(|_| 1_i64))
+    .bind(patch.einsatznummer_intern.and_then(|v| v))
+    .bind(patch.leitstellen_nr.map(|_| 1_i64))
+    .bind(patch.leitstellen_nr.and_then(|v| v))
+    .bind(patch.einsatzort.map(|_| 1_i64))
+    .bind(patch.einsatzort.and_then(|v| v))
+    .bind(patch.einsatzort_lat.map(|_| 1_i64))
+    .bind(patch.einsatzort_lat.and_then(|v| v))
+    .bind(patch.einsatzort_lon.map(|_| 1_i64))
+    .bind(patch.einsatzort_lon.and_then(|v| v))
+    .bind(patch.meldende_stelle.map(|_| 1_i64))
+    .bind(patch.meldende_stelle.and_then(|v| v))
+    .bind(patch.sachverhalt.map(|_| 1_i64))
+    .bind(patch.sachverhalt.and_then(|v| v))
+    .bind(patch.anzahl_betroffene_initial.map(|_| 1_i64))
+    .bind(patch.anzahl_betroffene_initial.and_then(|v| v))
+    .bind(patch.begonnen_at.map(|_| 1_i64))
+    .bind(patch.begonnen_at)
     .bind(einsatz_id)
     .execute(pool)
     .await;
@@ -1274,68 +1304,132 @@ mod tests {
         );
     }
 
+    /// Migriert aus `aktualisiere_kopf_setzt_felder_und_leere_optionals_null` (LFH-306):
+    /// ein VOLLSTÄNDIGER Patch verhält sich weiterhin wie der frühere Vollersatz, und der
+    /// explizite Leerwunsch (`Some(None)`) schreibt weiterhin NULL. Zugleich der
+    /// Bind-Reihenfolge-Test der zwölf Flag/Wert-Paare: jede Spalte trägt einen anderen
+    /// Wert und wird einzeln geprüft — eine verschobene Kette vertauschte
+    /// `meldende_stelle`↔`sachverhalt` bzw. `einsatzort_lat`↔`einsatzort_lon` still.
     #[tokio::test]
-    async fn aktualisiere_kopf_setzt_felder_und_leere_optionals_null() {
+    async fn patche_kopf_setzt_jede_spalte_an_ihren_platz() {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
         let einsatz = anlegen(&pool, "Alt", None, leit).await.unwrap();
 
-        let aktualisiert = aktualisiere_kopf(
+        let aktualisiert = patche_kopf(
             &pool,
             einsatz.id,
-            KopfDaten {
-                bezeichnung: "Neu",
-                stichwort: Some("H1"),
-                einsatzart: crate::einsatz::EINSATZART_UEBUNG,
-                einsatznummer_intern: einsatz.einsatznummer_intern.as_deref(),
-                leitstellen_nr: None,
-                einsatzort: Some("Hauptstraße 1"),
-                einsatzort_lat: Some(52.5),
-                einsatzort_lon: Some(13.4),
-                meldende_stelle: None,
-                sachverhalt: Some("Mehrzeiliges\nMeldebild"),
-                anzahl_betroffene_initial: Some(3),
-                begonnen_at: "2026-05-25 08:00:00",
+            KopfPatch {
+                bezeichnung: Some("Neu"),
+                stichwort: Some(Some("H1")),
+                einsatzart: Some(crate::einsatz::EINSATZART_UEBUNG),
+                einsatznummer_intern: Some(einsatz.einsatznummer_intern.as_deref()),
+                leitstellen_nr: Some(None),
+                einsatzort: Some(Some("Hauptstraße 1")),
+                einsatzort_lat: Some(Some(52.5)),
+                einsatzort_lon: Some(Some(13.4)),
+                meldende_stelle: Some(None),
+                sachverhalt: Some(Some("Mehrzeiliges\nMeldebild")),
+                anzahl_betroffene_initial: Some(Some(3)),
+                begonnen_at: Some("2026-05-25 08:00:00"),
             },
         )
         .await
         .unwrap();
 
         assert_eq!(aktualisiert.bezeichnung, "Neu");
+        assert_eq!(aktualisiert.stichwort.as_deref(), Some("H1"));
         assert_eq!(aktualisiert.einsatzart, Einsatzart::Uebung);
         assert_eq!(aktualisiert.einsatzort.as_deref(), Some("Hauptstraße 1"));
         assert_eq!(aktualisiert.einsatzort_lat, Some(52.5));
+        assert_eq!(aktualisiert.einsatzort_lon, Some(13.4));
+        assert_eq!(
+            aktualisiert.sachverhalt.as_deref(),
+            Some("Mehrzeiliges\nMeldebild")
+        );
         assert_eq!(aktualisiert.anzahl_betroffene_initial, Some(3));
-        assert_eq!(aktualisiert.leitstellen_nr, None);
+        assert_eq!(aktualisiert.leitstellen_nr, None, "Some(None) leert");
+        assert_eq!(aktualisiert.meldende_stelle, None, "Some(None) leert");
         assert_eq!(aktualisiert.begonnen_at, "2026-05-25 08:00:00");
         // angelegt_at bleibt unverändert (Audit-Spur).
         assert_eq!(aktualisiert.angelegt_at, einsatz.angelegt_at);
     }
 
+    /// Der Kern von LFH-306: ein Patch fasst nur die gesendeten Spalten an. Der
+    /// `Default`-Patch (alle Felder absent) lässt die Zeile vollständig in Ruhe —
+    /// insbesondere springt `begonnen_at` nicht auf `now`.
     #[tokio::test]
-    async fn aktualisiere_kopf_doppelte_nummer_ist_conflict() {
+    async fn patche_kopf_laesst_nicht_gesendete_spalten_stehen() {
+        let pool = crate::db::test_pool().await;
+        let leit = benutzer_anlegen(&pool, "leit").await;
+        let einsatz = anlegen(&pool, "Alt", None, leit).await.unwrap();
+        let voll = patche_kopf(
+            &pool,
+            einsatz.id,
+            KopfPatch {
+                stichwort: Some(Some("H1")),
+                einsatzort: Some(Some("Hauptstraße 1")),
+                meldende_stelle: Some(Some("Leitstelle")),
+                sachverhalt: Some(Some("Meldebild")),
+                anzahl_betroffene_initial: Some(Some(3)),
+                begonnen_at: Some("2026-05-25 08:00:00"),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+        let nachher = patche_kopf(
+            &pool,
+            einsatz.id,
+            KopfPatch {
+                einsatzort_lat: Some(Some(52.5)),
+                einsatzort_lon: Some(Some(13.4)),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(nachher.einsatzort_lat, Some(52.5));
+        assert_eq!(nachher.bezeichnung, voll.bezeichnung);
+        assert_eq!(nachher.stichwort, voll.stichwort);
+        assert_eq!(nachher.einsatzort, voll.einsatzort);
+        assert_eq!(nachher.meldende_stelle, voll.meldende_stelle);
+        assert_eq!(nachher.sachverhalt, voll.sachverhalt);
+        assert_eq!(
+            nachher.anzahl_betroffene_initial,
+            voll.anzahl_betroffene_initial
+        );
+        assert_eq!(nachher.einsatznummer_intern, voll.einsatznummer_intern);
+        assert_eq!(
+            nachher.begonnen_at, "2026-05-25 08:00:00",
+            "Alarmzeit darf nicht auf 'now' springen"
+        );
+
+        // Leerer Patch → die Zeile bleibt vollständig, kein Fehler.
+        let unveraendert = patche_kopf(&pool, einsatz.id, KopfPatch::default())
+            .await
+            .unwrap();
+        assert_eq!(unveraendert.stichwort, voll.stichwort);
+        assert_eq!(unveraendert.begonnen_at, "2026-05-25 08:00:00");
+    }
+
+    /// Migriert aus `aktualisiere_kopf_doppelte_nummer_ist_conflict` (LFH-306): der 409
+    /// auf den Einsatznummer-Unique-Index überlebt den Umbau auf Flag/Wert-Paare.
+    #[tokio::test]
+    async fn patche_kopf_doppelte_nummer_ist_conflict() {
         let pool = crate::db::test_pool().await;
         let leit = benutzer_anlegen(&pool, "leit").await;
         let a = anlegen(&pool, "A", None, leit).await.unwrap();
         let b = anlegen(&pool, "B", None, leit).await.unwrap();
 
         // b auf a's Nummer setzen → Unique-Verstoß → Conflict.
-        let err = aktualisiere_kopf(
+        let err = patche_kopf(
             &pool,
             b.id,
-            KopfDaten {
-                bezeichnung: "B",
-                stichwort: None,
-                einsatzart: crate::einsatz::EINSATZART_REALEINSATZ,
-                einsatznummer_intern: a.einsatznummer_intern.as_deref(),
-                leitstellen_nr: None,
-                einsatzort: None,
-                einsatzort_lat: None,
-                einsatzort_lon: None,
-                meldende_stelle: None,
-                sachverhalt: None,
-                anzahl_betroffene_initial: None,
-                begonnen_at: &b.begonnen_at,
+            KopfPatch {
+                einsatznummer_intern: Some(a.einsatznummer_intern.as_deref()),
+                ..Default::default()
             },
         )
         .await

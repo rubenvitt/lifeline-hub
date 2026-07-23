@@ -426,3 +426,62 @@ async fn umbenennen_setzt_label_und_fremdes_gid_ist_404() {
     .await;
     assert_eq!(s2, StatusCode::NOT_FOUND);
 }
+
+// ---------- LFH-306: Teil-PATCH mit Tri-State ----------
+
+/// **Der unterscheidende Test.** `gefahrengebiet.label` ist nullable — vor LFH-306 nahm der
+/// Handler den Ein-Feld-Body durch `trimme`, wodurch „Feld nicht gesendet" und „Label auf
+/// NULL setzen" zu ein und derselben Anfrage kollabierten: ein PATCH ohne `label` löschte
+/// das Label still. Dieser Test ist gegen HEAD gar nicht formulierbar gewesen.
+/// Gegenstück: `patch_label_null_loescht_label`.
+#[tokio::test]
+async fn patch_ohne_label_laesst_label_stehen() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
+
+    let (status, g) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}"),
+        &admin,
+        Some("{}"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{g:?}");
+    assert_eq!(g["label"], "Nord", "nicht gesendetes Label bleibt");
+}
+
+#[tokio::test]
+async fn patch_label_null_loescht_label() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
+
+    let (status, g) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}"),
+        &admin,
+        Some(&json!({ "label": Value::Null }).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{g:?}");
+    assert!(g["label"].is_null(), "explizites null leert das Label");
+
+    // `""` ist der zweite Weg zum Leerwunsch (trimme_tri) — die Formulare schicken bei
+    // geleertem Eingabefeld einen Leerstring, kein `null`.
+    let gid2 = gefahrengebiet_anlegen(&app, &admin, einsatz, "Süd").await;
+    let (status, g2) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid2}"),
+        &admin,
+        Some(&json!({"label":"   "}).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{g2:?}");
+    assert!(g2["label"].is_null());
+}

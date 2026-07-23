@@ -494,8 +494,9 @@ async fn sprechgruppe_anlegen(
 }
 
 /// Einheit mit optionalem Vater und Sprechgruppen bilden. Die Sprechgruppen werden
-/// direkt beim Bilden gesetzt — ein nachgelagertes PATCH wäre Vollersatz und würde
-/// `ueber_einheit_id` stillschweigend leeren.
+/// direkt beim Bilden gesetzt. (Seit LFH-306 wäre ein nachgelagertes PATCH ungefährlich —
+/// es fasste `ueber_einheit_id` nicht mehr an —, der Aufbau bleibt trotzdem so, weil er
+/// den Testaufbau in einem Request hält.)
 async fn einheit_unter(
     app: &axum::Router,
     cookie: &str,
@@ -926,4 +927,252 @@ async fn liste_mischt_keine_kraefte_aus_einem_zweiten_einsatz() {
         (1, 0, 0),
         "auch die kumulierte Stärke bleibt auf den eigenen Einsatz beschränkt"
     );
+}
+
+// ---------- LFH-306: Teil-PATCH mit Tri-State ----------
+
+/// Bildet eine Einheit mit VOLL besetzten Nebenfeldern (Soll-Trio, Bemerkung,
+/// Kommunikationsmittel, Erreichbarkeit, Sortierung) und ordnet ihr eine Sprechgruppe zu.
+async fn einheit_voll(app: &axum::Router, cookie: &str, einsatz: i64, sg: i64) -> i64 {
+    let (s, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        cookie,
+        Some(&format!(
+            r#"{{"name":"1. Zug","soll_fuehrer":1,"soll_unterfuehrer":3,"soll_mannschaft":18,
+                 "bemerkung":"Bem","kommunikationsmittel":"digitalfunk",
+                 "erreichbarkeit":"0170/12345","sortier":42,"sprechgruppe_ids":[{sg}]}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    json["id"].as_i64().unwrap()
+}
+
+/// **Der fachliche Kern des Commits.** Bildet exakt den `fuehrerSetzen`-Aufruf der
+/// Einheiten-Seite nach: ein PATCH, der NUR `fuehrer_id` trägt. Unter dem alten Vollersatz
+/// löschte dieser Request stillschweigend Kommunikationsmittel, Erreichbarkeit und die
+/// Sprechgruppen-Zuordnung der Einheit und nullte das Soll-Trio.
+#[tokio::test]
+async fn patch_fuehrer_laesst_kommunikationsmittel_erreichbarkeit_und_sprechgruppen_stehen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sg = sprechgruppe_anlegen(&app, &admin, "100_T_LAGE", "TMO", 10).await;
+    let e = einheit_voll(&app, &admin, einsatz, sg).await;
+    let ep = person_anlegen(&app, &admin, einsatz, "Chef").await;
+    personal_zuordnen(&app, &admin, einsatz, e, ep).await;
+
+    let (status, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{e}"),
+        &admin,
+        Some(&format!(r#"{{"fuehrer_id":{ep}}}"#)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["fuehrer_id"], ep);
+    assert_eq!(json["name"], "1. Zug", "Pflichtfeld unberührt");
+    assert_eq!(json["kommunikationsmittel"], "digitalfunk");
+    assert_eq!(json["erreichbarkeit"], "0170/12345");
+    assert_eq!(json["bemerkung"], "Bem");
+    assert_eq!(json["sortier"], 42);
+    assert_eq!(json["soll"]["fuehrer"], 1);
+    assert_eq!(json["soll"]["unterfuehrer"], 3);
+    assert_eq!(json["soll"]["mannschaft"], 18);
+    assert_eq!(
+        namen(&json["sprechgruppen"], "bezeichnung"),
+        vec!["100_T_LAGE"],
+        "Sprechgruppen-Zuordnung darf ein Patch ohne den Key nicht löschen"
+    );
+}
+
+/// Die Änderungserkennung des Führers hängt jetzt an „Feld im Patch enthalten UND Wert
+/// verschieden". Ein Patch ohne `fuehrer_id` darf keinen Führerwechsel auf `None` und
+/// damit auch keinen ETB-Eintrag auslösen. Der ETB-Zähler ist die Assertion, die ein
+/// reiner Spaltenvergleich nicht sichtbar machen würde.
+#[tokio::test]
+async fn patch_ohne_fuehrer_id_loest_keinen_fuehrerwechsel_aus() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sg = sprechgruppe_anlegen(&app, &admin, "100_T_LAGE", "TMO", 10).await;
+    let e = einheit_voll(&app, &admin, einsatz, sg).await;
+    let ep = person_anlegen(&app, &admin, einsatz, "Chef").await;
+    personal_zuordnen(&app, &admin, einsatz, e, ep).await;
+    // Führer setzen (erzeugt EINEN ETB-Eintrag).
+    anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{e}"),
+        &admin,
+        Some(&format!(r#"{{"fuehrer_id":{ep}}}"#)),
+    )
+    .await;
+    let vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+
+    // Patch ohne `fuehrer_id` → kein Wechsel, kein ETB-Eintrag, Führer bleibt.
+    let (status, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{e}"),
+        &admin,
+        Some(r#"{"bemerkung":"neue Bemerkung"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["fuehrer_id"], ep, "Führer bleibt gesetzt");
+    assert_eq!(json["bemerkung"], "neue Bemerkung");
+    assert_eq!(
+        system_etb_anzahl(&app, &admin, einsatz).await,
+        vorher,
+        "kein Führerwechsel → kein ETB-Eintrag"
+    );
+}
+
+/// Grenzt gegen den vorigen ab: der Leer-Weg bleibt offen. `null` entfernt den Führer
+/// UND schreibt dafür den ETB-Eintrag.
+#[tokio::test]
+async fn patch_fuehrer_id_null_entfernt_fuehrer() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sg = sprechgruppe_anlegen(&app, &admin, "100_T_LAGE", "TMO", 10).await;
+    let e = einheit_voll(&app, &admin, einsatz, sg).await;
+    let ep = person_anlegen(&app, &admin, einsatz, "Chef").await;
+    personal_zuordnen(&app, &admin, einsatz, e, ep).await;
+    anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{e}"),
+        &admin,
+        Some(&format!(r#"{{"fuehrer_id":{ep}}}"#)),
+    )
+    .await;
+    let vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+
+    let (status, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{e}"),
+        &admin,
+        Some(r#"{"fuehrer_id":null}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(json["fuehrer_id"].is_null());
+    assert_eq!(
+        system_etb_anzahl(&app, &admin, einsatz).await,
+        vorher + 1,
+        "Führer entfernt → genau ein ETB-Eintrag"
+    );
+}
+
+/// `sprechgruppe_ids` war schon vor LFH-306 tri-state — der Test pinnt, dass der Umbau
+/// die Semantik nicht verdreht hat: absent = unverändert, `[]` = leeren.
+#[tokio::test]
+async fn patch_ohne_sprechgruppe_ids_laesst_zuordnung_stehen_leeres_array_leert() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sg = sprechgruppe_anlegen(&app, &admin, "100_T_LAGE", "TMO", 10).await;
+    let e = einheit_voll(&app, &admin, einsatz, sg).await;
+
+    let (_, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{e}"),
+        &admin,
+        Some(r#"{"name":"Umbenannt"}"#),
+    )
+    .await;
+    assert_eq!(
+        namen(&json["sprechgruppen"], "bezeichnung"),
+        vec!["100_T_LAGE"]
+    );
+
+    let (_, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/einheiten/{e}"),
+        &admin,
+        Some(r#"{"sprechgruppe_ids":[]}"#),
+    )
+    .await;
+    assert!(json["sprechgruppen"].as_array().unwrap().is_empty());
+}
+
+/// Effektivzustands-Prüfung des Soll-Trios: EIN Feld patchen ist zulässig, weil der
+/// Bestand die anderen zwei trägt; das Trio halb zu leeren bleibt 400; alle drei `null`
+/// leert es legitim.
+#[tokio::test]
+async fn patch_soll_trio_prueft_gegen_bestand() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sg = sprechgruppe_anlegen(&app, &admin, "100_T_LAGE", "TMO", 10).await;
+    let e = einheit_voll(&app, &admin, einsatz, sg).await;
+    let pfad = format!("/api/einsaetze/{einsatz}/einheiten/{e}");
+
+    let (status, json) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(r#"{"soll_mannschaft":20}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["soll"]["fuehrer"], 1);
+    assert_eq!(json["soll"]["mannschaft"], 20);
+
+    assert_eq!(
+        anfrage(
+            &app,
+            "PATCH",
+            &pfad,
+            &admin,
+            Some(r#"{"soll_fuehrer":null}"#)
+        )
+        .await
+        .0,
+        StatusCode::BAD_REQUEST,
+        "Trio darf nicht halb geleert werden"
+    );
+
+    let (status, json) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(r#"{"soll_fuehrer":null,"soll_unterfuehrer":null,"soll_mannschaft":null}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(json["soll"].is_null());
+}
+
+/// Statuscode-Konvention (LFH-305): vorhandenes-aber-leeres Pflichtfeld → 400, absentes
+/// geht durch. Der Kontrast ist die Aussage.
+#[tokio::test]
+async fn patch_leerer_name_ist_400_absenter_laesst_namen_stehen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sg = sprechgruppe_anlegen(&app, &admin, "100_T_LAGE", "TMO", 10).await;
+    let e = einheit_voll(&app, &admin, einsatz, sg).await;
+    let pfad = format!("/api/einsaetze/{einsatz}/einheiten/{e}");
+
+    assert_eq!(
+        anfrage(&app, "PATCH", &pfad, &admin, Some(r#"{"name":"   "}"#))
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    let (status, json) = anfrage(&app, "PATCH", &pfad, &admin, Some(r#"{"sortier":9}"#)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["name"], "1. Zug");
+    assert_eq!(json["sortier"], 9);
 }

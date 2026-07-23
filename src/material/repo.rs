@@ -102,8 +102,78 @@ pub async fn anlegen(
     laden(pool, org_id, id).await
 }
 
+/// Teil-Patch der editierbaren Stammfelder (LFH-306, Tri-State): die äußere `Option` sagt
+/// „im Patch enthalten?" — `None` lässt die Spalte unverändert. Bei den nullable Spalten
+/// trägt der Wert selbst noch eine `Option`: `Some(None)` setzt sie auf NULL.
+#[derive(Debug, Default)]
+pub struct MaterialPatch<'a> {
+    pub bezeichnung: Option<&'a str>,
+    pub kategorie: Option<Option<&'a str>>,
+    pub bestandsnummer: Option<Option<&'a str>>,
+    pub traegerorganisation: Option<Option<&'a str>>,
+    pub standort: Option<Option<&'a str>>,
+    pub bemerkung: Option<Option<&'a str>>,
+}
+
+/// Teil-Patch der editierbaren Felder (org-scoped). `NotFound` bei fremder Org,
+/// `Conflict` bei Bestandsnummer-Dublette — beides unverändert gegenüber dem früheren
+/// Vollersatz.
+///
+/// Flag/Wert-Paare statt COALESCE (LFH-266/F12, Vorlage `personal/status_repo.rs`): erst so
+/// lässt sich eine nullable Spalte über die API wieder auf NULL setzen, und ein nicht
+/// gesendetes Feld fasst seine Spalte nicht an. Die Parameter sind **nummeriert**, weil
+/// eine um eine Position verschobene Bind-Kette die gleichtypigen Nachbarspalten
+/// (`standort`↔`bemerkung`) STILL vertauschen würde — abgesichert von
+/// `patche_setzt_jede_spalte_an_ihren_platz`.
+pub async fn patche(
+    pool: &SqlitePool,
+    org_id: i64,
+    id: i64,
+    patch: MaterialPatch<'_>,
+) -> Result<Material, AppError> {
+    let ergebnis = sqlx::query(
+        "UPDATE material SET \
+            bezeichnung = CASE WHEN ?1 IS NULL THEN bezeichnung ELSE ?2 END, \
+            kategorie = CASE WHEN ?3 IS NULL THEN kategorie ELSE ?4 END, \
+            bestandsnummer = CASE WHEN ?5 IS NULL THEN bestandsnummer ELSE ?6 END, \
+            traegerorganisation = CASE WHEN ?7 IS NULL THEN traegerorganisation ELSE ?8 END, \
+            standort = CASE WHEN ?9 IS NULL THEN standort ELSE ?10 END, \
+            bemerkung = CASE WHEN ?11 IS NULL THEN bemerkung ELSE ?12 END \
+         WHERE id = ?13 AND org_id = ?14",
+    )
+    .bind(patch.bezeichnung.map(|_| 1_i64))
+    .bind(patch.bezeichnung)
+    .bind(patch.kategorie.map(|_| 1_i64))
+    .bind(patch.kategorie.and_then(|v| v))
+    .bind(patch.bestandsnummer.map(|_| 1_i64))
+    .bind(patch.bestandsnummer.and_then(|v| v))
+    .bind(patch.traegerorganisation.map(|_| 1_i64))
+    .bind(patch.traegerorganisation.and_then(|v| v))
+    .bind(patch.standort.map(|_| 1_i64))
+    .bind(patch.standort.and_then(|v| v))
+    .bind(patch.bemerkung.map(|_| 1_i64))
+    .bind(patch.bemerkung.and_then(|v| v))
+    .bind(id)
+    .bind(org_id)
+    .execute(pool)
+    .await;
+
+    let resultat = match ergebnis {
+        Ok(r) => r,
+        Err(e) => return bestandsnummer_conflict(e),
+    };
+    if resultat.rows_affected() == 0 {
+        return Err(AppError::NotFound);
+    }
+    laden(pool, org_id, id).await
+}
+
 /// Vollersatz der editierbaren Felder (org-scoped). `NotFound` bei fremder Org,
 /// `Conflict` bei Bestandsnummer-Dublette.
+///
+/// **Nicht mehr im Produktivpfad** — die PATCH-Route nutzt seit LFH-306 [`patche`].
+/// Bleibt stehen, weil die co-lokierten Tests von `material/disposition_repo.rs` sie als
+/// Stamm-Änderungs-Werkzeug (Snapshot-vs-Live) aufrufen.
 pub async fn aktualisiere(
     pool: &SqlitePool,
     org_id: i64,
@@ -302,29 +372,193 @@ mod tests {
         ));
     }
 
+    /// Migriert aus `aktualisiere_ersetzt_felder` (LFH-306): dieselbe fachliche Zusage —
+    /// gesendete Felder kommen an — jetzt über `patche`.
     #[tokio::test]
-    async fn aktualisiere_ersetzt_felder() {
+    async fn patche_ersetzt_gesendete_felder() {
         let pool = crate::db::test_pool().await;
         org(&pool, 1).await;
         let m = anlegen(&pool, 1, daten("Wolldecke")).await.unwrap();
-        let mut neu = daten("Wolldecke gross");
-        neu.kategorie = Some("Sanitaet");
-        neu.standort = Some("Lagerhalle 2");
-        let g = aktualisiere(&pool, 1, m.id, neu).await.unwrap();
+        let g = patche(
+            &pool,
+            1,
+            m.id,
+            MaterialPatch {
+                bezeichnung: Some("Wolldecke gross"),
+                kategorie: Some(Some("Sanitaet")),
+                standort: Some(Some("Lagerhalle 2")),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(g.bezeichnung, "Wolldecke gross");
         assert_eq!(g.kategorie.as_deref(), Some("Sanitaet"));
         assert_eq!(g.standort.as_deref(), Some("Lagerhalle 2"));
     }
 
+    /// Migriert aus `aktualisiere_fremde_org_ist_notfound` (LFH-306). Mandantengrenze
+    /// (LFH-232): ein Patch mit fremder `org_id` trifft die Zeile nicht und ist `NotFound`,
+    /// nicht etwa ein stiller No-Op.
     #[tokio::test]
-    async fn aktualisiere_fremde_org_ist_notfound() {
+    async fn patche_fremde_org_ist_notfound() {
         let pool = crate::db::test_pool().await;
         org(&pool, 1).await;
         org(&pool, 2).await;
         let m = anlegen(&pool, 1, daten("Wolldecke")).await.unwrap();
         assert!(matches!(
-            aktualisiere(&pool, 2, m.id, daten("X")).await.unwrap_err(),
+            patche(
+                &pool,
+                2,
+                m.id,
+                MaterialPatch {
+                    bezeichnung: Some("X"),
+                    ..Default::default()
+                }
+            )
+            .await
+            .unwrap_err(),
             AppError::NotFound
+        ));
+        assert_eq!(
+            laden(&pool, 1, m.id).await.unwrap().bezeichnung,
+            "Wolldecke",
+            "fremde Org darf nichts geschrieben haben"
+        );
+    }
+
+    /// Bind-Reihenfolge der Flag/Wert-Kette: alle sechs Spalten in EINEM Patch auf distinkte
+    /// Werte setzen und einzeln prüfen. Eine um eine Position verschobene Kette würde
+    /// gleichtypige Nachbarspalten (`standort`↔`bemerkung`) still vertauschen — ohne
+    /// Compile- und ohne Laufzeitfehler.
+    #[tokio::test]
+    async fn patche_setzt_jede_spalte_an_ihren_platz() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let m = anlegen(&pool, 1, daten("Wolldecke")).await.unwrap();
+        let g = patche(
+            &pool,
+            1,
+            m.id,
+            MaterialPatch {
+                bezeichnung: Some("B-Wert"),
+                kategorie: Some(Some("K-Wert")),
+                bestandsnummer: Some(Some("N-Wert")),
+                traegerorganisation: Some(Some("T-Wert")),
+                standort: Some(Some("S-Wert")),
+                bemerkung: Some(Some("M-Wert")),
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(g.bezeichnung, "B-Wert");
+        assert_eq!(g.kategorie.as_deref(), Some("K-Wert"));
+        assert_eq!(g.bestandsnummer.as_deref(), Some("N-Wert"));
+        assert_eq!(g.traegerorganisation.as_deref(), Some("T-Wert"));
+        assert_eq!(g.standort.as_deref(), Some("S-Wert"));
+        assert_eq!(g.bemerkung.as_deref(), Some("M-Wert"));
+    }
+
+    /// Der Kern von LFH-306: ein Patch fasst NUR die gesendeten Spalten an. Der
+    /// `Default`-Patch (alle Felder absent) darf die Zeile Byte für Byte so lassen.
+    #[tokio::test]
+    async fn patche_laesst_nicht_gesendete_spalten_stehen() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let m = anlegen(
+            &pool,
+            1,
+            MaterialDaten {
+                bezeichnung: "Wolldecke",
+                kategorie: Some("Betreuung"),
+                bestandsnummer: Some("INV-1"),
+                traegerorganisation: Some("DRK"),
+                standort: Some("Halle 1"),
+                bemerkung: Some("geprüft"),
+            },
+        )
+        .await
+        .unwrap();
+
+        // Nur `bezeichnung` im Patch.
+        let g = patche(
+            &pool,
+            1,
+            m.id,
+            MaterialPatch {
+                bezeichnung: Some("Wolldecke gross"),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(g.bezeichnung, "Wolldecke gross");
+        assert_eq!(g.kategorie.as_deref(), Some("Betreuung"), "unberührt");
+        assert_eq!(g.bestandsnummer.as_deref(), Some("INV-1"), "unberührt");
+        assert_eq!(g.traegerorganisation.as_deref(), Some("DRK"), "unberührt");
+        assert_eq!(g.standort.as_deref(), Some("Halle 1"), "unberührt");
+        assert_eq!(g.bemerkung.as_deref(), Some("geprüft"), "unberührt");
+
+        // Leerer Patch → alles bleibt, insbesondere kein NotFound.
+        let u = patche(&pool, 1, m.id, MaterialPatch::default())
+            .await
+            .unwrap();
+        assert_eq!(u.bezeichnung, "Wolldecke gross");
+        assert_eq!(u.standort.as_deref(), Some("Halle 1"));
+    }
+
+    /// `Some(None)` ist der Leerwunsch und muss von „absent" unterscheidbar sein —
+    /// grenzt gegen `patche_laesst_nicht_gesendete_spalten_stehen` ab.
+    #[tokio::test]
+    async fn patche_none_loescht_die_spalte() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let mut d = daten("Wolldecke");
+        d.standort = Some("Halle 1");
+        let m = anlegen(&pool, 1, d).await.unwrap();
+        let g = patche(
+            &pool,
+            1,
+            m.id,
+            MaterialPatch {
+                standort: Some(None),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(g.standort, None);
+        assert_eq!(
+            g.kategorie.as_deref(),
+            Some("Betreuung"),
+            "Nachbar unberührt"
+        );
+        assert_eq!(g.bezeichnung, "Wolldecke", "Nachbar unberührt");
+    }
+
+    /// Die Bestandsnummer-Dublette bleibt auch im Teil-Patch ein `Conflict` (Verhalten
+    /// aus dem Vollersatz übernommen).
+    #[tokio::test]
+    async fn patche_auf_vergebene_bestandsnummer_ist_conflict() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let mut belegt = daten("Stromerzeuger");
+        belegt.bestandsnummer = Some("INV-1");
+        anlegen(&pool, 1, belegt).await.unwrap();
+        let m = anlegen(&pool, 1, daten("Wolldecke")).await.unwrap();
+        assert!(matches!(
+            patche(
+                &pool,
+                1,
+                m.id,
+                MaterialPatch {
+                    bestandsnummer: Some(Some("INV-1")),
+                    ..Default::default()
+                }
+            )
+            .await
+            .unwrap_err(),
+            AppError::Conflict(_)
         ));
     }
 

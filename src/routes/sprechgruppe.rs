@@ -5,6 +5,7 @@ use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::katalog::Betriebsart;
+use crate::routes::support::{deserialize_optional_field, trimme_tri};
 use crate::sprechgruppe::repo as sg_repo;
 use crate::sprechgruppe::{Sprechgruppe, SprechgruppeAnzeige};
 use axum::extract::{Path, Query, State};
@@ -83,6 +84,75 @@ fn normalisiere_katalog(body: KatalogBody) -> Result<NormalisierterKatalog, AppE
     })
 }
 
+/// PATCH-Body des **Katalogs** (LFH-306, Tri-State): jedes Feld ist optional —
+/// absent = unverändert. Bewusst getrennt von [`KatalogBody`]: der POST muss
+/// `bezeichnung`/`betriebsart` weiterhin strukturell erzwingen.
+///
+/// **Kein `#[serde(default)]` an `sortier`** — und genau das ist hier der teure Fehler
+/// gewesen: `SprechgruppeFormModal` sendet `{bezeichnung, betriebsart, hinweis}` OHNE
+/// `sortier`, der alte Body trug `#[serde(default)] sortier: i64`, also setzte jede
+/// Hinweis-Änderung die Sortierung still auf 0 und verschob den Eintrag in der
+/// Katalogliste. Belegt von `patch_ohne_sortier_behaelt_sortier`
+/// (`tests/sprechgruppe_katalog.rs`).
+#[derive(Debug, Deserialize)]
+pub struct PatchKatalog {
+    pub bezeichnung: Option<String>,
+    pub betriebsart: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub hinweis: Option<Option<String>>,
+    pub sortier: Option<i64>,
+}
+
+#[derive(Debug)]
+struct PatchNormalisiert {
+    bezeichnung: Option<String>,
+    betriebsart: Option<String>,
+    hinweis: Option<Option<String>>,
+    sortier: Option<i64>,
+}
+
+impl PatchNormalisiert {
+    fn patch(&self) -> sg_repo::KatalogPatch<'_> {
+        sg_repo::KatalogPatch {
+            bezeichnung: self.bezeichnung.as_deref(),
+            betriebsart: self.betriebsart.as_deref(),
+            hinweis: self.hinweis.as_ref().map(|v| v.as_deref()),
+            sortier: self.sortier,
+        }
+    }
+}
+
+/// Prüft nur die **gesendeten** Felder: leere `bezeichnung` → 400, unbekannte
+/// `betriebsart` → 400 (LFH-305-Konvention). Die Prüfungen dürfen nicht auf den
+/// Absent-Zweig durchschlagen, sonst wäre jeder Teil-Patch abgelehnt.
+fn normalisiere_patch_katalog(body: PatchKatalog) -> Result<PatchNormalisiert, AppError> {
+    let bezeichnung = match body.bezeichnung {
+        Some(b) => {
+            let b = b.trim().to_string();
+            if b.is_empty() {
+                return Err(AppError::Validation(
+                    "Bezeichnung darf nicht leer sein".into(),
+                ));
+            }
+            Some(b)
+        }
+        None => None,
+    };
+    if let Some(ba) = &body.betriebsart {
+        if Betriebsart::parse(ba).is_none() {
+            return Err(AppError::Validation(format!(
+                "Ungültige Betriebsart «{ba}» — erlaubt: TMO, DMO"
+            )));
+        }
+    }
+    Ok(PatchNormalisiert {
+        bezeichnung,
+        betriebsart: body.betriebsart,
+        hinweis: trimme_tri(body.hinweis),
+        sortier: body.sortier,
+    })
+}
+
 // ---------------------------------------------------------------------------
 // Normalisierung einsatz-lokal
 // ---------------------------------------------------------------------------
@@ -153,15 +223,16 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(sg.anzeige())))
 }
 
-/// PATCH /api/sprechgruppen/{id} — Admin, Vollersatz.
+/// PATCH /api/sprechgruppen/{id} — Admin, echter Teil-Patch (LFH-306):
+/// Feld absent = unverändert, `null`/`""` bei `hinweis` = leeren.
 pub async fn aktualisieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
     Path(id): Path<i64>,
-    JsonBody(body): JsonBody<KatalogBody>,
+    JsonBody(body): JsonBody<PatchKatalog>,
 ) -> Result<Json<SprechgruppeAnzeige>, AppError> {
-    let n = normalisiere_katalog(body)?;
-    let sg = sg_repo::aktualisiere_katalog(&state.pool, benutzer.org_id, id, n.daten()).await?;
+    let n = normalisiere_patch_katalog(body)?;
+    let sg = sg_repo::patche_katalog(&state.pool, benutzer.org_id, id, n.patch()).await?;
     Ok(Json(sg.anzeige()))
 }
 

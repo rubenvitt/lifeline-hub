@@ -10,6 +10,7 @@ use crate::einsatz::{
 };
 use crate::error::AppError;
 use crate::extract::JsonBody;
+use crate::routes::support;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -597,77 +598,108 @@ fn bereinige(feld: Option<String>) -> Option<String> {
     feld.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
 }
 
+/// PATCH-Body der Kopfdaten (LFH-306, Tri-State): jedes Feld optional, absent =
+/// unverändert, `null`/`""` = leeren. Ersetzt den früheren Vollersatz-Body
+/// `KopfdatenUpdate`, der ersatzlos entfällt — er hatte genau diesen einen Aufrufer
+/// (POST /api/einsaetze nimmt `NeuerEinsatz` und behält dort seine Pflichtfelder).
+///
+/// **Kein `#[serde(default)]` an den NOT-NULL-Feldern** — `bezeichnung`, `einsatzart` und
+/// `begonnen_at` sind `Option<String>` ohne Attribut: absent lässt die Spalte in Ruhe,
+/// `""` ist ein 400 (Statuscode-Konvention), und `begonnen_at` springt insbesondere
+/// **nicht** auf `now`, wenn es fehlt.
 #[derive(Debug, Deserialize)]
-pub struct KopfdatenUpdate {
-    pub bezeichnung: String,
-    pub stichwort: Option<String>,
-    pub einsatzart: String,
-    pub einsatznummer_intern: Option<String>,
-    pub leitstellen_nr: Option<String>,
-    pub einsatzort: Option<String>,
-    pub einsatzort_lat: Option<f64>,
-    pub einsatzort_lon: Option<f64>,
-    pub meldende_stelle: Option<String>,
-    pub sachverhalt: Option<String>,
-    pub anzahl_betroffene_initial: Option<i64>,
+pub struct KopfdatenPatch {
+    pub bezeichnung: Option<String>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub stichwort: Option<Option<String>>,
+    pub einsatzart: Option<String>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub einsatznummer_intern: Option<Option<String>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub leitstellen_nr: Option<Option<String>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub einsatzort: Option<Option<String>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub einsatzort_lat: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub einsatzort_lon: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub meldende_stelle: Option<Option<String>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub sachverhalt: Option<Option<String>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    pub anzahl_betroffene_initial: Option<Option<i64>>,
     /// Alarmzeit (ISO-8601/RFC3339 oder SQLite-Format).
-    pub begonnen_at: String,
+    pub begonnen_at: Option<String>,
 }
 
-/// PATCH /api/einsaetze/{id} — Kopf-/Stammdaten in einem Request aktualisieren.
+/// PATCH /api/einsaetze/{id} — Kopf-/Stammdaten als echter Teil-Patch (LFH-306).
 /// Gate: Einsatz-Schreibrecht ODER System-Admin, plus aktiver Einsatz (sonst 409).
-/// Vollersatz der editierbaren Felder; leere Optional-Strings → NULL.
+/// Feld absent = unverändert; `null`/`""` bei den optionalen Feldern = leeren.
 pub async fn aktualisieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path(id): Path<i64>,
-    JsonBody(req): JsonBody<KopfdatenUpdate>,
+    JsonBody(req): JsonBody<KopfdatenPatch>,
 ) -> Result<Json<EinsatzAnzeige>, AppError> {
     let einsatz = repo::laden(&state.pool, id).await?;
     let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
     fordere_schreibrecht_oder_admin(&benutzer, rolle)?;
     fordere_aktiv(&einsatz)?;
 
-    let bezeichnung = req.bezeichnung.trim();
-    if bezeichnung.is_empty() {
-        return Err(AppError::Validation(
-            "Bezeichnung darf nicht leer sein".into(),
-        ));
+    // Die drei Pflichtfelder werden NUR geprüft, wenn sie gesendet wurden — sonst wäre
+    // jeder Teil-Patch abgelehnt. Vorhanden-aber-leer bleibt 400 (LFH-305).
+    let bezeichnung = match req.bezeichnung {
+        Some(b) => {
+            let b = b.trim().to_string();
+            if b.is_empty() {
+                return Err(AppError::Validation(
+                    "Bezeichnung darf nicht leer sein".into(),
+                ));
+            }
+            Some(b)
+        }
+        None => None,
+    };
+    if let Some(art) = &req.einsatzart {
+        Einsatzart::parse(art)
+            .ok_or_else(|| AppError::Validation("Ungültige Einsatzart".into()))?;
     }
-    Einsatzart::parse(&req.einsatzart)
-        .ok_or_else(|| AppError::Validation("Ungültige Einsatzart".into()))?;
-    if let Some(n) = req.anzahl_betroffene_initial {
+    if let Some(Some(n)) = req.anzahl_betroffene_initial {
         if n < 0 {
             return Err(AppError::Validation(
                 "Anzahl Betroffene darf nicht negativ sein".into(),
             ));
         }
     }
-    let begonnen_at = crate::etb::normalisiere_zeit(&req.begonnen_at)?;
+    let begonnen_at = match &req.begonnen_at {
+        Some(z) => Some(crate::etb::normalisiere_zeit(z)?),
+        None => None,
+    };
 
-    let stichwort = bereinige(req.stichwort);
-    let einsatznummer_intern = bereinige(req.einsatznummer_intern);
-    let leitstellen_nr = bereinige(req.leitstellen_nr);
-    let einsatzort = bereinige(req.einsatzort);
-    let meldende_stelle = bereinige(req.meldende_stelle);
-    let sachverhalt = bereinige(req.sachverhalt);
+    let stichwort = support::trimme_tri(req.stichwort);
+    let einsatznummer_intern = support::trimme_tri(req.einsatznummer_intern);
+    let leitstellen_nr = support::trimme_tri(req.leitstellen_nr);
+    let einsatzort = support::trimme_tri(req.einsatzort);
+    let meldende_stelle = support::trimme_tri(req.meldende_stelle);
+    let sachverhalt = support::trimme_tri(req.sachverhalt);
 
-    let aktualisiert = repo::aktualisiere_kopf(
+    let aktualisiert = repo::patche_kopf(
         &state.pool,
         id,
-        repo::KopfDaten {
-            bezeichnung,
-            stichwort: stichwort.as_deref(),
-            einsatzart: &req.einsatzart,
-            einsatznummer_intern: einsatznummer_intern.as_deref(),
-            leitstellen_nr: leitstellen_nr.as_deref(),
-            einsatzort: einsatzort.as_deref(),
+        repo::KopfPatch {
+            bezeichnung: bezeichnung.as_deref(),
+            stichwort: stichwort.as_ref().map(|v| v.as_deref()),
+            einsatzart: req.einsatzart.as_deref(),
+            einsatznummer_intern: einsatznummer_intern.as_ref().map(|v| v.as_deref()),
+            leitstellen_nr: leitstellen_nr.as_ref().map(|v| v.as_deref()),
+            einsatzort: einsatzort.as_ref().map(|v| v.as_deref()),
             einsatzort_lat: req.einsatzort_lat,
             einsatzort_lon: req.einsatzort_lon,
-            meldende_stelle: meldende_stelle.as_deref(),
-            sachverhalt: sachverhalt.as_deref(),
+            meldende_stelle: meldende_stelle.as_ref().map(|v| v.as_deref()),
+            sachverhalt: sachverhalt.as_ref().map(|v| v.as_deref()),
             anzahl_betroffene_initial: req.anzahl_betroffene_initial,
-            begonnen_at: &begonnen_at,
+            begonnen_at: begonnen_at.as_deref(),
         },
     )
     .await?;

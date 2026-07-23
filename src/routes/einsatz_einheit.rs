@@ -1,7 +1,7 @@
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
 use crate::auth::Benutzer;
-use crate::einheit::repo::{self as einheit_repo, EinheitDaten};
+use crate::einheit::repo::{self as einheit_repo, EinheitDaten, EinheitPatch};
 use crate::einheit::{mitglied_repo, EinheitAnzeige};
 use crate::einsatz::berechtigung::{
     fordere_aktiv, fordere_lesezugriff, fordere_modul_zugriff_laden, fordere_schreibrecht,
@@ -13,7 +13,7 @@ use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "einheiten";
-use crate::routes::support::trimme;
+use crate::routes::support::{deserialize_optional_field, trimme, trimme_tri};
 use crate::staerke::Staerke;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -193,59 +193,117 @@ pub async fn bilden(
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
 
-/// PATCH /api/einsaetze/{id}/einheiten/{eid} — Vollersatz inkl. authoritativem fuehrer_id.
-/// Führer-Wechsel und Abschnitts-Zuordnungs-Änderung schreiben je einen ETB-Eintrag.
+/// PATCH-Body (LFH-306, Tri-State): jedes Feld optional, absent = unverändert,
+/// `null` = leeren. Getrennt von [`EinheitBody`], damit der POST sein Pflicht-`name`
+/// strukturell erzwingt.
+///
+/// **Kein `#[serde(default)]` an `sortier`** — das machte aus „nicht gesendet" ein
+/// „auf 0 setzen". `sprechgruppe_ids` ist bereits als `Option<Vec<i64>>` tri-state
+/// (absent = Zuordnung unverändert, `Some(vec)` ersetzt die Menge vollständig) und
+/// war schon vor LFH-306 das Vorbild im Haus.
+#[derive(Debug, Deserialize)]
+pub struct EinheitPatchBody {
+    pub name: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub abschnitt_id: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub ueber_einheit_id: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub typ_id: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub fuehrer_id: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub soll_fuehrer: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub soll_unterfuehrer: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub soll_mannschaft: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub bemerkung: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub kommunikationsmittel: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub erreichbarkeit: Option<Option<String>>,
+    pub sortier: Option<i64>,
+    pub sprechgruppe_ids: Option<Vec<i64>>,
+}
+
+/// PATCH /api/einsaetze/{id}/einheiten/{eid} — echter Teil-Patch (LFH-306) inkl.
+/// authoritativem `fuehrer_id`. Führer-Wechsel und Abschnitts-Zuordnungs-Änderung
+/// schreiben je einen ETB-Eintrag.
 pub async fn aktualisieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, eid)): Path<(i64, i64)>,
-    JsonBody(body): JsonBody<EinheitBody>,
+    JsonBody(body): JsonBody<EinheitPatchBody>,
 ) -> Result<Json<EinheitAnzeige>, AppError> {
     let einsatz = schreib_gate(&state, &benutzer, einsatz_id).await?;
-    let name = body.name.trim().to_string();
-    if name.is_empty() {
-        return Err(AppError::Validation("Name darf nicht leer sein".into()));
-    }
-    Staerke::aus_optionen(
-        body.soll_fuehrer,
-        body.soll_unterfuehrer,
-        body.soll_mannschaft,
-    )
-    .map_err(AppError::Validation)?;
-    let bemerkung = trimme(body.bemerkung);
-    let kommunikationsmittel = trimme(body.kommunikationsmittel);
-    let erreichbarkeit = trimme(body.erreichbarkeit);
+    let name = match body.name {
+        Some(n) => {
+            let n = n.trim().to_string();
+            if n.is_empty() {
+                return Err(AppError::Validation("Name darf nicht leer sein".into()));
+            }
+            Some(n)
+        }
+        None => None,
+    };
 
     let vorher = einheit_repo::laden(&state.pool, einsatz_id, eid).await?;
+    // Das Soll-Trio trägt die Mehrspalten-Invariante „alle drei oder keiner" und wird
+    // deshalb gegen den EFFEKTIVZUSTAND geprüft (Patch gewinnt, sonst Bestand) — sonst
+    // lehnte `{"soll_mannschaft":20}` auf eine Zeile mit vollem Trio als „halb geleert" ab.
+    // Geschrieben wird trotzdem nur der Patch, nie das gemergte Trio.
+    let bestand_soll = einheit_repo::soll_roh(&state.pool, einsatz_id, eid).await?;
+    let effektiv = |patch: Option<Option<i64>>, gespeichert: Option<i64>| match patch {
+        Some(v) => v,
+        None => gespeichert,
+    };
+    Staerke::aus_optionen(
+        effektiv(body.soll_fuehrer, bestand_soll.0),
+        effektiv(body.soll_unterfuehrer, bestand_soll.1),
+        effektiv(body.soll_mannschaft, bestand_soll.2),
+    )
+    .map_err(AppError::Validation)?;
+
+    let bemerkung = trimme_tri(body.bemerkung);
+    let kommunikationsmittel = trimme_tri(body.kommunikationsmittel);
+    let erreichbarkeit = trimme_tri(body.erreichbarkeit);
+
+    // Führerwechsel heißt jetzt „Feld im Patch enthalten UND Wert verschieden". Ein Patch
+    // OHNE `fuehrer_id` (so ruft die Einheiten-Seite an) darf keinen Führerwechsel auf
+    // `None` samt ETB-Eintrag auslösen — unter dem alten Vollersatz tat er genau das.
+    let fuehrer_neu = body.fuehrer_id;
+    let fuehrer_wechsel = matches!(fuehrer_neu, Some(neu) if neu != vorher.fuehrer_id);
     // Führer-Gültigkeit VOR jeglichem Write prüfen, damit ein ungültiger Führer
     // (Nicht-Mitglied) kein Teil-Update der übrigen Felder hinterlässt.
-    if vorher.fuehrer_id != body.fuehrer_id {
-        einheit_repo::pruefe_fuehrer(&state.pool, einsatz_id, eid, body.fuehrer_id).await?;
+    if fuehrer_wechsel {
+        einheit_repo::pruefe_fuehrer(&state.pool, einsatz_id, eid, fuehrer_neu.flatten()).await?;
     }
-    let nachher = einheit_repo::aktualisiere(
+    let nachher = einheit_repo::patche(
         &state.pool,
         einsatz_id,
         einsatz.org_id,
         eid,
-        EinheitDaten {
-            name: &name,
+        EinheitPatch {
+            name: name.as_deref(),
             abschnitt_id: body.abschnitt_id,
             ueber_einheit_id: body.ueber_einheit_id,
             typ_id: body.typ_id,
             soll_fuehrer: body.soll_fuehrer,
             soll_unterfuehrer: body.soll_unterfuehrer,
             soll_mannschaft: body.soll_mannschaft,
-            bemerkung: bemerkung.as_deref(),
-            kommunikationsmittel: kommunikationsmittel.as_deref(),
-            erreichbarkeit: erreichbarkeit.as_deref(),
+            bemerkung: bemerkung.as_ref().map(|v| v.as_deref()),
+            kommunikationsmittel: kommunikationsmittel.as_ref().map(|v| v.as_deref()),
+            erreichbarkeit: erreichbarkeit.as_ref().map(|v| v.as_deref()),
             sortier: body.sortier,
         },
     )
     .await?;
 
     // Führer authoritativ setzen (Mitgliedschaft bereits geprüft) + ETB bei Änderung.
-    if vorher.fuehrer_id != body.fuehrer_id {
-        einheit_repo::setze_fuehrer(&state.pool, einsatz_id, eid, body.fuehrer_id).await?;
+    if fuehrer_wechsel {
+        einheit_repo::setze_fuehrer(&state.pool, einsatz_id, eid, fuehrer_neu.flatten()).await?;
     }
     if let Some(ids) = &body.sprechgruppe_ids {
         crate::sprechgruppe::repo::setze_einheit_sprechgruppen(
@@ -260,7 +318,7 @@ pub async fn aktualisieren(
     // Endgültige Anzeige (inkl. neu aufgelöstem Führer-Namen und Sprechgruppen).
     let final_anzeige = einheit_repo::laden(&state.pool, einsatz_id, eid).await?;
 
-    if vorher.fuehrer_id != body.fuehrer_id {
+    if fuehrer_wechsel {
         let inhalt = match (&vorher.fuehrer_name, &final_anzeige.fuehrer_name) {
             (None, Some(neu)) => format!(
                 "Einheit «{}»: Einheitsführer «{}» gesetzt",

@@ -343,3 +343,172 @@ async fn liste_ohne_abschnitte_ist_leer() {
     assert_eq!(status, StatusCode::OK);
     assert!(liste.as_array().unwrap().is_empty());
 }
+
+// ---------- LFH-306: Teil-PATCH mit Tri-State ----------
+
+/// Abschnitt mit VOLL besetzten Nebenfeldern und einer Sprechgruppen-Zuordnung.
+async fn abschnitt_voll(app: &axum::Router, cookie: &str, einsatz: i64, sg: i64) -> i64 {
+    let (s, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        cookie,
+        Some(&format!(
+            r#"{{"name":"Nord","bemerkung":"Bem","kommunikationsmittel":"digitalfunk",
+                 "erreichbarkeit":"0151 23456","sortier":42,"sprechgruppe_ids":[{sg}]}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    json["id"].as_i64().unwrap()
+}
+
+/// **Der unterscheidende Test der Route.** Ein Patch, der nur `name` trägt, darf Leiter,
+/// Erreichbarkeit, Kommunikationsmittel, Bemerkung, Sortierung und die
+/// Sprechgruppen-Zuordnung nicht anfassen. Unter dem alten Vollersatz nullte derselbe
+/// Request sie alle (und `sortier` fiel per `#[serde(default)]` auf 0).
+#[tokio::test]
+async fn patch_nur_name_laesst_leiter_und_erreichbarkeit_stehen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sg = sprechgruppe_anlegen(&app, &admin, "100_T_LAGE", "TMO", 10).await;
+    let a = abschnitt_voll(&app, &admin, einsatz, sg).await;
+    let ep = person_anlegen(&app, &admin, einsatz, "Leiter").await;
+    let pfad = format!("/api/einsaetze/{einsatz}/abschnitte/{a}");
+    anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&format!(r#"{{"leiter_id":{ep}}}"#)),
+    )
+    .await;
+
+    let (status, json) =
+        anfrage(&app, "PATCH", &pfad, &admin, Some(r#"{"name":"Nord-neu"}"#)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["name"], "Nord-neu");
+    assert_eq!(json["leiter_id"], ep, "Leiter unberührt");
+    assert_eq!(json["bemerkung"], "Bem");
+    assert_eq!(json["kommunikationsmittel"], "digitalfunk");
+    assert_eq!(json["erreichbarkeit"], "0151 23456");
+    assert_eq!(
+        json["sortier"], 42,
+        "NOT-NULL-Spalte darf nicht auf 0 fallen"
+    );
+    assert_eq!(
+        bezeichnungen(&json["sprechgruppen"]),
+        vec!["100_T_LAGE"],
+        "Sprechgruppen-Zuordnung bleibt"
+    );
+}
+
+/// Grenzt gegen den vorigen ab: `null` leert genau das gesendete Feld — und nur das.
+#[tokio::test]
+async fn patch_erreichbarkeit_null_loescht_nur_dieses_feld() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sg = sprechgruppe_anlegen(&app, &admin, "100_T_LAGE", "TMO", 10).await;
+    let a = abschnitt_voll(&app, &admin, einsatz, sg).await;
+
+    let (status, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/abschnitte/{a}"),
+        &admin,
+        Some(r#"{"erreichbarkeit":null}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(json["erreichbarkeit"].is_null());
+    assert_eq!(
+        json["kommunikationsmittel"], "digitalfunk",
+        "Nachbar bleibt"
+    );
+    assert_eq!(json["bemerkung"], "Bem", "Nachbar bleibt");
+}
+
+/// Der Leiter-Weg in beide Richtungen: setzen, nicht anfassen, explizit entfernen.
+#[tokio::test]
+async fn patch_leiter_id_null_entfernt_leiter_absent_laesst_ihn_stehen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sg = sprechgruppe_anlegen(&app, &admin, "100_T_LAGE", "TMO", 10).await;
+    let a = abschnitt_voll(&app, &admin, einsatz, sg).await;
+    let ep = person_anlegen(&app, &admin, einsatz, "Leiter").await;
+    let pfad = format!("/api/einsaetze/{einsatz}/abschnitte/{a}");
+
+    let (_, json) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&format!(r#"{{"leiter_id":{ep}}}"#)),
+    )
+    .await;
+    assert_eq!(json["leiter_id"], ep);
+
+    let (_, json) = anfrage(&app, "PATCH", &pfad, &admin, Some(r#"{"bemerkung":"X"}"#)).await;
+    assert_eq!(json["leiter_id"], ep, "absent = unverändert");
+
+    let (_, json) = anfrage(&app, "PATCH", &pfad, &admin, Some(r#"{"leiter_id":null}"#)).await;
+    assert!(json["leiter_id"].is_null(), "null = entfernen");
+}
+
+/// `sprechgruppe_ids` war schon vor LFH-306 tri-state — der Test pinnt, dass der Umbau
+/// die Semantik nicht verdreht hat.
+#[tokio::test]
+async fn patch_sprechgruppe_ids_leeres_array_leert_absent_laesst_stehen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sg = sprechgruppe_anlegen(&app, &admin, "100_T_LAGE", "TMO", 10).await;
+    let a = abschnitt_voll(&app, &admin, einsatz, sg).await;
+    let pfad = format!("/api/einsaetze/{einsatz}/abschnitte/{a}");
+
+    let (_, json) = anfrage(&app, "PATCH", &pfad, &admin, Some(r#"{"name":"N2"}"#)).await;
+    assert_eq!(bezeichnungen(&json["sprechgruppen"]), vec!["100_T_LAGE"]);
+
+    let (_, json) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(r#"{"sprechgruppe_ids":[]}"#),
+    )
+    .await;
+    assert!(json["sprechgruppen"].as_array().unwrap().is_empty());
+}
+
+/// Statuscode-Konvention (LFH-305): vorhandenes-aber-leeres Pflichtfeld → 400, absentes
+/// geht durch. Ein unbekannter Leiter (nicht disponiert) bleibt 400.
+#[tokio::test]
+async fn patch_leerer_name_ist_400_absenter_laesst_namen_stehen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let sg = sprechgruppe_anlegen(&app, &admin, "100_T_LAGE", "TMO", 10).await;
+    let a = abschnitt_voll(&app, &admin, einsatz, sg).await;
+    let pfad = format!("/api/einsaetze/{einsatz}/abschnitte/{a}");
+
+    assert_eq!(
+        anfrage(&app, "PATCH", &pfad, &admin, Some(r#"{"name":"   "}"#))
+            .await
+            .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        anfrage(&app, "PATCH", &pfad, &admin, Some(r#"{"leiter_id":99999}"#))
+            .await
+            .0,
+        StatusCode::BAD_REQUEST,
+        "unbekannter Leiter bleibt 400 — die Prüfung läuft nur im Some-Zweig"
+    );
+    let (status, json) = anfrage(&app, "PATCH", &pfad, &admin, Some(r#"{"sortier":9}"#)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["name"], "Nord");
+    assert_eq!(json["sortier"], 9);
+}

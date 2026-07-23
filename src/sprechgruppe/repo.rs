@@ -93,24 +93,51 @@ pub async fn anlegen_katalog(
     laden(pool, org_id, id).await
 }
 
-/// Vollersatz der editierbaren Felder einer Katalog-Sprechgruppe (org-scoped,
+/// Teil-Patch der editierbaren Felder einer Katalog-Sprechgruppe (LFH-306, Tri-State):
+/// die äußere `Option` sagt „im Patch enthalten?" — `None` lässt die Spalte unverändert.
+/// Bei der nullable Spalte `hinweis` trägt der Wert selbst noch eine `Option`:
+/// `Some(None)` setzt sie auf NULL.
+#[derive(Debug, Default)]
+pub struct KatalogPatch<'a> {
+    pub bezeichnung: Option<&'a str>,
+    pub betriebsart: Option<&'a str>,
+    pub hinweis: Option<Option<&'a str>>,
+    pub sortier: Option<i64>,
+}
+
+/// Teil-Patch der editierbaren Felder einer Katalog-Sprechgruppe (org-scoped,
 /// `einsatz_id IS NULL`). `NotFound` bei fremder Org oder einsatz-lokaler Sprechgruppe,
 /// `Conflict` bei Bezeichnung-/Betriebsart-Dublette.
-pub async fn aktualisiere_katalog(
+///
+/// Flag/Wert-Paare statt Vollersatz (LFH-306): erst so lässt sich `hinweis` über die API
+/// wieder auf NULL setzen, und ein nicht gesendetes Feld fasst seine Spalte nicht an — das
+/// beseitigt den stillen `sortier`-Reset, den das Frontend-Formular auslöste (es sendet
+/// `{bezeichnung, betriebsart, hinweis}` ohne `sortier`). Die Parameter sind nummeriert,
+/// weil eine um eine Position verschobene Bind-Kette gleichtypige Nachbarspalten
+/// (`bezeichnung`↔`betriebsart`) STILL vertauschen würde — abgesichert von
+/// `patche_katalog_setzt_jede_spalte_an_ihren_platz`.
+pub async fn patche_katalog(
     pool: &SqlitePool,
     org_id: i64,
     id: i64,
-    daten: KatalogDaten<'_>,
+    patch: KatalogPatch<'_>,
 ) -> Result<Sprechgruppe, AppError> {
     let ergebnis = sqlx::query(
-        "UPDATE sprechgruppe \
-         SET bezeichnung = ?, betriebsart = ?, hinweis = ?, sortier = ? \
-         WHERE id = ? AND org_id = ? AND einsatz_id IS NULL",
+        "UPDATE sprechgruppe SET \
+            bezeichnung = CASE WHEN ?1 IS NULL THEN bezeichnung ELSE ?2 END, \
+            betriebsart = CASE WHEN ?3 IS NULL THEN betriebsart ELSE ?4 END, \
+            hinweis = CASE WHEN ?5 IS NULL THEN hinweis ELSE ?6 END, \
+            sortier = CASE WHEN ?7 IS NULL THEN sortier ELSE ?8 END \
+         WHERE id = ?9 AND org_id = ?10 AND einsatz_id IS NULL",
     )
-    .bind(daten.bezeichnung)
-    .bind(daten.betriebsart)
-    .bind(daten.hinweis)
-    .bind(daten.sortier)
+    .bind(patch.bezeichnung.map(|_| 1_i64))
+    .bind(patch.bezeichnung)
+    .bind(patch.betriebsart.map(|_| 1_i64))
+    .bind(patch.betriebsart)
+    .bind(patch.hinweis.map(|_| 1_i64))
+    .bind(patch.hinweis.and_then(|v| v))
+    .bind(patch.sortier.map(|_| 1_i64))
+    .bind(patch.sortier)
     .bind(id)
     .bind(org_id)
     .execute(pool)
@@ -772,20 +799,28 @@ mod tests {
             .await
             .is_ok());
     }
+    /// Patch-Variante des früheren `aktualisieren_ersetzt_felder` (LFH-306): dieselbe
+    /// fachliche Zusage — gesendete Felder landen in ihren Spalten und `laden` sieht sie.
     #[tokio::test]
-    async fn aktualisieren_ersetzt_felder() {
+    async fn patche_katalog_ersetzt_gesendete_felder() {
         let pool = crate::db::test_pool().await;
         org(&pool, 1).await;
         let sg = anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO"))
             .await
             .unwrap();
-        let neu = KatalogDaten {
-            bezeichnung: "490_F_DRK",
-            betriebsart: "TMO",
-            hinweis: Some("Marschkanal"),
-            sortier: 5,
-        };
-        let g = aktualisiere_katalog(&pool, 1, sg.id, neu).await.unwrap();
+        let g = patche_katalog(
+            &pool,
+            1,
+            sg.id,
+            KatalogPatch {
+                bezeichnung: Some("490_F_DRK"),
+                betriebsart: Some("TMO"),
+                hinweis: Some(Some("Marschkanal")),
+                sortier: Some(5),
+            },
+        )
+        .await
+        .unwrap();
         assert_eq!(g.bezeichnung, "490_F_DRK");
         assert_eq!(g.hinweis.as_deref(), Some("Marschkanal"));
         assert_eq!(g.sortier, 5);
@@ -795,8 +830,115 @@ mod tests {
         assert_eq!(geladen.hinweis.as_deref(), Some("Marschkanal"));
         assert_eq!(geladen.sortier, 5);
     }
+
+    /// Bind-Reihenfolge der Flag/Wert-Kette: eine um eine Position verschobene Kette würde
+    /// `bezeichnung`↔`betriebsart` still vertauschen — ohne Compile- und ohne Laufzeitfehler.
+    /// Deshalb hier alle vier Spalten distinkt und einzeln geprüft.
     #[tokio::test]
-    async fn aktualisieren_auf_geschwister_ist_conflict() {
+    async fn patche_katalog_setzt_jede_spalte_an_ihren_platz() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let sg = anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO"))
+            .await
+            .unwrap();
+        let g = patche_katalog(
+            &pool,
+            1,
+            sg.id,
+            KatalogPatch {
+                bezeichnung: Some("490_F_DRK"),
+                betriebsart: Some("DMO"),
+                hinweis: Some(Some("Marschkanal")),
+                sortier: Some(7),
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(g.bezeichnung, "490_F_DRK");
+        assert_eq!(g.betriebsart.as_str(), "DMO");
+        assert_eq!(g.hinweis.as_deref(), Some("Marschkanal"));
+        assert_eq!(g.sortier, 7);
+    }
+
+    /// Der Kern von LFH-306: ein Patch fasst NUR die gesendeten Spalten an.
+    #[tokio::test]
+    async fn patche_katalog_laesst_nicht_gesendete_spalten_stehen() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let sg = anlegen_katalog(
+            &pool,
+            1,
+            KatalogDaten {
+                bezeichnung: "412_F_DRK",
+                betriebsart: "TMO",
+                hinweis: Some("Marschkanal"),
+                sortier: 5,
+            },
+        )
+        .await
+        .unwrap();
+        let g = patche_katalog(
+            &pool,
+            1,
+            sg.id,
+            KatalogPatch {
+                bezeichnung: Some("490_F_DRK"),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(g.bezeichnung, "490_F_DRK");
+        assert_eq!(g.betriebsart.as_str(), "TMO", "unberührt");
+        assert_eq!(g.hinweis.as_deref(), Some("Marschkanal"), "unberührt");
+        assert_eq!(g.sortier, 5, "unberührt");
+
+        // Leerer Patch → alles bleibt, insbesondere kein NotFound.
+        let unveraendert = patche_katalog(&pool, 1, sg.id, KatalogPatch::default())
+            .await
+            .unwrap();
+        assert_eq!(unveraendert.bezeichnung, "490_F_DRK");
+        assert_eq!(unveraendert.sortier, 5);
+    }
+
+    /// `Some(None)` ist der Leerwunsch und muss von „absent" unterscheidbar sein —
+    /// grenzt gegen `patche_katalog_laesst_nicht_gesendete_spalten_stehen` ab.
+    #[tokio::test]
+    async fn patche_katalog_hinweis_none_loescht_die_spalte() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let sg = anlegen_katalog(
+            &pool,
+            1,
+            KatalogDaten {
+                bezeichnung: "412_F_DRK",
+                betriebsart: "TMO",
+                hinweis: Some("Marschkanal"),
+                sortier: 5,
+            },
+        )
+        .await
+        .unwrap();
+        let g = patche_katalog(
+            &pool,
+            1,
+            sg.id,
+            KatalogPatch {
+                hinweis: Some(None),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(g.hinweis, None);
+        assert_eq!(g.bezeichnung, "412_F_DRK", "Nachbarfeld unberührt");
+        assert_eq!(g.sortier, 5, "Nachbarfeld unberührt");
+    }
+
+    /// Migriert aus `aktualisieren_auf_geschwister_ist_conflict` — die Conflict-Zusage des
+    /// Unique-Index bleibt am Teil-Patch bestehen.
+    #[tokio::test]
+    async fn patche_katalog_auf_geschwister_ist_conflict() {
         let pool = crate::db::test_pool().await;
         org(&pool, 1).await;
         anlegen_katalog(&pool, 1, daten("412_F_DRK", "TMO"))
@@ -807,14 +949,24 @@ mod tests {
             .unwrap();
         // Umbenennen auf die Bezeichnung des Geschwisters (gleiche Betriebsart) → Conflict.
         assert!(matches!(
-            aktualisiere_katalog(&pool, 1, zweite.id, daten("412_F_DRK", "TMO"))
-                .await
-                .unwrap_err(),
+            patche_katalog(
+                &pool,
+                1,
+                zweite.id,
+                KatalogPatch {
+                    bezeichnung: Some("412_F_DRK"),
+                    ..Default::default()
+                }
+            )
+            .await
+            .unwrap_err(),
             AppError::Conflict(_)
         ));
     }
+
+    /// Migriert aus `aktualisieren_fremde_org_ist_notfound` — Mandantengrenze.
     #[tokio::test]
-    async fn aktualisieren_fremde_org_ist_notfound() {
+    async fn patche_katalog_fremde_org_ist_notfound() {
         let pool = crate::db::test_pool().await;
         org(&pool, 1).await;
         org(&pool, 2).await;
@@ -822,14 +974,25 @@ mod tests {
             .await
             .unwrap();
         assert!(matches!(
-            aktualisiere_katalog(&pool, 2, sg.id, daten("490_F_DRK", "TMO"))
-                .await
-                .unwrap_err(),
+            patche_katalog(
+                &pool,
+                2,
+                sg.id,
+                KatalogPatch {
+                    bezeichnung: Some("490_F_DRK"),
+                    ..Default::default()
+                }
+            )
+            .await
+            .unwrap_err(),
             AppError::NotFound
         ));
     }
+
+    /// Migriert aus `aktualisieren_trifft_einsatz_lokale_zeile_nicht` — der
+    /// `einsatz_id IS NULL`-Guard trennt Katalog von einsatz-lokalen Zeilen.
     #[tokio::test]
-    async fn aktualisieren_trifft_einsatz_lokale_zeile_nicht() {
+    async fn patche_katalog_trifft_einsatz_lokale_zeile_nicht() {
         let pool = crate::db::test_pool().await;
         org(&pool, 1).await;
         let einsatz_id: i64 = sqlx::query_scalar(
@@ -848,9 +1011,17 @@ mod tests {
         .unwrap();
         // Der einsatz_id IS NULL-Guard darf einsatz-lokale Zeilen nicht treffen → NotFound.
         assert!(matches!(
-            aktualisiere_katalog(&pool, 1, lokal_id, daten("umbenannt", "TMO"))
-                .await
-                .unwrap_err(),
+            patche_katalog(
+                &pool,
+                1,
+                lokal_id,
+                KatalogPatch {
+                    bezeichnung: Some("umbenannt"),
+                    ..Default::default()
+                }
+            )
+            .await
+            .unwrap_err(),
             AppError::NotFound
         ));
     }

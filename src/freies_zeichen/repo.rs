@@ -18,18 +18,21 @@ pub struct ZeichenNeu<'a> {
     pub erstellt_von: i64,
 }
 
-/// Whole-Spec-Overwrite: alle TZ-Overlays + label werden gesetzt (fehlt ein Feld → NULL).
+/// Teil-Patch eines freien Zeichens (LFH-306, Tri-State): die äußere `Option` sagt
+/// „im Patch enthalten?" — `None` lässt die Spalte unverändert. Bei den nullable
+/// Overlay-Spalten trägt der Wert selbst noch eine `Option`: `Some(None)` setzt sie auf NULL.
+/// `grundzeichen` ist NOT NULL und daher nur einfach optional (absent = unverändert).
 /// lat/lon sind NICHT verschiebbar (v1) und daher NICHT Teil des Updates.
-#[derive(Debug)]
-pub struct ZeichenUpdate<'a> {
-    pub grundzeichen: &'a str,
-    pub organisation: Option<&'a str>,
-    pub fachaufgabe: Option<&'a str>,
-    pub symbol: Option<&'a str>,
-    pub einheit: Option<&'a str>,
-    pub funktion: Option<&'a str>,
-    pub farbe: Option<&'a str>,
-    pub label: Option<&'a str>,
+#[derive(Debug, Default)]
+pub struct ZeichenPatch<'a> {
+    pub grundzeichen: Option<&'a str>,
+    pub organisation: Option<Option<&'a str>>,
+    pub fachaufgabe: Option<Option<&'a str>>,
+    pub symbol: Option<Option<&'a str>>,
+    pub einheit: Option<Option<&'a str>>,
+    pub funktion: Option<Option<&'a str>>,
+    pub farbe: Option<Option<&'a str>>,
+    pub label: Option<Option<&'a str>>,
 }
 
 const SELECT_ALLE: &str = "\
@@ -136,29 +139,50 @@ pub async fn anlegen(
     laden(pool, einsatz_id, id).await
 }
 
-/// Whole-Spec-Update aller TZ-Overlays + label + `geaendert_at`. lat/lon bleiben
-/// UNVERÄNDERT (kein Verschieben in v1). `NotFound`, falls fremd/unbekannt.
-pub async fn aktualisiere(
+/// Teil-Patch der TZ-Overlays + label + grundzeichen (LFH-306); `geaendert_at` wird immer
+/// nachgezogen. lat/lon bleiben UNVERÄNDERT (kein Verschieben in v1). `NotFound`, falls
+/// fremd/unbekannt.
+///
+/// Flag/Wert-Paare statt Vollersatz: erst so lässt ein `{"label":"X"}`-Patch die sieben
+/// Overlays stehen, statt sie stillschweigend zu nullen — und `null` bleibt trotzdem als
+/// Leerwunsch verfügbar. Die Parameter sind nummeriert, weil eine um eine Position
+/// verschobene Bind-Kette die gleichtypigen Nachbarspalten (`organisation`↔`fachaufgabe`)
+/// STILL vertauschen würde — abgesichert von `patche_setzt_jede_spalte_an_ihren_platz`.
+pub async fn patche(
     pool: &SqlitePool,
     einsatz_id: i64,
     id: i64,
-    daten: ZeichenUpdate<'_>,
+    patch: ZeichenPatch<'_>,
 ) -> Result<FreiesZeichenAnzeige, AppError> {
     let betroffen = sqlx::query(
         "UPDATE freies_zeichen SET \
-            grundzeichen = ?, organisation = ?, fachaufgabe = ?, symbol = ?, \
-            einheit = ?, funktion = ?, farbe = ?, label = ?, \
+            grundzeichen = CASE WHEN ?1 IS NULL THEN grundzeichen ELSE ?2 END, \
+            organisation = CASE WHEN ?3 IS NULL THEN organisation ELSE ?4 END, \
+            fachaufgabe = CASE WHEN ?5 IS NULL THEN fachaufgabe ELSE ?6 END, \
+            symbol = CASE WHEN ?7 IS NULL THEN symbol ELSE ?8 END, \
+            einheit = CASE WHEN ?9 IS NULL THEN einheit ELSE ?10 END, \
+            funktion = CASE WHEN ?11 IS NULL THEN funktion ELSE ?12 END, \
+            farbe = CASE WHEN ?13 IS NULL THEN farbe ELSE ?14 END, \
+            label = CASE WHEN ?15 IS NULL THEN label ELSE ?16 END, \
             geaendert_at = datetime('now') \
-         WHERE id = ? AND einsatz_id = ?",
+         WHERE id = ?17 AND einsatz_id = ?18",
     )
-    .bind(daten.grundzeichen)
-    .bind(daten.organisation)
-    .bind(daten.fachaufgabe)
-    .bind(daten.symbol)
-    .bind(daten.einheit)
-    .bind(daten.funktion)
-    .bind(daten.farbe)
-    .bind(daten.label)
+    .bind(patch.grundzeichen.map(|_| 1_i64))
+    .bind(patch.grundzeichen)
+    .bind(patch.organisation.map(|_| 1_i64))
+    .bind(patch.organisation.and_then(|v| v))
+    .bind(patch.fachaufgabe.map(|_| 1_i64))
+    .bind(patch.fachaufgabe.and_then(|v| v))
+    .bind(patch.symbol.map(|_| 1_i64))
+    .bind(patch.symbol.and_then(|v| v))
+    .bind(patch.einheit.map(|_| 1_i64))
+    .bind(patch.einheit.and_then(|v| v))
+    .bind(patch.funktion.map(|_| 1_i64))
+    .bind(patch.funktion.and_then(|v| v))
+    .bind(patch.farbe.map(|_| 1_i64))
+    .bind(patch.farbe.and_then(|v| v))
+    .bind(patch.label.map(|_| 1_i64))
+    .bind(patch.label.and_then(|v| v))
     .bind(id)
     .bind(einsatz_id)
     .execute(pool)
@@ -260,24 +284,27 @@ mod tests {
         ));
     }
 
+    /// Migriert von `aktualisiere_whole_spec_haelt_lat_lon` (LFH-306): ein **Vollbody**
+    /// (jedes Feld gesendet, die Leerwünsche explizit als `Some(None)`) verhält sich
+    /// weiterhin exakt wie der frühere Vollersatz — und lat/lon bleiben unberührt.
     #[tokio::test]
-    async fn aktualisiere_whole_spec_haelt_lat_lon() {
+    async fn patche_whole_spec_haelt_lat_lon() {
         let pool = crate::db::test_pool().await;
         let (einsatz, von) = setup(&pool).await;
         let z = anlegen(&pool, einsatz, neu(von)).await.unwrap();
-        let n = aktualisiere(
+        let n = patche(
             &pool,
             einsatz,
             z.id,
-            ZeichenUpdate {
-                grundzeichen: "fahrzeug",
-                organisation: Some("thw"),
-                fachaufgabe: None,
-                symbol: Some("kran"),
-                einheit: None,
-                funktion: Some("zugtrupp"),
-                farbe: None,
-                label: Some("B"),
+            ZeichenPatch {
+                grundzeichen: Some("fahrzeug"),
+                organisation: Some(Some("thw")),
+                fachaufgabe: Some(None),
+                symbol: Some(Some("kran")),
+                einheit: Some(None),
+                funktion: Some(Some("zugtrupp")),
+                farbe: Some(None),
+                label: Some(Some("B")),
             },
         )
         .await
@@ -288,7 +315,7 @@ mod tests {
         assert_eq!(n.symbol.as_deref(), Some("kran"));
         assert_eq!(n.funktion.as_deref(), Some("zugtrupp"));
         assert_eq!(n.label.as_deref(), Some("B"));
-        // … fehlende Felder auf NULL (Whole-Spec-Overwrite) …
+        // … explizit geleerte Felder auf NULL …
         assert_eq!(n.fachaufgabe, None);
         assert_eq!(n.einheit, None);
         assert_eq!(n.farbe, None);
@@ -299,25 +326,122 @@ mod tests {
         assert_eq!(geladen, n);
     }
 
+    /// Bind-Reihenfolge der Flag/Wert-Kette: alle acht Spalten in EINEM Patch auf distinkte
+    /// Werte setzen und einzeln prüfen. Eine um eine Position verschobene Kette würde die
+    /// gleichtypigen Nachbarn (`organisation`↔`fachaufgabe`↔`symbol`…) still vertauschen —
+    /// ohne Compile- und ohne Laufzeitfehler.
     #[tokio::test]
-    async fn aktualisiere_fremder_einsatz_ist_notfound() {
+    async fn patche_setzt_jede_spalte_an_ihren_platz() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, von) = setup(&pool).await;
+        let z = anlegen(&pool, einsatz, neu(von)).await.unwrap();
+        let n = patche(
+            &pool,
+            einsatz,
+            z.id,
+            ZeichenPatch {
+                grundzeichen: Some("stelle"),
+                organisation: Some(Some("thw")),
+                fachaufgabe: Some(Some("bergung")),
+                symbol: Some(Some("kran")),
+                einheit: Some(Some("gruppe")),
+                funktion: Some(Some("zugtrupp")),
+                farbe: Some(Some("#00ff00")),
+                label: Some(Some("B")),
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(n.grundzeichen, "stelle");
+        assert_eq!(n.organisation.as_deref(), Some("thw"));
+        assert_eq!(n.fachaufgabe.as_deref(), Some("bergung"));
+        assert_eq!(n.symbol.as_deref(), Some("kran"));
+        assert_eq!(n.einheit.as_deref(), Some("gruppe"));
+        assert_eq!(n.funktion.as_deref(), Some("zugtrupp"));
+        assert_eq!(n.farbe.as_deref(), Some("#00ff00"));
+        assert_eq!(n.label.as_deref(), Some("B"));
+    }
+
+    /// Der Kern von LFH-306: ein Patch fasst NUR die gesendeten Spalten an. Der
+    /// `Default`-Patch (alle Felder absent) darf die Zeile Byte für Byte so lassen.
+    #[tokio::test]
+    async fn patche_laesst_nicht_gesendete_spalten_stehen() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, von) = setup(&pool).await;
+        let z = anlegen(&pool, einsatz, neu(von)).await.unwrap();
+        // Nur `label` im Patch.
+        let n = patche(
+            &pool,
+            einsatz,
+            z.id,
+            ZeichenPatch {
+                label: Some(Some("B")),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(n.label.as_deref(), Some("B"));
+        assert_eq!(n.grundzeichen, "einheit", "unberührt");
+        assert_eq!(n.organisation.as_deref(), Some("feuerwehr"), "unberührt");
+        assert_eq!(
+            n.fachaufgabe.as_deref(),
+            Some("brandbekaempfung"),
+            "unberührt"
+        );
+        assert_eq!(n.einheit.as_deref(), Some("zug"), "unberührt");
+        assert_eq!(n.farbe.as_deref(), Some("#ff0000"), "unberührt");
+
+        // Leerer Patch → alles bleibt, insbesondere kein NotFound.
+        let unveraendert = patche(&pool, einsatz, z.id, ZeichenPatch::default())
+            .await
+            .unwrap();
+        assert_eq!(unveraendert.label.as_deref(), Some("B"));
+        assert_eq!(unveraendert.organisation.as_deref(), Some("feuerwehr"));
+    }
+
+    /// `Some(None)` ist der Leerwunsch und muss von „absent" unterscheidbar sein —
+    /// grenzt gegen `patche_laesst_nicht_gesendete_spalten_stehen` ab.
+    #[tokio::test]
+    async fn patche_organisation_none_loescht_nur_diese_spalte() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, von) = setup(&pool).await;
+        let z = anlegen(&pool, einsatz, neu(von)).await.unwrap();
+        let n = patche(
+            &pool,
+            einsatz,
+            z.id,
+            ZeichenPatch {
+                organisation: Some(None),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(n.organisation, None);
+        assert_eq!(
+            n.fachaufgabe.as_deref(),
+            Some("brandbekaempfung"),
+            "Nachbarfeld unberührt"
+        );
+        assert_eq!(n.farbe.as_deref(), Some("#ff0000"), "Nachbarfeld unberührt");
+    }
+
+    /// Mandantenzusage (migriert von `aktualisiere_fremder_einsatz_ist_notfound`): ein
+    /// Zeichen über einen fremden Einsatz zu patchen bleibt `NotFound`.
+    #[tokio::test]
+    async fn patche_fremder_einsatz_ist_notfound() {
         let pool = crate::db::test_pool().await;
         let (einsatz, von) = setup(&pool).await;
         let z = anlegen(&pool, einsatz, neu(von)).await.unwrap();
         assert!(matches!(
-            aktualisiere(
+            patche(
                 &pool,
                 999,
                 z.id,
-                ZeichenUpdate {
-                    grundzeichen: "einheit",
-                    organisation: None,
-                    fachaufgabe: None,
-                    symbol: None,
-                    einheit: None,
-                    funktion: None,
-                    farbe: None,
-                    label: None,
+                ZeichenPatch {
+                    grundzeichen: Some("einheit"),
+                    ..Default::default()
                 },
             )
             .await

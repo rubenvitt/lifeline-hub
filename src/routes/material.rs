@@ -2,15 +2,16 @@ use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
 use crate::error::AppError;
 use crate::extract::JsonBody;
-use crate::material::repo::{self, MaterialDaten};
+use crate::material::repo::{self, MaterialDaten, MaterialPatch};
 use crate::material::MaterialAnzeige;
-use crate::routes::support::trimme;
+use crate::routes::support::{deserialize_optional_field, trimme, trimme_tri};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 
-/// Body für Anlegen + Vollersatz-PATCH (gleiche editierbaren Felder).
+/// Body für das Anlegen (POST). Bewusst getrennt vom PATCH-Body: der POST muss seine
+/// Pflichtfelder strukturell erzwingen (fehlende `bezeichnung` → 400 schon im Extractor).
 #[derive(Debug, Deserialize)]
 pub struct MaterialBody {
     pub bezeichnung: String,
@@ -61,6 +62,75 @@ fn normalisiere(body: MaterialBody) -> Result<Normalisiert, AppError> {
     })
 }
 
+/// PATCH-Body (LFH-306, Tri-State): **jedes** Feld ist optional — absent = unverändert,
+/// `null`/`""` = leeren. Alle fünf Zusatzfelder liegen auf nullable Spalten und tragen
+/// deshalb den Tri-State-Deserializer; `bezeichnung` (NOT NULL) ist ein schlichtes
+/// `Option<String>` **ohne** `#[serde(default)]` — ein `default` machte aus „nicht gesendet"
+/// ein „auf Leerstring setzen", also genau den stillen Spalten-Reset, den LFH-306 beseitigt.
+#[derive(Debug, Deserialize)]
+pub struct PatchMaterial {
+    pub bezeichnung: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub kategorie: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub bestandsnummer: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub traegerorganisation: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub standort: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub bemerkung: Option<Option<String>>,
+}
+
+/// Owned, validierte Patch-Felder; `MaterialPatch` borgt daraus.
+struct PatchNormalisiert {
+    bezeichnung: Option<String>,
+    kategorie: Option<Option<String>>,
+    bestandsnummer: Option<Option<String>>,
+    traegerorganisation: Option<Option<String>>,
+    standort: Option<Option<String>>,
+    bemerkung: Option<Option<String>>,
+}
+
+impl PatchNormalisiert {
+    fn patch(&self) -> MaterialPatch<'_> {
+        MaterialPatch {
+            bezeichnung: self.bezeichnung.as_deref(),
+            kategorie: self.kategorie.as_ref().map(|v| v.as_deref()),
+            bestandsnummer: self.bestandsnummer.as_ref().map(|v| v.as_deref()),
+            traegerorganisation: self.traegerorganisation.as_ref().map(|v| v.as_deref()),
+            standort: self.standort.as_ref().map(|v| v.as_deref()),
+            bemerkung: self.bemerkung.as_ref().map(|v| v.as_deref()),
+        }
+    }
+}
+
+/// Prüft nur die **gesendeten** Felder. Ein vorhandenes, aber leeres Pflichtfeld ist 400
+/// (Statuscode-Konvention LFH-305), ein absentes ist schlicht kein Wunsch — die Prüfung darf
+/// nicht auf den Absent-Zweig durchschlagen, sonst wäre jeder Teil-Patch abgelehnt.
+fn normalisiere_patch(body: PatchMaterial) -> Result<PatchNormalisiert, AppError> {
+    let bezeichnung = match body.bezeichnung {
+        Some(b) => {
+            let b = b.trim().to_string();
+            if b.is_empty() {
+                return Err(AppError::Validation(
+                    "Bezeichnung darf nicht leer sein".into(),
+                ));
+            }
+            Some(b)
+        }
+        None => None,
+    };
+    Ok(PatchNormalisiert {
+        bezeichnung,
+        kategorie: trimme_tri(body.kategorie),
+        bestandsnummer: trimme_tri(body.bestandsnummer),
+        traegerorganisation: trimme_tri(body.traegerorganisation),
+        standort: trimme_tri(body.standort),
+        bemerkung: trimme_tri(body.bemerkung),
+    })
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ListeParams {
     #[serde(default)]
@@ -96,15 +166,16 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(m.anzeige())))
 }
 
-/// PATCH /api/material/{id} — Admin, Vollersatz. NotFound bei fremder/unbek. id.
+/// PATCH /api/material/{id} — Admin, echter Teil-Patch (LFH-306): Feld absent =
+/// unverändert, `null`/`""` = leeren. NotFound bei fremder/unbek. id.
 pub async fn aktualisieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
     Path(id): Path<i64>,
-    JsonBody(body): JsonBody<MaterialBody>,
+    JsonBody(body): JsonBody<PatchMaterial>,
 ) -> Result<Json<MaterialAnzeige>, AppError> {
-    let n = normalisiere(body)?;
-    let m = repo::aktualisiere(&state.pool, benutzer.org_id, id, n.daten()).await?;
+    let n = normalisiere_patch(body)?;
+    let m = repo::patche(&state.pool, benutzer.org_id, id, n.patch()).await?;
     Ok(Json(m.anzeige()))
 }
 

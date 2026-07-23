@@ -7,9 +7,10 @@ use crate::karte::download::{self, Fortschritt};
 use crate::karte::proxy;
 use crate::karte::quellen;
 use crate::karte::registry::repo::{
-    self, OfflineKarte, OfflineKarteEingabe, OnlineQuelle, OnlineQuelleEingabe,
+    self, OfflineKarte, OfflineKarteEingabe, OnlineQuelle, OnlineQuelleEingabe, OnlineQuelleFelder,
 };
 use crate::karte::tile_cache;
+use crate::routes::support::deserialize_optional_field;
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
 use axum::http::{header, HeaderMap, StatusCode};
@@ -576,7 +577,171 @@ pub struct OfflineKarteBody {
     pub sortier: i64,
 }
 
-/// Validiert + normalisiert einen Online-Quelle-Body (Anlegen wie Vollersatz-PATCH teilen das).
+/// PATCH-Body einer Online-Quelle (LFH-306, echter Teil-Patch): **jedes** Feld ist optional,
+/// absent = unverändert. Bewusst getrennt von [`OnlineQuelleBody`], der seine Pflichtfelder
+/// beim Anlegen weiterhin strukturell erzwingt.
+///
+/// **Kein `#[serde(default …)]`** an `sortier`/`aktiv`/`proxy`: der Default `proxy = true`
+/// des Anlege-Bodys machte aus jedem PATCH ohne `proxy` ein stilles Zurückschalten einer
+/// bewusst direkt geladenen Quelle auf den Proxy — inklusive Invalidierung ihrer
+/// Kachel-Slots.
+///
+/// `attribution` ist Tri-State, aber NICHT weil die Spalte geleert werden dürfte: die
+/// Lizenzauflage macht sie zur Pflicht. Der Tri-State trennt allein `null`/`""`
+/// (Leerwunsch → 400) von „nicht gesendet" (zulässig, solange der gespeicherte Wert trägt);
+/// ein schlichtes `Option<String>` kollabierte beides zu `None` und ließe `null` durch.
+#[derive(Debug, Deserialize)]
+pub struct OnlineQuellePatch {
+    pub name: Option<String>,
+    pub url: Option<String>,
+    pub typ: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub attribution: Option<Option<String>>,
+    pub sortier: Option<i64>,
+    pub aktiv: Option<bool>,
+    pub proxy: Option<bool>,
+}
+
+/// Normalisierter Teil-Patch: nur die gesendeten Felder sind `Some`.
+struct OnlinePatchNormalisiert {
+    name: Option<String>,
+    url: Option<String>,
+    typ: Option<String>,
+    attribution: Option<String>,
+    sortier: Option<i64>,
+    aktiv: Option<bool>,
+    proxy: Option<bool>,
+    /// `url` ODER `proxy` standen im Patch → die Proxy-Slots der Quelle sind stale.
+    beruehrt_proxy_ziel: bool,
+}
+
+impl OnlinePatchNormalisiert {
+    fn felder(&self) -> OnlineQuelleFelder<'_> {
+        OnlineQuelleFelder {
+            name: self.name.as_deref(),
+            url: self.url.as_deref(),
+            typ: self.typ.as_deref(),
+            attribution: self.attribution.as_deref(),
+            sortier: self.sortier,
+            aktiv: self.aktiv,
+            proxy: self.proxy,
+        }
+    }
+}
+
+/// SSRF-/Platzhalter-Vorabprüfung einer **proxied** Quell-URL (LFH-182).
+///
+/// Geteilt von Anlegen und Teil-PATCH, damit das Download-Gate nur an EINER Stelle
+/// definiert ist. URL roh belassen (kein `Url`-Roundtrip — der würde `{}` percent-kodieren),
+/// aber vorab prüfen: nur unterstützte Platzhalter, und SSRF-Check auf einer
+/// materialisierten Probe (Platzhalter durch 0/Dummy ersetzt).
+fn pruefe_proxy_url(url: &str) -> Result<(), AppError> {
+    let unbekannt = proxy::unbekannte_platzhalter(url);
+    if !unbekannt.is_empty() {
+        return Err(AppError::Validation(format!(
+            "Nicht unterstützte Platzhalter in der Proxy-URL: {}",
+            unbekannt.join(", ")
+        )));
+    }
+    let probe = proxy::subst_template(&proxy::subst_glyphs(url, "a", "0-0"), 0, 0, 0);
+    let parsed = reqwest::Url::parse(&probe)
+        .map_err(|e| AppError::Validation(format!("Ungültige Proxy-URL: {e}")))?;
+    download::url_ist_sicher(&parsed).map_err(AppError::Validation)
+}
+
+/// Validiert einen Teil-PATCH gegen den **Effektivzustand** (Patch gewinnt, sonst Bestand).
+///
+/// Die beiden mehrspaltigen Invarianten dieser Route hängen am gemergten Zustand, nicht am
+/// Body allein:
+///
+/// 1. **Attribution ist Pflicht** (Lizenzauflage). Ein PATCH ohne das Feld ist zulässig —
+///    aber nur, solange der GESPEICHERTE Wert trägt. `null`/`""` bleibt 400.
+/// 2. **Das SSRF-/Platzhalter-Gate hängt am Paar (`url`, `proxy`)**, nicht an `url` allein.
+///    `{"proxy":true}` auf eine Quelle mit interner, direkt geladener URL wäre sonst ein
+///    Bypass des Download-Gates: der Server begänne, eine interne Adresse selbst zu holen,
+///    ohne dass die URL je geprüft wurde. Deshalb läuft die Prüfung, sobald `url` ODER
+///    `proxy` im Patch steht — immer gegen das effektive Paar.
+///
+/// Geschrieben wird trotzdem **nur der Patch**, nie der gemergte Zustand (das wäre wieder
+/// Vollersatz).
+fn validiere_online_patch(
+    body: OnlineQuellePatch,
+    bestand: &OnlineQuelle,
+) -> Result<OnlinePatchNormalisiert, AppError> {
+    let name = match &body.name {
+        Some(n) => {
+            let n = n.trim();
+            if n.is_empty() {
+                return Err(AppError::Validation("Name darf nicht leer sein".into()));
+            }
+            Some(n.to_string())
+        }
+        None => None,
+    };
+    let url = match &body.url {
+        Some(u) => {
+            let u = u.trim();
+            if u.is_empty() {
+                return Err(AppError::Validation("URL darf nicht leer sein".into()));
+            }
+            Some(u.to_string())
+        }
+        None => None,
+    };
+    if let Some(t) = &body.typ {
+        if t != "vektor" && t != "raster" {
+            return Err(AppError::Validation(
+                "Typ muss 'vektor' oder 'raster' sein".into(),
+            ));
+        }
+    }
+    let attribution_pflicht =
+        || AppError::Validation("Attribution ist Pflicht (Lizenzauflage)".into());
+    let attribution = match &body.attribution {
+        // Gesendet: muss nach dem Trimmen tragen — `null` wie `""` sind Leerwunsch → 400.
+        Some(wert) => Some(
+            wert.as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .ok_or_else(attribution_pflicht)?
+                .to_string(),
+        ),
+        // Nicht gesendet: der gespeicherte Wert muss die Pflicht tragen.
+        None => {
+            bestand
+                .attribution
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .ok_or_else(attribution_pflicht)?;
+            None
+        }
+    };
+
+    // Das Gate hängt am EFFEKTIVEN Paar (url, proxy), nicht am Body allein.
+    let beruehrt_proxy_ziel = body.url.is_some() || body.proxy.is_some();
+    if beruehrt_proxy_ziel {
+        let url_effektiv = url.as_deref().unwrap_or(&bestand.url);
+        let proxy_effektiv = body.proxy.unwrap_or(bestand.proxy);
+        // Direkte Quellen (proxy=0) lädt der Browser selbst — keine Server-seitige Prüfung.
+        if proxy_effektiv {
+            pruefe_proxy_url(url_effektiv)?;
+        }
+    }
+
+    Ok(OnlinePatchNormalisiert {
+        name,
+        url,
+        typ: body.typ,
+        attribution,
+        sortier: body.sortier,
+        aktiv: body.aktiv,
+        proxy: body.proxy,
+        beruehrt_proxy_ziel,
+    })
+}
+
+/// Validiert + normalisiert einen Online-Quelle-Body zum **Anlegen**.
 /// Name/URL nicht leer (getrimmt), `typ ∈ {vektor,raster}`, **Attribution Pflicht** (Lizenzauflage).
 fn validiere_online(body: OnlineQuelleBody) -> Result<OnlineQuelleEingabe, AppError> {
     let name = body.name.trim();
@@ -600,22 +765,11 @@ fn validiere_online(body: OnlineQuelleBody) -> Result<OnlineQuelleEingabe, AppEr
         .ok_or_else(|| AppError::Validation("Attribution ist Pflicht (Lizenzauflage)".into()))?
         .to_string();
     let proxy_effektiv = body.proxy;
-    // Proxied Quellen (key-basiert): URL roh speichern (kein Url-Roundtrip — würde `{}`
-    // percent-kodieren), aber vorab validieren: nur unterstützte Platzhalter, und SSRF-Check auf
-    // einer materialisierten Probe (Platzhalter durch 0/Dummy ersetzt). Direkte Quellen (proxy=0)
-    // bleiben unverändert: der Browser lädt sie selbst, keine Server-seitige Prüfung nötig.
+    // Proxied Quellen (key-basiert) durchlaufen das SSRF-/Platzhalter-Gate. Direkte Quellen
+    // (proxy=0) bleiben unverändert: der Browser lädt sie selbst, keine Server-seitige
+    // Prüfung nötig.
     if proxy_effektiv {
-        let unbekannt = proxy::unbekannte_platzhalter(url);
-        if !unbekannt.is_empty() {
-            return Err(AppError::Validation(format!(
-                "Nicht unterstützte Platzhalter in der Proxy-URL: {}",
-                unbekannt.join(", ")
-            )));
-        }
-        let probe = proxy::subst_template(&proxy::subst_glyphs(url, "a", "0-0"), 0, 0, 0);
-        let parsed = reqwest::Url::parse(&probe)
-            .map_err(|e| AppError::Validation(format!("Ungültige Proxy-URL: {e}")))?;
-        download::url_ist_sicher(&parsed).map_err(AppError::Validation)?;
+        pruefe_proxy_url(url)?;
     }
     Ok(OnlineQuelleEingabe {
         name: name.to_string(),
@@ -667,20 +821,30 @@ pub async fn online_katalog(_admin: AdminUser) -> Result<Json<Vec<OnlineStyle>>,
     Ok(Json(default_online_styles()))
 }
 
-/// PATCH /api/karte/online-quellen/{id} — Online-Quelle vollständig aktualisieren (Admin).
+/// PATCH /api/karte/online-quellen/{id} — Online-Quelle teilweise aktualisieren (Admin).
+///
+/// Echter Teil-Patch (LFH-306): Feld absent = unverändert. Validiert gegen den
+/// Effektivzustand — insbesondere läuft das SSRF-Gate auch bei `{"proxy":true}` ohne `url`.
 pub async fn online_aktualisieren(
     State(state): State<AppState>,
     _admin: AdminUser,
     Path(id): Path<i64>,
-    JsonBody(body): JsonBody<OnlineQuelleBody>,
+    JsonBody(body): JsonBody<OnlineQuellePatch>,
 ) -> Result<Json<OnlineQuelle>, AppError> {
-    let eingabe = validiere_online(body)?;
-    let aktualisiert = repo::aktualisiere_online_quelle(&state.pool, id, &eingabe).await?;
-    if aktualisiert.is_some() {
-        // URL kann sich geändert haben → alte Proxy-Slots sind stale und müssen weg.
+    // Bestand zuerst — liefert zugleich das 404 für unbekannte ids.
+    let bestand = repo::finde_online_quelle(&state.pool, id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    let n = validiere_online_patch(body, &bestand)?;
+    let aktualisiert = repo::patche_online_quelle(&state.pool, id, n.felder())
+        .await?
+        .ok_or(AppError::NotFound)?;
+    // Nur wenn `url` oder `proxy` im Patch standen, sind die Slots stale. Ein reiner
+    // Umbenenn-/Sortier-Patch darf den Kachel-Cache der Quelle NICHT wegwerfen.
+    if n.beruehrt_proxy_ziel {
         repo::slots_loeschen(&state.pool, id).await?;
     }
-    aktualisiert.map(Json).ok_or(AppError::NotFound)
+    Ok(Json(aktualisiert))
 }
 
 /// DELETE /api/karte/online-quellen/{id} — Online-Quelle löschen (Admin).

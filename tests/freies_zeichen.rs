@@ -1,7 +1,8 @@
 //! LFH-170 Freie taktische Zeichen — Backend-Integrationstests.
 //!
-//! Deckt ab: CRUD (POST→GET→PATCH→DELETE), Whole-Spec-Overwrite (fehlende Overlays →
-//! NULL, lat/lon unverändert), 400 bei fehlendem/leerem grundzeichen, 404 für fremden
+//! Deckt ab: CRUD (POST→GET→PATCH→DELETE), Teil-Patch-Semantik (LFH-306: absentes Feld
+//! unverändert, `null` leert, lat/lon unverändert), 400 bei fehlendem/leerem grundzeichen
+//! (POST), 404 für fremden
 //! Einsatz bzw. fremde zeichen-id, Gate-Matrix (GET braucht Lesezugriff+Modul; POST/PATCH/
 //! DELETE Schreibrecht+aktiv+Modul; Org-Isolation), SSE-Event `freies_zeichen` (Wire-Tag +
 //! Payload load-bearing für das Frontend).
@@ -177,8 +178,11 @@ async fn leeres_grundzeichen_ist_400() {
     );
 }
 
+/// Migriert von `crud_whole_spec_haelt_lat_lon` (LFH-306): derselbe Teil-Body, invertierte
+/// Zusage. Vor LFH-306 nullte ein PATCH ohne `organisation`/`fachaufgabe`/… diese Overlays
+/// still mit; jetzt fasst er nur die gesendeten Felder an. lat/lon bleiben unverschiebbar.
 #[tokio::test]
-async fn crud_whole_spec_haelt_lat_lon() {
+async fn crud_teil_patch_haelt_lat_lon_und_overlays() {
     let (app, _live) = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
@@ -193,7 +197,7 @@ async fn crud_whole_spec_haelt_lat_lon() {
     .await;
     let zid = z["id"].as_i64().unwrap();
 
-    // Whole-Spec-PATCH: nur grundzeichen + symbol; alle anderen Overlays fallen weg (NULL).
+    // Teil-PATCH: nur grundzeichen + symbol; alle anderen Overlays bleiben stehen.
     let patch = json!({"grundzeichen": "fahrzeug", "symbol": "kran"}).to_string();
     let (status, n) = anfrage(
         &app,
@@ -206,11 +210,11 @@ async fn crud_whole_spec_haelt_lat_lon() {
     assert_eq!(status, StatusCode::OK, "{n:?}");
     assert_eq!(n["grundzeichen"], "fahrzeug");
     assert_eq!(n["symbol"], "kran");
-    assert!(n["organisation"].is_null(), "Overlay weg → NULL: {n:?}");
-    assert!(n["fachaufgabe"].is_null());
-    assert!(n["einheit"].is_null());
-    assert!(n["farbe"].is_null());
-    assert!(n["label"].is_null());
+    assert_eq!(n["organisation"], "feuerwehr", "nicht gesendet → bleibt");
+    assert_eq!(n["fachaufgabe"], "brandbekaempfung");
+    assert_eq!(n["einheit"], "zug");
+    assert_eq!(n["farbe"], "#ff0000");
+    assert_eq!(n["label"], "A");
     // lat/lon nicht verschiebbar.
     assert_eq!(n["lat"], 50.1);
     assert_eq!(n["lon"], 8.6);
@@ -234,6 +238,142 @@ async fn crud_whole_spec_haelt_lat_lon() {
     )
     .await;
     assert_eq!(liste.as_array().unwrap().len(), 0);
+}
+
+// ===== LFH-306: Teil-Patch — absent ≠ null =====
+
+/// Anlege-Body mit ALLEN sieben Overlay-Feldern gesetzt (für die Teil-Patch-Tests).
+fn neu_body_alle_overlays() -> String {
+    json!({
+        "lat": 50.1, "lon": 8.6, "grundzeichen": "einheit",
+        "organisation": "feuerwehr", "fachaufgabe": "brandbekaempfung",
+        "symbol": "kran", "einheit": "zug", "funktion": "zugtrupp",
+        "farbe": "#ff0000", "label": "A"
+    })
+    .to_string()
+}
+
+/// Legt ein Zeichen mit allen sieben Overlays an und liefert dessen id.
+async fn zeichen_mit_allen_overlays(app: &axum::Router, admin: &str, einsatz: i64) -> i64 {
+    let (status, z) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        admin,
+        Some(&neu_body_alle_overlays()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{z:?}");
+    z["id"].as_i64().unwrap()
+}
+
+/// Der Kern von LFH-306: ein Patch, der nur `label` schickt, lässt alle sieben Overlays
+/// stehen. Gegen HEAD fällt das hart durch — der Whole-Spec-Overwrite nullte sie mit.
+///
+/// Zwei Runden: erst MIT `grundzeichen` im Body (gegen HEAD deserialisierbar, damit die
+/// Rotfärbung wirklich vom Overwrite kommt und nicht vom Extractor), dann der minimale
+/// Body `{"label": …}` allein — der ist überhaupt erst seit LFH-306 zulässig.
+#[tokio::test]
+async fn patch_nur_label_laesst_overlays_stehen() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let zid = zeichen_mit_allen_overlays(&app, &admin, einsatz).await;
+
+    let (status, n) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &admin,
+        Some(&json!({"grundzeichen": "einheit", "label": "X"}).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{n:?}");
+    assert_eq!(n["label"], "X");
+    assert_eq!(n["organisation"], "feuerwehr", "Overlay unberührt: {n:?}");
+    assert_eq!(n["fachaufgabe"], "brandbekaempfung");
+    assert_eq!(n["symbol"], "kran");
+    assert_eq!(n["einheit"], "zug");
+    assert_eq!(n["funktion"], "zugtrupp");
+    assert_eq!(n["farbe"], "#ff0000");
+    assert_eq!(n["grundzeichen"], "einheit");
+
+    // Minimalster Teil-Patch: nur `label`, ohne jedes weitere Feld.
+    let (status, n) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &admin,
+        Some(&json!({"label": "Y"}).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{n:?}");
+    assert_eq!(n["label"], "Y");
+    assert_eq!(n["organisation"], "feuerwehr");
+    assert_eq!(n["funktion"], "zugtrupp");
+    assert_eq!(n["farbe"], "#ff0000");
+}
+
+/// Grenzt gegen `patch_nur_label_laesst_overlays_stehen` ab: `null` ist der Leerwunsch und
+/// trifft GENAU das gesendete Feld — die übrigen sechs Overlays bleiben stehen.
+#[tokio::test]
+async fn patch_organisation_null_loescht_nur_diese() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let zid = zeichen_mit_allen_overlays(&app, &admin, einsatz).await;
+
+    let (status, n) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &admin,
+        Some(&json!({"grundzeichen": "einheit", "organisation": null}).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{n:?}");
+    assert!(n["organisation"].is_null(), "null leert das Feld: {n:?}");
+    assert_eq!(n["fachaufgabe"], "brandbekaempfung", "Nachbar unberührt");
+    assert_eq!(n["symbol"], "kran");
+    assert_eq!(n["einheit"], "zug");
+    assert_eq!(n["funktion"], "zugtrupp");
+    assert_eq!(n["farbe"], "#ff0000");
+    assert_eq!(n["label"], "A");
+}
+
+/// `grundzeichen` ist NOT NULL: ein Patch OHNE das Feld lässt es stehen (statt am Extractor
+/// zu scheitern), ein Patch mit LEEREM Wert bleibt 400 (Statuscode-Konvention, LFH-267/F22).
+/// Die POST-seitigen Referenztests `fehlendes_/leeres_grundzeichen_ist_400` bleiben davon
+/// unberührt — dort ist das Feld strukturell Pflicht.
+#[tokio::test]
+async fn patch_ohne_grundzeichen_behaelt_grundzeichen() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let zid = zeichen_mit_allen_overlays(&app, &admin, einsatz).await;
+
+    let (status, n) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &admin,
+        Some(&json!({"label": "Z"}).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{n:?}");
+    assert_eq!(n["grundzeichen"], "einheit", "nicht gesendet → bleibt");
+    assert_eq!(n["label"], "Z");
+
+    // Vorhanden, aber leer → 400 (das Feld ist ISOLIERT unbrauchbar).
+    let (status, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &admin,
+        Some(&json!({"grundzeichen": "   "}).to_string()),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]

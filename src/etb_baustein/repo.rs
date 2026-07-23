@@ -80,26 +80,58 @@ pub async fn anlegen(
     laden(pool, org_id, id).await
 }
 
-/// Vollersatz der editierbaren Felder (org-scoped), setzt `aktualisiert_at`.
+/// Teil-Patch der editierbaren Felder (LFH-306, Tri-State): die äußere `Option` sagt
+/// „im Patch enthalten?" — `None` lässt die Spalte unverändert. Bei den nullable Spalten
+/// `meldeweg`/`veranlassung` trägt der Wert selbst noch eine `Option`: `Some(None)` setzt
+/// sie auf NULL.
+#[derive(Debug, Default)]
+pub struct BausteinPatch<'a> {
+    pub label: Option<&'a str>,
+    pub typ: Option<&'a str>,
+    pub inhalt: Option<&'a str>,
+    pub meldeweg: Option<Option<&'a str>>,
+    pub veranlassung: Option<Option<&'a str>>,
+    pub sortier: Option<i64>,
+}
+
+/// Teil-Patch der editierbaren Felder (org-scoped), setzt `aktualisiert_at`.
 /// `NotFound` bei fremder/unbekannter id, `Conflict` bei Label-Dublette.
-pub async fn aktualisiere(
+///
+/// Flag/Wert-Paare statt COALESCE (LFH-266/F12, Vorlage `personal/status_repo.rs`): erst so
+/// lassen sich `meldeweg`/`veranlassung` über die API wieder auf NULL setzen, und ein nicht
+/// gesendetes Feld fasst seine Spalte nicht an. Die Parameter sind nummeriert, weil eine um
+/// eine Position verschobene Bind-Kette gleichtypige Nachbarspalten (`label`↔`typ`↔`inhalt`,
+/// `meldeweg`↔`veranlassung`) STILL vertauschen würde — abgesichert von
+/// `patche_setzt_jede_spalte_an_ihren_platz` in `tests/etb_baustein.rs`.
+pub async fn patche(
     pool: &SqlitePool,
     org_id: i64,
     id: i64,
-    daten: BausteinDaten<'_>,
+    patch: BausteinPatch<'_>,
 ) -> Result<EtbBaustein, AppError> {
     let ergebnis = sqlx::query(
         "UPDATE etb_baustein SET \
-            label = ?, typ = ?, inhalt = ?, meldeweg = ?, veranlassung = ?, sortier = ?, \
+            label = CASE WHEN ?1 IS NULL THEN label ELSE ?2 END, \
+            typ = CASE WHEN ?3 IS NULL THEN typ ELSE ?4 END, \
+            inhalt = CASE WHEN ?5 IS NULL THEN inhalt ELSE ?6 END, \
+            meldeweg = CASE WHEN ?7 IS NULL THEN meldeweg ELSE ?8 END, \
+            veranlassung = CASE WHEN ?9 IS NULL THEN veranlassung ELSE ?10 END, \
+            sortier = CASE WHEN ?11 IS NULL THEN sortier ELSE ?12 END, \
             aktualisiert_at = datetime('now') \
-         WHERE id = ? AND org_id = ?",
+         WHERE id = ?13 AND org_id = ?14",
     )
-    .bind(daten.label)
-    .bind(daten.typ)
-    .bind(daten.inhalt)
-    .bind(daten.meldeweg)
-    .bind(daten.veranlassung)
-    .bind(daten.sortier)
+    .bind(patch.label.map(|_| 1_i64))
+    .bind(patch.label)
+    .bind(patch.typ.map(|_| 1_i64))
+    .bind(patch.typ)
+    .bind(patch.inhalt.map(|_| 1_i64))
+    .bind(patch.inhalt)
+    .bind(patch.meldeweg.map(|_| 1_i64))
+    .bind(patch.meldeweg.and_then(|v| v))
+    .bind(patch.veranlassung.map(|_| 1_i64))
+    .bind(patch.veranlassung.and_then(|v| v))
+    .bind(patch.sortier.map(|_| 1_i64))
+    .bind(patch.sortier)
     .bind(id)
     .bind(org_id)
     .execute(pool)

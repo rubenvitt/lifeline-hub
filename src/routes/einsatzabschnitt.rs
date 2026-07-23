@@ -9,10 +9,10 @@ use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "einsatzabschnitte";
-use crate::einsatzabschnitt::repo::{self as abschnitt_repo, AbschnittDaten};
+use crate::einsatzabschnitt::repo::{self as abschnitt_repo, AbschnittDaten, AbschnittPatch};
 use crate::einsatzabschnitt::EinsatzabschnittAnzeige;
 use crate::error::AppError;
-use crate::routes::support::trimme;
+use crate::routes::support::{trimme, trimme_tri};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -123,13 +123,51 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
 
-/// PATCH /api/einsaetze/{id}/abschnitte/{aid} — Vollersatz editierbarer Felder (kein ETB-Eintrag).
+/// PATCH-Body (LFH-306, Tri-State): jedes Feld optional, absent = unverändert,
+/// `null`/`""` = leeren. Getrennt von [`AbschnittBody`], damit der POST sein Pflicht-`name`
+/// strukturell erzwingt. **Kein `#[serde(default)]` an `sortier`** — das machte aus
+/// „nicht gesendet" ein „auf 0 setzen".
+#[derive(Debug, Deserialize)]
+pub struct AbschnittPatchBody {
+    pub name: Option<String>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub ueber_abschnitt_id: Option<Option<i64>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub leiter_id: Option<Option<i64>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub bemerkung: Option<Option<String>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub kommunikationsmittel: Option<Option<String>>,
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub erreichbarkeit: Option<Option<String>>,
+    pub sortier: Option<i64>,
+    /// Sprechgruppen-IDs; `Some` ersetzt die Zuordnung vollständig, `None` lässt sie
+    /// unverändert — das Feld war schon vor LFH-306 tri-state.
+    pub sprechgruppe_ids: Option<Vec<i64>>,
+}
+
+/// PATCH /api/einsaetze/{id}/abschnitte/{aid} — echter Teil-Patch (LFH-306).
 /// Kein ETB-Eintrag (reine Korrektur; Auflösen ist die sinntragende Aktion).
 pub async fn aktualisieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Path((einsatz_id, aid)): Path<(i64, i64)>,
-    JsonBody(body): JsonBody<AbschnittBody>,
+    JsonBody(body): JsonBody<AbschnittPatchBody>,
 ) -> Result<Json<EinsatzabschnittAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -144,24 +182,30 @@ pub async fn aktualisieren(
     .await?;
     fordere_aktiv(&einsatz)?;
 
-    let name = body.name.trim().to_string();
-    if name.is_empty() {
-        return Err(AppError::Validation("Name darf nicht leer sein".into()));
-    }
-    let bemerkung = trimme(body.bemerkung);
-    let mittel = trimme(body.kommunikationsmittel);
-    let erreichbar = trimme(body.erreichbarkeit);
-    let mut anzeige = abschnitt_repo::aktualisiere(
+    let name = match body.name {
+        Some(n) => {
+            let n = n.trim().to_string();
+            if n.is_empty() {
+                return Err(AppError::Validation("Name darf nicht leer sein".into()));
+            }
+            Some(n)
+        }
+        None => None,
+    };
+    let bemerkung = trimme_tri(body.bemerkung);
+    let mittel = trimme_tri(body.kommunikationsmittel);
+    let erreichbar = trimme_tri(body.erreichbarkeit);
+    let mut anzeige = abschnitt_repo::patche(
         &state.pool,
         einsatz_id,
         aid,
-        AbschnittDaten {
-            name: &name,
+        AbschnittPatch {
+            name: name.as_deref(),
             ueber_abschnitt_id: body.ueber_abschnitt_id,
             leiter_id: body.leiter_id,
-            bemerkung: bemerkung.as_deref(),
-            kommunikationsmittel: mittel.as_deref(),
-            erreichbarkeit: erreichbar.as_deref(),
+            bemerkung: bemerkung.as_ref().map(|v| v.as_deref()),
+            kommunikationsmittel: mittel.as_ref().map(|v| v.as_deref()),
+            erreichbarkeit: erreichbar.as_ref().map(|v| v.as_deref()),
             sortier: body.sortier,
         },
     )

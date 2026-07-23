@@ -233,29 +233,84 @@ pub async fn anlegen(
     laden(pool, einsatz_id, id).await
 }
 
-/// Vollersatz der editierbaren Felder (Parent-Wechsel zyklenfrei). `NotFound`,
+/// Teil-Patch der editierbaren Felder (LFH-306, Tri-State): äußere `Option` = „im Patch
+/// enthalten?", innere = Wert (`Some(None)` setzt die Spalte auf NULL).
+#[derive(Debug, Default)]
+pub struct AbschnittPatch<'a> {
+    pub name: Option<&'a str>,
+    pub ueber_abschnitt_id: Option<Option<i64>>,
+    pub leiter_id: Option<Option<i64>>,
+    pub bemerkung: Option<Option<&'a str>>,
+    pub kommunikationsmittel: Option<Option<&'a str>>,
+    pub erreichbarkeit: Option<Option<&'a str>>,
+    pub sortier: Option<i64>,
+}
+
+/// Validiert nur die **gesendeten** Bezugsfelder. `Some(None)` (Zuordnung lösen) und ein
+/// absentes Feld brauchen keine Prüfung — es gibt keinen neuen Bezug zu prüfen. Beide
+/// Prüfungen hängen je an EINER Spalte, deshalb ist hier keine Effektivzustands-Bildung
+/// nötig.
+async fn validiere_patch(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    self_id: i64,
+    patch: &AbschnittPatch<'_>,
+) -> Result<(), AppError> {
+    if let Some(Some(parent)) = patch.ueber_abschnitt_id {
+        pruefe_parent(pool, einsatz_id, parent).await?;
+        if waere_zyklus(pool, self_id, parent).await? {
+            return Err(AppError::Validation(
+                "Abschnitt darf nicht eigener Vorfahr werden".into(),
+            ));
+        }
+    }
+    if let Some(Some(leiter)) = patch.leiter_id {
+        pruefe_leiter(pool, einsatz_id, leiter).await?;
+    }
+    Ok(())
+}
+
+/// Teil-Patch der editierbaren Felder (Parent-Wechsel zyklenfrei). `NotFound`,
 /// falls der Abschnitt nicht zum Einsatz gehört.
-pub async fn aktualisiere(
+///
+/// Flag/Wert-Paare mit **nummerierten** Parametern (LFH-266/F12, Vorlage `person/repo.rs`):
+/// nur gesendete Spalten werden angefasst. Die Nummerierung schützt gegen eine um eine
+/// Position verschobene Bind-Kette, die gleichtypige Nachbarspalten
+/// (`kommunikationsmittel`↔`erreichbarkeit`) still vertauschte.
+pub async fn patche(
     pool: &SqlitePool,
     einsatz_id: i64,
     id: i64,
-    daten: AbschnittDaten<'_>,
+    patch: AbschnittPatch<'_>,
 ) -> Result<EinsatzabschnittAnzeige, AppError> {
     // Existenz im Einsatz sichern (auch für die self_id-Zyklenprüfung).
     laden(pool, einsatz_id, id).await?;
-    validiere(pool, einsatz_id, Some(id), &daten).await?;
+    validiere_patch(pool, einsatz_id, id, &patch).await?;
     let resultat = sqlx::query(
-        "UPDATE einsatzabschnitt SET ueber_abschnitt_id = ?, name = ?, leiter_id = ?, \
-                bemerkung = ?, kommunikationsmittel = ?, erreichbarkeit = ?, sortier = ? \
-         WHERE id = ? AND einsatz_id = ?",
+        "UPDATE einsatzabschnitt SET \
+            ueber_abschnitt_id = CASE WHEN ?1 IS NULL THEN ueber_abschnitt_id ELSE ?2 END, \
+            name = CASE WHEN ?3 IS NULL THEN name ELSE ?4 END, \
+            leiter_id = CASE WHEN ?5 IS NULL THEN leiter_id ELSE ?6 END, \
+            bemerkung = CASE WHEN ?7 IS NULL THEN bemerkung ELSE ?8 END, \
+            kommunikationsmittel = CASE WHEN ?9 IS NULL THEN kommunikationsmittel ELSE ?10 END, \
+            erreichbarkeit = CASE WHEN ?11 IS NULL THEN erreichbarkeit ELSE ?12 END, \
+            sortier = CASE WHEN ?13 IS NULL THEN sortier ELSE ?14 END \
+         WHERE id = ?15 AND einsatz_id = ?16",
     )
-    .bind(daten.ueber_abschnitt_id)
-    .bind(daten.name)
-    .bind(daten.leiter_id)
-    .bind(daten.bemerkung)
-    .bind(daten.kommunikationsmittel)
-    .bind(daten.erreichbarkeit)
-    .bind(daten.sortier)
+    .bind(patch.ueber_abschnitt_id.map(|_| 1_i64))
+    .bind(patch.ueber_abschnitt_id.and_then(|v| v))
+    .bind(patch.name.map(|_| 1_i64))
+    .bind(patch.name)
+    .bind(patch.leiter_id.map(|_| 1_i64))
+    .bind(patch.leiter_id.and_then(|v| v))
+    .bind(patch.bemerkung.map(|_| 1_i64))
+    .bind(patch.bemerkung.and_then(|v| v))
+    .bind(patch.kommunikationsmittel.map(|_| 1_i64))
+    .bind(patch.kommunikationsmittel.and_then(|v| v))
+    .bind(patch.erreichbarkeit.map(|_| 1_i64))
+    .bind(patch.erreichbarkeit.and_then(|v| v))
+    .bind(patch.sortier.map(|_| 1_i64))
+    .bind(patch.sortier)
     .bind(id)
     .bind(einsatz_id)
     .execute(pool)
@@ -399,6 +454,14 @@ mod tests {
         }
     }
 
+    /// Patch, der ausschließlich `ueber_abschnitt_id` trägt (`None` = Zuordnung lösen).
+    fn parent_patch<'a>(parent: Option<i64>) -> AbschnittPatch<'a> {
+        AbschnittPatch {
+            ueber_abschnitt_id: Some(parent),
+            ..Default::default()
+        }
+    }
+
     /// Org + Einsatz + ein Abschnitt; liefert (einsatz_id, abschnitt_id).
     async fn seed_abschnitt(pool: &SqlitePool) -> (i64, i64) {
         let einsatz = setup(pool).await;
@@ -466,25 +529,43 @@ mod tests {
         assert_eq!(a.kommunikationsmittel.as_deref(), Some("digitalfunk"));
         assert_eq!(a.erreichbarkeit.as_deref(), Some("0151 23456"));
 
-        // Voll-Ersatz: kommunikationsmittel geändert, erreichbarkeit geleert (→ None).
-        let b = aktualisiere(
+        // LFH-306: `kommunikationsmittel` geändert, `erreichbarkeit` EXPLIZIT geleert.
+        // Vor dem Umbau reichte dafür ein Vollbody mit `erreichbarkeit: None`; jetzt muss
+        // der Leerwunsch als `Some(None)` gesendet werden — genau das ist der Unterschied,
+        // den die Route neu kennt.
+        let b = patche(
             &pool,
             einsatz,
             a.id,
-            AbschnittDaten {
-                name: "Nord",
-                ueber_abschnitt_id: None,
-                leiter_id: None,
-                bemerkung: None,
-                sortier: 0,
-                kommunikationsmittel: Some("mobil"),
-                erreichbarkeit: None,
+            AbschnittPatch {
+                kommunikationsmittel: Some(Some("mobil")),
+                erreichbarkeit: Some(None),
+                ..Default::default()
             },
         )
         .await
         .unwrap();
         assert_eq!(b.kommunikationsmittel.as_deref(), Some("mobil"));
         assert_eq!(b.erreichbarkeit, None);
+
+        // Gegenprobe: ein Patch OHNE die beiden Keys fasst sie nicht an.
+        let c = patche(
+            &pool,
+            einsatz,
+            a.id,
+            AbschnittPatch {
+                name: Some("Nord-neu"),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(c.name, "Nord-neu");
+        assert_eq!(
+            c.kommunikationsmittel.as_deref(),
+            Some("mobil"),
+            "unberührt"
+        );
     }
 
     #[tokio::test]
@@ -573,18 +654,22 @@ mod tests {
 
         // A unter sich selbst.
         assert!(matches!(
-            aktualisiere(&pool, einsatz, a.id, daten("A", Some(a.id), None))
+            patche(&pool, einsatz, a.id, parent_patch(Some(a.id)))
                 .await
                 .unwrap_err(),
             AppError::Validation(_)
         ));
         // A unter C (C ist Nachfahre von A) → transitiver Zyklus.
         assert!(matches!(
-            aktualisiere(&pool, einsatz, a.id, daten("A", Some(c.id), None))
+            patche(&pool, einsatz, a.id, parent_patch(Some(c.id)))
                 .await
                 .unwrap_err(),
             AppError::Validation(_)
         ));
+        // Grenzt ab: `null` löst die Zuordnung und läuft nicht in die Zyklenprüfung.
+        assert!(patche(&pool, einsatz, b.id, parent_patch(None))
+            .await
+            .is_ok());
     }
 
     #[tokio::test]
@@ -625,16 +710,24 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn aktualisiere_fremder_einsatz_ist_notfound() {
+    async fn patche_fremder_einsatz_ist_notfound() {
         let pool = crate::db::test_pool().await;
         let einsatz = setup(&pool).await;
         let a = anlegen(&pool, einsatz, daten("A", None, None))
             .await
             .unwrap();
         assert!(matches!(
-            aktualisiere(&pool, 999, a.id, daten("A", None, None))
-                .await
-                .unwrap_err(),
+            patche(
+                &pool,
+                999,
+                a.id,
+                AbschnittPatch {
+                    name: Some("A"),
+                    ..Default::default()
+                }
+            )
+            .await
+            .unwrap_err(),
             AppError::NotFound
         ));
         assert!(matches!(

@@ -539,6 +539,212 @@ async fn online_crud_durchlauf() {
     assert!(json(res).await.as_array().unwrap().is_empty());
 }
 
+// ===== LFH-306: Online-Quellen-PATCH ist ein Teil-Patch =====
+
+/// Legt eine Online-Quelle über die API an (erwartet 201) und liefert ihre id.
+async fn online_quelle_anlegen(app: &axum::Router, cookie: &str, body: &str) -> i64 {
+    let res = anfrage(
+        app,
+        "POST",
+        "/api/karte/online-quellen",
+        Some(cookie),
+        Some(body),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::CREATED);
+    json(res).await["id"].as_i64().unwrap()
+}
+
+/// `proxy` hing am `#[serde(default = "default_proxy")]` (true): jeder PATCH ohne das Feld
+/// schaltete eine bewusst DIREKT geladene Quelle zurück auf den Proxy und warf ihre
+/// Kachel-Slots weg. Der schärfste Test dieser Route — gegen HEAD springt `proxy` auf true.
+#[tokio::test]
+async fn patch_ohne_proxy_behaelt_proxy_false() {
+    let (app, cookie) = admin_app().await;
+    let id = online_quelle_anlegen(
+        &app,
+        &cookie,
+        r#"{"name":"Direkt","url":"https://tiles.example/liberty","typ":"vektor","attribution":"© OSM","proxy":false}"#,
+    )
+    .await;
+
+    // Body mit allen früheren Pflichtfeldern, NUR `proxy` fehlt.
+    let res = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/karte/online-quellen/{id}"),
+        Some(&cookie),
+        Some(r#"{"name":"Direkt neu","url":"https://tiles.example/liberty","typ":"vektor","attribution":"© OSM"}"#),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let akt = json(res).await;
+    assert_eq!(akt["name"], "Direkt neu");
+    assert_eq!(
+        akt["proxy"], false,
+        "nicht gesendet → bleibt false (kein Rückfall auf den Anlege-Default): {akt:?}"
+    );
+}
+
+/// Der sicherheitskritische Test dieser Route: `{"proxy":true}` OHNE `url` schaltet den
+/// Server-seitigen Abruf einer bereits GESPEICHERTEN, internen URL scharf. Ohne
+/// Effektivzustands-Prüfung ginge der Patch durch (die URL steht ja nicht im Body) — und der
+/// Server holte fortan eine Loopback-Adresse. Muss 400 sein.
+#[tokio::test]
+async fn patch_proxy_true_prueft_gespeicherte_url_gegen_ssrf() {
+    let (app, cookie) = admin_app().await;
+    // Direkt geladene Quelle mit interner URL: beim Anlegen ungeprüft (proxy=false), weil
+    // sie der Browser selbst lädt.
+    let id = online_quelle_anlegen(
+        &app,
+        &cookie,
+        r#"{"name":"Intern","url":"https://127.0.0.1/style.json","typ":"vektor","attribution":"© X","proxy":false}"#,
+    )
+    .await;
+
+    let res = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/karte/online-quellen/{id}"),
+        Some(&cookie),
+        Some(r#"{"proxy":true}"#),
+    )
+    .await;
+    assert_eq!(
+        res.status(),
+        StatusCode::BAD_REQUEST,
+        "proxy=true auf gespeicherte interne URL muss am SSRF-Gate scheitern"
+    );
+
+    // Und die Quelle ist unverändert direkt geblieben.
+    let liste = json(
+        anfrage(
+            &app,
+            "GET",
+            "/api/karte/online-quellen",
+            Some(&cookie),
+            None,
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(liste[0]["proxy"], false, "abgelehnt ⇒ nichts geschrieben");
+}
+
+/// Attribution ist Lizenzauflage: ein PATCH OHNE das Feld ist zulässig, solange der
+/// GESPEICHERTE Wert trägt. Grenzt gegen `patch_attribution_null_ist_400` ab.
+#[tokio::test]
+async fn patch_ohne_attribution_bleibt_gueltig() {
+    let (app, cookie) = admin_app().await;
+    let id = online_quelle_anlegen(
+        &app,
+        &cookie,
+        r#"{"name":"A","url":"https://tiles.example/a","typ":"vektor","attribution":"© OSM","proxy":false}"#,
+    )
+    .await;
+
+    let res = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/karte/online-quellen/{id}"),
+        Some(&cookie),
+        Some(r#"{"name":"A2"}"#),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let akt = json(res).await;
+    assert_eq!(akt["name"], "A2");
+    assert_eq!(akt["attribution"], "© OSM", "unberührt: {akt:?}");
+}
+
+/// `null` (wie `""`) ist ein Leerwunsch — und der ist an der Pflicht-Attribution 400.
+/// Ohne den Tri-State kollabierte `null` zu „nicht gesendet" und ginge still durch.
+#[tokio::test]
+async fn patch_attribution_null_ist_400() {
+    let (app, cookie) = admin_app().await;
+    let id = online_quelle_anlegen(
+        &app,
+        &cookie,
+        r#"{"name":"A","url":"https://tiles.example/a","typ":"vektor","attribution":"© OSM","proxy":false}"#,
+    )
+    .await;
+
+    for body in [r#"{"attribution":null}"#, r#"{"attribution":"   "}"#] {
+        let res = anfrage(
+            &app,
+            "PATCH",
+            &format!("/api/karte/online-quellen/{id}"),
+            Some(&cookie),
+            Some(body),
+        )
+        .await;
+        assert_eq!(
+            res.status(),
+            StatusCode::BAD_REQUEST,
+            "Attribution ist Pflicht: {body}"
+        );
+    }
+}
+
+/// `sortier` hing am `#[serde(default)]` (0): jeder PATCH ohne das Feld warf die
+/// Reihenfolge auf 0 zurück. NOT-NULL-Spalte, fällt gegen HEAD hart durch.
+#[tokio::test]
+async fn patch_ohne_sortier_behaelt_sortier() {
+    let (app, cookie) = admin_app().await;
+    let id = online_quelle_anlegen(
+        &app,
+        &cookie,
+        r#"{"name":"S","url":"https://tiles.example/s","typ":"vektor","attribution":"© OSM","sortier":7,"proxy":false}"#,
+    )
+    .await;
+
+    let res = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/karte/online-quellen/{id}"),
+        Some(&cookie),
+        Some(r#"{"name":"S neu","url":"https://tiles.example/s","typ":"vektor","attribution":"© OSM","proxy":false}"#),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let akt = json(res).await;
+    assert_eq!(akt["sortier"], 7, "nicht gesendet → bleibt: {akt:?}");
+}
+
+/// Die Proxy-Slots einer Quelle sind nur stale, wenn sich das Abrufziel ändern KANN — also
+/// wenn `url` oder `proxy` im Patch stehen. Ein reiner Umbenenn-Patch warf den Kachel-Cache
+/// vorher bedingungslos weg (HEAD ruft `slots_loeschen` unbedingt).
+#[tokio::test]
+async fn patch_ohne_url_und_proxy_loescht_keine_slots() {
+    use lifeline_hub::karte::registry::repo;
+    let pool = pool().await;
+    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
+        .await
+        .unwrap();
+    insert_proxy_quelle(&pool, "Q", "https://x/style.json?key=K", "vektor", 1, 1, 0).await; // id 1
+    sqlx::query("INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) VALUES (1, 'https://x/sprite?key=K', 'sprite')")
+        .execute(&pool).await.unwrap(); // slot 1
+    let app = app_mit_pool(pool.clone());
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    let res = anfrage(
+        &app,
+        "PATCH",
+        "/api/karte/online-quellen/1",
+        Some(&cookie),
+        Some(r#"{"name":"Q neu","sortier":3}"#),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    assert!(
+        repo::slot_aufloesen(&pool, 1, 1, "sprite")
+            .await
+            .unwrap()
+            .is_some(),
+        "Patch ohne url/proxy lässt die Slots stehen"
+    );
+}
+
 #[tokio::test]
 async fn online_anlegen_ohne_attribution_ist_400() {
     let (app, cookie) = admin_app().await;

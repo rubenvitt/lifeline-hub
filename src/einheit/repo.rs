@@ -366,34 +366,127 @@ pub async fn anlegen(
     laden(pool, einsatz_id, id).await
 }
 
-/// Vollersatz der editierbaren Felder (ohne Führer). Parent-Wechsel zyklenfrei. `NotFound`,
+/// Teil-Patch der editierbaren Felder (LFH-306, ohne Führer): äußere `Option` = „im Patch
+/// enthalten?", innere = Wert (`Some(None)` setzt die Spalte auf NULL).
+#[derive(Debug, Default)]
+pub struct EinheitPatch<'a> {
+    pub name: Option<&'a str>,
+    pub abschnitt_id: Option<Option<i64>>,
+    pub ueber_einheit_id: Option<Option<i64>>,
+    pub typ_id: Option<Option<i64>>,
+    pub soll_fuehrer: Option<Option<i64>>,
+    pub soll_unterfuehrer: Option<Option<i64>>,
+    pub soll_mannschaft: Option<Option<i64>>,
+    pub bemerkung: Option<Option<&'a str>>,
+    pub kommunikationsmittel: Option<Option<&'a str>>,
+    pub erreichbarkeit: Option<Option<&'a str>>,
+    pub sortier: Option<i64>,
+}
+
+/// Validiert nur die **gesendeten** FK-Felder. `Some(None)` (Zuordnung lösen) und ein
+/// absentes Feld brauchen keine Prüfung — es gibt keinen neuen Bezug zu prüfen. Damit
+/// entfällt hier auch jede Effektivzustands-Bildung: die drei Prüfungen hängen je an
+/// EINER Spalte, nicht an einer Kombination (anders als das Soll-Trio im Handler).
+async fn validiere_patch(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    org_id: i64,
+    self_id: i64,
+    patch: &EinheitPatch<'_>,
+) -> Result<(), AppError> {
+    if let Some(Some(typ)) = patch.typ_id {
+        if !crate::einheit::typ_repo::ist_in_org(pool, org_id, typ).await? {
+            return Err(AppError::Validation("Unbekannter Einheitstyp".into()));
+        }
+    }
+    if let Some(Some(abschnitt)) = patch.abschnitt_id {
+        pruefe_abschnitt(pool, einsatz_id, abschnitt).await?;
+    }
+    if let Some(Some(parent)) = patch.ueber_einheit_id {
+        pruefe_gehoert_zum_einsatz(pool, einsatz_id, parent).await?;
+        if waere_zyklus(pool, self_id, parent).await? {
+            return Err(AppError::Validation(
+                "Einheit darf nicht eigener Vorfahr werden".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Die drei Soll-Spalten **roh** (für die Effektivzustands-Prüfung des Trios beim
+/// Teil-PATCH, LFH-306). `EinheitAnzeige.soll` glättet ein inkonsistentes Trio still auf
+/// `None`; gegen dieses geglättete Trio darf der Handler nicht validieren.
+/// `NotFound`, falls die Einheit nicht zum Einsatz gehört.
+pub async fn soll_roh(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<(Option<i64>, Option<i64>, Option<i64>), AppError> {
+    sqlx::query_as::<_, (Option<i64>, Option<i64>, Option<i64>)>(
+        "SELECT soll_fuehrer, soll_unterfuehrer, soll_mannschaft \
+         FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)
+}
+
+/// Teil-Patch der editierbaren Felder (ohne Führer). Parent-Wechsel zyklenfrei. `NotFound`,
 /// falls die Einheit nicht zum Einsatz gehört.
-pub async fn aktualisiere(
+///
+/// Flag/Wert-Paare mit **nummerierten** Parametern (LFH-266/F12, Vorlage `person/repo.rs`):
+/// nur gesendete Spalten werden angefasst. Die Nummerierung ist bei elf aufeinanderfolgenden
+/// Paaren keine Stilfrage — eine um eine Position verschobene Bind-Kette vertauschte
+/// gleichtypige Nachbarspalten (`kommunikationsmittel`↔`erreichbarkeit`,
+/// `abschnitt_id`↔`ueber_einheit_id`) STILL, ohne Compile- und ohne Laufzeitfehler.
+pub async fn patche(
     pool: &SqlitePool,
     einsatz_id: i64,
     org_id: i64,
     id: i64,
-    daten: EinheitDaten<'_>,
+    patch: EinheitPatch<'_>,
 ) -> Result<EinheitAnzeige, AppError> {
     pruefe_gehoert_zum_einsatz(pool, einsatz_id, id).await?;
-    validiere(pool, einsatz_id, org_id, Some(id), &daten).await?;
+    validiere_patch(pool, einsatz_id, org_id, id, &patch).await?;
     let resultat = sqlx::query(
-        "UPDATE einsatz_einheit SET abschnitt_id = ?, ueber_einheit_id = ?, typ_id = ?, name = ?, \
-                soll_fuehrer = ?, soll_unterfuehrer = ?, soll_mannschaft = ?, bemerkung = ?, \
-                kommunikationsmittel = ?, erreichbarkeit = ?, sortier = ? \
-         WHERE id = ? AND einsatz_id = ?",
+        "UPDATE einsatz_einheit SET \
+            abschnitt_id = CASE WHEN ?1 IS NULL THEN abschnitt_id ELSE ?2 END, \
+            ueber_einheit_id = CASE WHEN ?3 IS NULL THEN ueber_einheit_id ELSE ?4 END, \
+            typ_id = CASE WHEN ?5 IS NULL THEN typ_id ELSE ?6 END, \
+            name = CASE WHEN ?7 IS NULL THEN name ELSE ?8 END, \
+            soll_fuehrer = CASE WHEN ?9 IS NULL THEN soll_fuehrer ELSE ?10 END, \
+            soll_unterfuehrer = CASE WHEN ?11 IS NULL THEN soll_unterfuehrer ELSE ?12 END, \
+            soll_mannschaft = CASE WHEN ?13 IS NULL THEN soll_mannschaft ELSE ?14 END, \
+            bemerkung = CASE WHEN ?15 IS NULL THEN bemerkung ELSE ?16 END, \
+            kommunikationsmittel = CASE WHEN ?17 IS NULL THEN kommunikationsmittel ELSE ?18 END, \
+            erreichbarkeit = CASE WHEN ?19 IS NULL THEN erreichbarkeit ELSE ?20 END, \
+            sortier = CASE WHEN ?21 IS NULL THEN sortier ELSE ?22 END \
+         WHERE id = ?23 AND einsatz_id = ?24",
     )
-    .bind(daten.abschnitt_id)
-    .bind(daten.ueber_einheit_id)
-    .bind(daten.typ_id)
-    .bind(daten.name)
-    .bind(daten.soll_fuehrer)
-    .bind(daten.soll_unterfuehrer)
-    .bind(daten.soll_mannschaft)
-    .bind(daten.bemerkung)
-    .bind(daten.kommunikationsmittel)
-    .bind(daten.erreichbarkeit)
-    .bind(daten.sortier)
+    .bind(patch.abschnitt_id.map(|_| 1_i64))
+    .bind(patch.abschnitt_id.and_then(|v| v))
+    .bind(patch.ueber_einheit_id.map(|_| 1_i64))
+    .bind(patch.ueber_einheit_id.and_then(|v| v))
+    .bind(patch.typ_id.map(|_| 1_i64))
+    .bind(patch.typ_id.and_then(|v| v))
+    .bind(patch.name.map(|_| 1_i64))
+    .bind(patch.name)
+    .bind(patch.soll_fuehrer.map(|_| 1_i64))
+    .bind(patch.soll_fuehrer.and_then(|v| v))
+    .bind(patch.soll_unterfuehrer.map(|_| 1_i64))
+    .bind(patch.soll_unterfuehrer.and_then(|v| v))
+    .bind(patch.soll_mannschaft.map(|_| 1_i64))
+    .bind(patch.soll_mannschaft.and_then(|v| v))
+    .bind(patch.bemerkung.map(|_| 1_i64))
+    .bind(patch.bemerkung.and_then(|v| v))
+    .bind(patch.kommunikationsmittel.map(|_| 1_i64))
+    .bind(patch.kommunikationsmittel.and_then(|v| v))
+    .bind(patch.erreichbarkeit.map(|_| 1_i64))
+    .bind(patch.erreichbarkeit.and_then(|v| v))
+    .bind(patch.sortier.map(|_| 1_i64))
+    .bind(patch.sortier)
     .bind(id)
     .bind(einsatz_id)
     .execute(pool)
@@ -761,17 +854,38 @@ mod tests {
             .await
             .unwrap();
         // PATCH (nur Name) muss trotzdem gelingen, Typ bleibt referenziert.
-        let nachher = aktualisiere(
+        // LFH-306: der Patch enthält `typ_id` gar nicht mehr — der Typ bleibt allein
+        // dadurch stehen, dass er nicht angefasst wird. Der zweite Patch unten sendet ihn
+        // ausdrücklich mit, damit die Zusage „deaktivierter Typ bleibt setzbar" weiter
+        // geprüft wird und nicht bloß am Nicht-Anfassen hängt.
+        let nachher = patche(
             &pool,
             einsatz,
             1,
             e.id,
-            daten("1. Zug umbenannt", Some(typ), None, None, None),
+            EinheitPatch {
+                name: Some("1. Zug umbenannt"),
+                ..Default::default()
+            },
         )
         .await
         .unwrap();
         assert_eq!(nachher.name, "1. Zug umbenannt");
         assert_eq!(nachher.typ_id, Some(typ));
+
+        let erneut = patche(
+            &pool,
+            einsatz,
+            1,
+            e.id,
+            EinheitPatch {
+                typ_id: Some(Some(typ)),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(erneut.typ_id, Some(typ), "deaktivierter Typ bleibt setzbar");
     }
 
     #[tokio::test]
@@ -828,16 +942,171 @@ mod tests {
         .unwrap();
         // A unter C (Nachfahre) → transitiver Zyklus.
         assert!(matches!(
-            aktualisiere(
+            patche(
                 &pool,
                 einsatz,
                 1,
                 a.id,
-                daten("A", None, None, Some(d.id), None)
+                EinheitPatch {
+                    ueber_einheit_id: Some(Some(d.id)),
+                    ..Default::default()
+                }
             )
             .await
             .unwrap_err(),
             AppError::Validation(_)
+        ));
+        // Grenzt ab: `null` löst die Zuordnung und darf nicht in die Zyklenprüfung laufen.
+        assert!(patche(
+            &pool,
+            einsatz,
+            1,
+            a.id,
+            EinheitPatch {
+                ueber_einheit_id: Some(None),
+                ..Default::default()
+            }
+        )
+        .await
+        .is_ok());
+    }
+
+    /// Kern von LFH-306: nicht gesendete Spalten bleiben stehen. Unter dem alten
+    /// Vollersatz nullte ein Patch ohne diese Keys Bemerkung, Kommunikationsmittel,
+    /// Erreichbarkeit und das Soll-Trio und setzte `sortier` auf 0.
+    #[tokio::test]
+    async fn patche_laesst_nicht_gesendete_spalten_stehen() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, b) = setup(&pool).await;
+        let e = anlegen(
+            &pool,
+            einsatz,
+            1,
+            EinheitDaten {
+                name: "1. Zug",
+                abschnitt_id: None,
+                ueber_einheit_id: None,
+                typ_id: None,
+                soll_fuehrer: Some(1),
+                soll_unterfuehrer: Some(3),
+                soll_mannschaft: Some(18),
+                bemerkung: Some("Bem"),
+                kommunikationsmittel: Some("digitalfunk"),
+                erreichbarkeit: Some("0170/1"),
+                sortier: 42,
+            },
+            b,
+        )
+        .await
+        .unwrap();
+        let nachher = patche(
+            &pool,
+            einsatz,
+            1,
+            e.id,
+            EinheitPatch {
+                name: Some("Umbenannt"),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(nachher.name, "Umbenannt");
+        assert_eq!(nachher.bemerkung.as_deref(), Some("Bem"));
+        assert_eq!(nachher.kommunikationsmittel.as_deref(), Some("digitalfunk"));
+        assert_eq!(nachher.erreichbarkeit.as_deref(), Some("0170/1"));
+        assert_eq!(nachher.soll, Some(crate::staerke::Staerke::neu(1, 3, 18)));
+        assert_eq!(nachher.sortier, 42);
+    }
+
+    /// Bind-Reihenfolge der elf Flag/Wert-Paare: alle Spalten in EINEM Patch auf distinkte
+    /// Werte setzen und einzeln prüfen. Eine verschobene Kette vertauschte gleichtypige
+    /// Nachbarspalten (`kommunikationsmittel`↔`erreichbarkeit`) still.
+    #[tokio::test]
+    async fn patche_setzt_jede_spalte_an_ihren_platz() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, b) = setup(&pool).await;
+        let typ: i64 = sqlx::query_scalar(
+            "INSERT INTO einheit_typ (org_id, label) VALUES (1, 'Zug') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let parent = anlegen(&pool, einsatz, 1, daten("Oben", None, None, None, None), b)
+            .await
+            .unwrap();
+        let e = anlegen(
+            &pool,
+            einsatz,
+            1,
+            daten("1. Zug", None, None, None, None),
+            b,
+        )
+        .await
+        .unwrap();
+        let nachher = patche(
+            &pool,
+            einsatz,
+            1,
+            e.id,
+            EinheitPatch {
+                name: Some("Neu"),
+                abschnitt_id: Some(None),
+                ueber_einheit_id: Some(Some(parent.id)),
+                typ_id: Some(Some(typ)),
+                soll_fuehrer: Some(Some(2)),
+                soll_unterfuehrer: Some(Some(5)),
+                soll_mannschaft: Some(Some(30)),
+                bemerkung: Some(Some("B")),
+                kommunikationsmittel: Some(Some("K")),
+                erreichbarkeit: Some(Some("E")),
+                sortier: Some(7),
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(nachher.name, "Neu");
+        assert_eq!(nachher.abschnitt_id, None);
+        assert_eq!(nachher.ueber_einheit_id, Some(parent.id));
+        assert_eq!(nachher.typ_id, Some(typ));
+        assert_eq!(nachher.soll, Some(crate::staerke::Staerke::neu(2, 5, 30)));
+        assert_eq!(nachher.bemerkung.as_deref(), Some("B"));
+        assert_eq!(nachher.kommunikationsmittel.as_deref(), Some("K"));
+        assert_eq!(nachher.erreichbarkeit.as_deref(), Some("E"));
+        assert_eq!(nachher.sortier, 7);
+    }
+
+    #[tokio::test]
+    async fn patche_fremder_einsatz_ist_notfound() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, b) = setup(&pool).await;
+        let fremd: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Fremd') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let e = anlegen(&pool, einsatz, 1, daten("X", None, None, None, None), b)
+            .await
+            .unwrap();
+        assert!(matches!(
+            patche(
+                &pool,
+                fremd,
+                1,
+                e.id,
+                EinheitPatch {
+                    name: Some("Y"),
+                    ..Default::default()
+                }
+            )
+            .await
+            .unwrap_err(),
+            AppError::NotFound
+        ));
+        assert!(matches!(
+            soll_roh(&pool, fremd, e.id).await.unwrap_err(),
+            AppError::NotFound
         ));
     }
 

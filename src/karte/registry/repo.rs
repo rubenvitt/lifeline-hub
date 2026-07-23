@@ -166,25 +166,62 @@ pub async fn anlegen_online_quelle(
     hole_online_quelle(pool, id).await
 }
 
-/// Aktualisiert eine Online-Quelle vollständig. `Ok(None)`, wenn keine Zeile mit `id` existiert.
-pub async fn aktualisiere_online_quelle(
+/// Teil-Patch einer Online-Quelle (LFH-306): `None` heißt „nicht im Patch enthalten" und
+/// lässt die Spalte unverändert.
+///
+/// `attribution` ist bewusst **kein** Tri-State: die Lizenzauflage macht sie zur Pflicht,
+/// ein `null` im Body lehnt der Handler mit 400 ab — die Spalte kann über diesen Weg also
+/// nie geleert werden.
+#[derive(Debug, Default)]
+pub struct OnlineQuelleFelder<'a> {
+    pub name: Option<&'a str>,
+    pub url: Option<&'a str>,
+    pub typ: Option<&'a str>,
+    pub attribution: Option<&'a str>,
+    pub sortier: Option<i64>,
+    pub aktiv: Option<bool>,
+    pub proxy: Option<bool>,
+}
+
+/// Teil-Patch einer Online-Quelle. `Ok(None)`, wenn keine Zeile mit `id` existiert.
+///
+/// Flag/Wert-Paare statt Vollersatz (LFH-306): ein PATCH ohne `proxy` darf eine bewusst
+/// direkt geladene Quelle nicht zurück auf Proxy schalten, ein PATCH ohne `sortier` die
+/// Reihenfolge nicht auf 0 werfen. Die Parameter sind nummeriert, weil eine um eine
+/// Position verschobene Bind-Kette die gleichtypigen Nachbarn (`name`↔`url`↔`typ`,
+/// `aktiv`↔`proxy`) STILL vertauschen würde — abgesichert von
+/// `patche_online_quelle_setzt_jede_spalte_an_ihren_platz`.
+pub async fn patche_online_quelle(
     pool: &SqlitePool,
     id: i64,
-    eingabe: &OnlineQuelleEingabe,
+    patch: OnlineQuelleFelder<'_>,
 ) -> Result<Option<OnlineQuelle>, sqlx::Error> {
     let betroffen = sqlx::query(
-        "UPDATE karte_online_quelle \
-         SET name = ?, url = ?, typ = ?, attribution = ?, sortier = ?, aktiv = ?, proxy = ?, \
-             geaendert_at = datetime('now') \
-         WHERE id = ?",
+        "UPDATE karte_online_quelle SET \
+            name = CASE WHEN ?1 IS NULL THEN name ELSE ?2 END, \
+            url = CASE WHEN ?3 IS NULL THEN url ELSE ?4 END, \
+            typ = CASE WHEN ?5 IS NULL THEN typ ELSE ?6 END, \
+            attribution = CASE WHEN ?7 IS NULL THEN attribution ELSE ?8 END, \
+            sortier = CASE WHEN ?9 IS NULL THEN sortier ELSE ?10 END, \
+            aktiv = CASE WHEN ?11 IS NULL THEN aktiv ELSE ?12 END, \
+            proxy = CASE WHEN ?13 IS NULL THEN proxy ELSE ?14 END, \
+            geaendert_at = datetime('now') \
+         WHERE id = ?15",
     )
-    .bind(&eingabe.name)
-    .bind(&eingabe.url)
-    .bind(&eingabe.typ)
-    .bind(&eingabe.attribution)
-    .bind(eingabe.sortier)
-    .bind(eingabe.aktiv)
-    .bind(eingabe.proxy)
+    .bind(patch.name.map(|_| 1_i64))
+    .bind(patch.name)
+    .bind(patch.url.map(|_| 1_i64))
+    .bind(patch.url)
+    .bind(patch.typ.map(|_| 1_i64))
+    .bind(patch.typ)
+    .bind(patch.attribution.map(|_| 1_i64))
+    .bind(patch.attribution)
+    .bind(patch.sortier.map(|_| 1_i64))
+    .bind(patch.sortier)
+    .bind(patch.aktiv.map(|_| 1_i64))
+    .bind(patch.aktiv)
+    .bind(patch.proxy.map(|_| 1_i64))
+    .bind(patch.proxy)
     .bind(id)
     .execute(pool)
     .await?
@@ -762,38 +799,124 @@ mod tests {
         assert!(q.aktiv);
     }
 
+    /// Migriert von `aktualisiere_online_quelle_aendert_alle_felder` (LFH-306): ein
+    /// Vollbody-Patch ändert weiterhin jedes Feld. Die frühere `attribution: None`-Zusage
+    /// ist bewusst zu einem NEUEN Wert geworden — `None` heißt im Patch „unverändert",
+    /// und geleert werden kann die Pflicht-Attribution über die API ohnehin nicht.
     #[tokio::test]
-    async fn aktualisiere_online_quelle_aendert_alle_felder() {
+    async fn patche_online_quelle_aendert_alle_felder() {
         let pool = test_pool().await;
         let q = anlegen_online_quelle(&pool, &eingabe("X", 1, true))
             .await
             .unwrap();
-        let neu = OnlineQuelleEingabe {
-            name: "Neu".into(),
-            url: "https://neu".into(),
-            typ: "raster".into(),
-            attribution: None,
-            sortier: 9,
-            aktiv: false,
-            proxy: false,
-        };
-        let akt = aktualisiere_online_quelle(&pool, q.id, &neu)
-            .await
-            .unwrap()
-            .expect("Zeile existiert");
+        let akt = patche_online_quelle(
+            &pool,
+            q.id,
+            OnlineQuelleFelder {
+                name: Some("Neu"),
+                url: Some("https://neu"),
+                typ: Some("raster"),
+                attribution: Some("© Neu"),
+                sortier: Some(9),
+                aktiv: Some(false),
+                proxy: Some(true),
+            },
+        )
+        .await
+        .unwrap()
+        .expect("Zeile existiert");
         assert_eq!(akt.id, q.id);
         assert_eq!(akt.name, "Neu");
         assert_eq!(akt.typ, "raster");
-        assert_eq!(akt.attribution, None);
+        assert_eq!(akt.attribution.as_deref(), Some("© Neu"));
         assert!(!akt.aktiv);
     }
 
+    /// Bind-Reihenfolge der Flag/Wert-Kette: alle sieben Spalten auf distinkte Werte setzen
+    /// und einzeln prüfen. Eine verschobene Kette vertauschte `name`↔`url`↔`typ` bzw.
+    /// `aktiv`↔`proxy` still — ohne Compile- und ohne Laufzeitfehler.
     #[tokio::test]
-    async fn aktualisiere_online_quelle_unbekannt_gibt_none() {
+    async fn patche_online_quelle_setzt_jede_spalte_an_ihren_platz() {
         let pool = test_pool().await;
-        let r = aktualisiere_online_quelle(&pool, 999, &eingabe("X", 1, true))
+        let q = anlegen_online_quelle(&pool, &eingabe("X", 1, true))
             .await
             .unwrap();
+        let akt = patche_online_quelle(
+            &pool,
+            q.id,
+            OnlineQuelleFelder {
+                name: Some("Name"),
+                url: Some("https://url.example/x"),
+                typ: Some("raster"),
+                attribution: Some("© Attribution"),
+                sortier: Some(7),
+                aktiv: Some(false),
+                proxy: Some(true),
+            },
+        )
+        .await
+        .unwrap()
+        .expect("Zeile existiert");
+        assert_eq!(akt.name, "Name");
+        assert_eq!(akt.url, "https://url.example/x");
+        assert_eq!(akt.typ, "raster");
+        assert_eq!(akt.attribution.as_deref(), Some("© Attribution"));
+        assert_eq!(akt.sortier, 7);
+        assert!(!akt.aktiv);
+        assert!(akt.proxy);
+    }
+
+    /// Der Kern von LFH-306: ein Patch fasst NUR die gesendeten Spalten an — insbesondere
+    /// bleiben `proxy` und `sortier` stehen, die vorher an `#[serde(default …)]` hingen.
+    #[tokio::test]
+    async fn patche_online_quelle_laesst_nicht_gesendete_spalten_stehen() {
+        let pool = test_pool().await;
+        let mut e = eingabe("X", 4, true);
+        e.proxy = false;
+        let q = anlegen_online_quelle(&pool, &e).await.unwrap();
+        let akt = patche_online_quelle(
+            &pool,
+            q.id,
+            OnlineQuelleFelder {
+                name: Some("Umbenannt"),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap()
+        .expect("Zeile existiert");
+        assert_eq!(akt.name, "Umbenannt");
+        assert_eq!(akt.url, q.url, "unberührt");
+        assert_eq!(akt.typ, "vektor", "unberührt");
+        assert_eq!(akt.attribution.as_deref(), Some("© Test"), "unberührt");
+        assert_eq!(akt.sortier, 4, "unberührt");
+        assert!(akt.aktiv, "unberührt");
+        assert!(!akt.proxy, "unberührt — kein Rückfall auf den Default true");
+
+        // Leerer Patch → alles bleibt, insbesondere kein `None`.
+        let unveraendert = patche_online_quelle(&pool, q.id, OnlineQuelleFelder::default())
+            .await
+            .unwrap()
+            .expect("Zeile existiert");
+        assert_eq!(unveraendert.name, "Umbenannt");
+        assert!(!unveraendert.proxy);
+    }
+
+    /// Pinnt das 404-Verhalten der Route (migriert von
+    /// `aktualisiere_online_quelle_unbekannt_gibt_none`).
+    #[tokio::test]
+    async fn patche_online_quelle_unbekannt_gibt_none() {
+        let pool = test_pool().await;
+        let r = patche_online_quelle(
+            &pool,
+            999,
+            OnlineQuelleFelder {
+                name: Some("X"),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
         assert!(r.is_none());
     }
 

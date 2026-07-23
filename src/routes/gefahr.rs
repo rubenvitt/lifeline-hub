@@ -12,7 +12,7 @@ const MODUL_KEY: &str = "gefahrenzonen";
 use crate::error::AppError;
 use crate::gefahr::repo::{self as gefahr_repo, BewertungDaten};
 use crate::gefahr::{self, GefahrBewertungAnzeige, GefahrengebietAnzeige};
-use crate::routes::support::trimme;
+use crate::routes::support::{deserialize_optional_field, trimme, trimme_tri};
 use axum::extract::{Path, State};
 use axum::Json;
 use serde::Deserialize;
@@ -181,9 +181,14 @@ pub async fn bewerten(
     Ok(Json(z))
 }
 
+/// PATCH-Body des Gefahrengebiets (LFH-306, Tri-State). `gefahrengebiet.label` ist nullable
+/// (`migrations/0041`), deshalb muss der Ein-Feld-Body drei Fälle tragen: absent = Label
+/// unverändert, `null`/`""` = Label leeren, Wert = setzen. Vorher kollabierte `trimme` die
+/// ersten beiden Fälle zu `None` — ein Patch ohne `label` löschte das Label still.
 #[derive(Debug, Deserialize)]
 pub struct UmbenennenBody {
-    pub label: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub label: Option<Option<String>>,
 }
 
 /// PATCH /api/einsaetze/{id}/gefahrengebiete/{gid} — Label des Gefahrengebiets ändern.
@@ -206,8 +211,14 @@ pub async fn umbenennen(
     .await?;
     fordere_aktiv(&einsatz)?;
     gefahr_repo::gebiet_laden(&state.pool, einsatz_id, gid).await?; // Ownership-Gate
-    let label = trimme(body.label);
-    let g = gefahr_repo::gebiet_umbenennen(&state.pool, einsatz_id, gid, label.as_deref()).await?;
+    let label = trimme_tri(body.label);
+    let g = gefahr_repo::gebiet_umbenennen(
+        &state.pool,
+        einsatz_id,
+        gid,
+        label.as_ref().map(|v| v.as_deref()),
+    )
+    .await?;
     sse_gefahr(&state, einsatz_id, gid);
     Ok(Json(g))
 }

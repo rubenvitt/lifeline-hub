@@ -72,21 +72,46 @@ pub async fn anlegen(
     laden(pool, org_id, id).await
 }
 
-/// Vollersatz der editierbaren Felder (org-scoped). `NotFound`/`Conflict` analog Stamm.
-pub async fn aktualisiere(
+/// Teil-Patch der editierbaren Felder (LFH-306, Tri-State): die äußere `Option` sagt
+/// „im Patch enthalten?" — `None` lässt die Spalte unverändert. Bei der nullable Spalte
+/// `farbe` trägt der Wert selbst noch eine `Option`: `Some(None)` setzt sie auf NULL.
+#[derive(Debug, Default)]
+pub struct StatusPatch<'a> {
+    pub label: Option<&'a str>,
+    pub kategorie: Option<&'a str>,
+    pub farbe: Option<Option<&'a str>>,
+    pub sortier: Option<i64>,
+}
+
+/// Teil-Patch der editierbaren Felder (org-scoped). `NotFound`/`Conflict` analog Stamm.
+///
+/// Flag/Wert-Paare statt COALESCE (LFH-266/F12, Vorlage `person/repo.rs`): erst so lässt
+/// sich `farbe` über die API wieder auf NULL setzen, und ein nicht gesendetes Feld fasst
+/// seine Spalte nicht an. Die Parameter sind nummeriert, weil eine um eine Position
+/// verschobene Bind-Kette gleichtypige Nachbarspalten (`label`↔`kategorie`) STILL
+/// vertauschen würde — abgesichert von `patche_setzt_jede_spalte_an_ihren_platz`.
+pub async fn patche(
     pool: &SqlitePool,
     org_id: i64,
     id: i64,
-    daten: StatusDaten<'_>,
+    patch: StatusPatch<'_>,
 ) -> Result<PersonalStatus, AppError> {
     let ergebnis = sqlx::query(
-        "UPDATE personal_status SET label = ?, kategorie = ?, farbe = ?, sortier = ? \
-         WHERE id = ? AND org_id = ?",
+        "UPDATE personal_status SET \
+            label = CASE WHEN ?1 IS NULL THEN label ELSE ?2 END, \
+            kategorie = CASE WHEN ?3 IS NULL THEN kategorie ELSE ?4 END, \
+            farbe = CASE WHEN ?5 IS NULL THEN farbe ELSE ?6 END, \
+            sortier = CASE WHEN ?7 IS NULL THEN sortier ELSE ?8 END \
+         WHERE id = ?9 AND org_id = ?10",
     )
-    .bind(daten.label)
-    .bind(daten.kategorie)
-    .bind(daten.farbe)
-    .bind(daten.sortier)
+    .bind(patch.label.map(|_| 1_i64))
+    .bind(patch.label)
+    .bind(patch.kategorie.map(|_| 1_i64))
+    .bind(patch.kategorie)
+    .bind(patch.farbe.map(|_| 1_i64))
+    .bind(patch.farbe.and_then(|v| v))
+    .bind(patch.sortier.map(|_| 1_i64))
+    .bind(patch.sortier)
     .bind(id)
     .bind(org_id)
     .execute(pool)
@@ -253,6 +278,135 @@ mod tests {
             .unwrap();
         assert!(ist_in_org(&pool, 1, s.id).await.unwrap());
         assert!(!ist_in_org(&pool, 2, s.id).await.unwrap());
+    }
+
+    /// Bind-Reihenfolge der Flag/Wert-Kette: alle vier Spalten in EINEM Patch auf distinkte
+    /// Werte setzen und einzeln prüfen. Eine um eine Position verschobene Kette würde
+    /// `label`↔`kategorie` still vertauschen — ohne Compile- und ohne Laufzeitfehler.
+    #[tokio::test]
+    async fn patche_setzt_jede_spalte_an_ihren_platz() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let s = anlegen(&pool, 1, daten("alt", KATEGORIE_GEBUNDEN, 10))
+            .await
+            .unwrap();
+        let neu = patche(
+            &pool,
+            1,
+            s.id,
+            StatusPatch {
+                label: Some("neu"),
+                kategorie: Some(KATEGORIE_VERFUEGBAR),
+                farbe: Some(Some("#00ff00")),
+                sortier: Some(42),
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(neu.label, "neu");
+        assert_eq!(neu.kategorie.as_str(), KATEGORIE_VERFUEGBAR);
+        assert_eq!(neu.farbe.as_deref(), Some("#00ff00"));
+        assert_eq!(neu.sortier, 42);
+    }
+
+    /// Der Kern von LFH-306: ein Patch fasst NUR die gesendeten Spalten an. Der
+    /// `Default`-Patch (alle Felder absent) darf die Zeile Byte für Byte so lassen.
+    #[tokio::test]
+    async fn patche_laesst_nicht_gesendete_spalten_stehen() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let s = anlegen(
+            &pool,
+            1,
+            StatusDaten {
+                label: "alt",
+                kategorie: KATEGORIE_GEBUNDEN,
+                farbe: Some("#ff0000"),
+                sortier: 10,
+            },
+        )
+        .await
+        .unwrap();
+        // Nur `label` im Patch.
+        let neu = patche(
+            &pool,
+            1,
+            s.id,
+            StatusPatch {
+                label: Some("neu"),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(neu.label, "neu");
+        assert_eq!(neu.kategorie.as_str(), KATEGORIE_GEBUNDEN, "unberührt");
+        assert_eq!(neu.farbe.as_deref(), Some("#ff0000"), "unberührt");
+        assert_eq!(neu.sortier, 10, "unberührt");
+
+        // Leerer Patch → alles bleibt, insbesondere kein NotFound.
+        let unveraendert = patche(&pool, 1, s.id, StatusPatch::default())
+            .await
+            .unwrap();
+        assert_eq!(unveraendert.label, "neu");
+        assert_eq!(unveraendert.farbe.as_deref(), Some("#ff0000"));
+    }
+
+    /// `Some(None)` ist der Leerwunsch und muss von „absent" unterscheidbar sein —
+    /// grenzt gegen `patche_laesst_nicht_gesendete_spalten_stehen` ab.
+    #[tokio::test]
+    async fn patche_farbe_none_loescht_die_spalte() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let s = anlegen(
+            &pool,
+            1,
+            StatusDaten {
+                label: "alt",
+                kategorie: KATEGORIE_GEBUNDEN,
+                farbe: Some("#ff0000"),
+                sortier: 10,
+            },
+        )
+        .await
+        .unwrap();
+        let neu = patche(
+            &pool,
+            1,
+            s.id,
+            StatusPatch {
+                farbe: Some(None),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(neu.farbe, None);
+        assert_eq!(neu.label, "alt", "Nachbarfeld unberührt");
+    }
+
+    #[tokio::test]
+    async fn patche_fremde_org_ist_notfound() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        org(&pool, 2).await;
+        let s = anlegen(&pool, 1, daten("alt", KATEGORIE_GEBUNDEN, 10))
+            .await
+            .unwrap();
+        assert!(matches!(
+            patche(
+                &pool,
+                2,
+                s.id,
+                StatusPatch {
+                    label: Some("fremd"),
+                    ..Default::default()
+                }
+            )
+            .await
+            .unwrap_err(),
+            AppError::NotFound
+        ));
     }
 
     #[tokio::test]

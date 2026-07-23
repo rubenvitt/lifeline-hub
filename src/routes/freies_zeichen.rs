@@ -6,10 +6,10 @@ use crate::einsatz::berechtigung::{
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
 use crate::extract::JsonBody;
-use crate::freies_zeichen::repo::{self as zeichen_repo, ZeichenNeu, ZeichenUpdate};
+use crate::freies_zeichen::repo::{self as zeichen_repo, ZeichenNeu, ZeichenPatch};
 use crate::freies_zeichen::FreiesZeichenAnzeige;
 use crate::live::LiveEvent;
-use crate::routes::support::trimme;
+use crate::routes::support::{deserialize_optional_field, trimme, trimme_tri};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -113,20 +113,37 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(z)))
 }
 
+/// PATCH-Body (LFH-306, Tri-State): **jedes** Feld ist optional — absent = unverändert.
+/// Bewusst getrennt von [`AnlegenBody`]: der POST muss sein Pflicht-`grundzeichen`
+/// weiterhin strukturell erzwingen (fehlendes Feld → 400 schon im Extractor, siehe
+/// `fehlendes_grundzeichen_ist_400`).
+///
+/// `grundzeichen` ist NOT NULL und daher **nicht** Tri-State: absent = unverändert, ein
+/// vorhandener leerer Wert bleibt 400 (`grundzeichen_pflicht`). Die sieben Overlay-Felder
+/// sind nullable und tragen den vollen Tri-State — vor LFH-306 nullte ein Patch, der sie
+/// wegließ, sie stillschweigend mit.
 #[derive(Debug, Deserialize)]
 pub struct PatchBody {
-    pub grundzeichen: String,
-    pub organisation: Option<String>,
-    pub fachaufgabe: Option<String>,
-    pub symbol: Option<String>,
-    pub einheit: Option<String>,
-    pub funktion: Option<String>,
-    pub farbe: Option<String>,
-    pub label: Option<String>,
+    pub grundzeichen: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub organisation: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub fachaufgabe: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub symbol: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub einheit: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub funktion: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub farbe: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub label: Option<Option<String>>,
 }
 
-/// PATCH /api/einsaetze/{id}/freie-zeichen/{zid} — Whole-Spec-Overwrite aller Overlays +
-/// label + grundzeichen. lat/lon sind NICHT verschiebbar (v1). Schreibrecht + aktiv.
+/// PATCH /api/einsaetze/{id}/freie-zeichen/{zid} — echter Teil-Patch (LFH-306): Feld absent
+/// = unverändert, `null`/`""` bei den Overlays = leeren. lat/lon sind NICHT verschiebbar
+/// (v1). Schreibrecht + aktiv.
 pub async fn aktualisieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -146,28 +163,33 @@ pub async fn aktualisieren(
     .await?;
     fordere_aktiv(&einsatz)?;
 
-    let grundzeichen = grundzeichen_pflicht(&body.grundzeichen)?;
-    let organisation = trimme(body.organisation.clone());
-    let fachaufgabe = trimme(body.fachaufgabe.clone());
-    let symbol = trimme(body.symbol.clone());
-    let einheit = trimme(body.einheit.clone());
-    let funktion = trimme(body.funktion.clone());
-    let farbe = trimme(body.farbe.clone());
-    let label = trimme(body.label.clone());
+    // Nur GESENDETE Felder werden geprüft: ein absentes `grundzeichen` ist schlicht kein
+    // Wunsch, ein vorhandenes leeres bleibt 400.
+    let grundzeichen = match &body.grundzeichen {
+        Some(g) => Some(grundzeichen_pflicht(g)?),
+        None => None,
+    };
+    let organisation = trimme_tri(body.organisation);
+    let fachaufgabe = trimme_tri(body.fachaufgabe);
+    let symbol = trimme_tri(body.symbol);
+    let einheit = trimme_tri(body.einheit);
+    let funktion = trimme_tri(body.funktion);
+    let farbe = trimme_tri(body.farbe);
+    let label = trimme_tri(body.label);
 
-    let z = zeichen_repo::aktualisiere(
+    let z = zeichen_repo::patche(
         &state.pool,
         einsatz_id,
         zid,
-        ZeichenUpdate {
-            grundzeichen: &grundzeichen,
-            organisation: organisation.as_deref(),
-            fachaufgabe: fachaufgabe.as_deref(),
-            symbol: symbol.as_deref(),
-            einheit: einheit.as_deref(),
-            funktion: funktion.as_deref(),
-            farbe: farbe.as_deref(),
-            label: label.as_deref(),
+        ZeichenPatch {
+            grundzeichen: grundzeichen.as_deref(),
+            organisation: organisation.as_ref().map(|v| v.as_deref()),
+            fachaufgabe: fachaufgabe.as_ref().map(|v| v.as_deref()),
+            symbol: symbol.as_ref().map(|v| v.as_deref()),
+            einheit: einheit.as_ref().map(|v| v.as_deref()),
+            funktion: funktion.as_ref().map(|v| v.as_deref()),
+            farbe: farbe.as_ref().map(|v| v.as_deref()),
+            label: label.as_ref().map(|v| v.as_deref()),
         },
     )
     .await?;

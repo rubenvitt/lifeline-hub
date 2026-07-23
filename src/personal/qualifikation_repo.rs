@@ -79,22 +79,41 @@ pub async fn anlegen(
     laden(pool, org_id, id).await
 }
 
-/// Vollersatz von label/sortier (org-scoped). `NotFound`/`Conflict` analog Stamm.
-pub async fn aktualisiere(
+/// Teil-Patch von label/sortier (LFH-306): die `Option` sagt „im Patch enthalten?" —
+/// `None` lässt die Spalte unverändert. Die Tabelle hat **keine** nullable Spalte, also
+/// auch keinen Tri-State; der Gewinn ist allein, dass ein nicht gesendetes `sortier`
+/// nicht mehr still auf 0 zurückfällt.
+#[derive(Debug, Default)]
+pub struct QualifikationPatch<'a> {
+    pub label: Option<&'a str>,
+    pub sortier: Option<i64>,
+}
+
+/// Teil-Patch von label/sortier (org-scoped). `NotFound`/`Conflict` analog Stamm.
+///
+/// Flag/Wert-Paare statt Vollersatz (LFH-306): ein nicht gesendetes Feld fasst seine Spalte
+/// nicht an. Die Parameter sind nummeriert — abgesichert von
+/// `patche_setzt_jede_spalte_an_ihren_platz`.
+pub async fn patche(
     pool: &SqlitePool,
     org_id: i64,
     id: i64,
-    label: &str,
-    sortier: i64,
+    patch: QualifikationPatch<'_>,
 ) -> Result<Qualifikation, AppError> {
-    let ergebnis =
-        sqlx::query("UPDATE qualifikation SET label = ?, sortier = ? WHERE id = ? AND org_id = ?")
-            .bind(label)
-            .bind(sortier)
-            .bind(id)
-            .bind(org_id)
-            .execute(pool)
-            .await;
+    let ergebnis = sqlx::query(
+        "UPDATE qualifikation SET \
+            label = CASE WHEN ?1 IS NULL THEN label ELSE ?2 END, \
+            sortier = CASE WHEN ?3 IS NULL THEN sortier ELSE ?4 END \
+         WHERE id = ?5 AND org_id = ?6",
+    )
+    .bind(patch.label.map(|_| 1_i64))
+    .bind(patch.label)
+    .bind(patch.sortier.map(|_| 1_i64))
+    .bind(patch.sortier)
+    .bind(id)
+    .bind(org_id)
+    .execute(pool)
+    .await;
     let resultat = match ergebnis {
         Ok(r) => r,
         Err(e) => return label_conflict(e),
@@ -174,6 +193,101 @@ mod tests {
         assert!(matches!(
             laden(&pool, 2, q.id).await.unwrap_err(),
             AppError::NotFound
+        ));
+    }
+
+    /// Bind-Reihenfolge der Flag/Wert-Kette: beide Spalten in EINEM Patch auf distinkte
+    /// Werte setzen und einzeln prüfen.
+    #[tokio::test]
+    async fn patche_setzt_jede_spalte_an_ihren_platz() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let q = anlegen(&pool, 1, "Sanitäter", 10).await.unwrap();
+        let neu = patche(
+            &pool,
+            1,
+            q.id,
+            QualifikationPatch {
+                label: Some("Rettungssanitäter"),
+                sortier: Some(42),
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(neu.label, "Rettungssanitäter");
+        assert_eq!(neu.sortier, 42);
+    }
+
+    /// Der Kern von LFH-306: ein Patch fasst NUR die gesendeten Spalten an. Ohne den Umbau
+    /// setzte ein Body ohne `sortier` die Spalte still auf 0 (`#[serde(default)]`).
+    #[tokio::test]
+    async fn patche_laesst_nicht_gesendete_spalten_stehen() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        let q = anlegen(&pool, 1, "Sanitäter", 10).await.unwrap();
+        let neu = patche(
+            &pool,
+            1,
+            q.id,
+            QualifikationPatch {
+                label: Some("Rettungssanitäter"),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(neu.label, "Rettungssanitäter");
+        assert_eq!(neu.sortier, 10, "unberührt");
+
+        // Leerer Patch → alles bleibt, insbesondere kein NotFound.
+        let unveraendert = patche(&pool, 1, q.id, QualifikationPatch::default())
+            .await
+            .unwrap();
+        assert_eq!(unveraendert.label, "Rettungssanitäter");
+        assert_eq!(unveraendert.sortier, 10);
+    }
+
+    #[tokio::test]
+    async fn patche_fremde_org_ist_notfound() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        org(&pool, 2).await;
+        let q = anlegen(&pool, 1, "Sanitäter", 10).await.unwrap();
+        assert!(matches!(
+            patche(
+                &pool,
+                2,
+                q.id,
+                QualifikationPatch {
+                    label: Some("fremd"),
+                    ..Default::default()
+                }
+            )
+            .await
+            .unwrap_err(),
+            AppError::NotFound
+        ));
+    }
+
+    #[tokio::test]
+    async fn patche_auf_bestehendes_label_ist_conflict() {
+        let pool = crate::db::test_pool().await;
+        org(&pool, 1).await;
+        anlegen(&pool, 1, "Sanitäter", 10).await.unwrap();
+        let zweite = anlegen(&pool, 1, "Notarzt", 20).await.unwrap();
+        assert!(matches!(
+            patche(
+                &pool,
+                1,
+                zweite.id,
+                QualifikationPatch {
+                    label: Some("Sanitäter"),
+                    ..Default::default()
+                }
+            )
+            .await
+            .unwrap_err(),
+            AppError::Conflict(_)
         ));
     }
 
