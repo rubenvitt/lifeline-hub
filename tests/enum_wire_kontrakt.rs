@@ -532,6 +532,7 @@ fn live_event_wire() {
         Etb => "etb",
         Befehl => "befehl",
         KartenAnsicht => "karten_ansicht",
+        LageSnapshot => "lage_snapshot",
         Sofortmeldung => "sofortmeldung",
         Lagged => "lagged",
     } in lifeline_hub::live::LiveEvent::ALLE);
