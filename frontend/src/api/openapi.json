@@ -3526,6 +3526,106 @@
           }
         }
       },
+      "LageSnapshotAnzeige": {
+        "type": "object",
+        "description": "Metadaten eines Snapshots — **ohne** das `daten`-Dokument (Listen-Response; `daten` kann\nje Stand ~100 KB groß sein und gehört nicht in die Liste).",
+        "required": [
+          "id",
+          "einsatz_id",
+          "stand_at",
+          "schema_version",
+          "erstellt_von",
+          "erstellt_at"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "erstellt_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "notiz": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "stand_at": {
+            "type": "string"
+          }
+        }
+      },
+      "LageSnapshotDokument": {
+        "type": "object",
+        "description": "Volldokument eines Snapshots inkl. eingefrorenem Lagebild (`daten`) — Einzel-Response.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "stand_at",
+          "schema_version",
+          "erstellt_von",
+          "erstellt_at",
+          "daten"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "daten": {
+            "description": "Eingefrorenes Lagebild (rohe `*Anzeige`-DTO-Listen, `schema_version = 1`)."
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "erstellt_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "notiz": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "stand_at": {
+            "type": "string"
+          }
+        }
+      },
       "LageZoneAnzeige": {
         "type": "object",
         "description": "Eine freie Lage-Zone (Gefahren-/Absperrzone). Eigenständige Entität — kein Fachobjekt.",
@@ -3769,6 +3869,7 @@
           "etb",
           "befehl",
           "karten_ansicht",
+          "lage_snapshot",
           "sofortmeldung",
           "lagged"
         ]

@@ -50,6 +50,7 @@ export const EINSATZ_KEYS = {
   befehle: 'einsatz-befehle',
   befehl: 'einsatz-befehl',
   kartenAnsicht: 'einsatz-karten-ansicht',
+  lageSnapshot: 'einsatz-lage-snapshot',
   // Nicht live über SSE getrieben (siehe NICHT_LIVE_KEYS + Guard-Test):
   einsatz: 'einsatz',
   einstellungen: 'einsatz-einstellungen',
@@ -128,6 +129,9 @@ export const EINSATZ_STREAM_EVENTS = {
   // Kartenansichten live (LFH-319): PATCH („Für den Einsatz speichern") publiziert
   // `karten_ansicht` → der Ansichts-Switcher aller Betrachter aktualisiert sich.
   karten_ansicht: [EINSATZ_KEYS.kartenAnsicht],
+  // Lage-Snapshots live (LFH-321): Anlegen/Ändern/Löschen eines Standes publiziert
+  // `lage_snapshot` → die Snapshot-Liste/Zeitleiste aller Betrachter aktualisiert sich.
+  lage_snapshot: [EINSATZ_KEYS.lageSnapshot],
 } as const satisfies Record<string, readonly EinsatzKey[]>;
 
 export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
@@ -219,6 +223,7 @@ export const einsatzKeys = {
   zonen: (einsatzId: number) => [EINSATZ_KEYS.zonen, einsatzId] as const,
   freieZeichen: (einsatzId: number) => [EINSATZ_KEYS.freieZeichen, einsatzId] as const,
   kartenAnsicht: (einsatzId: number) => [EINSATZ_KEYS.kartenAnsicht, einsatzId] as const,
+  lageSnapshot: (einsatzId: number) => [EINSATZ_KEYS.lageSnapshot, einsatzId] as const,
   gefahrengebiete: (einsatzId: number) => [EINSATZ_KEYS.gefahrengebiete, einsatzId] as const,
   gefahrenmatrix: (einsatzId: number, gewaehlt: number | null) =>
     [EINSATZ_KEYS.gefahrenmatrix, einsatzId, gewaehlt] as const,

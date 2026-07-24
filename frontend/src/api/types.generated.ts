@@ -1204,6 +1204,41 @@ export interface components {
             meldung_lfd_nr: number;
             text: string;
         };
+        /**
+         * @description Metadaten eines Snapshots — **ohne** das `daten`-Dokument (Listen-Response; `daten` kann
+         *     je Stand ~100 KB groß sein und gehört nicht in die Liste).
+         */
+        LageSnapshotAnzeige: {
+            bezeichnung?: string | null;
+            /** Format: int64 */
+            einsatz_id: number;
+            erstellt_at: string;
+            /** Format: int64 */
+            erstellt_von: number;
+            /** Format: int64 */
+            id: number;
+            notiz?: string | null;
+            /** Format: int64 */
+            schema_version: number;
+            stand_at: string;
+        };
+        /** @description Volldokument eines Snapshots inkl. eingefrorenem Lagebild (`daten`) — Einzel-Response. */
+        LageSnapshotDokument: {
+            bezeichnung?: string | null;
+            /** @description Eingefrorenes Lagebild (rohe `*Anzeige`-DTO-Listen, `schema_version = 1`). */
+            daten: unknown;
+            /** Format: int64 */
+            einsatz_id: number;
+            erstellt_at: string;
+            /** Format: int64 */
+            erstellt_von: number;
+            /** Format: int64 */
+            id: number;
+            notiz?: string | null;
+            /** Format: int64 */
+            schema_version: number;
+            stand_at: string;
+        };
         /** @description Eine freie Lage-Zone (Gefahren-/Absperrzone). Eigenständige Entität — kein Fachobjekt. */
         LageZoneAnzeige: {
             /**
@@ -1281,7 +1316,7 @@ export interface components {
          *     die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
          * @enum {string}
          */
-        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "karten_ansicht" | "sofortmeldung" | "lagged";
+        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "lagged";
         /** @description Öffentliche Material-Darstellung (ohne `org_id`). */
         MaterialAnzeige: {
             angelegt_at: string;
