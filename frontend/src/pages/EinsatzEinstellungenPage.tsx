@@ -1,4 +1,4 @@
-import { Alert, App, AutoComplete, Button, Checkbox, Form, Input, InputNumber, Spin, Switch, Typography } from 'antd';
+import { Alert, App, AutoComplete, Button, Form, Input, InputNumber, Spin, Switch, Typography } from 'antd';
 import { Select } from '../components/Select';
 import { useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -13,7 +13,7 @@ import { useAuth } from '../auth/AuthContext';
 import { darfImEinsatzSchreiben, darfEinsatzLeiten } from '../einsatz/schreibrecht';
 import { modulRegistry, istModulAusblendbar } from '../einsatz/modulRegistry';
 import type {
-  BasemapModus, EinheitenSystem, EinstellungenUpdate, FachebenenSichtbar,
+  EinheitenSystem, EinstellungenUpdate, FachebenenSichtbar,
   Koordinatenformat, ModulOverrideUpdate, OrgModulEinstellungen, Zeitformat,
 } from '../api/types';
 
@@ -22,19 +22,6 @@ const ROLLEN_OPTIONEN: { value: string; label: string }[] = [
   { value: '', label: 'Frei (alle)' },
   { value: 'fuehrungskraft', label: 'Führungskraft' },
   { value: 'admin', label: 'Admin' },
-];
-
-const BASEMAP_OPTIONEN: { value: BasemapModus; label: string }[] = [
-  { value: 'online', label: 'Online' },
-  { value: 'offline', label: 'Offline' },
-  { value: 'blind', label: 'Blindkarte' },
-];
-
-const FACHEBENEN_OPTIONEN: { value: keyof FachebenenSichtbar; label: string }[] = [
-  { value: 'nina', label: 'NINA (Warnungen)' },
-  { value: 'dwd', label: 'DWD (Wetter)' },
-  { value: 'pegelonline', label: 'Pegelonline (Hochwasser)' },
-  { value: 'kritis', label: 'KRITIS' },
 ];
 
 // Anzeige-Konventionen (LFH-136). Kuratierte IANA-Zeitzonen + Freitext (AutoComplete).
@@ -71,8 +58,6 @@ const AUTO_ETB_OPTIONEN: { value: boolean; label: string }[] = [
 /** Formularwerte; Fachebenen als Liste der aktiven Keys (Checkbox.Group). */
 interface FormWerte {
   standard_modul?: string;
-  basemap_modus?: BasemapModus;
-  fachebenen: (keyof FachebenenSichtbar)[];
   zeitzone?: string;
   zeitformat?: Zeitformat;
   einheiten?: EinheitenSystem;
@@ -167,15 +152,8 @@ export default function EinsatzEinstellungenPage() {
     .filter((m) => m.status === 'fertig')
     .map((m) => ({ value: m.key, label: m.label }));
 
-  // LFH-120: Backend serialisiert `fachebenen_sichtbar` als untypisiertes JSON (Rust
-  // `Option<serde_json::Value>` → generiert `unknown`); FE kennt die Form via FachebenenSichtbar.
-  const aktiveFachebenen = einstellungen.fachebenen_sichtbar as FachebenenSichtbar | null;
   const initialWerte: FormWerte = {
     standard_modul: einstellungen.standard_modul ?? undefined,
-    basemap_modus: einstellungen.basemap_modus ?? undefined,
-    fachebenen: aktiveFachebenen
-      ? FACHEBENEN_OPTIONEN.map((o) => o.value).filter((k) => aktiveFachebenen[k])
-      : [],
     zeitzone: einstellungen.zeitzone ?? undefined,
     zeitformat: einstellungen.zeitformat ?? undefined,
     einheiten: einstellungen.einheiten ?? undefined,
@@ -230,20 +208,15 @@ export default function EinsatzEinstellungenPage() {
   }
 
   function speichern(werte: FormWerte) {
-    const gewaehlt = new Set(werte.fachebenen ?? []);
-    const fachebenen_sichtbar: FachebenenSichtbar = {
-      nina: gewaehlt.has('nina'),
-      dwd: gewaehlt.has('dwd'),
-      pegelonline: gewaehlt.has('pegelonline'),
-      kritis: gewaehlt.has('kritis'),
-    };
     const felder: EinstellungenUpdate = {
       standard_modul: werte.standard_modul || null,
-      basemap_modus: werte.basemap_modus ?? null,
-      // Start-Zoom wird hier (noch) nicht erhoben — Anwendung im Karten-Kern folgt im
-      // Anzeige-Konventionen-Folge-Subtask; Spalte bleibt als Fundament erhalten.
+      // Karten-Defaults (basemap_modus/fachebenen_sichtbar/karten_zoom_start) leben seit LFH-319
+      // auf der Karte („Für den Einsatz speichern") und sind aus diesem Formular entfernt. Die
+      // Spalten bleiben als Saat der Standardansicht — deshalb MUSS ihr Bestandswert hier
+      // mitfahren, sonst nullt dieser Vollersatz-UPSERT-PUT sie beim nächsten Save.
+      basemap_modus: einstellungen.basemap_modus ?? null,
       karten_zoom_start: einstellungen.karten_zoom_start ?? null,
-      fachebenen_sichtbar,
+      fachebenen_sichtbar: (einstellungen.fachebenen_sichtbar as FachebenenSichtbar | null) ?? null,
       // Anzeige-Konventionen (LFH-136); leer = projektweiter Default (null).
       zeitzone: werte.zeitzone?.trim() || null,
       zeitformat: werte.zeitformat ?? null,
@@ -302,18 +275,6 @@ export default function EinsatzEinstellungenPage() {
             placeholder="Standard (Lage-Dashboard bzw. ETB)"
             options={standardModulOptionen}
           />
-        </Form.Item>
-
-        <Typography.Title level={5}>Karten-Defaults</Typography.Title>
-        <Form.Item
-          label="Basemap-Vorwahl"
-          name="basemap_modus"
-          tooltip="Kartenhintergrund beim ersten Öffnen der Lagekarte. Leer = automatische Wahl."
-        >
-          <Select allowClear placeholder="Automatisch (Verfügbarkeit)" options={BASEMAP_OPTIONEN} />
-        </Form.Item>
-        <Form.Item label="Aktive Lage-Layer" name="fachebenen">
-          <Checkbox.Group options={FACHEBENEN_OPTIONEN} />
         </Form.Item>
 
         <Typography.Title level={5}>Anzeige-Konventionen</Typography.Title>

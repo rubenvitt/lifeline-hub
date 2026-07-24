@@ -59,7 +59,7 @@ describe('EinsatzEinstellungenPage', () => {
     vi.mocked(ladeOrgModulEinstellungen).mockResolvedValue({});
   });
 
-  it('zeigt die gespeicherten Werte (Default-Modul + Basemap)', async () => {
+  it('zeigt die gespeicherten Werte (Default-Modul)', async () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue({
       einsatz_id: 1,
       standard_modul: 'etb',
@@ -76,14 +76,14 @@ describe('EinsatzEinstellungenPage', () => {
 
     // Sektionen + gespeicherte Werte sichtbar (async: nach Query-Auflösung).
     expect(await screen.findByText('Standard-Modul (Einstieg)')).toBeInTheDocument();
-    expect(screen.getByText('Karten-Defaults')).toBeInTheDocument();
+    // Karten-Defaults (Basemap/Fachebenen) sind seit LFH-319 aus dem Formular entfernt.
+    expect(screen.queryByText('Karten-Defaults')).not.toBeInTheDocument();
     // Gewähltes Standard-Modul: das Select-Selection-Item trägt title="ETB"
     // ('ETB' kommt jetzt auch als Modul-Label in der Sichtbarkeits-Sektion vor).
     expect(screen.getByTitle('ETB')).toBeInTheDocument();
-    expect(screen.getByTitle('Offline')).toBeInTheDocument(); // gewählte Basemap
   });
 
-  it('speichert den transformierten Payload (Fachebenen-Array → Objekt, Zoom-Passthrough)', async () => {
+  it('lässt die Karten-Defaults (basemap/fachebenen/zoom) als Bestandswert im Payload mitfahren (LFH-319)', async () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue({
       einsatz_id: 1,
       standard_modul: 'etb',
@@ -105,10 +105,10 @@ describe('EinsatzEinstellungenPage', () => {
     await waitFor(() =>
       expect(speichereEinstellungen).toHaveBeenCalledWith(1, {
         standard_modul: 'etb',
+        // Karten-Defaults sind aus dem Formular entfernt (leben auf der Karte, LFH-319),
+        // fahren aber mit ihrem Bestandswert mit — sonst nullt der Vollersatz-UPSERT sie.
         basemap_modus: 'offline',
-        // Start-Zoom wird unverändert durchgereicht (UI erhebt ihn noch nicht).
         karten_zoom_start: 12,
-        // Checkbox-Array → Boolean-Objekt.
         fachebenen_sichtbar: { nina: true, dwd: false, pegelonline: false, kritis: false },
         // Anzeige-Konventionen (LFH-136) — hier nicht gesetzt → null (Default).
         zeitzone: null,
