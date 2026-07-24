@@ -9,7 +9,9 @@ use serde_json::json;
 use sqlx::SqlitePool;
 
 mod common;
-use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup_mit_pool};
+use common::{
+    anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup_mit_pool,
+};
 
 /// Router + Einsatz + Admin-Cookie (Admin = Einsatzleitung) für HTTP-Tests.
 async fn setup_http() -> (axum::Router, i64, String) {
@@ -24,10 +26,11 @@ async fn setup() -> (SqlitePool, i64, i64, i64) {
     let (app, pool) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz_id = einsatz_anlegen(&app, &cookie).await;
-    let benutzer_id: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let benutzer_id: i64 =
+        sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     let org_id: i64 = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
         .bind(einsatz_id)
         .fetch_one(&pool)
@@ -37,7 +40,13 @@ async fn setup() -> (SqlitePool, i64, i64, i64) {
 }
 
 /// Legt eine minimale Einheit an und liefert deren id.
-async fn seed_einheit(pool: &SqlitePool, einsatz_id: i64, org_id: i64, benutzer_id: i64, name: &str) -> i64 {
+async fn seed_einheit(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    org_id: i64,
+    benutzer_id: i64,
+    name: &str,
+) -> i64 {
     einheit_repo::anlegen(
         pool,
         einsatz_id,
@@ -115,13 +124,22 @@ async fn lade_und_loesche_sind_einsatz_gescopt() {
 
     // Ein fremder Einsatz sieht den Snapshot nicht und kann ihn nicht löschen.
     let fremd = einsatz_id + 999;
-    assert!(repo::lade_dokument(&pool, fremd, id).await.unwrap().is_none());
+    assert!(repo::lade_dokument(&pool, fremd, id)
+        .await
+        .unwrap()
+        .is_none());
     assert!(!repo::loesche(&pool, fremd, id).await.unwrap());
 
     // Der eigene Einsatz schon.
-    assert!(repo::lade_dokument(&pool, einsatz_id, id).await.unwrap().is_some());
+    assert!(repo::lade_dokument(&pool, einsatz_id, id)
+        .await
+        .unwrap()
+        .is_some());
     assert!(repo::loesche(&pool, einsatz_id, id).await.unwrap());
-    assert!(repo::liste_metadaten(&pool, einsatz_id).await.unwrap().is_empty());
+    assert!(repo::liste_metadaten(&pool, einsatz_id)
+        .await
+        .unwrap()
+        .is_empty());
 }
 
 #[tokio::test]
@@ -252,7 +270,10 @@ async fn post_erzeugt_snapshot_201_liste_ohne_daten_einzel_mit_daten() {
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v:?}");
     let sid = v["id"].as_i64().unwrap();
-    assert!(v["daten"].is_object(), "POST-Antwort ist das Volldokument: {v}");
+    assert!(
+        v["daten"].is_object(),
+        "POST-Antwort ist das Volldokument: {v}"
+    );
 
     // Liste: Metadaten ohne daten.
     let (s, liste) = anfrage(
@@ -313,9 +334,18 @@ async fn patch_ist_immutabel_fuer_daten_und_stand_at() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{patched:?}");
-    assert_eq!(patched["bezeichnung"], "Neu", "nur Metadaten sind schreibbar");
-    assert_eq!(patched["daten"], daten_vorher, "daten muss unveränderlich sein");
-    assert_eq!(patched["stand_at"], stand_vorher, "stand_at muss unveränderlich sein");
+    assert_eq!(
+        patched["bezeichnung"], "Neu",
+        "nur Metadaten sind schreibbar"
+    );
+    assert_eq!(
+        patched["daten"], daten_vorher,
+        "daten muss unveränderlich sein"
+    );
+    assert_eq!(
+        patched["stand_at"], stand_vorher,
+        "stand_at muss unveränderlich sein"
+    );
 }
 
 #[tokio::test]

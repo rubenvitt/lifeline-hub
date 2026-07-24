@@ -243,13 +243,17 @@ pub async fn erzeuge(
         ansichten: crate::karten_ansicht::repo::liste(pool, einsatz_id).await?,
         uhs: crate::uhs::repo::liste(pool, einsatz_id, None, None).await?,
         // inkl_storniert=false: der Stand spiegelt das sichtbare Lagebild, nicht stornierte Schäden.
-        schaeden: crate::schaden::repo::liste(pool, einsatz_id, None, None, None, None, false).await?,
+        schaeden: crate::schaden::repo::liste(pool, einsatz_id, None, None, None, None, false)
+            .await?,
         einheiten: crate::einheit::repo::liste(pool, einsatz_id).await?,
         // Fahrzeuge aus der einsatz-scoped Disposition (NICHT dem org-weiten Fuhrpark).
-        fahrzeuge: crate::fahrzeug::disposition_repo::liste(pool, einsatz_id, einsatz_aktiv).await?,
-        // Nur Führungskräfte werden Marker (EL/AL), nicht das gesamte Personal.
-        fuehrungskraefte: crate::personal::disposition_repo::liste_fuehrungskraefte(pool, einsatz_id)
+        fahrzeuge: crate::fahrzeug::disposition_repo::liste(pool, einsatz_id, einsatz_aktiv)
             .await?,
+        // Nur Führungskräfte werden Marker (EL/AL), nicht das gesamte Personal.
+        fuehrungskraefte: crate::personal::disposition_repo::liste_fuehrungskraefte(
+            pool, einsatz_id,
+        )
+        .await?,
         abschnitte: crate::einsatzabschnitt::repo::liste(pool, einsatz_id).await?,
         zonen: crate::lage_zone::repo::liste(pool, einsatz_id, None).await?,
         freie_zeichen: crate::freies_zeichen::repo::liste(pool, einsatz_id, None).await?,
@@ -260,8 +264,16 @@ pub async fn erzeuge(
 
     let daten_value = serde_json::to_value(&daten)
         .map_err(|e| AppError::Internal(format!("Snapshot-Serialisierung: {e}")))?;
-    let id = insert_roh(pool, einsatz_id, benutzer_id, bezeichnung, notiz, &stand_at, &daten_value)
-        .await?;
+    let id = insert_roh(
+        pool,
+        einsatz_id,
+        benutzer_id,
+        bezeichnung,
+        notiz,
+        &stand_at,
+        &daten_value,
+    )
+    .await?;
     lade_dokument(pool, einsatz_id, id)
         .await?
         .ok_or_else(|| AppError::Internal("Snapshot direkt nach Anlegen nicht auffindbar".into()))
