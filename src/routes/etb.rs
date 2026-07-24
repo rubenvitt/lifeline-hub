@@ -6,12 +6,13 @@ use crate::einsatz::berechtigung::{
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
 use crate::extract::JsonBody;
+use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132); gegen die Override-Map geprüft.
 const MODUL_KEY: &str = "etb";
 use crate::etb::{normalisiere_zeit, repo, EtbEintragAnzeige, EtbTyp, MeldeWeg};
-use axum::extract::{Path, Query, State};
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -47,7 +48,7 @@ fn bereinige(feld: Option<String>) -> Option<String> {
 pub async fn erfassen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
     JsonBody(req): JsonBody<NeuerEintrag>,
 ) -> Result<(StatusCode, Json<EtbEintragAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -166,7 +167,7 @@ pub async fn erfassen(
 pub async fn auftrag_erteilen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, eintrag_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, eintrag_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<crate::auftrag::NeuerAuftrag>,
 ) -> Result<(StatusCode, Json<crate::auftrag::AuftragDetail>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -242,7 +243,7 @@ pub struct EtbAbfrageParams {
 pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
     Query(params): Query<EtbAbfrageParams>,
 ) -> Result<Json<Vec<EtbEintragAnzeige>>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?; // 404, wenn unbekannt

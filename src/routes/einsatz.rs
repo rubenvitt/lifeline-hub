@@ -10,8 +10,9 @@ use crate::einsatz::{
 };
 use crate::error::AppError;
 use crate::extract::JsonBody;
+use crate::extract::PfadParam;
 use crate::routes::support;
-use axum::extract::{Path, State};
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use serde::{Deserialize, Serialize};
@@ -67,7 +68,7 @@ pub async fn liste(
 pub async fn detail(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
 ) -> Result<Json<EinsatzAnzeige>, AppError> {
     let einsatz = repo::laden(&state.pool, id).await?;
     let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
@@ -80,7 +81,7 @@ pub async fn detail(
 pub async fn abschliessen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
 ) -> Result<Json<EinsatzAnzeige>, AppError> {
     let einsatz = repo::laden(&state.pool, id).await?;
     let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
@@ -111,7 +112,7 @@ pub struct FristSetzen {
 pub async fn aufbewahrungsfrist_setzen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
     JsonBody(req): JsonBody<FristSetzen>,
 ) -> Result<Json<EinsatzAnzeige>, AppError> {
     let einsatz = repo::laden(&state.pool, id).await?;
@@ -189,7 +190,7 @@ pub struct EinstellungenUpdate {
 pub async fn einstellungen_laden(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
 ) -> Result<Json<EinstellungenMitOrgDefaults>, AppError> {
     let einsatz = repo::laden(&state.pool, id).await?;
     let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
@@ -231,7 +232,7 @@ async fn freeze_flags(
 pub async fn einstellungen_setzen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
     JsonBody(req): JsonBody<EinstellungenUpdate>,
 ) -> Result<Json<einstellungen::EinstellungenAnzeige>, AppError> {
     let einsatz = repo::laden(&state.pool, id).await?;
@@ -430,7 +431,7 @@ pub async fn einstellungen_setzen(
 pub async fn modul_overrides_laden(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
 ) -> Result<Json<HashMap<String, modul_override::EinsatzModulOverride>>, AppError> {
     let einsatz = repo::laden(&state.pool, id).await?;
     let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
@@ -453,7 +454,7 @@ pub struct ModulOverrideUpdate {
 pub async fn modul_override_setzen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((id, modul_key)): Path<(i64, String)>,
+    PfadParam((id, modul_key)): PfadParam<(i64, String)>,
     JsonBody(req): JsonBody<ModulOverrideUpdate>,
 ) -> Result<Json<modul_override::EinsatzModulOverride>, AppError> {
     let einsatz = repo::laden(&state.pool, id).await?;
@@ -504,7 +505,7 @@ pub struct MitgliedRolle {
 pub async fn mitglieder(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
 ) -> Result<Json<Vec<MitgliedAnzeige>>, AppError> {
     let einsatz = repo::laden(&state.pool, id).await?; // 404, wenn der Einsatz nicht existiert
     let rolle = repo::rolle_von(&state.pool, id, benutzer.id).await?;
@@ -518,7 +519,7 @@ pub async fn mitglieder(
 pub async fn mitglied_setzen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((id, ziel_id)): Path<(i64, i64)>,
+    PfadParam((id, ziel_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<MitgliedRolle>,
 ) -> Result<Json<Vec<MitgliedAnzeige>>, AppError> {
     let einsatz = repo::laden(&state.pool, id).await?;
@@ -571,7 +572,7 @@ pub async fn mitglied_setzen(
 pub async fn mitglied_entfernen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((id, ziel_id)): Path<(i64, i64)>,
+    PfadParam((id, ziel_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<Vec<MitgliedAnzeige>>, AppError> {
     let einsatz = repo::laden(&state.pool, id).await?;
     let meine = repo::rolle_von(&state.pool, id, benutzer.id).await?;
@@ -639,7 +640,7 @@ pub struct KopfdatenPatch {
 pub async fn aktualisieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
     JsonBody(req): JsonBody<KopfdatenPatch>,
 ) -> Result<Json<EinsatzAnzeige>, AppError> {
     let einsatz = repo::laden(&state.pool, id).await?;

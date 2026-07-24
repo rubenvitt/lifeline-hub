@@ -7,6 +7,7 @@ use crate::einsatz::berechtigung::{
 };
 use crate::einsatz::repo as einsatz_repo;
 use crate::extract::JsonBody;
+use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -15,7 +16,7 @@ use crate::error::AppError;
 // Vokabular modulübergreifend über das Kommunikations-Fundament referenziert
 // (LFH-84) statt direkt aus `etb` — Single Source of Truth bleibt `etb`.
 use crate::kommunikation::EtbTyp;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -52,7 +53,7 @@ fn kanal_ids(einsatz_id: i64, kanal_id: i64) -> String {
 pub async fn kanaele_liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
 ) -> Result<Json<Vec<ChatKanalAnzeige>>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -80,7 +81,7 @@ pub struct NeuerKanal {
 pub async fn kanal_anlegen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
     JsonBody(req): JsonBody<NeuerKanal>,
 ) -> Result<(StatusCode, Json<ChatKanalAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -127,7 +128,7 @@ pub struct NachrichtenParams {
 pub async fn nachrichten_liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, kanal_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, kanal_id)): PfadParam<(i64, i64)>,
     Query(params): Query<NachrichtenParams>,
 ) -> Result<Json<Vec<ChatNachrichtAnzeige>>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -174,7 +175,7 @@ pub struct NeueNachricht {
 pub async fn nachricht_erfassen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, kanal_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, kanal_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<NeueNachricht>,
 ) -> Result<(StatusCode, Json<ChatNachrichtAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -258,7 +259,7 @@ async fn fordere_autor(
 pub async fn nachricht_bearbeiten(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, nachricht_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, nachricht_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<NeueNachricht>,
 ) -> Result<Json<ChatNachrichtAnzeige>, AppError> {
     fordere_autor(&state, &benutzer, einsatz_id, nachricht_id).await?;
@@ -277,7 +278,7 @@ pub async fn nachricht_bearbeiten(
 pub async fn nachricht_loeschen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, nachricht_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, nachricht_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     fordere_autor(&state, &benutzer, einsatz_id, nachricht_id).await?;
     repo::loeschen(&state.pool, nachricht_id).await?;
@@ -303,7 +304,7 @@ pub struct BezugBody {
 pub async fn bezug_setzen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, nachricht_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, nachricht_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<BezugBody>,
 ) -> Result<Json<ChatNachrichtAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -336,7 +337,7 @@ pub async fn bezug_setzen(
 pub async fn bezug_loeschen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, nachricht_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, nachricht_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<ChatNachrichtAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -374,7 +375,7 @@ pub struct HeraufstufenBody {
 pub async fn heraufstufen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, nachricht_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, nachricht_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<HeraufstufenBody>,
 ) -> Result<Json<ChatNachrichtAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -440,7 +441,7 @@ pub async fn heraufstufen(
 pub async fn heraufstufen_auftrag(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, nachricht_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, nachricht_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<crate::auftrag::NeuerAuftrag>,
 ) -> Result<(StatusCode, Json<ChatNachrichtAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;

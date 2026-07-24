@@ -5,6 +5,7 @@ use crate::einsatz::berechtigung::{
 };
 use crate::einsatz::repo as einsatz_repo;
 use crate::extract::JsonBody;
+use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -13,7 +14,7 @@ use crate::error::AppError;
 use crate::gefahr::repo::{self as gefahr_repo, BewertungDaten};
 use crate::gefahr::{self, GefahrBewertungAnzeige, GefahrengebietAnzeige};
 use crate::routes::support::{deserialize_optional_field, trimme, trimme_tri};
-use axum::extract::{Path, State};
+use axum::extract::State;
 use axum::Json;
 use serde::Deserialize;
 
@@ -31,7 +32,7 @@ fn sse_gefahr(state: &AppState, einsatz_id: i64, gefahrengebiet_id: i64) {
 pub async fn gebiete(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
 ) -> Result<Json<Vec<GefahrengebietAnzeige>>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -53,7 +54,7 @@ pub async fn gebiete(
 pub async fn matrix(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, gid)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, gid)): PfadParam<(i64, i64)>,
 ) -> Result<Json<Vec<GefahrBewertungAnzeige>>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -84,7 +85,7 @@ pub struct BewertungBody {
 pub async fn bewerten(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, gid)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, gid)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<BewertungBody>,
 ) -> Result<Json<GefahrBewertungAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -195,7 +196,7 @@ pub struct UmbenennenBody {
 pub async fn umbenennen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, gid)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, gid)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<UmbenennenBody>,
 ) -> Result<Json<GefahrengebietAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;

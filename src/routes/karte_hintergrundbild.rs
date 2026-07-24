@@ -6,12 +6,13 @@ use crate::einsatz::berechtigung::{
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
 use crate::extract::JsonBody;
+use crate::extract::PfadParam;
 use crate::karte_hintergrundbild::{
     self as bild, repo as bild_repo, repo::BildPatch, HintergrundbildAnzeige,
 };
 use crate::live::LiveEvent;
 use crate::routes::support::{etag_von, if_none_match_matcht, ASSET_CACHE_CONTROL};
-use axum::extract::{Multipart, Path, State};
+use axum::extract::{Multipart, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -31,7 +32,7 @@ fn sse_bild(state: &AppState, einsatz_id: i64) {
 pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
 ) -> Result<Json<Vec<HintergrundbildAnzeige>>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -52,7 +53,7 @@ pub async fn liste(
 pub async fn hochladen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
     mut multipart: Multipart,
 ) -> Result<(StatusCode, Json<HintergrundbildAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -130,7 +131,7 @@ pub async fn hochladen(
 pub async fn herunterladen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, bild_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, bild_id)): PfadParam<(i64, i64)>,
     req_headers: HeaderMap,
 ) -> Result<Response, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -195,7 +196,7 @@ pub struct BildPatchBody {
 pub async fn aktualisieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, bild_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, bild_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<BildPatchBody>,
 ) -> Result<Json<HintergrundbildAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -239,7 +240,7 @@ pub async fn aktualisieren(
 pub async fn loeschen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, bild_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, bild_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;

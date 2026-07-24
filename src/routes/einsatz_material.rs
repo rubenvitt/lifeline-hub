@@ -5,6 +5,7 @@ use crate::einsatz::berechtigung::{
 };
 use crate::einsatz::repo as einsatz_repo;
 use crate::extract::JsonBody;
+use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -13,7 +14,7 @@ use crate::error::AppError;
 use crate::material::disposition_repo::{self, AdhocDaten};
 use crate::material::{EinsatzMaterialAnzeige, MaterialStatus};
 use crate::routes::support::{trimme, trimme_tri};
-use axum::extract::{Path, State};
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -32,7 +33,7 @@ fn sse_material(state: &AppState, einsatz_id: i64, em_id: i64) {
 pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
 ) -> Result<Json<Vec<EinsatzMaterialAnzeige>>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -70,7 +71,7 @@ pub struct DisponierenBody {
 pub async fn disponieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
     JsonBody(body): JsonBody<DisponierenBody>,
 ) -> Result<(StatusCode, Json<EinsatzMaterialAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -194,7 +195,7 @@ pub struct DispoPatchBody {
 pub async fn aktualisieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, em_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, em_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<DispoPatchBody>,
 ) -> Result<Json<EinsatzMaterialAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -289,7 +290,7 @@ pub async fn aktualisieren(
 pub async fn entfernen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, em_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, em_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;

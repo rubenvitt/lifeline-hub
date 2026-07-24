@@ -9,7 +9,7 @@
 //! [`JsonBody`] delegiert deshalb an `axum::Json` (identische Deserialisierung und
 //! Content-Type-Prüfung) und ersetzt ausschließlich die Rejection.
 
-use axum::extract::rejection::JsonRejection;
+use axum::extract::rejection::{JsonRejection, PathRejection};
 use axum::extract::{ConnectInfo, FromRequest, FromRequestParts, Request};
 use axum::http::request::Parts;
 use serde::de::DeserializeOwned;
@@ -105,6 +105,66 @@ fn rejection_zu_app_error(rejection: JsonRejection) -> AppError {
         andere => {
             tracing::error!("Unbehandelte JsonRejection-Variante: {andere}");
             AppError::Internal(format!("Unbehandelte Json-Rejection: {andere}"))
+        }
+    }
+}
+
+/// Pfad-Parameter-Extractor mit deutschsprachiger Rejection im `{error}`-Format (LFH-317/F22-B).
+///
+/// Verhält sich beim Deserialisieren exakt wie `axum::extract::Path` — nur der Fehlerfall
+/// unterscheidet sich. axums `Path` antwortet bei einer nicht-deserialisierbaren Route-ID
+/// (z. B. `abc` statt einer Zahl) mit `text/plain` und läuft damit am `{error}`-JSON-Vertrag
+/// vorbei; das Frontend (`api/client.ts`) sähe dann nur „Serverfehler (status)".
+///
+/// Der Name ist bewusst distinkt (nicht `Path`), aus drei Gründen: damit der Guard
+/// `tests/path_extractor_guard.rs` Wrapper und Rohform unterscheiden kann, damit ein vergessener
+/// Import nicht still auf `axum::extract::Path` zurückfällt, und wegen der Kollision mit
+/// `std::path::Path`.
+///
+/// **Status 400, nicht 404:** Eine nicht-parsebare Route-ID ist ein formal ungültiger
+/// Eingabewert (LFH-267: falscher Feldtyp → 400), und axums Default ist bereits 400 — die
+/// Ersetzung ist damit envelope-only, ohne Status-Änderung (gepinnt:
+/// `tests/karte.rs::proxy_raster_nicht_numerisches_z_ist_400`). Bewusst ANDERS als
+/// `src/einsatz/kontext.rs`, das die *einsatz_id* auf `NotFound` (404) abbildet: dort ist die
+/// fehlende ID eine Ressourcen-Existenzfrage (den Einsatz gibt es nicht), hier nur eine
+/// Parse-Frage des Pfad-Segments. Die beiden Extraktoren sind orthogonal — `EinsatzKontext`
+/// zieht die `{id}`, `PfadParam` die Sub-IDs; ein Modul nutzt oft beide (z. B. `auftrag.rs`).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct PfadParam<T>(pub T);
+
+impl<T, S> FromRequestParts<S> for PfadParam<T>
+where
+    T: DeserializeOwned + Send,
+    S: Send + Sync,
+{
+    type Rejection = AppError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        match axum::extract::Path::<T>::from_request_parts(parts, state).await {
+            Ok(axum::extract::Path(wert)) => Ok(PfadParam(wert)),
+            Err(rejection) => Err(pfad_rejection_zu_app_error(rejection)),
+        }
+    }
+}
+
+/// Bildet eine `PathRejection` auf einen `AppError` ab. Der Deserialisierungsfehler (die häufige
+/// nicht-numerische ID) landet auf **400** — analog `rejection_zu_app_error` für den Body.
+fn pfad_rejection_zu_app_error(rejection: PathRejection) -> AppError {
+    match rejection {
+        PathRejection::FailedToDeserializePathParams(e) => {
+            AppError::Validation(format!("Ungültiger Pfad-Parameter: {e}"))
+        }
+        // `MissingPathParams` heißt: der Handler verlangt mehr Pfad-Segmente als die Route trägt —
+        // ein Router-/Handler-Fehler, kein Client-Fehler. Wie beim Json-Wrapper: auffallen (500 +
+        // Log) statt still als 400 durchgehen.
+        PathRejection::MissingPathParams(e) => {
+            tracing::error!("MissingPathParams (Route/Handler-Mismatch): {e}");
+            AppError::Internal(format!("Pfad-Parameter fehlen (Router-Fehler): {e}"))
+        }
+        // `PathRejection` ist `#[non_exhaustive]` — erzwungener Arm für künftige axum-Varianten.
+        andere => {
+            tracing::error!("Unbehandelte PathRejection-Variante: {andere}");
+            AppError::Internal(format!("Unbehandelte Path-Rejection: {andere}"))
         }
     }
 }
@@ -212,5 +272,49 @@ mod tests {
         assert_eq!(status, StatusCode::BAD_REQUEST);
         let json: Value = serde_json::from_str(&body).expect("Body ist JSON");
         assert!(json["error"].as_str().unwrap().contains("Content-Type"));
+    }
+
+    // ── PfadParam (LFH-317) ──
+
+    fn pfad_router() -> Router {
+        Router::new().route(
+            "/t/{a}/{b}",
+            axum::routing::get(|PfadParam((a, b)): PfadParam<(i64, String)>| async move {
+                format!("{a}/{b}")
+            }),
+        )
+    }
+
+    async fn hole(uri: &str) -> (StatusCode, String) {
+        let resp = pfad_router()
+            .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        let status = resp.status();
+        let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        (status, String::from_utf8_lossy(&bytes).to_string())
+    }
+
+    /// Wie beim Json-Wrapper der wichtigste Test: der PfadParam-Wrapper extrahiert identisch
+    /// zu `axum::extract::Path` — Voraussetzung dafür, dass die Ersetzung über ~206 Call-Sites
+    /// verhaltensneutral ist.
+    #[tokio::test]
+    async fn pfad_gueltig_wird_unveraendert_extrahiert() {
+        let (status, body) = hole("/t/42/hallo").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body, "42/hallo");
+    }
+
+    /// Der Kern von LFH-317: eine nicht-numerische Route-ID liefert 400 im `{error}`-Envelope
+    /// statt `text/plain` (axum-Default-Status 400 bleibt, nur der Body wird JSON).
+    #[tokio::test]
+    async fn pfad_nicht_numerisch_wird_400_mit_envelope() {
+        let (status, body) = hole("/t/abc/hallo").await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        let json: Value = serde_json::from_str(&body).expect("Body ist JSON");
+        assert!(
+            json["error"].as_str().unwrap().contains("Pfad-Parameter"),
+            "deutsche Envelope-Meldung erwartet, war: {json}"
+        );
     }
 }

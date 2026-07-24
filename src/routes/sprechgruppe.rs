@@ -4,11 +4,12 @@ use crate::einsatz::berechtigung::{fordere_aktiv, fordere_lesezugriff, fordere_s
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
 use crate::extract::JsonBody;
+use crate::extract::PfadParam;
 use crate::katalog::Betriebsart;
 use crate::routes::support::{deserialize_optional_field, trimme_tri};
 use crate::sprechgruppe::repo as sg_repo;
 use crate::sprechgruppe::{Sprechgruppe, SprechgruppeAnzeige};
-use axum::extract::{Path, Query, State};
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -228,7 +229,7 @@ pub async fn anlegen(
 pub async fn aktualisieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
     JsonBody(body): JsonBody<PatchKatalog>,
 ) -> Result<Json<SprechgruppeAnzeige>, AppError> {
     let n = normalisiere_patch_katalog(body)?;
@@ -240,7 +241,7 @@ pub async fn aktualisieren(
 pub async fn deaktivieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
 ) -> Result<StatusCode, AppError> {
     sg_repo::deaktiviere(&state.pool, benutzer.org_id, id).await?;
     Ok(StatusCode::NO_CONTENT)
@@ -255,7 +256,7 @@ pub async fn deaktivieren(
 pub async fn liste_fuer_einsatz(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
 ) -> Result<Json<Vec<SprechgruppeAnzeige>>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -270,7 +271,7 @@ pub async fn liste_fuer_einsatz(
 pub async fn anlegen_einsatz_lokal(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
     JsonBody(body): JsonBody<EinsatzLokalBody>,
 ) -> Result<(StatusCode, Json<SprechgruppeAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;

@@ -9,13 +9,14 @@ use crate::einsatz::berechtigung::{
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
 use crate::extract::JsonBody;
+use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "einheiten";
 use crate::routes::support::{deserialize_optional_field, trimme, trimme_tri};
 use crate::staerke::Staerke;
-use axum::extract::{Path, State};
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -94,7 +95,7 @@ async fn einheit_name(state: &AppState, einsatz_id: i64, eid: i64) -> Result<Str
 pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
 ) -> Result<Json<Vec<EinheitAnzeige>>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -134,7 +135,7 @@ pub struct EinheitBody {
 pub async fn bilden(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
     JsonBody(body): JsonBody<EinheitBody>,
 ) -> Result<(StatusCode, Json<EinheitAnzeige>), AppError> {
     let einsatz = schreib_gate(&state, &benutzer, einsatz_id).await?;
@@ -234,7 +235,7 @@ pub struct EinheitPatchBody {
 pub async fn aktualisieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, eid)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, eid)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<EinheitPatchBody>,
 ) -> Result<Json<EinheitAnzeige>, AppError> {
     let einsatz = schreib_gate(&state, &benutzer, einsatz_id).await?;
@@ -353,7 +354,7 @@ pub async fn aktualisieren(
 pub async fn aufloesen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, eid)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, eid)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let name = einheit_name(&state, einsatz_id, eid).await?;
@@ -382,7 +383,7 @@ pub async fn aufloesen(
 pub async fn personal_zuordnen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, eid, ep_id)): Path<(i64, i64, i64)>,
+    PfadParam((einsatz_id, eid, ep_id)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
@@ -412,7 +413,7 @@ pub async fn personal_zuordnen(
 pub async fn personal_freigeben(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, eid, ep_id)): Path<(i64, i64, i64)>,
+    PfadParam((einsatz_id, eid, ep_id)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
@@ -441,7 +442,7 @@ pub async fn personal_freigeben(
 pub async fn fahrzeug_zuordnen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, eid, ef_id)): Path<(i64, i64, i64)>,
+    PfadParam((einsatz_id, eid, ef_id)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
@@ -470,7 +471,7 @@ pub async fn fahrzeug_zuordnen(
 pub async fn fahrzeug_freigeben(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, eid, ef_id)): Path<(i64, i64, i64)>,
+    PfadParam((einsatz_id, eid, ef_id)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
@@ -499,7 +500,7 @@ pub async fn fahrzeug_freigeben(
 pub async fn material_zuordnen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, eid, em_id)): Path<(i64, i64, i64)>,
+    PfadParam((einsatz_id, eid, em_id)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
@@ -532,7 +533,7 @@ pub async fn material_zuordnen(
 pub async fn material_freigeben(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, eid, em_id)): Path<(i64, i64, i64)>,
+    PfadParam((einsatz_id, eid, em_id)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     schreib_gate(&state, &benutzer, einsatz_id).await?;
     let einheit = einheit_name(&state, einsatz_id, eid).await?;
@@ -589,7 +590,7 @@ pub struct PositionBody {
 pub async fn position(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, einheit_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, einheit_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<PositionBody>,
 ) -> Result<Json<EinheitAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;

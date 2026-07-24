@@ -5,6 +5,7 @@ use crate::einsatz::berechtigung::{
 };
 use crate::einsatz::repo as einsatz_repo;
 use crate::extract::JsonBody;
+use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -15,7 +16,7 @@ use crate::fahrzeug::disposition_repo::{self, AdhocDaten};
 use crate::fahrzeug::status_repo;
 use crate::fahrzeug::EinsatzFahrzeugAnzeige;
 use crate::routes::support::{trimme, trimme_tri};
-use axum::extract::{Path, State};
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -41,7 +42,7 @@ fn sse_personal(state: &AppState, einsatz_id: i64, ep_id: i64) {
 pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
 ) -> Result<Json<Vec<EinsatzFahrzeugAnzeige>>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -79,7 +80,7 @@ pub struct DisponierenBody {
 pub async fn disponieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
     JsonBody(body): JsonBody<DisponierenBody>,
 ) -> Result<(StatusCode, Json<EinsatzFahrzeugAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -207,7 +208,7 @@ pub struct DispoPatchBody {
 pub async fn aktualisieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, ef_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, ef_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<DispoPatchBody>,
 ) -> Result<Json<EinsatzFahrzeugAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -274,7 +275,7 @@ pub async fn aktualisieren(
 pub async fn entfernen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, ef_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, ef_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -313,7 +314,7 @@ pub async fn entfernen(
 pub async fn besatzung_zuordnen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, ef_id, ep_id)): Path<(i64, i64, i64)>,
+    PfadParam((einsatz_id, ef_id, ep_id)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -361,7 +362,7 @@ pub async fn besatzung_zuordnen(
 pub async fn besatzung_freigeben(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, ef_id, ep_id)): Path<(i64, i64, i64)>,
+    PfadParam((einsatz_id, ef_id, ep_id)): PfadParam<(i64, i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -432,7 +433,7 @@ pub struct PositionBody {
 pub async fn position(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, ef_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, ef_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<PositionBody>,
 ) -> Result<Json<EinsatzFahrzeugAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;

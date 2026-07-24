@@ -4,13 +4,14 @@ use crate::einsatz::berechtigung::{
 };
 use crate::einsatz::repo as einsatz_repo;
 use crate::extract::JsonBody;
+use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
 const MODUL_KEY: &str = "nachforderungen";
 use crate::error::AppError;
 use crate::nachforderung::{repo, NachforderungAnzeige, PRIO_NORMAL, STATUS_ABGELEHNT};
-use axum::extract::{Path, Query, State};
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use chrono::{NaiveDateTime, Utc};
@@ -55,7 +56,7 @@ pub struct ListeParams {
 pub async fn liste(
     State(state): State<AppState>,
     crate::auth::session::CurrentUser(benutzer): crate::auth::session::CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
     Query(params): Query<ListeParams>,
 ) -> Result<Json<Vec<NachforderungAnzeige>>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -99,7 +100,7 @@ pub struct NeueNachforderung {
 pub async fn anlegen(
     State(state): State<AppState>,
     crate::auth::session::CurrentUser(benutzer): crate::auth::session::CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
     JsonBody(req): JsonBody<NeueNachforderung>,
 ) -> Result<(StatusCode, Json<NachforderungAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -207,7 +208,7 @@ pub struct StatusReq {
 pub async fn status(
     State(state): State<AppState>,
     crate::auth::session::CurrentUser(benutzer): crate::auth::session::CurrentUser,
-    Path((einsatz_id, nachforderung_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, nachforderung_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<StatusReq>,
 ) -> Result<Json<NachforderungAnzeige>, AppError> {
     fordere_bearbeitbar(&state, &benutzer, einsatz_id, nachforderung_id).await?;
@@ -253,7 +254,7 @@ pub struct AblehnenReq {
 pub async fn ablehnen(
     State(state): State<AppState>,
     crate::auth::session::CurrentUser(benutzer): crate::auth::session::CurrentUser,
-    Path((einsatz_id, nachforderung_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, nachforderung_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<AblehnenReq>,
 ) -> Result<Json<NachforderungAnzeige>, AppError> {
     fordere_bearbeitbar(&state, &benutzer, einsatz_id, nachforderung_id).await?;

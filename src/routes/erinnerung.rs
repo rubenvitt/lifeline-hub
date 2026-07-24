@@ -5,6 +5,7 @@ use crate::einsatz::berechtigung::{
 };
 use crate::einsatz::repo as einsatz_repo;
 use crate::extract::JsonBody;
+use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -14,7 +15,7 @@ use crate::error::AppError;
 use crate::kommunikation::{
     repo as krepo, OBJEKT_AUFTRAG, OBJEKT_ERINNERUNG, OBJEKT_MELDUNG, VOLLZUG_VOLLZOGEN,
 };
-use axum::extract::{Path, Query, State};
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use chrono::{NaiveDateTime, Utc};
@@ -44,7 +45,7 @@ pub struct ListeParams {
 pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
     Query(params): Query<ListeParams>,
 ) -> Result<Json<Vec<ErinnerungAnzeige>>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -96,7 +97,7 @@ fn parse_faellig(roh: &str) -> Result<String, AppError> {
 pub async fn anlegen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
     JsonBody(req): JsonBody<NeueErinnerung>,
 ) -> Result<(StatusCode, Json<ErinnerungAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -217,7 +218,7 @@ async fn fordere_bearbeitbar(
 pub async fn erledigen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, erinnerung_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, erinnerung_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<ErinnerungAnzeige>, AppError> {
     let org_id = fordere_bearbeitbar(&state, &benutzer, einsatz_id, erinnerung_id).await?;
     let now = jetzt();
@@ -242,7 +243,7 @@ pub async fn erledigen(
 pub async fn quittieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, erinnerung_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, erinnerung_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<ErinnerungAnzeige>, AppError> {
     let org_id = fordere_bearbeitbar(&state, &benutzer, einsatz_id, erinnerung_id).await?;
     let now = jetzt();

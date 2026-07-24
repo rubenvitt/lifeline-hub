@@ -5,8 +5,9 @@ use crate::einsatz::kontext::{EinsatzKontext, EinsatzLesezugriff, EinsatzSchreib
 use crate::einsatz::modul::Auftraege;
 use crate::error::AppError;
 use crate::extract::JsonBody;
+use crate::extract::PfadParam;
 use crate::live::LiveEvent;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use chrono::Utc;
@@ -159,7 +160,7 @@ async fn gehoert_pruefen(
 pub async fn quittieren(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Auftraege>,
-    Path((einsatz_id, auftrag_id, empfaenger_id)): Path<(i64, i64, i64)>,
+    PfadParam((einsatz_id, auftrag_id, empfaenger_id)): PfadParam<(i64, i64, i64)>,
 ) -> Result<Json<AuftragDetail>, AppError> {
     gehoert_pruefen(&state, &ctx, auftrag_id).await?;
     if !repo::empfaenger_gehoert_zu_auftrag(&state.pool, empfaenger_id, auftrag_id).await? {
@@ -197,7 +198,7 @@ pub struct VollzugReq {
 pub async fn vollzug(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Auftraege>,
-    Path((einsatz_id, auftrag_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, auftrag_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<VollzugReq>,
 ) -> Result<Json<AuftragDetail>, AppError> {
     let org_id = gehoert_pruefen(&state, &ctx, auftrag_id).await?;
@@ -257,7 +258,7 @@ pub async fn vollzug(
 pub async fn abnehmen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Auftraege>,
-    Path((einsatz_id, auftrag_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, auftrag_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<AuftragDetail>, AppError> {
     gehoert_pruefen(&state, &ctx, auftrag_id).await?;
     let now = jetzt();

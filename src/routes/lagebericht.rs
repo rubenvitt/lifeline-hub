@@ -5,6 +5,7 @@ use crate::einsatz::berechtigung::{
 };
 use crate::einsatz::repo as einsatz_repo;
 use crate::extract::JsonBody;
+use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -13,7 +14,7 @@ use crate::error::AppError;
 use crate::etb::normalisiere_zeit;
 use crate::lagebericht::repo::{self as lagebericht_repo, LageberichtAnzeige, LageberichtPatch};
 use crate::lagebericht::{self, render_snapshot, validiere_freigabe, vorlage, Abschnitt};
-use axum::extract::{Path, State};
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -35,7 +36,7 @@ fn sse_lagebericht(state: &AppState, einsatz_id: i64, lb_id: i64) {
 pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
 ) -> Result<Json<Vec<LageberichtAnzeige>>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -57,7 +58,7 @@ pub async fn liste(
 pub async fn detail(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, lid)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, lid)): PfadParam<(i64, i64)>,
 ) -> Result<Json<LageberichtAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -86,7 +87,7 @@ pub struct AnlegenBody {
 pub async fn anlegen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
     JsonBody(body): JsonBody<AnlegenBody>,
 ) -> Result<(StatusCode, Json<LageberichtAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -138,7 +139,7 @@ pub struct PatchBody {
 pub async fn aktualisieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, lid)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, lid)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<PatchBody>,
 ) -> Result<Json<LageberichtAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -205,7 +206,7 @@ pub async fn aktualisieren(
 pub async fn freigeben(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, lid)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, lid)): PfadParam<(i64, i64)>,
 ) -> Result<Json<LageberichtAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -256,7 +257,7 @@ pub struct FortschreibenBody {
 pub async fn fortschreiben(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, lid)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, lid)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<FortschreibenBody>,
 ) -> Result<(StatusCode, Json<LageberichtAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;

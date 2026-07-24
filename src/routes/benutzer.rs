@@ -5,7 +5,8 @@ use crate::auth::{
 };
 use crate::error::AppError;
 use crate::extract::JsonBody;
-use axum::extract::{Path, State};
+use crate::extract::PfadParam;
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -190,7 +191,7 @@ async fn verweigere_admin_lockout(
 pub async fn deaktivieren(
     State(state): State<AppState>,
     _admin: AdminUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
 ) -> Result<Json<BenutzerAnzeige>, AppError> {
     let ziel = sqlx::query_as::<_, crate::auth::Benutzer>(
         "SELECT id, org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle, aktiv, erstellt_at \
@@ -239,7 +240,7 @@ pub async fn deaktivieren(
 pub async fn bearbeiten(
     State(state): State<AppState>,
     _admin: AdminUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
     JsonBody(req): JsonBody<PatchBenutzer>,
 ) -> Result<Json<BenutzerAnzeige>, AppError> {
     let ziel = sqlx::query_as::<_, crate::auth::Benutzer>(
@@ -328,7 +329,7 @@ pub async fn bearbeiten(
 pub async fn totp_reset(
     State(state): State<AppState>,
     _admin: AdminUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
 ) -> Result<Json<BenutzerAnzeige>, AppError> {
     let existiert: Option<i64> = sqlx::query_scalar("SELECT id FROM benutzer WHERE id = ?")
         .bind(id)

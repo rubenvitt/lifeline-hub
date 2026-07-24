@@ -4,12 +4,13 @@ use crate::einsatz::modul::{Lagemeldungen, Meldungen};
 use crate::einsatz::repo as einsatz_repo;
 use crate::error::AppError;
 use crate::extract::JsonBody;
+use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 use crate::meldung::{
     repo, MeldungAnzeige, ART_SOFORTMELDUNG, ART_SONSTIGE, BESTAETIGUNG_FRIST_DEFAULT_MIN,
     PRIO_NORMAL, PRIO_SOFORT, RICHTUNG_INTERN,
 };
-use axum::extract::{Path, Query, State};
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use chrono::{Duration, NaiveDateTime};
@@ -275,7 +276,7 @@ pub struct StatusReq {
 pub async fn status(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Meldungen>,
-    Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, meldung_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<StatusReq>,
 ) -> Result<Json<MeldungAnzeige>, AppError> {
     gehoert_pruefen(&state, &ctx, meldung_id).await?;
@@ -296,7 +297,7 @@ pub async fn status(
 pub async fn bestaetigen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Meldungen>,
-    Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, meldung_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<MeldungAnzeige>, AppError> {
     let org_id = gehoert_pruefen(&state, &ctx, meldung_id).await?;
     let now = jetzt();
@@ -330,7 +331,7 @@ pub struct ZuweisenReq {
 pub async fn zuweisen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Meldungen>,
-    Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, meldung_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<ZuweisenReq>,
 ) -> Result<Json<MeldungAnzeige>, AppError> {
     gehoert_pruefen(&state, &ctx, meldung_id).await?;
@@ -362,7 +363,7 @@ pub struct LagerelevantReq {
 pub async fn lagerelevant(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Meldungen>,
-    Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, meldung_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<LagerelevantReq>,
 ) -> Result<Json<MeldungAnzeige>, AppError> {
     gehoert_pruefen(&state, &ctx, meldung_id).await?;
@@ -403,7 +404,7 @@ pub async fn lagerelevant(
 pub async fn auftrag_erteilen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Meldungen>,
-    Path((einsatz_id, meldung_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, meldung_id)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<crate::auftrag::NeuerAuftrag>,
 ) -> Result<(StatusCode, Json<MeldungAnzeige>), AppError> {
     gehoert_pruefen(&state, &ctx, meldung_id).await?;

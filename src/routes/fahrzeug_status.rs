@@ -2,10 +2,11 @@ use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
 use crate::error::AppError;
 use crate::extract::JsonBody;
+use crate::extract::PfadParam;
 use crate::fahrzeug::status_repo::{self, StatusDaten, StatusPatch};
 use crate::fahrzeug::{FahrzeugStatus, StatusKategorie};
 use crate::routes::support::{deserialize_optional_field, trimme, trimme_tri};
-use axum::extract::{Path, State};
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -169,7 +170,7 @@ pub async fn anlegen(
 pub async fn aktualisieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
     JsonBody(body): JsonBody<PatchStatus>,
 ) -> Result<Json<FahrzeugStatus>, AppError> {
     let n = normalisiere_patch(body)?;
@@ -181,7 +182,7 @@ pub async fn aktualisieren(
 pub async fn deaktivieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
 ) -> Result<StatusCode, AppError> {
     status_repo::deaktivieren(&state.pool, benutzer.org_id, id).await?;
     Ok(StatusCode::NO_CONTENT)

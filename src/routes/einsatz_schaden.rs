@@ -5,6 +5,7 @@ use crate::einsatz::berechtigung::{
 };
 use crate::einsatz::repo as einsatz_repo;
 use crate::extract::JsonBody;
+use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -16,7 +17,7 @@ use crate::schaden::{
     darf_uebergehen, ort_kurz, registrier_anzeige, repo as schaden_repo, AbschlussGrund, Ausmass,
     SchadenAnzeige, SchadenStatus, SchadenTyp,
 };
-use axum::extract::{Path, Query, State};
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -46,7 +47,7 @@ pub struct ListeParams {
 pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
     Query(params): Query<ListeParams>,
 ) -> Result<Json<Vec<SchadenAnzeige>>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -112,7 +113,7 @@ pub struct AnlegenBody {
 pub async fn anlegen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
     JsonBody(body): JsonBody<AnlegenBody>,
 ) -> Result<(StatusCode, Json<SchadenAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -235,7 +236,7 @@ pub async fn anlegen(
 pub async fn detail(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, schaden_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, schaden_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<SchadenAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -311,7 +312,7 @@ pub struct PatchBody {
 pub async fn aktualisieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, schaden_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, schaden_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<PatchBody>,
 ) -> Result<Json<SchadenAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -501,7 +502,7 @@ pub struct UebergebenBody {
 pub async fn uebergeben(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, schaden_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, schaden_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<UebergebenBody>,
 ) -> Result<Json<SchadenAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -581,7 +582,7 @@ pub struct AbschliessenBody {
 pub async fn abschliessen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, schaden_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, schaden_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<AbschliessenBody>,
 ) -> Result<Json<SchadenAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -668,7 +669,7 @@ pub async fn abschliessen(
 pub async fn stornieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, schaden_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, schaden_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;

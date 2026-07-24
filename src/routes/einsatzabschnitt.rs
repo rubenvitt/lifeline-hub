@@ -5,6 +5,7 @@ use crate::einsatz::berechtigung::{
 };
 use crate::einsatz::repo as einsatz_repo;
 use crate::extract::JsonBody;
+use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -13,7 +14,7 @@ use crate::einsatzabschnitt::repo::{self as abschnitt_repo, AbschnittDaten, Absc
 use crate::einsatzabschnitt::EinsatzabschnittAnzeige;
 use crate::error::AppError;
 use crate::routes::support::{trimme, trimme_tri};
-use axum::extract::{Path, State};
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -30,7 +31,7 @@ fn sse_abschnitt(state: &AppState, einsatz_id: i64, aid: i64) {
 pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
 ) -> Result<Json<Vec<EinsatzabschnittAnzeige>>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -64,7 +65,7 @@ pub struct AbschnittBody {
 pub async fn anlegen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
     JsonBody(body): JsonBody<AbschnittBody>,
 ) -> Result<(StatusCode, Json<EinsatzabschnittAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -166,7 +167,7 @@ pub struct AbschnittPatchBody {
 pub async fn aktualisieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, aid)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, aid)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<AbschnittPatchBody>,
 ) -> Result<Json<EinsatzabschnittAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -229,7 +230,7 @@ pub async fn aktualisieren(
 pub async fn aufloesen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, aid)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, aid)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -284,7 +285,7 @@ pub struct FlaecheBody {
 pub async fn flaeche(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, aid)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, aid)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<FlaecheBody>,
 ) -> Result<Json<EinsatzabschnittAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;

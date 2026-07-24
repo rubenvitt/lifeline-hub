@@ -18,9 +18,10 @@ use crate::einsatz::einstellungen::{
 use crate::einsatz::modul::{ist_gueltige_benoetigte_rolle, ist_gueltiger_modul_key};
 use crate::error::AppError;
 use crate::extract::JsonBody;
+use crate::extract::PfadParam;
 use crate::org::einstellungen::{self, OrgEinstellungenAnzeige, OrgEinstellungenDaten};
 use crate::org::modul_einstellung;
-use axum::extract::{Path, State};
+use axum::extract::State;
 use axum::Json;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -206,7 +207,7 @@ pub async fn modul_einstellungen_lesen(
 pub async fn modul_einstellung_setzen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
-    Path(modul_key): Path<String>,
+    PfadParam(modul_key): PfadParam<String>,
     JsonBody(req): JsonBody<ModulRolleUpdate>,
 ) -> Result<(), AppError> {
     // Modul-Key validieren (400 bei unbekanntem Key).

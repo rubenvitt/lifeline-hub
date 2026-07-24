@@ -2,11 +2,12 @@ use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
 use crate::error::AppError;
 use crate::extract::JsonBody;
+use crate::extract::PfadParam;
 use crate::fahrzeug::repo::{self, FahrzeugDaten, FahrzeugPatch};
 use crate::fahrzeug::{FahrzeugAnzeige, FahrzeugVorschlaege};
 use crate::routes::support::{deserialize_optional_field, trimme, trimme_tri};
 use crate::staerke::Staerke;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -266,7 +267,7 @@ pub async fn anlegen(
 pub async fn aktualisieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
     JsonBody(body): JsonBody<PatchFahrzeug>,
 ) -> Result<Json<FahrzeugAnzeige>, AppError> {
     // Bestand vor der Validierung — liefert zugleich das 404 für fremde/unbekannte id.
@@ -280,7 +281,7 @@ pub async fn aktualisieren(
 pub async fn ausser_dienst(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
 ) -> Result<Json<FahrzeugAnzeige>, AppError> {
     let f = repo::setze_dienststatus(&state.pool, benutzer.org_id, id, false).await?;
     Ok(Json(f.anzeige()))
@@ -290,7 +291,7 @@ pub async fn ausser_dienst(
 pub async fn in_dienst(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
 ) -> Result<Json<FahrzeugAnzeige>, AppError> {
     let f = repo::setze_dienststatus(&state.pool, benutzer.org_id, id, true).await?;
     Ok(Json(f.anzeige()))

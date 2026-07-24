@@ -2,8 +2,9 @@ use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
 use crate::error::AppError;
 use crate::extract::JsonBody;
+use crate::extract::PfadParam;
 use crate::stichwort::{self, StichwortVorschlag};
-use axum::extract::{Path, State};
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -43,7 +44,7 @@ pub async fn anlegen(
 pub async fn loeschen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
 ) -> Result<StatusCode, AppError> {
     stichwort::loeschen(&state.pool, benutzer.org_id, id).await?;
     Ok(StatusCode::NO_CONTENT)

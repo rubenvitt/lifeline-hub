@@ -2,6 +2,7 @@ use crate::app::AppState;
 use crate::auth::session::{self, CurrentUser, SESSION_COOKIE};
 use crate::auth::Benutzer;
 use crate::error::AppError;
+use crate::extract::PfadParam;
 use crate::extract::{JsonBody, PeerIp};
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -294,7 +295,7 @@ pub struct ProviderSchaltenRequest {
 pub async fn provider_schalten(
     State(state): State<AppState>,
     _admin: crate::auth::session::AdminUser,
-    axum::extract::Path(id): axum::extract::Path<String>,
+    PfadParam(id): PfadParam<String>,
     JsonBody(req): JsonBody<ProviderSchaltenRequest>,
 ) -> Result<Json<Vec<crate::auth::provider::AuthProviderAnzeige>>, AppError> {
     crate::auth::provider::registry::schalten(&state.pool, &id, req.aktiviert).await?;

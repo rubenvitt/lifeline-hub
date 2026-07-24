@@ -3,6 +3,7 @@ use crate::auth::session::{AdminUser, CurrentUser};
 use crate::config::{default_online_styles, OfflineKatalogEintrag, OnlineStyle, OnlineStyleTyp};
 use crate::error::AppError;
 use crate::extract::JsonBody;
+use crate::extract::PfadParam;
 use crate::karte::download::{self, Fortschritt};
 use crate::karte::proxy;
 use crate::karte::quellen;
@@ -13,7 +14,7 @@ use crate::karte::tile_cache;
 use crate::karte::typen::{BuildJob, RegionDto};
 use crate::routes::support::deserialize_optional_field;
 use axum::body::Body;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Query, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -174,7 +175,7 @@ fn grob_format(format: &str) -> &'static str {
 /// Clients ohne Multi-Region-Support; neue Clients nutzen den region-adressierten Endpoint.
 pub async fn offline_tiles(
     State(state): State<AppState>,
-    Path((z, x, y)): Path<(i64, i64, i64)>,
+    PfadParam((z, x, y)): PfadParam<(i64, i64, i64)>,
 ) -> Result<Response, AppError> {
     let Some((pfad_rel, format)) = repo::aktive_offline_karte_pfad_und_format(&state.pool).await?
     else {
@@ -188,7 +189,7 @@ pub async fn offline_tiles(
 /// Vector-Source auf diesen Endpoint. `204`, wenn die Region unbekannt/nicht bereit ist.
 pub async fn offline_tiles_region(
     State(state): State<AppState>,
-    Path((karte_id, z, x, y)): Path<(i64, i64, i64, i64)>,
+    PfadParam((karte_id, z, x, y)): PfadParam<(i64, i64, i64, i64)>,
 ) -> Result<Response, AppError> {
     let Some((pfad_rel, format)) =
         repo::offline_karte_pfad_und_format(&state.pool, karte_id).await?
@@ -204,7 +205,7 @@ pub async fn offline_tiles_region(
 /// liefert über den Containment-Check ohnehin 204). Immer Vektor (`pbf`, Shortbread).
 pub async fn offline_welt_tiles(
     State(state): State<AppState>,
-    Path((z, x, y)): Path<(i64, i64, i64)>,
+    PfadParam((z, x, y)): PfadParam<(i64, i64, i64)>,
 ) -> Result<Response, AppError> {
     serve_offline_tile(
         &state,
@@ -349,7 +350,7 @@ fn if_none_match(headers: &HeaderMap) -> Option<&str> {
 /// `{datei}` = `<range>.pbf` (z. B. `0-255.pbf`), so wie MapLibres glyphs-Template es anfragt.
 pub async fn offline_fonts(
     headers: HeaderMap,
-    Path((fontstack, datei)): Path<(String, String)>,
+    PfadParam((fontstack, datei)): PfadParam<(String, String)>,
 ) -> Response {
     // `.pbf` abstreifen: validiere_range erwartet `<int>-<int>` OHNE Suffix (src/karte/proxy.rs).
     let Some(range) = datei.strip_suffix(".pbf") else {
@@ -367,7 +368,7 @@ pub async fn offline_fonts(
 }
 
 /// GET /api/karte/offline/sprites/{datei} — eingebettetes Sprite (png/json, +@2x).
-pub async fn offline_sprite(headers: HeaderMap, Path(datei): Path<String>) -> Response {
+pub async fn offline_sprite(headers: HeaderMap, PfadParam(datei): PfadParam<String>) -> Response {
     // Nur bekannte Basisnamen zulassen (kein Traversal).
     let ct = if datei.ends_with(".png") {
         "image/png"
@@ -409,14 +410,14 @@ mod offline_assets_tests {
         // Handler direkt aufrufen (kein Server nötig): Path ist ein Tuple-Wrapper.
         let r = offline_fonts(
             HeaderMap::new(),
-            axum::extract::Path(("Noto Sans Regular".into(), "boese.pbf".into())),
+            PfadParam(("Noto Sans Regular".into(), "boese.pbf".into())),
         )
         .await;
         assert_eq!(r.status(), StatusCode::BAD_REQUEST);
         // Ohne .pbf-Suffix ebenfalls ablehnen.
         let r2 = offline_fonts(
             HeaderMap::new(),
-            axum::extract::Path(("Noto Sans Regular".into(), "0-255".into())),
+            PfadParam(("Noto Sans Regular".into(), "0-255".into())),
         )
         .await;
         assert_eq!(r2.status(), StatusCode::BAD_REQUEST);
@@ -428,7 +429,7 @@ mod offline_assets_tests {
     async fn offline_fonts_liefert_eingebettetes_pbf() {
         let r = offline_fonts(
             HeaderMap::new(),
-            axum::extract::Path(("Noto Sans Regular".into(), "0-255.pbf".into())),
+            PfadParam(("Noto Sans Regular".into(), "0-255.pbf".into())),
         )
         .await;
         assert_eq!(r.status(), StatusCode::OK);
@@ -441,13 +442,13 @@ mod offline_assets_tests {
     // Positivpfad Sprite: .json → application/json, .png → image/png.
     #[tokio::test]
     async fn offline_sprite_liefert_json_und_png() {
-        let j = offline_sprite(HeaderMap::new(), axum::extract::Path("basemap.json".into())).await;
+        let j = offline_sprite(HeaderMap::new(), PfadParam("basemap.json".into())).await;
         assert_eq!(j.status(), StatusCode::OK);
         assert_eq!(
             j.headers().get(header::CONTENT_TYPE).unwrap(),
             "application/json"
         );
-        let p = offline_sprite(HeaderMap::new(), axum::extract::Path("basemap.png".into())).await;
+        let p = offline_sprite(HeaderMap::new(), PfadParam("basemap.png".into())).await;
         assert_eq!(p.status(), StatusCode::OK);
         assert_eq!(p.headers().get(header::CONTENT_TYPE).unwrap(), "image/png");
     }
@@ -456,18 +457,15 @@ mod offline_assets_tests {
     #[tokio::test]
     async fn offline_sprite_lehnt_fremde_endung_und_traversal_ab() {
         assert_eq!(
-            offline_sprite(HeaderMap::new(), axum::extract::Path("basemap.txt".into()))
+            offline_sprite(HeaderMap::new(), PfadParam("basemap.txt".into()))
                 .await
                 .status(),
             StatusCode::BAD_REQUEST
         );
         assert_eq!(
-            offline_sprite(
-                HeaderMap::new(),
-                axum::extract::Path("../geheim.png".into())
-            )
-            .await
-            .status(),
+            offline_sprite(HeaderMap::new(), PfadParam("../geheim.png".into()))
+                .await
+                .status(),
             StatusCode::BAD_REQUEST
         );
     }
@@ -513,7 +511,7 @@ mod offline_assets_tests {
 /// GET /api/karte/fachebenen/{quelle} — externe Lagedaten als GeoJSON-Umschlag.
 pub async fn fachebenen(
     State(state): State<AppState>,
-    Path(quelle): Path<String>,
+    PfadParam(quelle): PfadParam<String>,
     Query(params): Query<HashMap<String, String>>,
 ) -> Result<Json<crate::karte::typen::FachebeneAntwort>, AppError> {
     let bbox = params.get("bbox").map(|s| s.as_str());
@@ -829,7 +827,7 @@ pub async fn online_katalog(_admin: AdminUser) -> Result<Json<Vec<OnlineStyle>>,
 pub async fn online_aktualisieren(
     State(state): State<AppState>,
     _admin: AdminUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
     JsonBody(body): JsonBody<OnlineQuellePatch>,
 ) -> Result<Json<OnlineQuelle>, AppError> {
     // Bestand zuerst — liefert zugleich das 404 für unbekannte ids.
@@ -852,7 +850,7 @@ pub async fn online_aktualisieren(
 pub async fn online_loeschen(
     State(state): State<AppState>,
     _admin: AdminUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
 ) -> Result<StatusCode, AppError> {
     if repo::loesche_online_quelle(&state.pool, id).await? {
         // Verwaiste Proxy-Slots explizit entfernen (zusätzlich zu ON DELETE CASCADE, dessen
@@ -1096,7 +1094,7 @@ pub async fn offline_registrieren(
 pub async fn offline_aktivieren(
     State(state): State<AppState>,
     _admin: AdminUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
 ) -> Result<Json<OfflineKarte>, AppError> {
     repo::aktiviere_offline_karte(&state.pool, id)
         .await?
@@ -1112,7 +1110,7 @@ pub async fn offline_aktivieren(
 pub async fn offline_loeschen(
     State(state): State<AppState>,
     _admin: AdminUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
 ) -> Result<StatusCode, AppError> {
     // Zeile vor dem DB-Delete lesen, um gemanagte Downloads von extern Registrierten zu trennen.
     let karte = repo::finde_offline_karte(&state.pool, id).await?;
@@ -1371,7 +1369,7 @@ pub struct OfflineNeuLadenBody {
 pub async fn offline_neu_laden(
     State(state): State<AppState>,
     _admin: AdminUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
     JsonBody(body): JsonBody<OfflineNeuLadenBody>,
 ) -> Result<(StatusCode, Json<OfflineKarte>), AppError> {
     let karte = repo::finde_offline_karte(&state.pool, id)
@@ -1580,7 +1578,7 @@ pub async fn offline_download(
 pub async fn offline_abbrechen(
     State(state): State<AppState>,
     _admin: AdminUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
 ) -> Result<StatusCode, AppError> {
     let laufend = download::lies_fortschritt(&state.download_fortschritt)
         .get(&id)
@@ -1801,7 +1799,7 @@ async fn proxy_asset(state: &AppState, u: reqwest::Url) -> Result<Response, AppE
 /// GET /api/karte/proxy/{id}/style.json — Vektor-Style serverseitig holen + key-frei umschreiben.
 pub async fn proxy_style(
     State(state): State<AppState>,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
 ) -> Result<Response, AppError> {
     let q = aktive_proxy_quelle(&state, id).await?;
     let u = ssrf_geprueft(&q.url)?;
@@ -1814,7 +1812,7 @@ pub async fn proxy_style(
 /// GET /api/karte/proxy/{id}/raster/{z}/{x}/{y} — Raster-Tile aus der gespeicherten Template-URL.
 pub async fn proxy_raster(
     State(state): State<AppState>,
-    Path((id, z, x, y)): Path<(i64, i64, i64, i64)>,
+    PfadParam((id, z, x, y)): PfadParam<(i64, i64, i64, i64)>,
 ) -> Result<Response, AppError> {
     let q = aktive_proxy_quelle(&state, id).await?;
     let u = ssrf_geprueft(&proxy::subst_template(&q.url, z, x, y))?;
@@ -1824,7 +1822,7 @@ pub async fn proxy_raster(
 /// GET /api/karte/proxy/{id}/tile/{slot}/{z}/{x}/{y} — Vektor-/Raster-Tile aus einem Style-Slot.
 pub async fn proxy_tile(
     State(state): State<AppState>,
-    Path((id, slot, z, x, y)): Path<(i64, i64, i64, i64, i64)>,
+    PfadParam((id, slot, z, x, y)): PfadParam<(i64, i64, i64, i64, i64)>,
 ) -> Result<Response, AppError> {
     aktive_proxy_quelle(&state, id).await?;
     let template = slot_oder_nf(&state, id, slot, proxy::SlotArt::Template).await?;
@@ -1835,7 +1833,7 @@ pub async fn proxy_tile(
 /// GET /api/karte/proxy/{id}/tilejson/{slot} — TileJSON-Indirektion holen + key-frei umschreiben.
 pub async fn proxy_tilejson(
     State(state): State<AppState>,
-    Path((id, slot)): Path<(i64, i64)>,
+    PfadParam((id, slot)): PfadParam<(i64, i64)>,
 ) -> Result<Response, AppError> {
     aktive_proxy_quelle(&state, id).await?;
     let upstream = slot_oder_nf(&state, id, slot, proxy::SlotArt::Tilejson).await?;
@@ -1849,7 +1847,7 @@ pub async fn proxy_tilejson(
 /// GET /api/karte/proxy/{id}/sprite/{rest} — Sprite (`{rest}` = `{slot}.json|.png|@2x…`).
 pub async fn proxy_sprite(
     State(state): State<AppState>,
-    Path((id, rest)): Path<(i64, String)>,
+    PfadParam((id, rest)): PfadParam<(i64, String)>,
 ) -> Result<Response, AppError> {
     aktive_proxy_quelle(&state, id).await?;
     let (slot, suffix) = proxy::split_slot_suffix(&rest).map_err(AppError::Validation)?;
@@ -1861,7 +1859,7 @@ pub async fn proxy_sprite(
 /// GET /api/karte/proxy/{id}/glyphs/{slot}/{fontstack}/{range} — Glyphs aus einem Style-Slot.
 pub async fn proxy_glyphs(
     State(state): State<AppState>,
-    Path((id, slot, fontstack, range)): Path<(i64, i64, String, String)>,
+    PfadParam((id, slot, fontstack, range)): PfadParam<(i64, i64, String, String)>,
 ) -> Result<Response, AppError> {
     aktive_proxy_quelle(&state, id).await?;
     proxy::validiere_fontstack(&fontstack).map_err(AppError::Validation)?;

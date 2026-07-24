@@ -6,6 +6,7 @@ use crate::einsatz::berechtigung::{
 };
 use crate::einsatz::repo as einsatz_repo;
 use crate::extract::JsonBody;
+use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 
 /// Modul-Key dieses Route-Moduls (LFH-132).
@@ -22,7 +23,7 @@ use crate::person::{
     PersonStatus, Sichtungskategorie, VerbleibArt, VerbleibStatus,
 };
 use crate::routes::support::{trimme, trimme_tri};
-use axum::extract::{Path, Query, State};
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -92,7 +93,7 @@ pub struct ListeParams {
 pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
     Query(params): Query<ListeParams>,
 ) -> Result<Json<Vec<PersonAnzeige>>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -135,7 +136,7 @@ pub struct AnlegenBody {
 pub async fn anlegen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
     JsonBody(body): JsonBody<AnlegenBody>,
 ) -> Result<(StatusCode, Json<PersonAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -203,7 +204,7 @@ pub async fn anlegen(
 pub async fn detail(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, person_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, person_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<PersonDetail>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -302,7 +303,7 @@ pub struct PatchBody {
 pub async fn aktualisieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, person_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, person_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<PatchBody>,
 ) -> Result<Json<PersonAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -370,7 +371,7 @@ pub struct StatusBody {
 pub async fn status_wechsel(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, person_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, person_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<StatusBody>,
 ) -> Result<Json<PersonAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -443,7 +444,7 @@ pub async fn status_wechsel(
 pub async fn stornieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, person_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, person_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -502,7 +503,7 @@ pub struct SichtungBody {
 pub async fn sichten(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, person_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, person_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<SichtungBody>,
 ) -> Result<(StatusCode, Json<SichtungAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -573,7 +574,7 @@ pub async fn sichten(
 pub async fn audit(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, person_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, person_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<Vec<ZugriffAnzeige>>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -611,7 +612,7 @@ fn csv_feld(s: &str) -> String {
 pub async fn export(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path(einsatz_id): Path<i64>,
+    PfadParam(einsatz_id): PfadParam<i64>,
 ) -> Result<Response, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -668,7 +669,7 @@ pub struct VerbleibBody {
 pub async fn verbleib(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, person_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, person_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<VerbleibBody>,
 ) -> Result<(StatusCode, Json<VerbleibAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -754,7 +755,7 @@ pub struct NotizBody {
 pub async fn notiz(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, person_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, person_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<NotizBody>,
 ) -> Result<(StatusCode, Json<NotizAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -799,7 +800,7 @@ pub struct AbgleichBody {
 pub async fn abgleich_anlegen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, person_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, person_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<AbgleichBody>,
 ) -> Result<(StatusCode, Json<AbgleichAnzeige>), AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
@@ -862,7 +863,7 @@ pub struct EntscheidungBody {
 pub async fn abgleich_entscheiden(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
-    Path((einsatz_id, person_id, abgleich_id)): Path<(i64, i64, i64)>,
+    PfadParam((einsatz_id, person_id, abgleich_id)): PfadParam<(i64, i64, i64)>,
     JsonBody(body): JsonBody<EntscheidungBody>,
 ) -> Result<Json<AbgleichAnzeige>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;

@@ -293,11 +293,21 @@ Nur die 400-Erwartung beweist, dass der Precheck vor der DB greift (per Mutation
 statt eines nackten 500. Per-Handler-Prechecks bleiben für präzise Meldungen zuständig.
 
 **Extractor-Vertrag:** Handler nehmen Request-Bodies **ausschließlich** über
-`crate::extract::JsonBody` entgegen, nie über `axum::Json` — nur so folgt auch eine
-Deserialisierungs-Rejection dem `{error}`-JSON-Format. `axum::Json` bleibt für **Responses**
-richtig. Erzwungen von `tests/json_extractor_guard.rs`; querschnittliche Fehlerfälle
-(405, unbekannter API-Pfad, kaputter Body) deckt `tests/fehler_vertrag.rs` ab.
-Noch offen (LFH-317, abgespalten von LFH-305): `Path`-Rejections antworten weiterhin
-`text/plain`. Bewusst **nach** der LFH-121/230-Kontextmigration einzuplanen — jedes Modul, das
-auf den typisierten `EinsatzKontext`-Extractor wechselt, verliert sein rohes `Path` und damit
-den Swap.
+`crate::extract::JsonBody` und Route-IDs **ausschließlich** über `crate::extract::PfadParam`
+entgegen, nie über `axum::Json` bzw. `axum::extract::Path` — nur so folgt auch eine
+Deserialisierungs-/Path-Rejection dem `{error}`-JSON-Format (LFH-317/F22-B). `axum::Json` bleibt
+für **Responses** richtig. Erzwungen von `tests/json_extractor_guard.rs` und
+`tests/path_extractor_guard.rs` (beide `src/routes/`-scoped, Token-genau — `FsPath<`/`PfadParam<`
+sind kein Verstoß); querschnittliche Fehlerfälle (405, unbekannter API-Pfad, kaputter Body,
+nicht-numerische Route-ID) deckt `tests/fehler_vertrag.rs` ab.
+
+**`PfadParam` → 400, `EinsatzKontext` → 404 — bewusst getrennt.** Eine nicht-parsebare Sub-ID ist
+ein formaler Eingabefehler (LFH-267: falscher Feldtyp → 400; axum-Default ist ohnehin 400, die
+Umstellung ist envelope-only, gepinnt von `proxy_raster_nicht_numerisches_z_ist_400`). Die
+*einsatz_id* dagegen bildet `src/einsatz/kontext.rs` auf `NotFound` (404) ab — dort ist die
+fehlende ID eine Ressourcen-Existenzfrage. Die beiden Extraktoren sind **orthogonal**:
+`EinsatzKontext` zieht die `{id}`, `PfadParam` die Sub-IDs. Ein auf `EinsatzKontext` migriertes
+Modul behält deshalb sein rohes `Path` für die Sub-IDs (gemessen: `auftrag.rs`/`meldung.rs` nutzen
+beide) — die frühere Annahme „Migration entfernt das rohe Path" war falsch, weshalb LFH-317
+unabhängig von der (partiell gebliebenen, unscheduled) LFH-121/230-Migration umgesetzt wurde. Eine
+spätere Kontext-Migration trimmt höchstens ein Tuple-Element, macht den Swap aber nicht zunichte.

@@ -2,11 +2,12 @@ use crate::app::AppState;
 use crate::auth::session::{AdminUser, CurrentUser};
 use crate::error::AppError;
 use crate::extract::JsonBody;
+use crate::extract::PfadParam;
 use crate::personal::repo::{self, PersonalDaten, PersonalPatch};
 use crate::personal::{PersonalAnzeige, PersonalVorschlaege};
 use crate::routes::support::{deserialize_optional_field, trimme, trimme_tri};
 use crate::staerke::StaerkePosition;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -217,7 +218,7 @@ pub async fn anlegen(
 pub async fn aktualisieren(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
     JsonBody(body): JsonBody<PatchPersonal>,
 ) -> Result<Json<PersonalAnzeige>, AppError> {
     let n = normalisiere_patch(body)?;
@@ -237,7 +238,7 @@ pub async fn aktualisieren(
 pub async fn ausser_dienst(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
 ) -> Result<Json<PersonalAnzeige>, AppError> {
     repo::setze_dienststatus(&state.pool, benutzer.org_id, id, false).await?;
     Ok(Json(
@@ -249,7 +250,7 @@ pub async fn ausser_dienst(
 pub async fn in_dienst(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
-    Path(id): Path<i64>,
+    PfadParam(id): PfadParam<i64>,
 ) -> Result<Json<PersonalAnzeige>, AppError> {
     repo::setze_dienststatus(&state.pool, benutzer.org_id, id, true).await?;
     Ok(Json(

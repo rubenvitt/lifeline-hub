@@ -2,7 +2,8 @@ use crate::anhang::{self, AnhangAnzeige};
 use crate::app::AppState;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::error::AppError;
-use axum::extract::{Multipart, Path, State};
+use crate::extract::PfadParam;
+use axum::extract::{Multipart, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -77,7 +78,7 @@ pub async fn hochladen(
 pub async fn herunterladen(
     State(state): State<AppState>,
     _ctx: EinsatzLesezugriff,
-    Path((einsatz_id, anhang_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, anhang_id)): PfadParam<(i64, i64)>,
     req_headers: HeaderMap,
 ) -> Result<Response, AppError> {
     // fordere_lesezugriff erledigt der Extractor.
@@ -134,7 +135,7 @@ pub async fn herunterladen(
 pub async fn loeschen(
     State(state): State<AppState>,
     _ctx: EinsatzSchreibzugriff,
-    Path((einsatz_id, anhang_id)): Path<(i64, i64)>,
+    PfadParam((einsatz_id, anhang_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     anhang::repo::loeschen(&state.pool, einsatz_id, anhang_id).await?;
     Ok(StatusCode::NO_CONTENT)
