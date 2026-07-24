@@ -1782,8 +1782,9 @@ async fn bau_status_ohne_service_config_liefert_leere_liste() {
 /// Mini-Mock des zentralen karten-service für die beiden Read-Proxies (Muster:
 /// `spawn_karten_service_mock` oben, hier aber `GET /regions` + `GET /builds`). Prüft das
 /// weitergereichte Bearer-Token und liefert realistische Service-Antworten — `/builds` insbesondere
-/// mit VERSCHACHTELTEM `status`-Objekt (mirrort die reale karten-service-Serialisierung), damit der
-/// Test echte Raw-Passthrough-Treue prüft statt eines geflachten Test-Fixtures.
+/// mit VERSCHACHTELTEM `status`-Objekt (mirrort die reale karten-service-Serialisierung). LFH-323:
+/// lifeline-hub deserialisiert die Antwort jetzt typisiert (`Vec<RegionDto>`/`Vec<BuildJob>`) und
+/// re-serialisiert sie — der Test belegt, dass die Wire-Form dabei byte-identisch bleibt.
 async fn spawn_regionen_und_builds_mock(erwartetes_token: &'static str) -> String {
     use axum::routing::get;
     use axum::Router;
@@ -1863,7 +1864,8 @@ async fn baubare_regionen_und_bau_status_forwarden_service_antwort_roh() {
     .await;
     assert_eq!(status_res.status(), StatusCode::OK);
     let status = json(status_res).await;
-    // Verschachteltes status.status statt geflacht — Raw-Passthrough-Beweis (kein Reshape).
+    // Verschachteltes status.status statt geflacht — belegt, dass der typisierte Round-Trip
+    // (LFH-323) die adjacently-tagged JobStatus-Form byte-identisch erhält.
     assert_eq!(
         status[0]["status"]["status"], "building",
         "verschachtelter Build-Status unverändert durchgereicht: {status:?}"

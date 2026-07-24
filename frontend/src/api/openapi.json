@@ -943,6 +943,133 @@
           "aufgeloest"
         ]
       },
+      "BuildJob": {
+        "type": "object",
+        "description": "Ein Build-Job des zentralen karten-service (LFH-323, verschoben aus `karten-service`). Damit\nläuft der Cross-Service-Vertrag durch die bestehende Codegen-Kette statt als roher\n`serde_json::Value` daran vorbei.",
+        "required": [
+          "id",
+          "slug",
+          "status",
+          "gestartet"
+        ],
+        "properties": {
+          "beendet": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "gestartet": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "slug": {
+            "type": "string"
+          },
+          "status": {
+            "oneOf": [
+              {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "status"
+                    ],
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "queued"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "status"
+                    ],
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "building"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "status"
+                    ],
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "uploading"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "status"
+                    ],
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "publishing"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "status"
+                    ],
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "done"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "fehler",
+                      "status"
+                    ],
+                    "properties": {
+                      "fehler": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "failed"
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "description": "Adjacently-tagged Status eines karten-service-Build-Jobs (LFH-323, verschoben aus\n`karten-service/src/jobs.rs`). Wire: `{\"status\":\"building\"}` bzw. `{\"status\":\"failed\",\"fehler\":\"…\"}`.\n`karten-service` serialisiert ihn, `lifeline-hub` deserialisiert die Proxy-Antwort und exponiert\nihn (eingebettet in [`BuildJob`]) durch den Typ-Codegen. `Failed(String)` macht ihn\n**datentragend** — deshalb bewusst NICHT in `tests/enum_wire_kontrakt.rs` gepinnt (dessen Makros\nverlangen feldlose Enums) und in [`BuildJob`] `inline` statt als eigenes Component-Schema\nregistriert; die Wire-Treue sichert stattdessen der Round-Trip-Test unten."
+              }
+            ],
+            "description": "Inline statt `$ref`: [`JobStatus`] ist datentragend und bewusst kein registriertes\nComponent-Schema — utoipa bettet die Union direkt hier ein."
+          }
+        }
+      },
       "ChatKanalAnzeige": {
         "type": "object",
         "description": "Öffentliche Darstellung eines Chat-Kanals.",
@@ -5007,6 +5134,30 @@
             "format": "int64"
           },
           "label": {
+            "type": "string"
+          }
+        }
+      },
+      "RegionDto": {
+        "type": "object",
+        "description": "Eine vom zentralen karten-service baubare Region (LFH-323, verschoben aus `karten-service`).\nAuf `String`-Felder umgebaut (vorher `&'static str`), damit `lifeline-hub` die Proxy-Antwort\ndeserialisieren kann; `karten-service`s `dtos()` klont die `alle()`-Refs entsprechend.",
+        "required": [
+          "slug",
+          "name",
+          "region",
+          "gruppe"
+        ],
+        "properties": {
+          "gruppe": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string"
+          },
+          "slug": {
             "type": "string"
           }
         }

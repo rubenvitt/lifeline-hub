@@ -23,6 +23,53 @@ pub struct OfflineKatalogEintrag {
     pub gruppe: Option<String>,
 }
 
+/// Adjacently-tagged Status eines karten-service-Build-Jobs (LFH-323, verschoben aus
+/// `karten-service/src/jobs.rs`). Wire: `{"status":"building"}` bzw. `{"status":"failed","fehler":"…"}`.
+/// `karten-service` serialisiert ihn, `lifeline-hub` deserialisiert die Proxy-Antwort und exponiert
+/// ihn (eingebettet in [`BuildJob`]) durch den Typ-Codegen. `Failed(String)` macht ihn
+/// **datentragend** — deshalb bewusst NICHT in `tests/enum_wire_kontrakt.rs` gepinnt (dessen Makros
+/// verlangen feldlose Enums) und in [`BuildJob`] `inline` statt als eigenes Component-Schema
+/// registriert; die Wire-Treue sichert stattdessen der Round-Trip-Test unten.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "status", content = "fehler", rename_all = "lowercase")]
+#[cfg_attr(feature = "schema", derive(utoipa::ToSchema))]
+pub enum JobStatus {
+    Queued,
+    Building,
+    Uploading,
+    Publishing,
+    Done,
+    Failed(String),
+}
+
+/// Ein Build-Job des zentralen karten-service (LFH-323, verschoben aus `karten-service`). Damit
+/// läuft der Cross-Service-Vertrag durch die bestehende Codegen-Kette statt als roher
+/// `serde_json::Value` daran vorbei.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(utoipa::ToSchema))]
+pub struct BuildJob {
+    pub id: u64,
+    pub slug: String,
+    /// Inline statt `$ref`: [`JobStatus`] ist datentragend und bewusst kein registriertes
+    /// Component-Schema — utoipa bettet die Union direkt hier ein.
+    #[cfg_attr(feature = "schema", schema(inline))]
+    pub status: JobStatus,
+    pub gestartet: String,
+    pub beendet: Option<String>,
+}
+
+/// Eine vom zentralen karten-service baubare Region (LFH-323, verschoben aus `karten-service`).
+/// Auf `String`-Felder umgebaut (vorher `&'static str`), damit `lifeline-hub` die Proxy-Antwort
+/// deserialisieren kann; `karten-service`s `dtos()` klont die `alle()`-Refs entsprechend.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(utoipa::ToSchema))]
+pub struct RegionDto {
+    pub slug: String,
+    pub name: String,
+    pub region: String,
+    pub gruppe: String,
+}
+
 /// Merged den kompilierten Default-Katalog mit einem optionalen Remote-Manifest (Hybrid, LFH-199).
 /// Override per `name`: ein gültiger Remote-Eintrag mit gleichem Namen ersetzt den compiled-in
 /// Eintrag; neue Namen werden angehängt. Der compiled-in Katalog ist immer die Baseline
@@ -162,6 +209,82 @@ mod tests {
             "http://127.0.0.1@evil.com/x.mbtiles"
         )));
     }
+
+    // ── LFH-323: Wire-Treue der verschobenen karten-service-Kontrakt-Typen. ──
+    // Reiner Serde-Test (kein `schema`-Feature nötig): läuft auch im standalone-`karten-service`
+    // und ersetzt für das datentragende `JobStatus` den `enum_wire_kontrakt`-Pin, der hier nicht
+    // greifen kann.
+
+    #[test]
+    fn jobstatus_serde_round_trip_je_variante() {
+        let faelle = [
+            (JobStatus::Queued, serde_json::json!({"status": "queued"})),
+            (
+                JobStatus::Building,
+                serde_json::json!({"status": "building"}),
+            ),
+            (
+                JobStatus::Uploading,
+                serde_json::json!({"status": "uploading"}),
+            ),
+            (
+                JobStatus::Publishing,
+                serde_json::json!({"status": "publishing"}),
+            ),
+            (JobStatus::Done, serde_json::json!({"status": "done"})),
+            (
+                JobStatus::Failed("boom".into()),
+                serde_json::json!({"status": "failed", "fehler": "boom"}),
+            ),
+        ];
+        for (variante, wire) in faelle {
+            let ser = serde_json::to_value(&variante).unwrap();
+            assert_eq!(ser, wire, "Wire-Serialisierung von {variante:?}");
+            let zurueck: JobStatus = serde_json::from_value(ser).unwrap();
+            assert_eq!(
+                serde_json::to_value(&zurueck).unwrap(),
+                wire,
+                "Round-Trip (deser→ser) von {variante:?}",
+            );
+        }
+    }
+
+    #[test]
+    fn build_job_verschachtelter_status_round_trip() {
+        // Genau die Form, die `lifeline-hub` vom karten-service proxyt (verschachteltes status.status).
+        let job = BuildJob {
+            id: 1,
+            slug: "bayern".into(),
+            status: JobStatus::Building,
+            gestartet: "2026-01-01T00:00:00Z".into(),
+            beendet: None,
+        };
+        let v = serde_json::to_value(&job).unwrap();
+        assert_eq!(
+            v["status"]["status"], "building",
+            "verschachteltes status.status"
+        );
+        let zurueck: BuildJob = serde_json::from_value(v).unwrap();
+        assert!(matches!(zurueck.status, JobStatus::Building));
+        assert_eq!(zurueck.beendet, None);
+    }
+
+    #[test]
+    fn region_dto_round_trip() {
+        let dto = RegionDto {
+            slug: "bayern".into(),
+            name: "Bayern".into(),
+            region: "DE-BY".into(),
+            gruppe: "Bundesländer".into(),
+        };
+        let v = serde_json::to_value(&dto).unwrap();
+        assert_eq!(
+            v,
+            serde_json::json!({"slug": "bayern", "name": "Bayern", "region": "DE-BY", "gruppe": "Bundesländer"}),
+        );
+        let zurueck: RegionDto = serde_json::from_value(v).unwrap();
+        assert_eq!(zurueck.slug, "bayern");
+    }
 }
 
 /// LFH-265: Beleg, dass das `schema`-Feature `ToSchema` wirklich anhängt. Der Test kompiliert
@@ -200,5 +323,36 @@ mod schema_tests {
         assert!(!o.required.contains(&"sha256".to_string()));
         assert!(!o.required.contains(&"gruppe".to_string()));
         assert!(o.required.contains(&"name".to_string()));
+    }
+
+    /// LFH-323: `BuildJob`/`RegionDto` sind ToSchema-fähig, und `BuildJob.status` ist INLINE
+    /// (kein `$ref` auf ein `JobStatus`-Component). Der Inline-Check ist die Unterscheidungskraft:
+    /// wäre das `#[schema(inline)]` weg, zeigte `status` als `RefOr::Ref` auf ein nicht
+    /// registriertes Schema — der generierte TS-Typ liefe ins Leere.
+    #[test]
+    fn build_job_und_region_dto_haben_schema_mit_inline_status() {
+        let RefOr::T(Schema::Object(o)) = BuildJob::schema() else {
+            panic!("BuildJob muss ein Object-Schema sein");
+        };
+        for feld in ["id", "slug", "status", "gestartet", "beendet"] {
+            assert!(
+                o.properties.contains_key(feld),
+                "BuildJob-Feld {feld} fehlt"
+            );
+        }
+        assert!(
+            matches!(o.properties.get("status"), Some(RefOr::T(_))),
+            "BuildJob.status muss inline sein (kein $ref auf ein JobStatus-Component)",
+        );
+
+        let RefOr::T(Schema::Object(o)) = RegionDto::schema() else {
+            panic!("RegionDto muss ein Object-Schema sein");
+        };
+        for feld in ["slug", "name", "region", "gruppe"] {
+            assert!(
+                o.properties.contains_key(feld),
+                "RegionDto-Feld {feld} fehlt"
+            );
+        }
     }
 }

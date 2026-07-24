@@ -4,6 +4,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use utoipa::ToSchema;
 
+// LFH-323: Cross-Service-Kontrakt-Typen des karten-service (aus dem geteilten Crate
+// `karten-katalog`). Hier re-exportiert, damit `src/api_doc.rs` sie mit ToSchema registriert und
+// der Proxy in `routes/karte.rs` sie typisiert deserialisiert — statt roh als `serde_json::Value`.
+// `JobStatus` bleibt bewusst UNregistriert: es ist datentragend (`Failed(String)`) und in
+// `BuildJob` inline (`#[schema(inline)]`), damit weder ein `enum_wire_kontrakt`-Pin nötig noch der
+// Inventar-Guard verletzt ist (siehe `karten-katalog`).
+pub use karten_katalog::{BuildJob, RegionDto};
+
 /// Status einer Fachebenen-Antwort.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]

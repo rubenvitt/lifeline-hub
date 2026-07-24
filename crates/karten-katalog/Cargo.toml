@@ -15,3 +15,9 @@ utoipa = { version = "5", optional = true }
 
 [features]
 schema = ["dep:utoipa"]
+
+[dev-dependencies]
+# LFH-323: Serde-Round-Trip-Beleg für die verschobenen Wire-Typen (BuildJob/JobStatus/RegionDto).
+# Nur Dev — zieht NICHT in den standalone-`karten-service`-Build (dessen `karten-katalog`-Dep bleibt
+# ohne dev-deps und ohne utoipa).
+serde_json = "1"

@@ -66,14 +66,9 @@ const AUSNAHMEN: Record<string, string> = {
     'FE-lokale Formgebung: Rust serialisiert `fachebenen_sichtbar` untypisiert (`unknown`), ' +
     'es gibt also kein Schema zum Re-Exportieren. Bereits in types.ts so dokumentiert (LFH-120).',
 
-  // ── Durchreiche des externen karten-service (LFH-203). ──
-  // Das Backend antwortet auf /bau-status und /baubare-regionen mit `Json<serde_json::Value>`
-  // (verifiziert in `src/routes/karte.rs`) — es reicht die Antwort eines FREMDEN Dienstes roh
-  // durch. Es gibt kein `ToSchema`-Struct und damit kein generiertes Schema; ein Re-Export ist
-  // hier unmöglich, nicht bloß unbequem.
-  'offlineKarten.ts#BauJobStatus': 'karten-service-Durchreiche (serde_json::Value) — kein Schema.',
-  'offlineKarten.ts#BauJob': 'karten-service-Durchreiche (serde_json::Value) — kein Schema.',
-  'offlineKarten.ts#BaubareRegion': 'karten-service-Durchreiche (serde_json::Value) — kein Schema.',
+  // LFH-323: Die karten-service-Durchreiche (BauJob/BauJobStatus/BaubareRegion) ist KEINE Ausnahme
+  // mehr — die Wire-Typen liegen im geteilten Crate `karten-katalog` und laufen durch den Codegen;
+  // die drei FE-Typen sind jetzt Re-Exporte (siehe MIGRIERTE_RESPONSE_TYPEN unten).
 
   // ── Response-Formen ohne Codegen-Gegenstück, jeweils mit dokumentiertem Grund. ──
   'auth.ts#MfaErforderlich':
@@ -97,6 +92,7 @@ const AUSNAHMEN: Record<string, string> = {
 const MIGRIERTE_RESPONSE_TYPEN = [
   'OnlineStyle', 'OfflineRegion', 'KarteServerConfig', // karte.ts
   'OfflineKarte', 'OfflineKatalogEintrag', 'VorhandeneKarte', // offlineKarten.ts
+  'BauJob', 'BauJobStatus', 'BaubareRegion', // offlineKarten.ts (LFH-323, karten-service-Kontrakt)
   'OnlineQuelle', // onlineQuellen.ts
   'FeatureCollection', 'FachebeneAntwort', // fachebenen.ts
   'Hintergrundbild', // kartenbilder.ts

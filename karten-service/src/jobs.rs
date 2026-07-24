@@ -1,26 +1,9 @@
-use serde::Serialize;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
-#[derive(Clone, Serialize)]
-#[serde(tag = "status", content = "fehler", rename_all = "lowercase")]
-pub enum JobStatus {
-    Queued,
-    Building,
-    Uploading,
-    Publishing,
-    Done,
-    Failed(String),
-}
-
-#[derive(Clone, Serialize)]
-pub struct BuildJob {
-    pub id: u64,
-    pub slug: String,
-    pub status: JobStatus,
-    pub gestartet: String,
-    pub beendet: Option<String>,
-}
+// LFH-323: Wire-Typen leben jetzt im geteilten Crate `karten-katalog` (Cross-Service-Vertrag durch
+// den Typ-Codegen). Re-Export, damit `crate::jobs::{BuildJob, JobStatus}` als Pfad erhalten bleibt.
+pub use karten_katalog::{BuildJob, JobStatus};
 
 #[derive(Debug)]
 pub enum EnqueueError {

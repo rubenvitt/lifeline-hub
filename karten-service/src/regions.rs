@@ -242,22 +242,19 @@ pub fn finde(slug: &str) -> Option<&'static Region> {
     REGIONS.iter().find(|r| r.slug == slug)
 }
 
-#[derive(serde::Serialize)]
-pub struct RegionDto {
-    pub slug: &'static str,
-    pub name: &'static str,
-    pub region: &'static str,
-    pub gruppe: &'static str,
-}
+// LFH-323: `RegionDto` lebt jetzt im geteilten Crate `karten-katalog` — auf owned `String`-Felder
+// umgebaut, damit `lifeline-hub` die Proxy-Antwort deserialisieren kann. Re-Export hält den Pfad
+// `crate::regions::RegionDto` erhalten; `dtos()` klont die `&'static str`-Refs entsprechend.
+pub use karten_katalog::RegionDto;
 
 pub fn dtos() -> Vec<RegionDto> {
     alle()
         .iter()
         .map(|r| RegionDto {
-            slug: r.slug,
-            name: r.name,
-            region: r.region,
-            gruppe: r.gruppe,
+            slug: r.slug.to_string(),
+            name: r.name.to_string(),
+            region: r.region.to_string(),
+            gruppe: r.gruppe.to_string(),
         })
         .collect()
 }

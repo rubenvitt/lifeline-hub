@@ -6,9 +6,10 @@ import type { components } from './types.generated';
  * `/api/karte/offline-karten`-Endpunkte (Liste/Download/Aktivieren/Abbrechen/Löschen + Katalog).
  * Einziger API-Berührungspunkt der Offline-Verwaltung — Komponenten importieren nur von hier.
  *
- * LFH-265 (Teil A, Frontend): die Response-Typen sind Re-Exporte der generierten Schemas.
- * Eingabe-Bodies (`Offline*Body`, `RegistriereBody`) bleiben handgepflegt (CLAUDE.md), ebenso
- * die roh durchgereichten karten-service-Typen ganz unten.
+ * LFH-265 (Teil A) / LFH-323 (Teil B): die Response-Typen sind Re-Exporte der generierten Schemas
+ * — inklusive der karten-service-Kontrakt-Typen ganz unten (`BauJob`/`BaubareRegion`), die seit
+ * LFH-323 über das geteilte Crate `karten-katalog` durch den Codegen laufen. Eingabe-Bodies
+ * (`Offline*Body`, `RegistriereBody`) bleiben handgepflegt (CLAUDE.md).
  */
 
 type S = components['schemas'];
@@ -124,37 +125,23 @@ export function registriereOfflineKarte(body: RegistriereBody): Promise<OfflineK
 
 // ===== Region-Bau (zentraler karten-service, LFH-203) =====
 //
-// BEWUSST HANDGEPFLEGT (LFH-265, Allowlist-Bucket „karten-service-Durchreiche" in
-// `apiResponseTypen.guard.test.ts`): diese vier Formen beschreiben KEIN Lifeline-Hub-DTO,
-// sondern die Antwort des externen karten-service, die das Backend als `serde_json::Value`
-// roh durchreicht. Es gibt für sie kein `ToSchema`-Struct und damit kein generiertes Schema —
-// ein Re-Export ist hier nicht möglich, nicht bloß unbequem.
+// LFH-323: Re-Exporte der generierten Schemas. Die karten-service-Wire-Typen leben jetzt im
+// geteilten Crate `karten-katalog` (`BuildJob`/`JobStatus`/`RegionDto`), lifeline-hub deserialisiert
+// die Proxy-Antwort und exponiert sie mit ToSchema — der Cross-Service-Vertrag läuft damit durch
+// die Codegen-Kette statt als roher `serde_json::Value` daran vorbei (früher hier von Hand
+// nachmodelliert, mit Allowlist-Eintrag im Response-Typen-Guard). FE-Namen bleiben stabil (`Bau…`).
 
-export type BauStatus = 'queued' | 'building' | 'uploading' | 'publishing' | 'done' | 'failed';
+/** Ein Build-Job des zentralen karten-service (`/bau-status`). */
+export type BauJob = S['BuildJob'];
 
-/** karten-service serialisiert `status` als verschachteltes Objekt ({status, fehler?}), NICHT flach —
- *  der Proxy reicht es roh durch. */
-export interface BauJobStatus {
-  status: BauStatus;
-  fehler?: string;
-}
+/** Verschachtelter Build-Status ({status, fehler?}) — adjacently-tagged Union aus dem Backend. */
+export type BauJobStatus = BauJob['status'];
 
-/** Ein Build-Job des zentralen karten-service (über `/bau-status` roh durchgereicht). */
-export interface BauJob {
-  id: number;
-  slug: string;
-  status: BauJobStatus;
-  gestartet: string;
-  beendet?: string | null;
-}
+/** Die einzelnen Status-Phasen (`queued`…`failed`) — Diskriminante der Union. */
+export type BauStatus = BauJobStatus['status'];
 
-/** Eine vom zentralen karten-service baubare Region (über `/baubare-regionen` roh durchgereicht). */
-export interface BaubareRegion {
-  slug: string;
-  name: string;
-  region: string;
-  gruppe: string;
-}
+/** Eine vom zentralen karten-service baubare Region (`/baubare-regionen`). */
+export type BaubareRegion = S['RegionDto'];
 
 /** Stößt einen Region-Build beim zentralen karten-service an (Admin). */
 export function starteRegionBau(slug: string): Promise<{ job_id: number }> {

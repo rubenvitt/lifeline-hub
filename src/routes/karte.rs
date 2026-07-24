@@ -10,6 +10,7 @@ use crate::karte::registry::repo::{
     self, OfflineKarte, OfflineKarteEingabe, OnlineQuelle, OnlineQuelleEingabe, OnlineQuelleFelder,
 };
 use crate::karte::tile_cache;
+use crate::karte::typen::{BuildJob, RegionDto};
 use crate::routes::support::deserialize_optional_field;
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
@@ -1664,14 +1665,21 @@ pub async fn offline_bauen(
 /// Service-Konfiguration (URL/Token), ist das Feature schlicht aus — anders als bei `offline_bauen`
 /// (dort `501`, weil ein Trigger ohne Ziel ein Fehler ist) antworten die Listen-Endpunkte hier mit
 /// einer leeren Liste (`200`), damit das Admin-UI ohne konfigurierten Service einfach nichts
-/// anzeigt statt einen Fehlerzustand rendern zu müssen. Die Service-Antwort wird roh
-/// durchgereicht (kein Reshape) — Format ist Vertragssache des karten-service.
-async fn service_get(st: &AppState, pfad: &str) -> Result<serde_json::Value, AppError> {
+/// anzeigt statt einen Fehlerzustand rendern zu müssen.
+///
+/// LFH-323: Die Antwort wird jetzt TYPISIERT deserialisiert (`Vec<T>`, T aus dem geteilten Crate
+/// `karten-katalog`) statt roh als `serde_json::Value` durchgereicht — der Cross-Service-Vertrag
+/// läuft damit durch den Typ-Codegen. Die Wire-Form ist byte-identisch (Deserialisieren →
+/// Re-Serialisieren derselben Felder), die Admin-UI-Konsumenten bleiben unverändert.
+async fn service_get_liste<T: serde::de::DeserializeOwned>(
+    st: &AppState,
+    pfad: &str,
+) -> Result<Vec<T>, AppError> {
     let (Some(url), Some(token)) = (
         st.karten_service_url.as_deref(),
         st.karten_service_token.as_deref(),
     ) else {
-        return Ok(serde_json::json!([]));
+        return Ok(Vec::new());
     };
     let resp = KARTEN_SERVICE_CLIENT
         .get(format!("{}{}", url.trim_end_matches('/'), pfad))
@@ -1685,7 +1693,7 @@ async fn service_get(st: &AppState, pfad: &str) -> Result<serde_json::Value, App
             resp.status()
         )));
     }
-    resp.json()
+    resp.json::<Vec<T>>()
         .await
         .map_err(|e| AppError::BadGateway(format!("karten-service-Antwort: {e}")))
 }
@@ -1695,8 +1703,8 @@ async fn service_get(st: &AppState, pfad: &str) -> Result<serde_json::Value, App
 pub async fn offline_baubare_regionen(
     State(st): State<AppState>,
     _admin: AdminUser,
-) -> Result<Json<serde_json::Value>, AppError> {
-    Ok(Json(service_get(&st, "/regions").await?))
+) -> Result<Json<Vec<RegionDto>>, AppError> {
+    Ok(Json(service_get_liste::<RegionDto>(&st, "/regions").await?))
 }
 
 /// GET /api/karte/offline-karten/bau-status — forwarded `GET {url}/builds` des zentralen
@@ -1705,8 +1713,8 @@ pub async fn offline_baubare_regionen(
 pub async fn offline_bau_status(
     State(st): State<AppState>,
     _admin: AdminUser,
-) -> Result<Json<serde_json::Value>, AppError> {
-    Ok(Json(service_get(&st, "/builds").await?))
+) -> Result<Json<Vec<BuildJob>>, AppError> {
+    Ok(Json(service_get_liste::<BuildJob>(&st, "/builds").await?))
 }
 
 // ===== Style-/Tile-Proxy (LFH-182, öffentlich — wie /config & /tiles) =====

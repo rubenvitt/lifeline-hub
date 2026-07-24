@@ -336,6 +336,42 @@ export interface components {
          * @enum {string}
          */
         BrStatus: "geplant" | "aktiv" | "aufgeloest";
+        /**
+         * @description Ein Build-Job des zentralen karten-service (LFH-323, verschoben aus `karten-service`). Damit
+         *     läuft der Cross-Service-Vertrag durch die bestehende Codegen-Kette statt als roher
+         *     `serde_json::Value` daran vorbei.
+         */
+        BuildJob: {
+            beendet?: string | null;
+            gestartet: string;
+            /** Format: int64 */
+            id: number;
+            slug: string;
+            /**
+             * @description Inline statt `$ref`: [`JobStatus`] ist datentragend und bewusst kein registriertes
+             *     Component-Schema — utoipa bettet die Union direkt hier ein.
+             */
+            status: {
+                /** @enum {string} */
+                status: "queued";
+            } | {
+                /** @enum {string} */
+                status: "building";
+            } | {
+                /** @enum {string} */
+                status: "uploading";
+            } | {
+                /** @enum {string} */
+                status: "publishing";
+            } | {
+                /** @enum {string} */
+                status: "done";
+            } | {
+                fehler: string;
+                /** @enum {string} */
+                status: "failed";
+            };
+        };
         /** @description Öffentliche Darstellung eines Chat-Kanals. */
         ChatKanalAnzeige: {
             archiviert_at?: string | null;
@@ -1731,6 +1767,17 @@ export interface components {
             /** Format: int64 */
             id: number;
             label: string;
+        };
+        /**
+         * @description Eine vom zentralen karten-service baubare Region (LFH-323, verschoben aus `karten-service`).
+         *     Auf `String`-Felder umgebaut (vorher `&'static str`), damit `lifeline-hub` die Proxy-Antwort
+         *     deserialisieren kann; `karten-service`s `dtos()` klont die `alle()`-Refs entsprechend.
+         */
+        RegionDto: {
+            gruppe: string;
+            name: string;
+            region: string;
+            slug: string;
         };
         /**
          * @description Geteilte Richtung für Auftrag/Meldung (Schema-Anker für die OpenAPI-Union, LFH-120).
