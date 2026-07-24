@@ -13,7 +13,8 @@ use axum::Json;
 /// `karten_ansicht` — das Frontend filtert exakt darauf und invalidiert den
 /// Ansichts-Cache des Einsatzes.
 fn sse_ansicht(state: &AppState, einsatz_id: i64, ansicht_id: i64) {
-    let data = serde_json::json!({ "einsatz_id": einsatz_id, "ansicht_id": ansicht_id }).to_string();
+    let data =
+        serde_json::json!({ "einsatz_id": einsatz_id, "ansicht_id": ansicht_id }).to_string();
     state
         .live
         .publiziere_event(einsatz_id, LiveEvent::KartenAnsicht, data);
@@ -51,7 +52,9 @@ pub async fn patch(
     }
     if let Some(t) = req.karten_theme.as_deref() {
         if !ist_gueltiges_karten_theme(t) {
-            return Err(AppError::Validation(format!("Unbekanntes karten_theme: {t}")));
+            return Err(AppError::Validation(format!(
+                "Unbekanntes karten_theme: {t}"
+            )));
         }
     }
     let einsatz_id = ctx.einsatz.id;

@@ -429,11 +429,7 @@ fn orphan_enums_wire() {
         Offline => "offline",
         Blind => "blind",
     });
-    enum_wire_as_str!(lifeline_hub::karten_ansicht::KartenTheme {
-        Auto,
-        Light,
-        Dark,
-    });
+    enum_wire_as_str!(lifeline_hub::karten_ansicht::KartenTheme { Auto, Light, Dark });
     enum_wire!(lifeline_hub::einsatz::einstellungen::Zeitformat {
         VierundzwanzigStunden => "24h",
         ZwoelfStunden => "12h",

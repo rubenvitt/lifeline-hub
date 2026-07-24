@@ -188,7 +188,10 @@ async fn patch_ueberschreibt_konfiguration() {
     assert_eq!(v["layer_sichtbar"]["zone"], false);
 
     let (_, v2) = anfrage(&app, "GET", &url, &cookie, None).await;
-    assert_eq!(v2[0]["basemap_modus"], "online", "Stand persistiert: {v2:?}");
+    assert_eq!(
+        v2[0]["basemap_modus"], "online",
+        "Stand persistiert: {v2:?}"
+    );
     assert_eq!(v2[0]["karten_theme"], "dark");
     assert_eq!(v2.as_array().unwrap().len(), 1, "kein Neu-Seed durch PATCH");
 }
