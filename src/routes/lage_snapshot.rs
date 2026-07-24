@@ -53,15 +53,56 @@ pub async fn erzeugen(
     Ok((StatusCode::CREATED, Json(dok)))
 }
 
+/// Datenquellen im Snapshot-Dokument, deren LIVE-Endpunkte auf ein EIGENES Modul (≠ `lagekarte`)
+/// gegatet sind: (`daten`-Feld, Modul-Key). Ein Leser, der das jeweilige Modul nicht sehen darf,
+/// bekommt das Feld auf `[]` redigiert — sonst umginge der Snapshot die Sub-Modul-Gates (LFH-227:
+/// Gate-Key = Datenobjekt, nicht die Route). `fuehrungskraefte`/`zonen`/`freie_zeichen`/`bilder`/
+/// `ansichten`/`einsatz`/`org_default` sind lagekarte-nativ und bleiben.
+const REDIGIERBARE_MODUL_FELDER: &[(&str, &str)] = &[
+    ("schaeden", "schaeden"),
+    ("uhs", "unfallhilfsstellen"),
+    ("einheiten", "einheiten"),
+    ("fahrzeuge", "fahrzeuge"),
+    ("abschnitte", "einsatzabschnitte"),
+    ("gefahrengebiete", "gefahrenzonen"),
+    ("lagemeldungen", "lagemeldungen"),
+];
+
+/// Redigiert das eingefrorene `daten`-Dokument auf die Per-Layer-Autorisierung des Lesers —
+/// spiegelbildlich zur stillen Layer-Degradierung der Live-Karte. Nur bei `Forbidden` wird das
+/// Feld geleert; echte Fehler (DB) werden propagiert.
+async fn redigiere_nach_modulrechten(
+    state: &AppState,
+    ctx: &EinsatzLesezugriff<Lagekarte>,
+    dok: &mut LageSnapshotDokument,
+) -> Result<(), AppError> {
+    let Some(obj) = dok.daten.as_object_mut() else {
+        return Ok(());
+    };
+    for (feld, modul) in REDIGIERBARE_MODUL_FELDER {
+        match ctx.fordere_modul_zugriff(&state.pool, modul).await {
+            Ok(()) => {}
+            Err(AppError::Forbidden) => {
+                obj.insert((*feld).to_string(), serde_json::Value::Array(Vec::new()));
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(())
+}
+
 /// GET /api/einsaetze/{id}/lage-snapshots/{sid} — Volldokument eines Standes (inkl. `daten`).
+/// Das Dokument wird vor der Rückgabe auf die Modul-Rechte des Lesers redigiert (s.
+/// [`redigiere_nach_modulrechten`]).
 pub async fn einzeln(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Lagekarte>,
     PfadParam((_id, sid)): PfadParam<(i64, i64)>,
 ) -> Result<Json<LageSnapshotDokument>, AppError> {
-    let dok = repo::lade_dokument(&state.pool, ctx.einsatz.id, sid)
+    let mut dok = repo::lade_dokument(&state.pool, ctx.einsatz.id, sid)
         .await?
         .ok_or(AppError::NotFound)?;
+    redigiere_nach_modulrechten(&state, &ctx, &mut dok).await?;
     Ok(Json(dok))
 }
 

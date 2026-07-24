@@ -423,3 +423,66 @@ async fn fremder_einsatz_ist_404() {
     .await;
     assert_eq!(s, StatusCode::NOT_FOUND);
 }
+
+// ---------- Review-Fix #2: Modul-Redaktion des Snapshot-Dokuments ----------
+
+#[tokio::test]
+async fn snapshot_dokument_redigiert_gesperrtes_modul_fuer_den_leser() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let benutzer_id: i64 =
+        sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let org_id: i64 = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+    seed_einheit(&pool, e, org_id, benutzer_id, "Zug 1").await;
+    let snap = repo::erzeuge(&pool, e, benutzer_id, Some("S"), None)
+        .await
+        .unwrap();
+
+    // Ein Mitglied mit lagekarte-Lesezugriff (Beobachter genügt zum Lesen).
+    let leser_id = benutzer_anlegen(&app, &admin, "leser1", "keine").await;
+    rolle_setzen(&app, &admin, e, leser_id, "beobachter").await;
+    let leser = login_cookie(&app, "leser1", "leser1pw1").await;
+
+    let pfad = format!("/api/einsaetze/{e}/lage-snapshots/{}", snap.id);
+
+    // Vor der Sperre: der Leser sieht die Einheit im eingefrorenen Dokument.
+    let (s, dok) = anfrage(&app, "GET", &pfad, &leser, None).await;
+    assert_eq!(s, StatusCode::OK, "{dok:?}");
+    assert!(
+        !dok["daten"]["einheiten"].as_array().unwrap().is_empty(),
+        "vor Sperre sieht der Leser die Einheiten: {dok}"
+    );
+
+    // „einheiten" einsatzweit sperren (Admin/Leitung).
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/modul-overrides/einheiten"),
+        &admin,
+        Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+
+    // Nach der Sperre: einheiten ist im Dokument leer redigiert (spiegelt den 403 des Live-Wegs),
+    // lagekarte-natives (einsatz) bleibt erhalten.
+    let (s, dok) = anfrage(&app, "GET", &pfad, &leser, None).await;
+    assert_eq!(s, StatusCode::OK, "{dok:?}");
+    assert!(
+        dok["daten"]["einheiten"].as_array().unwrap().is_empty(),
+        "nach Sperre muss einheiten redigiert sein: {dok}"
+    );
+    assert!(
+        dok["daten"].get("einsatz").is_some(),
+        "lagekarte-natives einsatz bleibt: {dok}"
+    );
+}
