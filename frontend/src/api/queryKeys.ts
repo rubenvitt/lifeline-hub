@@ -49,6 +49,7 @@ export const EINSATZ_KEYS = {
   etb: 'etb',
   befehle: 'einsatz-befehle',
   befehl: 'einsatz-befehl',
+  kartenAnsicht: 'einsatz-karten-ansicht',
   // Nicht live über SSE getrieben (siehe NICHT_LIVE_KEYS + Guard-Test):
   einsatz: 'einsatz',
   einstellungen: 'einsatz-einstellungen',
@@ -124,6 +125,9 @@ export const EINSATZ_STREAM_EVENTS = {
   // Anlegen/Ändern/Freigeben/Fortschreiben. Invalidiert Befehls-Liste UND -Detail
   // (Prefix-Match: ['einsatz-befehl', einsatzId, befehlId] trifft alle befehlIds).
   befehl: [EINSATZ_KEYS.befehle, EINSATZ_KEYS.befehl],
+  // Kartenansichten live (LFH-319): PATCH („Für den Einsatz speichern") publiziert
+  // `karten_ansicht` → der Ansichts-Switcher aller Betrachter aktualisiert sich.
+  karten_ansicht: [EINSATZ_KEYS.kartenAnsicht],
 } as const satisfies Record<string, readonly EinsatzKey[]>;
 
 export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
@@ -214,6 +218,7 @@ export const einsatzKeys = {
   // Lage
   zonen: (einsatzId: number) => [EINSATZ_KEYS.zonen, einsatzId] as const,
   freieZeichen: (einsatzId: number) => [EINSATZ_KEYS.freieZeichen, einsatzId] as const,
+  kartenAnsicht: (einsatzId: number) => [EINSATZ_KEYS.kartenAnsicht, einsatzId] as const,
   gefahrengebiete: (einsatzId: number) => [EINSATZ_KEYS.gefahrengebiete, einsatzId] as const,
   gefahrenmatrix: (einsatzId: number, gewaehlt: number | null) =>
     [EINSATZ_KEYS.gefahrenmatrix, einsatzId, gewaehlt] as const,

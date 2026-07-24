@@ -133,6 +133,9 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   it('lagekartePfad mit ?gefahrengebiet= (Reverse-Deeplink)', () => {
     expect(lagekartePfad(E, { gefahrengebiet: 4 })).toBe('/einsaetze/5/lagekarte?gefahrengebiet=4');
   });
+  it('lagekartePfad mit ?ansicht= (Kartenansicht-Selektion, LFH-319)', () => {
+    expect(lagekartePfad(E, { ansicht: 7 })).toBe('/einsaetze/5/lagekarte?ansicht=7');
+  });
   it('einsatzdatenPfad', () => {
     expect(einsatzdatenPfad(E)).toBe('/einsaetze/5/einsatzdaten');
   });

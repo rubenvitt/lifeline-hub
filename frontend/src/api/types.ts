@@ -250,6 +250,24 @@ export interface NeuesFreiesZeichen {
 /** PATCH-Body (Whole-Spec-Overwrite ohne lat/lon — v1 nicht verschiebbar). LFH-170. */
 export type FreiesZeichenUpdate = Omit<NeuesFreiesZeichen, 'lat' | 'lon'>;
 
+// ============================== LFH-319 Kartenansichten ==============================
+export type KartenAnsicht = S['KartenAnsichtAnzeige'];
+export type KartenTheme = S['KartenTheme'];
+
+/** PATCH-Body „Für den Einsatz speichern": Vollersatz der Konfigurationsfelder einer
+ *  Ansicht. FE-lokal (kein Backend-Schema). `layer_sichtbar`/`fachebenen_sichtbar` sind
+ *  serialisierte Bool-Maps; `name`/`ist_standard` gehören nicht hierher (Inkrement B). */
+export interface PatchKartenAnsicht {
+  basemap_modus?: BasemapModus | null;
+  online_stil?: string | null;
+  karten_theme?: KartenTheme | null;
+  layer_sichtbar?: Record<string, boolean> | null;
+  fachebenen_sichtbar?: Record<string, boolean> | null;
+  zentrum_lat?: number | null;
+  zentrum_lon?: number | null;
+  zoom?: number | null;
+}
+
 // ============================== LFH-48 Lageberichte ==============================
 export type LageberichtVorlageKey = S['LageberichtVorlage'];
 export type LageberichtStatus = S['LageberichtStatus'];
