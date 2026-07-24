@@ -3,10 +3,10 @@ use crate::einsatz::einstellungen::ist_gueltiger_basemap_modus;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Lagekarte;
 use crate::error::AppError;
-use crate::extract::JsonBody;
+use crate::extract::{JsonBody, PfadParam};
 use crate::karten_ansicht::{ist_gueltiges_karten_theme, repo, KartenAnsichtAnzeige};
 use crate::live::LiveEvent;
-use axum::extract::{Path, State};
+use axum::extract::State;
 use axum::Json;
 
 /// SSE-Notify (Lage-Karte): eine Kartenansicht hat sich geändert. Event-Tag
@@ -40,7 +40,7 @@ pub async fn liste(
 pub async fn patch(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Lagekarte>,
-    Path((_id, aid)): Path<(i64, i64)>,
+    PfadParam((_id, aid)): PfadParam<(i64, i64)>,
     JsonBody(req): JsonBody<repo::AnsichtPatch>,
 ) -> Result<Json<KartenAnsichtAnzeige>, AppError> {
     if let Some(m) = req.basemap_modus.as_deref() {
