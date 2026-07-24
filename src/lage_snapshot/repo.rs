@@ -133,3 +133,88 @@ pub async fn loesche(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<bool
         .await?;
     Ok(res.rows_affected() > 0)
 }
+
+/// Eingefrorenes Lagebild (`schema_version = 1`). Jedes Feld ist die **rohe `*Anzeige`-DTO-Liste**
+/// der jeweiligen Lagekarte-Quelle — so bleiben Inspector-Felder (status/staerke/abschnitt_id …)
+/// erhalten und das Frontend leitet Marker im Replay durch die unveränderten `baueMarker`-Ableiter.
+#[derive(serde::Serialize)]
+struct SnapshotDaten {
+    version: u32,
+    stand_at: String,
+    /// Eingefrorener Org-TZ-Default (`organisation.tz_organisation`) — Fallback in der
+    /// Marker-Ableitung; muss eingefroren werden, sonst ändert eine Org-Umbenennung den Stand.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    org_default: Option<String>,
+    einsatz: crate::einsatz::EinsatzAnzeige,
+    ansichten: Vec<crate::karten_ansicht::KartenAnsichtAnzeige>,
+    uhs: Vec<crate::uhs::UhsAnzeige>,
+    schaeden: Vec<crate::schaden::SchadenAnzeige>,
+    einheiten: Vec<crate::einheit::EinheitAnzeige>,
+    fahrzeuge: Vec<crate::fahrzeug::EinsatzFahrzeugAnzeige>,
+    fuehrungskraefte: Vec<crate::personal::FuehrungskraftKarte>,
+    abschnitte: Vec<crate::einsatzabschnitt::EinsatzabschnittAnzeige>,
+    zonen: Vec<crate::lage_zone::LageZoneAnzeige>,
+    freie_zeichen: Vec<crate::freies_zeichen::FreiesZeichenAnzeige>,
+    /// Enthält `hoechste_warnstufe` je Gebiet — die Zonen-Färbung; ebenfalls einzufrieren.
+    gefahrengebiete: Vec<crate::gefahr::GefahrengebietAnzeige>,
+    lagemeldungen: Vec<crate::meldung::LageMeldungAnzeige>,
+    /// Nur Metadaten/ID-Referenz — die BLOB-Bytes bleiben live (kein 5-MB-Grundriss je Stand).
+    bilder: Vec<crate::karte_hintergrundbild::HintergrundbildAnzeige>,
+}
+
+/// Capture: friert das volle Lagebild eines Einsatzes in EIN JSON-Dokument ein (LFH-321, C).
+///
+/// Sammelt über **Pool-Reuse** dieselben Roh-`*Anzeige`-DTOs ein, die auch die Lagekarte speisen.
+/// Bewusst **keine** echte Read-Transaktion (jede `liste` nutzt eine eigene Pool-Connection) — für
+/// einen manuell ausgelösten Stand akzeptiert; SQLite serialisiert Writes, das Torn-Read-Fenster ist
+/// winzig. Global-Scope-Ableitungsinputs (`org_default`, gefahrengebiet-Warnstufe über die
+/// Gebiets-Liste) werden mit eingefroren — sonst schriebe ein späterer Config-Wechsel den Stand um.
+pub async fn erzeuge(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    bezeichnung: Option<&str>,
+    notiz: Option<&str>,
+) -> Result<LageSnapshotDokument, AppError> {
+    let einsatz = crate::einsatz::repo::laden(pool, einsatz_id).await?;
+    let einsatz_aktiv = einsatz.ist_aktiv();
+    let org_default: Option<String> =
+        sqlx::query_scalar("SELECT tz_organisation FROM organisation WHERE id = ?")
+            .bind(einsatz.org_id)
+            .fetch_one(pool)
+            .await?;
+    let stand_at: String = sqlx::query_scalar("SELECT datetime('now')")
+        .fetch_one(pool)
+        .await?;
+
+    let daten = SnapshotDaten {
+        version: 1,
+        stand_at: stand_at.clone(),
+        org_default,
+        einsatz: einsatz.anzeige(None),
+        ansichten: crate::karten_ansicht::repo::liste(pool, einsatz_id).await?,
+        uhs: crate::uhs::repo::liste(pool, einsatz_id, None, None).await?,
+        // inkl_storniert=false: der Stand spiegelt das sichtbare Lagebild, nicht stornierte Schäden.
+        schaeden: crate::schaden::repo::liste(pool, einsatz_id, None, None, None, None, false).await?,
+        einheiten: crate::einheit::repo::liste(pool, einsatz_id).await?,
+        // Fahrzeuge aus der einsatz-scoped Disposition (NICHT dem org-weiten Fuhrpark).
+        fahrzeuge: crate::fahrzeug::disposition_repo::liste(pool, einsatz_id, einsatz_aktiv).await?,
+        // Nur Führungskräfte werden Marker (EL/AL), nicht das gesamte Personal.
+        fuehrungskraefte: crate::personal::disposition_repo::liste_fuehrungskraefte(pool, einsatz_id)
+            .await?,
+        abschnitte: crate::einsatzabschnitt::repo::liste(pool, einsatz_id).await?,
+        zonen: crate::lage_zone::repo::liste(pool, einsatz_id, None).await?,
+        freie_zeichen: crate::freies_zeichen::repo::liste(pool, einsatz_id, None).await?,
+        gefahrengebiete: crate::gefahr::repo::gebiete_liste(pool, einsatz_id).await?,
+        lagemeldungen: crate::meldung::repo::liste_lage_meldungen(pool, einsatz_id).await?,
+        bilder: crate::karte_hintergrundbild::repo::liste(pool, einsatz_id, None).await?,
+    };
+
+    let daten_value = serde_json::to_value(&daten)
+        .map_err(|e| AppError::Internal(format!("Snapshot-Serialisierung: {e}")))?;
+    let id = insert_roh(pool, einsatz_id, benutzer_id, bezeichnung, notiz, &stand_at, &daten_value)
+        .await?;
+    lade_dokument(pool, einsatz_id, id)
+        .await?
+        .ok_or_else(|| AppError::Internal("Snapshot direkt nach Anlegen nicht auffindbar".into()))
+}
