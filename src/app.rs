@@ -605,6 +605,16 @@ pub fn build_router(state: AppState) -> Router {
             "/api/einsaetze/{id}/karten-ansichten/{aid}",
             patch(routes::karten_ansicht::patch).delete(routes::karten_ansicht::loeschen),
         )
+        .route(
+            "/api/einsaetze/{id}/lage-snapshots",
+            get(routes::lage_snapshot::liste).post(routes::lage_snapshot::erzeugen),
+        )
+        .route(
+            "/api/einsaetze/{id}/lage-snapshots/{sid}",
+            get(routes::lage_snapshot::einzeln)
+                .patch(routes::lage_snapshot::patch)
+                .delete(routes::lage_snapshot::loeschen),
+        )
         .route("/api/einsaetze/{id}/zonen", get(routes::lage_zone::liste))
         .route(
             "/api/einsaetze/{id}/zonen",

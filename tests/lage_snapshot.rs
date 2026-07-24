@@ -2,13 +2,22 @@
 //! Task 1: Persistenz — Metadaten-Liste (ohne `daten`), Volldokument, Einsatz-Scoping.
 //! Task 2: Capture `erzeuge` — Einfrieren des vollen Lagebilds (Immutabilität, Vollständigkeit).
 
+use axum::http::StatusCode;
 use lifeline_hub::einheit::repo::{self as einheit_repo, EinheitDaten, EinheitPatch};
 use lifeline_hub::lage_snapshot::repo;
 use serde_json::json;
 use sqlx::SqlitePool;
 
 mod common;
-use common::{einsatz_anlegen, login_cookie, setup_mit_pool};
+use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup_mit_pool};
+
+/// Router + Einsatz + Admin-Cookie (Admin = Einsatzleitung) für HTTP-Tests.
+async fn setup_http() -> (axum::Router, i64, String) {
+    let (app, _pool) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz_id = einsatz_anlegen(&app, &cookie).await;
+    (app, einsatz_id, cookie)
+}
 
 /// Pool + frischer Einsatz + Admin-`benutzer_id` + `org_id` für Repo-Level-Tests.
 async fn setup() -> (SqlitePool, i64, i64, i64) {
@@ -226,4 +235,161 @@ async fn snapshot_hat_alle_quellen_und_friert_org_default_ein() {
         dok.daten["org_default"], "thw",
         "Org-Default muss im Stand eingefroren bleiben"
     );
+}
+
+// ---------- Task 3: HTTP-Routen ----------
+
+#[tokio::test]
+async fn post_erzeugt_snapshot_201_liste_ohne_daten_einzel_mit_daten() {
+    let (app, e, cookie) = setup_http().await;
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/lage-snapshots"),
+        &cookie,
+        Some(r#"{"bezeichnung":"Stand 1"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v:?}");
+    let sid = v["id"].as_i64().unwrap();
+    assert!(v["daten"].is_object(), "POST-Antwort ist das Volldokument: {v}");
+
+    // Liste: Metadaten ohne daten.
+    let (s, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/lage-snapshots"),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let arr = liste.as_array().unwrap();
+    assert_eq!(arr.len(), 1);
+    assert_eq!(arr[0]["bezeichnung"], "Stand 1");
+    assert!(
+        arr[0].get("daten").is_none(),
+        "Liste darf kein daten tragen: {liste}"
+    );
+
+    // Einzel: Volldokument mit daten.
+    let (s, dok) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/lage-snapshots/{sid}"),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(
+        dok["daten"]["einheiten"].is_array(),
+        "Volldokument trägt daten: {dok}"
+    );
+}
+
+#[tokio::test]
+async fn patch_ist_immutabel_fuer_daten_und_stand_at() {
+    let (app, e, cookie) = setup_http().await;
+    let (_, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/lage-snapshots"),
+        &cookie,
+        Some(r#"{"bezeichnung":"Stand 1"}"#),
+    )
+    .await;
+    let sid = v["id"].as_i64().unwrap();
+    let daten_vorher = v["daten"].clone();
+    let stand_vorher = v["stand_at"].clone();
+
+    // Versuch, daten/stand_at per PATCH zu ändern — diese Felder existieren im DTO nicht.
+    let (s, patched) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/lage-snapshots/{sid}"),
+        &cookie,
+        Some(r#"{"bezeichnung":"Neu","daten":{"hacked":true},"stand_at":"1999"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{patched:?}");
+    assert_eq!(patched["bezeichnung"], "Neu", "nur Metadaten sind schreibbar");
+    assert_eq!(patched["daten"], daten_vorher, "daten muss unveränderlich sein");
+    assert_eq!(patched["stand_at"], stand_vorher, "stand_at muss unveränderlich sein");
+}
+
+#[tokio::test]
+async fn delete_nur_einsatzleitung() {
+    let (app, e, admin) = setup_http().await;
+    let (_, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/lage-snapshots"),
+        &admin,
+        Some(r#"{"bezeichnung":"S"}"#),
+    )
+    .await;
+    let sid = v["id"].as_i64().unwrap();
+
+    // Führungspersonal: hat Schreibrecht, aber keine Einsatzleitung.
+    let fuehr_id = benutzer_anlegen(&app, &admin, "fuehrer1", "keine").await;
+    rolle_setzen(&app, &admin, e, fuehr_id, "fuehrungspersonal").await;
+    let fuehr = login_cookie(&app, "fuehrer1", "fuehrer1pw1").await;
+
+    // ... darf einen Stand sichern (Schreibrecht) ...
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/lage-snapshots"),
+        &fuehr,
+        Some(r#"{"bezeichnung":"vom Fuehrer"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "Führungspersonal darf sichern");
+
+    // ... aber NICHT löschen (Dokumenten-Vernichtung, nur Leitung).
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{e}/lage-snapshots/{sid}"),
+        &fuehr,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "Nur Einsatzleitung darf löschen");
+
+    // Die Einsatzleitung schon.
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{e}/lage-snapshots/{sid}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+}
+
+#[tokio::test]
+async fn fremder_einsatz_ist_404() {
+    let (app, e, cookie) = setup_http().await;
+    let (_, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/lage-snapshots"),
+        &cookie,
+        Some(r#"{}"#),
+    )
+    .await;
+    let sid = v["id"].as_i64().unwrap();
+    // Nicht existenter Einsatz → 404 über den EinsatzKontext-Extractor.
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{}/lage-snapshots/{sid}", e + 999),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
 }

@@ -3,10 +3,29 @@
 //! sammelt das volle Lagebild über Pool-Reuse ein.
 
 use crate::error::AppError;
+use serde::Deserialize;
 use serde_json::Value;
 use sqlx::SqlitePool;
 
 use super::{LageSnapshotAnzeige, LageSnapshotDokument};
+
+/// POST-Body: manuelle Snapshot-Auslösung mit optionaler Bezeichnung/Notiz.
+#[derive(Debug, Deserialize)]
+pub struct NeuerLageSnapshot {
+    pub bezeichnung: Option<String>,
+    pub notiz: Option<String>,
+}
+
+/// PATCH-Body — **nur** Metadaten. `daten`/`stand_at`/`erstellt_*` sind strukturell NICHT
+/// enthalten (Unveränderlichkeit ist typseitig erzwungen). Tri-State (`Option<Option<T>>`):
+/// absent = unverändert, `null` = löschen, Wert = setzen.
+#[derive(Debug, Deserialize)]
+pub struct PatchLageSnapshot {
+    #[serde(default)]
+    pub bezeichnung: Option<Option<String>>,
+    #[serde(default)]
+    pub notiz: Option<Option<String>>,
+}
 
 const SELECT_META: &str = "\
     SELECT id, einsatz_id, bezeichnung, notiz, stand_at, schema_version, erstellt_von, erstellt_at \
@@ -132,6 +151,35 @@ pub async fn loesche(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<bool
         .execute(pool)
         .await?;
     Ok(res.rows_affected() > 0)
+}
+
+/// Aktualisiert **nur** die Metadaten (Tri-State: `None` = Feld unverändert, `Some(None)` =
+/// auf NULL, `Some(Some(v))` = setzen). `daten`/`stand_at`/`erstellt_*` bleiben unangetastet —
+/// das ist die Unveränderlichkeits-Garantie. Kein gesetztes Feld = No-op.
+pub async fn patche_meta(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+    bezeichnung: Option<Option<&str>>,
+    notiz: Option<Option<&str>>,
+) -> Result<(), AppError> {
+    if let Some(b) = bezeichnung {
+        sqlx::query("UPDATE lage_snapshot SET bezeichnung = ? WHERE einsatz_id = ? AND id = ?")
+            .bind(b)
+            .bind(einsatz_id)
+            .bind(id)
+            .execute(pool)
+            .await?;
+    }
+    if let Some(n) = notiz {
+        sqlx::query("UPDATE lage_snapshot SET notiz = ? WHERE einsatz_id = ? AND id = ?")
+            .bind(n)
+            .bind(einsatz_id)
+            .bind(id)
+            .execute(pool)
+            .await?;
+    }
+    Ok(())
 }
 
 /// Eingefrorenes Lagebild (`schema_version = 1`). Jedes Feld ist die **rohe `*Anzeige`-DTO-Liste**

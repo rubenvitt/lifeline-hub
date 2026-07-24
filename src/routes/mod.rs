@@ -30,6 +30,7 @@ pub mod health;
 pub mod karte;
 pub mod karte_hintergrundbild;
 pub mod karten_ansicht;
+pub mod lage_snapshot;
 pub mod lage_zone;
 pub mod lagebericht;
 pub mod live;
