@@ -22,6 +22,25 @@ fn sse_ansicht(state: &AppState, einsatz_id: i64, ansicht_id: i64) {
         .publiziere_event(einsatz_id, LiveEvent::KartenAnsicht, data);
 }
 
+/// SSE-Notify für die drei ansichtsgebundenen Objekt-Layer (LFH-320): beim Löschen einer
+/// Ansicht ändert sich deren Sichtbarkeit einsatzweit (freigegeben → NULL oder mitgelöscht).
+/// Der Auslöser liegt AUSSERHALB der Objekt-Module (die Objekt-Routen feuern ihre Events
+/// selbst), deshalb werden die Events hier direkt publiziert — Bulk-Change, daher nur
+/// `einsatz_id` (das FE invalidiert die ganze Liste). Ohne das sähen andere Clients, die die
+/// betroffene Ansicht offen haben, veraltete Objekte bis zu einem unbezogenen Refetch.
+fn sse_objekt_layer(state: &AppState, einsatz_id: i64) {
+    let data = serde_json::json!({ "einsatz_id": einsatz_id }).to_string();
+    state
+        .live
+        .publiziere_event(einsatz_id, LiveEvent::FreiesZeichen, data.clone());
+    state
+        .live
+        .publiziere_event(einsatz_id, LiveEvent::LageZone, data.clone());
+    state
+        .live
+        .publiziere_event(einsatz_id, LiveEvent::KarteBild, data);
+}
+
 /// GET /api/einsaetze/{id}/karten-ansichten — Liste der Ansichten des Einsatzes.
 /// Legt lazy die Standardansicht an, falls noch keine existiert (Seed aus
 /// `einsatz_einstellungen`). Läuft bewusst unter dem Lese-Gate — der Seed ist
@@ -146,5 +165,8 @@ pub async fn loeschen(
     let einsatz_id = ctx.einsatz.id;
     repo::loesche(&state.pool, einsatz_id, aid, behandlung).await?;
     sse_ansicht(&state, einsatz_id, aid);
+    // Die Objekt-Layer haben sich geändert (freigegeben oder mitgelöscht) — Clients mit der
+    // betroffenen Ansicht offen müssen ihre Objekt-Listen neu ziehen (Multi-Client-Konsistenz).
+    sse_objekt_layer(&state, einsatz_id);
     Ok(StatusCode::NO_CONTENT)
 }

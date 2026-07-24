@@ -3,8 +3,10 @@ use axum::http::{header, Request, StatusCode};
 use lifeline_hub::app::{build_router, AppState};
 use lifeline_hub::auth::bootstrap::bootstrap_admin;
 use lifeline_hub::db;
-use lifeline_hub::live::LiveHub;
+use lifeline_hub::live::{LiveHub, LiveNachricht};
 use serde_json::{json, Value};
+use std::time::Duration;
+use tokio::sync::broadcast::Receiver;
 use tower::ServiceExt;
 
 mod common;
@@ -28,6 +30,37 @@ async fn setup_mit_pool() -> (axum::Router, sqlx::SqlitePool) {
         karten_service_token: None,
     });
     (router, pool)
+}
+
+/// Wie [`setup_mit_pool`], liefert aber zusätzlich einen LiveHub-Klon (teilt den inneren
+/// Arc mit dem AppState) — für den SSE-Mithör-Test (LFH-320, Muster aus tests/lage_zone.rs).
+async fn setup_mit_live() -> (axum::Router, LiveHub) {
+    let pool = db::test_pool().await;
+    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
+        .await
+        .unwrap();
+    let live = LiveHub::new();
+    let router = build_router(AppState {
+        pool,
+        live: live.clone(),
+        karten_dir: std::env::temp_dir(),
+        fachebenen: lifeline_hub::karte::FachebenenState::neu(),
+        download_client: lifeline_hub::karte::download::download_client(),
+        download_fortschritt: lifeline_hub::karte::download::neue_fortschritt_map(),
+        karten_service_url: None,
+        karten_service_token: None,
+    });
+    (router, live)
+}
+
+async fn recv_until_tag(rx: &mut Receiver<LiveNachricht>, tag: &str, timeout: Duration) -> bool {
+    loop {
+        match tokio::time::timeout(timeout, rx.recv()).await {
+            Ok(Ok(n)) if n.event.as_str() == tag => return true,
+            Ok(Ok(_)) => continue,
+            _ => return false,
+        }
+    }
 }
 
 async fn anfrage(
@@ -251,6 +284,50 @@ async fn standard_aid(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
     )
     .await;
     v[0]["id"].as_i64().unwrap()
+}
+
+/// Löschen einer Ansicht ändert die drei ansichtsgebundenen Objekt-Layer (freigegeben oder
+/// mitgelöscht) — die Route MUSS deren SSE-Events feuern, sonst sehen andere Clients (die die
+/// betroffene Ansicht offen haben) veraltete Objekte bis zu einem unbezogenen Refetch. Es wird
+/// bewusst ERST NACH dem Anlegen der Zone abonniert, damit das empfangene `lage_zone`-Event nur
+/// vom DELETE stammen kann (nicht vom Anlege-POST).
+#[tokio::test]
+async fn delete_feuert_objekt_layer_sse() {
+    let (app, live) = setup_mit_live().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &cookie).await;
+    let url = format!("/api/einsaetze/{e}/karten-ansichten");
+    standard_aid(&app, &cookie, e).await;
+    let (_, neu) = anfrage(&app, "POST", &url, &cookie, Some(&json!({"name": "Nord"}))).await;
+    let aid = neu["id"].as_i64().unwrap();
+    anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/zonen"),
+        &cookie,
+        Some(&json!({
+            "typ": "absperrbereich", "geometrie_typ": "Polygon",
+            "geometrie": "{\"type\":\"Polygon\",\"coordinates\":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}",
+            "ansicht_id": aid
+        })),
+    )
+    .await;
+
+    // Erst JETZT abonnieren → das nächste lage_zone-Event stammt vom DELETE, nicht vom POST.
+    let mut rx = live.abonniere(e);
+    let (s, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("{url}/{aid}?objekte=loeschen"),
+        &cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    assert!(
+        recv_until_tag(&mut rx, "lage_zone", Duration::from_secs(1)).await,
+        "DELETE feuert ein lage_zone-SSE-Event (Multi-Client-Konsistenz)"
+    );
 }
 
 /// POST legt eine zweite, benannte Ansicht an — nicht Standard, reiht hinter die
