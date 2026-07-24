@@ -23,6 +23,10 @@ import FreiesZeichenInspector from './lagekarte/FreiesZeichenInspector';
 import ZonenInspector from './lagekarte/ZonenInspector';
 import FachebenenInspector from './lagekarte/FachebenenInspector';
 import ZeichnenSteuerung from './lagekarte/ZeichnenSteuerung';
+import { HistorienBanner } from './lagekarte/HistorienBanner';
+import { SnapshotLeiste } from './lagekarte/SnapshotLeiste';
+import { useLageSnapshots } from './lagekarte/useLageSnapshots';
+import type { Standquelle } from './lagekarte/snapshotDaten';
 
 export default function LagekartePage() {
   const { id } = useParams();
@@ -45,6 +49,12 @@ export default function LagekartePage() {
   // der Hook liest sie als Prop (bleibt Router-frei/testbar).
   const ansichtParam = parseRouteId(searchParams.get('ansicht') ?? undefined) ?? undefined;
 
+  // Historien-Modus (C/LFH-321): ?snapshot=<id> schaltet die Karte auf einen eingefrorenen,
+  // schreibgeschützten Stand. Die Seite besitzt die URL; die Daten-Hooks lesen die Quelle als Prop.
+  const snapshotParam = parseRouteId(searchParams.get('snapshot') ?? undefined) ?? undefined;
+  const quelle: Standquelle =
+    snapshotParam != null ? { typ: 'snapshot', id: snapshotParam } : { typ: 'live' };
+
   // Zentraler Config-State der Karte (LFH-319/320): Basemap/Fachebenen/Layer + Schmutzig-
   // Erkennung, „Für den Einsatz speichern" und die Ansichts-Verwaltung. Löst die drei
   // getrennten localStorage-Quellen ab.
@@ -61,7 +71,7 @@ export default function LagekartePage() {
   const {
     einsatz, darfSchreiben, ladt, gebiete,
     verortet, flaechen, zonenFeatures, alleVerortet, nichtVerortetAlle, zonen, freieZeichen,
-  } = useLagekarteDaten({ einsatzId, zeigeZonen: layer.zone, aktiveAnsichtId });
+  } = useLagekarteDaten({ einsatzId, zeigeZonen: layer.zone, aktiveAnsichtId, quelle });
 
   const {
     onFachebeneToggle, aktiveFachebenen, fachebenenStatus, fachebenenLaedt,
@@ -96,6 +106,21 @@ export default function LagekartePage() {
     (id: number) => {
       const naechste = new URLSearchParams(searchParams);
       naechste.set('ansicht', String(id));
+      setSearchParams(naechste);
+    },
+    [searchParams, setSearchParams],
+  );
+
+  // Snapshot-Liste (für den Banner-Zeitstempel; Cache-geteilt mit der Snapshot-Leiste).
+  const { snapshots } = useLageSnapshots(einsatzId);
+  const aktiverSnapshot = snapshotParam != null ? snapshots.find((s) => s.id === snapshotParam) : undefined;
+
+  // Snapshot wählen/verlassen: ?snapshot= setzen bzw. räumen (Deeplink-Muster wie ?ansicht=).
+  const waehleSnapshot = useCallback(
+    (id: number | null) => {
+      const naechste = new URLSearchParams(searchParams);
+      if (id == null) naechste.delete('snapshot');
+      else naechste.set('snapshot', String(id));
       setSearchParams(naechste);
     },
     [searchParams, setSearchParams],
@@ -173,7 +198,7 @@ export default function LagekartePage() {
     bilder, bildOverlays, aktivesPlatzierBild, bildPlatzierZentrum,
     onBildUpload, onBildToggle, onBildOpazitaet, onBildLoeschen, onBildVerschieben,
     onPlatzierGeometrie, onBildZentrieren, onBildUmbenennen, onBildMittelpunkt,
-  } = useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktiveAnsichtId, fehler });
+  } = useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktiveAnsichtId, quelle, fehler });
 
   const sichtbareMarker = alleVerortet.filter((m) => layer[m.typ]);
   const aktiverMarker = alleVerortet.find((m) => m.schluessel === auswahl) ?? null;
@@ -366,6 +391,20 @@ export default function LagekartePage() {
             ansichten={ansichten ?? []}
           />
         )}
+        {snapshotParam != null && (
+          <HistorienBanner
+            standAt={aktiverSnapshot?.stand_at}
+            bezeichnung={aktiverSnapshot?.bezeichnung}
+            onZurueckAktuell={() => waehleSnapshot(null)}
+          />
+        )}
+        <SnapshotLeiste
+          einsatzId={einsatzId}
+          darfSichern={!!darfSchreiben}
+          aktiverSnapshotId={snapshotParam}
+          onWaehle={waehleSnapshot}
+          fehler={fehler}
+        />
       </div>
     </div>
   );

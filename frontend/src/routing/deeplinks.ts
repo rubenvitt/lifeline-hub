@@ -158,11 +158,13 @@ export function gefahrenPfad(einsatzId: number, opts: { gefahrengebiet?: number 
  */
 export function lagekartePfad(
   einsatzId: number,
-  opts: { gefahrengebiet?: number; ansicht?: number } = {},
+  opts: { gefahrengebiet?: number; ansicht?: number; snapshot?: number } = {},
 ): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'lagekarte'), {
     gefahrengebiet: opts.gefahrengebiet,
     ansicht: opts.ansicht,
+    // Historien-Modus (C/LFH-321): ?snapshot=<id> zeigt den eingefrorenen Stand (schreibgeschützt).
+    snapshot: opts.snapshot,
   });
 }
 

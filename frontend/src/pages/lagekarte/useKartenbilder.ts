@@ -5,9 +5,11 @@ import {
   loescheHintergrundbild, ladeBildBlobUrl, type Ecken,
 } from '../../api/kartenbilder';
 import { einsatzKeys } from '../../api/queryKeys';
+import { ladeLageSnapshot } from '../../api/lageSnapshot';
 import { eckenAusBounds, zentroid, verschiebeEcken } from './bildGeometrie';
 import type { BildOverlay } from './bildLayer';
 import type { KartenHandle } from './Kartenflaeche';
+import type { SnapshotDaten, Standquelle } from './snapshotDaten';
 
 /** Seitenverhältnis (Breite/Höhe) eines Bilds aus der Datei lesen; Fallback 1 (quadratisch). */
 function leseBildSeitenverhaeltnis(datei: File): Promise<number> {
@@ -34,6 +36,9 @@ interface KartenbilderArgs {
   bildPlatzierenId: number | null;
   /** Aktive Ansicht (B/LFH-320): filtert die sichtbaren Bilder client-seitig und stempelt Uploads. */
   aktiveAnsichtId?: number;
+  /** Datenquelle (C/LFH-321): im Snapshot-Modus kommen die Bild-Metadaten aus dem eingefrorenen
+   *  Dokument; die Blob-Bytes werden weiterhin live geladen (ein gelöschtes Bild → Hinweis). */
+  quelle?: Standquelle;
   /** Stabiler Fehler-Handler (useCallback über App.useApp-message). */
   fehler: (e: unknown) => void;
 }
@@ -43,17 +48,31 @@ interface KartenbilderArgs {
  * LFH-166/LFH-35), Overlay-Ableitung und die CRUD-/Platzier-Handler. `bildPlatzierenId`
  * kommt als FSM-Parameter herein — die Reset-Logik liegt in useKartenInteraktion.
  */
-export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktiveAnsichtId, fehler }: KartenbilderArgs) {
+export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktiveAnsichtId, quelle = { typ: 'live' }, fehler }: KartenbilderArgs) {
   const qc = useQueryClient();
   const [blobUrls, setBlobUrls] = useState<Record<number, string>>({});
   // Spiegelt blobUrls als Ref, damit der Cleanup-Return des Blob-URL-Effekts beim
   // Unmount alle aktuellen URLs revoken kann (Leak-Schutz) — ohne Stale-Closure.
   const blobUrlsRef = useRef<Record<number, string>>({});
 
+  const istSnapshot = quelle.typ === 'snapshot';
+  const snapshotId = quelle.typ === 'snapshot' ? quelle.id : undefined;
+
   const bilderQuery = useQuery({
     queryKey: einsatzKeys.kartenbilder(einsatzId),
     queryFn: () => listeHintergrundbilder(einsatzId),
+    enabled: !istSnapshot,
   });
+  // Im Snapshot-Modus die eingefrorenen Bild-Metadaten aus dem Dokument (gleicher queryKey wie
+  // useLagekarteDaten → Cache-geteilt, kein zweiter Fetch). Blob-Bytes lädt der Effekt live.
+  const snapQuery = useQuery({
+    queryKey: [...einsatzKeys.lageSnapshot(einsatzId), snapshotId] as const,
+    queryFn: () => ladeLageSnapshot(einsatzId, snapshotId as number),
+    enabled: snapshotId != null,
+  });
+  const bilderRoh = istSnapshot
+    ? (snapQuery.data?.daten as SnapshotDaten | undefined)?.bilder
+    : bilderQuery.data;
 
   const invalidiereBilder = () => qc.invalidateQueries({ queryKey: einsatzKeys.kartenbilder(einsatzId) });
 
@@ -66,7 +85,7 @@ export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktive
   // (spätestens nach Theme-/Basemap-Wechsel mit Source-Neuaufbau). Der Unmount-Leak-Schutz
   // liegt deshalb in einem separaten, leeren-deps-Effekt weiter unten.
   useEffect(() => {
-    const bilder = bilderQuery.data ?? [];
+    const bilder = bilderRoh ?? [];
     let abgebrochen = false;
     for (const b of bilder) {
       if (!blobUrlsRef.current[b.id]) {
@@ -99,7 +118,7 @@ export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktive
     };
     // `fehler` ist ein stabiler useCallback-Handler → als ehrliche Dep aufgenommen, ohne
     // den Effekt neu auszulösen (kein Disable mehr nötig, LFH-166).
-  }, [bilderQuery.data, einsatzId, fehler]);
+  }, [bilderRoh, einsatzId, fehler]);
 
   // Unmount-only: beim Verlassen der Karte alle dann noch aktuellen Blob-URLs freigeben.
   // Separater Effekt mit leeren deps → läuft NUR beim Unmount, nicht bei jedem Refetch.
@@ -111,8 +130,8 @@ export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktive
   // ansichtslosen (`ansicht_id == null`, auf allen Ansichten). `== null` fängt sowohl `null`
   // als auch das per skip_serializing_if weggelassene Feld (`undefined`).
   const sichtbareBilder = useMemo(
-    () => (bilderQuery.data ?? []).filter((b) => b.ansicht_id == null || b.ansicht_id === aktiveAnsichtId),
-    [bilderQuery.data, aktiveAnsichtId],
+    () => (bilderRoh ?? []).filter((b) => b.ansicht_id == null || b.ansicht_id === aktiveAnsichtId),
+    [bilderRoh, aktiveAnsichtId],
   );
 
   // Memoisiert: ohne useMemo entsteht pro Render eine neue Array-Identität (+ JSON.parse),
@@ -161,7 +180,7 @@ export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktive
     invalidiereBilder();
   };
   const onBildZentrieren = (id: number) => {
-    const b = (bilderQuery.data ?? []).find((x) => x.id === id);
+    const b = (bilderRoh ?? []).find((x) => x.id === id);
     if (b) kartenRef.current?.zentriereAufEcken(JSON.parse(b.ecken_json) as Ecken);
   };
   const onBildUmbenennen = async (id: number, name: string) => {
@@ -171,7 +190,7 @@ export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktive
   // Mittelpunkt des Platzier-Bilds numerisch setzen: Ecken um die Differenz verschieben.
   const onBildMittelpunkt = async (lat: number, lon: number) => {
     if (bildPlatzierenId == null) return;
-    const b = (bilderQuery.data ?? []).find((x) => x.id === bildPlatzierenId);
+    const b = (bilderRoh ?? []).find((x) => x.id === bildPlatzierenId);
     if (!b) return;
     const ecken = JSON.parse(b.ecken_json) as Ecken;
     const [clng, clat] = zentroid(ecken);
@@ -182,10 +201,10 @@ export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktive
 
   const aktivesPlatzierBild = useMemo(() => {
     if (bildPlatzierenId == null) return null;
-    const b = (bilderQuery.data ?? []).find((x) => x.id === bildPlatzierenId);
+    const b = (bilderRoh ?? []).find((x) => x.id === bildPlatzierenId);
     if (!b) return null;
     return { id: b.id, ecken: JSON.parse(b.ecken_json) as Ecken };
-  }, [bildPlatzierenId, bilderQuery.data]);
+  }, [bildPlatzierenId, bilderRoh]);
 
   // Aktueller Mittelpunkt des Platzier-Bilds für die numerische Eingabe in der Sidebar.
   const bildPlatzierZentrum = useMemo<{ lat: number; lon: number } | null>(() => {
