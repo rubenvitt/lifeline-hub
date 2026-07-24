@@ -431,6 +431,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("hochgeladen_von", G_FK),
             retain("erstellt_at", G_ZEIT),
             retain("geaendert_at", G_ZEIT),
+            // Ansichts-Zugehörigkeit (LFH-320): FK auf karten_ansicht, kein Personenbezug.
+            retain("ansicht_id", G_FK),
         ],
     },
     TabellenRegel {
@@ -482,6 +484,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erstellt_von", G_FK),
             retain("erstellt_at", G_ZEIT),
             retain("geaendert_at", G_ZEIT),
+            // Ansichts-Zugehörigkeit (LFH-320): FK auf karten_ansicht, kein Personenbezug.
+            retain("ansicht_id", G_FK),
         ],
     },
     TabellenRegel {
@@ -520,6 +524,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erstellt_at", G_ZEIT),
             retain("geaendert_at", G_ZEIT),
             retain("gefahrengebiet_id", G_FK),
+            // Ansichts-Zugehörigkeit (LFH-320): FK auf karten_ansicht, kein Personenbezug.
+            retain("ansicht_id", G_FK),
         ],
     },
     TabellenRegel {

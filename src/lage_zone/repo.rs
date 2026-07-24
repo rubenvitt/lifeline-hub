@@ -11,6 +11,8 @@ pub struct ZoneNeu<'a> {
     pub label: Option<&'a str>,
     pub farbe: Option<&'a str>,
     pub notiz: Option<&'a str>,
+    /// Ansichts-Zugehörigkeit (LFH-320): `None` = auf allen Ansichten sichtbar.
+    pub ansicht_id: Option<i64>,
     pub erstellt_von: i64,
 }
 
@@ -22,11 +24,14 @@ pub struct ZonePatch<'a> {
     pub farbe: Option<Option<&'a str>>,
     pub notiz: Option<Option<&'a str>>,
     pub gefahrengebiet_id: Option<Option<i64>>,
+    /// Verschieben/Freigeben (LFH-320): `None` = unverändert, `Some(None)` = auf alle
+    /// Ansichten (NULL), `Some(Some(x))` = auf Ansicht x.
+    pub ansicht_id: Option<Option<i64>>,
 }
 
 const SELECT_ALLE: &str = "\
     SELECT id, einsatz_id, typ, geometrie_typ, geometrie, label, farbe, notiz, \
-           gefahrengebiet_id, erstellt_von, erstellt_at, geaendert_at \
+           gefahrengebiet_id, ansicht_id, erstellt_von, erstellt_at, geaendert_at \
     FROM lage_zone";
 
 #[derive(sqlx::FromRow)]
@@ -41,6 +46,7 @@ struct Row {
     farbe: Option<String>,
     notiz: Option<String>,
     gefahrengebiet_id: Option<i64>,
+    ansicht_id: Option<i64>,
     erstellt_von: i64,
     erstellt_at: String,
     geaendert_at: String,
@@ -57,20 +63,31 @@ fn zu_anzeige(r: Row) -> LageZoneAnzeige {
         farbe: r.farbe,
         notiz: r.notiz,
         gefahrengebiet_id: r.gefahrengebiet_id,
+        ansicht_id: r.ansicht_id,
         erstellt_von: r.erstellt_von,
         erstellt_at: r.erstellt_at,
         geaendert_at: r.geaendert_at,
     }
 }
 
-/// Alle Zonen eines Einsatzes, älteste zuerst.
-pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<LageZoneAnzeige>, AppError> {
-    let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
-        "{SELECT_ALLE} WHERE einsatz_id = ? ORDER BY id"
-    )))
-    .bind(einsatz_id)
-    .fetch_all(pool)
-    .await?;
+/// Alle Zonen eines Einsatzes, älteste zuerst. `ansicht = Some(x)` filtert auf die Zonen der
+/// Ansicht x PLUS die ansichtslosen (`ansicht_id IS NULL`); `None` liefert alles (LFH-320).
+pub async fn liste(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    ansicht: Option<i64>,
+) -> Result<Vec<LageZoneAnzeige>, AppError> {
+    let sql = match ansicht {
+        Some(_) => format!(
+            "{SELECT_ALLE} WHERE einsatz_id = ? AND (ansicht_id IS NULL OR ansicht_id = ?) ORDER BY id"
+        ),
+        None => format!("{SELECT_ALLE} WHERE einsatz_id = ? ORDER BY id"),
+    };
+    let mut q = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(sql)).bind(einsatz_id);
+    if let Some(a) = ansicht {
+        q = q.bind(a);
+    }
+    let rows = q.fetch_all(pool).await?;
     Ok(rows.into_iter().map(zu_anzeige).collect())
 }
 
@@ -135,11 +152,13 @@ pub async fn anlegen_tx(
     };
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO lage_zone \
-            (einsatz_id, typ, geometrie_typ, geometrie, label, farbe, notiz, gefahrengebiet_id, erstellt_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            (einsatz_id, typ, geometrie_typ, geometrie, label, farbe, notiz, gefahrengebiet_id, ansicht_id, erstellt_von) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id).bind(daten.typ).bind(daten.geometrie_typ).bind(daten.geometrie)
-    .bind(daten.label).bind(daten.farbe).bind(daten.notiz).bind(gebiet_id).bind(daten.erstellt_von)
+    .bind(daten.label).bind(daten.farbe).bind(daten.notiz).bind(gebiet_id)
+    // ansicht_id NUR in der Zone (LFH-320) — die Gefahrengebiet-Gruppe oben ist ansichtslos.
+    .bind(daten.ansicht_id).bind(daten.erstellt_von)
     .fetch_one(&mut *conn).await?;
     Ok(id)
 }
@@ -211,6 +230,7 @@ pub async fn aktualisiere(
             farbe = CASE WHEN ? THEN ? ELSE farbe END, \
             notiz = CASE WHEN ? THEN ? ELSE notiz END, \
             gefahrengebiet_id = ?, \
+            ansicht_id = CASE WHEN ? THEN ? ELSE ansicht_id END, \
             geaendert_at = datetime('now') \
          WHERE id = ? AND einsatz_id = ?",
     )
@@ -224,6 +244,8 @@ pub async fn aktualisiere(
     .bind(daten.notiz.flatten())
     // ziel_gebiet enthält bereits den Effektivwert (None-Arm = unverändert) → kein CASE nötig.
     .bind(ziel_gebiet)
+    .bind(daten.ansicht_id.is_some())
+    .bind(daten.ansicht_id.flatten())
     .bind(id)
     .bind(einsatz_id)
     .execute(&mut *tx)
@@ -319,6 +341,7 @@ mod tests {
                 label: Some("Chemie Halle 3"),
                 farbe: None,
                 notiz: None,
+                ansicht_id: None,
                 erstellt_von: von,
             },
         )
@@ -346,6 +369,7 @@ mod tests {
                 label: None,
                 farbe: Some("#00ff00"),
                 notiz: None,
+                ansicht_id: None,
                 erstellt_von: von,
             },
         )
@@ -368,6 +392,7 @@ mod tests {
                 label: Some("A"),
                 farbe: None,
                 notiz: Some("Notiz bleibt"),
+                ansicht_id: None,
                 erstellt_von: von,
             },
         )
@@ -407,6 +432,7 @@ mod tests {
                 label: None,
                 farbe: None,
                 notiz: None,
+                ansicht_id: None,
                 erstellt_von: von,
             },
         )
@@ -422,6 +448,7 @@ mod tests {
                 label: None,
                 farbe: None,
                 notiz: None,
+                ansicht_id: None,
                 erstellt_von: von,
             },
         )
@@ -463,6 +490,7 @@ mod tests {
                 label: None,
                 farbe: None,
                 notiz: None,
+                ansicht_id: None,
                 erstellt_von: von,
             },
         )
@@ -489,6 +517,7 @@ mod tests {
                 label: None,
                 farbe: None,
                 notiz: None,
+                ansicht_id: None,
                 erstellt_von: von,
             },
         )
@@ -527,6 +556,7 @@ mod tests {
                 label: None,
                 farbe: None,
                 notiz: None,
+                ansicht_id: None,
                 erstellt_von: von,
             },
         )

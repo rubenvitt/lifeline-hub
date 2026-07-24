@@ -11,8 +11,10 @@ use crate::karte_hintergrundbild::{
     self as bild, repo as bild_repo, repo::BildPatch, HintergrundbildAnzeige,
 };
 use crate::live::LiveEvent;
-use crate::routes::support::{etag_von, if_none_match_matcht, ASSET_CACHE_CONTROL};
-use axum::extract::{Multipart, State};
+use crate::routes::support::{
+    deserialize_optional_field, etag_von, if_none_match_matcht, AnsichtFilter, ASSET_CACHE_CONTROL,
+};
+use axum::extract::{Multipart, Query, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -33,6 +35,7 @@ pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     PfadParam(einsatz_id): PfadParam<i64>,
+    Query(filter): Query<AnsichtFilter>,
 ) -> Result<Json<Vec<HintergrundbildAnzeige>>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -45,7 +48,9 @@ pub async fn liste(
         &benutzer,
     )
     .await?;
-    Ok(Json(bild_repo::liste(&state.pool, einsatz_id).await?))
+    Ok(Json(
+        bild_repo::liste(&state.pool, einsatz_id, filter.ansicht).await?,
+    ))
 }
 
 /// POST Multipart-Upload. Felder: `datei` (Bytes), `ecken` (JSON-String der 4 Ecken),
@@ -72,6 +77,8 @@ pub async fn hochladen(
     let mut bytes: Option<Vec<u8>> = None;
     let mut ecken: Option<String> = None;
     let mut name: Option<String> = None;
+    // Ansichts-Zugehörigkeit (LFH-320) als Multipart-Feld — es gibt keinen JSON-Body.
+    let mut ansicht_id: Option<i64> = None;
 
     while let Some(feld) = multipart
         .next_field()
@@ -98,6 +105,18 @@ pub async fn hochladen(
                     AppError::Validation(format!("Name lesen fehlgeschlagen: {e}"))
                 })?);
             }
+            Some("ansicht_id") => {
+                let roh = feld.text().await.map_err(|e| {
+                    AppError::Validation(format!("ansicht_id lesen fehlgeschlagen: {e}"))
+                })?;
+                let roh = roh.trim();
+                // Leeres Feld = keine Ansicht (auf allen sichtbar); sonst muss es eine Zahl sein.
+                if !roh.is_empty() {
+                    ansicht_id = Some(roh.parse::<i64>().map_err(|_| {
+                        AppError::Validation(format!("ansicht_id ist keine Zahl: {roh}"))
+                    })?);
+                }
+            }
             _ => {}
         }
     }
@@ -121,6 +140,7 @@ pub async fn hochladen(
         mime,
         &bytes,
         &ecken,
+        ansicht_id,
     )
     .await?;
     sse_bild(&state, einsatz_id);
@@ -190,6 +210,9 @@ pub struct BildPatchBody {
     pub opazitaet: Option<i64>,
     pub sichtbar: Option<bool>,
     pub reihenfolge: Option<i64>,
+    /// Verschieben/Freigeben (LFH-320): absent = unverändert, `null` = auf alle Ansichten.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub ansicht_id: Option<Option<i64>>,
 }
 
 /// PATCH Stil/Geometrie ohne Neuupload. Schreibrecht + aktiv.
@@ -229,6 +252,7 @@ pub async fn aktualisieren(
             opazitaet: body.opazitaet,
             sichtbar: body.sichtbar,
             reihenfolge: body.reihenfolge,
+            ansicht_id: body.ansicht_id,
         },
     )
     .await?;

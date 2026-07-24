@@ -19,6 +19,9 @@ pub struct HintergrundbildAnzeige {
     pub opazitaet: i64,
     pub sichtbar: bool,
     pub reihenfolge: i64,
+    /// Ansichts-Zugehörigkeit (LFH-320): `None` = auf allen Ansichten sichtbar.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ansicht_id: Option<i64>,
     pub hochgeladen_von: i64,
     pub erstellt_at: String,
     pub geaendert_at: String,

@@ -20,7 +20,10 @@ use std::time::Duration;
 use tokio::sync::broadcast::Receiver;
 
 mod common;
-use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie};
+use common::{
+    anfrage, benutzer_anlegen, einsatz_anlegen, karten_ansicht_anlegen, login_cookie,
+    standard_ansicht_id,
+};
 
 const POLY: &str =
     r#"{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}"#;
@@ -882,4 +885,132 @@ async fn merge_feuert_gefahr_event() {
     let n = recv_until_tag(&mut rx, "gefahr", Duration::from_secs(1)).await;
     let v: Value = serde_json::from_str(&n.data).unwrap();
     assert_eq!(v["gefahrengebiet_id"], ziel);
+}
+
+// ---------- B (LFH-320): Ansichts-Zugehörigkeit ----------
+
+async fn zone_anlegen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    label: &str,
+    ansicht_id: Option<i64>,
+) -> i64 {
+    let mut body = json!({
+        "typ": "absperrbereich", "geometrie_typ": "Polygon",
+        "geometrie": POLY, "label": label,
+    });
+    if let Some(a) = ansicht_id {
+        body["ansicht_id"] = json!(a);
+    }
+    let (s, z) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/zonen"),
+        cookie,
+        Some(&body.to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "zone_anlegen: {z:?}");
+    z["id"].as_i64().unwrap()
+}
+
+/// POST mit `ansicht_id` stempelt die Zugehörigkeit; die Antwort trägt die id.
+#[tokio::test]
+async fn anlegen_mit_ansicht_id_stempelt_zugehoerigkeit() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let aid = standard_ansicht_id(&app, &admin, einsatz).await;
+
+    let (s, z) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/zonen"),
+        &admin,
+        Some(
+            &json!({"typ":"absperrbereich","geometrie_typ":"Polygon","geometrie":POLY,"ansicht_id":aid})
+                .to_string(),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{z:?}");
+    assert_eq!(z["ansicht_id"], aid, "ansicht_id gestempelt: {z:?}");
+}
+
+/// `?ansicht=X` liefert die X-Zonen UND die NULL-Zonen (auf allen Ansichten), NICHT die
+/// Zonen einer anderen Ansicht Y. Negativ-Assertion (Y fehlt) — der Isolationstest bleibt
+/// bei aufgeweichtem Filter NICHT grün. Mutationsprobe: die `ansicht_id=?`-Klausel im
+/// Listen-SQL entfernen → dieser Test wird rot.
+#[tokio::test]
+async fn liste_ansicht_filtert_fremde_aus_haelt_null() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let x = standard_ansicht_id(&app, &admin, einsatz).await;
+    let y = karten_ansicht_anlegen(&app, &admin, einsatz, "Y").await;
+
+    let zx = zone_anlegen(&app, &admin, einsatz, "auf-X", Some(x)).await;
+    let zy = zone_anlegen(&app, &admin, einsatz, "auf-Y", Some(y)).await;
+    let znull = zone_anlegen(&app, &admin, einsatz, "auf-alle", None).await;
+
+    let (s, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/zonen?ansicht={x}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{liste:?}");
+    let ids: Vec<i64> = liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|z| z["id"].as_i64().unwrap())
+        .collect();
+    assert!(ids.contains(&zx), "X-Zone sichtbar: {ids:?}");
+    assert!(
+        ids.contains(&znull),
+        "NULL-Zone (alle Ansichten) sichtbar: {ids:?}"
+    );
+    assert!(!ids.contains(&zy), "Y-Zone NICHT sichtbar auf X: {ids:?}");
+}
+
+/// PATCH `{ansicht_id}` verschiebt die Zone; `null` gibt sie auf alle Ansichten frei.
+#[tokio::test]
+async fn patch_verschiebt_zwischen_ansichten() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let x = standard_ansicht_id(&app, &admin, einsatz).await;
+    let y = karten_ansicht_anlegen(&app, &admin, einsatz, "Y").await;
+    let zid = zone_anlegen(&app, &admin, einsatz, "wandernd", Some(x)).await;
+
+    // Verschieben X → Y
+    let (s, v) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/zonen/{zid}"),
+        &admin,
+        Some(&json!({"ansicht_id": y}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    assert_eq!(v["ansicht_id"], y, "auf Y verschoben: {v:?}");
+
+    // Auf alle Ansichten freigeben (null)
+    let (s, v) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/zonen/{zid}"),
+        &admin,
+        Some(&json!({"ansicht_id": Value::Null}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    assert!(
+        v.get("ansicht_id").is_none() || v["ansicht_id"].is_null(),
+        "auf alle Ansichten freigegeben (NULL/absent): {v:?}"
+    );
 }

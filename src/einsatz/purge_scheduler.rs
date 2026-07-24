@@ -280,6 +280,7 @@ mod tests {
             "image/png",
             &[0x89, b'P', b'N', b'G'],
             "[[9.0,50.0],[9.1,50.0],[9.1,49.9],[9.0,49.9]]",
+            None,
         )
         .await
         .unwrap();
@@ -374,7 +375,7 @@ mod tests {
         );
         assert_eq!(snap_stamm_funktion.as_deref(), Some("Gruppenführer"));
         // (b2) Bild-Hintergrund: name geschwärzt, BLOB (Kartografie) bleibt erhalten.
-        let nachher = crate::karte_hintergrundbild::repo::liste(&pool, e)
+        let nachher = crate::karte_hintergrundbild::repo::liste(&pool, e, None)
             .await
             .unwrap();
         assert_eq!(

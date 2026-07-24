@@ -176,6 +176,39 @@ pub async fn einsatz_anlegen(app: &axum::Router, cookie: &str) -> i64 {
     json["id"].as_i64().unwrap()
 }
 
+/// Seedet (via GET) und liefert die id der Standardansicht des Einsatzes (LFH-320).
+pub async fn standard_ansicht_id(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
+    let (status, v) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/karten-ansichten"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "karten-ansichten GET: {v:?}");
+    v[0]["id"].as_i64().unwrap()
+}
+
+/// Legt eine zweite, benannte Kartenansicht an und liefert ihre id (LFH-320).
+pub async fn karten_ansicht_anlegen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    name: &str,
+) -> i64 {
+    let (status, v) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/karten-ansichten"),
+        cookie,
+        Some(&format!(r#"{{"name":"{name}"}}"#)),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "karten-ansicht anlegen: {v:?}");
+    v["id"].as_i64().unwrap()
+}
+
 /// Weist einem Benutzer eine Einsatz-Rolle zu (durch die Einsatzleitung).
 pub async fn rolle_setzen(
     app: &axum::Router,

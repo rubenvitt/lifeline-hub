@@ -15,6 +15,8 @@ pub struct ZeichenNeu<'a> {
     pub funktion: Option<&'a str>,
     pub farbe: Option<&'a str>,
     pub label: Option<&'a str>,
+    /// Ansichts-Zugehörigkeit (LFH-320): `None` = auf allen Ansichten sichtbar.
+    pub ansicht_id: Option<i64>,
     pub erstellt_von: i64,
 }
 
@@ -33,11 +35,14 @@ pub struct ZeichenPatch<'a> {
     pub funktion: Option<Option<&'a str>>,
     pub farbe: Option<Option<&'a str>>,
     pub label: Option<Option<&'a str>>,
+    /// Verschieben/Freigeben (LFH-320): `None` = unverändert, `Some(None)` = auf alle
+    /// Ansichten (NULL), `Some(Some(x))` = auf Ansicht x.
+    pub ansicht_id: Option<Option<i64>>,
 }
 
 const SELECT_ALLE: &str = "\
     SELECT id, einsatz_id, lat, lon, grundzeichen, organisation, fachaufgabe, symbol, \
-           einheit, funktion, farbe, label, erstellt_von, erstellt_at, geaendert_at \
+           einheit, funktion, farbe, label, ansicht_id, erstellt_von, erstellt_at, geaendert_at \
     FROM freies_zeichen";
 
 #[derive(sqlx::FromRow)]
@@ -54,6 +59,7 @@ struct Row {
     funktion: Option<String>,
     farbe: Option<String>,
     label: Option<String>,
+    ansicht_id: Option<i64>,
     erstellt_von: i64,
     erstellt_at: String,
     geaendert_at: String,
@@ -73,23 +79,32 @@ fn zu_anzeige(r: Row) -> FreiesZeichenAnzeige {
         funktion: r.funktion,
         farbe: r.farbe,
         label: r.label,
+        ansicht_id: r.ansicht_id,
         erstellt_von: r.erstellt_von,
         erstellt_at: r.erstellt_at,
         geaendert_at: r.geaendert_at,
     }
 }
 
-/// Alle freien Zeichen eines Einsatzes, älteste zuerst.
+/// Alle freien Zeichen eines Einsatzes, älteste zuerst. `ansicht = Some(x)` filtert auf die
+/// Zeichen der Ansicht x PLUS die ansichtslosen (`ansicht_id IS NULL`, auf allen Ansichten);
+/// `None` liefert wie bisher alles (LFH-320).
 pub async fn liste(
     pool: &SqlitePool,
     einsatz_id: i64,
+    ansicht: Option<i64>,
 ) -> Result<Vec<FreiesZeichenAnzeige>, AppError> {
-    let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
-        "{SELECT_ALLE} WHERE einsatz_id = ? ORDER BY id"
-    )))
-    .bind(einsatz_id)
-    .fetch_all(pool)
-    .await?;
+    let sql = match ansicht {
+        Some(_) => format!(
+            "{SELECT_ALLE} WHERE einsatz_id = ? AND (ansicht_id IS NULL OR ansicht_id = ?) ORDER BY id"
+        ),
+        None => format!("{SELECT_ALLE} WHERE einsatz_id = ? ORDER BY id"),
+    };
+    let mut q = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(sql)).bind(einsatz_id);
+    if let Some(a) = ansicht {
+        q = q.bind(a);
+    }
+    let rows = q.fetch_all(pool).await?;
     Ok(rows.into_iter().map(zu_anzeige).collect())
 }
 
@@ -119,8 +134,8 @@ pub async fn anlegen(
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO freies_zeichen \
             (einsatz_id, lat, lon, grundzeichen, organisation, fachaufgabe, symbol, \
-             einheit, funktion, farbe, label, erstellt_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             einheit, funktion, farbe, label, ansicht_id, erstellt_von) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(daten.lat)
@@ -133,6 +148,7 @@ pub async fn anlegen(
     .bind(daten.funktion)
     .bind(daten.farbe)
     .bind(daten.label)
+    .bind(daten.ansicht_id)
     .bind(daten.erstellt_von)
     .fetch_one(pool)
     .await?;
@@ -164,8 +180,9 @@ pub async fn patche(
             funktion = CASE WHEN ?11 IS NULL THEN funktion ELSE ?12 END, \
             farbe = CASE WHEN ?13 IS NULL THEN farbe ELSE ?14 END, \
             label = CASE WHEN ?15 IS NULL THEN label ELSE ?16 END, \
+            ansicht_id = CASE WHEN ?17 IS NULL THEN ansicht_id ELSE ?18 END, \
             geaendert_at = datetime('now') \
-         WHERE id = ?17 AND einsatz_id = ?18",
+         WHERE id = ?19 AND einsatz_id = ?20",
     )
     .bind(patch.grundzeichen.map(|_| 1_i64))
     .bind(patch.grundzeichen)
@@ -183,6 +200,8 @@ pub async fn patche(
     .bind(patch.farbe.and_then(|v| v))
     .bind(patch.label.map(|_| 1_i64))
     .bind(patch.label.and_then(|v| v))
+    .bind(patch.ansicht_id.map(|_| 1_i64))
+    .bind(patch.ansicht_id.and_then(|v| v))
     .bind(id)
     .bind(einsatz_id)
     .execute(pool)
@@ -243,6 +262,7 @@ mod tests {
             funktion: None,
             farbe: Some("#ff0000"),
             label: Some("A"),
+            ansicht_id: None,
             erstellt_von: von,
         }
     }
@@ -267,7 +287,7 @@ mod tests {
         let (einsatz, von) = setup(&pool).await;
         let a = anlegen(&pool, einsatz, neu(von)).await.unwrap();
         let b = anlegen(&pool, einsatz, neu(von)).await.unwrap();
-        let liste = liste(&pool, einsatz).await.unwrap();
+        let liste = liste(&pool, einsatz, None).await.unwrap();
         assert_eq!(liste.len(), 2);
         assert_eq!(liste[0].id, a.id);
         assert_eq!(liste[1].id, b.id);
@@ -305,6 +325,7 @@ mod tests {
                 funktion: Some(Some("zugtrupp")),
                 farbe: Some(None),
                 label: Some(Some("B")),
+                ansicht_id: None,
             },
         )
         .await
@@ -348,6 +369,7 @@ mod tests {
                 funktion: Some(Some("zugtrupp")),
                 farbe: Some(Some("#00ff00")),
                 label: Some(Some("B")),
+                ansicht_id: None,
             },
         )
         .await

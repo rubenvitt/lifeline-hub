@@ -5,7 +5,7 @@ use sqlx::SqlitePool;
 
 const ANZEIGE_SELECT: &str = "\
     SELECT id, einsatz_id, name, mime, groesse, ecken_json, opazitaet, \
-           sichtbar, reihenfolge, hochgeladen_von, erstellt_at, geaendert_at \
+           sichtbar, reihenfolge, ansicht_id, hochgeladen_von, erstellt_at, geaendert_at \
     FROM karte_hintergrundbild";
 
 fn hex(bytes: &[u8]) -> String {
@@ -16,18 +16,26 @@ fn hex(bytes: &[u8]) -> String {
     s
 }
 
+/// `ansicht = Some(x)` filtert auf die Bilder der Ansicht x PLUS die ansichtslosen
+/// (`ansicht_id IS NULL`); `None` liefert alles (LFH-320).
 pub async fn liste(
     pool: &SqlitePool,
     einsatz_id: i64,
+    ansicht: Option<i64>,
 ) -> Result<Vec<HintergrundbildAnzeige>, AppError> {
-    Ok(
-        sqlx::query_as::<_, HintergrundbildAnzeige>(sqlx::AssertSqlSafe(format!(
-            "{ANZEIGE_SELECT} WHERE einsatz_id = ? ORDER BY reihenfolge, id"
-        )))
-        .bind(einsatz_id)
-        .fetch_all(pool)
-        .await?,
-    )
+    let sql = match ansicht {
+        Some(_) => format!(
+            "{ANZEIGE_SELECT} WHERE einsatz_id = ? AND (ansicht_id IS NULL OR ansicht_id = ?) \
+             ORDER BY reihenfolge, id"
+        ),
+        None => format!("{ANZEIGE_SELECT} WHERE einsatz_id = ? ORDER BY reihenfolge, id"),
+    };
+    let mut q =
+        sqlx::query_as::<_, HintergrundbildAnzeige>(sqlx::AssertSqlSafe(sql)).bind(einsatz_id);
+    if let Some(a) = ansicht {
+        q = q.bind(a);
+    }
+    Ok(q.fetch_all(pool).await?)
 }
 
 pub async fn laden(
@@ -91,19 +99,20 @@ pub async fn anlegen(
     mime: &str,
     daten: &[u8],
     ecken_json: &str,
+    ansicht_id: Option<i64>,
 ) -> Result<HintergrundbildAnzeige, AppError> {
     let groesse = daten.len() as i64;
     let sha = hex(&Sha256::digest(daten));
     // Neue Bilder oben auf den Stapel: max(reihenfolge)+1.
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO karte_hintergrundbild \
-            (einsatz_id, name, daten, mime, groesse, sha256, ecken_json, reihenfolge, hochgeladen_von) \
+            (einsatz_id, name, daten, mime, groesse, sha256, ecken_json, reihenfolge, ansicht_id, hochgeladen_von) \
          VALUES (?, ?, ?, ?, ?, ?, ?, \
             (SELECT COALESCE(MAX(reihenfolge), -1) + 1 FROM karte_hintergrundbild WHERE einsatz_id = ?), \
-            ?) RETURNING id",
+            ?, ?) RETURNING id",
     )
     .bind(einsatz_id).bind(name).bind(daten).bind(mime).bind(groesse).bind(sha)
-    .bind(ecken_json).bind(einsatz_id).bind(hochgeladen_von)
+    .bind(ecken_json).bind(einsatz_id).bind(ansicht_id).bind(hochgeladen_von)
     .fetch_one(pool)
     .await?;
     laden(pool, einsatz_id, id).await
@@ -116,6 +125,9 @@ pub struct BildPatch {
     pub opazitaet: Option<i64>,
     pub sichtbar: Option<bool>,
     pub reihenfolge: Option<i64>,
+    /// Verschieben/Freigeben (LFH-320): `None` = unverändert, `Some(None)` = auf alle
+    /// Ansichten (NULL), `Some(Some(x))` = auf Ansicht x.
+    pub ansicht_id: Option<Option<i64>>,
 }
 
 pub async fn aktualisiere(
@@ -132,6 +144,7 @@ pub async fn aktualisiere(
             opazitaet   = CASE WHEN ? THEN ? ELSE opazitaet END, \
             sichtbar    = CASE WHEN ? THEN ? ELSE sichtbar END, \
             reihenfolge = CASE WHEN ? THEN ? ELSE reihenfolge END, \
+            ansicht_id  = CASE WHEN ? THEN ? ELSE ansicht_id END, \
             geaendert_at = datetime('now') \
          WHERE id = ? AND einsatz_id = ?",
     )
@@ -145,6 +158,8 @@ pub async fn aktualisiere(
     .bind(daten.sichtbar)
     .bind(daten.reihenfolge.is_some())
     .bind(daten.reihenfolge)
+    .bind(daten.ansicht_id.is_some())
+    .bind(daten.ansicht_id.flatten())
     .bind(id)
     .bind(einsatz_id)
     .execute(pool)
@@ -206,9 +221,18 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (eid, uid) = setup(&pool).await;
         let bytes = [0x89u8, b'P', b'N', b'G', 1, 2, 3];
-        let a = anlegen(&pool, eid, uid, "plan.png", "image/png", &bytes, ecken())
-            .await
-            .unwrap();
+        let a = anlegen(
+            &pool,
+            eid,
+            uid,
+            "plan.png",
+            "image/png",
+            &bytes,
+            ecken(),
+            None,
+        )
+        .await
+        .unwrap();
         assert_eq!(a.name, "plan.png");
         assert_eq!(a.groesse, bytes.len() as i64);
         assert_eq!(a.opazitaet, 100);
@@ -219,7 +243,7 @@ mod tests {
         assert_eq!(mime, "image/png");
         assert_eq!(daten, bytes);
 
-        let liste = liste(&pool, eid).await.unwrap();
+        let liste = liste(&pool, eid, None).await.unwrap();
         assert_eq!(liste.len(), 1);
     }
 
@@ -235,6 +259,7 @@ mod tests {
             "image/png",
             &[0x89, b'P'],
             ecken(),
+            None,
         )
         .await
         .unwrap();
@@ -249,6 +274,7 @@ mod tests {
                 sichtbar: Some(false),
                 name: None,
                 reihenfolge: None,
+                ansicht_id: None,
             },
         )
         .await
@@ -265,9 +291,18 @@ mod tests {
     async fn fremder_einsatz_notfound() {
         let pool = crate::db::test_pool().await;
         let (eid, uid) = setup(&pool).await;
-        let a = anlegen(&pool, eid, uid, "p.png", "image/png", &[0x89], ecken())
-            .await
-            .unwrap();
+        let a = anlegen(
+            &pool,
+            eid,
+            uid,
+            "p.png",
+            "image/png",
+            &[0x89],
+            ecken(),
+            None,
+        )
+        .await
+        .unwrap();
         // anderer Einsatz: ALLE einsatz-scoped Pfade müssen das fremde Bild abweisen.
         let (eid2, _) = setup(&pool).await;
         assert!(laden(&pool, eid2, a.id).await.is_err());
@@ -284,11 +319,20 @@ mod tests {
     async fn loeschen_entfernt() {
         let pool = crate::db::test_pool().await;
         let (eid, uid) = setup(&pool).await;
-        let a = anlegen(&pool, eid, uid, "p.png", "image/png", &[0x89], ecken())
-            .await
-            .unwrap();
+        let a = anlegen(
+            &pool,
+            eid,
+            uid,
+            "p.png",
+            "image/png",
+            &[0x89],
+            ecken(),
+            None,
+        )
+        .await
+        .unwrap();
         loeschen(&pool, eid, a.id).await.unwrap();
-        assert!(liste(&pool, eid).await.unwrap().is_empty());
+        assert!(liste(&pool, eid, None).await.unwrap().is_empty());
         // Zweites Löschen trifft keine Zeile mehr → NotFound (rows_affected == 0).
         assert!(loeschen(&pool, eid, a.id).await.is_err());
     }

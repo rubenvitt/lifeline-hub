@@ -13,8 +13,8 @@ const MODUL_KEY: &str = "lagekarte";
 use crate::error::AppError;
 use crate::lage_zone::repo::{self as zone_repo, ZoneNeu, ZonePatch};
 use crate::lage_zone::{self, LageZoneAnzeige};
-use crate::routes::support::trimme;
-use axum::extract::State;
+use crate::routes::support::{deserialize_optional_field, trimme, AnsichtFilter};
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -40,6 +40,7 @@ pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     PfadParam(einsatz_id): PfadParam<i64>,
+    Query(filter): Query<AnsichtFilter>,
 ) -> Result<Json<Vec<LageZoneAnzeige>>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -52,7 +53,9 @@ pub async fn liste(
         &benutzer,
     )
     .await?;
-    Ok(Json(zone_repo::liste(&state.pool, einsatz_id).await?))
+    Ok(Json(
+        zone_repo::liste(&state.pool, einsatz_id, filter.ansicht).await?,
+    ))
 }
 
 #[derive(Debug, Deserialize)]
@@ -65,6 +68,9 @@ pub struct ZoneBody {
     pub label: Option<String>,
     pub farbe: Option<String>,
     pub notiz: Option<String>,
+    /// Ansichts-Zugehörigkeit (LFH-320): das FE sendet die aktive Ansicht; absent/NULL =
+    /// auf allen Ansichten sichtbar.
+    pub ansicht_id: Option<i64>,
 }
 
 /// Validiert typ/geometrie_typ/geometrie (statt DB-CHECK→500). Statuscodes nach der
@@ -150,6 +156,7 @@ pub async fn anlegen(
                 label: label.as_deref(),
                 farbe: farbe.as_deref(),
                 notiz: notiz.as_deref(),
+                ansicht_id: body.ansicht_id,
                 erstellt_von: benutzer.id,
             },
         )
@@ -192,6 +199,9 @@ pub struct ZonePatchBody {
         deserialize_with = "crate::routes::support::deserialize_optional_field"
     )]
     pub gefahrengebiet_id: Option<Option<i64>>,
+    /// Verschieben/Freigeben (LFH-320): absent = unverändert, `null` = auf alle Ansichten.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub ansicht_id: Option<Option<i64>>,
 }
 
 /// PATCH /api/einsaetze/{id}/zonen/{zid} — label/typ/farbe/notiz. Geometrie NICHT änderbar.
@@ -281,6 +291,7 @@ pub async fn aktualisieren(
                 .as_ref()
                 .map(|o| o.as_deref().map(str::trim).filter(|s| !s.is_empty())),
             gefahrengebiet_id: gebiet_patch,
+            ansicht_id: body.ansicht_id,
         },
     )
     .await?;

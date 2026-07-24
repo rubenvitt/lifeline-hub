@@ -965,6 +965,11 @@ export interface components {
         };
         /** @description Ein freies taktisches Zeichen (Punkt-Marker ohne Fachobjekt, LFH-170). */
         FreiesZeichenAnzeige: {
+            /**
+             * Format: int64
+             * @description Ansichts-Zugehörigkeit (LFH-320): `None` = auf allen Ansichten sichtbar.
+             */
+            ansicht_id?: number | null;
             einheit?: string | null;
             /** Format: int64 */
             einsatz_id: number;
@@ -1079,6 +1084,11 @@ export interface components {
         Geschlecht: "maennlich" | "weiblich" | "divers" | "unbekannt";
         /** @description Anzeige-DTO (ohne BLOB-Bytes). `sichtbar` als bool für saubere JSON-Ausgabe. */
         HintergrundbildAnzeige: {
+            /**
+             * Format: int64
+             * @description Ansichts-Zugehörigkeit (LFH-320): `None` = auf allen Ansichten sichtbar.
+             */
+            ansicht_id?: number | null;
             ecken_json: string;
             /** Format: int64 */
             einsatz_id: number;
@@ -1196,6 +1206,11 @@ export interface components {
         };
         /** @description Eine freie Lage-Zone (Gefahren-/Absperrzone). Eigenständige Entität — kein Fachobjekt. */
         LageZoneAnzeige: {
+            /**
+             * Format: int64
+             * @description Ansichts-Zugehörigkeit (LFH-320): `None` = auf allen Ansichten sichtbar.
+             */
+            ansicht_id?: number | null;
             /** Format: int64 */
             einsatz_id: number;
             erstellt_at: string;

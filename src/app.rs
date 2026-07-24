@@ -599,11 +599,11 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/karten-ansichten",
-            get(routes::karten_ansicht::liste),
+            get(routes::karten_ansicht::liste).post(routes::karten_ansicht::anlegen),
         )
         .route(
             "/api/einsaetze/{id}/karten-ansichten/{aid}",
-            patch(routes::karten_ansicht::patch),
+            patch(routes::karten_ansicht::patch).delete(routes::karten_ansicht::loeschen),
         )
         .route("/api/einsaetze/{id}/zonen", get(routes::lage_zone::liste))
         .route(

@@ -20,7 +20,10 @@ use std::time::Duration;
 use tokio::sync::broadcast::Receiver;
 
 mod common;
-use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie};
+use common::{
+    anfrage, benutzer_anlegen, einsatz_anlegen, karten_ansicht_anlegen, login_cookie,
+    standard_ansicht_id,
+};
 
 async fn setup() -> (axum::Router, LiveHub) {
     let pool = db::test_pool().await;
@@ -622,5 +625,86 @@ async fn abgeschlossener_einsatz_blockt_schreibrouten() {
         del,
         StatusCode::CONFLICT,
         "DELETE auf abgeschlossenem Einsatz → 409"
+    );
+}
+
+// ---------- B (LFH-320): Ansichts-Zugehörigkeit ----------
+
+async fn zeichen_anlegen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    ansicht_id: Option<i64>,
+) -> i64 {
+    let mut body = json!({"lat": 50.1, "lon": 8.6, "grundzeichen": "einheit"});
+    if let Some(a) = ansicht_id {
+        body["ansicht_id"] = json!(a);
+    }
+    let (s, z) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        cookie,
+        Some(&body.to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "zeichen_anlegen: {z:?}");
+    z["id"].as_i64().unwrap()
+}
+
+/// POST mit `ansicht_id` stempelt die Zugehörigkeit des freien Zeichens.
+#[tokio::test]
+async fn anlegen_mit_ansicht_id_stempelt_zugehoerigkeit() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let aid = standard_ansicht_id(&app, &admin, einsatz).await;
+
+    let (s, z) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &admin,
+        Some(&json!({"lat":50.1,"lon":8.6,"grundzeichen":"einheit","ansicht_id":aid}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{z:?}");
+    assert_eq!(z["ansicht_id"], aid, "ansicht_id gestempelt: {z:?}");
+}
+
+/// `?ansicht=X` liefert die X-Zeichen und die NULL-Zeichen, NICHT die von Y (Negativ-
+/// Assertion, Mutationsprobe-Ziel).
+#[tokio::test]
+async fn liste_ansicht_filtert_fremde_aus_haelt_null() {
+    let (app, _live) = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let x = standard_ansicht_id(&app, &admin, einsatz).await;
+    let y = karten_ansicht_anlegen(&app, &admin, einsatz, "Y").await;
+
+    let zx = zeichen_anlegen(&app, &admin, einsatz, Some(x)).await;
+    let zy = zeichen_anlegen(&app, &admin, einsatz, Some(y)).await;
+    let znull = zeichen_anlegen(&app, &admin, einsatz, None).await;
+
+    let (s, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/freie-zeichen?ansicht={x}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{liste:?}");
+    let ids: Vec<i64> = liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|z| z["id"].as_i64().unwrap())
+        .collect();
+    assert!(ids.contains(&zx), "X-Zeichen sichtbar: {ids:?}");
+    assert!(ids.contains(&znull), "NULL-Zeichen sichtbar: {ids:?}");
+    assert!(
+        !ids.contains(&zy),
+        "Y-Zeichen NICHT sichtbar auf X: {ids:?}"
     );
 }

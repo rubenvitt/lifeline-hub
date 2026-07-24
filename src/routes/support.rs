@@ -68,6 +68,15 @@ where
     Option::<T>::deserialize(deserializer).map(Some)
 }
 
+/// Query-Filter `?ansicht=<id>` der ansichtsgebundenen Karten-Objekt-Listen (LFH-320):
+/// die drei entitätslosen Layer (freies Zeichen, Zone, Hintergrundbild) filtern auf die
+/// Objekte der Ansicht PLUS die ansichtslosen. Ohne Parameter (`None`) bleibt es bei „alles"
+/// — für andere Module/Export. Einmal definiert statt dreifach kopiert.
+#[derive(Debug, Deserialize)]
+pub struct AnsichtFilter {
+    pub ansicht: Option<i64>,
+}
+
 /// Baut den SSE-Ausgabe-Stream aus einem Live-Kanal-Empfänger: jede `LiveNachricht` wird zu
 /// einem benannten SSE-Event; ein übergelaufener (lagged) Empfänger erhält ein
 /// `lagged`/`resync`-Signal statt eines Stream-Abbruchs — der Client resynct dann per GET.

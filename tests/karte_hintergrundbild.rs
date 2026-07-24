@@ -16,7 +16,7 @@ use serde_json::Value;
 use tower::ServiceExt;
 
 mod common;
-use common::login_cookie;
+use common::{karten_ansicht_anlegen, login_cookie, standard_ansicht_id};
 
 // ---------- Harness ----------
 
@@ -429,4 +429,119 @@ async fn download_if_none_match_liefert_304() {
         download_bild_inm(&app, einsatz, bild_id, &admin, Some("\"deadbeef\"")).await;
     assert_eq!(s200, StatusCode::OK, "unpassend → 200");
     assert_eq!(body200, png, "voller Body bei 200");
+}
+
+// ---------- B (LFH-320): Ansichts-Zugehörigkeit ----------
+
+/// Upload mit optionalem `ansicht_id`-Multipart-Feld → (Status, JSON).
+async fn upload_bild_ansicht(
+    app: &axum::Router,
+    einsatz_id: i64,
+    cookie: &str,
+    daten: &[u8],
+    ecken: &str,
+    ansicht_id: Option<i64>,
+) -> (StatusCode, Value) {
+    let boundary = "LFHTESTBND";
+    let mut body = Vec::new();
+    body.extend_from_slice(
+        format!(
+            "--{boundary}\r\nContent-Disposition: form-data; name=\"datei\"; filename=\"plan.png\"\r\nContent-Type: image/png\r\n\r\n"
+        )
+        .as_bytes(),
+    );
+    body.extend_from_slice(daten);
+    body.extend_from_slice(b"\r\n");
+    body.extend_from_slice(
+        format!("--{boundary}\r\nContent-Disposition: form-data; name=\"ecken\"\r\n\r\n")
+            .as_bytes(),
+    );
+    body.extend_from_slice(ecken.as_bytes());
+    body.extend_from_slice(b"\r\n");
+    if let Some(a) = ansicht_id {
+        body.extend_from_slice(
+            format!("--{boundary}\r\nContent-Disposition: form-data; name=\"ansicht_id\"\r\n\r\n{a}\r\n")
+                .as_bytes(),
+        );
+    }
+    body.extend_from_slice(format!("--{boundary}--\r\n").as_bytes());
+
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!(
+                    "/api/einsaetze/{einsatz_id}/karte/hintergrundbilder"
+                ))
+                .header(header::COOKIE, cookie)
+                .header(
+                    header::CONTENT_TYPE,
+                    format!("multipart/form-data; boundary={boundary}"),
+                )
+                .body(Body::from(body))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = resp.status();
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
+    )
+}
+
+/// Multipart-Upload mit `ansicht_id`-Feld stempelt die Zugehörigkeit des Bildes.
+#[tokio::test]
+async fn upload_mit_ansicht_id_stempelt_zugehoerigkeit() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let aid = standard_ansicht_id(&app, &admin, einsatz).await;
+
+    let (s, bild) =
+        upload_bild_ansicht(&app, einsatz, &admin, &minimal_png(), ECKEN, Some(aid)).await;
+    assert_eq!(s, StatusCode::CREATED, "{bild:?}");
+    assert_eq!(bild["ansicht_id"], aid, "ansicht_id gestempelt: {bild:?}");
+}
+
+/// `?ansicht=X` liefert die X-Bilder und die NULL-Bilder, NICHT die von Y (Negativ-
+/// Assertion, Mutationsprobe-Ziel).
+#[tokio::test]
+async fn liste_ansicht_filtert_fremde_aus_haelt_null() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let x = standard_ansicht_id(&app, &admin, einsatz).await;
+    let y = karten_ansicht_anlegen(&app, &admin, einsatz, "Y").await;
+    let png = minimal_png();
+
+    let (_, bx) = upload_bild_ansicht(&app, einsatz, &admin, &png, ECKEN, Some(x)).await;
+    let (_, by) = upload_bild_ansicht(&app, einsatz, &admin, &png, ECKEN, Some(y)).await;
+    let (_, bnull) = upload_bild_ansicht(&app, einsatz, &admin, &png, ECKEN, None).await;
+    let (bx, by, bnull) = (
+        bx["id"].as_i64().unwrap(),
+        by["id"].as_i64().unwrap(),
+        bnull["id"].as_i64().unwrap(),
+    );
+
+    let (s, liste) = json_anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/karte/hintergrundbilder?ansicht={x}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{liste:?}");
+    let ids: Vec<i64> = liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|b| b["id"].as_i64().unwrap())
+        .collect();
+    assert!(ids.contains(&bx), "X-Bild sichtbar: {ids:?}");
+    assert!(ids.contains(&bnull), "NULL-Bild sichtbar: {ids:?}");
+    assert!(!ids.contains(&by), "Y-Bild NICHT sichtbar auf X: {ids:?}");
 }

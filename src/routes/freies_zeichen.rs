@@ -10,8 +10,8 @@ use crate::extract::PfadParam;
 use crate::freies_zeichen::repo::{self as zeichen_repo, ZeichenNeu, ZeichenPatch};
 use crate::freies_zeichen::FreiesZeichenAnzeige;
 use crate::live::LiveEvent;
-use crate::routes::support::{deserialize_optional_field, trimme, trimme_tri};
-use axum::extract::State;
+use crate::routes::support::{deserialize_optional_field, trimme, trimme_tri, AnsichtFilter};
+use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -33,6 +33,7 @@ pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     PfadParam(einsatz_id): PfadParam<i64>,
+    Query(filter): Query<AnsichtFilter>,
 ) -> Result<Json<Vec<FreiesZeichenAnzeige>>, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
@@ -45,7 +46,9 @@ pub async fn liste(
         &benutzer,
     )
     .await?;
-    Ok(Json(zeichen_repo::liste(&state.pool, einsatz_id).await?))
+    Ok(Json(
+        zeichen_repo::liste(&state.pool, einsatz_id, filter.ansicht).await?,
+    ))
 }
 
 #[derive(Debug, Deserialize)]
@@ -60,6 +63,9 @@ pub struct AnlegenBody {
     pub funktion: Option<String>,
     pub farbe: Option<String>,
     pub label: Option<String>,
+    /// Ansichts-Zugehörigkeit (LFH-320): das FE sendet die aktive Ansicht; absent/NULL =
+    /// auf allen Ansichten sichtbar.
+    pub ansicht_id: Option<i64>,
 }
 
 /// POST /api/einsaetze/{id}/freie-zeichen — anlegen. Schreibrecht + aktiv.
@@ -105,6 +111,7 @@ pub async fn anlegen(
             funktion: funktion.as_deref(),
             farbe: farbe.as_deref(),
             label: label.as_deref(),
+            ansicht_id: body.ansicht_id,
             erstellt_von: benutzer.id,
         },
     )
@@ -140,6 +147,9 @@ pub struct PatchBody {
     pub farbe: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub label: Option<Option<String>>,
+    /// Verschieben/Freigeben (LFH-320): absent = unverändert, `null` = auf alle Ansichten.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub ansicht_id: Option<Option<i64>>,
 }
 
 /// PATCH /api/einsaetze/{id}/freie-zeichen/{zid} — echter Teil-Patch (LFH-306): Feld absent
@@ -191,6 +201,7 @@ pub async fn aktualisieren(
             funktion: funktion.as_ref().map(|v| v.as_deref()),
             farbe: farbe.as_ref().map(|v| v.as_deref()),
             label: label.as_ref().map(|v| v.as_deref()),
+            ansicht_id: body.ansicht_id,
         },
     )
     .await?;
