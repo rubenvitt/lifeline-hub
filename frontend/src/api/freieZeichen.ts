@@ -21,3 +21,15 @@ export function aktualisiereFreiesZeichen(
 export function loescheFreiesZeichen(einsatzId: number, id: number): Promise<void> {
   return apiSend<void>(`/api/einsaetze/${einsatzId}/freie-zeichen/${id}`, 'DELETE');
 }
+
+/** Verschiebt ein freies Zeichen auf eine Ansicht (`null` = auf alle Ansichten). Echter
+ *  Teil-Patch (nur `ansicht_id`) — die übrigen Felder bleiben unverändert (LFH-320). */
+export function verschiebeFreiesZeichen(
+  einsatzId: number,
+  id: number,
+  ansichtId: number | null,
+): Promise<FreiesZeichen> {
+  return apiSend<FreiesZeichen>(`/api/einsaetze/${einsatzId}/freie-zeichen/${id}`, 'PATCH', {
+    ansicht_id: ansichtId,
+  });
+}

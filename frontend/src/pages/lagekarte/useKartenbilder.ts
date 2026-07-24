@@ -32,6 +32,8 @@ interface KartenbilderArgs {
   kartenRef: RefObject<KartenHandle | null>;
   /** Aktuell zu platzierendes Bild (FSM-State aus useKartenInteraktion); null = kein Platzier-Modus. */
   bildPlatzierenId: number | null;
+  /** Aktive Ansicht (B/LFH-320): filtert die sichtbaren Bilder client-seitig und stempelt Uploads. */
+  aktiveAnsichtId?: number;
   /** Stabiler Fehler-Handler (useCallback über App.useApp-message). */
   fehler: (e: unknown) => void;
 }
@@ -41,7 +43,7 @@ interface KartenbilderArgs {
  * LFH-166/LFH-35), Overlay-Ableitung und die CRUD-/Platzier-Handler. `bildPlatzierenId`
  * kommt als FSM-Parameter herein — die Reset-Logik liegt in useKartenInteraktion.
  */
-export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, fehler }: KartenbilderArgs) {
+export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktiveAnsichtId, fehler }: KartenbilderArgs) {
   const qc = useQueryClient();
   const [blobUrls, setBlobUrls] = useState<Record<number, string>>({});
   // Spiegelt blobUrls als Ref, damit der Cleanup-Return des Blob-URL-Effekts beim
@@ -105,10 +107,18 @@ export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, fehler
     Object.values(blobUrlsRef.current).forEach(URL.revokeObjectURL);
   }, []);
 
+  // Ansichts-Filter (B/LFH-320, client-seitig): Bilder der aktiven Ansicht PLUS die
+  // ansichtslosen (`ansicht_id == null`, auf allen Ansichten). `== null` fängt sowohl `null`
+  // als auch das per skip_serializing_if weggelassene Feld (`undefined`).
+  const sichtbareBilder = useMemo(
+    () => (bilderQuery.data ?? []).filter((b) => b.ansicht_id == null || b.ansicht_id === aktiveAnsichtId),
+    [bilderQuery.data, aktiveAnsichtId],
+  );
+
   // Memoisiert: ohne useMemo entsteht pro Render eine neue Array-Identität (+ JSON.parse),
   // was den bilder-Effekt der Kartenflaeche bei jedem Render unnötig feuert.
   const bildOverlays = useMemo<BildOverlay[]>(
-    () => (bilderQuery.data ?? [])
+    () => sichtbareBilder
       .filter((b) => blobUrls[b.id])
       .map((b) => ({
         id: b.id,
@@ -117,7 +127,7 @@ export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, fehler
         opazitaet: b.opazitaet,
         sichtbar: b.sichtbar,
       })),
-    [bilderQuery.data, blobUrls],
+    [sichtbareBilder, blobUrls],
   );
 
   const onBildUpload = async (datei: File) => {
@@ -125,7 +135,7 @@ export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, fehler
     // Fallback (Karte noch nicht bereit): kleines achsenparalleles Rechteck.
     const ar = await leseBildSeitenverhaeltnis(datei);
     const ecken: Ecken = kartenRef.current?.initialeEckenFuerBild(ar) ?? eckenAusBounds(9, 49.95, 9.1, 50);
-    await ladeHintergrundbildHoch(einsatzId, datei, ecken, datei.name);
+    await ladeHintergrundbildHoch(einsatzId, datei, ecken, datei.name, aktiveAnsichtId ?? null);
     invalidiereBilder();
   };
   const onBildToggle = async (id: number, sichtbar: boolean) => {
@@ -138,6 +148,11 @@ export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, fehler
   };
   const onBildLoeschen = async (id: number) => {
     await loescheHintergrundbild(einsatzId, id);
+    invalidiereBilder();
+  };
+  // Verschieben auf eine andere Ansicht bzw. auf alle (`null`) — Teil-Patch (B/LFH-320).
+  const onBildVerschieben = async (id: number, ansichtId: number | null) => {
+    await aktualisiereHintergrundbild(einsatzId, id, { ansicht_id: ansichtId });
     invalidiereBilder();
   };
   const onPlatzierGeometrie = async (ecken: Ecken) => {
@@ -180,7 +195,7 @@ export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, fehler
   }, [aktivesPlatzierBild]);
 
   return {
-    bilder: bilderQuery.data ?? [],
+    bilder: sichtbareBilder,
     bildOverlays,
     aktivesPlatzierBild,
     bildPlatzierZentrum,
@@ -188,6 +203,7 @@ export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, fehler
     onBildToggle,
     onBildOpazitaet,
     onBildLoeschen,
+    onBildVerschieben,
     onPlatzierGeometrie,
     onBildZentrieren,
     onBildUmbenennen,

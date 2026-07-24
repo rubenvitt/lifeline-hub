@@ -57,11 +57,20 @@ const basisProps: SidebarProps = {
   onBildPlatzieren: vi.fn(),
   onBildPlatzierenFertig: vi.fn(),
   onBildLoeschen: vi.fn(),
+  onBildVerschieben: vi.fn(),
   onBildZentrieren: vi.fn(),
   onBildUmbenennen: vi.fn(),
   onBildMittelpunkt: vi.fn(),
   bildPlatzierenId: null,
   bildPlatzierZentrum: null,
+  ansichten: [],
+  aktiveAnsichtId: undefined,
+  onAnsichtWaehlen: vi.fn(),
+  onAnsichtNeu: vi.fn(),
+  onAnsichtUmbenennen: vi.fn(),
+  onAnsichtStandard: vi.fn(),
+  onAnsichtLoeschen: vi.fn(),
+  ansichtBusy: false,
 };
 
 const bildLageplan = {

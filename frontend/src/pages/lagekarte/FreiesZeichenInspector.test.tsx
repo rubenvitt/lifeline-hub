@@ -38,6 +38,8 @@ function renderInspector(opts: {
       onSchliessen={() => {}}
       onAendern={onAendern}
       onLoeschen={onLoeschen}
+      ansichten={[]}
+      onVerschieben={() => {}}
     />,
   );
   return { onAendern, onLoeschen };

@@ -9,9 +9,10 @@ import TaktischesZeichen, {
   symbole,
 } from 'taktische-zeichen-react';
 import type { GrundzeichenId } from 'taktische-zeichen-react';
-import type { FreiesZeichen, FreiesZeichenUpdate } from '../../api/types';
+import type { FreiesZeichen, FreiesZeichenUpdate, KartenAnsicht } from '../../api/types';
 import KartenDetailCard from './KartenDetailCard';
 import FreiesZeichenPicker from './FreiesZeichenPicker';
+import AnsichtZuordnung from './AnsichtZuordnung';
 import { baueFreiesZeichenTz } from './marker';
 
 export interface FreiesZeichenInspectorProps {
@@ -21,6 +22,9 @@ export interface FreiesZeichenInspectorProps {
   /** Whole-Spec-Overwrite (lat/lon unveränderbar in v1). */
   onAendern: (spec: FreiesZeichenUpdate) => void;
   onLoeschen: () => void;
+  /** Ansichts-Zuordnung (B/LFH-320). */
+  ansichten: KartenAnsicht[];
+  onVerschieben: (ansichtId: number | null) => void;
 }
 
 const NEUTRALE_FARBE = '#333333';
@@ -52,7 +56,7 @@ function labelAus(katalog: readonly { id: string; label: string }[], id: string 
  * Der Parent hält den Inspector über `key={zeichen.id}` je Record frisch (Init-State).
  */
 export default function FreiesZeichenInspector({
-  zeichen, darfSchreiben, onSchliessen, onAendern, onLoeschen,
+  zeichen, darfSchreiben, onSchliessen, onAendern, onLoeschen, ansichten, onVerschieben,
 }: FreiesZeichenInspectorProps) {
   const [entwurf, setEntwurf] = useState<FreiesZeichenUpdate>(() => baueWert(zeichen));
   const titel = zeichen.label?.trim() ? zeichen.label : 'Taktisches Zeichen';
@@ -68,6 +72,12 @@ export default function FreiesZeichenInspector({
               setEntwurf(spec);
               onAendern(spec);
             }}
+          />
+          <AnsichtZuordnung
+            ansichten={ansichten}
+            wert={zeichen.ansicht_id}
+            disabled={!darfSchreiben}
+            onChange={onVerschieben}
           />
           <Button danger block onClick={onLoeschen}>
             Löschen

@@ -41,20 +41,27 @@ export default function LagekartePage() {
   // Hydration der Ansicht braucht (löst die Zirkularität config↔layer↔config auf).
   const { data: config } = useQuery({ queryKey: globalKeys.karteConfig(), queryFn: ladeKarteConfig });
 
-  // Zentraler Config-State der Karte (LFH-319): Basemap/Fachebenen/Layer + Schmutzig-Erkennung
-  // und „Für den Einsatz speichern". Löst die drei getrennten localStorage-Quellen ab.
+  // Aktive Ansicht (B/LFH-320) aus dem ?ansicht=-Query-Param; die Seite besitzt die URL,
+  // der Hook liest sie als Prop (bleibt Router-frei/testbar).
+  const ansichtParam = parseRouteId(searchParams.get('ansicht') ?? undefined) ?? undefined;
+
+  // Zentraler Config-State der Karte (LFH-319/320): Basemap/Fachebenen/Layer + Schmutzig-
+  // Erkennung, „Für den Einsatz speichern" und die Ansichts-Verwaltung. Löst die drei
+  // getrennten localStorage-Quellen ab.
   const {
+    ansichten, aktiveAnsichtId,
+    neueAnsicht, umbenennen, setzeStandard, loeschen, ansichtBusy,
     basemap, setBasemap, onlineStilName, setOnlineStilName, kartenTheme, setKartenTheme,
     fachebenenSichtbar, setFachebenenSichtbar, layer, setLayer,
     effektiveBasemap, onStyleFehler, dirty, speichern, speichertGerade,
-  } = useKartenAnsicht({ einsatzId, config });
+  } = useKartenAnsicht({ einsatzId, config, aktiveAnsichtId: ansichtParam });
 
   // Domänen-Daten + Marker-Ableitungen (SSE-Live liegt im EinsatzLayout, keine eigene
   // EventSource hier — eine 2. Verbindung/Seite spränge das HTTP/1.1-6-Limit).
   const {
     einsatz, darfSchreiben, ladt, gebiete,
     verortet, flaechen, zonenFeatures, alleVerortet, nichtVerortetAlle, zonen, freieZeichen,
-  } = useLagekarteDaten({ einsatzId, zeigeZonen: layer.zone });
+  } = useLagekarteDaten({ einsatzId, zeigeZonen: layer.zone, aktiveAnsichtId });
 
   const {
     onFachebeneToggle, aktiveFachebenen, fachebenenStatus, fachebenenLaedt,
@@ -83,6 +90,71 @@ export default function LagekartePage() {
     }
   }, [speichern, message, fehler]);
 
+  // Ansichtswechsel schreibt ?ansicht= (Deeplink-Muster: Query-Param). Der Hook re-seedet
+  // daraufhin Config/Layer/Fachebenen aus der Zielansicht.
+  const waehleAnsicht = useCallback(
+    (id: number) => {
+      const naechste = new URLSearchParams(searchParams);
+      naechste.set('ansicht', String(id));
+      setSearchParams(naechste);
+    },
+    [searchParams, setSearchParams],
+  );
+
+  const onAnsichtNeu = useCallback(
+    async (name: string) => {
+      try {
+        const neu = await neueAnsicht(name);
+        waehleAnsicht(neu.id);
+        message.success(`Ansicht „${name}" angelegt`);
+      } catch (e) {
+        fehler(e);
+      }
+    },
+    [neueAnsicht, waehleAnsicht, message, fehler],
+  );
+
+  const onAnsichtUmbenennen = useCallback(
+    async (id: number, name: string) => {
+      try {
+        await umbenennen({ id, name });
+      } catch (e) {
+        fehler(e);
+      }
+    },
+    [umbenennen, fehler],
+  );
+
+  const onAnsichtStandard = useCallback(
+    async (id: number) => {
+      try {
+        await setzeStandard(id);
+        message.success('Als Standardansicht gesetzt');
+      } catch (e) {
+        fehler(e);
+      }
+    },
+    [setzeStandard, message, fehler],
+  );
+
+  const onAnsichtLoeschen = useCallback(
+    async (id: number, objekte: 'freigeben' | 'loeschen') => {
+      try {
+        await loeschen({ id, objekte });
+        message.success('Ansicht gelöscht');
+        // War die gelöschte Ansicht aktiv, ?ansicht= räumen → Fallback auf die Standardansicht.
+        if (id === aktiveAnsichtId) {
+          const naechste = new URLSearchParams(searchParams);
+          naechste.delete('ansicht');
+          setSearchParams(naechste);
+        }
+      } catch (e) {
+        fehler(e);
+      }
+    },
+    [loeschen, aktiveAnsichtId, searchParams, setSearchParams, message, fehler],
+  );
+
   const {
     platzierungZiel, zeichneAbschnittId, zoneEntwurf, zoneBestaetigung, zoneSpeichern,
     zoneZeichnenNonce, zoneAuswahl, auswahl, flyToZiel, fachebeneAuswahl, bildPlatzierenId,
@@ -91,17 +163,17 @@ export default function LagekartePage() {
     onKarteKlick, onMarkerWaehlen, loescheVerortung, aendereSymbol,
     bestaetigungSpeichern, bestaetigungVerwerfen,
     onPlatzierenStart, onPlatzierenAbbrechen, onAbschnittZeichnenStart, onZoneZeichnenStart,
-    onZeichenPlatzierenStart, onZeichenPlatzierenAbbrechen, zeichenAendern, zeichenLoeschen,
+    onZeichenPlatzierenStart, onZeichenPlatzierenAbbrechen, zeichenAendern, zeichenVerschieben, zeichenLoeschen,
     onKoordinateEingeben, onEinsatzortPlatzieren, onBildPlatzieren, onBildPlatzierenFertig,
     onFlaecheGezeichnet, onFlaecheKlick, onZoneKlick, onZoneGezeichnet, onFachebeneKlick,
     onZeichnenAbbrechen, zoneAendern, zoneLoeschen,
-  } = useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVerortet, fehler });
+  } = useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVerortet, aktiveAnsichtId, fehler });
 
   const {
     bilder, bildOverlays, aktivesPlatzierBild, bildPlatzierZentrum,
-    onBildUpload, onBildToggle, onBildOpazitaet, onBildLoeschen,
+    onBildUpload, onBildToggle, onBildOpazitaet, onBildLoeschen, onBildVerschieben,
     onPlatzierGeometrie, onBildZentrieren, onBildUmbenennen, onBildMittelpunkt,
-  } = useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, fehler });
+  } = useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktiveAnsichtId, fehler });
 
   const sichtbareMarker = alleVerortet.filter((m) => layer[m.typ]);
   const aktiverMarker = alleVerortet.find((m) => m.schluessel === auswahl) ?? null;
@@ -185,11 +257,20 @@ export default function LagekartePage() {
         onBildPlatzieren={onBildPlatzieren}
         onBildPlatzierenFertig={onBildPlatzierenFertig}
         onBildLoeschen={onBildLoeschen}
+        onBildVerschieben={onBildVerschieben}
         onBildZentrieren={onBildZentrieren}
         onBildUmbenennen={onBildUmbenennen}
         onBildMittelpunkt={onBildMittelpunkt}
         bildPlatzierenId={bildPlatzierenId}
         bildPlatzierZentrum={bildPlatzierZentrum}
+        ansichten={ansichten ?? []}
+        aktiveAnsichtId={aktiveAnsichtId}
+        onAnsichtWaehlen={waehleAnsicht}
+        onAnsichtNeu={onAnsichtNeu}
+        onAnsichtUmbenennen={onAnsichtUmbenennen}
+        onAnsichtStandard={onAnsichtStandard}
+        onAnsichtLoeschen={onAnsichtLoeschen}
+        ansichtBusy={ansichtBusy}
       />
       <div style={{ flex: 1, position: 'relative' }}>
         <Kartenflaeche
@@ -261,6 +342,8 @@ export default function LagekartePage() {
             onSchliessen={() => setAuswahl(null)}
             onAendern={(spec) => zeichenAendern(ausgewaehltesZeichen.id, spec)}
             onLoeschen={() => zeichenLoeschen(ausgewaehltesZeichen.id)}
+            ansichten={ansichten ?? []}
+            onVerschieben={(ansichtId) => zeichenVerschieben(ausgewaehltesZeichen.id, ansichtId)}
           />
         )}
         {fachebeneAuswahl && (
@@ -280,6 +363,7 @@ export default function LagekartePage() {
             onAendern={(patch) => zoneAendern(ausgewaehlteZone.id, patch)}
             onMatrixOeffnen={(gid) => navigate(gefahrenPfad(einsatzId, { gefahrengebiet: gid }))}
             onLoeschen={() => zoneLoeschen(ausgewaehlteZone.id)}
+            ansichten={ansichten ?? []}
           />
         )}
       </div>

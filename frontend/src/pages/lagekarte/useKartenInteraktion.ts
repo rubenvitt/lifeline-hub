@@ -8,7 +8,12 @@ import { verorteFahrzeug } from '../../api/einsatzFahrzeuge';
 import { verortePerson } from '../../api/einsatzPersonal';
 import { zeichneAbschnitt } from '../../api/einsatzabschnitte';
 import { legeZoneAn, aktualisiereZone, loescheZone, type ZonePatch } from '../../api/lagezonen';
-import { legeFreiesZeichenAn, aktualisiereFreiesZeichen, loescheFreiesZeichen } from '../../api/freieZeichen';
+import {
+  legeFreiesZeichenAn,
+  aktualisiereFreiesZeichen,
+  loescheFreiesZeichen,
+  verschiebeFreiesZeichen,
+} from '../../api/freieZeichen';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { EinsatzAnzeige, ZoneTyp, FreiesZeichenUpdate } from '../../api/types';
 import type { FachebeneQuelle } from '../../api/fachebenen';
@@ -117,6 +122,8 @@ interface KartenInteraktionArgs {
   einsatz: EinsatzAnzeige | undefined;
   darfSchreiben: boolean;
   alleVerortet: KarteMarker[];
+  /** Aktive Ansicht (B/LFH-320): neu angelegte Objekte werden auf ihr gestempelt. */
+  aktiveAnsichtId?: number;
   /** Stabiler Fehler-Handler (useCallback über App.useApp-message). */
   fehler: (e: unknown) => void;
 }
@@ -128,7 +135,7 @@ interface KartenInteraktionArgs {
  * resettet exakt dieselben States wie zuvor inline auf der Page (LFH-145: sonst bleibt ein
  * Zonen-Entwurf als Orphan liegen — von jsdom-Tests nicht gefangen).
  */
-export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVerortet, fehler }: KartenInteraktionArgs) {
+export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVerortet, aktiveAnsichtId, fehler }: KartenInteraktionArgs) {
   const qc = useQueryClient();
 
   const [modus, dispatch] = useReducer(modusReducer, { art: 'idle' } as KartenModus);
@@ -214,7 +221,12 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
   const legeZeichenMutation = useMutation({
     mutationFn: async (p: { lat: number; lon: number }) => {
       if (!zeichenPlatzieren) return;
-      await legeFreiesZeichenAn(einsatzId, { lat: p.lat, lon: p.lon, ...zeichenPlatzieren });
+      await legeFreiesZeichenAn(einsatzId, {
+        lat: p.lat,
+        lon: p.lon,
+        ...zeichenPlatzieren,
+        ansicht_id: aktiveAnsichtId ?? null,
+      });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) });
@@ -305,6 +317,7 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
       geometrie_typ: zu.geometrie.type,
       geometrie: JSON.stringify(zu.geometrie),
       farbe: zu.typ === 'freie_skizze' ? zu.farbe ?? null : null,
+      ansicht_id: aktiveAnsichtId ?? null,
     })
       .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatzId) }))
       .catch(fehler)
@@ -400,6 +413,11 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
     aktualisiereFreiesZeichen(einsatzId, id, spec)
       .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) }))
       .catch(fehler);
+  // Verschieben auf eine andere Ansicht bzw. auf alle (`null`) — Teil-Patch (B/LFH-320).
+  const zeichenVerschieben = (id: number, ansichtId: number | null) =>
+    verschiebeFreiesZeichen(einsatzId, id, ansichtId)
+      .then(() => qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) }))
+      .catch(fehler);
   const zeichenLoeschen = (id: number) =>
     loescheFreiesZeichen(einsatzId, id)
       .then(() => {
@@ -455,6 +473,7 @@ export function useKartenInteraktion({ einsatzId, einsatz, darfSchreiben, alleVe
     zoneAendern,
     zoneLoeschen,
     zeichenAendern,
+    zeichenVerschieben,
     zeichenLoeschen,
   };
 }

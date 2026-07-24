@@ -27,6 +27,9 @@ interface LagekarteDatenArgs {
   einsatzId: number;
   /** Zonen-Layer sichtbar (layer.zone, UI-State) → als Parameter, um die Grenze sauber zu halten. */
   zeigeZonen: boolean;
+  /** Aktive Ansicht (B/LFH-320): filtert die ansichtsgebundenen Objekte (Zonen, freie Zeichen)
+   *  client-seitig auf die der Ansicht PLUS die ansichtslosen. `undefined` = alles zeigen. */
+  aktiveAnsichtId?: number;
 }
 
 /**
@@ -34,7 +37,7 @@ interface LagekarteDatenArgs {
  * eigene EventSource hier) plus die reinen Marker-/Flächen-/Zonen-Ableitungen. `zonenFeatures`
  * hängt bewusst nur an `zeigeZonen` (nicht am ganzen Layer-State), damit die Grenze sauber bleibt.
  */
-export function useLagekarteDaten({ einsatzId, zeigeZonen }: LagekarteDatenArgs) {
+export function useLagekarteDaten({ einsatzId, zeigeZonen, aktiveAnsichtId }: LagekarteDatenArgs) {
   const { benutzer } = useAuth();
   const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
   const uhsQuery = useQuery({ queryKey: einsatzKeys.uhs(einsatzId), queryFn: () => listeUhs(einsatzId) });
@@ -82,6 +85,22 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen }: LagekarteDatenArgs)
 
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+
+  // Ansichts-Filter (B/LFH-320, client-seitig): Objekte der aktiven Ansicht PLUS die
+  // ansichtslosen (`ansicht_id == null`, auf allen Ansichten). `== null` fängt sowohl `null`
+  // als auch das per skip_serializing_if weggelassene Feld (`undefined`). Ein Ansichtswechsel
+  // ändert `aktiveAnsichtId` → die Ableitungen (Marker/Features) rechnen neu.
+  const zonen = useMemo(
+    () => (zonenQuery.data ?? []).filter((z) => z.ansicht_id == null || z.ansicht_id === aktiveAnsichtId),
+    [zonenQuery.data, aktiveAnsichtId],
+  );
+  const freieZeichen = useMemo(
+    () =>
+      (freieZeichenQuery.data ?? []).filter(
+        (z) => z.ansicht_id == null || z.ansicht_id === aktiveAnsichtId,
+      ),
+    [freieZeichenQuery.data, aktiveAnsichtId],
+  );
 
   const { verortet, nichtVerortet } = useMemo(
     () => baueMarker(einsatz, uhsQuery.data ?? [], schaedenQuery.data ?? []),
@@ -144,7 +163,7 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen }: LagekarteDatenArgs)
 
   const zonenFeatures = useMemo<ZoneFeature[]>(
     () =>
-      (zeigeZonen ? zonenQuery.data ?? [] : []).flatMap((z) => {
+      (zeigeZonen ? zonen : []).flatMap((z) => {
         const g = parseGeometry(z.geometrie);
         if (!g) return [];
         const stil =
@@ -153,7 +172,7 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen }: LagekarteDatenArgs)
             : zoneStil(z.typ, z.farbe);
         return [{ id: z.id, geometrie: g, label: z.label ?? null, stil }];
       }),
-    [zonenQuery.data, zeigeZonen, gebietWarnstufe],
+    [zonen, zeigeZonen, gebietWarnstufe],
   );
 
   const lageMeldungMarker = useMemo(
@@ -162,8 +181,8 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen }: LagekarteDatenArgs)
   );
 
   const freieZeichenMarker = useMemo(
-    () => baueFreieZeichenMarker(freieZeichenQuery.data ?? []),
-    [freieZeichenQuery.data],
+    () => baueFreieZeichenMarker(freieZeichen),
+    [freieZeichen],
   );
 
   const alleVerortet = useMemo(
@@ -193,10 +212,11 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen }: LagekarteDatenArgs)
     config: configQuery.data,
     einstellungen: einstellungenQuery.data,
     einstellungenLaedt: einstellungenQuery.isLoading,
-    zonen: zonenQuery.data ?? [],
+    // Ansichts-gefiltert (B/LFH-320): nur Objekte der aktiven Ansicht + ansichtslose.
+    zonen,
     gebiete: gebieteQuery.data ?? [],
-    // Rohliste der freien Zeichen für den Inspector-Lookup (Etappe 4, LFH-170).
-    freieZeichen: freieZeichenQuery.data ?? [],
+    // Ansichts-gefilterte freie Zeichen für den Inspector-Lookup (Etappe 4, LFH-170).
+    freieZeichen,
     // Abgeleitete Marker/Flächen/Zonen.
     verortet,
     flaechen,

@@ -14,6 +14,9 @@ import { FACHEBENEN, fachebeneKeys } from './fachebenen';
 import KoordinatenEingabe from '../../anzeige/KoordinatenEingabe';
 import type { LatLon } from '../../anzeige/koordinaten';
 import type { Hintergrundbild } from '../../api/kartenbilder';
+import type { KartenAnsicht } from '../../api/types';
+import AnsichtSwitcher from './AnsichtSwitcher';
+import AnsichtZuordnung from './AnsichtZuordnung';
 
 export interface LayerSichtbar {
   einsatzort: boolean;
@@ -105,6 +108,8 @@ export interface SidebarProps {
   onBildPlatzieren: (id: number) => void;
   onBildPlatzierenFertig: () => void;
   onBildLoeschen: (id: number) => void;
+  /** Bild auf eine andere Ansicht verschieben bzw. auf alle (`null`) — B/LFH-320. */
+  onBildVerschieben: (id: number, ansichtId: number | null) => void;
   onBildZentrieren: (id: number) => void;
   onBildUmbenennen: (id: number, name: string) => void;
   /** Mittelpunkt des gerade platzierten Bilds numerisch setzen. */
@@ -112,6 +117,15 @@ export interface SidebarProps {
   bildPlatzierenId: number | null;
   /** Aktueller Mittelpunkt des Platzier-Bilds (für die numerische Eingabe). */
   bildPlatzierZentrum: LatLon | null;
+  /** Ansichts-Switcher (B/LFH-320). */
+  ansichten: KartenAnsicht[];
+  aktiveAnsichtId?: number;
+  onAnsichtWaehlen: (id: number) => void;
+  onAnsichtNeu: (name: string) => void;
+  onAnsichtUmbenennen: (id: number, name: string) => void;
+  onAnsichtStandard: (id: number) => void;
+  onAnsichtLoeschen: (id: number, objekte: 'freigeben' | 'loeschen') => void;
+  ansichtBusy: boolean;
 }
 
 export default function Sidebar(props: SidebarProps) {
@@ -130,6 +144,17 @@ export default function Sidebar(props: SidebarProps) {
 
   return (
     <div style={{ width: 300, padding: 12, overflowY: 'auto', height: '100%' }}>
+      <AnsichtSwitcher
+        ansichten={props.ansichten}
+        aktiveAnsichtId={props.aktiveAnsichtId}
+        darfSchreiben={darfSchreiben}
+        busy={props.ansichtBusy}
+        onWaehlen={props.onAnsichtWaehlen}
+        onNeu={props.onAnsichtNeu}
+        onUmbenennen={props.onAnsichtUmbenennen}
+        onStandard={props.onAnsichtStandard}
+        onLoeschen={props.onAnsichtLoeschen}
+      />
       <Card
         size="small"
         title={
@@ -423,6 +448,12 @@ export default function Sidebar(props: SidebarProps) {
                   disabled={!darfSchreiben}
                   onChange={(v) => props.onBildOpazitaet(b.id, v as number)}
                   tooltip={{ formatter: (v) => `${v}%` }}
+                />
+                <AnsichtZuordnung
+                  ansichten={props.ansichten}
+                  wert={b.ansicht_id}
+                  disabled={!darfSchreiben}
+                  onChange={(ansichtId) => props.onBildVerschieben(b.id, ansichtId)}
                 />
                 {imPlatzieren && darfSchreiben && (
                   <div style={{ padding: 8, background: 'rgba(22,119,255,.06)', borderRadius: 4 }}>

@@ -8,9 +8,13 @@ import type { KartenAnsicht, PatchKartenAnsicht } from '../../api/types';
 
 const ladeKartenAnsichten = vi.fn();
 const patcheKartenAnsicht = vi.fn();
+const erstelleKartenAnsicht = vi.fn();
+const loescheKartenAnsicht = vi.fn();
 vi.mock('../../api/kartenAnsicht', () => ({
   ladeKartenAnsichten: (...a: unknown[]) => ladeKartenAnsichten(...a),
   patcheKartenAnsicht: (...a: unknown[]) => patcheKartenAnsicht(...a),
+  erstelleKartenAnsicht: (...a: unknown[]) => erstelleKartenAnsicht(...a),
+  loescheKartenAnsicht: (...a: unknown[]) => loescheKartenAnsicht(...a),
 }));
 
 import { useKartenAnsicht } from './useKartenAnsicht';
@@ -46,6 +50,8 @@ describe('useKartenAnsicht', () => {
   beforeEach(() => {
     ladeKartenAnsichten.mockReset();
     patcheKartenAnsicht.mockReset();
+    erstelleKartenAnsicht.mockReset();
+    loescheKartenAnsicht.mockReset();
   });
 
   it('hydratisiert aus der Standardansicht und ist zunächst nicht schmutzig', async () => {
@@ -105,5 +111,71 @@ describe('useKartenAnsicht', () => {
     });
     expect(result.current.basemap).toBe('blind');
     expect(result.current.dirty).toBe(true);
+  });
+
+  // ---------- B (LFH-320) ----------
+
+  it('wählt die Ansicht aus aktiveAnsichtId statt der Standardansicht', async () => {
+    ladeKartenAnsichten.mockResolvedValue([
+      standardansicht({ id: 1, basemap_modus: 'offline' }),
+      standardansicht({ id: 2, ist_standard: false, name: 'Nord', basemap_modus: 'online' }),
+    ]);
+    const { result } = renderHook(
+      () => useKartenAnsicht({ einsatzId: 5, config: CONFIG, aktiveAnsichtId: 2 }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(result.current.aktiveAnsicht?.id).toBe(2));
+    await waitFor(() => expect(result.current.basemap).toBe('online'));
+  });
+
+  it('re-seedet die Config bei einem Ansichtswechsel (neue view-id)', async () => {
+    ladeKartenAnsichten.mockResolvedValue([
+      standardansicht({ id: 1, basemap_modus: 'offline' }),
+      standardansicht({ id: 2, ist_standard: false, basemap_modus: 'online' }),
+    ]);
+    const { result, rerender } = renderHook(
+      ({ aid }: { aid: number }) =>
+        useKartenAnsicht({ einsatzId: 5, config: CONFIG, aktiveAnsichtId: aid }),
+      { wrapper: wrapper(), initialProps: { aid: 1 } },
+    );
+    await waitFor(() => expect(result.current.basemap).toBe('offline'));
+    rerender({ aid: 2 });
+    await waitFor(() => expect(result.current.basemap).toBe('online'));
+  });
+
+  it('„Als neue Ansicht speichern" sendet Name + aktuellen Karten-Zustand', async () => {
+    ladeKartenAnsichten.mockResolvedValue([standardansicht({ basemap_modus: 'offline' })]);
+    erstelleKartenAnsicht.mockResolvedValue(
+      standardansicht({ id: 9, ist_standard: false, name: 'Neu' }),
+    );
+    const { result } = renderHook(() => useKartenAnsicht({ einsatzId: 5, config: CONFIG }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.basemap).toBe('offline'));
+
+    act(() => result.current.setBasemap('online'));
+    await act(async () => {
+      await result.current.neueAnsicht('Neu');
+    });
+    expect(erstelleKartenAnsicht).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({ name: 'Neu', basemap_modus: 'online' }),
+    );
+  });
+
+  it('löscht eine Ansicht mit der gewählten Objekt-Behandlung', async () => {
+    ladeKartenAnsichten.mockResolvedValue([
+      standardansicht({ id: 1 }),
+      standardansicht({ id: 2, ist_standard: false, name: 'Nord' }),
+    ]);
+    loescheKartenAnsicht.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useKartenAnsicht({ einsatzId: 5, config: CONFIG }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.ansichten?.length).toBe(2));
+    await act(async () => {
+      await result.current.loeschen({ id: 2, objekte: 'loeschen' });
+    });
+    expect(loescheKartenAnsicht).toHaveBeenCalledWith(5, 2, 'loeschen');
   });
 });

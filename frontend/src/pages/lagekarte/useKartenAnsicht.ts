@@ -2,7 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { KarteServerConfig } from '../../api/karte';
 import type { KartenAnsicht } from '../../api/types';
-import { ladeKartenAnsichten, patcheKartenAnsicht } from '../../api/kartenAnsicht';
+import {
+  erstelleKartenAnsicht,
+  ladeKartenAnsichten,
+  loescheKartenAnsicht,
+  patcheKartenAnsicht,
+} from '../../api/kartenAnsicht';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { BasemapModus, KartenThemeWahl } from './basemapStil';
 import { waehleInitialeBasemap, type GespeicherteBasemap } from './basemapAuswahl';
@@ -86,6 +91,9 @@ function gleich(a: KonfigStand, b: KonfigStand): boolean {
 interface KartenAnsichtArgs {
   einsatzId: number;
   config: KarteServerConfig | undefined;
+  /** Aktive Ansicht (aus dem `?ansicht=`-Query-Param, LagekartePage besitzt die URL). `null`/
+   *  unbekannt → Standardansicht. B/LFH-320: ein Wechsel ändert die view-id → Config-Re-Seed. */
+  aktiveAnsichtId?: number | null;
 }
 
 /**
@@ -94,17 +102,19 @@ interface KartenAnsichtArgs {
  * die geteilte DB-Ansicht ist die Wahrheit. `useBasemap`/`useFachebenen` bekommen ihren
  * Startzustand von hier (Derivations-Hooks).
  */
-export function useKartenAnsicht({ einsatzId, config }: KartenAnsichtArgs) {
+export function useKartenAnsicht({ einsatzId, config, aktiveAnsichtId }: KartenAnsichtArgs) {
   const qc = useQueryClient();
   const { data: ansichten } = useQuery({
     queryKey: einsatzKeys.kartenAnsicht(einsatzId),
     queryFn: () => ladeKartenAnsichten(einsatzId),
   });
-  // A: die Standardansicht ist die aktive. (B ergänzt Auswahl über ?ansicht=.)
-  const aktiveAnsicht = useMemo(
-    () => ansichten?.find((a) => a.ist_standard) ?? ansichten?.[0],
-    [ansichten],
-  );
+  // B/LFH-320: die aktive Ansicht kommt aus `?ansicht=` (per Prop); fällt auf die
+  // Standardansicht (bzw. die erste) zurück, wenn der Param fehlt oder ins Leere zeigt.
+  const aktiveAnsicht = useMemo(() => {
+    const byParam =
+      aktiveAnsichtId != null ? ansichten?.find((a) => a.id === aktiveAnsichtId) : undefined;
+    return byParam ?? ansichten?.find((a) => a.ist_standard) ?? ansichten?.[0];
+  }, [ansichten, aktiveAnsichtId]);
 
   const [basemap, setBasemap] = useState<BasemapModus>('blind');
   const [onlineStilName, setOnlineStilName] = useState<string | null>(null);
@@ -140,18 +150,63 @@ export function useKartenAnsicht({ einsatzId, config }: KartenAnsichtArgs) {
     return !gleich({ basemap, onlineStilName, kartenTheme, fachebenenSichtbar, layer }, ziel);
   }, [aktiveAnsicht, config, basemap, onlineStilName, kartenTheme, fachebenenSichtbar, layer]);
 
+  // Der aktuelle Karten-Zustand als Config-Payload — geteilt von „Für den Einsatz speichern"
+  // (PATCH-Vollersatz) und „Als neue Ansicht speichern" (POST). `kartenZoom`/`zentrum` sind
+  // bewusst NICHT dabei (transient, siehe Hook-Kontrakt).
+  const konfigPayload = useCallback(
+    () => ({
+      basemap_modus: basemap,
+      online_stil: onlineStilName,
+      karten_theme: kartenTheme,
+      layer_sichtbar: layer as unknown as Record<string, boolean>,
+      fachebenen_sichtbar: fachebenenSichtbar,
+    }),
+    [basemap, onlineStilName, kartenTheme, layer, fachebenenSichtbar],
+  );
+
+  const invalidiereAnsichten = useCallback(
+    () => qc.invalidateQueries({ queryKey: einsatzKeys.kartenAnsicht(einsatzId) }),
+    [qc, einsatzId],
+  );
+
   const speichernMut = useMutation({
     mutationFn: () => {
       if (!aktiveAnsicht) throw new Error('keine aktive Ansicht');
-      return patcheKartenAnsicht(einsatzId, aktiveAnsicht.id, {
-        basemap_modus: basemap,
-        online_stil: onlineStilName,
-        karten_theme: kartenTheme,
-        layer_sichtbar: layer as unknown as Record<string, boolean>,
-        fachebenen_sichtbar: fachebenenSichtbar,
-      });
+      return patcheKartenAnsicht(einsatzId, aktiveAnsicht.id, konfigPayload());
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: einsatzKeys.kartenAnsicht(einsatzId) }),
+    onSuccess: invalidiereAnsichten,
+  });
+
+  // „Als neue Ansicht speichern" (B/LFH-320): friert den aktuellen Karten-Zustand unter einem
+  // neuen Namen ein. Liefert die neue Ansicht zurück (die Seite schaltet per ?ansicht= um).
+  const neueMut = useMutation({
+    mutationFn: (name: string) =>
+      erstelleKartenAnsicht(einsatzId, { name, ...konfigPayload() }),
+    onSuccess: invalidiereAnsichten,
+  });
+
+  const umbenennenMut = useMutation({
+    mutationFn: ({ id, name }: { id: number; name: string }) =>
+      patcheKartenAnsicht(einsatzId, id, { name }),
+    onSuccess: invalidiereAnsichten,
+  });
+
+  const standardMut = useMutation({
+    mutationFn: (id: number) => patcheKartenAnsicht(einsatzId, id, { ist_standard: true }),
+    onSuccess: invalidiereAnsichten,
+  });
+
+  const loeschenMut = useMutation({
+    mutationFn: ({ id, objekte }: { id: number; objekte: 'freigeben' | 'loeschen' }) =>
+      loescheKartenAnsicht(einsatzId, id, objekte),
+    // Ansichts-Liste UND die drei ansichtsgebundenen Objekt-Layer invalidieren — beim
+    // Löschen ändert sich deren Sichtbarkeit (freigegeben/mitgelöscht).
+    onSuccess: () => {
+      invalidiereAnsichten();
+      qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatzId) });
+      qc.invalidateQueries({ queryKey: einsatzKeys.freieZeichen(einsatzId) });
+      qc.invalidateQueries({ queryKey: einsatzKeys.kartenbilder(einsatzId) });
+    },
   });
 
   // Manuelle Basemap-Wahl hebt einen aktiven Anzeige-Fallback auf.
@@ -172,6 +227,18 @@ export function useKartenAnsicht({ einsatzId, config }: KartenAnsichtArgs) {
   return {
     ansichten,
     aktiveAnsicht,
+    // Aktive Ansicht-id — für Objekt-Filterung (client-seitig) und das Stempeln neuer Objekte.
+    aktiveAnsichtId: aktiveAnsicht?.id,
+    // Ansichts-Verwaltung (B/LFH-320)
+    neueAnsicht: neueMut.mutateAsync,
+    umbenennen: umbenennenMut.mutateAsync,
+    setzeStandard: standardMut.mutateAsync,
+    loeschen: loeschenMut.mutateAsync,
+    ansichtBusy:
+      neueMut.isPending ||
+      umbenennenMut.isPending ||
+      standardMut.isPending ||
+      loeschenMut.isPending,
     // gewählte Konfiguration (View-Config)
     basemap,
     setBasemap: waehleBasemap,

@@ -1,12 +1,13 @@
 import { Button, Input, Popconfirm, Space, Tag, Typography } from 'antd';
 import { Select } from '../../components/Select';
 import type { ReactNode } from 'react';
-import type { Gefahrengebiet, LageZone, ZoneTyp } from '../../api/types';
+import type { Gefahrengebiet, KartenAnsicht, LageZone, ZoneTyp } from '../../api/types';
 import { gefahrengebietName } from '../../api/gefahren';
 import { ZONE_TYPEN, zoneTypLabel, zoneStil } from './zonenStil';
 import { WARNSTUFEN, warnstufeFarbe } from '../gefahren/gefahrenSchema';
 import { parseGeometry, geoKennzahlen, formatFlaeche, formatLaenge } from './geo';
 import KartenDetailCard from './KartenDetailCard';
+import AnsichtZuordnung from './AnsichtZuordnung';
 
 /** Sentinel im Dropdown für „in neues Gefahrengebiet abspalten". */
 const NEU = -1;
@@ -27,12 +28,14 @@ export interface ZonenInspectorProps {
   darfSchreiben: boolean;
   onSchliessen: () => void;
   /** Partielles PATCH (nur geänderte Felder). */
-  onAendern: (patch: { typ?: ZoneTyp; label?: string | null; farbe?: string | null; notiz?: string | null; gefahrengebiet_id?: number | null }) => void;
+  onAendern: (patch: { typ?: ZoneTyp; label?: string | null; farbe?: string | null; notiz?: string | null; gefahrengebiet_id?: number | null; ansicht_id?: number | null }) => void;
   onMatrixOeffnen: (gefahrengebietId: number) => void;
   onLoeschen: () => void;
+  /** Ansichts-Zuordnung (B/LFH-320). */
+  ansichten: KartenAnsicht[];
 }
 
-export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchliessen, onAendern, onMatrixOeffnen, onLoeschen }: ZonenInspectorProps) {
+export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchliessen, onAendern, onMatrixOeffnen, onLoeschen, ansichten }: ZonenInspectorProps) {
   const istFreieSkizze = zone.typ === 'freie_skizze';
   const erlaubteTypen = ZONE_TYPEN.filter((t) => t.geometrie === 'beides' || t.geometrie === zone.geometrie_typ);
   const aktuellesGebiet = gebiete.find((g) => g.id === zone.gefahrengebiet_id) ?? null;
@@ -122,6 +125,13 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
 
         <Input.TextArea aria-label="Notiz" placeholder="Notiz" defaultValue={zone.notiz ?? ''} disabled={!darfSchreiben} rows={2}
           onBlur={(e) => { const v = e.target.value.trim(); if (v !== (zone.notiz ?? '')) onAendern({ notiz: v || null }); }} />
+
+        <AnsichtZuordnung
+          ansichten={ansichten}
+          wert={zone.ansicht_id}
+          disabled={!darfSchreiben}
+          onChange={(ansichtId) => onAendern({ ansicht_id: ansichtId })}
+        />
 
         {darfSchreiben && (
           aktuellHatWarnstufen ? (

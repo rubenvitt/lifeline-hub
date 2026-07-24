@@ -284,6 +284,8 @@ describe('useKartenInteraktion — freies Zeichen platzieren (LFH-170)', () => {
         lon: 8.6,
         grundzeichen: 'stelle',
         label: 'X',
+        // B/LFH-320: ohne aktive Ansicht wird auf „alle Ansichten" (null) gestempelt.
+        ansicht_id: null,
       }),
     );
     // nach erfolgreichem Anlegen ist der Platzier-Modus beendet

@@ -245,6 +245,8 @@ export interface NeuesFreiesZeichen {
   funktion?: FunktionId | null;
   farbe?: string | null;
   label?: string | null;
+  /** Ansichts-Zugehörigkeit (LFH-320): aktive Ansicht beim Anlegen; `null` = auf allen. */
+  ansicht_id?: number | null;
 }
 
 /** PATCH-Body (Whole-Spec-Overwrite ohne lat/lon — v1 nicht verschiebbar). LFH-170. */
@@ -254,10 +256,28 @@ export type FreiesZeichenUpdate = Omit<NeuesFreiesZeichen, 'lat' | 'lon'>;
 export type KartenAnsicht = S['KartenAnsichtAnzeige'];
 export type KartenTheme = S['KartenTheme'];
 
-/** PATCH-Body „Für den Einsatz speichern": Vollersatz der Konfigurationsfelder einer
- *  Ansicht. FE-lokal (kein Backend-Schema). `layer_sichtbar`/`fachebenen_sichtbar` sind
- *  serialisierte Bool-Maps; `name`/`ist_standard` gehören nicht hierher (Inkrement B). */
+/** PATCH-Body einer Ansicht (LFH-319/320). FE-lokal (kein Backend-Schema). Drei unabhängige
+ *  Operationen im selben Endpunkt: „Für den Einsatz speichern" (Config-Vollersatz — die
+ *  Config-Felder), Umbenennen (`name`) und Standard-Setzen (`ist_standard: true`). Ein reines
+ *  Umbenennen sendet NUR `name` (ohne Config-Felder), sonst würde der Vollersatz die Config
+ *  wischen. `layer_sichtbar`/`fachebenen_sichtbar` sind serialisierte Bool-Maps. */
 export interface PatchKartenAnsicht {
+  name?: string;
+  ist_standard?: boolean;
+  basemap_modus?: BasemapModus | null;
+  online_stil?: string | null;
+  karten_theme?: KartenTheme | null;
+  layer_sichtbar?: Record<string, boolean> | null;
+  fachebenen_sichtbar?: Record<string, boolean> | null;
+  zentrum_lat?: number | null;
+  zentrum_lon?: number | null;
+  zoom?: number | null;
+}
+
+/** POST-Body „Als neue Ansicht speichern" (LFH-320): Pflicht-`name` + der aktuelle
+ *  Karten-Zustand (dieselben Config-Felder wie beim Speichern). Nie Standard. */
+export interface NeueKartenAnsicht {
+  name: string;
   basemap_modus?: BasemapModus | null;
   online_stil?: string | null;
   karten_theme?: KartenTheme | null;

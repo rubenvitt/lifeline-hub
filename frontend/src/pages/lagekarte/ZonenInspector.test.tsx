@@ -53,6 +53,7 @@ function renderInspector(opts: {
       onAendern={onAendern}
       onMatrixOeffnen={onMatrixOeffnen}
       onLoeschen={onLoeschen}
+      ansichten={[]}
     />,
   );
   return { onAendern, onLoeschen, onMatrixOeffnen };

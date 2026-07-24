@@ -623,11 +623,11 @@ describe('LagekartePage', () => {
     await screen.findByText('marker-schaden-9');
     // Default-View ist der erste (Liberty) → dessen Attribution liegt an.
     expect(screen.getByTestId('attribution')).toHaveTextContent('© Liberty');
-    // Sub-Switcher (Select) öffnen und TopPlus wählen. Es gibt nur EINE Combobox auf der
-    // Seite (Koordinatenformat-Select im Platzierungsmodus nicht aktiv) → Query ohne name eindeutig.
-    // Option über `.ant-select-item-option` abgrenzen (etabliertes Muster, da der Text
-    // auch im ausgewählten Selektor stehen kann).
-    await user.click(screen.getByRole('combobox'));
+    // Sub-Switcher (Online-Ansicht-Select) öffnen und TopPlus wählen. Seit B/LFH-320 trägt
+    // die Sidebar oben zusätzlich den Ansichts-Switcher (eigene Combobox) → per aria-label
+    // eindeutig abgrenzen. Option über `.ant-select-item-option` (der Text steht auch im
+    // ausgewählten Selektor).
+    await user.click(screen.getByRole('combobox', { name: 'Online-Ansicht' }));
     const option = (await screen.findAllByText('TopPlus')).find((el) =>
       el.closest('.ant-select-item-option'),
     );

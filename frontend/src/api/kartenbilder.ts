@@ -17,6 +17,8 @@ export interface BildPatch {
   opazitaet?: number;
   sichtbar?: boolean;
   reihenfolge?: number;
+  /** Verschieben/Freigeben (LFH-320): Ziel-Ansicht oder `null` = auf alle Ansichten. */
+  ansicht_id?: number | null;
 }
 
 const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/karte/hintergrundbilder`;
@@ -30,11 +32,14 @@ export function ladeHintergrundbildHoch(
   datei: File,
   ecken: Ecken,
   name?: string,
+  ansichtId?: number | null,
 ): Promise<Hintergrundbild> {
   const fd = new FormData();
   fd.append('datei', datei);
   fd.append('ecken', JSON.stringify(ecken));
   if (name !== undefined) fd.append('name', name);
+  // Ansichts-Zugehörigkeit (LFH-320) als Multipart-Feld — es gibt keinen JSON-Body.
+  if (ansichtId != null) fd.append('ansicht_id', String(ansichtId));
   return apiUpload<Hintergrundbild>(basis(einsatzId), fd);
 }
 
