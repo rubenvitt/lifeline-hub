@@ -16,12 +16,14 @@ import { listeFreieZeichen } from '../../api/freieZeichen';
 import { ladeGefahrengebiete } from '../../api/gefahren';
 import { listeLageMeldungen } from '../../api/meldungen';
 import { ladeOrganisation } from '../../api/organisation';
+import { ladeLageSnapshot } from '../../api/lageSnapshot';
 import type { Warnstufe } from '../../api/types';
 import { baueMarker, baueTaktischeMarker, baueLageMeldungMarker, baueFreieZeichenMarker, type KarteMarker } from './marker';
 import { parsePolygon, parseGeometry, polygonZentroid } from './geo';
 import { baueTzProps } from './taktischesZeichen';
 import { zoneStil, gefahrengebietStil } from './zonenStil';
 import type { ZoneFeature } from './kartenLayer';
+import type { SnapshotDaten, Standquelle } from './snapshotDaten';
 
 interface LagekarteDatenArgs {
   einsatzId: number;
@@ -30,99 +32,141 @@ interface LagekarteDatenArgs {
   /** Aktive Ansicht (B/LFH-320): filtert die ansichtsgebundenen Objekte (Zonen, freie Zeichen)
    *  client-seitig auf die der Ansicht PLUS die ansichtslosen. `undefined` = alles zeigen. */
   aktiveAnsichtId?: number;
+  /** Datenquelle (C/LFH-321): Live-Zustand (Default) oder ein eingefrorener Snapshot
+   *  (Historien-Modus). Im Snapshot-Modus kommen ALLE Objekte + der Org-TZ-Default + die
+   *  Gefahrengebiet-Warnstufen aus dem Dokument, und `darfSchreiben` ist hart `false`. */
+  quelle?: Standquelle;
 }
 
 /**
  * Daten-Leg der Lagekarte: alle Domänen-Queries (SSE-Live via EinsatzLayout, deshalb keine
  * eigene EventSource hier) plus die reinen Marker-/Flächen-/Zonen-Ableitungen. `zonenFeatures`
  * hängt bewusst nur an `zeigeZonen` (nicht am ganzen Layer-State), damit die Grenze sauber bleibt.
+ *
+ * **Standquelle (C/LFH-321):** Alle Live-Queries sind im Snapshot-Modus abgeschaltet
+ * (`enabled: liveAn`); stattdessen liefert `snapQuery` das eingefrorene Dokument, aus dem die
+ * ROHEN DTO-Listen in dieselben Ableiter (`baueMarker` etc.) fließen — die Rückgabeform bleibt
+ * identisch, die Konsumenten bleiben unverändert.
  */
-export function useLagekarteDaten({ einsatzId, zeigeZonen, aktiveAnsichtId }: LagekarteDatenArgs) {
+export function useLagekarteDaten({ einsatzId, zeigeZonen, aktiveAnsichtId, quelle = { typ: 'live' } }: LagekarteDatenArgs) {
   const { benutzer } = useAuth();
-  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
-  const uhsQuery = useQuery({ queryKey: einsatzKeys.uhs(einsatzId), queryFn: () => listeUhs(einsatzId) });
+  const istSnapshot = quelle.typ === 'snapshot';
+  const liveAn = !istSnapshot;
+  const snapshotId = quelle.typ === 'snapshot' ? quelle.id : undefined;
+
+  const snapQuery = useQuery({
+    queryKey: [...einsatzKeys.lageSnapshot(einsatzId), snapshotId] as const,
+    queryFn: () => ladeLageSnapshot(einsatzId, snapshotId as number),
+    enabled: snapshotId != null,
+  });
+
+  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId), enabled: liveAn });
+  const uhsQuery = useQuery({ queryKey: einsatzKeys.uhs(einsatzId), queryFn: () => listeUhs(einsatzId), enabled: liveAn });
   const schaedenQuery = useQuery({
     queryKey: einsatzKeys.schaeden(einsatzId),
     queryFn: () => listeSchaeden(einsatzId),
+    enabled: liveAn,
   });
   const einheitenQuery = useQuery({
     queryKey: einsatzKeys.einheiten(einsatzId),
     queryFn: () => listeEinheiten(einsatzId),
+    enabled: liveAn,
   });
   const fahrzeugeQuery = useQuery({
     queryKey: einsatzKeys.fahrzeuge(einsatzId),
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
+    enabled: liveAn,
   });
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
+    enabled: liveAn,
   });
   const zonenQuery = useQuery({
     queryKey: einsatzKeys.zonen(einsatzId),
     queryFn: () => listeZonen(einsatzId),
+    enabled: liveAn,
   });
   const freieZeichenQuery = useQuery({
     queryKey: einsatzKeys.freieZeichen(einsatzId),
     queryFn: () => listeFreieZeichen(einsatzId),
+    enabled: liveAn,
   });
-  const gebieteQuery = useQuery({ queryKey: einsatzKeys.gefahrengebiete(einsatzId), queryFn: () => ladeGefahrengebiete(einsatzId) });
+  const gebieteQuery = useQuery({ queryKey: einsatzKeys.gefahrengebiete(einsatzId), queryFn: () => ladeGefahrengebiete(einsatzId), enabled: liveAn });
   const lageMeldungenQuery = useQuery({
     queryKey: einsatzKeys.lagemeldungen(einsatzId),
     queryFn: () => listeLageMeldungen(einsatzId),
+    enabled: liveAn,
   });
   const fkQuery = useQuery({
     queryKey: einsatzKeys.fuehrungskraefte(einsatzId),
     queryFn: () => listeFuehrungskraefte(einsatzId),
+    enabled: liveAn,
   });
-  const orgQuery = useQuery({ queryKey: globalKeys.organisation(), queryFn: ladeOrganisation });
+  const orgQuery = useQuery({ queryKey: globalKeys.organisation(), queryFn: ladeOrganisation, enabled: liveAn });
+  // Config + Einstellungen sind reiner Render-Kontext (Style-Katalog, Basemap-Defaults), kein Teil
+  // des eingefrorenen Lagebilds → auch im Historien-Modus live.
   const configQuery = useQuery({ queryKey: globalKeys.karteConfig(), queryFn: ladeKarteConfig });
-  // Einsatz-Einstellungen als Karten-Defaults (LFH-131): Basemap-Vorwahl + Lage-Layer.
-  // Geteilter queryKey mit Einstellungen-Seite/Redirect → i. d. R. bereits gecacht.
   const einstellungenQuery = useQuery({
     queryKey: einsatzKeys.einstellungen(einsatzId),
     queryFn: () => ladeEinstellungen(einsatzId),
   });
 
-  const einsatz = einsatzQuery.data;
-  const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
+  // Effektive Rohquellen: im Snapshot-Modus die eingefrorenen DTO-Listen aus dem Dokument, sonst
+  // die Live-Query-Daten. Beide Seiten haben dieselbe Form → dieselben Ableiter darunter.
+  const snap = istSnapshot ? (snapQuery.data?.daten as SnapshotDaten | undefined) : undefined;
+  const einsatz = istSnapshot ? snap?.einsatz : einsatzQuery.data;
+  const uhsRoh = istSnapshot ? snap?.uhs : uhsQuery.data;
+  const schaedenRoh = istSnapshot ? snap?.schaeden : schaedenQuery.data;
+  const einheitenRoh = istSnapshot ? snap?.einheiten : einheitenQuery.data;
+  const fahrzeugeRoh = istSnapshot ? snap?.fahrzeuge : fahrzeugeQuery.data;
+  const abschnitteRoh = istSnapshot ? snap?.abschnitte : abschnitteQuery.data;
+  const zonenRoh = istSnapshot ? snap?.zonen : zonenQuery.data;
+  const freieZeichenRoh = istSnapshot ? snap?.freie_zeichen : freieZeichenQuery.data;
+  const gebieteRoh = istSnapshot ? snap?.gefahrengebiete : gebieteQuery.data;
+  const lageMeldungenRoh = istSnapshot ? snap?.lagemeldungen : lageMeldungenQuery.data;
+  const fkRoh = istSnapshot ? snap?.fuehrungskraefte : fkQuery.data;
+  // Global-Scope-Freeze (Advisor): Org-TZ-Default aus dem Dokument, NICHT der Live-Query — sonst
+  // schriebe eine Org-Umbenennung den historischen Stand um.
+  const orgDefault = (istSnapshot ? snap?.org_default : orgQuery.data?.tz_organisation) ?? null;
+
+  // Schreibsperre im Historien-Modus: hart `false` → alle UI-Schreibpfade (prop-gegatet) fallen weg.
+  const darfSchreiben = istSnapshot ? false : darfImEinsatzSchreiben(einsatz, benutzer);
 
   // Ansichts-Filter (B/LFH-320, client-seitig): Objekte der aktiven Ansicht PLUS die
-  // ansichtslosen (`ansicht_id == null`, auf allen Ansichten). `== null` fängt sowohl `null`
-  // als auch das per skip_serializing_if weggelassene Feld (`undefined`). Ein Ansichtswechsel
-  // ändert `aktiveAnsichtId` → die Ableitungen (Marker/Features) rechnen neu.
+  // ansichtslosen (`ansicht_id == null`). `== null` fängt sowohl `null` als auch das per
+  // skip_serializing_if weggelassene Feld (`undefined`).
   const zonen = useMemo(
-    () => (zonenQuery.data ?? []).filter((z) => z.ansicht_id == null || z.ansicht_id === aktiveAnsichtId),
-    [zonenQuery.data, aktiveAnsichtId],
+    () => (zonenRoh ?? []).filter((z) => z.ansicht_id == null || z.ansicht_id === aktiveAnsichtId),
+    [zonenRoh, aktiveAnsichtId],
   );
   const freieZeichen = useMemo(
     () =>
-      (freieZeichenQuery.data ?? []).filter(
+      (freieZeichenRoh ?? []).filter(
         (z) => z.ansicht_id == null || z.ansicht_id === aktiveAnsichtId,
       ),
-    [freieZeichenQuery.data, aktiveAnsichtId],
+    [freieZeichenRoh, aktiveAnsichtId],
   );
 
   const { verortet, nichtVerortet } = useMemo(
-    () => baueMarker(einsatz, uhsQuery.data ?? [], schaedenQuery.data ?? []),
-    [einsatz, uhsQuery.data, schaedenQuery.data],
+    () => baueMarker(einsatz, uhsRoh ?? [], schaedenRoh ?? []),
+    [einsatz, uhsRoh, schaedenRoh],
   );
-
-  const orgDefault = orgQuery.data?.tz_organisation ?? null;
 
   const taktisch = useMemo(
     () =>
       baueTaktischeMarker({
-        einheiten: einheitenQuery.data ?? [],
-        fahrzeuge: fahrzeugeQuery.data ?? [],
-        fuehrungskraefte: fkQuery.data ?? [],
+        einheiten: einheitenRoh ?? [],
+        fahrzeuge: fahrzeugeRoh ?? [],
+        fuehrungskraefte: fkRoh ?? [],
         orgDefault,
       }),
-    [einheitenQuery.data, fahrzeugeQuery.data, fkQuery.data, orgDefault],
+    [einheitenRoh, fahrzeugeRoh, fkRoh, orgDefault],
   );
 
   const flaechen = useMemo(
     () =>
-      (abschnitteQuery.data ?? []).flatMap((a) => {
+      (abschnitteRoh ?? []).flatMap((a) => {
         const poly = parsePolygon(a.flaeche_geojson);
         if (!poly) return [];
         const z = polygonZentroid(poly);
@@ -152,14 +196,14 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen, aktiveAnsichtId }: La
           },
         ];
       }),
-    [abschnitteQuery.data, orgDefault],
+    [abschnitteRoh, orgDefault],
   );
 
   const gebietWarnstufe = useMemo(() => {
     const m = new Map<number, Warnstufe>();
-    (gebieteQuery.data ?? []).forEach((g) => m.set(g.id, g.hoechste_warnstufe));
+    (gebieteRoh ?? []).forEach((g) => m.set(g.id, g.hoechste_warnstufe));
     return m;
-  }, [gebieteQuery.data]);
+  }, [gebieteRoh]);
 
   const zonenFeatures = useMemo<ZoneFeature[]>(
     () =>
@@ -176,8 +220,8 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen, aktiveAnsichtId }: La
   );
 
   const lageMeldungMarker = useMemo(
-    () => baueLageMeldungMarker(lageMeldungenQuery.data ?? []),
-    [lageMeldungenQuery.data],
+    () => baueLageMeldungMarker(lageMeldungenRoh ?? []),
+    [lageMeldungenRoh],
   );
 
   const freieZeichenMarker = useMemo(
@@ -197,24 +241,26 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen, aktiveAnsichtId }: La
     () => [
       ...nichtVerortet,
       ...taktisch.nichtVerortet,
-      ...(abschnitteQuery.data ?? [])
+      ...(abschnitteRoh ?? [])
         .filter((a) => !a.flaeche_geojson)
         .map((a) => ({ typ: 'abschnitt' as const, id: a.id, label: a.name })),
     ],
-    [nichtVerortet, taktisch.nichtVerortet, abschnitteQuery.data],
+    [nichtVerortet, taktisch.nichtVerortet, abschnitteRoh],
   );
 
   return {
     // Rohdaten-/Status-Durchreichungen (für Ladegate, Basemap/Fachebenen-Hooks, Panels).
     einsatz,
     darfSchreiben,
-    ladt: einsatzQuery.isLoading || configQuery.isLoading,
+    // Ladegate spiegelt die aktive Quelle: im Snapshot-Modus die Dokument-Query (eine disabled
+    // Live-Query meldet isLoading=false → sonst „fertig geladen" bei leerem Dokument, Marker-Pop-in).
+    ladt: istSnapshot ? snapQuery.isLoading : einsatzQuery.isLoading || configQuery.isLoading,
     config: configQuery.data,
     einstellungen: einstellungenQuery.data,
     einstellungenLaedt: einstellungenQuery.isLoading,
     // Ansichts-gefiltert (B/LFH-320): nur Objekte der aktiven Ansicht + ansichtslose.
     zonen,
-    gebiete: gebieteQuery.data ?? [],
+    gebiete: gebieteRoh ?? [],
     // Ansichts-gefilterte freie Zeichen für den Inspector-Lookup (Etappe 4, LFH-170).
     freieZeichen,
     // Abgeleitete Marker/Flächen/Zonen.
