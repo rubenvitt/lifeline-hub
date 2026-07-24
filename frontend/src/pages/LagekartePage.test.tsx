@@ -253,6 +253,13 @@ function basisHandler(
     http.get('/api/organisation', () => HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null })),
     http.get('/api/karte/config', () => HttpResponse.json(config)),
     http.get('/api/einsaetze/1/karte/hintergrundbilder', () => HttpResponse.json([])),
+    // LFH-319: Standardansicht mit basemap_modus=null → useKartenAnsicht hydratisiert auf
+    // den config-Verfügbarkeits-Default (wie vor der Kartenansichten-Umstellung).
+    http.get('/api/einsaetze/1/karten-ansichten', () =>
+      HttpResponse.json([
+        { id: 1, einsatz_id: 1, name: 'Standard', reihenfolge: 0, ist_standard: true, erstellt_at: '', geaendert_at: '' },
+      ]),
+    ),
   );
 }
 
@@ -443,6 +450,28 @@ describe('LagekartePage', () => {
     expect((screen.getByRole('radio', { name: 'Online' }) as HTMLInputElement).checked).toBe(false);
     // Marker bleiben im Blind-Modus sichtbar (Spec-Garantie):
     expect(screen.getByText('marker-schaden-9')).toBeInTheDocument();
+  });
+
+  it('Schmutzig-Erkennung: Basemap-Wechsel blendet „Für den Einsatz speichern" ein (LFH-319)', async () => {
+    basisHandler([], {
+      online_styles: [{ name: 'Online', url: 'https://x/style.json', typ: 'vektor', attribution: '© X' }],
+      offline_verfuegbar: true,
+      offline_tiles_url: '/api/karte/offline/tiles/{z}/{x}/{y}?v=abc',
+      offline_attribution: null,
+      offline_regionen: [],
+      karten_bau_verfuegbar: false,
+    });
+    const user = userEvent.setup();
+    renderSeite();
+    await screen.findByText('marker-schaden-9');
+    // Frisch hydratisiert = deckungsgleich mit der Ansicht → noch kein Speichern-Button.
+    expect(screen.queryByRole('button', { name: 'Für den Einsatz speichern' })).toBeNull();
+    // Basemap auf Blind wechseln → der Zustand weicht von der gespeicherten Ansicht ab.
+    const blindLabel = screen.getByText('Blind').closest('label') ?? screen.getByText('Blind');
+    await user.click(blindLabel);
+    expect(
+      await screen.findByRole('button', { name: 'Für den Einsatz speichern' }),
+    ).toBeInTheDocument();
   });
 
   it('Basemap-Umschalter: ohne Config sind Online/Offline disabled, Blind aktiv', async () => {

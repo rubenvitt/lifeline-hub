@@ -84,6 +84,11 @@ export interface SidebarProps {
   /** Karten-lokale Theme-Wahl (Offline-Basemap): 'auto' folgt dem App-Theme. */
   kartenTheme: KartenThemeWahl;
   onKartenThemeWechsel: (wahl: KartenThemeWahl) => void;
+  /** „Für den Einsatz speichern" (LFH-319): true, wenn der aktuelle Karten-Zustand von der
+   *  gespeicherten Ansicht abweicht (Basemap/Ebenen/Fachebenen). */
+  ansichtDirty: boolean;
+  ansichtSpeichert: boolean;
+  onAnsichtSpeichern: () => void;
   fachebenenSichtbar: import('./fachebenenAuswahl').FachebenenSichtbar;
   onFachebeneToggle: (key: import('../../api/fachebenen').FachebeneQuelle, an: boolean) => void;
   /** Status je Fachebene für Ausgrau-/Offline-Hinweis. */
@@ -260,6 +265,19 @@ export default function Sidebar(props: SidebarProps) {
           )}
         />
       </Card>
+
+      {darfSchreiben && props.ansichtDirty && (
+        <Card size="small" style={{ marginBottom: 12 }}>
+          <Space orientation="vertical" style={{ width: '100%' }}>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              Karten-Konfiguration weicht von der gespeicherten Ansicht ab.
+            </Typography.Text>
+            <Button type="primary" block loading={props.ansichtSpeichert} onClick={props.onAnsichtSpeichern}>
+              Für den Einsatz speichern
+            </Button>
+          </Space>
+        </Card>
+      )}
 
       <Card size="small" title="Ebenen" style={{ marginBottom: 12 }}>
         <Space orientation="vertical">

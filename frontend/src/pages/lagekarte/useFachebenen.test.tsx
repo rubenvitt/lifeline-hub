@@ -2,9 +2,11 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 import { neuerQueryClient } from '../../test/utils';
 import type { FachebeneAntwort, FachebeneQuelle, FeatureCollection } from '../../api/fachebenen';
 import { useFachebenen } from './useFachebenen';
+import { defaultFachebenenSichtbar, type FachebenenSichtbar } from './fachebenenAuswahl';
 
 // Fixtures via vi.hoisted, damit sowohl die (hochgezogene) vi.mock-Factory als auch
 // die Assertions dieselben Feature-Sammlungen sehen.
@@ -42,9 +44,14 @@ function wrapper() {
   );
 }
 
+// Sichtbarkeit ist seit LFH-319 externer State (useKartenAnsicht); im Test hält ihn ein
+// kontrollierter useState, damit onFachebeneToggle → setFachebenenSichtbar den Hook re-rendert.
 function rendere() {
   return renderHook(
-    () => useFachebenen({ einsatzId: 5, einstellungen: undefined, einstellungenLaedt: false }),
+    () => {
+      const [sichtbar, setSichtbar] = useState<FachebenenSichtbar>(defaultFachebenenSichtbar);
+      return useFachebenen({ fachebenenSichtbar: sichtbar, setFachebenenSichtbar: setSichtbar });
+    },
     { wrapper: wrapper() },
   );
 }

@@ -1,19 +1,23 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { App, Spin } from 'antd';
 import { ApiError } from '../api/client';
+import { ladeKarteConfig } from '../api/karte';
+import { globalKeys } from '../api/queryKeys';
 import { gefahrenPfad, parseRouteId } from '../routing/deeplinks';
 import { parsePolygon, polygonZentroid } from './lagekarte/geo';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import { useKartenbilder } from './lagekarte/useKartenbilder';
 import { useBasemap } from './lagekarte/useBasemap';
+import { useKartenAnsicht } from './lagekarte/useKartenAnsicht';
 import { useLagekarteDaten } from './lagekarte/useLagekarteDaten';
 import { useFachebenen } from './lagekarte/useFachebenen';
 import { useKartenInteraktion } from './lagekarte/useKartenInteraktion';
 import { rasterBbox } from './lagekarte/fachebenen';
 import { ZONE_TYPEN } from './lagekarte/zonenStil';
 import Kartenflaeche, { type KartenHandle } from './lagekarte/Kartenflaeche';
-import Sidebar, { type LayerSichtbar } from './lagekarte/Sidebar';
+import Sidebar from './lagekarte/Sidebar';
 import Inspector from './lagekarte/Inspector';
 import FreiesZeichenInspector from './lagekarte/FreiesZeichenInspector';
 import ZonenInspector from './lagekarte/ZonenInspector';
@@ -28,29 +32,38 @@ export default function LagekartePage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [layer, setLayer] = useState<LayerSichtbar>({
-    einsatzort: true, uhs: true, schaden: true, einheit: true, fahrzeug: true, fuehrung: true, abschnitt: true, zone: true, lagemeldung: true, freies_zeichen: true,
-  });
   // Imperative Karten-API (Upload-Platzierung in Viewport-Mitte, Auf-Bild-Zentrieren,
   // Abschnitt-/Zone-Zeichnen abschließen).
   const kartenRef = useRef<KartenHandle>(null);
 
+  // Karten-Config vorziehen — dieselbe globale Query wie in useLagekarteDaten (react-query
+  // dedupliziert), aber hier zuerst, weil useKartenAnsicht sie für die config-validierte
+  // Hydration der Ansicht braucht (löst die Zirkularität config↔layer↔config auf).
+  const { data: config } = useQuery({ queryKey: globalKeys.karteConfig(), queryFn: ladeKarteConfig });
+
+  // Zentraler Config-State der Karte (LFH-319): Basemap/Fachebenen/Layer + Schmutzig-Erkennung
+  // und „Für den Einsatz speichern". Löst die drei getrennten localStorage-Quellen ab.
+  const {
+    basemap, setBasemap, onlineStilName, setOnlineStilName, kartenTheme, setKartenTheme,
+    fachebenenSichtbar, setFachebenenSichtbar, layer, setLayer,
+    effektiveBasemap, onStyleFehler, dirty, speichern, speichertGerade,
+  } = useKartenAnsicht({ einsatzId, config });
+
   // Domänen-Daten + Marker-Ableitungen (SSE-Live liegt im EinsatzLayout, keine eigene
   // EventSource hier — eine 2. Verbindung/Seite spränge das HTTP/1.1-6-Limit).
   const {
-    einsatz, darfSchreiben, ladt, config, einstellungen, einstellungenLaedt, gebiete,
+    einsatz, darfSchreiben, ladt, gebiete,
     verortet, flaechen, zonenFeatures, alleVerortet, nichtVerortetAlle, zonen, freieZeichen,
   } = useLagekarteDaten({ einsatzId, zeigeZonen: layer.zone });
 
   const {
-    fachebenenSichtbar, onFachebeneToggle, aktiveFachebenen, fachebenenStatus, fachebenenLaedt,
+    onFachebeneToggle, aktiveFachebenen, fachebenenStatus, fachebenenLaedt,
     fachebenenAttribution, kritisZoomZuKlein, setKritisBbox, setKartenZoom,
-  } = useFachebenen({ einsatzId, einstellungen, einstellungenLaedt });
+  } = useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar });
 
-  const {
-    basemap, setBasemap, onlineStilName, setOnlineStilName, kartenTheme, setKartenTheme,
-    style, basisAttribution, onStyleFehler,
-  } = useBasemap({ einsatzId, config, einstellungen, einstellungenLaedt, effektiv });
+  const { style, basisAttribution } = useBasemap({
+    basemap: effektiveBasemap, onlineStilName, kartenTheme, config, effektiv,
+  });
 
   // Stabiler Fehler-Handler (message aus App.useApp ist stabil) → als ehrliche Dep in Effekten
   // nutzbar (u. a. Blob-URL-Effekt in useKartenbilder), ohne diese neu auszulösen.
@@ -58,6 +71,17 @@ export default function LagekartePage() {
     (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Aktion fehlgeschlagen'),
     [message],
   );
+
+  // „Für den Einsatz speichern": aktuellen Karten-Zustand in die Ansicht schreiben,
+  // mit Erfolgs-/Fehler-Feedback (die Mutation selbst wirft — hier gefangen).
+  const onAnsichtSpeichern = useCallback(async () => {
+    try {
+      await speichern();
+      message.success('Für den Einsatz gespeichert');
+    } catch (e) {
+      fehler(e);
+    }
+  }, [speichern, message, fehler]);
 
   const {
     platzierungZiel, zeichneAbschnittId, zoneEntwurf, zoneBestaetigung, zoneSpeichern,
@@ -136,7 +160,7 @@ export default function LagekartePage() {
         onEinsatzortPlatzieren={onEinsatzortPlatzieren}
         layer={layer}
         onLayerToggle={(k, an) => setLayer((l) => ({ ...l, [k]: an }))}
-        basemap={basemap ?? 'blind'}
+        basemap={basemap}
         onBasemapWechsel={setBasemap}
         onMarkerWaehlen={onMarkerWaehlen}
         onlineVerfuegbar={(config?.online_styles.length ?? 0) > 0}
@@ -146,6 +170,9 @@ export default function LagekartePage() {
         onOnlineStilWechsel={setOnlineStilName}
         kartenTheme={kartenTheme}
         onKartenThemeWechsel={setKartenTheme}
+        ansichtDirty={dirty}
+        ansichtSpeichert={speichertGerade}
+        onAnsichtSpeichern={onAnsichtSpeichern}
         fachebenenSichtbar={fachebenenSichtbar}
         fachebenenStatus={fachebenenStatus}
         onFachebeneToggle={onFachebeneToggle}

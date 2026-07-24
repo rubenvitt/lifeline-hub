@@ -1,10 +1,5 @@
-import { describe, expect, it, beforeEach } from 'vitest';
-import {
-  waehleInitialeBasemap,
-  merkeLetzteBasemap,
-  liesLetzteBasemap,
-  type GespeicherteBasemap,
-} from './basemapAuswahl';
+import { describe, expect, it } from 'vitest';
+import { waehleInitialeBasemap, type GespeicherteBasemap } from './basemapAuswahl';
 import type { KarteServerConfig, OnlineStyle } from '../../api/karte';
 
 function view(name: string): OnlineStyle {
@@ -85,32 +80,5 @@ describe('waehleInitialeBasemap', () => {
     // Alt-Eintrag ohne kartenTheme bzw. mit Müllwert.
     const gespeichert = { modus: 'online', onlineView: 'Liberty', kartenTheme: 'sepia' } as unknown as GespeicherteBasemap;
     expect(waehleInitialeBasemap(config(), gespeichert)).toEqual({ modus: 'online', onlineView: 'Liberty', kartenTheme: 'auto' });
-  });
-});
-
-describe('letzte-Basemap-Speicher', () => {
-  beforeEach(() => localStorage.clear());
-
-  it('merkt und liest die zuletzt gewählte Karte (inkl. Karten-Theme) pro Einsatz', () => {
-    merkeLetzteBasemap(1, { modus: 'blind', onlineView: null, kartenTheme: 'auto' });
-    merkeLetzteBasemap(2, { modus: 'online', onlineView: 'basemap.de', kartenTheme: 'dark' });
-    expect(liesLetzteBasemap(1)).toEqual({ modus: 'blind', onlineView: null, kartenTheme: 'auto' });
-    expect(liesLetzteBasemap(2)).toEqual({ modus: 'online', onlineView: 'basemap.de', kartenTheme: 'dark' });
-  });
-
-  it('liefert null, wenn für den Einsatz noch nichts gemerkt wurde', () => {
-    expect(liesLetzteBasemap(99)).toBeNull();
-  });
-
-  it('liefert null bei kaputtem/fremdem Inhalt', () => {
-    localStorage.setItem('basemap:letzteAuswahl:5', '{kein json');
-    expect(liesLetzteBasemap(5)).toBeNull();
-    localStorage.setItem('basemap:letzteAuswahl:6', JSON.stringify({ modus: 'satellit' }));
-    expect(liesLetzteBasemap(6)).toBeNull();
-  });
-
-  it('defaultet Alt-Einträge ohne kartenTheme auf auto (Rückwärtskompatibilität)', () => {
-    localStorage.setItem('basemap:letzteAuswahl:7', JSON.stringify({ modus: 'offline', onlineView: null }));
-    expect(liesLetzteBasemap(7)).toEqual({ modus: 'offline', onlineView: null, kartenTheme: 'auto' });
   });
 });

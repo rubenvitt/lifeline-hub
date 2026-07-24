@@ -1,14 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { keepPreviousData, useQueries } from '@tanstack/react-query';
-import type { EinsatzEinstellungen } from '../../api/types';
 import {
   ladeFachebene, type FachebeneQuelle, type FachebeneStatus, type FeatureCollection,
 } from '../../api/fachebenen';
 import { FACHEBENEN, fachebeneKeys, KRITIS_MIN_ZOOM, mergeFeatures } from './fachebenen';
-import {
-  liesFachebenenSichtbar, merkeFachebenenSichtbar, defaultFachebenenSichtbar,
-  type FachebenenSichtbar,
-} from './fachebenenAuswahl';
+import type { FachebenenSichtbar } from './fachebenenAuswahl';
 import type { AktiveFachebene } from './kartenLayer';
 import { globalKeys } from '../../api/queryKeys';
 
@@ -16,14 +12,15 @@ import { globalKeys } from '../../api/queryKeys';
 const KRITIS_MAX = 4000;
 
 interface FachebenenArgs {
-  einsatzId: number;
-  einstellungen: EinsatzEinstellungen | undefined;
-  einstellungenLaedt: boolean;
+  /** Sichtbarkeit + Setter kommen aus useKartenAnsicht (geteilte Ansicht = Wahrheit). */
+  fachebenenSichtbar: FachebenenSichtbar;
+  setFachebenenSichtbar: Dispatch<SetStateAction<FachebenenSichtbar>>;
 }
 
 /**
- * Fachebenen-Leg der Lagekarte: Sichtbarkeits-State (localStorage + Einsatz-Default),
- * die vier externen Daten-Queries und ihre Ableitungen.
+ * Fachebenen-Leg der Lagekarte: die vier externen Daten-Queries und ihre Ableitungen.
+ * Die Sichtbarkeit hält seit LFH-319 `useKartenAnsicht` (geteilte Ansicht) — dieser Hook
+ * bekommt sie als Prop und bietet nur den Toggle; kein eigener State/keine Persistenz.
  *
  * Die vier Queries laufen als EIN `useQueries` mit `combine`: react-query memoisiert das
  * kombinierte Ergebnis (structural sharing via replaceEqualDeep), sodass die Ableitungen
@@ -31,31 +28,10 @@ interface FachebenenArgs {
  * `eslint-disable react-hooks/exhaustive-deps` stabil bleiben — das inline gebaute,
  * pro Render instabile `fachebenenQueries`-Record (und die vier Disables) entfällt damit.
  */
-export function useFachebenen({ einsatzId, einstellungen, einstellungenLaedt }: FachebenenArgs) {
-  // Fachebenen-Sichtbarkeit: einmal aus localStorage laden (analog basemap-Persistenz).
-  // Muss VOR den Fachebenen-Queries stehen, damit enabled korrekt ist.
-  const [fachebenenSichtbar, setFachebenenSichtbar] = useState<FachebenenSichtbar>(defaultFachebenenSichtbar);
+export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: FachebenenArgs) {
   const [kritisBbox, setKritisBbox] = useState<string | null>(null);
   // Aktuelles Karten-Zoom-Level — steuert den „näher heranzoomen"-Hinweis für KRITIS.
   const [kartenZoom, setKartenZoom] = useState<number | null>(null);
-  const fachebenenInitRef = useRef(false);
-  useEffect(() => {
-    // Erst initialisieren, wenn die Einsatz-Einstellungen geladen (oder fehlgeschlagen)
-    // sind — sonst ginge der Einsatz-Default als Fallback verloren.
-    if (fachebenenInitRef.current || einstellungenLaedt) return;
-    fachebenenInitRef.current = true;
-    // Priorität: gemerkte (localStorage) Auswahl → Einsatz-Default → alles aus.
-    const gespeichert = liesFachebenenSichtbar(einsatzId);
-    // LFH-120: `fachebenen_sichtbar` ist backendseitig untypisiertes JSON (generiert `unknown`);
-    // die Form entspricht FachebenenSichtbar (Karten-Default).
-    const einsatzDefault = (einstellungen?.fachebenen_sichtbar ?? null) as FachebenenSichtbar | null;
-    if (gespeichert) setFachebenenSichtbar(gespeichert);
-    else if (einsatzDefault) setFachebenenSichtbar(einsatzDefault);
-  }, [einsatzId, einstellungenLaedt, einstellungen]);
-  useEffect(() => {
-    if (!fachebenenInitRef.current) return;
-    merkeFachebenenSichtbar(einsatzId, fachebenenSichtbar);
-  }, [fachebenenSichtbar, einsatzId]);
 
   // KRITIS akkumulieren: einmal geladene Objekte bleiben sichtbar (auch beim Rauszoomen oder
   // Wechsel des Gebiets), statt bei jedem Fetch ersetzt zu werden. Dedup über die Koordinate.

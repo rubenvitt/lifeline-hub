@@ -52,31 +52,3 @@ export function waehleInitialeBasemap(
 
   return { modus, onlineView, kartenTheme };
 }
-
-const schluessel = (einsatzId: number) => `basemap:letzteAuswahl:${einsatzId}`;
-
-/** Merkt die zuletzt gewählte Karte pro Einsatz (überlebt Reload). */
-export function merkeLetzteBasemap(einsatzId: number, wahl: GespeicherteBasemap): void {
-  try {
-    localStorage.setItem(schluessel(einsatzId), JSON.stringify(wahl));
-  } catch {
-    /* localStorage nicht verfügbar — ohne Persistenz weiterarbeiten */
-  }
-}
-
-/** Liest die zuletzt gewählte Karte eines Einsatzes, oder null. */
-export function liesLetzteBasemap(einsatzId: number): GespeicherteBasemap | null {
-  try {
-    const roh = localStorage.getItem(schluessel(einsatzId));
-    if (!roh) return null;
-    const wert = JSON.parse(roh) as Partial<GespeicherteBasemap>;
-    if (wert.modus !== 'online' && wert.modus !== 'offline' && wert.modus !== 'blind') return null;
-    return {
-      modus: wert.modus,
-      onlineView: typeof wert.onlineView === 'string' ? wert.onlineView : null,
-      kartenTheme: kartenThemeGueltig(wert.kartenTheme) ? wert.kartenTheme : 'auto',
-    };
-  } catch {
-    return null;
-  }
-}
