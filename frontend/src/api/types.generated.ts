@@ -1129,6 +1129,44 @@ export interface components {
             online_styles: components["schemas"]["OnlineStyle"][];
         };
         /**
+         * @description Eine Kartenansicht wie ans Frontend geliefert. Enum-tragende `String`-Felder
+         *     tragen `#[schema(value_type = Option<Enum>)]`, damit die generierte TS die Union
+         *     kennt; `Option<T>` mit `skip_serializing_if`, damit absent/null unterscheidbar
+         *     bleibt (Norm ab LFH-265). `layer_sichtbar`/`fachebenen_sichtbar` sind opake JSON.
+         */
+        KartenAnsichtAnzeige: {
+            basemap_modus?: null | components["schemas"]["BasemapModus"];
+            /** Format: int64 */
+            einsatz_id: number;
+            erstellt_at: string;
+            /** Format: int64 */
+            erstellt_von?: number | null;
+            fachebenen_sichtbar?: unknown;
+            geaendert_at: string;
+            /** Format: int64 */
+            geaendert_von?: number | null;
+            /** Format: int64 */
+            id: number;
+            ist_standard: boolean;
+            karten_theme?: null | components["schemas"]["KartenTheme"];
+            layer_sichtbar?: unknown;
+            name: string;
+            online_stil?: string | null;
+            /** Format: int64 */
+            reihenfolge: number;
+            /** Format: double */
+            zentrum_lat?: number | null;
+            /** Format: double */
+            zentrum_lon?: number | null;
+            /** Format: double */
+            zoom?: number | null;
+        };
+        /**
+         * @description Karten-Theme (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `karten_theme`.
+         * @enum {string}
+         */
+        KartenTheme: "auto" | "light" | "dark";
+        /**
          * @description Koordinatenformat (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `koordinatenformat`.
          * @enum {string}
          */
@@ -1228,7 +1266,7 @@ export interface components {
          *     die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
          * @enum {string}
          */
-        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "sofortmeldung" | "lagged";
+        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "karten_ansicht" | "sofortmeldung" | "lagged";
         /** @description Öffentliche Material-Darstellung (ohne `org_id`). */
         MaterialAnzeige: {
             angelegt_at: string;

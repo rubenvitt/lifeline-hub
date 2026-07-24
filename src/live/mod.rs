@@ -31,6 +31,7 @@ pub enum LiveEvent {
     KarteBild,
     Etb,
     Befehl,
+    KartenAnsicht,
     Sofortmeldung,
     Lagged,
 }
@@ -38,7 +39,7 @@ pub enum LiveEvent {
 impl LiveEvent {
     /// Alle Varianten in kanonischer Reihenfolge — Anker für den Wire-Kontrakt-Guard
     /// (`tests/enum_wire_kontrakt.rs`) und die Exhaustiveness-Prüfung.
-    pub const ALLE: [LiveEvent; 24] = [
+    pub const ALLE: [LiveEvent; 25] = [
         LiveEvent::Uhs,
         LiveEvent::Schaden,
         LiveEvent::Fahrzeug,
@@ -61,6 +62,7 @@ impl LiveEvent {
         LiveEvent::KarteBild,
         LiveEvent::Etb,
         LiveEvent::Befehl,
+        LiveEvent::KartenAnsicht,
         LiveEvent::Sofortmeldung,
         LiveEvent::Lagged,
     ];
@@ -92,6 +94,7 @@ impl LiveEvent {
             LiveEvent::KarteBild => "karte_bild",
             LiveEvent::Etb => "etb",
             LiveEvent::Befehl => "befehl",
+            LiveEvent::KartenAnsicht => "karten_ansicht",
             LiveEvent::Sofortmeldung => "sofortmeldung",
             LiveEvent::Lagged => "lagged",
         }
@@ -152,6 +155,9 @@ impl LiveEvent {
             LiveEvent::Etb => &["etb"],
             // Befehle sind Teil des Auftrags-Moduls (`routes::befehl::MODUL_KEY`).
             LiveEvent::Befehl => &["auftraege"],
+            // Die Kartenansicht-Konfiguration lebt auf der Lage-Karte; wer `lagekarte`
+            // sehen darf, darf ihre Änderung erfahren (Cache-Invalidierung des Switchers).
+            LiveEvent::KartenAnsicht => &["lagekarte"],
             LiveEvent::Sofortmeldung => &["meldungen"],
             // Kontroll-Event ohne Fachbezug: muss JEDEN Abonnenten erreichen, sonst
             // hängt der Resync nach Ring-Overflow/Neustart.
@@ -505,6 +511,7 @@ mod tests {
             (LiveEvent::KarteBild, &["lagekarte"]),
             (LiveEvent::Etb, &["etb"]),
             (LiveEvent::Befehl, &["auftraege"]),
+            (LiveEvent::KartenAnsicht, &["lagekarte"]),
             (LiveEvent::Sofortmeldung, &["meldungen"]),
             (LiveEvent::Lagged, &[]),
         ];

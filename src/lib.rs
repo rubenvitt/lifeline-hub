@@ -26,6 +26,7 @@ pub mod gefahr;
 pub mod geocoding;
 pub mod karte;
 pub mod karte_hintergrundbild;
+pub mod karten_ansicht;
 pub mod katalog;
 pub mod kommunikation;
 pub mod lage_zone;

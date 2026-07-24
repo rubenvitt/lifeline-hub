@@ -3329,6 +3329,117 @@
           }
         }
       },
+      "KartenAnsichtAnzeige": {
+        "type": "object",
+        "description": "Eine Kartenansicht wie ans Frontend geliefert. Enum-tragende `String`-Felder\ntragen `#[schema(value_type = Option<Enum>)]`, damit die generierte TS die Union\nkennt; `Option<T>` mit `skip_serializing_if`, damit absent/null unterscheidbar\nbleibt (Norm ab LFH-265). `layer_sichtbar`/`fachebenen_sichtbar` sind opake JSON.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "name",
+          "reihenfolge",
+          "ist_standard",
+          "erstellt_at",
+          "geaendert_at"
+        ],
+        "properties": {
+          "basemap_modus": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BasemapModus"
+              }
+            ]
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erstellt_at": {
+            "type": "string"
+          },
+          "erstellt_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "fachebenen_sichtbar": {},
+          "geaendert_at": {
+            "type": "string"
+          },
+          "geaendert_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ist_standard": {
+            "type": "boolean"
+          },
+          "karten_theme": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/KartenTheme"
+              }
+            ]
+          },
+          "layer_sichtbar": {},
+          "name": {
+            "type": "string"
+          },
+          "online_stil": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reihenfolge": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "zentrum_lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "zentrum_lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "zoom": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "KartenTheme": {
+        "type": "string",
+        "description": "Karten-Theme (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `karten_theme`.",
+        "enum": [
+          "auto",
+          "light",
+          "dark"
+        ]
+      },
       "Koordinatenformat": {
         "type": "string",
         "description": "Koordinatenformat (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `koordinatenformat`.",
@@ -3633,6 +3744,7 @@
           "karte_bild",
           "etb",
           "befehl",
+          "karten_ansicht",
           "sofortmeldung",
           "lagged"
         ]

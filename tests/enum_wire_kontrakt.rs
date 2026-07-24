@@ -429,6 +429,11 @@ fn orphan_enums_wire() {
         Offline => "offline",
         Blind => "blind",
     });
+    enum_wire_as_str!(lifeline_hub::karten_ansicht::KartenTheme {
+        Auto,
+        Light,
+        Dark,
+    });
     enum_wire!(lifeline_hub::einsatz::einstellungen::Zeitformat {
         VierundzwanzigStunden => "24h",
         ZwoelfStunden => "12h",
@@ -530,6 +535,7 @@ fn live_event_wire() {
         KarteBild => "karte_bild",
         Etb => "etb",
         Befehl => "befehl",
+        KartenAnsicht => "karten_ansicht",
         Sofortmeldung => "sofortmeldung",
         Lagged => "lagged",
     } in lifeline_hub::live::LiveEvent::ALLE);

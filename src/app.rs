@@ -597,6 +597,14 @@ pub fn build_router(state: AppState) -> Router {
             "/api/einsaetze/{id}/befehle/{bid}/fortschreiben",
             post(routes::befehl::fortschreiben),
         )
+        .route(
+            "/api/einsaetze/{id}/karten-ansichten",
+            get(routes::karten_ansicht::liste),
+        )
+        .route(
+            "/api/einsaetze/{id}/karten-ansichten/{aid}",
+            patch(routes::karten_ansicht::patch),
+        )
         .route("/api/einsaetze/{id}/zonen", get(routes::lage_zone::liste))
         .route(
             "/api/einsaetze/{id}/zonen",

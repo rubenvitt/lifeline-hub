@@ -41,6 +41,8 @@ use utoipa::OpenApi;
     crate::einsatz::Einsatzart,
     crate::einsatz::MitgliedAnzeige,
     crate::einsatz::einstellungen::BasemapModus,
+    crate::karten_ansicht::KartenAnsichtAnzeige,
+    crate::karten_ansicht::KartenTheme,
     crate::einsatz::einstellungen::EinheitenSystem,
     crate::einsatz::einstellungen::EinstellungenAnzeige,
     crate::einsatz::einstellungen::Koordinatenformat,
