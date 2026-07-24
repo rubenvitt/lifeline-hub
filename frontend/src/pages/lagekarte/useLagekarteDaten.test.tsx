@@ -24,9 +24,11 @@ function wrapper() {
   );
 }
 
-/** Minimal-Snapshot-Dokument: eine Gefahrengebiet-Zone + das Gebiet mit EINGEFRORENER Warnstufe. */
+/** Minimal-Snapshot-Dokument: eine Gefahrengebiet-Zone (EINGEFRORENE Warnstufe) + eine verortete
+ *  Einheit OHNE eigene Org (org-scoped tz_organisation=null) → prüft den org_default-Freeze.
+ *  `stand_at` bewusst im ECHTEN naiven UTC-Wire-Format (ohne 'T'/'Z'), wie das Backend liefert. */
 function dokument(warnstufe: string) {
-  const stand = '2026-07-24T08:00:00Z';
+  const stand = '2026-07-24 08:00:00';
   return {
     id: 9,
     einsatz_id: 5,
@@ -42,7 +44,9 @@ function dokument(warnstufe: string) {
       ansichten: [],
       uhs: [],
       schaeden: [],
-      einheiten: [],
+      einheiten: [
+        { id: 1, name: 'Zug 1', typ_label: 'Zug', lat: 50.1, lon: 8.6, tz_fachaufgabe: null, tz_organisation: null },
+      ],
       fahrzeuge: [],
       fuehrungskraefte: [],
       abschnitte: [],
@@ -71,14 +75,21 @@ function dokument(warnstufe: string) {
 describe('useLagekarteDaten Standquelle', () => {
   beforeEach(() => ladeLageSnapshot.mockReset());
 
-  it('Historien-Modus sperrt Schreiben (darfSchreiben=false) und ladt spiegelt die Snapshot-Query', async () => {
-    ladeLageSnapshot.mockResolvedValue(dokument('akut'));
+  it('Historien-Modus sperrt Schreiben und ladt trägt die Snapshot-Query (pending → false)', async () => {
+    // Deferred Promise: die Pending-Phase explizit festnageln — sonst greift waitFor(false) sofort
+    // und die `istSnapshot ? snapQuery.isLoading`-Regel bliebe ungetestet (Review-Fix #5).
+    let aufloesen!: (v: unknown) => void;
+    ladeLageSnapshot.mockReturnValue(new Promise((r) => { aufloesen = r; }));
     const { result } = renderHook(
       () => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
       { wrapper: wrapper() },
     );
-    // ladt darf nicht sofort false sein (disabled Live-Query meldet isLoading=false — die
-    // Snapshot-Query trägt das Ladegate).
+    // Solange das Dokument nicht da ist, MUSS ladt true sein (die disabled Live-Queries melden
+    // isLoading=false → nur die Snapshot-Query darf das Gate tragen).
+    expect(result.current.ladt).toBe(true);
+    expect(result.current.darfSchreiben).toBe(false);
+
+    aufloesen(dokument('akut'));
     await waitFor(() => expect(result.current.ladt).toBe(false));
     expect(result.current.darfSchreiben).toBe(false);
     expect(ladeLageSnapshot).toHaveBeenCalledWith(5, 9);
@@ -95,5 +106,18 @@ describe('useLagekarteDaten Standquelle', () => {
     // Live-Quelle (im Snapshot-Modus abgeschaltet → undefined → 'keine'), wäre die Farbe eine andere.
     expect(result.current.zonenFeatures[0].stil).toEqual(gefahrengebietStil('mittel'));
     expect(result.current.zonenFeatures[0].stil).not.toEqual(gefahrengebietStil('keine'));
+  });
+
+  it('speist den org_default aus dem Dokument in die Marker-TZ, nicht aus Live (Review-Fix #4)', async () => {
+    ladeLageSnapshot.mockResolvedValue(dokument('mittel'));
+    const { result } = renderHook(
+      () => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(result.current.alleVerortet.length).toBeGreaterThan(0));
+    // Die Einheit hat kein eigenes tz_organisation → ihre TZ nutzt den EINGEFRORENEN org_default 'thw'.
+    // Läse der Hook die (im Snapshot-Modus abgeschaltete) Live-Org-Query, wäre organisation nicht 'thw'.
+    const einheit = result.current.alleVerortet.find((m) => m.schluessel === 'einheit-1');
+    expect(einheit?.tz?.organisation).toBe('thw');
   });
 });

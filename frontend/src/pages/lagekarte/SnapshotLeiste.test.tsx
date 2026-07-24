@@ -27,10 +27,10 @@ function snapshot(over: Snap = {}): Snap {
     einsatz_id: 5,
     bezeichnung: 'Stand A',
     notiz: null,
-    stand_at: '2026-07-24T08:00:00Z',
+    stand_at: '2026-07-24 08:00:00',
     schema_version: 1,
     erstellt_von: 1,
-    erstellt_at: '2026-07-24T08:00:00Z',
+    erstellt_at: '2026-07-24 08:00:00',
     ...over,
   };
 }
@@ -89,8 +89,8 @@ describe('SnapshotLeiste', () => {
     // Reihenfolge absichtlich neu→alt (wie das Backend liefert) — der Slider muss chronologisch sortieren.
     renderLeiste(
       [
-        snapshot({ id: 20, bezeichnung: 'B', stand_at: '2026-07-24T09:00:00Z' }),
-        snapshot({ id: 10, bezeichnung: 'A', stand_at: '2026-07-24T08:00:00Z' }),
+        snapshot({ id: 20, bezeichnung: 'B', stand_at: '2026-07-24 09:00:00' }),
+        snapshot({ id: 10, bezeichnung: 'A', stand_at: '2026-07-24 08:00:00' }),
       ],
       { onWaehle },
     );
@@ -105,8 +105,8 @@ describe('SnapshotLeiste', () => {
     const onWaehle = vi.fn();
     const { rerender } = renderLeiste(
       [
-        snapshot({ id: 10, bezeichnung: 'A', stand_at: '2026-07-24T08:00:00Z' }),
-        snapshot({ id: 20, bezeichnung: 'B', stand_at: '2026-07-24T09:00:00Z' }),
+        snapshot({ id: 10, bezeichnung: 'A', stand_at: '2026-07-24 08:00:00' }),
+        snapshot({ id: 20, bezeichnung: 'B', stand_at: '2026-07-24 09:00:00' }),
       ],
       { onWaehle },
     );
@@ -120,5 +120,62 @@ describe('SnapshotLeiste', () => {
     await vi.advanceTimersByTimeAsync(ANZEIGE_MS);
     expect(ladeLageSnapshot).toHaveBeenCalledWith(5, 20); // Vorladen des nächsten Dokuments
     expect(onWaehle).toHaveBeenLastCalledWith(20);
+  });
+
+  it('Replay stoppt am Ende der Folge (Out-of-Bounds-Guard)', async () => {
+    vi.useFakeTimers();
+    const onWaehle = vi.fn();
+    const { rerender } = renderLeiste(
+      [
+        snapshot({ id: 10, bezeichnung: 'A', stand_at: '2026-07-24 08:00:00' }),
+        snapshot({ id: 20, bezeichnung: 'B', stand_at: '2026-07-24 09:00:00' }),
+      ],
+      { onWaehle },
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Abspielen' }));
+    rerender(
+      <SnapshotLeiste einsatzId={5} darfSichern={false} aktiverSnapshotId={10} onWaehle={onWaehle} fehler={vi.fn()} />,
+    );
+    await vi.advanceTimersByTimeAsync(ANZEIGE_MS);
+    expect(onWaehle).toHaveBeenLastCalledWith(20);
+
+    // Am LETZTEN Stand angekommen (spielt bleibt an) → terminaler Zweig: kein weiterer Schritt,
+    // Wiedergabe stoppt. Ohne den next>=length-Guard würfe chrono[2] hier (Out-of-Bounds).
+    onWaehle.mockClear();
+    rerender(
+      <SnapshotLeiste einsatzId={5} darfSichern={false} aktiverSnapshotId={20} onWaehle={onWaehle} fehler={vi.fn()} />,
+    );
+    await vi.advanceTimersByTimeAsync(ANZEIGE_MS * 2);
+    expect(onWaehle).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Abspielen' })).toBeInTheDocument();
+  });
+
+  it('Replay startet neu vom Anfang, wenn man am letzten Stand abspielt', async () => {
+    const onWaehle = vi.fn();
+    renderLeiste(
+      [
+        snapshot({ id: 10, bezeichnung: 'A', stand_at: '2026-07-24 08:00:00' }),
+        snapshot({ id: 20, bezeichnung: 'B', stand_at: '2026-07-24 09:00:00' }),
+      ],
+      { aktiverSnapshotId: 20, onWaehle },
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Abspielen' }));
+    expect(onWaehle).toHaveBeenCalledWith(10); // Neustart am ältesten Stand
+  });
+
+  it('„Aktuell" unterbricht eine laufende Wiedergabe', async () => {
+    const onWaehle = vi.fn();
+    renderLeiste(
+      [
+        snapshot({ id: 10, bezeichnung: 'A', stand_at: '2026-07-24 08:00:00' }),
+        snapshot({ id: 20, bezeichnung: 'B', stand_at: '2026-07-24 09:00:00' }),
+      ],
+      { onWaehle },
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Abspielen' }));
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Aktuell' }));
+    expect(onWaehle).toHaveBeenLastCalledWith(null);
+    expect(screen.getByRole('button', { name: 'Abspielen' })).toBeInTheDocument();
   });
 });

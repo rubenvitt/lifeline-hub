@@ -55,7 +55,7 @@ export function useLagekarteDaten({ einsatzId, zeigeZonen, aktiveAnsichtId, quel
   const snapshotId = quelle.typ === 'snapshot' ? quelle.id : undefined;
 
   const snapQuery = useQuery({
-    queryKey: [...einsatzKeys.lageSnapshot(einsatzId), snapshotId] as const,
+    queryKey: einsatzKeys.lageSnapshotDokument(einsatzId, snapshotId as number),
     queryFn: () => ladeLageSnapshot(einsatzId, snapshotId as number),
     enabled: snapshotId != null,
   });

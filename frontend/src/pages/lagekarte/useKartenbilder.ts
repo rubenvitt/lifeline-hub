@@ -66,7 +66,7 @@ export function useKartenbilder({ einsatzId, kartenRef, bildPlatzierenId, aktive
   // Im Snapshot-Modus die eingefrorenen Bild-Metadaten aus dem Dokument (gleicher queryKey wie
   // useLagekarteDaten → Cache-geteilt, kein zweiter Fetch). Blob-Bytes lädt der Effekt live.
   const snapQuery = useQuery({
-    queryKey: [...einsatzKeys.lageSnapshot(einsatzId), snapshotId] as const,
+    queryKey: einsatzKeys.lageSnapshotDokument(einsatzId, snapshotId as number),
     queryFn: () => ladeLageSnapshot(einsatzId, snapshotId as number),
     enabled: snapshotId != null,
   });

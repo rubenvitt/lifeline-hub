@@ -66,6 +66,9 @@ export const EINSATZ_KEYS = {
   personAudit: 'einsatz-person-audit',
   tier: 'einsatz-tier',
   schaden: 'einsatz-schaden',
+  // Snapshot-Dokument (LFH-321): eigener Prefix, damit die Listen-Invalidierung
+  // (`lage_snapshot`-SSE) die per Design UNVERÄNDERLICHEN Dokumente nicht per Prefix mit-refetcht.
+  lageSnapshotDokument: 'einsatz-lage-snapshot-dokument',
 } as const;
 
 export type EinsatzKey = (typeof EINSATZ_KEYS)[keyof typeof EINSATZ_KEYS];
@@ -164,6 +167,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.personAudit,
   EINSATZ_KEYS.tier,
   EINSATZ_KEYS.schaden,
+  EINSATZ_KEYS.lageSnapshotDokument,
 ] as const satisfies readonly EinsatzKey[];
 
 /**
@@ -224,6 +228,8 @@ export const einsatzKeys = {
   freieZeichen: (einsatzId: number) => [EINSATZ_KEYS.freieZeichen, einsatzId] as const,
   kartenAnsicht: (einsatzId: number) => [EINSATZ_KEYS.kartenAnsicht, einsatzId] as const,
   lageSnapshot: (einsatzId: number) => [EINSATZ_KEYS.lageSnapshot, einsatzId] as const,
+  lageSnapshotDokument: (einsatzId: number, snapshotId: number) =>
+    [EINSATZ_KEYS.lageSnapshotDokument, einsatzId, snapshotId] as const,
   gefahrengebiete: (einsatzId: number) => [EINSATZ_KEYS.gefahrengebiete, einsatzId] as const,
   gefahrenmatrix: (einsatzId: number, gewaehlt: number | null) =>
     [EINSATZ_KEYS.gefahrenmatrix, einsatzId, gewaehlt] as const,

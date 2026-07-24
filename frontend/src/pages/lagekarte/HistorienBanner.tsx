@@ -1,7 +1,8 @@
 import { Alert, Button } from 'antd';
+import { formatZeit } from '../../anzeige/format';
 
 interface HistorienBannerProps {
-  /** Zeitstempel des angezeigten Standes (`stand_at`, ISO). */
+  /** Zeitstempel des angezeigten Standes (`stand_at`, naiver UTC-Wire-String). */
   standAt?: string;
   /** Bezeichnung des Standes, falls gesetzt. */
   bezeichnung?: string | null;
@@ -9,18 +10,14 @@ interface HistorienBannerProps {
   onZurueckAktuell: () => void;
 }
 
-function formatiereStand(standAt?: string): string {
-  if (!standAt) return '';
-  const d = new Date(standAt);
-  return Number.isNaN(d.getTime()) ? standAt : d.toLocaleString('de-DE');
-}
-
 /**
  * Historien-Modus-Banner (C/LFH-321): schwebt über der Karte, sobald ein Snapshot aktiv ist,
  * und macht die Schreibsperre sichtbar. Der „Aktuell"-Button springt in den Live-Modus zurück.
  */
 export function HistorienBanner({ standAt, bezeichnung, onZurueckAktuell }: HistorienBannerProps) {
-  const stand = formatiereStand(standAt);
+  // formatZeit (dayjs.utc) statt new Date(): stand_at ist ein naiver UTC-Wire-String
+  // ('YYYY-MM-DD HH:MM:SS'), den new Date() als Lokalzeit fehlinterpretieren würde (LFH-321-Review).
+  const stand = standAt ? formatZeit(standAt) : '';
   const beschreibung = [bezeichnung?.trim(), stand].filter(Boolean).join(' · ');
   return (
     <Alert

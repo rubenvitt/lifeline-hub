@@ -4,6 +4,7 @@ import { CameraOutlined, PauseOutlined, PlayCircleOutlined } from '@ant-design/i
 import { useQueryClient } from '@tanstack/react-query';
 import { einsatzKeys } from '../../api/queryKeys';
 import { ladeLageSnapshot } from '../../api/lageSnapshot';
+import { formatZeitKurz } from '../../anzeige/format';
 import { useLageSnapshots } from './useLageSnapshots';
 
 /** Feste Anzeigedauer je Stand im Replay (D/LFH-322). */
@@ -22,11 +23,9 @@ interface SnapshotLeisteProps {
 }
 
 function chipLabel(bezeichnung: string | null | undefined, standAt: string): string {
-  const d = new Date(standAt);
-  const zeit = Number.isNaN(d.getTime())
-    ? standAt
-    : d.toLocaleString('de-DE', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
-  return bezeichnung?.trim() || zeit;
+  // formatZeitKurz (dayjs.utc) statt new Date(): stand_at ist ein naiver UTC-Wire-String
+  // ('YYYY-MM-DD HH:MM:SS') → new Date() läse ihn als Lokalzeit (LFH-321-Review).
+  return bezeichnung?.trim() || formatZeitKurz(standAt);
 }
 
 /**
@@ -54,7 +53,7 @@ export function SnapshotLeiste({ einsatzId, darfSichern, aktiverSnapshotId, onWa
   const prefetch = useCallback(
     (id: number) => {
       void qc.prefetchQuery({
-        queryKey: [...einsatzKeys.lageSnapshot(einsatzId), id] as const,
+        queryKey: einsatzKeys.lageSnapshotDokument(einsatzId, id),
         queryFn: () => ladeLageSnapshot(einsatzId, id),
       });
     },
