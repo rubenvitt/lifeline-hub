@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { aktualisierePerson } from './einsatzPerson';
 import { aktualisiereTier } from './einsatzTier';
-import { normalisierePatch, nurGesetzteFelder, patchBody } from './patchTriState';
+import { leerZuNull, normalisierePatch, nurGesetzteFelder, patchBody } from './patchTriState';
 
 /**
  * LFH-266/F12, ausgebaut für LFH-306: PATCH-Tri-State am Wire.
@@ -33,6 +33,26 @@ describe('Die Falle selbst (Grund für den ganzen Unterbau)', () => {
 
   it('macht den Unterschied nach der Normalisierung sichtbar', () => {
     expect(JSON.stringify(normalisierePatch({ notiz: undefined }))).toBe('{"notiz":null}');
+  });
+});
+
+describe('leerZuNull — Feld-Helfer (trimmt; leer/undefined → null)', () => {
+  it('WERT GESETZT: trimmt und gibt den Text zurück', () => {
+    expect(leerZuNull('  Muster  ')).toBe('Muster');
+  });
+
+  it('LÖSCHEN: undefined (geleertes Select allowClear) wird zu null', () => {
+    expect(leerZuNull(undefined)).toBeNull();
+  });
+
+  it('LÖSCHEN: leerer und rein aus Leerraum bestehender String werden zu null', () => {
+    expect(leerZuNull('')).toBeNull();
+    expect(leerZuNull('   ')).toBeNull();
+  });
+
+  it('TRIMMT den Wert — der bewusste Unterschied zu normalisierePatch (das ungetrimmt lässt)', () => {
+    expect(leerZuNull(' x ')).toBe('x');
+    expect(normalisierePatch({ f: ' x ' })).toEqual({ f: ' x ' });
   });
 });
 

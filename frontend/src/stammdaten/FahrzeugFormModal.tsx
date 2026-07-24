@@ -6,6 +6,7 @@ import { aktualisiereFahrzeug, legeFahrzeugAn, type FahrzeugEingabe } from '../a
 import type { Fahrzeug, FahrzeugVorschlaege, Staerke } from '../api/types';
 import StaerkeEingabe from '../anzeige/StaerkeEingabe';
 import { globalKeys } from '../api/queryKeys';
+import { leerZuNull } from '../api/patchTriState';
 
 interface FormWerte {
   funkrufname: string;
@@ -19,11 +20,6 @@ interface FormWerte {
   tragenkapazitaet?: number;
   staerke?: Staerke | null;
   bemerkung?: string;
-}
-
-function leerZuNull(w: string | undefined): string | null {
-  const t = w?.trim();
-  return t ? t : null;
 }
 
 export default function FahrzeugFormModal({

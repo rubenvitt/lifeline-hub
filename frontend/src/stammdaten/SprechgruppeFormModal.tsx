@@ -6,16 +6,12 @@ import { ApiError } from '../api/client';
 import { aktualisiereSprechgruppe, legeSprechgruppeAn } from '../api/sprechgruppen';
 import type { Betriebsart, Sprechgruppe } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
+import { leerZuNull } from '../api/patchTriState';
 
 interface FormWerte {
   bezeichnung: string;
   betriebsart: Betriebsart;
   hinweis?: string;
-}
-
-function leerZuNull(w: string | undefined): string | null {
-  const t = w?.trim();
-  return t ? t : null;
 }
 
 export default function SprechgruppeFormModal({

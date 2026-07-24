@@ -9,6 +9,7 @@ import {
 } from '../api/fahrzeugStatus';
 import type { FahrzeugStatus, StatusKategorie } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
+import { leerZuNull } from '../api/patchTriState';
 
 const KATEGORIE_LABELS: Record<StatusKategorie, string> = {
   verfuegbar: 'verfügbar',
@@ -45,7 +46,7 @@ export default function StatusKatalogTab() {
       const daten: StatusEingabe = {
         label: werte.label.trim(),
         kategorie: werte.kategorie,
-        farbe: werte.farbe?.trim() || null,
+        farbe: leerZuNull(werte.farbe),
         fms_anker: werte.fms_anker ?? null,
         sortier: werte.sortier ?? 0,
       };

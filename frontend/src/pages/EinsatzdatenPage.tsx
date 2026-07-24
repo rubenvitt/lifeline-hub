@@ -16,6 +16,7 @@ import { useAuth } from '../auth/AuthContext';
 import { darfImEinsatzSchreiben, darfEinsatzLeiten } from '../einsatz/schreibrecht';
 import type { Einsatzart } from '../api/types';
 import MitgliederAbschnitt from './MitgliederAbschnitt';
+import { leerZuNull } from '../api/patchTriState';
 
 const EINSATZART_LABELS: Record<Einsatzart, string> = {
   realeinsatz: 'Realeinsatz',
@@ -23,12 +24,6 @@ const EINSATZART_LABELS: Record<Einsatzart, string> = {
   sanitaetsdienst: 'Sanitätsdienst',
   bereitstellung: 'Bereitstellung',
 };
-
-/** Trimmt einen Formularwert; leer → null (wird serverseitig zu NULL). */
-function leerZuNull(wert: string | undefined): string | null {
-  const t = wert?.trim();
-  return t ? t : null;
-}
 
 /** Werte des Bearbeiten-Formulars (begonnen_at als Dayjs aus dem DatePicker). */
 interface FormWerte {

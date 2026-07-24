@@ -9,6 +9,7 @@ import { ERFASSBARE_TYPEN, TYP_LABEL } from '../etb/typFarben';
 import { AUTO_PLATZHALTER } from '../etb/bausteinEinsetzen';
 import { MELDEWEG_OPTIONEN } from '../etb/schnellerfassungModell';
 import { globalKeys } from '../api/queryKeys';
+import { leerZuNull } from '../api/patchTriState';
 
 interface FormWerte {
   label: string;
@@ -17,11 +18,6 @@ interface FormWerte {
   meldeweg?: MeldeWeg;
   veranlassung?: string;
   sortier: number;
-}
-
-function leerZuNull(w: string | undefined): string | null {
-  const t = w?.trim();
-  return t ? t : null;
 }
 
 export default function EtbBausteinFormModal({

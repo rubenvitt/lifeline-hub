@@ -23,6 +23,7 @@ import StaerkeEingabe from '../anzeige/StaerkeEingabe';
 import SprechgruppenPicker from '../components/SprechgruppenPicker';
 import FunkErreichbarkeit, { KOMMUNIKATIONSMITTEL_OPTIONEN } from '../components/FunkErreichbarkeit';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { leerZuNull } from '../api/patchTriState';
 
 /** Baut antd-Tree-Daten aus der flachen Einheitenliste (nach ueber_einheit_id). */
 function baueBaum(einheiten: Einheit[]): TreeDataNode[] {
@@ -125,10 +126,10 @@ export default function EinheitenPage() {
         soll_fuehrer: werte.soll?.fuehrer ?? null,
         soll_unterfuehrer: werte.soll?.unterfuehrer ?? null,
         soll_mannschaft: werte.soll?.mannschaft ?? null,
-        bemerkung: werte.bemerkung?.trim() || null,
+        bemerkung: leerZuNull(werte.bemerkung),
         sprechgruppe_ids: werte.sprechgruppe_ids ?? [],
-        kommunikationsmittel: werte.kommunikationsmittel || null,
-        erreichbarkeit: werte.erreichbarkeit?.trim() || null,
+        kommunikationsmittel: leerZuNull(werte.kommunikationsmittel),
+        erreichbarkeit: leerZuNull(werte.erreichbarkeit),
       };
       return aktuell ? aktualisiereEinheit(einsatzId, aktuell.id, daten) : bildeEinheit(einsatzId, daten);
     },

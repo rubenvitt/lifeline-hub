@@ -8,6 +8,7 @@ import { listeQualifikationen } from '../api/qualifikationen';
 import { listeBenutzer } from '../api/benutzer';
 import type { Personal, PersonalVorschlaege, StaerkePosition } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
+import { leerZuNull } from '../api/patchTriState';
 
 interface FormWerte {
   name: string;
@@ -18,11 +19,6 @@ interface FormWerte {
   qualifikation_ids: number[];
   benutzer_id?: number;
   bemerkung?: string;
-}
-
-function leerZuNull(w: string | undefined): string | null {
-  const t = w?.trim();
-  return t ? t : null;
 }
 
 export default function PersonalFormModal({

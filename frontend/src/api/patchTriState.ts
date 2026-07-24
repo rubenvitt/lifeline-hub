@@ -62,6 +62,26 @@
 export type PatchWire<T> = { [K in keyof T]?: Exclude<T[K], undefined> | null };
 
 /**
+ * Feld-Helfer: EIN einzelner Formular-String → Wire-Wert. Trimmt, und macht aus einem leeren
+ * (auch `undefined` vom geleerten `Select allowClear`) oder rein aus Leerraum bestehenden Wert ein
+ * explizites `null` = LÖSCHEN; sonst den getrimmten Text.
+ *
+ * Für hand-gebaute Payloads, die EINZELNE nullable String-Felder setzen, statt ein ganzes
+ * Formular-Objekt zu normalisieren ({@link normalisierePatch}). Der Unterschied ist bewusst:
+ * dieser Helfer TRIMMT den Inhalt — das ist der Bestandsvertrag der Stammdaten-Formulare, aus
+ * denen er konsolidiert wurde (LFH-324: `const t = w?.trim(); return t ? t : null`). Wo der
+ * ungetrimmte Sprung-nach-`null` gebraucht wird, ist `normalisierePatch` richtig.
+ *
+ * WARUM überhaupt, statt `w || null`: `JSON.stringify` entfernt `undefined`-Keys ersatzlos aus dem
+ * Body — ein geleertes Feld käme nie beim Server an und bliebe still unverändert. `leerZuNull`
+ * garantiert `null` statt `undefined` (siehe Modul-Kopf).
+ */
+export function leerZuNull(w: string | undefined): string | null {
+  const t = w?.trim();
+  return t ? t : null;
+}
+
+/**
  * Formular-Werte → Wire-Patch: macht aus geleerten Feldern ein explizites `null`.
  *
  * `undefined` (geleertes `Select allowClear`) und ein rein aus Leerraum bestehender String

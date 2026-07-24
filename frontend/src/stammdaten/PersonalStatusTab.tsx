@@ -9,6 +9,7 @@ import {
 } from '../api/personalStatus';
 import type { PersonalStatus, StatusKategorie } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
+import { leerZuNull } from '../api/patchTriState';
 
 const KATEGORIE_LABELS: Record<StatusKategorie, string> = {
   verfuegbar: 'verfügbar',
@@ -44,7 +45,7 @@ export default function PersonalStatusTab() {
       const daten: StatusEingabe = {
         label: werte.label.trim(),
         kategorie: werte.kategorie,
-        farbe: werte.farbe?.trim() || null,
+        farbe: leerZuNull(werte.farbe),
         sortier: werte.sortier ?? 0,
       };
       return bearbeite ? aktualisiereStatus(bearbeite.id, daten) : legeStatusAn(daten);
