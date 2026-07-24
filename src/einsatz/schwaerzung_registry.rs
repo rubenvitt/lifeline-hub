@@ -434,6 +434,34 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     TabellenRegel {
+        // Kartenansicht (LFH-319): einsatzweit geteilte Karten-Konfiguration. Reine
+        // Layout-/Konfig-Daten; einziger Freitext ist der Ansichts-Name.
+        tabelle: "karten_ansicht",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            // Ansichts-Name ist meist thematisch („Standard“, „Verkehr“), kann aber PII
+            // tragen → Platzhalter (NOT NULL), konsistent mit karte_hintergrundbild.name.
+            scrub("name", Strategie::Platzhalter),
+            retain("reihenfolge", G_KONFIG),
+            retain("ist_standard", G_KONFIG),
+            retain("basemap_modus", G_ENUM),
+            retain("online_stil", G_KONFIG),
+            retain("karten_theme", G_ENUM),
+            retain("layer_sichtbar", G_KONFIG),
+            retain("fachebenen_sichtbar", G_KONFIG),
+            retain("zentrum_lat", G_GEO),
+            retain("zentrum_lon", G_GEO),
+            retain("zoom", G_KONFIG),
+            retain("erstellt_von", G_FK),
+            retain("erstellt_at", G_ZEIT),
+            retain("geaendert_at", G_ZEIT),
+            retain("geaendert_von", G_FK),
+        ],
+    },
+    TabellenRegel {
         tabelle: "freies_zeichen",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
