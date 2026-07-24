@@ -506,6 +506,27 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("erstellt_at", Strategie::ZeileLoeschen),
         ],
     },
+    TabellenRegel {
+        // Ganze Zeile löschen (LFH-321): `daten` ist das eingefrorene volle Lagebild inkl.
+        // PII (Personal-Marker, Freitext-Labels) — die Nutzlast IST die PII, kein zu
+        // erhaltendes Skelett. KEINE ETB-Kopplung → nicht Retain-fähig wie lagebericht/
+        // befehl.abschnitte (deren Rechtsstand ins ETB gesnapshottet ist); bezeichnung/notiz
+        // sind Freitext-PII und werden mitentfernt.
+        tabelle: "lage_snapshot",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        spalten: &[
+            scrub("id", Strategie::ZeileLoeschen),
+            scrub("einsatz_id", Strategie::ZeileLoeschen),
+            scrub("bezeichnung", Strategie::ZeileLoeschen),
+            scrub("notiz", Strategie::ZeileLoeschen),
+            scrub("stand_at", Strategie::ZeileLoeschen),
+            scrub("schema_version", Strategie::ZeileLoeschen),
+            scrub("daten", Strategie::ZeileLoeschen),
+            scrub("erstellt_von", Strategie::ZeileLoeschen),
+            scrub("erstellt_at", Strategie::ZeileLoeschen),
+        ],
+    },
     // ---------- Lage / Gefahren (Freitext-Labels der „ELW Fam. Müller“-Klasse) ----------
     TabellenRegel {
         tabelle: "lage_zone",
