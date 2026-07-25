@@ -452,7 +452,7 @@ describe('LagekartePage', () => {
     expect(screen.getByText('marker-schaden-9')).toBeInTheDocument();
   });
 
-  it('Schmutzig-Erkennung: Basemap-Wechsel blendet „Für den Einsatz speichern" ein (LFH-319)', async () => {
+  it('Schmutzig-Erkennung: Basemap-Wechsel blendet „In dieser Ansicht speichern" ein (LFH-319)', async () => {
     basisHandler([], {
       online_styles: [{ name: 'Online', url: 'https://x/style.json', typ: 'vektor', attribution: '© X' }],
       offline_verfuegbar: true,
@@ -465,12 +465,12 @@ describe('LagekartePage', () => {
     renderSeite();
     await screen.findByText('marker-schaden-9');
     // Frisch hydratisiert = deckungsgleich mit der Ansicht → noch kein Speichern-Button.
-    expect(screen.queryByRole('button', { name: 'Für den Einsatz speichern' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'In dieser Ansicht speichern' })).toBeNull();
     // Basemap auf Blind wechseln → der Zustand weicht von der gespeicherten Ansicht ab.
     const blindLabel = screen.getByText('Blind').closest('label') ?? screen.getByText('Blind');
     await user.click(blindLabel);
     expect(
-      await screen.findByRole('button', { name: 'Für den Einsatz speichern' }),
+      await screen.findByRole('button', { name: 'In dieser Ansicht speichern' }),
     ).toBeInTheDocument();
   });
 

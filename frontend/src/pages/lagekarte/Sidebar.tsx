@@ -87,8 +87,8 @@ export interface SidebarProps {
   /** Karten-lokale Theme-Wahl (Offline-Basemap): 'auto' folgt dem App-Theme. */
   kartenTheme: KartenThemeWahl;
   onKartenThemeWechsel: (wahl: KartenThemeWahl) => void;
-  /** „Für den Einsatz speichern" (LFH-319): true, wenn der aktuelle Karten-Zustand von der
-   *  gespeicherten Ansicht abweicht (Basemap/Ebenen/Fachebenen). */
+  /** „In dieser Ansicht speichern" (LFH-319/320): true, wenn der aktuelle Karten-Zustand von
+   *  der gespeicherten Ansicht abweicht (Basemap/Ebenen/Fachebenen). */
   ansichtDirty: boolean;
   ansichtSpeichert: boolean;
   onAnsichtSpeichern: () => void;
@@ -297,8 +297,11 @@ export default function Sidebar(props: SidebarProps) {
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               Karten-Konfiguration weicht von der gespeicherten Ansicht ab.
             </Typography.Text>
+            {/* Seit LFH-320 schreibt der Button in die AKTIVE Ansicht, nicht in eine
+                einsatzweite Einstellung — die alte Beschriftung „Für den Einsatz speichern"
+                legte genau das Gegenteil nahe (LFH-325). */}
             <Button type="primary" block loading={props.ansichtSpeichert} onClick={props.onAnsichtSpeichern}>
-              Für den Einsatz speichern
+              In dieser Ansicht speichern
             </Button>
           </Space>
         </Card>

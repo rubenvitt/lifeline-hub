@@ -89,12 +89,13 @@ export default function LagekartePage() {
     [message],
   );
 
-  // „Für den Einsatz speichern": aktuellen Karten-Zustand in die Ansicht schreiben,
-  // mit Erfolgs-/Fehler-Feedback (die Mutation selbst wirft — hier gefangen).
+  // „In dieser Ansicht speichern": aktuellen Karten-Zustand in die AKTIVE Ansicht schreiben
+  // (nicht einsatzweit, LFH-320/323), mit Erfolgs-/Fehler-Feedback (die Mutation wirft —
+  // hier gefangen).
   const onAnsichtSpeichern = useCallback(async () => {
     try {
       await speichern();
-      message.success('Für den Einsatz gespeichert');
+      message.success('In der Ansicht gespeichert');
     } catch (e) {
       fehler(e);
     }

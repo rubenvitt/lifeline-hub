@@ -17,6 +17,7 @@ import { findeGeometrieAn } from './geo';
 import { createZeichnung, type Zeichnung, type ZeichenModus } from './zeichnen';
 import { wendeKartenDatenAn } from './kartenDaten';
 import { absolutiereProxyAnfrage } from './basemapStil';
+import { neuerStilFehlerWaechter } from './stilFehlerWaechter';
 import {
   baueFlaechenFc,
   baueZonenFc,
@@ -137,9 +138,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   // aufrufen können, ohne als Dependency neu zu binden.
   const oeffneSpiderRef = useRef<(clusterId: string, center: [number, number], anzahl: number) => void>(() => {});
   const schliesseSpiderRef = useRef<() => void>(() => {});
-  // true, sobald der initiale Style geladen ist → danach gelten error-Events als
-  // transient (einzelne Tiles), NICHT als Style-Ladefehler.
-  const stilGeladenRef = useRef(false);
+  // Entscheidet, welches error-Event die Basemap abstuft (LFH-325): Kachel-Fehler nie,
+  // höchstens eine Abstufung je angewandtem Style, nach dem Laden gar keine mehr.
+  const stilWaechterRef = useRef(neuerStilFehlerWaechter());
   // Eigene AttributionControl (statt der eingebauten), damit customAttribution je View
   // gesetzt werden kann. Wird bei Attribution-Wechsel entfernt und neu hinzugefügt.
   const attribControlRef = useRef<maplibregl.AttributionControl | null>(null);
@@ -211,8 +212,16 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       transformRequest: absolutiereProxyAnfrage,
     });
     map.addControl(new maplibregl.NavigationControl(), 'top-right');
+    // Fenster für die Basemap-Abstufung schließen, sobald der STYLE steht — NICHT erst bei
+    // 'load'. 'load' wartet auf das Absetzen aller sichtbaren Kacheln (Map.loaded →
+    // Style.loaded → TileManager.loaded), sein Fenster umfasst also den kompletten ersten
+    // Kachel-Lauf. 'style.load' feuert dagegen in Style._load, also erst nachdem das
+    // Style-JSON geladen und angewandt wurde — und bei einem gescheiterten Style-Fetch gar
+    // nicht (dort feuert stattdessen ein ErrorEvent). Genau die richtige Trennlinie (LFH-325).
+    map.on('style.load', () => {
+      stilWaechterRef.current.stilGeladen();
+    });
     map.on('load', () => {
-      stilGeladenRef.current = true;
       sorgeFuerAbschnittLayer(map, flaechenDatenRef.current);
       sorgeFuerZonenLayer(map, zonenDatenRef.current);
       for (const fe of fachebenenRef.current) {
@@ -266,9 +275,12 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Style wechseln (Basemap-Umschalter / Theme). Bewusst KEIN Reset von
-  // stilGeladenRef: ein Style-Ladefehler nach manuellem Wechsel wird NICHT über
-  // onStyleFehler gemeldet (Reset würde transiente Tile-Errors als Fehler werten).
+  // Style wechseln (Basemap-Umschalter / Theme). Bewusst KEIN Zurücksetzen des
+  // Geladen-Zustands: ein Style-Ladefehler nach manuellem Wechsel wird NICHT über
+  // onStyleFehler gemeldet (das würde transiente Tile-Errors als Fehler werten).
+  // `stilAngewandt()` schärft nur die EINE Abstufung je Style neu — damit bleibt die
+  // Degradationskette online→offline→blind bei echter Nicht-Erreichbarkeit erhalten,
+  // ohne dass zwei Fehler im selben Ladefenster zwei Stufen springen (LFH-325).
   //
   // WICHTIG `diff: false`: per Default difft setStyle und ist bei URL-/Vektor-Styles
   // ASYNCHRON (erst Fetch, dann Diff). In diesem Fenster liefert isStyleLoaded() noch
@@ -283,6 +295,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     if (style === angewandterStyleRef.current) return; // Mount: Konstruktor hat ihn schon
     schliesseSpiderRef.current?.(); // setStyle wischt Spider-Sources/Layer → Controller-State sonst stale
     angewandterStyleRef.current = style;
+    stilWaechterRef.current.stilAngewandt();
     map.setStyle(style, { diff: false });
     planeReAnlegenNachStyle(
       map,
@@ -318,11 +331,15 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     if (!map) return;
     const handler = (e: maplibregl.MapMouseEvent) => onKarteKlick?.({ lng: e.lngLat.lng, lat: e.lngLat.lat });
     map.on('click', handler);
-    // Nur der INITIALE Style-Ladefehler stuft die Basemap ab. MapLibre feuert
-    // 'error' auch für einzelne fehlende Tiles — die dürfen den Nutzer nicht aus
-    // dem Online-Modus werfen.
-    const fehler = () => {
-      if (!stilGeladenRef.current) onStyleFehler?.();
+    // Nur der INITIALE Style-Ladefehler stuft die Basemap ab. MapLibre feuert 'error' auch
+    // für einzelne fehlende Tiles — und zwar ZWANGSLÄUFIG vor 'load', weil 'load' selbst auf
+    // das Absetzen aller sichtbaren Kacheln wartet (siehe stilFehlerWaechter.ts). Die
+    // Klassifikation liegt deshalb im Wächter; hier wird nur verdrahtet und laut protokolliert,
+    // damit eine Abstufung im Feld nachvollziehbar ist statt still die Karte zu leeren.
+    const fehler = (e: unknown) => {
+      if (!stilWaechterRef.current.meldeFehler(e as { tile?: unknown })) return;
+      console.warn('[Lagekarte] Basemap-Style nicht ladbar → Abstufung der Anzeige', e);
+      onStyleFehler?.();
     };
     map.on('error', fehler);
     return () => {
