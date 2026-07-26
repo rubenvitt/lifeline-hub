@@ -163,6 +163,42 @@ describe('SnapshotLeiste', () => {
     expect(onWaehle).toHaveBeenCalledWith(10); // Neustart am ältesten Stand
   });
 
+  it('Ausblenden lässt nur den Einblenden-Knopf stehen, Einblenden holt die Leiste zurück', async () => {
+    renderLeiste([snapshot({ id: 7, bezeichnung: 'Stand A' })], { darfSichern: true });
+    await userEvent.click(await screen.findByRole('button', { name: 'Zeitachse ausblenden' }));
+    expect(screen.queryByRole('button', { name: 'Stand A' })).toBeNull();
+    expect(screen.queryByLabelText('Snapshot-Bezeichnung')).toBeNull();
+    expect(screen.queryByRole('slider')).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zeitachse einblenden' }));
+    expect(screen.getByRole('button', { name: 'Stand A' })).toBeInTheDocument();
+  });
+
+  it('der eingeklappte Zustand überlebt einen Remount (per-User gemerkt)', async () => {
+    const erst = renderLeiste([snapshot({ id: 7, bezeichnung: 'Stand A' })], {});
+    await userEvent.click(await screen.findByRole('button', { name: 'Zeitachse ausblenden' }));
+    erst.unmount();
+
+    renderLeiste([snapshot({ id: 7, bezeichnung: 'Stand A' })], {});
+    expect(await screen.findByRole('button', { name: 'Zeitachse einblenden' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Stand A' })).toBeNull();
+  });
+
+  it('Ausblenden stoppt eine laufende Wiedergabe (sonst liefe sie ohne sichtbare Pause-Taste weiter)', async () => {
+    renderLeiste(
+      [
+        snapshot({ id: 10, bezeichnung: 'A', stand_at: '2026-07-24 08:00:00' }),
+        snapshot({ id: 20, bezeichnung: 'B', stand_at: '2026-07-24 09:00:00' }),
+      ],
+      {},
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Abspielen' }));
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Zeitachse ausblenden' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Zeitachse einblenden' }));
+    expect(screen.getByRole('button', { name: 'Abspielen' })).toBeInTheDocument();
+  });
+
   it('„Aktuell" unterbricht eine laufende Wiedergabe', async () => {
     const onWaehle = vi.fn();
     renderLeiste(

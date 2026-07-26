@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { App, Button, Input, Slider, Space, theme, Tooltip } from 'antd';
-import { CameraOutlined, PauseOutlined, PlayCircleOutlined } from '@ant-design/icons';
+import { CameraOutlined, DownOutlined, HistoryOutlined, PauseOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { einsatzKeys } from '../../api/queryKeys';
 import { ladeLageSnapshot } from '../../api/lageSnapshot';
@@ -9,6 +9,28 @@ import { useLageSnapshots } from './useLageSnapshots';
 
 /** Feste Anzeigedauer je Stand im Replay (D/LFH-322). */
 export const ANZEIGE_MS = 2500;
+
+// Ein-/Ausklappen ist eine Per-User-Anzeigevorliebe, KEINE Ansichts-Konfiguration: die Leiste
+// liegt über der Karte und ist ein Werkzeug auf Abruf, kein Dauerelement. Deshalb localStorage
+// (Muster wie alarmTon/ThemeModeProvider) und bewusst NICHT der Konfig-Bag von `useKartenAnsicht`
+// — dort würde sie geteilt und jede Klapp-Aktion machte die Ansicht schmutzig.
+const SPEICHER_SCHLUESSEL = 'lfh:lagekarte:zeitachse-eingeklappt';
+
+function gespeichertEingeklappt(): boolean {
+  try {
+    return localStorage.getItem(SPEICHER_SCHLUESSEL) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function merkeEingeklappt(wert: boolean): void {
+  try {
+    localStorage.setItem(SPEICHER_SCHLUESSEL, wert ? '1' : '0');
+  } catch {
+    /* localStorage nicht verfügbar → nicht persistierbar, kein harter Fehler */
+  }
+}
 
 interface SnapshotLeisteProps {
   einsatzId: number;
@@ -33,6 +55,10 @@ function chipLabel(bezeichnung: string | null | undefined, standAt: string): str
  * die Auswahl gespeicherter Stände (Chips) und der Replay über die Zeitleiste (Slider +
  * Play/Pause mit fester Anzeigedauer, Vorladen des nächsten Dokuments gegen Flackern). Die
  * Auswahl schaltet die Karte über `?snapshot=` in den schreibgeschützten Historien-Modus.
+ *
+ * Ein-/ausklappbar (LFH-353): das Band liegt über der Karte und ist ein Werkzeug auf Abruf, kein
+ * Dauerelement. Eingeklappt bleibt nur ein kleiner Knopf unten links stehen; der Zustand ist
+ * per-User gemerkt (localStorage), NICHT Teil der geteilten Ansichts-Konfiguration.
  */
 export function SnapshotLeiste({ einsatzId, darfSichern, aktiverSnapshotId, onWaehle, fehler }: SnapshotLeisteProps) {
   const { message } = App.useApp();
@@ -41,6 +67,7 @@ export function SnapshotLeiste({ einsatzId, darfSichern, aktiverSnapshotId, onWa
   const { snapshots, sichern, sichertGerade } = useLageSnapshots(einsatzId);
   const [bezeichnung, setBezeichnung] = useState('');
   const [spielt, setSpielt] = useState(false);
+  const [eingeklappt, setEingeklappt] = useState(gespeichertEingeklappt);
 
   // Chronologisch (alt → neu) für die Zeitleiste; das Backend liefert neueste zuerst.
   const chrono = useMemo(
@@ -100,8 +127,38 @@ export function SnapshotLeiste({ einsatzId, darfSichern, aktiverSnapshotId, onWa
     onWaehle(null);
   };
 
+  const klappeUm = (zu: boolean) => {
+    setEingeklappt(zu);
+    merkeEingeklappt(zu);
+    // Einklappen stoppt eine laufende Wiedergabe: ein Replay, das die Karte weiterschaltet,
+    // während die Pause-Taste nicht sichtbar ist, wäre eine Falle. Der Historien-Modus selbst
+    // bleibt bestehen — der Rückweg steht im HistorienBanner.
+    if (zu) setSpielt(false);
+  };
+
   // Nichts anzeigen, wenn es weder etwas zu sichern noch etwas zu betrachten gibt.
   if (!darfSichern && snapshots.length === 0) return null;
+
+  if (eingeklappt) {
+    return (
+      <Tooltip title="Zeitachse einblenden">
+        <Button
+          size="small"
+          icon={<HistoryOutlined />}
+          aria-label="Zeitachse einblenden"
+          onClick={() => klappeUm(false)}
+          style={{
+            position: 'absolute',
+            bottom: 12,
+            left: 12,
+            zIndex: 5,
+            background: token.colorBgElevated,
+            boxShadow: token.boxShadow,
+          }}
+        />
+      </Tooltip>
+    );
+  }
 
   const marks = Object.fromEntries(chrono.map((_, i) => [i, '']));
 
@@ -202,6 +259,19 @@ export function SnapshotLeiste({ einsatzId, darfSichern, aktiverSnapshotId, onWa
           ))}
         </div>
       )}
+
+      {/* Ganz rechts, `marginLeft: auto` trägt auch dann, wenn der Zeitleisten-Block mit
+          seinem flex:1 fehlt (Schreibrecht, aber noch keine Stände). */}
+      <Tooltip title="Zeitachse ausblenden">
+        <Button
+          size="small"
+          type="text"
+          icon={<DownOutlined />}
+          aria-label="Zeitachse ausblenden"
+          onClick={() => klappeUm(true)}
+          style={{ marginLeft: 'auto' }}
+        />
+      </Tooltip>
     </div>
   );
 }
