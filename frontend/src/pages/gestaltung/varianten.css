@@ -933,3 +933,120 @@
   text-transform: uppercase;
   letter-spacing: 1px;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   D · NACHTKARTE — die Kreuzung aus A und C.
+
+   Aus A: Flächenwirkung und Ruhe. Tiefe statt harter Trennung, weicher Radius,
+          Schatten als Erhebung, dunkler Grund fürs Fahrzeug bei Nacht.
+   Aus C: die Formensprache. Dreiecksmarker nach DV 102, das Messtischblatt-
+          Raster als sehr leiser Grund, gesperrte Versalien als Kartenbeschriftung,
+          der kartenblaue Bedienton.
+
+   Schrift: Archivo Narrow für die Köpfe (kartografisch, schmal) über IBM Plex
+   Sans/Mono für Text und Zahlen (ingenieurhaft, bester Ziffernsatz der drei
+   Kandidaten). 110,1 KB · 6 Schnitte.
+   ════════════════════════════════════════════════════════════════════════ */
+
+.gs--d {
+  --gs-schrift-text: 'LFH Plex Sans', system-ui, sans-serif;
+  --gs-schrift-display: 'LFH Archivo Narrow', 'LFH Plex Sans', system-ui, sans-serif;
+  --gs-schrift-zahl: 'LFH Plex Mono', ui-monospace, monospace;
+
+  --gs-radius-flaeche: 8px;
+  --gs-radius-steuer: 4px;
+  --gs-radius-marke: 0;
+  --gs-kachel-rahmen: 1px solid var(--gs-linie-stark);
+  --gs-kz-fuge: 1px;
+  --gs-raster-fuge: 12px;
+  --gs-raster-luft: 12px;
+  --gs-raster-grund: transparent;
+  --gs-zeilenhoehe: 38px;
+  --gs-versal-sperrung: 2px;
+}
+
+.gs--d[data-modus='dunkel'] {
+  --gs-grund: #0a141d;
+  --gs-flaeche: #12212e;
+  --gs-flaeche-2: #182b3b;
+  --gs-linie: #1e3446;
+  --gs-linie-stark: #5e6c76; /* 3,03:1 — der Umrissrahmen trägt die Kachel (aus C) */
+  --gs-raster-linie: rgba(126, 196, 227, 0.06);
+  --gs-text: #dfe9f1;
+  --gs-gedaempft: #9cb4c6;
+  --gs-schwach: #7e98ab;
+  --gs-bedien: #7ec4e3;
+  --gs-alarm: #ff8072;
+  --gs-achtung: #f2bc4c;
+  --gs-normal: #5fc793;
+  --gs-marke: #e04552;
+  --gs-marke-glut: 0 0 12px 0 rgba(224, 69, 82, 0.5);
+  --gs-alarm-fuellung: rgba(255, 128, 114, 0.1);
+  --gs-achtung-fuellung: rgba(242, 188, 76, 0.1);
+  --gs-normal-fuellung: rgba(95, 199, 147, 0.1);
+  --gs-erhebung: 0 10px 26px -14px rgba(0, 0, 0, 0.85);
+}
+
+.gs--d[data-modus='hell'] {
+  --gs-grund: #e4e6e2;
+  --gs-flaeche: #f5f4f0;
+  --gs-flaeche-2: #ebeae4;
+  --gs-linie: #cfd0c9;
+  --gs-linie-stark: #868e93; /* 3,03:1 — s. o., Tagmodus */
+  --gs-raster-linie: rgba(28, 74, 100, 0.07);
+  --gs-text: #12262f;
+  --gs-gedaempft: #45606c;
+  --gs-schwach: #536e7a;
+  --gs-bedien: #145a75;
+  --gs-alarm: #a82e1e;
+  --gs-achtung: #7a5200;
+  --gs-normal: #1e6144;
+  --gs-marke: #a8071a;
+  --gs-marke-glut: none;
+  --gs-alarm-fuellung: rgba(168, 46, 30, 0.07);
+  --gs-achtung-fuellung: rgba(122, 82, 0, 0.08);
+  --gs-normal-fuellung: rgba(30, 97, 68, 0.07);
+  --gs-erhebung: 0 8px 22px -16px rgba(18, 38, 47, 0.45);
+}
+
+/* Kartenraster im Grund — leiser als in C, damit die Tiefe aus A trägt. */
+.gs--d .gs-flaeche {
+  background-image:
+    linear-gradient(var(--gs-raster-linie) 1px, transparent 1px),
+    linear-gradient(90deg, var(--gs-raster-linie) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* Dreiecksmarker aus der DV-102-Formensprache (aus C). */
+.gs--d .gs-marker {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 9px solid;
+}
+.gs--d .gs-marker--alarm {
+  border-bottom-color: var(--gs-alarm);
+}
+.gs--d .gs-marker--achtung {
+  border-bottom-color: var(--gs-achtung);
+}
+.gs--d .gs-marker--normal {
+  border-bottom-color: var(--gs-normal);
+}
+
+/* Der Akzentstrich bleibt A: der glühende 36 × 3 px Balken der Anmeldeseite —
+   das ist die vorhandene Marke, und C hätte sie durch ein Dreieck ersetzt. */
+.gs--d .gs-kachel__kopf .gs-marke__strich {
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 9px solid var(--gs-bedien);
+  width: 0;
+  height: 0;
+  background: none;
+}
+
+.gs--d .gs-zeile__von {
+  text-transform: uppercase;
+  letter-spacing: 0.9px;
+}

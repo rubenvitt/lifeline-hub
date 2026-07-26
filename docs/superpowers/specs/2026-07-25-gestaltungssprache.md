@@ -33,6 +33,29 @@ dieselben Sweep-Befunde um (Wortlaut statt nackter Zähler, zweiter Kanal neben 
 `tabular-nums`, Instrumentenband, Fehler ≠ leer) — sie unterscheiden sich in der Haltung,
 nicht im Funktionsumfang.
 
+### Runde 2 (26.07.): B ist raus, D kommt dazu
+
+Der Auftraggeber hat **A und C** als Favoriten benannt, **B ist damit verworfen** — die
+entsättigte Werkzeugtafel war die nüchternste und dichteste Richtung, aber nicht die, in der
+sich die Anwendung wiedererkennen soll.
+
+A und C liegen nicht so weit auseinander, wie die Vorrunde annahm („C lässt sich nicht
+mischen"). Diese Annahme galt für den **Grundton** — sie gilt nicht für die **Formensprache**.
+Deshalb steht jetzt eine vierte Richtung zur Wahl, gebaut als echte Kreuzung:
+
+|              | D · Nachtkarte                                                                                                                                        |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Aus A**    | Flächenwirkung und Ruhe: Radius 8 px, Schatten als Erhebung, dunkler Grund fürs Fahrzeug, der glühende Akzentstrich der Anmeldeseite als Marke        |
+| **Aus C**    | Formensprache: Dreiecksmarker nach DV 102, Messtischblatt-Raster als leiser Grund, gesperrte Versalien als Kartenbeschriftung, kartenblauer Bedienton |
+| **Schrift**  | Archivo Narrow für die Köpfe (kartografisch, schmal) über IBM Plex Sans / Plex Mono (bester Ziffernsatz der Kandidaten)                               |
+| **Budget**   | 110,1 KB · 6 Schnitte                                                                                                                                 |
+| **Kontrast** | alle Ziele erfüllt, tragende Linien 3,03:1 in beiden Modi                                                                                             |
+
+D beantwortet die Frage, die zwischen A und C steht: **muss man sich zwischen der Tiefe der
+Anmeldeseite und der Fachsprache der Karte entscheiden?** Die Antwort ist nein — die Tiefe
+sitzt in Fläche, Radius und Schatten, die Fachsprache in Ikonografie, Raster und Beschriftung.
+Beides ist orthogonal und lässt sich zusammen tragen.
+
 ## Was in allen drei Richtungen schon entschieden ist
 
 Diese Punkte sind **nicht** Teil der Wahl — sie gelten unabhängig davon, welche Richtung

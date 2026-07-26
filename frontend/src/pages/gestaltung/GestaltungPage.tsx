@@ -42,7 +42,7 @@ import './schriften.css';
 import './varianten.css';
 import './harness.css';
 
-type Variante = 'a' | 'b' | 'c';
+type Variante = 'a' | 'b' | 'c' | 'd';
 type Modus = 'hell' | 'dunkel';
 
 const VARIANTEN: { key: Variante; name: string; these: string; schrift: string }[] = [
@@ -64,6 +64,13 @@ const VARIANTEN: { key: Variante; name: string; these: string; schrift: string }
     name: 'C · Kartenwerk',
     these: 'Messtischblatt-Raster, Umrissrahmen statt Flächen, Dreiecksmarker nach DV 102.',
     schrift: 'Archivo / Archivo Narrow / JetBrains Mono',
+  },
+  {
+    key: 'd',
+    name: 'D · Nachtkarte',
+    these:
+      'Kreuzung aus A und C: Flächenwirkung und Ruhe von A, Formensprache und Kartenton von C.',
+    schrift: 'Archivo Narrow (Köpfe) / IBM Plex Sans / Plex Mono',
   },
 ];
 
