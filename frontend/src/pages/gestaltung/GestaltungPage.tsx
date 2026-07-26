@@ -42,7 +42,7 @@ import './schriften.css';
 import './varianten.css';
 import './harness.css';
 
-type Variante = 'a' | 'b' | 'c' | 'd';
+type Variante = 'a' | 'b' | 'c' | 'd' | 'e';
 type Modus = 'hell' | 'dunkel';
 
 const VARIANTEN: { key: Variante; name: string; these: string; schrift: string }[] = [
@@ -71,6 +71,13 @@ const VARIANTEN: { key: Variante; name: string; these: string; schrift: string }
     these:
       'Kreuzung aus A und C: Flächenwirkung und Ruhe von A, Formensprache und Kartenton von C.',
     schrift: 'Archivo Narrow (Köpfe) / IBM Plex Sans / Plex Mono',
+  },
+  {
+    key: 'e',
+    name: 'E · Lagekarte nachts',
+    these:
+      'Farben aus A, Dichte aus B, Formensprache aus C: Nachtblau und blaue Bedienfarbe, kompakte Polsterung, Radius 0 mit Umrissrahmen, Kartenraster und DV-102-Dreiecke.',
+    schrift: 'Archivo / Archivo Narrow / JetBrains Mono',
   },
 ];
 

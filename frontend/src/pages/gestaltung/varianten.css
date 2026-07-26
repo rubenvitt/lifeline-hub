@@ -1050,3 +1050,142 @@
   text-transform: uppercase;
   letter-spacing: 0.9px;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   E · LAGEKARTE NACHTS — Farben aus A, Dichte aus B, Formensprache aus C.
+
+   Die Wahl des Auftraggebers, aus drei Richtungen zusammengesetzt:
+     Farben (A)  Nachtblau und kühles Blaugrau, blaue Bedienfarbe, der glühende
+                 rote Akzentstrich der Anmeldeseite als Marke.
+     Dichte (B)  13,5 px Grundschrift, 11/18 px Polsterung, 30 px Zeilenhöhe,
+                 kompakte Kennzahlen — rund ein Drittel mehr Inhalt je Fläche.
+     Stil (C)    Radius 0, Umrissrahmen statt Erhebung, Messtischblatt-Raster,
+                 Dreiecksmarker nach DV 102, weit gesperrte Kartenbeschriftung,
+                 Archivo / Archivo Narrow / JetBrains Mono.
+
+   Die Trennlinien tragen hier die Kachel (Stil C) und liegen deshalb bei ≥ 3:1
+   — A allein käme mit 1,63:1 aus, weil dort Radius und Schatten mittragen.
+   ════════════════════════════════════════════════════════════════════════ */
+
+.gs--e {
+  --gs-schrift-text: 'LFH Archivo', system-ui, sans-serif;
+  --gs-schrift-display: 'LFH Archivo Narrow', 'LFH Archivo', system-ui, sans-serif;
+  --gs-schrift-zahl: 'LFH JetBrains Mono', ui-monospace, monospace;
+
+  /* Form: C */
+  --gs-radius-flaeche: 0;
+  --gs-radius-steuer: 0;
+  --gs-radius-marke: 0;
+  --gs-kachel-rahmen: 1px solid var(--gs-linie-stark);
+  --gs-erhebung: none;
+  --gs-versal-sperrung: 2.2px;
+
+  /* Dichte: B */
+  --gs-luft-1: 3px;
+  --gs-luft-2: 7px;
+  --gs-luft-3: 11px;
+  --gs-luft-4: 18px;
+  --gs-zeilenhoehe: 30px;
+  --gs-kz-fuge: 1px;
+  --gs-raster-fuge: 8px;
+  --gs-raster-luft: 8px;
+  --gs-raster-grund: transparent;
+  font-size: 13.5px;
+}
+
+/* Kennzahlen dichter als in A/C/D — der Streifen kostet dort 76 px Höhe. */
+.gs--e .gs-kz {
+  min-height: 62px;
+}
+
+.gs--e .gs-zahl--gross {
+  font-size: 20px;
+}
+
+.gs--e .gs-staerke {
+  font-size: 25px;
+}
+
+/* Farben: A, mit der einen nötigen Abweichung — die tragende Linie. */
+.gs--e[data-modus='dunkel'] {
+  --gs-grund: #0b0e13;
+  --gs-flaeche: #161c25;
+  --gs-flaeche-2: #1d242f;
+  --gs-linie: #262f3b;
+  --gs-linie-stark: #606874; /* 3,04:1 — im Stil C trägt der Rahmen die Kachel */
+  --gs-raster-linie: rgba(111, 180, 236, 0.055);
+  --gs-text: #dee5ec;
+  --gs-gedaempft: #9aa7b6;
+  --gs-schwach: #7d8b9b;
+  --gs-bedien: #6fb4ec;
+  --gs-alarm: #ff7a7f;
+  --gs-achtung: #f5b942;
+  --gs-normal: #5cc48d;
+  --gs-marke: #e04552;
+  --gs-marke-glut: 0 0 12px 0 rgba(224, 69, 82, 0.55);
+  --gs-alarm-fuellung: rgba(255, 122, 127, 0.1);
+  --gs-achtung-fuellung: rgba(245, 185, 66, 0.1);
+  --gs-normal-fuellung: rgba(92, 196, 141, 0.1);
+}
+
+.gs--e[data-modus='hell'] {
+  --gs-grund: #e7ebf0;
+  --gs-flaeche: #ffffff;
+  --gs-flaeche-2: #f2f5f8;
+  --gs-linie: #d3dae2;
+  --gs-linie-stark: #8c949e; /* 3,07:1 — s. o. */
+  --gs-raster-linie: rgba(26, 95, 160, 0.07);
+  --gs-text: #10161e;
+  --gs-gedaempft: #4a5563;
+  --gs-schwach: #5a6675;
+  --gs-bedien: #1a5fa0;
+  --gs-alarm: #b02318;
+  --gs-achtung: #7a5200;
+  --gs-normal: #1c6640;
+  --gs-marke: #a8071a;
+  --gs-marke-glut: 0 0 10px 0 rgba(168, 7, 26, 0.3);
+  --gs-alarm-fuellung: rgba(176, 35, 24, 0.07);
+  --gs-achtung-fuellung: rgba(122, 82, 0, 0.08);
+  --gs-normal-fuellung: rgba(28, 102, 64, 0.07);
+}
+
+/* Messtischblatt-Raster im Grund (Stil C), gezogen in A-Blau. */
+.gs--e .gs-flaeche {
+  background-image:
+    linear-gradient(var(--gs-raster-linie) 1px, transparent 1px),
+    linear-gradient(90deg, var(--gs-raster-linie) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* Dreiecksmarker nach DV 102 (Stil C). */
+.gs--e .gs-marker {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 9px solid;
+}
+.gs--e .gs-marker--alarm {
+  border-bottom-color: var(--gs-alarm);
+}
+.gs--e .gs-marker--achtung {
+  border-bottom-color: var(--gs-achtung);
+}
+.gs--e .gs-marker--normal {
+  border-bottom-color: var(--gs-normal);
+}
+
+/* Sektionsmarke als Dreieck (C) — der Akzentstrich der Marke bleibt A. */
+.gs--e .gs-kachel__kopf .gs-marke__strich {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 9px solid var(--gs-bedien);
+  background: none;
+}
+
+.gs--e .gs-zeile__von {
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
