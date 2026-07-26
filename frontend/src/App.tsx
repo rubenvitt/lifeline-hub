@@ -48,6 +48,12 @@ import { modulRegistry } from './einsatz/modulRegistry';
 
 const LagekartePage = lazy(() => import('./pages/LagekartePage'));
 const KraefteuebersichtPage = lazy(() => import('./pages/KraefteuebersichtPage'));
+/* LFH-352 · Sandbox für die Variantenrunde der Gestaltungssprache. Vollbild,
+   außerhalb von AppLayout/EinsatzLayout — die Varianten sollen den ganzen
+   Schirm zeigen, nicht in der heutigen Schale sitzen. Wird nach der
+   Richtungsentscheidung samt Seite und CSS wieder entfernt; deshalb lazy
+   geladen und bewusst NICHT in `routing/deeplinks.ts` eingetragen. */
+const GestaltungPage = lazy(() => import('./pages/gestaltung/GestaltungPage'));
 
 /**
  * Module mit echter Implementierung; alle übrigen rendern den ModulStub.
@@ -100,6 +106,15 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route element={<RequireAuth />}>
+        {/* LFH-352 · Gestaltungs-Sandbox (temporär, siehe Kommentar am Import) */}
+        <Route
+          path="/gestaltung/:id"
+          element={
+            <Suspense fallback={<div style={{ padding: 24 }}>Entwürfe werden geladen…</div>}>
+              <GestaltungPage />
+            </Suspense>
+          }
+        />
         {/* Ebene 1 — globale Shell */}
         <Route element={<AppLayout />}>
           <Route path="/einsaetze" element={<EinsaetzePage />} />

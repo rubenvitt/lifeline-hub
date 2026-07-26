@@ -1,0 +1,137 @@
+/* LFH-352 · Schriftkandidaten für die Variantenrunde.
+   ALLE Schnitte sind lokal ausgeliefert (SIL OFL 1.1) — kein Google-Fonts-CDN,
+   kein externer Abruf zur Laufzeit. Der Fükw arbeitet ohne Netz.
+   Die woff2 tragen bereits das `latin`-Subset (U+0000–00FF: deutsche Diakritika
+   und ß vollständig). Feineres Subsetting folgt erst nach der Richtungsentscheidung
+   — dann bleibt genau EINE Paarung übrig, die anderen beiden fliegen raus.
+
+   Gemessene Budgets (echte Dateigröße, nicht Blockgröße):
+     Plex     117,6 KB · 6 Schnitte
+     Atkinson  56,2 KB · 5 Schnitte
+     Archivo   96,6 KB · 6 Schnitte
+   Alle drei liegen unter dem 200-KB-Deckel aus LFH-352. */
+
+/* ── Paarung 1 · Plex — ingenieurhafte Grotesk, eine Familie über alle Rollen ── */
+@font-face {
+  font-family: 'LFH Plex Sans';
+  src: url('../../assets/fonts/ibm-plex-sans-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'LFH Plex Sans';
+  src: url('../../assets/fonts/ibm-plex-sans-500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'LFH Plex Sans';
+  src: url('../../assets/fonts/ibm-plex-sans-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'LFH Plex Cond';
+  src: url('../../assets/fonts/ibm-plex-sans-condensed-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'LFH Plex Mono';
+  src: url('../../assets/fonts/ibm-plex-mono-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'LFH Plex Mono';
+  src: url('../../assets/fonts/ibm-plex-mono-500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ── Paarung 2 · Atkinson Hyperlegible — auf Zeichenunterscheidbarkeit gezeichnet ── */
+@font-face {
+  font-family: 'LFH Atkinson';
+  src: url('../../assets/fonts/atkinson-hyperlegible-next-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'LFH Atkinson';
+  src: url('../../assets/fonts/atkinson-hyperlegible-next-500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'LFH Atkinson';
+  src: url('../../assets/fonts/atkinson-hyperlegible-next-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'LFH Atkinson Mono';
+  src: url('../../assets/fonts/atkinson-hyperlegible-mono-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'LFH Atkinson Mono';
+  src: url('../../assets/fonts/atkinson-hyperlegible-mono-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ── Paarung 3 · Archivo — kantige Grotesk + Schmalschnitt für Köpfe ── */
+@font-face {
+  font-family: 'LFH Archivo';
+  src: url('../../assets/fonts/archivo-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'LFH Archivo';
+  src: url('../../assets/fonts/archivo-500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'LFH Archivo';
+  src: url('../../assets/fonts/archivo-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'LFH Archivo Narrow';
+  src: url('../../assets/fonts/archivo-narrow-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'LFH JetBrains Mono';
+  src: url('../../assets/fonts/jetbrains-mono-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'LFH JetBrains Mono';
+  src: url('../../assets/fonts/jetbrains-mono-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
