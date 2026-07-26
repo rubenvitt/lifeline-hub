@@ -1,3 +1,7 @@
+// Reihenfolge zählt: erst die Schriftrollen, dann die Farb-/Formrollen, dann
+// das globale CSS, das beide benutzt (LFH-352 · A0).
+import './theme/schriften.css';
+import './theme/rollen.css';
 import './index.css';
 import React from 'react';
 import ReactDOM from 'react-dom/client';

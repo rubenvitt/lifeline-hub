@@ -41,8 +41,13 @@ describe('App-Routing', () => {
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     );
     renderApp('/einsaetze/7');
+    // Das Dashboard trägt die Bezeichnung seit LFH-352 im Instrumentenband, nicht
+    // mehr als Seitenüberschrift — die Überschriften-Ebene gehört jetzt den
+    // Kachelköpfen. Geprüft wird deshalb das Band selbst.
     await waitFor(() =>
-      expect(screen.getByRole('heading', { name: 'Hochwasser Nord' })).toBeInTheDocument(),
+      expect(
+        screen.getAllByText('Hochwasser Nord').some((e) => e.classList.contains('lfh-band__titel')),
+      ).toBe(true),
     );
     // Panel öffnet sich auf dem Redirect-Pfad zur Kategorie des Ziel-Moduls (Lage).
     expect(await screen.findByText('Lage')).toBeInTheDocument();

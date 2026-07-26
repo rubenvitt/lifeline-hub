@@ -1,12 +1,13 @@
 /**
- * LFH-352 · Sandbox — Datenmodell der Variantenrunde.
+ * Datenmodell des Lage-Dashboards (LFH-352 · A0).
  *
- * Verdichtet die ECHTEN Queries des Lage-Dashboards auf ein flaches, darstellungs-
- * neutrales Lagebild. Zweck: die drei Gestaltungsvarianten zeigen dieselben echten
- * Zahlen desselben Einsatzes — Unterschiede sind dann Gestaltung, nicht Datenlage.
+ * Verdichtet die 15 Queries der Seite auf ein flaches, darstellungsneutrales
+ * Lagebild. Die Trennung ist Absicht: die Seite entscheidet über Form, diese
+ * Datei über Bedeutung — welche Zahl alarmiert, welcher Wortlaut zu ihr gehört.
  *
- * Diese Datei ist Wegwerf-Gerüst: sie verschwindet mit der Sandbox, sobald die
- * Richtungsentscheidung gefallen und die Referenzseite gebaut ist.
+ * Entstanden als Datenschicht der Variantenrunde; sie hat den Vergleich der
+ * Entwürfe ehrlich gehalten (gleiche Zahlen, verschiedene Gestaltung) und ist
+ * mit der Entscheidung in die Referenzseite übergegangen.
  */
 import type {
   Auftrag,
@@ -34,7 +35,7 @@ import {
   verdichteSchaeden,
   verdichteTiere,
   verdichteUhs,
-} from '../lage-dashboard/lageVerdichtung';
+} from './lageVerdichtung';
 
 /** Die vier Datenzustände, die eine Gestaltungssprache tragen muss.
  *  `fehler` und `leer` sind bewusst getrennt — der Sweep-Befund lautet
@@ -111,6 +112,13 @@ const WARNSTUFE_WORT: Record<Warnstufe, string> = {
 export function dtgKurz(d: Date): string {
   const zz = (n: number) => String(n).padStart(2, '0');
   return `${zz(d.getDate())}${zz(d.getHours())}${zz(d.getMinutes())}`;
+}
+
+/** DTG des Aufrufzeitpunkts. Eigene Funktion, damit Tests sie stellen können —
+ *  ein Instrumentenband mit stehengebliebener Uhr wäre im Einsatz ein Fehler,
+ *  und ein Test, der `new Date()` nicht kontrollieren kann, ist flaky. */
+export function dtgJetzt(): string {
+  return dtgKurz(new Date());
 }
 
 /** `2026-07-26 14:32:00` → `14:32`. */

@@ -74,21 +74,28 @@
   margin-bottom: 28px;
 }
 
+/* Der Akzentstrich ist Signatur-Element 1 der Gestaltungssprache (LFH-352 · A0).
+   Er liest jetzt die Markenrolle statt `var(--ant-color-primary, …)` — diese
+   Variable griff nie, weil der ConfigProvider kein `cssVar: true` setzt, und lief
+   still auf ihren Fallback. Damit ist eine der acht #a8071a-Stellen aus A2 hier
+   schon erledigt; Radius und Glühen kommen ebenfalls aus den Rollen. */
 .login-marke__akzent {
   display: block;
   width: 36px;
   height: 3px;
   margin-bottom: 16px;
-  border-radius: 2px;
-  background: var(--ant-color-primary, #a8071a);
-  box-shadow: 0 0 12px 0 rgba(168, 7, 26, 0.6);
+  border-radius: var(--lfh-radius-marke);
+  background: var(--lfh-marke);
+  box-shadow: var(--lfh-marke-glut);
 }
 
 .login-marke__name {
   margin: 0;
+  font-family: var(--lfh-schrift-display);
   font-size: 26px;
   font-weight: 600;
-  letter-spacing: 0.5px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
   color: #f5f5f5;
   line-height: 1.1;
 }
@@ -97,9 +104,11 @@
   margin: 6px 0 0;
   font-size: 12px;
   font-weight: 500;
-  letter-spacing: 2px;
+  letter-spacing: var(--lfh-versal-sperrung);
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.5);
+  /* 0,5 Deckkraft ergab auf der Glaskarte rund 4,4:1 — knapp unter dem Boden aus
+     A1. 0,66 hebt es über 4,5:1, ohne die Metadaten-Stimme laut zu machen. */
+  color: rgba(255, 255, 255, 0.66);
 }
 
 /* Dev-Schnellanmeldung: dezenter, abgesetzter Block über dem Formular.
@@ -132,6 +141,7 @@
   text-align: center;
   letter-spacing: 0.5em;
   text-indent: 0.5em;
+  font-family: var(--lfh-schrift-zahl);
   font-variant-numeric: tabular-nums;
   font-size: 20px;
 }

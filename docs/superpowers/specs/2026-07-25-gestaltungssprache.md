@@ -155,20 +155,58 @@ Specimen geprüft (`1 l I` · `0 O` · `5 S` · `8 B` · `2 Z` · `6 b 9 g`):
 JetBrains Mono 400/600) — gut unter dem 200-KB-Deckel. Der Ordner enthält derzeit noch alle
 Kandidaten (270,4 KB); Plex und Atkinson fliegen mit dem Aufräumen der Sandbox raus.
 
-## Was jetzt noch zu tun ist
+## Umgesetzt (26.07.2026)
 
-- **Referenzseite:** das echte Lage-Dashboard in E umsetzen und mergen — der Maßstab, gegen
-  den jeder Band-C-Task geprüft wird.
-- **`tokens.ts` ausbauen:** die Rollen aus `varianten.css` als benannte Token verankern
-  (Übergabe an A2 / LFH-328).
-- **Anmeldeseite nachziehen** (Schrift, Farben, Kontrast), damit sie Referenz bleibt und nicht
-  zum Sonderfall wird — nimmt LFH-314 gestalterisch mit auf.
-- **Schriften aufräumen und subsetten:** nur noch Archivo / Archivo Narrow / JetBrains Mono,
-  auf die tatsächlich benutzten Zeichen reduziert; nicht gewählte Familien und ihre
-  Lizenztexte entfernen.
-- **Sandbox entfernen** (siehe unten).
-- **Offline-Nachweis:** Anwendung mit blockiertem Netz starten und prüfen, dass die Schrift
-  rendert statt auf die Systemschrift zurückzufallen.
+A0 ist vollständig — die Sprache steht nicht nur im Dokument, sondern in der Anwendung:
+
+|                       | Wo                                                                                                                                                       |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Rollen, TS-Seite**  | `frontend/src/theme/tokens.ts` — Farbrollen je Modus, Abstandsraster, Form, Schriftrollen, plus `antdToken()` als **einzige** Ableitungsrichtung zu antd |
+| **Rollen, CSS-Seite** | `frontend/src/theme/rollen.css` — dieselben Werte als statische Custom Properties unter `:root` / `[data-theme='dark']`                                  |
+| **Driftschutz**       | `frontend/src/theme/rollen.guard.test.ts` — 43 Prüfungen, die beide Seiten Wert für Wert vergleichen                                                     |
+| **Bausteine**         | `frontend/src/theme/sprache.css` — die fünf Signatur-Elemente, ausschließlich aus `--lfh-*` gebaut                                                       |
+| **Schriften**         | `frontend/src/theme/schriften.css` + `src/assets/fonts/` — 96,6 KB, 6 Schnitte, OFL-Texte daneben                                                        |
+| **Referenzseite**     | `frontend/src/pages/lage-dashboard/LageDashboardPage.tsx` — das echte Dashboard in E                                                                     |
+| **Anmeldeseite**      | `frontend/src/pages/LoginPage.css` — Akzentstrich, Marke und TOTP-Ziffern auf die Rollen gezogen                                                         |
+
+**Warum die CSS-Rollen statisch sind und nicht aus dem Provider kommen:** `index.html` setzt
+`data-theme` synchron vor dem React-Mount. Eine Property, die erst ein `useEffect` an `<html>`
+hängt, existiert beim ersten Paint nicht — jede Regel, die sie liest, fiele auf ihren Fallback,
+und im Nachtbetrieb wäre das ein weißer Blitz.
+
+**Warum die Redundanz einen Test braucht:** eine Drift zwischen `tokens.ts` und `rollen.css`
+**bricht nichts**. Kein Fehler, kein roter Build — die antd-Fläche trüge nur eine andere Farbe
+als die handgeschriebene daneben, und das fiele erst jemandem im Einsatz auf. Derselbe Grund,
+aus dem die Wire-Strings der Query-Keys byte-gepinnt sind.
+
+### Gemessene Nachweise
+
+- **Offline:** Anwendung mit hart abgebrochenen Fremd-Anfragen geladen — 0 externe Requests,
+  alle drei Familien geladen, Fließtext rendert in `LFH Archivo`, Zahlen in
+  `LFH JetBrains Mono`. Keine Systemschrift-Ersetzung.
+- **Budget:** `du -ch frontend/src/assets/fonts/*.woff2` → 108K Blockgröße, 96,6 KB echt.
+- **Kein CDN:** `grep -rn "fonts.googleapis\|fonts.gstatic" frontend/` = 0 Treffer.
+- **Testsuite:** 1600 Vitest-Tests grün, `pnpm lint --max-warnings 0` und `tsc` sauber.
+
+### Was der Umbau am Verhalten geändert hat
+
+- **Kennzahl-genaue Datenzustände.** Vorher zeigte eine tote Abfrage `—` wie „nichts
+  vorhanden". Jetzt zeigt jede Kennzahl den Zustand **ihrer eigenen** Quelle: `?` plus „Stand
+  unbekannt" bei Fehler, `····` beim Laden. Ein Ausfall der Gefahrenmatrix macht die
+  Patientenzahl daneben **nicht** unkenntlich — dafür gibt es einen eigenen Test.
+- **Die Seitenüberschrift ist weg.** Die Bezeichnung steht im Instrumentenband; die
+  Überschriften-Ebene gehört den Kachelköpfen. `App.test.tsx` und der Dashboard-Test sind
+  mitgezogen, nicht gelöscht — sie belegen weiterhin dieselben Zahlen.
+- **Die alten Kachel-Komponenten sind entfallen** (`BetroffeneKachel`, `KraefteKachel`,
+  `InfrastrukturKachel`, `LageberichtKachel`, `AuftraegeKachel`, `MeldungenKachel`,
+  `KennzahlenLeiste`, `klickbar`). Ihre Logik lebt in `lagebild.ts`, ihre Form in `sprache.css`.
+
+### Container-Queries statt Viewport — mit sichtbarer Folge
+
+Die Referenzseite bricht bei **1366 px Viewport** auf zwei Kachelspalten, weil Sidebar und
+Modulpanel rund 420 px wegnehmen und der Inhalt real ~950 px hat. Das ist kein Fehler, sondern
+der Zweck: der Breakpoint richtet sich nach der Fläche, die der Inhalt wirklich hat. Eine
+Viewport-Media-Query hätte hier drei Spalten in 950 px gequetscht.
 
 ## Was bewusst noch nicht entschieden ist
 

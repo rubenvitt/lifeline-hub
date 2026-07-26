@@ -1,0 +1,592 @@
+/* Gestaltungssprache „E · Lagekarte nachts" (LFH-352 · A0) — die Bausteine.
+   ============================================================================
+   Referenzimplementierung der fünf Signatur-Elemente. Alles hier liest
+   ausschließlich `--lfh-*` aus `rollen.css` — kein Literalwert, keine zweite
+   Farbentscheidung. Wer eine Farbe hart einträgt, hebelt die Sprache aus.
+
+   Die Klassen sind bewusst allgemein gehalten (`lfh-kachel`, nicht
+   `lage-dashboard-kachel`): Band B hebt sie zu React-Primitiven, Band C
+   konsumiert sie. Bis dahin ist das Lage-Dashboard ihr einziger Konsument und
+   zugleich die Referenzseite, gegen die jeder C-Task geprüft wird.
+
+   NICHT ANTD: diese Bausteine kommen ohne antd-Komponenten aus. Nicht aus
+   Prinzip, sondern weil antd seine eigene Formensprache mitbringt (Radien,
+   Schatten, Polsterung) und sie genau da überschreiben würde, wo die Handschrift
+   sitzt. Formulare, Tabellen und Overlays bleiben antd — mit den Tokens aus
+   `tokens.ts`.
+   ========================================================================== */
+
+/* ── Fläche mit Kartenraster ───────────────────────────────────────────────
+   Signatur: das Messtischblatt-Raster liegt IM GRUND, nie über dem Text. */
+.lfh-flaeche {
+  background: var(--lfh-grund);
+  color: var(--lfh-text);
+  font-family: var(--lfh-schrift-text);
+  font-size: var(--lfh-schriftgroesse);
+  line-height: 1.45;
+  background-image:
+    linear-gradient(var(--lfh-raster-linie) 1px, transparent 1px),
+    linear-gradient(90deg, var(--lfh-raster-linie) 1px, transparent 1px);
+  background-size: 28px 28px;
+
+  /* Container-Query-Wurzel: die Breakpoints richten sich nach der Fläche, die
+     der Inhalt wirklich hat — nicht nach dem Viewport. Sonst stimmt das Raster
+     nur am Designer-Monitor und nicht in einem schmalen Panel daneben. */
+  container-type: inline-size;
+  container-name: lfh;
+}
+
+.lfh-flaeche *,
+.lfh-flaeche *::before,
+.lfh-flaeche *::after {
+  box-sizing: border-box;
+}
+
+/* Fokus-Ring in der BEDIENFARBE, nie in Signalrot (LFH-315). */
+.lfh-flaeche :focus-visible {
+  outline: 2px solid var(--lfh-bedien);
+  outline-offset: 2px;
+}
+
+/* ── Signatur 1 · Der Akzentstrich als Marke ───────────────────────────────
+   36 × 3 px mit Glühen — unverändert aus der Anmeldeseite übernommen. */
+.lfh-marke {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lfh-marke__strich {
+  display: block;
+  width: 36px;
+  height: 3px;
+  flex: 0 0 auto;
+  background: var(--lfh-marke);
+  border-radius: var(--lfh-radius-marke);
+  box-shadow: var(--lfh-marke-glut);
+}
+
+.lfh-marke__name {
+  font-family: var(--lfh-schrift-display);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 2px;
+}
+
+/* ── Signatur 2 · Das Dreieck als Sektionsmarke (DV 102) ───────────────────
+   Trägt Kachelköpfe und Zeilenmarker. Weil es eine FORM ist, unterscheidet es
+   Statusstufen auch ohne Farbe — der zweite Kanal aus WCAG 1.4.1. */
+.lfh-zeichen {
+  width: 0;
+  height: 0;
+  flex: 0 0 auto;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 9px solid var(--lfh-bedien);
+}
+
+.lfh-zeichen--alarm {
+  border-bottom-color: var(--lfh-alarm);
+}
+.lfh-zeichen--achtung {
+  border-bottom-color: var(--lfh-achtung);
+}
+.lfh-zeichen--normal {
+  border-bottom-color: var(--lfh-normal);
+}
+
+/* ── Signatur 3 · Zahlen als Instrument ────────────────────────────────────
+   `tabular-nums` überall, wo fachlich gezählt oder verglichen wird. Ziffern-
+   flattern in einer Stärkeangabe ist ein Lesefehler, kein Schönheitsfehler. */
+.lfh-zahl {
+  font-family: var(--lfh-schrift-zahl);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: 0;
+}
+
+.lfh-zahl--gross {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.lfh-zahl--mittel {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+/** Stärke in BOS-Schreibweise (1/3/18//22) — das größte Element ihrer Kachel. */
+.lfh-staerke {
+  font-size: 25px;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: 0.5px;
+}
+
+/* ── Signatur 4 · Das Instrumentenband ─────────────────────────────────────
+   Die Größen, die im Einsatz nie fehlen dürfen — schmal, immer sichtbar,
+   immer an derselben Stelle. */
+.lfh-band {
+  display: flex;
+  align-items: center;
+  gap: var(--lfh-luft-4);
+  padding: var(--lfh-luft-2) var(--lfh-luft-3);
+  background: var(--lfh-flaeche);
+  border-bottom: 1px solid var(--lfh-linie-stark);
+  flex-wrap: wrap;
+}
+
+.lfh-band__wert {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.lfh-band__titel {
+  font-family: var(--lfh-schrift-display);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lfh-band__verbindung {
+  display: flex;
+  align-items: center;
+  gap: var(--lfh-luft-2);
+  margin-left: auto;
+}
+
+.lfh-puls {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: var(--lfh-radius-marke);
+  background: var(--lfh-normal);
+}
+
+.lfh-puls--alarm {
+  background: var(--lfh-alarm);
+}
+
+/* ── Signatur 5 · Gesperrte Versalien als Metadaten-Stimme ─────────────────
+   Der Unterschied zwischen Formular und Werkzeug. */
+.lfh-etikett {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: var(--lfh-versal-sperrung);
+  text-transform: uppercase;
+  color: var(--lfh-gedaempft);
+  white-space: nowrap;
+}
+
+.lfh-zusatz {
+  font-size: 11.5px;
+  color: var(--lfh-schwach);
+}
+
+.lfh-fussnote {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--lfh-gedaempft);
+}
+
+/* ── Kennzahlenleiste ──────────────────────────────────────────────────────
+   Kennzahlen tragen WORTLAUT, nicht nur Zähler („hoch" statt „3"). */
+.lfh-kennzahlen {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--lfh-linie);
+  border-bottom: 1px solid var(--lfh-linie-stark);
+}
+
+.lfh-kz {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--lfh-luft-1);
+  padding: var(--lfh-luft-3);
+  min-height: 62px;
+  background: var(--lfh-flaeche);
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--lfh-uebergang);
+}
+
+.lfh-kz:hover {
+  background: var(--lfh-flaeche-2);
+}
+
+/* Zweiter Kanal: eine Kante trägt die Stufe mit, nicht nur die Ziffernfarbe. */
+.lfh-kz--alarm {
+  box-shadow: inset 3px 0 0 0 var(--lfh-alarm);
+}
+.lfh-kz--alarm .lfh-zahl--gross {
+  color: var(--lfh-alarm);
+}
+.lfh-kz--achtung {
+  box-shadow: inset 3px 0 0 0 var(--lfh-achtung);
+}
+.lfh-kz--achtung .lfh-zahl--gross {
+  color: var(--lfh-achtung);
+}
+
+/* ── Kachelraster ──────────────────────────────────────────────────────────
+   Umrissrahmen statt Erhebung: die Kachel ist eine Kartensignatur, kein Blatt
+   Papier, das über der Fläche schwebt. */
+.lfh-raster {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px;
+}
+
+.lfh-kachel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--lfh-flaeche);
+  border: 1px solid var(--lfh-linie-stark);
+  border-radius: var(--lfh-radius-flaeche);
+}
+
+.lfh-kachel--breit {
+  grid-column: 1 / -1;
+}
+
+.lfh-kachel__kopf {
+  display: flex;
+  align-items: center;
+  gap: var(--lfh-luft-2);
+  padding: var(--lfh-luft-2) var(--lfh-luft-3);
+  border-bottom: 1px solid var(--lfh-linie);
+}
+
+.lfh-kachel__titel {
+  margin: 0;
+  font-family: var(--lfh-schrift-display);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: var(--lfh-versal-sperrung);
+  text-transform: uppercase;
+}
+
+.lfh-kachel__mehr {
+  margin-left: auto;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--lfh-bedien);
+}
+
+.lfh-kachel__leib {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lfh-luft-2);
+  padding: var(--lfh-luft-3);
+  flex: 1;
+}
+
+/* ── Werteblöcke ───────────────────────────────────────────────────────────── */
+.lfh-felder {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--lfh-linie);
+  border: 1px solid var(--lfh-linie);
+}
+
+.lfh-feld {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--lfh-luft-2);
+  background: var(--lfh-flaeche-2);
+}
+
+.lfh-feld--alarm .lfh-zahl {
+  color: var(--lfh-alarm);
+}
+.lfh-feld--achtung .lfh-zahl {
+  color: var(--lfh-achtung);
+}
+
+.lfh-werte {
+  display: flex;
+  gap: var(--lfh-luft-4);
+  margin: 0;
+  flex-wrap: wrap;
+}
+
+.lfh-werte--liste {
+  flex-direction: column;
+  gap: var(--lfh-luft-1);
+}
+
+.lfh-werte > div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.lfh-werte--liste > div {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--lfh-luft-3);
+  padding: 3px 0;
+  border-bottom: 1px solid var(--lfh-linie);
+}
+
+.lfh-werte--liste > div:last-child {
+  border-bottom: 0;
+}
+
+.lfh-werte dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* ── Plaketten — Farbe IMMER mit Text, nie allein ──────────────────────────── */
+.lfh-plakette {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border: 1px solid;
+  border-radius: var(--lfh-radius-steuer);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.lfh-plakette--alarm {
+  color: var(--lfh-alarm);
+  border-color: var(--lfh-alarm);
+  background: var(--lfh-alarm-fuellung);
+}
+.lfh-plakette--achtung {
+  color: var(--lfh-achtung);
+  border-color: var(--lfh-achtung);
+  background: var(--lfh-achtung-fuellung);
+}
+.lfh-plakette--normal {
+  color: var(--lfh-normal);
+  border-color: var(--lfh-normal);
+  background: var(--lfh-normal-fuellung);
+}
+
+/* ── Ereigniszeilen ────────────────────────────────────────────────────────── */
+.lfh-zeilen {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.lfh-zeile {
+  display: flex;
+  align-items: center;
+  gap: var(--lfh-luft-2);
+  min-height: var(--lfh-zeilenhoehe);
+  padding: var(--lfh-luft-1) 0;
+  border-top: 1px solid var(--lfh-linie);
+  font-size: 13px;
+}
+
+.lfh-zeile:first-child {
+  border-top: 0;
+}
+
+.lfh-zeile time {
+  color: var(--lfh-gedaempft);
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+
+.lfh-zeile__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lfh-zeile__quelle {
+  flex: 0 0 auto;
+  color: var(--lfh-schwach);
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* ── Datenzustände: LADEN, FEHLER und LEER sehen verschieden aus ───────────
+   Der Sweep-Befund lautet „Fehler sieht aus wie leer" — wer daraus eine Lage
+   funkt, funkt falsch. Deshalb tragen sie hier verschiedene Form UND Wortlaut. */
+.lfh-skelett {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lfh-luft-2);
+  padding: var(--lfh-luft-1) 0;
+}
+
+.lfh-skelett__balken {
+  height: 12px;
+  width: 100%;
+  background: var(--lfh-linie);
+  animation: lfh-puls 1.4s ease-in-out infinite;
+}
+
+.lfh-skelett__balken--gross {
+  height: 26px;
+  width: 55%;
+}
+.lfh-skelett__balken--kurz {
+  width: 35%;
+}
+
+@keyframes lfh-puls {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+.lfh-fehler {
+  display: flex;
+  gap: var(--lfh-luft-3);
+  padding: var(--lfh-luft-3);
+  border: 1px solid var(--lfh-alarm);
+  background: var(--lfh-alarm-fuellung);
+}
+
+.lfh-fehler__zeichen {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--lfh-alarm);
+  color: var(--lfh-alarm);
+  font-family: var(--lfh-schrift-display);
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.lfh-fehler__titel {
+  display: block;
+  color: var(--lfh-alarm);
+  font-size: 13px;
+}
+
+.lfh-fehler__text {
+  margin: 2px 0 var(--lfh-luft-2);
+  font-size: 12px;
+  color: var(--lfh-gedaempft);
+}
+
+.lfh-leer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--lfh-luft-2);
+  padding: var(--lfh-luft-3) 0;
+}
+
+.lfh-leer__text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--lfh-gedaempft);
+}
+
+/* Jeder Leerzustand führt zu einer Aktion (Bestand: 1 von 46). */
+.lfh-knopf {
+  padding: 7px 14px;
+  min-height: 32px;
+  border: 1px solid var(--lfh-bedien);
+  border-radius: var(--lfh-radius-steuer);
+  background: transparent;
+  color: var(--lfh-bedien);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  transition:
+    background var(--lfh-uebergang),
+    color var(--lfh-uebergang);
+}
+
+.lfh-knopf:hover {
+  background: var(--lfh-bedien);
+  color: var(--lfh-grund);
+}
+
+/* Bewegung nur mit Bedeutung — und nie erzwungen. */
+@media (prefers-reduced-motion: reduce) {
+  .lfh-flaeche *,
+  .lfh-flaeche *::before,
+  .lfh-flaeche *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Schmale Schirme ───────────────────────────────────────────────────────
+   Schwellen an den Einsatzkontexten: > 1100 px Fükw (13–15"), 700–1100 px
+   Führungs-Tablet, < 700 px mobil. Die Staffel selbst gehört A1 (LFH-327). */
+@container lfh (max-width: 1100px) {
+  .lfh-kennzahlen {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .lfh-raster {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container lfh (max-width: 700px) {
+  .lfh-kennzahlen {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .lfh-raster {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* Abgeschnittene Etiketten sind im Einsatz schlimmer als eine zweite Zeile. */
+  .lfh-etikett {
+    white-space: normal;
+  }
+  /* Die Quelle rutscht unter den Text, statt ihm die Breite zu nehmen. */
+  .lfh-zeile {
+    flex-wrap: wrap;
+    row-gap: 0;
+  }
+  .lfh-zeile__text {
+    flex: 1 1 100%;
+    order: 3;
+    white-space: normal;
+  }
+  .lfh-zeile__quelle {
+    margin-left: auto;
+  }
+}
+
+/* Der „Öffnen"-Verweis im Kachelkopf ist ein Knopf (er navigiert), soll aber
+   wie Text aussehen — sonst konkurriert er mit der eigentlichen Aktion. */
+.lfh-knopf-blank {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}

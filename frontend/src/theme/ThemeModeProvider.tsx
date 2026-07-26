@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 import { ConfigProvider, theme as antdTheme } from 'antd';
 import deDE from 'antd/locale/de_DE';
-import { baseToken } from './tokens';
+import { antdToken, farbenDunkel, farbenHell } from './tokens';
 
 /** Vom Nutzer wählbarer Modus. `system` folgt der OS-Einstellung. */
 export type ThemeModus = 'system' | 'light' | 'dark';
@@ -68,7 +68,10 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
       <ConfigProvider
         locale={deDE}
         theme={{
-          token: baseToken,
+          // Die Farbrollen kommen je Modus aus derselben Quelle wie `rollen.css`
+          // (LFH-352 · A0). Der antd-Algorithmus bleibt darunter: er leitet die
+          // abgeleiteten Töne (Hover, Rand, Füllung) aus den gesetzten ab.
+          token: antdToken(effektiv === 'dark' ? farbenDunkel : farbenHell),
           algorithm: effektiv === 'dark' ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
         }}
       >

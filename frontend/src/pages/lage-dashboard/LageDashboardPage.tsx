@@ -1,8 +1,24 @@
-import { Alert, Breadcrumb, Col, Row, Space, Spin, Tag, Typography } from 'antd';
-import { formatZeitKurz } from '../../kommunikation/zeit';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+/**
+ * Lage-Dashboard — die Referenzseite der Gestaltungssprache (LFH-352 · A0).
+ *
+ * Diese Seite ist der Maßstab, gegen den jeder Band-C-Modulumbau geprüft wird.
+ * Eine Gestaltungssprache, die nur im Dokument steht, wird nicht befolgt.
+ *
+ * Sie zeigt die fünf Signatur-Elemente an echten Daten: Akzentstrich als Marke,
+ * Dreieck als Sektionsmarke (DV 102), Zahlen als Instrument (`tabular-nums`),
+ * Instrumentenband, gesperrte Versalien als Metadaten-Stimme.
+ *
+ * DREI DATENZUSTÄNDE, DREI ERSCHEINUNGEN. Der Sweep-Befund lautete „Fehler sieht
+ * aus wie leer": eine fehlgeschlagene Abfrage rendert denselben Leerzustand wie
+ * „nichts vorhanden", und das Dashboard meldete während des Ladens „Kräfte
+ * 0/0/0//0". Wer in dem Moment ans Funkgerät geht, meldet eine falsche Lage.
+ * Deshalb hängt jede Kachel an ihren eigenen Queries und unterscheidet
+ * `lädt` / `Fehler` / `leer` sichtbar.
+ */
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { Alert, Breadcrumb } from 'antd';
 import { einsatzKeys } from '../../api/queryKeys';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { listePersonen } from '../../api/einsatzPerson';
@@ -19,18 +35,81 @@ import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
 import { listeEinsatzMaterial } from '../../api/einsatzMaterial';
 import { listeAbschnitte } from '../../api/einsatzabschnitte';
-import { baueKraeftebild } from '../../kraefte/kraeftebild';
-import {
-  neuesterLagebericht, verdichteGefahrengebiete, verdichtePersonen,
-  verdichteSchaeden, verdichteTiere, verdichteUhs,
-} from './lageVerdichtung';
-import KennzahlenLeiste from './KennzahlenLeiste';
-import BetroffeneKachel from './BetroffeneKachel';
-import KraefteKachel from './KraefteKachel';
-import InfrastrukturKachel from './InfrastrukturKachel';
-import LageberichtKachel from './LageberichtKachel';
-import AuftraegeKachel from './AuftraegeKachel';
-import MeldungenKachel from './MeldungenKachel';
+import { baueLagebild, dtgJetzt, type Datenzustand, type Dringlichkeit } from './lagebild';
+import '../../theme/sprache.css';
+
+/** Verdichtet mehrere Queries auf den Zustand, den ihre Kachel zeigen muss.
+ *  Fehler schlägt Laden: eine halb geladene Kachel mit einem toten Teil darf
+ *  nicht so aussehen, als wäre sie vollständig. */
+function zustandVon(...queries: UseQueryResult<unknown>[]): Datenzustand {
+  if (queries.some((q) => q.isError)) return 'fehler';
+  if (queries.some((q) => q.isLoading)) return 'laden';
+  return 'daten';
+}
+
+function Plakette({ stufe, children }: { stufe: Dringlichkeit; children: React.ReactNode }) {
+  return <span className={`lfh-plakette lfh-plakette--${stufe}`}>{children}</span>;
+}
+
+function Kachel(props: {
+  titel: string;
+  mehr: string;
+  zustand: Datenzustand;
+  leer?: boolean;
+  leerText: string;
+  leerAktion: string;
+  aufMehr: () => void;
+  aufNeuladen: () => void;
+  breit?: boolean;
+  children: React.ReactNode;
+}) {
+  const { titel, mehr, zustand, leer, leerText, leerAktion, aufMehr, aufNeuladen, breit } = props;
+  return (
+    <section className={`lfh-kachel${breit ? ' lfh-kachel--breit' : ''}`}>
+      <header className="lfh-kachel__kopf">
+        <span className="lfh-zeichen" aria-hidden="true" />
+        <h2 className="lfh-kachel__titel">{titel}</h2>
+        <button type="button" className="lfh-kachel__mehr lfh-knopf-blank" onClick={aufMehr}>
+          {mehr}
+        </button>
+      </header>
+      <div className="lfh-kachel__leib">
+        {zustand === 'laden' && (
+          <div className="lfh-skelett" aria-busy="true" aria-label={`${titel} wird geladen`}>
+            <span className="lfh-skelett__balken lfh-skelett__balken--gross" />
+            <span className="lfh-skelett__balken" />
+            <span className="lfh-skelett__balken lfh-skelett__balken--kurz" />
+          </div>
+        )}
+        {zustand === 'fehler' && (
+          <div className="lfh-fehler" role="alert">
+            <span className="lfh-fehler__zeichen" aria-hidden="true">
+              !
+            </span>
+            <div>
+              <b className="lfh-fehler__titel">Daten nicht abrufbar</b>
+              <p className="lfh-fehler__text">
+                Stand unbekannt — nicht als Lage melden. Letzter Abruf fehlgeschlagen.
+              </p>
+              <button type="button" className="lfh-knopf" onClick={aufNeuladen}>
+                Erneut abrufen
+              </button>
+            </div>
+          </div>
+        )}
+        {zustand === 'daten' && leer && (
+          <div className="lfh-leer">
+            <p className="lfh-leer__text">{leerText}</p>
+            <button type="button" className="lfh-knopf" onClick={aufMehr}>
+              {leerAktion}
+            </button>
+          </div>
+        )}
+        {zustand === 'daten' && !leer && props.children}
+      </div>
+    </section>
+  );
+}
 
 export default function LageDashboardPage() {
   const { id } = useParams();
@@ -38,91 +117,406 @@ export default function LageDashboardPage() {
   const navigate = useNavigate();
   const gehe = (route: string) => navigate(`/einsaetze/${einsatzId}/${route}`);
 
-  const einsatzQuery = useQuery({ queryKey: einsatzKeys.einsatz(einsatzId), queryFn: () => ladeEinsatz(einsatzId) });
-  // Query-Keys IDENTISCH zu den vom Live-Hook (useEinsatzLiveStream) invalidierten Keys.
-  const personenQuery = useQuery({ queryKey: einsatzKeys.personen(einsatzId), queryFn: () => listePersonen(einsatzId) });
-  const tiereQuery = useQuery({ queryKey: einsatzKeys.tiere(einsatzId), queryFn: () => listeTiere(einsatzId) });
-  const uhsQuery = useQuery({ queryKey: einsatzKeys.uhs(einsatzId), queryFn: () => listeUhs(einsatzId) });
-  const schaedenQuery = useQuery({ queryKey: einsatzKeys.schaeden(einsatzId), queryFn: () => listeSchaeden(einsatzId) });
-  const gefahrenQuery = useQuery({ queryKey: einsatzKeys.gefahrengebiete(einsatzId), queryFn: () => ladeGefahrengebiete(einsatzId) });
-  const zonenQuery = useQuery({ queryKey: einsatzKeys.zonen(einsatzId), queryFn: () => listeZonen(einsatzId) });
-  const lageberichteQuery = useQuery({ queryKey: einsatzKeys.lageberichte(einsatzId), queryFn: () => listeLageberichte(einsatzId) });
-  const einheitenQuery = useQuery({ queryKey: einsatzKeys.einheiten(einsatzId), queryFn: () => listeEinheiten(einsatzId) });
-  const personalQuery = useQuery({ queryKey: einsatzKeys.personal(einsatzId), queryFn: () => listeEinsatzPersonal(einsatzId) });
-  const fahrzeugeQuery = useQuery({ queryKey: einsatzKeys.fahrzeuge(einsatzId), queryFn: () => listeEinsatzFahrzeuge(einsatzId) });
-  const materialQuery = useQuery({ queryKey: einsatzKeys.material(einsatzId), queryFn: () => listeEinsatzMaterial(einsatzId) });
-  const abschnitteQuery = useQuery({ queryKey: einsatzKeys.abschnitte(einsatzId), queryFn: () => listeAbschnitte(einsatzId) });
-  const auftraegeQuery = useQuery({ queryKey: einsatzKeys.auftraege(einsatzId), queryFn: () => listeAuftraege(einsatzId) });
-  const meldungenQuery = useQuery({ queryKey: einsatzKeys.meldungen(einsatzId), queryFn: () => listeMeldungen(einsatzId) });
+  const einsatzQuery = useQuery({
+    queryKey: einsatzKeys.einsatz(einsatzId),
+    queryFn: () => ladeEinsatz(einsatzId),
+  });
+  const personenQuery = useQuery({
+    queryKey: einsatzKeys.personen(einsatzId),
+    queryFn: () => listePersonen(einsatzId),
+  });
+  const tiereQuery = useQuery({
+    queryKey: einsatzKeys.tiere(einsatzId),
+    queryFn: () => listeTiere(einsatzId),
+  });
+  const uhsQuery = useQuery({
+    queryKey: einsatzKeys.uhs(einsatzId),
+    queryFn: () => listeUhs(einsatzId),
+  });
+  const schaedenQuery = useQuery({
+    queryKey: einsatzKeys.schaeden(einsatzId),
+    queryFn: () => listeSchaeden(einsatzId),
+  });
+  const gefahrenQuery = useQuery({
+    queryKey: einsatzKeys.gefahrengebiete(einsatzId),
+    queryFn: () => ladeGefahrengebiete(einsatzId),
+  });
+  const zonenQuery = useQuery({
+    queryKey: einsatzKeys.zonen(einsatzId),
+    queryFn: () => listeZonen(einsatzId),
+  });
+  const lageberichteQuery = useQuery({
+    queryKey: einsatzKeys.lageberichte(einsatzId),
+    queryFn: () => listeLageberichte(einsatzId),
+  });
+  const einheitenQuery = useQuery({
+    queryKey: einsatzKeys.einheiten(einsatzId),
+    queryFn: () => listeEinheiten(einsatzId),
+  });
+  const personalQuery = useQuery({
+    queryKey: einsatzKeys.personal(einsatzId),
+    queryFn: () => listeEinsatzPersonal(einsatzId),
+  });
+  const fahrzeugeQuery = useQuery({
+    queryKey: einsatzKeys.fahrzeuge(einsatzId),
+    queryFn: () => listeEinsatzFahrzeuge(einsatzId),
+  });
+  const materialQuery = useQuery({
+    queryKey: einsatzKeys.material(einsatzId),
+    queryFn: () => listeEinsatzMaterial(einsatzId),
+  });
+  const abschnitteQuery = useQuery({
+    queryKey: einsatzKeys.abschnitte(einsatzId),
+    queryFn: () => listeAbschnitte(einsatzId),
+  });
+  const auftraegeQuery = useQuery({
+    queryKey: einsatzKeys.auftraege(einsatzId),
+    queryFn: () => listeAuftraege(einsatzId),
+  });
+  const meldungenQuery = useQuery({
+    queryKey: einsatzKeys.meldungen(einsatzId),
+    queryFn: () => listeMeldungen(einsatzId),
+  });
 
-  const kraefteFehler = einheitenQuery.isError || personalQuery.isError
-    || fahrzeugeQuery.isError || materialQuery.isError || abschnitteQuery.isError;
-  const kraefte = useMemo(() => {
-    if (kraefteFehler) return null;
-    return baueKraeftebild(
-      abschnitteQuery.data ?? [], einheitenQuery.data ?? [], personalQuery.data ?? [],
-      fahrzeugeQuery.data ?? [], materialQuery.data ?? [],
-    ).verdichtung;
-  }, [kraefteFehler, abschnitteQuery.data, einheitenQuery.data, personalQuery.data, fahrzeugeQuery.data, materialQuery.data]);
-
-  const betroffene = personenQuery.isError ? null : verdichtePersonen(personenQuery.data ?? []);
-  const tiere = tiereQuery.isError ? null : verdichteTiere(tiereQuery.data ?? []);
-  const uhs = uhsQuery.isError ? null : verdichteUhs(uhsQuery.data ?? []);
-  const schaeden = schaedenQuery.isError ? null : verdichteSchaeden(schaedenQuery.data ?? []);
-  const gefahren = gefahrenQuery.isError ? null : verdichteGefahrengebiete(gefahrenQuery.data ?? []);
-  const zonen = zonenQuery.isError ? null : (zonenQuery.data ?? []).length;
-  const bericht = lageberichteQuery.isError ? null : neuesterLagebericht(lageberichteQuery.data ?? []);
-  const einheitenAnzahl = einheitenQuery.isError ? null : (einheitenQuery.data ?? []).length;
-  const abschnitteAnzahl = abschnitteQuery.isError ? null : (abschnitteQuery.data ?? []).length;
-  const auftraege = auftraegeQuery.isError ? null : (auftraegeQuery.data ?? []);
-  const meldungen = meldungenQuery.isError ? null : (meldungenQuery.data ?? []);
-
-  if (einsatzQuery.isLoading) {
-    return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
-  }
-  if (einsatzQuery.isError || !einsatzQuery.data) {
-    return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
-  }
   const einsatz = einsatzQuery.data;
 
+  const lagebild = useMemo(() => {
+    if (!einsatz) return null;
+    return baueLagebild({
+      einsatz,
+      personen: personenQuery.data ?? [],
+      tiere: tiereQuery.data ?? [],
+      uhs: uhsQuery.data ?? [],
+      schaeden: schaedenQuery.data ?? [],
+      gefahren: gefahrenQuery.data ?? [],
+      zonen: zonenQuery.data ?? [],
+      lageberichte: lageberichteQuery.data ?? [],
+      einheiten: einheitenQuery.data ?? [],
+      personal: personalQuery.data ?? [],
+      fahrzeuge: fahrzeugeQuery.data ?? [],
+      material: materialQuery.data ?? [],
+      abschnitte: abschnitteQuery.data ?? [],
+      auftraege: auftraegeQuery.data ?? [],
+      meldungen: meldungenQuery.data ?? [],
+    });
+  }, [
+    einsatz,
+    personenQuery.data,
+    tiereQuery.data,
+    uhsQuery.data,
+    schaedenQuery.data,
+    gefahrenQuery.data,
+    zonenQuery.data,
+    lageberichteQuery.data,
+    einheitenQuery.data,
+    personalQuery.data,
+    fahrzeugeQuery.data,
+    materialQuery.data,
+    abschnitteQuery.data,
+    auftraegeQuery.data,
+    meldungenQuery.data,
+  ]);
+
+  // Je Kachel der Zustand ihrer eigenen Quellen — nicht ein globaler.
+  const zBetroffene = zustandVon(personenQuery);
+  const zKraefte = zustandVon(
+    abschnitteQuery,
+    einheitenQuery,
+    personalQuery,
+    fahrzeugeQuery,
+    materialQuery,
+  );
+  const zInfra = zustandVon(uhsQuery, schaedenQuery, tiereQuery, zonenQuery);
+  const zBericht = zustandVon(lageberichteQuery);
+  const zAuftraege = zustandVon(auftraegeQuery);
+  const zMeldungen = zustandVon(meldungenQuery);
+  // Je Kennzahl der Zustand IHRER Quelle, nicht ein Sammelzustand: fällt die
+  // Gefahrenmatrix aus, darf das die Patientenzahl nicht mit unkenntlich machen.
+  // Die Reihenfolge ist die aus `baueLagebild` — beide Listen stehen und fallen
+  // gemeinsam, deshalb prüft ein Test sie gegeneinander.
+  const kennzahlZustaende: Datenzustand[] = [
+    zKraefte,
+    zBetroffene,
+    zBetroffene,
+    zustandVon(gefahrenQuery),
+    zustandVon(schaedenQuery),
+    zustandVon(uhsQuery),
+  ];
+  // Der Verbindungszustand im Band spricht für die ganze Seite.
+  const zGesamt: Datenzustand = [
+    zBetroffene,
+    zKraefte,
+    zInfra,
+    zBericht,
+    zAuftraege,
+    zMeldungen,
+    zustandVon(gefahrenQuery),
+  ].includes('fehler')
+    ? 'fehler'
+    : 'daten';
+
+  if (einsatzQuery.isError || (!einsatzQuery.isLoading && !einsatz)) {
+    return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+  }
+
   return (
-    <div>
+    <>
       <Breadcrumb
-        style={{ marginBottom: 12 }}
-        items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Lage-Dashboard' }]}
+        style={{ marginBottom: 8 }}
+        items={[
+          { title: <Link to="/einsaetze">Einsätze</Link> },
+          { title: einsatz?.bezeichnung ?? '…' },
+          { title: 'Lage-Dashboard' },
+        ]}
       />
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 8 }} align="center">
-        <div>
-          <Typography.Title level={3} style={{ margin: 0 }}>{einsatz.bezeichnung}</Typography.Title>
-          <Typography.Text type="secondary">
-            {[einsatz.stichwort, `seit ${formatZeitKurz(einsatz.begonnen_at)}`, einsatz.org_name]
-              .filter(Boolean).join(' · ')}
-          </Typography.Text>
+
+      <div className="lfh-flaeche">
+        {/* Signatur 4 · Instrumentenband */}
+        <header className="lfh-band">
+          <div className="lfh-marke">
+            <span className="lfh-marke__strich" aria-hidden="true" />
+            <span className="lfh-marke__name">LIFELINE HUB</span>
+          </div>
+          <div className="lfh-band__wert">
+            <span className="lfh-etikett">Einsatz</span>
+            <b className="lfh-band__titel">{einsatz?.bezeichnung ?? '—'}</b>
+          </div>
+          <div className="lfh-band__wert">
+            <span className="lfh-etikett">DTG</span>
+            <b className="lfh-zahl">{dtgJetzt()}</b>
+          </div>
+          <div className="lfh-band__wert">
+            <span className="lfh-etikett">Gesamtstärke</span>
+            <b className="lfh-zahl">
+              {zKraefte === 'daten' && lagebild ? lagebild.staerke : '—/—/—//—'}
+            </b>
+          </div>
+          <div className="lfh-band__verbindung">
+            <span
+              className={`lfh-puls${zGesamt === 'fehler' ? ' lfh-puls--alarm' : ''}`}
+              aria-hidden="true"
+            />
+            <span className="lfh-etikett">
+              {zGesamt === 'fehler' ? 'Verbindung gestört' : 'Live verbunden'}
+            </span>
+          </div>
+        </header>
+
+        {/* Kennzahlen — Wortlaut statt nackter Zähler */}
+        <div className="lfh-kennzahlen">
+          {(lagebild?.kennzahlen ?? []).map((k, i) => {
+            const z = kennzahlZustaende[i] ?? 'daten';
+            return (
+              <button
+                type="button"
+                key={k.etikett}
+                className={`lfh-kz${k.stufe && k.stufe !== 'normal' && z === 'daten' ? ` lfh-kz--${k.stufe}` : ''}`}
+                onClick={() => gehe(k.route)}
+              >
+                <span className="lfh-etikett">{k.etikett}</span>
+                {z === 'laden' ? (
+                  <b className="lfh-zahl lfh-zahl--gross" aria-busy="true">
+                    ····
+                  </b>
+                ) : z === 'fehler' ? (
+                  <b className="lfh-zahl lfh-zahl--gross" title="Stand unbekannt">
+                    ?
+                  </b>
+                ) : (
+                  <b className="lfh-zahl lfh-zahl--gross">{k.wert}</b>
+                )}
+                <span className="lfh-zusatz">
+                  {z === 'fehler' ? 'Stand unbekannt' : z === 'laden' ? 'wird abgerufen' : k.zusatz}
+                </span>
+              </button>
+            );
+          })}
         </div>
-        <Space>
-          <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
-          <Tag color="blue">Live</Tag>
-        </Space>
-      </Space>
 
-      <KennzahlenLeiste
-        kraefte={kraefte}
-        patienten={betroffene?.patienten ?? null}
-        vermisst={betroffene?.vermisst ?? null}
-        warnstufe={gefahren?.hoechste ?? null}
-        schaedenOffen={schaeden?.offen ?? null}
-        uhsAktiv={uhs?.aktiv ?? null}
-        onNavigate={gehe}
-      />
+        <div className="lfh-raster">
+          <Kachel
+            titel="Betroffene"
+            mehr="Personenliste"
+            zustand={zBetroffene}
+            leer={lagebild?.betroffeneGesamt === 0}
+            leerText="Noch keine Personen erfasst."
+            leerAktion="Person aufnehmen"
+            aufMehr={() => gehe('personen')}
+            aufNeuladen={() => void personenQuery.refetch()}
+          >
+            <div className="lfh-felder">
+              {(lagebild?.sichtung ?? []).map((s) => (
+                <div key={s.etikett} className={`lfh-feld lfh-feld--${s.stufe}`}>
+                  <span className="lfh-etikett">{s.etikett}</span>
+                  <b className="lfh-zahl lfh-zahl--mittel">{s.wert}</b>
+                </div>
+              ))}
+            </div>
+            <p className="lfh-fussnote">
+              {lagebild?.betroffeneGesamt ?? 0} erfasst
+              {(lagebild?.vermisst ?? 0) > 0 && (
+                <>
+                  {' · '}
+                  <Plakette stufe="alarm">{lagebild?.vermisst} vermisst</Plakette>
+                </>
+              )}
+            </p>
+          </Kachel>
 
-      <Row gutter={[16, 16]}>
-        <Col xs={24} md={12} xl={8}><BetroffeneKachel betroffene={betroffene} onNavigate={gehe} /></Col>
-        <Col xs={24} md={12} xl={8}><KraefteKachel kraefte={kraefte} einheiten={einheitenAnzahl} abschnitte={abschnitteAnzahl} onNavigate={gehe} /></Col>
-        <Col xs={24} md={12} xl={8}><InfrastrukturKachel uhs={uhs} schaeden={schaeden} tiere={tiere} zonen={zonen} onNavigate={gehe} /></Col>
-        <Col xs={24} md={12} xl={8}><LageberichtKachel bericht={bericht} onNavigate={gehe} /></Col>
-        <Col xs={24} md={12} xl={8}><AuftraegeKachel auftraege={auftraege} onNavigate={gehe} /></Col>
-        <Col xs={24} md={12} xl={8}><MeldungenKachel meldungen={meldungen} onNavigate={gehe} /></Col>
-      </Row>
-    </div>
+          <Kachel
+            titel="Kräfte"
+            mehr="Meldebild"
+            zustand={zKraefte}
+            leer={lagebild?.einheiten === 0 && lagebild?.abschnitte === 0}
+            leerText="Noch keine Kräfte disponiert."
+            leerAktion="Einheiten öffnen"
+            aufMehr={() => gehe('kraefteuebersicht')}
+            aufNeuladen={() => {
+              void einheitenQuery.refetch();
+              void personalQuery.refetch();
+            }}
+          >
+            <b className="lfh-zahl lfh-staerke">{lagebild?.staerke}</b>
+            <p className="lfh-fussnote">Führer / Unterführer / Mannschaft // Gesamt</p>
+            <dl className="lfh-werte">
+              <div>
+                <dt className="lfh-etikett">Einheiten</dt>
+                <dd className="lfh-zahl">{lagebild?.einheiten}</dd>
+              </div>
+              <div>
+                <dt className="lfh-etikett">Abschnitte</dt>
+                <dd className="lfh-zahl">{lagebild?.abschnitte}</dd>
+              </div>
+              <div>
+                <dt className="lfh-etikett">Fahrzeuge gebunden</dt>
+                <dd className="lfh-zahl">
+                  {lagebild?.fahrzeugeGebunden}/{lagebild?.fahrzeugeGesamt}
+                </dd>
+              </div>
+            </dl>
+          </Kachel>
+
+          <Kachel
+            titel="Infrastruktur"
+            mehr="Übersicht"
+            zustand={zInfra}
+            leer={
+              lagebild?.uhsGesamt === 0 &&
+              lagebild?.schaedenGesamt === 0 &&
+              lagebild?.tiereAktiv === 0 &&
+              lagebild?.zonen === 0
+            }
+            leerText="Noch keine Einrichtungen, Schäden oder Zonen erfasst."
+            leerAktion="Unfallhilfsstellen öffnen"
+            aufMehr={() => gehe('unfallhilfsstellen')}
+            aufNeuladen={() => {
+              void uhsQuery.refetch();
+              void schaedenQuery.refetch();
+            }}
+          >
+            <dl className="lfh-werte lfh-werte--liste">
+              <div>
+                <dt className="lfh-etikett">UHS aktiv</dt>
+                <dd className="lfh-zahl">
+                  {lagebild?.uhsAktiv}/{lagebild?.uhsGesamt}
+                </dd>
+              </div>
+              <div>
+                <dt className="lfh-etikett">Schäden offen</dt>
+                <dd className="lfh-zahl">
+                  {lagebild?.schaedenOffen}/{lagebild?.schaedenGesamt}
+                </dd>
+              </div>
+              <div>
+                <dt className="lfh-etikett">Tiere aktiv</dt>
+                <dd className="lfh-zahl">{lagebild?.tiereAktiv}</dd>
+              </div>
+              <div>
+                <dt className="lfh-etikett">Lagezonen</dt>
+                <dd className="lfh-zahl">{lagebild?.zonen}</dd>
+              </div>
+            </dl>
+          </Kachel>
+
+          <Kachel
+            titel="Aktueller Lagebericht"
+            mehr="Berichte"
+            zustand={zBericht}
+            leer={!lagebild?.bericht}
+            leerText="Noch kein Lagebericht erstellt."
+            leerAktion="Lagebericht schreiben"
+            aufMehr={() => gehe('lageberichte')}
+            aufNeuladen={() => void lageberichteQuery.refetch()}
+          >
+            <b className="lfh-band__titel">{lagebild?.bericht?.titel}</b>
+            <p className="lfh-fussnote">
+              <Plakette stufe={lagebild?.bericht?.status === 'freigegeben' ? 'normal' : 'achtung'}>
+                {lagebild?.bericht?.status}
+              </Plakette>
+              {' · Stand '}
+              <span className="lfh-zahl">{lagebild?.bericht?.stand}</span>
+            </p>
+            <p className="lfh-fussnote">von {lagebild?.bericht?.von}</p>
+          </Kachel>
+
+          <Kachel
+            titel="Aufträge / Befehle"
+            mehr="Auftragsliste"
+            zustand={zAuftraege}
+            leer={(auftraegeQuery.data ?? []).length === 0}
+            leerText="Keine Aufträge erteilt."
+            leerAktion="Auftrag erteilen"
+            aufMehr={() => gehe('auftraege')}
+            aufNeuladen={() => void auftraegeQuery.refetch()}
+          >
+            <b className="lfh-zahl lfh-zahl--gross">{lagebild?.auftraegeOffen}</b>
+            <p className="lfh-fussnote">offen oder in Arbeit</p>
+            {(lagebild?.auftraegeUeberfaellig ?? 0) > 0 && (
+              <p className="lfh-fussnote">
+                <Plakette stufe="alarm">{lagebild?.auftraegeUeberfaellig} überfällig</Plakette>
+              </p>
+            )}
+          </Kachel>
+
+          <Kachel
+            titel="Meldungen (eingehend)"
+            mehr="Meldebuch"
+            zustand={zMeldungen}
+            leer={(meldungenQuery.data ?? []).length === 0}
+            leerText="Keine Meldungen eingegangen."
+            leerAktion="Meldung erfassen"
+            aufMehr={() => gehe('meldungen')}
+            aufNeuladen={() => void meldungenQuery.refetch()}
+            breit
+          >
+            <div className="lfh-werte">
+              <div>
+                <dt className="lfh-etikett">Offen</dt>
+                <dd className="lfh-zahl lfh-zahl--mittel">{lagebild?.meldungenOffen}</dd>
+              </div>
+              <div>
+                <dt className="lfh-etikett">Neu</dt>
+                <dd className="lfh-zahl lfh-zahl--mittel">{lagebild?.meldungenNeu}</dd>
+              </div>
+              {(lagebild?.meldungenUeberfaellig ?? 0) > 0 && (
+                <div>
+                  <Plakette stufe="alarm">{lagebild?.meldungenUeberfaellig} überfällig</Plakette>
+                </div>
+              )}
+            </div>
+            <ul className="lfh-zeilen">
+              {(lagebild?.ereignisse ?? []).map((e, i) => (
+                <li className="lfh-zeile" key={`${e.zeit}-${i}`}>
+                  <span className={`lfh-zeichen lfh-zeichen--${e.stufe}`} aria-hidden="true" />
+                  <time className="lfh-zahl">{e.zeit}</time>
+                  <span className="lfh-zeile__text">{e.text}</span>
+                  <span className="lfh-zeile__quelle">{e.von}</span>
+                </li>
+              ))}
+            </ul>
+          </Kachel>
+        </div>
+      </div>
+    </>
   );
 }
