@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Tag, Typography } from 'antd';
 import { personDetailPfad, personalPfad } from '../../routing/deeplinks';
 import type {

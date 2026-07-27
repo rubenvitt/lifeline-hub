@@ -1,7 +1,7 @@
 import { Alert, App, Breadcrumb, Button, Descriptions, Form, Input, Modal, Popconfirm, Space, Spin, Tag, Typography } from 'antd';
 import { Select } from '../components/Select';
 import { useState } from 'react';
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';

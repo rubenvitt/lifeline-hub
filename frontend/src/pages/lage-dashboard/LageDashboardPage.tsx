@@ -16,7 +16,7 @@
  * `lädt` / `Fehler` / `leer` sichtbar.
  */
 import { useMemo } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { Alert, Breadcrumb } from 'antd';
 import { einsatzKeys } from '../../api/queryKeys';

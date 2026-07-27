@@ -1,5 +1,5 @@
 import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Spin, Tabs, Tag, Typography } from 'antd';
-import { Link, Navigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { ladeEinsatz } from '../../api/einsaetze';

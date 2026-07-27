@@ -1,6 +1,6 @@
 import { Alert, App, AutoComplete, Button, Form, Input, InputNumber, Spin, Switch, Typography } from 'antd';
 import { Select } from '../components/Select';
-import { useParams } from 'react-router-dom';
+import { useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ladeEinsatz, ladeEinstellungen, speichereEinstellungen,

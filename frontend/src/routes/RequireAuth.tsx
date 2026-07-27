@@ -1,5 +1,5 @@
 import { Spin } from 'antd';
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 
 /** Schützt verschachtelte Routen: leitet nicht angemeldete Nutzer nach /login um. */

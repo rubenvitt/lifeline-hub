@@ -2,7 +2,7 @@ import { App, Button, Form, Input, Modal, Space, Table, Tag } from 'antd';
 import { Select } from '../components/Select';
 import type { TableColumnsType } from 'antd';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
 import { legeBefehlAn, listeBefehle, type NeuerBefehl } from '../api/befehle';

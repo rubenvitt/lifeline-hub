@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import { useSitzungsWache } from './useSitzungsWache';
 import { SITZUNG_ABGELAUFEN, sitzungsMeldungZuruecksetzen } from './sitzungsEvent';
 

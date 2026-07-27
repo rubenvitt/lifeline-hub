@@ -1,5 +1,5 @@
 import { Alert, App, Breadcrumb, Button, Space, Spin, Table, Tabs, Tag, Typography } from 'antd';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { personDetailPfad } from '../routing/deeplinks';

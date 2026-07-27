@@ -1,6 +1,6 @@
 import { Layout, Menu, Spin, theme } from 'antd';
 import type { MenuProps } from 'antd';
-import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, Outlet, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import type { BenutzerAnzeige } from '../api/types';
 import { adminBenutzer, adminGruppen } from './adminNav';

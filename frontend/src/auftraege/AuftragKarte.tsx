@@ -3,7 +3,7 @@ import {
 } from 'antd';
 import { ClockCircleOutlined } from '@ant-design/icons';
 import type { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import type { Auftrag } from '../api/types';
 import { AUFTRAG_STATUS, PRIO_META, StatusBadge, formatZeit } from '../kommunikation';
 import { etbPfad } from '../routing/deeplinks';

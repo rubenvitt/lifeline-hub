@@ -1,6 +1,6 @@
 import { Button, Dropdown, type MenuProps } from 'antd';
 import { DownOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { listeEinsaetze } from '../api/einsaetze';
 import { globalKeys } from '../api/queryKeys';

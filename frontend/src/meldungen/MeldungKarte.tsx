@@ -2,7 +2,7 @@ import { Button, Card, Flex, Popconfirm, Space, Tag, Typography, theme } from 'a
 import { Select } from '../components/Select';
 import { ClockCircleOutlined } from '@ant-design/icons';
 import type { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { auftraegePfad } from '../routing/deeplinks';
 import type { Meldung, MeldungStatus } from '../api/types';
 import { MELDUNG_STATUS, PrioBadge, QuittungIndikator, StatusBadge, formatZeit } from '../kommunikation';

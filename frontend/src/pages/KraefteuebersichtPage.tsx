@@ -2,7 +2,7 @@ import { Alert, App as AntApp, Breadcrumb, Button, Card, Input, Space, Spin, Sta
 import { taktischeDtgVoll } from '../anzeige/format';
 import { Select } from '../components/Select';
 import type { ColumnsType } from 'antd/es/table';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { lageberichtDetailPfad } from '../routing/deeplinks';

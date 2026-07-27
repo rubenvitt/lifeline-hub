@@ -2,7 +2,7 @@ import { Alert, App, Breadcrumb, Button, Col, Descriptions, Form, Input, InputNu
 import { Select } from '../components/Select';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useState } from 'react';
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben, darfEinsatzLeiten, istEinsatzLeitung } from '../einsatz/schreibrecht';

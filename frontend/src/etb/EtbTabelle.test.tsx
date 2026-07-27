@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import type { ComponentProps } from 'react';
 import type { EtbEintragAnzeige } from '../api/types';
 import EtbTabelle from './EtbTabelle';

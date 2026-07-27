@@ -2,7 +2,7 @@ import {
   Alert, App, Breadcrumb, Button, Drawer, Form, Input, Space,
   Spin, Table, Tag, Typography, type TableColumnsType,
 } from 'antd';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { bereitstellungsraumDetailPfad } from '../../routing/deeplinks';

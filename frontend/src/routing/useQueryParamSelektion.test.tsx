@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router';
 import type { ReactNode } from 'react';
 import { useQueryParamSelektion } from './useQueryParamSelektion';
 

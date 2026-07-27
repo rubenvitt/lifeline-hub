@@ -1,5 +1,5 @@
 import { Tag } from 'antd';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import type { EtbEintragAnzeige } from '../api/types';
 import { befehlDetailPfad, lageberichtDetailPfad, auftraegePfad } from '../routing/deeplinks';
 

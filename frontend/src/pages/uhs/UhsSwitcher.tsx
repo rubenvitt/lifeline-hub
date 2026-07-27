@@ -1,6 +1,6 @@
 import { Button, Dropdown, Space, Tag, Typography, type MenuProps } from 'antd';
 import { DownOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { uhsDetailPfad } from '../../routing/deeplinks';

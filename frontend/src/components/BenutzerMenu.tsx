@@ -1,6 +1,6 @@
 import { Avatar, Button, Dropdown, Space, Tag, Typography, type MenuProps } from 'antd';
 import { DownOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 
 /** Initialen aus dem Anzeigenamen (erstes + letztes Wort, sonst erste zwei Zeichen). */

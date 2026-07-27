@@ -2,7 +2,7 @@ import { App, Breadcrumb, Button, Form, Input, Modal, Space, Spin, Table, Tag, T
 import { Select } from '../components/Select';
 import type { TableColumnsType } from 'antd';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { lageberichtDetailPfad } from '../routing/deeplinks';
 import { ladeEinsatz } from '../api/einsaetze';
