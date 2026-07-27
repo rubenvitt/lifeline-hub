@@ -3,6 +3,7 @@ import { TbList, TbUser, TbSettings, TbLogout, TbPlus, TbSun, TbMoon, TbDeviceDe
 import {
   modulRegistry, istModulSichtbar, istModulGesperrt, modulZielRoute,
 } from '../einsatz/modulRegistry';
+import { darfVerwaltung } from '../einsatz/schreibrecht';
 import type { IconType } from 'react-icons';
 import type { Befehl, BefehlKontext } from './typen';
 import type { ThemeModus } from '../theme/ThemeModeProvider';
@@ -81,10 +82,18 @@ export function baueBefehle(k: BefehlKontext): Befehl[] {
   // 5. Navigation — global
   befehle.push({ id: 'nav:einsaetze', gruppe: 'navigation', label: 'Alle Einsätze', icon: TbList, ausfuehren: () => k.navigate('/einsaetze') });
   befehle.push({ id: 'nav:profil', gruppe: 'navigation', label: 'Profil', icon: TbUser, ausfuehren: () => k.navigate('/profil') });
-  if (k.benutzer?.system_rolle === 'admin') {
-    befehle.push({ id: 'nav:benutzer', gruppe: 'navigation', label: 'Benutzerverwaltung', icon: TbUser, ausfuehren: () => k.navigate('/benutzer') });
+  // Zwei Stufen, bewusst getrennt (LFH-328/M8): Verwaltungsbereich und Stammdaten hängen am
+  // AdminLayout-Gate `darfVerwaltung` — vorher standen sie unter `system_rolle === 'admin'`
+  // allein, weshalb eine Führungskraft „Verwaltung" in der Topbar sah und die Route betreten
+  // durfte, den Eintrag hier aber nicht fand.
+  if (darfVerwaltung(k.benutzer)) {
     befehle.push({ id: 'nav:stammdaten', gruppe: 'navigation', label: 'Stammdaten', icon: TbList, ausfuehren: () => k.navigate('/stammdaten') });
     befehle.push({ id: 'nav:admin', gruppe: 'navigation', label: 'Administration', icon: TbSettings, ausfuehren: () => k.navigate('/admin') });
+  }
+  // Die Benutzerverwaltung bleibt strenger: `/benutzer` leitet auf `/admin/benutzer`, und
+  // AdminLayout zeigt diesen Menüpunkt nur System-Admins. Sie mitzuziehen wäre eine Ausweitung.
+  if (k.benutzer?.system_rolle === 'admin') {
+    befehle.push({ id: 'nav:benutzer', gruppe: 'navigation', label: 'Benutzerverwaltung', icon: TbUser, ausfuehren: () => k.navigate('/benutzer') });
   }
   befehle.push({ id: 'nav:abmelden', gruppe: 'navigation', label: 'Abmelden', icon: TbLogout, ausfuehren: () => k.logout() });
 

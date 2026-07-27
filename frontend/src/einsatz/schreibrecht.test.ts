@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   darfEinsatzLeiten,
   darfImEinsatzSchreiben,
+  darfVerwaltung,
   istAdmin,
   istBeobachter,
   istEinsatzLeitung,
@@ -104,5 +105,20 @@ describe('istAdmin', () => {
     expect(istAdmin(keiner)).toBe(false);
     expect(istAdmin(undefined)).toBe(false);
     expect(istAdmin(null)).toBe(false);
+  });
+});
+
+// ORG-Achse (LFH-328) — bewusst ohne Einsatz-Argument: `darfVerwaltung` kennt weder `status`
+// noch `meine_rolle`. Wahrheitstabelle über die zwei Benutzer-Felder.
+describe('darfVerwaltung', () => {
+  it('öffnet die Verwaltung für System-Admin UND Führungskraft', () => {
+    expect(darfVerwaltung({ system_rolle: 'admin', org_rolle: 'keine' })).toBe(true);
+    expect(darfVerwaltung({ system_rolle: 'keiner', org_rolle: 'fuehrungskraft' })).toBe(true);
+    expect(darfVerwaltung({ system_rolle: 'admin', org_rolle: 'fuehrungskraft' })).toBe(true);
+  });
+  it('sperrt Benutzer ohne beide Rollen und fehlende Kontexte', () => {
+    expect(darfVerwaltung({ system_rolle: 'keiner', org_rolle: 'keine' })).toBe(false);
+    expect(darfVerwaltung(undefined)).toBe(false);
+    expect(darfVerwaltung(null)).toBe(false);
   });
 });

@@ -51,9 +51,22 @@ describe('baueBefehle — Module', () => {
 });
 
 describe('baueBefehle — Navigation/Berechtigung', () => {
-  it('zeigt Admin-Navigation nur für Admins', () => {
+  it('zeigt die Benutzerverwaltung nur für System-Admins', () => {
     expect(baueBefehle(kontext({ benutzer: admin })).some((x) => x.id === 'nav:benutzer')).toBe(true);
     expect(baueBefehle(kontext({ benutzer: fuehrungskraft })).some((x) => x.id === 'nav:benutzer')).toBe(false);
+  });
+  // LFH-328/M8: vorher hingen auch diese zwei an `system_rolle === 'admin'` allein — eine
+  // Führungskraft sah „Verwaltung" in der Topbar und durfte die Route betreten, fand den
+  // Eintrag hier aber nicht. Jetzt teilen sich Topbar, Route und Palette `darfVerwaltung`.
+  it('zeigt Verwaltung und Stammdaten auch der Führungskraft', () => {
+    const b = baueBefehle(kontext({ benutzer: fuehrungskraft }));
+    expect(b.some((x) => x.id === 'nav:admin')).toBe(true);
+    expect(b.some((x) => x.id === 'nav:stammdaten')).toBe(true);
+  });
+  it('verbirgt Verwaltung und Stammdaten vor Benutzern ohne Org-Rolle', () => {
+    const b = baueBefehle(kontext({ benutzer: sichter }));
+    expect(b.some((x) => x.id === 'nav:admin')).toBe(false);
+    expect(b.some((x) => x.id === 'nav:stammdaten')).toBe(false);
   });
   it('bietet immer Abmelden + Alle Einsätze', () => {
     const b = baueBefehle(kontext({ einsatzId: null, benutzer: sichter }));

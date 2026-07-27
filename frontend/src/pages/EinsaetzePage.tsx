@@ -7,6 +7,7 @@ import type { EinsatzAnzeige } from '../api/types';
 import { ApiError } from '../api/client';
 import { legeEinsatzAn, listeEinsaetze } from '../api/einsaetze';
 import { useAuth } from '../auth/AuthContext';
+import { darfVerwaltung } from '../einsatz/schreibrecht';
 import { globalKeys } from '../api/queryKeys';
 
 const STATUS_FARBE: Record<string, string> = { aktiv: 'green', abgeschlossen: 'default' };
@@ -19,7 +20,7 @@ export default function EinsaetzePage() {
   const [dialogOffen, setDialogOffen] = useState(false);
   const [form] = Form.useForm<{ bezeichnung: string; stichwort?: string }>();
 
-  const darfAnlegen = benutzer?.system_rolle === 'admin' || benutzer?.org_rolle === 'fuehrungskraft';
+  const darfAnlegen = darfVerwaltung(benutzer);
 
   const { data: einsaetze = [], isLoading } = useQuery({
     queryKey: globalKeys.einsaetze(),

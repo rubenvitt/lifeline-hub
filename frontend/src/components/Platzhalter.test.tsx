@@ -29,6 +29,22 @@ describe('Platzhalter', () => {
     expect(screen.getByText(/noch nicht bedienbar/)).toBeInTheDocument();
   });
 
+  // `pages/ProfilPage` rendert den Platzhalter unter einer funktionierenden
+  // 2FA-Sektion und steht in keinem Einsatz — ein Satz über den Einsatz wäre dort
+  // schlicht falsch. Er hängt deshalb am Rückweg, dem einzigen Signal für „im Einsatz".
+  it('spricht ohne Rückweg nicht vom Einsatz (LFH-328)', () => {
+    renderMitProviders(<Platzhalter titel="Profil" />);
+    expect(screen.queryByText(/Der Einsatz läuft/)).not.toBeInTheDocument();
+  });
+
+  it('ergänzt mit Rückweg den Einsatz-Bezug (LFH-328)', () => {
+    renderMitProviders(
+      <Platzhalter titel="Stab" rueckweg={{ pfad: '/einsaetze/7/etb', label: 'ETB öffnen' }} />,
+      { route: '/einsaetze/7/stab' },
+    );
+    expect(screen.getByText(/Der Einsatz läuft/)).toBeInTheDocument();
+  });
+
   it('bietet ohne Rückweg keinen Knopf an (Konsument ohne Einsatz-Kontext)', () => {
     renderMitProviders(<Platzhalter titel="Profil" />);
     expect(screen.queryByRole('button')).not.toBeInTheDocument();

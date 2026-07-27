@@ -22,11 +22,17 @@ interface Props {
 }
 
 /** Erwartungshorizont: sagt, woran man ist. Ein „In Arbeit"-Etikett allein beantwortet
- *  die Frage nicht, die eine Einsatzkraft vor einer leeren Seite hat — nämlich ob sie
- *  hier gleich etwas erfassen kann oder anderswo weiterarbeiten muss. */
+ *  die Frage nicht, die jemand vor einer leeren Seite hat — nämlich ob hier gleich
+ *  etwas zu erfassen ist oder anderswo weitergearbeitet werden muss.
+ *
+ *  Bewusst kontextfrei formuliert („Bereich", kein Einsatz): `pages/ProfilPage` rendert
+ *  den Platzhalter unter einer funktionierenden 2FA-Sektion und steht in keinem Einsatz. */
 const ERWARTUNGSHORIZONT =
-  'Dieses Modul ist geplant, aber noch nicht bedienbar — hier lässt sich nichts erfassen ' +
-  'oder auswerten. Der Einsatz läuft davon unberührt weiter.';
+  'Dieser Bereich ist geplant, aber noch nicht bedienbar — hier lässt sich nichts ' +
+  'erfassen oder auswerten.';
+
+/** Der Einsatz-Bezug hängt am Rückweg, dem einzigen Signal für „steht in einem Einsatz". */
+const ERWARTUNGSHORIZONT_EINSATZ = ' Der Einsatz läuft davon unberührt weiter.';
 
 /**
  * Einheitlicher Platzhalter für noch nicht implementierte Bereiche.
@@ -51,7 +57,7 @@ export default function Platzhalter({ titel, beschreibung, rueckweg }: Props) {
       }
     >
       <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-        {ERWARTUNGSHORIZONT}
+        {rueckweg ? ERWARTUNGSHORIZONT + ERWARTUNGSHORIZONT_EINSATZ : ERWARTUNGSHORIZONT}
       </Typography.Paragraph>
     </Result>
   );
