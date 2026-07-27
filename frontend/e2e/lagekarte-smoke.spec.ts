@@ -1,0 +1,103 @@
+import { expect, test, type Page } from '@playwright/test';
+
+// Browser-Smoke der Lagekarte: das EINZIGE automatisierte Netz unter MapLibre/WebGL.
+//
+// Warum es diese Datei gibt: `Kartenflaeche.tsx` ist die einzige Stelle, die
+// `new maplibregl.Map` aufruft — und sie wurde von KEINEM Test je ausgeführt.
+// `LagekartePage.test.tsx` stubbt die Komponente komplett weg, alle übrigen
+// Lagekarten-Unit-Tests arbeiten mit `import type` (wegkompiliert) oder handgebauten
+// `fakeMap()`-Attrappen. Ein Bruch in MapLibre selbst (Versionswechsel, ESM-Interop,
+// WebGL-Anforderung) oder im terra-draw-Adapter blieb damit vollständig unsichtbar:
+// die Suite wäre grün und die Karte tot. jsdom kann das prinzipiell nicht abdecken
+// (kein Layout, kein WebGL); Playwright-Chromium liefert WebGL2 via SwiftShader.
+//
+// `page.on('pageerror')` ist der Backstop für die Fehler, die KEINE Spur im DOM
+// hinterlassen — ein geworfener Fehler in einem Timer, einem Karten-Callback oder einem
+// async Handler, der die Karte trotzdem stehen lässt. Der Listener ist scharf: mit einem
+// injizierten `setTimeout(() => { throw … })` im Map-Init-Effekt wird die letzte Zeile
+// dieses Tests rot (gemessen, 2× wegen StrictMode). Für einen Fehler im Render oder im
+// Effekt selbst greifen dagegen schon die DOM-Assertionen darüber: `LagekartePage` kommt
+// per `lazy()`, im gesamten `src/` gibt es KEINE ErrorBoundary — der React-Root reißt
+// also ab und die Karte fehlt schlicht. Genau diesen Fall übersieht der bestehende
+// Palette-Test (command-palette.spec.ts), der die Lagekarte zwar öffnet, aber nur URL
+// und Palettenzustand prüft — beides überlebt eine leere Seite.
+//
+// Deterministisch ohne Netzwerk: die e2e-Suite fährt auf einer frischen Temp-DB ohne
+// konfigurierte Basemap. `baueBasemapStyle` fällt dann auf `blindStyle` zurück
+// (`sources: {}` + ein Background-Layer). Die Map konstruiert also garantiert, Canvas
+// und Controls erscheinen — und es wird nie eine Kachel geladen. Der Test hängt damit
+// weder an einem Tile-Server noch an Seed-Daten.
+
+const ADMIN = 'admin';
+const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
+
+async function anmelden(page: Page) {
+  await page.goto('/login');
+  await page.getByLabel('Benutzername').fill(ADMIN);
+  await page.getByLabel('Passwort').fill(PW);
+  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
+  await expect(page).toHaveURL(/\/einsaetze/);
+}
+
+async function einsatzAnlegenUndOeffnen(page: Page): Promise<number> {
+  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
+  await page.getByLabel('Bezeichnung').fill(`E2E Lagekarte ${Date.now()}`);
+  await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
+  await expect(page).toHaveURL(/\/einsaetze\/\d+/);
+  return Number(page.url().match(/\/einsaetze\/(\d+)/)![1]);
+}
+
+test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ page }) => {
+  const seitenFehler: Error[] = [];
+  page.on('pageerror', (fehler) => seitenFehler.push(fehler));
+
+  await anmelden(page);
+  const eid = await einsatzAnlegenUndOeffnen(page);
+  await page.goto(`/einsaetze/${eid}/lagekarte`);
+
+  // Anker statt Timeout: der Container gehört React, das Canvas erzeugt erst MapLibre.
+  // `LagekartePage` kommt per lazy() und zeigt bis zur geladenen Karten-Config ein Spin —
+  // auf ein festes Warteintervall wäre hier kein Verlass.
+  const karte = page.getByTestId('kartenflaeche');
+  await expect(karte).toBeVisible();
+
+  const canvas = karte.locator('canvas.maplibregl-canvas');
+  // GENAU eins, nicht „mindestens eins": unter Vite-Dev ist React StrictMode AN, der
+  // Map-Init-Effekt läuft also doppelt. Bliebe das Cleanup (`map.remove()`) aus oder
+  // würde es in einer neuen MapLibre-Version anders greifen, stünden zwei Canvas im
+  // Container — sichtbar wäre die Karte trotzdem. toHaveCount(1) fängt genau das und
+  // wartet dabei das StrictMode-Remount-Fenster aus.
+  await expect(canvas).toHaveCount(1);
+  await expect(canvas).toBeVisible();
+
+  // NavigationControl lebt: beweist, dass die Map nicht nur konstruiert wurde, sondern
+  // ihr Control-/DOM-Gerüst aufgebaut hat.
+  await expect(page.locator('.maplibregl-ctrl-zoom-in')).toBeVisible();
+
+  // Zeitachse einklappen — nicht kosmetisch, sondern Voraussetzung: die ausgeklappte
+  // SnapshotLeiste liegt mit `left:12/right:12` über die volle Kartenbreite, bei gleichem
+  // zIndex (5) wie die ZeichnenSteuerung und später im DOM. Sie überdeckt deren Buttons
+  // daher vollständig (gemessen: Klick auf „Abbrechen" läuft in den Timeout, „<div>
+  // intercepts pointer events"). `toBeVisible()` würde das NICHT bemerken — CSS-Sichtbarkeit
+  // ist keine Klickbarkeit. Eingeklappt schrumpft die Leiste auf einen Button unten links.
+  await page.getByRole('button', { name: 'Zeitachse ausblenden' }).click();
+
+  // terra-draw: der Adapter ruft beim Start `addSource`/`addLayer` auf der Map auf und
+  // setzt den Cursor über `map.getCanvas().style.cursor`. Der Cursor ist der einzige
+  // DOM-sichtbare Beleg, dass der Adapter die Map wirklich übernommen hat — und er ist
+  // nicht redundant: die „Abschließen"/„Abbrechen"-Buttons kommen aus reinem React-State
+  // und stehen auch dann da, wenn terra-draw gar nichts tut. Gemessen mit einem
+  // no-op-`starten()`: Buttons grün, Cursor rot („grab" statt „crosshair"). Ein
+  // Versionswechsel, der den Adapter still wirkungslos macht, hinge allein an dieser Zeile.
+  await page.getByRole('button', { name: 'Gefahrengebiet zeichnen' }).click();
+  await expect(page.getByRole('button', { name: 'Abschließen' })).toBeVisible();
+  await expect(canvas).toHaveCSS('cursor', 'crosshair');
+
+  // Abbrechen fährt `stoppen()` → `draw.stop()` → Adapter-`unregister()` mit
+  // `removeLayer`/`removeSource`. Der Abbau ist eine eigene MapLibre-API-Fläche und
+  // damit eine eigene Bruchstelle — deshalb wird er mitgelaufen, nicht nur der Aufbau.
+  await page.getByRole('button', { name: 'Abbrechen' }).click();
+  await expect(page.getByRole('button', { name: 'Abschließen' })).toBeHidden();
+
+  expect(seitenFehler.map((f) => f.message)).toEqual([]);
+});
