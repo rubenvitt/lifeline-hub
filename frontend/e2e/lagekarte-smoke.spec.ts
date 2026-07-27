@@ -110,6 +110,11 @@ test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ 
   // während die Karte längst arbeitete. Eine Assertion darauf wäre ein Flake mit Ansage. Die
   // ungeladenen Quellen kommen trotzdem mit, aber als DIAGNOSE in der Fehlermeldung, nicht als
   // Bedingung — damit ein Fehlschlag zeigt, WO es klemmt, statt nur „false".
+  //
+  // FALLE für den nächsten, der das hier „schärfer" machen will: `map.areTilesLoaded()` klingt
+  // nach der eigentlich richtigen Prüfung und ist wertlos — bei stummem Worker gemessen TRUE
+  // (Vergleichsmessung lebend/tot: loaded true/false, areTilesLoaded true/TRUE). Wer darauf
+  // umstellt, baut eine Zeile ein, die nie anschlägt.
   await expect
     .poll(
       () =>
@@ -117,7 +122,14 @@ test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ 
           const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte;
           if (!map) return 'kein Karten-Handle (window.__lfhKarte fehlt)';
           const quellen = Object.keys(map.getStyle()?.sources ?? {});
-          if (quellen.length === 0) return 'Style hat gar keine Quellen';
+          // Zweiter, von maplibre ENTKOPPELTER Beleg: die Quellenzahl misst unser eigenes
+          // Verhalten statt einen Bibliotheks-Boolean, dessen Semantik ein v7 stillschweigend
+          // ändern könnte. Gemessen: 6 Quellen bei lebender Karte, 1 bei totem Worker — alles
+          // außer `abschnitte` legt erst der `load`-Handler an, und `load` feuert nur, wenn der
+          // Worker antwortet. Die Zahl steigt monoton (nichts entfernt Quellen wieder), flapt
+          // also nicht wie `isSourceLoaded`. Schwelle bewusst locker, damit ein Umbau der
+          // Kartenebenen den Test nicht grundlos rot färbt.
+          if (quellen.length < 2) return `nur ${quellen.length} Quelle(n): ${quellen.join(', ')}`;
           if (map.loaded()) return 'geladen';
           const ungeladen = quellen.filter((q) => !map.isSourceLoaded(q));
           return `map.loaded() ist false; ungeladen: ${ungeladen.join(', ') || '(keine)'}`;
