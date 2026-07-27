@@ -26,6 +26,49 @@ Faustregel: Sobald ein Drawer Tabs bekommt, einen Edit-Modus mit vielen Feldern 
 oder breiter als ~480 px sein muss, gehört der Inhalt auf eine eigene Route.
 Details/Inventar: `docs/superpowers/specs/2026-06-22-drawer-nutzung-reduzieren-design.md`.
 
+## Frontend — Bedien-Leitlinie (Einsatzkontexte)
+
+Die **zweite Achse** neben LFH-19 (Gerät und Einsatzkontext, LFH-327). Die Regel oben bleibt
+unverändert gültig — sie sagt, welche **Form** der Inhalt bekommt. Diese hier sagt, für welchen
+**Kontext** er gebaut wird; die **Erscheinung** (Farbe, Form, Schrift) regelt die
+Gestaltungssprache aus LFH-352. Dieselbe Form kann je Kontext eine andere Dichte, Treffläche und
+Spaltenzahl haben.
+
+**Die vier Kontexte:** **Fükw** (primär, 13–15", Tastatur+Maus, kompakt, voll) · **Führungs-Tablet**
+(1024–1280 px, Touch, oft Handschuh, komfortabel/Handschuh, keine Massenerfassung) ·
+**ortsfeste Stelle** (BHP/BTP, Dauerbetrieb, kompakt + voller Tastaturfluss) · **mobil** (~390 px,
+einhändig, komfortabel, keine Vergleichsansichten).
+
+**Sieben Festlegungen, je mit einem maschinell prüfbaren Gate** — Kontexte · Tabelle/Liste/Kachel ·
+Trefflächen · Dichte-Staffel · Statusfarben · Live-Aktualisierung · Prüfliste. Die vier für den
+Alltag wichtigsten:
+
+- **Tabelle nur, wenn verglichen wird** (NN/g), dann mit fixierter Kopfzeile, fixierter
+  **menschenlesbarer** Identifierspalte (Funkrufname/Ordnungsnummer, nie die DB-`id`) und
+  Spaltenschalter **mit Zähler ausgeblendeter Spalten**. Liste/Karte, wenn gelesen wird; Kachel nur
+  für Überblicksflächen. Auf schmalem Schirm wird eine Tabelle **angepasst, nicht in Karten
+  aufgelöst** — Karten-Fallback ist die Ausnahme mit Begründung im Task.
+- **Dichte-Staffel 30 / 48 / 72 px** (kompakt aus LFH-352 · komfortabel = Material 48 dp ·
+  Handschuh = 72 px ≙ 19,05 mm, MIL-STD-1472F Fig. 12). Träger ist ein **Dichte-Token am
+  `ConfigProvider`** — nicht `componentSize` (dessen `large` endet bei 40 px) und erst recht nicht
+  236 verstreute `size="small"`. **Neues punktuelles `size="small"` auf interaktiven Elementen ist
+  ab sofort verboten**; der Abbau des Bestands läuft über LFH-328/B5.
+- **Rot bedient nichts** (LFH-352/LFH-315): `bedien` und Fokusring sind blau, Rot ist Gefahr.
+  Jede Statusfarbe braucht einen **zweiten Kanal** (Text, Symbol, Form — WCAG 1.4.1). Farbwerte
+  kommen ausschließlich aus `theme/tokens.ts`/`theme/rollen.css`; ein abweichender Wert ist ein
+  Fehler, kein Vorschlag.
+- **Live-Updates springen nicht unter dem Cursor**: neue Datensätze als **Sammelbanner**
+  („12 neue Meldungen"), nicht eingeschoben (CLS ≤ 0,1; WCAG 3.2.5). Alarmbudget nach
+  EEMUA 191/ISA-18.2: 1–2 je 10 min, ≤ 3 Eskalationsstufen. Kein Blinken auf lesbarem Text.
+
+**Die Prüfliste Einsatztauglichkeit (15 Kriterien) wird an jede neue oder umgebaute Seite
+angelegt** — ein Modul-Task ohne ausgefüllte Prüfliste gilt nicht als fertig; jede Zeile trägt ein
+Verdikt (erfüllt / offen → Zielticket / nicht anwendbar), „nicht geprüft" ist keins.
+
+Jede Zahl trägt dort Quelle und Abschnittsnummer, Gerechnetes ist als `[abgeleitet]` markiert.
+Details, Herleitungen und die am Lage-Dashboard validierte Prüfliste:
+`docs/superpowers/specs/2026-07-25-bedien-leitlinie-einsatzkontexte.md`.
+
 ## Frontend — Deeplink-Muster (Route vs. Query-Param)
 
 Modulübergreifende Deeplinks folgen einem festen Muster (LFH-25):
