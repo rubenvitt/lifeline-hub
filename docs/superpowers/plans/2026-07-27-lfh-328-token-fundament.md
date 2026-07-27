@@ -561,6 +561,10 @@ Disable-Gates und Mutations-Payloads.
 - Modify: `frontend/src/pages/EinsaetzePage.tsx:22-27, :64-107`
 - Modify: `frontend/src/pages/EinsaetzePage.test.tsx`
 
+> **Vorbedingung:** Zeile 22 (`darfAnlegen`) ist bereits von **Task 13** auf
+> `darfVerwaltung(benutzer)` umgestellt — nicht erneut anfassen, nicht zurückdrehen. Der
+> Variablenname `darfAnlegen` bleibt dabei bestehen.
+
 **Gemessener Ist-Zustand:** `useQuery` destrukturiert nur `{ data, isLoading }` — `isError`,
 `error`, `refetch` sind verfügbar und werden **nirgends** benutzt. `isLoading` wirkt nur im
 `!darfAnlegen`-Zweig (`:72`), Anlegeberechtigte sehen während des Ladens eine leere Seite mit
@@ -681,8 +685,26 @@ und einem Kommentar, der die Achse benennt — sonst weicht die dokumentierte Tr
 
 **Gemessen existiert die Formel dreimal:** `AppLayout.tsx:30` (privat), `AdminLayout.tsx:11`
 (exportiert, wird von AppLayout **nicht** importiert), `EinsaetzePage.tsx:22` (byte-gleich,
-anderer Name `darfAnlegen`). A2 löst die ersten beiden; `EinsaetzePage:22` zieht mit, weil
-Task 10 die Datei ohnehin öffnet.
+anderer Name `darfAnlegen`).
+
+> **Reihenfolge-Korrektur (nachgetragen 2026-07-27, im Lauf gefunden):** alle **drei** Stellen
+> müssen fallen, sonst ist der Guard nicht grün zu bekommen — `EinsaetzePage.tsx:22` aus dem
+> Scan auszunehmen würde ihn entkernen. Task 13 stellt die Zeile deshalb **selbst** um
+> (`const darfAnlegen = darfVerwaltung(benutzer);` — Name bleibt, nur die rechte Seite ändert
+> sich, damit der Diff für Task 10 klein bleibt). Task 10 findet sie bereits umgestellt vor.
+> Der Plan hatte diese Abhängigkeit ursprünglich nicht.
+
+**Eine vierte Fundstelle, die kein Verstoß ist:** `pages/BenutzerPage.tsx:88` —
+`b.system_rolle !== 'admin' && b.org_rolle !== 'fuehrungskraft'` ist der „weder-noch"-Arm einer
+dreiteiligen Rollen-**Anzeige**, kein Gate. An `!darfVerwaltung` gekoppelt würde eine spätere
+Regeländerung still die Tag-Bedeutung verschieben. Der Guard scannt deshalb nur `===`, und die
+Grenze steht in seinem Kopfkommentar.
+
+**`nav:benutzer` in `befehle.ts` zieht NICHT mit.** Nur `nav:stammdaten` und `nav:admin` gehen
+auf `darfVerwaltung`. `AdminLayout.tsx:41` gated den Benutzer-Menüpunkt selbst auf
+`istSystemAdmin` allein — die Palette daran anzugleichen wäre eine Rechteausweitung, kein Fix.
+A2 hat keinen Auftrag, Berechtigungen zu erweitern. Die Asymmetrie trägt einen Kommentar an der
+Stelle.
 
 **Was der Guard NICHT scannt** (im Kopfkommentar zu nennen, wie es
 `schreibrecht.guard.test.ts:13-14` vormacht): die 24 inline `system_rolle === 'admin'`-Stellen.
