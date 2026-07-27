@@ -31,6 +31,18 @@ import { expect, test, type Page } from '@playwright/test';
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
+/**
+ * Minimalausschnitt der MapLibre-Instanz, den `window.__lfhKarte` (DEV-Haken in
+ * Kartenflaeche.tsx) für diesen Test bereitstellen muss. Bewusst NICHT der echte
+ * maplibre-Typ: der Spec-Ordner soll nicht gegen die Karten-Bibliothek binden, und ein
+ * Versionssprung darf diesen Test nicht typseitig mitreißen — er soll ihn fachlich prüfen.
+ */
+interface MapHaken {
+  getStyle(): { sources?: Record<string, unknown> } | undefined;
+  isSourceLoaded(id: string): boolean;
+  loaded(): boolean;
+}
+
 async function anmelden(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Benutzername').fill(ADMIN);
@@ -78,6 +90,41 @@ test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ 
   // NavigationControl lebt: beweist, dass die Map nicht nur konstruiert wurde, sondern
   // ihr Control-/DOM-Gerüst aufgebaut hat.
   await expect(page.locator('.maplibregl-ctrl-zoom-in')).toBeVisible();
+
+  // Und jetzt das, was das DOM NICHT verrät: arbeitet die Karte überhaupt?
+  // Alles oben — Canvas, `toHaveCount(1)`, Controls, weiter unten der Cursor — ist auch dann
+  // grün, wenn der maplibre-Tile-Worker tot ist. Gemessen mit einer stummen `window.Worker`-
+  // Attrappe: fünf von fünf Assertionen grün, keine `pageerror`, während real nur 1 statt 6
+  // Quellen existierten, `isSourceLoaded` false war und `map.loaded()` false blieb — also keine
+  // Marker, keine Zonen, keine Fachebenen, kein `load`-Event. Eine tote Karte, die aussieht wie
+  // eine lebende. Seit maplibre 6 hängt genau das an einer explizit verdrahteten Worker-URL
+  // (`setWorkerUrl` in Kartenflaeche.tsx), deren Fehlkonfiguration mit exit 0 durchläuft.
+  //
+  // `map.loaded()` ist der eine Boolean, der kippt: er verlangt geladenen Style UND geladene
+  // Quellen, und die GeoJSON-Quellen gehen zwingend durch den Worker — auch ohne Basemap, ohne
+  // eine einzige Kachel.
+  //
+  // Geprüft wird bewusst NUR `loaded()`, nicht „alle Quellen sind geladen": `isSourceLoaded` je
+  // Quelle flapt, weil der React-Datenpfad `setData` nachzieht und jede Neuzuweisung die Quelle
+  // bis zur Worker-Antwort wieder als ungeladen führt — gemessen, `abschnitte` blieb 15 s false,
+  // während die Karte längst arbeitete. Eine Assertion darauf wäre ein Flake mit Ansage. Die
+  // ungeladenen Quellen kommen trotzdem mit, aber als DIAGNOSE in der Fehlermeldung, nicht als
+  // Bedingung — damit ein Fehlschlag zeigt, WO es klemmt, statt nur „false".
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const map = (window as unknown as { __lfhKarte?: MapHaken }).__lfhKarte;
+          if (!map) return 'kein Karten-Handle (window.__lfhKarte fehlt)';
+          const quellen = Object.keys(map.getStyle()?.sources ?? {});
+          if (quellen.length === 0) return 'Style hat gar keine Quellen';
+          if (map.loaded()) return 'geladen';
+          const ungeladen = quellen.filter((q) => !map.isSourceLoaded(q));
+          return `map.loaded() ist false; ungeladen: ${ungeladen.join(', ') || '(keine)'}`;
+        }),
+      { timeout: 15_000, message: 'Karte wird nie fertig — Verdacht: maplibre-Worker antwortet nicht' },
+    )
+    .toBe('geladen');
 
   // Zeitachse einklappen — nicht kosmetisch, sondern Voraussetzung: die ausgeklappte
   // SnapshotLeiste liegt mit `left:12/right:12` über die volle Kartenbreite, bei gleichem

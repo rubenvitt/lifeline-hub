@@ -18,7 +18,6 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { erzeugeTaktischesZeichen } from 'taktische-zeichen-react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
-maplibregl.setWorkerUrl(workerUrl);
 import type { KarteMarker } from './marker';
 import {
   baueMarkerFc, baueEinsatzortFc, reAnlegenMarker, pinneMarkerLayerNachOben,
@@ -58,6 +57,17 @@ import { erzeugeBildHandles, type BildHandles } from './bildHandles';
 import type { Ecken } from '../../api/kartenbilder';
 import { KRITIS_MIN_ZOOM } from './fachebenen';
 import type { FachebeneQuelle } from '../../api/fachebenen';
+
+// Worker-URL setzen, bevor die erste Map entsteht — diese Datei ist die einzige Stelle im Repo,
+// die eine Map erzeugt. Der Guard davor ist keine Paranoia, sondern deckt eine gemessene Bruchlinie
+// ab: maplibre nimmt die URL intern als `config.WORKER_URL || defaultWorkerUrl()` — ein `||`, kein
+// `??`. Käme hier je ein falsy Wert an (Vite-Versionswechsel, jemand streicht das `&url`, anderer
+// Build-Modus), fiele maplibre STILL auf seinen Default zurück. Und der ist die perfide Variante:
+// unter Dev löst er auf eine echte, von Vite ausgelieferte Datei auf und alles bleibt grün — im
+// Prod-Build zeigt er auf `/assets/maplibre-gl-worker.mjs`, das es dort nicht gibt, und die Karte
+// lädt keine einzige Kachel. Dev grün, Prod tot, ohne eine Fehlermeldung. Lieber hier laut brechen.
+if (!workerUrl) throw new Error('maplibre-Worker-URL ist leer — `?worker&url` hat nichts geliefert');
+maplibregl.setWorkerUrl(workerUrl);
 
 // Re-Export: LagekartePage importiert ZoneFeature weiterhin aus Kartenflaeche.
 export type { ZoneFeature };
@@ -293,9 +303,23 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       img.src = dataUrl;
     });
     mapRef.current = map;
+    // Testhaken für den Browser-Smoke (e2e/lagekarte-smoke.spec.ts): die Karte lebt in WebGL, ihr
+    // Zustand ist im DOM praktisch unsichtbar — ein toter Tile-Worker lässt Canvas, Controls und
+    // Cursor unverändert stehen (gemessen), nur `map.loaded()` kippt. Ohne einen Griff auf die
+    // Instanz gäbe es keine Assertion, die das fängt. `import.meta.env.DEV` heißt: im Prod-Build
+    // ist die Zeile weg, e2e läuft unter Vite-Dev also mit Haken, Auslieferung ohne.
+    // Bewusst statt der früher genutzten React-Fiber-Traversierung: die hängt an React-Internas
+    // und reißt beim nächsten React-Sprung — als Kartenfehler getarnt.
+    if (import.meta.env.DEV) (window as unknown as { __lfhKarte?: unknown }).__lfhKarte = map;
     return () => {
       map.remove(); // zerstört auch die AttributionControl
       mapRef.current = null;
+      // Testhaken mit abräumen: sonst zeigt er nach dem Verlassen der Seite auf eine ENTFERNTE
+      // Map. Ein späterer Test läse dann Zustand von einer toten Instanz und wäre grün, ohne dass
+      // je eine Karte lief — genau die Sorte stiller Fehlbeleg, gegen die der Haken existiert.
+      // (Unter StrictMode ist die Reihenfolge Effekt A → Cleanup A → Effekt B, der Haken zeigt
+      // danach also korrekt auf die zweite, lebende Instanz.)
+      if (import.meta.env.DEV) delete (window as unknown as { __lfhKarte?: unknown }).__lfhKarte;
       // Ref nullen: sonst sieht der Attribution-Effekt nach StrictMode-Remount eine
       // stale Control der entfernten Map und ruft removeControl auf bereits Zerstörtem.
       attribControlRef.current = null;
