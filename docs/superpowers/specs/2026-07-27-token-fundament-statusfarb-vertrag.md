@@ -430,18 +430,41 @@ hätte (6) — die Prüfliste hat an ihrem zweiten Anlagefall wieder etwas gefun
 | 4 | Statusfarb-Vertrag exhaustiv, **per Mutationsprobe belegt**: Rust-Enum-Variante ergänzen → `check-typ-codegen.sh` → `tsc` rot → revert. Ergebnis in dieser Spec dokumentiert | **präzisiert** — ein lokales Union-Widening beweist nichts |
 | 5 | `grep -rn "KATEGORIE_FARBEN\|KAT_FARBE\|STATUS_META\|STATUS_LABEL\|UHS_TYP_LABEL" …` = 0 | **eingeschränkt** auf die Vertrags-Enums. `STATUS_META` benennt 7 fachlich unabhängige Maps (Material, Tier ×2, UHS, BR, Person, Schaden) — die außerhalb des Vertrags bleiben draußen (§5) |
 | 6 | Jeder Eintrag trägt einen zweiten Kanal — `label` ist Pflichtfeld | unverändert, Form in §1.3 |
-| 7 | `grep -rl "SektionHeader\|EinsatzSeite" … \| wc -l` ≥ 10 | **offen — Entscheidung des Auftraggebers.** Heute 2. Ohne Bestands-Sweep erreicht A2 4–6. Siehe unten |
+| 7 | `grep -rl "SektionHeader\|EinsatzSeite" … \| wc -l` ≥ 10 | **gilt.** Erreicht über die konsequente Anwendung der Norm auf alle ohnehin angefassten Dateien, siehe unten |
 | 8 | Vitest belegt für `EinsaetzePage` drei unterscheidbar gerenderte Zustände (Laden / Fehler / Leer) | unverändert |
 | 9 | Guard-Test schlägt fehl, sobald `befehle.ts` die Verwaltungs-Berechtigung selbst beurteilt | unverändert |
 | 10 | **Gate 4** (A1): `grep -rn "controlHeight" frontend/src \| grep -v '/theme/'` = 0; `size="small"` ≤ 236 | **ergänzt** — heute grün, muss grün bleiben |
 | 11 | Keine angefasste Seite weicht unbegründet von der Referenzseite ab | erfüllt durch §3.1 (Begründung für den `titel`-Slot) |
 | 12 | `pnpm lint --max-warnings 0` und `./scripts/check-all.sh` grün | unverändert |
 
-**Zu AC 7 — das eine Kriterium, das A2 ohne Sweep nicht erreicht.** Heute nutzen 2 Dateien
-`SektionHeader` (1 Konsument + Testdatei). `EinsatzSeite` als neues Primitiv plus die im Task
-genannten Umzüge (`EinsatzEinstellungenPage` mit 6 rohen Titeln, `EinsatzDefaults` nutzt
-`SektionHeader` schon) landet bei **4–6 Dateien**. Die „≥ 10" zu erreichen hieße, weitere
-4–6 Seiten umzuziehen, die der Task nicht nennt — genau der verbotene Sweep. Entweder das AC
-wird auf den erreichten Wert korrigiert, oder der Auftraggeber weitet den Umfang bewusst aus.
-**Diese Frage ist dem Auftraggeber vorgelegt worden**; die getroffene Entscheidung wird hier
-nachgetragen.
+### 7.1 · Zu AC 7 — die Norm gilt für „ohnehin Angefasstes", und das wird ernst genommen
+
+Heute nutzen 2 Dateien `SektionHeader` (1 Konsument + Testdatei). Die naheliegende Lesart —
+nur die im Task **wörtlich genannten** Zeilen umzuziehen — landet bei 4–6 Dateien und verfehlt
+das AC.
+
+**Die Auflösung liegt in der Task-Norm selbst.** Sie lautet zweimal wörtlich: „Kein
+Bestands-Sweep — verbindliche Norm für **Neues und ohnehin Angefasstes**." Der Riegel steht
+gegen das *Aufsuchen* fremder Dateien, nicht gegen das *Fertigmachen* der eigenen. A2 öffnet
+aus anderen Gründen (Statusfarbe, Token, Primitiv-Extraktion, Zustandslogik) rund **40
+Dateien**. Wer eine davon öffnet, um eine Farb-Map zu ersetzen, und den rohen
+`Typography.Title` drei Zeilen darüber stehen lässt, wendet die Norm nicht an — er umgeht sie.
+
+**Verbindliche Auslegung für diesen Task:**
+
+> Jede Datei, die A2 aus irgendeinem Grund ändert, wird **vollständig** auf die Zielzustände
+> gezogen: Seiten-/Sektionskopf über `EinsatzSeite`/`SektionHeader`, Farben aus den Rollen,
+> Abstände aus `abstand`/`flaeche`, Lade- und Fehlerzustand über die Zustands-Primitive,
+> `size="small"` auf 0 (Gate 4). Eine Datei, die A2 **nicht** aus anderem Grund öffnet, wird
+> nicht aufgesucht.
+
+Damit ist AC 7 erreichbar, ohne den Riegel zu brechen — und die Baselines in §5 bleiben
+gültig: was übrig bleibt, bleibt Baseline für Band B/C, nicht weil es zu mühsam wäre, sondern
+weil A2 diese Dateien schlicht nicht anfasst.
+
+**Erwarteter Umfang** (die Menge ergibt sich aus §5 und dem Plan, nicht aus einer Zielzahl):
+`EinsatzEinstellungenPage` · `EinsatzDefaults` · `AnzeigeEinstellungen` · `EinsatzdatenPage` ·
+`EinsaetzePage` · `UnfallhilfsstellenPage` · `uhs/UhsDetailPage` ·
+`bereitstellungsraum/BereitstellungsraeumePage` · `bereitstellungsraum/BrDetailPage` ·
+`KraefteuebersichtPage` · `PersonenDetailPage` · `MaterialPage` (nur falls von einem anderen
+A2-Punkt berührt). Das sind ≥ 10 auch dann, wenn zwei davon wegfallen.
