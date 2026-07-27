@@ -59,13 +59,25 @@ export default function ModulPanel({
             >
               <Icon size={18} />
               <span>{m.label}</span>
-              {m.status === 'wip' && <span title="In Arbeit">🚧</span>}
+              {/* Dekoration neben dem Label — `aria-hidden` wie beim ↗ darunter, sonst
+                  landet der Emoji im Accessible Name des Knopfes („Stab 🚧"). */}
+              {m.status === 'wip' && (
+                <span title="In Arbeit" aria-hidden>
+                  🚧
+                </span>
+              )}
               {m.verweistAuf && (
                 <span title="Öffnet in der Lagekarte" aria-hidden style={{ marginLeft: 'auto' }}>
                   ↗
                 </span>
               )}
-              {gesperrt && <span style={{ marginLeft: 'auto' }}>🔒</span>}
+              {/* Ebenfalls Dekoration: die Sperre trägt der Knopf selbst über `disabled`
+                  und `title="Keine Berechtigung"`, nicht der Emoji. */}
+              {gesperrt && (
+                <span aria-hidden style={{ marginLeft: 'auto' }}>
+                  🔒
+                </span>
+              )}
             </button>
           );
         })}

@@ -49,6 +49,21 @@ describe('ModulPanel', () => {
     expect(screen.getByText(/🔒/)).toBeInTheDocument();
   });
 
+  // Der 🚧-Marker ist reine Dekoration neben dem Label — er darf nicht im Accessible Name
+  // des Knopfes landen („Sachschäden 🚧"), so wie das ↗ daneben es schon vormacht (LFH-328).
+  it('haelt den WIP-Marker aus dem Accessible Name heraus', () => {
+    renderMitProviders(
+      <ModulPanel
+        titel="Erfassung" module={module} benutzer={ohne}
+        aktiverModulKey={null} onModulKlick={() => {}}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Sachschäden' })).toBeInTheDocument();
+    expect(screen.getByTitle('In Arbeit')).toBeInTheDocument();
+    // Dasselbe gilt für das Schloss — die Sperre trägt `disabled` + `title`, nicht der Emoji.
+    expect(screen.getByRole('button', { name: 'Geheim' })).toBeDisabled();
+  });
+
   it('markiert ein Deep-Link-Modul mit Hinweis-Symbol', () => {
     renderMitProviders(
       <ModulPanel
