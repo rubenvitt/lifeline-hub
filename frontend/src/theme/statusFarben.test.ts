@@ -16,19 +16,33 @@ const hellToken = tokenFuer(farbenHell, false);
 const dunkelToken = tokenFuer(farbenDunkel, true);
 const ALLE_ROLLEN: sf.Statusrolle[] = ['alarm', 'achtung', 'normal', 'neutral', 'bedien', 'marke'];
 
-const ALLE_MAPS = {
-  statusKategorie: sf.statusKategorie,
-  verfuegbarkeit: sf.verfuegbarkeit,
-  etbTyp: sf.etbTyp,
-  uhsStatus: sf.uhsStatus,
-  uhsTyp: sf.uhsTyp,
-  brStatus: sf.brStatus,
-  belegungsArt: sf.belegungsArt,
-  warnstufeKarte: sf.warnstufeKarte,
-  warnstufeKennzahl: sf.warnstufeKennzahl,
-};
+/** Bewusst AUS DEM MODUL abgeleitet statt handgepflegt: eine handgeschriebene Liste
+ *  ließe eine zehnte Map still am Kanal-Test vorbeilaufen. Die Zahl unten ist der
+ *  Wächter — kommt ein Enum dazu, wird sie laut, statt dass die Abdeckung schrumpft. */
+const ALLE_MAPS = Object.fromEntries(
+  Object.entries(sf).filter(
+    ([, wert]) =>
+      !!wert &&
+      typeof wert === 'object' &&
+      Object.values(wert).every((e) => !!e && typeof e === 'object' && 'rolle' in e),
+  ),
+) as Record<string, Record<string, sf.StatusDarstellung>>;
 
 describe('Statusfarb-Vertrag', () => {
+  it('deckt alle neun Vertrags-Enums ab — eine zehnte Map rutscht nicht still durch', () => {
+    expect(Object.keys(ALLE_MAPS).sort()).toEqual([
+      'belegungsArt',
+      'brStatus',
+      'etbTyp',
+      'statusKategorie',
+      'uhsStatus',
+      'uhsTyp',
+      'verfuegbarkeit',
+      'warnstufeKarte',
+      'warnstufeKennzahl',
+    ]);
+  });
+
   it('gibt jedem Eintrag einen zweiten Kanal (WCAG 1.4.1)', () => {
     for (const [name, map] of Object.entries(ALLE_MAPS)) {
       for (const [schluessel, d] of Object.entries(map)) {
@@ -68,9 +82,14 @@ describe('Statusfarb-Vertrag', () => {
     }
   });
 
-  it('gibt verschiedenen Rollen verschiedene Farbwerte — sonst wäre der Kanal blind', () => {
-    const werte = ALLE_ROLLEN.map((r) => sf.rollenFarbe(r, hellToken).toLowerCase());
-    expect(new Set(werte).size).toBe(werte.length);
+  // Absichtlich nur Verschiedenheit, nicht Unterscheidbarkeit: `marke` und `alarm` sind
+  // beide Rot in anderer Sättigung (A0: „ROT BEDIENT NICHTS" trennt Marke von Gefahr über
+  // den Ort, nicht über den Farbton). Den zweiten Kanal trägt `label`, nicht der Abstand.
+  it('gibt in BEIDEN Modi keiner Rolle den Farbwert einer anderen', () => {
+    for (const token of [hellToken, dunkelToken]) {
+      const werte = ALLE_ROLLEN.map((r) => sf.rollenFarbe(r, token).toLowerCase());
+      expect(new Set(werte).size).toBe(werte.length);
+    }
   });
 
   it('folgt dem Modus — `marke` hat keinen antd-Token und muss trotzdem umschalten', () => {
