@@ -1,7 +1,9 @@
-import { screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { ConfigProvider } from 'antd';
 import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
+import { antdToken, farbenHell, type Dichte } from '../theme/tokens';
 import { Liste, ListenEintrag, ListenEintragMeta } from './Liste';
 
 describe('Liste', () => {
@@ -102,5 +104,72 @@ describe('Liste', () => {
     );
     expect(screen.getByText('Der Titel')).toBeInTheDocument();
     expect(screen.getByText('Die Beschreibung')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Innenabstände (LFH-328/T14). `Liste` versorgt 10 Masken — zieht sie bei einer
+ * Dichteumschaltung (B5) nicht mit, bleibt die Dichte-Staffel folgenlos.
+ *
+ * Der Test liest die Zahl NICHT aus dem Token (das prüfte den Token gegen sich
+ * selbst), sondern belegt zweierlei:
+ *  1. unter dem **antd-Standardtheme** bleiben die Werte byte-gleich zu vorher
+ *     (16 klein / 24 default) — die 10 Masken sehen unverändert aus;
+ *  2. unter `antdToken(farbenHell, 'handschuh')` **bewegen** sie sich, und zwar
+ *     in beiden Größen. Ein hartkodiertes Pixel bliebe hier stehen.
+ * jsdom rechnet kein Layout, gibt Inline-Styles aber zurück — das genügt.
+ */
+function abstaende(size: 'small' | 'default', dichte?: Dichte) {
+  const { container, unmount } = render(
+    <ConfigProvider theme={dichte ? { token: antdToken(farbenHell, dichte) } : undefined}>
+      <Liste
+        size={size}
+        bordered
+        header={<span>Kopf</span>}
+        dataSource={['A']}
+        renderItem={(t) => <ListenEintrag>{t}</ListenEintrag>}
+      />
+    </ConfigProvider>,
+  );
+  const kopf = container.firstElementChild?.firstElementChild as HTMLElement;
+  const eintrag = container.querySelector('.listen-eintrag') as HTMLElement;
+  const werte = {
+    kopfInline: kopf.style.paddingLeft,
+    kopfBlock: kopf.style.paddingTop,
+    eintragInline: eintrag.style.getPropertyValue('padding-inline'),
+    eintragBlock: eintrag.style.getPropertyValue('padding-block'),
+  };
+  unmount();
+  return werte;
+}
+
+describe('Liste — Innenabstände folgen der Dichte', () => {
+  it('bleibt unter dem antd-Standardtheme bei den bisherigen Werten (16 / 24)', () => {
+    expect(abstaende('small').kopfInline).toBe('16px');
+    expect(abstaende('small').eintragInline).toBe('16px');
+    expect(abstaende('default').kopfInline).toBe('24px');
+    expect(abstaende('default').eintragInline).toBe('24px');
+  });
+
+  it('unterscheidet small und default auch in einer anderen Dichtestufe', () => {
+    const klein = abstaende('small', 'handschuh');
+    const gross = abstaende('default', 'handschuh');
+    expect(klein.kopfInline).not.toBe(gross.kopfInline);
+    expect(klein.eintragInline).not.toBe(gross.eintragInline);
+  });
+
+  it('zieht bei einer Dichteumschaltung mit (kein hartkodiertes Pixel)', () => {
+    for (const size of ['small', 'default'] as const) {
+      const kompakt = abstaende(size, 'kompakt');
+      const handschuh = abstaende(size, 'handschuh');
+      // Waagerecht: die beiden Zeilen aus T14.
+      expect(handschuh.kopfInline).not.toBe(kompakt.kopfInline);
+      expect(handschuh.eintragInline).not.toBe(kompakt.eintragInline);
+      // Senkrecht: `paddingContentVertical*` ist in diesem Theme genauso
+      // eingefroren wie die waagerechte Variante — mitgezogen, sonst wäre die
+      // Komponente nur halb dichteabhängig.
+      expect(handschuh.kopfBlock).not.toBe(kompakt.kopfBlock);
+      expect(handschuh.eintragBlock).not.toBe(kompakt.eintragBlock);
+    }
   });
 });

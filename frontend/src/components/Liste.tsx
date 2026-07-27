@@ -8,9 +8,20 @@ import type { CSSProperties, Key, ReactNode } from 'react';
  * antd 6 hat `List`/`List.Item`/`List.Item.Meta` als deprecated markiert (Entfernung in v7).
  * Dieses Modul bildet die im Projekt genutzte Teilmenge (vertikale Liste, Trennlinien,
  * Größen small/default, bordered, Header, Loading, Leer-Zustand, Item mit Aktionen/Klick,
- * Meta aus Titel + Beschreibung) über Flex-Layout + Theme-Tokens nach. Optik-Werte
- * (Padding/Trennlinie/Textfarben) stammen aus den antd-List-Default-Tokens, damit die
- * betroffenen Masken unverändert aussehen. Farben kommen aus `theme.useToken()` → dark-safe.
+ * Meta aus Titel + Beschreibung) über Flex-Layout + Theme-Tokens nach. Farben kommen aus
+ * `theme.useToken()` → dark-safe.
+ *
+ * **Innenabstände (LFH-328/T14).** Sie lagen als Pixel-Literale (16/24) bzw. als
+ * `paddingContent*` im Code und waren damit von der Dichte-Staffel abgekoppelt: `antdToken()`
+ * überschreibt `padding`/`paddingSM`/`paddingXS`/`paddingLG`, **nicht** die `size*`-Map-Tokens,
+ * aus denen antd die `paddingContent*`-Aliase ableitet — gemessen bleiben die bei 16/16/12/8,
+ * egal welche Dichtestufe gesetzt ist. Deshalb steht hier jetzt die jeweils gleichwertige,
+ * dichteabhängige Quelle derselben antd-Alias-Kette (`alias.js`):
+ * `paddingContentHorizontalSM`/`padding` ← `size` · `paddingContentHorizontalLG`/`paddingLG`
+ * ← `sizeLG` · `paddingContentVertical`/`paddingSM` ← `sizeSM` ·
+ * `paddingContentVerticalSM`/`paddingXS` ← `sizeXS`. Unter dem antd-Standardtheme sind die
+ * Werte damit unverändert (16/24/12/8), unter `kompakt` fallen sie auf 11/18/7/3 und ziehen
+ * bei einer Dichteumschaltung (B5) mit. Gepinnt in `Liste.test.tsx`.
  */
 
 const { useToken } = theme;
@@ -63,7 +74,7 @@ export function Liste<T>({
     ...style,
   };
 
-  const headerPaddingInline = bordered ? (size === 'small' ? 16 : 24) : 0;
+  const headerPaddingInline = bordered ? (size === 'small' ? token.padding : token.paddingLG) : 0;
 
   // antd `List`: bei gesetztem `emptyText` nur den Text zeigen (`.ant-list-empty-text`), sonst
   // das Standard-`<Empty>` (simple image) als Fallback — beides in derselben zentrierten Box.
@@ -105,7 +116,7 @@ export function Liste<T>({
         {header != null && (
           <div
             style={{
-              padding: `${token.paddingContentVertical}px ${headerPaddingInline}px`,
+              padding: `${token.paddingSM}px ${headerPaddingInline}px`,
               borderBlockEnd: `1px solid ${token.colorSplit}`,
             }}
           >
@@ -131,8 +142,8 @@ export function ListenEintrag({ children, actions, onClick, style, className }: 
   const { token } = useToken();
   const { size, bordered } = useContext(ListeContext);
 
-  const paddingBlock = size === 'small' ? token.paddingContentVerticalSM : token.paddingContentVertical;
-  const paddingInline = size === 'small' ? 16 : bordered ? 24 : 0;
+  const paddingBlock = size === 'small' ? token.paddingXS : token.paddingSM;
+  const paddingInline = size === 'small' ? token.padding : bordered ? token.paddingLG : 0;
 
   return (
     <div

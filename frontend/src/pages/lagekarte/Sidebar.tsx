@@ -1,4 +1,4 @@
-import { Badge, Button, Card, Empty, Popconfirm, Radio, Slider, Space, Spin, Switch, Tooltip, Typography, Upload } from 'antd';
+import { Badge, Button, Card, Empty, Popconfirm, Radio, Slider, Space, Spin, Switch, theme, Tooltip, Typography, Upload } from 'antd';
 import { Select } from '../../components/Select';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { AimOutlined, DeleteOutlined, FullscreenOutlined, UploadOutlined } from '@ant-design/icons';
@@ -130,6 +130,9 @@ export interface SidebarProps {
 
 export default function Sidebar(props: SidebarProps) {
   const { nichtVerortet, verortet, darfSchreiben, platzierungZiel } = props;
+  // Darstellungsfarben/-abstände kommen aus den Rollen-Tokens (LFH-328/T14) — dark-safe und
+  // dichteabhängig. Persistierte Farbwerte (Zone `farbe`) sind davon ausgenommen, siehe unten.
+  const { token } = theme.useToken();
   const [koord, setKoord] = useState<LatLon | null>(null);
   // Freies-Zeichen-Schnellerfassung (LFH-170): Picker erst auf Klick sichtbar (kein Dauer-
   // Combobox in der Sidebar), Entwurf bleibt über Platzierungen erhalten.
@@ -160,7 +163,8 @@ export default function Sidebar(props: SidebarProps) {
         title={
           <Space>
             <Typography.Text strong>⚠ Nicht verortet</Typography.Text>
-            <Badge count={nichtVerortet.length} showZero color="#fa8c16" />
+            {/* Zweiter Kanal ist die Zahl selbst (WCAG 1.4.1) — die Farbe trägt hier nur „Achtung". */}
+            <Badge count={nichtVerortet.length} showZero color={token.colorWarning} />
           </Space>
         }
         style={{ marginBottom: 12 }}
@@ -215,7 +219,7 @@ export default function Sidebar(props: SidebarProps) {
       </Card>
 
       {platzierungZiel && darfSchreiben && (
-        <Card size="small" style={{ marginBottom: 12, borderColor: '#1677ff' }}>
+        <Card size="small" style={{ marginBottom: 12, borderColor: token.colorPrimary }}>
           <Typography.Text type="secondary">
             Klick auf die Karte setzt die Koordinate. (Abbrechen beendet.)
           </Typography.Text>
@@ -390,7 +394,7 @@ export default function Sidebar(props: SidebarProps) {
           {props.bilder.map((b) => {
             const imPlatzieren = props.bildPlatzierenId === b.id;
             return (
-              <div key={b.id} style={{ borderBottom: '1px solid #f0f0f0', paddingBottom: 6 }}>
+              <div key={b.id} style={{ borderBottom: `1px solid ${token.colorSplit}`, paddingBottom: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Switch
                     size="small"
@@ -458,8 +462,17 @@ export default function Sidebar(props: SidebarProps) {
                   disabled={!darfSchreiben}
                   onChange={(ansichtId) => props.onBildVerschieben(b.id, ansichtId)}
                 />
+                {/* Hinterlegung war `rgba(22,119,255,.06)` — derselbe Blauton wie die
+                    Bedien-Rolle, nur in rgba-Schreibweise und damit für jedes Hex-Grep
+                    unsichtbar. Jetzt die Rolle „aktiver Bedienbereich". */}
                 {imPlatzieren && darfSchreiben && (
-                  <div style={{ padding: 8, background: 'rgba(22,119,255,.06)', borderRadius: 4 }}>
+                  <div
+                    style={{
+                      padding: token.paddingSM,
+                      background: token.colorPrimaryBg,
+                      borderRadius: token.borderRadiusSM,
+                    }}
+                  >
                     <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                       Auf der Karte: Ecken = Größe (Seitenverhältnis), Kanten = frei strecken, ↻ = drehen, Mitte = verschieben. Oder Mittelpunkt numerisch:
                     </Typography.Text>
@@ -515,6 +528,11 @@ export default function Sidebar(props: SidebarProps) {
                 return (
                   <Space key={t.typ}>
                     <Typography.Text>{t.label}</Typography.Text>
+                    {/* `farbe` ist ein PERSISTIERTER Datenwert: er wandert über
+                        `onZoneZeichnenStart` in die Zone und damit in die Datenbank. Er darf
+                        deshalb NICHT auf ein Laufzeit-Token zeigen — ein Themenwechsel würde
+                        sonst bereits gespeicherte Zonen nachträglich uminterpretieren. Das
+                        Literal bleibt bewusst stehen (LFH-328/T14). */}
                     <Button
                       size="small"
                       onClick={() => props.onZoneZeichnenStart({ typ: t.typ, modus: 'polygon', farbe: '#1677ff' })}
