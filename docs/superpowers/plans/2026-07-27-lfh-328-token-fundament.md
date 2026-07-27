@@ -44,8 +44,21 @@ Diese gelten für **jeden** Task, ohne dass sie dort wiederholt werden:
   über `frontend/src/routing/deeplinks.ts` (CLAUDE.md).
 - **Lint:** `pnpm lint` läuft mit `--max-warnings 0`. `eslint-disable` nur zeilengenau **mit
   Begründung**, niemals datei- oder blockweit.
-- **pnpm-Aufruf:** `mise exec pnpm@<ver> -- pnpm -C /Users/rubeen/dev/personal/lifeline-hub/frontend <cmd>`
-  — immer absoluter Pfad.
+- **pnpm-Aufruf — genau diese Form, verifiziert 2026-07-27:**
+
+  ```bash
+  PNPM="mise exec pnpm@11.10.0 -- pnpm"
+  FE=/Users/rubeen/dev/personal/lifeline-hub/frontend
+  $PNPM -C "$FE" exec vitest run src/theme/     # Tests (exec, KEIN `pnpm test`)
+  $PNPM -C "$FE" run lint                        # Lint
+  $PNPM -C "$FE" run build                       # tsc -b && vite build
+  ```
+
+  Drei Fallen, alle gemessen: es gibt **kein** Root-`package.json` und **keine**
+  `pnpm-workspace.yaml` — `pnpm -C <fe> vitest …` und `pnpm test` scheitern beide mit
+  `ERROR packages field missing or empty`. Es braucht `exec`. Und die Version ist
+  **11.10.0** (die der `scripts/check-*.sh` nutzen), nicht die lokal ebenfalls
+  installierte 9.15.x.
 - **Gate-Kommandos über `rtk proxy`** (der rtk-Hook maskiert sonst Exit-Codes), **kein `| tail`**.
 - **Commits** referenzieren `LFH-328` im Body.
 
