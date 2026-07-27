@@ -1,5 +1,7 @@
-import { Button, Descriptions, Space, Tag } from 'antd';
+import { Button, Descriptions, Space, Tag, theme } from 'antd';
+import { useId } from 'react';
 import { Select } from '../../components/Select';
+import FeldLabel from '../../components/FeldLabel';
 import { Link } from 'react-router';
 import type { KarteMarker, MarkerTyp } from './marker';
 import { markerToUrl } from './markerToUrl';
@@ -74,6 +76,11 @@ function inspectorExclude(m: KarteMarker, einsatzId: number): string | undefined
 export default function Inspector({
   einsatzId, marker, darfSchreiben, onSchliessen, onVerortungLoeschen, onSymbolAendern,
 }: InspectorProps) {
+  const { token } = theme.useToken();
+  // Eigene ids statt fester Literale: der Inspector kann neben anderen Feldern derselben
+  // Beschriftung stehen, doppelte ids brächen die Label-Assoziation.
+  const fachaufgabeId = useId();
+  const organisationId = useId();
   const modulLink = markerToUrl(marker, einsatzId);
   // Geometrie-Kennzahlen (z. B. Abschnittsfläche), rein clientseitig (LFH-146).
   const kennzahlen = marker.geometrie ? geoKennzahlen(marker.geometrie) : null;
@@ -104,29 +111,30 @@ export default function Inspector({
         )}
       </Descriptions>
       {symbolAuswahl && (
-        <Space orientation="vertical" size="small" style={{ width: '100%', marginTop: 8 }}>
-          <label style={{ display: 'block' }}>
-            <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>Fachaufgabe</div>
+        <Space orientation="vertical" size={token.marginXS} style={{ width: '100%', marginTop: token.marginXS }}>
+          {/* Kein `aria-label` mehr: das FeldLabel trägt den Namen. Zwei Quellen wären eine
+              doppelte Benennung, bei der `aria-label` gewinnt und den sichtbaren Text vom
+              Accessible Name abkoppelt. */}
+          <FeldLabel text="Fachaufgabe" htmlFor={fachaufgabeId}>
             <Select
-              aria-label="Fachaufgabe"
+              id={fachaufgabeId}
               allowClear
               style={{ width: '100%' }}
               value={marker.tz?.fachaufgabe ?? undefined}
               options={FACHAUFGABE_OPTIONEN}
               onChange={(v) => onSymbolAendern!(marker, { tz_fachaufgabe: v ?? null })}
             />
-          </label>
-          <label style={{ display: 'block' }}>
-            <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>Organisation (Override)</div>
+          </FeldLabel>
+          <FeldLabel text="Organisation (Override)" htmlFor={organisationId}>
             <Select
-              aria-label="Organisation (Override)"
+              id={organisationId}
               allowClear
               style={{ width: '100%' }}
               value={marker.tz?.organisation ?? undefined}
               options={ORG_OPTIONEN}
               onChange={(v) => onSymbolAendern!(marker, { tz_organisation: v ?? null })}
             />
-          </label>
+          </FeldLabel>
         </Space>
       )}
       <Space style={{ marginTop: 8 }}>

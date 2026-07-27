@@ -1,6 +1,7 @@
 import { Button, Input, Popconfirm, Space, Tag, Typography } from 'antd';
 import { Select } from '../../components/Select';
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
+import FeldLabel from '../../components/FeldLabel';
 import type { Gefahrengebiet, KartenAnsicht, LageZone, ZoneTyp } from '../../api/types';
 import { gefahrengebietName } from '../../api/gefahren';
 import { ZONE_TYPEN, zoneTypLabel, zoneStil } from './zonenStil';
@@ -36,6 +37,7 @@ export interface ZonenInspectorProps {
 }
 
 export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchliessen, onAendern, onMatrixOeffnen, onLoeschen, ansichten }: ZonenInspectorProps) {
+  const gebietId = useId();
   const istFreieSkizze = zone.typ === 'freie_skizze';
   const erlaubteTypen = ZONE_TYPEN.filter((t) => t.geometrie === 'beides' || t.geometrie === zone.geometrie_typ);
   const aktuellesGebiet = gebiete.find((g) => g.id === zone.gefahrengebiet_id) ?? null;
@@ -103,18 +105,20 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
 
         {zone.typ === 'gefahrengebiet' && (
           <>
-            <Typography.Text type="secondary">Gehört zu Gefahrengebiet</Typography.Text>
-            <Select<number>
-              aria-label="Gehört zu Gefahrengebiet"
-              style={{ width: '100%' }}
-              value={zone.gefahrengebiet_id ?? undefined}
-              disabled={!darfSchreiben}
-              options={[
-                ...gebiete.map((g) => ({ value: g.id, label: gefahrengebietName(g.label, g.id) })),
-                { value: NEU, label: '+ Neues Gefahrengebiet' },
-              ]}
-              onChange={(v) => umhaengen(v)}
-            />
+            {/* Kein `aria-label` mehr: das FeldLabel trägt den Namen (LFH-328/A2). */}
+            <FeldLabel text="Gehört zu Gefahrengebiet" htmlFor={gebietId}>
+              <Select<number>
+                id={gebietId}
+                style={{ width: '100%' }}
+                value={zone.gefahrengebiet_id ?? undefined}
+                disabled={!darfSchreiben}
+                options={[
+                  ...gebiete.map((g) => ({ value: g.id, label: gefahrengebietName(g.label, g.id) })),
+                  { value: NEU, label: '+ Neues Gefahrengebiet' },
+                ]}
+                onChange={(v) => umhaengen(v)}
+              />
+            </FeldLabel>
             {zone.gefahrengebiet_id != null && (
               <Button block onClick={() => onMatrixOeffnen(zone.gefahrengebiet_id as number)}>
                 Gefahrenmatrix bearbeiten

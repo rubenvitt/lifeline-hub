@@ -1,5 +1,7 @@
-import { Typography } from 'antd';
+import { theme } from 'antd';
+import { useId } from 'react';
 import { Select } from '../../components/Select';
+import FeldLabel from '../../components/FeldLabel';
 import type { KartenAnsicht } from '../../api/types';
 
 interface AnsichtZuordnungProps {
@@ -19,24 +21,27 @@ const ALLE = 0;
  * (nichts zu wählen). Geteilt von Zonen-/Zeichen-/Bild-Inspektor.
  */
 export default function AnsichtZuordnung({ ansichten, wert, disabled, onChange }: AnsichtZuordnungProps) {
+  const { token } = theme.useToken();
+  // Drei Aufrufstellen, die nebeneinander stehen können → id je Instanz, kein Literal.
+  const id = useId();
   if (ansichten.length <= 1) return null;
   return (
-    <div style={{ marginTop: 8 }}>
-      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-        Sichtbar auf
-      </Typography.Text>
-      <Select<number>
-        size="small"
-        style={{ width: '100%', marginTop: 2 }}
-        value={wert ?? ALLE}
-        disabled={disabled}
-        onChange={(v) => onChange(v === ALLE ? null : v)}
-        aria-label="Ansichts-Zuordnung"
-        options={[
-          { value: ALLE, label: 'Allen Ansichten' },
-          ...ansichten.map((a) => ({ value: a.id, label: a.name })),
-        ]}
-      />
+    <div style={{ marginTop: token.marginXS }}>
+      {/* Kein `aria-label` mehr: das FeldLabel trägt den Namen; der sichtbare Text
+          („Sichtbar auf") ist damit zugleich der Accessible Name (LFH-328/A2). */}
+      <FeldLabel text="Sichtbar auf" htmlFor={id}>
+        <Select<number>
+          id={id}
+          style={{ width: '100%' }}
+          value={wert ?? ALLE}
+          disabled={disabled}
+          onChange={(v) => onChange(v === ALLE ? null : v)}
+          options={[
+            { value: ALLE, label: 'Allen Ansichten' },
+            ...ansichten.map((a) => ({ value: a.id, label: a.name })),
+          ]}
+        />
+      </FeldLabel>
     </div>
   );
 }

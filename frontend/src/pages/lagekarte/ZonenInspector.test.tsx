@@ -64,6 +64,9 @@ describe('ZonenInspector — Gefahrengebiet-Gruppe', () => {
     renderInspector({});
     // Der Inspector soll ein Dropdown für die Gruppen-Zugehörigkeit zeigen.
     expect(screen.getAllByLabelText('Gehört zu Gefahrengebiet')[0]).toBeInTheDocument();
+    // Seit LFH-328 trägt ein echtes <label> den Namen (kein aria-label mehr): der sichtbare
+    // Text ist der Accessible Name, der gewählte Gebietsname steckt NICHT darin.
+    expect(screen.getByRole('combobox', { name: 'Gehört zu Gefahrengebiet' })).toBeInTheDocument();
   });
 
   it('zeigt den Button „Gefahrenmatrix bearbeiten" bei gesetzter gefahrengebiet_id', () => {
