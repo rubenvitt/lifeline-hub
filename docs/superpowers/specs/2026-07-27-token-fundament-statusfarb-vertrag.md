@@ -389,6 +389,19 @@ Angefasstes". Diese Zahlen sind gemessene Baselines, kein Auftrag:
    bewusst nicht).
 6. **`rgba`-getarnte Hex-Werte** — `Sidebar.tsx:462` und die `,.5`-Kurznotation in
    `bildHandles.ts` fallen durch jedes Hex-Grep. Betrifft die Verlässlichkeit von Gate 5.
+7. **Der App-Shell fehlt eine Farbrolle** *(im Lauf gefunden, 2026-07-27)* —
+   `components/AppLayout.tsx` trägt `'#fff'` (2×), `rgba(255,255,255,0.35)`, `fontSize: 18`,
+   `padding: 24`, `gap: 16`. Für **Text auf dunkler Kopfzeile** gibt es in `Farbrollen` keine
+   Rolle, und das Abstandsraster ist 3/7/11/18 — `abstand.lg` für `padding: 24` wäre eine
+   **visuelle Änderung der App-Shell**, kein Token-Tausch. Die Norm „ohnehin Angefasstes" wurde
+   hier deshalb bewusst **nicht** angewandt: einen Wert zu erfinden oder der Shell still ein
+   anderes Aussehen zu geben, wäre schlechter als der Befund. Braucht eine Rolle
+   `textAufMarke` und eine Entscheidung über den Kopfzeilen-Abstand.
+
+> **Die Norm hat eine Grenze, und Befund 7 zeigt sie.** „Ohnehin Angefasstes vollständig ziehen"
+> heißt: auf **vorhandene** Rollen und Token ziehen. Wo keine Rolle existiert, ist der Fund ein
+> Befund — keine Einladung, einen Wert zu erfinden. A0 hat die Rollen gemessen; ein
+> danebengesetzter Wert wäre genau die Ad-hoc-Entscheidung, gegen die dieser Task antritt.
 
 ---
 
