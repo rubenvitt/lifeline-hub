@@ -1,5 +1,6 @@
-import { Alert, App, Button, Form, Input, InputNumber, Spin, Switch } from 'antd';
+import { App, Button, Form, Input, InputNumber, Switch } from 'antd';
 import { Select } from '../../components/Select';
+import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ladeOrgEinstellungen,
@@ -73,15 +74,16 @@ export default function EinsatzDefaults() {
   });
 
   if (einstellungenQuery.isLoading || modulQuery.isLoading) {
-    return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
-        <Spin size="large" />
-      </div>
-    );
+    return <SeitenSkeleton />;
   }
 
   if (einstellungenQuery.isError || !einstellungenQuery.data) {
-    return <Alert type="error" title="Einstellungen nicht ladbar oder kein Zugriff" showIcon />;
+    return (
+      <SeitenFehler
+        text="Einstellungen nicht ladbar oder kein Zugriff"
+        onWiederholen={() => void einstellungenQuery.refetch()}
+      />
+    );
   }
 
   const einstellungen = einstellungenQuery.data;

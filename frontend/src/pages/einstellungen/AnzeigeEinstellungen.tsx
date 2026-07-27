@@ -1,5 +1,6 @@
-import { Alert, App, AutoComplete, Button, Form, Input, Spin } from 'antd';
+import { App, AutoComplete, Button, Form, Input } from 'antd';
 import { Select } from '../../components/Select';
+import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeOrgEinstellungen, speichereOrgEinstellungen } from '../../api/orgEinstellungen';
 import { ApiError } from '../../api/client';
@@ -70,15 +71,16 @@ export default function AnzeigeEinstellungen() {
   });
 
   if (einstellungenQuery.isLoading) {
-    return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
-        <Spin size="large" />
-      </div>
-    );
+    return <SeitenSkeleton />;
   }
 
   if (einstellungenQuery.isError || !einstellungenQuery.data) {
-    return <Alert type="error" title="Einstellungen nicht ladbar oder kein Zugriff" showIcon />;
+    return (
+      <SeitenFehler
+        text="Einstellungen nicht ladbar oder kein Zugriff"
+        onWiederholen={() => void einstellungenQuery.refetch()}
+      />
+    );
   }
 
   const einstellungen = einstellungenQuery.data;

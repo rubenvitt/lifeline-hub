@@ -1,5 +1,6 @@
-import { Alert, App, AutoComplete, Button, Form, Input, InputNumber, Spin, Switch, Typography } from 'antd';
+import { Alert, App, AutoComplete, Button, Form, Input, InputNumber, Switch, Typography } from 'antd';
 import { Select } from '../components/Select';
+import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -125,14 +126,18 @@ export default function EinsatzEinstellungenPage() {
   });
 
   if (einsatzQuery.isLoading || einstellungenQuery.isLoading || overridesQuery.isLoading) {
-    return (
-      <div style={{ textAlign: 'center', paddingTop: 80 }}>
-        <Spin size="large" />
-      </div>
-    );
+    return <SeitenSkeleton />;
   }
   if (einsatzQuery.isError || !einsatzQuery.data || einstellungenQuery.isError || !einstellungenQuery.data) {
-    return <Alert type="error" title="Einstellungen nicht ladbar oder kein Zugriff" showIcon />;
+    return (
+      <SeitenFehler
+        text="Einstellungen nicht ladbar oder kein Zugriff"
+        onWiederholen={() => {
+          void einsatzQuery.refetch();
+          void einstellungenQuery.refetch();
+        }}
+      />
+    );
   }
   const einsatz = einsatzQuery.data;
   const einstellungen = einstellungenQuery.data;
