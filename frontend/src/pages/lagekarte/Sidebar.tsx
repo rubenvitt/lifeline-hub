@@ -468,7 +468,7 @@ export default function Sidebar(props: SidebarProps) {
                 {imPlatzieren && darfSchreiben && (
                   <div
                     style={{
-                      padding: token.paddingSM,
+                      padding: token.paddingXS,
                       background: token.colorPrimaryBg,
                       borderRadius: token.borderRadiusSM,
                     }}
