@@ -41,7 +41,12 @@ async function anmelden(page: Page) {
 
 async function einsatzAnlegenUndOeffnen(page: Page): Promise<number> {
   await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
-  await page.getByLabel('Bezeichnung').fill(`E2E Lagekarte ${Date.now()}`);
+  // Der Name darf KEINEN Modulnamen enthalten. Alle Specs teilen sich eine Datenbank, und
+  // die Kommandopalette durchsucht Module UND Einsätze in derselben Optionsliste. Ein
+  // Einsatz „E2E Lagekarte …" ließ command-palette.spec.ts mit einer strict-mode-Verletzung
+  // scheitern (`getByRole('option', { name: /Lagekarte/ })` traf 2 Elemente) — und zwar nur
+  // je nach Worker-Reihenfolge, also als Flake (gemessen: 1/0/2 Fehlschläge in 3 Läufen).
+  await page.getByLabel('Bezeichnung').fill(`E2E Kartensmoke ${Date.now()}`);
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze\/\d+/);
   return Number(page.url().match(/\/einsaetze\/(\d+)/)![1]);
