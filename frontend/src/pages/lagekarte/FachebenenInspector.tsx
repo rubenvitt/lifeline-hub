@@ -1,9 +1,10 @@
-import { Descriptions, Tag, Typography } from 'antd';
+import { Descriptions, Tag, Typography, theme } from 'antd';
 import { taktischeDtgVoll } from '../../anzeige/format';
 import type { FachebeneQuelle } from '../../api/fachebenen';
+import GeoKennzahlen from '../../components/GeoKennzahlen';
 import { FACHEBENEN } from './fachebenen';
 import { kategorieLabel } from './fachebenenLayer';
-import { geoKennzahlen, formatFlaeche, formatLaenge } from './geo';
+import { geoKennzahlen } from './geo';
 import KartenDetailCard from './KartenDetailCard';
 
 export interface FachebenenInspectorProps {
@@ -12,19 +13,6 @@ export interface FachebenenInspectorProps {
   /** Volle (un-geclippte) Geometrie des angeklickten Features → Fläche/Umfang/Länge (LFH-146). */
   geometrie?: { type: string; coordinates: unknown } | null;
   onSchliessen: () => void;
-}
-
-/** Read-only Fläche/Umfang/Länge aus einer (auch Multi-*) Geometrie. */
-function GeoKennzahlenBlock({ geometrie }: { geometrie?: { type: string; coordinates: unknown } | null }) {
-  const k = geometrie ? geoKennzahlen(geometrie) : null;
-  if (!k) return null;
-  return (
-    <Descriptions column={1} size="small" style={{ marginTop: 8 }}>
-      {k.flaecheM2 != null && <Descriptions.Item label="Fläche">{formatFlaeche(k.flaecheM2)}</Descriptions.Item>}
-      {k.umfangM != null && <Descriptions.Item label="Umfang">{formatLaenge(k.umfangM)}</Descriptions.Item>}
-      {k.laengeM != null && <Descriptions.Item label="Länge">{formatLaenge(k.laengeM)}</Descriptions.Item>}
-    </Descriptions>
-  );
 }
 
 /** Wert als getrimmter String oder null (akzeptiert auch Zahlen). */
@@ -114,7 +102,7 @@ function WarnungInhalt({ p }: { p: Record<string, unknown> }) {
       ) : schwere ? (
         <Tag style={{ marginBottom: 8 }}>{schwere}</Tag>
       ) : null}
-      <Descriptions column={1} size="small">
+      <Descriptions column={1}>
         {dring && <Descriptions.Item label="Dringlichkeit">{DRINGLICHKEIT[dring] ?? dring}</Descriptions.Item>}
         {(von || bis) && (
           <Descriptions.Item label="Gültig">
@@ -158,7 +146,7 @@ function PegelInhalt({ p }: { p: Record<string, unknown> }) {
           Kein aktueller Messwert
         </Typography.Paragraph>
       )}
-      <Descriptions column={1} size="small">
+      <Descriptions column={1}>
         {s(p.gewaesser) && <Descriptions.Item label="Gewässer">{s(p.gewaesser)}</Descriptions.Item>}
         {km && <Descriptions.Item label="Stations-km">{km}</Descriptions.Item>}
         {fmtZeit(s(p.zeitpunkt)) && (
@@ -179,7 +167,7 @@ function KritisInhalt({ p }: { p: Record<string, unknown> }) {
   return (
     <>
       {kategorie && <Tag color="purple" style={{ marginBottom: 8 }}>{kategorieLabel(kategorie)}</Tag>}
-      <Descriptions column={1} size="small">
+      <Descriptions column={1}>
         {s(p.adresse) && <Descriptions.Item label="Adresse">{s(p.adresse)}</Descriptions.Item>}
         {s(p.betreiber) && <Descriptions.Item label="Betreiber">{s(p.betreiber)}</Descriptions.Item>}
         {telefon && (
@@ -204,8 +192,11 @@ function KritisInhalt({ p }: { p: Record<string, unknown> }) {
 
 /** Detailpanel für ein angeklicktes Fachebenen-Objekt (read-only externe Daten). */
 export default function FachebenenInspector({ quelle, properties, geometrie, onSchliessen }: FachebenenInspectorProps) {
+  const { token } = theme.useToken();
   const p = properties;
   const istWarnung = quelle === 'nina' || quelle === 'dwd';
+  // Fläche/Umfang/Länge rein clientseitig aus der (auch Multi-*) Geometrie (LFH-146).
+  const kennzahlen = geometrie ? geoKennzahlen(geometrie) : null;
 
   let titel: string;
   if (istWarnung) {
@@ -228,7 +219,13 @@ export default function FachebenenInspector({ quelle, properties, geometrie, onS
       ) : (
         <KritisInhalt p={p} />
       )}
-      <GeoKennzahlenBlock geometrie={geometrie} />
+      {/* Abstand am Aufrufer, nicht im Primitiv: `GeoKennzahlen` rendert ohne Kennzahlen
+          nichts, ein Wrapper mit `marginTop` hinterließe sonst eine leere Lücke. */}
+      {kennzahlen && (
+        <div style={{ marginTop: token.marginSM }}>
+          <GeoKennzahlen kennzahlen={kennzahlen} />
+        </div>
+      )}
     </KartenDetailCard>
   );
 }

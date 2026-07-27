@@ -183,7 +183,7 @@ export default function AnsichtSwitcher({
           value={objektBehandlung}
           onChange={(e) => setObjektBehandlung(e.target.value)}
         >
-          <Space direction="vertical">
+          <Space orientation="vertical">
             <Radio value="freigeben">Auf allen Ansichten sichtbar machen (empfohlen)</Radio>
             <Radio value="loeschen">Mitlöschen</Radio>
           </Space>

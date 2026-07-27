@@ -1,27 +1,18 @@
 import { Button, Input, Popconfirm, Space, Tag, Typography } from 'antd';
 import { Select } from '../../components/Select';
-import { useId, type ReactNode } from 'react';
+import { useId } from 'react';
 import FeldLabel from '../../components/FeldLabel';
+import GeoKennzahlen, { KennzahlZeile } from '../../components/GeoKennzahlen';
 import type { Gefahrengebiet, KartenAnsicht, LageZone, ZoneTyp } from '../../api/types';
 import { gefahrengebietName } from '../../api/gefahren';
 import { ZONE_TYPEN, zoneTypLabel, zoneStil } from './zonenStil';
 import { WARNSTUFEN, warnstufeFarbe } from '../gefahren/gefahrenSchema';
-import { parseGeometry, geoKennzahlen, formatFlaeche, formatLaenge } from './geo';
+import { parseGeometry, geoKennzahlen } from './geo';
 import KartenDetailCard from './KartenDetailCard';
 import AnsichtZuordnung from './AnsichtZuordnung';
 
 /** Sentinel im Dropdown für „in neues Gefahrengebiet abspalten". */
 const NEU = -1;
-
-/** Read-only Label→Wert-Zeile für die Geometrie-Kennzahlen. */
-function KennzahlZeile({ label, wert }: { label: string; wert: ReactNode }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-      <Typography.Text type="secondary">{label}</Typography.Text>
-      <Typography.Text>{wert}</Typography.Text>
-    </div>
-  );
-}
 
 export interface ZonenInspectorProps {
   zone: LageZone;
@@ -63,22 +54,18 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
           <Typography.Text>{zoneTypLabel(zone.typ)}</Typography.Text>
         )}
 
-        {(kennzahlen || (zone.typ === 'gefahrengebiet' && aktuellesGebiet)) && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {kennzahlen?.flaecheM2 != null && (
-              <KennzahlZeile label="Fläche" wert={formatFlaeche(kennzahlen.flaecheM2)} />
-            )}
-            {kennzahlen?.umfangM != null && (
-              <KennzahlZeile label="Umfang" wert={formatLaenge(kennzahlen.umfangM)} />
-            )}
-            {kennzahlen?.laengeM != null && (
-              <KennzahlZeile label="Länge" wert={formatLaenge(kennzahlen.laengeM)} />
-            )}
-            {zone.typ === 'gefahrengebiet' && aktuellesGebiet && (
+        {/* Warnstufe und Zonen-Anzahl sind keine Geo-Kennzahlen, gehören aber ins selbe
+            Label→Wert-Raster — dafür ist der `zusatz`-Slot da (LFH-328/A2). Die Warnstufe
+            ist ein Tag und läuft deshalb mit `zahl={false}` an der Zahlenschrift vorbei. */}
+        <GeoKennzahlen
+          kennzahlen={kennzahlen}
+          zusatz={
+            zone.typ === 'gefahrengebiet' && aktuellesGebiet ? (
               <>
                 {aktuellHatWarnstufen && (
                   <KennzahlZeile
                     label="Höchste Warnstufe"
+                    zahl={false}
                     wert={
                       <Tag
                         color={warnstufeFarbe(aktuellesGebiet.hoechste_warnstufe)}
@@ -91,9 +78,9 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
                 )}
                 <KennzahlZeile label="Zonen" wert={String(aktuellesGebiet.zonen_ids.length)} />
               </>
-            )}
-          </div>
-        )}
+            ) : undefined
+          }
+        />
 
         <Input aria-label="Label" placeholder="Bezeichnung" defaultValue={zone.label ?? ''} disabled={!darfSchreiben}
           onBlur={(e) => { const v = e.target.value.trim(); if (v !== (zone.label ?? '')) onAendern({ label: v || null }); }} />

@@ -2,10 +2,11 @@ import { Button, Descriptions, Space, Tag, theme } from 'antd';
 import { useId } from 'react';
 import { Select } from '../../components/Select';
 import FeldLabel from '../../components/FeldLabel';
+import GeoKennzahlen from '../../components/GeoKennzahlen';
 import { Link } from 'react-router';
 import type { KarteMarker, MarkerTyp } from './marker';
 import { markerToUrl } from './markerToUrl';
-import { geoKennzahlen, formatFlaeche, formatLaenge } from './geo';
+import { geoKennzahlen } from './geo';
 import KartenDetailCard from './KartenDetailCard';
 import KoordinatenAnzeige from '../../anzeige/KoordinatenAnzeige';
 
@@ -89,8 +90,8 @@ export default function Inspector({
 
   return (
     <KartenDetailCard titel={marker.label} akzentFarbe={marker.farbe} onSchliessen={onSchliessen}>
-      <Tag color={marker.farbe} style={{ marginBottom: 8 }}>{TYP_LABEL[marker.typ]}</Tag>
-      <Descriptions column={1} size="small">
+      <Tag color={marker.farbe} style={{ marginBottom: token.marginXS }}>{TYP_LABEL[marker.typ]}</Tag>
+      <Descriptions column={1}>
         {marker.typ === 'lagemeldung' && marker.lageMeldung && (
           <Descriptions.Item label="Absender">{marker.lageMeldung.absender}</Descriptions.Item>
         )}
@@ -100,16 +101,8 @@ export default function Inspector({
         <Descriptions.Item label="Koordinate">
           <KoordinatenAnzeige lat={marker.lat} lon={marker.lon} einsatzId={einsatzId} exclude={inspectorExclude(marker, einsatzId)} />
         </Descriptions.Item>
-        {kennzahlen?.flaecheM2 != null && (
-          <Descriptions.Item label="Fläche">{formatFlaeche(kennzahlen.flaecheM2)}</Descriptions.Item>
-        )}
-        {kennzahlen?.umfangM != null && (
-          <Descriptions.Item label="Umfang">{formatLaenge(kennzahlen.umfangM)}</Descriptions.Item>
-        )}
-        {kennzahlen?.laengeM != null && (
-          <Descriptions.Item label="Länge">{formatLaenge(kennzahlen.laengeM)}</Descriptions.Item>
-        )}
       </Descriptions>
+      <GeoKennzahlen kennzahlen={kennzahlen} />
       {symbolAuswahl && (
         <Space orientation="vertical" size={token.marginXS} style={{ width: '100%', marginTop: token.marginXS }}>
           {/* Kein `aria-label` mehr: das FeldLabel trägt den Namen. Zwei Quellen wären eine
@@ -137,16 +130,16 @@ export default function Inspector({
           </FeldLabel>
         </Space>
       )}
-      <Space style={{ marginTop: 8 }}>
+      <Space style={{ marginTop: token.marginXS }}>
         <Link to={modulLink}>
-          <Button size="small">
+          <Button>
             {marker.typ === 'lagemeldung' ? 'Zur Quell-Meldung' : 'Im Fach-Modul öffnen'}
           </Button>
         </Link>
         {/* Lagemeldungen sind auf der Karte read-only: verortet wird ausschließlich beim
             Übergeben (LFH-113). Re-/Ent-Verorten würde am ON-CONFLICT-Upsert ohnehin verpuffen. */}
         {darfSchreiben && marker.typ !== 'einsatzort' && marker.typ !== 'lagemeldung' && (
-          <Button size="small" danger onClick={() => onVerortungLoeschen(marker)}>
+          <Button danger onClick={() => onVerortungLoeschen(marker)}>
             Verortung löschen
           </Button>
         )}
