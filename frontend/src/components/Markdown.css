@@ -3,7 +3,7 @@
    eigene Token-Pflege lesbar bleiben. Nur strukturelle Akzente (Code-Hinter-
    grund, Zitat-/Tabellen-Rahmen) bekommen einen theme-abhängigen Wert. */
 .markdown {
-  --md-akzent: #a8071a; /* antd colorPrimary */
+  --md-akzent: var(--lfh-marke);
   --md-flaeche: rgba(0, 0, 0, 0.04);
   --md-rahmen: rgba(0, 0, 0, 0.12);
   color: inherit;
@@ -12,9 +12,9 @@
 }
 
 [data-theme='dark'] .markdown {
-  /* Das dunkle Marken-Rot #a8071a verfehlt auf dunklem Grund den Kontrast;
-     im Dark-Mode ein aufgehelltes Rot (antd red-5) für lesbare Links/Akzente. */
-  --md-akzent: #ff4d4f;
+  /* `--md-akzent` braucht hier KEINE Korrektur mehr: `--lfh-marke` aus
+     `theme/rollen.css` trägt seit A0 (LFH-352) je Modus einen eigenen Wert, der
+     auf dunklem Grund lesbar ist. Die Fläche/Rahmen-Werte bleiben modusabhängig. */
   --md-flaeche: rgba(255, 255, 255, 0.08);
   --md-rahmen: rgba(255, 255, 255, 0.18);
 }

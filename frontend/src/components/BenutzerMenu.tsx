@@ -1,7 +1,8 @@
-import { Avatar, Button, Dropdown, Space, Tag, Typography, type MenuProps } from 'antd';
+import { Avatar, Button, Dropdown, Space, Tag, Typography, theme, type MenuProps } from 'antd';
 import { DownOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
+import { rollenFarbe } from '../theme/statusFarben';
 
 /** Initialen aus dem Anzeigenamen (erstes + letztes Wort, sonst erste zwei Zeichen). */
 function initialen(name: string): string {
@@ -11,16 +12,20 @@ function initialen(name: string): string {
   return (teile[0][0] + teile[teile.length - 1][0]).toUpperCase();
 }
 
-const AVATAR_FARBE = '#a8071a';
-
 /**
  * Identitäts-Menü in der Topbar: Avatar + Name als Trigger, Dropdown mit
  * Rollen-Übersicht, Profil und Abmelden. Holt sich Benutzer und Logout selbst,
  * damit es in beiden Layout-Ebenen (global + Einsatz-Workspace) gleich nutzbar ist.
+ *
+ * Der Avatar trägt die MARKENFARBE (LFH-328/A2, Spec §1.2) — er ist das Markenzeichen im
+ * Kopf, keine Gefahrenmeldung. Sie kommt über `rollenFarbe('marke', token)` und damit je
+ * Modus aus `theme/tokens.ts`; vorher stand hier eine Kopie des Hex-Werts.
  */
 export default function BenutzerMenu() {
   const { benutzer, logout } = useAuth();
   const navigate = useNavigate();
+  const { token } = theme.useToken();
+  const avatarFarbe = rollenFarbe('marke', token);
 
   if (!benutzer) return null;
 
@@ -51,7 +56,7 @@ export default function BenutzerMenu() {
       type: 'group',
       label: (
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', padding: '4px 0' }}>
-          <Avatar style={{ backgroundColor: AVATAR_FARBE, color: '#fff', flexShrink: 0 }}>
+          <Avatar style={{ backgroundColor: avatarFarbe, color: '#fff', flexShrink: 0 }}>
             {initialen(benutzer.anzeigename)}
           </Avatar>
           <div style={{ minWidth: 0 }}>
@@ -102,7 +107,7 @@ export default function BenutzerMenu() {
       >
         <Avatar
           size={28}
-          style={{ backgroundColor: AVATAR_FARBE, color: '#fff', fontSize: 13, flexShrink: 0 }}
+          style={{ backgroundColor: avatarFarbe, color: '#fff', fontSize: 13, flexShrink: 0 }}
         >
           {initialen(benutzer.anzeigename)}
         </Avatar>

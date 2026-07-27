@@ -1,3 +1,5 @@
+import type { GlobalToken } from 'antd';
+import { rollenFarbe } from '../../theme/statusFarben';
 import type { Einheit, EinsatzAnzeige, EinsatzFahrzeug, FreiesZeichen, FuehrungskraftKarte, LageMeldung, Schaden, Uhs } from '../../api/types';
 import { baueTzProps, einsatzortTz, grundzeichenAkzeptiert, schadenTz, uhsTz, type TzProps } from './taktischesZeichen';
 import type { GeoJsonGeometry } from './geo';
@@ -33,8 +35,21 @@ export interface NichtVerortet {
   label: string;
 }
 
-const EINSATZORT_FARBE = '#a8071a';
-const UHS_FARBE = '#1677ff';
+/**
+ * Farbrollen der beiden Signaturen, die A2 (LFH-328) aus harten Hex-Werten gelöst hat.
+ *
+ * - **Einsatzort → `marke`.** Der Einsatzort ist der Ankerpunkt des EIGENEN Einsatzes, kein
+ *   Gefahrenobjekt. Auf `alarm` gezogen läse er sich als Gefahr, und „eine Farbe = eine
+ *   Bedeutung" (A1 Festlegung 5) wäre verletzt: `alarm` trüge dann Gefahrengebiet UND
+ *   Ortssignatur. Vorher: der Marken-Hexwert, aus `tokens.ts` herauskopiert.
+ * - **UHS → `bedien`.** Vorher `#1677ff` — antd-v5-Default-Blau und damit nicht einmal der
+ *   A0-Bedienwert; die Signatur wich still vom Rest der Anwendung ab.
+ *
+ * DIESES MODUL ERZEUGT MapLibre-`paint`-WERTE, keine DOM-Styles — kein `useToken()`-Zugang.
+ * Der Token kommt von der aufrufenden Ebene (`useLagekarteDaten`).
+ */
+const EINSATZORT_ROLLE = 'marke' as const;
+const UHS_ROLLE = 'bedien' as const;
 
 function schadenLabel(registrierNr: number): string {
   return `S-${String(registrierNr).padStart(3, '0')}`;
@@ -45,6 +60,7 @@ export function baueMarker(
   einsatz: EinsatzAnzeige | undefined,
   uhsListe: Uhs[],
   schaeden: Schaden[],
+  token: GlobalToken,
 ): { verortet: KarteMarker[]; nichtVerortet: NichtVerortet[] } {
   const verortet: KarteMarker[] = [];
   const nichtVerortet: NichtVerortet[] = [];
@@ -57,7 +73,7 @@ export function baueMarker(
       lat: einsatz.einsatzort_lat,
       lon: einsatz.einsatzort_lon,
       label: einsatz.einsatzort ?? 'Einsatzort',
-      farbe: EINSATZORT_FARBE,
+      farbe: rollenFarbe(EINSATZORT_ROLLE, token),
       tz: einsatzortTz(),
     });
   }
@@ -71,7 +87,7 @@ export function baueMarker(
         lat: u.lat,
         lon: u.lon,
         label: u.bezeichnung,
-        farbe: UHS_FARBE,
+        farbe: rollenFarbe(UHS_ROLLE, token),
         tz: uhsTz(u.typ),
       });
     } else {

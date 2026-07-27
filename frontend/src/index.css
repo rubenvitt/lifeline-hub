@@ -53,10 +53,13 @@ body {
   box-shadow: 0 8px 16px -10px rgba(0, 0, 0, 0.7);
 }
 
-/* Roter Primär-Akzent (colorPrimary) markiert das Eingabefeld als aktive
-   Schreibfläche – klar abgesetzt von der neutralen Tabelle darunter. */
+/* Die Bedienfarbe markiert das Eingabefeld als aktive Schreibfläche – klar
+   abgesetzt von der neutralen Tabelle darunter. Bewusst NICHT die Marken- oder
+   Alarmrolle: „Rot bedient nichts" (LFH-315/A0), und eine Schreibfläche ist
+   Bedienung, keine Gefahr. Der Kommentar hier behauptete früher „colorPrimary"
+   und trug daneben ein hartes Rot (LFH-328/A2). */
 .etb-erfassung-card {
-  border-left: 3px solid #a8071a;
+  border-left: 3px solid var(--lfh-bedien);
 }
 
 /* Höhe der aufgeklappten Markdown-Vorschau in der angepinnten Leiste deckeln,

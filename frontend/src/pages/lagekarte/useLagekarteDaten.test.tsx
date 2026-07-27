@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { theme } from 'antd';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
@@ -102,10 +103,17 @@ describe('useLagekarteDaten Standquelle', () => {
       { wrapper: wrapper() },
     );
     await waitFor(() => expect(result.current.zonenFeatures.length).toBe(1));
+    // Der Token kommt aus DEMSELBEN Render-Pfad wie im Hook (LFH-328/A2: `gefahrengebietStil`
+    // bekommt ihn durchgereicht, weil Kartenstil-Module keinen `useToken()`-Zugang haben) —
+    // nicht aus `theme.getDesignToken()`, das wäre eine ungeprüfte Gleichheitsannahme.
+    const { result: tk } = renderHook(() => theme.useToken(), { wrapper: wrapper() });
+    const token = tk.current.token;
     // Die Zonenfarbe stammt aus der eingefrorenen Warnstufe 'mittel'. Läse der Hook aus einer
     // Live-Quelle (im Snapshot-Modus abgeschaltet → undefined → 'keine'), wäre die Farbe eine andere.
-    expect(result.current.zonenFeatures[0].stil).toEqual(gefahrengebietStil('mittel'));
-    expect(result.current.zonenFeatures[0].stil).not.toEqual(gefahrengebietStil('keine'));
+    // NICHT auf 'niedrig' vs. 'mittel' umschreiben: beide fallen seit A2 auf die Rolle `achtung`
+    // (dokumentierter Auflösungsverlust), die Gegenprobe würde damit stillschweigend leer.
+    expect(result.current.zonenFeatures[0].stil).toEqual(gefahrengebietStil('mittel', token));
+    expect(result.current.zonenFeatures[0].stil).not.toEqual(gefahrengebietStil('keine', token));
   });
 
   it('speist den org_default aus dem Dokument in die Marker-TZ, nicht aus Live (Review-Fix #4)', async () => {
