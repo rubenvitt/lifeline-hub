@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Col, Descriptions, Form, Input, InputNumber, Modal, Popconfirm, Row, Space, Spin, Table, Tag, Typography, type TableColumnsType } from 'antd';
+import { Alert, App, Breadcrumb, Button, Col, Descriptions, Form, Input, InputNumber, Modal, Popconfirm, Row, Space, Spin, Table, Tag, Typography, theme, type TableColumnsType } from 'antd';
 import { Select } from '../components/Select';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useState } from 'react';
@@ -13,8 +13,9 @@ import { listeSchaeden, schadenRegistrierAnzeige, aktualisiereSchaden } from '..
 import { listeUhs, aenderePersonBelegung } from '../api/einsatzUhs';
 import { ApiError, istKonflikt } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
-import { SK_META, STATUS_META } from '../personen/personMeta';
-import type { PersonDetail, PersonStatus, PersonZugriff, Schaden, Sichtungskategorie, Spezies, Tier, Verbleib, VerbleibArt } from '../api/types';
+import { SK_META, STATUS_META, istPatient } from '../personen/personMeta';
+import PersonVerlauf from '../personen/PersonVerlauf';
+import type { PersonDetail, PersonStatus, PersonZugriff, Schaden, Sichtungskategorie, Spezies, Tier, VerbleibArt } from '../api/types';
 import { parseRouteId, personenPfad, schadenDetailPfad, tiereDetailPfad } from '../routing/deeplinks';
 
 const TIER_SPEZIES_LABEL: Record<Spezies, string> = {
@@ -33,26 +34,8 @@ function naechsteStatus(aktuell: PersonStatus): PersonStatus[] {
   }
 }
 
-/** Triage-Reihenfolge der Patienten-Abschnitte (SK I zuerst, tot zuletzt). */
-const PATIENT_SK: Sichtungskategorie[] = ['sk1', 'sk2', 'sk3', 'sk4', 'tot'];
-
-/** Patient = gesichtet mit behandlungsrelevanter Kategorie (SK I–IV oder tot). */
-function istPatient(p: PersonDetail): boolean {
-  return p.aktuelle_sichtung != null && PATIENT_SK.includes(p.aktuelle_sichtung);
-}
-
-function kurzVerbleib(v: Verbleib): string {
-  const ziel = v.ziel ? ` → ${v.ziel}` : '';
-  const tm = v.transportmittel ? ` (${v.transportmittel})` : '';
-  switch (v.art) {
-    case 'transport': return `Transport${ziel}${tm}`;
-    case 'entlassung': return 'entlassen';
-    case 'vor_ort': return 'verbleibt vor Ort';
-    case 'verstorben': return 'Verbleib des Leichnams';
-  }
-}
-
 export default function PersonenDetailPage() {
+  const { token } = theme.useToken();
   const { id, personId: personIdParam } = useParams();
   const einsatzId = Number(id);
   const personId = Number(personIdParam);
@@ -272,7 +255,7 @@ export default function PersonenDetailPage() {
         type="error" showIcon
         title="Person konnte nicht geladen werden"
         description={detailQuery.error instanceof ApiError ? detailQuery.error.message : undefined}
-        action={<Button size="small" onClick={() => detailQuery.refetch()}>Erneut versuchen</Button>}
+        action={<Button onClick={() => detailQuery.refetch()}>Erneut versuchen</Button>}
       />
     );
   }
@@ -303,22 +286,6 @@ export default function PersonenDetailPage() {
   ];
 
   function medSpalte(person: PersonDetail) {
-    const eintraege: Array<{ key: string; at: string; node: React.ReactNode }> = [
-      ...(person.sichtungen ?? []).map((s) => ({
-        key: `s-${s.id}`, at: s.gesichtet_at,
-        node: <span><Tag color={SK_META[s.kategorie].color}>{SK_META[s.kategorie].label}</Tag>
-          {s.notiz && <Typography.Text type="secondary"> — {s.notiz}</Typography.Text>}</span>,
-      })),
-      ...(person.notizen ?? []).map((n) => ({
-        key: `n-${n.id}`, at: n.erfasst_at,
-        node: <span><Tag>Notiz</Tag> {n.text}</span>,
-      })),
-      ...(person.verbleib ?? []).map((v) => ({
-        key: `v-${v.id}`, at: v.zeitpunkt_at,
-        node: <span><Tag color="purple">Verbleib</Tag> {kurzVerbleib(v)}</span>,
-      })),
-    ].sort((a, b) => b.at.localeCompare(a.at));
-
     return (
       <Space orientation="vertical" style={{ width: '100%' }} size="large">
         <Space wrap>
@@ -339,7 +306,7 @@ export default function PersonenDetailPage() {
             type="warning" showIcon
             title="Sichtung = tot. Admin-Status wurde NICHT automatisch geändert."
             action={
-              <Button size="small" onClick={() => statusMutation.mutate({ personId: person.id, status: 'verstorben' })}>
+              <Button onClick={() => statusMutation.mutate({ personId: person.id, status: 'verstorben' })}>
                 Status → verstorben
               </Button>
             }
@@ -355,23 +322,14 @@ export default function PersonenDetailPage() {
           </Form>
         )}
         <div>
-          <Typography.Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
+          <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
             Chronologischer Verlauf (neueste zuerst)
           </Typography.Text>
-          {eintraege.length === 0
-            ? <Typography.Text type="secondary"> noch leer</Typography.Text>
-            : <ul style={{ listStyle: 'none', paddingLeft: 0 }}>
-                {eintraege.map((e) => (
-                  <li key={e.key} style={{ padding: '4px 0', borderBottom: '1px solid #f0f0f0' }}>
-                    <Typography.Text type="secondary" style={{ fontSize: 12, marginRight: 8 }}><ZeitAnzeige wert={e.at} format="dtgVoll" /></Typography.Text>
-                    {e.node}
-                  </li>
-                ))}
-              </ul>}
+          <PersonVerlauf person={person} />
         </div>
         {(person.abgleiche?.length ?? 0) > 0 && (
           <div>
-            <Typography.Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
+            <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
               Vermisstenabgleich
             </Typography.Text>
             <ul style={{ listStyle: 'none', paddingLeft: 0 }}>
@@ -383,13 +341,13 @@ export default function PersonenDetailPage() {
                   </Typography.Text>
                   {a.status === 'verdacht' && a.vermisst_person_id === person.id && (
                     <Space style={{ marginLeft: 12 }}>
-                      <Button size="small" type="primary"
+                      <Button type="primary"
                         disabled={!darfEinsatzLeiten(einsatz, benutzer)}
                         onClick={() => abgleichEntscheidenMutation.mutate({
                           vermisstId: person.id, abgleichId: a.id, entscheidung: 'bestaetigt' })}>
                         Bestätigen
                       </Button>
-                      <Button size="small" danger
+                      <Button danger
                         disabled={!darfEinsatzLeiten(einsatz, benutzer)}
                         onClick={() => abgleichEntscheidenMutation.mutate({
                           vermisstId: person.id, abgleichId: a.id, entscheidung: 'verworfen' })}>
@@ -432,7 +390,7 @@ export default function PersonenDetailPage() {
             </Space>
           </Form>
         ) : (
-          <Descriptions column={1} size="small" bordered>
+          <Descriptions column={1} bordered>
             <Descriptions.Item label="Name">{person.name ?? '—'}</Descriptions.Item>
             <Descriptions.Item label="Vorname">{person.vorname ?? '—'}</Descriptions.Item>
             <Descriptions.Item label="Geschlecht">{person.geschlecht ?? '—'}</Descriptions.Item>
@@ -447,11 +405,11 @@ export default function PersonenDetailPage() {
 
         <div>
           <Space wrap>
-            <Typography.Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
+            <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
               Zugeordnete Tiere
             </Typography.Text>
             {darfZuordnen && (
-              <Button size="small" onClick={() => { tierForm.resetFields(); setTierModalOffen(true); }}>
+              <Button onClick={() => { tierForm.resetFields(); setTierModalOffen(true); }}>
                 Tier zuweisen
               </Button>
             )}
@@ -471,7 +429,7 @@ export default function PersonenDetailPage() {
                     {t.rufname ? ` „${t.rufname}"` : ''}
                   </Tag>
                   {darfZuordnen && (
-                    <Button size="small" type="text" onClick={() => tierLoesenMut.mutate(t.id)}>lösen</Button>
+                    <Button type="text" onClick={() => tierLoesenMut.mutate(t.id)}>lösen</Button>
                   )}
                 </Space>
               ))}
@@ -481,11 +439,11 @@ export default function PersonenDetailPage() {
 
         <div>
           <Space wrap>
-            <Typography.Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
+            <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
               Als Geschädigte bei Schäden
             </Typography.Text>
             {darfZuordnen && (
-              <Button size="small" onClick={() => { schadenForm.resetFields(); setSchadenModalOffen(true); }}>
+              <Button onClick={() => { schadenForm.resetFields(); setSchadenModalOffen(true); }}>
                 Schaden zuweisen
               </Button>
             )}
@@ -502,7 +460,7 @@ export default function PersonenDetailPage() {
                     </Tag>
                   </Link>
                   {darfZuordnen && (
-                    <Button size="small" type="text" onClick={() => schadenLoesenMut.mutate(sch.id)}>lösen</Button>
+                    <Button type="text" onClick={() => schadenLoesenMut.mutate(sch.id)}>lösen</Button>
                   )}
                 </Space>
               ))}
@@ -511,7 +469,7 @@ export default function PersonenDetailPage() {
         </div>
 
         <div>
-          <Typography.Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
+          <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
             UHS-Verortung
           </Typography.Text>
           <div style={{ marginTop: 4 }}>
@@ -523,10 +481,10 @@ export default function PersonenDetailPage() {
                 </Tag>
                 {darfSchreiben && !person.storniert_at && (
                   <>
-                    <Button size="small" onClick={() => { uhsForm.resetFields(); setUhsModalOffen(true); }}>
+                    <Button onClick={() => { uhsForm.resetFields(); setUhsModalOffen(true); }}>
                       UHS ändern
                     </Button>
-                    <Button size="small" danger onClick={() => austrittMutation.mutate()}>Austragen</Button>
+                    <Button danger onClick={() => austrittMutation.mutate()}>Austragen</Button>
                   </>
                 )}
               </Space>
@@ -534,7 +492,7 @@ export default function PersonenDetailPage() {
               <Space wrap>
                 <Typography.Text type="secondary">keiner UHS zugewiesen</Typography.Text>
                 {darfSchreiben && !person.storniert_at && !person.aktueller_verbleib && (
-                  <Button size="small" onClick={() => { uhsForm.resetFields(); setUhsModalOffen(true); }}>
+                  <Button onClick={() => { uhsForm.resetFields(); setUhsModalOffen(true); }}>
                     UHS zuweisen
                   </Button>
                 )}
@@ -545,11 +503,11 @@ export default function PersonenDetailPage() {
 
         {istEinsatzLeitung(einsatz) && (
           <div>
-            <Typography.Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>
+            <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>
               Zugriffs-Audit
             </Typography.Text>
             <Table<PersonZugriff>
-              rowKey="id" size="small" pagination={false}
+              rowKey="id" pagination={false}
               loading={auditQuery.isLoading}
               dataSource={auditQuery.data ?? []}
               columns={auditSpalten}
@@ -585,7 +543,7 @@ export default function PersonenDetailPage() {
           {darfSchreiben && !p.storniert_at && !bearbeiten && (
             <Space wrap>
               {naechsteStatus(p.status).map((s) => (
-                <Button key={s} size="small" onClick={() => statusMutation.mutate({ personId: p.id, status: s })}>
+                <Button key={s} onClick={() => statusMutation.mutate({ personId: p.id, status: s })}>
                   → {STATUS_META[s].label}
                 </Button>
               ))}
@@ -601,7 +559,7 @@ export default function PersonenDetailPage() {
 
       <Row gutter={24}>
         <Col xs={24} lg={12}>
-          <Typography.Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase' }}>Stammdaten</Typography.Text>
+          <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}>Stammdaten</Typography.Text>
           {stammdatenSpalte(p)}
         </Col>
         <Col xs={24} lg={12}>
