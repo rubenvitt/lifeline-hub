@@ -18,7 +18,17 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { abstand, farbenDunkel, farbenHell, form, schrift, type Farbrollen } from './tokens';
+import {
+  abstand,
+  dichten,
+  farbenDunkel,
+  farbenHell,
+  form,
+  schrift,
+  type Abstandsraster,
+  type Dichte,
+  type Farbrollen,
+} from './tokens';
 
 const hier = dirname(fileURLToPath(import.meta.url));
 const css = readFileSync(join(hier, 'rollen.css'), 'utf-8');
@@ -44,6 +54,31 @@ function block(selektor: string): Record<string, string> {
 
 const hell = block(':root');
 const dunkel = block("[data-theme='dark']");
+
+/** Die drei Dichtestufen und ihr Block. `kompakt` lebt unter `:root` — sie ist
+ *  der Ausgangszustand, nicht eine Abweichung davon. */
+const DICHTE_BLOECKE: Record<Dichte, Record<string, string>> = {
+  kompakt: hell,
+  komfortabel: block("[data-dichte='komfortabel']"),
+  handschuh: block("[data-dichte='handschuh']"),
+};
+
+/** Abstandsstufe in TS → Property-Name in CSS. Die Namen laufen bewusst
+ *  auseinander (`xs/sm/md/lg` gegen `luft-1..4`), deshalb eine Abbildung und
+ *  keine abgeleitete Namensbildung. */
+const LUFT_ABBILDUNG: Record<keyof Abstandsraster, string> = {
+  xs: '--lfh-luft-1',
+  sm: '--lfh-luft-2',
+  md: '--lfh-luft-3',
+  lg: '--lfh-luft-4',
+};
+
+/** Alles, was eine Dichtestufe ausmacht — und nichts sonst. */
+const DICHTE_PROPERTIES = [
+  ...Object.values(LUFT_ABBILDUNG),
+  '--lfh-zeilenhoehe',
+  '--lfh-schriftgroesse',
+];
 
 /** Rollenname in TS → Property-Name in CSS. */
 const FARB_ABBILDUNG: Record<keyof Farbrollen, string> = {
@@ -109,6 +144,59 @@ describe('Gestaltungssprache E — CSS und TS tragen dieselben Werte', () => {
     expect(hell['--lfh-schrift-text']).toBe(schrift.text);
     expect(hell['--lfh-schrift-display']).toBe(schrift.display);
     expect(hell['--lfh-schrift-zahl']).toBe(schrift.zahl);
+  });
+});
+
+describe('Dichte-Staffel — CSS und TS tragen dieselben Stufen (LFH-328 · A2)', () => {
+  it.each(Object.keys(DICHTE_BLOECKE) as Dichte[])('%s stimmt Wert für Wert überein', (stufe) => {
+    const css_ = DICHTE_BLOECKE[stufe];
+    const ts = dichten[stufe];
+    for (const [schluessel, property] of Object.entries(LUFT_ABBILDUNG)) {
+      expect(css_[property], `${stufe}.${schluessel}`).toBe(
+        `${ts.abstand[schluessel as keyof Abstandsraster]}px`,
+      );
+    }
+    expect(css_['--lfh-zeilenhoehe']).toBe(`${ts.zeilenhoehe}px`);
+    expect(css_['--lfh-schriftgroesse']).toBe(`${ts.schriftgroesse}px`);
+  });
+
+  it('die beiden Nicht-:root-Stufen überschreiben genau die Dichte-Properties', () => {
+    // Gleiche Schärfe wie beim Nachtmodus oben: GENAU diese Menge, nicht eine
+    // Teilmenge. Eine vergessene Property fiele sonst still auf `:root` zurück
+    // (halb umgeschaltete Stufe), eine zusätzliche würde Farbe oder Form an die
+    // Dichte koppeln — beides bricht nichts und fällt erst im Einsatz auf.
+    for (const stufe of ['komfortabel', 'handschuh'] as const) {
+      expect(Object.keys(DICHTE_BLOECKE[stufe]).sort(), stufe).toEqual(
+        [...DICHTE_PROPERTIES].sort(),
+      );
+    }
+  });
+
+  it('A2 liefert den Träger, nicht den Schalter — nichts setzt `data-dichte`', () => {
+    // Die Umschaltung ist B5. Solange sie nicht da ist, darf kein Produktivcode
+    // das Attribut setzen; sonst wäre die Stufe faktisch aktiv, ohne dass ein
+    // Kontext sie begründet.
+    // `/src/theme/` ist hier ABSICHTLICH NICHT ausgenommen: der Schalter käme
+    // am ehesten in `ThemeModeProvider` — ein Guard, der ausgerechnet dort
+    // wegsieht, bewachte nichts. Ausgenommen sind nur Testdateien und
+    // Kommentarzeilen; ohne letztere meldet der Guard die eigene Begründung als
+    // Verstoß (gemessen: `tokens.ts` schlug allein wegen seines Doc-Kommentars
+    // an).
+    const quellen = import.meta.glob('/src/**/*.{ts,tsx}', { query: '?raw', eager: true }) as Record<
+      string,
+      { default: string }
+    >;
+    const setzer = Object.entries(quellen)
+      .filter(([pfad]) => !/\.test\.[jt]sx?$/.test(pfad))
+      .flatMap(([pfad, modul]) =>
+        modul.default
+          .split('\n')
+          .map((zeile, i) => [zeile, i + 1] as const)
+          .filter(([zeile]) => !/^\s*(\/\/|\/\*|\*)/.test(zeile))
+          .filter(([zeile]) => /dataset\.dichte\s*=|['"]?data-dichte['"]?\s*[=,]/.test(zeile))
+          .map(([, nr]) => `${pfad}:${nr}`),
+      );
+    expect(setzer, 'Dichte-Umschaltung gehört nach B5, nicht nach A2').toEqual([]);
   });
 });
 

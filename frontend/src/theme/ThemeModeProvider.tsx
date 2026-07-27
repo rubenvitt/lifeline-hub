@@ -71,7 +71,11 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
           // Die Farbrollen kommen je Modus aus derselben Quelle wie `rollen.css`
           // (LFH-352 · A0). Der antd-Algorithmus bleibt darunter: er leitet die
           // abgeleiteten Töne (Hover, Rand, Füllung) aus den gesetzten ab.
-          token: antdToken(effektiv === 'dark' ? farbenDunkel : farbenHell),
+          //
+          // Die Dichte steht hier ABSICHTLICH fest auf `kompakt` (LFH-328 · A2):
+          // A2 baut nur den Träger. Wer die Stufe aus Einsatzkontext oder
+          // Benutzerwahl ableitet, ist B5 — und tut es genau an dieser Stelle.
+          token: antdToken(effektiv === 'dark' ? farbenDunkel : farbenHell, 'kompakt'),
           algorithm: effektiv === 'dark' ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
         }}
       >
