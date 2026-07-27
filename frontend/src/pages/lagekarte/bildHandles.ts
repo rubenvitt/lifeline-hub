@@ -1,4 +1,8 @@
-import maplibregl, { type Map as MapLibreMap, type Marker } from 'maplibre-gl';
+// Namespace-Import, weil maplibre-gl ab 6 echtes ESM ohne Default-Export ist (v5 lieferte ein
+// UMD-Bundle, aus dem Bundler/TS per CJS-Interop einen Default synthetisierten). `import * as ns,
+// { type X }` ist KEIN gültiges ES — Namespace und named müssen in zwei Statements.
+import * as maplibregl from 'maplibre-gl';
+import type { Map as MapLibreMap, Marker } from 'maplibre-gl';
 import type { Ecke, Ecken } from '../../api/kartenbilder';
 import { setzeBildGeometrie } from './bildLayer';
 import { zentroid, skaliereUmAnker, skaliereKante, rotiereUmZentroid, type Kante, type Punkt } from './bildGeometrie';
