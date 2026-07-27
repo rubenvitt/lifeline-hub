@@ -1,6 +1,6 @@
-import { App, Button, Form, Input, InputNumber, Switch } from 'antd';
-import { Select } from '../../components/Select';
+import { App, Button, Form, Input, InputNumber, Switch, theme } from 'antd';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
+import ModulEinstellungsListe from './ModulEinstellungsListe';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ladeOrgEinstellungen,
@@ -12,7 +12,6 @@ import { ApiError } from '../../api/client';
 import AdminPage from '../../components/AdminPage';
 import SektionHeader from '../../components/SektionHeader';
 import { useAuth } from '../../auth/AuthContext';
-import { modulRegistry, istModulAusblendbar } from '../../einsatz/modulRegistry';
 import { globalKeys } from '../../api/queryKeys';
 import {
   type FormWerteEinsatz,
@@ -20,13 +19,6 @@ import {
   normalisiereEinsatz,
   zuUpdate,
 } from './orgEinstellungenForm';
-
-/** Optionen für den Modul-Rollen-Default; '' = kein Rollen-Zwang (frei). */
-const ROLLEN_OPTIONEN: { value: string; label: string }[] = [
-  { value: '', label: 'Frei (alle)' },
-  { value: 'fuehrungskraft', label: 'Führungskraft' },
-  { value: 'admin', label: 'Admin' },
-];
 
 /**
  * Admin-Sektion `/admin/einstellungen/einsatz` — Aufbewahrung, Nummernkreise, Fristen,
@@ -39,6 +31,7 @@ export default function EinsatzDefaults() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [form] = Form.useForm<FormWerteEinsatz>();
+  const { token } = theme.useToken();
   const istAdmin = benutzer?.system_rolle === 'admin';
 
   const einstellungenQuery = useQuery({
@@ -179,41 +172,25 @@ export default function EinsatzDefaults() {
       </Form>
 
       {/* ── Modul-Rollen-Default (Sofort-Speichern, kein Form-Feld) ──────── */}
-      <div style={{ marginTop: 32 }}>
+      <div style={{ marginTop: token.marginXL }}>
         <SektionHeader
           titel="Modul-Rollen-Default"
           beschreibung="Org-weiter Default für die benötigte Rolle je Modul. Kann pro Einsatz überschrieben werden. Änderungen werden sofort gespeichert."
         />
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, opacity: 0.6 }}>
-          <span style={{ flex: 1 }}>Modul</span>
-          <span style={{ width: 180 }}>Benötigte Rolle (Default)</span>
-        </div>
-        {modulRegistry.map((m) => {
-          const rolle = orgModul[m.key] ?? null;
-          const ausblendbar = istModulAusblendbar(m.key);
-          return (
-            <div key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ flex: 1 }}>{m.label}</span>
-              <Select
-                aria-label={`Benötigte Rolle: ${m.label}`}
-                style={{ width: 180 }}
-                value={rolle ?? ''}
-                disabled={!istAdmin || !ausblendbar || modulMutation.isPending}
-                options={ROLLEN_OPTIONEN}
-                onChange={(val) =>
-                  modulMutation.mutate({
-                    modulKey: m.key,
-                    rolle: (val || null) as 'admin' | 'fuehrungskraft' | null,
-                  })
-                }
-              />
-            </div>
-          );
-        })}
-      </div>
+      <ModulEinstellungsListe
+        rollenSpalte="Benötigte Rolle (Default)"
+        rolleVon={(key) => orgModul[key] ?? ''}
+        aufRolle={(modulKey, val) =>
+          modulMutation.mutate({
+            modulKey,
+            rolle: (val || null) as 'admin' | 'fuehrungskraft' | null,
+          })
+        }
+        darfVerwalten={istAdmin}
+        laeuft={modulMutation.isPending}
+      />
     </AdminPage>
   );
 }

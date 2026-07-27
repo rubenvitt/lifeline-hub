@@ -1,6 +1,15 @@
-import { Alert, App, AutoComplete, Button, Form, Input, InputNumber, Switch, Typography } from 'antd';
+import { Alert, App, AutoComplete, Button, Form, Input, InputNumber, theme } from 'antd';
 import { Select } from '../components/Select';
+import EinsatzSeite from '../components/EinsatzSeite';
+import SektionHeader from '../components/SektionHeader';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import ModulEinstellungsListe from './einstellungen/ModulEinstellungsListe';
+import {
+  EINHEITEN_OPTIONEN,
+  KOORDINATEN_OPTIONEN,
+  ZEITFORMAT_OPTIONEN,
+  ZEITZONEN_OPTIONEN,
+} from './einstellungen/optionen';
 import { useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -12,45 +21,14 @@ import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { darfImEinsatzSchreiben, darfEinsatzLeiten } from '../einsatz/schreibrecht';
-import { modulRegistry, istModulAusblendbar } from '../einsatz/modulRegistry';
+import { modulRegistry } from '../einsatz/modulRegistry';
 import type {
   EinheitenSystem, EinstellungenUpdate, FachebenenSichtbar,
   Koordinatenformat, ModulOverrideUpdate, OrgModulEinstellungen, Zeitformat,
 } from '../api/types';
 
-/** Optionen für die benötigte Rolle eines Moduls; '' = frei (für alle sichtbaren). */
-const ROLLEN_OPTIONEN: { value: string; label: string }[] = [
-  { value: '', label: 'Frei (alle)' },
-  { value: 'fuehrungskraft', label: 'Führungskraft' },
-  { value: 'admin', label: 'Admin' },
-];
-
-// Anzeige-Konventionen (LFH-136). Kuratierte IANA-Zeitzonen + Freitext (AutoComplete).
-const ZEITZONEN_OPTIONEN = [
-  'Europe/Berlin', 'Europe/London', 'Europe/Paris', 'Europe/Zurich', 'Europe/Vienna',
-  'Europe/Warsaw', 'Europe/Moscow', 'UTC', 'America/New_York', 'America/Los_Angeles',
-  'Asia/Istanbul', 'Asia/Dubai', 'Asia/Tokyo',
-].map((z) => ({ value: z }));
-
-const ZEITFORMAT_OPTIONEN: { value: Zeitformat; label: string }[] = [
-  { value: '24h', label: '24 Stunden' },
-  { value: '12h', label: '12 Stunden (AM/PM)' },
-];
-
-const EINHEITEN_OPTIONEN: { value: EinheitenSystem; label: string }[] = [
-  { value: 'metrisch', label: 'Metrisch (m, km)' },
-  { value: 'imperial', label: 'Imperial (ft, mi)' },
-];
-
-const KOORDINATEN_OPTIONEN: { value: Koordinatenformat; label: string }[] = [
-  { value: 'wgs84', label: 'WGS84 dezimal' },
-  { value: 'dms', label: 'WGS84 (Grad/Min/Sek)' },
-  { value: 'utm', label: 'UTM' },
-  { value: 'mgrs', label: 'MGRS' },
-  { value: 'gk', label: 'Gauß-Krüger' },
-];
-
-/** Tristate-Optionen für automatische ETB-Einträge (null=erbt Org, true=An, false=Aus). */
+/** Tristate-Optionen für automatische ETB-Einträge (null=erbt Org, true=An, false=Aus).
+ *  Bleibt bewusst hier: diese Liste gibt es nur auf der Einsatz-Ebene. */
 const AUTO_ETB_OPTIONEN: { value: boolean; label: string }[] = [
   { value: true, label: 'An' },
   { value: false, label: 'Aus' },
@@ -85,6 +63,7 @@ export default function EinsatzEinstellungenPage() {
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [form] = Form.useForm<FormWerte>();
+  const { token } = theme.useToken();
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -150,6 +129,9 @@ export default function EinsatzEinstellungenPage() {
   // (deckt das Backend-Gate einsatzleitung|admin ab).
   const darfModuleVerwalten = darfEinsatzLeiten(einsatz, benutzer);
   const overrides = overridesQuery.data ?? {};
+
+  /** Sichtbarkeit einer Modul-Zeile aus dem Override-Bestand (Default: sichtbar). */
+  const sichtbarVon = (modulKey: string) => overrides[modulKey]?.sichtbar ?? true;
 
   // Nur fertige Module sind als Default-Modul wählbar (Pre-Mortem: kein Sprung
   // auf geplante/WIP-Module).
@@ -245,23 +227,32 @@ export default function EinsatzEinstellungenPage() {
   }
 
   return (
-    <div style={{ maxWidth: 640 }}>
-      <Typography.Title level={3} style={{ marginTop: 0 }}>
-        Einstellungen
-      </Typography.Title>
-      <Typography.Paragraph type="secondary">
-        Einsatzbezogene Einstellungen für „{einsatz.bezeichnung}". Gelten nur für diesen Einsatz.
-      </Typography.Paragraph>
-
-      {!istAktiv && (
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginBottom: 16 }}
-          title="Einsatz abgeschlossen — Einstellungen sind eingefroren und können nicht mehr geändert werden."
-        />
-      )}
-
+    <EinsatzSeite
+      titel="Einstellungen"
+      beschreibung={`Einsatzbezogene Einstellungen für „${einsatz.bezeichnung}". Gelten nur für diesen Einsatz.`}
+      aktionen={
+        // Der Aktionen-Slot liegt AUSSERHALB des <Form> — deshalb `form.submit()`
+        // statt `htmlType="submit"`, und deshalb das explizite `disabled`: das
+        // Form-weite `disabled` erreicht diesen Knopf nicht.
+        <Button
+          type="primary"
+          onClick={() => form.submit()}
+          loading={speichernMutation.isPending}
+          disabled={!darfBearbeiten}
+        >
+          Speichern
+        </Button>
+      }
+      hinweis={
+        !istAktiv && (
+          <Alert
+            type="info"
+            showIcon
+            title="Einsatz abgeschlossen — Einstellungen sind eingefroren und können nicht mehr geändert werden."
+          />
+        )
+      }
+    >
       <Form<FormWerte>
         form={form}
         layout="vertical"
@@ -269,7 +260,7 @@ export default function EinsatzEinstellungenPage() {
         onFinish={speichern}
         disabled={!darfBearbeiten}
       >
-        <Typography.Title level={5}>Einstieg</Typography.Title>
+        <SektionHeader titel="Einstieg" />
         <Form.Item
           label="Standard-Modul (Einstieg)"
           name="standard_modul"
@@ -282,10 +273,10 @@ export default function EinsatzEinstellungenPage() {
           />
         </Form.Item>
 
-        <Typography.Title level={5}>Anzeige-Konventionen</Typography.Title>
-        <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
-          Gemeinsame Darstellung für diesen Einsatz (Lagebild). Leer = Standard.
-        </Typography.Paragraph>
+        <SektionHeader
+          titel="Anzeige-Konventionen"
+          beschreibung="Gemeinsame Darstellung für diesen Einsatz (Lagebild). Leer = Standard."
+        />
         <Form.Item
           label="Zeitzone"
           name="zeitzone"
@@ -324,12 +315,10 @@ export default function EinsatzEinstellungenPage() {
           <Select allowClear placeholder="WGS84 dezimal (Standard)" options={KOORDINATEN_OPTIONEN} />
         </Form.Item>
 
-        <Typography.Title level={5}>Verhalten &amp; Automatik</Typography.Title>
-        <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
-          Nummernkreise (Präfix + Startwert), Default-Fristen und automatische ETB-Einträge für
-          diesen Einsatz. Präfixe sind reine Anzeige. Sobald die erste Nummer eines Kreises
-          vergeben ist, sind Präfix und Startwert nicht mehr änderbar.
-        </Typography.Paragraph>
+        <SektionHeader
+          titel="Verhalten & Automatik"
+          beschreibung="Nummernkreise (Präfix + Startwert), Default-Fristen und automatische ETB-Einträge für diesen Einsatz. Präfixe sind reine Anzeige. Sobald die erste Nummer eines Kreises vergeben ist, sind Präfix und Startwert nicht mehr änderbar."
+        />
 
         {([
           {
@@ -345,7 +334,7 @@ export default function EinsatzEinstellungenPage() {
             orgPraefix: orgDefaults?.auftrag_nummer_praefix,
           },
         ] as const).map((nk) => (
-          <div key={nk.key} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div key={nk.key} style={{ display: 'flex', gap: token.margin, alignItems: 'flex-start' }}>
             <Form.Item
               label={`Präfix ${nk.label}`}
               name={`${nk.key}_nummer_praefix`}
@@ -400,15 +389,10 @@ export default function EinsatzEinstellungenPage() {
           />
         </Form.Item>
 
-        <Typography.Title level={5}>Aufbewahrung &amp; Archiv</Typography.Title>
-        <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
-          Aufbewahrungs-Dauer in Tagen für diesen Einsatz. Die Frist greift erst beim
-          Abschluss (sie wird daraus als Zeitpunkt berechnet) und wirkt nie auf den
-          laufenden Einsatz. Nach Fristablauf wird der Einsatz zunächst gesperrt und
-          später unwiderruflich von Personendaten bereinigt (ETB und Statistik bleiben
-          erhalten). Leer = keine automatische Frist. Eine spätere Verkürzung einer
-          bereits gesetzten Frist ist gesondert (manuelle Frist) bestätigungspflichtig.
-        </Typography.Paragraph>
+        <SektionHeader
+          titel="Aufbewahrung & Archiv"
+          beschreibung="Aufbewahrungs-Dauer in Tagen für diesen Einsatz. Die Frist greift erst beim Abschluss (sie wird daraus als Zeitpunkt berechnet) und wirkt nie auf den laufenden Einsatz. Nach Fristablauf wird der Einsatz zunächst gesperrt und später unwiderruflich von Personendaten bereinigt (ETB und Statistik bleiben erhalten). Leer = keine automatische Frist. Eine spätere Verkürzung einer bereits gesetzten Frist ist gesondert (manuelle Frist) bestätigungspflichtig."
+        />
         <Form.Item
           label="Aufbewahrungs-Dauer (Tage)"
           name="retention_dauer_tage"
@@ -417,76 +401,47 @@ export default function EinsatzEinstellungenPage() {
         >
           <InputNumber min={1} max={3650} style={{ width: 200 }} placeholder="keine" />
         </Form.Item>
-
-        <Button type="primary" htmlType="submit" loading={speichernMutation.isPending} disabled={!darfBearbeiten}>
-          Speichern
-        </Button>
       </Form>
 
-      <Typography.Title level={5} style={{ marginTop: 32 }}>
-        Modul-Sichtbarkeit &amp; Berechtigungen
-      </Typography.Title>
-      <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-        Module für diesen Einsatz ausblenden oder auf eine Rolle beschränken. Einsatzdaten und
-        Einstellungen lassen sich nicht ausblenden. Änderungen werden sofort gespeichert.
-      </Typography.Paragraph>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, opacity: 0.6 }}>
-          <span style={{ flex: 1 }}>Modul</span>
-          <span style={{ width: 64, textAlign: 'center' }}>Sichtbar</span>
-          <span style={{ width: 180 }}>Benötigte Rolle</span>
-        </div>
-        {modulRegistry.map((m) => {
-          const ausblendbar = istModulAusblendbar(m.key);
-          const ov = overrides[m.key];
-          const sichtbar = ausblendbar ? ov?.sichtbar ?? true : true;
-          const rolle = ov?.benoetigte_rolle ?? null;
-          const orgRolleHinweis = orgRollenHinweis(orgModulDefaults[m.key]);
-          return (
-            <div key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ flex: 1 }}>{m.label}</span>
-              <div style={{ width: 64, textAlign: 'center' }}>
-                <Switch
-                  aria-label={`Sichtbar: ${m.label}`}
-                  checked={sichtbar}
-                  disabled={!darfModuleVerwalten || !ausblendbar || overrideMutation.isPending}
-                  onChange={(checked) =>
-                    overrideMutation.mutate({
-                      modulKey: m.key,
-                      // LFH-120: Backend typisiert benoetigte_rolle als freien Option<String>
-                      // (generiert `string | null`); FE verengt auf die gültigen Rollen-Codes.
-                      update: { sichtbar: checked, benoetigte_rolle: rolle as ModulOverrideUpdate['benoetigte_rolle'] },
-                    })
-                  }
-                />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Select
-                  aria-label={`Benötigte Rolle: ${m.label}`}
-                  style={{ width: 180 }}
-                  value={rolle ?? ''}
-                  disabled={!darfModuleVerwalten || !ausblendbar || overrideMutation.isPending}
-                  options={ROLLEN_OPTIONEN}
-                  onChange={(val) =>
-                    overrideMutation.mutate({
-                      modulKey: m.key,
-                      update: {
-                        sichtbar,
-                        benoetigte_rolle: (val || null) as ModulOverrideUpdate['benoetigte_rolle'],
-                      },
-                    })
-                  }
-                />
-                {orgRolleHinweis && (
-                  <span style={{ fontSize: 11, color: 'var(--ant-color-text-secondary, rgba(0,0,0,0.45))' }}>
-                    {orgRolleHinweis}
-                  </span>
-                )}
-              </div>
-            </div>
-          );
-        })}
+      <div style={{ marginTop: token.marginXL }}>
+        <SektionHeader
+          titel="Modul-Sichtbarkeit & Berechtigungen"
+          beschreibung="Module für diesen Einsatz ausblenden oder auf eine Rolle beschränken. Einsatzdaten und Einstellungen lassen sich nicht ausblenden. Änderungen werden sofort gespeichert."
+        />
       </div>
-    </div>
+      <ModulEinstellungsListe
+        rollenSpalte="Benötigte Rolle"
+        rolleVon={(key) => overrides[key]?.benoetigte_rolle ?? ''}
+        aufRolle={(modulKey, val) =>
+          overrideMutation.mutate({
+            modulKey,
+            update: {
+              // Die Sichtbarkeit MUSS mitfahren: der PUT ist Vollersatz — ohne den
+              // Bestandswert nullt eine reine Rollen-Änderung das Ausblenden.
+              sichtbar: sichtbarVon(modulKey),
+              benoetigte_rolle: (val || null) as ModulOverrideUpdate['benoetigte_rolle'],
+            },
+          })
+        }
+        sichtbarSpalte={{
+          titel: 'Sichtbar',
+          sichtbarVon,
+          aufSichtbar: (modulKey, checked) =>
+            overrideMutation.mutate({
+              modulKey,
+              update: {
+                sichtbar: checked,
+                // LFH-120: Backend typisiert benoetigte_rolle als freien Option<String>
+                // (generiert `string | null`); FE verengt auf die gültigen Rollen-Codes.
+                benoetigte_rolle: (overrides[modulKey]?.benoetigte_rolle ??
+                  null) as ModulOverrideUpdate['benoetigte_rolle'],
+              },
+            }),
+        }}
+        darfVerwalten={darfModuleVerwalten}
+        laeuft={overrideMutation.isPending}
+        hinweisVon={(key) => orgRollenHinweis(orgModulDefaults[key])}
+      />
+    </EinsatzSeite>
   );
 }

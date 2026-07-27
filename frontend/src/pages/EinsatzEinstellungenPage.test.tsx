@@ -208,6 +208,35 @@ describe('EinsatzEinstellungenPage', () => {
     );
   });
 
+  it('lässt beim Ändern der Rolle die Sichtbarkeit als Bestandswert mitfahren (Vollersatz-PUT)', async () => {
+    // Ohne den Bestandswert würde eine reine Rollen-Änderung das Ausblenden nullen —
+    // der Switch-Test allein deckt das nicht ab (er ändert nur die andere Spalte).
+    vi.mocked(ladeModulOverrides).mockResolvedValue({
+      etb: { sichtbar: false, benoetigte_rolle: null },
+    } as never);
+    vi.mocked(ladeEinstellungen).mockResolvedValue({
+      einsatz_id: 1, standard_modul: null, basemap_modus: null, karten_zoom_start: null,
+      fachebenen_sichtbar: null,
+      zeitzone: null, zeitformat: null, einheiten: null, koordinatenformat: null,
+      ...VERHALTEN_DEFAULTS,
+      geaendert_at: null, geaendert_von: null,
+    });
+
+    rendern();
+
+    fireEvent.mouseDown(
+      await screen.findByRole('combobox', { name: 'Benötigte Rolle: ETB' }),
+    );
+    fireEvent.click(await screen.findByText('Admin'));
+
+    await waitFor(() =>
+      expect(setzeModulOverride).toHaveBeenCalledWith(1, 'etb', {
+        sichtbar: false,
+        benoetigte_rolle: 'admin',
+      }),
+    );
+  });
+
   it('blendet einen Hinweis ein, wenn der Einsatz abgeschlossen ist', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue({
       id: 1, bezeichnung: 'Lage', status: 'abgeschlossen', meine_rolle: 'einsatzleitung',
