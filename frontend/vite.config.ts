@@ -64,6 +64,13 @@ export default defineConfig(({ mode }) => {
         },
       }),
     ],
+    // maplibre-gl aus der Dep-Optimierung heraushalten (ab v6 nötig): der Optimizer bündelt es
+    // sonst nach `node_modules/.vite/deps/`, und weil maplibre seine Worker-URL zur Laufzeit als
+    // Geschwisterdatei von `import.meta.url` konstruiert, sucht es den Worker dann dort — wo er
+    // nicht liegt (gemessen: 404 auf `/node_modules/.vite/deps/maplibre-gl-worker.mjs`, mit
+    // exclude: 200 auf den echten Pfad). Betrifft NUR den Dev-Server; der Prod-Build wird über
+    // `setWorkerUrl` in Kartenflaeche.tsx versorgt, dort steht die ausführliche Begründung.
+    optimizeDeps: { exclude: ['maplibre-gl'] },
     server: {
       port: frontendPort, // undefined → Vite-Default (5173) bzw. nächster freier Port
       strictPort: false,

@@ -1,4 +1,4 @@
-import maplibregl from 'maplibre-gl';
+import type { Map as MapLibreMap } from 'maplibre-gl';
 import { TerraDraw, TerraDrawLineStringMode, TerraDrawPolygonMode } from 'terra-draw';
 import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter';
 import type { GeoJsonGeometry } from './geo';
@@ -21,10 +21,14 @@ export interface Zeichnung {
  * Persistenz übernimmt die App; das Roh-Feature bleibt sichtbar, bis `stoppen()` es räumt.
  */
 export function createZeichnung(
-  map: maplibregl.Map,
+  map: MapLibreMap,
   onFertig: (geometrie: GeoJsonGeometry) => void,
 ): Zeichnung {
-  // Hinweis: terra-draw-maplibre-gl-adapter@1.x nimmt KEIN `lib`; der Adapter bindet MapLibre intern.
+  // Hinweis: terra-draw-maplibre-gl-adapter@1.x nimmt KEIN `lib` — er importiert maplibre-gl gar
+  // nicht, sondern duck-typed gegen die übergebene Map-Instanz (sein einziger maplibre-Import ist
+  // type-only, und er fasst das Event-System der Map nie an; seine Listener hängen am Canvas-DOM).
+  // Daher der lose Peer-Range `>=4`, daher kein Dual-Instance-Risiko — und daher überstand er den
+  // Sprung auf maplibre 6 unverändert.
   const draw = new TerraDraw({
     adapter: new TerraDrawMapLibreGLAdapter({ map }),
     modes: [new TerraDrawPolygonMode(), new TerraDrawLineStringMode()],

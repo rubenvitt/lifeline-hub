@@ -1,7 +1,24 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
-import maplibregl, { type LngLatLike, type StyleSpecification, type GeoJSONSource } from 'maplibre-gl';
+// Namespace-Import, weil maplibre-gl ab 6 echtes ESM ohne Default-Export ist (v5 lieferte ein
+// UMD-Bundle, aus dem Bundler/TS per CJS-Interop einen Default synthetisierten). Bewusst KEIN
+// named-Import der Klassen: `Map` würde den globalen `Map` beschatten, den die tzRegistry unten
+// als `useRef<Map<string, TzProps>>` nutzt — der Fehler landete dann auf der Registry-Zeile und
+// zeigte von der Ursache weg. `import * as ns, { type X }` ist kein gültiges ES, daher zwei Zeilen.
+import * as maplibregl from 'maplibre-gl';
+import type { LngLatLike, StyleSpecification, GeoJSONSource } from 'maplibre-gl';
+// Der Worker MUSS explizit verdrahtet werden, und zwar mit `?worker&url`, nicht `?url`:
+// maplibre 6 baut seine Worker-URL zur Laufzeit aus `import.meta.url` in einer Variablen zusammen
+// (`web_worker.ts`), was kein Bundler statisch sieht — ohne das hier emittiert `vite build` die
+// Worker-Datei gar nicht erst, mit exit 0 und ohne Warnung. Zur Laufzeit lädt dann der Style, aber
+// es kommt keine einzige Kachel. `?url` allein ist die Falle daneben: es emittiert zwar eine Datei,
+// die aber weiter ihre Geschwisterdatei `maplibre-gl-shared.mjs` importiert und daran stirbt.
+// `?worker&url` bündelt self-contained — und nur diese Variante landet als `.js` im
+// Workbox-Precache-Manifest, ist also auch offline da.
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { erzeugeTaktischesZeichen } from 'taktische-zeichen-react';
 import 'maplibre-gl/dist/maplibre-gl.css';
+
+maplibregl.setWorkerUrl(workerUrl);
 import type { KarteMarker } from './marker';
 import {
   baueMarkerFc, baueEinsatzortFc, reAnlegenMarker, pinneMarkerLayerNachOben,
@@ -207,6 +224,17 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       center: [10.45, 51.16], // Mitte DE als neutraler Start
       zoom: 5,
       attributionControl: false,
+      // maplibre 6 hat hierfür den Default 4 eingeführt — eine Option, die wir nie gesetzt haben
+      // und die das Rendering trotzdem ändert. Effektive Kachel-maxzoom wäre dann
+      // max(source.maxzoom, maxZoom-4); unsere Offline-Weltübersicht hat maxzoom 6, es würden also
+      // z7-18 aus EINEM z6-Tile client-seitig gesliced. Netzseitig harmlos (die echte Kachel-URL
+      // wird weiter korrekt geholt), aber MapLibre dokumentiert selbst geänderte Label-Platzierung,
+      // und auf Feldgeräten ist das Slicing auch eine CPU-/Speicherfrage. `undefined` stellt das
+      // v5-Verhalten her — der Konstruktor merged per Spread, ein explizites undefined überschreibt
+      // den Default also wirklich (nachgelesen in map.ts:723, `_zoomLevelsToOverscale` ist
+      // `number | undefined`). Bewusste Entscheidung, kein Versehen: wer Overscaling will, setzt
+      // hier eine Zahl und prüft die Basemap-Beschriftung auf einem echten Gerät nach.
+      zoomLevelsToOverscale: undefined,
       // Server-Proxy-URLs (/api/karte/proxy/…, LFH-182) sind root-relativ; im Tile-Worker ohne
       // Dokument-Base scheitern sie sonst. Hier gegen die Origin absolutieren.
       transformRequest: absolutiereProxyAnfrage,
