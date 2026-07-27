@@ -39,6 +39,28 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
 
   const umhaengen = (ziel: number) => onAendern({ gefahrengebiet_id: ziel === NEU ? null : ziel });
 
+  // Nicht-Geo-Zeilen im selben Raster (Warnstufe, Zonen-Anzahl) — null, wenn keine anfallen.
+  const zusatzZeilen =
+    zone.typ === 'gefahrengebiet' && aktuellesGebiet ? (
+      <>
+        {aktuellHatWarnstufen && (
+          <KennzahlZeile
+            label="Höchste Warnstufe"
+            zahl={false}
+            wert={
+              <Tag
+                color={warnstufeFarbe(aktuellesGebiet.hoechste_warnstufe)}
+                style={{ marginInlineEnd: 0 }}
+              >
+                {warnstufeLabel ?? aktuellesGebiet.hoechste_warnstufe}
+              </Tag>
+            }
+          />
+        )}
+        <KennzahlZeile label="Zonen" wert={String(aktuellesGebiet.zonen_ids.length)} />
+      </>
+    ) : null;
+
   return (
     <KartenDetailCard
       titel={zone.label?.trim() ? zone.label : zoneTypLabel(zone.typ)}
@@ -56,31 +78,15 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
 
         {/* Warnstufe und Zonen-Anzahl sind keine Geo-Kennzahlen, gehören aber ins selbe
             Label→Wert-Raster — dafür ist der `zusatz`-Slot da (LFH-328/A2). Die Warnstufe
-            ist ein Tag und läuft deshalb mit `zahl={false}` an der Zahlenschrift vorbei. */}
-        <GeoKennzahlen
-          kennzahlen={kennzahlen}
-          zusatz={
-            zone.typ === 'gefahrengebiet' && aktuellesGebiet ? (
-              <>
-                {aktuellHatWarnstufen && (
-                  <KennzahlZeile
-                    label="Höchste Warnstufe"
-                    zahl={false}
-                    wert={
-                      <Tag
-                        color={warnstufeFarbe(aktuellesGebiet.hoechste_warnstufe)}
-                        style={{ marginInlineEnd: 0 }}
-                      >
-                        {warnstufeLabel ?? aktuellesGebiet.hoechste_warnstufe}
-                      </Tag>
-                    }
-                  />
-                )}
-                <KennzahlZeile label="Zonen" wert={String(aktuellesGebiet.zonen_ids.length)} />
-              </>
-            ) : undefined
-          }
-        />
+            ist ein Tag und läuft deshalb mit `zahl={false}` an der Zahlenschrift vorbei.
+
+            Die Bedingung steht HIER und nicht nur in `GeoKennzahlen`: antds `Space` filtert
+            ein `false`-Kind heraus, wickelt aber eine Komponente, die null RENDERT, trotzdem
+            in ein `.ant-space-item` (gemessen: 3 statt 2) — das gäbe im häufigen Fall ohne
+            Kennzahlen eine leere Lücke. Gepinnt im Test. */}
+        {(kennzahlen || zusatzZeilen) && (
+          <GeoKennzahlen kennzahlen={kennzahlen} zusatz={zusatzZeilen} />
+        )}
 
         <Input aria-label="Label" placeholder="Bezeichnung" defaultValue={zone.label ?? ''} disabled={!darfSchreiben}
           onBlur={(e) => { const v = e.target.value.trim(); if (v !== (zone.label ?? '')) onAendern({ label: v || null }); }} />

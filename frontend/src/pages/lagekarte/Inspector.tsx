@@ -102,7 +102,14 @@ export default function Inspector({
           <KoordinatenAnzeige lat={marker.lat} lon={marker.lon} einsatzId={einsatzId} exclude={inspectorExclude(marker, einsatzId)} />
         </Descriptions.Item>
       </Descriptions>
-      <GeoKennzahlen kennzahlen={kennzahlen} />
+      {/* Abstand am Aufrufer wie im FachebenenInspector: `GeoKennzahlen` rendert ohne
+          Kennzahlen nichts, ein Wrapper mit `marginTop` hinterließe sonst eine leere Lücke —
+          und der Punkt-Marker ohne Geometrie ist hier der Regelfall. */}
+      {kennzahlen && (
+        <div style={{ marginTop: token.marginSM }}>
+          <GeoKennzahlen kennzahlen={kennzahlen} />
+        </div>
+      )}
       {symbolAuswahl && (
         <Space orientation="vertical" size={token.marginXS} style={{ width: '100%', marginTop: token.marginXS }}>
           {/* Kein `aria-label` mehr: das FeldLabel trägt den Namen. Zwei Quellen wären eine
