@@ -1,5 +1,5 @@
 import { Layout, Space, Typography } from 'antd';
-import { Link, Outlet } from 'react-router-dom';
+import { Link, Outlet } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import ThemeToggle from './ThemeToggle';
 import BenutzerMenu from './BenutzerMenu';

@@ -1,6 +1,6 @@
 import { App, Breadcrumb, Button, Form, Input, Space, Spin, Tag, Typography } from 'antd';
 import { useEffect } from 'react';
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';

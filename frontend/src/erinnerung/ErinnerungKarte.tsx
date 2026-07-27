@@ -1,7 +1,7 @@
 import { Button, Card, Flex, Popconfirm, Space, Tag, Tooltip, Typography, theme } from 'antd';
 import { ClockCircleOutlined } from '@ant-design/icons';
 import type { ReactNode } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 import type { Erinnerung } from '../api/types';
 import { auftraegePfad, etbPfad, meldungenPfad, parseRouteId } from '../routing/deeplinks';
 import { ERINNERUNG_STATUS, StatusBadge, QuittungIndikator, formatZeit } from '../kommunikation';

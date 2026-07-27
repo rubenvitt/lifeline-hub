@@ -1,4 +1,4 @@
-import { Navigate, useParams } from 'react-router-dom';
+import { Navigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Spin } from 'antd';
 import { ladeEinstellungen } from '../api/einsaetze';

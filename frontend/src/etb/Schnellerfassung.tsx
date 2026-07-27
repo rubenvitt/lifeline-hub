@@ -3,7 +3,7 @@ import { Select } from '../components/Select';
 import { PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import type { NeuerEintrag } from '../api/etb';
 import type { EinsatzAnzeige, EtbBaustein, EtbEintragAnzeige, EtbTyp, MeldeWeg } from '../api/types';
 import { ERFASSBARE_TYPEN, TYP_LABEL } from './typFarben';

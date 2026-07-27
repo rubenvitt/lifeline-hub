@@ -1,7 +1,7 @@
 import { App, Button, Card, Empty, Form, Input, Modal, Space, Tag, Typography } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { EinsatzAnzeige } from '../api/types';
 import { ApiError } from '../api/client';

@@ -1,5 +1,5 @@
 import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Spin, Tag, Typography } from 'antd';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz, schliesseEinsatzAb } from '../api/einsaetze';
 import { darfEinsatzLeiten, darfImEinsatzSchreiben } from '../einsatz/schreibrecht';

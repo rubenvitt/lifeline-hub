@@ -51,7 +51,7 @@ karten-katalog = { path = "crates/karten-katalog", features = ["schema"] }
 clamav-client = { version = "2.2", optional = true, default-features = false, features = ["tokio"] }
 # LFH-274: HTTPS/TLS-Transport — axum-server für den rustls-basierten TLS-Bind,
 # rcgen für die selbstsignierte Cert-Generierung (mkcert-/BYO-Fallback).
-axum-server = { version = "0.7", features = ["tls-rustls"] }
+axum-server = { version = "0.8", features = ["tls-rustls"] }
 rcgen = "0.14"
 # LFH-231/G10: ausschließlich für `TokioTimer` — hyper braucht einen Timer, bevor
 # `header_read_timeout` gesetzt werden darf (sonst Panik beim Verbindungsaufbau). Die Crate

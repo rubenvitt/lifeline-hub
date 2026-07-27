@@ -274,7 +274,9 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         tracing::info!("Server lauscht auf {}", config.bind);
 
         let handle = graceful_handle();
-        let mut server = axum_server::from_tcp(listener.into_std()?)
+        // `from_tcp` gibt seit axum-server 0.8 ein `io::Result` zurück (der Listener wird
+        // intern nach tokio konvertiert, was fehlschlagen kann) — vorher war es der Server.
+        let mut server = axum_server::from_tcp(listener.into_std()?)?
             .acceptor(verbindung::SemaphorAkzeptor::default());
         verbindung::zeitschranken_setzen(&mut server, verbindung::Fristen::default());
         server
@@ -342,7 +344,10 @@ async fn cmd_restore(
 /// `axum::serve(..).with_graceful_shutdown(..)`, das unbegrenzt auf offene Verbindungen
 /// wartet; hier gilt nun dieselbe 10-Sekunden-Frist wie im TLS-Pfad — sinnvoll, weil eine
 /// SSE-Verbindung sonst den Shutdown beliebig lange offen hielte.
-fn graceful_handle() -> axum_server::Handle {
+/// Der Adress-Parameter ist seit axum-server 0.8 nötig (`Handle<A: Address>`, weil das Handle
+/// jetzt auch Unix-Sockets tragen kann). Beide Serve-Pfade hier binden auf IP, deshalb
+/// `SocketAddr`.
+fn graceful_handle() -> axum_server::Handle<std::net::SocketAddr> {
     let handle = axum_server::Handle::new();
     let h2 = handle.clone();
     tokio::spawn(async move {

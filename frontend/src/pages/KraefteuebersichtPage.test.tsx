@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route } from 'react-router';
 import { App as AntApp } from 'antd';
 import KraefteuebersichtPage from './KraefteuebersichtPage';
 import { AuthProvider } from '../auth/AuthContext';
@@ -25,7 +25,7 @@ vi.mock('../api/lageberichte', () => ({
   legeLageberichtAn: vi.fn(() => Promise.resolve({ id: 99 })),
   aktualisiereLagebericht: vi.fn(() => Promise.resolve({})),
 }));
-vi.mock('react-router-dom', async (orig) => ({ ...(await orig()), useNavigate: () => vi.fn() }));
+vi.mock('react-router', async (orig) => ({ ...(await orig()), useNavigate: () => vi.fn() }));
 
 // Nur die im Page genutzten Felder; Rest via Cast (Test-Fixture, kein echter Server-DTO).
 const EINSATZ = { id: 1, bezeichnung: 'Testeinsatz', status: 'aktiv', meine_rolle: 'einsatzleitung' } as EinsatzAnzeige;

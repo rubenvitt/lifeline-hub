@@ -1,6 +1,6 @@
 import { Button, Descriptions, Space, Tag } from 'antd';
 import { Select } from '../../components/Select';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import type { KarteMarker, MarkerTyp } from './marker';
 import { markerToUrl } from './markerToUrl';
 import { geoKennzahlen, formatFlaeche, formatLaenge } from './geo';

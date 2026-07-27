@@ -8,7 +8,7 @@ import ReactDOM from 'react-dom/client';
 import { App as AntApp } from 'antd';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter } from 'react-router';
 import { registerSW } from 'virtual:pwa-register';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';

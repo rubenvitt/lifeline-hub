@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Layout, Space, Spin } from 'antd';
-import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';

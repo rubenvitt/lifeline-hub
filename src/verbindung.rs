@@ -130,8 +130,14 @@ where
 /// Setzt Timer und Fristen auf dem hyper-Builder des Servers — für HTTP/1 **und** HTTP/2.
 ///
 /// Gilt für beide Bind-Arten (`from_tcp` wie `bind_rustls`), weil `http_builder` auf
-/// `impl<A> Server<A>` sitzt. Der Timer ist **nicht optional** — ohne ihn paniked hyper bei
-/// der ersten Verbindung, s. Modul-Doku.
+/// `impl<A: Address, Acc> Server<A, Acc>` sitzt. Der Timer ist **nicht optional** — ohne ihn
+/// paniked hyper bei der ersten Verbindung, s. Modul-Doku.
+///
+/// Die ZWEI Generics sind kein Zierrat: seit axum-server 0.8 ist `Server` nicht mehr nur über
+/// den Akzeptor generisch, sondern auch über die Adress-Art (TCP/Unix-Socket) — `A` ist die
+/// Adresse, `Acc` der Akzeptor. In 0.7 stand das einzelne `A` noch für den Akzeptor. Wer hier
+/// auf ein Generic zurückkürzt, bindet die Funktion still an den Default-Akzeptor und schließt
+/// damit genau die beiden Aufrufer aus, die den `SemaphorAkzeptor` tragen.
 ///
 /// **Beide Protokolle müssen konfiguriert werden.** `hyper_util`s `auto::Builder` hält
 /// getrennte h1-/h2-Konfigurationen und dispatcht nach ausgehandeltem Protokoll. Der
@@ -140,7 +146,10 @@ where
 /// moderne Clients ungeschützt. Weil HTTP/2 kein `header_read_timeout` kennt, tritt dort die
 /// PING-basierte Keep-Alive-Prüfung an seine Stelle; `.http2()` braucht dafür einen
 /// **eigenen** Timer.
-pub fn zeitschranken_setzen<A>(server: &mut axum_server::Server<A>, fristen: Fristen) {
+pub fn zeitschranken_setzen<A: axum_server::Address, Acc>(
+    server: &mut axum_server::Server<A, Acc>,
+    fristen: Fristen,
+) {
     let builder = server.http_builder();
     builder
         .http1()
@@ -230,7 +239,9 @@ mod tests {
         let addr = listener.local_addr().expect("Adresse");
 
         let akzeptor = SemaphorAkzeptor::neu(max_verbindungen);
-        let mut server = axum_server::from_tcp(listener).acceptor(akzeptor.clone());
+        let mut server = axum_server::from_tcp(listener)
+            .expect("from_tcp")
+            .acceptor(akzeptor.clone());
         zeitschranken_setzen(&mut server, fristen);
 
         tokio::spawn(async move { server.serve(app.into_make_service()).await });

@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router';
 import { Fragment, lazy, Suspense } from 'react';
 import type { ReactElement } from 'react';
 import RequireAuth from './routes/RequireAuth';

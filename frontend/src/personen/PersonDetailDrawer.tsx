@@ -1,6 +1,6 @@
 import { Alert, Button, Descriptions, Drawer, Space, Spin, Tag, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { personDetailPfad } from '../routing/deeplinks';
 import { ladePerson, registrierAnzeige } from '../api/einsatzPerson';
 import { ApiError } from '../api/client';

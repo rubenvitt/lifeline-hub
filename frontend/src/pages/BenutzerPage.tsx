@@ -3,7 +3,7 @@ import { Select } from '../components/Select';
 import AdminPage from '../components/AdminPage';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Navigate } from 'react-router-dom';
+import { Navigate } from 'react-router';
 import type { BenutzerAnzeige, OrgRolle, SystemRolle } from '../api/types';
 import { ApiError } from '../api/client';
 import {

@@ -2,7 +2,7 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import { App as AntApp } from 'antd';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route } from 'react-router';
 import AlarmZentrale from './AlarmZentrale';
 import { istAlarmGemutet } from '../alarm/alarmTon';
 

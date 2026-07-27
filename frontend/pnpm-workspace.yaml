@@ -24,3 +24,39 @@ overrides:
   # Abhängigkeit, die wir nicht selbst rufen. Reines Build-Zeit-Tooling (PWA-Manifest),
   # kein Laufzeit-Code im Bundle.
   fast-uri@>=3.0.0 <3.1.4: ^3.1.4
+
+# Bewertete Advisories OHNE Fix — dieselbe Doktrin wie .cargo/audit.toml auf der
+# Rust-Seite: hier steht nur, wofür es KEINEN Upgrade-Pfad gibt UND wofür die
+# Nichtbetroffenheit begründet ist. Ein Eintrag braucht: warum kein Upgrade möglich ist,
+# warum das Risiko in DIESEM Projekt nicht trägt, und woran man merkt, dass sich das ändert.
+# Was hier nicht steht, bricht `scripts/check-deps.sh`.
+auditConfig:
+  ignoreGhsas:
+    # GHSA-mh99-v99m-4gvg (high): brace-expansion expandiert Brace-Muster unbegrenzt,
+    # ein bösartiges Glob-Pattern kann den Prozess per OOM killen (DoS).
+    #
+    # Kein Upgrade möglich: das Advisory patcht AUSSCHLIESSLICH die 5.x-Linie (>=5.0.8),
+    # für die 2.x-Linie gibt es keinen Backport. Betroffen ist brace-expansion 2.1.2,
+    # gezogen von minimatch@5.1.9 über zwei Ketten, beide devDependencies:
+    #   openapi-typescript → @redocly/openapi-core → minimatch@5
+    #   vite-plugin-pwa → workbox-build → …ejs → jake → filelist → minimatch@5
+    # Ein Override auf ^5.0.8 ist KEIN Ausweg, sondern ein Bruch: minimatch@5 macht
+    # `const expand = require('brace-expansion')` (minimatch.js:19), brace-expansion 5
+    # exportiert aber keinen Default mehr, sondern nur noch `{ expand, EXPANSION_MAX,
+    # EXPANSION_MAX_LENGTH }` (an der installierten 5.0.8 nachgemessen) — `expand()` wäre
+    # zur Laufzeit kein Callable. minimatch selbst hochzuziehen scheitert am selben Muster
+    # eine Ebene höher (filelist@1.0.6 ruft minimatch als Funktion, minimatch@10 exportiert
+    # named). Die direkten Konsumenten stehen bereits auf der neuesten Version.
+    #
+    # Warum das Risiko hier nicht trägt: reines Build-Zeit-Tooling, kein Byte davon landet
+    # im ausgelieferten Bundle oder im Binary. Die Glob-Patterns, die diese beiden Ketten
+    # sehen, stammen aus unserer eigenen Repo-Konfiguration (Redocly-Defaults beim
+    # Typ-Codegen, workbox-Globs beim PWA-Build) — es gibt keinen Pfad, über den ein
+    # Angreifer ein Pattern einschleust. Der Schaden wäre zudem ein abgestürzter lokaler
+    # Build, kein Zugriff.
+    #
+    # Neu bewerten, wenn: (a) ein 2.x-Backport erscheint (dann Ignore streichen),
+    # (b) openapi-typescript/@redocly/openapi-core oder vite-plugin-pwa/workbox-build auf
+    # minimatch >=10 wechseln (dann fällt die 2.x-Linie von selbst raus), (c) eine dieser
+    # Ketten in Laufzeit-Code wandert.
+    - GHSA-mh99-v99m-4gvg

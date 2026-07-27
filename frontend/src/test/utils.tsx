@@ -1,7 +1,7 @@
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
 import { render, type RenderOptions } from '@testing-library/react';
 import { App as AntApp, ConfigProvider } from 'antd';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import type { ReactElement, ReactNode } from 'react';
 import { AuthProvider } from '../auth/AuthContext';
 import { erzeugeQueryClient } from '../api/queryClient';

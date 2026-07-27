@@ -1,6 +1,6 @@
 import { Alert, App, Breadcrumb, Button, Descriptions, Popconfirm, Space, Spin, Tag } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
-import { Link, Navigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';

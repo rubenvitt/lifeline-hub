@@ -1,6 +1,6 @@
 // frontend/src/command-palette/useBefehle.ts
 import { useMemo } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';

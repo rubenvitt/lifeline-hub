@@ -1,6 +1,6 @@
 import { Table, Tag } from 'antd';
 import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
 import { einsatzKeys } from '../../api/queryKeys';

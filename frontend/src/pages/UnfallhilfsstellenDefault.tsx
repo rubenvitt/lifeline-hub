@@ -1,5 +1,5 @@
 import { Alert, Button, Empty, Spin } from 'antd';
-import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { listeUhs } from '../api/einsatzUhs';

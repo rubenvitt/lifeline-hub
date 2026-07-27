@@ -2,7 +2,7 @@ import { Alert, Button, Divider, Form, Input, Space, Tag } from 'antd';
 import { KeyOutlined, LoginOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router';
 import { startAuthentication } from '@simplewebauthn/browser';
 import { ApiError } from '../api/client';
 import { devBenutzerLaden, type DevBenutzer } from '../api/dev';

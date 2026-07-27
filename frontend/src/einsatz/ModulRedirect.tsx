@@ -1,4 +1,4 @@
-import { Navigate, useParams } from 'react-router-dom';
+import { Navigate, useParams } from 'react-router';
 
 /**
  * Deep-Link-Modul: leitet auf die `route` eines anderen Moduls im selben Einsatz um.

@@ -4,7 +4,7 @@ import { Select } from '../components/Select';
 import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
 import KoordinatenEingabe from '../anzeige/KoordinatenEingabe';
 import type { LatLon } from '../anzeige/koordinaten';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import dayjs, { type Dayjs } from 'dayjs';
