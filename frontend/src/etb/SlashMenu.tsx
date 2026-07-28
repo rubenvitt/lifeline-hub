@@ -29,9 +29,10 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
   const flach: SlashEintrag[] = useMemo(() => [...treffer.felder, ...treffer.bausteine], [treffer]);
   const [aktiv, setAktiv] = useState(0);
   // Aufgelöste Theme-Tokens (theme.useToken()) statt antd-CSS-Variablen: robust
-  // gegenüber dem Theme-Modus. (antd 6 aktiviert cssVar zwar standardmäßig, doch
-  // aufgelöste Tokens bleiben hier die klarere, modussichere Wahl — vermeidet den
-  // früheren Fehler, dass `var(--ant-color-bg-elevated, …)` den dunklen Fallback nahm.)
+  // gegenüber dem Theme-Modus. Eine antd-Custom-Property griff hier früher nie und
+  // lief still auf ihren dunklen Fallback — der ConfigProvider setzt `cssVar` nicht,
+  // und dass er es NICHT tut, ist seit A2 (LFH-328) eine begründete Entscheidung:
+  // handgeschriebenes CSS liest `--lfh-*` aus `theme/rollen.css`, TSX liest useToken().
   const { token } = theme.useToken();
 
   useEffect(() => setAktiv(0), [filter, offen]);

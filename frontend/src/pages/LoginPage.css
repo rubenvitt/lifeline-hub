@@ -75,16 +75,18 @@
 }
 
 /* Der Akzentstrich ist Signatur-Element 1 der Gestaltungssprache (LFH-352 · A0).
-   Er liest die Markenrolle statt `var(--ant-color-primary, …)` — diese Variable
-   griff nie, weil der ConfigProvider kein `cssVar: true` setzt, und lief still auf
-   ihren Fallback. Dass `cssVar` aus BLEIBT, ist in A2 (LFH-328) entschieden und
-   begründet: handgeschriebenes CSS liest `--lfh-*`, TSX liest `useToken()`.
-   Radius und Glühen kommen ebenfalls aus den Rollen.
+   Er liest die Markenrolle statt einer antd-Custom-Property — die griff nie, weil der
+   ConfigProvider kein `cssVar: true` setzt, und lief still auf ihren Fallback. Dass
+   `cssVar` aus BLEIBT, ist in A2 (LFH-328) entschieden und begründet: handgeschriebenes
+   CSS liest `--lfh-*`, TSX liest `useToken()`. Radius und Glühen kommen ebenfalls aus
+   den Rollen.
 
-   Der frühere Hinweis auf die „acht Marken-Rot-Stellen aus A2" ist entfallen — er
-   nannte den Farbwert im Klartext und riss damit Gate 5 (A1 Festlegung 5), das
-   genau diese Werte außerhalb von `theme/` verbietet. Ein Gate, das an seinem
-   eigenen Erklärtext scheitert, erzieht dazu, es abzuschalten. */
+   Zweimal hat der Erklärtext hier das Gate gerissen, das er erklärt: erst nannte er den
+   Marken-Rot-Wert im Klartext (Gate 5, A1 Festlegung 5), dann die antd-Variable in ihrer
+   `var(…)`-Schreibweise (A2-Kriterium: 0 Vorkommen im Frontend). Beide Male war der Code
+   längst richtig und nur die Prosa daneben. Wer hier etwas ergänzt: die verbotenen
+   Konstrukte umschreiben, nicht zitieren — ein Gate, das an seinem eigenen Erklärtext
+   scheitert, erzieht dazu, es abzuschalten. */
 .login-marke__akzent {
   display: block;
   width: 36px;
