@@ -336,7 +336,6 @@ export default function OfflineKartenVerwaltung() {
           dataSource={karten}
           columns={spalten}
           locale={{ emptyText: 'Noch keine Offline-Karten' }}
-          pagination={false}
         />
       )}
       <OfflineRegionPicker offen={pickerOffen} onClose={() => setPickerOffen(false)} />

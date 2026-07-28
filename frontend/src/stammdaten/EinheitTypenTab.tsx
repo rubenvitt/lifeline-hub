@@ -100,7 +100,6 @@ export default function EinheitTypenTab() {
         loading={typenQuery.isLoading}
         dataSource={typenQuery.data ?? []}
         columns={spalten}
-        pagination={false}
         locale={{ emptyText: 'Kein Einheitstyp' }}
       />
       <Modal

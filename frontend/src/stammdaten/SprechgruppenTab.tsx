@@ -102,7 +102,6 @@ export default function SprechgruppenTab() {
         dataSource={sprechgruppenQuery.data ?? []}
         columns={spalten}
         locale={{ emptyText: 'Noch keine Sprechgruppen' }}
-        pagination={false}
       />
       <SprechgruppeFormModal
         offen={modalOffen}

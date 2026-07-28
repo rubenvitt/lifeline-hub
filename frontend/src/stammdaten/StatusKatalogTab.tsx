@@ -117,7 +117,6 @@ export default function StatusKatalogTab() {
         loading={statusQuery.isLoading}
         dataSource={statusQuery.data ?? []}
         columns={spalten}
-        pagination={false}
         locale={{ emptyText: 'Kein Status' }}
       />
       <Modal

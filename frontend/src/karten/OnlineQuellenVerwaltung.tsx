@@ -115,7 +115,6 @@ export default function OnlineQuellenVerwaltung() {
           dataSource={quellen}
           columns={spalten}
           locale={{ emptyText: 'Noch keine Online-Quellen' }}
-          pagination={false}
         />
       )}
       <OnlineQuelleFormModal

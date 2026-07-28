@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Popconfirm, Space, Table, Tag, Typography, type TableColumnsType } from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Popconfirm, Space, Tag, Typography } from 'antd';
 import { Select } from '../components/Select';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -22,6 +22,8 @@ import type { EinsatzPersonal, StaerkePosition } from '../api/types';
 import StatusTag from '../components/StatusTag';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
+import Datensicht, { spaltenFuer } from '../components/Datensicht';
+import { KATEGORIE_REIHENFOLGE, KATEGORIE_WERTE, kategorieEtikett, kategorieVon } from '../kraefte/statusAchse';
 import { statusKategorie } from '../theme/statusFarben';
 import { flaeche } from '../theme/tokens';
 
@@ -158,10 +160,47 @@ export default function PersonalPage() {
     .filter((p) => !disponierteIds.has(p.id))
     .map((p) => ({ value: p.id, label: `${p.name}${p.personalnummer ? ` (${p.personalnummer})` : ''}` }));
 
-  const spalten: TableColumnsType<EinsatzPersonal> = [
+  /**
+   * Trägerfilter aus den EIGENEN Daten; `undefined` ohne Werte — ein Filterfeld mit null
+   * Optionen wäre Rauschen in der Werkzeugzeile.
+   *
+   * BEWUSSTE FOLGE, damit sie nicht unbenannt bleibt: das Feld erscheint erst mit dem
+   * ersten gepflegten Wert, also nach dem Laden — in der umbrechenden Werkzeugzeile eine
+   * kleine Verschiebung. Der Tausch ist gewollt: ein dauerhaft leeres Filterfeld sieht wie
+   * ein Werkzeug aus und ist keins.
+   */
+  const traegerWerte = [...new Set(eps.map((e) => e.traegerorganisation).filter((t): t is string => !!t))]
+    .sort()
+    .map((t) => ({ text: t, value: t }));
+  const traegerFilter = traegerWerte.length > 0
+    ? { werte: traegerWerte, trifft: (e: EinsatzPersonal, w: string) => e.traegerorganisation === w }
+    : undefined;
+
+  /**
+   * Spaltenregister der Personalseite — die breiteste Fläche des Repos (9 Spalten) und
+   * damit der erste Adressat des Spaltenschalters (LFH-330 · B2).
+   *
+   * Durch `spaltenFuer<EinsatzPersonal>()` geführt, NICHT annotiert (sonst weitet sich `K`
+   * auf `string` und der Kartenplan nimmt jeden Tippfehler an).
+   *
+   * ── KEIN `abBreite` AUF `position` — und das ist eine Entscheidung ───────────────
+   *
+   * Die API-Spec schlägt `abBreite: 'xl'` vor. Dagegen steht der Kontext
+   * **Führungs-Tablet** aus der Bedien-Leitlinie: 1024–1280 px, und antds `xl` liegt bei
+   * 1200 — die Spalte verschwände also genau dort. `position` ist eine von nur zwei
+   * Schreib-Bedienungen dieser Seite, und es gibt keine Detailroute, auf die man sie
+   * verlagern könnte. Wer sie weghaben will, nimmt `spaltenAusVoreinstellung`; dann steht
+   * sie im Schalter, im Zähler, und ein Klick holt sie zurück.
+   */
+  const spalten = spaltenFuer<EinsatzPersonal>()([
     {
       title: 'Name',
       key: 'name',
+      immerSichtbar: true,
+      sortWert: (ep) => ep.name,
+      suchText: (ep) => ep.name,
+      // Der Deeplink der Fahrzeug-/Einheitsspalte wandert NICHT hierher: nur die
+      // Titelspalte dürfte `titel.ziel` tragen, und `personalPfad` zeigte auf DIESE Seite.
       render: (_, ep) => (
         <Space>
           {ep.name}
@@ -169,8 +208,14 @@ export default function PersonalPage() {
         </Space>
       ),
     },
-    { title: 'Funktion', dataIndex: 'funktion', key: 'funktion', render: (t) => t ?? '—' },
-    { title: 'Träger', dataIndex: 'traegerorganisation', key: 'traeger', render: (t) => t ?? '—' },
+    {
+      title: 'Funktion', dataIndex: 'funktion', key: 'funktion',
+      sortWert: (ep) => ep.funktion, suchText: (ep) => ep.funktion, render: (t) => t ?? '—',
+    },
+    {
+      title: 'Träger', dataIndex: 'traegerorganisation', key: 'traeger',
+      filter: traegerFilter, render: (t) => t ?? '—',
+    },
     {
       title: 'Fahrzeug',
       key: 'fahrzeug',
@@ -210,6 +255,12 @@ export default function PersonalPage() {
     {
       title: 'Status',
       key: 'status',
+      // Gefiltert wird über die KATEGORIE, nicht über `status_id`: die ID kommt aus dem
+      // Mandantenkatalog und filterte je Mandant anders — und passte nicht zu den Gruppen.
+      filter: {
+        werte: KATEGORIE_WERTE,
+        trifft: (ep, w) => kategorieVon(ep.status_kategorie) === w,
+      },
       render: (_, ep) =>
         darfSchreiben ? (
           <Select
@@ -238,19 +289,22 @@ export default function PersonalPage() {
         ),
     },
     ...(darfSchreiben
-      ? ([
+      ? [
           {
             title: 'Aktionen',
-            key: 'aktionen',
-            render: (_, ep: EinsatzPersonal) => (
+            key: 'aktionen' as const,
+            immerSichtbar: true,
+            render: (_: unknown, ep: EinsatzPersonal) => (
               <Popconfirm title="Aus Einsatz entfernen?" onConfirm={() => entfernenMutation.mutate(ep.id)}>
-                <Button danger>Entfernen</Button>
+                {/* Kein `danger`: Rot ist Gefahr, nicht Bedienung. Der zweite Handgriff
+                    aus Kriterium 4 ist die Rückfrage. */}
+                <Button>Entfernen</Button>
               </Popconfirm>
             ),
           },
-        ] as TableColumnsType<EinsatzPersonal>)
+        ]
       : []),
-  ];
+  ]);
 
   return (
     <EinsatzSeite
@@ -291,14 +345,50 @@ export default function PersonalPage() {
         )
       }
     >
-      <Table
-        rowKey="id"
-        loading={epQuery.isLoading}
-        dataSource={eps}
-        columns={spalten}
-        pagination={false}
-        rowClassName={(r) => (r.id === highlightId ? 'zeile-hervorgehoben' : '')}
-        locale={{ emptyText: 'Noch kein Personal disponiert' }}
+      {/* `titel` ohne `ziel`: `personalPfad` ist eine Query-Param-Selektion auf DIESE Seite,
+          der Link zeigte auf sich selbst — und er machte aus der Namenszelle in beiden
+          Zweigen einen Link, was die gepinnte LFH-139-Aussage „in dieser Zeile steht kein
+          Link" lautlos umdrehte. Die echten Fremd-Links (Fahrzeug, Einheit) bleiben in ihren
+          Zellen.
+
+          `zufluss` bleibt der Default `sammelbanner`: diese Seite trägt ZWEI Auswahlfelder
+          in der Zeile (Position, Status), eigener wie fremder Wechsel läuft über eine
+          Invalidierung. */}
+      <Datensicht
+        bezeichnung="Personal im Einsatz"
+        spalten={spalten}
+        daten={eps}
+        zeilenSchluessel="id"
+        ladend={epQuery.isLoading}
+        leerText="Noch kein Personal disponiert"
+        suche={{ platzhalter: 'Name, Funktion' }}
+        standardSortierung={{ spalte: 'name', richtung: 'auf' }}
+        spaltenAusVoreinstellung={['bemerkung']}
+        gruppen={{
+          schluessel: (ep) => kategorieVon(ep.status_kategorie),
+          etikett: kategorieEtikett,
+          reihenfolge: KATEGORIE_REIHENFOLGE,
+        }}
+        zeilenKlasse={(r) => (r.id === highlightId ? 'zeile-hervorgehoben' : undefined)}
+        karte={{
+          art: 'plan',
+          titel: { spalte: 'name' },
+          status: (ep) =>
+            ep.status_kategorie
+              ? {
+                  ...statusKategorie[ep.status_kategorie],
+                  label: ep.status_label ?? statusKategorie[ep.status_kategorie].label,
+                }
+              : null,
+          sekundaer: ['funktion', 'einheit', 'fahrzeug'],
+          aktion: darfSchreiben
+            ? {
+                etikett: 'Entfernen',
+                bestaetigung: 'Aus Einsatz entfernen?',
+                onKlick: (ep) => entfernenMutation.mutate(ep.id),
+              }
+            : undefined,
+        }}
       />
 
       <Modal

@@ -5,6 +5,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { setzeViewportBreite } from '../test/viewport';
 import { AuthProvider } from '../auth/AuthContext';
 import LageberichtePage from './LageberichtePage';
 import LageberichtDetailPage from './LageberichtDetailPage';
@@ -31,6 +32,27 @@ const bericht: LageberichtAnzeige = {
   aktualisiert_at: '2026-06-02 10:00:00', freigegeben_von_id: null, freigegeben_von_name: null,
   freigegeben_at: null, etb_eintrag_id: null,
 };
+
+/**
+ * FORTSCHREIBUNGSKETTE, additiv neben `bericht` angelegt (LFH-330 · B2, Bündel III):
+ * `bericht` wird von `setupDetail` über `lagebericht7Abschnitte` weiterverwendet, ein Umbau
+ * dort träfe die zehn Detailseiten-Tests dieser Datei mit.
+ *
+ * Zwei Fassungen mit identischem Titel — die Fortschreibung legt eine neue Zeile mit
+ * `version + 1` an, der Vorgänger bleibt freigegeben liegen.
+ *
+ * ABSICHTLICH AUFSTEIGEND, also GEGEN die Serverordnung (`zeitstand DESC, id DESC`): in
+ * Serverordnung wäre jede Sortierbehauptung unfälschbar grün und `standardSortierung`
+ * ungeprüft.
+ */
+const KETTE: LageberichtAnzeige[] = [
+  {
+    ...bericht, id: 14, titel: 'Vortrag Nachmittag', vorlage: 'lagebericht', version: 1,
+    status: 'freigegeben', zeitstand: '2026-06-02 09:00:00',
+  },
+  { ...bericht, id: 11, version: 1, status: 'freigegeben', zeitstand: '2026-06-02 10:00:00' },
+  { ...bericht, id: 13, version: 2, status: 'entwurf', zeitstand: '2026-06-02 12:00:00', vorgaenger_id: 11 },
+];
 
 function setup(berichte: LageberichtAnzeige[] = [bericht]) {
   server.use(
@@ -244,5 +266,81 @@ describe('LageberichtePage', () => {
   it('zeigt leeren Zustand ohne Berichte', async () => {
     setup([]);
     expect(await screen.findByText(/Noch keine Lageberichte/i)).toBeInTheDocument();
+  });
+
+  it('zeigt leeren Zustand ohne eigenen Leer-Knoten', async () => {
+    // WÄCHTER, kein Treiber: auch mit der alten Tabelle grün. Der Riss entsteht erst,
+    // wenn `leerText` WEGGELASSEN wird — dann greift der Fallback in `Liste.tsx` und
+    // rendert einen `.ant-empty`-Knoten (LFH-331/B3 verlangt null solcher Knoten).
+    const { container } = setup([]);
+    await screen.findByText(/Noch keine Lageberichte/i);
+    expect(container.querySelector('.ant-empty')).toBeNull();
+  });
+
+  it('macht die Fortschreibungskette als Kette lesbar (v-Nummer, Gruppen, Zähler)', async () => {
+    setup(KETTE);
+    const sicht = await screen.findByRole('region', { name: 'Lageberichte' });
+
+    // Zwei Karten mit demselben Titel — unterscheidbar nur über die v-Nummer.
+    const links = await screen.findAllByRole('link', { name: 'Lage 10:00' });
+    expect(links.map((l) => l.getAttribute('href'))).toEqual([
+      '/einsaetze/7/lageberichte/13',
+      '/einsaetze/7/lageberichte/11',
+    ]);
+    // Kein zweiter Anker im Titel-Link: der Link entsteht in `karte.titel.ziel`.
+    links.forEach((l) => expect(l.querySelector('a')).toBeNull());
+
+    expect(sicht).toHaveTextContent('v2');
+    expect(sicht).toHaveTextContent('v1');
+    // Exakter Text in eigenem Knoten; zwei Treffer, weil die Vorlage ein Merkmal der
+    // KETTE ist und die Fortschreibung sie unverändert kopiert.
+    expect(screen.getAllByText('Freier Bericht')).toHaveLength(2);
+
+    // Gruppenköpfe mit Zähler, Entwürfe zuerst (`gruppen.reihenfolge`). Trennzeichen und
+    // Zählerform gehören dem Primitiv → `[·(]` plus `toHaveTextContent` auf der Region.
+    expect(sicht).toHaveTextContent(/Entwürfe\s*[·(]\s*1/);
+    expect(sicht).toHaveTextContent(/Freigegeben\s*[·(]\s*2/);
+    const text = sicht.textContent ?? '';
+    expect(text.indexOf('Entwürfe')).toBeLessThan(text.indexOf('Freigegeben'));
+
+    // Gruppenachse führend, INNERHALB der Gruppe absteigend nach Zeitstand
+    // (`standardSortierung`). Nur an der aufsteigenden Fixture beweiskräftig: 11 (10:00)
+    // muss vor 14 (09:00) stehen, obwohl 14 zuerst geliefert wird.
+    expect(within(sicht).getAllByRole('link').map((l) => l.getAttribute('href'))).toEqual([
+      '/einsaetze/7/lageberichte/13',
+      '/einsaetze/7/lageberichte/11',
+      '/einsaetze/7/lageberichte/14',
+    ]);
+  });
+
+  it('bleibt in jeder Breite eine Kartensicht (form="karte", kein Breakpoint-Rückfall)', async () => {
+    setzeViewportBreite(390);
+    const schmal = setup(KETTE);
+    await screen.findAllByRole('link', { name: 'Lage 10:00' });
+    expect(schmal.container.querySelector('.ant-table')).toBeNull();
+    schmal.unmount();
+
+    setzeViewportBreite(1366);
+    const breit = setup(KETTE);
+    await screen.findAllByRole('link', { name: 'Lage 10:00' });
+    expect(breit.container.querySelector('.ant-table')).toBeNull();
+  });
+
+  it('filtert die Kartenliste über die Suche (Titel UND Vorlage)', async () => {
+    setup(KETTE);
+    await screen.findAllByRole('link', { name: 'Lage 10:00' });
+
+    // „zur Information" steht NUR im Vorlagen-Label, in keinem Titel — ein nur auf den
+    // Titel gelegter `suchText` wäre hier rot.
+    await userEvent.type(screen.getByPlaceholderText('Titel oder Vorlage'), 'zur Information');
+
+    expect(screen.queryAllByRole('link', { name: 'Lage 10:00' })).toHaveLength(0);
+    expect(screen.getByRole('link', { name: 'Vortrag Nachmittag' })).toBeInTheDocument();
+  });
+
+  it('trägt Überschrift und Kennzahlenzeile', async () => {
+    setup(KETTE);
+    expect(await screen.findByRole('heading', { name: 'Lageberichte', level: 3 })).toBeInTheDocument();
+    expect(await screen.findByText(/3 Berichte · 1 im Entwurf/)).toBeInTheDocument();
   });
 });

@@ -1,8 +1,7 @@
-import { App as AntApp, Breadcrumb, Button, Card, Input, Space, Statistic, Table, Tag, theme } from 'antd';
+import { App as AntApp, Breadcrumb, Button, Card, Input, Space, Statistic, Tag, theme } from 'antd';
 import type { GlobalToken } from 'antd';
 import { taktischeDtgVoll } from '../anzeige/format';
 import { Select } from '../components/Select';
-import type { ColumnsType } from 'antd/es/table';
 import { Link, useNavigate, useParams } from 'react-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -24,10 +23,12 @@ import {
   type FilterWerte,
   type MeldebildZeile,
   type Rohdaten,
-  type StatusVerteilung,
 } from '../kraefte/kraeftebild';
+import AmpelZelle from '../kraefte/AmpelZelle';
+import { KATEGORIE_WERTE } from '../kraefte/statusAchse';
 import { legeLageberichtAn, aktualisiereLagebericht } from '../api/lageberichte';
-import type { MaterialStatus } from '../api/types';
+import type { MaterialStatus, StatusKategorie } from '../api/types';
+import Datensicht, { spaltenFuer } from '../components/Datensicht';
 import StatusTag from '../components/StatusTag';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import EinsatzSeite from '../components/EinsatzSeite';
@@ -74,64 +75,69 @@ function achsenTrenner(token: GlobalToken) {
   );
 }
 
-/** Kurzform der Statusverteilung. Die Texte bleiben ABGEKÜRZT („geb.", „n.v.") — die
- *  vollen Vertragslabels würden die Statusspalte sprengen; der zweite Kanal ist
- *  vorhanden, nur enger gesetzt. `o.A.` ist keine Vertragskategorie, sondern die
- *  ABWESENHEIT eines Status und deshalb `neutral`. */
-function verteilungTags(v: StatusVerteilung | null) {
-  if (!v) return null;
-  return (
-    <Space size={abstand.xs}>
-      {v.verfuegbar > 0 && (
-        <StatusTag darstellung={{ ...statusKategorie.verfuegbar, label: `${v.verfuegbar} frei` }} />
-      )}
-      {v.gebunden > 0 && (
-        <StatusTag darstellung={{ ...statusKategorie.gebunden, label: `${v.gebunden} geb.` }} />
-      )}
-      {v.nicht_verfuegbar > 0 && (
-        <StatusTag
-          darstellung={{ ...statusKategorie.nicht_verfuegbar, label: `${v.nicht_verfuegbar} n.v.` }}
-        />
-      )}
-      {v.ohne > 0 && <StatusTag darstellung={{ rolle: 'neutral', label: `${v.ohne} o.A.` }} />}
-    </Space>
-  );
-}
-
-const spalten: ColumnsType<MeldebildZeile> = [
+/**
+ * Das Spaltenregister des Meldebilds (LFH-330 · B2, Teil 2 + 3).
+ *
+ * Bleibt Modul-Konstante: keine Spalte braucht `token` oder einen Hook — `AmpelZelle`
+ * holt ihre Farbe über CSS-Klassen. Ein `useMemo` im Rumpf wäre nur eine weitere
+ * Abhängigkeitsliste unter `--max-warnings 0`, ohne Gegenwert.
+ *
+ * Durch `spaltenFuer<MeldebildZeile>()` geführt, NICHT annotiert: eine Annotation weitet
+ * die Schlüsselliterale auf `string`, und der Kartenplan nähme danach jeden Tippfehler an.
+ *
+ * ── DIE AMPELZEILE HAT ZWEI EIGENE SPALTEN ──────────────────────────────────────
+ *
+ * Vorher trug die Statusspalte drei Rollen gleichzeitig: den Einzelstatus der Mittel, die
+ * Personalverteilung und die Fahrzeugverteilung — bis zu acht `Tag` in einem `Space` ohne
+ * `wrap` bei `width: 220`, unterschieden allein durch zwei Emoji. Und Werte gleich 0 fielen
+ * weg, wodurch zwei übereinanderliegende Zeilen einer VERGLEICHSTABELLE nicht mehr
+ * fluchteten (Prüflisten-Kriterium 14).
+ *
+ * Jetzt: „Personal" und „Fahrzeuge" als Spalten mit Textkopf, je eine kompakte Zählzeile
+ * mit vier Feldern in fester Folge. Der Volltext hängt als `title` daran, der Kurztext ist
+ * sichtbar — Farbe allein trägt keine Bedeutung (Kriterium 6).
+ *
+ * „Status" bleibt und wandert nach HINTEN: sie betrifft nur noch Blätter (`mittel`).
+ */
+const meldebildSpalten = spaltenFuer<MeldebildZeile>()([
   {
-    title: 'Bezeichnung', dataIndex: 'bezeichnung', key: 'bez',
+    title: 'Bezeichnung', dataIndex: 'bezeichnung', key: 'bez', immerSichtbar: true,
     render: (_t, z) => <span style={{ fontWeight: z.art === 'abschnitt' ? 600 : 400 }}>{z.bezeichnung}</span>,
   },
-  { title: 'Typ / Rolle', dataIndex: 'detail', key: 'detail', responsive: ['md'] },
+  // `abBreite` statt antds Breiten-Prop: nur so fließt das Verbergen in DENSELBEN Zähler
+  // wie die Handauswahl des Spaltenschalters — ein Zähler, der lügen kann, verfehlt sein Ziel.
+  { title: 'Typ / Rolle', dataIndex: 'detail', key: 'detail', abBreite: 'md' },
   {
     title: 'Stärke', key: 'staerke', width: 130,
     render: (_t, z) => (z.art === 'mittel' && z.mittelArt !== 'person') ? null : staerkeText(z.staerke),
   },
   {
+    title: 'Personal', key: 'personal', width: 190,
+    render: (_t, z) => <AmpelZelle bezeichnung="Personal" symbol="👤" verteilung={z.personalVerteilung} />,
+  },
+  {
+    title: 'Fahrzeuge', key: 'fahrzeuge', width: 190,
+    render: (_t, z) => <AmpelZelle bezeichnung="Fahrzeuge" symbol="🚒" verteilung={z.fahrzeugVerteilung} />,
+  },
+  {
     title: 'Status', key: 'status', width: 220,
     render: (_t, z) => {
-      if (z.art === 'mittel') {
-        if (z.mittelArt === 'material') {
-          const text = [z.statusLabel, z.menge != null ? `×${z.menge}` : null].filter(Boolean).join(' · ');
-          return text ? <Tag>{text}</Tag> : null;
-        }
-        // Ohne Kategorie gibt es keine Rolle — dann bleibt es beim farblosen Tag.
-        if (!z.statusKategorie) return <Tag>{z.statusLabel ?? '—'}</Tag>;
-        // Der mandantengepflegte `statusLabel` schlägt das Vertragslabel; vorher stand
-        // hier ersatzweise der ROHE Enum-String (`nicht_verfuegbar`).
-        const meta = statusKategorie[z.statusKategorie];
-        return <StatusTag darstellung={{ ...meta, label: z.statusLabel ?? meta.label }} />;
+      // Nur noch Blätter: die Aggregate der Abschnitts- und Einheitszeilen stehen in den
+      // zwei Spalten links davon.
+      if (z.art !== 'mittel') return null;
+      if (z.mittelArt === 'material') {
+        const text = [z.statusLabel, z.menge != null ? `×${z.menge}` : null].filter(Boolean).join(' · ');
+        return text ? <Tag>{text}</Tag> : null;
       }
-      return (
-        <Space size={8}>
-          <span>👤</span>{verteilungTags(z.personalVerteilung)}
-          <span>🚒</span>{verteilungTags(z.fahrzeugVerteilung)}
-        </Space>
-      );
+      // Ohne Kategorie gibt es keine Rolle — dann bleibt es beim farblosen Tag.
+      if (!z.statusKategorie) return <Tag>{z.statusLabel ?? '—'}</Tag>;
+      // Der mandantengepflegte `statusLabel` schlägt das Vertragslabel; vorher stand
+      // hier ersatzweise der ROHE Enum-String (`nicht_verfuegbar`).
+      const meta = statusKategorie[z.statusKategorie];
+      return <StatusTag darstellung={{ ...meta, label: z.statusLabel ?? meta.label }} />;
     },
   },
-];
+]);
 
 function alleKeys(zeilen: MeldebildZeile[]): string[] {
   return zeilen.flatMap((z) => [z.key, ...(z.children ? alleKeys(z.children) : [])]);
@@ -309,36 +315,72 @@ export default function KraefteuebersichtPage() {
             options={traeger.map((t) => ({ value: t, label: t }))}
             onChange={(v) => setFilter((f) => ({ ...f, traeger: v ?? null }))}
           />
+          {/* Die drei Optionen standen hier als Literale — dritte Kopie derselben Labels.
+              Sie kommen jetzt aus der einen Statusachse.
+
+              DER VIERTE EIMER BLEIBT DRAUSSEN, und das ist eine Entscheidung, keine
+              Auslassung: `FilterWerte.kategorie` ist `StatusKategorie | null`, und
+              `filtereKraefte` vergleicht `kat === f.kategorie`. Ein Filterwert `'ohne'`
+              träfe damit NIE eine Zeile — eine tote Option, die wie ein Filter aussieht.
+              Gruppieren nach vier Eimern (Fahrzeuge/Personal) und Filtern nach drei ist
+              hier kein Widerspruch, sondern die Grenze der Datenschicht. */}
           <Select
             placeholder="Status"
             allowClear
             style={{ minWidth: 160 }}
             value={filter.kategorie ?? undefined}
-            options={[
-              { value: 'verfuegbar' as const, label: 'verfügbar' },
-              { value: 'gebunden' as const, label: 'gebunden' },
-              { value: 'nicht_verfuegbar' as const, label: 'nicht verfügbar' },
-            ]}
+            options={KATEGORIE_WERTE.filter((w) => w.value !== 'ohne').map((w) => ({
+              value: w.value as StatusKategorie,
+              label: w.text,
+            }))}
             onChange={(v) => setFilter((f) => ({ ...f, kategorie: v ?? null }))}
           />
+          {/* Fluide statt `width: 220`: die Regel aus `feldbreiten.guard.test.ts` gilt auch
+              außerhalb seiner vier gescannten Bereiche (Grenze 3 desselben Guards). */}
           <Input.Search
             placeholder="Suche..."
             allowClear
-            style={{ width: 220 }}
+            style={{ flex: '1 1 220px', minWidth: 0, maxWidth: 320 }}
             value={filter.suche}
             onChange={(e) => setFilter((f) => ({ ...f, suche: e.target.value }))}
           />
         </Space>
       </Card>
-      <Table<MeldebildZeile>
-        columns={spalten} dataSource={bild.baum} pagination={false}
-        rowKey="key"
-        expandable={{
-          expandedRowKeys: expandedKeys,
-          onExpandedRowsChange: (keys) => setExpandedKeys([...keys]),
-          childrenColumnName: 'children',
-        }}
-        locale={{ emptyText: 'Keine Kräfte im Einsatz disponiert' }} />
+      {/* Das Meldebild läuft mit `form="tabelle"` — in JEDER Breite Tabelle, kein
+          Kartenzweig. Die Bedien-Leitlinie führt diese Seite als kanonisches „wird
+          verglichen: ja", und Prüflisten-Kriterium 14 verbietet dort die Auflösung in
+          Karten ausdrücklich. Das ist kein Ermessen, und es gibt kein `ohneFixierung`:
+          die fixierte menschenlesbare Kennung (Spalte 0) gehört zum selben Kriterium.
+
+          KEIN `suche`, KEIN Spaltenfilter, KEINE `gruppen`, KEINE `standardSortierung`.
+          Die Aggregate der Elternzeilen werden stromaufwärts über die VOLLMENGE kumuliert
+          (`addKategorie`), während `filtereKraefte` die Rohlisten filtert und den Baum neu
+          baut. Fiele im Primitiv eine Zeile weg, behielten die Eltern Zahlen über nicht
+          mehr sichtbare Kinder — die Ampelzahlen lügen still, und kein Test sähe es. Also
+          filtert das Modul (Filter-Card oben, außerhalb), `Datensicht` rendert.
+
+          `zufluss="sofort"` folgt der API-Spec §6 gegen den Plan-Entwurf. Begründung: die
+          Schleuse führt nur die WURZEL-Schlüsselfolge. Eine neue Disposition schiebt aber
+          eine Mittel-Zeile TIEF in den Baum — deren Position kennt die Schleuse nicht, der
+          erhoffte Schutz tritt also gar nicht ein, und ein Sammelbanner erschiene für einen
+          Zufluss, der oben nie ankommt. Diese Fläche trägt zudem keine Bedienelemente in
+          der Zeile; das Kriterium-12-Risiko liegt bei Fahrzeugen und Personal.
+
+          `handleDrucken` bleibt in `aktionen` und wandert NICHT in `werkzeuge` (Abweichung
+          von Spec §6): `kraefteuebersichtPrint.css` markiert über `.kraefte-no-print`, und
+          ein Knoten innerhalb von `Datensicht` ist nicht markierbar — `DatensichtProps`
+          nimmt kein `className`. */}
+      <Datensicht
+        bezeichnung="Meldebild"
+        form="tabelle"
+        spalten={meldebildSpalten}
+        daten={bild.baum}
+        zeilenSchluessel="key"
+        leerText="Keine Kräfte im Einsatz disponiert"
+        baum={{ kinder: 'children', aufgeklappt: expandedKeys, onAufgeklappt: setExpandedKeys }}
+        zufluss="sofort"
+        karte={{ art: 'plan', titel: { spalte: 'bez' }, sekundaer: ['detail', 'staerke', 'status'] }}
+      />
       </EinsatzSeite>
     </div>
   );

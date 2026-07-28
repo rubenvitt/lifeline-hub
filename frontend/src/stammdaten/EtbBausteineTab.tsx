@@ -64,7 +64,6 @@ export default function EtbBausteineTab() {
         loading={query.isLoading}
         dataSource={query.data ?? []}
         columns={spalten}
-        pagination={false}
         locale={{ emptyText: 'Keine Bausteine' }}
       />
       <EtbBausteinFormModal offen={modalOffen} baustein={bearbeite} onClose={() => setModalOffen(false)} />

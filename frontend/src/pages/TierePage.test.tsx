@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
+import { setzeViewportBreite } from '../test/viewport';
 import { renderMitProviders } from '../test/utils';
 import { AuthProvider } from '../auth/AuthContext';
 import TierePage from './TierePage';
@@ -44,6 +45,15 @@ const tierBasis: Tier = {
 };
 const tierVermisst: Tier = { ...tierBasis, id: 11, registrier_nr: 2, status: 'vermisst', spezies: 'katze', rufname: 'Mimi' };
 
+/**
+ * Zeilenfolge der T-Nummern in Dokumentordnung. Die FOLGE ist die belastbare Behauptung —
+ * ein gerenderter Zeitstring hinge an der Zeitzone des Testrechners, weil
+ * `renderMitProviders` keinen `EinsatzAnzeigeProvider` einhängt.
+ */
+function regFolge(): string[] {
+  return screen.getAllByText(/^T-\d{3}$/).map((e) => e.textContent ?? '');
+}
+
 function render(einsatzObj: typeof einsatzAktiv, tiere: Tier[]) {
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
@@ -82,7 +92,11 @@ describe('TierePage', () => {
   it('filtert nach Spezies', async () => {
     render(einsatzAktiv, [tierBasis, { ...tierBasis, id: 12, registrier_nr: 3, spezies: 'katze', rufname: 'Felix' }]);
     await screen.findByText('Rex');
-    await userEvent.click(screen.getByRole('combobox'));
+    // Namensfilter, nicht „die einzige Combobox der Seite": die Werkzeugzeile von
+    // `Datensicht` kann ein zweites Combobox-artiges Element mitbringen (Spaltenschalter,
+    // Spaltenfilter). Ohne den Namen bräche diese Zeile aus einem Grund, der mit Tieren
+    // nichts zu tun hat.
+    await userEvent.click(screen.getByRole('combobox', { name: 'Spezies' }));
     // Tabellenzelle und Dropdown-Option tragen beide "Katze" → auf die Option im Dropdown zielen.
     const katzeOption = (await screen.findAllByText('Katze')).find((el) => el.closest('.ant-select-item-option'));
     expect(katzeOption).toBeTruthy();
@@ -134,6 +148,87 @@ describe('TierePage', () => {
     await userEvent.click((await screen.findAllByText('Rex'))[0]);
     // Drawer entfernt (LFH-147) → Zeilen-Klick navigiert auf /tiere/:tierId.
     expect(await screen.findByText('DETAIL-SEITE')).toBeInTheDocument();
+  });
+
+  it('sortiert die Liste selbst, statt die Lieferreihenfolge zu übernehmen', async () => {
+    // AUFSTEIGEND geliefert, obwohl das Backend `ORDER BY t.registrier_nr DESC` fährt
+    // (`src/tier/repo.rs`): nur so beweist die absteigende Zeilenfolge, dass die Umkehrung
+    // im Client passiert. In Backend-Reihenfolge geliefert könnte dieser Test nicht
+    // fehlschlagen.
+    const drei = [
+      tierBasis,
+      { ...tierBasis, id: 21, registrier_nr: 2, rufname: 'Bello' },
+      { ...tierBasis, id: 22, registrier_nr: 3, rufname: 'Cleo' },
+    ];
+    render(einsatzAktiv, drei);
+    await vi.waitFor(() => expect(regFolge()).toHaveLength(3));
+    expect(regFolge()).toEqual(['T-003', 'T-002', 'T-001']);
+  });
+
+  it('zeigt „seit" aus dem Erfassungszeitpunkt und sortiert danach', async () => {
+    /**
+     * Für Tiere gibt es KEINE Dringlichkeitssortierung: `TierAnzeige` trägt weder
+     * Sichtungskategorie noch Sichtungszeitpunkt (verifiziert am generierten Typ, die
+     * Rust-Doku nennt das Modul „bewusst schlank"). „seit" kommt deshalb aus `erfasst_at`;
+     * `geaendert_at` wäre falsch, weil es bei jeder Notiz weiterläuft.
+     *
+     * Der Klick auf den Spaltenkopf ist die tragende Hälfte. Gemessen: eine Prüfung, die nur
+     * Kopf und Zellmuster sieht, blieb grün, als der `sortWert` der Spalte entfiel UND als
+     * der Kopf umbenannt wurde — sie belegte also weder Sortierbarkeit noch Beschriftung.
+     *
+     * Die Zeitstempel liegen ABSICHTLICH quer zur Registriernummer, sonst wäre die
+     * Zeitsortierung von der Nummernsortierung nicht zu unterscheiden. Und sie sind
+     * verschieden: alle Bestandsfixtures teilen `erfasst_at`, eine Behauptung darüber wäre
+     * dort eine Attrappe.
+     */
+    const drei = [
+      { ...tierBasis, id: 30, registrier_nr: 1, rufname: 'Alt', erfasst_at: '2026-05-29 07:00:00' },
+      { ...tierBasis, id: 31, registrier_nr: 2, rufname: 'Neu', erfasst_at: '2026-05-29 12:00:00' },
+      { ...tierBasis, id: 32, registrier_nr: 3, rufname: 'Mitte', erfasst_at: '2026-05-29 09:00:00' },
+    ];
+    render(einsatzAktiv, drei);
+    await vi.waitFor(() => expect(regFolge()).toHaveLength(3));
+    // Muster statt Fixwert: ohne `EinsatzAnzeigeProvider` rendert die Zeit in der Zeitzone
+    // des Testrechners.
+    const dtg = screen
+      .getAllByText(/^\d{6}(JAN|FEB|MÄR|APR|MAI|JUN|JUL|AUG|SEP|OKT|NOV|DEZ)2026$/)
+      .map((e) => e.textContent);
+    expect(dtg).toHaveLength(3);
+    // DREI VERSCHIEDENE Werte. Gemessen als Lücke: die Fixtures teilen `geaendert_at`, also
+    // blieb ein `render` auf dem falschen Feld grün, solange nur das Format geprüft wurde.
+    expect(new Set(dtg).size).toBe(3);
+    // Vorgabe ist die Nummer, absteigend …
+    expect(regFolge()).toEqual(['T-003', 'T-002', 'T-001']);
+    // … und ein Klick auf den seit-Kopf ordnet nach Zeit, ältestes zuerst.
+    await userEvent.click(screen.getByRole('columnheader', { name: 'seit' }));
+    expect(regFolge()).toEqual(['T-001', 'T-003', 'T-002']);
+  });
+
+  it('trägt „seit" auch in den Kartenzweig bei 390 px', async () => {
+    /**
+     * Ohne diesen Fall belegte das Bündel die Zeitachse NUR für die Tabelle. Unter `md`
+     * rendert `Datensicht` genau einen anderen Zweig, und dort kommt die Zeit aus dem
+     * `sekundaer`-Tupel des Kartenplans — ein dort fehlender Slot wäre in jeder
+     * Tabellenprüfung unsichtbar.
+     *
+     * Die Breite VOR dem Rendern setzen: antds Beobachter ruft seinen Zuhörer beim
+     * Abonnieren synchron auf und liest dabei nur den Trefferstand.
+     */
+    setzeViewportBreite(390);
+    const schmal = render(einsatzAktiv, [tierBasis]);
+    await screen.findByRole('region', { name: 'Tiere im Einsatz' });
+    // Genau EIN Zweig im Baum — sonst wäre die Aussage darüber, welcher gilt, wertlos.
+    expect(schmal.container.querySelector('.ant-table')).toBeNull();
+    // Etikett UND Wert: das Etikett ist der zweite Kanal der Karte.
+    expect(screen.getByText('seit')).toBeInTheDocument();
+    expect(
+      screen.getByText(/^\d{6}(JAN|FEB|MÄR|APR|MAI|JUN|JUL|AUG|SEP|OKT|NOV|DEZ)2026$/),
+    ).toBeInTheDocument();
+    // Das Tastaturziel der Zeile ist der Titel-Link, nicht die Kartenfläche.
+    expect(screen.getByRole('link', { name: 'T-001' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/tiere/10',
+    );
   });
 
   it('zeigt die Halter-R-Nr und „storniert" aus den Join-Feldern', async () => {

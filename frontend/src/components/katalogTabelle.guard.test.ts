@@ -48,7 +48,7 @@ const SRC = (() => {
  * arbeitet auf einem serverseitigen 100-Zeilen-Fenster. Ihre Aufnahme ist ein benannter
  * Restposten (LFH-330 · AP8), kein stiller Nebeneffekt.
  */
-const KATALOGTABELLEN = [
+const KATALOGE = [
   'stammdaten/QualifikationenTab.tsx',
   'stammdaten/SprechgruppenTab.tsx',
   'stammdaten/FahrzeugeTab.tsx',
@@ -62,6 +62,14 @@ const KATALOGTABELLEN = [
   'karten/OnlineQuellenVerwaltung.tsx',
   'karten/OfflineKartenVerwaltung.tsx',
   'pages/BenutzerPage.tsx',
+];
+
+/**
+ * Die sechs Nachzügler des Überlaufschutzes. Getrennt gehalten, weil eine Zusicherung nur
+ * für die Kataloge gilt (die Blätterungsschwelle unten) — eine flache 19er-Liste könnte das
+ * nicht ausdrücken, ohne die sechs mitzuverpflichten.
+ */
+const UEBERLAUF_NACHZUG = [
   'pages/bereitstellungsraum/BereitstellungsraeumePage.tsx',
   'pages/UnfallhilfsstellenPage.tsx',
   'pages/SchaedenPage.tsx',
@@ -69,6 +77,8 @@ const KATALOGTABELLEN = [
   'pages/uhs/MaterialTab.tsx',
   'pages/MitgliederAbschnitt.tsx',
 ];
+
+const KATALOGTABELLEN = [...KATALOGE, ...UEBERLAUF_NACHZUG];
 
 /** Entfernt Zeilen- und Blockkommentare, Block-Zustand über Zeilengrenzen getragen. */
 function ohneKommentare(quelle: string): string {
@@ -135,6 +145,31 @@ describe('KatalogTabelle-Inventar', () => {
     expect(treffer(primitiv, SCROLL_MUSTER)).toBe(1);
     expect(treffer(primitiv, /\bsticky\b/g)).toBeGreaterThan(0);
     expect(treffer(primitiv, /fixed: 'left'/g)).toBe(1);
+  });
+
+  it('die Blätterungsschwelle der Kataloge hat lebende Konsumenten', () => {
+    /**
+     * Ohne diese Zusicherung ist `BLAETTER_SCHWELLE` eine Attrappe: das Primitiv blättert
+     * ab fünfzig Zeilen, aber ein Aufrufer mit `pagination={false}` schaltet das ab — und
+     * zwar lautlos, weil abgeschaltete Blätterung genauso aussieht wie eine Liste unter der
+     * Schwelle. Gemessen war das der Zustand direkt nach der Einführung: zwanzig Konsumenten,
+     * zwanzig Abschaltungen, null Wirkung.
+     *
+     * Nur die dreizehn Kataloge sind verpflichtet. Die sechs Nachzügler des Überlaufschutzes
+     * dürfen weiter abschalten — dort ist Blätterung fachlich nicht bestellt (Audit-Protokoll,
+     * Abschnitts-Mitglieder), und `components/Datensicht.tsx` schaltet sie mit eigener,
+     * im Code hinterlegter Begründung ab: eine Seitenblätterung schnitte die Zeilenschleuse
+     * entzwei, und Kriterium 12 hat Vorrang.
+     */
+    const abgeschaltet = QUELLEN.filter(
+      (q) => KATALOGE.includes(q.pfad) && /pagination=\{false\}/.test(q.text),
+    );
+    expect(abgeschaltet.map((q) => q.pfad)).toEqual([]);
+
+    const primitiv = ohneKommentare(
+      readFileSync(join(SRC, 'components', 'KatalogTabelle.tsx'), 'utf8'),
+    );
+    expect(primitiv).toContain('BLAETTER_SCHWELLE');
   });
 
   it('der Scanner findet die verbotenen Formen wirklich (Selbstbeweis)', () => {

@@ -539,7 +539,14 @@ export const personenSpalten = spaltenFuer<Person>()([
     render: (t) => t ?? '—' },
 ]);
 
-export const personenKarte = (einsatzId: number): Kartenplan<Person, PersonenSpaltenKey> => ({
+// KORREKTUR (bei der Umsetzung gemessen, LFH-330): der Rückgabetyp ist der PLAN-ZWEIG,
+// nicht der Verbundtyp. Ein `Kartenplan<…>` lässt sich nicht spreizen — `{ ...personenKarte(id),
+// aktion: … }` ergibt TS2322, weil der Spread die `art`-Unterscheidung verliert und TypeScript
+// `aktion` gegen den `art: 'eigen'`-Zweig prüft, der sie nicht kennt. Betrifft jede Helferfunktion,
+// deren Ergebnis später um einen Slot ergänzt wird.
+type KartenPlanZweig<T, K extends string> = Extract<Kartenplan<T, K>, { art: 'plan' }>;
+
+export const personenKarte = (einsatzId: number): KartenPlanZweig<Person, PersonenSpaltenKey> => ({
   art: 'plan',
   titel: { spalte: 'reg', ziel: (p) => personDetailPfad(einsatzId, p.id) },
   sekundaer: ['name', 'sk', 'seit'],

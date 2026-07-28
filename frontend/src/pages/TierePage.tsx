@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Space, Spin, Table, Tabs, Tag, Typography, type TableColumnsType } from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Space, Spin, Tabs, Tag, Typography } from 'antd';
 import { Select } from '../components/Select';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -9,7 +9,10 @@ import { useAuth } from '../auth/AuthContext';
 import { legeTierAn, listeTiere, tierRegistrierAnzeige, type TierEingabe } from '../api/einsatzTier';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
+import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensicht';
+import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { tiereDetailPfad } from '../routing/deeplinks';
+import { filterTiere, type TiereSicht } from './tiere/tierHelfer';
 import type { Spezies, Tier, TierStatus } from '../api/types';
 
 const STATUS_META: Record<TierStatus, { label: string; color: string }> = {
@@ -25,7 +28,7 @@ const SPEZIES_META: Record<Spezies, string> = {
 const SPEZIES_KEYS = Object.keys(SPEZIES_META) as Spezies[];
 
 /** Status-Sichten: 'alle' = kein Filter; sonst Status-Filter. */
-type Sicht = 'aktiv' | 'vermisst' | 'abgeschlossen' | 'alle';
+type Sicht = TiereSicht;
 const SICHTEN: { key: Sicht; label: string }[] = [
   { key: 'aktiv', label: 'Aktiv' },
   { key: 'vermisst', label: 'Vermisst' },
@@ -33,10 +36,17 @@ const SICHTEN: { key: Sicht; label: string }[] = [
   { key: 'alle', label: 'Alle' },
 ];
 
+/** Registriernummer des Halters in Anzeigeschreibweise, oder `null`. */
+function halterNummer(t: Tier): string | null {
+  return t.halter_registrier_nr != null
+    ? `R-${String(t.halter_registrier_nr).padStart(3, '0')}`
+    : null;
+}
+
 /** Halter-Kurzanzeige für die Liste. */
 function halterAnzeige(t: Tier): React.ReactNode {
-  if (t.halter_registrier_nr != null) {
-    const label = `R-${String(t.halter_registrier_nr).padStart(3, '0')}`;
+  const label = halterNummer(t);
+  if (label != null) {
     return t.halter_storniert_at
       ? <Typography.Text type="secondary">Halter (storniert): {label}</Typography.Text>
       : <Tag color="blue">{label}</Tag>;
@@ -44,6 +54,96 @@ function halterAnzeige(t: Tier): React.ReactNode {
   if (t.halter_kontakt) return <Typography.Text>{t.halter_kontakt}</Typography.Text>;
   return <Typography.Text type="secondary">unbekannt</Typography.Text>;
 }
+
+/**
+ * Das EINE Spaltenregister der Tierliste (LFH-330 · B2). Modulkonstante, weil kein `render`
+ * Komponentenzustand liest — und durch `spaltenFuer<Tier>()` geführt, nie annotiert: eine
+ * Annotation weitete die Schlüsselliterale auf `string`, und der Kartenplan nähme danach
+ * jeden Tippfehler unbemerkt an.
+ */
+const tierSpalten = spaltenFuer<Tier>()([
+  {
+    title: 'Reg.-Nr.',
+    key: 'reg',
+    width: 90,
+    immerSichtbar: true,
+    // Über die ZAHL sortiert — über den Text läge „T-10" vor „T-9".
+    sortWert: (t) => t.registrier_nr,
+    suchText: (t) => tierRegistrierAnzeige(t.registrier_nr),
+    // KEIN Anker: den Titel-Link setzt der Kartenplan über `titel.ziel`, in beiden Zweigen.
+    render: (_, t) => <Typography.Text strong>{tierRegistrierAnzeige(t.registrier_nr)}</Typography.Text>,
+  },
+  {
+    title: 'Status',
+    key: 'status',
+    width: 130,
+    render: (_, t) => <Tag color={STATUS_META[t.status].color}>{STATUS_META[t.status].label}</Tag>,
+  },
+  { title: 'Spezies', key: 'spezies', width: 120, render: (_, t) => SPEZIES_META[t.spezies] },
+  {
+    title: 'Rufname',
+    key: 'rufname',
+    suchText: (t) => t.rufname,
+    render: (_, t) => t.rufname ?? <Typography.Text type="secondary">—</Typography.Text>,
+  },
+  {
+    title: 'Rasse',
+    dataIndex: 'rasse_beschreibung',
+    key: 'rasse',
+    abBreite: 'lg',
+    suchText: (t) => t.rasse_beschreibung,
+    render: (r) => r ?? '—',
+  },
+  {
+    title: 'Halter',
+    key: 'halter',
+    // Beide Halter-Wege tragen zur Suche bei: die verknüpfte Person über ihre R-Nummer, der
+    // frei erfasste Kontakt über seinen Text.
+    suchText: (t) => halterNummer(t) ?? t.halter_kontakt,
+    render: (_, t) => halterAnzeige(t),
+  },
+  {
+    title: 'seit',
+    key: 'seit',
+    /**
+     * ABWEICHUNG von der Personenliste, und sie ist keine Nachlässigkeit: `TierAnzeige`
+     * trägt weder Sichtungskategorie noch Sichtungszeitpunkt (verifiziert am generierten
+     * Typ; die Rust-Doku nennt das Modul „bewusst schlank — keine Sichtungskette wie bei
+     * Personen"). Für Tiere gibt es deshalb KEINE Dringlichkeitssortierung, sondern nur
+     * „seit" aus `erfasst_at`.
+     *
+     * `geaendert_at` wäre der naheliegende und falsche Griff: es läuft bei jeder Notiz
+     * weiter und beantwortet „wann wurde der Satz zuletzt angefasst", nicht „seit wann ist
+     * das Tier erfasst".
+     *
+     * Keine Breitenschwelle: die Zeitachse ist der Zweck dieser Änderung, und eine Spalte,
+     * die schon unter 1200 px verschwindet, wäre in jeder jsdom-Prüfung abwesend.
+     */
+    sortWert: (t) => t.erfasst_at,
+    render: (_, t) => <ZeitAnzeige wert={t.erfasst_at} />,
+  },
+  {
+    title: 'Antreffort',
+    dataIndex: 'antreff_ort',
+    key: 'antreff_ort',
+    abBreite: 'xl',
+    render: (t) => t ?? '—',
+  },
+]);
+
+type TierSpaltenKey = (typeof tierSpalten)[number]['key'];
+
+/**
+ * Kartenplan der Tierliste. KEIN `status`-Slot: `TierStatus` steht nicht im
+ * A2-Statusfarbvertrag (`theme/statusFarben.ts` führt diese Seite ausdrücklich als bewusst
+ * draußen), und ihn hineinzuziehen wäre der von A2 verbotene Bestands-Sweep. Der Status
+ * steht deshalb als Sekundärfeld — mit Etikett, also mit zweitem Kanal.
+ */
+const tierKarte = (einsatzId: number): Kartenplan<Tier, TierSpaltenKey> => ({
+  art: 'plan',
+  titel: { spalte: 'reg', ziel: (t) => tiereDetailPfad(einsatzId, t.id) },
+  sekundaer: ['rufname', 'status', 'seit'],
+});
 
 export default function TierePage() {
   const { id } = useParams();
@@ -85,28 +185,7 @@ export default function TierePage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   const alle = tiereQuery.data ?? [];
-  const tiere = alle
-    .filter((t) => sicht === 'alle' || t.status === sicht)
-    .filter((t) => !speziesFilter || t.spezies === speziesFilter);
-
-  const spalten: TableColumnsType<Tier> = [
-    {
-      title: 'Reg.-Nr.', key: 'reg', width: 90,
-      render: (_, t) => <Typography.Text strong>{tierRegistrierAnzeige(t.registrier_nr)}</Typography.Text>,
-    },
-    {
-      title: 'Status', key: 'status', width: 130,
-      render: (_, t) => <Tag color={STATUS_META[t.status].color}>{STATUS_META[t.status].label}</Tag>,
-    },
-    { title: 'Spezies', key: 'spezies', width: 120, render: (_, t) => SPEZIES_META[t.spezies] },
-    {
-      title: 'Rufname', key: 'rufname',
-      render: (_, t) => t.rufname ?? <Typography.Text type="secondary">—</Typography.Text>,
-    },
-    { title: 'Rasse', dataIndex: 'rasse_beschreibung', key: 'rasse', render: (r) => r ?? '—' },
-    { title: 'Halter', key: 'halter', render: (_, t) => halterAnzeige(t) },
-    { title: 'Antreffort', dataIndex: 'antreff_ort', key: 'antreff_ort', render: (t) => t ?? '—' },
-  ];
+  const tiere = filterTiere(alle, { sicht, spezies: speziesFilter });
 
   return (
     <div>
@@ -131,7 +210,10 @@ export default function TierePage() {
 
       <Space wrap style={{ marginBottom: 12 }}>
         <Typography.Text type="secondary">Spezies:</Typography.Text>
-        <Select<Spezies | undefined> allowClear placeholder="alle" style={{ width: 180 }}
+        {/* `aria-label`, weil die `Typography.Text` daneben kein `<label>` ist (kein `htmlFor`,
+            keine Umschließung): ohne ihn hat das Feld keinen zugänglichen Namen und ist nur
+            solange eindeutig auffindbar, wie es die einzige Combobox der Seite ist. */}
+        <Select<Spezies | undefined> aria-label="Spezies" allowClear placeholder="alle" style={{ width: 180 }}
           value={speziesFilter} onChange={(v) => setSpeziesFilter(v)}
           options={SPEZIES_KEYS.map((k) => ({ value: k, label: SPEZIES_META[k] }))} />
       </Space>
@@ -140,14 +222,20 @@ export default function TierePage() {
         <Alert style={{ marginBottom: 12 }} type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
       )}
 
-      <Table
-        rowKey="id"
-        loading={tiereQuery.isLoading}
-        dataSource={tiere}
-        columns={spalten}
-        pagination={false}
-        locale={{ emptyText: 'Keine Tiere in dieser Sicht' }}
-        onRow={(t) => ({ onClick: () => navigate(tiereDetailPfad(einsatzId, t.id)), style: { cursor: 'pointer' } })}
+      <Datensicht
+        bezeichnung="Tiere im Einsatz"
+        spalten={tierSpalten}
+        daten={tiere}
+        zeilenSchluessel="id"
+        ladend={tiereQuery.isLoading}
+        leerText="Keine Tiere in dieser Sicht"
+        suche={{ platzhalter: 'T-Nr., Rufname, Rasse' }}
+        // Spiegelt die Backend-Ordnung (`ORDER BY t.registrier_nr DESC`): das jüngste Tier
+        // oben. Die Sortierung liegt jetzt trotzdem im Client — der Sortierpfeil der Spalte
+        // dreht sie um, ohne einen Nachladevorgang.
+        standardSortierung={{ spalte: 'reg', richtung: 'ab' }}
+        onZeileKlick={(t) => navigate(tiereDetailPfad(einsatzId, t.id))}
+        karte={tierKarte(einsatzId)}
       />
 
       <Modal

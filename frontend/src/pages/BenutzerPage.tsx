@@ -144,7 +144,6 @@ export default function BenutzerPage() {
         dataSource={benutzerListe}
         columns={spalten}
         locale={{ emptyText: 'Noch keine Benutzer' }}
-        pagination={false}
       />
 
       <Modal

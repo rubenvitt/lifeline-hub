@@ -6,6 +6,8 @@ import {
   MELDUNG_STATUS,
   NACHFORDERUNG_STATUS,
   ERINNERUNG_STATUS,
+  BEFEHL_STATUS,
+  LAGEBERICHT_STATUS,
   istAbgeschlossen,
   type KommPhase,
 } from './phase';
@@ -54,6 +56,24 @@ describe('Status-Deskriptoren', () => {
     expect(ERINNERUNG_STATUS.offen).toEqual({ label: 'Offen', phase: 'offen' });
     expect(ERINNERUNG_STATUS.erledigt).toEqual({ label: 'Erledigt', phase: 'abgeschlossen' });
     expect(ERINNERUNG_STATUS.quittiert).toEqual({ label: 'Quittiert', phase: 'abgeschlossen' });
+  });
+
+  it('BEFEHL/LAGEBERICHT mappen entwurf→offen, freigegeben→abgeschlossen', () => {
+    expect(BEFEHL_STATUS.entwurf).toEqual({ label: 'Entwurf', phase: 'offen' });
+    expect(BEFEHL_STATUS.freigegeben).toEqual({ label: 'Freigegeben', phase: 'abgeschlossen' });
+    // Eine Achse, zwei Module: `BefehlStatus` und `LageberichtStatus` sind beide
+    // 'entwurf' | 'freigegeben' (api/types.generated.ts). Zwei divergierende Maps wären
+    // ein Fehler, den nur diese Zeile sieht.
+    expect(LAGEBERICHT_STATUS).toEqual(BEFEHL_STATUS);
+  });
+
+  it('reproduziert die Bestandsfarben der beiden Listen', () => {
+    // Vor LFH-330/B2 gaben BefehlListe und LageberichtePage `green` für freigegeben und
+    // `default` sonst. Diese Zeilen pinnen „kein sichtbarer Farbwechsel gegen vorher"
+    // gegen PHASE_META, statt es zu behaupten — es gibt keinen
+    // Vollständigkeits-Guard über die Deskriptor-Menge.
+    expect(PHASE_META[BEFEHL_STATUS.entwurf.phase].color).toBe('default');
+    expect(PHASE_META[BEFEHL_STATUS.freigegeben.phase].color).toBe('success');
   });
 });
 

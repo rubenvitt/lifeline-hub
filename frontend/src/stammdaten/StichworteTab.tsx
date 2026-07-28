@@ -82,7 +82,6 @@ export default function StichworteTab() {
         dataSource={vorschlaege}
         columns={spalten}
         locale={{ emptyText: 'Noch keine Stichworte' }}
-        pagination={false}
       />
 
       {istAdmin && (

@@ -86,7 +86,6 @@ export default function FahrzeugeTab() {
         dataSource={fahrzeugeQuery.data ?? []}
         columns={spalten}
         locale={{ emptyText: 'Noch keine Fahrzeuge' }}
-        pagination={false}
       />
       <FahrzeugFormModal
         offen={modalOffen}

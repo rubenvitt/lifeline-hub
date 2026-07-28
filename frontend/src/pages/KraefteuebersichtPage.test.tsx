@@ -1,10 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter, Routes, Route } from 'react-router';
-import { App as AntApp } from 'antd';
+import { screen, within, fireEvent, waitFor } from '@testing-library/react';
+import { renderMitProviders } from '../test/utils';
+import { setzeViewportBreite } from '../test/viewport';
 import KraefteuebersichtPage from './KraefteuebersichtPage';
-import { AuthProvider } from '../auth/AuthContext';
+import { Routes, Route } from 'react-router';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
@@ -20,7 +22,9 @@ vi.mock('../api/einsatzPersonal', () => ({ listeEinsatzPersonal: vi.fn() }));
 vi.mock('../api/einsatzFahrzeuge', () => ({ listeEinsatzFahrzeuge: vi.fn() }));
 vi.mock('../api/einsatzMaterial', () => ({ listeEinsatzMaterial: vi.fn() }));
 vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn() }));
-vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: vi.fn() }));
+// Der frühere `vi.mock('../live/useEinsatzLiveStream')` ist entfallen: die Seite importiert
+// den Hook nicht (0 Treffer). Die Aussage dahinter — diese Fläche hat KEINEN eigenen
+// Stream, sie hängt an den sechs Queries oben — steht jetzt am Zufluss-Kommentar der Seite.
 vi.mock('../api/lageberichte', () => ({
   legeLageberichtAn: vi.fn(() => Promise.resolve({ id: 99 })),
   aktualisiereLagebericht: vi.fn(() => Promise.resolve({})),
@@ -74,8 +78,11 @@ const FAHRZEUG_F1 = {
   aktueller_br_id: null, soll_besatzung: null,
 };
 
+let drucke: ReturnType<typeof vi.fn>;
+
 beforeEach(() => {
-  vi.stubGlobal('print', vi.fn());
+  drucke = vi.fn();
+  vi.stubGlobal('print', drucke);
   vi.mocked(ladeEinsatz).mockResolvedValue(EINSATZ);
   vi.mocked(listeEinheiten).mockResolvedValue([]);
   vi.mocked(listeEinsatzPersonal).mockResolvedValue([]);
@@ -84,19 +91,28 @@ beforeEach(() => {
   vi.mocked(listeAbschnitte).mockResolvedValue([]);
 });
 
+/**
+ * Auf `renderMitProviders` gehoben (vorher rohes `render` mit selbstgebauten Providern,
+ * OHNE `ConfigProvider`). Ohne ihn ist jede Aussage über einen Zweig oder über die
+ * Dichte-/Höhenachse von `Datensicht` unerreichbar, weil `theme.useToken()` dann auf
+ * antd-Defaults statt auf die Anwendungskonfiguration fällt. Die eigene
+ * `AuthProvider`-Schachtel entfällt — `renderMitProviders` bringt sie mit, zweimal
+ * verschachtelt lädt sie zweimal.
+ */
 function setup() {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={qc}>
-      <AntApp>
-        <AuthProvider>
-          <MemoryRouter initialEntries={['/einsaetze/1/kraefteuebersicht']}>
-            <Routes><Route path="/einsaetze/:id/kraefteuebersicht" element={<KraefteuebersichtPage />} /></Routes>
-          </MemoryRouter>
-        </AuthProvider>
-      </AntApp>
-    </QueryClientProvider>,
+  return renderMitProviders(
+    <Routes>
+      <Route path="/einsaetze/:id/kraefteuebersicht" element={<KraefteuebersichtPage />} />
+    </Routes>,
+    { route: '/einsaetze/1/kraefteuebersicht' },
   );
+}
+
+/** Fixture mit Abschnitt → Einheit → Fahrzeug, also allen drei Zeilenarten. */
+function mitBaum() {
+  vi.mocked(listeAbschnitte).mockResolvedValue([ABSCHNITT_A1]);
+  vi.mocked(listeEinheiten).mockResolvedValue([EINHEIT_E10]);
+  vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([FAHRZEUG_F1]);
 }
 
 describe('KraefteuebersichtPage', () => {
@@ -114,9 +130,7 @@ describe('KraefteuebersichtPage', () => {
   });
 
   it('rendert Abschnitt, Einheit und Einzelmittel als aufklappbare Zeilen', async () => {
-    vi.mocked(listeAbschnitte).mockResolvedValue([ABSCHNITT_A1]);
-    vi.mocked(listeEinheiten).mockResolvedValue([EINHEIT_E10]);
-    vi.mocked(listeEinsatzFahrzeuge).mockResolvedValue([FAHRZEUG_F1]);
+    mitBaum();
     const { container } = setup();
     // Abschnitt-Zeile muss sichtbar sein
     expect(await screen.findByText('Abschnitt Nord')).toBeInTheDocument();
@@ -177,5 +191,177 @@ describe('KraefteuebersichtPage', () => {
         }),
       ),
     );
+  });
+
+  // ── Teil 2: die Ampelzeile als zwei eigene Spalten ──────────────────────────────
+
+  it('zeigt Personal und Fahrzeuge als eigene Spalten mit Textkopf', async () => {
+    /**
+     * Vorher: eine 220-px-Statusspalte mit bis zu acht `Tag` und zwei Emoji als einziger
+     * Achsenunterscheidung. „Personal"/„Fahrzeuge" existierten nur als `Statistic title`
+     * im Kennzahlenkopf, und antd rendert die in einem `div` OHNE Rolle — diese Abfrage
+     * kann also nicht aus der falschen Richtung grün werden.
+     */
+    mitBaum();
+    setup();
+    await screen.findByText('Abschnitt Nord');
+    expect(screen.getByRole('columnheader', { name: 'Personal' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Fahrzeuge' })).toBeInTheDocument();
+  });
+
+  it('die Zählgruppen einer Abschnittszeile sind über ihr Etikett erreichbar und tragen Kurztexte', async () => {
+    /**
+     * `within(zeile)` ist PFLICHT, nicht Kosmetik: die Fixture hat mit Abschnitt UND
+     * Einheit zwei Zeilen mit Zählgruppen, und nur weil `expandedRowKeys` leer startet,
+     * existiert zufällig genau ein Knoten. Ungescopet würde diese Abfrage beim ersten
+     * zweiten Abschnitt oder beim ersten Aufklapp-Klick mit einer
+     * Mehrfachtreffer-Verletzung werfen — grün aus dem falschen Grund.
+     */
+    mitBaum();
+    const { container } = setup();
+    await screen.findByText('Abschnitt Nord');
+    const zeile = container.querySelector('[data-row-key="ab-10"]') as HTMLElement;
+    expect(zeile).not.toBeNull();
+
+    const personal = within(zeile).getByLabelText('Personal');
+    // Der Kurztext IST der zweite Kanal (Kriterium 6): die Farbe färbt nur die Zahl.
+    expect(personal).toHaveTextContent('frei');
+    expect(personal).toHaveTextContent('n.v.');
+
+    const fahrzeuge = within(zeile).getByLabelText('Fahrzeuge');
+    // Ein verfügbares Fahrzeug im Abschnitt, über die Einheit kumuliert.
+    expect(within(fahrzeuge).getByTitle('verfügbar')).toHaveTextContent('1');
+    // Und die 0 steht MIT da — sonst fluchten zwei Zeilen nicht übereinander.
+    expect(within(fahrzeuge).getByTitle('gebunden')).toHaveTextContent('0');
+  });
+
+  it('die Statusspalte trägt nur noch den Einzelstatus der Mittel', async () => {
+    mitBaum();
+    const { container } = setup();
+    await screen.findByText('Abschnitt Nord');
+    // Bis zur Mittelzeile durchklappen: Abschnitt → Einheit → Fahrzeug.
+    fireEvent.click(container.querySelector('[data-row-key="ab-10"] .ant-table-row-expand-icon')!);
+    await screen.findByText('1. Zug');
+    fireEvent.click(container.querySelector('[data-row-key="eh-20"] .ant-table-row-expand-icon')!);
+    await screen.findByText('FW 1/44-1');
+
+    const mittel = container.querySelector('[data-row-key="ef-30"]') as HTMLElement;
+    expect(within(mittel).getByText('verfügbar')).toBeInTheDocument();
+    // Und umgekehrt: die Aggregatzeilen tragen ihre Zahlen NICHT mehr in der Statusspalte,
+    // sondern in den zwei eigenen Spalten — dort steht kein Kurztext.
+    const abschnitt = container.querySelector('[data-row-key="ab-10"]') as HTMLElement;
+    const statusZelle = abschnitt.querySelectorAll('td')[5];
+    expect(statusZelle.textContent).toBe('');
+  });
+
+  it('die Statusfilter-Optionen kommen aus der einen Statusachse — ohne den vierten Eimer', async () => {
+    /**
+     * Die drei Optionen standen hier als Literale und waren die dritte Kopie derselben
+     * Labels. Sie kommen jetzt aus `KATEGORIE_WERTE`.
+     *
+     * Der vierte Eimer („ohne Status") bleibt draußen, und das ist eine Entscheidung:
+     * `FilterWerte.kategorie` ist `StatusKategorie | null`, und `filtereKraefte` vergleicht
+     * `kat === f.kategorie` — ein Filterwert `'ohne'` träfe also NIE eine Zeile und wäre
+     * eine tote Option. Gruppieren nach vier Eimern (Fahrzeuge/Personal) und Filtern nach
+     * drei ist hier kein Widerspruch, sondern die Grenze der Datenschicht.
+     */
+    const { container } = setup();
+    await screen.findByText('Trägerorganisation');
+    // Auf die Filter-Card scopen: „Status" ist auch ein Spaltenkopf, ungescopet ist die
+    // Abfrage mehrdeutig. Und NICHT über die Position im DOM — ein zusätzliches Feld in
+    // der Leiste würde einen Positionsindex lautlos verschieben.
+    const karte = container.querySelector('.kraefte-no-print.ant-card') as HTMLElement;
+    expect(karte, 'Filter-Card nicht gefunden').not.toBeNull();
+    const statusFilter = [...karte.querySelectorAll('.ant-select')].find((s) =>
+      s.textContent?.includes('Status'),
+    );
+    expect(statusFilter, 'Status-Select nicht gefunden').not.toBeUndefined();
+    // antd 6 nennt die Klickfläche `.ant-select-content` (v5: `.ant-select-selector`) und
+    // den Platzhalter `.ant-select-placeholder` — nachgemessen, nicht aus dem Gedächtnis.
+    fireEvent.mouseDown(statusFilter!.querySelector('.ant-select-content')!);
+    const optionen = await waitFor(() => {
+      const treffer = document.querySelectorAll('.ant-select-item-option-content');
+      expect(treffer.length).toBeGreaterThan(0);
+      return [...treffer].map((o) => o.textContent);
+    });
+    expect(optionen).toEqual(['verfügbar', 'gebunden', 'nicht verfügbar']);
+  });
+
+  // ── Teil 3: das Meldebild auf dem Primitiv ──────────────────────────────────────
+
+  it('der Meldebild-Baum bleibt AUCH bei 390 px eine Tabelle', async () => {
+    /**
+     * Prüflisten-Kriterium 14: „keine Auflösung in Karten, wo verglichen wird". Die
+     * Bedien-Leitlinie führt genau diese Seite als kanonisches „wird verglichen: ja",
+     * deshalb `form="tabelle"` und kein Kartenzweig. Ohne diese Zusicherung wäre ein
+     * `form="auto"` hier unauffällig — die Breit-Ansicht sähe identisch aus.
+     */
+    setzeViewportBreite(390);
+    mitBaum();
+    const { container } = setup();
+    await screen.findByText('Abschnitt Nord');
+    expect(container.querySelector('.ant-table')).not.toBeNull();
+    // Gegenprobe zur Formwahl: kein Kartenzweig daneben (genau EIN Zweig im Baum).
+    expect(container.querySelector('[data-lfh="datensicht-karte"]')).toBeNull();
+  });
+
+  it('Drucken klappt alle Knoten auf und druckt genau einmal', async () => {
+    /**
+     * Der Aufklappzustand liegt beim AUFRUFER, nicht im Primitiv — genau deswegen: hier
+     * setzt ihn ein anderes Seitenmerkmal (`handleDrucken`), und gedruckt wird erst im
+     * Folgeeffekt. Ein Primitiv mit internem Aufklappzustand hätte diesen Pfad lautlos
+     * stillgelegt: kein Fehler, kein roter Test, nur ein Ausdruck mit kollabierten Zeilen.
+     */
+    mitBaum();
+    setup();
+    await screen.findByText('Abschnitt Nord');
+    expect(screen.queryByText('1. Zug')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /Drucken/i }));
+
+    expect(await screen.findByText('1. Zug')).toBeInTheDocument();
+    expect(screen.getByText('FW 1/44-1')).toBeInTheDocument();
+    await waitFor(() => expect(drucke).toHaveBeenCalledTimes(1));
+  });
+
+  it('„Drucken" bleibt AUSSERHALB der Werkzeugzeile des Primitivs', async () => {
+    /**
+     * Abweichung von der API-Spec §6, begründet: `kraefteuebersichtPrint.css` arbeitet über
+     * `body * { visibility: hidden }` plus `.kraefte-no-print { display: none }`. Ein Knoten
+     * INNERHALB von `Datensicht` ist damit nicht markierbar — `DatensichtProps` nimmt kein
+     * `className`. In `werkzeuge` läge der Druckknopf also im Ausdruck.
+     */
+    mitBaum();
+    const { container } = setup();
+    await screen.findByText('Abschnitt Nord');
+    const werkzeuge = container.querySelector('[data-lfh="datensicht-werkzeuge"]') as HTMLElement;
+    expect(werkzeuge).not.toBeNull();
+    expect(within(werkzeuge).queryByRole('button', { name: /Drucken/i })).toBeNull();
+    // Was dort steht, ist der Spaltenschalter — und nur er.
+    expect(within(werkzeuge).getByRole('button', { name: /Spalten/ })).toBeInTheDocument();
+    expect(werkzeuge.childElementCount).toBe(1);
+  });
+
+  it('der Druck neutralisiert Bildlaufcontainer, Sticky-Kopf, fixierte Spalte und Werkzeugzeile', () => {
+    /**
+     * jsdom rechnet kein Layout und `@media print` schon gar nicht — diese Zusicherung ist
+     * bewusst eine TEXT-Prüfung der Regeldatei, kein Layoutbeweis. Sie steht hier, weil der
+     * Umbau auf `KatalogTabelle` einen `overflow: auto`-Container, einen Sticky-Holder und
+     * `position: sticky` an Spalte 0 einführt, die das alte Blatt (nur `visibility`) nicht
+     * kennt: der Ausdruck wäre rechts abgeschnitten, und JEDER Vitest bliebe grün.
+     * Der Layoutbeweis gehört nach `frontend/e2e/` (Bildlaufmaß unter `emulateMedia`).
+     */
+    const hier = dirname(fileURLToPath(import.meta.url));
+    const css = readFileSync(join(hier, 'kraefteuebersichtPrint.css'), 'utf-8');
+    const druckblock = css.slice(css.indexOf('@media print'));
+    for (const marke of [
+      '.ant-table-body',
+      '.ant-table-sticky-holder',
+      '.ant-table-cell-fix-start',
+      '[data-lfh="datensicht-werkzeuge"]',
+    ]) {
+      expect(druckblock, `Druckregel für ${marke} fehlt`).toContain(marke);
+    }
+    expect(druckblock).toMatch(/overflow:\s*visible\s*!important/);
   });
 });

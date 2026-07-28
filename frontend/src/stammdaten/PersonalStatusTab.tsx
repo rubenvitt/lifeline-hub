@@ -108,7 +108,6 @@ export default function PersonalStatusTab() {
         loading={statusQuery.isLoading}
         dataSource={statusQuery.data ?? []}
         columns={spalten}
-        pagination={false}
         locale={{ emptyText: 'Kein Status' }}
       />
       <Modal

@@ -79,7 +79,6 @@ export default function MaterialTab() {
         dataSource={materialQuery.data ?? []}
         columns={spalten}
         locale={{ emptyText: 'Noch kein Material' }}
-        pagination={false}
       />
       <MaterialFormModal
         offen={modalOffen}

@@ -1,9 +1,11 @@
 import { http, HttpResponse } from 'msw';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { setzeViewportBreite } from '../test/viewport';
+import { einsatzKeys } from '../api/queryKeys';
 import { AuthProvider } from '../auth/AuthContext';
 import FahrzeugePage from './FahrzeugePage';
 
@@ -49,12 +51,13 @@ function person(overrides: Record<string, unknown> = {}) {
 function render(
   einsatzObj: ReturnType<typeof einsatz>,
   personal: ReturnType<typeof person>[] = [],
-  efObj: Record<string, unknown> = ef,
+  efObj: Record<string, unknown> | Record<string, unknown>[] = ef,
 ) {
+  const efListe = Array.isArray(efObj) ? efObj : [efObj];
   server.use(
     http.get('/api/auth/me', () => HttpResponse.json(nutzer)),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatzObj)),
-    http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([efObj])),
+    http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json(efListe)),
     http.get('/api/einsaetze/7/personal', () => HttpResponse.json(personal)),
     http.get('/api/fahrzeug-status', () => HttpResponse.json(stati)),
     http.get('/api/fahrzeuge', () => HttpResponse.json([])), // Pool (nur_im_dienst)
@@ -203,5 +206,149 @@ describe('FahrzeugePage', () => {
     fireEvent.click(container.querySelector('.ant-table-row-expand-icon-collapsed')!);
     expect(await screen.findByText(/Cara Diskrepanz/)).toBeInTheDocument();
     expect(screen.getByText('andere Einheit')).toBeInTheDocument();
+  });
+
+  // ── Datensicht (LFH-330 · B2) ───────────────────────────────────────────────────
+
+  /**
+   * ZWEI Zeilen, deren gruppengeführte Reihenfolge sich beim Statuswechsel UMDREHT.
+   *
+   * Eine einzeilige Fixture wäre hier wertlos: `expect(reihenfolge).toEqual(vorher)` ist
+   * über einem Einelement-Array auch ohne Schleuse, auch mit `zufluss="sofort"` und auch
+   * bei kaputter Sortierung grün. Hier gilt:
+   *   Serverordnung  [10 Florian 1 (gebunden), 11 Florian 9 (verfügbar)]
+   *   gerendert      [11, 10]  (Gruppenachse führt: verfügbar vor gebunden)
+   *   nach dem Flip  [10, 11]  (beide verfügbar → nach Funkrufname)
+   * Die gerenderte Ausgangsfolge ist damit WEDER die Serverordnung noch die Zielordnung.
+   */
+  const efGebunden = { ...ef, id: 10, funkrufname: 'Florian 1' };
+  const efVerfuegbar = {
+    ...ef, id: 11, funkrufname: 'Florian 9', status_id: 3, status_label: 'einsatzbereit',
+    status_kategorie: 'verfuegbar',
+  };
+  const zeilenFolge = (container: HTMLElement) =>
+    [...container.querySelectorAll('tr.ant-table-row')].map((r) => r.getAttribute('data-row-key'));
+
+  it('gruppiert nach Statuskategorie, mit Zähler im Etikett', async () => {
+    const { container } = render(einsatz(), [], [efGebunden, efVerfuegbar]);
+    await screen.findByText('Florian 1');
+    // EIN Textknoten, nicht zwei: sonst würfe dieselbe Abfrage später mit einer
+    // Mehrfachtreffer-Verletzung, sobald ein Zähler daneben steht.
+    expect(screen.getByText('verfügbar · 1')).toBeInTheDocument();
+    expect(screen.getByText('gebunden · 1')).toBeInTheDocument();
+    // Und die Gruppenachse führt wirklich: verfügbar (Florian 9) steht VOR gebunden.
+    expect(zeilenFolge(container)).toEqual(['11', '10']);
+  });
+
+  it('ein Statuswechsel unter dem Cursor verschiebt die Zeile NICHT (Kriterium 12)', async () => {
+    const { container, client } = render(einsatz(), [], [efGebunden, efVerfuegbar]);
+    await screen.findByText('Florian 1');
+    const vorher = zeilenFolge(container);
+    expect(vorher).toEqual(['11', '10']);
+
+    // Fokus in die Statusauswahl DERSELBEN Zeile, die gleich wandern würde.
+    const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
+    const auswahl = within(zeile).getByRole('combobox');
+    act(() => auswahl.focus());
+    // Die Schleuse hängt an Fokus-CONTAINMENT. Das wird gemessen, nicht angenommen —
+    // ein Test, der grün ist, weil nichts umsortiert wurde, sieht sonst identisch aus.
+    const sicht = screen.getByRole('region', { name: 'Fahrzeuge im Einsatz' });
+    expect(sicht.contains(document.activeElement)).toBe(true);
+
+    act(() => {
+      client.setQueryData(einsatzKeys.fahrzeuge(7), [
+        { ...efGebunden, status_id: 3, status_label: 'vor_ort', status_kategorie: 'verfuegbar' },
+        efVerfuegbar,
+      ]);
+    });
+
+    // Zellinhalt AKTUALISIERT: die Auswahl der Zeile zeigt den neuen Status. Über
+    // `textContent` statt `getByText`, weil antds Auswahlfeld den gewählten Text mehrfach
+    // in den Baum legt (Anzeige + Messknoten) und eine Einzeltreffer-Abfrage dort wirft.
+    await waitFor(() => expect(zeile.textContent).toContain('vor_ort'));
+    // Reihenfolge EINGEFROREN: die Zeile wandert nicht unter dem offenen Auswahlfeld weg.
+    expect(zeilenFolge(container)).toEqual(vorher);
+
+    /**
+     * DIE GEMESSENE ABWEICHUNG von Plan §0.2 (a), hier als Regressionsanker statt als
+     * Prosa: der Zählerstreifen rechnet über die FRISCHEN Zeilenobjekte in der gefrorenen
+     * Folge (`gruppiere(sichtbareZeilen, …)` in `Datensicht`), also nicht eingefroren. Und
+     * weil der Statuswechsel keinen Schlüssel ändert, ist `zufluessig === 0` und ein
+     * Sammelbanner erscheint NIE — es gibt keine zweite Bannerursache „Reihenfolge
+     * veraltet". Beides gehört dem Primitiv (Bündel F); geändert wird es nicht hier.
+     */
+    expect(screen.getByText('verfügbar · 2')).toBeInTheDocument();
+    expect(screen.queryByText(/^gebunden · /)).toBeNull();
+    expect(screen.queryByRole('button', { name: /neue? Ein(trag|träge)/ })).toBeNull();
+  });
+
+  it('Gegenprobe: OHNE Fokus in der Sicht ordnet sich die Liste sofort neu', async () => {
+    // Ohne diese Gegenprobe belegt der Test oben nichts über die Fokusbedingung — eine
+    // Sicht, die IMMER einfriert, wäre dort ebenfalls grün.
+    const { container, client } = render(einsatz(), [], [efGebunden, efVerfuegbar]);
+    await screen.findByText('Florian 1');
+    expect(zeilenFolge(container)).toEqual(['11', '10']);
+
+    act(() => {
+      client.setQueryData(einsatzKeys.fahrzeuge(7), [
+        { ...efGebunden, status_id: 3, status_label: 'vor_ort', status_kategorie: 'verfuegbar' },
+        efVerfuegbar,
+      ]);
+    });
+
+    await waitFor(() => expect(zeilenFolge(container)).toEqual(['10', '11']));
+  });
+
+  it('der Spaltenschalter zählt Handauswahl UND Breitenausblendung in EINEM Zähler', async () => {
+    /**
+     * Gate 2 verlangt den Zähler ausgeblendeter Spalten. Er darf nicht aus `aus.length`
+     * kommen: bei 1024 px ist genau `bemerkung` per Voreinstellung abgewählt (1), bei
+     * 800 px fällt `kennzeichen` über `abBreite: 'lg'` zusätzlich weg (2). Ein Zähler, der
+     * nur die Handauswahl kennt, meldete beide Male „1".
+     */
+    const { unmount } = render(einsatz());
+    await screen.findByText('Florian 1');
+    expect(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ })).toBeInTheDocument();
+    unmount();
+
+    setzeViewportBreite(800);
+    render(einsatz());
+    await screen.findByText('Florian 1');
+    expect(screen.getByRole('button', { name: /Spalten · 2 ausgeblendet/ })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Kennzeichen' })).toBeNull();
+  });
+
+  describe('unter md', () => {
+    it('steht keine Tabelle, sondern Karten — und genau EIN Zweig im Baum', async () => {
+      setzeViewportBreite(390);
+      const { container } = render(einsatz());
+      expect(await screen.findByText('Florian 1')).toBeInTheDocument();
+      // `findByText('Florian 1')` allein ist in BEIDEN Zweigen grün und als Zweignachweis
+      // wertlos — es zählt die Abwesenheit der Tabelle.
+      expect(container.querySelector('.ant-table')).toBeNull();
+      expect(container.querySelectorAll('[data-lfh="datensicht-karte"]')).toHaveLength(1);
+    });
+
+    it('die Karte trägt genau eine Primäraktion, und die fragt nach (Kriterium 4)', async () => {
+      setzeViewportBreite(390);
+      const { container } = render(einsatz());
+      await screen.findByText('Florian 1');
+      const karte = container.querySelector('[data-lfh="datensicht-karte"]') as HTMLElement;
+      const knopf = within(karte).getByRole('button', { name: 'Entfernen' });
+      // Rot bedient nichts: die kritische Aktion trägt KEINEN Gefahren-Anstrich, sondern
+      // eine Rückfrage als zweiten Handgriff.
+      expect(knopf).not.toHaveClass('ant-btn-dangerous');
+      fireEvent.click(knopf);
+      expect(await screen.findByText('Aus Einsatz entfernen?')).toBeInTheDocument();
+    });
+  });
+
+  it('Gegenprobe: ab md steht die Tabelle', async () => {
+    // Ohne diese Gegenprobe wäre der Schmal-Test auch grün, wenn die Weiche bei JEDER
+    // Breite auf Karten fiele.
+    const { container } = render(einsatz());
+    await screen.findByText('Florian 1');
+    expect(container.querySelector('.ant-table')).not.toBeNull();
+    expect(container.querySelector('[data-lfh="datensicht-karte"]')).toBeNull();
   });
 });

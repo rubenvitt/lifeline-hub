@@ -92,21 +92,40 @@ const KARTEN_EIGENBAU: string[] = [];
 /**
  * Dateien, die `form="karte"` tragen MÜSSEN — Module, die heute schon kartenbasiert gelesen
  * werden (Befehle, Lageberichte). Dort ist die Tabelle der Befund, nicht der Zielzustand.
- * → Bündel V füllt (AP7: `auftraege/BefehlListe.tsx`, `pages/LageberichtePage.tsx`).
  */
-const NUR_KARTE: string[] = [];
+const NUR_KARTE: string[] = ['/src/auftraege/BefehlListe.tsx', '/src/pages/LageberichtePage.tsx'];
 
 /**
  * Dateien, die `form="tabelle"` tragen MÜSSEN — Vergleichsflächen, die Kriterium 14
  * ausdrücklich nicht in Karten auflösen darf.
- * → Bündel V füllt (AP6: `pages/KraefteuebersichtPage.tsx`).
  *
  * WARUM DIESE ZWEI LISTEN ÜBERHAUPT: eine Datei mit `form="karte"` bleibt bei `<Table` = 0
  * grün, AUCH wenn sie eine Tabelle rendert — das Tabellenelement liegt in
  * `KatalogTabelle.tsx`. Die Verbotsmarke allein kann die Formwahl also nicht prüfen; nur die
  * Anwesenheit des Literals kann es.
  */
-const NUR_TABELLE: string[] = [];
+const NUR_TABELLE: string[] = ['/src/pages/KraefteuebersichtPage.tsx'];
+
+/**
+ * Das Konsumenteninventar von LFH-330 · B2, handgeschrieben — nicht aus dem Scan abgeleitet.
+ *
+ * Der Scan sagt, WER heute konsumiert; diese Liste sagt, wer es SOLL. Beides gegeneinander
+ * zu prüfen ist der einzige Weg, zwei verschiedene Fehler zu fangen: eine Datei, die still
+ * aus dem Primitiv herausfällt (steht hier, fehlt im Scan), und eine, die ungeplant
+ * hinzukommt (steht im Scan, fehlt hier). Ein abgeleitetes Inventar kann das erste nicht
+ * sehen — es hätte sich einfach mitverkleinert.
+ */
+const KONSUMENTEN = [
+  '/src/auftraege/BefehlListe.tsx',
+  '/src/pages/FahrzeugePage.tsx',
+  '/src/pages/KraefteuebersichtPage.tsx',
+  '/src/pages/LageberichtePage.tsx',
+  '/src/pages/MaterialPage.tsx',
+  '/src/pages/PersonalPage.tsx',
+  '/src/pages/PersonenPage.tsx',
+  '/src/pages/TierePage.tsx',
+  '/src/pages/uhs/BewegungenTab.tsx',
+];
 
 /** Alle Quelldateien als Rohtext, Pfad relativ zu `src/` (führendes `/src/…`). */
 function lieseQuellen(verzeichnis: string, praefix = '/src'): Record<string, string> {
@@ -324,12 +343,15 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     ).toEqual([]);
   });
 
-  it('die drei semantischen Ausnahmemengen sind bei Lieferung leer (Bündel V füllt sie)', () => {
-    // Auf 0 gepinnt, nicht weil 0 ein Ziel ist, sondern weil dieses Bündel NULL Konsumenten
-    // liefert. Wer einträgt, ohne umzubauen, fällt am Anwesenheits-Gegentest oben auf.
+  it('die semantischen Ausnahmemengen stehen auf dem entschiedenen Stand', () => {
+    // `KARTEN_EIGENBAU` bleibt leer, und das ist die Aussage: kein Modul dieses Pakets
+    // brauchte einen eigenen Kartenrenderer. Wer den ersten einträgt, muss begründen, warum
+    // der Plan-Modus nicht reicht — sonst wächst die Ausnahme über das Band auf fünf.
     expect(KARTEN_EIGENBAU).toHaveLength(0);
-    expect(NUR_KARTE).toHaveLength(0);
-    expect(NUR_TABELLE).toHaveLength(0);
+    // Zwei Kartenmodule, eine Vergleichsfläche. Wer einträgt, ohne umzubauen, fällt am
+    // Anwesenheits-Gegentest oben auf; wer umbaut, ohne einzutragen, an der Formprüfung.
+    expect(NUR_KARTE).toHaveLength(2);
+    expect(NUR_TABELLE).toHaveLength(1);
   });
 
   it('Sentinel: der Scan sieht das Primitiv und mehr als 200 Dateien', () => {
@@ -340,15 +362,47 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     expect(dateien[PRIMITIV]).toContain('KatalogTabelle');
   });
 
-  it('bei Lieferung gibt es NULL Konsumenten — und das ist eine Aussage, keine Lücke', () => {
+  it('der Scan sieht genau die neun geplanten Konsumenten', () => {
     /**
-     * Dieses Bündel liefert das Primitiv ohne Aufrufstelle: die API ist gegen keine reale
-     * Nutzung validiert, und die Aufrufbeispiele der Entscheidung sind ungeprüfter Text.
-     * Der Fall steht hier, damit dieser Umstand SICHTBAR ist statt implizit — und er fällt
-     * von selbst, sobald das erste Konsumentenbündel landet. Dann ist das Anpassen dieser
-     * Zahl der Moment, in dem jemand die Ausnahmemengen oben nachzieht.
+     * Die Gleichheit prüft BEIDE Richtungen: eine Datei, die still aus dem Primitiv
+     * herausfällt, verschwindet aus dem Scan und bleibt in {@link KONSUMENTEN} stehen; eine
+     * ungeplant hinzukommende steht im Scan und fehlt in der Liste. Ein rein abgeleitetes
+     * Inventar sähe den ersten Fall nie — es hätte sich stillschweigend mitverkleinert.
      */
-    expect(konsumentenVon(dateien)).toEqual([]);
+    expect([...konsumentenVon(dateien)].sort()).toEqual([...KONSUMENTEN].sort());
+  });
+
+  it('mehrere Sichten in einer Datei tragen distinkte key-Angaben', () => {
+    /**
+     * Die teuerste gemessene Falle dieses Pakets, und sie erzeugt keinen Fehler:
+     * zwei `Datensicht` in den Zweigen eines Ternärs stehen an DERSELBEN Baumstelle mit
+     * DEMSELBEN Komponententyp. React montiert dann nicht neu, sondern reicht die Instanz
+     * weiter — samt Sortierung, Suchbegriff, Spaltenauswahl und Zeilenschleuse. Gemessen an
+     * `pages/PersonenPage.tsx`: der Patienten-Reiter behielt die Sortierung der Listen-Sicht,
+     * die eigene Voreinstellung griff nie. Keine Warnung, kein roter Test — sichtbar wurde es
+     * nur, weil zufällig eine Sortierbehauptung auf dem zweiten Zweig lag.
+     *
+     * Die Prüfung ist bewusst grob (Anwesenheit mindestens so vieler `key=`-Angaben wie
+     * Sichten, nicht deren Distinktheit): ob zwei Schlüssel wirklich verschieden sind, kann
+     * ein Textscanner nicht entscheiden. Sie fängt den Fall, der real auftrat — Sichten ohne
+     * jeden Schlüssel — und benennt für Band C die Regel, um die es geht.
+     */
+    const mehrfach = Object.entries(dateien)
+      .filter(([pfad]) => KONSUMENTEN.includes(pfad))
+      .map(([pfad, roh]) => {
+        const text = ohneKommentare(roh);
+        return {
+          pfad,
+          sichten: text.match(/<Datensicht(?=[\s/>{<])/g)?.length ?? 0,
+          schluessel: text.match(/\bkey=/g)?.length ?? 0,
+        };
+      })
+      .filter((d) => d.sichten > 1);
+
+    expect(
+      mehrfach.filter((d) => d.schluessel < d.sichten).map((d) => d.pfad),
+      'Zwei Sichten an derselben Baumstelle teilen ihren Zustand — jede braucht ihr eigenes key.',
+    ).toEqual([]);
   });
 
   it('Selbstbeweis: fehlende tragende Marke UND jede Verbotsform werden gemeldet', () => {

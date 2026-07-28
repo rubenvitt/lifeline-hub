@@ -89,7 +89,6 @@ export default function PersonalTab() {
         dataSource={personalQuery.data ?? []}
         columns={spalten}
         locale={{ emptyText: 'Noch kein Personal' }}
-        pagination={false}
       />
       <PersonalFormModal
         offen={modalOffen}

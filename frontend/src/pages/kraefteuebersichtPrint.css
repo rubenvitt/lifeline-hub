@@ -3,4 +3,30 @@
   .kraefte-print-root, .kraefte-print-root * { visibility: visible; }
   .kraefte-print-root { position: absolute; left: 0; top: 0; width: 100%; padding: 0; }
   .kraefte-no-print { display: none !important; }
+
+  /* ── Neutralisierer für die Tabelle des Primitivs (LFH-330 · B2) ──────────────
+     Bis B2 schaltete dieses Blatt NUR `visibility`. Das genügte, solange das
+     Meldebild ein rohes Tabellenelement ohne Bildlauf war. `KatalogTabelle` setzt
+     nun unbedingt einen waagerechten Bildlaufcontainer, eine stehende Kopfzeile
+     (zwei getrennte Tabellen plus Sticky-Holder) und `position: sticky` an Spalte 0.
+     Ohne die Regeln unten wäre der Ausdruck rechts abgeschnitten, die Kopfzeile
+     verrutscht und die Kennungsspalte über den Text geschoben — und JEDER Vitest
+     bliebe grün, weil jsdom kein Layout rechnet und `@media print` gar nicht.
+     Der Layoutbeweis gehört deshalb nach `frontend/e2e/`. */
+  .kraefte-print-root .ant-table-body,
+  .kraefte-print-root .ant-table-content {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+  .kraefte-print-root .ant-table-body table { width: 100% !important; }
+  .kraefte-print-root .ant-table-sticky-holder { position: static !important; }
+  .kraefte-print-root .ant-table-sticky-scroll { display: none !important; }
+  .kraefte-print-root .ant-table-cell-fix-start,
+  .kraefte-print-root .ant-table-cell-fix-end { position: static !important; }
+
+  /* Die Werkzeugzeile des Primitivs liegt INNERHALB von `Datensicht` und ist damit
+     nicht über `.kraefte-no-print` markierbar (`DatensichtProps` nimmt kein
+     `className`). Ihr stabiles Datenattribut ist der Griff — sonst stünde der
+     Spaltenschalter im Ausdruck. */
+  .kraefte-print-root [data-lfh="datensicht-werkzeuge"] { display: none !important; }
 }

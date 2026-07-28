@@ -92,7 +92,6 @@ export default function QualifikationenTab() {
         loading={query.isLoading}
         dataSource={query.data ?? []}
         columns={spalten}
-        pagination={false}
         locale={{ emptyText: 'Keine Qualifikationen' }}
       />
       <Modal
