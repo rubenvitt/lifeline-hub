@@ -1,4 +1,5 @@
-import { Alert, App as AntApp, Breadcrumb, Button, Card, Input, Space, Spin, Statistic, Table, Tag, Typography } from 'antd';
+import { App as AntApp, Breadcrumb, Button, Card, Input, Space, Statistic, Table, Tag, Typography, theme } from 'antd';
+import type { GlobalToken } from 'antd';
 import { taktischeDtgVoll } from '../anzeige/format';
 import { Select } from '../components/Select';
 import type { ColumnsType } from 'antd/es/table';
@@ -26,32 +27,72 @@ import {
   type StatusVerteilung,
 } from '../kraefte/kraeftebild';
 import { legeLageberichtAn, aktualisiereLagebericht } from '../api/lageberichte';
-import type { MaterialStatus, StatusKategorie } from '../api/types';
+import type { MaterialStatus } from '../api/types';
+import StatusTag from '../components/StatusTag';
+import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import { rollenFarbe, statusKategorie, type Statusrolle } from '../theme/statusFarben';
+import { abstand } from '../theme/tokens';
 import './kraefteuebersichtPrint.css';
 
-const KAT_FARBE: Record<StatusKategorie, string> = { verfuegbar: 'green', gebunden: 'gold', nicht_verfuegbar: 'red' };
-
-const MAT_STATUS_ANZEIGE: Array<{ key: MaterialStatus; label: string; farbe?: string }> = [
-  { key: 'einsatzbereit', label: 'Mtl. einsatzbereit', farbe: '#52c41a' },
-  { key: 'im_einsatz', label: 'Mtl. im Einsatz', farbe: '#faad14' },
-  { key: 'defekt', label: 'Mtl. defekt', farbe: '#ff4d4f' },
+/**
+ * Materialstatus als Kopfzeilen-Kennzahl.
+ *
+ * Die Map bleibt LOKAL, und das ist eine Entscheidung, keine Auslassung: `MaterialStatus`
+ * ist kein Vertrags-Enum (Spec §1.3 listet die acht, §5 zieht die Grenze), und die Labels
+ * hier tragen das seitenspezifische Präfix „Mtl." — beides gehört nicht in
+ * `theme/statusFarben.ts`. Was aus dem Vertrag kommt, ist die WÄHRUNG: eine `Statusrolle`
+ * statt der drei rohen Hex, die hier standen. Die waren antd-v5-Defaults und damit für
+ * Gate 5 unsichtbar — es kennt nur die A0-Palette; hier hilft nur ein Blick in die Datei.
+ *
+ * `verbraucht` hat weiterhin KEINE Rolle. Das ist der Bestand und bleibt es: verbrauchtes
+ * Material meldet nichts, und ihm `neutral` zu geben würde die Zahl auf
+ * `colorTextTertiary` dämpfen — eine visuelle Änderung im Gewand einer Aufräumarbeit.
+ * Fehlende Rolle heißt hier „kein Signal", nicht „noch nicht zugeordnet".
+ */
+const MAT_STATUS_ANZEIGE: Array<{ key: MaterialStatus; label: string; rolle?: Statusrolle }> = [
+  { key: 'einsatzbereit', label: 'Mtl. einsatzbereit', rolle: 'normal' },
+  { key: 'im_einsatz', label: 'Mtl. im Einsatz', rolle: 'achtung' },
+  { key: 'defekt', label: 'Mtl. defekt', rolle: 'alarm' },
   { key: 'verbraucht', label: 'Mtl. verbraucht' },
-  { key: 'desinfektion_noetig', label: 'Mtl. Desinfektion', farbe: '#faad14' },
+  { key: 'desinfektion_noetig', label: 'Mtl. Desinfektion', rolle: 'achtung' },
 ];
 
 // Schlichter, umbruchsicherer Achsen-Trenner (Flex-Kind statt inline-block Divider).
-const achsenTrenner = (
-  <div style={{ width: 1, height: 48, background: '#d9d9d9', alignSelf: 'center', flex: 'none' }} />
-);
+// Funktion statt Konstante, seit die Linienfarbe aus dem Theme kommt statt als rohes Grau.
+function achsenTrenner(token: GlobalToken) {
+  return (
+    <div
+      style={{
+        width: 1,
+        height: 48,
+        background: token.colorBorderSecondary,
+        alignSelf: 'center',
+        flex: 'none',
+      }}
+    />
+  );
+}
 
+/** Kurzform der Statusverteilung. Die Texte bleiben ABGEKÜRZT („geb.", „n.v.") — die
+ *  vollen Vertragslabels würden die Statusspalte sprengen; der zweite Kanal ist
+ *  vorhanden, nur enger gesetzt. `o.A.` ist keine Vertragskategorie, sondern die
+ *  ABWESENHEIT eines Status und deshalb `neutral`. */
 function verteilungTags(v: StatusVerteilung | null) {
   if (!v) return null;
   return (
-    <Space size={4}>
-      {v.verfuegbar > 0 && <Tag color="green">{v.verfuegbar} frei</Tag>}
-      {v.gebunden > 0 && <Tag color="gold">{v.gebunden} geb.</Tag>}
-      {v.nicht_verfuegbar > 0 && <Tag color="red">{v.nicht_verfuegbar} n.v.</Tag>}
-      {v.ohne > 0 && <Tag>{v.ohne} o.A.</Tag>}
+    <Space size={abstand.xs}>
+      {v.verfuegbar > 0 && (
+        <StatusTag darstellung={{ ...statusKategorie.verfuegbar, label: `${v.verfuegbar} frei` }} />
+      )}
+      {v.gebunden > 0 && (
+        <StatusTag darstellung={{ ...statusKategorie.gebunden, label: `${v.gebunden} geb.` }} />
+      )}
+      {v.nicht_verfuegbar > 0 && (
+        <StatusTag
+          darstellung={{ ...statusKategorie.nicht_verfuegbar, label: `${v.nicht_verfuegbar} n.v.` }}
+        />
+      )}
+      {v.ohne > 0 && <StatusTag darstellung={{ rolle: 'neutral', label: `${v.ohne} o.A.` }} />}
     </Space>
   );
 }
@@ -74,8 +115,12 @@ const spalten: ColumnsType<MeldebildZeile> = [
           const text = [z.statusLabel, z.menge != null ? `×${z.menge}` : null].filter(Boolean).join(' · ');
           return text ? <Tag>{text}</Tag> : null;
         }
-        const farbe = z.statusKategorie ? KAT_FARBE[z.statusKategorie] : undefined;
-        return <Tag color={farbe}>{z.statusLabel ?? z.statusKategorie ?? '—'}</Tag>;
+        // Ohne Kategorie gibt es keine Rolle — dann bleibt es beim farblosen Tag.
+        if (!z.statusKategorie) return <Tag>{z.statusLabel ?? '—'}</Tag>;
+        // Der mandantengepflegte `statusLabel` schlägt das Vertragslabel; vorher stand
+        // hier ersatzweise der ROHE Enum-String (`nicht_verfuegbar`).
+        const meta = statusKategorie[z.statusKategorie];
+        return <StatusTag darstellung={{ ...meta, label: z.statusLabel ?? meta.label }} />;
       }
       return (
         <Space size={8}>
@@ -97,6 +142,7 @@ export default function KraefteuebersichtPage() {
   const { benutzer } = useAuth();
   const navigate = useNavigate();
   const { message } = AntApp.useApp();
+  const { token } = theme.useToken();
 
   const [filter, setFilter] = useState<FilterWerte>({ abschnittId: null, traeger: null, kategorie: null, suche: '' });
   const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
@@ -158,17 +204,24 @@ export default function KraefteuebersichtPage() {
     setPrintPending(true);
   };
 
-  if (einsatzQuery.isLoading) return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
-  if (einsatzQuery.isError || !einsatzQuery.data) return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+  if (einsatzQuery.isLoading) return <SeitenSkeleton />;
+  if (einsatzQuery.isError || !einsatzQuery.data) {
+    return (
+      <SeitenFehler
+        text="Einsatz nicht gefunden oder kein Zugriff"
+        onWiederholen={() => void einsatzQuery.refetch()}
+      />
+    );
+  }
   const einsatz = einsatzQuery.data;
   const v = bild.verdichtung;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
 
   return (
     <div className="kraefte-print-root">
-      <Breadcrumb className="kraefte-no-print" style={{ marginBottom: 12 }}
+      <Breadcrumb className="kraefte-no-print" style={{ marginBottom: abstand.md }}
         items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Kräfteübersicht' }]} />
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 4 }}>
+      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: abstand.xs }}>
         <Typography.Title level={3} style={{ marginTop: 0 }}>Kräfteübersicht</Typography.Title>
         <Space className="kraefte-no-print">
           {darfSchreiben && (
@@ -177,7 +230,7 @@ export default function KraefteuebersichtPage() {
           <Button onClick={handleDrucken}>Drucken / als PDF</Button>
         </Space>
       </Space>
-      <Card size="small" style={{ marginBottom: 16 }} styles={{ body: { overflowX: 'auto' } }}>
+      <Card style={{ marginBottom: abstand.lg }} styles={{ body: { overflowX: 'auto' } }}>
         {/* Monitoring-Kopf: nicht umbrechend, bei schmalem Viewport horizontal scrollbar. */}
         <Space size="large" align="start" style={{ flexWrap: 'nowrap' }}>
           {/* Achse 1: Personalstärke */}
@@ -186,35 +239,49 @@ export default function KraefteuebersichtPage() {
             <Statistic title="Personal" value={v.anzahlPersonal} />
           </Space>
 
-          {achsenTrenner}
+          {achsenTrenner(token)}
 
           {/* Achse 2: Fahrzeug-Verfügbarkeit */}
           <Space size="large">
             <Statistic title="Fahrzeuge" value={v.anzahlFahrzeuge} />
-            <Statistic title="Fzg frei" value={v.fahrzeugStatus.verfuegbar} styles={{ content: { color: '#52c41a' } }} />
-            <Statistic title="Fzg gebunden" value={v.fahrzeugStatus.gebunden} styles={{ content: { color: '#faad14' } }} />
-            <Statistic title="Fzg n. einsatzbereit" value={v.fahrzeugStatus.nicht_verfuegbar} styles={{ content: { color: '#ff4d4f' } }} />
+            {/* Dieselben drei Rollen wie die Statusspalte — die Kopfzahl und der Tag
+                darunter dürfen nicht in verschiedenen Rottönen sprechen. */}
+            <Statistic
+              title="Fzg frei"
+              value={v.fahrzeugStatus.verfuegbar}
+              styles={{ content: { color: rollenFarbe(statusKategorie.verfuegbar.rolle, token) } }}
+            />
+            <Statistic
+              title="Fzg gebunden"
+              value={v.fahrzeugStatus.gebunden}
+              styles={{ content: { color: rollenFarbe(statusKategorie.gebunden.rolle, token) } }}
+            />
+            <Statistic
+              title="Fzg n. einsatzbereit"
+              value={v.fahrzeugStatus.nicht_verfuegbar}
+              styles={{ content: { color: rollenFarbe(statusKategorie.nicht_verfuegbar.rolle, token) } }}
+            />
           </Space>
 
-          {achsenTrenner}
+          {achsenTrenner(token)}
 
           {/* Achse 3: Material */}
           <Space size="large">
             <Statistic title="Material (Pos.)" value={v.anzahlMaterialPositionen} />
-            {MAT_STATUS_ANZEIGE.map(({ key, label, farbe }) =>
+            {MAT_STATUS_ANZEIGE.map(({ key, label, rolle }) =>
               v.materialStatus[key] > 0 ? (
                 <Statistic
                   key={key}
                   title={label}
                   value={v.materialStatus[key]}
-                  styles={{ content: farbe ? { color: farbe } : undefined }}
+                  styles={{ content: rolle ? { color: rollenFarbe(rolle, token) } : undefined }}
                 />
               ) : null,
             )}
           </Space>
         </Space>
       </Card>
-      <Card size="small" className="kraefte-no-print" style={{ marginBottom: 12 }}>
+      <Card className="kraefte-no-print" style={{ marginBottom: abstand.md }}>
         <Space wrap>
           <Select
             placeholder="Abschnitt"
@@ -254,7 +321,7 @@ export default function KraefteuebersichtPage() {
         </Space>
       </Card>
       <Table<MeldebildZeile>
-        size="small" columns={spalten} dataSource={bild.baum} pagination={false}
+        columns={spalten} dataSource={bild.baum} pagination={false}
         rowKey="key"
         expandable={{
           expandedRowKeys: expandedKeys,
