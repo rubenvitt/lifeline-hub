@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Popconfirm, Space, Spin, Table, Tag, Typography, type TableColumnsType } from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Popconfirm, Space, Table, Tag, Typography, type TableColumnsType } from 'antd';
 import { Select } from '../components/Select';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -18,18 +18,42 @@ import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { einheitenPfad, fahrzeugePfad } from '../routing/deeplinks';
 import { ApiError } from '../api/client';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
-import type { EinsatzPersonal, StaerkePosition, StatusKategorie } from '../api/types';
+import type { EinsatzPersonal, StaerkePosition } from '../api/types';
+import StatusTag from '../components/StatusTag';
+import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
+import { statusKategorie } from '../theme/statusFarben';
+import { abstand } from '../theme/tokens';
 
-const KATEGORIE_FALLBACK: Record<StatusKategorie, string> = {
-  verfuegbar: 'green',
-  gebunden: 'orange',
-  nicht_verfuegbar: 'red',
-};
-
+/**
+ * Statusanzeige eines disponierten Einsatzpersonals — und zugleich die GRENZE des
+ * Statusfarb-Vertrags (LFH-328/A2, Spec §1.3).
+ *
+ * Die Anzeige hat zwei Achsen, und nur eine davon kann der Vertrag tragen:
+ *
+ * 1. **DB-Achse** — `status_farbe` ist mandantengepflegter Freitext aus den
+ *    Stammdaten-Tabs. Das Backend (`src/routes/personal_status.rs`) trimmt ihn und
+ *    prüft sonst NICHTS: kein Enum, kein Hex-Format. Ein getypter `Record` kann das
+ *    nicht einfangen. Diese Achse bleibt deshalb unangetastet — wer sie „aufräumt",
+ *    nimmt dem Mandanten seine gepflegte Farbe weg. (Dass sie gegen die A0-Rollen
+ *    validiert werden sollte, ist ein eigener Befund, Spec §5 Nr. 1.)
+ * 2. **Fallback-Achse** — früher `KATEGORIE_FALLBACK`, byte-identisch in dieser und
+ *    der Nachbarseite dupliziert. Sie kommt jetzt aus `statusKategorie`.
+ *
+ * ABWEICHUNG VOM PLANWORTLAUT, bewusst: der Plan sagt „`status_farbe ?? …` bleibt
+ * stehen", gemeint als „die DB-Achse bleibt". Aus dem `??` einen Zweig zu machen
+ * erhält genau das — und vermeidet den Fehler, den `StatusTag` selbst dokumentiert:
+ * antds `color`-Prop rendert einen NICHT-Preset-Wert als Vollfläche mit erzwungen
+ * weißem Text. Die Rollenfarbe dort hineinzureichen (`rollenFarbe(...)` liefert Hex,
+ * nie einen Preset-Namen) hätte aus jedem Fallback-Tag — dem Normalfall, solange kein
+ * Mandant eine Farbe pflegt — eine gefüllte Fläche gemacht, im Dunkelmodus mit weißer
+ * Schrift auf aufgehelltem Rot. Der Zweig hält die DB-Achse byte-gleich und stellt die
+ * Fallback-Achse auf die Umrissform, die der Rest der Anwendung nach A2 trägt.
+ */
 function StatusBadge({ ep }: { ep: EinsatzPersonal }) {
   if (!ep.status_label || !ep.status_kategorie) return <Tag>kein Status</Tag>;
-  const farbe = ep.status_farbe ?? KATEGORIE_FALLBACK[ep.status_kategorie];
-  return <Tag color={farbe}>{ep.status_label}</Tag>;
+  if (ep.status_farbe) return <Tag color={ep.status_farbe}>{ep.status_label}</Tag>;
+  const meta = statusKategorie[ep.status_kategorie];
+  return <StatusTag darstellung={{ ...meta, label: ep.status_label }} />;
 }
 
 export default function PersonalPage() {
@@ -111,10 +135,15 @@ export default function PersonalPage() {
   });
 
   if (einsatzQuery.isLoading) {
-    return <div style={{ textAlign: 'center', paddingTop: 80 }}><Spin size="large" /></div>;
+    return <SeitenSkeleton />;
   }
   if (einsatzQuery.isError || !einsatzQuery.data) {
-    return <Alert type="error" title="Einsatz nicht gefunden oder kein Zugriff" showIcon />;
+    return (
+      <SeitenFehler
+        text="Einsatz nicht gefunden oder kein Zugriff"
+        onWiederholen={() => void einsatzQuery.refetch()}
+      />
+    );
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz, benutzer);
@@ -166,7 +195,6 @@ export default function PersonalPage() {
       render: (_, ep) =>
         darfSchreiben ? (
           <Select
-            size="small"
             style={{ minWidth: 130 }}
             value={ep.staerke_position ?? undefined}
             placeholder="—"
@@ -184,7 +212,6 @@ export default function PersonalPage() {
       render: (_, ep) =>
         darfSchreiben ? (
           <Select
-            size="small"
             style={{ minWidth: 150 }}
             value={ep.status_id ?? undefined}
             placeholder="Status wählen"
@@ -216,7 +243,7 @@ export default function PersonalPage() {
             key: 'aktionen',
             render: (_, ep: EinsatzPersonal) => (
               <Popconfirm title="Aus Einsatz entfernen?" onConfirm={() => entfernenMutation.mutate(ep.id)}>
-                <Button size="small" danger>Entfernen</Button>
+                <Button danger>Entfernen</Button>
               </Popconfirm>
             ),
           },
@@ -227,10 +254,10 @@ export default function PersonalPage() {
   return (
     <div>
       <Breadcrumb
-        style={{ marginBottom: 12 }}
+        style={{ marginBottom: abstand.md }}
         items={[{ title: <Link to="/einsaetze">Einsätze</Link> }, { title: einsatz.bezeichnung }, { title: 'Personal' }]}
       />
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
+      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: abstand.lg }}>
         <Space>
           <Typography.Title level={3} style={{ margin: 0 }}>Personal</Typography.Title>
           <Tag color={einsatz.status === 'aktiv' ? 'green' : 'default'}>{einsatz.status}</Tag>
@@ -251,7 +278,7 @@ export default function PersonalPage() {
       </Space>
 
       {!darfSchreiben && einsatz.status !== 'aktiv' && (
-        <Alert style={{ marginBottom: 12 }} type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
+        <Alert style={{ marginBottom: abstand.md }} type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
       )}
 
       <Table
