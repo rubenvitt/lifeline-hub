@@ -1,4 +1,4 @@
-import { App, Button, Popconfirm, Space, Table, Typography } from 'antd';
+import { App, Button, Popconfirm, Space, Typography } from 'antd';
 import { Select } from '../components/Select';
 import type { ColumnsType } from 'antd/es/table';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -8,6 +8,7 @@ import { ApiError } from '../api/client';
 import { entferneMitglied, ladeMitglieder, setzeMitglied } from '../api/einsaetze';
 import { listeBenutzer } from '../api/benutzer';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
+import KatalogTabelle from '../components/KatalogTabelle';
 
 const ROLLEN: { value: EinsatzRolle; label: string }[] = [
   { value: 'einsatzleitung', label: 'Einsatzleitung' },
@@ -121,7 +122,7 @@ export default function MitgliederAbschnitt({ einsatzId, darfVerwalten }: Props)
           </Button>
         </Space>
       )}
-      <Table
+      <KatalogTabelle<MitgliedAnzeige>
         rowKey="benutzer_id"
         size="small"
         pagination={false}

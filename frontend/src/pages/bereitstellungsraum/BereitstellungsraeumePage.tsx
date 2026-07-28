@@ -1,6 +1,6 @@
 import {
   Alert, App, Breadcrumb, Button, Drawer, Form, Input,
-  Spin, Table, type TableColumnsType,
+  Spin, type TableColumnsType,
 } from 'antd';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -17,6 +17,7 @@ import EinsatzSeite from '../../components/EinsatzSeite';
 import StatusTag from '../../components/StatusTag';
 import { brStatus } from '../../theme/statusFarben';
 import { flaeche } from '../../theme/tokens';
+import KatalogTabelle from '../../components/KatalogTabelle';
 
 export default function BereitstellungsraeumePage() {
   const { id } = useParams();
@@ -94,7 +95,7 @@ export default function BereitstellungsraeumePage() {
         </Button>
       }
     >
-      <Table<Bereitstellungsraum>
+      <KatalogTabelle<Bereitstellungsraum>
         rowKey="id"
         dataSource={(brQuery.data ?? []).filter((br) => !br.storniert_at)}
         columns={spalten}

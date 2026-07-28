@@ -26,6 +26,15 @@ Faustregel: Sobald ein Drawer Tabs bekommt, einen Edit-Modus mit vielen Feldern 
 oder breiter als ~480 px sein muss, gehört der Inhalt auf eine eigene Route.
 Details/Inventar: `docs/superpowers/specs/2026-06-22-drawer-nutzung-reduzieren-design.md`.
 
+**Die Liste ist die zweite Frage** (LFH-330/B2). Die vier Formen oben tragen einen **einzelnen**
+Datensatz; für eine **Menge** gilt: Ist die Frage „welcher von diesen ist der richtige?", wird
+verglichen → **Tabelle** (`components/KatalogTabelle.tsx`, oder `components/Datensicht.tsx` mit
+`form="tabelle"`). Ist sie „was ist mit diesem hier?" → **Liste/Karte** (`components/Liste.tsx`,
+oder `Datensicht` mit `form="karte"`). Kachel nur für Überblicksflächen. Der Karten-Fallback
+unter `md` (`form="auto"`) ist die begründungspflichtige Ausnahme, nicht der Normalfall — die
+Begründung steht im Dateikopf von `Datensicht.tsx`, die Regel in Abschnitt AK3b des
+Drawer-Specs. Keine der 13 Katalogtabellen wird zu Karten.
+
 **Eine benannte Ausnahme: der Navigations-Drawer** (LFH-329/B1, `einsatz/EinsatzLayout.tsx`
 mit `einsatz/ModulAkkordeon.tsx`). Unterhalb `lg` liegt der Einsatz-Navigationsrahmen in einem
 Drawer statt inline. Er zeigt **Navigation, keine Entität** — kein Datensatz, kein Formular,
@@ -59,6 +68,14 @@ Alltag wichtigsten:
   Spaltenschalter **mit Zähler ausgeblendeter Spalten**. Liste/Karte, wenn gelesen wird; Kachel nur
   für Überblicksflächen. Auf schmalem Schirm wird eine Tabelle **angepasst, nicht in Karten
   aufgelöst** — Karten-Fallback ist die Ausnahme mit Begründung im Task.
+  **Träger seit LFH-330/B2:** `components/KatalogTabelle.tsx` (Scrollcontainer, stehende Kopfzeile,
+  fixierte Kennung) und `components/Datensicht.tsx` (Formachse `auto`/`tabelle`/`karte`,
+  Spaltenschalter mit Zähler, Sortierung/Filter/Suche). Der Zähler kennt **eine** Wahrheit —
+  Handauswahl und breitenabhängige Spalten (`abBreite`) laufen durch dieselbe Funktion, weil ein
+  Zähler, der lügen kann, das Kriterium verfehlt, für das er existiert; antds eigenes `responsive`
+  ist am Spaltentyp deshalb gesperrt. Die begründete Ausnahme ist **eingelöst und begrenzt**:
+  Dateikopf von `Datensicht.tsx` plus Abschnitt AK3b in
+  `docs/superpowers/specs/2026-06-22-drawer-nutzung-reduzieren-design.md`.
 - **Dichte-Staffel 30 / 48 / 72 px** (kompakt aus LFH-352 · komfortabel = Material 48 dp ·
   Handschuh = 72 px ≙ 19,05 mm, MIL-STD-1472F Fig. 12). Träger ist ein **Dichte-Token am
   `ConfigProvider`** — nicht `componentSize` (dessen `large` endet bei 40 px) und erst recht nicht

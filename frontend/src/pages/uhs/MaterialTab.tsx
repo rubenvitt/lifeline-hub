@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Button, Popconfirm, Space, Table, Modal, App } from 'antd';
+import { Button, Popconfirm, Space, Modal, App } from 'antd';
 import { Select } from '../../components/Select';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { listeEinsatzMaterial, aktualisiereDisposition } from '../../api/einsatzMaterial';
 import type { EinsatzMaterial, UhsDetail } from '../../api/types';
 import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
+import KatalogTabelle from '../../components/KatalogTabelle';
 
 interface Props {
   einsatzId: number;
@@ -87,7 +88,7 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
           Material zuordnen
         </Button>
       )}
-      <Table<EinsatzMaterial>
+      <KatalogTabelle<EinsatzMaterial>
         rowKey="id"
         dataSource={verortet}
         columns={columns}

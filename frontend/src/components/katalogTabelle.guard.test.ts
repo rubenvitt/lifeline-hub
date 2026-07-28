@@ -35,7 +35,19 @@ const SRC = (() => {
   throw new Error(`Katalogtabellen-Guard findet frontend/src nicht (cwd: ${process.cwd()})`);
 })();
 
-/** Die dreizehn Katalogtabellen — zehn Stammdaten-Reiter, zwei Karten-Sektionen, Benutzer. */
+/**
+ * Die neunzehn Tabellen hinter dem Primitiv — dreizehn Kataloge (zehn Stammdaten-Reiter,
+ * zwei Karten-Sektionen, Benutzer) und sechs Einsatz-/Verwaltungstabellen, die LFH-330 · B2
+ * als Überlaufschutz nachgezogen hat.
+ *
+ * Die sechs Neuzugänge sind ausdrücklich KEINE `Datensicht`-Konsumenten (E3/E4): sie
+ * bekommen nur waagerechten Scrollcontainer, stehende Kopfzeile und fixierte Kennung. Ihr
+ * Guard-Ort ist deshalb dieses Inventar und nicht `datensicht.guard.test.ts`.
+ *
+ * `etb/EtbTabelle.tsx` ist die zwanzigste Konsumentin und steht bewusst NICHT hier: sie
+ * arbeitet auf einem serverseitigen 100-Zeilen-Fenster. Ihre Aufnahme ist ein benannter
+ * Restposten (LFH-330 · AP8), kein stiller Nebeneffekt.
+ */
 const KATALOGTABELLEN = [
   'stammdaten/QualifikationenTab.tsx',
   'stammdaten/SprechgruppenTab.tsx',
@@ -50,6 +62,12 @@ const KATALOGTABELLEN = [
   'karten/OnlineQuellenVerwaltung.tsx',
   'karten/OfflineKartenVerwaltung.tsx',
   'pages/BenutzerPage.tsx',
+  'pages/bereitstellungsraum/BereitstellungsraeumePage.tsx',
+  'pages/UnfallhilfsstellenPage.tsx',
+  'pages/SchaedenPage.tsx',
+  'pages/PersonenDetailPage.tsx',
+  'pages/uhs/MaterialTab.tsx',
+  'pages/MitgliederAbschnitt.tsx',
 ];
 
 /** Entfernt Zeilen- und Blockkommentare, Block-Zustand über Zeilengrenzen getragen. */
@@ -97,8 +115,8 @@ const QUELLEN = KATALOGTABELLEN.map((pfad) => ({
 }));
 
 describe('KatalogTabelle-Inventar', () => {
-  it('alle 13 Katalogtabellen laufen über das Primitiv', () => {
-    expect(QUELLEN).toHaveLength(13);
+  it('alle 19 Tabellen laufen über das Primitiv', () => {
+    expect(QUELLEN).toHaveLength(19);
 
     const ohnePrimitiv = QUELLEN.filter((q) => treffer(q.text, elementMuster('KatalogTabelle')) < 1);
     expect(ohnePrimitiv.map((q) => q.pfad)).toEqual([]);
@@ -132,5 +150,23 @@ describe('KatalogTabelle-Inventar', () => {
     expect(treffer(probe, elementMuster('Table'))).toBe(1);
     expect(treffer(probe, SCROLL_MUSTER)).toBe(1);
     expect(treffer(probe, elementMuster('KatalogTabelle'))).toBe(1);
+  });
+
+  it('die generische Schreibweise wird richtig zugeordnet (Selbstbeweis)', () => {
+    /**
+     * Die sechs Migrationen von LFH-330 · B2 schreiben durchweg die generische Form
+     * (`<KatalogTabelle<Uhs>`), weil `T extends object` sonst nicht gebunden ist. Genau darauf
+     * ruht die ganze Migrationsprüfung — also wird beide Richtungen belegt: `<Table<Foo>` MUSS
+     * als antd-Tabelle zählen, `<KatalogTabelle<Foo>` darf es NICHT (dort steht vor `Table`
+     * kein `<`). Ohne diesen Fall wäre eine Migration grün, die gar nichts getauscht hat.
+     */
+    const probe = ohneKommentare(
+      [
+        'const a = <KatalogTabelle<Uhs> rowKey="id" columns={SPALTEN} />;',
+        'const b = <Table<Uhs> rowKey="id" />;',
+      ].join('\n'),
+    );
+    expect(treffer(probe, elementMuster('KatalogTabelle'))).toBe(1);
+    expect(treffer(probe, elementMuster('Table'))).toBe(1);
   });
 });

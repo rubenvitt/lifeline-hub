@@ -68,6 +68,45 @@ sie auch in künftige KI-Arbeit automatisch einfließt.
 
 ---
 
+## AK3b — Listenform-Leitlinie (nachgetragen 2026-07-28, LFH-330 · B2)
+
+Die Tabelle oben beantwortet **eine** Frage: welches Gefäß trägt einen **einzelnen** Datensatz
+(Vollseite / Modal / Inline / Drawer). Sie sagt nichts darüber, wie eine **Menge** von
+Datensätzen dargestellt wird — und genau dort ist das Frontend auseinandergelaufen: 30 Dateien
+rendern eine antd-`<Table>`, 10 gehen über `components/Liste.tsx`, ohne Regel wann was
+(Befund M33 des UI/UX-Sweeps). Diese Lücke schließt der folgende Abschnitt.
+
+| Listenform | Wann |
+|------------|------|
+| **Tabelle** (`components/KatalogTabelle.tsx`, bzw. `Datensicht` mit `form="tabelle"`) | Es wird **verglichen**: homogene Datensätze, Blick wandert über eine Spalte statt über eine Zeile, Sortieren/Filtern über mehr als vier Attribute. Kanonisch: die Stammdaten-Verwaltung und das Meldebild der Kräfteübersicht. |
+| **Liste / Karte** (`components/Liste.tsx`, bzw. `Datensicht` mit `form="karte"`) | Ein Datensatz wird als **Einheit** erfasst: Titel, Status, Zeit und **eine** Handlung. Kanonisch: die Kommunikationsmodule (Aufträge, Meldungen, Erinnerungen, Nachforderungen, Befehle, Lageberichte). |
+| **Kachel** | Nur für Überblicksflächen, die zu einer anderen Fläche führen — nicht für Datenmengen, die man durchsucht. |
+
+**Faustregel:** Ist die Frage „welcher von diesen ist der richtige?" → Tabelle. Ist sie
+„was ist mit diesem hier?" → Liste/Karte.
+
+**Auf schmalem Schirm wird eine Tabelle angepasst, nicht in Karten aufgelöst.** Der Regelweg
+ist der waagerechte Scrollcontainer mit stehender Kopfzeile und fixierter menschenlesbarer
+Kennung, den `KatalogTabelle` unbedingt setzt (Festlegung 2 der Bedien-Leitlinie,
+`2026-07-25-bedien-leitlinie-einsatzkontexte.md`). Zusätzlich kann eine Spalte über
+`abBreite` erst ab einer Breite erscheinen — „weniger Spalten, aber weiter Tabelle".
+
+**Der Karten-Fallback unter `md` ist die begründungspflichtige Ausnahme**, nicht der
+Normalfall. Er gilt für `Datensicht` mit `form="auto"` und ist auf Module beschränkt, in
+denen ein Datensatz als Einheit erfasst wird. Die Begründung steht im Dateikopf von
+`frontend/src/components/Datensicht.tsx` und in der Prüfliste Einsatztauglichkeit des
+Pakets; sie stützt sich auf die gemessene Lage bei 390 px, wo antd bis zu zehn Spalten auf
+die verfügbare Breite staucht und die Aktionsspalte nicht mehr treffbar ist. **Keine der 13
+Katalogtabellen wird zu Karten** — dort wird verglichen.
+
+Was der Kartenzweig heute **nicht** kann und bewusst nicht können soll: In-Zeile-Bedienung.
+Die `Select`-Felder in den Zeilen von Fahrzeugen, Personal und Material haben in einer Karte
+keine Entsprechung; unter `md` sind diese Module lesend plus eine Primäraktion. Das ist ein
+realer Verlust, kein Versehen — B5 (LFH-333) holt den Statuswechsel ohnehin aus der 24-px-Zelle
+in einen Quick-View, und dann passt der Auslöser in den Aktionsslot der Karte.
+
+---
+
 ## AK2 — Referenz-Umstellung: PersonenPage-Drawer → Vollseite
 
 ### Architektur
