@@ -70,6 +70,15 @@
      bei der kompakten Steuerhöhe rund 47 px je Seite. */
   --lfh-kopf-polsterung: 12px;
 
+  /* Vordergrund der Kopfzeile. STEHT BEWUSST NUR HIER und hat KEINEN Nachtmodus-
+     Gegenwert: die Kopfzeile trägt in beiden Modi denselben dunklen Grund
+     (gemessen `rgb(0, 21, 41)` hell wie dunkel), also braucht sie in beiden
+     denselben hellen Vordergrund. Wer hier einen `[data-theme='dark']`-Eintrag
+     ergänzt, dreht genau den Fehler wieder herein, den diese Rolle behebt:
+     ein Symbol, das der Textrolle des Modus folgt statt seinem eigenen Grund,
+     verschwindet im Hellmodus dunkel auf dunkel. */
+  --lfh-kopf-vordergrund: #ffffff;
+
   /* ── Stimme und Bewegung ───────────────────────────────────────────────── */
   --lfh-versal-sperrung: 2.2px;
   --lfh-uebergang: 120ms cubic-bezier(0.2, 0.8, 0.2, 1);

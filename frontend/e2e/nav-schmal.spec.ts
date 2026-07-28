@@ -229,3 +229,48 @@ test('Navigationsrahmen: das Breitenmaß landet auf dem Drawer-Panel, nicht auf 
   // Der Körper liegt INNERHALB des Panels (Innenrand), ist also nie breiter.
   expect(koerper.width, 'Körper liegt im Panel').toBeLessThanOrEqual(DRAWER_BREITE);
 });
+
+/**
+ * Der Griff muss auf seinem eigenen Grund lesbar sein — in BEIDEN Farbschemata.
+ *
+ * WARUM DAS EIN EIGENER TEST IST: Ein antd-Textknopf erbt `colorText`, und die
+ * Rolle folgt dem Farbschema. Die Kopfzeile tut das NICHT — sie trägt hell wie
+ * dunkel denselben dunklen Grund. Im Hellmodus stand der Griff dadurch dunkel
+ * auf dunkel und war praktisch unsichtbar, während jede jsdom-Prüfung grün
+ * blieb: Vitest fährt mit `css: false` und rechnet keine Farben.
+ *
+ * Gemessen wird der Kontrast nach WCAG 2.1 (1.4.11, Nicht-Text-Kontrast ≥ 3:1
+ * für Bedienelemente) statt eines Farbwerts — ein Wertvergleich ginge bei jeder
+ * Palettenpflege rot, ohne dass die Lesbarkeit litte.
+ */
+test('Navigationsrahmen: der Griff hebt sich in beiden Farbschemata vom Kopf ab', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Nav Kontrast ${Date.now()}`);
+
+  for (const modus of ['light', 'dark'] as const) {
+    await page.evaluate((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
+    await page.setViewportSize(HANDSCHIRM);
+    await page.goto(`/einsaetze/${einsatzId}/etb`);
+    await expect(page.getByRole('button', { name: 'Navigation öffnen' })).toBeVisible();
+
+    const kontrast = await page.evaluate(() => {
+      const kanal = (c: number) => {
+        const s = c / 255;
+        return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+      };
+      const luminanz = (farbe: string) => {
+        const [r, g, b] = farbe.match(/\d+(\.\d+)?/g)!.map(Number);
+        return 0.2126 * kanal(r) + 0.7152 * kanal(g) + 0.0722 * kanal(b);
+      };
+      const kopf = document.querySelector('.ant-layout-header')!;
+      const griff = document.querySelector('[aria-label="Navigation öffnen"]')!;
+      const a = luminanz(getComputedStyle(kopf).backgroundColor);
+      const b = luminanz(getComputedStyle(griff).color);
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    });
+
+    expect(kontrast, `Griff gegen Kopfgrund im Modus ${modus}`).toBeGreaterThanOrEqual(3);
+  }
+});

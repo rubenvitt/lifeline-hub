@@ -171,7 +171,21 @@ export default function EinsatzLayout() {
             // `flexShrink: 0` ist nicht Kosmetik: der Header ist eine Flex-Zeile,
             // und ohne die Sperre drückt der Inhalt daneben den Knopf auf dem
             // Handschirm auf gut die halbe Trefffläche zusammen (gemessen: 26 px).
-            style={{ width: TREFFLAECHE, height: TREFFLAECHE, flexShrink: 0 }}
+            //
+            // `color` ebenso wenig: ein antd-Textknopf erbt `colorText`, und die
+            // Rolle folgt dem Farbschema — im Hellmodus also dunkel. Die
+            // Kopfzeile trägt aber in BEIDEN Modi denselben dunklen Grund
+            // (gemessen `rgb(0, 21, 41)`), sodass der Griff dort dunkel auf
+            // dunkel verschwand. Er folgt jetzt seinem Grund statt dem Modus —
+            // dieselbe Entscheidung, die Alarmzentrale und Benutzermenü
+            // nebenan schon treffen, hier nur als Rolle statt als wiederholter
+            // Festwert.
+            style={{
+              width: TREFFLAECHE,
+              height: TREFFLAECHE,
+              flexShrink: 0,
+              color: 'var(--lfh-kopf-vordergrund)',
+            }}
             icon={<TbMenu2 size={24} />}
             onClick={() => setNavOffen(true)}
           />
