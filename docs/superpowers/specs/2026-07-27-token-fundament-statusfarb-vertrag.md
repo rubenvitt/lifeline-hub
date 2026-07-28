@@ -532,3 +532,46 @@ Verdichtung im Lagebild. Der zweite Fund ist der interessanteste: `STATUS_RANG` 
 bewusst **nicht** in den Vertrag gezogen (fachliche Sortierung, keine Darstellung) — und ist
 trotzdem exhaustiv getypt. Die Entscheidung, ihn lokal zu lassen, hat also keine Lücke
 aufgerissen.
+
+---
+
+## 9 — Abschluss: gemessen am fertigen Stand (2026-07-28)
+
+`./scripts/check-all.sh` läuft alle sieben Schritte grün durch (Exit 0), inklusive
+`cargo test --workspace`, Vitest und der Playwright-Suite (19 e2e-Tests).
+
+| Kriterium | Ziel | Vorher | Erreicht |
+|---|---|---|---|
+| **Gate 5** — Rollenfarbwerte außerhalb `frontend/src/theme/` | 0 | 8 | **0** |
+| `var(--ant-color-` im Frontend (cssVar-Zweig „AUS") | 0 | 3 | **0** |
+| **Gate 4** — `controlHeight` außerhalb `theme/` | 0 | 0 | **0** |
+| **Gate 4** — `size="small"` repo-weit | ≤ 236 | 236 | **152** |
+| `Space direction=` (antd-6-Rest) | 0 | 1 | **0** |
+| **AC 7** — Dateien mit `SektionHeader`/`EinsatzSeite` | ≥ 10 | 2 | **15** |
+| Vitest | grün | — | **217 Dateien / 1695 Tests** |
+| Exhaustivität des Vertrags | belegt | behauptet | **Mutationsprobe, §8** |
+
+**Zur `size="small"`-Zahl.** Die 152 sind kein Sweep-Ergebnis, sondern die Folge der Norm auf
+ohnehin Angefasstes: gefallen sind die Vorkommen auf **interaktiven** Elementen in den von A2
+geöffneten Dateien. Ein Teil der Container-Vorkommen (`Card` in der Lagekarten-Sidebar) blieb
+mit Begründung an der Stelle stehen — dort verkleinert `size="small"` keine Trefffläche,
+sondern nur Polsterung, und die Sidebar ist eine schmale Fläche, auf der Kompaktheit gewollt
+ist. Das ist die Unterscheidung, die A1 Festlegung 4 selbst zieht. Der Rest bleibt **B5**.
+
+**Zur AC-7-Zahl.** 15 Dateien, davon 3 die Primitive selbst
+(`EinsatzSeite.tsx`, `SektionHeader.tsx`, `SeitenZustand.tsx`) — also **12 echte Konsumenten**
+gegen vorher 1. Der Grep im Task zählt die Definitionsdatei mit (er tat es auch bei der
+Ausgangszahl 2), die Messmethode ist damit unverändert.
+
+**Drei Dinge, die im Lauf gefunden wurden und ohne den Lauf unentdeckt geblieben wären:**
+
+1. **`check-typ-codegen.sh` bricht vor dem `tsc`-Schritt** (§8) — ein Gate, das aus dem
+   richtigen Grund rot wird, aber nicht aus dem geprüften.
+2. **Ein Erklärkommentar kann sein eigenes Gate reißen.** Zweimal passiert
+   (`LoginPage.css`, `SlashMenu.tsx`): erst nannte der Text den Farbwert im Klartext, dann die
+   antd-Variable in `var(…)`-Schreibweise. Beide Male war der Code längst richtig und nur die
+   Prosa daneben. **Regel: verbotene Konstrukte umschreiben, nicht zitieren** — ein Gate, das
+   an seinem eigenen Erklärtext scheitert, erzieht dazu, es abzuschalten.
+3. **Ein Parse-Fehler reißt Nachbardateien mit, ohne dass ein Test rot meldet.** Der Lauf
+   bricht ab, bevor er beginnt; wer nur seine eigene Testdatei fährt, sieht das nie. Deshalb
+   ist die Zahl der **Testdateien** die belastbare Kennzahl, nicht „passed".
