@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { http, HttpResponse } from 'msw';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -5,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
+import { warnstufeKennzahl } from '../../theme/statusFarben';
 import LageDashboardPage from './LageDashboardPage';
 import type { Auftrag, Meldung } from '../../api/types';
 
@@ -315,5 +319,171 @@ describe('LageDashboardPage — Referenzseite der Gestaltungssprache', () => {
       'UHS aktiv',
     ];
     for (const e of etiketten) expect(kennzahl(e)).toBeInTheDocument();
+  });
+
+  it('die Leiste trägt genau 6 Kennzahlen in fester Reihenfolge', async () => {
+    // Der Nachbartest darüber prüft VORHANDENSEIN (auch bei Teilfehlern). Dieser
+    // prüft ANZAHL und ORDNUNG — zwei verschiedene Befunde, die nicht zu einem
+    // verschmolzen werden dürfen.
+    //
+    // Warum die Anzahl gepinnt ist: „überfällige Aufträge" wären der Kandidat für
+    // eine siebte Kennzahl. Sie bleiben die Alarm-Plakette der Aufträge-Kachel.
+    // Sieben Kennzahlen ergäben am Handschirm bei 2 Spalten 4 statt 3 Zeilen.
+    //
+    // Warum die Reihenfolge gepinnt ist: Prüfliste Kriterium 9 verlangt, dass
+    // dieselbe Größe in jedem Zustand an derselben Stelle steht. Nach
+    // Dringlichkeit umsortieren ist deshalb ausdrücklich verboten — wer eine Lage
+    // funkt, sucht die Zahl an ihrem Platz, nicht in einer Rangliste.
+    mockEndpunkte({ personen: [person('sk1')] });
+    render();
+    await screen.findByText('Patienten SK I–IV');
+
+    const knoepfe = Array.from(document.querySelectorAll('.lfh-kennzahlen .lfh-kz'));
+    expect(knoepfe).toHaveLength(6);
+    const etiketten = knoepfe.map((k) => k.querySelector('.lfh-etikett')?.textContent);
+    expect(etiketten).toEqual([
+      'Kräfte F/UF/M//Σ',
+      'Patienten SK I–IV',
+      'Vermisst',
+      'Höchste Warnstufe',
+      'Schäden offen',
+      'UHS aktiv',
+    ]);
+  });
+
+  it('die Stufenkante hängt an der Kennzahl, die sie meint', async () => {
+    // Die Kante ist der zweite Kanal nach WCAG 1.4.1 (`sprache.css`, Block
+    // `.lfh-kz--alarm`/`--achtung`). Geprüft werden KLASSENNAMEN, nicht Geometrie:
+    // Vitest fährt mit `css: false`, und jsdom rechnet kein Layout — die Regel
+    // hätte hier keine Wirkung. Dass sie WIRKT, belegt `e2e/lage-dashboard-schmal.spec.ts`.
+    //
+    // NICHT geprüft (und bewusst so): die Bedingung `z === 'daten'` in
+    // `LageDashboardPage.tsx`, die im Fehlerzustand jede Stufenfarbe unterdrückt.
+    // Sie ist über die Endpunkte nicht auslösbar — jede Kennzahl zieht Wert UND
+    // Stufe aus derselben Abfrage, und fällt die aus, ist die Stufe ohnehin
+    // `normal`. Ein Test darauf wäre grün durch Konstruktion. Der Schutz bleibt
+    // trotzdem richtig, sobald eine Kennzahl einmal aus zwei Quellen speist.
+    mockEndpunkte({
+      personen: [person(null, 'vermisst')],
+      gefahren: [{ hoechste_warnstufe: 'mittel' }],
+    });
+    render();
+    await screen.findByText('Vermisst');
+
+    expect(kennzahl('Vermisst').className).toContain('lfh-kz--alarm');
+    expect(kennzahl('Höchste Warnstufe').className).toContain('lfh-kz--achtung');
+    // Kräfte tragen keine Bewertung — eine Stärke ist keine Gefahrenmeldung.
+    expect(kennzahl('Kräfte F/UF/M//Σ').className).not.toContain('lfh-kz--');
+  });
+
+  it('Warnstufe „niedrig" hebt nicht ab und trägt den Wortlaut als zweiten Kanal', async () => {
+    // Entscheidung des Pakets, hier festgenagelt: `niedrig` bleibt Rolle `normal`.
+    // Das Alarmbudget (EEMUA 191 / ISA-18.2, ≤ 3 Eskalationsstufen) trägt die
+    // Entscheidung fachlich — eine niedrige Warnstufe ist definitionsgemäß kein
+    // Alarmbeitrag —, und der zweite Kanal nach WCAG 1.4.1 ist bei dieser Kennzahl
+    // der ausgeschriebene Wortlaut, nicht die Kante.
+    //
+    // Der Pin auf die Karte ist der eigentliche Ertrag: `statusFarben.ts` ist der
+    // app-weite Vertrag mit vielen Konsumenten. Ein stilles Umhängen von `niedrig`
+    // auf `achtung` bräche heute NICHTS — es färbte nur jede Anzeige der Warnstufe
+    // in der ganzen Anwendung um. Ab hier färbt es diesen Test rot.
+    expect(warnstufeKennzahl.niedrig.rolle).toBe('normal');
+    expect(warnstufeKennzahl.niedrig.label).toBe('niedrig');
+
+    mockEndpunkte({ gefahren: [{ hoechste_warnstufe: 'niedrig' }] });
+    render();
+    await screen.findByText('Höchste Warnstufe');
+    const knopf = kennzahl('Höchste Warnstufe');
+    expect(knopf).toHaveTextContent('niedrig');
+    expect(knopf.className).not.toContain('lfh-kz--');
+  });
+});
+
+/**
+ * Quellpins auf `theme/sprache.css`.
+ *
+ * Gelesen wird über `node:fs`, NICHT über einen Import und NICHT über
+ * `import.meta.glob(…?raw)`: Vitest fährt mit `css: false`, und beides lieferte
+ * dann den Leerstring — der Pin wäre inhaltsleer grün. Dieselbe Mechanik nutzt
+ * `components/EinsatzSeite.test.tsx`; sie ist bewusst kopiert und nicht geteilt,
+ * damit nicht zwei Testdateien an einer Hilfsfunktion hängen.
+ */
+describe('Die Kennzahlenleiste in sprache.css', () => {
+  const hier = dirname(fileURLToPath(import.meta.url));
+  const css = readFileSync(join(hier, '..', '..', 'theme', 'sprache.css'), 'utf-8');
+
+  /** Der Rumpf der ersten Regel für `wahl` ab Position `ab`. */
+  function regel(wahl: string, ab = 0): string {
+    const start = css.indexOf(wahl, ab);
+    expect(start, `Selektor ${wahl} steht nicht in sprache.css`).toBeGreaterThanOrEqual(0);
+    const auf = css.indexOf('{', start);
+    const zu = css.indexOf('}', auf);
+    return css.slice(auf + 1, zu);
+  }
+
+  it('die Spaltenstaffel der Kennzahlenleiste steht in sprache.css: 6 → 3 → 2', () => {
+    // DIE SCHWELLEN SIND CONTAINER-BREITEN, nicht Viewport-Breiten — `.lfh-flaeche`
+    // trägt `container-type: inline-size`. Im Browser nachgemessen (LFH-329 · B1):
+    // Viewport 1366 → Container 1036 · 1024 → 694 · 390 → 366.
+    //
+    // Dieser Pin ist der einzige Schutz der 1100er-Schwelle: keine der drei
+    // e2e-Prüfbreiten läge nach einer Senkung auf 1000 in einem anderen Band, die
+    // Senkung liefe also durch. Gemessen brauchen sechs Spalten mindestens
+    // ~1036 px Container (Container 950 → 14 px Etikettenüberlauf, 1036 → 0 px);
+    // 1100 ist die nächste Schwelle darüber, die Luft lässt. Wer sie senkt, misst
+    // vorher neu und schreibt die Messung in den Kommentar über dem Block.
+    expect(regel('.lfh-kennzahlen {')).toMatch(
+      /grid-template-columns:\s*repeat\(6, minmax\(0, 1fr\)\)/,
+    );
+
+    const tablet = css.indexOf('@container lfh (max-width: 1100px)');
+    expect(tablet, 'Schwelle 1100px fehlt').toBeGreaterThanOrEqual(0);
+    expect(regel('.lfh-kennzahlen {', tablet)).toMatch(
+      /grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/,
+    );
+
+    const hand = css.indexOf('@container lfh (max-width: 700px)');
+    expect(hand, 'Schwelle 700px fehlt').toBeGreaterThanOrEqual(0);
+    expect(regel('.lfh-kennzahlen {', hand)).toMatch(
+      /grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/,
+    );
+  });
+
+  it('die Stufenregeln der Kennzahl ändern Farbe und Kantenbreite, nicht Schriftgröße oder -schnitt', () => {
+    // Die verworfene Alternative, hier festgenagelt: eine stufenabhängige
+    // SCHRIFTGRÖSSE ließe die Kennzahlenzeile bei jedem Statuswechsel in der Höhe
+    // springen — Festlegung 6 der Bedien-Leitlinie deckelt CLS bei 0,1 (WCAG 3.2.5).
+    // Der stufenabhängige SCHNITT ist an dieser Stelle nachweislich leer: in
+    // Chromium gemessen liegt die Vorschubbreite der Kennzahl bei 400/500 auf
+    // 96,33 px und bei 600/700/800 auf 96,00 px — über 600 hinaus liefert
+    // `schriften.css` keinen Schnitt, und der Browser setzt keinen künstlichen
+    // Fettdruck. Die Zahl steht bereits auf 600.
+    //
+    // Was stattdessen trägt: die abgestufte Kante. Sie kostet null Layout
+    // (`inset`-Schatten) und unterscheidet die beiden bewerteten Stufen auch ohne
+    // Farbe voneinander — vorher taten das nur die Farbwerte.
+    const alarm = regel('.lfh-kz--alarm {');
+    const achtung = regel('.lfh-kz--achtung {');
+    for (const [name, block] of [
+      ['alarm', alarm],
+      ['achtung', achtung],
+      ['alarm/Zahl', regel('.lfh-kz--alarm .lfh-zahl--gross {')],
+      ['achtung/Zahl', regel('.lfh-kz--achtung .lfh-zahl--gross {')],
+    ] as const) {
+      expect(block, `${name}: Schriftgröße gehört nicht in eine Stufenregel`).not.toMatch(
+        /font-size/,
+      );
+      expect(block, `${name}: Schriftschnitt gehört nicht in eine Stufenregel`).not.toMatch(
+        /font-weight/,
+      );
+    }
+
+    const kante = (block: string) => Number(block.match(/inset (\d+)px/)![1]);
+    expect(kante(alarm), 'Alarmkante muss breiter sein als die Achtungkante').toBeGreaterThan(
+      kante(achtung),
+    );
+
+    // Und die Grundgröße der Kennzahl ist unbedingt — genau ein `font-size`.
+    expect(regel('.lfh-zahl--gross {').match(/font-size/g)).toHaveLength(1);
   });
 });

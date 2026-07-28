@@ -221,6 +221,19 @@ export function baueLagebild(r: Rohdaten): Lagebild {
     org: r.einsatz.org_name ?? null,
     seit: uhrzeit(r.einsatz.begonnen_at),
     status: r.einsatz.status,
+    // SECHS Kennzahlen, feste Reihenfolge (LFH-329 · B1).
+    //
+    // Die Anzahl ist eine Entscheidung, keine Zufälligkeit: am Handschirm stehen
+    // sie in 2 Spalten, sechs ergeben also genau 3 Zeilen. Eine siebte — der
+    // Kandidat waren die überfälligen Aufträge — machte daraus 4 Zeilen. Die
+    // überfälligen Aufträge tragen deshalb weiterhin die Alarm-Plakette IHRER
+    // Kachel; der Punkt ist erfüllt, nur an anderer Stelle.
+    //
+    // Die Reihenfolge wird NICHT nach Dringlichkeit sortiert. Prüfliste
+    // Kriterium 9 verlangt dieselbe Größe an derselben Stelle, in jedem Zustand —
+    // wer eine Lage funkt, greift nach der Zahl an ihrem Platz. Zweitens hängt an
+    // dieser Liste eine zweite in `LageDashboardPage.tsx` (Kennzahl ↔ Datenzustand),
+    // die stumm aus dem Takt liefe; beide pinnt `LageDashboardPage.test.tsx`.
     kennzahlen: [
       {
         etikett: 'Kräfte F/UF/M//Σ',
