@@ -61,6 +61,15 @@
      Achse als die Dichte — deshalb NICHT in den `data-dichte`-Blöcken unten. */
   --lfh-seiten-polsterung: 12px;
 
+  /* ── Kopfzeile · Viewport-Achse (LFH-329 · B1) ─────────────────────────── */
+  /* Gleiche Richtung wie die Rinne darüber, aber EINE ANDERE SCHWELLE: die
+     Kopfzeile wird ab antds `lg` (992 px) voll, die Fläche schon ab `md`
+     (768 px). Das ist Absicht — der Kopf wird enger, bevor die Fläche es wird,
+     weil dort Umschalter und Einsatzname um dieselbe Zeile konkurrieren.
+     Ohne diese Property hinge der Kopf am antd-Komponententoken, und der frisst
+     bei der kompakten Steuerhöhe rund 47 px je Seite. */
+  --lfh-kopf-polsterung: 12px;
+
   /* ── Stimme und Bewegung ───────────────────────────────────────────────── */
   --lfh-versal-sperrung: 2.2px;
   --lfh-uebergang: 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -136,5 +145,22 @@
 @media (min-width: 768px) {
   :root {
     --lfh-seiten-polsterung: 24px;
+  }
+}
+
+/* ── Kopfzeile · die zweite Viewport-Schwelle (LFH-329 · B1) ───────────────
+   Ab antds `lg` (992 px) trägt die Kopfzeile die volle Polsterung. Dieselbe
+   Schwelle, an der sie ihre Umschalter wieder aufnimmt und der
+   Navigationsrahmen aus dem Griff zurück in die Fläche wandert — eine Zahl für
+   den ganzen Kopf.
+
+   Die Auflagen von oben gelten unverändert: DATEIENDE und EINGERÜCKTER innerer
+   Selektor. `rollen.guard.test.ts` sucht `:root` am Zeilenanfang und nimmt den
+   ersten Treffer.
+   ======================================================================== */
+
+@media (min-width: 992px) {
+  :root {
+    --lfh-kopf-polsterung: 24px;
   }
 }

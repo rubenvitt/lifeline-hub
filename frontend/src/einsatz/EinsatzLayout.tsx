@@ -35,6 +35,36 @@ const { Header, Content } = Layout;
 const TREFFLAECHE = 48;
 
 /**
+ * Die Kopfzeile trägt ihre Polsterung selbst (LFH-329 · B1/M12).
+ *
+ * Ohne diesen Stil hinge sie am antd-Komponententoken, der sich aus der
+ * Steuerhöhe ableitet und bei der kompakten Stufe rund 47 px je Seite beträgt —
+ * auf einem 390-px-Schirm knapp ein Viertel der Breite, nur für Rand. Die Zahl
+ * steht NICHT hier, sondern als Custom Property in `theme/rollen.css`: sie
+ * hängt am Viewport, und eine Media-Regel greift beim ersten Paint, während
+ * eine JS-Ableitung erst nach dem Mount stimmte. Geschwisterstil in
+ * `components/AppLayout.tsx` — beide Kopfzeilen lesen dieselbe Property.
+ */
+const KOPF_STIL = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 16,
+  paddingInline: 'var(--lfh-kopf-polsterung)',
+} as const;
+
+/**
+ * Der Einsatzname bekommt die Restbreite — und nur die.
+ *
+ * `flexBasis: 0` ist tragend: mit `auto` bemäße sich der Rahmen am Inhalt, und
+ * eine 60-Zeichen-Bezeichnung schöbe die Umschalter rechts aus der Kopfzeile
+ * heraus. `minWidth: 0` ebenso — ohne die Aufhebung der Mindestbreite kürzt ein
+ * Flex-Kind nicht, sondern wächst über seinen Rahmen hinaus. Die andere Hälfte
+ * der Kürzung (Ellipsis, `title`) sitzt im `EinsatzSwitcher`: der Name steht in
+ * einem antd-Knopf, und der kürzt ohne eigenes `overflow` nicht.
+ */
+const REST_STIL = { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 } as const;
+
+/**
  * Ebene 2: Einsatz-Workspace mit Switcher-Header, Icon-Rail und Modul-Panel.
  *
  * BREITENWEICHE AN antds `lg` (992 px, LFH-329 · B1/H11): darüber steht der
@@ -133,7 +163,7 @@ export default function EinsatzLayout() {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Header style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+      <Header style={KOPF_STIL}>
         {!breit && (
           <Button
             type="text"
@@ -146,14 +176,20 @@ export default function EinsatzLayout() {
             onClick={() => setNavOffen(true)}
           />
         )}
-        {isLoading ? (
-          <Spin />
-        ) : (
-          <EinsatzSwitcher aktuellName={einsatz?.bezeichnung ?? 'Einsatz'} />
-        )}
+        <div style={REST_STIL}>
+          {isLoading ? (
+            <Spin />
+          ) : (
+            <EinsatzSwitcher aktuellName={einsatz?.bezeichnung ?? 'Einsatz'} />
+          )}
+        </div>
         <Space style={{ marginLeft: 'auto' }} size="middle">
+          {/* Die Alarm-Zentrale bleibt auch auf dem Handschirm stehen: sie ist
+              bereits reines Symbol und kostet so wenig Breite wie der Griff
+              links. Farbschema UND Bediendichte wandern unter `lg` dagegen ins
+              Benutzermenü — nicht ersatzlos weg. */}
           <AlarmZentrale />
-          <ThemeToggle />
+          {breit && <ThemeToggle />}
           <BenutzerMenu />
         </Space>
       </Header>

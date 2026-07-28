@@ -129,6 +129,35 @@ describe('EinsatzLayout', () => {
   });
 
   /**
+   * Gegenprobe zum Kopfzeilen-Block unter lg — mit DERSELBEN Abfrage. Eine
+   * `queryBy…`-Null allein belegt nichts: sie wäre auch bei falsch
+   * geschriebener Beschriftung grün.
+   */
+  it('ab lg stehen beide Umschalter in der Kopfzeile', async () => {
+    setup();
+    await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+    expect(screen.getByRole('radiogroup', { name: 'Farbschema wählen' })).toBeInTheDocument();
+    expect(screen.getByRole('radiogroup', { name: 'Bediendichte wählen' })).toBeInTheDocument();
+  });
+
+  it('der Einsatzname sitzt im Restbreiten-Rahmen', async () => {
+    // Der Rahmen ist die eine Hälfte der Kürzung — die andere (Ellipsis und
+    // `title`) sitzt im Switcher und wird dort geprüft. Ohne `min-width: 0`
+    // kürzt ein Flex-Kind nicht, sondern schiebt seine Nachbarn hinaus.
+    setup();
+    //
+    // `parentElement` ist belastbar: antds Dropdown klont sein Kind, statt es
+    // einzupacken — zwischen Rahmen und Knopf liegt nichts.
+    const switcher = await screen.findByRole('button', { name: /Hochwasser Nord/ });
+    const rahmen = switcher.parentElement!;
+    expect(rahmen.style.minWidth).toBe('0px');
+    expect(rahmen.style.flexGrow).toBe('1');
+    // `flex-basis: 0` gehört dazu: mit `auto` bemäße sich der Rahmen am
+    // Inhalt und wüchse mit einem langen Namen über die Kopfzeile hinaus.
+    expect(rahmen.style.flexBasis).toBe('0px');
+  });
+
+  /**
    * Der gemerkte Einklapp-Zustand ist ein EIGENES Boolean neben `offeneKategorie`.
    * Diese drei Tests pinnen die Auftrennung: die Rail behält ihre Hervorhebung
    * (WELCHE Kategorie), das Panel verschwindet (OB offen) — und der Effekt, der
@@ -220,6 +249,23 @@ describe('EinsatzLayout', () => {
       expect(await screen.findByText('Lagekarte-Inhalt')).toBeInTheDocument();
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
       expect(screen.queryAllByRole('navigation')).toHaveLength(0);
+    });
+
+    it('legt beide Umschalter ab, behält Alarm-Zentrale und Benutzermenü', async () => {
+      // Die Alarm-Zentrale ist bereits reines Symbol und bleibt deshalb stehen —
+      // sie kostet auf 390 px so wenig Breite wie der Griff daneben.
+      setup();
+      await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
+      expect(
+        screen.queryByRole('radiogroup', { name: 'Farbschema wählen' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('radiogroup', { name: 'Bediendichte wählen' }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Benutzermenü' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Alarm-Ton stummschalten' }),
+      ).toBeInTheDocument();
     });
 
     it('hält Hamburger und Schließen-Knopf auf der A1-Trefffläche', async () => {
