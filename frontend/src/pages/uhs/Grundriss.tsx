@@ -23,6 +23,22 @@ import { rollenFarbe, verfuegbarkeit as verfuegbarkeitVertrag } from '../../them
 // groß genug für den Worst Case (2-zeiliger Titel + Tag + Belegung + Aktionszeile).
 const PLATZ_KARTE_HOEHE = 116;
 
+// BEFUND zu `size="small"` (LFH-328/A1 Festlegung 4, Gate 4) — hier bleiben SECHS stehen,
+// in zwei Gruppen, und die zweite ist kein Ermessen, sondern eine gemessene Kollision:
+//
+//   * `<Card size="small">` in `PersonenSpalte`/`TransportSpalte` (2×) ist ein reiner
+//     Polsterungsfall und trifft keine Treffläche — bleibt.
+//   * Die vier Aktions-Buttons in `PlatzKarte` (Transport, Zurückweisen, „als frei",
+//     Platzaktionen) lassen sich NICHT auf `controlHeight` heben, ohne die Karte zu
+//     sprengen. Die Rechnung: Innenraum = 116 − 12 (padding) − 4 (border) = 100 px, belegt
+//     von Titel 30 + Tags 24 + Belegung 24 + Aktionen 24 = 102 px. Ein Button auf
+//     `controlHeight` (kompakt: 30 px, statt `controlHeightSM` = 22,5 px) braucht 108 px
+//     — und die Karte darf nicht wachsen, weil SCHRITT_Y = 120 im BACKEND
+//     (`raster_position`) sitzt. Die Treffläche hier hängt also an einer Server-Konstante,
+//     nicht an einem Frontend-Token; das gehört zur Dichte-Umschaltung (B5), nicht in A2.
+//     Einen Wert danebenzusetzen wäre genau die Ad-hoc-Entscheidung, gegen die A2 antritt
+//     (Spec §5 Befund 7).
+
 function personLabel(person: Person): string {
   const nr = registrierAnzeige(person.registrier_nr);
   return person.name ? `${nr} · ${person.name}` : `${nr} · unbekannt`;
@@ -455,7 +471,6 @@ export default function Grundriss({
                 : (
                   <Space>
                     <Button
-                      size="small"
                       type={platzBearbeitung ? 'primary' : 'text'}
                       onClick={() => setPlatzBearbeitung((v) => !v)}
                     >
@@ -566,7 +581,7 @@ function NeuerPlatzKnopf({ einsatzId, uhsId, onSuccess, primaer }: { einsatzId: 
     onError: (e: unknown) => message.error(e instanceof ApiError ? e.message : 'Anlegen fehlgeschlagen'),
   });
   if (!open) {
-    return <Button size="small" type={primaer ? 'primary' : 'default'} onClick={() => setOpen(true)}>Plätze anlegen</Button>;
+    return <Button type={primaer ? 'primary' : 'default'} onClick={() => setOpen(true)}>Plätze anlegen</Button>;
   }
   return (
     <Space align="center" wrap>
@@ -576,7 +591,6 @@ function NeuerPlatzKnopf({ einsatzId, uhsId, onSuccess, primaer }: { einsatzId: 
         options={PLATZ_TYPEN}
         style={{ width: 200 }}
         aria-label="Platz-Typ"
-        size="small"
       />
       <InputNumber
         min={1}
@@ -584,10 +598,9 @@ function NeuerPlatzKnopf({ einsatzId, uhsId, onSuccess, primaer }: { einsatzId: 
         value={menge}
         onChange={(v) => setMenge(v ?? 1)}
         aria-label="Menge"
-        size="small"
       />
-      <Button size="small" type="primary" loading={mut.isPending} onClick={() => mut.mutate()}>Anlegen</Button>
-      <Button size="small" onClick={() => setOpen(false)}>Abbrechen</Button>
+      <Button type="primary" loading={mut.isPending} onClick={() => mut.mutate()}>Anlegen</Button>
+      <Button onClick={() => setOpen(false)}>Abbrechen</Button>
     </Space>
   );
 }

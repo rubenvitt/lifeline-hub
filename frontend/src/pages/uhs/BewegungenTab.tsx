@@ -76,7 +76,6 @@ export default function BewegungenTab({ uhs }: Props) {
       rowKey="id"
       dataSource={uhs.belegungen}
       columns={columns}
-      size="small"
       pagination={false}
       locale={{ emptyText: 'Keine Bewegungen erfasst' }}
       loading={personenQuery.isLoading}

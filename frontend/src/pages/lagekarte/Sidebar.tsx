@@ -145,6 +145,19 @@ export default function Sidebar(props: SidebarProps) {
   const uhsVerortet = verortet.filter((m) => m.typ === 'uhs');
   const schadenVerortet = verortet.filter((m) => m.typ === 'schaden');
 
+  // `size="small"` in dieser Datei (LFH-328/A1 Festlegung 4): auf allen interaktiven
+  // Elementen — Button, Switch, Select, Radio.Group — ist es ENTFERNT; deren Höhe kommt
+  // jetzt aus `controlHeight` der Dichte-Staffel am `ConfigProvider`. Stehen bleiben
+  // ausschliesslich Container-Fälle, und zwar aus zwei getrennten Gründen:
+  //
+  //   * `<Card size="small">` (11×) und `<Spin size="small">` ändern nur die Polsterung
+  //     bzw. die Grösse einer Anzeige — sie verkleinern keine Treffläche. Die Leiste ist
+  //     300 px breit und scrollt; elf Karten auf Normalpolsterung zu heben wäre eine
+  //     REINE Sichtänderung an der meistgenutzten Fläche der Anwendung, die jsdom nicht
+  //     nachrechnen kann (Layout-Regressionen sind hier nur per e2e sichtbar).
+  //   * `<Liste size="small">` (3×) ist gar kein antd-Prop: `components/Liste.tsx` bildet
+  //     `size` auf die Abstands-Token ab und zieht bei der Dichte-Umschaltung (B5) mit.
+  //     Es zu entfernen würde die Staffel nicht bedienen, sondern verlassen.
   return (
     <div style={{ width: 300, padding: 12, overflowY: 'auto', height: '100%' }}>
       <AnsichtSwitcher
@@ -182,13 +195,13 @@ export default function Sidebar(props: SidebarProps) {
               if (darfSchreiben) {
                 if (o.typ === 'abschnitt') {
                   action = (
-                    <Button size="small" type="primary" onClick={() => props.onAbschnittZeichnenStart(o.id)}>
+                    <Button type="primary" onClick={() => props.onAbschnittZeichnenStart(o.id)}>
                       Fläche zeichnen
                     </Button>
                   );
                 } else if (aktiv) {
                   action = (
-                    <Button size="small" onClick={props.onPlatzierenAbbrechen}>
+                    <Button onClick={props.onPlatzierenAbbrechen}>
                       Abbrechen
                     </Button>
                   );
@@ -197,7 +210,6 @@ export default function Sidebar(props: SidebarProps) {
                   const punktTyp = o.typ;
                   action = (
                     <Button
-                      size="small"
                       type="primary"
                       onClick={() => props.onPlatzierenStart({ typ: punktTyp, id: o.id })}
                     >
@@ -233,7 +245,6 @@ export default function Sidebar(props: SidebarProps) {
           </div>
           <div style={{ marginTop: 8 }}>
             <Button
-              size="small"
               disabled={!koord}
               onClick={() => {
                 if (koord) {
@@ -255,12 +266,11 @@ export default function Sidebar(props: SidebarProps) {
           </Typography.Text>
           {darfSchreiben &&
             (platzierungZiel?.typ === 'einsatzort' ? (
-              <Button size="small" onClick={props.onPlatzierenAbbrechen}>
+              <Button onClick={props.onPlatzierenAbbrechen}>
                 Abbrechen
               </Button>
             ) : (
               <Button
-                size="small"
                 type={props.einsatzortVerortet ? 'default' : 'primary'}
                 onClick={props.onEinsatzortPlatzieren}
               >
@@ -397,7 +407,6 @@ export default function Sidebar(props: SidebarProps) {
               <div key={b.id} style={{ borderBottom: `1px solid ${token.colorSplit}`, paddingBottom: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Switch
-                    size="small"
                     checked={b.sichtbar}
                     aria-label={b.name}
                     onChange={(v) => props.onBildToggle(b.id, v)}
@@ -419,7 +428,6 @@ export default function Sidebar(props: SidebarProps) {
                   <Space size={4} style={{ flexShrink: 0 }}>
                     <Tooltip title="Auf Bild zentrieren">
                       <Button
-                        size="small"
                         icon={<FullscreenOutlined />}
                         onClick={() => props.onBildZentrieren(b.id)}
                         aria-label={`${b.name} zentrieren`}
@@ -429,7 +437,6 @@ export default function Sidebar(props: SidebarProps) {
                       <>
                         <Tooltip title={imPlatzieren ? 'Platzieren beenden' : 'Auf der Karte platzieren'}>
                           <Button
-                            size="small"
                             type={imPlatzieren ? 'primary' : 'default'}
                             icon={<AimOutlined />}
                             onClick={() => (imPlatzieren ? props.onBildPlatzierenFertig() : props.onBildPlatzieren(b.id))}
@@ -442,7 +449,7 @@ export default function Sidebar(props: SidebarProps) {
                           okText="Entfernen"
                           cancelText="Abbrechen"
                         >
-                          <Button size="small" danger icon={<DeleteOutlined />} aria-label={`${b.name} löschen`} />
+                          <Button danger icon={<DeleteOutlined />} aria-label={`${b.name} löschen`} />
                         </Popconfirm>
                       </>
                     )}
@@ -485,7 +492,6 @@ export default function Sidebar(props: SidebarProps) {
                     </div>
                     <Space style={{ marginTop: 6, width: '100%', justifyContent: 'space-between' }}>
                       <Button
-                        size="small"
                         disabled={!bildMitte}
                         onClick={() => {
                           if (bildMitte) {
@@ -496,7 +502,7 @@ export default function Sidebar(props: SidebarProps) {
                       >
                         Mittelpunkt setzen
                       </Button>
-                      <Button size="small" type="primary" onClick={props.onBildPlatzierenFertig}>
+                      <Button type="primary" onClick={props.onBildPlatzierenFertig}>
                         Fertig
                       </Button>
                     </Space>
@@ -514,7 +520,7 @@ export default function Sidebar(props: SidebarProps) {
                 return false;
               }}
             >
-              <Button icon={<UploadOutlined />} size="small">Bild hochladen</Button>
+              <Button icon={<UploadOutlined />}>Bild hochladen</Button>
             </Upload>
           )}
         </Space>
@@ -534,13 +540,11 @@ export default function Sidebar(props: SidebarProps) {
                         sonst bereits gespeicherte Zonen nachträglich uminterpretieren. Das
                         Literal bleibt bewusst stehen (LFH-328/T14). */}
                     <Button
-                      size="small"
                       onClick={() => props.onZoneZeichnenStart({ typ: t.typ, modus: 'polygon', farbe: '#1677ff' })}
                     >
                       Fläche
                     </Button>
                     <Button
-                      size="small"
                       onClick={() => props.onZoneZeichnenStart({ typ: t.typ, modus: 'linie', farbe: '#1677ff' })}
                     >
                       Linie
@@ -552,7 +556,6 @@ export default function Sidebar(props: SidebarProps) {
               return (
                 <Button
                   key={t.typ}
-                  size="small"
                   block
                   onClick={() => props.onZoneZeichnenStart({ typ: t.typ, modus })}
                 >
@@ -569,7 +572,7 @@ export default function Sidebar(props: SidebarProps) {
           {props.zeichenPlatzieren ? (
             <Space orientation="vertical" style={{ width: '100%' }}>
               <Typography.Text type="secondary">Auf Karte klicken zum Platzieren.</Typography.Text>
-              <Button size="small" onClick={props.onZeichenPlatzierenAbbrechen}>
+              <Button onClick={props.onZeichenPlatzierenAbbrechen}>
                 Abbrechen
               </Button>
             </Space>
@@ -578,7 +581,6 @@ export default function Sidebar(props: SidebarProps) {
               <FreiesZeichenPicker wert={zeichenEntwurf} onChange={setZeichenEntwurf} />
               <Space>
                 <Button
-                  size="small"
                   type="primary"
                   onClick={() => {
                     props.onZeichenPlatzierenStart(zeichenEntwurf);
@@ -587,13 +589,13 @@ export default function Sidebar(props: SidebarProps) {
                 >
                   Platzieren
                 </Button>
-                <Button size="small" onClick={() => setZeichenPickerOffen(false)}>
+                <Button onClick={() => setZeichenPickerOffen(false)}>
                   Abbrechen
                 </Button>
               </Space>
             </Space>
           ) : (
-            <Button size="small" block onClick={() => setZeichenPickerOffen(true)}>
+            <Button block onClick={() => setZeichenPickerOffen(true)}>
               Taktisches Zeichen platzieren
             </Button>
           )}
@@ -605,7 +607,6 @@ export default function Sidebar(props: SidebarProps) {
           value={props.basemap}
           onChange={(e) => props.onBasemapWechsel(e.target.value as BasemapModus)}
           optionType="button"
-          size="small"
           name="lagekarte-basemap"
         >
           <Tooltip title={props.onlineVerfuegbar ? '' : 'nicht konfiguriert'}>
@@ -622,7 +623,6 @@ export default function Sidebar(props: SidebarProps) {
         </Radio.Group>
         {props.basemap === 'online' && props.onlineStyles.length > 1 && (
           <Select
-            size="small"
             aria-label="Online-Ansicht"
             style={{ width: '100%', marginTop: 8 }}
             value={props.onlineStilName ?? props.onlineStyles[0]?.name}
@@ -639,7 +639,6 @@ export default function Sidebar(props: SidebarProps) {
               value={props.kartenTheme}
               onChange={(e) => props.onKartenThemeWechsel(e.target.value as KartenThemeWahl)}
               optionType="button"
-              size="small"
               aria-label="Karten-Design"
               name="lagekarte-karten-design"
             >
