@@ -16,6 +16,8 @@ import { abstand, antdToken, dichten, farbenHell, flaeche, type Dichte } from '.
 // Eigene Importzeile, damit der geschlossene §2.2-Pin unten in einem reinen
 // Additions-Diff stehen bleibt (eine erweiterte Importzeile wäre eine Änderung).
 import { seitenrinne } from './tokens';
+// Ebenfalls eigene Zeile, aus demselben Grund wie die Zeile darüber.
+import { navDrawerBreite } from './tokens';
 
 /** `ThemeConfig['token']` ist optional getypt — hier nicht wegcasten, sondern
  *  laut scheitern, wenn `antdToken` nichts liefert. */
@@ -108,5 +110,27 @@ describe('Seitenrinne (LFH-329 · B1)', () => {
     // Benannte Diagnose gegen ein vertauschtes Paar: ein `toEqual` allein
     // meldet nur einen Objektdiff, nicht die verdrehte Richtung.
     expect(seitenrinne.schmal).toBeLessThan(seitenrinne.breit);
+  });
+});
+
+/**
+ * Die Breite des Navigations-Drawers ist wie die Seitenrinne eine
+ * VIEWPORT-Aussage und keine §2.2-Baseline — deshalb ein eigener Export statt
+ * eines sechsten Schlüssels in `flaeche`. Der `toEqual`-Pin dort ist
+ * erschöpfend und trägt den Namen „die fünf gemessenen Baselines"; ein
+ * zusätzlicher Schlüssel machte beides unwahr (dieselbe Begründung, aus der
+ * `seitenrinne` daneben steht).
+ */
+describe('Navigations-Drawer (LFH-329 · B1/H11)', () => {
+  it('exportiert die Breite des Navigations-Drawers als Token (LFH-329 · B1)', () => {
+    expect(navDrawerBreite).toBe(280);
+  });
+
+  it('lässt den geschlossenen Flächen-Pin unberührt', () => {
+    // Der Drawer bekommt bewusst KEINEN Platz in `flaeche`. Ohne diese Zeile
+    // würde ein späteres Verschieben dorthin nur den Namen des Pins oben
+    // verbiegen, ohne dass hier etwas rot wird.
+    expect(Object.keys(flaeche)).toHaveLength(5);
+    expect(flaeche).not.toHaveProperty('navDrawer');
   });
 });

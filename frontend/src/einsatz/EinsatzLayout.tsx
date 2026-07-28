@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Layout, Space, Spin } from 'antd';
+import { Button, Drawer, Layout, Space, Spin } from 'antd';
+import { TbMenu2 } from 'react-icons/tb';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ladeEinsatz, ladeModulOverrides } from '../api/einsaetze';
@@ -12,16 +13,36 @@ import {
 import EinsatzSwitcher from './EinsatzSwitcher';
 import IconRail from './IconRail';
 import ModulPanel from './ModulPanel';
+import ModulAkkordeon from './ModulAkkordeon';
+import { leseNavEingeklappt, schreibeNavEingeklappt } from './navPersistenz';
 import AlarmZentrale from './AlarmZentrale';
 import ThemeToggle from '../components/ThemeToggle';
 import BenutzerMenu from '../components/BenutzerMenu';
+import { useViewport } from '../components/useViewport';
+import { navDrawerBreite } from '../theme/tokens';
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import LiveStatusBanner from '../live/LiveStatusBanner';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 
 const { Header, Content } = Layout;
 
-/** Ebene 2: Einsatz-Workspace mit Switcher-Header, Icon-Rail und Modul-Panel. */
+/**
+ * 48 px ist die Trefffläche aus A1 Festlegung 4 (Material 48 dp) — dieselbe Zahl,
+ * die die Rail trägt. Sie gilt für den Hamburger und für den Schließen-Knopf, den
+ * der Drawer selbst mitbringt: der ist von Haus aus kleiner, und ein Knopf, den
+ * man auf dem Handschirm nicht trifft, ist keiner.
+ */
+const TREFFLAECHE = 48;
+
+/**
+ * Ebene 2: Einsatz-Workspace mit Switcher-Header, Icon-Rail und Modul-Panel.
+ *
+ * BREITENWEICHE AN antds `lg` (992 px, LFH-329 · B1/H11): darüber steht der
+ * Rahmen inline wie bisher, darunter liegt die Navigation hinter dem Hamburger
+ * in einem Drawer. Die Frage stellt ausschließlich `useViewport` — eine zweite,
+ * handgeschriebene Breitenabfrage driftet still von antds Schwellen weg
+ * (erzwungen von `components/useViewport.guard.test.ts`).
+ */
 export default function EinsatzLayout() {
   const { id } = useParams();
   const einsatzId = Number(id);
@@ -45,12 +66,32 @@ export default function EinsatzLayout() {
   const aktuellesModul = modulRegistry.find((m) => m.route === aktuellesSegment);
   const aktiveKategorie: KategorieKey | null = aktuellesModul?.kategorie ?? null;
 
+  const { abBreite } = useViewport();
+  const breit = abBreite('lg');
+
   const [offeneKategorie, setOffeneKategorie] = useState<KategorieKey | null>(aktiveKategorie);
+  /**
+   * ZWEITER Zustand neben `offeneKategorie`, bewusst getrennt: jene sagt WELCHE
+   * Kategorie offen ist, dieser OB das Panel überhaupt steht. Der Effekt darunter
+   * gleicht nur die erste Frage an die Route an und fasst diese hier NICHT an —
+   * sonst klappte ein zugeklapptes Panel beim ersten Modulwechsel wieder auf, und
+   * die Persistenz wäre wirkungslos. Lazy-Initialisierer: ein Lesevorgang, kein
+   * Effekt.
+   */
+  const [panelEingeklappt, setPanelEingeklappt] = useState(leseNavEingeklappt);
+  const [navOffen, setNavOffen] = useState(false);
 
   // Panel an die aktuelle Modul-Kategorie angleichen (auch nach Default-Redirect, der kein Remount auslöst).
   useEffect(() => {
     setOffeneKategorie(aktiveKategorie);
   }, [aktiveKategorie]);
+
+  // Wird der Schirm breit, steht der Rahmen wieder inline — ein gemerktes „Drawer
+  // offen" darf dann nicht auf die Rückkehr zum Handschirm warten. `breit` ist ein
+  // Primitiv, damit ist die Dependency-Regel strukturell erfüllt.
+  useEffect(() => {
+    if (breit) setNavOffen(false);
+  }, [breit]);
 
   const { data: einsatz, isLoading } = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -64,17 +105,47 @@ export default function EinsatzLayout() {
     queryFn: () => ladeModulOverrides(einsatzId),
   });
 
+  /**
+   * Rail-Klick im inline-Rahmen: derselbe Kategorie-Knopf klappt das Panel zu und
+   * merkt das; ein anderer klappt es wieder auf. Die Rail behält dabei ihre
+   * Hervorhebung, weil sie `offeneKategorie ?? aktiveKategorie` bekommt.
+   */
   function onKategorieKlick(key: KategorieKey) {
+    const zu = offeneKategorie === key ? !panelEingeklappt : false;
+    setOffeneKategorie(key);
+    setPanelEingeklappt(zu);
+    schreibeNavEingeklappt(zu);
+  }
+
+  /**
+   * Kopfzeilen-Klick im Drawer: nur auf- und zuklappen. Das gemerkte Flag gehört
+   * ausschließlich zum inline-Rahmen — sonst trüge derselbe Schalter in zwei
+   * Darstellungen zwei Bedeutungen.
+   */
+  function onDrawerKategorieKlick(key: KategorieKey) {
     setOffeneKategorie((aktuell) => (aktuell === key ? null : key));
   }
 
   function onModulKlick(modul: ModulEintrag) {
     navigate(`/einsaetze/${einsatzId}/${modulZielRoute(modul)}`);
+    setNavOffen(false);
   }
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Header style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        {!breit && (
+          <Button
+            type="text"
+            aria-label="Navigation öffnen"
+            // `flexShrink: 0` ist nicht Kosmetik: der Header ist eine Flex-Zeile,
+            // und ohne die Sperre drückt der Inhalt daneben den Knopf auf dem
+            // Handschirm auf gut die halbe Trefffläche zusammen (gemessen: 26 px).
+            style={{ width: TREFFLAECHE, height: TREFFLAECHE, flexShrink: 0 }}
+            icon={<TbMenu2 size={24} />}
+            onClick={() => setNavOffen(true)}
+          />
+        )}
         {isLoading ? (
           <Spin />
         ) : (
@@ -87,13 +158,19 @@ export default function EinsatzLayout() {
         </Space>
       </Header>
       <LiveStatusBanner />
+      {/* Das Seitenspalten-Attribut unten ist tragend, in BEIDEN Zweigen: weder
+          die Rail (`<nav>`) noch das Panel (`<div>`) ist eine antd-Seitenspalte,
+          antd erkennt also von selbst keine — nur dieses Attribut erzwingt die
+          waagerechte Achse. Ohne es stapeln die Spalten untereinander. */}
       <Layout hasSider>
-        <IconRail
-          kategorien={kategorien}
-          aktiveKategorie={offeneKategorie ?? aktiveKategorie}
-          onKategorieKlick={onKategorieKlick}
-        />
-        {offeneKategorie && (
+        {breit && (
+          <IconRail
+            kategorien={kategorien}
+            aktiveKategorie={offeneKategorie ?? aktiveKategorie}
+            onKategorieKlick={onKategorieKlick}
+          />
+        )}
+        {breit && offeneKategorie && !panelEingeklappt && (
           <ModulPanel
             titel={kategorien.find((k) => k.key === offeneKategorie)!.label}
             module={moduleNachKategorie(offeneKategorie)}
@@ -109,6 +186,34 @@ export default function EinsatzLayout() {
           </EinsatzAnzeigeProvider>
         </Content>
       </Layout>
+      {/* Nur im Schmal-Zweig überhaupt vorhanden, und bewusst OHNE Vorab-Rendern
+          des Inhalts: sonst stünden die Navigationsknoten doppelt im Baum und
+          jede Aussage über den ausgeblendeten Rahmen wäre bedeutungslos.
+          `destroyOnHidden`, weil das Panel sonst nach dem Schließen im DOM
+          stehenbleibt und ein „ist zu"-Assert nichts mehr belegt. */}
+      {!breit && (
+        <Drawer
+          placement="left"
+          title="Navigation"
+          // `size`, nicht `width`: letzteres ist in antd 6 abgekündigt und
+          // meldet sich im Entwicklungsmodus als Konsolen-Warnung.
+          size={navDrawerBreite}
+          open={navOffen}
+          onClose={() => setNavOffen(false)}
+          destroyOnHidden
+          styles={{ close: { minWidth: TREFFLAECHE, minHeight: TREFFLAECHE } }}
+        >
+          <ModulAkkordeon
+            kategorien={kategorien}
+            offeneKategorie={offeneKategorie}
+            aktiverModulKey={aktuellesModul?.key ?? null}
+            benutzer={benutzer}
+            overrides={modulOverrides}
+            onKategorieKlick={onDrawerKategorieKlick}
+            onModulKlick={onModulKlick}
+          />
+        </Drawer>
+      )}
     </Layout>
   );
 }

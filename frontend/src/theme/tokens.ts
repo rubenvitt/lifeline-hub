@@ -185,6 +185,22 @@ export const seitenrinne = {
   schmal: 12,
 } as const;
 
+/**
+ * Breite des Navigations-Drawers, der den Einsatz-Rahmen unter antds
+ * `lg`-Schwelle ersetzt (LFH-329 · B1/H11).
+ *
+ * VIEWPORT-ACHSE WIE DIE SEITENRINNE, deshalb ein eigener Export und kein
+ * sechster Schlüssel in `flaeche`: das trägt die gemessenen §2.2-Baselines und
+ * ist als geschlossene Menge gepinnt.
+ *
+ * Warum dieses Maß trägt, obwohl der inline-Rahmen breiter ist: der Drawer
+ * zeigt die Navigation NICHT als Rail plus Modul-Spalte. Beide nebeneinander
+ * bräuchten mehr, als hier steht — auf dem Handschirm (~390 px) belegte das
+ * über vier Fünftel der Fläche. Im Drawer steht deshalb ein flaches Akkordeon
+ * in einer Spalte: Kategorie-Kopfzeile, darunter ihre Module.
+ */
+export const navDrawerBreite = 280;
+
 /** Formrollen. Radius 0 ist eine Entscheidung, keine Unentschiedenheit:
  *  die Kachel wird vom Umrissrahmen getragen, nicht von einer weichen Ecke.
  *
