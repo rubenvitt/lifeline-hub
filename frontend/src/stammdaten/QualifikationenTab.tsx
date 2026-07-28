@@ -1,7 +1,8 @@
 import {
-  App, Button, Form, Input, InputNumber, Modal, Popconfirm, Space, Table,
+  App, Button, Form, Input, InputNumber, Modal, Popconfirm, Space,
   type TableColumnsType,
 } from 'antd';
+import KatalogTabelle from '../components/KatalogTabelle';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
@@ -86,7 +87,7 @@ export default function QualifikationenTab() {
           Qualifikation anlegen
         </Button>
       )}
-      <Table
+      <KatalogTabelle
         rowKey="id"
         loading={query.isLoading}
         dataSource={query.data ?? []}
@@ -108,7 +109,7 @@ export default function QualifikationenTab() {
             <Input />
           </Form.Item>
           <Form.Item label="Sortierung" name="sortier">
-            <InputNumber min={0} style={{ width: 120 }} />
+            <InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} />
           </Form.Item>
         </Form>
       </Modal>

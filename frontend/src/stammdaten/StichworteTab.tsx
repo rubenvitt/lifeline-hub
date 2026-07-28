@@ -1,4 +1,5 @@
-import { App, Button, Input, Space, Table, Typography, type TableColumnsType } from 'antd';
+import { App, Button, Input, Space, Typography, type TableColumnsType } from 'antd';
+import KatalogTabelle from '../components/KatalogTabelle';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
@@ -75,7 +76,7 @@ export default function StichworteTab() {
         Einsatz unabhängig davon möglich.
       </Typography.Paragraph>
 
-      <Table
+      <KatalogTabelle
         rowKey="id"
         loading={vorschlaegeQuery.isLoading}
         dataSource={vorschlaege}

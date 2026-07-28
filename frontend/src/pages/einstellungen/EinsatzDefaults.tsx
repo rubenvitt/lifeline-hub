@@ -116,7 +116,7 @@ export default function EinsatzDefaults() {
           name="retention_dauer_tage"
           tooltip="1 bis 3650 Tage. Leer = keine automatische Aufbewahrungsfrist."
         >
-          <InputNumber min={1} max={3650} style={{ width: 200 }} placeholder="keine" />
+          <InputNumber min={1} max={3650} style={{ width: '100%', maxWidth: 200 }} placeholder="keine" />
         </Form.Item>
 
         <SektionHeader
@@ -129,21 +129,21 @@ export default function EinsatzDefaults() {
           name="etb_nummer_praefix"
           tooltip="Wird der laufenden ETB-Nummer vorangestellt (z. B. EB-). Max. 8 Zeichen."
         >
-          <Input maxLength={8} placeholder="z. B. EB-" style={{ width: 200 }} />
+          <Input maxLength={8} placeholder="z. B. EB-" style={{ width: '100%', maxWidth: 200 }} />
         </Form.Item>
         <Form.Item
           label="Präfix Meldungen"
           name="meldung_nummer_praefix"
           tooltip="Wird der laufenden Meldungs-Nummer vorangestellt. Max. 8 Zeichen."
         >
-          <Input maxLength={8} placeholder="z. B. M-" style={{ width: 200 }} />
+          <Input maxLength={8} placeholder="z. B. M-" style={{ width: '100%', maxWidth: 200 }} />
         </Form.Item>
         <Form.Item
           label="Präfix Aufträge"
           name="auftrag_nummer_praefix"
           tooltip="Wird der laufenden Auftrags-Nummer vorangestellt. Max. 8 Zeichen."
         >
-          <Input maxLength={8} placeholder="z. B. A-" style={{ width: 200 }} />
+          <Input maxLength={8} placeholder="z. B. A-" style={{ width: '100%', maxWidth: 200 }} />
         </Form.Item>
 
         <Form.Item
@@ -151,14 +151,14 @@ export default function EinsatzDefaults() {
           name="meldung_bestaetigung_frist_min"
           tooltip="Frist für die Bestätigung pflichtiger Meldungen. Leer = kein Default."
         >
-          <InputNumber min={1} max={10080} style={{ width: 200 }} placeholder="kein Default" />
+          <InputNumber min={1} max={10080} style={{ width: '100%', maxWidth: 200 }} placeholder="kein Default" />
         </Form.Item>
         <Form.Item
           label="Default-Quittierungsfrist Aufträge (Minuten)"
           name="auftrag_quittierung_frist_min"
           tooltip="Frist für unquittierte Aufträge ohne explizite Frist. Leer = kein Default."
         >
-          <InputNumber min={1} max={10080} style={{ width: 200 }} placeholder="kein Default" />
+          <InputNumber min={1} max={10080} style={{ width: '100%', maxWidth: 200 }} placeholder="kein Default" />
         </Form.Item>
 
         <Form.Item

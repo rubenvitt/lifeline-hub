@@ -1,4 +1,5 @@
-import { App, Button, Form, Input, InputNumber, Modal, Popconfirm, Space, Table, type TableColumnsType } from 'antd';
+import { App, Button, Form, Input, InputNumber, Modal, Popconfirm, Space, type TableColumnsType } from 'antd';
+import KatalogTabelle from '../components/KatalogTabelle';
 import { Select } from '../components/Select';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -111,7 +112,7 @@ export default function StatusKatalogTab() {
           Status anlegen
         </Button>
       )}
-      <Table
+      <KatalogTabelle
         rowKey="id"
         loading={statusQuery.isLoading}
         dataSource={statusQuery.data ?? []}
@@ -144,10 +145,10 @@ export default function StatusKatalogTab() {
             <Input placeholder="#22aa55" />
           </Form.Item>
           <Form.Item label="FMS-Anker (0–9, optional)" name="fms_anker">
-            <InputNumber min={0} max={9} style={{ width: 120 }} />
+            <InputNumber min={0} max={9} style={{ width: '100%', maxWidth: 120 }} />
           </Form.Item>
           <Form.Item label="Sortierung" name="sortier">
-            <InputNumber min={0} style={{ width: 120 }} />
+            <InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} />
           </Form.Item>
         </Form>
       </Modal>

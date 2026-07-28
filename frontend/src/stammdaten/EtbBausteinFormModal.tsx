@@ -113,7 +113,7 @@ export default function EtbBausteinFormModal({
           <Input />
         </Form.Item>
         <Form.Item label="Sortierung" name="sortier">
-          <InputNumber min={0} style={{ width: 120 }} />
+          <InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} />
         </Form.Item>
       </Form>
     </Modal>

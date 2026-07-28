@@ -1,7 +1,8 @@
 import {
-  Alert, App, Button, Dropdown, Popconfirm, Progress, Space, Table, Tag, Typography,
+  Alert, App, Button, Dropdown, Popconfirm, Progress, Space, Tag, Typography,
   type TableColumnsType,
 } from 'antd';
+import KatalogTabelle from '../components/KatalogTabelle';
 import { DownOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
@@ -329,7 +330,7 @@ export default function OfflineKartenVerwaltung() {
           description={kartenQuery.error instanceof ApiError ? kartenQuery.error.message : undefined}
         />
       ) : (
-        <Table
+        <KatalogTabelle
           rowKey="id"
           loading={kartenQuery.isLoading}
           dataSource={karten}
