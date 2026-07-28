@@ -177,8 +177,16 @@ test('Navigationsrahmen: auf 390 px liegt die Navigation hinter dem Hamburger', 
   // Auf das TOKEN-Maß geprüft, nicht bloß auf „passt in den Schirm": antds
   // Vorgabebreite (378) läge ebenfalls unter 390, ein ignoriertes Breitenmaß
   // fiele einem `<= 390`-Assert also nie auf.
+  // Gemessen mit Toleranz, nicht auf den Punkt: `boundingBox` liefert
+  // Fließkomma, und unter Last hat Chromium hier 279.99999237060547
+  // zurückgegeben — ein exakter Vergleich färbte das Gate rot, ohne dass sich
+  // etwas geändert hätte. Ein halbes Pixel trennt trotzdem noch jede andere
+  // Breite, die hier in Frage käme (antds Vorgabe 378, ein 320er Drawer).
   const drawerKasten = (await drawer.boundingBox())!;
-  expect(drawerKasten.width, 'Drawer-Breite kommt aus dem Token').toBe(DRAWER_BREITE);
+  expect(
+    Math.abs(drawerKasten.width - DRAWER_BREITE),
+    `Drawer-Breite kommt aus dem Token (gemessen ${drawerKasten.width})`,
+  ).toBeLessThanOrEqual(0.5);
   expect(drawerKasten.width).toBeLessThan(HANDSCHIRM.width);
 
   // Modulklick navigiert UND schließt den Drawer.
