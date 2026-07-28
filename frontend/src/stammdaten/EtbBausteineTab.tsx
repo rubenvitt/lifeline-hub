@@ -1,4 +1,5 @@
-import { App, Button, Popconfirm, Space, Table, Tag, type TableColumnsType } from 'antd';
+import { App, Button, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
+import KatalogTabelle from '../components/KatalogTabelle';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
@@ -58,7 +59,7 @@ export default function EtbBausteineTab() {
           Baustein anlegen
         </Button>
       )}
-      <Table
+      <KatalogTabelle
         rowKey="id"
         loading={query.isLoading}
         dataSource={query.data ?? []}

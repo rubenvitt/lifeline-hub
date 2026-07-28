@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { useThemeMode } from '../theme/ThemeModeProvider';
+import { useDichte, useThemeMode } from '../theme/ThemeModeProvider';
 import { listeEinsaetze, ladeModulOverrides, ladeEinsatz } from '../api/einsaetze';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { setzeOverride } from '../anzeige/koordinatenSystemStore';
@@ -16,6 +16,7 @@ import type { Befehl } from './typen';
 export function useBefehle(): Befehl[] {
   const { benutzer, logout } = useAuth();
   const { setModus } = useThemeMode();
+  const { setDichte } = useDichte();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const einsatzId = einsatzIdAusPfad(pathname);
@@ -38,9 +39,13 @@ export function useBefehle(): Befehl[] {
       einsatzId, benutzer, einsaetze, overrides, darfSchreibenImEinsatz: darfSchreibenImEinsatz ?? false,
       navigate: (p) => navigate(p),
       setThemeModus: setModus,
+      setDichte,
       setKoordinaten: setzeOverride,
       logout: () => { void logout(); },
     }),
-    [einsatzId, benutzer, einsaetze, overrides, darfSchreibenImEinsatz, navigate, setModus, logout],
+    // `setDichte` gehört hier hinein und ist dafür identitätsstabil (useCallback im
+    // Provider) — das aus `useDichte()` zurückgegebene Objekt dagegen NICHT: es ist
+    // je Aufruf frisch und würde die Liste bei jedem Render neu bauen.
+    [einsatzId, benutzer, einsaetze, overrides, darfSchreibenImEinsatz, navigate, setModus, setDichte, logout],
   );
 }

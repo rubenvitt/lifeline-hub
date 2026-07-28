@@ -1,4 +1,5 @@
-import { App, Button, Form, Input, Modal, Popconfirm, Space, Table, Tag, type TableColumnsType } from 'antd';
+import { App, Button, Form, Input, Modal, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
+import KatalogTabelle from '../components/KatalogTabelle';
 import { Select } from '../components/Select';
 import AdminPage from '../components/AdminPage';
 import { useState } from 'react';
@@ -137,7 +138,7 @@ export default function BenutzerPage() {
         </Button>
       }
     >
-      <Table
+      <KatalogTabelle
         rowKey="id"
         loading={isLoading}
         dataSource={benutzerListe}

@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto';
 import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest';
 import { cleanup, configure } from '@testing-library/react';
 import { server } from './server';
+import { installiereMatchMedia, setzeViewportZurueck } from './viewport';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 
@@ -65,20 +66,12 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
   globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
 }
 
-// antd verwendet window.matchMedia (responsive observer) — in jsdom nicht vorhanden.
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: vi.fn().mockImplementation((query: string) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  })),
-});
+// antds Breakpoint-Beobachter braucht die Medienabfrage-API, die jsdom nicht mitbringt.
+// Der Stub liegt als eigenes Modul in ./viewport (Muster ./server) und ist BREITENBEWUSST:
+// er wertet min-/max-width gegen eine steuerbare Breite aus, Default 1024 px. Der frühere
+// Stub hier lieferte für jede Abfrage `matches: false` und machte damit jede Behauptung
+// über responsives Verhalten zur Attrappe. Details und Setter: ./viewport.
+installiereMatchMedia();
 
 // Web-Storage-Polyfill: jsdom liefert hier kein localStorage, und Node 26 stellt sein
 // experimentelles globales localStorage ohne `--localstorage-file` als undefined bereit
@@ -103,6 +96,7 @@ afterEach(() => {
   cleanup();
   server.resetHandlers();
   localStorage.clear(); // Persistenz (z. B. gemerkte Basemap/UHS) nicht zwischen Tests lecken lassen
+  setzeViewportZurueck(); // Breite/Zeigerart/Zuhörer zurück auf den Ausgangszustand
 });
 afterAll(() => server.close());
 

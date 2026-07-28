@@ -26,6 +26,17 @@ Faustregel: Sobald ein Drawer Tabs bekommt, einen Edit-Modus mit vielen Feldern 
 oder breiter als ~480 px sein muss, gehört der Inhalt auf eine eigene Route.
 Details/Inventar: `docs/superpowers/specs/2026-06-22-drawer-nutzung-reduzieren-design.md`.
 
+**Eine benannte Ausnahme: der Navigations-Drawer** (LFH-329/B1, `einsatz/EinsatzLayout.tsx`
+mit `einsatz/ModulAkkordeon.tsx`). Unterhalb `lg` liegt der Einsatz-Navigationsrahmen in einem
+Drawer statt inline. Er zeigt **Navigation, keine Entität** — kein Datensatz, kein Formular,
+kein Edit-Modus; er schließt beim Modulklick. Die Regeln oben zielen auf *Inhalts*-Drawer und
+sind für ihn nicht gemeint: die Alternative wäre keine eigene Route, sondern gar keine
+Navigation auf schmalem Schirm. Die Ausnahme ist **auf diesen einen Fall beschränkt** — ein
+zweiter Navigations-Drawer braucht eine eigene Entscheidung, kein Berufen auf diesen Absatz.
+Wer ihn anfasst: der Inhalt wird bewusst erst beim Öffnen gerendert (kein `forceRender`),
+sonst steht die Navigation doppelt im Baum und die Prüfung „unter `lg` nicht im Layout" wird
+bedeutungslos.
+
 ## Frontend — Bedien-Leitlinie (Einsatzkontexte)
 
 Die **zweite Achse** neben LFH-19 (Gerät und Einsatzkontext, LFH-327). Die Regel oben bleibt
@@ -357,39 +368,20 @@ spätere Kontext-Migration trimmt höchstens ein Tuple-Element, macht den Swap a
 <!-- cona:begin -->
 ## cona — token-efficient code navigation
 
-**The rule, before you Read a code file or Grep:** this project is cona-indexed.
-Default to `cona outline <file>` → `cona show <Sym>` to pull ONE symbol, not the
-whole file. Reach for Read only with an explicit offset/limit, or on a file cona
-doesn't index. For finding a name, `cona grep`/`refs` beat Grep (code-only, semantic).
-If a repo isn't indexed yet, `cona index` (~1s) first — then the above applies.
+This project is cona-indexed: reading ONE symbol costs a fraction of a whole
+file, and `cona grep`/`refs` search code semantically (identifier nodes — never
+strings or comments). Prefer them over a full Read or a broad Grep when you want
+a specific function, class, or usage site.
 
-Coarse → fine: `cona tree --rank` → `cona outline <file>` → `cona show <Sym>` → `cona edit <Sym>`.
+Coarse → fine: `cona tree --rank` (orient) → `cona outline <file>` (map a file) →
+`cona show <Sym>` (read one symbol) → `cona edit <Sym>` (syntax-verified write).
 
-### Commands
+`<Sym>` = `Name`, `Parent.Name`, or `file.rs:Name`. Index auto-refreshes;
+`cona index` (~1s) if a repo isn't indexed yet.
 
-- `cona find <Name> [--kind fn] [--json]` — locate a symbol (file:start-end + signature)
-- `cona show <Sym> [<Sym2> …] [--context 3] [--sig]` — print only those symbols' source (several names in one call); `--sig` = signature line only, the leanest peek; `<Sym>` = `Name`, `Parent.Name` or `file.rs:Name`
-- `cona refs <Name>` — usage sites as file:line (semantic — string/comment mentions don't match)
-- `cona tree --rank [--budget 2000]` — symbols ranked by reference fan-in — fastest orientation in an unknown codebase
-- `cona grep <pattern> [-i]` — code-only substring search, hits labeled with their enclosing symbol
-- `cona diff [ref]` — changed symbols vs a git ref (incl. uncommitted/untracked) — start code reviews here
-- `cona context <Sym>` — one pack: symbol source + callee signatures + call sites (instead of show+refs+shows)
-- `cona edit <Sym> --file new.txt` (or stdin) — replace symbol body, syntax-verified, rollback on error
-- `cona edit <file> --range S-E` — replace just lines S-E of a file (patch without resending a whole symbol)
-- `cona insert <Sym> --after|--before` (or `--at <file> <line>`) — add code without touching a body; `--at` works on a new/empty file; syntax re-verified
-- `cona check [<file>]` — syntax-only parse diagnostics (not a compiler); no file = all changed vs HEAD — confirm a file still parses after editing without a full build
-- `cona impact <Sym>` — blast radius before an edit: refs + callers + tests + recent history in one pack
-- `cona entries` — entry points (mains, public API, tests) — first command in an unknown repo
-- `cona deps [path]` — file-level import graph + most-imported + cycles — the architecture view
-- `cona callers/callees <Sym> [--depth 2]`, `cona path <A> <B>` — transitive call trees and shortest call chain
-- `cona tests <Sym>` — which tests exercise a symbol (loud when none do)
-- `cona blame <Sym>` / `hot` / `coupling <file>` — symbol-level git history, churn hotspots, co-change coupling
-- `cona shape <Sym>` — symbol source + referenced types expanded one level
-- `cona note <Sym> <text…>` — persistent notes on symbols, auto-surfaced in show/context (`note` lists, `--rm <id>` deletes)
-- `cona rename <Sym> <new>` — semantic project-wide rename, collision-guarded, syntax-verified, all-or-nothing
-- `cona stats [--json]` — savings per project + global; `cona ui` — live dashboard.
-- Index is incremental and auto-refreshes (git hooks / agent hooks); `cona index` if in doubt.
-- NEVER read a whole file just to find one function — `outline`/`show` get you there for a fraction of the tokens.
+Everything else — `context` `impact` `diff` `deps` `callers` `tests` `blame`
+`insert` `rename` `note` `check` — is listed in `cona --help`, with details per
+group (`cona nav --help`, `inspect`, `code`, `history`, `project`, `maint`).
 <!-- cona:end -->
 
 <!-- rtk-instructions v2 -->

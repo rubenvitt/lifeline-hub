@@ -148,7 +148,7 @@ export default function OnlineQuelleFormModal({
           name="sortier"
           tooltip="Reihenfolge im Basemap-Switcher (kleiner = weiter oben)."
         >
-          <InputNumber min={0} style={{ width: 160 }} />
+          <InputNumber min={0} style={{ width: '100%', maxWidth: 160 }} />
         </Form.Item>
         <Form.Item
           label="Aktiv"

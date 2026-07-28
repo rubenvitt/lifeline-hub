@@ -1,10 +1,11 @@
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { setzeViewportBreite } from '../test/viewport';
 import { AuthProvider } from '../auth/AuthContext';
 import AppLayout from './AppLayout';
 
@@ -54,5 +55,37 @@ describe('AppLayout (globale Topbar)', () => {
     expect(screen.getByText('Verwaltung 🔒')).toBeInTheDocument();
     expect(screen.queryByText('Benutzer 🔒')).not.toBeInTheDocument();
     expect(screen.queryByText('Admin')).not.toBeInTheDocument();
+  });
+
+  /**
+   * Die Gegenprobe zum Schmal-Block darunter — und zwar mit DERSELBEN Abfrage.
+   * Ohne sie wäre die Null unten auch dann grün, wenn die Beschriftung falsch
+   * geschrieben oder die Rolle eine andere wäre.
+   */
+  it('ab lg stehen beide Umschalter in der Kopfzeile', async () => {
+    setup(admin);
+    await waitFor(() => expect(screen.getByText('Chef')).toBeInTheDocument());
+    expect(screen.getByRole('radiogroup', { name: 'Farbschema wählen' })).toBeInTheDocument();
+    expect(screen.getByRole('radiogroup', { name: 'Bediendichte wählen' })).toBeInTheDocument();
+  });
+
+  describe('unter lg', () => {
+    // Breite VOR dem Render: antds Beobachter ruft seinen Zuhörer beim
+    // Abonnieren synchron auf und liest dabei nur `matches`.
+    beforeEach(() => setzeViewportBreite(390));
+
+    it('legt beide Umschalter ab und behält das Benutzermenü', async () => {
+      setup(admin);
+      // Der Trigger trägt hier keinen Namen mehr, deshalb hängt das Warten am
+      // `aria-label` statt am Anzeigenamen.
+      expect(await screen.findByRole('button', { name: 'Benutzermenü' })).toBeInTheDocument();
+      expect(screen.queryByRole('radiogroup', { name: 'Farbschema wählen' })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('radiogroup', { name: 'Bediendichte wählen' }),
+      ).not.toBeInTheDocument();
+      // Der Anzeigename ist mit dem Trigger geschrumpft — die drei
+      // Bestandsfälle oben laufen deshalb bewusst auf der Standardbreite.
+      expect(screen.queryByText('Chef')).not.toBeInTheDocument();
+    });
   });
 });

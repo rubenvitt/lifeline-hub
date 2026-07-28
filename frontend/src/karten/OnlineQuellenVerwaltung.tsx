@@ -1,4 +1,5 @@
-import { Alert, App, Button, Popconfirm, Space, Table, Tag, type TableColumnsType } from 'antd';
+import { Alert, App, Button, Popconfirm, Space, Tag, type TableColumnsType } from 'antd';
+import KatalogTabelle from '../components/KatalogTabelle';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
@@ -108,7 +109,7 @@ export default function OnlineQuellenVerwaltung() {
           description={quellenQuery.error instanceof ApiError ? quellenQuery.error.message : undefined}
         />
       ) : (
-        <Table
+        <KatalogTabelle
           rowKey="id"
           loading={quellenQuery.isLoading}
           dataSource={quellen}

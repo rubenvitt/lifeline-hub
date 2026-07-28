@@ -1,6 +1,7 @@
 import {
-  App, Button, Form, Input, InputNumber, Modal, Popconfirm, Space, Table, type TableColumnsType,
+  App, Button, Form, Input, InputNumber, Modal, Popconfirm, Space, type TableColumnsType,
 } from 'antd';
+import KatalogTabelle from '../components/KatalogTabelle';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
@@ -94,7 +95,7 @@ export default function EinheitTypenTab() {
           Typ anlegen
         </Button>
       )}
-      <Table
+      <KatalogTabelle
         rowKey="id"
         loading={typenQuery.isLoading}
         dataSource={typenQuery.data ?? []}
@@ -118,7 +119,7 @@ export default function EinheitTypenTab() {
           <Form.Item label="Soll-Stärke (vollständig oder leer lassen)" name="soll">
             <StaerkeEingabe />
           </Form.Item>
-          <Form.Item label="Sortierung" name="sortier"><InputNumber min={0} style={{ width: 120 }} /></Form.Item>
+          <Form.Item label="Sortierung" name="sortier"><InputNumber min={0} style={{ width: '100%', maxWidth: 120 }} /></Form.Item>
         </Form>
       </Modal>
     </>

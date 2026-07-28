@@ -163,6 +163,44 @@ export const flaeche = {
   kachelMinKlein: 220,
 } as const;
 
+/**
+ * Die Seitenrinne — der seitliche Rand, den eine Seite zum Fensterrand hält
+ * (LFH-329 · B1). Zwei Stufen, nach Viewport: `breit` am Fükw-Schirm und an
+ * jedem Tablet, `schmal` auf dem Handschirm.
+ *
+ * VIEWPORT-ACHSE, NICHT DICHTE-ACHSE — deshalb ein eigener Export und kein
+ * weiterer Schlüssel in `flaeche` (das trägt die gemessenen §2.2-Baselines und
+ * ist als solches gepinnt) und erst recht kein Eintrag in `dichten`.
+ *
+ * Wirksam wird sie nicht hier, sondern als Custom-Property in `rollen.css`:
+ * eine Media-Regel an antds `md`-Schwelle schaltet die Stufe um, die vier
+ * Konsumstellen lesen nur noch die Property. Das ist beim ersten Paint korrekt
+ * und gilt unter beiden Layouts. Dass CSS- und TS-Seite dieselben Stufen
+ * tragen, bewacht `rollen.guard.test.ts`.
+ */
+export const seitenrinne = {
+  /** Ab antds `md`-Schwelle (768 px) — Fükw, ortsfeste Stelle, Führungs-Tablet. */
+  breit: 24,
+  /** Darunter — mobil, ~390 px einhändig. */
+  schmal: 12,
+} as const;
+
+/**
+ * Breite des Navigations-Drawers, der den Einsatz-Rahmen unter antds
+ * `lg`-Schwelle ersetzt (LFH-329 · B1/H11).
+ *
+ * VIEWPORT-ACHSE WIE DIE SEITENRINNE, deshalb ein eigener Export und kein
+ * sechster Schlüssel in `flaeche`: das trägt die gemessenen §2.2-Baselines und
+ * ist als geschlossene Menge gepinnt.
+ *
+ * Warum dieses Maß trägt, obwohl der inline-Rahmen breiter ist: der Drawer
+ * zeigt die Navigation NICHT als Rail plus Modul-Spalte. Beide nebeneinander
+ * bräuchten mehr, als hier steht — auf dem Handschirm (~390 px) belegte das
+ * über vier Fünftel der Fläche. Im Drawer steht deshalb ein flaches Akkordeon
+ * in einer Spalte: Kategorie-Kopfzeile, darunter ihre Module.
+ */
+export const navDrawerBreite = 280;
+
 /** Formrollen. Radius 0 ist eine Entscheidung, keine Unentschiedenheit:
  *  die Kachel wird vom Umrissrahmen getragen, nicht von einer weichen Ecke.
  *

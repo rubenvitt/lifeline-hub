@@ -45,6 +45,43 @@ describe('EinsatzSwitcher', () => {
     expect(screen.getByText('Stammdaten')).toBeInTheDocument();
   });
 
+  /**
+   * Ein Rahmen mit `flex: 1; min-width: 0` im Layout reicht NICHT: der Name
+   * sitzt in einem antd-Knopf, und der kürzt ohne eigenes `overflow` nicht,
+   * sondern schiebt die Kopfzeile breit. Diese Hälfte gehört deshalb hierher.
+   *
+   * jsdom rechnet kein Layout — geprüft werden die gesetzten Eigenschaften.
+   * Dass daraus wirklich ein „…" wird, belegt `e2e/kopfzeile-schmal.spec.ts`.
+   */
+  it('ein langer Name kürzt und steht vollständig im title', async () => {
+    const lang = 'Hochwasser Nord — Deichverteidigung Abschnitt West, Lage 3';
+    server.use(http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])));
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/*" element={<EinsatzSwitcher aktuellName={lang} />} />
+      </Routes>,
+      { route: '/einsaetze/7/etb' },
+    );
+
+    const knopf = await screen.findByRole('button', { name: new RegExp(lang.slice(0, 20)) });
+    // Der VOLLE Name bleibt am Knopf lesbar, auch wenn die Anzeige kürzt.
+    expect(knopf).toHaveAttribute('title', lang);
+    // Der Name bleibt Textinhalt und wandert NICHT in ein `aria-label` — sonst
+    // kippte der zugängliche Name und die zwei Fälle oben mit ihm.
+    expect(knopf).not.toHaveAttribute('aria-label');
+
+    // DIE TRAGENDE ZEILE: ohne `maxWidth` bemäße sich der inline-flex-Knopf am
+    // Inhalt, das `overflow: hidden` darunter klippte nie, und die drei
+    // Behauptungen dahinter wären grün durch Nichtstun (per Mutationsprobe
+    // belegt: ohne diese Zeile bleibt der Test auch ohne `maxWidth` grün).
+    expect(knopf.style.maxWidth).toBe('100%');
+
+    const span = screen.getByText(lang);
+    expect(span.style.overflow).toBe('hidden');
+    expect(span.style.textOverflow).toBe('ellipsis');
+    expect(span.style.whiteSpace).toBe('nowrap');
+  });
+
   it('navigiert ueber „Alle Einsätze …" zur Heim-Seite', async () => {
     server.use(http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])));
     setup();

@@ -224,9 +224,25 @@
   background: var(--lfh-flaeche-2);
 }
 
-/* Zweiter Kanal: eine Kante trägt die Stufe mit, nicht nur die Ziffernfarbe. */
+/* Zweiter Kanal: eine Kante trägt die Stufe mit, nicht nur die Ziffernfarbe.
+   Die Kante ist ABGESTUFT (6 px Alarm gegen 3 px Achtung), weil die beiden
+   Stufen sich sonst ausschließlich in der Farbe unterschieden — WCAG 1.4.1
+   verlangt den zweiten Kanal nicht nur gegenüber „unauffällig", sondern
+   zwischen den bewerteten Stufen selbst.
+
+   AUSDRÜCKLICH NICHT über die Schriftgröße (LFH-329 · B1, Prüfliste Kriterium 6):
+   eine stufenabhängige Größe ließe die Zeile bei jedem Statuswechsel in der Höhe
+   springen — Festlegung 6 der Bedien-Leitlinie deckelt CLS bei 0,1 (WCAG 3.2.5).
+   Ein `inset`-Schatten kostet dagegen null Layout.
+
+   Und NICHT über das Schriftgewicht: gemessen in Chromium an der Kennzahl
+   „Kräfte F/UF/M//Σ" — Vorschubbreite bei 400/500 = 96,33 px, bei 600/700/800 =
+   96,00 px. Über 600 hinaus gibt es keinen Schnitt (`schriften.css` liefert von
+   LFH JetBrains Mono nur 400 und 600), und der Browser setzt keinen künstlichen
+   Fettdruck darauf. Die Zahl steht bereits auf 600 — nach oben ist der Kanal
+   also nachweislich leer, nicht bloß vermutlich. */
 .lfh-kz--alarm {
-  box-shadow: inset 3px 0 0 0 var(--lfh-alarm);
+  box-shadow: inset 6px 0 0 0 var(--lfh-alarm);
 }
 .lfh-kz--alarm .lfh-zahl--gross {
   color: var(--lfh-alarm);
@@ -545,7 +561,22 @@
 
 /* ── Schmale Schirme ───────────────────────────────────────────────────────
    Schwellen an den Einsatzkontexten: > 1100 px Fükw (13–15"), 700–1100 px
-   Führungs-Tablet, < 700 px mobil. Die Staffel selbst gehört A1 (LFH-327). */
+   Führungs-Tablet, < 700 px mobil. Die Staffel selbst gehört A1 (LFH-327).
+
+   DIE ZAHLEN SIND CONTAINER-BREITEN, NICHT VIEWPORT-BREITEN. Gemessen wird
+   `.lfh-flaeche` (`container-type: inline-size`, oben in dieser Datei), also die
+   Fläche, die dem Inhalt nach Abzug von Navigationsrahmen und Seitenrinne bleibt.
+   Im Browser nachgemessen (LFH-329 · B1, Chromium, `e2e/lage-dashboard-schmal.spec.ts`):
+   Viewport 1366 → Container 1036 · 1024 → 694 · 390 → 366.
+
+   WARUM 1100 UND NICHT WENIGER: sechs Spalten brauchen mindestens ~1036 px
+   Container, sonst läuft das längste Etikett aus seinem Knopf. Gemessen mit
+   erzwungenen sechs Spalten: Container 950 → 14 px Überlauf, Container 1036 →
+   0 px. Eine Schwelle bei 1000 (so der ursprüngliche Entwurf) gäbe also genau
+   dem Band 1000–1036 sechs Spalten mit abgeschnittenen Etiketten — und
+   abgeschnittene Etiketten sind im Einsatz schlimmer als eine zweite Zeile.
+   1100 lässt die nötige Luft. Wer die Zahl senkt, misst vorher neu; der Pin in
+   `pages/lage-dashboard/LageDashboardPage.test.tsx` färbt eine stille Senkung rot. */
 @container lfh (max-width: 1100px) {
   .lfh-kennzahlen {
     grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Button, Form, Input } from 'antd';
 import { renderMitProviders } from '../test/utils';
+import { flaeche } from '../theme/tokens';
 import AdminPage from './AdminPage';
 
 describe('AdminPage', () => {
@@ -42,5 +43,41 @@ describe('AdminPage', () => {
     renderMitProviders(<Harness />);
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(onFinish).toHaveBeenCalledWith({ feld: 'wert' });
+  });
+
+  it('hält die Container-Breite auf `flaeche.seiteSchmal` und lässt sie überschreiben', () => {
+    // Wörtlich nach dem Muster des Schwester-Primitivs `EinsatzSeite.test.tsx`:
+    // `renderMitProviders` legt eine `.ant-app`-Hülle um den Baum — die Wurzel
+    // des Primitivs ist deren erstes Kind, nicht `container.firstElementChild`.
+    // ACHTUNG: kein zusätzlicher Wrapper-DIV in `AdminPage` — der Selektor
+    // zeigte sonst still auf ihn und der Test wäre aussagelos.
+    //
+    // Der Test ist am Bestand GRÜN, weil das hartkodierte Maß zufällig
+    // `flaeche.seiteSchmal` ist. Sein Rotnachweis läuft als Mutationsprobe
+    // (`seiteSchmal` in `tokens.ts` verstellen → dieser Test rot); ohne sie
+    // belegte er nur die Zahl, nicht deren Quelle.
+    const wurzel = (c: HTMLElement) => c.querySelector<HTMLElement>('.ant-app > div')!;
+
+    const { container, unmount } = renderMitProviders(
+      <AdminPage titel="Schmal">
+        <div>x</div>
+      </AdminPage>,
+    );
+    // HANDGESCHRIEBENE LITERALE, nicht `${flaeche.seiteSchmal}px`: seit die
+    // Komponente ihre Vorgabe aus demselben Token liest, kämen sonst beide
+    // Seiten aus einer Quelle und bewegten sich gemeinsam — ein Rückfall auf
+    // die früher hartkodierte 900 bliebe grün. Dass die Zahlen zum Token
+    // passen, sichert der Byte-Pin in `theme/tokens.test.ts`; erst beide
+    // zusammen belegen die Verdrahtung. Die Regel dahinter steht in CLAUDE.md
+    // („Charakterisierungstests bauen ihre Keys als Literale").
+    expect(wurzel(container).style.maxWidth).toBe('900px');
+    unmount();
+
+    const breit = renderMitProviders(
+      <AdminPage titel="Breit" breite={flaeche.seiteBreit}>
+        <div>x</div>
+      </AdminPage>,
+    );
+    expect(wurzel(breit.container).style.maxWidth).toBe('960px');
   });
 });

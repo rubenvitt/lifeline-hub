@@ -32,16 +32,20 @@ body {
 /* ETB-Erfassung als angepinnte Kommandoleiste am Kopf des Tagebuchs.
    Das Eingabefeld bleibt beim Scrollen durch ältere Einträge sichtbar; neue
    Einträge erscheinen direkt darunter (Tabelle ist neueste-zuerst sortiert).
-   Negative Seitenränder ziehen die Leiste randlos über die 24px-Polsterung
-   des Content-Bereichs, damit beim Scrollen kein Tabelleninhalt seitlich
-   durchscheint. Hintergrund = colorBgLayout je Theme, deckt die durchlaufende
-   Liste sauber ab. */
+   Negative Seitenränder ziehen die Leiste randlos über die Seitenrinne des
+   Content-Bereichs, damit beim Scrollen kein Tabelleninhalt seitlich
+   durchscheint — und der eigene Innenrand nimmt dieselbe Rinne wieder auf,
+   damit der Text der Leiste auf einer Flucht mit dem Seiteninhalt steht. Beide
+   Maße lesen deshalb dieselbe Custom-Property aus `theme/rollen.css`; ein
+   festes Pixelmaß hier würde auf schmalem Schirm gegen die Seite verrutschen.
+   Hintergrund = colorBgLayout je Theme, deckt die durchlaufende Liste sauber
+   ab. */
 .etb-erfassung-sticky {
   position: sticky;
   top: 0;
   z-index: 20;
-  margin: 0 -24px 16px;
-  padding: 12px 24px 14px;
+  margin: 0 calc(-1 * var(--lfh-seiten-polsterung)) 16px;
+  padding: 12px var(--lfh-seiten-polsterung) 14px;
   background: #f5f5f5;
   border-bottom: 1px solid #e8e8e8;
   box-shadow: 0 8px 16px -12px rgba(0, 0, 0, 0.35);

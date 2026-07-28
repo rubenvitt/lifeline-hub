@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 import { ConfigProvider, theme as antdTheme } from 'antd';
 import deDE from 'antd/locale/de_DE';
-import { antdToken, farbenDunkel, farbenHell } from './tokens';
+import { antdToken, farbenDunkel, farbenHell, type Dichte } from './tokens';
 
 /** Vom Nutzer wählbarer Modus. `system` folgt der OS-Einstellung. */
 export type ThemeModus = 'system' | 'light' | 'dark';
@@ -10,11 +10,22 @@ export type ThemeModus = 'system' | 'light' | 'dark';
 export type EffektivesTheme = 'light' | 'dark';
 
 const SPEICHER_SCHLUESSEL = 'lifeline-hub.theme';
+const DICHTE_SCHLUESSEL = 'lifeline-hub.dichte';
+
+/** Ausgangsstufe ohne gespeicherte Wahl: der Fükw-Arbeitsplatz (A1 Festlegung 1). */
+const DICHTE_DEFAULT: Dichte = 'kompakt';
 
 interface ThemeModeWert {
   modus: ThemeModus;
   effektiv: EffektivesTheme;
   setModus: (m: ThemeModus) => void;
+  /** Gewählte Bediendichte. Es gibt hier bewusst KEINEN zweiten Typ analog
+   *  `ThemeModus`/`EffektivesTheme`: die Wahl IST die effektive Stufe. Ein
+   *  `system`-Wert, der sich aus Schirmbreite oder Zeigerart auflöste, bräuchte
+   *  eine zweite Medienabfrage in diesem Provider — und die gehört laut B1
+   *  ausschließlich in `useViewport`. Die Ableitung aus dem Einsatzkontext ist B5. */
+  dichte: Dichte;
+  setDichte: (d: Dichte) => void;
 }
 
 const ThemeModeContext = createContext<ThemeModeWert | null>(null);
@@ -28,6 +39,15 @@ function gespeicherterModus(): ThemeModus {
   return istThemeModus(wert) ? wert : 'system';
 }
 
+function istDichte(wert: string | null): wert is Dichte {
+  return wert === 'kompakt' || wert === 'komfortabel' || wert === 'handschuh';
+}
+
+function gespeicherteDichte(): Dichte {
+  const wert = localStorage.getItem(DICHTE_SCHLUESSEL);
+  return istDichte(wert) ? wert : DICHTE_DEFAULT;
+}
+
 function systemBevorzugtDunkel(): boolean {
   return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }
@@ -35,6 +55,7 @@ function systemBevorzugtDunkel(): boolean {
 export function ThemeModeProvider({ children }: { children: ReactNode }) {
   const [modus, setModusState] = useState<ThemeModus>(gespeicherterModus);
   const [systemDunkel, setSystemDunkel] = useState<boolean>(systemBevorzugtDunkel);
+  const [dichte, setDichteState] = useState<Dichte>(gespeicherteDichte);
 
   // OS-Einstellung live verfolgen — relevant, sobald der Modus `system` ist.
   useEffect(() => {
@@ -49,6 +70,11 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(SPEICHER_SCHLUESSEL, m);
   }, []);
 
+  const setDichte = useCallback((d: Dichte) => {
+    setDichteState(d);
+    localStorage.setItem(DICHTE_SCHLUESSEL, d);
+  }, []);
+
   const effektiv: EffektivesTheme = modus === 'system' ? (systemDunkel ? 'dark' : 'light') : modus;
 
   // `data-theme` + `color-scheme` am <html> setzen, damit reines CSS
@@ -58,9 +84,24 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
     document.documentElement.style.colorScheme = effektiv;
   }, [effektiv]);
 
+  // Die zweite Hälfte des Dichte-Schalters: das Merkmal am <html> schaltet die
+  // `[data-dichte='…']`-Blöcke in `rollen.css` und damit alle `var(--lfh-luft-*)`-
+  // Konsumenten. Ohne diese Zeile folgte nur die antd-Fläche, das
+  // handgeschriebene CSS daneben bliebe kompakt — eine halb umgeschaltete Stufe,
+  // die nichts bricht und erst im Einsatz auffällt.
+  //
+  // Gesetzt wird für ALLE drei Stufen, auch für `kompakt` (kein bedingtes
+  // Entfernen): `kompakt` lebt in `rollen.css` unter `:root` und braucht deshalb
+  // keinen eigenen Block. Wer je einen `[data-dichte='kompakt']`-Block ergänzt,
+  // muss `DICHTE_BLOECKE` und die Partitionsprüfung in `rollen.guard.test.ts`
+  // nachziehen — sonst prüft der Guard die kompakte Stufe weiter gegen `:root`.
+  useEffect(() => {
+    document.documentElement.dataset.dichte = dichte;
+  }, [dichte]);
+
   const wert = useMemo<ThemeModeWert>(
-    () => ({ modus, effektiv, setModus }),
-    [modus, effektiv, setModus],
+    () => ({ modus, effektiv, setModus, dichte, setDichte }),
+    [modus, effektiv, setModus, dichte, setDichte],
   );
 
   return (
@@ -72,10 +113,14 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
           // (LFH-352 · A0). Der antd-Algorithmus bleibt darunter: er leitet die
           // abgeleiteten Töne (Hover, Rand, Füllung) aus den gesetzten ab.
           //
-          // Die Dichte steht hier ABSICHTLICH fest auf `kompakt` (LFH-328 · A2):
-          // A2 baut nur den Träger. Wer die Stufe aus Einsatzkontext oder
-          // Benutzerwahl ableitet, ist B5 — und tut es genau an dieser Stelle.
-          token: antdToken(effektiv === 'dark' ? farbenDunkel : farbenHell, 'kompakt'),
+          // Die Dichte kommt seit LFH-329 · B1 aus der Benutzerwahl (vorher stand
+          // sie fest auf `kompakt`, weil A2 nur den Träger baute). Sie hängt genau
+          // hier und nicht an einer Größen-Prop je Element: die Steuerhöhe trägt
+          // alle Steuerelemente auf einmal, während die verworfene Prop bei 40 px
+          // endet und die 48-/72-px-Stufen nicht darstellen kann. Was NOCH offen
+          // ist: die Stufe aus dem Einsatzkontext ABZULEITEN statt sie zu wählen —
+          // das ist B5.
+          token: antdToken(effektiv === 'dark' ? farbenDunkel : farbenHell, dichte),
           algorithm: effektiv === 'dark' ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
         }}
       >
@@ -93,5 +138,31 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
 export function useThemeMode(): ThemeModeWert {
   const wert = useContext(ThemeModeContext);
   if (wert) return wert;
-  return { modus: 'system', effektiv: 'light', setModus: () => {} };
+  return {
+    modus: 'system',
+    effektiv: 'light',
+    setModus: () => {},
+    dichte: DICHTE_DEFAULT,
+    setDichte: () => {},
+  };
+}
+
+/**
+ * Benannter Zugang zur Bediendichte (LFH-329 · B1).
+ *
+ * Beide Achsen teilen einen Provider (ein Context, ein `useMemo`), aber sie
+ * teilen keinen Namen: wer eine Trefffläche umschaltet, soll nicht `useThemeMode`
+ * lesen müssen. Zweiter Bedienweg ist dieselbe Quelle — der Umschalter in der
+ * Kopfzeile und die Kommandopalette hängen hier, und ein Eintrag im
+ * Benutzermenü kann es ebenso (nötig, weil die Kopfzeile auf schmalem Schirm
+ * ihre Umschalter ablegt und die Stufe sonst genau in den Kontexten unbedienbar
+ * wäre, denen A1 `komfortabel` und `handschuh` zuweist).
+ *
+ * Das zurückgegebene Objekt ist je Aufruf frisch — es gehört NICHT in ein
+ * Dependency-Array. Stabil sind `dichte` (ein String) und `setDichte` (per
+ * `useCallback` identitätsstabil); genau die zwei gehören hinein.
+ */
+export function useDichte(): { dichte: Dichte; setDichte: (d: Dichte) => void } {
+  const { dichte, setDichte } = useThemeMode();
+  return { dichte, setDichte };
 }

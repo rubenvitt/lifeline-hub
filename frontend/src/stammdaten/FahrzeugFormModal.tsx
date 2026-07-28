@@ -146,7 +146,7 @@ export default function FahrzeugFormModal({
           <Switch />
         </Form.Item>
         <Form.Item label="Tragenkapazität" name="tragenkapazitaet">
-          <InputNumber min={0} style={{ width: 160 }} />
+          <InputNumber min={0} style={{ width: '100%', maxWidth: 160 }} />
         </Form.Item>
         <Form.Item label="Soll-Stärke (alle drei oder keiner)" name="staerke">
           <StaerkeEingabe />

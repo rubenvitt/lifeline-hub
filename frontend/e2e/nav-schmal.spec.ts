@@ -1,0 +1,334 @@
+import { expect, test, type Page } from '@playwright/test';
+
+/**
+ * Der Einsatz-Navigationsrahmen auf dem Handschirm (LFH-329 · B1/H11).
+ *
+ * WARUM HIER UND NICHT IN VITEST: jsdom rechnet kein Layout — `boundingBox` und
+ * `document.body.scrollWidth` gibt es dort nicht, und genau die beiden tragen die
+ * zwei Gates, die dieses Paket zu erfüllen hat (kein waagerechter Überlauf; jede
+ * Trefffläche mindestens auf dem A1-Maß). Dass der Rahmen unter `lg` überhaupt
+ * dem Drawer weicht, belegt `src/einsatz/EinsatzLayout.test.tsx` — hier geht es
+ * nur um die gemessene Wirkung.
+ *
+ * Bewusst KEIN zweites Playwright-Projekt und kein Device-Descriptor: ein
+ * `devices['iPhone …']` zöge webkit nach, und ein Browser-Download ist im Repo
+ * nirgends abgesichert. Anmelden und Anlegen laufen am Fükw-Maß (die Einsatzliste
+ * ist noch nicht umgebaut), erst danach wird der Viewport umgestellt — dasselbe
+ * Vorgehen wie in `seitenrinne.spec.ts`.
+ */
+
+const ADMIN = 'admin';
+const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
+
+/** A1 Festlegung 4: Untergrenze einer Trefffläche (Material 48 dp). */
+const TREFFLAECHE = 48;
+
+/**
+ * Subpixel-Spielraum für JEDEN Maßvergleich in dieser Datei.
+ *
+ * `boundingBox()` liefert Fließkomma, und Chromium rechnet unter Last anders als
+ * im Einzellauf. Dieselbe Falle hat hier inzwischen DREIMAL zugeschlagen — an der
+ * Drawer-Breite (`279.99999237` gegen 280), an ihrer Schwesterstelle, und an der
+ * Trefffläche (`47.99999809` gegen 48). Jedes Mal nur im vollen Sammel-Gate, nie
+ * im gescopten Lauf; ein Gate, das zufällig rot wird, wird abgeschaltet statt
+ * befolgt.
+ *
+ * Ein halbes Pixel ist kein Aufweichen: die Trefffläche trennt 48 weiterhin von
+ * antds Vorgabe 32, und die Drawer-Breite 280 von 320 und 378.
+ */
+const SUBPIXEL = 0.5;
+
+/** Gate 3 der Bedien-Leitlinie: mindestens 48 px, subpixel-tolerant gemessen. */
+function haeltTreffflaeche(wert: number, name: string) {
+  expect(wert, `${name} (gemessen ${wert}px, Soll ≥ ${TREFFLAECHE})`).toBeGreaterThanOrEqual(
+    TREFFLAECHE - SUBPIXEL,
+  );
+}
+
+const HANDSCHIRM = { width: 390, height: 844 };
+
+/**
+ * Erwartete Drawer-Breite. Bewusst als handgeschriebene Zahl und NICHT aus
+ * `theme/tokens` importiert: sonst prüfte der Test den Token gegen sich selbst
+ * und bliebe auch dann grün, wenn das Maß gar nicht mehr am Drawer ankommt.
+ */
+const DRAWER_BREITE = 280;
+
+// Login-/Anlege-Helfer aus `seitenrinne.spec.ts` kopiert — es gibt (noch) kein
+// geteiltes e2e-Hilfsmodul.
+async function anmelden(page: Page) {
+  await page.goto('/login');
+  await page.getByLabel('Benutzername').fill(ADMIN);
+  await page.getByLabel('Passwort').fill(PW);
+  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
+  await expect(page).toHaveURL(/\/einsaetze/);
+}
+
+async function einsatzAnlegen(page: Page, name: string): Promise<string> {
+  await page.getByRole('button', { name: 'Neuer Einsatz' }).click();
+  await page.getByLabel('Bezeichnung').fill(name);
+  await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
+  await expect(page).toHaveURL(/\/einsaetze\/\d+/);
+  return page.url().match(/\/einsaetze\/(\d+)/)![1];
+}
+
+/**
+ * Misst den waagerechten Überlauf elementweise UND benennt die Verursacher.
+ *
+ * WARUM NICHT `document.body.scrollWidth <= window.innerWidth`: dieses eine
+ * Gesamtmaß sagt nichts über den BESITZER eines Überlaufs. Es steht und fällt
+ * mit fremden Paketen — Kopfzeile, Modulseite —, und ein Bruch dort läse sich
+ * als „der Navigationsrahmen ist kaputt". Die Prüfung unten teilt deshalb
+ * elementweise nach Besitzer auf: `rahmen` (dieses Paket, wird zugesichert),
+ * `kopfzeile` und `inhalt` (fremde Pakete, werden GEMELDET statt stillschweigend
+ * übergangen).
+ *
+ * (Gemessen an HEAD wäre das Gesamtmaß auf 390 px grün — `body.scrollWidth`
+ * misst dort glatte 390 px. Der frühere Kommentar hier nannte es „heute rot" und
+ * bezifferte die Kopfzeilen-Knopfgruppe mit 869 px; beides gilt nicht mehr,
+ * siehe `meldeFremdenUeberlauf` unten. Die Aufteilung bleibt trotzdem richtig:
+ * sie trennt Verantwortung, nicht Symptome.)
+ *
+ * Ohne Täterliste meldet ein rotes Gate nur „ist zu breit", und der nächste
+ * Leser fängt bei null an.
+ */
+async function messeUeberlauf(page: Page) {
+  return page.evaluate(() => {
+    const grenze = document.documentElement.clientWidth;
+    const benenne = (el: Element) =>
+      `${el.tagName.toLowerCase()}[${(el.getAttribute('class') ?? '').slice(0, 60)}] → ${Math.round(
+        el.getBoundingClientRect().right,
+      )}px`;
+    // Ein Element, das in einer eigenen Scroll-/Klipp-Fläche sitzt (antds
+    // Tabellen tun das), schiebt die SEITE nicht auf — es scrollt in seinem
+    // Kasten. Ohne diese Unterscheidung meldete das Gate jede breite Tabelle als
+    // Layoutfehler und wäre unbrauchbar.
+    const eingefasst = (el: Element) => {
+      for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+        if (getComputedStyle(p).overflowX !== 'visible') return true;
+      }
+      return false;
+    };
+    const zuBreit = Array.from(document.querySelectorAll('*')).filter(
+      (el) => el.getBoundingClientRect().right > grenze + 1 && !eingefasst(el),
+    );
+    const im = (el: Element, wahl: string) => Boolean(el.closest(wahl));
+    return {
+      innerWidth: window.innerWidth,
+      // Was WEDER Kopfzeile NOCH Modulseite ist: der Navigationsrahmen selbst
+      // (Rahmen-Wurzel, Rail, Modul-Spalte, der ans Dokument gehängte Drawer).
+      rahmen: zuBreit
+        .filter((el) => !im(el, '.ant-layout-header') && !im(el, '.ant-layout-content'))
+        .slice(0, 6)
+        .map(benenne),
+      kopfzeile: zuBreit.filter((el) => im(el, '.ant-layout-header')).slice(0, 3).map(benenne),
+      inhalt: zuBreit.filter((el) => im(el, '.ant-layout-content')).slice(0, 3).map(benenne),
+    };
+  });
+}
+
+/**
+ * Meldet, was AUSSERHALB dieses Pakets über den Rand ragt — laut, aber ohne den
+ * Lauf rot zu färben.
+ *
+ * GEMESSEN AN HEAD meldet diese Funktion NICHTS: auf 390 px sind Kopfzeile und
+ * Modulseite beide leer, und `document.body.scrollWidth` misst glatte 390 px.
+ * Die Stelle ist damit heute eine reine Wache, kein Bericht über bekannte
+ * Ausreißer.
+ *
+ * FRÜHER STAND HIER, es seien zwei Stellen, und beide Angaben sind überholt:
+ *  - „die Knopfgruppe rechts in der Kopfzeile misst 869 px" — sie klappt
+ *    inzwischen zusammen und misst auf 390 px gemessene 46 px. Der Wert 869
+ *    stammt von einer Messung am FÜKW-Schirm, wo er nichts überragt.
+ *  - „die ETB-Tabelle bringt (noch) keine eigene Scroll-Fläche mit" — sie tut es:
+ *    `src/etb/EtbTabelle.tsx` läuft seit dem Katalogtabellen-Paket über
+ *    `KatalogTabelle`, und das setzt `scroll={{ x: 'max-content' }}`. Gemessen
+ *    trägt `.ant-table-body` `overflow-x: auto`; die 942 px breite Tabelle liegt
+ *    also in ihrem eigenen Bildlaufbereich und wird von `eingefasst()` unten
+ *    zu Recht herausgefiltert.
+ *
+ * Die AUFTEILUNG NACH BESITZER bleibt trotzdem richtig — sie ruhte nie darauf,
+ * dass gerade etwas überragt, sondern darauf, dass dieser Spec nur für den
+ * Navigationsrahmen geradesteht. Ein dokumentweiter `body.scrollWidth`-Assert
+ * wäre HEUTE grün, aber er würde diesem Paket fremde Pakete anlasten, sobald
+ * dort etwas kippt. Deshalb weiterhin: zusichern, was der Rahmen beiträgt — und
+ * den Rest benennen, statt ihn zu verschweigen.
+ *
+ * NEBENBEFUND, hier nicht behoben: `eingefasst()` unten behandelt JEDES
+ * `overflow-x` ungleich `visible` als Freibrief, also auch `hidden`. Ein
+ * geklippter (= unerreichbarer) Inhalt fiele dieser Prüfung damit nicht auf.
+ * `gate1-ueberlauf.spec.ts` beschreibt dieselbe Lücke und weist `hidden` in
+ * seiner Diagnose getrennt aus.
+ */
+function meldeFremdenUeberlauf(
+  lage: string,
+  messung: { kopfzeile: string[]; inhalt: string[] },
+): void {
+  for (const [bereich, treffer] of [
+    ['Kopfzeile', messung.kopfzeile],
+    ['Modulseite', messung.inhalt],
+  ] as const) {
+    if (treffer.length === 0) continue;
+    console.log(`[${lage}] ${bereich} ragt über den Rand:\n${treffer.join('\n')}`);
+  }
+}
+
+test('Navigationsrahmen: auf 390 px liegt die Navigation hinter dem Hamburger', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Nav schmal ${Date.now()}`);
+
+  await page.setViewportSize(HANDSCHIRM);
+  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await expect(page.getByPlaceholder('Inhalt …')).toBeVisible();
+
+  // Der inline-Rahmen ist weg …
+  await expect(page.getByRole('navigation', { name: 'Kategorien' })).toHaveCount(0);
+  // … und die Navigation hängt an einem Knopf, der die Trefffläche hält (Gate 3).
+  const hamburger = page.getByRole('button', { name: 'Navigation öffnen' });
+  const kasten = (await hamburger.boundingBox())!;
+  haeltTreffflaeche(kasten.width, 'Hamburger-Breite');
+  haeltTreffflaeche(kasten.height, 'Hamburger-Höhe');
+
+  // Gate 1: außerhalb der Kopfzeile ragt nichts über den Rand, solange der
+  // Drawer zu ist. Vor dem Umbau tat das der Rahmen selbst (Rail + Modul-Spalte
+  // belegten über 300 px von 390).
+  const zu = await messeUeberlauf(page);
+  expect(
+    zu.rahmen,
+    `Der Navigationsrahmen ragt auf ${HANDSCHIRM.width} px über:\n${zu.rahmen.join('\n')}`,
+  ).toEqual([]);
+  meldeFremdenUeberlauf('Drawer zu', zu);
+
+  // Drawer öffnen: Akkordeon statt Rail, und der Schließen-Knopf ist ebenfalls
+  // eine Trefffläche (den bringt antd mit, von Haus aus zu klein).
+  await hamburger.click();
+  const drawer = page.getByRole('dialog');
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByRole('navigation', { name: 'Einsatz-Navigation' })).toBeVisible();
+  const schliessen = (await drawer.locator('.ant-drawer-close').boundingBox())!;
+  haeltTreffflaeche(schliessen.width, 'Schließen-Breite');
+  haeltTreffflaeche(schliessen.height, 'Schließen-Höhe');
+
+  // Der Drawer selbst darf die Seite nicht breiter machen — das war die
+  // Entscheidung gegen Rail + Modul-Spalte im Drawer.
+  const offen = await messeUeberlauf(page);
+  expect(
+    offen.rahmen,
+    `Der offene Drawer erzeugt Überlauf:\n${offen.rahmen.join('\n')}`,
+  ).toEqual([]);
+  meldeFremdenUeberlauf('Drawer offen', offen);
+  // Auf das TOKEN-Maß geprüft, nicht bloß auf „passt in den Schirm": antds
+  // Vorgabebreite (378) läge ebenfalls unter 390, ein ignoriertes Breitenmaß
+  // fiele einem `<= 390`-Assert also nie auf.
+  // Gemessen mit Toleranz, nicht auf den Punkt: `boundingBox` liefert
+  // Fließkomma, und unter Last hat Chromium hier 279.99999237060547
+  // zurückgegeben — ein exakter Vergleich färbte das Gate rot, ohne dass sich
+  // etwas geändert hätte. Ein halbes Pixel trennt trotzdem noch jede andere
+  // Breite, die hier in Frage käme (antds Vorgabe 378, ein 320er Drawer).
+  const drawerKasten = (await drawer.boundingBox())!;
+  expect(
+    Math.abs(drawerKasten.width - DRAWER_BREITE),
+    `Drawer-Breite kommt aus dem Token (gemessen ${drawerKasten.width})`,
+  ).toBeLessThanOrEqual(0.5);
+  expect(drawerKasten.width).toBeLessThan(HANDSCHIRM.width);
+
+  // Modulklick navigiert UND schließt den Drawer.
+  await drawer.getByRole('button', { name: 'Personen', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/personen`));
+  await expect(drawer).toHaveCount(0);
+});
+
+test('Navigationsrahmen: am Fükw-Schirm steht er weiter inline', async ({ page }) => {
+  // Die Gegenprobe auf dem Projekt-Default (1280 ≥ lg). Ohne sie wäre der Test
+  // oben auch dann grün, wenn der Hamburger bei JEDER Breite erschiene.
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Nav breit ${Date.now()}`);
+
+  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await expect(page.getByRole('navigation', { name: 'Kategorien' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Navigation öffnen' })).toHaveCount(0);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('Navigationsrahmen: das Breitenmaß landet auf dem Drawer-Panel, nicht auf dem Inhalt', async ({
+  page,
+}) => {
+  // Getrennter Test, weil er eine ANDERE Frage stellt als der Test oben: dort
+  // geht es darum, DASS der Drawer schmal genug ist, hier darum, WELCHE Box das
+  // Maß bekommt. `size` hat in antd 6 das abgekündigte `width` abgelöst und ist
+  // zugleich die Achse der Vorgabestufen ('default'/'large') — ein numerischer
+  // Wert könnte dort im Grundsatz auf der Inhaltsbox statt auf dem Panel landen.
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Nav Box ${Date.now()}`);
+
+  await page.setViewportSize(HANDSCHIRM);
+  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await page.getByRole('button', { name: 'Navigation öffnen' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+
+  const panel = (await page.locator('.ant-drawer-content-wrapper').boundingBox())!;
+  const koerper = (await page.locator('.ant-drawer-body').boundingBox())!;
+  // Dieselbe halbe-Pixel-Toleranz wie beim Schwestertest oben (Zeile ~186): es ist
+  // DIESELBE Messung an DEMSELBEN Panel, und dort hat Chromium unter Last
+  // 279.99999237060547 geliefert. Ein exakter Vergleich hier hätte denselben
+  // Flake behalten, der dort schon behoben war.
+  //
+  // Die Aussage bleibt unberührt: dieser Test fragt nicht, OB das Panel schmal
+  // genug ist (das tut der Test oben), sondern WELCHE Box das Maß trägt. Ein
+  // halbes Pixel unterscheidet das Panel weiterhin von jeder anderen Box, die
+  // hier in Frage käme — die Inhaltsbox liegt um die Polsterung schmaler, antds
+  // Vorgabe läge bei 378.
+  expect(
+    Math.abs(panel.width - DRAWER_BREITE),
+    `Panel trägt das Maß (gemessen ${panel.width})`,
+  ).toBeLessThanOrEqual(0.5);
+  // Der Körper liegt INNERHALB des Panels (Innenrand), ist also nie breiter.
+  expect(koerper.width, 'Körper liegt im Panel').toBeLessThanOrEqual(DRAWER_BREITE);
+});
+
+/**
+ * Der Griff muss auf seinem eigenen Grund lesbar sein — in BEIDEN Farbschemata.
+ *
+ * WARUM DAS EIN EIGENER TEST IST: Ein antd-Textknopf erbt `colorText`, und die
+ * Rolle folgt dem Farbschema. Die Kopfzeile tut das NICHT — sie trägt hell wie
+ * dunkel denselben dunklen Grund. Im Hellmodus stand der Griff dadurch dunkel
+ * auf dunkel und war praktisch unsichtbar, während jede jsdom-Prüfung grün
+ * blieb: Vitest fährt mit `css: false` und rechnet keine Farben.
+ *
+ * Gemessen wird der Kontrast nach WCAG 2.1 (1.4.11, Nicht-Text-Kontrast ≥ 3:1
+ * für Bedienelemente) statt eines Farbwerts — ein Wertvergleich ginge bei jeder
+ * Palettenpflege rot, ohne dass die Lesbarkeit litte.
+ */
+test('Navigationsrahmen: der Griff hebt sich in beiden Farbschemata vom Kopf ab', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Nav Kontrast ${Date.now()}`);
+
+  for (const modus of ['light', 'dark'] as const) {
+    await page.evaluate((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
+    await page.setViewportSize(HANDSCHIRM);
+    await page.goto(`/einsaetze/${einsatzId}/etb`);
+    await expect(page.getByRole('button', { name: 'Navigation öffnen' })).toBeVisible();
+
+    const kontrast = await page.evaluate(() => {
+      const kanal = (c: number) => {
+        const s = c / 255;
+        return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+      };
+      const luminanz = (farbe: string) => {
+        const [r, g, b] = farbe.match(/\d+(\.\d+)?/g)!.map(Number);
+        return 0.2126 * kanal(r) + 0.7152 * kanal(g) + 0.0722 * kanal(b);
+      };
+      const kopf = document.querySelector('.ant-layout-header')!;
+      const griff = document.querySelector('[aria-label="Navigation öffnen"]')!;
+      const a = luminanz(getComputedStyle(kopf).backgroundColor);
+      const b = luminanz(getComputedStyle(griff).color);
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    });
+
+    expect(kontrast, `Griff gegen Kopfgrund im Modus ${modus}`).toBeGreaterThanOrEqual(3);
+  }
+});

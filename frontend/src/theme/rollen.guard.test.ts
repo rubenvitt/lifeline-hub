@@ -29,6 +29,10 @@ import {
   type Dichte,
   type Farbrollen,
 } from './tokens';
+// Eigene Importzeilen (LFH-329 · B1): der Bestandsblock oben bleibt so
+// unangetastet, während die Seitenrinne unten ihren eigenen Guard bekommt.
+import { theme } from 'antd';
+import { seitenrinne } from './tokens';
 
 const hier = dirname(fileURLToPath(import.meta.url));
 const css = readFileSync(join(hier, 'rollen.css'), 'utf-8');
@@ -172,16 +176,29 @@ describe('Dichte-Staffel — CSS und TS tragen dieselben Stufen (LFH-328 · A2)'
     }
   });
 
-  it('A2 liefert den Träger, nicht den Schalter — nichts setzt `data-dichte`', () => {
-    // Die Umschaltung ist B5. Solange sie nicht da ist, darf kein Produktivcode
-    // das Attribut setzen; sonst wäre die Stufe faktisch aktiv, ohne dass ein
-    // Kontext sie begründet.
-    // `/src/theme/` ist hier ABSICHTLICH NICHT ausgenommen: der Schalter käme
-    // am ehesten in `ThemeModeProvider` — ein Guard, der ausgerechnet dort
-    // wegsieht, bewachte nichts. Ausgenommen sind nur Testdateien und
-    // Kommentarzeilen; ohne letztere meldet der Guard die eigene Begründung als
-    // Verstoß (gemessen: `tokens.ts` schlug allein wegen seines Doc-Kommentars
-    // an).
+  it('B1 liefert den Schalter — genau EIN Setzer, und der sitzt in ThemeModeProvider', () => {
+    // UMGEDREHT gegenüber A2 (LFH-329 · B1): dort verbot dieser Guard das
+    // Merkmal noch jedem Produktivfile, weil A2 nur den Träger baute. Jetzt gibt
+    // es den Schalter — und die Aussage ist die positive: er existiert GENAU
+    // EINMAL. Zwei Setzer wären das eigentliche Übel, denn sie überschreiben sich
+    // gegenseitig ohne Fehler; die Fläche träge dann je nach Renderfolge eine
+    // andere Stufe.
+    //
+    // Zuständigkeitsgrenze, damit der nächste Leser sie nicht falsch liest: der
+    // MECHANISMUS (Benutzerwahl, Speicher, ConfigProvider, Merkmal am `<html>`)
+    // ist B1/LFH-329. Die POLITIK — die Stufe aus dem Einsatzkontext ableiten —
+    // bleibt B5. Die Kommentare in `tokens.ts` und `rollen.css` benennen dafür
+    // noch pauschal B5; das ist Nacharbeit am Elternstrang, nicht hier.
+    //
+    // `/src/theme/` ist ABSICHTLICH NICHT ausgenommen: der Setzer sitzt genau
+    // dort, und ein Guard, der ausgerechnet dort wegsähe, bewachte nichts.
+    // Ausgenommen sind nur Testdateien und Kommentarzeilen; ohne letztere meldet
+    // der Guard die eigene Begründung als Verstoß (gemessen: `tokens.ts` schlug
+    // allein wegen seines Doc-Kommentars an).
+    //
+    // Verglichen wird auf DATEI-Ebene und dedupliziert: ein Zeilennummern-Pin
+    // bräche bei jeder Einrückung, und zwei Treffer in derselben Datei (Setzen
+    // plus Aufräumen) sind kein Verstoß.
     const quellen = import.meta.glob('/src/**/*.{ts,tsx}', { query: '?raw', eager: true }) as Record<
       string,
       { default: string }
@@ -196,7 +213,10 @@ describe('Dichte-Staffel — CSS und TS tragen dieselben Stufen (LFH-328 · A2)'
           .filter(([zeile]) => /dataset\.dichte\s*=|['"]?data-dichte['"]?\s*[=,]/.test(zeile))
           .map(([, nr]) => `${pfad}:${nr}`),
       );
-    expect(setzer, 'Dichte-Umschaltung gehört nach B5, nicht nach A2').toEqual([]);
+    expect(
+      [...new Set(setzer.map((treffer) => treffer.split(':')[0]))],
+      'die Dichte-Umschaltung gehört an GENAU EINE Stelle',
+    ).toEqual(['/src/theme/ThemeModeProvider.tsx']);
   });
 });
 
@@ -221,5 +241,59 @@ describe('Gestaltungssprache E — die Entscheidungen selbst', () => {
     for (const familie of Object.values(schrift)) {
       expect(familie).toMatch(/^'LFH /);
     }
+  });
+});
+
+/** Schneidet den `:root`-Block aus DEM Media-Block, der ab der genannten
+ *  Mindestbreite greift, und liest seine `--lfh-*`-Deklarationen.
+ *
+ *  Die Schwelle steht bewusst als Argument im Regex und nicht als generisches
+ *  `@media`: ein zweiter Media-Block am selben Dateiende (eine `max-width`-Regel
+ *  etwa) würde sonst je nach Reihenfolge mitgelesen, und der Guard ginge aus dem
+ *  falschen Grund rot. Geschnitten wird bis zur schließenden Klammer des
+ *  Media-Blocks am Zeilenanfang — der eingerückte innere Block landet dabei
+ *  vollständig im Ausschnitt. */
+function medienblock(mindestbreite: number): Record<string, string> {
+  const treffer = new RegExp(`^@media \\(min-width: ${mindestbreite}px\\)\\s*\\{`, 'm').exec(css);
+  if (!treffer) throw new Error(`Kein @media-Block ab ${mindestbreite}px in rollen.css`);
+  const auf = css.indexOf('{', treffer.index);
+  const zu = css.indexOf('\n}', auf);
+  const werte: Record<string, string> = {};
+  for (const [, name, wert] of css
+    .slice(auf + 1, zu)
+    .matchAll(/(--lfh-[\w-]+):\s*([^;]+);/g)) {
+    werte[name] = wert.trim();
+  }
+  return werte;
+}
+
+describe('Seitenrinne — CSS und TS tragen dieselben Stufen (LFH-329 · B1)', () => {
+  it(':root trägt die schmale Rinne', () => {
+    // Mobil zuerst: der Ausgangszustand ist der schmale Schirm. Wer die
+    // Property ohne Media-Kontext liest, bekommt so den sicheren Wert.
+    expect(hell['--lfh-seiten-polsterung']).toBe(`${seitenrinne.schmal}px`);
+  });
+
+  it('der Haupt-`:root`-Block wird vom Media-Block nicht beschattet', () => {
+    // `block(':root')` ankert am Zeilenanfang und nimmt den ERSTEN Treffer. Läge
+    // der Media-Block vor dem Haupt-`:root` oder wäre sein innerer Selektor
+    // nicht eingerückt, liefen die 18 Farbvergleiche oben still gegen die
+    // falschen Werte. Diese eine Zeile ist die Gegenprobe darauf.
+    expect(hell['--lfh-grund']).toBe(farbenHell.grund);
+  });
+
+  it('ab der md-Schwelle trägt sie die volle Rinne', () => {
+    // Die Schwelle wird NICHT neu erfunden: sie ist antds `md`. Damit tragen
+    // die CSS-Achse (diese Datei) und jede spätere JS-Achse dieselbe Zahl.
+    const md = theme.getDesignToken().screenMD;
+    expect(md).toBe(768);
+    expect(medienblock(md)['--lfh-seiten-polsterung']).toBe(`${seitenrinne.breit}px`);
+  });
+
+  it('die Seitenrinne steht in keinem Dichte-Block (Viewport ≠ Dichte)', () => {
+    // Folgt zwar schon aus dem Partitionstest oben, liefert hier aber die
+    // benannte Diagnose statt eines Mengendiffs.
+    expect(DICHTE_BLOECKE.komfortabel['--lfh-seiten-polsterung']).toBeUndefined();
+    expect(DICHTE_BLOECKE.handschuh['--lfh-seiten-polsterung']).toBeUndefined();
   });
 });

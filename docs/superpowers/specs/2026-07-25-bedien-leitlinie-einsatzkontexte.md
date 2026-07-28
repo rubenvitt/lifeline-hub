@@ -429,7 +429,7 @@ eine Prüfliste, die am ersten Fall nichts findet, misst nichts.
 | 3  | **teilweise erfüllt**  | Ladezustand ist sofort sichtbar (`.lfh-skelett`, `aria-busy`) ✓; optimistische Updates gibt es nirgends (Baseline: 0) → **B6** |
 | 4  | **nicht anwendbar**    | Das Dashboard führt keine kritische oder irreversible Aktion aus — es liest und navigiert            |
 | 5  | **erfüllt**            | A0 gemessen: 13,47 : 1 dunkel / 18,17 : 1 hell; tragende Linie 3,04 / 3,07; Fokusring 7,67 / 6,59      |
-| 6  | **erfüllt**            | Stufenkante an der Kennzahl, Text in jeder Plakette, Dreiecksform am Zeilenmarker (A0, zweiter Kanal)  |
+| 6  | **erfüllt**            | Stufenkante an der Kennzahl (seit LFH-329 · B1 **abgestuft**: 6 px Alarm gegen 3 px Achtung — vorher unterschieden sich die beiden bewerteten Stufen ausschließlich in der Farbe), Text in jeder Plakette, Dreiecksform am Zeilenmarker (A0, zweiter Kanal). Größe und Schriftschnitt wurden als dritter Kanal geprüft und **verworfen**: die Größe, weil sie die Zeilenhöhe bei jedem Statuswechsel springen ließe (Festlegung 6, CLS ≤ 0,1); der Schnitt, weil er gemessen leer ist (Vorschubbreite in Chromium 96,33 px bei 400/500 und 96,00 px bei 600/700/800 — über 600 liefert `schriften.css` keinen Schnitt, die Zahl steht bereits dort). Pin: `die Stufenregeln der Kennzahl ändern Farbe und Kantenbreite, nicht Schriftgröße oder -schnitt` |
 | 7  | **erfüllt**            | Grund `#0b0e13` / `#e7ebf0` — weder reines Schwarz noch reines Weiß; `alarm` ausschließlich Gefahr     |
 | 8  | **offen**              | Kein Helligkeits-/Kontrastregler in der Anwendung; A0 verweist ihn ausdrücklich weiter → **eigener Folge-Task, siehe „Was diese Leitlinie nicht entscheidet"** |
 | 9  | **erfüllt**            | Das Instrumentenband (`.lfh-band`) liegt oben, immer an derselben Stelle; Kennzahlen im oberen Drittel |
@@ -439,6 +439,34 @@ eine Prüfliste, die am ersten Fall nichts findet, misst nichts.
 | 13 | **erfüllt**            | Das Instrumentenband `.lfh-band` liegt **im Fluss**, nicht über dem Inhalt: `sprache.css` enthält kein einziges `position:` (geprüft 2026-07-27), das einzige `position: sticky` im Frontend ist `.etb-erfassung-sticky` in `index.css` und gehört nicht zu dieser Seite |
 | 14 | **nicht anwendbar**    | Keine Tabelle auf dem Dashboard — Kacheln sind Level-1-Überblick                                       |
 | 15 | **nicht anwendbar**    | Keine Erfassungsmaske auf dem Dashboard                                                                 |
+
+**Gate 1 am Lage-Dashboard belegt (LFH-329 · B1).** Die Kennzahlenleiste ist auf den drei
+Prüfbreiten im Browser gemessen — `frontend/e2e/lage-dashboard-schmal.spec.ts`, Chromium,
+`4 passed`. Sie bricht um, statt waagerecht zu scrollen; auf 390 px stehen alle sechs
+Kennzahlen in 2 Spalten × 3 Zeilen.
+
+Die Staffel hängt an der **Container**-Breite (`.lfh-flaeche` trägt `container-type:
+inline-size`), nicht am Viewport — was zählt, ist die Fläche nach Abzug von
+Navigationsrahmen und Seitenrinne. Gemessen: Viewport 1366 → Container **1036** px ·
+1024 → **694** px · 390 → **366** px.
+
+Daraus zwei Befunde, die ohne Messung nicht zu haben waren:
+
+- **Die Schwelle 1100 px bleibt.** Der Entwurf sah eine Senkung auf 1000 vor, damit der Fükw
+  sechs statt drei Spalten bekommt. Gegenmessung mit erzwungenen sechs Spalten: ab Container
+  950 px läuft das längste Etikett um 14 px aus seinem Knopf, erst ab 1036 px gar nicht mehr.
+  Eine Schwelle bei 1000 gäbe also genau dem Band 1000–1036 sechs Spalten mit abgeschnittenen
+  Etiketten — und abgeschnittene Etiketten sind im Einsatz schlimmer als eine zweite Zeile.
+  Der Fükw steht damit bei 3 Spalten × 2 Zeilen, vollständig lesbar. Keine der drei
+  Prüfbreiten fängt eine spätere stille Senkung; das tut der Quellpin
+  `die Spaltenstaffel der Kennzahlenleiste steht in sprache.css: 6 → 3 → 2`.
+- **Offen für den Parent:** bei 1024 px — der dokumentierten Breite des Führungs-Tablets —
+  bleiben nur 694 px Container, also 6 px unter der 700er-Schwelle. Das Tablet bekommt dort
+  die Zweispalten-Ansicht des Handschirms, während ein 768-px-Tablet (Container 720, Rahmen
+  bereits hinter dem Griff) drei Spalten zeigt. Ursache ist nicht die Leiste, sondern der
+  Navigationsrahmen: unterhalb `lg` (992 px) liegt er hinter dem Griff, bei 1024 px steht er
+  inline und nimmt ~330 px. Am selben 700er-Block hängt auch `.lfh-raster`, die Entscheidung
+  gehört also nicht in dieses Paket.
 
 **Was die Validierung an der Prüfliste selbst geändert hat.** Zwei Kriterien waren in der
 Rohfassung (`ergebnis.md`, Anhang an LFH-327) nicht anlegbar und wurden geschärft:
