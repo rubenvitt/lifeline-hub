@@ -23,6 +23,28 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 /** A1 Festlegung 4: Untergrenze einer Trefffläche (Material 48 dp). */
 const TREFFLAECHE = 48;
 
+/**
+ * Subpixel-Spielraum für JEDEN Maßvergleich in dieser Datei.
+ *
+ * `boundingBox()` liefert Fließkomma, und Chromium rechnet unter Last anders als
+ * im Einzellauf. Dieselbe Falle hat hier inzwischen DREIMAL zugeschlagen — an der
+ * Drawer-Breite (`279.99999237` gegen 280), an ihrer Schwesterstelle, und an der
+ * Trefffläche (`47.99999809` gegen 48). Jedes Mal nur im vollen Sammel-Gate, nie
+ * im gescopten Lauf; ein Gate, das zufällig rot wird, wird abgeschaltet statt
+ * befolgt.
+ *
+ * Ein halbes Pixel ist kein Aufweichen: die Trefffläche trennt 48 weiterhin von
+ * antds Vorgabe 32, und die Drawer-Breite 280 von 320 und 378.
+ */
+const SUBPIXEL = 0.5;
+
+/** Gate 3 der Bedien-Leitlinie: mindestens 48 px, subpixel-tolerant gemessen. */
+function haeltTreffflaeche(wert: number, name: string) {
+  expect(wert, `${name} (gemessen ${wert}px, Soll ≥ ${TREFFLAECHE})`).toBeGreaterThanOrEqual(
+    TREFFLAECHE - SUBPIXEL,
+  );
+}
+
 const HANDSCHIRM = { width: 390, height: 844 };
 
 /**
@@ -166,8 +188,8 @@ test('Navigationsrahmen: auf 390 px liegt die Navigation hinter dem Hamburger', 
   // … und die Navigation hängt an einem Knopf, der die Trefffläche hält (Gate 3).
   const hamburger = page.getByRole('button', { name: 'Navigation öffnen' });
   const kasten = (await hamburger.boundingBox())!;
-  expect(kasten.width, 'Hamburger-Breite').toBeGreaterThanOrEqual(TREFFLAECHE);
-  expect(kasten.height, 'Hamburger-Höhe').toBeGreaterThanOrEqual(TREFFLAECHE);
+  haeltTreffflaeche(kasten.width, 'Hamburger-Breite');
+  haeltTreffflaeche(kasten.height, 'Hamburger-Höhe');
 
   // Gate 1: außerhalb der Kopfzeile ragt nichts über den Rand, solange der
   // Drawer zu ist. Vor dem Umbau tat das der Rahmen selbst (Rail + Modul-Spalte
@@ -186,8 +208,8 @@ test('Navigationsrahmen: auf 390 px liegt die Navigation hinter dem Hamburger', 
   await expect(drawer).toBeVisible();
   await expect(drawer.getByRole('navigation', { name: 'Einsatz-Navigation' })).toBeVisible();
   const schliessen = (await drawer.locator('.ant-drawer-close').boundingBox())!;
-  expect(schliessen.width, 'Schließen-Breite').toBeGreaterThanOrEqual(TREFFLAECHE);
-  expect(schliessen.height, 'Schließen-Höhe').toBeGreaterThanOrEqual(TREFFLAECHE);
+  haeltTreffflaeche(schliessen.width, 'Schließen-Breite');
+  haeltTreffflaeche(schliessen.height, 'Schließen-Höhe');
 
   // Der Drawer selbst darf die Seite nicht breiter machen — das war die
   // Entscheidung gegen Rail + Modul-Spalte im Drawer.
