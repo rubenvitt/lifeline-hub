@@ -1,6 +1,7 @@
-import { Button, Space, Table, Tag, Tooltip } from 'antd';
+import { Button, Space, Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { EtbEintragAnzeige } from '../api/types';
+import KatalogTabelle from '../components/KatalogTabelle';
 import Markdown from '../components/Markdown';
 import StatusTag from '../components/StatusTag';
 import EtbBacklinkBadges from './EtbBacklinkBadges';
@@ -126,7 +127,12 @@ export default function EtbTabelle({
   }
 
   return (
-    <Table
+    // Über das geteilte Primitiv statt roh (LFH-329 · B1, Gate-1-Abschluss):
+    // die Chronologie ist mit sieben Spalten breiter als ein Handschirm und
+    // drückte den Seitenrumpf auf 390 px um 10 px auseinander — leer gemessen,
+    // mit Einträgen mehr. Sie scrollt jetzt in sich, behält ihre Kopfzeile beim
+    // Rollen und lässt die laufende Nummer stehen.
+    <KatalogTabelle<EtbEintragAnzeige>
       rowKey="id"
       columns={spalten}
       dataSource={eintraege}
