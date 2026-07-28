@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { theme } from 'antd';
 import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
+import { farbenDunkel } from '../theme/tokens';
 import IconRail from './IconRail';
 import { kategorien } from './modulRegistry';
 
@@ -50,8 +51,13 @@ describe('IconRail', () => {
     expect(bedien).not.toBe(alarm);
 
     const aktiv = screen.getByRole('button', { name: 'Lage' });
-    expect(aktiv).toHaveStyle({ backgroundColor: bedien });
+    // Geprüft wird die ROLLE, nicht der Modus-Wert: die Rail ist in beiden Modi eine
+    // dunkle Fläche und trägt deshalb `farbenDunkel.bedien` (8,67:1) statt des hellen
+    // Bedien-Tokens, das auf dunklem Grund nur 2,93:1 erreicht und WCAG 1.4.11 (3:1 für
+    // Zustandsanzeige) verfehlt. Entscheidend bleibt: Bedienfarbe, nicht Alarmfarbe.
+    expect(aktiv).toHaveStyle({ backgroundColor: farbenDunkel.bedien });
     expect(aktiv).not.toHaveStyle({ backgroundColor: alarm });
+    expect(farbenDunkel.bedien).not.toBe(alarm);
 
     // Die inaktive Fläche trägt die Bedienfarbe NICHT — sonst wäre der Vergleich oben trivial.
     // (`transparent` ist als Erwartung untauglich: jsdom rechnet es auf `rgba(0, 0, 0, 0)` um.)

@@ -1,4 +1,4 @@
-import { Button, Input, Popconfirm, Space, Tag, Typography } from 'antd';
+import { Button, Input, Popconfirm, Space, Typography } from 'antd';
 import { Select } from '../../components/Select';
 import { useId } from 'react';
 import FeldLabel from '../../components/FeldLabel';
@@ -6,7 +6,8 @@ import GeoKennzahlen, { KennzahlZeile } from '../../components/GeoKennzahlen';
 import type { Gefahrengebiet, KartenAnsicht, LageZone, ZoneTyp } from '../../api/types';
 import { gefahrengebietName } from '../../api/gefahren';
 import { ZONE_TYPEN, zoneTypLabel, zoneStil } from './zonenStil';
-import { WARNSTUFEN, warnstufeFarbe } from '../gefahren/gefahrenSchema';
+import StatusTag from '../../components/StatusTag';
+import { warnstufeKarte } from '../../theme/statusFarben';
 import { parseGeometry, geoKennzahlen } from './geo';
 import KartenDetailCard from './KartenDetailCard';
 import AnsichtZuordnung from './AnsichtZuordnung';
@@ -35,7 +36,6 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
   const aktuellHatWarnstufen = (aktuellesGebiet?.hoechste_warnstufe ?? 'keine') !== 'keine';
   // Geometrie-Kennzahlen rein clientseitig aus der GeoJSON-Geometrie (LFH-146).
   const kennzahlen = geoKennzahlen(parseGeometry(zone.geometrie));
-  const warnstufeLabel = WARNSTUFEN.find((w) => w.wert === aktuellesGebiet?.hoechste_warnstufe)?.label;
 
   const umhaengen = (ziel: number) => onAendern({ gefahrengebiet_id: ziel === NEU ? null : ziel });
 
@@ -47,14 +47,10 @@ export default function ZonenInspector({ zone, gebiete, darfSchreiben, onSchlies
           <KennzahlZeile
             label="Höchste Warnstufe"
             zahl={false}
-            wert={
-              <Tag
-                color={warnstufeFarbe(aktuellesGebiet.hoechste_warnstufe)}
-                style={{ marginInlineEnd: 0 }}
-              >
-                {warnstufeLabel ?? aktuellesGebiet.hoechste_warnstufe}
-              </Tag>
-            }
+            /* Kartenlesart, nicht Kennzahllesart: der Inspektor beschreibt EIN Objekt
+               (dieses Gefahrengebiet), nicht eine Verdichtung über viele. `keine` ist
+               hier deshalb `alarm` — unbewertet gilt vorsichtshalber als Gefahr. */
+            wert={<StatusTag darstellung={warnstufeKarte[aktuellesGebiet.hoechste_warnstufe]} />}
           />
         )}
         <KennzahlZeile label="Zonen" wert={String(aktuellesGebiet.zonen_ids.length)} />

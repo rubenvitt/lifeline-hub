@@ -121,8 +121,13 @@ export interface Lagebild {
 
 /**
  * Warnstufe → Dringlichkeit der Kennzahl. Ableitung aus dem Statusfarb-Vertrag, keine
- * zweite Liste (LFH-328/A2) — sonst entstünde neben `warnstufeKarte` und
- * `warnstufeKennzahl` eine dritte Lesart desselben Enums.
+ * zweite Liste (LFH-328/A2) — sonst käme neben `warnstufeKarte` und `warnstufeKennzahl`
+ * noch eine Lesart desselben Enums dazu.
+ *
+ * Es GIBT eine dritte, und sie ist bewusst draußen: `gefahrenSchema.warnstufeFarbe()`
+ * hinterlegt Matrixzellen flächig (Pastelltöne, `keine` = transparent). Das ist eine
+ * andere Darstellungssorte — Zellhintergrund statt Status-Etikett — und sie ist im
+ * Kopfkommentar von `theme/statusFarben.ts` als Grenze benannt.
  *
  * Gelesen wird ausdrücklich {@link warnstufeKennzahl} und NICHT `warnstufeKarte`: die
  * Karte zeigt ein OBJEKT (dieses eine Gebiet ist unbewertet ⇒ vorsichtshalber Gefahr,

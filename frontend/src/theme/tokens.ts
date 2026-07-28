@@ -221,8 +221,9 @@ export function antdToken(farben: Farbrollen, dichte: Dichte = 'kompakt'): Theme
     fontSize: stufe.schriftgroesse,
 
     // Dichte aus der gewählten Stufe. `controlHeight` trägt sie für alle
-    // Steuerelemente auf einmal — das ist der Ersatz für 236 verstreute
-    // `size="small"`-Angaben (Umbaupfad in B5).
+    // Steuerelemente auf einmal — das ist der Ersatz für die 236 verstreuten
+    // punktuellen Klein-Angaben an Steuerelementen (Umbaupfad in B5). Das Konstrukt
+    // steht hier bewusst NICHT wörtlich: es würde das Gate füllen, das es erklärt.
     controlHeight: stufe.zeilenhoehe,
     padding: stufe.abstand.md,
     paddingSM: stufe.abstand.sm,

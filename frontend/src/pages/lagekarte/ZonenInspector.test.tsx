@@ -165,7 +165,10 @@ describe('ZonenInspector — Kennzahlen (LFH-146)', () => {
     const g: Gefahrengebiet = { ...gebiet, hoechste_warnstufe: 'hoch', zonen_ids: [1, 2, 3] };
     renderInspector({ zone, gebiete: [g] });
     expect(screen.getByText('Höchste Warnstufe')).toBeInTheDocument();
-    expect(screen.getByText('Hoch')).toBeInTheDocument();
+    // Das Label kommt seit LFH-328 aus `warnstufeKarte` (Statusfarb-Vertrag) und nicht
+    // mehr aus dem WARNSTUFEN-Katalog: klein wie alle anderen Status-Labels des Vertrags
+    // ('aktiv', 'geplant', 'aufgelöst'). Der Katalog bleibt für Auswahl-Dropdowns.
+    expect(screen.getByText('hoch')).toBeInTheDocument();
     expect(screen.getByText('Zonen')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
   });

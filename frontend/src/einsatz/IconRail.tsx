@@ -1,4 +1,4 @@
-import { Tooltip, theme } from 'antd';
+import { Tooltip } from 'antd';
 import { abstand, farbenDunkel, form } from '../theme/tokens';
 import type { Kategorie, KategorieKey } from './modulRegistry';
 
@@ -21,7 +21,6 @@ interface Props {
  * aus `farbenDunkel`, nicht aus dem modusabhängigen Token.
  */
 export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick }: Props) {
-  const { token } = theme.useToken();
   return (
     <nav
       aria-label="Kategorien"
@@ -45,7 +44,12 @@ export default function IconRail({ kategorien, aktiveKategorie, onKategorieKlick
                 // Material 48 dp), keine Dichte-Angabe an einem Steuerelement.
                 width: 48, height: 48, border: 'none', cursor: 'pointer',
                 borderRadius: form.radiusSteuer, display: 'grid', placeItems: 'center',
-                background: aktiv ? token.colorPrimary : 'transparent',
+                // `farbenDunkel.bedien`, nicht `token.colorPrimary`: die Rail ist in
+                // BEIDEN Modi dunkel (Grund und Text kommen darunter ebenfalls aus
+                // `farbenDunkel`). Der helle Bedien-Token auf dunklem Grund liefe auf
+                // 2,93:1 und verfehlte WCAG 1.4.11 (3:1 für Zustandsanzeige); der
+                // Dunkelmodus-Wert liefert 8,67:1.
+                background: aktiv ? farbenDunkel.bedien : 'transparent',
                 color: aktiv ? farbenDunkel.text : farbenDunkel.gedaempft,
               }}
             >

@@ -45,6 +45,25 @@ import type {
  * `kommunikation/phase.ts`, `MaterialPage`, `TierePage`, `clusterDonut.ts`,
  * `taktischesZeichen.ts` u. a.). Sie hineinzuziehen wäre der Bestands-Sweep, den A2
  * ausdrücklich verbietet.
+ *
+ * ── ZWEITE GRENZE: eine Farbkarte ÜBER einem Vertrags-Enum, die hier NICHT hergehört ──
+ *
+ * `pages/gefahren/gefahrenSchema.ts:warnstufeFarbe()` bildet `Warnstufe` — ein
+ * Vertrags-Enum — auf eigene Pastelltöne ab (`keine` = `transparent`). Das ist KEIN
+ * Versehen und keine vergessene Migration: es ist eine andere **Darstellungssorte**.
+ * `warnstufeKarte`/`warnstufeKennzahl` liefern ein Status-**Etikett** (Rolle + Text auf
+ * kleiner Fläche); `warnstufeFarbe` hinterlegt eine **Matrixzelle flächig**, wo der Text
+ * die Zelle selbst ist und ein gesättigter Rollenton den Inhalt unlesbar machte.
+ *
+ * Die Konsequenz für Leser dieses Vertrags: „eine Quelle für Statusfarbe" gilt für
+ * Etiketten, nicht für Flächencodierung. Wer eine dritte Sorte braucht, benennt sie hier —
+ * still danebenzubauen ist der Fehler, nicht das Danebenbauen selbst.
+ *
+ * Gefunden im Code-Review zu LFH-328: `pages/lagekarte/ZonenInspector.tsx` benutzte
+ * `warnstufeFarbe` für ein Status-Etikett und ist auf {@link warnstufeKarte} gezogen
+ * worden — dort war es die falsche Sorte. Ein Guard „kein `Tag color=` über einem
+ * Vertrags-Enum außerhalb `theme/`" wäre die maschinelle Fassung dieser Grenze und ist
+ * als Folge-Ticket erfasst.
  */
 
 /** Eine A0-Statusrolle. Farbwerte stehen ausschließlich in `tokens.ts`/`rollen.css`. */
