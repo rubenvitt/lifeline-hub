@@ -4,14 +4,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { legeUhsAn, type UhsEingabe } from '../../api/einsatzUhs';
 import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
-import type { Uhs, UhsTyp } from '../../api/types';
-
-const UHS_TYP_LABEL: Record<UhsTyp, string> = {
-  patientenablage: 'Patientenablage',
-  behandlungsplatz: 'Behandlungsplatz',
-  verletztensammelstelle: 'Verletztensammelstelle',
-  sonstige: 'Sonstige',
-};
+import type { Uhs } from '../../api/types';
+import { uhsTyp } from '../../theme/statusFarben';
 
 interface Props {
   einsatzId: number;
@@ -56,7 +50,7 @@ export default function UhsAnlegenDrawer({ einsatzId, open, onClose, onAngelegt 
         initialValues={{ typ: 'behandlungsplatz' }}
       >
         <Form.Item label="Typ" name="typ" rules={[{ required: true }]}>
-          <Select options={Object.entries(UHS_TYP_LABEL).map(([v, l]) => ({ value: v, label: l }))} />
+          <Select options={Object.entries(uhsTyp).map(([v, d]) => ({ value: v, label: d.label }))} />
         </Form.Item>
         <Form.Item label="Bezeichnung" name="bezeichnung" rules={[{ required: true, message: 'Bezeichnung erforderlich' }]}>
           <Input placeholder="z. B. BHP 50" />

@@ -15,19 +15,13 @@ import type { Person, PlatzTyp, UhsDetail, UhsPlatz, VerbleibArt, Verfuegbarkeit
 import { ApiError } from '../../api/client';
 import { einsatzKeys } from '../../api/queryKeys';
 import PersonDetailDrawer from '../../personen/PersonDetailDrawer';
+import StatusTag from '../../components/StatusTag';
+import { rollenFarbe, verfuegbarkeit as verfuegbarkeitVertrag } from '../../theme/statusFarben';
 
 // Feste Karten-Höhe. Muss unter dem Raster-Zeilenabstand (raster_position SCHRITT_Y=120
 // im Backend) bleiben, damit absolut platzierte Karten einander nicht überlappen, und
 // groß genug für den Worst Case (2-zeiliger Titel + Tag + Belegung + Aktionszeile).
 const PLATZ_KARTE_HOEHE = 116;
-
-const VERF_FARBE: Record<Verfuegbarkeit, string> = {
-  frei: '#52c41a',
-  defekt: '#ff4d4f',
-  aufbereitung: '#faad14',
-  gesperrt: '#bfbfbf',
-  reserviert: '#1677ff',
-};
 
 function personLabel(person: Person): string {
   const nr = registrierAnzeige(person.registrier_nr);
@@ -109,7 +103,7 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
     overflow: 'hidden',
     boxSizing: 'border-box',
     cursor: bearbeitbar ? 'grab' : 'default',
-    border: `2px solid ${VERF_FARBE[platz.verfuegbarkeit]}`,
+    border: `2px solid ${rollenFarbe(verfuegbarkeitVertrag[platz.verfuegbarkeit].rolle, token)}`,
     // Belegte Plätze: Hintergrund + „belegt"-Tag. „frei" und „belegt" schließen sich aus
     // (s. u. tag-Logik); andere Verfügbarkeiten (defekt/gesperrt/…) bleiben daneben sichtbar.
     // Theme-Tokens statt fixer Hex-Werte, damit die Karten im Dark Mode mitziehen.
@@ -159,7 +153,7 @@ function PlatzKarte({ platz, belegtVon, schreibgeschuetzt, bearbeitbar, onVerfue
       </Typography.Text>
       {/* Status-Tags: eine Zeile, kein Umbruch (feste Höhe). */}
       <div style={{ height: 24, overflow: 'hidden', whiteSpace: 'nowrap' }}>
-        {zeigeVerfTag && <Tag color={VERF_FARBE[platz.verfuegbarkeit]}>{platz.verfuegbarkeit}</Tag>}
+        {zeigeVerfTag && <StatusTag darstellung={verfuegbarkeitVertrag[platz.verfuegbarkeit]} />}
         {belegtVon && <Tag color="blue">belegt</Tag>}
       </div>
       {/* Belegung: feste Höhe reserviert, auch wenn leer → Karte bleibt gleich groß.

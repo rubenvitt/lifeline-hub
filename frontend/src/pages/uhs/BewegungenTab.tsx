@@ -1,4 +1,4 @@
-import { Table, Tag } from 'antd';
+import { Table } from 'antd';
 import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
@@ -6,18 +6,8 @@ import { listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
 import { einsatzKeys } from '../../api/queryKeys';
 import { personDetailPfad } from '../../routing/deeplinks';
 import type { UhsBelegung, UhsDetail, BelegungsArt } from '../../api/types';
-
-const ART_FARBE: Record<BelegungsArt, string> = {
-  eintritt: 'green',
-  wechsel: 'blue',
-  austritt: 'orange',
-};
-
-const ART_LABEL: Record<BelegungsArt, string> = {
-  eintritt: 'Eintritt',
-  wechsel: 'Wechsel',
-  austritt: 'Austritt',
-};
+import StatusTag from '../../components/StatusTag';
+import { belegungsArt } from '../../theme/statusFarben';
 
 interface Props {
   uhs: UhsDetail;
@@ -60,7 +50,7 @@ export default function BewegungenTab({ uhs }: Props) {
       dataIndex: 'art',
       key: 'art',
       render: (art: BelegungsArt) => (
-        <Tag color={ART_FARBE[art]}>{ART_LABEL[art]}</Tag>
+        <StatusTag darstellung={belegungsArt[art]} />
       ),
     },
     {
