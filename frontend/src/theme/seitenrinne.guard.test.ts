@@ -82,6 +82,12 @@ describe('Seitenrinne — die Verdrahtung (LFH-329 · B1)', () => {
     // Bewusst über die ganze Datei und ohne Kommentar-Ausnahme: der erklärende
     // Text über der Leiste nannte die Zahl wörtlich und muss umgeschrieben
     // werden, nicht zitiert.
-    expect(treffer(lies(INDEX_CSS), /24/g)).toBe(0);
+    //
+    // Gesucht wird die ZAHL ALS MASS (`24px`), nicht die Ziffernfolge: eine
+    // nackte `/24/g` färbte diese Prüfung bei jedem künftigen `1240`, `#242424`
+    // oder `0.24s` rot — aus einem Grund, der mit der Seitenrinne nichts zu tun
+    // hat. Ein Gate, das aus dem falschen Grund bricht, wird abgeschaltet statt
+    // befolgt.
+    expect(treffer(lies(INDEX_CSS), /\b24px\b/g)).toBe(0);
   });
 });

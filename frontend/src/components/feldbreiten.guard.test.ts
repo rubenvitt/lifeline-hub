@@ -138,9 +138,14 @@ describe('Feldbreiten im Verwaltungsteil', () => {
       const quelle = QUELLEN.find((q) => q.pfad === pfad);
       if (!quelle) throw new Error(`Feldbreiten-Guard: ${pfad} nicht im Scan`);
       gemessen[pfad] = quelle.text.match(OBERGRENZE)?.length ?? 0;
-      expect(gemessen[pfad], pfad).toBeGreaterThanOrEqual(anzahl);
+      // Exakt, nicht „mindestens": bei `>=` trüge die Zahl in der Erwartungsmap
+      // keine Aussage mehr, und die Summe darunter zählte nur noch sich selbst.
+      expect(gemessen[pfad], pfad).toBe(anzahl);
     }
-    expect(Object.values(erwartet).reduce((a, b) => a + b, 0)).toBe(14);
+    // Summiert wird das GEMESSENE, nicht die Erwartungsmap. Sonst verglich diese
+    // Zeile eine hartkodierte Zahl mit einer hartkodierten Zahl und belegte über
+    // den Quellbaum nichts — die vierzehn im Testnamen wäre nirgends erzwungen.
+    expect(Object.values(gemessen).reduce((a, b) => a + b, 0)).toBe(14);
   });
 
   it('der Scanner findet die verbotene Form wirklich (Selbstbeweis)', () => {

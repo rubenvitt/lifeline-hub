@@ -58,8 +58,21 @@ const SRC = (() => {
 /** `.tsx` ist Pflicht — `ThemeModeProvider` ist eine `.tsx`, ohne sie wäre die Allowlist tot. */
 const ENDUNGEN = /\.(ts|tsx)$/;
 
-/** Die Scan-Marke. Siehe Dateikopf: ohne Klammer, groß-/kleinschreibungsempfindlich. */
-const MARKE = /matchMedia/;
+/**
+ * Die Scan-Marke. Siehe Dateikopf: ohne Klammer, groß-/kleinschreibungsempfindlich.
+ *
+ * ZWEI Muster, nicht eines. `matchMedia` allein deckte nur den halben Vertrag:
+ * antds `Grid.useBreakpoint()` ruft die Browser-API nicht selbst auf, sondern über
+ * `responsiveObserver` — gemessen enthält `antd/es/grid/hooks/useBreakpoint.js`
+ * NULL Vorkommen von `matchMedia`, und die Fundstelle liegt in `node_modules`,
+ * also außerhalb dieses Scans. Ein direktes `Grid.useBreakpoint()` in einer
+ * Komponente wäre am Guard vorbeigelaufen — und hätte genau die Semantik
+ * umgangen, für die es das Primitiv gibt: `useBreakpoint` liefert auf dem ersten
+ * Render eine leere Map, jedes `!screens.lg` ist dort wahr, und am Fükw-Schirm
+ * blitzte für einen Frame das Handlayout auf. `abBreiteAus` dreht genau das um
+ * („unbekannt ⇒ breit").
+ */
+const MARKE = /matchMedia|\buseBreakpoint\b/;
 
 /** Dateiweise freigestellt — Begründung je Eintrag. */
 const ALLOWLIST = [

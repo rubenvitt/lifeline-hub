@@ -63,7 +63,14 @@ describe('AdminPage', () => {
         <div>x</div>
       </AdminPage>,
     );
-    expect(wurzel(container).style.maxWidth).toBe(`${flaeche.seiteSchmal}px`);
+    // HANDGESCHRIEBENE LITERALE, nicht `${flaeche.seiteSchmal}px`: seit die
+    // Komponente ihre Vorgabe aus demselben Token liest, kämen sonst beide
+    // Seiten aus einer Quelle und bewegten sich gemeinsam — ein Rückfall auf
+    // die früher hartkodierte 900 bliebe grün. Dass die Zahlen zum Token
+    // passen, sichert der Byte-Pin in `theme/tokens.test.ts`; erst beide
+    // zusammen belegen die Verdrahtung. Die Regel dahinter steht in CLAUDE.md
+    // („Charakterisierungstests bauen ihre Keys als Literale").
+    expect(wurzel(container).style.maxWidth).toBe('900px');
     unmount();
 
     const breit = renderMitProviders(
@@ -71,6 +78,6 @@ describe('AdminPage', () => {
         <div>x</div>
       </AdminPage>,
     );
-    expect(wurzel(breit.container).style.maxWidth).toBe(`${flaeche.seiteBreit}px`);
+    expect(wurzel(breit.container).style.maxWidth).toBe('960px');
   });
 });
